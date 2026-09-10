@@ -4,6 +4,7 @@ import { validateCourse } from '../../../engines/pharmacology.engine';
 import { checkDrugInteractions } from '../../../engines/interactions-calculator';
 import { useDataLink } from '../../../core/data-link';
 import { PharmaScoreCard } from '../../components/PharmaScoreCard';
+import { copyOrShareText, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 const CURRENT_KEY = 'he_pharma_report_current';
 const ARCHIVE_KEY = 'he_pharma_reports';
@@ -45,6 +46,31 @@ export const PharmaReportsTab: React.FC = () => {
   const linked = useDataLink();
   const course = useMemo(() => linked.course || [], [linked.course]);
   const [generated, setGenerated] = useState<PharmaReport | null>(() => readCurrent());
+  const [ioStatus, setIoStatus] = useState<string | null>(null);
+  const flashIo = (msg: string) => {
+    setIoStatus(msg);
+    try { setTimeout(() => setIoStatus(null), 2500); } catch {}
+  };
+
+  const reportText = (r: PharmaReport): string => {
+    const lines = [
+      `Фарма-отчёт ${r.date} · ${r.totalSubstances} преп. · ${r.totalWeeks} нед`,
+      ...r.substances.map(s => `• ${s.name} (${s.class}) — ${s.dose}, нед ${s.weeks}`),
+      r.riskOverall != null ? `Риск: ${Math.round(r.riskOverall)}%` : 'Риск: —',
+      ...r.warnings.map(w => `⚠ ${w}`),
+      ...r.interactions.map(i => `⚡ [${i.type}] ${i.drugs.join(' + ')} — ${i.recommendation}`),
+    ];
+    return lines.join('\n');
+  };
+
+  const shareReport = async (r: PharmaReport) => {
+    flashIo(shareOutcomeLabel(await copyOrShareText(reportText(r), 'Фарма-отчёт')));
+  };
+
+  const saveReportFile = async (r: PharmaReport) => {
+    const payload = JSON.stringify(r, null, 2);
+    flashIo(shareOutcomeLabel(await saveTextFileApk(`pharma-report-${r.date}.json`, payload, 'application/json;charset=utf-8')));
+  };
 
   const validation = useMemo(() => validateCourse(course), [course]);
   const interactions = useMemo(() => checkDrugInteractions(course), [course]);
@@ -244,6 +270,17 @@ export const PharmaReportsTab: React.FC = () => {
               <div style={{ fontSize:11, color:'#fff', marginTop:8, textAlign:'center' }}>
                 Сохранён в архив — смотри «Профиль → Отчёты → Архив»
               </div>
+              <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
+                <button onClick={() => void shareReport(generated)} style={{
+                  flex:1, minHeight:44, padding:'10px 12px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12,
+                  background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.30)', color:'#fff',
+                }}>📋 Копия / Share</button>
+                <button onClick={() => void saveReportFile(generated)} style={{
+                  flex:1, minHeight:44, padding:'10px 12px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12,
+                  background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff',
+                }}>📥 JSON</button>
+              </div>
+              {ioStatus && <div role="status" style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:6 }}>{ioStatus}</div>}
             </div>
           )}
         </div>

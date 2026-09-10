@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '../../ui';
 import { NativeIcon } from '../../../../native/NativeIcons';
 import { DiaryHeader } from '../DiaryHeader';
+import { saveCsvApk, printHtmlApk } from '../../../../../core/apk-share';
 import { AddBodyMeasurementsModal } from '../../diary-modals';
 import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, getWeightLogArchived, getWeightLogWithPhotos, normalizeWeightEntry, type WeightEntry } from '../../../../../engines/profile-store';
 import { migrateWeightPhotosFromLocalStorage } from '../../../../../engines/weight-photo-store';
@@ -713,34 +714,20 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   const doExportCsv = () => {
     const cols = ['date', ...FIELDS, 'timeOfDay', 'notes'];
     const csv =
-      '\ufeff' +
       [cols.join(','), ...rows.map((r) => cols.map((c) => csvEscape((r as any)[c])).join(','))].join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${svgName}.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 500);
+    // АПК: <a download> в WebView не сохраняет — Documents + Share (BOM добавит хелпер).
+    void saveCsvApk(`${svgName}.csv`, csv);
   };
   const exportArchiveCsv = () => {
     const cols = ['date', 'weight', 'bodyFat', 'notes'];
-    const csv = '\ufeff' + [cols.join(','), ...archiveRows.map((r) => cols.map((c) => csvEscape((r as any)[c])).join(','))].join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${svgName}-archive.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 500);
+    const csv = [cols.join(','), ...archiveRows.map((r) => cols.map((c) => csvEscape((r as any)[c])).join(','))].join('\n');
+    void saveCsvApk(`${svgName}-archive.csv`, csv);
   };
   const doPrint = () => {
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(
-      `<!doctype html><html><head><title>Вес и замеры</title><style>body{font:12px sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:4px}</style></head><body><h1>Вес и замеры</h1><table><tr>${['Дата', ...FIELDS.map((f) => LABELS[f]), 'Заметка'].map((x) => `<th>${esc(x)}</th>`).join('')}</tr>${rows.map((r) => `<tr><td>${esc(r.date)}</td>${FIELDS.map((f) => `<td>${esc(r[f])}</td>`).join('')}<td>${esc(r.notes)}</td></tr>`).join('')}</table></body></html>`,
-    );
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 100);
+    const html =
+      `<!doctype html><html><head><title>Вес и замеры</title><style>body{font:12px sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:4px}</style></head><body><h1>Вес и замеры</h1><table><tr>${['Дата', ...FIELDS.map((f) => LABELS[f]), 'Заметка'].map((x) => `<th>${esc(x)}</th>`).join('')}</tr>${rows.map((r) => `<tr><td>${esc(r.date)}</td>${FIELDS.map((f) => `<td>${esc(r[f])}</td>`).join('')}<td>${esc(r.notes)}</td></tr>`).join('')}</table></body></html>`;
+    // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
+    void printHtmlApk(html, 'weight-diary.html');
   };
   const exportAllDiaries = () => {
     exportAllDiariesPdf([{
@@ -1618,7 +1605,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   { label: 'Все', cols: [...FIELDS] as Field[] },
                   { label: 'Сброс', cols: [...DEFAULT_VISIBLE] as Field[] },
                 ] as const).map(p => (
-                  <button key={p.label} style={{ ...btn, minHeight: 40, padding: '8px 14px', fontSize: 12 }} onClick={() => setVisibleCols([...p.cols])}>
+                  <button key={p.label} style={{ ...btn, minHeight: 44, padding: '10px 14px', fontSize: 12 }} onClick={() => setVisibleCols([...p.cols])}>
                     {p.label}
                   </button>
                 ))}

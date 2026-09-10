@@ -112,7 +112,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
                   onClick={() => { undoLastSnapshot(); setUndoAvailable(getSnapshotsCount() > 0); }}
                   title="Отменить последнее изменение"
                   aria-label="Отменить последнее изменение"
-                  style={{ marginLeft:'auto', background:'rgba(0,0,0,0.45)', border:'1px solid rgba(59,130,246,0.4)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', color:'#fff', padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', minHeight:32, flexShrink:0 }}
+                  style={{ marginLeft:'auto', background:'rgba(0,0,0,0.45)', border:'1px solid rgba(59,130,246,0.4)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', color:'#fff', padding:'10px 14px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', minHeight:44, minWidth:44, flexShrink:0 }}
                 >↩</button>
               )}
             </div>

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { PROBLEM_PANELS, formatPanelAsReferral, type ProblemPanel } from '../../../data/labs-problem-panels';
 import { getProblemPanelsForSymptoms } from '../../../engines/symptom-lab-link';
 import { SYMPTOM_DB, findSymptomById, type SymptomEntry } from '../../../engines/symptom-solver.engine';
+import { copyOrShareText } from '../../../core/apk-share';
 
 const URGENCY_LABELS: Record<string, string> = {
   routine: 'Планово',
@@ -115,10 +116,11 @@ const LabsProblemPanelsTab: React.FC = () => {
 
   const handleCopyReferral = useCallback((panel: ProblemPanel) => {
     const text = formatPanelAsReferral(panel);
-    navigator.clipboard?.writeText(text).then(() => {
+    void copyOrShareText(text, 'Направление на анализы').then(o => {
+      if (o === 'failed') return;
       setReferralCopied(true);
       setTimeout(() => setReferralCopied(false), 2000);
-    }).catch(() => {});
+    });
   }, []);
 
   const handleSymptomLinkClick = useCallback(() => {

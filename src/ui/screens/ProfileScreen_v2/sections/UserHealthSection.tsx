@@ -264,7 +264,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
               padding: '8px 8px 8px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700,
               background: 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(245,158,11,0.08))', color: '#fff',
               border: '1px solid rgba(245,158,11,0.4)', display: 'flex', alignItems: 'center', gap: 8,
-              boxShadow: '0 4px 14px rgba(245,158,11,0.2)', minHeight: 40,
+              boxShadow: '0 4px 14px rgba(245,158,11,0.2)', minHeight: 44,
             }}>
               {inj?.location || '—'}
               <span
@@ -282,9 +282,9 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
               onClick={() => updateHealth({ injuries: [...(Array.isArray(health.injuries) ? health.injuries : []), { id: 'inj_' + Date.now(), location: loc, type: 'muscle', painLevel: 3, movementLimit: 'mild', side: 'both', chronic: false, date: new Date().toISOString().slice(0, 10) }] })}
               className="pf-inj-add"
               style={{
-                padding: '8px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                padding: '10px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600,
                 background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.65)',
-                border: '1px dashed rgba(255,255,255,0.18)', cursor: 'pointer', minHeight: 40,
+                border: '1px dashed rgba(255,255,255,0.18)', cursor: 'pointer', minHeight: 44,
               }}
             >+ {loc}</button>
           ))}

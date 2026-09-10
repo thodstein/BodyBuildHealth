@@ -292,7 +292,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
             display: 'inline-flex',
             alignItems: 'center',
             gap: 5,
-            minHeight: 36,
+            minHeight: 44,
           }}
           title={p.label}
         >
@@ -379,7 +379,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
                     aria-label="Удалить фото"
                     style={{
                       position: 'absolute', top: 4, right: 4, background: 'rgba(239,68,68,0.85)', color: '#fff',
-                      border: '1px solid rgba(255,255,255,0.25)', borderRadius: 10, width: 32, height: 32, minWidth: 32, minHeight: 32, cursor: 'pointer', fontSize: 14,
+                      border: '1px solid rgba(255,255,255,0.25)', borderRadius: 10, width: 40, height: 40, minWidth: 40, minHeight: 40, cursor: 'pointer', fontSize: 14,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >

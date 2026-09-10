@@ -13,6 +13,7 @@ import {
   thresholdText,
 } from '../../../engines/risk-verification.engine';
 import { TZ_MECH_LABELS } from '../../../data/support-db';
+import { copyOrShareText, saveCsvApk, printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 const ACCENT = '#00e68a';
 const CARD: React.CSSProperties = { padding: 16, borderRadius: 18, background: 'rgba(20,22,30,0.55)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 12px 30px rgba(0,0,0,0.20)', marginBottom: 12 };
@@ -25,6 +26,11 @@ const EXPORT_BTN: React.CSSProperties = {
 
 export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; result?: TzSpecResult | null }> = ({ labMap, result }) => {
   const [copied, setCopied] = useState(false);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const flashShare = (msg: string) => {
+    setShareStatus(msg);
+    try { setTimeout(() => setShareStatus(null), 2500); } catch {}
+  };
 
   const report = useMemo(() => buildVerificationReport(labMap || {}), [labMap]);
 
@@ -53,42 +59,22 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
 
   const copyText = async () => {
     const text = buildVerificationText(labMap || {});
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand('copy'); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
-      document.body.removeChild(ta);
-    }
+    const o = await copyOrShareText(text, 'Верификация рисков');
+    if (o === 'failed') return;
+    setCopied(true);
+    flashShare(shareOutcomeLabel(o));
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const downloadCsv = () => {
+  const downloadCsv = async () => {
     const csv = buildVerificationCsv(labMap || {});
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `verification-risks-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    flashShare(shareOutcomeLabel(await saveCsvApk(`verification-risks-${new Date().toISOString().slice(0, 10)}.csv`, csv)));
   };
 
-  const printPdf = () => {
-    try {
-      const w = window.open('', '_blank');
-      if (!w) return;
-      w.document.write(buildVerificationHtml(labMap || {}));
-      w.document.close();
-      w.focus();
-      w.print();
-    } catch {}
+  const printPdf = async () => {
+    const html = buildVerificationHtml(labMap || {});
+    const text = buildVerificationText(labMap || {});
+    flashShare(shareOutcomeLabel(await printHtmlApk(html, `verification-risks-${new Date().toISOString().slice(0, 10)}.html`, text)));
   };
 
   const overallPct = Math.round((engineOverall ?? report.overall) * 100);
@@ -130,10 +116,11 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
       {/* EXPORT — липкая удобная лента (ниже сабтабов 56+67: зазор 9px) */}
       <div className="risk-verify-export" style={{ ...CARD, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', position:'sticky', top:132, zIndex:10 }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>📤 Экспорт:</span>
-        <button onClick={copyText} style={EXPORT_BTN}>{copied ? '✅ Скопировано' : '📋 Текст'}</button>
-        <button onClick={downloadCsv} style={EXPORT_BTN}>📊 CSV</button>
-        <button onClick={printPdf} style={EXPORT_BTN}>🖨 PDF</button>
+        <button onClick={() => void copyText()} style={EXPORT_BTN}>{copied ? '✅ Скопировано' : '📋 Текст'}</button>
+        <button onClick={() => void downloadCsv()} style={EXPORT_BTN}>📊 CSV</button>
+        <button onClick={() => void printPdf()} style={EXPORT_BTN}>🖨 PDF</button>
         <span style={{ fontSize: 11, color: '#fff' }}>весь перечень по всем системам</span>
+        {shareStatus && <span role="status" style={{ fontSize: 11, color: '#fff', width:'100%' }}>{shareStatus}</span>}
       </div>
 
       {/* SYSTEMS */}

@@ -28,11 +28,12 @@ import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResul
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
 import { normalizedRatio } from '../../core/labs-mapping';
-import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, downloadCSV, type LabTrend } from '../../engines/lab-trend.engine';
+import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, type LabTrend } from '../../engines/lab-trend.engine';
 import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { isNativeApp } from '../../core/app-platform';
 import { ensureLabsApkStyles } from './LabsScreen_parts/labs-apk-loader';
+import { dataUrlToFile, saveCsvApk, printHtmlApk, copyOrShareText, shareOutcomeLabel } from '../../core/apk-share';
 
 ensureLabsApkStyles();
 
@@ -614,6 +615,34 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const toggleLabSelection = useCallback((code: string) => {
     setSelectedLabs(prev => { const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next; });
   }, []);
+
+  const [nativePhotoBusy, setNativePhotoBusy] = useState(false);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const flashShare = useCallback((msg: string) => {
+    setShareStatus(msg);
+    try { setTimeout(() => setShareStatus(null), 2500); } catch {}
+  }, []);
+
+  // АПК: системный диалог камеры/галереи вместо <input type=file> —
+  // в Capacitor WebView capture-инпут ненадёжен, а dataUrl идёт в тот же
+  // handleFileUpload (и дальше в оффлайн-OCR движка).
+  const handleNativePhoto = useCallback(async () => {
+    if (nativePhotoBusy) return;
+    setNativePhotoBusy(true);
+    try {
+      const { pickPhoto } = await import('../../core/native-bridge');
+      const photo = await pickPhoto();
+      if (!photo?.uri) return;
+      const file = dataUrlToFile(photo.uri, `lab-photo.${photo.format || 'jpg'}`);
+      if (!file) {
+        setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Не удалось прочитать фото из галереи'] });
+        return;
+      }
+      await handleFileUpload(file);
+    } finally {
+      setNativePhotoBusy(false);
+    }
+  }, [nativePhotoBusy, handleFileUpload]);
 
   const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
   const deviationCount = labRisks?.markerDeviations?.length ?? 0;
@@ -1295,6 +1324,17 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     ))}
                   </div>
                   <div style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:8 }}>Сохранено в архив. Доступно в Профиле → Отчёты.</div>
+                  <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
+                    <button onClick={() => {
+                      const txt = `Анализы ${new Date().toISOString().slice(0,10)} · ${labs.length} маркеров (${deviationCount} с откл.)\n` + labs.map((l: any) => `${l.name || l.code}: ${l.value} ${l.unit || ''} (${l.date || ''})`).join('\n');
+                      void copyOrShareText(txt, 'Анализы').then(o => flashShare(shareOutcomeLabel(o)));
+                    }} style={{ flex:1, minHeight:44, padding:'10px 14px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.30)', color:'#fff' }}>📋 Копия / Share</button>
+                    <button onClick={() => {
+                      const csv = 'code;name;value;unit;date\n' + labs.map((l: any) => `${l.code};${(l.name || l.code).replace(/;/g, ',')};${l.value};${l.unit || ''};${l.date || ''}`).join('\n');
+                      void saveCsvApk(`labs-${new Date().toISOString().slice(0,10)}.csv`, csv).then(o => flashShare(shareOutcomeLabel(o)));
+                    }} style={{ flex:1, minHeight:44, padding:'10px 14px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12, background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff' }}>📥 CSV</button>
+                  </div>
+                  {shareStatus && <div role="status" style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:6 }}>{shareStatus}</div>}
                 </div>
               )}
               {labArchive.length > 0 && (
@@ -1444,13 +1484,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   })}
                   <button onClick={() => {
                     const csv = exportTrendsToCSV(report);
-                    downloadCSV(csv, `lab-trends-${new Date().toISOString().slice(0,10)}.csv`);
+                    void saveCsvApk(`lab-trends-${new Date().toISOString().slice(0,10)}.csv`, csv).then(o => flashShare(shareOutcomeLabel(o)));
                   }} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid rgba(140,190,255,0.14)', background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:11, cursor:'pointer', whiteSpace:'nowrap', minHeight:44, flexShrink:0 }}>
                     📥 CSV
                   </button>
                   <button onClick={() => {
-                    const win = window.open('', '_blank');
-                    if (!win) return;
                     const insightsHtml = insights.map(i => `<li>${i.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]!))}</li>`).join('');
                     const rowsHtml = report.trends.map(t => `
                       <tr style="border-bottom:1px solid #eee">
@@ -1465,7 +1503,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         <td style="padding:6px">${t.significance}</td>
                       </tr>
                     `).join('');
-                    win.document.write(`<!DOCTYPE html><html><head><title>Lab Trends ${new Date().toISOString().slice(0,10)}</title>
+                    const html = `<!DOCTYPE html><html><head><title>Lab Trends ${new Date().toISOString().slice(0,10)}</title>
                       <style>body{font-family:Arial,sans-serif;padding:24px;color:#222}h1{color:#00c97f}table{border-collapse:collapse;width:100%;margin-top:12px}th{background:#00c97f;color:#fff;padding:8px;text-align:left}ul{margin-top:8px;padding-left:20px}li{margin:4px 0}</style>
                       </head><body>
                       <h1>📈 Lab Trends Report</h1>
@@ -1475,9 +1513,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       <table><thead><tr><th>Marker</th><th>Prev Date</th><th>Prev Value</th><th>Current Date</th><th>Current Value</th><th>Δ Abs</th><th>Δ %</th><th>Dir</th><th>Significance</th></tr></thead>
                       <tbody>${rowsHtml}</tbody></table>
                       <p style="margin-top:24px;font-size:11;color:#888">Generated by BioStackAI · ${new Date().toLocaleString()}</p>
-                      </body></html>`);
-                    win.document.close();
-                    win.print();
+                      </body></html>`;
+                    void printHtmlApk(html, `lab-trends-${new Date().toISOString().slice(0,10)}.html`, `${report.summary}\n${insights.join('\n')}`).then(o => flashShare(shareOutcomeLabel(o)));
                   }} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid rgba(140,190,255,0.14)', background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:11, cursor:'pointer', whiteSpace:'nowrap', minHeight:44, flexShrink:0 }}>
                     🖨 Print
                   </button>
@@ -2192,6 +2229,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <div>
                   <p style={{ fontSize:13, color:'#fff', marginBottom:12, lineHeight:1.5 }}>Загрузите PDF, фото или вставьте текст результатов анализов.</p>
                   <div style={{ display:'grid', gap:8 }}>
+                    {isNativeApp() && (
+                      <button onClick={() => void handleNativePhoto()} disabled={nativePhotoBusy} style={{ padding:16, borderRadius:16, border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.35)', background:'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))', color:'#0a1a08', fontWeight:800, fontSize:14, cursor:'pointer', minHeight:56 }}>
+                        {nativePhotoBusy ? '⏳ Открываю камеру…' : '📷 Снять / выбрать фото (АПК)'}
+                      </button>
+                    )}
                     <button onClick={() => fileInputRef.current?.click()} style={{ padding:16, borderRadius:16, border:'1px dashed rgba(140,190,255,0.25)', background:'rgba(21,38,66,0.60)', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', minHeight:56 }}>
                       📄 Выбрать PDF или фото
                     </button>

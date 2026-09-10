@@ -483,7 +483,7 @@ export const BoolChip: React.FC<{
       data-active={checked}
       aria-pressed={checked}
       style={{
-        padding: '8px 15px',
+        padding: '10px 15px',
         borderRadius: 999,
         fontSize: 12.5,
         fontWeight: checked ? 800 : 600,
@@ -492,7 +492,7 @@ export const BoolChip: React.FC<{
         background: checked ? `linear-gradient(135deg, ${withAlpha(c, '30')}, ${withAlpha(c, '12')})` : 'rgba(255,255,255,0.04)',
         color: checked ? '#fff' : 'rgba(255,255,255,0.65)',
         transition: 'all 0.2s',
-        minHeight: 40,
+        minHeight: 44,
         boxShadow: checked ? `0 4px 14px ${withAlpha(c, '28')}, inset 0 1px 0 rgba(255,255,255,0.12)` : 'none',
       }}
     >

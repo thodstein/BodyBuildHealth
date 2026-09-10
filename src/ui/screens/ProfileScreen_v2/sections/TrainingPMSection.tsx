@@ -181,9 +181,9 @@ export const TrainingPMSection: React.FC = React.memo(function TrainingPMSection
                       fontWeight: 700,
                       cursor: 'pointer',
                       fontFamily: 'inherit',
-                      padding: '8px 14px',
+                      padding: '10px 14px',
                       borderRadius: 12,
-                      minHeight: 40,
+                      minHeight: 44,
                     }}
                   >
                     🗑 Очистить группу «{cat.label}»

@@ -7,6 +7,7 @@ import { mapToUcumCode, normalizeLabMeasurement } from './labs-mapping';
 import { db } from './db';
 import { notifyDataChange } from './data-link';
 import { formatDate } from './utils/date-utils';
+import { isNativeApp } from './app-platform';
 import type { LabPoint } from './types';
 
 /**
@@ -501,7 +502,10 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
     source = 'pdf';
     try {
       const arrayBuffer = await file.arrayBuffer();
-      if (isMobileClient()) {
+      // АПК: серверных ./api/* в нативном WebView нет — сразу локальный путь
+      // (текстовый слой pdfjs + локальный tesseract по страницам). Серверный
+      // OCR здесь только для Telegram-mobile, где бэкенд рядом.
+      if (!isNativeApp() && isMobileClient()) {
         const ocrText = await serverOcrScannedPdf(file);
         rawText = ocrText;
         const parsedAll = parseLabTextAllWays(rawText, 'server-tesseract');
@@ -567,6 +571,28 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
     source = 'image';
     try {
       let serverResult: { text: string; meals?: ParsedMeal[] };
+      // АПК: серверные ./api/* недоступны/долгие в нативном WebView —
+      // сначала локальный tesseract из бандла, сервер только запасным.
+      if (isNativeApp()) {
+        try {
+          const offlineText = await recognizeImageTextOffline(file);
+          if (offlineText.trim().length > 2) {
+            warnings.push('Фото распознано оффлайн на устройстве (АПК-режим).');
+            serverResult = { text: offlineText };
+            rawText = offlineText;
+          } else {
+            warnings.push('Оффлайн-распознавание вернуло пустой текст — пробую сервер.');
+            serverResult = await serverOcrImage(file);
+            rawText = serverResult.text;
+            warnings.push('Фото обработано на сервере OCR.');
+          }
+        } catch (offlineError: any) {
+          warnings.push(`Оффлайн-распознавание не удалось: ${offlineError?.message || String(offlineError)} — пробую сервер.`);
+          serverResult = await serverOcrImage(file);
+          rawText = serverResult.text;
+          warnings.push('Фото обработано на сервере OCR.');
+        }
+      } else {
       try {
         serverResult = await serverOcrImage(file);
         rawText = serverResult.text;
@@ -589,6 +615,7 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
             text: '', labs: [], meals: [], source, confidence: 0, warnings,
           };
         }
+      }
       }
 
       if (rawText.trim().length > 2) {

@@ -917,6 +917,7 @@ export const buildHourDistribution = (dates: string[]): { hour: number; count: n
 };
 
 // ─── Экспорт SVG в PNG через Canvas ────────────────────────────────────────
+// АПК: <a download> в WebView не сохраняет — PNG-Blob уходит в Documents + Share.
 
 export const exportSvgAsPng = (svgEl: SVGSVGElement, filename: string) => {
   const serializer = new XMLSerializer();
@@ -938,14 +939,9 @@ export const exportSvgAsPng = (svgEl: SVGSVGElement, filename: string) => {
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     canvas.toBlob((pngBlob) => {
       if (!pngBlob) { URL.revokeObjectURL(url); return; }
-      const pngUrl = URL.createObjectURL(pngBlob);
-      const a = document.createElement('a');
-      a.href = pngUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => { URL.revokeObjectURL(pngUrl); URL.revokeObjectURL(url); }, 500);
+      void import('../../../core/apk-share').then(({ saveBlobApk }) => saveBlobApk(filename, pngBlob)).then(() => {
+        setTimeout(() => { URL.revokeObjectURL(url); }, 500);
+      });
     }, 'image/png');
   };
   img.onerror = () => URL.revokeObjectURL(url);
@@ -957,15 +953,10 @@ export const exportSvgAsPng = (svgEl: SVGSVGElement, filename: string) => {
 export const exportSvgAsFile = (svgEl: SVGSVGElement, filename: string) => {
   const serializer = new XMLSerializer();
   const svgString = serializer.serializeToString(svgEl);
-  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 500);
+  // АПК: <a download> в WebView не сохраняет — SVG-текст в Documents + Share.
+  void import('../../../core/apk-share').then(({ saveTextFileApk }) =>
+    saveTextFileApk(filename, svgString, 'image/svg+xml;charset=utf-8'),
+  );
 };
 
 // ─── Сводный балл сна (0-100) ────────────────────────────────────────────

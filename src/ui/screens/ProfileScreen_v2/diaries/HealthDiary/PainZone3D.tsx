@@ -548,7 +548,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
               <b style={{ fontSize: 13.5, color: '#fff' }}>{meta.label}</b>
               <button
                 onClick={() => selectZone(selectedZone)}
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff', cursor: 'pointer', fontSize: 13, minWidth: 36, minHeight: 36, borderRadius: 11 }}
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff', cursor: 'pointer', fontSize: 13, minWidth: 44, minHeight: 44, borderRadius: 11 }}
                 aria-label="Закрыть"
               >
                 ✕
@@ -610,8 +610,8 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
               key={z.id}
               onClick={() => selectZone(z.id)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 999,
-                fontSize: 11.5, fontWeight: active ? 800 : 600, cursor: 'pointer', minHeight: 32,
+                display: 'flex', alignItems: 'center', gap: 5, padding: '10px 12px', borderRadius: 999,
+                fontSize: 11.5, fontWeight: active ? 800 : 600, cursor: 'pointer', minHeight: 40,
                 background: active ? `${c}2e` : 'rgba(255,255,255,0.03)',
                 border: `1px solid ${active ? c : 'rgba(255,255,255,0.09)'}`,
                 color: active ? '#fff' : 'rgba(255,255,255,0.65)',

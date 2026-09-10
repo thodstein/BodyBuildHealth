@@ -171,7 +171,7 @@ const ZoneMap: React.FC<{
                 boxShadow: isSelected ? `0 4px 14px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)` : 'none',
                 color: isSelected ? '#fff' : c.text,
                 transition: 'all 0.15s',
-                minHeight: 40,
+                minHeight: 44,
                 fontVariantNumeric: 'tabular-nums',
               }}
               title={
@@ -507,7 +507,7 @@ const ScheduleItemEditor: React.FC<{
         <h3 style={{ margin: 0, fontSize: 14.5, fontWeight: 800, letterSpacing: '-0.2px' }}>
           {initial ? '✎ Редактировать пункт расписания' : '➕ Новый пункт расписания'}
         </h3>
-        <button style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px' }} onClick={onClose} aria-label="Закрыть редактор расписания">
+        <button style={{ ...button, minHeight: 44, minWidth: 44, padding: '6px 10px' }} onClick={onClose} aria-label="Закрыть редактор расписания">
           ✕
         </button>
       </div>
@@ -547,8 +547,8 @@ const ScheduleItemEditor: React.FC<{
               type="button"
               onClick={() => toggleDay(day)}
               style={{
-                minHeight: 36,
-                minWidth: 40,
+                minHeight: 44,
+                minWidth: 44,
                 borderRadius: 10,
                 cursor: 'pointer',
                 fontSize: 12,
@@ -755,48 +755,47 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
         .map(cell)
         .join(','),
     );
-    const url = URL.createObjectURL(
-      new Blob(['\ufeff', head.map(cell).join(','), '\n', body.join('\n')], { type: 'text/csv;charset=utf-8' }),
+    // АПК: <a download> в WebView не сохраняет — Documents + Share (BOM внутри строки).
+    void import('../../../../../core/apk-share').then(({ saveTextFileApk }) =>
+      saveTextFileApk(`injection-diary-${todayLocalStr()}.csv`, `\ufeff${head.map(cell).join(',')}\n${body.join('\n')}`, 'text/csv;charset=utf-8'),
     );
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `injection-diary-${todayLocalStr()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
   };
   const print = () => {
-    const popup = window.open('', '_blank');
-    if (!popup) return;
-    popup.document.write(
-      `<html><head><title>Дневник инъекций</title><style>body{font:12px Arial;color:#111}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:5px}h1{color:#111}</style></head><body><h1>Дневник инъекций</h1><p>Всего: ${stats.totalInjections}; средняя боль: ${stats.avgPain ?? '—'}; PIP: ${stats.avgPip ?? '—'}</p><table><tr><th>Дата</th><th>Препарат</th><th>Доза</th><th>Зона</th><th>PIP</th><th>Боль</th><th>Осложнения</th></tr>${entries.map((entry) => `<tr><td>${escapeHtml(entry.date)}</td><td>${escapeHtml(entry.substance)}</td><td>${escapeHtml(entry.dose)}</td><td>${escapeHtml(zoneLabel(entry.zone))}</td><td>${entry.pipLevel}/10</td><td>${entry.painLevel}/10</td><td>${escapeHtml([entry.redness && 'краснота', entry.lump && 'уплотнение', entry.bruise && 'гематома', entry.fever && 'температура'].filter(Boolean).join(', ') || '—')}</td></tr>`).join('')}</table></body></html>`,
+    const html =
+      `<html><head><title>Дневник инъекций</title><style>body{font:12px Arial;color:#111}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:5px}h1{color:#111}</style></head><body><h1>Дневник инъекций</h1><p>Всего: ${stats.totalInjections}; средняя боль: ${stats.avgPain ?? '—'}; PIP: ${stats.avgPip ?? '—'}</p><table><tr><th>Дата</th><th>Препарат</th><th>Доза</th><th>Зона</th><th>PIP</th><th>Боль</th><th>Осложнения</th></tr>${entries.map((entry) => `<tr><td>${escapeHtml(entry.date)}</td><td>${escapeHtml(entry.substance)}</td><td>${escapeHtml(entry.dose)}</td><td>${escapeHtml(zoneLabel(entry.zone))}</td><td>${entry.pipLevel}/10</td><td>${entry.painLevel}/10</td><td>${escapeHtml([entry.redness && 'краснота', entry.lump && 'уплотнение', entry.bruise && 'гематома', entry.fever && 'температура'].filter(Boolean).join(', ') || '—')}</td></tr>`).join('')}</table></body></html>`;
+    // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
+    void import('../../../../../core/apk-share').then(({ printHtmlApk }) =>
+      printHtmlApk(html, `injection-diary-${todayLocalStr()}.html`),
     );
-    popup.document.close();
-    popup.print();
   };
   const exportChart = (png = false) => {
     const svg = chartRef.current;
     if (!svg) return;
     const data = new XMLSerializer().serializeToString(svg);
-    const url = URL.createObjectURL(new Blob([data], { type: 'image/svg+xml' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `injection-pain-${todayLocalStr()}.svg`;
-    link.click();
-    URL.revokeObjectURL(url);
-    if (png) {
-      const image = new Image();
-      image.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 720;
-        canvas.height = 230;
-        canvas.getContext('2d')?.drawImage(image, 0, 0);
-        const pngLink = document.createElement('a');
-        pngLink.href = canvas.toDataURL('image/png');
-        pngLink.download = `injection-pain-${todayLocalStr()}.png`;
-        pngLink.click();
-      };
-      image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}`;
+    // АПК: <a download> в WebView не сохраняет — через общий слой выдачи.
+    if (!png) {
+      void import('../../../../../core/apk-share').then(({ saveTextFileApk }) =>
+        saveTextFileApk(`injection-pain-${todayLocalStr()}.svg`, data, 'image/svg+xml;charset=utf-8'),
+      );
+      return;
     }
+    const url = URL.createObjectURL(new Blob([data], { type: 'image/svg+xml' }));
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 720;
+      canvas.height = 230;
+      canvas.getContext('2d')?.drawImage(image, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((pngBlob) => {
+        if (!pngBlob) return;
+        void import('../../../../../core/apk-share').then(({ saveBlobApk }) =>
+          saveBlobApk(`injection-pain-${todayLocalStr()}.png`, pngBlob),
+        );
+      }, 'image/png');
+    };
+    image.onerror = () => URL.revokeObjectURL(url);
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}`;
   };
 
   if (!open) return null;
@@ -900,7 +899,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                 </div>
               </div>
               <button
-                style={{ ...button, fontSize: 12.5, padding: '8px 14px', minHeight: 40 }}
+                style={{ ...button, fontSize: 12.5, padding: '10px 14px', minHeight: 44 }}
                 onClick={() => setMode('stats')}
               >
                 📊 Детали
@@ -1063,13 +1062,13 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                       </td>
                       <td data-label="Действия" style={{ padding: 8, whiteSpace: 'nowrap' }}>
                         <button
-                          style={{ ...button, minHeight: 34, padding: '5px 8px' }}
+                          style={{ ...button, minHeight: 44, minWidth: 44, padding: '8px 10px' }}
                           onClick={() => setEditor({ open: true, entry })}
                         >
                           ✎
                         </button>{' '}
                         <button
-                          style={{ ...dangerButton, minHeight: 34, padding: '5px 8px' }}
+                          style={{ ...dangerButton, minHeight: 44, minWidth: 44, padding: '8px 10px' }}
                           onClick={() => remove(entry)}
                         >
                           🗑
@@ -1323,22 +1322,22 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
               <h3 style={{ margin: 0 }}>📈 Динамика боли и PIP</h3>
               <div>
-                <button
-                  style={{
-                    ...button,
-                    minHeight: 34,
-                    background: chartMetric === 'pain' ? colors.primaryDim : undefined,
-                  }}
-                  onClick={() => setChartMetric('pain')}
-                >
-                  Боль
-                </button>{' '}
-                <button
-                  style={{
-                    ...button,
-                    minHeight: 34,
-                    background: chartMetric === 'pip' ? colors.primaryDim : undefined,
-                  }}
+                  <button
+                    style={{
+                      ...button,
+                      minHeight: 44,
+                      background: chartMetric === 'pain' ? colors.primaryDim : undefined,
+                    }}
+                    onClick={() => setChartMetric('pain')}
+                  >
+                    Боль
+                  </button>{' '}
+                  <button
+                    style={{
+                      ...button,
+                      minHeight: 44,
+                      background: chartMetric === 'pip' ? colors.primaryDim : undefined,
+                    }}
                   onClick={() => setChartMetric('pip')}
                 >
                   PIP
@@ -1551,14 +1550,14 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
-                        style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px' }}
+                        style={{ ...button, minHeight: 44, minWidth: 44, padding: '6px 10px' }}
                         onClick={() => setScheduleEditor({ open: true, item: row.item })}
                         aria-label="Редактировать пункт расписания"
                       >
                         ✎
                       </button>
                       <button
-                        style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px', background: 'rgba(239,68,68,0.12)', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
+                        style={{ ...button, minHeight: 44, minWidth: 44, padding: '6px 10px', background: 'rgba(239,68,68,0.12)', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
                         onClick={() => {
                           if (window.confirm(`Удалить пункт расписания «${row.item.substance}»?`)) {
                             setSchedule(removeScheduleItem(row.item.id));
@@ -1699,14 +1698,14 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px' }}
+                      style={{ ...button, minHeight: 44, minWidth: 44, padding: '6px 10px' }}
                       onClick={() => setScheduleEditor({ open: true, item: row.item })}
                       aria-label="Редактировать пункт расписания"
                     >
                       ✎
                     </button>
                     <button
-                      style={{ ...dangerButton, minHeight: 40, minWidth: 40, padding: '6px 10px' }}
+                      style={{ ...dangerButton, minHeight: 44, minWidth: 44, padding: '6px 10px' }}
                       onClick={() => {
                         if (window.confirm(`Удалить пункт расписания «${row.item.substance}»?`)) {
                           setSchedule(removeScheduleItem(row.item.id));

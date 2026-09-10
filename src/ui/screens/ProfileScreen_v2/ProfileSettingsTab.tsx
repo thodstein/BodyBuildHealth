@@ -12,6 +12,7 @@ import { WidgetsSetupCard } from '../../../ui/native/WidgetsSetupCard';
 import { AppearanceSetupCard } from '../../../ui/native/AppearanceSetupCard';
 import { BiometrySetupCard } from '../../../ui/native/BiometrySetupCard';
 import { NativeFeaturesCard } from '../../../ui/native/NativeFeaturesCard';
+import { copyOrShareText, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 const PRIVACY = [
   { id: 'private', label: 'Только я' },
@@ -50,18 +51,17 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
     updateProfile({ settings: { ...cur, system: next } });
   };
 
+  const toast = (msg: string) => {
+    try { (window as any).showToast?.(msg); } catch {}
+  };
+
   const handleExport = () => {
     try {
       const data = JSON.stringify(profile, null, 2);
-      const blob = new Blob([data], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `profile_backup_${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      // АПК: <a download> в WebView не сохраняет — Documents + Share.
+      void saveTextFileApk(`profile_backup_${new Date().toISOString().slice(0, 10)}.json`, data, 'application/json;charset=utf-8').then(o => toast(shareOutcomeLabel(o)));
     } catch (e) {
-      alert('Ошибка экспорта: ' + (e as Error).message);
+      toast('Ошибка экспорта: ' + (e as Error).message);
     }
   };
 
@@ -97,10 +97,10 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
   const handleCopy = () => {
     try {
       const data = JSON.stringify(profile, null, 2);
-      navigator.clipboard?.writeText(data);
-      alert('✅ Профиль скопирован в буфер обмена');
+      // АПК: clipboard в WebView ненадёжен — Share-диалог как основной путь.
+      void copyOrShareText(data, 'Профиль').then(o => toast(shareOutcomeLabel(o)));
     } catch (e) {
-      alert('Ошибка: ' + (e as Error).message);
+      toast('Ошибка: ' + (e as Error).message);
     }
   };
 

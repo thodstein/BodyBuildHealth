@@ -32,6 +32,7 @@ import { readRiskBridge, type RiskBridgeData } from '../../engines/risk-bridge';
 import { LABS_CARD, labsWithAlpha } from './LabsScreen_parts/LabsUI';
 import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
 import { isNativeApp } from '../../core/app-platform';
+import { copyOrShareText, saveTextFileApk, shareOutcomeLabel } from '../../core/apk-share';
 
 /** RiskHeroStats — нетто/брутто риск в hero, ТОЛЬКО APK (isNativeApp гейт). */
 const RiskHeroStats: React.FC<{ net: number | null; raw: number | null }> = ({ net, raw }) => {
@@ -166,6 +167,11 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const [riskArchive, setRiskArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_risk_reports') || '[]'); } catch { return []; }
   });
+  const [reportIo, setReportIo] = useState<string | null>(null);
+  const flashReportIo = (msg: string) => {
+    setReportIo(msg);
+    try { setTimeout(() => setReportIo(null), 2500); } catch {}
+  };
 
   // Toggle forceNoLabs
   const toggleForceNoLabs = () => {
@@ -484,6 +490,20 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       setRiskReportGenerated(true);
     };
 
+    const riskReportText = (): string => {
+      const cur = (() => { try { return JSON.parse(localStorage.getItem('he_risk_report_current') || 'null'); } catch { return null; } })();
+      const src: any = cur || {
+        overallRaw: riskResult?.overallRaw || 0,
+        overallNet: riskResult?.overallNet || 0,
+        systems: riskResult?.systemBreakdown ? Object.entries(riskResult.systemBreakdown).map(([k, v]: any) => ({ system: k, raw: v.raw, net: v.net })) : [],
+      };
+      const lines = [
+        `Отчёт по рискам ${src.date || new Date().toISOString().slice(0, 10)} · net ${Math.round(src.overallNet || 0)}% · raw ${Math.round(src.overallRaw || 0)}%`,
+        ...(Array.isArray(src.systems) ? src.systems.map((s: any) => `• ${s.system}: raw ${Math.round(s.raw || 0)}% → net ${Math.round(s.net || 0)}%`) : []),
+      ];
+      return lines.join('\n');
+    };
+
     return (
       <div className="risk-reports" style={{ padding:'0 12px 80px' }}>
         <h3 style={{ fontSize:17, fontWeight:800, color:'#fff', margin:'0 0 4px' }}>📄 Отчёты по рискам</h3>
@@ -533,6 +553,21 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             <div style={{ fontSize:12, color:'#fff', textAlign:'center', marginTop:10 }}>
               Отчёт сохранён в архив. Доступен в Профиле → Отчёты.
             </div>
+            <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
+              <button onClick={() => { void copyOrShareText(riskReportText(), 'Отчёт по рискам').then(o => flashReportIo(shareOutcomeLabel(o))); }} style={{
+                flex:1, minHeight:44, padding:'10px 14px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12,
+                background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.30)', color:'#fff',
+              }}>📋 Копия / Share</button>
+              <button onClick={() => {
+                const cur = (() => { try { return JSON.parse(localStorage.getItem('he_risk_report_current') || 'null'); } catch { return null; } })();
+                const payload = JSON.stringify(cur || { text: riskReportText() }, null, 2);
+                void saveTextFileApk(`risk-report-${new Date().toISOString().slice(0, 10)}.json`, payload, 'application/json;charset=utf-8').then(o => flashReportIo(shareOutcomeLabel(o)));
+              }} style={{
+                flex:1, minHeight:44, padding:'10px 14px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12,
+                background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff',
+              }}>📥 JSON</button>
+            </div>
+            {reportIo && <div role="status" style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:6 }}>{reportIo}</div>}
           </div>
         )}
 

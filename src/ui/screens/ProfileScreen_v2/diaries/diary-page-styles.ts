@@ -100,8 +100,8 @@ export const menuItem = (accent: string): React.CSSProperties => ({
 // ── Чипы ───────────────────────────────────────────────────────────────
 
 export const chip = (accent: string): React.CSSProperties => ({
-  minHeight: 40,
-  padding: '8px 15px',
+  minHeight: 44,
+  padding: '10px 15px',
   borderRadius: 999,
   fontSize: 12.5,
   fontWeight: 700,
@@ -141,7 +141,7 @@ export const segWrap: React.CSSProperties = {
   scrollbarWidth: 'none',
 };
 export const segBtn = (active: boolean, accent: string): React.CSSProperties => ({
-  minHeight: 40,
+  minHeight: 44,
   padding: '0 16px',
   borderRadius: 11,
   cursor: 'pointer',

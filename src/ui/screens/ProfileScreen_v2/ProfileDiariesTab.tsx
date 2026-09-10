@@ -22,6 +22,7 @@ import {
 } from './diary-helpers';
 import { calculateTrend } from './diaries/BPDiary/bp-trend-prediction';
 import { buildDiariesExportHtml } from './diary-pdf-export';
+import { saveTextFileApk, printHtmlApk } from '../../../core/apk-share';
 import { DiaryCard } from './diary-ui';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 import { SleepDiary } from './diaries/SleepDiary/SleepDiary';
@@ -235,12 +236,12 @@ const Snackbar: React.FC<{ action: UndoAction | null; onUndo: () => void; onDism
             background: 'linear-gradient(135deg, #34d399, #22c55e)',
             border: 'none',
             color: '#04120c',
-            padding: '7px 14px',
+            padding: '10px 14px',
             borderRadius: 10,
             fontSize: 12,
             fontWeight: 800,
             cursor: 'pointer',
-            minHeight: 36,
+            minHeight: 44,
             boxShadow: '0 3px 12px rgba(52,211,153,0.3)',
             flexShrink: 0,
           }}
@@ -256,8 +257,8 @@ const Snackbar: React.FC<{ action: UndoAction | null; onUndo: () => void; onDism
             color: '#ffffff',
             fontSize: 18,
             cursor: 'pointer',
-            minWidth: 32,
-            minHeight: 36,
+            minWidth: 44,
+            minHeight: 44,
             flexShrink: 0,
           }}
         >
@@ -286,7 +287,8 @@ const Snackbar: React.FC<{ action: UndoAction | null; onUndo: () => void; onDism
   );
 };
 
-const QUICK_DIARY_LINKS: QuickLink[] = [
+// Экспортированы для теста диплинков: каждая цель обязана быть в NAV_TARGETS (App).
+export const QUICK_DIARY_LINKS: QuickLink[] = [
   {
     icon: '🍽',
     label: 'Дневник питания',
@@ -324,7 +326,8 @@ const QUICK_DIARY_LINKS: QuickLink[] = [
   },
 ];
 
-const QUICK_REPORT_LINKS: QuickLink[] = [
+// Экспортированы для теста диплинков: каждая цель обязана быть в NAV_TARGETS (App).
+export const QUICK_REPORT_LINKS: QuickLink[] = [
   {
     icon: '🏋️',
     label: 'Тренер-отчёт',
@@ -785,15 +788,8 @@ export const ProfileDiariesTab: React.FC<{
       },
     };
     const json = JSON.stringify(payload, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `diaries-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 500);
+    // АПК: <a download> в WebView не сохраняет — Documents + Share.
+    void saveTextFileApk(`diaries-${new Date().toISOString().slice(0, 10)}.json`, json, 'application/json;charset=utf-8');
     if ((window as any).showToast) (window as any).showToast('📦 Все дневники экспортированы в JSON');
   };
 
@@ -806,12 +802,8 @@ const exportAllDiariesPdf = () => {
       healthEntries,
       cardioLog,
     });
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 120);
+    // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
+    void printHtmlApk(html, `diaries-${new Date().toISOString().slice(0, 10)}.html`);
   };
 
 
@@ -1129,10 +1121,10 @@ const exportAllDiariesPdf = () => {
                         cursor: 'pointer',
                         fontSize: 12,
                         fontWeight: 800,
-                        padding: '8px 14px',
+                        padding: '10px 14px',
                         borderRadius: 12,
                         flexShrink: 0,
-                        minHeight: 40,
+                        minHeight: 44,
                         boxShadow: '0 4px 14px rgba(245,158,11,0.22)',
                       }}
                     >
@@ -1169,10 +1161,10 @@ const exportAllDiariesPdf = () => {
                         color: '#fbbf24',
                         cursor: 'pointer',
                         fontSize: 14,
-                        width: 40,
-                        height: 40,
-                        minWidth: 40,
-                        minHeight: 40,
+                        width: 44,
+                        height: 44,
+                        minWidth: 44,
+                        minHeight: 44,
                         borderRadius: 10,
                         flexShrink: 0,
                       }}

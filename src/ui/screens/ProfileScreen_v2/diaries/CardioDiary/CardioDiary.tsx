@@ -10,6 +10,7 @@ import { colors, glassCard, inputStyle, labelStyle, selectStyle } from '../../ui
 import { NativeIcon } from '../../../../native/NativeIcons';
 import { btnBase, btnPrimary, chip, chipActive, diaryShell, header as diaryHeaderStyle, glassSection, heroCard, main as pageMain, sectionTitle, statCard, tableTh, tableTd } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
+import { saveCsvApk, printHtmlApk } from '../../../../../core/apk-share';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
   cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal, cardioPaceMinPerKm,
@@ -259,16 +260,11 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '',
         legDayDates.has(e.date) ? 'да' : '', e.notes ?? '', e.completed ? 'да' : 'нет'].map(csvCell).join(','),
     ).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(['\ufeff' + head + body], { type: 'text/csv' }));
-    a.download = `cardio-${todayIso()}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    // АПК: <a download> в WebView не сохраняет — Documents + Share.
+    void saveCsvApk(`cardio-${todayIso()}.csv`, head + body);
   };
 
   const printPdf = () => {
-    const w = window.open('', '_blank');
-    if (!w) return;
     const typeLabel = (id: CardioType) => TYPES.find(t => t.id === id)?.label ?? id;
     const rows = log.map(e =>
       `<tr><td>${escapeHtml(e.date)}</td><td>${escapeHtml(typeLabel(e.type))}</td><td>${e.durationMin}</td>` +
@@ -298,10 +294,8 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   <tr><th>Дата</th><th>Тип</th><th>Минуты</th><th>Км</th><th>Темп</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th><th>День ног</th><th>Заметка</th></tr>
   ${rows}
 </table>`;
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    w.print();
+    // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
+    void printHtmlApk(html, `cardio-${todayIso()}.html`);
   };
 
   const totalMinutes = log.reduce((s, e) => s + e.durationMin, 0);
@@ -600,14 +594,14 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 <button
                   onClick={() => startEdit(e)}
                   aria-label={`Редактировать ${e.date}`}
-                  style={{ ...btnBase(ACCENT), minHeight: 40, minWidth: 40, padding: '6px 10px', color: '#fff', borderColor: 'rgba(245,158,11,0.4)' }}
+                  style={{ ...btnBase(ACCENT), minHeight: 44, minWidth: 44, padding: '10px 12px', color: '#fff', borderColor: 'rgba(245,158,11,0.4)' }}
                 >
                   ✎
                 </button>
                 <button
                   onClick={() => { if (editingId === e.id) setEditingId(null); remove(e.id); }}
                   aria-label={`Удалить ${e.date}`}
-                  style={{ ...btnBase(ACCENT), minHeight: 40, minWidth: 40, padding: '6px 10px', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
+                  style={{ ...btnBase(ACCENT), minHeight: 44, minWidth: 44, padding: '10px 12px', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
                 >
                   ✕
                 </button>

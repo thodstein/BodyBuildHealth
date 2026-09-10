@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
 import { validateCourse } from '../../engines/pharmacology.engine';
 import { checkDrugInteractions } from '../../engines/interactions-calculator';
@@ -9,6 +9,7 @@ import { isNativeApp } from '../../core/app-platform';
 import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
 import { NativeEmptyArt } from '../native/NativeEmpty';
 import { scheduleWeeklyReminders, cancelScheduledReminders } from '../../core/native-bridge';
+import { copyOrShareText, saveTextFileApk, shareOutcomeLabel } from '../../core/apk-share';
 import {
   loadRemindPrefs, saveRemindPrefs, buildReminderItems, allReminderIds,
   REMINDER_DAYS_RU, type RemindPrefs,
@@ -177,6 +178,60 @@ export const PharmaCourseScreen: React.FC = () => {
   const [historyCourses, setHistoryCourses] = useState<{ name: string; date: string; entries: CourseEntry[] }[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_course_history') || '[]'); } catch { return []; }
   });
+  const [ioStatus, setIoStatus] = useState<string | null>(null);
+  const courseFileRef = useRef<HTMLInputElement>(null);
+  const flashIo = (msg: string) => {
+    setIoStatus(msg);
+    try { setTimeout(() => setIoStatus(null), 2500); } catch {}
+  };
+
+  // Экспорт курса в JSON: АПК — Documents + Share, web — скачивание.
+  const exportCourse = async () => {
+    if (course.length === 0) {
+      flashIo('Курс пуст — нечего выгружать');
+      return;
+    }
+    const payload = JSON.stringify({ exportedAt: new Date().toISOString(), entries: course }, null, 2);
+    const o = await saveTextFileApk(`course-${new Date().toISOString().slice(0, 10)}.json`, payload, 'application/json;charset=utf-8');
+    flashIo(shareOutcomeLabel(o));
+  };
+
+  // Импорт курса из JSON-файла (структура exportCourse или голый массив entries).
+  const importCourseFile = async (file: File) => {
+    try {
+      const txt = await file.text();
+      const parsed: any = JSON.parse(txt);
+      const arr: any[] = Array.isArray(parsed) ? parsed : parsed.entries;
+      if (!Array.isArray(arr) || arr.length === 0) {
+        flashIo('⚠ В файле нет записей курса');
+        return;
+      }
+      const valid = arr.filter(e => e && typeof e.substanceId === 'string');
+      if (valid.length === 0) {
+        flashIo('⚠ Нет записей с substanceId');
+        return;
+      }
+      const entries: CourseEntry[] = valid.map((e, i) => ({
+        id: typeof e.id === 'string' ? e.id : `imported-${Date.now()}-${i}`,
+        substanceId: e.substanceId,
+        doseValue: Number(e.doseValue) || 0,
+        doseUnit: e.doseUnit || 'мг',
+        frequency: e.frequency ?? '2x/wk',
+        injectionDays: Array.isArray(e.injectionDays) ? e.injectionDays : undefined,
+        startWeek: Number(e.startWeek) || 0,
+        endWeek: Number(e.endWeek) || 12,
+      } as CourseEntry));
+      await db.init();
+      for (const e of entries) {
+        try { await db.put('course_log', e); } catch {}
+      }
+      setCourse(prev => [...prev, ...entries]);
+      notifyDataChange();
+      flashIo(`✓ Импортировано: ${entries.length}`);
+    } catch {
+      flashIo('⚠ Не удалось прочитать файл');
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -411,6 +466,37 @@ export const PharmaCourseScreen: React.FC = () => {
           </div>
         </div>
         <div style={{ display:'flex', gap:7, flexShrink:0, flexWrap:'wrap', justifyContent:'flex-end' }}>
+          <input ref={courseFileRef} type="file" accept="application/json,.json" style={{ display:'none' }}
+            aria-label="Импорт курса из JSON"
+            onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) void importCourseFile(f); }} />
+          <button onClick={() => courseFileRef.current?.click()} className="pc-btn2" aria-label="Импорт курса" style={{
+            background: 'rgba(255,255,255,0.06)', color: '#fff',
+            border: '1px solid rgba(255,255,255,0.10)', borderRadius: 12, padding: '8px 11px', fontWeight:700,
+            fontSize:11, display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}>
+            📥 Импорт
+          </button>
+          {course.length > 0 && (
+            <button onClick={() => void exportCourse()} className="pc-btn2" aria-label="Экспорт курса" style={{
+              background: 'rgba(59,130,246,0.12)', color: '#fff',
+              border: '1px solid rgba(59,130,246,0.28)', borderRadius: 12, padding: '8px 11px', fontWeight:700,
+              fontSize:11, display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+              📤 Экспорт
+            </button>
+          )}
+          {course.length > 0 && (
+            <button onClick={() => {
+              const txt = course.map(e => `${subName(e.substanceId)} ${e.doseValue}${e.doseUnit} · нед ${e.startWeek || 0}–${e.endWeek}`).join('\n');
+              void copyOrShareText(`Курс (${course.length} преп.)\n${txt}`, 'Курс').then(o => flashIo(shareOutcomeLabel(o)));
+            }} className="pc-btn2" aria-label="Скопировать курс" style={{
+              background: 'rgba(255,255,255,0.06)', color: '#fff',
+              border: '1px solid rgba(255,255,255,0.10)', borderRadius: 12, padding: '8px 11px', fontWeight:700,
+              fontSize:11, display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+              📋 Копия
+            </button>
+          )}
           {course.length > 0 && (
             <button onClick={saveCourseHistory} className="pc-btn2" style={{
               background: 'rgba(245,158,11,0.12)', color: '#fff',
@@ -430,6 +516,7 @@ export const PharmaCourseScreen: React.FC = () => {
           </button>
         </div>
       </div>
+      {ioStatus && <div role="status" style={{ fontSize:11, color:'#fff', textAlign:'center', padding:'6px 10px', background:'rgba(59,130,246,0.10)', border:'1px solid rgba(59,130,246,0.22)', borderRadius:10 }}>{ioStatus}</div>}
 
       {/* Course start date */}
       <div className="pc-glass" style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', flexWrap:'wrap' }}>

@@ -89,6 +89,61 @@ function DarkBg() {
   );
 }
 
+// Карта глубоких переходов (профиль → дневник/отчёт блока).
+// Экспортирована для тестов диплинков: каждая цель кнопок профиля обязана
+// указывать tab + subTab конкретного раздела, а не главную страницу блока.
+export const NAV_TARGETS: Record<string, NavTarget> = {
+  'dashboard': { tab: 'home' },
+  'pharma': { tab: 'pharma' },
+  'support': { tab: 'support' },
+  'training': { tab: 'training' },
+  'labs': { tab: 'labs' },
+  'risks': { tab: 'risks' },
+  'nutrition': { tab: 'nutrition' },
+  'profile': { tab: 'profile' },
+  'course': { tab: 'training' },
+  'plan': { tab: 'training' },
+  'substances': { tab: 'support' },
+  'peptides': { tab: 'support' },
+  'predictive': { tab: 'home' },
+  'marketplace': { tab: 'marketplace' },
+  'articles': { tab: 'articles' },
+  'assistant': { tab: 'home' },
+  'gamification': { tab: 'home' },
+  'fertility-pct': { tab: 'support' },
+  'role-management': { tab: 'profile' },
+  'recovery': { tab: 'training' },
+  'wellness': { tab: 'training' },
+  'performance': { tab: 'pharma' },
+  'bloodwork': { tab: 'labs' },
+  'toolkit': { tab: 'training' },
+  'training-tools': { tab: 'training' },
+
+  // Дневники в других блоках — открываем конкретный sub-раздел
+  'nutrition-diary': { tab: 'nutrition', subTab: 'diary' },
+  'workout-log': { tab: 'training', subTab: 'diary' },
+  'pharma-course': { tab: 'pharma', subTab: 'course' },
+  'support-diary': { tab: 'support', subTab: 'diary' },
+  'symptoms': { tab: 'support', subTab: 'symptoms' },
+  'labs-diary': { tab: 'labs', subTab: 'diary' },
+
+  // Отчёты
+  'training-analytics': { tab: 'training', subTab: 'analytics' },
+  'pharma-reports': { tab: 'pharma', subTab: 'reports' },
+  'risk-reports': { tab: 'risks', subTab: 'reports' },
+  'labs-reports': { tab: 'labs', subTab: 'reports' },
+  'nutrition-reports': { tab: 'nutrition', subTab: 'reports' },
+  'support-reports': { tab: 'support', subTab: 'reports' },
+  'custom-report': { tab: 'profile', subTab: 'custom-report' },
+  'profile-reports': { tab: 'profile', subTab: 'reports' },
+
+  // Встроенные дневники — открываем профильный дневник
+  'profile-diary-sleep': { tab: 'profile', subTab: 'sleep' },
+  'profile-diary-bp': { tab: 'profile', subTab: 'bp' },
+  'profile-diary-weight': { tab: 'profile', subTab: 'weight' },
+  'profile-diary-measurements': { tab: 'profile', subTab: 'measurements' },
+};
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [subTab, setSubTab] = useState<string | null>(null);
@@ -198,7 +253,7 @@ export default function App() {
     return () => { try { off?.(); } catch { /* ignore */ } };
   }, [tab]);
 
-  const go = (t: Tab, st: string | null = null) => {
+  const go = useCallback((t: Tab, st: string | null = null) => {
     // Тактильный отклик — ТОЛЬКО APK. В Telegram ветка не выполняется вообще.
     if (isNativeApp() && tab !== t) {
       try {
@@ -207,6 +262,9 @@ export default function App() {
         /* ignore */
       }
     }
+    // Повторный переход в тот же экран (в т.ч. из профиля в уже открытый блок)
+    // тоже пересобирает экран: screenKey в key гарантирует remount и отработку
+    // initialSubTab (дневник/отчёт откроются сразу, а не останутся на hero).
     if (tab === t) {
       setScreenKey(k => k + 1);
     } else {
@@ -215,7 +273,7 @@ export default function App() {
     setSubTab(st);
     if (mainRef.current) mainRef.current.scrollTop = 0;
     window.scrollTo(0, 0);
-  };
+  }, [tab]);
 
   // Свайпы между вкладками — ТОЛЬКО APK (порядок PRIMARY_NAV, с анимацией).
   // В Telegram ветка не монтируется вообще.
@@ -242,60 +300,9 @@ export default function App() {
   // handleNavigate: каждая цель указывает tab + subTab (конкретный дневник/отчёт).
   // subTab пробрасывается в конкретный экран через props.
   const handleNavigate = useCallback((screen: string) => {
-    const tabMap: Record<string, NavTarget> = {
-      'dashboard': { tab: 'home' },
-      'pharma': { tab: 'pharma' },
-      'support': { tab: 'support' },
-      'training': { tab: 'training' },
-      'labs': { tab: 'labs' },
-      'risks': { tab: 'risks' },
-      'nutrition': { tab: 'nutrition' },
-      'profile': { tab: 'profile' },
-      'course': { tab: 'training' },
-      'plan': { tab: 'training' },
-      'substances': { tab: 'support' },
-      'peptides': { tab: 'support' },
-      'predictive': { tab: 'home' },
-      'marketplace': { tab: 'marketplace' },
-      'articles': { tab: 'articles' },
-      'assistant': { tab: 'home' },
-      'gamification': { tab: 'home' },
-      'fertility-pct': { tab: 'support' },
-      'role-management': { tab: 'profile' },
-      'recovery': { tab: 'training' },
-      'wellness': { tab: 'training' },
-      'performance': { tab: 'pharma' },
-      'bloodwork': { tab: 'labs' },
-      'toolkit': { tab: 'training' },
-      'training-tools': { tab: 'training' },
-
-      // Дневники в других блоках — открываем конкретный sub-раздел
-      'nutrition-diary': { tab: 'nutrition', subTab: 'diary' },
-      'workout-log': { tab: 'training', subTab: 'diary' },
-      'pharma-course': { tab: 'pharma', subTab: 'course' },
-      'support-diary': { tab: 'support', subTab: 'diary' },
-      'symptoms': { tab: 'support', subTab: 'symptoms' },
-      'labs-diary': { tab: 'labs', subTab: 'diary' },
-
-      // Отчёты
-      'training-analytics': { tab: 'training', subTab: 'analytics' },
-      'pharma-reports': { tab: 'pharma', subTab: 'reports' },
-      'risk-reports': { tab: 'risks', subTab: 'reports' },
-      'labs-reports': { tab: 'labs', subTab: 'reports' },
-      'nutrition-reports': { tab: 'nutrition', subTab: 'reports' },
-      'support-reports': { tab: 'support', subTab: 'reports' },
-      'custom-report': { tab: 'profile', subTab: 'custom-report' },
-      'profile-reports': { tab: 'profile', subTab: 'reports' },
-
-      // Встроенные дневники — открываем профильный дневник
-      'profile-diary-sleep': { tab: 'profile', subTab: 'sleep' },
-      'profile-diary-bp': { tab: 'profile', subTab: 'bp' },
-      'profile-diary-weight': { tab: 'profile', subTab: 'weight' },
-      'profile-diary-measurements': { tab: 'profile', subTab: 'measurements' },
-    };
-    const target = tabMap[screen] || { tab: 'home' as Tab };
+    const target = NAV_TARGETS[screen] || { tab: 'home' as Tab };
     go(target.tab, target.subTab ?? null);
-  }, []);
+  }, [go]);
 
   // Deep-link: #pl-plan-<cycleId> или Telegram startapp=pl-plan-<cycleId>.
   // Маркер в sessionStorage читает SRCBBScreen и выбирает нужный цикл.

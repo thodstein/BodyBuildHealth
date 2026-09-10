@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BoolChip, SliderInput, colors, glassCard, inputStyle } from '../../ui';
 import { NativeIcon, type NativeIconName } from '../../../../native/NativeIcons';
 import { useDiaryDraft } from '../../diary-modals';
+import { saveCsvApk, printHtmlApk } from '../../../../../core/apk-share';
 import {
   analyzeAllSleepCorrelations,
   generateCorrelationRecommendations,
@@ -127,8 +128,8 @@ const menuItem: React.CSSProperties = {
   boxShadow: 'none',
 };
 const chip: React.CSSProperties = {
-  minHeight: 40,
-  padding: '8px 15px',
+  minHeight: 44,
+  padding: '10px 15px',
   borderRadius: 999,
   fontSize: 12.5,
   fontWeight: 700,
@@ -706,20 +707,15 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
     ]
       .map((row) => row.map(csvCell).join(','))
       .join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
-    a.download = `sleep-${todayIso()}.csv`;
-    a.click();
+    // АПК: <a download> в WebView не сохраняет — Documents + Share.
+    void saveCsvApk(`sleep-${todayIso()}.csv`, csv);
   };
   const print = () => {
-    const w = window.open('', '_blank');
-    if (!w) return;
     const report = generateSleepReport(rows, { targetHours: goals.targetHours, targetQuality: goals.targetQuality });
-    w.document.write(
-      `<html><head><title>Дневник сна</title><style>body{font-family:Arial;padding:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:5px;text-align:left}</style></head><body><h1>💤 Дневник сна</h1><pre>${escapeHtml(report)}</pre><table><tr><th>Дата</th><th>Часы</th><th>Качество</th><th>Проб.</th><th>Латентность</th><th>Стресс</th><th>Заметки</th></tr>${rows.map((r) => `<tr><td>${escapeHtml(r.date)}</td><td>${r.hours}</td><td>${r.quality}</td><td>${r.awakenings}</td><td>${r.latency ?? ''}</td><td>${r.stressLevel ?? ''}</td><td>${escapeHtml(r.notes)}</td></tr>`).join('')}</table></body></html>`,
-    );
-    w.document.close();
-    w.print();
+    const html =
+      `<html><head><title>Дневник сна</title><style>body{font-family:Arial;padding:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:5px;text-align:left}</style></head><body><h1>💤 Дневник сна</h1><pre>${escapeHtml(report)}</pre><table><tr><th>Дата</th><th>Часы</th><th>Качество</th><th>Проб.</th><th>Латентность</th><th>Стресс</th><th>Заметки</th></tr>${rows.map((r) => `<tr><td>${escapeHtml(r.date)}</td><td>${r.hours}</td><td>${r.quality}</td><td>${r.awakenings}</td><td>${r.latency ?? ''}</td><td>${r.stressLevel ?? ''}</td><td>${escapeHtml(r.notes)}</td></tr>`).join('')}</table></body></html>`;
+    // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
+    void printHtmlApk(html, `sleep-${todayIso()}.html`, report);
   };
 
   if (!open) return null;
@@ -1538,11 +1534,11 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                       {r.notes || '—'}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      <button style={{ ...btnBase, minHeight: 40, minWidth: 40, padding: '6px 10px' }} onClick={() => openSleepForm(r, true)} aria-label="Редактировать запись">
+                      <button style={{ ...btnBase, minHeight: 44, minWidth: 44, padding: '10px 12px' }} onClick={() => openSleepForm(r, true)} aria-label="Редактировать запись">
                         ✏️
                       </button>{' '}
                       <button
-                        style={{ ...btnBase, minHeight: 40, minWidth: 40, padding: '6px 10px', color: '#f87171' }}
+                        style={{ ...btnBase, minHeight: 44, minWidth: 44, padding: '10px 12px', color: '#f87171' }}
                         onClick={() => commit(rows.filter((x) => x.date !== r.date))}
                         aria-label="Удалить запись"
                       >

@@ -132,14 +132,10 @@ function entryFields(entry: UnifiedHealthEntry): DiaryEntryLike {
 }
 
 function downloadText(name: string, text: string, type: string) {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 500);
+  // АПК: <a download> в WebView не сохраняет — Documents + Share, web — как было.
+  void import('../../../../../core/apk-share').then(({ saveTextFileApk }) =>
+    saveTextFileApk(name, text, type),
+  );
 }
 
 /** Индекс здоровья из реальных данных (профиль v2, дневники, labs, тренировки) с безопасными фолбэками. */
@@ -562,7 +558,7 @@ const EntryEditor: React.FC<{
               <b>{s.severity}/5</b>
               <span style={{ color: 'rgba(255,255,255,0.6)' }}>{s.duration || ''}</span>
               <button
-                style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
+                style={{ ...button, minHeight: 44, minWidth: 44, padding: '6px 10px', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
                 onClick={() => setDraft((d) => ({ ...d, symptoms: d.symptoms.filter((x) => x.id !== s.id) }))}
                 aria-label="Удалить симптом"
               >
@@ -917,14 +913,12 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
       const symptoms = e.symptoms.map((s) => `${escapeHtml(s.name)} ${s.severity}/5`).join('<br>');
       return `<tr><td>${escapeHtml(e.date)}</td><td>${e.pain?.totalScore || 0}/${PAIN_MAX}</td>${zones}<td>${symptoms}</td><td>${e.neuro?.totalScore || 0}/10</td><td>${e.acne?.totalScore || 0}/12</td><td>${e.hemato?.totalScore || 0}/8</td><td>${escapeHtml(e.notes || '')}</td></tr>`;
     }).join('');
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(
-      `<!doctype html><html><head><meta charset="utf-8"><title>Дневник здоровья</title><style>body{font:12px Arial;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:5px;text-align:left}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>Дневник здоровья</h1><p>Сформирован ${new Date().toLocaleString('ru-RU')}</p><table><tr><th>Дата</th><th>Боль</th>${zoneCols}<th>Симптомы</th><th>Нейро</th><th>Акне</th><th>Гемат</th><th>Заметка</th></tr>${rowsHtml}</table></body></html>`,
+    const html =
+      `<!doctype html><html><head><meta charset="utf-8"><title>Дневник здоровья</title><style>body{font:12px Arial;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:5px;text-align:left}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>Дневник здоровья</h1><p>Сформирован ${new Date().toLocaleString('ru-RU')}</p><table><tr><th>Дата</th><th>Боль</th>${zoneCols}<th>Симптомы</th><th>Нейро</th><th>Акне</th><th>Гемат</th><th>Заметка</th></tr>${rowsHtml}</table></body></html>`;
+    // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
+    void import('../../../../../core/apk-share').then(({ printHtmlApk }) =>
+      printHtmlApk(html, `health-${todayIso()}.html`),
     );
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 250);
   };
   const symptomSeries = useMemo(
     () =>
@@ -1084,7 +1078,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                       </label>
                       {supportable && (
                         <div style={{ marginTop: 3, paddingLeft: 29 }}>
-                          <button style={{ ...button, minHeight: 40, padding: '8px 14px', fontSize: 12.5, fontWeight: 800 }} onClick={() => onNavigate('support')}>🛡 Протокол поддержки</button>
+                          <button style={{ ...button, minHeight: 44, padding: '10px 14px', fontSize: 12.5, fontWeight: 800 }} onClick={() => onNavigate('support')}>🛡 Протокол поддержки</button>
                         </div>
                       )}
                     </div>
@@ -1417,11 +1411,11 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                     <td style={tableTd}>{row.pain?.linkedExercise || ''}</td>
                     <td style={tableTd}>{row.notes ? (row.notes.length > 20 ? row.notes.slice(0, 20) + '…' : row.notes) : ''}</td>
                     <td style={tableTd}>
-                      <button style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px' }} onClick={() => setEdit(row)} aria-label="Редактировать запись">
+                      <button style={{ ...button, minHeight: 44, minWidth: 44, padding: '6px 10px' }} onClick={() => setEdit(row)} aria-label="Редактировать запись">
                         ✏️
                       </button>{' '}
                       <button
-                        style={{ ...button, minHeight: 40, minWidth: 40, padding: '6px 10px', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
+                        style={{ ...button, minHeight: 44, minWidth: 44, padding: '6px 10px', color: '#fca5a5', borderColor: 'rgba(239,68,68,0.35)' }}
                         onClick={() => {
                           if (confirm(`Удалить запись ${row.date}?`)) {
                             commit(deleteUnifiedHealthEntry(row.date));

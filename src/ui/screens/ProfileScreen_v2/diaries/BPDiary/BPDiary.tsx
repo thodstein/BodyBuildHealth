@@ -13,6 +13,7 @@ import {
   statCard,
 } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
+import { saveCsvApk, printHtmlApk } from '../../../../../core/apk-share';
 import { useDiaryDraft } from '../../diary-modals';
 import {
   buildWeeklyHistogram,
@@ -339,14 +340,11 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
         (x.symptoms || []).join('; '), x.notes || '',
       ].map(esc).join(','),
     ).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(['\ufeff' + head + body], { type: 'text/csv' }));
-    a.download = `bp-${todayIso()}.csv`; a.click();
+    // АПК: <a download> в WebView не сохраняет — Documents + Share.
+    void saveCsvApk(`bp-${todayIso()}.csv`, head + body);
   };
 
   const print = () => {
-    const w = window.open('', '_blank');
-    if (!w) return;
 
     const classOf = (s: number, d: number) => {
       const c = classifyBP(s, d);
@@ -432,8 +430,8 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   <p style="font-size:11px;color:#666;">Дневник сформирован автоматически. Данные не заменяют консультацию врача.</p>
 </div>`;
 
-    w.document.write(html);
-    w.document.close(); w.focus(); setTimeout(() => w.print(), 100);
+    // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
+    void printHtmlApk(html, `bp-${todayIso()}.html`);
   };
 
   if (!open) return null;
@@ -501,7 +499,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 <div style={{ fontSize: 13, marginTop: 4 }}>{alert.message}</div>
               </div>
               <button
-                style={{ ...btn, padding: '6px 10px', minHeight: 40, minWidth: 40, fontSize: 13 }}
+                style={{ ...btn, padding: '10px 12px', minHeight: 44, minWidth: 44, fontSize: 13 }}
                 onClick={() => dismissAlert(alert.id)}
                 aria-label="Закрыть предупреждение"
               >
@@ -1101,7 +1099,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {BP_SYMPTOMS.map(symptom => {
                   const active = draft.selectedSymptoms.includes(symptom);
-                  return <button key={symptom} type="button" aria-pressed={active} style={{ minHeight: 40, padding: '8px 15px', borderRadius: 999, fontSize: 12.5, fontWeight: active ? 800 : 600, border: active ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.12)', background: active ? 'linear-gradient(135deg, rgba(239,68,68,.28), rgba(239,68,68,.1))' : 'rgba(255,255,255,0.05)', color: active ? '#fff' : '#ffffff', cursor: 'pointer', boxShadow: active ? '0 4px 14px rgba(239,68,68,0.25)' : 'none' }} onClick={() => setDraft({ ...draft, selectedSymptoms: active ? draft.selectedSymptoms.filter(x => x !== symptom) : [...draft.selectedSymptoms, symptom] })}>{symptom}</button>;
+                  return <button key={symptom} type="button" aria-pressed={active} style={{ minHeight: 44, padding: '10px 15px', borderRadius: 999, fontSize: 12.5, fontWeight: active ? 800 : 600, border: active ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.12)', background: active ? 'linear-gradient(135deg, rgba(239,68,68,.28), rgba(239,68,68,.1))' : 'rgba(255,255,255,0.05)', color: active ? '#fff' : '#ffffff', cursor: 'pointer', boxShadow: active ? '0 4px 14px rgba(239,68,68,0.25)' : 'none' }} onClick={() => setDraft({ ...draft, selectedSymptoms: active ? draft.selectedSymptoms.filter(x => x !== symptom) : [...draft.selectedSymptoms, symptom] })}>{symptom}</button>;
                 })}
               </div>
             </div>

@@ -238,7 +238,7 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
         {onSvg && (
           <button
             style={{
-              minHeight: 40, padding: '8px 14px', borderRadius: 12, background: '#27272a',
+              minHeight: 44, padding: '10px 14px', borderRadius: 12, background: '#27272a',
               border: '1px solid #4b4b52', color: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
             }}
             onClick={() => svgRef.current && onSvg(svgRef.current)}
@@ -249,7 +249,7 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
         {onPng && (
           <button
             style={{
-              minHeight: 40, padding: '8px 14px', borderRadius: 12, background: '#27272a',
+              minHeight: 44, padding: '10px 14px', borderRadius: 12, background: '#27272a',
               border: '1px solid #4b4b52', color: '#fff', cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
             }}
             onClick={() => svgRef.current && onPng(svgRef.current)}

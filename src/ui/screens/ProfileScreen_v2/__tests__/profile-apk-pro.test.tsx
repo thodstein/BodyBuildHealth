@@ -110,7 +110,7 @@ describe('Profile §85 — PVE-попап: хуки и тач-цели', () => {
 });
 
 describe('Profile §86 — тело дневников: рутинг, фильтры, поиск', () => {
-  it('кнопки рутинга 48px, пропуск 44, закрытие 40', async () => {
+  it('кнопки рутинга 48px, пропуск 44, закрытие 44', async () => {
     const { ProfileDiariesTab } = await import('../ProfileDiariesTab');
     const { container, getByText, getByLabelText, queryByLabelText } = render(<ProfileDiariesTab />);
     const go = getByText(/Утренний лог/) as HTMLElement;
@@ -121,7 +121,7 @@ describe('Profile §86 — тело дневников: рутинг, фильт
     expect(queryByLabelText('Отменить лог')).toBeNull();
     fireEvent.click(go);
     expect((getByText(/Пропустить/) as HTMLElement).style.minHeight).toBe('44px');
-    expect((getByLabelText('Отменить лог') as HTMLElement).style.minHeight).toBe('40px');
+    expect((getByLabelText('Отменить лог') as HTMLElement).style.minHeight).toBe('44px');
     expect(container.querySelector('.pf-streaks')).not.toBeNull();
     cleanup();
   });
