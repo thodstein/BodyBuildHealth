@@ -7,6 +7,7 @@ import { isDayConflictWithOutside } from '../outside-load.engine';
 import { getCombat } from './combat-volume';
 import { sessionLimitsForCombat, validateSyncCombat } from './combat-limits';
 import { combatHrvReport } from './combat-monitoring.engine';
+import { cbRuInterference } from './combat-builder.engine';
 
 export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
   const warnings = [...(plan.validation?.warnings || [])];
@@ -179,7 +180,7 @@ export function buildCombatReport(plan: CombatPlan): string {
     const grip = wk.sessions.reduce((a,s)=> a + s.exercises.filter(e=> e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')).reduce((x,e)=> x+e.sets,0),0);
     lines.push(`Нед ${wk.week} ${wk.phase}: шея ${neck} сетов, хват ${grip}, ${wk.sessions.length} сессий`);
   }
-  if (plan.outsideMetrics) lines.push(`Вне зала: ${plan.outsideMetrics.weeklyLoad} load → ×${plan.outsideMetrics.volumeMultiplier} (${plan.outsideMetrics.interference}) ${plan.outsideMetrics.rationale.join(' | ')}`);
+  if (plan.outsideMetrics) lines.push(`Вне зала: ${plan.outsideMetrics.weeklyLoad} load → ×${plan.outsideMetrics.volumeMultiplier} (${cbRuInterference(plan.outsideMetrics.interference)}) ${plan.outsideMetrics.rationale.join(' | ')}`);
   lines.push(`Rationale: ${plan.rationale.slice(0,5).join(' | ')}`);
   if (plan.validation?.warnings.length) lines.push(`Предупреждения (${plan.validation.warnings.length}): ${plan.validation.warnings.slice(0,5).join(' | ')}`);
   if (plan.validation && !plan.validation.ok) lines.push(`Ошибки: ${plan.validation.errors.join(' | ')}`);

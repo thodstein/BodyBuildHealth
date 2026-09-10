@@ -111,6 +111,14 @@ const CB_EX_META: Record<string, { name: string; group: string; pattern: string 
 export function cbExerciseName(id: string): string {
   return CB_EX_META[id]?.name || id;
 }
+/** RU-подписи ids для rationale/отчёта (видны пользователю в плане). */
+const CB_RU_DISC: Record<string, string> = { boxing: 'Бокс', mma: 'ММА', wrestling: 'Борьба', kickboxing: 'Кикбоксинг', general: 'Общая' };
+const CB_RU_GOAL: Record<string, string> = { power: 'взрывная сила', endurance: 'выносливость', maintenance: 'поддержание', camp: 'кэмп к бою', weight_cut: 'весогонка' };
+const CB_RU_STYLE: Record<string, string> = { striker: 'ударник', grappler: 'борец', hybrid: 'гибрид' };
+const CB_RU_MODEL: Record<string, string> = { atr_10: 'ATR 5/3/2', linear_12: 'Linear 12', conjugate: 'Conjugate' };
+const CB_RU_INTERF: Record<string, string> = { high: 'высокая', medium: 'средняя', low: 'низкая' };
+const CB_RU_MODE: Record<string, string> = { stable: 'стабильно', load_cut: 'загрузка-срез', moderate_cut: 'плавный срез', deplete_reload: 'слив-загрузка' };
+export function cbRuInterference(v: string): string { return CB_RU_INTERF[v] || v; }
 const CB_TECHNIQUE: Record<string,string> = {
   bench_bar:'Жим: лопатки сведены, грудь вверх, стопы в пол',
   row_bar:'Тяга: нейтральная спина, локти к корпусу',
@@ -340,14 +348,14 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   const wcProtocol = input.weightCutProtocol || (goal === 'weight_cut' && input.weightCutKg ? buildWeightCutProtocol(input.weightCutKg, { startWeightKg: input.bodyweight } as any) : null);
   const rationale: string[] = [];
   if (forceDowngraded) rationale.push(`Частота зала снижена ${origPatternId}→${pattern.id} из-за высокой внезальной ${outsideSessions}×/нед (sparring) — перегруз предотвращён`);
-  rationale.push(`Дисциплина: ${discipline} · стиль ${input.fightStyle || 'hybrid'} · цель ${goal} · ${weeks} нед · ${pattern.name} · модель ${periodModelEarly}`);
+  rationale.push(`Дисциплина: ${CB_RU_DISC[discipline] || discipline} · стиль ${CB_RU_STYLE[input.fightStyle as string] || input.fightStyle || 'гибрид'} · цель ${CB_RU_GOAL[goal] || goal} · ${weeks} нед · ${pattern.name} · модель ${CB_RU_MODEL[periodModelEarly] || periodModelEarly}`);
   rationale.push(styleNarrative(input.fightStyle as any, discipline as any));
   if (input.sparringLoad) rationale.push(sparringSummary(input.sparringLoad));
-  if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load (${outsideMetrics.interference}) → объём зала ×${outsideMetrics.volumeMultiplier}`);
+  if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load (${cbRuInterference(outsideMetrics.interference)}) → объём зала ×${outsideMetrics.volumeMultiplier}`);
   rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)}${acwrMult !== 1 ? ` · ACWR ×${acwrMult.toFixed(2)}` : ''} · Budget ${weeklyBudget}`);
   if (input.weightCutKg && input.weightCutKg > 0 && !wcProtocol) rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
   if (wcProtocol) {
-    rationale.push(`Протокол весогонки: ${wcProtocol.targetLossKg}кг за ${wcProtocol.weeksOut}нед · вода ${wcProtocol.waterMode} · Na ${wcProtocol.sodiumMode} · угли ${wcProtocol.carbMode}${wcProtocol.heatSessions?' · сауна':''}`);
+    rationale.push(`Протокол весогонки: ${wcProtocol.targetLossKg}кг за ${wcProtocol.weeksOut}нед · вода ${CB_RU_MODE[wcProtocol.waterMode] || wcProtocol.waterMode} · Na ${CB_RU_MODE[wcProtocol.sodiumMode] || wcProtocol.sodiumMode} · угли ${CB_RU_MODE[wcProtocol.carbMode] || wcProtocol.carbMode}${wcProtocol.heatSessions?' · сауна':''}`);
     const nut = weightCutNutritionForWeek(1, weeks, wcProtocol, input.bodyweight || 80, input.sex as any);
     if (nut.kcal) rationale.push(`Питание W1: ${nut.kcal}ккал P${nut.proteinG}/C${nut.carbsG} · вода ${nut.waterMl}мл Na ${nut.sodiumMg}мг`);
     rationale.push(weightCutRehydrationNotes(wcProtocol.targetLossKg)[0]);

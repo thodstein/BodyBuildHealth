@@ -51,6 +51,12 @@ const STEP_GROUPS: Record<string, Step[]> = {
   'ВЫДАЧА': ['export'],
 };
 const WM_LABEL_RU: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Тяга', chest: 'Грудь', back: 'Спина', quads: 'Квадрицепс', hamstrings: 'Бицепс бедра', shoulders: 'Плечи' };
+/* RU-подписи для саммари/кнопок — те же строки, что в шитах выбора */
+const DISC_RU: Record<string, string> = { boxing: 'Бокс', mma: 'ММА', wrestling: 'Борьба', kickboxing: 'Кикбоксинг', general: 'Общая' };
+const GOAL_RU: Record<string, string> = { power: 'Взрывная сила', endurance: 'Выносливость', maintenance: 'Поддержание', camp: 'Кэмп к бою', weight_cut: 'Весогонка' };
+const METHOD_RU: Record<string, string> = { compound_first: 'База первой', pre_exhaust: 'Предутомление', post_exhaust: 'Постутомление' };
+const DUP_RU: Record<string, string> = { off: 'DUP выкл', power_endurance: 'Сила/выносливость', heavy_light: 'Тяж/лёгк', conjugate: 'Сопряжённая' };
+const STYLE_RU: Record<string, string> = { striker: 'Ударник', grappler: 'Борец', hybrid: 'Гибрид' };
 
 const rangeStyle: React.CSSProperties = {
   width: '100%', height: 6, borderRadius: 999, appearance: 'none' as any, WebkitAppearance: 'none' as any,
@@ -512,7 +518,7 @@ export const CombatConstructor: React.FC = () => {
 
       {step === 'params' && (
         <div className="cb-pane" data-pane="params" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <CbSec title="🎯 Дисциплина и цель" defaultOpen summary={`${discipline} · ${goal} · ${weeks}нед`}>
+          <CbSec title="🎯 Дисциплина и цель" defaultOpen summary={`${DISC_RU[discipline] || discipline} · ${GOAL_RU[goal] || goal} · ${weeks}нед`}>
             <SectionCard icon="🎯" title="Дисциплина и цель" subtitle="Подбирает акценты: шея/хват/ротация">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <CombatPopupSelect label="Дисциплина" value={discipline} onChange={v=> setDiscipline(v as any)} options={[
@@ -568,13 +574,13 @@ export const CombatConstructor: React.FC = () => {
                 ]} />
               </div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:2 }}>
-                <span style={{ fontSize:10, color:'#fff', background:'rgba(168,85,247,0.08)', padding:'4px 8px', borderRadius:8, border:'1px solid rgba(168,85,247,0.14)' }}><Highlight color="#a855f7">50% Accum</Highlight> 6-10/RIR2-3 → <Highlight>30% Trans</Highlight> 3-6/RIR1-2 → <Highlight>20% Real</Highlight> RIR4</span>
-                <span style={{ fontSize:10, color:'#fff', background:'rgba(59,130,246,0.06)', padding:'4px 8px', borderRadius:8, border:'1px solid rgba(59,130,246,0.14)' }}><Highlight color="#3b82f6">Alactic 8×10с</Highlight> · <Highlight color="#3b82f6">Lactic 5×3мин</Highlight> · <Highlight color="#3b82f6">Aerobic 40′</Highlight></span>
+                <span style={{ fontSize:11, color:'#fff', background:'rgba(168,85,247,0.08)', padding:'6px 10px', borderRadius:8, border:'1px solid rgba(168,85,247,0.14)' }}><Highlight color="#a855f7">50% Accum</Highlight> 6-10/RIR2-3 → <Highlight>30% Trans</Highlight> 3-6/RIR1-2 → <Highlight>20% Real</Highlight> RIR4</span>
+                <span style={{ fontSize:11, color:'#fff', background:'rgba(59,130,246,0.06)', padding:'6px 10px', borderRadius:8, border:'1px solid rgba(59,130,246,0.14)' }}><Highlight color="#3b82f6">Alactic 8×10с</Highlight> · <Highlight color="#3b82f6">Lactic 5×3мин</Highlight> · <Highlight color="#3b82f6">Aerobic 40′</Highlight></span>
               </div>
             </SectionCard>
           </CbSec>
 
-          <CbSec title="🧠 Методика и интенсивность" summary={`${methodology} · ${dupMode}`}>
+          <CbSec title="🧠 Методика и интенсивность" summary={`${METHOD_RU[methodology ?? ''] || methodology} · ${DUP_RU[dupMode ?? ''] || dupMode}`}>
             <SectionCard icon="🧠" title="Методика и интенсивность" subtitle="Подсвечены зоны RIR/веса">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <CombatPopupSelect label="Порядок" value={methodology} onChange={v=> setMethodology(v as any)} options={[
@@ -654,7 +660,7 @@ export const CombatConstructor: React.FC = () => {
                   const d = vals.best>0 && vals.last>0 ? diagnoseVelocityLossCombat(vals.best, vals.last, 20) : null;
                   return (
                     <div key={lift} style={{ background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', gap:6 }}>
-                      <div style={{ fontSize:10, fontWeight:800, color:'#c4b5fd', textTransform:'uppercase', letterSpacing:0.5 }}>{lift === 'squat' ? '🦵 Присед' : lift === 'bench_bar' ? '🏋️ Жим' : '💪 Тяга'} · {lift}</div>
+                      <div style={{ fontSize:10, fontWeight:800, color:'#c4b5fd', textTransform:'uppercase', letterSpacing:0.5 }}>{lift === 'squat' ? '🦵 Присед' : lift === 'bench_bar' ? '🏋️ Жим' : '💪 Тяга'}</div>
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                         <Field label="Best м/с"><input type="number" step={0.05} value={vals.best || ''} onChange={e => { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), best:v}})); }} style={INPUT} placeholder="0.80" /></Field>
                         <Field label="Last м/с"><input type="number" step={0.05} value={vals.last || ''} onChange={e => { const v=Number(e.target.value)||0; setVbtPerLift(s=> ({...s, [lift]:{...((s as any)[lift]||{best:0,last:0}), last:v}})); }} style={INPUT} placeholder="0.60" /></Field>
@@ -664,7 +670,7 @@ export const CombatConstructor: React.FC = () => {
                   );
                 })}
               </div>
-              <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>Per-lift приоритетнее скаляра: если заполнен хотя бы один lift (squat/bench/row) — builder режет вес/RIR индивидуально (иначе скаляр Best/Last).</div>
+              <div style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>По лифтам приоритетнее скаляра: присед/жим/тяга режутся индивидуально (иначе скаляр Best/Last).</div>
             </SectionCard>
           </CbSec>
 
@@ -678,7 +684,7 @@ export const CombatConstructor: React.FC = () => {
                 ))}
               </div>
               <button onClick={() => setShowExactWM(v => !v)} style={{ ...BTN, background: showExactWM ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${showExactWM ? 'rgba(168,85,247,0.28)' : 'rgba(255,255,255,0.07)'}`, color: showExactWM ? '#d8b4fe' : '#fff', fontSize: 11 }}>
-                {showExactWM ? '▲ Скрыть точные веса' : '▼ Точные веса по упражнениям (64)'}
+                {showExactWM ? '▲ Скрыть точные веса' : '▼ Точные веса по упражнениям'}
               </button>
               {showExactWM && (() => {
                 const WM_GROUPS: Record<string, { label: string; ids: string[] }> = {
@@ -698,7 +704,7 @@ export const CombatConstructor: React.FC = () => {
                           {grp.ids.map(id => (
                             <label key={id} style={{ color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', gap: 4 }}>
                               {cbExerciseName(id)}
-                              <input type="number" value={workMaxByExercise[id] || ''} onChange={e => { const v = Number(e.target.value) || 0; setWorkMaxByExercise(s => { const n = { ...s }; if (v > 0) n[id] = v; else delete n[id]; return n; }); }} style={{ ...INPUT, padding: '7px 8px', fontSize: 12 }} placeholder="кг" aria-label={cbExerciseName(id)} />
+                              <input type="number" value={workMaxByExercise[id] || ''} onChange={e => { const v = Number(e.target.value) || 0; setWorkMaxByExercise(s => { const n = { ...s }; if (v > 0) n[id] = v; else delete n[id]; return n; }); }} style={{ ...INPUT, padding: '10px 8px', fontSize: 13 }} placeholder="кг" aria-label={cbExerciseName(id)} />
                             </label>
                           ))}
                         </div>
@@ -782,7 +788,7 @@ export const CombatConstructor: React.FC = () => {
               </Field>
               {weightCut > 0 && (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
                     <CombatPopupSelect label="Взвешивание" value={weighInType} onChange={v=> setWeighInType(v as any)} options={[{id:'day_before_24h',label:'За 24ч (MMA/бокс)',desc:'8-12г/кг рефид'},{id:'same_day_2h',label:'В день (борьба)',desc:'≤3кг, без острой'}]} />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -794,8 +800,8 @@ export const CombatConstructor: React.FC = () => {
                     <Field label={`ORS Na ${orsSodium} mmol/дл`} hint="ISSN 50-90">
                       <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={30} max={90} step={5} value={orsSodium} onChange={e => setOrsSodium(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{orsSodium}</Highlight></div>
                     </Field>
-                    <Field label="Клетчатка fight week" hint={'ISSN <10г ×4д =1-2% BM'}>
-                      <div style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>10г/день — low fiber 4д</div>
+                    <Field label="Клетчатка · нед. боя" hint={'ISSN <10г ×4д =1-2% BM'}>
+                      <div style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>10г/день — низкая клетчатка 4 дн</div>
                     </Field>
                   </div>
                   <CbSwitch checked={heatSessions} onChange={setHeatSessions} label="Сауна 15-20′ ×3/нед" desc="heat acclimation (≤4% BM/24ч)" />
@@ -819,8 +825,8 @@ export const CombatConstructor: React.FC = () => {
                 <>
                   <Field label="Режим учёта">
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => setSparringEnabled(false)} style={sparringEnabled ? BTN : { ...BTN, background: ACCENT_GRAD, color: '#fff', border: 'none' } as any}>Общий — OutsideLoad</button>
-                      <button onClick={() => setSparringEnabled(true)} style={!sparringEnabled ? BTN : { ...BTN, background: ACCENT_GRAD, color: '#fff', border: 'none' } as any}>Декомпозиция — P0-6</button>
+                      <button onClick={() => setSparringEnabled(false)} style={sparringEnabled ? BTN : { ...BTN, background: ACCENT_GRAD, color: '#fff', border: 'none' } as any}>Общий учёт</button>
+                      <button onClick={() => setSparringEnabled(true)} style={!sparringEnabled ? BTN : { ...BTN, background: ACCENT_GRAD, color: '#fff', border: 'none' } as any}>Декомпозиция спарринга</button>
                     </div>
                   </Field>
 
@@ -850,10 +856,10 @@ export const CombatConstructor: React.FC = () => {
 
                   {sparringEnabled && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 10, background: 'rgba(0,0,0,0.14)', padding: 12, borderRadius: 12, border: '0.5px solid rgba(255,255,255,0.06)' }}>
-                      <Field label="Hard spar" hint={`RPE 8.5 · 90мин`}>
+                      <Field label="Жёсткий спарринг" hint={`RPE 8.5 · 90мин`}>
                         <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={4} value={sparringHard} onChange={e => setSparringHard(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#ff3b30">{sparringHard}×</Highlight></div>
                       </Field>
-                      <Field label="Tech spar" hint={`RPE 5.5 · 60мин`}>
+                      <Field label="Технический спарринг" hint={`RPE 5.5 · 60мин`}>
                         <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={4} value={sparringTech} onChange={e => setSparringTech(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#64d2ff">{sparringTech}×</Highlight></div>
                       </Field>
                       <Field label="Борьба" hint={`RPE 7.5 · 75мин`}>
@@ -873,8 +879,8 @@ export const CombatConstructor: React.FC = () => {
             </SectionCard>
           </CbSec>
 
-          <CbSec title="🥊 Стиль боя и осевая нагрузка" summary={fightStyle}>
-            <SectionCard icon="🥊" title="Стиль боя и осевая нагрузка" subtitle="Стиль меняет объём: striker +ротация, grappler +шея/хват">
+          <CbSec title="🥊 Стиль боя и осевая нагрузка" summary={STYLE_RU[fightStyle] || fightStyle}>
+            <SectionCard icon="🥊" title="Стиль боя и осевая нагрузка" subtitle="Стиль меняет объём: ударник +ротация, борец +шея/хват">
               <Field label="Стиль боя">
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <ChipToggle active={fightStyle === 'striker'} onClick={() => setFightStyle('striker')} icon="👊">Ударник</ChipToggle>
@@ -926,7 +932,7 @@ export const CombatConstructor: React.FC = () => {
                   </div>
                   <div style={{ fontSize: 11.5, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{p.description}</div>
                   <div className="cb-split-preview" style={{ fontSize: 11, color: '#fff', marginTop: 6, fontFamily: 'ui-monospace, monospace', background: 'rgba(0,0,0,0.18)', padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>{preview}</div>
-                  {active && <div className="cb-split-active" style={{ fontSize: 11, color: '#d8b4fe', fontWeight: 800, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', boxShadow: '0 0 8px #a855f7' }} /> Выбран — предпросмотр: {p.schedule.filter(s => s.kind === 'тренировка').map(s => s.sessionTag).join(', ')}</div>}
+                  {active && <div className="cb-split-active" style={{ fontSize: 11, color: '#d8b4fe', fontWeight: 800, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', boxShadow: '0 0 8px #a855f7' }} /> Выбран — предпросмотр: {p.schedule.filter(s => s.kind === 'тренировка').map(s => SESSION_TAG_RU[s.sessionTag || ''] || s.sessionTag).join(', ')}</div>}
                 </button>
               );
             })}
