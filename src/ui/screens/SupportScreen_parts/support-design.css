@@ -1465,6 +1465,34 @@
   line-height: 1.3 !important;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+ * §31. ТЕЛЕФОН ≤480px: плоский скролл вместо колодцев.
+ * Вложенные max-height+overflow-y внутри скролла страницы на таче
+ * дерутся: низ контента недостижим, экран «не помещается». На телефоне
+ * скроллит одна страница. Модалки (.sup-manualpick/.sup-modals/
+ * .sup-dialog/85vh-шит) НЕ трогаем — у них свой оверлей-скролл.
+ * Только подача (kebab-селекторы, без hex).
+ * ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .support-screen.support-root [data-sup='content'] [data-sup='content'] {
+    overflow: visible !important;
+  }
+  .support-screen.support-root .sup-interact [style*='max-height: calc(70vh)'],
+  .support-screen.support-root .sup-research [style*='max-height: 400px'],
+  .support-screen.support-root .sup-research [style*='max-height: 300px'],
+  .support-screen.support-root .sup-synergy [style*='max-height: 400px'],
+  .support-screen.support-root .sup-analog [style*='max-height: 200px'],
+  .support-screen.support-root .sup-timing [style*='max-height: 150px'],
+  .support-screen.support-root .sup-diary [style*='max-height: 96px'] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  /* Липкая лента хаба была шире контейнера на 16px (margin -8px) — резалась. */
+  .support-screen.support-root .sup-calctools [style*='position: sticky'] {
+    margin: 0 0 10px !important;
+  }
+}
+
 /* ─── 27.4. ДНЕВНИК — gauge + табы + ряды ──────────────────── */
 .support-screen.support-root .sup-diary > div[style*='border-radius: 14'] {
   background: linear-gradient(180deg, rgba(22,30,52,0.76), rgba(14,20,38,0.76)) !important;

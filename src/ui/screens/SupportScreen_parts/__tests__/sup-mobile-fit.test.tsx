@@ -382,6 +382,10 @@ describe('SUP mobile fit (360px)', () => {
       'min-width: 44px',
       'repeat(2, 1fr)',
       'flex-wrap: wrap',
+      // §31 плоский скролл: колодцы распрямлены, лента без минусовых полей
+      'max-height: none',
+      'overflow: visible',
+      'margin: 0 0 10px',
     ]) {
       expect(css, hook).toContain(hook);
     }
