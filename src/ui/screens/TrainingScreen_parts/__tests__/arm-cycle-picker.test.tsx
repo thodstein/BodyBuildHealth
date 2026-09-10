@@ -75,6 +75,17 @@ describe('Arm cycle picker', () => {
     expect(container.querySelectorAll("[data-arm='cycle-picker'] .ad-split").length).toBe(ARM_CYCLE_LIBRARY.length);
   });
 
+  it('шит — портал в body: fixed строго по вьюпорту, не в карточке', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    const dlg = openCycleSheet();
+    const portal = dlg.closest('[data-arm="sheet-portal"]');
+    expect(portal, 'portal wrapper').not.toBeNull();
+    expect(portal!.parentElement).toBe(document.body);
+    // вне фильтрованных предков: ближайший .ad-card/.ad-steps — только портал-скоуп
+    expect(dlg.closest('.ad-card')).toBeNull();
+  });
+
   it('выбор из шита ставит цикл ( Toproll )', () => {
     render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));

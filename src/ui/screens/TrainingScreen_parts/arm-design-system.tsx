@@ -7,6 +7,7 @@
  * строки/aria/роли задаёт вызывающий (контракты тестов не меняются).
  */
 import React from 'react';
+import ReactDOM from 'react-dom';
 import './arm-design.css';
 import { isNativeApp } from '../../../core/app-platform';
 import { ensureArmApkStyles } from './arm-apk-loader';
@@ -289,7 +290,11 @@ export function AdSheetSelect({
           ▾
         </span>
       </button>
-      {open && (
+      {open && typeof document !== 'undefined' && ReactDOM.createPortal(
+        // Скоуп-обёртка: шит живёт в body (fixed ровно по вьюпорту, без
+        // влияния backdrop-filter/transform предков), а классы .ad-* цепляются.
+        // В native — тот же arm-apk скоуп, чтобы работали APK-правила шита.
+        <div className={isNativeApp() ? 'train-arm arm-apk' : 'train-arm'} data-arm="sheet-portal">
         <div className="ad-sheet-backdrop" onClick={() => setOpen(false)}>
           <div
             className="ad-sheet-card"
@@ -324,6 +329,8 @@ export function AdSheetSelect({
             </AdBtn>
           </div>
         </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

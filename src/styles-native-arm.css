@@ -895,3 +895,36 @@ html.app-native .train-arm.arm-apk .ad-sheet-value {
     transition: none !important;
   }
 }
+
+/* ─── 25. НОЛЬ БОКОВОГО СКРОЛЛА + ШИТЫ СТРОГО ПО ВЬЮПОРТУ ────────── */
+/* Страничный скролл вправо давали отрицательные поля липких лент
+ * (ad-steps margin 0 -4px) — режем переполнение, липкость цела
+ * (clip, в отличие от hidden, sticky не ломает). */
+html.app-native body {
+  overflow-x: clip !important;
+}
+
+html.app-native .train-arm.arm-apk,
+html.app-native .train-armdiag.arm-apk {
+  overflow-x: clip !important;
+  max-width: 100% !important;
+}
+
+html.app-native .train-arm.arm-apk .ad-steps,
+html.app-native .train-armdiag.arm-apk .ad-steps {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Портальный шит: страховка геометрии поверх вьюпорта + safe-area низа */
+html.app-native .train-arm.arm-apk [data-arm='sheet-portal'] .ad-sheet-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .train-arm.arm-apk [data-arm='sheet-portal'] .ad-sheet-card {
+    max-width: 100% !important;
+  }
+}
