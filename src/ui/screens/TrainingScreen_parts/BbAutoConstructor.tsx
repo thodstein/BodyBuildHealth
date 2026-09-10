@@ -3831,6 +3831,37 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
         </div>
 
+        {/* Топ-волна: сводка валидатора в выдаче (CYCLE-SYSTEM-FULL-AUDIT Ф5) */}
+        {(() => {
+          try {
+            const v = validateBBPlan(builtPlan, builtPlan.safetyConstraints);
+            const errs = v.issues.filter((i: any) => i.level === 'error');
+            const warns = v.issues.filter((i: any) => i.level === 'warning');
+            const ok = errs.length === 0;
+            return (
+              <CollapsibleCard
+                title="🧪 Валидация плана"
+                defaultOpen={false}
+                headerStyle={{ background: ok ? 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))' : 'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(239,68,68,0.04))', color: ok ? '#22c55e' : '#ef4444' }}
+                badge={ok ? `✓ 0 ошибок · ${warns.length} замечаний` : `✗ ${errs.length} ошибок · ${warns.length} замечаний`}
+              >
+                {v.issues.length === 0 ? (
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>Проблем не найдено: объём в коридорах, делоды снижены, фазы размечены.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {[...errs, ...warns].slice(0, 12).map((i: any, k: number) => (
+                      <div key={k} style={{ fontSize: 11, color: i.level === 'error' ? '#ef4444' : '#e5e7eb', padding: '4px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)' }}>
+                        {i.level === 'error' ? '⛔' : '⚠'} {i.message}
+                      </div>
+                    ))}
+                    {v.issues.length > 12 && <div style={{ fontSize: 10, color: '#fff' }}>… и ещё {v.issues.length - 12} замечаний</div>}
+                  </div>
+                )}
+              </CollapsibleCard>
+            );
+          } catch { return null; }
+        })()}
+
         {/* Верхняя инфо перенесена в шаг Качество — здесь только план упражнений */}
         {(() => {
           const vol = builtPlan.rotationMuscleVolume || {};
