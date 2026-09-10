@@ -473,7 +473,7 @@ export const StrengthSportConstructor: React.FC = () => {
       {step === 'params' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <SectionCard icon="🎯" title="Режим и цель" subtitle="Подбирает сплит, тоннаж и % зоны" summary={`${ruLabel(MODE_RU, mode)} · ${ruLabel(GOAL_RU, goal)} · ${ruLabel(LEVEL_RU, level)} · ${weeks}н × ${days}дн`}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
               <StrengthPopupSelect label="Режим" value={mode} onChange={v=> setMode(v as any)} strong={mode==='strongman'} options={[
                 { id:'weightlifting', label:'🏋️ ТА', desc:'рывок/толчок/присед' },
                 { id:'strongman', label:'🪨 Стронг', desc:'йок/фермер/камни' },
@@ -487,7 +487,7 @@ export const StrengthSportConstructor: React.FC = () => {
                 { id:'maintenance', label:'🛡️ Поддержание', desc:'минимум' },
               ]} />
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
               <StrengthPopupSelect label="Уровень" value={level} onChange={v=> setLevel(v as any)} options={[
                 { id:'beginner', label:'Новичок', desc:'RIR 3-4' },
                 { id:'intermediate', label:'Средний', desc:'RIR 2-3' },
@@ -506,9 +506,9 @@ export const StrengthSportConstructor: React.FC = () => {
             </div>
             <Divider />
             <GroupHeading icon="📅" text="Объём цикла" desc="Недели и частота — тоннаж и восстановление" />
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <Field label={`Недель`} hint={`${weeks} нед — мезоцикл`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{weeks}</Highlight></div><div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff', fontFamily:'-apple-system, system-ui, sans-serif' }}><span>2</span><span>16</span></div></Field>
-              <Field label={`Дней / нед`} hint={`${days}× — сплит и тоннаж`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={6} value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{days}×</Highlight></div><div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff' }}><span>2</span><span>6</span></div></Field>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <Field label={`Недель`} hint={`${weeks} нед — мезоцикл`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{weeks}</Highlight></div></Field>
+              <Field label={`Дней / нед`} hint={`${days}× — сплит и тоннаж`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={6} value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{days}×</Highlight></div></Field>
             </div>
           </SectionCard>
 
