@@ -40,7 +40,7 @@ export function HubGripTab({ H }: { H: any }) {
       <AdGrid cols="2">
         <AdSec title={`Force Vector · WAF ${weightClassAuto}`}>
           <div className="ad-hero-side" data-arm="force-score">
-            <div className="ad-hero-score" aria-hidden><b>{forceVecPro.totalScore}</b><span>сила</span></div>
+            <div className="ad-hero-score" aria-hidden><b style={{ fontVariantNumeric: 'tabular-nums' }}>{forceVecPro.totalScore}</b><span>сила</span></div>
             <div className="ad-hero-name">Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch}<span>Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure}</span></div>
             {forceVecPro.asymmetryPct!=null && <span className="ad-tag" data-sev={forceVecPro.asymmetryPct>=12?'bad':forceVecPro.asymmetryPct>=7?'warn':'ok'}>Асим {forceVecPro.asymmetryPct}%</span>}
           </div>
@@ -144,7 +144,7 @@ export function HubWristTab({ H }: { H: any }) {
           <AdChip active={false} onClick={()=>toggleWeakPoint(autoPoint)}>+ Добавить {autoPoint}</AdChip>
         </AdBanner>
       )}
-      <AdSec title="📹 Видео (BlazePose/HANDS) — опционально" hint="Камера или landmarks JSON → углы автоматически (estimateAnglesFromLandmarks + angleBetween). Fallback — ручные ползунки.">
+      <AdSec title="📹 Видео (BlazePose/HANDS) — опционально" hint="Камера или landmarks JSON → углы автоматически (estimateAnglesFromLandmarks + angleBetween). Fallback — ручные ползунки." collapsible defaultOpen={false} summary={showCam ? 'камера вкл' : 'ручной ввод'}>
         {!isOnline() && <AdBanner tone="warn">📴 Офлайн (APK): Hands-модель грузится из CDN и недоступна — камера покажет картинку без live-углов, вводи углы вручную или JSON.</AdBanner>}
         <div className="ad-row">
           <AdChip active={showCam} tone="green" onClick={()=> setShowCam((v: boolean)=>!v)}>{showCam?'⏹ Выкл камеру':'📹 Включить камеру'}</AdChip>
@@ -181,7 +181,7 @@ export function HubWristTab({ H }: { H: any }) {
           )}
         </div>
       </AdSec>
-      <AdSec title="🎯 12 мёртвых точек (1–3)" hint={`Группы Кисть/Ротация/Давление · техника ${state.technique} · до 3`}>
+      <AdSec title="🎯 12 мёртвых точек (1–3)" hint={`Группы Кисть/Ротация/Давление · техника ${state.technique} · до 3`} status={state.weakPoints.length ? 'ok' : undefined}>
         <div className="ad-row" data-arm="wp-groups">
           {WEAK_GROUPS.map(g=> (
             <div key={g.title}>
