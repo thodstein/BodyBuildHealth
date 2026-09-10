@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { ArmAutoConstructor, loadArmVariants, saveArmVariants } from '../ArmAutoConstructor';
+import { ArmAutoConstructor, loadArmVariants, saveArmVariants, compareArmVariants } from '../ArmAutoConstructor';
 
 beforeEach(() => {
   localStorage.clear();
@@ -70,5 +70,34 @@ describe('Arm plan variants', () => {
     const bad = new File(['{oops'], 'bad.json', { type: 'application/json' });
     fireEvent.change(input, { target: { files: [bad] } });
     await screen.findByText('⚠ Битый JSON-файл');
+  });
+
+  it('compareArmVariants: недели/сеты/дельты по мышцам', () => {
+    const mk = (sets: number, muscle = 'wrist_flexors') => ({
+      pattern: { id: 'p', name: 'P' },
+      weeks: [{ week: 1, phase: 'accumulation', sessions: [{ exercises: [{ muscle, sets }] }] }],
+    });
+    expect(compareArmVariants(null as any, mk(1))).toBeNull();
+    const d = compareArmVariants(mk(4), mk(7))!;
+    expect(d.weeksA).toBe(1);
+    expect(d.setsA).toBe(4);
+    expect(d.setsB).toBe(7);
+    expect(d.rows).toEqual([{ muscle: 'wrist_flexors', a: 4, b: 7, d: 3 }]);
+    const same = compareArmVariants(mk(4), mk(4))!;
+    expect(same.rows.every((r) => r.d === 0)).toBe(true);
+  });
+
+  it('UI: выбор двух вариантов показывает дельты', () => {
+    build();
+    fireEvent.click(screen.getByRole('button', { name: /Варианты плана/ }));
+    fireEvent.change(screen.getByLabelText('Название варианта'), { target: { value: 'VA' } });
+    fireEvent.click(screen.getByText(/Сохранить вариант/));
+    fireEvent.change(screen.getByLabelText('Название варианта'), { target: { value: 'VB' } });
+    fireEvent.click(screen.getByText(/Сохранить вариант/));
+    const toggles = screen.getAllByRole('button', { name: /Сравнить V/ });
+    expect(toggles.length).toBe(2);
+    fireEvent.click(toggles[0]);
+    fireEvent.click(toggles[1]);
+    expect(document.body.textContent).toContain('Объёмы идентичны.');
   });
 });

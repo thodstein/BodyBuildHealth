@@ -217,6 +217,44 @@ export function saveArmVariants(list: ArmPlanVariant[]): void {
   try { localStorage.setItem(ARM_VARIANTS_KEY, JSON.stringify(list.slice(0, 10))); } catch {}
 }
 
+/* ── Сравнение вариантов: недели/сеты/фазы/помышечный объём с дельтой.
+ * Чистая функция; UI — выбор двух чекбоксами в секции вариантов. ── */
+export type ArmVariantDiff = {
+  weeksA: number; weeksB: number;
+  setsA: number; setsB: number;
+  phasesA: string; phasesB: string;
+  rows: Array<{ muscle: string; a: number; b: number; d: number }>;
+};
+function planMuscleSets(plan: any): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const wk of plan?.weeks || []) {
+    for (const s of wk.sessions || []) {
+      for (const e of s.exercises || []) {
+        const m = String(e.muscle || '—');
+        out[m] = (out[m] || 0) + (e.sets || 0);
+      }
+    }
+  }
+  return out;
+}
+function planTotalSets(plan: any): number {
+  return Object.values(planMuscleSets(plan)).reduce((a: number, v) => (a as number) + (v as number), 0) as number;
+}
+export function compareArmVariants(a: any, b: any): ArmVariantDiff | null {
+  if (!a || !b || !Array.isArray(a.weeks) || !Array.isArray(b.weeks)) return null;
+  const ma = planMuscleSets(a);
+  const mb = planMuscleSets(b);
+  const keys = Array.from(new Set([...Object.keys(ma), ...Object.keys(mb)])).sort();
+  const rows = keys.map((muscle) => ({ muscle, a: ma[muscle] || 0, b: mb[muscle] || 0, d: (mb[muscle] || 0) - (ma[muscle] || 0) }));
+  const ph = (p: any) => (p.weeks || []).map((w: any) => String(w.phase || '').slice(0, 3)).join('→');
+  return {
+    weeksA: (a.weeks || []).length, weeksB: (b.weeks || []).length,
+    setsA: planTotalSets(a), setsB: planTotalSets(b),
+    phasesA: ph(a), phasesB: ph(b),
+    rows,
+  };
+}
+
 /* ── №1 Ручная коррекция плана (overlay поверх builtPlan, как exerciseEdits
  * в ББ-авто): сеты/повторы/вес + своп внутри substitutionGroup каталога.
  * Валидация/отчёт остаются базовыми (честная пометка «с правками»). ── */
@@ -792,6 +830,14 @@ export function ArmAutoConstructor() {
   // №2: сохранённые варианты
   const [armVariants, setArmVariants] = useState<ArmPlanVariant[]>(() => loadArmVariants());
   const [variantName, setVariantName] = useState('');
+  const [cmpIds, setCmpIds] = useState<string[]>([]);
+  const cmpDiff = useMemo(() => {
+    if (cmpIds.length !== 2) return null;
+    const va = armVariants.find(v => v.id === cmpIds[0]);
+    const vb = armVariants.find(v => v.id === cmpIds[1]);
+    if (!va || !vb) return null;
+    return { names: [va.name, vb.name] as [string, string], diff: compareArmVariants(va.plan, vb.plan) };
+  }, [cmpIds, armVariants]);
   // Год: серия → блоки (preview) → сборка каждого buildArmBlock
   const [yearSeries, setYearSeries] = useState<string>('local');
   const [yearWeeks, setYearWeeks] = useState<number>(52);
@@ -1005,8 +1051,8 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   ))}
                 </AdGrid>
               </>
-            )}
-          </AdSec>
+                )}
+              </AdSec>
 
           <AdSec title="🏋️ Рабочие максимумы (для прогрессии веса)" hint="Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%)." collapsible defaultOpen={false} summary={summWm} status={Object.values(workMaxEdit).some(v=>v!=='') ? 'ok' : undefined}>
             <AdGrid cols="3">
@@ -1674,6 +1720,12 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                       <div key={v.id} className="ad-sec ad-bio" data-valid="na">
                         <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                           <span style={{ flex: 1 }}><b>{v.name}</b> <span className="ad-muted">· {(v.plan?.weeks || []).length} нед · {String(v.dateIso || '').slice(0, 10)}</span></span>
+                          <AdChip active={cmpIds.includes(v.id)} onClick={()=>{
+                            setCmpIds(prev=>{
+                              if (prev.includes(v.id)) return prev.filter(x=>x!==v.id);
+                              return [...prev, v.id].slice(-2);
+                            });
+                          }} aria-label={`Сравнить ${v.name}`}>⇄</AdChip>
                           <AdBtn variant="ghost" aria-label={`Загрузить ${v.name}`} style={{ minWidth: 48, minHeight: 48 }} onClick={()=>{
                             setBuiltPlan(v.plan);
                             try { localStorage.setItem('he_arm_last_plan', JSON.stringify(v.plan)); } catch {}
@@ -1703,6 +1755,22 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+                {cmpDiff?.diff && (
+                  <div data-arm="variants-diff" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div className="ad-sec-t">⇄ {cmpDiff.names[0]} vs {cmpDiff.names[1]}</div>
+                    <div className="ad-muted" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      Недели {cmpDiff.diff.weeksA} → {cmpDiff.diff.weeksB} · Сеты {cmpDiff.diff.setsA} → {cmpDiff.diff.setsB} ({cmpDiff.diff.setsB - cmpDiff.diff.setsA >= 0 ? '+' : ''}{cmpDiff.diff.setsB - cmpDiff.diff.setsA})
+                    </div>
+                    <div className="ad-muted">Фазы A: {cmpDiff.diff.phasesA || '—'}</div>
+                    <div className="ad-muted">Фазы B: {cmpDiff.diff.phasesB || '—'}</div>
+                    {cmpDiff.diff.rows.filter(r=>r.d!==0).slice(0, 12).map(r=>(
+                      <div key={r.muscle} className="ad-finding" data-level="info" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {ARM_MUSCLE_RU[r.muscle] || r.muscle}: {r.a} → {r.b} ({r.d >= 0 ? '+' : ''}{r.d})
+                      </div>
+                    ))}
+                    {cmpDiff.diff.rows.every(r=>r.d===0) && <div className="ad-muted">Объёмы идентичны.</div>}
                   </div>
                 )}
                 <div style={{ marginTop: 8 }}>
