@@ -635,14 +635,13 @@ export const StrengthSportConstructor: React.FC = () => {
       )}
 
       {step === 'split' && (
-        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-          <SectionCard icon="✨" title="Рекомендация" subtitle="Подбор сплита по режиму · дням · уровню" accent>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <SectionCard icon="✨" title="Рекомендация" subtitle="Подбор сплита по режиму · дням · уровню" accent collapsible defaultOpen={false} summary={patternId ? `Выбран: ${STRENGTH_SPORT_PATTERNS.find(p=>p.id===patternId)?.name}` : recommendStrengthSportPattern(mode, days, level).name} status="ok">
             <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
               <span style={{ fontSize:12, color: '#fff' }}>Рекомендуем:</span><Highlight color={modeColor}>{recommendStrengthSportPattern(mode, days, level).name}</Highlight>
               <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`}>{recommendStrengthSportPattern(mode, days, level).sessionsPerRotation}×/нед</Badge>
             </div>
-            <div style={{ fontSize:11, color: '#fff' }}>{patternId ? <span>Выбран: <Highlight color={modeColor}>{STRENGTH_SPORT_PATTERNS.find(p=>p.id===patternId)?.name}</Highlight></span> : 'Авто по режиму/дням/уровню · тапните карточку ниже'}</div>
-            <div style={{ fontSize:10, color:'#fff', fontFamily:'-apple-system, system-ui, sans-serif', background:'rgba(0,0,0,0.16)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.04)' }}>Дней <Highlight>{days}×</Highlight> · Режим <Highlight color={modeColor}>{mode==='weightlifting'?'ТА':mode==='strongman'?'Стронг':'Гибрид'}</Highlight> · Уровень {ruLabel(LEVEL_RU, level)}</div>
+            <div style={{ fontSize:11, color: '#fff' }}>Дней {days}× · Режим {mode==='weightlifting'?'ТА':mode==='strongman'?'Стронг':'Гибрид'} · Уровень {ruLabel(LEVEL_RU, level)} · {patternId ? 'выбран вручную' : 'авто — тапните карточку ниже'}</div>
           </SectionCard>
           <SectionCard icon="📚" title="Интернет-цикл" subtitle="Дословные программы ТА/стронга · перекрывает сплит ниже" accent={!!cycleId}>
             {!cycleId && rankedCycles.filter(r=> !r.blocked).length > 0 && (
