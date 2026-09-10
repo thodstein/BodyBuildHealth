@@ -94,6 +94,15 @@ export function HubPressureTab({ H }: { H: any }) {
           const mp = profileOpponent({ myTechnique: state.technique, oppStyle: muState.opp, oppHand: muState.hand, weightDeltaKg: parseFloat(muState.wd) || 0 });
           return <div className="ad-muted">Матчап: {mp.note} Приоритет: {mp.priorityMuscles.slice(0,3).join(', ')}. {mp.gameplan[0]}</div>;
         } catch { return null; } })()}
+        {(()=>{ try {
+          const pts: string[] = state.weakPoints || [];
+          if (!pts.length) return null;
+          if (muState.opp === 'unknown' && !muState.wd) return <div className="ad-muted">Связка: точки {pts.join(', ')} — выбери оппонента выше, и стол скажет, куда бить.</div>;
+          const mp = profileOpponent({ myTechnique: state.technique, oppStyle: muState.opp, oppHand: muState.hand, weightDeltaKg: parseFloat(muState.wd) || 0 });
+          const mus = Array.from(new Set(pts.flatMap((wp: string) => ((ARM_BIOMECH as any)[wp]?.weakMuscles || []))));
+          const hit = mp.priorityMuscles.filter((m: string) => mus.includes(m));
+          return <div className="ad-tip">Связка: точки {pts.join(', ')} ({mus.slice(0, 4).join('/')}) × соперник {muState.opp} → {hit.length ? `бей в ${hit.join(', ')}` : 'прямых пересечений нет — качай приоритет соперника'} · {mp.gameplan[0]}</div>;
+        } catch { return null; } })()}
         <div className="ad-sec-t">Table-IQ: схватки ({tiq.length})</div>
         <AdGrid cols="auto-sm">
           <AdField label="Фолы">
@@ -120,6 +129,13 @@ export function HubPressureTab({ H }: { H: any }) {
           const trend = tableIqTrend(tiq);
           return <div className="ad-sec ad-bio" data-valid="na" data-arm="tiq-out"><div>{iq.note}</div>{iq.levers.map((l: string,i: number)=><div key={i} className="ad-finding" data-level="warn">• {l}</div>)}<div className="ad-muted">{trend.note}</div></div>;
         } catch { return null; } })()}
+      </AdSec>
+      <AdSec title="📖 Фолы WAF → что чинить" collapsible defaultOpen={false} summary="5 фолов">
+        <div className="ad-kv"><span>Отрыв локтя</span><span>пад + back_drag · posting-стойка</span></div>
+        <div className="ad-kv"><span>Сгиб кисти (cup открылась)</span><span>cup_start/cup_hold · contain_fingers</span></div>
+        <div className="ad-kv"><span>Касание плечом / ранний дожимать</span><span>side_mid · не форсируй, RIR≥2</span></div>
+        <div className="ad-kv"><span>Фальстарт</span><span>старт по команде · reaction_go дриллы</span></div>
+        <div className="ad-kv"><span>Срыв в ремень</span><span>журнал Table-IQ выше · strap_start</span></div>
       </AdSec>
     </div>
   );
@@ -162,7 +178,28 @@ export function HubStrengthTab({ H }: { H: any }) {
             </div>
           )}
         </AdSec>
-        <AdSec title="Асимметрия L/R">
+        <AdSec title="Асимметрия L/R — единый вердикт">
+          {(()=>{
+            const ds = (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null;
+            const gs = forceVecPro.asymmetryPct ?? null;
+            const bs = bilatP0?.asymmetryPct ?? null;
+            const vals = [ds, gs, bs].filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+            if (!vals.length) return <div className="ad-muted">Введи left/right хват или finger/hook обе руки — вердикта пока нет</div>;
+            const mx = Math.max(...vals);
+            const dyn = (dynamicReport as any)?.asymmetry;
+            const weak = bilatP0?.weakArm || (dyn ? (dyn.leftMax < dyn.rightMax ? 'left' : 'right') : null);
+            const verdict = mx >= 12 ? '🔴 своди: слабой +объём, сильной maintenance' : mx >= 7 ? '🟠 своди: слабой +15%' : '🟢 в допуске';
+            return (
+              <div data-arm="asym-verdict">
+                <div className="ad-muted">Источники: {[
+                  ds != null ? `динамика ${ds}%` : null,
+                  gs != null ? `хват ${gs}%` : null,
+                  bs != null ? `bilateral ${bs}%` : null,
+                ].filter(Boolean).join(' · ')}</div>
+                <div><b>Вердикт: max {mx}%{weak ? ` · слабая ${weak === 'left' ? 'левая' : 'правая'}` : ''} — {verdict}</b></div>
+              </div>
+            );
+          })()}
           <div className="ad-muted">{(dynamicReport as any)?.asymmetry ? `${(dynamicReport as any).asymmetry.leftMax} / ${(dynamicReport as any).asymmetry.rightMax} кг → ${(dynamicReport as any).asymmetry.asymmetryPct}% — ${(dynamicReport as any).asymmetry.advice}` : (forceVecPro.asymmetryPct!=null ? `По хвату ${forceVecPro.asymmetryPct}% ${forceVecPro.asymmetryPct>=12?'🔴':forceVecPro.asymmetryPct>=7?'🟠':'🟢'}` : 'Введи left/right хват или finger/hook обе руки')}</div>
           {bilatP0 && (
             <div className="ad-muted">
@@ -240,6 +277,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
   const { acwr, tendonAcwr, state, report, tendonWeeklyLimit, angles, anglesVerified, perMuscleAcwrSumP0, armMobility, mob, setMob, mobRetest, setMobRetest, onMobToProfile, mobMsg, autoregP0, cnsHeavyP0, guardsP0, armPlan, rh, setRh, buildRehabPlanFn, forceHistory } = H;
   return (
     <div>
+      <AdSec title="📊 Нагрузка — ACWR и тендоны" collapsible defaultOpen={true} summary={acwr ? `ACWR ${acwr.ratio}` : 'нужен дневник'}>
       <AdGrid cols="2">
         <AdSec title={`ACWR ${acwr? acwr.ratio.toFixed(2) : '—'}`} hook="acwr">
           <div className="ad-muted">{acwr? `Острая/хроническая — факт` : 'нет данных (нужен дневник sRPE)'}</div>
@@ -262,6 +300,8 @@ export function HubRecoveryTab({ H }: { H: any }) {
           <span> · Per-muscle: {perMuscleAcwrSumP0.danger.length > 0 && <b>🔴 {perMuscleAcwrSumP0.danger.join(', ')}</b>} {perMuscleAcwrSumP0.caution.length > 0 && <span>🟠 {perMuscleAcwrSumP0.caution.join(', ')}</span>}</span>
         )}
       </AdBanner>
+      </AdSec>
+      <AdSec title="🦿 Тело — мобильность, авторег, возврат" collapsible defaultOpen={true} summary="3 блока">
       <AdSec title={`🦿 Мобильность · score ${armMobility.score} ${armMobility.failedCount ? `· провалы: ${armMobility.fails.join(', ')}` : '· ✓ норма'}`} collapsible hook="mob">
         <div className="ad-muted">Нормы ROM: сгиб кисти ≥80° · разгиб ≥70° · пронация/супинация ≥80° · локоть полный</div>
         <div className="ad-chips" data-arm="mob-chips">
@@ -337,10 +377,13 @@ export function HubRecoveryTab({ H }: { H: any }) {
           </div>;
         } catch { return null; } })()}
       </AdSec>
+      </AdSec>
       {forceHistory.stats.length>0 && (
+      <AdSec title="📈 Итог — усталость" collapsible defaultOpen={false} summary="fatigue 12 нед">
         <AdSec title="Fatigue 12-нед (патент WO2026106582A1)">
           <div className="ad-muted">Avg {forceHistory.stats[0]?.avg}→{forceHistory.stats[forceHistory.stats.length-1]?.avg} · Max {forceHistory.stats[0]?.max}→{forceHistory.stats[forceHistory.stats.length-1]?.max} · Fatigue {forceHistory.fatigue?.first}%→{forceHistory.fatigue?.last}% ({forceHistory.fatigue?.improving? '↓ адаптация':'↑ усталость'})</div>
         </AdSec>
+      </AdSec>
       )}
     </div>
   );

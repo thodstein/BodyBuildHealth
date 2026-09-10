@@ -323,6 +323,80 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('Точки: pron_open');
   });
 
+  it('F1: селект снаряда Axle меняет норму 133 ↔ 237.5', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByPlaceholderText('100'), { target: { value: '200' } });
+    expect(document.body.textContent).toContain('Axle vs Saxon-ориентир');
+    expect(document.body.textContent).toContain('150%');
+    fireEvent.click(screen.getByText(/Apollon \(М/));
+    expect(document.body.textContent).toContain('Axle vs Apollon WR');
+    expect(document.body.textContent).toContain('84%');
+  });
+
+  it('F2: teen-гейт 14–15 показывает MHE-баннер', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByText('Подросток 14–15'));
+    expect(document.body.textContent).toContain('надмыщелка');
+    expect(document.body.textContent).toContain('не диагноз');
+  });
+
+  it('F3: памятка фолов WAF в Давлении', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Давление/ }));
+    expect(document.body.textContent).toContain('Фолы WAF');
+    expect(document.body.textContent).toContain('Отрыв локтя');
+    expect(document.body.textContent).toContain('back_drag');
+  });
+
+  it('R1: единый вердикт асимметрии из 3 источников', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByPlaceholderText('50'), { target: { value: '40' } });
+    fireEvent.change(screen.getByPlaceholderText('55'), { target: { value: '50' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сила/ }));
+    expect(document.body.textContent).toContain('Вердикт: max');
+    expect(document.body.textContent).toContain('Источники:');
+  });
+
+  it('R2: Recovery распилен на Нагрузка/Тело/Итог', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Сухожилие/ }));
+    expect(document.body.textContent).toContain('📊 Нагрузка');
+    expect(document.body.textContent).toContain('🦿 Тело');
+    expect(document.body.textContent).toContain('Мобильность');
+    expect(document.body.textContent).toContain('Авторегуляция');
+  });
+
+  it('R3: Grip распилен на Замеры/Приборы', () => {
+    render(<ArmDiagnosticsHub />);
+    expect(document.body.textContent).toContain('✊ Замеры хвата');
+    expect(document.body.textContent).toContain('📟 Приборы');
+    expect(document.body.textContent).toContain('Force Vector');
+  });
+
+  it('R4: инъекция hero, экспорты ghost', () => {
+    render(<ArmDiagnosticsHub />);
+    const inject = screen.getByText(/Вставить коррекции в план/);
+    expect(inject.classList.contains('ad-btn-hero')).toBe(true);
+    expect(screen.getByText('🖨 HTML').getAttribute('data-variant')).toBe('ghost');
+    expect(screen.getByText('📥 CSV').getAttribute('data-variant')).toBe('ghost');
+  });
+
+  it('R5: связка точек с матчапом', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    fireEvent.click(screen.getByText(/Pron откр/));
+    fireEvent.click(screen.getByRole('button', { name: /Давление/ }));
+    expect(document.body.textContent).toContain('Связка: точки pron_open');
+  });
+
+  it('X1: Excalibur замер без выдуманного WR + CoC-ориентир', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.change(screen.getByPlaceholderText('40'), { target: { value: '45' } });
+    expect(document.body.textContent).toContain('Excalibur 50мм');
+    expect(document.body.textContent).toContain('SAR по своей весовой');
+    expect(document.body.textContent).toContain('не калибровка');
+  });
+
   it('D2: per-muscle danger виден в Recovery', () => {
     const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
     const mk = (date: string, n: number) => ({ date, exercises: [{ muscle: 'pronators', sets: Array.from({ length: n }, () => ({ weightKg: 30, reps: 8 })) }] });

@@ -68,7 +68,6 @@ export function HubHead({ H }: { H: any }) {
           <b>1 Тело</b> — вес, хват (RT/Axle/Pinch), VBT · <b>2 Точки</b> — 1–3 мёртвые точки из 12 (подсветка ● = для твоей техники) · <b>3 Тесты</b> — 4×F/t + L/R + стол/scale · <b>4 План</b> — причины → топ-3 → «💉 Вставить» или «→ Применить в Арм-конструктор» внизу. Видео — опционально.
         </div>
       </AdSec>
-      {showScoring && scoring && <div className="ad-muted">{scoring.findings.slice(0,3).map((f: any)=>f.text).join(' · ')} {scoring.floors.length? `· floor: ${scoring.floors.join(', ')}` : ''} · v{Math.round(scoring.verification*100)}% (видео 0.35+VBT 0.35+история 0.30)</div>}
       {toast && <AdBanner tone="ok">{toast}</AdBanner>}
     </div>
   );
@@ -104,6 +103,19 @@ export function HubControls({ H }: { H: any }) {
           {[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}].map(o=> <AdChip key={o.id} active={state.sex===o.id} onClick={()=>setState((s: any)=>({...s, sex:o.id}))}>{o.label}</AdChip>)}
         </div>
       </div>
+      <div>
+        <div className="ad-fl">Возраст</div>
+        <div className="ad-chips">
+          <AdChip active={state.ageBand === 'adult'} onClick={()=>setState((s: any)=>({...s, ageBand: s.ageBand === 'adult' ? '' : 'adult'}))}>Взрослый 16+</AdChip>
+          <AdChip active={state.ageBand === 'teen'} tone="red" onClick={()=>setState((s: any)=>({...s, ageBand: s.ageBand === 'teen' ? '' : 'teen'}))}>Подросток 14–15</AdChip>
+        </div>
+      </div>
+      {state.ageBand === 'teen' && (
+        <AdBanner tone="bad">
+          <b>⚠ 14–15 лет: зона отрыва медиального надмыщелка</b>
+          <div>Резкая тяга flexor-pronator отрывает апофиз роста — side-давление, спарринги и максимумы запрещены, только техника/ОФП + врач. Это скрининг, не диагноз.</div>
+        </AdBanner>
+      )}
       {state.level === 'beginner' && state.technique === 'press' && (
         <AdBanner tone="warn">
           <b>⚠ Новичкам пресс опасен</b>
@@ -222,13 +234,13 @@ export function HubP0Panel({ H }: { H: any }) {
           {diarySuggestP0.length > 0 && (
             <AdBtn variant="dark" onClick={() => { for (const p of diarySuggestP0.slice(0, 3)) if (!state.weakPoints.includes(p as any)) toggleWeakPoint(p as any); }}>📊 Дневник → в слабые ({diarySuggestP0.slice(0, 3).join(', ')})</AdBtn>
           )}
-          <AdBtn variant="primary" onClick={handleInjectP0}>💉 Вставить коррекции в план ({state.weakPoints.length || 0})</AdBtn>
+          <AdBtn variant="primary" block hero onClick={handleInjectP0}>💉 Вставить коррекции в план ({state.weakPoints.length || 0})</AdBtn>
           {hasInjectPrev && (
             <AdBtn variant="dark" onClick={handleRollbackP0}>↩ Откат</AdBtn>
           )}
-          <AdBtn variant="dark" onClick={handleExportHtmlP0}>🖨 HTML</AdBtn>
-          <AdBtn variant="dark" onClick={handlePrintP0}>🖨 Печать</AdBtn>
-          <AdBtn variant="dark" onClick={handleExportCsvP0}>📥 CSV</AdBtn>
+          <AdBtn variant="ghost" onClick={handleExportHtmlP0}>🖨 HTML</AdBtn>
+          <AdBtn variant="ghost" onClick={handlePrintP0}>🖨 Печать</AdBtn>
+          <AdBtn variant="ghost" onClick={handleExportCsvP0}>📥 CSV</AdBtn>
           {criticalSideP0 && <span className="ad-tip">🔴 критично — side только ремень/изометрия</span>}
         </div>
         {injectMsg && <AdBanner tone={injectMsg.startsWith('✓') || injectMsg.startsWith('↩') ? 'ok' : 'warn'}>{injectMsg}</AdBanner>}
@@ -272,7 +284,7 @@ export function HubScenarios({ H }: { H: any }) {
     const s: DiagScenario = {
       id: `${d.getTime()}`,
       date: `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
-      fields: { rtKg: state.rtKg, axleKg: state.axleKg, pinchSec: state.pinchSec, sideKg: state.sideKg, backKg: state.backKg, leftKg: state.leftKg, rightKg: state.rightKg, bwKg: state.bwKg },
+      fields: { rtKg: state.rtKg, axleKg: state.axleKg, excalKg: state.excalKg, pinchSec: state.pinchSec, sideKg: state.sideKg, backKg: state.backKg, leftKg: state.leftKg, rightKg: state.rightKg, bwKg: state.bwKg },
       weakPoints: [...state.weakPoints],
     };
     setScens((p) => { const n = [s, ...p].slice(0, 6); saveScenarios(n); return n; });
@@ -286,6 +298,7 @@ export function HubScenarios({ H }: { H: any }) {
       if (Number.isFinite(x) && Number.isFinite(y) && x > 0 && y > 0 && x !== y) parts.push(`${label} ${y > x ? '+' : ''}${Math.round((y - x) * 10) / 10}`);
     };
     num(s.fields.rtKg, state.rtKg, 'RT');
+    num(s.fields.excalKg, state.excalKg, 'Excal');
     num(s.fields.sideKg, state.sideKg, 'Side');
     num(s.fields.backKg, state.backKg, 'Back');
     num(s.fields.pinchSec, state.pinchSec, 'Pinch');

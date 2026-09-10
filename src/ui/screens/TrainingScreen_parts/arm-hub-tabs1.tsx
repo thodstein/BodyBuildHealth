@@ -20,6 +20,7 @@ export function HubGripTab({ H }: { H: any }) {
   const { state, setState, forceVecPro, weightClassAuto, bwNum, platformP0, measureHistP0, setMeasureTick, attKg, setAttKg, attOk, setAttOk, attHistP0, setAttTick, vbt, vbtThP0, benchRes, toggleWeakPoint } = H;
   return (
     <div>
+      <AdSec title="✊ Замеры хвата" collapsible defaultOpen={true} summary="RT · Axle · Pinch · L/R">
       <AdGrid cols="auto-sm">
         <AdField label="RT кг">
           <input inputMode="decimal" value={state.rtKg} onChange={e=>setState((s: any)=>({...s, rtKg:e.target.value}))} placeholder="60" />
@@ -36,7 +37,18 @@ export function HubGripTab({ H }: { H: any }) {
         <AdField label="Right кг">
           <input inputMode="decimal" value={state.rightKg} onChange={e=>setState((s: any)=>({...s, rightKg:e.target.value}))} placeholder="55" />
         </AdField>
+        <AdField label="Excalibur кг">
+          <input inputMode="decimal" value={state.excalKg} onChange={e=>setState((s: any)=>({...s, excalKg:e.target.value}))} placeholder="40" aria-label="Excalibur кг" />
+        </AdField>
       </AdGrid>
+      <div>
+        <div className="ad-fl">Снаряд Axle</div>
+        <div className="ad-chips">
+          <AdChip active={state.axleImpl !== 'apollon'} onClick={()=>setState((s: any)=>({...s, axleImpl:'saxon'}))}>Saxon (ориентир 133)</AdChip>
+          <AdChip active={state.axleImpl === 'apollon'} onClick={()=>setState((s: any)=>({...s, axleImpl:'apollon'}))}>Apollon (М 237.5 / Ж 137.9)</AdChip>
+        </div>
+      </div>
+      </AdSec>
       <AdGrid cols="2">
         <AdSec title={`Force Vector · WAF ${weightClassAuto}`}>
           <div className="ad-hero-side" data-arm="force-score">
@@ -44,7 +56,7 @@ export function HubGripTab({ H }: { H: any }) {
             <div className="ad-hero-name">Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch}<span>Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure}</span></div>
             {forceVecPro.asymmetryPct!=null && <span className="ad-tag" data-sev={forceVecPro.asymmetryPct>=12?'bad':forceVecPro.asymmetryPct>=7?'warn':'ok'}>Асим {forceVecPro.asymmetryPct}%</span>}
           </div>
-          <div className="ad-muted">WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle 133 · Side ref {(bwNum*0.6).toFixed(0)}кг</div>
+          <div className="ad-muted">WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle {state.axleImpl === 'apollon' ? '237.5/137.9' : 133} · Side ref {(bwNum*0.6).toFixed(0)}кг</div>
           {(()=>{
             const rows: Array<{ n: string; v: string }> = [];
             const rt = parseFloat(state.rtKg);
@@ -53,7 +65,13 @@ export function HubGripTab({ H }: { H: any }) {
               rows.push({ n: 'RT vs WR', v: `${rt}кг = ${Math.round((rt / wr) * 100)}% WR (${wr}кг)` });
             }
             const ax = parseFloat(state.axleKg);
-            if (Number.isFinite(ax) && ax > 0) rows.push({ n: 'Axle vs Saxon WR', v: `${ax}кг = ${Math.round((ax / 133) * 100)}% (133кг)` });
+            if (Number.isFinite(ax) && ax > 0) {
+              const ap = state.axleImpl === 'apollon';
+              const wr = ap ? (state.sex === 'female' ? 137.9 : 237.5) : 133;
+              rows.push({ n: ap ? 'Axle vs Apollon WR' : 'Axle vs Saxon-ориентир', v: `${ax}кг = ${Math.round((ax / wr) * 100)}% (${wr}кг)` });
+            }
+            const ex = parseFloat(state.excalKg);
+            if (Number.isFinite(ex) && ex > 0) rows.push({ n: 'Excalibur 50мм', v: `${ex}кг · норматив SAR по своей весовой (ред. 01.07.2025)` });
             const pin = parseFloat(state.pinchSec);
             if (Number.isFinite(pin) && pin > 0) rows.push({ n: 'Pinch vs норма', v: `${pin}с ${pin >= 10 ? '✓ ≥10с' : '⚠ <10с — чинить'}` });
             const sd = parseFloat(state.sideKg);
@@ -99,6 +117,7 @@ export function HubGripTab({ H }: { H: any }) {
             {attHistP0.length > 0 && <span className="ad-muted">Попытки: {attHistP0.slice(-5).map((h: any) => `${h.weightKg}${h.success ? '✓' : '✗'} ${h.wrPct}%`).join(' · ')}</span>}
           </div>
         </AdSec>
+        <AdSec title="📟 Приборы — VBT" collapsible defaultOpen={false} summary="скорость · пороги">
         <AdSec title="VBT">
           <div className="ad-muted">{vbt.advice} {vbt.e1RM? `· e1RM ${vbt.e1RM}кг` : ''} · zone <b>{vbt.zone}</b></div>
           {vbtThP0 && <div className="ad-muted">Пороги точки {state.weakPoints[0]}: warn {vbtThP0.warnPct}% / stop {vbtThP0.stopPct}%</div>}
@@ -122,10 +141,12 @@ export function HubGripTab({ H }: { H: any }) {
             </AdField>
           </div>
         </AdSec>
+        </AdSec>
       </AdGrid>
-      <AdSec title={`Бенчмарки · ${benchRes.level}`}>
+      <AdSec title={`Бенчмарки · ${benchRes.level}`} collapsible defaultOpen={false} summary={benchRes.level}>
         <div className="ad-muted" data-arm="bench">{benchRes.details.map((d: any)=>`${d.id}:${d.value}→${d.level}`).join(' · ') || 'введи WristCurl/Coc'}</div>
         <div className="ad-muted">{benchAdviceForLevel(benchRes.level)}</div>
+        <div className="ad-muted">CoC-ориентир (фунты, рейтинг IronMind — не калибровка): №1≈140 · №1.5≈168 · №2≈195 · №2.5≈238 · №3≈280 (мировой benchmark)</div>
       </AdSec>
       {(state.pinchSec && parseFloat(state.pinchSec) < 10) || (state.rtKg && parseFloat(state.rtKg) < 60) ? (
         <AdBanner tone="warn">

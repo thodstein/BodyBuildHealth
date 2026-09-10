@@ -90,6 +90,8 @@ function loadP1State(): Record<string, any> {
 type ArmDiagState = {
   rtKg: string;
   axleKg: string;
+  axleImpl: string;
+  excalKg: string;
   pinchSec: string;
   sideKg: string;
   backKg: string;
@@ -98,6 +100,7 @@ type ArmDiagState = {
   bwKg: string;
   sex: string;
   weightClass: string;
+  ageBand: string;
   cup: boolean;
   rising: boolean;
   pron: boolean;
@@ -130,7 +133,7 @@ type ArmDiagState = {
 };
 
 const DEFAULT_STATE: ArmDiagState = {
-  rtKg: '', axleKg: '', pinchSec: '', sideKg: '', backKg: '', leftKg: '', rightKg: '', bwKg: '80', sex: 'male', weightClass: '',
+  rtKg: '', axleKg: '', axleImpl: 'saxon', excalKg: '', pinchSec: '', sideKg: '', backKg: '', leftKg: '', rightKg: '', bwKg: '80', sex: 'male', weightClass: '', ageBand: '',
   cup: false, rising: false, pron: false, sup: false, side: false, back: false, weakPoints: [],
   technique: 'balanced', level: 'intermediate',
   elbowDeg: '110', forearmDeg: '90', wristDeg: '10', direction: 'to_middle',
