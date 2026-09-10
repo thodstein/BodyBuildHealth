@@ -101,6 +101,49 @@ describe('P4 петля штанги SRD', () => {
   });
 });
 
+describe('PRO-2 в экспорте (HTML/CSV)', () => {
+  it('HTML несёт разделы L/R, готовность, флаги, штанга, углы, подросток, женские', async () => {
+    const { buildBBDiagnosticsHtml, buildBBDiagnosticsCsv } = await import('../bb-diagnostics-export.engine');
+    const rep = {
+      score: { score: 70, level: 'ok', verification: '1', floors: [] },
+      weakCandidates: [], weakMusclesCanonical: [], weakZonesGranular: [],
+      symmetry: { ratios: {}, issues: [], score: 80 },
+      stimulus: { issues: [], global: { lengthened: 1, midRange: 1, shortened: 0, compound: 1, isolation: 1 } },
+      findings: [], priorities: [],
+    } as any;
+    const meta = {
+      lr: [{ group: 'biceps', left: 5, right: 2, asymPct: 60, weakSide: 'right', verdict: 'topup', topUpSets: 2, text: 'Слабее: правая' }],
+      readiness: { level: 'red', advice: 'Красный', reasons: ['Боль 8/10'] },
+      redFlags: { active: true, blocked: true, items: ['острая боль'], text: 'Стоп' },
+      bar: { xLoop: 7, yMax: 20, type: 'широкая петля', text: 'чиним' },
+      pose: { hip: 90, knee: 80, ankle: 40, shoulder: 170, n: 2, faults: [] as string[] },
+      teen: '14–15 лет: техника без отказа',
+      femaleNotes: ['Лютеиновая фаза: вода'],
+    } as any;
+    const html = buildBBDiagnosticsHtml(rep, meta);
+    for (const needle of ['Лево/право', 'Готовность', 'Флаги', 'Штанга', 'Углы', 'Подросток', 'Женские ориентиры']) {
+      expect(html).toContain(needle);
+    }
+    const csv = buildBBDiagnosticsCsv(rep, null, meta);
+    for (const needle of ['lr_group', 'readiness', 'red_flags', 'bar_xLoop', 'pose', 'teen', 'female_notes']) {
+      expect(csv).toContain(needle);
+    }
+  });
+  it('без PRO-2 мета экспорт как раньше (без новых разделов)', async () => {
+    const { buildBBDiagnosticsHtml } = await import('../bb-diagnostics-export.engine');
+    const rep = {
+      score: { score: 80, level: 'ok', verification: '1', floors: [] },
+      weakCandidates: [], weakMusclesCanonical: [], weakZonesGranular: [],
+      symmetry: { ratios: {}, issues: [], score: 80 },
+      stimulus: { issues: [], global: { lengthened: 1, midRange: 1, shortened: 0, compound: 1, isolation: 1 } },
+      findings: [], priorities: [],
+    } as any;
+    const html = buildBBDiagnosticsHtml(rep, {});
+    expect(html).not.toContain('Лево/право');
+    expect(html).toContain('Симметрия');
+  });
+});
+
 describe('P7 женская симметрия + teen', () => {
   it('коридор 0.65–0.80 — норма, лютеиновая — пометка про воду', () => {
     expect(femaleSymmetryNotes({ waist: 70, hips: 95 })[0]).toMatch(/коридор нормы/);

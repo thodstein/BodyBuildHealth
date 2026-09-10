@@ -14,16 +14,18 @@
 import React, { useMemo, useState } from 'react';
 import {
   buildBBContestPrep, validateBBContestPrepConfig, isoToday, isoAddDays, isoDiffDays,
-  CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS, resolveMainCompetition,
-  type BBContestPrepConfig, type BBContestCategory, type PeakDayPhase,
+  CONTEST_CATEGORY_LABELS, resolveMainCompetition,
+  type BBContestPrepConfig, type BBContestCategory,
   type ContestSpecialization, type ContestEventEntry,
 } from '../../../../engines/bb/bb-contest-prep.engine';
+import { ContestPeakWeekCard } from '../../../../ui/components/contest-prep/ContestPeakWeekCard';
 import { GlassCard } from './ui';
 import { shareOrCopyText } from './planner-day-print';
 import { usePlanCtx } from './IndividualPlanContext';
 import { getProfile } from '../../../../core/profile-manager';
 import { ContestPrepConfigEditor } from '../../../../ui/components/contest-prep/ContestPrepConfigEditor';
 import { saveContestPrepEverywhere, clearContestPrepEverywhere } from '../../../../engines/bb/bb-contest-prep-sync';
+import { loadShowChecklist, toggleShowChecklistItem } from '../../../../engines/bb/bb-contest-prep.engine';
 
 const ACCENT = '#f59e0b';
 const DIM = 'rgba(255,255,255,0.55)';
@@ -235,6 +237,9 @@ export const PeakWeekTab: React.FC = () => {
 
   const [draft, setDraft] = useState<BBContestPrepConfig>(() => bbPrepConfig ?? defaultConfig(sex, weight, bbCategory));
   const [savedFlash, setSavedFlash] = useState(false);
+  // Э5: тик обновления персистентного чек-листа готовности.
+  const [showTick, setShowTick] = useState(0);
+  const showCheckState = useMemo(() => loadShowChecklist(), [showTick, draft.showDate]);
 
   const patch = (p: Partial<BBContestPrepConfig>) => setDraft(prev => ({ ...prev, ...p }));
 
@@ -408,16 +413,30 @@ export const PeakWeekTab: React.FC = () => {
           </div>
         </div>
       )}
-      {/* Чек-лист готовности (проф-UX) */}
+      {/* Чек-лист готовности (Э5: персистентный, he_prep_show_checklist) */}
       {result && (
         <div style={CARD}>
           <div style={CARD_TITLE}>✅ Чек-лист готовности</div>
           <div style={{ display:'flex', flexDirection:'column', gap:4, fontSize:10 }}>
-            <label style={{ display:'flex', gap:6, alignItems:'center' }}><input type="checkbox" /> Вес записан сегодня (7д среднее)</label>
-            <label style={{ display:'flex', gap:6, alignItems:'center' }}><input type="checkbox" /> Сон ≥7ч, готовность к пику — {result.readiness.verdict}</label>
-            <label style={{ display:'flex', gap:6, alignItems:'center' }}><input type="checkbox" /> Питание по фазам — ккал/БЖУ/вода/Na</label>
-            <label style={{ display:'flex', gap:6, alignItems:'center' }}><input type="checkbox" /> Тренировки — taper применён в ББ-авто</label>
-            <label style={{ display:'flex', gap:6, alignItems:'center' }}><input type="checkbox" /> Позирование 20-30 мин/день</label>
+            {([
+              ['rd_weight', 'Вес записан сегодня (7д среднее)'],
+              ['rd_sleep', `Сон ≥7ч, готовность к пику — ${result.readiness.verdict}`],
+              ['rd_nutrition', 'Питание по фазам — ккал/БЖУ/вода/Na'],
+              ['rd_taper', 'Тренировки — taper применён в ББ-авто'],
+              ['rd_posing', 'Позирование 20-30 мин/день'],
+            ] as Array<[string, string]>).map(([id, label]) => {
+              const key = `${draft.showDate}_${id}`;
+              const checked = !!showCheckState[key];
+              return (
+                <label key={id} style={{ display:'flex', gap:6, alignItems:'center', opacity: checked ? 0.6 : 1 }}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => { try { toggleShowChecklistItem(draft.showDate, id); setShowTick(t => t + 1); } catch { /* ignore */ } }}
+                  /> {label}
+                </label>
+              );
+            })}
           </div>
         </div>
       )}
@@ -464,62 +483,8 @@ export const PeakWeekTab: React.FC = () => {
 
           <div style={CARD}>
             <div style={CARD_TITLE}>🍚 Пик-неделя <span style={{ fontSize: 9, fontWeight: 700, color: DIM, marginLeft: 'auto' }}>7 дней · шоу {result.config.showDate}</span></div>
-            {/* Легенда фаз */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-              {([['deplete_1', 'Деплеция'], ['load_1', 'Загрузка'], ['peak', 'Пик'], ['show', 'Шоу']] as [PeakDayPhase, string][]).map(([ph, label]) => (
-                <span key={ph} style={{ ...chip, background: PEAK_PHASE_COLORS[ph] + '18', color: PEAK_PHASE_COLORS[ph], border: `1px solid ${PEAK_PHASE_COLORS[ph]}40` }}>
-                  ● {label}
-                </span>
-              ))}
-            </div>
-            <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9, minWidth: 480 }}>
-                <thead>
-                  <tr style={{ color: DIM, textAlign: 'left', background: 'rgba(255,255,255,0.03)' }}>
-                    <th style={{ padding: '5px 6px' }}>День</th>
-                    <th style={{ padding: '5px 6px' }}>Фаза</th>
-                    <th style={{ padding: '5px 6px', textAlign: 'right' }}>Ккал</th>
-                    <th style={{ padding: '5px 6px', textAlign: 'right' }}>Б</th>
-                    <th style={{ padding: '5px 6px', textAlign: 'right' }}>У</th>
-                    <th style={{ padding: '5px 6px', textAlign: 'right' }}>Ж</th>
-                    <th style={{ padding: '5px 6px', textAlign: 'right' }}>💧л</th>
-                    <th style={{ padding: '5px 6px', textAlign: 'right' }}>Na</th>
-                    <th style={{ padding: '5px 6px' }}>Тренировка</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.peakWeek.map(d => {
-                    const phColor = PEAK_PHASE_COLORS[d.phase];
-                    return (
-                      <tr key={d.day} style={{
-                        borderTop: '1px solid rgba(255,255,255,0.05)',
-                        borderLeft: `3px solid ${phColor}`,
-                        background: d.day === 7
-                          ? 'linear-gradient(90deg, rgba(251,191,36,0.12), rgba(251,191,36,0.03))'
-                          : 'transparent',
-                      }}>
-                        <td style={{ padding: '5px 6px', fontWeight: 800, color: d.day === 7 ? '#fbbf24' : '#fff' }}>
-                          {d.day === 7 ? '🎬' : `D-${7 - d.day}`}
-                          <div style={{ fontSize: 8, color: DIM, fontWeight: 400 }}>{d.date.slice(5).replace('-', '.')}</div>
-                        </td>
-                        <td style={{ padding: '5px 6px' }}>
-                          <span style={{ ...chip, background: phColor + '18', color: phColor, border: `1px solid ${phColor}40`, fontSize: 8 }}>
-                            {PHASE_LABELS_RU[d.phase]}
-                          </span>
-                        </td>
-                        <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 700 }}>{d.kcal}</td>
-                        <td style={{ padding: '5px 6px', textAlign: 'right' }}>{d.proteinG}</td>
-                        <td style={{ padding: '5px 6px', textAlign: 'right' }}>{d.carbsG}</td>
-                        <td style={{ padding: '5px 6px', textAlign: 'right' }}>{d.fatG}</td>
-                        <td style={{ padding: '5px 6px', textAlign: 'right' }}>{d.waterLiters}</td>
-                        <td style={{ padding: '5px 6px', textAlign: 'right' }}>{d.sodiumMg}</td>
-                        <td style={{ padding: '5px 6px', color: DIM }}>{d.training.minutes > 0 ? d.training.type.split(' ')[0] : '—'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {/* Единый рендер протокола (Э0.3): ContestPeakWeekCard */}
+            <ContestPeakWeekCard bare result={result} showRationale={false} showWarnings={false} showPotassiumNote={false} />
             <div style={{ marginTop: 6, fontSize: 9, color: DIM }}>K {result.peakWeek[0]?.potassiumMg} мг — не снижается всю неделю. Белок {result.peakWeek[0]?.proteinG} г — постоянный.</div>
           </div>
 

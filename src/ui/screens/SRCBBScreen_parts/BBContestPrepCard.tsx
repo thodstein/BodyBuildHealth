@@ -1,9 +1,10 @@
 /**
- * BBContestPrepCard.tsx — контракт для годового планировщика (MacrocyclePanel).
+ * BBContestPrepCard.tsx — единая read-only карточка статуса тапера ББ.
  *
- * Заменяет заглушку «Тапер для ББ — в разработке» в карточке ББ-блока:
- * показывает статус единой системы тапера ББ (goals.bbPeakConfig) и даёт
- * кнопку настройки. Вставляется как:
+ * Э0: единственный компонент статуса (ранее дубль с BBContestPrepActiveCard —
+ * теперь ActiveCard делегирует сюда в compact-режиме). Читает единый план
+ * (goals.bbContestPrepPlan → legacy bbPeakConfig → legacy поля).
+ * Вставляется как:
  *
  *   <BBContestPrepCard
  *     competition={{ name: c.name, week: c.week, date: c.date }}
@@ -142,6 +143,11 @@ export const BBContestPrepCard: React.FC<{
                   }} />
                 ));
               })()}
+            </div>
+          )}
+          {plan && compact && (
+            <div style={{ color: '#fff', marginTop: 2 }}>
+              Режим: объём {Math.round((plan.preparation.volumeMult ?? 1) * 100)}% · темп {plan.preparation.targetRatePctPerWeek}%/нед · ккал {plan.preparation.currentCalories}
             </div>
           )}
           {summary && compact && (

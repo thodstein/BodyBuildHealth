@@ -39,6 +39,12 @@ import {
   buildPrepIcs,
   buildPrepCoachJson,
   prepTrainingCompliance,
+  prepRefeedDates,
+  isPrepRefeedDay,
+  buildShowChecklist,
+  postShowReverseDiet,
+  buildPrepWeeklyReportHtml,
+  buildPrepCheckinsCsv,
   type BBContestPrepConfig,
   type BBContestPrepPlan,
   type BBPlanWithPrep,
@@ -680,6 +686,145 @@ describe('Этап 5 — питание по дням (план vs факт)', (
     expect(taperDay.waterMl).toBe(base.waterMl);
     expect(taperDay.sodiumMg).toBe(base.sodiumMg);
     expect(taperDay.proteinG).toBeGreaterThanOrEqual(prepDay.proteinG * 0.95);
+  });
+});
+
+describe('Э3 — рефиды и карб-волна в живом питании подготовки', () => {
+  const base = { kcal: 2600, proteinG: 170, fatG: 65, carbsG: 300, waterMl: 3000, sodiumMg: 2800 };
+  const mkPlan = () => buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 12, taperWeeks: 2 });
+
+  it('календарь рефидов детерминирован и только в preparation/final_preparation', () => {
+    const plan = mkPlan();
+    const a = prepRefeedDates(plan);
+    const b = prepRefeedDates(plan);
+    expect(a).toEqual(b);
+    expect(a.length).toBeGreaterThan(0);
+    for (const d of a) {
+      const ph = prepPhaseForDate(plan, d);
+      expect(['preparation', 'final_preparation']).toContain(ph?.key);
+      expect(isPrepRefeedDay(d, plan)).toBe(true);
+    }
+  });
+
+  it('рефид-день: ккал до поддержания дня, карбс выше обычного, жиры на полу', () => {
+    const plan = mkPlan();
+    const refeedDay = prepRefeedDates(plan)[0];
+    const normal = nutritionTargetsForPrepDate(plan.phases[0].dateStart, plan, base);
+    const rf = nutritionTargetsForPrepDate(refeedDay, plan, base);
+    expect(rf.kcal).toBeGreaterThanOrEqual(normal.kcal);
+    expect(rf.carbsG).toBeGreaterThan(normal.carbsG);
+    expect(rf.note).toMatch(/Рефид/);
+  });
+
+  it('тяжёлый день: угли +15% к обычному дню; лёгкий: −10%', () => {
+    const plan = mkPlan();
+    const day = plan.phases[0].dateStart;
+    const normal = nutritionTargetsForPrepDate(day, plan, base);
+    const heavy = nutritionTargetsForPrepDate(day, plan, base, { isHeavyTrainDay: true });
+    const light = nutritionTargetsForPrepDate(day, plan, base, { isHeavyTrainDay: false });
+    expect(heavy.carbsG).toBeGreaterThan(normal.carbsG);
+    expect(heavy.note).toMatch(/Тяжёлый день/);
+    expect(light.carbsG).toBeLessThan(normal.carbsG);
+    expect(light.kcal).toBeLessThanOrEqual(normal.kcal);
+  });
+
+describe('Э5 — чек-лист шоу и live-календарь', () => {
+  it('buildShowChecklist: D-10…D-0 с датами от шоу', () => {
+    const items = buildShowChecklist('2026-10-01');
+    expect(items.length).toBeGreaterThanOrEqual(10);
+    const music = items.find(i => i.id === 'music')!;
+    expect(music.dayOffset).toBe(10);
+    expect(music.date).toBe('2026-09-21');
+    const pump = items.find(i => i.id === 'pump')!;
+    expect(pump.dayOffset).toBe(0);
+    expect(pump.date).toBe('2026-10-01');
+    expect(items.some(i => i.id.startsWith('tan'))).toBe(true);
+    expect(items.some(i => i.id.startsWith('checkin'))).toBe(true);
+  });
+
+  it('невалидная дата — пусто', () => {
+    expect(buildShowChecklist('nope')).toEqual([]);
+  });
+
+  it('ics содержит события чек-листа + старые события фаз целы', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2 });
+    const ics = buildPrepIcs(plan);
+    expect(ics).toContain('SUMMARY:🎬 Show day');
+    expect(ics).toContain('📋');
+    expect(ics).toContain('Tan');
+  });
+});
+
+describe('Э7 — обратная диета post-show', () => {
+  const base = { kcal: 2600, proteinG: 170, fatG: 65, carbsG: 300, waterMl: 3000, sodiumMg: 2800 };
+
+  it('кривая: старт = поддержание, монотонный рост, кап', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2 });
+    const curve = postShowReverseDiet(plan);
+    expect(curve).toHaveLength(4);
+    for (let i = 1; i < curve.length; i++) {
+      expect(curve[i].kcal).toBeGreaterThanOrEqual(curve[i - 1].kcal);
+    }
+    expect(curve[3].kcal - curve[0].kcal).toBeLessThanOrEqual(300);
+    expect(curve[0].note).toMatch(/нед 1\/4/);
+    expect(curve[3].note).toMatch(/нед 4\/4/);
+  });
+
+  it('цели дня идут по кривой (нед 1 → нед 3)', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2 });
+    const w1 = nutritionTargetsForPrepDate(addDaysIso(plan.showDate, 2), plan, base);
+    const w3 = nutritionTargetsForPrepDate(addDaysIso(plan.showDate, 16), plan, base);
+    expect(w1.phaseLabel).toBe('Post-show');
+    expect(w3.kcal).toBeGreaterThan(w1.kcal);
+    expect(w3.note).toMatch(/нед 3\/4/);
+  });
+});
+
+describe('Э8 — отчёт тренеру', () => {
+  it('HTML: недели + чек-ины + сила-тренд + протокол', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 4, taperWeeks: 2 });
+    const html = buildPrepWeeklyReportHtml(plan, {
+      checkins: [{ week: 1, date: plan.preparation.startDate, weightAvg: 80, advice: 'on_track' }],
+      strengthDowns: [{ exercise: 'Жим лёжа', before: 120, after: 110, deltaPct: -8.3 }],
+    });
+    expect(html).toContain('Отчёт prep');
+    expect(html).toContain('80');
+    expect(html).toContain('Жим лёжа');
+    expect(html).toContain(plan.showDate);
+  });
+
+  it('HTML: XSS-экранирование пользовательских строк', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 4, taperWeeks: 2 });
+    const evil = { ...plan, safety: { ...plan.safety, warnings: ['<script>alert(1)</script>'] } };
+    const html = buildPrepWeeklyReportHtml(evil, { checkins: [], strengthDowns: [] });
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('CSV: шапка + строки по неделям', () => {
+    const csv = buildPrepCheckinsCsv([
+      { week: 2, date: '2026-01-08', weightAvg: 79.5, advice: 'too_fast' },
+      { week: 1, date: '2026-01-01', weightAvg: 80 },
+    ]);
+    const lines = csv.split('\n');
+    expect(lines[0]).toBe('week,date,weightAvg,waistCm,sleepAvg,sessionsDone,psyche,advice');
+    expect(lines[1]).toContain('"1"');
+    expect(lines[2]).toContain('too_fast');
+  });
+});
+  it('паритет с display-таблицей Prep-цикла: в каждую рефид-неделю есть рефид-день', async () => {
+    const { buildPrepNutritionPlan } = await import('../bb-prep-cycle.engine');
+    const plan = mkPlan();
+    const cfg = { category: 'mens_physique', sex: 'male', weightKg: 80 } as any;
+    const table = buildPrepNutritionPlan(plan, cfg);
+    const refeedWeeks = table.weeks.filter(w => w.refeed).map(w => w.week);
+    expect(refeedWeeks.length).toBeGreaterThan(0);
+    const dates = prepRefeedDates(plan);
+    for (const w of refeedWeeks) {
+      const weekStart = addDaysIso(plan.preparation.startDate, (w - 1) * 7);
+      const weekEnd = addDaysIso(plan.preparation.startDate, w * 7 - 1);
+      expect(dates.some(d => d >= weekStart && d <= weekEnd)).toBe(true);
+    }
   });
 });
 

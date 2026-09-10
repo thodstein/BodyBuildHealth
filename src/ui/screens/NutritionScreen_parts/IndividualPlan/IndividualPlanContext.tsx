@@ -3280,7 +3280,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
               carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
               waterMl: 3000,
               sodiumMg: 3500,
-            })
+            }, { isHeavyTrainDay: plannerModeRef.current === 'pro' ? isTrainDay(offset) : undefined })
           : bbPrepConfig
             ? computePeakWeekNutritionTargets(_prepDate, {
                 kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),

@@ -50,7 +50,8 @@
 - [x] **D14. Тапер для ББ — реализован** (Раунд F): карточка «🎭 Пик-неделя (тапер ББ) — 7 дней к сцене»
       в prep-блоке (протокол по дням: вода/натрий/карбы/тренировка/позы, фазы load→depletion→reload→peak→show);
       в сборщике цикла — чекбокс «🎭 Применить пик-неделю к последней неделе contest prep» →
-      `applyPeakWeekToPlan` (движок `bb-peak-week.engine`, `weekNumber` поддержан).
+      `applyPeakWeekOverlayToBBPlan` (движок `bb-contest-prep.engine`, `weekNumber` поддержан;
+      `bb-peak-week.engine` удалён, функционал — в каноне).
 - [x] **D15. Prep с датой шоу** — (Раунд H) вес/пол/категория шоу из профиля (`profilePeakDefaults`:
        `personal.weight/sex` + `goals.bbCategory`, маппинг категорий), селектор «🎭 Категория шоу»
        (7 категорий) в сборщике; (Раунд L) **чек-ин prep** — «⚖️ Чек-ин prep» в prep-блоке:

@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   recommendBBTaperConfig, sRPEAdjustment, buildPreTaperCascade,
   coordinateLastHeavyDay, addPeakPriming, planTwoShowSequence,
+  applyAdaptiveTaper,
 } from '../bb-contest-prep.engine';
 import { buildBBPlan } from '../bb-builder.engine';
 
@@ -85,6 +86,23 @@ describe('Фаза 3.15: pre-taper каскад', () => {
     const cascade = buildPreTaperCascade(cfg({ waterStrategy: 'stable' }));
     expect(cascade.length).toBe(7);
     expect(cascade[0].waterLiters).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('Э2: applyAdaptiveTaper — только недели тапера, пик не двигается', () => {
+  it('меняет только weeksOut (showDate/стратегии целы)', () => {
+    const base = cfg({ weeksOut: 2 });
+    const out = applyAdaptiveTaper(base, { weeksOut: 3, volumeMult: 0.9, reasons: [] });
+    expect(out.weeksOut).toBe(3);
+    expect(out.showDate).toBe(base.showDate);
+    expect(out.waterStrategy).toBe(base.waterStrategy);
+    expect(out.carbLoadStrategy).toBe(base.carbLoadStrategy);
+  });
+  it('комбо danger (усталость+ACWR+sRPE) — кап 4 нед', () => {
+    const sessions = Array.from({ length: 10 }, () => ({ sRPE: 9 }));
+    const r = recommendBBTaperConfig({ fatigue: 95, acwrRatio: 1.9, recentSessions: sessions as any, baseWeeksOut: 2 });
+    expect(r.weeksOut).toBeLessThanOrEqual(4);
+    expect(r.weeksOut).toBeGreaterThanOrEqual(3);
   });
 });
 

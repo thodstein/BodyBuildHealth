@@ -107,18 +107,55 @@ export function loadContestPrepConfig(): BBContestPrepConfig | null {
       const cfg = deserializeBBPrepConfig(raw);
       if (cfg) return cfg;
     }
-    // bridge через план
+    // bridge через план: конфиг восстанавливается из версионированного плана
     const plan = planFromStored(s?.goals?.bbContestPrepPlan, s?.goals?.bbPeakConfig, s?.goals, s?.personal);
-    if (plan) {
-      // plan → cfg обратная проекция делается в движке через configFromPlan, но нам нужен полный cfg;
-      // здесь достаточно вернуть cfg из плана, если он был сохранён рядом (bbPeakConfig), иначе — из плана
-      // plan уже есть — вернём cfg, восстановленный из сериализованного bbPeakConfig (выше) либо fallback
-      return null;
-    }
+    if (plan) return configFromPlan(plan);
     return null;
   } catch {
     return null;
   }
+}
+
+export interface StoreContestPrepOpts {
+  source?: ContestPrepSource;
+  trainingPlanId?: string;
+  nutritionPlanId?: string;
+}
+
+/**
+ * Сохранить УЖЕ СОБРАННЫЙ план + конфиг (единая точка записи для всех поверхностей:
+ * ББ-авто, Prep-цикл, питание, SRCBB). Пишет оба ключа профиля и событие.
+ * В отличие от saveContestPrepEverywhere — не пересобирает план из конфига,
+ * а сохраняет переданный (важно для trial-id/adjustments/updatedAt).
+ */
+export function storeContestPrepPlan(
+  plan: BBContestPrepPlan,
+  rawCfg: BBContestPrepConfig,
+  opts: StoreContestPrepOpts = {},
+): void {
+  try {
+    const cur = getProfile();
+    const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
+    if (!next.goals) next.goals = {};
+    next.goals.bbContestPrepPlan = serializeBBContestPrepPlan(plan);
+    next.goals.bbPeakConfig = serializeBBPrepConfig(rawCfg);
+    next.goals.peakWeek = true;
+    next.goals.peakShowDay = rawCfg.showDate;
+    updateProfile({ settings: next });
+  } catch { /* silent */ }
+  try {
+    window.dispatchEvent(
+      new CustomEvent(CONTEST_PREP_UPDATED_EVENT, {
+        detail: {
+          prepPlanId: plan.id,
+          trainingPlanId: opts.trainingPlanId,
+          nutritionPlanId: opts.nutritionPlanId,
+          showDate: rawCfg.showDate,
+          source: opts.source ?? plan.source ?? 'bb_auto',
+        },
+      }),
+    );
+  } catch { /* ignore */ }
 }
 
 /** Полностью отключить тапер ББ (оба ключа + событие). */

@@ -11,7 +11,17 @@ function esc(s: string): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakHeads?: string[]; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null }): string {
+export interface BBDiagnosticsPro2Meta {
+  lr?: Array<{ group: string; left: number; right: number; asymPct: number | null; weakSide: string | null; verdict: string; topUpSets: number; text: string }>;
+  readiness?: { level: string; advice: string; reasons: string[] };
+  redFlags?: { active: boolean; blocked: boolean; items: string[]; text: string };
+  bar?: { xLoop: number; yMax: number; type: string; text: string } | null;
+  pose?: { hip?: number; knee?: number; ankle?: number; shoulder?: number; n: number; faults: string[] } | null;
+  teen?: string | null;
+  femaleNotes?: string[];
+}
+
+export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakHeads?: string[]; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta): string {
   const date = meta?.date || new Date().toISOString().slice(0, 10);
   const level = meta?.level || '';
   const rowsWeak = report.weakCandidates.map(c => `<tr><td>${esc(c.muscle)}</td><td>${esc(c.granular || '')}</td><td>${esc(c.source)}</td><td>${c.deltaPct}%</td><td>${esc(c.reason)}</td></tr>`).join('') || '<tr><td colspan="5">— баланс</td></tr>';
@@ -76,6 +86,19 @@ ${(meta as any)?.weakCauses ? `<h2>Причины отставания (MAX PRO)
       return `<h2>Покрытие слабых головок планом</h2><table><tr><th>Головка</th><th>Статус</th><th>Упражнения</th></tr>${cov.map((c) => `<tr><td>${esc(c.head)}</td><td>${c.covered ? '✓ есть' : '✗ нет'}</td><td>${esc(c.by.join(', ') || '—')}</td></tr>`).join('')}</table>`;
     } catch { return ''; }
   })()}
+${(() => {
+    const m = meta as BBDiagnosticsPro2Meta | undefined;
+    if (!m) return '';
+    const parts: string[] = [];
+    if (m.lr?.length) parts.push(`<h2>Лево/право (дневник)</h2><table><tr><th>Группа</th><th>Л</th><th>П</th><th>Перекос</th><th>Вердикт</th></tr>${m.lr.map((v) => `<tr><td>${esc(v.group)}</td><td>${v.left}</td><td>${v.right}</td><td>${v.asymPct ?? '—'}%</td><td>${esc(v.text)}</td></tr>`).join('')}</table>`);
+    if (m.readiness?.level) parts.push(`<h2>Готовность — ${esc(m.readiness.level)}</h2><div style="font-size:12px">${esc(m.readiness.advice)}</div><ul>${m.readiness.reasons.map((r) => `<li>${esc(r)}</li>`).join('') || '<li>—</li>'}</ul>`);
+    if (m.redFlags?.active) parts.push(`<h2>Флаги — ${m.redFlags.blocked ? 'стоп' : 'осторожно'}</h2><div style="font-size:12px">${esc(m.redFlags.text)} (скрининг, не диагноз)</div>`);
+    if (m.bar) parts.push(`<h2>Штанга (видео)</h2><div style="font-size:12px">Петля ${m.bar.xLoop} см · ${esc(m.bar.type)} — ${esc(m.bar.text)} (порог 4/6 см)</div>`);
+    if (m.pose) parts.push(`<h2>Углы (таблица)</h2><div style="font-size:12px">Таз ${m.pose.hip ?? '—'}° · колено ${m.pose.knee ?? '—'}° · голеностоп ${m.pose.ankle ?? '—'}° · плечо ${m.pose.shoulder ?? '—'}° (кадров: ${m.pose.n})${m.pose.faults.length ? ` — ${esc(m.pose.faults.join(' · '))}` : ''}</div>`);
+    if (m.teen) parts.push(`<h2>Подросток</h2><div style="font-size:12px">${esc(m.teen)}</div>`);
+    if (m.femaleNotes?.length) parts.push(`<h2>Женские ориентиры</h2><ul>${m.femaleNotes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>`);
+    return parts.join('');
+  })()}
 <h2>Симметрия</h2><table><tr><th>Рацио</th><th>Значение</th></tr>${rowsSym}</table><ul>${issuesSym}</ul>
 <h2>Стимул</h2><ul>${issuesStim}</ul><div style="font-size:11px;color:#666">lengthened ${report.stimulus.global.lengthened} · mid ${report.stimulus.global.midRange} · shortened ${report.stimulus.global.shortened} · compound ${report.stimulus.global.compound} / iso ${report.stimulus.global.isolation}</div>
 ${exerciseSection}
@@ -88,7 +111,7 @@ ${exerciseSection}
 export function buildBBDiagnosticsCsv(
   report: BBDiagnosticsReport,
   plan?: any,
-  meta?: { weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; weakHeads?: string[]; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; note: string }> } | null },
+  meta?: { weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; weakHeads?: string[]; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta,
 ): string {
   const escCsv = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines: string[] = [];
@@ -127,6 +150,26 @@ export function buildBBDiagnosticsCsv(
     }
   }
   for (const [k, v] of Object.entries(report.symmetry.ratios)) lines.push([k, v].map(escCsv).join(','));
+  if (meta?.lr?.length) {
+    lines.push('');
+    lines.push(['lr_group', 'left', 'right', 'asymPct', 'verdict'].map(escCsv).join(','));
+    for (const v of meta.lr) lines.push([v.group, v.left, v.right, v.asymPct ?? '', v.text].map(escCsv).join(','));
+  }
+  if (meta?.readiness?.level) {
+    lines.push('');
+    lines.push(['readiness', meta.readiness.level, meta.readiness.advice, (meta.readiness.reasons || []).join(' · ')].map(escCsv).join(','));
+  }
+  if (meta?.redFlags?.active) {
+    lines.push(['red_flags', meta.redFlags.blocked ? 'stop' : 'caution', meta.redFlags.text].map(escCsv).join(','));
+  }
+  if (meta?.bar) {
+    lines.push(['bar_xLoop', meta.bar.xLoop, 'bar_type', meta.bar.type].map(escCsv).join(','));
+  }
+  if (meta?.pose) {
+    lines.push(['pose', `hip ${meta.pose.hip ?? '—'} knee ${meta.pose.knee ?? '—'} ankle ${meta.pose.ankle ?? '—'} shoulder ${meta.pose.shoulder ?? '—'} n ${meta.pose.n}`].map(escCsv).join(','));
+  }
+  if (meta?.teen) lines.push(['teen', meta.teen].map(escCsv).join(','));
+  if (meta?.femaleNotes?.length) lines.push(['female_notes', meta.femaleNotes.join(' · ')].map(escCsv).join(','));
   // упражнения → эффект (максимально)
   try {
     const p = plan || (() => { try { const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_bb_plan_saved') : null; if (!raw) return null; const j = JSON.parse(raw); return j?.plan?.weeks ? j.plan : j?.weeks ? j : null; } catch { return null; } })();

@@ -75,26 +75,3 @@ export const PEAKING_PROTOCOLS: Record<PeakingProtocol, PeakingProtocolOutput> =
 export function getPeakingProtocol(type: PeakingProtocol): PeakingProtocolOutput {
   return PEAKING_PROTOCOLS[type] || PL_PROTOCOL;
 }
-
-export function applyPeakingToMicrocycles(
-  microcycles: Array<{ weekNumber: number; mesocycleType: string; volumeMultiplier: number; rirRange: [number, number]; }>,
-  protocol: PeakingProtocol,
-  startWeek: number
-): Array<{ weekNumber: number; volumeMultiplier: number; rirRange: [number, number]; rpeTarget: number; notes: string }> {
-  const p = getPeakingProtocol(protocol);
-  const result: Array<{ weekNumber: number; volumeMultiplier: number; rirRange: [number, number]; rpeTarget: number; notes: string }> = [];
-
-  for (let i = 0; i < p.weeks.length; i++) {
-    const pw = p.weeks[i];
-    const existing = microcycles.find(m => m.weekNumber === startWeek + i);
-    const baseVol = existing?.volumeMultiplier ?? 1.0;
-    result.push({
-      weekNumber: startWeek + i,
-      volumeMultiplier: baseVol * pw.volumePct,
-      rirRange: [pw.rirMin, pw.rirMax],
-      rpeTarget: 10 - pw.rirMax,
-      notes: `${p.name} — ${pw.label}: ${pw.focus}`,
-    });
-  }
-  return result;
-}

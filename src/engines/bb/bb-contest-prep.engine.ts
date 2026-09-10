@@ -1076,6 +1076,65 @@ export function buildShowTimeline(cfg: BBContestPrepConfig): ShowTimelineItem[] 
 }
 
 /**
+ * Э5: структурированный чек-лист шоу D-10…D-0 (исполнение, не только расписание).
+ * dayOffset — дней до шоу (0 = show day). Даты детерминированы от showDate.
+ */
+export interface ShowChecklistItem {
+  id: string;
+  dayOffset: number;
+  date: string;   // ISO
+  label: string;
+  detail?: string;
+}
+
+export function buildShowChecklist(showDate: string): ShowChecklistItem[] {
+  if (!isValidIsoDate(showDate)) return [];
+  const items: Array<[string, number, string, string?]> = [
+    ['music', 10, '🎵 Музыка и позы под счёт', 'Прогон обязательной программы под музыку, удержание поз 3–5 сек.'],
+    ['tan_test', 7, '🤎 Тест tan на патче', 'Проба автозагара на скрытом участке — проверка оттенка и аллергии.'],
+    ['walkthrough', 6, '🚶 Walkthrough сцены', 'Выход/уходы, точки остановок, работа с судьями (если доступно — на площадке).'],
+    ['hair_legs', 5, '💈 Волосы / ноги', 'Стрижка, бритьё/эпиляция ног и торса — не позже D-5 (раздражение должно сойти).'],
+    ['tan_1', 3, '🤎 Tan: первый слой', 'Первый слой за 2–3 дня; сон в тёмном белье, без душа утром.'],
+    ['checkin_d3', 3, '📸 Чек-ин D-3', 'Вес утром, фото (фронт/бок/спина), fullness/вода 1–5 — ввод в live-adjust ниже.'],
+    ['tan_2', 2, '🤎 Tan: второй слой', 'Второй слой за 1–2 дня; контроль складок/ладоней.'],
+    ['checkin_d2', 2, '📸 Чек-ин D-2', 'Вес + фото; при spill — карбс −100 г (см. live-adjust).'],
+    ['food_bag', 1, '🎒 Сумка + еда на утро', 'Костюм, очки, еда (рисовые хлебцы/мёд/банан), вода, соль, полотенца, билет, документы.'],
+    ['checkin_d1', 1, '📸 Чек-ин D-1 (live-adjust)', 'Утренние fullness/вода/spill → live-adjust: карбс/вода/Na на день. Фото через 3–4 ч.'],
+    ['water_d1', 1, '💧 Вода D-1 по плану', 'По протоколу пик-недели; глотки после обеда (classic) или стабильно (stable).'],
+    ['pump', 0, '💪 Памп-рутина backstage', 'Резинки/отжимания/лёгкие гантели 15–20 повт × 2 круга за 45 мин до выхода.'],
+    ['stage_food', 0, '🍚 Карбс на сцене', 'Рисовые хлебцы + мёд малыми порциями между выходами; вода глотками.'],
+  ];
+  return items.map(([id, dayOffset, label, detail]) => ({
+    id, dayOffset, label, detail,
+    date: isoAddDays(showDate, -dayOffset),
+  }));
+}
+
+/** Ключ персиста чек-листа шоу. */
+export const SHOW_CHECKLIST_STORAGE_KEY = 'he_prep_show_checklist';
+
+export function loadShowChecklist(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(SHOW_CHECKLIST_STORAGE_KEY);
+    const p = JSON.parse(raw || '{}') as unknown;
+    if (!p || typeof p !== 'object') return {};
+    const out: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(p as Record<string, unknown>)) {
+      if (typeof k === 'string' && typeof v === 'boolean') out[k] = v;
+    }
+    return out;
+  } catch { return {}; }
+}
+
+export function toggleShowChecklistItem(showDate: string, id: string): Record<string, boolean> {
+  const key = `${showDate}_${id}`;
+  const cur = loadShowChecklist();
+  const next = { ...cur, [key]: !cur[key] };
+  try { localStorage.setItem(SHOW_CHECKLIST_STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  return next;
+}
+
+/**
  * Фаза 3.13: последний тяжёлый день + прайминг для ББ (аналог PL LAST_HEAVY_DAYS).
  * ББ-тапер раньше имел только мягкую деплецию 60% без координаты последней тяжёлой
  * сессии и без прайминга. Здесь:
@@ -1557,6 +1616,8 @@ export function applyTrainingTaperToBBPlan(
  * Оверлей только пик-недели (без недельного тапера) — на конкретную неделю плана
  * (по умолчанию финальная; `opts.weekNumber` — 1-индекс, клампится к краям).
  * Идемпотентен per-week — можно накладывать на несколько недель шоу.
+ * Э1: единый формат маркеров — неделя всегда несёт И `peakWeek=true`, И
+ * `contestPhase='peak_week'` (паритет с applyContestPrepToBBPlan).
  */
 export function applyPeakWeekOverlayToBBPlan(
   plan: BBPlan,
@@ -1580,9 +1641,13 @@ export function applyPeakWeekOverlayToBBPlan(
     target.deload = false;
     target.taper = true;
     target.peakWeek = true;
+    target.contestPhase = 'peak_week';
     target.sessions = target.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
     target.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}`;
     applied = true;
+  } else if (target.contestPhase !== 'peak_week') {
+    // Нормализация legacy-разметки (только peakWeek=true): доводим до единого формата.
+    target.contestPhase = 'peak_week';
   }
 
   const result = {
@@ -2132,6 +2197,12 @@ export function computePrepPhaseRanges(
   }
   push('post_show', total + 1, total + 1,
     'Post-show: восстановление — питание на поддерживающем уровне, лёгкие тренировки, контроль веса.');
+  // Э7: reverse-diet окно 4 нед — фаза покрывает 28 дней после шоу (цели — по кривой postShowReverseDiet).
+  const ps = phases.find(p => p.key === 'post_show');
+  if (ps) {
+    ps.dateEnd = isoAddDays(showDate, 28);
+    ps.note = 'Post-show (4 нед): обратная диета — калории ступенчато к поддержанию (+100 ккал/нед), белок 2 г/кг, вода/натрий стабильны.';
+  }
 
   return phases;
 }
@@ -2481,16 +2552,52 @@ export function prepPhaseForDate(plan: BBContestPrepPlan, dateIso: string): Prep
 }
 
 /**
+ * Э3: детерминированный календарь рефид-дней подготовки — единый источник для
+ * живого рациона (nutritionTargetsForPrepDate) и display-таблицы
+ * buildPrepNutritionPlan. Правило: последний день каждой 3-й недели подготовки
+ * + последний день каждой недели финальной подготовки. Тапер/пик — без рефидов.
+ */
+export function prepRefeedDates(plan: BBContestPrepPlan): string[] {
+  const out: string[] = [];
+  try {
+    const start = plan.preparation.startDate;
+    if (!isValidIsoDate(start)) return out;
+    for (const p of plan.phases) {
+      if (p.key !== 'preparation' && p.key !== 'final_preparation') continue;
+      const startIdx = isoDiffDays(start, p.dateStart);
+      const endIdx = isoDiffDays(start, p.dateEnd);
+      for (let d = Math.max(0, startIdx); d <= endIdx; d++) {
+        if (d % 7 !== 6) continue; // рефид — последний день 7-дневки
+        const weekIdx = Math.floor(d / 7) + 1;
+        if (p.key === 'final_preparation' || weekIdx % 3 === 0) out.push(isoAddDays(start, d));
+      }
+    }
+  } catch { /* ignore */ }
+  return out;
+}
+
+/** Рефид-день ли эта дата (только preparation/final_preparation). */
+export function isPrepRefeedDay(dateIso: string, plan: BBContestPrepPlan): boolean {
+  if (!isValidIsoDate(dateIso)) return false;
+  const phase = prepPhaseForDate(plan, dateIso);
+  if (!phase || (phase.key !== 'preparation' && phase.key !== 'final_preparation')) return false;
+  return prepRefeedDates(plan).includes(dateIso);
+}
+
+/**
  * Единая точка расчёта дневных целей питания на ЛЮБУЮ дату contest prep.
  * - пик-неделя (≤ 7 дней до шоу): абсолютные цели buildPeakWeek;
  * - подготовка/тапер: дефицит по plan.preparation (калории ступенчатые,
  *   белок из профиля категории, жиры ≥ безопасный минимум, вода/натрий стабильны);
+ * - Э3: рефид-дни (калории до поддержания дня, жиры на полу) + карб-волна
+ *   под тяжёлые дни (угли +15%) / отдых (−10%), фибра по формуле 14 г/1000 ккал;
  * - вне окна: база без изменений.
  */
 export function nutritionTargetsForPrepDate(
   dateIso: string,
   plan: BBContestPrepPlan,
   base: PeakNutritionBase,
+  opts?: { isHeavyTrainDay?: boolean },
 ): PeakNutritionTargets {
   const day = peakWeekDayForDate(dateIso, configFromPlan(plan));
   if (day) {
@@ -2505,21 +2612,23 @@ export function nutritionTargetsForPrepDate(
     };
   }
   if (phase.key === 'post_show') {
-    // После шоу — восстановление на поддерживающем уровне (не дефицит подготовки).
-    const w = plan.preparation.startingWeightKg;
+    // Э7: после шоу — обратная диета по недельной кривой (авто-переключение целей).
     const post = buildPostShowPlan(plan);
+    const curve = postShowReverseDiet(plan);
+    const daysAfter = Math.max(0, isoDiffDays(plan.showDate, dateIso));
+    const level = curve[Math.min(3, Math.floor(daysAfter / 7))] ?? curve[0];
     return {
-      kcal: post.kcal,
-      proteinG: post.proteinG,
-      fatG: Math.max(30, Math.round(w * prepFatFloorGPerKg(plan.sex))),
-      carbsG: Math.max(50, Math.round((post.kcal - post.proteinG * 4 - Math.max(30, Math.round(w * prepFatFloorGPerKg(plan.sex))) * 9) / 4)),
-      fiberMaxG: 40,
+      kcal: level.kcal,
+      proteinG: level.proteinG,
+      fatG: level.fatG,
+      carbsG: level.carbsG,
+      fiberMaxG: Math.min(70, Math.max(25, Math.round(level.kcal * 0.014))),
       waterMl: Math.round(post.waterLiters * 1000),
       sodiumMg: base.sodiumMg,
       potassiumMg: 3500,
       phase: null,
       phaseLabel: PREP_PHASE_LABELS.post_show,
-      note: `🔄 Post-show: питание на поддерживающем уровне (${post.kcal} ккал), белок ${post.proteinG} г, вода/натрий стабильны. ${post.weightCheck}`,
+      note: `🔄 Post-show: ${level.kcal} ккал · Б/У/Ж ${level.proteinG}/${level.carbsG}/${level.fatG} г, вода/натрий стабильны. ${level.note} ${post.weightCheck}`,
     };
   }
   const profile = CATEGORY_PROFILES[plan.category];
@@ -2533,8 +2642,26 @@ export function nutritionTargetsForPrepDate(
   // PRO TDEE: позирование 3ккал/мин + шаги 0.04ккал/шаг (20мин позинг ≈60ккал, 8000 шагов ≈320ккал)
   const posingExtra = phase.key === 'taper' ? 60 : phase.key === 'final_preparation' ? 30 : 0;
   // Женский калорийный пол выше (RED-S / энергетическая доступность): минимум 1400 ккал.
-  const kcal = Math.max(isFemale ? 1400 : 1200, Math.round(plan.preparation.currentCalories * phaseMult + posingExtra));
-  const carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
+  let kcal = Math.max(isFemale ? 1400 : 1200, Math.round(plan.preparation.currentCalories * phaseMult + posingExtra));
+  let carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
+  // Э3: рефид и карб-волна (только preparation/final_preparation).
+  let waveNote = '';
+  const isPrepPhase = phase.key === 'preparation' || phase.key === 'final_preparation';
+  if (isPrepPhase && isPrepRefeedDay(dateIso, plan)) {
+    kcal = Math.max(kcal, Math.round(base.kcal));
+    carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
+    waveNote = ' 🔄 Рефид-день: калории до поддержания дня, карбс на гликоген/лептин, жиры на полу.';
+  } else if (isPrepPhase && opts?.isHeavyTrainDay === true) {
+    const up = Math.round(carbsG * 1.15);
+    kcal += (up - carbsG) * 4;
+    carbsG = up;
+    waveNote = ' 🏋️ Тяжёлый день: угли +15% на гликоген и восстановление.';
+  } else if (isPrepPhase && opts?.isHeavyTrainDay === false) {
+    const down = Math.max(50, Math.round(carbsG * 0.9));
+    kcal = Math.max(isFemale ? 1400 : 1200, kcal - (carbsG - down) * 4);
+    carbsG = down;
+    waveNote = ' 🌙 Лёгкий день/отдых: угли −10%, дефицит держится карбсами.';
+  }
   const basePhaseNote = phase.key === 'taper'
     ? 'Объём снижается, калории стабильны — усталость падает, катаболизм не нужен.'
     : phase.key === 'final_preparation'
@@ -2549,13 +2676,13 @@ export function nutritionTargetsForPrepDate(
         'Цикл: в лютеиновую фазу возможна задержка воды +0.5–1 кг — не паникуйте, анализируйте среднее за 7 дней.',
       ].join(' ')
     : '';
-  const phaseNote = `${basePhaseNote}${femaleNotes ? ' ' + femaleNotes : ''}`;
+  const phaseNote = `${basePhaseNote}${femaleNotes ? ' ' + femaleNotes : ''}${waveNote}`;
   return {
     kcal,
     proteinG,
     fatG,
     carbsG,
-    fiberMaxG: 40,
+    fiberMaxG: Math.min(70, Math.max(25, Math.round(kcal * 0.014))),
     waterMl: base.waterMl,
     sodiumMg: base.sodiumMg,
     potassiumMg: 3500,
@@ -2891,6 +3018,38 @@ export interface PostShowPlan {
 }
 
 /**
+ * Э7: обратная диета post-show — понедельная кривая возврата калорий.
+ * Нед 1 = поддержание (buildPostShowPlan), далее +100 ккал/нед (≈ +25 г углей),
+ * кап — поддержание +300. Белок 2 г/кг, жиры на полу, вода/натрий стабильны.
+ */
+export interface ReverseDietWeek {
+  week: 1 | 2 | 3 | 4;
+  kcal: number;
+  proteinG: number;
+  fatG: number;
+  carbsG: number;
+  note: string;
+}
+
+export function postShowReverseDiet(plan: BBContestPrepPlan): ReverseDietWeek[] {
+  const w = plan.preparation.startingWeightKg;
+  const post = buildPostShowPlan(plan);
+  const fatG = Math.max(30, Math.round(w * prepFatFloorGPerKg(plan.sex)));
+  const proteinG = post.proteinG;
+  const cap = Math.round(w * 33);
+  return ([1, 2, 3, 4] as const).map(week => {
+    const kcal = Math.min(cap, post.kcal + (week - 1) * 100);
+    const carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
+    return {
+      week, kcal, proteinG, fatG, carbsG,
+      note: week === 1
+        ? 'Обратная диета: нед 1/4 — поддержание, белок 2 г/кг, вес +1–2 кг (гликоген/вода) — норма.'
+        : `Обратная диета: нед ${week}/4 — +${(week - 1) * 100} ккал к поддержанию (угли +${(week - 1) * 25} г/нед).`,
+    };
+  });
+}
+
+/**
  * План восстановления после шоу: питание на поддерживающем уровне,
  * стабильные вода/натрий, лёгкий возврат к тренировкам, контроль веса.
  * НЕ возвращает резких протоколов — пост-шоу не место для манипуляций.
@@ -3082,6 +3241,15 @@ export function buildPrepIcs(plan: BBContestPrepPlan): string {
   lines.push('SUMMARY:🎬 Show day');
   lines.push(`DESCRIPTION:${icsEscape(`${CONTEST_CATEGORY_LABELS[plan.category] ?? plan.category} — выход на сцену`)}`);
   lines.push('END:VEVENT');
+  // Э5: чек-лист шоу (tan/чек-ины/сумка) — отдельными событиями, старые события целы.
+  for (const item of buildShowChecklist(plan.showDate)) {
+    lines.push('BEGIN:VEVENT');
+    lines.push(`DTSTART;VALUE=DATE:${item.date.replace(/-/g, '')}`);
+    lines.push(`DTEND;VALUE=DATE:${isoAddDays(item.date, 1).replace(/-/g, '')}`);
+    lines.push(`SUMMARY:${icsEscape(`📋 ${item.label}`)}`);
+    lines.push(`DESCRIPTION:${icsEscape(item.detail ?? '')}`);
+    lines.push('END:VEVENT');
+  }
   lines.push('END:VCALENDAR');
   return lines.join('\r\n');
 }
@@ -3102,6 +3270,83 @@ export function buildPrepCoachJson(plan: BBContestPrepPlan): string {
     safety: plan.safety,
     updatedAt: plan.updatedAt,
   }, null, 2);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Э8: недельный отчёт тренеру (чек-ины + сила-тренд + протокол) — HTML и CSV
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PrepWeeklyReportCheckin {
+  week: number;
+  date?: string;
+  weightAvg?: number;
+  waistCm?: number;
+  sleepAvg?: number;
+  sessionsDone?: number;
+  psyche?: number;
+  advice?: string;
+  note?: string;
+}
+
+export interface PrepWeeklyReportInput {
+  checkins: PrepWeeklyReportCheckin[];
+  strengthDowns: Array<{ exercise: string; before: number; after: number; deltaPct: number }>;
+}
+
+/** HTML-отчёт тренеру: недели (фаза/даты/чек-ины) + сила-тренд + протокол + safety + история. */
+export function buildPrepWeeklyReportHtml(plan: BBContestPrepPlan, extra?: PrepWeeklyReportInput): string {
+  const checkins = extra?.checkins ?? [];
+  const byWeek = new Map<number, PrepWeeklyReportCheckin>();
+  for (const c of checkins) {
+    if (Number.isFinite(c.week)) byWeek.set(c.week, c);
+  }
+  const total = Math.max(1, Math.min(52, Math.round(plan.preparation.weeks)));
+  const rows: string[] = [];
+  for (let w = 1; w <= total; w++) {
+    const dateStart = isoAddDays(plan.preparation.startDate, (w - 1) * 7);
+    const dateEnd = isoAddDays(plan.preparation.startDate, w * 7 - 1);
+    const ph = prepPhaseForDate(plan, dateStart);
+    const c = byWeek.get(w);
+    rows.push(
+      `<tr><td>${w}</td><td>${escHtml(dateStart)} – ${escHtml(dateEnd)}</td>` +
+      `<td>${escHtml(ph?.label ?? '')}</td>` +
+      `<td>${c?.weightAvg ?? '—'}</td><td>${c?.waistCm ?? '—'}</td>` +
+      `<td>${c?.sleepAvg ?? '—'}</td><td>${c?.sessionsDone ?? '—'}</td>` +
+      `<td>${c?.psyche ?? '—'}</td><td>${escHtml(c?.advice ?? '—')}</td></tr>`,
+    );
+  }
+  const downs = (extra?.strengthDowns ?? []).map(
+    s => `<li>${escHtml(s.exercise)}: e1RM ${s.before} → ${s.after} кг (${s.deltaPct}%)</li>`,
+  ).join('');
+  const adjustments = (plan.adjustments ?? []).map(a => {
+    const d = Number(a.caloriesDelta) || 0;
+    return `<li>${escHtml(a.date)}: ${escHtml(a.reason)} (${d > 0 ? '+' : ''}${d} ккал)</li>`;
+  }).join('');
+  const safety = plan.safety.warnings.map(w => `<li>${escHtml(w)}</li>`).join('');
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Отчёт prep ${escHtml(plan.showDate)}</title></head><body>` +
+    `<h1>🏁 Contest prep — отчёт тренеру (шоу ${escHtml(plan.showDate)}, ${escHtml(CONTEST_CATEGORY_LABELS[plan.category] ?? plan.category)})</h1>` +
+    `<p>Подготовка ${plan.preparation.weeks} нед · тапер ${plan.taper.weeks} нед · темп ${plan.preparation.targetRatePctPerWeek}%/нед · ${plan.preparation.currentCalories} ккал</p>` +
+    `<h2>📊 Недели и чек-ины</h2>` +
+    `<table border="1" cellpadding="4" cellspacing="0"><thead><tr><th>Нед</th><th>Даты</th><th>Фаза</th><th>Вес ср</th><th>Талия</th><th>Сон</th><th>Сесс</th><th>Пси</th><th>Статус</th></tr></thead><tbody>${rows.join('')}</tbody></table>` +
+    (downs ? `<h2>📉 Сила-тренд (падение на дефиците)</h2><ul>${downs}</ul>` : '') +
+    `<h2>🎭 Протокол пика</h2><p>Стратегия: ${escHtml(plan.peakWeek.strategy)} · вода ${escHtml(plan.peakWeek.waterMode)} · натрий ${escHtml(plan.peakWeek.sodiumMode)}</p>` +
+    (safety ? `<h2>⚠ Safety</h2><ul>${safety}</ul>` : '') +
+    (adjustments ? `<h2>📝 История корректировок</h2><ul>${adjustments}</ul>` : '') +
+    `</body></html>`;
+}
+
+function escCsvCell(v: unknown): string {
+  return `"${String(v ?? '').replace(/"/g, '""')}"`;
+}
+
+/** CSV чек-инов недель (неделя/дата/вес/талия/сон/сессии/психика/статус). */
+export function buildPrepCheckinsCsv(checkins: PrepWeeklyReportCheckin[]): string {
+  const head = ['week', 'date', 'weightAvg', 'waistCm', 'sleepAvg', 'sessionsDone', 'psyche', 'advice'];
+  const lines = [head.join(',')];
+  for (const c of [...checkins].sort((a, b) => a.week - b.week)) {
+    lines.push([c.week, c.date ?? '', c.weightAvg ?? '', c.waistCm ?? '', c.sleepAvg ?? '', c.sessionsDone ?? '', c.psyche ?? '', c.advice ?? ''].map(escCsvCell).join(','));
+  }
+  return lines.join('\n');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

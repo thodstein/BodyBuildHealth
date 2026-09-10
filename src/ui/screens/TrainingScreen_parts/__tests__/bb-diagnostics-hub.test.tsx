@@ -245,7 +245,8 @@ describe('BBDiagnosticsHub', () => {
     expect(screen.getAllByText(/Готовность: красный/)[0]).toBeInTheDocument();
     fireEvent.click(screen.getByRole('switch', { name: /Острая боль/ }));
     expect(screen.getAllByText(/вставка объёма заблокирована/)[0]).toBeInTheDocument();
-    // вставка заблокирована: план не меняется, снимка нет
+    // вставка заблокирована: план не меняется, снимка нет (возврат на таб Слабых — зоны живут там)
+    fireEvent.click(screen.getByRole('button', { name: /Слабые/ }));
     fireEvent.click(screen.getAllByText('Верх груди')[0]);
     fireEvent.click(screen.getByRole('button', { name: /Вставить коррекции в план/ }));
     expect(screen.getAllByText(/Стоп:/)[0]).toBeInTheDocument();
@@ -266,6 +267,28 @@ describe('BBDiagnosticsHub', () => {
     render(<BBDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /Стимул/ }));
     expect(screen.getAllByText(/Детали углов и строгих групп/)[0]).toBeInTheDocument();
+  });
+  it('PRO-2: печать несёт L/R + готовность + флаги (тост с PRO-2)', () => {
+    const s = (n: number) => Array.from({ length: n }, () => ({ weightKg: 20, reps: 10 }));
+    localStorage.setItem('he_workout_log_v1', JSON.stringify([
+      { date: '2026-09-01', exercises: [{ muscleGroup: 'biceps', side: 'left', sets: s(5) }, { muscleGroup: 'biceps', side: 'right', sets: s(2) }] },
+    ]));
+    (URL as any).createObjectURL = () => 'blob:mock';
+    (URL as any).revokeObjectURL = () => {};
+    const origCreate = document.createElement.bind(document);
+    (document as any).createElement = ((tag: string, ...rest: any[]) => {
+      const el = origCreate(tag, ...rest) as any;
+      if (tag === 'a') el.click = () => {};
+      return el;
+    }) as any;
+    try {
+      render(<BBDiagnosticsHub />);
+      fireEvent.click(screen.getAllByText('Верх груди')[0]);
+      fireEvent.click(screen.getByRole('button', { name: /Печать/ }));
+      expect(screen.getAllByText(/PRO-2/)[0]).toBeInTheDocument();
+    } finally {
+      (document as any).createElement = origCreate;
+    }
   });
   it('P7: teen-гейт 14 лет + женская лютеиновая пометка', () => {
     render(<BBDiagnosticsHub />);

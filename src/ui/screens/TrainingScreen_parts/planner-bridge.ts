@@ -44,6 +44,13 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
    *  приёмник валидирует поля перед применением. */
   specBlock?: unknown;
   sleepHours?: number | null;
+  /** PRO-2 (BBDiagnosticsHub P1–P5/P7 → BbAutoConstructor): всё опционально, приёмник только сохраняет. */
+  lrVerdicts?: Array<{ group: string; left: number; right: number; asymPct: number | null; weakSide: string | null; verdict: string; topUpSets: number; text: string }>;
+  readiness?: { level: string; advice: string; reasons: string[] };
+  redFlags?: { active: boolean; blocked: boolean; items: string[]; text: string };
+  barPath?: { xLoop: number; yMax: number; type: string; text: string } | null;
+  poseAngles?: { hip?: number; knee?: number; ankle?: number; shoulder?: number; n: number } | null;
+  teenNote?: string | null;
 }
 export interface PriPayload { volumeMult: number; rirShift: number }
 export interface TempoPayload { eccentric: number; bottomPause?: number; concentric: number; topPause?: number; label?: string }

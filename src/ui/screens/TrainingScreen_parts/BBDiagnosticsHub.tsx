@@ -564,6 +564,43 @@ export const BBDiagnosticsHub: React.FC = () => {
         weakHeads,
         specBlock: specPayload,
         sleepHours: Number.isFinite(sleepNum as number) ? sleepNum : null,
+        // PRO-2: L/R, готовность, флаги, штанга, поза, teen (лениво — мемы ниже недоступны из-за TDZ)
+        lrVerdicts: (() => { try { return lrVerdictsFromSessions(diarySessions as any); } catch { return []; } })(),
+        readiness: (() => {
+          try {
+            const pain = state.pain010 ? parseFloat(state.pain010) : null;
+            const sl = state.sleepHours ? parseFloat(state.sleepHours) : null;
+            const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
+            return assessBbReadiness({
+              sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
+              pain010: Number.isFinite(pain as number) ? (pain as number) : null,
+              vbtLossPct: vbt?.lossPct ?? null,
+              dangerMuscles: danger,
+            });
+          } catch { return null; }
+        })(),
+        redFlags: (() => {
+          try { return assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain }); } catch { return null; }
+        })(),
+        barPath: (() => {
+          try {
+            const pts = parseKinoveaCSV(state.csvText);
+            const res = pts ? analyzeBarTracking(pts as any) : null;
+            if (!res) return null;
+            const vd = bbBarPathVerdict(res.xLoop, res.yMax);
+            return { xLoop: res.xLoop, yMax: res.yMax, type: vd.type, text: vd.text };
+          } catch { return null; }
+        })(),
+        poseAngles: (() => {
+          try {
+            const samples = parsePoseAnglesCsv(state.poseCsvText);
+            const sum = samples ? summarizePoseAngles(samples) : null;
+            if (!sum) return null;
+            const avg = avgAnglesOfSummary(sum);
+            return { hip: avg.hip, knee: avg.knee, ankle: avg.ankle, shoulder: avg.shoulder, n: sum.n };
+          } catch { return null; }
+        })(),
+        teenNote: (() => { try { return teenTrainingNote(state.age ? parseFloat(state.age) : null); } catch { return null; } })(),
       },
       source: 'intellectual',
     });
@@ -592,7 +629,8 @@ export const BBDiagnosticsHub: React.FC = () => {
       p.training = p.training || {}; (p.training as any).mobilityRestrictions = uniq;
       localStorage.setItem('he_profile_v2', JSON.stringify(p));
       try { window.dispatchEvent(new CustomEvent('profile-updated')); } catch {}
-      setToast(`✓ Мобильность ${uniq.join(', ') || 'OK'} → профиль`);
+      const restrRu: Record<string, string> = { ankle: 'голеностоп', hip: 'таз', shoulder: 'плечо', lower_back: 'поясница' };
+      setToast(`✓ Подвижность ${uniq.map((r) => restrRu[r] || r).join(', ') || 'в порядке'} → профиль`);
       setTimeout(() => setToast(''), 2500);
     } catch {}
   };
@@ -602,7 +640,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     if (!pts) { setToast('CSV не распознан'); setTimeout(() => setToast(''), 2000); return; }
     const res = analyzeBarTracking(pts as any);
     if (!res) { setToast('Нет точек'); return; }
-    setToast(`✓ Kinovea: xLoop ${res.xLoop}см yMax ${res.yMax}см vmax ${res.vmax} м/с`);
+    setToast(`✓ Разбор: петля ${res.xLoop} см, высота ${res.yMax} см, скорость ${res.vmax} м/с`);
     setTimeout(() => setToast(''), 3000);
   };
 
@@ -643,9 +681,56 @@ export const BBDiagnosticsHub: React.FC = () => {
       const f: Record<string, number> = {};
       spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
     } catch { /* noop */ }
-    const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan, weakHeads: heads, weakCauses: causes as any, specBlock: spec as any } as any);
+    // PRO-2 в экспорт: считаем теми же движками, что мемы экрана (мемы ниже недоступны из-за TDZ)
+    let pro2: Record<string, unknown> = {};
+    try {
+      const lr = lrVerdictsFromSessions(diarySessions as any).map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
+      const pain = state.pain010 ? parseFloat(state.pain010) : null;
+      const sl = state.sleepHours ? parseFloat(state.sleepHours) : null;
+      const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
+      const readinessEx = assessBbReadiness({
+        sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
+        pain010: Number.isFinite(pain as number) ? (pain as number) : null,
+        vbtLossPct: vbt?.lossPct ?? null,
+        dangerMuscles: danger,
+      });
+      const redEx = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
+      let barEx: Record<string, unknown> | null = null;
+      try {
+        const pts = parseKinoveaCSV(state.csvText);
+        const res = pts ? analyzeBarTracking(pts as any) : null;
+        if (res) barEx = { xLoop: res.xLoop, yMax: res.yMax, type: bbBarPathVerdict(res.xLoop, res.yMax).type, text: bbBarPathVerdict(res.xLoop, res.yMax).text };
+      } catch { /* noop */ }
+      let poseEx: Record<string, unknown> | null = null;
+      try {
+        const samples = parsePoseAnglesCsv(state.poseCsvText);
+        const sum = samples ? summarizePoseAngles(samples) : null;
+        if (sum) {
+          const avg = avgAnglesOfSummary(sum);
+          poseEx = { hip: avg.hip, knee: avg.knee, ankle: avg.ankle, shoulder: avg.shoulder, n: sum.n, faults: [] as string[] };
+        }
+      } catch { /* noop */ }
+      const w = parseFloat(state.circ.waist || '');
+      const h = parseFloat(state.circ.hips || '');
+      const tRaw = parseFloat(state.circ.thighL || '') || parseFloat(state.circ.thighR || '');
+      pro2 = {
+        lr,
+        readiness: { level: readinessEx.level, advice: readinessEx.advice, reasons: readinessEx.reasons },
+        redFlags: { active: redEx.active, blocked: redEx.blocked, items: redEx.items, text: redEx.text },
+        bar: barEx,
+        pose: poseEx,
+        teen: teenTrainingNote(state.age ? parseFloat(state.age) : null),
+        femaleNotes: state.sex === 'female'
+          ? femaleSymmetryNotes(
+            { waist: Number.isFinite(w) ? w : null, hips: Number.isFinite(h) ? h : null, thigh: Number.isFinite(tRaw) ? tRaw : null },
+            { cyclePhase: (state.cyclePhase || 'any') as any },
+          )
+          : [],
+      };
+    } catch { /* noop */ }
+    const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan, weakHeads: heads, weakCauses: causes as any, specBlock: spec as any, ...pro2 } as any);
     downloadHtml(html, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
-    setToast('✓ HTML экспорт (причины + спец-блок + упражнения)');
+    setToast('✓ HTML экспорт (причины + спец-блок + упражнения + PRO-2)');
     setTimeout(() => setToast(''), 2000);
   };
   const handleExportCsv = () => {
@@ -685,9 +770,55 @@ export const BBDiagnosticsHub: React.FC = () => {
       const f: Record<string, number> = {};
       spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
     } catch { /* noop */ }
-    const csv = buildBBDiagnosticsCsv(report, bbPlan as any, { weakCauses: causes, weakHeads: heads, specBlock: spec });
+    let pro2csv: Record<string, unknown> = {};
+    try {
+      const lr = lrVerdictsFromSessions(diarySessions as any).map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
+      const pain = state.pain010 ? parseFloat(state.pain010) : null;
+      const sl = state.sleepHours ? parseFloat(state.sleepHours) : null;
+      const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
+      const readinessEx = assessBbReadiness({
+        sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
+        pain010: Number.isFinite(pain as number) ? (pain as number) : null,
+        vbtLossPct: vbt?.lossPct ?? null,
+        dangerMuscles: danger,
+      });
+      const redEx = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
+      let barEx: Record<string, unknown> | null = null;
+      try {
+        const pts = parseKinoveaCSV(state.csvText);
+        const res = pts ? analyzeBarTracking(pts as any) : null;
+        if (res) barEx = { xLoop: res.xLoop, yMax: res.yMax, type: bbBarPathVerdict(res.xLoop, res.yMax).type, text: bbBarPathVerdict(res.xLoop, res.yMax).text };
+      } catch { /* noop */ }
+      let poseEx: Record<string, unknown> | null = null;
+      try {
+        const samples = parsePoseAnglesCsv(state.poseCsvText);
+        const sum = samples ? summarizePoseAngles(samples) : null;
+        if (sum) {
+          const avg = avgAnglesOfSummary(sum);
+          poseEx = { hip: avg.hip, knee: avg.knee, ankle: avg.ankle, shoulder: avg.shoulder, n: sum.n, faults: [] as string[] };
+        }
+      } catch { /* noop */ }
+      const w = parseFloat(state.circ.waist || '');
+      const h = parseFloat(state.circ.hips || '');
+      const tRaw = parseFloat(state.circ.thighL || '') || parseFloat(state.circ.thighR || '');
+      pro2csv = {
+        lr,
+        readiness: { level: readinessEx.level, advice: readinessEx.advice, reasons: readinessEx.reasons },
+        redFlags: { active: redEx.active, blocked: redEx.blocked, items: redEx.items, text: redEx.text },
+        bar: barEx,
+        pose: poseEx,
+        teen: teenTrainingNote(state.age ? parseFloat(state.age) : null),
+        femaleNotes: state.sex === 'female'
+          ? femaleSymmetryNotes(
+            { waist: Number.isFinite(w) ? w : null, hips: Number.isFinite(h) ? h : null, thigh: Number.isFinite(tRaw) ? tRaw : null },
+            { cyclePhase: (state.cyclePhase || 'any') as any },
+          )
+          : [],
+      };
+    } catch { /* noop */ }
+    const csv = buildBBDiagnosticsCsv(report, bbPlan as any, { weakCauses: causes, weakHeads: heads, specBlock: spec, ...pro2csv });
     downloadCsv(csv, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
-    setToast('✓ CSV экспорт (причины + спец-блок + упражнения)');
+    setToast('✓ CSV экспорт (причины + спец-блок + упражнения + PRO-2)');
     setTimeout(() => setToast(''), 2000);
   };
 
@@ -1226,7 +1357,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                   const col = c.cause === 'recovery' ? '#ef4444' : c.cause === 'volume' ? '#f59e0b' : '#a78bfa';
                   return (
                     <div key={z} style={{ padding: '8px 10px', borderRadius: 8, background: `${col}0f`, border: `1px solid ${col}33`, fontSize: 10, lineHeight: 1.5 }}>
-                      <b style={{ color: col }}>{weakRu(z)}: причина — {c.cause === 'volume' ? 'объём' : c.cause === 'recovery' ? 'восстановление' : c.cause === 'technique' ? 'техника' : c.cause === 'strength' ? 'сила' : c.cause === 'mobility' ? 'подвижность' : c.cause === 'fatigue' ? 'усталость' : c.cause} ({Math.round(c.confidence * 100)}%)</b>
+                      <b style={{ color: col }}>{weakRu(z)}: причина — {c.cause === 'volume' ? 'объём' : c.cause === 'recovery' ? 'восстановление' : c.cause === 'technique' ? 'техника' : c.cause === 'strength' ? 'сила' : c.cause === 'mobility' ? 'подвижность' : c.cause === 'fatigue' ? 'усталость' : c.cause === 'activation' ? 'включение мышцы' : c.cause === 'genetics' ? 'особенности строения' : c.cause} ({Math.round(c.confidence * 100)}%)</b>
                       <div style={{ color: '#fff' }}>{c.evidence.join(' · ') || '—'}</div>
                       {(() => {
                         let t: { deltaPct: number; sessions: number } | null = null;
@@ -1364,14 +1495,19 @@ export const BBDiagnosticsHub: React.FC = () => {
             {planAudit ? (
               <div style={{ padding: '8px 10px', borderRadius: 10, background: 'linear-gradient(135deg,rgba(0,230,138,0.08),rgba(168,85,247,0.06))', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 8, fontSize: 10, lineHeight: 1.5 }}>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>SFR {planAudit.avgSfr ?? '—'}/5 {planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '⚠ низко' : 'OK'}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>SFR {planAudit.avgSfr ?? '—'}/5 {planAudit.avgSfr != null && planAudit.avgSfr < 3.5 ? '⚠ низко' : 'порядок'}</span>
                   <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.lengthenedRatio < 0.3 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.lengthenedRatio < 0.3 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>растяж. {(planAudit.lengthenedRatio * 100).toFixed(0)}% {planAudit.lengthenedRatio < 0.3 ? '⚠ мало' : 'порядок'}</span>}
                   <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.unilateralRatio < 0.08 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.unilateralRatio < 0.08 ? '#f59e0b' : '#22c55e' }}>одност. {(planAudit.unilateralRatio * 100).toFixed(0)}% {planAudit.unilateralRatio < 0.08 ? '→ добавь' : 'порядок'}</span>}
                   <span style={{ padding: '2px 8px', borderRadius: 20, background: planAudit.fatigueDensity > 1.35 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: planAudit.fatigueDensity > 1.35 ? '#ef4444' : '#fff' }}>усталость {planAudit.fatigueDensity.toFixed(2)} {planAudit.fatigueDensity > 1.35 ? '⚠ высоко' : ''}</span>
                   <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{planAudit.totalExercises} упр · {planAudit.totalSets} сетов</span>
                 </div>
-                {planAudit.flags.length > 0 && <div style={{ color: '#f59e0b', fontSize: 10 }}>Флаги: {planAudit.flags.join(' · ')}</div>}
-                <div style={{ color: '#fff', marginTop: 2 }}>План: {bbPlan ? `${bbPlan.weeks?.length || 0} нед` : '— нет плана (собери в ББ-авто)'} · слабые: {report.weakZonesGranular.join(', ') || '—'} · asym {(() => { const v = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return v.length ? Math.max(...v).toFixed(1) + '%' : '—'; })()}</div>
+                {planAudit.flags.length > 0 && <div style={{ color: '#f59e0b', fontSize: 10 }}>Замечания: {planAudit.flags.map((f) => {
+                  const base = String(f).split(':')[0];
+                  const ru: Record<string, string> = { lowSFR: 'низкий стимул', midSFR: 'стимул средний', missingLengthened: 'мало растянутой', lowUnilateral: 'мало односторонних', highFatigue: 'усталость высокая', singleAngle: 'один угол' };
+                  const tail = String(f).includes(':') ? ` (${String(f).split(':').slice(1).map((m) => MUSCLE_LABEL_RU[m] || m).join(', ')})` : '';
+                  return `${ru[base] || f}${tail}`;
+                }).join(' · ')}</div>}
+                <div style={{ color: '#fff', marginTop: 2 }}>План: {bbPlan ? `${bbPlan.weeks?.length || 0} нед` : '— нет плана (собери в ББ-авто)'} · слабые: {weakListRu(report.weakZonesGranular) || '—'} · перекос {(() => { const v = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return v.length ? Math.max(...v).toFixed(1) + '%' : '—'; })()}</div>
               </div>
             ) : (
               <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: '#fff', marginBottom: 8 }}>Нет плана ББ — собери в ББ-авто, тогда аудит портфеля появится здесь.</div>
@@ -1388,7 +1524,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                         <b style={{ color: '#fff', fontSize: 11 }}>{MUSCLE_LABEL_RU[m] || m}</b>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 20, background: bm.avgSfr != null && bm.avgSfr < 3.5 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', color: bm.avgSfr != null && bm.avgSfr < 3.5 ? '#ef4444' : '#22c55e' }}>SFR {bm.avgSfr ?? '—'}</span>
                         <span style={{ fontSize: 10, color: '#fff' }}>раст. {bm.lengthened}/{bm.totalSets} · сред. {bm.mid} · пик. {bm.shortened}</span>
-                        <span style={{ fontSize: 10, color: bm.angleCoverage.missing.length ? '#f59e0b' : '#22c55e' }}>углы {bm.angleCoverage.covered}/{bm.angleCoverage.total} {bm.angleCoverage.missing.length ? `→ нет: ${bm.angleCoverage.missing.slice(0, 2).join(', ')}` : 'OK'}</span>
+                        <span style={{ fontSize: 10, color: bm.angleCoverage.missing.length ? '#f59e0b' : '#22c55e' }}>углы {bm.angleCoverage.covered}/{bm.angleCoverage.total} {bm.angleCoverage.missing.length ? `→ нет: ${bm.angleCoverage.missing.slice(0, 2).join(', ')}` : 'порядок'}</span>
                         <span style={{ fontSize: 10, color: bm.strictCoverage.missing.length ? '#f59e0b' : '#fff' }}>строгие {bm.strictCoverage.covered}/{bm.strictCoverage.total}</span>
                         <span style={{ fontSize: 10, color: bm.regionalCoverage.missing.length ? '#f59e0b' : '#fff' }}>подрег {bm.regionalCoverage.covered}/{bm.regionalCoverage.total}</span>
                         <span style={{ fontSize: 10, color: '#fff' }}>{bm.totalSets} сет · уни {bm.unilateral} · устал {bm.fatigueDensity.toFixed(2)}</span>
@@ -1518,7 +1654,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
                         <span style={{ padding: '2px 7px', borderRadius: 20, background: i === 0 ? '#00e68a' : 'rgba(255,255,255,0.08)', color: i === 0 ? '#06281c' : '#fff', fontWeight: 800, fontSize: 10 }}>#{i + 1} {a.type}</span>
                         <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{a.targetName || a.tempo || a.execCues?.[0] || a.type}</span>
-                        <span style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.18)', color: '#a78bfa' }}>conf {(a.confidence * 100).toFixed(0)}%</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.18)', color: '#a78bfa' }}>увер. {(a.confidence * 100).toFixed(0)}%</span>
                       </div>
                       <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4, marginBottom: 4 }}>{a.reason}</div>
                       <div style={{ fontSize: 10, color: '#60a5fa', marginBottom: 6 }}>{a.deltaPreview} {delta?.summary ? `· Δ ${delta.summary}` : ''} {delta?.issuesResolved?.length ? `→ исправит: ${delta.issuesResolved.join(', ')}` : ''}</div>

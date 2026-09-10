@@ -20,6 +20,7 @@ import {
   computePeakWeekNutritionTargets,
   applyTrainingTaperToBBPlan,
   applyPeakWeekOverlayToBBPlan,
+  applyContestPrepToBBPlan,
   serializeBBPrepConfig,
   deserializeBBPrepConfig,
   legacyConfigFromProfile,
@@ -647,6 +648,34 @@ describe('applyPeakWeekOverlayToBBPlan', () => {
     const out = applyPeakWeekOverlayToBBPlan(plan, baseConfig()) as BBPlanWithPrep;
     const comment = String(out.weeks[7].sessions[0].exercises[0].comment || '');
     expect(comment).toContain('[Peak week:');
+  });
+
+  it('Э1: оверлей ставит единый формат маркеров (peakWeek + contestPhase)', () => {
+    const plan = makePlan(8);
+    const out = applyPeakWeekOverlayToBBPlan(plan, baseConfig()) as BBPlanWithPrep;
+    expect(out.weeks[7].peakWeek).toBe(true);
+    expect((out.weeks[7] as any).contestPhase).toBe('peak_week');
+    expect((out.weeks[6] as any).contestPhase).not.toBe('peak_week');
+  });
+
+  it('Э1: legacy-неделя (только peakWeek=true) нормализуется до единого формата', () => {
+    const plan = makePlan(8) as any;
+    plan.weeks[7].peakWeek = true;
+    const out = applyPeakWeekOverlayToBBPlan(plan, baseConfig()) as BBPlanWithPrep;
+    expect(out.weeks[7].peakWeek).toBe(true);
+    expect((out.weeks[7] as any).contestPhase).toBe('peak_week');
+  });
+
+  it('Э1: паритет маркеров пик-недели overlay ↔ orchestrator', () => {
+    const cfg = baseConfig();
+    const viaOverlay = applyPeakWeekOverlayToBBPlan(makePlan(8), cfg) as BBPlanWithPrep;
+    const viaOrchestrator = applyContestPrepToBBPlan(makePlan(8), cfg, { prepWeeks: 4, taperWeeks: 2 }) as BBPlanWithPrep;
+    const peakO = viaOverlay.weeks.find((w: any) => (w as any).contestPhase === 'peak_week') as any;
+    const peakC = viaOrchestrator.weeks.find((w: any) => (w as any).contestPhase === 'peak_week') as any;
+    expect(peakO).toBeTruthy();
+    expect(peakC).toBeTruthy();
+    expect(peakO.peakWeek).toBe(true);
+    expect(peakC.peakWeek).toBe(true);
   });
 });
 

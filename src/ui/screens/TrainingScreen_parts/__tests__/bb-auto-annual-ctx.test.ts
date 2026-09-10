@@ -48,8 +48,8 @@ describe('annualBlockCtxToPrepPatch', () => {
     });
     expect(patch!.peakWeekCategory).toBe('bikini');
     expect(patch!.prepTaperWeeks).toBe(4);
-    expect(patch!.prepWaterMode).toBe('moderate');
-    expect(patch!.prepSodiumMode).toBe('moderate');
+    expect(patch!.prepWaterMode).toBe('tapered');   // moderate → канонический tapered
+    expect(patch!.prepSodiumMode).toBe('tapered'); // cut_2d → канонический tapered
     expect(patch!.prepCarbMode).toBe('high');
     expect(patch!.prepConfirmedManip).toBe(true);
   });
