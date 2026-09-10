@@ -1407,3 +1407,56 @@ html.app-native .train-sup.sup-apk .sup-catalogview [style*='border-radius: 12']
 html.app-native .train-sup.sup-apk .sup-catalogview > div > button.support-pill[data-active='true'] {
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.2), 0 8px 22px rgba(var(--accent-rgb), 0.38) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * §21. СТЕКИ / ИЗБРАННОЕ / ИССЛЕДОВАНИЯ / ДНЕВНИК — TOP-ВИЗУАЛ APK.
+ * Зеркало support-design §27 с blur20 + глубокими тенями.
+ * Только native (каждый селектор — с html.app-native, без hex).
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 21.1. СТЕКИ — герой + список стекло ───────────────────── */
+html.app-native .train-sup.sup-apk .sup-stacks .card {
+  background: linear-gradient(180deg, rgba(22,30,52,0.78), rgba(14,20,38,0.78)) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+  backdrop-filter: blur(20px) saturate(150%) !important;
+  border-radius: 16px !important;
+}
+html.app-native .train-sup.sup-apk .sup-stacks input[placeholder*='Название'] {
+  background: rgba(6, 13, 29, 0.62) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 32px rgba(0,0,0,0.30) !important;
+  backdrop-filter: blur(14px) saturate(150%) !important;
+}
+html.app-native .train-sup.sup-apk .sup-stacks > div[style*='border-radius: 10'] {
+  backdrop-filter: blur(20px) saturate(150%) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+
+/* ─── 21.2. ИЗБРАННОЕ — поиск + ряды стекло ────────────────── */
+html.app-native .train-sup.sup-apk .sup-fav input[placeholder*='Поиск'] {
+  background: rgba(6, 13, 29, 0.62) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 32px rgba(0,0,0,0.30) !important;
+  backdrop-filter: blur(14px) saturate(150%) !important;
+}
+html.app-native .train-sup.sup-apk .sup-fav [style*='border-radius: 8'] {
+  backdrop-filter: blur(20px) saturate(150%) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+
+/* ─── 21.3. ИССЛЕДОВАНИЯ — пилюли + карточки стекло ────────── */
+html.app-native .train-sup.sup-apk .sup-research .card {
+  backdrop-filter: blur(20px) saturate(150%) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+html.app-native .train-sup.sup-apk .sup-research a[style*='border-radius: 8'] {
+  backdrop-filter: blur(14px) saturate(150%) !important;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+}
+
+/* ─── 21.4. ДНЕВНИК — gauge-карта + ряды стекло ────────────── */
+html.app-native .train-sup.sup-apk .sup-diary > div[style*='border-radius: 14'] {
+  backdrop-filter: blur(20px) saturate(150%) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06) !important;
+}
+html.app-native .train-sup.sup-apk .sup-diary [style*='cursor: pointer'] {
+  backdrop-filter: blur(14px) saturate(150%) !important;
+}
