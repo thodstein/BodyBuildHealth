@@ -2744,8 +2744,8 @@ export function buildCardioPrintHtml(cycle: CardioCycle): string {
     .map(h => `<tr><td>${h.week}</td><td>${escHtml(CARDIO_PHASE_LABELS[h.phase])}</td><td>${escHtml(h.text)}</td></tr>`)
     .join('');
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${escHtml(cycle.name)}</title>
-<style>body{font-family:system-ui,sans-serif;padding:24px;color:#111}table{border-collapse:collapse;width:100%;margin-top:12px}
-th,td{border:1px solid #ccc;padding:6px 10px;font-size:13px;text-align:left}th{background:#f0f0f0}h2{font-size:18px}</style></head>
+<style>@page{margin:14mm}body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;padding:24px;color:#111;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}table{border-collapse:collapse;width:100%;margin-top:12px;page-break-inside:auto}
+th,td{border:1px solid #ccc;padding:7px 10px;font-size:13px;text-align:left}th{background:#0f766e;color:#fff;text-transform:uppercase;font-size:11px;letter-spacing:.4px}tr:nth-child(even) td{background:#f7faf9}h2{font-size:22px;margin:0 0 4px;padding-bottom:8px;border-bottom:3px solid #00e68a}h3{font-size:15px;margin:18px 0 4px;color:#0f766e;text-transform:uppercase;letter-spacing:.4px}tr{page-break-inside:avoid}</style></head>
 <body><h2>❤️ ${escHtml(cycle.name)}</h2>
 <p>Цель: ${escHtml(CARDIO_GOAL_LABELS[cycle.goal])} · ${cycle.totalWeeks} нед · в среднем ${summary.avgMinutesPerWeek} мин/нед · ${summary.avgKcalPerWeek} ккал/нед</p>
 ${legDays.length > 0 ? `<p style="font-size:12px;color:#8a6d1a">🦵 Дни тяжёлых ног: ${legDays.map(d => escHtml(DAY_LABELS_RU[d])).join(', ')} — интенсивное кардио на них не ставится (recovery — можно).</p>` : ''}
