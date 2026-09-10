@@ -506,64 +506,6 @@ export const StrengthSportConstructor: React.FC = () => {
             </div>
           </SectionCard>
 
-          {mode==='strongman' && (
-            <SectionCard icon="🏆" title="Контест — пакет ивентов" subtitle="Йок/лог/камни → план строит под них" collapsible defaultOpen={false} summary={contest ? `${contest.name || 'Кастом'} · ${contest.events.length} ивентов` : 'без пакета — generic 5-фаз'} status={contest ? 'ok' : undefined}>
-              <Field label="Пресет контеста">
-                  <div data-ss="presets" style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                    {Object.entries(CONTEST_PRESETS).map(([pid, pc])=> (
-                      <button key={pid} onClick={()=> setContest(pc as StrongmanContest)} style={{ padding:'11px 16px', borderRadius:14, border: contest?.name===pc.name ? '1.5px solid #f59e0b' : '1px solid rgba(255,255,255,0.10)', background: contest?.name===pc.name ? 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(239,68,68,0.12))':'rgba(255,255,255,0.04)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', minHeight:48, boxShadow: contest?.name===pc.name ? '0 4px 16px rgba(245,158,11,0.25)' : 'none' }}>{pc.name}</button>
-                    ))}
-                    <button onClick={()=> setContest(null)} style={{ padding:'11px 16px', borderRadius:14, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:13, fontWeight:600, minHeight:48 }}>✕ Очистить</button>
-                  </div>
-                </Field>
-                {contest && (
-                  <div data-ss="contest" style={{ background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.18)', borderRadius:10, padding:10, display:'flex', flexDirection:'column', gap:8 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <span style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>{contest.name || 'Кастом'} · {contest.events.length} ивентов</span>
-                      <StrengthPopupSelect label="Стратегия" value={contestStrategy} onChange={v=> setContestStrategy(v as any)} strong options={[{id:'conservative',label:'🛡️ Консерва'},{id:'balanced',label:'⚖️ Баланс'},{id:'aggressive',label:'🔥 Агрессив'}]} />
-                    </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {contest.events.map((ev, idx)=> (
-                        <div key={idx} style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', background:'rgba(0,0,0,0.22)', padding:'10px 12px', borderRadius:14, border:'0.5px solid rgba(255,255,255,0.08)' }}>
-                          <span style={{ fontSize:14, fontWeight:700, color:'#fff', minWidth:110, flex:'1 1 110px' }}>{(EVENT_META as any)[ev.id]?.label || ev.id}</span>
-                          <span style={{ fontSize:11, fontWeight:700, color:'#f5b04c', background:'rgba(245,158,11,0.12)', padding:'4px 10px', borderRadius:22, border:'0.5px solid rgba(245,158,11,0.22)', whiteSpace:'nowrap' }}>{ev.format}</span>
-                          <input type="number" value={ev.weight||''} placeholder="кг" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, weight: Number(e.target.value)||0 } : x)} : c)} style={{ width:78, minHeight:48, padding:'10px 8px', fontSize:15, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:12, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />
-                          {(ev.id.includes('yoke')||ev.id.includes('farmers')||ev.id.includes('conan')||ev.id.includes('truck')||ev.id.includes('carry')||ev.id.includes('shield')||ev.id.includes('duck')) && <input type="number" value={ev.distanceM||''} placeholder="м" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, distanceM: Number(e.target.value)||0 } : x)} : c)} style={{ width:66, minHeight:48, padding:'10px 8px', fontSize:15, fontWeight:700, background:'rgba(255,159,10,0.08)', border:'0.5px solid rgba(255,159,10,0.20)', borderRadius:12, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />}
-                          <input type="number" value={ev.timeCapS||''} placeholder="capс" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, timeCapS: Number(e.target.value)||0 } : x)} : c)} style={{ width:70, minHeight:48, padding:'10px 8px', fontSize:15, fontWeight:700, background:'rgba(59,130,246,0.08)', border:'0.5px solid rgba(59,130,246,0.20)', borderRadius:12, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />
-                          <label style={{ display:'flex', gap:8, alignItems:'center', fontSize:13, fontWeight:600, color:'#fff', minHeight:48, cursor:'pointer' }}><input type="checkbox" checked={!!ev.turn} onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, turn: e.target.checked } : x)} : c)} style={{ width:22, height:22, accentColor:'#f59e0b' }} /> разв.</label>
-                          <input type="number" value={ev.heightCm||''} placeholder="высота" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, heightCm: Number(e.target.value)||0 } : x)} : c)} style={{ width:88, minHeight:48, padding:'10px 8px', fontSize:13, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:12, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />
-                          {(ev.format==='ladder' || ev.id.includes('stone') || ev.id.includes('sandbag')) && <input type="text" value={(ev.ladderWeights||[]).join(',')} placeholder="100,110,120" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, ladderWeights: e.target.value.split(',').map(v=> Number(v.trim())).filter(v=> v>0) } : x)} : c)} style={{ flex:1, minWidth:130, minHeight:48, padding:'10px', fontSize:13, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:12, color:'#fff' }} />}
-                          <button onClick={()=> setContest(c=> c ? { ...c, events: c.events.filter((_,i)=> i!==idx)} : c)} style={{ width:48, height:48, borderRadius:14, background:'rgba(239,68,68,0.14)', border:'0.5px solid rgba(239,68,68,0.24)', color:'#fecaca', cursor:'pointer', fontSize:16, fontWeight:700 }}>✕</button>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
-                      <select onChange={e=> { const id=e.target.value; if(!id) return; setContest(c=> c ? { ...c, events: [...c.events, { id, format: (EVENT_META as any)[id]?.class === 'loading_race' ? 'loading_race' : (EVENT_META as any)[id]?.class === 'reps_60s' ? 'reps_60s' : 'max', weight: 100 } as any] } : { name:'Кастом', events:[{ id, format:'max', weight:100 } as any] }); e.target.value=''; }} style={{ ...SELECT, flex:1, minWidth:160 }}>
-                        <option value="">＋ Добавить ивент…</option>
-                        {Object.keys(EVENT_META).map(id=> <option key={id} value={id}>{(EVENT_META as any)[id]?.label || id}</option>)}
-                      </select>
-                      <span style={{ fontSize:10, color:'#fff' }}>Taper: йок/камень 7д · лог/фермер 5д · броски 4д</span>
-                    </div>
-                    {contestSim && (
-                      <div style={{ background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.22)', borderRadius:10, padding:'8px 10px', display:'flex', flexDirection:'column', gap:6 }}>
-                        <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: {contestSim.totalPoints} pts → прогноз {contestSim.predictedPlace} место из 10 · avg {contestSim.avgPoints}</div>
-                        <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                          {contestSim.events.map(ev=> (
-                            <span key={ev.id} style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background: ev.isWeak ? 'rgba(239,68,68,0.14)':'rgba(34,197,94,0.10)', border:`0.5px solid ${ev.isWeak?'rgba(239,68,68,0.22)':'rgba(34,197,94,0.18)'}`, color: ev.isWeak?'#fecaca':'#86efac' }}>{ev.id} {ev.points}pts {ev.effectiveRatio*100>0?`${Math.round(ev.effectiveRatio*100)}%`:''}</span>
-                          ))}
-                        </div>
-                        <div style={{ fontSize:10, color:'#fff' }}>Rec order: {contestSim.recOrder.join(' → ')}</div>
-                        <div style={{ fontSize:10, color:'#fff' }}>{contestSim.rationale.join(' · ')}</div>
-                        {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них (injection)</div>}
-                      </div>
-                    )}
-                    <InfoBanner tone="strong">Contest Packet: план строит event_day/overhead/deadlift под заявленные ивенты, прогрессия веса к контест-весу, taper cess 7/5/4д (Winwood), medley 90с cap180</InfoBanner>
-                  </div>
-                )}
-                {!contest && <InfoBanner tone="info">Без пакета — план generic 5-фаз. Выбери пресет для PRO-контеста.</InfoBanner>}
-            </SectionCard>
-          )}
-
           {renderNavRow(null, 'athlete')}
         </div>
       )}
@@ -767,6 +709,52 @@ export const StrengthSportConstructor: React.FC = () => {
               );
             })()}
           </SectionCard>
+          {mode==='strongman' && (
+            <SectionCard icon="🏆" title="Контест — пакет ивентов" subtitle="Йок/лог/камни → план строит под них" collapsible defaultOpen={false} summary={contest ? `${contest.name || 'Кастом'} · ${contest.events.length} ивентов` : 'без пакета — generic 5-фаз'} status={contest ? 'ok' : undefined}>
+              <Field label="Пресет контеста">
+              <div data-ss="presets" style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {Object.entries(CONTEST_PRESETS).map(([pid, pc])=> (
+                  <button key={pid} onClick={()=> setContest(pc as StrongmanContest)} style={{ padding:'10px 14px', borderRadius:12, border: contest?.name===pc.name ? '1.5px solid #f59e0b' : '1px solid rgba(255,255,255,0.10)', background: contest?.name===pc.name ? 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(239,68,68,0.12))':'rgba(255,255,255,0.04)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', minHeight:44 }}>{pc.name}</button>
+                ))}
+                <button onClick={()=> setContest(null)} style={{ padding:'10px 14px', borderRadius:12, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:12, fontWeight:600, minHeight:44 }}>✕</button>
+              </div>
+              </Field>
+              {contest && (
+                <div data-ss="contest" style={{ background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.18)', borderRadius:10, padding:8, display:'flex', flexDirection:'column', gap:6 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>{contest.name || 'Кастом'} · {contest.events.length}</span>
+                    <StrengthPopupSelect label="Стратегия" value={contestStrategy} onChange={v=> setContestStrategy(v as any)} strong options={[{id:'conservative',label:'🛡️ Консерва'},{id:'balanced',label:'⚖️ Баланс'},{id:'aggressive',label:'🔥 Агрессив'}]} />
+                  </div>
+                  {contest.events.map((ev, idx)=> (
+                    <div key={idx} style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', background:'rgba(0,0,0,0.22)', padding:'8px 10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.08)' }}>
+                      <span style={{ fontSize:13, fontWeight:700, color:'#fff', flex:'1 1 100px' }}>{(EVENT_META as any)[ev.id]?.label || ev.id}</span>
+                      <span style={{ fontSize:10, fontWeight:700, color:'#f5b04c', background:'rgba(245,158,11,0.12)', padding:'3px 8px', borderRadius:22, border:'0.5px solid rgba(245,158,11,0.22)', whiteSpace:'nowrap' }}>{ev.format}</span>
+                      <input type="number" value={ev.weight||''} placeholder="кг" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, weight: Number(e.target.value)||0 } : x)} : c)} style={{ width:72, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />
+                      {(ev.id.includes('yoke')||ev.id.includes('farmers')||ev.id.includes('conan')||ev.id.includes('truck')||ev.id.includes('carry')||ev.id.includes('shield')||ev.id.includes('duck')) && <input type="number" value={ev.distanceM||''} placeholder="м" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, distanceM: Number(e.target.value)||0 } : x)} : c)} style={{ width:60, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(255,159,10,0.08)', border:'0.5px solid rgba(255,159,10,0.20)', borderRadius:10, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />}
+                      <input type="number" value={ev.timeCapS||''} placeholder="capс" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, timeCapS: Number(e.target.value)||0 } : x)} : c)} style={{ width:64, minHeight:44, padding:'8px 6px', fontSize:14, fontWeight:700, background:'rgba(59,130,246,0.08)', border:'0.5px solid rgba(59,130,246,0.20)', borderRadius:10, color:'#fff', textAlign:'center', fontVariantNumeric:'tabular-nums' }} />
+                      <label style={{ display:'flex', gap:6, alignItems:'center', fontSize:12, fontWeight:600, color:'#fff', minHeight:44, cursor:'pointer' }}><input type="checkbox" checked={!!ev.turn} onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, turn: e.target.checked } : x)} : c)} style={{ width:20, height:20, accentColor:'#f59e0b' }} /> разв.</label>
+                      <input type="number" value={ev.heightCm||''} placeholder="высота" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, heightCm: Number(e.target.value)||0 } : x)} : c)} style={{ width:76, minHeight:44, padding:'8px 6px', fontSize:12, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, color:'#fff' }} />
+                      {(ev.format==='ladder' || ev.id.includes('stone') || ev.id.includes('sandbag')) && <input type="text" value={(ev.ladderWeights||[]).join(',')} placeholder="100,110,120" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, ladderWeights: e.target.value.split(',').map(v=> Number(v.trim())).filter(v=> v>0) } : x)} : c)} style={{ flex:1, minWidth:120, minHeight:44, padding:'8px', fontSize:12, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, color:'#fff' }} />}
+                      <button onClick={()=> setContest(c=> c ? { ...c, events: c.events.filter((_,i)=> i!==idx)} : c)} style={{ width:44, height:44, borderRadius:12, background:'rgba(239,68,68,0.14)', border:'0.5px solid rgba(239,68,68,0.24)', color:'#fecaca', cursor:'pointer', fontSize:15, fontWeight:700 }}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                    <select onChange={e=> { const id=e.target.value; if(!id) return; setContest(c=> c ? { ...c, events: [...c.events, { id, format: (EVENT_META as any)[id]?.class === 'loading_race' ? 'loading_race' : (EVENT_META as any)[id]?.class === 'reps_60s' ? 'reps_60s' : 'max', weight: 100 } as any] } : { name:'Кастом', events:[{ id, format:'max', weight:100 } as any] }); e.target.value=''; }} style={{ ...SELECT, flex:1, minWidth:160 }}>
+                      <option value="">＋ Добавить ивент…</option>
+                      {Object.keys(EVENT_META).map(id=> <option key={id} value={id}>{(EVENT_META as any)[id]?.label || id}</option>)}
+                    </select>
+                  </div>
+                  {contestSim && (
+                    <div style={{ background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.22)', borderRadius:10, padding:'8px 10px', display:'flex', flexDirection:'column', gap:4 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: {contestSim.totalPoints} pts → {contestSim.predictedPlace} место из 10</div>
+                      {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них</div>}
+                    </div>
+                  )}
+                </div>
+              )}
+              {!contest && <InfoBanner tone="info">Без пакета — план generic. Выбери пресет для PRO-контеста.</InfoBanner>}
+            </SectionCard>
+          )}
           <div data-ss="split-list" style={{ display:'flex', flexDirection:'column', gap:8, opacity: cycleId ? 0.45 : 1 }}>
             <div style={{ fontSize:10, color:'#fff' }}>{cycleId ? 'Сплит перекрыт интернет-циклом (дни/недели из шаблона)' : 'Сплит для параметрического плана'}</div>
             {STRENGTH_SPORT_PATTERNS.filter(p => p.mode===mode || p.mode==='any').map(p => {

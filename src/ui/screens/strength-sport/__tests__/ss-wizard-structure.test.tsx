@@ -90,6 +90,15 @@ describe('SS wizard structure (combat-style, 7 steps)', () => {
     });
   }, 15000);
 
+  it('контест живёт в сплите, а не в параметрах (strongman)', async () => {
+    render(<StrengthSportConstructor />);
+    fireEvent.click(screen.getByLabelText('Режим'));
+    fireEvent.click(await screen.findByText(/Стронг/));
+    expect(document.body.textContent).not.toContain('Пресет контеста');
+    goToSplit();
+    expect(document.body.textContent).toContain('Пресет контеста');
+  });
+
   it('выдача: сборка ведёт на план, экспорт доступен', async () => {
     render(<StrengthSportConstructor />);
     goToSplit();
