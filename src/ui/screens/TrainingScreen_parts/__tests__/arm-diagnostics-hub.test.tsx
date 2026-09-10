@@ -295,6 +295,16 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('Что чинить:');
   });
 
+  it('P5: red-flags стоп + press-гейт новичка', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByText('Острая боль'));
+    expect(document.body.textContent).toContain('🔴 Стоп');
+    expect(document.body.textContent).toContain('не диагноз');
+    fireEvent.click(screen.getByText('Новичок'));
+    fireEvent.click(screen.getByText('Пресс'));
+    expect(document.body.textContent).toContain('Новичкам пресс опасен');
+  });
+
   it('D2: per-muscle danger виден в Recovery', () => {
     const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
     const mk = (date: string, n: number) => ({ date, exercises: [{ muscle: 'pronators', sets: Array.from({ length: n }, () => ({ weightKg: 30, reps: 8 })) }] });

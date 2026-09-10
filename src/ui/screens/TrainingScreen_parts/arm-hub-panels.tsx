@@ -104,6 +104,12 @@ export function HubControls({ H }: { H: any }) {
           {[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}].map(o=> <AdChip key={o.id} active={state.sex===o.id} onClick={()=>setState((s: any)=>({...s, sex:o.id}))}>{o.label}</AdChip>)}
         </div>
       </div>
+      {state.level === 'beginner' && state.technique === 'press' && (
+        <AdBanner tone="warn">
+          <b>⚠ Новичкам пресс опасен</b>
+          <div>Тендоны локтя рвутся от пресса из невыгодной позиции — только из нейтрали, начни с хука/топролла.</div>
+        </AdBanner>
+      )}
       <AdSteps steps={TAB_DEFS.map(t=>({ id: t.id, label: `${t.icon} ${t.label}` }))} active={tab} onSelect={(id)=>setTab(id)} hook="hub-tabs" numbered={false} />
     </div>
   );
@@ -149,10 +155,36 @@ export function HubOutput({ H }: { H: any }) {
   );
 }
 
+const RED_FLAGS: Array<{ id: string; label: string }> = [
+  { id: 'pain', label: 'Острая боль' },
+  { id: 'swell', label: 'Отёк' },
+  { id: 'click', label: 'Щелчки в локте' },
+  { id: 'numb', label: 'Онемение пальцев' },
+  { id: 'fract', label: 'Перелом <6 мес' },
+];
+
 export function HubP0Panel({ H }: { H: any }) {
-  const { state, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0, diaryTrendsP0, diarySuggestP0, toggleWeakPoint, handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0, injectMsg, criticalSideP0, specWeeks, setSpecWeeks, armPlan } = H;
+  const { state, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0, diaryTrendsP0, diarySuggestP0, toggleWeakPoint, handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0, injectMsg, criticalSideP0, specWeeks, setSpecWeeks, armPlan, setTab } = H;
+  const [redFlags, setRedFlags] = React.useState<string[]>([]);
+  const toggleRed = (id: string) => setRedFlags((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   return (
     <AdCard>
+      <AdSec title="🚨 Red-flags — скрининг перед тестами" collapsible defaultOpen={false} summary={redFlags.length ? `🔴 ${redFlags.length}` : 'проверь себя'}>
+        <div className="ad-chips" data-arm="red-flags">
+          {RED_FLAGS.map((f) => (
+            <AdChip key={f.id} active={redFlags.includes(f.id)} tone="red" onClick={() => toggleRed(f.id)}>{f.label}</AdChip>
+          ))}
+        </div>
+        {redFlags.length > 0 ? (
+          <AdBanner tone="bad">
+            <b>🔴 Стоп: {redFlags.map((id) => RED_FLAGS.find((f) => f.id === id)?.label).join(', ')}</b>
+            <div>Сначала врач + return-to-pull (вкладка «Сухожилие/Восстановление»), тесты — после. Это скрининг, не диагноз.</div>
+            <AdBtn variant="danger" onClick={() => setTab('recovery')}>→ К return-to-pull</AdBtn>
+          </AdBanner>
+        ) : (
+          <div className="ad-muted">Ничего из списка? Можно тестироваться. Скрининг, не диагноз.</div>
+        )}
+      </AdSec>
       <AdSec title="🧬 P0 PRO — план → причины → топ-3 → спец-блок → инъекция">
         <div className="ad-muted">
           {armAudit ? `Аудит плана: покрытие ${armAudit.covered.length}/12 (${armAudit.coveragePct}%) · стол ${(armAudit.tableRatio * 100).toFixed(0)}% · статика ${armAudit.staticSets}/динамика ${armAudit.dynamicSets}${armAudit.duplicates.length ? ` · дубли: ${armAudit.duplicates.slice(0, 3).join(', ')}` : ''}` : 'Нет плана арм (he_arm_plan_saved / he_arm_last_plan) — собери в Арм-конструкторе; причины и топ-3 работают и без плана'}
