@@ -1545,4 +1545,7 @@ html.app-native .train-sup.sup-apk .sup-weekplan [style*='font-size: 5'] {
   html.app-native .train-sup.sup-apk .sup-calctools [style*='position: sticky'] {
     margin: 0 0 10px !important;
   }
+  html.app-native .train-sup.sup-apk [data-sup] [style*='display: flex']:not([style*='overflow-x']):has(> .support-pill) {
+    flex-wrap: wrap !important;
+  }
 }

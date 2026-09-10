@@ -1491,6 +1491,13 @@
   .support-screen.support-root .sup-calctools [style*='position: sticky'] {
     margin: 0 0 10px !important;
   }
+  /* Ряды пилюль без своего скролла — переносом (прецедент: план-пилюли
+   * «Действующий/Мои/Архив» давали 444px на 360px-экране). Ленты со
+   * скроллом (overflow-x) не трогаем — они едут горизонтально штатно.
+   * :has — Chrome 105+, старый WebView молча игнорит (row как было). */
+  .support-screen.support-root [data-sup] [style*='display: flex']:not([style*='overflow-x']):has(> .support-pill) {
+    flex-wrap: wrap !important;
+  }
 }
 
 /* ─── 27.4. ДНЕВНИК — gauge + табы + ряды ──────────────────── */
