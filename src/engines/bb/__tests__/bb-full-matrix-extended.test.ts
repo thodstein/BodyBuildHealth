@@ -25,7 +25,10 @@ function assertPlanValid(plan: any, tag: string) {
   for (const w of plan.weeks) {
     for (const s of w.sessions) {
       for (const e of s.exercises) {
-        expect(e.sets, `${tag} w${w.week} ${e.name} sets`).toBeGreaterThanOrEqual(2);
+        // Ф3.1: выведенные делоды (inferCycleDeloadWeeks) — floor сета 1
+        // легитимен на deload-неделе (normalizeWeekMrv floor=1).
+        const minSets = (w.phase === 'deload' || w.deload === true) ? 1 : 2;
+        expect(e.sets, `${tag} w${w.week} ${e.name} sets`).toBeGreaterThanOrEqual(minSets);
         expect(e.sets, `${tag} w${w.week} ${e.name} sets cap`).toBeLessThanOrEqual(5);
         expect(e.workSets?.length ?? e.sets, `${tag} workSets`).toBe(e.sets);
       }

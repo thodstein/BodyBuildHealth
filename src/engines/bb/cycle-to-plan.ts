@@ -614,6 +614,37 @@ function isPrimaryByLoad(load: string | undefined): boolean {
 }
 
 /**
+ * Ф3.2 (CYCLE-SYSTEM-FULL-AUDIT): 93 из 110 циклов не несут meta.rirProgression —
+ * fallback был плоский RIR 2 на весь цикл (нет прогрессии, нет пика). Выводим
+ * лестницу из периода/уровня: mass 3→1, strength 2→0, peak 1→0, endurance 3→2;
+ * новичку +1 запас (4→2); короткие циклы (≤4н) сжимаются на 1.
+ */
+export function inferCycleRirProgression(meta: { period?: string; level?: string; weeks?: number }): { start: number; end: number } {
+  const base: Record<string, [number, number]> = {
+    mass: [3, 1], cutting: [3, 1], mixed: [3, 1],
+    strength: [2, 0], peak: [1, 0], endurance: [3, 2],
+  };
+  let [start, end] = base[String(meta.period || 'mass')] || [3, 1];
+  if (meta.level === 'novice' || meta.level === 'beginner') start = Math.min(4, start + 1);
+  if ((meta.weeks || 0) <= 4) { start = Math.max(1, start - 1); end = Math.max(0, end); if (end > start) end = start; }
+  return { start, end };
+}
+
+/**
+ * Ф3.1 (CYCLE-SYSTEM-FULL-AUDIT): 93 из 110 циклов без meta.deloadWeeks —
+ * BB-конверсия выдавала план без единой разгрузки (единственный делод — ACWR).
+ * Выводим делод-недели: каждые ~6 недель для планов ≥8н (нед 6, 12, …), финал
+ * цикла всегда делод при ≥8н (восстановление перед следующим блоком).
+ */
+export function inferCycleDeloadWeeks(weeks: number): number[] {
+  if (weeks < 8) return [];
+  const out: number[] = [];
+  for (let w = 6; w < weeks; w += 6) out.push(w);
+  if (out[out.length - 1] !== weeks) out.push(weeks);
+  return out;
+}
+
+/**
  * BB-ФИЛЬТР: заменить ПЛ/олимпийские упражнения на ББ-альтернативы.
  * Становая тяга (классическая/сумо) — ПЛ движение, не для ББ гипертрофии.
  * Жим стоя/армейский/швунг — осевая, заменить на жим сидя.
@@ -907,11 +938,14 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     workMax = applyWeightProgression(workMax, progression);
   }
   const daysPerWeek = meta.sessionsPerWeek;
+  // Ф3.1: циклы без meta.deloadWeeks получают выведенные делоды (каждые ~6н
+  // для планов ≥8н) — иначе конверсия выдавала мезоцикл без единой разгрузки.
+  const effDeloadWeeks = meta.deloadWeeks?.length ? meta.deloadWeeks : inferCycleDeloadWeeks(meta.weeks);
   // L7: src2-* циклы имеют явную много-недельную разкладку (cycle.weeks[][]).
   // Если она есть и совпадает по длине с totalWeeks — используем каждую неделю дословно (multi-week faithful).
   const hasExplicitWeeks = !!(cycle as any).weeks && Array.isArray((cycle as any).weeks) && (cycle as any).weeks.length > 0;
   const week1Days = cycle.week1;
-  const rirProg = meta.rirProgression;
+  const rirProg = meta.rirProgression ?? inferCycleRirProgression(meta);
   const phases = meta.phases && meta.phases.length > 0 ? meta.phases : undefined;
 
   // Injury exclusions — используем planStartWeek для per-week оценки травм (fix F)
@@ -1219,7 +1253,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     });
 
     // Apply deload if this week is a deload week
-    const isDeload = meta.deloadWeeks?.includes(w);
+    const isDeload = effDeloadWeeks.includes(w);
     if (isDeload) {
       const protocol = DELOAD_PROTOCOLS[deloadType || 'pump'];
       const deloadWeek = applyDeloadToWeek({ week: w, sessions }, protocol);
@@ -1370,9 +1404,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     ...finalPlan,
     volumeLandmarks,
     muscleFrequency,
-    // Ф1.1: цикл управляет своей периодизацией (meta.deloadWeeks) — авто-taper
-    // финализатора не накладывается поверх (taper W2-W4 рабочего мезоцикла).
-    sourceDeloads: meta.deloadWeeks?.length ? true : undefined,
+    // Ф1.1: цикл управляет своей периодизацией (meta.deloadWeeks или выведенные
+    // делоды Ф3.1) — авто-taper финализатора не накладывается поверх.
+    sourceDeloads: effDeloadWeeks.length > 0 ? true : undefined,
     // Контекст специализации/лимитов сохраняется для повторной финализации.
     specializationSchedule: specSchedule,
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
