@@ -8,6 +8,8 @@ import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
 import { ruLabel, PHASE_RU, SESSION_TAG_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
 import { cbExerciseName } from '../../../engines/combat/combat-builder.engine';
+import { combatMesocycleSummary } from '../../../engines/combat/combat-mesocycle';
+import type { DiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
 import { downloadCombatXlsx } from '../../../engines/combat/combat-xlsx.engine';
@@ -80,6 +82,42 @@ export const CbQualityMap: React.FC<{ plan: CombatPlan }> = ({ plan }) => (
     <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'6px 10px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight color="#a855f7">Фиолетовый</Highlight> оптимум · <Highlight color="#f59e0b">янтарь</Highlight> недобор · <Highlight color="#eab308">жёлтый</Highlight> высоко · <Highlight color="#ef4444">красный</Highlight> перебор</div>
   </SectionCard>
 );
+
+/* Кросс-мезо карта: что привнесла прогрессия из прошлого плана (движок был немым) */
+export const CbMesoCard: React.FC<{ prev: CombatPlan | null; nextInput: any }> = ({ prev, nextInput }) => {
+  const lines = combatMesocycleSummary(prev, nextInput);
+  return (
+    <SectionCard icon="🔗" title="Кросс-мезоцикл" subtitle={prev ? `от плана ${prev.weeks}нед · ${prev.patternId}` : 'первый цикл'} accent>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {lines.map((l, i) => (
+          <div key={i} style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.06)', lineHeight: 1.45, fontVariantNumeric: 'tabular-nums' }}>{l}</div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+};
+
+const CB_TREND_RU: Record<string, string> = { neck: 'Шея', grip: 'Хват', legs: 'Ноги', push: 'Жим', pull: 'Тяга', rotational: 'Ротация', core: 'Кор' };
+
+/* Дневник: e1RM-тренды групп из реального лога (были видны только движку) */
+export const CbDiaryCard: React.FC<{ trends: DiaryTrendCB[] | null }> = ({ trends }) => {
+  if (!trends || !trends.length) return null;
+  return (
+    <SectionCard icon="📊" title="Дневник — тренды групп" subtitle="e1RM 28д vs пред. 28д · из вашего лога" accent>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {trends.map(t => {
+          const col = t.changePct <= -5 ? '#f87171' : t.changePct < 0 ? '#fbbf24' : '#4ade80';
+          const badge = t.changePct <= -5 ? 'слабо' : t.changePct < 0 ? 'плато' : 'рост';
+          return (
+            <span key={t.group} style={{ padding: '6px 10px', borderRadius: 10, background: `${col}14`, border: `0.5px solid ${col}44`, color: '#fff', fontSize: 11, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              {CB_TREND_RU[t.group] || t.group} <Highlight color={col}>{t.changePct > 0 ? `+${t.changePct}` : t.changePct}%</Highlight> · {badge} · {t.recentMax}/{t.prevMax}
+            </span>
+          );
+        })}
+      </div>
+    </SectionCard>
+  );
+};
 
 export const CombatPlanView: React.FC<Props> = ({
   plan, historyLen, onUndo, onUpdateEx, onMoveEx, onSwapEx,

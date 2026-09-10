@@ -34,7 +34,8 @@ import {
   EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel, CbSwitch,
 } from './CombatUI';
 import { CARD as T_CARD, BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, H as T_H, SMALL as T_SMALL, STEP_PILL, IN as T_IN } from '../TrainingScreen_parts/training-ui';
-import { CombatPlanView, CbQualityMap } from './CombatPlanView';
+import { CombatPlanView, CbQualityMap, CbMesoCard, CbDiaryCard } from './CombatPlanView';
+import { getDiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
 
 type Step = WizardStep;
 const STEP_LABEL_RU: Record<Step, string> = {
@@ -450,6 +451,13 @@ export const CombatConstructor: React.FC = () => {
     const a = document.createElement('a'); a.href = url; a.download = `combat-annual-${annual.totalWeeks}w.ics`; a.click(); URL.revokeObjectURL(url);
   };
   const doMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2200); };
+  const mesoPrev = React.useMemo(() => {
+    try { const h = loadCombatPlans(); return h.length > 1 ? h[1] : null; }
+    catch { return null; }
+  }, [plan]);
+  const diaryTrends = React.useMemo(() => {
+    try { return getDiaryTrendCB(); } catch { return null; }
+  }, [plan]);
   const sparringErrs = sparringEnabled
     ? validateSparringLoad({ hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest })
     : [];
@@ -1112,6 +1120,8 @@ export const CombatConstructor: React.FC = () => {
           {plan.validation?.warnings.map((w, i) => (
             <InfoBanner key={i} tone="warn">{w}</InfoBanner>
           ))}
+          <CbMesoCard prev={mesoPrev} nextInput={(plan.inputSnapshot as any) || {}} />
+          <CbDiaryCard trends={diaryTrends} />
           <CbQualityMap plan={plan} />
           {plan.rationale?.length ? (
             <CbSec title="📄 Подробный отчёт (текст)" summary={`${plan.rationale.length} строк`}>
