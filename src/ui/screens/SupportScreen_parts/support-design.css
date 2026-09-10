@@ -50,8 +50,11 @@
 }
 
 @keyframes supIn {
-  from { opacity: 0; transform: translateY(10px) scale(0.995); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  /* БЕЗ transform: fixed-потомки (топбар/суббар/тосты/модалки) внутри
+   * трансформированного предка привязываются к нему, а не к вьюпорту —
+   * суббар уезжал под глобальный дашборд. Только opacity. */
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ─── 2. ТИПОГРАФИКА СЕКЦИЙ ─────────────────────────────────────── */
@@ -1195,6 +1198,25 @@
 .support-screen.support-root .sup-diary [style*='min-height: 36'],
 .support-screen.support-root .sup-diary [style*='min-height: 38'] {
   min-height: 44px !important;
+}
+
+/* ─── 25.7. ТЕЛЕФОН ≤480px: каталог — плоский скролл + перенос ──
+ * Вложенный колодец 68vh внутри скролла страницы прятал низ списка
+ * за суббаром + давал двойной скролл. На телефоне — плоский список,
+ * скроллит страница. Строки веществ переносят кнопки второй строкой. */
+@media (max-width: 480px) {
+  .support-screen.support-root [style*='max-height: 68vh'] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .support-screen.support-root .sup-catalogview [style*='padding: 7px 12px 7px 16px'],
+  .support-screen.support-root .sup-catalogview [style*='padding:7px 12px 7px 16px'],
+  .support-screen.support-root .sup-catalogview [style*='padding: 6px 10px 6px 18px'],
+  .support-screen.support-root .sup-catalogview [style*='padding:6px 10px 6px 18px'],
+  .support-screen.support-root .sup-catalogview [style*='padding: 6px 10px 6px 22px'] {
+    flex-wrap: wrap !important;
+    row-gap: 6px !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════

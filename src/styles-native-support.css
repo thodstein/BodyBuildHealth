@@ -100,13 +100,12 @@ html.app-native .train-sup.sup-apk [data-sup='modal'] > div {
 
 /* ─── 8. MOTION ─────────────────────────────────────────────────── */
 @keyframes supApkIn {
+  /* БЕЗ transform — иначе fixed суббар/топбар/тост ломаются (см. supIn). */
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.99);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -1345,6 +1344,20 @@ html.app-native .train-sup.sup-apk [data-sup] table {
 html.app-native .train-sup.sup-apk .sup-diary [style*='min-height: 24'],
 html.app-native .train-sup.sup-apk .sup-diary [style*='min-height: 36'] {
   min-height: 44px !important;
+}
+
+/* ─── 19.8. ТЕЛЕФОН ≤480px: каталог — плоский скролл + перенос ── */
+@media (max-width: 480px) {
+  html.app-native .train-sup.sup-apk [style*='max-height: 68vh'] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  html.app-native .train-sup.sup-apk .sup-catalogview [style*='padding: 7px 12px 7px 16px'],
+  html.app-native .train-sup.sup-apk .sup-catalogview [style*='padding: 6px 10px 6px 18px'],
+  html.app-native .train-sup.sup-apk .sup-catalogview [style*='padding: 6px 10px 6px 22px'] {
+    flex-wrap: wrap !important;
+    row-gap: 6px !important;
+  }
 }
 
 /* ─── 19.7. ДИАРИ-CARD: 4-колонки комплаенс/жалоб уже 2, но на

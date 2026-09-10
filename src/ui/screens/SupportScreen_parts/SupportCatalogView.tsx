@@ -315,16 +315,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                                   <span style={{ fontSize:9, fontWeight: f.best ? 700 : 400, color: f.best ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{f.best ? '★' : '○'} {f.name}</span>
                                                   <span style={{ fontSize:8, color:'rgba(255,255,255,0.6)' }}>{f.dose}</span>
                                                   {f.best && <span style={{ fontSize:7, padding:'0px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.2)' }}>Рекоменд.</span>}
-      {/* ===== TOAST ===== */}
-      {toast && (
-        <div className="sup-catalog-toast" style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:1000,
-          padding:'8px 20px', borderRadius:12, fontSize:10, fontWeight:700,
-          background: toast.type==='success'?'rgba(0,230,138,0.9)':toast.type==='warning'?'rgba(245,158,11,0.9)':'rgba(239,68,68,0.9)',
-          color: toast.type==='success'?'#000':'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.4)' }}>
-          {toast.msg}
-        </div>
-      )}
-    </div>
+                                                </div>
                                               ))}
                                             </div>
                                           )}
@@ -414,6 +405,15 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                   {(groupedSubstances||[]).length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text-dim)', fontSize:11 }}>Ничего не найдено</div>}
                 </div>
                 )}
+      {/* ===== TOAST (корень каталога — fixed работает, т.к. на корне нет transform) ===== */}
+      {toast && (
+        <div className="sup-catalog-toast" style={{ position:'fixed', bottom:'calc(var(--nav-height, 68px) + 130px + env(safe-area-inset-bottom, 0px))', left:'50%', transform:'translateX(-50%)', zIndex:1000,
+          padding:'8px 20px', borderRadius:12, fontSize:10, fontWeight:700, maxWidth:'calc(100vw - 32px)', textAlign:'center',
+          background: toast.type==='success'?'rgba(0,230,138,0.9)':toast.type==='warning'?'rgba(245,158,11,0.9)':'rgba(239,68,68,0.9)',
+          color: toast.type==='success'?'#000':'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.4)' }}>
+          {toast.msg}
+        </div>
+      )}
               </div>
   );
 };
