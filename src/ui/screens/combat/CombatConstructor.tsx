@@ -540,11 +540,11 @@ export const CombatConstructor: React.FC = () => {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
                   <Field label={`Недель`} hint={`${weeks} нед — ATR блок`}>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={12} value={weeks} onChange={e => setWeeks(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{weeks}</Highlight></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff', marginTop: 2 }}><span>2</span><span>12</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}><span>2</span><span>12</span></div>
                   </Field>
                   <Field label={`Дней/нед`} hint={`${days}× — зал`}>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={4} value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{days}×</Highlight></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff', marginTop: 2 }}><span>2</span><span>4</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}><span>2</span><span>4</span></div>
                   </Field>
                 </div>
                 <div style={{ height:0.5, background:'rgba(84,84,88,0.36)', margin:'4px 0' }} />
@@ -693,10 +693,10 @@ export const CombatConstructor: React.FC = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(0,0,0,0.18)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', maxHeight: 340, overflowY: 'auto' }}>
                     {Object.entries(WM_GROUPS).map(([key, grp]) => (
                       <div key={key}>
-                        <div style={{ fontSize: 10, color: '#c4b5fd', fontWeight: 800, marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase' }}>{grp.label} · {grp.ids.length}</div>
+                        <div style={{ fontSize: 11, color: '#c4b5fd', fontWeight: 800, marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase' }}>{grp.label} · {grp.ids.length}</div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6 }}>
                           {grp.ids.map(id => (
-                            <label key={id} style={{ color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <label key={id} style={{ color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', gap: 4 }}>
                               {cbExerciseName(id)}
                               <input type="number" value={workMaxByExercise[id] || ''} onChange={e => { const v = Number(e.target.value) || 0; setWorkMaxByExercise(s => { const n = { ...s }; if (v > 0) n[id] = v; else delete n[id]; return n; }); }} style={{ ...INPUT, padding: '7px 8px', fontSize: 12 }} placeholder="кг" aria-label={cbExerciseName(id)} />
                             </label>
@@ -828,7 +828,7 @@ export const CombatConstructor: React.FC = () => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,0.14)', padding: 12, borderRadius: 12, border: '0.5px solid rgba(255,255,255,0.06)' }}>
                       <Field label="Сессий вне зала" hint={`${outside.sessionsPerWeek}×/нед`}>
                         <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={6} value={outside.sessionsPerWeek} onChange={e => setOutside(o => o ? { ...o, sessionsPerWeek: Number(e.target.value) } : o)} style={{ flex:1 }} /><Highlight color="#a855f7">{outside.sessionsPerWeek}×</Highlight></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: TEXT_3 }}><span>0</span><span>6</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: TEXT_3, fontVariantNumeric: 'tabular-nums' }}><span>0</span><span>6</span></div>
                       </Field>
                       <Field label="Длительность" hint={`${outside.avgDurationMin} мин`}>
                         <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={30} max={180} step={10} value={outside.avgDurationMin} onChange={e => setOutside(o => o ? { ...o, avgDurationMin: Number(e.target.value) } : o)} style={{ flex:1 }} /><Highlight>{outside.avgDurationMin}′</Highlight></div>
@@ -925,7 +925,7 @@ export const CombatConstructor: React.FC = () => {
                     <span className="cb-split-freq" style={{ fontSize: 11, fontWeight: 800, color: active ? '#d8b4fe' : '#fff', background: active ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: `1px solid ${active ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.06)'}` }}>{p.sessionsPerRotation}×/нед</span>
                   </div>
                   <div style={{ fontSize: 11.5, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{p.description}</div>
-                  <div className="cb-split-preview" style={{ fontSize: 10, color: '#fff', marginTop: 6, fontFamily: 'ui-monospace, monospace', background: 'rgba(0,0,0,0.18)', padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>{preview}</div>
+                  <div className="cb-split-preview" style={{ fontSize: 11, color: '#fff', marginTop: 6, fontFamily: 'ui-monospace, monospace', background: 'rgba(0,0,0,0.18)', padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>{preview}</div>
                   {active && <div className="cb-split-active" style={{ fontSize: 11, color: '#d8b4fe', fontWeight: 800, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', boxShadow: '0 0 8px #a855f7' }} /> Выбран — предпросмотр: {p.schedule.filter(s => s.kind === 'тренировка').map(s => s.sessionTag).join(', ')}</div>}
                 </button>
               );
@@ -959,7 +959,7 @@ export const CombatConstructor: React.FC = () => {
                     <span className="cb-cycle-meta" style={{ fontSize: 11, fontWeight: 800, color: '#d8b4fe', background: 'rgba(168,85,247,0.18)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(168,85,247,0.22)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{c.weeks}нед · {c.daysPerWeek}×</span>
                   </div>
                   <div style={{ fontSize: 11.5, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{c.blurb}</div>
-                  <div style={{ fontSize: 10, color: '#fff', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>Модель <b style={{ color: '#fff' }}>{ruLabel(PERIODIZATION_RU, c.periodizationModel ?? 'atr_10')}</b></div>
+                  <div style={{ fontSize: 11, color: '#fff', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>Модель <b style={{ color: '#fff' }}>{ruLabel(PERIODIZATION_RU, c.periodizationModel ?? 'atr_10')}</b></div>
                   <button
                     onClick={() => {
                       setDiscipline(c.discipline); setGoal(c.goal); setWeeks(c.weeks); setDays(c.daysPerWeek);

@@ -345,7 +345,7 @@ export const ChipToggle: React.FC<{ active: boolean; onClick: () => void; childr
   <button
     className="kit-chiptoggle cb-chip"
     data-active={active}
-    style={{ ...(active ? CHIP_ACTIVE : CHIP), opacity: disabled ? 0.38 : 1, display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SF, minHeight: 40 }}
+    style={{ ...(active ? CHIP_ACTIVE : CHIP), opacity: disabled ? 0.38 : 1, display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: SF, minHeight: 44 }}
     onClick={onClick} disabled={disabled} aria-pressed={active}
   >
     {icon && <span style={{ fontSize: 12 }}>{icon}</span>}{children}
@@ -513,7 +513,7 @@ export const CombatPopupNumber: React.FC<{ label: string; value: number; min?: n
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="cb-pop-numtitle" style={{ fontSize: 17, fontWeight: 600, color: TEXT_1, textAlign: 'center', fontFamily: SF }}>{label}</div>
               <input className="cb-pop-range" type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: ACCENT, height: 6, borderRadius: 999 }} />
-              <div className="cb-pop-scale" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: TEXT_3, fontFamily: SF }}><span>{min ?? 0}</span><span>{max ?? 300}</span></div>
+              <div className="cb-pop-scale" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: TEXT_3, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}><span>{min ?? 0}</span><span>{max ?? 300}</span></div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input className="cb-pop-input" type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '11px 12px', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, background: 'rgba(58,58,60,0.72)', color: TEXT_1, fontSize: 17, fontWeight: 400, textAlign: 'center', outline: 'none', fontFamily: SF, fontVariantNumeric: 'tabular-nums' }} />
                 {suffix && <span style={{ fontSize: 13, color: TEXT_2, fontFamily: SF }}>{suffix}</span>}
