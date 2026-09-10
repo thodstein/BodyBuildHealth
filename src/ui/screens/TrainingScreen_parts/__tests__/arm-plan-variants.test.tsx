@@ -47,8 +47,7 @@ describe('Arm plan variants', () => {
     expect(loadArmVariants().length).toBe(0);
   });
 
-  it('кап 10: одиннадцатый вытесняет старый', () => {
-    build();
+  it('кап 10: одиннадцатый вытесняет старый', () => {    build();
     fireEvent.click(screen.getByRole('button', { name: /Варианты плана/ }));
     for (let i = 0; i < 11; i++) {
       fireEvent.change(screen.getByLabelText('Название варианта'), { target: { value: `V${i}` } });
@@ -58,5 +57,18 @@ describe('Arm plan variants', () => {
     expect(list.length).toBe(10);
     expect(list[0].name).toBe('V10');
     expect(list.some((v) => v.name === 'V0')).toBe(false);
+  });
+
+  it('импорт JSON: валидный добавляет, битый даёт ошибку', async () => {
+    build();
+    fireEvent.click(screen.getByRole('button', { name: /Варианты плана/ }));
+    const input = screen.getByLabelText('Импорт варианта JSON') as HTMLInputElement;
+    const good = new File([JSON.stringify({ name: 'Из файла', plan: { pattern: { id: 'p', name: 'P' }, weeks: [] } })], 'plan.json', { type: 'application/json' });
+    fireEvent.change(input, { target: { files: [good] } });
+    await screen.findByText('📥 Импортирован: Из файла');
+    expect(loadArmVariants().some((v) => v.name === 'Из файла')).toBe(true);
+    const bad = new File(['{oops'], 'bad.json', { type: 'application/json' });
+    fireEvent.change(input, { target: { files: [bad] } });
+    await screen.findByText('⚠ Битый JSON-файл');
   });
 });

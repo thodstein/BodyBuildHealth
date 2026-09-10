@@ -1666,6 +1666,17 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                             setStep('plan');
                             flash(`📥 Вариант загружен: ${v.name}`);
                           }}>📥</AdBtn>
+                          <AdBtn variant="ghost" aria-label={`Скачать ${v.name} JSON`} onClick={()=>{
+                            try {
+                              const blob = new Blob([JSON.stringify(v, null, 2)], { type: 'application/json' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `arm-plan-${v.id}.json`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            } catch { flash('⚠ Не удалось скачать'); }
+                          }}>📤</AdBtn>
                           <AdBtn variant="ghost" aria-label={`Удалить ${v.name}`} onClick={()=>{
                             const next = armVariants.filter(x=>x.id!==v.id);
                             setArmVariants(next);
@@ -1677,6 +1688,46 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                     ))}
                   </div>
                 )}
+                <div style={{ marginTop: 8 }}>
+                  <AdField label="Импорт варианта из JSON-файла">
+                    <input type="file" accept="application/json,.json" aria-label="Импорт варианта JSON" onChange={(e)=>{
+                      const f = (e.target as HTMLInputElement).files?.[0];
+                      if (!f) return;
+                      (e.target as HTMLInputElement).value = '';
+                      const readText = (): Promise<string> => {
+                        try {
+                          const t = (f as any).text;
+                          if (typeof t === 'function') return t.call(f);
+                        } catch {}
+                        return new Promise((res, rej) => {
+                          try {
+                            const rd = new FileReader();
+                            rd.onload = () => res(String(rd.result || ''));
+                            rd.onerror = () => rej(new Error('read'));
+                            rd.readAsText(f);
+                          } catch (err) { rej(err); }
+                        });
+                      };
+                      readText().then((txt: string) => {
+                        try {
+                          const j = JSON.parse(txt);
+                          const plan = j && Array.isArray(j.weeks) ? j : j?.plan;
+                          if (!plan || !Array.isArray(plan.weeks) || !plan.pattern) { flash('⚠ В файле нет арм-плана'); return; }
+                          const v: ArmPlanVariant = {
+                            id: `armv-${Date.now()}`,
+                            name: String(j?.name || plan?.pattern?.name || 'Импорт').slice(0, 80),
+                            dateIso: new Date().toISOString(),
+                            plan,
+                          };
+                          const next = [v, ...armVariants].slice(0, 10);
+                          setArmVariants(next);
+                          saveArmVariants(next);
+                          flash(`📥 Импортирован: ${v.name}`);
+                        } catch { flash('⚠ Битый JSON-файл'); }
+                      }).catch(()=>flash('⚠ Не удалось прочитать файл'));
+                    }} />
+                  </AdField>
+                </div>
               </AdSec>
               <AdSec title="📖 Обоснование" collapsible defaultOpen={false} summary={`${builtPlan.rationale.length} причин`}>
                 <div data-arm="rationale">{builtPlan.rationale.map((r: string, i: number) => <div key={i} className="ad-finding" data-level="info">{r}</div>)}</div>
