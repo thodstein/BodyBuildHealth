@@ -19,6 +19,10 @@
 - **Хаб-шелл (коммит `e6a77b29`)**: `arm-hub-panels.tsx` — hero-шапка на CARD с янтарной кромкой, ритм-контролы, мост-кнопка hero-CTA; классы/хуки/строки 1-в-1 (хаб-тесты 34/34 без правок).
 - **Печать (коммит `ac77f932`)**: итоги в шапках («Неделя N · X сетов · M сесс.» / «День · X сетов»), вес `≈X кг` из workSets с гардом, `thead{display:table-header-group}`, `@page{margin:12mm}`; NEW R3-тест в `arm-print-modern` 3/3.
 - **Проверено**: arm UI 36/36 + остальные арм 45/45 + apk-pack/bridge/rest-hooks 93/93, `tsc` 0, `verify:apk-design` OK. НЕ ПУШИТЬ.
+- **Визуал 1–5**: grip-группы аккордеонами + hero-скор tabular/glow; RIR-светофор + цвет фаз + сводка-чипы + hero-wrap; сеты в пилюлях недель + кромка сессий + «📋 Копировать сводку» (clipboard+fallback, тест).
+- **№1 коррекция (`4d72d63e`)**: overlay `applyArmEdits` (сеты/повторы/вес + своп внутри `substitutionGroup` с пересчётом веса от workMax × характер); редактор ✏️ в строках плана; печать/.ics/копия/heatmap — с правками, гейты честно базовые; NEW `arm-plan-correction` 7/7.
+- **№2 варианты (`2d187333`)**: `he_arm_plan_variants` (сохранить с правками / загрузить / удалить, кап 10, битый стор → []); NEW `arm-plan-variants` 3/3.
+- **№3 микро (`8bd9f2fb`)**: `.ad-stepview` enter-переход (keyframes adTabIn + reduced-motion) + haptic пилюль с гардом. `tsc` по своим 0 (3 ошибки — чужой bb-WIP `bb-builder/bb-finalize`, не тронут).
 
 ## Каталог продуктов: TOP-визуал карточек (Sep 09 2026, НЕ пушить — очередь чужих)
 
