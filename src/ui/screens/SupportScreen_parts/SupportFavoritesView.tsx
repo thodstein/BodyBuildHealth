@@ -5,6 +5,7 @@ import { ALL_INTERACTIONS, SUPPORT_CATALOG_DATA } from '../../../data/support-da
 import { CATEGORY_LABELS } from './SupportScreenData';
 import { getMergedExternalSubIds } from '../TrainingScreen_parts/support-plan-bridge';
 import { readFavRecommendations, deleteFavRecommendation, queueMixToSupportPlan } from '../../../engines/training-plan-save.engine';
+import { readSupportArr, readSupportStrArr, writeSupportJSON } from './support-storage';
 
 export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -43,8 +44,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
   const livePlanDosages: Record<string, { mg: number; timing: string }> =
     (effectiveLevel?.dosages as Record<string, { mg: number; timing: string }> | undefined) || {};
 
-  let favIds: string[] = [];
-  try { favIds = JSON.parse(localStorage.getItem('he_support_favorites') || '[]'); } catch {}
+  const favIds: string[] = readSupportStrArr('he_support_favorites');
   const favSubstances = favIds.map((id: string) => catalogSubstances.find((sub: any) => sub.id === id)).filter(Boolean);
   const filtered = favSearch ? favSubstances.filter((sub: any) => (sub?.name||'').toLowerCase().includes(favSearch.toLowerCase())) : favSubstances;
 
@@ -83,13 +83,11 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                 </div>
               </div>
               <button onClick={() => {
-                try {
-                  let f: string[] = JSON.parse(localStorage.getItem('he_support_favorites') || '[]');
-                  const idx = f.indexOf(sub.id);
-                  if (idx >= 0) f.splice(idx, 1);
-                  localStorage.setItem('he_support_favorites', JSON.stringify(f));
-                  setFavRefresh((prev:number) => prev + 1);
-                } catch {}
+                const f: string[] = readSupportStrArr('he_support_favorites');
+                const idx = f.indexOf(sub.id);
+                if (idx >= 0) f.splice(idx, 1);
+                writeSupportJSON('he_support_favorites', f);
+                setFavRefresh((prev:number) => prev + 1);
               }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>★ Убрать</button>
             </div>
           ))
@@ -146,8 +144,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
         </div>
         {(() => {
-          let mySubs: any[] = [];
-          try { mySubs = JSON.parse(localStorage.getItem('he_my_substances') || '[]'); } catch {}
+          const mySubs: any[] = readSupportArr('he_my_substances');
           const filteredSubs = favSearch ? mySubs.filter((sub:any) => (sub.name||sub.id||'').toLowerCase().includes(favSearch.toLowerCase())) : mySubs;
           if (filteredSubs.length === 0) return (
             <div style={{ padding:24, textAlign:'center' }}>
@@ -166,11 +163,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                     {sub.source && <div style={{ fontSize:8, color:'rgba(0,230,138,0.6)' }}>📌 {sub.source}</div>}
                   </div>
                   <button onClick={() => {
-                    try {
-                      let arr: any[] = JSON.parse(localStorage.getItem('he_my_substances') || '[]');
-                      localStorage.setItem('he_my_substances', JSON.stringify(arr.filter((x:any) => x.id !== sub.id)));
-                      setFavRefresh((prev:number) => prev + 1);
-                    } catch {}
+                    const arr: any[] = readSupportArr('he_my_substances');
+                    writeSupportJSON('he_my_substances', arr.filter((x:any) => x.id !== sub.id));
+                    setFavRefresh((prev:number) => prev + 1);
                   }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', fontWeight:600, whiteSpace:'nowrap', flexShrink:0 }}>✕ Убрать</button>
                 </div>
               ))}
@@ -189,8 +184,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--text)', fontSize:11, boxSizing:'border-box' }} />
         </div>
         {(() => {
-          let myStacksArr: any[] = [];
-          try { myStacksArr = JSON.parse(localStorage.getItem('he_my_stacks') || '[]'); } catch {}
+          const myStacksArr: any[] = readSupportArr('he_my_stacks');
           const filteredStacks = favSearch ? myStacksArr.filter((st:any) => (st.name||st.id||'').toLowerCase().includes(favSearch.toLowerCase())) : myStacksArr;
           if (filteredStacks.length === 0) return (
             <div style={{ padding:24, textAlign:'center' }}>
@@ -209,11 +203,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                       <div style={{ fontSize:8, color:'var(--text-dim)' }}>{st.subs?.length || 0} препаратов · {st.system || '—'}</div>
                     </div>
                     <button onClick={() => {
-                      try {
-                        let arr: any[] = JSON.parse(localStorage.getItem('he_my_stacks') || '[]');
-                        localStorage.setItem('he_my_stacks', JSON.stringify(arr.filter((x:any) => x.id !== st.id)));
-                        setFavRefresh((prev:number) => prev + 1);
-                      } catch {}
+                      const arr: any[] = readSupportArr('he_my_stacks');
+                      writeSupportJSON('he_my_stacks', arr.filter((x:any) => x.id !== st.id));
+                      setFavRefresh((prev:number) => prev + 1);
                     }} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', whiteSpace:'nowrap', flexShrink:0 }}>✕ Удалить</button>
                   </div>
                   {st.description && <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4, lineHeight:1.3 }}>{st.description.slice(0, 120)}{st.description.length > 120 ? '...' : ''}</div>}
@@ -291,8 +283,8 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                   <button onClick={() => setStackPickerOpen(o => !o)} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontWeight:600 }}>📦 Из моих стеков</button>
                   <button onClick={() => {
                     const items = subs.map((id: string) => { const info = getInfo(id); return { id, name: info.name, dose: info.mg, timing: info.timing }; });
-                    const existing = JSON.parse(localStorage.getItem('supportCart') || '[]');
-                    localStorage.setItem('supportCart', JSON.stringify([...existing, ...items]));
+                    const existing: any[] = readSupportArr('supportCart');
+                    writeSupportJSON('supportCart', [...existing, ...items]);
                     setCartItems([...cartItems, ...items]);
                     showToast('✅ Добавлено в корзину');
                   }} style={{ padding:'6px 12px', borderRadius:8, fontSize:10, cursor:'pointer', background:'rgba(255,152,0,0.15)', border:'1px solid rgba(255,152,0,0.3)', color:'#ff9800', fontWeight:600 }}>🛒 В корзину</button>
@@ -368,9 +360,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                 <div style={{ display:'flex', gap:6, marginTop:6 }}>
                   <button onClick={() => {
                     const plan = { level:supportLevel, date:new Date().toISOString(), subs, dosages, label:supportLevel||level?.label, budget: supportLevel };
-                    const existing = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]');
+                    const existing: any[] = readSupportArr('he_saved_support_plans');
                     existing.push({ id:Date.now(), date:new Date().toISOString(), plan });
-                    localStorage.setItem('he_saved_support_plans', JSON.stringify(existing));
+                    writeSupportJSON('he_saved_support_plans', existing);
                     setPlanSaved(true);
                   }} style={{ flex:1, padding:'8px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:11 }}>💾 Сохранить план</button>
                 </div>
@@ -378,8 +370,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
 
                 {/* My plans */}
                 {(() => {
-                  let savedPlans: any[] = [];
-                  try { savedPlans = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]'); } catch {}
+                  const savedPlans: any[] = readSupportArr('he_saved_support_plans');
                   if (savedPlans.length === 0) return null;
                   return (
                     <div style={{ marginTop:8 }}>
@@ -402,11 +393,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                                 setTimeout(() => setPlanSaved(''), 3000);
                               }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
                               <button onClick={() => {
-                                try {
-                                  let saved: any[] = JSON.parse(localStorage.getItem('he_saved_support_plans') || '[]');
-                                  localStorage.setItem('he_saved_support_plans', JSON.stringify(saved.filter((x:any) => x.id !== sp.id)));
-                                  setFavRefresh((prev:number) => prev + 1);
-                                } catch {}
+                                const saved: any[] = readSupportArr('he_saved_support_plans');
+                                writeSupportJSON('he_saved_support_plans', saved.filter((x:any) => x.id !== sp.id));
+                                setFavRefresh((prev:number) => prev + 1);
                               }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                             </div>
                           </div>
@@ -468,10 +457,10 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                             </table>
                           )}
                           <button onClick={() => {
-                            const archive = JSON.parse(localStorage.getItem('supportPlanArchive') || '[]');
+                            const archive: any[] = readSupportArr('supportPlanArchive');
                             const key = [...archivedPlans].reverse()[idx];
                             const realIdx = archivedPlans.indexOf(key);
-                            if (realIdx >= 0) { archive.splice(realIdx, 1); localStorage.setItem('supportPlanArchive', JSON.stringify(archive)); setArchivedPlans(archive); }
+                            if (realIdx >= 0) { archive.splice(realIdx, 1); writeSupportJSON('supportPlanArchive', archive); setArchivedPlans(archive); }
                           }} style={{ marginTop:6, padding:'4px 10px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑 Удалить из архива</button>
                         </div>
                       )}
@@ -488,8 +477,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
               <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>📋 Мои планы поддержки</div>
               <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3 }}>Сохранённые планы с уровнем, составом и рисками. Можно загрузить в калькулятор.</div>
               {(() => {
-                let myPlans: any[] = [];
-                try { myPlans = JSON.parse(localStorage.getItem('he_my_plans') || '[]'); } catch {}
+                const myPlans: any[] = readSupportArr('he_my_plans');
                 if (myPlans.length === 0) return (
                   <div style={{ padding:24, textAlign:'center' }}>
                     <div style={{ fontSize:24, marginBottom:6 }}>📋</div>
@@ -517,11 +505,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                               setTimeout(() => setPlanSaved(''), 3000);
                             }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
                               <button onClick={() => {
-                                try {
-                                  let arr: any[] = JSON.parse(localStorage.getItem('he_my_plans') || '[]');
-                                  localStorage.setItem('he_my_plans', JSON.stringify(arr.filter((x: any) => x.id !== p.id)));
-                                  setMyPlansRefresh((prev:number) => prev + 1);
-                                } catch {}
+                                const arr: any[] = readSupportArr('he_my_plans');
+                                writeSupportJSON('he_my_plans', arr.filter((x: any) => x.id !== p.id));
+                                setMyPlansRefresh((prev:number) => prev + 1);
                               }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                           </div>
                         </div>
@@ -544,8 +530,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
           <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>🧮 Сохранённые расчёты калькулятора</div>
           <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3 }}>Здесь хранятся расчёты поддержки — результат + уровень + неделя. Можно загрузить обратно в калькулятор.</div>
           {(() => {
-            let saved: any[] = [];
-            try { saved = JSON.parse(localStorage.getItem('he_saved_calc_results') || '[]'); } catch {}
+            const saved: any[] = readSupportArr('he_saved_calc_results');
             if (saved.length === 0) return (
               <div style={{ padding:24, textAlign:'center' }}>
                 <div style={{ fontSize:24, marginBottom:6 }}>🧮</div>
@@ -574,11 +559,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                           setTimeout(() => setPlanSaved(''), 3000);
                         }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
                         <button onClick={() => {
-                          try {
-                            let arr: any[] = JSON.parse(localStorage.getItem('he_saved_calc_results') || '[]');
-                            localStorage.setItem('he_saved_calc_results', JSON.stringify(arr.filter((x: any) => x.id !== r.id)));
-                            setFavRefresh((prev:number) => prev + 1);
-                          } catch {}
+                          const arr: any[] = readSupportArr('he_saved_calc_results');
+                          writeSupportJSON('he_saved_calc_results', arr.filter((x: any) => x.id !== r.id));
+                          setFavRefresh((prev:number) => prev + 1);
                         }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                       </div>
                     </div>
@@ -601,8 +584,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
           <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>🎯 Сохранённые комплекты миксов</div>
           <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3 }}>Полные комплекты (пред + интра + пост), сохранённые из калькулятора тренировочных миксов.</div>
           {(() => {
-            let saved: any[] = [];
-            try { saved = JSON.parse(localStorage.getItem('he_saved_calc_results') || '[]').filter((x: any) => x.type === 'mix'); } catch {}
+            const saved: any[] = readSupportArr('he_saved_calc_results').filter((x: any) => x.type === 'mix');
             if (saved.length === 0) return (
               <div style={{ padding:24, textAlign:'center' }}>
                 <div style={{ fontSize:24, marginBottom:6 }}>🎯</div>
@@ -632,11 +614,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                           setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc');
                         }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
                         <button onClick={() => {
-                          try {
-                            let arr: any[] = JSON.parse(localStorage.getItem('he_saved_calc_results') || '[]');
-                            localStorage.setItem('he_saved_calc_results', JSON.stringify(arr.filter((x: any) => x.id !== kit.id)));
-                            setFavRefresh((p:number) => p + 1);
-                          } catch {}
+                          const arr: any[] = readSupportArr('he_saved_calc_results');
+                          writeSupportJSON('he_saved_calc_results', arr.filter((x: any) => x.id !== kit.id));
+                          setFavRefresh((p:number) => p + 1);
                         }} style={{ padding:'3px 8px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                       </div>
                     </div>
@@ -671,14 +651,13 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             const age = profile?.settings?.age ?? 30;
             const sex = profile?.settings?.sex ?? 'male';
             // ПЛАН 1 (калькулятор): risk-driven + ручные правки ∪ уровень
-            let computedIds: string[] = [];
-            try { computedIds = JSON.parse(localStorage.getItem('he_support_plan_result') || '[]'); } catch {}
+            const computedIds: string[] = readSupportStrArr('he_support_plan_result');
             const calcSubIds = [...new Set([...(SUPPORT_LEVELS[supportLevel]?.subs || []), ...computedIds])];
              // ПЛАН 2 (общий): внешние вещества (миксы/питание), которых нет в плане калькулятора
             let extIds: string[] = [];
             try {
-              const generalData = JSON.parse(localStorage.getItem('he_general_plan') || 'null');
-              if (generalData && Array.isArray(generalData)) extIds = generalData.filter((id: string) => !calcSubIds.includes(id));
+              const generalData: unknown[] = readSupportArr('he_general_plan');
+              if (generalData.length > 0) extIds = (generalData as string[]).filter((id: string) => !calcSubIds.includes(id));
               else extIds = getMergedExternalSubIds();
             } catch { try { extIds = getMergedExternalSubIds(); } catch {} }
             const levelSubIds = [...new Set([...calcSubIds, ...extIds])];
@@ -694,10 +673,10 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
               substanceCount: catalogSubstances.length, interactionCount: ALL_INTERACTIONS.length,
               timestamp: Date.now()
             };
-            const archive = JSON.parse(localStorage.getItem('he_support_reports_archive') || '[]');
+            const archive: any[] = readSupportArr('he_support_reports_archive');
             archive.unshift(report);
-            localStorage.setItem('he_support_reports_archive', JSON.stringify(archive));
-            localStorage.setItem('he_support_report_current', JSON.stringify(report));
+            writeSupportJSON('he_support_reports_archive', archive);
+            writeSupportJSON('he_support_report_current', report);
             try { localStorage.setItem('he_support_reports', JSON.stringify(archive.slice(0, 20))); } catch {}
             try { localStorage.setItem('he_profile_support_reports', JSON.stringify(archive.slice(0, 10))); } catch {}
             setReportGenerated(true);
@@ -705,8 +684,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
 
           {/* Archive */}
           {(() => {
-            let archive: any[] = [];
-            try { archive = JSON.parse(localStorage.getItem('he_support_reports_archive') || '[]'); } catch {}
+            const archive: any[] = readSupportArr('he_support_reports_archive');
             if (archive.length === 0) return null;
             return (
               <div style={{ marginTop:8 }}>
@@ -725,11 +703,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                       <div style={{ fontSize:8, color:'var(--text-dim)' }}>{new Date(r.date).toLocaleDateString('ru-RU')}</div>
                     </div>
                     <button onClick={() => {
-                      try {
-                        const arch: any[] = JSON.parse(localStorage.getItem('he_support_reports_archive') || '[]');
-                        const realIdx = arch.findIndex((x: any) => x.id === r.id);
-                        if (realIdx >= 0) { arch.splice(realIdx, 1); localStorage.setItem('he_support_reports_archive', JSON.stringify(arch)); setFavRefresh((prev:number) => prev + 1); }
-                      } catch {}
+                      const arch: any[] = readSupportArr('he_support_reports_archive');
+                      const realIdx = arch.findIndex((x: any) => x.id === r.id);
+                      if (realIdx >= 0) { arch.splice(realIdx, 1); writeSupportJSON('he_support_reports_archive', arch); setFavRefresh((prev:number) => prev + 1); }
                     }} style={{ padding:'3px 6px', borderRadius:4, fontSize:8, cursor:'pointer', background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444' }}>🗑</button>
                   </div>
                 ))}

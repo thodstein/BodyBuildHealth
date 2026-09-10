@@ -133,7 +133,16 @@ interface DiaryEntry {
 }
 
 function loadDiary(): DiaryEntry[] {
-  try { return JSON.parse(localStorage.getItem(DIARY_KEY) || '[]'); } catch { return []; }
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(DIARY_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    // Битые элементы (скаляры, записи без даты/веществ) — режем, иначе .find/.map роняют рендер.
+    return (parsed as DiaryEntry[]).filter(
+      (e) => !!e && typeof e === 'object' && typeof (e as DiaryEntry).date === 'string' && !!(e as DiaryEntry).substances && typeof (e as DiaryEntry).substances === 'object',
+    );
+  } catch {
+    return [];
+  }
 }
 
 function loadToday(): DiaryEntry | null {

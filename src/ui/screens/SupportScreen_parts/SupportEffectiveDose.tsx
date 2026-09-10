@@ -130,7 +130,12 @@ export const SupportEffectiveDose: React.FC = () => {
   const [form1Idx, setForm1Idx] = useState(0);
   const [form2Idx, setForm2Idx] = useState(0);
   const [activeAdjusters, setActiveAdjusters] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_bio_adjusters') || '[]'); } catch { return []; }
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem('he_bio_adjusters') || '[]');
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
   });
 
   const catalog = useMemo(() => buildBioavailabilityCatalog(), []);

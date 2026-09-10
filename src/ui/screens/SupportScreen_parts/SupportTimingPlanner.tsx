@@ -52,7 +52,12 @@ function buildCatalog(): EnrichedEntry[] {
 // ─── Timing component ───
 export const SupportTimingPlanner: React.FC = () => {
   const [selectedSubs, setSelectedSubs] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_bio_timing_subs') || '[]'); } catch { return []; }
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem('he_bio_timing_subs') || '[]');
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
   });
   const [timingSearch, setTimingSearch] = useState('');
 

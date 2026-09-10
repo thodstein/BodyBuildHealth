@@ -59,7 +59,14 @@ export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s
   const [sortBy, setSortBy] = useState<'bio' | 'name' | 'forms'>('bio');
   const [showAAS, setShowAAS] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() => localStorage.getItem('he_bio_selected'));
-  const [compareIds, setCompareIds] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_bio_compare') || '[]'); } catch { return []; } });
+  const [compareIds, setCompareIds] = useState<string[]>(() => {
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem('he_bio_compare') || '[]');
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
   const [showCompare, setShowCompare] = useState(compareIds.length > 0);
 
   const catalog = useMemo(() => buildBioavailabilityCatalog(), []);

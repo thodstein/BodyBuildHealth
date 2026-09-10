@@ -5,6 +5,7 @@
  * SupportCatalogTab — tab='catalog' полный блок с InfoErrorBoundary.
  */
 import React from 'react';
+import { readSupportArr, readSupportStrArr, writeSupportJSON } from './support-storage';
 import { PopupSelect } from '../../components/PopupXxx';
 import { InfoErrorBoundary, getCategoryInfo, CLASS_BASE_NAMES, MECH_TRANSLATIONS_RU, TYPE_LABELS_RU, MECH_LABELS, CATEGORY_LABELS } from './SupportScreenData';
 import { ALL_STACKS, ALL_INTERACTIONS, SUPPORT_CATALOG_DATA, getSubstanceTier, TIER_LABELS, SYSTEM_LABELS_CATALOG, ORGAN_LABELS, type SupportSubstance } from '../../../data/support-database';
@@ -82,8 +83,8 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                     </div>
                                   </div>
                                   <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
-                                   <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(sub?.id||'');if(idx>=0)f.splice(idx,1);else f.push(sub?.id||'');localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
-                                   <button onClick={e => { e.stopPropagation(); try { let arr:any[]=JSON.parse(localStorage.getItem('he_my_substances')||'[]'); if(!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); localStorage.setItem('he_my_substances',JSON.stringify(arr)); setFavRefresh(p=>p+1); } }catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
+                                   <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(sub?.id||''); if (idx >= 0) f.splice(idx,1); else f.push(sub?.id||''); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(readSupportStrArr('he_support_favorites').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)') }}>★</button>
+                                   <button onClick={e => { e.stopPropagation(); { const arr: any[] = readSupportArr('he_my_substances'); if (!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); writeSupportJSON('he_my_substances', arr); setFavRefresh(p=>p+1); } } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                    <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                  </div>
                                   {isSelected && sub && (
@@ -139,8 +140,8 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                          <div style={{ fontSize:8, color:'var(--text-dim)' }}>{(sub.categories||[]).slice(0,2).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ')}</div>
                                       </div>
                                       <button onClick={e => { e.stopPropagation(); if (!enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(id) ? '✓' : '+ Мой стек'}</button>
-                                       <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(id);if(idx>=0)f.splice(idx,1);else f.push(id);localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(id)?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
-                                       <button onClick={e => { e.stopPropagation(); try { let arr:any[]=JSON.parse(localStorage.getItem('he_my_substances')||'[]'); if(!arr.find((x:any)=>x.id===id)) { arr.push({id, name:sub?.name||id, source:'Каталог', date:new Date().toISOString()}); localStorage.setItem('he_my_substances',JSON.stringify(arr)); setFavRefresh(p=>p+1); } }catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
+                                       <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(id); if (idx >= 0) f.splice(idx,1); else f.push(id); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(readSupportStrArr('he_support_favorites').includes(id)?'#fbbf24':'var(--text-dim)') }}>★</button>
+                                       <button onClick={e => { e.stopPropagation(); { const arr: any[] = readSupportArr('he_my_substances'); if (!arr.find((x:any)=>x.id===id)) { arr.push({id, name:sub?.name||id, source:'Каталог', date:new Date().toISOString()}); writeSupportJSON('he_my_substances', arr); setFavRefresh(p=>p+1); } } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                       <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                     </div>
                                     {isSelected && (
@@ -195,26 +196,24 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                             <div style={{ display:'flex', gap:4 }}>
                               <button onClick={() => {
                                 const ids = stk.substances.map((s: any) => s.id);
-                                const existing = JSON.parse(localStorage.getItem('he_finder_saved_stacks')||'[]');
-                                localStorage.setItem('he_finder_saved_stacks', JSON.stringify([ids, ...existing].slice(0,10)));
+                                const existing: unknown[] = readSupportArr('he_finder_saved_stacks');
+                                writeSupportJSON('he_finder_saved_stacks', [ids, ...existing].slice(0,10));
                                 setEnhancedSubs(prev => [...new Set([...prev, ...ids])]);
                               }} style={{ flex:1, padding:'4px 0', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)', color:'#00e68a' }}>📥 + Мой стек</button>
                               <button onClick={() => {
-                                try {
-                                  let arr: any[] = JSON.parse(localStorage.getItem('he_my_stacks') || '[]');
-                                  if (!arr.find((x:any) => x.id === stk.id)) {
-                                    arr.push({
-                                      id: stk.id, name: stk.name, description: stk.description, system: stk.system,
-                                      subs: stk.substances.map((s: any) => s.id), dosages: Object.fromEntries(stk.substances.map((s: any) => [s.id, s.dose])),
-                                      timingSummary: stk.timingSummary, monitoring: stk.monitoring,
-                                      specialInstructions: stk.specialInstructions, contraindications: stk.contraindications,
-                                      warnings: stk.warnings, synergyScore: stk.synergyScore,
-                                      source: 'Каталог стеков', date: new Date().toISOString()
-                                    });
-                                    localStorage.setItem('he_my_stacks', JSON.stringify(arr));
-                                    setFavRefresh(p => p + 1);
-                                  }
-                                } catch {}
+                                const arr: any[] = readSupportArr('he_my_stacks');
+                                if (!arr.find((x:any) => x.id === stk.id)) {
+                                  arr.push({
+                                    id: stk.id, name: stk.name, description: stk.description, system: stk.system,
+                                    subs: stk.substances.map((s: any) => s.id), dosages: Object.fromEntries(stk.substances.map((s: any) => [s.id, s.dose])),
+                                    timingSummary: stk.timingSummary, monitoring: stk.monitoring,
+                                    specialInstructions: stk.specialInstructions, contraindications: stk.contraindications,
+                                    warnings: stk.warnings, synergyScore: stk.synergyScore,
+                                    source: 'Каталог стеков', date: new Date().toISOString()
+                                  });
+                                  writeSupportJSON('he_my_stacks', arr);
+                                  setFavRefresh(p => p + 1);
+                                }
                               }} style={{ padding:'4px 8px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.15)', color:'#818cf8' }}>📦 В мои стеки</button>
                               <button onClick={() => setStackExpanded(isExp ? null : stk.id)} style={{
                                 padding:'4px 10px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer',
@@ -284,8 +283,8 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                           </div>
                                         </div>
                                         <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
-                                        <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(sub?.id||'');if(idx>=0)f.splice(idx,1);else f.push(sub?.id||'');localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
-                                        <button onClick={e => { e.stopPropagation(); try { let arr:any[]=JSON.parse(localStorage.getItem('he_my_substances')||'[]'); if(!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); localStorage.setItem('he_my_substances',JSON.stringify(arr)); setFavRefresh(p=>p+1); } }catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
+                                        <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(sub?.id||''); if (idx >= 0) f.splice(idx,1); else f.push(sub?.id||''); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(readSupportStrArr('he_support_favorites').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)') }}>★</button>
+                                        <button onClick={e => { e.stopPropagation(); { const arr: any[] = readSupportArr('he_my_substances'); if (!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); writeSupportJSON('he_my_substances', arr); setFavRefresh(p=>p+1); } } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                          <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                        </div>
                                         {selectedSub === sub?.id && sub && (
@@ -347,8 +346,8 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                       </div>
                                     </div>
                                     <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
-                                    <button onClick={e => { e.stopPropagation(); try { let f:string[]=JSON.parse(localStorage.getItem('he_support_favorites')||'[]');const idx=f.indexOf(sub?.id||'');if(idx>=0)f.splice(idx,1);else f.push(sub?.id||'');localStorage.setItem('he_support_favorites',JSON.stringify(f));setFavRefresh(p=>p+1);}catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(()=>{try{return JSON.parse(localStorage.getItem('he_support_favorites')||'[]').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)';}catch{return 'var(--text-dim)';}})() }}>★</button>
-                                    <button onClick={e => { e.stopPropagation(); try { let arr:any[]=JSON.parse(localStorage.getItem('he_my_substances')||'[]'); if(!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); localStorage.setItem('he_my_substances',JSON.stringify(arr)); setFavRefresh(p=>p+1); } }catch{} }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
+                                    <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(sub?.id||''); if (idx >= 0) f.splice(idx,1); else f.push(sub?.id||''); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(readSupportStrArr('he_support_favorites').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)') }}>★</button>
+                                    <button onClick={e => { e.stopPropagation(); { const arr: any[] = readSupportArr('he_my_substances'); if (!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); writeSupportJSON('he_my_substances', arr); setFavRefresh(p=>p+1); } } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                     <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                   </div>
                                   {selectedSub === sub?.id && sub && (
