@@ -2051,3 +2051,18 @@
   animation: adTabIn 0.28s cubic-bezier(0.22, 0.68, 0, 1);
   min-width: 0;
 }
+
+/* ─── №6 КОНСТРУКТОР БЕЗ ГОРИЗОНТАЛЬНОГО СКРОЛЛА: ленты → перенос ─── */
+/* Только конструктор (.train-arm) — хаб (.train-armdiag) не тронут. */
+:is(.train-arm) .ad-chips,
+:is(.train-arm) .ad-strip {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  scroll-snap-type: none;
+}
+
+:is(.train-arm) .ad-chips > *,
+:is(.train-arm) .ad-strip > * {
+  flex-shrink: 1;
+  scroll-snap-align: none;
+}

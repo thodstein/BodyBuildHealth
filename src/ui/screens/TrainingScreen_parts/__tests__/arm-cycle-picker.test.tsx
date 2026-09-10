@@ -1,7 +1,7 @@
 /**
  * arm-cycle-picker.test.tsx — живой подбор именного цикла карточками.
  *
- * Топ-3 rankArmCycles поверх селекта (селект и мост из библиотеки целы):
+ * Весь каталог rankArmCycles в пикере поверх шита (шит и мост из библиотеки целы):
  * рендер пикера + фаз-полос, клик ставит цикл, повторный — сбрасывает.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -9,6 +9,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import React from 'react';
 import { ArmAutoConstructor } from '../ArmAutoConstructor';
 import { rankArmCycles } from '../../../../engines/arm/arm-cycle-selector.engine';
+import { ARM_CYCLE_LIBRARY } from '../../../../engines/arm/arm-cycle-library.engine';
 
 function openCycleSheet() {
   const head = screen.getAllByRole('button', { name: /Именной цикл/ }).find((b) => b.getAttribute('aria-expanded') != null);
@@ -24,16 +25,19 @@ beforeEach(() => {
 const BASE = { discipline: 'armwrestling', level: 'intermediate', goal: 'strength', weeks: 8, daysPerWeek: 4, gripFocus: 'support' } as const;
 
 describe('Arm cycle picker', () => {
-  it('показывает топ-3 с фаз-полосами недель', () => {
+  it('показывает ВЕСЬ каталог с фаз-полосами недель, топ-3 со звёздами', () => {
     const { container } = render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     const picker = container.querySelector("[data-arm='cycle-picker']");
     expect(picker, 'picker').not.toBeNull();
-    expect(picker!.querySelectorAll('.ad-split').length).toBe(3);
+    expect(picker!.querySelectorAll('.ad-split').length).toBe(ARM_CYCLE_LIBRARY.length);
     const phases = picker!.querySelectorAll("[data-arm='cycle-phases'] .ad-ph");
     expect(phases.length, 'phase blocks').toBeGreaterThan(0);
     for (const b of Array.from(phases)) {
       expect(b.getAttribute('data-phase')).toBeTruthy();
+    }
+    for (const star of ['★1', '★2', '★3']) {
+      expect(picker!.textContent).toContain(star);
     }
   });
 
@@ -62,13 +66,13 @@ describe('Arm cycle picker', () => {
     expect(screen.getByRole('button', { name: 'Цикл: — обычный план —' }), 'reset').toBeTruthy();
   });
 
-  it('шит покрывает всю библиотеку (19), пикер — только топ-3', () => {
+  it('шит и пикер покрывают всю библиотеку (19)', () => {
     const { container } = render(<ArmAutoConstructor />);
     fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
     const dlg = openCycleSheet();
     const opts = within(dlg).getAllByRole('button').filter((b) => b.textContent !== 'Готово');
     expect(opts.length).toBe(20);
-    expect(container.querySelectorAll("[data-arm='cycle-picker'] .ad-split").length).toBe(3);
+    expect(container.querySelectorAll("[data-arm='cycle-picker'] .ad-split").length).toBe(ARM_CYCLE_LIBRARY.length);
   });
 
   it('выбор из шита ставит цикл ( Toproll )', () => {

@@ -760,7 +760,8 @@ export function ArmAutoConstructor() {
   const summCyc = cycId ? ((()=>{ try { return ARM_CYCLE_LIBRARY.find(c=>c.id===cycId)?.name || cycId; } catch { return cycId; } })()) : 'Обычный план';
   const rankedCycles = useMemo(() => {
     try {
-      return rankArmCycles({ discipline, level, goal, weeks, daysPerWeek, gripFocus }).slice(0, 3);
+      // №6: весь каталог в пикере (не топ-3) — выбор из всех 19 без селекта
+      return rankArmCycles({ discipline, level, goal, weeks, daysPerWeek, gripFocus });
     } catch { return []; }
   }, [discipline, level, goal, weeks, daysPerWeek, gripFocus]);
   const CYC_LEVEL_RU: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый', enhanced: 'Enhanced' };
@@ -782,7 +783,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         side={best ? (<div className="ad-hero-side" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div className="ad-hero-score" aria-hidden style={{ minWidth: 56, textAlign: 'center', padding: '6px 10px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.25), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.4)', boxShadow: '0 4px 16px rgba(0,230,138,0.25)' }}><b style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{ranked[0]?.score ?? 0}</b><span style={{ display: 'block', fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>баллов</span></div><div className="ad-hero-name" style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>{best.name}<span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,0.65)', fontVariantNumeric: 'tabular-nums' }}>лучший сплит · {daysPerWeek} дн/нед</span></div></div>) : '—'}
       />
 
-      <div data-arm="steps" aria-label="Шаги" className="ad-steps" style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 8, overflowX: 'auto' as const, alignItems: 'center' }}>
+      <div data-arm="steps" aria-label="Шаги" className="ad-steps" style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {STEP_GROUPS.map((g, gi) => (
           <span key={g.name} className="ad-step-group" style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             <span className="ad-step-group-label" aria-hidden style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 }}>{g.name}</span>
@@ -1213,11 +1214,11 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           <AdSec title="📚 Именной цикл" hint="Интернет-библиотека — пусто = обычный план" collapsible defaultOpen={false} summary={summCyc} status={cycId ? 'ok' : undefined}>
             {rankedCycles.length > 0 && (
               <div className="ad-list" data-arm="cycle-picker">
-                {rankedCycles.map(({ cycle: c, score, reasons }) => (
+                {rankedCycles.map(({ cycle: c, score, reasons }, ci) => (
                   <div key={c.id} className="ad-sec ad-split" data-active={cycId===c.id} onClick={()=>setCycId(cycId===c.id ? '' : c.id)} role="button" tabIndex={0} aria-pressed={cycId===c.id} aria-label={`Цикл ${c.name}`} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') setCycId(cycId===c.id ? '' : c.id); }}>
                     <div className="ad-split-top">
                       <span className="ad-split-radio" aria-hidden />
-                      <span className="ad-split-name">{c.name} <span>— {c.weeks} нед · {c.daysPerWeek}×/нед</span></span>
+                      <span className="ad-split-name">{ci < 3 ? `★${ci + 1} ` : ''}{c.name} <span>— {c.weeks} нед · {c.daysPerWeek}×/нед</span></span>
                       <span className="ad-split-score">{score}</span>
                     </div>
                     <div className="ad-row" data-arm="cycle-chips">
