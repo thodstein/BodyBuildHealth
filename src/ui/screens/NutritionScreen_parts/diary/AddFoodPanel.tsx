@@ -6,6 +6,7 @@ import { BarcodeScanner } from '../../../components/BarcodeScanner';
 import { type OFFProduct, productToFoodItem, searchByName as searchOFF } from '../../../../engines/openfoodfacts.engine';
 import { RETAIL_CHAINS, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../../../engines/retail-search.engine';
 import { processUploadedFile } from '../../../../core/ocr-engine';
+import { isCapacitorNative } from '../../../../core/app-platform';
 import { parseNutritionText, findFood } from '../../../../engines/nutrition-ocr-parser';
 import { readDiaryV2 } from '../diary-storage-v2';
 
@@ -70,6 +71,23 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   customFoodName, onCustomFoodNameChange, customFoodKcal, customFoodP, customFoodF, customFoodC,
   onCustomFoodFieldChange, onAddCustomFood, ocrFileRef, ocrCameraRef,
 }) => {
+  // АПК: системная камера/галерея вместо сырого file-input (в WebView он
+  // открывается через раз). Перехват клика по плитке «Фото».
+  const handlePhotoTile = async (e: React.MouseEvent) => {
+    if (!isCapacitorNative()) return;
+    e.preventDefault();
+    if (ocrFileLoading) return;
+    try {
+      const { pickPhoto } = await import('../../../../core/native-bridge');
+      const photo = await pickPhoto();
+      if (!photo) return;
+      const blob = await (await fetch(photo.uri)).blob();
+      const file = new File([blob], `food.${photo.format || 'jpg'}`, { type: blob.type || 'image/jpeg' });
+      onOcrFile(file);
+    } catch {
+      try { ocrFileRef.current?.click(); } catch { /* ignore */ }
+    }
+  };
   const foodSearchResults = useMemo(() => {
     if (!debouncedSearch.trim()) return [];
     const q = debouncedSearch.toLowerCase().replace(/ё/g,'е').trim();
@@ -354,7 +372,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             <span style={{ fontSize: 20, filter: showBarcode ? 'none' : 'grayscale(0.3)' }}>📱</span>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.3 }}>Штрих-код</span>
           </button>
-          <label style={{ padding: '14px 8px', borderRadius: 14, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+          <label onClick={handlePhotoTile} style={{ padding: '14px 8px', borderRadius: 14, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
               background: ocrFileLoading ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.08))' : 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(139,92,246,0.02))',
               border: `1px solid ${ocrFileLoading ? 'rgba(0,230,138,0.3)' : 'rgba(139,92,246,0.12)'}`,
               color: ocrFileLoading ? '#00e68a' : 'rgba(255,255,255,0.9)', minHeight: 72, fontWeight: 600, backdropFilter: 'blur(8px)', transition: 'all 0.2s', boxShadow: ocrFileLoading ? '0 4px 16px rgba(0,230,138,0.15)' : '0 2px 8px rgba(0,0,0,0.1)', opacity: ocrFileLoading ? 0.9 : 1, justifyContent: 'center', pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>

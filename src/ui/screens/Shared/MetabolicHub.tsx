@@ -16,9 +16,53 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { ModernHero } from '../NutritionScreen_parts/nutrition-modern-kit';
+import { printPlanHtml, shareOrCopyText, downloadCoachFile } from '../NutritionScreen_parts/IndividualPlan/planner-day-print';
 
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' } as any;
 const CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginBottom: 10, transition:'all 0.18s ease' } as any;
+
+/**
+ * MhToggle — карточка-переключатель вместо нативного checkbox.
+ * TG/web и АПК — один DOM (хук mh-toggle + data-on), АПК-специфика в §96.
+ */
+function MhToggle({ checked, onChange, icon, title, desc, accent = '#22c55e', compact, span }: {
+  checked: boolean; onChange: (v: boolean) => void; icon?: string; title: string; desc?: string;
+  accent?: string; compact?: boolean; span?: boolean;
+}) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} aria-label={title}
+      onClick={() => onChange(!checked)} className="mh-toggle" data-on={checked ? 'true' : 'false'}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer',
+        minHeight: compact ? 44 : 52, padding: compact ? '8px 10px' : '10px 12px', borderRadius: 12,
+        border: checked ? `1px solid ${accent}66` : '1px solid rgba(255,255,255,0.07)',
+        background: checked ? `${accent}14` : 'rgba(255,255,255,0.03)', color: '#fff',
+        boxShadow: checked ? `0 4px 14px ${accent}22` : 'none', transition: 'all 0.18s ease',
+        ...(span ? { gridColumn: '1 / -1' } : {}),
+      }}>
+      {icon != null && (
+        <span aria-hidden style={{
+          width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 15, flexShrink: 0, background: checked ? `${accent}1e` : 'rgba(255,255,255,0.05)',
+          border: `1px solid ${checked ? `${accent}44` : 'rgba(255,255,255,0.07)'}`,
+        }}>{icon}</span>
+      )}
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: compact ? 10 : 11, fontWeight: 700, lineHeight: 1.3 }}>{title}</span>
+        {desc != null && <span style={{ display: 'block', fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>{desc}</span>}
+      </span>
+      <span aria-hidden style={{
+        width: 42, height: 25, borderRadius: 999, flexShrink: 0, position: 'relative', transition: 'background 0.18s ease',
+        background: checked ? accent : 'rgba(255,255,255,0.12)', boxShadow: checked ? `0 0 10px ${accent}55` : 'none',
+      }}>
+        <span style={{
+          position: 'absolute', top: 3, left: checked ? 20 : 3, width: 19, height: 19, borderRadius: '50%',
+          background: '#fff', transition: 'left 0.18s ease', boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+        }} />
+      </span>
+    </button>
+  );
+}
 
 type Mode = 'water'|'steps'|'kbju'|'fat'|'cortisol'|'hematology'|'ea'|'alcohol'|'protein'|'maintenance'|'neat'|'at'|'thyroid'|'sweat'|'mets'|'break';
 const MODE_DEFS: Array<{m:Mode; label:string; icon:string; desc:string; accent:string; hint:string; evidence:string}> = [
@@ -737,7 +781,7 @@ export const MetabolicHub: React.FC = () => {
       <div style={{ ...CARD, padding:10, display:'flex', gap:6, alignItems:'center', background:'rgba(255,255,255,0.04)' }}>
         <span style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.55)', textTransform:'uppercase' }}>Мастер:</span>
         {([1,2,3] as const).map(s=>(
-          <button key={s} onClick={()=> setWizardStep(s)} style={{ flex:1, minHeight:34, borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:800, border: wizardStep===s ? '1px solid #60a5fa':'1px solid rgba(255,255,255,0.08)', background: wizardStep===s ? 'rgba(96,165,250,0.14)':'rgba(255,255,255,0.02)', color: wizardStep===s ? '#60a5fa':'#fff' }}>
+          <button key={s} onClick={()=> setWizardStep(s)} aria-current={wizardStep===s} className="mh-seg" style={{ flex:1, minHeight:44, borderRadius:12, cursor:'pointer', fontSize:11, fontWeight:800, border: wizardStep===s ? '1px solid #60a5fa':'1px solid rgba(255,255,255,0.08)', background: wizardStep===s ? 'rgba(96,165,250,0.14)':'rgba(255,255,255,0.02)', color: wizardStep===s ? '#60a5fa':'#fff' }}>
             {s===1?'① Тело':s===2?'② Активность':'③ Цель/Лабы'}
           </button>
         ))}
@@ -746,8 +790,8 @@ export const MetabolicHub: React.FC = () => {
           const payload={ tdee, low:oneAnswer.low, high:oneAnswer.high, water:oneAnswer.water, ea:oneAnswer.ea, ts:Date.now(), source:'metabolic-hub-one-answer' };
           try{ localStorage.setItem('he_metabolic_one_answer', JSON.stringify(payload)); }catch{}
           const html=`<!doctype html><html><head><meta charset="utf-8"><title>Метаболика PRO — сводка</title><style>body{font-family:system-ui;padding:24px;color:#111}h1{font-size:18px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px 8px;font-size:12px}th{background:#f5f5f5}</style></head><body><h1>⚖️ Метаболика PRO — сводка ${new Date().toLocaleString('ru-RU')}</h1><p>TDEE ${tdee} (${oneAnswer.low}-${oneAnswer.high}) · Вода ${oneAnswer.water}мл · EA ${oneAnswer.ea ?? '—'} · HCT ${hematology.hct ?? '—'}% · WHtR ${whtr?.toFixed(2) ?? '—'}</p><p>BMR ${kbju.nat.bmr} PAL ${kbju.nat.pal} · КБЖУ ${kbju.nat.kcal} Б${kbju.nat.p} Ж${kbju.nat.f} У${kbju.nat.c} · FFMI ${fat.ffmiNorm} · EA ${ea?.ea ?? '—'} (${ea?.zoneLabel ?? ''})</p><script>window.print()</`+`script></body></html>`;
-          const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); } else showToast('Всплывающие окна заблокированы');
-        }} style={{ padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontSize:9, fontWeight:700, cursor:'pointer' }}>🖨 PDF</button>
+          void printPlanHtml('Метаболика PRO — сводка', html);
+        }} className="mh-act" style={{ padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>🖨 PDF</button>
         <button onClick={()=>{
           const rows=[
             ['TDEE', `${oneAnswer.tdee} (${oneAnswer.low}-${oneAnswer.high})`],
@@ -766,15 +810,15 @@ export const MetabolicHub: React.FC = () => {
             ['Пот', `${sweatV2?.rateLPerH?.toFixed(2) ?? '—'} л/ч Na ${sweatV2?.elect.sodiumMg ?? '—'}мг${sweatV2 && !sweatV2.measured ? ' (оценка)' : ''}`],
           ];
           const html2=`<!doctype html><html><head><meta charset="utf-8"><title>Метаболика PRO — полный отчёт</title><style>body{font-family:system-ui;padding:24px;color:#111}h1{font-size:18px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px 8px;font-size:12px}th{background:#f5f5f5}</style></head><body><h1>⚖️ Метаболика PRO — полный отчёт ${new Date().toLocaleString('ru-RU')}</h1><table><tr><th>Показатель</th><th>Значение</th></tr>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table><script>window.print()</`+`script></body></html>`;
-          const w2=window.open('','_blank'); if(w2){ w2.document.write(html2); w2.document.close(); } else showToast('Всплывающие окна заблокированы');
-        }} style={{ padding:'8px 8px', borderRadius:8, border:'1px solid rgba(96,165,250,0.18)', background:'rgba(96,165,250,0.10)', color:'#60a5fa', fontSize:9, fontWeight:700, cursor:'pointer' }}>📄 Всё PDF</button>
+          void printPlanHtml('Метаболика PRO — полный отчёт', html2);
+        }} className="mh-act" style={{ padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(96,165,250,0.18)', background:'rgba(96,165,250,0.10)', color:'#60a5fa', fontSize:10, fontWeight:700, cursor:'pointer' }}>📄 Всё PDF</button>
       </div>
 
        {/* Переключатель ААС */}
       <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
         <div style={{ display:'flex', gap:6, marginBottom: onAAS?8:0 }}>
-          <button onClick={()=> setOnAAS(false)} style={{ flex:1, minHeight:36, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:800, border: !onAAS ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.08)', background: !onAAS ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.02)', color: !onAAS ? '#22c55e' : '#fff' }}>🌿 Без ААС</button>
-          <button onClick={()=> setOnAAS(true)} style={{ flex:1, minHeight:36, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:800, border: onAAS ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)', background: onAAS ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.02)', color: onAAS ? '#f87171' : '#fff' }}>💉 С ААС</button>
+          <button onClick={()=> setOnAAS(false)} aria-pressed={!onAAS} className="mh-seg" style={{ flex:1, minHeight:48, borderRadius:12, cursor:'pointer', fontSize:12, fontWeight:800, border: !onAAS ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.08)', background: !onAAS ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.02)', color: !onAAS ? '#22c55e' : '#fff' }}>🌿 Без ААС</button>
+          <button onClick={()=> setOnAAS(true)} aria-pressed={onAAS} className="mh-seg" style={{ flex:1, minHeight:48, borderRadius:12, cursor:'pointer', fontSize:12, fontWeight:800, border: onAAS ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)', background: onAAS ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.02)', color: onAAS ? '#f87171' : '#fff' }}>💉 С ААС</button>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:8, paddingTop:8, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
           <PopupNumber label="Доза ААС, мг/нед" value={aasDose} min={0} max={3000} onChange={setAasDose} />
@@ -790,8 +834,8 @@ export const MetabolicHub: React.FC = () => {
           <PopupSelect label="Триместр 🤰" value={String(trimester)} options={[{id:'0',label:'Нет'},{id:'1',label:'I (0 ккал)'},{id:'2',label:'II (+340) IOM'},{id:'3',label:'III (+452) IOM'}]} onChange={v=> setTrimester(Number(v) as any)} />
           <PopupSelect label="Лактация" value={lactating} options={[{id:'none',label:'Нет'},{id:'exclusive',label:'Эксклюзив +500'},{id:'mixed',label:'Смешанная +400'}]} onChange={v=> setLactating(v as any)} />
           <PopupSelect label="Этничность" value={ethnicity} options={[{id:'european',label:'Европеоид'},{id:'african',label:'Африкан. −5%'},{id:'east_asian',label:'Вост.-азиат. −5%'}]} onChange={v=> setEthnicity(v as any)} />
-          <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background: postBariatric?'rgba(245,158,11,0.10)':'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={postBariatric} onChange={e=> setPostBariatric(e.target.checked)} /> Бариатрия −12% (Knuth)</label>
-          <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background: acclimated?'rgba(6,182,214,0.10)':'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff', gridColumn:'1 / -1' }}><input type="checkbox" checked={acclimated} onChange={e=> setAcclimated(e.target.checked)} /> Акклиматизация 10–14д: пот +15%, Na −40% (Periard)</label>
+          <MhToggle checked={postBariatric} onChange={setPostBariatric} icon="🩺" title="Бариатрия −12%" desc="Knuth" accent="#f59e0b" />
+          <MhToggle checked={acclimated} onChange={setAcclimated} icon="🌡" title="Акклиматизация 10–14д" desc="пот +15%, Na −40% (Periard)" accent="#06b6d4" span />
           {pregAdd > 0 && <div style={{ gridColumn:'1 / -1', fontSize:8, color:'#f9a8d4', background:'rgba(249,168,212,0.08)', border:'1px solid rgba(249,168,212,0.18)', borderRadius:8, padding:'6px 8px' }}>🤰 IOM 2025: +{pregAdd}ккал к TDEE (не к BMR) — мониторинг веса еженедельно</div>}
         </div>
       </div>
@@ -805,18 +849,18 @@ export const MetabolicHub: React.FC = () => {
             { label:'Атлет 90кг', act:()=>{ setWeight(90); setHeight(185); setAge(28); setActivityLevel('medium' as any); setTrainingDays(5); setCardioMin(120); setBodyFat(12); } },
             { label:'Тяж 110кг', act:()=>{ setWeight(110); setHeight(190); setAge(32); setActivityLevel('high' as any); setTrainingDays(6); setCardioMin(150); setBodyFat(18); } },
             { label:'Бикини 55кг', act:()=>{ setWeight(55); setHeight(165); setAge(26); setSex('female' as any); setActivityLevel('medium' as any); setTrainingDays(4); setBodyFat(18); } },
-          ].map(p=> <button key={p.label} onClick={p.act} style={{ padding:'6px 10px', borderRadius:20, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:9, fontWeight:700, cursor:'pointer' }}>{p.label}</button>)}
+          ].map(p=> <button key={p.label} onClick={p.act} className="mh-preset" style={{ padding:'6px 10px', borderRadius:20, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{p.label}</button>)}
         </div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
-          <button onClick={saveScenario} style={{ padding:'6px 12px', borderRadius:8, border:'1px solid rgba(96,165,250,0.18)', background:'rgba(96,165,250,0.10)', color:'#60a5fa', fontSize:9, fontWeight:700, cursor:'pointer' }}>💾 Сохранить сценарий</button>
+          <button onClick={saveScenario} className="mh-act" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(96,165,250,0.18)', background:'rgba(96,165,250,0.10)', color:'#60a5fa', fontSize:10, fontWeight:700, cursor:'pointer' }}>💾 Сохранить сценарий</button>
           {scenarios.length>0 && <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }}>{scenarios.length}/6 · отметь 2 для ⇄ Сравнить</span>}
           <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
             {scenarios.map(sc=>(
               <span key={sc.id} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'4px 6px 4px 8px', borderRadius:20, background: compareIds.includes(sc.id) ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.04)', border: compareIds.includes(sc.id) ? '1px solid rgba(96,165,250,0.25)' : '1px solid rgba(255,255,255,0.06)', fontSize:8, color:'#fff' }}>
-                <input type="checkbox" checked={compareIds.includes(sc.id)} onChange={e=> { const next = e.target.checked ? [...compareIds, sc.id].slice(-2) : compareIds.filter(id=> id!==sc.id); setCompareIds(next); }} />
+                <button type="button" aria-pressed={compareIds.includes(sc.id)} aria-label={`Сравнить: ${sc.name}`} title="Отметить для ⇄ Сравнить" onClick={()=> { const next = compareIds.includes(sc.id) ? compareIds.filter(id=> id!==sc.id) : [...compareIds, sc.id].slice(-2); setCompareIds(next); }} className="mh-compare" data-on={compareIds.includes(sc.id) ? 'true' : 'false'} style={{ width:30, height:30, borderRadius:'50%', border: compareIds.includes(sc.id) ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.12)', background: compareIds.includes(sc.id) ? 'rgba(96,165,250,0.18)' : 'rgba(255,255,255,0.04)', color: compareIds.includes(sc.id) ? '#60a5fa' : 'rgba(255,255,255,0.45)', fontSize:12, fontWeight:800, cursor:'pointer', flexShrink:0 }}>{compareIds.includes(sc.id) ? '✓' : '○'}</button>
                 {sc.name}
-                <button onClick={()=> loadScenario(sc.id)} style={{ padding:'2px 6px', borderRadius:10, border:'none', background:'#60a5fa', color:'#000', fontSize:8, fontWeight:700, cursor:'pointer' }}>▶</button>
-                <button onClick={()=> deleteScenario(sc.id)} style={{ width:18, height:18, borderRadius:10, border:'none', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8, cursor:'pointer' }}>✕</button>
+                <button onClick={()=> loadScenario(sc.id)} aria-label={`Загрузить ${sc.name}`} className="mh-mini" style={{ padding:'8px 10px', minHeight:40, minWidth:44, borderRadius:10, border:'none', background:'#60a5fa', color:'#000', fontSize:10, fontWeight:700, cursor:'pointer' }}>▶</button>
+                <button onClick={()=> deleteScenario(sc.id)} aria-label={`Удалить ${sc.name}`} className="mh-mini" style={{ minWidth:40, minHeight:40, borderRadius:10, border:'none', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:11, cursor:'pointer' }}>✕</button>
               </span>
             ))}
           </div>
@@ -836,7 +880,7 @@ export const MetabolicHub: React.FC = () => {
           <PopupSelect label="Белок DIAAS" value={proteinSource} options={[{id:'mixed',label:'Смешанный 0.95'},{id:'whey',label:'Whey 1.09'},{id:'milk',label:'Молоко 1.14'},{id:'egg',label:'Яйцо 1.13'},{id:'beef',label:'Говядина 1.10'},{id:'chicken',label:'Курица 1.08'},{id:'fish',label:'Рыба 1.05'},{id:'casein',label:'Казеин 1.12'},{id:'soy',label:'Соя 0.90'},{id:'pea',label:'Горох 0.58'},{id:'rice',label:'Рис 0.59'},{id:'blend_plant',label:'Бленд 0.75'}]} onChange={setProteinSource} />
           <PopupSelect label="Цель" value={goal} options={[{id:'cut',label:'Сушка −18% TDEE'},{id:'maintain',label:'Поддержание'},{id:'bulk',label:'Масса +10%'},{id:'health',label:'🩸 Здоровье (EA)'}]} onChange={v=> setGoal(v as any)} />
           <PopupNumber label="Цель вес, кг" value={targetWeight ?? weight} min={35} max={200} onChange={v=> setTargetWeight(v)} />
-          <PopupNumber label="Креатин?" value={creatineUse?1:0} min={0} max={1} onChange={v=> setCreatineUse(v===1)} />
+          <MhToggle checked={creatineUse} onChange={setCreatineUse} icon="💊" title="Креатин 5 г/сут" desc="сила · масса · вода в мышцах" accent="#84cc16" />
         </div>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, lineHeight:1.35 }}>
           BMR: {kbju.nat.method==='cunningham'?'Cunningham': kbju.nat.method==='ten_haaf'?'TenHaaf': kbju.nat.method==='owen'?'Owen': kbju.nat.method==='katch_mcardle'?'Katch-McArdle':'Mifflin'} · {kbju.nat.bmr}ккал · PAL {kbju.nat.pal.toFixed(2)} (pro {palPro.toFixed(2)}) · TDEE {stepsCalc.tdeeNat} · TEF {kbju.tefNat}ккал · DIAAS {proteinPro.diaas} leuc {proteinPro.leucinePerMeal}г (60+ ceiling {proteinPro.ceiling})
@@ -865,7 +909,7 @@ export const MetabolicHub: React.FC = () => {
         <div style={{ marginTop:6 }}>
           <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.55)', marginBottom:4 }}>Расписание (plain-English):</div>
           <textarea value={scheduleText} onChange={e=> setScheduleText(e.target.value)} placeholder="пн: силовая 1ч, вт: бег 0.5ч, чт: силовая 1ч, сб: ходьба 1ч" style={{ width:'100%', minHeight:48, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:9, padding:'8px 10px', resize:'vertical' }} />
-          {parsedSchedule && <div style={{ fontSize:8, color:'#22c55e', marginTop:4 }}>Распознано: {parsedSchedule.map(s=>`${s.key} ${s.hours}ч`).join(', ')} → {scheduleMetHours} MET-ч/нед → PAL +{(scheduleMetHours*0.0067).toFixed(2)} <button onClick={()=> setMetHoursPerWeek(scheduleMetHours)} style={{ marginLeft:6, padding:'2px 6px', borderRadius:6, border:'1px solid rgba(34,197,94,0.18)', background:'rgba(34,197,94,0.10)', color:'#22c55e', fontSize:8, cursor:'pointer' }}>→ Применить</button></div>}
+          {parsedSchedule && <div style={{ fontSize:8, color:'#22c55e', marginTop:4 }}>Распознано: {parsedSchedule.map(s=>`${s.key} ${s.hours}ч`).join(', ')} → {scheduleMetHours} MET-ч/нед → PAL +{(scheduleMetHours*0.0067).toFixed(2)} <button onClick={()=> setMetHoursPerWeek(scheduleMetHours)} className="mh-mini" style={{ marginLeft:6, padding:'8px 10px', minHeight:40, borderRadius:8, border:'1px solid rgba(34,197,94,0.18)', background:'rgba(34,197,94,0.10)', color:'#22c55e', fontSize:10, fontWeight:700, cursor:'pointer' }}>→ Применить</button></div>}
         </div>
         <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>
           {metHoursPerWeek ? `MET ${metHoursPerWeek}ч/нед → честный PAL ${stepsCalc.pal.toFixed(2)} (Ainsworth) · PALpro ${palPro.toFixed(2)} (профессия ${profession} ${PROFESSION_PAL[profession]})` : 'Подсказка: 3× силовая 6 MET ×1ч =18 MET-ч/нед → +0.12 PAL. Парсер v2 понимает км и 2×, EN+RU, 60 активностей.'}
@@ -962,7 +1006,7 @@ export const MetabolicHub: React.FC = () => {
           <PopupNumber label="JP3 сумма, мм" value={skinfoldSum3 ?? 30} min={8} max={150} onChange={v=> setSkinfoldSum3(v||undefined)} />
           <PopupNumber label="Durnin 4 сумма, мм" value={skinfoldSum4 ?? 40} min={10} max={200} onChange={v=> setSkinfoldSum4(v||undefined)} />
           <PopupNumber label="BIA R, Ом" value={biaResistance ?? 500} min={350} max={900} onChange={v=> setBiaResistance(v||undefined)} />
-          <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background: untreatedHypo?'rgba(245,158,11,0.10)':'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={untreatedHypo} onChange={e=> setUntreatedHypo(e.target.checked)} /> Нелечёный гипотиреоз (BMR −12%)</label>
+          <MhToggle checked={untreatedHypo} onChange={setUntreatedHypo} icon="🦋" title="Нелечёный гипотиреоз" desc="BMR −12%" accent="#f59e0b" />
           <PopupNumber label="SFA, г/сут" value={sfaG ?? 25} min={5} max={80} onChange={v=> setSfaG(v||undefined)} />
           <PopupNumber label="ТГ, мг/дл" value={tgMgDl2 ?? 120} min={40} max={400} onChange={v=> setTgMgDl2(v||undefined)} />
           <PopupNumber label="GGT, Ед/л" value={ggt ?? 25} min={8} max={150} onChange={v=> setGgt(v||undefined)} />
@@ -1035,9 +1079,8 @@ export const MetabolicHub: React.FC = () => {
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <div style={{ gridColumn:'1 / -1', display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
             {['Травмы (частые)','Болезни (частые)','ЖКТ вздутие','ЖКТ газы','Менстр. нарушения','Усталость','Настроение','Сон'].map((q,i)=>(
-              <label key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', borderRadius:8, background: leafAnswers[i] ? 'rgba(6,182,214,0.12)' : 'rgba(255,255,255,0.03)', border:`1px solid ${leafAnswers[i] ? 'rgba(6,182,214,0.18)' : 'rgba(255,255,255,0.06)'}`, fontSize:8, color:'#fff' }}>
-                <input type="checkbox" checked={leafAnswers[i]} onChange={e=> { const next=[...leafAnswers]; next[i]=e.target.checked; setLeafAnswers(next); setLeafScore(next.filter(Boolean).length*2); }} /> {q}
-              </label>
+              <MhToggle key={i} compact checked={leafAnswers[i]} accent="#06b6d4" title={q}
+                onChange={v=> { const next=[...leafAnswers]; next[i]=v; setLeafAnswers(next); setLeafScore(next.filter(Boolean).length*2); }} />
             ))}
             <div style={{ gridColumn:'1 / -1', fontSize:8, color: leafCalc.risk==='high'?'#ef4444': leafCalc.risk==='moderate'?'#f59e0b':'#22c55e', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px', textAlign:'center' }}>LEAF {leafCalc.score}/16 — {leafCalc.note} (чекбоксы ×2 балла)</div>
           </div>
@@ -1046,18 +1089,17 @@ export const MetabolicHub: React.FC = () => {
           <div style={{ gridColumn:'1 / -1', display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
             <div style={{ fontSize:8, fontWeight:800, color:'rgba(255,255,255,0.55)', gridColumn:'1 / -1' }}>LEAM-Q lite (М, Lundy 2022):</div>
             {['Либидо ↓','Утр. эрекция нет','Усталость','Переломы','Вес ↓','Настроение ↓'].map((q,i)=>(
-              <label key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 8px', borderRadius:8, background: leamAnswers[i] ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)', border:`1px solid ${leamAnswers[i] ? 'rgba(249,115,22,0.25)' : 'rgba(255,255,255,0.06)'}`, fontSize:8, color:'#fff' }}>
-                <input type="checkbox" checked={leamAnswers[i]} onChange={e=> { const next=[...leamAnswers]; next[i]=e.target.checked; setLeamAnswers(next); }} /> {q}
-              </label>
+              <MhToggle key={i} compact checked={leamAnswers[i]} accent="#f97316" title={q}
+                onChange={v=> { const next=[...leamAnswers]; next[i]=v; setLeamAnswers(next); }} />
             ))}
             <div style={{ gridColumn:'1 / -1', fontSize:8, color: leamCalc.risk==='high'?'#ef4444': leamCalc.risk==='moderate'?'#f59e0b':'#22c55e', textAlign:'center' }}>LEAM {leamCalc.score}/12 — {leamCalc.note}</div>
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-            <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={boneFlag} onChange={e=> setBoneFlag(e.target.checked)} /> Стресс-перелом</label>
-            <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={menstrualFlag} onChange={e=> setMenstrualFlag(e.target.checked)} /> Аменорея</label>
-            <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={lowT} onChange={e=> setLowT(e.target.checked)} /> Тесто низкое (М)</label>
-            <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={lowBMD} onChange={e=> setLowBMD(e.target.checked)} /> BMD T&lt;−1</label>
-            <label style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff' }}><input type="checkbox" checked={t3Low} onChange={e=> setT3Low(e.target.checked)} /> T3 низкий (secondary)</label>
+            <MhToggle checked={boneFlag} onChange={setBoneFlag} icon="🦴" title="Стресс-перелом" accent="#ef4444" />
+            <MhToggle checked={menstrualFlag} onChange={setMenstrualFlag} icon="🌸" title="Аменорея" accent="#f472b6" />
+            <MhToggle checked={lowT} onChange={setLowT} icon="📉" title="Тесто низкое (М)" accent="#f59e0b" />
+            <MhToggle checked={lowBMD} onChange={setLowBMD} icon="🦷" title="BMD T<−1" accent="#a78bfa" />
+            <MhToggle checked={t3Low} onChange={setT3Low} icon="🦋" title="T3 низкий" desc="secondary" accent="#38bdf8" />
           </div>
         </div>
         <div style={{ marginTop:6, fontSize:8, color:'rgba(255,255,255,0.45)' }}>EA {ea?.ea ?? '—'} · RMR ratio {measuredRMR && kbju.nat.bmr ? (measuredRMR/kbju.nat.bmr).toFixed(2):'—'} (&lt;0.90 = primary-флаг) · скрининг, не диагноз.</div>
@@ -1093,9 +1135,9 @@ export const MetabolicHub: React.FC = () => {
           </div>
         </div>
         <div style={{ marginTop:6, display:'flex', gap:6, flexWrap:'wrap' }}>
-          <button onClick={()=> { setHct(undefined); setHgb(undefined); setFerritin(undefined); setGfr(undefined); showToast('Лабы сброшены — подтянутся из профиля'); }} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.65)', fontSize:9, fontWeight:600, cursor:'pointer' }}>⟲ Сброс лаб</button>
-          <button onClick={recordHct} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(56,165,250,0.18)', background:'rgba(56,165,250,0.10)', color:'#38bdf8', fontSize:9, fontWeight:700, cursor:'pointer' }}>📌 Записать HCT</button>
-          <button onClick={recordDonation} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(239,68,68,0.18)', background:'rgba(239,68,68,0.10)', color:'#ef4444', fontSize:9, fontWeight:700, cursor:'pointer' }}>🩸 Донация сегодня</button>
+          <button onClick={()=> { setHct(undefined); setHgb(undefined); setFerritin(undefined); setGfr(undefined); showToast('Лабы сброшены — подтянутся из профиля'); }} className="mh-act" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.65)', fontSize:10, fontWeight:600, cursor:'pointer' }}>⟲ Сброс лаб</button>
+          <button onClick={recordHct} className="mh-act" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(56,165,250,0.18)', background:'rgba(56,165,250,0.10)', color:'#38bdf8', fontSize:10, fontWeight:700, cursor:'pointer' }}>📌 Записать HCT</button>
+          <button onClick={recordDonation} className="mh-act" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(239,68,68,0.18)', background:'rgba(239,68,68,0.10)', color:'#ef4444', fontSize:10, fontWeight:700, cursor:'pointer' }}>🩸 Донация сегодня</button>
           <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)', alignSelf:'center' }}>ESC &gt;52% (м)/48% (ж), флеботомия &gt;54%.</span>
         </div>
         {hctHistory.length>0 && (
@@ -1183,8 +1225,8 @@ export const MetabolicHub: React.FC = () => {
 
       <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {MODE_DEFS.map(({m,label,icon,desc,accent,evidence})=> (
-          <button key={m} onClick={()=> setMode(m)} title={`${desc} · ${evidence}`} style={{
-            flex:'0 0 auto', display:'flex', alignItems:'center', gap:4, padding:'7px 10px', borderRadius:20, cursor:'pointer', fontSize:10, fontWeight:800, whiteSpace:'nowrap',
+          <button key={m} onClick={()=> setMode(m)} title={`${desc} · ${evidence}`} aria-pressed={mode===m} className="mh-mode" style={{
+            flex:'0 0 auto', display:'flex', alignItems:'center', gap:4, padding:'7px 10px', borderRadius:20, cursor:'pointer', fontSize:10, fontWeight:800, whiteSpace:'nowrap', minHeight:40,
             border: mode===m ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.08)',
             background: mode===m ? `${accent}18` : 'rgba(255,255,255,0.04)',
             color: mode===m ? accent : '#fff', transition:'all 0.16s',
@@ -1322,8 +1364,8 @@ export const MetabolicHub: React.FC = () => {
                 </div>
               )}
               <div style={{ marginTop:6, display:'flex', gap:6 }}>
-                <button onClick={applyKBJU} style={{ flex:1, padding:10, borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#f59e0b,#d97706)', color:'#000', fontWeight:800, fontSize:11 }}>🍽 Применить к плану питания → буфер</button>
-                <button onClick={()=> { const s = onAAS? kbju.aas:kbju.nat; const t=`КБЖУ ${s.kcal} Б${s.p} Ж${s.f} У${s.c} (P${s.protPerKg})`; navigator.clipboard?.writeText(t).then(()=> showToast('Скопировано: '+t)).catch(()=> showToast(t)); }} style={{ padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>⎘ Копировать</button>
+                <button onClick={applyKBJU} className="mh-act" style={{ flex:1, padding:'12px 10px', minHeight:48, borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#f59e0b,#d97706)', color:'#000', fontWeight:800, fontSize:12 }}>🍽 Применить к плану питания → буфер</button>
+                <button onClick={()=> { const s = onAAS? kbju.aas:kbju.nat; const t=`КБЖУ ${s.kcal} Б${s.p} Ж${s.f} У${s.c} (P${s.protPerKg})`; void shareOrCopyText('КБЖУ из Метаболики', t).then(ok => showToast(ok ? 'Скопировано: '+t : t)); }} className="mh-act" style={{ padding:'12px', minHeight:48, minWidth:48, borderRadius:12, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>⎘ Копировать</button>
               </div>
               <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.45)', lineHeight:1.35 }}>Буфер: <code style={{ background:'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:5, color:'#fff' }}>he_planner_kbju_suggestion</code> — планировщик подхватит как подсказку. Потолок У — 5г/кг (6 на ААС, ≤8 с инсулином) — из `planner-targets`.</div>
             </div>
@@ -1437,7 +1479,7 @@ export const MetabolicHub: React.FC = () => {
                 {hematology.recommendations.map((r,i)=>(<span key={i}>• {r}<br/></span>))}
               </div>
               <div style={{ marginTop:6, display:'flex', gap:6 }}>
-                <button onClick={()=> { const txt=`HCT ${hematology.hct}% — ${hematology.zoneLabel}. Вода ${hematology.waterTargetMl}мл (${hematology.mlPerKg}мл/кг), ${hematology.ironRecLabel}, ${hematology.donation.text}`; navigator.clipboard?.writeText(txt).then(()=> showToast('Скопировано: '+txt)).catch(()=> showToast(txt)); }} style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700, fontSize:10, cursor:'pointer' }}>⎘ Копировать сводку</button>
+                <button onClick={()=> { const txt=`HCT ${hematology.hct}% — ${hematology.zoneLabel}. Вода ${hematology.waterTargetMl}мл (${hematology.mlPerKg}мл/кг), ${hematology.ironRecLabel}, ${hematology.donation.text}`; void shareOrCopyText('HCT-сводка', txt).then(ok => showToast(ok ? 'Скопировано: '+txt : txt)); }} className="mh-act" style={{ flex:1, padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>⎘ Копировать сводку</button>
                 <button onClick={()=> {
                   const payload={ hct: hematology.hct, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, ts: Date.now(), source:'metabolic-hub-hematology' };
                   try{ localStorage.setItem('he_hematology_advice', JSON.stringify(payload)); window.dispatchEvent(new CustomEvent('he-hematology-advice', {detail: payload})); showToast(`Сохранено he_hematology_advice: HCT ${hematology.hct}% → ${hematology.zoneLabel}`); }catch{ showToast('Сохранено'); }
@@ -1447,15 +1489,15 @@ export const MetabolicHub: React.FC = () => {
                 <button onClick={()=>{
                   try{
                     const html=`<!doctype html><html><head><meta charset="utf-8"><title>Гематология — ${hematology.hct ?? '—'}%</title><style>body{font-family:system-ui;padding:24px;color:#111}h1{font-size:18px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px 8px;font-size:12px}th{background:#f5f5f5;text-align:left}.badge{padding:2px 6px;border-radius:6px;color:#fff;font-weight:700;font-size:11px}</style></head><body><h1>🩸 Гематокрит — сводка PRO</h1><p>Дата: ${new Date().toLocaleString('ru-RU')} · Вес ${weight}кг · Пол ${sex} · ААС ${onAAS? aasDose+'мг': 'нет'}</p><table><tr><th>Показатель</th><th>Значение</th></tr><tr><td>HCT</td><td><span class="badge" style="background:${hematology.color}">${hematology.hct ?? '—'}% — ${hematology.zoneLabel}</span></td></tr><tr><td>HGB (оценка)</td><td>${hematology.hgbEstimated ?? '—'} г/л</td></tr><tr><td>Вода цель</td><td>${hematology.waterTargetMl} мл (${hematology.mlPerKg} мл/кг) ${hematology.waterAdjMl? `+${hematology.waterAdjMl} к базе`:''} · факт ${waterL}л</td></tr><tr><td>Железо</td><td>${hematology.ironRecLabel}</td></tr><tr><td>Донация</td><td>${hematology.donation.text} k=${hematology.donation.k}</td></tr><tr><td>Вязкость</td><td>${hematology.viscosityFlag? '⚠ гипервязкость':'OK'} · GFR ${gfr ?? '—'} ${hematology.gfrFlag? '⚠ &lt;60':''} · ферритин ${ferritin ?? '—'} ${hematology.ferritinFlag? '⚠ &lt;30':''}</td></tr><tr><td>Питание×гематология</td><td>×${hematology.nutritionMult} · PRAL ${hematology.pralNote}</td></tr></table><h3>Рекомендации</h3><ul>${hematology.recommendations.map(r=>`<li>${r}</li>`).join('')}</ul><p style="font-size:10px;color:#666">Источники: ESC 2023 эритроцитоз &gt;52% (м)/48% (ж), ASA флеботомия &gt;54%, lab-tier-recommendations, PROCEDURE_DB k0.30/0.45. Дисклеймер: не назначение — к гематологу + JAK2 при HCT&gt;52%.</p><script>window.print()</`+`script></body></html>`;
-                    const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); } else showToast('Всплывающие окна заблокированы');
+                    void printPlanHtml('Гематокрит — сводка PRO', html);
                   }catch{ showToast('Печать: открой HCT вкладку'); }
-                }} style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:10, cursor:'pointer' }}>🖨 Печать / PDF</button>
+                }} className="mh-act" style={{ flex:1, padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>🖨 Печать / PDF</button>
                 <button onClick={()=>{
                   try{
                     const data={ date: new Date().toISOString().slice(0,10), weight, sex, onAAS, aasDose, hct: hematology.hct, hgb: hematology.hgbEstimated, gfr, ferritin, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, zone: hematology.zone, recommendations: hematology.recommendations, nutritionMult: hematology.nutritionMult };
-                    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`hematology-${data.date}.json`; a.click(); URL.revokeObjectURL(url); showToast('JSON экспортирован');
+                    void downloadCoachFile(JSON.stringify(data,null,2), `hematology-${data.date}.json`).then(ok => showToast(ok ? 'JSON экспортирован' : 'Экспорт'));
                   }catch{ showToast('Экспорт'); }
-                }} style={{ padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:10, cursor:'pointer' }}>⬇ JSON</button>
+                }} className="mh-act" style={{ padding:'10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>⬇ JSON</button>
               </div>
               <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.45)', lineHeight:1.35 }}>Зоны: &lt;48 норма · 48-51 внимание · 51-54 донация · &gt;54 стоп ААС · &gt;60 критично. Источник: ESC 2023, ASA флеботомия, lab-tier-recommendations. Дисклеймер: не назначение — к гематологу + JAK2 при HCT&gt;52%.</div>
             </div>

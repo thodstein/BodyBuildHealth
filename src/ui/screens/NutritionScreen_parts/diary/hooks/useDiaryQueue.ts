@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { type OFFProduct, productToFoodItem } from '../../../../../engines/openfoodfacts.engine';
 import { fillMissingMicros, parseNutritionText, quantityToGrams, findFood } from '../../../../../engines/nutrition-ocr-parser';
 import { processUploadedFile } from '../../../../../core/ocr-engine';
+import { isCapacitorNative } from '../../../../../core/app-platform';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { type DiaryItem, type FoodItemLike } from '../../types';
 import { readJSONArr } from '../../diary-storage-v2';
@@ -91,17 +92,23 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
     }
     let backup: number | undefined;
     let hard: number | undefined;
+    // АПК: серверный OCR недоступен, работает оффлайн-tesseract (до ~90с) —
+    // таймауты гонки шире, иначе оффлайн-путь внутри processUploadedFile убивается раньше.
+    const nativeOcr = isCapacitorNative();
+    const raceMs = nativeOcr ? 120_000 : 45_000;
+    const backupMs = nativeOcr ? 130_000 : 50_000;
+    const hardMs = nativeOcr ? 140_000 : 55_000;
     const backupPromise = new Promise<never>((_, reject) => {
-      backup = window.setTimeout(() => reject(new Error('Превышено время ожидания (50с). Попробуйте скриншот экрана вместо фото камеры.')) as any, 50_000);
+      backup = window.setTimeout(() => reject(new Error(nativeOcr ? 'Превышено время ожидания (120с). Попробуйте фото меньше/чётче.' : 'Превышено время ожидания (50с). Попробуйте скриншот экрана вместо фото камеры.')) as any, backupMs);
     });
     hard = window.setTimeout(() => {
       setOcrFileLoading(false);
-      setOcrError(prev => (prev as any) || 'Зависло на телефоне. Попробуйте кнопку «Фото/файл» → выберите скриншот из галереи (не «Камера»).');
-    }, 55_000) as any;
+      setOcrError(prev => (prev as any) || (nativeOcr ? 'Зависло на телефоне. Попробуйте фото при хорошем свете или вставьте текст вручную через «Текст».' : 'Зависло на телефоне. Попробуйте кнопку «Фото/файл» → выберите скриншот из галереи (не «Камера»).'));
+    }, hardMs) as any;
     try {
       const result: any = await Promise.race([
         processUploadedFile(file),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), 45_000)),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(nativeOcr ? 'Оффлайн-распознавание не ответило за 120 секунд.' : 'Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), raceMs)),
         backupPromise,
       ]);
       setOcrText(result.text || '');

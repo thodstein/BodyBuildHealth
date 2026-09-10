@@ -1,5 +1,15 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Питание под АПК: выдача/сканер/OCR/тоглы метаболики (Sep 10 2026, НЕ пушить — очередь чужих)
+
+Три задачи одним заходом. Только подача/маршруты, движки/строки 1-в-1 (TG/web — байт-в-байт, АПК-дожим в §96).
+
+- **Ч1 кнопки выдачи** (`planner-day-print.ts` NEW `shareOrCopyText/printPlanHtml/downloadCoachFile`: native → `native-bridge` Share/Documents+Share, web — clipboard/print/Blob как было): IndividualPlanResults — копировать/импорт/печать меню/файл тренеру/печать отчёта/таймлайн/корзина/сохранённые (микро 7px → 44px + `aria-label` + хуки `plan-actbtn/plan-mini/plan-mact`); PeakWeekTab-сводка → Share; MetabolicHub — PDF/всё-PDF/HCT-печать/JSON/KBJU-копии → те же маршруты; ReportsTab `alert` → toast-с-фолбэком.
+- **Ч2 сканер+еда** (`BarcodeScanner.tsx`): NEW «📷 Снять камерой» только native — `pickPhoto()` (системный диалог) + `Html5Qrcode.scanFile` через скрытый holder, дальше цепочка OFF/retail 1-в-1; живой стрим без изменений; ошибка камеры на native советует фото-кнопку. `AddFoodPanel`: плитка «Фото» на native перехватывается в `pickPhoto()` → File → тот же `onOcrFile`. OCR: NEW `recognizeImageTextOffline` (`ocr-engine.ts`, локальный tesseract rus+eng из бандла) в ветке падения сервера + широкие таймауты гонки на native (45→120с) в `useDiaryQueue`.
+- **Ч3 метаболика** (`MetabolicHub.tsx`): NEW `MhToggle` (role=switch + трек-тамб + `data-on`, 52/44px) — все 11 чекбокс-точек (бариатрия/акклиматизация/сравнение-сценариев/гипо/8 LEAF/6 LEAM/5 CAT2) → карточки, `input[type=checkbox]`/`select` в файле — 0 (проверено grep); креатин-костыль PopupNumber 0/1 → тогл; пресеты/сценарии/режимы/AAS/лабы — 44px + aria (`mh-*` хуки); селекты/числа и так были попапами (PopupSelect/PopupNumber) — не тронуты.
+- **Поймано своё**: дважды чуть не сломал соседний код точечной заменой (stopScanner-склейка, импорт ModernHero) — чинено сразу с перепроверкой чтением; PS-redirect в файл даёт UTF-16 — для сверок только `git diff`/Read.
+- **Проверено**: NEW `planner-apk-actions` 6/6 (мост замокан, web/native-ветки) + `metabolic-hub-toggles` 5/5 (0 чекбоксов, флип aria, 16 режимов, хуки) + `barcode-scanner-native` 2/2 + круг nutrition-native 12/12 + hubs-deep 5/5 + apk-top-pack 31/31 + diary-pro 22/22 + recipe/day-print 14/14 + metabolic-hub engine 121/121, `verify:apk-design` OK, `tsc --noEmit` **0 по проекту**. Коммит pathspec своих (3 NEW теста включены), без пуша.
+
 ## Циклы: полный аудит всех циклов и путей выдачи — Ф1-Ф5 закрыты (Sep 10 2026, НЕ пушить — очередь чужих)
 
 Выполнение `docs/CYCLE-SYSTEM-FULL-AUDIT-PLAN.md` по команде «выполняй полностью». Реестр: 121 LMS (+11 новых) + 19 ARM + 15 SS. Финальные прогоны: **bb 189 файлов / 2142 тестов — 0 падений**, **engines/__tests__ 2817/2818** (единственное — чужой предсуществующий `bb-macrocycle` v7, замыкание lms/macrocycle, доказано stash), **tsc --noEmit 0 по проекту**.

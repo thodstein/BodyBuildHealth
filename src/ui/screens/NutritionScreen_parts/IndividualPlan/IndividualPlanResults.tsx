@@ -15,7 +15,7 @@ import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 import { MealQuickControls } from "./MealQuickControls";
 import { readDiaryV2 } from "../diary-storage-v2";
-import { buildDayReportPrintHtml, printDayReport, buildMealTimelinePrintHtml, printMealTimeline, buildRecipePlanPrintHtml, buildCoachExportHtml, downloadCoachExport } from "./planner-day-print";
+import { buildDayReportPrintHtml, buildMealTimelinePrintHtml, buildRecipePlanPrintHtml, buildCoachExportHtml, shareOrCopyText, printPlanHtml, downloadCoachFile } from "./planner-day-print";
 import { buildDayBriefing } from "./planner-briefing";
 
 const getDiaryEntriesForDate = (date: string): any[] => {
@@ -518,21 +518,21 @@ const doImportPlan = (raw: string): boolean => {
             }}>📅 {planView === 'calendar' ? 'Список' : 'Календарь'}</button>
           )}
           {planDays !== 1 && !monthPlanMode && (
-            <button onClick={() => generatePlan(planDays, undefined, undefined, { async: true })} style={{ marginTop: 0, marginBottom:6, padding: '8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>
+            <button onClick={() => generatePlan(planDays, undefined, undefined, { async: true })} className="plan-actbtn" style={{ marginTop: 0, marginBottom:6, padding: '10px 8px', minHeight:44, borderRadius: 10, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 11, fontWeight: 700, width: '100%' }}>
               {planBusy ? '⏳ Генерация…' : `🔄 Перегенерировать ${planDays === 3 ? '3 дня' : 'неделю'}`}
             </button>
           )}
           {monthPlanMode && monthPlan.length > 0 && (
-            <button onClick={runMonthPlan} style={{ marginTop: 0, marginBottom:6, padding: '8px', borderRadius: 8, border: '1px solid rgba(168,85,247,0.25)', background: 'rgba(168,85,247,0.06)', color: '#a78bfa', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>
+            <button onClick={runMonthPlan} className="plan-actbtn" style={{ marginTop: 0, marginBottom:6, padding: '10px 8px', minHeight:44, borderRadius: 10, border: '1px solid rgba(168,85,247,0.25)', background: 'rgba(168,85,247,0.06)', color: '#a78bfa', cursor: 'pointer', fontSize: 11, fontWeight: 700, width: '100%' }}>
               🔄 Перегенерировать месяц (4 недели)
             </button>
           )}
           <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
             <button onClick={() => {
               const txt = dayPlan ? `🍽 План питания\n${(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any) => `${m.time} ${m.label}: ${(Array.isArray(m.items) ? m.items : []).map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals?.kcal || 0)} ккал, Б${Math.round(dayPlan.totals?.p || 0)}/Ж${Math.round(dayPlan.totals?.f || 0)}/У${Math.round(dayPlan.totals?.c || 0)}, клетчатка ${Math.round(dayPlan.totals?.fiber||0)}г${(dayPlan as any).healthScore ? `\n\n🩺 Health-score: ${(dayPlan as any).healthScore.score}/100 (${(dayPlan as any).healthScore.status}) — микро ${(dayPlan as any).healthScore.micro}/клетч ${(dayPlan as any).healthScore.fiber}/MPS ${(dayPlan as any).healthScore.mps}/EA ${(dayPlan as any).healthScore.ea}/диверс ${(dayPlan as any).healthScore.diversity}` : ''}${(dayPlan as any).energyAvailability ? `\n⚡ EA: ${(dayPlan as any).energyAvailability.ea} ккал/кг FFM (${(dayPlan as any).energyAvailability.status})` : ''}${(dayPlan as any).menstrualPhaseNote ? `\n🌸 ${(dayPlan as any).menstrualPhaseNote}` : ''}${(dayPlan as any).categoryNote ? `\n🏋 ${(dayPlan as any).categoryNote}` : ''}${(dayPlan as any).redSNote ? `\n⚠️ ${(dayPlan as any).redSNote}` : ''}${(dayPlan as any).peakWeekNote ? `\n🏆 ${(dayPlan as any).peakWeekNote}` : ''}` : '';
-              try { void (navigator.clipboard?.writeText(txt)?.catch(() => setErrorMsg('Не удалось скопировать план.'))); } catch { setErrorMsg('Не удалось скопировать план.'); }
-            }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>📤 Копировать</button>
-            <button onClick={() => setImportModalOpen(true)} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:10, fontWeight:600 }}>📥 Импорт</button>
+              void shareOrCopyText('План питания', txt).then(ok => { if (!ok) setErrorMsg('Не удалось скопировать план.'); });
+            }} className="plan-actbtn" style={{ flex:1, padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:11, fontWeight:700 }}>📤 Копировать</button>
+            <button onClick={() => setImportModalOpen(true)} className="plan-actbtn" style={{ flex:1, padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:11, fontWeight:700 }}>📥 Импорт</button>
           </div>
         </GlassCard>
       </>)}
@@ -1226,7 +1226,7 @@ const doImportPlan = (raw: string): boolean => {
       )}
 
       {generated && undoStack.length > 0 && (
-        <button onClick={() => undoLast()} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>
+        <button onClick={() => undoLast()} className="plan-actbtn" style={{ width:'100%', padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:11, fontWeight:700 }}>
           ↩ Отменить ({undoStack.length})
         </button>
       )}
@@ -1291,7 +1291,7 @@ const doImportPlan = (raw: string): boolean => {
         </GlassCard>
       )}
 
-      <button onClick={() => setShowRecipeCreator(true)} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:9, fontWeight:600, marginTop:4 }}>
+      <button onClick={() => setShowRecipeCreator(true)} className="plan-actbtn" style={{ width:'100%', padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:11, fontWeight:700, marginTop:4 }}>
         🍳 Создать свой рецепт
       </button>
       {showRecipeCreator && (
@@ -1365,14 +1365,14 @@ const doImportPlan = (raw: string): boolean => {
             return (
               <>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                  <button onClick={() => { allItems.forEach((i: any) => addToCart({ name: i.name, kcal: i.kcal || 0, amount: i.amount, category: i.catLabel || i.category })); }} style={{ flex:1, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>
+                  <button onClick={() => { allItems.forEach((i: any) => addToCart({ name: i.name, kcal: i.kcal || 0, amount: i.amount, category: i.catLabel || i.category })); }} className="plan-actbtn" style={{ flex:1, padding: '10px', minHeight:44, borderRadius: 10, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
                     🛒 В корзину ({totalItems})
                   </button>
                   <div style={{ padding: '5px 8px', borderRadius: 8, background: checkedCount === totalItems && totalItems > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(0,230,138,0.06)', border: checkedCount === totalItems && totalItems > 0 ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(0,230,138,0.15)', color: checkedCount === totalItems && totalItems > 0 ? '#22c55e' : '#00e68a', fontSize: 8, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                     💰 ~{estCost * 100}₽
                   </div>
-                  <button onClick={() => { try { void navigator.clipboard?.writeText(exportText).catch(() => setErrorMsg('Не удалось скопировать список покупок.')); } catch { setErrorMsg('Не удалось скопировать список покупок.'); } }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>📋</button>
-                  {checkedCount > 0 && <button onClick={() => { try { localStorage.setItem('he_shopping_checked', '[]'); } catch {} setChecked(new Set()); }} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', cursor: 'pointer', fontSize: 8, fontWeight: 600 }}>✕ Сброс</button>}
+                  <button aria-label="Скопировать список покупок" onClick={() => { void shareOrCopyText('Список покупок', exportText).then(ok => { if (!ok) setErrorMsg('Не удалось скопировать список покупок.'); }); }} className="plan-mini" style={{ padding: '10px 12px', minHeight:44, minWidth:44, borderRadius: 10, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>📋</button>
+                  {checkedCount > 0 && <button aria-label="Сбросить отметки" onClick={() => { try { localStorage.setItem('he_shopping_checked', '[]'); } catch {} setChecked(new Set()); }} className="plan-mini" style={{ padding: '10px 12px', minHeight:44, minWidth:44, borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>✕ Сброс</button>}
                 </div>
                 {checkedCount > 0 && <div style={{marginBottom:6,height:4,borderRadius:2,background:'rgba(255,255,255,0.06)',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(checkedCount/totalItems*100)}%`,borderRadius:2,background:'#22c55e',transition:'width 0.3s'}}/></div>}
                 {(shoppingList as any)._diversity && <div style={{marginBottom:6,fontSize:9,color:((shoppingList as any)._diversity.score >= 7 ? '#22c55e' : '#f59e0b'),fontWeight:600}}>🌈 Разнообразие: {((shoppingList as any)._diversity.uniqueFoods)} видов продуктов · {((shoppingList as any)._diversity.note)}</div>}
@@ -1400,7 +1400,7 @@ const doImportPlan = (raw: string): boolean => {
                               {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
                               {data.buyAmount && data.buyAmount !== Math.round(data.amount) && <span style={{ color: '#60a5fa' }}> · купить {data.buyAmount >= 1000 ? `${(data.buyAmount / 1000).toFixed(1)} кг` : `${Math.round(data.buyAmount)} г`}</span>}
                             </span>
-                            <button onClick={() => addToCart({ name: data.name, kcal: data.kcal || 0, amount: data.amount, category: data.catLabel || data.category })} style={{ padding: '2px 4px', borderRadius: 4, border: 'none', background: 'rgba(249,115,22,0.12)', color: '#f97316', cursor: 'pointer', fontSize: 7 }}>🛒</button>
+                            <button aria-label="В корзину" onClick={() => addToCart({ name: data.name, kcal: data.kcal || 0, amount: data.amount, category: data.catLabel || data.category })} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.12)', color: '#f97316', cursor: 'pointer', fontSize: 14 }}>🛒</button>
                           </div>
                         </div>
                         {(() => {
@@ -2116,7 +2116,7 @@ const doImportPlan = (raw: string): boolean => {
           {generated && dayPlan?.meals?.some((m: any) => m.recipeApplied) && (
             <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(249,115,22,0.06)', padding:'8px 6px', textAlign:'center' }}>
               <div style={{ display:'flex', gap:4 }}>
-                <button onClick={() => printDayReport(buildRecipePlanPrintHtml(dayPlan, (weightMode === 'raw' ? 'raw' : 'cooked') as any))} title="Ингредиенты и пошаговые инструкции выбранных рецептов" style={{ flex:1, padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+                <button onClick={() => printPlanHtml('Меню дня по рецептам', buildRecipePlanPrintHtml(dayPlan, (weightMode === 'raw' ? 'raw' : 'cooked') as any))} title="Ингредиенты и пошаговые инструкции выбранных рецептов" className="plan-actbtn" style={{ flex:1, padding:'10px 6px', minHeight:44, borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:11, transition:'all 0.15s' }}>
                   🖨 Печать меню
                 </button>
                 <button onClick={() => {
@@ -2131,10 +2131,11 @@ const doImportPlan = (raw: string): boolean => {
                       notes: [...(dayPlan.proNotes || []), ...(dayPlanNotes ? [`💬 ${dayPlanNotes}`] : [])],
                       weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any,
                     });
-                    const ok = downloadCoachExport(html, `plan-coach-${new Date().toISOString().slice(0, 10)}.html`);
-                    if (typeof (window as any).showToast === 'function') (window as any).showToast(ok ? '📤 Файл для тренера скачан' : 'Не удалось скачать файл', ok ? 'success' : 'warning');
+                    void downloadCoachFile(html, `plan-coach-${new Date().toISOString().slice(0, 10)}.html`).then(ok => {
+                      if (typeof (window as any).showToast === 'function') (window as any).showToast(ok ? '📤 Файл для тренера готов' : 'Не удалось создать файл', ok ? 'success' : 'warning');
+                    });
                   } catch {}
-                }} title="План + рецепты + закупки одним HTML-файлом" style={{ flex:1, padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.3)', color:'#60a5fa', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+                }} title="План + рецепты + закупки одним HTML-файлом" className="plan-actbtn" style={{ flex:1, padding:'10px 6px', minHeight:44, borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.3)', color:'#60a5fa', fontWeight:700, fontSize:11, transition:'all 0.15s' }}>
                   📤 Файл тренеру
                 </button>
               </div>
@@ -2213,9 +2214,9 @@ const doImportPlan = (raw: string): boolean => {
                   <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{p.name || p.date}</span>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                      <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600 }}>{p.dayPlan ? `${Math.round(p.dayPlan.totals?.kcal || 0)} ккал` : ''}</span>
-                    <button onClick={(e) => { e.stopPropagation(); loadSavedPlan(p); }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontWeight: 600 }}>📋</button>
-                     <button onClick={(e) => { e.stopPropagation(); const txt = `🍽 План питания ${p.name || p.date}\n${p.dayPlan?.meals?.map((m: any) => `${m.time} ${m.label}: ${m.items?.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}`).join('\n') || ''}`; try { void navigator.clipboard?.writeText(txt).catch(() => setErrorMsg('Не удалось скопировать сохранённый план.')); } catch { setErrorMsg('Не удалось скопировать сохранённый план.'); } }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', color: '#60a5fa', fontWeight: 600 }}>📤</button>
-                     <button onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((_: any, j: number) => j !== pi); setSavedPlans(updated); try { localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); } catch {} }} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 7, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}>✕</button>
+                     <button aria-label="Загрузить сохранённый план" onClick={(e) => { e.stopPropagation(); loadSavedPlan(p); }} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, fontSize: 13, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontWeight: 600 }}>📋</button>
+                     <button aria-label="Поделиться сохранённым планом" onClick={(e) => { e.stopPropagation(); const txt = `🍽 План питания ${p.name || p.date}\n${p.dayPlan?.meals?.map((m: any) => `${m.time} ${m.label}: ${m.items?.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}`).join('\n') || ''}`; void shareOrCopyText('Сохранённый план', txt).then(ok => { if (!ok) setErrorMsg('Не удалось скопировать сохранённый план.'); }); }} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, fontSize: 13, cursor: 'pointer', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', color: '#60a5fa', fontWeight: 600 }}>📤</button>
+                     <button aria-label="Удалить сохранённый план" onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((_: any, j: number) => j !== pi); setSavedPlans(updated); try { localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); } catch {} }} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, fontSize: 13, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}>✕</button>
                   </div>
                 </div>
                 {isExpanded && (
@@ -2260,8 +2261,8 @@ const doImportPlan = (raw: string): boolean => {
               style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontFamily: 'monospace', outline: 'none', resize: 'vertical' }}
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <button onClick={() => { setImportModalOpen(false); setImportText(''); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontWeight: 600, cursor: 'pointer' }}>Отмена</button>
-              <button onClick={() => { if (doImportPlan(importText)) { setImportModalOpen(false); setImportText(''); } }} style={{ flex: 1, padding: 10, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#f97316,#fb923c)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Импортировать</button>
+              <button onClick={() => { setImportModalOpen(false); setImportText(''); }} className="plan-actbtn" style={{ flex: 1, padding: 12, minHeight:48, borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>Отмена</button>
+              <button onClick={() => { if (doImportPlan(importText)) { setImportModalOpen(false); setImportText(''); } }} className="plan-actbtn" style={{ flex: 1, padding: 12, minHeight:48, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#f97316,#fb923c)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 12 }}>Импортировать</button>
             </div>
           </div>
         </div>
@@ -2512,15 +2513,15 @@ const doImportPlan = (raw: string): boolean => {
                     <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:4 }}>
                       <span>📈 Совокупный анализ ({calcResults.length} приёма)</span>
                       <span style={{ display:'flex', gap:4 }}>
-                        <button onClick={() => printDayReport(buildDayReportPrintHtml(calcDailyReport, {
+                        <button onClick={() => { void printPlanHtml('Дневной отчёт питания', buildDayReportPrintHtml(calcDailyReport, {
                           dayScore: (dayPlan as any)?.healthScore?.score ?? null,
                           dayStatus: (dayPlan as any)?.healthScore?.status ?? null,
                           coverage: (Array.isArray((dayPlan as any)?.microSummary?.coverage) ? (dayPlan as any).microSummary.coverage : []).map((c: any) => ({ nutrient: c.nutrient, pct: c.pct, status: c.status })),
-                        }))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
-                        <button onClick={() => printMealTimeline(buildMealTimelinePrintHtml(
+                        })); }} className="plan-actbtn" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
+                        <button onClick={() => { void printPlanHtml('План на день — таймлайн', buildMealTimelinePrintHtml(
                           (Array.isArray(dayPlan?.meals) ? dayPlan.meals : []).map((m: any) => ({ time: m.time, label: m.label, type: m.type, items: (m.items || []).map((it: any) => ({ name: it.name, amount: it.amount, id: it.id })), totals: m.totals || {} })),
                           { title: 'План на день', kcal: dayPlan?.totals?.kcal, trainStart, weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any }
-                        ))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#22d3ee' }}>⏳ Таймлайн (PDF)</button>
+                        )); }} className="plan-actbtn" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#22d3ee' }}>⏳ Таймлайн (PDF)</button>
                       </span>
                     </div>
                     {/* Overall grade */}

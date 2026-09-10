@@ -6,6 +6,8 @@
  */
 import type { DailyDietReport } from '../../../../engines/product-usefulness-v2.engine';
 import { displayAmount, type WeightMode } from './planner-weight-mode';
+import { isCapacitorNative } from '../../../../core/app-platform';
+import { saveTextFile, shareText } from '../../../../core/native-bridge';
 
 const esc = (v: unknown): string => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -201,6 +203,34 @@ export function downloadCoachExport(html: string, filename: string): boolean {
     window.setTimeout(() => URL.revokeObjectURL(url), 2000);
     return true;
   } catch { return false; }
+}
+
+// ─── АПК-маршруты выдачи (native-bridge; web/TG — как было 1-в-1) ────────────
+// window.open().print() и <a download> в WebView-АПК не работают/немы:
+// печать уходит файлом в Documents + Share-диалог, текст — в системный Share.
+
+/** Поделиться текстом или скопировать: native — Share-диалог, иначе clipboard. */
+export async function shareOrCopyText(title: string, text: string): Promise<boolean> {
+  if (isCapacitorNative()) {
+    try { if (await shareText({ title, text })) return true; } catch { /* fallback ниже */ }
+  }
+  try { await navigator.clipboard?.writeText(text); return true; } catch { return false; }
+}
+
+/** Печать HTML: native — HTML-файл в Documents + Share, иначе print-окно. */
+export async function printPlanHtml(title: string, html: string): Promise<boolean> {
+  if (isCapacitorNative()) {
+    try { return await saveTextFile(`${title}.html`, html); } catch { return false; }
+  }
+  try { printDayReport(html); return true; } catch { return false; }
+}
+
+/** Файл тренеру: native — Documents + Share, иначе скачивание Blob. */
+export async function downloadCoachFile(html: string, filename: string): Promise<boolean> {
+  if (isCapacitorNative()) {
+    try { return await saveTextFile(filename, html); } catch { return false; }
+  }
+  return downloadCoachExport(html, filename);
 }
 
 /**

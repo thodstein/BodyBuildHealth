@@ -78,21 +78,25 @@ html.app-native main::-webkit-scrollbar {
   display: none;
 }
 
-/* ─── 2. FLOATING BOTTOM NAV — визитка APK ──────────────────────── */
+/* ─── 2. DOCKED BOTTOM NAV — в самом низу, контент не перекрывает ── */
+html.app-native {
+  --tabbar-offset: 0px;
+}
 html.app-native .tabs {
-  left: 12px;
-  right: 12px;
-  /* При битом env пилюля всплывает над системным навбаром (fallback 28px),
-   * иначе её низ съедает жест-бар / 3-кнопки, а контент — её саму. */
-  bottom: calc(max(env(safe-area-inset-bottom, 0px), 28px) + 10px);
+  left: 0;
+  right: 0;
+  /* Док-станция в самом низу: safe-зона уходит в padding, а не в отступ —
+   * пилюля больше не плавает над контентом и не закрывает его. */
+  bottom: 0;
   height: var(--nav-height);
-  border-radius: 26px;
+  border-radius: 20px 20px 0 0;
   border: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(9, 18, 34, 0.82);
+  border-bottom: none;
+  background: rgba(9, 18, 34, 0.92);
   backdrop-filter: blur(28px) saturate(180%);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px) * 0);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  padding: 8px 6px max(env(safe-area-inset-bottom, 0px), 28px);
   justify-content: space-between;
 }
 
@@ -13077,8 +13081,8 @@ html.app-native .nd-gauge-mini {
 }
 
 /* --- 76. BOTTOM-DASHBOARD CLEARANCE + NUTRITION SUBNAV --- */
-/* Пилюля .tabs занимает снизу: height var(--nav-height) + offset 10px +
- * safe-zone (native fallback 28px). Старые блоки с paddingBottom 80 и
+/* Док .tabs в самом низу: height var(--nav-height) + safe-zone
+ * (native fallback 28px, offset 0 — см. §2). Старые блоки с paddingBottom 80 и
  * фиксированные таймеры на nav-height+14px уходили под неё.
  * Правило: только отступы/позиция, логика и движки не тронуты. */
 html.app-native .screen {
@@ -13371,6 +13375,85 @@ html.app-native .ck-libcard {
 }
 @media (prefers-reduced-motion: reduce) {
   html.app-native .cardio-constructor .kit-chip:active {
+    transform: none !important;
+  }
+}
+
+/* --- 96. NUTRITION PLAN APK: выдача/скан/метаболик-тоглы --- */
+/* Хуки plan-actbtn/plan-mini/plan-mact (план), nd-scanphoto (сканер),
+   mh-toggle/mh-compare/mh-mini/mh-preset/mh-mode/mh-seg/mh-act (метаболик).
+   TG/web — инлайн-стили 1-в-1; здесь только native-дожим. */
+html.app-native .plan-actbtn,
+html.app-native .plan-mini,
+html.app-native .mh-act,
+html.app-native .mh-seg,
+html.app-native .mh-mode,
+html.app-native .mh-preset,
+html.app-native .mh-mini,
+html.app-native .mh-compare,
+html.app-native .nd-scanphoto {
+  -webkit-tap-highlight-color: transparent !important;
+}
+html.app-native .plan-actbtn:active,
+html.app-native .plan-mini:active,
+html.app-native .mh-act:active,
+html.app-native .mh-seg:active,
+html.app-native .mh-mode:active,
+html.app-native .mh-preset:active,
+html.app-native .mh-mini:active,
+html.app-native .mh-compare:active,
+html.app-native .mh-toggle:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .plan-actbtn:focus-visible,
+html.app-native .plan-mini:focus-visible,
+html.app-native .mh-act:focus-visible,
+html.app-native .mh-seg:focus-visible,
+html.app-native .mh-mode:focus-visible,
+html.app-native .mh-preset:focus-visible,
+html.app-native .mh-mini:focus-visible,
+html.app-native .mh-compare:focus-visible,
+html.app-native .mh-toggle:focus-visible,
+html.app-native .nd-scanphoto:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .plan-mact {
+  min-height: 40px !important;
+  min-width: 40px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 8px 10px !important;
+  font-size: 13px !important;
+}
+html.app-native .mh-toggle {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-scanphoto {
+  min-height: 52px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+@media (max-width: 380px) {
+  html.app-native .plan-mact {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+  html.app-native .mh-toggle {
+    padding: 8px 10px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .plan-actbtn:active,
+  html.app-native .plan-mini:active,
+  html.app-native .mh-act:active,
+  html.app-native .mh-seg:active,
+  html.app-native .mh-mode:active,
+  html.app-native .mh-preset:active,
+  html.app-native .mh-mini:active,
+  html.app-native .mh-compare:active,
+  html.app-native .mh-toggle:active {
     transform: none !important;
   }
 }

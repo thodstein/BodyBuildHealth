@@ -19,6 +19,7 @@ import {
   type ContestSpecialization, type ContestEventEntry,
 } from '../../../../engines/bb/bb-contest-prep.engine';
 import { GlassCard } from './ui';
+import { shareOrCopyText } from './planner-day-print';
 import { usePlanCtx } from './IndividualPlanContext';
 import { getProfile } from '../../../../core/profile-manager';
 import { ContestPrepConfigEditor } from '../../../../ui/components/contest-prep/ContestPrepConfigEditor';
@@ -311,11 +312,11 @@ export const PeakWeekTab: React.FC = () => {
       ...(result.warnings.length ? ['— Предупреждения —', ...result.warnings] : []),
     ];
     const text = lines.join('\n');
-    try {
-      if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(text).then(() => { setCopyFlash(true); window.setTimeout(() => setCopyFlash(false), 1800); }).catch(() => fallbackCopy(text));
-      } else { fallbackCopy(text); }
-    } catch { fallbackCopy(text); }
+    // АПК: системный Share-диалог, иначе clipboard/execCommand как было.
+    void shareOrCopyText('Тапер ББ — сводка', text).then(ok => {
+      if (ok) { setCopyFlash(true); window.setTimeout(() => setCopyFlash(false), 1800); }
+      else fallbackCopy(text);
+    });
   };
 
   const catsFor = draft.sex === 'female' ? FEMALE_CATS : MALE_CATS;

@@ -1033,7 +1033,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
             <button onClick={() => { if (reportEditMode) { try { localStorage.setItem('he_nutrition_report_current', reportEditText); } catch {} }; setReportEditMode(!reportEditMode); }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', minHeight:44, border:'1px solid rgba(96,165,250,0.3)', background: reportEditMode ? 'rgba(96,165,250,0.15)' : 'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:11, fontWeight:700 }}>
               {reportEditMode ? '💾 Сохранить правки' : '✏️ Редактировать отчёт'}
             </button>
-            <button onClick={() => { try { const edited = reportEditMode ? JSON.parse(reportEditText) : fullReport; saveReportToArchive(edited); } catch(e) { alert('Ошибка сохранения: ' + e); } }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', minHeight:44, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:11, fontWeight:700 }}>
+            <button onClick={() => { try { const edited = reportEditMode ? JSON.parse(reportEditText) : fullReport; saveReportToArchive(edited); } catch(e) { const msg = 'Ошибка сохранения: ' + e; if (typeof (window as any).showToast === 'function') (window as any).showToast(msg, 'error'); else alert(msg); } }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', minHeight:44, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:11, fontWeight:700 }}>
               📥 Сохранить в архив
             </button>
           </div>

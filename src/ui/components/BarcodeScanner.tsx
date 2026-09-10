@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { searchByBarcode, searchByName, saveToCache, type OFFProduct } from '../../engines/openfoodfacts.engine';
 import { guessRetailCategory, searchRetailProductByBarcode } from '../../engines/retail-search.engine';
+import { isCapacitorNative } from '../../core/app-platform';
 
 interface Props {
   onProductFound: (product: OFFProduct) => void;
@@ -75,6 +76,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchResults, setSearchResults] = useState<OFFProduct[]>([]);
+  const [photoLoading, setPhotoLoading] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannedRef = useRef(false);
   const barcodeRef = useRef('');
@@ -146,6 +148,49 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
     }
   }, [searchQuery]);
 
+    // АПК: системная камера (Capacitor Camera → системный диалог) + декод фото
+  // через scanFile. Живой html5-qrcode-стрим в WebView часто упирается в
+  // разрешения/secure-context — фото-путь работает всегда, кода 1-в-1 дальше.
+  const handlePhotoScan = useCallback(async () => {
+    if (!isCapacitorNative()) return;
+    setPhotoLoading(true);
+    setError('');
+    try {
+      const { pickPhoto } = await import('../../core/native-bridge');
+      const photo = await pickPhoto();
+      if (!photo) return;
+      const blob = await (await fetch(photo.uri)).blob();
+      const file = new File([blob], `barcode.${photo.format || 'jpg'}`, { type: blob.type || 'image/jpeg' });
+      const holder = document.createElement('div');
+      const holderId = `barcode-photo-decode-${Date.now()}`;
+      holder.id = holderId;
+      holder.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;';
+      document.body.appendChild(holder);
+      try {
+        const decoder = new Html5Qrcode(holderId);
+        try {
+          const decoded = await decoder.scanFile(file, false);
+          await decoder.clear();
+          if (decoded) {
+            setBarcode(String(decoded));
+            setMode('manual');
+            await handleBarcodeLookup(String(decoded));
+            return;
+          }
+        } catch {
+          try { await decoder.clear(); } catch { /* ignore */ }
+        }
+        setError('Штрихкод на фото не распознан. Поднесите ближе при хорошем свете или введите цифры вручную.');
+      } finally {
+        holder.remove();
+      }
+    } catch {
+      setError('Не удалось открыть камеру. Введите штрихкод вручную.');
+    } finally {
+      setPhotoLoading(false);
+    }
+  }, [handleBarcodeLookup]);
+
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current;
     scannerRef.current = null;
@@ -188,7 +233,9 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
       if (scannerRef.current === scanner) {
         scannerRef.current = null;
       }
-      setError('Не удалось запустить камеру. Введите штрихкод вручную.');
+      setError(isCapacitorNative()
+        ? 'Живой видеопоток недоступен в WebView. Нажмите «📷 Снять камерой» ниже или введите штрихкод вручную.'
+        : 'Не удалось запустить камеру. Введите штрихкод вручную.');
       setMode('manual');
     }
   }, [stopScanner, handleBarcodeLookup]);
@@ -273,6 +320,11 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
           <p style={{ color: 'var(--text-light)', fontSize: 12, textAlign: 'center', marginTop: 8 }}>
             Наведите камеру на штрихкод. Автоматическое распознавание EAN-13/EAN-8.
           </p>
+          {isCapacitorNative() && (
+            <button type="button" onClick={() => void handlePhotoScan()} disabled={photoLoading} className="nd-scanphoto" aria-label="Снять штрихкод камерой" style={{ ...btnStyle, width: '100%', marginTop: 4, opacity: photoLoading ? 0.6 : 1 }}>
+              {photoLoading ? '⏳ Распознаём фото…' : '📷 Снять камерой (АПК)'}
+            </button>
+          )}
         </div>
       )}
 

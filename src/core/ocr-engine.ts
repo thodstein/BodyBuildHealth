@@ -446,6 +446,36 @@ async function serverOcrImage(file: File): Promise<{ text: string; meals?: Parse
 }
 
 /**
+ * Оффлайн-распознавание фото еды (АПК и нет сети): локальный tesseract.js
+ * rus+eng, ассеты из бандла (/tesseract, sync-ocr-assets) — серверные ./api/*
+ * в WebView-АПК недоступны. Возвращает сырой текст для parseNutritionText.
+ */
+export async function recognizeImageTextOffline(file: File, timeoutMs = 90_000): Promise<string> {
+  const { resolveTesseractOptions } = await import('../engines/ocr-assets');
+  const opts = await resolveTesseractOptions();
+  const Tesseract = await import('tesseract.js') as any;
+  let upload: Blob = file;
+  try { upload = await prepareImageForServer(file); } catch { /* исходник как есть */ }
+  const worker = await Tesseract.createWorker('rus+eng', 1, {
+    workerPath: opts.workerPath,
+    corePath: opts.corePath,
+    langPath: opts.langPath,
+  });
+  try {
+    const run: Promise<string> = worker
+      .recognize(upload)
+      .then((r: any) => String(r?.data?.text || ''));
+    return await Promise.race([
+      run,
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error('превышено время оффлайн-распознавания')), timeoutMs)),
+    ]);
+  } finally {
+    try { await worker.terminate(); } catch { /* ignore */ }
+  }
+}
+
+/**
  * Process an uploaded file (PDF, image, or text) for lab analysis or nutrition data.
  * Returns parsed labs and meals ready for auto-input.
  */
@@ -543,9 +573,22 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
         warnings.push('Фото обработано на сервере OCR.');
       } catch (serverError: any) {
         warnings.push(`Серверный OCR не завершился: ${serverError?.message || String(serverError)}`);
-        return {
-          text: '', labs: [], meals: [], source, confidence: 0, warnings,
-        };
+        // АПК/оффлайн: серверные ./api/* в WebView недоступны — пробуем
+        // локальный tesseract, дальше общий парсинг rawText как обычно.
+        try {
+          const offlineText = await recognizeImageTextOffline(file);
+          if (offlineText.trim().length <= 2) {
+            return { text: '', labs: [], meals: [], source, confidence: 0, warnings };
+          }
+          warnings.push('Сервер недоступен — фото распознано оффлайн на устройстве.');
+          serverResult = { text: offlineText };
+          rawText = offlineText;
+        } catch (offlineError: any) {
+          warnings.push(`Оффлайн-распознавание не удалось: ${offlineError?.message || String(offlineError)}`);
+          return {
+            text: '', labs: [], meals: [], source, confidence: 0, warnings,
+          };
+        }
       }
 
       if (rawText.trim().length > 2) {
