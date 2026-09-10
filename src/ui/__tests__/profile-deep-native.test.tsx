@@ -31,17 +31,19 @@ afterEach(async () => {
 });
 
 describe('profile deep hooks', () => {
-  it('1. UserTab: quick-jump из 9 ссылок с хуками', () => {
+  it('1. UserTab: 9 секций-аккордеонов, мёртвой quick-jump ленты нет', () => {
     const { container } = render(<ProfileUserTab />);
-    expect(container.querySelector('.profile-jump')).not.toBeNull();
-    expect(container.querySelector('.profile-jump-row')).not.toBeNull();
-    expect(container.querySelectorAll('.profile-jump-link').length).toBe(9);
+    // quick-jump лента удалена (клики не скроллили во WebView/APK) — её хуков быть не должно.
+    expect(container.querySelector('.profile-jump')).toBeNull();
+    expect(container.querySelector('.profile-jump-link')).toBeNull();
     expect(container.querySelector('.profile-user-sections')).not.toBeNull();
+    expect(container.querySelectorAll('.pf-acc').length).toBe(9);
   });
 
-  it('2. UserTab: клик по ссылке не роняет (нет секции в изоляции)', () => {
-    render(<ProfileUserTab />);
-    fireEvent.click(screen.getByLabelText('Перейти к разделу Питание'));
+  it('2. UserTab: «Развернуть все» открывает секции (замена мёртвого джампа)', () => {
+    const { container, getByText } = render(<ProfileUserTab />);
+    fireEvent.click(getByText(/Развернуть все/));
+    expect(container.querySelectorAll('.pf-acc[data-open="true"]').length).toBeGreaterThan(1);
   });
 
   it('3. DiaryCard: классы, data-diary, stale-флаг', () => {

@@ -50,17 +50,14 @@ describe('Profile §83 — поднавигация без hero', () => {
   });
 });
 
-describe('Profile §83 — quick-jump и аккордеоны', () => {
-  it('клик по разделу выставляет data-active', () => {
-    const { container, getByLabelText } = render(<ProfileUserTab />);
-    const btn = getByLabelText('Перейти к разделу Цели');
-    fireEvent.click(btn);
-    expect(btn.getAttribute('data-active')).toBe('true');
-    expect(container.querySelectorAll('.pf-jump-link[data-active="true"]').length).toBe(1);
+describe('Profile §83 — аккордеоны (quick-jump удалён)', () => {
+  it('мёртвой jump-ленты нет, секции на месте', () => {
+    const { container } = render(<ProfileUserTab />);
+    expect(container.querySelector('.pf-jump-link')).toBeNull();
+    expect(container.querySelectorAll('.pf-acc').length).toBe(9);
   });
 
-  it('«Развернуть все» открывает аккордеоны (data-open)', () => {
-    const { container, getByText } = render(<ProfileUserTab />);
+  it('«Развернуть все» открывает аккордеоны (data-open)', () => {    const { container, getByText } = render(<ProfileUserTab />);
     fireEvent.click(getByText(/Развернуть все/));
     const opened = container.querySelectorAll('.pf-acc[data-open="true"]');
     expect(opened.length).toBeGreaterThan(1);
@@ -68,10 +65,12 @@ describe('Profile §83 — quick-jump и аккордеоны', () => {
     expect(container.querySelectorAll('.pf-acc[data-open="true"]').length).toBe(0);
   });
 
-  it('jump-цели 40px', () => {
-    const { container } = render(<ProfileUserTab />);
-    const first = container.querySelector('.pf-jump-link') as HTMLElement;
-    expect(first.style.minHeight).toBe('40px');
+  it('кнопки «Развернуть/Свернуть» 44px', () => {
+    const { container, getByText } = render(<ProfileUserTab />);
+    const btns = container.querySelectorAll('.pf-toggle-btn');
+    expect(btns.length).toBe(2);
+    btns.forEach(b => expect((b as HTMLElement).style.minHeight).toBe('44px'));
+    expect(getByText(/Развернуть все/)).toBeTruthy();
   });
 });
 
