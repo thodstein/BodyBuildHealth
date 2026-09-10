@@ -828,19 +828,24 @@ export const CycleCatalog: React.FC<Props> = (p) => {
           </div>
           {cycles.map(c => {
             const m = c.meta;
-            const chips = [m.level, `${m.weeks} нед`, `${m.sessionsPerWeek} дн/нед`, PERIOD_LABELS[m.period] || m.period, FOCUS_LABELS[focusKeyOf(c, cat)] || focusKeyOf(c, cat)];
+            // Ф5: ♀-бейдж на женских циклах (первым чипом, с розовым акцентом)
+            const isFemale = (m.tags || []).includes('female');
+            const chips = [
+              ...(isFemale ? ['♀ Женский'] : []),
+              m.level, `${m.weeks} нед`, `${m.sessionsPerWeek} дн/нед`, PERIOD_LABELS[m.period] || m.period, FOCUS_LABELS[focusKeyOf(c, cat)] || focusKeyOf(c, cat),
+            ];
             return (
               <ExpandableCard
                 key={m.id}
                 title={m.title}
                 icon=""
-                accent="#00e68a"
+                accent={isFemale ? '#f472b6' : '#00e68a'}
                 short={
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                         {chips.map((ch, i) => (
-                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
+                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: (isFemale && i === 0) ? 'rgba(244,114,182,0.18)' : 'rgba(255,255,255,0.06)', border: (isFemale && i === 0) ? '1px solid rgba(244,114,182,0.35)' : '1px solid transparent', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
                         ))}
                       </div>
                       <button aria-label={favs.includes(m.id) ? `Убрать из избранного ${m.title}` : `В избранное ${m.title}`}
