@@ -35,7 +35,6 @@ import {
 } from './CombatUI';
 import { CARD as T_CARD, BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, H as T_H, SMALL as T_SMALL, STEP_PILL, IN as T_IN } from '../TrainingScreen_parts/training-ui';
 import { CombatPlanView, CbQualityMap, CbMesoCard, CbDiaryCard } from './CombatPlanView';
-import { getDiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
 
 type Step = WizardStep;
 const STEP_LABEL_RU: Record<Step, string> = {
