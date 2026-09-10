@@ -1181,7 +1181,7 @@ const FavoritesTab: React.FC = () => {
   const pill = (t: string, icon: string, label: string) => (
     <button onClick={() => setFavTab(t as any)} aria-pressed={favTab === t} style={{ padding:'10px 14px', borderRadius:999, fontSize:12, fontWeight: favTab === t ? 700 : 500, cursor:'pointer', minHeight:44, border: favTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)', background: favTab === t ? 'linear-gradient(135deg,rgba(0,230,138,0.18),rgba(0,200,160,0.12))' : '#202023', color: favTab === t ? '#00e68a' : 'rgba(255,255,255,0.7)', boxShadow: favTab === t ? '0 2px 8px rgba(0,230,138,0.2)' : 'none' }}>{icon} {label}</button>
   );
-  return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}><ModernHero icon="⭐" title="Избранное" subtitle="Твои сохранённые продукты и блюда — быстрый доступ к любимому." /><div style={{ display:'flex', flexDirection:'column', gap:8, paddingBottom:80 }}>
+  return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}><ModernHero icon="⭐" title="Избранное" subtitle="Твои сохранённые продукты и блюда — быстрый доступ к любимому." /><div style={{ display:'flex', flexDirection:'column', gap:8, paddingBottom:'var(--tabbar-clear, 140px)' }}>
     <div style={{ display:'flex', gap:3, flexWrap:'wrap', padding:'4px 0' }}>
       {pill('products','⭐','Продукты')}{pill('recipes','🍳','Рецепты')}{pill('plans','📋','Планы')}{pill('stacks','🧩','Стеки')}
     </div>
@@ -1532,7 +1532,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   }
 
   return (
-    <div className="screen nutrition nutrition-screen nutrition-tabs" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'auto', padding:0 }}>
+    <div className="screen nutrition nutrition-screen nutrition-tabs" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden', padding:0 }}>
       <div className="nutrition-tabs-head" style={{
         display:'flex', flexDirection:'column', alignItems:'stretch', gap:0, padding:'8px 12px 0', flexShrink:0,
         background:'#18181b',
@@ -1588,6 +1588,35 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
             }}>{s.label}</button>
           ))}
         </div>
+        <div className="nutrition-chips nutrition-chips-head" style={{
+          display:'flex', gap:6, flexWrap:'nowrap', overflowX:'auto', overflowY:'hidden',
+          padding:'10px 12px 12px', margin:0,
+          scrollbarWidth:'none', msOverflowStyle:'none',
+          WebkitOverflowScrolling:'touch', whiteSpace:'nowrap', flexShrink:0,
+          background:'#18181b', borderTop:'1px solid rgba(255,255,255,0.06)',
+        }}>
+          {(SECTION_TABS[nutritionSection] || SECTION_TABS.all).map(t => {
+            const isActive = tab === t;
+            return (
+              <button key={t} onClick={() => setTab(t as ActiveTab)} className="nutrition-chip" data-active={isActive} style={{
+                flexShrink:0, padding:'10px 16px', borderRadius:14, cursor:'pointer',
+                fontSize:13, fontWeight: isActive ? 800 : 600, letterSpacing:-0.2,
+                border: isActive ? '1.5px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
+                background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                color: isActive ? '#000' : 'rgba(255,255,255,0.85)',
+                transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
+                boxShadow: isActive ? '0 4px 16px rgba(0,230,138,0.25), 0 1px 0 rgba(255,255,255,0.1) inset' : '0 2px 8px rgba(0,0,0,0.12)',
+                minHeight:44, display:'inline-flex', alignItems:'center', gap:6,
+                transform: isActive ? 'translateY(-1px)' : 'none',
+              }}>
+                {TAB_LABELS[t] || t}
+                {t === 'cart' && cartCount > 0 && (
+                  <span style={{ marginLeft:2, background: isActive ? 'rgba(0,0,0,0.12)' : 'rgba(0,230,138,0.12)', borderRadius:999, padding:'2px 7px', fontSize:10, fontWeight:800, color: isActive ? '#000' : '#00e68a', border: isActive ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(0,230,138,0.18)' }}>{cartCount}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
       {isNativeApp() && scanOpen && (
         <BarcodeScanner onProductFound={(p) => onScanProduct(p)} onClose={() => setScanOpen(false)} />
@@ -1625,35 +1654,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         );
       })()}
 
-      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 80px' }}>
-        <div className="nutrition-chips" style={{
-          display:'flex', gap:6, flexWrap:'nowrap', overflowX:'auto', overflowY:'hidden',
-          padding:'10px 4px 12px',
-          scrollbarWidth:'none', msOverflowStyle:'none',
-          WebkitOverflowScrolling:'touch', whiteSpace:'nowrap',
-        }}>
-          {(SECTION_TABS[nutritionSection] || SECTION_TABS.all).map(t => {
-            const isActive = tab === t;
-            return (
-              <button key={t} onClick={() => setTab(t as ActiveTab)} className="nutrition-chip" data-active={isActive} style={{
-                flexShrink:0, padding:'10px 16px', borderRadius:14, cursor:'pointer',
-                fontSize:13, fontWeight: isActive ? 800 : 600, letterSpacing:-0.2,
-                border: isActive ? '1.5px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
-                background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-                color: isActive ? '#000' : 'rgba(255,255,255,0.85)',
-                transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
-                boxShadow: isActive ? '0 4px 16px rgba(0,230,138,0.25), 0 1px 0 rgba(255,255,255,0.1) inset' : '0 2px 8px rgba(0,0,0,0.12)',
-                minHeight:44, display:'inline-flex', alignItems:'center', gap:6,
-                transform: isActive ? 'translateY(-1px)' : 'none',
-              }}>
-                {TAB_LABELS[t] || t}
-                {t === 'cart' && cartCount > 0 && (
-                  <span style={{ marginLeft:2, background: isActive ? 'rgba(0,0,0,0.12)' : 'rgba(0,230,138,0.12)', borderRadius:999, padding:'2px 7px', fontSize:10, fontWeight:800, color: isActive ? '#000' : '#00e68a', border: isActive ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(0,230,138,0.18)' }}>{cartCount}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 140px' }}>
         <div style={{ animation:'fadeSlideIn 0.3s ease' }}>
           {renderContent()}
         </div>

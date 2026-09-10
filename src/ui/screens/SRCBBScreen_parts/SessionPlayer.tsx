@@ -2147,7 +2147,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         {/* Липкий нижний таймер для зала (SessionPlayer) */}
         {phase === 'main' && timerRunning && timerSec > 0 && (
           <div style={{
-            position: 'fixed', bottom: 'calc(var(--nav-height) + 14px)', left: 12, right: 12, zIndex: 45,
+            position: 'fixed', bottom: 'var(--tabbar-lift, calc(var(--nav-height) + 46px))', left: 12, right: 12, zIndex: 45,
             display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 16,
             background: timerSec <= 10 ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #00e68a, #00c853)',
             color: timerSec <= 10 ? '#fff' : '#000', boxShadow: '0 10px 28px rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.18)',

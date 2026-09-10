@@ -212,7 +212,7 @@ const ReportTab: React.FC = () => {
     color: ok ? '#22c55e' : '#ef4444',
   });
   return (
-    <div style={{ paddingBottom: 80 }}>
+    <div style={{ paddingBottom: 'var(--tabbar-clear, 140px)' }}>
       {/* E7-фикс: явная передача dayPlan (раньше вызов без аргументов молча падал на ctx.dayPlan,
           а при пустом плане архивировал пустоту); явный флаг archive=true — пользовательское действие */}
       <button onClick={() => { generateFullNutritionReport?.(dayPlan || undefined, true); setGenerated(true); }} style={{

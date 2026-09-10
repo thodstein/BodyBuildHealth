@@ -348,7 +348,7 @@ export const OrganLoadCalculator: React.FC = () => {
   const topScore = result.totalMetabolicLoad;
 
   return (
-    <div style={{ paddingBottom: 80, maxWidth: 540, margin: '0 auto' }}>
+    <div style={{ paddingBottom: 'var(--tabbar-clear, 140px)', maxWidth: 540, margin: '0 auto' }}>
       {/* ── Mode tabs ── */}
       <div style={{ display: 'flex', gap: 3, marginBottom: 10 }}>
         {[

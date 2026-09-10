@@ -139,7 +139,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
 
       {/* === MY SUBSTANCES TAB === */}
       {favTab === 'mySubstances' && (
-      <div style={{ paddingBottom:80 }}>
+      <div style={{ paddingBottom: 'var(--tabbar-clear, 140px)' }}>
         <div style={{ display:'flex', gap:4, marginBottom:8 }}>
           <input value={favSearch} onChange={e => setFavSearch(e.target.value)}
             placeholder="🔍 Поиск в Моих препаратах..."
@@ -182,7 +182,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
 
       {/* === MY STACKS TAB === */}
       {favTab === 'myStacks' && (
-      <div style={{ paddingBottom:80 }}>
+      <div style={{ paddingBottom: 'var(--tabbar-clear, 140px)' }}>
         <div style={{ display:'flex', gap:4, marginBottom:8 }}>
           <input value={favSearch} onChange={e => setFavSearch(e.target.value)}
             placeholder="🔍 Поиск в Моих стеках..."
@@ -529,7 +529,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
 
       {/* === CALCULATOR SAVED DATA === */}
       {favTab === 'calculator' && (
-        <div style={{ paddingBottom:80 }}>
+        <div style={{ paddingBottom: 'var(--tabbar-clear, 140px)' }}>
           <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>🧮 Сохранённые расчёты калькулятора</div>
           <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3 }}>Здесь хранятся расчёты поддержки — результат + уровень + неделя. Можно загрузить обратно в калькулятор.</div>
           {(() => {
@@ -586,7 +586,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
 
       {/* === MIXES TAB === */}
       {favTab === 'mixes' && (
-        <div style={{ paddingBottom:80 }}>
+        <div style={{ paddingBottom: 'var(--tabbar-clear, 140px)' }}>
           <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>🎯 Сохранённые комплекты миксов</div>
           <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3 }}>Полные комплекты (пред + интра + пост), сохранённые из калькулятора тренировочных миксов.</div>
           {(() => {
@@ -649,7 +649,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
 
       {/* === REPORTS TAB === */}
       {favTab === 'reports' && (
-        <div style={{ paddingBottom:80 }}>
+        <div style={{ paddingBottom: 'var(--tabbar-clear, 140px)' }}>
           <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>📊 Отчёты поддержки</div>
           <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:8, lineHeight:1.3 }}>Полный отчёт по рискам, поддержке, взаимодействиям и курсу. Сохраняется в архив.</div>
 
