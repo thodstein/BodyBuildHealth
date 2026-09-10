@@ -1351,6 +1351,13 @@ html.app-native .train-sup.sup-apk .sup-diary [style*='min-height: 36'] {
   min-height: 44px !important;
 }
 
+/* ─── 19.7b. TABBAR-CLEAR 140px → 24px (как в TG §30) ─────────
+ * Табы избранного/стеков/миксов/отчётов несут инлайн-низ 140px поверх
+ * корневых 140px — в АПК оставалась двойная пустота. */
+html.app-native .train-sup.sup-apk [style*='tabbar-clear'] {
+  padding-bottom: 24px !important;
+}
+
 /* ─── 19.8. ТЕЛЕФОН ≤480px: каталог — плоский скролл + перенос ── */
 @media (max-width: 480px) {
   html.app-native .train-sup.sup-apk [style*='max-height: 68vh'] {
