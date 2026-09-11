@@ -210,6 +210,23 @@ const GOAL_FALLBACK: Record<string, string> = {
   conditioning: 'conditioning',
 };
 
+/**
+ * Превью «сост/изол» для хаба (замена goalTempos на generateRepTempo в TempoTab).
+ * Чистое отображение канона — без pattern/rationale-слоя генератора.
+ */
+export function goalPreviewFor(goal: string): { compound: string; isolation: string } {
+  switch (goal) {
+    case 'strength':
+      return { compound: TEMPO_CANON.strength.notation, isolation: TEMPO_CANON.strength.notation };
+    case 'hypertrophy':
+      return { compound: TEMPO_CANON.hypertrophy_compound.notation, isolation: TEMPO_CANON.hypertrophy_isolation.notation };
+    case 'power':
+      return { compound: TEMPO_CANON.power.notation, isolation: TEMPO_CANON.power.notation };
+    default:
+      return { compound: TEMPO_CANON.technique.notation, isolation: TEMPO_CANON.technique.notation };
+  }
+}
+
 /** Темп под конкретное упражнение: overrides → fallback канона по цели. */
 export function tempoForExerciseName(name: string, goal = 'hypertrophy'): ExerciseTempoPick {
   const n = (name || '').toLowerCase();

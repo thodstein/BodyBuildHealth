@@ -8,7 +8,6 @@ import {
   type TempoPreset,
 } from '../../../engines/rep-tempo.engine';
 import {
-  generateRepTempo,
   type RepPattern,
 } from '../../../engines/rep-tempo-engine';
 import {
@@ -16,6 +15,7 @@ import {
   tutZoneForSecs,
   tempoForExerciseName,
   parseTempoCanon,
+  goalPreviewFor,
 } from '../../../engines/tempo-canon.engine';
 import { loadTempoPrevSnapshot } from './planner-bridge-handlers';
 import type { TempoApplyMode } from './planner-bridge';
@@ -67,13 +67,8 @@ const MANUAL_TEMPOS: TempoPreset[] = [
     description: 'Максимальное время под нагрузкой. Акцент на метаболический стресс и саркоплазматическую гипертрофию.',
     goal: 'hypertrophy',
   },
-  {
-    id: 'speed',
-    nameRu: 'Скоростной',
-    tempo: { eccentric: 1, bottomPause: 0, concentric: 0, topPause: 0 },
-    description: 'Компенсаторное ускорение (CAT). Максимальное намерение ускорить штангу в концентрике.',
-    goal: 'power',
-  },
+  // 'speed' 1-0-0-0 удалён: дубль канона power 1-0-X-0 (взрывное намерение, не «0с»).
+  // Плюс сумма 1с — вне рабочего диапазона 2–8с (S1). CAT — пресет 'power' из ALL_TEMPOS.
   {
     id: 'iso_stretch',
     nameRu: 'Изометрия в растяжении',
@@ -154,15 +149,11 @@ export const TempoTab: React.FC = () => {
   const totalRepTime = calculateRepDuration(customTempo);
   const maxPhase = Math.max(customTempo.eccentric, customTempo.bottomPause, customTempo.concentric, customTempo.topPause, 1);
 
+  // Превью — строго из канона (раньше generateRepTempo давал 3-2-1-0 вместо 3-1-1-0).
   const goalTempos = useMemo(() => {
     const base: Record<string, { compound: string; isolation: string }> = {};
     GOALS.forEach(g => {
-      const compoundInput = { goal: g, riskLevel: 'low' as const, difficultyLevel: 'medium' as const, techniqueIssues: [], isMainLift: true };
-      const isolationInput = { ...compoundInput, isMainLift: false };
-      base[g] = {
-        compound: generateRepTempo(compoundInput).tempo.toString,
-        isolation: generateRepTempo(isolationInput).tempo.toString,
-      };
+      base[g] = goalPreviewFor(g);
     });
     return base;
   }, []);
@@ -182,6 +173,7 @@ export const TempoTab: React.FC = () => {
           {GOALS.map(g => (
             <button
               key={g}
+              data-testid={`goal-${g}`}
               onClick={() => setSelectedGoal(g)}
               style={{
                 padding: '6px 4px', borderRadius: 8, border: '1px solid ' + (selectedGoal === g ? ACCENT : 'rgba(255,255,255,0.08)'),

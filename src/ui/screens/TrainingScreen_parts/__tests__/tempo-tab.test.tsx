@@ -46,6 +46,15 @@ describe('TempoTab (эпик E)', () => {
     expect(container.textContent).toContain('2-0-1-0');
   });
 
+  it('превью Авто-темп — из канона (гипертрофия 3-1-1-0 / 3-2-1-0)', async () => {
+    const { getByTestId } = render(<TempoTab />);
+    const { within } = await import('@testing-library/react');
+    const btn = getByTestId('goal-hypertrophy');
+    const scope = within(btn as HTMLElement);
+    expect(scope.getByText((_, el) => el?.textContent === 'сост: 3-1-1-0')).not.toBeNull();
+    expect(scope.getByText((_, el) => el?.textContent === 'изол: 3-2-1-0')).not.toBeNull();
+  });
+
   it('карточки паттернов больше не одинаковые', () => {
     const { getAllByTestId } = render(<TempoTab />);
     const badges = getAllByTestId('pattern-tempo').map((el) => el.textContent);

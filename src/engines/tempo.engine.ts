@@ -1,3 +1,7 @@
+/**
+ * @deprecated для новых назначений — канон `tempo-canon.engine.ts`
+ * (goalPreviewFor). Файл заморожен ради совместимости (ExecutionZone и др.).
+ */
 import type { TempoProfile } from '../core/types';
 
 const GOAL_TEMPO_MAP: Record<string, TempoProfile> = {
@@ -29,3 +33,6 @@ export function selectTempo(
 export function formatTempo(tempo: TempoProfile): string {
   return tempo.label;
 }
+
+/** Фасад канона для discoverability (реэкспорт, поведения не меняет). */
+export { TEMPO_CANON, goalPreviewFor } from './tempo-canon.engine';

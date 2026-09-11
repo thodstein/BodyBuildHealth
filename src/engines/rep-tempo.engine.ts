@@ -1,6 +1,10 @@
 /**
  * rep-tempo.engine.ts — Движок управления темпом повторений (Rep Tempo).
- * 
+ *
+ * @deprecated для новых назначений — канон `tempo-canon.engine.ts`
+ * (TEMPO_CANON/parseTempoCanon/tutSecsForTempo). Этот файл заморожен ради
+ * совместимости (SessionPlayer-бейдж, training.engine). Не менять цифры.
+ *
  * Формат темпа: "X-X-X-X"
  * X1: Эксцентрическая фаза (опускание веса)
  * X2: Изометрическая пауза в нижней точке (stretch)
@@ -16,6 +20,18 @@ export type TempoPhase = {
   concentric: number;
   topPause: number;
 };
+
+/** Фасад канона для discoverability (реэкспорт, поведения не меняет). */
+export {
+  TEMPO_CANON,
+  TEMPO_PRESET_LIST,
+  parseTempoCanon,
+  isValidTempoCanon,
+  tutSecsForTempo,
+  tutZoneForSecs,
+  tempoForExerciseName,
+  goalPreviewFor,
+} from './tempo-canon.engine';
 
 export interface TempoPreset {
   id: string;

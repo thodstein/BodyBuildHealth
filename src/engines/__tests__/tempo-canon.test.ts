@@ -12,7 +12,9 @@ import {
   tutSecsForTempo,
   tutZoneForSecs,
   tempoForExerciseName,
+  goalPreviewFor,
 } from '../tempo-canon.engine';
+import { isKvExcludedKey } from '../../core/cloud-kv';
 
 describe('tempo-canon: эпик A — канон и парсер', () => {
   it('все ростовые дефолты внутри 2–8с/повт (S1-инвариант)', () => {
@@ -100,6 +102,22 @@ describe('tempo-canon: эпик B — TUT и per-exercise', () => {
     const z = tutZoneForSecs(100, 10);
     expect(z.warn).toContain('>8с');
     expect(tutZoneForSecs(50, 5).warn).toBeNull();
+  });
+
+  it('goalPreviewFor: превью строго из канона', () => {
+    expect(goalPreviewFor('hypertrophy')).toEqual({
+      compound: TEMPO_CANON.hypertrophy_compound.notation,
+      isolation: TEMPO_CANON.hypertrophy_isolation.notation,
+    });
+    expect(goalPreviewFor('hypertrophy').compound).toBe('3-1-1-0');
+    expect(goalPreviewFor('hypertrophy').isolation).toBe('3-2-1-0');
+    expect(goalPreviewFor('strength').compound).toBe('2-0-X-0');
+    expect(goalPreviewFor('неизвестно-что').compound).toBe(TEMPO_CANON.technique.notation);
+  });
+
+  it('П4: ключи хаба синкаются облаком (не в исключениях cloud-kv)', () => {
+    expect(isKvExcludedKey('he_tempo_prev_v1')).toBe(false);
+    expect(isKvExcludedKey('he_tempo_hub_v1')).toBe(false);
   });
 
   it('override: румынская → 3-1-1-0, неизвестное → fallback estimated', () => {

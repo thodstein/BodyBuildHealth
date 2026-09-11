@@ -1,6 +1,6 @@
 # Хаб «Темп повторений» — PRO-план (аудит + интернет-синтез + доработка)
 
-> **Статус:** 📋 план на согласование (Sep 12 2026)
+> **Статус:** ✅ выполнен полностью (добивка 1–6 закрыта кодом, см. §10)
 > **Объект:** `src/ui/screens/TrainingScreen_parts/TempoTab.tsx:1` (306с, хаб `tempo_hub` + карточка в `PlannerToolsPanel.tsx:55,64`),
 > движки `src/engines/rep-tempo.engine.ts:1` (98с), `src/engines/rep-tempo-engine.ts:1` (250с),
 > `src/engines/tempo.engine.ts:1` (31с), `src/engines/bb/bb-tempo-rest.ts:1` (128с),
@@ -201,6 +201,25 @@ parseTempoCanon / tutForSet / tutZone (чистые, тестируемые)
 - Персональный темп-план на мезоцикл (в MVP — разовое назначение + мост).
 
 ---
+
+## 10. Добивка 1–6 — выполнение (Sep 12 2026, закоммичено, без пуша)
+
+1. **Превью на канон**: `goalPreviewFor` в каноне; `TempoTab goalTempos` больше не зовёт
+   `generateRepTempo` (гипертрофия теперь честно `3-1-1-0`/`3-2-1-0`). `TechniqueCalcTab`/
+   `ExerciseLabShared` оставлены на генераторе осознанно: там используется его
+   pattern/rationale/RPE-слой, которого в каноне нет (замена была бы даунгрейдом).
+   Генерация планов (`training.engine`, `bb-tempo-rest`, `SRCBBScreen`, `ExecutionZone`)
+   не тронута — там свои калибровки и тесты.
+2. **Legacy-фасад**: три движка помечены `@deprecated` + реэкспорт канона
+   (аддитивно, поведение байт-в-байт). Поймано своим прогоном: edit разорвал шапку
+   комментария в `rep-tempo.engine.ts` (esbuild `Unexpected "*"`) — починено до коммита.
+3. **Speed-дубль**: UI-пресет `1-0-0-0` удалён из витрины (сумма 1с — вне диапазона 2–8с);
+   CAT покрывает канон power `1-0-X-0`.
+4. **Кросс-девайс**: `he_tempo_prev_v1`/`he_tempo_hub_v1` не входят в `EXCLUDED_KEYS`/
+   `EXCLUDED_PREFIXES` (`cloud-kv.ts:45`) — синкаются облаком автоматически;
+   lock-тест в `tempo-canon.test.ts`.
+5. **Статус дока** — `✅ выполнен полностью`.
+6. `verify:apk-design` OK; свои **28/28** (канон 16 + мост 5 + UI 7); `tsc` 0 по своим.
 
 ## 9. Риски
 

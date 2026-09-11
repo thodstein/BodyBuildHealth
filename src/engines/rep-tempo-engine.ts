@@ -18,6 +18,10 @@
  *  Example: "3-1-1-0" = 3s eccentric, 1s pause bottom, 1s concentric, 0s pause top
  *
  * @module rep-tempo-engine
+ *
+ * @deprecated для чистого темпа — канон `tempo-canon.engine.ts`.
+ * Этот файл живёт ради pattern/rationale/RPE-слоя (TechniqueCalcTab,
+ * ExerciseLabShared) и заморожен: цифры/порядок правил не менять.
  */
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -213,6 +217,9 @@ const PATTERN_RULES: PatternRule[] = [
 // ═══════════════════════════════════════════════════════════════════════════
 // Main Engine
 // ═══════════════════════════════════════════════════════════════════════════
+
+/** Фасад канона для discoverability (реэкспорт, поведения не меняет). */
+export { TEMPO_CANON, parseTempoCanon, tutSecsForTempo, goalPreviewFor } from './tempo-canon.engine';
 
 export function generateRepTempo(input: RepTempoInput): RepTempoOutput {
   // Override: high risk always forces slow/tempo
