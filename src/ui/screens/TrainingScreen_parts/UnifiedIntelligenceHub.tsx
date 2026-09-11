@@ -93,6 +93,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
   const [repCnt, setRepCnt] = useState(5);
   const [topPct, setTopPct] = useState(0.85);
   const [planRIR, setPlanRIR] = useState(2);
+  const [goal, setGoal] = useState<'strength' | 'hypertrophy'>('hypertrophy');
   const [calDelta, setCalDelta] = useState(0);
   const [sleepDelta, setSleepDelta] = useState(0);
   const [aasMult, setAasMult] = useState(1);
@@ -196,8 +197,8 @@ export const UnifiedIntelligenceHub: React.FC = () => {
 
   const autoReg = useMemo(()=> autoRegulate({
     readiness, acwr: { ratio: acwr.ratio, zone: acwr.zone }, fatigue, hrvRatio, sleepScore: recoveryOut?.sleepScore ?? 70,
-    lastSessionRPE: lastRPE, lastVelocityLossPct: vLoss, plannedTopSetPct: topPct, plannedRIR: planRIR,
-  }), [readiness, acwr, fatigue, hrvRatio, recoveryOut, lastRPE, vLoss, topPct, planRIR]);
+    lastSessionRPE: lastRPE, lastVelocityLossPct: vLoss, plannedTopSetPct: topPct, plannedRIR: planRIR, goal,
+  }), [readiness, acwr, fatigue, hrvRatio, recoveryOut, lastRPE, vLoss, topPct, planRIR, goal]);
 
   const trainToday = useMemo(()=> shouldTrainToday({ readiness, acwr, hrvRatio }), [readiness, acwr, hrvRatio]);
 
@@ -586,8 +587,8 @@ export const UnifiedIntelligenceHub: React.FC = () => {
             <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 8px', borderRadius:20, background:'rgba(168,85,247,0.12)', border:'1px solid rgba(168,85,247,0.22)', color:'#a855f7', fontWeight:800 }}>PRI {pri} · {priThr.label}</span>
           </div>
 
-          {/* PRI */}
-          <MetricCard title={`PRI · ${priThr.label}`} accent={pri>=70?'#22c55e': pri>=50?'#eab308':'#ef4444'}>
+          {/* PRI — контекст/объяснение; в план идёт autoReg ниже */}
+          <MetricCard title={`PRI · ${priThr.label} (контекст)`} accent={pri>=70?'#22c55e': pri>=50?'#eab308':'#ef4444'}>
             <div style={{ height:8, borderRadius:99, background:'rgba(255,255,255,0.06)', overflow:'hidden', marginBottom:6 }}>
               <div style={{ width:`${pri}%`, height:'100%', background: pri>=70? 'linear-gradient(90deg,#22c55e,#16a34a)' : pri>=50? 'linear-gradient(90deg,#eab308,#f59e0b)' : 'linear-gradient(90deg,#ef4444,#dc2626)', transition:'width 0.3s' }} />
             </div>
@@ -599,6 +600,10 @@ export const UnifiedIntelligenceHub: React.FC = () => {
           </MetricCard>
 
           {/* pro decisions */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+            <PopupSelect label="Цель блока (VL-пороги)" value={goal} options={[{id:'hypertrophy',label:'Гипертрофия'},{id:'strength',label:'Сила (VL строже)'}]} onChange={v=> setGoal(v as any)} />
+            <div style={{ fontSize:10, color:DIM, alignSelf:'end', paddingBottom:8, lineHeight:1.4 }}>Применится именно этот блок. PRI выше — объяснение, не второй пересчёт.</div>
+          </div>
           <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background: autoReg.deload? 'rgba(239,68,68,0.07)' : 'rgba(168,85,247,0.06)', border:`1px solid ${autoReg.deload? 'rgba(239,68,68,0.16)' : 'rgba(168,85,247,0.14)'}` }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>
               <div style={{ fontSize:12, fontWeight:900, color: autoReg.deload? '#ef4444' : '#a855f7' }}>{autoReg.deload? '⭐ Deload' : autoReg.intensityNote? autoReg.intensityNote : 'Авторегуляция'}</div>
@@ -614,7 +619,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
             {autoReg.adjustedTopSetPct!=null && <div style={{ marginTop:6, fontSize:10, color:DIM }}>Топ-сет: {(topPct*100).toFixed(0)}% → <b style={{ color:'#fff' }}>{(autoReg.adjustedTopSetPct*100).toFixed(1)}%</b> · RIR: {planRIR} → <b style={{ color:'#fff' }}>{autoReg.adjustedRIR}</b></div>}
           </div>
 
-          {/* RPE ↔ вес — единственный калькулятор в хабе */}
+          {/* RPE ↔ вес — единственный калькулятор в хабе (Epley-канон Helms/Zourdos; консенсус 7 формул — в Лаборатории) */}
           <MetricCard title="RPE ↔ вес (Epley, единственное место)" accent="#a855f7">
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:8 }}>
               <PopupNumber label="e1RM, кг" value={e1rm} min={20} max={400} onChange={setE1rm} />
@@ -637,6 +642,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               <PopupNumber label="Топ-сет план %" value={Math.round(topPct*100)} min={50} max={100} suffix="%" onChange={v=> setTopPct(v/100)} hint="Плановый топ-сет перед авторегуляцией" />
               <PopupNumber label="План RIR" value={planRIR} min={0} max={4} onChange={setPlanRIR} />
             </div>
+            <div style={{ ...SMALL, marginTop:6 }}>ⓘ Новички систематически ошибаются в RIR (Zourdos: 8.96 vs 9.80 на 1RM) — сверяйтесь с RIR-калибровкой ниже.</div>
           </MetricCard>
 
           {/* RIR калибрация — только если есть данные, без дубля */}

@@ -25,6 +25,8 @@ export interface AutoRegInput {
   plannedTopSetPct?: number;    // напр. 0.85
   plannedVolumeMult?: number;    // 1
   plannedRIR?: number;           // 0-4
+  /** Цель блока: силовой порог VL строже (Pareja-Blanco: ≤25% — сила, выше — утомление без силы). */
+  goal?: 'strength' | 'hypertrophy' | 'general';
   /** Суммарный сдвиг RIR из нескольких авторегуляционных источников. */
   combinedRirShift?: number;
 }
@@ -112,9 +114,13 @@ export function autoRegulate(input: AutoRegInput): AutoRegOutput {
   if (lrpe >= 9.5) { volMult *= 0.85; decisions.push(`RPE прошлой сессии ${lrpe}≥9.5 → RIR+2, объём×0.85`); }
   else if (lrpe >= 9 && lrpe > 0) { decisions.push(`RPE прошлой сессии ${lrpe}≥9 → RIR+1, контроль`); }
 
-  // Velocity loss (P2)
+  // Velocity loss (P2 + P4): пороги по цели блока (Pareja-Blanco 2017; Chiang 2025 — межиндивидуальный разброс велик,
+  // поэтому это зоны-предупреждения, а deload-гейт 40% общий). Epley-канон для RPE↔% — осознанно (Helms/Zourdos).
   const vl = input.lastVelocityLossPct ?? 0;
+  const goal = input.goal ?? 'general';
   if (vl > 40) { deload = true; volMult *= 0.5; topMult *= 0.92; decisions.push(`VLoss ${vl}%>40 → deload, объём×0.5, топ-сет×0.92`); }
+  else if (goal === 'strength' && vl > 25) { volMult *= 0.75; decisions.push(`VLoss ${vl}%>25 при силовой цели → объём×0.75 (лишний объём не в силу, Pareja-Blanco)`); }
+  else if (goal !== 'strength' && vl > 30) { volMult *= 0.85; decisions.push(`VLoss ${vl}%>30 → объём×0.85`); }
   else if (vl > 25) { volMult *= 0.8; decisions.push(`VLoss ${vl}%>25 → объём×0.8`); }
   else if (vl > 0 && vl < 10) { volMult *= 1.05; decisions.push(`VLoss ${vl}%<10 (свежесть) → объём×1.05`); }
 
