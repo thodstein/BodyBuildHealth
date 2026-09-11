@@ -45,6 +45,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
+import { bbOrthoMobilityAdd } from '../../../engines/pro/ortho-screen.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply, applyToPlanner, type WeakpointsPayload } from './planner-bridge';
 import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
@@ -1625,20 +1626,26 @@ export const BbAutoConstructor: React.FC = () => {
         }
         // J7 орто-скрининг: гарды ПРИМЕНЯЮТСЯ (не только сохраняются).
         // pauseOverhead/limitDeepSquat → mobilityRestrictions (живой фильтр пула);
-        // Beighton closedChainOnly → авто-делод (щадящий режим); всё — в персист + тост.
+        // Beighton closedChainOnly / teen → интенсивность light + авто-делод (щадящий режим); всё — в персист + тост.
         if (bbDiag.orthoGuards && typeof bbDiag.orthoGuards === 'object') {
           const og = bbDiag.orthoGuards as { pauseOverhead?: boolean; limitDeepSquat?: boolean; closedChainOnly?: boolean; blockedPatterns?: string[]; mobilityAdd?: string[] };
-          const BB_MOB = ['shoulder', 'hip', 'ankle', 'lower_back', 'wrist'];
-          const mobAdd = Array.from(new Set([...(og.pauseOverhead ? ['shoulder'] : []), ...(og.limitDeepSquat ? ['hip'] : []), ...((og.mobilityAdd || []).filter((m) => BB_MOB.includes(String(m))))]));
+          const mobAdd = bbOrthoMobilityAdd(og);
           if (mobAdd.length) {
             setMobilityRestrictions((prev) => Array.from(new Set([...prev, ...mobAdd])));
             pro2parts.push(`🦴 орто-гарды: ${mobAdd.join('+')} → фильтр пула`);
           }
           if (og.closedChainOnly) {
             setAutoDeload(true);
-            pro2parts.push('🦴 Beighton+: авто-делод ВКЛ (щадящий режим)');
+            setIntensityLevel('light');
+            pro2parts.push('🦴 Beighton+: light + авто-делод (щадящий режим)');
           }
           try { localStorage.setItem('he_bb_ortho_guards', JSON.stringify(og)); } catch {}
+        }
+        if (typeof bbDiag.teenNote === 'string' && bbDiag.teenNote) {
+          try { localStorage.setItem('he_bb_last_teen', bbDiag.teenNote); } catch {}
+          setAutoDeload(true);
+          setIntensityLevel('light');
+          pro2parts.push('🧒 teen: light + авто-делод');
         }
         if (Array.isArray(bbDiag.orthoFlags) && bbDiag.orthoFlags.length) {
           try { localStorage.setItem('he_bb_ortho_flags', JSON.stringify(bbDiag.orthoFlags)); } catch {}

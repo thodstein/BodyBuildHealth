@@ -145,6 +145,11 @@ export function useStrengthSportWizard() {
         try { setContestStrategy('conservative'); } catch {}
         setMsg('🧒 Teen 14–15: консервативный режим (без максимумов, RIR≥2)'); setTimeout(() => setMsg(''), 2600);
       }
+      // П1/П2: Beighton closedChainOnly — тоже консервативный режим (щадящий, без максимумов).
+      if (p.orthoClosedChain) {
+        try { setContestStrategy('conservative'); } catch {}
+        setMsg('🦴 Beighton+: консервативный режим (закрытая цепь, без end-range)'); setTimeout(() => setMsg(''), 2600);
+      }
       if (p.orthoSummary || p.orthoYokeGate || p.orthoTeen || p.orthoClosedChain) {
         try {
           const parts: string[] = [];

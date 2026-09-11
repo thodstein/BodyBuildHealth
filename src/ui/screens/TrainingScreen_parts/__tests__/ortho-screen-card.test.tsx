@@ -25,6 +25,12 @@ describe('OrthoScreenCard', () => {
     fireEvent.change(screen.getByLabelText('Hop Single R, см'), { target: { value: '200' } });
     expect(screen.getByText(/итог 75%/)).toBeTruthy();
   });
+  it('сила считает живой LSI', () => {
+    render(<OrthoScreenCard />);
+    fireEvent.change(screen.getByLabelText('Сила Квадр L, кг'), { target: { value: '80' } });
+    fireEvent.change(screen.getByLabelText('Сила Квадр R, кг'), { target: { value: '100' } });
+    expect(screen.getByText(/LSI силы: квадр 80%/)).toBeTruthy();
+  });
   it('печать открывает окно (фолбэк — копия HTML)', () => {
     const write = vi.fn();
     const close = vi.fn();

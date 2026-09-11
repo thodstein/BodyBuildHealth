@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   screenOrtho, orthoGuardsForPlan, saveOrthoFlags, loadOrthoFlags,
   applyOrthoToProfile, rankJointSupport, buildOrthoCsv, buildOrthoHtml,
-  orthoBridgePayload, hopLsiOverall,
+  orthoBridgePayload, hopLsiOverall, strengthLsiOverall,
   type OrthoScreenInput,
 } from '../../../engines/pro/ortho-screen.engine';
 import { applyToPlanner } from './planner-bridge';
@@ -27,6 +27,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
     valgusSls: false, wobbleStepDown: false, ybt: '',
     lsiMeasured: false, lsiPass: false, months: '', graft: 'none' as string, fear: false, prevention: false,
     hopSL: '', hopSR: '', hopTL: '', hopTR: '',
+    strQL: '', strQR: '', strHL: '', strHR: '',
     slrPain: false, stiffLong: false, popSound: false, cantHeel: false,
     fink: false, phalen: false, tinel: false, elbowV: false,
     pinkyL: false, pinkyR: false, thumbL: false, thumbR: false, elbowL: false, elbowR: false, kneeL: false, kneeR: false, trunk: false, age: '', pq: '',
@@ -39,7 +40,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
     shoulder: { painfulArc: s.painfulArc, hawkinsPain: s.hawkinsPain, jobeWeak: s.jobeWeak, dropArm: s.dropArm, apprehension: s.apprehension },
     hip: { faddirPain: s.faddirPain, faberPain: s.faberPain, iropPain: s.iropPain, romFlag: s.romFlag },
     knee: { valgusSls: s.valgusSls, wobbleStepDown: s.wobbleStepDown, ybtAntDiffCm: s.ybt === '' ? undefined : Number(s.ybt) },
-    rts: { lsiMeasured: s.lsiMeasured, lsiPass: s.lsiPass, monthsSinceOp: s.months === '' ? undefined : Number(s.months), graft: s.graft as 'btb' | 'hamstring' | 'other' | 'none', fear: s.fear, preventionProgram: s.prevention, hop: { singleL: s.hopSL === '' ? undefined : Number(s.hopSL), singleR: s.hopSR === '' ? undefined : Number(s.hopSR), tripleL: s.hopTL === '' ? undefined : Number(s.hopTL), tripleR: s.hopTR === '' ? undefined : Number(s.hopTR) } },
+    rts: { lsiMeasured: s.lsiMeasured, lsiPass: s.lsiPass, monthsSinceOp: s.months === '' ? undefined : Number(s.months), graft: s.graft as 'btb' | 'hamstring' | 'other' | 'none', fear: s.fear, preventionProgram: s.prevention, hop: { singleL: s.hopSL === '' ? undefined : Number(s.hopSL), singleR: s.hopSR === '' ? undefined : Number(s.hopSR), tripleL: s.hopTL === '' ? undefined : Number(s.hopTL), tripleR: s.hopTR === '' ? undefined : Number(s.hopTR) }, strength: { quadL: s.strQL === '' ? undefined : Number(s.strQL), quadR: s.strQR === '' ? undefined : Number(s.strQR), hamL: s.strHL === '' ? undefined : Number(s.strHL), hamR: s.strHR === '' ? undefined : Number(s.strHR) } },
     spine: { slrPain: s.slrPain, morningStiffnessLong: s.stiffLong },
     achilles: { popSound: s.popSound, cantHeelRaise: s.cantHeel },
     hand: { finkelsteinPain: s.fink, phalenNumbness: s.phalen, tinelTingle: s.tinel },
@@ -52,6 +53,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
   const result = useMemo(() => screenOrtho(input), [input]);
   const guards = useMemo(() => orthoGuardsForPlan(result), [result]);
   const hopLsiLive = useMemo(() => hopLsiOverall(input.rts?.hop), [input]);
+  const strLsiLive = useMemo(() => strengthLsiOverall(input.rts?.strength), [input]);
   const support = useMemo(() => rankJointSupport(), []);
   const evColor = (e: string): string => e === 'proven' ? '#22c55e' : e === 'moderate' ? '#f59e0b' : e === 'weak' ? '#71717a' : '#f43f5e';
 
@@ -138,6 +140,19 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
           {hopLsiLive.overall != null && (
             <div style={{ fontSize: 11, color: hopLsiLive.overall >= 90 ? '#22c55e' : '#f59e0b' }}>
               LSI: single {hopLsiLive.single}% · triple {hopLsiLive.triple ?? '—'}% → итог {hopLsiLive.overall}% {hopLsiLive.overall >= 90 ? '✓' : '< 90%'} (замер бьёт чекбоксы)
+            </div>
+          )}
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>RTS: сила, кг (квадр/хамс L/R → LSI, порог 90%)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {([['strQL', 'Квадр L'], ['strQR', 'Квадр R'], ['strHL', 'Хамс L'], ['strHR', 'Хамс R']] as Array<[string, string]>).map(([k, label]) => (
+              <label key={k} style={{ fontSize: 11, color: '#fff' }}>{label}:
+                <input value={(s as unknown as Record<string, string>)[k]} onChange={e => set(k, e.target.value)} inputMode="decimal" placeholder="кг" aria-label={`Сила ${label}, кг`} style={{ marginLeft: 6, width: 80, padding: 6, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 12 }} />
+              </label>
+            ))}
+          </div>
+          {strLsiLive.overall != null && (
+            <div style={{ fontSize: 11, color: strLsiLive.overall >= 90 ? '#22c55e' : '#f59e0b' }}>
+              LSI силы: квадр {strLsiLive.quad}% · хамс {strLsiLive.ham ?? '—'}% → итог {strLsiLive.overall}% {strLsiLive.overall >= 90 ? '✓' : '< 90%'} (замер бьёт чекбоксы)
             </div>
           )}
           <Check label="LSI измерено (сила + hop)" value={s.lsiMeasured} onChange={v => set('lsiMeasured', v)} />

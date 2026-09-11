@@ -128,6 +128,8 @@ export interface RtsChecklistInput {
   preventionProgram?: boolean; // есть ACL-prevention программа
   /** П5: измеренные hop-дистанции, см (single-hop + triple-hop L/R) — приоритет над ручными чекбоксами */
   hop?: HopInput;
+  /** П5-добой: измеренная сила, кг (квадр/хамс L/R) — приоритет над ручными чекбоксами */
+  strength?: StrengthInput;
 }
 
 /** П5: LSI одного hop-теста = min/max×100. null — нет данных (ноль/пусто/мусор). */
@@ -146,14 +148,39 @@ export function hopLsiOverall(h?: HopInput): { single: number | null; triple: nu
   return { single, triple, overall: vals.length ? Math.min(...vals) : null };
 }
 
+/** П5-добой: сила (квадрицепс/хамстринг L/R, кг) — LSI тем же min/max×100. */
+export interface StrengthInput { quadL?: number; quadR?: number; hamL?: number; hamR?: number }
+
+export function strengthLsiOverall(s?: StrengthInput): { quad: number | null; ham: number | null; overall: number | null } {
+  const quad = hopLsi(s?.quadL, s?.quadR);
+  const ham = hopLsi(s?.hamL, s?.hamR);
+  const vals = [quad, ham].filter((v): v is number => v != null);
+  return { quad, ham, overall: vals.length ? Math.min(...vals) : null };
+}
+
+/** П6: чистая логика ББ-приёмника (покрыта тестом; сам приёмник дергает те же сеттеры). */
+export const BB_MOBILITY_IDS = ['shoulder', 'hip', 'ankle', 'lower_back', 'wrist'];
+
+export function bbOrthoMobilityAdd(g: { pauseOverhead?: boolean; limitDeepSquat?: boolean; mobilityAdd?: string[] }): string[] {
+  return Array.from(new Set([
+    ...(g.pauseOverhead ? ['shoulder'] : []),
+    ...(g.limitDeepSquat ? ['hip'] : []),
+    ...((g.mobilityAdd || []).filter((m) => BB_MOBILITY_IDS.includes(String(m)))),
+  ]));
+}
+
 export function assessRts(i: RtsChecklistInput): { ready: boolean; status: string; flags: OrthoFlag[] } {
   // П5: измеренные hop-дистанции приоритетнее ручных чекбоксов
   const hop = hopLsiOverall(i.hop);
+  const str = strengthLsiOverall(i.strength);
   const hopMeasured = hop.overall != null;
-  const lsiMeasured = hopMeasured || Boolean(i.lsiMeasured);
-  const lsiPass = hopMeasured ? (hop.overall as number) >= 90 : Boolean(i.lsiPass);
-  const hopNote = hopMeasured
-    ? ` Замерено: single ${hop.single}% · triple ${hop.triple}% (порог 90%).`
+  const strMeasured = str.overall != null;
+  const lsiMeasured = hopMeasured || strMeasured || Boolean(i.lsiMeasured);
+  const lsiPass = hopMeasured || strMeasured
+    ? (hop.overall == null || hop.overall >= 90) && (str.overall == null || str.overall >= 90)
+    : Boolean(i.lsiPass);
+  const hopNote = hopMeasured || strMeasured
+    ? ` Замерено:${hopMeasured ? ` hop single ${hop.single}% · triple ${hop.triple}%` : ''}${strMeasured ? ` сила квадр ${str.quad}% · хамс ${str.ham}%` : ''} (порог 90%).`
     : '';
   if (!lsiMeasured) {
     return {
@@ -170,7 +197,11 @@ export function assessRts(i: RtsChecklistInput): { ready: boolean; status: strin
   const timeOk = typeof i.monthsSinceOp === 'number' && i.monthsSinceOp >= minMonths;
   const ready = Boolean(lsiPass && timeOk && !i.fear && i.preventionProgram);
   const missing: string[] = [];
-  if (!lsiPass) missing.push(hopMeasured ? `LSI ${hop.overall}% <90%` : 'LSI <90%');
+  if (!lsiPass) {
+    const worst = hopMeasured && strMeasured ? Math.min(hop.overall as number, str.overall as number)
+      : hopMeasured ? hop.overall as number : strMeasured ? str.overall as number : null;
+    missing.push(worst != null ? `LSI ${worst}% <90%` : 'LSI <90%');
+  }
   if (!timeOk) missing.push(`срок <${minMonths} мес`);
   if (i.fear) missing.push('страх движения');
   if (!i.preventionProgram) missing.push('нет prevention-программы');

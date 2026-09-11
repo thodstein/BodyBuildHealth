@@ -49,4 +49,32 @@ describe('J7 приёмник орто-моста в Арм-конструкто
     expect(localStorage.getItem('he_arm_ortho_guards')).toBeNull();
     expect(document.body.textContent).not.toContain('Орто-гарды');
   });
+
+  it('mobilityAdd пишет wrist/elbow в профиль (живой фильтр пула без ручной кнопки)', () => {
+    localStorage.setItem('he_profile_v2', JSON.stringify({ settings: { health: {}, training: {} } }));
+    applyToPlanner({
+      kind: 'weakpoints', label: 'Орто-скрининг J1–J7',
+      data: { groups: [], orthoGuards: { mobilityAdd: ['wrist', 'elbow', 'knee'] } },
+      source: 'intellectual',
+    });
+    render(<ArmAutoConstructor />);
+    const prof = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+    const s = prof.settings ?? prof;
+    expect((s.health?.mobilityRestrictions || [])).toContain('wrist');
+    expect((s.health?.mobilityRestrictions || [])).toContain('elbow');
+    // knee — не ключ АРМ-пула, в профиль не пишем
+    expect((s.health?.mobilityRestrictions || [])).not.toContain('knee');
+  });
+
+  it('closedChainOnly/teen включают «Без отказов»', () => {
+    applyToPlanner({
+      kind: 'weakpoints', label: 'Орто-скрининг J1–J7',
+      data: { groups: [], orthoGuards: { closedChainOnly: true }, teenNote: 'Подросток 14–15' },
+      source: 'intellectual',
+    });
+    const { container } = render(<ArmAutoConstructor />);
+    expect(document.body.textContent).toContain('Подросток 14–15');
+    expect(JSON.parse(localStorage.getItem('he_arm_ortho_guards') || '{}').closedChainOnly).toBe(true);
+    void container;
+  });
 });

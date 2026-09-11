@@ -602,15 +602,39 @@ export function ArmAutoConstructor() {
           flash(`⛔ Red-flags из диагностики: ${rf.join(', ')} — сначала врач, тесты после`);
         }
       } catch {}
-      // J7 орто-скрининг: гарды — в персист + флеш (wrist/elbow уже в профиле через applyOrthoToProfile → живой фильтр пула)
+      // J7 орто-скрининг: гарды ИСПОЛНЯЮТСЯ.
+      // mobilityAdd (wrist/forearm/elbow) → прямо в профиль (живой фильтр пула без ручной кнопки);
+      // Beighton closedChainOnly / teen → «Без отказов» (щадящий режим); всё — в персист + флеш.
       try {
         const og = payload.data?.orthoGuards;
         if (og && typeof og === 'object') {
           localStorage.setItem('he_arm_ortho_guards', JSON.stringify(og));
           const bits: string[] = [];
           if ((og as any).pauseOverhead) bits.push('плечо-пауза');
-          if ((og as any).closedChainOnly) bits.push('Beighton-щадящий');
-          if (Array.isArray((og as any).mobilityAdd) && (og as any).mobilityAdd.length) bits.push((og as any).mobilityAdd.join('+'));
+          if ((og as any).closedChainOnly) {
+            bits.push('Beighton-щадящий');
+            setCycNever(true);
+          }
+          const mobW = Array.isArray((og as any).mobilityAdd)
+            ? Array.from(new Set((og as any).mobilityAdd.map((m: unknown) => String(m)).filter((m: string) => ['wrist', 'forearm', 'elbow'].includes(m))))
+            : [];
+          if (mobW.length) {
+            bits.push(mobW.join('+'));
+            try {
+              const raw = localStorage.getItem('he_profile_v2');
+              if (raw) {
+                const p = JSON.parse(raw);
+                const s = p.settings ?? p;
+                s.health = s.health ?? {};
+                s.training = s.training ?? {};
+                const hPrev: string[] = Array.isArray((s.health as any).mobilityRestrictions) ? (s.health as any).mobilityRestrictions : [];
+                const tPrev: string[] = Array.isArray((s.training as any).mobilityRestrictions) ? (s.training as any).mobilityRestrictions : [];
+                (s.health as any).mobilityRestrictions = Array.from(new Set([...hPrev, ...mobW]));
+                (s.training as any).mobilityRestrictions = Array.from(new Set([...tPrev, ...mobW]));
+                localStorage.setItem('he_profile_v2', JSON.stringify(p.settings ? { ...p, settings: s } : s));
+              }
+            } catch {}
+          }
           if (bits.length) flash(`🦴 Орто-гарды: ${bits.join(' · ')}`);
         }
         const of = payload.data?.orthoFlags;
@@ -618,7 +642,10 @@ export function ArmAutoConstructor() {
           try { localStorage.setItem('he_arm_ortho_flags', JSON.stringify(of)); } catch {}
         }
         const tn = payload.data?.teenNote;
-        if (typeof tn === 'string' && tn) flash(`🧒 ${tn}`);
+        if (typeof tn === 'string' && tn) {
+          setCycNever(true);
+          flash(`🧒 ${tn}`);
+        }
       } catch {}
       // TOP из хаба: матчап + Table-IQ (аддитивно)
       try {

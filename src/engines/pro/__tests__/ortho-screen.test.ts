@@ -4,7 +4,7 @@ import {
   assessSpineMin, assessAchilles, assessHand, assessElbowValgus,
   scoreBeighton, beightonCutoff, assessBeighton, assessYellow, teenGate,
   rankJointSupport, screenOrtho, orthoGuardsForPlan, buildOrthoCsv, orthoBridgePayload,
-  hopLsi, hopLsiOverall, applyOrthoToProfile,
+  hopLsi, hopLsiOverall, strengthLsiOverall, bbOrthoMobilityAdd, applyOrthoToProfile,
 } from '../ortho-screen.engine';
 
 describe('ortho-screen J1 плечо', () => {
@@ -223,5 +223,38 @@ describe('ortho-screen SM-мост: parseSmBridgePayload ест орто-пол�
     expect(empty.orthoBlocked).toEqual([]);
     expect(empty.orthoTeen).toBe(false);
     expect(empty.orthoSummary).toBeNull();
+  });
+  it('orthoBlocked ПЛ-словаря → mobility SM/TA (П3)', async () => {
+    const { parseSmBridgePayload } = await import('../../../ui/screens/strength-sport/sm-bridge-intake');
+    const p = parseSmBridgePayload({ orthopedic: { blockedPatterns: ['vertical_push', 'lunge', 'нос', 'hinge'] } });
+    expect(p.orthoBlocked).toEqual(['vertical_push', 'lunge', 'нос', 'hinge']);
+    expect(p.orthoMobility).toEqual(['shoulder', 'knee', 'lower_back']);
+  });
+});
+
+describe('ortho-screen strength-LSI + ББ-хелпер', () => {
+  it('сила: квадр/хамс LSI тем же min/max; мусор → null', () => {
+    expect(strengthLsiOverall({ quadL: 90, quadR: 100, hamL: 80, hamR: 100 }).overall).toBe(80);
+    expect(strengthLsiOverall({}).overall).toBeNull();
+    expect(strengthLsiOverall({ quadL: 0, quadR: 100 }).quad).toBeNull();
+  });
+  it('RTS: сила <90 блокирует даже при hop≥90 (худший побеждает)', () => {
+    const r = assessRts({
+      monthsSinceOp: 9, graft: 'btb', fear: false, preventionProgram: true,
+      hop: { singleL: 195, singleR: 200 }, strength: { quadL: 80, quadR: 100 },
+    });
+    expect(r.ready).toBe(false);
+    expect(r.flags[0].label).toMatch(/80%/);
+  });
+  it('RTS: сила+hop ≥90 — готов без чекбоксов', () => {
+    const r = assessRts({
+      monthsSinceOp: 9, graft: 'btb', fear: false, preventionProgram: true,
+      hop: { singleL: 195, singleR: 200 }, strength: { quadL: 95, quadR: 100, hamL: 92, hamR: 100 },
+    });
+    expect(r.ready).toBe(true);
+  });
+  it('bbOrthoMobilityAdd: паузы + whitelist, чужие режутся', () => {
+    expect(bbOrthoMobilityAdd({ pauseOverhead: true, limitDeepSquat: true, mobilityAdd: ['wrist', 'нос', 'knee'] })).toEqual(['shoulder', 'hip', 'wrist']);
+    expect(bbOrthoMobilityAdd({ pauseOverhead: false, limitDeepSquat: false, mobilityAdd: [] })).toEqual([]);
   });
 });

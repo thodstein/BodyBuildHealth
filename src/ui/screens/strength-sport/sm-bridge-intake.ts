@@ -200,7 +200,13 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     return Array.from(new Set(out));
   };
   const orthoBlocked = Array.from(new Set([...strArr(ortRaw?.blockedPatterns), ...strArr(ogRaw?.blockedPatterns)])).slice(0, 8);
-  const orthoMobility = Array.from(new Set([...strArr(ogRaw?.mobilityAdd, 7)].filter((m) => MOB_KEYS.includes(m))));
+  // П3: blocked-паттерны ПЛ-словаря → mobility-ключи SM/TA (семантика orthopedic-load-engines blacklist).
+  const BLOCK_TO_MOB: Record<string, string> = {
+    vertical_push: 'shoulder', horizontal_push: 'shoulder', vertical_pull: 'shoulder',
+    squat: 'hip', lunge: 'knee', hinge: 'lower_back', carry: 'lower_back',
+  };
+  const blockedMob = orthoBlocked.map((b) => BLOCK_TO_MOB[b]).filter((m): m is string => Boolean(m));
+  const orthoMobility = Array.from(new Set([...strArr(ogRaw?.mobilityAdd, 7), ...blockedMob].filter((m) => MOB_KEYS.includes(m))));
   const orthoYokeGate = ogRaw?.yokeGate === true;
   const orthoClosedChain = ogRaw?.closedChainOnly === true;
   const orthoTeen = typeof (d as any).teenNote === 'string' && ((d as any).teenNote as string).length > 0;
