@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Сцена: бикини ×2 + бодифитнес + дельты + wellness — 5 женских циклов (Sep 11 2026, в worktree БЕЗ коммита)
+
+По команде «выполняй полностью» (аудит 10 женских циклов + сеть: Traisha Martin 12w prep/M&S/Mikolo + критерии Manion/NPC/IFBB). Только Write/Edit + vitest/tsc через терминал; чужие WIP не тронуты (bb-pro3/cardio/BBDiagnosticsHub — в диффе только свои ханки, сверено `git diff`).
+
+- **NEW 5** (`src/data/lms-cycles/`): `f-bikini-base-12` (off-season база 4×, RIR 3→2, делоды 6/12), `f-bikini-prep-12` (подводка 5× по Traisha: плечи/спина/ноги/руки/autoregulation, с W6 50% → 4×12, RIR≥1, contest-тег), `f-bodyfitness-12` (Figure-плотность 5× KMS-MS: квадр-свип + хамс в 2 углах + кап дельт + ширина спины, targetFocus mixed), `f-delt-8` (hourglass 4×: 2 плечевых дня средняя+задняя, без шрагов в шаблоне, targetFocus shoulders), `f-wellness-12` (низ-доминанта 5×: 3 низа + 2 верха-лайт, без симметрии верх/низ).
+- **Реестр**: импорт + массив в `lms-cycle-index.ts` (каталог 127→132, все с тегом `female`).
+- **Тесты**: NEW `bb-female-stage.test.ts` 8/8 (реестр/форма/female-тег, prep RIR≥1, base thrust+баланс, bodyfitness свип, delt махи без шрагов в шаблоне — финализатор вправе добить трапы, wellness ≥3 низ-дня, quads>2, валидатор 0 errors); `cycle-wave2-matrix` расширен (+5 id, 132, «все 22») 3/3; `manual-library-arm-ss` калибровка advanced 65→66 (bodyfitness KMS-MS, честно); `cycle-catalog-arm-ss` без правок.
+- **Проверено**: 43/43 (stage 8 + female-cycles 10 + wave2 3 + catalog 12 + manual-library 10), `tsc` 0 по своим (3 ошибки — чужой `BBDiagnosticsHub.tsx` WIP: lvpPts×2 + implicit any, не тронут; tsc гонялся с NODE_OPTIONS=12GB — дефолтный heap падает OOM). НЕ КОММИТИЛ/НЕ ПУШИЛ (в worktree чужие WIP: pro3/cardio/hub).
+
 ## ББ-хаб PRO-3: R1–R7 + добивка закрыты кодом (Sep 11 2026, закоммичен, без пуша)
 
 По команде «выполняй полностью» закрыты все 7 эпиков + 5 честных гэпов (§7 в `docs/BB-DIAGNOSTICS-HUB-PRO-3.md`, интернет-синтез: Wolf/Maeo LML, Parkinson/Bishop асимметрия, Pareja-Blanco VBT, Calatayud/Schoenfeld MMC). Только Edit/Write + vitest/tsc через терминал; чужие WIP не тронуты (taper/cardio/annual).

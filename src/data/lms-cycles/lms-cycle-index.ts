@@ -72,6 +72,12 @@ import { CYCLE_BB_M_LEGS_10 } from './cycle-bb-m-legs-10';
 import { CYCLE_BB_M_STRENGTH_8 } from './cycle-bb-m-strength-8';
 import { CYCLE_BB_M_HOTEL_4 } from './cycle-bb-m-hotel-4';
 import { CYCLE_BB_F_GLUTE_PUMP_4 } from './cycle-bb-f-glute-pump-4';
+// Сцена: бикини ×2 + бодифитнес + дельты + wellness (сеть: Traisha/M&S/Mikolo + Manion/NPC/IFBB)
+import { CYCLE_BB_F_BIKINI_BASE_12 } from './cycle-bb-f-bikini-base-12';
+import { CYCLE_BB_F_BIKINI_PREP_12 } from './cycle-bb-f-bikini-prep-12';
+import { CYCLE_BB_F_BODYFITNESS_12 } from './cycle-bb-f-bodyfitness-12';
+import { CYCLE_BB_F_DELT_8 } from './cycle-bb-f-delt-8';
+import { CYCLE_BB_F_WELLNESS_12 } from './cycle-bb-f-wellness-12';
 
 // СРЦ2 (авторские программы) — начато Jul 12
 import { SRC2_MURAVYOV_16 } from './src2/src2-muravyov-16';
@@ -205,7 +211,13 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_BB_M_LEGS_10,
  CYCLE_BB_M_STRENGTH_8,
  CYCLE_BB_M_HOTEL_4,
- CYCLE_BB_F_GLUTE_PUMP_4,
+  CYCLE_BB_F_GLUTE_PUMP_4,
+  // Сцена: бикини база + подводка + бодифитнес + дельты + wellness
+  CYCLE_BB_F_BIKINI_BASE_12,
+  CYCLE_BB_F_BIKINI_PREP_12,
+  CYCLE_BB_F_BODYFITNESS_12,
+  CYCLE_BB_F_DELT_8,
+  CYCLE_BB_F_WELLNESS_12,
    // СРЦ2
    SRC2_MURAVYOV_16,
    SRC2_SOLOVYOV_BENCH_28,
