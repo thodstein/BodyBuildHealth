@@ -11,7 +11,7 @@ import { useDataLink } from '../../../core/data-link';
 import {
   ACCENT, DIM, CARD, SMALL,
   GROUPS, GROUP_RU, TYPE_RU, EQUIP_RU, RIR_TO_RPE, RPE_LABEL,
-  REGION_MAP, getExerciseRegion, getResistanceProfile, getDifficultyScaler,
+  REGION_MAP, getExerciseRegion, getDifficultyScaler,
   SUBREGION_DEFS, calcTechniqueScore, getRiskColor,
 } from './ExerciseLabShared';
 import { calculatePlates } from '../../../engines/gym-competition.engine';
@@ -20,6 +20,7 @@ import { velocityForPct, pctForVelocity, estimate1RMFromVelocity } from '../../.
 import { tempoFor, tutForSet, REST_BY_CHARACTER } from '../../../engines/bb/bb-tempo-rest';
 import { techniquesFor } from '../../../engines/bb/bb-intensity-techniques';
 import { resolveLabWorkingWeight, getLabResistanceProfile } from '../../../engines/lab-exercise-profile.engine';
+import { calcExerciseEffect, exerciseEffectScore } from '../../../engines/bb/bb-exercise-effect.engine';
 import { prescribeLabCorrections, simulateLabCorrection, buildLabBridgeData, formatSimulatorDelta } from '../../../engines/lab-exercise-correction.engine';
 import { loadLabPlanFromStorage } from '../../../engines/lab-plan-exercise-audit.engine';
 import { readLabAthleteCtx, readLabPlanBundle, diagnoseLabWithPlan, useLabRefresh } from './lab-athlete-ctx';
@@ -265,7 +266,20 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
     return { current: oneRM, projected, weeklyRate, pctGain, progressionWeeks };
   }, [oneRM, level, totalWeeks, week]);
 
-  const resistanceProfile = useMemo(() => { if (!ex) return null; return getResistanceProfile(ex); }, [ex]);
+  // Добивка-3: профиль из данных (Epic A), а не эвристика по названию.
+  const resistanceProfile = useMemo(() => {
+    if (!ex) return null;
+    try {
+      const lab = getLabResistanceProfile({ id: ex.id, name: ex.name });
+      const meta = {
+        lengthened: { label: 'Растянутая позиция', color: '#22c55e', note: 'Пик нагрузки в растянутой — главный драйвер гипертрофии (Strey 2026, ES 0.283)' },
+        mid: { label: 'Середина амплитуды', color: '#60a5fa', note: 'Основное усилие в середине — сила и база' },
+        short: { label: 'Пиковое сокращение', color: '#a78bfa', note: 'Пик в сокращённой — памп, дополняет lengthened, не заменяет' },
+      } as const;
+      const m = meta[lab.profile];
+      return { ...m, profile: lab.profile, sfr: lab.sfr, estimated: lab.source === 'estimated' };
+    } catch { return null; }
+  }, [ex]);
   const difficultyScaler = useMemo(() => { if (!ex) return null; return getDifficultyScaler(ex); }, [ex]);
 
   const freqRecommendation = useMemo(() => {
@@ -347,22 +361,24 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
     return { totalCal, glycogen, epoc, met, totalTimeMin: Math.round(totalTimeH * 60) };
   }, [ex, presc, tutInfo, workWeight, profile]);
 
+  // Добивка-3: рейтинг по exerciseEffectScore (SFR + lengthened + усталость, формула в движке),
+  // а не по выдуманной арифметике score*7 на эвристике.
   const exerciseRanking = useMemo(() => {
     if (!ex) return null;
     const groupExs = EXERCISE_CATALOG.filter(e => e.group === ex.group && e.id !== ex.id).slice(0, 15);
     const scored = groupExs.map(e => {
       try {
-        const p = calcExercisePrescription(e, goal, level, false, false, 1, week, totalWeeks);
-        const rp = getResistanceProfile(e);
-        const goalBonus = goal === 'hypertrophy' && rp.curve === 'stretch_mediated' ? 3 : goal === 'strength' && rp.curve === 'mid_range' ? 3 : 0;
-        return { id: e.id, name: e.name, score: Math.min(100, Math.round(rp.score * 7 + goalBonus * 3 + (e.type === 'compound' ? 5 : 0))), type: e.type };
+        const eff = calcExerciseEffect({ id: e.id, name: e.name, muscle: e.group }, { goal, muscle: e.group });
+        return { id: e.id, name: e.name, score: exerciseEffectScore(eff), sfr: eff.sfr, profile: eff.profile, type: e.type };
       } catch { return null; }
     }).filter((s): s is NonNullable<typeof s> => s !== null).sort((a, b) => b.score - a.score).slice(0, 8);
-    const currentRp = resistanceProfile;
-    const currentScore = currentRp ? Math.min(100, Math.round(currentRp.score * 7 + (ex.type === 'compound' ? 5 : 0))) : 50;
+    let currentScore = 50;
+    try {
+      currentScore = exerciseEffectScore(calcExerciseEffect({ id: ex.id, name: ex.name, muscle: ex.group }, { goal, muscle: ex.group }));
+    } catch {}
     const rank = scored.findIndex(s => s.score < currentScore);
     return { list: scored, currentScore, currentRank: rank === -1 ? scored.length + 1 : rank + 1, total: scored.length + 1 };
-  }, [ex, goal, level, week, totalWeeks, resistanceProfile]);
+  }, [ex, goal]);
 
   // PRO-анализ группы вынесён в Шаг 3 (ProSubstituteTab) — без дублей.
   const [vbtVel, setVbtVel] = useState<number>(0);
@@ -386,7 +402,7 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
       `1ПМ: ${oneRM} кг · Вес: ${workWeight} кг (${pct}%) · ${presc.sets}×${presc.reps} · RIR ${presc.rir} · RPE ${rpeInfo?.rpe}/10 · Отдых ${presc.rest}с`,
       `Объём: ${(volumeLoad / 1000).toFixed(1)}k кг · Утомление: ${fatigueScore}/20 · AMRAP: ~${amrapEstimate}`,
     ];
-    if (resistanceProfile) lines.push(`Профиль: ${resistanceProfile.label} (${resistanceProfile.score}/10) · ${resistanceProfile.bestGoal}`);
+    if (resistanceProfile) lines.push(`Профиль: ${resistanceProfile.label} (SFR ${resistanceProfile.sfr ?? '—'})${resistanceProfile.estimated ? ' [ориентир]' : ''}`);
     if (fatigueAnalysis) lines.push(`ЦНС: ${fatigueAnalysis.cnsLoad}/10 · Мышцы: ${fatigueAnalysis.muscularLoad}/10 · Восст.: ${fatigueAnalysis.recoveryHours}ч`);
     if (metabolicCost) lines.push(`Метаболизм: ${metabolicCost.totalCal} ккал · Гликоген: ${metabolicCost.glycogen}г · EPOC: +${metabolicCost.epoc} ккал`);
     if (oneRMProjection) lines.push(`Прогноз 1ПМ: ${oneRMProjection.projected} кг (+${oneRMProjection.pctGain}%) через ${oneRMProjection.progressionWeeks} нед`);
@@ -591,11 +607,11 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
         )}
 
         {resistanceProfile && (
-          <div style={{ ...CARD, marginTop: 10, border: `1px solid ${resistanceProfile.curve === 'stretch_mediated' ? 'rgba(34,197,94,0.3)' : 'rgba(96,165,250,0.3)'}` }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: resistanceProfile.curve === 'stretch_mediated' ? '#22c55e' : '#60a5fa', marginBottom: 4 }}>📐 Профиль сопротивления</div>
+          <div style={{ ...CARD, marginTop: 10, border: `1px solid ${resistanceProfile.profile === 'lengthened' ? 'rgba(34,197,94,0.3)' : 'rgba(96,165,250,0.3)'}` }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: resistanceProfile.color, marginBottom: 4 }}>📐 Профиль сопротивления {resistanceProfile.estimated && <span style={{ fontSize: 9, color: '#fff' }}>(ориентир)</span>}</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: resistanceProfile.curve === 'stretch_mediated' ? '#22c55e' : '#60a5fa' }}>{resistanceProfile.score}/10</div>
-              <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 12 }}>{resistanceProfile.label}</div><div style={{ ...SMALL, fontSize: 10 }}>{resistanceProfile.desc}</div></div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: resistanceProfile.color }}>SFR {resistanceProfile.sfr ?? '—'}</div>
+              <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 12 }}>{resistanceProfile.label}</div><div style={{ ...SMALL, fontSize: 10 }}>{resistanceProfile.note}</div></div>
             </div>
           </div>
         )}
@@ -684,7 +700,7 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
             {exerciseRanking.list.map((item, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', borderRadius: 4, marginBottom: 2, background: item.id === ex!.id ? 'rgba(0,230,138,0.08)' : 'transparent', fontSize: 10 }}>
                 <span style={{ color: item.id === ex!.id ? ACCENT : DIM }}>#{i + 1} {item.name}</span>
-                <span style={{ color: DIM }}>{item.type === 'compound' ? 'База' : 'Изол.'} · {item.score} pts</span>
+                <span style={{ color: DIM }}>{item.type === 'compound' ? 'База' : 'Изол.'} · SFR {item.sfr ?? '—'} · {item.score}</span>
               </div>
             ))}
           </div>

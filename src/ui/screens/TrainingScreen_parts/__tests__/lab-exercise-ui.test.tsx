@@ -139,6 +139,21 @@ describe('lab-exercise-ui', () => {
     expect(screen.getByText(/Δ на плане/)).toBeTruthy();
   });
 
+  it('Шаг 1: профиль и рейтинг из данных (SFR, не эвристика)', async () => {
+    render(<PrescriptionTab selectedId="bench_bar" />);
+    await waitFor(() => {
+      expect(screen.getByText(/Профиль сопротивления/)).toBeTruthy();
+    });
+    // bench_bar: SFR 3, профиль mid из SFR_DB (не keyword-эвристика).
+    expect(screen.getByText(/Середина амплитуды/)).toBeTruthy();
+    expect(screen.getByText(/Рейтинг в группе/)).toBeTruthy();
+    const rows = screen.getAllByText(/SFR \d · \d+/);
+    expect(rows.length).toBeGreaterThan(0);
+    const scores = rows.map((n) => Number(/(\d+)$/.exec(n.textContent || '')?.[1]));
+    const sorted = [...scores].sort((a, b) => b - a);
+    expect(scores).toEqual(sorted);
+  });
+
   it('Шаг 1: диагноз пишется в историю he_exercise_lab_v1', async () => {
     render(<PrescriptionTab selectedId="bench_bar" />);
     await waitFor(() => {
