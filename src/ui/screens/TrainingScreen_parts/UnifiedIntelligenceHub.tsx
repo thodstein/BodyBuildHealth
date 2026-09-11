@@ -20,7 +20,7 @@ import { analyzeRecovery, shouldTrain } from '../../../engines/recovery-optimiza
 import { calculatePRI, getPRIThreshold } from '../../../engines/autoregulation.engine';
 import { autoRegulate, loadForRPE, rpeFromLoad, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
 import { generateReadinessForecast, runWhatIf } from '../../../engines/predictive.engine';
-import { loadReadinessHistory } from './readiness-history';
+import { loadReadinessHistory, appendReadinessToday } from './readiness-history';
 import { getCalibrationStats } from '../../../engines/rir-calibration.engine';
 import { buildHrvBaseline, appendHrvReading, hrvReadiness, hrvRatioToBaseline, HRV_PROTOCOL_NOTE } from '../../../engines/pro/hrv-baseline.engine';
 import { getProfile } from '../../../core/profile-manager';
@@ -177,6 +177,19 @@ export const UnifiedIntelligenceHub: React.FC = () => {
 
   const verdict = useMemo(()=> recoveryOut ? shouldTrain(recoveryOut.overallRecoveryIndex, fatigue/100) : null, [recoveryOut, fatigue]);
 
+  // P3: живая история готовности — актуализация снапшота пишет точку дня (дедуп по дате внутри стора),
+  // прогноз появляется через 3 дня и молодеет вместе с данными
+  const [histTick, setHistTick] = useState(0);
+  useEffect(() => {
+    try {
+      if (recoveryOut) {
+        appendReadinessToday(recoveryOut.overallRecoveryIndex, fatigue);
+        setHistTick(t => t + 1);
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recoveryOut]);
+
   const readinessScores = useMemo(()=> ({ recovery: readiness, fatigue, nutrition:80, support:80, sleep: Math.round(sleepQuality*2), stress }), [readiness, fatigue, sleepQuality, stress]);
   const pri = useMemo(()=> calculatePRI(readinessScores as any, doms, sleepQuality*2, stress), [readinessScores, doms, sleepQuality, stress]);
   const priThr = useMemo(()=> getPRIThreshold(pri), [pri]);
@@ -190,7 +203,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
 
   const rirCalib = useMemo(()=> { try { return getCalibrationStats(); } catch { return null; } }, [sessions]);
 
-  const hist = useMemo(()=> loadReadinessHistory().map(p=> p.recovery), []);
+  const hist = useMemo(()=> loadReadinessHistory().map(p=> p.recovery), [histTick]);
   const forecast = useMemo(()=> hist.length >=3 ? generateReadinessForecast(hist) : null, [hist]);
   const whatIf = useMemo(()=> runWhatIf(recoveryOut?.overtrainingRisk ?? 22, readiness, {
     calorieChange: calDelta, sleepChange: sleepDelta, drugChange: aasMult!==1? { AAS: aasMult }: undefined,
@@ -654,7 +667,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
             <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.22)', fontSize:14 }}>🔮</span>
             <div>
-              <div style={{ fontSize:13, fontWeight:900, color:'#f59e0b' }}>Прогноз</div>
+              <div style={{ fontSize:13, fontWeight:900, color:'#f59e0b' }}>Прогноз {forecast && <span style={{ fontSize:9, padding:'2px 7px', borderRadius:10, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.25)', color:'#f59e0b', fontWeight:800, verticalAlign:'middle' }}>{forecast.confidence === 'stable' ? 'уверенный · 7+ точек' : 'ранний · <7 точек'}</span>}</div>
               <div style={{ fontSize:10, color:DIM }}>Хольт-прогноз по истории готовности + сценарий «что-если» — единственный прогноз в хабе</div>
             </div>
           </div>
@@ -721,6 +734,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               </div>
             </div>
             <div style={{ ...SMALL, marginTop:8, padding:'7px 10px', borderRadius:9, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)' }}>{whatIf.note}</div>
+            {aasMult !== 1 && <div style={{ ...SMALL, marginTop:6, padding:'7px 10px', borderRadius:9, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.16)' }}>⚠️ Фарма-множитель — грубая оценка направления. Дозы и безопасность — только в калькуляторе поддержки, здесь назначений нет.</div>}
           </MetricCard>
         </div>
       </section>

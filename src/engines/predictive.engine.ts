@@ -1,14 +1,15 @@
 import { PREDICTIVE_DEFAULTS } from '../core/constants';
 
-export interface ForecastResult { values: number[]; ci95: [number, number][]; warnings: string[]; }
+export interface ForecastResult { values: number[]; ci95: [number, number][]; warnings: string[]; confidence: 'early' | 'stable'; }
 
 function holtLinear(data: number[], alpha?: number, beta?: number, steps?: number): ForecastResult {
   const a = alpha ?? PREDICTIVE_DEFAULTS.alpha;
   const b = beta ?? PREDICTIVE_DEFAULTS.beta;
   const s = steps ?? PREDICTIVE_DEFAULTS.steps;
-  
-  if(data.length < 2) return { values: Array(s).fill(data[0]||0), ci95: Array(s).fill([0,0] as [number,number]), warnings:[] };
-  
+  const confidence = data.length >= 7 ? 'stable' : 'early';
+
+  if(data.length < 2) return { values: Array(s).fill(data[0]||0), ci95: Array(s).fill([0,0] as [number,number]), warnings:[], confidence };
+
   let level = data[0], trend = data[1]-data[0];
   const out: number[] = [], ci: [number,number][] = [], residuals: number[] = [];
   for(let i=1; i<data.length; i++) {
@@ -19,14 +20,17 @@ function holtLinear(data: number[], alpha?: number, beta?: number, steps?: numbe
   }
   const std = Math.sqrt(residuals.reduce((sum,v)=>sum+v*v,0)/residuals.length) * PREDICTIVE_DEFAULTS.ci_z_score;
   for(let i=0; i<s; i++) {
-    const val = level + (i+1)*trend;
+    // кламп 0–100: шкала готовности ограничена, тренд за границы не уходит; ДИ расширяется с горизонтом (√h)
+    const val = Math.max(0, Math.min(100, level + (i+1)*trend));
+    const half = std * Math.sqrt(i+1);
     out.push(parseFloat(val.toFixed(1)));
-    ci.push([parseFloat((val-std).toFixed(1)), parseFloat((val+std).toFixed(1))]);
+    ci.push([parseFloat(Math.max(0, val-half).toFixed(1)), parseFloat(Math.min(100, val+half).toFixed(1))]);
   }
   const warnings: string[] = [];
   if(out[2] < 40) warnings.push('⚠️ Readiness упадёт <40 через ~5 дней.');
   if(out[2] > 70) warnings.push('⚠️ Fatigue превысит 70. Запланируйте делод.');
-  return { values: out, ci95: ci, warnings };
+  if(confidence === 'early') warnings.push('⚠️ Ранний прогноз (<7 точек истории) — ориентир, не план.');
+  return { values: out, ci95: ci, warnings, confidence };
 }
 
 export function generateReadinessForecast(history: number[]): ForecastResult {
@@ -64,5 +68,7 @@ export function runWhatIf(baseRisk: number, baseReadiness: number, params: { dru
   }
   if(params.calorieChange) read += params.calorieChange > 0 ? 3 : -4;
   if(params.sleepChange) read += params.sleepChange * 5;
-  return { riskDelta: Math.round(risk-baseRisk), readinessDelta: Math.round(read-baseReadiness), note: note || 'Без изменений' };
+  // Коэффициенты — грубые ориентиры направления (не физиология): ±ккал → ±ед. готовности, +1ч сна → +5, фарма ×12.
+  const suffix = 'Ориентиры направления, не физиология.';
+  return { riskDelta: Math.round(risk-baseRisk), readinessDelta: Math.round(read-baseReadiness), note: (note || 'Без изменений') + ' ' + suffix };
 }
