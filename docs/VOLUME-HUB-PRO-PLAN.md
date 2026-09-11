@@ -161,6 +161,33 @@
   `PerMuscleBars`, `VolumeActions` компоненты; `TonnageCalcTab`/`PlateCalcTab` — только проекции VolumeInput
   (свои `useState rows` удалить после P6). Тесты: существующие smoke зелёные без правок + 1 NEW на `resolveOneRM`.
 
+## 5. Добивка до максимума (выполнена кодом, P1–P7 + Д1–Д3)
+
+- **Д1 (свапы + 1RM):** инвентарь профиля (`settings.training.equipment`, паттерн BBDiagnosticsHub:315)
+  заведён в `findBetterExerciseSwaps` + бейдж «Инвентарь: …» в секции замен; NEW `resolveVolumeOneRM`
+  (базлайны > per-row > глобальный) в conveyor-движке, таб переведён на него. Поймано своим RTL-тестом:
+  `equipment` в каталоге бывает массивом — крашило фильтр (`toLowerCase is not a function`), починено в движке.
+- **Д2 (INOL/блины):** NEW `inolScopeVerdict` (день 2.4 / неделя 7.2, шкала Hristov) + строка вердикта в тоннаже;
+  история весов `he_plate_history` (кап 8, дедуп, tap-recall) в блинах.
+- **Д3 (единый VolumeInput):** хаб держит `hubRows`, `VolumeOptimizerTab`/`TonnageCalcTab` принимают
+  опциональные контролируемые строки (без пропсов — автономно как раньше, smoke целы);
+  тоннаж маппит с сохранением week/day/rpe; блины получают топ-вес + селектор строк +
+  `onApply` возвращает собираемый вес в строку («✅ Вернуть вес в строки»). Попутно починен
+  `improveVolume` (цикл setRows терял добавления в контролируемом режиме — один проход).
+  NEW `volume-shared-input` 6/6 (sharing объём→тоннаж, controlled-оптимизатор, блины-конвейер).
+- Проверено на финале: объёмные тесты **93/93 (10 файлов)** + rest-hooks **68/68** + `tsc` 0 + `verify:apk-design` OK.
+
+## 6. Честные остатки (не баги, а границы)
+
+1. `division='bb'` проп не введён: потребителя нет (BBDiagnosticsHub не embed'ит таб) —
+   механизм встройки = deep-link `VolumeHub?volmode=volume` (P6). Ввести проп без потребителя = заглушка.
+2. `bbPlanToQualityInput`/`manualToQualityInput` + V2-композитор — файлы QualityHub-агента
+   (параллельный WIP) — не трогаем; API потребления готово (`canonicalMrvForGroup`,
+   `canonicalGroupRow`, `frequencyForVolume`, `rirProfileCheck`).
+3. Скоростная валидация зон Прилепина (PoinT GO/MCV-устройства) — в проекте нет device-данных.
+4. Мульти-локации инвентаря блинов (PerSide) — см. §4, спроса нет.
+5. SRA-окно в SFR — модельный уровень поверх эпиков плана; SFR v2 покрывает длину/опору/RIR/цель.
+
 ## 4. Не делаем (осознанно)
 
 - Не переписываем числа `VOLUME_LANDMARKS_DB` (коридоры совпадают с RP 2026 — только MV/session-кап/effective сверху).
