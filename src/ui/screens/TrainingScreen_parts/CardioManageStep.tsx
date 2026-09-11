@@ -17,6 +17,8 @@ import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
 import { CardioTaperStep } from './CardioTaperStep';
 import { CardioCatalogSection } from './CardioCatalogSection';
+import { CardioRecordsSection } from './CardioRecordsSection';
+import { forecastYearCtl } from '../../../engines/lms/cardio-year-forecast.engine';
 import { SectionCard, ROW, LABEL, BTN, BTN_PRIMARY, BTN_CTA, BTN_DANGER, BTN_SMALL, InfoBanner, Tabs, Badge, EmptyState } from './CardioUI';
 
 const GOAL_COLOR: Record<string, string> = {
@@ -186,7 +188,7 @@ export const CardioManageStep: React.FC<{
   const libraryPages = Math.max(1, Math.ceil(filteredLibrary.length / LIB_PAGE_SIZE));
   const pagedLibrary = filteredLibrary.slice(libraryPage * LIB_PAGE_SIZE, (libraryPage + 1) * LIB_PAGE_SIZE);
 
-  const [tab, setTab] = useState<'integrations' | 'export' | 'week' | 'taper' | 'library' | 'catalog' | 'scenarios'>('integrations');
+  const [tab, setTab] = useState<'integrations' | 'export' | 'week' | 'taper' | 'library' | 'catalog' | 'records' | 'scenarios'>('integrations');
   const TABS = [
     { id: 'integrations', label: 'Интеграции', icon: '🔗' },
     { id: 'export', label: 'Экспорт', icon: '📤' },
@@ -194,6 +196,7 @@ export const CardioManageStep: React.FC<{
     { id: 'taper', label: 'Тапер', icon: '📉' },
     { id: 'library', label: 'Библиотека', icon: '📚' },
     { id: 'catalog', label: 'Каталог', icon: '📖' },
+    { id: 'records', label: 'Рекорды', icon: '🏆' },
     { id: 'scenarios', label: 'Сценарии', icon: '📸' },
   ] as const;
 
@@ -292,6 +295,13 @@ export const CardioManageStep: React.FC<{
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>
                   Итого: {yearPlan.totalWeeks} нед · {yearPlan.avgMinutesPerWeek} мин/нед · {yearPlan.avgKcalPerWeek} ккал/нед
                 </div>
+                {(() => {
+                  try {
+                    const f = forecastYearCtl(yearPlan.blocks.map(b => b.cycle));
+                    if (!f) return null;
+                    return <div style={{ fontSize: 11, color: '#fff' }}>🔮 Прогноз года: CTL {f.ctl} · ATL {f.atl} · TSB {f.tsb > 0 ? '+' : ''}{f.tsb} — {f.verdict}</div>;
+                  } catch { return null; }
+                })()}
                 {(() => {
                   try {
                     const pseudo = { weeks: yearPlan.blocks.flatMap(b => b.cycle.weeks), totalWeeks: yearPlan.totalWeeks } as unknown as import('../../../engines/lms/cardio.engine').CardioCycle;
@@ -404,6 +414,10 @@ export const CardioManageStep: React.FC<{
         onApplyTemplate
           ? <CardioCatalogSection goal={goal ?? 'health'} level={level ?? 'intermediate'} daysAvailable={daysAvailable ?? 4} lowImpact={!!lowImpact} onApplyTemplate={onApplyTemplate} />
           : <EmptyState icon="📖" title="Каталог недоступен" desc="Обновите конструктор: нет обработчика сборки шаблона." />
+      )}
+
+      {tab === 'records' && (
+        <CardioRecordsSection />
       )}
 
       {tab === 'scenarios' && (

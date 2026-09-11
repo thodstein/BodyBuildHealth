@@ -23,6 +23,27 @@ export function formatPace(secPerKm: number): string {
   return `${m}:${String(s).padStart(2, '0')}/км`;
 }
 
+/**
+ * Разобрать темп из поля ввода: «5:20», «5.5» (мин/км десятичные),
+ * «320» (секунды). null — пусто/мусор (честно, без угадывания).
+ */
+export function parsePaceText(v: string | undefined | null): number | null {
+  if (v == null) return null;
+  const t = String(v).trim().replace(',', '.');
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2}):([0-5]?\d)$/);
+  if (m) {
+    const sec = Number(m[1]) * 60 + Number(m[2]);
+    return sec >= 120 && sec <= 900 ? sec : null;
+  }
+  if (/^\d+(\.\d+)?$/.test(t)) {
+    const n = Number(t);
+    if (n >= 120 && n <= 900) return Math.round(n); // секунды
+    if (n >= 2 && n < 15) return Math.round(n * 60); // мин/км десятичные
+  }
+  return null;
+}
+
 function validPace(v: unknown): v is number {
   return typeof v === 'number' && v >= 120 && v <= 900;
 }

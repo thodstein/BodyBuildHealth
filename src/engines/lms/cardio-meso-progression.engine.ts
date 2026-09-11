@@ -4,7 +4,7 @@
  * отношение среднего объёма последних 2 недель к первым 2-м,
  * кламп ×1.0-1.15 (консервативно: +0-15%). Чистые функции.
  */
-import type { CardioCycle } from './cardio.engine';
+import { cycleBodyWeight, recalcSessionKcal, type CardioCycle } from './cardio.engine';
 
 export interface CardioMesoProgression {
   /** Множитель стартового объёма следующего цикла. */
@@ -47,4 +47,34 @@ export function cardioProgressionAdvice(prev: CardioCycle | null | undefined): s
   const p = extractCardioProgression(prev);
   if (!p) return 'Прошлого цикла нет — старт с базового объёма уровня.';
   return `🔗 Cross-meso: ${p.reason}`;
+}
+
+/**
+ * Применить множитель к собранному циклу: длительности сессий ×mult
+ * (мин 10), ккал пересчитаны тем же движком, итоги недель/цикла и
+ * rationale обновлены. Возвращает новый цикл (вход не мутируется).
+ * No-op при mult ≤ 1 (тот же объект).
+ */
+export function applyMesoMult(cycle: CardioCycle, mult: number): CardioCycle {
+  if (!(mult > 1)) return cycle;
+  const bw = cycleBodyWeight(cycle);
+  const sex = cycle.config?.sex;
+  const weeks = cycle.weeks.map(w => {
+    const sessions = w.sessions.map(s => {
+      const next = { ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)) };
+      return recalcSessionKcal(next, bw, sex);
+    });
+    return {
+      ...w,
+      sessions,
+      totalMinutes: sessions.reduce((sum, x) => sum + x.durationMin * x.weeklyFrequency, 0),
+      totalKcal: sessions.reduce((sum, x) => sum + x.kcalPerSession * x.weeklyFrequency, 0),
+    };
+  });
+  return {
+    ...cycle,
+    weeks,
+    totalKcal: weeks.reduce((sum, w) => sum + w.totalKcal, 0),
+    rationale: [...cycle.rationale, `🔗 Cross-meso: стартовый объём ×${mult} от прошлого цикла.`],
+  };
 }

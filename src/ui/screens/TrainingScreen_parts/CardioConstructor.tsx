@@ -17,12 +17,16 @@ import {
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   bumpCardioZone2Volume,
   cardioProfileFactors, cardioNutritionNotes, CARDIO_VARIANT_LABELS,
-  latestFieldTestMetrics,
-  type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
+  latestFieldTestMetrics, kcalForCardio,
+  type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario, type CardioSession,
 } from '../../../engines/lms/cardio.engine';
 import { getCardioCycleTemplateById } from '../../../data/cardio-cycles/cardio-cycle-index';
 import { buildCardioCycleFromTemplate } from '../../../engines/lms/cardio-templates.engine';
 import { consumeCardioTemplatePending, subscribeCardioTemplatePending } from '../../../engines/lms/cardio-cycle-bridge';
+import { applyCardioCompetitionCascade } from '../../../engines/lms/cardio.engine';
+import { applyPersonalTargetsToCycle, parsePaceText } from '../../../engines/lms/cardio-personal-zones.engine';
+import { extractCardioProgression, applyMesoMult, cardioProgressionAdvice } from '../../../engines/lms/cardio-meso-progression.engine';
+import { getCardioIntervalPreset } from '../../../engines/lms/cardio-interval-presets.engine';
 import { planFromStored, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
 import { buildAnnualCardioCycles, type AnnualCardioBuildOptions } from '../../../engines/annual-training/annual-training-cardio.engine';
 import {
@@ -49,6 +53,8 @@ import { CardioCompsStep, type CompDraft } from './CardioCompsStep';
 import { CardioPreviewStep } from './CardioPreviewStep';
 import { CardioManageStep } from './CardioManageStep';
 import { CardioDiaryStep } from './CardioDiaryStep';
+import { CardioValidationCard, CardioMesoRow } from './CardioPlanExtras';
+import { CardioHiitSection } from './CardioHiitSection';
 
 /**
  * Кардио-конструктор в оболочке ББ-авто (модерн): 7 мелких шагов
@@ -259,6 +265,12 @@ export const CardioConstructor: React.FC = () => {
   const [talkHr, setTalkHr] = useState(() => String((wizard as WizardState).talkHr ?? fieldTestDefaults().talkHr ?? ''));
   const [tempC, setTempC] = useState(String((wizard as WizardState).tempC ?? ''));
   const [altitudeM, setAltitudeM] = useState(String((wizard as WizardState).altitudeM ?? ''));
+  // Темпы VDOT Daniels (текст «M:SS») — дописываются в сессии при сборке.
+  const [easyPace, setEasyPace] = useState(String((wizard as WizardState).easyPace ?? ''));
+  const [tempoPace, setTempoPace] = useState(String((wizard as WizardState).tempoPace ?? ''));
+  const [intervalPace, setIntervalPace] = useState(String((wizard as WizardState).intervalPace ?? ''));
+  // Кросс-мезо: стартовать от прошлого цикла (выкл по умолчанию — сборка 1-в-1).
+  const [mesoOn, setMesoOn] = useState((wizard as WizardState).mesoOn === true);
   const [variant, setVariant] = useState<CardioVariant>(wizard.variant ?? 'base');
   const [wizardMode, setWizardMode] = useState<'simple' | 'pro'>((wizard as WizardState).wizardMode ?? 'pro');
   const [legDays, setLegDays] = useState<number[]>(wizard.legDays ?? []);
@@ -371,19 +383,60 @@ export const CardioConstructor: React.FC = () => {
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
+  /** Пост-обработка собранного цикла: каскад стартов A/B/C → кросс-мезо → темпы VDOT/FTP. */
+  const finishCycle = (c: CardioCycle): CardioCycle => {
+    let out = c;
+    // Каскад — только при включённом taper: явный opt-out пользователя
+    // («без taper — наращивание») старше приоритетов стартов.
+    if (taperEnabled) {
+      try {
+        out = applyCardioCompetitionCascade(out, comps.map(x => ({ week: x.week, priority: x.priority ?? 'B' })));
+      } catch { /* ignore */ }
+    }
+    if (mesoOn) {
+      try {
+        const prev = loadCardioCycles()
+          .filter(x => x.id !== out.id)
+          .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))[0];
+        const p = extractCardioProgression(prev);
+        if (p && p.startMult > 1) out = applyMesoMult(out, p.startMult);
+      } catch { /* ignore */ }
+    }
+    try {
+      out = applyPersonalTargetsToCycle(out, {
+        easyPaceSec: parsePaceText(easyPace) ?? undefined,
+        tempoPaceSec: parsePaceText(tempoPace) ?? undefined,
+        intervalPaceSec: parsePaceText(intervalPace) ?? undefined,
+        ftpWatts: Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined,
+      });
+    } catch { /* ignore */ }
+    return out;
+  };
+
+  /** Кросс-мезо для UI: совет + множитель от свежего прошлого цикла библиотеки. */
+  const mesoInfo = useMemo(() => {
+    try {
+      const prev = [...library]
+        .filter(x => !cycle || x.id !== cycle.id)
+        .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))[0];
+      const p = extractCardioProgression(prev);
+      return { advice: cardioProgressionAdvice(prev), mult: p?.startMult ?? 1 };
+    } catch { return { advice: 'Прошлого цикла нет — старт с базового объёма уровня.', mult: 1 }; }
+  }, [library, cycle]);
+
   /** Каталог → конструктор: собрать именной шаблон с параметрами атлета. */
   const applyTemplate = (templateId: string) => {
     const tpl = getCardioCycleTemplateById(templateId);
     if (!tpl) { flashMsg('⚠ Шаблон не найден'); return; }
     const bf = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
-    const c = buildCardioCycleFromTemplate(tpl, {
+    const c = finishCycle(buildCardioCycleFromTemplate(tpl, {
       bodyWeight,
       bodyFatPct: bf,
       age: Math.max(12, Math.min(90, Number(age) || 30)),
       restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
       sex, level, daysAvailable, equipment, lowImpact, legDays,
       ...previewFactors,
-    });
+    }));
     saveCardioCycle(c);
     setActiveCardioCycle(c);
     setCycle(c);
@@ -402,6 +455,48 @@ export const CardioConstructor: React.FC = () => {
   }, []);
 
   const refreshActive = () => { setCycle(loadActiveCardioCycle()); reload(); };
+
+  /** HIIT-протокол → сессия в неделю 1 активного цикла (снапшот для undo). */
+  const addHiitToCycle = (presetId: string, opts: { hrMax?: number; sixMinDistanceM?: number }) => {
+    if (!cycle) { flashMsg('⚠ Сначала соберите цикл'); return; }
+    const preset = getCardioIntervalPreset(presetId);
+    if (!preset) { flashMsg('⚠ Протокол не найден'); return; }
+    try { saveCardioCycleVersion(cycle, `До HIIT «${preset.title}»`); } catch { /* ignore */ }
+    const block = preset.build(opts ?? {});
+    const equip = (equipment.find(e => preset.equipment.includes(e)) ?? preset.equipment[0] ?? 'running') as CardioEquipment;
+    const totalMin = Math.max(12, Math.round((block.workSec * block.reps + block.restSec * block.reps) / 60) + 12);
+    const session: CardioSession = {
+      type: 'hiit',
+      durationMin: totalMin,
+      weeklyFrequency: 1,
+      intensity: 'high',
+      kcalPerSession: kcalForCardio('hiit', totalMin, bodyWeight, equip, sex),
+      purpose: `${preset.title}: ${preset.protocol}. Разминка 10-12 мин.`,
+      equipment: equip,
+      structured: [block],
+    };
+    const weeks = cycle.weeks.map(w => {
+      if (w.week !== 1) return w;
+      const sessions = [...w.sessions, session];
+      return {
+        ...w,
+        sessions,
+        totalMinutes: sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0),
+        totalKcal: sessions.reduce((s, x) => s + x.kcalPerSession * x.weeklyFrequency, 0),
+      };
+    });
+    const next: CardioCycle = {
+      ...cycle,
+      weeks,
+      totalKcal: weeks.reduce((s, w) => s + w.totalKcal, 0),
+      rationale: [...cycle.rationale, `⚡ HIIT «${preset.title}» добавлен в неделю 1.`],
+    };
+    saveCardioCycle(next);
+    setActiveCardioCycle(next);
+    setCycle(next);
+    reload();
+    flashMsg(`⚡ «${preset.title}» — в неделю 1 (отмена — «↩ Вернуть версию»)`);
+  };
 
   const build = () => {
     const bf = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
@@ -447,7 +542,7 @@ export const CardioConstructor: React.FC = () => {
     // иначе «⚙️ Изменить параметры» восстановит другой уровень и пересборка
     // даст иной цикл, чем показанный пользователю.
     const applied = { ...base, ...vOpts };
-    const c = buildCardioCycle({ ...applied, config: applied });
+    const c = finishCycle(buildCardioCycle({ ...applied, config: applied }));
     saveCardioCycle(c);
     setActiveCardioCycle(c);
     setCycle(c);
@@ -499,7 +594,7 @@ export const CardioConstructor: React.FC = () => {
         ? { level: 'advanced' as CardioLevel, recoveryLow: false }
         : { level, recoveryLow };
     const applied = { ...base, ...vOpts };
-    const c = buildCardioCycle({ ...applied, config: applied });
+    const c = finishCycle(buildCardioCycle({ ...applied, config: applied }));
     saveCardioCycle(c);
     setActiveCardioCycle(c);
     setCycle(c);
@@ -766,10 +861,11 @@ export const CardioConstructor: React.FC = () => {
         factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
         variant, comps, wizardMode,
         lthr, ftpWatts, talkHr, tempC, altitudeM,
+        easyPace, tempoPace, intervalPace, mesoOn,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, ftpWatts, talkHr, tempC, altitudeM]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -906,6 +1002,10 @@ export const CardioConstructor: React.FC = () => {
     setTalkHr('');
     setTempC('');
     setAltitudeM('');
+    setEasyPace('');
+    setTempoPace('');
+    setIntervalPace('');
+    setMesoOn(false);
     setLegDays([]);
     setComps([]);
     flashMsg('⟲ Параметры сброшены к значениям по умолчанию');
@@ -1161,6 +1261,9 @@ export const CardioConstructor: React.FC = () => {
           talkHr={talkHr} setTalkHr={setTalkHr}
           tempC={tempC} setTempC={setTempC}
           altitudeM={altitudeM} setAltitudeM={setAltitudeM}
+          easyPace={easyPace} setEasyPace={setEasyPace}
+          tempoPace={tempoPace} setTempoPace={setTempoPace}
+          intervalPace={intervalPace} setIntervalPace={setIntervalPace}
           onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr} onFromLog={fromFieldTestLog}
           wizardMode={wizardMode}
         />
@@ -1201,6 +1304,9 @@ export const CardioConstructor: React.FC = () => {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button style={BTN_GHOST} onClick={migrateFromPlan}>📦 Мигрировать недельный план</button>
           </div>
+          <CardioValidationCard cycle={cycle} beginner={level === 'beginner'} />
+          <CardioMesoRow advice={mesoInfo.advice} mult={mesoInfo.mult} on={mesoOn} onToggle={() => setMesoOn(v => !v)} />
+          <CardioHiitSection onAdd={addHiitToCycle} disabled={!cycle} />
         </>
       )}
       {step === 'manage' && (

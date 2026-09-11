@@ -350,12 +350,16 @@ export const CardioAthleteSection: React.FC<{
   talkHr?: string; setTalkHr?: (v: string) => void;
   tempC?: string; setTempC?: (v: string) => void;
   altitudeM?: string; setAltitudeM?: (v: string) => void;
+  /** Темпы VDOT Daniels, текст «M:SS» (E/T/I) — дописываются в сессии планом. */
+  easyPace?: string; setEasyPace?: (v: string) => void;
+  tempoPace?: string; setTempoPace?: (v: string) => void;
+  intervalPace?: string; setIntervalPace?: (v: string) => void;
   onFromProfile: () => void;
   onSaveProfile: () => void;
   onFromDiaryHr: () => void;
   onFromLog?: () => void;
   wizardMode?: 'simple' | 'pro';
-}> = ({ age, setAge, bodyWeight, setBodyWeight, restingHr, setRestingHr, sex, setSex, level, setLevel, recoveryLow, setRecoveryLow, lthr = '', setLthr, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, altitudeM = '', setAltitudeM, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, wizardMode = 'pro' }) => (
+}> = ({ age, setAge, bodyWeight, setBodyWeight, restingHr, setRestingHr, sex, setSex, level, setLevel, recoveryLow, setRecoveryLow, lthr = '', setLthr, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, altitudeM = '', setAltitudeM, easyPace = '', setEasyPace, tempoPace = '', setTempoPace, intervalPace = '', setIntervalPace, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, wizardMode = 'pro' }) => (
   <>
     {/* ── 1. Пользователь — открыт ── */}
     <Accordion id="sec-user" title="Параметры пользователя" icon="👤" defaultOpen badge={<span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{age}л · {bodyWeight}кг · {CARDIO_LEVEL_LABELS[level]}</span>}>
@@ -401,6 +405,23 @@ export const CardioAthleteSection: React.FC<{
           {setFtpWatts && <NumberInput label="FTP 20'×0.95 (вело)" value={ftpWatts} onChange={setFtpWatts} min={30} max={800} step={1} placeholder="250" ariaLabel="FTP" width={100} suffix="Вт" />}
           {setTalkHr && <NumberInput label="Talk-test потолок Z2" value={talkHr} onChange={setTalkHr} min={80} max={200} step={1} placeholder="145" ariaLabel="Talk-test" width={100} suffix="уд/мин" />}
         </div>
+        {setEasyPace && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+            {[
+              { label: 'Темп E (easy)', value: easyPace, set: setEasyPace, ph: '6:00', hint: 'Темп E' },
+              { label: 'Темп T (порог)', value: tempoPace, set: setTempoPace, ph: '5:00', hint: 'Темп T' },
+              { label: 'Темп I (интервалы)', value: intervalPace, set: setIntervalPace, ph: '4:30', hint: 'Темп I' },
+            ].map(f => (
+              <label key={f.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={LABEL}>{f.label}</span>
+                <input value={f.value} onChange={e => f.set!(e.target.value)} placeholder={f.ph} aria-label={f.hint}
+                  inputMode="numeric"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, width: 110, outline: 'none' }} />
+              </label>
+            ))}
+          </div>
+        )}
+        {setEasyPace && <div style={HINT_SM}>Темпы VDOT Daniels (M:SS/км) дописываются в сессии плана. Нет VDOT — оставьте пустыми.</div>}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           {setTempC && <NumberInput label="Жара" value={tempC} onChange={setTempC} min={-10} max={45} step={1} placeholder="22" ariaLabel="Температура" width={90} suffix="°C" />}
           {setAltitudeM && <NumberInput label="Высота" value={altitudeM} onChange={setAltitudeM} min={0} max={5000} step={50} placeholder="0" ariaLabel="Высота" width={100} suffix="м" />}
