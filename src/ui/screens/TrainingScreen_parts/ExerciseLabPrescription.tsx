@@ -3,6 +3,7 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../engines/training.engine';
 import { mesocyclePhaseForWeek } from '../../../engines/rir-matrix.engine';
 import { calculateRepDuration, parseTempo } from '../../../engines/rep-tempo.engine';
+import { parseTempoCanon, repSecsOf } from '../../../engines/tempo-canon.engine';
 import { forceVector, lengthenedPartials } from '../../../engines/pro/exercise-prescription.engine';
 import { assessSafety } from '../../../engines/movement-engines';
 import { PopupSelect, PopupNumber, PopupText, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
@@ -105,13 +106,13 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
 
   const tutInfo = useMemo(() => {
     if (!ex || !presc || !workWeight) return null;
-    const tempo = parseTempo(manualTempo || presc.tempo);
+    const tempo = parseTempoCanon(manualTempo || presc.tempo);
     if (!tempo) return null;
-    const repDuration = calculateRepDuration(tempo);
+    const repDuration = repSecsOf(tempo);
     const avgReps = (parseInt(presc.reps.split('-')[0]) + parseInt(presc.reps.split('-')[1] || presc.reps.split('-')[0])) / 2;
     const perSet = +(avgReps * repDuration).toFixed(0);
     const perSession = +(perSet * presc.sets).toFixed(0);
-    return { repDuration, perSet, perSession, eccentric: tempo.eccentric, bottomPause: tempo.bottomPause, concentric: tempo.concentric, topPause: tempo.topPause };
+    return { repDuration, perSet, perSession, eccentric: tempo.ecc, bottomPause: tempo.bot, concentric: tempo.conc, topPause: tempo.top };
   }, [ex, presc, manualTempo, workWeight]);
 
   const rpeInfo = useMemo(() => {
