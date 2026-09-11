@@ -84,6 +84,8 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
 export interface PriPayload { volumeMult: number; rirShift: number }
 export type TempoApplyMode = 'all' | 'compound' | 'isolation' | 'skip_deload';
 export interface TempoPayload { eccentric: number; bottomPause?: number; concentric: number; topPause?: number; label?: string; mode?: TempoApplyMode }
+/** Откат последнего применения темпа (данные не нужны — читается снимок he_tempo_prev_v1). */
+export interface TempoRollbackPayload { [key: string]: unknown }
 export interface RirPayload { rirShift: number; label?: string }
 export interface MrvPayload { mrv: number; label?: string }
 export interface DeloadPayload { volumeMult: number; rirShift: number; weeks: number[]; label?: string }
@@ -110,7 +112,7 @@ export interface LimiterPayload {
   limiterDayMap?: Record<string, number[]>;
 }
 
-export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload | BBNutritionPayload | ArmCyclePayload | SSCyclePayload;
+export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | TempoRollbackPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload | BBNutritionPayload | ArmCyclePayload | SSCyclePayload;
 
 /** Типобезопасная карта данных для публичного канала. */
 export interface PlannerApplyDataByKind {
@@ -119,6 +121,7 @@ export interface PlannerApplyDataByKind {
   weakpoints: WeakpointsPayload;
   pri: PriPayload;
   tempo: TempoPayload;
+  tempo_rollback: TempoRollbackPayload;
   rir: RirPayload;
   mrv: MrvPayload;
   deload: DeloadPayload;

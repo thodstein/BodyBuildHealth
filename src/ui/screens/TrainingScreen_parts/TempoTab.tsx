@@ -11,6 +11,14 @@ import {
   generateRepTempo,
   type RepPattern,
 } from '../../../engines/rep-tempo-engine';
+import {
+  tutSecsForTempo,
+  tutZoneForSecs,
+  tempoForExerciseName,
+  parseTempoCanon,
+} from '../../../engines/tempo-canon.engine';
+import { loadTempoPrevSnapshot } from './planner-bridge-handlers';
+import type { TempoApplyMode } from './planner-bridge';
 import { useDataLink } from '../../../core/data-link';
 
 const ACCENT = '#00e68a';
@@ -78,12 +86,68 @@ const MANUAL_TEMPOS: TempoPreset[] = [
 const GOALS = ['strength', 'hypertrophy', 'power', 'technique'] as const;
 type TempoGoal = typeof GOALS[number];
 
+/** Честное превью паттерна: каждому — свой темп канона (раньше все 8 показывали один). */
+const PATTERN_PREVIEW: Record<RepPattern, { tempo: string; note?: string }> = {
+  normal: { tempo: '3-1-1-0' },
+  pause: { tempo: '3-2-1-0' },
+  tempo: { tempo: '4-1-2-0' },
+  explosive: { tempo: '2-0-X-0' },
+  cluster: { tempo: '2-0-1-0', note: '+15–20с между повторами' },
+  rest_pause: { tempo: '2-0-1-0', note: '+20–30с между мини-сетами' },
+  partial: { tempo: '3-1-1-0', note: 'только длинная часть амплитуды' },
+  slow: { tempo: '4-2-2-1' },
+};
+
+const TEMPO_HUB_KEY = 'he_tempo_hub_v1';
+
+interface TempoHubPersist {
+  customTempo: TempoPhase;
+  filterGoal: TempoGoal | 'all';
+  tutReps: number;
+  tutSets: number;
+  mode: TempoApplyMode;
+}
+
+function loadTempoHubPersist(): TempoHubPersist | null {
+  try {
+    const raw = localStorage.getItem(TEMPO_HUB_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as Partial<TempoHubPersist>;
+    if (!v || typeof v.customTempo !== 'object') return null;
+    return v as TempoHubPersist;
+  } catch {
+    return null;
+  }
+}
+
 export const TempoTab: React.FC = () => {
   const linked = useDataLink();
   const [selectedGoal, setSelectedGoal] = useState<TempoGoal>('hypertrophy');
-  const [customTempo, setCustomTempo] = useState<TempoPhase>({ eccentric: 3, bottomPause: 1, concentric: 1, topPause: 0 });
-  const [filterGoal, setFilterGoal] = useState<TempoGoal | 'all'>('all');
+  const [persisted] = useState<TempoHubPersist | null>(() => loadTempoHubPersist());
+  const [customTempo, setCustomTempo] = useState<TempoPhase>(persisted?.customTempo ?? { eccentric: 3, bottomPause: 1, concentric: 1, topPause: 0 });
+  const [filterGoal, setFilterGoal] = useState<TempoGoal | 'all'>(persisted?.filterGoal ?? 'all');
   const [showPresets, setShowPresets] = useState(true);
+  const [tutReps, setTutReps] = useState<number>(persisted?.tutReps ?? 10);
+  const [tutSets, setTutSets] = useState<number>(persisted?.tutSets ?? 3);
+  const [exName, setExName] = useState<string>('');
+  const [bridgeMode, setBridgeMode] = useState<TempoApplyMode>(persisted?.mode ?? 'all');
+  const [snapInfo, setSnapInfo] = useState(loadTempoPrevSnapshot);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(TEMPO_HUB_KEY, JSON.stringify({ customTempo, filterGoal, tutReps, tutSets, mode: bridgeMode } satisfies TempoHubPersist));
+    } catch { /* ignore */ }
+  }, [customTempo, filterGoal, tutReps, tutSets, bridgeMode]);
+
+  const tutCalc = useMemo(() => {
+    const parsed = parseTempoCanon(formatTempo(customTempo));
+    if (!parsed) return null;
+    const r = tutSecsForTempo(parsed, tutReps, tutSets);
+    if (!r) return null;
+    return { ...r, zone: tutZoneForSecs(r.perSet, r.perRep) };
+  }, [customTempo, tutReps, tutSets]);
+
+  const exPick = useMemo(() => (exName.trim() ? tempoForExerciseName(exName.trim()) : null), [exName]);
 
   const filteredPresets = MANUAL_TEMPOS.filter(p => filterGoal === 'all' || p.goal === filterGoal);
 
@@ -144,7 +208,7 @@ export const TempoTab: React.FC = () => {
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
           🎨 Визуальная схема темпа: <span style={{ color: ACCENT, fontFamily: 'monospace', fontSize: 15 }}>{formatTempo(customTempo)}</span>
-          <span style={{ fontSize: 10, color: '#fff', marginLeft: 8 }}>TUL: {totalRepTime}с</span>
+          <span style={{ fontSize: 10, color: '#fff', marginLeft: 8 }}>TUT: {totalRepTime}с</span>
         </div>
 
         <div style={{ display: 'flex', gap: 1, height: 40, marginBottom: 8, borderRadius: 8, overflow: 'hidden' }}>
@@ -185,6 +249,71 @@ export const TempoTab: React.FC = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* TUT-доза сета */}
+      <div style={CARD}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>⏳ TUT-доза сета</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <label style={{ flex: 1, fontSize: 10, color: '#fff' }}>
+            Повторы
+            <input
+              data-testid="tut-reps"
+              type="number" min={1} max={100} value={tutReps}
+              onChange={e => setTutReps(Math.max(1, Math.min(100, +e.target.value || 1)))}
+              style={{ width: '100%', marginTop: 2, padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14 }}
+            />
+          </label>
+          <label style={{ flex: 1, fontSize: 10, color: '#fff' }}>
+            Сеты
+            <input
+              data-testid="tut-sets"
+              type="number" min={1} max={30} value={tutSets}
+              onChange={e => setTutSets(Math.max(1, Math.min(30, +e.target.value || 1)))}
+              style={{ width: '100%', marginTop: 2, padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14 }}
+            />
+          </label>
+        </div>
+        {tutCalc ? (
+          <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.6 }}>
+            <div>Повтор: <b style={{ color: ACCENT }}>{tutCalc.perRep}с</b> · TUT сета: <b style={{ color: ACCENT }}>{tutCalc.perSet}с</b> · Сессия ({tutSets}): <b style={{ color: ACCENT }}>{tutCalc.total}с</b></div>
+            <div style={{ marginTop: 2 }}>📊 {tutCalc.zone.label}</div>
+            {tutCalc.zone.warn && <div style={{ marginTop: 2, color: '#f59e0b' }}>⚠ {tutCalc.zone.warn}</div>}
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: '#fff' }}>Введите повторы и сеты — посчитаем TUT.</div>
+        )}
+        <div style={{ fontSize: 10, color: '#fff', marginTop: 6, lineHeight: 1.5, opacity: 0.8 }}>
+          TUT — доза, а не прогноз: рост решают объём + близость к отказу. Рабочий диапазон повтора 2–8с (Schoenfeld 2015).
+        </div>
+      </div>
+
+      {/* Темп по упражнению */}
+      <div style={CARD}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>🎯 Темп по упражнению</div>
+        <input
+          data-testid="tempo-exercise-input"
+          value={exName}
+          onChange={e => setExName(e.target.value)}
+          placeholder="Например: румынская тяга…"
+          style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14, marginBottom: 6 }}
+        />
+        {exPick && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span data-testid="tempo-exercise-pick" style={{ fontSize: 13, fontWeight: 800, color: ACCENT, fontFamily: 'monospace' }}>{exPick.notation}</span>
+            <span style={{ fontSize: 10, color: '#fff' }}>{exPick.reason}{exPick.estimated ? ' (ориентир)' : ''}</span>
+            <button
+              data-testid="tempo-exercise-take"
+              onClick={() => {
+                const t = parseTempoCanon(exPick.notation);
+                if (t) setCustomTempo({ eccentric: t.ecc, bottomPause: t.bot, concentric: t.conc, topPause: t.top });
+              }}
+              style={{ padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'rgba(0,230,138,0.15)', color: ACCENT, fontWeight: 800, fontSize: 11, minHeight: 40 }}
+            >
+              Взять темп
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Библиотека пресетов */}
@@ -236,7 +365,7 @@ export const TempoTab: React.FC = () => {
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{preset.nameRu}</span>
                   <span style={{ fontSize: 10, color: ACCENT, fontFamily: 'monospace', fontWeight: 700 }}>
                     {formatTempo(t)}
-                    <span style={{ color: '#fff', marginLeft: 4 }}>TUL {repTime}с</span>
+                    <span style={{ color: '#fff', marginLeft: 4 }}>TUT {repTime}с</span>
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 1, height: 14, borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
@@ -270,13 +399,13 @@ export const TempoTab: React.FC = () => {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {REP_PATTERNS.map(rp => {
-            const engineTempo = generateRepTempo({ goal: 'hypertrophy', riskLevel: 'low', difficultyLevel: 'medium', techniqueIssues: [], isMainLift: true });
+            const preview = PATTERN_PREVIEW[rp.id];
             return (
               <div key={rp.id} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{rp.nameRu}</div>
                 <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, marginBottom: 3 }}>{rp.desc}</div>
-                <div style={{ fontSize: 10, color: '#a855f7', fontFamily: 'monospace', background: 'rgba(168,85,247,0.1)', padding: '1px 5px', borderRadius: 4, display: 'inline-block' }}>
-                  {engineTempo.tempo.toString}
+                <div data-testid="pattern-tempo" style={{ fontSize: 10, color: '#a855f7', fontFamily: 'monospace', background: 'rgba(168,85,247,0.1)', padding: '1px 5px', borderRadius: 4, display: 'inline-block' }}>
+                  {preview.tempo}{preview.note ? ` · ${preview.note}` : ''}
                 </div>
               </div>
             );
@@ -296,8 +425,37 @@ export const TempoTab: React.FC = () => {
         </div>
       </div>
       <div style={{ marginTop: 6, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить темп <b style={{ color: '#00e68a' }}>{formatTempo(customTempo)}</b> к активному планировщику — все упражнения плана получат этот темп (эксцентрика/пауза/концентрика/пауза).</div>
-        <button onClick={() => applyToPlanner({ kind: 'tempo', label: 'Темп ' + formatTempo(customTempo), data: { ...customTempo, label: formatTempo(customTempo) } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить темп к планировщику</button>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить темп <b style={{ color: '#00e68a' }}>{formatTempo(customTempo)}</b> к активному планировщику — упражнения плана получат этот темп (эксцентрика/пауза/концентрика/пауза).</div>
+        <label style={{ display: 'block', fontSize: 10, color: '#fff', marginBottom: 8 }}>
+          Режим применения
+          <select
+            data-testid="tempo-mode"
+            value={bridgeMode}
+            onChange={e => setBridgeMode(e.target.value as TempoApplyMode)}
+            style={{ width: '100%', marginTop: 4, padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13 }}
+          >
+            <option value="all">Все упражнения</option>
+            <option value="compound">Только база</option>
+            <option value="isolation">Только изоляция</option>
+            <option value="skip_deload">Кроме делоада</option>
+          </select>
+        </label>
+        <button onClick={() => { applyToPlanner({ kind: 'tempo', label: 'Темп ' + formatTempo(customTempo), data: { ...customTempo, label: formatTempo(customTempo), mode: bridgeMode } }); setSnapInfo(loadTempoPrevSnapshot()); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить темп к планировщику</button>
+        <div style={{ marginTop: 8, fontSize: 10, color: '#fff' }}>
+          {snapInfo ? (
+            <span>📸 Снимок: {snapInfo.count} сетов · {new Date(snapInfo.ts).toLocaleString('ru-RU')} </span>
+          ) : (
+            <span>📸 Снимка пока нет — появится после применения темпа. </span>
+          )}
+          <button
+            data-testid="tempo-rollback"
+            onClick={() => applyToPlanner({ kind: 'tempo_rollback', label: 'Откат темпа', data: {} })}
+            disabled={!snapInfo}
+            style={{ marginLeft: 6, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: snapInfo ? 'rgba(255,255,255,0.06)' : 'transparent', color: snapInfo ? '#fff' : 'rgba(255,255,255,0.4)', cursor: snapInfo ? 'pointer' : 'default', fontWeight: 800, fontSize: 11, minHeight: 40 }}
+          >
+            ↩ Откатить темп
+          </button>
+        </div>
       </div>
     </div>
   );
