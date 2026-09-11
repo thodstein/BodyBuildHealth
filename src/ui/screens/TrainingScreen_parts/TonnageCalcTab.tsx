@@ -12,7 +12,7 @@ const CARD: React.CSSProperties = {
 };
 const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.4 };
 
-interface Row { id: string; exerciseId: string; weight: number; reps: number; sets: number; oneRM?: number; }
+interface Row { id: string; exerciseId: string; weight: number; reps: number; sets: number; oneRM?: number; week?: number }
 
 export interface TonnageCalcTabProps {
   /** Д3: общие строки хаба (VolumeInput). Без пропсов — автономный режим как раньше. */
@@ -21,7 +21,7 @@ export interface TonnageCalcTabProps {
 }
 
 function toTonRow(s: ProExerciseRow): Row {
-  return { id: s.id, exerciseId: s.exerciseId, weight: s.weight, reps: s.reps, sets: s.sets, oneRM: s.oneRM };
+  return { id: s.id, exerciseId: s.exerciseId, weight: s.weight, reps: s.reps, sets: s.sets, oneRM: s.oneRM, week: s.week };
 }
 
 export const TonnageCalcTab: React.FC<TonnageCalcTabProps> = ({ sharedRows, onSharedRowsChange }) => {
@@ -33,9 +33,12 @@ export const TonnageCalcTab: React.FC<TonnageCalcTabProps> = ({ sharedRows, onSh
   ]);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Е4: фильтр недель — общие строки многонедельные, тоннаж считается на выбранную неделю
+  const [activeWeek, setActiveWeek] = useState<'all' | number>('all');
 
   // Д3: в контролируемом режиме правим общие строки, сохраняя week/day/rpe
   const rows: Row[] = sharedRows ? sharedRows.map(toTonRow) : internalRows;
+  const maxWeek = rows.reduce((m, r) => Math.max(m, r.week ?? 1), 1);
   const upd = (id: string, field: keyof Row, val: any) => {
     if (sharedRows && onSharedRowsChange) {
       onSharedRowsChange(sharedRows.map(r => r.id === id ? { ...r, [field]: val } : r));
@@ -44,10 +47,11 @@ export const TonnageCalcTab: React.FC<TonnageCalcTabProps> = ({ sharedRows, onSh
     }
   };
   const addRow = () => {
+    const w = activeWeek === 'all' ? 1 : activeWeek;
     if (sharedRows && onSharedRowsChange) {
-      onSharedRowsChange(sharedRows.concat([{ id: 'r' + Date.now(), exerciseId: 'bench_bar', week: 1, day: 1, weight: 60, reps: 6, sets: 3 }]));
+      onSharedRowsChange(sharedRows.concat([{ id: 'r' + Date.now(), exerciseId: 'bench_bar', week: w, day: 1, weight: 60, reps: 6, sets: 3 }]));
     } else {
-      setInternalRows(prev => prev.concat([{ id: 'r' + Date.now(), exerciseId: 'bench_bar', weight: 60, reps: 6, sets: 3 }]));
+      setInternalRows(prev => prev.concat([{ id: 'r' + Date.now(), exerciseId: 'bench_bar', weight: 60, reps: 6, sets: 3, week: w }]));
     }
   };
   const delRow = (id: string) => {
@@ -60,13 +64,15 @@ export const TonnageCalcTab: React.FC<TonnageCalcTabProps> = ({ sharedRows, onSh
 
   // P3: расчёт через tonnage-prilepin.engine (Прилепин + INOL вместо crude КПШ).
   // Легаси-КПШ (tonnage×intensity) оставлен как «нагрузочный индекс» для совместимости сводки.
+  // Е4: считаем только выбранную неделю (иначе многонедельный план раздувает INOL сессии).
   const memo = useMemo(() => {
     let totalTonnage = 0, totalReps = 0, totalSets = 0, totalKpSh = 0, totalInol = 0, patternTonnage = 0;
     const byMuscle: Record<string, number> = {}, kpshByMuscle: Record<string, number> = {};
     const byZone: Record<string, number> = { tech: 0, hypertrophy: 0, strength: 0, max: 0, unknown: 0 };
     const rowResults: Record<string, ReturnType<typeof tonnageRowResult>> = {};
+    const effRows = activeWeek === 'all' ? rows : rows.filter(r => (r.week ?? 1) === activeWeek);
 
-    rows.forEach(r => {
+    effRows.forEach(r => {
       const ex = getExerciseById(r.exerciseId);
       if (!ex) return;
       const rm = r.oneRM ?? oneRMGlobal;
@@ -97,7 +103,7 @@ export const TonnageCalcTab: React.FC<TonnageCalcTabProps> = ({ sharedRows, onSh
     const relInt = oneRMGlobal > 0 ? (avgWeight / oneRMGlobal) * 100 : 0;
 
     return { totalTonnage, totalReps, totalSets, totalKpSh, totalInol, patternTonnage, avgWeight, relInt, byMuscle, kpshByMuscle, byZone, rowResults };
-  }, [rows, oneRMGlobal, bodyweight]);
+  }, [rows, oneRMGlobal, bodyweight, activeWeek]);
 
   const handleSave = () => {
     localStorage.setItem('he_saved_tonnage_calc', JSON.stringify({ timestamp: Date.now(), oneRMGlobal, rows }));
@@ -134,7 +140,17 @@ export const TonnageCalcTab: React.FC<TonnageCalcTabProps> = ({ sharedRows, onSh
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
           <button onClick={addRow} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>＋ Добавить упражнение</button>
         </div>
-        {rows.map(row => (
+        {maxWeek > 1 && (
+          <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+            {(['all', ...Array.from({ length: maxWeek }, (_, i) => i + 1)] as Array<'all' | number>).map(w => (
+              <button key={String(w)} onClick={() => setActiveWeek(w)}
+                style={{ padding: '6px 10px', borderRadius: 6, border: activeWeek === w ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.10)', background: activeWeek === w ? 'rgba(0,230,138,0.10)' : 'transparent', color: activeWeek === w ? ACCENT : '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 36 }}>
+                {w === 'all' ? 'Все' : `Н${w}`}
+              </button>
+            ))}
+          </div>
+        )}
+        {(activeWeek === 'all' ? rows : rows.filter(r => (r.week ?? 1) === activeWeek)).map(row => (
           <div key={row.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'end', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ flex: '1 1 100%', minWidth: 0 }}>
               <PopupSelect label="Упражнение" value={row.exerciseId}

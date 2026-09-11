@@ -41,6 +41,21 @@ describe('volume shared input: строки общие для табов', () =>
   });
 });
 
+describe('volume shared input: тоннаж фильтрует недели (Е4)', () => {
+  const shared = [
+    { id: 'w1', exerciseId: 'bench_bar', week: 1, day: 1, weight: 80, reps: 5, sets: 4 },
+    { id: 'w2', exerciseId: 'bench_bar', week: 2, day: 1, weight: 82.5, reps: 5, sets: 4 },
+  ];
+  it('табы недель есть; Н1 показывает 1 строку (INOL не раздут)', () => {
+    const { container } = render(<TonnageCalcTab sharedRows={shared} onSharedRowsChange={() => {}} />);
+    expect(screen.getByText('Н1')).toBeTruthy();
+    expect(screen.getByText('Н2')).toBeTruthy();
+    fireEvent.click(screen.getByText('Н1'));
+    const root = container.querySelector('.train-tonnage')!;
+    expect(Array.from(root.querySelectorAll('button')).filter(b => b.textContent === '✕')).toHaveLength(1);
+  });
+});
+
 describe('volume shared input: контролируемый оптимизатор', () => {
   it('рендерит переданные строки; ✕ зовёт onRowsChange с []', () => {
     const fn = vi.fn();
