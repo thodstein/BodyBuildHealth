@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-хаб PRO-3: R1–R7 + добивка закрыты кодом (Sep 11 2026, закоммичен, без пуша)
+
+По команде «выполняй полностью» закрыты все 7 эпиков + 5 честных гэпов (§7 в `docs/BB-DIAGNOSTICS-HUB-PRO-3.md`, интернет-синтез: Wolf/Maeo LML, Parkinson/Bishop асимметрия, Pareja-Blanco VBT, Calatayud/Schoenfeld MMC). Только Edit/Write + vitest/tsc через терминал; чужие WIP не тронуты (taper/cardio/annual).
+
+- **Движки** (NEW 7): `bb-lvp` (регрессия вес×скорость, MVT из канона pro/vbt, гейты разброс≥10/наклон<0/r²≥0.85, селектор 5 движений), `bb-tendon-guard` (локоть/плечо, warn/stop по уровню 8/12·12/18·15/22), `bb-return-to` (3 ступени), `bb-mmc-gate` (порог 0.65 точный, позинг с ценой в силе), `bb-lr-history` (`he_bb_lr_history`, ≥3 — добивка, флип — наблюдение), `bb-spec-ics` (ICS паттерном SM/TA + `bbWorkingRange` 65–80/80–90) + `bb-spec-annual` (патч BB-блока года: слабые/focus/spec + доноры в notes).
+- **Встройка**: `bb-vbt` += `e1RMByVelocity` + `{goal}` (строки untouched); инъекция += `unilateralTopUp/rirShift/volumeMult` (дефолт выкл); экспорт — PRO-3 разделы (без меты байт-в-байт); мост — `lvp/tendon/returnTo/readinessAction/lrTopUp/lrDirection/mmc/workingRange`; приёмник сохраняет + тост «применено»; автосборка — стейт `lrTopUp` (персист + автоочистка) + пост-пасс (клон унилатерально ≤3, делод скип, сессия <10); хаб — карточка `pro3-card` (LVP/цель VBT/%1RM/сухожилия/возврат/год/ICS).
+- **Проверено**: NEW pro3 26/26 + UI 5/5 + соседи 58/58 + bb-область 2245/2246 (1 — чужое max-pro female) + хаб 27/30 (3 — чужой WIP, вне диффа) + `tsc` 0 по своим. Коммиты `729d3a73`+`7ee5a8e`+`ce976e1c`+`7ee5a8e` pathspec своих, без пуша.
+- **Шторм-урок**: taper-`add -A` подмёл мой ханк приёмника в свой коммит + застейджил его удаление; чужой `BbAutoConstructor`-WIP выносил/возвращал побайтово (пустой дифф — доказательство), свой ханк — только через pathspec; повершел-редирект даёт UTF-16 (патчи — только Edit-инструментом).
+
 ## Тапер ББ PRO-2: все 7 эпиков выполнены кодом (Sep 11 2026, закоммичен, без пуша)
 
 По команде «выполняй полностью от начала до конца» закрыт `docs/BB-TAPER-PRO-2.md` (синтез Escalante 2021 / Homer-Cross-Helms 2024 / Bosquet 2007 / Travis 2020 / Helms-recovery 2025 / Buechel 2025). Только Edit/Write + vitest/tsc через терминал; чужие WIP не тронуты.
