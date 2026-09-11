@@ -241,7 +241,18 @@ he_bb_plan_saved + he_workout_log_v1 + he_profile_v2 (оборудование/�
 
 ---
 
-## 9. Риски
+## 9. Добивка «1–7 полностью» (выполнена кодом, Sep 12 2026)
+
+- **1 план-контекст в карточке** — NEW `planCtxForExercise` (`lab-athlete-ctx`): факт из плана (сеты/RIR/темп/пауза) + missing из аудита (singleAngle при 1 угле и ≥6 сетов / uncovered / strict); бейдж «в плане», полный список issues (был срез 4).
+- **2 Δ до клика** — NEW `formatSimulatorDelta` (только ненулевые: SFR/усталость/lengthened-п.п./углы/✓issues); топ-4 коррекции показывают «Δ на плане» до применения.
+- **3 Δ-ранжир замен** — NEW `rankSubstitutesByDelta` (рост SFR → снижение усталости; без плана — исходный порядок); Шаг 3 сортирует «Допустимые» и печатает Δ.
+- **4 травмы в safety Шага 4** — `getExData` принимает травмы профиля (было `[]`).
+- **5 история диагнозов** — `he_exercise_lab_v1.history` (дедуп по упражнению, кап 10, effect-запись) + блок «🕘 История» с переходом.
+- **6 чип каталога только при плане** — SFR/профиль всегда, диагноз-скор только при `he_bb_plan_saved`/`he_bb_plans`.
+- **7 приёмник ББ-авто** — чужой `BbAutoConstructor`: persist `he_bb_last_lab_delta` + Δ в bridge-flash (аддитивный ханк, остальное не тронуто).
+- Тесты добивки: ctx +2, correction +3 (format/rank×2), UI +5 (план-бейдж/Δ/история/ранжир/гейтинг/сравнение) — итого своих **68/68**; соседи: rest-hooks 68/68, bb-auto-smoke 8/8, bridge-handlers, catalog/manual, bb-sfr/instructions; `tsc` 0.
+
+## 10. Риски
 
 - Эвристика `getResistanceProfile` живёт в 4 местах (Shared + Prescription + ProSubstitute + bb-диагноз) —
   менять только через новый движок-адаптер, иначе рассинхрон.
