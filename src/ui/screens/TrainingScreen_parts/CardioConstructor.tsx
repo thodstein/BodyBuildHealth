@@ -974,8 +974,14 @@ export const CardioConstructor: React.FC = () => {
     if (!same(cfg.talkZone2Hr, Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined)) return true;
     if (!same(cfg.tempC, tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined)) return true;
     if (!same(cfg.altitudeM, altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined)) return true;
+    // Пост-обработка из config-штампа finish-хелпера (темпы VDOT + мезо-флаг).
+    const stamped = cfg as unknown as { paceEasySec?: number; paceTempoSec?: number; paceIntervalSec?: number; mesoOn?: boolean };
+    if (!same(stamped.paceEasySec, parsePaceText(easyPace) ?? undefined)) return true;
+    if (!same(stamped.paceTempoSec, parsePaceText(tempoPace) ?? undefined)) return true;
+    if (!same(stamped.paceIntervalSec, parsePaceText(intervalPace) ?? undefined)) return true;
+    if ((stamped.mesoOn === true) !== mesoOn) return true;
     return false;
-  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors, lthr, ftpWatts, talkHr, tempC, altitudeM]);
+  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn]);
 
   const resetParams = () => {
     setGoal('cut');
