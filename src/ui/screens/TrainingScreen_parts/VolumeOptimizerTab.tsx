@@ -557,7 +557,8 @@ export const VolumeOptimizerTab: React.FC = () => {
                       <span>Подходов: <b style={{ color }}>{m.currentSets}</b></span>
                       <span>База: {m.compoundSets} / Изол: {m.isolationSets}</span>
                       <span>Тяж: {m.heavySets}</span>
-                      <span>Частота: {m.currentFreq}×/нед (опт: {m.optimalFreq})</span>
+                      <span>Частота: {m.currentFreq}×/нед · hard {m.hardSets}/{m.currentSets}</span>
+                      <span style={{ color: m.freqKind === 'ok' ? '#22c55e' : m.freqKind === 'info' ? '#fff' : m.freqKind === 'warning' ? '#f59e0b' : '#ef4444' }}>{m.freqKind === 'ok' ? '✅' : m.freqKind === 'info' ? 'ℹ️' : '⚠'} {m.freqVerdict}</span>
                       <span>Восст: ~{m.recoveryHoursEst}ч</span>
                     </div>
                     {m.actionableTips.length > 0 && (

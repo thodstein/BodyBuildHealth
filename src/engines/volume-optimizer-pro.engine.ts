@@ -17,6 +17,7 @@ import { EXERCISE_CATALOG, getExerciseById } from '../core/exercise-catalog';
 import type { Exercise } from '../core/types';
 import { getVolumeLandmarks, getAllVolumeLandmarks, normLevel, normMuscle, checkVolumeStatus } from './volume-landmarks.engine';
 import type { MuscleVolumeLandmarks, TrainingLevel } from './volume-landmarks.engine';
+import { frequencyForVolume, hardSetsCount } from './volume-canonical.engine';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -47,10 +48,13 @@ export interface MuscleVolumeProAnaly {
   muscle: string;
   muscleRu: string;
   currentSets: number;
+  hardSets: number;
   mev: number;
   mav: number;
   mrv: number;
   status: 'below_mev' | 'optimal' | 'approaching_mrv' | 'exceeding_mrv';
+  freqKind: 'ok' | 'info' | 'warning' | 'critical';
+  freqVerdict: string;
   compoundSets: number;
   isolationSets: number;
   heavySets: number;          // sets ≥85% 1RM
@@ -289,6 +293,11 @@ export function analyzeMuscleVolumePro(
   const recoveryHours = Math.round(currentSets * 4 + heavySets * 8 + compoundSets * 3);
   const optimalFreq = currentSets <= lm.mev ? 2 : currentSets <= lm.mav ? 2 : 1.5;
 
+  // P2: частота v2 — единый вердикт (Schoenfeld 2016 / Grgic 2018), hard-сеты (RPE≥7)
+  const freqDays = daysSeen.size;
+  const freqV = frequencyForVolume(currentSets, Math.max(1, freqDays), lm, muscle);
+  const hard = hardSetsCount(muscleEntries.map(e => ({ sets: e.sets, rpe: e.rpe })));
+
   // Efficiency score: how well are we using our sets?
   const volScore = status === 'optimal' ? 100 : status === 'approaching_mrv' ? 70 : status === 'below_mev' ? 30 : 10;
   const sfrScore = Math.min(100, avgSFR * 60);
@@ -317,10 +326,17 @@ export function analyzeMuscleVolumePro(
   if (currentFreq(muscleEntries) === 1 && currentSets > lm.mav * 0.8) {
     tips.push('Большой объём в 1 день — разнесите на 2 сессии для лучшего восстановления');
   }
+  if (freqV.kind === 'warning' || freqV.kind === 'critical') {
+    tips.push(freqV.message);
+  }
+  if (hard.hardSets < currentSets && hard.totalSets > 0) {
+    tips.push(`Только ${hard.hardSets}/${hard.totalSets} hard-сетов (RPE≥7) — лёгкие сеты не растят`);
+  }
 
   return {
     muscle, muscleRu: muscleRu(muscle),
-    currentSets, mev: lm.mev, mav: lm.mav, mrv: lm.mrv, status,
+    currentSets, hardSets: hard.hardSets, mev: lm.mev, mav: lm.mav, mrv: lm.mrv, status,
+    freqKind: freqV.kind, freqVerdict: freqV.message,
     compoundSets, isolationSets, heavySets,
     recoveryHoursEst: recoveryHours,
     optimalFreq, currentFreq: daysSeen.size,
