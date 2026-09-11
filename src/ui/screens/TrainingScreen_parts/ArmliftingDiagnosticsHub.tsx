@@ -27,9 +27,31 @@ const DEFAULT_STATE: LiftState = {
   attImplement: 'rolling_thunder', attTarget: '', attOk: true,
 };
 
+/** PRO-3 W6: сид из арм-хаба — замеры не дублируются вручную.
+ *  Односторонний (сюда, не обратно — петель нет): только если своего ключа ещё нет. */
+const ARM_HUB_KEY = 'he_arm_diagnostics_hub_v4';
+
 function loadState(): LiftState {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+    if (raw == null) {
+      try {
+        const arm = typeof localStorage !== 'undefined' ? localStorage.getItem(ARM_HUB_KEY) : null;
+        const a = arm ? JSON.parse(arm) : null;
+        if (a && typeof a === 'object') {
+          const g = (k: string): string => (typeof (a as any)[k] === 'string' ? (a as any)[k] : '');
+          const seeded: LiftState = {
+            ...DEFAULT_STATE,
+            rtKg: g('rtKg'), axleKg: g('axleKg'),
+            axleImpl: g('axleImpl') === 'apollon' ? 'apollon' : 'saxon',
+            pinchSec: g('pinchSec'), excalKg: g('excalKg'),
+            sex: g('sex') === 'female' ? 'female' : 'male',
+            bwKg: g('bwKg') || '80',
+          };
+          if (seeded.rtKg || seeded.axleKg || seeded.pinchSec || seeded.excalKg) return seeded;
+        }
+      } catch { /* noop → дефолт ниже */ }
+    }
     const j = raw ? JSON.parse(raw) : {};
     if (!j || typeof j !== 'object') return DEFAULT_STATE;
     const s = (k: keyof LiftState): string => (typeof (j as any)[k] === 'string' ? (j as any)[k] : String(DEFAULT_STATE[k]));
@@ -191,6 +213,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <AdChip active={state.sex === 'female'} onClick={() => set({ sex: 'female' })}>Ж</AdChip>
           </div>
           <div className="ad-muted">CoC — ordinal (№1≈140 … №3≈280 фунтов, не калибровка) · Excalibur — факт без % (SAR по весовой)</div>
+          <div className="ad-muted">Замеры подтягиваются из арм-хаба при первом входе (свой ввод приоритетнее, обратно не пишем)</div>
         </AdSec>
       </AdCard>
 

@@ -31,6 +31,23 @@ describe('W-AL UI: хаб армлифтинга', () => {
     expect(screen.getByText('📥 CSV')).toBeTruthy();
     expect(screen.getByText('🖨 Печать')).toBeTruthy();
   });
+  it('W6: сид из арм-хаба при первом входе (своего ключа нет)', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    try {
+      localStorage.setItem('he_arm_diagnostics_hub_v4', JSON.stringify({ rtKg: '77', axleKg: '', pinchSec: '', excalKg: '', sex: 'male', bwKg: '90' }));
+    } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    expect((screen.getByLabelText(/RT кг/) as HTMLInputElement).value).toBe('77');
+  });
+  it('W6: свой ввод приоритетнее сида (свой ключ есть — чужое не затирает)', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    try {
+      localStorage.setItem('he_arm_diagnostics_hub_v4', JSON.stringify({ rtKg: '77', sex: 'male', bwKg: '90' }));
+      localStorage.setItem('he_armlifting_diag_v1', JSON.stringify({ rtKg: '60', sex: 'male' }));
+    } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    expect((screen.getByLabelText(/RT кг/) as HTMLInputElement).value).toBe('60');
+  });
   it('мост с RT — тост про армлифтинг + трек arm', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);
