@@ -296,11 +296,23 @@ export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot, onHubPatch })
             const fact = diarySeries.map(d => d.squatE1RM).filter(v => v > 0);
             if (fact.length >= 3) {
               const f = holtForecast(fact, 0.4, 0.2, 4);
-              return `факт ${fact.slice(-3).join('→')} → прогноз ${f.join('→')} кг`;
+              return `присед факт ${fact.slice(-3).join('→')} → прогноз ${f.join('→')} кг`;
             }
             return 'недостаточно данных (нужно ≥3 точки приседа)';
           })()}
         </div>
+        {(['benchE1RM', 'deadE1RM'] as const).map(k => {
+          const fact = diarySeries.map(d => d[k]).filter(v => v > 0);
+          const label = k === 'benchE1RM' ? 'Жим' : 'Тяга';
+          return (
+            <div key={k} style={{ fontSize: 11, color: '#fff', marginBottom: 4 }}>
+              {label}: {fact.length >= 3 ? (() => {
+                const f = holtForecast(fact, 0.4, 0.2, 4);
+                return <>факт {fact.slice(-3).join('→')} → прогноз <b style={{ color: ACCENT }}>{f.join('→')}</b> кг</>;
+              })() : <span style={{ color: DIM }}>нужно ≥3 точки (сейчас {fact.length})</span>}
+            </div>
+          );
+        })}
         <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>
           Прогноз +10% к приседу ({target1RM} кг) ≈ <b style={{ color: ACCENT }}>{weeks} нед</b> (логарифм). Holt даёт тренд с учётом последних 4 нед — точнее при плато/скачке.
         </div>

@@ -9,7 +9,7 @@ import type { HubSnapshot } from './StrengthAnalysisHub';
 
 const HIST_KEY = 'he_onerm_history_v1';
 const HIST_CAP = 30;
-interface HistEntry { date: string; lift: string; e1RM: number; weight: number; reps: number }
+interface HistEntry { date: string; lift: string; e1RM: number; weight: number; reps: number; method?: string }
 function loadHist(): HistEntry[] {
   try {
     const raw = localStorage.getItem(HIST_KEY);
@@ -61,7 +61,7 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
 
   const pushHist = (lift: string, e1RM: number) => {
     setHist(prev => {
-      const next = [{ date: new Date().toISOString().slice(0, 10), lift, e1RM, weight, reps: clampedReps }, ...prev].slice(0, HIST_CAP);
+      const next = [{ date: new Date().toISOString().slice(0, 10), lift, e1RM, weight, reps: clampedReps, method }, ...prev].slice(0, HIST_CAP);
       try { localStorage.setItem(HIST_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
@@ -257,7 +257,7 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
           {hist.length > 0 && (
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: '#fff' }}>
               <b>📈 История e1RM (последние {Math.min(5, hist.length)}):</b> {hist.slice(0, 5).map((h, i) => (
-                <span key={i} style={{ marginRight: 8 }}>{h.date} {h.lift} <b style={{ color: ACCENT }}>{h.e1RM}</b></span>
+                <span key={i} style={{ marginRight: 8 }} title={`метод: ${h.method === 'trimmed' ? 'trimmed-mean' : 'медиана'}`}>{h.date} {h.lift} <b style={{ color: ACCENT }}>{h.e1RM}</b></span>
               ))}
             </div>
           )}

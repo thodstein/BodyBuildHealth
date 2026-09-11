@@ -30,13 +30,13 @@ export function csvCell(v: string | number): string {
   return `"${guarded.replace(/"/g, '""')}"`;
 }
 
-export interface OnermHistoryEntry { date: string; lift: string; e1RM: number; weight: number; reps: number }
+export interface OnermHistoryEntry { date: string; lift: string; e1RM: number; weight: number; reps: number; method?: string }
 
-/** CSV динамики e1RM (история he_onerm_history_v1): BOM + заголовок + guard. */
+/** CSV динамики e1RM (история he_onerm_history_v1): BOM + заголовок + guard + метод консенсуса. */
 export function buildStrengthHistoryCsv(hist: OnermHistoryEntry[]): string {
-  const lines = ['date,lift,e1RM_kg,weight_kg,reps'];
+  const lines = ['date,lift,e1RM_kg,weight_kg,reps,method'];
   for (const h of hist) {
-    lines.push([csvCell(h.date), csvCell(h.lift), csvCell(h.e1RM), csvCell(h.weight), csvCell(h.reps)].join(','));
+    lines.push([csvCell(h.date), csvCell(h.lift), csvCell(h.e1RM), csvCell(h.weight), csvCell(h.reps), csvCell(h.method ?? 'median')].join(','));
   }
   return `﻿${lines.join('\n')}`;
 }

@@ -38,7 +38,7 @@ describe('P5 экспорт: CSV/JSON/ICS', () => {
       { date: '2026-09-02', lift: '=cmd', e1RM: 1, weight: 1, reps: 1 },
     ]);
     expect(csv.charCodeAt(0)).toBe(0xfeff);
-    expect(csv).toContain('date,lift,e1RM_kg,weight_kg,reps');
+    expect(csv).toContain('date,lift,e1RM_kg,weight_kg,reps,method');
     expect(csv).toContain("'=cmd");
     expect(csvCell('a"b')).toBe('"a""b"');
   });

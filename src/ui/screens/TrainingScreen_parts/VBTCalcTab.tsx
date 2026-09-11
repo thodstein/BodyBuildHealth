@@ -280,7 +280,7 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
       {snapshot && hubVal != null && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 11, alignItems: 'center' }}>
           <span style={{ color: '#fff' }}>Хаб {LIFT_RU[lift]}:</span>
-          <span style={{ color: '#3b82f6', fontWeight: 800 }}>{hubVal} кг</span>
+          <span style={{ color: '#3b82f6', fontWeight: 800 }}>{hubVal} кг{lift === 'row' ? ' (оценка ≈55% тяги)' : ''}</span>
           <span style={{ color: '#fff' }}>· e1RM сейчас {e1RM} кг</span>
           {hubVal !== e1RM && (
             <button
