@@ -260,6 +260,9 @@ export interface CardioCycleInput {
   name?: string;
   source?: CardioCycle['source'];
   createdAt?: string;
+  /** Id шаблона библиотеки (ставит buildCardioCycleFromTemplate для явных
+   *  циклов): валидатор относится к острым неделям как к авторским (advisory). */
+  templateId?: string;
 }
 
 // ─── Факторы профиля (сон/стресс/HRV/PED/суставы) и питание ───

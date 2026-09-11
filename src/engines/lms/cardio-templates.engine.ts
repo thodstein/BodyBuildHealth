@@ -125,6 +125,8 @@ export function buildCardioCycleFromTemplate(
   const merged: CardioCycleInput = {
     ...tpl.preset,
     ...Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined)),
+    // Штамп источника: валидатор градирует острые недели как авторские.
+    templateId: tpl.meta.id,
   };
   const rationale = [
     `📚 Шаблон «${tpl.meta.title}» (${tpl.meta.sourceLabel}).`,

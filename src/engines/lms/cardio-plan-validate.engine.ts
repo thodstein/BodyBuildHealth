@@ -34,6 +34,12 @@ function hiitShare(week: CardioCycle['weeks'][number]): number {
   return hi / total;
 }
 
+/** Неделя содержит гонку (старт вместо тренировки): нагрузка недели —
+ *  сама гонка, правила объёма/HIIT к ней не применяются. */
+function weekHasRace(week: CardioCycle['weeks'][number]): boolean {
+  return week.sessions.some(s => /старт|race|гонка|соревнов|марафон|полумарафон/i.test(s.purpose ?? ''));
+}
+
 /**
  * Проверить цикл. opts.beginner — строгий HIIT-гард (≤10%);
  * opts.competitionWeeks — недели стартов (taper-контроль).
@@ -47,20 +53,29 @@ export function validateCardioCycle(
   if (weeks.length === 0) {
     return { issues: [{ level: 'error', code: 'empty', text: 'Цикл без недель.' }], qualityScore: 0, valid: false };
   }
+  // Опубликованный шаблон (штамп config.templateId): острые недели —
+  // авторские (план прошли тысячи атлетов), градируем advisory (max warn).
+  // Наш синтез и ручные правки — строго (error).
+  const faithful = typeof cycle.config?.templateId === 'string' && cycle.config.templateId.length > 0;
+  if (faithful) {
+    issues.push({ level: 'info', code: 'source_template', text: `Опубликованный план (${cycle.config!.templateId}): острые недели — по автору, сверьтесь с самочувствием.` });
+  }
   // Правило 10%: скачок объёма между соседними рабочими неделями.
   // Абсолютный пол: +12 мин на 3 сессии (C25K-стиль) — не нарушение,
   // правило ловит только значимые скачки (>15 мин warn, >20 мин error).
+  // Гоночные недели скипаются: отскок после гонки — не скачок.
   for (let i = 1; i < weeks.length; i++) {
     const prev = weeks[i - 1];
     const cur = weeks[i];
     if (cur.deload || cur.taper || prev.deload || prev.taper) continue;
+    if (weekHasRace(prev) || weekHasRace(cur)) continue;
     const pv = weekMinutes(prev);
     const cv = weekMinutes(cur);
     if (pv <= 0) continue;
     const jump = (cv - pv) / pv;
     const absJump = cv - pv;
     if (jump > 0.2 && absJump > 20) {
-      issues.push({ level: 'error', code: 'volume_jump', text: `Нед ${cur.week}: объём +${Math.round(jump * 100)}% (+${Math.round(absJump)} мин) к прошлой (лимит +10%, >+20% — травмоопасно).` });
+      issues.push({ level: faithful ? 'warn' : 'error', code: 'volume_jump', text: `Нед ${cur.week}: объём +${Math.round(jump * 100)}% (+${Math.round(absJump)} мин) к прошлой (лимит +10%, >+20% — травмоопасно).` });
     } else if (jump > 0.1 && absJump > 15) {
       issues.push({ level: 'warn', code: 'volume_jump', text: `Нед ${cur.week}: объём +${Math.round(jump * 100)}% (+${Math.round(absJump)} мин) (лимит +10%/нед).` });
     }
@@ -80,13 +95,13 @@ export function validateCardioCycle(
       issues.push({ level: 'warn', code: 'no_deload', text: 'Нет делода каждые ≤4 нед — добавьте разгрузочную неделю (объём −40%, без HIIT).' });
     }
   }
-  // HIIT-доля: поляризованный гард.
+  // HIIT-доля: поляризованный гард (гоночные недели — сама гонка, скип).
   const hiitCap = opts.beginner ? 0.1 : 0.2;
   weeks.forEach(w => {
-    if (w.deload || w.taper) return;
+    if (w.deload || w.taper || weekHasRace(w)) return;
     const share = hiitShare(w);
     if (share > hiitCap + 0.1) {
-      issues.push({ level: 'error', code: 'hiit_share', text: `Нед ${w.week}: HIIT ${Math.round(share * 100)}% объёма (лимит ${Math.round(hiitCap * 100)}%).` });
+      issues.push({ level: faithful ? 'warn' : 'error', code: 'hiit_share', text: `Нед ${w.week}: HIIT ${Math.round(share * 100)}% объёма (лимит ${Math.round(hiitCap * 100)}%).` });
     } else if (share > hiitCap) {
       issues.push({ level: 'warn', code: 'hiit_share', text: `Нед ${w.week}: HIIT ${Math.round(share * 100)}% — выше ${Math.round(hiitCap * 100)}% (80/20).` });
     }
