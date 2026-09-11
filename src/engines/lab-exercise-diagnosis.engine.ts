@@ -72,7 +72,7 @@ export function labInjuryMatches(
     // Суставной уровень: травма сустава + high-нагрузка этого сустава у упражнения.
     if (exId) {
       try {
-        const js = getJointStress(exId) as Record<string, { level?: string }>;
+        const js = getJointStress(exId) as unknown as Record<string, { level?: string }>;
         for (const [joint, aliases] of Object.entries(JOINT_ALIASES)) {
           const stress = js[joint];
           if (stress && stress.level === 'high'
@@ -114,7 +114,7 @@ export function diagnoseLabExercise(
     uncoveredSubregions: ctx.uncoveredSubregions,
     strictMissing: ctx.strictMissing,
   };
-  const d = diagnoseExercise(ex as Record<string, string>, base);
+  const d = diagnoseExercise(ex, base);
   // Травмы — лабораторный слой: базовый движок их не знает.
   const hit = labInjuryMatches(ctx.injuries, muscle, ex.name, ex.id);
   if (hit && !d.flags.includes('jointRisk')) {
