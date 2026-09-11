@@ -304,17 +304,17 @@ export const UnifiedIntelligenceHub: React.FC = () => {
     } catch { return null; }
   }, [readiness, acwr, sessions.length]);
 
-  // unified apply: один раз pri + явный deload вторым пейлоадом при флаге
-  // (pri-контракт deload-флага не несёт — только объём/RIR; оба kind живут в хендлерах)
+  // unified apply: РОВНО ОДИН пейлоад (два синхронных dispatchEvent батчатся React в один setState —
+  // приёмник увидел бы только последний, pri потерялся бы). При флаге deload едет kind='deload' (несёт те же
+  // объём/RIR + явный флаг; pri-контракт флага не имеет), иначе kind='pri'.
   const applyUnified = ()=> {
     const vol = autoReg.volumeMultiplier;
     const rir = autoReg.rirShift;
     const deload = autoReg.deload || !!recoveryOut?.deloadRecommended;
     const label = deload ? `Интеллект: deload (ACWR ${acwr.ratio.toFixed(2)}/${ZONE_META[acwr.zone].label}, RI ${recoveryOut?.overallRecoveryIndex ?? '—'})` : `Интеллект: объём ×${vol} · RIR +${rir} (ACWR ${acwr.ratio.toFixed(2)}, PRI ${pri})`;
-    // pri-канал — канон для объёма/RIR; добавим deload-флаг в label (движок объёма учтёт).
-    applyToPlanner({ kind:'pri', label, data:{ volumeMult: vol, rirShift: rir } });
     if (deload) applyToPlanner({ kind:'deload', label: `${label} · deload-неделя`, data:{ volumeMult: vol, rirShift: rir, weeks: [] } });
-    const t = (window as any).showToast; if (typeof t==='function') t(deload ? '🔄 Deload отправлен в планировщик (pri + deload-неделя)' : `✓ Коррекция ×${vol} · RIR+${rir} отправлена`, 'success'); else alert(label);
+    else applyToPlanner({ kind:'pri', label, data:{ volumeMult: vol, rirShift: rir } });
+    const t = (window as any).showToast; if (typeof t==='function') t(deload ? '🔄 Deload отправлен в планировщик (kind=deload)' : `✓ Коррекция ×${vol} · RIR+${rir} отправлена`, 'success'); else alert(label);
   };
 
   const last7 = report.dailyLoads.slice(-7);
@@ -351,7 +351,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
       <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {SECTIONS.map(s=> (
           <button key={s.id} onClick={()=> scrollTo(s.id)} aria-pressed={active===s.id} aria-label={`Раздел: ${s.label}. ${s.desc}`} style={{
-            flex:'0 0 auto', display:'flex', alignItems:'center', gap:6, padding:'7px 11px', borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:800, whiteSpace:'nowrap',
+            flex:'0 0 auto', display:'flex', alignItems:'center', gap:6, padding:'7px 11px', minHeight:44, borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:800, whiteSpace:'nowrap',
             border: active===s.id ? `1px solid ${s.accent}` : '1px solid rgba(255,255,255,0.08)',
             background: active===s.id ? `${s.accent}18` : 'rgba(255,255,255,0.04)',
             color: active===s.id ? s.accent : '#fff', transition:'all 0.16s',
@@ -359,7 +359,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
             <span>{s.icon}</span> {s.label}
           </button>
         ))}
-        <button onClick={applyUnified} style={{ marginLeft:'auto', flex:'0 0 auto', padding:'7px 12px', borderRadius:20, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:11, whiteSpace:'nowrap' }}>🛠 Применить</button>
+        <button onClick={applyUnified} style={{ marginLeft:'auto', flex:'0 0 auto', padding:'7px 12px', minHeight:44, borderRadius:20, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:11, whiteSpace:'nowrap' }}>🛠 Применить</button>
       </div>
 
       {/* summary strip — 4 плитки, живые, без дублей формул */}
@@ -547,8 +547,8 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                         <>
                           <span>{s.date}</span><span>RPE {s.sRPE}</span><span>{s.durationMin} мин</span><span style={{ color:ACCENT, fontWeight:800 }}>{sessionLoad(s.sRPE,s.durationMin)} AU</span>
                           <span style={{ display:'flex', gap:4 }}>
-                            <button onClick={()=> { setEditIdx(realIdx); setEditRpe(s.sRPE); setEditDur(s.durationMin); }} aria-label={`Править запись ${s.date}`} style={{ minWidth:40, minHeight:40, borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'#fff', fontSize:12, cursor:'pointer' }}>✏️</button>
-                            <button onClick={()=> setSessions(deleteSRPESession(realIdx))} aria-label={`Удалить запись ${s.date}`} style={{ minWidth:40, minHeight:40, borderRadius:8, border:'1px solid rgba(239,68,68,0.25)', background:'transparent', color:'#ef4444', fontSize:12, cursor:'pointer' }}>🗑</button>
+                            <button onClick={()=> { setEditIdx(realIdx); setEditRpe(s.sRPE); setEditDur(s.durationMin); }} aria-label={`Править запись ${s.date}`} style={{ minWidth:44, minHeight:44, borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'#fff', fontSize:12, cursor:'pointer' }}>✏️</button>
+                            <button onClick={()=> setSessions(deleteSRPESession(realIdx))} aria-label={`Удалить запись ${s.date}`} style={{ minWidth:44, minHeight:44, borderRadius:8, border:'1px solid rgba(239,68,68,0.25)', background:'transparent', color:'#ef4444', fontSize:12, cursor:'pointer' }}>🗑</button>
                           </span>
                         </>
                       )}
@@ -874,7 +874,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
         <div style={{ ...SMALL, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:10, lineHeight:1.45 }}>
           <b style={{ color:'#fff' }}>Что применится:</b> объём <b style={{ color:ACCENT }}>×{autoReg.volumeMultiplier}</b> · RIR <b style={{ color:ACCENT }}>+{autoReg.rirShift}</b> ·
           топ-сет <b style={{ color:ACCENT }}>{(autoReg.adjustedTopSetPct ?? topPct)!=null ? `${((autoReg.adjustedTopSetPct ?? topPct)*100).toFixed(1)}%` : '—'}</b> <span style={{ color:DIM }}>(ориентир — в планировщик едут объём/RIR, вес правится вручную)</span>
-          { (autoReg.deload || !!recoveryOut?.deloadRecommended) && <span style={{ color:'#ef4444', fontWeight:800 }}> · deload (вторым пейлоадом kind=deload)</span> }.
+          { (autoReg.deload || !!recoveryOut?.deloadRecommended) && <span style={{ color:'#ef4444', fontWeight:800 }}> · deload (одним пейлоадом kind=deload)</span> }.
           Forecast {forecast ? `→ ${Math.round(forecast.values[0])}` : '—'} + what-if ΔГ {whatIf.readinessDelta>=0?'+':''}{whatIf.readinessDelta} — информативно, в план не пишется.
           <span style={{ color:DIM }}> Канал: pri (планировщик покажет баннер и пересчитает).</span>
         </div>

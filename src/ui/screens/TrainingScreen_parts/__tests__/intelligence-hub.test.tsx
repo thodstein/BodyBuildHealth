@@ -61,16 +61,34 @@ describe('P5 Intelligence Hub UI', () => {
   });
 
   it('E1 pri уходит всегда, deload — вторым пейлоадом при флаге', () => {
-    render(<UnifiedIntelligenceHub />);
-    fireEvent.click(screen.getByText(/Применить к планировщику/));
+    const dispatched: unknown[] = [];
+    const orig = window.dispatchEvent;
+    window.dispatchEvent = ((e: Event) => { if (e instanceof CustomEvent && e.type === 'planner-apply' && (e as CustomEvent).detail) dispatched.push((e as CustomEvent).detail); return orig.call(window, e); }) as typeof window.dispatchEvent;
+    try {
+      render(<UnifiedIntelligenceHub />);
+      fireEvent.click(screen.getByText(/Применить к планировщику/));
+    } finally {
+      window.dispatchEvent = orig;
+    }
+    // ровно один пейлоад (два синхронных батчатся React — второй съел бы первый)
+    expect(dispatched).toHaveLength(1);
+    expect((dispatched[0] as { kind: string }).kind).toBe('pri');
     expect(JSON.parse(localStorage.getItem('he_planner_apply') || '{}').kind).toBe('pri');
   });
 
-  it('E1 deload-путь: низкая готовность → последним едет kind=deload', () => {
+  it('E1 deload-путь: низкая готовность → одним пейлоадом kind=deload', () => {
     localStorage.setItem('he_unified_intel_snapshot_v2', JSON.stringify({ readiness: 20, fatigue: 90 }));
-    render(<UnifiedIntelligenceHub />);
-    fireEvent.click(screen.getByText(/Применить к планировщику/));
-    const payload = JSON.parse(localStorage.getItem('he_planner_apply') || '{}');
+    const dispatched: unknown[] = [];
+    const orig = window.dispatchEvent;
+    window.dispatchEvent = ((e: Event) => { if (e instanceof CustomEvent && e.type === 'planner-apply' && (e as CustomEvent).detail) dispatched.push((e as CustomEvent).detail); return orig.call(window, e); }) as typeof window.dispatchEvent;
+    try {
+      render(<UnifiedIntelligenceHub />);
+      fireEvent.click(screen.getByText(/Применить к планировщику/));
+    } finally {
+      window.dispatchEvent = orig;
+    }
+    expect(dispatched).toHaveLength(1);
+    const payload = (dispatched[0] as { kind: string; data: { volumeMult: number } });
     expect(payload.kind).toBe('deload');
     expect(payload.data.volumeMult).toBeLessThan(1);
   });
