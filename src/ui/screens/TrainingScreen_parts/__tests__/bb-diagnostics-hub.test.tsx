@@ -308,4 +308,27 @@ describe('BBDiagnosticsHub', () => {
     expect(screen.getByTestId('bb-vbt-goal').textContent).toMatch(/Сила/);
     expect(screen.getByRole('button', { name: /Спец-блок \(.ics\)/ })).toBeInTheDocument();
   });
+  it('PRO-3 добивка: LVP-движение переключается, %1RM двигает фокус', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByTestId('bb-lvp-lift'));
+    fireEvent.click(screen.getAllByText('Жим лёжа')[0]);
+    expect(screen.getByTestId('bb-lvp-lift').textContent).toMatch(/Жим лёжа/);
+    fireEvent.change(screen.getByTestId('bb-mmc-load'), { target: { value: '80' } });
+    expect(screen.getAllByText(/Внешний фокус/)[0]).toBeInTheDocument();
+  });
+  it('PRO-3 добивка: спец-блок уходит в конфиг BB-блока года', () => {
+    localStorage.setItem('he_annual_training_plan_v1', JSON.stringify({
+      id: 'y1', version: 1, totalWeeks: 12, direction: 'bb', macroRef: null, status: 'draft',
+      createdAt: '2026-01-01', updatedAt: '2026-01-01',
+      blocks: [{ ref: { blockKey: 'b1', blockIndex: 0, kind: 'BB', phase: 'hypertrophy', startWeek: 1, weeks: 8 }, config: {}, status: 'unbuilt' }],
+    }));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /в годовой план/ }));
+    const saved = JSON.parse(localStorage.getItem('he_annual_training_plan_v1') || '{}');
+    expect(saved.blocks[0].config.specialization).toBe(true);
+    expect(saved.blocks[0].config.weakPoints).toContain('chest');
+    expect(screen.getAllByText(/в годовой план/)[0]).toBeInTheDocument();
+  });
 });

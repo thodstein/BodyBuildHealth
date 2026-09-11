@@ -29,6 +29,9 @@ import { buildReturnToPlan } from '../../../engines/bb/bb-return-to.engine';
 import { mmcAdviceFor, posingIsoNote } from '../../../engines/bb/bb-mmc-gate.engine';
 import { pushLrSnapshot, summarizeLrDirection, type BbLrSnapshot } from '../../../engines/bb/bb-lr-history.engine';
 import { buildBBSpecIcs, downloadBBSpecIcs, bbWorkingRange } from '../../../engines/bb/bb-spec-ics.engine';
+import { bbSpecToAnnualPatch } from '../../../engines/bb/bb-spec-annual.engine';
+import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
+import { setAnnualBlockConfig } from '../../../engines/annual-training/block-builders.engine';
 import { isSpecializationTargetConflict, canonicalMuscle } from '../../../engines/bb/bb-specialization.engine';
 import { calcExerciseEffect, exerciseEffectScore } from '../../../engines/bb/bb-exercise-effect.engine';
 import { auditPlanExercises } from '../../../engines/bb/bb-plan-exercise-audit.engine';
@@ -79,9 +82,13 @@ type BBState = {
   jointClickPain: boolean;
   /** PRO-3: LVP-строки «вес скорость», цель VBT, позинг-опция, боль в локте. */
   lvpText: string;
+  lvpLift: string;
   vbtGoal: '' | 'mass' | 'strength';
   posingIso: boolean;
   elbowPain: boolean;
+  /** PRO-3: нагрузка для MMC-гейта (%1RM изоляции) + целевой BB-блок года. */
+  mmcLoadPct: string;
+  annualBlockKey: string;
 };
 
 const DEFAULT_STATE: BBState = {
@@ -112,9 +119,12 @@ const DEFAULT_STATE: BBState = {
   numbness: false,
   jointClickPain: false,
   lvpText: '',
+  lvpLift: 'squat',
   vbtGoal: '',
   posingIso: false,
   elbowPain: false,
+  mmcLoadPct: '',
+  annualBlockKey: '',
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
@@ -435,18 +445,19 @@ export const BBDiagnosticsHub: React.FC = () => {
     try {
       const pts = parseBbLvpText(state.lvpText);
       if (pts.length < 3) return null;
-      return calibrateBbLvp('squat', pts);
+      return calibrateBbLvp(state.lvpLift || 'squat', pts);
     } catch { return null; }
-  }, [state.lvpText]);
-  // PRO-3 R3: сухожилия (тяжёлые сеты недели + боль/плечо из присед-теста)
+  }, [state.lvpText, state.lvpLift]);
+  // PRO-3 R3: сухожилия (тяжёлые сеты недели + боль/плечо из присед-теста, пороги по уровню)
   const tendonGuard = useMemo(() => {
     try {
       return assessBbTendonGuard(diarySessions as any, {
         elbowPain: state.elbowPain,
         shoulderOhsFail: !state.ohsArmsOverMidfoot,
+        level,
       });
     } catch { return null; }
-  }, [diarySessions, state.elbowPain, state.ohsArmsOverMidfoot]);
+  }, [diarySessions, state.elbowPain, state.ohsArmsOverMidfoot, level]);
   // PRO-3 R2: return-to после стоп-флагов
   const returnToPlan = useMemo(() => {
     try { return buildReturnToPlan(redFlags as any); } catch { return null; }
@@ -524,9 +535,23 @@ export const BBDiagnosticsHub: React.FC = () => {
   const mmcAdvice = useMemo(() => {
     try {
       const iso = (report.weakZonesGranular || []).length > 0;
-      return mmcAdviceFor({ isolation: iso, loadPct1RM: null, explosive: false });
+      const pctRaw = state.mmcLoadPct ? parseFloat(state.mmcLoadPct) : null;
+      const loadPct = Number.isFinite(pctRaw as number) && (pctRaw as number) > 0 ? (pctRaw as number) / 100 : null;
+      return mmcAdviceFor({ isolation: iso, loadPct1RM: loadPct, explosive: false });
     } catch { return null; }
-  }, [report]);
+  }, [report, state.mmcLoadPct]);
+  // PRO-3 R7: годовой план (только BB-блоки — спец-блок ложится в конфиг)
+  const annualBbBlocks = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_annual_training_plan_v1');
+      if (!raw) return [];
+      const j = JSON.parse(raw);
+      const blocks = Array.isArray(j?.blocks) ? j.blocks : [];
+      return blocks
+        .filter((b: any) => b?.ref?.kind === 'BB')
+        .map((b: any) => ({ key: String(b.ref.blockKey), label: `${b.ref.description || b.ref.phase} · ${b.ref.weeks} нед` }));
+    } catch { return []; }
+  }, [diarySessions, planNonce]);
 
   // ── MAX PRO: причины слабых + McCallum + триада + спец-блок + топ-3 ──
   const wristNum = state.wristCm ? parseFloat(state.wristCm) : NaN;
@@ -699,13 +724,13 @@ export const BBDiagnosticsHub: React.FC = () => {
           try {
             const pts = parseBbLvpText(state.lvpText);
             if (pts.length < 3) return null;
-            const p = calibrateBbLvp('squat', pts);
+            const p = calibrateBbLvp(state.lvpLift || 'squat', pts);
             return p ? { lift: p.lift, r2: p.r2, e1rm: p.e1rm, text: p.text } : null;
           } catch { return null; }
         })(),
         tendon: (() => {
           try {
-            const g = assessBbTendonGuard(diarySessions as any, { elbowPain: state.elbowPain, shoulderOhsFail: !state.ohsArmsOverMidfoot });
+            const g = assessBbTendonGuard(diarySessions as any, { elbowPain: state.elbowPain, shoulderOhsFail: !state.ohsArmsOverMidfoot, level });
             return { elbow: g.elbow.text, shoulder: g.shoulder.text, elbowLevel: g.elbow.level, shoulderLevel: g.shoulder.level };
           } catch { return null; }
         })(),
@@ -755,7 +780,9 @@ export const BBDiagnosticsHub: React.FC = () => {
         mmc: (() => {
           try {
             const iso = (report.weakZonesGranular || []).length > 0;
-            const a = mmcAdviceFor({ isolation: iso, loadPct1RM: null, explosive: false });
+            const pctRaw = state.mmcLoadPct ? parseFloat(state.mmcLoadPct) : null;
+            const loadPct = Number.isFinite(pctRaw as number) && (pctRaw as number) > 0 ? (pctRaw as number) / 100 : null;
+            const a = mmcAdviceFor({ isolation: iso, loadPct1RM: loadPct, explosive: false });
             return `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}`;
           } catch { return null; }
         })(),
@@ -814,8 +841,8 @@ export const BBDiagnosticsHub: React.FC = () => {
   const buildPro3Export = (): Record<string, unknown> => {
     try {
       const lvpPts = parseBbLvpText(state.lvpText);
-      const lvpP = lvpPts.length >= 3 ? calibrateBbLvp('squat', lvpPts) : null;
-      const tg = assessBbTendonGuard(diarySessions as any, { elbowPain: state.elbowPain, shoulderOhsFail: !state.ohsArmsOverMidfoot });
+      const lvpP = lvpPts.length >= 3 ? calibrateBbLvp(state.lvpLift || 'squat', lvpPts) : null;
+      const tg = assessBbTendonGuard(diarySessions as any, { elbowPain: state.elbowPain, shoulderOhsFail: !state.ohsArmsOverMidfoot, level });
       const gate = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
       const rt = buildReturnToPlan(gate as any);
       const raw = localStorage.getItem('he_bb_lr_history');
@@ -828,7 +855,9 @@ export const BBDiagnosticsHub: React.FC = () => {
       const e = vbt?.e1RMByVelocity ?? null;
       const wr = e != null ? bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass') : null;
       const iso = (report.weakZonesGranular || []).length > 0;
-      const mmc = mmcAdviceFor({ isolation: iso, loadPct1RM: null, explosive: false });
+      const pctRaw = state.mmcLoadPct ? parseFloat(state.mmcLoadPct) : null;
+      const loadPct = Number.isFinite(pctRaw as number) && (pctRaw as number) > 0 ? (pctRaw as number) / 100 : null;
+      const mmc = mmcAdviceFor({ isolation: iso, loadPct1RM: loadPct, explosive: false });
       return {
         lvp: lvpP ? { lift: lvpP.lift, r2: lvpP.r2, e1rm: lvpP.e1rm, text: lvpP.text } : null,
         tendon: { elbow: tg.elbow.text, shoulder: tg.shoulder.text },
@@ -1018,6 +1047,45 @@ export const BBDiagnosticsHub: React.FC = () => {
     downloadCsv(csv, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
     setToast('✓ CSV экспорт (причины + спец-блок + упражнения + PRO-2)');
     setTimeout(() => setToast(''), 2000);
+  };
+
+  // PRO-3 R7: спец-блок → конфиг BB-блока годового плана (официальный setAnnualBlockConfig)
+  const handleAnnualApply = () => {
+    try {
+      if (!report.weakZonesGranular.length) {
+        setToast('Выбери 1-2 слабые зоны — нечего класть в год');
+        setTimeout(() => setToast(''), 2000);
+        return;
+      }
+      const plan = loadAnnualTrainingPlan();
+      if (!plan || !plan.blocks.length) {
+        setToast('Годового плана нет — собери разметку в «Годовой план»');
+        setTimeout(() => setToast(''), 2500);
+        return;
+      }
+      const bbBlocks = plan.blocks.filter((b) => b?.ref?.kind === 'BB');
+      if (!bbBlocks.length) {
+        setToast('В году нет ББ-блоков — спец-блок класть некуда');
+        setTimeout(() => setToast(''), 2500);
+        return;
+      }
+      const key = state.annualBlockKey || bbBlocks[0].ref.blockKey;
+      const f: Record<string, number> = {};
+      const sb = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      const patch = bbSpecToAnnualPatch(sb, report.weakZonesGranular);
+      if (!patch) {
+        setToast('Не удалось собрать патч спец-блока');
+        setTimeout(() => setToast(''), 2000);
+        return;
+      }
+      const next = setAnnualBlockConfig(plan, key, patch as any);
+      saveAnnualTrainingPlan(next);
+      setToast(`✓ Спец-блок → годовой план (${key}): слабые + специализация, блок помечен stale`);
+      setTimeout(() => setToast(''), 3000);
+    } catch {
+      setToast('⚠ Не удалось применить в годовой план');
+      setTimeout(() => setToast(''), 2000);
+    }
   };
 
   // PRO-3 R7: календарь спец-блока (.ics) — тот же паттерн, что SM/TA
@@ -1666,6 +1734,9 @@ export const BBDiagnosticsHub: React.FC = () => {
                 </div>
               )}
               <div style={{ marginTop: 6 }}>
+                <BbSheetSelect label="Движение LVP" value={state.lvpLift} onChange={(v) => setState((s) => ({ ...s, lvpLift: v }))} options={[{ id: 'squat', label: 'Присед' }, { id: 'bench', label: 'Жим лёжа' }, { id: 'deadlift', label: 'Становая' }, { id: 'ohp', label: 'Жим стоя' }, { id: 'row', label: 'Тяга' }]} testId="bb-lvp-lift" />
+              </div>
+              <div style={{ marginTop: 6 }}>
                 <label style={{ display: 'block', color: '#fff', marginBottom: 3 }}>LVP-точки «вес скорость» — по строке на замер (мин. 3)</label>
                 <textarea value={state.lvpText} onChange={(e) => setState((s) => ({ ...s, lvpText: e.target.value }))} placeholder="100 0.62&#10;110 0.55&#10;120 0.47" aria-label="LVP-точки вес скорость" data-bb="lvp-input" style={{ width: '100%', height: 56, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, fontFamily: 'monospace', boxSizing: 'border-box' }} />
                 <div style={{ color: '#fff', marginTop: 4 }} data-bb="lvp-line">
@@ -1689,6 +1760,10 @@ export const BBDiagnosticsHub: React.FC = () => {
                   {mmcAdvice.focus === 'internal' ? '🧠 Внутренний' : '🎯 Внешний'} фокус: {mmcAdvice.cue} — {mmcAdvice.text}
                 </div>
               )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                <BbNum label="Нагрузка изоляции, %1RM" value={state.mmcLoadPct} onChange={(v) => setState((s) => ({ ...s, mmcLoadPct: v }))} placeholder="60" step={5} testId="bb-mmc-load" />
+                <BbSheetSelect label="Блок года" value={state.annualBlockKey} onChange={(v) => setState((s) => ({ ...s, annualBlockKey: v }))} options={[{ id: '', label: 'Первый ББ-блок' }, ...annualBbBlocks.map((b) => ({ id: b.key, label: b.label }))]} testId="bb-annual-block" />
+              </div>
               <div style={{ marginTop: 6 }}>
                 <BbCheckCard active={state.posingIso} title="Позинг 30 с в отдыхе (квадрицепс)" desc={posingIsoNote()} onToggle={() => setState((s) => ({ ...s, posingIso: !s.posingIso }))} accent="#a78bfa" />
               </div>
@@ -1700,6 +1775,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                 </div>
               )}
               <button onClick={handleSpecIcs} data-bb="export-ics" style={{ width: '100%', minHeight: 48, marginTop: 6, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>📅 Спец-блок (.ics)</button>
+              <button onClick={handleAnnualApply} data-bb="annual-apply" style={{ width: '100%', minHeight: 48, marginTop: 6, padding: '10px 14px', borderRadius: 10, background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.30)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>🗓 Спец-блок → в годовой план</button>
             </div>
             {report.weakZonesGranular.length > 0 && (
               <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>

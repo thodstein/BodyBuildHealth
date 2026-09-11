@@ -10,6 +10,8 @@ import { mmcAdviceFor, posingIsoNote, MMC_LOAD_THRESHOLD } from '../bb-mmc-gate.
 import { pushLrSnapshot, summarizeLrDirection } from '../bb-lr-history.engine';
 import { buildBBSpecIcs, bbWorkingRange } from '../bb-spec-ics.engine';
 import { bbVbtRecommendation } from '../bb-vbt.engine';
+import { bbSpecToAnnualPatch } from '../bb-spec-annual.engine';
+import { buildSpecBlock } from '../bb-spec-block.engine';
 import { injectBBWeakPoints } from '../bb-diagnostics-injection.engine';
 import { buildBBDiagnosticsHtml, buildBBDiagnosticsCsv } from '../bb-diagnostics-export.engine';
 import { buildBBDiagnosticsReport } from '../bb-diagnostics-hub.engine';
@@ -28,6 +30,21 @@ describe('R1 LVP-лайт', () => {
     expect(p!.r2).toBeGreaterThanOrEqual(0.85);
     expect(p!.e1rm).not.toBeNull();
     expect(p!.text).toMatch(/e1RM/);
+  });
+  it('жим использует свой MVT (0.15), не приседа (0.25)', () => {
+    const sq = calibrateBbLvp('squat', [
+      { weightKg: 100, velocity: 0.62 },
+      { weightKg: 110, velocity: 0.55 },
+      { weightKg: 120, velocity: 0.47 },
+    ])!;
+    const bn = calibrateBbLvp('bench', [
+      { weightKg: 80, velocity: 0.5 },
+      { weightKg: 90, velocity: 0.4 },
+      { weightKg: 100, velocity: 0.3 },
+    ])!;
+    expect(bn.vbtLift).toBe('bench');
+    expect(bn.mvt).toBe(0.15);
+    expect(sq.mvt).toBe(0.25);
   });
   it('скучённые точки (<10 кг) — честный null, без выдумок', () => {
     expect(calibrateBbLvp('squat', [
@@ -95,6 +112,14 @@ describe('R3 сухожилия', () => {
     const g = assessBbTendonGuard(sess(['Жим лёжа'], 2), {});
     expect(g.shoulder.level).toBe('ok');
   });
+  it('пороги масштабируются уровнем: новичку 9 сетов — уже warn', () => {
+    const beg = assessBbTendonGuard(sess(['Жим лёжа'], 9), { level: 'beginner' });
+    expect(beg.shoulder.level).toBe('warn');
+    const mid = assessBbTendonGuard(sess(['Жим лёжа'], 9), { level: 'intermediate' });
+    expect(mid.shoulder.level).toBe('ok');
+    const adv = assessBbTendonGuard(sess(['Жим лёжа'], 16), { level: 'advanced' });
+    expect(adv.shoulder.level).toBe('warn');
+  });
   it('перебор жимов + провал плеча — стоп', () => {
     const g = assessBbTendonGuard(sess(['Жим лёжа', 'Жим стоя', 'Брусья'], 8), { shoulderOhsFail: true });
     expect(g.shoulder.level).toBe('stop');
@@ -114,6 +139,10 @@ describe('R4 MMC-гейт + позинг', () => {
     expect(mmcAdviceFor({ isolation: true, loadPct1RM: 0.5 }).focus).toBe('internal');
     expect(mmcAdviceFor({ isolation: true, loadPct1RM: 0.8 }).focus).toBe('external');
     expect(mmcAdviceFor({ isolation: true, explosive: true }).focus).toBe('external');
+  });
+  it('точный %1RM двигает гейт: 64% — внутренний, 66% — внешний', () => {
+    expect(mmcAdviceFor({ isolation: true, loadPct1RM: 0.64 }).focus).toBe('internal');
+    expect(mmcAdviceFor({ isolation: true, loadPct1RM: 0.66 }).focus).toBe('external');
   });
   it('позинг — честный трейдофф', () => {
     expect(posingIsoNote()).toMatch(/силу/);
@@ -150,7 +179,7 @@ describe('R6 направление перекоса', () => {
   });
 });
 
-describe('R7 ICS + рабочие веса', () => {
+describe('R7 ICS + рабочие веса + годовой патч', () => {
   it('спец-блок → валидный календарь понедельниками', () => {
     const ics = buildBBSpecIcs(
       { weeks: [{ week: 1, targetSets: { chest_upper: 12, delt_mid: 8 }, note: 'база' }, { week: 2, targetSets: { chest_upper: 14 }, note: 'рост' }], weakZones: ['chest_upper'] },
@@ -173,6 +202,15 @@ describe('R7 ICS + рабочие веса', () => {
     expect(s.low).toBe(80);
     expect(s.high).toBe(90);
     expect(bbWorkingRange(0)).toBeNull();
+  });
+  it('спец-блок → годовой патч: слабые + специализация + доноры в notes', () => {
+    const spec = buildSpecBlock({ weakZones: ['chest_upper'], factSets: {}, level: 'intermediate', weeks: 8 });
+    const patch = bbSpecToAnnualPatch(spec, ['chest_upper', 'delt_mid']);
+    expect(patch!.weakPoints).toContain('chest');
+    expect(patch!.focusGroup).toBe('chest');
+    expect(patch!.specialization).toBe(true);
+    expect(patch!.notes).toMatch(/нед/);
+    expect(bbSpecToAnnualPatch(null, [])).toBeNull();
   });
   it('экспорт несёт PRO-3 разделы, без меты — байт-в-байт', () => {
     const rep = buildBBDiagnosticsReport({ level: 'intermediate' });

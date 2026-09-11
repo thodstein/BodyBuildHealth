@@ -44,30 +44,42 @@ function countFor(sessions: any[], re: RegExp): number {
   return n;
 }
 
-function levelFor(sets: number, pain: boolean): BbTendonLevel {
+function levelFor(sets: number, pain: boolean, warnAt: number, stopAt: number): BbTendonLevel {
   if (pain) return 'stop';
-  if (sets > 18) return 'stop';
-  if (sets > 12) return 'warn';
+  if (sets > stopAt) return 'stop';
+  if (sets > warnAt) return 'warn';
   return 'ok';
 }
 
+/**
+ * Пороги — эвристика скрининга, масштабируется уровнем (новичок раньше упирается
+ * в потолок восстановления; прецедент — MRV-лесенка volume-landmarks).
+ */
+const LEVEL_CAPS: Record<string, { warn: number; stop: number }> = {
+  beginner: { warn: 8, stop: 12 },
+  intermediate: { warn: 12, stop: 18 },
+  advanced: { warn: 15, stop: 22 },
+  enhanced: { warn: 15, stop: 22 },
+};
+
 export function assessBbTendonGuard(
   sessions: any[],
-  opts: { elbowPain?: boolean; shoulderOhsFail?: boolean } = {},
+  opts: { elbowPain?: boolean; shoulderOhsFail?: boolean; level?: string } = {},
 ): BbTendonGuard {
+  const caps = LEVEL_CAPS[String(opts.level || 'intermediate').toLowerCase()] || LEVEL_CAPS.intermediate;
   const elbowSets = countFor(sessions, ELBOW_RE);
   const shoulderSets = countFor(sessions, SHOULDER_RE);
-  const elbowLevel = levelFor(elbowSets, !!opts.elbowPain);
-  const shoulderLevel = levelFor(shoulderSets, !!opts.shoulderOhsFail);
+  const elbowLevel = levelFor(elbowSets, !!opts.elbowPain, caps.warn, caps.stop);
+  const shoulderLevel = levelFor(shoulderSets, !!opts.shoulderOhsFail, caps.warn, caps.stop);
   const elbowText = elbowLevel === 'stop'
     ? `Локоть: стоп — ${elbowSets} тяж. сетов/нед${opts.elbowPain ? ' + боль' : ''}, только изометрия/ремень-техника`
     : elbowLevel === 'warn'
-      ? `Локоть: осторожно — ${elbowSets} тяж. сетов/нед (>12), без разнохвата и читинга`
+      ? `Локоть: осторожно — ${elbowSets} тяж. сетов/нед (>${caps.warn}), без разнохвата и читинга`
       : `Локоть: порядок — ${elbowSets} тяж. сетов/нед`;
   const shoulderText = shoulderLevel === 'stop'
     ? `Плечо: стоп — ${shoulderSets} жимовых сетов/нед${opts.shoulderOhsFail ? ' + провал плеча в присед-тесте' : ''}, жимы над головой убрать`
     : shoulderLevel === 'warn'
-      ? `Плечо: осторожно — ${shoulderSets} жимовых сетов/нед (>12), контроль лопатки, без отказа`
+      ? `Плечо: осторожно — ${shoulderSets} жимовых сетов/нед (>${caps.warn}), контроль лопатки, без отказа`
       : `Плечо: порядок — ${shoulderSets} жимовых сетов/нед`;
   return {
     elbow: { joint: 'elbow', heavySets: elbowSets, level: elbowLevel, text: elbowText },

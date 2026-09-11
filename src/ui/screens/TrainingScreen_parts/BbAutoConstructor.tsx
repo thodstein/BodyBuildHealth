@@ -92,7 +92,7 @@ import {
   prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv,
   manipulationLockedFor, manipulationLockNote, trialCarbDoseGPerKg,
   TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks,
-  postShowRecoveryDiet,
+  postShowRecoveryDiet, buildPeakWeek, recarbLoadFromVisual,
   type PrepAdjustment,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
@@ -655,6 +655,19 @@ export const BbAutoConstructor: React.FC = () => {
   const [executionCorrections, setExecutionCorrections] = useState<Array<any>>(() => {
     try { const raw = localStorage.getItem('he_bb_execution_corrections'); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; } catch { return []; }
   });
+  // PRO-3 R2: L/R-добивка слабой стороны из ББ-диагностики (применяется в автосборке поверх плана)
+  const [lrTopUp, setLrTopUp] = useState<Record<string, { side: 'left' | 'right'; sets: number }>>(() => {
+    try {
+      const raw = localStorage.getItem('he_bb_lr_topup');
+      const j = raw ? JSON.parse(raw) : {};
+      if (!j || typeof j !== 'object') return {};
+      const out: Record<string, { side: 'left' | 'right'; sets: number }> = {};
+      for (const [k, v] of Object.entries(j as Record<string, any>)) {
+        if (v && (v.side === 'left' || v.side === 'right')) out[String(k)] = { side: v.side, sets: Math.max(1, Math.min(3, Math.round(Number(v.sets) || 1))) };
+      }
+      return out;
+    } catch { return {}; }
+  });
   // Epic A: персональная калибровка MEV (личный минимум объёма). Хранится в he_bb_mev_calibration.
   const [mevCal, setMevCal] = useState<MEVCalibration | null>(() => loadMEVCalibration());
   const [mevDraft, setMevDraft] = useState<MEVSignal>({ pump: 4, soreness: 2, performance: 4 });
@@ -912,6 +925,9 @@ export const BbAutoConstructor: React.FC = () => {
   });
   const [liveFull, setLiveFull] = useState(3);
   const [liveWater, setLiveWater] = useState(3);
+  // PRO-2 P2-доводка: live-пересчёт оставшихся load-дней по визуалу (персист по дате шоу).
+  const [liveVisual, setLiveVisual] = useState<'flat' | 'full' | 'spill'>('full');
+  const [recarb, setRecarb] = useState<Array<{ day: number; phase: string; carbsG: number; kcal: number }> | null>(null);
   // PRO-2 P6: лог восстановления post-show (6 нед) — вводы формы.
   const [postLogTick, setPostLogTick] = useState(0);
   const [postLogWeek, setPostLogWeek] = useState<number>(1);
@@ -1618,9 +1634,20 @@ export const BbAutoConstructor: React.FC = () => {
           if (ra.level === 'red') pro2parts.push(`готовность red → вставка ×${ra.volumeMult ?? 0.75} RIR+${ra.rirShift ?? 1}`);
         }
         if (bbDiag.lrTopUp && typeof bbDiag.lrTopUp === 'object' && Object.keys(bbDiag.lrTopUp).length) {
-          try { localStorage.setItem('he_bb_lr_topup', JSON.stringify(bbDiag.lrTopUp)); } catch {}
-          const names = Object.entries(bbDiag.lrTopUp).map(([g, v]) => `${g}: ${(v as { side: string }).side === 'left' ? 'левая' : 'правая'} +${(v as { sets: number }).sets}`).join(', ');
-          pro2parts.push(`добивка слабой ${names}`);
+          const clean: Record<string, { side: 'left' | 'right'; sets: number }> = {};
+          for (const [k, v] of Object.entries(bbDiag.lrTopUp as Record<string, any>)) {
+            if (v && ((v as any).side === 'left' || (v as any).side === 'right')) {
+              clean[String(k)] = { side: (v as any).side, sets: Math.max(1, Math.min(3, Math.round(Number((v as any).sets) || 1))) };
+            }
+          }
+          setLrTopUp(clean);
+          try { localStorage.setItem('he_bb_lr_topup', JSON.stringify(clean)); } catch {}
+          const names = Object.entries(clean).map(([g, v]) => `${g}: ${v.side === 'left' ? 'левая' : 'правая'} +${v.sets}`).join(', ');
+          if (names) pro2parts.push(`добивка слабой ${names} → в сборку`);
+        } else if (bbDiag.lrTopUp && typeof bbDiag.lrTopUp === 'object') {
+          // перекос закрыт — чистим добивку, чтобы не висела на сборках
+          setLrTopUp({});
+          try { localStorage.removeItem('he_bb_lr_topup'); } catch {}
         }
         if (Array.isArray(bbDiag.lrDirection) && bbDiag.lrDirection.length) {
           try { localStorage.setItem('he_bb_lr_direction', JSON.stringify(bbDiag.lrDirection)); } catch {}
@@ -2213,7 +2240,8 @@ export const BbAutoConstructor: React.FC = () => {
       plan = applyDUPOverlay(plan, { mode: dupMode, cycleDays: dupMode === 'full_dup' ? 3 : 2, muscles: dupMuscles.length ? dupMuscles : undefined });
     }
     // Лаборатория ББ-диагностики: замены + предпочитаемые + PROF-коррекции выполнения (темп/ROM/техника) — поверх плана
-    if (exerciseSwaps.length > 0 || preferredExerciseIds.length > 0 || executionCorrections.length > 0) {
+    // PRO-3 R2: L/R-добивка слабой стороны — поверх плана (унилатерально, слабая первой, ≤3 сетов, делод скип, сессия <10 упр)
+    if (exerciseSwaps.length > 0 || preferredExerciseIds.length > 0 || executionCorrections.length > 0 || Object.keys(lrTopUp).length > 0) {
       const swaps = exerciseSwaps.slice();
       // preferred как swap если упражнения нет в плане — добавим в первую неделю
       for (const pid of preferredExerciseIds) {
@@ -2277,6 +2305,34 @@ export const BbAutoConstructor: React.FC = () => {
         }
       }
       const profParts: string[] = [];
+      // PRO-3 R2: добивка слабой стороны — клон первого упражнения мышцы унилатерально (слабая первой)
+      const lrEntries = Object.entries(lrTopUp);
+      if (lrEntries.length) {
+        const sideRu = (sd: string) => (sd === 'left' ? 'левая' : 'правая');
+        for (const [g, tu] of lrEntries) {
+          const gl = String(g).toLowerCase();
+          const side = (tu as any)?.side === 'right' ? 'right' : 'left';
+          const addSets = Math.max(1, Math.min(3, Math.round(Number((tu as any)?.sets) || 1)));
+          for (const w of (plan.weeks || []) as any[]) {
+            if (!w || (w as any).deload) continue;
+            let target: any = null;
+            for (const s of (w.sessions || []) as any[]) {
+              if ((s.exercises || []).some((e: any) => String(e.muscle || '').toLowerCase() === gl)) { target = s; break; }
+            }
+            if (!target || !Array.isArray(target.exercises) || target.exercises.length >= 10) continue;
+            const src = (target.exercises as any[]).find((e: any) => String(e.muscle || '').toLowerCase() === gl);
+            if (!src) continue;
+            target.exercises.push({
+              ...src,
+              sets: addSets,
+              role: 'accessory' as const,
+              comment: `${(src as any).comment ? (src as any).comment + ' · ' : ''}↔ L/R: слабая ${sideRu(side)} первой, унилатерально +${addSets}`,
+            });
+          }
+        }
+        const lrNames = lrEntries.map(([g, tu]) => `${g}: ${sideRu(String((tu as any)?.side))} +${Math.max(1, Math.min(3, Math.round(Number((tu as any)?.sets) || 1)))}`).join(', ');
+        profParts.push(`L/R добивка ${lrNames}`);
+      }
       if (preferredExerciseIds.length) profParts.push(`предпочтения ${preferredExerciseIds.join(', ')}`);
       if (exerciseSwaps.length) profParts.push(`замены ${exerciseSwaps.map(s => `${s.oldId}→${s.newId}`).join(', ')}`);
       if (executionCorrections.length) profParts.push(`PROF ${executionCorrections.map(c => c.type).join(', ')}`);
@@ -6963,6 +7019,38 @@ export const BbAutoConstructor: React.FC = () => {
                     </div>
                     <div style={{ fontSize:10, color: live.status === 'on_track' ? '#4ade80' : '#fbbf24', marginTop:4 }}>
                       {live.status === 'flat' ? '📉 ' : live.status === 'spill' ? '💧 ' : '✅ '}{live.note}
+                    </div>
+                    {/* PRO-2 P2-доводка: пересчёт оставшихся load-дней по визуалу */}
+                    <div style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(251,191,36,0.2)' }}>
+                      <div style={{ fontSize:10, fontWeight:800, color:'#fbbf24', marginBottom:4 }}>🔄 Пересчёт load-дней по визуалу (остаток пик-недели)</div>
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', fontSize:10, color:'#fff' }}>
+                        {([['flat', '📉 Плоско'], ['full', '✅ Норма'], ['spill', '💧 Залило']] as const).map(([v, label]) => (
+                          <button key={v} onClick={() => { setLiveVisual(v); setRecarb(null); }} aria-pressed={liveVisual === v} style={{ minHeight:44, padding:'6px 10px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', color: liveVisual === v ? '#fbbf24' : '#fff', border:'1px solid rgba(251,191,36,0.35)', background: liveVisual === v ? 'rgba(251,191,36,0.25)' : 'rgba(255,255,255,0.03)' }}>{label}</button>
+                        ))}
+                        <button
+                          onClick={() => {
+                            try {
+                              const base = buildPeakWeek(configFromPlan(prepPlan), prepPlan.peakWeek.carbDoseGPerKg != null ? { carbDoseGPerKg: prepPlan.peakWeek.carbDoseGPerKg } : undefined);
+                              const loads = base.filter(d => d.phase.startsWith('load'));
+                              const adj = recarbLoadFromVisual(loads, liveVisual);
+                              setRecarb(adj.map(d => ({ day: d.day, phase: d.phaseLabel, carbsG: d.carbsG, kcal: d.kcal })));
+                              try { localStorage.setItem(`he_peak_recarb_${prepPlan.showDate}`, JSON.stringify({ visual: liveVisual, at: new Date().toISOString(), days: adj.map(d => ({ day: d.day, carbsG: d.carbsG, kcal: d.kcal })) })); } catch { /* ignore */ }
+                              flash(`🔄 Load-дни пересчитаны (${liveVisual === 'flat' ? '+75г' : liveVisual === 'spill' ? '−100г' : 'без изменений'} на остаток)`);
+                            } catch { flash('Не удалось пересчитать load-дни'); }
+                          }}
+                          style={{ minHeight:44, padding:'6px 12px', borderRadius:8, fontSize:11, fontWeight:800, cursor:'pointer', color:'#fff', border:'1px solid #fbbf24', background:'rgba(251,191,36,0.2)' }}
+                        >
+                          🔄 Пересчитать load-дни
+                        </button>
+                      </div>
+                      {recarb && recarb.length > 0 && (
+                        <div style={{ fontSize:10, color:'#fff', marginTop:6 }}>
+                          {recarb.map(r => (
+                            <div key={r.day}>Д{r.day} ({r.phase}): <b>{r.carbsG}г</b> · {r.kcal} ккал</div>
+                          ))}
+                          <div style={{ fontSize:9, color:'#fff', marginTop:2 }}>Цифры для приёмов пищи (persist — переживает перезапуск). Дневник/рацион не переписываются.</div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
