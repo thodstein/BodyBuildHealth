@@ -701,7 +701,10 @@ export const CardioParamsStep: React.FC<{
           warnings.push(`Дней в неделю (${daysAvailable}) меньше запрошенной частоты — сессии урезаны на ${cutWeeks.length} нед.`);
         }
       }
-      return { cycle, warnings };
+      // Legacy-preview: тот же finish-хелпер (каскад стартов; темпов/мезо
+      // у компонента нет — только то, что знает его модель).
+      const finishedLegacy = finishCardioCycle(cycle, { competitions: comps, taperEnabled });
+      return { cycle: finishedLegacy, warnings };
     } catch { return { cycle: null, warnings }; }
   }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula, lthr, ftpWatts, talkHr, tempC, altitudeM]);
 
