@@ -115,6 +115,9 @@ export interface JointLoadInput {
   mobilityRestrictions?: string[];
   currentPain?: string[];
   jointLimitations?: Record<string,'none'|'mild'|'moderate'|'severe'>;
+  /** J7: флаги орто-скрининга (ortho-screen) — добавляют гарды без смены ядра */
+  orthoBlockedPatterns?: string[];
+  orthoNote?: string;
 }
 
 export interface JointLoadDiagnosis {
@@ -144,11 +147,13 @@ export function jointLoadDiagnosis(input: JointLoadInput): JointLoadDiagnosis {
   const flows = getMobilityFlows().filter(f => f.targetAreas.some(a => joint.label.includes(a) || a.toLowerCase().includes(joint.label.toLowerCase()))).slice(0,2);
   // опции по суставу + лифту
   const options = JOINT_OPTIONS.filter(o => o.joint === input.joint && (o.lifts.length===0 || o.lifts.some(l=> (input.lifts??joint.relatedLifts).includes(l))));
+  // J7: орто-гарды — мёрдж blocked без затирания ядра
+  const blockedPatterns = Array.from(new Set([...ortho.blockedPatterns, ...(input.orthoBlockedPatterns ?? [])]));
   return {
     joint,
     phase: ortho.phase,
     allowedPatterns: ortho.allowedPatterns,
-    blockedPatterns: ortho.blockedPatterns,
+    blockedPatterns,
     romLimits: ortho.romLimits,
     stressLimits: ortho.jointStressLimits,
     mobilityTests: mobTests,

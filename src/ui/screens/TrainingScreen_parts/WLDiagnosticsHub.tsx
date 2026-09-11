@@ -38,6 +38,7 @@ import { planTAAttempts } from '../../../engines/strength-sport/strength-sport-t
 import { diagnoseTAImtp, IMTP_PROTOCOL_CHECKLIST, IMTP_CLEAN_TRANSFER_NOTE, impulseVerdict } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
 import { buildTAIcs, downloadTAIcs } from '../../../engines/strength-sport/strength-sport-ta-ics.engine';
 import { buildTAAnnualOverlay, saveTAAnnualOverlay } from '../../../engines/strength-sport/strength-sport-ta-annual-bridge.engine';
+import { OrthoScreenCard } from './OrthoScreenCard';
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 import { pciFromTrackings, persistingAsymmetry } from '../../../engines/strength-sport/strength-sport-ta-bar-consistency.engine';
 import { jerkAclFlags } from '../../../engines/strength-sport/strength-sport-ta-jerk-safety.engine';
@@ -1827,6 +1828,9 @@ export const WLDiagnosticsHub: React.FC = () => {
               <button data-wl="jerk-snap" onClick={takeJerkSnapshot} style={{ marginTop: 6, width: '100%', minHeight: 44, padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок ножниц</button>
             </div>
             <button data-wl="ohs-profile" onClick={applyMobilityToProfile} style={{ marginTop: 8, width: '100%', minHeight: 48, padding: '8px 12px', borderRadius: 8, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: ohs.failed > 0 ? '#60a5fa' : '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Применить OHS в профиль {ohs.failed ? `(${ohs.failed}/6 → ${ohs.primaryDriver || 'ограничения'})` : '(OK)'}</button>
+            <div style={{ marginTop: 8 }} data-wl="ortho-screen">
+              <OrthoScreenCard compact />
+            </div>
           </div>
         )}
       </div>

@@ -53,6 +53,7 @@ import { scoreArm, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { haptics } from '../../../core/native-bridge';
+import { OrthoScreenCard } from './OrthoScreenCard';
 
 const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
 
@@ -1185,6 +1186,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
           {tab==='pressure' && <HubPressureTab H={H} />}
 
           {tab==='recovery' && <HubRecoveryTab H={H} />}
+          {tab==='recovery' && (
+            <div style={{ marginTop: 8 }} data-arm="ortho-screen">
+              <OrthoScreenCard compact />
+            </div>
+          )}
         </div>
         <HubTabNext H={H} />
       </AdCard>

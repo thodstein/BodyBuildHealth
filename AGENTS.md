@@ -1,5 +1,13 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Суставы и ортопедия J1–J7: план + полное выполнение кодом (Sep 2026, закоммичено, без пуша)
+
+План `docs/JOINTS-ORTOPEDICS-PLAN.md` (аудит 1.1–1.7 + интернет-синтез: плечо-кластеры Gismervik/Jain-2024, FMS AUC 0.587, Pålsson ТБС, Wright/AAOS RTS, YBT-ANT>4 Garrison, Beighton/Møller/Brittain, Nulty 2025 коллаген, UC-II Lugo/Crowley, BPC/TB preclinical-only + WADA). Только Edit/Write + vitest/tsc; чужие WIP не тронуты.
+
+- **Движки**: NEW `pro/ortho-screen.engine` (J1 плечо 5/кластер≥2 + urgent; J2 ТБС 3+ROM; J3 вальгус/YBT/LSI+RTS; J4 SLR/Thompson/кисть/локоть; J5 Beighton 9 + 6/5/4 + 5PQ; yellow + teen; J6 ранжир proven→investigational + WADA; J7 screenOrtho/гарды/профиль `health.orthoFlags`/HTML+CSV+BOM/мост) + `joint-load-master` += orthoBlockedPatterns + `planner-bridge` WeakpointsPayload += orthoFlags/Summary/Guards.
+- **Хабы/поддержка**: NEW `OrthoScreenCard` (полная + compact, `he_ortho_screen_v1`, 💾/CSV/HTML/📦) в 5 точках (SafetyHub + BB/WL/SM/ARM); `supportProtocolJoints` += J6-легенда + UC-II-сепарация.
+- **Проверено**: NEW ortho-screen 26/26 + card 2/2 + соседи 49/49; `tsc` 0. BB-hub 3 падения — чужие предсуществующие (доказано прогоном без моих правок). НЕ ПУШИЛ.
+
 ## Армлифтинг PRO-4: все 10 эпиков выполнены кодом (Sep 11 2026, закоммичено, без пуша)
 
 План `docs/ARMLIFTING-DIAGNOSTICS-PRO-4.md` (аудит хаба + интернет-синтез 2025–2026: IronMind RT/Axle/Hub/Silver rules, CoC FAQ + буклет 60–365 фунтов, Armlifting USA 2026 last-man-standing/классы/20+ лидербордов, Mathiowetz/Werle/Grippit нормы щипка). Только Edit/Write + vitest/tsc; чужие WIP не тронуты (в диффе только свои 9 файлов, сверено `git status`).

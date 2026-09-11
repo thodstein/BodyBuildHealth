@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 
 import { LoadSafetyCard } from './LoadSafetyCard';
+import { OrthoScreenCard } from './OrthoScreenCard';
 import { TrainingLoadCalculator } from './TrainingLoadCalculator';
 import { FatigueIndexTab } from './FatigueIndexTab';
 import { AutoregPanel } from '../SRCBBScreen_parts/AutoregPanel';
@@ -60,6 +61,8 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
             🦴 Глубокий анализ сустава (JSI, 8 блоков, FMS) и оценка техники упражнения — во вкладке <b style={{ color: '#f43f5e' }}>«Суставы и ортопедия»</b> (единый инструмент, без дублей). Здесь — быстрый орто-чек.
           </div>
           <LoadSafetyCard initialSubTab="ortho" />
+          <div style={{ height: 8 }} />
+          <OrthoScreenCard />
         </>
       )}
       {section === 'load' && (

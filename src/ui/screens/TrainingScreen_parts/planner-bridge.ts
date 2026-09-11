@@ -71,6 +71,10 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   armLifting?: { weakest: string | null; avgPct: number | null; totalKg: number; rows: Array<{ implement: string; display: string; scorePct: number | null; level: string; internal: boolean }>; weakestWr?: string | null; avgWrPct?: number | null; avgInternalPct?: number | null; prescription?: string; weightClass?: string; rulesNote?: string; lms?: { label: string; steps: number[] } };
   armRedFlags?: string[];
   armProfile?: { leftKg?: number; rightKg?: number; bwKg?: number; rtKg?: number; pinchKg?: number; hubKg?: number };
+  /** J7 орто-скрининг (OrthoScreenCard → конструкторы): всё опционально, приёмники только сохраняют/гарды. */
+  orthoFlags?: Array<{ id: string; joint: string; level: string; label: string; action: string }>;
+  orthoSummary?: string;
+  orthoGuards?: { pauseOverhead?: boolean; limitDeepSquat?: boolean; yokeGate?: boolean; closedChainOnly?: boolean; blockedPatterns?: string[]; mobilityAdd?: string[] };
 }
 export interface PriPayload { volumeMult: number; rirShift: number }
 export interface TempoPayload { eccentric: number; bottomPause?: number; concentric: number; topPause?: number; label?: string }

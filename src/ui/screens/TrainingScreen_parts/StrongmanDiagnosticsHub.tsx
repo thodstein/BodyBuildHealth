@@ -52,6 +52,7 @@ import { buildSMFormatPlan, SM_EVENT_FORMAT_LABEL, type SMEventFormat } from '..
 import { smAutoAnglesFromCsv } from '../../../engines/strength-sport/strength-sport-sm-auto-angles.engine';
 import { smAttemptsFor } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
 import { applyToPlanner } from './planner-bridge';
+import { OrthoScreenCard } from './OrthoScreenCard';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
@@ -1490,6 +1491,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginBottom:6 }}>
               <HubNum label="Колено-стена (Knee-to-wall)" unit="см" value={state.kneeToWallCm} onChange={v=>setState(s=>({...s, kneeToWallCm:v}))} placeholder="12" step={1} />
               <HubNum label="Голеностоп" unit="°" value={state.ankleDeg} onChange={v=>setState(s=>({...s, ankleDeg:v}))} placeholder="35" step={1} />
+            </div>
+            <div style={{ marginTop: 6 }} data-sm="ortho-screen">
+              <OrthoScreenCard compact />
             </div>
             <div style={{ display:'flex', gap:6, marginBottom:6, alignItems:'center', flexWrap:'wrap' }}>
               <span style={{ fontSize:13, color:'#fff' }}>Подъём пятки 2.5 см (heel-raise)</span>

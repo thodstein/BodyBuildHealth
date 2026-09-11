@@ -66,6 +66,15 @@ export const SupportProtocolJoints: React.FC<{ s: Record<string, any> }> = ({ s 
               {/* Protocol phases */}
               {jointTab === 'protocol' && (
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                <div style={{ ...cardBg, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.22)' }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', marginBottom:4 }}>📚 Честность доказательности (J6, 2026)</div>
+                  <div style={{ fontSize:8, color:'var(--text-light)', lineHeight:1.4 }}>
+                    ✅ <b>Доказано:</b> гидролизат коллагена 15–30г + VitC 50мг за 30–60мин ДО нагрузки (Nulty 2025: CSA/жёсткость выше vs тренировка alone) · VitC — кофактор синтеза.<br/>
+                    🟡 <b>Умеренно:</b> UC-II 40мг натощак отдельно от гидролизата (Lugo 2013 / Crowley 2016: WOMAC лучше, эффект умеренный) · омега-3 / босвеллия / MSM — фон, не ремонт.<br/>
+                    ⚪ <b>Слабо:</b> глюкозамин + хондроитин — при строгом concealment пользы по боли/WOMAC нет (мета 20 RCT) — опция, не база.<br/>
+                    🔴 <b>Исследуется:</b> BPC-157 / TB-500 — сильный preclinical, ноль human efficacy RCT на 2026 (только pilot безопасности n=2) · TB-500 — лист WADA · онко-осторожность (VEGF).
+                  </div>
+                </div>
                 {[
                   {
                     phase:'ФАЗА 1 · ЯДРО', label:'Обязательный минимум (профилактика)', color:'#22c55e',
@@ -133,7 +142,7 @@ export const SupportProtocolJoints: React.FC<{ s: Record<string, any> }> = ({ s 
               {jointTab === 'timing' && (
                 <div style={cardBg}>
                   <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>⏰ Суточный тайминг поддержки суставов</div>
-                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Коллагеновые субстраты — натощак (нет конкуренции с белком). Противовоспалительные — с едой.</p>
+                  <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Коллагеновые субстраты — натощак (нет конкуренции с белком). Противовоспалительные — с едой. UC-II 40мг — отдельно натощак, не смешивать с гидролизатом в один приём.</p>
                   {[
                     { time:'🌅 Утро натощак (06:00–08:00)', color:'#22c55e', items:[
                       { n:'UC-II 40 мг + Желатин 10-15 г + вит.C 500 мг', why:'За 30-60 мин ДО завтрака (или за 1 ч до тренировки). Коллагеновые субстраты не конкурируют с пищевым белком' },
