@@ -65,7 +65,7 @@ th{background:#f9fafb}
 </div>
 ${s.lifts ? `<div class="card"><h3 style="margin:0 0 6px;font-size:13px">Относительная сила по движениям</h3><table><thead><tr><th>Движение</th><th>кг</th><th>×BW</th><th>Уровень</th></tr></thead><tbody>${liftsRow}</tbody></table></div>` : ''}
 <div class="card small">
-  Источники: DOTS/Wilks/IPF GL — канонические формулы (relative-strength.engine); процентили — Rippetoe/Kilgore + StrengthLevel.com (sex ×0.62); MEV/MAV/MRV — Israetel.
+  Источники: DOTS/Wilks/IPF GL — канонические формулы (relative-strength.engine); процентили — Rippetoe/Kilgore + StrengthLevel.com (sex: DOTS-ratio по весу); MEV/MAV/MRV — Israetel.
   Сводка для тренера — скопируйте текст или распечатайте эту страницу (Ctrl+P).
 </div>
 <script>window.onload=()=>window.print()</script>

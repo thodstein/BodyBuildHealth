@@ -13,6 +13,7 @@ import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-st
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import { epley1RM } from '../../../engines/e1rm';
+import { sinclairScore } from '../../../engines/pro/relative-strength.engine';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -21,6 +22,7 @@ const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, m
 
 interface Props {
   snapshot?: HubSnapshot;
+  onHubPatch?: (patch: Partial<HubSnapshot>) => void;
 }
 
 // sex-aware percentile теперь в движке (getStrengthPercentile с sex-параметром)
@@ -28,7 +30,7 @@ function getStrengthPercentileSexAware(ex: string, bw: number, oneRM: number, se
   return getPctRaw(ex, bw, oneRM, sex);
 }
 
-export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot }) => {
+export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot, onHubPatch }) => {
   const prof = useMemo(() => loadTrainingProfile(), []);
   const hubSex: 'male' | 'female' = snapshot ? snapshot.sex : (prof as any).sex || 'male';
   const [squat, setSquat] = useState<number>(snapshot ? snapshot.squat : (prof.pmSquat || 100));
@@ -37,7 +39,10 @@ export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot }) => {
   const [ohp, setOhp] = useState<number>(snapshot ? snapshot.ohp : Math.round((prof.workMax.shoulders || 50) * 1.3) || 40);
   const [bw, setBw] = useState<number>(snapshot ? snapshot.bw : (prof.bodyWeight || 80));
   const [years, setYears] = useState<number>(2);
-  const [weeklyVol, setWeeklyVol] = useState<number>(12);
+  const [volByMuscle, setVolByMuscle] = useState<Record<string, number>>({});
+  const setVol = (m: string, v: number) => setVolByMuscle(prev => ({ ...prev, [m]: v }));
+  // правка внизу сразу пишет в снапшот хаба (двусторонняя связь, без рассинхрона)
+  const patch = (p: Partial<HubSnapshot>) => { if (snapshot && onHubPatch) onHubPatch(p); };
   const [saved, setSaved] = useState(false);
   const [diarySeries, setDiarySeries] = useState<{ date: string; squatE1RM: number; benchE1RM: number; deadE1RM: number }[]>([]);
   const [tonnage7, setTonnage7] = useState<number>(0);
@@ -158,10 +163,10 @@ export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot }) => {
     <div className="train-strengthanalytics" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>💪 Аналитика силы {snapshot ? <span style={{ fontSize: 10, color: ACCENT, border: '1px solid rgba(0,230,138,0.2)', borderRadius: 6, padding: '2px 6px', marginLeft: 6 }}>из хаба · {hubSex === 'female' ? '♀' : '♂'} {bw} кг</span> : null}</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 10 }}>
-        Процентиль силы (sex-aware), уровень, соотношения, дисбалансы, тоннаж, динамика из дневника, ACWR, объёмные ориентиры (MEV/MAV/MRV). Источники: Rippetoe/Kilgore + StrengthLevel.com (sex-коррекция ×0.62 для женщин); Helms et al. 2016; Israetel MEV/MAV/MRV.
+        Процентиль силы (sex-aware), уровень, соотношения, дисбалансы, тоннаж, динамика из дневника, ACWR, объёмные ориентиры (MEV/MAV/MRV). Источники: Rippetoe/Kilgore + StrengthLevel.com (sex-коррекция DOTS-ratio по весу); Helms et al. 2016; Israetel MEV/MAV/MRV; Sinclair IWF 2021–2024.
       </div>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
-        <b style={{ color: '#60a5fa' }}>Как читать:</b> Процентиль — место среди атлетов вашего веса и пола (70% = сильнее 70%). У женщин пороги ×0.62. Соотношения: присед/тяга 85–100%, жим/присед 55–70%. Тоннаж — сумма кг×повт за 7/28 дней из дневника. Прогноз — по стажу {prof.level} линейно + Holt-идея (см. ниже).
+        <b style={{ color: '#60a5fa' }}>Как читать:</b> Процентиль — место среди атлетов вашего веса и пола (70% = сильнее 70%). У женщин — DOTS-эквивалент по весу (тяжелее вес → выше коэффициент). Соотношения: присед/тяга 85–100%, жим/присед 55–70%. Тоннаж — сумма кг×повт за 7/28 дней из дневника. Прогноз — по стажу {prof.level} линейно + Holt-идея (см. ниже).
       </div>
 
       {validations.length > 0 && (
@@ -171,25 +176,28 @@ export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot }) => {
       )}
 
       <div style={CARD}>
-        <div style={H}>⚙️ Ввод {snapshot ? <span style={{ fontSize: 10, color: ACCENT }}>(синхрон с хабом)</span> : null}</div>
+        <div style={H}>⚙️ Ввод {snapshot ? <span style={{ fontSize: 10, color: ACCENT }}>(двусторонний синхрон с хабом)</span> : null}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          <PopupNumber label="Присед" value={squat} min={0} max={500} suffix="кг" onChange={v => { setSquat(v); if (snapshot) { /* хаб-синхрон через родителя — локально */ } }} />
-          <PopupNumber label="Жим" value={bench} min={0} max={400} suffix="кг" onChange={setBench} />
-          <PopupNumber label="Тяга" value={dead} min={0} max={500} suffix="кг" onChange={setDead} />
-          <PopupNumber label="Жим стоя" value={ohp} min={0} max={300} suffix="кг" onChange={setOhp} />
-          <PopupNumber label="Вес тела" value={bw} min={0} max={250} suffix="кг" onChange={setBw} />
+          <PopupNumber label="Присед" value={squat} min={0} max={500} suffix="кг" onChange={v => { setSquat(v); patch({ squat: v }); }} />
+          <PopupNumber label="Жим" value={bench} min={0} max={400} suffix="кг" onChange={v => { setBench(v); patch({ bench: v }); }} />
+          <PopupNumber label="Тяга" value={dead} min={0} max={500} suffix="кг" onChange={v => { setDead(v); patch({ dead: v }); }} />
+          <PopupNumber label="Жим стоя" value={ohp} min={0} max={300} suffix="кг" onChange={v => { setOhp(v); patch({ ohp: v }); }} />
+          <PopupNumber label="Вес тела" value={bw} min={0} max={250} suffix="кг" onChange={v => { setBw(v); patch({ bw: v }); }} />
           <PopupNumber label="Стаж" value={years} min={0} max={40} suffix="лет" onChange={setYears} />
         </div>
-        {snapshot && <div style={{ fontSize: 10, color: ACCENT, marginTop: 6 }}>Значения берутся из единого снапшота хаба (шапка). Изменение в шапке сразу отражается здесь.</div>}
+        {snapshot && <div style={{ fontSize: 10, color: ACCENT, marginTop: 6 }}>Правка здесь сразу обновляет шапку хаба (и наоборот) — рассинхрона нет.</div>}
+        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)', fontSize: 11, color: '#fff' }}>
+          🏋️ Sinclair (IWF 2021–2024, ориентир ТА): <b style={{ color: '#a855f7' }}>{sinclairScore(squat + bench + dead, bw, hubSex)}</b> · тотал {squat + bench + dead} кг при {bw} кг · <span style={{ color: DIM, fontSize: 10 }}>→ ТА-диагностика / Стронг-диагностика за разбором по движениям</span>
+        </div>
       </div>
 
       <div style={CARD}>
-        <div style={H}>📊 Процентиль силы (по весу и полу — {hubSex === 'female' ? '♀ женские ×0.62' : '♂ мужские'})</div>
+        <div style={H}>📊 Процентиль силы (по весу и полу — {hubSex === 'female' ? '♀ женские (DOTS-ratio по весу)' : '♂ мужские'})</div>
         <Row label="Присед" pct={pcts.squat} level={levels.squat} />
         <Row label="Жим лёжа" pct={pcts.bench} level={levels.bench} />
         <Row label="Тяга" pct={pcts.deadlift} level={levels.deadlift} />
         <Row label="Жим стоя" pct={pcts.overhead_press} />
-        <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Женские процентили — масштабирование мужских таблиц ×0.62 (DOTS ratio), без выдумок.</div>
+        <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Женский эквивалент — DOTS-ratio по весу тела (1.26–1.40 вместо плоских 1.61): scoreF(W)=scoreM(M) ⟺ M=W×ratio.</div>
       </div>
 
       <div style={CARD}>
@@ -300,20 +308,25 @@ export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot }) => {
       </div>
 
       <div style={CARD}>
-        <div style={H}>📐 Объёмные ориентиры (MEV/MAV/MRV)</div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Уровень: {LEVEL_RU[prof.level || 'intermediate'] || prof.level}. Статус для текущего объёма:</div>
-        <div style={{ marginBottom: 8 }}>
-          <PopupNumber label="Объём (по грудь)" value={weeklyVol} min={0} max={40} suffix="подходов/нед" onChange={setWeeklyVol} />
-        </div>
+        <div style={H}>📐 Объёмные ориентиры (MEV/MAV/MRV — по каждой мышце)</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Уровень: {LEVEL_RU[prof.level || 'intermediate'] || prof.level}. Введите свой объём подходов/нед под каждой мышцей — статус посчитается.</div>
         {landmarks.slice(0, 6).map(l => {
-          const chest = l.muscle === 'chest' ? checkVolumeStatus(weeklyVol, l) : null;
+          const vol = volByMuscle[l.muscle] ?? 12;
+          const st = checkVolumeStatus(vol, l);
+          const stColor = st === 'optimal' ? '#22c55e' : st === 'below_mev' ? '#3b82f6' : st === 'approaching_mrv' ? '#f59e0b' : '#ef4444';
+          const stLabel = st === 'optimal' ? 'оптимально' : st === 'below_mev' ? 'ниже MEV' : st === 'approaching_mrv' ? 'у MRV' : 'выше MRV';
           return (
-            <div key={l.muscle} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10 }}>
-              <span style={{ color: '#fff', textTransform: 'capitalize' }}>{l.muscle}</span>
-              <span style={{ color: DIM }}>MEV {l.mev}</span>
-              <span style={{ color: DIM }}>MAV {l.mav}</span>
-              <span style={{ color: DIM }}>MRV {l.mrv}</span>
-              {chest && <span style={{ color: chest === 'optimal' ? '#22c55e' : chest === 'below_mev' ? '#3b82f6' : '#ef4444', gridColumn: '1 / -1' }}>Грудь: {chest === 'optimal' ? 'оптимально' : chest === 'below_mev' ? 'ниже MEV' : 'близко к MRV'}</span>}
+            <div key={l.muscle} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, marginBottom: 4 }}>
+                <span style={{ color: '#fff', textTransform: 'capitalize', fontWeight: 700 }}>{l.muscle}</span>
+                <span style={{ color: DIM }}>MEV {l.mev}</span>
+                <span style={{ color: DIM }}>MAV {l.mav}</span>
+                <span style={{ color: DIM }}>MRV {l.mrv}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ flex: 1 }}><PopupNumber label={`Подходов/нед (${l.muscle})`} value={vol} min={0} max={40} suffix="/нед" onChange={v => setVol(l.muscle, v)} /></div>
+                <span style={{ color: stColor, fontWeight: 800, minWidth: 80, textAlign: 'right' }}>{stLabel}</span>
+              </div>
             </div>
           );
         })}

@@ -32,6 +32,7 @@ export interface PerformanceRatios {
 }
 
 import { getAllVolumeLandmarks as getVL, getVolumeLandmarks as getVLOne, checkVolumeStatus as checkVS, type MuscleVolumeLandmarks } from './volume-landmarks.engine';
+import { femaleToMaleRatio } from './pro/relative-strength.engine';
 /** @deprecated Используйте MuscleVolumeLandmarks из volume-landmarks.engine.ts */
 export type VolumeLandmarks = { muscle: string; mev: number; mav: number; mrv: number };
 
@@ -93,7 +94,8 @@ export function getStrengthLevel(exercise: string, weightKg: number, oneRM: numb
   const standards = STRENGTH_STANDARDS[exercise];
   if (!standards) return 'intermediate';
 
-  const effectiveOneRM = sex === 'female' ? oneRM / 0.62 : oneRM;
+  // Женский эквивалент — DOTS-ratio по весу (femaleToMaleRatio), не плоские 1/0.62
+  const effectiveOneRM = sex === 'female' ? oneRM * femaleToMaleRatio(weightKg) : oneRM;
   const bracketIdx = BODYWEIGHT_BRACKETS.indexOf(getClosestBracket(weightKg));
   const levels: StrengthLevel[] = ['world_class', 'elite', 'advanced', 'intermediate', 'novice', 'untrained'];
 
@@ -116,15 +118,15 @@ export function getNextLevelTarget(exercise: string, weightKg: number, currentLe
   if (idx < levels.length - 1) {
     const nextLevel = levels[idx + 1];
     const maleVal = standards[nextLevel][Math.min(bracketIdx, standards[nextLevel].length - 1)];
-    return sex === 'female' ? Math.round(maleVal * 0.62) : maleVal;
+    return sex === 'female' ? Math.round(maleVal / femaleToMaleRatio(weightKg)) : maleVal;
   }
 
   return 0; // Already world class
 }
 
 export function getStrengthPercentile(exercise: string, weightKg: number, oneRM: number, sex: 'male' | 'female' = 'male'): number {
-  // sex-aware: женские пороги ~62% от мужских (DOTS ratio). Для women масштабируем oneRM к мужскому эквиваленту.
-  const effectiveOneRM = sex === 'female' ? oneRM / 0.62 : oneRM;
+  // sex-aware: женский эквивалент через DOTS-ratio по весу (femaleToMaleRatio, 1.26–1.40 вместо плоских 1.61).
+  const effectiveOneRM = sex === 'female' ? oneRM * femaleToMaleRatio(weightKg) : oneRM;
   const level = getStrengthLevel(exercise, weightKg, effectiveOneRM);
   const levels: StrengthLevel[] = ['untrained', 'novice', 'intermediate', 'advanced', 'elite', 'world_class'];
   const idx = levels.indexOf(level);

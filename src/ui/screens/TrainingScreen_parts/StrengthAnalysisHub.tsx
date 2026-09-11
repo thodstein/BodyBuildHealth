@@ -208,7 +208,7 @@ export const StrengthAnalysisHub: React.FC<{ initialMode?: StrengthAnalysisHubMo
           {mode === '1rm' && <OneRmCalcTab snapshot={snapshot} onHubPatch={patchHub} />}
           {mode === 'vbt' && <VBTCalcTab snapshot={snapshot} onHubPatch={patchHub} />}
           {mode === 'norms' && <PlNormsCalcTab snapshot={snapshot} onSnapshotChange={patchHub} />}
-          {mode === 'analytics' && <StrengthAnalyticsCard snapshot={snapshot} />}
+          {mode === 'analytics' && <StrengthAnalyticsCard snapshot={snapshot} onHubPatch={patchHub} />}
         </div>
       </div>
 

@@ -118,6 +118,46 @@ export function ageAdjustedScore(score: number, age: number): number {
   return r1(score * mccullochCoeff(age));
 }
 
+/** Знаменатель DOTS-полинома (экспорт для производных метрик). */
+export function dotsDenom(bw: number, sex: Sex): number {
+  if (bw <= 0) return 0;
+  const a = sex === "male" ? -0.0000010930 : -0.0000010706;
+  const b = sex === "male" ? 0.0007391293 : 0.0005158568;
+  const c = sex === "male" ? -0.1918759221 : -0.1126655495;
+  const d = sex === "male" ? 24.0900756 : 13.6175032;
+  const e = sex === "male" ? -307.75076 : -57.96288;
+  return a * bw ** 4 + b * bw ** 3 + c * bw * bw + d * bw + e;
+}
+
+/**
+ * Женский→мужской эквивалент силы по весу тела (для процентильных таблиц).
+ * Выводится из DOTS: scoreF(W) = scoreM(M) ⟺ M = W × denomM/denomF.
+ * Кривая по весу: 50 кг → 1.26, 70 → 1.35, 90 → 1.38, 120 → 1.40 (вместо плоских 1/0.62 = 1.61).
+ * Допущение задокументировано: эквивалентность относительной силы ≈ эквивалентность процентиля.
+ */
+export function femaleToMaleRatio(bw: number): number {
+  if (!Number.isFinite(bw) || bw <= 0) return 1.37;
+  const dm = dotsDenom(bw, "male");
+  const df = dotsDenom(bw, "female");
+  if (!(dm > 0) || !(df > 0)) return 1.37;
+  return r3(Math.max(1.2, Math.min(1.45, dm / df)));
+}
+
+/**
+ * Sinclair (IWF, только для ориентира ТА-атлетам — read-only бейдж).
+ * Коэффициенты олимпийского цикла 2021–2024 (самые цитируемые):
+ * М A=0.722762521/b=193.609, Ж A=0.787489808/b=153.757.
+ * Якорь: М 81/300 → ~380.8. Формула: total × 10^(A × log10(bw/b)²).
+ */
+export function sinclairScore(total: number, bw: number, sex: Sex): number {
+  if (bw <= 0 || total <= 0) return 0;
+  const A = sex === "male" ? 0.722762521 : 0.787489808;
+  const b = sex === "male" ? 193.609 : 153.757;
+  if (bw >= b) return r1(total);
+  const x = Math.log10(bw / b);
+  return r1(total * Math.pow(10, A * x * x));
+}
+
 /** Allometric scaling: strength ∝ bw^(2/3). */
 export function allometricScore(total: number, bw: number): number {
   if (bw <= 0 || total <= 0) return 0;
