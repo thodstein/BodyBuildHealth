@@ -10,6 +10,8 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import type { Lift } from '../../../engines/lms/weakpoint-pl';
+import { isNativeApp } from '../../../core/app-platform';
+import { copyOrShareText, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 const ACCENT = '#38bdf8';
 const DIM = '#fff';
@@ -113,6 +115,10 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
     if(videoRef.current) videoRef.current.srcObject=null;
   };
   const [progress, setProgress] = useState<number>(0);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
+  const [isNative, setIsNative] = useState(false);
+  useEffect(()=>{ try{ setIsNative(isNativeApp()); }catch{ setIsNative(false); } }, []);
+  const flashShare = (m: string)=>{ setShareMsg(m); setTimeout(()=>setShareMsg(null), 2500); };
   const handleFile = async (f: File | null)=>{
     if(!f) return;
     setError(null);
@@ -154,7 +160,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
       }catch(e){
         console.warn('[video] pose failed', e);
       }
-      if (!out) out = mockAnalyze(lift);
+      if (!out) out = { ...mockAnalyze(lift), note: 'Поза не распознана (возможно офлайн — WASM с CDN недоступен). Это оценка, не замер — повторите с сетью.' };
       setResult(out);
       onResult?.(out);
       // сохранить отчёт локально для истории (не в облако — тяжёлый)
@@ -202,16 +208,32 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
         </div>
       </div>
 
-      {/* Кнопки */}
+      {/* Кнопки (АПК: 44px+, системный видеопикер первичен) */}
       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
-        {!stream ? <button disabled={analyzing} onClick={startCam} style={{ padding:'7px 12px', borderRadius:7, cursor: analyzing?'not-allowed':'pointer', background:'rgba(56,189,248,0.15)', color:ACCENT, border:'1px solid rgba(56,189,248,0.3)', fontWeight:700, fontSize:10, opacity: analyzing?0.6:1 }}>📹 Включить камеру</button>
-          : <button onClick={stopCam} style={{ padding:'7px 12px', borderRadius:7, cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#f87171', border:'1px solid rgba(239,68,68,0.3)', fontWeight:700, fontSize:10 }}>⏹ Стоп</button>}
-        <label style={{ padding:'7px 12px', borderRadius:7, border:'1px solid rgba(56,189,248,0.3)', background:'rgba(56,189,248,0.1)', color:ACCENT, fontSize:10, fontWeight:700, cursor: analyzing?'not-allowed':'pointer', opacity: analyzing?0.6:1 }}>
-          📁 Выбрать файл (надёжно в Telegram)
-          <input type="file" accept="video/*" capture="environment" style={{ display:'none' }} onChange={e=>handleFile(e.target.files?.[0] ?? null)} disabled={analyzing} />
+        {!stream ? <button data-vc="live" aria-label="Включить живую камеру" disabled={analyzing} onClick={startCam} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor: analyzing?'not-allowed':'pointer', background:'rgba(56,189,248,0.15)', color:ACCENT, border:'1px solid rgba(56,189,248,0.3)', fontWeight:700, fontSize:12, opacity: analyzing?0.6:1 }}>📹 Включить камеру</button>
+          : <button data-vc="stop" aria-label="Остановить камеру" onClick={stopCam} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#f87171', border:'1px solid rgba(239,68,68,0.3)', fontWeight:700, fontSize:12 }}>⏹ Стоп</button>}
+        <label data-vc="file" aria-label={isNative ? 'Снять видео через системную камеру' : 'Выбрать видеофайл'} style={{ minHeight:44, display:'inline-flex', alignItems:'center', padding:'10px 14px', borderRadius:10, border:'1px solid rgba(56,189,248,0.3)', background:'rgba(56,189,248,0.1)', color:ACCENT, fontSize:12, fontWeight:700, cursor: analyzing?'not-allowed':'pointer', opacity: analyzing?0.6:1 }}>
+          {isNative ? '🎥 Снять видео (камера/галерея)' : '📁 Выбрать файл (надёжно в Telegram)'}
+          <input type="file" accept="video/*" capture="environment" aria-label="Видеофайл подхода" style={{ display:'none' }} onChange={e=>handleFile(e.target.files?.[0] ?? null)} disabled={analyzing} />
         </label>
-        <button disabled={analyzing} onClick={()=>{ const r=mockAnalyze(lift); setResult(r); onResult?.(r); }} style={{ padding:'7px 12px', borderRadius:7, cursor: analyzing?'not-allowed':'pointer', background:'rgba(0,230,138,0.12)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.25)', fontWeight:700, fontSize:10, opacity: analyzing?0.6:1 }}>🧪 Демо-разбор</button>
+        <button data-vc="demo" aria-label="Демо-разбор без видео" disabled={analyzing} onClick={()=>{ const r={...mockAnalyze(lift), note:'Демо-оценка (не замер): введите реальное видео для CV-анализа.'}; setResult(r); onResult?.(r); }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor: analyzing?'not-allowed':'pointer', background:'rgba(0,230,138,0.12)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.25)', fontWeight:700, fontSize:12, opacity: analyzing?0.6:1 }}>🧪 Демо-разбор</button>
       </div>
+      {isNative && <div style={{ marginTop:6, fontSize:10, color:'#fff', lineHeight:1.4 }}>АПК: съёмка идёт через системный видеопикер (камера/галерея) — живое превью браузера в WebView может быть недоступно, это нормально.</div>}
+      {result && (
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
+          <button data-vc="copy" aria-label="Копировать разбор видео" onClick={async ()=>{
+            const t = `Видео-разбор (${lift}): локти ${result.elbowAvgDeg ?? '—'}° · хват ${result.gripRatio ?? '—'} · скорость ${result.barVelocity ?? '—'} м/с · ${result.note}`;
+            const o = await copyOrShareText(t, 'Видео-разбор');
+            flashShare(shareOutcomeLabel(o));
+          }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>📋 Копировать разбор</button>
+          <button data-vc="save" aria-label="Сохранить отчёт видео" onClick={async ()=>{
+            const json = JSON.stringify({ lift, ts: Date.now(), result }, null, 2);
+            const o = await saveTextFileApk(`videocap-${lift}.json`, json, 'application/json;charset=utf-8');
+            flashShare(shareOutcomeLabel(o));
+          }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>💾 Отчёт (JSON)</button>
+          {shareMsg && <span role="status" style={{ fontSize:11, color:'#fff', alignSelf:'center' }}>{shareMsg}</span>}
+        </div>
+      )}
       {analyzing && <div style={{ marginTop:6, fontSize:10, color:ACCENT, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.2)', padding:'6px 8px', borderRadius:6 }}>⏳ Анализ видео… {progress>0?`${progress}% — `:''}BlazePose воркер (не морозит UI) — первый раз качает WASM ~2-3с.</div>}
       {error && <div style={{ marginTop:6, fontSize:10, color:'#f87171', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', padding:'6px 8px', borderRadius:6 }}>{error}</div>}
 
@@ -224,7 +246,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
       {/* Result */}
       {result && (
         <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)' }}>
-          <div style={{ fontSize:10, fontWeight:700, color:'#00e68a' }}>📊 Разбор (MVP мок):</div>
+          <div style={{ fontSize:10, fontWeight:700, color:'#00e68a' }}>📊 Разбор:</div>
           <div style={{ fontSize:10, color:DIM, marginTop:4, lineHeight:1.4 }}>
             {result.elbowAvgDeg>0 && <div>Локти (средн.): <b style={{color:'#fff'}}>{result.elbowAvgDeg}°</b> {result.elbowAvgDeg<40?'— tucked':result.elbowAvgDeg>65?'— flared':'— moderate'}</div>}
             {result.gripRatio>0 && <div>Хват ratio: <b style={{color:'#fff'}}>{result.gripRatio.toFixed(2)}×</b> ширины плеч</div>}

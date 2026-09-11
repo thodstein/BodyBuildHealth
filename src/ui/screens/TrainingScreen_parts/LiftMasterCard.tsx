@@ -28,6 +28,9 @@ import { diagnoseVelocity } from '../../../engines/pro/vbt.engine';
 import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-builder.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
+import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, movementDiagnosticsFilename } from '../../../engines/pro/movement-diagnostics-export.engine';
+import { copyOrShareText, saveCsvApk, printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
 import { RIRCalibrationCard } from './RIRCalibrationCard';
@@ -234,6 +237,10 @@ export const LiftMasterCard: React.FC<{
   const [vbtWeight, setVbtWeight] = useState(initial.vbtWeight);
   const [armSpanInput, setArmSpanInput] = useState('');
   const [shoulderInput, setShoulderInput] = useState('');
+  const [kinoveaText, setKinoveaText] = useState('');
+  const [kinoveaMsg, setKinoveaMsg] = useState<string | null>(null);
+  const [videoNote, setVideoNote] = useState('');
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const toggleCollapsed = (id: string) => setCollapsed(p => ({ ...p, [id]: !p[id] }));
   useEffect(()=>{
@@ -727,7 +734,78 @@ export const LiftMasterCard: React.FC<{
               setVbtBest((v+0.15).toFixed(2));
               setVbtLast(v.toFixed(2));
             }
+            setVideoNote(`Локти ${r.elbowAvgDeg ?? '—'}° · хват ${r.gripRatio ?? '—'} · скорость ${r.barVelocity ?? '—'} м/с · ${r.note}`);
           }} />
+          {/* Kinovea CSV импорт (углы — да, скорость — оценка) */}
+          <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(14,165,233,0.05)', border:'1px solid rgba(14,165,233,0.18)' }}>
+            <div style={{ fontSize:10, fontWeight:800, color:'#0ea5e9' }}>📊 Kinovea CSV — трекинг штанги (t,x,y)</div>
+            <div style={{ fontSize:9, color:'#fff', marginTop:2, lineHeight:1.4 }}>Файл из Kinovea или вставка текста. Углы/дистанции валидны при 90° и 5 м; скорость — оценка, не LPT.</div>
+            <label data-lift="import-kinovea" aria-label="Импорт Kinovea CSV файлом" style={{ display:'inline-flex', alignItems:'center', minHeight:44, padding:'10px 14px', borderRadius:10, border:'1px solid rgba(14,165,233,0.3)', background:'rgba(14,165,233,0.1)', color:'#0ea5e9', fontSize:12, fontWeight:700, cursor:'pointer', marginTop:6 }}>
+              📁 Импорт Kinovea CSV
+              <input type="file" accept=".csv,text/csv" aria-label="Kinovea CSV файл" style={{ display:'none' }} onChange={e=>{
+                const f = e.target.files?.[0]; if (!f) return;
+                const rd = new FileReader();
+                rd.onload = ()=>{ setKinoveaText(String(rd.result ?? '')); setKinoveaMsg(null); };
+                rd.readAsText(f);
+                e.target.value = '';
+              }} />
+            </label>
+            <textarea data-lift="kinovea-text" aria-label="Текст Kinovea CSV" value={kinoveaText} onChange={e=>setKinoveaText(e.target.value)} placeholder="Frame,Time,X,Y …" rows={3} style={{ width:'100%', marginTop:6, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:8, padding:'8px 10px', fontSize:12, fontFamily:'monospace' }} />
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+              <button data-lift="parse-kinovea" aria-label="Разобрать Kinovea CSV" onClick={()=>{
+                const pts = parseKinoveaCSV(kinoveaText);
+                if (!pts) { setKinoveaMsg('CSV не распознан — нужны колонки t,x,y (разделитель , или ;).'); return; }
+                const r = analyzeBarTracking(pts);
+                if (!r) { setKinoveaMsg('Точек мало для анализа (нужно ≥2).'); return; }
+                const badge = r.xLoop >= 6 ? 'крит. >6' : r.xLoop >= 4 ? 'внимание ≥4' : 'норма';
+                setKinoveaMsg(`xLoop ${r.xLoop} см (${badge}) · yMax ${r.yMax} см · vmax ${r.vmax} м/с (оценка) · точек ${r.points.length}`);
+              }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(14,165,233,0.15)', color:'#0ea5e9', border:'1px solid rgba(14,165,233,0.3)', fontWeight:700, fontSize:12 }}>📊 Разобрать CSV</button>
+              <button data-lift="clear-kinovea" aria-label="Очистить Kinovea" onClick={()=>{ setKinoveaText(''); setKinoveaMsg(null); }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>✕ Очистить</button>
+            </div>
+            {kinoveaMsg && <div role="status" style={{ marginTop:6, fontSize:10, color:'#0ea5e9', lineHeight:1.4 }}>{kinoveaMsg}</div>}
+          </div>
+          {/* Выдача: HTML / CSV / Поделиться (АПК-слой) */}
+          <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.15)' }}>
+            <div style={{ fontSize:10, fontWeight:800, color:'#00e68a' }}>📤 Выдача диагностики</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+              <button data-lift="export-html" aria-label="Печать отчёта диагностики" onClick={async ()=>{
+                const best = parseFloat(vbtBest), last = parseFloat(vbtLast), w = parseFloat(vbtWeight);
+                const vd = (Number.isFinite(best) && Number.isFinite(last) && best > 0 && last > 0 && last <= best) ? diagnoseVelocity(lift, best, last, Number.isFinite(w) && w > 0 ? w : undefined) : null;
+                const kpts = parseKinoveaCSV(kinoveaText);
+                const ka = kpts ? analyzeBarTracking(kpts) : null;
+                const html = buildMovementDiagnosticsHtml({
+                  lift, liftRu: LIFT_RU[lift], phase: effectivePhase ?? '', phaseRu: (PHASE_RU as Record<string,string>)[String(effectivePhase ?? '')] ?? String(effectivePhase ?? ''),
+                  issues, issuesRu: issues.map(i=>ISSUE_RU[i]),
+                  vbtBest: Number.isFinite(best) ? best : null, vbtLast: Number.isFinite(last) ? last : null,
+                  vbtWeightKg: Number.isFinite(w) ? w : null, vbtLossPct: vd ? vd.lossPct : null, vbtZone: vd ? vd.zone : '',
+                  videoNote, kinoveaXLoop: ka ? ka.xLoop : null,
+                });
+                const o = await printHtmlApk(html, movementDiagnosticsFilename(lift, 'html'));
+                setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
+              }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(0,230,138,0.15)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.3)', fontWeight:700, fontSize:12 }}>🖨 HTML</button>
+              <button data-lift="export-csv" aria-label="Скачать таблицу диагностики" onClick={async ()=>{
+                const best = parseFloat(vbtBest), last = parseFloat(vbtLast), w = parseFloat(vbtWeight);
+                const vd = (Number.isFinite(best) && Number.isFinite(last) && best > 0 && last > 0 && last <= best) ? diagnoseVelocity(lift, best, last, Number.isFinite(w) && w > 0 ? w : undefined) : null;
+                const kpts = parseKinoveaCSV(kinoveaText);
+                const ka = kpts ? analyzeBarTracking(kpts) : null;
+                const csv = buildMovementDiagnosticsCsv({
+                  lift, liftRu: LIFT_RU[lift], phase: effectivePhase ?? '', phaseRu: (PHASE_RU as Record<string,string>)[String(effectivePhase ?? '')] ?? String(effectivePhase ?? ''),
+                  issues, issuesRu: issues.map(i=>ISSUE_RU[i]),
+                  vbtBest: Number.isFinite(best) ? best : null, vbtLast: Number.isFinite(last) ? last : null,
+                  vbtWeightKg: Number.isFinite(w) ? w : null, vbtLossPct: vd ? vd.lossPct : null, vbtZone: vd ? vd.zone : '',
+                  videoNote, kinoveaXLoop: ka ? ka.xLoop : null,
+                });
+                const o = await saveCsvApk(movementDiagnosticsFilename(lift, 'csv'), csv);
+                setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
+              }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>📊 CSV</button>
+              <button data-lift="share" aria-label="Поделиться диагностикой" onClick={async ()=>{
+                const t = `Диагностика ${LIFT_RU[lift]}: фаза ${(PHASE_RU as Record<string,string>)[String(effectivePhase ?? '')] ?? '—'} · откл. ${issues.map(i=>ISSUE_RU[i]).join('; ') || '—'} · VBT ${vbtBest || '—'}→${vbtLast || '—'} м/с${videoNote ? ` · Видео: ${videoNote}` : ''}`;
+                const o = await copyOrShareText(t, 'Диагностика движений');
+                setShareMsg(shareOutcomeLabel(o)); setTimeout(()=>setShareMsg(null), 2500);
+              }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>📤 Поделиться</button>
+              {shareMsg && <span role="status" style={{ fontSize:11, color:'#fff', alignSelf:'center' }}>{shareMsg}</span>}
+            </div>
+          </div>
         </div>}</div>
 
       {/* ── 7. Дневник срывы ── */}

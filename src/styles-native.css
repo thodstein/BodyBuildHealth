@@ -13768,3 +13768,37 @@ html.app-native .peak-hero {
     transform: none !important;
   }
 }
+/* 76. MOVEMENT DIAGNOSTICS P8 — APK import/export buttons + video */
+html.app-native .train-videocap button {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-videocap label {
+  min-height: 44px !important;
+}
+html.app-native .train-videocap button:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .train-videocap button:focus-visible, html.app-native .train-videocap label:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-lift button {
+  min-height: 44px !important;
+}
+html.app-native .train-lift input, html.app-native .train-lift textarea, html.app-native .train-videocap input, html.app-native .train-videocap textarea {
+  font-size: 16px !important;
+}
+html.app-native .train-lift textarea {
+  font-variant-numeric: tabular-nums !important;
+}
+@media (max-width: 380px) {
+  html.app-native .train-videocap button {
+    width: 100% !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-videocap button:active {
+    transform: none !important;
+  }
+}
