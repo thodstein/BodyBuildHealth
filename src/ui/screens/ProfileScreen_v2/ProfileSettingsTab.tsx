@@ -12,6 +12,7 @@ import { WidgetsSetupCard } from '../../../ui/native/WidgetsSetupCard';
 import { AppearanceSetupCard } from '../../../ui/native/AppearanceSetupCard';
 import { BiometrySetupCard } from '../../../ui/native/BiometrySetupCard';
 import { NativeFeaturesCard } from '../../../ui/native/NativeFeaturesCard';
+import { SyncLinkSection } from './SyncLinkSection';
 import { copyOrShareText, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 const PRIVACY = [
@@ -223,6 +224,17 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
             ...btnStyle, borderColor: 'rgba(239,68,68,0.45)', color: '#fff', background: 'linear-gradient(135deg, rgba(239,68,68,0.22), rgba(239,68,68,0.07))',
           }}><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.16)', border:'1px solid rgba(239,68,68,0.4)', flexShrink:0 }}><NativeIcon name="alertTriangle" size={14} /></span>Сбросить профиль</button>
         </div>
+      </AccordionSection>
+
+      {/* 4.5 — синхронизация ТГ ↔ АПК: общая секция, внутри — ветвление по платформе.
+          4.4 — только APK: виджеты, биометрия, возможности телефона. */}
+      <AccordionSection
+        title="4.5 Синхронизация"
+        subtitle="Общие данные в Telegram и АПК по коду — без логина"
+        icon={<NativeIcon name="share" size={20} />}
+        color={colors.primary}
+      >
+        <SyncLinkSection />
       </AccordionSection>
 
       {/* 4.4 — только APK: виджеты, биометрия, возможности телефона.

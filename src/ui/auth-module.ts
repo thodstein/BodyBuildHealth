@@ -2,7 +2,7 @@ import { db } from '../core/db';
 import type { LocalUserProfile } from '../core/auth-manager';
 import { ensureAdmin } from '../core/auth-manager';
 import type { UserProfile, UserRole } from '../core/types';
-import { initKvSync } from '../core/cloud-kv';
+import { initKvSync, getLinkedTgToken } from '../core/cloud-kv';
 
 function toAppProfile(p: LocalUserProfile): UserProfile {
   return {
@@ -99,5 +99,10 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
   user.lastLogin = new Date().toISOString();
   await db.put('users', user);
   localStorage.setItem('he_session_v2', JSON.stringify({ id: user.id, email: user.email, ts: Date.now() }));
+  // АПК после привязки кодом: привязанный tg-токен даёт pull облака (переустановка — тоже).
+  try {
+    const linked = getLinkedTgToken();
+    if (linked) await initKvSync(user.id, { token: linked });
+  } catch (e) { console.warn('KvSync linked init failed:', e); }
   onLogin(toAppProfile(user));
 }

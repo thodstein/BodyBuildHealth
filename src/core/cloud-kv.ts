@@ -38,8 +38,11 @@ export const IDB_STORES = ['labs_log', 'course_log', 'workout_log', 'training_lo
 const IDB_META_KEY = 'he_sync_meta_idb_v1';
 const IDB_KV_PREFIX = 'idb:';
 
+/** Ключ локально хранимого tg-токена после привязки АПК кодом (не синкается). */
+export const LINKED_TG_TOKEN_KEY = 'he_sync_tg_token_v1';
+
 /** Ключи, которые НЕ синхронизируются (сессия/ключи шифрования/синк-внутренности). */
-export const EXCLUDED_KEYS = new Set(['he_session_v2', 'he_crypto_key', 'he_last_active', META_KEY, IDB_META_KEY]);
+export const EXCLUDED_KEYS = new Set(['he_session_v2', 'he_crypto_key', 'he_last_active', META_KEY, IDB_META_KEY, LINKED_TG_TOKEN_KEY]);
 export const EXCLUDED_PREFIXES = ['he_sync_ts_', 'he_draft_', 'he_nav_', 'he_admin_'];
 
 export interface KvRow {
@@ -158,6 +161,34 @@ export function isKvSyncEnabled(): boolean {
   return state.status !== 'off';
 }
 
+/** Прочитать сохранённый tg-токен привязки АПК (null — не привязано). */
+export function getLinkedTgToken(): string | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const v = localStorage.getItem(LINKED_TG_TOKEN_KEY);
+    return v && v.startsWith('tk_') ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Сохранить tg-токен после ввода кода (не синкается — в EXCLUDED_KEYS). */
+export function saveLinkedTgToken(tgToken: string): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (!tgToken || !tgToken.startsWith('tk_')) return;
+    localStorage.setItem(LINKED_TG_TOKEN_KEY, tgToken);
+  } catch { /* quota — честно никак */ }
+}
+
+/** Отвязать АПК от ТГ-аккаунта (локальные данные остаются, облако больше не тянется). */
+export function clearLinkedTgToken(): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(LINKED_TG_TOKEN_KEY);
+  } catch { /* no-op */ }
+}
+
 /**
  * Инициализация синка. Вызывается после успешного входа (auth-module).
  * userId — локальный id пользователя вида 'tg_<telegramId>'.
@@ -179,13 +210,19 @@ export async function initKvSync(
     return state;
   }
   const tgId = userId.startsWith('tg_') ? userId.slice(3) : '';
-  if (!tgId && !opts?.transport) {
+  // dev_* (АПК) без явного токена — локальный режим. С явным tg-токеном
+  // (привязка кодом) — работает как второе устройство того же аккаунта.
+  if (!tgId && !opts?.token && !opts?.transport) {
     setState({ status: 'off', error: undefined });
     return state;
   }
   installHook();
   try {
-    token = opts?.token || (await deriveSyncToken(tgId));
+    token = opts?.token || (tgId ? await deriveSyncToken(tgId) : '');
+    if (!token) {
+      setState({ status: 'off', error: undefined });
+      return state;
+    }
     if (opts?.transport) {
       transport = opts.transport;
     } else {
