@@ -21,8 +21,23 @@ const MODE_DEFS: Array<{ m: HubMode; label: string; icon: string; desc: string; 
   { m: 'plates', label: 'Блины', icon: '🥞', accent: '#f59e0b', desc: 'Грифы 8 типов, блины, %1RM, разминка', hint: 'Подбор блинов · 1RM-пресеты · SVG грифа · разминка' },
 ];
 
-export const VolumeHub: React.FC<{ initialMode?: HubMode }> = ({ initialMode }) => {
-  const [mode, setMode] = useState<HubMode>(initialMode ?? 'volume');
+function queryHubInit(initialMode?: HubMode, initialWeight?: number): { mode: HubMode; weight?: number } {
+  if (typeof window === 'undefined') return { mode: initialMode ?? 'volume', weight: initialWeight };
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const m = q.get('volmode');
+    const mode: HubMode = m === 'tonnage' || m === 'plates' || m === 'volume' ? m : (initialMode ?? 'volume');
+    const wRaw = q.get('weight');
+    const w = wRaw !== null ? Number(wRaw) : initialWeight;
+    return { mode, weight: typeof w === 'number' && w > 0 ? w : undefined };
+  } catch {
+    return { mode: initialMode ?? 'volume', weight: initialWeight };
+  }
+}
+
+export const VolumeHub: React.FC<{ initialMode?: HubMode; initialWeight?: number }> = ({ initialMode, initialWeight }) => {
+  const [queryInit] = useState(() => queryHubInit(initialMode, initialWeight));
+  const [mode, setMode] = useState<HubMode>(queryInit.mode);
   const active = MODE_DEFS.find(d => d.m === mode)!;
 
   return (
@@ -87,8 +102,27 @@ export const VolumeHub: React.FC<{ initialMode?: HubMode }> = ({ initialMode }) 
         <div style={{ padding: 10 }}>
           {mode === 'volume' && <VolumeOptimizerTab />}
           {mode === 'tonnage' && <TonnageCalcTab />}
-          {mode === 'plates' && <PlateCalcTab />}
+          {mode === 'plates' && <PlateCalcTab initialWeight={queryInit.weight} />}
         </div>
+      </div>
+
+      {/* P6: конвейер-навигация между тремя проекциями */}
+      <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+        {mode !== 'volume' && (
+          <button onClick={() => setMode('volume')} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.07)', color: '#22c55e', fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
+            ← Объём
+          </button>
+        )}
+        {mode !== 'tonnage' && (
+          <button onClick={() => setMode('tonnage')} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.07)', color: '#60a5fa', fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
+            {mode === 'volume' ? 'Строки → Тоннаж' : '→ Тоннаж'}
+          </button>
+        )}
+        {mode !== 'plates' && (
+          <button onClick={() => setMode('plates')} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.07)', color: '#f59e0b', fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
+            {mode === 'tonnage' ? 'Вес → Блины' : '→ Блины'}
+          </button>
+        )}
       </div>
 
       <div style={{ fontSize:10, color:'#fff', textAlign:'center', marginTop:10, lineHeight:1.45, opacity:0.9 }}>

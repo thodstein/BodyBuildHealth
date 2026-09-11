@@ -16,6 +16,11 @@ import {
   frequencyForVolume, rirProfileCheck, hardSetsCount, mvForMuscle,
 } from '../../../engines/volume-canonical.engine';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
+import {
+  importRowsFromDiary, saveVolumeSnapshot, loadVolumeSnapshots, removeVolumeSnapshot,
+  compareVolumeSnapshot, buildVolumeCsv, buildVolumeHtml,
+  type VolumeSnapshot,
+} from '../../../engines/volume-hub-conveyor.engine';
 
 const ACCENT = '#00e68a';
 const DIM_ = '#fff';
@@ -57,6 +62,8 @@ export const VolumeOptimizerTab: React.FC = () => {
     quality: true, muscles: true, cnsRecovery: true, progression: false, gaps: true, swaps: false,
   });
   const [improving, setImproving] = useState(false);
+  const [flash, setFlash] = useState<string>('');
+  const [snapshots, setSnapshots] = useState<VolumeSnapshot[]>(() => loadVolumeSnapshots());
   const weakPoints: string[] = (profile?.settings as any)?.training?.weakPoints ?? [];
   const labAnalysis = (profile?.settings as any)?.labs ?? null;
 
@@ -719,6 +726,79 @@ export const VolumeOptimizerTab: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* ── P6: конвейер — дневник / снапшоты / экспорт ── */}
+      <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.18)' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 8 }}>🔗 Конвейер: дневник · снапшоты · экспорт</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button onClick={() => {
+            try {
+              const raw = localStorage.getItem('he_workout_log_v1') || localStorage.getItem('he_training_log') || '[]';
+              const imp = importRowsFromDiary(JSON.parse(raw), { days: 7 });
+              if (imp.rows.length === 0) {
+                setFlash(`📥 Дневник: строк за 7 дней нет${imp.skipped > 0 ? ` (пропущено без маппинга: ${imp.skipped})` : ''}`);
+              } else {
+                setRows(imp.rows.map((r, i) => ({ id: 'imp' + Date.now() + '_' + i, ...r })));
+                setActiveWeek('all');
+                setFlash(`📥 Импорт: ${imp.rows.length} строк из ${imp.sessions} сессий${imp.skipped > 0 ? `, пропущено: ${imp.skipped}` : ''}`);
+              }
+            } catch { setFlash('📥 Дневник: хранилище битое'); }
+          }} style={{ flex: '1 1 140px', padding: 10, borderRadius: 10, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
+            📥 Из дневника (7д)
+          </button>
+          <button onClick={() => {
+            const snaps = saveVolumeSnapshot(
+              rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, week: r.week, weight: r.weight, reps: r.reps, sets: r.sets, rpe: r.rpe, oneRM: r.oneRM })),
+              level,
+              { totalSets: analysis?.totalSets ?? 0, totalTonnage: analysis?.totalTonnage ?? 0, byGroup: Object.fromEntries((analysis?.perMuscle ?? []).map(m => [m.muscle, m.currentSets])) },
+            );
+            setSnapshots(snaps);
+            setFlash(`📸 Снапшот сохранён (${snaps.length}/10)`);
+          }} style={{ flex: '1 1 140px', padding: 10, borderRadius: 10, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
+            📸 Снапшот
+          </button>
+          <button onClick={() => {
+            try {
+              const blob = new Blob([buildVolumeCsv(rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, week: r.week, weight: r.weight, reps: r.reps, sets: r.sets, rpe: r.rpe })))], { type: 'text/csv;charset=utf-8' });
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = 'volume.csv';
+              a.click();
+              setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+            } catch { /* ignore */ }
+          }} style={{ flex: '1 1 100px', padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
+            📄 CSV
+          </button>
+          <button onClick={() => {
+            try {
+              const w = window.open('', '_blank');
+              if (!w) { setFlash('🖨 Всплывающие окна заблокированы'); return; }
+              w.document.write(buildVolumeHtml(rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, week: r.week, weight: r.weight, reps: r.reps, sets: r.sets, rpe: r.rpe })), { level }));
+              w.document.close();
+              w.print();
+            } catch { setFlash('🖨 Печать недоступна'); }
+          }} style={{ flex: '1 1 100px', padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
+            🖨 HTML
+          </button>
+        </div>
+        {flash && <div role="status" style={{ marginTop: 8, fontSize: 11, color: '#fff' }}>{flash}</div>}
+        {snapshots.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            {snapshots.slice(0, 5).map(s => {
+              const cmp = compareVolumeSnapshot(s, rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, week: r.week, weight: r.weight, reps: r.reps, sets: r.sets, rpe: r.rpe })));
+              return (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, marginBottom: 4, fontSize: 10 }}>
+                  <span style={{ color: '#fff' }}>{new Date(s.at).toLocaleDateString('ru-RU')} · {s.level} · {s.totalSets} подх</span>
+                  <span style={{ color: cmp.setsDelta === 0 ? '#fff' : cmp.setsDelta > 0 ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
+                    Δ {cmp.setsDelta > 0 ? '+' : ''}{cmp.setsDelta} подх · {cmp.tonnageDelta > 0 ? '+' : ''}{cmp.tonnageDelta.toLocaleString('ru-RU')} кг·повт
+                  </span>
+                  <button onClick={() => setSnapshots(removeVolumeSnapshot(s.id))} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', borderRadius: 6, cursor: 'pointer', fontSize: 10, padding: '4px 8px' }}>✕</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* ── Apply to planner ── */}
       {analysis && (
