@@ -5,7 +5,7 @@ import {
   scoreBeighton, beightonCutoff, assessBeighton, assessYellow, teenGate,
   rankJointSupport, screenOrtho, orthoGuardsForPlan, buildOrthoCsv, orthoBridgePayload,
   hopLsi, hopLsiOverall, strengthLsiOverall, bbOrthoMobilityAdd, applyOrthoToProfile,
-  isRiskyOpenChain, riskyOpenChainIds,
+  isRiskyOpenChain, riskyOpenChainIds, decideBbOrthoIntake,
 } from '../ortho-screen.engine';
 
 describe('ortho-screen J1 плечо', () => {
@@ -257,6 +257,29 @@ describe('ortho-screen strength-LSI + ББ-хелпер', () => {
   it('bbOrthoMobilityAdd: паузы + whitelist, чужие режутся', () => {
     expect(bbOrthoMobilityAdd({ pauseOverhead: true, limitDeepSquat: true, mobilityAdd: ['wrist', 'нос', 'knee'] })).toEqual(['shoulder', 'hip', 'wrist']);
     expect(bbOrthoMobilityAdd({ pauseOverhead: false, limitDeepSquat: false, mobilityAdd: [] })).toEqual([]);
+  });
+  it('decideBbOrthoIntake: пусто — inactive, всё false', () => {
+    expect(decideBbOrthoIntake({}, 'linear')).toEqual({
+      active: false, mobAdd: [], light: false, deload: false, techNone: false, forceDouble: false, excludeRisky: false, teen: false,
+    });
+    expect(decideBbOrthoIntake({ orthoGuards: 'мусор' }, 'linear').active).toBe(false);
+  });
+  it('decideBbOrthoIntake: closedChain — полный щадящий + forceDouble только не-double', () => {
+    const g = { pauseOverhead: true, limitDeepSquat: true, closedChainOnly: true, mobilityAdd: ['wrist'] };
+    const d = decideBbOrthoIntake({ orthoGuards: g }, 'linear');
+    expect(d).toEqual({
+      active: true, mobAdd: ['shoulder', 'hip', 'wrist'], light: true, deload: true, techNone: true, forceDouble: true, excludeRisky: true, teen: false,
+    });
+    expect(decideBbOrthoIntake({ orthoGuards: g }, 'double_progression').forceDouble).toBe(false);
+  });
+  it('decideBbOrthoIntake: teen без гардов — light/deload/tech, без mobility/exclude', () => {
+    const d = decideBbOrthoIntake({ teenNote: 'Подросток 14–15' }, 'wave');
+    expect(d.active).toBe(true);
+    expect(d.teen).toBe(true);
+    expect(d.light && d.deload && d.techNone).toBe(true);
+    expect(d.mobAdd).toEqual([]);
+    expect(d.excludeRisky).toBe(false);
+    expect(d.forceDouble).toBe(false);
   });
 });
 

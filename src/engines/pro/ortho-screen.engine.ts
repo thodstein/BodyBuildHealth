@@ -196,6 +196,45 @@ export function riskyOpenChainIds(catalog: Array<{ id: string; name: string }>, 
   return out;
 }
 
+/**
+ * Э2: чистое решение ББ-приёмника (покрыто прямым тестом; компонент только дергает сеттеры/персист/тост).
+ * Возвращает ЧТО применить; применяется только при наличии orthoGuards или teenNote.
+ */
+export interface BbOrthoDecision {
+  active: boolean;
+  mobAdd: string[];
+  light: boolean;
+  deload: boolean;
+  techNone: boolean;
+  forceDouble: boolean;
+  excludeRisky: boolean;
+  teen: boolean;
+}
+
+export function decideBbOrthoIntake(
+  d: { orthoGuards?: { pauseOverhead?: boolean; limitDeepSquat?: boolean; closedChainOnly?: boolean; mobilityAdd?: string[] } | null | unknown; teenNote?: unknown },
+  loadStrategy: string,
+): BbOrthoDecision {
+  const og = (d && typeof d.orthoGuards === 'object' && !Array.isArray(d.orthoGuards)
+    ? d.orthoGuards as { pauseOverhead?: boolean; limitDeepSquat?: boolean; closedChainOnly?: boolean; mobilityAdd?: string[] }
+    : null);
+  const teen = typeof d?.teenNote === 'string' && (d.teenNote as string).length > 0;
+  if (!og && !teen) {
+    return { active: false, mobAdd: [], light: false, deload: false, techNone: false, forceDouble: false, excludeRisky: false, teen: false };
+  }
+  const closed = og?.closedChainOnly === true;
+  return {
+    active: true,
+    mobAdd: og ? bbOrthoMobilityAdd(og) : [],
+    light: closed || teen,
+    deload: closed || teen,
+    techNone: closed || teen,
+    forceDouble: closed && loadStrategy !== 'double_progression',
+    excludeRisky: closed,
+    teen,
+  };
+}
+
 export function assessRts(i: RtsChecklistInput): { ready: boolean; status: string; flags: OrthoFlag[] } {
   // П5: измеренные hop-дистанции приоритетнее ручных чекбоксов
   const hop = hopLsiOverall(i.hop);

@@ -45,7 +45,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
-import { bbOrthoMobilityAdd, riskyOpenChainIds } from '../../../engines/pro/ortho-screen.engine';
+import { bbOrthoMobilityAdd, riskyOpenChainIds, decideBbOrthoIntake } from '../../../engines/pro/ortho-screen.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply, applyToPlanner, type WeakpointsPayload } from './planner-bridge';
 import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
@@ -1627,37 +1627,36 @@ export const BbAutoConstructor: React.FC = () => {
           pro2parts.push('🧒 teen-режим');
         }
         // J7 орто-скрининг: гарды ПРИМЕНЯЮТСЯ (не только сохраняются).
+        // Решение — чистая decideBbOrthoIntake (прямой тест); здесь только сеттеры/персист/тост.
         // pauseOverhead/limitDeepSquat → mobilityRestrictions (живой фильтр пула);
-        // Beighton closedChainOnly / teen → интенсивность light + авто-делод (щадящий режим); всё — в персист + тост.
-        if (bbDiag.orthoGuards && typeof bbDiag.orthoGuards === 'object') {
-          const og = bbDiag.orthoGuards as { pauseOverhead?: boolean; limitDeepSquat?: boolean; closedChainOnly?: boolean; blockedPatterns?: string[]; mobilityAdd?: string[] };
-          const mobAdd = bbOrthoMobilityAdd(og);
-          if (mobAdd.length) {
-            setMobilityRestrictions((prev) => Array.from(new Set([...prev, ...mobAdd])));
-            pro2parts.push(`🦴 орто-гарды: ${mobAdd.join('+')} → фильтр пула`);
-          }
-          if (og.closedChainOnly) {
-            setAutoDeload(true);
-            setIntensityLevel('light');
-            // Э1 буквально: без отказных техник + прогрессия повторами (+5%, double_progression) + раскрытия из пула
-            setIntensityTech('none');
-            if (loadStrategy !== 'double_progression') {
+        // Beighton closedChainOnly / teen → light + без отказных + повторы + раскрытия из пула + авто-делод.
+        {
+          const dec = decideBbOrthoIntake({ orthoGuards: (bbDiag as any).orthoGuards, teenNote: (bbDiag as any).teenNote }, loadStrategy);
+          if (dec.active) {
+            if (dec.mobAdd.length) {
+              setMobilityRestrictions((prev) => Array.from(new Set([...prev, ...dec.mobAdd])));
+              pro2parts.push(`🦴 орто-гарды: ${dec.mobAdd.join('+')} → фильтр пула`);
+            }
+            if (dec.light) setIntensityLevel('light');
+            if (dec.deload) setAutoDeload(true);
+            if (dec.techNone) setIntensityTech('none');
+            if (dec.forceDouble) {
               setLoadStrategy('double_progression');
               try { userTouched.current.loadStrategy = true; } catch {}
             }
-            const risky = riskyOpenChainIds(EXERCISE_CATALOG as any, 40);
-            if (risky.length) {
-              setBbExclEx((prev) => Array.from(new Set([...prev, ...risky])));
-              try { localStorage.setItem('he_bb_ortho_excluded', JSON.stringify(risky)); } catch {}
+            if (dec.excludeRisky) {
+              const risky = riskyOpenChainIds(EXERCISE_CATALOG as any, 40);
+              if (risky.length) {
+                setBbExclEx((prev) => Array.from(new Set([...prev, ...risky])));
+                try { localStorage.setItem('he_bb_ortho_excluded', JSON.stringify(risky)); } catch {}
+              }
+              pro2parts.push(`🦴 Beighton+: light + без отказных + повторы + ${risky.length} раскрытий исключено`);
             }
-            pro2parts.push(`🦴 Beighton+: light + без отказных + повторы + ${risky.length} раскрытий исключено`);
+            try { localStorage.setItem('he_bb_ortho_guards', JSON.stringify((bbDiag as any).orthoGuards ?? null)); } catch {}
           }
-          try { localStorage.setItem('he_bb_ortho_guards', JSON.stringify(og)); } catch {}
         }
         if (typeof bbDiag.teenNote === 'string' && bbDiag.teenNote) {
           try { localStorage.setItem('he_bb_last_teen', bbDiag.teenNote); } catch {}
-          setAutoDeload(true);
-          setIntensityLevel('light');
           pro2parts.push('🧒 teen: light + авто-делод');
         }
         if (Array.isArray(bbDiag.orthoFlags) && bbDiag.orthoFlags.length) {
