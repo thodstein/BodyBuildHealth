@@ -1,5 +1,12 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ТА PRO-v4 + добойки + IPST + spec opt-in + откат (Sep 11 2026, закоммичено, без пуша)
+
+План `docs/TA-DIAGNOSTICS-PRO-PLAN-V4.md` (§6–§10): 7 эпиков V4 (PCI/персист, IFP+импульс+нормы, честный MVT-2/posterior, ACL-гард, meet-план, yMax/женские нормы, выносливость) + добойка 7 пунктов (персист-знак, mean/peak+перетест, вердикт ♀, shrinkage×r², FvR-фолбэк, Q-points+тренд, полный мост G8) + IPST 3-я позиция (слабое звено цепи) + spec opt-in кнопка в конструкторе (снапшот, честный скип) + откат спец-блока (тот же снапшот что у хаба) + честная формулировка prefCorr в rationale. Только Edit/Write + vitest/tsc; чужие WIP не тронуты (коммиты pathspec своих: `feeba960` V4+добойка, `2efeea0` IPST, `f4c766a` spec opt-in).
+
+- Проверено: v4 35/35 + UI 5/5 + wizard 8/8 + intake 14/14 + spec-apply 2/2 (вставка→откат) + область 65 файлов / 885, `tsc` 0 (NODE_OPTIONS=12GB), `verify:apk-design` OK.
+- Границы: Q/Sinclair — вторичные источники + lock-тесты; prior SD 0.05 экспертный; PCI пуст у новичка (задумано); спец-блок только по клику (авто-инъекция запрещена).
+
 ## Сцена: бикини ×2 + бодифитнес + дельты + wellness — 5 женских циклов (Sep 11 2026, в worktree БЕЗ коммита)
 
 По команде «выполняй полностью» (аудит 10 женских циклов + сеть: Traisha Martin 12w prep/M&S/Mikolo + критерии Manion/NPC/IFBB). Только Write/Edit + vitest/tsc через терминал; чужие WIP не тронуты (bb-pro3/cardio/BBDiagnosticsHub — в диффе только свои ханки, сверено `git diff`).

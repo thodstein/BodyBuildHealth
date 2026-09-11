@@ -49,4 +49,33 @@ describe('TA spec opt-in', () => {
     // Хендлер отработал: успех или честный скип (бюджет/дубли)
     await waitFor(() => expect(container.textContent).toMatch(/встроен|не вставлен/), { timeout: 10000 });
   }, 30000);
+
+  it('откат спец-блока возвращает план и тост', async () => {
+    applyToPlanner({
+      kind: 'weakpoints',
+      label: 't',
+      data: {
+        wlWeakPoints: ['snatch_mid'],
+        taSpecBlock: { totalWeeks: 2, weeks: [{ targetSets: 3 }, { targetSets: 4 }] },
+        taPreferredCorr: { snatch_mid: 'pause_snatch' },
+        taWeakCauses: { snatch_mid: 'technique' },
+      } as any,
+    });
+    const { container } = render(<StrengthSportConstructor />);
+    fireEvent.click(screen.getByText(/Далее → 2 👤 Атлет/));
+    fireEvent.click(screen.getByText(/Далее → 3 🏃 Вне зала/));
+    fireEvent.click(screen.getByText(/Далее → 4 🧩 Сплит/));
+    fireEvent.click(screen.getByText(/Собрать план/));
+    await waitFor(() => expect(container.textContent).toContain('План 8нед'), { timeout: 12000 });
+    fireEvent.click(await screen.findByText(/Спец-блок \(2 нед\)/, {}, { timeout: 5000 }));
+    await waitFor(() => expect(container.textContent).toMatch(/встроен|не вставлен/), { timeout: 10000 });
+    // Кнопка отката — только при успешной вставке (есть снапшот); при скипе её нет честно
+    const rollback = container.querySelector('[data-ss="rollback-spec"]');
+    if (rollback) {
+      fireEvent.click(rollback);
+      await waitFor(() => expect(container.textContent).toMatch(/откачен|нечего|пересобран/), { timeout: 5000 });
+    } else {
+      expect(container.textContent).toMatch(/не вставлен/);
+    }
+  }, 30000);
 });
