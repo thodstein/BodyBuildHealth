@@ -4213,7 +4213,7 @@ ull → default. Реальные значения лежат в UnifiedSettings
 - **П3 hero-preview**: NEW `finishCardioCycle` в `cardio-templates` (каскад→мезо→темпы/FTP + штамп в config) — единый для сборки/варианта/шаблона/preview; `useCardioParamsPreview` показывает финал 1-в-1 (поймано: в файле два одинаковых блока — legacy-компонент не тронут, правился только hook по уникальному якорю `return { preview, s, tidPreview }`).
 - **П4 editConfig**: восстановление темпов VDOT (`formatPace`) и `mesoOn` из config-штампа.
 - **П5 HIIT в любую неделю** (селект нед 1..N) + **график динамики рекордов** (SVG-тренд по видам, ▲/▼).
-- **П6 дневник**: NEW `CardioDiarySlot` (план/факт сегодня + неделя, без пропсов) — `TrainingDiaryHub` НЕ тронут (чужая зона), монтирование за владельцем.
+- **П6 дневник**: `CardioDiarySlot` смонтирован в `TrainingDiaryHub` (record-режим, рядом с BB-карточками — прецедент; импорт + 1 строка с меткой, хаб-тесты 20/20 целы) — пункт закрыт полностью.
 - **П7 валидатор strict**: `opts.strict` отключает advisory + тоггл в карточке (дефолт advisory).
 - **П8 доки**: эта запись + § в `CARDIO-CYCLE-INTEGRATION-PLAN` (ниже).
 - **Поймано**: соседний тест «taper выкл → без taper» ронял мой каскад (накладывал taper поверх opt-out) — чинено в логике (`taperEnabled`-гард) + lock-тест; `CardioParamsStep`/`WLDiagnosticsHub` правят параллельные агенты — мои ханки только свои.

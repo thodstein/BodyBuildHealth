@@ -57,6 +57,7 @@ import { DiaryHubContext, type DiaryHubCtx } from './diary-hub-context';
 import { CompetitionPlansView } from './CompetitionPlansView';
 import { BBRecommendationsTab } from './BBRecommendationsTab';
 import BBFeedbackCard from './BBFeedbackCard';
+import { CardioDiarySlot } from './CardioDiarySlot'; // кардио-слой дня (владелец — кардио-конструктор)
 import { MyTrainingTab } from './MyTrainingTab';
 import { MindsetTab } from './MindsetTab';
 import { MobilityTab } from './MobilityTab';
@@ -584,6 +585,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           }} />
           {/* 📊 Фидбек ББ: план vs факт — компактно в записи, полно — в вкладке Фидбек */}
           <BBFeedbackCard />
+          {/* 🏃 Кардио-слой дня (план/факт активного цикла; владелец — кардио-конструктор) */}
+          <CardioDiarySlot />
           <InfoErrorBoundary label="Сегодня"><>{(() => {
             const todayIdx = (new Date().getDay() + 6) % 7;
             const planned = (trainingOutput?.plan?.[todayIdx] && trainingOutput.plan[todayIdx].exercises.length > 0) ? trainingOutput.plan[todayIdx] : null;
