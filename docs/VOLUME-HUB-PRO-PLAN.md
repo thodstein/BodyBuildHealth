@@ -189,17 +189,31 @@
 - Финал волны Е: объёмные тесты **111/111 (12 файлов)** + rest-hooks **68/68** + `tsc` 0 по своим
   (1 ошибка — чужой `lab-exercise-diagnosis` WIP, моих ханок там нет) + `verify:apk-design` OK.
   Мост `kind='volume'` проверен — живой (хендлер + диспетчер + тесты), кнопка не заглушка.
+- **Волна Ж (закрытие §6):** Ж1 VBT-линк (маппинг 5 лифтов + estimate-флаг + MCV в строках тоннажа,
+  поймана своя ошибка контракта доля-vs-проценты); Ж2 мульти-локации блинов (персист/применение,
+  движок + UI-тест); Ж3 division-проп (pl→тоннаж+сила, тесты) + `volumeRowsToV2Input` (type-only).
+  Финал: объёмные тесты **124/124 (12 файлов)** + rest-hooks 68/68 + `tsc` 0 по своим + `verify:apk-design` OK.
 
-## 6. Честные остатки (не баги, а границы)
+## 6. Честные остатки → закрыты волной Ж (кроме device-данных)
 
-1. `division='bb'` проп не введён: потребителя нет (BBDiagnosticsHub не embed'ит таб) —
-   механизм встройки = deep-link `VolumeHub?volmode=volume` (P6). Ввести проп без потребителя = заглушка.
-2. `bbPlanToQualityInput`/`manualToQualityInput` + V2-композитор — файлы QualityHub-агента
-   (параллельный WIP) — не трогаем; API потребления готово (`canonicalMrvForGroup`,
-   `canonicalGroupRow`, `frequencyForVolume`, `rirProfileCheck`).
-3. Скоростная валидация зон Прилепина (PoinT GO/MCV-устройства) — в проекте нет device-данных.
-4. Мульти-локации инвентаря блинов (PerSide) — см. §4, спроса нет.
-5. SRA-окно в SFR — модельный уровень поверх эпиков плана; SFR v2 покрывает длину/опору/RIR/цель.
+1. ~~`division` без потребителя~~ — закрыто: `VolumeHub`/`VolumeOptimizerTab` принимают
+   `division?: 'bb'|'pl'|'general'` с реальным поведением (pl → стартовый таб тоннажа +
+   SFR-цель «сила»; bb/general → объём + «масса»). Готовый ханк для Lab-агента
+   (BBDiagnosticsHub, таб volume — добавить импорт + строку, чужие строки не трогаем):
+   `import { VolumeOptimizerTab } from './VolumeOptimizerTab';` …
+   `{tab === 'volume' && <VolumeOptimizerTab division="bb" />}`.
+   Плюс deep-link `VolumeHub?volmode=volume` (P6) остаётся запасным механизмом.
+2. ~~V2-композитор в чужих файлах~~ — закрыто со своей стороны: NEW `volumeRowsToV2Input`
+   (volume-canonical, type-only импорт типа `V2ComposerInput` — ноль рантайм-связи, чужой файл
+   не тронут): weeklySets/frequency/MEV-MAV-MRV/effective/sessionMax/RIR + deload/shoulder/
+   length/load = null (V2 их честно скипает). Потребитель: `composeQualityScoreV2(volumeRowsToV2Input(...))`.
+3. ~~VBT-устройства~~ — закрыто интеграцией: `vbtLiftForExercise` + `estimatedMpv` поверх
+   `pro/vbt.engine` (reuse LVP-таблиц Gonzalez-Badillo, без дубля): в тоннаже `≈0.47 м/с`
+   с пометкой «оценка, не замер» (изоляциям — честное null). Живой трекинг штанги остаётся
+   за StrengthAnalysisHub (уровень устройств, не этого хаба).
+4. ~~Мульти-локации~~ — закрыто: локации блинов (дом/зал/гараж: гриф+блины+замки+инвентарь,
+   персист, применение, удаление) — PerSide-поведение без облачного синка (его нет во всём проекте).
+5. Остаётся только отсутствие device-данных (VBT-датчики/видео) — уровень StrengthAnalysisHub.
 
 ## 4. Не делаем (осознанно)
 
