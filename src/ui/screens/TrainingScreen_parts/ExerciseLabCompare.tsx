@@ -34,12 +34,13 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
     setGoal((profile?.settings as any)?.training?.primaryGoal ?? 'hypertrophy');
   }, [profile]);
 
+  const labTick = useLabRefresh();
   const labInjuries = useMemo(() => {
     try {
       const ctx = readLabAthleteCtx();
       return ctx.injuries.map(x => (typeof x === 'string' ? x : String(x?.muscle || '')).toLowerCase()).filter(Boolean);
     } catch { return []; }
-  }, [id1, id2]);
+  }, [id1, id2, labTick]);
   const getExData = (ex: any, injuries: string[] = []) => {
     if (!ex) return null;
     const presc = calcExercisePrescription(ex, goal, level, false, false, 1);
@@ -61,7 +62,6 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
   const d2 = useMemo(() => getExData(ex2, labInjuries), [ex2, goal, level, labInjuries]);
 
   // Epic F: профили из данных + Δ-диагноз A vs B на материале атлета.
-  const labTick = useLabRefresh();
   const labCtx = useMemo(() => {
     try { return readLabAthleteCtx(); } catch { return null; }
   }, [id1, id2, labTick]);

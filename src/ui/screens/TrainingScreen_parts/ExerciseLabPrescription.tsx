@@ -197,13 +197,23 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
   const applyLabCorrection = useCallback((a: (typeof labCorrections)[number]) => {
     if (!ex || !labDx) return;
     try {
+      // Трек — ДО отправки: иначе applyToPlanner резолвит stale-трек (pl-auto)
+      // и приёмник ББ-авто игнорирует пакет. Source — явно.
+      try {
+        localStorage.setItem('he_training_planning_track', 'bb');
+        window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any));
+      } catch {}
       const plan = loadLabPlanFromStorage();
       const delta = plan ? simulateLabCorrection(plan, a, ex.id) : null;
       const data = buildLabBridgeData({ action: a, exId: ex.id, exName: ex.name, diagnosis: labDx.d, delta });
       applyToPlanner({
         kind: 'weakpoints',
         label: `Лаб: ${ex.name} → ${a.targetName || a.type}`,
+        source: 'bb-auto',
         data: {
+          // groups: [] — гард приёмника требует groups/weakZonesGranular; пустой массив
+          // проходит гард, но НЕ создаёт spec-блок (spec строится только из непустых).
+          groups: [],
           preferredExerciseIds: data.preferredExerciseIds,
           exerciseSwap: data.exerciseSwap ?? undefined,
           labDiagnosis: data.labDiagnosis,
@@ -211,10 +221,6 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
           labDelta: data.labDelta,
         },
       });
-      try {
-        window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'bb' } as any));
-        localStorage.setItem('he_training_planning_track', 'bb');
-      } catch {}
       setLabMsg(`✓ ${a.type} → в ББ-авто${delta?.summary ? ` (${delta.summary})` : ''}`);
       setTimeout(() => setLabMsg(''), 3000);
     } catch { setLabMsg('⚠ Не удалось применить'); setTimeout(() => setLabMsg(''), 2500); }

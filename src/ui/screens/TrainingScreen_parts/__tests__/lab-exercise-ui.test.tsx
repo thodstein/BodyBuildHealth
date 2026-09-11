@@ -231,6 +231,24 @@ describe('lab-exercise-ui', () => {
     expect(readScore()).toBeLessThan(clean);
   });
 
+  it('мост: пакет проходит гард приёмника (groups + source, трек заранее)', async () => {
+    // Контракт приёмника BbAuto (kind weakpoints требует groups/weakZonesGranular,
+    // source pl-auto игнорируется): пакет обязан нести groups: [] + source + трек,
+    // выставленный ДО отправки. Рендер полного конструктора в jsdom виснет
+    // (тяжёлые эффекты, предсуществующее) — проверяем контракт на outbox.
+    localStorage.setItem('he_training_planning_track', 'pl-auto');
+    render(<PrescriptionTab selectedId="bench_bar" />);
+    await waitFor(() => {
+      expect(screen.getByText('▶ Применить в план')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('▶ Применить в план'));
+    const payload = JSON.parse(localStorage.getItem(BRIDGE_KEY) || 'null');
+    expect(payload?.kind).toBe('weakpoints');
+    expect(payload?.source).toBe('bb-auto');
+    expect(Array.isArray(payload?.data?.groups)).toBe(true);
+    expect(localStorage.getItem('he_training_planning_track')).toBe('bb');
+  });
+
   it('персист: выбор в каталоге сохраняется в he_exercise_lab_v1', () => {
     const { container } = render(<ExerciseLabMerged />);
     fireEvent.click(screen.getByText(/📚 Каталог/));
