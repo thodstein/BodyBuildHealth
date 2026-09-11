@@ -9,8 +9,14 @@ import { makeAlpha } from '../../native/accent';
 
 export const LABS_ACCENT = 'var(--labs-accent, #00e68a)';
 export const LABS_ACCENT_RGB = 'var(--labs-accent-rgb, 0,230,138)';
-/** Единая реализация — native/accent.makeAlpha (сигнатура и выхлоп те же). */
-export const labsWithAlpha = makeAlpha(LABS_ACCENT, LABS_ACCENT_RGB);
+/** Единая реализация — native/accent.makeAlpha (сигнатура и выхлоп те же).
+ * Лениво: прямой вызов на топ-левеле ронял прод-билд (TDZ — makeAlpha живёт
+ * в main-чанке, LabsUI в labs-ui; порядок evaluation чанков не гарантирован). */
+let labsAlphaCache: ((c: string, hexAlpha: string) => string) | null = null;
+export const labsWithAlpha = (c: string, hexAlpha: string): string => {
+  if (!labsAlphaCache) labsAlphaCache = makeAlpha(LABS_ACCENT, LABS_ACCENT_RGB);
+  return labsAlphaCache(c, hexAlpha);
+};
 export const LABS_ACCENT_DIM = 'rgba(var(--labs-accent-rgb, 0,230,138), 0.12)';
 export const LABS_ACCENT_BORDER = 'rgba(var(--labs-accent-rgb, 0,230,138), 0.22)';
 export const LABS_ACCENT_SOFT = 'rgba(var(--labs-accent-rgb, 0,230,138), 0.06)';

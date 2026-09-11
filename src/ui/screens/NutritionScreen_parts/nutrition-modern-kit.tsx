@@ -6,7 +6,13 @@ import { makeFill } from '../../native/accent';
 /** Витринный акцент питания: в APK за темой, в TG/web — минт. */
 export const NUT_ACC = 'var(--nut-accent, #00e68a)';
 const NUT_RGB = 'var(--nut-accent-rgb, 0,230,138)';
-const nutA = makeFill(NUT_RGB);
+// Лениво: прямой вызов на топ-левеле ронял прод-билд (TDZ — makeFill живёт
+// в main-чанке, кит в nutrition-ui; порядок evaluation чанков не гарантирован).
+let nutACache: ((alpha: number) => string) | null = null;
+const nutA = (alpha: number): string => {
+  if (!nutACache) nutACache = makeFill(NUT_RGB);
+  return nutACache(alpha);
+};
 
 /** Эмодзи витрин → SVG. Неизвестное — как было (совместимость). */
 const HERO_ICONS: Record<string, NativeIconName> = {
