@@ -56,6 +56,27 @@ describe('volume shared input: тоннаж фильтрует недели (Е4
   });
 });
 
+describe('volume shared input: division (Ж3)', () => {
+  it("hub division='pl' стартует с тоннажа", () => {
+    const { container } = render(<VolumeHub initialMode={undefined} division="pl" />);
+    expect(container.querySelector('.train-tonnage')).not.toBeNull();
+    expect(container.querySelector('.train-volopt')).toBeNull();
+  });
+
+  it("оптимизатор division='pl' — SFR-цель Сила активна", () => {
+    render(<VolumeOptimizerTab division="pl" />);
+    fireEvent.click(screen.getByText('Рекомендации по замене (SFR)'));
+    expect(screen.getByLabelText('SFR-цель: сила').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByLabelText('SFR-цель: масса').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it("дефолт без division — Масса активна", () => {
+    render(<VolumeOptimizerTab />);
+    fireEvent.click(screen.getByText('Рекомендации по замене (SFR)'));
+    expect(screen.getByLabelText('SFR-цель: масса').getAttribute('aria-pressed')).toBe('true');
+  });
+});
+
 describe('volume shared input: контролируемый оптимизатор', () => {
   it('рендерит переданные строки; ✕ зовёт onRowsChange с []', () => {
     const fn = vi.fn();

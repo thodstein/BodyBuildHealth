@@ -114,6 +114,37 @@ describe('volume-canonical: RIR-профиль', () => {
   });
 });
 
+describe('volume-canonical: V2-адаптер (Ж3)', () => {
+  it('строит полный вход композитора: сеты/частота/канон/effective/sessionMax/RIR', async () => {
+    const m = await import('../volume-canonical.engine');
+    const input = m.volumeRowsToV2Input([
+      { exerciseId: 'bench_bar', day: 1, sets: 4, rpe: 8 },
+      { exerciseId: 'bench_bar', day: 3, sets: 4, rpe: 9 },
+    ], 'intermediate');
+    expect(input.level).toBe('intermediate');
+    expect(input.weeklySets.chest).toBe(8);
+    expect(input.frequency.chest).toBe(2);
+    expect(input.mev.chest).toBe(8);
+    expect(input.mav.chest).toBe(14);
+    expect(input.mrv.chest).toBe(20);
+    expect(input.effectiveSets!.triceps).toBeCloseTo(3.6, 1);
+    expect(input.sessionMaxByMuscle!.chest).toBe(4);
+    expect(input.rir!.totalSets).toBe(8);
+    expect(input.rir!.avgRir).toBeCloseTo(1.5, 2);
+    expect(input.deload).toBeNull();
+    expect(input.shoulder).toBeNull();
+  });
+  it('без RPE — rir null (V2 скипает срез)', async () => {
+    const m = await import('../volume-canonical.engine');
+    const input = m.volumeRowsToV2Input([{ exerciseId: 'bench_bar', day: 1, sets: 4 }], 'beginner');
+    expect(input.rir).toBeNull();
+  });
+  it('неизвестные id пропускаются без throw', async () => {
+    const m = await import('../volume-canonical.engine');
+    expect(() => m.volumeRowsToV2Input([{ exerciseId: 'nope_xyz', day: 1, sets: 5 }], 'intermediate')).not.toThrow();
+  });
+});
+
 describe('volume-canonical: hard sets', () => {
   it('RPE≥7 — hard; RPE<7 — нет; пустой — hard assumed', () => {
     const r = hardSetsCount([

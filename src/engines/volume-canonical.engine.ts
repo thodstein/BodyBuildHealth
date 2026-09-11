@@ -20,12 +20,15 @@
 
 import {
   getVolumeLandmarks,
+  getAllVolumeLandmarks,
   normMuscle,
   checkVolumeStatus,
 } from './volume-landmarks.engine';
 import type { MuscleVolumeLandmarks, VolumeStatus } from './volume-landmarks.engine';
 import { indirectMuscleContributions } from './bb/bb-volume.engine';
 import { getExerciseById } from '../core/exercise-catalog';
+// Ж3: только ТИП композитора (рантайм-связи нет — чужой движок не трогаем и не падаем вместе с ним)
+import type { V2ComposerInput } from './quality-score-v2.engine';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. MV (maintenance volume) — уровень-независимый, RP 0–6
@@ -285,6 +288,93 @@ export function hardSetsCount(rows: Array<{ sets: number; rpe?: number }>): Hard
 export function canonicalMrvForGroup(level: string, group: string): number | null {
   const lm = getVolumeLandmarks(level, group);
   return lm ? lm.mrv : null;
+}
+
+/**
+ * Ж3: адаптер строк хаба → вход единого V2-композитора качества.
+ * Покрывает volume/frequency/RIR-срезы полностью (direct+effective+sessionMax+RIR-статистика);
+ * deload/shoulder/length/load — null (у строк хаба нет фаз/плоскостей/дневника, V2 честно их скипает).
+ * Потребитель (QualityHub/BB-авто) вызывает composeQualityScoreV2(volumeRowsToV2Input(...)) на своей стороне.
+ */
+export interface VolumeHubAdapterRow {
+  exerciseId: string;
+  day: number;
+  sets: number;
+  rpe?: number;
+}
+
+export function volumeRowsToV2Input(
+  rows: VolumeHubAdapterRow[],
+  level: string,
+): V2ComposerInput {
+  const weeklySets: Record<string, number> = {};
+  const freqDays: Record<string, Set<number>> = {};
+  const namesByMuscle: Record<string, string[]> = {};
+  const sessionMax: Record<string, number> = {};
+  const perDay: Record<string, Record<number, number>> = {};
+  let rirSum = 0;
+  let rirSets = 0;
+  let le2Sets = 0;
+  let zeroSets = 0;
+  let totalSets = 0;
+
+  for (const r of rows) {
+    const ex = getExerciseById(r.exerciseId) as { group?: string; name?: string } | undefined;
+    if (!ex) continue;
+    const g = ex.group || 'other';
+    const sets = Math.max(0, r.sets || 0);
+    weeklySets[g] = (weeklySets[g] || 0) + sets;
+    totalSets += sets;
+    if (!freqDays[g]) freqDays[g] = new Set();
+    freqDays[g].add(r.day);
+    if (!perDay[g]) perDay[g] = {};
+    perDay[g][r.day] = (perDay[g][r.day] || 0) + sets;
+    const nm = ex.name || r.exerciseId;
+    if (!namesByMuscle[g]) namesByMuscle[g] = [];
+    if (!namesByMuscle[g].includes(nm)) namesByMuscle[g].push(nm);
+    if (typeof r.rpe === 'number' && r.rpe >= 5 && r.rpe <= 10) {
+      const rir = 10 - r.rpe;
+      rirSum += rir * sets;
+      rirSets += sets;
+      if (rir <= 2) le2Sets += sets;
+      if (rir <= 0) zeroSets += sets;
+    }
+  }
+
+  const allLM = getAllVolumeLandmarks(level);
+  const mev: Record<string, number> = {};
+  const mav: Record<string, number> = {};
+  const mrv: Record<string, number> = {};
+  for (const g of Object.keys(weeklySets)) {
+    const lm = getVolumeLandmarks(level, g) || allLM[g];
+    mev[g] = lm?.mev ?? 0;
+    mav[g] = lm?.mav ?? 0;
+    mrv[g] = lm?.mrv ?? 0;
+  }
+  for (const [g, days] of Object.entries(perDay)) {
+    sessionMax[g] = Math.max(0, ...Object.values(days));
+  }
+  const eff = effectiveVolumeByMuscle(rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, sets: r.sets })));
+
+  return {
+    level,
+    weeklySets,
+    frequency: Object.fromEntries(Object.entries(freqDays).map(([g, s]) => [g, s.size])),
+    mev, mav, mrv,
+    effectiveSets: eff.effective,
+    sessionMaxByMuscle: sessionMax,
+    namesByMuscle,
+    rir: rirSets > 0
+      ? { avgRir: rirSum / rirSets, fracRirLE2: le2Sets / rirSets, fracRir0: zeroSets / rirSets, totalSets: rirSets }
+      : null,
+    deload: null,
+    shoulder: null,
+    lengthShare: null,
+    load: null,
+    specTargets: [],
+    maintenanceMuscles: [],
+    exerciseNames: Object.values(namesByMuscle),
+  };
 }
 
 /** Каноническая строка группы: MV/MEV/MAV/MRV + статус (effective судится по effective-объёму). */

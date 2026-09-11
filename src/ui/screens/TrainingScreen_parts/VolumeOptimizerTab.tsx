@@ -42,10 +42,14 @@ function muscleRu(en: string): string { return MUSCLE_RU[en] || GROUP_RU[en] || 
 
 const SFR_TIER_COLOR: Record<string, string> = { S: '#22c55e', A: '#00e68a', B: '#f59e0b', C: '#ef4444' };
 
+export type VolumeDivision = 'bb' | 'pl' | 'general';
+
 export interface VolumeOptimizerTabProps {
   /** Д3: контролируемые строки хаба (VolumeInput). Без пропсов — автономный режим как раньше. */
   rows?: ProExerciseRow[];
   onRowsChange?: (rows: ProExerciseRow[]) => void;
+  /** Ж3: дивизион — преддефолт SFR-цели (bb/general → масса, pl → сила). */
+  division?: VolumeDivision;
 }
 
 export const DEFAULT_VOLUME_ROWS: ProExerciseRow[] = [
@@ -54,7 +58,7 @@ export const DEFAULT_VOLUME_ROWS: ProExerciseRow[] = [
   { id: 'r3', exerciseId: 'squat', week: 1, day: 3, weight: 100, reps: 5, sets: 4, rpe: 8 },
 ];
 
-export const VolumeOptimizerTab: React.FC<VolumeOptimizerTabProps> = ({ rows: propRows, onRowsChange }) => {
+export const VolumeOptimizerTab: React.FC<VolumeOptimizerTabProps> = ({ rows: propRows, onRowsChange, division }) => {
   const { profile } = useDataLink();
   const [level, setLevel] = useState<TrainingLevel>((profile?.settings.trainingLevel as TrainingLevel) ?? 'intermediate');
   const [mesoWeeks, setMesoWeeks] = useState<number>(4);
@@ -126,7 +130,7 @@ export const VolumeOptimizerTab: React.FC<VolumeOptimizerTabProps> = ({ rows: pr
     return planVolumeProgression(wk1Rows, level, mesoWeeks);
   }, [rows, level, mesoWeeks]);
 
-  const [sfrGoal, setSfrGoal] = useState<'strength' | 'hypertrophy'>('hypertrophy');
+  const [sfrGoal, setSfrGoal] = useState<'strength' | 'hypertrophy'>(division === 'pl' ? 'strength' : 'hypertrophy');
   const swaps: ExerciseSwapRec[] = useMemo(() => {
     if (rows.length === 0) return [];
     return findBetterExerciseSwaps(rows, level, { goal: sfrGoal, level, equipment: profileEquipment });
@@ -611,7 +615,7 @@ export const VolumeOptimizerTab: React.FC<VolumeOptimizerTabProps> = ({ rows: pr
             <div style={{ marginTop: 10 }}>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                 {(['hypertrophy', 'strength'] as const).map(g => (
-                  <button key={g} onClick={() => setSfrGoal(g)}
+                  <button key={g} onClick={() => setSfrGoal(g)} aria-pressed={sfrGoal === g} aria-label={g === 'hypertrophy' ? 'SFR-цель: масса' : 'SFR-цель: сила'}
                     style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: sfrGoal === g ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.10)', background: sfrGoal === g ? 'rgba(0,230,138,0.10)' : 'transparent', color: sfrGoal === g ? ACCENT : DIM_, fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 44 }}>
                     {g === 'hypertrophy' ? '💪 Масса' : '🏋️ Сила'}
                   </button>

@@ -3,7 +3,7 @@
  *  Без дублей: объём считался в 3 местах — теперь единый расчёт. Белый текст, стекло, градиенты.
  */
 import React, { useMemo, useState } from 'react';
-import { VolumeOptimizerTab, DEFAULT_VOLUME_ROWS } from './VolumeOptimizerTab';
+import { VolumeOptimizerTab, DEFAULT_VOLUME_ROWS, type VolumeDivision } from './VolumeOptimizerTab';
 import { TonnageCalcTab } from './TonnageCalcTab';
 import { PlateCalcTab } from './PlateCalcTab';
 import { getExerciseById } from '../../../core/exercise-catalog';
@@ -37,8 +37,8 @@ function queryHubInit(initialMode?: HubMode, initialWeight?: number): { mode: Hu
   }
 }
 
-export const VolumeHub: React.FC<{ initialMode?: HubMode; initialWeight?: number }> = ({ initialMode, initialWeight }) => {
-  const [queryInit] = useState(() => queryHubInit(initialMode, initialWeight));
+export const VolumeHub: React.FC<{ initialMode?: HubMode; initialWeight?: number; division?: VolumeDivision }> = ({ initialMode, initialWeight, division }) => {
+  const [queryInit] = useState(() => queryHubInit(initialMode ?? (division === 'pl' ? 'tonnage' : undefined), initialWeight));
   const [mode, setMode] = useState<HubMode>(queryInit.mode);
   const active = MODE_DEFS.find(d => d.m === mode)!;
 
@@ -121,7 +121,7 @@ export const VolumeHub: React.FC<{ initialMode?: HubMode; initialWeight?: number
           </div>
         </div>
         <div style={{ padding: 10 }}>
-          {mode === 'volume' && <VolumeOptimizerTab rows={hubRows} onRowsChange={setHubRows} />}
+          {mode === 'volume' && <VolumeOptimizerTab rows={hubRows} onRowsChange={setHubRows} division={division} />}
           {mode === 'tonnage' && <TonnageCalcTab sharedRows={hubRows} onSharedRowsChange={setHubRows} />}
           {mode === 'plates' && (
             <PlateCalcTab
