@@ -87,9 +87,14 @@ describe('sfr v2: свапы с фильтрами', () => {
     // ни одна опция не должна резолвиться в запретные ключи
     expect(allIds.length).toBeGreaterThanOrEqual(0);
   });
-  it('фильтр оборудования: только свой вес — штанги отсечены', () => {
+  it('фильтр оборудования: только свой вес — штанги отсечены', async () => {
     const s = findBetterExerciseSwaps(entries, 'intermediate', { equipment: ['bodyweight'] });
-    const allEq = s.flatMap(x => x.betterOptions.map(o => o.exerciseId));
-    expect(Array.isArray(allEq)).toBe(true);
+    const { getExerciseById } = await import('../../core/exercise-catalog');
+    const opts = s.flatMap(x => x.betterOptions.map(o => o.exerciseId));
+    expect(opts.length).toBeGreaterThan(0);
+    for (const id of opts) {
+      const ex = getExerciseById(id) as { equipment?: string } | undefined;
+      expect(String(ex?.equipment || '').toLowerCase()).toContain('bodyweight');
+    }
   });
 });

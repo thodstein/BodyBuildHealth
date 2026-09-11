@@ -56,6 +56,30 @@ export const INOL_OPT_DAY = 2.4;
 export const INOL_OPT_WEEK_SINGLE = 1.6;
 export const INOL_OPT_WEEK_ALL = 7.2;
 
+export interface InolScopeVerdict {
+  kind: 'below' | 'optimal' | 'high' | 'over';
+  ratio: number;
+  message: string;
+}
+
+/**
+ * Вердикт суммарного INOL дня/недели (Hristov: день 2.4, неделя-все 7.2).
+ * Шкала по доле от оптимума: <0.5 недобор, 0.5–1.5 оптимум, 1.5–2.5 высоко, >2.5 перебор.
+ */
+export function inolScopeVerdict(
+  totalInol: number,
+  scope: 'day' | 'week',
+  label?: string,
+): InolScopeVerdict {
+  const opt = scope === 'day' ? INOL_OPT_DAY : INOL_OPT_WEEK_ALL;
+  const ratio = opt > 0 ? totalInol / opt : 0;
+  const name = label || (scope === 'day' ? 'День' : 'Неделя');
+  if (ratio < 0.5) return { kind: 'below', ratio, message: `${name}: INOL ${totalInol.toFixed(2)} (${(ratio * 100).toFixed(0)}% от оптимума ${opt}) — недобор` };
+  if (ratio <= 1.5) return { kind: 'optimal', ratio, message: `${name}: INOL ${totalInol.toFixed(2)} — оптимум (${opt})` };
+  if (ratio <= 2.5) return { kind: 'high', ratio, message: `${name}: INOL ${totalInol.toFixed(2)} — высоко, следите за скоростью/техникой` };
+  return { kind: 'over', ratio, message: `${name}: INOL ${totalInol.toFixed(2)} — перебор, резать объём` };
+}
+
 /** Скидка становой к оптимуму (PoinT GO: −20…−30% из-за спинальной/нейро-цены). */
 export const DEADLIFT_OPT_FACTOR = 0.75;
 

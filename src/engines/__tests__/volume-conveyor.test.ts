@@ -9,6 +9,7 @@ import {
   buildVolumeCsv,
   buildVolumeHtml,
   csvCellVolume,
+  resolveVolumeOneRM,
   VOLUME_HISTORY_KEY,
 } from '../volume-hub-conveyor.engine';
 
@@ -69,6 +70,19 @@ describe('conveyor: снапшоты + сравнение', () => {
     expect(d.groupDelta.length).toBeGreaterThan(0);
     const rest = removeVolumeSnapshot(all[0].id);
     expect(rest).toHaveLength(9);
+  });
+});
+
+describe('conveyor: resolveVolumeOneRM (профиль > per-row > глобальный)', () => {
+  it('базлайн профиля приоритетнее всего', () => {
+    expect(resolveVolumeOneRM({ bench_bar: 120 }, 100, 'bench_bar', 110)).toBe(120);
+  });
+  it('per-row при пустом профиле', () => {
+    expect(resolveVolumeOneRM({}, 100, 'bench_bar', 90)).toBe(90);
+  });
+  it('глобальный фолбэк; нули/отрицательные игнорятся', () => {
+    expect(resolveVolumeOneRM({}, 100, 'bench_bar')).toBe(100);
+    expect(resolveVolumeOneRM({ bench_bar: 0 }, 100, 'bench_bar', -5)).toBe(100);
   });
 });
 

@@ -18,7 +18,7 @@ import {
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import {
   importRowsFromDiary, saveVolumeSnapshot, loadVolumeSnapshots, removeVolumeSnapshot,
-  buildVolumeCsv, buildVolumeHtml,
+  buildVolumeCsv, buildVolumeHtml, resolveVolumeOneRM,
   type VolumeSnapshot,
 } from '../../../engines/volume-hub-conveyor.engine';
 import { VolBar, VolSectionHeader, VolumeQualityCard, PerMuscleList, VolumeConveyorCard } from './volume-optimizer-parts';
@@ -62,10 +62,21 @@ export const VolumeOptimizerTab: React.FC = () => {
   const weakPoints: string[] = (profile?.settings as any)?.training?.weakPoints ?? [];
   const labAnalysis = (profile?.settings as any)?.labs ?? null;
 
+  // Д1: инвентарь профиля (паттерн BBDiagnosticsHub:315) — фильтр SFR-свапов
+  const profileEquipment: string[] | undefined = useMemo(() => {
+    try {
+      const p: any = profile;
+      const eq = p?.settings?.training?.equipment ?? p?.training?.equipment;
+      if (Array.isArray(eq)) {
+        const clean = eq.map((s) => String(s)).filter(Boolean);
+        return clean.length ? clean : undefined;
+      }
+      return undefined;
+    } catch { return undefined; }
+  }, [profile]);
+
   const getOneRM = useCallback((exerciseId: string): number => {
-    const baseline = (profile?.settings.strengthBaselines ?? {})[exerciseId];
-    if (baseline && baseline > 0) return baseline;
-    return oneRMGlobal;
+    return resolveVolumeOneRM(profile?.settings.strengthBaselines, oneRMGlobal, exerciseId);
   }, [profile?.settings.strengthBaselines, oneRMGlobal]);
 
   const upd = useCallback((id: string, field: keyof ProExerciseRow, val: any) => {
@@ -100,8 +111,8 @@ export const VolumeOptimizerTab: React.FC = () => {
   const [sfrGoal, setSfrGoal] = useState<'strength' | 'hypertrophy'>('hypertrophy');
   const swaps: ExerciseSwapRec[] = useMemo(() => {
     if (rows.length === 0) return [];
-    return findBetterExerciseSwaps(rows, level, { goal: sfrGoal });
-  }, [rows, level, sfrGoal]);
+    return findBetterExerciseSwaps(rows, level, { goal: sfrGoal, level, equipment: profileEquipment });
+  }, [rows, level, sfrGoal, profileEquipment]);
   const applySwap = useCallback((fromId: string, toId: string) => {
     setRows(prev => prev.map(r => (r.exerciseId === fromId ? { ...r, exerciseId: toId } : r)));
   }, []);
@@ -572,6 +583,9 @@ export const VolumeOptimizerTab: React.FC = () => {
                     {g === 'hypertrophy' ? '💪 Масса' : '🏋️ Сила'}
                   </button>
                 ))}
+              </div>
+              <div style={{ fontSize: 10, color: DIM_, marginBottom: 8 }}>
+                🏋️ Инвентарь: {profileEquipment && profileEquipment.length > 0 ? profileEquipment.join(', ') : 'весь зал (в профиле не задан)'} · чужое оборудование отсечено из замен
               </div>
               {swaps.slice(0, 5).map(s => (
                 <div key={s.currentExerciseId} style={{ marginBottom: 8, padding: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>

@@ -5,6 +5,7 @@ import {
   inolForReps,
   inolForSet,
   verdictForInol,
+  inolScopeVerdict,
   tonnageRowResult,
   bodyweightLoad,
   patternOf,
@@ -46,6 +47,19 @@ describe('tonnage-prilepin: INOL', () => {
     const v = verdictForInol(2.5, { isAccessory: true, label: 'Махи' });
     expect(v.kind).toBe('over');
     expect(v.message).toContain('ориентир');
+  });
+});
+
+describe('tonnage-prilepin: INOL дня/недели (Hristov 2.4/7.2)', () => {
+  it('день 2.4 — optimal; 1.0 — below; 5.0 — high; 7.0 — over', () => {
+    expect(inolScopeVerdict(2.4, 'day').kind).toBe('optimal');
+    expect(inolScopeVerdict(1.0, 'day').kind).toBe('below');
+    expect(inolScopeVerdict(5.0, 'day').kind).toBe('high');
+    expect(inolScopeVerdict(7.0, 'day').kind).toBe('over');
+  });
+  it('неделя 7.2 — optimal; 20 — over', () => {
+    expect(inolScopeVerdict(7.2, 'week').kind).toBe('optimal');
+    expect(inolScopeVerdict(20, 'week').kind).toBe('over');
   });
 });
 

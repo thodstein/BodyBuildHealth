@@ -247,6 +247,32 @@ export function nearestLoadable(
   return { down, up };
 }
 
+/** История целевых весов `he_plate_history` (кап 8, тап — recall). */
+export const PLATE_HISTORY_KEY = 'he_plate_history';
+const PLATE_HISTORY_CAP = 8;
+
+export function loadPlateHistory(): number[] {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(PLATE_HISTORY_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter(v => typeof v === 'number' && v > 0).slice(0, PLATE_HISTORY_CAP) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function pushPlateHistory(weight: number): number[] {
+  const w = Math.round(weight * 10) / 10;
+  if (!(w > 0)) return loadPlateHistory();
+  const arr = [w, ...loadPlateHistory().filter(v => v !== w)].slice(0, PLATE_HISTORY_CAP);
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(PLATE_HISTORY_KEY, JSON.stringify(arr));
+  } catch { /* quota — молча */ }
+  return arr;
+}
+
 /** %-пресеты от 1RM для программирования (тап → целевой вес). */
 export const PLATE_PERCENT_PRESETS = [50, 60, 65, 70, 75, 80, 85, 90, 95];
 

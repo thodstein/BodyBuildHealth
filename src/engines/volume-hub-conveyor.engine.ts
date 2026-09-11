@@ -97,6 +97,22 @@ export function importRowsFromDiary(
 // Снапшоты he_volume_history (кап 10) + сравнение
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Разрешение 1RM упражнения: strengthBaselines профиля > per-row > глобальный.
+ * Один источник вместо хардкода 100 в трёх местах (P7-добивка).
+ */
+export function resolveVolumeOneRM(
+  baselines: Record<string, number> | undefined,
+  global: number,
+  exerciseId: string,
+  perRow?: number,
+): number {
+  const base = baselines?.[exerciseId];
+  if (typeof base === 'number' && base > 0) return base;
+  if (typeof perRow === 'number' && perRow > 0) return perRow;
+  return global;
+}
+
 export const VOLUME_HISTORY_KEY = 'he_volume_history';
 const VOLUME_HISTORY_CAP = 10;
 

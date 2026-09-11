@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
 import { PopupSelect, PopupNumber, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
-import { PRILEPIN_TABLE, tonnageRowResult, INOL_OPT_EXERCISE } from '../../../engines/tonnage-prilepin.engine';
+import { PRILEPIN_TABLE, tonnageRowResult, inolScopeVerdict } from '../../../engines/tonnage-prilepin.engine';
 
 const ACCENT = '#00e68a';
 const CARD: React.CSSProperties = {
@@ -189,10 +189,16 @@ export const TonnageCalcTab: React.FC = () => {
             );
           })}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '8px 8px 0' }}>
-          <span style={{ color: '#fff' }}>Суммарный INOL сессии (опт ≈ {INOL_OPT_EXERCISE}/упр)</span>
-          <span style={{ color: memo.totalInol > 2.4 ? '#ef4444' : memo.totalInol >= 0.4 ? '#22c55e' : '#60a5fa', fontWeight: 700 }}>{memo.totalInol.toFixed(2)}</span>
-        </div>
+        {(() => {
+          const v = inolScopeVerdict(memo.totalInol, 'day', 'Сессия');
+          const color = v.kind === 'optimal' ? '#22c55e' : v.kind === 'below' ? '#60a5fa' : v.kind === 'high' ? '#f59e0b' : '#ef4444';
+          return (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '8px 8px 0', gap: 8 }}>
+              <span style={{ color: '#fff' }}>INOL сессии (Hristov: день 2.4, неделя 7.2)</span>
+              <span style={{ color, fontWeight: 700, textAlign: 'right' }}>{v.message.split(': ')[1] || v.message}</span>
+            </div>
+          );
+        })()}
         {memo.byZone.unknown > 0 && <div style={{ fontSize: 10, color: '#fff', padding: '4px 8px 0' }}>ℹ️ {(memo.byZone.unknown).toLocaleString()} кг·повт без 1ПМ — вне зон Прилепина</div>}
       </div>
 

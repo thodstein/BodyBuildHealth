@@ -6,7 +6,7 @@
  * Движок: gym-competition.engine (calculatePlates / getPlateLoadingOrder / warmupPlateSequence).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { calculatePlates, getPlateLoadingOrder, warmupPlateSequence, reversePlateWeight, nearestLoadable, percentTargets, type WeightUnit, type PlateInventory } from '../../../engines/gym-competition.engine';
+import { calculatePlates, getPlateLoadingOrder, warmupPlateSequence, reversePlateWeight, nearestLoadable, percentTargets, loadPlateHistory, pushPlateHistory, type WeightUnit, type PlateInventory } from '../../../engines/gym-competition.engine';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
@@ -88,6 +88,15 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
   const [reverseStack, setReverseStack] = useState<Array<{ plate: number; count: number }>>([]);
   const [presetName, setPresetName] = useState<string>('');
   const [showPresetForm, setShowPresetForm] = useState(false);
+  const [weightHistory, setWeightHistory] = useState<number[]>(() => loadPlateHistory());
+  const lastPushedRef = React.useRef<number>(0);
+  // Д2: история целевых весов — пишется при смене веса (дедуп подряд идущих)
+  useEffect(() => {
+    if (targetWeight > 0 && targetWeight !== lastPushedRef.current) {
+      lastPushedRef.current = targetWeight;
+      setWeightHistory(pushPlateHistory(targetWeight));
+    }
+  }, [targetWeight]);
   const [savedPresets, setSavedPresets] = useState<Array<{ id: number; name: string; unit: string; barWeight: number; targetWeight: number; plates?: string; collars?: number }>>(() => { try { return JSON.parse(localStorage.getItem('he_plate_presets') || '[]'); } catch { return []; } });
 
   useEffect(() => {
@@ -288,6 +297,19 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
           {customPlates.trim() && <button onClick={() => setCustomPlates('')} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 10, whiteSpace: 'nowrap' }}>Сброс</button>}
         </div>
         <div style={{ ...SMALL, marginTop: 6, color: ACCENT }}>≈ альтернативная система: {displayAlt}</div>
+        {weightHistory.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>🕘 Недавние веса (тап — recall)</div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {weightHistory.map(w => (
+                <button key={w} onClick={() => setTargetWeight(w)}
+                  style={{ padding: '6px 10px', borderRadius: 6, border: targetWeight === w ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.10)', background: targetWeight === w ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)', color: targetWeight === w ? ACCENT : '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, minHeight: 36 }}>
+                  {w}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 🎯 Сводка */}

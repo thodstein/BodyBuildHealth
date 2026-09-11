@@ -4,6 +4,9 @@ import {
   reversePlateWeight,
   nearestLoadable,
   percentTargets,
+  loadPlateHistory,
+  pushPlateHistory,
+  PLATE_HISTORY_KEY,
 } from '../gym-competition.engine';
 
 describe('plates PRO: замки', () => {
@@ -57,6 +60,25 @@ describe('plates PRO: reverse', () => {
   });
   it('reverse с замками', () => {
     expect(reversePlateWeight([{ plate: 25, count: 1 }], 20, 2.5)).toBe(72.5);
+  });
+});
+
+describe('plates PRO: история весов (кап 8, дедуп)', () => {
+  it('push/load roundtrip + дедуп повтора наверх + кап', () => {
+    localStorage.clear();
+    pushPlateHistory(100);
+    pushPlateHistory(80);
+    pushPlateHistory(100);
+    expect(loadPlateHistory()).toEqual([100, 80]);
+    for (let w = 60; w < 140; w += 5) pushPlateHistory(w);
+    expect(loadPlateHistory().length).toBeLessThanOrEqual(8);
+    expect(localStorage.getItem(PLATE_HISTORY_KEY)).toContain('100');
+  });
+  it('мусор/нули не пишутся', () => {
+    localStorage.clear();
+    pushPlateHistory(0);
+    pushPlateHistory(-5);
+    expect(loadPlateHistory()).toEqual([]);
   });
 });
 
