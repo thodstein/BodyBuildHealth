@@ -146,4 +146,16 @@ describe('ortho-screen J7 агрегатор/гарды/экспорт', () => {
     expect(p.orthoFlags.length).toBeGreaterThan(0);
     expect(p.orthoGuards.pauseOverhead).toBe(true);
   });
+  it('bridge замыкает живые контуры: orthopedic.blockedPatterns в ПЛ + teenNote в ББ', () => {
+    const r = screenOrtho({ shoulder: { painfulArc: true, hawkinsPain: true }, beighton: undefined, yellow: undefined, ageBand: 'teen_14_15' });
+    const p = orthoBridgePayload(r, orthoGuardsForPlan(r)) as any;
+    // ПЛ-контур: SRCBBScreen читает orthopedic.blockedPatterns
+    expect(p.orthopedic.blockedPatterns).toContain('vertical_push');
+    // ББ-контур: приёмник читает teenNote
+    expect(typeof p.teenNote).toBe('string');
+    expect(p.teenNote).toMatch(/14–15/);
+    // Без teen — честный null, не пустая строка
+    const r2 = screenOrtho({ shoulder: { painfulArc: true, hawkinsPain: true } });
+    expect((orthoBridgePayload(r2, orthoGuardsForPlan(r2)) as any).teenNote).toBeNull();
+  });
 });

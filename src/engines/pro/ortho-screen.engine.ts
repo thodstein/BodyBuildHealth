@@ -485,6 +485,7 @@ export function buildOrthoCsv(r: OrthoScreenResult): string {
 }
 
 export function orthoBridgePayload(r: OrthoScreenResult, guards: OrthoGuards): Record<string, unknown> {
+  const teen = r.flags.some(f => f.id === 'teen_gate');
   return {
     orthoFlags: r.flags,
     orthoSummary: r.summary,
@@ -496,5 +497,10 @@ export function orthoBridgePayload(r: OrthoScreenResult, guards: OrthoGuards): R
       blockedPatterns: guards.blockedPatterns,
       mobilityAdd: guards.mobilityAdd,
     },
+    // Живой контур в ПЛ-авто: SRCBBScreen (kind weakpoints) читает orthopedic.blockedPatterns
+    // → orthopedicBlockedPatterns → lms-builder фильтрует паттерны (плечо+ реально ставит vertical_push на паузу).
+    orthopedic: { blockedPatterns: guards.blockedPatterns, source: 'ortho-screen' },
+    // Живой контур в ББ-авто: приёмник читает teenNote → he_bb_last_teen (показ teen-режима).
+    teenNote: teen ? 'Подросток 14–15 (орто-скрининг): без отказа, без максимумов, RIR≥2.' : null,
   };
 }
