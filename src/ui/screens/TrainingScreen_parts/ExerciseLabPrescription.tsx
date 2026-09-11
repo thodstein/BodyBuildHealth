@@ -19,6 +19,7 @@ import { estimate1RMConsensus } from '../../../engines/pro/estimate1rm.engine';
 import { velocityForPct, pctForVelocity, estimate1RMFromVelocity } from '../../../engines/pro/vbt.engine';
 import { tempoFor, tutForSet, REST_BY_CHARACTER } from '../../../engines/bb/bb-tempo-rest';
 import { techniquesFor } from '../../../engines/bb/bb-intensity-techniques';
+import { resolveLabWorkingWeight } from '../../../engines/lab-exercise-profile.engine';
 
 const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?: (ex: any) => void }> = ({ selectedId, onSelectExercise }) => {
   const { profile } = useDataLink();
@@ -38,7 +39,19 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
   const [genGoal, setGenGoal] = useState('bulk');
   const [genLevel, setGenLevel] = useState('intermediate');
   const [genCount, setGenCount] = useState(5);
-  const [genResult, setGenResult] = useState<Array<{ name: string; group: string; type: string; equipment: string; sets: number; reps: string; rir: number; rest: number; weight: number; pct: number }> | null>(null);
+  const [genResult, setGenResult] = useState<Array<{ name: string; group: string; type: string; equipment: string; sets: number; reps: string; rir: number; rest: number; weight: number | null; pct: number }> | null>(null);
+
+  // Epic B: честные веса генератора — baseline → workMax мышцы → null (мока нет).
+  const labBaselines = useMemo(() => {
+    try {
+      const s = (profile as any)?.settings || {};
+      return { ...(s?.training?.workMaxByExercise || {}), ...(s?.strengthBaselines || {}) };
+    } catch { return {}; }
+  }, [profile]);
+  const labWorkMax = useMemo(() => {
+    try { return ((profile as any)?.settings?.training?.workMax || null) as Record<string, number> | null; }
+    catch { return null; }
+  }, [profile]);
 
   useEffect(() => { if (selectedId) setExId(selectedId); }, [selectedId]);
 
@@ -49,10 +62,19 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
     setGoal((profile?.settings as any)?.training?.primaryGoal ?? 'strength');
   }, [profile]);
 
+  // Epic B: 1RM честно из профиля (baseline → workMaxByExercise → workMax мышцы);
+  // без базы — 100 как явно помеченное примерное (oneRMEstimated), а не «данные».
+  const [oneRMEstimated, setOneRMEstimated] = useState(false);
   useEffect(() => {
-    if (!exId || !profile) { setOneRM(0); return; }
-    const baseline = profile?.settings.strengthBaselines?.[exId];
-    setOneRM(baseline && baseline > 0 ? baseline : 100);
+    if (!exId || !profile) { setOneRM(0); setOneRMEstimated(false); return; }
+    const s = (profile as any)?.settings || {};
+    const baseline = s?.strengthBaselines?.[exId];
+    const byEx = s?.training?.workMaxByExercise?.[exId];
+    const cat = EXERCISE_CATALOG.find(e => e.id === exId);
+    const byMuscle = cat ? s?.training?.workMax?.[cat.group] : undefined;
+    const found = [baseline, byEx, byMuscle].find(v => Number(v) > 0);
+    if (found != null) { setOneRM(Number(found)); setOneRMEstimated(false); }
+    else { setOneRM(100); setOneRMEstimated(true); }
   }, [exId, profile]);
 
   const exList = useMemo(() => {
@@ -85,18 +107,19 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
       return { ex: e, p, score };
     });
     scored.sort((a: any, b: any) => b.score - a.score);
-    const genLevelNumber = genLevel === 'beginner' ? 1 : genLevel === 'intermediate' ? 2 : genLevel === 'advanced' ? 3 : 4;
-    const fakeRM = 80 + genLevelNumber * 20;
     setGenResult(scored.slice(0, genCount).map((s: any) => {
       const repsN = parseInt(s.p.reps) || 5;
       const pcN = Math.round(100 / (1 + repsN / 30));
+      // Честно: вес только из профиля (baseline → workMax мышцы), без базы — null.
+      const w = resolveLabWorkingWeight(labBaselines, labWorkMax, { id: s.ex.id, group: s.ex.group });
       return {
         name: s.ex.name, group: s.ex.group, type: s.ex.type,
         equipment: s.ex.equipment || '—', sets: s.p.sets, reps: s.p.reps,
-        rir: s.p.rir, rest: s.p.rest, weight: +((fakeRM) * pcN / 100).toFixed(1), pct: pcN,
+        rir: s.p.rir, rest: s.p.rest,
+        weight: w.weight != null ? +((w.weight) * pcN / 100).toFixed(1) : null, pct: pcN,
       };
     }));
-  }, [genGroup, genGoal, genLevel, genCount]);
+  }, [genGroup, genGoal, genLevel, genCount, labBaselines, labWorkMax]);
 
   const volumeLoad = useMemo(() => {
     if (!ex || !presc || !workWeight) return 0;
@@ -306,11 +329,16 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
                   <span style={{ width: 45, textAlign: 'center', color: ACCENT, fontWeight: 700 }}>{r.sets}</span>
                   <span style={{ width: 50, textAlign: 'center', color: ACCENT, fontWeight: 600 }}>{r.reps}</span>
                   <span style={{ width: 28, textAlign: 'center', color: DIM }}>{r.rir}</span>
-                  <span style={{ width: 45, textAlign: 'center', color: '#60a5fa' }}>{r.weight} кг</span>
+                  <span style={{ width: 45, textAlign: 'center', color: '#60a5fa' }}>{r.weight != null ? `${r.weight} кг` : '—'}</span>
                 </div>
               ))}
             </div>
           ) : <div style={{ textAlign: 'center', padding: 10, color: DIM, fontSize: 10 }}>Нет упражнений для выбранной группы</div>}
+          {genResult && genResult.some(r => r.weight == null) && (
+            <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 10, color: '#fbbf24', lineHeight: 1.4 }}>
+              ⚠ Веса нет в профиле — введи 1RM/рабочие веса в Профиле → Тренировки. Примерные кг не показываем.
+            </div>
+          )}
         </div>
       )}
 
@@ -340,6 +368,7 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
           🎯 Слабая группа {weakToggle ? '(вкл)' : '(выкл)'}
         </button>
         {isDeload && <span style={{ padding: '6px 12px', borderRadius: 6, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: 11, fontWeight: 700 }}>⚠ ДЕЛОАД (фаза {phase})</span>}
+        {ex && oneRMEstimated && <span style={{ padding: '6px 12px', borderRadius: 6, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)', color: '#fbbf24', fontSize: 11, fontWeight: 600 }}>⚠ 1RM примерный (100) — уточни вручную или заполни Профиль</span>}
       </div>
 
       {!ex ? (
