@@ -5,7 +5,7 @@ import {
   scoreBeighton, beightonCutoff, assessBeighton, assessYellow, teenGate,
   rankJointSupport, screenOrtho, orthoGuardsForPlan, buildOrthoCsv, orthoBridgePayload,
   hopLsi, hopLsiOverall, strengthLsiOverall, bbOrthoMobilityAdd, applyOrthoToProfile,
-  isRiskyOpenChain, riskyOpenChainIds, decideBbOrthoIntake, subtractTracked,
+  isRiskyOpenChain, riskyOpenChainIds, decideBbOrthoIntake, subtractTracked, monthsSince,
 } from '../ortho-screen.engine';
 
 describe('ortho-screen J1 плечо', () => {
@@ -98,6 +98,12 @@ describe('ortho-screen J5 Beighton', () => {
     expect(r.score).toBe(4);
     expect(r.positive).toBe(true);
     expect(r.flags[0].action).toMatch(/Сила НЕ запрещена/);
+  });
+  it('Э5: 5PQ клампится (9 → 5, мусор — игнор)', () => {
+    const over = assessBeighton({ pinkyL: true, pinkyR: true, thumbL: true, thumbR: true, age: 30, fivePQ: 9 });
+    expect(over.positive).toBe(true);
+    const junk = assessBeighton({ pinkyL: true, pinkyR: true, thumbL: true, thumbR: true, age: 30, fivePQ: NaN });
+    expect(junk.positive).toBe(false);
   });
   it('ниже порога без 5PQ — negative', () => {
     expect(assessBeighton({ pinkyL: true, age: 30 }).positive).toBe(false);
@@ -283,6 +289,31 @@ describe('ortho-screen strength-LSI + ББ-хелпер', () => {
   });
 });
 
+describe('ortho-screen Э3 subtractTracked', () => {
+  it('вычитает только отслеженные, своё цело', () => {
+    expect(subtractTracked(['shoulder', 'hip', 'wrist'], ['shoulder'])).toEqual(['hip', 'wrist']);
+    expect(subtractTracked(['hip'], [])).toEqual(['hip']);
+    expect(subtractTracked(['hip'], null)).toEqual(['hip']);
+    expect(subtractTracked(['hip'], 'мусор')).toEqual(['hip']);
+  });
+});
+
+describe('ortho-screen Э6 monthsSince + opDate', () => {
+  it('полные месяцы, будущее → 0, мусор → null', () => {
+    expect(monthsSince('2026-01-15', '2026-09-11')).toBe(7);
+    expect(monthsSince('2026-09-01', '2026-09-11')).toBe(0);
+    expect(monthsSince('2027-01-01', '2026-09-11')).toBe(0);
+    expect(monthsSince('мусор', '2026-09-11')).toBeNull();
+    expect(monthsSince(undefined)).toBeNull();
+  });
+  it('opDate бьёт ручные месяцы', () => {
+    const byDate = assessRts({ lsiMeasured: true, lsiPass: true, monthsSinceOp: 1, opDate: '2025-01-01', graft: 'btb', fear: false, preventionProgram: true });
+    expect(byDate.ready).toBe(true);
+    const byHands = assessRts({ lsiMeasured: true, lsiPass: true, monthsSinceOp: 1, graft: 'btb', fear: false, preventionProgram: true });
+    expect(byHands.ready).toBe(false);
+  });
+});
+
 describe('ortho-screen Э1 risky open-chain', () => {
   it('раскрытие ловится, база — нет', () => {
     expect(isRiskyOpenChain({ name: 'Разводка гантелей лёжа' })).toBe(true);
@@ -316,14 +347,5 @@ describe('ortho-screen Э1 risky open-chain', () => {
     expect(riskyOpenChainIds(cat, 1)).toEqual(['fly_db']);
     expect(riskyOpenChainIds(cat)).toEqual(['fly_db', 'cable_fly']);
     expect(riskyOpenChainIds(null as any)).toEqual([]);
-  });
-});
-
-describe('ortho-screen Э3 subtractTracked', () => {
-  it('вычитает только отслеженные, своё цело', () => {
-    expect(subtractTracked(['shoulder', 'hip', 'wrist'], ['shoulder'])).toEqual(['hip', 'wrist']);
-    expect(subtractTracked(['hip'], [])).toEqual(['hip']);
-    expect(subtractTracked(['hip'], null)).toEqual(['hip']);
-    expect(subtractTracked(['hip'], 'мусор')).toEqual(['hip']);
   });
 });

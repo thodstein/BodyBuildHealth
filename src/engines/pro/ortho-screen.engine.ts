@@ -123,6 +123,8 @@ export interface RtsChecklistInput {
   lsiMeasured?: boolean; // мерялось ли вообще (сила + hop)
   lsiPass?: boolean; // все LSI ≥90%
   monthsSinceOp?: number;
+  /** Э6: дата операции ISO — месяцы считаются авто (приоритет над ручными). */
+  opDate?: string;
   graft?: 'btb' | 'hamstring' | 'other' | 'none';
   fear?: boolean; // страх движения / неготовность
   preventionProgram?: boolean; // есть ACL-prevention программа
@@ -137,6 +139,18 @@ export function hopLsi(a?: number, b?: number): number | null {
   if (typeof a !== 'number' || typeof b !== 'number') return null;
   if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
   return Math.round((Math.min(a, b) / Math.max(a, b)) * 1000) / 10;
+}
+
+/** Э6: полных месяцев между датами ISO (день операции → сегодня/референс). Мусор → null. */
+export function monthsSince(isoDate?: string, refIso?: string): number | null {
+  if (!isoDate) return null;
+  const d = new Date(`${isoDate}T12:00:00`);
+  const r = refIso ? new Date(`${refIso}T12:00:00`) : new Date();
+  if (Number.isNaN(d.getTime()) || Number.isNaN(r.getTime())) return null;
+  if (d.getTime() > r.getTime()) return 0;
+  let m = (r.getFullYear() - d.getFullYear()) * 12 + (r.getMonth() - d.getMonth());
+  if (r.getDate() < d.getDate()) m -= 1;
+  return Math.max(0, m);
 }
 
 export interface HopInput { singleL?: number; singleR?: number; tripleL?: number; tripleR?: number }
@@ -273,7 +287,10 @@ export function assessRts(i: RtsChecklistInput): { ready: boolean; status: strin
     };
   }
   const minMonths = i.graft === 'hamstring' ? 7 : 6;
-  const timeOk = typeof i.monthsSinceOp === 'number' && i.monthsSinceOp >= minMonths;
+  // Э6: дата операции бьёт ручные месяцы
+  const autoMonths = monthsSince(i.opDate);
+  const months = autoMonths ?? (typeof i.monthsSinceOp === 'number' ? i.monthsSinceOp : undefined);
+  const timeOk = typeof months === 'number' && months >= minMonths;
   const ready = Boolean(lsiPass && timeOk && !i.fear && i.preventionProgram);
   const missing: string[] = [];
   if (!lsiPass) {
@@ -395,8 +412,10 @@ export function beightonCutoff(age?: number): number {
 export function assessBeighton(i: BeightonInput): { score: number; cutoff: number; positive: boolean; flags: OrthoFlag[] } {
   const score = scoreBeighton(i);
   const cutoff = beightonCutoff(i.age);
+  // Э5: 5PQ клампится к 0–5 (мусор из свободного ввода не должен решать)
+  const pq = typeof i.fivePQ === 'number' && Number.isFinite(i.fivePQ) ? Math.max(0, Math.min(5, Math.round(i.fivePQ))) : undefined;
   let positive = score >= cutoff;
-  if (!positive && score === cutoff - 1 && typeof i.fivePQ === 'number' && i.fivePQ >= 2) positive = true;
+  if (!positive && score === cutoff - 1 && pq != null && pq >= 2) positive = true;
   if (!positive) return { score, cutoff, positive, flags: [] };
   return {
     score, cutoff, positive,

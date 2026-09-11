@@ -28,6 +28,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
     lsiMeasured: false, lsiPass: false, months: '', graft: 'none' as string, fear: false, prevention: false,
     hopSL: '', hopSR: '', hopTL: '', hopTR: '',
     strQL: '', strQR: '', strHL: '', strHR: '',
+    opDate: '',
     slrPain: false, stiffLong: false, popSound: false, cantHeel: false,
     fink: false, phalen: false, tinel: false, elbowV: false,
     pinkyL: false, pinkyR: false, thumbL: false, thumbR: false, elbowL: false, elbowR: false, kneeL: false, kneeR: false, trunk: false, age: '', pq: '',
@@ -40,7 +41,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
     shoulder: { painfulArc: s.painfulArc, hawkinsPain: s.hawkinsPain, jobeWeak: s.jobeWeak, dropArm: s.dropArm, apprehension: s.apprehension },
     hip: { faddirPain: s.faddirPain, faberPain: s.faberPain, iropPain: s.iropPain, romFlag: s.romFlag },
     knee: { valgusSls: s.valgusSls, wobbleStepDown: s.wobbleStepDown, ybtAntDiffCm: s.ybt === '' ? undefined : Number(s.ybt) },
-    rts: { lsiMeasured: s.lsiMeasured, lsiPass: s.lsiPass, monthsSinceOp: s.months === '' ? undefined : Number(s.months), graft: s.graft as 'btb' | 'hamstring' | 'other' | 'none', fear: s.fear, preventionProgram: s.prevention, hop: { singleL: s.hopSL === '' ? undefined : Number(s.hopSL), singleR: s.hopSR === '' ? undefined : Number(s.hopSR), tripleL: s.hopTL === '' ? undefined : Number(s.hopTL), tripleR: s.hopTR === '' ? undefined : Number(s.hopTR) }, strength: { quadL: s.strQL === '' ? undefined : Number(s.strQL), quadR: s.strQR === '' ? undefined : Number(s.strQR), hamL: s.strHL === '' ? undefined : Number(s.strHL), hamR: s.strHR === '' ? undefined : Number(s.strHR) } },
+    rts: { lsiMeasured: s.lsiMeasured, lsiPass: s.lsiPass, monthsSinceOp: s.months === '' ? undefined : Number(s.months), opDate: s.opDate || undefined, graft: s.graft as 'btb' | 'hamstring' | 'other' | 'none', fear: s.fear, preventionProgram: s.prevention, hop: { singleL: s.hopSL === '' ? undefined : Number(s.hopSL), singleR: s.hopSR === '' ? undefined : Number(s.hopSR), tripleL: s.hopTL === '' ? undefined : Number(s.hopTL), tripleR: s.hopTR === '' ? undefined : Number(s.hopTR) }, strength: { quadL: s.strQL === '' ? undefined : Number(s.strQL), quadR: s.strQR === '' ? undefined : Number(s.strQR), hamL: s.strHL === '' ? undefined : Number(s.strHL), hamR: s.strHR === '' ? undefined : Number(s.strHR) } },
     spine: { slrPain: s.slrPain, morningStiffnessLong: s.stiffLong },
     achilles: { popSound: s.popSound, cantHeelRaise: s.cantHeel },
     hand: { finkelsteinPain: s.fink, phalenNumbness: s.phalen, tinelTingle: s.tinel },
@@ -162,6 +163,9 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
               <label style={{ fontSize: 11, color: '#fff' }}>Месяцев после операции:
                 <input value={s.months} onChange={e => set('months', e.target.value)} inputMode="numeric" placeholder="9" style={{ marginLeft: 6, width: 70, padding: 6, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 12 }} />
               </label>
+              <label style={{ fontSize: 11, color: '#fff' }}>Дата операции (месяцы авто):
+                <input type="date" value={s.opDate} onChange={e => set('opDate', e.target.value)} aria-label="Дата операции" style={{ marginLeft: 6, padding: 6, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 12 }} />
+              </label>
               <label style={{ fontSize: 11, color: '#fff' }}>Трансплантат:
                 <select value={s.graft} onChange={e => set('graft', e.target.value)} style={{ marginLeft: 6, padding: 6, borderRadius: 6, background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 12 }}>
                   <option value="none">—</option>
@@ -196,7 +200,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
               <input value={s.age} onChange={e => set('age', e.target.value)} inputMode="numeric" placeholder="30" style={{ marginLeft: 6, width: 70, padding: 6, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 12 }} />
             </label>
             <label style={{ fontSize: 11, color: '#fff' }}>5PQ (при пограничном):
-              <input value={s.pq} onChange={e => set('pq', e.target.value)} inputMode="numeric" placeholder="0–5" style={{ marginLeft: 6, width: 70, padding: 6, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 12 }} />
+              <input value={s.pq} onChange={e => set('pq', e.target.value.replace(/[^0-9]/g, '').slice(0, 1))} inputMode="numeric" placeholder="0–5" aria-label="5PQ опросник, 0–5" style={{ marginLeft: 6, width: 70, padding: 6, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 12 }} />
             </label>
           </div>
 
