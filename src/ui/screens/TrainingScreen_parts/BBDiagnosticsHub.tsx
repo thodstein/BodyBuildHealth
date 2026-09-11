@@ -477,12 +477,17 @@ export const BBDiagnosticsHub: React.FC = () => {
   const returnActive = useMemo(() => {
     try { return activeReturnToStage(returnToPlan as any, state.returnStage as any); } catch { return null; }
   }, [returnToPlan, state.returnStage]);
-  // PRO-3 R7 + S2: рабочий вес-ориентир — индивидуальный e1RM первым, популяционный запасным
+  // PRO-3 R7 + S2: рабочий вес-ориентир — индивид. e1RM первым, популяц. fallback с пометкой
   const workingRange = useMemo(() => {
     try {
-      const e = lvpProfile?.e1rm ?? vbt?.e1RMByVelocity ?? null;
+      const indiv = lvpProfile?.e1rm ?? null;
+      const pop = vbt?.e1RMByVelocity ?? null;
+      const e = indiv ?? pop;
       if (e == null) return null;
-      return bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass');
+      const r = bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass');
+      if (!r) return null;
+      const badge = indiv != null ? ' · индивид. LVP' : ' · популяц. LVP';
+      return { ...r, text: r.text + badge };
     } catch { return null; }
   }, [vbt, lvpProfile, state.vbtGoal]);
   // PRO-3 R6: направление перекоса (история слабых сторон)
@@ -885,7 +890,9 @@ export const BBDiagnosticsHub: React.FC = () => {
       const lvpStored = lvpPts.length >= 3 ? null : (loadBbLvpProfiles()[state.lvpLift || 'squat'] ?? null);
       const e = vbt?.e1RMByVelocity ?? null;
       const eEff = (lvpP && lvpP.valid ? lvpP.e1rm : null) ?? (lvpStored && lvpStored.valid ? lvpStored.e1rm : null) ?? e;
-      const wr = eEff != null ? bbWorkingRange(eEff, state.vbtGoal === 'strength' ? 'strength' : 'mass') : null;
+      const isIndiv = !!(lvpP && lvpP.valid ? true : lvpStored && lvpStored.valid);
+      const wr0 = eEff != null ? bbWorkingRange(eEff, state.vbtGoal === 'strength' ? 'strength' : 'mass') : null;
+      const wr = wr0 ? { ...wr0, text: wr0.text + (isIndiv ? ' · индивид.' : ' · популяц.') } : null;
       const iso = (report.weakZonesGranular || []).length > 0;
       const pctRaw = state.mmcLoadPct ? parseFloat(state.mmcLoadPct) : null;
       const loadPct = Number.isFinite(pctRaw as number) && (pctRaw as number) > 0 ? (pctRaw as number) / 100 : null;

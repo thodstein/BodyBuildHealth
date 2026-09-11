@@ -2328,6 +2328,39 @@ export const BbAutoConstructor: React.FC = () => {
         }
       }
       const profParts: string[] = [];
+      // S3: возврат — главный план тоже режется (ступень 2 ×0.5, ступень 1 = только техника)
+      if (returnAction && Number.isFinite(returnAction.volumeMult) && returnAction.volumeMult < 1) {
+        const mult = Math.max(0, Math.min(1, returnAction.volumeMult));
+        const rirAdd = Math.max(0, Math.min(3, Math.round(returnAction.rirShift || 0)));
+        for (const w of (plan.weeks || []) as any[]) {
+          if (w.deload) continue;
+          for (const s of w.sessions as any[]) {
+            for (const ex of s.exercises as any[]) {
+              if (mult === 0) {
+                ex.sets = 1;
+                if (Array.isArray(ex.workSets) && ex.workSets.length > 1) ex.workSets = ex.workSets.slice(0, 1);
+                ex.rir = Math.min(5, (ex.rir || 2) + rirAdd + 2);
+                ex.comment = `${ex.comment ? ex.comment + ' · ' : ''}↩ возврат: техника`;
+              } else {
+                const ns = Math.max(1, Math.round(ex.sets * mult));
+                if (ns !== ex.sets) {
+                  if (Array.isArray(ex.workSets)) {
+                    if (ns < ex.workSets.length) ex.workSets = ex.workSets.slice(0, ns);
+                    else if (ns > ex.workSets.length) {
+                      const tpl = ex.workSets[ex.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+                      ex.workSets = [...ex.workSets, ...Array.from({ length: ns - ex.workSets.length }, () => ({ ...tpl }))];
+                    }
+                  }
+                  ex.sets = ns;
+                }
+                if (rirAdd) ex.rir = Math.min(5, (ex.rir || 2) + rirAdd);
+                ex.comment = `${ex.comment ? ex.comment + ' · ' : ''}↩ возврат ×${mult}`;
+              }
+            }
+          }
+        }
+        profParts.push(mult === 0 ? 'возврат: ступень 1 — только техника' : `возврат: ×${mult} RIR+${rirAdd}`);
+      }
       // PRO-3 R2 + S3: добивка слабой стороны (S3: на ступени 1 возврата — 0%, не добавляем)
       const retMult = Number.isFinite(returnAction?.volumeMult) ? Math.max(0, Math.min(1, returnAction.volumeMult)) : 1;
       const lrEntries = retMult <= 0 ? [] : Object.entries(lrTopUp);

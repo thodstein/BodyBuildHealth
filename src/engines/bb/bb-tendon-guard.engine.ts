@@ -3,9 +3,8 @@
  *
  * Parity с ARM (`checkUCLGuard/checkShoulderGuard/checkTendonGuard`): считаем недельный
  * объём тяжёлой тяговой/жимой работы из сессий дневника → уровни ok/warn/stop.
- * S1: деление по нагрузке — свободные веса/тело ×1.0, трос/тренажёр ×0.5 (ниже пиковая
- * нагрузка на сухожилие; без данных о снаряде — ×1.0 консервативно). Сеты без веса
- * (голая цифра) считаются ×1.0 — честно, без занижения. План не мутирует.
+ * S1: снаряжение по каталогу (cable/machine ×0.5) + вес-градация <40кг ×0.7, тело/без веса ×1.0.
+ * План не мутирует.
  */
 
 export type BbTendonLevel = 'ok' | 'warn' | 'stop';
@@ -47,17 +46,26 @@ function catalogEquipment(ex: any): string | null {
   } catch { return null; }
 }
 
-/** Эквивалент сета: свободный вес/свой вес ×1.0, трос/тренажёр ×0.5, пустой сет — 0. */
+/** Эквивалент сета: свободный/свой ×1.0, трос/тренажёр ×0.5, пустой — 0, лёгкий <40кг ×0.7. */
 function setEquiv(ex: any, set: any): number {
   if (set != null && typeof set === 'object') {
     const r = Number((set as any).reps);
     if (Number.isFinite(r) && r <= 0) return 0; // пустой сет
   }
+  let base = 1.0;
   const equip = catalogEquipment(ex);
-  if (equip && MACHINE_EQUIP.has(equip)) return 0.5;
-  if (equip && equip !== '') return 1.0;
-  const name = `${ex?.exerciseName || ''} ${ex?.name || ''}`;
-  return MACHINE_RE.test(name) ? 0.5 : 1.0;
+  if (equip && MACHINE_EQUIP.has(equip)) base = 0.5;
+  else if (equip && equip !== '') base = 1.0;
+  else {
+    const name = `${ex?.exerciseName || ''} ${ex?.name || ''}`;
+    base = MACHINE_RE.test(name) ? 0.5 : 1.0;
+  }
+  // градация по весу: <40кг — ×0.7 (связка недогружена), тело/без веса — ×1.0
+  if (set != null && typeof set === 'object') {
+    const w = Number((set as any).weightKg ?? (set as any).weight);
+    if (Number.isFinite(w) && w > 0 && w < 40) base *= 0.7;
+  }
+  return base;
 }
 
 function countFor(sessions: any[], re: RegExp): number {

@@ -20,10 +20,10 @@ export interface BBDiagnosticsPro2Meta {
   teen?: string | null;
   femaleNotes?: string[];
   /** PRO-3: LVP-профиль, сухожилия, MMC, return-to, направление перекоса, рабочие веса. */
-  lvp?: { lift: string; r2: number; e1rm: number | null; text: string } | null;
+  lvp?: { lift: string; r2: number; e1rm: number | null; text: string; valid?: boolean } | null;
   tendon?: { elbow: string; shoulder: string };
   mmc?: string | null;
-  returnTo?: { text: string; stages: Array<{ stage: number; title: string; volume: string; rir: string; note: string }> } | null;
+  returnTo?: { text: string; stages: Array<{ stage: number; title: string; volume: string; rir: string; note: string; action?: { volumeMult: number; rirShift: number } }> } | null;
   lrDirection?: Array<{ group: string; text: string }>;
   workingRange?: string | null;
 }
