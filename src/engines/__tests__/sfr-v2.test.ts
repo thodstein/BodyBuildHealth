@@ -54,6 +54,17 @@ describe('sfr v2: цель', () => {
   });
 });
 
+describe('sfr v2: equipment-массив не крашит фильтр (регрессия RTL)', () => {
+  it('findBetterExerciseSwaps жив при equipment-массивах каталога', () => {
+    const s = findBetterExerciseSwaps(
+      [{ id: 'r1', exerciseId: 'bench_bar', week: 1, day: 1, weight: 80, reps: 8, sets: 3 }],
+      'intermediate',
+      { equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'] },
+    );
+    expect(Array.isArray(s)).toBe(true);
+  });
+});
+
 describe('sfr v2: RIR-модификатор', () => {
   it('отказ на базе (RPE 10, systemic≥50) роняет тир', () => {
     const p = getSFRProfile('squat')!;

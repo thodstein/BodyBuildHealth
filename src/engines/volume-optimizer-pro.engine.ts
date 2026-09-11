@@ -785,7 +785,9 @@ export function findBetterExerciseSwaps(
       if (catEx.id === e.exerciseId) return;
       if (catEx.group !== curEx.group) return;
       if (opts?.equipment && opts.equipment.length > 0) {
-        const eq = (catEx.equipment || '').toLowerCase();
+        // equipment в каталоге — string или string[] (оба варианта реальны)
+        const rawEq: unknown = (catEx as { equipment?: unknown }).equipment;
+        const eq = (Array.isArray(rawEq) ? rawEq.join(' ') : String(rawEq ?? '')).toLowerCase();
         if (!opts.equipment.some(w => eq.includes(w.toLowerCase()))) return;
       }
       if (effLevel === 'beginner') {

@@ -1,0 +1,75 @@
+import React from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { render, fireEvent, screen, within, cleanup } from '@testing-library/react';
+import { VolumeHub } from '../VolumeHub';
+import { VolumeOptimizerTab } from '../VolumeOptimizerTab';
+import { TonnageCalcTab } from '../TonnageCalcTab';
+import { PlateCalcTab } from '../PlateCalcTab';
+
+afterEach(cleanup);
+
+function tonnageDeleteCount(container: HTMLElement): number {
+  const root = container.querySelector('.train-tonnage');
+  if (!root) return -1;
+  return Array.from(root.querySelectorAll('button')).filter(b => b.textContent === '✕').length;
+}
+
+describe('volume shared input: строки общие для табов', () => {
+  it('добавление строки в «Объёме» видно в «Тоннаже» (4 vs автономных 2)', () => {
+    const { container } = render(<VolumeHub initialMode="volume" />);
+    fireEvent.click(screen.getByText('+ Добавить упражнение'));
+    fireEvent.click(screen.getByTitle(/Прилепин \+ INOL/));
+    expect(container.querySelector('.train-tonnage')).not.toBeNull();
+    expect(tonnageDeleteCount(container)).toBe(4);
+  });
+
+  it('автономный тоннаж по-прежнему со своими 2 строками', () => {
+    const { container } = render(<TonnageCalcTab />);
+    expect(tonnageDeleteCount(container)).toBe(2);
+  });
+
+  it('удаление в «Объёме» убирает строку из «Тоннажа» (присед остаётся — признак sharing)', () => {
+    const { container } = render(<VolumeHub initialMode="volume" />);
+    const vol = container.querySelector('.train-volopt')!;
+    const dels = Array.from(vol.querySelectorAll('button')).filter(b => b.textContent === '✕');
+    expect(dels.length).toBe(3);
+    fireEvent.click(dels[0]); // удалить жим
+    fireEvent.click(screen.getByTitle(/Прилепин \+ INOL/));
+    expect(tonnageDeleteCount(container)).toBe(2);
+    // приседа нет в автономном тоннаже — его наличие доказывает общие строки
+    expect(within(container.querySelector('.train-tonnage') as HTMLElement).getAllByText(/Приседания/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('volume shared input: контролируемый оптимизатор', () => {
+  it('рендерит переданные строки; ✕ зовёт onRowsChange с []', () => {
+    const fn = vi.fn();
+    const { container } = render(
+      <VolumeOptimizerTab
+        rows={[{ id: 'x1', exerciseId: 'bench_bar', week: 1, day: 1, weight: 70, reps: 8, sets: 3, rpe: 8 }]}
+        onRowsChange={fn}
+      />,
+    );
+    const vol = container.querySelector('.train-volopt')!;
+    const dels = Array.from(vol.querySelectorAll('button')).filter(b => b.textContent === '✕');
+    expect(dels).toHaveLength(1);
+    fireEvent.click(dels[0]);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn.mock.calls[0][0]).toEqual([]);
+  });
+});
+
+describe('volume shared input: блины следуют за строками', () => {
+  it('хаб в plates: топ-вес 100 + селектор строк + возврат веса', () => {
+    const { container } = render(<VolumeHub initialMode="plates" />);
+    expect(container.querySelector('.train-plates')).not.toBeNull();
+    expect(screen.getByText('Упражнение текущей сессии')).toBeTruthy();
+    expect(screen.getByText('✅ Вернуть вес в строки')).toBeTruthy();
+  });
+
+  it('автономные блины без exerciseOptions — без селектора (контракт цел)', () => {
+    const { container } = render(<PlateCalcTab />);
+    expect(container.querySelector('.train-plates')).not.toBeNull();
+    expect(container.textContent).not.toContain('Упражнение текущей сессии');
+  });
+});

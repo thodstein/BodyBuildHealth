@@ -42,17 +42,35 @@ function muscleRu(en: string): string { return MUSCLE_RU[en] || GROUP_RU[en] || 
 
 const SFR_TIER_COLOR: Record<string, string> = { S: '#22c55e', A: '#00e68a', B: '#f59e0b', C: '#ef4444' };
 
-export const VolumeOptimizerTab: React.FC = () => {
+export interface VolumeOptimizerTabProps {
+  /** Д3: контролируемые строки хаба (VolumeInput). Без пропсов — автономный режим как раньше. */
+  rows?: ProExerciseRow[];
+  onRowsChange?: (rows: ProExerciseRow[]) => void;
+}
+
+export const DEFAULT_VOLUME_ROWS: ProExerciseRow[] = [
+  { id: 'r1', exerciseId: 'bench_bar', week: 1, day: 1, weight: 80, reps: 5, sets: 4, rpe: 8 },
+  { id: 'r2', exerciseId: 'row_bar', week: 1, day: 2, weight: 60, reps: 8, sets: 3, rpe: 7 },
+  { id: 'r3', exerciseId: 'squat', week: 1, day: 3, weight: 100, reps: 5, sets: 4, rpe: 8 },
+];
+
+export const VolumeOptimizerTab: React.FC<VolumeOptimizerTabProps> = ({ rows: propRows, onRowsChange }) => {
   const { profile } = useDataLink();
   const [level, setLevel] = useState<TrainingLevel>((profile?.settings.trainingLevel as TrainingLevel) ?? 'intermediate');
   const [mesoWeeks, setMesoWeeks] = useState<number>(4);
   const [activeWeek, setActiveWeek] = useState<'all' | number>('all');
   const [oneRMGlobal, setOneRMGlobal] = useState<number>(100);
-  const [rows, setRows] = useState<ProExerciseRow[]>([
-    { id: 'r1', exerciseId: 'bench_bar', week: 1, day: 1, weight: 80, reps: 5, sets: 4, rpe: 8 },
-    { id: 'r2', exerciseId: 'row_bar', week: 1, day: 2, weight: 60, reps: 8, sets: 3, rpe: 7 },
-    { id: 'r3', exerciseId: 'squat', week: 1, day: 3, weight: 100, reps: 5, sets: 4, rpe: 8 },
-  ]);
+  const [internalRows, setInternalRows] = useState<ProExerciseRow[]>(DEFAULT_VOLUME_ROWS);
+  // Д3: контролируемый режим (строки хаба) vs автономный (свои). Поведение 1-в-1.
+  const rows = propRows ?? internalRows;
+  const setRows = useCallback((u: React.SetStateAction<ProExerciseRow[]>) => {
+    if (onRowsChange) {
+      const next = typeof u === 'function' ? (u as (p: ProExerciseRow[]) => ProExerciseRow[])(propRows ?? internalRows) : u;
+      onRowsChange(next);
+    } else {
+      setInternalRows(u);
+    }
+  }, [onRowsChange, propRows, internalRows]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     quality: true, muscles: true, cnsRecovery: true, progression: false, gaps: true, swaps: false,
   });
@@ -217,23 +235,27 @@ export const VolumeOptimizerTab: React.FC = () => {
     if (!analysis || !quality) return;
     const overGroups = quality.over;
     if (overGroups.length === 0 && quality.weakMissed.length === 0) return;
-    setRows(prev => prev.map(r => {
-      const ex = getEx(r.exerciseId);
-      if (!ex) return r;
-      if (overGroups.includes(ex.group) && r.sets > 2) return { ...r, sets: r.sets - 1 };
-      return r;
-    }));
-    // add exercises for uncovered weak groups
-    const coveredGroups = [...new Set(rows.map(r => { const ex = getEx(r.exerciseId); return ex?.group || ''; }).filter(Boolean))];
-    quality.weakMissed.forEach((w: string) => {
-      if (!coveredGroups.includes(w)) {
-        const cat = EXERCISE_CATALOG.find(e => e.group === w && e.type === 'compound');
-        if (cat) setRows(prev => [...prev, { id: 'r' + Date.now() + '_' + w, exerciseId: cat.id, week: 1, day: 1, weight: 60, reps: 8, sets: 3, rpe: 7 }]);
-      }
+    // Д3: один проход (в цикле setRows терял добавления в контролируемом режиме)
+    setRows(prev => {
+      const next = prev.map(r => {
+        const ex = getEx(r.exerciseId);
+        if (!ex) return r;
+        if (overGroups.includes(ex.group) && r.sets > 2) return { ...r, sets: r.sets - 1 };
+        return r;
+      });
+      const coveredGroups = [...new Set(next.map(r => { const ex = getEx(r.exerciseId); return ex?.group || ''; }).filter(Boolean))];
+      const additions: ProExerciseRow[] = [];
+      quality.weakMissed.forEach((w: string) => {
+        if (!coveredGroups.includes(w)) {
+          const cat = EXERCISE_CATALOG.find(e => e.group === w && e.type === 'compound');
+          if (cat) additions.push({ id: 'r' + Date.now() + '_' + w, exerciseId: cat.id, week: 1, day: 1, weight: 60, reps: 8, sets: 3, rpe: 7 });
+        }
+      });
+      return [...next, ...additions];
     });
     setImproving(true);
     setTimeout(() => setImproving(false), 2000);
-  }, [analysis, quality, rows, getEx]);
+  }, [analysis, quality, getEx]);
 
   const toggleSection = useCallback((key: string) => {
     setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));

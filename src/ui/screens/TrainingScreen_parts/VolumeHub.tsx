@@ -2,10 +2,12 @@
  *  Объединяет VolumeOptimizerTab (MEV/MAV/MRV), TonnageCalcTab (тоннаж/КПШ/УОИ) и PlateCalcTab (блины).
  *  Без дублей: объём считался в 3 местах — теперь единый расчёт. Белый текст, стекло, градиенты.
  */
-import React, { useState } from 'react';
-import { VolumeOptimizerTab } from './VolumeOptimizerTab';
+import React, { useMemo, useState } from 'react';
+import { VolumeOptimizerTab, DEFAULT_VOLUME_ROWS } from './VolumeOptimizerTab';
 import { TonnageCalcTab } from './TonnageCalcTab';
 import { PlateCalcTab } from './PlateCalcTab';
+import { getExerciseById } from '../../../core/exercise-catalog';
+import type { ProExerciseRow } from '../../../engines/volume-optimizer-pro.engine';
 
 const ACCENT = '#00e68a';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' };
@@ -17,7 +19,7 @@ type HubMode = 'volume' | 'tonnage' | 'plates';
 
 const MODE_DEFS: Array<{ m: HubMode; label: string; icon: string; desc: string; accent: string; hint: string }> = [
   { m: 'volume', label: 'Объём', icon: '📐', accent: '#22c55e', desc: 'MEV/MAV/MRV, оптимизация, SFR, прогрессия', hint: 'По мышцам · сеты vs MEV/MAV/MRV · частота · SFR' },
-  { m: 'tonnage', label: 'Тоннаж', icon: '⚖️', accent: '#3b82f6', desc: 'Тоннаж/КПШ/УОИ, зоны интенсивности', hint: 'вес×репы×сеты · КПШ · УОИ · зоны <60/60-80/>80%' },
+  { m: 'tonnage', label: 'Тоннаж', icon: '⚖️', accent: '#3b82f6', desc: 'Тоннаж/КПШ/УОИ, Прилепин + INOL', hint: 'вес×репы×сеты · INOL · зоны Прилепина · становая ×0.75' },
   { m: 'plates', label: 'Блины', icon: '🥞', accent: '#f59e0b', desc: 'Грифы 8 типов, блины, %1RM, разминка', hint: 'Подбор блинов · 1RM-пресеты · SVG грифа · разминка' },
 ];
 
@@ -40,6 +42,25 @@ export const VolumeHub: React.FC<{ initialMode?: HubMode; initialWeight?: number
   const [mode, setMode] = useState<HubMode>(queryInit.mode);
   const active = MODE_DEFS.find(d => d.m === mode)!;
 
+  // Д3: единый VolumeInput — строки вводятся ОДИН раз в хабе, табы — три проекции.
+  const [hubRows, setHubRows] = useState<ProExerciseRow[]>(DEFAULT_VOLUME_ROWS);
+  const topWeight = useMemo(
+    () => hubRows.reduce((m, r) => Math.max(m, r.weight || 0), 0),
+    [hubRows],
+  );
+  const plateExercises = useMemo(
+    () => hubRows.map(r => {
+      const ex = getExerciseById(r.exerciseId) as { name?: string } | undefined;
+      return { id: r.id, label: ex?.name || r.exerciseId, weight: r.weight > 0 ? r.weight : undefined };
+    }),
+    [hubRows],
+  );
+  // Блины → назад в строки: собираемый вес возвращается в строку упражнения
+  const handlePlateApply = (actualWeight: number, exerciseId?: string) => {
+    if (!exerciseId) return;
+    setHubRows(prev => prev.map(r => (r.id === exerciseId ? { ...r, weight: actualWeight } : r)));
+  };
+
   return (
     <div className="train-volumehub" style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 760, margin: '0 auto' }}>
       {/* header */}
@@ -54,7 +75,7 @@ export const VolumeHub: React.FC<{ initialMode?: HubMode; initialWeight?: number
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap' }}>без дублей</span>
         </div>
         <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
-          <b style={{ color:'#fff' }}>Как читать:</b> <span style={{ color:'#fff' }}>«Объём»</span> — по мышцам (сеты vs MEV/MAV/MRV, % от MRV, частота). <span style={{ color:'#fff' }}>«Тоннаж»</span> — вес×репы×сеты + КПШ + УОИ + зоны &lt;60/60-80/&gt;80%. <span style={{ color:'#fff' }}>«Блины»</span> — подбор блинов под гриф/вес, 1RM-% пресеты, SVG. Источники: Israetel MEV/MAV/MRV, Helms 2019, Schoenfeld 2017, Prilepin 1974 (КПШ).
+          <b style={{ color:'#fff' }}>Как читать:</b> <span style={{ color:'#fff' }}>«Объём»</span> — по мышцам (сеты vs MEV/MAV/MRV, MV-плашка, частота). <span style={{ color:'#fff' }}>«Тоннаж»</span> — вес×репы×сеты + INOL + зоны Прилепина. <span style={{ color:'#fff' }}>«Блины»</span> — подбор блинов под гриф/вес, 1RM-% пресеты, SVG. Строки общие: правка в любом табе видна везде; вес из «Блинов» возвращается в строки. Источники: Israetel MEV/MAV/MRV, Helms 2019, Schoenfeld 2017, Prilepin 1974 + Hristov INOL.
         </div>
       </div>
 
@@ -100,9 +121,16 @@ export const VolumeHub: React.FC<{ initialMode?: HubMode; initialWeight?: number
           </div>
         </div>
         <div style={{ padding: 10 }}>
-          {mode === 'volume' && <VolumeOptimizerTab />}
-          {mode === 'tonnage' && <TonnageCalcTab />}
-          {mode === 'plates' && <PlateCalcTab initialWeight={queryInit.weight} />}
+          {mode === 'volume' && <VolumeOptimizerTab rows={hubRows} onRowsChange={setHubRows} />}
+          {mode === 'tonnage' && <TonnageCalcTab sharedRows={hubRows} onSharedRowsChange={setHubRows} />}
+          {mode === 'plates' && (
+            <PlateCalcTab
+              initialWeight={queryInit.weight ?? (topWeight > 0 ? topWeight : undefined)}
+              exerciseOptions={plateExercises}
+              onApply={handlePlateApply}
+              applyLabel="✅ Вернуть вес в строки"
+            />
+          )}
         </div>
       </div>
 
@@ -126,7 +154,7 @@ export const VolumeHub: React.FC<{ initialMode?: HubMode; initialWeight?: number
       </div>
 
       <div style={{ fontSize:10, color:'#fff', textAlign:'center', marginTop:10, lineHeight:1.45, opacity:0.9 }}>
-        Единый хаб без дублей — объём только в «Объёме», тоннаж только в «Тоннаже», блины только в «Блинах». Связный конвейер, а не 3 разрозненных калькулятора.
+        Строки общие: «Объём», «Тоннаж» и «Блины» — три проекции одного VolumeInput ({hubRows.length} строк). Deep-link: ?volmode=volume|tonnage|plates&amp;weight=КГ.
       </div>
     </div>
   );

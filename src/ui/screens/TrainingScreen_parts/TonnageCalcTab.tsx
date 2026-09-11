@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
 import { PopupSelect, PopupNumber, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { PRILEPIN_TABLE, tonnageRowResult, inolScopeVerdict } from '../../../engines/tonnage-prilepin.engine';
+import type { ProExerciseRow } from '../../../engines/volume-optimizer-pro.engine';
 
 const ACCENT = '#00e68a';
 const CARD: React.CSSProperties = {
@@ -13,19 +14,49 @@ const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.
 
 interface Row { id: string; exerciseId: string; weight: number; reps: number; sets: number; oneRM?: number; }
 
-export const TonnageCalcTab: React.FC = () => {
+export interface TonnageCalcTabProps {
+  /** Д3: общие строки хаба (VolumeInput). Без пропсов — автономный режим как раньше. */
+  sharedRows?: ProExerciseRow[];
+  onSharedRowsChange?: (rows: ProExerciseRow[]) => void;
+}
+
+function toTonRow(s: ProExerciseRow): Row {
+  return { id: s.id, exerciseId: s.exerciseId, weight: s.weight, reps: s.reps, sets: s.sets, oneRM: s.oneRM };
+}
+
+export const TonnageCalcTab: React.FC<TonnageCalcTabProps> = ({ sharedRows, onSharedRowsChange }) => {
   const [oneRMGlobal, setOneRMGlobal] = useState<number>(100);
   const [bodyweight, setBodyweight] = useState<number>(80);
-  const [rows, setRows] = useState<Row[]>([
+  const [internalRows, setInternalRows] = useState<Row[]>([
     { id: 'r1', exerciseId: 'bench_bar', weight: 80, reps: 5, sets: 4 },
     { id: 'r2', exerciseId: 'row_bar', weight: 60, reps: 8, sets: 3 },
   ]);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const upd = (id: string, field: keyof Row, val: any) => setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
-  const addRow = () => setRows(prev => prev.concat([{ id: 'r' + Date.now(), exerciseId: 'bench_bar', weight: 60, reps: 6, sets: 3 }]));
-  const delRow = (id: string) => setRows(prev => prev.filter(r => r.id !== id));
+  // Д3: в контролируемом режиме правим общие строки, сохраняя week/day/rpe
+  const rows: Row[] = sharedRows ? sharedRows.map(toTonRow) : internalRows;
+  const upd = (id: string, field: keyof Row, val: any) => {
+    if (sharedRows && onSharedRowsChange) {
+      onSharedRowsChange(sharedRows.map(r => r.id === id ? { ...r, [field]: val } : r));
+    } else {
+      setInternalRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
+    }
+  };
+  const addRow = () => {
+    if (sharedRows && onSharedRowsChange) {
+      onSharedRowsChange(sharedRows.concat([{ id: 'r' + Date.now(), exerciseId: 'bench_bar', week: 1, day: 1, weight: 60, reps: 6, sets: 3 }]));
+    } else {
+      setInternalRows(prev => prev.concat([{ id: 'r' + Date.now(), exerciseId: 'bench_bar', weight: 60, reps: 6, sets: 3 }]));
+    }
+  };
+  const delRow = (id: string) => {
+    if (sharedRows && onSharedRowsChange) {
+      onSharedRowsChange(sharedRows.filter(r => r.id !== id));
+    } else {
+      setInternalRows(prev => prev.filter(r => r.id !== id));
+    }
+  };
 
   // P3: расчёт через tonnage-prilepin.engine (Прилепин + INOL вместо crude КПШ).
   // Легаси-КПШ (tonnage×intensity) оставлен как «нагрузочный индекс» для совместимости сводки.
@@ -79,7 +110,18 @@ export const TonnageCalcTab: React.FC = () => {
     try {
       const d = JSON.parse(raw);
       if (d.oneRMGlobal !== undefined) setOneRMGlobal(d.oneRMGlobal);
-      if (d.rows) setRows(d.rows);
+      if (Array.isArray(d.rows)) {
+        if (sharedRows && onSharedRowsChange) {
+          // Д3: загруженное маппим на общие строки (week/day/rpe живых сохраняем по id)
+          const liveById = new Map(sharedRows.map(r => [r.id, r]));
+          onSharedRowsChange(d.rows.map((r: Row) => {
+            const live = liveById.get(r.id);
+            return { id: r.id, exerciseId: r.exerciseId, week: live?.week ?? 1, day: live?.day ?? 1, weight: r.weight, reps: r.reps, sets: r.sets, oneRM: r.oneRM, rpe: live?.rpe };
+          }));
+        } else {
+          setInternalRows(d.rows);
+        }
+      }
     } catch { /* ignore */ }
   };
 
