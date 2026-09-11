@@ -15,6 +15,52 @@ import {
   filterBtn, pill, secTitle, chipRow,
 } from './ExerciseLabShared';
 import { applyToPlanner } from './planner-bridge';
+import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
+import { readLabAthleteCtx, type LabAthleteCtx } from './lab-athlete-ctx';
+
+/**
+ * Epic F: блок «Коррекция техники под ваш диагноз» (только при jointRisk —
+ * травма/мобильность; иначе тишина). Регрессия вместо усложнения.
+ */
+const LabRegressionBlock: React.FC<{
+  ex: { id: string; name: string; group: string };
+  technique: any;
+  cues: any[];
+  ctx: LabAthleteCtx | null;
+}> = ({ ex, technique, cues, ctx }) => {
+  const dx = useMemo(() => {
+    if (!ctx) return null;
+    try {
+      return diagnoseLabExercise(
+        { id: ex.id, name: ex.name, muscle: ex.group },
+        {
+          goal: ctx.goal, level: ctx.level, weakZones: ctx.weakZones, asymPct: ctx.asymPct,
+          muscle: ex.group, mobilityRestrictions: ctx.mobilityRestrictions, injuries: ctx.injuries,
+        },
+      );
+    } catch { return null; }
+  }, [ex.id, ex.name, ex.group, ctx]);
+  if (!dx || !dx.flags.includes('jointRisk')) return null;
+  const nm = ex.name.toLowerCase();
+  const upright = /тяга.*подбород|upright|протяжка/.test(nm);
+  const behindNeck = /за.*голов|behind.?neck|за голову/.test(nm);
+  const regressions: string[] = Array.isArray(technique?.regression) ? technique.regression.slice(0, 2) : [];
+  const topCue = cues.find((c: any) => c?.priority === 'critical') || cues[0];
+  return (
+    <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
+      <div style={{ fontSize: 10, fontWeight: 800, color: '#f87171', marginBottom: 4 }}>🩺 Коррекция техники под ваш диагноз</div>
+      {dx.issues.filter(i => /Травма|Сустав|мобильност/i.test(i)).slice(0, 2).map((iss, i) => (
+        <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>• {iss}</div>
+      ))}
+      {topCue && <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 4 }}>⚡ Сначала: {topCue.cue}</div>}
+      {regressions.length > 0 && (
+        <div style={{ fontSize: 10, color: '#22c55e', marginTop: 4 }}>📉 Регрессия (не усложнение): {regressions.join(' → ')}</div>
+      )}
+      {upright && <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 4 }}>⚠ Тяга к подбородку: не выше 90° (плечо) — импиджмент-пик 70–120°</div>}
+      {behindNeck && <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 4 }}>⚠ За голову: только при здоровой мобильности плеча, иначе — жим перед собой</div>}
+    </div>
+  );
+};
 
 const COLLAPSED_HEIGHT = 42;
 
@@ -54,6 +100,15 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
   const toggleFav = (id: string) => setFavorites(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const toggleExpandEx = (id: string) => setExpandedEx(prev => prev === id ? null : id);
   const toggleRegion = (id: string) => setExpandedRegion(prev => prev === id ? null : id);
+
+  // Epic F: контекст атлета один раз (травмы — в safety вместо []).
+  const labCtx = useMemo(() => {
+    try { return readLabAthleteCtx(); } catch { return null; }
+  }, [group]);
+  const labInjuries = useMemo(() => {
+    if (!labCtx) return [];
+    return labCtx.injuries.map(x => (typeof x === 'string' ? x : String(x?.muscle || '')).toLowerCase()).filter(Boolean);
+  }, [labCtx]);
 
   const subregions = SUBREGION_DEFS[group] || [];
   const groupedExercises = useMemo(() => {
@@ -231,7 +286,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
               <div style={{ paddingLeft: 8, marginTop: 4 }}>
                 {filteredExs.map(({ exercise: ex, bio, technique, score, cues, errors, progression, synergy, jointStress, classification, fVector, lengthened }) => {
                   const isExpanded = expandedEx === ex.id;
-                  const safety = assessSafety(ex.id, [], score.total / 100);
+                  const safety = assessSafety(ex.id, labInjuries, score.total / 100);
                   const isFav = favorites.includes(ex.id);
                   const printId = `elab-t-${ex.id}`;
                   return (
@@ -241,6 +296,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
                       </div>
                       {isExpanded && <>
                         <TechniqueDetail ex={ex} technique={technique} score={score} cues={cues} errors={errors} progression={progression} synergy={synergy} jointStress={jointStress} classification={classification} fVector={fVector} lengthened={lengthened} safety={safety} bio={bio} cssScale={0.9} />
+                        <LabRegressionBlock ex={ex} technique={technique} cues={cues} ctx={labCtx} />
                         {ex.comments && (
                           <div style={{ marginTop: 8 }}>
                             <div style={secTitle}>💬 Комментарий</div>
@@ -275,7 +331,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
       {/* LIST VIEW */}
       {viewMode === 'list' && [...flatList].sort((a, b) => b.score.total - a.score.total).map(({ exercise: ex, bio, technique, score, cues, errors, progression, synergy, jointStress, classification, fVector, lengthened }) => {
         const isExpanded = expandedEx === ex.id;
-        const safety = assessSafety(ex.id, [], score.total / 100);
+        const safety = assessSafety(ex.id, labInjuries, score.total / 100);
         const isFav = favorites.includes(ex.id);
         const printId = `elab-l-${ex.id}`;
         return (
@@ -283,6 +339,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
             <div onClick={() => toggleExpandEx(ex.id)} style={{ cursor: 'pointer' }}>{renderExHeader(ex, score, bio, isFav, safety)}</div>
             {isExpanded && <>
               <TechniqueDetail ex={ex} technique={technique} score={score} cues={cues} errors={errors} progression={progression} synergy={synergy} jointStress={jointStress} classification={classification} fVector={fVector} lengthened={lengthened} safety={safety} bio={bio} />
+              <LabRegressionBlock ex={ex} technique={technique} cues={cues} ctx={labCtx} />
               {ex.comments && (
                 <div style={{ marginTop: 8 }}>
                   <div style={secTitle}>💬 Комментарий</div>

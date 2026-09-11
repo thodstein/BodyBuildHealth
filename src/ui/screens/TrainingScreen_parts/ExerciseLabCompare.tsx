@@ -11,8 +11,11 @@ import { useDataLink } from '../../../core/data-link';
 import {
   ACCENT, DIM, CARD, SMALL,
   GROUP_RU, TYPE_RU, EQUIP_RU,
-  TechniqueDetail, calcTechniqueScore, getResistanceProfile, getRiskColor,
+  TechniqueDetail, calcTechniqueScore, getRiskColor,
 } from './ExerciseLabShared';
+import { getLabResistanceProfile } from '../../../engines/lab-exercise-profile.engine';
+import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
+import { readLabAthleteCtx } from './lab-athlete-ctx';
 
 const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ initialId1, initialId2 }) => {
   const [id1, setId1] = useState(initialId1);
@@ -51,6 +54,25 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
 
   const d1 = useMemo(() => getExData(ex1), [ex1, goal, level]);
   const d2 = useMemo(() => getExData(ex2), [ex2, goal, level]);
+
+  // Epic F: профили из данных + Δ-диагноз A vs B на материале атлета.
+  const labCtx = useMemo(() => {
+    try { return readLabAthleteCtx(); } catch { return null; }
+  }, [id1, id2]);
+  const labRp1 = useMemo(() => { try { return ex1 ? getLabResistanceProfile({ id: ex1.id, name: ex1.name }) : null; } catch { return null; } }, [ex1]);
+  const labRp2 = useMemo(() => { try { return ex2 ? getLabResistanceProfile({ id: ex2.id, name: ex2.name }) : null; } catch { return null; } }, [ex2]);
+  const labDxDelta = useMemo(() => {
+    if (!ex1 || !ex2 || !labCtx) return null;
+    try {
+      const base = {
+        goal, level, weakZones: labCtx.weakZones, asymPct: labCtx.asymPct,
+        mobilityRestrictions: labCtx.mobilityRestrictions, injuries: labCtx.injuries,
+      };
+      const a = diagnoseLabExercise({ id: ex1.id, name: ex1.name, muscle: ex1.group }, { ...base, muscle: ex1.group });
+      const b = diagnoseLabExercise({ id: ex2.id, name: ex2.name, muscle: ex2.group }, { ...base, muscle: ex2.group });
+      return { a: a.score, b: b.score, sfrA: a.effect.sfr, sfrB: b.effect.sfr };
+    } catch { return null; }
+  }, [ex1, ex2, labCtx, goal, level]);
 
   const renderColumn = (d: any, color: string) => {
     if (!d) return <div style={{ flex: 1, textAlign: 'center', color: DIM, padding: 20 }}>Выберите упражнение</div>;
@@ -123,24 +145,23 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
               <div style={{ fontWeight: 700, color: ACCENT, marginBottom: 4 }}>{ex1!.name}</div>
               <div>Тех. счёт: <b>{d1.score.total}/100</b></div><div>Безопасность: <b style={{ color: getRiskColor(d1.safety.level) }}>{d1.safety.score}/100</b></div>
               <div>ЦНС: <b>{d1.bio?.cnsDemand || '?'}/5</b></div><div>Объём: <b>{d1.presc.sets}×{d1.presc.reps}</b></div>
-              <div>Профиль: <b>{getResistanceProfile(ex1!).curve.replace('_', ' ')}</b></div>
+              <div>Профиль: <b>{labRp1 ? `${labRp1.profile}${labRp1.source === 'estimated' ? '~' : ''} · SFR ${labRp1.sfr ?? '—'}` : '—'}</b></div>
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(0,0,0,0.12)' }}>
               <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>{ex2!.name}</div>
               <div>Тех. счёт: <b>{d2.score.total}/100</b></div><div>Безопасность: <b style={{ color: getRiskColor(d2.safety.level) }}>{d2.safety.score}/100</b></div>
               <div>ЦНС: <b>{d2.bio?.cnsDemand || '?'}/5</b></div><div>Объём: <b>{d2.presc.sets}×{d2.presc.reps}</b></div>
-              <div>Профиль: <b>{getResistanceProfile(ex2!).curve.replace('_', ' ')}</b></div>
+              <div>Профиль: <b>{labRp2 ? `${labRp2.profile}${labRp2.source === 'estimated' ? '~' : ''} · SFR ${labRp2.sfr ?? '—'}` : '—'}</b></div>
             </div>
           </div>
           {(() => {
-            const rp1 = getResistanceProfile(ex1!);
-            const rp2 = getResistanceProfile(ex2!);
+            const rp1 = labRp1; const rp2 = labRp2;
             let winner: 1 | 2 = 1; let reason = '';
             if (goal === 'hypertrophy') {
-              if (rp1.curve === 'stretch_mediated' && rp2.curve !== 'stretch_mediated') { winner = 1; reason = 'stretch-mediated профиль лучше для гипертрофии'; }
-              else if (rp2.curve === 'stretch_mediated' && rp1.curve !== 'stretch_mediated') { winner = 2; reason = 'stretch-mediated профиль лучше для гипертрофии'; }
-              else if (rp1.score > rp2.score) { winner = 1; reason = 'выше resistance-оценка'; }
-              else if (rp2.score > rp1.score) { winner = 2; reason = 'выше resistance-оценка'; }
+              if (rp1?.profile === 'lengthened' && rp2?.profile !== 'lengthened') { winner = 1; reason = 'lengthened-профиль лучше для гипертрофии (данные, не эвристика)'; }
+              else if (rp2?.profile === 'lengthened' && rp1?.profile !== 'lengthened') { winner = 2; reason = 'lengthened-профиль лучше для гипертрофии (данные, не эвристика)'; }
+              else if ((rp1?.sfr ?? 0) > (rp2?.sfr ?? 0)) { winner = 1; reason = 'выше SFR'; }
+              else if ((rp2?.sfr ?? 0) > (rp1?.sfr ?? 0)) { winner = 2; reason = 'выше SFR'; }
               else { winner = d1.score.total > d2.score.total ? 1 : 2; reason = 'выше технический счёт'; }
             } else if (goal === 'strength') {
               if (ex1!.type === 'compound' && ex2!.type !== 'compound') { winner = 1; reason = 'базовое движение для силы'; }
@@ -153,12 +174,20 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
             }
             const wName = winner === 1 ? ex1!.name : ex2!.name;
             const wColor = winner === 1 ? ACCENT : '#60a5fa';
-            return (
+            return (<>
               <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: wColor }}>🏅 Рекомендовано: {wName}</div>
                 <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>Причина: {reason}. Цель: {goal === 'hypertrophy' ? 'гипертрофия' : goal}.</div>
               </div>
-            );
+              {labDxDelta && (
+                <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                  <b style={{ color: '#c084fc' }}>Δ-диагноз (твой контекст):</b> A {labDxDelta.a}/100 vs B {labDxDelta.b}/100
+                  {labDxDelta.sfrA != null && labDxDelta.sfrB != null && labDxDelta.sfrA !== labDxDelta.sfrB && (
+                    <> · SFR {labDxDelta.sfrA} vs {labDxDelta.sfrB} (Δ {labDxDelta.sfrB - labDxDelta.sfrA > 0 ? '+' : ''}{labDxDelta.sfrB - labDxDelta.sfrA})</>
+                  )}
+                </div>
+              )}
+            </>);
           })()}
         </div>
       </>)}

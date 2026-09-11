@@ -11,8 +11,11 @@ import {
   ACCENT, DIM, CARD,
   GROUPS, GROUP_RU, GROUP_ICON,
   SUBREGION_DEFS,
-  getResistanceProfile, calcTechniqueScore, getRiskColor,
+  calcTechniqueScore, getRiskColor,
 } from './ExerciseLabShared';
+import { getLabResistanceProfile, groupSubregionCoverage } from '../../../engines/lab-exercise-profile.engine';
+import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
+import { readLabAthleteCtx } from './lab-athlete-ctx';
 
 const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId }) => {
   const [proGroup, setProGroup] = useState('chest');
@@ -20,16 +23,24 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
   // синхронизация если выбрано в шаге 1/2
   React.useEffect(() => { if (selectedId) { const ex = EXERCISE_CATALOG.find(e => e.id === selectedId); if (ex) { setProGroup(ex.group); setSubExId(selectedId); } } }, [selectedId]);
 
+  // Epic F: профиль сопротивления из данных (Epic A), травмы — из профиля атлета.
+  const labCtx = useMemo(() => {
+    try { return readLabAthleteCtx(); } catch { return null; }
+  }, [proGroup, subExId]);
   const groupExercises = useMemo(() =>
-    EXERCISE_CATALOG.filter(e => e.group === proGroup).map(ex => ({
-      exercise: ex,
-      rp: getResistanceProfile(ex),
-      fv: forceVector(ex.group, ex.type, ex.name),
-      score: calcTechniqueScore(ex),
-      safety: assessSafety(ex.id, [], calcTechniqueScore(ex).total / 100),
-      lp: lengthenedPartials(ex.group),
-    })).sort((a, b) => b.rp.score - a.rp.score),
-  [proGroup]);
+    EXERCISE_CATALOG.filter(e => e.group === proGroup).map(ex => {
+      const lab = getLabResistanceProfile({ id: ex.id, name: ex.name });
+      const injuries = (labCtx?.injuries || []).map(x => (typeof x === 'string' ? x : String(x?.muscle || '')).toLowerCase()).filter(Boolean);
+      return {
+        exercise: ex,
+        rp: lab,
+        fv: forceVector(ex.group, ex.type, ex.name),
+        score: calcTechniqueScore(ex),
+        safety: assessSafety(ex.id, injuries, calcTechniqueScore(ex).total / 100),
+        lp: lengthenedPartials(ex.group),
+      };
+    }).sort((a, b) => (b.rp.sfr ?? 0) - (a.rp.sfr ?? 0)),
+  [proGroup, labCtx]);
 
   const fvDist = useMemo(() => {
     const map: Record<string, number> = {};
@@ -37,7 +48,7 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [groupExercises]);
 
-  const stretchLeaders = useMemo(() => groupExercises.filter(g => g.rp.curve === 'stretch_mediated').slice(0, 5), [groupExercises]);
+  const stretchLeaders = useMemo(() => groupExercises.filter(g => g.rp.profile === 'lengthened').slice(0, 5), [groupExercises]);
   const synergyPairs = useMemo(() => {
     const pairs: Array<{ a: string; b: string; type: string; reason: string }> = [];
     const seen = new Set<string>();
@@ -54,20 +65,17 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
         if (seen.has(key)) return;
         const agn = antagonistMap[a.fv] || [];
         if (agn.includes(b.fv)) { seen.add(key); pairs.push({ a: a.exercise.name, b: b.exercise.name, type: 'антагонист', reason: `${a.fv} ↔ ${b.fv} — суперсет` }); }
-        else if (a.fv === b.fv && a.rp.curve !== b.rp.curve) { seen.add(key); pairs.push({ a: a.exercise.name, b: b.exercise.name, type: 'вариация', reason: `${a.fv}, ${a.rp.label} vs ${b.rp.label}` }); }
+        else if (a.fv === b.fv && a.rp.profile !== b.rp.profile) { seen.add(key); pairs.push({ a: a.exercise.name, b: b.exercise.name, type: 'вариация', reason: `${a.fv}, ${a.rp.profile} vs ${b.rp.profile}` }); }
       });
     });
     return pairs.slice(0, 8);
   }, [groupExercises]);
 
+  // Epic F: честное покрытие — матчинг по bio+имя+целевая (Epic A), а не по короткой строке.
   const regionalCoverage = useMemo(() => {
-    const regions = SUBREGION_DEFS[proGroup] || [];
-    const covered: string[] = []; const uncovered: string[] = [];
-    regions.forEach(r => {
-      const has = groupExercises.some(g => r.keywords.some(kw => (g.exercise.targetMuscle || '').toLowerCase().includes(kw.toLowerCase())));
-      if (has) covered.push(r.name); else uncovered.push(r.name);
-    });
-    return { covered, uncovered, total: regions.length };
+    const cov = groupSubregionCoverage(proGroup, groupExercises.map(g => ({ id: g.exercise.id, name: g.exercise.name })));
+    const nameOf = (id: string) => (SUBREGION_DEFS[proGroup] || []).find(r => r.id === id)?.name || id;
+    return { covered: cov.covered.map(nameOf), uncovered: cov.uncovered.map(nameOf), total: cov.total };
   }, [proGroup, groupExercises]);
 
   // — Замена —
@@ -115,7 +123,7 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
         <div style={{ ...CARD, border: '1px solid rgba(34,197,94,0.18)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>🏆 Stretch-лидеры</div>
           {stretchLeaders.length ? stretchLeaders.map((g, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 0' }}><span>#{i + 1} {g.exercise.name}</span><span style={{ color: '#22c55e' }}>{g.rp.score}/10</span></div>
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 0' }}><span>#{i + 1} {g.exercise.name}</span><span style={{ color: '#22c55e' }}>{g.rp.profile === 'lengthened' ? 'lengthened' : g.rp.profile}{g.rp.source === 'estimated' ? '~' : ''}</span></div>
           )) : <div style={{ fontSize: 10, color: DIM }}>Нет stretch-mediated</div>}
         </div>
         <div style={{ ...CARD, border: '1px solid rgba(251,146,60,0.18)' }}>
@@ -131,20 +139,35 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>{regionalCoverage.covered.map(r => <span key={r} style={{ padding: '2px 6px', borderRadius: 10, fontSize: 10, background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{r}</span>)} {regionalCoverage.uncovered.map(r => <span key={r} style={{ padding: '2px 6px', borderRadius: 10, fontSize: 10, background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>{r}</span>)}</div>
       </div>
 
-      {/* Таблица */}
+      {/* Таблица (+ колонка диагноза по контексту атлета) */}
       <div style={{ ...CARD, marginBottom: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: DIM, marginBottom: 6 }}>📋 Таблица {GROUP_RU[proGroup]} — {groupExercises.length} упр.</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 4, fontSize: 10, color: DIM, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 4 }}>
-          <span>Упражнение</span><span style={{ textAlign: 'center' }}>Профиль</span><span style={{ textAlign: 'center' }}>Техника</span><span style={{ textAlign: 'center' }}>Безоп.</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: 4, fontSize: 10, color: DIM, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 4 }}>
+          <span>Упражнение</span><span style={{ textAlign: 'center' }}>Профиль</span><span style={{ textAlign: 'center' }}>Техника</span><span style={{ textAlign: 'center' }}>Безоп.</span><span style={{ textAlign: 'center' }}>Диагноз</span>
         </div>
-        {groupExercises.slice(0, 20).map((g, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 4, padding: '3px 0', fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.02)', background: g.exercise.id === selectedId ? 'rgba(0,230,138,0.06)' : 'transparent' }}>
+        {groupExercises.slice(0, 20).map((g, i) => {
+          let dxScore: number | null = null;
+          try {
+            dxScore = diagnoseLabExercise(
+              { id: g.exercise.id, name: g.exercise.name, muscle: proGroup },
+              {
+                goal: labCtx?.goal, level: labCtx?.level, weakZones: labCtx?.weakZones,
+                asymPct: labCtx?.asymPct, muscle: proGroup,
+                mobilityRestrictions: labCtx?.mobilityRestrictions, injuries: labCtx?.injuries,
+              },
+            ).score;
+          } catch { dxScore = null; }
+          const dxColor = dxScore == null ? DIM : dxScore >= 70 ? '#22c55e' : dxScore >= 45 ? '#f59e0b' : '#ef4444';
+          return (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: 4, padding: '3px 0', fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.02)', background: g.exercise.id === selectedId ? 'rgba(0,230,138,0.06)' : 'transparent' }}>
             <span style={{ fontWeight: g.exercise.id === selectedId ? 700 : 400, color: g.exercise.id === selectedId ? ACCENT : '#fff' }}>{g.exercise.name}</span>
-            <span style={{ textAlign: 'center', color: g.rp.curve === 'stretch_mediated' ? '#22c55e' : '#60a5fa' }}>{g.rp.score}/10</span>
+            <span style={{ textAlign: 'center', color: g.rp.profile === 'lengthened' ? '#22c55e' : '#60a5fa' }}>SFR {g.rp.sfr ?? '—'}{g.rp.source === 'estimated' ? '~' : ''}</span>
             <span style={{ textAlign: 'center', color: getRiskColor(g.score.level) }}>{g.score.total}</span>
             <span style={{ textAlign: 'center', color: getRiskColor(g.safety.level) }}>{g.safety.score}</span>
+            <span style={{ textAlign: 'center', color: dxColor, fontWeight: 700 }}>{dxScore ?? '—'}</span>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ЗАМЕНА */}

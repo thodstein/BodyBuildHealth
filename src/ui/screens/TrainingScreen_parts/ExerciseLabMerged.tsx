@@ -11,7 +11,19 @@ import TechniqueTab from './ExerciseLabTechnique';
 import CompareTab from './ExerciseLabCompare';
 import ProSubstituteTab from './ExerciseLabProSubstitute';
 import ExerciseLabCatalog from './ExerciseLabCatalog';
+import { readLabAthleteCtx, readLabPlanAudit } from './lab-athlete-ctx';
+import { buildLabExportHtml, buildLabExportCsv, collectLabExportDiagnoses } from '../../../engines/lab-exercise-export.engine';
+import { loadLabPlanFromStorage } from '../../../engines/lab-plan-exercise-audit.engine';
 import type { Exercise } from '../../../core/types';
+
+const LAB_STORE_KEY = 'he_exercise_lab_v1';
+
+function loadLabSelected(): string | null {
+  try {
+    const j = JSON.parse(localStorage.getItem(LAB_STORE_KEY) || 'null');
+    return typeof j?.selectedId === 'string' ? j.selectedId : null;
+  } catch { return null; }
+}
 
 export type LabProMode = LabMode | 'bb_tools' | 'pro_substitute';
 
@@ -28,8 +40,19 @@ const ExerciseLabMerged: React.FC<{
 }> = ({ onSelectExercise, onClose }) => {
   const [mode, setMode] = useState<LabProMode>('prescription');
   const [compareIds, setCompareIds] = useState<string[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => loadLabSelected());
   const [catalogOpen, setCatalogOpen] = useState(false);
+
+  // Epic F: персист выбора + диагностическая лента по плану (пересчёт при смене шага).
+  useEffect(() => {
+    try { localStorage.setItem(LAB_STORE_KEY, JSON.stringify({ selectedId })); } catch {}
+  }, [selectedId]);
+  const labCtx = useMemo(() => {
+    try { return readLabAthleteCtx(); } catch { return null; }
+  }, [mode]);
+  const labAudit = useMemo(() => {
+    try { return labCtx ? readLabPlanAudit(labCtx) : null; } catch { return null; }
+  }, [labCtx, mode]);
 
   // При наличии onSelectExercise — открываем drawer каталога (а не вкладку)
   useEffect(() => {
@@ -67,6 +90,11 @@ const ExerciseLabMerged: React.FC<{
             <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>Подбор → техника → PRO+замена → сравнение. Каталог — быстрый drawer с поиском, избранным и недавними.</div>
           </div>
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap' }}>PRO · ЕДИНЫЙ</span>
+          {labAudit && (
+            <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background: labAudit.labScore >= 70 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontWeight:800, whiteSpace:'nowrap' }}>
+              Lab {labAudit.labScore}
+            </span>
+          )}
           {onSelectExercise && (
             <span style={{ fontSize:9, color:'#f59e0b', background:'rgba(245,158,11,0.12)', padding:'4px 8px', borderRadius:20, fontWeight:800, border:'1px solid rgba(245,158,11,0.22)' }}>
               Режим выбора
@@ -103,7 +131,76 @@ const ExerciseLabMerged: React.FC<{
         <button onClick={() => setCompareIds(prev => prev.length ? [] : prev)} style={{ padding: '7px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, fontWeight:700 }}>
           ⇆ Сравнение {compareIds.length > 0 ? `· ${compareIds.length}` : ''}
         </button>
+        {labAudit && (
+          <>
+            <button onClick={() => {
+              try {
+                const plan = loadLabPlanFromStorage();
+                const dx = collectLabExportDiagnoses(plan, labCtx || {});
+                const w = window.open('', '_blank');
+                if (!w) return;
+                w.document.write(buildLabExportHtml(labAudit, dx));
+                w.document.close();
+                w.focus();
+                w.print();
+              } catch {}
+            }} style={{ padding: '7px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, fontWeight:700 }}>
+              🖨 Печать
+            </button>
+            <button onClick={() => {
+              try {
+                const plan = loadLabPlanFromStorage();
+                const dx = collectLabExportDiagnoses(plan, labCtx || {});
+                const blob = new Blob([buildLabExportCsv(dx)], { type: 'text/csv;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'lab-audit.csv';
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+              } catch {}
+            }} style={{ padding: '7px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, fontWeight:700 }}>
+              📥 CSV
+            </button>
+          </>
+        )}
       </div>
+
+      {/* Epic F: диагностическая лента по плану (или честный пустой стейт) */}
+      {labAudit ? (
+        <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(168,85,247,0.20)' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>
+            🔍 Портфель плана: Lab {labAudit.labScore}/100 · {labAudit.totalExercises} упр · {labAudit.totalSets} сетов
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, fontSize: 10, color: '#fff' }}>
+            <span style={{ padding: '2px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}>
+              SFR {labAudit.audit.avgSfr != null ? labAudit.audit.avgSfr.toFixed(1) : '—'}
+            </span>
+            <span style={{ padding: '2px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}>
+              lengthened {Math.round(labAudit.audit.lengthenedRatio * 100)}%
+            </span>
+            <span style={{ padding: '2px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}>
+              unilateral {Math.round(labAudit.audit.unilateralRatio * 100)}%
+            </span>
+            {labAudit.safetyFlags.some(f => f.blocked) && (
+              <span style={{ padding: '2px 8px', borderRadius: 12, background: 'rgba(239,68,68,0.12)', color: '#fca5a5' }}>
+                🚫 {labAudit.safetyFlags.filter(f => f.blocked).length} с травмой — только замена
+              </span>
+            )}
+            {labCtx && labCtx.weakZones.length > 0 && (
+              <span style={{ padding: '2px 8px', borderRadius: 12, background: 'rgba(0,230,138,0.10)', color: ACCENT }}>
+                🎯 {labCtx.weakZones.slice(0, 2).join(', ')}
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
+            Выбери упражнение — Шаг 1 покажет диагноз и коррекцию с Δ-превью.
+          </div>
+        </div>
+      ) : (
+        <div style={{ ...CARD, marginBottom: 10, fontSize: 10, color: '#fff' }}>
+          📭 Нет плана ББ — собери в ББ-авто: лента покажет SFR/lengthened/углы/подрегионы портфеля и диагноз.
+        </div>
+      )}
 
       {/* 4 шага — sticky, удобно */}
       <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 12px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>

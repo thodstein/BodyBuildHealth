@@ -3,6 +3,9 @@ import { EXERCISE_CATALOG, canReplace } from '../../../core/exercise-catalog';
 import { getExerciseBio } from '../../../data/exercise-biomechanics-db';
 import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { ACCENT, DIM, SMALL, GROUP_RU, TYPE_RU, EQUIP_RU, GROUPS, BodyMapSVG, muscleToRegion } from './ExerciseLabShared';
+import { getLabResistanceProfile } from '../../../engines/lab-exercise-profile.engine';
+import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
+import { readLabAthleteCtx } from './lab-athlete-ctx';
 import type { Exercise } from '../../../core/types';
 
 const MUSCLE_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
@@ -57,12 +60,42 @@ const ExerciseLabCatalog: React.FC<{
     return list;
   }, [search, group, type, equipment, difficulty]);
 
+  // Epic F: контекст атлета (дешево — один раз на фильтры).
+  const labCtx = useMemo(() => {
+    try { return readLabAthleteCtx(); } catch { return null; }
+  }, [search, group, type, equipment, difficulty]);
+
   const selectedEx = useMemo(() => EXERCISE_CATALOG.find(e => e.id === selectedId), [selectedId]);
   const selectedBio = useMemo(() => selectedId ? getExerciseBio(selectedId) : null, [selectedId]);
   // 🗺 Карта работающих мышц (primary/secondary → регионы тела).
   const primaryRegions = useMemo(() => selectedBio ? [...new Set((selectedBio.primaryMuscles || []).map(muscleToRegion).filter(r => r !== 'other'))] : [], [selectedBio]);
   const secondaryRegions = useMemo(() => selectedBio ? [...new Set((selectedBio.secondaryMuscles || []).map(muscleToRegion).filter(r => r !== 'other'))] : [], [selectedBio]);
   const visibleList = filtered.slice(0, visible);
+
+  // Epic F: SFR/профиль/диагноз-чипы — только видимые строки (лень, кэш в меме).
+  const labMap = useMemo(() => {
+    const map = new Map<string, { sfr: number | null; profile: string; estimated: boolean; dx: number | null }>();
+    for (const e of visibleList) {
+      try {
+        const p = getLabResistanceProfile({ id: e.id, name: e.name });
+        let dx: number | null = null;
+        if (labCtx) {
+          try {
+            dx = diagnoseLabExercise(
+              { id: e.id, name: e.name, muscle: e.group },
+              {
+                goal: labCtx.goal, level: labCtx.level, weakZones: labCtx.weakZones,
+                asymPct: labCtx.asymPct, muscle: e.group,
+                mobilityRestrictions: labCtx.mobilityRestrictions, injuries: labCtx.injuries,
+              },
+            ).score;
+          } catch { dx = null; }
+        }
+        map.set(e.id, { sfr: p.sfr, profile: p.profile, estimated: p.source === 'estimated', dx });
+      } catch { /* noop */ }
+    }
+    return map;
+  }, [visibleList, labCtx]);
 
   const groupOptions = [
     { id: 'all', label: 'Все группы' },
@@ -154,6 +187,23 @@ const ExerciseLabCatalog: React.FC<{
                     <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: ex.jointStress === 'high' ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', color: ex.jointStress === 'high' ? '#ef4444' : '#22c55e' }}>
                       {ex.jointStress === 'high' ? '⚠ сустав' : ex.jointStress === 'med' ? 'средне' : '✓ сустав'}
                     </span>
+                    {(() => {
+                      const lab = labMap.get(ex.id);
+                      if (!lab) return null;
+                      return (<>
+                        {lab.sfr != null && (
+                          <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>SFR {lab.sfr}</span>
+                        )}
+                        <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: 'rgba(96,165,250,0.08)', color: '#60a5fa' }}>
+                          {lab.profile === 'lengthened' ? 'растянут.' : lab.profile === 'short' ? 'пик.' : 'серед.'}{lab.estimated ? '~' : ''}
+                        </span>
+                        {lab.dx != null && (
+                          <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, fontWeight: 700, background: lab.dx >= 70 ? 'rgba(34,197,94,0.10)' : lab.dx >= 45 ? 'rgba(245,158,11,0.10)' : 'rgba(239,68,68,0.10)', color: lab.dx >= 70 ? '#22c55e' : lab.dx >= 45 ? '#f59e0b' : '#ef4444' }}>
+                            {lab.dx >= 70 ? '✓' : lab.dx >= 45 ? '⚠' : '🚫'} {lab.dx}
+                          </span>
+                        )}
+                      </>);
+                    })()}
                     {bio && <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: RISK_COLOR[bio.riskProfile] + '14', color: RISK_COLOR[bio.riskProfile] }}>{bio.riskProfile === 'low' ? '✓ риск' : bio.riskProfile === 'medium' ? '⚠ риск' : '🛑 риск'}</span>}
                   </div>
                 </div>
