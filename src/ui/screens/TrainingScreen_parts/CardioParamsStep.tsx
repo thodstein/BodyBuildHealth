@@ -12,6 +12,8 @@ import {
   timeInZones, polarizationIndex, classifyTid,
   type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment, type CardioPeriodizationModel, type CardioTaperModel,
 } from '../../../engines/lms/cardio.engine';
+import { finishCardioCycle } from '../../../engines/lms/cardio-templates.engine';
+import { parsePaceText } from '../../../engines/lms/cardio-personal-zones.engine';
 import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/cardio.engine';
 import {
   ROW, LABEL, HINT_SM, BTN_SMALL, CHIP, CHIP_ACTIVE, PHASE_COLOR, TYPE_COLOR,
@@ -99,6 +101,11 @@ export interface CardioParamsModel {
   talkHr?: string;
   tempC?: string;
   altitudeM?: string;
+  /** Темпы VDOT (текст «M:SS») + множитель кросс-мезо — применяются и в hero-предпросмотре. */
+  easyPace?: string;
+  tempoPace?: string;
+  intervalPace?: string;
+  mesoMult?: number;
 }
 
 /** Живой предпросмотр цикла из параметров мастера (та же сборка, что была в шаге 1). */
@@ -110,7 +117,7 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
   const { goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight,
     taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment,
     lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula,
-    lthr, ftpWatts, talkHr, tempC, altitudeM } = m;
+    lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoMult } = m;
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -171,9 +178,20 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
           warnings.push(`Дней в неделю (${daysAvailable}) меньше запрошенной частоты — сессии урезаны на ${cutWeeks.length} нед.`);
         }
       }
-      return { cycle, warnings };
+      // Hero показывает финал 1-в-1 со сборкой: тот же finish-хелпер
+      // (каскад стартов → мезо → темпы/FTP).
+      const finished = finishCardioCycle(cycle, {
+        competitions: comps,
+        taperEnabled,
+        mesoMult: mesoMult != null && mesoMult > 1 ? mesoMult : undefined,
+        easyPaceSec: parsePaceText(easyPace) ?? undefined,
+        tempoPaceSec: parsePaceText(tempoPace) ?? undefined,
+        intervalPaceSec: parsePaceText(intervalPace) ?? undefined,
+        ftpWatts: ftpNum,
+      });
+      return { cycle: finished, warnings };
     } catch { return { cycle: null, warnings }; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula, lthr, ftpWatts, talkHr, tempC, altitudeM]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoMult]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
   // PRO: TID Polarization Index превью-цикла (раунд 9)

@@ -11,6 +11,7 @@
 
 import {
   assignSessionDays,
+  applyCardioCompetitionCascade,
   buildCardioCycle,
   capSessionsToDays,
   kcalForCardio,
@@ -23,6 +24,8 @@ import {
 } from './cardio.engine';
 import type { CardioCycleTemplate } from '../../data/cardio-cycles/cardio-cycle-types';
 import { getCardioCycleTemplateById } from '../../data/cardio-cycles/cardio-cycle-index';
+import { applyMesoMult } from './cardio-meso-progression.engine';
+import { applyPersonalTargetsToCycle } from './cardio-personal-zones.engine';
 
 const INTENSITY_OF: Record<string, 'low' | 'moderate' | 'high'> = {
   zone2: 'moderate',
@@ -157,4 +160,54 @@ export function buildCardioCycleFromTemplateId(
   const tpl = getCardioCycleTemplateById(templateId);
   if (!tpl) return null;
   return buildCardioCycleFromTemplate(tpl, overrides);
+}
+
+export interface CardioFinishOpts {
+  /** Старты с приоритетами (каскад A/B/C). */
+  competitions?: { week: number; priority?: 'A' | 'B' | 'C' }[];
+  /** false = явный opt-out: каскад не накладывается (наращивание). */
+  taperEnabled?: boolean;
+  /** Множитель кросс-мезо (>1 — применить). */
+  mesoMult?: number;
+  /** Темпы VDOT, с/км (не заданы — не дописываются). */
+  easyPaceSec?: number;
+  tempoPaceSec?: number;
+  intervalPaceSec?: number;
+  /** FTP вело/гребли, Вт. */
+  ftpWatts?: number;
+}
+
+/**
+ * Пост-обработка собранного цикла (единая для сборки/варианта/шаблона/preview):
+ * каскад стартов → кросс-мезо → темпы VDOT/FTP. Чистая (вход не мутируется).
+ * Применённые темпы/мезо штампуются в config — для «⚙️ Изменить параметры».
+ */
+export function finishCardioCycle(cycle: CardioCycle, opts: CardioFinishOpts = {}): CardioCycle {
+  let out = cycle;
+  if (opts.taperEnabled !== false && opts.competitions && opts.competitions.length > 0) {
+    try {
+      out = applyCardioCompetitionCascade(out, opts.competitions.map(x => ({ week: x.week, priority: x.priority ?? 'B' })));
+    } catch { /* ignore */ }
+  }
+  if (opts.mesoMult != null && opts.mesoMult > 1) {
+    try { out = applyMesoMult(out, opts.mesoMult); } catch { /* ignore */ }
+  }
+  try {
+    out = applyPersonalTargetsToCycle(out, {
+      easyPaceSec: opts.easyPaceSec,
+      tempoPaceSec: opts.tempoPaceSec,
+      intervalPaceSec: opts.intervalPaceSec,
+      ftpWatts: opts.ftpWatts,
+    });
+  } catch { /* ignore */ }
+  const stamp: Record<string, number | boolean> = {};
+  if (opts.easyPaceSec != null) stamp.paceEasySec = opts.easyPaceSec;
+  if (opts.tempoPaceSec != null) stamp.paceTempoSec = opts.tempoPaceSec;
+  if (opts.intervalPaceSec != null) stamp.paceIntervalSec = opts.intervalPaceSec;
+  if (opts.ftpWatts != null) stamp.ftpWattsApplied = opts.ftpWatts;
+  if (opts.mesoMult != null && opts.mesoMult > 1) stamp.mesoOn = true;
+  if (Object.keys(stamp).length > 0) {
+    out = { ...out, config: { ...(out.config as CardioCycleInput | undefined), ...stamp } as CardioCycleInput };
+  }
+  return out;
 }

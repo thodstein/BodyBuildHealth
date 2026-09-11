@@ -88,8 +88,7 @@ describe('CycleCatalog — кардио', () => {
     }
   });
 
-  it('matchCardioLevel/matchCardioPeriod маппят LMS-фильтры', () => {
-    const c25k = CARDIO_CYCLES.find(c => c.meta.id === 'cardio-run-c25k-9')!;
+  it('matchCardioLevel/matchCardioPeriod маппят LMS-фильтры', () => {    const c25k = CARDIO_CYCLES.find(c => c.meta.id === 'cardio-run-c25k-9')!;
     expect(matchCardioLevel(c25k, 'all')).toBe(true);
     expect(matchCardioLevel(c25k, 'novice')).toBe(true);
     expect(matchCardioLevel(c25k, 'MS-MSMK')).toBe(false);
@@ -101,5 +100,17 @@ describe('CycleCatalog — кардио', () => {
     expect(matchCardioPeriod(c25k, 'peak')).toBe(false);
     const peak = CARDIO_CYCLES.find(c => c.meta.id === 'cardio-pro-tri-sprint-8')!;
     expect(matchCardioPeriod(peak, 'mixed')).toBe(true);
+  });
+
+  it('«Рекомендуемые для меня» содержат кардио с кнопкой моста', () => {
+    const { container } = render(<CycleCatalog {...PROPS} />);
+    fireEvent.click(screen.getByText(/Рекомендуемые для меня/));
+    const rec = container.querySelector('.lib-rec') as HTMLElement;
+    const btns = within(rec).getAllByText('🏃 Собрать в кардио-конструкторе →');
+    expect(btns.length).toBeGreaterThan(0);
+    fireEvent.click(btns[0]);
+    expect(localStorage.getItem('he_cardio_template_pending')).not.toBeNull();
+    expect(localStorage.getItem('he_training_planning_track')).toBe('cardio');
+    expect(screen.getByRole('status').textContent).toContain('кардио-конструктор');
   });
 });

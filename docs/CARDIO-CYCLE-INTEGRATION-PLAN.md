@@ -456,3 +456,10 @@ lowImpact/age/restingHr/sex), авто-подстройка, история ве
 6. Годовой timeline, heatmap, печать и `.ics`.
 
 Главное архитектурное правило: **кардио является отдельным равноправным конструктором и циклом с общей временной шкалой, а в PL/BB подключается ссылкой, а не обязательным вложенным шагом**.
+
+## 15. Библиотека PRO-циклов + UI-поверхность (Sep 12 2026, выполнено)
+
+- [x] **Библиотека** `src/data/cardio-cycles/` (35 шаблонов: Хигдон half×2/marathon, FIRST-finish, BarryP, Daniels-24, MAF-12, Pete-full-12, PeteBeginner-24, SSB-LV-6, swim-base-4, tri-sprint-8, bridge-10K + базовые/целевые) + селектор `rankCardioCycles` + сборщик `buildCardioCycleFromTemplate` (generator/explicit) + единый `finishCardioCycle` (каскад A/B/C → мезо → темпы/FTP + штамп в config).
+- [x] **Каталоги**: таб «📖 Каталог» в конструкторе + раздел «🏃 Кардио» в общем `CycleCatalog` (вид/уровень/период/частота/поиск, избранное `cardio:`, мост `requestCardioTemplateBuild` + трек cardio) + таб «🏃 Кардио» в `ManualLibraryGallery` + топ-3 кардио в «💡 Рекомендуемые».
+- [x] **Конструктор**: темпы VDOT в «Атлете» + проводка в сборку, hero-preview = финал 1-в-1, `editConfig` восстанавливает темпы/мезо, валидация + strict-тоггл, кросс-мезо-тоггл, HIIT в любую неделю, журнал рекордов (Riegel/Billat/SVG-тренд), год-прогноз CTL, `CardioDiarySlot` (монтирование за владельцем `TrainingDiaryHub` — файл хаба не тронут).
+- [x] Тесты: ui2 13/13 + catalog-cardio 8/8 + library 48/48; cardio+catalog 714/714; `tsc` 0 по своим.

@@ -7,8 +7,9 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { parsePaceText } from '../../../../engines/lms/cardio-personal-zones.engine';
 import { applyMesoMult } from '../../../../engines/lms/cardio-meso-progression.engine';
+import { validateCardioCycle } from '../../../../engines/lms/cardio-plan-validate.engine';
 import { applyCardioCompetitionCascade, type CardioCycle } from '../../../../engines/lms/cardio.engine';
-import { buildCardioCycleFromTemplateId } from '../../../../engines/lms/cardio-templates.engine';
+import { buildCardioCycleFromTemplateId, finishCardioCycle } from '../../../../engines/lms/cardio-templates.engine';
 import { CardioValidationCard, CardioMesoRow } from '../CardioPlanExtras';
 import { CardioHiitSection } from '../CardioHiitSection';
 import { CardioRecordsSection } from '../CardioRecordsSection';
@@ -78,6 +79,19 @@ describe('CardioValidationCard', () => {
     const { container } = render(<CardioValidationCard cycle={null} beginner={false} />);
     expect(container.textContent).toBe('');
   });
+  it('strict-тоггл зовёт колбэк и грейдит шаблон строго', () => {
+    const onToggle = vi.fn();
+    const c = buildCardioCycleFromTemplateId('cardio-pro-tri-sprint-8', {})!;
+    const soft = validateCardioCycle(c);
+    expect(soft.valid).toBe(true);
+    expect(soft.issues.some(i => i.level === 'warn')).toBe(true);
+    const hard = validateCardioCycle(c, { strict: true });
+    expect(hard.valid).toBe(false);
+    expect(hard.issues.some(i => i.level === 'error')).toBe(true);
+    render(<CardioValidationCard cycle={c} beginner={false} strict={false} onToggleStrict={onToggle} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Строгий режим валидации' }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('CardioMesoRow', () => {
@@ -95,15 +109,16 @@ describe('CardioMesoRow', () => {
 });
 
 describe('CardioHiitSection', () => {
-  it('3 протокола + клик отдаёт id и калибровку', () => {
+  it('3 протокола + клик отдаёт id, калибровку и неделю', () => {
     const onAdd = vi.fn();
-    const { container } = render(<CardioHiitSection onAdd={onAdd} />);
+    const { container } = render(<CardioHiitSection onAdd={onAdd} totalWeeks={9} />);
     expect(container.textContent).toContain('Norwegian 4×4');
     expect(container.textContent).toContain('Billat 30-30');
     expect(container.textContent).toContain('Tabata');
     fireEvent.change(container.querySelector('input[aria-label="HRmax для 4×4"]') as HTMLInputElement, { target: { value: '190' } });
-    fireEvent.click(screen.getByRole('button', { name: /Norwegian 4×4.*в неделю 1/ }));
-    expect(onAdd).toHaveBeenCalledWith('norwegian-4x4', expect.objectContaining({ hrMax: 190 }));
+    fireEvent.change(screen.getByLabelText('Неделя для HIIT-сессии'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: /Norwegian 4×4.*в неделю 5/ }));
+    expect(onAdd).toHaveBeenCalledWith('norwegian-4x4', expect.objectContaining({ hrMax: 190 }), 5);
   });
 });
 
@@ -120,8 +135,7 @@ describe('CardioRecordsSection', () => {
   });
 });
 
-describe('каскад A/B/C (движок)', () => {
-  it('A на нед 9: нед 9 — peak, 7-8 — taper', () => {
+describe('каскад A/B/C (движок)', () => {  it('A на нед 9: нед 9 — peak, 7-8 — taper', () => {
     const c = buildCardioCycleFromTemplateId('cardio-run-c25k-9', {})!;
     const out = applyCardioCompetitionCascade(c, [{ week: 9, priority: 'A' }]);
     expect(out.weeks[8].phase).toBe('peak');
@@ -177,5 +191,32 @@ describe('CardioConstructor — сквозная проводка', () => {
     await waitFor(() => { expect(loadActiveCardioCycle()).not.toBeNull(); });
     const c = loadActiveCardioCycle()!;
     expect(c.weeks.some(w => w.phase === 'taper')).toBe(false);
+  });
+});
+
+describe('finishCardioCycle (единый пост-проход)', () => {
+  it('каскад + темпы + штамп в config', () => {
+    const base = buildCardioCycleFromTemplateId('cardio-run-c25k-9', {})!;
+    const out = finishCardioCycle(base, {
+      competitions: [{ week: 9, priority: 'A' }],
+      taperEnabled: true,
+      easyPaceSec: 360,
+    });
+    expect(out.weeks[8].phase).toBe('peak');
+    const z2 = out.weeks.flatMap(w => w.sessions).find(s => s.type === 'zone2');
+    expect(z2?.purpose).toContain('6:00/км');
+    expect((out.config as unknown as { paceEasySec?: number }).paceEasySec).toBe(360);
+  });
+  it('пустые opts — цикл тот же по сути (штампа нет)', () => {
+    const base = buildCardioCycleFromTemplateId('cardio-run-c25k-9', {})!;
+    const out = finishCardioCycle(base, {});
+    expect(out.weeks.length).toBe(base.weeks.length);
+    expect((out.config as unknown as { paceEasySec?: number }).paceEasySec).toBeUndefined();
+  });
+  it('taperEnabled false — каскад скипается', () => {
+    const base = buildCardioCycleFromTemplateId('cardio-run-c25k-9', {})!;
+    const out = finishCardioCycle(base, { competitions: [{ week: 9, priority: 'A' }], taperEnabled: false });
+    expect(out.weeks.some(w => w.phase === 'taper')).toBe(false);
+    expect(out.weeks[8].phase).not.toBe('peak');
   });
 });

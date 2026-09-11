@@ -13,6 +13,7 @@ import type { SSCycleTemplate } from '../../../data/ss-cycles/ss-types';
 import { CARDIO_CYCLES } from '../../../data/cardio-cycles/cardio-cycle-index';
 import type { CardioCycleTemplate } from '../../../data/cardio-cycles/cardio-cycle-types';
 import { requestCardioTemplateBuild } from '../../../engines/lms/cardio-cycle-bridge';
+import { rankCardioCycles, type CardioSelectorInput } from '../../../engines/lms/cardio-cycle-selector.engine';
 import { rankCycles } from '../../../engines/lms/lms-selector.engine';
 import { ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { applyToPlanner } from './planner-bridge';
@@ -494,6 +495,23 @@ export const CycleCatalog: React.FC<Props> = (p) => {
     return ranked.filter(r => r.score > 0).slice(0, 5);
   }, [p.goal, p.level, p.daysPerWeek, cat]);
 
+  // ── Кардио в «Рекомендуемых»: маппинг цели/уровня каталога на селектор ──
+  const cardioRecommendations = React.useMemo(() => {
+    const g = normalizeGoal(p.goal);
+    const goalMap: Record<UserGoal, CardioSelectorInput['goal']> = {
+      strength: 'pl_prep', mass: 'health', endurance: 'health',
+      peak: 'bb_taper', mixed: 'maintenance', speed: 'health',
+    };
+    const lvl = normalizeLevel(p.level);
+    const levelMap: Record<UserLevel, CardioSelectorInput['level']> = {
+      novice: 'beginner', intermediate: 'intermediate', 'II-KMS': 'intermediate',
+      'KMS-MS': 'intermediate', 'MS-MSMK': 'advanced', 'II-MS': 'advanced',
+    };
+    return rankCardioCycles({ goal: goalMap[g], level: levelMap[lvl], daysPerWeek: p.daysPerWeek })
+      .filter(r => r.score > 0)
+      .slice(0, 3);
+  }, [p.goal, p.level, p.daysPerWeek]);
+
   const resetFilters = () => {
     setFocus('all'); setLevelF('all'); setPeriod('all'); setWeeks('all'); setFreq('all'); setAuthor('all'); setSearch('');
     setFavOnly(false);
@@ -736,7 +754,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         </button>
         {showRec && (
           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {recommendations.length === 0 && <div style={{ fontSize: 11, color: '#fff' }}>Нет подходящих — уточните цель/уровень в профиле.</div>}
+            {recommendations.length === 0 && cardioRecommendations.length === 0 && <div style={{ fontSize: 11, color: '#fff' }}>Нет подходящих — уточните цель/уровень в профиле.</div>}
             {recommendations.map(r => (
               <div key={r.cycle.meta.id} style={{ background: 'rgba(24,24,27,0.4)', borderRadius: 10, padding: 8, border: '1px solid rgba(0,230,138,0.18)' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>{r.cycle.meta.title}</div>
@@ -744,6 +762,16 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                 {r.rationale.slice(0, 2).map((x, i) => (
                   <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.4 }}>✓ {x}</div>
                 ))}
+              </div>
+            ))}
+            {cardioRecommendations.map(r => (
+              <div key={`cardio:${r.template.meta.id}`} style={{ background: 'rgba(24,24,27,0.4)', borderRadius: 10, padding: 8, border: '1px solid rgba(6,182,214,0.25)' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#06b6d4' }}>🏃 {r.template.meta.title}</div>
+                <div style={{ fontSize: 11, color: '#fff', margin: '2px 0 4px' }}>Скоринг подбора: {r.score} · {r.reasons.slice(0, 3).join(', ')}</div>
+                <button className="lib-apply" onClick={() => sendCardioCycle(r.template.meta.id, r.template.meta.title)} style={{
+                  width: '100%', marginTop: 4, padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer',
+                  background: 'rgba(6,182,214,0.16)', color: '#06b6d4', fontWeight: 800, fontSize: 12, minHeight: 44,
+                }}>🏃 Собрать в кардио-конструкторе →</button>
               </div>
             ))}
           </div>

@@ -4203,3 +4203,18 @@ ull → default. Реальные значения лежат в UnifiedSettings
 - **Re-baseline (осознанно, комментарии в тестах)**: zero-state enhanced (quads 21→25, back 45 — keep-first пулы) и natural (glutes 9, quads 20, hams 10); tradeoff w8→w9 (фазы вернули делод на 8-й неделе); DC-ротация ±2→±3 (канонические варианты в ротационном пуле); blast/cruise ≥ (бюджет выравнивает недели); P1-7 previousPlan переписан на движковый контракт (extract/applyWeightProgression) — сквозные веса не инвариантны под rotation-avoidance.
 - **Cap-adjust**: скоуп новой сортировки резки сужен до glutes (fatigue-first + отведение последним) — для остальных мышц legacy sets-asc (перераспределение резки сдвигало калиброванные объёмы).
 - НЕ ПУШИТЬ (очередь чужих WIP: combat UI, арм-слои).
+
+## Кардио: все 9 остатков закрыты — библиотека/конструктор/дневник-слот (Sep 12 2026, закоммичен pathspec, без пуша)
+
+По команде «выполняй полностью все 9 пунктов». Только Edit/Write + vitest/tsc; чужие WIP не тронуты (в диффе чужие `WLDiagnosticsHub`/`ta-imtp`/`ta-mvt` — в коммит взяты только свои pathspec, сверено `git status`).
+
+- **П1 ручная библиотека**: `ManualLibraryGallery` += таб «🏃 Кардио (N)» (поиск/уровень/дни/избранное `cardio:`, превью, мост `requestCardioTemplateBuild` + трек cardio) — опциональный проп с дефолтом, старые вызовы целы.
+- **П2 рекомендации**: общий `CycleCatalog` — кардио в «💡 Рекомендуемые для меня» (топ-3 `rankCardioCycles` + кнопка моста; маппинг цели/уровня каталога).
+- **П3 hero-preview**: NEW `finishCardioCycle` в `cardio-templates` (каскад→мезо→темпы/FTP + штамп в config) — единый для сборки/варианта/шаблона/preview; `useCardioParamsPreview` показывает финал 1-в-1 (поймано: в файле два одинаковых блока — legacy-компонент не тронут, правился только hook по уникальному якорю `return { preview, s, tidPreview }`).
+- **П4 editConfig**: восстановление темпов VDOT (`formatPace`) и `mesoOn` из config-штампа.
+- **П5 HIIT в любую неделю** (селект нед 1..N) + **график динамики рекордов** (SVG-тренд по видам, ▲/▼).
+- **П6 дневник**: NEW `CardioDiarySlot` (план/факт сегодня + неделя, без пропсов) — `TrainingDiaryHub` НЕ тронут (чужая зона), монтирование за владельцем.
+- **П7 валидатор strict**: `opts.strict` отключает advisory + тоггл в карточке (дефолт advisory).
+- **П8 доки**: эта запись + § в `CARDIO-CYCLE-INTEGRATION-PLAN` (ниже).
+- **Поймано**: соседний тест «taper выкл → без taper» ронял мой каскад (накладывал taper поверх opt-out) — чинено в логике (`taperEnabled`-гард) + lock-тест; `CardioParamsStep`/`WLDiagnosticsHub` правят параллельные агенты — мои ханки только свои.
+- **Проверено**: NEW ui2 13/13 + catalog-cardio 8/8 + library 48/48 + зона cardio+catalog (TBD прогоном) + `tsc` 0 по своим.

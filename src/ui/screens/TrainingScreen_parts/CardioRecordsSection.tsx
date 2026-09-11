@@ -22,6 +22,41 @@ function fmtVal(kind: CardioRecordKind, v: number): string {
   return kind === 'ftp' || kind === 'cp20' ? `${v} Вт` : formatCardioTime(v);
 }
 
+/** Мини-график динамики вида: точки по дате, нормированные в 100×36. */
+const RecordTrend: React.FC<{ kind: CardioRecordKind; list: CardioRecord[] }> = ({ kind, list }) => {
+  const pts = list.filter(r => r.kind === kind).sort((a, b) => a.date.localeCompare(b.date));
+  if (pts.length < 2) return null;
+  const vals = pts.map(p => p.value);
+  const lo = Math.min(...vals);
+  const hi = Math.max(...vals);
+  const span = hi - lo || 1;
+  const W = 100;
+  const H = 36;
+  const xy = pts.map((p, i) => {
+    const x = pts.length === 1 ? 0 : (i / (pts.length - 1)) * W;
+    const y = H - 4 - ((p.value - lo) / span) * (H - 8);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const better = kind === 'ftp' || kind === 'cp20'
+    ? vals[vals.length - 1] >= vals[0]
+    : vals[vals.length - 1] <= vals[0];
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <svg width="110" height="40" viewBox={`0 0 ${W} ${H + 4}`} role="img" aria-label={`Динамика ${CARDIO_RECORD_LABELS[kind]}`}>
+        <polyline points={xy} fill="none" stroke={better ? '#22c55e' : '#f59e0b'} strokeWidth="2" strokeLinejoin="round" />
+        {pts.map((p, i) => {
+          const x = pts.length === 1 ? 0 : (i / (pts.length - 1)) * W;
+          const y = H - 4 - ((p.value - lo) / span) * (H - 8);
+          return <circle key={p.id} cx={x} cy={y} r="2.2" fill={better ? '#22c55e' : '#f59e0b'} />;
+        })}
+      </svg>
+      <span style={{ fontSize: 11, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+        {fmtVal(kind, vals[0])} → {fmtVal(kind, vals[vals.length - 1])} {better ? '▲' : '▼'}
+      </span>
+    </div>
+  );
+};
+
 export const CardioRecordsSection: React.FC = () => {
   const [list, setList] = useState<CardioRecord[]>(() => loadCardioRecords());
   const [kind, setKind] = useState<CardioRecordKind>('run5k');
@@ -84,6 +119,10 @@ export const CardioRecordsSection: React.FC = () => {
             const b = bestCardioRecord(k);
             return <Badge key={k}>{CARDIO_RECORD_LABELS[k]}: {b ? fmtVal(k, b.value) : '—'}</Badge>;
           })}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginTop: 4 }}>Динамика:</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {KINDS.map(k => <RecordTrend key={k} kind={k} list={list} />)}
         </div>
       </div>
       <div style={CARD}>

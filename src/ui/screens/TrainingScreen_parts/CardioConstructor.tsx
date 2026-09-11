@@ -21,11 +21,10 @@ import {
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario, type CardioSession,
 } from '../../../engines/lms/cardio.engine';
 import { getCardioCycleTemplateById } from '../../../data/cardio-cycles/cardio-cycle-index';
-import { buildCardioCycleFromTemplate } from '../../../engines/lms/cardio-templates.engine';
+import { buildCardioCycleFromTemplate, finishCardioCycle } from '../../../engines/lms/cardio-templates.engine';
 import { consumeCardioTemplatePending, subscribeCardioTemplatePending } from '../../../engines/lms/cardio-cycle-bridge';
-import { applyCardioCompetitionCascade } from '../../../engines/lms/cardio.engine';
-import { applyPersonalTargetsToCycle, parsePaceText } from '../../../engines/lms/cardio-personal-zones.engine';
-import { extractCardioProgression, applyMesoMult, cardioProgressionAdvice } from '../../../engines/lms/cardio-meso-progression.engine';
+import { parsePaceText, formatPace } from '../../../engines/lms/cardio-personal-zones.engine';
+import { extractCardioProgression, cardioProgressionAdvice } from '../../../engines/lms/cardio-meso-progression.engine';
 import { getCardioIntervalPreset } from '../../../engines/lms/cardio-interval-presets.engine';
 import { planFromStored, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
 import { buildAnnualCardioCycles, type AnnualCardioBuildOptions } from '../../../engines/annual-training/annual-training-cardio.engine';
@@ -271,6 +270,8 @@ export const CardioConstructor: React.FC = () => {
   const [intervalPace, setIntervalPace] = useState(String((wizard as WizardState).intervalPace ?? ''));
   // Кросс-мезо: стартовать от прошлого цикла (выкл по умолчанию — сборка 1-в-1).
   const [mesoOn, setMesoOn] = useState((wizard as WizardState).mesoOn === true);
+  // Строгая валидация (по умолчанию advisory для шаблонов).
+  const [strictValidate, setStrictValidate] = useState((wizard as WizardState).strictValidate === true);
   const [variant, setVariant] = useState<CardioVariant>(wizard.variant ?? 'base');
   const [wizardMode, setWizardMode] = useState<'simple' | 'pro'>((wizard as WizardState).wizardMode ?? 'pro');
   const [legDays, setLegDays] = useState<number[]>(wizard.legDays ?? []);
@@ -383,35 +384,27 @@ export const CardioConstructor: React.FC = () => {
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
-  /** Пост-обработка собранного цикла: каскад стартов A/B/C → кросс-мезо → темпы VDOT/FTP. */
-  const finishCycle = (c: CardioCycle): CardioCycle => {
-    let out = c;
-    // Каскад — только при включённом taper: явный opt-out пользователя
-    // («без taper — наращивание») старше приоритетов стартов.
-    if (taperEnabled) {
-      try {
-        out = applyCardioCompetitionCascade(out, comps.map(x => ({ week: x.week, priority: x.priority ?? 'B' })));
-      } catch { /* ignore */ }
-    }
-    if (mesoOn) {
-      try {
-        const prev = loadCardioCycles()
-          .filter(x => x.id !== out.id)
-          .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))[0];
-        const p = extractCardioProgression(prev);
-        if (p && p.startMult > 1) out = applyMesoMult(out, p.startMult);
-      } catch { /* ignore */ }
-    }
+  /** Пост-обработка собранного цикла (единый finish-хелпер движка). */
+  const mesoMultFor = (): number => {
+    if (!mesoOn) return 1;
     try {
-      out = applyPersonalTargetsToCycle(out, {
-        easyPaceSec: parsePaceText(easyPace) ?? undefined,
-        tempoPaceSec: parsePaceText(tempoPace) ?? undefined,
-        intervalPaceSec: parsePaceText(intervalPace) ?? undefined,
-        ftpWatts: Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined,
-      });
-    } catch { /* ignore */ }
-    return out;
+      const prev = loadCardioCycles()
+        .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))[0];
+      return extractCardioProgression(prev)?.startMult ?? 1;
+    } catch { return 1; }
   };
+  const paceNums = () => ({
+    easyPaceSec: parsePaceText(easyPace) ?? undefined,
+    tempoPaceSec: parsePaceText(tempoPace) ?? undefined,
+    intervalPaceSec: parsePaceText(intervalPace) ?? undefined,
+    ftpWatts: Number(ftpWatts) >= 30 && Number(ftpWatts) <= 800 ? Math.round(Number(ftpWatts)) : undefined,
+  });
+  const finishCycle = (c: CardioCycle): CardioCycle => finishCardioCycle(c, {
+    competitions: comps,
+    taperEnabled,
+    mesoMult: mesoMultFor(),
+    ...paceNums(),
+  });
 
   /** Кросс-мезо для UI: совет + множитель от свежего прошлого цикла библиотеки. */
   const mesoInfo = useMemo(() => {
@@ -456,8 +449,8 @@ export const CardioConstructor: React.FC = () => {
 
   const refreshActive = () => { setCycle(loadActiveCardioCycle()); reload(); };
 
-  /** HIIT-протокол → сессия в неделю 1 активного цикла (снапшот для undo). */
-  const addHiitToCycle = (presetId: string, opts: { hrMax?: number; sixMinDistanceM?: number }) => {
+  /** HIIT-протокол → сессия в выбранную неделю активного цикла (снапшот для undo). */
+  const addHiitToCycle = (presetId: string, opts: { hrMax?: number; sixMinDistanceM?: number }, week = 1) => {
     if (!cycle) { flashMsg('⚠ Сначала соберите цикл'); return; }
     const preset = getCardioIntervalPreset(presetId);
     if (!preset) { flashMsg('⚠ Протокол не найден'); return; }
@@ -476,7 +469,7 @@ export const CardioConstructor: React.FC = () => {
       structured: [block],
     };
     const weeks = cycle.weeks.map(w => {
-      if (w.week !== 1) return w;
+      if (w.week !== Math.max(1, Math.min(cycle.totalWeeks, Math.round(week)))) return w;
       const sessions = [...w.sessions, session];
       return {
         ...w,
@@ -485,17 +478,18 @@ export const CardioConstructor: React.FC = () => {
         totalKcal: sessions.reduce((s, x) => s + x.kcalPerSession * x.weeklyFrequency, 0),
       };
     });
+    const targetWeek = Math.max(1, Math.min(cycle.totalWeeks, Math.round(week)));
     const next: CardioCycle = {
       ...cycle,
       weeks,
       totalKcal: weeks.reduce((s, w) => s + w.totalKcal, 0),
-      rationale: [...cycle.rationale, `⚡ HIIT «${preset.title}» добавлен в неделю 1.`],
+      rationale: [...cycle.rationale, `⚡ HIIT «${preset.title}» добавлен в неделю ${targetWeek}.`],
     };
     saveCardioCycle(next);
     setActiveCardioCycle(next);
     setCycle(next);
     reload();
-    flashMsg(`⚡ «${preset.title}» — в неделю 1 (отмена — «↩ Вернуть версию»)`);
+    flashMsg(`⚡ «${preset.title}» — в неделю ${targetWeek} (отмена — «↩ Вернуть версию»)`);
   };
 
   const build = () => {
@@ -628,6 +622,12 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.talkZone2Hr != null) setTalkHr(String(cfg.talkZone2Hr));
     if (cfg.tempC != null) setTempC(String(cfg.tempC));
     if (cfg.altitudeM != null) setAltitudeM(String(cfg.altitudeM));
+    // Пост-обработка из config-штампа finish-хелпера (темпы VDOT + мезо-флаг).
+    const stamped = cfg as unknown as { paceEasySec?: number; paceTempoSec?: number; paceIntervalSec?: number; mesoOn?: boolean };
+    if (stamped.paceEasySec != null) setEasyPace(formatPace(stamped.paceEasySec));
+    if (stamped.paceTempoSec != null) setTempoPace(formatPace(stamped.paceTempoSec));
+    if (stamped.paceIntervalSec != null) setIntervalPace(formatPace(stamped.paceIntervalSec));
+    if (stamped.mesoOn === true) setMesoOn(true);
     setLegDays(cfg.legDays ? [...cfg.legDays] : []);
     setFactorsOn({
       sleep: cfg.sleepHours != null && cfg.sleepHours < 6,
@@ -861,11 +861,11 @@ export const CardioConstructor: React.FC = () => {
         factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
         variant, comps, wizardMode,
         lthr, ftpWatts, talkHr, tempC, altitudeM,
-        easyPace, tempoPace, intervalPace, mesoOn,
+        easyPace, tempoPace, intervalPace, mesoOn, strictValidate,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn, strictValidate]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -1006,6 +1006,7 @@ export const CardioConstructor: React.FC = () => {
     setTempoPace('');
     setIntervalPace('');
     setMesoOn(false);
+    setStrictValidate(false);
     setLegDays([]);
     setComps([]);
     flashMsg('⟲ Параметры сброшены к значениям по умолчанию');
@@ -1098,6 +1099,8 @@ export const CardioConstructor: React.FC = () => {
     taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment,
     lowImpact, age, sex, restingHr, legDays, periodizationModel, maxHrFormula,
     lthr, ftpWatts, talkHr, tempC, altitudeM,
+    easyPace, tempoPace, intervalPace,
+    mesoMult: mesoOn ? mesoInfo.mult : 1,
   });
 
   const stepLabels: Record<CardioStep, string> = {
@@ -1304,9 +1307,9 @@ export const CardioConstructor: React.FC = () => {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button style={BTN_GHOST} onClick={migrateFromPlan}>📦 Мигрировать недельный план</button>
           </div>
-          <CardioValidationCard cycle={cycle} beginner={level === 'beginner'} />
+          <CardioValidationCard cycle={cycle} beginner={level === 'beginner'} strict={strictValidate} onToggleStrict={() => setStrictValidate(v => !v)} />
           <CardioMesoRow advice={mesoInfo.advice} mult={mesoInfo.mult} on={mesoOn} onToggle={() => setMesoOn(v => !v)} />
-          <CardioHiitSection onAdd={addHiitToCycle} disabled={!cycle} />
+          <CardioHiitSection onAdd={addHiitToCycle} totalWeeks={cycle?.totalWeeks} disabled={!cycle} />
         </>
       )}
       {step === 'manage' && (

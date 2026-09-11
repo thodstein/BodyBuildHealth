@@ -10,8 +10,10 @@ import { CARD, ROW, LABEL, BTN_SMALL, Badge, ProgressBar, HINT_SM } from './Card
 export const CardioValidationCard: React.FC<{
   cycle: CardioCycle | null;
   beginner: boolean;
-}> = ({ cycle, beginner }) => {
-  const v = useMemo(() => (cycle ? validateCardioCycle(cycle) : null), [cycle, beginner]);
+  strict?: boolean;
+  onToggleStrict?: () => void;
+}> = ({ cycle, beginner, strict, onToggleStrict }) => {
+  const v = useMemo(() => (cycle ? validateCardioCycle(cycle, { strict }) : null), [cycle, beginner, strict]);
   if (!cycle || !v) return null;
   const color = v.qualityScore >= 85 ? '#22c55e' : v.qualityScore >= 60 ? '#f59e0b' : '#ef4444';
   const bg = v.qualityScore >= 85 ? 'rgba(34,197,94,0.14)' : v.qualityScore >= 60 ? 'rgba(245,158,11,0.14)' : 'rgba(239,68,68,0.14)';
@@ -20,6 +22,13 @@ export const CardioValidationCard: React.FC<{
       <div style={ROW}>
         <span style={LABEL}>🧪 Валидация плана</span>
         <Badge bg={bg} border={bg} color={color}>{v.qualityScore}/100 · {v.valid ? 'годен' : 'есть ошибки'}</Badge>
+        {onToggleStrict && (
+          <button style={strict ? { ...BTN_SMALL, background: 'rgba(239,68,68,0.18)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171' } : BTN_SMALL}
+            onClick={onToggleStrict} aria-pressed={!!strict} aria-label="Строгий режим валидации"
+            title="Строго: острые недели шаблона тоже считаются ошибками">
+            {strict ? 'Строго ✓' : 'Строго'}
+          </button>
+        )}
       </div>
       <ProgressBar value={v.qualityScore} color={color} height={8} />
       {v.issues.slice(0, 8).map((i, k) => (

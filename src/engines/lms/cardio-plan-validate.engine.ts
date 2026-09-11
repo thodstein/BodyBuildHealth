@@ -42,11 +42,13 @@ function weekHasRace(week: CardioCycle['weeks'][number]): boolean {
 
 /**
  * Проверить цикл. opts.beginner — строгий HIIT-гард (≤10%);
- * opts.competitionWeeks — недели стартов (taper-контроль).
+ * opts.competitionWeeks — недели стартов (taper-контроль);
+ * opts.strict — игнорировать авторский advisory: острые недели шаблона
+ * тоже грейдятся error (для самопроверки и кастомных правок поверх).
  */
 export function validateCardioCycle(
   cycle: CardioCycle,
-  opts: { beginner?: boolean; competitionWeeks?: number[] } = {},
+  opts: { beginner?: boolean; competitionWeeks?: number[]; strict?: boolean } = {},
 ): CardioPlanValidation {
   const issues: CardioPlanIssue[] = [];
   const weeks = cycle.weeks ?? [];
@@ -55,10 +57,13 @@ export function validateCardioCycle(
   }
   // Опубликованный шаблон (штамп config.templateId): острые недели —
   // авторские (план прошли тысячи атлетов), градируем advisory (max warn).
-  // Наш синтез и ручные правки — строго (error).
-  const faithful = typeof cycle.config?.templateId === 'string' && cycle.config.templateId.length > 0;
+  // Наш синтез и ручные правки — строго (error). strict — строго для всех.
+  const faithful = !opts.strict && typeof cycle.config?.templateId === 'string' && cycle.config.templateId.length > 0;
   if (faithful) {
     issues.push({ level: 'info', code: 'source_template', text: `Опубликованный план (${cycle.config!.templateId}): острые недели — по автору, сверьтесь с самочувствием.` });
+  }
+  if (opts.strict) {
+    issues.push({ level: 'info', code: 'source_strict', text: 'Строгий режим: авторский advisory отключён, все нарушения — ошибки.' });
   }
   // Правило 10%: скачок объёма между соседними рабочими неделями.
   // Абсолютный пол: +12 мин на 3 сессии (C25K-стиль) — не нарушение,
