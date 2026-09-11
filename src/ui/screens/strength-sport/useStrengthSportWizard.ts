@@ -161,6 +161,23 @@ export function useStrengthSportWizard() {
           setOrthoNote(parts.join(' · ').slice(0, 300));
         } catch {}
       }
+      if (p.orthoMobility.length) {
+        try { localStorage.setItem('he_ss_ortho_mobility', JSON.stringify(p.orthoMobility)); } catch {}
+      }
+      // Э3: мост без орто-полей снимает ранее отслеженное (только свои id).
+      const hasOrtho = p.orthoMobility.length > 0 || p.orthoYokeGate || p.orthoTeen || p.orthoClosedChain || p.orthoSummary != null || p.orthoBlocked.length > 0;
+      if (!hasOrtho) {
+        try {
+          const raw = localStorage.getItem('he_ss_ortho_mobility');
+          const tm: unknown = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(tm) && tm.length) {
+            setMobility((prev: string[]) => (prev || []).filter((x) => !tm.includes(x)));
+            setMsg('🦴 Орто-гарды сняты'); setTimeout(() => setMsg(''), 2600);
+          }
+          localStorage.removeItem('he_ss_ortho_mobility');
+          setOrthoNote(null);
+        } catch {}
+      }
       // V4-добой (G8): заявки/Sinclair/спец-блок ТА — вне гейта слабых.
       // V4-добой-2 (П1): + причины/коррекции/FvR/асимметрия/OHS.
       if (p.taAttempts || p.taSinclair || p.taSpecWeeks != null || p.taPreferredCorr || p.taWeakCauses || p.taFvr || p.taAsymPct != null || p.taOhsFailed != null || p.taSpecTargets) {

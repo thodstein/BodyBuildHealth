@@ -197,6 +197,16 @@ export function riskyOpenChainIds(catalog: Array<{ id: string; name: string }>, 
 }
 
 /**
+ * Э3: гигиена снятия — вычитает ТОЛЬКО ранее отслеженные id (свои юзера не трогаем).
+ * Чистая, покрыта тестом; приёмники трекают списки в he_*_ortho_mobility / he_bb_ortho_excluded.
+ */
+export function subtractTracked(current: string[], tracked: unknown): string[] {
+  if (!Array.isArray(tracked) || !tracked.length) return current;
+  const set = new Set(tracked.map((x) => String(x)));
+  return (current || []).filter((x) => !set.has(String(x)));
+}
+
+/**
  * Э2: чистое решение ББ-приёмника (покрыто прямым тестом; компонент только дергает сеттеры/персист/тост).
  * Возвращает ЧТО применить; применяется только при наличии orthoGuards или teenNote.
  */

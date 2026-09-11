@@ -633,6 +633,7 @@ export function ArmAutoConstructor() {
                 (s.training as any).mobilityRestrictions = Array.from(new Set([...tPrev, ...mobW]));
                 localStorage.setItem('he_profile_v2', JSON.stringify(p.settings ? { ...p, settings: s } : s));
               }
+              localStorage.setItem('he_arm_ortho_mobility', JSON.stringify(mobW));
             } catch {}
           }
           if (bits.length) flash(`🦴 Орто-гарды: ${bits.join(' · ')}`);
@@ -645,6 +646,34 @@ export function ArmAutoConstructor() {
         if (typeof tn === 'string' && tn) {
           setCycNever(true);
           flash(`🧒 ${tn}`);
+        }
+      } catch {}
+      // Э3: мост без орто-полей снимает ранее отслеженное из профиля (только свои id).
+      try {
+        const d: any = payload.data;
+        const hasOrtho = (d?.orthoGuards && typeof d.orthoGuards === 'object')
+          || (Array.isArray(d?.orthoFlags) && d.orthoFlags.length)
+          || (typeof d?.teenNote === 'string' && d.teenNote);
+        if (!hasOrtho) {
+          const raw = localStorage.getItem('he_arm_ortho_mobility');
+          const tm: unknown = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(tm) && tm.length) {
+            const pr = localStorage.getItem('he_profile_v2');
+            if (pr) {
+              const pp = JSON.parse(pr);
+              const ss = pp.settings ?? pp;
+              const strip = (arr: unknown): string[] => Array.isArray(arr) ? arr.map(String).filter((x) => !tm.includes(x)) : [];
+              (ss.health as any) = ss.health ?? {};
+              (ss.training as any) = ss.training ?? {};
+              (ss.health as any).mobilityRestrictions = strip((ss.health as any).mobilityRestrictions);
+              (ss.training as any).mobilityRestrictions = strip((ss.training as any).mobilityRestrictions);
+              localStorage.setItem('he_profile_v2', JSON.stringify(pp.settings ? { ...pp, settings: ss } : ss));
+            }
+            flash(`🦴 Орто-гарды сняты (${tm.length})`);
+          }
+          localStorage.removeItem('he_arm_ortho_mobility');
+          localStorage.removeItem('he_arm_ortho_guards');
+          localStorage.removeItem('he_arm_ortho_flags');
         }
       } catch {}
       // TOP из хаба: матчап + Table-IQ (аддитивно)

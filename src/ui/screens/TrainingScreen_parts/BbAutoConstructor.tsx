@@ -45,7 +45,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
-import { bbOrthoMobilityAdd, riskyOpenChainIds, decideBbOrthoIntake } from '../../../engines/pro/ortho-screen.engine';
+import { bbOrthoMobilityAdd, riskyOpenChainIds, decideBbOrthoIntake, subtractTracked } from '../../../engines/pro/ortho-screen.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply, applyToPlanner, type WeakpointsPayload } from './planner-bridge';
 import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
@@ -1630,11 +1630,11 @@ export const BbAutoConstructor: React.FC = () => {
         // Решение — чистая decideBbOrthoIntake (прямой тест); здесь только сеттеры/персист/тост.
         // pauseOverhead/limitDeepSquat → mobilityRestrictions (живой фильтр пула);
         // Beighton closedChainOnly / teen → light + без отказных + повторы + раскрытия из пула + авто-делод.
-        {
-          const dec = decideBbOrthoIntake({ orthoGuards: (bbDiag as any).orthoGuards, teenNote: (bbDiag as any).teenNote }, loadStrategy);
-          if (dec.active) {
+        const dec = decideBbOrthoIntake({ orthoGuards: (bbDiag as any).orthoGuards, teenNote: (bbDiag as any).teenNote }, loadStrategy);
+        if (dec.active) {
             if (dec.mobAdd.length) {
               setMobilityRestrictions((prev) => Array.from(new Set([...prev, ...dec.mobAdd])));
+              try { localStorage.setItem('he_bb_ortho_mobility', JSON.stringify(dec.mobAdd)); } catch {}
               pro2parts.push(`🦴 орто-гарды: ${dec.mobAdd.join('+')} → фильтр пула`);
             }
             if (dec.light) setIntensityLevel('light');
@@ -1655,13 +1655,30 @@ export const BbAutoConstructor: React.FC = () => {
             try { localStorage.setItem('he_bb_ortho_guards', JSON.stringify((bbDiag as any).orthoGuards ?? null)); } catch {}
           }
         }
-        if (typeof bbDiag.teenNote === 'string' && bbDiag.teenNote) {
-          try { localStorage.setItem('he_bb_last_teen', bbDiag.teenNote); } catch {}
-          pro2parts.push('🧒 teen: light + авто-делод');
-        }
         if (Array.isArray(bbDiag.orthoFlags) && bbDiag.orthoFlags.length) {
           try { localStorage.setItem('he_bb_ortho_flags', JSON.stringify(bbDiag.orthoFlags)); } catch {}
           if (typeof bbDiag.orthoSummary === 'string' && bbDiag.orthoSummary) pro2parts.push(`🦴 ${bbDiag.orthoSummary.slice(0, 80)}`);
+        }
+        // Э3: мост без орто-полей снимает ранее отслеженные гарды (только свои id — чужое/своё юзера цело).
+        if (!dec.active) {
+          let cleaned = 0;
+          try {
+            const tm: unknown = JSON.parse(localStorage.getItem('he_bb_ortho_mobility') || '[]');
+            const te: unknown = JSON.parse(localStorage.getItem('he_bb_ortho_excluded') || '[]');
+            if (Array.isArray(tm) && tm.length) {
+              setMobilityRestrictions((prev) => subtractTracked(prev, tm));
+              cleaned += tm.length;
+            }
+            if (Array.isArray(te) && te.length) {
+              setBbExclEx((prev) => subtractTracked(prev, te));
+              cleaned += te.length;
+            }
+            localStorage.removeItem('he_bb_ortho_mobility');
+            localStorage.removeItem('he_bb_ortho_excluded');
+            localStorage.removeItem('he_bb_ortho_guards');
+            localStorage.removeItem('he_bb_ortho_flags');
+          } catch {}
+          if (cleaned) pro2parts.push(`🦴 орто-гарды сняты (${cleaned})`);
         }
         // PRO-3 R2: L/R-добивка и острая готовность ПРИМЕНЯЮТСЯ (к вставке коррекций,
         // не к мезоциклу — острая готовность не должна переписывать структуру блока).

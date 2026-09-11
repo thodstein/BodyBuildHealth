@@ -72,9 +72,23 @@ describe('J7 приёмник орто-моста в Арм-конструкто
       data: { groups: [], orthoGuards: { closedChainOnly: true }, teenNote: 'Подросток 14–15' },
       source: 'intellectual',
     });
-    const { container } = render(<ArmAutoConstructor />);
+    const { container: _c } = render(<ArmAutoConstructor />);
     expect(document.body.textContent).toContain('Подросток 14–15');
     expect(JSON.parse(localStorage.getItem('he_arm_ortho_guards') || '{}').closedChainOnly).toBe(true);
-    void container;
+    expect(_c).toBeTruthy();
+  });
+
+  it('Э3: мост без орто снимает отслеженное из профиля, своё цело', () => {
+    localStorage.setItem('he_profile_v2', JSON.stringify({
+      settings: { health: { mobilityRestrictions: ['wrist', 'forearm'] }, training: { mobilityRestrictions: [] } },
+    }));
+    localStorage.setItem('he_arm_ortho_mobility', JSON.stringify(['wrist']));
+    applyToPlanner({ kind: 'weakpoints', label: 't', data: { groups: [] }, source: 'intellectual' });
+    render(<ArmAutoConstructor />);
+    const prof = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+    const s = prof.settings ?? prof;
+    expect(s.health.mobilityRestrictions).toEqual(['forearm']);
+    expect(localStorage.getItem('he_arm_ortho_mobility')).toBeNull();
+    expect(document.body.textContent).toContain('Орто-гарды сняты');
   });
 });

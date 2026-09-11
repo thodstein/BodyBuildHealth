@@ -61,4 +61,24 @@ describe('useStrengthSportWizard ortho-intake', () => {
     expect(result.current.mobility).toEqual(mobBefore);
     expect(result.current.orthoNote).toBeNull();
   });
+
+  it('Э3: следующий мост без орто снимает отслеженное, своё цело', () => {
+    const { result } = renderHook(() => useStrengthSportWizard());
+    act(() => { result.current.setMobility(['ankle']); });
+    act(() => {
+      applyToPlanner({
+        kind: 'weakpoints', label: 'Орто-скрининг',
+        data: { groups: [], orthoGuards: { mobilityAdd: ['shoulder'] }, orthoSummary: 'Флагов: 1' },
+        source: 'intellectual',
+      } as any);
+    });
+    expect(result.current.mobility).toContain('shoulder');
+    expect(result.current.mobility).toContain('ankle');
+    act(() => {
+      applyToPlanner({ kind: 'weakpoints', label: 't', data: { groups: [] }, source: 'intellectual' } as any);
+    });
+    expect(result.current.mobility).not.toContain('shoulder');
+    expect(result.current.mobility).toContain('ankle');
+    expect(result.current.orthoNote).toBeNull();
+  });
 });

@@ -5,7 +5,7 @@ import {
   scoreBeighton, beightonCutoff, assessBeighton, assessYellow, teenGate,
   rankJointSupport, screenOrtho, orthoGuardsForPlan, buildOrthoCsv, orthoBridgePayload,
   hopLsi, hopLsiOverall, strengthLsiOverall, bbOrthoMobilityAdd, applyOrthoToProfile,
-  isRiskyOpenChain, riskyOpenChainIds, decideBbOrthoIntake,
+  isRiskyOpenChain, riskyOpenChainIds, decideBbOrthoIntake, subtractTracked,
 } from '../ortho-screen.engine';
 
 describe('ortho-screen J1 плечо', () => {
@@ -316,5 +316,14 @@ describe('ortho-screen Э1 risky open-chain', () => {
     expect(riskyOpenChainIds(cat, 1)).toEqual(['fly_db']);
     expect(riskyOpenChainIds(cat)).toEqual(['fly_db', 'cable_fly']);
     expect(riskyOpenChainIds(null as any)).toEqual([]);
+  });
+});
+
+describe('ortho-screen Э3 subtractTracked', () => {
+  it('вычитает только отслеженные, своё цело', () => {
+    expect(subtractTracked(['shoulder', 'hip', 'wrist'], ['shoulder'])).toEqual(['hip', 'wrist']);
+    expect(subtractTracked(['hip'], [])).toEqual(['hip']);
+    expect(subtractTracked(['hip'], null)).toEqual(['hip']);
+    expect(subtractTracked(['hip'], 'мусор')).toEqual(['hip']);
   });
 });
