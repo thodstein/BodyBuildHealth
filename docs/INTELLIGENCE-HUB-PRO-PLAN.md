@@ -147,3 +147,26 @@
 - NEW `intelligence-acwr-pro` + `intelligence-hrv` + `intelligence-forecast` + `intelligence-hub-ui` зелёные;
   соседи training-load/recovery/autoreg/predictive/rir без регрессий; `tsc --noEmit` 0 по своим файлам;
   `verify:apk-design` OK. Коммит pathspec своих файлов, без пуша.
+
+## §6. Выполнение (Sep 12 2026, 7 этапных коммитов, без пуша)
+- **P1** `6d7ceed`: `ACWRMethod coupled_ra (дефолт, байт-в-байт для 40+ потребителей) + ewma_uncoupled` (Вильямс 2017,
+  хроническая без острой) + `lowBase` (пол 100 AU/день, зона не выше caution) + `ACWR_DISCLAIMER` (Impellizzeri 2020,
+  BMC 2025) в `LoadReport` + `ACWR_ZONE_META`-канон (хаб и дашборд на нём, дубль порогов удалён) + NEW тест 7/7.
+- **P2** `8f6c7d8`: NEW `hrv-baseline.engine` (lnRMSSD/SWC=max(0.5×SD,0.03)/CV, REUSE `he_hrv_log` с толерантным парсингом
+  обоих форматов, `hrvReadiness`, `hrvRatioToBaseline`, `HRV_PROTOCOL_NOTE`) + карточка базы в хабе + ratio к своей базе
+  (фолбэк /60 с пометкой). Поймано своим тестом: сверхплотная база обнуляла SWC → пол 0.03. Тест 8/8.
+- **P3** `144620e`: Хольт + кламп 0–100 + ДИ √h + `confidence early/stable` + раннее предупреждение; `runWhatIf` честно
+  подписан («ориентиры»); хаб пишет `appendReadinessToday` при каждом пересчёте (дедуп по дню) + бейдж уверенности +
+  ААС-гейт. Тест 5/5 (вкл. дедуп истории).
+- **P4** `ac21e26`: VL-зоны по `goal` (strength >25 → ×0.75; hyper >30 → ×0.85; deload 40 общий; чужая ветка 4.7 байт-в-байт) +
+  селект цели + «PRI — контекст» + Epley-канон/RIR-новички. Тест 5/5 + чужой 4.7 + autoreg 16/16.
+- **P5** `bf9b89f`: `update/delete/importSRPEFromDiary` (дедуп, пропуск без-RPE — поймано своим тестом) + правка/удаление/
+  импорт в журнале + снапшот v2 (миграция v1, +goal/e1RM/RPE/what-if) + NEW `intelligence-export` (HTML/XSS + CSV/BOM/
+  формулы + ICS-deload) + NEW hub UI smoke 3/3.
+- **P6** `f78e721`: NEW `banisterForm` (z-тренд, порог значимости 5 AU — пойманы лесенка округления и TDZ) + де-дозинг
+  recovery + ранний deload-хинт + Hooper-5. Дважды снесено чужим checkout из worktree — восстановлено по записи,
+  коммит одним add+commit (урок шторма).
+- **P7** `a26a49f`: aria-pressed/labels навигации, дата-инпут 16px, role=img графика, мемоизация ACWR-бейджа дашборда.
+- Проверено: область **88/88 (12 файлов: 7 NEW + 5 соседних)** + pl-key 28/28 + rest-hooks 68/68 (2 флейка DB-timing,
+  повтор 68/68); `tsc` 0 по своим файлам (в проекте — чужой закоммиченный конфликт `IndividualPlanContext`
+  `0734ae046`, не тронут). НЕ ПУШИЛ.
