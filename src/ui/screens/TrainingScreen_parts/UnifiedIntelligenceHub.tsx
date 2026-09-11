@@ -22,6 +22,7 @@ import { autoRegulate, loadForRPE, rpeFromLoad, shouldTrainToday } from '../../.
 import { generateReadinessForecast, runWhatIf } from '../../../engines/predictive.engine';
 import { loadReadinessHistory } from './readiness-history';
 import { getCalibrationStats } from '../../../engines/rir-calibration.engine';
+import { buildHrvBaseline, appendHrvReading, hrvReadiness, hrvRatioToBaseline, HRV_PROTOCOL_NOTE } from '../../../engines/pro/hrv-baseline.engine';
 import { getProfile } from '../../../core/profile-manager';
 import { applyToPlanner } from './planner-bridge';
 import { generateBBRecommendations, bbRecSummary } from '../../../engines/bb/bb-training-recommendations.engine';
@@ -153,7 +154,11 @@ export const UnifiedIntelligenceHub: React.FC = () => {
   const monotony = useMemo(()=> weeklyMonotony(dailyLoads), [dailyLoads]);
   const banister = useMemo(()=> fitnessFatigue(dailyLoads), [dailyLoads]);
   const report = useMemo(()=> trainingLoadReport(sessions), [sessions]);
-  const hrvRatio = useMemo(()=> rmssd / 60, [rmssd]);
+  // P2: персональная HRV-база (lnRMSSD+SWC) вместо фиксированной нормы 60 мс
+  const [hrvBump, setHrvBump] = useState(0);
+  const hrvBase = useMemo(()=> { try { return buildHrvBaseline(); } catch { return null; } }, [hrvBump]);
+  const hrvState = useMemo(()=> hrvReadiness(rmssd, hrvBase), [rmssd, hrvBase]);
+  const hrvRatio = useMemo(()=> hrvRatioToBaseline(rmssd, hrvBase).ratio, [rmssd, hrvBase]);
 
   const recoveryOut = useMemo(()=> {
     try {
@@ -367,7 +372,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
           }} style={{ minWidth:84, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:DIM, fontWeight:700, fontSize:12, cursor:'pointer', transition:'all 0.15s' }}>↩ Сброс</button>
         </div>
         <div style={{ ...SMALL, marginTop:8, padding:'7px 10px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-          HRV-ratio {hrvRatio.toFixed(2)} · PRI {pri} ({priThr.label}) · trainToday: <b style={{ color: trainToday.train ? '#22c55e' : '#ef4444'}}>{trainToday.train ? 'да' : 'нет'}</b> — {trainToday.reason}
+          HRV-ratio {hrvRatio.toFixed(2)}{hrvBase ? ' (к своей базе)' : ' (базы нет — ориентир)'} · PRI {pri} ({priThr.label}) · trainToday: <b style={{ color: trainToday.train ? '#22c55e' : '#ef4444'}}>{trainToday.train ? 'да' : 'нет'}</b> — {trainToday.reason}
         </div>
       </div>
 
@@ -516,6 +521,17 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                 <MetricCard title="HRV" accent={recoveryOut.hrvScore>=65?'#22c55e':'#eab308'}><div style={{ fontSize:15, fontWeight:900, color: recoveryOut.hrvScore>=65?'#22c55e':'#eab308' }}>{recoveryOut.hrvScore}</div><div style={SMALL}>/100</div></MetricCard>
                 <MetricCard title="Перетрен" accent={recoveryOut.overtrainingRisk>=60?'#ef4444':'#22c55e'}><div style={{ fontSize:15, fontWeight:900, color: recoveryOut.overtrainingRisk>=60?'#ef4444':'#22c55e' }}>{recoveryOut.overtrainingRisk}</div><div style={SMALL}>/100</div></MetricCard>
                 <MetricCard title="Суперкомп." accent="#60a5fa"><div style={{ fontSize:15, fontWeight:900, color:'#60a5fa' }}>{recoveryOut.supercompensationHours}ч</div><div style={SMALL}>окно</div></MetricCard>
+              </div>
+
+              <div style={{ marginTop:8, padding:'10px 12px', borderRadius:10, background:'rgba(34,197,94,0.05)', border:'1px solid rgba(34,197,94,0.14)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#22c55e' }}>💓 HRV-база (lnRMSSD + SWC) · {hrvBase ? `${hrvBase.n} зам. · сред. ${hrvBase.meanRmssd} мс · CV ${hrvBase.cvPct}%` : 'базы нет'}</div>
+                  <button onClick={()=> { appendHrvReading(rmssd); setHrvBump(b=> b+1); const t=(window as any).showToast; if(typeof t==='function') t('💓 Утренний замер записан','success'); }} style={{ padding:'8px 12px', borderRadius:9, border:'1px solid rgba(34,197,94,0.28)', background:'rgba(34,197,94,0.10)', color:'#22c55e', fontWeight:800, fontSize:11, cursor:'pointer', minHeight:40 }}>📥 Записать замер ({rmssd} мс)</button>
+                </div>
+                <div style={{ fontSize:10, color:'#fff', marginTop:4, lineHeight:1.4 }}>
+                  {hrvBase ? <>Сегодня: <b style={{ color: hrvState.status==='low' ? '#ef4444' : hrvState.status==='reduced' ? '#eab308' : '#22c55e' }}>{hrvState.status === 'need_base' ? '—' : `${hrvState.deltaSwc >= 0 ? '+' : ''}${hrvState.deltaSwc} SWC · ${hrvState.status}`}</b> — {hrvState.note}</> : 'Нужно ≥3 утренних замеров — сравнение с популяционной нормой запрещено (Plews/Buchheit: 20–100 мс всё норма).'}
+                </div>
+                <div style={{ fontSize:9, color:'#fff', marginTop:4, opacity:0.75 }}>ⓘ {HRV_PROTOCOL_NOTE}</div>
               </div>
 
               <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:10 }}>
