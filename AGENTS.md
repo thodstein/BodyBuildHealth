@@ -7,6 +7,7 @@
 - **Движки**: NEW `pro/ortho-screen.engine` (J1 плечо 5/кластер≥2 + urgent; J2 ТБС 3+ROM; J3 вальгус/YBT/LSI+RTS; J4 SLR/Thompson/кисть/локоть; J5 Beighton 9 + 6/5/4 + 5PQ; yellow + teen; J6 ранжир proven→investigational + WADA; J7 screenOrtho/гарды/профиль `health.orthoFlags`/HTML+CSV+BOM/мост) + `joint-load-master` += orthoBlockedPatterns + `planner-bridge` WeakpointsPayload += orthoFlags/Summary/Guards.
 - **Хабы/поддержка**: NEW `OrthoScreenCard` (полная + compact, `he_ortho_screen_v1`, 💾/CSV/HTML/📦) в 5 точках (SafetyHub + BB/WL/SM/ARM); `supportProtocolJoints` += J6-легенда + UC-II-сепарация.
 - **Проверено**: NEW ortho-screen 27/27 + card 2/2 + соседи 49/49; `tsc` 0 по своим (1 ошибка — чужой `LiftMasterCard` WIP). BB-hub 3 падения — чужие предсуществующие (доказано прогоном без моих правок). Живые контуры: `orthopedic.blockedPatterns` → ПЛ-авто, `teenNote` → ББ-приёмник. НЕ ПУШИЛ.
+- **Добивка-2 «1–5 полностью»**: приёмники исполняют гарды — ББ (shoulder/hip в `mobilityRestrictions` + Beighton-автоделод), SM/TA (`sm-bridge-intake` += 6 орто-полей: mobility-merge + yoke/teen-смягчение стратегии + `orthoNote` в rationale), АРМ (персист + флеш + teen); Beighton wrist/elbow в отбор; teen TA/STRONG через SM-приёмник; печать HTML окном; hop-LSI в RTS (замер бьёт чекбоксы). Проверено: ortho 34/34 + card 4/4 + arm-bridge-ortho 3/3 + sm-intake 14/14 + соседи 117/117; `tsc` 0. НЕ ПУШИЛ.
 
 ## Армлифтинг PRO-4: все 10 эпиков выполнены кодом (Sep 11 2026, закоммичено, без пуша)
 

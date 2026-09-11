@@ -602,6 +602,24 @@ export function ArmAutoConstructor() {
           flash(`⛔ Red-flags из диагностики: ${rf.join(', ')} — сначала врач, тесты после`);
         }
       } catch {}
+      // J7 орто-скрининг: гарды — в персист + флеш (wrist/elbow уже в профиле через applyOrthoToProfile → живой фильтр пула)
+      try {
+        const og = payload.data?.orthoGuards;
+        if (og && typeof og === 'object') {
+          localStorage.setItem('he_arm_ortho_guards', JSON.stringify(og));
+          const bits: string[] = [];
+          if ((og as any).pauseOverhead) bits.push('плечо-пауза');
+          if ((og as any).closedChainOnly) bits.push('Beighton-щадящий');
+          if (Array.isArray((og as any).mobilityAdd) && (og as any).mobilityAdd.length) bits.push((og as any).mobilityAdd.join('+'));
+          if (bits.length) flash(`🦴 Орто-гарды: ${bits.join(' · ')}`);
+        }
+        const of = payload.data?.orthoFlags;
+        if (Array.isArray(of) && of.length) {
+          try { localStorage.setItem('he_arm_ortho_flags', JSON.stringify(of)); } catch {}
+        }
+        const tn = payload.data?.teenNote;
+        if (typeof tn === 'string' && tn) flash(`🧒 ${tn}`);
+      } catch {}
       // TOP из хаба: матчап + Table-IQ (аддитивно)
       try {
         const mu = payload.data?.armMatchup;

@@ -83,6 +83,8 @@ export function useStrengthSportWizard() {
   // минуя vbtMap (у него другой формат ключей week-day-ex-set).
   const [hubVelocity, setHubVelocity] = useState<Record<string, number[]>>({});
   const [swayCmBridge, setSwayCmBridge] = useState<number | null>(null);
+  // J7 орто-скрининг: сводка в rationale плана (паттерн swayCmBridge).
+  const [orthoNote, setOrthoNote] = useState<string | null>(null);
   // V4-добой (G8): заявки/Sinclair/спец-блок ТА-хаба — в rationale плана + бейдж.
   // V4-добой-2 (П1): + причины/коррекции/FvR/асимметрия/OHS.
   const [taBridge, setTaBridge] = useState<{ attempts: { snatch: number[]; cj: number[] } | null; sinclair: { total: number; value: number; cycle?: string | null; q?: number | null } | null; specWeeks: number | null; prefCorr: Record<string, string> | null; causes: Record<string, string> | null; fvr: { snatchTh: number; pmax: number } | null; asymPct: number | null; ohsFailed: number | null; specTargets: number[] | null }>({ attempts: null, sinclair: null, specWeeks: null, prefCorr: null, causes: null, fvr: null, asymPct: null, ohsFailed: null, specTargets: null });
@@ -130,6 +132,30 @@ export function useStrengthSportWizard() {
       if (p.velocityLossPct != null) setVelocityLoss(p.velocityLossPct);
       // Sway carry из хаба — в rationale плана (у билдера нет sway-входа)
       if (p.swayCm != null) setSwayCmBridge(p.swayCm);
+      // J7 орто-скрининг: гарды ПРИМЕНЯЮТСЯ.
+      // mobility-merge — живой фильтр пула; yoke/teen — смягчение стратегии + rationale.
+      if (Array.isArray(p.orthoMobility) && p.orthoMobility.length > 0) {
+        try { setMobility((prev: string[]) => Array.from(new Set([...(prev || []), ...p.orthoMobility]))); } catch {}
+      }
+      if (p.orthoYokeGate) {
+        try { setContestStrategy((prev) => (prev === 'aggressive' ? 'balanced' : prev)); } catch {}
+        setMsg('🦴 Орто-гейт: йок/фермер — стратегия смягчена, трекинг/лента'); setTimeout(() => setMsg(''), 2600);
+      }
+      if (p.orthoTeen) {
+        try { setContestStrategy('conservative'); } catch {}
+        setMsg('🧒 Teen 14–15: консервативный режим (без максимумов, RIR≥2)'); setTimeout(() => setMsg(''), 2600);
+      }
+      if (p.orthoSummary || p.orthoYokeGate || p.orthoTeen || p.orthoClosedChain) {
+        try {
+          const parts: string[] = [];
+          if (p.orthoSummary) parts.push(p.orthoSummary);
+          if (p.orthoYokeGate) parts.push('йок/фермер-гейт');
+          if (p.orthoTeen) parts.push('teen 14–15');
+          if (p.orthoClosedChain) parts.push('Beighton+: закрытая цепь, без end-range');
+          if (p.orthoBlocked.length) parts.push(`блок: ${p.orthoBlocked.join(', ')}`);
+          setOrthoNote(parts.join(' · ').slice(0, 300));
+        } catch {}
+      }
       // V4-добой (G8): заявки/Sinclair/спец-блок ТА — вне гейта слабых.
       // V4-добой-2 (П1): + причины/коррекции/FvR/асимметрия/OHS.
       if (p.taAttempts || p.taSinclair || p.taSpecWeeks != null || p.taPreferredCorr || p.taWeakCauses || p.taFvr || p.taAsymPct != null || p.taOhsFailed != null || p.taSpecTargets) {
@@ -230,6 +256,7 @@ export function useStrengthSportWizard() {
     taperWeeks, setTaperWeeks, contest, setContest, contestStrategy, setContestStrategy,
     medleyPreview, setMedleyPreview, weakPoints, setWeakPoints, diagnosticLevel, setDiagnosticLevel,
     hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge,
+    orthoNote, setOrthoNote,
     taBridge, setTaBridge,
     vbtMap, setVbtMap, plan, setPlan, annual, setAnnual,
     diaryLoad, setDiaryLoad, expandedWeek, setExpandedWeek, msg, setMsg,

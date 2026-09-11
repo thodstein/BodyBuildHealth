@@ -126,10 +126,36 @@ export interface RtsChecklistInput {
   graft?: 'btb' | 'hamstring' | 'other' | 'none';
   fear?: boolean; // страх движения / неготовность
   preventionProgram?: boolean; // есть ACL-prevention программа
+  /** П5: измеренные hop-дистанции, см (single-hop + triple-hop L/R) — приоритет над ручными чекбоксами */
+  hop?: HopInput;
+}
+
+/** П5: LSI одного hop-теста = min/max×100. null — нет данных (ноль/пусто/мусор). */
+export function hopLsi(a?: number, b?: number): number | null {
+  if (typeof a !== 'number' || typeof b !== 'number') return null;
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
+  return Math.round((Math.min(a, b) / Math.max(a, b)) * 1000) / 10;
+}
+
+export interface HopInput { singleL?: number; singleR?: number; tripleL?: number; tripleR?: number }
+
+export function hopLsiOverall(h?: HopInput): { single: number | null; triple: number | null; overall: number | null } {
+  const single = hopLsi(h?.singleL, h?.singleR);
+  const triple = hopLsi(h?.tripleL, h?.tripleR);
+  const vals = [single, triple].filter((v): v is number => v != null);
+  return { single, triple, overall: vals.length ? Math.min(...vals) : null };
 }
 
 export function assessRts(i: RtsChecklistInput): { ready: boolean; status: string; flags: OrthoFlag[] } {
-  if (!i.lsiMeasured) {
+  // П5: измеренные hop-дистанции приоритетнее ручных чекбоксов
+  const hop = hopLsiOverall(i.hop);
+  const hopMeasured = hop.overall != null;
+  const lsiMeasured = hopMeasured || Boolean(i.lsiMeasured);
+  const lsiPass = hopMeasured ? (hop.overall as number) >= 90 : Boolean(i.lsiPass);
+  const hopNote = hopMeasured
+    ? ` Замерено: single ${hop.single}% · triple ${hop.triple}% (порог 90%).`
+    : '';
+  if (!lsiMeasured) {
     return {
       ready: false, status: 'not_measured',
       flags: [{
@@ -142,9 +168,9 @@ export function assessRts(i: RtsChecklistInput): { ready: boolean; status: strin
   }
   const minMonths = i.graft === 'hamstring' ? 7 : 6;
   const timeOk = typeof i.monthsSinceOp === 'number' && i.monthsSinceOp >= minMonths;
-  const ready = Boolean(i.lsiPass && timeOk && !i.fear && i.preventionProgram);
+  const ready = Boolean(lsiPass && timeOk && !i.fear && i.preventionProgram);
   const missing: string[] = [];
-  if (!i.lsiPass) missing.push('LSI <90%');
+  if (!lsiPass) missing.push(hopMeasured ? `LSI ${hop.overall}% <90%` : 'LSI <90%');
   if (!timeOk) missing.push(`срок <${minMonths} мес`);
   if (i.fear) missing.push('страх движения');
   if (!i.preventionProgram) missing.push('нет prevention-программы');
@@ -154,7 +180,7 @@ export function assessRts(i: RtsChecklistInput): { ready: boolean; status: strin
     flags: [{
       id: 'rts_not_ready', joint: 'knee', level: 'watch',
       label: `🟡 RTS: не готов (${missing.join('; ')})`,
-      action: 'Возврат — после закрытия всех пунктов. LSI переоценивает при детренированной здоровой ноге — смотреть абсолютные цифры тоже.',
+      action: `Возврат — после закрытия всех пунктов.${hopNote} LSI переоценивает при детренированной здоровой ноге — смотреть абсолютные цифры тоже.`,
       evidence: 'AAOS AUC 2025: стабильность + симптомы + сила + баланс + симметрия + время + псих-готовность + prevention.',
     }],
   };
@@ -414,6 +440,11 @@ export function orthoGuardsForPlan(r: OrthoScreenResult): OrthoGuards {
     g.mobilityAdd.push('knee');
     g.rationale.push('Коленный флаг → йок/фермер гейт + трекинг/лента.');
   }
+  // Рука в гарды моста: wrist/elbow понимают ARM-пул и SM/TA (MOBILITY_RU), BB их игнорит по whitelist у себя
+  for (const f of r.flags) {
+    if (f.id === 'hand_cluster') { g.mobilityAdd.push('wrist'); g.rationale.push('Кисть-флаг → wrist в ограничения мобильности.'); }
+    if (f.id === 'elbow_valgus') { g.mobilityAdd.push('elbow'); g.rationale.push('Локоть-флаг → elbow в ограничения мобильности.'); }
+  }
   if (r.beightonPositive) {
     g.closedChainOnly = true;
     g.noEndRangeLoaded = true;
@@ -448,6 +479,9 @@ export function applyOrthoToProfile(flags: OrthoFlag[]): { orthoFlags: OrthoFlag
     if (f.id === 'shoulder_cluster_pos' || f.id === 'shoulder_urgent') return ['shoulder'];
     if (f.id === 'hip_cluster_pos' || f.id === 'hip_watch') return ['hip'];
     if (f.id === 'knee_valgus_pos' || f.id === 'rts_not_ready') return ['knee'];
+    // Рука: ключи совпадают с arm-mobility (wrist/forearm/elbow) и MOBILITY_RU — АРМ-пул фильтруется живьём
+    if (f.id === 'hand_cluster') return ['wrist'];
+    if (f.id === 'elbow_valgus') return ['elbow'];
     return [];
   })));
   try {

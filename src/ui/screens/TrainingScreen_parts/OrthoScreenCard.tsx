@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   screenOrtho, orthoGuardsForPlan, saveOrthoFlags, loadOrthoFlags,
   applyOrthoToProfile, rankJointSupport, buildOrthoCsv, buildOrthoHtml,
-  orthoBridgePayload,
+  orthoBridgePayload, hopLsiOverall,
   type OrthoScreenInput,
 } from '../../../engines/pro/ortho-screen.engine';
 import { applyToPlanner } from './planner-bridge';
@@ -26,6 +26,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
     faddirPain: false, faberPain: false, iropPain: false, romFlag: false,
     valgusSls: false, wobbleStepDown: false, ybt: '',
     lsiMeasured: false, lsiPass: false, months: '', graft: 'none' as string, fear: false, prevention: false,
+    hopSL: '', hopSR: '', hopTL: '', hopTR: '',
     slrPain: false, stiffLong: false, popSound: false, cantHeel: false,
     fink: false, phalen: false, tinel: false, elbowV: false,
     pinkyL: false, pinkyR: false, thumbL: false, thumbR: false, elbowL: false, elbowR: false, kneeL: false, kneeR: false, trunk: false, age: '', pq: '',
@@ -38,7 +39,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
     shoulder: { painfulArc: s.painfulArc, hawkinsPain: s.hawkinsPain, jobeWeak: s.jobeWeak, dropArm: s.dropArm, apprehension: s.apprehension },
     hip: { faddirPain: s.faddirPain, faberPain: s.faberPain, iropPain: s.iropPain, romFlag: s.romFlag },
     knee: { valgusSls: s.valgusSls, wobbleStepDown: s.wobbleStepDown, ybtAntDiffCm: s.ybt === '' ? undefined : Number(s.ybt) },
-    rts: { lsiMeasured: s.lsiMeasured, lsiPass: s.lsiPass, monthsSinceOp: s.months === '' ? undefined : Number(s.months), graft: s.graft as 'btb' | 'hamstring' | 'other' | 'none', fear: s.fear, preventionProgram: s.prevention },
+    rts: { lsiMeasured: s.lsiMeasured, lsiPass: s.lsiPass, monthsSinceOp: s.months === '' ? undefined : Number(s.months), graft: s.graft as 'btb' | 'hamstring' | 'other' | 'none', fear: s.fear, preventionProgram: s.prevention, hop: { singleL: s.hopSL === '' ? undefined : Number(s.hopSL), singleR: s.hopSR === '' ? undefined : Number(s.hopSR), tripleL: s.hopTL === '' ? undefined : Number(s.hopTL), tripleR: s.hopTR === '' ? undefined : Number(s.hopTR) } },
     spine: { slrPain: s.slrPain, morningStiffnessLong: s.stiffLong },
     achilles: { popSound: s.popSound, cantHeelRaise: s.cantHeel },
     hand: { finkelsteinPain: s.fink, phalenNumbness: s.phalen, tinelTingle: s.tinel },
@@ -50,6 +51,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
 
   const result = useMemo(() => screenOrtho(input), [input]);
   const guards = useMemo(() => orthoGuardsForPlan(result), [result]);
+  const hopLsiLive = useMemo(() => hopLsiOverall(input.rts?.hop), [input]);
   const support = useMemo(() => rankJointSupport(), []);
   const evColor = (e: string): string => e === 'proven' ? '#22c55e' : e === 'moderate' ? '#f59e0b' : e === 'weak' ? '#71717a' : '#f43f5e';
 
@@ -76,6 +78,19 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
       if (navigator.clipboard) void navigator.clipboard.writeText(html);
       set('msg', '🖨 HTML сводка скопирована (для печати/тренера).');
     } catch { set('msg', '⚠ Не удалось скопировать.'); }
+  };
+
+  const printHtml = (): void => {
+    try {
+      const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Орто-скрининг J1–J7</title></head><body>${buildOrthoHtml(result)}</body></html>`;
+      const w = window.open('', '_blank', 'width=800,height=600');
+      if (!w) { copyHtml(); return; }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      w.print();
+      set('msg', '🖨 Печать открыта (окно).');
+    } catch { copyHtml(); }
   };
 
   const sendToPlan = (): void => {
@@ -112,6 +127,19 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
           <label style={{ fontSize: 11, color: '#fff' }}>YBT-ANT разница |L−R|, см (флаг &gt;4):
             <input value={s.ybt} onChange={e => set('ybt', e.target.value)} inputMode="decimal" placeholder="напр. 3.5" style={{ marginLeft: 6, width: 90, padding: 6, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 12 }} />
           </label>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>RTS: hop-замеры, см (LSI = худшая/лучшая × 100, порог 90%)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {([['hopSL', 'Single L'], ['hopSR', 'Single R'], ['hopTL', 'Triple L'], ['hopTR', 'Triple R']] as Array<[string, string]>).map(([k, label]) => (
+              <label key={k} style={{ fontSize: 11, color: '#fff' }}>{label}:
+                <input value={(s as unknown as Record<string, string>)[k]} onChange={e => set(k, e.target.value)} inputMode="decimal" placeholder="см" aria-label={`Hop ${label}, см`} style={{ marginLeft: 6, width: 80, padding: 6, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 12 }} />
+              </label>
+            ))}
+          </div>
+          {hopLsiLive.overall != null && (
+            <div style={{ fontSize: 11, color: hopLsiLive.overall >= 90 ? '#22c55e' : '#f59e0b' }}>
+              LSI: single {hopLsiLive.single}% · triple {hopLsiLive.triple ?? '—'}% → итог {hopLsiLive.overall}% {hopLsiLive.overall >= 90 ? '✓' : '< 90%'} (замер бьёт чекбоксы)
+            </div>
+          )}
           <Check label="LSI измерено (сила + hop)" value={s.lsiMeasured} onChange={v => set('lsiMeasured', v)} />
           {s.lsiMeasured && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 4 }}>
@@ -186,6 +214,7 @@ export const OrthoScreenCard: React.FC<{ compact?: boolean }> = ({ compact = fal
         <button onClick={save} style={{ padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid #f59e0b', background: 'rgba(245,158,11,0.15)', color: '#fff' }}>💾 В профиль + историю</button>
         <button onClick={copyCsv} style={{ padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}>📋 CSV</button>
         <button onClick={copyHtml} style={{ padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}>🖨 HTML</button>
+        <button onClick={printHtml} style={{ padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}>🖨 Печать</button>
         <button onClick={sendToPlan} style={{ padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.12)', color: '#fff' }}>📦 В конструктор</button>
       </div>
       {s.msg && <div role="status" style={{ fontSize: 10, color: '#fff' }}>{s.msg}</div>}

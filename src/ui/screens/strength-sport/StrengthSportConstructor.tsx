@@ -66,6 +66,7 @@ export const StrengthSportConstructor: React.FC = () => {
     taperWeeks, setTaperWeeks, contest, setContest, contestStrategy, setContestStrategy,
     medleyPreview, setMedleyPreview, weakPoints, setWeakPoints, diagnosticLevel, setDiagnosticLevel,
     hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge,
+    orthoNote,
     taBridge, setTaBridge,
     vbtMap, setVbtMap, plan, setPlan, annual, setAnnual,
     diaryLoad, setDiaryLoad, expandedWeek, setExpandedWeek, msg, setMsg,
@@ -254,6 +255,10 @@ export const StrengthSportConstructor: React.FC = () => {
     // чтобы замер не терялся молча (Kinovea SRD 3/5см).
     if (swayCmBridge != null && swayCmBridge > 0) {
       p.rationale.push(`Sway ${swayCmBridge}см из диагностики (Kinovea): коридор ±3см, при >5см — стоп carries и проверка техники`);
+    }
+    // J7 орто-скрининг: сводка в rationale (паттерн sway-блока — замер не теряется молча).
+    if (orthoNote) {
+      p.rationale.push(`🦴 Орто-скрининг: ${orthoNote}`);
     }
     // V4-добой (G8): заявки/Sinclair/спец-блок ТА-хаба — в rationale (у билдера нет входов — не теряем молча).
     try {

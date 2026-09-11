@@ -1623,6 +1623,27 @@ export const BbAutoConstructor: React.FC = () => {
           try { localStorage.setItem('he_bb_last_teen', bbDiag.teenNote); } catch {}
           pro2parts.push('🧒 teen-режим');
         }
+        // J7 орто-скрининг: гарды ПРИМЕНЯЮТСЯ (не только сохраняются).
+        // pauseOverhead/limitDeepSquat → mobilityRestrictions (живой фильтр пула);
+        // Beighton closedChainOnly → авто-делод (щадящий режим); всё — в персист + тост.
+        if (bbDiag.orthoGuards && typeof bbDiag.orthoGuards === 'object') {
+          const og = bbDiag.orthoGuards as { pauseOverhead?: boolean; limitDeepSquat?: boolean; closedChainOnly?: boolean; blockedPatterns?: string[]; mobilityAdd?: string[] };
+          const BB_MOB = ['shoulder', 'hip', 'ankle', 'lower_back', 'wrist'];
+          const mobAdd = Array.from(new Set([...(og.pauseOverhead ? ['shoulder'] : []), ...(og.limitDeepSquat ? ['hip'] : []), ...((og.mobilityAdd || []).filter((m) => BB_MOB.includes(String(m))))]));
+          if (mobAdd.length) {
+            setMobilityRestrictions((prev) => Array.from(new Set([...prev, ...mobAdd])));
+            pro2parts.push(`🦴 орто-гарды: ${mobAdd.join('+')} → фильтр пула`);
+          }
+          if (og.closedChainOnly) {
+            setAutoDeload(true);
+            pro2parts.push('🦴 Beighton+: авто-делод ВКЛ (щадящий режим)');
+          }
+          try { localStorage.setItem('he_bb_ortho_guards', JSON.stringify(og)); } catch {}
+        }
+        if (Array.isArray(bbDiag.orthoFlags) && bbDiag.orthoFlags.length) {
+          try { localStorage.setItem('he_bb_ortho_flags', JSON.stringify(bbDiag.orthoFlags)); } catch {}
+          if (typeof bbDiag.orthoSummary === 'string' && bbDiag.orthoSummary) pro2parts.push(`🦴 ${bbDiag.orthoSummary.slice(0, 80)}`);
+        }
         // PRO-3 R2: L/R-добивка и острая готовность ПРИМЕНЯЮТСЯ (к вставке коррекций,
         // не к мезоциклу — острая готовность не должна переписывать структуру блока).
         // Остальное (LVP/сухожилия/return-to/MMC/веса) — сохраняется + тост, сборку не меняет.

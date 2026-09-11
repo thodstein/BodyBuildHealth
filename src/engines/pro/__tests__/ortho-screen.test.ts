@@ -4,6 +4,7 @@ import {
   assessSpineMin, assessAchilles, assessHand, assessElbowValgus,
   scoreBeighton, beightonCutoff, assessBeighton, assessYellow, teenGate,
   rankJointSupport, screenOrtho, orthoGuardsForPlan, buildOrthoCsv, orthoBridgePayload,
+  hopLsi, hopLsiOverall, applyOrthoToProfile,
 } from '../ortho-screen.engine';
 
 describe('ortho-screen J1 плечо', () => {
@@ -157,5 +158,70 @@ describe('ortho-screen J7 агрегатор/гарды/экспорт', () => {
     // Без teen — честный null, не пустая строка
     const r2 = screenOrtho({ shoulder: { painfulArc: true, hawkinsPain: true } });
     expect((orthoBridgePayload(r2, orthoGuardsForPlan(r2)) as any).teenNote).toBeNull();
+  });
+});
+
+describe('ortho-screen П5 hop-LSI', () => {
+  it('LSI = min/max×100; мусор → null', () => {
+    expect(hopLsi(180, 200)).toBe(90);
+    expect(hopLsi(200, 180)).toBe(90);
+    expect(hopLsi(0, 200)).toBeNull();
+    expect(hopLsi(-5, 200)).toBeNull();
+    expect(hopLsi(undefined, 200)).toBeNull();
+    expect(hopLsi(NaN, 200)).toBeNull();
+  });
+  it('overall = худший из замеренных; пусто → null', () => {
+    expect(hopLsiOverall({ singleL: 180, singleR: 200, tripleL: 500, tripleR: 600 }).overall).toBeLessThan(90);
+    expect(hopLsiOverall({ singleL: 195, singleR: 200 }).overall).toBe(97.5);
+    expect(hopLsiOverall({}).overall).toBeNull();
+  });
+  it('замер бьёт чекбоксы: LSI≥90 без галок — измерено', () => {
+    const r = assessRts({ monthsSinceOp: 9, graft: 'btb', fear: false, preventionProgram: true, hop: { singleL: 195, singleR: 200, tripleL: 590, tripleR: 600 } });
+    expect(r.ready).toBe(true);
+    expect(r.status).toBe('ready');
+  });
+  it('замер <90 — не готов с цифрой в причине', () => {
+    const r = assessRts({ monthsSinceOp: 9, graft: 'btb', fear: false, preventionProgram: true, hop: { singleL: 150, singleR: 200 } });
+    expect(r.ready).toBe(false);
+    expect(r.flags[0].label).toMatch(/75%/);
+    expect(r.flags[0].action).toMatch(/single 75%/);
+  });
+});
+
+describe('ortho-screen профиль: wrist/elbow-мэппинг', () => {
+  it('кисть → wrist, локоть → elbow (ключи ARM-пула)', () => {
+    const r = applyOrthoToProfile([
+      { id: 'hand_cluster', joint: 'hand', level: 'doctor', label: 'x', action: 'y', evidence: 'z' },
+      { id: 'elbow_valgus', joint: 'elbow', level: 'watch', label: 'x', action: 'y', evidence: 'z' },
+    ]);
+    expect(r.mobilityAdd).toContain('wrist');
+    expect(r.mobilityAdd).toContain('elbow');
+  });
+  it('гарды моста несут wrist/elbow', () => {
+    const r = screenOrtho({ hand: { finkelsteinPain: true }, elbowValgusPain: true });
+    expect(orthoGuardsForPlan(r).mobilityAdd).toContain('wrist');
+    expect(orthoGuardsForPlan(r).mobilityAdd).toContain('elbow');
+  });
+});
+
+describe('ortho-screen SM-мост: parseSmBridgePayload ест орто-поля', () => {
+  it('mobility/yoke/teen/summary парсятся, мусор режется', async () => {
+    const { parseSmBridgePayload } = await import('../../../ui/screens/strength-sport/sm-bridge-intake');
+    const p = parseSmBridgePayload({
+      orthoGuards: { yokeGate: true, closedChainOnly: true, blockedPatterns: ['vertical_push', '  ', 42], mobilityAdd: ['shoulder', 'knee', 'нос', 'hip'] },
+      orthopedic: { blockedPatterns: ['squat'] },
+      teenNote: 'Подросток 14–15',
+      orthoSummary: 'x'.repeat(500),
+    });
+    expect(p.orthoYokeGate).toBe(true);
+    expect(p.orthoClosedChain).toBe(true);
+    expect(p.orthoTeen).toBe(true);
+    expect(p.orthoBlocked).toEqual(['squat', 'vertical_push', '42']);
+    expect(p.orthoMobility).toEqual(['shoulder', 'knee', 'hip']);
+    expect(p.orthoSummary?.length).toBe(200);
+    const empty = parseSmBridgePayload({});
+    expect(empty.orthoBlocked).toEqual([]);
+    expect(empty.orthoTeen).toBe(false);
+    expect(empty.orthoSummary).toBeNull();
   });
 });

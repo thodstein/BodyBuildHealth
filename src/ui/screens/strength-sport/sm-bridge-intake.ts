@@ -64,6 +64,17 @@ export interface SmBridgePatch {
   taOhsFailed: number | null;
   /** Spec-блок opt-in: сеты по неделям из taSpecBlock.weeks[].targetSets или null. */
   taSpecTargets: number[] | null;
+  /** J7 орто-скрининг: заблокированные паттерны (orthopedic.blockedPatterns + orthoGuards.blockedPatterns). */
+  orthoBlocked: string[];
+  /** J7: mobility-merge (только ключи MOBILITY_RU). */
+  orthoMobility: string[];
+  /** J7: йок/фермер-гейт (стронг) и closed-chain (Beighton+). */
+  orthoYokeGate: boolean;
+  orthoClosedChain: boolean;
+  /** J7: teen-флаг (teenNote непустой). */
+  orthoTeen: boolean;
+  /** J7: сводка орто-скрининга для rationale (≤200 символов) или null. */
+  orthoSummary: string | null;
 }
 
 const STRATEGIES: readonly string[] = ['conservative', 'balanced', 'aggressive'];
@@ -174,6 +185,27 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
       if (arr.length > 0) taSpecTargets = arr;
     }
   } catch { /* noop */ }
+  // J7 орто-скрининг: гарды из моста — всё санитизировано, null-safe.
+  const MOB_KEYS = ['shoulder', 'hip', 'knee', 'ankle', 'wrist', 'lower_back', 'neck'];
+  const ogRaw: any = d.orthoGuards != null && typeof d.orthoGuards === 'object' && !Array.isArray(d.orthoGuards) ? d.orthoGuards : null;
+  const ortRaw: any = (d as any).orthopedic != null && typeof (d as any).orthopedic === 'object' && !Array.isArray((d as any).orthopedic) ? (d as any).orthopedic : null;
+  const strArr = (v: unknown, cap = 8): string[] => {
+    if (!Array.isArray(v)) return [];
+    const out: string[] = [];
+    for (const x of v) {
+      if (out.length >= cap) break;
+      const s = String(x ?? '').trim().slice(0, 40);
+      if (s) out.push(s);
+    }
+    return Array.from(new Set(out));
+  };
+  const orthoBlocked = Array.from(new Set([...strArr(ortRaw?.blockedPatterns), ...strArr(ogRaw?.blockedPatterns)])).slice(0, 8);
+  const orthoMobility = Array.from(new Set([...strArr(ogRaw?.mobilityAdd, 7)].filter((m) => MOB_KEYS.includes(m))));
+  const orthoYokeGate = ogRaw?.yokeGate === true;
+  const orthoClosedChain = ogRaw?.closedChainOnly === true;
+  const orthoTeen = typeof (d as any).teenNote === 'string' && ((d as any).teenNote as string).length > 0;
+  const sumRaw = typeof (d as any).orthoSummary === 'string' ? ((d as any).orthoSummary as string) : '';
+  const orthoSummary = sumRaw.length > 0 ? sumRaw.slice(0, 200) : null;
   return {
     weakPoints,
     diagnosticLevel,
@@ -192,6 +224,12 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     taAsymPct,
     taOhsFailed,
     taSpecTargets,
+    orthoBlocked,
+    orthoMobility,
+    orthoYokeGate,
+    orthoClosedChain,
+    orthoTeen,
+    orthoSummary,
   };
 }
 

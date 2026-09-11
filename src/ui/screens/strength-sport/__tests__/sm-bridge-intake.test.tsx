@@ -136,6 +136,12 @@ describe('parseSmBridgePayload', () => {
       taAsymPct: null,
       taOhsFailed: null,
       taSpecTargets: null,
+      orthoBlocked: [],
+      orthoMobility: [],
+      orthoYokeGate: false,
+      orthoClosedChain: false,
+      orthoTeen: false,
+      orthoSummary: null,
     });
   });
 });
