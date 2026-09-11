@@ -8,6 +8,7 @@ describe('ta-v4 hub UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /Взятие/ }));
     expect(screen.getByText(/IFP кг/)).toBeTruthy();
     expect(screen.getByText(/Импульс/)).toBeTruthy();
+    expect(screen.getByText(/IPST кг/)).toBeTruthy();
   });
   it('ACL toggles render in jerk tab', () => {
     render(<WLDiagnosticsHub />);

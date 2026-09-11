@@ -250,4 +250,22 @@ describe('ta-v4 добойка (все 7 пунктов)', () => {
     expect(impulseVerdict(199, 'female')).toMatch(/ориентире/);
     expect(impulseVerdict(null)).toBeNull();
   });
+  it('IPST-добойка: ratio + слабое звено каждой позиции', async () => {
+    const { diagnoseTAImtp } = await import('../strength-sport-ta-imtp.engine');
+    const bw = 90;
+    const base = { bodyweightKg: bw, peakForceN: 3500 };
+    const t = diagnoseTAImtp({ ...base, ipstPeakN: 2800 })!;
+    expect(t.ipstRatio).toBeCloseTo(0.8, 2);
+    expect(t.weakLink).toBe('transition');
+    expect(t.chainNote).toMatch(/transition/);
+    const floor = diagnoseTAImtp({ ...base, ifpPeakN: 1500, ipstPeakN: 3000 })!;
+    expect(floor.weakLink).toBe('floor');
+    expect(floor.chainNote).toMatch(/пол/);
+    const trans = diagnoseTAImtp({ ...base, ifpPeakN: 2200, ipstPeakN: 1500 })!;
+    expect(trans.weakLink).toBe('transition');
+    const power = diagnoseTAImtp({ bodyweightKg: bw, peakForceN: 2000, ifpPeakN: 2200, ipstPeakN: 2100 })!;
+    expect(power.weakLink).toBe('power');
+    expect(power.chainNote).toMatch(/power/);
+    expect(diagnoseTAImtp({ bodyweightKg: bw, ipstPeakN: 2000 })!.weakLink).toBeNull();
+  });
 });

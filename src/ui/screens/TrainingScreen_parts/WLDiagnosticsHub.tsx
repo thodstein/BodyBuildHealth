@@ -133,6 +133,8 @@ type WLState = {
   imtpImpulse: string;
   endurFirst: string;
   endurLast: string;
+  // V4-добой-3: старт transition IPST (Rochau 2025)
+  ipstKg: string;
   // V4: ACL-флаги dip толчка
   jerkValgus: boolean;
   jerkRotation: boolean;
@@ -196,6 +198,8 @@ const DEFAULT_STATE: WLState = {
   imtpRfd: '', imtpDur: '', imtpCountermove: false,
   // V4: первая тяга + импульс + выносливость
   ifpKg: '', imtpImpulse: '', endurFirst: '', endurLast: '',
+  // V4-добой-3: старт transition IPST
+  ipstKg: '',
   // V4: ACL-флаги
   jerkValgus: false, jerkRotation: false, deepDip: false,
   // V4-добой: метрика скорости LVP (mean/peak путать нельзя)
@@ -790,7 +794,7 @@ export const WLDiagnosticsHub: React.FC = () => {
   const imtpResult = useMemo(() => {
     try {
       // IMTP-ввод живёт в clean-табе (кг силы), RFD/длительность/вес — здесь же
-      const hasAny = state.imtpKg || state.imtpRfd || state.imtpDur || state.imtpCountermove || state.imtpBw || state.ifpKg || state.imtpImpulse;
+      const hasAny = state.imtpKg || state.imtpRfd || state.imtpDur || state.imtpCountermove || state.imtpBw || state.ifpKg || state.imtpImpulse || state.ipstKg;
       if (!hasAny) return null;
       const manualBw = state.imtpBw ? parseFloat(state.imtpBw) : NaN;
       return diagnoseTAImtp({
@@ -802,9 +806,11 @@ export const WLDiagnosticsHub: React.FC = () => {
         // V4: первая тяга + импульс
         ifpPeakN: state.ifpKg ? parseFloat(state.ifpKg) * 9.81 : null,
         impulseNs: state.imtpImpulse ? parseFloat(state.imtpImpulse) : null,
+        // V4-добой-3: старт transition
+        ipstPeakN: state.ipstKg ? parseFloat(state.ipstKg) * 9.81 : null,
       });
     } catch { return null; }
-  }, [state.imtpKg, state.imtpRfd, state.imtpDur, state.imtpCountermove, state.imtpBw, state.ifpKg, state.imtpImpulse, profileWeightKg]);
+  }, [state.imtpKg, state.imtpRfd, state.imtpDur, state.imtpCountermove, state.imtpBw, state.ifpKg, state.imtpImpulse, state.ipstKg, profileWeightKg]);
 
   // V4-добой-2 (П5): вердикт импульса против норм Bustamante 2024
   const impulseNote = useMemo(() => {
@@ -1264,6 +1270,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         if (imtpResult?.ifpRatio != null) hubNotes.push(`IFP/IMTP ${imtpResult.ifpRatio} (сила с пола)`);
         if (imtpResult?.hasImpulse) hubNotes.push('Импульс 0–200мс записан (переносим между девайсами)');
         if (impulseNote) hubNotes.push(impulseNote);
+        if (imtpResult?.chainNote) hubNotes.push(imtpResult.chainNote);
         if (aclGuard) hubNotes.push(`Dip-ACL: ${aclGuard.text}`);
         if (meetBlock) hubNotes.push(`Старт: рывок ${meetBlock.snatchOpener}, взятие ${meetBlock.cjOpener}`);
         if (ymaxNote) hubNotes.push(ymaxNote);
@@ -1486,6 +1493,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize: 11, color: '#fff' }}>Вес кг<br /><input value={state.imtpBw} onChange={e => setState(s => ({ ...s, imtpBw: e.target.value }))} placeholder={profileWeightKg ? String(profileWeightKg) : '90'} style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
                 <label style={{ fontSize: 11, color: '#fff' }}>IFP кг (первая тяга)<br /><input data-wl="ifp" value={state.ifpKg} onChange={e => setState(s => ({ ...s, ifpKg: e.target.value }))} placeholder="180" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
                 <label style={{ fontSize: 11, color: '#fff' }}>Импульс Н·с (0–200)<br /><input data-wl="impulse" value={state.imtpImpulse} onChange={e => setState(s => ({ ...s, imtpImpulse: e.target.value }))} placeholder="650" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>IPST кг (transition)<br /><input data-wl="ipst" value={state.ipstKg} onChange={e => setState(s => ({ ...s, ipstKg: e.target.value }))} placeholder="200" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
               <button data-wl="imtp-dip" onClick={() => setState(s => ({ ...s, imtpCountermove: !s.imtpCountermove }))} aria-pressed={state.imtpCountermove} aria-label="Был dip перед тягой"
                 style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, width: '100%', marginTop: 6, padding: '8px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 700, background: state.imtpCountermove ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)', border: state.imtpCountermove ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>
@@ -1495,6 +1503,7 @@ export const WLDiagnosticsHub: React.FC = () => {
               {imtpResult && <div style={{ fontSize: 10, color: imtpResult.profile === 'balanced' ? '#22c55e' : '#f59e0b', marginTop: 6 }}>{imtpResult.relForce != null ? `${imtpResult.relForce}×BW · ` : ''}{imtpResult.verdict}</div>}
               {imtpResult?.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>⚠️ {w}</div>)}
               {impulseNote && <div data-wl="impulse-norm" style={{ fontSize: 10, color: impulseNote.startsWith('Импульс') && impulseNote.includes('ниже') ? '#f59e0b' : '#22c55e', marginTop: 4 }}>⚡ {impulseNote}</div>}
+              {imtpResult?.chainNote && <div data-wl="iso-chain" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>⛓️ {imtpResult.chainNote}</div>}
               <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>📋 Протокол: {IMTP_PROTOCOL_CHECKLIST.join(' · ')}</div>
               <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{IMTP_CLEAN_TRANSFER_NOTE}</div>
               <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>

@@ -9,6 +9,9 @@
  * ICC 0.94–0.98), RFD между девайсами несопоставим (Wang 2025) → серая зона
  * RFD ±25% не даёт explosive_deficit, только warning; трансфер IMTP→взятие
  * сильнее, чем→рывок (Arauz 2025: взятие force-доминантно).
+ * V4-добой-3 (IPST): третья позиция — старт transition (Rochau et al. 2025,
+ * Appl Sci: IMTP + IPST + IPSP, ICC ≥0.86; IPSP/IPST сильнее коррелируют с
+ * суммой, r ≥0.90) → цепочка трёх позиций + слабое звено.
  * Пороги — ориентиры полевых норм, помечены как таковые.
  * Чистый движок, без UI/storage.
  */
@@ -23,7 +26,11 @@ export interface TAImtpInput {
   ifpPeakN?: number | null;
   /** V4: импульс 0–200мс (Н·с) — переносимая между девайсами метрика (Wang 2025). */
   impulseNs?: number | null;
+  /** V4-добой-3: пик старта transition IPST (Н) — двойное сгибание колен (Rochau 2025). */
+  ipstPeakN?: number | null;
 }
+
+export type IsoWeakLink = 'floor' | 'transition' | 'power';
 
 export interface TAImtpResult {
   valid: boolean;
@@ -37,6 +44,12 @@ export interface TAImtpResult {
   ifpRatio: number | null;
   /** V4: импульс как переносимая метрика (есть/нет). */
   hasImpulse: boolean;
+  /** V4-добой-3: отношение IPST/IMTP или null (нормы нет — только цепь). */
+  ipstRatio: number | null;
+  /** V4-добой-3: слабое звено цепи (мин. относительная сила среди замеренных) или null. */
+  weakLink: IsoWeakLink | null;
+  /** V4-добой-3: текст цепи + коррекция или null. */
+  chainNote: string | null;
 }
 
 /** Ориентиры полевых норм (не диагноз): относительная сила и RFD. */
@@ -53,6 +66,8 @@ export const IMTP_PROTOCOL_CHECKLIST: string[] = [
   '3 пробы + знакомизация',
   'Без dip/пружины (инвалидирует)',
   'Тот же девайс для динамики (RFD между девайсами несопоставим)',
+  'Лямки + тейп хвата (хват не лимитирует, Rochau 2025)',
+  'Разница проб >250Н — перетест; порядок IMTP→IPST→IPSP (стойку опускать проще)',
 ];
 
 /** W2: трансфер — IMTP ближе ко взятию, чем к рывку (Arauz 2025). */
@@ -60,7 +75,8 @@ export const IMTP_CLEAN_TRANSFER_NOTE = 'IMTP→взятие сильнее, ч�
 
 export function diagnoseTAImtp(input: TAImtpInput): TAImtpResult | null {
   const pf = input.peakForceN, bw = input.bodyweightKg;
-  if (pf == null && input.rfdNs == null && input.durationS == null && input.countermovement == null) return null;
+  if (pf == null && input.rfdNs == null && input.durationS == null && input.countermovement == null
+    && input.ifpPeakN == null && input.ipstPeakN == null && input.impulseNs == null) return null;
   const warnings: string[] = [];
   if (input.countermovement === true) {
     warnings.push('Dip перед тягой — тест невалиден: только статическая тяга 3–5с, без пружины (Science for Sport).');
@@ -109,7 +125,31 @@ export function diagnoseTAImtp(input: TAImtpInput): TAImtpResult | null {
   if (hasImpulse && rfdGray) {
     warnings.push('RFD в серой зоне — опирайся на импульс 0–200мс: он переносим между девайсами (Wang 2025).');
   }
-  return { valid: input.countermovement !== true, relForce, profile, verdict, warnings, rfdGray, ifpRatio, hasImpulse };
+  // V4-добой-3: цепочка трёх позиций + слабое звено (Rochau 2025: все три предсказывают сумму)
+  let ipstRatio: number | null = null;
+  let weakLink: IsoWeakLink | null = null;
+  let chainNote: string | null = null;
+  const ipst = input.ipstPeakN;
+  if (ipst != null && Number.isFinite(ipst) && ipst > 0 && pf != null && Number.isFinite(pf) && pf > 0) {
+    ipstRatio = Math.round((ipst / pf) * 100) / 100;
+  }
+  if (bw != null && Number.isFinite(bw) && bw > 0) {
+    const rel = (v: number | null | undefined): number | null =>
+      v != null && Number.isFinite(v) && v > 0 ? Math.round((v / (bw * 9.81)) * 100) / 100 : null;
+    const cands = [
+      { link: 'floor', v: rel(input.ifpPeakN), fix: 'дефицит/паузы у пола' },
+      { link: 'transition', v: rel(ipst), fix: 'паузы у колен, вис ниже колен' },
+      { link: 'power', v: relForce, fix: 'power-позиция: тяги + шраги' },
+    ].filter((c): c is { link: IsoWeakLink; v: number; fix: string } => c.v != null);
+    if (cands.length >= 2) {
+      const worst = cands.reduce((a, b) => (b.v < a.v ? b : a));
+      weakLink = worst.link;
+      const chain = cands.map((c) => `${c.link === 'floor' ? 'пол' : c.link === 'transition' ? 'transition' : 'power'} ${c.v}`).join(' · ');
+      const linkRu = weakLink === 'floor' ? 'пол (первая тяга)' : weakLink === 'transition' ? 'transition (старт передачи)' : 'power-позиция';
+      chainNote = `Цепь: ${chain} ×BW → слабое звено ${linkRu}: ${worst.fix} (Rochau 2025)`;
+    }
+  }
+  return { valid: input.countermovement !== true, relForce, profile, verdict, warnings, rfdGray, ifpRatio, hasImpulse, ipstRatio, weakLink, chainNote };
 }
 
 /**
