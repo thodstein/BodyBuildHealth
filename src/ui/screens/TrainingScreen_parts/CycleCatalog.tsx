@@ -10,11 +10,14 @@ import { ARM_CYCLE_LIBRARY } from '../../../engines/arm/arm-cycle-library.engine
 import type { ArmCycleTemplate } from '../../../engines/arm/arm-cycle-library.engine';
 import { SS_CYCLES } from '../../../data/ss-cycles/ss-cycle-index';
 import type { SSCycleTemplate } from '../../../data/ss-cycles/ss-types';
+import { CARDIO_CYCLES } from '../../../data/cardio-cycles/cardio-cycle-index';
+import type { CardioCycleTemplate } from '../../../data/cardio-cycles/cardio-cycle-types';
+import { requestCardioTemplateBuild } from '../../../engines/lms/cardio-cycle-bridge';
 import { rankCycles } from '../../../engines/lms/lms-selector.engine';
 import { ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { applyToPlanner } from './planner-bridge';
 
-type CatFilter = 'all' | 'strength' | 'bodybuilding' | 'arm' | 'strong';
+type CatFilter = 'all' | 'strength' | 'bodybuilding' | 'arm' | 'strong' | 'cardio';
 type UserGoal = 'strength' | 'mass' | 'endurance' | 'peak' | 'mixed' | 'speed';
 type UserLevel = 'novice' | 'II-KMS' | 'KMS-MS' | 'MS-MSMK' | 'II-MS' | 'intermediate';
 
@@ -61,6 +64,20 @@ export function matchSSPeriod(c: SSCycleTemplate, period: string): boolean {
   if (period === 'peak') return c.meta.period === 'peak';
   if (period === 'endurance') return false;
   if (period === 'mixed') return c.meta.period === 'mixed';
+  return true;
+}
+/** Совпадение кардио-цикла с LMS-фильтром уровня (шкала beginner/intermediate/advanced). */
+export function matchCardioLevel(c: CardioCycleTemplate, levelF: string): boolean {
+  if (levelF === 'all') return true;
+  return c.meta.level.some(l => proLevelsFor(levelF).includes(l));
+}
+/** Совпадение кардио-цикла с фильтром периода (LMS-шкала → кардио-фазы). */
+export function matchCardioPeriod(c: CardioCycleTemplate, period: string): boolean {
+  if (period === 'all') return true;
+  if (period === 'strength' || period === 'mass') return c.meta.period === 'base' || c.meta.period === 'build';
+  if (period === 'peak') return c.meta.period === 'peak';
+  if (period === 'endurance') return c.meta.period === 'base';
+  if (period === 'mixed') return c.meta.period === 'mixed' || c.meta.period === 'taper' || c.meta.period === 'recovery';
   return true;
 }
 
@@ -116,6 +133,10 @@ const PERIOD_LABELS: Record<string, string> = { strength: 'Сила', peak: 'В�
 const SS_PERIOD_LABELS: Record<string, string> = { base: 'База', build: 'Напор', peak: 'Пик', mixed: 'Смешанный' };
 const SS_MODE_LABELS: Record<string, string> = { weightlifting: 'Тяжёлая атлетика', strongman: 'Стронг', hybrid: 'Гибрид' };
 const ARM_DISC_LABELS: Record<string, string> = { armwrestling: 'Армрестлинг', armlifting: 'Армлифтинг', hybrid: 'Гибрид', any: 'Любая' };
+// ── Подписи видов кардио (sport-ось раздела) ──
+const CARDIO_SPORT_LABELS: Record<string, string> = { run: 'Бег', row: 'Гребля', bike: 'Вело', mixed: 'Смешанные', hiit: 'HIIT' };
+const CARDIO_PERIOD_LABELS: Record<string, string> = { base: 'База', build: 'Напор', peak: 'Пик', mixed: 'Смешанный', taper: 'Тапер', recovery: 'Восстановление' };
+const CARDIO_TYPE_LABELS: Record<string, string> = { zone2: 'Zone 2', miss: 'MISS', hiit: 'HIIT', recovery: 'Rec' };
 
 // ── Просмотр раскладки цикла (дни → упражнения → подходы/повторы/%ПМ) ──
 export const CycleLayoutView: React.FC<{ cycle: SRCycleTemplate }> = ({ cycle }) => {
@@ -286,13 +307,25 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   // ── Мост «Библиотека → конструктор»: именной цикл уходит в planner-bridge
   // (kind arm_cycle/ss_cycle), конструктор подхватывает при открытии + живьём.
   const [bridgeMsg, setBridgeMsg] = React.useState('');
-  const sendCycle = (kind: 'arm_cycle' | 'ss_cycle', cycleId: string, title: string) => {
-    try {
+  const sendCycle = (kind: 'arm_cycle' | 'ss_cycle', cycleId: string, title: string) => {    try {
       applyToPlanner({ kind, label: title, data: { cycleId } });
       const track = kind === 'arm_cycle' ? 'arm' : 'strength';
       try { localStorage.setItem('he_training_planning_track', track); } catch { /* ignore */ }
       try { window.dispatchEvent(new CustomEvent('planning-track-open', { detail: track })); } catch { /* ignore */ }
       setBridgeMsg(`✅ «${title}» → ${kind === 'arm_cycle' ? 'арм-конструктор' : 'конструктор ТА/стронга'}`);
+      setTimeout(() => setBridgeMsg(''), 5000);
+    } catch { setBridgeMsg('⚠ Не удалось отправить цикл'); }
+  };
+  // ── Мост «Библиотека → кардио-конструктор»: свой канал (cardio-bridge),
+  // трек открывается тем же событием planning-track-open (track 'cardio'
+  // уже поддерживается TrainingScreen). Конструктор подхватывает заявку
+  // при монтировании + живьём, planner-bridge не тронут.
+  const sendCardioCycle = (cycleId: string, title: string) => {
+    try {
+      requestCardioTemplateBuild(cycleId);
+      try { localStorage.setItem('he_training_planning_track', 'cardio'); } catch { /* ignore */ }
+      try { window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'cardio' })); } catch { /* ignore */ }
+      setBridgeMsg(`✅ «${title}» → кардио-конструктор`);
       setTimeout(() => setBridgeMsg(''), 5000);
     } catch { setBridgeMsg('⚠ Не удалось отправить цикл'); }
   };
@@ -308,11 +341,15 @@ export const CycleCatalog: React.FC<Props> = (p) => {
     () => (Array.isArray(favs) ? SS_CYCLES.filter(c => favs.includes(`ss:${c.meta.id}`)) : []),
     [favs],
   );
-  const favTotal = favCycles.length + favArmCycles.length + favSSCycles.length;
+  const favCardioCycles = React.useMemo(
+    () => (Array.isArray(favs) ? CARDIO_CYCLES.filter(c => favs.includes(`cardio:${c.meta.id}`)) : []),
+    [favs],
+  );
+  const favTotal = favCycles.length + favArmCycles.length + favSSCycles.length + favCardioCycles.length;
 
   const base = React.useMemo(() => {
     if (cat === 'all') return LMS_CYCLES;
-    if (cat === 'arm' || cat === 'strong') return LMS_CYCLES;
+    if (cat === 'arm' || cat === 'strong' || cat === 'cardio') return LMS_CYCLES;
     return LMS_CYCLES.filter(c =>
       cat === 'bodybuilding'
         ? normalizeCycleDirection(c.meta.direction) === 'bodybuilding'
@@ -353,6 +390,22 @@ export const CycleCatalog: React.FC<Props> = (p) => {
     });
   }, [search, focus, levelF, weeks, freq, favOnly, favs, cat]);
 
+  // ── Кардио-библиотека (35 именных циклов): фильтры поиска/вида/уровня/периода/недель/частоты ──
+  const cardioFiltered = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return CARDIO_CYCLES.filter(c => {
+      const m = c.meta;
+      if (favOnly && !favs.includes(`cardio:${m.id}`)) return false;
+      // Вид спорта применяется только внутри раздела; в «Все» LMS-фокус кардио не прячет.
+      if (cat === 'cardio' && focus !== 'all' && m.sport !== focus) return false;
+      if (!matchCardioLevel(c, levelF)) return false;
+      if (!matchCardioPeriod(c, period)) return false;
+      if (weeks !== 'all' && weeksBucket(m.weeks) !== weeks) return false;
+      if (freq !== 'all' && String(m.sessionsPerWeek) !== freq && String(m.sessionsPerWeekMax ?? m.sessionsPerWeek) !== freq) return false;
+      if (q && !(`${m.title || ''} ${m.description || ''} ${m.howItWorks || ''} ${(m.tags || []).join(' ')} ${m.sourceLabel || ''}`.toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [search, focus, levelF, period, weeks, freq, favOnly, favs, cat]);
   // ── SS-библиотека (ТА/стронг, 15 циклов): фильтры поиска/режима/уровня/периода/недель/частоты ──
   const ssFiltered = React.useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -401,21 +454,34 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       (SS_MODE_LABELS[a[0]] || a[0]).localeCompare(SS_MODE_LABELS[b[0]] || b[0], 'ru'));
   }, [ssFiltered]);
 
+  const cardioGrouped = React.useMemo(() => {
+    const map = new Map<string, CardioCycleTemplate[]>();
+    for (const c of cardioFiltered) {
+      if (!map.has(c.meta.sport)) map.set(c.meta.sport, []);
+      map.get(c.meta.sport)!.push(c);
+    }
+    return [...map.entries()].sort((a, b) =>
+      (CARDIO_SPORT_LABELS[a[0]] || a[0]).localeCompare(CARDIO_SPORT_LABELS[b[0]] || b[0], 'ru'));
+  }, [cardioFiltered]);
+
   const availableFocus = React.useMemo(() => {
     if (cat === 'arm') return [...new Set(ARM_CYCLE_LIBRARY.map(c => c.discipline))].sort((a, b) => (ARM_DISC_LABELS[a] || a).localeCompare(ARM_DISC_LABELS[b] || b, 'ru'));
     if (cat === 'strong') return [...new Set(SS_CYCLES.map(c => c.meta.mode))].sort((a, b) => (SS_MODE_LABELS[a] || a).localeCompare(SS_MODE_LABELS[b] || b, 'ru'));
+    if (cat === 'cardio') return [...new Set(CARDIO_CYCLES.map(c => c.meta.sport))].sort((a, b) => (CARDIO_SPORT_LABELS[a] || a).localeCompare(CARDIO_SPORT_LABELS[b] || b, 'ru'));
     return uniqKeys(base, cat);
   }, [base, cat]);
   const availableAuthors = React.useMemo(() => AUTHORS.filter(a => base.some(c => (c.meta.tags || []).includes(a))), [base]);
 
-  // ── Сколько всего видно в текущей категории (LMS + арм + SS) ──
+  // ── Сколько всего видно в текущей категории (LMS + арм + SS + кардио) ──
   const visibleCount = cat === 'arm' ? armFiltered.length
     : cat === 'strong' ? ssFiltered.length
-    : cat === 'all' ? filtered.length + armFiltered.length + ssFiltered.length
+    : cat === 'cardio' ? cardioFiltered.length
+    : cat === 'all' ? filtered.length + armFiltered.length + ssFiltered.length + cardioFiltered.length
     : filtered.length;
   const totalCount = cat === 'arm' ? ARM_CYCLE_LIBRARY.length
     : cat === 'strong' ? SS_CYCLES.length
-    : cat === 'all' ? LMS_CYCLES.length + ARM_CYCLE_LIBRARY.length + SS_CYCLES.length
+    : cat === 'cardio' ? CARDIO_CYCLES.length
+    : cat === 'all' ? LMS_CYCLES.length + ARM_CYCLE_LIBRARY.length + SS_CYCLES.length + CARDIO_CYCLES.length
     : LMS_CYCLES.length;
 
   const recommendations = React.useMemo(() => {
@@ -436,10 +502,12 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const focusLabel = cat === 'strength' ? 'Направление'
     : cat === 'bodybuilding' ? 'Специализация'
     : cat === 'arm' ? 'Дисциплина'
+    : cat === 'cardio' ? 'Вид спорта'
     : cat === 'strong' ? 'Режим' : 'Специализация / направление';
   const focusChipLabel = (k: string): string => {
     if (cat === 'arm') return ARM_DISC_LABELS[k] || k;
     if (cat === 'strong') return SS_MODE_LABELS[k] || k;
+    if (cat === 'cardio') return CARDIO_SPORT_LABELS[k] || k;
     return FOCUS_LABELS[k] || k;
   };
 
@@ -448,18 +516,20 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   // «2 дн/нед», «13+ нед» в ТА·Стронг, где таких циклов нет в данных, — прячем,
   // иначе пользователь получает «Ничего не найдено» без своей вины)
   const periodOpts = React.useMemo(
-    () => (cat === 'strong' ? PERIODS.filter(p => SS_CYCLES.some(c => matchSSPeriod(c, p))) : PERIODS),
+    () => (cat === 'strong' ? PERIODS.filter(p => SS_CYCLES.some(c => matchSSPeriod(c, p))) : cat === 'cardio' ? PERIODS.filter(p => CARDIO_CYCLES.some(c => matchCardioPeriod(c, p))) : PERIODS),
     [cat],
   );
   const freqOpts = React.useMemo(() => {
     if (cat === 'strong') return CYCLE_FREQ_OPTS.filter(f => SS_CYCLES.some(c => String(c.meta.sessionsPerWeek) === f));
     if (cat === 'arm') return CYCLE_FREQ_OPTS.filter(f => ARM_CYCLE_LIBRARY.some(c => String(c.daysPerWeek) === f));
+    if (cat === 'cardio') return CYCLE_FREQ_OPTS.filter(f => CARDIO_CYCLES.some(c => String(c.meta.sessionsPerWeek) === f || String(c.meta.sessionsPerWeekMax ?? c.meta.sessionsPerWeek) === f));
     return CYCLE_FREQ_OPTS;
   }, [cat]);
   const weeksOpts = React.useMemo(() => {
     const keys = Object.keys(WEEKS_LABELS);
     if (cat === 'strong') return keys.filter(w => SS_CYCLES.some(c => weeksBucket(c.meta.weeks) === w));
     if (cat === 'arm') return keys.filter(w => ARM_CYCLE_LIBRARY.some(c => weeksBucket(c.weeks) === w));
+    if (cat === 'cardio') return keys.filter(w => CARDIO_CYCLES.some(c => weeksBucket(c.meta.weeks) === w));
     return keys;
   }, [cat]);
 
@@ -479,14 +549,19 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       if (freq !== 'all' && !ARM_CYCLE_LIBRARY.some(c => String(c.daysPerWeek) === freq)) setFreq('all');
       if (weeks !== 'all' && !ARM_CYCLE_LIBRARY.some(c => weeksBucket(c.weeks) === weeks)) setWeeks('all');
       setAuthor('all');
+    } else if (id === 'cardio') {
+      if (period !== 'all' && !CARDIO_CYCLES.some(c => matchCardioPeriod(c, period))) setPeriod('all');
+      if (freq !== 'all' && !CARDIO_CYCLES.some(c => String(c.meta.sessionsPerWeek) === freq || String(c.meta.sessionsPerWeekMax ?? c.meta.sessionsPerWeek) === freq)) setFreq('all');
+      if (weeks !== 'all' && !CARDIO_CYCLES.some(c => weeksBucket(c.meta.weeks) === weeks)) setWeeks('all');
+      setAuthor('all');
     }
   };
 
   return (
     <div className="train-cycles lib-cycles" style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div className="lib-intro" style={{ fontSize: 11, color: '#fff' }}>Справочник готовых циклов: ПЛ и ББ ({LMS_CYCLES.length}), армрестлинг и армлифтинг ({ARM_CYCLE_LIBRARY.length}), тяжёлая атлетика и стронг ({SS_CYCLES.length}). Выберите тип, уточните специализацию, уровень, период и другие параметры — каталог перестроится автоматически.</div>
+      <div className="lib-intro" style={{ fontSize: 11, color: '#fff' }}>Справочник готовых циклов: ПЛ и ББ ({LMS_CYCLES.length}), армрестлинг и армлифтинг ({ARM_CYCLE_LIBRARY.length}), тяжёлая атлетика и стронг ({SS_CYCLES.length}), кардио ({CARDIO_CYCLES.length}). Выберите тип, уточните специализацию, уровень, период и другие параметры — каталог перестроится автоматически.</div>
 
-      {/* ── Сегмент-контрол: Все / Силовые / Бодибилдинг / Арм / ТА·Стронг ── */}
+      {/* ── Сегмент-контрол: Все / Силовые / Бодибилдинг / Арм / ТА·Стронг / Кардио ── */}
       <div className="lib-seg" style={{ display: 'flex', gap: 4, padding: '6px', borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)' }}>
         {([
           { id: 'all' as CatFilter, label: 'Все', icon: '📚' },
@@ -494,6 +569,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
           { id: 'bodybuilding' as CatFilter, label: 'Бодибилдинг', icon: '💪' },
           { id: 'arm' as CatFilter, label: 'Арм', icon: '💪' },
           { id: 'strong' as CatFilter, label: 'ТА·Стронг', icon: '🏋️' },
+          { id: 'cardio' as CatFilter, label: 'Кардио', icon: '🏃' },
         ]).map(s => (
           <button key={s.id} data-active={cat === s.id ? 'true' : 'false'} aria-pressed={cat === s.id} onClick={() => switchCat(s.id)} style={{
             flex: 1, padding: '8px 4px', borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: cat === s.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
@@ -599,7 +675,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         <div role="status" style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 12, padding: '10px 12px' }}>{bridgeMsg}</div>
       )}
 
-      {/* ⭐ Избранные циклы (ПЛ/ББ + арм + ТА/стронг) */}
+      {/* ⭐ Избранные циклы (ПЛ/ББ + арм + ТА/стронг + кардио) */}
       {favTotal > 0 && (
         <div className="lib-fav" style={{ background: 'rgba(250,204,21,0.05)', borderRadius: 12, border: '1px solid rgba(250,204,21,0.18)', padding: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#facc15', marginBottom: 6 }}>⭐ Избранные циклы ({favTotal})</div>
@@ -634,6 +710,18 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                     <button aria-label={`Убрать из избранного ${m.title}`} data-fav="true" onClick={() => toggleFav(`ss:${m.id}`)} style={{ minWidth: 44, minHeight: 44, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15 }} title="Убрать из избранного">⭐</button>
                   </div>
                   <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>🏋️ {SS_MODE_LABELS[m.mode] || m.mode} · {m.weeks} нед · {m.sessionsPerWeek} дн/нед · {SS_PERIOD_LABELS[m.period] || m.period}</div>
+                </div>
+              );
+            })}
+            {favCardioCycles.map(c => {
+              const m = c.meta;
+              return (
+                <div key={`cardio:${m.id}`} style={{ background: 'rgba(24,24,27,0.4)', borderRadius: 10, padding: 8, border: '1px solid rgba(250,204,21,0.15)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#facc15', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</div>
+                    <button aria-label={`Убрать из избранного ${m.title}`} data-fav="true" onClick={() => toggleFav(`cardio:${m.id}`)} style={{ minWidth: 44, minHeight: 44, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15 }} title="Убрать из избранного">⭐</button>
+                  </div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>🏃 {CARDIO_SPORT_LABELS[m.sport] || m.sport} · {m.weeks} нед · {m.sessionsPerWeek} дн/нед · {CARDIO_PERIOD_LABELS[m.period] || m.period}</div>
                 </div>
               );
             })}
@@ -813,6 +901,91 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                       width: '100%', marginTop: 8, padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer',
                       background: 'var(--accent)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 48,
                     }}>🏋️ Собрать в ТА/стронг-конструкторе →</button>
+                  </div>
+                }
+              />
+            );
+          })}
+        </div>
+      ))}
+      {/* ── Кардио-циклы (именная библиотека: бег/гребля/вело/триатлон, дословно по источникам) ── */}
+      {(cat === 'cardio' || cat === 'all') && cardioFiltered.length > 0 && (
+        <div className="lib-group lib-cardio-group">
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, margin: '6px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>🏃 Кардио</span>
+            <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '1px 7px', color: '#fff' }}>{cardioFiltered.length}</span>
+          </div>
+        </div>
+      )}
+      {(cat === 'cardio' || cat === 'all' ? cardioGrouped : []).map(([sk, cycles]) => (
+        <div key={`cardio-${sk}`} className="lib-group lib-cat-cardio">
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, margin: '6px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>{CARDIO_SPORT_LABELS[sk] || sk}</span>
+            <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '1px 7px', color: '#fff' }}>{cycles.length}</span>
+          </div>
+          {cycles.map(c => {
+            const m = c.meta;
+            const favId = `cardio:${m.id}`;
+            const days = m.sessionsPerWeekMax && m.sessionsPerWeekMax !== m.sessionsPerWeek
+              ? `${m.sessionsPerWeek}–${m.sessionsPerWeekMax} дн/нед` : `${m.sessionsPerWeek} дн/нед`;
+            const chips = [`${m.weeks} нед`, days, CARDIO_PERIOD_LABELS[m.period] || m.period, (m.level || []).join('/')];
+            const week1 = c.meta.kind === 'explicit' && c.weeks && c.weeks[0]
+              ? c.weeks[0].sessions.map(s => `${CARDIO_TYPE_LABELS[s.type] || s.type} ${s.durationMin} мин`).join(' · ')
+              : null;
+            return (
+              <ExpandableCard
+                key={favId}
+                title={m.title}
+                icon=""
+                accent="#06b6d4"
+                short={
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {chips.map((ch, i) => (
+                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
+                        ))}
+                        {m.lowImpact && (
+                          <span className="lib-equip-badge" style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(34,197,94,0.16)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 8, padding: '2px 7px' }}>🦵 Щадящий</span>
+                        )}
+                      </div>
+                      <button aria-label={favs.includes(favId) ? `Убрать из избранного ${m.title}` : `В избранное ${m.title}`}
+                        data-fav={favs.includes(favId) ? 'true' : 'false'}
+                        onClick={e => { e.stopPropagation(); toggleFav(favId); }}
+                        style={{ minWidth: 40, minHeight: 40, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15, flexShrink: 0, filter: favs.includes(favId) ? 'none' : 'grayscale(1)', opacity: favs.includes(favId) ? 1 : 0.4 }}
+                        title={favs.includes(favId) ? 'Убрать из избранного' : 'В избранное'}>⭐</button>
+                    </div>
+                    <div>{m.description}</div>
+                  </div>
+                }
+                full={
+                  <div>
+                    <div style={{ marginBottom: 6 }}>{m.howItWorks}</div>
+                    {m.conditions.length > 0 && (
+                      <div>
+                        <b style={{ fontSize: 11 }}>Условия:</b>
+                        <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: 11 }}>
+                          {m.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 2 }}>{cond}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                    {m.equipment && m.equipment.length > 0 && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: '#fff' }}>Снаряжение: {m.equipment.join(', ')}</div>
+                    )}
+                    <div style={{ marginTop: 6, fontSize: 11, color: '#fff' }}>📖 Источник: {m.sourceLabel}</div>
+                    {week1 && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', marginBottom: 4 }}>📅 Неделя 1</div>
+                        <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5 }}>{week1}</div>
+                      </div>
+                    )}
+                    <div className="lib-cardio-note" style={{ marginTop: 8, fontSize: 11, color: '#fff', background: 'rgba(6,182,214,0.08)', border: '1px solid rgba(6,182,214,0.22)', borderRadius: 8, padding: '6px 8px' }}>
+                      🏃 Именной цикл — одной кнопкой уходит в конструктор (таб «📖 Каталог»).
+                    </div>
+                    <button className="lib-apply" onClick={() => sendCardioCycle(m.id, m.title)} style={{
+                      width: '100%', marginTop: 8, padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer',
+                      background: 'var(--accent)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 48,
+                    }}>🏃 Собрать в кардио-конструкторе →</button>
                   </div>
                 }
               />
