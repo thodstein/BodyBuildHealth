@@ -191,9 +191,9 @@ export function analyzeRecovery(input: RecoveryInput): RecoveryOutput {
     deloadReason = 'Уже в фазе deload';
   }
 
-  // Recommendations
+  // Recommendations (поведенческие; дозы и добавки — только в калькуляторе поддержки, не здесь)
   if (sleep.score < 50) {
-    recommendations.push('Приоритет: нормализация сна. Мелатонин 3-5мг, магний 400мг бисглицинат, экранный детокс за 1ч до сна.');
+    recommendations.push('Приоритет: гигиена сна — тёмная прохладная спальня, экранный детокс за 1ч до сна, стабильное время подъёма. Добавки и дозы — только в калькуляторе поддержки.');
   }
   if (hrv.score < 50) {
     recommendations.push('HRV снижен — добавьте дыхательные практики (4-7-8), лёгкое кардио 20-30мин.');

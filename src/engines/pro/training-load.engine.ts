@@ -192,6 +192,27 @@ export function fitnessFatigue(
   return { series, current: series[series.length - 1] || null, peakPerformanceIdx: peakIdx };
 }
 
+export interface BanisterForm { z: number; trend: 'up' | 'flat' | 'down'; label: string; }
+/** Форма по Banister как z-тренд performance за 7 дней (сырые AU несопоставимы с readiness 0–100).
+ *  null при <7 точек. Тренд — наклон второй половины к первой в единицах SD. */
+export function banisterForm(dailyLoads: DayLoad[]): BanisterForm | null {
+  const { series } = fitnessFatigue(dailyLoads);
+  if (series.length < 7) return null;
+  const tail = series.slice(-7).map(p => p.performance);
+  const mean = tail.reduce((s, v) => s + v, 0) / tail.length;
+  const sd = Math.sqrt(tail.reduce((s, v) => s + (v - mean) ** 2, 0) / tail.length);
+  const z = sd > 0 ? (tail[tail.length - 1] - mean) / sd : 0;
+  const first = (tail[0] + tail[1] + tail[2]) / 3;
+  const last = (tail[4] + tail[5] + tail[6]) / 3;
+  const r = (v: number) => Math.round(v * 10) / 10;
+  // Порог значимости: округление series до целых даёт лесенку +1/нед даже на асимптоте — ниже 5 AU шум, не тренд.
+  if (Math.abs(last - first) < 5) return { z: r(z), trend: 'flat', label: `форма ${r(z)}σ · плато` };
+  const slope = sd > 0 ? (last - first) / sd : 0;
+  const trend = slope > 0.3 ? 'up' : slope < -0.3 ? 'down' : 'flat';
+  const label = trend === 'up' ? `форма +${r(z)}σ · растёт — окно для тяжёлой сессии` : trend === 'down' ? `форма ${r(z)}σ · падает — придержите объём` : `форма ${r(z)}σ · плато`;
+  return { z: r(z), trend, label };
+}
+
 export interface LoadReport {
   dailyLoads: DayLoad[];
   acwr: ACWRResult;

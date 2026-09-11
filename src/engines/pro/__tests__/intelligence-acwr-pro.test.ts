@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   acuteChronicRatio,
   trainingLoadReport,
+  banisterForm,
   ACWR_DISCLAIMER,
   ACWR_ZONE_META,
   ACWR_CHRONIC_FLOOR_DEFAULT,
@@ -86,5 +87,33 @@ describe('P1 честный ACWR', () => {
     expect(ACWR_ZONE_META.optimal).toEqual({ label: 'Оптимум', color: '#22c55e' });
     expect(ACWR_ZONE_META.caution).toEqual({ label: 'Осторожно', color: '#eab308' });
     expect(ACWR_ZONE_META.dangerous).toEqual({ label: 'Опасно', color: '#ef4444' });
+  });
+});
+
+describe('P6 Banister-форма z-трендом', () => {
+  it('null при <7 точек', () => {
+    expect(banisterForm(flatLoads(5, 400))).toBeNull();
+  });
+
+  it('плато на долгой ровной нагрузке (5τ фитнеса ≈ 210+ дн)', () => {
+    const f = banisterForm(flatLoads(300, 400))!;
+    expect(f.trend).toBe('flat');
+  });
+
+  it('на ramp-up форма растёт (фитнес копится быстрее утомления)', () => {
+    const f = banisterForm(flatLoads(14, 400))!;
+    expect(f.trend).toBe('up');
+  });
+
+  it('разгрузка после нагрузки — форма растёт', () => {
+    const loads = [...flatLoads(14, 500, '2026-07-21'), ...flatLoads(7, 0, '2026-07-28')];
+    const f = banisterForm(loads)!;
+    expect(f.trend).toBe('up');
+  });
+
+  it('ударная неделя после отдыха — форма падает', () => {
+    const loads = [...flatLoads(14, 100, '2026-07-21'), ...flatLoads(7, 900, '2026-07-28')];
+    const f = banisterForm(loads)!;
+    expect(f.trend).toBe('down');
   });
 });

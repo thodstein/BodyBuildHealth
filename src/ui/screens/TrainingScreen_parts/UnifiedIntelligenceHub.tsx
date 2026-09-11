@@ -16,7 +16,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { loadSRPESessions, saveSRPESession, clearSRPESessions, updateSRPESession, deleteSRPESession, importSRPEFromDiary, type SRPESession } from '../../../engines/pro/srpe-store';
 import { buildIntelCsv, buildIntelHtml, buildIntelDeloadIcs } from '../../../engines/pro/intelligence-export.engine';
-import { toDailyLoads, acuteChronicRatio, weeklyMonotony, fitnessFatigue, trainingLoadReport, sessionLoad, ACWR_DISCLAIMER, type DayLoad } from '../../../engines/pro/training-load.engine';
+import { toDailyLoads, acuteChronicRatio, weeklyMonotony, fitnessFatigue, trainingLoadReport, sessionLoad, banisterForm, ACWR_DISCLAIMER, type DayLoad } from '../../../engines/pro/training-load.engine';
 import { analyzeRecovery, shouldTrain } from '../../../engines/recovery-optimization.engine';
 import { calculatePRI, getPRIThreshold } from '../../../engines/autoregulation.engine';
 import { autoRegulate, loadForRPE, rpeFromLoad, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
@@ -185,6 +185,8 @@ export const UnifiedIntelligenceHub: React.FC = () => {
   const acwr = useMemo(()=> acuteChronicRatio(dailyLoads, undefined, 7, 28, { method: 'ewma_uncoupled' }), [dailyLoads]);
   const monotony = useMemo(()=> weeklyMonotony(dailyLoads), [dailyLoads]);
   const banister = useMemo(()=> fitnessFatigue(dailyLoads), [dailyLoads]);
+  // P6: форма z-трендом (сырые AU — только в тултипах)
+  const form = useMemo(()=> banisterForm(dailyLoads), [dailyLoads]);
   const report = useMemo(()=> trainingLoadReport(sessions), [sessions]);
   // P2: персональная HRV-база (lnRMSSD+SWC) вместо фиксированной нормы 60 мс
   const [hrvBump, setHrvBump] = useState(0);
@@ -419,6 +421,9 @@ export const UnifiedIntelligenceHub: React.FC = () => {
         <div style={{ ...SMALL, marginTop:8, padding:'7px 10px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
           HRV-ratio {hrvRatio.toFixed(2)}{hrvBase ? ' (к своей базе)' : ' (базы нет — ориентир)'} · PRI {pri} ({priThr.label}) · trainToday: <b style={{ color: trainToday.train ? '#22c55e' : '#ef4444'}}>{trainToday.train ? 'да' : 'нет'}</b> — {trainToday.reason}
         </div>
+        <div style={{ ...SMALL, marginTop:6, padding:'7px 10px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          Hooper-5: сон {sleepHours}ч · качество {sleepQuality}/5 · стресс {stress}/10 · усталость {fatigue}/100 · DOMS {doms}/10 — один ряд вместо разрозненных оценок.
+        </div>
       </div>
 
       {/* ——— НАГРУЗКА ——— */}
@@ -490,6 +495,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                     <div style={{ background:'rgba(0,230,138,0.06)', borderRadius:10, padding:'10px 6px', textAlign:'center' }}><div style={{ fontSize:9, color:DIM }}>Работосп.</div><div style={{ fontSize:15, fontWeight:900, color: banister.current.performance>=0? ACCENT : '#ef4444' }}>{Math.round(banister.current.performance)}</div></div>
                   </div>
                   {banister.series[banister.peakPerformanceIdx] && <div style={{ ...SMALL, marginTop:6 }}>Пик: {Math.round(banister.series[banister.peakPerformanceIdx].performance)} ({banister.series[banister.peakPerformanceIdx].date})</div>}
+                  {form && <div title={`fitness ${banister.current?.fitness} − fatigue ${banister.current?.fatigue} (сырые AU, несопоставимы с readiness)`} style={{ ...SMALL, marginTop:6, padding:'7px 10px', borderRadius:9, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.14)' }}>📈 {form.label}</div>}
                 </MetricCard>
               )}
 
@@ -606,6 +612,11 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                   {recoveryOut.deloadRecommended ? `⚠ ${recoveryOut.deloadReason}` : `✓ ${recoveryOut.deloadReason}`}
                 </div>
               </div>
+              {!recoveryOut.deloadRecommended && (recoveryOut.overtrainingRisk >= 60 || monotony.monotony > 2) && (
+                <div style={{ marginTop:6, padding:'7px 10px', borderRadius:9, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.16)', fontSize:10, color:'#f59e0b', lineHeight:1.4 }}>
+                  🟡 Ранний сигнал: {recoveryOut.overtrainingRisk >= 60 ? `риск перетрена ${recoveryOut.overtrainingRisk}≥60` : ''}{recoveryOut.overtrainingRisk >= 60 && monotony.monotony > 2 ? ' + ' : ''}{monotony.monotony > 2 ? `монотонность ${monotony.monotony}>2` : ''} — запланируйте deload на следующую неделю, не дожидаясь провала восстановления.
+                </div>
+              )}
 
               {recoveryOut.recommendations.length>0 && (
                 <div style={{ marginTop:8, padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
