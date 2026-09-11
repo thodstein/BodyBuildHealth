@@ -42,6 +42,11 @@ export interface SFRProfile {
   sfrRatio: number;         // stimulus / (localFatigue + systemicFatigue) — higher = better
   tier: 'S' | 'A' | 'B' | 'C'; // SFR tier
   bestFor: string;
+  lengthBias?: 'lengthened' | 'mid' | 'shortened'; // длина (Maeo/Kassiano/Wolf/Strey)
+  stability?: 'supported' | 'free' | 'unstable';   // опора/направляющая
+  bracingCost?: number;     // цена распорки/пояса (0-100) — высокий bracing роняет SFR
+  goalNote?: string;        // пометка sfrForGoal
+  rirNote?: string;         // пометка applyRirToSfr
 }
 
 export interface MuscleVolumeProAnaly {
@@ -168,6 +173,37 @@ const SFR_DB: Record<string, SFRProfile> = {
   cgbp:            { stimulus: 78, localFatigue: 45, systemicFatigue: 35, sfrRatio: 0, tier: 'B', bestFor: 'Трицепс, сила' },
   pushdown:        { stimulus: 60, localFatigue: 25, systemicFatigue: 5,  sfrRatio: 0, tier: 'S', bestFor: 'Трицепс, изоляция' },
   overhead_ext:    { stimulus: 65, localFatigue: 30, systemicFatigue: 10, sfrRatio: 0, tier: 'A', bestFor: 'Длинная головка трицепса' },
+
+  // ── P5: вторая волна — машины/кабели/унилатерал (высокий SFR за счёт опоры) ──
+  machine_press:   { stimulus: 85, localFatigue: 35, systemicFatigue: 15, sfrRatio: 0, tier: 'A', bestFor: 'Грудь, объём без распорки' },
+  smith_bench:     { stimulus: 84, localFatigue: 40, systemicFatigue: 25, sfrRatio: 0, tier: 'A', bestFor: 'Грудь, стабильный жим' },
+  pushup:          { stimulus: 70, localFatigue: 30, systemicFatigue: 15, sfrRatio: 0, tier: 'A', bestFor: 'Грудь, свой вес' },
+  chest_supported_row: { stimulus: 86, localFatigue: 35, systemicFatigue: 15, sfrRatio: 0, tier: 'S', bestFor: 'Толщина спины без поясницы' },
+  seal_row:        { stimulus: 84, localFatigue: 35, systemicFatigue: 20, sfrRatio: 0, tier: 'S', bestFor: 'Спина лёжа, строгая техника' },
+  cable_row:       { stimulus: 80, localFatigue: 30, systemicFatigue: 12, sfrRatio: 0, tier: 'S', bestFor: 'Центр спины, пиковое сокращение' },
+  tbar_row:        { stimulus: 83, localFatigue: 55, systemicFatigue: 40, sfrRatio: 0, tier: 'B', bestFor: 'Толщина спины, сила' },
+  pullover:        { stimulus: 68, localFatigue: 28, systemicFatigue: 10, sfrRatio: 0, tier: 'S', bestFor: 'Широчайшие на длине' },
+  hyperext:        { stimulus: 60, localFatigue: 30, systemicFatigue: 20, sfrRatio: 0, tier: 'A', bestFor: 'Разгибатели, ягодицы' },
+  belt_squat:      { stimulus: 88, localFatigue: 50, systemicFatigue: 20, sfrRatio: 0, tier: 'S', bestFor: 'Квадрицепсы без осевой' },
+  pendulum_squat:  { stimulus: 90, localFatigue: 55, systemicFatigue: 25, sfrRatio: 0, tier: 'A', bestFor: 'Квадрицепсы на длине' },
+  sissy_squat:     { stimulus: 72, localFatigue: 40, systemicFatigue: 10, sfrRatio: 0, tier: 'A', bestFor: 'Квадрицепсы на длине, свой вес' },
+  step_up:         { stimulus: 70, localFatigue: 50, systemicFatigue: 30, sfrRatio: 0, tier: 'B', bestFor: 'Ягодицы/квадры, баланс' },
+  glute_bridge:    { stimulus: 70, localFatigue: 35, systemicFatigue: 15, sfrRatio: 0, tier: 'A', bestFor: 'Ягодицы на длине' },
+  lying_leg_curl:  { stimulus: 66, localFatigue: 28, systemicFatigue: 8,  sfrRatio: 0, tier: 'S', bestFor: 'Бицепс бедра, изоляция' },
+  seated_leg_curl: { stimulus: 70, localFatigue: 30, systemicFatigue: 8,  sfrRatio: 0, tier: 'S', bestFor: 'Бицепс бедра на длине (Maeo)' },
+  standing_calf:   { stimulus: 50, localFatigue: 30, systemicFatigue: 5,  sfrRatio: 0, tier: 'A', bestFor: 'Икры на длине (Kassiano)' },
+  seated_calf:     { stimulus: 52, localFatigue: 30, systemicFatigue: 5,  sfrRatio: 0, tier: 'A', bestFor: 'Камбаловидная' },
+  machine_shoulder_press: { stimulus: 80, localFatigue: 35, systemicFatigue: 20, sfrRatio: 0, tier: 'A', bestFor: 'Плечи, стабильный жим' },
+  cable_lateral:   { stimulus: 68, localFatigue: 22, systemicFatigue: 5,  sfrRatio: 0, tier: 'S', bestFor: 'Средняя дельта, постоянное напряжение' },
+  arnold_press:    { stimulus: 76, localFatigue: 40, systemicFatigue: 30, sfrRatio: 0, tier: 'B', bestFor: 'Все пучки, ротация' },
+  shrug:           { stimulus: 55, localFatigue: 25, systemicFatigue: 10, sfrRatio: 0, tier: 'A', bestFor: 'Трапеции' },
+  incline_curl:    { stimulus: 70, localFatigue: 30, systemicFatigue: 8,  sfrRatio: 0, tier: 'S', bestFor: 'Бицепс на длине' },
+  cable_curl:      { stimulus: 66, localFatigue: 24, systemicFatigue: 6,  sfrRatio: 0, tier: 'S', bestFor: 'Бицепс, постоянное напряжение' },
+  skullcrusher:    { stimulus: 68, localFatigue: 32, systemicFatigue: 12, sfrRatio: 0, tier: 'A', bestFor: 'Трицепс на длине' },
+  concentration_curl: { stimulus: 62, localFatigue: 22, systemicFatigue: 5, sfrRatio: 0, tier: 'S', bestFor: 'Пик бицепса, опора' },
+  reverse_curl:    { stimulus: 52, localFatigue: 28, systemicFatigue: 8,  sfrRatio: 0, tier: 'A', bestFor: 'Брахиорадиалис, предплечья' },
+  hanging_leg_raise: { stimulus: 55, localFatigue: 30, systemicFatigue: 15, sfrRatio: 0, tier: 'A', bestFor: 'Пресс, свой вес' },
+  cable_crunch:    { stimulus: 58, localFatigue: 28, systemicFatigue: 8,  sfrRatio: 0, tier: 'A', bestFor: 'Пресс с отягощением' },
 };
 
 // Calculate SFR ratios
@@ -175,6 +211,77 @@ for (const key of Object.keys(SFR_DB)) {
   const p = SFR_DB[key];
   p.sfrRatio = p.stimulus / (p.localFatigue + p.systemicFatigue + 0.001);
 }
+
+// ── P5: мета-флаги SFR (длина/стабильность/bracing) ──
+const LENGTHENED_KEYS = new Set([
+  'incline_db', 'fly_db', 'cable_fly', 'rdl', 'incline_curl', 'cable_curl', 'overhead_ext',
+  'skullcrusher', 'seated_leg_curl', 'pullover', 'glute_bridge', 'pendulum_squat', 'sissy_squat',
+  'cable_lateral', 'hip_thrust', 'bulgarian_split', 'lunge', 'standing_calf',
+]);
+const SHORTENED_KEYS = new Set([
+  'preacher_curl', 'concentration_curl', 'leg_ext', 'pushdown', 'pec_deck', 'shrug', 'seated_calf', 'hammer_curl',
+]);
+const SUPPORTED_KEYS = new Set([
+  'cable_fly', 'pec_deck', 'seated_row', 'cable_row', 'chest_supported_row', 'seal_row', 'face_pull',
+  'straight_pull', 'hack_squat', 'leg_press', 'leg_ext', 'leg_curl', 'lying_leg_curl', 'seated_leg_curl',
+  'hip_thrust', 'glute_bridge', 'calf_raise', 'standing_calf', 'seated_calf', 'lateral_raise', 'cable_lateral',
+  'rear_delt_fly', 'machine_press', 'smith_bench', 'machine_shoulder_press', 'belt_squat', 'pendulum_squat',
+  'db_curl', 'cable_curl', 'incline_curl', 'concentration_curl', 'preacher_curl', 'pushdown', 'overhead_ext',
+  'skullcrusher', 'pullover', 'cable_crunch', 'pec_deck', 'fly_db',
+]);
+const UNSTABLE_KEYS = new Set(['bulgarian_split', 'lunge', 'step_up', 'sissy_squat', 'pushup']);
+
+function sfrMeta(key: string): Pick<SFRProfile, 'lengthBias' | 'stability' | 'bracingCost'> {
+  return {
+    lengthBias: LENGTHENED_KEYS.has(key) ? 'lengthened' : SHORTENED_KEYS.has(key) ? 'shortened' : 'mid',
+    stability: SUPPORTED_KEYS.has(key) ? 'supported' : UNSTABLE_KEYS.has(key) ? 'unstable' : 'free',
+    bracingCost: SFR_DB[key]?.systemicFatigue ?? 30,
+  };
+}
+
+// Силовые лифты: для цели «сила» SFR растёт (специфичность), для «массы» — как есть.
+const STRENGTH_LIFTS = new Set(['squat', 'front_squat', 'deadlift', 'bench_bar', 'ohp', 'row_bar', 'cgbp']);
+
+const TIER_UP: Record<SFRProfile['tier'], SFRProfile['tier']> = { C: 'B', B: 'A', A: 'A', S: 'S' };
+const TIER_DOWN: Record<SFRProfile['tier'], SFRProfile['tier']> = { S: 'A', A: 'B', B: 'C', C: 'C' };
+
+/** SFR под цель: сила поднимает специфичные лифты (×1.15, тир+1), масса — бонус опоре ×1.05. */
+export function sfrForGoal(exerciseId: string, goal: 'strength' | 'hypertrophy'): SFRProfile | null {
+  const base = getSFRProfile(exerciseId);
+  if (!base) return null;
+  const key = resolveExerciseId(exerciseId) || exerciseId;
+  if (goal === 'strength' && STRENGTH_LIFTS.has(key)) {
+    return {
+      ...base,
+      sfrRatio: Math.round(base.sfrRatio * 1.15 * 100) / 100,
+      tier: TIER_UP[base.tier],
+      goalNote: 'сила-приоритет: специфичность лифта',
+    };
+  }
+  if (goal === 'hypertrophy' && base.stability === 'supported') {
+    return {
+      ...base,
+      sfrRatio: Math.round(base.sfrRatio * 1.05 * 100) / 100,
+      goalNote: 'масса-приоритет: опора держит объём',
+    };
+  }
+  return { ...base, goalNote: goal === 'strength' ? 'сила: нейтрально' : 'масса: нейтрально' };
+}
+
+/** RIR-модификатор: отказ на базе (RPE≥9.5 при systemic≥50) роняет тир; RPE≤6 — недогруз. */
+export function applyRirToSfr(profile: SFRProfile, rpe?: number): SFRProfile {
+  if (typeof rpe !== 'number') return { ...profile };
+  if (rpe >= 9.5 && (profile.systemicFatigue ?? 0) >= 50) {
+    return { ...profile, tier: TIER_DOWN[profile.tier], rirNote: 'отказ на базе — SFR падает, держите RIR 1–3' };
+  }
+  if (rpe <= 6) {
+    return { ...profile, rirNote: 'RPE≤6 — недогруз, стимул ниже заявленного' };
+  }
+  return { ...profile };
+}
+
+// Новичкам не предлагаем технически сложные/высоко-травматичные паттерны.
+const BEGINNER_UNSAFE_KEYS = new Set(['deadlift', 'squat', 'front_squat', 'sissy_squat', 'bulgarian_split', 'upright_row', 'tbar_row']);
 
 // Exact exercise ID match or fuzzy match from catalog
 function resolveExerciseId(rawId: string): string | null {
@@ -207,6 +314,35 @@ function resolveExerciseId(rawId: string): string | null {
     'preacher_curl': ['скамья скотта', 'preacher_curl'],
     'cgbp': ['узким хватом', 'cgbp'], 'pushdown': ['разгибани', 'pushdown', 'трицепс блок'],
     'overhead_ext': ['французский', 'overhead'],
+    'machine_press': ['тренажер', 'тренажёр', 'хаммер', 'machine_press', 'чест-пресс'],
+    'smith_bench': ['смита', 'smith'],
+    'pushup': ['отжимания от пола', 'pushup', 'push-up'],
+    'chest_supported_row': ['с упором', 'chest_supported'],
+    'seal_row': ['seal', 'лежа на скамье'],
+    'cable_row': ['горизонтального блока', 'cable_row', 'нижнего блока'],
+    'tbar_row': ['т-гриф', 'т-тяга', 'tbar', 't-bar'],
+    'pullover': ['пуловер', 'pullover'],
+    'hyperext': ['гиперэкстенз', 'hyperext'],
+    'belt_squat': ['belt', 'поясной присед'],
+    'pendulum_squat': ['маятник', 'pendulum'],
+    'sissy_squat': ['сисси', 'sissy'],
+    'step_up': ['зашагивани', 'step_up', 'степ-ап'],
+    'glute_bridge': ['ягодичный мост', 'glute_bridge'],
+    'lying_leg_curl': ['сгибание ног лежа', 'lying'],
+    'seated_leg_curl': ['сгибание ног сидя', 'seated_leg'],
+    'standing_calf': ['икры стоя', 'голень стоя'],
+    'seated_calf': ['икры сидя', 'голень сидя'],
+    'machine_shoulder_press': ['плечевой тренажер', 'дельт-машина'],
+    'cable_lateral': ['отведение в кроссовере', 'cable_lateral'],
+    'arnold_press': ['арнольд', 'arnold'],
+    'shrug': ['шраги', 'shrug'],
+    'incline_curl': ['наклонной скамье', 'incline_curl'],
+    'cable_curl': ['кроссовер', 'cable_curl', 'сгибание в блоке'],
+    'skullcrusher': ['skull', 'черепа'],
+    'concentration_curl': ['концентрирован', 'concentration'],
+    'reverse_curl': ['обратным хватом', 'reverse_curl'],
+    'hanging_leg_raise': ['подъем ног в висе', 'hanging_leg'],
+    'cable_crunch': ['скручивания в блоке', 'cable_crunch'],
   };
 
   for (const [sfrKey, kwds] of Object.entries(keywords)) {
@@ -233,7 +369,7 @@ function resolveExerciseId(rawId: string): string | null {
 export function getSFRProfile(exerciseId: string): SFRProfile | null {
   const key = resolveExerciseId(exerciseId);
   if (!key || !SFR_DB[key]) return null;
-  return { ...SFR_DB[key] };
+  return { ...SFR_DB[key], ...sfrMeta(key) };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -618,14 +754,26 @@ export function scoreSplitQuality(
 // 8. EXERCISE SWAP RECOMMENDATIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
+export interface SwapFilterOpts {
+  /** Оборудование в наличии (barbell/dumbbell/machine/cable/bodyweight) — чужое отсекаем. */
+  equipment?: string[];
+  /** Уровень для teen/novice-гейта (новичку — без технически сложных). */
+  level?: TrainingLevel;
+  /** Цель: ранжир по sfrForGoal вместо базового SFR. */
+  goal?: 'strength' | 'hypertrophy';
+}
+
 export function findBetterExerciseSwaps(
   entries: ProExerciseRow[],
   level: TrainingLevel,
+  opts?: SwapFilterOpts,
 ): ExerciseSwapRec[] {
   const swaps: ExerciseSwapRec[] = [];
+  const goal = opts?.goal;
+  const effLevel = opts?.level || level;
 
   entries.forEach(e => {
-    const currentSFR = getSFRProfile(e.exerciseId);
+    const currentSFR = goal ? sfrForGoal(e.exerciseId, goal) : getSFRProfile(e.exerciseId);
     const currentSFRVal = currentSFR?.sfrRatio || 0;
     const curEx = getExerciseById(e.exerciseId) as Exercise | undefined;
     if (!curEx) return;
@@ -636,8 +784,16 @@ export function findBetterExerciseSwaps(
     EXERCISE_CATALOG.forEach(catEx => {
       if (catEx.id === e.exerciseId) return;
       if (catEx.group !== curEx.group) return;
+      if (opts?.equipment && opts.equipment.length > 0) {
+        const eq = (catEx.equipment || '').toLowerCase();
+        if (!opts.equipment.some(w => eq.includes(w.toLowerCase()))) return;
+      }
+      if (effLevel === 'beginner') {
+        const k = resolveExerciseId(catEx.id);
+        if (k && BEGINNER_UNSAFE_KEYS.has(k)) return;
+      }
 
-      const sfr = getSFRProfile(catEx.id);
+      const sfr = goal ? sfrForGoal(catEx.id, goal) : getSFRProfile(catEx.id);
       if (!sfr || sfr.sfrRatio <= currentSFRVal + 0.1) return;
 
       const muscleMatch = catEx.group === curEx.group ? 100 : 50;
@@ -645,6 +801,8 @@ export function findBetterExerciseSwaps(
       if (sfr.tier === 'S') reason = 'Высший SFR-тир — максимум стимула при минимуме усталости';
       else if (sfr.sfrRatio > currentSFRVal * 1.5) reason = `SFR в ${(sfr.sfrRatio / currentSFRVal).toFixed(1)}× выше — значительно эффективнее`;
       else reason = 'Более эффективная альтернатива';
+      if (sfr.lengthBias === 'lengthened') reason += ' · на длине';
+      if (sfr.goalNote) reason += ` · ${sfr.goalNote}`;
 
       betterOptions.push({ exerciseId: catEx.id, name: catEx.name, sfr: sfr.sfrRatio, muscleMatch, reason });
     });

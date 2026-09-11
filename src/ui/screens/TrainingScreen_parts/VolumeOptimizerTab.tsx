@@ -95,10 +95,14 @@ export const VolumeOptimizerTab: React.FC = () => {
     return planVolumeProgression(wk1Rows, level, mesoWeeks);
   }, [rows, level, mesoWeeks]);
 
+  const [sfrGoal, setSfrGoal] = useState<'strength' | 'hypertrophy'>('hypertrophy');
   const swaps: ExerciseSwapRec[] = useMemo(() => {
     if (rows.length === 0) return [];
-    return findBetterExerciseSwaps(rows, level);
-  }, [rows, level]);
+    return findBetterExerciseSwaps(rows, level, { goal: sfrGoal });
+  }, [rows, level, sfrGoal]);
+  const applySwap = useCallback((fromId: string, toId: string) => {
+    setRows(prev => prev.map(r => (r.exerciseId === fromId ? { ...r, exerciseId: toId } : r)));
+  }, []);
 
   const gaps: CoverageGap[] = useMemo(() => {
     if (rows.length === 0) return [];
@@ -641,6 +645,14 @@ export const VolumeOptimizerTab: React.FC = () => {
           {sectionHeader('swaps', '🔄', 'Рекомендации по замене (SFR)')}
           {expandedSections.swaps && (
             <div style={{ marginTop: 10 }}>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                {(['hypertrophy', 'strength'] as const).map(g => (
+                  <button key={g} onClick={() => setSfrGoal(g)}
+                    style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: sfrGoal === g ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.10)', background: sfrGoal === g ? 'rgba(0,230,138,0.10)' : 'transparent', color: sfrGoal === g ? ACCENT : DIM_, fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 44 }}>
+                    {g === 'hypertrophy' ? '💪 Масса' : '🏋️ Сила'}
+                  </button>
+                ))}
+              </div>
               {swaps.slice(0, 5).map(s => (
                 <div key={s.currentExerciseId} style={{ marginBottom: 8, padding: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
                   <div style={{ fontSize: 10, color: DIM_, marginBottom: 4 }}>
@@ -652,6 +664,9 @@ export const VolumeOptimizerTab: React.FC = () => {
                         <span style={{ fontSize: 10, fontWeight: 700, color: ACCENT }}>→ {opt.name}</span>
                         <span style={{ ...BADGE('#22c55e') }}>SFR {opt.sfr.toFixed(2)}</span>
                         <span style={{ fontSize: 10, color: DIM_ }}>{opt.reason}</span>
+                        {i === 0 && (
+                          <button onClick={() => applySwap(s.currentExerciseId, opt.exerciseId)} style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 6, border: '1px solid ' + ACCENT, background: 'rgba(0,230,138,0.08)', color: ACCENT, fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 36 }}>Заменить</button>
+                        )}
                       </div>
                     ))}
                   </div>
