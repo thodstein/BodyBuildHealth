@@ -2494,6 +2494,13 @@ export const BbAutoConstructor: React.FC = () => {
       if (preferredExerciseIds.length) profParts.push(`предпочтения ${preferredExerciseIds.join(', ')}`);
       if (exerciseSwaps.length) profParts.push(`замены ${exerciseSwaps.map(s => `${s.oldId}→${s.newId}`).join(', ')}`);
       if (executionCorrections.length) profParts.push(`PROF ${executionCorrections.map(c => c.type).join(', ')}`);
+      // Lab-добивка-2 п.6: Δ лабораторной коррекции — постоянной строкой (флеш transient, rationale живёт в плане).
+      try {
+        const lastLabDelta = JSON.parse(localStorage.getItem('he_bb_last_lab_delta') || 'null') as { summary?: unknown } | null;
+        if (lastLabDelta && typeof lastLabDelta.summary === 'string' && lastLabDelta.summary) {
+          profParts.push(`Δ лаб. коррекции: ${lastLabDelta.summary}`);
+        }
+      } catch { /* битый стор — молча */ }
       plan.rationale = [...(plan.rationale || []), `🧬 Лаб ББ: ${profParts.join(' · ')}`];
     }
     // Объёмный режим в generic-ветке уже прокинут через buildBBPlan(effectiveVolGoal/effectiveVolumeScheme); капы те же от уровня
