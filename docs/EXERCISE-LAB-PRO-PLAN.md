@@ -1,6 +1,8 @@
 # Лаборатория упражнений — PRO-план (хаб калькуляторов интеллектуальных тренировок)
 
-> **Статус:** 📋 план на согласование (Sep 12 2026)
+> **Статус:** ✅ выполнен полностью кодом (Sep 12 2026, 7 этапных коммитов `ecef2edd`→`10ccbfc12`, без пуша)
+> **Проверено:** свои 55/55 (A10+B2+C9+D9+E13+export3+UI7+ctx2); соседи rest-hooks 68/68 + catalog/manual 30/30 + bb-sfr/instructions 18/18; `tsc --noEmit` 0 по проекту. Чужие предсуществующие: `bb-diagnostics-hub` 3 падения, ReportsScreen unhandled-timeout.
+> **Отклонение (честно):** движки C/D/E — тонкие адаптеры поверх найденных разведкой `bb-exercise-diagnosis/audit/correction/simulator`, а не с нуля (дублей ноль — что и требовал план); E поймал тестом, что узкий `canReplace` убивает легитимные замены → канон запрета только `cannotReplace`/`forbidden` для substitute/mobilitySwap.
 > **Где:** `src/ui/screens/TrainingScreen_parts/ExerciseLabMerged.tsx:1` (4 шага), `ExerciseLabShared.tsx:1` (shared),
 > `ExerciseLabPrescription.tsx:1` (656с), `ExerciseLabTechnique.tsx:1` (329с), `ExerciseLabProSubstitute.tsx:1` (186с),
 > `ExerciseLabCatalog.tsx:1` (373с), `src/data/exercise-biomechanics-db.ts:1` (908с), `src/engines/movement-engines.ts:1`
