@@ -6,7 +6,7 @@
  * Движок: gym-competition.engine (calculatePlates / getPlateLoadingOrder / warmupPlateSequence).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { calculatePlates, getPlateLoadingOrder, warmupPlateSequence, type WeightUnit } from '../../../engines/gym-competition.engine';
+import { calculatePlates, getPlateLoadingOrder, warmupPlateSequence, reversePlateWeight, nearestLoadable, percentTargets, type WeightUnit, type PlateInventory } from '../../../engines/gym-competition.engine';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
@@ -82,7 +82,13 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
   const [oneRM, setOneRM] = useState<number>(0);
   const [applied, setApplied] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<string>('');
-  const [savedPresets, setSavedPresets] = useState<Array<{ id: number; name: string; unit: string; barWeight: number; targetWeight: number; plates?: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_plate_presets') || '[]'); } catch { return []; } });
+  const [collars, setCollars] = useState<number>(0);
+  const [inventoryText, setInventoryText] = useState<string>('');
+  const [reverseMode, setReverseMode] = useState(false);
+  const [reverseStack, setReverseStack] = useState<Array<{ plate: number; count: number }>>([]);
+  const [presetName, setPresetName] = useState<string>('');
+  const [showPresetForm, setShowPresetForm] = useState(false);
+  const [savedPresets, setSavedPresets] = useState<Array<{ id: number; name: string; unit: string; barWeight: number; targetWeight: number; plates?: string; collars?: number }>>(() => { try { return JSON.parse(localStorage.getItem('he_plate_presets') || '[]'); } catch { return []; } });
 
   useEffect(() => {
     if (initialWeight && initialWeight > 0) setTargetWeight(initialWeight);
@@ -104,6 +110,17 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
     [unit, customPlates]
   );
 
+  // P4: инвентарь «номинал:пары» (напр. «25:1, 20:2») → всего блинов = пары×2
+  const inventory: PlateInventory | undefined = useMemo(() => {
+    if (!inventoryText.trim()) return undefined;
+    const out: PlateInventory = {};
+    inventoryText.split(/[\s,]+/).forEach(tok => {
+      const m = tok.match(/^(\d+(?:\.\d+)?):(\d+)$/);
+      if (m) out[Number(m[1])] = Math.max(0, Number(m[2])) * 2;
+    });
+    return Object.keys(out).length > 0 ? out : undefined;
+  }, [inventoryText]);
+
   const barOptions = useMemo(() => BAR_TYPES[unit].map(b => ({ id: b.id, label: b.label, desc: `${b.weight} ${unit === 'metric' ? 'кг' : 'фн'}` })), [unit]);
 
   const applyBar = (id: string) => {
@@ -124,9 +141,13 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
     return lbl.includes('гантел') || lbl.includes('dumbbell');
   }, [selectedOpt]);
   const effectiveBarWeight = isDumbbellSelected ? (unit === 'metric' ? 2 : 5) : barWeight;
-  const plates = useMemo(() => calculatePlates(targetWeight, effectiveBarWeight, wUnit, availablePlates), [targetWeight, effectiveBarWeight, wUnit, availablePlates]);
-  const order = useMemo(() => getPlateLoadingOrder(targetWeight, effectiveBarWeight, wUnit), [targetWeight, effectiveBarWeight, wUnit]);
-  const warmup = useMemo(() => warmupPlateSequence(targetWeight, effectiveBarWeight, wUnit, availablePlates), [targetWeight, effectiveBarWeight, wUnit, availablePlates]);
+  const plateOpts = useMemo(() => ({ collarsKg: isDumbbellSelected ? 0 : collars, inventory }), [collars, inventory, isDumbbellSelected]);
+  const plates = useMemo(() => calculatePlates(targetWeight, effectiveBarWeight, wUnit, availablePlates, plateOpts), [targetWeight, effectiveBarWeight, wUnit, availablePlates, plateOpts]);
+  const order = useMemo(() => getPlateLoadingOrder(targetWeight, effectiveBarWeight, wUnit, plateOpts), [targetWeight, effectiveBarWeight, wUnit, plateOpts]);
+  const warmup = useMemo(() => warmupPlateSequence(targetWeight, effectiveBarWeight, wUnit, availablePlates, plateOpts), [targetWeight, effectiveBarWeight, wUnit, availablePlates, plateOpts]);
+  const nearest = useMemo(() => (plates.deviation !== 0 ? nearestLoadable(targetWeight, effectiveBarWeight, wUnit, availablePlates, plateOpts) : null), [plates.deviation, targetWeight, effectiveBarWeight, wUnit, availablePlates, plateOpts]);
+  const pctTable = useMemo(() => percentTargets(oneRM, effectiveBarWeight), [oneRM, effectiveBarWeight]);
+  const reverseTotal = useMemo(() => reversePlateWeight(reverseStack, effectiveBarWeight, isDumbbellSelected ? 0 : collars), [reverseStack, effectiveBarWeight, collars, isDumbbellSelected]);
   const displayAlt = unit === 'metric' ? `${kgToLb(targetWeight)} фн` : `${lbToKg(targetWeight)} кг`;
   const deviation = Math.abs(plates.deviation);
   const devColor = deviation < 0.5 ? ACCENT : deviation > 2 ? '#ef4444' : '#f59e0b';
@@ -175,13 +196,53 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <PopupSelect label="Система единиц" value={unit} options={unitOpts} onChange={v => { setUnit(v as Unit); setTargetWeight(100); }} />
-          <PopupSelect label="Тип грифа" value={barId} options={barOptions} onChange={v => applyBar(v as string)} />
+          <PopupSelect label="Система единиц" value={unit} options={unitOpts} onChange={v => {
+            const nu = v as Unit;
+            // P4: конвертация вместо сброса в 100 — ввод не теряется
+            if (nu !== unit) {
+              setTargetWeight(nu === 'metric' ? lbToKg(targetWeight) : kgToLb(targetWeight));
+              setBarWeight(nu === 'metric' ? lbToKg(barWeight) : kgToLb(barWeight));
+            }
+            setUnit(nu);
+          }} />
+          <PopupSelect label="Тип грифа" value={barId} options={barId === 'custom' ? [...barOptions, { id: 'custom', label: 'Свой вес', desc: 'ручной ввод ниже' }] : barOptions} onChange={v => applyBar(v as string)} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
           <PopupNumber label={`Рабочий вес (${unitLabel})`} value={targetWeight} min={barWeight} max={800} suffix={` ${unitLabel}`} onChange={setTargetWeight} />
-          <PopupNumber label={`Вес грифа (${unitLabel})`} value={barWeight} min={1} max={60} suffix={` ${unitLabel}`} onChange={v => setBarWeight(v || 0)} />
+          <PopupNumber label={`Вес грифа (${unitLabel})`} value={barWeight} min={1} max={60} suffix={` ${unitLabel}`} onChange={v => { setBarWeight(v || 0); setBarId('custom'); }} />
         </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <PopupSelect label="Замки (пара)" value={String(collars)} options={[
+            { id: '0', label: 'Без замков', desc: '0' },
+            { id: unit === 'metric' ? '2.5' : '5', label: unit === 'metric' ? 'Стандарт 2.5 кг' : 'Стандарт 5 фн', desc: 'пара' },
+            { id: unit === 'metric' ? '1.25' : '2.5', label: unit === 'metric' ? 'Малые 1.25 кг' : 'Малые 2.5 фн', desc: 'пара' },
+          ]} onChange={v => setCollars(Number(v))} />
+          <div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 3 }}>Инвентарь «номинал:пары» (пусто = зал)</div>
+            <input type="text" value={inventoryText} placeholder="напр.: 25:1, 20:2" onChange={e => setInventoryText(e.target.value)} style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px', minHeight: 40, width: '100%', boxSizing: 'border-box' as const, fontSize: 12 }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <button onClick={() => setReverseMode(v => !v)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: reverseMode ? 'rgba(168,85,247,0.15)' : 'rgba(168,85,247,0.06)', color: '#a855f7', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>
+            {reverseMode ? '✓ Обратный режим: что на штанге?' : '⇄ Обратный режим: что на штанге?'}
+          </button>
+        </div>
+        {reverseMode && (
+          <div style={{ marginBottom: 8, padding: 8, background: 'rgba(168,85,247,0.05)', borderRadius: 8, border: '1px solid rgba(168,85,247,0.15)' }}>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Тап — +блин на сторону, повторный ряд — сброс. Итого: <b style={{ color: '#a855f7' }}>{reverseTotal} {unitLabel}</b></div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {availablePlates.map(p => (
+                <button key={p} onClick={() => setReverseStack(prev => {
+                  const f = prev.find(x => x.plate === p);
+                  if (f) return prev.map(x => x.plate === p ? { ...x, count: x.count + 1 } : x);
+                  return [...prev, { plate: p, count: 1 }];
+                })} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>{p}</button>
+              ))}
+              <button onClick={() => setReverseStack([])} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 11 }}>Сброс</button>
+              <button onClick={() => setTargetWeight(reverseTotal)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: ACCENT, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>→ В целевой вес</button>
+            </div>
+          </div>
+        )}
         {/* Быстрые пресеты грифов */}
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 10, color: DIM, marginBottom: 3 }}>Быстрый выбор грифа</div>
@@ -206,11 +267,16 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
             <span style={{ fontSize: 10, color: DIM }}>1ПМ для расчёта рабочего веса по проценту</span>
             {oneRM > 0 && <button onClick={() => setOneRM(0)} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 10 }}>✕</button>}
           </div>
-          {oneRM > 0 && (
+          {oneRM > 0 && pctTable.length > 0 && (
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {[{ p: 0.50, l: '50%' }, { p: 0.60, l: '60%' }, { p: 0.65, l: '65%' }, { p: 0.70, l: '70%' }, { p: 0.75, l: '75%' }, { p: 0.80, l: '80%' }, { p: 0.85, l: '85%' }, { p: 0.90, l: '90%' }, { p: 0.95, l: '95%' }].map(p => (
-                <button key={p.l} onClick={() => setTargetWeight(Math.max(barWeight, Math.round(oneRM * p.p * 10) / 10))} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(59,130,246,0.2)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>{p.l}</button>
-              ))}
+              {pctTable.map(p => {
+                const ok = calculatePlates(p.weight, effectiveBarWeight, wUnit, availablePlates, plateOpts).deviation === 0;
+                return (
+                  <button key={p.pct} onClick={() => setTargetWeight(p.weight)} title={`${p.weight} ${unitLabel}${ok ? ' — собирается точно' : ' — nearest см. сводку'}`} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(59,130,246,0.2)', background: 'rgba(59,130,246,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>
+                    {p.pct}%{ok ? '' : '≈'}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -239,6 +305,16 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
           <div style={SMALL}>{unitLabel}</div>
         </MetricCard>
       </div>
+
+      {nearest && (nearest.down !== null || nearest.up !== null) && (
+        <div style={{ ...CARD, background: 'rgba(245,158,11,0.05)', borderColor: 'rgba(245,158,11,0.2)' }}>
+          <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>⚠ Точно не собирается (отклонение {plates.deviation > 0 ? '+' : ''}{plates.deviation} {unitLabel}). Ближайшие:</div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            {nearest.down !== null && <button onClick={() => setTargetWeight(nearest.down!)} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.08)', color: '#f59e0b', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>↓ {nearest.down} {unitLabel}</button>}
+            {nearest.up !== null && <button onClick={() => setTargetWeight(nearest.up!)} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.08)', color: '#f59e0b', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>↑ {nearest.up} {unitLabel}</button>}
+          </div>
+        </div>
+      )}
 
       {/* 📐 Раскладка блинов */}
       <div style={CARD}>
@@ -334,14 +410,22 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>💾 Пресеты и экспорт</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-          <button onClick={() => {
-            const name = prompt('Название пресета:', `Вес ${targetWeight} ${unitLabel}`);
-            if (!name) return;
-            const item = { id: Date.now(), name, unit, barWeight, targetWeight, plates: customPlates };
-            const arr = [item, ...savedPresets].slice(0, 20);
-            setSavedPresets(arr);
-            try { localStorage.setItem('he_plate_presets', JSON.stringify(arr)); } catch { /* ignore */ }
-          }} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${ACCENT}33`, background: `${ACCENT}0d`, color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>＋ Сохранить</button>
+          {!showPresetForm ? (
+            <button onClick={() => { setPresetName(`Вес ${targetWeight} ${unitLabel}`); setShowPresetForm(true); }} style={{ padding: '6px 12px', borderRadius: 6, border: `1px solid ${ACCENT}33`, background: `${ACCENT}0d`, color: ACCENT, cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>＋ Сохранить</button>
+          ) : (
+            <div style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'center' }}>
+              <input type="text" value={presetName} onChange={e => setPresetName(e.target.value)} placeholder="Название пресета" style={{ flex: 1, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '8px 10px', fontSize: 12 }} />
+              <button onClick={() => {
+                const name = presetName.trim() || `Вес ${targetWeight} ${unitLabel}`;
+                const item = { id: Date.now(), name, unit, barWeight, targetWeight, plates: customPlates, collars };
+                const arr = [item, ...savedPresets].slice(0, 20);
+                setSavedPresets(arr);
+                try { localStorage.setItem('he_plate_presets', JSON.stringify(arr)); } catch { /* ignore */ }
+                setShowPresetForm(false);
+              }} style={{ padding: '8px 14px', borderRadius: 6, border: 'none', background: ACCENT, color: '#000', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>OK</button>
+              <button onClick={() => setShowPresetForm(false)} style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 11 }}>✕</button>
+            </div>
+          )}
           <button onClick={() => {
             const lines: string[] = [];
             lines.push('=== Калькулятор блинов — Отчёт ===');
@@ -371,6 +455,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
                   else if (p.unit === 'imperial' && unit !== 'imperial') { setUnit('imperial'); setBarWeight(p.barWeight); setTargetWeight(p.targetWeight); }
                   else { setBarWeight(p.barWeight); setTargetWeight(p.targetWeight); }
                   if (p.plates) setCustomPlates(p.plates);
+                  if (typeof p.collars === 'number') setCollars(p.collars);
                 }} style={{ flex: 1, textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 11 }}>
                   <strong style={{ color: ACCENT }}>{p.name}</strong>
                   <span style={{ color: '#fff', marginLeft: 6 }}>{p.targetWeight} {p.unit === 'metric' ? 'кг' : 'фн'} · гриф {p.barWeight}</span>

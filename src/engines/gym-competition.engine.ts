@@ -149,22 +149,35 @@ export function getMachineByName(name: string): GymMachine | undefined { return 
 
 export type WeightUnit = 'kg' | 'lbs';
 
-const METRIC_PLATES = [25, 20, 15, 10, 5, 2.5, 1.25];
-const IMPERIAL_PLATES = [45, 35, 25, 10, 5, 2.5];
+const METRIC_PLATES = [25, 20, 15, 10, 5, 2.5, 1.25, 1.0, 0.5];
+const IMPERIAL_PLATES = [45, 35, 25, 10, 5, 2.5, 1.25];
+
+/** Инвентарь: номинал → всего блинов в наличии (пара = 2 шт). Жадность режется наличием. */
+export type PlateInventory = Record<number, number>;
+
+export interface PlateCalcOpts {
+  /** Пара замков, кг/фн (добавляется к грифу: 2.5/1.25/0). */
+  collarsKg?: number;
+  /** Инвентарь: номинал → штук всего. Без записи — безлимит (зал). */
+  inventory?: PlateInventory;
+}
 
 export function calculatePlates(
-  targetWeight: number, 
-  barWeight: number = 20, 
+  targetWeight: number,
+  barWeight: number = 20,
   unit: WeightUnit = 'kg',
-  availablePlates?: number[]
+  availablePlates?: number[],
+  opts?: PlateCalcOpts,
 ): PlateMathResult {
-  const platesSet = availablePlates || (unit === 'kg' ? METRIC_PLATES : IMPERIAL_PLATES);
-  const weightPerSide = (targetWeight - barWeight) / 2;
+  const platesSet = [...(availablePlates || (unit === 'kg' ? METRIC_PLATES : IMPERIAL_PLATES))];
+  const collars = Math.max(0, opts?.collarsKg || 0);
+  const effBar = Math.round((barWeight + collars) * 100) / 100;
+  const weightPerSide = (targetWeight - effBar) / 2;
 
   if (weightPerSide < 0) {
     return {
       targetWeight, barWeight, platesPerSide: [], totalPlates: 0,
-      actualWeight: barWeight, deviation: barWeight - targetWeight,
+      actualWeight: effBar, deviation: Math.round((effBar - targetWeight) * 100) / 100,
     };
   }
 
@@ -172,16 +185,20 @@ export function calculatePlates(
   let remaining = weightPerSide;
 
   for (const plate of platesSet.sort((a, b) => b - a)) {
-    if (remaining >= plate) {
-      const count = Math.floor(remaining / plate);
-      platesPerSide.push({ plate, count });
-      remaining = Math.round((remaining - count * plate) * 100) / 100;
+    if (remaining + 1e-9 >= plate) {
+      let count = Math.floor((remaining + 1e-9) / plate);
+      const inv = opts?.inventory?.[plate];
+      if (typeof inv === 'number') count = Math.min(count, Math.floor(Math.max(0, inv) / 2));
+      if (count > 0) {
+        platesPerSide.push({ plate, count });
+        remaining = Math.round((remaining - count * plate) * 100) / 100;
+      }
     }
   }
 
   const totalPlates = platesPerSide.reduce((s, p) => s + p.count * 2, 0);
   const sideWeight = platesPerSide.reduce((s, p) => s + p.plate * p.count, 0);
-  const actualWeight = Math.round((barWeight + sideWeight * 2) * 100) / 100;
+  const actualWeight = Math.round((effBar + sideWeight * 2) * 100) / 100;
 
   return {
     targetWeight, barWeight, platesPerSide, totalPlates,
@@ -189,8 +206,60 @@ export function calculatePlates(
   };
 }
 
-export function getPlateLoadingOrder(targetWeight: number, barWeight: number = 20, unit: WeightUnit = 'kg'): string[] {
-  const result = calculatePlates(targetWeight, barWeight, unit);
+/** Reverse-калькулятор: блины на штанге → общий вес («что уже навешано?»). */
+export function reversePlateWeight(
+  platesPerSide: Array<{ plate: number; count: number }>,
+  barWeight: number = 20,
+  collarsKg: number = 0,
+): number {
+  const side = platesPerSide.reduce((s, p) => s + p.plate * Math.max(0, p.count), 0);
+  return Math.round((barWeight + Math.max(0, collarsKg) + side * 2) * 100) / 100;
+}
+
+/** Ближайшие собираемые веса при несобираемом целевом (вверх/вниз, null если нет в ±20). */
+export function nearestLoadable(
+  targetWeight: number,
+  barWeight: number = 20,
+  unit: WeightUnit = 'kg',
+  availablePlates?: number[],
+  opts?: PlateCalcOpts,
+): { down: number | null; up: number | null } {
+  const step = unit === 'kg' ? 0.5 : 1;
+  const minW = barWeight + (opts?.collarsKg || 0);
+  let down: number | null = null;
+  let up: number | null = null;
+  // Поиск по абсолютной сетке (…, 99.5, 100, 100.5, …), а не шагами от цели —
+  // иначе точные веса между шагами (100 при цели 101.3) пропускаются.
+  const startDown = Math.floor(targetWeight / step) * step;
+  for (let w = Math.round(startDown * 100) / 100; w >= Math.max(minW, targetWeight - 20); w = Math.round((w - step) * 100) / 100) {
+    if (calculatePlates(w, barWeight, unit, availablePlates, opts).deviation === 0) {
+      down = w;
+      break;
+    }
+  }
+  const startUp = targetWeight === startDown ? targetWeight + step : Math.ceil(targetWeight / step) * step;
+  for (let w = Math.round(startUp * 100) / 100; w <= targetWeight + 20; w = Math.round((w + step) * 100) / 100) {
+    if (calculatePlates(w, barWeight, unit, availablePlates, opts).deviation === 0) {
+      up = w;
+      break;
+    }
+  }
+  return { down, up };
+}
+
+/** %-пресеты от 1RM для программирования (тап → целевой вес). */
+export const PLATE_PERCENT_PRESETS = [50, 60, 65, 70, 75, 80, 85, 90, 95];
+
+export function percentTargets(oneRM: number, barWeight: number = 20): Array<{ pct: number; weight: number }> {
+  if (!(oneRM > 0)) return [];
+  return PLATE_PERCENT_PRESETS.map(pct => ({
+    pct,
+    weight: Math.max(barWeight, Math.round(oneRM * (pct / 100) * 2) / 2),
+  }));
+}
+
+export function getPlateLoadingOrder(targetWeight: number, barWeight: number = 20, unit: WeightUnit = 'kg', opts?: PlateCalcOpts): string[] {
+  const result = calculatePlates(targetWeight, barWeight, unit, undefined, opts);
   const unitLabel = unit === 'kg' ? 'кг' : 'lb';
   const steps: string[] = [];
 
@@ -209,7 +278,7 @@ export function getPlateLoadingOrder(targetWeight: number, barWeight: number = 2
 }
 
 /** Common warmup plate loading for powerlifting */
-export function warmupPlateSequence(workingWeight: number, barWeight: number = 20, unit: WeightUnit = 'kg', availablePlates?: number[]): { set: number; weight: number; plates: string; reps: number; restMin: number }[] {
+export function warmupPlateSequence(workingWeight: number, barWeight: number = 20, unit: WeightUnit = 'kg', availablePlates?: number[], opts?: PlateCalcOpts): { set: number; weight: number; plates: string; reps: number; restMin: number }[] {
   const steps = [0.2, 0.4, 0.6, 0.75, 0.85].map((pct, i) => ({
     set: i + 1,
     weight: Math.round(workingWeight * pct * 0.5) * 2,
@@ -219,7 +288,7 @@ export function warmupPlateSequence(workingWeight: number, barWeight: number = 2
   }));
 
   for (const step of steps) {
-    const result = calculatePlates(Math.max(barWeight, step.weight), barWeight, unit, availablePlates);
+    const result = calculatePlates(Math.max(barWeight + (opts?.collarsKg || 0), step.weight), barWeight, unit, availablePlates, opts);
     step.plates = result.platesPerSide.map(p => `${p.plate}×${p.count}`).join(' + ') || 'пустой';
   }
 
