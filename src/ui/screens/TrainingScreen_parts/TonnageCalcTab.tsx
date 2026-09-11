@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
 import { PopupSelect, PopupNumber, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
-import { PRILEPIN_TABLE, tonnageRowResult, inolScopeVerdict } from '../../../engines/tonnage-prilepin.engine';
+import { PRILEPIN_TABLE, tonnageRowResult, inolScopeVerdict, estimatedMpv } from '../../../engines/tonnage-prilepin.engine';
 import type { ProExerciseRow } from '../../../engines/volume-optimizer-pro.engine';
 
 const ACCENT = '#00e68a';
@@ -175,10 +175,13 @@ export const TonnageCalcTab: React.FC<TonnageCalcTabProps> = ({ sharedRows, onSh
               if (!res) return null;
               if (res.intensityPct === null) return <div style={{ flex: '1 1 100%', fontSize: 10, color: '#fff' }}>ℹ️ Укажите 1ПМ (свой или глобальный) — зона Прилепина и INOL появятся здесь</div>;
               const vc = res.verdict!.kind === 'optimal' ? '#22c55e' : res.verdict!.kind === 'below' ? '#60a5fa' : res.verdict!.kind === 'high' ? '#f59e0b' : '#ef4444';
+              const ex = getExerciseById(row.exerciseId);
+              const mpv = ex ? estimatedMpv(ex.name, res.intensityPct) : null;
               return (
                 <div style={{ flex: '1 1 100%', fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                   <span style={{ color: '#60a5fa' }}>{res.intensityPct.toFixed(0)}% · {res.zone!.label}</span>
                   {' · '}<span style={{ color: vc }}>INOL {res.inol!.toFixed(2)} — {res.verdict!.message.split('— ')[1] || res.verdict!.message}</span>
+                  {mpv && <span style={{ color: '#a78bfa' }}> · ≈{mpv.velocity.toFixed(2)} м/с{mpv.isEstimate ? ' (оценка LVP, не замер)' : ' (LVP-ориентир)'}</span>}
                 </div>
               );
             })()}

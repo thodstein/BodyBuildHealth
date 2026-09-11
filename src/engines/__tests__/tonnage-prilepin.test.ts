@@ -10,6 +10,8 @@ import {
   bodyweightLoad,
   patternOf,
   isDeadliftLike,
+  vbtLiftForExercise,
+  estimatedMpv,
   INOL_OPT_EXERCISE,
 } from '../tonnage-prilepin.engine';
 
@@ -60,6 +62,29 @@ describe('tonnage-prilepin: INOL дня/недели (Hristov 2.4/7.2)', () => {
   it('неделя 7.2 — optimal; 20 — over', () => {
     expect(inolScopeVerdict(7.2, 'week').kind).toBe('optimal');
     expect(inolScopeVerdict(20, 'week').kind).toBe('over');
+  });
+});
+
+describe('tonnage-prilepin: VBT-линк (Ж1, reuse LVP)', () => {
+  it('присед/жим/становая/армейский/тяга → канон; инклайн/сумо/пулдаун → estimate', () => {
+    expect(vbtLiftForExercise('Приседания со штангой')).toEqual({ lift: 'squat', isEstimate: false });
+    expect(vbtLiftForExercise('Жим штанги лёжа')).toEqual({ lift: 'bench', isEstimate: false });
+    expect(vbtLiftForExercise('Становая тяга')).toEqual({ lift: 'deadlift', isEstimate: false });
+    expect(vbtLiftForExercise('Жим гантелей на наклонной')).toEqual({ lift: 'bench', isEstimate: true });
+    expect(vbtLiftForExercise('Становая сумо')).toEqual({ lift: 'deadlift', isEstimate: true });
+    expect(vbtLiftForExercise('Тяга верхнего блока')).toEqual({ lift: 'row', isEstimate: true });
+  });
+  it('изоляция — null (VBT невалиден, честно молчим)', () => {
+    expect(vbtLiftForExercise('Сгибания рук с гантелями')).toBeNull();
+    expect(vbtLiftForExercise('Махи гантелей')).toBeNull();
+  });
+  it('85% приседа → 0.55 м/с (таблица Gonzalez-Badillo)', () => {
+    const v = estimatedMpv('Присед', 85)!;
+    expect(v.velocity).toBeCloseTo(0.55, 2);
+    expect(v.mvt).toBeCloseTo(0.25, 2);
+  });
+  it('без %1RM — null', () => {
+    expect(estimatedMpv('Присед', 0)).toBeNull();
   });
 });
 

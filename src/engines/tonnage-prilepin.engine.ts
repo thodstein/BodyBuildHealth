@@ -10,6 +10,8 @@
  * Заменяет crude-формулу `КПШ = tonnage × intensity` и зоны `<60/60-80/>80%`.
  */
 
+import { velocityForPct, mvtForLift, type VBTLift } from './pro/vbt.engine';
+
 export interface PrilepinZone {
   id: 'tech' | 'hypertrophy' | 'strength' | 'max';
   label: string;
@@ -117,6 +119,52 @@ export function patternOf(name: string, type?: string): keyof typeof PATTERN_MUL
 }
 
 export type InolVerdictKind = 'below' | 'optimal' | 'high' | 'over';
+
+// ── Ж1: VBT-линк (reuse pro/vbt.engine, без дубля LVP-таблиц) ───
+export interface VbtLiftMatch {
+  lift: VBTLift;
+  /** true — ближайший профиль (не канон): инклайн→bench, пулдаун→row, сумо→deadlift. */
+  isEstimate: boolean;
+}
+
+/**
+ * Маппинг упражнения на VBT-профиль. Канон (Gonzalez-Badillo): присед/жим/становая/ОHP/тяга.
+ * Изоляции (curl/raise/fly) — null (VBT-метрика там невалидна, честно молчим).
+ */
+export function vbtLiftForExercise(name: string): VbtLiftMatch | null {
+  const n = (name || '').toLowerCase();
+  if (/фронт|front/i.test(n)) return { lift: 'squat', isEstimate: true };
+  if (/присед|squat|жим.*ног|leg.?press|гакк|hack/i.test(n)) return { lift: 'squat', isEstimate: /жим.*ног|leg.?press|гакк|hack/i.test(n) };
+  if (/сумо|sumo/i.test(n)) return { lift: 'deadlift', isEstimate: true };
+  if (/станов|deadlift|румын|rdl|тяга.*(стан|мертв)/i.test(n)) return { lift: 'deadlift', isEstimate: /румын|rdl/i.test(n) };
+  if (/наклон|incline/i.test(n) && /жим|bench|press/i.test(n)) return { lift: 'bench', isEstimate: true };
+  if (/жим.*(леж|лёж)|bench|груд/i.test(n)) return { lift: 'bench', isEstimate: false };
+  if (/брус|dips|отжим/i.test(n)) return { lift: 'bench', isEstimate: true };
+  if (/армей|воен|overhead|ohp|стоя.*жим|сидя.*жим.*плеч|плеч.*жим/i.test(n)) return { lift: 'ohp', isEstimate: false };
+  if (/подтяг|pull.?up|пуллдаун|pulldown|верх.*блок/i.test(n)) return { lift: 'row', isEstimate: true };
+  if (/тяга|row|подтягивани/i.test(n)) return { lift: 'row', isEstimate: false };
+  return null;
+}
+
+export interface EstimatedMpv {
+  velocity: number; // м/с, средняя концентрическая (оценка LVP, НЕ замер!)
+  lift: VBTLift;
+  isEstimate: boolean;
+  mvt: number; // минимальная скорость порога (скорость 1ПМ)
+}
+
+/**
+ * Оценочная скорость для %1RM по LVP-канону. Для владельцев VBT-датчиков —
+ * точка сравнения «ожидалось vs замерено»; без датчика — ориентир темпа.
+ */
+export function estimatedMpv(name: string, intensityPct: number): EstimatedMpv | null {
+  const m = vbtLiftForExercise(name);
+  if (!m) return null;
+  if (!(intensityPct > 0)) return null;
+  // velocityForPct берёт долю 0–1, у нас проценты 0–100
+  const frac = Math.max(0.3, Math.min(1, intensityPct / 100));
+  return { velocity: velocityForPct(m.lift, frac), lift: m.lift, isEstimate: m.isEstimate, mvt: mvtForLift(m.lift) };
+}
 
 export interface InolVerdict {
   kind: InolVerdictKind;
