@@ -11,7 +11,7 @@ import TechniqueTab from './ExerciseLabTechnique';
 import CompareTab from './ExerciseLabCompare';
 import ProSubstituteTab from './ExerciseLabProSubstitute';
 import ExerciseLabCatalog from './ExerciseLabCatalog';
-import { readLabAthleteCtx, readLabPlanAudit } from './lab-athlete-ctx';
+import { readLabAthleteCtx, readLabPlanAudit, useLabRefresh } from './lab-athlete-ctx';
 import { buildLabExportHtml, buildLabExportCsv, collectLabExportDiagnoses } from '../../../engines/lab-exercise-export.engine';
 import { loadLabPlanFromStorage } from '../../../engines/lab-plan-exercise-audit.engine';
 import type { Exercise } from '../../../core/types';
@@ -47,12 +47,13 @@ const ExerciseLabMerged: React.FC<{
   useEffect(() => {
     try { localStorage.setItem(LAB_STORE_KEY, JSON.stringify({ selectedId })); } catch {}
   }, [selectedId]);
+  const labTick = useLabRefresh();
   const labCtx = useMemo(() => {
     try { return readLabAthleteCtx(); } catch { return null; }
-  }, [mode]);
+  }, [mode, labTick]);
   const labAudit = useMemo(() => {
     try { return labCtx ? readLabPlanAudit(labCtx) : null; } catch { return null; }
-  }, [labCtx, mode]);
+  }, [labCtx, mode, labTick]);
 
   // При наличии onSelectExercise — открываем drawer каталога (а не вкладку)
   useEffect(() => {

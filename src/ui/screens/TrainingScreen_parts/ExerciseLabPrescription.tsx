@@ -20,11 +20,9 @@ import { velocityForPct, pctForVelocity, estimate1RMFromVelocity } from '../../.
 import { tempoFor, tutForSet, REST_BY_CHARACTER } from '../../../engines/bb/bb-tempo-rest';
 import { techniquesFor } from '../../../engines/bb/bb-intensity-techniques';
 import { resolveLabWorkingWeight, getLabResistanceProfile } from '../../../engines/lab-exercise-profile.engine';
-import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
 import { prescribeLabCorrections, simulateLabCorrection, buildLabBridgeData, formatSimulatorDelta } from '../../../engines/lab-exercise-correction.engine';
 import { loadLabPlanFromStorage } from '../../../engines/lab-plan-exercise-audit.engine';
-import { readLabAthleteCtx, planCtxForExercise } from './lab-athlete-ctx';
-import { auditLabPlan } from '../../../engines/lab-plan-exercise-audit.engine';
+import { readLabAthleteCtx, readLabPlanBundle, diagnoseLabWithPlan, useLabRefresh } from './lab-athlete-ctx';
 import { applyToPlanner } from './planner-bridge';
 
 const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?: (ex: any) => void }> = ({ selectedId, onSelectExercise }) => {
@@ -136,41 +134,25 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
       return Array.isArray(j?.history) ? j.history : [];
     } catch { return []; }
   });
+  const labTick = useLabRefresh();
+  const labAthlete = useMemo(() => {
+    try { return readLabAthleteCtx(); } catch { return null; }
+  }, [ex, goal, level, labTick]);
   const labPlan = useMemo(() => {
-    try {
-      const plan = loadLabPlanFromStorage();
-      if (!plan) return null;
-      const athlete = readLabAthleteCtx();
-      const injuries = athlete.injuries.map(x => (typeof x === 'string' ? x : String(x?.muscle || '')).toLowerCase()).filter(Boolean);
-      const audit = auditLabPlan(plan, { injuries });
-      return audit ? { plan, audit, athlete } : null;
-    } catch { return null; }
-  }, [ex, goal, level]);
+    try { return labAthlete ? readLabPlanBundle(labAthlete) : null; } catch { return null; }
+  }, [labAthlete, ex, goal, level, labTick]);
   const labDx = useMemo(() => {
-    if (!ex) return null;
+    if (!ex || !labAthlete) return null;
     try {
-      const ctx = labPlan?.athlete || readLabAthleteCtx();
-      const planEx = labPlan ? planCtxForExercise(labPlan.audit, labPlan.plan, ex.id) : null;
-      const muscle = planEx?.muscle || ex.group;
-      const d = diagnoseLabExercise(
-        {
-          id: ex.id, name: ex.name, muscle,
-          tempo: manualTempo || planEx?.tempo || presc?.tempo,
-          pauseSeconds: planEx?.pauseSeconds ?? ex.pauseSeconds,
-          rir: planEx?.rir ?? undefined,
-        },
-        {
-          goal, level, weakZones: ctx.weakZones, weakMusclesCanonical: ctx.weakMusclesCanonical,
-          asymPct: ctx.asymPct, muscle, mobilityRestrictions: ctx.mobilityRestrictions,
-          injuries: ctx.injuries, equipment: ctx.equipment,
-          singleAngleMuscle: planEx?.singleAngleMuscle,
-          uncoveredSubregions: planEx && planEx.uncoveredSubregions.length ? planEx.uncoveredSubregions : undefined,
-          strictMissing: planEx && planEx.strictMissing.length ? planEx.strictMissing : undefined,
-        },
+      const r = diagnoseLabWithPlan(
+        labPlan,
+        labAthlete,
+        { id: ex.id, name: ex.name, group: ex.group },
+        { tempo: manualTempo || null, prescTempo: presc?.tempo || null },
       );
-      return { ctx, d, inPlan: planEx?.inPlan || false };
+      return { ctx: labAthlete, d: r.d, inPlan: r.inPlan };
     } catch { return null; }
-  }, [ex, goal, level, manualTempo, presc, labPlan]);
+  }, [ex, goal, level, manualTempo, presc, labPlan, labAthlete]);
   const labCorrections = useMemo(() => {
     if (!labDx || !ex) return [];
     try {

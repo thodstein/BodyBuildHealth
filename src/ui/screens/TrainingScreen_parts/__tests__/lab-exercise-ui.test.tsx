@@ -1,7 +1,7 @@
 /**
  * lab-exercise-ui.test.tsx — Epic F: лента, диагноз, мост, каталог-чипы, техника-блок, персист.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import ExerciseLabMerged from '../ExerciseLabMerged';
 import PrescriptionTab from '../ExerciseLabPrescription';
@@ -155,8 +155,40 @@ describe('lab-exercise-ui', () => {
     seedPlan();
     render(<ProSubstituteTab selectedId="bench_bar" />);
     await waitFor(() => {
-      expect(screen.getAllByText(/Δ на плане/).length).toBeGreaterThan(0);
+      // Δ и в «Допустимых», и в «Все в группе».
+      expect(screen.getAllByText(/Δ на плане/).length).toBeGreaterThanOrEqual(2);
     });
+  });
+
+  it('экспорт: печать пишет HTML сводки, CSV скачивается Blob-ом', async () => {
+    seedPlan();
+    const writes: string[] = [];
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue({
+      document: { write: (s: string) => writes.push(s), close: () => {} },
+      focus: () => {},
+      print: () => {},
+    } as never);
+    render(<ExerciseLabMerged />);
+    fireEvent.click(screen.getByText('🖨 Печать'));
+    expect(writes.join('')).toMatch(/Лаборатория упражнений — сводка/);
+    openSpy.mockRestore();
+    const blobs: Blob[] = [];
+    vi.stubGlobal('URL', {
+      createObjectURL: (b: Blob) => { blobs.push(b); return 'blob:lab'; },
+      revokeObjectURL: () => {},
+    });
+    const downloads: string[] = [];
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) { downloads.push(this.download); });
+    fireEvent.click(screen.getByText('📥 CSV'));
+    expect(blobs).toHaveLength(1);
+    expect(downloads).toEqual(['lab-audit.csv']);
+    // Содержимое CSV покрыто движковыми тестами; тут — непустой Blob правильного типа.
+    expect(blobs[0].size).toBeGreaterThan(0);
+    expect(blobs[0].type).toMatch(/csv/);
+    clickSpy.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('каталог: диагноз-чип только при плане', () => {

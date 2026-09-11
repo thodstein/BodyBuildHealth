@@ -15,8 +15,7 @@ import {
   filterBtn, pill, secTitle, chipRow,
 } from './ExerciseLabShared';
 import { applyToPlanner } from './planner-bridge';
-import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
-import { readLabAthleteCtx, type LabAthleteCtx } from './lab-athlete-ctx';
+import { readLabAthleteCtx, readLabPlanBundle, diagnoseLabWithPlan, type LabAthleteCtx } from './lab-athlete-ctx';
 
 /**
  * Epic F: блок «Коррекция техники под ваш диагноз» (только при jointRisk —
@@ -31,13 +30,8 @@ const LabRegressionBlock: React.FC<{
   const dx = useMemo(() => {
     if (!ctx) return null;
     try {
-      return diagnoseLabExercise(
-        { id: ex.id, name: ex.name, muscle: ex.group },
-        {
-          goal: ctx.goal, level: ctx.level, weakZones: ctx.weakZones, asymPct: ctx.asymPct,
-          muscle: ex.group, mobilityRestrictions: ctx.mobilityRestrictions, injuries: ctx.injuries,
-        },
-      );
+      const bundle = readLabPlanBundle(ctx);
+      return diagnoseLabWithPlan(bundle, ctx, { id: ex.id, name: ex.name, group: ex.group }).d;
     } catch { return null; }
   }, [ex.id, ex.name, ex.group, ctx]);
   if (!dx || !dx.flags.includes('jointRisk')) return null;

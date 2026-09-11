@@ -7,7 +7,91 @@
  *  - `he_training_profile` (legacy) — injuries / equipment / mobilityRestrictions fallback.
  * Пусто = честные дефолты, никогда throw.
  */
+import { useState, useEffect } from 'react';
 import { auditLabPlan, loadLabPlanFromStorage, type LabPlanAudit } from '../../../engines/lab-plan-exercise-audit.engine';
+import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
+import type { ExerciseDiagnosis } from '../../../engines/bb/bb-exercise-diagnosis.engine';
+
+/**
+ * Тик обновления при возврате на вкладку / изменении storage в другой вкладке.
+ * Лечит staleness ленты/карточек без подписки на каждый ключ (честный минимум).
+ */
+export function useLabRefresh(): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setTick((t) => t + 1);
+    window.addEventListener('focus', bump);
+    window.addEventListener('storage', bump);
+    return () => {
+      window.removeEventListener('focus', bump);
+      window.removeEventListener('storage', bump);
+    };
+  }, []);
+  return tick;
+}
+
+export interface LabPlanBundle {
+  plan: unknown;
+  audit: LabPlanAudit;
+}
+
+/** План + аудит одним чтением (null без плана). */
+export function readLabPlanBundle(ctx?: Pick<LabAthleteCtx, 'injuries'>): LabPlanBundle | null {
+  try {
+    const plan = loadLabPlanFromStorage();
+    if (!plan) return null;
+    const injuries = (ctx?.injuries || []).map((x) => (typeof x === 'string' ? x : String(x?.muscle || '')).toLowerCase()).filter(Boolean);
+    const audit = auditLabPlan(plan, { injuries });
+    return audit ? { plan, audit } : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface LabDxWithPlan {
+  d: ExerciseDiagnosis;
+  inPlan: boolean;
+}
+
+/**
+ * Диагноз упражнения с план-контекстом (добивка-2 п.1): факт из плана
+ * (сеты/RIR/темп/пауза) + missing-списки аудита. Единая точка для Шага 1/3,
+ * каталога и Шага 2 — чтобы singleAngle/uncovered/strict стреляли везде.
+ */
+export function diagnoseLabWithPlan(
+  bundle: LabPlanBundle | null,
+  athlete: LabAthleteCtx,
+  ex: { id?: string; name: string; group?: string; muscle?: string; tempo?: string; pauseSeconds?: number; rir?: number },
+  opts: { tempo?: string | null; prescTempo?: string | null } = {},
+): LabDxWithPlan {
+  const planEx = bundle ? planCtxForExercise(bundle.audit, bundle.plan, String(ex.id || '')) : null;
+  const muscle = planEx?.muscle || ex.muscle || ex.group || '';
+  const d = diagnoseLabExercise(
+    {
+      id: ex.id,
+      name: ex.name,
+      muscle,
+      tempo: opts.tempo || planEx?.tempo || opts.prescTempo || ex.tempo,
+      pauseSeconds: planEx?.pauseSeconds ?? ex.pauseSeconds,
+      rir: planEx?.rir ?? ex.rir,
+    },
+    {
+      goal: athlete.goal,
+      level: athlete.level,
+      weakZones: athlete.weakZones,
+      weakMusclesCanonical: athlete.weakMusclesCanonical,
+      asymPct: athlete.asymPct,
+      muscle,
+      mobilityRestrictions: athlete.mobilityRestrictions,
+      injuries: athlete.injuries,
+      equipment: athlete.equipment,
+      singleAngleMuscle: planEx?.singleAngleMuscle,
+      uncoveredSubregions: planEx && planEx.uncoveredSubregions.length ? planEx.uncoveredSubregions : undefined,
+      strictMissing: planEx && planEx.strictMissing.length ? planEx.strictMissing : undefined,
+    },
+  );
+  return { d, inPlan: planEx?.inPlan || false };
+}
 
 export interface LabAthleteCtx {
   goal: string;

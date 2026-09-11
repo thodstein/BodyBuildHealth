@@ -4,8 +4,7 @@ import { getExerciseBio } from '../../../data/exercise-biomechanics-db';
 import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { ACCENT, DIM, SMALL, GROUP_RU, TYPE_RU, EQUIP_RU, GROUPS, BodyMapSVG, muscleToRegion } from './ExerciseLabShared';
 import { getLabResistanceProfile } from '../../../engines/lab-exercise-profile.engine';
-import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
-import { readLabAthleteCtx } from './lab-athlete-ctx';
+import { readLabAthleteCtx, readLabPlanBundle, diagnoseLabWithPlan, useLabRefresh } from './lab-athlete-ctx';
 import type { Exercise } from '../../../core/types';
 
 const MUSCLE_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
@@ -60,10 +59,14 @@ const ExerciseLabCatalog: React.FC<{
     return list;
   }, [search, group, type, equipment, difficulty]);
 
-  // Epic F: контекст атлета (дешево — один раз на фильтры).
+  // Epic F: контекст атлета (дешево — один раз на фильтры) + тик против staleness.
+  const labTick = useLabRefresh();
   const labCtx = useMemo(() => {
     try { return readLabAthleteCtx(); } catch { return null; }
-  }, [search, group, type, equipment, difficulty]);
+  }, [search, group, type, equipment, difficulty, labTick]);
+  const labBundle = useMemo(() => {
+    try { return labCtx ? readLabPlanBundle(labCtx) : null; } catch { return null; }
+  }, [labCtx, search, group, type, equipment, difficulty, labTick]);
 
   const selectedEx = useMemo(() => EXERCISE_CATALOG.find(e => e.id === selectedId), [selectedId]);
   const selectedBio = useMemo(() => selectedId ? getExerciseBio(selectedId) : null, [selectedId]);
@@ -72,38 +75,24 @@ const ExerciseLabCatalog: React.FC<{
   const secondaryRegions = useMemo(() => selectedBio ? [...new Set((selectedBio.secondaryMuscles || []).map(muscleToRegion).filter(r => r !== 'other'))] : [], [selectedBio]);
   const visibleList = filtered.slice(0, visible);
 
-  // Epic F + добивка 6: SFR/профиль — всегда; диагноз-чип — только при плане (честно).
-  const labHasPlan = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('he_bb_plan_saved') || localStorage.getItem('he_bb_plans');
-      if (!raw) return false;
-      const j = JSON.parse(raw);
-      return !!(j?.plan?.weeks?.length || j?.weeks?.length);
-    } catch { return false; }
-  }, [search, group, type, equipment, difficulty]);
+  // Epic F + добивка 6 + добивка-2 п.1: SFR/профиль — всегда; диагноз-чип с
+  // план-контекстом — только при плане (честно).
   const labMap = useMemo(() => {
     const map = new Map<string, { sfr: number | null; profile: string; estimated: boolean; dx: number | null }>();
     for (const e of visibleList) {
       try {
         const p = getLabResistanceProfile({ id: e.id, name: e.name });
         let dx: number | null = null;
-        if (labCtx && labHasPlan) {
+        if (labCtx && labBundle) {
           try {
-            dx = diagnoseLabExercise(
-              { id: e.id, name: e.name, muscle: e.group },
-              {
-                goal: labCtx.goal, level: labCtx.level, weakZones: labCtx.weakZones,
-                asymPct: labCtx.asymPct, muscle: e.group,
-                mobilityRestrictions: labCtx.mobilityRestrictions, injuries: labCtx.injuries,
-              },
-            ).score;
+            dx = diagnoseLabWithPlan(labBundle, labCtx, { id: e.id, name: e.name, group: e.group }).d.score;
           } catch { dx = null; }
         }
         map.set(e.id, { sfr: p.sfr, profile: p.profile, estimated: p.source === 'estimated', dx });
       } catch { /* noop */ }
     }
     return map;
-  }, [visibleList, labCtx, labHasPlan]);
+  }, [visibleList, labCtx, labBundle]);
 
   const groupOptions = [
     { id: 'all', label: 'Все группы' },

@@ -142,6 +142,10 @@ export function formatSimulatorDelta(d: SimulatorDelta | null): string | null {
   if (len) parts.push(len);
   const ang = fmtDelta(d.angleDelta, 2);
   if (ang) parts.push(`углы ${ang}`);
+  const uni = d.unilateralDelta != null && Number.isFinite(d.unilateralDelta) && d.unilateralDelta !== 0
+    ? `unilateral ${d.unilateralDelta > 0 ? '+' : ''}${Math.round(d.unilateralDelta * 100)} п.п.`
+    : null;
+  if (uni) parts.push(uni);
   for (const issue of d.issuesResolved.slice(0, 3)) parts.push(`✓ ${issue}`);
   return parts.length ? parts.join(' · ') : null;
 }

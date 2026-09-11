@@ -208,6 +208,11 @@ describe('lab-exercise-correction', () => {
     expect(ranked[0].deltaSummary).toMatch(/SFR/);
   });
 
+  it('formatSimulatorDelta: unilateral показывается в п.п.', () => {
+    const s = formatSimulatorDelta({ sfrDelta: null, fatigueDelta: null, lengthenedDelta: null, unilateralDelta: 0.2, angleDelta: null, issuesResolved: [], summary: '' } as never);
+    expect(s).toMatch(/unilateral \+20 п\.п\./);
+  });
+
   it('rankSubstitutesByDelta: без плана — исходный порядок, Δ null', () => {
     const ranked = rankSubstitutesByDelta(null, 'bench_bar', [
       { id: 'bench_db', name: 'b', reason: 'r' },

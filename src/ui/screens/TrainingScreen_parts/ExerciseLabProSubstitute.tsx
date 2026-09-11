@@ -14,10 +14,8 @@ import {
   calcTechniqueScore, getRiskColor,
 } from './ExerciseLabShared';
 import { getLabResistanceProfile, groupSubregionCoverage } from '../../../engines/lab-exercise-profile.engine';
-import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
 import { rankSubstitutesByDelta } from '../../../engines/lab-exercise-correction.engine';
-import { loadLabPlanFromStorage } from '../../../engines/lab-plan-exercise-audit.engine';
-import { readLabAthleteCtx } from './lab-athlete-ctx';
+import { readLabAthleteCtx, readLabPlanBundle, diagnoseLabWithPlan, useLabRefresh } from './lab-athlete-ctx';
 
 const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId }) => {
   const [proGroup, setProGroup] = useState('chest');
@@ -26,9 +24,14 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
   React.useEffect(() => { if (selectedId) { const ex = EXERCISE_CATALOG.find(e => e.id === selectedId); if (ex) { setProGroup(ex.group); setSubExId(selectedId); } } }, [selectedId]);
 
   // Epic F: профиль сопротивления из данных (Epic A), травмы — из профиля атлета.
+  const labTick = useLabRefresh();
   const labCtx = useMemo(() => {
     try { return readLabAthleteCtx(); } catch { return null; }
-  }, [proGroup, subExId]);
+  }, [proGroup, subExId, labTick]);
+  const labBundle = useMemo(() => {
+    try { return labCtx ? readLabPlanBundle(labCtx) : null; } catch { return null; }
+  }, [labCtx, proGroup, subExId, labTick]);
+
   const groupExercises = useMemo(() =>
     EXERCISE_CATALOG.filter(e => e.group === proGroup).map(ex => {
       const lab = getLabResistanceProfile({ id: ex.id, name: ex.name });
@@ -49,6 +52,18 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
     groupExercises.forEach(g => { map[g.fv] = (map[g.fv] || 0) + 1; });
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [groupExercises]);
+
+  // Добивка-2 п.1+7: диагнозы строк с план-контекстом, мемо (не при каждом рендере).
+  const dxScores = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!labCtx) return m;
+    for (const g of groupExercises.slice(0, 20)) {
+      try {
+        m.set(g.exercise.id, diagnoseLabWithPlan(labBundle, labCtx, { id: g.exercise.id, name: g.exercise.name, group: proGroup }).d.score);
+      } catch {}
+    }
+    return m;
+  }, [groupExercises, labCtx, labBundle, proGroup]);
 
   const stretchLeaders = useMemo(() => groupExercises.filter(g => g.rp.profile === 'lengthened').slice(0, 5), [groupExercises]);
   const synergyPairs = useMemo(() => {
@@ -102,12 +117,26 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
   const rankedSubs = useMemo(() => {
     if (!subEx) return [];
     try {
-      const plan = loadLabPlanFromStorage();
-      return rankSubstitutesByDelta(plan, subEx.id, subs);
+      return rankSubstitutesByDelta(labBundle?.plan ?? null, subEx.id, subs);
     } catch {
       return subs.map(s => ({ ...s, sfrDelta: null as number | null, fatigueDelta: null as number | null, deltaSummary: null as string | null }));
     }
-  }, [subEx, subs]);
+  }, [subEx, subs, labBundle]);
+  // Добивка-2 п.3: «Все в группе» — разрешённые первыми по Δ, остальные в порядке каталога.
+  const groupRanked = useMemo(() => {
+    if (!subEx) return { order: subExList, deltas: new Map<string, string | null>() };
+    try {
+      const ok = subExList.filter(e => e.id !== subEx.id && canReplace(subEx.id, e.id));
+      const ranked = rankSubstitutesByDelta(labBundle?.plan ?? null, subEx.id, ok.map(e => ({ id: e.id, name: e.name, reason: '' })));
+      const deltas = new Map<string, string | null>(ranked.map(r => [r.id, r.deltaSummary]));
+      const rest = subExList.filter(e => e.id === subEx.id || !canReplace(subEx.id, e.id));
+      const byId = new Map(subExList.map(e => [e.id, e]));
+      const ordered = [...ranked.map(r => byId.get(r.id)!).filter(Boolean), ...rest];
+      return { order: ordered, deltas };
+    } catch {
+      return { order: subExList, deltas: new Map<string, string | null>() };
+    }
+  }, [subEx, subExList, labBundle]);
 
   return (
     <div className="train-exlabsub" style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
@@ -159,17 +188,7 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
           <span>Упражнение</span><span style={{ textAlign: 'center' }}>Профиль</span><span style={{ textAlign: 'center' }}>Техника</span><span style={{ textAlign: 'center' }}>Безоп.</span><span style={{ textAlign: 'center' }}>Диагноз</span>
         </div>
         {groupExercises.slice(0, 20).map((g, i) => {
-          let dxScore: number | null = null;
-          try {
-            dxScore = diagnoseLabExercise(
-              { id: g.exercise.id, name: g.exercise.name, muscle: proGroup },
-              {
-                goal: labCtx?.goal, level: labCtx?.level, weakZones: labCtx?.weakZones,
-                asymPct: labCtx?.asymPct, muscle: proGroup,
-                mobilityRestrictions: labCtx?.mobilityRestrictions, injuries: labCtx?.injuries,
-              },
-            ).score;
-          } catch { dxScore = null; }
+          const dxScore = dxScores.get(g.exercise.id) ?? null;
           const dxColor = dxScore == null ? DIM : dxScore >= 70 ? '#22c55e' : dxScore >= 45 ? '#f59e0b' : '#ef4444';
           return (
           <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: 4, padding: '3px 0', fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.02)', background: g.exercise.id === selectedId ? 'rgba(0,230,138,0.06)' : 'transparent' }}>
@@ -209,9 +228,10 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
             )}
             <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', margin: '8px 0 4px' }}>📋 Все в группе {subExList.length - 1} шт</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {subExList.filter(e => e.id !== subEx.id).slice(0, 10).map(e => {
+              {groupRanked.order.filter(e => e.id !== subEx.id).slice(0, 10).map(e => {
                 const ok = canReplace(subEx.id, e.id);
-                return <div key={e.id} style={{ padding: '6px 8px', borderRadius: 6, fontSize: 10, background: ok ? 'rgba(34,197,94,0.04)' : 'rgba(245,158,11,0.04)', border: `1px solid ${ok ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)'}`, display: 'flex', justifyContent: 'space-between' }}><span>{e.name}</span><span style={{ color: ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{ok ? '✅' : '⚠️'}</span></div>;
+                const delta = groupRanked.deltas.get(e.id);
+                return <div key={e.id} style={{ padding: '6px 8px', borderRadius: 6, fontSize: 10, background: ok ? 'rgba(34,197,94,0.04)' : 'rgba(245,158,11,0.04)', border: `1px solid ${ok ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)'}` }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{e.name}</span><span style={{ color: ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{ok ? '✅' : '⚠️'}</span></div>{delta && <div style={{ color: '#60a5fa', marginTop: 2 }}>Δ на плане: {delta}</div>}</div>;
               })}
             </div>
           </>

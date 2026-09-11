@@ -14,8 +14,7 @@ import {
   TechniqueDetail, calcTechniqueScore, getRiskColor,
 } from './ExerciseLabShared';
 import { getLabResistanceProfile } from '../../../engines/lab-exercise-profile.engine';
-import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
-import { readLabAthleteCtx } from './lab-athlete-ctx';
+import { readLabAthleteCtx, readLabPlanBundle, diagnoseLabWithPlan, useLabRefresh } from './lab-athlete-ctx';
 
 const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ initialId1, initialId2 }) => {
   const [id1, setId1] = useState(initialId1);
@@ -62,20 +61,18 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
   const d2 = useMemo(() => getExData(ex2, labInjuries), [ex2, goal, level, labInjuries]);
 
   // Epic F: профили из данных + Δ-диагноз A vs B на материале атлета.
+  const labTick = useLabRefresh();
   const labCtx = useMemo(() => {
     try { return readLabAthleteCtx(); } catch { return null; }
-  }, [id1, id2]);
+  }, [id1, id2, labTick]);
   const labRp1 = useMemo(() => { try { return ex1 ? getLabResistanceProfile({ id: ex1.id, name: ex1.name }) : null; } catch { return null; } }, [ex1]);
   const labRp2 = useMemo(() => { try { return ex2 ? getLabResistanceProfile({ id: ex2.id, name: ex2.name }) : null; } catch { return null; } }, [ex2]);
   const labDxDelta = useMemo(() => {
     if (!ex1 || !ex2 || !labCtx) return null;
     try {
-      const base = {
-        goal, level, weakZones: labCtx.weakZones, asymPct: labCtx.asymPct,
-        mobilityRestrictions: labCtx.mobilityRestrictions, injuries: labCtx.injuries,
-      };
-      const a = diagnoseLabExercise({ id: ex1.id, name: ex1.name, muscle: ex1.group }, { ...base, muscle: ex1.group });
-      const b = diagnoseLabExercise({ id: ex2.id, name: ex2.name, muscle: ex2.group }, { ...base, muscle: ex2.group });
+      const bundle = readLabPlanBundle(labCtx);
+      const a = diagnoseLabWithPlan(bundle, labCtx, { id: ex1.id, name: ex1.name, group: ex1.group }).d;
+      const b = diagnoseLabWithPlan(bundle, labCtx, { id: ex2.id, name: ex2.name, group: ex2.group }).d;
       return { a: a.score, b: b.score, sfrA: a.effect.sfr, sfrB: b.effect.sfr };
     } catch { return null; }
   }, [ex1, ex2, labCtx, goal, level]);
