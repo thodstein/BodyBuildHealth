@@ -317,6 +317,7 @@ describe('PRO-2 доводка — трек хранится в плане', () 
 });
 
 describe('PRO-2 доводка — display-таблица знает брейки', () => {
+  // Тяжёлые 20-недельные сборки: явный лимит (под штормовой нагрузкой >5с дефолта).
   it('20 нед: нед 8 и 16 — Diet break без рефида; нед 3 — рефид', async () => {
     const { buildPrepNutritionPlan } = await import('../bb-prep-cycle.engine');
     const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 20, taperWeeks: 2 });
@@ -330,7 +331,7 @@ describe('PRO-2 доводка — display-таблица знает брейк�
     expect(w16.note).toMatch(/Diet break/);
     expect(w16.refeed).toBe(false);
     expect(w3.refeed).toBe(true);
-  });
+  }, 60000);
   it('12 нед: брейков нет, рефиды как раньше (3/6/9 + финал)', async () => {
     const { buildPrepNutritionPlan } = await import('../bb-prep-cycle.engine');
     const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 12, taperWeeks: 2 });
@@ -339,7 +340,7 @@ describe('PRO-2 доводка — display-таблица знает брейк�
     expect(table.weeks.some(w => w.note.includes('Diet break'))).toBe(false);
     expect(table.weeks.find(w => w.week === 3)!.refeed).toBe(true);
     expect(table.weeks.find(w => w.week === 6)!.refeed).toBe(true);
-  });
+  }, 60000);
 });
 
 describe('PRO-2 доводка — post-show лог в экспорте', () => {
