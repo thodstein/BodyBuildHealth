@@ -20,6 +20,7 @@ import {
   type AgeGroup,
 } from '../../../engines/pl-norms.engine';
 import { wilksScore, dotsScore, ipfGLPoints, ipfGLPointsFor, allometricScore, relativeStrength, liftRelativeStrength, mccullochCoeff, ageAdjustedScore } from '../../../engines/pro/relative-strength.engine';
+import { planMeetAttempts, type AttemptGoal } from '../../../engines/pro/pl-attempts.engine';
 import { calcGlossbrenner } from '../../../engines/pl-points.engine';
 import { applyToPlanner } from './planner-bridge';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
@@ -67,6 +68,7 @@ export const PlNormsCalcTab: React.FC<Props> = ({ snapshot, onSnapshotChange }) 
   const [ageNum, setAgeNum] = useState<number>(30);
   const [mcOn, setMcOn] = useState(false);
   const [bwDelta, setBwDelta] = useState<number>(0);
+  const [attemptGoal, setAttemptGoal] = useState<AttemptGoal>('standard');
   const [disc, setDisc] = useState<Discipline>('total');
   const [ageGroup, setAgeGroup] = useState<AgeGroup>('open');
   const [bwLocal, setBwLocal] = useState<number>(() => { try { return Number((getProfile().settings as any)?.personal?.weight) || 83; } catch { return 83; } });
@@ -372,6 +374,45 @@ export const PlNormsCalcTab: React.FC<Props> = ({ snapshot, onSnapshotChange }) 
               <b style={{ color: '#fff' }}>До следующего</b> — разница: порог_следующего − ваш результат.<br />
               <b style={{ color: '#fff' }}>Прогресс-бар</b> — доля пути от текущего разряда до следующего.
             </div>
+          </div>
+
+          <div style={CARD}>
+            <div style={SECTION}>🏁 Раскладка попыток (от текущих движений)</div>
+            {(() => {
+              const goalLabel = attemptGoal === 'safe' ? 'надёжная' : attemptGoal === 'record' ? 'на рекорд' : 'стандарт';
+              const m = planMeetAttempts(squat, bench, dead, attemptGoal);
+              const rows: Array<[string, { opener: number; second: number; third: number }]> = [['Присед', m.squat], ['Жим', m.bench], ['Тяга', m.deadlift]];
+              return (
+                <>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                    {(['safe', 'standard', 'record'] as AttemptGoal[]).map(g => (
+                      <button key={g} onClick={() => setAttemptGoal(g)} style={{ flex: 1, padding: 8, borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: attemptGoal === g ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.08)', background: attemptGoal === g ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)', color: attemptGoal === g ? '#00e68a' : '#fff' }}>
+                        {g === 'safe' ? '🛡 Надёжная' : g === 'record' ? '🔥 На рекорд' : '⚖️ Стандарт'}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 10, color: '#fff', marginBottom: 4 }}>
+                    <span />
+                    <span style={{ textAlign: 'center' }}>1-я (92.5%)</span>
+                    <span style={{ textAlign: 'center' }}>2-я (97.5%)</span>
+                    <span style={{ textAlign: 'center' }}>3-я ({goalLabel})</span>
+                  </div>
+                  {rows.map(([label, a]) => (
+                    <div key={label} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 12, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#fff' }}>
+                      <span style={{ fontWeight: 700 }}>{label}</span>
+                      <span style={{ textAlign: 'center' }}>{a.opener}</span>
+                      <span style={{ textAlign: 'center' }}>{a.second}</span>
+                      <span style={{ textAlign: 'center', fontWeight: 800, color: ACCENT }}>{a.third}</span>
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 6, fontSize: 11, color: '#fff' }}>
+                    Прогноз тотала (все третьи): <b style={{ color: ACCENT }}>{m.totalThird} кг</b>
+                    {displayResult && displayResult.kgToNext > 0 ? <> · до <b style={{ color: '#f59e0b' }}>{displayResult.nextLabel}</b> не хватает <b>{displayResult.kgToNext} кг</b> — третьи дают {m.totalThird >= displayTotal + displayResult.kgToNext ? '✅ покрывают' : '⚠️ не покрывают'}.</> : ' · высший разряд — третьи на рекорд.'}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Шаг 2.5 кг · 1-я гарантия, 2-я рабочая, 3-я по задаче. Школа Шейко/IPF-практика.</div>
+                </>
+              );
+            })()}
           </div>
 
           <div style={CARD}>

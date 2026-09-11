@@ -7,11 +7,26 @@ import { OneRmCalcTab } from './OneRmCalcTab';
 import { VBTCalcTab } from './VBTCalcTab';
 import { PlNormsCalcTab } from './PlNormsCalcTab';
 import { StrengthAnalyticsCard } from './StrengthAnalyticsCard';
+import { RelStrengthTab } from './RelStrengthTab';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { getProfile } from '../../../core/profile-manager';
 import { relativeStrengthFullReport, dotsScore, wilksScore, ipfGLPoints } from '../../../engines/pro/relative-strength.engine';
-import { buildStrengthReportText, buildStrengthPrintHtml } from '../../../engines/pro/strength-export.engine';
+import { buildStrengthReportText, buildStrengthPrintHtml, buildStrengthHistoryCsv, buildStrengthCoachJson, buildStrengthTestDayIcs } from '../../../engines/pro/strength-export.engine';
 import type { Sex } from '../../../engines/pro/relative-strength.engine';
+
+function downloadFile(name: string, content: string, mime: string) {
+  try {
+    const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch { try { (window as any).showToast?.('⚠️ Не удалось скачать файл'); } catch {} }
+}
 
 const ACCENT = '#00e68a';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' };
@@ -19,13 +34,14 @@ const CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, mar
 const DIM = '#fff';
 const SMALL: React.CSSProperties = { fontSize: 10, color: '#fff', lineHeight: 1.45 };
 
-type StrengthAnalysisHubMode = '1rm' | 'vbt' | 'norms' | 'analytics';
+type StrengthAnalysisHubMode = '1rm' | 'vbt' | 'relstrength' | 'norms' | 'analytics';
 
 export interface HubSnapshot { sex: Sex; bw: number; squat: number; bench: number; dead: number; ohp: number }
 const MODE_DEFS: Array<{ m: StrengthAnalysisHubMode; label: string; icon: string; desc: string; accent: string }> = [
   { m: '1rm', label: '1RM', icon: '🎯', desc: '7 формул, консенсус', accent: '#00e68a' },
   { m: 'vbt', label: 'VBT', icon: '⚡', desc: 'Скорость штанги', accent: '#3b82f6' },
-  { m: 'norms', label: 'Нормативы', icon: '🏆', desc: 'Разряды + DOTS/Wilks/IPF GL', accent: '#f59e0b' },
+  { m: 'relstrength', label: 'Отн. сила', icon: '⚖️', desc: 'DOTS/Wilks/IPF GL сравнение', accent: '#a855f7' },
+  { m: 'norms', label: 'Нормативы', icon: '🏆', desc: 'Разряды + очки + попытки', accent: '#f59e0b' },
   { m: 'analytics', label: 'Аналитика', icon: '📊', desc: 'Процентили, соотношения, MEV', accent: '#22c55e' },
 ];
 
@@ -98,7 +114,7 @@ export const StrengthAnalysisHub: React.FC<{ initialMode?: StrengthAnalysisHubMo
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap' }}>без дублей</span>
         </div>
         <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
-          <b style={{ color:'#fff' }}>Как работает:</b> вверху — единый ввод (пол/вес/3 движения). Он один раз питает все 4 секции ниже. <span style={{ color:ACCENT }}>1RM</span> — 7 формул + консенсус, <span style={{ color:'#3b82f6' }}>VBT</span> — скорость, <span style={{ color:'#f59e0b' }}>нормативы</span> — DOTS/Wilks/IPF GL, <span style={{ color:'#22c55e' }}>аналитика</span> — процентили. Переключение вкладок не сбрасывает ввод.
+          <b style={{ color:'#fff' }}>Как работает:</b> вверху — единый ввод (пол/вес/3 движения). Он один раз питает все 5 секций ниже. <span style={{ color:ACCENT }}>1RM</span> — 7 формул + консенсус, <span style={{ color:'#3b82f6' }}>VBT</span> — скорость, <span style={{ color:'#a855f7' }}>отн. сила</span> — DOTS/Wilks/IPF GL, <span style={{ color:'#f59e0b' }}>нормативы</span> — разряды + попытки, <span style={{ color:'#22c55e' }}>аналитика</span> — процентили. Переключение вкладок не сбрасывает ввод.
         </div>
       </div>
 
@@ -179,6 +195,48 @@ export const StrengthAnalysisHub: React.FC<{ initialMode?: StrengthAnalysisHubMo
         >
           🖨 Печать / PDF
         </button>
+        <button
+          onClick={() => {
+            try {
+              const raw = localStorage.getItem('he_onerm_history_v1') || '[]';
+              const hist = JSON.parse(raw);
+              downloadFile('strength-e1rm-history.csv', buildStrengthHistoryCsv(Array.isArray(hist) ? hist : []), 'text/csv');
+            } catch { try { (window as any).showToast?.('⚠️ Нет истории e1RM'); } catch {} }
+          }}
+          style={{ flex: '1 1 140px', padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+        >
+          📥 e1RM-история (CSV)
+        </button>
+        <button
+          onClick={() => {
+            const payload = { sex, bw, squat, bench, dead, ohp, total, dots, wilks, ipfgl, relative: report.relative, levelLabel: report.classification.label, lifts: { squat: { rs: report.lifts.squat.rs, label: report.lifts.squat.label }, bench: { rs: report.lifts.bench.rs, label: report.lifts.bench.label }, deadlift: { rs: report.lifts.deadlift.rs, label: report.lifts.deadlift.label } } };
+            downloadFile('strength-coach.json', buildStrengthCoachJson(payload), 'application/json');
+            try { (window as any).showToast?.('📥 JSON тренеру скачан'); } catch {}
+          }}
+          style={{ flex: '1 1 140px', padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+        >
+          📥 JSON тренеру
+        </button>
+        <button
+          onClick={() => {
+            const payload = { sex, bw, squat, bench, dead, ohp, total, dots, wilks, ipfgl, relative: report.relative, levelLabel: report.classification.label };
+            downloadFile('strength-test-day.ics', buildStrengthTestDayIcs(payload), 'text/calendar');
+            try { (window as any).showToast?.('📅 Прикидка — ближайшая суббота'); } catch {}
+          }}
+          style={{ flex: '1 1 140px', padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+        >
+          📅 Прикидка (.ics)
+        </button>
+        <button
+          onClick={() => {
+            const fn = (window as any).__navigateToTrainingTab;
+            if (typeof fn === 'function') fn('calc_plates');
+            else { try { (window as any).showToast?.('🧮 Блины: Тренировки → Объём-хаб → Блины'); } catch {} }
+          }}
+          style={{ flex: '1 1 140px', padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(59,130,246,0.25)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+        >
+          🧮 Раскладка блинов →
+        </button>
       </div>
 
       {/* sticky nav */}
@@ -201,19 +259,20 @@ export const StrengthAnalysisHub: React.FC<{ initialMode?: StrengthAnalysisHubMo
           <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background: `${MODE_DEFS.find(x=>x.m===mode)!.accent}18`, border:`1px solid ${MODE_DEFS.find(x=>x.m===mode)!.accent}33`, fontSize:14 }}>{MODE_DEFS.find(x=>x.m===mode)!.icon}</span>
           <div>
             <div style={{ fontSize:12, fontWeight:900, color: MODE_DEFS.find(x=>x.m===mode)!.accent }}>{MODE_DEFS.find(x=>x.m===mode)!.label} · {MODE_DEFS.find(x=>x.m===mode)!.desc}</div>
-            <div style={{ fontSize:10, color:'#fff' }}>{mode === '1rm' ? 'Вес×повторы → 1RM' : mode === 'vbt' ? 'Скорость штанги → %1RM/вес' : mode === 'norms' ? 'Разряды + очки' : 'Процентили и объём'}</div>
+            <div style={{ fontSize:10, color:'#fff' }}>{mode === '1rm' ? 'Вес×повторы → 1RM' : mode === 'vbt' ? 'Скорость штанги → %1RM/вес' : mode === 'relstrength' ? 'DOTS/Wilks/IPF GL вне категорий' : mode === 'norms' ? 'Разряды + очки + попытки' : 'Процентили и объём'}</div>
           </div>
         </div>
         <div style={{ padding: 10 }}>
           {mode === '1rm' && <OneRmCalcTab snapshot={snapshot} onHubPatch={patchHub} />}
           {mode === 'vbt' && <VBTCalcTab snapshot={snapshot} onHubPatch={patchHub} />}
+          {mode === 'relstrength' && <RelStrengthTab snapshot={snapshot} onHubPatch={patchHub} />}
           {mode === 'norms' && <PlNormsCalcTab snapshot={snapshot} onSnapshotChange={patchHub} />}
           {mode === 'analytics' && <StrengthAnalyticsCard snapshot={snapshot} onHubPatch={patchHub} />}
         </div>
       </div>
 
       <div style={{ fontSize:10, color:'#fff', textAlign:'center', marginTop:10, opacity:0.9, lineHeight:1.45 }}>
-        Единый хаб без дублей — ввод пол/вес/тотал один раз, все секции читают один снапшот. Формулы: Epley/Brzycki/Lander/Lombardi/Mayhew/O'Conner/Wathen (1RM), Gonzalez-Badillo VBT, DOTS/Wilks/IPF GL (2019), Rippetoe/Kilgore + Israetel MEV/MAV/MRV.
+        Единый хаб без дублей — ввод пол/вес/тотал один раз, все секции читают один снапшот. Формулы: Epley/Brzycki/Lander/Lombardi/Mayhew/O'Conner/Wathen (1RM), Gonzalez-Badillo VBT, DOTS (BVDK 2019)/Wilks (1994)/IPF GL (2020, classic/equipped/total/bench), Rippetoe/Kilgore + Israetel MEV/MAV/MRV.
       </div>
     </div>
   );
