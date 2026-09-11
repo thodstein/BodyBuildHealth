@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
 import type { Exercise } from '../../../core/types';
 import { getVolumeReferences } from '../../../engines/training-methodology.engine';
-import { getSFRProfile, analyzeFullVolume, planVolumeProgression, findBetterExerciseSwaps, findCoverageGaps } from '../../../engines/volume-optimizer-pro.engine';
+import { getSFRProfile, analyzeFullVolume, planVolumeProgression, findBetterExerciseSwaps, findCoverageGaps, deloadDepthOk } from '../../../engines/volume-optimizer-pro.engine';
 import type { ProExerciseRow, FullVolumeAnalysis, ExerciseSwapRec, CoverageGap } from '../../../engines/volume-optimizer-pro.engine';
 import type { TrainingLevel } from '../../../engines/volume-landmarks.engine';
 import { PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
@@ -540,6 +540,17 @@ export const VolumeOptimizerTab: React.FC<VolumeOptimizerTabProps> = ({ rows: pr
           {expandedSections.progression && (
             <div style={{ marginTop: 10 }}>
               <div style={{ fontSize: 10, color: DIM_, marginBottom: 8 }}>Модель: {progression.progressionModel}</div>
+              {(() => {
+                const last = progression.weeks[progression.weeks.length - 1];
+                const prev = progression.weeks[progression.weeks.length - 2];
+                if (!last || !prev || last.phase !== 'deload') return null;
+                const d = deloadDepthOk(prev.targetTotalSets, last.targetTotalSets);
+                return (
+                  <div style={{ fontSize: 10, marginBottom: 8, color: d.ok ? '#22c55e' : '#f59e0b' }}>
+                    {d.ok ? '✅' : '⚠'} Делод: {prev.targetTotalSets} → {last.targetTotalSets} подх ({d.message})
+                  </div>
+                );
+              })()}
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
                   <thead>

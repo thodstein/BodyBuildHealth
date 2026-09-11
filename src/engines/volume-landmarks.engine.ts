@@ -129,6 +129,8 @@ const MUSCLE_ALIASES: Record<string, string> = {
   трицепс: 'triceps', triceps: 'triceps', 'трицепсы': 'triceps',
   икры: 'calves', calves: 'calves', голени: 'calves',
   ягодицы: 'glutes', glutes: 'glutes', ягоды: 'glutes',
+  ноги: 'legs', legs: 'legs',
+  руки: 'arms', arms: 'arms',
   пресс: 'abs', abs: 'abs', кор: 'abs', core: 'abs',
   трапеции: 'traps', traps: 'traps', трап: 'traps', 'трапециевидные': 'traps',
   предплечья: 'forearms', forearms: 'forearms', 'forearm': 'forearms', 'предплечье': 'forearms',

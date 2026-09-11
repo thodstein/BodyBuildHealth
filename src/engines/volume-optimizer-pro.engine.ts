@@ -17,7 +17,24 @@ import { EXERCISE_CATALOG, getExerciseById } from '../core/exercise-catalog';
 import type { Exercise } from '../core/types';
 import { getVolumeLandmarks, getAllVolumeLandmarks, normLevel, normMuscle, checkVolumeStatus } from './volume-landmarks.engine';
 import type { MuscleVolumeLandmarks, TrainingLevel } from './volume-landmarks.engine';
-import { frequencyForVolume, hardSetsCount } from './volume-canonical.engine';
+import { frequencyForVolume, hardSetsCount, mvForMuscle } from './volume-canonical.engine';
+import { sraForMuscle, sraFrequencyCheck } from './volume-sra.engine';
+
+/**
+ * Е3: глубина делода — доля среза объёма (1 − after/before).
+ * RP-канон: 40–60% среза (объём ×0.4–0.6 от пиковой недели), RIR+2.
+ */
+export function deloadDepthOk(beforeSets: number, afterSets: number): { cutPct: number; ok: boolean; message: string } {
+  if (beforeSets <= 0) return { cutPct: 0, ok: true, message: 'Нет базового объёма — делод не требуется' };
+  const cutPct = Math.round((1 - Math.max(0, afterSets) / beforeSets) * 100);
+  const ok = cutPct >= 40 && cutPct <= 60;
+  return {
+    cutPct, ok,
+    message: ok
+      ? `Делод −${cutPct}% — в каноне RP (−40…−60%)`
+      : `Делод −${cutPct}% — мимо канона RP (−40…−60%): ${cutPct < 40 ? 'недожат, усталость останется' : 'пережат, растеряете форму'}`,
+  };
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -425,8 +442,9 @@ export function analyzeMuscleVolumePro(
   const status = checkVolumeStatus(currentSets, lm);
   const avgSFR = sfrCount > 0 ? totalSFR / sfrCount : 0;
 
-  // Recovery estimation (hours) — based on volume and intensity
-  const recoveryHours = Math.round(currentSets * 4 + heavySets * 8 + compoundSets * 3);
+  // Е2: SRA-модель RP вместо выдуманной формулы sets*4+heavy*8+compound*3
+  const sra = sraForMuscle(muscle, level, currentSets, heavySets);
+  const recoveryHours = sra.recoveryHours;
   const optimalFreq = currentSets <= lm.mev ? 2 : currentSets <= lm.mav ? 2 : 1.5;
 
   // P2: частота v2 — единый вердикт (Schoenfeld 2016 / Grgic 2018), hard-сеты (RPE≥7)
@@ -467,6 +485,10 @@ export function analyzeMuscleVolumePro(
   }
   if (hard.hardSets < currentSets && hard.totalSets > 0) {
     tips.push(`Только ${hard.hardSets}/${hard.totalSets} hard-сетов (RPE≥7) — лёгкие сеты не растят`);
+  }
+  const sraFreq = sraFrequencyCheck(muscle, daysSeen.size, sra.recoveryHours, muscle);
+  if (sraFreq.kind !== 'ok') {
+    tips.push(`SRA: ${sraFreq.message}`);
   }
 
   return {
@@ -609,11 +631,13 @@ export function planVolumeProgression(
     });
   }
 
-  // Deload week
-  if (accumWeeks < totalWeeks) {
+  // Deload week — Е3: ×0.5 от ПОСЛЕДНЕЙ недели накопления с MV-флором (RP),
+  // а не mev+(mrv-mev)*0.4 (давал ~MAV — не делод, а ещё одна рабочая неделя).
+  const hasDeload = accumWeeks < totalWeeks;
+  if (hasDeload) {
     phases.push({
       weekIndex: accumWeeks, phase: 'deload', phaseRu: 'Разгрузка',
-      intensityZone: '50-65% 1RM', rirTarget: 4, volMultiplier: 0.4,
+      intensityZone: '50-65% 1RM', rirTarget: 4, volMultiplier: 0.5,
     });
   }
 
@@ -628,7 +652,20 @@ export function planVolumeProgression(
     return { weekIndex: p.weekIndex, phase: p.phase, phaseRu: p.phaseRu, targetTotalSets: totalTarget, intensityZone: p.intensityZone, rirTarget: p.rirTarget, setsByMuscle };
   });
 
-  return { weeks, totalWeeks, progressionModel: 'RP-стиль: накопление MEV→MRV + делод' };
+  // Е3: пересчёт делода от пиковой недели накопления (×0.5, флор MV)
+  if (hasDeload && weeks.length >= 2) {
+    const peak = weeks[weeks.length - 2];
+    const deload = weeks[weeks.length - 1];
+    const cut: Record<string, number> = {};
+    for (const [label, peakSets] of Object.entries(peak.setsByMuscle)) {
+      const mv = mvForMuscle(label);
+      cut[label] = Math.max(mv, Math.round(peakSets * 0.5));
+    }
+    deload.setsByMuscle = cut;
+    deload.targetTotalSets = Object.values(cut).reduce((a, b) => a + b, 0);
+  }
+
+  return { weeks, totalWeeks, progressionModel: 'RP-стиль: накопление MEV→MRV + делод ×0.5 от пика (флор MV)' };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
