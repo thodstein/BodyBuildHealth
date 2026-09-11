@@ -219,6 +219,8 @@ export interface BbOrthoDecision {
   forceDouble: boolean;
   excludeRisky: boolean;
   teen: boolean;
+  /** Э4: teen — только standard-объём (форсить setVolumeScheme('standard')). */
+  stdVolume: boolean;
 }
 
 export function decideBbOrthoIntake(
@@ -230,7 +232,7 @@ export function decideBbOrthoIntake(
     : null);
   const teen = typeof d?.teenNote === 'string' && (d.teenNote as string).length > 0;
   if (!og && !teen) {
-    return { active: false, mobAdd: [], light: false, deload: false, techNone: false, forceDouble: false, excludeRisky: false, teen: false };
+    return { active: false, mobAdd: [], light: false, deload: false, techNone: false, forceDouble: false, excludeRisky: false, teen: false, stdVolume: false };
   }
   const closed = og?.closedChainOnly === true;
   return {
@@ -242,6 +244,7 @@ export function decideBbOrthoIntake(
     forceDouble: closed && loadStrategy !== 'double_progression',
     excludeRisky: closed,
     teen,
+    stdVolume: teen,
   };
 }
 

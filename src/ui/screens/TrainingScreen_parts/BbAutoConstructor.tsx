@@ -1640,6 +1640,11 @@ export const BbAutoConstructor: React.FC = () => {
             if (dec.light) setIntensityLevel('light');
             if (dec.deload) setAutoDeload(true);
             if (dec.techNone) setIntensityTech('none');
+            // Э4 teen hard ban: только standard-объём (никаких GVT/FST-памп-схем подростку)
+            if (dec.stdVolume && volumeScheme !== 'standard') {
+              setVolumeScheme('standard');
+              pro2parts.push('🧒 teen: только standard-объём');
+            }
             if (dec.forceDouble) {
               setLoadStrategy('double_progression');
               try { userTouched.current.loadStrategy = true; } catch {}

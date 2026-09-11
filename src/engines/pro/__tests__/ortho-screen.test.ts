@@ -260,7 +260,7 @@ describe('ortho-screen strength-LSI + ББ-хелпер', () => {
   });
   it('decideBbOrthoIntake: пусто — inactive, всё false', () => {
     expect(decideBbOrthoIntake({}, 'linear')).toEqual({
-      active: false, mobAdd: [], light: false, deload: false, techNone: false, forceDouble: false, excludeRisky: false, teen: false,
+      active: false, mobAdd: [], light: false, deload: false, techNone: false, forceDouble: false, excludeRisky: false, teen: false, stdVolume: false,
     });
     expect(decideBbOrthoIntake({ orthoGuards: 'мусор' }, 'linear').active).toBe(false);
   });
@@ -268,15 +268,15 @@ describe('ortho-screen strength-LSI + ББ-хелпер', () => {
     const g = { pauseOverhead: true, limitDeepSquat: true, closedChainOnly: true, mobilityAdd: ['wrist'] };
     const d = decideBbOrthoIntake({ orthoGuards: g }, 'linear');
     expect(d).toEqual({
-      active: true, mobAdd: ['shoulder', 'hip', 'wrist'], light: true, deload: true, techNone: true, forceDouble: true, excludeRisky: true, teen: false,
+      active: true, mobAdd: ['shoulder', 'hip', 'wrist'], light: true, deload: true, techNone: true, forceDouble: true, excludeRisky: true, teen: false, stdVolume: false,
     });
     expect(decideBbOrthoIntake({ orthoGuards: g }, 'double_progression').forceDouble).toBe(false);
   });
-  it('decideBbOrthoIntake: teen без гардов — light/deload/tech, без mobility/exclude', () => {
+  it('decideBbOrthoIntake: teen без гардов — light/deload/tech/stdVolume, без mobility/exclude', () => {
     const d = decideBbOrthoIntake({ teenNote: 'Подросток 14–15' }, 'wave');
     expect(d.active).toBe(true);
     expect(d.teen).toBe(true);
-    expect(d.light && d.deload && d.techNone).toBe(true);
+    expect(d.light && d.deload && d.techNone && d.stdVolume).toBe(true);
     expect(d.mobAdd).toEqual([]);
     expect(d.excludeRisky).toBe(false);
     expect(d.forceDouble).toBe(false);
