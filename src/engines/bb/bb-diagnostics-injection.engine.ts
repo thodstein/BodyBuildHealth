@@ -101,9 +101,13 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
     const catName = cat ? cat.name : corrId;
     const catId = cat ? cat.id : corrId;
     const catType = cat ? cat.type : 'isolation';
-    // PRO-4 S3: ступень возврата — запрет снарядов и нулевой объём
-    const ban = Array.isArray(opts.returnAction?.bannedPatterns) ? opts.returnAction!.bannedPatterns.map((b) => String(b).toLowerCase()).filter(Boolean) : [];
-    const hitBan = ban.length > 0 && ban.some((b) => corrId.toLowerCase().includes(b) || catName.toLowerCase().includes(b));
+    // PRO-4 S3: ступень возврата — запрет снарядов (токен-матч, не подстрока "жим" в "отжимания")
+    const ban = Array.isArray(opts.returnAction?.bannedPatterns) ? opts.returnAction!.bannedPatterns.map((b) => String(b).toLowerCase().trim()).filter(Boolean) : [];
+    const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const hitBan = ban.length > 0 && ban.some((b) => {
+      const re = new RegExp(`\\b${escRe(b)}\\b`, 'i');
+      return re.test(corrId) || re.test(catName);
+    });
     if (hitBan) { notes.push(`↩ ${wp} → ${catName}: запрещён ступенью возврата — только техника`); continue; }
     const retVol = Number.isFinite(opts.returnAction?.volumeMult as number) ? Math.max(0, Math.min(1, opts.returnAction!.volumeMult)) : 1;
     if (retVol <= 0) { notes.push(`↩ ${wp}: ступень 1 возврата — только техника, без силовых вставок`); continue; }

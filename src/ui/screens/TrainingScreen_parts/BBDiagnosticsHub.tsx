@@ -23,7 +23,7 @@ import { assessBbReadiness } from '../../../engines/bb/bb-readiness.engine';
 import { assessBbRedFlags } from '../../../engines/bb/bb-red-flags.engine';
 import { bbBarPathVerdict } from '../../../engines/bb/bb-bar-path.engine';
 import { bbVbtRecommendation } from '../../../engines/bb/bb-vbt.engine';
-import { calibrateBbLvp, parseBbLvpText, loadBbLvpProfiles, saveBbLvpProfile } from '../../../engines/bb/bb-lvp.engine';
+import { calibrateBbLvp, parseBbLvpText, loadBbLvpProfiles, saveBbLvpProfile, clearBbLvpProfiles } from '../../../engines/bb/bb-lvp.engine';
 import { assessBbTendonGuard } from '../../../engines/bb/bb-tendon-guard.engine';
 import { buildReturnToPlan, activeReturnToStage } from '../../../engines/bb/bb-return-to.engine';
 import { mmcAdviceFor, posingIsoNote } from '../../../engines/bb/bb-mmc-gate.engine';
@@ -1787,10 +1787,14 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <label style={{ display: 'block', color: '#fff', marginBottom: 3 }}>LVP-точки «вес скорость» — по строке на замер (мин. 3)</label>
                 <textarea value={state.lvpText} onChange={(e) => setState((s) => ({ ...s, lvpText: e.target.value }))} placeholder="100 0.62&#10;110 0.55&#10;120 0.47" aria-label="LVP-точки вес скорость" data-bb="lvp-input" style={{ width: '100%', height: 56, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, fontFamily: 'monospace', boxSizing: 'border-box' }} />
                 <div style={{ color: '#fff', marginTop: 4 }} data-bb="lvp-line">
-                  {state.lvpText.trim() === '' && 'LVP пуст — e1RM считаем по популяционному профилю из скорости сета.'}
+                  {state.lvpText.trim() === '' && lvpProfile && 'Индивидуальный LVP активен — популяционный fallback не нужен.'}
+                  {state.lvpText.trim() === '' && !lvpProfile && 'LVP пуст — e1RM считаем по популяционному профилю из скорости сета.'}
                   {state.lvpText.trim() !== '' && !lvpProfile && 'Точек мало или мусор — нужно 3+ с разбросом веса ≥10 кг.'}
-                  {lvpProfile && (lvpProfile.valid ? `✓ ${lvpProfile.text}` : `⚠ ${lvpProfile.text}`)}
+                  {lvpProfile && (lvpProfile.valid ? `✓ ${lvpProfile.text} · индивид.` : `⚠ ${lvpProfile.text}`)}
                 </div>
+                {lvpProfile && (
+                  <button onClick={() => { clearBbLvpProfiles(); setState((s) => ({ ...s, lvpText: '' })); }} data-bb="lvp-clear" style={{ marginTop: 6, minHeight: 36, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>Очистить LVP</button>
+                )}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
                 <BbSheetSelect label="Цель VBT" value={state.vbtGoal} onChange={(v) => setState((s) => ({ ...s, vbtGoal: v as any }))} options={[{ id: '', label: 'Не указана' }, { id: 'mass', label: 'Масса' }, { id: 'strength', label: 'Сила' }]} testId="bb-vbt-goal" />

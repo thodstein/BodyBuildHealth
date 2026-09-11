@@ -17,6 +17,8 @@ export interface BbTendonJoint {
   text: string;
 }
 
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+
 export interface BbTendonGuard {
   elbow: BbTendonJoint;
   shoulder: BbTendonJoint;
@@ -32,15 +34,29 @@ function setsOf(ex: any): number {
   return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
 }
 
-/** Трос/тренажёры — половинный вес сета (маркер в id/имени). */
+/** Трос/тренажёры — половинный вес сета (каталог equipment, fallback — маркер в имени). */
 const MACHINE_RE = /кабел|cable|блок|кроссовер|машин|machine|тренаж|смит|smith|hammer strength|hummer/i;
+const MACHINE_EQUIP = new Set(['cable', 'machine']);
+
+function catalogEquipment(ex: any): string | null {
+  try {
+    const id = String(ex?.exerciseName || ex?.id || '').toLowerCase();
+    const name = String(ex?.name || '').toLowerCase();
+    const found = (EXERCISE_CATALOG as any[]).find((c) => c.id.toLowerCase() === id || c.name.toLowerCase() === name);
+    return found ? String(found.equipment || '').toLowerCase() : null;
+  } catch { return null; }
+}
 
 /** Эквивалент сета: свободный вес/свой вес ×1.0, трос/тренажёр ×0.5, пустой сет — 0. */
-function setEquiv(name: string, set: any): number {
+function setEquiv(ex: any, set: any): number {
   if (set != null && typeof set === 'object') {
     const r = Number((set as any).reps);
     if (Number.isFinite(r) && r <= 0) return 0; // пустой сет
   }
+  const equip = catalogEquipment(ex);
+  if (equip && MACHINE_EQUIP.has(equip)) return 0.5;
+  if (equip && equip !== '') return 1.0;
+  const name = `${ex?.exerciseName || ''} ${ex?.name || ''}`;
   return MACHINE_RE.test(name) ? 0.5 : 1.0;
 }
 
@@ -53,7 +69,7 @@ function countFor(sessions: any[], re: RegExp): number {
       const name = `${ex?.exerciseName || ''} ${ex?.name || ''}`;
       if (!re.test(name)) continue;
       if (Array.isArray(ex?.sets)) {
-        for (const st of ex.sets) n += setEquiv(name, st);
+        for (const st of ex.sets) n += setEquiv(ex, st);
       } else {
         n += setsOf(ex); // голая цифра — данных нет, ×1.0 консервативно
       }

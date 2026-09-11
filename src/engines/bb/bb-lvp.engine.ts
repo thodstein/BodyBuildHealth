@@ -143,16 +143,24 @@ export function loadBbLvpProfiles(): BbLvpStore {
   } catch { return {}; }
 }
 
-/** Сохранить только валидный профиль (r²≥0.85, e1RM честный); мусор не пишем. */
+/** Сохранить только валидный профиль (r²≥0.85, e1RM честный); мусор не пишем. LRU: обновлённый ключ в конец. */
 export function saveBbLvpProfile(profile: BbLvpProfile | null | undefined): BbLvpStore {
   const store = loadBbLvpProfiles();
   if (!profile || !isLvpProfileShape(profile)) return store;
-  const next: BbLvpStore = { ...store, [profile.lift.toLowerCase()]: profile };
-  // кап 5 движений — свежие вытесняют старые по createdAt? порядка нет — режем лишнее
-  const keys = Object.keys(next);
-  if (keys.length > 5) delete next[keys[0]];
+  const key = profile.lift.toLowerCase();
+  // LRU — удаляем старый ключ, чтобы вставить в конец
+  if (store[key]) delete (store as any)[key];
+  const next: BbLvpStore = { ...store, [key]: profile };
+  if (Object.keys(next).length > 5) delete next[Object.keys(next)[0]!];
   try {
     if (typeof localStorage !== 'undefined') localStorage.setItem(LVP_STORE_KEY, JSON.stringify(next));
   } catch { /* quota — молча, профиль останется на сессию */ }
   return next;
+}
+
+/** Очистить сохранённые LVP-профили (кнопка в хабе). */
+export function clearBbLvpProfiles(): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(LVP_STORE_KEY);
+  } catch { /* noop */ }
 }
