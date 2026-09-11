@@ -7,7 +7,8 @@
  *  - pm        : { squat?, bench?, dead?, lift?, value? }          — предельные максимумы (все или один)
  *  - weakpoints: { groups: string[], lift?, plWeakPoints?, diagnosticExerciseMap?, diagnosticDayMap?, weakGroupExerciseMap?, weakGroupDayMap? } — слабые группы + диагностика движения (карточка «Слабые мышцы → Слабые точки → Мёртвые точки → Движение штанги»)
  *  - pri       : { volumeMult, rirShift }                          — готовность → объём/RIR
- *  - tempo     : { eccentric, bottomPause, concentric, topPause, label } — темп повторений
+ *  - tempo     : { eccentric, bottomPause, concentric, topPause, label, mode? } — темп повторений
+ *  - tempo_rollback: {} — откат последнего применения темпа (снимок he_tempo_prev_v1)
  *  - rir       : { rirShift, label }                               — корректировка RIR
  *  - mrv       : { mrv: number, label }                            — индивидуальный MRV (сет/м/нед)
  *  - deload    : { volumeMult, rirShift, weeks: number[], label }  — делод-недели
@@ -26,7 +27,7 @@
 const KEY = 'he_planner_apply';
 type Listener = (payload: PlannerApply | null) => void;
 
-export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter' | 'bb_nutrition' | 'arm_cycle' | 'ss_cycle';
+export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'tempo_rollback' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter' | 'bb_nutrition' | 'arm_cycle' | 'ss_cycle';
 
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
@@ -81,7 +82,8 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   orthoGuards?: { pauseOverhead?: boolean; limitDeepSquat?: boolean; yokeGate?: boolean; closedChainOnly?: boolean; blockedPatterns?: string[]; mobilityAdd?: string[] };
 }
 export interface PriPayload { volumeMult: number; rirShift: number }
-export interface TempoPayload { eccentric: number; bottomPause?: number; concentric: number; topPause?: number; label?: string }
+export type TempoApplyMode = 'all' | 'compound' | 'isolation' | 'skip_deload';
+export interface TempoPayload { eccentric: number; bottomPause?: number; concentric: number; topPause?: number; label?: string; mode?: TempoApplyMode }
 export interface RirPayload { rirShift: number; label?: string }
 export interface MrvPayload { mrv: number; label?: string }
 export interface DeloadPayload { volumeMult: number; rirShift: number; weeks: number[]; label?: string }

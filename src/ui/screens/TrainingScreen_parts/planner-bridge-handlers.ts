@@ -29,6 +29,7 @@ import {
   loadCardioCycles, loadActiveCardioCycle, cardioToNutritionPayload,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
+import { parseTempoCanon } from '../../../engines/tempo-canon.engine';
 
 export interface BridgeCtx {
   program: UserProgram;
@@ -297,12 +298,91 @@ const pmHandler: Handler = (payload, { program: p, onChange, showToast }) => {
   showToast('🔗 ПМ применён: ' + payload.label);
 };
 
+/**
+ * TEMPO-REP PRO, эпик D: мост темпа с режимами + валидация + снапшот-откат.
+ * Снимок предыдущих недель — `he_tempo_prev_v1` (для kind 'tempo_rollback').
+ */
+export const TEMPO_PREV_KEY = 'he_tempo_prev_v1';
+
+export type TempoBridgeMode = 'all' | 'compound' | 'isolation' | 'skip_deload';
+
+const TEMPO_MODES: TempoBridgeMode[] = ['all', 'compound', 'isolation', 'skip_deload'];
+
+export interface TempoPrevSnapshot {
+  ts: number;
+  weeks: unknown[];
+  count: number;
+}
+
+/** Читает снимок для отката (null — нет снимка или битый). UI использует для состояния кнопки. */
+export function loadTempoPrevSnapshot(): TempoPrevSnapshot | null {
+  try {
+    const raw = localStorage.getItem(TEMPO_PREV_KEY);
+    if (!raw) return null;
+    const snap = JSON.parse(raw) as TempoPrevSnapshot;
+    if (!snap || !Array.isArray(snap.weeks) || typeof snap.count !== 'number') return null;
+    return snap;
+  } catch {
+    return null;
+  }
+}
+
 const tempoHandler: Handler = (payload, { program: p, update, showToast }) => {
-  if (!p.bb) return;
-  const notation = payload.data.label ?? [payload.data.eccentric, payload.data.bottomPause, payload.data.concentric, payload.data.topPause].join('-');
-  const weeks = p.bb.weeks.map((w) => ({ ...w, sessions: w.sessions.map((s) => ({ ...s, blocks: s.blocks.map((b) => ({ ...b, sets: (b.sets ?? []).map((st) => ({ ...st, tempo: notation })) })) })) }));
+  if (!p.bb) {
+    showToast('🔗 Темп: мост только для ББ-плана — не применён');
+    return;
+  }
+  const rawLabel = payload.data.label ?? [payload.data.eccentric, payload.data.bottomPause, payload.data.concentric, payload.data.topPause].join('-');
+  const parsed = parseTempoCanon(String(rawLabel ?? ''));
+  if (!parsed) {
+    showToast('⚠ Темп не применён: битая нотация «' + String(rawLabel ?? '') + '»');
+    return;
+  }
+  const notation = parsed.notation;
+  const modeRaw = payload.data.mode;
+  const mode: TempoBridgeMode = TEMPO_MODES.includes(modeRaw as TempoBridgeMode) ? (modeRaw as TempoBridgeMode) : 'all';
+  // Снимок до мутации (для отката). Не блокирует применение при ошибке записи.
+  try {
+    const prevWeeks = JSON.parse(JSON.stringify(p.bb.weeks)) as unknown[];
+    let count = 0;
+    for (const w of p.bb.weeks) for (const s of (w as any).sessions ?? []) for (const b of (s as any).blocks ?? []) count += ((b as any).sets ?? []).length;
+    localStorage.setItem(TEMPO_PREV_KEY, JSON.stringify({ ts: Date.now(), weeks: prevWeeks, count } satisfies TempoPrevSnapshot));
+  } catch { /* ignore */ }
+  let applied = 0;
+  const weeks = p.bb.weeks.map((w) => {
+    if (mode === 'skip_deload' && (w as any).deload) return w;
+    return {
+      ...w,
+      sessions: (w as any).sessions.map((s: any) => ({
+        ...s,
+        blocks: (s.blocks ?? []).map((b: any) => {
+          if (mode === 'compound' && b.type !== 'compound') return b;
+          if (mode === 'isolation' && b.type === 'compound') return b;
+          const sets = (b.sets ?? []).map((st: any) => ({ ...st, tempo: notation }));
+          applied += (b.sets ?? []).length;
+          return { ...b, sets };
+        }),
+      })),
+    };
+  });
   update({ bb: { ...p.bb, weeks } });
-  showToast('🔗 Темп применён: ' + payload.label);
+  const modeSuffix = mode === 'all' ? '' : mode === 'compound' ? ' (только база)' : mode === 'isolation' ? ' (только изоляция)' : ' (кроме делоада)';
+  showToast(`🔗 Темп применён: ${notation}${modeSuffix} · сетов ${applied}`);
+};
+
+const tempoRollbackHandler: Handler = (payload, { program: p, update, showToast }) => {
+  void payload;
+  if (!p.bb) {
+    showToast('🔗 Откат темпа: мост только для ББ-плана');
+    return;
+  }
+  const snap = loadTempoPrevSnapshot();
+  if (!snap) {
+    showToast('⚠ Откат темпа: снимка нет (сначала примените темп)');
+    return;
+  }
+  update({ bb: { ...p.bb, weeks: snap.weeks as any } });
+  showToast(`↩ Темп откачен: восстановлено сетов ${snap.count}`);
 };
 
 const rirHandler: Handler = (payload, { program: p, update, showToast }) => {
@@ -646,6 +726,7 @@ export const BRIDGE_HANDLERS: Record<string, Handler> = {
   limiter: limiterHandler,
   pm: pmHandler,
   tempo: tempoHandler,
+  tempo_rollback: tempoRollbackHandler,
   rir: rirHandler,
   mrv: mrvHandler,
   deload: deloadHandler,
