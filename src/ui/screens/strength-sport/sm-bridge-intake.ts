@@ -11,6 +11,8 @@
  * Теперь: parseSmBridgePayload — чистая функция (покрыта тестом
  * sm-bridge-intake), intake конструктора только раскладывает патч по сеттерам.
  */
+import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-sport-ta-correction-rank.engine';
+import type { WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
 
 export type SmBridgeMode = 'strongman' | 'weightlifting';
 export type SmBridgeStrategy = 'conservative' | 'balanced' | 'aggressive';
@@ -60,6 +62,8 @@ export interface SmBridgePatch {
   taAsymPct: number | null;
   /** V4-добой-2 (П1): провалов OHS (0–6) или null. */
   taOhsFailed: number | null;
+  /** Spec-блок opt-in: сеты по неделям из taSpecBlock.weeks[].targetSets или null. */
+  taSpecTargets: number[] | null;
 }
 
 const STRATEGIES: readonly string[] = ['conservative', 'balanced', 'aggressive'];
@@ -161,6 +165,15 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
   const ohsRaw: any = d.ohs != null && typeof d.ohs === 'object' ? d.ohs : null;
   const ohsF = ohsRaw ? finiteNum(ohsRaw.failed) : null;
   const taOhsFailed = ohsF != null && ohsF >= 0 && ohsF <= 6 ? Math.round(ohsF) : null;
+  // Spec-блок opt-in: понедельные сеты из taSpecBlock.weeks[].targetSets.
+  let taSpecTargets: number[] | null = null;
+  try {
+    const wks = specRaw && Array.isArray(specRaw.weeks) ? specRaw.weeks : null;
+    if (wks) {
+      const arr = wks.map((w: any) => finiteNum(w?.targetSets)).filter((n: number | null): n is number => n != null && n > 0 && n <= 30).slice(0, 12);
+      if (arr.length > 0) taSpecTargets = arr;
+    }
+  } catch { /* noop */ }
   return {
     weakPoints,
     diagnosticLevel,
@@ -178,9 +191,38 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     taFvr,
     taAsymPct,
     taOhsFailed,
+    taSpecTargets,
   };
 }
 
+/**
+ * Протоколы спец-блока для инъекции: предпочитаемая коррекция хаба (⭐) —
+ * первой, иначе топ-1 ранжира. Чистая функция (покрыта тестом).
+ */
+export function buildSpecProtocols(
+  weakPoints: string[],
+  prefCorr: Record<string, string> | null | undefined,
+  causes: Record<string, string> | null | undefined,
+  equipment?: string[],
+  mobilityRestrictions?: string[],
+): Record<string, { sets: number; reps: number; pct: number }> {
+  const out: Record<string, { sets: number; reps: number; pct: number }> = {};
+  for (const wp of Array.isArray(weakPoints) ? weakPoints : []) {
+    if (!wp) continue;
+    try {
+      const ranked = rankCorrectionsForTA(wp as WLWeakPoint, {
+        equipment,
+        mobilityRestrictions,
+        cause: (causes?.[wp] ?? null) as any,
+      });
+      if (!ranked.length) continue;
+      const prefId = prefCorr?.[wp];
+      const pick = (prefId && ranked.find((c) => c.id === prefId)) || ranked[0];
+      if (pick) out[wp] = { sets: pick.protocol.sets, reps: pick.protocol.reps, pct: pick.protocol.pct };
+    } catch { /* noop — фаза без протокола скипается */ }
+  }
+  return out;
+}
 /**
  * Собирает velocityHistory для билда из трёх источников (порядок = приоритет):
  * посетовый vbtMap (ключи `week-day-ex-set`) → per-lift ввод → hubVelocity хаба.

@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import React from 'react';
-import { parseSmBridgePayload, collectSsVelocityHistory } from '../sm-bridge-intake';
+import { parseSmBridgePayload, collectSsVelocityHistory, buildSpecProtocols } from '../sm-bridge-intake';
 import { buildStrengthSportPlan } from '../../../../engines/strength-sport/strength-sport-builder.engine';
 import { StrengthSportConstructor } from '../StrengthSportConstructor';
 
@@ -57,6 +57,23 @@ describe('parseSmBridgePayload', () => {
     expect(p.mode).toBe('weightlifting');
     expect(p.contest).toBeNull();
     expect(p.weakPoints).toEqual(['snatch_pull']);
+  });
+
+  it('spec opt-in: taSpecTargets из weeks[].targetSets + buildSpecProtocols', () => {
+    const p = parseSmBridgePayload({
+      wlWeakPoints: ['snatch_mid'],
+      taSpecBlock: { totalWeeks: 3, weeks: [{ targetSets: 3 }, { targetSets: 4 }, { targetSets: 'x' }] },
+      taPreferredCorr: { snatch_mid: 'pause_snatch' },
+      taWeakCauses: { snatch_mid: 'technique' },
+    });
+    expect(p.taSpecTargets).toEqual([3, 4]);
+    expect(p.taSpecWeeks).toBe(3);
+    const protos = buildSpecProtocols(['snatch_mid'], p.taPreferredCorr, p.taWeakCauses, [], []);
+    expect(protos.snatch_mid.sets).toBeGreaterThan(0);
+    expect(protos.snatch_mid.reps).toBeGreaterThan(0);
+    // Без слабых — пусто, без паники
+    expect(buildSpecProtocols([], null, null)).toEqual({});
+    expect(parseSmBridgePayload({}).taSpecTargets).toBeNull();
   });
 
   it('контест без events отклоняется, smContest — фолбэк', () => {
@@ -118,6 +135,7 @@ describe('parseSmBridgePayload', () => {
       taFvr: null,
       taAsymPct: null,
       taOhsFailed: null,
+      taSpecTargets: null,
     });
   });
 });

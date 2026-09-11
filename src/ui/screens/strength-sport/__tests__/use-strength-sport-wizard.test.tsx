@@ -127,6 +127,23 @@ describe('useStrengthSportWizard', () => {
     expect(result.current.weakPoints).toEqual([]);
   });
 
+  it('мост ТА: specTargets доходят до taBridge', () => {
+    const { result } = renderHook(() => useStrengthSportWizard());
+    act(() => {
+      applyToPlanner({
+        kind: 'weakpoints',
+        label: 't',
+        data: {
+          wlWeakPoints: ['snatch_mid'],
+          taSpecBlock: { totalWeeks: 2, weeks: [{ targetSets: 3 }, { targetSets: 5 }] },
+        } as any,
+      });
+    });
+    expect(result.current.taBridge.specTargets).toEqual([3, 5]);
+    expect(result.current.taBridge.specWeeks).toBe(2);
+    expect(result.current.weakPoints).toEqual(['snatch_mid']);
+  });
+
   it('персист: cycleId/cycleMode переживают перемонтирование', () => {
     const h1 = renderHook(() => useStrengthSportWizard());
     act(() => { h1.result.current.setCycleId('ss-ta-general-8'); });
