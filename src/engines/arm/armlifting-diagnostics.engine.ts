@@ -257,16 +257,18 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
         : `Saxon-ориентир ${wr} кг (внутренний, сверяется с Saxon 3×4 лидербордом)`,
     });
   }
-  // Pinch кг (турнирный, %WR) отдельно от удержания (A2)
+  // Pinch кг отдельно от удержания (A2 + добивка: единого WR нет —
+  // рекорды зависят от ширины/1H-2H/федерации, Gods of Grip 2024–2025,
+  // поэтому 80/45 — внутренний ориентир, в avgWR не входит)
   const pinchKg = num(input.pinchKg);
   if (pinchKg != null) {
     const wr = platformWrFor('pinch_block', sex);
     const p = pctOf(pinchKg, wr);
     rows.push({
       implement: 'pinch_block', label: IMPLEMENT_LABEL.pinch_block,
-      display: `${pinchKg} кг`, scorePct: p, internal: false,
+      display: `${pinchKg} кг`, scorePct: p, internal: true,
       level: lvlOf(p), attempts: planAttempts(pinchKg),
-      note: `ориентир ${wr} кг`,
+      note: `внутренний ориентир ${wr} кг (единого WR нет — ширина/1H-2H/федерация)`,
     });
   }
   const pin = num(input.pinchSec);

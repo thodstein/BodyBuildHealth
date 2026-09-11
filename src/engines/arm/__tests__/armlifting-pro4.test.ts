@@ -62,16 +62,18 @@ describe('PRO-4 A9: раздельный avg + тотал только кг', ()
 });
 
 describe('PRO-4 A2/A3: pinch кг+сек и Silver Bullet', () => {
-  it('pinch кг — %WR и не-internal; сек — internal и вне avgWR', () => {
+  it('pinch кг и сек — оба internal (единого WR нет), вне avgWR', () => {
     const r = buildArmliftingReport({ pinchKg: 40, pinchSec: 15, sex: 'male' });
     const kg = r.rows.find((x) => x.implement === 'pinch_block')!;
     const hold = r.rows.find((x) => x.implement === 'pinch_hold')!;
-    expect(kg.internal).toBe(false);
+    expect(kg.internal).toBe(true);
     expect(kg.scorePct).toBe(50);
+    expect(kg.note).toContain('единого WR нет');
     expect(hold.internal).toBe(true);
     expect(hold.scorePct).toBe(100);
-    expect(r.avgWrPct).toBe(50);
-    expect(r.avgInternalPct).toBe(100);
+    expect(r.avgWrPct).toBeNull();
+    expect(r.avgInternalPct).toBe(75);
+    expect(r.avgPct).toBe(75);
   });
   it('Silver Bullet — время без %, с гриппером', () => {
     const r = buildArmliftingReport({ silverSec: 20, silverGripper: '3', sex: 'male' });
