@@ -1,3 +1,7 @@
+/**
+ * @deprecated PRO-анализ переехал в `ExerciseLabProSubstitute.tsx` (Шаг 3 `ExerciseLabMerged`).
+ * Файл оставлен только ради smoke-теста `rest-hooks-native` — новые вызовы запрещены.
+ */
 import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { assessSafety } from '../../../engines/movement-engines';
