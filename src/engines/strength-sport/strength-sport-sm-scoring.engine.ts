@@ -18,6 +18,7 @@ export interface SMScoringInput {
   gripFails?: number | null; // 0-3 tri-modal
   axialOverload?: boolean | null; // axialSets≥12 + carry>300
   conditioningFail?: boolean | null;
+  acwrZone?: string | null; // undertrained|optimal|caution|dangerous — живой мост (P7)
 }
 export interface SMScoringResult {
   score: number;
@@ -109,6 +110,14 @@ export function scoreSM(
   if (input.conditioningFail) {
     penalties.push(PENALTY_SM.conditioning);
     findings.push({ level: 'warn', text: 'Кондиция — провал medley' });
+  }
+
+  if (input.acwrZone === 'dangerous') {
+    penalties.push(PENALTY_SM.conditioning);
+    findings.push({ level: 'warn', text: 'ACWR dangerous — недовосстановление давит на скор' });
+  } else if (input.acwrZone === 'caution') {
+    penalties.push(PENALTY_SM.mobility);
+    findings.push({ level: 'warn', text: 'ACWR caution — осторожный режим' });
   }
 
   const rss = penalties.length ? Math.sqrt(penalties.reduce((s, p) => s + p * p, 0)) : 0;

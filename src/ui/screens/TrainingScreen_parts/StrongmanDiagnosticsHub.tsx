@@ -16,7 +16,7 @@ import { buildSMBackup, downloadSMBackup, smStorageBytes, SM_STORAGE_KEYS } from
 import { VBT_SS_THRESHOLDS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { diagnoseVelocityLossSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { parseKinoveaCSV, analyzeBarTracking, diagnoseCarrySway } from '../../../engines/strength-sport/strength-sport-video.engine';
-import { detectSMWeakFromDiary, candidateSMWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-sm-diary.engine';
+import { detectSMWeakFromDiary, candidateSMWeakPointsFromDiary, smWeeklySetsByLift, smLiftKeyForWeakPoint } from '../../../engines/strength-sport/strength-sport-sm-diary.engine';
 import { buildSMDiagnosticsHtml, downloadSMHtml, downloadSMCsv } from '../../../engines/strength-sport/strength-sport-sm-export.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, ensurePoseModel } from '../../../engines/strength-sport/strength-sport-pose.engine';
@@ -31,7 +31,7 @@ import { simulateContest } from '../../../engines/strength-sport/strength-sport-
 import { buildSMAttemptsForContest } from '../../../engines/strength-sport/strength-sport-sm-attempts-bridge.engine';
 import { diagnoseSMAnthro } from '../../../engines/strength-sport/strength-sport-sm-anthro.engine';
 import { diagnoseSMGripAsymmetry, appendSMGripSnapshot, smGripTrend } from '../../../engines/strength-sport/strength-sport-sm-asymmetry.engine';
-import { diagnoseSMHold } from '../../../engines/strength-sport/strength-sport-sm-hold.engine';
+import { diagnoseSMHold, smFarmersWeightClass } from '../../../engines/strength-sport/strength-sport-sm-hold.engine';
 import { appendSMProgress, smProgressTrend, loadSMProgress, saveSMProgress } from '../../../engines/strength-sport/strength-sport-sm-progress.engine';
 import { buildSMIcs, downloadSMIcs } from '../../../engines/strength-sport/strength-sport-sm-ics.engine';
 import { buildSMAnnualOverlay, saveSMAnnualOverlay } from '../../../engines/strength-sport/strength-sport-sm-annual-bridge.engine';
@@ -146,6 +146,12 @@ type SMState = {
   herculesSec: string;
   herculesKg: string;
   medleyDrops: string;
+  yMaxCm: string;
+  stoneGripS: string;
+  stonePeakWeek: boolean;
+  stoneZeroLap: boolean;
+  stonePull2Style: '' | 'pop' | 'grind';
+  daysToStart: string;
 };
 
 const DEFAULT_STATE: SMState = {
@@ -172,6 +178,8 @@ const DEFAULT_STATE: SMState = {
   carrySplit1S: '', carrySplit2S: '', carrySplit3S: '',
   bicepsHistory: false,
   herculesSec: '', herculesKg: '', medleyDrops: '',
+  yMaxCm: '',
+  stoneGripS: '', stonePeakWeek: false, stoneZeroLap: false, stonePull2Style: '', daysToStart: '',
 };
 
 const TAB_DEFS: Array<{ id: SMTab; label: string; icon: string; desc: string }> = [
@@ -197,9 +205,9 @@ const CARRY_OPTS = [
   { id: 'farmers_carry', label: SM_BIOMECH.farmers_carry.label, sm: 'farmers_carry' as SMWeakPoint },
 ];
 const LOAD_OPTS = [
-  { id: 'pull_start', label: 'Камень: отрыв', sm: 'stone_off_floor' as SMWeakPoint },
-  { id: 'squat_bottom', label: 'Камень: загрузка', sm: 'stone_load' as SMWeakPoint },
-  { id: 'press_start', label: 'Мешок: жим', sm: 'stone_lap' as SMWeakPoint },
+  { id: 'stone_off_floor_opt', label: 'Камень: отрыв', sm: 'stone_off_floor' as SMWeakPoint },
+  { id: 'stone_load_opt', label: 'Камень: загрузка', sm: 'stone_load' as SMWeakPoint },
+  { id: 'bag_press', label: 'Мешок: жим', sm: 'stone_lap' as SMWeakPoint },
 ];
 const GRIP_OPTS = [
   { id: 'grip', label: 'Хват слаб', sm: 'farmers_grip' as SMWeakPoint },
@@ -356,7 +364,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const [state, setState] = useState<SMState>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return { ...DEFAULT_STATE, ...JSON.parse(raw) };
+      if (raw) {
+        const parsed = { ...DEFAULT_STATE, ...JSON.parse(raw) };
+        // Миграция дублей id (PRO-3): старые loadWeak press_start/pull_start/squat_bottom → уникальные
+        if (Array.isArray((parsed as any).loadWeak)) {
+          (parsed as any).loadWeak = (parsed as any).loadWeak.map((x: string) =>
+            x === 'press_start' ? 'bag_press' : x === 'pull_start' ? 'stone_off_floor_opt' : x === 'squat_bottom' ? 'stone_load_opt' : x,
+          );
+        }
+        return parsed;
+      }
     } catch {}
     return DEFAULT_STATE;
   });
@@ -371,34 +388,59 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
   }, [state]);
 
+  // Живой мост P7: подписка на профиль (пол/антро без ремаунта)
+  const [profileTick, setProfileTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setProfileTick(t => t + 1);
+    try {
+      window.addEventListener('profile-updated', bump as EventListener);
+      window.addEventListener('storage', bump as EventListener);
+    } catch {}
+    return () => {
+      try {
+        window.removeEventListener('profile-updated', bump as EventListener);
+        window.removeEventListener('storage', bump as EventListener);
+      } catch {}
+    };
+  }, []);
+
   const acwr = useMemo(() => {
     try {
       const srpe = loadSRPESessions();
       if (srpe.length < 2) return null;
       return acuteChronicRatio(toDailyLoads(srpe as any));
     } catch { return null; }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileTick]);
+
+  const diaryLogs = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_workout_log') || localStorage.getItem('he_training_log') || localStorage.getItem('he_workout_log_v1');
+      const logs = raw ? JSON.parse(raw) : [];
+      return Array.isArray(logs) ? logs : [];
+    } catch { return []; }
+  }, [profileTick]);
+
+  const weeklySetsByLift = useMemo(() => {
+    try { return smWeeklySetsByLift(diaryLogs as any); } catch { return {}; }
+  }, [diaryLogs]);
 
   const diaryWeaks = useMemo(() => {
     try {
-      const raw = localStorage.getItem('he_workout_log') || localStorage.getItem('he_training_log') || localStorage.getItem('he_workout_log_v1');
-      const logs = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(logs)) return [];
-      return detectSMWeakFromDiary(logs as any);
+      if (!Array.isArray(diaryLogs)) return [];
+      return detectSMWeakFromDiary(diaryLogs as any);
     } catch { return []; }
-  }, []);
+  }, [diaryLogs]);
 
   const diaryPhases = useMemo(() => {
     try {
-      const raw = localStorage.getItem('he_workout_log') || localStorage.getItem('he_training_log') || localStorage.getItem('he_workout_log_v1');
-      const logs = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(logs)) return [];
-      const y = candidateSMWeakPointsFromDiary(logs as any, 'yoke');
-      const s = candidateSMWeakPointsFromDiary(logs as any, 'stone');
-      const f = candidateSMWeakPointsFromDiary(logs as any, 'farmers');
+      if (!Array.isArray(diaryLogs)) return [];
+      const y = candidateSMWeakPointsFromDiary(diaryLogs as any, 'yoke');
+      const s = candidateSMWeakPointsFromDiary(diaryLogs as any, 'stone');
+      const f = candidateSMWeakPointsFromDiary(diaryLogs as any, 'farmers');
       return [...y, ...s, ...f].slice(0, 3);
     } catch { return []; }
-  }, []);
+  }, [diaryLogs]);
 
   const weakPoints = useMemo(() => {
     const all = [...state.pressWeak, ...state.carryWeak, ...state.loadWeak, ...state.gripWeak];
@@ -477,11 +519,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     gripFails: gripFails || null,
     axialOverload,
     conditioningFail: state.conditioningFail || state.gripWeak.includes('conditioning') || false,
+    acwrZone: acwr ? (acwr as { zone?: string }).zone ?? null : null,
     hasVideo: !!swayCm || !!csvText,
     hasVbt: !!vbtLoss,
     hasMobility: ohs.failed !== 6,
     hasGrip: gripFails > 0 || !!state.gripHoldSec,
-  }), [weakPoints.length, asymmetry, swayCm, vbtLoss, ohs.failed, gripFails, axialOverload, state.conditioningFail, state.gripWeak, csvText, state.gripHoldSec]);
+  }), [weakPoints.length, asymmetry, swayCm, vbtLoss, ohs.failed, gripFails, axialOverload, state.conditioningFail, state.gripWeak, csvText, state.gripHoldSec, acwr]);
 
   const score = scoring.score;
   const level = scoring.level;
@@ -576,18 +619,21 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       }, (state.strategy as any) || 'balanced', contest as any);
     } catch { return null; }
   }, [state.contestId, state.yokeKg, state.farmersKg, state.stoneKg, state.logKg, state.axleKg, state.strategy, contest]);
-  const smCauses = useMemo(() => smWeakPoints.map((wp) => diagnoseSMWeakCause({
-    zone: wp as any,
-    factSetsPerWeek: null,
-    e1rmDeltaPct: diaryWeaks.find((d) => String(d.lift).toLowerCase().includes(String(wp).split('_')[0]))?.deltaPct ?? null,
-    e1rmSessions: 2,
-    acwrZone: acwr ? (acwr as { zone?: string }).zone ?? null : null,
-    vbtLossPct: vbtLoss?.lossPct ?? null,
-    ohsFailed: ohs.failed,
-    gripFails,
-    swayCm,
-    asymmetryPct: asymmetry?.diff ?? null,
-  })), [smWeakPoints, diaryWeaks, acwr, vbtLoss, ohs.failed, gripFails, swayCm, asymmetry]);
+  const smCauses = useMemo(() => smWeakPoints.map((wp) => {
+    const liftKey = smLiftKeyForWeakPoint(wp as string);
+    return diagnoseSMWeakCause({
+      zone: wp as any,
+      factSetsPerWeek: (weeklySetsByLift as Record<string, number>)[liftKey] ?? null,
+      e1rmDeltaPct: diaryWeaks.find((d) => String(d.lift).toLowerCase().includes(String(wp).split('_')[0]))?.deltaPct ?? null,
+      e1rmSessions: 2,
+      acwrZone: acwr ? (acwr as { zone?: string }).zone ?? null : null,
+      vbtLossPct: vbtLoss?.lossPct ?? null,
+      ohsFailed: ohs.failed,
+      gripFails,
+      swayCm,
+      asymmetryPct: asymmetry?.diff ?? null,
+    });
+  }), [smWeakPoints, diaryWeaks, acwr, vbtLoss, ohs.failed, gripFails, swayCm, asymmetry, weeklySetsByLift]);
   const smRankTop = useMemo(() => {
     const wp = smWeakPoints[0] as any;
     if (!wp) return [];
@@ -679,8 +725,14 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       const p = raw ? JSON.parse(raw) : null;
       return (p?.personal?.sex ?? p?.settings?.personal?.sex ?? null) as string | null;
     } catch { return null; }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileTick]);
   const athleteSex = useMemo(() => resolveAthleteSex(state.poseSex, profileSex), [state.poseSex, profileSex]);
+  const numOrNull = (s: string): number | null => {
+    const v = parseFloat(s);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  };
+  const farmersClass = useMemo(() => smFarmersWeightClass(numOrNull(state.farmersKg), athleteSex), [state.farmersKg, athleteSex]);
   const scaledLogAttempts = useMemo(() => {
     const pm = parseFloat(state.logKg);
     if (!Number.isFinite(pm) || !pm || logDiamCm == null) return null;
@@ -693,16 +745,18 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       };
     } catch { return null; }
   }, [state.logKg, state.strategy, logDiamCm]);
-  const numOrNull = (s: string): number | null => {
-    const v = parseFloat(s);
-    return Number.isFinite(v) && v > 0 ? v : null;
-  };
   const stonePhase = useMemo(() => diagnoseStonePhaseTiming({
     pull1S: numOrNull(state.stonePull1S),
     lapS: numOrNull(state.stoneLapS),
     pull2S: numOrNull(state.stonePull2S),
     sex: athleteSex,
-  }), [state.stonePull1S, state.stoneLapS, state.stonePull2S, athleteSex]);
+    gripS: numOrNull(state.stoneGripS),
+    zeroLap: state.stoneZeroLap || null,
+    pull2Style: state.stonePull2Style || null,
+    workPct: numOrNull(state.workPct),
+    isPeakWeek: state.stonePeakWeek || null,
+    cessationDays: numOrNull(state.daysToStart),
+  }), [state.stonePull1S, state.stoneLapS, state.stonePull2S, athleteSex, state.stoneGripS, state.stoneZeroLap, state.stonePull2Style, state.workPct, state.stonePeakWeek, state.daysToStart]);
   const sexStonePull = useMemo(() => diagnoseStoneSecondPullForSex(
     numOrNull(state.stonePull2S), athleteSex,
   ), [state.stonePull2S, athleteSex]);
@@ -819,6 +873,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       logDiameter: logDiamCls ? { cm: logDiamCm, cls: logDiamCls, scaledLogAttempts } : null,
       athleteSex,
       phaseTiming: { stone: stonePhase, carry: carrySplitDiag, sexStonePull },
+      stoneFivePhase: { gripS: state.stoneGripS || null, zeroLap: state.stoneZeroLap, pull2Style: state.stonePull2Style || null, peakWeek: state.stonePeakWeek, daysToStart: state.daysToStart || null },
+      yMaxCm: state.yMaxCm ? parseFloat(state.yMaxCm) : null,
+      farmersClass,
+      axialBreakdown: axialQuant.breakdown,
+      weeklySetsByLift,
       bicepsRisk: { score: bicepsRisk.score, level: bicepsRisk.level, gate: bicepsRisk.gate, lines: bicepsRisk.lines },
       holdEvent: holdEventDiag,
       eventFormat: state.eventFormat,
@@ -979,7 +1038,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     const res = analyzeBarTracking(pts);
     if (!res) { setToast('Нет точек'); return; }
     const sway = Math.round(res.xLoop * 10)/10;
-    setState(s => ({ ...s, swayCm: String(sway), yokeSwayCm: String(sway) }));
+    const yMax = Math.round(res.yMax * 10)/10;
+    setState(s => ({ ...s, swayCm: String(sway), yokeSwayCm: String(sway), yMaxCm: String(yMax) }));
     try {
       const path = diagnoseCarryPathFromPoints(pts.map((p) => ({ x: p.x, y: p.y, t: p.t })));
       setCarryPath(path ? { type: path.type, verdict: path.verdict, lines: path.lines } : null);
@@ -1043,6 +1103,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     athleteSex: athleteSexLabel(athleteSex),
     sexStonePull: sexStonePull ? sexStonePull.lines.join(' · ') : null,
     stonePhases: stonePhase ? stonePhase.lines.join(' · ') : null,
+    stoneFive: `хват ${state.stoneGripS || '—'}с · zero-lap ${state.stoneZeroLap ? 'да' : 'нет'} · ${state.stonePull2Style || 'стиль н/у'} · пик ${state.stonePeakWeek ? 'да' : 'нет'} · до старта ${state.daysToStart || '—'}дн`,
+    yMax: state.yMaxCm || null,
+    farmersClass,
+    axialBreakdown: axialQuant.breakdown.join(' · '),
+    weeklySets: Object.entries(weeklySetsByLift as Record<string, number>).map(([k, v]) => `${k} ${v}/нед`).join(' · ') || null,
     carrySplits: carrySplitDiag ? carrySplitDiag.lines.join(' · ') : null,
     biceps: `${bicepsRisk.score}/100 ${bicepsRisk.level}${bicepsRisk.gate ? ' · ГЕЙТ: только лямки/нейтраль' : ''}`,
     holdEvent: holdEventDiag ? holdEventDiag.lines.join(' · ') : null,
@@ -1175,14 +1240,14 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ ...CARD, padding: 10, position: 'sticky', top: 0, zIndex: 20, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
+      <div style={{ ...CARD, padding: 10, position: 'sticky', top: 'calc(env(safe-area-inset-top, 0px))', zIndex: 20, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 8, alignItems: 'center', scrollbarWidth: 'none', paddingBottom: 2 }}>
           {TAB_DEFS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} style={{ padding:'11px 16px', minHeight:48, flexShrink:0, borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#ef4444' : 'rgba(140,190,255,0.16)', background: tab===t.id ? 'linear-gradient(135deg, rgba(239,68,68,0.22), rgba(245,158,11,0.12))' : 'rgba(22,30,52,0.88)', color: tab===t.id ? '#fff' : '#fff', cursor:'pointer', fontSize:14, fontWeight:800, boxShadow: tab===t.id ? '0 4px 16px rgba(239,68,68,0.25)' : 'none' }}>
               {t.icon} {t.label}
             </button>
           ))}
-          <button onClick={applyToConstructor} style={{ marginLeft:'auto', flexShrink:0, padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#ef4444,#f59e0b)', color:'#fff', border:'none', fontWeight:800, fontSize:14, cursor:'pointer', boxShadow:'0 6px 20px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)', whiteSpace:'nowrap' }}>→ Применить в Стронг</button>
+          <button onClick={applyToConstructor} aria-label="Применить в Стронг (верх)" style={{ marginLeft:'auto', flexShrink:0, padding:'13px 20px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:800, fontSize:14, cursor:'pointer', whiteSpace:'nowrap' }}>→ Применить в Стронг</button>
         </div>
 
         {tab==='press' && (
@@ -1292,7 +1357,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             {swayDiag && <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{swayDiag.text} · порог 3/5 см · скорость йок {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div>}
             {vbtLoss && <div style={{ fontSize:12, color: vbtLoss.exceeded?'#ef4444':'#22c55e', marginTop:4 }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} · порог 15% carry (MHV-декремент &gt;15% = стоп, PoinT GO)</div>}
-            {carryPhys ? <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика: {carryPhys.note} · скорость 1.69 м/с, шаг 1.14 м, темп 1.62 Гц</div> : <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика йока: введи вес тела (вкладка Жим) + йок, кг → скорость/шаг/темп/оценка</div>}
+            {carryPhys ? <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика: {carryPhys.note}{carryPhys.rateLimited ? ' · разгон 0–5м частотой, дальше крейсер коротким шагом' : ''}</div> : <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика йока: введи вес тела (вкладка Жим) + йок, кг → скорость/шаг/темп/оценка</div>}
+            {farmersClass && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Фермер-класс: {farmersClass} (на руку, {athleteSex === 'female' ? 'Ж' : 'М'} нормы FitnessVolt)</div>}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
               <HubNum label="Отрезок 0–5 м" unit="сек" value={state.carrySplit1S} onChange={v=>setState(s=>({...s, carrySplit1S:v}))} placeholder="4.0" step={0.5} />
               <HubNum label="Отрезок 5–15 м" unit="сек" value={state.carrySplit2S} onChange={v=>setState(s=>({...s, carrySplit2S:v}))} placeholder="7.0" step={0.5} />
@@ -1339,10 +1405,18 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{state.tackyUsed ? '✓ Смола (tacky) учтена — руки не сгибать' : '⚠ Без смолы — риск сгибания рук + разрыв бицепса'}</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
               <HubNum label="Рабочий % от макса" unit="%" value={state.workPct} onChange={v=>setState(s=>({...s, workPct:v}))} placeholder="90" step={1} />
+              <HubNum label="Камень хват" unit="сек" value={state.stoneGripS} onChange={v=>setState(s=>({...s, stoneGripS:v}))} placeholder="1.2" step={0.1} />
               <HubNum label="Камень 1-я тяга" unit="сек" value={state.stonePull1S} onChange={v=>setState(s=>({...s, stonePull1S:v}))} placeholder="2.5" step={0.5} />
               <HubNum label="Камень колени" unit="сек" value={state.stoneLapS} onChange={v=>setState(s=>({...s, stoneLapS:v}))} placeholder="1.5" step={0.5} />
               <HubNum label="Камень 2-я тяга" unit="сек" value={state.stonePull2S} onChange={v=>setState(s=>({...s, stonePull2S:v}))} placeholder="2.5" step={0.5} />
+              <HubNum label="Дней до старта" unit="дн" value={state.daysToStart} onChange={v=>setState(s=>({...s, daysToStart:v}))} placeholder="14" step={1} />
             </div>
+            <HubToggle checked={state.stoneZeroLap} onChange={v=>setState(s=>({...s, stoneZeroLap:v}))} label="Zero-lap one-motion (без перевала на колени)" style={{ marginTop:6 }} />
+            <HubToggle checked={state.stonePeakWeek} onChange={v=>setState(s=>({...s, stonePeakWeek:v}))} label="Пиковая неделя — камень ≥90% разрешён" style={{ marginTop:6 }} />
+            <div style={{ marginTop:6 }}>
+              <HubPopupSelect label="Стиль 2-й тяги" value={state.stonePull2Style} onChange={v=>setState(s=>({...s, stonePull2Style:v as '' | 'pop' | 'grind'}))} options={[{ id:'', label:'Не указан' }, { id:'pop', label:'Pop — взрыв в конце', desc:'топ-профиль' }, { id:'grind', label:'Grind — дожим', desc:'медленно' }]} />
+            </div>
+            <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Руки-канаты: локти прямые, хват вперёд центра, обхват максимум (Hooper) — сгибание = разрыв бицепса</div>
             {stonePhase && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>⏱ {stonePhase.lines.join(' · ')}</div>}
           </div>
         )}
@@ -1367,6 +1441,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <HubToggle checked={state.conditioningFail} onChange={v=>setState(s=>({...s, conditioningFail:v}))} label="Кондиция провалена (медли дольше 60 сек)" />
             </div>
             <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>Хват: провалы {gripFails}/3 (калибровка {gripFailsCal}/3) {gripFails>=2?'— профилактика: молот 3×12 + щипок 2×15': '— норма'} · осевая {axialOverload?'перегруз — чемодан 2×20 м': 'в норме'} · {axialQuant.text}</div>
+            <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Бюджет McGill: {axialQuant.breakdown.join(' · ')}</div>
             <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Нагрузка (ACWR) {acwr? `${acwr.ratio.toFixed(2)}` : '—'} · кондиция: рывки 8×10 сек/50 сек</div>
             {(() => {
               const sess = smCondSessionFor({ conditioningFail: state.conditioningFail || state.gripWeak.includes('conditioning'), mhvDecrementPct: vbtLoss?.lossPct ?? null });
@@ -1478,7 +1553,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
               <HubNum label="Качание (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="3.2" step={0.5} />
-              <HubNum label="Высота подъёма (yMax)" unit="см" value={state.stoneKg} onChange={v=>setState(s=>({...s, stoneKg:v}))} placeholder="85" step={5} />
+              <HubNum label="Высота подъёма (yMax)" unit="см" value={state.yMaxCm} onChange={v=>setState(s=>({...s, yMaxCm:v}))} placeholder="85" step={5} />
               <HubNum label="VBT йок — скорость" unit="м/с" value={state.vbtYokeLast} onChange={v=>setState(s=>({...s, vbtYokeLast:v}))} placeholder="1.25" step={0.05} />
             </div>
             {swayDiag && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: swayDiag.severity==='critical'?'rgba(239,68,68,0.08)': swayDiag.severity==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${swayDiag.severity==='ok'?'rgba(34,197,94,0.2)': swayDiag.severity==='warn'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize:14, fontWeight:800, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444' }}>{swayDiag.text}</div><div style={{ fontSize:12, color:'#fff' }}>Порог качания 3/5 см — {swayDiag.isReal?'реально выше порога':'в пределах шума'}</div></div>}
@@ -1588,7 +1663,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Хранилище: {(smStoreBytes.total / 1024).toFixed(1)} КБ · защита от переполнения (истории урезаются, чужие ключи не трогаем)</div>
       </div>
 
-      <div style={{ position:'sticky', bottom:0, zIndex:20, display:'flex', gap:10, alignItems:'center', padding:'10px 12px calc(10px + env(safe-area-inset-bottom, 0px))', margin:'0 -12px -22px', background:'rgba(9,18,34,0.88)', borderTop:'1px solid rgba(140,190,255,0.14)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }}>
+      <div style={{ position:'sticky', bottom:0, zIndex:30, display:'flex', gap:10, alignItems:'center', padding:'10px 12px calc(10px + env(safe-area-inset-bottom, 0px))', margin:'8px -8px -16px', background:'rgba(9,18,34,0.94)', borderTop:'1px solid rgba(140,190,255,0.14)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', paddingBottom:'calc(10px + env(safe-area-inset-bottom, 0px) + var(--tabbar-clear, 0px))' }}>
         <span style={{ width:40, height:40, borderRadius:20, background:`conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.08) 0)`, display:'flex', alignItems:'center', justifyContent:'center', border:`2px solid ${sColor}`, fontWeight:900, color:'#fff', fontSize:13, flexShrink:0, fontVariantNumeric:'tabular-nums' }}>{score}</span>
         <span style={{ fontSize:14, fontWeight:800, color: weakPoints.length ? '#fff' : '#fff', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{weakPoints.length ? `${weakPoints.length} слабые: ${weakPoints.join(', ')}` : 'Выбери слабые фазы'}</span>
         <button onClick={applyToConstructor} style={{ padding:'12px 16px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#ef4444,#f59e0b)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap', boxShadow:'0 6px 20px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>→ Применить в Стронг</button>

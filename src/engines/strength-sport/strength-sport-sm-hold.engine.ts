@@ -37,6 +37,22 @@ export const SM_HOLD_NORMS = {
   axleDohRatio: 0.7, // axleDOH ≥70% DL
 };
 
+/** Весовые классы фермера на руку (FitnessVolt 2000+ стартов, М; Ж ×0.6). */
+export const SM_FARMERS_WEIGHT_CLASSES = [
+  { max: 90, label: 'Beginner 50–90' },
+  { max: 120, label: 'Novice 75–120' },
+  { max: 170, label: 'Intermediate 110–170' },
+  { max: 220, label: 'Advanced 145–220' },
+  { max: 9999, label: 'Elite 180–280' },
+] as const;
+
+export function smFarmersWeightClass(farmersKgPerHand: number | null | undefined, sex?: 'male' | 'female' | null): string | null {
+  if (farmersKgPerHand == null || !Number.isFinite(farmersKgPerHand) || farmersKgPerHand <= 0) return null;
+  const v = sex === 'female' ? farmersKgPerHand / 0.6 : farmersKgPerHand;
+  for (const c of SM_FARMERS_WEIGHT_CLASSES) if (v <= c.max) return c.label;
+  return 'Elite 180–280';
+}
+
 export function diagnoseSMHold(input: SMHoldInput): SMHoldResult | null {
   const hasAny =
     input.logHoldSec != null || input.farmersHoldSec != null || input.axleDohKg != null || input.logHoldKg != null || input.farmersHoldKg != null;

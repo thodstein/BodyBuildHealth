@@ -59,6 +59,7 @@ export interface SMAxialCheckResult {
   ratioBW: number | null; // йок / BW
   text: string;
   recipe: string;
+  breakdown: string[]; // раздельный бюджет йок/фермер/камень (McGill/Harris)
 }
 
 /** Количественный axial вместо boolean ≥12+300м: ratio + дистанция + момент. */
@@ -80,7 +81,12 @@ export function axialMomentCheck(input: SMAxialCheckInput): SMAxialCheckResult {
         ? `Axial WARN: йок ${ratioBW ?? '—'}×BW / carries ${meters}м / сеты ${sets} / stone ${moment}Н·м`
         : `Axial OK: йок ${ratioBW ?? '—'}×BW / carries ${meters}м / сеты ${sets}`;
   const recipe = risk === 'ok' ? 'QL-профилактика: suitcase 2×20м' : 'QL suitcase 2×20м + side plank 2×30с + hammer 3×12 + plank (McGill/Hindle)';
-  return { risk, ratioBW, text, recipe };
+  const breakdown: string[] = [
+    `Йок ${ratioBW ?? '—'}×BW ${ratioBW != null && ratioBW >= 3 ? 'HIGH (McGill 3–4×BW max)' : ratioBW != null && ratioBW >= 2 ? 'WARN' : 'OK'}`,
+    `Фермер ${meters}м/${sets} сетов ${sets >= 18 && meters >= 300 ? 'HIGH' : sets >= 12 && meters >= 200 ? 'WARN' : 'OK'}`,
+    `Камень ${moment}Н·м ${moment > 350 ? 'HIGH (Harris >350)' : moment > 250 ? 'WARN' : 'OK'}`,
+  ];
+  return { risk, ratioBW, text, recipe, breakdown };
 }
 
 export function mixedGripCheck(grip: string | null | undefined, eventId: string): string | null {

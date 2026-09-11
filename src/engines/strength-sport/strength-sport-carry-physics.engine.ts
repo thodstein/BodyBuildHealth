@@ -5,7 +5,7 @@
  */
 
 export interface CarryPhysicsInput { loadKg: number; bodyweightKg: number; type: 'yoke'|'farmers'|'frame'|'husafell'|'sandbag'|'other'; distanceM?: number; }
-export interface CarryPhysicsResult { speedMs: number; timeS: number; strideM: number; cadenceHz: number; feasible: boolean; note: string; }
+export interface CarryPhysicsResult { speedMs: number; timeS: number; strideM: number; cadenceHz: number; feasible: boolean; note: string; loadRatio: number; rateLimited: boolean; }
 
 const K_BY_TYPE: Record<string, number> = { yoke: 0.015, farmers: 0.010, frame: 0.012, husafell: 0.013, sandbag: 0.011, other: 0.012 };
 
@@ -23,8 +23,10 @@ export function carryPhysics(input: CarryPhysicsInput): CarryPhysicsResult | nul
   const dist = input.distanceM ?? 20;
   const timeS = Math.round(dist / speed *10)/10;
   const feasible = timeS < (input.type === 'yoke' ? 60 : 75);
-  const note = `stride ${stride.toFixed(2)}м cad ${cadence.toFixed(2)}Hz speed ${speed}м/с → ${dist}м за ${timeS}с ${feasible ? '✅' : '⚠️ >cap'}`;
-  return { speedMs: speed, timeS, strideM: Math.round(stride*100)/100, cadenceHz: Math.round(cadence*100)/100, feasible, note };
+  // Порог Hindle: темп не компенсирует падение длины при loadRatio ≥1.5 — скорость падает шагом
+  const rateLimited = loadRatio >= 1.5;
+  const note = `stride ${stride.toFixed(2)}м cad ${cadence.toFixed(2)}Hz speed ${speed}м/с → ${dist}м за ${timeS}с ${feasible ? '✅' : '⚠️ >cap'}${rateLimited ? ' · темп упёрся — укорачивай шаг, разгон 0–5м частотой (Hindle)' : ''}`;
+  return { speedMs: speed, timeS, strideM: Math.round(stride*100)/100, cadenceHz: Math.round(cadence*100)/100, feasible, note, loadRatio: Math.round(loadRatio*100)/100, rateLimited };
 }
 
 export function dynamicCarryDistance(loadKg: number, bodyweightKg: number, type: 'yoke'|'farmers'|'frame'|'husafell'|'sandbag'|'other', timeCapS: number): number {

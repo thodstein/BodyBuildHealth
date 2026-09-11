@@ -17,9 +17,15 @@ export interface SMStonePhaseInput {
   lapS?: number | null; // колени (перехват), с
   pull2S?: number | null; // 2-я тяга (колени → платформа), с
   sex?: 'male' | 'female' | null;
+  gripS?: number | null; // хват/подхват (recovery→grip), с — норма ≤1.5
+  zeroLap?: boolean | null; // one-motion без перевала на колени
+  pull2Style?: 'pop' | 'grind' | null; // техника 2-й тяги
+  workPct?: number | null; // % от макса камня
+  isPeakWeek?: boolean | null; // пиковая неделя — ≥90% разрешены
+  cessationDays?: number | null; // дней до старта
 }
 
-export const SM_STONE_PHASE_NORMS = { pull1MaxS: 3.0, lapMaxS: 2.0, pull2MaxSM: 3.5, pull2MaxSF: 2.8 };
+export const SM_STONE_PHASE_NORMS = { pull1MaxS: 3.0, lapMaxS: 2.0, pull2MaxSM: 3.5, pull2MaxSF: 2.8, gripMaxS: 1.5, heavyGatePct: 90, cessationMinDays: 4 };
 
 export interface SMPhaseTimingResult {
   valid: boolean;
@@ -35,7 +41,8 @@ export function diagnoseStonePhaseTiming(input: SMStonePhaseInput): SMPhaseTimin
   const p1 = num(input.pull1S);
   const lap = num(input.lapS);
   const p2 = num(input.pull2S);
-  if (p1 == null && lap == null && p2 == null) return null;
+  const grip = num(input.gripS);
+  if (p1 == null && lap == null && p2 == null && grip == null && !input.zeroLap) return null;
   const pull2Max = input.sex === 'female' ? SM_STONE_PHASE_NORMS.pull2MaxSF : SM_STONE_PHASE_NORMS.pull2MaxSM;
   const lines: string[] = [];
   let bad = 0;
@@ -54,9 +61,32 @@ export function diagnoseStonePhaseTiming(input: SMStonePhaseInput): SMPhaseTimin
       }
     }
   };
+  if (grip != null) {
+    if (grip <= SM_STONE_PHASE_NORMS.gripMaxS) lines.push(`Хват ${grip} с ≤ ${SM_STONE_PHASE_NORMS.gripMaxS} с — норма`);
+    else { bad++; lines.push(`Хват ${grip} с > ${SM_STONE_PHASE_NORMS.gripMaxS} с — подхват долгий: обхват снизу + смола + руки-канаты`); }
+  }
+  if (input.zeroLap) {
+    lines.push('Zero-lap one-motion — топ-техника (без перевала): требует обхват + взрыв таза; хват вперёд центра, локти прямые');
+  }
   check(p1, SM_STONE_PHASE_NORMS.pull1MaxS, '1-я тяга', 'тяга с пола слабая: RDL/дефицит + обхват', 'pull1');
-  check(lap, SM_STONE_PHASE_NORMS.lapMaxS, 'Колени', 'перехват слабый: колени выше + смола + предплечья', 'lap');
+  if (!input.zeroLap) {
+    check(lap, SM_STONE_PHASE_NORMS.lapMaxS, 'Колени', 'перехват слабый: колени выше + смола + предплечья', 'lap');
+  } else if (lap != null) {
+    lines.push(`Колени ${lap} с при zero-lap — перевал не нужен, время идёт в зачёт 2-й тяги`);
+  }
   check(p2, pull2Max, '2-я тяга', 'взрыв таза слабый: прыжки/толчки + RFD-пик', 'pull2');
+  if (input.pull2Style === 'pop') lines.push('2-я тяга pop — быстрое разгибание в конце (топ-профиль Hooper)');
+  else if (input.pull2Style === 'grind') { bad++; lines.push('2-я тяга grind — дожимаешь до последнего: добавь скорость таза, иначе провал на высокой платформе'); }
+  const pct = input.workPct;
+  if (pct != null && Number.isFinite(pct) && pct >= SM_STONE_PHASE_NORMS.heavyGatePct && !input.isPeakWeek) {
+    bad++;
+    lines.push(`Камень ${pct}% ≥90% вне пика — 91% травм стронга именно там (Winwood): только техника ≤85%`);
+  }
+  const cess = input.cessationDays;
+  if (cess != null && Number.isFinite(cess) && (p1 != null || p2 != null || lap != null) && cess < SM_STONE_PHASE_NORMS.cessationMinDays) {
+    bad++;
+    lines.push(`До старта ${cess} дн <4 — камень уже стоп (Winwood cessation 3.9 дн): только мобильность/тактика`);
+  }
   const verdict: SMPhaseTimingResult['verdict'] = bad === 0 ? 'ok' : bad >= 2 ? 'critical' : 'warn';
   return { valid: true, verdict, weakPhase, lines };
 }

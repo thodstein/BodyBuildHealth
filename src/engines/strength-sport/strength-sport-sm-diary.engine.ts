@@ -158,3 +158,35 @@ export function candidateSMWeakPointsFromDiary(logs: any[], eventId: string): st
   if ((t as any).plateau) return ['conditioning'];
   return [];
 }
+
+/** Факт сетов/нед по лифт-ключам за последние 7 дней (живой мост P7 в причины). */
+export function smWeeklySetsByLift(logs: any[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!Array.isArray(logs) || logs.length === 0) return out;
+  const now = Date.now();
+  const dayMs = 24 * 3600 * 1000;
+  for (const e of logs) {
+    const d = String((e as any).date || '');
+    const t = new Date(d).getTime();
+    if (!Number.isFinite(t) || now - t < 0 || now - t > 7 * dayMs) continue;
+    const n = String((e as any).exerciseName || (e as any).name || '').toLowerCase();
+    const key = liftKeyForSM(n);
+    if (!key) continue;
+    const sets = Array.isArray((e as any).sets) ? (e as any).sets : [];
+    const work = (sets as any[]).filter((s: any) => !s.isWarmup && Number(s.weight) > 0).length;
+    if (work > 0) out[key] = (out[key] || 0) + work;
+  }
+  return out;
+}
+
+/** Маппинг SM-фазы → лифт-ключ дневника для factSetsPerWeek. */
+export function smLiftKeyForWeakPoint(wp: string): string {
+  const z = String(wp || '').toLowerCase();
+  if (z.startsWith('yoke_')) return 'yoke';
+  if (z.startsWith('farmers_') || z === 'farmers_carry' || z === 'farmers_pickup' || z === 'farmers_grip') return 'farmers';
+  if (z.startsWith('stone_')) return 'stone';
+  if (z.startsWith('log_')) return 'log';
+  if (z === 'grip_support' || z === 'core_brace' || z === 'conditioning') return 'grip';
+  if (z === 'yoke_turn') return 'yoke';
+  return 'carry';
+}
