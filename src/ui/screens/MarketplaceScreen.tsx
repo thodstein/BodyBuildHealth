@@ -8,7 +8,13 @@ import { makeFill } from '../native/accent';
 /** Витринный акцент: в APK идёт за темой, в TG/web — фирменный минт. */
 const SHOP_ACC = 'var(--shop-accent, #00e68a)';
 const SHOP_RGB = 'var(--shop-accent-rgb, 0,230,138)';
-const shopA = makeFill(SHOP_RGB);
+// Лениво: прямой вызов на топ-левеле ронял прод-билд (TDZ — makeFill живёт
+// в main-чанке; порядок evaluation чанков не гарантирован).
+let shopACache: ((alpha: number) => string) | null = null;
+const shopA = (alpha: number): string => {
+  if (!shopACache) shopACache = makeFill(SHOP_RGB);
+  return shopACache(alpha);
+};
 
 type CategoryFilter = 'all' | 'pharma' | 'supplement' | 'vitamin';
 type SortMode = 'price' | 'category' | 'name';

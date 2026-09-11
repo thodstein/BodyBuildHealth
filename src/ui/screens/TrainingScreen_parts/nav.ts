@@ -11,8 +11,14 @@ export type TrainingZone = 'planner' | 'training' | 'diary' | 'calculators' | 'l
 /** Бренд-акцент зоны планировщика: в APK за темой, в TG/web — минт. */
 export const TRAIN_ACCENT_VAR = 'var(--train-accent, #00e68a)';
 export const TRAIN_ACCENT_RGB = 'var(--train-accent-rgb, 0,230,138)';
-/** Единая реализация — native/accent.makeAlpha (сигнатура и выхлоп те же). */
-export const trainAlpha = makeAlpha(TRAIN_ACCENT_VAR, TRAIN_ACCENT_RGB);
+/** Единая реализация — native/accent.makeAlpha (сигнатура и выхлоп те же).
+ * Лениво: прямой вызов на топ-левеле ронял прод-билд (TDZ — makeAlpha живёт
+ * в main-чанке; порядок evaluation чанков не гарантирован). */
+let trainAlphaCache: ((c: string, hexAlpha: string) => string) | null = null;
+export const trainAlpha = (c: string, hexAlpha: string): string => {
+  if (!trainAlphaCache) trainAlphaCache = makeAlpha(TRAIN_ACCENT_VAR, TRAIN_ACCENT_RGB);
+  return trainAlphaCache(c, hexAlpha);
+};
 
 export interface ZoneCategory { label: string; icon: NativeIconName; tabs: TrainingTab[]; }
 

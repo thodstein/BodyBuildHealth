@@ -8,7 +8,13 @@ import { makeFill } from '../native/accent';
 /** Читалка/хром за акцентом темы; категории — свои семантические цвета. */
 const ART_ACC = 'var(--article-accent, #00e68a)';
 const ART_RGB = 'var(--article-accent-rgb, 0,230,138)';
-const artA = makeFill(ART_RGB);
+// Лениво: прямой вызов на топ-левеле ронял прод-билд (TDZ — makeFill живёт
+// в main-чанке; порядок evaluation чанков не гарантирован).
+let artACache: ((alpha: number) => string) | null = null;
+const artA = (alpha: number): string => {
+  if (!artACache) artACache = makeFill(ART_RGB);
+  return artACache(alpha);
+};
 
 const SAVED_KEY = 'he_articles_saved_v1';
 

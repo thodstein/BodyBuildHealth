@@ -42,8 +42,14 @@ export const colors = {
  * строка что раньше, для акцента — rgba() через rgb-триплет. */
 export const PROFILE_ACCENT_VAR = 'var(--profile-accent, #34d399)';
 export const PROFILE_ACCENT_RGB_VAR = 'var(--profile-accent-rgb, 52, 211, 153)';
-/** Единая реализация — native/accent.makeAlpha (сигнатура и выхлоп те же). */
-export const withAlpha = makeAlpha(PROFILE_ACCENT_VAR, PROFILE_ACCENT_RGB_VAR);
+/** Единая реализация — native/accent.makeAlpha (сигнатура и выхлоп те же).
+ * Лениво: прямой вызов на топ-левеле ронял прод-билд (TDZ — makeAlpha живёт
+ * в main-чанке, ui-kit в другом; порядок evaluation чанков не гарантирован). */
+let withAlphaCache: ((c: string, hexAlpha: string) => string) | null = null;
+export const withAlpha = (c: string, hexAlpha: string): string => {
+  if (!withAlphaCache) withAlphaCache = makeAlpha(PROFILE_ACCENT_VAR, PROFILE_ACCENT_RGB_VAR);
+  return withAlphaCache(c, hexAlpha);
+};
 
 /* ── Enhanced Design System: Gradients, Animations, Glassmorphism ──────── */
 
