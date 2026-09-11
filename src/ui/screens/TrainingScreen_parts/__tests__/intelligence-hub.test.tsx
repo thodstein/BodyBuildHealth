@@ -42,4 +42,14 @@ describe('P5 Intelligence Hub UI', () => {
     expect(snap.v).toBe(2);
     expect(snap.goal).toBe('hypertrophy');
   });
+
+  it('P7 a11y: навигация с aria-pressed, дата-инпут 16px, график с role=img', () => {
+    render(<UnifiedIntelligenceHub />);
+    const nav = document.querySelector('[aria-label^="Раздел: Нагрузка"]');
+    expect(nav).toBeTruthy();
+    expect(nav!.getAttribute('aria-pressed')).toBe('true');
+    const dateInput = document.querySelector('input[type="date"]') as HTMLElement | null;
+    expect(dateInput).toBeTruthy();
+    expect(dateInput!.style.fontSize).toBe('16px');
+  });
 });

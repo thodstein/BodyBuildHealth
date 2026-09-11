@@ -1,7 +1,7 @@
 /** TrainingIntelligenceDashboard.tsx — визуальная сетка карточек инструментов.
  *  Категории с цветными заголовками, каждая карточка — иконка + название + описание.
  *  Без коллапсов и мелких текстов: всё видно сразу, читаемо на 320px+ */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { ManualResult } from './program-types';
 import type { WorkoutLog } from '../../../core/types';
 import type { TrainingTab } from './shared';
@@ -38,8 +38,11 @@ type Category = {
 export default function TrainingIntelligenceDashboard(p: Props) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const toggle = (label: string) => setCollapsed(prev => ({ ...prev, [label]: !prev[label] }));
-  const srpe = loadSRPESessions();
-  const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe), undefined, 7, 28, { method: 'ewma_uncoupled' }) : null;
+  // P7: ACWR-бейдж мемоизирован (раньше считался на каждый рендер)
+  const acwr = useMemo(() => {
+    const srpe = loadSRPESessions();
+    return srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe), undefined, 7, 28, { method: 'ewma_uncoupled' }) : null;
+  }, []);
   const acwrLabel = acwr ? ACWR_ZONE_META[acwr.zone].label.toLowerCase() : '—';
   const acwrColor = acwr ? ACWR_ZONE_META[acwr.zone].color : '#888';
 

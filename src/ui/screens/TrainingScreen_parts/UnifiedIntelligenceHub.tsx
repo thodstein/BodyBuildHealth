@@ -344,7 +344,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
       {/* sticky nav */}
       <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {SECTIONS.map(s=> (
-          <button key={s.id} onClick={()=> scrollTo(s.id)} style={{
+          <button key={s.id} onClick={()=> scrollTo(s.id)} aria-pressed={active===s.id} aria-label={`Раздел: ${s.label}. ${s.desc}`} style={{
             flex:'0 0 auto', display:'flex', alignItems:'center', gap:6, padding:'7px 11px', borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:800, whiteSpace:'nowrap',
             border: active===s.id ? `1px solid ${s.accent}` : '1px solid rgba(255,255,255,0.08)',
             background: active===s.id ? `${s.accent}18` : 'rgba(255,255,255,0.04)',
@@ -442,7 +442,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:8, alignItems:'end' }}>
             <div>
               <div style={{ fontSize:10, color:DIM, marginBottom:3 }}>Дата</div>
-              <input type="date" value={sDate} onChange={e=> setSDate(e.target.value)} style={{ width:'100%', background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:9, padding:'9px 8px', fontSize:12, minHeight:38, boxSizing:'border-box' }} />
+              <input type="date" value={sDate} onChange={e=> setSDate(e.target.value)} aria-label="Дата тренировки" style={{ width:'100%', background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:9, padding:'9px 8px', fontSize:16, minHeight:38, boxSizing:'border-box' }} />
             </div>
             <PopupNumber label="sRPE 1–10" value={sRPE} min={1} max={10} onChange={setSRPE} />
             <PopupNumber label="Длит. мин" value={sDur} min={5} max={300} suffix=" мин" onChange={setSDur} />
@@ -758,7 +758,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                   const histPts = recs.map((v,i)=> `${px(i)},${py(v)}`).join(' ');
                   const fcPts = forecast.values.map((v,i)=> `${px(recs.length-1+i)},${py(v)}`).join(' ');
                   return (
-                    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display:'block', maxWidth:380, margin:'0 auto' }}>
+                    <svg width="100%" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Прогноз готовности: история ${recs.length} точек, прогноз ${forecast.values.length} дней`} style={{ display:'block', maxWidth:380, margin:'0 auto' }}>
                       <polyline points={histPts} fill="none" stroke="#60a5fa" strokeWidth={1.6} />
                       <polyline points={fcPts} fill="none" stroke={ACCENT} strokeWidth={1.7} strokeDasharray="5 4" />
                       {forecast.values.map((v,i)=> <circle key={i} cx={px(recs.length-1+i)} cy={py(v)} r={2.6} fill={ACCENT} />)}
