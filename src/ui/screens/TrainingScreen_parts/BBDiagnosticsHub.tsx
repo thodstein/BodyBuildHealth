@@ -1820,7 +1820,7 @@ export const BBDiagnosticsHub: React.FC = () => {
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
                 <BbNum label="Нагрузка изоляции, %1RM" value={state.mmcLoadPct} onChange={(v) => setState((s) => ({ ...s, mmcLoadPct: v }))} placeholder="60" step={5} testId="bb-mmc-load" />
-                <BbSheetSelect label="Блок года" value={state.annualBlockKey} onChange={(v) => setState((s) => ({ ...s, annualBlockKey: v }))} options={[{ id: '', label: 'Первый ББ-блок' }, ...annualBbBlocks.map((b) => ({ id: b.key, label: b.label }))]} testId="bb-annual-block" />
+                <BbSheetSelect label="Блок года" value={state.annualBlockKey} onChange={(v) => setState((s) => ({ ...s, annualBlockKey: v }))} options={[{ id: '', label: 'Первый ББ-блок' }, ...annualBbBlocks.map((b: any) => ({ id: b.key, label: b.label }))]} testId="bb-annual-block" />
               </div>
               <div style={{ marginTop: 6 }}>
                 <BbCheckCard active={state.posingIso} title="Позинг 30 с в отдыхе (квадрицепс)" desc={posingIsoNote()} onToggle={() => setState((s) => ({ ...s, posingIso: !s.posingIso }))} accent="#a78bfa" />

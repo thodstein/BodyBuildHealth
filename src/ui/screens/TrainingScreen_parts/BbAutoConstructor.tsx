@@ -2362,7 +2362,7 @@ export const BbAutoConstructor: React.FC = () => {
         profParts.push(mult === 0 ? 'возврат: ступень 1 — только техника' : `возврат: ×${mult} RIR+${rirAdd}`);
       }
       // PRO-3 R2 + S3: добивка слабой стороны (S3: на ступени 1 возврата — 0%, не добавляем)
-      const retMult = Number.isFinite(returnAction?.volumeMult) ? Math.max(0, Math.min(1, returnAction.volumeMult)) : 1;
+      const retMult = returnAction && Number.isFinite(returnAction.volumeMult) ? Math.max(0, Math.min(1, returnAction.volumeMult)) : 1;
       const lrEntries = retMult <= 0 ? [] : Object.entries(lrTopUp);
       if (lrEntries.length) {
         const sideRu = (sd: string) => (sd === 'left' ? 'левая' : 'правая');
