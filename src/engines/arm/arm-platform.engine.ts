@@ -25,7 +25,11 @@ export interface PlatformResult {
 /** Мировые ориентиры (муж, открытая) — сверены с IronMind 2025–2026 (добивка PRO-4).
  * RT 130.5 Тюкалов 2013; Apollon 237.5 Майерско 16.12.2022 / 137.9 Гайдученко 02.03.2019;
  * Hub 44.80 Толонен 10.02.2019 / 28.51 Кулагина 20.12.2021.
- * Saxon 133 — ВНУТРЕННИЙ ориентир хаба (фиксированного WR нет, только классы APL/лидерборды AUSA). */
+ * ВНУТРЕННИЕ ориентиры хаба (`platformIsInternal`, фиксированного WR нет):
+ * Saxon 133 (только классы APL/лидерборды AUSA); Pinch-блок 80/45 (единого WR нет —
+ * ширина/1H-2H/федерация, Gods of Grip 2024–2025); CoC-экв 55/30 (гриппер не меряется в кг);
+ * Grandfather Clock 90/50 и Anvil 30/16 (только лидерборды; лучший известный Country Crush 2"
+ * ~198 кг Dingey 2021 GripSport — выше нашего числа, т.е. это точно не WR). */
 export const PLATFORM_WR: Record<string, { maleKg: number; femaleKg: number; name: string }> = {
   rolling_thunder: { maleKg: 130.5, femaleKg: 77.2, name: 'Rolling Thunder' },
   apollon_axle: { maleKg: 237.5, femaleKg: 137.9, name: 'Apollon Axle' },
@@ -41,6 +45,21 @@ export const PLATFORM_WR: Record<string, { maleKg: number; femaleKg: number; nam
 export function platformWrFor(implement: string, sex: string): number {
   const rec = PLATFORM_WR[implement] || PLATFORM_WR['rolling_thunder'];
   return (sex || '').toLowerCase() === 'female' ? rec.femaleKg : rec.maleKg;
+}
+
+/** PRO-4 добивка-3: какие знаменатели — внутренние ориентиры, а не WR (см. шапку). */
+const PLATFORM_INTERNAL: Record<string, true> = {
+  saxon_bar: true,
+  pinch_block: true,
+  coc_gripper: true,
+  grandfather_clock: true,
+  anvil: true,
+  country_crush: true,
+};
+
+/** true → % считается от внутреннего ориентира хаба, не от мирового рекорда. */
+export function platformIsInternal(implement: string): boolean {
+  return !!PLATFORM_INTERNAL[String(implement || '')];
 }
 
 /** План попыток: opener 90%, second 95-97%, third 101-103% от цели (лесенка для зала). */
@@ -82,6 +101,8 @@ export function scorePlatform(input: {
   const ok = (input.attempts || []).filter((a) => a.success && Number.isFinite(Number(a.weightKg)));
   const bestKg = ok.length ? Math.max(...ok.map((a) => Number(a.weightKg))) : 0;
   const wrPct = wr > 0 ? Math.round((bestKg / wr) * 1000) / 10 : 0;
+  const internal = platformIsInternal(implement);
+  const suffix = internal ? ' (внутренний ориентир, не WR)' : '';
   return {
     implement,
     bestKg,
@@ -90,13 +111,13 @@ export function scorePlatform(input: {
     worldRecordKg: wr,
     wrPct,
     note:
-      ok.length === 0
+      (ok.length === 0
         ? 'Все попытки сорваны — занизить opener до 85%.'
         : wrPct >= 90
           ? `Элита: ${wrPct}% WR.`
           : wrPct >= 70
             ? `Соревновательный уровень: ${wrPct}% WR.`
-            : `База: ${wrPct}% WR — работать opener.`,
+            : `База: ${wrPct}% WR — работать opener.`) + suffix,
   };
 }
 

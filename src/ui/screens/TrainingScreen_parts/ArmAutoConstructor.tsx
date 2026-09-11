@@ -18,7 +18,7 @@ import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
-import { PLATFORM_WR, planAttempts, platformWrFor } from '../../../engines/arm/arm-platform.engine';
+import { PLATFORM_WR, planAttempts, platformWrFor, platformIsInternal } from '../../../engines/arm/arm-platform.engine';
 import { WAF_FOULS, WAF_FOULS_OUT_AFTER } from '../../../engines/arm/arm-start-strap.engine';
 import { buildSupermatchPlan } from '../../../engines/arm/arm-supermatch.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
@@ -1654,7 +1654,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   <AdSec title="🏟 Помост: план попыток (опенер 90 / 96 / 102%)" hook="platform">
                     <AdGrid cols="2">
                       <AdSheetSelect label="Снаряд" value={proPlatImpl} onChange={setProPlatImpl} options={
-                        Object.entries(PLATFORM_WR).map(([id, r])=> ({ id, label: (r as any).name }))
+                        Object.entries(PLATFORM_WR).map(([id, r])=> ({ id, label: (r as any).name + (platformIsInternal(id) ? ' (ориентир)' : '') }))
                       } />
                       <AdField label="Цель, кг">
                         <input value={proPlatTarget} onChange={e=>setProPlatTarget(e.target.value)} placeholder="100" inputMode="decimal" />
@@ -1667,9 +1667,10 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                       const wr = platformWrFor(proPlatImpl, linked?.profile?.personal?.sex);
                       const pct = Math.round((t / wr) * 1000) / 10;
                       const lvl = pct >= 90 ? 'элита' : pct >= 70 ? 'соревновательный уровень' : 'база';
+                      const orientir = platformIsInternal(proPlatImpl);
                       return (<><div className="ad-hero-side" data-arm="platform-wr">
-                        <div className="ad-hero-score" aria-hidden><b>{pct}%</b><span>WR</span></div>
-                        <div className="ad-hero-name">цель {t} кг · WR {wr} кг<span>{lvl} · опенер {att[0]} кг</span></div>
+                        <div className="ad-hero-score" aria-hidden><b>{pct}%</b><span>{orientir ? 'ориентир' : 'WR'}</span></div>
+                        <div className="ad-hero-name">цель {t} кг · {orientir ? `ориентир ${wr}` : `WR ${wr}`} кг<span>{lvl} · опенер {att[0]} кг</span></div>
                         <span className="ad-tag" data-sev={pct >= 90 ? 'ok' : pct >= 70 ? 'warn' : 'bad'}>{lvl}</span>
                       </div>
                       <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.min(100, pct)}%` }} /></div>

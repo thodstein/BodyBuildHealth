@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planAttempts, scorePlatform, platformRotationForWeek, platformWrFor } from '../arm-platform.engine';
+import { planAttempts, scorePlatform, platformRotationForWeek, platformWrFor, platformIsInternal } from '../arm-platform.engine';
 
 describe('arm-platform (эпик J)', () => {
   it('попытки 90/96/102%', () => {
@@ -34,5 +34,21 @@ describe('arm-platform (эпик J)', () => {
   it('женский WR ниже', () => {
     expect(platformWrFor('rolling_thunder', 'female')).toBe(77.2);
     expect(platformWrFor('rolling_thunder', 'male')).toBe(130.5);
+  });
+  it('PRO-4 добивка-3: несверенные знаменатели — internal (эпик J без источников)', () => {
+    for (const impl of ['saxon_bar', 'pinch_block', 'coc_gripper', 'grandfather_clock', 'anvil', 'country_crush']) {
+      expect(platformIsInternal(impl)).toBe(true);
+    }
+    for (const impl of ['rolling_thunder', 'apollon_axle', 'hub']) {
+      expect(platformIsInternal(impl)).toBe(false);
+    }
+    expect(platformIsInternal('неизвестный')).toBe(false);
+  });
+  it('PRO-4 добивка-3: note честно маркирует ориентир, % не меняется', () => {
+    const r = scorePlatform({ implement: 'country_crush', sex: 'male', attempts: [{ attempt: 1, weightKg: 100, success: true }] });
+    expect(r.wrPct).toBe(100);
+    expect(r.note).toContain('ориентир');
+    const rt = scorePlatform({ implement: 'rolling_thunder', sex: 'male', attempts: [{ attempt: 1, weightKg: 100, success: true }] });
+    expect(rt.note).not.toContain('ориентир');
   });
 });
