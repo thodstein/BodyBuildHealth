@@ -218,7 +218,7 @@ he_bb_plan_saved + he_workout_log_v1 + he_profile_v2 (оборудование/�
 
 ## 7. Критерии PRO
 
-- Каждое упражнение плана диагностируется: 0–3 флага с объяснением (не общая теория).
+- Каждое упражнение плана диагностируется: флаги с объяснением (обычно 1–4, cap issues 10 — не общая теория).
 - Каждый флаг → топ-1 коррекция с `confidence + reason + Δ-превью` до применения.
 - `▶ Применить в план` реально меняет следующую сборку (`preferredExerciseIds` в плане).
 - Коррекции отфильтрованы по `equipment + mobilityRestrictions + травмы`; `canReplace` /
@@ -250,9 +250,22 @@ he_bb_plan_saved + he_workout_log_v1 + he_profile_v2 (оборудование/�
 - **5 история диагнозов** — `he_exercise_lab_v1.history` (дедуп по упражнению, кап 10, effect-запись) + блок «🕘 История» с переходом.
 - **6 чип каталога только при плане** — SFR/профиль всегда, диагноз-скор только при `he_bb_plan_saved`/`he_bb_plans`.
 - **7 приёмник ББ-авто** — чужой `BbAutoConstructor`: persist `he_bb_last_lab_delta` + Δ в bridge-flash (аддитивный ханк, остальное не тронуто).
-- Тесты добивки: ctx +2, correction +3 (format/rank×2), UI +5 (план-бейдж/Δ/история/ранжир/гейтинг/сравнение) — итого своих **68/68**; соседи: rest-hooks 68/68, bb-auto-smoke 8/8, bridge-handlers, catalog/manual, bb-sfr/instructions; `tsc` 0.
+- Тесты добивки: ctx +2, correction +3 (format/rank×2), UI +5 (план-бейдж/Δ/история/ранжир/гейтинг/сравнение) — итого своих **65/65** (в записи AGENTS ошибочно стояло 68 — исправлено здесь); соседи: rest-hooks 68/68, bb-auto-smoke 8/8, bridge-handlers, catalog/manual, bb-sfr/instructions; `tsc` 0.
 
-## 10. Риски
+## 10. Добивка-2 «включая мелкие» (выполнена кодом, Sep 12 2026)
+
+Закрыты все 7 пунктов честного остатка (`d452621f` + `83a27973`):
+
+- **1 план-контекст везде** — NEW `diagnoseLabWithPlan` (единая точка: факт плана + missing аудита) + рефактор Шага 1 на него; Шаг 3 (`dxScores` мемо), каталог, Шаг 2, сравнение — singleAngle/uncovered/strict стреляют везде.
+- **2 unilateralDelta** в `formatSimulatorDelta` (п.п.).
+- **3 «Все в группе»** — разрешённые первыми по Δ (`groupRanked`), остальные в порядке каталога + Δ-бейджи.
+- **4 тесты экспорта** — печать (mock `window.open`, ассерт HTML) + CSV (Blob size/type + download-имя).
+- **5 anti-staleness** — NEW `useLabRefresh` (`focus`/`storage`) в ленте, каталоге, карточке, сравнении, Шаге 3 и блоке Шага 2.
+- **6 labDelta в rationale** — чужой `BbAutoConstructor`: постоянная строка из `he_bb_last_lab_delta` (аддитивно, без теста — чужой файл, smoke цел).
+- **7 мелочь** — критерий «0–3 флага» → «обычно 1–4, cap 10»; поймано своё: TDZ `dxScores`, неэкспортированный тип, `rir` в типе входа.
+- Тесты: +2 — итого своих **67/67**; соседи 224/224 (17 файлов); `tsc --noEmit` **0 по всему проекту**.
+
+## 11. Риски
 
 - Эвристика `getResistanceProfile` живёт в 4 местах (Shared + Prescription + ProSubstitute + bb-диагноз) —
   менять только через новый движок-адаптер, иначе рассинхрон.
