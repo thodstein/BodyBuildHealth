@@ -110,6 +110,14 @@ describe('parseSmBridgePayload', () => {
       hubVelocity: {},
       swayCm: null,
       strategy: null,
+      taAttempts: null,
+      taSinclair: null,
+      taSpecWeeks: null,
+      taPreferredCorr: null,
+      taWeakCauses: null,
+      taFvr: null,
+      taAsymPct: null,
+      taOhsFailed: null,
     });
   });
 });

@@ -83,6 +83,9 @@ export function useStrengthSportWizard() {
   // минуя vbtMap (у него другой формат ключей week-day-ex-set).
   const [hubVelocity, setHubVelocity] = useState<Record<string, number[]>>({});
   const [swayCmBridge, setSwayCmBridge] = useState<number | null>(null);
+  // V4-добой (G8): заявки/Sinclair/спец-блок ТА-хаба — в rationale плана + бейдж.
+  // V4-добой-2 (П1): + причины/коррекции/FvR/асимметрия/OHS.
+  const [taBridge, setTaBridge] = useState<{ attempts: { snatch: number[]; cj: number[] } | null; sinclair: { total: number; value: number; cycle?: string | null; q?: number | null } | null; specWeeks: number | null; prefCorr: Record<string, string> | null; causes: Record<string, string> | null; fvr: { snatchTh: number; pmax: number } | null; asymPct: number | null; ohsFailed: number | null }>({ attempts: null, sinclair: null, specWeeks: null, prefCorr: null, causes: null, fvr: null, asymPct: null, ohsFailed: null });
   // Приём из хабов ТА/стронг (planner-bridge weakpoints → weightlifting/strongman)
   // через чистый parseSmBridgePayload (см. sm-bridge-intake.ts + его тест).
   // + мост из Библиотеки (каталог циклов → kind 'ss_cycle': ставит цикл+режим+сроки).
@@ -127,6 +130,11 @@ export function useStrengthSportWizard() {
       if (p.velocityLossPct != null) setVelocityLoss(p.velocityLossPct);
       // Sway carry из хаба — в rationale плана (у билдера нет sway-входа)
       if (p.swayCm != null) setSwayCmBridge(p.swayCm);
+      // V4-добой (G8): заявки/Sinclair/спец-блок ТА — вне гейта слабых.
+      // V4-добой-2 (П1): + причины/коррекции/FvR/асимметрия/OHS.
+      if (p.taAttempts || p.taSinclair || p.taSpecWeeks != null || p.taPreferredCorr || p.taWeakCauses || p.taFvr || p.taAsymPct != null || p.taOhsFailed != null) {
+        try { setTaBridge({ attempts: p.taAttempts, sinclair: p.taSinclair, specWeeks: p.taSpecWeeks, prefCorr: p.taPreferredCorr, causes: p.taWeakCauses, fvr: p.taFvr, asymPct: p.taAsymPct, ohsFailed: p.taOhsFailed }); } catch {}
+      }
       if (Array.isArray(p.weakPoints) && p.weakPoints.length > 0) {
         setWeakPoints(p.weakPoints);
         if (p.mode) setMode(p.mode as any);
@@ -222,6 +230,7 @@ export function useStrengthSportWizard() {
     taperWeeks, setTaperWeeks, contest, setContest, contestStrategy, setContestStrategy,
     medleyPreview, setMedleyPreview, weakPoints, setWeakPoints, diagnosticLevel, setDiagnosticLevel,
     hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge,
+    taBridge, setTaBridge,
     vbtMap, setVbtMap, plan, setPlan, annual, setAnnual,
     diaryLoad, setDiaryLoad, expandedWeek, setExpandedWeek, msg, setMsg,
     building, setBuilding, buildStage, setBuildStage, tick,

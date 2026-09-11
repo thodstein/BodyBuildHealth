@@ -19,6 +19,10 @@ export interface TAImtpInput {
   rfdNs?: number | null; // Н/с, окно 0–200мс
   durationS?: number | null; // длительность теста
   countermovement?: boolean | null; // dip перед тягой
+  /** V4: пик первой тяги IFP/IPSP (Н) — сила с пола (Lum 2025; Rochau 2024). */
+  ifpPeakN?: number | null;
+  /** V4: импульс 0–200мс (Н·с) — переносимая между девайсами метрика (Wang 2025). */
+  impulseNs?: number | null;
 }
 
 export interface TAImtpResult {
@@ -29,6 +33,10 @@ export interface TAImtpResult {
   warnings: string[];
   /** W2: RFD в серой зоне девайса (±25% от порога) — профиль не строится по RFD. */
   rfdGray: boolean;
+  /** V4: отношение IFP/IMTP (~0.5–0.55 норма; ниже = слабо с пола). */
+  ifpRatio: number | null;
+  /** V4: импульс как переносимая метрика (есть/нет). */
+  hasImpulse: boolean;
 }
 
 /** Ориентиры полевых норм (не диагноз): относительная сила и RFD. */
@@ -86,5 +94,58 @@ export function diagnoseTAImtp(input: TAImtpInput): TAImtpResult | null {
     profile = 'balanced';
     verdict = `Профиль сбалансирован (${relForce}×BW${rfd != null ? `, RFD ${rfd}` : ''}) — работа по фазам.`;
   }
-  return { valid: input.countermovement !== true, relForce, profile, verdict, warnings, rfdGray };
+  // V4: первая тяга + импульс (не ломают профиль, только дополняют вердикт)
+  let ifpRatio: number | null = null;
+  const ifp = input.ifpPeakN;
+  if (ifp != null && Number.isFinite(ifp) && ifp > 0 && pf != null && Number.isFinite(pf) && pf > 0) {
+    ifpRatio = Math.round((ifp / pf) * 100) / 100;
+    if (ifpRatio < 0.45) {
+      warnings.push(`IFP/IMTP ${ifpRatio} <0.45 — слабо с пола: дефицит/паузы у пола, первая тяга (Lum 2025; Rochau 2024; норма ≈0.50–0.58 по Rochau/Joffe).`);
+    } else {
+      warnings.push(`IFP/IMTP ${ifpRatio} — сила с пола в норме (≈0.50–0.58, Rochau 2024; Joffe).`);
+    }
+  }
+  const hasImpulse = input.impulseNs != null && Number.isFinite(input.impulseNs) && input.impulseNs > 0;
+  if (hasImpulse && rfdGray) {
+    warnings.push('RFD в серой зоне — опирайся на импульс 0–200мс: он переносим между девайсами (Wang 2025).');
+  }
+  return { valid: input.countermovement !== true, relForce, profile, verdict, warnings, rfdGray, ifpRatio, hasImpulse };
+}
+
+/**
+ * V7 PRO-v4: выносливость силы 10×5с/10с (Grover 2024, PeerJ).
+ * Дроп среднего пика последних 3 к первым 3: >15% = лимитирует.
+ */
+export function imtpEnduranceDrop(first3: Array<number | null | undefined>, last3: Array<number | null | undefined>): { dropPct: number; limited: boolean; text: string } | null {
+  const f = (Array.isArray(first3) ? first3 : []).filter((v): v is number => v != null && Number.isFinite(v) && v > 0);
+  const l = (Array.isArray(last3) ? last3 : []).filter((v): v is number => v != null && Number.isFinite(v) && v > 0);
+  if (f.length < 2 || l.length < 2) return null;
+  const mf = f.reduce((a, b) => a + b, 0) / f.length;
+  const ml = l.reduce((a, b) => a + b, 0) / l.length;
+  if (!(mf > 0)) return null;
+  const dropPct = Math.round(((mf - ml) / mf) * 1000) / 10;
+  const limited = dropPct > 15;
+  return { dropPct, limited, text: limited ? `Дроп силы ${dropPct}% >15% — выносливость силы лимитирует (10×5с/10с, Grover 2024)` : `Дроп силы ${dropPct}% — выносливость силы в норме` };
+}
+
+/**
+ * V4-добой-2 (П5): нормы импульса 0–200мс, Н·с (Bustamante et al. 2024,
+ * чилийские high-performance, n=77: Ж IMP200 199.48±46.74; М 280.89±52.26).
+ * Коридор mean±SD; ниже −SD = «ниже ориентира», выше +SD = «выше».
+ * Скрининг-ориентир, не диагноз (выборка одна, не ТА-специфична).
+ */
+export const IMPULSE200_NORMS: Record<'male' | 'female', { mean: number; sd: number }> = {
+  male: { mean: 280.89, sd: 52.26 },
+  female: { mean: 199.48, sd: 46.74 },
+};
+
+export function impulseVerdict(impulseNs: number | null | undefined, sex?: string | null): string | null {
+  if (impulseNs == null || !Number.isFinite(impulseNs) || impulseNs <= 0) return null;
+  const s = String(sex || '').toLowerCase() === 'female' ? 'female' : 'male';
+  const { mean, sd } = IMPULSE200_NORMS[s];
+  const lo = Math.round((mean - sd) * 10) / 10;
+  const hi = Math.round((mean + sd) * 10) / 10;
+  if (impulseNs < lo) return `Импульс ${impulseNs} Н·с ниже ориентира ${s === 'female' ? 'Ж' : 'М'} ${lo}–${hi} (Bustamante 2024): взрывное усилие — вис/прыжки`;
+  if (impulseNs > hi) return `Импульс ${impulseNs} Н·с выше ориентира ${s === 'female' ? 'Ж' : 'М'} ${lo}–${hi} — отлично`;
+  return `Импульс ${impulseNs} Н·с в ориентире ${lo}–${hi} (Bustamante 2024)`;
 }

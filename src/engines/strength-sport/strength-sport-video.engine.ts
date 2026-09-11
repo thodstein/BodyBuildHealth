@@ -19,6 +19,8 @@ export interface BarTrackingResult {
   vmax: number;
   hAcc: number; // высота на vmax (для FvR2 hAcc)
   duration: number;
+  /** V4-PROv4: знаковое латеральное смещение (среднее x − старт x, см): + вправо, − влево. Питает персист асимметрии. */
+  xBias: number;
 }
 
 export interface TrackingProvider {
@@ -175,7 +177,9 @@ export function analyzeBarTracking(points: BarPoint[]): BarTrackingResult | null
   const duration = filtered[filtered.length - 1].t - filtered[0].t;
   hAcc = Math.round(hAcc * 100) / 100;
   if (hAcc <= 0.2) hAcc = 0.8;
-  return { points: filtered, fps, yMax: Math.round(yMax), xLoop: Math.round(xLoop * 10) / 10, vmax, hAcc, duration: Math.round(duration * 100) / 100 };
+  const xMean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const xBias = Math.round((xMean - xs[0]) * 10) / 10;
+  return { points: filtered, fps, yMax: Math.round(yMax), xLoop: Math.round(xLoop * 10) / 10, vmax, hAcc, duration: Math.round(duration * 100) / 100, xBias };
 }
 
 // Force provider abstraction (loadsol insoles, force plate)

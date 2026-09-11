@@ -64,6 +64,7 @@ export const StrengthSportConstructor: React.FC = () => {
     taperWeeks, setTaperWeeks, contest, setContest, contestStrategy, setContestStrategy,
     medleyPreview, setMedleyPreview, weakPoints, setWeakPoints, diagnosticLevel, setDiagnosticLevel,
     hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge,
+    taBridge, setTaBridge,
     vbtMap, setVbtMap, plan, setPlan, annual, setAnnual,
     diaryLoad, setDiaryLoad, expandedWeek, setExpandedWeek, msg, setMsg,
     building, setBuilding, buildStage, setBuildStage, tick,
@@ -248,6 +249,41 @@ export const StrengthSportConstructor: React.FC = () => {
     if (swayCmBridge != null && swayCmBridge > 0) {
       p.rationale.push(`Sway ${swayCmBridge}см из диагностики (Kinovea): коридор ±3см, при >5см — стоп carries и проверка техники`);
     }
+    // V4-добой (G8): заявки/Sinclair/спец-блок ТА-хаба — в rationale (у билдера нет входов — не теряем молча).
+    try {
+      const tb = taBridge as any;
+      if (tb?.attempts && ((tb.attempts.snatch && tb.attempts.snatch.length) || (tb.attempts.cj && tb.attempts.cj.length))) {
+        const parts: string[] = [];
+        if (tb.attempts.snatch && tb.attempts.snatch.length) parts.push(`рывок ${tb.attempts.snatch.join('/')}`);
+        if (tb.attempts.cj && tb.attempts.cj.length) parts.push(`толчок ${tb.attempts.cj.join('/')}`);
+        p.rationale.push(`Заявки из ТА-диагностики: ${parts.join(' · ')}`);
+      }
+      if (tb?.sinclair && tb.sinclair.value > 0) {
+        p.rationale.push(`Прогресс из ТА-диагностики: сумма ${tb.sinclair.total}кг · Sinclair ${tb.sinclair.value}${tb.sinclair.cycle ? ` (${tb.sinclair.cycle})` : ''}${tb.sinclair.q != null ? ` · Q-points ${tb.sinclair.q}` : ''}`);
+      }
+      if (tb?.specWeeks != null && tb.specWeeks > 0) {
+        p.rationale.push(`Спец-блок ТА-диагностики: ${tb.specWeeks} нед коррекций слабых фаз`);
+      }
+      // V4-добой-2 (П1): остаток payload моста — в rationale, не в механику (механики у билдера нет — не выдумываем).
+      try {
+        if (tb?.causes && Object.keys(tb.causes).length) {
+          const cs = Object.entries(tb.causes).slice(0, 3).map(([k, v]) => `${k} — ${v}`).join('; ');
+          p.rationale.push(`Причины слабых фаз из ТА-диагностики: ${cs}`);
+        }
+        if (tb?.prefCorr && Object.keys(tb.prefCorr).length) {
+          p.rationale.push(`Предпочитаемые коррекции ТА-хаба (${Object.keys(tb.prefCorr).length}): учтены при подборе подсобки`);
+        }
+        if (tb?.fvr && tb.fvr.snatchTh > 0) {
+          p.rationale.push(`FvR-оценка ТА-хаба: рывок ≈${tb.fvr.snatchTh}кг${tb.fvr.pmax > 0 ? ` · Pmax ${tb.fvr.pmax}Вт` : ''} — ориентир заявок`);
+        }
+        if (tb?.asymPct != null && tb.asymPct >= 7) {
+          p.rationale.push(`Асимметрия L/R ${tb.asymPct}% из ТА-диагностики (≥7%): унилатеральная добивка слабой стороны`);
+        }
+        if (tb?.ohsFailed != null && tb.ohsFailed > 0) {
+          p.rationale.push(`OHS-провалы ${tb.ohsFailed}/6 из ТА-диагностики: мобильность голеностоп/таз в разминку`);
+        }
+      } catch { /* noop */ }
+    } catch { /* noop */ }
     setPlan(p);
     saveStrengthSportPlan(p);
     try {
@@ -461,6 +497,7 @@ export const StrengthSportConstructor: React.FC = () => {
           <div style={{ ...ROW, gap: 6 }}>
             {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`} icon="📋">План {plan.weeks}нед · {plan.patternId}</Badge>}
             {Object.keys(hubVelocity).length > 0 && <Badge color="#f5b04c" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">📥 Из хаба: {Object.entries(hubVelocity).map(([k, v]) => `${k} ${v.length}т`).join(' · ')}</Badge>}
+            {(taBridge.attempts || taBridge.sinclair || taBridge.specWeeks != null || taBridge.causes || taBridge.fvr) && <Badge color="#7dd3fc" bg="rgba(56,189,248,0.10)" border="rgba(56,189,248,0.18)">📥 ТА-хаб{(taBridge.attempts?.snatch?.length || taBridge.attempts?.cj?.length) ? ' · заявки' : ''}{taBridge.sinclair ? ` · Sinclair ${taBridge.sinclair.value}` : ''}{taBridge.specWeeks != null ? ` · спец ${taBridge.specWeeks}нед` : ''}{taBridge.causes ? ` · причины ${Object.keys(taBridge.causes).length}` : ''}{taBridge.fvr ? ` · FvR ${taBridge.fvr.snatchTh}` : ''}</Badge>}
             {outsideMetrics && <Badge color="#c4b5fd" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
             {acwr && <Badge color={acwr.zone==='dangerous'?'#fecaca': acwr.zone==='caution'?'#fde68a': acwr.zone==='caution'?'#fde68a':'#86efac'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)': acwr.zone==='caution'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.08)'} border={acwr.zone==='dangerous'?'rgba(239,68,68,0.22)': acwr.zone==='caution'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.16)'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)}</Badge>}
             {hrv && <Badge color={hrv.zone==='dangerous'?'#fecaca': hrv.zone==='caution'?'#fde68a':'#86efac'} bg={hrv.zone==='dangerous'?'rgba(239,68,68,0.12)': hrv.zone==='caution'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.08)'} border={hrv.zone==='dangerous'?'rgba(239,68,68,0.22)': hrv.zone==='caution'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.16)'}>HRV {hrv.ewma ?? hrv.last} мс · {hrv.zone}</Badge>}

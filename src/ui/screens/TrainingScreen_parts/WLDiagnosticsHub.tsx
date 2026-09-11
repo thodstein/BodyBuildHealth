@@ -24,7 +24,7 @@ import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend, TA_OHS_HIST_KEY
 import { calibrateLVP, saveLVPProfile } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary, ensurePoseModel } from '../../../engines/strength-sport/strength-sport-pose.engine';
-import { sinclairCoefficient, sinclairTotal, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
+import { sinclairCoefficient, sinclairTotal, qPoints, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 import { auditTAPlan, hubTabForPhase, TA_CORE_PHASES, TA_AUX_PHASES } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
@@ -35,10 +35,16 @@ import { buildTASpecBlock } from '../../../engines/strength-sport/strength-sport
 import { diagnoseTAAnthro } from '../../../engines/strength-sport/strength-sport-ta-anthro.engine';
 import { diagnoseSplitJerkAsymmetry, appendSplitJerkSnapshot, splitJerkTrend, type SplitJerkSnapshot } from '../../../engines/strength-sport/strength-sport-ta-asymmetry.engine';
 import { planTAAttempts } from '../../../engines/strength-sport/strength-sport-ta-attempts.engine';
-import { diagnoseTAImtp, IMTP_PROTOCOL_CHECKLIST, IMTP_CLEAN_TRANSFER_NOTE } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
+import { diagnoseTAImtp, IMTP_PROTOCOL_CHECKLIST, IMTP_CLEAN_TRANSFER_NOTE, impulseVerdict } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
 import { buildTAIcs, downloadTAIcs } from '../../../engines/strength-sport/strength-sport-ta-ics.engine';
 import { buildTAAnnualOverlay, saveTAAnnualOverlay } from '../../../engines/strength-sport/strength-sport-ta-annual-bridge.engine';
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
+import { pciFromTrackings, persistingAsymmetry } from '../../../engines/strength-sport/strength-sport-ta-bar-consistency.engine';
+import { jerkAclFlags } from '../../../engines/strength-sport/strength-sport-ta-jerk-safety.engine';
+import { meetPlan } from '../../../engines/strength-sport/strength-sport-ta-meet-strategy.engine';
+import { ymaxVerdict, femalePhaseNorm, femaleLevelOf, femalePhaseVerdict } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
+import { shrinkMVT, mvtPosterior, isVelocityShiftReal, velocityMetricFlag, mvtRetestNote, TA_POPULATION_MVT } from '../../../engines/strength-sport/strength-sport-ta-mvt.engine';
+import { imtpEnduranceDrop } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -122,6 +128,20 @@ type WLState = {
   imtpRfd: string;
   imtpDur: string;
   imtpCountermove: boolean;
+  // V4: первая тяга + импульс + выносливость силы
+  ifpKg: string;
+  imtpImpulse: string;
+  endurFirst: string;
+  endurLast: string;
+  // V4: ACL-флаги dip толчка
+  jerkValgus: boolean;
+  jerkRotation: boolean;
+  deepDip: boolean;
+  // V4-добой: метрика скорости LVP (mean/peak путать нельзя)
+  velMetric: '' | 'mean' | 'peak';
+  // V4-добой: факт фаз женского рывка (против нормы уровня)
+  femFinalAcc: string;
+  femHipDeg: string;
   // V6-B3: ручной вес для IMTP (при пустом профиле)
   imtpBw: string;
   // V4-B/V6-B1: ноты последней инъекции (идут в экспорт, персистятся с состоянием хаба)
@@ -174,6 +194,14 @@ const DEFAULT_STATE: WLState = {
   taPullBest: '', taSquat3: '', taOhpBest: '',
   // E13: IMTP/RFD
   imtpRfd: '', imtpDur: '', imtpCountermove: false,
+  // V4: первая тяга + импульс + выносливость
+  ifpKg: '', imtpImpulse: '', endurFirst: '', endurLast: '',
+  // V4: ACL-флаги
+  jerkValgus: false, jerkRotation: false, deepDip: false,
+  // V4-добой: метрика скорости LVP (mean/peak путать нельзя)
+  velMetric: '' as '' | 'mean' | 'peak',
+  // V4-добой: факт фаз женского рывка
+  femFinalAcc: '', femHipDeg: '',
   // V6-B3: ручной вес IMTP
   imtpBw: '',
   // V3: live-статус + прогресс
@@ -418,7 +446,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       const cj = state.progCj ? parseFloat(state.progCj) : NaN;
       if (!Number.isFinite(bw) || bw <= 0 || !Number.isFinite(sn) || !Number.isFinite(cj) || sn <= 0 || cj <= 0) return null;
       const total = Math.round((sn + cj) * 10) / 10;
-      return { bw, sn, cj, total, cycle: progCycleEff, coeff: sinclairCoefficient(bw, progSexEff, progCycleEff), sinclair: sinclairTotal(total, bw, progSexEff, progCycleEff) };
+      return { bw, sn, cj, total, cycle: progCycleEff, coeff: sinclairCoefficient(bw, progSexEff, progCycleEff), sinclair: sinclairTotal(total, bw, progSexEff, progCycleEff), q: qPoints(total, bw, progSexEff) };
     } catch { return null; }
   }, [state.progBw, state.progSnatch, state.progCj, progSexEff, progCycleEff, profileWeightKg]);
   const progTrend = useMemo(() => {
@@ -584,6 +612,55 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch { return null; }
   }, [lvpLiveProfile, state.vbtWeight, state.vbtVel]);
 
+  // V4: честный MVT-2 — shrinkage + SDD + перетест (Swinton 2026; Thompson/Weakley)
+  // V4-добой-2 (П4): posterior из остатков регрессии — primary, shrinkage — fallback.
+  const mvtHonest = useMemo(() => {
+    try {
+      if (!mvtLive || !mvtLive.valid) return null;
+      const n = lvpLiveProfile?.points?.length ?? 0;
+      const shr = shrinkMVT(mvtLive.mvt, TA_POPULATION_MVT, n, mvtLive.r2);
+      const post = lvpLiveProfile ? mvtPosterior(lvpLiveProfile) : null;
+      const shake = state.vbtVel && state.vbtBest ? isVelocityShiftReal(parseFloat(state.vbtBest), parseFloat(state.vbtVel)) : null;
+      return { shr, post, shake };
+    } catch { return null; }
+  }, [mvtLive, lvpLiveProfile, state.vbtVel, state.vbtBest]);
+  // V4-добой: живая мета калибровки LVP (дата + вес) → перетест-напоминание
+  const calibMeta = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_ta_lvp_calib_meta_v1');
+      const m = raw ? JSON.parse(raw) : null;
+      if (!m || typeof m.date !== 'string') return null;
+      return { date: m.date as string, bw: typeof m.bw === 'number' ? m.bw : null };
+    } catch { return null; }
+  }, [planNonce, state.lvpResult]);
+  const retestNote = useMemo(() => {
+    try {
+      if (!calibMeta) return null;
+      const days = Math.floor((Date.now() - new Date(calibMeta.date + 'T00:00:00').getTime()) / 86400000);
+      const weeks = days >= 0 ? days / 7 : null;
+      const curBw = state.progBw ? parseFloat(state.progBw) : profileWeightKg ?? null;
+      const dBw = curBw != null && calibMeta.bw != null ? curBw - calibMeta.bw : null;
+      return mvtRetestNote(weeks, dBw);
+    } catch { return null; }
+  }, [calibMeta, state.progBw, profileWeightKg]);
+  const velFlag = useMemo(() => velocityMetricFlag(state.velMetric || null), [state.velMetric]);
+  // V4-добой: вердикт факта женского рывка против нормы уровня (уровень — прямым чтением стора, мемы ниже — TDZ)
+  const femVerdict = useMemo(() => {
+    try {
+      const t = state.femFinalAcc ? parseFloat(state.femFinalAcc) : null;
+      const h = state.femHipDeg ? parseFloat(state.femHipDeg) : null;
+      if ((t == null || !Number.isFinite(t)) && (h == null || !Number.isFinite(h))) return null;
+      let lv = 'intermediate';
+      try {
+        const raw = localStorage.getItem('he_strength_sport_plan_v1');
+        const j = raw ? JSON.parse(raw) : null;
+        const p = j?.weeksData ? j : j?.plan?.weeksData ? j.plan : null;
+        lv = (p as any)?.inputSnapshot?.level ?? (p as any)?.level ?? 'intermediate';
+      } catch { /* noop */ }
+      return femalePhaseVerdict(femaleLevelOf(lv), t, h);
+    } catch { return null; }
+  }, [state.femFinalAcc, state.femHipDeg, planNonce]);
+
   // E9: антропометрия → хват/старт
   const anthro = useMemo(() => {
     try {
@@ -713,7 +790,7 @@ export const WLDiagnosticsHub: React.FC = () => {
   const imtpResult = useMemo(() => {
     try {
       // IMTP-ввод живёт в clean-табе (кг силы), RFD/длительность/вес — здесь же
-      const hasAny = state.imtpKg || state.imtpRfd || state.imtpDur || state.imtpCountermove || state.imtpBw;
+      const hasAny = state.imtpKg || state.imtpRfd || state.imtpDur || state.imtpCountermove || state.imtpBw || state.ifpKg || state.imtpImpulse;
       if (!hasAny) return null;
       const manualBw = state.imtpBw ? parseFloat(state.imtpBw) : NaN;
       return diagnoseTAImtp({
@@ -722,9 +799,57 @@ export const WLDiagnosticsHub: React.FC = () => {
         rfdNs: state.imtpRfd ? parseFloat(state.imtpRfd) : null,
         durationS: state.imtpDur ? parseFloat(state.imtpDur) : null,
         countermovement: state.imtpCountermove || null,
+        // V4: первая тяга + импульс
+        ifpPeakN: state.ifpKg ? parseFloat(state.ifpKg) * 9.81 : null,
+        impulseNs: state.imtpImpulse ? parseFloat(state.imtpImpulse) : null,
       });
     } catch { return null; }
-  }, [state.imtpKg, state.imtpRfd, state.imtpDur, state.imtpCountermove, state.imtpBw, profileWeightKg]);
+  }, [state.imtpKg, state.imtpRfd, state.imtpDur, state.imtpCountermove, state.imtpBw, state.ifpKg, state.imtpImpulse, profileWeightKg]);
+
+  // V4-добой-2 (П5): вердикт импульса против норм Bustamante 2024
+  const impulseNote = useMemo(() => {
+    try {
+      const v = state.imtpImpulse ? parseFloat(state.imtpImpulse) : null;
+      if (v == null || !Number.isFinite(v)) return null;
+      return impulseVerdict(v, progSexEff);
+    } catch { return null; }
+  }, [state.imtpImpulse, progSexEff]);
+  // V4: консистентность траектории (PCI) + персист из истории трекинга
+  const pciBlock = useMemo(() => {
+    try {
+      const hist = loadBarTracking();
+      const loops = hist.map((h) => h.xLoop).filter((v) => Number.isFinite(v));
+      const cur = parseFloat(state.xLoopCm);
+      const all = Number.isFinite(cur) && cur > 0 ? [...loops, cur] : loops;
+      if (all.length < 2) return { pci: null, persist: { persisting: false, n: all.length, text: null } };
+      // V4-добой: персист по знаковому xBias истории (старые записи без xBias — скип)
+      const biases = hist.map((h) => (typeof h.xBias === 'number' && Number.isFinite(h.xBias) ? h.xBias : null)).filter((v): v is number => v != null);
+      return { pci: pciFromTrackings(all), persist: persistingAsymmetry(biases) };
+    } catch { return { pci: null, persist: { persisting: false, n: 0, text: null } }; }
+  }, [trackNonce, state.xLoopCm]);
+
+  // V4: ACL-гард dip + выносливость силы + стратегия старта + нормы
+  const aclGuard = useMemo(() => {
+    try {
+      return jerkAclFlags({ kneeValgus: state.jerkValgus, kneeRotation: state.jerkRotation, hamDeficit: imtpResult?.profile === 'strength_deficit', deepDip: state.deepDip });
+    } catch { return null; }
+  }, [state.jerkValgus, state.jerkRotation, state.deepDip, imtpResult]);
+  const endurBlock = useMemo(() => {
+    try {
+      if (!state.endurFirst.trim() || !state.endurLast.trim()) return null;
+      const f = state.endurFirst.split(/[,;\s]+/).map(Number);
+      const l = state.endurLast.split(/[,;\s]+/).map(Number);
+      return imtpEnduranceDrop(f, l);
+    } catch { return null; }
+  }, [state.endurFirst, state.endurLast]);
+  const ymaxNote = useMemo(() => {
+    try {
+      const y = parseFloat(state.yMaxCm);
+      if (!Number.isFinite(y)) return null;
+      const bw = state.progBw ? parseFloat(state.progBw) : profileWeightKg ?? null;
+      return ymaxVerdict(y, bw, progSexEff);
+    } catch { return null; }
+  }, [state.yMaxCm, state.progBw, profileWeightKg, progSexEff]);
 
   // W9: пофазная тяга — какой конец проседает первым (Sports Biomech 2025)
   const pullPhase = useMemo(() => {
@@ -825,6 +950,19 @@ export const WLDiagnosticsHub: React.FC = () => {
       return buildTASpecBlock({ weakPoints, level: taLevel, weeks: wks });
     } catch { return null; }
   }, [weakPoints, taLevel, planAudit.workWeeks]);
+
+  // V4: стратегия старта (опенер 92–94% + прыжки + bomb-out; Nature 2024)
+  // V4-добой: рывок подтягивается из FvR-базы при пустой ручной заявке (как snatchAttempts)
+  const meetBlock = useMemo(() => {
+    try {
+      const fvrBase = state.fvrLift === 'snatch' ? fvr?.snatchTh ?? null : null;
+      const snRaw = state.taSnatchMax ? parseFloat(state.taSnatchMax) : NaN;
+      const sn = Number.isFinite(snRaw) && snRaw > 0 ? snRaw : fvrBase;
+      const cj = state.taCjMax ? parseFloat(state.taCjMax) : null;
+      if ((sn == null || !(sn > 0)) && (cj == null || !(cj > 0))) return null;
+      return meetPlan({ snatchMaxKg: sn, cjMaxKg: cj, level: taLevel });
+    } catch { return null; }
+  }, [state.taSnatchMax, state.taCjMax, state.fvrLift, fvr, taLevel]);
 
   // E6: инъекция коррекций в сохранённый план (все рабочие недели + спец-блок + откат)
   const handleInjectToPlan = () => {
@@ -988,7 +1126,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         taWeakCauses: Object.fromEntries(weakPoints.map(wp => { try { return [wp, causeFor(wp)?.cause ?? null]; } catch { return [wp, null]; } })),
         // V5-A: попытки + Sinclair (информационно для конструктора/дневника)
         ...(snatchAttempts || cjAttempts ? { taAttempts: { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) } } : {}),
-        ...(progCalc && progCalc.sinclair != null ? { taSinclair: { total: progCalc.total, value: progCalc.sinclair, cycle: progCalc.cycle } } : {}),
+        ...(progCalc && progCalc.sinclair != null ? { taSinclair: { total: progCalc.total, value: progCalc.sinclair, cycle: progCalc.cycle, q: progCalc.q ?? null } } : {}),
       } as any,
       source: 'intellectual',
     });
@@ -1115,9 +1253,28 @@ export const WLDiagnosticsHub: React.FC = () => {
         if (mvtLive && mvtLive.valid) {
           hubNotes.push(`MVT индивид.: ${mvtLive.mvt} м/с (r² ${mvtLive.r2})${mvtEst ? ` · ${mvtEst.note}` : ''}`);
         }
+        if (mvtHonest?.post) hubNotes.push(`MVT posterior: ${mvtHonest.post.note}`);
+        else if (mvtHonest?.shr) hubNotes.push(`MVT честный: ${mvtHonest.shr.note}`);
+        if (mvtHonest?.shake === false) hubNotes.push('Сдвиг скорости в пределах шума ±0.06 м/с — не прогресс');
+      } catch { /* noop */ }
+      // V4 PRO-v4: PCI + IFP/импульс + ACL + стратегия + нормы + выносливость
+      try {
+        if (pciBlock.pci) hubNotes.push(`PCI: ${pciBlock.pci.text}`);
+        if (pciBlock.persist.persisting && pciBlock.persist.text) hubNotes.push(`Персист: ${pciBlock.persist.text}`);
+        if (imtpResult?.ifpRatio != null) hubNotes.push(`IFP/IMTP ${imtpResult.ifpRatio} (сила с пола)`);
+        if (imtpResult?.hasImpulse) hubNotes.push('Импульс 0–200мс записан (переносим между девайсами)');
+        if (impulseNote) hubNotes.push(impulseNote);
+        if (aclGuard) hubNotes.push(`Dip-ACL: ${aclGuard.text}`);
+        if (meetBlock) hubNotes.push(`Старт: рывок ${meetBlock.snatchOpener}, взятие ${meetBlock.cjOpener}`);
+        if (ymaxNote) hubNotes.push(ymaxNote);
+        if (endurBlock) hubNotes.push(endurBlock.text);
+        if (femVerdict) hubNotes.push(femVerdict);
+        if (retestNote) hubNotes.push(retestNote);
+        if (velFlag) hubNotes.push(`Метрика скорости: ${velFlag}`);
       } catch { /* noop */ }
       base.notes = hubNotes;
       if (progCalc && progCalc.sinclair != null) base.sinclair = { total: progCalc.total, coeff: progCalc.coeff, value: progCalc.sinclair, cycle: progCalc.cycle };
+      if (progCalc && progCalc.q != null) hubNotes.push(`Q-points ${progCalc.q} (USAW Best Lifter с 2025)`);
     } catch { /* noop — базовый снап */ }
     return base;
   };
@@ -1266,6 +1423,15 @@ export const WLDiagnosticsHub: React.FC = () => {
               {barPathDiag?.weak && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 6 }}>→ {WL_WEAKPOINT_LABELS[barPathDiag.weak]} · {barPathDiag.corrections.join(' · ')}</div>}
               {barMetricsDiag && <div style={{ fontSize: 10, color: barMetricsDiag.severity === 'ok' ? '#22c55e' : barMetricsDiag.severity === 'warn' ? '#f59e0b' : '#ef4444', marginTop: 4 }}>{barMetricsDiag.text} {barMetrics?.xLoop ? `(SRD ${isRealChange(barMetrics.xLoop) ? 'реально' : 'в пределах шума'})` : ''}</div>}
               {barMetrics && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Метрика: xLoop {videoQuality.flag === 'rough' ? '≈' : ''}{barMetrics.xLoop}см yMax {barMetrics.yMax}см vmax {barMetrics.vMax} м/с {TA_PEAK_VELOCITY_ZONES.snatch ? `· зона ${taZoneForVelocity(barMetrics.vMax, 'snatch')}` : ''}</div>}
+              {ymaxNote && <div data-wl="ymax-norm" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>📏 {ymaxNote}</div>}
+              {profileSex === 'female' && <div style={{ fontSize: 10, color: '#f9a8d4', marginTop: 4 }}>♀ Норма фазы по уровню ({femaleLevelOf(taLevel)}): финал-ускорение {femalePhaseNorm(femaleLevelOf(taLevel)).finalAccS.join('–')}с · таз {femalePhaseNorm(femaleLevelOf(taLevel)).hipAmortDeg.join('–')}° (Slobozhanskyi 2025)</div>}
+              {profileSex === 'female' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                  <label style={{ fontSize: 10, color: '#fff' }}>Финал-ускорение, с<br /><input data-wl="fem-fact" value={state.femFinalAcc} onChange={e => setState(s => ({ ...s, femFinalAcc: e.target.value }))} placeholder="0.95" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                  <label style={{ fontSize: 10, color: '#fff' }}>Таз в амортизации, °<br /><input data-wl="fem-fact" value={state.femHipDeg} onChange={e => setState(s => ({ ...s, femHipDeg: e.target.value }))} placeholder="136" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                </div>
+              )}
+              {femVerdict && <div data-wl="fem-verdict" style={{ fontSize: 10, color: femVerdict.startsWith('✓') ? '#22c55e' : '#f59e0b', marginTop: 4 }}>{femVerdict}</div>}
             </div>
           </div>
         )}
@@ -1318,6 +1484,8 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize: 11, color: '#fff' }}>RFD Н/с (0–200мс)<br /><input value={state.imtpRfd} onChange={e => setState(s => ({ ...s, imtpRfd: e.target.value }))} placeholder="7000" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
                 <label style={{ fontSize: 11, color: '#fff' }}>Длительность с<br /><input value={state.imtpDur} onChange={e => setState(s => ({ ...s, imtpDur: e.target.value }))} placeholder="4" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
                 <label style={{ fontSize: 11, color: '#fff' }}>Вес кг<br /><input value={state.imtpBw} onChange={e => setState(s => ({ ...s, imtpBw: e.target.value }))} placeholder={profileWeightKg ? String(profileWeightKg) : '90'} style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>IFP кг (первая тяга)<br /><input data-wl="ifp" value={state.ifpKg} onChange={e => setState(s => ({ ...s, ifpKg: e.target.value }))} placeholder="180" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 11, color: '#fff' }}>Импульс Н·с (0–200)<br /><input data-wl="impulse" value={state.imtpImpulse} onChange={e => setState(s => ({ ...s, imtpImpulse: e.target.value }))} placeholder="650" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
               <button data-wl="imtp-dip" onClick={() => setState(s => ({ ...s, imtpCountermove: !s.imtpCountermove }))} aria-pressed={state.imtpCountermove} aria-label="Был dip перед тягой"
                 style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, width: '100%', marginTop: 6, padding: '8px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', fontSize: 12, fontWeight: 700, background: state.imtpCountermove ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)', border: state.imtpCountermove ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>
@@ -1326,8 +1494,17 @@ export const WLDiagnosticsHub: React.FC = () => {
               </button>
               {imtpResult && <div style={{ fontSize: 10, color: imtpResult.profile === 'balanced' ? '#22c55e' : '#f59e0b', marginTop: 6 }}>{imtpResult.relForce != null ? `${imtpResult.relForce}×BW · ` : ''}{imtpResult.verdict}</div>}
               {imtpResult?.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>⚠️ {w}</div>)}
+              {impulseNote && <div data-wl="impulse-norm" style={{ fontSize: 10, color: impulseNote.startsWith('Импульс') && impulseNote.includes('ниже') ? '#f59e0b' : '#22c55e', marginTop: 4 }}>⚡ {impulseNote}</div>}
               <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>📋 Протокол: {IMTP_PROTOCOL_CHECKLIST.join(' · ')}</div>
               <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{IMTP_CLEAN_TRANSFER_NOTE}</div>
+              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>Выносливость силы 10×5с/10с (опция, Grover 2024)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                  <label style={{ fontSize: 10, color: '#fff' }}>Первые 3 пика (Н, через запятую)<br /><input data-wl="endur" value={state.endurFirst} onChange={e => setState(s => ({ ...s, endurFirst: e.target.value }))} placeholder="4000,3950,3900" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                  <label style={{ fontSize: 10, color: '#fff' }}>Последние 3 пика (Н)<br /><input data-wl="endur" value={state.endurLast} onChange={e => setState(s => ({ ...s, endurLast: e.target.value }))} placeholder="3200,3150,3100" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                </div>
+                {endurBlock && <div style={{ fontSize: 10, color: endurBlock.limited ? '#f59e0b' : '#22c55e', marginTop: 4 }}>{endurBlock.text}</div>}
+              </div>
             </div>
           </div>
         )}
@@ -1352,6 +1529,12 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize: 11, color: '#fff' }}>Время dip мс<br /><input value={state.jerkDipMs} onChange={e => setState(s => ({ ...s, jerkDipMs: e.target.value }))} placeholder="200" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
               {jerkDip && <div style={{ fontSize: 10, color: jerkDip.isOptimal ? '#22c55e' : '#f59e0b', marginTop: 6 }}>Dip {jerkDip.dipCm}см за {jerkDip.dipTimeMs}мс · скорость {jerkDip.dipVelocityMs} м/с{jerkDip.drivePowerW ? ` · drive ~${jerkDip.drivePowerW}Вт` : ''} — {jerkDip.recommendation}</div>}
+              <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                {([['jerkValgus', 'Вальгус колена в dip'], ['jerkRotation', 'Ротация колена внутрь'], ['deepDip', 'Глубокий/проваленный dip']] as const).map(([key, label]) => (
+                  <button key={key} data-wl="jerk-acl" onClick={() => setState(s => ({ ...s, [key]: !(s as any)[key] } as any))} aria-pressed={(state as any)[key]} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: (state as any)[key] ? '#ef4444' : '#1f3a5f', background: (state as any)[key] ? 'rgba(239,68,68,0.12)' : '#0a1629', color: (state as any)[key] ? '#ef4444' : '#fff', fontSize: 11, cursor: 'pointer' }}>{(state as any)[key] ? '✓ ' : ''}{label}</button>
+                ))}
+              </div>
+              {aclGuard && <div data-wl="jerk-acl-note" style={{ fontSize: 10, color: aclGuard.level === 'stop' ? '#ef4444' : '#f59e0b', marginTop: 4 }}>{aclGuard.text}</div>}
             </div>
           </div>
         )}
@@ -1431,6 +1614,7 @@ export const WLDiagnosticsHub: React.FC = () => {
               {cjAttempts && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 4 }}>Толчок: {cjAttempts.attempts[0]} / {cjAttempts.attempts[1]} / {cjAttempts.attempts[2]} (±{cjAttempts.bandKg}){cjAttempts.readinessCut ? ' (−2.5 readiness)' : ''}</div>}
               {(snatchAttempts?.readinessNote || cjAttempts?.readinessNote) && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚠️ {snatchAttempts?.readinessNote || cjAttempts?.readinessNote}</div>}
               {snatchDiv.divergent && <div data-wl="base-div" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚖️ {snatchDiv.text}</div>}
+              {meetBlock && <div data-wl="meet-plan" style={{ fontSize: 10, color: '#fff', marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.16)' }}>🏟 Старт: рывок опенер {meetBlock.snatchOpener > 0 ? `${meetBlock.snatchOpener} +${meetBlock.snatchJumps[0]}/+${meetBlock.snatchJumps[1]}` : '—'} · взятие опенер {meetBlock.cjOpener > 0 ? `${meetBlock.cjOpener} +${meetBlock.cjJumps[0]}/+${meetBlock.cjJumps[1]}` : '—'} · {meetBlock.notes[1]}</div>}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 6 }}>
                 <label style={{ fontSize: 10, color: '#fff' }}>Тяга лучшая, кг<br /><input data-wl="num" value={state.taPullBest} onChange={e => setState(s => ({ ...s, taPullBest: e.target.value }))} placeholder="120" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
                 <label style={{ fontSize: 10, color: '#fff' }}>Присед 3RM, кг<br /><input data-wl="num" value={state.taSquat3} onChange={e => setState(s => ({ ...s, taSquat3: e.target.value }))} placeholder="140" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
@@ -1457,7 +1641,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <button data-wl="lvp-cal" onClick={()=> {
                   const pts = [{pct:0.5, velocity:parseFloat(state.lvp50)}, {pct:0.65, velocity:parseFloat(state.lvp65)}, {pct:0.80, velocity:parseFloat(state.lvp75)}, {pct:0.90, velocity:parseFloat(state.lvp90)}].filter(p=> Number.isFinite(p.velocity) && p.velocity>0) as any;
                   const res = calibrateLVP(state.lvpLift, pts);
-                  if (res) { saveLVPProfile(res); setState(s=>({...s, lvpResult: `r² ${res.r2} ${res.valid?'✅':'⚠️'} slope ${res.slope} → e1RM 80кг@${res.slope? (80/res.r2).toFixed(0):'—'} | ${velocityTypeForLift(state.lvpLift)}` })); setToast(`✦ LVP ${state.lvpLift} r² ${res.r2} ${res.valid?'✅':'⚠️'}`); setTimeout(()=>setToast(''),2000); }
+                  if (res) { saveLVPProfile(res); try { const bwNow = state.progBw ? parseFloat(state.progBw) : (profileWeightKg ?? null); localStorage.setItem('he_ta_lvp_calib_meta_v1', JSON.stringify({ date: new Date().toISOString().slice(0, 10), bw: Number.isFinite(bwNow as number) ? bwNow : null })); } catch {} setState(s=>({...s, lvpResult: `r² ${res.r2} ${res.valid?'✅':'⚠️'} slope ${res.slope} → e1RM 80кг@${res.slope? (80/res.r2).toFixed(0):'—'} | ${velocityTypeForLift(state.lvpLift)}` })); setToast(`✦ LVP ${state.lvpLift} r² ${res.r2} ${res.valid?'✅':'⚠️'}`); setTimeout(()=>setToast(''),2000); }
                   else { setState(s=>({...s, lvpResult: 'Ошибка: нужно ≥3 точки, spread ≥0.2, slope<0' })); }
                 }} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#3b82f6)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Калибровать LVP</button>
                 <span style={{ fontSize:10, color:'#fff', alignSelf:'center' }}>{state.lvpResult}</span>
@@ -1468,10 +1652,19 @@ export const WLDiagnosticsHub: React.FC = () => {
                   {mvtLive.valid ? `✓ MVT ${mvtLive.mvt} м/с (r² ${mvtLive.r2}, индивид.)` : `⚠️ MVT: ${mvtLive.reason}`}
                   {mvtLive.valid && mvtEst && <span> · {mvtEst.note}</span>}
                   {mvtLive.valid && !mvtEst && <span> · введи вес + пик (штанга) выше — посчитаем 1RM</span>}
+                  {mvtHonest?.post ? <span> · {mvtHonest.post.note}</span> : mvtHonest?.shr ? <span> · {mvtHonest.shr.note} (Swinton 2026)</span> : null}
+                  {mvtHonest?.shake === false && <span> · сдвиг скорости в пределах шума ±0.06</span>}
+                  {retestNote ? <span> · ⏰ {retestNote}</span> : <span> · перекалибруй ramp после блока 4+ нед / ΔBW 3+ кг</span>}
                 </div>
               ) : (
                 <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>MVT: введи ≥3 точки ramp — индивидуальный порог точнее популяционного (García-Ramos 2023c).</div>
               )}
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                {(['mean', 'peak'] as const).map(m => (
+                  <button key={m} data-wl="vel-metric" onClick={() => setState(s => ({ ...s, velMetric: s.velMetric === m ? '' : m }))} aria-pressed={state.velMetric === m} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: state.velMetric === m ? '#a855f7' : '#1f3a5f', background: state.velMetric === m ? 'rgba(168,85,247,0.14)' : '#0a1629', color: state.velMetric === m ? '#a855f7' : '#fff', fontSize: 10 }}>{m === 'mean' ? 'Средняя (mean)' : 'Пиковая (peak)'}</button>
+                ))}
+              </div>
+              {velFlag && <div data-wl="vel-metric-flag" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚠️ {velFlag}</div>}
               <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (Wood 2026 individual). {velocityTypeForLift(state.lvpLift)==='peak'?'peak':'mpv'} badge.</div>
               {lvpSpark && <div style={{ marginTop: 6 }}><svg width="120" height="36" role="img" aria-label={`LVP ${lvpSpark.n} точки`}><polyline points={lvpSpark.pts} fill="none" stroke="#a78bfa" strokeWidth="2" /></svg></div>}
             </div>
@@ -1487,6 +1680,8 @@ export const WLDiagnosticsHub: React.FC = () => {
               <button data-wl="kinovea" onClick={handleCsvParse} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, cursor: 'pointer' }}>📊 Разобрать Kinovea CSV</button>
               <span style={{ fontSize: 10, color: '#fff', alignSelf: 'center' }}>Или введи метрики вручную ниже</span>
             </div>
+            {pciBlock.pci && <div data-wl="pci" style={{ fontSize: 10, color: pciBlock.pci.level === 'elite' || pciBlock.pci.level === 'intermediate' ? '#22c55e' : '#f59e0b', marginTop: 6 }}>🔁 {pciBlock.pci.text} (история трекинга, PoinT GO 2026)</div>}
+            {pciBlock.persist.persisting && <div data-wl="pci-persist" style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>↔️ {pciBlock.persist.text}</div>}
             {/* W4: метаданные съёмки → флаг качества xLoop */}
             <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🎥 Съёмка — геометрия для xLoop (Shah 2026)</div>
@@ -1700,8 +1895,8 @@ export const WLDiagnosticsHub: React.FC = () => {
             ))}
             <button data-wl="prog-snap" onClick={takeProgSnapshot} style={{ marginLeft: 'auto', minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок</button>
           </div>
-          {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{progSexEff === 'female' ? '♀' : '♂'} Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair} ({progCalc.cycle})</div>}
-          {progTrend && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Тренд ({progTrend.n} зам.): сумма {progTrend.totalDelta > 0 ? '+' : ''}{progTrend.totalDelta}кг · вес {progTrend.bwDelta > 0 ? '+' : ''}{progTrend.bwDelta}кг{progTrend.sinclairDelta != null ? ` · Sinclair ${progTrend.sinclairDelta > 0 ? '+' : ''}${progTrend.sinclairDelta}` : ''}{progTrend.bestSinclair != null ? ` · лучший ${progTrend.bestSinclair} (${progTrend.bestDate})` : ''}</div>}
+          {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{progSexEff === 'female' ? '♀' : '♂'} Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair} ({progCalc.cycle}){progCalc.q != null ? ` · Q-points ${progCalc.q}` : ''}</div>}
+          {progTrend && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Тренд ({progTrend.n} зам.): сумма {progTrend.totalDelta > 0 ? '+' : ''}{progTrend.totalDelta}кг · вес {progTrend.bwDelta > 0 ? '+' : ''}{progTrend.bwDelta}кг{progTrend.sinclairDelta != null ? ` · Sinclair ${progTrend.sinclairDelta > 0 ? '+' : ''}${progTrend.sinclairDelta}` : ''}{progTrend.bestSinclair != null ? ` · лучший ${progTrend.bestSinclair} (${progTrend.bestDate})` : ''}{progTrend.qDelta != null ? ` · Q ${progTrend.qDelta > 0 ? '+' : ''}${progTrend.qDelta}` : ''}{progTrend.bestQ != null ? ` · лучший Q ${progTrend.bestQ} (${progTrend.bestQDate})` : ''}</div>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button data-wl="apply-bottom" onClick={applyToConstructor} style={{ flex: 1, minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>

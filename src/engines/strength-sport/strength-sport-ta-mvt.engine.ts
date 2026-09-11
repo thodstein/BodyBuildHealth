@@ -79,3 +79,117 @@ export function predict1RMFromProfile(profile: LVPProfile | null | undefined, we
       : `1RM≈${e1rmKg}кг (экстраполяция за замеры — ± шире, MVT ${m.mvt} м/с)`,
   };
 }
+
+/** V4 PRO-v4: честный MVT-2 (Swinton 2026; Thompson/Weakley). */
+
+/** SDD средней скорости (шум): меньше = не прогресс, а вариативность. */
+export const TA_VELOCITY_SDD = 0.06; // м/с
+
+/** Значим ли сдвиг скорости (вне SDD). */
+export function isVelocityShiftReal(beforeMs: number, afterMs: number, sdd = TA_VELOCITY_SDD): boolean | null {
+  if (!Number.isFinite(beforeMs) || !Number.isFinite(afterMs)) return null;
+  return Math.abs(afterMs - beforeMs) >= sdd;
+}
+
+/**
+ * Shrinkage MVT к популяционному при малом числе точек (частичный пулинг,
+ * Swinton 2026: индивидуальный MVT на 2–3 точках переобучается, TE 0.048).
+ * V4-добой: вес с учётом r² — шумная регрессия (низкий r²) сильнее тянется
+ * к популяционному: effN = n × r². Без r² (legacy) — как раньше.
+ */
+export function shrinkMVT(individualMvt: number, populationMvt: number, nPoints: number, r2?: number | null): { mvt: number; te: number; note: string } | null {
+  if (!Number.isFinite(individualMvt) || !Number.isFinite(populationMvt) || !Number.isFinite(nPoints) || nPoints < 2) return null;
+  const r = r2 != null && Number.isFinite(r2) ? Math.max(0.3, Math.min(1, r2)) : 1;
+  const effN = nPoints * r;
+  const w = effN / (effN + 2);
+  const mvt = Math.round((w * individualMvt + (1 - w) * populationMvt) * 100) / 100;
+  const te = effN >= 4 ? 0.02 : 0.03;
+  return { mvt, te, note: effN >= 4 ? `MVT≈${mvt} м/с (±${te}, точек достаточно)` : `MVT≈${mvt} м/с (±${te}, мало точек — притянут к популяционному ${populationMvt})` };
+}
+
+/** Популяционный MVT ТА-тяги как якорь shrinkage (пик-скорость, ориентир). */
+export const TA_POPULATION_MVT = 1.3; // м/с — нижняя граница PLOS-зон рывка
+
+/** Разброс популяционного MVT (PoinT GO: индивид ±0.05–0.10 от среднего — берём 0.05, честно). */
+export const TA_POPULATION_MVT_SD = 0.05; // м/с
+
+export interface MVTPosterior {
+  mvt: number; // posterior mean, м/с
+  sd: number; // posterior SD (честный TE)
+  seIndiv: number; // SE индивидуальной оценки из остатков
+  n: number;
+  note: string;
+}
+
+/**
+ * V4-добой-2 (П4): настоящий эмпирический Байес вместо эвристики n/(n+2).
+ * SE индивидуальной MVT-оценки — из остатков LVP-регрессии в точке pct=1.0:
+ *   se = s·sqrt(1 + 1/n + (1−x̄)²/Sxx), s = sqrt(SSE/(n−2)).
+ * Posterior = precision-взвесь likelihood N(m, se²) и приора N(popMvt, popSd²).
+ * Мало точек / большой разброс → posterior автоматически тянется к популяции,
+ * много чистых точек → к индивиду. Swinton 2026: именно так partial pooling
+ * чинит переобучение индивидуального MVT (TE 0.048 → ~0.020).
+ */
+export function mvtPosterior(
+  profile: LVPProfile | null | undefined,
+  populationMvt: number = TA_POPULATION_MVT,
+  populationSd: number = TA_POPULATION_MVT_SD,
+): MVTPosterior | null {
+  if (!profile || !Number.isFinite(profile.slope) || !Number.isFinite(profile.intercept)) return null;
+  if (!Number.isFinite(populationMvt) || !Number.isFinite(populationSd) || populationSd <= 0) return null;
+  const pts = (Array.isArray(profile.points) ? profile.points : []).filter(
+    (p) => p && Number.isFinite(p.pct) && Number.isFinite(p.velocity),
+  );
+  const n = pts.length;
+  if (n < 3) return null;
+  const xs = pts.map((p) => p.pct);
+  const meanX = xs.reduce((a, b) => a + b, 0) / n;
+  let sse = 0;
+  let sxx = 0;
+  for (const p of pts) {
+    const r = p.velocity - (profile.intercept + profile.slope * p.pct);
+    sse += r * r;
+    sxx += (p.pct - meanX) * (p.pct - meanX);
+  }
+  if (!(sxx > 0) || n - 2 < 1) return null;
+  const s = Math.sqrt(sse / (n - 2));
+  // Предсказание в x=1.0 (MVT): se предсказания нового наблюдения
+  const seIndiv = s * Math.sqrt(1 + 1 / n + ((1 - meanX) * (1 - meanX)) / sxx);
+  if (!Number.isFinite(seIndiv) || seIndiv <= 0) return null;
+  const m = profile.intercept + profile.slope * 1.0;
+  if (!Number.isFinite(m) || m <= 0) return null;
+  const wIndiv = 1 / (seIndiv * seIndiv);
+  const wPop = 1 / (populationSd * populationSd);
+  const post = (wIndiv * m + wPop * populationMvt) / (wIndiv + wPop);
+  const sd = Math.sqrt(1 / (wIndiv + wPop));
+  const mvt = Math.round(post * 100) / 100;
+  const sdR = Math.round(sd * 1000) / 1000;
+  const pulled = Math.abs(post - m) > 0.015;
+  return {
+    mvt,
+    sd: sdR,
+    seIndiv: Math.round(seIndiv * 1000) / 1000,
+    n,
+    note: pulled
+      ? `MVT≈${mvt} ±${sdR} (posterior: индивид ${Math.round(m * 100) / 100} с SE ${Math.round(seIndiv * 1000) / 1000} притянут к ${populationMvt})`
+      : `MVT≈${mvt} ±${sdR} (индивид надёжен, n=${n})`,
+  };
+}
+
+/** Флаг метрики скорости: mean vs peak путать нельзя (обзоры 2024). */
+export function velocityMetricFlag(metric: string | null | undefined): string | null {
+  const m = String(metric || '').toLowerCase();
+  if (!m) return null;
+  if (m.includes('peak') || m.includes('пик')) return 'пик-скорость: для прогноза 1RM нужна средняя (mean) — пик завышает оценку';
+  return null;
+}
+
+/** Напоминание о перетесте LVP/MVT (блок 4+ нед / ΔBW 3+ кг / layoff 3+ нед). */
+export function mvtRetestNote(weeksSinceCalib: number | null | undefined, bwDeltaKg: number | null | undefined): string | null {
+  const w = weeksSinceCalib != null && Number.isFinite(weeksSinceCalib) ? weeksSinceCalib : null;
+  const d = bwDeltaKg != null && Number.isFinite(Math.abs(bwDeltaKg)) ? Math.abs(bwDeltaKg) : null;
+  if ((w != null && w >= 4) || (d != null && d >= 3)) {
+    return 'LVP/MVT устарел (блок 4+ нед или ΔBW 3+ кг) — перекалибруй ramp перед заявками';
+  }
+  return null;
+}

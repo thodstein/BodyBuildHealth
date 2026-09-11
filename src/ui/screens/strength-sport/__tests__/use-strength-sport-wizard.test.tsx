@@ -106,6 +106,27 @@ describe('useStrengthSportWizard', () => {
     expect(result.current.mode).toBe('weightlifting');
   });
 
+  it('мост ТА: заявки/Sinclair/спец-блок доходят до taBridge вне гейта слабых', () => {
+    const { result } = renderHook(() => useStrengthSportWizard());
+    act(() => {
+      applyToPlanner({
+        kind: 'weakpoints',
+        label: 't',
+        data: {
+          wlWeakPoints: [],
+          taAttempts: { snatch: [90, 96, 102], cj: [112, 120, 127] },
+          taSinclair: { total: 229, value: 260.5, cycle: '2025-2028', q: 281.3 },
+          taSpecBlock: { totalWeeks: 6 },
+        } as any,
+      });
+    });
+    expect(result.current.taBridge.attempts).toEqual({ snatch: [90, 96, 102], cj: [112, 120, 127] });
+    expect(result.current.taBridge.sinclair?.value).toBe(260.5);
+    expect(result.current.taBridge.sinclair?.q).toBe(281.3);
+    expect(result.current.taBridge.specWeeks).toBe(6);
+    expect(result.current.weakPoints).toEqual([]);
+  });
+
   it('персист: cycleId/cycleMode переживают перемонтирование', () => {
     const h1 = renderHook(() => useStrengthSportWizard());
     act(() => { h1.result.current.setCycleId('ss-ta-general-8'); });

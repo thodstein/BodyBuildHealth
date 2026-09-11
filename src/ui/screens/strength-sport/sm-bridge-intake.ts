@@ -15,6 +15,18 @@
 export type SmBridgeMode = 'strongman' | 'weightlifting';
 export type SmBridgeStrategy = 'conservative' | 'balanced' | 'aggressive';
 
+export interface SmBridgeTaAttempts {
+  snatch: number[];
+  cj: number[];
+}
+
+export interface SmBridgeTaSinclair {
+  total: number;
+  value: number;
+  cycle?: string | null;
+  q?: number | null;
+}
+
 export interface SmBridgePatch {
   /** Дедуплицированные слабые зоны, максимум 4 (как было в intake). */
   weakPoints: string[];
@@ -32,6 +44,22 @@ export interface SmBridgePatch {
   swayCm: number | null;
   /** Стратегия попыток из хаба или null. */
   strategy: SmBridgeStrategy | null;
+  /** V4-добой (G8): заявки ТА-хаба 90/96/102 или null. */
+  taAttempts: SmBridgeTaAttempts | null;
+  /** V4-добой (G8): Sinclair/Q прогресса ТА-хаба или null. */
+  taSinclair: SmBridgeTaSinclair | null;
+  /** V4-добой (G8): недель в спец-блоке ТА-хаба или null. */
+  taSpecWeeks: number | null;
+  /** V4-добой-2 (П1): предпочитаемые коррекции {weakPoint: corrId} или null. */
+  taPreferredCorr: Record<string, string> | null;
+  /** V4-добой-2 (П1): причины слабых фаз {weakPoint: cause} или null. */
+  taWeakCauses: Record<string, string> | null;
+  /** V4-добой-2 (П1): FvR-оценка хаба {snatchTh, pmax} или null. */
+  taFvr: { snatchTh: number; pmax: number } | null;
+  /** V4-добой-2 (П1): L/R-асимметрия хаба % или null. */
+  taAsymPct: number | null;
+  /** V4-добой-2 (П1): провалов OHS (0–6) или null. */
+  taOhsFailed: number | null;
 }
 
 const STRATEGIES: readonly string[] = ['conservative', 'balanced', 'aggressive'];
@@ -92,6 +120,47 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     typeof d.strategy === 'string' && STRATEGIES.includes(d.strategy)
       ? (d.strategy as SmBridgeStrategy)
       : null;
+  // V4-добой (G8): заявки/прогресс/спец-блок ТА-хаба — раньше игнорировались.
+  const numArr = (v: unknown): number[] | null => {
+    if (!Array.isArray(v)) return null;
+    const clean = (v as unknown[]).map((x) => finiteNum(x)).filter((n): n is number => n != null && n > 0).slice(0, 3);
+    return clean.length > 0 ? clean : null;
+  };
+  const taRaw: any = d.taAttempts != null && typeof d.taAttempts === 'object' ? d.taAttempts : null;
+  const taSn = taRaw ? numArr(taRaw.snatch) : null;
+  const taCj = taRaw ? numArr(taRaw.cj) : null;
+  const taAttempts: SmBridgeTaAttempts | null = taSn || taCj ? { snatch: taSn ?? [], cj: taCj ?? [] } : null;
+  const sinRaw: any = d.taSinclair != null && typeof d.taSinclair === 'object' ? d.taSinclair : null;
+  const sinVal = sinRaw ? finiteNum(sinRaw.value) : null;
+  const sinTot = sinRaw ? finiteNum(sinRaw.total) : null;
+  const taSinclair: SmBridgeTaSinclair | null = sinVal != null && sinVal > 0
+    ? { total: sinTot ?? 0, value: sinVal, cycle: typeof sinRaw.cycle === 'string' ? sinRaw.cycle : null, q: finiteNum(sinRaw.q) }
+    : null;
+  const specRaw: any = d.taSpecBlock != null && typeof d.taSpecBlock === 'object' ? d.taSpecBlock : null;
+  const specW = specRaw ? finiteNum(specRaw.totalWeeks) : null;
+  const taSpecWeeks = specW != null && specW >= 1 && specW <= 12 ? Math.round(specW) : null;
+  // V4-добой-2 (П1): остаток payload — строки/записи, всё санитизировано, null-safe.
+  const strRecord = (v: unknown, cap = 6): Record<string, string> | null => {
+    if (v == null || typeof v !== 'object' || Array.isArray(v)) return null;
+    const out: Record<string, string> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (Object.keys(out).length >= cap) break;
+      if (!k || typeof val !== 'string' || !val) continue;
+      out[String(k).slice(0, 40)] = val.slice(0, 40);
+    }
+    return Object.keys(out).length ? out : null;
+  };
+  const taPreferredCorr = strRecord(d.taPreferredCorr);
+  const taWeakCauses = strRecord(d.taWeakCauses);
+  const fvrRaw: any = d.fvr != null && typeof d.fvr === 'object' ? d.fvr : null;
+  const fvrTh = fvrRaw ? finiteNum(fvrRaw.snatchTh) : null;
+  const fvrPmax = fvrRaw ? finiteNum(fvrRaw.Pmax ?? fvrRaw.pmax) : null;
+  const taFvr = fvrTh != null && fvrTh > 0 ? { snatchTh: fvrTh, pmax: fvrPmax ?? 0 } : null;
+  const asymRaw = finiteNum(d.asymmetry ?? d.asymmetryPct);
+  const taAsymPct = asymRaw != null && asymRaw >= 0 && asymRaw <= 50 ? Math.round(asymRaw * 10) / 10 : null;
+  const ohsRaw: any = d.ohs != null && typeof d.ohs === 'object' ? d.ohs : null;
+  const ohsF = ohsRaw ? finiteNum(ohsRaw.failed) : null;
+  const taOhsFailed = ohsF != null && ohsF >= 0 && ohsF <= 6 ? Math.round(ohsF) : null;
   return {
     weakPoints,
     diagnosticLevel,
@@ -101,6 +170,14 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     hubVelocity,
     swayCm,
     strategy,
+    taAttempts,
+    taSinclair,
+    taSpecWeeks,
+    taPreferredCorr,
+    taWeakCauses,
+    taFvr,
+    taAsymPct,
+    taOhsFailed,
   };
 }
 
