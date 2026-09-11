@@ -7,6 +7,7 @@ import {
   adjustVelocityForMetric,
   pctFromCalibrated,
   e1RMFromCalibrated,
+  expectedVelocityFromCalib,
   calibrationQuality,
 } from '../vbt.engine';
 
@@ -48,6 +49,16 @@ describe('P2 калибровка LVP', () => {
     expect(e1RMFromCalibrated(cal, 0.68, 150)!).toBeCloseTo(200, -1);
     expect(pctFromCalibrated({ slope: 0, intercept: 0 }, 0.7)).toBeNull();
     expect(e1RMFromCalibrated(null, 0.7, 150)).toBeNull();
+  });
+  it('ожидание разминки из личного профиля (добивка)', () => {
+    const cal = calibrateLVP([
+      { pct: 0.6, velocity: 0.87 },
+      { pct: 0.75, velocity: 0.68 },
+      { pct: 0.9, velocity: 0.47 },
+    ])!;
+    expect(expectedVelocityFromCalib(cal, 0.6)!).toBeCloseTo(0.87, 1);
+    expect(expectedVelocityFromCalib(null, 0.6)).toBeNull();
+    expect(expectedVelocityFromCalib(cal, 0.2)).toBeNull();
   });
 });
 

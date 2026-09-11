@@ -23,6 +23,7 @@ import {
   dailyReadinessCheck,
   adjustVelocityForMetric,
   e1RMFromCalibrated,
+  expectedVelocityFromCalib,
   calibrationQuality,
   type VBTLift,
   type VBTIntent,
@@ -143,35 +144,59 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
     } catch {}
     return 'mcv';
   });
-  // калибровка личного LVP: скорости на 60/75/90% (вес берётся из e1RM)
-  const [calV60, setCalV60] = useState(() => { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return typeof j.calV60 === 'number' ? j.calV60 : 0; } catch { return 0; } });
-  const [calV75, setCalV75] = useState(() => { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return typeof j.calV75 === 'number' ? j.calV75 : 0; } catch { return 0; } });
-  const [calV90, setCalV90] = useState(() => { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return typeof j.calV90 === 'number' ? j.calV90 : 0; } catch { return 0; } });
-  const [calAt, setCalAt] = useState<number | null>(() => { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return typeof j.calAt === 'number' ? j.calAt : null; } catch { return null; } });
+  // калибровка личного LVP — ПО ДВИЖЕНИЯМ (профили скоростей разные: жим быстрее приседа).
+  // Миграция: старые плоские calV60/75/90 без движения → слот текущего движения.
+  interface CalibSlot { v60: number; v75: number; v90: number; at: number | null }
+  const emptySlot = (): CalibSlot => ({ v60: 0, v75: 0, v90: 0, at: null });
+  const [calibByLift, setCalibByLift] = useState<Partial<Record<VBTLift, CalibSlot>>>(() => {
+    try {
+      const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+      if (j.calibByLift && typeof j.calibByLift === 'object') {
+        const out: Partial<Record<VBTLift, CalibSlot>> = {};
+        for (const k of Object.keys(LOAD_VELOCITY_PROFILE) as VBTLift[]) {
+          const s = (j.calibByLift as any)[k];
+          if (s && typeof s.v60 === 'number') out[k] = { v60: s.v60, v75: s.v75, v90: s.v90, at: typeof s.at === 'number' ? s.at : null };
+        }
+        if (Object.keys(out).length) return out;
+      }
+      if (typeof j.calV60 === 'number' || typeof j.calV75 === 'number' || typeof j.calV90 === 'number') {
+        return { squat: { v60: j.calV60 || 0, v75: j.calV75 || 0, v90: j.calV90 || 0, at: typeof j.calAt === 'number' ? j.calAt : null } };
+      }
+    } catch {}
+    return {};
+  });
+  const slot: CalibSlot = calibByLift[lift] ?? emptySlot();
+  const setSlot = (patch: Partial<CalibSlot>) => setCalibByLift(prev => ({ ...prev, [lift]: { ...(prev[lift] ?? emptySlot()), ...patch, at: Date.now() } }));
   const [readyActual, setReadyActual] = useState(() => { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return typeof j.readyActual === 'number' ? j.readyActual : 0; } catch { return 0; } });
 
   // персист
   useEffect(() => {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ lift, intent, e1RM, measuredVelocity, measuredWeight, velocitiesStr, metric, calV60, calV75, calV90, calAt, readyActual })); } catch {}
-  }, [lift, intent, e1RM, measuredVelocity, measuredWeight, velocitiesStr, metric, calV60, calV75, calV90, calAt, readyActual]);
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ lift, intent, e1RM, measuredVelocity, measuredWeight, velocitiesStr, metric, calibByLift, readyActual })); } catch {}
+  }, [lift, intent, e1RM, measuredVelocity, measuredWeight, velocitiesStr, metric, calibByLift, readyActual]);
 
   // поправка метрики датчика (peak завышает → ×0.9, ориентир)
   const adjV = (v: number) => adjustVelocityForMetric(v, metric);
 
-  // личная калибровка
+  // личная калибровка текущего движения
   const calibration = useMemo(() => {
-    const pts = [{ pct: 0.6, velocity: calV60 }, { pct: 0.75, velocity: calV75 }, { pct: 0.9, velocity: calV90 }].filter(p => p.velocity > 0.05 && p.velocity <= 2.5);
+    const pts = [{ pct: 0.6, velocity: slot.v60 }, { pct: 0.75, velocity: slot.v75 }, { pct: 0.9, velocity: slot.v90 }].filter(p => p.velocity > 0.05 && p.velocity <= 2.5);
     if (pts.length < 3) return null;
     return calibrateLVP(pts);
-  }, [calV60, calV75, calV90]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slot.v60, slot.v75, slot.v90]);
   const calQuality = calibrationQuality(calibration?.r2);
-  const calStale = useMemo(() => lvrStale(calAt ?? undefined), [calAt]);
+  const calStale = useMemo(() => lvrStale(slot.at ?? undefined), [slot.at]);
   const personalE1RM = useMemo(() => {
     if (!calibration || calQuality !== 'ok' || calStale?.stale) return null;
     if (measuredVelocity <= 0 || measuredWeight <= 0) return null;
     return e1RMFromCalibrated(calibration, adjV(measuredVelocity), safeWeight(measuredWeight));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calibration, calQuality, calStale, measuredVelocity, measuredWeight, metric]);
+  // ожидание разминки: личный профиль приоритетнее группового
+  const readyExpected = useMemo(() => {
+    if (calibration && calQuality === 'ok' && !calStale?.stale) return expectedVelocityFromCalib(calibration, 0.6);
+    return velocityForPct(lift, 0.6);
+  }, [calibration, calQuality, calStale, lift]);
 
   // синхронизация e1RM с хабом при смене lift, если e1RM ещё дефолтный (не менялся вручную после переключения)
   const hubVal = hubLiftValue(snapshot, lift);
@@ -214,12 +239,12 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [velocitiesStr, intent, metric]);
 
-  // готовность по разминке 60%: ожидание из профиля vs факт
+  // готовность по разминке 60%: ожидание (личный профиль → групповой) vs факт
   const readiness = useMemo(() => {
     if (readyActual <= 0) return null;
-    return dailyReadinessCheck(velocityForPct(lift, 0.6), adjV(readyActual));
+    return dailyReadinessCheck(readyExpected, adjV(readyActual));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lift, readyActual, metric]);
+  }, [readyExpected, readyActual, metric]);
 
   // Корректирующие упражнения фазы срыва
   const vbtCorrections = useMemo<AssistanceAnalysis | null>(() => {
@@ -351,14 +376,14 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
         )}
       </div>
 
-      {/* Мой профиль LVP */}
+      {/* Мой профиль LVP (по движению) */}
       <div style={CARD}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🧬 Мой профиль «нагрузка–скорость» ({LIFT_RU[lift]})</div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>Замерьте скорость на 60/75/90% от e1RM ({Math.round(e1RM * 0.6)}/{Math.round(e1RM * 0.75)}/{Math.round(e1RM * 0.9)} кг). Нужно 3 точки; r²≥0.85 — профиль годится, иначе «замерьте ещё». Старше 6 нед — перекалибровать.</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🧬 Мой профиль «нагрузка–скорость» ({LIFT_RU[lift]} — только это движение)</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>Замерьте скорость на 60/75/90% от e1RM ({Math.round(e1RM * 0.6)}/{Math.round(e1RM * 0.75)}/{Math.round(e1RM * 0.9)} кг). Нужно 3 точки; r²≥0.85 — профиль годится, иначе «замерьте ещё». Старше 6 нед — перекалибровать. У каждого движения свой профиль.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <PopupNumber label="Скорость на 60% (м/с)" value={calV60} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => { setCalV60(Math.max(0, Math.min(2.5, v || 0))); setCalAt(Date.now()); }} />
-          <PopupNumber label="Скорость на 75% (м/с)" value={calV75} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => { setCalV75(Math.max(0, Math.min(2.5, v || 0))); setCalAt(Date.now()); }} />
-          <PopupNumber label="Скорость на 90% (м/с)" value={calV90} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => { setCalV90(Math.max(0, Math.min(2.5, v || 0))); setCalAt(Date.now()); }} />
+          <PopupNumber label="Скорость на 60% (м/с)" value={slot.v60} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => setSlot({ v60: Math.max(0, Math.min(2.5, v || 0)) })} />
+          <PopupNumber label="Скорость на 75% (м/с)" value={slot.v75} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => setSlot({ v75: Math.max(0, Math.min(2.5, v || 0)) })} />
+          <PopupNumber label="Скорость на 90% (м/с)" value={slot.v90} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => setSlot({ v90: Math.max(0, Math.min(2.5, v || 0)) })} />
         </div>
         {!calibration ? (
           <div style={SMALL}>Введите все 3 скорости → slope/intercept/r² (линейная регрессия).</div>
@@ -374,7 +399,7 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
 
       {/* Готовность по разминке */}
       <div style={CARD}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🌡 Готовность по разминке (60% = {velocityForPct(lift, 0.6)} м/с ожидание)</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🌡 Готовность по разминке (60% = {readyExpected} м/с ожидание{calibration && calQuality === 'ok' && !calStale?.stale ? ', личный профиль' : ', групповой профиль'})</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
           <PopupNumber label="Факт разминки (м/с)" value={readyActual} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => setReadyActual(Math.max(0, Math.min(2.5, v || 0)))} />
           <div style={{ fontSize: 11, color: '#fff', alignSelf: 'center', padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>

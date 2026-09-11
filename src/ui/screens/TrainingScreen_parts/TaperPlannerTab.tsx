@@ -21,7 +21,7 @@ import { applyToPlanner } from './planner-bridge';
 import { getProfile } from '../../../core/profile-manager';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { LMS_CYCLES, getCyclesByTrainingDirection } from '../../../data/lms-cycles/lms-cycle-index';
-import { AGE_GROUPS, eligibleRanksForAge, ageEligibilityNote, type AgeGroup, type Federation, type Sex } from '../../../engines/pl-norms.engine';
+import { AGE_GROUPS, eligibleRanksForAge, ageEligibilityNote, resolveFederation, type AgeGroup, type Federation, type Sex } from '../../../engines/pl-norms.engine';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -86,7 +86,7 @@ export const TaperPlannerTab: React.FC = () => {
   const [bw, setBw] = useState(() => { try { return Number((getProfile().settings as any)?.personal?.weight) || 80; } catch { return 80; } });
   const [fed, setFed] = useState('IPF');
   const [taperSex, setTaperSex] = useState<Sex>(() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } });
-  const [taperFed, setTaperFed] = useState<Federation>('fpr_ipf');
+  const [taperFed, setTaperFed] = useState<Federation>('fpr_classic');
   const [taperAgeGroup, setTaperAgeGroup] = useState<AgeGroup>(() => {
     try {
       const age = Number((getProfile().settings as any)?.personal?.age) || 25;
@@ -385,7 +385,7 @@ export const TaperPlannerTab: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <PopupSelect label="Возрастная группа" value={taperAgeGroup} options={AGE_GROUPS.map(a => ({ id: a.id, label: a.label, desc: a.desc }))} onChange={v => setTaperAgeGroup(v as AgeGroup)} />
           <PopupSelect label="Пол" value={taperSex} options={[{ id: 'male', label: '♂ Мужчина', desc: '59-120 кг' }, { id: 'female', label: '♀ Женщина', desc: '43-84 кг' }]} onChange={v => setTaperSex(v as Sex)} />
-          <PopupSelect label="Федерация" value={taperFed} options={[{ id: 'fpr_ipf', label: 'ФПР / IPF', desc: 'с ДК' }, { id: 'wrpf_tested', label: 'WRPF с ДК', desc: 'с ДК' }, { id: 'wrpf_untested', label: 'WRPF без ДК', desc: 'без ДК' }]} onChange={v => { const nf = v as Federation; setTaperFed(nf); setFed(nf === 'fpr_ipf' ? 'IPF' : 'other'); }} />
+          <PopupSelect label="Федерация" value={taperFed} options={[{ id: 'fpr_classic', label: 'ФПР / IPF — классика', desc: 'с ДК' }, { id: 'fpr_equipped', label: 'ФПР — экипировка', desc: 'с ДК' }, { id: 'wrpf_tested', label: 'WRPF с ДК', desc: 'с ДК' }, { id: 'wrpf_untested', label: 'WRPF без ДК', desc: 'без ДК' }]} onChange={v => { const nf = v as Federation; setTaperFed(nf); const rf = resolveFederation(nf); setFed(rf === 'fpr_classic' || rf === 'fpr_equipped' ? 'IPF' : 'other'); }} />
           <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
             <div style={{ fontSize: 10, color: DIM, lineHeight: 1.3 }}>
               Весовая: <b style={{ color: '#fff' }}>{taperSex === 'female' ? '♀' : '♂'} {taperFedLabel}</b> · Категория до <b style={{ color: ACCENT }}>{cls.weightClass} кг</b><br />

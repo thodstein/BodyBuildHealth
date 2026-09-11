@@ -310,11 +310,13 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   .slice(0, 3);
                 if (bw <= 0 || lifts.length === 0) return null;
                 const sex: Sex = (() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } })();
-                const fedForDiary: any = 'wrpf_untested';
+                // Мужчинам — WRPF без ДК (отдельные таблицы); женщинам — ФПР классика (официальных женских
+                // WRPF-таблиц нет; ФПР даёт только жим отдельно — присед/тяга у женщин честно пропускаются).
+                const fedForDiary: any = sex === 'female' ? 'fpr_classic' : 'wrpf_untested';
                 return (
                   <div style={style.card}>
-                    <div style={style.label}>🏅 Нормативы ПЛ ({sex === 'female' ? '♀ WRPF, женщины' : 'WRPF, raw'} · {bw} кг · {sex === 'female' ? '43-84+ кат.' : '60-140+ кат.'})</div>
-                    <div style={{ fontSize: 9, color: '#fff', marginBottom: 6, lineHeight: 1.4 }}>e1RM из дневника → разряд по ближайшей категории (WRPF без ДК). Пол берётся из профиля ({sex === 'female' ? 'женские пороги ~60% от мужских' : 'мужские'}). Для точного выбора федерации/категории — «Анализ силы → Единый».</div>
+                    <div style={style.label}>🏅 Нормативы ПЛ ({sex === 'female' ? '♀ ФПР классика' : 'WRPF, raw'} · {bw} кг · {sex === 'female' ? '43-84+ кат.' : '60-140+ кат.'})</div>
+                    <div style={{ fontSize: 9, color: '#fff', marginBottom: 6, lineHeight: 1.4 }}>e1RM из дневника → разряд по ближайшей категории ({sex === 'female' ? 'ФПР классика; отдельные таблицы только на жим — присед/тягу смотрите тоталом' : 'WRPF без ДК'}). Пол берётся из профиля. Для точного выбора федерации/категории — «Анализ силы → Нормативы».</div>
                     {lifts.map(({ id, rm, disc }) => {
                       const perTable = getNormTable(fedForDiary, disc as Discipline, sex);
                       if (!perTable) return null;

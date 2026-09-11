@@ -139,6 +139,13 @@ export function calibrationQuality(r2: number | null | undefined): 'ok' | 'remea
   return r2 >= 0.85 ? 'ok' : 'remeasure';
 }
 
+/** Ожидаемая скорость на %1RM по личному профилю (прямая calibrateLVP); null без калибровки. */
+export function expectedVelocityFromCalib(cal: { slope: number; intercept: number } | null | undefined, pct: number): number | null {
+  if (!cal || !Number.isFinite(cal.slope) || !Number.isFinite(cal.intercept)) return null;
+  if (pct < 0.3 || pct > 1) return null;
+  return round2(cal.slope * pct + cal.intercept);
+}
+
 /** Daily Readiness: warm-up 60% vs профиль. Снижение >8% → volume -20% (PoinT GO). */
 export function dailyReadinessCheck(expectedVelocity: number, actualVelocity: number): { dropPct: number; action: 'as-planned' | 'reduce-volume-20' | 'deload' } {
   if (expectedVelocity <= 0 || actualVelocity <= 0) return { dropPct: 0, action: 'as-planned' };
