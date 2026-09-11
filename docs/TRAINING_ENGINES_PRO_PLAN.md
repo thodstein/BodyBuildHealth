@@ -104,13 +104,12 @@ P10 (диагностика) → P11 (VBT-дневник) → P12 (UI/интег
 - Пояснения ко всем графикам (как в `pl-norms`): Шаг 1 — метрики/RIR/RPE/объём/утомление/TUT/профиль, Шаг 2 — подрегионы/тех.счёт, Шаг 3 — force/подрегионы/синергия/замена, Шаг 4 — сравнение типов.
 - Верификация: `tsc --skipLibCheck` 0 по своим файлам, `pl-norms` 5/5, `relative-strength` 17/17, `cardio-pro-panels` 58/58.
 
-### P14 — Единый калькулятор разрядных нормативов + Анализ силы ✅ ГОТОВО (2026-08, `PlNormsCalcTab.tsx:51`, `RelativeStrengthCalcTab.tsx:1`, `StrengthAnalysisHub.tsx:1`)
-- `pl-norms.engine.ts:11` — `Sex` + `sex` в `NormTable`, женские ФПР 2022-2025 (43-84+ кг, `FPR_F_CLASSIC_TOTAL:120`) + WRPF×1.12/1.04/0.55, `findCategoryByLabel`/`classifyTotalForCategory`/`progressToNextRank`.
-- `PlNormsCalcTab` — единый центр (пол ♂/♀, `fed`/`disc`/`auto|ручная категория`, `bw`/`total`/`showLifts` → `effectiveTotal`/`displayResult`, прогресс-бар, `DOTS/Wilks/IPF GL/Gloss`, таблица всех категорий + пояснения `NORM_EXPLANATIONS` ко всем графикам).
-- `RelativeStrengthCalcTab` — синхронизирован по `sex`/`getNormTable(...,sex)`, ручная категория, `progressToNextRank`, баннер дублирования → указывает на `Единый`.
-- `StrengthAnalysisHub.tsx:15` — 5 вкладок (`1RM/VBT/Отн.сила/Единый/Аналитика`) с описанием плана чистки; `TrainingScreen.tsx:677` фикс — `strength_analysis` теперь рендерит `StrengthAnalysisHub` (было пусто, `CALC_TABS` не имел handler).
+### P14 — Единый калькулятор разрядных нормативов + Анализ силы ✅ ГОТОВО (2026-08; PRO P1–P6 кодом 2026-09, план `docs/STRENGTH-ANALYSIS-HUB-PRO-PLAN.md`)
+- `pl-norms.engine.ts` — ЕВСК 2022-2025 полная лесенка (МСМК/МС/КМС/I/II/III/юношеские, сверено fprz/frs24): `fpr_classic` + `fpr_equipped` total М/Ж, `fpr_classic` bench М/Ж; `fpr_ipf` — deprecated-алиас классики; выдуманные женские WRPF-таблицы удалены (честно undefined); `eligibleRanksForAge`/`ageEligibilityNote` под новую лесенку.
+- `relative-strength.engine.ts` — фиксы по реальным протоколам: Wilks 5-я степень (90/600 → 383.0), DOTS-Ж официальные BVDK (72.9/305 → 301.6), IPF GL classic/equipped/total/bench (Ж 46.8/435 → 121.0; М 90/600 → 79.8); NEW `mccullochCoeff`/`ageAdjustedScore`, `femaleToMaleRatio` (DOTS-ratio 1.26–1.40), `sinclairScore` (IWF 2021–2024).
+- Хаб 5 вкладок (`1RM/VBT/Отн.сила/Нормативы/Аналитика`): trimmed-mean + per-lift точность + RPE-сетка Brzycki + блины + история e1RM; личный LVP + метрика + readiness; what-if вес + McCulloch; попытки 3×3; CSV/JSON/ICS; двусторонний синхрон аналитики.
 - `ProMetricsPanel.tsx:66` — `sex`-aware `disciplineOptions` + `manualCat`/`effectiveCat`/`classifyTotalForCategory` + пояснения.
-- Верификация: `strength_analysis` теперь показывает все калькуляторы, удаляемый контент — только дубль PRO-группы в `PrescriptionTab:238`.
+- Верификация P1–P6: NEW тесты p1 9/9 + p2 10/10 + p3 14/14 + p4 5/5 + p5 6/6; соседи (estimate1rm/autoreg/vbt/relative-strength/pl-norms/export/rest-hooks) зелёные; `tsc` 0 по своим.
 
 ### P15 — Аудит «Интеллект тренировки» (`nav.ts:55`, `TrainingIntelligenceDashboard.tsx:44`) — план
 - Текущие 15 `tab` в `calculators` vs 12 карточек в дашборде (`bb_foundation`/`load_safety` выпадают). Дубли: `load_management`→`load_safety` алиас, `calc_plates`/`tonnage` vs mini в лабе, `volume` vs `tonnage` vs `split_gen`, `calc_quality` vs `diagnostics`.

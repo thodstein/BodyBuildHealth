@@ -60,6 +60,16 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
         </div>
         <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
           Нажми на заголовок карточки — скрыть/раскрыть блок. Протокол берётся из цикла, видео считает скорость автоматически.
+          <button
+            onClick={() => {
+              const fn = (window as any).__navigateToTrainingTab;
+              if (typeof fn === 'function') fn('calc_vbt');
+              else { try { (window as any).showToast?.('⚡ VBT: Тренировки → Анализ силы → VBT'); } catch {} }
+            }}
+            style={{ display: 'block', width: '100%', marginTop: 6, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.25)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+          >
+            ⚡ Скорость — полный разбор: Анализ силы → VBT (LVP один, без дубля)
+          </button>
         </div>
       </div>
       <LiftMasterCard dayCount={dayCount} template={template as any} sessions={sessions as any} profile={tprofile as any} readinessRecovery={readinessRecovery} readinessFatigue={readinessFatigue} mesoWeeks={mesoWeeks} missedSessions={missedSessions} currentVolume={currentVolume} currentRir={currentRir} />

@@ -1811,6 +1811,17 @@ export const BBDiagnosticsHub: React.FC = () => {
               {vbt?.e1RMByVelocity != null && (
                 <div style={{ color: '#fff', marginTop: 4 }} data-bb="vbt-e1rm">e1RM по скорости ≈ {vbt.e1RMByVelocity} кг (популяционный LVP).</div>
               )}
+              <button
+                onClick={() => {
+                  const fn = (window as any).__navigateToTrainingTab;
+                  if (typeof fn === 'function') fn('calc_vbt');
+                  else { try { (window as any).showToast?.('⚡ VBT: Тренировки → Анализ силы → VBT'); } catch {} }
+                }}
+                data-bb="vbt-hub-link"
+                style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.25)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontWeight: 700, fontSize: 11, cursor: 'pointer', width: '100%' }}
+              >
+                ⚡ Полная VBT — Анализ силы → VBT (профиль, калибровка, readiness)
+              </button>
               {workingRange && (
                 <div style={{ color: '#fff', marginTop: 2 }} data-bb="working-range">{workingRange.text}</div>
               )}
