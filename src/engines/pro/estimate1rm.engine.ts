@@ -86,6 +86,62 @@ export function estimate1RM(weight: number, reps: number): number {
   return estimate1RMConsensus(weight, reps).value;
 }
 
+/** Метод сведения формул в одно число: медиана (устойчива к выбросам) или trimmed-mean (стандарт индустрии: отброс min/max → среднее). */
+export type ConsensusMethod = 'median' | 'trimmed';
+
+/** Trimmed-mean консенсус: отброс min/max → среднее остальных (как 1rmcalculator.org/HubFit). При n<3 — медиана. */
+export function estimate1RMTrimmedMean(weight: number, reps: number): Consensus1RM {
+  const base = estimate1RMConsensus(weight, reps);
+  if (base.n < 3) return base;
+  const vals = base.formulas.map(f => f.value).sort((a, b) => a - b).slice(1, -1);
+  const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
+  return { ...base, value: round1(mean), mean: round1(mean) };
+}
+
+/** Сведение по выбранному методу (дефолт median — backward-compat). */
+export function estimate1RMByMethod(weight: number, reps: number, method: ConsensusMethod = 'median'): Consensus1RM {
+  return method === 'trimmed' ? estimate1RMTrimmedMean(weight, reps) : estimate1RMConsensus(weight, reps);
+}
+
+/**
+ * P1 (StrengthAnalysisHub PRO): применимость формул по движению.
+ * Литература (LeSuer 1997; Macarilla 2022): жим держит точность до ~12 повт, присед/тяга — до ~10,
+ * тяга на 8+ повт грубее (усталость хвата/спины). Кап повторов для ОЦЕНКИ (движок estimate1RMFormula не тронут).
+ */
+export const LIFT_REPS_CAP: Record<string, number> = {
+  squat: 10, bench: 12, deadlift: 10, ohp: 10, row: 12,
+};
+
+export function liftRepsCap(lift: string | null | undefined): number {
+  if (!lift) return 12;
+  return LIFT_REPS_CAP[lift] ?? 12;
+}
+
+/** Формулы, применимые для движения и повторов (пересечение APPLICABLE-диапазона и лифт-капа). */
+export function applicableFormulasForLift(lift: string | null | undefined, reps: number): RMFormula[] {
+  const cap = liftRepsCap(lift);
+  const r = Math.max(1, Math.min(15, reps));
+  if (r > cap) return [];
+  return (Object.keys(APPLICABLE) as RMFormula[]).filter(f => {
+    const [lo, hi] = APPLICABLE[f];
+    return r >= lo && r <= Math.min(hi, cap);
+  });
+}
+
+/**
+ * Честная пометка точности для движения/повт (источник: 1rmcalculator.org comparison 2026:
+ * Brzycki ±3% <10 повт, Epley ±5%, Lombardi ±4%, O'Conner ±6%, Mayhew ±4% до 15, Wathan ±3% тяжёлые, Lander ±5%).
+ */
+export function rmAccuracyNote(lift: string | null | undefined, reps: number): string {
+  const r = Math.max(1, Math.min(15, reps));
+  const cap = liftRepsCap(lift);
+  if (r > cap) return `>${cap} повт для этого движения — оценка грубая (±8–12%), тестируйте 3–6 повт`;
+  if (r >= 12) return '12+ повт: точнее Mayhew (±4%), остальные грубее — тестируйте 3–6 повт';
+  if (lift === 'deadlift' && r >= 8) return 'тяга на 8+ повт: точность ниже (хват/спина) — ориентир ±5%';
+  if (r <= 6) return 'оптимальный диапазон: Brzycki/Wathan ±3%';
+  return 'рабочий диапазон: формулы сходятся, ±3–5%';
+}
+
 // ── Load-velocity profile (P2 расширит; здесь минимальная таблица для e1RM-по-скорости) ──
 // Средняя скорость (м/с) на %1RM для соревновательных движений (Jovanovic / Gonzalez-Badillo).
 const LVP: Record<string, readonly [number, number][]> = {

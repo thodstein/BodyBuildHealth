@@ -1,9 +1,22 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { estimate1RMFormula, estimate1RMConsensus, type RMFormula } from '../../../engines/pro/estimate1rm.engine';
-import { pctForRPE, rpeFromLoad } from '../../../engines/pro/autoregulation-pro.engine';
+import { estimate1RMFormula, estimate1RMByMethod, rmAccuracyNote, type RMFormula, type ConsensusMethod } from '../../../engines/pro/estimate1rm.engine';
+import { rpeFromLoad } from '../../../engines/pro/autoregulation-pro.engine';
+import { rpePctBrzycki } from '../../../engines/pro/rpe-table.engine';
+import { calculatePlates } from '../../../engines/gym-competition.engine';
 import { applyToPlanner } from './planner-bridge';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import type { HubSnapshot } from './StrengthAnalysisHub';
+
+const HIST_KEY = 'he_onerm_history_v1';
+const HIST_CAP = 30;
+interface HistEntry { date: string; lift: string; e1RM: number; weight: number; reps: number }
+function loadHist(): HistEntry[] {
+  try {
+    const raw = localStorage.getItem(HIST_KEY);
+    const j = JSON.parse(raw || '[]');
+    return Array.isArray(j) ? j.filter(e => e && typeof e.e1RM === 'number') : [];
+  } catch { return []; }
+}
 
 const ACCENT = '#00e68a';
 const SMALL: React.CSSProperties = { color: '#fff', fontSize: 12, lineHeight: 1.5 };
@@ -39,10 +52,20 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
     return 5;
   });
   const [targetLift, setTargetLift] = useState<'squat' | 'bench' | 'dead' | 'ohp'>('bench');
+  const [method, setMethod] = useState<ConsensusMethod>('median');
+  const [hist, setHist] = useState<HistEntry[]>(() => loadHist());
 
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify({ weight, reps })); } catch {}
   }, [weight, reps]);
+
+  const pushHist = (lift: string, e1RM: number) => {
+    setHist(prev => {
+      const next = [{ date: new Date().toISOString().slice(0, 10), lift, e1RM, weight, reps: clampedReps }, ...prev].slice(0, HIST_CAP);
+      try { localStorage.setItem(HIST_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   const clampedReps = Math.max(1, Math.min(15, reps));
   const repsClampedNote = reps !== clampedReps;
@@ -50,10 +73,14 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
   const results = useMemo(() => {
     if (weight <= 0 || clampedReps <= 0) return null;
     const per: { f: RMFormula; v: number }[] = FORMULAS.map(f => ({ f, v: Math.round(estimate1RMFormula(weight, clampedReps, f) * 10) / 10 }));
-    const cons = estimate1RMConsensus(weight, clampedReps);
+    const cons = estimate1RMByMethod(weight, clampedReps, method);
+    const med = method === 'median' ? cons.value : estimate1RMByMethod(weight, clampedReps, 'median').value;
+    const trim = method === 'trimmed' ? cons.value : estimate1RMByMethod(weight, clampedReps, 'trimmed').value;
     return {
       per,
       cons: Math.round((cons.value ?? 0) * 10) / 10,
+      median: Math.round(med * 10) / 10,
+      trimmed: Math.round(trim * 10) / 10,
       mean: Math.round((cons.mean ?? 0) * 10) / 10,
       min: Math.round((cons.min ?? 0) * 10) / 10,
       max: Math.round((cons.max ?? 0) * 10) / 10,
@@ -61,15 +88,22 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
       n: cons.n,
       repsClamped: cons.repsClamped,
     };
-  }, [weight, clampedReps]);
+  }, [weight, clampedReps, method]);
+
+  const accuracyNote = useMemo(() => rmAccuracyNote(targetLift, clampedReps), [targetLift, clampedReps]);
 
   const pctTable = useMemo(() => {
     if (!results) return [];
     const one = results.cons || 0;
-    return [100, 95, 90, 85, 80, 75, 70, 65, 60].map(p => ({ p, kg: Math.round(one * p / 100) }));
+    return [100, 95, 90, 85, 80, 75, 70, 65, 60].map(p => {
+      const raw = one * p / 100;
+      const kg = Math.round(raw / 2.5) * 2.5;
+      const pl = calculatePlates(kg, 20, 'kg');
+      return { p, kg, actual: pl.actualWeight, dev: pl.deviation, plates: pl.platesPerSide };
+    });
   }, [results]);
 
-  // RPE/RIR таблица: для текущего 1RM — вес для повторов 1..8 на RPE 7..10
+  // RPE/RIR таблица (сетка Brzycki от повторы+RIR — rpe-table.engine; Epley-версия осталась в авторегуляции)
   const rpeTable = useMemo(() => {
     if (!results || !results.cons) return null;
     const e1rm = results.cons;
@@ -80,7 +114,7 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
       rpeRange,
       rows: repRange.map(r => ({
         reps: r,
-        cols: rpeRange.map(rpe => Math.round(e1rm * pctForRPE(rpe, r))),
+        cols: rpeRange.map(rpe => Math.round(e1rm * rpePctBrzycki(r, rpe))),
       })),
     };
   }, [results]);
@@ -129,6 +163,20 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
           onChange={v => setTargetLift(v as any)}
         />
       </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
+        <PopupSelect
+          label="Консенсус"
+          value={method}
+          options={[
+            { id: 'median', label: 'Медиана (устойчива)', desc: 'Медиана применимых формул — устойчива к выбросам' },
+            { id: 'trimmed', label: 'Trimmed-mean (индустрия)', desc: 'Отброс min/max → среднее — стандарт 1rmcalculator/HubFit' },
+          ]}
+          onChange={v => setMethod(v as ConsensusMethod)}
+        />
+        <div style={{ flex: '1 1 200px', fontSize: 10, color: '#fff', padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.14)', lineHeight: 1.4 }}>
+          🎯 Точность: {accuracyNote}
+        </div>
+      </div>
 
       {reps !== clampedReps && (
         <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', color: '#f59e0b', fontSize: 11, marginBottom: 10 }}>
@@ -146,9 +194,9 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
       ) : (
         <>
           <div style={{ padding: 14, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.25)', marginBottom: 12, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: '#fff' }}>Консенсус 1RM (медиана, n={results.n}) — {weight}кг × {clampedReps}</div>
+            <div style={{ fontSize: 10, color: '#fff' }}>Консенсус 1RM ({method === 'median' ? 'медиана' : 'trimmed-mean'}, n={results.n}) — {weight}кг × {clampedReps}</div>
             <div style={{ fontSize: 30, fontWeight: 800, color: ACCENT }}>{results.cons} <span style={{ fontSize: 14 }}>кг</span></div>
-            <div style={{ fontSize: 10, color: '#fff' }}>диапазон: {results.min}–{results.max} кг · среднее {results.mean} · разброс {results.spread}</div>
+            <div style={{ fontSize: 10, color: '#fff' }}>диапазон: {results.min}–{results.max} кг · медиана {results.median} · trimmed {results.trimmed} · разброс {results.spread}</div>
             {snapshot && (() => {
               const hubVal = targetLift === 'squat' ? snapshot.squat : targetLift === 'bench' ? snapshot.bench : targetLift === 'dead' ? snapshot.dead : snapshot.ohp;
               const diff = Math.round(results.cons - hubVal);
@@ -167,12 +215,13 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
             ))}
           </div>
 
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6 }}>Таблица %1RM (от консенсуса-медианы)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6 }}>Таблица %1RM (шаг 2.5 кг + раскладка блинов, гриф 20)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
             {pctTable.map(t => (
-              <div key={t.p} style={{ padding: '6px 2px', borderRadius: 6, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', textAlign: 'center' }}>
+              <div key={t.p} style={{ padding: '6px 6px', borderRadius: 6, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', textAlign: 'center' }}>
                 <div style={{ fontSize: 10, color: '#fff' }}>{t.p}%</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa' }}>{t.kg}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#60a5fa' }}>{t.kg}{t.actual !== t.kg ? <span style={{ fontSize: 9, color: '#f59e0b' }}> → {t.actual}</span> : null}</div>
+                <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.3 }}>{t.plates.length ? t.plates.map(p => `${p.plate}×${p.count}`).join(' + ') + ' /стор' : 'пустой гриф'}</div>
               </div>
             ))}
           </div>
@@ -199,12 +248,19 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
                 </table>
               </div>
               <div style={{ fontSize: 10, color: '#fff', marginTop: 6, lineHeight: 1.4 }}>
-                Формула: вес = 1RM × % для (повт + RIR) до отказа (Epley-обратная: 1/(1+reps/30)). Проверка: {weight}×{clampedReps} → RPE ≈ {rpeFromLoad(results.cons, weight, clampedReps)}.
+                Сетка: Brzycki от (повт + RIR) — сверена с опубликованной сеткой Cornerstone 8×9 (±0.5 п.п.). Tuchscherer-ориентиры: 5@8≈80%, 8@7≈72% — расхождение ±3% индивидуально. Проверка: {weight}×{clampedReps} → RPE ≈ {rpeFromLoad(results.cons, weight, clampedReps)}.
               </div>
             </div>
           )}
 
-          <div style={{ fontSize: 10, color: '#fff', marginTop: 8, lineHeight: 1.5 }}>💡 Консенсус — медиана применимых формул (устойчива к выбросам). Epley/Brzycki точнее для 1–10 повт; для 12–15 оценка грубее (разброс {results.spread} кг). Обновите хаб/профиль, если 1RM выше текущего.</div>
+          <div style={{ fontSize: 10, color: '#fff', marginTop: 8, lineHeight: 1.5 }}>💡 Консенсус — {method === 'median' ? 'медиана применимых формул (устойчива к выбросам)' : 'trimmed-mean: отброс min/max → среднее (стандарт индустрии)'}; второй метод: {method === 'median' ? results.trimmed : results.median} кг. Epley/Brzycki точнее для 1–10 повт; для 12–15 оценка грубее (разброс {results.spread} кг). Обновите хаб/профиль, если 1RM выше текущего.</div>
+          {hist.length > 0 && (
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: '#fff' }}>
+              <b>📈 История e1RM (последние {Math.min(5, hist.length)}):</b> {hist.slice(0, 5).map((h, i) => (
+                <span key={i} style={{ marginRight: 8 }}>{h.date} {h.lift} <b style={{ color: ACCENT }}>{h.e1RM}</b></span>
+              ))}
+            </div>
+          )}
         </>
       )}
       {results && (
@@ -220,6 +276,7 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
                     patch[k === 'dead' ? 'dead' : k] = results.cons;
                     onHubPatch(patch);
                   }
+                  pushHist(k, results.cons);
                   applyToPlanner({ kind: 'pm', label: 'ПМ ' + l + ' ' + results.cons + ' кг', data: { lift: k === 'ohp' ? 'ohp' : k, value: results.cons } as any });
                 }}
                 style={{ flex: '1 1 90px', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12, minHeight: 40 }}
