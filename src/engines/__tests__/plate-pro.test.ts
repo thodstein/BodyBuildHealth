@@ -118,6 +118,10 @@ describe('plates PRO: nearest + проценты', () => {
     const n = nearestLoadable(100, 20, 'kg');
     expect(n.down).toBe(100);
   });
+  it('И2: фунтовые x.5 не пропускаются (137.5 = 45 + (35+10+1.25)×2)', () => {
+    const n = nearestLoadable(137.5, 45, 'lbs');
+    expect(n.down).toBe(137.5);
+  });
   it('percentTargets: 9 пресетов, 90% от 100 = 90', () => {
     const t = percentTargets(100, 20);
     expect(t).toHaveLength(9);

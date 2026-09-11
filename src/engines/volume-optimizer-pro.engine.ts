@@ -511,7 +511,15 @@ function currentFreq(entries: ProExerciseRow[]): number {
 // 4. CNS FATIGUE REPORT
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function computeCNSFatigue(entries: ProExerciseRow[]): CNSFatigueReport {
+/**
+ * И2: порог ЦНС — уровневый (новичок 40 / средний 80 / продвинутый 100 / enhanced 120),
+ * а не единый магический 80. Всё равно эвристика — так и подписано в recommendation.
+ */
+export const CNS_MAX_BY_LEVEL: Record<string, number> = {
+  beginner: 40, intermediate: 80, advanced: 100, enhanced: 120,
+};
+
+export function computeCNSFatigue(entries: ProExerciseRow[], level?: TrainingLevel | string): CNSFatigueReport {
   let totalScore = 0;
   let heavyCompound = 0;
   let heavyIsolation = 0;
@@ -535,18 +543,18 @@ export function computeCNSFatigue(entries: ProExerciseRow[]): CNSFatigueReport {
     }
   });
 
-  const maxRec = 80;
+  const maxRec = (level && CNS_MAX_BY_LEVEL[String(level).toLowerCase()]) || 80;
   let warning: string | null = null;
-  let recommendation = 'Нагрузка на ЦНС в пределах нормы';
+  let recommendation = 'Нагрузка на ЦНС в пределах нормы (эвристика)';
 
   if (totalScore > maxRec * 1.3) {
     warning = 'КРИТИЧЕСКАЯ нагрузка на ЦНС — запланируйте разгрузку';
-    recommendation = 'Сократите тяжёлые подходы на 40-50%, уберите становую/присед на неделю';
+    recommendation = 'Сократите тяжёлые подходы на 40-50%, уберите становую/присед на неделю (эвристика)';
   } else if (totalScore > maxRec) {
     warning = 'Высокая нагрузка на ЦНС — контролируйте восстановление';
-    recommendation = 'Снизьте число тяжёлых компаунд-подходов, добавьте 1 день отдыха';
+    recommendation = 'Снизьте число тяжёлых компаунд-подходов, добавьте 1 день отдыха (эвристика)';
   } else if (totalScore > maxRec * 0.7) {
-    recommendation = 'Умеренная нагрузка — следите за сном и питанием';
+    recommendation = 'Умеренная нагрузка — следите за сном и питанием (эвристика)';
   }
 
   return { totalCNSScore: totalScore, heavyCompoundSets: heavyCompound, heavyIsolationSets: heavyIsolation, maxRecommended: maxRec, warning, recommendation };
@@ -581,7 +589,7 @@ export function computeRecoveryCapacity(entries: ProExerciseRow[], level: Traini
   }
 
   // Systemic fatigue from CNS + total volume
-  const cns = computeCNSFatigue(entries);
+  const cns = computeCNSFatigue(entries, level);
   const systemicFatigue = Math.round((cns.totalCNSScore / cns.maxRecommended) * 50 + (utilization / 100) * 50);
 
   let deloadRecommended = false;
@@ -643,7 +651,7 @@ export function planVolumeProgression(
 
   const weeks = phases.map(p => {
     const setsByMuscle: Record<string, number> = {};
-    for (const [muscle, baseSets] of Object.entries(muscleSets)) {
+    for (const muscle of Object.keys(muscleSets)) {
       const lm = allLM[normalizeMuscleForLM(muscle)] || { mev: 8, mav: 12, mrv: 20 };
       const target = Math.round(lm.mev + (lm.mrv - lm.mev) * p.volMultiplier);
       setsByMuscle[muscleRu(muscle)] = Math.min(target, lm.mrv);
@@ -666,6 +674,32 @@ export function planVolumeProgression(
   }
 
   return { weeks, totalWeeks, progressionModel: 'RP-стиль: накопление MEV→MRV + делод ×0.5 от пика (флор MV)' };
+}
+
+/**
+ * И2: честное масштабирование строк недели 1 под целевой объём недели.
+ * Заменяет бессмысленную формулу `target/Σвсех_мышц × r.sets`:
+ * каждая мышца масштабируется своим коэффициентом target/wk1 (флор 1 сет).
+ * Ключи целей — RU-подписи (как в setsByMuscle планировщика).
+ */
+export function scaleWeekRowsToTarget(
+  wk1Rows: ProExerciseRow[],
+  targetByMuscleRu: Record<string, number>,
+): ProExerciseRow[] {
+  const wk1ByMuscle: Record<string, number> = {};
+  wk1Rows.forEach(r => {
+    const ex = getExerciseById(r.exerciseId) as Exercise | undefined;
+    const g = ex?.group || 'other';
+    wk1ByMuscle[g] = (wk1ByMuscle[g] || 0) + Math.max(0, r.sets || 0);
+  });
+  return wk1Rows.map(r => {
+    const ex = getExerciseById(r.exerciseId) as Exercise | undefined;
+    const g = ex?.group || 'other';
+    const target = targetByMuscleRu[muscleRu(g)] ?? targetByMuscleRu[g] ?? r.sets;
+    const base = wk1ByMuscle[g] || r.sets;
+    const f = base > 0 ? target / base : 1;
+    return { ...r, sets: Math.max(1, Math.round(r.sets * f)) };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -770,7 +804,7 @@ export function scoreSplitQuality(
   intScore = Math.max(0, Math.min(100, intScore));
 
   // 5. Recovery Balance
-  const cns = computeCNSFatigue(entries);
+  const cns = computeCNSFatigue(entries, level);
   let recScore = 100;
   if (cns.totalCNSScore > cns.maxRecommended * 1.3) recScore -= 35;
   else if (cns.totalCNSScore > cns.maxRecommended) recScore -= 18;
@@ -943,7 +977,7 @@ export function analyzeFullVolume(
 
   return {
     perMuscle,
-    cnsFatigue: computeCNSFatigue(entries),
+    cnsFatigue: computeCNSFatigue(entries, level),
     recovery: computeRecoveryCapacity(entries, level),
     quality: scoreSplitQuality(entries, level, weakPoints),
     coverageGaps: findCoverageGaps(entries, level),

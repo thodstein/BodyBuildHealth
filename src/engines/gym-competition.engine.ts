@@ -224,7 +224,9 @@ export function nearestLoadable(
   availablePlates?: number[],
   opts?: PlateCalcOpts,
 ): { down: number | null; up: number | null } {
-  const step = unit === 'kg' ? 0.5 : 1;
+  // И2: шаг 0.5 для обеих систем — фунтовые totals идут кратно 2.5 (x.0/x.5),
+  // шаг 1 пропускал собираемые веса вида 137.5
+  const step = 0.5;
   const minW = barWeight + (opts?.collarsKg || 0);
   let down: number | null = null;
   let up: number | null = null;

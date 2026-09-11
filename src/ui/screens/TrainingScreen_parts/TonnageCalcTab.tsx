@@ -200,9 +200,9 @@ export const TonnageCalcTab: React.FC<TonnageCalcTabProps> = ({ sharedRows, onSh
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{memo.totalTonnage.toLocaleString()}</div>
             <div style={SMALL}>кг·повт</div>
           </MetricCard>
-          <MetricCard title="КПШ" icon="🔢" accent="#60a5fa">
+          <MetricCard title="Индекс нагрузки" icon="🔢" accent="#60a5fa">
             <div style={{ fontSize: 20, fontWeight: 800, color: '#60a5fa' }}>{memo.totalKpSh.toFixed(0)}</div>
-            <div style={SMALL}>общий</div>
+            <div style={SMALL}>тоннаж × %1RM (не КПШ Прилепина)</div>
           </MetricCard>
           <MetricCard title="Средний вес" icon="🔸" accent="#f59e0b">
             <div style={{ fontSize: 20, fontWeight: 800, color: '#f59e0b' }}>{memo.avgWeight.toFixed(1)}</div>
@@ -224,7 +224,8 @@ export const TonnageCalcTab: React.FC<TonnageCalcTabProps> = ({ sharedRows, onSh
               <span style={{ color: ACCENT, fontWeight: 700 }}>{t.toLocaleString()} кг·повт</span>
             </div>
           ))}
-          <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginTop: 8, marginBottom: 6 }}>📊 КПШ по мышцам</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginTop: 8, marginBottom: 6 }}>📊 Индекс нагрузки по мышцам</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>С паттерн-весами: {memo.patternTonnage.toLocaleString()} кг·повт — для сравнения разных лифтов (штанга 1.00 / вторая 0.85 / изоляция 0.65 / ТА 0.75)</div>
           {Object.entries(memo.kpshByMuscle).map(([m, k]) => (
             <div key={m} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, marginBottom: 3 }}>
               <span style={{ color: '#fff' }}>{m}</span>

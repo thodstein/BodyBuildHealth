@@ -1,11 +1,10 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
 import type { Exercise } from '../../../core/types';
-import { getVolumeReferences } from '../../../engines/training-methodology.engine';
-import { getSFRProfile, analyzeFullVolume, planVolumeProgression, findBetterExerciseSwaps, findCoverageGaps, deloadDepthOk } from '../../../engines/volume-optimizer-pro.engine';
+import { getSFRProfile, analyzeFullVolume, planVolumeProgression, findBetterExerciseSwaps, findCoverageGaps, deloadDepthOk, scaleWeekRowsToTarget } from '../../../engines/volume-optimizer-pro.engine';
 import type { ProExerciseRow, FullVolumeAnalysis, ExerciseSwapRec, CoverageGap } from '../../../engines/volume-optimizer-pro.engine';
 import type { TrainingLevel } from '../../../engines/volume-landmarks.engine';
-import { PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { PopupSelect, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { useDataLink } from '../../../core/data-link';
 import { applyToPlanner } from './planner-bridge';
 import { labTrainingAdjust } from './lab-training-adjust';
@@ -206,34 +205,29 @@ export const VolumeOptimizerTab: React.FC<VolumeOptimizerTabProps> = ({ rows: pr
     return { score, over, weakCovered, weakMissed, wk, mrv: 0, mrvByGroup, groups, monotonyNote, labWarnings: la.warnings, canonRows, mvGroups, sessViol, freqFlags, rir, hard, eff };
   }, [rows, level, weakPoints, labAnalysis, getEx]);
 
+  // И2: масштабирование честным scaleWeekRowsToTarget (per-muscle target/wk1, кап +2/нед)
   const generateProgression = useCallback(() => {
     if (!progression) return;
     const wk1Rows = rows.filter(r => r.week === 1);
     const newRows: ProExerciseRow[] = [...wk1Rows];
     progression.weeks.forEach((w, wi) => {
       if (wi === 0) return;
-      wk1Rows.forEach(r => {
-        const ex = getEx(r.exerciseId);
-        if (!ex) return;
-        const muscle = ex.group;
-        const targetSets = w.setsByMuscle[muscleRu(muscle)] ?? w.setsByMuscle[muscle] ?? 0;
-        const setsScale = r.sets > 0 ? Math.max(1, Math.round(targetSets / Math.max(1, Object.values(w.setsByMuscle).reduce((a, b) => a + b, 0)) * r.sets)) : 3;
+      const scaled = scaleWeekRowsToTarget(wk1Rows, w.setsByMuscle);
+      scaled.forEach((s, i) => {
+        const r = wk1Rows[i];
         newRows.push({
+          ...s,
           id: 'rp' + wi + '_' + r.id + '_' + Date.now(),
-          exerciseId: r.exerciseId,
           week: wi + 1,
-          day: r.day,
           weight: Math.round(r.weight * (0.95 + wi * 0.02)),
-          reps: r.reps,
-          sets: Math.min(setsScale, r.sets + 2),
+          sets: Math.min(s.sets, r.sets + 2),
           rpe: Math.max(6, (r.rpe || 7) - 1),
-          oneRM: r.oneRM,
         });
       });
     });
     setRows(newRows);
     setActiveWeek('all');
-  }, [progression, rows, getEx]);
+  }, [progression, rows]);
 
   const improveVolume = useCallback(() => {
     if (!analysis || !quality) return;

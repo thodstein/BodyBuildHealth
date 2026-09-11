@@ -77,6 +77,15 @@ describe('volume shared input: division (Ж3)', () => {
   });
 });
 
+describe('volume shared input: честные подписи (И2)', () => {
+  it('тоннаж: «Индекс нагрузки», а не «КПШ»; паттерн-тоннаж виден', () => {
+    const { container } = render(<TonnageCalcTab />);
+    expect(container.textContent).toContain('Индекс нагрузки');
+    expect(container.textContent).not.toContain('КПШ по мышцам');
+    expect(container.textContent).toContain('паттерн-весами');
+  });
+});
+
 describe('volume shared input: контролируемый оптимизатор', () => {
   it('рендерит переданные строки; ✕ зовёт onRowsChange с []', () => {
     const fn = vi.fn();
