@@ -189,7 +189,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
   const banister = useMemo(()=> fitnessFatigue(dailyLoads), [dailyLoads]);
   // P6: форма z-трендом (сырые AU — только в тултипах)
   const form = useMemo(()=> banisterForm(dailyLoads), [dailyLoads]);
-  const report = useMemo(()=> trainingLoadReport(sessions), [sessions]);
+  const report = useMemo(()=> trainingLoadReport(sessions, undefined, { method: 'ewma_uncoupled' }), [sessions]);
   // P2: персональная HRV-база (lnRMSSD+SWC) вместо фиксированной нормы 60 мс
   const [hrvBump, setHrvBump] = useState(0);
   const hrvBase = useMemo(()=> { try { return buildHrvBaseline(); } catch { return null; } }, [hrvBump]);

@@ -107,4 +107,15 @@ describe('D1 персональная база в analyzeRecovery', () => {
     expect(out.hrvScore).toBeLessThanOrEqual(35);
     expect(out.recommendations.join(' ')).toContain('личной базы');
   });
+
+  it('F2 reduced/elevated/need_base ветки', () => {
+    const hrv = { rmssd: 30, sdnn: 40, restingHR: 62, readinessScore: 70 };
+    const reduced = analyzeRecovery({ ...base, hrv, hrvBaseline: { status: 'reduced', n: 7 } });
+    expect(reduced.hrvScore).toBeLessThanOrEqual(55);
+    expect(reduced.recommendations.join(' ')).toContain('лёгкий');
+    const elevated = analyzeRecovery({ ...base, hrv, hrvBaseline: { status: 'elevated', n: 7 } });
+    expect(elevated.hrvScore).toBeGreaterThanOrEqual(60);
+    const noBase = analyzeRecovery({ ...base, hrv, hrvBaseline: { status: 'need_base', n: 1 } });
+    expect(noBase.hrvScore).toBeLessThan(60); // как раньше, без базы
+  });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   acuteChronicRatio,
+  toDailyLoads,
   trainingLoadReport,
   banisterForm,
   monotonyStreak,
@@ -81,6 +82,27 @@ describe('P1 честный ACWR', () => {
       '2026-07-28',
     );
     expect(report.disclaimer).toBe(ACWR_DISCLAIMER);
+  });
+
+  it('F1 отчёт тем же методом: цифры совпадают с прямым расчётом пульта', () => {
+    const sessions = Array.from({ length: 28 }, (_, i) => ({
+      date: `2026-07-${String(i + 1).padStart(2, '0')}`,
+      sRPE: 7,
+      durationMin: 60,
+    }));
+    const rep = trainingLoadReport(sessions, '2026-07-28', { method: 'ewma_uncoupled' });
+    const direct = acuteChronicRatio(toDailyLoads(sessions), '2026-07-28', 7, 28, { method: 'ewma_uncoupled' });
+    expect(rep.acwr.method).toBe('ewma_uncoupled');
+    expect(rep.acwr.ratio).toBe(direct.ratio);
+    expect(rep.acwr.zone).toBe(direct.zone);
+  });
+
+  it('F2 нестандартные окна работают тем же методом', () => {
+    const loads = [...flatLoads(7, 300, '2026-07-21'), ...flatLoads(7, 600, '2026-07-28')];
+    const r = acuteChronicRatio(loads, '2026-07-28', 7, 14, { method: 'ewma_uncoupled' });
+    expect(r.method).toBe('ewma_uncoupled');
+    expect(r.chronicDays).toBe(14);
+    expect(r.ratio).toBeGreaterThan(1);
   });
 
   it('канон зон един: метки/цвета совпадают с хабом', () => {
@@ -164,5 +186,12 @@ describe('D2 monotonyStreak — честные 2 недели подряд', () 
     const s = monotonyStreak(loads, 2);
     expect(s.current).toBeLessThanOrEqual(2);
     expect(s.sustainedHigh).toBe(false);
+  });
+
+  it('F2 три недели: все ровные — sustained, третья рваная — нет', () => {
+    const even = [...flatWeek('2026-07-14'), ...flatWeek('2026-07-21'), ...flatWeek('2026-07-28')];
+    expect(monotonyStreak(even, 3).sustainedHigh).toBe(true);
+    const broken = [...flatWeek('2026-07-14'), ...flatWeek('2026-07-21'), ...variedWeek('2026-07-28')];
+    expect(monotonyStreak(broken, 3).sustainedHigh).toBe(false);
   });
 });

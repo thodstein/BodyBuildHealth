@@ -231,10 +231,10 @@ export interface LoadReport {
   disclaimer: string;
 }
 
-/** Сводный отчёт по нагрузке + рекомендации. */
-export function trainingLoadReport(sessions: TrainingSession[], referenceDate?: string): LoadReport {
+/** Сводный отчёт по нагрузке + рекомендации. opts — тот же метод ACWR, что у вызывающего пульта (иначе цифры и тексты разойдутся). */
+export function trainingLoadReport(sessions: TrainingSession[], referenceDate?: string, opts: ACWROptions = {}): LoadReport {
   const dailyLoads = toDailyLoads(sessions);
-  const acwr = acuteChronicRatio(dailyLoads, referenceDate);
+  const acwr = acuteChronicRatio(dailyLoads, referenceDate, 7, 28, opts);
   const monotony = weeklyMonotony(dailyLoads, referenceDate);
   const banister = fitnessFatigue(dailyLoads);
   const recommendations: string[] = [];
