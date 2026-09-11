@@ -213,8 +213,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
   return (
     <div className="nd-add" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* Search */}
-      <div className="nd-search" style={{ padding: 14, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.15)' }}>
+      {/* Search — плавающая закреплённая строка (sticky): поиск + приёмы всегда под рукой */}
+      <div className="nd-search nd-add-sticky" style={{ padding: 14, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.15)', position:'sticky', top:0, zIndex:18 }}>
         <div style={{ display:'flex', gap:6, alignItems:'center' }}>
           <input type="text" value={foodSearch} onChange={e => onFoodSearchChange(e.target.value)}
             aria-label="Поиск продуктов" placeholder="🔍 Поиск продуктов... (начните вводить 2 буквы)" autoFocus
@@ -222,7 +222,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             style={{ flex:1, padding: '12px 14px', borderRadius: 12, background: '#202023',
               border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, boxSizing: 'border-box',
               outline: 'none', minHeight: 48 }} />
-          {foodSearch && <button onClick={() => onFoodSearchChange('')} aria-label="Очистить поиск" className="nd-search-clear" style={{ width:44, height:48, borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:14 }}>✕</button>}
+          {foodSearch && <button onClick={() => onFoodSearchChange('')} aria-label="Очистить поиск" className="nd-search-clear" style={{ width:44, height:48, borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', cursor:'pointer', fontSize:14 }}>✕</button>}
         </div>
         
         {foodSearchResults.length > 0 && (
@@ -346,7 +346,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               style={{ padding: '10px 14px', borderRadius: 999, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', display:'flex', alignItems:'center', gap:6, flexShrink: 0,
                 background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
                 border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
-                color: isActive ? '#000' : 'rgba(255,255,255,0.7)', fontWeight: isActive ? 700 : 500,
+                color: isActive ? '#000' : '#fff', fontWeight: isActive ? 700 : 500,
                 minHeight: 44, transition: 'all 0.15s', boxShadow: isActive ? '0 2px 8px rgba(0,230,138,0.2)' : 'none' }}>
               <span style={{ fontSize:12 }}>{icon}</span> {mt}
             </button>

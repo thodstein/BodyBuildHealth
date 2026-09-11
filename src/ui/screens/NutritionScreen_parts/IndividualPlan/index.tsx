@@ -119,14 +119,14 @@ const IndividualPlanInner: React.FC<{ embedded?: boolean }> = ({ embedded }) => 
 
   return (
     <>
-      <div className="plan-root" style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 84, maxWidth: 560, margin: '0 auto', paddingLeft: 2, paddingRight: 2 }}>
-        <div className="plan-tabbar" style={{
+      <div className="plan-root" style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 20, maxWidth: 560, margin: '0 auto', paddingLeft: 2, paddingRight: 2 }}>
+        <div className="plan-tabbar plan-tabbar-sticky" style={{
           display:'flex', gap:4, padding:4, overflowX:'auto', scrollbarWidth:'none',
           background:'linear-gradient(180deg, rgba(32,32,36,0.92), rgba(18,18,20,0.96))',
           border:'1px solid rgba(255,255,255,0.07)', borderRadius:16,
           boxShadow:'0 8px 28px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06)',
           backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
-          position:'sticky', top: 6, zIndex: 5,
+          position:'sticky', top: 0, zIndex: 20,
         }}>
           {visibleTabs.map(t => {
             const active = activeTab === t.key;
@@ -136,7 +136,7 @@ const IndividualPlanInner: React.FC<{ embedded?: boolean }> = ({ embedded }) => 
                 fontSize: 12, fontWeight: active ? 800 : 600, letterSpacing:'-0.2px',
                 border: active ? '1px solid rgba(0,230,138,0.38)' : '1px solid transparent',
                 background: active ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 46%, #00b894 100%)' : 'transparent',
-                color: active ? '#0A0A0A' : 'rgba(255,255,255,0.68)',
+                color: active ? '#0A0A0A' : '#fff',
                 boxShadow: active ? '0 4px 16px rgba(0,230,138,0.32), inset 0 1px 0 rgba(255,255,255,0.22)' : 'none',
                 transform: active ? 'translateY(-0.5px)' : 'none',
                 transition:'all 0.22s cubic-bezier(0.16,1,0.3,1)',
@@ -214,7 +214,7 @@ const ReportTab: React.FC = () => {
     color: ok ? '#22c55e' : '#ef4444',
   });
   return (
-    <div style={{ paddingBottom: 'var(--tabbar-clear, 140px)' }}>
+    <div style={{ paddingBottom: 24 }}>
       {/* E7-фикс: явная передача dayPlan (раньше вызов без аргументов молча падал на ctx.dayPlan,
           а при пустом плане архивировал пустоту); явный флаг archive=true — пользовательское действие */}
       <button onClick={() => { generateFullNutritionReport?.(dayPlan || undefined, true); setGenerated(true); }} style={{

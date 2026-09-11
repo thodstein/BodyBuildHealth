@@ -28,7 +28,7 @@ import { saveContestPrepEverywhere, clearContestPrepEverywhere } from '../../../
 import { loadShowChecklist, toggleShowChecklistItem } from '../../../../engines/bb/bb-contest-prep.engine';
 
 const ACCENT = '#f59e0b';
-const DIM = 'rgba(255,255,255,0.55)';
+const DIM = '#fff';
 const BTN_PRIMARY: React.CSSProperties = {
   flex: 1, padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 12, minHeight: 48,
   background: 'linear-gradient(135deg,#fbbf24,#d97706)', color: '#000',
@@ -36,11 +36,11 @@ const BTN_PRIMARY: React.CSSProperties = {
 };
 const BTN_GHOST: React.CSSProperties = {
   flex: 1, padding: 11, borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 11, minHeight: 44,
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)',
+  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff',
 };
 const CARD: React.CSSProperties = {
   padding: 14, borderRadius: 16, background: 'linear-gradient(180deg, rgba(28,28,32,0.96), rgba(20,20,23,0.92))',
-  border: '1px solid rgba(255,255,255,0.07)', marginBottom: 12,
+  border: '1px solid rgba(255,255,255,0.07)', borderTop: '2px solid rgba(245,158,11,0.45)', marginBottom: 12,
   boxShadow: '0 8px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05)',
 };
 const CARD_TITLE: React.CSSProperties = { fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 };
@@ -86,12 +86,14 @@ const ToggleChip: React.FC<{ label: string; icon?: string; value: boolean; onCha
     <button
       type="button"
       onClick={() => onChange(!value)}
+      aria-pressed={value}
+      className="peak-toggle"
       style={{
         display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 12, cursor: 'pointer',
         minHeight: 44, fontSize: 10, fontWeight: value ? 800 : 600,
         background: value ? (danger ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.08))' : 'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(245,158,11,0.08))') : 'rgba(255,255,255,0.04)',
         border: value ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.1)',
-        color: value ? color : 'rgba(255,255,255,0.75)',
+        color: value ? color : '#fff',
         boxShadow: value ? `0 2px 12px ${color}22` : 'none',
         transition: 'all 0.18s ease',
       }}
@@ -111,13 +113,13 @@ const ToggleChip: React.FC<{ label: string; icon?: string; value: boolean; onCha
 
 /** Дата-карточка: нативный date-picker в современной обёртке. */
 const DateCard: React.FC<{ label: string; value: string; onChange: (v: string) => void }> = ({ label, value, onChange }) => (
-  <div style={{
+  <div className="peak-date" style={{
     width: '100%', minHeight: 58, borderRadius: 12, padding: '8px 12px', boxSizing: 'border-box',
     background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
     border: '1px solid rgba(255,255,255,0.09)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
     boxShadow: '0 1px 8px rgba(0,0,0,0.22)', position: 'relative',
   }}>
-    <span style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</span>
+    <span style={{ fontSize: 8.5, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</span>
     <input
       type="date"
       value={value}
@@ -145,7 +147,7 @@ const SegGroup: React.FC<{
       <div style={{ fontSize: 8.5, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 5 }}>
         {icon && <span style={{ marginRight: 4 }}>{icon}</span>}{label}
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+      <div className="peak-seg" style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
         {options.map(o => {
           const active = o.id === value;
           return (
@@ -153,8 +155,9 @@ const SegGroup: React.FC<{
               key={o.id}
               type="button"
               onClick={() => onChange(o.id)}
+              aria-pressed={active}
               style={{
-                padding: '7px 11px', borderRadius: 999, cursor: 'pointer', minHeight: 36, fontSize: 10,
+                padding: '7px 11px', borderRadius: 999, cursor: 'pointer', minHeight: 44, fontSize: 10,
                 fontWeight: active ? 800 : 600, border: active ? '1px solid transparent' : '1px solid rgba(255,255,255,0.1)',
                 background: active
                   ? `linear-gradient(135deg, ${accent}, ${accent}cc)`
@@ -188,7 +191,7 @@ const Stepper: React.FC<{
 }> = ({ label, icon, value, min, max, step = 1, suffix = '', onChange, accent = '#00e68a' }) => {
   const set = (v: number) => onChange(Math.max(min, Math.min(max, Math.round(v * 100) / 100)));
   return (
-    <div style={{
+    <div className="peak-step" style={{
       display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 12,
       background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
       border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 1px 8px rgba(0,0,0,0.22)',
@@ -197,7 +200,7 @@ const Stepper: React.FC<{
         <div style={{ fontSize: 8.5, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 1 }}>
           {icon && <span style={{ marginRight: 4 }}>{icon}</span>}{label}
         </div>
-        <div style={{ fontSize: 14, fontWeight: 800, color: accent }}>{value}{suffix ? ` ${suffix}` : ''}</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: accent, fontVariantNumeric:'tabular-nums' }}>{value}{suffix ? ` ${suffix}` : ''}</div>
       </div>
       <button
         type="button"
@@ -205,7 +208,7 @@ const Stepper: React.FC<{
         disabled={value <= min}
         aria-label={`${label} минус`}
         style={{
-          width: 38, height: 38, borderRadius: 10, cursor: value <= min ? 'default' : 'pointer',
+          width: 44, height: 44, borderRadius: 10, cursor: value <= min ? 'default' : 'pointer',
           fontSize: 16, fontWeight: 800, border: '1px solid rgba(255,255,255,0.12)',
           background: 'rgba(255,255,255,0.04)', color: value <= min ? 'rgba(255,255,255,0.25)' : '#fff',
           opacity: value <= min ? 0.5 : 1,
@@ -219,7 +222,7 @@ const Stepper: React.FC<{
         disabled={value >= max}
         aria-label={`${label} плюс`}
         style={{
-          width: 38, height: 38, borderRadius: 10, cursor: value >= max ? 'default' : 'pointer',
+          width: 44, height: 44, borderRadius: 10, cursor: value >= max ? 'default' : 'pointer',
           fontSize: 16, fontWeight: 800, border: '1px solid transparent',
           background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: '#000',
           opacity: value >= max ? 0.5 : 1,
@@ -351,9 +354,9 @@ export const PeakWeekTab: React.FC = () => {
           : { text: `⏳ До шоу: ${daysToShow} дн`, color: '#4ade80' };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="peak-root" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* ── Hero ── */}
-      <div style={{
+      <div className="peak-hero" style={{
         padding: 14, borderRadius: 16, position: 'relative', overflow: 'hidden',
         background: 'linear-gradient(135deg, rgba(245,158,11,0.14), rgba(24,24,27,0.9) 60%)',
         border: '1px solid rgba(245,158,11,0.3)',

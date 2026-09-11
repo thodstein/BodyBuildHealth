@@ -77,7 +77,7 @@ const TAB_LABELS: Record<string, string> = {
 
 const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
 const pillActive = { background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700 as const, border: 'none', boxShadow: '0 2px 12px rgba(0,230,138,0.25)' };
-const pillInactive = { background: '#202023', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.06)' };
+const pillInactive = { background: '#202023', color: '#fff', border: '1px solid rgba(255,255,255,0.06)' };
 const inputStyle: React.CSSProperties = { width:'100%', padding:'10px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:13, boxSizing:'border-box', outline:'none' };
 const labelSec: React.CSSProperties = { fontSize:14, fontWeight:600, color:'#fff', marginBottom:10, letterSpacing:-0.3 };
 
@@ -1523,12 +1523,12 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
     const todayKcal = todayEntries.reduce((s, e) => s + (e.kcal || 0), 0);
     const todayProtein = todayEntries.reduce((s, e) => s + (e.p || 0), 0);
     return (
-      <div className="nutrition-hero" style={{ position:'fixed', inset:0, display:'flex', flexDirection:'column' }}>
-        <HeroImg webp="/nutrition-hero.webp" src="/nutrition-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 45%, rgba(0,0,0,0.85))' }} />
-        <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
+      <div className="nutrition-hero" style={{ position:'fixed', inset:0, top:0, bottom:0, left:0, right:0, height:'100dvh', maxHeight:'100dvh', display:'flex', flexDirection:'column', background:'#000', overflow:'hidden' }}>
+        <HeroImg webp="/nutrition-hero.webp" src="/nutrition-hero.jpg" alt="" style={{ position:'absolute', inset:0, top:0, bottom:0, left:0, right:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center' }} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 40%, rgba(0,0,0,0.88))' }} />
+        <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(var(--nav-height, 76px) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px)' }}>
           <h1 className="nutrition-hero-title" style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 2px', textShadow:'0 2px 14px rgba(0,0,0,0.9)' }}>Питание</h1>
-          <p className="nutrition-hero-sub" style={{ fontSize:11, color:'rgba(255,255,255,0.9)', margin:'0 0 14px', textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>Рекомендации и составление рациона под указанные параметры</p>
+          <p className="nutrition-hero-sub" style={{ fontSize:11, color:'#fff', margin:'0 0 14px', textShadow:'0 1px 8px rgba(0,0,0,0.8)' }}>Рекомендации и составление рациона под указанные параметры</p>
           {isNativeApp() && (
             <NutritionHeroStats
               kcal={todayKcal}
@@ -1573,7 +1573,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
         <button onClick={() => setPage('hero')} aria-label="Назад" style={{
-          width:44, height:44, borderRadius:12, cursor:'pointer', fontSize:20, color:'rgba(255,255,255,0.85)',
+          width:44, height:44, borderRadius:12, cursor:'pointer', fontSize:20, color:'#fff',
           border:'none', background:'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
         }}>←</button>
         <div style={{ flex:1, fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>Питание</div>
@@ -1636,7 +1636,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
                 fontSize:13, fontWeight: isActive ? 800 : 600, letterSpacing:-0.2,
                 border: isActive ? '1.5px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
                 background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-                color: isActive ? '#000' : 'rgba(255,255,255,0.85)',
+                color: isActive ? '#000' : '#fff',
                 transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
                 boxShadow: isActive ? '0 4px 16px rgba(0,230,138,0.25), 0 1px 0 rgba(255,255,255,0.1) inset' : '0 2px 8px rgba(0,0,0,0.12)',
                 minHeight:44, display:'inline-flex', alignItems:'center', gap:6,
@@ -1675,7 +1675,6 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         if (nv2.hungryLevel > 7) active.push('🔴 Высокий голод');
         if (nv2.metabolicAdaptation > 0) active.push(`📉 Адаптация -${Math.round(nv2.metabolicAdaptation * 100)}%`);
         if (v2Result && v2Result.adjustment !== 0) active.push(`📊 TDEE корр. ${v2Result.adjustment > 0 ? '+' : ''}${v2Result.adjustment}ккал`);
-        if (s.bodyFat) active.push(`🧬 %жира: ${s.bodyFat}%`);
 
         if (active.length === 0) return null;
         return (
@@ -1687,7 +1686,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         );
       })()}
 
-      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 140px' }}>
+      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 24px' }}>
         <NutritionPlanScope profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis}>
         <div style={{ animation:'fadeSlideIn 0.3s ease' }}>
           {renderContent()}

@@ -13626,3 +13626,85 @@ html.app-native .train-bbdiag [data-bb="export-row"] {
     transform: none !important;
   }
 }
+/* --- 114. NUTRITION FULL-BLEED + STICKY + WHITE-TEXT (задачи 09-2026) ---
+ * Только APK (html.app-native). TG/web — инлайны из TSX едины.
+ * 1) hero на весь экран (бьёт §73 top:24px — позже и точнее);
+ * 2) тело вкладок до низа без чёрной ямы (12px над пилюлей вместо 140px);
+ * 3) плавающая строка добавления еды + шапка рациона sticky;
+ * 4) FAB генерации fixed над пилюлей;
+ * 5) весь серый текст блока → белый (только color-свойство, рамки/фоны целы);
+ * 6) тапер: APK-press/focus/tabular/тач-норма. */
+html.app-native .nutrition-hero {
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  background: rgba(0, 0, 0, 1) !important;
+  overflow: hidden !important;
+}
+html.app-native .nutrition-tabs-body {
+  padding: 0 12px calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
+}
+html.app-native .nd-add-sticky {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 18 !important;
+  background: rgba(9, 18, 34, 0.92) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+}
+html.app-native .plan-tabbar-sticky {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+}
+html.app-native .plan-generate-fab {
+  position: fixed !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
+  max-width: 560px !important;
+  margin: 0 auto !important;
+  min-height: 52px !important;
+  z-index: 30 !important;
+}
+html.app-native .nutrition-screen [style*="color:rgba(255"], html.app-native .nutrition-screen [style*="color: rgba(255"], html.app-native .food-diary [style*="color:rgba(255"], html.app-native .food-diary [style*="color: rgba(255"], html.app-native .plan-root [style*="color:rgba(255"], html.app-native .plan-root [style*="color: rgba(255"], html.app-native .peak-root [style*="color:rgba(255"], html.app-native .peak-root [style*="color: rgba(255"], html.app-native .modern-hero [style*="color:rgba(255"], html.app-native .modern-hero [style*="color: rgba(255"] {
+  color: #fff !important;
+}
+html.app-native .nutrition-tabs input::placeholder {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+html.app-native .peak-seg button {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .peak-step button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .peak-toggle:active, html.app-native .peak-seg button:active, html.app-native .peak-step button:active {
+  transform: scale(0.96) !important;
+}
+html.app-native .peak-toggle:focus-visible, html.app-native .peak-seg button:focus-visible, html.app-native .peak-step button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .peak-hero {
+  border-radius: 20px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+@media (max-width: 380px) {
+  html.app-native .plan-generate-fab {
+    left: 8px !important;
+    right: 8px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .peak-toggle:active {
+    transform: none !important;
+  }
+}

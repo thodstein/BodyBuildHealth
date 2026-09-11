@@ -35,7 +35,7 @@ export const ModernHero: React.FC<{ icon: string; title: string; subtitle: strin
           {title}
           {count !== undefined && <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:999, background: nutA(0.14), color: NUT_ACC, border:`1px solid ${nutA(0.25)}` }}>{count}</span>}
         </div>
-        <div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginTop:4, lineHeight:1.4, maxWidth:480 }}>{subtitle}</div>
+        <div style={{ fontSize:11, color:'#fff', marginTop:4, lineHeight:1.4, maxWidth:480 }}>{subtitle}</div>
       </div>
       {action && <div style={{ flexShrink:0 }}>{action}</div>}
     </div>
@@ -43,9 +43,9 @@ export const ModernHero: React.FC<{ icon: string; title: string; subtitle: strin
       <div style={{ display:'grid', gridTemplateColumns:`repeat(${stats.length},1fr)`, gap:8, marginTop:12 }}>
         {stats.map(s => (
           <div key={s.k} style={{ background:s.bg, border:`1px solid ${s.col}18`, borderRadius:12, padding:'8px 10px', textAlign:'center' as const }}>
-            <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)', letterSpacing:0.3, textTransform:'uppercase' as const, fontWeight:600 }}>{s.k}</div>
+            <div style={{ fontSize:8, color:'#fff', letterSpacing:0.3, textTransform:'uppercase' as const, fontWeight:600 }}>{s.k}</div>
             <div style={{ fontSize:18, fontWeight:800, color:s.col, marginTop:2 }}>{s.v}</div>
-            <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>{s.sub}</div>
+            <div style={{ fontSize:8, color:'#fff' }}>{s.sub}</div>
           </div>
         ))}
       </div>
@@ -58,7 +58,7 @@ export const ModernPill: React.FC<{ active: boolean; onClick: () => void; childr
     padding:'6px 12px', borderRadius:999, fontSize:11, cursor:'pointer', fontWeight: active ? 700 : 500, whiteSpace:'nowrap' as const, transition:'all 0.15s',
     border: active ? `1px solid ${accent || NUT_ACC}` : '1px solid rgba(255,255,255,0.07)',
     background: active ? (accent ? `${accent}18` : `linear-gradient(135deg, ${nutA(0.18)}, ${nutA(0.12)})`) : '#202023',
-    color: active ? (accent || NUT_ACC) : 'rgba(255,255,255,0.75)',
+    color: active ? (accent || NUT_ACC) : '#fff',
     boxShadow: active ? `0 2px 8px ${accent ? accent + '20' : nutA(0.13)}` : 'none',
   }}>{children}</button>
 );

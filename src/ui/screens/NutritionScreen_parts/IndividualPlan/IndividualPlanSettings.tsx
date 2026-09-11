@@ -2794,8 +2794,8 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
       )}
 
-      {/* Кнопка генерации внизу настроек */}
-      <button onClick={() => { try { const _err = _validatePlannerInput(); if (_err) { setErrorMsg(_err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { try { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } catch {} } }} style={{
+      {/* Кнопка генерации внизу настроек — плавающая (FAB): TG sticky, APK fixed над пилюлей (§114) */}
+      <button className="plan-generate-fab" data-fab="plan-generate" onClick={() => { try { const _err = _validatePlannerInput(); if (_err) { setErrorMsg(_err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { try { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } catch {} } }} style={{
         width: '100%', padding: '14px', borderRadius: 12, cursor: 'pointer',
         fontSize: 13, fontWeight: 700,
         background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
