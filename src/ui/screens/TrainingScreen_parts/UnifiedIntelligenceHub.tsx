@@ -304,7 +304,8 @@ export const UnifiedIntelligenceHub: React.FC = () => {
     } catch { return null; }
   }, [readiness, acwr, sessions.length]);
 
-  // unified apply: один раз, без дублей
+  // unified apply: один раз pri + явный deload вторым пейлоадом при флаге
+  // (pri-контракт deload-флага не несёт — только объём/RIR; оба kind живут в хендлерах)
   const applyUnified = ()=> {
     const vol = autoReg.volumeMultiplier;
     const rir = autoReg.rirShift;
@@ -312,7 +313,8 @@ export const UnifiedIntelligenceHub: React.FC = () => {
     const label = deload ? `Интеллект: deload (ACWR ${acwr.ratio.toFixed(2)}/${ZONE_META[acwr.zone].label}, RI ${recoveryOut?.overallRecoveryIndex ?? '—'})` : `Интеллект: объём ×${vol} · RIR +${rir} (ACWR ${acwr.ratio.toFixed(2)}, PRI ${pri})`;
     // pri-канал — канон для объёма/RIR; добавим deload-флаг в label (движок объёма учтёт).
     applyToPlanner({ kind:'pri', label, data:{ volumeMult: vol, rirShift: rir } });
-    const t = (window as any).showToast; if (typeof t==='function') t(deload ? '🔄 Deload отправлен в планировщик' : `✓ Коррекция ×${vol} · RIR+${rir} отправлена`, 'success'); else alert(label);
+    if (deload) applyToPlanner({ kind:'deload', label: `${label} · deload-неделя`, data:{ volumeMult: vol, rirShift: rir, weeks: [] } });
+    const t = (window as any).showToast; if (typeof t==='function') t(deload ? '🔄 Deload отправлен в планировщик (pri + deload-неделя)' : `✓ Коррекция ×${vol} · RIR+${rir} отправлена`, 'success'); else alert(label);
   };
 
   const last7 = report.dailyLoads.slice(-7);
@@ -723,7 +725,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                     <span style={{ fontWeight:800, color: Math.abs(ex.avgBias)>1?'#ef4444':'#eab308' }}>{ex.avgBias>0?'+':''}{ex.avgBias.toFixed(1)} (n={ex.totalPoints})</span>
                   </div>
                 ))}
-                <div style={{ marginTop:6, color:DIM }}>Коррекция RIR уже учтена в «Авторегуляции» выше (rirShift). Отдельные кнопки применения — убраны, чтобы не дублировать.</div>
+                <div style={{ marginTop:6, color:DIM }}>Авторегуляция выше bias дневника не видит — это чтение для ручной правки «План RIR». В план bias уезжает тумблером «Применить калибровку» в карточке RIR-калибрации (дневник / RIR-хаб).</div>
               </div>
             } />
           ) : (
@@ -871,8 +873,8 @@ export const UnifiedIntelligenceHub: React.FC = () => {
         </div>
         <div style={{ ...SMALL, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:10, lineHeight:1.45 }}>
           <b style={{ color:'#fff' }}>Что применится:</b> объём <b style={{ color:ACCENT }}>×{autoReg.volumeMultiplier}</b> · RIR <b style={{ color:ACCENT }}>+{autoReg.rirShift}</b> ·
-          топ-сет <b style={{ color:ACCENT }}>{(autoReg.adjustedTopSetPct ?? topPct)!=null ? `${((autoReg.adjustedTopSetPct ?? topPct)*100).toFixed(1)}%` : '—'}</b>
-          { (autoReg.deload || !!recoveryOut?.deloadRecommended) && <span style={{ color:'#ef4444', fontWeight:800 }}> · deload</span> }.
+          топ-сет <b style={{ color:ACCENT }}>{(autoReg.adjustedTopSetPct ?? topPct)!=null ? `${((autoReg.adjustedTopSetPct ?? topPct)*100).toFixed(1)}%` : '—'}</b> <span style={{ color:DIM }}>(ориентир — в планировщик едут объём/RIR, вес правится вручную)</span>
+          { (autoReg.deload || !!recoveryOut?.deloadRecommended) && <span style={{ color:'#ef4444', fontWeight:800 }}> · deload (вторым пейлоадом kind=deload)</span> }.
           Forecast {forecast ? `→ ${Math.round(forecast.values[0])}` : '—'} + what-if ΔГ {whatIf.readinessDelta>=0?'+':''}{whatIf.readinessDelta} — информативно, в план не пишется.
           <span style={{ color:DIM }}> Канал: pri (планировщик покажет баннер и пересчитает).</span>
         </div>

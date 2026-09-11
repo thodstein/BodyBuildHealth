@@ -9,6 +9,8 @@ beforeEach(() => {
     localStorage.removeItem('he_srpe_sessions');
     localStorage.removeItem('he_hrv_log');
     localStorage.removeItem('he_readiness_history');
+    localStorage.removeItem('he_planner_apply');
+    localStorage.removeItem('he_rir_calibration');
   } catch { /* noop */ }
 });
 
@@ -56,5 +58,30 @@ describe('P5 Intelligence Hub UI', () => {
   it('D3 суперкомпенсация честно помечена ориентиром', () => {
     render(<UnifiedIntelligenceHub />);
     expect(document.body.textContent).toContain('Суперкомп. (ориентир)');
+  });
+
+  it('E1 pri уходит всегда, deload — вторым пейлоадом при флаге', () => {
+    render(<UnifiedIntelligenceHub />);
+    fireEvent.click(screen.getByText(/Применить к планировщику/));
+    expect(JSON.parse(localStorage.getItem('he_planner_apply') || '{}').kind).toBe('pri');
+  });
+
+  it('E1 deload-путь: низкая готовность → последним едет kind=deload', () => {
+    localStorage.setItem('he_unified_intel_snapshot_v2', JSON.stringify({ readiness: 20, fatigue: 90 }));
+    render(<UnifiedIntelligenceHub />);
+    fireEvent.click(screen.getByText(/Применить к планировщику/));
+    const payload = JSON.parse(localStorage.getItem('he_planner_apply') || '{}');
+    expect(payload.kind).toBe('deload');
+    expect(payload.data.volumeMult).toBeLessThan(1);
+  });
+
+  it('E2 калибровка: честная подпись (авторегуляция bias не видит)', () => {
+    localStorage.setItem('he_rir_calibration', JSON.stringify([
+      { date: '2026-09-01', sessionFocus: 'push', exerciseId: 'bench', exerciseName: 'Жим', plannedRIR: 2, actualRIR: 1, weight: 100, reps: 5, setNumber: 1 },
+      { date: '2026-09-02', sessionFocus: 'push', exerciseId: 'bench', exerciseName: 'Жим', plannedRIR: 2, actualRIR: 0, weight: 100, reps: 5, setNumber: 1 },
+    ]));
+    render(<UnifiedIntelligenceHub />);
+    fireEvent.click(screen.getByText(/RIR-калибрация/));
+    expect(document.body.textContent).toContain('не видит');
   });
 });
