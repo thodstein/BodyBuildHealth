@@ -14,7 +14,8 @@
  *  - визуальная шлифовка: стеклянные карты, градиенты, sticky-навигация, мягкие переходы, 44px тачи.
  */
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { loadSRPESessions, saveSRPESession, clearSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
+import { loadSRPESessions, saveSRPESession, clearSRPESessions, updateSRPESession, deleteSRPESession, importSRPEFromDiary, type SRPESession } from '../../../engines/pro/srpe-store';
+import { buildIntelCsv, buildIntelHtml, buildIntelDeloadIcs } from '../../../engines/pro/intelligence-export.engine';
 import { toDailyLoads, acuteChronicRatio, weeklyMonotony, fitnessFatigue, trainingLoadReport, sessionLoad, ACWR_DISCLAIMER, type DayLoad } from '../../../engines/pro/training-load.engine';
 import { analyzeRecovery, shouldTrain } from '../../../engines/recovery-optimization.engine';
 import { calculatePRI, getPRIThreshold } from '../../../engines/autoregulation.engine';
@@ -73,7 +74,8 @@ function useStickySection(active: SectionId, setActive: (s: SectionId) => void) 
   return refs;
 }
 
-const SNAP_KEY = 'he_unified_intel_snapshot_v1';
+const SNAP_KEY = 'he_unified_intel_snapshot_v1'; // legacy, только чтение для миграции
+const SNAP_KEY_V2 = 'he_unified_intel_snapshot_v2'; // P5: + goal/e1RM/RPE/топ-сет/what-if
 export const UnifiedIntelligenceHub: React.FC = () => {
   // ——— единый снапшот ———
   const [readiness, setReadiness] = useState(72);
@@ -101,31 +103,49 @@ export const UnifiedIntelligenceHub: React.FC = () => {
   const [sDate, setSDate] = useState(new Date().toISOString().slice(0,10));
   const [sRPE, setSRPE] = useState(7);
   const [sDur, setSDur] = useState(60);
+  // P5: точечная правка строки журнала
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editRpe, setEditRpe] = useState(7);
+  const [editDur, setEditDur] = useState(60);
   const [active, setActive] = useState<SectionId>('load');
   const refs = useStickySection(active, setActive);
   const scrollTo = (id: SectionId) => document.getElementById('sec-'+id)?.scrollIntoView({ behavior:'smooth', block:'start' });
 
-  // autofill once: снапшот → профиль → дефолт (снапшот приоритетнее, чтобы не терять ручные правки)
+  // autofill once: снапшот v2 → v1-миграция → профиль → дефолт (снапшот приоритетнее, чтобы не терять ручные правки)
   useEffect(() => {
+    const applySnap = (s: any) => {
+      if (typeof s.readiness === 'number') setReadiness(s.readiness);
+      if (typeof s.fatigue === 'number') setFatigue(s.fatigue);
+      if (typeof s.sleepHours === 'number') setSleepHours(s.sleepHours);
+      if (typeof s.sleepQuality === 'number') setSleepQuality(s.sleepQuality);
+      if (typeof s.rmssd === 'number') setRmssd(s.rmssd);
+      if (typeof s.restingHR === 'number') setRestingHR(s.restingHR);
+      if (typeof s.stress === 'number') setStress(s.stress);
+      if (typeof s.doms === 'number') setDoms(s.doms);
+      if (typeof s.trainDays === 'number') setTrainDays(s.trainDays);
+      if (s.phase) setPhase(s.phase);
+      if (typeof s.lastRPE === 'number') setLastRPE(s.lastRPE);
+      if (typeof s.vLoss === 'number') setVLoss(s.vLoss);
+      if (s.goal === 'strength' || s.goal === 'hypertrophy') setGoal(s.goal);
+      if (typeof s.e1rm === 'number') setE1rm(s.e1rm);
+      if (typeof s.rpe === 'number') setRpe(s.rpe);
+      if (typeof s.repCnt === 'number') setRepCnt(s.repCnt);
+      if (typeof s.topPct === 'number') setTopPct(s.topPct);
+      if (typeof s.planRIR === 'number') setPlanRIR(s.planRIR);
+      if (typeof s.calDelta === 'number') setCalDelta(s.calDelta);
+      if (typeof s.sleepDelta === 'number') setSleepDelta(s.sleepDelta);
+      if (typeof s.aasMult === 'number') setAasMult(s.aasMult);
+    };
     try {
+      const raw2 = localStorage.getItem(SNAP_KEY_V2);
+      if (raw2) { applySnap(JSON.parse(raw2)); return; }
       const raw = localStorage.getItem(SNAP_KEY);
       if (raw) {
-        const s = JSON.parse(raw);
-        if (typeof s.readiness === 'number') setReadiness(s.readiness);
-        if (typeof s.fatigue === 'number') setFatigue(s.fatigue);
-        if (typeof s.sleepHours === 'number') setSleepHours(s.sleepHours);
-        if (typeof s.sleepQuality === 'number') setSleepQuality(s.sleepQuality);
-        if (typeof s.rmssd === 'number') setRmssd(s.rmssd);
-        if (typeof s.restingHR === 'number') setRestingHR(s.restingHR);
-        if (typeof s.stress === 'number') setStress(s.stress);
-        if (typeof s.doms === 'number') setDoms(s.doms);
-        if (typeof s.trainDays === 'number') setTrainDays(s.trainDays);
-        if (s.phase) setPhase(s.phase);
-        if (typeof s.lastRPE === 'number') setLastRPE(s.lastRPE);
-        if (typeof s.vLoss === 'number') setVLoss(s.vLoss);
+        applySnap(JSON.parse(raw));
+        try { localStorage.removeItem(SNAP_KEY); } catch { /* ignore */ }
         return;
       }
-    } catch {}
+    } catch { /* ignore */ }
     try {
       const p: any = getProfile()?.settings || {};
       if (p.lifestyle?.sleepHours) setSleepHours(p.lifestyle.sleepHours);
@@ -137,15 +157,26 @@ export const UnifiedIntelligenceHub: React.FC = () => {
       if (p.training?.daysPerWeek) setTrainDays(p.training.daysPerWeek);
     } catch {}
   }, []);
-  // persist снапшот (debounce 400мс через эффект)
+  // persist снапшот v2 (debounce 400мс через эффект)
   useEffect(() => {
     try {
-      const snap = { readiness, fatigue, sleepHours, sleepQuality, rmssd, restingHR, stress, doms, trainDays, phase, lastRPE, vLoss };
-      localStorage.setItem(SNAP_KEY, JSON.stringify(snap));
-    } catch {}
-  }, [readiness, fatigue, sleepHours, sleepQuality, rmssd, restingHR, stress, doms, trainDays, phase, lastRPE, vLoss]);
+      const snap = { readiness, fatigue, sleepHours, sleepQuality, rmssd, restingHR, stress, doms, trainDays, phase, lastRPE, vLoss, goal, e1rm, rpe, repCnt, topPct, planRIR, calDelta, sleepDelta, aasMult, v: 2 };
+      localStorage.setItem(SNAP_KEY_V2, JSON.stringify(snap));
+    } catch { /* ignore */ }
+  }, [readiness, fatigue, sleepHours, sleepQuality, rmssd, restingHR, stress, doms, trainDays, phase, lastRPE, vLoss, goal, e1rm, rpe, repCnt, topPct, planRIR, calDelta, sleepDelta, aasMult]);
 
   const reload = useCallback(()=> setSessions(loadSRPESessions()), []);
+  // P5: импорт из дневника тренировок (без двойного ввода; дедуп внутри стора)
+  const importFromDiary = ()=> {
+    try {
+      const raw = JSON.parse(localStorage.getItem('he_workout_log_v2') || '[]');
+      const list = Array.isArray(raw) ? raw : [];
+      const { added } = importSRPEFromDiary(list.map((w: any)=> ({ date: w.date, overallRPE: w.overallRPE, durationMin: w.duration })));
+      reload();
+      const t = (window as any).showToast;
+      if (typeof t === 'function') t(added > 0 ? `📥 Импортировано тренировок: ${added}` : '📥 Новых тренировок в дневнике нет', added > 0 ? 'success' : 'info');
+    } catch { /* ignore */ }
+  };
   const addSession = ()=> { saveSRPESession({ date: sDate, sRPE, durationMin: sDur }); reload(); };
   const clearAll = ()=> { clearSRPESessions(); reload(); };
 
@@ -380,7 +411,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
           }} style={{ flex:1, minHeight:42, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(99,102,241,0.28)', background:'rgba(99,102,241,0.12)', color:'#818cf8', fontWeight:800, fontSize:12, cursor:'pointer', transition:'all 0.15s' }}>📋 Авто из профиля</button>
           <button onClick={reload} style={{ flex:1, minHeight:42, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(0,230,138,0.10)', color:ACCENT, fontWeight:800, fontSize:12, cursor:'pointer', transition:'all 0.15s' }}>🔁 sRPE ({sessions.length})</button>
           <button onClick={()=>{
-            try { localStorage.removeItem(SNAP_KEY); } catch {}
+            try { localStorage.removeItem(SNAP_KEY_V2); localStorage.removeItem(SNAP_KEY); } catch { /* ignore */ }
             setReadiness(72); setFatigue(28); setSleepHours(7.5); setSleepQuality(4); setRmssd(55); setRestingHR(58); setStress(4); setDoms(2); setTrainDays(4); setPhase('accumulation'); setLastRPE(7); setVLoss(12);
             const t=(window as any).showToast; if(typeof t==='function') t('↩ Сброшено к дефолту','info');
           }} style={{ minWidth:84, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:DIM, fontWeight:700, fontSize:12, cursor:'pointer', transition:'all 0.15s' }}>↩ Сброс</button>
@@ -411,8 +442,9 @@ export const UnifiedIntelligenceHub: React.FC = () => {
             <PopupNumber label="sRPE 1–10" value={sRPE} min={1} max={10} onChange={setSRPE} />
             <PopupNumber label="Длит. мин" value={sDur} min={5} max={300} suffix=" мин" onChange={setSDur} />
           </div>
-          <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+          <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
             <button onClick={addSession} style={{ flex:1, minHeight:42, borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:12 }}>💾 Добавить ({sessionLoad(sRPE,sDur)} AU)</button>
+            <button onClick={importFromDiary} style={{ padding:'10px 14px', borderRadius:10, border:'1px solid rgba(96,165,250,0.28)', background:'rgba(96,165,250,0.08)', color:'#60a5fa', fontWeight:800, fontSize:12, cursor:'pointer', minHeight:42 }}>📥 Из дневника</button>
             {sessions.length>0 && <button onClick={clearAll} style={{ padding:'10px 14px', borderRadius:10, border:'1px solid rgba(239,68,68,0.28)', background:'rgba(239,68,68,0.08)', color:'#ef4444', fontWeight:800, fontSize:12, cursor:'pointer' }}>Очистить</button>}
           </div>
           {sessions.length===0 ? (
@@ -486,11 +518,31 @@ export const UnifiedIntelligenceHub: React.FC = () => {
 
               <ExpandableCard title={`Журнал sRPE · ${sessions.length}`} short={`${sessions.length} записей · ACWR ${acwr.ratio.toFixed(2)} · ${ZONE_META[acwr.zone].label}`} full={
                 <div>
-                  {sessions.slice().reverse().slice(0,30).map((s,i)=> (
-                    <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 0.6fr 0.7fr 0.6fr', gap:4, fontSize:10, padding:'5px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>
-                      <span>{s.date}</span><span>RPE {s.sRPE}</span><span>{s.durationMin} мин</span><span style={{ color:ACCENT, fontWeight:800 }}>{sessionLoad(s.sRPE,s.durationMin)} AU</span>
+                  {sessions.slice().reverse().slice(0,30).map((s,i)=> {
+                    const realIdx = sessions.length - 1 - i;
+                    const editing = editIdx === realIdx;
+                    return (
+                    <div key={i} style={{ display:'grid', gridTemplateColumns: editing ? '1fr' : '1fr 0.6fr 0.7fr 0.6fr auto', gap:4, fontSize:10, padding:'5px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', color:'#fff', alignItems:'center' }}>
+                      {editing ? (
+                        <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                          <span>{s.date}</span>
+                          <label style={{ fontSize:10 }}>RPE <input type="number" min={1} max={10} value={editRpe} onChange={e=> setEditRpe(Number(e.target.value))} style={{ width:56, fontSize:16, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', borderRadius:8, padding:'6px' }} /></label>
+                          <label style={{ fontSize:10 }}>Мин <input type="number" min={1} max={600} value={editDur} onChange={e=> setEditDur(Number(e.target.value))} style={{ width:64, fontSize:16, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', borderRadius:8, padding:'6px' }} /></label>
+                          <button onClick={()=> { setSessions(updateSRPESession(realIdx, { sRPE: editRpe, durationMin: editDur })); setEditIdx(null); }} style={{ minHeight:40, padding:'6px 12px', borderRadius:8, border:'none', background:'#00e68a', color:'#000', fontWeight:800, fontSize:11, cursor:'pointer' }}>✓</button>
+                          <button onClick={()=> setEditIdx(null)} aria-label="Отменить правку" style={{ minHeight:40, padding:'6px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'#fff', fontSize:11, cursor:'pointer' }}>✕</button>
+                        </div>
+                      ) : (
+                        <>
+                          <span>{s.date}</span><span>RPE {s.sRPE}</span><span>{s.durationMin} мин</span><span style={{ color:ACCENT, fontWeight:800 }}>{sessionLoad(s.sRPE,s.durationMin)} AU</span>
+                          <span style={{ display:'flex', gap:4 }}>
+                            <button onClick={()=> { setEditIdx(realIdx); setEditRpe(s.sRPE); setEditDur(s.durationMin); }} aria-label={`Править запись ${s.date}`} style={{ minWidth:40, minHeight:40, borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'#fff', fontSize:12, cursor:'pointer' }}>✏️</button>
+                            <button onClick={()=> setSessions(deleteSRPESession(realIdx))} aria-label={`Удалить запись ${s.date}`} style={{ minWidth:40, minHeight:40, borderRadius:8, border:'1px solid rgba(239,68,68,0.25)', background:'transparent', color:'#ef4444', fontSize:12, cursor:'pointer' }}>🗑</button>
+                          </span>
+                        </>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               } />
 
@@ -812,6 +864,36 @@ export const UnifiedIntelligenceHub: React.FC = () => {
         <button onClick={applyUnified} style={{ width:'100%', minHeight:46, borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:13, boxShadow:'0 6px 18px rgba(0,230,138,0.22)' }}>
           🛠 Применить к планировщику — объём ×{autoReg.volumeMultiplier} · RIR +{autoReg.rirShift} {(autoReg.deload || !!recoveryOut?.deloadRecommended) ? '· deload' : ''}
         </button>
+        <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap' }}>
+          <button onClick={()=>{
+            try {
+              const html = buildIntelHtml(sessions, { acwr: acwr.ratio.toFixed(2), acwrZone: ZONE_META[acwr.zone].label, recovery: recoveryOut ? `${recoveryOut.overallRecoveryIndex} · ${recoveryOut.readinessLabel}` : '—', pri: `${pri} · ${priThr.label}`, volumeMult: autoReg.volumeMultiplier, rirShift: autoReg.rirShift, deload: autoReg.deload || !!recoveryOut?.deloadRecommended, forecast: forecast ? `${Math.round(forecast.values[0])}` : '—', generatedAt: new Date().toISOString().slice(0,10) });
+              const w = window.open('', '_blank');
+              if (w) { w.document.write(html); w.document.close(); w.focus(); w.print(); }
+              else { const t=(window as any).showToast; if(typeof t==='function') t('⚠ Всплывающие окна заблокированы','warning'); }
+            } catch { /* ignore */ }
+          }} style={{ flex:1, minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>🖨 HTML</button>
+          <button onClick={()=>{
+            try {
+              const blob = new Blob([buildIntelCsv(sessions)], { type: 'text/csv;charset=utf-8' });
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob); a.download = 'intellect-srpe.csv'; a.click();
+              setTimeout(()=> URL.revokeObjectURL(a.href), 2000);
+            } catch { /* ignore */ }
+          }} style={{ flex:1, minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📥 CSV</button>
+          <button onClick={()=>{
+            try {
+              const ics = buildIntelDeloadIcs(autoReg.deload || !!recoveryOut?.deloadRecommended);
+              const t = (window as any).showToast;
+              if (!ics) { if(typeof t==='function') t('Deload не требуется — событие не создано','info'); return; }
+              const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob); a.download = 'intellect-deload.ics'; a.click();
+              setTimeout(()=> URL.revokeObjectURL(a.href), 2000);
+              if(typeof t==='function') t('📅 Deload-неделя сохранена в календарь','success');
+            } catch { /* ignore */ }
+          }} style={{ flex:1, minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📅 Deload .ics</button>
+        </div>
         <div style={{ ...SMALL, textAlign:'center', marginTop:6 }}>Источники: Foster/Impellizzeri sRPE, Gabbett/Rollinson ACWR, Banister FF, Helms RIR/RPE, Zatsiorsky, Holt (1957). Без выдумок.</div>
       </div>
 
