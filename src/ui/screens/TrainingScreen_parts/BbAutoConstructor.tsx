@@ -1659,7 +1659,6 @@ export const BbAutoConstructor: React.FC = () => {
             }
             try { localStorage.setItem('he_bb_ortho_guards', JSON.stringify((bbDiag as any).orthoGuards ?? null)); } catch {}
           }
-        }
         if (Array.isArray(bbDiag.orthoFlags) && bbDiag.orthoFlags.length) {
           try { localStorage.setItem('he_bb_ortho_flags', JSON.stringify(bbDiag.orthoFlags)); } catch {}
           if (typeof bbDiag.orthoSummary === 'string' && bbDiag.orthoSummary) pro2parts.push(`🦴 ${bbDiag.orthoSummary.slice(0, 80)}`);
