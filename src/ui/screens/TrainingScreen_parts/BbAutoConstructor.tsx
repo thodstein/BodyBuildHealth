@@ -1899,6 +1899,14 @@ export const BbAutoConstructor: React.FC = () => {
     });
   }, [builtPlan, linked.profile, acwrData, injuries, mobilityRestrictions]);
   // Quality Hub PRO: V2-панель (аддитивно к S5 — S5 считается и показывается как раньше).
+  // Монотония Foster из того же дневника sRPE, что и ACWR.
+  const srpeMonotony = useMemo(() => {
+    try {
+      const srpe = loadSRPESessions();
+      if (srpe.length < 3) return null;
+      return sRPEAdjustment(srpe);
+    } catch { return null; }
+  }, [builtPlan]);
   const bbQualityV2 = useMemo(() => {
     if (!builtPlan) return null;
     try {
@@ -1906,10 +1914,19 @@ export const BbAutoConstructor: React.FC = () => {
         level: bbLevel,
         specTargets,
         acwrRatio: acwrData?.ratio ?? null,
+        monotony: srpeMonotony?.monotony ?? null,
         hasDiary: acwrData != null,
       });
     } catch { return null; }
-  }, [builtPlan, bbLevel, specTargets, acwrData]);
+  }, [builtPlan, bbLevel, specTargets, acwrData, srpeMonotony]);
+  const todayBadge = useMemo(() => {
+    if (acwrData == null) return null;
+    const acwr = acwrData.ratio;
+    if (acwr > 1.5) return '🔴 Сегодня — снизить объём (ACWR выше 1.5)';
+    if (acwr < 0.6) return '🔵 Сегодня — лёгкий день / техника (ACWR ниже 0.6)';
+    if (srpeMonotony != null && srpeMonotony.monotony > 2) return '🟡 Сегодня — варьируйте нагрузку (монотония выше 2)';
+    return '🟢 Сегодня — можно по плану';
+  }, [acwrData, srpeMonotony]);
   const safetyScore = useMemo<PlanSafetyScore | null>(() => {
     if (!builtPlan) return null;
     const personal = linked.profile?.settings?.personal;
@@ -5013,7 +5030,7 @@ export const BbAutoConstructor: React.FC = () => {
                 ))}
               </div>
             )}
-            {bbQualityV2 && <BbQualityV2Card v2={bbQualityV2} />}
+            {bbQualityV2 && <BbQualityV2Card v2={bbQualityV2} todayBadge={todayBadge} />}
           </CollapsibleCard>
         )}
         {/* 🧠 Логика построения плана — вынесена первой в Шаге 5 */}

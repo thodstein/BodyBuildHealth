@@ -76,4 +76,24 @@ describe('QualityActions — P6 smoke', () => {
     fireEvent.click(container.querySelector('[data-q="fix-volume"]')!);
     expect(container.querySelector('[role="status"]')?.textContent).toContain('планировщик');
   });
+
+  it('сводка S3+S4+V2 и split-кнопка', () => {
+    const { container } = render(
+      <QualityActions
+        {...PROPS} v2={V2} proDelta={-4}
+        splitCandidates={[{ muscle: 'chest', weeklySets: 18, frequency: 1 }]}
+      />,
+    );
+    expect(container.querySelector('[data-q="combined"]')?.textContent).toContain('База 78');
+    expect(container.querySelector('[data-q="combined"]')?.textContent).toContain('V2');
+    const split = container.querySelector('[data-q="fix-split"]') as HTMLButtonElement;
+    expect(split?.disabled).toBe(false);
+    fireEvent.click(split!);
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('План разбиения скопирован');
+  });
+
+  it('split без кандидатов — disabled', () => {
+    const { container } = render(<QualityActions {...PROPS} v2={V2} splitCandidates={[]} />);
+    expect((container.querySelector('[data-q="fix-split"]') as HTMLButtonElement)?.disabled).toBe(true);
+  });
 });

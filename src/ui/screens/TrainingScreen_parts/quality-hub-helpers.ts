@@ -25,6 +25,15 @@ const MUSCLE_TO_WM_KEY: Record<string, string> = {
   traps: 'traps', forearms: 'forearms',
 };
 
+/**
+ * Legacy-дефолты тоннажных графиков (display-only, из CalcQualityTab до распила).
+ * Профиль приоритетнее; эти числа — только когда профиля нет (графики не меняются).
+ */
+export const LEGACY_WM_DEFAULTS: Record<string, number> = {
+  chest: 100, back: 110, quads: 140, hamstrings: 90, glutes: 160, shoulders: 60,
+  biceps: 50, triceps: 60, calves: 120, abs: 60, legs: 120, arms: 50,
+};
+
 /** Единый резолв рабочего максимума: профиль → фолбэк 60. Не возвращает NaN/0. */
 export function resolveWorkMax(
   profileWorkMax: Record<string, number> | null | undefined,
@@ -41,25 +50,26 @@ export function resolveWorkMax(
 
 interface TplSet { pct?: number; reps?: number; sets?: number; rir?: number }
 interface TplExercise { name: string; group?: string; sets: TplSet[] }
-interface TplTemplate { weeks?: TplExercise[][][]; week1?: TplExercise[][] }
+interface TplDay { exercises: TplExercise[] }
+interface TplTemplate { weeks?: TplDay[][]; week1?: TplDay[] }
 
 export function buildSyntheticPlWeeks(tpl: TplTemplate | null | undefined): Array<{
   week: number; phase: 'accumulation'; deload: boolean;
   days: Array<{ name: string; exercises: Array<{ name: string; lift: 'accessory'; muscle: string; sets: TplSet[] }> }>;
 }> {
   if (!tpl) return [];
-  const rawWeeks: TplExercise[][][] = (tpl.weeks && tpl.weeks.length ? tpl.weeks : tpl.week1 ? [tpl.week1] : []);
+  const rawWeeks: TplDay[][] = (tpl.weeks && tpl.weeks.length ? tpl.weeks : tpl.week1 ? [tpl.week1] : []);
   return rawWeeks.map((days, wi) => ({
     week: wi + 1,
     phase: 'accumulation' as const,
     deload: false,
-    days: (days as TplExercise[][]).map((d: any, di: number) => ({
+    days: days.map((d, di) => ({
       name: `День ${di + 1}`,
-      exercises: ((d as any).exercises as TplExercise[]).map(ex => ({
+      exercises: (d.exercises || []).map(ex => ({
         name: ex.name,
         lift: 'accessory' as const,
         muscle: (ex as any).group || 'chest',
-        sets: ex.sets.map(s => ({ pct: s.pct, reps: s.reps, sets: s.sets, rir: s.rir ?? 2 })),
+        sets: (ex.sets || []).map(s => ({ pct: s.pct, reps: s.reps, sets: s.sets, rir: s.rir ?? 2 })),
       })),
     })),
   }));
@@ -96,6 +106,9 @@ export function deriveV2InputFromProgram(
   let weeksTotal = 0;
   let rirSum = 0; let rirN = 0; let rirLE2 = 0; let rir0 = 0;
   let deloadWeeks = 0;
+  const deloadWeekNums: number[] = [];
+  let deloadSetsSum = 0; let baseSetsSum = 0; let baseWeeksN = 0;
+  let deloadRirSum = 0; let deloadRirN = 0; let baseRirSum = 0; let baseRirN = 0;
   const pushName = (mu: string, nm: string) => {
     if (!nm) return;
     const arr = namesByMuscle[mu] || (namesByMuscle[mu] = []);
@@ -114,7 +127,10 @@ export function deriveV2InputFromProgram(
     if (!weeks.length) return null;
     weeksTotal = weeks.length;
     for (const w of weeks) {
-      if ((w as any).deload || (w as any).phase === 'deload') deloadWeeks += 1;
+      const isDeloadW = !!(w as any).deload || (w as any).phase === 'deload';
+      if (isDeloadW) { deloadWeeks += 1; deloadWeekNums.push((w as any).week || 0); }
+      else baseWeeksN += 1;
+      let weekSets = 0;
       for (const s of w.sessions || []) {
         const per: Record<string, number> = {};
         const names: string[] = [];
@@ -126,19 +142,32 @@ export function deriveV2InputFromProgram(
           weeklySets[mu] = (weeklySets[mu] || 0) + n;
           pushName(mu, b.exerciseName || '');
           names.push(b.exerciseName || '');
-          for (const st of b.sets || []) pushRir(st?.rir ?? 2, 1);
+          for (const st of b.sets || []) {
+            pushRir(st?.rir ?? 2, 1);
+            const r = Number(st?.rir ?? 2);
+            if (Number.isFinite(r)) {
+              if (isDeloadW) { deloadRirSum += r; deloadRirN += 1; }
+              else { baseRirSum += r; baseRirN += 1; }
+            }
+          }
+          weekSets += n;
         }
         exerciseNames.push(names);
         for (const [mu] of Object.entries(per)) freqCount[mu] = (freqCount[mu] || 0) + 1;
         for (const [mu, n] of Object.entries(per)) sessionMax[mu] = Math.max(sessionMax[mu] || 0, n);
       }
+      if (isDeloadW) deloadSetsSum += weekSets;
+      else baseSetsSum += weekSets;
     }
   } else {
     const weeks = program.pl?.customWeeks || [];
     if (!weeks.length) return null;
     weeksTotal = weeks.length;
     for (const w of weeks) {
-      if ((w as any).deload || (w as any).phase === 'deload') deloadWeeks += 1;
+      const isDeloadW = !!(w as any).deload || (w as any).phase === 'deload';
+      if (isDeloadW) { deloadWeeks += 1; deloadWeekNums.push((w as any).week || 0); }
+      else baseWeeksN += 1;
+      let weekSets = 0;
       for (const d of w.days || []) {
         const per: Record<string, number> = {};
         const names: string[] = [];
@@ -149,12 +178,22 @@ export function deriveV2InputFromProgram(
           weeklySets[mu] = (weeklySets[mu] || 0) + n;
           pushName(mu, ex.name || '');
           names.push(ex.name || '');
-          for (const s of ex.sets || []) pushRir(s?.rir ?? 2, s.sets || 1);
+          for (const s of ex.sets || []) {
+            pushRir(s?.rir ?? 2, s.sets || 1);
+            const r = Number(s?.rir ?? 2);
+            if (Number.isFinite(r)) {
+              if (isDeloadW) { deloadRirSum += r * (s.sets || 1); deloadRirN += (s.sets || 1); }
+              else { baseRirSum += r * (s.sets || 1); baseRirN += (s.sets || 1); }
+            }
+          }
+          weekSets += n;
         }
         exerciseNames.push(names);
         for (const [mu] of Object.entries(per)) freqCount[mu] = (freqCount[mu] || 0) + 1;
         for (const [mu, n] of Object.entries(per)) sessionMax[mu] = Math.max(sessionMax[mu] || 0, n);
       }
+      if (isDeloadW) deloadSetsSum += weekSets;
+      else baseSetsSum += weekSets;
     }
   }
 
@@ -173,6 +212,8 @@ export function deriveV2InputFromProgram(
     if (!lm) continue;
     mev[mu] = lm.mev; mav[mu] = lm.mav; mrv[mu] = lm.mrv;
   }
+  const baseAvg = baseWeeksN > 0 ? baseSetsSum / baseWeeksN : 0;
+  const deloadAvg = deloadWeeks > 0 ? deloadSetsSum / deloadWeeks : 0;
   return {
     level, weeklySets, frequency, mev, mav, mrv,
     sessionMaxByMuscle: sessionMax,
@@ -183,7 +224,17 @@ export function deriveV2InputFromProgram(
       fracRir0: Math.round((rir0 / rirN) * 100) / 100,
       totalSets: rirN,
     } : null,
-    deload: { hasDeload: deloadWeeks > 0, totalWeeks: weeksTotal, deloadWeeks: [] },
+    deload: deloadWeeks > 0 ? {
+      hasDeload: true,
+      totalWeeks: weeksTotal,
+      deloadWeeks: deloadWeekNums.filter(Boolean),
+      depthVolume: baseAvg > 0 ? Math.max(0, Math.min(1, Math.round((1 - deloadAvg / baseAvg) * 100) / 100)) : null,
+      rirShift: deloadRirN > 0 && baseRirN > 0
+        ? Math.round(((deloadRirSum / deloadRirN) - (baseRirSum / baseRirN)) * 10) / 10
+        : null,
+      loadDrop: null,
+      phaseTag: 'deload' as const,
+    } : null,
     shoulder: deriveShoulderFromNames(namesByMuscle, weeklySets),
     lengthShare: deriveLengthShare(namesByMuscle, weeklySets),
     load: null,
@@ -345,4 +396,103 @@ export function sendQualityWeakpointsFix(groups: string[], label: string): boole
     applyToPlanner({ kind: 'weakpoints', label, data: { groups } as any });
     return true;
   } catch { return false; }
+}
+
+/**
+ * Текст плана разбиения объёма на 2 сессии (для кнопки split-fix).
+ * Честный clipboard-план: конструкторы не умеют «разбить» мостом,
+ * поэтому отдаём готовый текст под копирование, а не фейковый мост.
+ */
+export function buildSplitFixText(
+  candidates: Array<{ muscle: string; weeklySets: number; frequency: number }>,
+): string {
+  const lines = candidates.map(c => {
+    const half = Math.round((c.weeklySets / 2) * 10) / 10;
+    return `${c.muscle}: ${c.weeklySets} сетов в ${c.frequency}×/нед → разбить на 2× по ~${half} (напр. Пн/Чт)`;
+  });
+  return `Разбиение объёма на 2 сессии (session MAV ≤10):\n${lines.join('\n')}`;
+}
+
+// ─── Сводка S3 + S4 + V2 (связка скорингов без двойного учёта) ───
+
+import { gradeQualityScore } from '../../../engines/quality-score-v2.engine';
+
+export interface CombinedQuality {
+  base: number;
+  proDelta: number | null;
+  proTotal: number | null;
+  v2: number | null;
+  /** Все доступные грейды в пределах одной соседней ступени. */
+  agreement: boolean;
+  text: string;
+}
+
+const GRADE_BAND: Record<string, number> = {
+  '🟢 Профессионально': 0, '🟡 Хорошо': 1, '🟠 Удовлетворительно': 2, '🔴 Требует доработки': 3,
+};
+
+/**
+ * Единый итог трёх контуров: база S3 + PRO-дельта S4 + V2 отдельно.
+ * Счёт НЕ суммируется (паттерны S4 и объём V2 — разные оси); agreement показывает,
+ * говорят ли контуры одно и то же (ступени грейда рядом).
+ */
+export function combinedQualitySummary(
+  baseScore: number,
+  proDelta: number | null | undefined,
+  v2Score: number | null | undefined,
+): CombinedQuality {
+  const pd = proDelta ?? null;
+  const v = v2Score ?? null;
+  const proTotal = pd == null ? null : Math.max(0, Math.min(100, baseScore + pd));
+  const bands = [gradeQualityScore(baseScore)];
+  if (proTotal != null) bands.push(gradeQualityScore(proTotal));
+  if (v != null) bands.push(gradeQualityScore(v));
+  const idx = bands.map(b => GRADE_BAND[b] ?? 3);
+  const agreement = Math.max(...idx) - Math.min(...idx) <= 1;
+  const text = `База ${baseScore}` +
+    (proTotal != null ? ` + PRO ${pd! >= 0 ? `+${pd}` : `${pd}`} = ${proTotal}` : ' · PRO нет') +
+    (v != null ? ` · V2 ${v}` : ' · V2 нет') +
+    (agreement ? ' · контуры согласны ✓' : ' · контуры расходятся ⚠');
+  return { base: baseScore, proDelta: pd, proTotal, v2: v, agreement, text };
+}
+
+// ─── Программа под разделение (канон синтеза из CalcQualityTab, 1-в-1) ───
+
+interface ProgramForDivision {
+  meta: { direction?: string };
+  pl?: { sourceCycleId?: string | null; customWeeks?: unknown };
+  hybrid?: { bbWeeks?: unknown };
+  bb?: unknown;
+}
+
+/**
+ * Программа для расчёта под разделение: ПЛ-синтетика из СРЦ-шаблона + hybrid-fallback.
+ * Чистая; раньше жила двумя копиями внутри CalcQualityTab (analysis/analysisNatural).
+ */
+export function programForDivision<T extends ProgramForDivision>(
+  selectedProgram: T | null | undefined,
+  division: 'bb' | 'pl',
+  getCycleById: (id: string) => unknown,
+): T | null {
+  if (!selectedProgram) return null;
+  let progForCalc = selectedProgram;
+  const isHybridProg = selectedProgram.meta.direction === 'hybrid';
+  if ((division === 'pl' || isHybridProg) && selectedProgram.pl?.sourceCycleId && !selectedProgram.pl.customWeeks) {
+    const tpl = getCycleById(selectedProgram.pl.sourceCycleId) as TplTemplate | null | undefined;
+    if (tpl) {
+      const synthWeeks = buildSyntheticPlWeeks(tpl);
+      progForCalc = { ...selectedProgram, pl: { ...selectedProgram.pl, customWeeks: synthWeeks as any } };
+    }
+  }
+  if (division === 'bb' && isHybridProg && !(progForCalc as any).bb && (progForCalc as any).hybrid?.bbWeeks) {
+    progForCalc = {
+      ...progForCalc,
+      bb: {
+        direction: 'bb', weeks: (progForCalc as any).hybrid.bbWeeks, volumeBudget: {},
+        progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: [] },
+        constraints: { equipment: [] }, microcycleTemplate: { daySlots: [] },
+      } as any,
+    };
+  }
+  return progForCalc;
 }

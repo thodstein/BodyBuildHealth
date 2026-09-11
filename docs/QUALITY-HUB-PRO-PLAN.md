@@ -1,8 +1,9 @@
 # Хаб «Качество программы» — аудит + PRO-план
 
-Статус: P1–P7 ВЫПОЛНЕНЫ кодом (Sep 12 2026, закоммичено pathspec своих, без пуша).
+Статус: P1–P7 ВЫПОЛНЕНЫ кодом (Sep 12 2026, закоммичено pathspec своих, без пуша: `d4a4c877`).
 Проверено: NEW v2 35/35 + S1-V2 11/11 + helpers 13/13 + actions 5/5 + соседи 67/67 = 131/131; `tsc` 0 по своим.
 Добивка «V2 в ББ-авто»: NEW bb-quality-v2 8/8 + card 3/3 + соседи 131/131 = 142/142; `tsc` 0 по проекту.
+Добивка-2 «9 остатков» (в worktree, БЕЗ коммита): phaseTag из contestPhase/peakWeek + глубина делода в хаб-деривации + монотония sRPEAdjustment с бейджем «сегодня» + manual RIR-passthrough + resolveWorkMax в проде + P7-распил (useQualityProgram/useQualityCharts/QualityScoreCard/PerMuscleBars) + паритет-матрица S1/S3/V2 (честный допуск ±12) + связка S4↔V2 (combinedQualitySummary) + split-фикс clipboard + АПК §117 (data-q/data-bb).
 Отклонения: legacy push/pull-ratio и грейды S3/S5 оставлены (V2-дубль рядом); QualityDiagnosticsHub не схлопнут (свои пропсы); числа VOLUME_LANDMARKS_DB не тронуты.
 Хаб: `QualityHub.tsx` (тонкая обёртка) → `CalcQualityTab.tsx` (~1100 строк) → движки `plan-quality.engine.ts` / `plan-quality-score.ts` / `manual-constructor/manual-quality.engine.ts` / `manual-constructor/pro-quality-analysis.engine.ts` / `volume-landmarks.engine.ts` / `bb/bb-quality-report.engine.ts`.
 Диагностика движения — соседний `DiagnosticsHub.tsx` (9 лифтов, вне скоупа этого плана, только стыки).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validatePlanQuality } from '../plan-quality.engine';
+import { validatePlanQuality, bbPlanToQualityInput, manualToQualityInput } from '../plan-quality.engine';
 
 const BASE = {
   dayGroups: [['chest'], ['back']],
@@ -100,5 +100,47 @@ describe('plan-quality S1+V2: делод-призрак и плечо/длина
   it('ACWR danger — warning', () => {
     const r = validatePlanQuality({ ...BASE, loadData: { hasDiary: true, acwr: 1.8, monotony: 1.2 } });
     expect(r.issues.some(i => i.id === 'load_acwr_danger')).toBe(true);
+  });
+  it('монотония >2 — info без штрафа делода', () => {
+    const r = validatePlanQuality({ ...BASE, loadData: { hasDiary: true, acwr: 1.0, monotony: 2.5 } });
+    expect(r.issues.some(i => i.id === 'load_monotony_high' && i.severity === 'info')).toBe(true);
+  });
+});
+
+describe('plan-quality: contestPhase → phaseTag', () => {
+  const wk = (extra: any, sets: number, rir: number) => ({
+    week: 1, ...extra,
+    sessions: [{ exercises: [{ muscle: 'chest', name: 'Жим', sets, rir, workSets: [] }] }],
+  });
+  it('taper-разметка даёт phaseTag taper (не делод)', () => {
+    const plan: any = {
+      weeks: [
+        wk({}, 10, 2), wk({}, 10, 2),
+        { ...wk({ contestPhase: 'taper' }, 6, 3), week: 3 },
+      ],
+    };
+    const input = bbPlanToQualityInput(plan, { level: 'intermediate' });
+    expect(input.deloadDepth?.phaseTag).toBe('taper');
+    expect(input.hasDeload).toBe(false);
+  });
+  it('peak_week-разметка даёт phaseTag peak', () => {
+    const plan: any = {
+      weeks: [wk({}, 10, 2), { ...wk({ contestPhase: 'peak_week', peakWeek: true }, 5, 3), week: 2 }],
+    };
+    const input = bbPlanToQualityInput(plan, { level: 'intermediate' });
+    expect(input.deloadDepth?.phaseTag).toBe('peak');
+  });
+});
+
+describe('plan-quality: manual RIR-passthrough', () => {
+  const days = [{ groups: ['chest'], exercises: [{ group: 'chest', sets: 12, name: 'Жим' }] }];
+  it('без rirStats — тишина, с rirStats новичка — critical', () => {
+    const a = validatePlanQuality(manualToQualityInput(days, { level: 'beginner' }));
+    expect(a.issues.some(i => i.id === 'rir_beginner_failure')).toBe(false);
+    const b = validatePlanQuality(manualToQualityInput(days, {
+      level: 'beginner',
+      rirStats: { avgRir: 1, fracRirLE2: 0.8, fracRir0: 0.2, totalSets: 12 },
+    }));
+    expect(b.issues.some(i => i.id === 'rir_beginner_failure' && i.severity === 'critical')).toBe(true);
   });
 });

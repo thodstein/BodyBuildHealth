@@ -11,7 +11,7 @@ import { v2OnlyIssues } from '../../../engines/bb/bb-quality-v2.engine';
 
 const NUM: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 
-export const BbQualityV2Card: React.FC<{ v2: QualityScoreV2 | null }> = ({ v2 }) => {
+export const BbQualityV2Card: React.FC<{ v2: QualityScoreV2 | null; todayBadge?: string | null }> = ({ v2, todayBadge }) => {
   const only = useMemo(() => v2OnlyIssues(v2), [v2]);
   if (!v2) return null;
   const color = v2.score >= 85 ? '#00e68a' : v2.score >= 65 ? '#fbbf24' : v2.score >= 45 ? '#fb923c' : '#f87171';
@@ -47,6 +47,11 @@ export const BbQualityV2Card: React.FC<{ v2: QualityScoreV2 | null }> = ({ v2 })
       {!v2.meta.hasDiary && (
         <div style={{ fontSize: 9, color: '#fff', opacity: 0.75, marginBottom: 4 }}>
           Нагрузка: нет дневника sRPE — слой ACWR не штрафует (запишите тренировки для точности).
+        </div>
+      )}
+      {v2.meta.hasDiary && todayBadge && (
+        <div data-bb="quality-v2-today" style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
+          {todayBadge}
         </div>
       )}
       {only.length > 0 ? (

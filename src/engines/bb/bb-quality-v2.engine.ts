@@ -20,6 +20,8 @@ export interface BBQualityV2Opts {
   specTargets?: string[];
   maintenanceMuscles?: string[];
   acwrRatio?: number | null;
+  /** Монотония Foster (sRPEAdjustment). null — нет данных. */
+  monotony?: number | null;
   hasDiary?: boolean;
 }
 
@@ -63,7 +65,7 @@ export function bbPlanQualityV2(
       sessionMaxByMuscle: qInput.sessionMaxByMuscle,
       namesByMuscle: qInput.namesByMuscle,
       rir: qInput.rirStats,
-      deload: qInput.hasDeload || (qInput.totalWeeks || 0) >= 6
+      deload: qInput.hasDeload || (qInput.totalWeeks || 0) >= 6 || qInput.deloadDepth != null
         ? {
           hasDeload: !!qInput.hasDeload,
           totalWeeks: qInput.totalWeeks || 0,
@@ -71,13 +73,13 @@ export function bbPlanQualityV2(
           depthVolume: qInput.deloadDepth?.depthVolume,
           rirShift: qInput.deloadDepth?.rirShift,
           loadDrop: qInput.deloadDepth?.loadDrop,
-          phaseTag: 'deload' as const,
+          phaseTag: qInput.deloadDepth?.phaseTag ?? 'deload',
         }
         : null,
       shoulder: qInput.shoulder,
       lengthShare: qInput.lengthShare,
-      load: opts.hasDiary || opts.acwrRatio != null
-        ? { acwr: opts.acwrRatio ?? null, monotony: null, hasDiary: !!opts.hasDiary }
+      load: opts.hasDiary || opts.acwrRatio != null || opts.monotony != null
+        ? { acwr: opts.acwrRatio ?? null, monotony: opts.monotony ?? null, hasDiary: !!opts.hasDiary }
         : null,
       specTargets: opts.specTargets,
       maintenanceMuscles: opts.maintenanceMuscles,

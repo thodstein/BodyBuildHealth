@@ -13802,3 +13802,35 @@ html.app-native .train-lift textarea {
     transform: none !important;
   }
 }
+
+/* ─── 117. QUALITY-HUB PRO — хаб качества: V2-действия, снапшоты, фиксы ─── */
+html.app-native [data-q="quality-actions"] button {
+  min-height: 44px !important;
+}
+html.app-native [data-q="quality-actions"] button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native [data-q="quality-actions"] button:focus-visible {
+  outline: 2px solid rgba(0, 230, 138, 0.8) !important;
+  outline-offset: 2px !important;
+}
+html.app-native [data-q="q-compare"] select {
+  min-height: 44px !important;
+  font-size: 16px !important;
+}
+html.app-native [data-q="v2-score"] span {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native [data-bb="quality-v2"] span {
+  font-variant-numeric: tabular-nums !important;
+}
+@media (max-width: 380px) {
+  html.app-native [data-q="quality-actions"] button {
+    font-size: 10px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native [data-q="quality-actions"] button:active {
+    transform: none !important;
+  }
+}

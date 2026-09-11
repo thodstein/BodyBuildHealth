@@ -9,6 +9,8 @@ import {
   QUALITY_HISTORY_CAP,
   buildQualityExportCsv,
   buildQualityExportHtml,
+  buildSplitFixText,
+  combinedQualitySummary,
   compareQualitySnapshots,
   loadQualityHistory,
   removeQualitySnapshot,
@@ -37,6 +39,10 @@ export interface QualityActionsProps {
   /** Недогруженные/слабые группы (для кнопки «Добить»). */
   weakGroups: string[];
   needsDeload: boolean;
+  /** PRO-дельта S4 (для сводки S3+S4+V2). null — S4 не посчитан. */
+  proDelta?: number | null;
+  /** Кандидаты на разбиение объёма (частота <2 при сетах >MAV). */
+  splitCandidates?: Array<{ muscle: string; weeklySets: number; frequency: number }>;
 }
 
 const BTN: React.CSSProperties = {
@@ -47,7 +53,7 @@ const BTN: React.CSSProperties = {
 const NUM: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 
 export const QualityActions: React.FC<QualityActionsProps> = (props) => {
-  const { programId, title, division, level, pedLabel, base, v2, overloadFix, weakGroups, needsDeload } = props;
+  const { programId, title, division, level, pedLabel, base, v2, overloadFix, weakGroups, needsDeload, proDelta, splitCandidates } = props;
   const [history, setHistory] = useState<QualitySnapshot[]>(() => loadQualityHistory());
   const [cmpA, setCmpA] = useState('');
   const [cmpB, setCmpB] = useState('');
@@ -123,6 +129,10 @@ export const QualityActions: React.FC<QualityActionsProps> = (props) => {
 
   const v2Color = !v2 ? '#fff' : v2.score >= 85 ? '#22c55e' : v2.score >= 65 ? '#f59e0b' : v2.score >= 45 ? '#fb923c' : '#ef4444';
   const overMuscles = Object.keys(overloadFix);
+  const combined = useMemo(
+    () => combinedQualitySummary(base.score, proDelta ?? null, v2?.score ?? null),
+    [base.score, proDelta, v2],
+  );
 
   return (
     <div data-q="quality-actions" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
@@ -149,6 +159,9 @@ export const QualityActions: React.FC<QualityActionsProps> = (props) => {
             })}
             <div style={{ fontSize: 9, color: '#fff', marginTop: 2 }}>
               {v2.meta.hasDiary ? 'Нагрузка: по дневнику' : 'Нагрузка: нет дневника — не штрафуется'} · Сетов/нед: <span style={NUM}>{v2.meta.totalSets}</span>
+            </div>
+            <div data-q="combined" style={{ fontSize: 10, fontWeight: 700, color: combined.agreement ? '#22c55e' : '#f59e0b', marginTop: 4 }}>
+              🧩 {combined.text}
             </div>
           </div>
         ) : (
@@ -190,6 +203,19 @@ export const QualityActions: React.FC<QualityActionsProps> = (props) => {
           style={{ ...BTN, flex: 1, minWidth: 150, border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.08)', color: '#60a5fa', opacity: weakGroups.length ? 1 : 0.4 }}
         >
           ➕ Добить слабые{weakGroups.length ? ` (${weakGroups.length})` : ''}
+        </button>
+        <button
+          data-q="fix-split" disabled={!(splitCandidates?.length)}
+          onClick={() => {
+            try {
+              const text = buildSplitFixText(splitCandidates || []);
+              navigator.clipboard?.writeText(text).catch(() => {});
+              say(`📋 План разбиения скопирован (${splitCandidates?.length}) — мост «разбить» конструкторы не умеют, вставьте вручную`);
+            } catch { say('⚠ Не удалось скопировать'); }
+          }}
+          style={{ ...BTN, flex: 1, minWidth: 150, border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)', color: '#a78bfa', opacity: splitCandidates?.length ? 1 : 0.4 }}
+        >
+          ✂ Разбить на 2×{splitCandidates?.length ? ` (${splitCandidates.length})` : ''}
         </button>
       </div>
 

@@ -120,6 +120,37 @@ describe('bb-quality-v2: RIR новичка и MV спец-блока', () => {
   });
 });
 
+describe('bb-quality-v2: монотония и taper-тег', () => {
+  it('монотония >2 — info без штрафа делода', () => {
+    const v2 = bbPlanQualityV2(bbPlan() as any, { level: 'intermediate', hasDiary: true, acwrRatio: 1.0, monotony: 2.5 })!;
+    expect(v2.issues.some(i => i.id === 'load_monotony_high' && i.severity === 'info')).toBe(true);
+  });
+  it('taper-разметка — phaseTag taper в глубине', () => {
+    const p = bbPlan({
+      weeks: [
+        {
+          week: 1, sessions: [{
+            day: 1, weekOffset: 1, character: 'тяж',
+            exercises: [
+              { muscle: 'chest', name: 'Жим', role: 'primary', sets: 10, repsRange: [6, 8], rir: 2, workSets: [] },
+            ],
+          }],
+        },
+        {
+          week: 2, contestPhase: 'taper', sessions: [{
+            day: 1, weekOffset: 1, character: 'лёг',
+            exercises: [
+              { muscle: 'chest', name: 'Жим', role: 'primary', sets: 6, repsRange: [6, 8], rir: 3, workSets: [] },
+            ],
+          }],
+        },
+      ],
+    });
+    const v2 = bbPlanQualityV2(p as any, { level: 'intermediate' })!;
+    expect(v2.issues.some(i => i.id === 'deload_ghost')).toBe(false);
+  });
+});
+
 describe('bb-quality-v2: пустой/битый план — null', () => {
   it('без недель — null', () => {
     expect(bbPlanQualityV2({ weeks: [] } as any, { level: 'intermediate' })).toBeNull();

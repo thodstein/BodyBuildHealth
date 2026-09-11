@@ -3,11 +3,14 @@ import {
   QUALITY_HISTORY_CAP,
   buildQualityExportCsv,
   buildQualityExportHtml,
+  buildSplitFixText,
   buildSyntheticPlWeeks,
+  combinedQualitySummary,
   compareQualitySnapshots,
   deriveV2InputFromProgram,
   escapeQualityHtml,
   loadQualityHistory,
+  programForDivision,
   removeQualitySnapshot,
   saveQualitySnapshot,
   QUALITY_HISTORY_KEY,
@@ -128,6 +131,75 @@ describe('quality-hub-helpers: сравнение', () => {
     expect(c.scoreDelta).toBe(10);
     expect(c.muscleDelta.find(m => m.muscle === 'chest')?.delta).toBe(4);
     expect(c.muscleDelta.find(m => m.muscle === 'back')?.delta).toBe(8);
+  });
+});
+
+describe('quality-hub-helpers: programForDivision', () => {
+  const tpl: any = { week1: [{ exercises: [{ name: 'Жим', sets: [{ pct: 0.7, reps: 5, sets: 3 }] }] }] };
+  const getById = (id: string) => (id === 'c1' ? tpl : null);
+  it('null → null', () => {
+    expect(programForDivision(null, 'bb', getById)).toBeNull();
+  });
+  it('ПЛ-синтетика из шаблона', () => {
+    const prog: any = { meta: { direction: 'pl' }, pl: { sourceCycleId: 'c1' } };
+    const out = programForDivision(prog, 'pl', getById)!;
+    expect(out.pl.customWeeks).toHaveLength(1);
+    expect(prog.pl.customWeeks).toBeUndefined(); // вход не мутирован
+  });
+  it('hybrid bb-fallback', () => {
+    const prog: any = { meta: { direction: 'hybrid' }, hybrid: { bbWeeks: [{ week: 1 }] } };
+    const out = programForDivision(prog, 'bb', getById)!;
+    expect((out.bb as any).weeks).toEqual([{ week: 1 }]);
+  });
+  it('без шаблона — как есть', () => {
+    const prog: any = { meta: { direction: 'pl' }, pl: { sourceCycleId: 'nope' } };
+    expect(programForDivision(prog, 'pl', getById)).toBe(prog);
+  });
+});
+
+describe('quality-hub-helpers: combinedQualitySummary', () => {
+  it('согласованные контуры — agreement true', () => {
+    const c = combinedQualitySummary(80, 3, 82);
+    expect(c.proTotal).toBe(83);
+    expect(c.agreement).toBe(true);
+    expect(c.text).toContain('согласны');
+  });
+  it('расходящиеся — agreement false', () => {
+    const c = combinedQualitySummary(95, null, 40);
+    expect(c.agreement).toBe(false);
+    expect(c.text).toContain('расходятся');
+  });
+  it('без PRO и V2 — только база', () => {
+    const c = combinedQualitySummary(70, null, null);
+    expect(c.proTotal).toBeNull();
+    expect(c.v2).toBeNull();
+    expect(c.agreement).toBe(true);
+  });
+});
+
+describe('quality-hub-helpers: split-текст', () => {
+  it('половинит объём по дням', () => {
+    const t = buildSplitFixText([{ muscle: 'chest', weeklySets: 18, frequency: 1 }]);
+    expect(t).toContain('chest: 18 сетов в 1×/нед → разбить на 2× по ~9');
+  });
+});
+
+describe('quality-hub-helpers: derive делод-глубина', () => {
+  it('номера недель + срез объёма + RIR-сдвиг', () => {
+    const prog: any = {
+      meta: { direction: 'bb' },
+      bb: {
+        weeks: [
+          { week: 1, sessions: [{ blocks: [{ muscle: 'chest', exerciseName: 'Жим', sets: [{ reps: 8, rir: 2 }, { reps: 8, rir: 2 }] }] }] },
+          { week: 2, deload: true, sessions: [{ blocks: [{ muscle: 'chest', exerciseName: 'Жим', sets: [{ reps: 8, rir: 4 }] }] }] },
+        ],
+      },
+    };
+    const v = deriveV2InputFromProgram(prog, 'bb', 'intermediate')!;
+    expect(v.deload?.hasDeload).toBe(true);
+    expect(v.deload?.deloadWeeks).toEqual([2]);
+    expect(v.deload?.depthVolume).toBeCloseTo(0.5, 1);
+    expect(v.deload?.rirShift).toBeCloseTo(2, 1);
   });
 });
 

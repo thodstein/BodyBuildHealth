@@ -660,9 +660,22 @@ export function bbPlanToQualityInput(bbPlan: {
     weeklySets[g] = Math.round(weeklySets[g] / bbPlan.weeks.length);
   }
 
-  // Авто-определение делода по факту плана, если не передан явно
-  const hasDeloadActual = opts.hasDeload ?? bbPlan.weeks.some(w => (w as any).deload || (w as any).phase === 'deload');
-  const deloadWeeksActual = opts.deloadWeeks ?? bbPlan.weeks.filter(w => (w as any).deload || (w as any).phase === 'deload').map(w => (w as any).week ?? 0).filter(Boolean);
+  // Авто-определение делода по факту плана, если не передан явно.
+  // Разметка contest prep (contestPhase/peakWeek) различает taper/peak/deload:
+  // taper держит интенсивность (не делод), peak_week — пик, остальное — разгрузка.
+  const weekKind = (w: unknown): 'peak' | 'taper' | 'deload' | 'work' => {
+    const wk = w as any;
+    if (wk?.peakWeek === true || wk?.contestPhase === 'peak_week') return 'peak';
+    if (wk?.contestPhase === 'taper') return 'taper';
+    if (wk?.deload || wk?.phase === 'deload') return 'deload';
+    return 'work';
+  };
+  const hasDeloadActual = opts.hasDeload ?? bbPlan.weeks.some(w => weekKind(w) === 'deload');
+  const deloadWeeksActual = opts.deloadWeeks ?? bbPlan.weeks.filter(w => weekKind(w) === 'deload').map(w => (w as any).week ?? 0).filter(Boolean);
+  // Тег фазы для V2: taper приоритетнее peak, peak — делода (конкретика важнее).
+  const phaseTag: 'deload' | 'taper' | 'peak' | 'none' = bbPlan.weeks.some(w => weekKind(w) === 'taper')
+    ? 'taper'
+    : bbPlan.weeks.some(w => weekKind(w) === 'peak') ? 'peak' : hasDeloadActual ? 'deload' : 'none';
 
   // ─── Quality Hub PRO: V2-деривация из факта плана ───
   const sessionMaxByMuscle: Record<string, number> = {};
@@ -671,7 +684,8 @@ export function bbPlanToQualityInput(bbPlan: {
   let deloadSetsSum = 0; let deloadWeeksN = 0; let baseSetsSum = 0; let baseWeeksN = 0;
   let deloadRirSum = 0; let deloadRirN = 0; let baseRirSum = 0; let baseRirN = 0;
   for (const week of bbPlan.weeks) {
-    const isDeloadW = !!(week as any).deload || (week as any).phase === 'deload';
+    const kind = weekKind(week);
+    const isDeloadW = kind !== 'work';
     let weekSets = 0;
     for (const sess of week.sessions) {
       const perMuscle: Record<string, number> = {};
@@ -705,7 +719,8 @@ export function bbPlanToQualityInput(bbPlan: {
   } : undefined;
   const baseAvg = baseWeeksN > 0 ? baseSetsSum / baseWeeksN : 0;
   const deloadAvg = deloadWeeksN > 0 ? deloadSetsSum / deloadWeeksN : 0;
-  const deloadDepth = hasDeloadActual ? {
+  // Глубина считается по неделям тега (taper/peak/deload); для taper срез нагрузки неведом — null.
+  const deloadDepth = (hasDeloadActual || phaseTag === 'taper' || phaseTag === 'peak') ? {
     depthVolume: baseAvg > 0 && deloadWeeksN > 0
       ? Math.max(0, Math.min(1, Math.round((1 - deloadAvg / baseAvg) * 100) / 100))
       : null,
@@ -713,7 +728,7 @@ export function bbPlanToQualityInput(bbPlan: {
       ? Math.round(((deloadRirSum / deloadRirN) - (baseRirSum / baseRirN)) * 10) / 10
       : null,
     loadDrop: null,
-    phaseTag: 'deload' as const,
+    phaseTag,
   } : undefined;
 
   return {
@@ -787,6 +802,9 @@ export function manualToQualityInput(days: {
 }[], opts: {
   level: string; weakPoints?: string[]; hasDeload?: boolean; totalWeeks?: number;
   mesoLength?: number; injuries?: { muscle: string; exclude?: boolean }[];
+  /** RIR-профиль (в днях ManualResult RIR нет — caller передаёт при наличии). */
+  rirStats?: { avgRir: number; fracRirLE2: number; fracRir0: number; totalSets: number };
+  specTargets?: string[]; maintenanceMuscles?: string[];
 }): PlanQualityInput {
   const weeklySets: Record<string, number> = {};
   const frequency: Record<string, number> = {};
@@ -820,7 +838,10 @@ export function manualToQualityInput(days: {
     totalWeeks: opts.mesoLength || opts.totalWeeks || 1,
     exerciseNames, injuries: opts.injuries,
     sessionMaxByMuscle, namesByMuscle,
+    rirStats: opts.rirStats,
     shoulder: deriveShoulderFromNames(namesByMuscle, weeklySets),
     lengthShare: deriveLengthShare(namesByMuscle, weeklySets),
+    specTargets: opts.specTargets,
+    maintenanceMuscles: opts.maintenanceMuscles,
   };
 }

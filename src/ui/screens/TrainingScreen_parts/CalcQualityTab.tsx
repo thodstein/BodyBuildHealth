@@ -3,19 +3,17 @@ import { computePlanQualityFor } from '../../../engines/manual-constructor';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
 import { GROUP_RU } from './program-types';
 import { loadTrainingProfile } from './training-profile';
-import { loadUserPrograms } from '../../../engines/user-program/program-store';
 import { useDataLink } from '../../../core/data-link';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { PopupSelect, PopupNumber, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { adaptForPEDs } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { analyzeProQuality } from '../../../engines/manual-constructor/pro-quality-analysis.engine';
-import TrainingMetricsChart, { type LMSWeekMetric } from '../SRCBBScreen_parts/TrainingMetricsChart';
-import { calcSessionMetrics } from '../../../engines/lms/lms-metrics.engine';
-import { norm } from '../../../engines/norm';
+import TrainingMetricsChart from '../SRCBBScreen_parts/TrainingMetricsChart';
 import { applyToPlanner } from './planner-bridge';
 import { composeQualityScoreV2 } from '../../../engines/quality-score-v2.engine';
-import { buildSyntheticPlWeeks, deriveV2InputFromProgram } from './quality-hub-helpers';
+import { deriveV2InputFromProgram, programForDivision } from './quality-hub-helpers';
+import { PerMuscleBars, QualityScoreCard, useQualityCharts, useQualityProgram } from './quality-hub-parts';
 import { QualityActions } from './QualityActions';
 
 const ACCENT = '#00e68a';
@@ -35,15 +33,8 @@ type LevelKey = 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
  */
 export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: string; goal?: string; onBuildPlan: () => void }> = ({ program: propsProgram, level = 'intermediate', goal = 'hypertrophy', onBuildPlan }) => {
   const linked = useDataLink();
-  const programs = useMemo(() => loadUserPrograms(), []);
-  const [selectedId, setSelectedId] = useState<string>(() => propsProgram?.meta.id || programs[0]?.meta.id || '');
-  const [division, setDivision] = useState<Division>(() => {
-    const p = propsProgram || programs[0];
-    if (!p) return 'bb';
-    if (p.meta.direction === 'pl') return 'pl';
-    if (p.meta.direction === 'bb') return 'bb';
-    return 'bb';
-  });
+  // P7: выбор программы + разделение вынесены в useQualityProgram (логика 1-в-1).
+  const { programs, selectedId, setSelectedId, division, setDivision, selectedProgram, isHybrid } = useQualityProgram(propsProgram);
   const [levelOverride, setLevelOverride] = useState<LevelKey | ''>('');
   const [usePed, setUsePed] = useState<boolean>(() => {
     try { return !!loadTrainingProfile().onCourse; } catch { return false; }
@@ -53,12 +44,6 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
   });
   const [useLab, setUseLab] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-
-  const selectedProgram: UserProgram | null = useMemo(() => {
-    if (propsProgram && !selectedId) return propsProgram;
-    if (selectedId) return programs.find(p => p.meta.id === selectedId) || propsProgram || programs[0] || null;
-    return propsProgram || programs[0] || null;
-  }, [propsProgram, programs, selectedId]);
 
   const effectiveLevel = (levelOverride || selectedProgram?.meta.level || level) as string;
   const prof = useMemo(() => loadTrainingProfile(), []);
@@ -103,21 +88,9 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
   // Вычисляем анализ для выбранного разделения — с учётом hybrid и PL-синтетики
   const analysis = useMemo(() => {
     if (!selectedProgram) return null;
-    let progForCalc: UserProgram = selectedProgram;
-    // hybrid: для BB-анализа берём bb-weeks, для PL — pl-weeks, иначе комбинируем
-    const isHybridProg = selectedProgram.meta.direction === 'hybrid';
-    if ((division === 'pl' || isHybridProg) && selectedProgram.pl?.sourceCycleId && !selectedProgram.pl.customWeeks) {
-      const tpl = getCycleById(selectedProgram.pl.sourceCycleId);
-      if (tpl) {
-        const synthWeeks = buildSyntheticPlWeeks(tpl as any);
-        progForCalc = { ...selectedProgram, pl: { ...selectedProgram.pl, customWeeks: synthWeeks as any } } as UserProgram;
-      }
-    }
-    // hybrid без bb-weeks — показываем PL-качество даже на BB-вкладке
-    if (division === 'bb' && isHybridProg && !progForCalc.bb && progForCalc.hybrid?.bbWeeks) {
-      progForCalc = { ...progForCalc, bb: { direction: 'bb', weeks: progForCalc.hybrid.bbWeeks as any, volumeBudget: {}, progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: [] }, constraints: { equipment: [] }, microcycleTemplate: { daySlots: [] } } as any } as UserProgram;
-    }
-    return computePlanQualityFor(progForCalc, effectiveLevel, {
+    const progForCalc = programForDivision(selectedProgram, division, (id: string) => getCycleById(id));
+    if (!progForCalc) return null;
+    return computePlanQualityFor(progForCalc as UserProgram, effectiveLevel, {
       onCourse: usePed,
       courseIntensity: courseIntensity as any,
       labMult: labMult,
@@ -128,18 +101,9 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
 
   const analysisNatural = useMemo(() => {
     if (!usePed || !selectedProgram) return null;
-    let progForCalc: UserProgram = selectedProgram;
-    if ((division === 'pl' || selectedProgram.meta.direction === 'hybrid') && selectedProgram.pl?.sourceCycleId && !selectedProgram.pl.customWeeks) {
-      const tpl = getCycleById(selectedProgram.pl.sourceCycleId);
-      if (tpl) {
-        const synthWeeks = buildSyntheticPlWeeks(tpl as any);
-        progForCalc = { ...selectedProgram, pl: { ...selectedProgram.pl, customWeeks: synthWeeks as any } } as UserProgram;
-      }
-    }
-    if (division === 'bb' && selectedProgram.meta.direction === 'hybrid' && !progForCalc.bb && progForCalc.hybrid?.bbWeeks) {
-      progForCalc = { ...progForCalc, bb: { direction: 'bb', weeks: progForCalc.hybrid.bbWeeks as any, volumeBudget: {}, progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: [] }, constraints: { equipment: [] }, microcycleTemplate: { daySlots: [] } } as any } as UserProgram;
-    }
-    return computePlanQualityFor(progForCalc, effectiveLevel, { onCourse: false, courseIntensity: 'moderate', labMult: useLab ? labMult : 1, division, enableV2: true });
+    const progForCalc = programForDivision(selectedProgram, division, (id: string) => getCycleById(id));
+    if (!progForCalc) return null;
+    return computePlanQualityFor(progForCalc as UserProgram, effectiveLevel, { onCourse: false, courseIntensity: 'moderate', labMult: useLab ? labMult : 1, division, enableV2: true });
   }, [selectedProgram, effectiveLevel, usePed, useLab, labMult, division]);
 
   const pro = useMemo(() => {
@@ -179,272 +143,17 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     } catch { return false; }
   }, [selectedProgram]);
 
-  // ——— Графики: тоннаж/КПШ/нагрузка — полный комплект ———
-  const lmsChart: LMSWeekMetric[] | null = useMemo(() => {
-    if (division !== 'pl' || !selectedProgram?.pl) return null;
-    try {
-      const weeks: any[] = (selectedProgram.pl as any).customWeeks || [];
-      let plWeeks: any[] = weeks;
-      if (!plWeeks.length && (selectedProgram.pl as any).sourceCycleId) {
-        const tpl = getCycleById((selectedProgram.pl as any).sourceCycleId);
-        if (tpl) plWeeks = buildSyntheticPlWeeks(tpl as any) as any[];
-      }
-      if (!plWeeks.length) return null;
-      const workMax: any = (selectedProgram.pl as any).workMax || { squat: 140, bench: 100, dead: 160 };
-      const pmMap: Record<string, number> = {
-        'Присед': workMax.squat || 140,
-        'Приседания со штангой': workMax.squat || 140,
-        'Жим лежа': workMax.bench || 100,
-        'Жим лёжа': workMax.bench || 100,
-        'Становая тяга': workMax.dead || 160,
-        'Тяга': workMax.dead || 160,
-      };
-      const fallbackPm = 80;
-      const getPm = (name: string) => {
-        if (pmMap[name] != null) return pmMap[name];
-        const n = norm(name);
-        for (const k of Object.keys(pmMap)) if (n.includes(norm(k)) || norm(k).includes(n)) return pmMap[k];
-        return fallbackPm;
-      };
-      const chart: LMSWeekMetric[] = [];
-      for (const w of plWeeks) {
-        const sessions: any[] = [];
-        for (const d of (w.days || [])) {
-          const exs: any[] = [];
-          for (const ex of (d.exercises || [])) {
-            const pm = getPm(ex.name);
-            const sets = (ex.sets || []).map((s: any) => ({ weight: pm * (s.pct || 0.7), reps: s.reps || 5, sets: s.sets || 3 }));
-            exs.push({ name: ex.name, group: ex.muscle || 'chest', coef: 1, mnosz: 1, pm, sets });
-          }
-          const m = calcSessionMetrics(exs);
-          sessions.push(m);
-        }
-        let ton = 0, kpsh = 0, relW = 0, uoiN = 0, intFB = 0;
-        for (const s of sessions) { ton += s.tonnage; kpsh += s.kpsh; relW += s.relIntensity * s.kpsh; uoiN += s.uoi * s.kpsh; intFB += s.intFB; }
-        const relInt = kpsh > 0 ? relW / kpsh : 0;
-        const uoi = kpsh > 0 ? uoiN / kpsh : 0;
-        chart.push({ week: (w as any).week || chart.length + 1, tonnage: Math.round(ton), kpsh, relInt: Math.round(relInt * 1000) / 1000, uoi: Math.round(uoi * 100) / 100, intFB: Math.round(intFB) });
-      }
-      return chart.length ? chart : null;
-    } catch { return null; }
-  }, [selectedProgram, division]);
+  const splitCandidates = useMemo(
+    () => (v2?.perMuscle || [])
+      .filter(m => m.frequency < 2 && m.weeklySets > m.mav)
+      .map(m => ({ muscle: m.muscle, weeklySets: m.weeklySets, frequency: m.frequency })),
+    [v2],
+  );
 
-  const bbChart = useMemo(() => {
-    if (division !== 'bb' || !selectedProgram?.bb) return null;
-    try {
-      const per = analysis?.perMuscle || [];
-      if (!per.length) return null;
-      return per.map(p => ({
-        muscle: ru(p.muscle),
-        sets: p.peakSets,
-        тяж: Math.round(p.peakSets * 0.6),
-        памп: Math.round(p.peakSets * 0.4),
-        mrv: p.mrv,
-      }));
-    } catch { return null; }
-  }, [selectedProgram, division, analysis]);
+  // ——— P7: все чарты/экстры вынесены в useQualityCharts (логика 1-в-1) ———
+  const { lmsChart, bbChart, bbWeeklyChart, bbExtra, plExtra, bbReportExtras, plReportExtras } = useQualityCharts(selectedProgram, division, analysis);
 
-  // BB недельная прогрессия — тоннаж и эфф. сеты по неделям (передискретизация PM×% — C)
-  const bbWeeklyChart = useMemo(() => {
-    if (division !== 'bb' || !selectedProgram?.bb) return null;
-    try {
-      const weeks: any[] = (selectedProgram.bb as any).weeks || [];
-      if (!weeks.length) return null;
-      const profileWorkMax: Record<string, number> = (() => {
-        try { const p = loadTrainingProfile() as any; return p?.workMax || {}; } catch { return {}; }
-      })();
-      const muscleWorkMaxMap: Record<string, number> = {
-        chest: profileWorkMax.chest || 100, back: profileWorkMax.back || 110, quads: profileWorkMax.quads || 140,
-        hamstrings: profileWorkMax.hamstrings || 90, glutes: profileWorkMax.glutes || 160, shoulders: profileWorkMax.shoulders || 60,
-        biceps: profileWorkMax.biceps || 50, triceps: profileWorkMax.triceps || 60, calves: profileWorkMax.calves || 120, abs: profileWorkMax.abs || 60,
-        legs: profileWorkMax.quads || 120, arms: profileWorkMax.biceps || 50,
-      };
-      return weeks.map((w: any, wi: number) => {
-        let ton = 0, eff = 0, sets = 0;
-        for (const s of (w.sessions || [])) {
-          for (const b of (s.blocks || [])) {
-            const muKey = String(b.muscle || '').toLowerCase();
-            const fallback = muscleWorkMaxMap[muKey] || 60;
-            for (const st of (b.sets || [])) {
-              const pct = (st as any).pctOf1RM ?? (st as any).pct ?? 0;
-              const baseW = (st as any).weight;
-              const wgt = Number.isFinite(baseW) && baseW > 0 ? baseW : (pct > 0 ? Math.round(fallback * pct) : fallback);
-              const reps = Number(st.reps) || 8;
-              ton += wgt * reps;
-              sets += 1;
-              if ((st.rir ?? 2) <= 3 && reps >= 5) eff += 1;
-            }
-          }
-        }
-        return { week: (w as any).week || wi + 1, tonnage: Math.round(ton), kpsh: sets, relInt: eff > 0 ? Math.round((eff / Math.max(1, sets)) * 1000) / 1000 : 0, uoi: 0, intFB: eff };
-      });
-    } catch { return null; }
-  }, [selectedProgram, division]);
-
-  const bbExtra = useMemo(() => {
-    if (division !== 'bb' || !selectedProgram?.bb) return null;
-    try {
-      const weeks: any[] = (selectedProgram.bb as any).weeks || [];
-      if (!weeks.length) return null;
-      const totalWeeks = weeks.length;
-      const freq: Record<string, number> = {};
-      let hardSets = 0, totalSets = 0, rirSum = 0, rirN = 0, tonnage = 0, effectiveSets = 0;
-      const perMuscleSets: Record<string, number> = {};
-      // B: реальный workMax из профиля (а не 60) — как в bb-builder
-      const profileWorkMax: Record<string, number> = (() => {
-        try {
-          const p = loadTrainingProfile() as any;
-          return p?.workMax || {};
-        } catch { return {}; }
-      })();
-      const muscleWorkMaxMap: Record<string, number> = {
-        chest: profileWorkMax.chest || 100, back: profileWorkMax.back || 110, quads: profileWorkMax.quads || 140,
-        hamstrings: profileWorkMax.hamstrings || 90, glutes: profileWorkMax.glutes || 160, shoulders: profileWorkMax.shoulders || 60,
-        biceps: profileWorkMax.biceps || 50, triceps: profileWorkMax.triceps || 60, calves: profileWorkMax.calves || 120, abs: profileWorkMax.abs || 60,
-        legs: profileWorkMax.quads || 120, arms: profileWorkMax.biceps || 50,
-      };
-      for (const w of weeks) {
-        for (const s of (w.sessions || [])) {
-          const musclesInSess = new Set<string>();
-          for (const b of (s.blocks || [])) {
-            const mu = String(b.muscle || '').toLowerCase();
-            if (mu) {
-              musclesInSess.add(mu);
-              perMuscleSets[mu] = (perMuscleSets[mu] || 0) + (b.sets?.length || 0);
-            }
-            const sets = (b.sets?.length || 0);
-            totalSets += sets;
-            for (const st of (b.sets || [])) {
-              // B: вес из workMax с учётом pctOf1RM, иначе профиль по мышце
-              const pct = (st as any).pctOf1RM ?? (st as any).pct ?? 0;
-              const baseW = (st as any).weight;
-              const muKey = String(b.muscle || '').toLowerCase();
-              const fallback = muscleWorkMaxMap[muKey] || 60;
-              const wgt = Number.isFinite(baseW) && baseW > 0 ? baseW : (pct > 0 ? Math.round(fallback * pct) : fallback);
-              const reps = Number(st.reps) || 8;
-              tonnage += wgt * reps;
-              if ((st.rir ?? 2) <= 3 && reps >= 5) effectiveSets += 1;
-            }
-            const rir = b.sets?.[0]?.rir ?? 2;
-            if (Number.isFinite(rir) && rir < 1) hardSets += sets;
-            if (Number.isFinite(rir)) { rirSum += rir * sets; rirN += sets; }
-          }
-          for (const mu of musclesInSess) freq[mu] = (freq[mu] || 0) + 1;
-        }
-      }
-      const freqPerWeek: Record<string, number> = {};
-      for (const [k, v] of Object.entries(freq)) freqPerWeek[k] = Math.round((v / totalWeeks) * 10) / 10;
-      const avgFreq = Object.values(freqPerWeek).length ? (Object.values(freqPerWeek).reduce((a,b)=>a+b,0)/Object.values(freqPerWeek).length) : 0;
-      return { freqPerWeek, hardSets, totalSets, avgRir: rirN ? rirSum / rirN : 0, tonnage: Math.round(tonnage), effectiveSets, perMuscleSets, avgFreq: Math.round(avgFreq*10)/10 };
-    } catch { return null; }
-  }, [selectedProgram, division]);
-
-  const plExtra = useMemo(() => {
-    if (division !== 'pl' || !selectedProgram?.pl) return null;
-    try {
-      const weeks: any[] = (selectedProgram.pl as any).customWeeks || [];
-      let plWeeks: any[] = weeks;
-      if (!plWeeks.length && (selectedProgram.pl as any).sourceCycleId) {
-        const tpl = getCycleById((selectedProgram.pl as any).sourceCycleId);
-        if (tpl) plWeeks = buildSyntheticPlWeeks(tpl as any) as any[];
-      }
-      if (!plWeeks.length) return null;
-      // частота по присед/жим/тяга
-      const liftFreq: Record<string, number> = { squat: 0, bench: 0, dead: 0 };
-      let totalKpsh = 0, totalTonnage = 0;
-      const zoneCounts: Record<string, number> = { '50-60': 0, '60-70': 0, '70-80': 0, '80-90': 0, '90+': 0 };
-      for (const w of plWeeks) {
-        for (const d of (w.days || [])) {
-          for (const ex of (d.exercises || [])) {
-            const name = norm(ex.name);
-            if (/присед|squat/.test(name)) liftFreq.squat += 1;
-            else if (/жим|bench|press/.test(name) && !/стоя/.test(name)) liftFreq.bench += 1;
-            else if (/тяга|dead|становая/.test(name)) liftFreq.dead += 1;
-            for (const s of (ex.sets || [])) {
-              const kpsh = (s.reps || 5) * (s.sets || 3);
-              totalKpsh += kpsh;
-              const pct = s.pct || 0.7;
-              const pm = 100; // условный
-              totalTonnage += pm * pct * (s.reps || 5) * (s.sets || 3);
-              if (pct < 0.6) zoneCounts['50-60'] += kpsh;
-              else if (pct < 0.7) zoneCounts['60-70'] += kpsh;
-              else if (pct < 0.8) zoneCounts['70-80'] += kpsh;
-              else if (pct < 0.9) zoneCounts['80-90'] += kpsh;
-              else zoneCounts['90+'] += kpsh;
-            }
-          }
-        }
-      }
-      const totalWeeks = plWeeks.length || 1;
-      const freqPerWeek = {
-        squat: Math.round((liftFreq.squat / totalWeeks) * 10) / 10,
-        bench: Math.round((liftFreq.bench / totalWeeks) * 10) / 10,
-        dead: Math.round((liftFreq.dead / totalWeeks) * 10) / 10,
-      };
-      return { freqPerWeek, totalKpsh, totalTonnage: Math.round(totalTonnage), zoneCounts };
-    } catch { return null; }
-  }, [selectedProgram, division]);
-
-  // BB-отчет доп. — фазы/методики/баланс/прогрессия (из bb-report.engine, без дублей PRO)
-  const bbReportExtras = useMemo(() => {
-    if (division !== 'bb' || !selectedProgram?.bb) return null;
-    try {
-      const weeks: any[] = (selectedProgram.bb as any).weeks || [];
-      if (!weeks.length) return null;
-      const phaseCount: Record<string, number> = {};
-      for (const w of weeks) phaseCount[String((w as any).phase || 'рабочая')] = (phaseCount[String((w as any).phase || 'рабочая')] || 0) + 1;
-      // баланс тяги/жимы по объёму (как в bb-report: pull/press)
-      let pull = 0, press = 0;
-      for (const w of weeks) for (const s of (w.sessions || [])) for (const b of (s.blocks || [])) {
-        const mu = String(b.muscle || '').toLowerCase();
-        if (mu === 'back' || mu === 'biceps') pull += (b.sets?.length || 0);
-        if (mu === 'chest' || mu === 'shoulders' || mu === 'triceps') press += (b.sets?.length || 0);
-      }
-      const ratio = press > 0 ? pull / press : 0;
-      // методики — superset/technique/DUP из блоков
-      let superset = 0, tech = 0; let dup = (selectedProgram.bb as any).progression?.loadStrategy || '';
-      for (const w of weeks) for (const s of (w.sessions || [])) for (const b of (s.blocks || [])) {
-        if ((b as any).supersetWith) superset++;
-        if ((b as any).technique && (b as any).technique !== 'none') tech++;
-      }
-      // прогрессия — прирост эфф. сетов w1→пик
-      const tonPerWeek = weeks.map((w: any) => {
-        let ton = 0;
-        for (const s of (w.sessions || [])) for (const b of (s.blocks || [])) for (const st of (b.sets || [])) ton += ((st as any).weight || 60) * (Number(st.reps) || 8);
-        return ton;
-      });
-      const peakIdx = tonPerWeek.indexOf(Math.max(...tonPerWeek));
-      const progPct = tonPerWeek[0] > 0 ? Math.round(((tonPerWeek[peakIdx] / tonPerWeek[0]) - 1) * 100) : 0;
-      return { phaseCount, pull, press, ratio: Math.round(ratio * 100) / 100, superset, tech, dup, progPct, peakWeek: peakIdx + 1 };
-    } catch { return null; }
-  }, [selectedProgram, division]);
-
-  const plReportExtras = useMemo(() => {
-    if (division !== 'pl' || !selectedProgram?.pl) return null;
-    try {
-      const weeks: any[] = (selectedProgram.pl as any).customWeeks || [];
-      let plWeeks: any[] = weeks;
-      if (!plWeeks.length && (selectedProgram.pl as any).sourceCycleId) {
-        const tpl = getCycleById((selectedProgram.pl as any).sourceCycleId);
-        if (tpl) plWeeks = buildSyntheticPlWeeks(tpl as any) as any[];
-      }
-      if (!plWeeks.length) return null;
-      // фазы PL — sourcePhase или аккум/пик/дёлод
-      const phaseCount: Record<string, number> = {};
-      for (const w of plWeeks) phaseCount[String((w as any).phase || 'accumulation')] = (phaseCount[String((w as any).phase || 'accumulation')] || 0) + 1;
-      const kpshPerWeek = plWeeks.map((w: any) => {
-        let k = 0;
-        for (const d of (w.days || [])) for (const ex of (d.exercises || [])) for (const s of (ex.sets || [])) k += (s.reps || 5) * (s.sets || 3);
-        return k;
-      });
-      const peakK = Math.max(...kpshPerWeek);
-      const progPct = kpshPerWeek[0] > 0 ? Math.round(((peakK / kpshPerWeek[0]) - 1) * 100) : 0;
-      return { phaseCount, peakK, progPct, weeks: plWeeks.length };
-    } catch { return null; }
-  }, [selectedProgram, division]);
-
-  // hybrid: показываем ББ+ПЛ совместно
-  const isHybrid = selectedProgram?.meta.direction === 'hybrid';
+  // hybrid: показываем ББ+ПЛ совместно (isHybrid — из useQualityProgram)
   const hasData = !!(selectedProgram && (division === 'bb' ? selectedProgram.bb || isHybrid : selectedProgram.pl || isHybrid));
   const hasAnyProgram = programs.length > 0 || !!propsProgram;
 
@@ -639,59 +348,14 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       )}
 
       {/* Score */}
-      <div style={{ padding: 12, borderRadius: 12, background: analysis.score >= 80 ? '#22c55e08' : analysis.score >= 50 ? '#f59e0b08' : '#ef444408', border: '1px solid ' + sc + '40', marginBottom: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: sc }}>Оценка качества {analysis.grade} · {division === 'bb' ? 'ББ-гипертрофия' : 'ПЛ-сила'}</span>
-          <span style={{ fontSize: 22, fontWeight: 800, color: sc }}>{analysis.score}<span style={{ fontSize: 11, fontWeight: 600, opacity: 0.6 }}>/100</span></span>
-        </div>
-        <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 8, border:'1px solid rgba(255,255,255,0.04)', position:'relative' }}>
-          <div style={{ height: '100%', width: analysis.score + '%', background: `linear-gradient(90deg, ${sc}, ${sc}cc)`, transition: 'width 0.35s', boxShadow: `0 0 10px ${sc}66`, borderRadius:6 }} />
-          <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, color:'#fff', fontWeight:800, letterSpacing:0.3, textShadow:'0 1px 2px rgba(0,0,0,0.5)' }}>{analysis.score >= 80 ? 'ОТЛИЧНО' : analysis.score >=50 ? 'СРЕДНЕ' : 'ТРЕБУЕТ РАБОТЫ'}</div>
-        </div>
-        <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
-          Уровень <b>{effectiveLevel}</b> · {pedOn ? `ПЕД ×${pedAdapt?.combinedMrvMultiplier.toFixed(2) ?? '1.2'}` : 'Натурал'} · Лаб ×{labMult.toFixed(2)} · {division === 'bb' ? 'ББ-объём по мышцам' : 'ПЛ-объём по группам'} · {analysis.perMuscle.length} групп
-        </div>
-        {analysis.issues.length > 0 && (
-          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {analysis.issues.map((iss, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: iss.startsWith('⚠') ? '#f59e0b' : iss.startsWith('⬇') ? '#3b82f6' : '#fff' }}>
-                <span style={{ fontWeight: 700 }}>{iss}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <QualityScoreCard
+        analysis={analysis}
+        division={division}
+        sc={sc}
+        contextLine={`Уровень ${effectiveLevel} · ${pedOn ? `ПЕД ×${pedAdapt?.combinedMrvMultiplier.toFixed(2) ?? '1.2'}` : 'Натурал'} · Лаб ×${labMult.toFixed(2)} · ${division === 'bb' ? 'ББ-объём по мышцам' : 'ПЛ-объём по группам'} · ${analysis.perMuscle.length} групп`}
+      />
 
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6 }}>Объём по группам — {division === 'bb' ? 'ББ (гипертрофия)' : 'ПЛ (сила)'} · Сеты · MEV · MAV · MRV · %MRV</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-        {analysis.perMuscle.map(pm => {
-          const st = pm.status === 'over' ? '#ef4444' : pm.status === 'low' ? '#3b82f6' : pm.status === 'high' ? '#f59e0b' : '#22c55e';
-          const pct = pm.mrv > 0 ? Math.round((pm.peakSets / pm.mrv) * 100) : 0;
-          const bar = Math.min(100, pct);
-          const mevPct = pm.mrv > 0 ? (pm.mev / pm.mrv) * 100 : 0;
-          const mavPct = pm.mrv > 0 ? (pm.mav / pm.mrv) * 100 : 0;
-          return (
-            <div key={pm.muscle} style={{ padding: '10px 12px', borderRadius: 12, background: `linear-gradient(135deg, ${st}0f, ${st}06)`, border: `1px solid ${st}30`, boxShadow: `0 2px 12px ${st}0a` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, marginBottom: 6 }}>
-                <span style={{ fontWeight: 800, color: '#fff', minWidth: 90 }}>{ru(pm.muscle)}</span>
-                <span style={{ color: st, fontWeight: 900, fontSize:13 }}>{pm.peakSets}<span style={{ fontSize:9, color:'#fff' }}> сет</span></span>
-                <span style={{ color: '#fff', fontSize: 10 }}>· MEV {pm.mev} · MAV {pm.mav} · MRV {pm.mrv} · <b style={{ color: st }}>{pct}%</b></span>
-                <span style={{ marginLeft: 'auto', padding: '3px 7px', borderRadius: 6, fontSize: 9, fontWeight: 800, background: st, color: pm.status === 'high' || pm.status === 'low' ? '#000' : '#fff', boxShadow: `0 1px 6px ${st}55` }}>{pm.status === 'over' ? 'ПЕРЕГРУЗ' : pm.status === 'low' ? 'НЕДОГРУЗ' : pm.status === 'high' ? 'ВЫСОКО' : 'ОК'}</span>
-              </div>
-              <div style={{ height: 10, borderRadius: 6, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', position:'relative', border:'1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ position:'absolute', left:0, width: `${mevPct}%`, height:'100%', background:'rgba(59,130,246,0.14)', borderRight:'1px dashed rgba(59,130,246,0.35)' }} />
-                <div style={{ position:'absolute', left: `${mevPct}%`, width: `${Math.max(0, mavPct-mevPct)}%`, height:'100%', background:'rgba(34,197,94,0.12)', borderRight:'1px dashed rgba(34,197,94,0.35)' }} />
-                <div style={{ height: '100%', width: bar + '%', background: `linear-gradient(90deg, ${st}, ${st}cc)`, borderRadius:6, transition:'width 0.35s', boxShadow: bar>85 ? `0 0 8px ${st}88` : 'none' }} />
-                <div style={{ position:'absolute', right:4, top:0, bottom:0, display:'flex', alignItems:'center', fontSize:7, color:'#fff', opacity:0.6 }}>MEV {pm.mev} · MAV {pm.mav}</div>
-              </div>
-              <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff' }}>
-                <span>Средн/нед: <b style={{ color: st }}>{pm.avgSets}</b> сет</span>
-                <span style={{ color: pct > 100 ? '#ef4444' : '#fff', fontWeight: pct>100 ? 800: 400 }}>{pct > 100 ? `+${pct - 100}% сверх MRV` : `${100 - pct}% запас до MRV`}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <PerMuscleBars perMuscle={analysis.perMuscle} division={division} />
 
       {/* PRO — паттерны / углы / растяжка / техника / цель */}
       {pro && (
@@ -810,6 +474,8 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
           overloadFix={overloadFix}
           weakGroups={weakGroups}
           needsDeload={needsDeload}
+          proDelta={pro?.scoreDelta ?? null}
+          splitCandidates={splitCandidates}
         />
       )}
 
