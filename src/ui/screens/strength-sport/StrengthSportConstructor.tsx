@@ -271,7 +271,7 @@ export const StrengthSportConstructor: React.FC = () => {
           p.rationale.push(`Причины слабых фаз из ТА-диагностики: ${cs}`);
         }
         if (tb?.prefCorr && Object.keys(tb.prefCorr).length) {
-          p.rationale.push(`Предпочитаемые коррекции ТА-хаба (${Object.keys(tb.prefCorr).length}): учтены при подборе подсобки`);
+          p.rationale.push(`Предпочитаемые коррекции ТА-хаба (${Object.keys(tb.prefCorr).length}): в план не вшиты — вставь кнопкой «💉 Вставить коррекции в план» в хабе`);
         }
         if (tb?.fvr && tb.fvr.snatchTh > 0) {
           p.rationale.push(`FvR-оценка ТА-хаба: рывок ≈${tb.fvr.snatchTh}кг${tb.fvr.pmax > 0 ? ` · Pmax ${tb.fvr.pmax}Вт` : ''} — ориентир заявок`);
