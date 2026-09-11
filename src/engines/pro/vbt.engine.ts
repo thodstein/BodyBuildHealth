@@ -108,6 +108,37 @@ export function calibrateLVP(points: Array<{ pct: number; velocity: number }>): 
 /** Training Max 90-92% как у Шейко (буфер для скорости) */
 export function trainingMax(compMax: number, pct: number = 0.90): number { return Math.round(compMax * pct * 10)/10; }
 
+/** Метрика скорости датчика: MCV/MPV — прямое использование, peak — завышает на ~10–20% (поправка ×0.9, ориентир). */
+export type VelocityMetric = 'mcv' | 'mpv' | 'peak';
+export function adjustVelocityForMetric(velocity: number, metric: VelocityMetric): number {
+  if (!Number.isFinite(velocity) || velocity <= 0) return 0;
+  return metric === 'peak' ? round2(velocity * 0.9) : round2(velocity);
+}
+
+export interface CalibratedLVP { slope: number; intercept: number; r2: number; lift: VBTLift; calibratedAt: number }
+
+/** %1RM по личному профилю (калибровка calibrateLVP): pct = (v − intercept)/slope, кламп 0.3–1. */
+export function pctFromCalibrated(cal: { slope: number; intercept: number }, velocity: number): number | null {
+  if (!Number.isFinite(velocity) || velocity <= 0) return null;
+  if (!Number.isFinite(cal.slope) || Math.abs(cal.slope) < 1e-9) return null;
+  const pct = (velocity - cal.intercept) / cal.slope;
+  return Math.max(0.3, Math.min(1, round2(pct)));
+}
+
+/** e1RM по личному профилю; null без валидной калибровки. Групповой профиль остаётся fallback. */
+export function e1RMFromCalibrated(cal: { slope: number; intercept: number } | null | undefined, velocity: number, weight: number): number | null {
+  if (!cal || weight <= 0) return null;
+  const pct = pctFromCalibrated(cal, velocity);
+  if (pct == null || pct <= 0) return null;
+  return round1(weight / pct);
+}
+
+/** Гейт качества калибровки для UI (порог — как в TA individualMVT: r²≥0.85). */
+export function calibrationQuality(r2: number | null | undefined): 'ok' | 'remeasure' | 'none' {
+  if (r2 == null || !Number.isFinite(r2)) return 'none';
+  return r2 >= 0.85 ? 'ok' : 'remeasure';
+}
+
 /** Daily Readiness: warm-up 60% vs профиль. Снижение >8% → volume -20% (PoinT GO). */
 export function dailyReadinessCheck(expectedVelocity: number, actualVelocity: number): { dropPct: number; action: 'as-planned' | 'reduce-volume-20' | 'deload' } {
   if (expectedVelocity <= 0 || actualVelocity <= 0) return { dropPct: 0, action: 'as-planned' };
@@ -214,10 +245,11 @@ export function velocityLoss(velocities: number[], threshold: VelocityLossThresh
   const exceeded = lossPct >= threshold;
   let remainingReps: number | null = null;
   if (!exceeded && vs.length >= 2) {
-    // линейная оценка: средняя потеря на повтор
+    // Консервативная оценка (StrengthAnalysisHub PRO P2): падение скорости ускоряется
+    // с утомлением, поэтому линейную оценку делим запасом ×1.5 и капаем 3 («дальше — стоп по порогу»).
     const perRepLoss = lossPct / Math.max(1, vs.length - 1);
     const budget = threshold - lossPct;
-    remainingReps = perRepLoss > 0 ? Math.max(0, Math.floor(budget / perRepLoss)) : 99;
+    remainingReps = perRepLoss > 0 ? Math.min(3, Math.max(0, Math.floor(budget / (perRepLoss * 1.5)))) : 3;
   }
   return { bestVelocity: round2(best), lastVelocity: round2(last), lossPct, threshold, exceeded, remainingReps };
 }

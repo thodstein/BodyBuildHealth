@@ -18,9 +18,16 @@ import {
   thresholdForIntent,
   velocityLossZone,
   diagnoseVelocity,
+  calibrateLVP,
+  lvrStale,
+  dailyReadinessCheck,
+  adjustVelocityForMetric,
+  e1RMFromCalibrated,
+  calibrationQuality,
   type VBTLift,
   type VBTIntent,
   type VelocityLossThreshold,
+  type VelocityMetric,
 } from '../../../engines/pro/vbt.engine';
 import { analyzeStickingCorrections, type AssistanceAnalysis } from '../../../engines/pro/lift-assistance.engine';
 import type { Lift } from '../../../engines/lms/weakpoint-pl';
@@ -126,11 +133,45 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
     } catch {}
     return '1.0,0.94,0.9,0.86,0.82';
   });
+  const [metric, setMetric] = useState<VelocityMetric>(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const j = JSON.parse(raw);
+        if (j.metric === 'mpv' || j.metric === 'peak') return j.metric as VelocityMetric;
+      }
+    } catch {}
+    return 'mcv';
+  });
+  // калибровка личного LVP: скорости на 60/75/90% (вес берётся из e1RM)
+  const [calV60, setCalV60] = useState(() => { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return typeof j.calV60 === 'number' ? j.calV60 : 0; } catch { return 0; } });
+  const [calV75, setCalV75] = useState(() => { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return typeof j.calV75 === 'number' ? j.calV75 : 0; } catch { return 0; } });
+  const [calV90, setCalV90] = useState(() => { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return typeof j.calV90 === 'number' ? j.calV90 : 0; } catch { return 0; } });
+  const [calAt, setCalAt] = useState<number | null>(() => { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return typeof j.calAt === 'number' ? j.calAt : null; } catch { return null; } });
+  const [readyActual, setReadyActual] = useState(() => { try { const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return typeof j.readyActual === 'number' ? j.readyActual : 0; } catch { return 0; } });
 
   // персист
   useEffect(() => {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ lift, intent, e1RM, measuredVelocity, measuredWeight, velocitiesStr })); } catch {}
-  }, [lift, intent, e1RM, measuredVelocity, measuredWeight, velocitiesStr]);
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ lift, intent, e1RM, measuredVelocity, measuredWeight, velocitiesStr, metric, calV60, calV75, calV90, calAt, readyActual })); } catch {}
+  }, [lift, intent, e1RM, measuredVelocity, measuredWeight, velocitiesStr, metric, calV60, calV75, calV90, calAt, readyActual]);
+
+  // поправка метрики датчика (peak завышает → ×0.9, ориентир)
+  const adjV = (v: number) => adjustVelocityForMetric(v, metric);
+
+  // личная калибровка
+  const calibration = useMemo(() => {
+    const pts = [{ pct: 0.6, velocity: calV60 }, { pct: 0.75, velocity: calV75 }, { pct: 0.9, velocity: calV90 }].filter(p => p.velocity > 0.05 && p.velocity <= 2.5);
+    if (pts.length < 3) return null;
+    return calibrateLVP(pts);
+  }, [calV60, calV75, calV90]);
+  const calQuality = calibrationQuality(calibration?.r2);
+  const calStale = useMemo(() => lvrStale(calAt ?? undefined), [calAt]);
+  const personalE1RM = useMemo(() => {
+    if (!calibration || calQuality !== 'ok' || calStale?.stale) return null;
+    if (measuredVelocity <= 0 || measuredWeight <= 0) return null;
+    return e1RMFromCalibrated(calibration, adjV(measuredVelocity), safeWeight(measuredWeight));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calibration, calQuality, calStale, measuredVelocity, measuredWeight, metric]);
 
   // синхронизация e1RM с хабом при смене lift, если e1RM ещё дефолтный (не менялся вручную после переключения)
   const hubVal = hubLiftValue(snapshot, lift);
@@ -156,24 +197,33 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
     return { tv, tp, workWeight, predictedVel };
   }, [lift, intent, e1RM]);
 
-  // e1RM по скорости и весу (с валидацией)
+  // e1RM по скорости и весу (с валидацией + поправка метрики)
   const velEst = useMemo(() => {
     if (measuredVelocity <= 0 || measuredWeight <= 0) return null;
     if (measuredVelocity < 0.05 || measuredVelocity > 2.5) return null;
-    return estimate1RMFromVelocity(lift, safeVelocity(measuredVelocity), safeWeight(measuredWeight));
-  }, [lift, measuredVelocity, measuredWeight]);
+    return estimate1RMFromVelocity(lift, adjV(safeVelocity(measuredVelocity)), safeWeight(measuredWeight));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lift, measuredVelocity, measuredWeight, metric]);
 
-  // velocity-loss анализ (фильтр отрицательных, NaN, пустых)
+  // velocity-loss анализ (фильтр отрицательных, NaN, пустых + поправка метрики)
   const vlRes = useMemo(() => {
-    const vs = velocitiesStr.split(/[\s,;]+/).map((s: string) => Number(s.trim())).filter((n: number) => Number.isFinite(n) && n > 0.05 && n <= 2.5);
+    const vs = velocitiesStr.split(/[\s,;]+/).map((s: string) => Number(s.trim())).filter((n: number) => Number.isFinite(n) && n > 0.05 && n <= 2.5).map(adjV);
     if (vs.length === 0) return null;
     const thr = thresholdForIntent(intent);
     return velocityLoss(vs, thr);
-  }, [velocitiesStr, intent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [velocitiesStr, intent, metric]);
+
+  // готовность по разминке 60%: ожидание из профиля vs факт
+  const readiness = useMemo(() => {
+    if (readyActual <= 0) return null;
+    return dailyReadinessCheck(velocityForPct(lift, 0.6), adjV(readyActual));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lift, readyActual, metric]);
 
   // Корректирующие упражнения фазы срыва
   const vbtCorrections = useMemo<AssistanceAnalysis | null>(() => {
-    const vs = velocitiesStr.split(/[\s,;]+/).map((s: string) => Number(s.trim())).filter((n: number) => Number.isFinite(n) && n > 0.05 && n <= 2.5);
+    const vs = velocitiesStr.split(/[\s,;]+/).map((s: string) => Number(s.trim())).filter((n: number) => Number.isFinite(n) && n > 0.05 && n <= 2.5).map(adjV);
     if (vs.length < 2) return null;
     const best = Math.max(...vs);
     const last = vs[vs.length - 1];
@@ -181,7 +231,8 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
     const d = diagnoseVelocity(liftAsLift, best, last, measuredWeight > 0 ? safeWeight(measuredWeight) : undefined);
     if (!d.exceeded || !d.suggestedPhase) return null;
     return analyzeStickingCorrections(liftAsLift, d.suggestedPhase);
-  }, [velocitiesStr, lift, measuredWeight]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [velocitiesStr, lift, measuredWeight, metric]);
 
   const lvpTable = LOAD_VELOCITY_PROFILE[lift];
   const vlThreshold = thresholdForIntent(intent);
@@ -225,6 +276,21 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
           <PopupSelect label="Цель (намерение)" value={intent} options={intentOpts} onChange={v => setIntent(v as VBTIntent)} />
           <PopupNumber label="Оценочный 1RM" value={e1RM} min={20} max={600} suffix=" кг" onChange={v => setE1RM(Math.max(20, Math.min(600, v || 20)))} />
         </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <PopupSelect
+            label="Метрика датчика"
+            value={metric}
+            options={[
+              { id: 'mcv', label: 'MCV — средняя', desc: 'Средняя концентрическая скорость (канон LVP)' },
+              { id: 'mpv', label: 'MPV — средняя пропульсивная', desc: 'Без фазы торможения, ≈MCV для средних весов' },
+              { id: 'peak', label: 'Peak — пиковая (×0.9)', desc: 'Дешёвые датчики завышают — поправка ×0.9, ориентир' },
+            ]}
+            onChange={v => setMetric(v as VelocityMetric)}
+          />
+          <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4, alignSelf: 'center' }}>
+            {lift === 'row' ? '⚠️ «Тяга в наклоне» — ориентир по жимовому паттерну (измеренного профиля нет), не выдавать за замер.' : 'Профиль «нагрузка–скорость» — Gonzalez-Badillo / Jovanovic, групповой. Личный — ниже в «Мой профиль».'}
+          </div>
+        </div>
         {snapshot && <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4 }}>Хаб питает этот калькулятор: при смене движения кнопка «Взять из хаба» подставляет актуальный ПМ из единого снапшота (без дубля ввода).</div>}
       </div>
 
@@ -262,8 +328,8 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
         )}
         {velEst ? (
           <div style={ROWStyle(ACCENT)}>
-            <span style={{ color: '#fff' }}>Прогноз <b style={{ color: ACCENT }}>e1RM</b> (из профиля):</span>
-            <span><b style={{ color: ACCENT }}>{velEst.e1RM} кг</b> · %1RM = <b>{Math.round(velEst.pct1RM * 100)}%</b></span>
+            <span style={{ color: '#fff' }}>Прогноз <b style={{ color: ACCENT }}>e1RM</b> (групповой профиль{metric === 'peak' ? ', peak×0.9' : ''}):</span>
+            <span><b style={{ color: ACCENT }}>{velEst.e1RM} кг</b> · %1RM = <b>{Math.round(velEst.pct1RM * 100)}%</b>{personalE1RM != null ? <span style={{ color: '#fff' }}> · личный <b style={{ color: '#3b82f6' }}>{personalE1RM} кг</b></span> : null}</span>
           </div>
         ) : (
           <div style={SMALL}>Введите скорость 0.05–2.5 м/с и вес → прогноз e1RM (через профиль «нагрузка–скорость» для {LIFT_RU[lift]}).</div>
@@ -285,6 +351,39 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
         )}
       </div>
 
+      {/* Мой профиль LVP */}
+      <div style={CARD}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🧬 Мой профиль «нагрузка–скорость» ({LIFT_RU[lift]})</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>Замерьте скорость на 60/75/90% от e1RM ({Math.round(e1RM * 0.6)}/{Math.round(e1RM * 0.75)}/{Math.round(e1RM * 0.9)} кг). Нужно 3 точки; r²≥0.85 — профиль годится, иначе «замерьте ещё». Старше 6 нед — перекалибровать.</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <PopupNumber label="Скорость на 60% (м/с)" value={calV60} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => { setCalV60(Math.max(0, Math.min(2.5, v || 0))); setCalAt(Date.now()); }} />
+          <PopupNumber label="Скорость на 75% (м/с)" value={calV75} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => { setCalV75(Math.max(0, Math.min(2.5, v || 0))); setCalAt(Date.now()); }} />
+          <PopupNumber label="Скорость на 90% (м/с)" value={calV90} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => { setCalV90(Math.max(0, Math.min(2.5, v || 0))); setCalAt(Date.now()); }} />
+        </div>
+        {!calibration ? (
+          <div style={SMALL}>Введите все 3 скорости → slope/intercept/r² (линейная регрессия).</div>
+        ) : (
+          <div style={{ fontSize: 11, color: '#fff', padding: '8px 10px', borderRadius: 8, background: calQuality === 'ok' && !calStale?.stale ? 'rgba(0,230,138,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${calQuality === 'ok' && !calStale?.stale ? 'rgba(0,230,138,0.2)' : 'rgba(245,158,11,0.2)'}` }}>
+            slope {calibration.slope.toFixed(2)} · intercept {calibration.intercept.toFixed(2)} · r² {calibration.r2.toFixed(2)} ·{' '}
+            {calQuality !== 'ok' ? <b style={{ color: '#f59e0b' }}>⚠️ r²&lt;0.85 — замерьте ещё (разброс точек)</b>
+              : calStale?.stale ? <b style={{ color: '#f59e0b' }}>⚠️ Профилю {calStale.weeksAgo} нед — перекалибровать (stale &gt;6 нед)</b>
+              : <b style={{ color: ACCENT }}>✅ Личный профиль активен — e1RM выше считается и по нему</b>}
+          </div>
+        )}
+      </div>
+
+      {/* Готовность по разминке */}
+      <div style={CARD}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🌡 Готовность по разминке (60% = {velocityForPct(lift, 0.6)} м/с ожидание)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <PopupNumber label="Факт разминки (м/с)" value={readyActual} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => setReadyActual(Math.max(0, Math.min(2.5, v || 0)))} />
+          <div style={{ fontSize: 11, color: '#fff', alignSelf: 'center', padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            {!readiness ? 'Введите факт → вердикт.' : readiness.action === 'as-planned' ? <b style={{ color: ACCENT }}>✅ По плану ({readiness.dropPct}%)</b> : readiness.action === 'reduce-volume-20' ? <b style={{ color: '#f59e0b' }}>⚠️ Объём −20% ({readiness.dropPct}%)</b> : <b style={{ color: '#ef4444' }}>🔴 Делод ({readiness.dropPct}%)</b>}
+          </div>
+        </div>
+        <div style={{ fontSize: 10, color: DIM }}>Падение &gt;8% → объём −20%, &gt;15% → делод (dailyReadinessCheck).</div>
+      </div>
+
       {/* Анализ потери скорости */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📉 Потеря скорости в сете</div>
@@ -303,7 +402,7 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
             ) : (
               <>
                 <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', color: ACCENT, fontSize: 11, fontWeight: 700 }}>✅ Продолжать: потеря {vlRes.lossPct}% &lt; порога {vlRes.threshold}%. {velocityLossZone(vlRes.lossPct)}.</div>
-                {vlRes.remainingReps != null && <div style={{ ...SMALL, marginTop: 6 }}>Осталось повторов до порога (оценка): <b style={{ color: ACCENT }}>{vlRes.remainingReps}</b></div>}
+                {vlRes.remainingReps != null && <div style={{ ...SMALL, marginTop: 6 }}>Осталось повторов до порога (грубая оценка, кап 3 — дальше стоп по порогу): <b style={{ color: ACCENT }}>{vlRes.remainingReps}</b></div>}
               </>
             )}
           </>
