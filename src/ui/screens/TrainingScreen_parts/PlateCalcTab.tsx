@@ -6,7 +6,7 @@
  * Движок: gym-competition.engine (calculatePlates / getPlateLoadingOrder / warmupPlateSequence).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { calculatePlates, getPlateLoadingOrder, warmupPlateSequence, reversePlateWeight, nearestLoadable, percentTargets, loadPlateHistory, pushPlateHistory, type WeightUnit, type PlateInventory } from '../../../engines/gym-competition.engine';
+import { calculatePlates, getPlateLoadingOrder, warmupPlateSequence, reversePlateWeight, nearestLoadable, percentTargets, loadPlateHistory, pushPlateHistory, loadPlateLocations, savePlateLocation, removePlateLocation, getActivePlateLocationId, setActivePlateLocationId, type WeightUnit, type PlateInventory, type PlateLocation } from '../../../engines/gym-competition.engine';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
@@ -89,6 +89,26 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
   const [presetName, setPresetName] = useState<string>('');
   const [showPresetForm, setShowPresetForm] = useState(false);
   const [weightHistory, setWeightHistory] = useState<number[]>(() => loadPlateHistory());
+  // Ж2: локации (дом/зал/гараж) — свой гриф/блины/замки/инвентарь на каждую
+  const [locations, setLocations] = useState<PlateLocation[]>(() => loadPlateLocations());
+  const [activeLocId, setActiveLocId] = useState<string | null>(() => getActivePlateLocationId());
+  const [showLocForm, setShowLocForm] = useState(false);
+  const [locName, setLocName] = useState('');
+  const applyLocation = useCallback((loc: PlateLocation) => {
+    setBarId('custom');
+    setBarWeight(loc.barWeight);
+    setCustomPlates(loc.plates || '');
+    setCollars(loc.collars || 0);
+    setInventoryText(loc.inventoryText || '');
+    setActiveLocId(loc.id);
+    setActivePlateLocationId(loc.id);
+  }, []);
+  const saveToLocation = useCallback(() => {
+    if (!activeLocId) return;
+    const cur = locations.find(l => l.id === activeLocId);
+    if (!cur) return;
+    setLocations(savePlateLocation({ ...cur, barWeight, plates: customPlates, collars, inventoryText }));
+  }, [activeLocId, locations, barWeight, customPlates, collars, inventoryText]);
   const lastPushedRef = React.useRef<number>(0);
   // Д2: история целевых весов — пишется при смене веса (дедуп подряд идущих)
   useEffect(() => {
@@ -189,6 +209,40 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
         {initialWeight && <span style={{ color: ACCENT }}> · Вес из плана: {initialWeight} {unitLabel}{isDumbbellSelected ? ' ×2 гантели' : ''}</span>}
         {selectedOpt && <span style={{ color: ACCENT }}> · Упражнение: {selectedOpt.label}</span>}
         {isDumbbellSelected && <span style={{ color: '#f59e0b', marginLeft: 6, fontWeight: 700 }}>· гантели: рукоять 2 кг, расчёт на одну гантель ({effectiveBarWeight} кг)</span>}
+      </div>
+
+      {/* Ж2: локации */}
+      <div style={CARD}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📍 Локация: гриф/блины/замки свои для каждого зала</div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {locations.map(l => (
+            <span key={l.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 4px 4px 10px', borderRadius: 8, border: activeLocId === l.id ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.10)', background: activeLocId === l.id ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)' }}>
+              <button onClick={() => applyLocation(l)} style={{ background: 'transparent', border: 'none', color: activeLocId === l.id ? ACCENT : '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, minHeight: 36 }}>📍 {l.name} · {l.barWeight}</button>
+              <button onClick={() => {
+                const rest = removePlateLocation(l.id);
+                setLocations(rest);
+                if (activeLocId === l.id) { setActiveLocId(null); setActivePlateLocationId(null); }
+              }} aria-label={`Удалить локацию ${l.name}`} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 11, minHeight: 36, minWidth: 36 }}>✕</button>
+            </span>
+          ))}
+          {!showLocForm ? (
+            <button onClick={() => { setLocName(''); setShowLocForm(true); }} style={{ padding: '6px 12px', borderRadius: 8, border: '1px dashed rgba(0,230,138,0.35)', background: 'transparent', color: ACCENT, cursor: 'pointer', fontSize: 11, fontWeight: 700, minHeight: 36 }}>＋ Локация</button>
+          ) : (
+            <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+              <input type="text" value={locName} onChange={e => setLocName(e.target.value)} placeholder="Дом / Зал" style={{ width: 110, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '8px', fontSize: 12 }} />
+              <button onClick={() => {
+                const loc: PlateLocation = { id: 'loc' + Date.now(), name: locName.trim() || 'Зал', barWeight, plates: customPlates, collars, inventoryText };
+                setLocations(savePlateLocation(loc));
+                applyLocation(loc);
+                setShowLocForm(false);
+              }} style={{ padding: '8px 12px', borderRadius: 6, border: 'none', background: ACCENT, color: '#000', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>OK</button>
+              <button onClick={() => setShowLocForm(false)} style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 11 }}>✕</button>
+            </span>
+          )}
+          {activeLocId && (
+            <button onClick={saveToLocation} title="Записать текущие гриф/блины/замки в активную локацию" style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', cursor: 'pointer', fontSize: 11, fontWeight: 700, minHeight: 36 }}>💾 В локацию</button>
+          )}
+        </div>
       </div>
 
       {/* ⚙️ Параметры */}

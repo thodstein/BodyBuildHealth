@@ -273,6 +273,79 @@ export function pushPlateHistory(weight: number): number[] {
   return arr;
 }
 
+/** Ж2: локация зала — свой гриф/блины/замки/инвентарь (дом/зал/гараж, как PerSide). */
+export interface PlateLocation {
+  id: string;
+  name: string;
+  barWeight: number;
+  plates?: string;
+  collars?: number;
+  inventoryText?: string;
+}
+
+export const PLATE_LOCATIONS_KEY = 'he_plate_locations';
+const PLATE_ACTIVE_LOC_KEY = 'he_plate_location';
+const PLATE_LOCATIONS_CAP = 6;
+
+export function loadPlateLocations(): PlateLocation[] {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(PLATE_LOCATIONS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((l): l is PlateLocation => l && typeof l.id === 'string' && typeof l.name === 'string')
+      .map(l => ({ ...l, barWeight: Number(l.barWeight) > 0 ? Number(l.barWeight) : 20 }))
+      .slice(0, PLATE_LOCATIONS_CAP);
+  } catch {
+    return [];
+  }
+}
+
+function persistPlateLocations(locs: PlateLocation[]): PlateLocation[] {
+  const arr = locs.slice(0, PLATE_LOCATIONS_CAP);
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(PLATE_LOCATIONS_KEY, JSON.stringify(arr));
+  } catch { /* quota — молча */ }
+  return arr;
+}
+
+export function savePlateLocation(loc: PlateLocation): PlateLocation[] {
+  const all = loadPlateLocations();
+  const i = all.findIndex(l => l.id === loc.id);
+  const clean: PlateLocation = {
+    id: String(loc.id), name: String(loc.name || 'Зал').slice(0, 24),
+    barWeight: Number(loc.barWeight) > 0 ? Number(loc.barWeight) : 20,
+    plates: loc.plates || '', collars: Math.max(0, Number(loc.collars) || 0),
+    inventoryText: loc.inventoryText || '',
+  };
+  if (i >= 0) all[i] = clean;
+  else all.unshift(clean);
+  return persistPlateLocations(all);
+}
+
+export function removePlateLocation(id: string): PlateLocation[] {
+  return persistPlateLocations(loadPlateLocations().filter(l => l.id !== id));
+}
+
+export function getActivePlateLocationId(): string | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage.getItem(PLATE_ACTIVE_LOC_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setActivePlateLocationId(id: string | null): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (id) localStorage.setItem(PLATE_ACTIVE_LOC_KEY, id);
+    else localStorage.removeItem(PLATE_ACTIVE_LOC_KEY);
+  } catch { /* ignore */ }
+}
+
 /** %-пресеты от 1RM для программирования (тап → целевой вес). */
 export const PLATE_PERCENT_PRESETS = [50, 60, 65, 70, 75, 80, 85, 90, 95];
 

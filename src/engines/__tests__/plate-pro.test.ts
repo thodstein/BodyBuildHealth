@@ -7,6 +7,11 @@ import {
   loadPlateHistory,
   pushPlateHistory,
   PLATE_HISTORY_KEY,
+  loadPlateLocations,
+  savePlateLocation,
+  removePlateLocation,
+  getActivePlateLocationId,
+  setActivePlateLocationId,
 } from '../gym-competition.engine';
 
 describe('plates PRO: замки', () => {
@@ -79,6 +84,27 @@ describe('plates PRO: история весов (кап 8, дедуп)', () => {
     pushPlateHistory(0);
     pushPlateHistory(-5);
     expect(loadPlateHistory()).toEqual([]);
+  });
+});
+
+describe('plates PRO: локации (Ж2, дом/зал)', () => {
+  it('save/load roundtrip + upsert + remove + active', () => {
+    localStorage.clear();
+    expect(loadPlateLocations()).toEqual([]);
+    savePlateLocation({ id: 'home', name: 'Дом', barWeight: 15, plates: '', collars: 0, inventoryText: '15:1' });
+    savePlateLocation({ id: 'gym', name: 'Зал', barWeight: 20 });
+    expect(loadPlateLocations()).toHaveLength(2);
+    savePlateLocation({ id: 'home', name: 'Дом+', barWeight: 15 });
+    expect(loadPlateLocations().find(l => l.id === 'home')?.name).toBe('Дом+');
+    setActivePlateLocationId('gym');
+    expect(getActivePlateLocationId()).toBe('gym');
+    removePlateLocation('gym');
+    expect(loadPlateLocations()).toHaveLength(1);
+  });
+  it('битые данные — пусто без throw', () => {
+    localStorage.clear();
+    localStorage.setItem('he_plate_locations', 'not-json');
+    expect(loadPlateLocations()).toEqual([]);
   });
 });
 

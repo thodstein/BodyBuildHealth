@@ -29,4 +29,17 @@ describe('PlateCalcTab — контексты отображения', () => {
     const html = renderToStaticMarkup(<PlateCalcTab onApply={() => {}} />);
     expect(html).not.toContain('Упражнение текущей сессии');
   });
+
+  it('Ж2: локации из стора рендерятся чипами', () => {
+    localStorage.setItem('he_plate_locations', JSON.stringify([
+      { id: 'home', name: 'Дом', barWeight: 15, plates: '', collars: 0, inventoryText: '' },
+    ]));
+    try {
+      const html = renderToStaticMarkup(<PlateCalcTab />);
+      expect(html).toContain('Локация');
+      expect(html).toContain('Дом');
+    } finally {
+      localStorage.removeItem('he_plate_locations');
+    }
+  });
 });
