@@ -6,6 +6,7 @@
 import type { UserProgram } from '../user-program/user-program.types';
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { analyzeManualVolume } from './manual-volume.engine';
+import { checkSessionCap, rirProfileCheck } from '../quality-score-v2.engine';
 
 export interface PlanQualityResult {
   score: number;
@@ -19,7 +20,7 @@ export interface PlanQualityResult {
 export function computePlanQualityFor(
   program: UserProgram,
   level: string,
-  opts?: { onCourse?: boolean; courseIntensity?: string; labMult?: number; division?: 'bb'|'pl'; trainingYears?: number },
+  opts?: { onCourse?: boolean; courseIntensity?: string; labMult?: number; division?: 'bb'|'pl'; trainingYears?: number; enableV2?: boolean },
 ): PlanQualityResult {
   const BASE_MUSCLES = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
   // Попытка PRO-анализа effective (bb/hybrid). Fallback — direct старый путь.
@@ -162,6 +163,22 @@ export function computePlanQualityFor(
       if (!issues.includes(msg)) issues.push(msg);
     }
   }
+  // Quality Hub PRO V2 (только при enableV2 — иначе байт-в-байт старое поведение):
+  // session-кап по фактическим сессиям + RIR-профиль из блоков ББ-недель.
+  if (opts?.enableV2 && (program.bb || program.hybrid?.bbWeeks)) {
+    try {
+      const v2 = qualityV2ForBBProgram(program, level);
+      for (const m of v2.sessionCaps) {
+        if (!issues.includes(m)) issues.push(m);
+        totalScore -= 2;
+      }
+      for (const m of v2.rir) {
+        if (!issues.includes(m)) issues.push(m);
+        totalScore -= m.startsWith('🔴') ? 5 : 2;
+      }
+      totalScore = Math.max(0, totalScore);
+    } catch { /* V2 — advisory, не роняем базовый скор */ }
+  }
   if (perMuscle.length === 0) {
     issues.push('⚠ Программа пуста — добавьте упражнения');
     totalScore = 0;
@@ -170,4 +187,56 @@ export function computePlanQualityFor(
   const grade = totalScore >= 90 ? '🟢 A' : totalScore >= 75 ? '🟡 B' : totalScore >= 50 ? '🟠 C' : '🔴 D';
   const proMeta = hasPro ? { weeklyBudget, sessionLimits, weeklyIssues: proIssues } : undefined;
   return { score: totalScore, grade, perMuscle, issues, proMeta };
+}
+
+/**
+ * Quality Hub PRO V2-деривация для ББ-программы (только при enableV2).
+ * Session-кап по фактическим сессиям + RIR-профиль из блоков. Чистая, без стора.
+ */
+function qualityV2ForBBProgram(
+  program: UserProgram,
+  level: string,
+): { sessionCaps: string[]; rir: string[] } {
+  const weeks: Array<{ sessions?: Array<{ blocks?: Array<{ muscle?: string; sets?: Array<{ rir?: number }> }> }> }> =
+    (program.bb?.weeks as any) || (program.hybrid?.bbWeeks as any) || [];
+  const sessionCaps: string[] = [];
+  const seenCap = new Set<string>();
+  let rirSum = 0; let rirSets = 0; let rirLE2 = 0; let rir0 = 0;
+  for (const w of weeks) {
+    for (const s of w.sessions || []) {
+      const perMuscle: Record<string, number> = {};
+      for (const b of s.blocks || []) {
+        const mu = (b.muscle || '').toLowerCase();
+        if (!mu) continue;
+        const n = b.sets?.length || 0;
+        perMuscle[mu] = (perMuscle[mu] || 0) + n;
+        for (const st of b.sets || []) {
+          const rir = Number(st?.rir);
+          if (!Number.isFinite(rir)) continue;
+          rirSum += rir; rirSets += 1;
+          if (rir <= 2) rirLE2 += 1;
+          if (rir <= 0) rir0 += 1;
+        }
+      }
+      for (const [mu, n] of Object.entries(perMuscle)) {
+        const hit = checkSessionCap(mu, n);
+        if (hit && !seenCap.has(mu)) {
+          seenCap.add(mu);
+          sessionCaps.push(`⚠ ${hit.message}`);
+        }
+      }
+    }
+  }
+  const rir: string[] = [];
+  if (rirSets >= 5) {
+    for (const r of rirProfileCheck({
+      avgRir: Math.round((rirSum / rirSets) * 10) / 10,
+      fracRirLE2: Math.round((rirLE2 / rirSets) * 100) / 100,
+      fracRir0: Math.round((rir0 / rirSets) * 100) / 100,
+      totalSets: rirSets,
+    }, level)) {
+      rir.push(`${r.severity === 'critical' ? '🔴' : '⚠'} ${r.message}`);
+    }
+  }
+  return { sessionCaps, rir };
 }

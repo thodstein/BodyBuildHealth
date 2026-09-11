@@ -4,6 +4,11 @@
  */
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 
+/** Канонический грейд V2 (границы 85/65/45) — единый для новых поверхностей хаба.
+ *  Локальные color-пороги функции ниже (80/50) оставлены как есть ради совместимости. */
+export { gradeQualityScore } from '../../../engines/quality-score-v2.engine';
+export type { QualityV2Grade } from '../../../engines/quality-score-v2.engine';
+
 export function calcQualityScore(
   days: any[],
   weeklySets: Record<string, number>,

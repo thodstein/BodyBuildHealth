@@ -14,6 +14,9 @@ import TrainingMetricsChart, { type LMSWeekMetric } from '../SRCBBScreen_parts/T
 import { calcSessionMetrics } from '../../../engines/lms/lms-metrics.engine';
 import { norm } from '../../../engines/norm';
 import { applyToPlanner } from './planner-bridge';
+import { composeQualityScoreV2 } from '../../../engines/quality-score-v2.engine';
+import { buildSyntheticPlWeeks, deriveV2InputFromProgram } from './quality-hub-helpers';
+import { QualityActions } from './QualityActions';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -106,20 +109,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     if ((division === 'pl' || isHybridProg) && selectedProgram.pl?.sourceCycleId && !selectedProgram.pl.customWeeks) {
       const tpl = getCycleById(selectedProgram.pl.sourceCycleId);
       if (tpl) {
-        const synthWeeks = (tpl.weeks && tpl.weeks.length ? tpl.weeks : [tpl.week1]).map((days, wi) => ({
-          week: wi + 1,
-          phase: 'accumulation' as const,
-          deload: false,
-          days: days.map((d, di) => ({
-            name: `День ${di + 1}`,
-            exercises: d.exercises.map(ex => ({
-              name: ex.name,
-              lift: 'accessory' as const,
-              muscle: (ex as any).group || 'chest',
-              sets: ex.sets.map(s => ({ pct: s.pct, reps: s.reps, sets: s.sets, rir: s.rir ?? 2 })),
-            })),
-          })),
-        }));
+        const synthWeeks = buildSyntheticPlWeeks(tpl as any);
         progForCalc = { ...selectedProgram, pl: { ...selectedProgram.pl, customWeeks: synthWeeks as any } } as UserProgram;
       }
     }
@@ -132,6 +122,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       courseIntensity: courseIntensity as any,
       labMult: labMult,
       division,
+      enableV2: true,
     });
   }, [selectedProgram, effectiveLevel, usePed, courseIntensity, labMult, division]);
 
@@ -141,27 +132,14 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     if ((division === 'pl' || selectedProgram.meta.direction === 'hybrid') && selectedProgram.pl?.sourceCycleId && !selectedProgram.pl.customWeeks) {
       const tpl = getCycleById(selectedProgram.pl.sourceCycleId);
       if (tpl) {
-        const synthWeeks = (tpl.weeks && tpl.weeks.length ? tpl.weeks : [tpl.week1]).map((days, wi) => ({
-          week: wi + 1,
-          phase: 'accumulation' as const,
-          deload: false,
-          days: days.map((d, di) => ({
-            name: `День ${di + 1}`,
-            exercises: d.exercises.map(ex => ({
-              name: ex.name,
-              lift: 'accessory' as const,
-              muscle: (ex as any).group || 'chest',
-              sets: ex.sets.map(s => ({ pct: s.pct, reps: s.reps, sets: s.sets, rir: s.rir ?? 2 })),
-            })),
-          })),
-        }));
+        const synthWeeks = buildSyntheticPlWeeks(tpl as any);
         progForCalc = { ...selectedProgram, pl: { ...selectedProgram.pl, customWeeks: synthWeeks as any } } as UserProgram;
       }
     }
     if (division === 'bb' && selectedProgram.meta.direction === 'hybrid' && !progForCalc.bb && progForCalc.hybrid?.bbWeeks) {
       progForCalc = { ...progForCalc, bb: { direction: 'bb', weeks: progForCalc.hybrid.bbWeeks as any, volumeBudget: {}, progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: [] }, constraints: { equipment: [] }, microcycleTemplate: { daySlots: [] } } as any } as UserProgram;
     }
-    return computePlanQualityFor(progForCalc, effectiveLevel, { onCourse: false, courseIntensity: 'moderate', labMult: useLab ? labMult : 1, division });
+    return computePlanQualityFor(progForCalc, effectiveLevel, { onCourse: false, courseIntensity: 'moderate', labMult: useLab ? labMult : 1, division, enableV2: true });
   }, [selectedProgram, effectiveLevel, usePed, useLab, labMult, division]);
 
   const pro = useMemo(() => {
@@ -172,6 +150,35 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     } catch { return null; }
   }, [selectedProgram, division, effectiveLevel, goal, analysis]);
 
+  // ——— P6: V2-оценка из факта программы (канон quality-score-v2) ———
+  const v2 = useMemo(() => {
+    if (!selectedProgram) return null;
+    try {
+      const input = deriveV2InputFromProgram(selectedProgram as any, division, effectiveLevel);
+      if (!input) return null;
+      return composeQualityScoreV2(input);
+    } catch { return null; }
+  }, [selectedProgram, division, effectiveLevel]);
+
+  const overloadFix = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const p of analysis?.perMuscle || []) if (p.status === 'over') out[p.muscle] = p.mav;
+    return out;
+  }, [analysis]);
+
+  const weakGroups = useMemo(
+    () => (analysis?.perMuscle || []).filter(p => p.status === 'low').map(p => p.muscle),
+    [analysis],
+  );
+
+  const needsDeload = useMemo(() => {
+    try {
+      const weeks: any[] = (selectedProgram?.bb as any)?.weeks || (selectedProgram?.hybrid as any)?.bbWeeks || [];
+      if (weeks.length >= 6) return !weeks.some((w: any) => w?.deload || w?.phase === 'deload');
+      return false;
+    } catch { return false; }
+  }, [selectedProgram]);
+
   // ——— Графики: тоннаж/КПШ/нагрузка — полный комплект ———
   const lmsChart: LMSWeekMetric[] | null = useMemo(() => {
     if (division !== 'pl' || !selectedProgram?.pl) return null;
@@ -180,23 +187,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       let plWeeks: any[] = weeks;
       if (!plWeeks.length && (selectedProgram.pl as any).sourceCycleId) {
         const tpl = getCycleById((selectedProgram.pl as any).sourceCycleId);
-        if (tpl) {
-          const rawWeeks: any[] = (tpl as any).weeks && (tpl as any).weeks.length ? (tpl as any).weeks : [(tpl as any).week1];
-          plWeeks = rawWeeks.map((days: any, wi: number) => ({
-            week: wi + 1,
-            phase: 'accumulation' as const,
-            deload: false,
-            days: (days as any[]).map((d: any, di: number) => ({
-              name: `День ${di + 1}`,
-              exercises: (d.exercises as any[]).map((ex: any) => ({
-                name: ex.name,
-                lift: 'accessory' as const,
-                muscle: (ex as any).group || 'chest',
-                sets: (ex.sets as any[]).map((s: any) => ({ pct: s.pct, reps: s.reps, sets: s.sets, rir: s.rir ?? 2 })),
-              })),
-            })),
-          }));
-        }
+        if (tpl) plWeeks = buildSyntheticPlWeeks(tpl as any) as any[];
       }
       if (!plWeeks.length) return null;
       const workMax: any = (selectedProgram.pl as any).workMax || { squat: 140, bench: 100, dead: 160 };
@@ -355,20 +346,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       let plWeeks: any[] = weeks;
       if (!plWeeks.length && (selectedProgram.pl as any).sourceCycleId) {
         const tpl = getCycleById((selectedProgram.pl as any).sourceCycleId);
-        if (tpl) {
-          const rawWeeks: any[] = (tpl as any).weeks && (tpl as any).weeks.length ? (tpl as any).weeks : [(tpl as any).week1];
-          plWeeks = rawWeeks.map((days: any, wi: number) => ({
-            week: wi + 1,
-            days: (days as any[]).map((d: any) => ({
-              exercises: (d.exercises as any[]).map((ex: any) => ({
-                name: ex.name,
-                lift: 'accessory' as const,
-                muscle: (ex as any).group || 'chest',
-                sets: (ex.sets as any[]).map((s: any) => ({ pct: s.pct, reps: s.reps, sets: s.sets })),
-              })),
-            })),
-          }));
-        }
+        if (tpl) plWeeks = buildSyntheticPlWeeks(tpl as any) as any[];
       }
       if (!plWeeks.length) return null;
       // частота по присед/жим/тяга
@@ -448,13 +426,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       let plWeeks: any[] = weeks;
       if (!plWeeks.length && (selectedProgram.pl as any).sourceCycleId) {
         const tpl = getCycleById((selectedProgram.pl as any).sourceCycleId);
-        if (tpl) {
-          const rawWeeks: any[] = (tpl as any).weeks && (tpl as any).weeks.length ? (tpl as any).weeks : [(tpl as any).week1];
-          plWeeks = rawWeeks.map((days: any, wi: number) => ({
-            week: wi + 1,
-            days: (days as any[]).map((d: any) => ({ exercises: (d.exercises as any[]).map((ex: any) => ({ name: ex.name, sets: (ex.sets as any[]).map((s: any) => ({ pct: s.pct, reps: s.reps, sets: s.sets })) })) })),
-          }));
-        }
+        if (tpl) plWeeks = buildSyntheticPlWeeks(tpl as any) as any[];
       }
       if (!plWeeks.length) return null;
       // фазы PL — sourcePhase или аккум/пик/дёлод
@@ -823,6 +795,22 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
             )}
           </div>
         </div>
+      )}
+
+      {/* P6: V2-оценка + действия (снапшоты/сравнение/фиксы/экспорт/мост) */}
+      {selectedProgram && analysis && (
+        <QualityActions
+          programId={selectedProgram.meta.id}
+          title={selectedProgram.meta.title}
+          division={division}
+          level={effectiveLevel}
+          pedLabel={pedOn ? `ПЕД ×${pedAdapt?.combinedMrvMultiplier.toFixed(2) ?? '1.2'}` : 'Натурал'}
+          base={{ score: analysis.score, grade: analysis.grade, perMuscle: analysis.perMuscle }}
+          v2={v2}
+          overloadFix={overloadFix}
+          weakGroups={weakGroups}
+          needsDeload={needsDeload}
+        />
       )}
 
       {/* BB/PL отчет — доп. без дублей (фазы, методики, баланс, прогрессия) */}

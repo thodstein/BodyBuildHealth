@@ -116,6 +116,8 @@ import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feed
 import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants, buildBBFitnessFatigue, buildBBMesocycleTable } from '../../../engines/bb/bb-visual.engine';
 import { buildBBPlanFact, bbPlanFactSummary, bbAdherenceBadge } from '../../../engines/bb/bb-plan-fact.engine';
 import { buildBBQualityReport, bbQualityReportSummary, bbQualityBadge } from '../../../engines/bb/bb-quality-report.engine';
+import { bbPlanQualityV2 } from '../../../engines/bb/bb-quality-v2.engine';
+import BbQualityV2Card from './BbQualityV2Card';
 import { unilateralRatioOf } from '../../../engines/bb/bb-sfr-db';
 import { overreachingCheck, rehabNotes } from '../../../engines/bb/bb-recovery.engine';
 import { PLATE_SET_PRESETS } from '../../../engines/bb/bb-plates.engine';
@@ -1865,6 +1867,18 @@ export const BbAutoConstructor: React.FC = () => {
       mobilityRestrictions,
     });
   }, [builtPlan, linked.profile, acwrData, injuries, mobilityRestrictions]);
+  // Quality Hub PRO: V2-панель (аддитивно к S5 — S5 считается и показывается как раньше).
+  const bbQualityV2 = useMemo(() => {
+    if (!builtPlan) return null;
+    try {
+      return bbPlanQualityV2(builtPlan as any, {
+        level: bbLevel,
+        specTargets,
+        acwrRatio: acwrData?.ratio ?? null,
+        hasDiary: acwrData != null,
+      });
+    } catch { return null; }
+  }, [builtPlan, bbLevel, specTargets, acwrData]);
   const safetyScore = useMemo<PlanSafetyScore | null>(() => {
     if (!builtPlan) return null;
     const personal = linked.profile?.settings?.personal;
@@ -4968,6 +4982,7 @@ export const BbAutoConstructor: React.FC = () => {
                 ))}
               </div>
             )}
+            {bbQualityV2 && <BbQualityV2Card v2={bbQualityV2} />}
           </CollapsibleCard>
         )}
         {/* 🧠 Логика построения плана — вынесена первой в Шаге 5 */}

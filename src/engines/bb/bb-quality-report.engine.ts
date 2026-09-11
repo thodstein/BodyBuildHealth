@@ -13,6 +13,7 @@
  */
 
 import { calculatePlanSafetyScore } from './bb-safety-score.engine';
+import { gradeQualityScore, type QualityV2Grade } from '../quality-score-v2.engine';
 
 export type BBQualitySource = 'validation' | 'balance' | 'rotation' | 'fatigue' | 'safety';
 export type BBQualityLevel = 'error' | 'warning' | 'info';
@@ -34,6 +35,8 @@ export interface BBQualityReport {
   /** Единый скор 0-100 (safety-база − штрафы за validation-замечания). */
   score: number;
   riskLevel: 'danger' | 'caution' | 'ok';
+  /** Канонический грейд V2 (границы 85/65/45) — для новых поверхностей хаба. */
+  v2Grade: QualityV2Grade;
   safetyScore: number;
   issues: BBQualityIssue[];
   recommendations: string[];
@@ -206,6 +209,7 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
   return {
     score,
     riskLevel,
+    v2Grade: gradeQualityScore(score),
     safetyScore: safety.score,
     issues,
     recommendations,

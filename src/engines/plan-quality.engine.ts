@@ -14,6 +14,17 @@
  * Источники: Israetel M. (RP Strength 2021), Schoenfeld B. (2016), Helms E. (2019).
  */
 
+import {
+  checkSessionCap,
+  deloadQualityCheck,
+  frequencyForVolume,
+  isSpecMaintenance,
+  lengthBiasCheck,
+  loadLayerCheck,
+  rirProfileCheck,
+  shoulderBalanceCheck,
+} from './quality-score-v2.engine';
+
 // ─── Пороговые значения по уровням ───
 
 export interface VolumeThresholds {
@@ -139,6 +150,24 @@ export interface PlanQualityInput {
   specialization?: boolean;
   focusGroup?: string;
   splitPattern?: string;
+  // ─── Quality Hub PRO (V2-срезы, всё опционально — без них поведение байт-в-байт) ───
+  /** Максимум прямых сетов мышцы в одной сессии (для session-капа ≤10). */
+  sessionMaxByMuscle?: Record<string, number>;
+  /** Имена упражнений по мышцам (для effective-объёма и длины). */
+  namesByMuscle?: Record<string, string[]>;
+  /** RIR-профиль плана (средний RIR, доли RIR≤2/RIR 0). */
+  rirStats?: { avgRir: number; fracRirLE2: number; fracRir0: number; totalSets: number };
+  /** Глубина делода (срез объёма 0–1, сдвиг RIR, срез нагрузки, тег фазы). */
+  deloadDepth?: { depthVolume?: number | null; rirShift?: number | null; loadDrop?: number | null; phaseTag?: 'deload' | 'taper' | 'peak' | 'none' };
+  /** Плечевой баланс верха (жимы vs тяги БЕЗ ног + плоскости + face-pull). */
+  shoulder?: { pressSets: number; pullSets: number; hasVerticalPull: boolean; hasHorizontalPull: boolean; hasFacePullOrER: boolean };
+  /** Доля длины по мышцам ({lengthSets, totalSets}). */
+  lengthShare?: Record<string, { lengthSets: number; totalSets: number }>;
+  /** Нагрузка из дневника (ACWR/монотония; без дневника — 0 штрафа). */
+  loadData?: { acwr?: number | null; monotony?: number | null; hasDiary: boolean };
+  /** Цели спец-блока + MV-режим (не-цели на MEV — поддержание, не штраф). */
+  specTargets?: string[];
+  maintenanceMuscles?: string[];
 }
 
 // ─── Основная функция ───
@@ -158,6 +187,16 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
   const specialization = (input as any).specialization as boolean | undefined;
   const focusGroup = (input as any).focusGroup as string | undefined;
   const splitPattern = (input as any).splitPattern as string | undefined;
+  // V2-входы (опционально — без них поведение прежнее)
+  const sessionMaxByMuscle = (input as any).sessionMaxByMuscle as Record<string, number> | undefined;
+  const namesByMuscle = (input as any).namesByMuscle as Record<string, string[]> | undefined;
+  const rirStats = (input as any).rirStats as { avgRir: number; fracRirLE2: number; fracRir0: number; totalSets: number } | undefined;
+  const deloadDepth = (input as any).deloadDepth as { depthVolume?: number | null; rirShift?: number | null; loadDrop?: number | null; phaseTag?: 'deload' | 'taper' | 'peak' | 'none' } | undefined;
+  const shoulder = (input as any).shoulder as { pressSets: number; pullSets: number; hasVerticalPull: boolean; hasHorizontalPull: boolean; hasFacePullOrER: boolean } | undefined;
+  const lengthShare = (input as any).lengthShare as Record<string, { lengthSets: number; totalSets: number }> | undefined;
+  const loadData = (input as any).loadData as { acwr?: number | null; monotony?: number | null; hasDiary: boolean } | undefined;
+  const specTargets = (input as any).specTargets as string[] | undefined;
+  const maintenanceMuscles = (input as any).maintenanceMuscles as string[] | undefined;
 
   // Контекстный суффикс для отчёта: на основе каких параметров пользователя
   // сформирован допустимый объём (стаж, курс, фокус, цель, методика).
@@ -417,6 +456,89 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     }
   }
 
+  // ─── Quality Hub PRO: V2-срезы (только при новых входах; иначе — тишина) ───
+  // MV-конверсия: vol_low на поддержании (MV-режим спец-блока) — info вместо warning.
+  // V2-issues копятся отдельно, чтобы legacy-цикл штрафов их не задваивал.
+  let v2ScoreAdj = 0;
+  const v2Issues: QualityIssue[] = [];
+  for (const iss of issues) {
+    if (!iss.id.startsWith('vol_low_') || iss.severity !== 'warning') continue;
+    const g = iss.muscle || iss.id.slice('vol_low_'.length);
+    const t = getThresholds(g, level, mrvByMuscle);
+    const sets = (weeklySets as Record<string, number>)[g] ?? 0;
+    if (isSpecMaintenance(g, sets, t.mev, specTargets, maintenanceMuscles)) {
+      iss.severity = 'info';
+      iss.message += ' — поддержание (MV-режим), не штрафуется';
+      v2ScoreAdj += 3; // возврат штрафа warning(−5)→info(−2)
+    }
+  }
+  const pushV2 = (
+    v: { id: string; severity: 'critical' | 'warning' | 'info'; category: QualityIssue['category']; message: string; muscle?: string; fix?: string },
+    penalty: number,
+  ) => {
+    if (issues.some(i => i.id === v.id) || v2Issues.some(i => i.id === v.id)) return;
+    v2Issues.push(v);
+    v2ScoreAdj -= penalty;
+    if (v.fix) recommendations.push(v.fix);
+  };
+  // Session-кап (нужен sessionMaxByMuscle)
+  if (sessionMaxByMuscle) {
+    for (const [g, m] of Object.entries(sessionMaxByMuscle)) {
+      const hit = checkSessionCap(g, m);
+      if (hit && (weeklySets as Record<string, number>)[g] != null) {
+        pushV2({ ...hit, category: 'volume' }, 3);
+      }
+    }
+  }
+  // Частота-от-объёма (нужны пороги мышцы — только для групп уже в отчёте)
+  for (const m of muscles) {
+    const f = frequencyForVolume(m.muscle, m.weeklySets, m.mav, m.mrv, m.frequency);
+    if (!f || f.severity === 'info') {
+      if (f) pushV2({ ...f, category: 'frequency' }, 0);
+      continue;
+    }
+    // Не дублируем legacy freq_zero (тот же смысл) — дополняем только split-кейсы.
+    if (f.id.startsWith('freq_split_')) pushV2({ ...f, category: 'frequency' }, f.severity === 'critical' ? 8 : 4);
+  }
+  // RIR-профиль
+  if (rirStats) {
+    for (const r of rirProfileCheck(rirStats, level)) {
+      pushV2({ ...r, category: 'progression' }, r.severity === 'critical' ? 8 : 4);
+    }
+  }
+  // Качество делода (глубина — только если передана; наличие/интервал уже проверены выше)
+  if (deloadDepth) {
+    for (const d of deloadQualityCheck({
+      hasDeload, totalWeeks, deloadWeeks,
+      depthVolume: deloadDepth.depthVolume,
+      rirShift: deloadDepth.rirShift,
+      loadDrop: deloadDepth.loadDrop,
+      phaseTag: deloadDepth.phaseTag,
+    })) {
+      if (d.id === 'no_deload' || d.id === 'deload_rare') continue; // уже покрыты legacy-гейтами
+      pushV2({ ...d, category: 'deload' }, d.severity === 'warning' ? 3 : 1);
+    }
+  }
+  // Плечо v2 (верх отдельно от ног) — legacy push/pull-ratio оставлен как есть
+  if (shoulder) {
+    for (const s of shoulderBalanceCheck(shoulder)) {
+      pushV2({ ...s, category: 'balance' }, s.severity === 'warning' ? 3 : 1);
+    }
+  }
+  // Длина
+  if (lengthShare) {
+    for (const l of lengthBiasCheck(lengthShare)) {
+      pushV2({ ...l, category: 'exercise' }, 2);
+    }
+  }
+  // Нагрузка (без дневника — 0 штрафа по построению loadLayerCheck)
+  if (loadData) {
+    const { issues: li } = loadLayerCheck(loadData);
+    for (const l of li) {
+      pushV2({ ...l, category: 'progression' }, l.severity === 'warning' ? 3 : 1);
+    }
+  }
+
   // ─── Расчёт оценки ───
   let score = 100;
 
@@ -431,6 +553,10 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
 
   // Бонус за наличие делода
   if (hasDeload) score += 5;
+
+  // V2-добавка (0 без новых входов — совместимость)
+  for (const v of v2Issues) issues.push(v);
+  score += v2ScoreAdj;
 
   score = Math.max(0, Math.min(100, Math.round(score)));
 
@@ -484,6 +610,7 @@ export function bbPlanToQualityInput(bbPlan: {
   onCourse?: boolean; trainingYears?: number; pedMultiplier?: number;
   injuries?: { muscle: string; exclude?: boolean }[];
   goal?: string; trainingFocus?: string; methodology?: string; volumeGoal?: string; specialization?: boolean; focusGroup?: string; splitPattern?: string;
+  specTargets?: string[]; maintenanceMuscles?: string[];
 }): PlanQualityInput {
   const weeklySets: Record<string, number> = {};
   const exerciseNames: string[][] = [];
@@ -537,6 +664,58 @@ export function bbPlanToQualityInput(bbPlan: {
   const hasDeloadActual = opts.hasDeload ?? bbPlan.weeks.some(w => (w as any).deload || (w as any).phase === 'deload');
   const deloadWeeksActual = opts.deloadWeeks ?? bbPlan.weeks.filter(w => (w as any).deload || (w as any).phase === 'deload').map(w => (w as any).week ?? 0).filter(Boolean);
 
+  // ─── Quality Hub PRO: V2-деривация из факта плана ───
+  const sessionMaxByMuscle: Record<string, number> = {};
+  const namesByMuscle: Record<string, string[]> = {};
+  let rirSum = 0; let rirSets = 0; let rirLE2 = 0; let rir0 = 0;
+  let deloadSetsSum = 0; let deloadWeeksN = 0; let baseSetsSum = 0; let baseWeeksN = 0;
+  let deloadRirSum = 0; let deloadRirN = 0; let baseRirSum = 0; let baseRirN = 0;
+  for (const week of bbPlan.weeks) {
+    const isDeloadW = !!(week as any).deload || (week as any).phase === 'deload';
+    let weekSets = 0;
+    for (const sess of week.sessions) {
+      const perMuscle: Record<string, number> = {};
+      for (const ex of sess.exercises) {
+        perMuscle[ex.muscle] = (perMuscle[ex.muscle] || 0) + ex.sets;
+        const nm = ex.name || '';
+        const arr = namesByMuscle[ex.muscle] || (namesByMuscle[ex.muscle] = []);
+        if (nm && !arr.includes(nm)) arr.push(nm);
+        const rir = Number((ex as any).rir);
+        if (Number.isFinite(rir)) {
+          rirSum += rir * ex.sets; rirSets += ex.sets;
+          if (rir <= 2) rirLE2 += ex.sets;
+          if (rir <= 0) rir0 += ex.sets;
+          if (isDeloadW) { deloadRirSum += rir * ex.sets; deloadRirN += ex.sets; }
+          else { baseRirSum += rir * ex.sets; baseRirN += ex.sets; }
+        }
+        weekSets += ex.sets;
+      }
+      for (const [g, s] of Object.entries(perMuscle)) {
+        sessionMaxByMuscle[g] = Math.max(sessionMaxByMuscle[g] || 0, s);
+      }
+    }
+    if (isDeloadW) { deloadSetsSum += weekSets; deloadWeeksN += 1; }
+    else { baseSetsSum += weekSets; baseWeeksN += 1; }
+  }
+  const rirStats = rirSets >= 5 ? {
+    avgRir: Math.round((rirSum / rirSets) * 10) / 10,
+    fracRirLE2: Math.round((rirLE2 / rirSets) * 100) / 100,
+    fracRir0: Math.round((rir0 / rirSets) * 100) / 100,
+    totalSets: rirSets,
+  } : undefined;
+  const baseAvg = baseWeeksN > 0 ? baseSetsSum / baseWeeksN : 0;
+  const deloadAvg = deloadWeeksN > 0 ? deloadSetsSum / deloadWeeksN : 0;
+  const deloadDepth = hasDeloadActual ? {
+    depthVolume: baseAvg > 0 && deloadWeeksN > 0
+      ? Math.max(0, Math.min(1, Math.round((1 - deloadAvg / baseAvg) * 100) / 100))
+      : null,
+    rirShift: deloadRirN > 0 && baseRirN > 0
+      ? Math.round(((deloadRirSum / deloadRirN) - (baseRirSum / baseRirN)) * 10) / 10
+      : null,
+    loadDrop: null,
+    phaseTag: 'deload' as const,
+  } : undefined;
+
   return {
     dayGroups, weeklySets, frequency,
     level: opts.level, weakPoints: opts.weakPoints,
@@ -554,6 +733,50 @@ export function bbPlanToQualityInput(bbPlan: {
     specialization: (opts as any).specialization ?? (bbPlan as any).inputSnapshot?.specialization ?? !!((bbPlan as any).specializationSchedule?.active),
     focusGroup: (opts as any).focusGroup ?? (bbPlan as any).inputSnapshot?.focusGroup ?? (bbPlan as any).priorityMuscles?.[0],
     splitPattern: (opts as any).splitPattern ?? (bbPlan as any).pattern?.id ?? (bbPlan as any).inputSnapshot?.splitPattern,
+    sessionMaxByMuscle, namesByMuscle, rirStats, deloadDepth,
+    shoulder: deriveShoulderFromNames(namesByMuscle, weeklySets),
+    lengthShare: deriveLengthShare(namesByMuscle, weeklySets),
+    specTargets: (opts as any).specTargets ?? (bbPlan as any).inputSnapshot?.specTargets,
+    maintenanceMuscles: (opts as any).maintenanceMuscles,
+  };
+}
+
+/** Доля «длины» по именам: наклон/RDL/overhead/глубокая/разводка/сидя-сгибание. */
+const LENGTH_NAME_RE = /наклон|incline|румын|rdl|stiff|мёртв|dead.?lift|overhead|над голов|глубок|развод|fly|пуловер|pullover|сидя.*сгиб|seated.*curl|выпад|lunge|болгар/i;
+
+export function deriveLengthShare(
+  namesByMuscle: Record<string, string[]>,
+  weeklySets: Record<string, number>,
+): Record<string, { lengthSets: number; totalSets: number }> {
+  const out: Record<string, { lengthSets: number; totalSets: number }> = {};
+  for (const [muscle, names] of Object.entries(namesByMuscle)) {
+    const total = weeklySets[muscle] || 0;
+    if (!total || !names.length) continue;
+    const hit = names.filter(n => LENGTH_NAME_RE.test(n)).length;
+    const lengthSets = Math.round((total * hit) / names.length);
+    out[muscle] = { lengthSets, totalSets: total };
+  }
+  return out;
+}
+
+const VERTICAL_PULL_RE = /подтяг|pull.?up|pulldown|верхн.*блок|тяга.*сверху/i;
+const HORIZONTAL_PULL_RE = /тяга.*(наклон|штанг|гантел|горизонт|сидя|блок.*низ)|row|тяга.*т.?гриф/i;
+const FACEPULL_RE = /лиц|face.?pull|наружн.*рот|external.*rot|задн.*дельт.*(мах|развед)/i;
+
+/** Плечевой баланс верха по факту имён (ноги исключены по построению). */
+export function deriveShoulderFromNames(
+  namesByMuscle: Record<string, string[]>,
+  weeklySets: Record<string, number>,
+): { pressSets: number; pullSets: number; hasVerticalPull: boolean; hasHorizontalPull: boolean; hasFacePullOrER: boolean } {
+  const s = (g: string) => weeklySets[g] || 0;
+  const pressSets = s('chest') + s('triceps') + s('shoulders') + s('delt_front') + s('delt_mid');
+  const pullSets = s('back') + s('biceps') + s('delt_rear');
+  const allNames = [...(namesByMuscle['back'] || []), ...(namesByMuscle['biceps'] || []), ...(namesByMuscle['shoulders'] || []), ...(namesByMuscle['delt_rear'] || [])];
+  return {
+    pressSets, pullSets,
+    hasVerticalPull: allNames.some(n => VERTICAL_PULL_RE.test(n)),
+    hasHorizontalPull: allNames.some(n => HORIZONTAL_PULL_RE.test(n)),
+    hasFacePullOrER: allNames.some(n => FACEPULL_RE.test(n)),
   };
 }
 
@@ -569,15 +792,24 @@ export function manualToQualityInput(days: {
   const frequency: Record<string, number> = {};
   const dayGroups: string[][] = [];
   const exerciseNames: string[][] = [];
+  const sessionMaxByMuscle: Record<string, number> = {};
+  const namesByMuscle: Record<string, string[]> = {};
 
   for (const day of days) {
     dayGroups.push(day.groups);
     exerciseNames.push(day.exercises.map(e => e.name));
+    const perMuscle: Record<string, number> = {};
     for (const g of day.groups) {
       frequency[g] = (frequency[g] || 0) + 1;
     }
     for (const ex of day.exercises) {
       weeklySets[ex.group] = (weeklySets[ex.group] || 0) + ex.sets;
+      perMuscle[ex.group] = (perMuscle[ex.group] || 0) + ex.sets;
+      const arr = namesByMuscle[ex.group] || (namesByMuscle[ex.group] = []);
+      if (ex.name && !arr.includes(ex.name)) arr.push(ex.name);
+    }
+    for (const [g, s] of Object.entries(perMuscle)) {
+      sessionMaxByMuscle[g] = Math.max(sessionMaxByMuscle[g] || 0, s);
     }
   }
 
@@ -587,5 +819,8 @@ export function manualToQualityInput(days: {
     hasDeload: opts.hasDeload, planType: 'manual',
     totalWeeks: opts.mesoLength || opts.totalWeeks || 1,
     exerciseNames, injuries: opts.injuries,
+    sessionMaxByMuscle, namesByMuscle,
+    shoulder: deriveShoulderFromNames(namesByMuscle, weeklySets),
+    lengthShare: deriveLengthShare(namesByMuscle, weeklySets),
   };
 }
