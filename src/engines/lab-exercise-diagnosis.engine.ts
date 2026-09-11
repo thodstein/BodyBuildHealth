@@ -17,6 +17,17 @@ import {
   type DiagnosisCtx,
 } from './bb/bb-exercise-diagnosis.engine';
 import { isMobilityRestricted } from './bb/bb-mobility.engine';
+import { getJointStress } from './movement-engines';
+
+/** Алиасы суставов для матчинга травмы с high-нагрузкой сустава (RU/EN). */
+const JOINT_ALIASES: Record<string, string[]> = {
+  shoulder: ['shoulder', 'плеч', 'плечо', 'плечи', 'дельт'],
+  elbow: ['elbow', 'локоть', 'локт'],
+  knee: ['knee', 'колен', 'колено'],
+  hip: ['hip', 'таз', 'бедр'],
+  spine: ['spine', 'поясниц', 'спина', 'позвоноч'],
+  ankle: ['ankle', 'голеностоп', 'щиколот'],
+};
 
 export interface LabDiagnosisInput {
   goal?: string;
@@ -43,10 +54,12 @@ export interface LabDiagnosisInput {
   strictMissing?: string[];
 }
 
-function injuryHitsMuscle(
+/** Совпадение травмы с мышцей/названием упражнения (переиспользуется коррекцией). */
+export function labInjuryMatches(
   injuries: LabDiagnosisInput['injuries'],
   muscle: string,
   exName: string,
+  exId?: string,
 ): string | null {
   if (!injuries || injuries.length === 0 || !muscle) return null;
   const m = muscle.toLowerCase();
@@ -56,6 +69,21 @@ function injuryHitsMuscle(
     if (!zone) continue;
     // Травма бьёт в упражнение: зона совпала с мышцей или с названием.
     if (m.includes(zone) || zone.includes(m) || nm.includes(zone)) return zone;
+    // Суставной уровень: травма сустава + high-нагрузка этого сустава у упражнения.
+    if (exId) {
+      try {
+        const js = getJointStress(exId) as Record<string, { level?: string }>;
+        for (const [joint, aliases] of Object.entries(JOINT_ALIASES)) {
+          const stress = js[joint];
+          if (stress && stress.level === 'high'
+            && aliases.some((al) => zone.includes(al) || al.includes(zone))) {
+            return zone;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
   }
   return null;
 }
@@ -88,7 +116,7 @@ export function diagnoseLabExercise(
   };
   const d = diagnoseExercise(ex as Record<string, string>, base);
   // Травмы — лабораторный слой: базовый движок их не знает.
-  const hit = injuryHitsMuscle(ctx.injuries, muscle, ex.name);
+  const hit = labInjuryMatches(ctx.injuries, muscle, ex.name, ex.id);
   if (hit && !d.flags.includes('jointRisk')) {
     d.flags.push('jointRisk');
     d.issues.unshift(`Травма ${hit} — только щадящий режим или замена`);
