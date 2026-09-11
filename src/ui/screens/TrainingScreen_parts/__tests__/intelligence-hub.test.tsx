@@ -52,4 +52,9 @@ describe('P5 Intelligence Hub UI', () => {
     expect(dateInput).toBeTruthy();
     expect(dateInput!.style.fontSize).toBe('16px');
   });
+
+  it('D3 суперкомпенсация честно помечена ориентиром', () => {
+    render(<UnifiedIntelligenceHub />);
+    expect(document.body.textContent).toContain('Суперкомп. (ориентир)');
+  });
 });

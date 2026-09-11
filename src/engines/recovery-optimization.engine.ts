@@ -41,6 +41,9 @@ export interface RecoveryInput {
   periodizationPhase: 'accumulation' | 'intensification' | 'peaking' | 'deload';
   recentPR: boolean;
   injuryHistory: string[];
+  /** Персональная HRV-база (lnRMSSD/SWC): персональное бьёт популяционное (Plews/Buchheit).
+   *  Опционально — без неё поведение байт-в-байт как раньше. */
+  hrvBaseline?: { status: 'need_base' | 'normal' | 'reduced' | 'low' | 'elevated'; n: number } | null;
 }
 
 export interface RecoveryOutput {
@@ -157,8 +160,24 @@ export function analyzeRecovery(input: RecoveryInput): RecoveryOutput {
   const hrv = scoreHRV(input.hrv);
   const recommendations: string[] = [];
 
+  // Персональная база перебивает популяционные пороги: низкая личная — кап вниз,
+  // нормальная личная при «низком» абсолютном — пол вверх (иначе атлета с базой 35 мс вечно красно).
+  let hrvScore = hrv.score;
+  const bb = input.hrvBaseline;
+  if (bb && bb.n >= 3 && bb.status !== 'need_base') {
+    if (bb.status === 'low') {
+      hrvScore = Math.min(hrvScore, 35);
+      recommendations.push('💓 HRV ниже вашей личной базы (≥2 SWC) — только восстановление; абсолютная норма тут не важна.');
+    } else if (bb.status === 'reduced') {
+      hrvScore = Math.min(hrvScore, 55);
+      recommendations.push('💓 HRV ниже вашей личной базы (1–2 SWC) — лёгкий режим.');
+    } else {
+      hrvScore = Math.max(hrvScore, 60);
+    }
+  }
+
   // Overall recovery index
-  const recoveryIndex = Math.round(sleep.score * 0.3 + hrv.score * 0.3
+  const recoveryIndex = Math.round(sleep.score * 0.3 + hrvScore * 0.3
     + (100 - input.fatigueScore * 100) * 0.3 + 10);
 
   // Readiness label
@@ -170,10 +189,10 @@ export function analyzeRecovery(input: RecoveryInput): RecoveryOutput {
   else readinessLabel = 'Критично';
 
   // Overtraining
-  const ot = detectOvertraining(sleep.score, hrv.score, input.fatigueScore, input.trainingDaysThisWeek, input.periodizationPhase, input.recentPR);
+  const ot = detectOvertraining(sleep.score, hrvScore, input.fatigueScore, input.trainingDaysThisWeek, input.periodizationPhase, input.recentPR);
 
   // Supercompensation
-  const supercomp = calcSupercompensation(input.fatigueScore, sleep.score, hrv.score);
+  const supercomp = calcSupercompensation(input.fatigueScore, sleep.score, hrvScore);
 
   // Deload recommendation
   let deloadRecommended = false;
@@ -195,7 +214,7 @@ export function analyzeRecovery(input: RecoveryInput): RecoveryOutput {
   if (sleep.score < 50) {
     recommendations.push('Приоритет: гигиена сна — тёмная прохладная спальня, экранный детокс за 1ч до сна, стабильное время подъёма. Добавки и дозы — только в калькуляторе поддержки.');
   }
-  if (hrv.score < 50) {
+  if (hrvScore < 50) {
     recommendations.push('HRV снижен — добавьте дыхательные практики (4-7-8), лёгкое кардио 20-30мин.');
   }
   if (input.fatigueScore > 0.7 && input.periodizationPhase !== 'deload') {
@@ -208,7 +227,7 @@ export function analyzeRecovery(input: RecoveryInput): RecoveryOutput {
   return {
     overallRecoveryIndex: recoveryIndex,
     sleepScore: sleep.score,
-    hrvScore: hrv.score,
+    hrvScore,
     readinessScore: input.hrv.readinessScore,
     deloadRecommended,
     deloadReason: deloadReason || 'Deload не требуется',

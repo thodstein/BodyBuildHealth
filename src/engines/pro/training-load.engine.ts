@@ -113,11 +113,6 @@ function acwrEwmaUncoupled(dailyLoads: DayLoad[], referenceDate: string | undefi
   return { acute: Math.round(acute * 100) / 100, chronic: Math.round(chronic * 100) / 100, ratio: Math.round(ratio * 100) / 100, zone, acuteDays, chronicDays, method: 'ewma_uncoupled', lowBase };
 }
 
-/** Гибридная нагрузка: sRPE×duration + VBL (velocity×load×reps) для штанги */
-export function hybridLoad(srpeLoad: number, vbl: number, weight: number = 0.5): number {
-  return srpeLoad * (1 - weight) + vbl * weight;
-}
-
 /** Traffic Light по HRV + ACWR + RPE дрейфу */
 export function trafficLight(hrvRatio: number | null, acwr: number, rpeDelta: number): 'green' | 'yellow' | 'red' {
   let score = 0;
@@ -190,6 +185,20 @@ export function fitnessFatigue(
   let peakIdx = 0;
   for (let i = 1; i < series.length; i++) if (series[i].performance > series[peakIdx].performance) peakIdx = i;
   return { series, current: series[series.length - 1] || null, peakPerformanceIdx: peakIdx };
+}
+
+export interface MonotonyStreak { current: number; prev: number[]; sustainedHigh: boolean; }
+/** Монотонность текущей + предыдущих недель (Фостер: monotony>2 + высокая нагрузка = риск перетрена).
+ *  sustainedHigh — текущая И все prev выше 2 (честный «2 недели подряд», а не одна). */
+export function monotonyStreak(dailyLoads: DayLoad[], weeks = 2): MonotonyStreak {
+  if (dailyLoads.length === 0) return { current: 0, prev: [], sustainedHigh: false };
+  const sorted = [...dailyLoads].sort((a, b) => a.date < b.date ? -1 : 1);
+  const ref = sorted[sorted.length - 1].date;
+  const current = weeklyMonotony(dailyLoads, ref).monotony;
+  const prev: number[] = [];
+  for (let w = 1; w < weeks; w++) prev.push(weeklyMonotony(dailyLoads, addDays(ref, -7 * w)).monotony);
+  const sustainedHigh = current > 2 && prev.length === weeks - 1 && prev.every(m => m > 2);
+  return { current: Math.round(current * 100) / 100, prev: prev.map(m => Math.round(m * 100) / 100), sustainedHigh };
 }
 
 export interface BanisterForm { z: number; trend: 'up' | 'flat' | 'down'; label: string; }

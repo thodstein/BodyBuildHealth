@@ -7,6 +7,7 @@ import {
   hrvRatioToBaseline,
   HRV_PROTOCOL_NOTE,
 } from '../hrv-baseline.engine';
+import { analyzeRecovery } from '../../recovery-optimization.engine';
 
 beforeEach(() => { try { localStorage.removeItem('he_hrv_log'); } catch { /* noop */ } });
 
@@ -73,5 +74,37 @@ describe('P2 HRV-база', () => {
 
   it('протокол замера документирован', () => {
     expect(HRV_PROTOCOL_NOTE).toContain('1 мин');
+  });
+});
+
+describe('D1 персональная база в analyzeRecovery', () => {
+  const base = {
+    sleep: { hours: 7.5, quality: 4, bedtime: '23:00', wakeTime: '07:00', latencyMin: 10, awakenings: 1 },
+    fatigueScore: 0.3, trainingDaysThisWeek: 4, currentWeek: 4,
+    periodizationPhase: 'accumulation' as const, recentPR: false, injuryHistory: [],
+  };
+
+  it('без базы — поведение как раньше (абсолютный RMSSD 30 = низкий скор)', () => {
+    const out = analyzeRecovery({ ...base, hrv: { rmssd: 30, sdnn: 40, restingHR: 62, readinessScore: 70 } });
+    expect(out.hrvScore).toBeLessThan(60);
+  });
+
+  it('личная норма перебивает абсолютную: база 30, замер 30 — скор не ниже 60', () => {
+    const out = analyzeRecovery({
+      ...base,
+      hrv: { rmssd: 30, sdnn: 40, restingHR: 62, readinessScore: 70 },
+      hrvBaseline: { status: 'normal', n: 7 },
+    });
+    expect(out.hrvScore).toBeGreaterThanOrEqual(60);
+  });
+
+  it('личная красная капает скор: замер вдвое ниже базы', () => {
+    const out = analyzeRecovery({
+      ...base,
+      hrv: { rmssd: 80, sdnn: 60, restingHR: 55, readinessScore: 80 },
+      hrvBaseline: { status: 'low', n: 7 },
+    });
+    expect(out.hrvScore).toBeLessThanOrEqual(35);
+    expect(out.recommendations.join(' ')).toContain('личной базы');
   });
 });

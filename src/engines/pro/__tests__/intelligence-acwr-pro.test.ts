@@ -3,6 +3,7 @@ import {
   acuteChronicRatio,
   trainingLoadReport,
   banisterForm,
+  monotonyStreak,
   ACWR_DISCLAIMER,
   ACWR_ZONE_META,
   ACWR_CHRONIC_FLOOR_DEFAULT,
@@ -115,5 +116,53 @@ describe('P6 Banister-форма z-трендом', () => {
     const loads = [...flatLoads(14, 100, '2026-07-21'), ...flatLoads(7, 900, '2026-07-28')];
     const f = banisterForm(loads)!;
     expect(f.trend).toBe('down');
+  });
+});
+
+describe('D2 monotonyStreak — честные 2 недели подряд', () => {
+  // почти ровные недели 500 (один день 480): mean/sd >> 2 — настоящее однообразие по Фостеру
+  function flatWeek(end: string): DayLoad[] {
+    const out: DayLoad[] = [];
+    const e = new Date(end);
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(e);
+      d.setDate(d.getDate() - i);
+      out.push({ date: d.toISOString().slice(0, 10), load: i === 3 ? 480 : 500 });
+    }
+    return out;
+  }
+  // рваная неделя 200/800 через день: высокая вариативность
+  function variedWeek(end: string): DayLoad[] {
+    const out: DayLoad[] = [];
+    const e = new Date(end);
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(e);
+      d.setDate(d.getDate() - i);
+      out.push({ date: d.toISOString().slice(0, 10), load: i % 2 === 0 ? 200 : 800 });
+    }
+    return out;
+  }
+
+  it('пусто — не sustained', () => {
+    expect(monotonyStreak([]).sustainedHigh).toBe(false);
+  });
+
+  it('одна монотонная неделя — не sustained (нужны две)', () => {
+    const s = monotonyStreak(flatWeek('2026-07-28'), 2);
+    expect(s.current).toBeGreaterThan(2);
+    expect(s.sustainedHigh).toBe(false); // прошлой недели нет в данных
+  });
+
+  it('две монотонные недели подряд — sustained', () => {
+    const loads = [...flatWeek('2026-07-21'), ...flatWeek('2026-07-28')];
+    const s = monotonyStreak(loads, 2);
+    expect(s.sustainedHigh).toBe(true);
+  });
+
+  it('рваная текущая неделя сбрасывает флаг', () => {
+    const loads = [...flatWeek('2026-07-21'), ...variedWeek('2026-07-28')];
+    const s = monotonyStreak(loads, 2);
+    expect(s.current).toBeLessThanOrEqual(2);
+    expect(s.sustainedHigh).toBe(false);
   });
 });

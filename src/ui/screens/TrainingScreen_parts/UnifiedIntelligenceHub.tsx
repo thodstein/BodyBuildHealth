@@ -16,7 +16,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { loadSRPESessions, saveSRPESession, clearSRPESessions, updateSRPESession, deleteSRPESession, importSRPEFromDiary, type SRPESession } from '../../../engines/pro/srpe-store';
 import { buildIntelCsv, buildIntelHtml, buildIntelDeloadIcs } from '../../../engines/pro/intelligence-export.engine';
-import { toDailyLoads, acuteChronicRatio, weeklyMonotony, fitnessFatigue, trainingLoadReport, sessionLoad, banisterForm, ACWR_DISCLAIMER, type DayLoad } from '../../../engines/pro/training-load.engine';
+import { toDailyLoads, acuteChronicRatio, weeklyMonotony, fitnessFatigue, trainingLoadReport, sessionLoad, banisterForm, monotonyStreak, ACWR_DISCLAIMER, type DayLoad } from '../../../engines/pro/training-load.engine';
 import { analyzeRecovery, shouldTrain } from '../../../engines/recovery-optimization.engine';
 import { calculatePRI, getPRIThreshold } from '../../../engines/autoregulation.engine';
 import { autoRegulate, loadForRPE, rpeFromLoad, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
@@ -184,6 +184,8 @@ export const UnifiedIntelligenceHub: React.FC = () => {
   const dailyLoads: DayLoad[] = useMemo(()=> toDailyLoads(sessions), [sessions]);
   const acwr = useMemo(()=> acuteChronicRatio(dailyLoads, undefined, 7, 28, { method: 'ewma_uncoupled' }), [dailyLoads]);
   const monotony = useMemo(()=> weeklyMonotony(dailyLoads), [dailyLoads]);
+  // D2: честные «2 недели подряд» вместо одной текущей
+  const monoStreak = useMemo(()=> monotonyStreak(dailyLoads, 2), [dailyLoads]);
   const banister = useMemo(()=> fitnessFatigue(dailyLoads), [dailyLoads]);
   // P6: форма z-трендом (сырые AU — только в тултипах)
   const form = useMemo(()=> banisterForm(dailyLoads), [dailyLoads]);
@@ -199,6 +201,8 @@ export const UnifiedIntelligenceHub: React.FC = () => {
       return analyzeRecovery({
         sleep: { hours: sleepHours, quality: sleepQuality, bedtime:'23:00', wakeTime:'07:00', latencyMin:10, awakenings:1 },
         hrv: { rmssd, sdnn:50, restingHR, readinessScore: readiness },
+        // D1: персональная база перебивает популяционные пороги внутри движка
+        hrvBaseline: hrvBase ? { status: hrvState.status, n: hrvBase.n } : null,
         fatigueScore: fatigue/100,
         trainingDaysThisWeek: trainDays,
         currentWeek: 4,
@@ -207,7 +211,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
         injuryHistory: [],
       });
     } catch { return null; }
-  }, [sleepHours, sleepQuality, rmssd, restingHR, readiness, fatigue, trainDays, phase]);
+  }, [sleepHours, sleepQuality, rmssd, restingHR, readiness, fatigue, trainDays, phase, hrvBase, hrvState]);
 
   const verdict = useMemo(()=> recoveryOut ? shouldTrain(recoveryOut.overallRecoveryIndex, fatigue/100) : null, [recoveryOut, fatigue]);
 
@@ -592,7 +596,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                 <MetricCard title="Сон" accent={recoveryOut.sleepScore>=65? '#22c55e':'#eab308'}><div style={{ fontSize:15, fontWeight:900, color: recoveryOut.sleepScore>=65?'#22c55e':'#eab308' }}>{recoveryOut.sleepScore}</div><div style={SMALL}>/100</div></MetricCard>
                 <MetricCard title="HRV" accent={recoveryOut.hrvScore>=65?'#22c55e':'#eab308'}><div style={{ fontSize:15, fontWeight:900, color: recoveryOut.hrvScore>=65?'#22c55e':'#eab308' }}>{recoveryOut.hrvScore}</div><div style={SMALL}>/100</div></MetricCard>
                 <MetricCard title="Перетрен" accent={recoveryOut.overtrainingRisk>=60?'#ef4444':'#22c55e'}><div style={{ fontSize:15, fontWeight:900, color: recoveryOut.overtrainingRisk>=60?'#ef4444':'#22c55e' }}>{recoveryOut.overtrainingRisk}</div><div style={SMALL}>/100</div></MetricCard>
-                <MetricCard title="Суперкомп." accent="#60a5fa"><div style={{ fontSize:15, fontWeight:900, color:'#60a5fa' }}>{recoveryOut.supercompensationHours}ч</div><div style={SMALL}>окно</div></MetricCard>
+                <MetricCard title="Суперкомп. (ориентир)" accent="#60a5fa"><div style={{ fontSize:15, fontWeight:900, color:'#60a5fa' }}>{recoveryOut.supercompensationHours}ч</div><div style={SMALL}>окно · формула грубая</div></MetricCard>
               </div>
 
               <div style={{ marginTop:8, padding:'10px 12px', borderRadius:10, background:'rgba(34,197,94,0.05)', border:'1px solid rgba(34,197,94,0.14)' }}>
@@ -612,9 +616,9 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                   {recoveryOut.deloadRecommended ? `⚠ ${recoveryOut.deloadReason}` : `✓ ${recoveryOut.deloadReason}`}
                 </div>
               </div>
-              {!recoveryOut.deloadRecommended && (recoveryOut.overtrainingRisk >= 60 || monotony.monotony > 2) && (
+              {!recoveryOut.deloadRecommended && (recoveryOut.overtrainingRisk >= 60 || monoStreak.sustainedHigh) && (
                 <div style={{ marginTop:6, padding:'7px 10px', borderRadius:9, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.16)', fontSize:10, color:'#f59e0b', lineHeight:1.4 }}>
-                  🟡 Ранний сигнал: {recoveryOut.overtrainingRisk >= 60 ? `риск перетрена ${recoveryOut.overtrainingRisk}≥60` : ''}{recoveryOut.overtrainingRisk >= 60 && monotony.monotony > 2 ? ' + ' : ''}{monotony.monotony > 2 ? `монотонность ${monotony.monotony}>2` : ''} — запланируйте deload на следующую неделю, не дожидаясь провала восстановления.
+                  🟡 Ранний сигнал: {recoveryOut.overtrainingRisk >= 60 ? `риск перетрена ${recoveryOut.overtrainingRisk}≥60` : ''}{recoveryOut.overtrainingRisk >= 60 && monoStreak.sustainedHigh ? ' + ' : ''}{monoStreak.sustainedHigh ? `монотонность >2 две недели подряд (${monoStreak.current}, ${monoStreak.prev.join('/')})` : ''} — запланируйте deload на следующую неделю, не дожидаясь провала восстановления.
                 </div>
               )}
 
