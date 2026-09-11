@@ -1,9 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { StrongmanDiagnosticsHub } from '../StrongmanDiagnosticsHub';
 
-beforeEach(() => { localStorage.clear(); });
+beforeEach(() => {
+  localStorage.clear();
+  (HTMLCanvasElement.prototype as any).getContext = vi.fn(() => null);
+});
 
 describe('StrongmanDiagnosticsHub PRO', () => {
   it('рендерит заголовок и 6 вкладок', async () => {

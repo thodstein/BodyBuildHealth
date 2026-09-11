@@ -19,7 +19,7 @@ import { parseKinoveaCSV, analyzeBarTracking, diagnoseCarrySway } from '../../..
 import { detectSMWeakFromDiary, candidateSMWeakPointsFromDiary, smWeeklySetsByLift, smLiftKeyForWeakPoint } from '../../../engines/strength-sport/strength-sport-sm-diary.engine';
 import { buildSMDiagnosticsHtml, downloadSMHtml, downloadSMCsv } from '../../../engines/strength-sport/strength-sport-sm-export.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
-import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, ensurePoseModel } from '../../../engines/strength-sport/strength-sport-pose.engine';
+import { StrongmanVideoGoniometer } from './StrongmanVideoGoniometer';
 import { diagnoseCarryPathFromPoints } from '../../../engines/strength-sport/strength-sport-sm-carry-path.engine';
 import { validatePassport, validateContestPassports } from '../../../engines/strength-sport/strength-sport-passport.engine';
 import { correctEnodeByVariable } from '../../../engines/strength-sport/strength-sport-barpath.engine';
@@ -131,7 +131,6 @@ type SMState = {
   armsBent: boolean;
   poseCsv: string;
   poseLift: string;
-  poseLive: '' | 'loading' | 'ok' | 'fail';
   poseSex: '' | 'male' | 'female';
   // SM PRO2: формат ивента + пофазный тайминг + бицепс-анамнез + холд/медли
   eventFormat: SMEventFormat;
@@ -171,7 +170,6 @@ const DEFAULT_STATE: SMState = {
   strategy: 'balanced', pinchWidth: '3in', cocLevel: 'coc1_5', fatGripMm: '50',
   specWeeks: '6', annualStartWeek: '1', mixGrip: 'overhand', armsBent: false,
   poseCsv: '', poseLift: 'yoke_walk',
-  poseLive: '',
   poseSex: '',
   eventFormat: 'max', workPct: '90',
   stonePull1S: '', stoneLapS: '', stonePull2S: '',
@@ -548,12 +546,6 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     if (!id) return null;
     return (CONTEST_PRESETS as any)[id] || null;
   }, [state.contestId]);
-
-  const mockPose = useMemo(() => {
-    const frames = createMockPoseStream();
-    const ang = estimateAnglesFromLandmarks(frames[0]);
-    return { angles: ang, status: livePoseStatus(ang) };
-  }, []);
 
   const passportResult = useMemo(() => {
     const h = parseFloat(state.platformHeightCm);
@@ -1046,19 +1038,6 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     } catch { setCarryPath(null); }
     setToast(`✓ Кинова (Kinovea): качание ${sway} см, высота ${res.yMax} см, скорость ${res.vmax} м/с`);
     setTimeout(()=>setToast(''),3000);
-  };
-
-  // MediaPipe live-проверка (честно: только наличие модели, углы — через CSV выше; parity с ТА)
-  const checkPoseLive = async () => {
-    setState(s => ({ ...s, poseLive: 'loading' }));
-    try {
-      const ok = await ensurePoseModel();
-      setState(s => ({ ...s, poseLive: ok ? 'ok' : 'fail' }));
-      setToast(ok ? '✓ Модель поз доступна — живые углы следующим шагом' : '✕ Модель поз недоступна (нет сети)');
-      setTimeout(() => setToast(''), 2500);
-    } catch {
-      setState(s => ({ ...s, poseLive: 'fail' }));
-    }
   };
 
   const applyMobilityToProfile = () => {
@@ -1563,8 +1542,20 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <div style={{ padding:'12px 12px', borderRadius:14, background: swayCm!=null ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(59,130,246,0.18)', fontSize:12, color:'#fff' }}>Поправка Энода (Enode): было {swayCm ?? '—'} см → стало {enodeCorrected ?? '—'} см<br/><span style={{ fontSize:10, color:'#fff' }}>{swayCm ?? 0} ×1.08 −0.45 = {enodeCorrected ?? 0}</span></div>
               <div style={{ padding:'12px 12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color:'#fff' }}>Сетка: yoke 1.30/1.00<br/>farmers 1.40/1.10<br/>stone 0.45/0.30<br/>log 0.32/0.20 м/с — стоп при &lt;stopMin</div>
             </div>
-            <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', fontSize:12, color:'#fff' }}>Поз-трекинг (заглушка BlazePose): таз {mockPose.angles.hip}° колено {mockPose.angles.knee}° голеностоп {mockPose.angles.ankle}° плечо {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'ОК (заглушка)'}</div>
             {carryPath && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: carryPath.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : carryPath.verdict === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border:'1px solid rgba(255,255,255,0.06)' }}><div style={{ fontSize:14, fontWeight:800, color: carryPath.verdict === 'ok' ? '#22c55e' : carryPath.verdict === 'warn' ? '#f59e0b' : '#ef4444' }}>Траектория переноски: {carryPath.type} · {carryPath.verdict.toUpperCase()}</div><div style={{ fontSize:12, color:'#fff', marginTop:2 }}>{carryPath.lines.join(' · ')}</div></div>}
+            <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
+              <summary style={{ padding:'12px 14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>📷 Видеоуглы с телефона (съёмка → точки → таблица)</summary>
+              <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
+                <StrongmanVideoGoniometer
+                  lift={state.poseLift}
+                  onAppend={(row) => {
+                    setState(s => ({ ...s, poseCsv: s.poseCsv ? `${s.poseCsv}\n${row}` : row }));
+                    setToast('✓ Замер добавлен в таблицу — жми «🦿 Разобрать углы»');
+                    setTimeout(() => setToast(''), 2500);
+                  }}
+                />
+              </div>
+            </details>
             <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
               <summary style={{ padding:'12px 14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>🦿 Углы суставов с видео (нормы)</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
@@ -1580,12 +1571,6 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <textarea value={state.poseCsv} onChange={e=>setState(s=>({...s, poseCsv:e.target.value}))} placeholder={'время,таз,колено,голеностоп,плечо\n0.00,24,8,90,170\n0.03,20,25,88,172'} style={{ width:'100%', height:64, marginTop:6, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:'monospace' }} />
               {poseResult && <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background: poseResult.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color: '#fff' }}>n={poseResult.n} · {ruVerdict(poseResult.verdict)} · {poseResult.lines.join(' · ')}</div>}
               {autoAngles && <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)', fontSize:12, color: '#fff' }}>📐 {ruVerdict(autoAngles.verdict)} · {autoAngles.lines.join(' · ')}</div>}
-              <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
-                <button onClick={checkPoseLive} style={{ padding:'12px 16px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>📷 Живая проверка модели</button>
-                {state.poseLive === 'loading' && <span style={{ fontSize: 12, color: '#fff' }}>проверяем сеть…</span>}
-                {state.poseLive === 'ok' && <span style={{ fontSize: 12, color: '#fff' }}>✓ модель доступна — живые углы следующим шагом</span>}
-                {state.poseLive === 'fail' && <span style={{ fontSize: 12, color: '#fff' }}>✕ нет сети — работай через таблицу выше</span>}
-              </div>
               </div>
             </details>
             <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>

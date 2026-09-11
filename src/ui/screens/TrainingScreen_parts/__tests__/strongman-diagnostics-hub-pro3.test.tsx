@@ -1,9 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { StrongmanDiagnosticsHub } from '../StrongmanDiagnosticsHub';
 
-beforeEach(() => { localStorage.clear(); });
+beforeEach(() => {
+  localStorage.clear();
+  (HTMLCanvasElement.prototype as any).getContext = vi.fn(() => null);
+});
 
 describe('StrongmanDiagnosticsHub PRO-3', () => {
   it('yMax пишется в yMaxCm и не трогает stoneKg', async () => {
@@ -43,5 +46,11 @@ describe('StrongmanDiagnosticsHub PRO-3', () => {
     render(<StrongmanDiagnosticsHub />);
     fireEvent.click(screen.getByText(/Хват\/Кор/));
     expect(document.body.textContent).toContain('Бюджет McGill');
+  });
+  it('таб Видео показывает гониометр вместо заглушки', async () => {
+    render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(screen.getByText(/Видео/));
+    expect(await screen.findByText(/Видеоуглы с телефона/)).toBeTruthy();
+    expect(document.body.textContent).not.toContain('заглушка BlazePose');
   });
 });
