@@ -20,6 +20,11 @@ export interface VbtAdvice {
   advice: string;
 }
 
+/** PRO-3 P1: сколько реальных замеров скорости в записях (loss требует ≥2). */
+export function vbtMeasureCount(records: VbtRecord[]): number {
+  return (records || []).map((r) => r.velocityMs).filter((v): v is number => typeof v === 'number' && Number.isFinite(v)).length;
+}
+
 export function estimateVbtLoss(records: VbtRecord[]): number | null {
   if (records.length < 2) return null;
   const vs = records.map(r => r.velocityMs).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
@@ -38,7 +43,8 @@ export function vbtZone(lossPct: number | null, exerciseId?: string, weakPoint?:
   return 'ok';
 }
 
-/** Пороги: weakPoint хаба приоритетнее (E9 P1), иначе legacy vbtForExercise (тесты пинят 20/30 wrist, 15/25 grip). */
+/** Пороги: weakPoint хаба — канон (E9 P1), иначе legacy vbtForExercise (тесты пинят 20/30 wrist, 15/25 grip).
+ * PRO-3 W5b: единственный экспорт-канон — thresholdsFor; vbtForExercise помечен @deprecated. */
 export function thresholdsFor(exerciseId: string, weakPoint?: string): { warnPct: number; stopPct: number } {
   if (weakPoint && isArmWeakPoint(weakPoint)) return vbtThresholdForWeakPoint(weakPoint as any);
   return vbtForExercise(exerciseId);
@@ -61,10 +67,17 @@ export function diagnoseVbt(records: VbtRecord[]): VbtAdvice {
   if (zone === 'stop') advice = `Потеря ≥${stopPct}% — стоп, риск tendon, снизить вес`;
   else if (zone === 'warn') advice = `Потеря ${warnPct}–${stopPct}% — на грани, +1 день отдыха`;
   else if (loss != null) advice = `Потеря ${loss}% — в допуске (<${warnPct}%)`;
-  else advice = 'Введите скорость (м/с) для двух подходов';
+  // PRO-3 P1: честный хинт — 0 замеров vs 1 замер (раньше один текст на оба случая)
+  else if (vbtMeasureCount(records) === 0) advice = 'Введи скорость (м/с) для двух подходов — loss считается между 1-м и 2-м';
+  else advice = 'Замер 1 есть — сделай 2-й подход и введи скорость, loss посчитается между ними';
   return { velocityLossPct: loss, e1RM, zone, advice };
 }
 
+/**
+ * @deprecated PRO-3 W5b: legacy-таблица exerciseId — канон теперь `vbtThresholdForWeakPoint`
+ * (пороги мёртвой точки). Оставлена как fallback для записей без weakPoint; числа пинятся тестами.
+ * Все пути хаба передают weakPoint (E9 P1 + PRO-3 P1), сюда попадают только внешние вызовы.
+ */
 export function vbtForExercise(exerciseId: string): { warnPct: number; stopPct: number } {
   const low = (exerciseId || '').toLowerCase();
   if (low.includes('wrist') || low.includes('cup')) return { warnPct: 20, stopPct: 30 };

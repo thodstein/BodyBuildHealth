@@ -65,6 +65,12 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   lrDirection?: Array<{ group: string; text: string }>;
   mmc?: string | null;
   workingRange?: string | null;
+  /** PRO-3 W-AL (ArmliftingDiagnosticsHub → ArmAutoConstructor) + P4 red-flags: всё опционально. */
+  armDiscipline?: string;
+  armLiftingVerdict?: string;
+  armLifting?: { weakest: string | null; avgPct: number | null; totalKg: number; rows: Array<{ implement: string; display: string; scorePct: number | null; level: string; internal: boolean }> };
+  armRedFlags?: string[];
+  armProfile?: { leftKg?: number; rightKg?: number; bwKg?: number; rtKg?: number };
 }
 export interface PriPayload { volumeMult: number; rirShift: number }
 export interface TempoPayload { eccentric: number; bottomPause?: number; concentric: number; topPause?: number; label?: string }

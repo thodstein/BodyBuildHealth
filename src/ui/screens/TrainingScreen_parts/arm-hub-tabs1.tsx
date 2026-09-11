@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { getRtWorldClass } from '../../../engines/arm/arm-force-capture.engine';
+import { wafClassFor } from '../../../engines/arm/arm-norms-table.engine';
 import { benchAdviceForLevel } from '../../../engines/arm/arm-benchmarks.engine';
 import { ARM_BIOMECH, angleJointForWeakPoint, isValidAngleForArmWeakPoint, vbtThresholdForWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
@@ -52,11 +53,16 @@ export function HubGripTab({ H }: { H: any }) {
       <AdGrid cols="2">
         <AdSec title={`Force Vector · WAF ${weightClassAuto}`}>
           <div className="ad-hero-side" data-arm="force-score">
-            <div className="ad-hero-score" aria-hidden><b style={{ fontVariantNumeric: 'tabular-nums' }}>{forceVecPro.totalScore}</b><span>сила</span></div>
+            <div className="ad-hero-score" aria-hidden><b style={{ fontVariantNumeric: 'tabular-nums' }}>{forceVecPro.scoreReliable ? forceVecPro.totalScore : '—'}</b><span>сила</span></div>
+            {!forceVecPro.scoreReliable && <div className="ad-muted">недостаточно данных — введи минимум 2 замера (RT/Axle/Pinch/Side/Back)</div>}
             <div className="ad-hero-name">Support {forceVecPro.gripSupport} · Pinch {forceVecPro.gripPinch}<span>Side {forceVecPro.sidePressure} · Back {forceVecPro.backPressure}</span></div>
             {forceVecPro.asymmetryPct!=null && <span className="ad-tag" data-sev={forceVecPro.asymmetryPct>=12?'bad':forceVecPro.asymmetryPct>=7?'warn':'ok'}>Асим {forceVecPro.asymmetryPct}%</span>}
           </div>
           <div className="ad-muted">WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle {state.axleImpl === 'apollon' ? '237.5/137.9' : 133} · Side ref {(bwNum*0.6).toFixed(0)}кг</div>
+          {(() => {
+            const ci = wafClassFor(bwNum, state.sex);
+            return <div className="ad-muted" data-arm="waf-class">Класс WAF: {ci.label} (ты {bwNum}кг){ci.toNext != null ? ` · до −${ci.cls}: −${ci.toNext}кг` : ' · открытая — без сгонки'}</div>;
+          })()}
           {(()=>{
             const rows: Array<{ n: string; v: string }> = [];
             const rt = parseFloat(state.rtKg);
@@ -120,6 +126,7 @@ export function HubGripTab({ H }: { H: any }) {
         <AdSec title="📟 Приборы — VBT" collapsible defaultOpen={false} summary="скорость · пороги">
         <AdSec title="VBT">
           <div className="ad-muted">{vbt.advice} {vbt.e1RM? `· e1RM ${vbt.e1RM}кг` : ''} · zone <b>{vbt.zone}</b></div>
+          <div className="ad-muted">Пороги loss по точке — внутренние эвристики хаба (LVP-профилей для рук не опубликовано)</div>
           {vbtThP0 && <div className="ad-muted">Пороги точки {state.weakPoints[0]}: warn {vbtThP0.warnPct}% / stop {vbtThP0.stopPct}%</div>}
           {vbtThP0 && vbt.velocityLossPct != null && (
             <div data-arm="vbt-scale">
@@ -136,10 +143,14 @@ export function HubGripTab({ H }: { H: any }) {
             <AdField label="Повторы">
               <input inputMode="numeric" value={state.vbtReps} onChange={e=>setState((s: any)=>({...s, vbtReps:e.target.value}))} placeholder="повт" aria-label="VBT повторы" />
             </AdField>
-            <AdField label="Скорость, м/с">
+            <AdField label="Скорость 1, м/с">
               <input inputMode="decimal" value={state.vbtVel} onChange={e=>setState((s: any)=>({...s, vbtVel:e.target.value}))} placeholder="м/с" aria-label="VBT скорость м/с" />
             </AdField>
+            <AdField label="Скорость 2, м/с">
+              <input inputMode="decimal" value={state.vbtVel2 || ''} onChange={e=>setState((s: any)=>({...s, vbtVel2:e.target.value}))} placeholder="м/с" aria-label="VBT скорость второго подхода м/с" />
+            </AdField>
           </div>
+          {state.vbtVel && !(state as any).vbtVel2 && <div className="ad-muted">Замер один: best≈ввод+0.2 (оценка) — введи скорость 2-го подхода для честного loss</div>}
         </AdSec>
         </AdSec>
       </AdGrid>

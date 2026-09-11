@@ -16,6 +16,8 @@
 
 **Нет (gap vs PL/TA/BB хабов — именно «упражнения и мёртвые точки» из запроса):**
 
+> ⚠️ Таблица ниже — историческая (аудит Aug 2026, до реализации). **ЗАКРЫТО КОДОМ (коммит 17265b98 + PRO-план Sep 05 + PRO-3 W1–W4):** 12 точек `ARM_BIOMECH` с углами/причинами/коррекциями/intensityPct, `scoreArm` RSS + floors + verification, инъекция во все недели + откат, топ-3 + причины + симуляция + спец-блок, VBT-пороги по точкам, Kinovea CSV + SRD, OHS-подобная мобильность 5 ROM + retest. Строки «Арм нет» оставлены для истории, актуальное состояние — `docs/ARM-DIAGNOSTICS-HUB-PRO-3.md`.
+
 | PL/TA/BB есть | Арм нет |
 |---|---|
 | `weakpoint-pl.ts` 12 lifts × 30 WeakPoint → `DIAGNOSIS[lift][point] {muscles, corrections[], intensityPct, rationale}` (`strength-sport-biomechanics TA_BIOMECH 16 WLWeakPoint → angleRange/keyJoint/reason/loadCues/intensity`)`lms-builder injectPLWeakPoints` + `strength-sport-ta-injection injectTAWeakPoints` 3×5 @intensityPct в `dayMap` с dedup/budget | `WEAK_MAP` — 8 грубых, без разбивки по фазам стола, без углов (`angleRangeDeg`), без `biomechanicalReason`, без `intensityPct`, без списка коррекций из каталога (2 хардкода). Нет `ARM_BIOMECH` мапы. |

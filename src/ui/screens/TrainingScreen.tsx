@@ -44,6 +44,7 @@ import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub'
 import TrainingIntelligenceDashboard from './TrainingScreen_parts/TrainingIntelligenceDashboard';
 import { DiagnosticsHub } from './TrainingScreen_parts/DiagnosticsHub';
 import { ArmDiagnosticsHub } from './TrainingScreen_parts/ArmDiagnosticsHub';
+import { ArmliftingDiagnosticsHub } from './TrainingScreen_parts/ArmliftingDiagnosticsHub';
 import { WLDiagnosticsHub } from './TrainingScreen_parts/WLDiagnosticsHub';
 import { StrongmanDiagnosticsHub } from './TrainingScreen_parts/StrongmanDiagnosticsHub';
 import { BBDiagnosticsHub } from './TrainingScreen_parts/BBDiagnosticsHub';
@@ -877,7 +878,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
-        const CALC_TABS = new Set(['intelligence_hub','strength_analysis','load_safety','joints_ortho','quality_hub','diagnostics_hub','arm_diagnostics_hub','wl_diagnostics_hub','strongman_diagnostics_hub','bb_diagnostics_hub','periodization_taper_hub','exercise_lab','volume_hub','tempo_hub','rir_forecast_hub','mix_hub','metabolic_hub']);
+        const CALC_TABS = new Set(['intelligence_hub','strength_analysis','load_safety','joints_ortho','quality_hub','diagnostics_hub','arm_diagnostics_hub','arm_lifting_diagnostics','wl_diagnostics_hub','strongman_diagnostics_hub','bb_diagnostics_hub','periodization_taper_hub','exercise_lab','volume_hub','tempo_hub','rir_forecast_hub','mix_hub','metabolic_hub']);
         // Качество и диагностика — РАЗДЕЛЬНО (бывший quality_joint_hub 2-в-1)
         const effectiveTab = tab === 'load_management' || tab === 'load_safety' ? 'intelligence_hub' as const
           : tab === 'rir_calibration' || tab === 'readiness_forecast' || tab === 'rir_forecast_hub' ? 'intelligence_hub' as const
@@ -886,6 +887,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           : tab === 'intelligence_hub' ? 'intelligence_hub' as const
           : tab === 'diagnostics' || tab === 'diagnostics_hub' ? 'diagnostics_hub' as const
           : (tab as string) === 'arm_diagnostics' || (tab as string) === 'arm_diagnostics_hub' ? 'arm_diagnostics_hub' as const
+          : (tab as string) === 'arm_lifting_diagnostics' ? 'arm_lifting_diagnostics' as const
           : (tab as string) === 'wl_diagnostics' || (tab as string) === 'wl_diagnostics_hub' ? 'wl_diagnostics_hub' as const
           : (tab as string) === 'strongman_diagnostics' || (tab as string) === 'strongman_diagnostics_hub' ? 'strongman_diagnostics_hub' as const
           : (tab as string) === 'bb_diagnostics' || (tab as string) === 'bb_diagnostics_hub' ? 'bb_diagnostics_hub' as const
@@ -910,6 +912,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {effectiveTab === 'quality_hub' && <InfoErrorBoundary label="Качество программы"><QualityHub onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
             {effectiveTab === 'diagnostics_hub' && <InfoErrorBoundary label="Диагностика движения"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} /></InfoErrorBoundary>}
             {effectiveTab === 'arm_diagnostics_hub' && <InfoErrorBoundary label="Арм-диагностика"><ArmDiagnosticsHub /></InfoErrorBoundary>}
+            {(effectiveTab as string) === 'arm_lifting_diagnostics' && <InfoErrorBoundary label="Армлифтинг-диагностика"><ArmliftingDiagnosticsHub /></InfoErrorBoundary>}
             {effectiveTab === 'wl_diagnostics_hub' && <InfoErrorBoundary label="ТА-диагностика"><WLDiagnosticsHub /></InfoErrorBoundary>}
             {effectiveTab === 'strongman_diagnostics_hub' && <InfoErrorBoundary label="Стронг-диагностика"><StrongmanDiagnosticsHub /></InfoErrorBoundary>}
             {(effectiveTab as any) === 'bb_diagnostics_hub' && <InfoErrorBoundary label="ББ-диагностика"><BBDiagnosticsHub /></InfoErrorBoundary>}

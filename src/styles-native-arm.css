@@ -965,3 +965,75 @@ html.app-native .train-arm.arm-apk [data-arm='week-pills'] {
   -webkit-backdrop-filter: blur(8px) !important;
   backdrop-filter: blur(8px) !important;
 }
+
+/* --- 28. PRO-3: кнопки хабов 44px+ и новые хуки (VBT-2, red-flags, сценарии, WAF-класс, humerus, армлифтинг) --- */
+/* Чипы диаг-хаба: тач-норма 44px + press + focus (у .train-arm было, у .train-armdiag не было) */
+html.app-native .train-armdiag.arm-apk .ad-chip {
+  min-height: 44px !important;
+  scroll-snap-align: start !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-chip:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-chip:focus-visible {
+  outline: 2px solid rgba(var(--arm-amber-rgb), 0.9) !important;
+  outline-offset: 2px !important;
+}
+
+/* Кнопки диаг-хаба: пол 48px (amber 56 / ghost 52 выигрывают специфичностью выше) */
+html.app-native .train-armdiag.arm-apk .ad-btn {
+  min-height: 48px !important;
+  border-radius: 15px !important;
+}
+
+html.app-native .train-armdiag.arm-apk .ad-btn:active {
+  transform: scale(0.96) !important;
+  filter: brightness(1.12) !important;
+}
+
+/* Новые строки PRO-3: вердикт/таблица снарядов, WAF-класс, humerus-стоп — tabular + перенос */
+html.app-native .train-armdiag.arm-apk [data-arm='lift-verdict'],
+html.app-native .train-armdiag.arm-apk [data-arm='lift-table'],
+html.app-native .train-armdiag.arm-apk [data-arm='waf-class'],
+html.app-native .train-armdiag.arm-apk [data-arm='humerus-stop'],
+html.app-native .train-armdiag.arm-apk [data-arm='asym-verdict'],
+html.app-native .train-armdiag.arm-apk [data-arm='norms-table'],
+html.app-native .train-armdiag.arm-apk [data-arm='scenario'] {
+  font-variant-numeric: tabular-nums !important;
+  overflow-wrap: anywhere !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='lift-table'] .ad-row,
+html.app-native .train-armdiag.arm-apk [data-arm='humerus-checks'] {
+  flex-wrap: wrap !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='lift-export'] .ad-btn {
+  min-height: 48px !important;
+}
+
+html.app-native .train-armdiag.arm-apk [data-arm='lift-export'] .ad-btn:focus-visible,
+html.app-native .train-armdiag.arm-apk [data-arm='humerus-checks'] .ad-chip:focus-visible {
+  outline: 2px solid rgba(var(--arm-amber-rgb), 0.9) !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .train-armdiag.arm-apk .ad-hero-score {
+    min-width: 48px !important;
+    height: 48px !important;
+  }
+  html.app-native .train-armdiag.arm-apk [data-arm='lift-table'] .ad-row {
+    gap: 4px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-armdiag.arm-apk .ad-chip:active,
+  html.app-native .train-armdiag.arm-apk .ad-btn:active {
+    transform: none !important;
+  }
+}

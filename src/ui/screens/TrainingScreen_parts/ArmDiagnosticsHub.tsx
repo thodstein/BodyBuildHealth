@@ -16,7 +16,7 @@ import { estimateForceVector } from '../../../engines/arm/arm-force-capture.engi
 import { diagnoseVbt } from '../../../engines/arm/arm-vbt-capture.engine';
 import { buildDynamicReport } from '../../../engines/arm/arm-dynamic-force.engine';
 import { loadForceTrials, addForceTrial, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
-import { resolveArmLevelByTests, wafWeightClassFor } from '../../../engines/arm/arm-benchmarks.engine';
+import { resolveArmLevelByTests } from '../../../engines/arm/arm-benchmarks.engine';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { applyToPlanner } from './planner-bridge';
 import { AdRoot, AdCard } from './arm-design-system';
@@ -43,6 +43,8 @@ import { scorePlatform, planAttempts, loadPlatformLog } from '../../../engines/a
 import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary } from '../../../engines/arm/arm-acwr.engine';
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
+import { loadRedFlags, redFlagLabels } from '../../../engines/arm/arm-redflags.store';
+import { wafClassFor } from '../../../engines/arm/arm-norms-table.engine';
 import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { buildRehabPlan } from '../../../engines/arm/arm-rehab.engine';
@@ -117,6 +119,8 @@ type ArmDiagState = {
   vbtWeight: string;
   vbtReps: string;
   vbtVel: string;
+  /** PRO-3 P1: скорость 2-го подхода — честный loss между замерами (пусто = оценка best≈ввод+0.2). */
+  vbtVel2: string;
   // dynamic: 4 trials
   fingerKg: string;
   fingerMs: string;
@@ -137,7 +141,7 @@ const DEFAULT_STATE: ArmDiagState = {
   cup: false, rising: false, pron: false, sup: false, side: false, back: false, weakPoints: [],
   technique: 'balanced', level: 'intermediate',
   elbowDeg: '110', forearmDeg: '90', wristDeg: '10', direction: 'to_middle',
-  vbtWeight: '', vbtReps: '', vbtVel: '',
+  vbtWeight: '', vbtReps: '', vbtVel: '', vbtVel2: '',
   fingerKg: '', fingerMs: '', hammerKg: '', hammerMs: '', hookKg: '', hookMs: '', cupKg: '', cupMs: '',
   wristCurlLb: '', pronHoldSec: '', cupHoldSec: '', cocLevel: '',
 };
@@ -289,7 +293,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
   }), [state.cup, state.rising, state.pron, state.sup, state.side, state.back, state.rtKg, state.axleKg, state.pinchSec, state.technique, state.weakPoints]);
 
   const bwNum = parseFloat(state.bwKg) || 80;
-  const weightClassAuto = state.weightClass || wafWeightClassFor(bwNum);
+  // PRO-3 P3: класс по полу (раньше wafWeightClassFor — только мужская сетка)
+  const weightClassAuto = state.weightClass || wafClassFor(bwNum, state.sex).cls;
 
   // локально с bw/sex/weightClass для корректного sideRef
   const forceVecPro = useMemo(() => estimateForceVector({
@@ -328,11 +333,19 @@ export const ArmDiagnosticsHub: React.FC = () => {
     // E9 P1: exerciseId топ-коррекции + weakPoint первой точки → пороги точки, иначе legacy
     const wp0 = state.weakPoints[0];
     const ex0 = (() => { try { return wp0 ? ARM_CORRECTIONS[wp0]?.exercises[0] : undefined; } catch { return undefined; } })();
+    // PRO-3 P1: два реальных замера — честный loss; один замер — оценка best≈ввод+0.2 (видно в UI)
+    const v2 = parseFloat((state as any).vbtVel2);
+    if (Number.isFinite(v2) && v2 > 0) {
+      return diagnoseVbt([
+        { weight: w, reps: r, velocityMs: v, exerciseId: ex0, weakPoint: wp0 } as any,
+        { weight: w, reps: r, velocityMs: v2, exerciseId: ex0, weakPoint: wp0 } as any,
+      ]);
+    }
     return diagnoseVbt([
       { weight: w, reps: r, velocityMs: v + 0.2, exerciseId: ex0, weakPoint: wp0 } as any,
       { weight: w, reps: r, velocityMs: v, exerciseId: ex0, weakPoint: wp0 } as any,
     ]);
-  }, [state.vbtWeight, state.vbtReps, state.vbtVel, state.weakPoints]);
+  }, [state.vbtWeight, state.vbtReps, state.vbtVel, (state as any).vbtVel2, state.weakPoints]);
 
   // E9 P1: какие пороги сейчас действуют на VBT-карточке
   const vbtThP0 = useMemo(() => {
@@ -449,6 +462,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
       const wp0 = (state.weakPoints as any)[0];
       const ex0 = (() => { try { return wp0 ? (ARM_CORRECTIONS as any)[wp0]?.exercises[0] : undefined; } catch { return undefined; } })();
       const mk = (vel: number) => ({ weight: parseFloat(state.vbtWeight), reps: parseInt(state.vbtReps || '5', 10), velocityMs: vel, exerciseId: ex0, weakPoint: wp0 });
+      // PRO-3 P1: паритет с vbt-мемо — два реальных замера, иначе оценка best≈ввод+0.2
+      const v2raw = parseFloat((state as any).vbtVel2);
+      if (Number.isFinite(v2raw) && v2raw > 0) return [mk(parseFloat(state.vbtVel)), mk(v2raw)];
       return [mk(parseFloat(state.vbtVel)), mk(parseFloat(state.vbtVel) + 0.2)];
     })() : [],
     level: state.level,
@@ -459,7 +475,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     weightClass: weightClassAuto,
     bodyWeightKg: bwNum,
     benchLevel: benchRes.level,
-  } as any), [state.cup, state.rising, state.pron, state.sup, state.side, state.back, state.weakPoints, state.level, state.technique, state.elbowDeg, state.wristDeg, state.forearmDeg, state.vbtWeight, state.vbtReps, state.vbtVel, state.rtKg, state.axleKg, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, derivedTable, derivedTendon, anglesVerified, weightClassAuto, bwNum, benchRes.level, forceHistoryTick]);
+  } as any), [state.cup, state.rising, state.pron, state.sup, state.side, state.back, state.weakPoints, state.level, state.technique, state.elbowDeg, state.wristDeg, state.forearmDeg, state.vbtWeight, state.vbtReps, state.vbtVel, (state as any).vbtVel2, state.rtKg, state.axleKg, state.pinchSec, state.sideKg, state.backKg, state.leftKg, state.rightKg, derivedTable, derivedTendon, anglesVerified, weightClassAuto, bwNum, benchRes.level, forceHistoryTick]);
 
   // ── P0 PRO: план → аудит → причины → топ-3 → Δ → спец-блок → дневник ──
   const armPlan = useMemo(() => {
@@ -835,6 +851,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
         const rh = buildRehabPlan({ injury: rhInjury, weeksSince: parseFloat(rhWeeks) || 0, pain: parseFloat(rhPain) || 0, surgery: rhSurg });
         return { note: rh.note, phase: rh.phase, title: rh.current.title };
       } catch { return null; } })(),
+      // PRO-3 P4: red-flags в экспорт
+      redFlags: (() => { try { return redFlagLabels(loadRedFlags()); } catch { return []; } })(),
     };
   };
 
@@ -895,6 +913,12 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
   const toggleWeakPoint = (wp: ArmWeakPoint) => {
     try { void haptics('light'); } catch { /* no-op */ }
+    // PRO-3 P6: 4-я точка вслух (раньше slice молча отбрасывал)
+    if (!state.weakPoints.includes(wp) && state.weakPoints.length >= 3) {
+      setToast(`Взяты первые 3 (${state.weakPoints.join(', ')}) — ${wp} вне топ-3: убери одну точку, чтобы добавить`);
+      setTimeout(() => setToast(''), 3000);
+      return;
+    }
     setState(s => {
       const has = s.weakPoints.includes(wp);
       let next = has ? s.weakPoints.filter(x=>x!==wp) : [...s.weakPoints, wp].slice(0,3) as ArmWeakPoint[];
@@ -944,6 +968,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
       acwrDanger: perMuscleAcwrSumP0.danger,
       bilateral: bilatP0 ? { weakArm: bilatP0.weakArm, weakSets: bilatP0.weakSets, strongSets: bilatP0.strongSets } : null,
       attempts: attHistP0,
+      // PRO-3 P4: red-flags скрининга — в конструктор
+      redFlags: (() => { try { return loadRedFlags(); } catch { return []; } })(),
     });
     // TOP: матчап + Table-IQ едут в конструктор тем же payload (аддитивно)
     try {
@@ -997,6 +1023,18 @@ export const ArmDiagnosticsHub: React.FC = () => {
   // legacy-чекбокс зеркалится в чипы 12 точек (единый видимый выбор): вкл — добавляет развёртку (до 3), выкл — убирает её
   const toggleLegacy = (k: 'cup' | 'rising' | 'pron' | 'sup' | 'side' | 'back') => {
     try { void haptics('light'); } catch { /* no-op */ }
+    // PRO-3 P6: молча отброшенные развёртки — вслух
+    if (!(state as any)[k]) {
+      const legacyKey = k === 'pron' ? 'pronation' : k === 'sup' ? 'supination' : k;
+      const expanded = LEGACY_TO_DETAILED[legacyKey] || [];
+      const fresh = expanded.filter((p) => !state.weakPoints.includes(p));
+      const room = 3 - state.weakPoints.length;
+      if (fresh.length > room) {
+        const dropped = fresh.slice(Math.max(0, room));
+        setToast(`Взяты первые 3 — вне топ-3: ${dropped.join(', ')} (убери точку, чтобы добавить)`);
+        setTimeout(() => setToast(''), 3000);
+      }
+    }
     setState(s => {
     const turningOn = !(s as any)[k];
     const legacyKey = k === 'pron' ? 'pronation' : k === 'sup' ? 'supination' : k;
@@ -1097,6 +1135,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
   };
   const undoTiqBout = () => { setTiq((prev)=>{ const next=prev.slice(0,-1); saveTiq(next); return next; }); };
   const clearTiqBouts = () => { setTiq([]); saveTiq([]); };
+  // PRO-3 P5: полный рестор сценария — замена журнала схваток целиком
+  const saveTiqAll = (bouts: TiqBout[]) => { const clean = Array.isArray(bouts) ? bouts.filter((b) => b && typeof b === 'object').slice(0, 60) : []; setTiq(clean); saveTiq(clean); };
   const onSaveBilat = () => { const lk = parseFloat(state.leftKg); const rk = parseFloat(state.rightKg); if (Number.isFinite(lk) && Number.isFinite(rk) && lk > 0 && rk > 0) { saveBilateralEntry(lk, rk); setBilatTick((x) => x + 1); } };
   const onResetDynamic = () => { const s = { fingerKg:'',fingerMs:'',hammerKg:'',hammerMs:'',hookKg:'',hookMs:'',cupKg:'',cupMs:'' }; setState(prev=> ({...prev, ...s})); };
   const onMobToProfile = () => { const s = applyArmMobilityToProfile(armMobility.restrictions); setMobMsg(`✓ Мобильность ${s} → профиль`); setTimeout(() => setMobMsg(''), 2500); };
@@ -1113,7 +1153,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     mockGuard, tablePreview,
     muState, setMuState, saveMu,
     tiq, tiqFouls, setTiqFouls, tiqWin, setTiqWin, tiqSlip, setTiqSlip, tiqStrap, setTiqStrap,
-    tiqCenter, setTiqCenter, tiqFinish, setTiqFinish, addTiqBout, undoTiqBout, clearTiqBouts,
+    tiqCenter, setTiqCenter, tiqFinish, setTiqFinish, addTiqBout, undoTiqBout, clearTiqBouts, setTiq, saveTiqAll,
     dynamicReport, bilatP0, bilatTrendP0, bilatHistP0, onSaveBilat,
     handleAddTrialsToHistory, onResetDynamic, forceHistory,
     acwr, tendonAcwr, landmarks, tendonWeeklyLimit, perMuscleAcwrSumP0,

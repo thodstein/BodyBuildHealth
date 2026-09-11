@@ -20,6 +20,10 @@ export interface ForceVector {
   sidePressure: number; // 0..100 (side vs bodyweight*0.6)
   backPressure: number; // 0..100 (back vs bodyweight*0.8)
   totalScore: number; // среднее по имеющимся векторам
+  /** PRO-3 P2: сколько векторов реально заполнено (0-4). total честен только при ≥2. */
+  filledCount: number;
+  /** PRO-3 P2: totalScore можно показывать только если true (иначе «недостаточно данных»). */
+  scoreReliable: boolean;
   asymmetryPct?: number; // если передан left/right
 }
 
@@ -67,13 +71,17 @@ export function estimateForceVector(r: GripForceRecord & { bodyWeightKg?: number
   const backPressure = r.backKg != null ? Math.max(0, Math.min(100, (r.backKg / backRef) * 100)) : 0;
   const vals = [gripSupport, gripPinch, sidePressure, backPressure].filter(v => v > 0);
   const totalScore = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+  // PRO-3 P2: один вектор 100 давал total 100 — честно только при ≥2 заполненных
+  const filledCount = vals.length;
+  const scoreReliable = filledCount >= 2;
   let asymmetryPct: number | undefined;
   if (r.leftKg != null && r.rightKg != null && r.leftKg > 0 && r.rightKg > 0) {
     const mx = Math.max(r.leftKg, r.rightKg);
     const mn = Math.min(r.leftKg, r.rightKg);
-    asymmetryPct = Math.round(((mx - mn) / mx) * 100);
+    // PRO-3 P12: 1 знак — паритет с bilateral (было целое)
+    asymmetryPct = Math.round(((mx - mn) / mx) * 1000) / 10;
   }
-  return { gripSupport: Math.round(gripSupport), gripPinch: Math.round(gripPinch), sidePressure: Math.round(sidePressure), backPressure: Math.round(backPressure), totalScore, asymmetryPct };
+  return { gripSupport: Math.round(gripSupport), gripPinch: Math.round(gripPinch), sidePressure: Math.round(sidePressure), backPressure: Math.round(backPressure), totalScore, filledCount, scoreReliable, asymmetryPct };
 }
 
 export function forceAdvice(v: ForceVector): string[] {

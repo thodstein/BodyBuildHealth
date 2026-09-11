@@ -4,6 +4,7 @@
  * живёт в ArmDiagnosticsHub. Строки и aria 1-в-1.
  */
 import React from 'react';
+import { loadRedFlags, saveRedFlags } from '../../../engines/arm/arm-redflags.store';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { getArmLandmarks } from '../../../engines/arm/arm-volume-landmarks.engine';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
@@ -60,7 +61,7 @@ export function HubHead({ H }: { H: any }) {
       </div>
       <div className="ad-row" data-arm="hub-tags">
         <span className="ad-tag">Table {(report.tableRatio*100).toFixed(0)}% (3/2/1) · Tendon {report.tendonLoad}/22 · WAF {weightClassAuto}кг</span>
-        <span className="ad-tag">{benchRes.level} · {Math.round(benchRes.avgScore*10)/10} (сила {forceVecPro.totalScore})</span>
+        <span className="ad-tag">{benchRes.level} · {Math.round(benchRes.avgScore*10)/10} (сила {forceVecPro.scoreReliable ? forceVecPro.totalScore : '—'})</span>
         {report.asymmetryPct!=null && <span className="ad-tag">Асимметрия {report.asymmetryPct}%</span>}
       </div>
       <AdSec title="ℹ️ Как пользоваться" collapsible defaultOpen={false} summary="4 шага до плана">
@@ -177,8 +178,13 @@ const RED_FLAGS: Array<{ id: string; label: string }> = [
 
 export function HubP0Panel({ H }: { H: any }) {
   const { state, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0, diaryTrendsP0, diarySuggestP0, toggleWeakPoint, handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0, injectMsg, criticalSideP0, specWeeks, setSpecWeeks, armPlan, setTab } = H;
-  const [redFlags, setRedFlags] = React.useState<string[]>([]);
-  const toggleRed = (id: string) => setRedFlags((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  // PRO-3 P4: red-flags в персисте (he_arm_diag_redflags), а не только в useState
+  const [redFlags, setRedFlags] = React.useState<string[]>(() => { try { return loadRedFlags(); } catch { return []; } });
+  const toggleRed = (id: string) => setRedFlags((p) => {
+    const next = p.includes(id) ? p.filter((x) => x !== id) : [...p, id];
+    try { saveRedFlags(next); } catch { /* noop */ }
+    return next;
+  });
   return (
     <AdCard>
       <AdSec title="🚨 Red-flags — скрининг перед тестами" collapsible defaultOpen={false} summary={redFlags.length ? `🔴 ${redFlags.length}` : 'проверь себя'}>
@@ -263,7 +269,19 @@ export function HubTabNext({ H }: { H: any }) {
 }
 
 const SCEN_KEY = 'he_arm_diag_scenarios';
-type DiagScenario = { id: string; date: string; fields: Record<string, string>; weakPoints: string[] };
+// PRO-3 P5: полный снимок — все поля стейта + мобильность/боли/TIQ/матчап/бенчи.
+// Legacy-снимки (только fields+weakPoints) грузятся с дефолтами, не крашатся.
+type DiagScenario = {
+  id: string;
+  date: string;
+  fields: Record<string, string>;
+  weakPoints: string[];
+  mob?: { fails: Record<string, boolean>; retest: string };
+  pains?: { elbow: string; wrist: string; sleep: string };
+  matchup?: { opp: string; hand: string; wd: string };
+  tiq?: Array<Record<string, unknown>>;
+  bench?: { level: string };
+};
 function loadScenarios(): DiagScenario[] {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(SCEN_KEY) : null;
@@ -276,7 +294,7 @@ function saveScenarios(list: DiagScenario[]): void {
 }
 
 export function HubScenarios({ H }: { H: any }) {
-  const { state, setState } = H;
+  const { state, setState, setMob, setMobRetest, setPainElbow, setPainWrist, setSleepHours, setMuState, saveMu, setTiq, saveTiqAll, muState, tiq, mob, mobRetest, painElbow, painWrist, sleepHours, benchRes } = H;
   const [scens, setScens] = React.useState<DiagScenario[]>(() => loadScenarios());
   const take = () => {
     const d = new Date();
@@ -284,12 +302,43 @@ export function HubScenarios({ H }: { H: any }) {
     const s: DiagScenario = {
       id: `${d.getTime()}`,
       date: `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
-      fields: { rtKg: state.rtKg, axleKg: state.axleKg, excalKg: state.excalKg, pinchSec: state.pinchSec, sideKg: state.sideKg, backKg: state.backKg, leftKg: state.leftKg, rightKg: state.rightKg, bwKg: state.bwKg },
+      fields: {
+        rtKg: state.rtKg, axleKg: state.axleKg, axleImpl: state.axleImpl, excalKg: state.excalKg,
+        pinchSec: state.pinchSec, sideKg: state.sideKg, backKg: state.backKg,
+        leftKg: state.leftKg, rightKg: state.rightKg, bwKg: state.bwKg,
+        sex: state.sex, ageBand: state.ageBand, technique: state.technique, level: state.level,
+        elbowDeg: state.elbowDeg, forearmDeg: state.forearmDeg, wristDeg: state.wristDeg, direction: state.direction,
+        vbtWeight: state.vbtWeight, vbtReps: state.vbtReps, vbtVel: state.vbtVel, vbtVel2: state.vbtVel2 || '',
+        wristCurlLb: state.wristCurlLb, pronHoldSec: state.pronHoldSec, cupHoldSec: state.cupHoldSec, cocLevel: state.cocLevel,
+        fingerKg: state.fingerKg, fingerMs: state.fingerMs, hammerKg: state.hammerKg, hammerMs: state.hammerMs,
+        hookKg: state.hookKg, hookMs: state.hookMs, cupKg: state.cupKg, cupMs: state.cupMs,
+      },
       weakPoints: [...state.weakPoints],
+      // PRO-3 P5: P1-мобильность/боли/TIQ/матчап/бенч — в тот же снимок
+      mob: { fails: { ...(mob || {}) }, retest: mobRetest || '' },
+      pains: { elbow: painElbow || '', wrist: painWrist || '', sleep: sleepHours || '' },
+      matchup: { opp: muState?.opp || 'unknown', hand: muState?.hand || 'unknown', wd: muState?.wd || '' },
+      tiq: Array.isArray(tiq) ? tiq.map((b: any) => ({ ...b })) : [],
+      bench: { level: benchRes?.level || '' },
     };
     setScens((p) => { const n = [s, ...p].slice(0, 6); saveScenarios(n); return n; });
   };
-  const load = (s: DiagScenario) => setState((prev: any) => ({ ...prev, ...s.fields, weakPoints: [...s.weakPoints] }));
+  const load = (s: DiagScenario) => {
+    setState((prev: any) => ({ ...prev, ...s.fields, weakPoints: [...s.weakPoints] }));
+    try {
+      if (s.mob) {
+        for (const [k, v] of Object.entries(s.mob.fails || {})) setMob?.(k, !!v);
+        if (s.mob.retest) setMobRetest?.(s.mob.retest);
+      }
+      if (s.pains) {
+        if (s.pains.elbow) setPainElbow?.(s.pains.elbow);
+        if (s.pains.wrist) setPainWrist?.(s.pains.wrist);
+        if (s.pains.sleep) setSleepHours?.(s.pains.sleep);
+      }
+      if (s.matchup) { setMuState?.(s.matchup); try { saveMu?.(s.matchup); } catch { /* noop */ } }
+      if (Array.isArray(s.tiq)) { try { saveTiqAll ? saveTiqAll(s.tiq as any) : setTiq?.(s.tiq); } catch { /* noop */ } }
+    } catch { /* noop */ }
+  };
   const drop = (id: string) => setScens((p) => { const n = p.filter((s) => s.id !== id); saveScenarios(n); return n; });
   const deltaLine = (s: DiagScenario) => {
     const parts: string[] = [];
@@ -323,6 +372,9 @@ export function HubScenarios({ H }: { H: any }) {
                   <span><b>{s.date}</b></span>
                   <span className="ad-muted">RT {s.fields.rtKg || '—'} · Side {s.fields.sideKg || '—'} · точки {s.weakPoints.join(', ') || '—'}</span>
                 </div>
+                {(s.bench?.level || s.matchup?.opp || (s.tiq && s.tiq.length)) && (
+                  <div className="ad-muted">Подробно: {s.bench?.level ? `бенч ${s.bench.level}` : ''}{s.bench?.level && (s.matchup?.opp || (s.tiq && s.tiq.length)) ? ' · ' : ''}{s.matchup && s.matchup.opp !== 'unknown' ? `матчап ${s.matchup.opp}` : ''}{s.matchup && s.matchup.opp !== 'unknown' && s.tiq && s.tiq.length ? ' · ' : ''}{s.tiq && s.tiq.length ? `TIQ ${s.tiq.length}` : ''}</div>
+                )}
                 <div className="ad-muted">{deltaLine(s)}</div>
                 <div className="ad-row">
                   <AdBtn variant="dark" onClick={() => load(s)}>📥 Загрузить</AdBtn>

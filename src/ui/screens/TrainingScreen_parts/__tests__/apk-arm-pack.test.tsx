@@ -16,6 +16,7 @@ import * as path from 'path';
 import React from 'react';
 import { ArmAutoConstructor } from '../ArmAutoConstructor';
 import { ArmDiagnosticsHub } from '../ArmDiagnosticsHub';
+import { ArmliftingDiagnosticsHub } from '../ArmliftingDiagnosticsHub';
 import { ensureArmApkStyles, resetArmApkStylesForTest } from '../arm-apk-loader';
 import { resetAppPlatformCache } from '../../../../core/app-platform';
 
@@ -148,6 +149,19 @@ describe('APK arm pack', () => {
       '.ad-step',
       'armApkIn',
       'prefers-reduced-motion',
+      // PRO-3: кнопки диаг-хаба 44px+ и новые хуки
+      ".train-armdiag.arm-apk .ad-chip",
+      ".train-armdiag.arm-apk .ad-btn",
+      ".train-armdiag.arm-apk .ad-chip:focus-visible",
+      "[data-arm='lift-verdict']",
+      "[data-arm='lift-table']",
+      "[data-arm='lift-export']",
+      "[data-arm='waf-class']",
+      "[data-arm='humerus-checks']",
+      "[data-arm='humerus-stop']",
+      "[data-arm='asym-verdict']",
+      "[data-arm='norms-table']",
+      "[data-arm='scenario']",
     ]) {
       expect(css, hook).toContain(hook);
     }
@@ -207,6 +221,24 @@ describe('APK arm pack', () => {
     const { container } = render(<ArmDiagnosticsHub />);
     const root = container.querySelector('.train-armdiag');
     expect(root?.classList.contains('arm-apk'), 'hub apk class in native').toBe(true);
+  });
+
+  it('PRO-3 армлифтинг-хаб: TG 1-в-1 без arm-apk, в native — с arm-apk', () => {
+    const tg = render(<ArmliftingDiagnosticsHub />);
+    const tgRoot = tg.container.querySelector('.train-armdiag');
+    expect(tgRoot, 'lift hub root').not.toBeNull();
+    expect(tgRoot?.classList.contains('arm-apk'), 'no lift apk class in TG').toBe(false);
+    expect(tg.container.querySelector("[data-arm='lift-verdict']"), 'verdict hook').not.toBeNull();
+    expect(tg.container.querySelector("[data-arm='lift-table']"), 'table hook').toBeNull(); // пусто без замеров
+    tg.unmount();
+    cleanup();
+    (window as unknown as { Capacitor?: unknown }).Capacitor = {
+      isNativePlatform: () => true,
+    };
+    resetAppPlatformCache();
+    const nat = render(<ArmliftingDiagnosticsHub />);
+    expect(nat.container.querySelector('.train-armdiag')?.classList.contains('arm-apk'), 'lift apk class in native').toBe(true);
+    expect(nat.container.querySelector("[data-arm='lift-export']"), 'export hook').not.toBeNull();
   });
 
   it('весь конструктор: 8 шагов рендерятся без падений (TG)', () => {

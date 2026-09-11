@@ -47,6 +47,8 @@ export interface ArmBridgeInput {
   acwrDanger: string[];
   bilateral: { weakArm: string | null; weakSets: number; strongSets: number } | null;
   attempts: Array<{ weightKg: number; success: boolean; wrPct: number }>;
+  /** PRO-3 P4: red-flags скрининга (id меток) — конструктор показывает стоп-баннер. */
+  redFlags?: string[];
 }
 
 export function buildArmBridgeData(i: ArmBridgeInput): Record<string, unknown> {
@@ -98,5 +100,7 @@ export function buildArmBridgeData(i: ArmBridgeInput): Record<string, unknown> {
     armAcwrDanger: i.acwrDanger,
     armBilateral: i.bilateral,
     armAttempts: i.attempts,
+    // PRO-3 P4
+    armRedFlags: i.redFlags || [],
   };
 }

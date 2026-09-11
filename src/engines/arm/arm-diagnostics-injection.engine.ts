@@ -80,7 +80,17 @@ function findSessionForWeakPoint(week: any, wp: ArmWeakPoint, dayMap?: Record<st
   return week.sessions[0] ?? null;
 }
 
-function weightForExercise(exId: string, workMax: Record<string, number>, intensityPct: number): number {
+function weightForExercise(exId: string, workMax: Record<string, number>, intensityPct: number, wp?: string): number {
+  // PRO-3 P12: вес из workMax мышцы точки напрямую; эвристика по имени — только fallback
+  if (wp) {
+    try {
+      const bio = ARM_BIOMECH[wp as keyof typeof ARM_BIOMECH];
+      for (const m of bio?.weakMuscles || []) {
+        const v = Number((workMax as Record<string, number>)[m]);
+        if (Number.isFinite(v) && v > 0) return Math.round(v * intensityPct * 2) / 2;
+      }
+    } catch { /* noop → fallback ниже */ }
+  }
   const low = exId.toLowerCase();
   let base = 40;
   if (low.includes('wrist') || low.includes('riser') || low.includes('cup')) base = workMax['wrist_flexors'] || workMax['risers'] || workMax['default'] || 30;
@@ -182,7 +192,7 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
         targetSession = alt;
       }
       const workMax = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
-      const weight = weightForExercise(exId, workMax, corr.intensityPct);
+      const weight = weightForExercise(exId, workMax, corr.intensityPct, wp);
       const repsAvg = Math.round((corr.repsRange[0] + corr.repsRange[1]) / 2);
       const finalSession = targetSession;
       if (finalSession.exercises.length >= 8) { skippedBudget++; notes.push(`⊘ ${wp} переполнено (нед ${wi + 1})`); continue; }

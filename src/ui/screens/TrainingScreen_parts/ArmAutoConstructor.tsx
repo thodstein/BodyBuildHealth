@@ -587,6 +587,21 @@ export function ArmAutoConstructor() {
       }
       const tech = payload.data?.armTechnique;
       if (tech) setTechnique(String(tech));
+      // PRO-3 W-AL: дисциплина из армлифтинг-хаба (раньше мост всегда оставался в armwrestling)
+      try {
+        if ((payload.data as any)?.armDiscipline === 'armlifting') {
+          setDiscipline('armlifting');
+          const vv = (payload.data as any)?.armLiftingVerdict;
+          flash(`↩ Армлифтинг-диагностика${vv ? `: ${vv}` : ''} → дисциплина «Армлифтинг»`);
+        }
+      } catch {}
+      // PRO-3 P4: red-flags из диагностики — стоп-баннер (сборку не ломаем)
+      try {
+        const rf = payload.data?.armRedFlags;
+        if (Array.isArray(rf) && rf.length) {
+          flash(`⛔ Red-flags из диагностики: ${rf.join(', ')} — сначала врач, тесты после`);
+        }
+      } catch {}
       // TOP из хаба: матчап + Table-IQ (аддитивно)
       try {
         const mu = payload.data?.armMatchup;
@@ -638,6 +653,7 @@ export function ArmAutoConstructor() {
           findings: payload.data?.armFindings,
           humerusWarnings: payload.data?.armHumerus,
           balanceWarnings: payload.data?.armBalance,
+          redFlags: payload.data?.armRedFlags,
           asymmetryPct: payload.data?.armAsymmetry,
           info: payload.data?.armInfo,
         };

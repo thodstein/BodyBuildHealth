@@ -8,8 +8,35 @@ import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
 import { hasVideoSupport } from '../../../engines/arm/arm-motion-capture.engine';
 import { ARM_BIOMECH } from '../../../engines/arm/arm-biomechanics.engine';
+import { HUMERUS_CHECKS, checkHumerusChecklist } from '../../../engines/arm/arm-humerus-checklist.engine';
 import { AdSec, AdGrid, AdField, AdChip, AdSwitch, AdSheetSelect, AdBtn, AdBanner } from './arm-design-system';
 import { WP_LABEL_SHORT } from './arm-hub-shared';
+
+/** PRO-3 P8: позиционный чек-лист — локальный стейт ритуала (не персистится: проверка «сегодня»). */
+function HumerusChecklist() {
+  const [failed, setFailed] = React.useState<string[]>([]);
+  const toggle = (id: string) => setFailed((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const res = checkHumerusChecklist(failed);
+  return (
+    <div>
+      <div className="ad-chips" data-arm="humerus-checks">
+        {HUMERUS_CHECKS.map((c) => {
+          const bad = failed.includes(c.id);
+          return (
+            <AdChip key={c.id} active={!bad} tone={bad ? 'red' : 'green'} onClick={() => toggle(c.id)} title={c.hint}>
+              {bad ? `✗ ${c.label}` : `✓ ${c.label}`}
+            </AdChip>
+          );
+        })}
+      </div>
+      {res.stopLine ? (
+        <div className="ad-tip" data-arm="humerus-stop">{res.stopLine}</div>
+      ) : (
+        <div className="ad-muted">✓ Все 5 — можно к тяжёлому столу (позиция + разминка)</div>
+      )}
+    </div>
+  );
+}
 
 export function HubPressureTab({ H }: { H: any }) {
   const { state, setState, toggleWeakPoint, toggleLegacy, mockGuard, bwNum, weightClassAuto, tablePreview, muState, setMuState, saveMu, tiq, tiqFouls, setTiqFouls, tiqWin, setTiqWin, tiqSlip, setTiqSlip, tiqStrap, setTiqStrap, tiqCenter, setTiqCenter, tiqFinish, setTiqFinish, addTiqBout, undoTiqBout, clearTiqBouts } = H;
@@ -49,7 +76,7 @@ export function HubPressureTab({ H }: { H: any }) {
             <span> ⚠ Side — прогрессия ≤10%/нед, RIR≥2, ≤3 сета первые 4н</span>
             {state.weakPoints.filter((wp: string)=>['side_mid','side_pin','back_start','back_drag'].includes(wp)).map((wp: string)=>{
               const bio = ARM_BIOMECH[wp as keyof typeof ARM_BIOMECH];
-              return <div key={wp}>{bio.label}: {bio.angleRangeDeg[0]}-{bio.angleRangeDeg[1]}° {bio.keyJoint} · угол н/п — контроль по технике</div>;
+              return <div key={wp}>{bio.label}: {bio.angleRangeDeg[0]}-{bio.angleRangeDeg[1]}° {bio.keyJoint} · угол н/п — контроль по технике{wp === 'side_pin' ? ' · дожимание — только вручную по видео (авто-хинт даёт side_mid: side_pin humerus-рискован)' : ''}</div>;
             })}
           </div>
         )}
@@ -57,6 +84,11 @@ export function HubPressureTab({ H }: { H: any }) {
       <AdGrid cols="2">
         <AdSec title="Humerus (side)">
           <div className="ad-muted">{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : '✓ Нет риска: side ≤3, RIR≥2, прогрессия ≤10%/нед'}</div>
+          <div className="ad-muted">Гвард плана: side &gt;6 первые 4 нед / &gt;9 / +10%/нед — детали во вкладке P0</div>
+        </AdSec>
+        <AdSec title="🦴 Чек-лист плеча перед тяжёлым столом" collapsible defaultOpen={false} summary="5 чеков">
+          <HumerusChecklist />
+          <div className="ad-muted">Маркеры: ось «кисть–локоть–плечо», запястье не позади плеча (81% переломов — сломанная ось). Side-прогрессия ≤10%/нед, RIR≥2.</div>
         </AdSec>
         <AdSec title="Side/Back vs норма WAF">
           <div className="ad-muted">Side ref {Math.round(bwNum*0.6)}кг · Back ref {Math.round(bwNum*0.8)}кг · WAF {weightClassAuto} (вектор и асимметрия — во вкладке «✊ Хват»)</div>
@@ -130,12 +162,16 @@ export function HubPressureTab({ H }: { H: any }) {
           return <div className="ad-sec ad-bio" data-valid="na" data-arm="tiq-out"><div>{iq.note}</div>{iq.levers.map((l: string,i: number)=><div key={i} className="ad-finding" data-level="warn">• {l}</div>)}<div className="ad-muted">{trend.note}</div></div>;
         } catch { return null; } })()}
       </AdSec>
-      <AdSec title="📖 Фолы WAF → что чинить" collapsible defaultOpen={false} summary="5 фолов">
+      <AdSec title="📖 Фолы WAF → что чинить" collapsible defaultOpen={false} summary="5 фолов + 2 дрилла">
         <div className="ad-kv"><span>Отрыв локтя</span><span>пад + back_drag · posting-стойка</span></div>
         <div className="ad-kv"><span>Сгиб кисти (cup открылась)</span><span>cup_start/cup_hold · contain_fingers</span></div>
         <div className="ad-kv"><span>Касание плечом / ранний дожимать</span><span>side_mid · не форсируй, RIR≥2</span></div>
         <div className="ad-kv"><span>Фальстарт</span><span>старт по команде · reaction_go дриллы</span></div>
         <div className="ad-kv"><span>Срыв в ремень</span><span>журнал Table-IQ выше · strap_start</span></div>
+        <div className="ad-sec-t">Дриллы старта/лямок (WAF §5.3/§7.1/§8.5)</div>
+        <div className="ad-kv"><span>🎯 Старт без фальстарта</span><span>судейский хват: плечо/кисть/пальцы неподвижны до команды · 30 с на Grip Up</span></div>
+        <div className="ad-kv"><span>🎗 Лямки</span><span>нейтральный слип → лямка ≥2,5 см от запястья · не срываться в проигрыше (&gt;2/3 = фол+поражение)</span></div>
+        <div className="ad-muted">Формат суперматча (EVW 2025): best-of-5 (до 3), титул best-of-7 (до 4) · раунды 10–15 с, отдых ~60–90 с — тренируй повторные пики, не один максимум</div>
       </AdSec>
     </div>
   );
@@ -148,6 +184,7 @@ export function HubStrengthTab({ H }: { H: any }) {
       <AdBanner tone="warn">
         <b>4 теста Bezkorovainyi — ARM1 Device FB5k (патент #43082)</b>
         <div>finger_flex (сгибание пальцев) · hammer (разгиб. молот) · hook (крюк) · cup (сгибание кисти). Введи силу кг + время достижения макс мс → получи F/t, F100, F500, градиент, F/m.</div>
+        <div className="ad-muted">Скорость важнее пика: у элиты временные характеристики объясняют ~71% различий (Bezkorovainyi 2023) — смотри F/t и t0.5F первым, кг вторым.</div>
       </AdBanner>
       <AdGrid cols="auto" >
         {[
@@ -197,6 +234,7 @@ export function HubStrengthTab({ H }: { H: any }) {
                   bs != null ? `bilateral ${bs}%` : null,
                 ].filter(Boolean).join(' · ')}</div>
                 <div><b>Вердикт: max {mx}%{weak ? ` · слабая ${weak === 'left' ? 'левая' : 'правая'}` : ''} — {verdict}</b></div>
+                <div className="ad-muted">Пороги 7/12% — рабочие эвристики хаба (фон популяции: хват +6–9%, норм для стола не опубликовано)</div>
               </div>
             );
           })()}
@@ -242,6 +280,7 @@ export function HubStrengthTab({ H }: { H: any }) {
             {(dynamicReport as any).metrics.cup && (dynamicReport as any).metrics.cup.f500 < 25 ? 'cup низкая → cup_start/hold · ' : ''}
             {!((dynamicReport as any).metrics.finger_flex?.ftIndex<30 || (dynamicReport as any).metrics.hammer?.ftIndex<30 || (dynamicReport as any).metrics.hook?.fMax<30 || (dynamicReport as any).metrics.cup?.f500<25) ? 'Все F/t в допуске — баланс' : ''}
           </div>
+          <div className="ad-muted">Пороги ftIndex&lt;30 / f500&lt;25 — внутренние эвристики хаба (популяционных норм F/t для стола не опубликовано)</div>
           <div className="ad-chips">
             {[
               { id:'contain_fingers', need: (dynamicReport as any).metrics.finger_flex?.ftIndex<30 },
@@ -304,6 +343,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
       <AdSec title="🦿 Тело — мобильность, авторег, возврат" collapsible defaultOpen={true} summary="3 блока">
       <AdSec title={`🦿 Мобильность · score ${armMobility.score} ${armMobility.failedCount ? `· провалы: ${armMobility.fails.join(', ')}` : '· ✓ норма'}`} collapsible hook="mob">
         <div className="ad-muted">Нормы ROM: сгиб кисти ≥80° · разгиб ≥70° · пронация/супинация ≥80° · локоть полный</div>
+        <div className="ad-muted">Эталоны локтя (Zwerus 2017, n=352): сгибание 146° · разгибание −2° · пронация 80° · супинация 87° · D/ND разница &lt;1° — норма. Гейты выше — рабочие, не диагноз.</div>
         <div className="ad-chips" data-arm="mob-chips">
           {[
             ['mobWristFlex', 'Сгиб кисти ≥80°'],

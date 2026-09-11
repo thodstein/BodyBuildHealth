@@ -137,18 +137,18 @@ export function buildArmDiagnosticsReport(input: {
     humerusWarnings = checkHumerusGuard(input.actualPlan);
     balanceWarnings = checkWristBalance(input.actualPlan);
   } else {
-    // чипы 12 точек тоже зажигают гварды, а не только legacy-чекбоксы (иначе side_pin в одиночку молчит)
+    // PRO-3 P2: без плана — честное «нет данных» вместо mock-8-сетов.
+    // Side-оценка объёма недоступна; side-точка даёт предупреждение-подсказку (не псевдо-гейт).
     const wpsEarly: ArmWeakPoint[] = detailed.weakPoints || [];
     const hasSideEarly = !!input.weakTest.sidePressureFails || wpsEarly.some(wp => wp === 'side_mid' || wp === 'side_pin');
-    const pronFailsEarly = !!input.weakTest.pronationFails || wpsEarly.some(wp => wp === 'pron_open' || wp === 'pron_lock');
-    const supFailsEarly = !!input.weakTest.supinationFails || wpsEarly.some(wp => wp === 'sup_cup' || wp === 'sup_drag');
-    const mockPlan: any = {
-      weeks: [
-        { week: 1, sessions: [{ exercises: [{ muscle: 'pronators', sets: pronFailsEarly ? 6 : 4 }, { muscle: 'supinators', sets: supFailsEarly ? 2 : 4 }] }] },
-      ],
-    };
-    humerusWarnings = checkHumerusGuard({ weeks: hasSideEarly ? [{ week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 8 }] }] } as any] : [] });
-    balanceWarnings = checkWristBalance(mockPlan);
+    const hasAnyPoint = wpsEarly.length > 0 || !!input.weakTest.sidePressureFails || !!input.weakTest.pronationFails || !!input.weakTest.supinationFails;
+    if (hasSideEarly) {
+      humerusWarnings = ['Side-точка выбрана (side_pressure), но план не подключён — side-объём не оценён, humerus-контроль недоступен (подключи план из Арм-конструктора)'];
+    }
+    balanceWarnings = [];
+    if (hasAnyPoint) {
+      info.push('План не подключён — оценка side-объёма и humerus/баланса недоступна (подключи план из Арм-конструктора)');
+    }
   }
   for (const w of humerusWarnings) findings.push({ level: 'critical', text: w, exercise: 'side_press_table' });
   for (const w of balanceWarnings) findings.push({ level: 'warn', text: w, exercise: 'pronation_cable' });
@@ -173,11 +173,11 @@ export function buildArmDiagnosticsReport(input: {
     const hasGripHistory = !!input.hasGripHistory;
     if (hasVideo || hasVbt || hasGripHistory || corrections.length>0) {
       const sideSets = (input.actualPlan?.weeks?.[0]?.sessions || []).reduce((a: number, s: any) => a + s.exercises.filter((e: any)=> e.muscle==='side_pressure').reduce((aa:number,e:any)=>aa+(e.sets||0),0),0);
-      const sidePlanned = input.weakTest.sidePressureFails || weakPoints.some(wp => wp === 'side_mid' || wp === 'side_pin');
+      // PRO-3 P2: без плана sideSets=0 честно (раньше sidePlanned подставлял 8 — псевдо-warn)
       scoring = scoreArm({
         weakCount: weakPoints.length,
         asymmetryPct: fv.asymmetryPct ?? null,
-        sideSetsWeek1: sideSets || (sidePlanned ? 8 : 0),
+        sideSetsWeek1: sideSets,
         tendonSets: input.tendonSets,
         tendonLimit: tendonWeeklyLimit(input.level),
         gripLevel: input.benchLevel,
