@@ -839,7 +839,7 @@ function injectDiagnosticExercises(
   if (!exerciseMap) return;
 
   const mainNameMap: Record<string, string> = {
-    bench: 'Жим лежа',
+    bench: 'Жим лёжа',
     squat: 'Присед',
     deadlift: 'Становая тяга',
     ohp: 'Жим стоя',
@@ -964,7 +964,7 @@ function injectLimiterExercises(
   if (!limiterMap) return;
 
   const mainNameMap: Record<string, string> = {
-    bench: 'Жим лежа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя',
+    bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя',
     row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей', sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс',
   };
 

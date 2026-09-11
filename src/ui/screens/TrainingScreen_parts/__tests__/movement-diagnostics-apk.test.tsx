@@ -20,6 +20,15 @@ describe('movement-diagnostics APK hooks', () => {
     expect(html).toContain('data-lift="export-csv"');
     expect(html).toContain('data-lift="share"');
   });
+  it('LiftMasterCard: P4 безопасность и P3 VBT-цели рендерятся', () => {
+    try { localStorage.removeItem('he_lift_master_v1'); } catch {}
+    const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
+    expect(html).toContain('data-lift="safety"');
+    expect(html).toContain('data-lift="red-flag"');
+    expect(html).toContain('data-lift="rule-ok"');
+    expect(html).toContain('data-lift="rule-fail"');
+    expect(html).toContain('data-lift="vbt-goal"');
+  });
   it('LiftMasterCard: L/R-замер при выбранной асимметрии', () => {
     try { localStorage.setItem('he_lift_master_v1', JSON.stringify({ lift: 'bench', phase: '', issues: ['asymmetric'] })); } catch {}
     const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
