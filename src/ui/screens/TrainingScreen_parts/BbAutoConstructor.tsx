@@ -1568,6 +1568,15 @@ export const BbAutoConstructor: React.FC = () => {
         if (labDiag) {
           try { localStorage.setItem('he_bb_last_lab_diagnosis', JSON.stringify(labDiag)); } catch {}
         }
+        // Lab-добивка 7: labDelta персистим и показываем (мост был немым по Δ).
+        const labDelta = bbDiag.labDelta as { summary?: unknown } | null | undefined;
+        if (labDelta && typeof labDelta === 'object') {
+          try { localStorage.setItem('he_bb_last_lab_delta', JSON.stringify(labDelta)); } catch {}
+          if (typeof labDelta.summary === 'string' && labDelta.summary) {
+            setBridgeMsg((prev: string) => prev ? `${prev} · Δ ${labDelta.summary}` : `🔗 Δ-коррекция из лаборатории: ${labDelta.summary}`);
+            setTimeout(() => setBridgeMsg(''), 5000);
+          }
+        }
         const labCorr = bbDiag.labCorrection;
         if (labCorr && labCorr.type) {
           setExecutionCorrections(prev => {
