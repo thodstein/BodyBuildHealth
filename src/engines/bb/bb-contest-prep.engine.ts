@@ -1783,11 +1783,12 @@ export function applyTrainingTaperToBBPlan(
  * Идемпотентен per-week — можно накладывать на несколько недель шоу.
  * Э1: единый формат маркеров — неделя всегда несёт И `peakWeek=true`, И
  * `contestPhase='peak_week'` (паритет с applyContestPrepToBBPlan).
+ * PRO-2 P2-доводка: `opts.carbDoseGPerKg` — доза trial в пик-неделю оверлея.
  */
 export function applyPeakWeekOverlayToBBPlan(
   plan: BBPlan,
   rawCfg: BBContestPrepConfig,
-  opts?: { weekNumber?: number },
+  opts?: { weekNumber?: number; carbDoseGPerKg?: number },
 ): BBPlanWithPrep {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
@@ -1801,14 +1802,15 @@ export function applyPeakWeekOverlayToBBPlan(
   const target = weeks[targetIdx];
   let applied = false;
   if (target.peakWeek !== true) {
-    const peakWeek = buildPeakWeek(cfg);
+    // PRO-2 P2-доводка: оверлей Macrocycle-пути тоже берёт дозу trial (без неё — коридор).
+    const peakWeek = buildPeakWeek(cfg, opts?.carbDoseGPerKg != null ? { carbDoseGPerKg: opts.carbDoseGPerKg } : undefined);
     target.phase = 'peaking';
     target.deload = false;
     target.taper = true;
     target.peakWeek = true;
     target.contestPhase = 'peak_week';
     target.sessions = target.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
-    target.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}`;
+    target.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}${opts?.carbDoseGPerKg != null ? ` · доза trial ${opts.carbDoseGPerKg} г/кг` : ''}`;
     applied = true;
   } else if (target.contestPhase !== 'peak_week') {
     // Нормализация legacy-разметки (только peakWeek=true): доводим до единого формата.
@@ -3129,6 +3131,48 @@ export function liveAdjustForPeakDay(flatScore: number, spillScore: number, wate
     return { status: 'spill', carbDelta: -100, waterDelta: -0.4, sodiumDelta: 0, note: 'Залито: -100г карб, -0.4л вода, +20 мин ходьба, без соли, фото через 4ч.' };
   }
   return { status: 'on_track', carbDelta: 0, waterDelta: 0, sodiumDelta: 0, note: 'На треке: держите план, глотки воды, позирование.' };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRO-2 P2-доводка: live-пересчёт ОСТАВШИХСЯ load-дней по визуалу (D-3…D-1).
+// Разовая дельта liveAdjustForPeakDay (±) распределяется по переданным load-дням
+// (только load-фазы трогаем, остальные дни — байт-в-байт, вход не мутирует).
+// ккал всегда = формула Б/У/Ж (инвариант), карбс ≥ 0. Пустой вход → пустой выход.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Визуал атлета утром чек-ина: плоско / норма / залито. */
+export type PeakVisual = 'flat' | 'full' | 'spill';
+
+export function recarbLoadFromVisual(
+  days: PeakWeekDayPlan[],
+  visual: PeakVisual,
+  opts?: { flatDeltaG?: number; spillDeltaG?: number },
+): PeakWeekDayPlan[] {
+  if (!Array.isArray(days) || days.length === 0) return [];
+  const total = visual === 'flat'
+    ? (opts?.flatDeltaG ?? 75)
+    : visual === 'spill'
+      ? (opts?.spillDeltaG ?? -100)
+      : 0;
+  if (total === 0) return days.map(d => ({ ...d }));
+  const loads = days.filter(d => d.phase.startsWith('load'));
+  if (loads.length === 0) return days.map(d => ({ ...d }));
+  // Делим нацело: остаток — на последний load-день (детерминировано).
+  const per = Math.trunc(total / loads.length);
+  const rem = total - per * loads.length;
+  let li = 0;
+  return days.map(d => {
+    if (!d.phase.startsWith('load')) return { ...d };
+    const delta = per + (li === loads.length - 1 ? rem : 0);
+    li += 1;
+    const carbsG = Math.max(0, d.carbsG + delta);
+    return {
+      ...d,
+      carbsG,
+      kcal: Math.round(d.proteinG * 4 + carbsG * 4 + d.fatG * 9),
+      mealNotes: [...d.mealNotes, `🔄 Live-пересчёт (${visual}): ${delta >= 0 ? '+' : ''}${delta}г карбс к этому дню.`],
+    };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

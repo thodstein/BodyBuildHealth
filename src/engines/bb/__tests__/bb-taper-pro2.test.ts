@@ -26,6 +26,8 @@ import {
   dominantPeakFamily,
   LAST_HARD_DN,
   applyPeakWeekOverlayToBBPlan,
+  recarbLoadFromVisual,
+  type PeakWeekDayPlan,
   CATEGORY_PROFILES,
   type BBContestPrepConfig,
   type TestPeakWeekResult,
@@ -420,5 +422,63 @@ describe('PRO-2 P4-wire — last-hard в сессиях пик-недели', ()
     expect(ss[0].exercises.length).toBeGreaterThan(0); // si0 DN6
     expect(ss[1].exercises.length).toBeGreaterThan(0); // si1 DN5, верх держится
     expect(ss[2].exercises.length).toBeGreaterThan(0); // si2 DN4, руки — памп
+  });
+});
+
+describe('PRO-2 добивка-3 — доза в оверлее/таблице + live-пересчёт', () => {
+  const mkPlan = (): any => ({
+    pattern: {}, rotationMuscleVolume: {}, rationale: [],
+    weeks: [{
+      week: 1, phase: 'accumulation', deload: false,
+      sessions: [1, 2, 3].map(() => ({
+        day: 1, character: 'тяж',
+        exercises: [{
+          muscle: 'chest', name: 'chest', role: 'primary', character: 'тяж', sets: 4,
+          repsRange: [8, 12] as [number, number], rir: 2,
+          workSets: [{ reps: 10, rir: 2, weight: 60 }], comment: '',
+        }],
+      })),
+    }],
+  });
+  it('оверлей с дозой помечает протокол; без дозы пометки нет', () => {
+    const [lo] = CATEGORY_PROFILES.mens_physique.carbTotalBudgetGPerKg;
+    const dosed = applyPeakWeekOverlayToBBPlan(mkPlan(), baseConfig(), { weekNumber: 1, carbDoseGPerKg: lo });
+    expect(String((dosed.weeks[0] as any).prepProtocol)).toMatch(/доза trial/);
+    const plain = applyPeakWeekOverlayToBBPlan(mkPlan(), baseConfig(), { weekNumber: 1 });
+    expect(String((plain.weeks[0] as any).prepProtocol)).not.toMatch(/доза trial/);
+  });
+  it('display-таблица: строка пика с дозой плана', async () => {
+    const { buildPrepNutritionPlan } = await import('../bb-prep-cycle.engine');
+    const [lo] = CATEGORY_PROFILES.mens_physique.carbTotalBudgetGPerKg;
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2, carbDoseGPerKg: lo });
+    const cfg = { category: 'mens_physique', sex: 'male', weightKg: 80 } as any;
+    const table = buildPrepNutritionPlan(plan, cfg);
+    const peak = table.weeks.find(w => w.phase === 'peak_week')!;
+    const expected = buildPeakWeek(configFromPlan(plan), { carbDoseGPerKg: lo })[6];
+    expect(peak.carbsG).toBe(expected.carbsG);
+    expect(peak.note).toMatch(/доза trial/);
+    // без дозы — старая строка без пометки
+    const plain = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const table2 = buildPrepNutritionPlan(plain, cfg);
+    expect(table2.weeks.find(w => w.phase === 'peak_week')!.note).not.toMatch(/доза trial/);
+  });
+  it('recarbLoadFromVisual: flat +75 / spill −100 по load-дням, ккал-инвариант', () => {
+    const days = buildPeakWeek(baseConfig());
+    const loads = days.filter(d => d.phase.startsWith('load'));
+    const flat = recarbLoadFromVisual(loads, 'flat');
+    expect(flat.reduce((a, d) => a + d.carbsG, 0) - loads.reduce((a, d) => a + d.carbsG, 0)).toBe(75);
+    const spill = recarbLoadFromVisual(loads, 'spill');
+    expect(spill.reduce((a, d) => a + d.carbsG, 0) - loads.reduce((a, d) => a + d.carbsG, 0)).toBe(-100);
+    for (const d of [...flat, ...spill]) {
+      expect(d.kcal).toBe(Math.round(d.proteinG * 4 + d.carbsG * 4 + d.fatG * 9));
+      expect(d.carbsG).toBeGreaterThanOrEqual(0);
+    }
+    // full — копия без изменений; вход не мутирует
+    const before = loads.map(d => d.carbsG).join(',');
+    const full = recarbLoadFromVisual(loads, 'full');
+    expect(full.map(d => d.carbsG).join(',')).toBe(before);
+    expect(loads.map(d => d.carbsG).join(',')).toBe(before);
+    expect(recarbLoadFromVisual([], 'flat')).toEqual([]);
+    expect(recarbLoadFromVisual(days.filter(d => !d.phase.startsWith('load')), 'spill').every((d, i, arr) => d.carbsG === days.filter(x => !x.phase.startsWith('load'))[i].carbsG)).toBe(true);
   });
 });

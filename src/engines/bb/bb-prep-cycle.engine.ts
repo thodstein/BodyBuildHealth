@@ -688,7 +688,11 @@ export function buildPrepNutritionPlan(
   }
 
   // Пик-неделя: представительный день (шоу-день) из buildPeakWeek.
-  const peakDay = buildPeakWeek({ ...configFromPlan(prepPlan), weeksOut: 1 })[6];
+  // PRO-2 P2-доводка: строка пика читает дозу из плана (если собрана с trial) — паритет с живыми целями.
+  const peakDose = prepPlan.peakWeek.carbDoseGPerKg != null
+    ? { carbDoseGPerKg: prepPlan.peakWeek.carbDoseGPerKg }
+    : undefined;
+  const peakDay = buildPeakWeek({ ...configFromPlan(prepPlan), weeksOut: 1 }, peakDose)[6];
   if (peakDay) {
     weeks.push({
       week: totalPrep + 1,
@@ -698,7 +702,7 @@ export function buildPrepNutritionPlan(
       fatG: peakDay.fatG,
       carbsG: peakDay.carbsG,
       refeed: false,
-      note: 'Пик-неделя: по протоколу buildPeakWeek (деплеция→загрузка→шоу).',
+      note: `Пик-неделя: по протоколу buildPeakWeek (деплеция→загрузка→шоу)${peakDose ? `, доза trial ${prepPlan.peakWeek.carbDoseGPerKg} г/кг` : ''}.`,
     });
   }
 
