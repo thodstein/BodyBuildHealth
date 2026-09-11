@@ -11,6 +11,11 @@ import { applyToPlanner } from './planner-bridge';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
+import {
+  canonicalMrvForGroup, canonicalGroupRow, sessionMavViolations, effectiveVolumeByMuscle,
+  frequencyForVolume, rirProfileCheck, hardSetsCount, mvForMuscle,
+} from '../../../engines/volume-canonical.engine';
+import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 
 const ACCENT = '#00e68a';
 const DIM_ = '#fff';
@@ -100,28 +105,56 @@ export const VolumeOptimizerTab: React.FC = () => {
     return findCoverageGaps(rows, level);
   }, [rows, level]);
 
-  // ── Quality assessment (from ToolsPanel) ──
+  // ── Quality assessment — ЕДИНЫЙ канон (volume-canonical, P1): per-group MRV из
+  // VOLUME_LANDMARKS_DB вместо грубого mrvBase 15/20/24/28; effective-объём с indirect.
   const quality = useMemo(() => {
     if (rows.length === 0) return null;
     const la = labTrainingAdjust(labAnalysis);
-    const mrvBase = ({
-      beginner: 15, intermediate: 20, advanced: 24, enhanced: 28,
-    } as Record<string, number>)[level] ?? 20;
-    const courseMult = 1;
-    const mrv = mrvBase * courseMult * la.mrvMultiplier;
+    const eff = effectiveVolumeByMuscle(rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, sets: r.sets })));
     const wk: Record<string, number> = {};
     rows.forEach(r => {
       const ex = getEx(r.exerciseId);
       if (ex) wk[ex.group] = (wk[ex.group] || 0) + r.sets;
     });
     const groups = Object.keys(wk);
-    const over = groups.filter(g => wk[g] > mrv);
+    const mrvByGroup: Record<string, number> = {};
+    groups.forEach(g => {
+      const base = canonicalMrvForGroup(level, g) ?? 20;
+      mrvByGroup[g] = Math.round(base * la.mrvMultiplier);
+    });
+    // Судим по effective (direct + indirect): жимы закрывают трицепс частично.
+    const over = groups.filter(g => Math.round(eff.effective[g] || wk[g] || 0) > (mrvByGroup[g] ?? 20));
+    const canonRows = groups
+      .map(g => canonicalGroupRow(level, g, wk[g] || 0, eff.effective[g] || wk[g] || 0))
+      .filter((r): r is Exclude<typeof r, null> => r !== null);
+    const mvGroups = canonRows.filter(r => r.status === 'maintenance');
+    const sessViol = sessionMavViolations(rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, sets: r.sets })));
+    const freqFlags = canonRows
+      .map(r => {
+        const days = new Set(rows.filter(x => { const ex = getEx(x.exerciseId); return ex?.group === r.group; }).map(x => x.day)).size;
+        const lm = getVolumeLandmarks(level, r.group);
+        if (!lm) return null;
+        const v = frequencyForVolume(r.effectiveSets, Math.max(1, days), lm, r.group);
+        return (v.kind === 'warning' || v.kind === 'critical') ? v.message : null;
+      })
+      .filter(Boolean) as string[];
+    const rir = rirProfileCheck(rows, level);
+    const hard = hardSetsCount(rows);
     const weakCovered = weakPoints.filter((w: string) => (wk[w] || 0) > 0);
     const weakMissed = weakPoints.filter((w: string) => (wk[w] || 0) === 0);
     let score = 100;
     score -= over.length * 12;
     score -= weakMissed.length * 10;
-    score -= groups.filter(g => wk[g] > 0 && wk[g] < Math.max(4, mrv * 0.4)).length * 4;
+    score -= sessViol.length * 4;
+    if (rir.verdict.kind === 'critical') score -= 12;
+    else if (rir.verdict.kind === 'warning') score -= 5;
+    score -= groups.filter(g => {
+      const lm = getVolumeLandmarks(level, g);
+      if (!lm) return false;
+      const mv = mvForMuscle(g);
+      const s = wk[g] || 0;
+      return s > 0 && s < mv;
+    }).length * 4;
     score = Math.max(0, Math.min(100, score));
     const srpe = loadSRPESessions();
     let monotonyNote = '';
@@ -131,7 +164,7 @@ export const VolumeOptimizerTab: React.FC = () => {
       else if (m.strain > 1000) monotonyNote = `⚠ Strain ${m.strain.toFixed(0)} (>1000 — перетрен)`;
       else monotonyNote = '✅ Монотонность/strain в норме';
     }
-    return { score, over, weakCovered, weakMissed, wk, mrv, groups, monotonyNote, labWarnings: la.warnings };
+    return { score, over, weakCovered, weakMissed, wk, mrv: 0, mrvByGroup, groups, monotonyNote, labWarnings: la.warnings, canonRows, mvGroups, sessViol, freqFlags, rir, hard, eff };
   }, [rows, level, weakPoints, labAnalysis, getEx]);
 
   const generateProgression = useCallback(() => {
@@ -293,6 +326,16 @@ export const VolumeOptimizerTab: React.FC = () => {
               {quality.weakCovered.length > 0 && <div style={{ color: ACCENT }}>✅ Слабые покрыты: {quality.weakCovered.map(g => GROUP_RU[g] || g).join(', ')}</div>}
             </div>
             {quality.monotonyNote && <div style={{ marginTop: 4 }}>{quality.monotonyNote}</div>}
+            {quality.mvGroups.length > 0 && <div style={{ marginTop: 2, color: '#60a5fa' }}>🛡 Поддержание (MV, не штраф): {quality.mvGroups.map(g => `${GROUP_RU[g.group] || g.group} ${g.effectiveSets}/${g.mev}`).join(', ')}</div>}
+            {quality.sessViol.slice(0, 3).map((v, i) => (
+              <div key={'sv' + i} style={{ marginTop: 2, color: '#f59e0b' }}>⚠ {v.message}</div>
+            ))}
+            {quality.freqFlags.slice(0, 3).map((f: string, i: number) => (
+              <div key={'fq' + i} style={{ marginTop: 2, color: '#f59e0b' }}>⚠ {f}</div>
+            ))}
+            <div style={{ marginTop: 2, color: quality.rir.verdict.kind === 'ok' ? '#22c55e' : quality.rir.verdict.kind === 'info' ? '#fff' : '#f59e0b' }}>
+              {quality.rir.verdict.kind === 'ok' ? '✅' : quality.rir.verdict.kind === 'info' ? 'ℹ️' : '⚠'} RIR: {quality.rir.verdict.message} · hard-сеты {quality.hard.hardSets}/{quality.hard.totalSets}{quality.hard.assumedSets > 0 ? ` (RPE пуст: ${quality.hard.assumedSets} assumed)` : ''}
+            </div>
             {quality.labWarnings.length > 0 && quality.labWarnings.map((w: string, i: number) => (
               <div key={i} style={{ marginTop: 2, color: '#f59e0b' }}>🧪 {w}</div>
             ))}
