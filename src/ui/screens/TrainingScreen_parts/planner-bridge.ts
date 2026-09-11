@@ -54,7 +54,10 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   /** PRO-3 (BBDiagnosticsHub R1–R7 → BbAutoConstructor): всё опционально. */
   lvp?: { lift: string; r2: number; e1rm: number | null; text: string } | null;
   tendon?: { elbow: string; shoulder: string; elbowLevel: string; shoulderLevel: string } | null;
-  returnTo?: { text: string; stages: Array<{ stage: number; title: string; volume: string; rir: string; note: string }> } | null;
+  returnTo?: { text: string; stages: Array<{ stage: number; title: string; volume: string; rir: string; note: string; action?: { volumeMult: number; rirShift: number; bannedPatterns: string[] } }> } | null;
+  /** S3: активная ступень возврата (ручной выбор 1–3) + её исполняемое действие. */
+  returnStage?: string | null;
+  returnAction?: { volumeMult: number; rirShift: number; bannedPatterns: string[] } | null;
   /** Острая готовность → вставка: объём ×0.75 + RIR+1 при red (применяется к коррекциям, не к мезоциклу). */
   readinessAction?: { level: string; volumeMult: number; rirShift: number } | null;
   /** Добивка слабой стороны: группа → сторона+сеты (применяется к вставке в пределах бюджета). */

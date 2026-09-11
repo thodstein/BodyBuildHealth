@@ -64,6 +64,8 @@ export interface BBInjectionOpts {
   rirShift?: number;
   /** PRO-3 R2: множитель объёма вставляемых коррекций (красная готовность → 0.75). */
   volumeMult?: number;
+  /** PRO-4 S3: активная ступень возврата (ступень 1 = только техника, объём 0). */
+  returnAction?: { volumeMult: number; rirShift: number; bannedPatterns: string[] };
 }
 
 export interface BBInjectionResult {
@@ -99,6 +101,13 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
     const catName = cat ? cat.name : corrId;
     const catId = cat ? cat.id : corrId;
     const catType = cat ? cat.type : 'isolation';
+    // PRO-4 S3: ступень возврата — запрет снарядов и нулевой объём
+    const ban = Array.isArray(opts.returnAction?.bannedPatterns) ? opts.returnAction!.bannedPatterns.map((b) => String(b).toLowerCase()).filter(Boolean) : [];
+    const hitBan = ban.length > 0 && ban.some((b) => corrId.toLowerCase().includes(b) || catName.toLowerCase().includes(b));
+    if (hitBan) { notes.push(`↩ ${wp} → ${catName}: запрещён ступенью возврата — только техника`); continue; }
+    const retVol = Number.isFinite(opts.returnAction?.volumeMult as number) ? Math.max(0, Math.min(1, opts.returnAction!.volumeMult)) : 1;
+    if (retVol <= 0) { notes.push(`↩ ${wp}: ступень 1 возврата — только техника, без силовых вставок`); continue; }
+    const retRir = Number.isFinite(opts.returnAction?.rirShift as number) ? Math.max(0, Math.min(3, Math.round(opts.returnAction!.rirShift))) : 0;
     // Недели: явные weekIdxs > все не-делоадные при allWeeks > только weeks[0]
     const all = (copy.weeks as any[]);
     const weekIdxs = Array.isArray(opts.weekIdxs) && opts.weekIdxs.length
@@ -113,12 +122,13 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
     const weight = Math.round(base * 0.65 / 2.5) * 2.5; // 65% для изоляции
     const reps = muscleKey === 'calves' ? 15 : muscleKey === 'forearms' ? 12 : 10;
     // PRO-3 R2: готовность дня двигает вставку (острая, не мезоцикл): RIR+1 / объём −25%
-    const rir = 2 + (Number.isFinite(opts.rirShift as number) ? Math.max(0, Math.min(2, Math.round(opts.rirShift as number))) : 0);
+    // PRO-4 S3: ступень возврата добавляется поверх (ступень 2: ×0.5 / RIR+3)
+    const rir = 2 + (Number.isFinite(opts.rirShift as number) ? Math.max(0, Math.min(2, Math.round(opts.rirShift as number))) : 0) + retRir;
     const tempo = opts.profTempo?.[wp] || opts.profTempo?.[muscleKey] || '3-1-1-0';
     const rest = 90;
     const wantBase = Math.max(2, Math.min(6, Math.round(opts.targetSets?.[wp] ?? opts.targetSets?.[muscleKey] ?? 3)));
     const volMult = Number.isFinite(opts.volumeMult as number) ? Math.max(0.5, Math.min(1, opts.volumeMult as number)) : 1;
-    let wantSets = Math.max(2, Math.round(wantBase * volMult));
+    let wantSets = Math.max(1, Math.round(wantBase * volMult * retVol));
     // PRO-3 R2: добивка слабой стороны — сверху в пределах бюджета (унилатерально, слабая первой)
     const topUp = opts.unilateralTopUp?.[wp] || opts.unilateralTopUp?.[muscleKey];
     const topUpSets = topUp && (topUp.side === 'left' || topUp.side === 'right') && Number.isFinite(topUp.sets)
@@ -161,7 +171,7 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
         exerciseType: catType,
         tempoSpec: tempo,
         restSeconds: rest,
-        comment: `🩺 ББ-диагностика: ${wp} → ${catName} ${addSets}×${reps} @65% ${tempo}${topUpSets > 0 && topUp ? ` · слабая ${topUp.side === 'left' ? 'левая' : 'правая'} первой +${topUpSets}` : ''}${volMult < 1 ? ' · объём срезан готовностью' : ''}`,
+        comment: `🩺 ББ-диагностика: ${wp} → ${catName} ${addSets}×${reps} @65% ${tempo}${topUpSets > 0 && topUp ? ` · слабая ${topUp.side === 'left' ? 'левая' : 'правая'} первой +${topUpSets}` : ''}${volMult < 1 ? ' · объём срезан готовностью' : ''}${retVol < 1 ? ' · возврат: объём срезан' : ''}${retRir > 0 ? ` · возврат RIR+${retRir}` : ''}`,
         warmupSets: [],
       } as any;
       targetSession.exercises.push(ex);

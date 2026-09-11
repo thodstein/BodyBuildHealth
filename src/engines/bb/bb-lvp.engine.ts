@@ -116,3 +116,43 @@ export function calibrateBbLvp(lift: string, points: BbLvpPoint[]): BbLvpProfile
       : `LVP ${lift}: r² ${lr.r2.toFixed(2)}, e1RM ≈ ${okE1rm ? e1rm : '—'} кг (при MVT ${mvt} м/с)`,
   };
 }
+
+/** S2: персист индивидуального профиля (подъём → профиль, кап 5 движений). */
+const LVP_STORE_KEY = 'he_bb_lvp_profile';
+
+export type BbLvpStore = Record<string, BbLvpProfile>;
+
+function isLvpProfileShape(v: any): v is BbLvpProfile {
+  return !!v && typeof v === 'object'
+    && typeof v.lift === 'string' && Array.isArray(v.points) && v.points.length >= 3
+    && Number.isFinite(v.slope) && Number.isFinite(v.intercept)
+    && Number.isFinite(v.r2) && v.valid === true;
+}
+
+export function loadBbLvpProfiles(): BbLvpStore {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(LVP_STORE_KEY) : null;
+    if (!raw) return {};
+    const j = JSON.parse(raw);
+    if (!j || typeof j !== 'object') return {};
+    const out: BbLvpStore = {};
+    for (const [k, v] of Object.entries(j)) {
+      if (isLvpProfileShape(v)) out[String(k).toLowerCase()] = v;
+    }
+    return out;
+  } catch { return {}; }
+}
+
+/** Сохранить только валидный профиль (r²≥0.85, e1RM честный); мусор не пишем. */
+export function saveBbLvpProfile(profile: BbLvpProfile | null | undefined): BbLvpStore {
+  const store = loadBbLvpProfiles();
+  if (!profile || !isLvpProfileShape(profile)) return store;
+  const next: BbLvpStore = { ...store, [profile.lift.toLowerCase()]: profile };
+  // кап 5 движений — свежие вытесняют старые по createdAt? порядка нет — режем лишнее
+  const keys = Object.keys(next);
+  if (keys.length > 5) delete next[keys[0]];
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(LVP_STORE_KEY, JSON.stringify(next));
+  } catch { /* quota — молча, профиль останется на сессию */ }
+  return next;
+}

@@ -3,7 +3,8 @@
  * Каждый эпик — своим триггером; существующее поведение не меняется.
  */
 import { describe, it, expect } from 'vitest';
-import { calibrateBbLvp, parseBbLvpText, bbLvpLiftFor } from '../bb-lvp.engine';
+import { calibrateBbLvp, parseBbLvpText, bbLvpLiftFor, loadBbLvpProfiles, saveBbLvpProfile } from '../bb-lvp.engine';
+import { activeReturnToStage, buildReturnToPlan } from '../bb-return-to.engine';
 import { assessBbTendonGuard } from '../bb-tendon-guard.engine';
 import { buildReturnToPlan } from '../bb-return-to.engine';
 import { mmcAdviceFor, posingIsoNote, MMC_LOAD_THRESHOLD } from '../bb-mmc-gate.engine';
@@ -65,6 +66,22 @@ describe('R1 LVP-лайт', () => {
     expect(bbLvpLiftFor('неизвестно')).toBeNull();
     expect(parseBbLvpText('100 0.62\n110, 0.55\nмусор').length).toBe(2);
   });
+  it('S2: валидный профиль персистится, мусор — нет, битый стор — пусто', () => {
+    localStorage.clear();
+    expect(loadBbLvpProfiles()).toEqual({});
+    const good = calibrateBbLvp('squat', [
+      { weightKg: 100, velocity: 0.62 },
+      { weightKg: 110, velocity: 0.55 },
+      { weightKg: 120, velocity: 0.47 },
+    ])!;
+    saveBbLvpProfile(good);
+    expect(loadBbLvpProfiles().squat?.e1rm).toBe(good.e1rm);
+    saveBbLvpProfile(null);
+    saveBbLvpProfile({ lift: 'bench' } as any);
+    expect(Object.keys(loadBbLvpProfiles())).toEqual(['squat']);
+    localStorage.setItem('he_bb_lvp_profile', 'битый');
+    expect(loadBbLvpProfiles()).toEqual({});
+  });
   it('e1RM по скорости пробрасывается в VBT-рекомендацию', () => {
     const r = bbVbtRecommendation('squat', 0.8, 0.6, 100);
     expect(r.e1RMByVelocity).not.toBeNull();
@@ -74,7 +91,23 @@ describe('R1 LVP-лайт', () => {
   });
 });
 
-describe('R2 мост v2 — готовность и L/R двигают вставку', () => {
+describe('R2 мост v2 — готовность и L/R двигают вставку + S3 возврат', () => {
+  it('S3: ступень возврата 1 — нулевой объём, запрет паттернов; ступень 2 — половина', () => {
+    const plan = buildReturnToPlan({ active: true, blocked: true, items: ['боль'] })!;
+    const s1 = activeReturnToStage(plan, 1)!;
+    const s2 = activeReturnToStage(plan, 2)!;
+    expect(s1.action.volumeMult).toBe(0);
+    expect(s1.action.bannedPatterns.length).toBeGreaterThan(0);
+    expect(s2.action.volumeMult).toBe(0.5);
+    expect(activeReturnToStage(null, 1)).toBeNull();
+  });
+  it('S3: инъекция на ступени 1 не вставляет силовые коррекции', () => {
+    const plan = { level: 'intermediate', weeks: [{ week: 1, sessions: [{ day: 1, exercises: [{ muscle: 'chest', name: 'Жим', exerciseName: 'bench_db', sets: 3, workSets: [{ reps: 10, rir: 2, weight: 40 }] }] }] }] } as any;
+    const ret = activeReturnToStage(buildReturnToPlan({ active: true, blocked: true, items: ['боль'] })!, 1)!.action;
+    const r = injectBBWeakPoints(plan, ['chest_upper'], { weekIdxs: [0], returnAction: ret as any });
+    expect(r.injected).toBe(0);
+    expect(r.notes.join(' ')).toMatch(/техника/);
+  });
   const planOf = () => ({
     level: 'intermediate',
     weeks: [{ week: 1, sessions: [{ day: 1, exercises: [{ muscle: 'chest', name: 'Жим', exerciseName: 'bench_db', sets: 3, workSets: [{ reps: 10, rir: 2, weight: 40 }] }] }] }],
@@ -119,6 +152,15 @@ describe('R3 сухожилия', () => {
     expect(mid.shoulder.level).toBe('ok');
     const adv = assessBbTendonGuard(sess(['Жим лёжа'], 16), { level: 'advanced' });
     expect(adv.shoulder.level).toBe('warn');
+  });
+  it('S1: трос — половинный эквивалент, штанга — полный, пустой сет — 0', () => {
+    const setsW = (n: number, w: number) => Array.from({ length: n }, () => ({ weightKg: w, reps: 10 }));
+    const cable = [{ date: '2026-01-01', exercises: [{ name: 'Тяга верхнего блока', sets: setsW(4, 60) }] }];
+    const bar = [{ date: '2026-01-01', exercises: [{ name: 'Тяга штанги в наклоне', sets: setsW(4, 60) }] }];
+    expect(assessBbTendonGuard(cable, {}).elbow.heavySets).toBe(2);
+    expect(assessBbTendonGuard(bar, {}).elbow.heavySets).toBe(4);
+    const empty = [{ date: '2026-01-01', exercises: [{ name: 'Тяга штанги в наклоне', sets: [{ weightKg: 60, reps: 0 }] }] }];
+    expect(assessBbTendonGuard(empty, {}).elbow.heavySets).toBe(0);
   });
   it('перебор жимов + провал плеча — стоп', () => {
     const g = assessBbTendonGuard(sess(['Жим лёжа', 'Жим стоя', 'Брусья'], 8), { shoulderOhsFail: true });
@@ -176,6 +218,19 @@ describe('R6 направление перекоса', () => {
     const d = summarizeLrDirection(h, 'biceps');
     expect(d!.persistent).toBe(false);
     expect(d!.text).toMatch(/плавает/);
+  });
+});
+
+describe('S4 per-side модель', () => {
+  it('BBExercise side/unilateral — опционально, старый план валиден (без sets_mismatch)', async () => {
+    const { validateBBPlan } = await import('../bb-validator.engine');
+    const plan: any = {
+      pattern: { id: 'fullbody_3' },
+      weeks: [{ week: 1, sessions: [{ day: 1, sessionTag: 'FullBody', exercises: [{ muscle: 'chest', name: 'Жим', exerciseName: 'bench_db', sets: 3, workSets: [{ reps: 10, rir: 2, weight: 40 }, { reps: 10, rir: 2, weight: 40 }, { reps: 10, rir: 2, weight: 40 }], side: 'left', unilateral: true }] }] }],
+    };
+    const res = validateBBPlan(plan, { level: 'intermediate' });
+    expect(res.issues.some(i => i.code === 'sets_mismatch')).toBe(false);
+    expect((plan.weeks[0].sessions[0].exercises[0] as any).side).toBe('left');
   });
 });
 

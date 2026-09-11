@@ -56,6 +56,9 @@ export interface BBExercise {
   supersetGroup?: number;
   /** Фаза 2.8: позиция в паре (0 = первый, 1 = второй) — для чередования A1/B1. */
   supersetSlot?: 0 | 1;
+  /** PRO-4 S4: унилатеральная добивка слабой стороны первой. */
+  side?: 'left' | 'right';
+  unilateral?: boolean;
 }
 
 export interface BBSession {

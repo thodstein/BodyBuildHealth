@@ -668,6 +668,17 @@ export const BbAutoConstructor: React.FC = () => {
       return out;
     } catch { return {}; }
   });
+  // PRO-4 S3: активная ступень возврата — влияет на вставку и автосборку (0% на ступени 1)
+  const [returnAction, setReturnAction] = useState<{ volumeMult: number; rirShift: number; bannedPatterns: string[] } | null>(() => {
+    try {
+      const raw = localStorage.getItem('he_bb_return_action');
+      const j = raw ? JSON.parse(raw) : null;
+      if (!j || typeof j !== 'object') return null;
+      const vm = Number(j.volumeMult);
+      if (!Number.isFinite(vm)) return null;
+      return { volumeMult: Math.max(0, Math.min(1, vm)), rirShift: Math.max(0, Math.min(3, Math.round(Number(j.rirShift) || 0))), bannedPatterns: Array.isArray(j.bannedPatterns) ? j.bannedPatterns.map((x: any) => String(x)) : [] };
+    } catch { return null; }
+  });
   // Epic A: персональная калибровка MEV (личный минимум объёма). Хранится в he_bb_mev_calibration.
   const [mevCal, setMevCal] = useState<MEVCalibration | null>(() => loadMEVCalibration());
   const [mevDraft, setMevDraft] = useState<MEVSignal>({ pump: 4, soreness: 2, performance: 4 });
@@ -1659,8 +1670,20 @@ export const BbAutoConstructor: React.FC = () => {
           try { localStorage.setItem('he_bb_last_working_range', bbDiag.workingRange); } catch {}
           pro2parts.push('рабочий вес-ориентир');
         }
+        if (bbDiag.returnAction && typeof bbDiag.returnAction === 'object' && Number.isFinite((bbDiag.returnAction as any).volumeMult)) {
+          const ra2 = bbDiag.returnAction as { volumeMult: number; rirShift: number; bannedPatterns: string[] };
+          const clean2 = { volumeMult: Math.max(0, Math.min(1, Number(ra2.volumeMult))), rirShift: Math.max(0, Math.min(3, Math.round(Number(ra2.rirShift) || 0))), bannedPatterns: Array.isArray(ra2.bannedPatterns) ? ra2.bannedPatterns.map((x) => String(x)) : [] };
+          setReturnAction(clean2);
+          try { localStorage.setItem('he_bb_return_action', JSON.stringify(clean2)); } catch {}
+          if (clean2.volumeMult <= 0) pro2parts.push('↩ возврат: ступень 1 — только техника');
+          else if (clean2.volumeMult < 1) pro2parts.push(`↩ возврат: ступень 2 — ×${clean2.volumeMult} RIR+${clean2.rirShift}`);
+        } else if (bbDiag.returnStage != null) {
+          // ступень без флага — чистим возврат
+          setReturnAction(null);
+          try { localStorage.removeItem('he_bb_return_action'); } catch {}
+        }
         if (pro2parts.length) {
-          setBridgeMsg((prev: string) => prev ? `${prev} · ${pro2parts.join(' · ')}` : `🔗 Диагностика PRO-2: ${pro2parts.join(' · ')}`);
+          setBridgeMsg((prev: string) => prev ? `${prev} · ${pro2parts.join(' · ')}` : `🔗 Диагностика PRO-3: ${pro2parts.join(' · ')}`);
           setTimeout(() => setBridgeMsg(''), 5000);
         }
       } else if (payload.kind === 'pm' && payload.data) {
@@ -2305,8 +2328,9 @@ export const BbAutoConstructor: React.FC = () => {
         }
       }
       const profParts: string[] = [];
-      // PRO-3 R2: добивка слабой стороны — клон первого упражнения мышцы унилатерально (слабая первой)
-      const lrEntries = Object.entries(lrTopUp);
+      // PRO-3 R2 + S3: добивка слабой стороны (S3: на ступени 1 возврата — 0%, не добавляем)
+      const retMult = Number.isFinite(returnAction?.volumeMult) ? Math.max(0, Math.min(1, returnAction.volumeMult)) : 1;
+      const lrEntries = retMult <= 0 ? [] : Object.entries(lrTopUp);
       if (lrEntries.length) {
         const sideRu = (sd: string) => (sd === 'left' ? 'левая' : 'правая');
         for (const [g, tu] of lrEntries) {
@@ -2326,6 +2350,8 @@ export const BbAutoConstructor: React.FC = () => {
               ...src,
               sets: addSets,
               role: 'accessory' as const,
+              side: side,
+              unilateral: true,
               comment: `${(src as any).comment ? (src as any).comment + ' · ' : ''}↔ L/R: слабая ${sideRu(side)} первой, унилатерально +${addSets}`,
             });
           }

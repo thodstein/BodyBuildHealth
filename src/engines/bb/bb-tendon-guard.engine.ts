@@ -1,10 +1,11 @@
 /**
- * bb-tendon-guard.engine.ts — PRO-3 R3: сухожильно-суставной скрининг (не диагноз).
+ * bb-tendon-guard.engine.ts — PRO-3 R3 + PRO-4 S1: сухожильно-суставной скрининг (не диагноз).
  *
  * Parity с ARM (`checkUCLGuard/checkShoulderGuard/checkTendonGuard`): считаем недельный
  * объём тяжёлой тяговой/жимой работы из сессий дневника → уровни ok/warn/stop.
- * Пороги — эвристика скрининга (12/18 тяжёлых сетов/нед), задокументирована здесь;
- * боль в локте/провал OHS-плеча сразу дают stop. План не мутирует.
+ * S1: деление по нагрузке — свободные веса/тело ×1.0, трос/тренажёр ×0.5 (ниже пиковая
+ * нагрузка на сухожилие; без данных о снаряде — ×1.0 консервативно). Сеты без веса
+ * (голая цифра) считаются ×1.0 — честно, без занижения. План не мутирует.
  */
 
 export type BbTendonLevel = 'ok' | 'warn' | 'stop';
@@ -31,6 +32,18 @@ function setsOf(ex: any): number {
   return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
 }
 
+/** Трос/тренажёры — половинный вес сета (маркер в id/имени). */
+const MACHINE_RE = /кабел|cable|блок|кроссовер|машин|machine|тренаж|смит|smith|hammer strength|hummer/i;
+
+/** Эквивалент сета: свободный вес/свой вес ×1.0, трос/тренажёр ×0.5, пустой сет — 0. */
+function setEquiv(name: string, set: any): number {
+  if (set != null && typeof set === 'object') {
+    const r = Number((set as any).reps);
+    if (Number.isFinite(r) && r <= 0) return 0; // пустой сет
+  }
+  return MACHINE_RE.test(name) ? 0.5 : 1.0;
+}
+
 function countFor(sessions: any[], re: RegExp): number {
   let n = 0;
   if (!Array.isArray(sessions)) return 0;
@@ -38,10 +51,15 @@ function countFor(sessions: any[], re: RegExp): number {
     const list = Array.isArray(s?.exercises) ? s.exercises : [];
     for (const ex of list) {
       const name = `${ex?.exerciseName || ''} ${ex?.name || ''}`;
-      if (re.test(name)) n += setsOf(ex);
+      if (!re.test(name)) continue;
+      if (Array.isArray(ex?.sets)) {
+        for (const st of ex.sets) n += setEquiv(name, st);
+      } else {
+        n += setsOf(ex); // голая цифра — данных нет, ×1.0 консервативно
+      }
     }
   }
-  return n;
+  return Math.round(n * 2) / 2;
 }
 
 function levelFor(sets: number, pain: boolean, warnAt: number, stopAt: number): BbTendonLevel {

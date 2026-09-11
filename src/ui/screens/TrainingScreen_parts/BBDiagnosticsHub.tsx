@@ -23,9 +23,9 @@ import { assessBbReadiness } from '../../../engines/bb/bb-readiness.engine';
 import { assessBbRedFlags } from '../../../engines/bb/bb-red-flags.engine';
 import { bbBarPathVerdict } from '../../../engines/bb/bb-bar-path.engine';
 import { bbVbtRecommendation } from '../../../engines/bb/bb-vbt.engine';
-import { calibrateBbLvp, parseBbLvpText } from '../../../engines/bb/bb-lvp.engine';
+import { calibrateBbLvp, parseBbLvpText, loadBbLvpProfiles, saveBbLvpProfile } from '../../../engines/bb/bb-lvp.engine';
 import { assessBbTendonGuard } from '../../../engines/bb/bb-tendon-guard.engine';
-import { buildReturnToPlan } from '../../../engines/bb/bb-return-to.engine';
+import { buildReturnToPlan, activeReturnToStage } from '../../../engines/bb/bb-return-to.engine';
 import { mmcAdviceFor, posingIsoNote } from '../../../engines/bb/bb-mmc-gate.engine';
 import { pushLrSnapshot, summarizeLrDirection, type BbLrSnapshot } from '../../../engines/bb/bb-lr-history.engine';
 import { buildBBSpecIcs, downloadBBSpecIcs, bbWorkingRange } from '../../../engines/bb/bb-spec-ics.engine';
@@ -89,6 +89,8 @@ type BBState = {
   /** PRO-3: нагрузка для MMC-гейта (%1RM изоляции) + целевой BB-блок года. */
   mmcLoadPct: string;
   annualBlockKey: string;
+  /** PRO-4 S3: подтверждённая ступень возврата ('' — авто: ступень 1). */
+  returnStage: '' | '1' | '2' | '3';
 };
 
 const DEFAULT_STATE: BBState = {
@@ -125,6 +127,7 @@ const DEFAULT_STATE: BBState = {
   elbowPain: false,
   mmcLoadPct: '',
   annualBlockKey: '',
+  returnStage: '',
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
@@ -440,14 +443,23 @@ export const BBDiagnosticsHub: React.FC = () => {
   const teenNote = useMemo(() => {
     try { return teenTrainingNote(state.age ? parseFloat(state.age) : null); } catch { return null; }
   }, [state.age]);
-  // PRO-3 R1: LVP-лайт из строк «вес скорость» (популяционный профиль — запасной)
+  // PRO-3 R1 + PRO-4 S2: LVP-лайт из строк; пусто — сохранённый индивидуальный профиль
   const lvpProfile = useMemo(() => {
     try {
+      const lift = state.lvpLift || 'squat';
       const pts = parseBbLvpText(state.lvpText);
-      if (pts.length < 3) return null;
-      return calibrateBbLvp(state.lvpLift || 'squat', pts);
+      if (pts.length >= 3) return calibrateBbLvp(lift, pts);
+      const stored = loadBbLvpProfiles()[lift];
+      return stored && stored.valid ? stored : null;
     } catch { return null; }
   }, [state.lvpText, state.lvpLift]);
+  // S2: валидный свежий профиль запоминаем (популяционный — только fallback с пометкой)
+  useEffect(() => {
+    try {
+      const pts = parseBbLvpText(state.lvpText);
+      if (pts.length >= 3 && lvpProfile && lvpProfile.valid) saveBbLvpProfile(lvpProfile);
+    } catch { /* noop */ }
+  }, [lvpProfile, state.lvpText]);
   // PRO-3 R3: сухожилия (тяжёлые сеты недели + боль/плечо из присед-теста, пороги по уровню)
   const tendonGuard = useMemo(() => {
     try {
@@ -458,18 +470,21 @@ export const BBDiagnosticsHub: React.FC = () => {
       });
     } catch { return null; }
   }, [diarySessions, state.elbowPain, state.ohsArmsOverMidfoot, level]);
-  // PRO-3 R2: return-to после стоп-флагов
+  // PRO-3 R2 + PRO-4 S3: return-to после стоп-флагов (ступень выбирается вручную)
   const returnToPlan = useMemo(() => {
     try { return buildReturnToPlan(redFlags as any); } catch { return null; }
   }, [redFlags]);
-  // PRO-3 R7: рабочий вес-ориентир от e1RM по скорости
+  const returnActive = useMemo(() => {
+    try { return activeReturnToStage(returnToPlan as any, state.returnStage as any); } catch { return null; }
+  }, [returnToPlan, state.returnStage]);
+  // PRO-3 R7 + S2: рабочий вес-ориентир — индивидуальный e1RM первым, популяционный запасным
   const workingRange = useMemo(() => {
     try {
-      const e = vbt?.e1RMByVelocity ?? null;
+      const e = lvpProfile?.e1rm ?? vbt?.e1RMByVelocity ?? null;
       if (e == null) return null;
       return bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass');
     } catch { return null; }
-  }, [vbt, state.vbtGoal]);
+  }, [vbt, lvpProfile, state.vbtGoal]);
   // PRO-3 R6: направление перекоса (история слабых сторон)
   const lrDirection = useMemo(() => {
     try {
@@ -484,7 +499,9 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { return []; }
   }, [lrVerdicts]);
   // PRO-3 R2: добивка слабой стороны + острая готовность для моста/вставки
+  // S3: на ступени возврата 1 — добивку не применяем (0% объёма)
   const lrTopUpMap = useMemo(() => {
+    if (returnActive && returnActive.action.volumeMult <= 0) return {};
     const out: Record<string, { side: 'left' | 'right'; sets: number }> = {};
     try {
       for (const v of lrVerdicts) {
@@ -494,7 +511,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       }
     } catch { /* noop */ }
     return out;
-  }, [lrVerdicts]);
+  }, [lrVerdicts, returnActive]);
   const readinessAction = useMemo(() => {
     try {
       if (readiness?.level === 'red') return { level: 'red', volumeMult: 0.75, rirShift: 1 };
@@ -740,6 +757,15 @@ export const BBDiagnosticsHub: React.FC = () => {
             return buildReturnToPlan(gate as any);
           } catch { return null; }
         })(),
+        returnStage: state.returnStage || null,
+        returnAction: (() => {
+          try {
+            const gate = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
+            const plan = buildReturnToPlan(gate as any);
+            const act = activeReturnToStage(plan as any, state.returnStage as any);
+            return act ? act.action : null;
+          } catch { return null; }
+        })(),
         readinessAction: (() => {
           try {
             const pain = state.pain010 ? parseFloat(state.pain010) : null;
@@ -788,7 +814,10 @@ export const BBDiagnosticsHub: React.FC = () => {
         })(),
         workingRange: (() => {
           try {
-            const e = vbt?.e1RMByVelocity ?? null;
+            const pts = parseBbLvpText(state.lvpText);
+            const fresh = pts.length >= 3 ? calibrateBbLvp(state.lvpLift || 'squat', pts) : null;
+            const stored = pts.length >= 3 ? null : (loadBbLvpProfiles()[state.lvpLift || 'squat'] ?? null);
+            const e = (fresh && fresh.valid ? fresh.e1rm : null) ?? (stored && stored.valid ? stored.e1rm : null) ?? vbt?.e1RMByVelocity ?? null;
             if (e == null) return null;
             const r = bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass');
             return r ? r.text : null;
@@ -845,6 +874,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       const tg = assessBbTendonGuard(diarySessions as any, { elbowPain: state.elbowPain, shoulderOhsFail: !state.ohsArmsOverMidfoot, level });
       const gate = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
       const rt = buildReturnToPlan(gate as any);
+      const rtActive = activeReturnToStage(rt as any, state.returnStage as any);
       const raw = localStorage.getItem('he_bb_lr_history');
       const hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
       const dir: Array<{ group: string; text: string }> = [];
@@ -852,8 +882,10 @@ export const BBDiagnosticsHub: React.FC = () => {
         const d = summarizeLrDirection(hist, v.group);
         if (d) dir.push({ group: v.group, text: d.text });
       }
+      const lvpStored = lvpPts.length >= 3 ? null : (loadBbLvpProfiles()[state.lvpLift || 'squat'] ?? null);
       const e = vbt?.e1RMByVelocity ?? null;
-      const wr = e != null ? bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass') : null;
+      const eEff = (lvpP && lvpP.valid ? lvpP.e1rm : null) ?? (lvpStored && lvpStored.valid ? lvpStored.e1rm : null) ?? e;
+      const wr = eEff != null ? bbWorkingRange(eEff, state.vbtGoal === 'strength' ? 'strength' : 'mass') : null;
       const iso = (report.weakZonesGranular || []).length > 0;
       const pctRaw = state.mmcLoadPct ? parseFloat(state.mmcLoadPct) : null;
       const loadPct = Number.isFinite(pctRaw as number) && (pctRaw as number) > 0 ? (pctRaw as number) / 100 : null;
@@ -863,6 +895,8 @@ export const BBDiagnosticsHub: React.FC = () => {
         tendon: { elbow: tg.elbow.text, shoulder: tg.shoulder.text },
         mmc: `${mmc.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${mmc.cue} — ${mmc.text}`,
         returnTo: rt,
+        returnStage: state.returnStage || null,
+        returnAction: rtActive ? rtActive.action : null,
         lrDirection: dir,
         workingRange: wr ? wr.text : null,
       };
@@ -1499,18 +1533,27 @@ export const BBDiagnosticsHub: React.FC = () => {
         if (Number.isFinite(v)) targetSets[z] = v;
       }
       try {
-        // PRO-3 R2: острая готовность и L/R-добивка двигают вставку (не мезоцикл)
-        const rirShift = readiness?.level === 'red' ? 1 : 0;
-        const volumeMult = readiness?.level === 'red' ? 0.75 : 1;
+        // PRO-3 R2 + S3: готовность + возврат + L/R-добивка двигают вставку (не мезоцикл)
+        const baseRir = readiness?.level === 'red' ? 1 : 0;
+        const baseVol = readiness?.level === 'red' ? 0.75 : 1;
+        const retAct = returnActive?.action ?? null;
+        const rirShift = baseRir + (retAct ? retAct.rirShift : 0);
+        const volumeMult = baseVol * (retAct ? retAct.volumeMult : 1);
+        if (retAct && retAct.volumeMult <= 0) {
+          skippedBudget++;
+          continue;
+        }
         const unilateralTopUp: Record<string, { side: 'left' | 'right'; sets: number }> = {};
         try {
-          for (const v of lrVerdicts) {
-            if ((v.verdict === 'topup' || v.verdict === 'watch') && v.weakSide) {
-              unilateralTopUp[v.group] = { side: v.weakSide, sets: Math.max(1, Math.min(3, v.topUpSets)) };
+          if (!retAct || retAct.volumeMult > 0) {
+            for (const v of lrVerdicts) {
+              if ((v.verdict === 'topup' || v.verdict === 'watch') && v.weakSide) {
+                unilateralTopUp[v.group] = { side: v.weakSide, sets: Math.max(1, Math.min(3, v.topUpSets)) };
+              }
             }
           }
         } catch { /* noop */ }
-        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, weekIdxs: [wi], rirShift, volumeMult, unilateralTopUp });
+        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, weekIdxs: [wi], rirShift, volumeMult, unilateralTopUp, returnAction: retAct ?? undefined });
         working = r.plan;
         injected += r.injected;
         skippedBudget += r.skippedBudget;
@@ -1729,8 +1772,12 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <div style={{ marginTop: 4, color: '#fff' }} data-bb="return-to">
                   <b>↩ {returnToPlan.text}</b>
                   {returnToPlan.stages.map((s) => (
-                    <div key={s.stage} style={{ marginTop: 2 }}>Ступень {s.stage}: {s.title} — {s.volume}, {s.rir}. {s.note}</div>
+                    <div key={s.stage} style={{ marginTop: 2, fontWeight: returnActive?.stage === s.stage ? 800 : 400, color: returnActive?.stage === s.stage ? '#22c55e' : '#fff' }}>{returnActive?.stage === s.stage ? '● ' : ''}Ступень {s.stage}: {s.title} — {s.volume}, {s.rir}. {s.note}</div>
                   ))}
+                  <div style={{ marginTop: 6 }}>
+                    <BbSheetSelect label="Ступень возврата" value={state.returnStage} onChange={(v) => setState((s) => ({ ...s, returnStage: v as any }))} options={[{ id: '', label: 'Ступень 1 — техника (дефолт)' }, { id: '1', label: 'Ступень 1 — техника' }, { id: '2', label: 'Ступень 2 — половина' }, { id: '3', label: 'Ступень 3 — полный' }]} testId="bb-return-stage" />
+                  </div>
+                  {returnActive && <div style={{ marginTop: 4, color: '#f59e0b' }} data-bb="return-active">Активна ступень {returnActive.stage}: объём ×{returnActive.action.volumeMult}, RIR+{returnActive.action.rirShift}{returnActive.action.bannedPatterns.length ? ` · запрет: ${returnActive.action.bannedPatterns.join(', ')}` : ''}</div>}
                 </div>
               )}
               <div style={{ marginTop: 6 }}>

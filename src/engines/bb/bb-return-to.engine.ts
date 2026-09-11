@@ -1,9 +1,13 @@
 /**
- * bb-return-to.engine.ts — PRO-3 R2: лёгкий return-to-план после стоп-флагов.
+ * bb-return-to.engine.ts — PRO-3 R2 + PRO-4 S3: возврат после стоп-флагов.
  *
  * Упрощённый parity ARM `buildRehabPlan`/return-to-pull: 3 ступени возврата
  * (техника → 50% → полный объём) при отсутствии боли. Скрининг, не реабилитация:
- * направление к врачу при stop уже даёт `bb-red-flags`. Чистый движок.
+ * направление к врачу при stop уже даёт `bb-red-flags`.
+ * S3: ступени несут исполняемые параметры (volumeMult/rirShift/bannedPatterns),
+ * которые применяют инъекция и автосборка. Переход ступеней — только ручной
+ * («боли нет N дней» ставит пользователь; автопереход по датам — враньё).
+ * Чистый движок.
  */
 
 export interface BbReturnToStage {
@@ -12,11 +16,27 @@ export interface BbReturnToStage {
   volume: string;
   rir: string;
   note: string;
+  /** S3: исполняемое действие ступени. */
+  action: {
+    /** 0 — без силового объёма (только техника), 0.5 — половина, 1 — полный. */
+    volumeMult: number;
+    /** Сдвиг RIR вставляемых/строящихся коррекций. */
+    rirShift: number;
+    /** Паттерны движений под запретом на ступени (подстроки имени, ru/en). */
+    bannedPatterns: string[];
+  };
 }
 
 export interface BbReturnToPlan {
   stages: BbReturnToStage[];
   text: string;
+}
+
+/** Активная ступень по ручному подтверждению (1–3, дефолт 1 — консервативно). */
+export function activeReturnToStage(plan: BbReturnToPlan | null | undefined, confirmedStage?: number | null): BbReturnToStage | null {
+  if (!plan || !plan.stages.length) return null;
+  const n = Math.max(1, Math.min(3, Math.round(Number(confirmedStage) || 1)));
+  return plan.stages[n - 1] ?? plan.stages[0];
 }
 
 export function buildReturnToPlan(
@@ -32,6 +52,7 @@ export function buildReturnToPlan(
         volume: '0% силового объёма',
         rir: '—',
         note: `Причина: ${what}. Изометрия, резинки, суставная гимнастика. Боль = стоп и к врачу.`,
+        action: { volumeMult: 0, rirShift: 0, bannedPatterns: ['жим', 'тяга', 'присед', 'press', 'row', 'pull', 'squat', 'deadlift'] },
       },
       {
         stage: 2,
@@ -39,6 +60,7 @@ export function buildReturnToPlan(
         volume: '50% объёма',
         rir: 'RIR+3',
         note: 'Только безболезненные движения, без отказа. Боль вернулась — назад на ступень 1.',
+        action: { volumeMult: 0.5, rirShift: 3, bannedPatterns: [] },
       },
       {
         stage: 3,
@@ -46,6 +68,7 @@ export function buildReturnToPlan(
         volume: '100% объёма',
         rir: 'по плану',
         note: 'При 2 неделях без боли. Первая тяжёлая — без отказа.',
+        action: { volumeMult: 1, rirShift: 0, bannedPatterns: [] },
       },
     ],
     text: `Возврат после «${what}»: техника → 50% → полный объём за ~4 недели без боли`,
