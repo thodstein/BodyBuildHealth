@@ -347,11 +347,12 @@ describe('buildPeakWeek', () => {
     }
   });
 
-  it('тренировки: день 1 верх, день 2 низ, день 3 — по стратегии, шоу — памп', () => {
+  it('тренировки: день 1 верх+низ (последний низ), день 2 верх, день 3 верх-памп, шоу — памп (PRO-2 P4)', () => {
     const days = buildPeakWeek(baseConfig({ carbLoadStrategy: 'moderate' }));
     expect(days[0].training.type).toMatch(/Верх/);
-    expect(days[1].training.type).toMatch(/Низ/);
-    expect(days[2].training.type).toMatch(/Full-body/);
+    expect(days[1].training.type).toMatch(/Верх/);
+    expect(days[1].training.type).not.toMatch(/Низ лёгкий/);
+    expect(days[2].training.type).toMatch(/памп|Верх/);
     expect(days[3].training.minutes).toBe(0);
     expect(days[6].training.type).toMatch(/Памп|backstage/);
   });

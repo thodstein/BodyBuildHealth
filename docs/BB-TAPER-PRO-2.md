@@ -249,6 +249,13 @@ harm-reduction + «👨‍⚕️ под контролем врача», доз�
 По вопросу «что осталось» найдены и закрыты пп. 1–3 и 5 (P4-тайминг в сессиях — вне скоупа,
 остался дисплей-only осознанно).
 
+> **Добивка-2 (P4-wire, этот раунд)**: per-group last-hard вшит в `toPeakWeekSession` —
+> NEW `LAST_HARD_DN` (ноги 6 / спина 5 / верх 4 / руки 0) + `peakFamilyOf`/`dominantPeakFamily`
+> (неизвестная мышца → без ограничений, back-compat); сессия после своего D-N уходит в отдых
+> с пометкой `peakWeekLastHardRest`; `TRAINING_BY_PHASE` приведён в соответствие (deplete_2 —
+> верх, deplete_3 — верх-памп, низ/спина отдыхают); старый тест типов дней обновлён осознанно.
+> Тесты +3 (семьи/доминанта, ноги/спина в отдых + флаг, грудь/руки держатся).
+
 - **Доза в сборке (был гэп №1)**: `carbDoseGPerKg` проброшен сквозь `buildBBContestPrepPlan.opts` →
   `plan.peakWeek.carbDoseGPerKg` → `nutritionTargetsForPrepDate` (пик-ветка) + `buildBBContestPrep.opts`
   + `applyTrainingTaperToBBPlan.opts` + `ContestPrepApplyOpts` → пик-неделя плана; кэш
@@ -267,7 +274,8 @@ harm-reduction + «👨‍⚕️ под контролем врача», доз�
   (таблица + маркеры + comedown); оба callsites BbAuto передают `getPostShowLog(prepPlan.id)`.
   Тест +1 (JSON + наличие/отсутствие секции).
 - **Проверено**: PRO-2 тест 27/27 + prep-cycle 48/48 + соседи 311/311 + `tsc` 0 по своим файлам
-  (2 ошибки — чужой `BBDiagnosticsHub.tsx` WIP: `report` TDZ, файл не тронут) + `verify:apk-design` OK.
+  (на тот момент 2 ошибки — чужой `BBDiagnosticsHub.tsx` WIP: `report` TDZ, файл не тронут) + `verify:apk-design` OK.
+  Добивка-2: PRO-2 30/30 + соседи 262/262 + UI 23/23 + `tsc` 0 по всему проекту (чужой WIP починен владельцем).
 - **Шторм-процедура (честная запись о гонке)**: в `BbAutoConstructor.tsx` параллельный агент держал
   свой ханк PRO-3 R2 — план был взять в коммит только 5 своих ханков (байтовый фильтр + `git apply
   --cached --unidiff-zero`; без флага zero-контекст не применяется; стейдж проверен — ровно 9+/2-).

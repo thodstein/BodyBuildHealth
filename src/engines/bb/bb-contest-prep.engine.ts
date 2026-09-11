@@ -828,31 +828,31 @@ interface DayTraining {
   details: string[];
 }
 
-/** PRO peak-week training: KISS — тот же диапазон 8-12, снижен объём 40-60%, RIR 2-3, last hard D-5 (Brad Rowe/Helms). */
+/** PRO peak-week training: per-group last-hard (ноги D-6 → спина D-5 → верх D-4 → руки памп D-2);
+ * объём −40–60%, RIR 2–3, без отказа и новых движений (Homer 2024, weightlifting-обзор 2026). */
 const TRAINING_BY_PHASE: Record<PeakDayPhase, DayTraining> = {
   deplete_1: {
-    type: 'Верх лёгкий (деплеция мягкая)',
+    type: 'Верх + низ лёгкий (последний низ D-6)',
     minutes: 35,
     details: [
-      '2 круга (не 3): жим/тяга/плечи — 8-12 повт, ~60% веса, RIR 2-3, пауза 90 сек',
-      'Без отказа и без новых упражнений — исчерпание умеренное (Homer 2024 без брутальной деплеции)',
+      '2 круга верх (жим/тяга/плечи) + 1 круг низ лёгко — 8-12 повт, ~60% веса, RIR 2-3, пауза 90 сек',
+      'Ноги сегодня в последний раз (дальше — только прогулки и позы). Без отказа и без новых упражнений (Homer 2024 без брутальной деплеции)',
       'Цель — лёгкое опорожнение гликогена, не ЦНС-краш',
     ],
   },
   deplete_2: {
-    type: 'Низ лёгкий (деплеция мягкая)',
+    type: 'Верх лёгкий (низ — отдых)',
     minutes: 35,
     details: [
-      '2 круга: присед-паттерн/RDL/сгибания ног — 8-12 повт, ~60%, RIR 2-3',
-      'Техника приоритет, не памп. Last hard session не позже D-3 (CNS 3-5 дней)',
-      'При признаках перегруза — пропустите',
+      '2 круга: жим/тяги/плечи — 8-12 повт, ~60%, RIR 2-3. Низ НЕ трогаем (last hard ног был D-6)',
+      'Техника приоритет, не памп. При признаках перегруза — пропустите',
     ],
   },
   deplete_3: {
-    type: 'Full-body лёгкий / прогулка',
+    type: 'Верх памп / прогулка (низ и спина — отдых)',
     minutes: 20,
     details: [
-      '1-2 круга только изоляция/тренажёры, 12-15 повт, 50% веса, RIR 3',
+      '1 круг верх памп 12-15 повт, 50% веса, RIR 3 (спина и низ уже отдыхают: last hard D-5/D-6)',
       'Альтернатива — прогулка 30 мин + позирование 15 мин',
     ],
   },
@@ -913,6 +913,57 @@ export function lastHardDayForMuscle(muscle: string | null | undefined): string 
 /** Explainer «тапер ≠ делод» для шага contest (строка, без новой математики). */
 export const TAPER_VS_DELOAD_NOTE =
   '📉 Тапер держит вес (≥85%) и режет только объём — готовность к сцене. Делод роняет всё (вес ×0.6, RIR+3) — восстановление внутри цикла. У вас наложен тапер (Bell 2025).';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PRO-2 P4-wire: per-group last-hard в сессиях пик-недели (не только чипы).
+// si 0..6 → день D-6..D-0 (sessionDN = 6 − si). Сессия, чья доминантная группа
+// уже прошла свой last-hard, уходит в отдых (ноги D-6, спина D-5, верх D-4);
+// руки/пресс — памп без ограничений (памп-дни и так покой по фазам).
+// ═══════════════════════════════════════════════════════════════════════════
+
+type PeakFamily = 'legs' | 'back' | 'chest' | 'arms';
+
+/** Последний «день N» (D-N) группы: позже этого дня группа не тренируется. */
+export const LAST_HARD_DN: Record<PeakFamily, number> = {
+  legs: 6,   // ноги: только D-6, дальше прогулки/позы
+  back: 5,   // спина: по D-5 включительно
+  chest: 4,  // грудь/дельты/трапы: по D-4 включительно (памп)
+  arms: 0,   // руки/пресс: памп до сцены, жёсткого last-hard нет
+};
+
+const LEGS_SET = ['legs', 'quads', 'hamstrings', 'glutes', 'calves'];
+const BACK_SET = ['back', 'back_width', 'back_thickness'];
+const CHEST_SET = ['chest', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear', 'traps'];
+
+/** Семья мышцы для last-hard (неизвестная → null = без ограничений, back-compat). */
+export function peakFamilyOf(muscle: string | null | undefined): PeakFamily | null {
+  const m = String(muscle || '').toLowerCase();
+  if (!m) return null;
+  if (LEGS_SET.includes(m)) return 'legs';
+  if (BACK_SET.includes(m)) return 'back';
+  if (CHEST_SET.includes(m)) return 'chest';
+  if (['biceps', 'triceps', 'forearms', 'abs'].includes(m)) return 'arms';
+  return null;
+}
+
+/** Доминантная семья сессии (мода мышц упражнений; пустая → null). */
+export function dominantPeakFamily(session: { exercises?: Array<{ muscle?: string }> }): PeakFamily | null {
+  const counts = new Map<PeakFamily, number>();
+  for (const e of session.exercises ?? []) {
+    const f = peakFamilyOf((e as { muscle?: string })?.muscle);
+    if (f) counts.set(f, (counts.get(f) ?? 0) + 1);
+  }
+  let best: PeakFamily | null = null;
+  let bestN = 0;
+  for (const [f, n] of counts) {
+    if (n > bestN) { best = f; bestN = n; }
+  }
+  return best;
+}
+
+const PEAK_FAMILY_RU: Record<PeakFamily, string> = {
+  legs: 'ноги', back: 'спина', chest: 'верх', arms: 'руки',
+};
 
 export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?: number }): PeakWeekDayPlan[] {
   const v = validateBBContestPrepConfig(cfg);
@@ -1545,6 +1596,19 @@ function toPeakWeekSession(
       exercises: [],
       peakWeekRest: true,
       comment: `🎭 Пик-неделя (${dayPhase ? (PHASE_LABELS_RU[dayPhase] ?? dayPhase) : 'день вне окна'}): отдых. Позирование ${POSING_BY_DAY[Math.min(7, si + 1)] ?? 60} мин, растяжка${dayPhase?.startsWith('load') ? ' — гликоген наполняется, без тренировки.' : '.'}`,
+    };
+  }
+  // PRO-2 P4-wire: per-group last-hard — группа после своего D-N отдыхает.
+  const sessionDN = 6 - si;
+  const fam = dominantPeakFamily(session);
+  const hardDN = fam ? LAST_HARD_DN[fam] : null;
+  if (fam && hardDN != null && sessionDN < hardDN) {
+    return {
+      ...session,
+      exercises: [],
+      peakWeekRest: true,
+      peakWeekLastHardRest: true,
+      comment: `🎭 Пик-неделя (${PHASE_LABELS_RU[dayPhase] ?? dayPhase}): отдых — ${PEAK_FAMILY_RU[fam]}: последний тяжёлый был D-${hardDN} (per-group last-hard). Позирование ${POSING_BY_DAY[Math.min(7, si + 1)] ?? 60} мин, прогулка.`,
     };
   }
   const training = peakWeek[Math.min(si, 2)]?.training ?? TRAINING_BY_PHASE.deplete_3;

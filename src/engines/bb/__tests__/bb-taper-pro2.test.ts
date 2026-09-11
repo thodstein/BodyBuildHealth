@@ -22,6 +22,10 @@ import {
   prepRefeedDates,
   isPrepRefeedDay,
   configFromPlan,
+  peakFamilyOf,
+  dominantPeakFamily,
+  LAST_HARD_DN,
+  applyPeakWeekOverlayToBBPlan,
   CATEGORY_PROFILES,
   type BBContestPrepConfig,
   type TestPeakWeekResult,
@@ -352,5 +356,69 @@ describe('PRO-2 доводка — post-show лог в экспорте', () => 
     expect(html).toContain('Восстановление post-show');
     expect(html).toContain('82');
     expect(buildContestPrepPrintHtml(plan)).not.toContain('Восстановление post-show');
+  });
+});
+
+describe('PRO-2 P4-wire — last-hard в сессиях пик-недели', () => {
+  it('семьи мышц и доминанта сессии', () => {
+    expect(peakFamilyOf('quads')).toBe('legs');
+    expect(peakFamilyOf('back_width')).toBe('back');
+    expect(peakFamilyOf('delt_mid')).toBe('chest');
+    expect(peakFamilyOf('biceps')).toBe('arms');
+    expect(peakFamilyOf('неизвестно')).toBe(null);
+    expect(peakFamilyOf('')).toBe(null);
+    expect(LAST_HARD_DN).toEqual({ legs: 6, back: 5, chest: 4, arms: 0 });
+    expect(dominantPeakFamily({ exercises: [{ muscle: 'quads' }, { muscle: 'hamstrings' }, { muscle: 'chest' }] })).toBe('legs');
+    expect(dominantPeakFamily({ exercises: [] })).toBe(null);
+  });
+  it('ноги после D-6 и спина после D-5 уходят в отдых, грудь D-4 держится', () => {
+    const mkSess = (muscle: string): any => ({
+      day: 1, character: 'тяж',
+      exercises: [{
+        muscle, name: muscle, role: 'primary', character: 'тяж', sets: 4,
+        repsRange: [8, 12] as [number, number], rir: 2,
+        workSets: [{ reps: 10, rir: 2, weight: 60 }], comment: '',
+      }],
+    });
+    const plan: any = {
+      pattern: {}, rotationMuscleVolume: {}, rationale: [],
+      weeks: [{
+        week: 1, phase: 'accumulation', deload: false,
+        sessions: [mkSess('quads'), mkSess('quads'), mkSess('back'), mkSess('chest'), mkSess('biceps'), mkSess('chest')],
+      }],
+    };
+    const out = applyPeakWeekOverlayToBBPlan(plan, baseConfig(), { weekNumber: 1 });
+    const ss = (out.weeks[0].sessions as any[]);
+    // si0 DN6 ноги — тренируется; si1 DN5 ноги — отдых по last-hard
+    expect(ss[0].exercises.length).toBeGreaterThan(0);
+    expect(ss[1].exercises).toEqual([]);
+    expect(ss[1].peakWeekLastHardRest).toBe(true);
+    // si2 DN4 спина — отдых по last-hard; грудь на si3 — отдых по фазе (load), без флага
+    expect(ss[2].exercises).toEqual([]);
+    expect(ss[2].peakWeekLastHardRest).toBe(true);
+    expect(ss[3].exercises).toEqual([]);
+    expect(ss[3].peakWeekLastHardRest).toBe(undefined);
+  });
+  it('грудь и руки на ранних deplete-днях тренируются (памп)', () => {
+    const mkSess = (muscle: string): any => ({
+      day: 1, character: 'тяж',
+      exercises: [{
+        muscle, name: muscle, role: 'primary', character: 'тяж', sets: 4,
+        repsRange: [8, 12] as [number, number], rir: 2,
+        workSets: [{ reps: 10, rir: 2, weight: 40 }], comment: '',
+      }],
+    });
+    const plan: any = {
+      pattern: {}, rotationMuscleVolume: {}, rationale: [],
+      weeks: [{
+        week: 1, phase: 'accumulation', deload: false,
+        sessions: [mkSess('chest'), mkSess('chest'), mkSess('biceps')],
+      }],
+    };
+    const out = applyPeakWeekOverlayToBBPlan(plan, baseConfig(), { weekNumber: 1 });
+    const ss = (out.weeks[0].sessions as any[]);
+    expect(ss[0].exercises.length).toBeGreaterThan(0); // si0 DN6
+    expect(ss[1].exercises.length).toBeGreaterThan(0); // si1 DN5, верх держится
+    expect(ss[2].exercises.length).toBeGreaterThan(0); // si2 DN4, руки — памп
   });
 });
