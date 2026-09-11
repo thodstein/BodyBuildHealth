@@ -18,9 +18,10 @@ import {
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import {
   importRowsFromDiary, saveVolumeSnapshot, loadVolumeSnapshots, removeVolumeSnapshot,
-  compareVolumeSnapshot, buildVolumeCsv, buildVolumeHtml,
+  buildVolumeCsv, buildVolumeHtml,
   type VolumeSnapshot,
 } from '../../../engines/volume-hub-conveyor.engine';
+import { VolBar, VolSectionHeader, VolumeQualityCard, PerMuscleList, VolumeConveyorCard } from './volume-optimizer-parts';
 
 const ACCENT = '#00e68a';
 const DIM_ = '#fff';
@@ -39,12 +40,6 @@ const GROUP_RU: Record<string, string> = {
 
 function muscleRu(en: string): string { return MUSCLE_RU[en] || GROUP_RU[en] || en; }
 
-const STATUS_COLOR: Record<string, string> = {
-  below_mev: '#ef4444', optimal: '#22c55e', approaching_mrv: '#f59e0b', exceeding_mrv: '#ef4444',
-};
-const STATUS_LABEL: Record<string, string> = {
-  below_mev: 'Ниже MEV', optimal: 'Оптимально', approaching_mrv: 'Близко к MRV', exceeding_mrv: 'Превышен MRV',
-};
 const SFR_TIER_COLOR: Record<string, string> = { S: '#22c55e', A: '#00e68a', B: '#f59e0b', C: '#ef4444' };
 
 export const VolumeOptimizerTab: React.FC = () => {
@@ -244,22 +239,13 @@ export const VolumeOptimizerTab: React.FC = () => {
     );
   };
 
-  const renderBar = (value: number, max: number, color: string): React.ReactNode => {
-    const pct = Math.min(100, Math.max(0, max > 0 ? (value / max) * 100 : 0));
-    return (
-      <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, marginTop: 2 }}>
-        <div style={{ width: pct + '%', height: '100%', borderRadius: 3, background: color, transition: 'width 0.3s' }} />
-      </div>
-    );
-  };
+  // P7: подача вынесена в volume-optimizer-parts (VolBar/VolSectionHeader/карточки)
+  const renderBar = (value: number, max: number, color: string): React.ReactNode => (
+    <VolBar value={value} max={max} color={color} />
+  );
 
   const sectionHeader = (key: string, icon: string, title: string): React.ReactNode => (
-    <button onClick={() => toggleSection(key)}
-      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 13, fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-      <span>{expandedSections[key] ? '▼' : '▶'}</span>
-      <span>{icon}</span>
-      <span style={{ color: ACCENT }}>{title}</span>
-    </button>
+    <VolSectionHeader icon={icon} title={title} open={!!expandedSections[key]} onToggle={() => toggleSection(key)} />
   );
 
   const qualityColor = quality ? quality.score >= 80 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444' : DIM_;
@@ -323,42 +309,8 @@ export const VolumeOptimizerTab: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Quality score card ── */}
-      {quality && (
-        <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: `${qualityColor}10`, border: `1px solid ${qualityColor}30` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 800, color: qualityColor }}>🎯 Качество программы</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: qualityColor }}>{quality.score}/100</span>
-          </div>
-          <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 4 }}>
-              {quality.over.length > 0 && <div style={{ color: '#ef4444' }}>⚠ Превышение MRV: {quality.over.map(g => GROUP_RU[g] || g).join(', ')}</div>}
-              {quality.weakMissed.length > 0 && <div style={{ color: '#f59e0b' }}>⚠ Слабые не покрыты: {quality.weakMissed.map(g => GROUP_RU[g] || g).join(', ')}</div>}
-              {quality.weakCovered.length > 0 && <div style={{ color: ACCENT }}>✅ Слабые покрыты: {quality.weakCovered.map(g => GROUP_RU[g] || g).join(', ')}</div>}
-            </div>
-            {quality.monotonyNote && <div style={{ marginTop: 4 }}>{quality.monotonyNote}</div>}
-            {quality.mvGroups.length > 0 && <div style={{ marginTop: 2, color: '#60a5fa' }}>🛡 Поддержание (MV, не штраф): {quality.mvGroups.map(g => `${GROUP_RU[g.group] || g.group} ${g.effectiveSets}/${g.mev}`).join(', ')}</div>}
-            {quality.sessViol.slice(0, 3).map((v, i) => (
-              <div key={'sv' + i} style={{ marginTop: 2, color: '#f59e0b' }}>⚠ {v.message}</div>
-            ))}
-            {quality.freqFlags.slice(0, 3).map((f: string, i: number) => (
-              <div key={'fq' + i} style={{ marginTop: 2, color: '#f59e0b' }}>⚠ {f}</div>
-            ))}
-            <div style={{ marginTop: 2, color: quality.rir.verdict.kind === 'ok' ? '#22c55e' : quality.rir.verdict.kind === 'info' ? '#fff' : '#f59e0b' }}>
-              {quality.rir.verdict.kind === 'ok' ? '✅' : quality.rir.verdict.kind === 'info' ? 'ℹ️' : '⚠'} RIR: {quality.rir.verdict.message} · hard-сеты {quality.hard.hardSets}/{quality.hard.totalSets}{quality.hard.assumedSets > 0 ? ` (RPE пуст: ${quality.hard.assumedSets} assumed)` : ''}
-            </div>
-            {quality.labWarnings.length > 0 && quality.labWarnings.map((w: string, i: number) => (
-              <div key={i} style={{ marginTop: 2, color: '#f59e0b' }}>🧪 {w}</div>
-            ))}
-            {quality.over.length === 0 && quality.weakMissed.length === 0 && <div style={{ color: ACCENT, marginTop: 4 }}>✅ Объём в норме, слабые группы покрыты</div>}
-          </div>
-          {(quality.over.length > 0 || quality.weakMissed.length > 0) && (
-            <button onClick={improveVolume} style={{ marginTop: 8, padding: '8px 16px', borderRadius: 8, border: '1px solid ' + ACCENT, background: 'rgba(0,230,138,0.08)', color: ACCENT, fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>
-              {improving ? '✓ Улучшено' : '🎯 Улучшить программу'}
-            </button>
-          )}
-        </div>
-      )}
+      {/* ── Quality score card (P7: карточка в parts) ── */}
+      {quality && <VolumeQualityCard quality={quality} improving={improving} onImprove={improveVolume} />}
 
       {/* ── Summary metrics (2x2 on mobile) ── */}
       {analysis && (
@@ -536,52 +488,13 @@ export const VolumeOptimizerTab: React.FC = () => {
         </div>
       )}
 
-      {/* ── Per-Muscle Analysis ── */}
+      {/* ── Per-Muscle Analysis (P7: список в parts) ── */}
       {analysis && (
         <div style={CARD}>
           {sectionHeader('muscles', '💪', 'Анализ по группам мышц')}
           {expandedSections.muscles && (
             <div style={{ marginTop: 10 }}>
-              {analysis.perMuscle.map(m => {
-                const color = STATUS_COLOR[m.status];
-                return (
-                  <div key={m.muscle} style={{ marginBottom: 10, padding: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 8, borderLeft: '3px solid ' + color }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <div>
-                        <span style={{ fontSize: 12, fontWeight: 700 }}>{m.muscleRu}</span>
-                        <span style={{ ...BADGE(color), marginLeft: 6 }}>{STATUS_LABEL[m.status]}</span>
-                      </div>
-                      <div style={{ fontSize: 10, color: DIM_ }}>
-                        SFR ср. {m.avgSFR.toFixed(2)} · Эфф. {m.efficiencyScore}%
-                      </div>
-                    </div>
-                    <div style={{ position: 'relative', height: 22, marginBottom: 6 }}>
-                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.04)', borderRadius: 4 }} />
-                      <div style={{ position: 'absolute', left: 0, width: (m.mev / m.mrv * 100) + '%', height: '100%', background: 'rgba(34,197,94,0.15)', borderRadius: '4px 0 0 4px' }} />
-                      <div style={{ position: 'absolute', left: (m.mev / m.mrv * 100) + '%', width: ((m.mav - m.mev) / m.mrv * 100) + '%', height: '100%', background: 'rgba(0,230,138,0.1)' }} />
-                      <div style={{ position: 'absolute', left: Math.min(98, (m.currentSets / m.mrv * 100)) + '%', top: -3, width: 4, height: 28, background: color, borderRadius: 2, transform: 'translateX(-50%)', zIndex: 2, boxShadow: '0 0 6px ' + color }} />
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px', zIndex: 1, fontSize: 10, color: DIM_ }}>
-                        <span>MEV {m.mev}</span><span>MAV {m.mav}</span><span>MRV {m.mrv}</span>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: DIM_, flexWrap: 'wrap' }}>
-                      <span>Подходов: <b style={{ color }}>{m.currentSets}</b></span>
-                      <span>База: {m.compoundSets} / Изол: {m.isolationSets}</span>
-                      <span>Тяж: {m.heavySets}</span>
-                      <span>Частота: {m.currentFreq}×/нед · hard {m.hardSets}/{m.currentSets}</span>
-                      <span style={{ color: m.freqKind === 'ok' ? '#22c55e' : m.freqKind === 'info' ? '#fff' : m.freqKind === 'warning' ? '#f59e0b' : '#ef4444' }}>{m.freqKind === 'ok' ? '✅' : m.freqKind === 'info' ? 'ℹ️' : '⚠'} {m.freqVerdict}</span>
-                      <span>Восст: ~{m.recoveryHoursEst}ч</span>
-                    </div>
-                    {m.actionableTips.length > 0 && (
-                      <div style={{ marginTop: 4 }}>
-                        {m.actionableTips.map((t, i) => (
-                          <div key={i} style={{ fontSize: 10, color: '#f59e0b', marginBottom: 1 }}>💡 {t}</div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              <PerMuscleList items={analysis.perMuscle} />
             </div>
           )}
         </div>
@@ -727,11 +640,13 @@ export const VolumeOptimizerTab: React.FC = () => {
         </div>
       )}
 
-      {/* ── P6: конвейер — дневник / снапшоты / экспорт ── */}
-      <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.18)' }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 8 }}>🔗 Конвейер: дневник · снапшоты · экспорт</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <button onClick={() => {
+      {/* ── P6/P7: конвейер — карточка в parts ── */}
+      <VolumeConveyorCard
+        flash={flash}
+        snapshots={snapshots}
+        compareWith={rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, week: r.week, weight: r.weight, reps: r.reps, sets: r.sets, rpe: r.rpe }))}
+        handlers={{
+          onDiaryImport: () => {
             try {
               const raw = localStorage.getItem('he_workout_log_v1') || localStorage.getItem('he_training_log') || '[]';
               const imp = importRowsFromDiary(JSON.parse(raw), { days: 7 });
@@ -743,10 +658,8 @@ export const VolumeOptimizerTab: React.FC = () => {
                 setFlash(`📥 Импорт: ${imp.rows.length} строк из ${imp.sessions} сессий${imp.skipped > 0 ? `, пропущено: ${imp.skipped}` : ''}`);
               }
             } catch { setFlash('📥 Дневник: хранилище битое'); }
-          }} style={{ flex: '1 1 140px', padding: 10, borderRadius: 10, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
-            📥 Из дневника (7д)
-          </button>
-          <button onClick={() => {
+          },
+          onSnapshot: () => {
             const snaps = saveVolumeSnapshot(
               rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, week: r.week, weight: r.weight, reps: r.reps, sets: r.sets, rpe: r.rpe, oneRM: r.oneRM })),
               level,
@@ -754,10 +667,8 @@ export const VolumeOptimizerTab: React.FC = () => {
             );
             setSnapshots(snaps);
             setFlash(`📸 Снапшот сохранён (${snaps.length}/10)`);
-          }} style={{ flex: '1 1 140px', padding: 10, borderRadius: 10, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
-            📸 Снапшот
-          </button>
-          <button onClick={() => {
+          },
+          onCsv: () => {
             try {
               const blob = new Blob([buildVolumeCsv(rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, week: r.week, weight: r.weight, reps: r.reps, sets: r.sets, rpe: r.rpe })))], { type: 'text/csv;charset=utf-8' });
               const a = document.createElement('a');
@@ -766,10 +677,8 @@ export const VolumeOptimizerTab: React.FC = () => {
               a.click();
               setTimeout(() => URL.revokeObjectURL(a.href), 5000);
             } catch { /* ignore */ }
-          }} style={{ flex: '1 1 100px', padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
-            📄 CSV
-          </button>
-          <button onClick={() => {
+          },
+          onHtml: () => {
             try {
               const w = window.open('', '_blank');
               if (!w) { setFlash('🖨 Всплывающие окна заблокированы'); return; }
@@ -777,28 +686,10 @@ export const VolumeOptimizerTab: React.FC = () => {
               w.document.close();
               w.print();
             } catch { setFlash('🖨 Печать недоступна'); }
-          }} style={{ flex: '1 1 100px', padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 800, fontSize: 11, cursor: 'pointer', minHeight: 44 }}>
-            🖨 HTML
-          </button>
-        </div>
-        {flash && <div role="status" style={{ marginTop: 8, fontSize: 11, color: '#fff' }}>{flash}</div>}
-        {snapshots.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            {snapshots.slice(0, 5).map(s => {
-              const cmp = compareVolumeSnapshot(s, rows.map(r => ({ exerciseId: r.exerciseId, day: r.day, week: r.week, weight: r.weight, reps: r.reps, sets: r.sets, rpe: r.rpe })));
-              return (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, marginBottom: 4, fontSize: 10 }}>
-                  <span style={{ color: '#fff' }}>{new Date(s.at).toLocaleDateString('ru-RU')} · {s.level} · {s.totalSets} подх</span>
-                  <span style={{ color: cmp.setsDelta === 0 ? '#fff' : cmp.setsDelta > 0 ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
-                    Δ {cmp.setsDelta > 0 ? '+' : ''}{cmp.setsDelta} подх · {cmp.tonnageDelta > 0 ? '+' : ''}{cmp.tonnageDelta.toLocaleString('ru-RU')} кг·повт
-                  </span>
-                  <button onClick={() => setSnapshots(removeVolumeSnapshot(s.id))} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', borderRadius: 6, cursor: 'pointer', fontSize: 10, padding: '4px 8px' }}>✕</button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+          },
+          onRemoveSnapshot: (id: number) => setSnapshots(removeVolumeSnapshot(id)),
+        }}
+      />
 
       {/* ── Apply to planner ── */}
       {analysis && (
