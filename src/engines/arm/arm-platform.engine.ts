@@ -22,12 +22,15 @@ export interface PlatformResult {
   note: string;
 }
 
-/** Мировые ориентиры (муж, открытая; женские — через коэффициент 0.59). */
+/** Мировые ориентиры (муж, открытая) — сверены с IronMind 2025–2026 (добивка PRO-4).
+ * RT 130.5 Тюкалов 2013; Apollon 237.5 Майерско 16.12.2022 / 137.9 Гайдученко 02.03.2019;
+ * Hub 44.80 Толонен 10.02.2019 / 28.51 Кулагина 20.12.2021.
+ * Saxon 133 — ВНУТРЕННИЙ ориентир хаба (фиксированного WR нет, только классы APL/лидерборды AUSA). */
 export const PLATFORM_WR: Record<string, { maleKg: number; femaleKg: number; name: string }> = {
   rolling_thunder: { maleKg: 130.5, femaleKg: 77.2, name: 'Rolling Thunder' },
-  apollon_axle: { maleKg: 133, femaleKg: 78, name: 'Apollon Axle' },
-  saxon_bar: { maleKg: 133, femaleKg: 70, name: 'Saxon Bar' },
-  hub: { maleKg: 45, femaleKg: 25, name: 'IronMind Hub' },
+  apollon_axle: { maleKg: 237.5, femaleKg: 137.9, name: 'Apollon Axle' },
+  saxon_bar: { maleKg: 133, femaleKg: 70, name: 'Saxon Bar (ориентир)' },
+  hub: { maleKg: 44.8, femaleKg: 28.51, name: 'IronMind Hub' },
   pinch_block: { maleKg: 80, femaleKg: 45, name: 'Pinch Block' },
   coc_gripper: { maleKg: 55, femaleKg: 30, name: 'CoC (эквивалент)' },
   grandfather_clock: { maleKg: 90, femaleKg: 50, name: 'Grandfather Clock' },
@@ -40,12 +43,33 @@ export function platformWrFor(implement: string, sex: string): number {
   return (sex || '').toLowerCase() === 'female' ? rec.femaleKg : rec.maleKg;
 }
 
-/** План попыток: opener 90%, second 95-97%, third 101-103% от цели. */
+/** План попыток: opener 90%, second 95-97%, third 101-103% от цели (лесенка для зала). */
 export function planAttempts(targetKg: number): number[] {
   const t = Number(targetKg);
   if (!Number.isFinite(t) || t <= 0) return [];
   const r = (v: number) => Math.round(v * 2) / 2;
   return [r(t * 0.9), r(t * 0.96), r(t * 1.02)];
+}
+
+/**
+ * PRO-4 A4: лесенка last-man-standing (Armlifting USA 2026):
+ * только вверх шагом 2.5/5 кг до цели, вниз нельзя, промах = выбыл.
+ */
+export function planLastManStanding(targetKg: number): number[] {
+  const t = Number(targetKg);
+  if (!Number.isFinite(t) || t <= 0) return [];
+  const step = t >= 100 ? 5 : 2.5;
+  const out: number[] = [];
+  let w = Math.round((t * 0.85) * 2) / 2;
+  if (w < 2.5) w = 2.5;
+  let guard = 0;
+  while (w < t && guard < 12) {
+    out.push(w);
+    w = Math.round((w + step) * 2) / 2;
+    guard++;
+  }
+  out.push(Math.round(t * 2) / 2);
+  return out;
 }
 
 export function scorePlatform(input: {

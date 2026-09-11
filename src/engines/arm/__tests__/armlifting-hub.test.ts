@@ -22,14 +22,16 @@ describe('W-AL движок: вердикт по снарядам', () => {
     const r = buildArmliftingReport({ rtKg: 38.6, sex: 'female' });
     expect(r.rows[0].scorePct).toBe(50);
   });
-  it('Axle saxon vs apollon — разные снаряды, WR оба 133 (честная оценка движка)', () => {
+  it('Axle saxon (ориентир) vs apollon (WR 237.5, добивка PRO-4)', () => {
     const s = buildArmliftingReport({ axleKg: 100, axleImpl: 'saxon', sex: 'male' });
     const a = buildArmliftingReport({ axleKg: 100, axleImpl: 'apollon', sex: 'male' });
     expect(s.rows[0].implement).toBe('saxon_bar');
     expect(s.rows[0].internal).toBe(true);
+    expect(s.rows[0].note).toContain('лидерборд');
     expect(a.rows[0].implement).toBe('apollon_axle');
     expect(a.rows[0].internal).toBe(false);
-    expect(s.rows[0].scorePct).toBe(a.rows[0].scorePct);
+    expect(a.rows[0].scorePct).toBe(42.1);
+    expect(a.rows[0].note).toContain('237.5');
   });
   it('weakest — минимальный %; avg — среднее; verdict называет снаряд', () => {
     const r = buildArmliftingReport({ rtKg: 117.45, axleKg: 66.5, axleImpl: 'saxon', sex: 'male' });

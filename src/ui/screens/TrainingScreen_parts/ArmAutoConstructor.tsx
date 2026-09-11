@@ -619,11 +619,28 @@ export function ArmAutoConstructor() {
             if (Number(ap.rightKg) > 0) setProRight(String(ap.rightKg));
             if (Number(ap.bwKg) > 0) setProBw(String(ap.bwKg));
             if (Number(ap.rtKg) > 0) setProBenchRt(String(ap.rtKg));
+            // PRO-4 добивка: pinch/RT из армлифтинг-хаба в рабочие максимумы (пустые не затираем)
+            if (Number((ap as any).pinchKg) > 0) setWorkMaxEdit((prev: any) => (!prev.grip_pinch ? { ...prev, grip_pinch: String((ap as any).pinchKg) } : prev));
+            if (Number((ap as any).rtKg) > 0) setWorkMaxEdit((prev: any) => (!prev.grip_support ? { ...prev, grip_support: String((ap as any).rtKg) } : prev));
           }
           const ar = payload.data?.armRfd;
           if (ar && Number.isFinite(Number(ar.explosivePct)) && Number(ar.explosivePct) > 0) {
             setTopExpl(String(ar.explosivePct));
             setTopRfd(true);
+          }
+        } catch {}
+        // PRO-4 добивка: класс/рецепт/LMS/правила из армлифтинг-хаба — видимой строкой (сборку не меняем)
+        try {
+          const al = (payload.data as any)?.armLifting;
+          if (al && typeof al === 'object') {
+            const parts: string[] = [];
+            if (al.weightClass) parts.push(`класс ${al.weightClass}`);
+            if (al.prescription) parts.push(String(al.prescription));
+            if (al.lms && Array.isArray(al.lms.steps) && al.lms.steps.length) {
+              parts.push(`LMS${al.lms.label ? ` (${al.lms.label})` : ''}: ${(al.lms.steps as number[]).join(' → ')}`);
+            }
+            if (al.rulesNote) parts.push(String(al.rulesNote));
+            if (parts.length) flash(`🏋️ Армлифтинг-мост: ${parts.join(' · ')}`);
           }
         } catch {}
         const bouts = payload.data?.armBouts;
