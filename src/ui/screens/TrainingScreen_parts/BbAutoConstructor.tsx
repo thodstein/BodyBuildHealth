@@ -45,7 +45,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
-import { bbOrthoMobilityAdd } from '../../../engines/pro/ortho-screen.engine';
+import { bbOrthoMobilityAdd, riskyOpenChainIds } from '../../../engines/pro/ortho-screen.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply, applyToPlanner, type WeakpointsPayload } from './planner-bridge';
 import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
@@ -1639,7 +1639,18 @@ export const BbAutoConstructor: React.FC = () => {
           if (og.closedChainOnly) {
             setAutoDeload(true);
             setIntensityLevel('light');
-            pro2parts.push('🦴 Beighton+: light + авто-делод (щадящий режим)');
+            // Э1 буквально: без отказных техник + прогрессия повторами (+5%, double_progression) + раскрытия из пула
+            setIntensityTech('none');
+            if (loadStrategy !== 'double_progression') {
+              setLoadStrategy('double_progression');
+              try { userTouched.current.loadStrategy = true; } catch {}
+            }
+            const risky = riskyOpenChainIds(EXERCISE_CATALOG as any, 40);
+            if (risky.length) {
+              setBbExclEx((prev) => Array.from(new Set([...prev, ...risky])));
+              try { localStorage.setItem('he_bb_ortho_excluded', JSON.stringify(risky)); } catch {}
+            }
+            pro2parts.push(`🦴 Beighton+: light + без отказных + повторы + ${risky.length} раскрытий исключено`);
           }
           try { localStorage.setItem('he_bb_ortho_guards', JSON.stringify(og)); } catch {}
         }

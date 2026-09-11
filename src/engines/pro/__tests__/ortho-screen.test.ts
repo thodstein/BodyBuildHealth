@@ -5,6 +5,7 @@ import {
   scoreBeighton, beightonCutoff, assessBeighton, assessYellow, teenGate,
   rankJointSupport, screenOrtho, orthoGuardsForPlan, buildOrthoCsv, orthoBridgePayload,
   hopLsi, hopLsiOverall, strengthLsiOverall, bbOrthoMobilityAdd, applyOrthoToProfile,
+  isRiskyOpenChain, riskyOpenChainIds,
 } from '../ortho-screen.engine';
 
 describe('ortho-screen J1 плечо', () => {
@@ -256,5 +257,41 @@ describe('ortho-screen strength-LSI + ББ-хелпер', () => {
   it('bbOrthoMobilityAdd: паузы + whitelist, чужие режутся', () => {
     expect(bbOrthoMobilityAdd({ pauseOverhead: true, limitDeepSquat: true, mobilityAdd: ['wrist', 'нос', 'knee'] })).toEqual(['shoulder', 'hip', 'wrist']);
     expect(bbOrthoMobilityAdd({ pauseOverhead: false, limitDeepSquat: false, mobilityAdd: [] })).toEqual([]);
+  });
+});
+
+describe('ortho-screen Э1 risky open-chain', () => {
+  it('раскрытие ловится, база — нет', () => {
+    expect(isRiskyOpenChain({ name: 'Разводка гантелей лёжа' })).toBe(true);
+    expect(isRiskyOpenChain({ name: 'Пек-дек (бабочка)' })).toBe(true);
+    expect(isRiskyOpenChain({ name: 'Махи гантелями в стороны' })).toBe(true);
+    expect(isRiskyOpenChain({ name: 'Разгибания ног в тренажёре' })).toBe(true);
+    expect(isRiskyOpenChain({ name: 'Пуловер с гантелью' })).toBe(true);
+    expect(isRiskyOpenChain({ name: 'Французский жим лёжа' })).toBe(true);
+    expect(isRiskyOpenChain({ name: 'Cable fly' })).toBe(true);
+    expect(isRiskyOpenChain({ name: 'Приседания со штангой' })).toBe(false);
+    expect(isRiskyOpenChain({ name: 'Подтягивания широким хватом' })).toBe(false);
+    expect(isRiskyOpenChain({ name: 'Отжимания на брусьях' })).toBe(false);
+    expect(isRiskyOpenChain({ name: 'Жим штанги лёжа' })).toBe(false);
+    expect(isRiskyOpenChain({ name: 'Тяга штанги в наклоне' })).toBe(false);
+    expect(isRiskyOpenChain({ name: 'Сгибание рук со штангой' })).toBe(false);
+    expect(isRiskyOpenChain({ name: 'Планка' })).toBe(false);
+  });
+  it('пусто/мусор — безопасно (сейф-дефолт)', () => {
+    expect(isRiskyOpenChain(null)).toBe(false);
+    expect(isRiskyOpenChain(undefined)).toBe(false);
+    expect(isRiskyOpenChain({})).toBe(false);
+    expect(isRiskyOpenChain({ name: '' })).toBe(false);
+  });
+  it('riskyOpenChainIds: только id строкой + cap', () => {
+    const cat = [
+      { id: 'fly_db', name: 'Разводка гантелей' },
+      { id: 'squat', name: 'Присед' },
+      { id: 42, name: 'Мусор' },
+      { id: 'cable_fly', name: 'Cable fly' },
+    ] as any;
+    expect(riskyOpenChainIds(cat, 1)).toEqual(['fly_db']);
+    expect(riskyOpenChainIds(cat)).toEqual(['fly_db', 'cable_fly']);
+    expect(riskyOpenChainIds(null as any)).toEqual([]);
   });
 });

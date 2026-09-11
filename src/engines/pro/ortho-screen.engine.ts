@@ -169,6 +169,33 @@ export function bbOrthoMobilityAdd(g: { pauseOverhead?: boolean; limitDeepSquat?
   ]));
 }
 
+/**
+ * Э1: risky open-chain — раскрывающие движения под нагрузкой в крайней амплитуде
+ * (гипермобильность: end-range под нагрузкой — главный избегаемый паттерн; Parry/EDS Society).
+ * Кураторский regex по RU/EN-именам каталога; сейф-дефолт — НЕ рискованное.
+ * Сознательно узкий список (только раскрытие/отведение/разгибание на растяжении),
+ * сгибания/жимы/тяги/приседы/подтягивания/отжимания/планки — безопасны.
+ */
+const OPEN_CHAIN_RISKY_RE = /развод|разведен|fly|pec.?deck|пек-дек|бабочк|кроссовер|crossover|сведен.*(кросс|блок)|махи|rise|raise|подъём.*(сторон|перед|гантел)|дельт.*мах|разгибани|leg.?ext|экстензия ног|пуловер|pullover|французск|skull|отведени.*(блок|кросс|трус)/i;
+
+export function isRiskyOpenChain(ex: { name?: string; id?: string } | null | undefined): boolean {
+  if (!ex) return false;
+  const s = `${ex.name ?? ''} ${ex.id ?? ''}`;
+  if (!s.trim()) return false;
+  return OPEN_CHAIN_RISKY_RE.test(s);
+}
+
+/** ids risky-упражнений из каталога (для excludedExercises; cap — не раздувать исключения). */
+export function riskyOpenChainIds(catalog: Array<{ id: string; name: string }>, cap = 40): string[] {
+  if (!Array.isArray(catalog)) return [];
+  const out: string[] = [];
+  for (const c of catalog) {
+    if (out.length >= cap) break;
+    if (c && typeof c.id === 'string' && isRiskyOpenChain(c)) out.push(c.id);
+  }
+  return out;
+}
+
 export function assessRts(i: RtsChecklistInput): { ready: boolean; status: string; flags: OrthoFlag[] } {
   // П5: измеренные hop-дистанции приоритетнее ручных чекбоксов
   const hop = hopLsiOverall(i.hop);
