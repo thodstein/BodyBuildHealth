@@ -15,6 +15,7 @@ import { getPeakCycles, buildPeakCycleTaperCurve } from '../../../engines/lms/pl
 import { buildBBContestPrep, normalizeContestCategory, planFromStored, configFromPlan, manipulationLockNote, recommendBBTaperConfig, TAPER_VS_DELOAD_NOTE, type BBContestPrepConfig, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
+import { saveContestPrepEverywhere } from '../../../engines/bb/bb-contest-prep-sync';
 import {
   selectWeightClassForSex, generateCompetitionTimeline,
   getRecoveryProtocols, getMentalRoutines, recommendWeightCut,
@@ -182,6 +183,12 @@ export const TaperPlannerTab: React.FC = () => {
   const [scenarios, setScenarios] = useState<TaperScenario[]>(() => loadTaperScenarios());
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
+  // BB мини-сборщик: превью → настоящий сохранённый план (единый контур saveContestPrepEverywhere)
+  const [prepWeeksBB, setPrepWeeksBB] = useState(12);
+  const [taperWeeksBB, setTaperWeeksBB] = useState(2);
+  const [carbStratBB, setCarbStratBB] = useState<'front' | 'moderate' | 'back'>('moderate');
+  const [bbBuildMsg, setBbBuildMsg] = useState<string | null>(null);
+  const [bbRefresh, setBbRefresh] = useState(0);
 
   const fatigue = fatigueRaw === 'low' ? 8 : fatigueRaw === 'high' ? 9 : fatigueNum;
 
@@ -361,7 +368,7 @@ export const TaperPlannerTab: React.FC = () => {
       };
     } catch { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind, showDate]);
+  }, [kind, showDate, bbRefresh]);
 
   // P3: адаптив из дневника (sRPE + ACWR) — PL предлагает недели, BB зеркалит recommendBBTaperConfig
   const adaptive = useMemo(() => {
@@ -835,6 +842,51 @@ export const TaperPlannerTab: React.FC = () => {
             </div>
           </div>
         </div>
+        {bb?.isPreview && (
+          <div style={CARD}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 4 }}>🏗 Собрать BB-план прямо здесь</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>Превью выше — безопасный stable-просмотр. Соберёте — план сохранится в профиль через единый контур (как из ББ-авто) и таблица станет живой.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <PopupNumber label="Подготовка, нед" value={prepWeeksBB} min={1} max={52} onChange={v => setPrepWeeksBB(Math.round(v) || 12)} />
+              <PopupNumber label="Тапер, нед" value={taperWeeksBB} min={1} max={4} onChange={v => setTaperWeeksBB(Math.min(4, Math.max(1, Math.round(v) || 2)))} />
+              <PopupSelect label="Загрузка" value={carbStratBB} options={[{ id: 'front', label: 'Front (ранняя)' }, { id: 'moderate', label: 'Moderate' }, { id: 'back', label: 'Back (поздняя)' }]} onChange={v => setCarbStratBB(v as any)} />
+            </div>
+            <button
+              onClick={() => {
+                try {
+                  const s: any = (() => { try { return (getProfile().settings as any) || {}; } catch { return {}; } })();
+                  const bbSex: 'male' | 'female' = s?.personal?.sex === 'female' ? 'female' : 'male';
+                  const bbCategory = String(s?.goals?.bbCategory || (bbSex === 'female' ? 'bikini' : 'mens_physique'));
+                  const bbWeight = Number(s?.personal?.weight) > 0 ? Number(s.personal.weight) : 80;
+                  const cfg: BBContestPrepConfig = {
+                    sex: bbSex,
+                    category: normalizeContestCategory(bbCategory, bbSex),
+                    weightKg: bbWeight,
+                    experienceLevel: 'intermediate',
+                    enhanced: false,
+                    prepCount: 0,
+                    showDate,
+                    weeksOut: taperWeeksBB,
+                    trainingProtocol: 'bb',
+                    carbLoadStrategy: carbStratBB,
+                    waterStrategy: 'stable',
+                    sodiumStrategy: 'stable',
+                  };
+                  const built = saveContestPrepEverywhere(cfg, { prepWeeks: prepWeeksBB, taperWeeks: taperWeeksBB, source: 'planner' });
+                  if (built) {
+                    setBbBuildMsg(`✓ План сохранён: шоу ${built.showDate} · подготовка ${built.preparation.weeks} нед · тапер ${built.taper.weeks} нед`);
+                    setBbRefresh(n => n + 1);
+                  } else {
+                    setBbBuildMsg('⚠ Не собралось: проверьте дату шоу и вес в профиле');
+                  }
+                } catch { setBbBuildMsg('⚠ Не собралось: проверьте дату шоу и вес в профиле'); }
+                setTimeout(() => setBbBuildMsg(null), 4000);
+              }}
+              style={{ ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }}
+            >🏗 Собрать и сохранить BB-план</button>
+            {bbBuildMsg && <div style={{ marginTop: 6, fontSize: 10, color: bbBuildMsg.startsWith('✓') ? ACCENT : '#f59e0b', lineHeight: 1.4 }}>{bbBuildMsg}</div>}
+          </div>
+        )}
         {bb && (
           <div style={CARD}>
             <div style={H}>⬇ Неделя пика (шоу){bb.isPreview ? <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 400 }}> · превью (нет сохранённого плана)</span> : <span style={{ fontSize: 10, color: ACCENT, fontWeight: 400 }}> · из сохранённого плана</span>}{bb.dose != null ? <span style={{ fontSize: 10, color: ACCENT, fontWeight: 400 }}> · 🧪 доза trial {bb.dose} г/кг</span> : null}</div>

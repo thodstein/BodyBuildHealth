@@ -192,6 +192,27 @@ describe('Добивка «всё полностью»: мост + хаб + ра
   });
 });
 
+describe('BB мини-сборщик: превью → настоящий план', () => {
+  beforeEach(() => { localStorage.clear(); seedProfile(80); });
+  afterEach(() => { cleanup(); localStorage.clear(); });
+
+  it('в превью виден сборщик; «Собрать» сохраняет план и таблица становится живой', () => {
+    render(<TaperPlannerTab />);
+    fireEvent.click(screen.getByText(/BB: Шоу-пик/));
+    expect(screen.getByText(/Собрать BB-план прямо здесь/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить BB-план/ }));
+    expect(screen.getByText(/из сохранённого плана/)).toBeTruthy();
+    expect(screen.queryByText(/Собрать BB-план прямо здесь/)).toBeNull();
+  });
+
+  it('после сборки мост несёт реальный объём, а не фикс', () => {
+    render(<TaperPlannerTab />);
+    fireEvent.click(screen.getByText(/BB: Шоу-пик/));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить BB-план/ }));
+    expect(screen.getByText(/Применить шоу-пик к планировщику/)).toBeTruthy();
+  });
+});
+
 describe('P6 residual-хинты', () => {
   it('3 записи (сила/гипертрофия/выносливость) + рендер', () => {
     expect(TAPER_RESIDUAL_HINTS.length).toBe(3);
