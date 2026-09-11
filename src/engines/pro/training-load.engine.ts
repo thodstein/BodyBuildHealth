@@ -10,7 +10,23 @@ export interface DayLoad { date: string; load: number; }        // нагруз�
 export interface WeeklyLoad { weekStart: string; load: number; days: number; }
 
 export type ACWRZone = 'undertrained' | 'optimal' | 'caution' | 'dangerous';
-export interface ACWRResult { acute: number; chronic: number; ratio: number; zone: ACWRZone; acuteDays: number; chronicDays: number; }
+export interface ACWRResult { acute: number; chronic: number; ratio: number; zone: ACWRZone; acuteDays: number; chronicDays: number; method: ACWRMethod; lowBase: boolean; }
+
+/** Метод расчёта ACWR: coupled_ra — классика Gabbett (острая неделя входит в хроническую, дефолт для совместимости);
+ *  ewma_uncoupled — Вильямс 2017: экспоненциально взвешенное среднее + хроническая без острой недели. */
+export type ACWRMethod = 'coupled_ra' | 'ewma_uncoupled';
+export interface ACWROptions { method?: ACWRMethod; chronicFloor?: number; }
+/** Пол хронической среднедневной нагрузки (AU/день): ниже — база тонкая, ratio завышен (флаг lowBase). */
+export const ACWR_CHRONIC_FLOOR_DEFAULT = 100;
+/** Честный дисклеймер: ACWR — эвристика мониторинга, а не предсказание травмы. */
+export const ACWR_DISCLAIMER = 'ACWR — эвристика мониторинга нагрузки, а не предсказание травмы (Impellizzeri 2020; мета-анализ BMC Sports Sci Med Rehab 2025, c≈0.57). Решение — по совокупности сигналов: сон/HRV/RPE/другая симптоматика.';
+/** Канон зон/цветов/подписей — единый источник для хаба и дашборда (без дублей порогов в UI). */
+export const ACWR_ZONE_META: Record<ACWRZone, { label: string; color: string }> = {
+  undertrained: { label: 'Недотрен', color: '#3b82f6' },
+  optimal: { label: 'Оптимум', color: '#22c55e' },
+  caution: { label: 'Осторожно', color: '#eab308' },
+  dangerous: { label: 'Опасно', color: '#ef4444' },
+};
 export interface MonotonyResult { meanDailyLoad: number; stdev: number; monotony: number; weeklyLoad: number; strain: number; }
 export interface BanisterPoint { date: string; fitness: number; fatigue: number; performance: number; }
 export interface FitnessFatigueResult { series: BanisterPoint[]; current: BanisterPoint | null; peakPerformanceIdx: number; }
@@ -49,10 +65,14 @@ export function ewma(values: number[], alpha: number): number {
   return e;
 }
 
-/** ACWR: острая (7д) / хроническая (28д) нагрузка. Использует EWMA (Rollinson/Gabbett).
- *  referenceDate — конец окна (по умолчанию последний день из dailyLoads). */
-export function acuteChronicRatio(dailyLoads: DayLoad[], referenceDate?: string, acuteDays = 7, chronicDays = 28): ACWRResult {
-  if (dailyLoads.length === 0) return { acute: 0, chronic: 0, ratio: 0, zone: 'undertrained', acuteDays, chronicDays };
+/** ACWR: острая (7д) / хроническая (28д) нагрузка.
+ *  referenceDate — конец окна (по умолчанию последний день из dailyLoads).
+ *  Без opts — байт-в-байт классика coupled RA (все 40+ потребителей не меняются).
+ *  С opts.method='ewma_uncoupled' — честный метод Вильямса 2017: EWMA (α=2/(N+1)) + хроническая без острой недели. */
+export function acuteChronicRatio(dailyLoads: DayLoad[], referenceDate?: string, acuteDays = 7, chronicDays = 28, opts: ACWROptions = {}): ACWRResult {
+  if (dailyLoads.length === 0) return { acute: 0, chronic: 0, ratio: 0, zone: 'undertrained', acuteDays, chronicDays, method: opts.method ?? 'coupled_ra', lowBase: false };
+  const method = opts.method ?? 'coupled_ra';
+  if (method === 'ewma_uncoupled') return acwrEwmaUncoupled(dailyLoads, referenceDate, acuteDays, chronicDays, opts.chronicFloor ?? ACWR_CHRONIC_FLOOR_DEFAULT);
   const sorted = [...dailyLoads].sort((a, b) => a.date < b.date ? -1 : 1);
   const ref = referenceDate || sorted[sorted.length - 1].date;
   // средняя дневная нагрузка за окно
@@ -69,7 +89,28 @@ export function acuteChronicRatio(dailyLoads: DayLoad[], referenceDate?: string,
   const chronic = avgOver(chronicDays);
   const ratio = chronic > 0 ? acute / chronic : (acute > 0 ? 2 : 0);
   const zone: ACWRZone = ratio < 0.8 ? 'undertrained' : ratio <= 1.3 ? 'optimal' : ratio <= 1.5 ? 'caution' : 'dangerous';
-  return { acute, chronic, ratio: Math.round(ratio * 100) / 100, zone, acuteDays, chronicDays };
+  return { acute, chronic, ratio: Math.round(ratio * 100) / 100, zone, acuteDays, chronicDays, method, lowBase: false };
+}
+
+/** Честный ACWR: EWMA acute (окно acuteDays) + EWMA chronic по дням ВНЕ острого окна (uncoupled).
+ *  Тонкая база (chronic < chronicFloor) → lowBase:true, зона не выше caution (не пугаем детренов красным). */
+function acwrEwmaUncoupled(dailyLoads: DayLoad[], referenceDate: string | undefined, acuteDays: number, chronicDays: number, chronicFloor: number): ACWRResult {
+  const sorted = [...dailyLoads].sort((a, b) => a.date < b.date ? -1 : 1);
+  const ref = referenceDate || sorted[sorted.length - 1].date;
+  const byDate: Record<string, number> = {};
+  for (const d of sorted) byDate[d.date] = (byDate[d.date] || 0) + d.load;
+  // полный ряд с нулями за хроническое окно
+  const series: number[] = [];
+  for (let i = chronicDays - 1; i >= 0; i--) series.push(byDate[addDays(ref, -i)] || 0);
+  const ewmaOf = (vals: number[], n: number) => ewma(vals, 2 / (n + 1));
+  const acute = ewmaOf(series.slice(chronicDays - acuteDays), acuteDays);
+  const chronicSeries = series.slice(0, chronicDays - acuteDays);
+  const chronic = chronicSeries.length > 0 ? ewmaOf(chronicSeries, chronicDays - acuteDays) : 0;
+  const lowBase = chronic < chronicFloor;
+  const ratio = chronic > 0 ? acute / chronic : (acute > 0 ? 2 : 0);
+  let zone: ACWRZone = ratio < 0.8 ? 'undertrained' : ratio <= 1.3 ? 'optimal' : ratio <= 1.5 ? 'caution' : 'dangerous';
+  if (lowBase && zone === 'dangerous') zone = 'caution'; // тонкая база раздувает ratio — красную зону не ставим
+  return { acute: Math.round(acute * 100) / 100, chronic: Math.round(chronic * 100) / 100, ratio: Math.round(ratio * 100) / 100, zone, acuteDays, chronicDays, method: 'ewma_uncoupled', lowBase };
 }
 
 /** Гибридная нагрузка: sRPE×duration + VBL (velocity×load×reps) для штанги */
@@ -157,6 +198,7 @@ export interface LoadReport {
   monotony: MonotonyResult;
   banister: FitnessFatigueResult;
   recommendations: string[];
+  disclaimer: string;
 }
 
 /** Сводный отчёт по нагрузке + рекомендации. */
@@ -174,5 +216,5 @@ export function trainingLoadReport(sessions: TrainingSession[], referenceDate?: 
     if (banister.current.performance < 0) recommendations.push(`Fitness-Fatigue performance отрицательный (${banister.current.performance}) —疲劳 накапливается, плановый deload.`);
     else recommendations.push(`Fitness-Fatigue performance ${banister.current.performance} (fitness ${banister.current.fitness} − fatigue ${banister.current.fatigue}).`);
   }
-  return { dailyLoads, acwr, monotony, banister, recommendations };
+  return { dailyLoads, acwr, monotony, banister, recommendations, disclaimer: ACWR_DISCLAIMER };
 }

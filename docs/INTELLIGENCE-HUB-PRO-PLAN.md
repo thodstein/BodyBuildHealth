@@ -1,0 +1,149 @@
+# Интеллект — единый пульт: аудит + PRO-план доработки
+
+> Объект: `src/ui/screens/TrainingScreen_parts/UnifiedIntelligenceHub.tsx` (787 строк, 5 секций:
+> Нагрузка → Восстановление → Авторегуляция → Прогноз → Рекомендации) + `TrainingIntelligenceDashboard.tsx`
+> (сетка 15 табов / 12 карточек). Движки: `pro/training-load.engine.ts`, `recovery-optimization.engine.ts`,
+> `autoregulation.engine.ts` (PRI), `pro/autoregulation-pro.engine.ts`, `predictive.engine.ts`,
+> `rir-calibration.engine.ts`, `pro/srpe-store.ts`, `readiness-history.ts`.
+> Принцип хаба — один снапшот `he_unified_intel_snapshot_v1` + одна кнопка «Применить» (канал `pri`) — сохранить.
+
+## §1. Аудит (что проверено по коду)
+
+### A1. Нагрузка — sRPE/ACWR/monotony/Banister (в целом канон, 2 научные дыры)
+- sRPE `sessionLoad = RPE × мин` (`training-load.engine.ts:19`) — Foster 2001, корректно; агрегация по дням с нулевыми днями (`toDailyLoads`, `avgOver` делит на длину окна) — правильно.
+- **Дыра 1 — ACWR не EWMA:** комментарий обещает «EWMA (Rollinson/Gabbett)» (`:52`), код — обычное coupled rolling-average
+  (`avgOver(7)/avgOver(28)`, острая неделя входит в хроническую). Coupled завышает связь + low-chronic раздувает ratio.
+  Зоны `<0.8 / ≤1.3 / ≤1.5 / dangerous` (`:71`) совпадают с Gabbett/BounceLab/ScienceForSport — ок, но дашборд дублирует
+  пороги инлайном (`TrainingIntelligenceDashboard.tsx:43-44`) — риск рассинхрона.
+- **Дыра 2 — Banister не калиброван:** `tau1=42/tau2=7/k1=1/k2=2` (`:124-127`) — классика Banister 1980, но performance
+  в сырых AU (тысячи) стоит рядом с readiness 0–100 — шкалы несоизмеримы, абсолютные fitness/fatigue вводят в заблуждение.
+- Monotony/strain — формула Foster верна (`mean/SD`, strain=×load); флаг `>2` верен (Anderson). Ок.
+- `hybridLoad`/`trafficLight` в движке — мёртвые (хаб не использует).
+
+### A2. Восстановление — веса и HRV-норма выдуманы
+- `analyzeRecovery`: индекс `sleep×0.3 + hrv×0.3 + (1-fatigue)×0.3 + 10` (`recovery-optimization.engine.ts:161`) — веса
+  произвольные, без источника; `scoreSleep`/`scoreHRV` — ступенчатые пороги.
+- **HRV против науки:** `scoreHRV` режет абсолютный RMSSD `≥50/≥35` (`:104-106`), хаб считает `hrvRatio = rmssd/60`
+  (`UnifiedIntelligenceHub.tsx:156`) — фиксированная норма 60 мс. Норма RMSSD 20–100 мс индивидуальна (Plews/Buchheit;
+  обзор Sensors 2026): сравнивать только с собственным rolling-baseline (lnRMSSD + CV), иначе «низкий HRV» у половины атлетов.
+- Сон/бодрствование захардкожены `23:00/07:00` (`:163`), маппинг профиля `good:5/fair:3/poor:1` (`:130`) грубый.
+- `calcSupercompensation` (`24 + fatigue×48`, `:146`) — выдуманная формула; deload-гейт `week>=4 AND recovery<35`
+  (`:181`) — поздний; рекомендации содержат дозы (мелатонин/магний, `:196-199`) — фарма в тренировочном хабе без дисклеймера.
+
+### A3. Авторегуляция — PRI + pro-склейка двоятся, VBT-пороги плоские
+- `calculatePRI` веса `0.30/0.25/0.20/0.15/0.10` (`autoregulation.engine.ts:78`) + пороги `volumeMod 0.4–1.0`
+  (`:63-69`) — без источника; хаб показывает PRI-рекомендации И pro-`autoRegulate` рядом — пользователь не понимает,
+  что применится (к счастью `applyUnified` шлёт только `autoReg`, `:252-259` — хорошо, но UI это не объясняет).
+- `autoRegulate` — мультипликативный стек с клампами `vol 0.4–1.25 / top 0.85–1.05`, RIR разбит intensity/load с капом 4
+  (`autoregulation-pro.engine.ts:121-127`) — безопасно спроектировано. Замечания: ветка сна молчит при `sleepScore=0`
+  (`:102` — дефолт хаба 70, но движок допускает 0); `VLoss>40 → deload ×0.5` (`:117`) — экстремально и без цели
+  (Pareja-Blanco/Chiang 2025: оптимум VL ≤25% для силы, индивидуальные различия велики).
+- `RPE↔вес` — только Epley (`pctForRPE`, `:51-55`), хотя P1-консенсус 7 формул (`estimate1rm.engine`) уже есть в проекте —
+  хаб его обходит; нет предупреждения о неточности RIR у новичков (Zourdos/Helms).
+
+### A4. Прогноз — Хольт без клампа, история не пишется, what-if коэффициенты выдуманы
+- `holtLinear` (`predictive.engine.ts:5-30`): тренд неограничен → прогноз readiness может уйти за 0–100; ДИ постоянной
+  ширины (должен расти с горизонтом); `warnings` читают `out[2]` при любом `steps`.
+- **История мёртвая:** `appendReadinessToday` существует (`readiness-history.ts:14`), хаб его никогда не вызывает —
+  у новых пользователей `hist.length<3` навсегда, прогноз пуст.
+- `runWhatIf` (`:60-67`): калории `± → +3/−4`, сон `×5`, фарма `×12` — выдуманные коэффициенты; множитель ААС в
+  тренировочном what-if — без safety-гейта.
+
+### A5. Данные/UX/покрытие
+- Снапшот хранит 12 полей, не хранит `e1RM/rpe/reps/topPct/planRIR/what-if` — контекст теряется; автозаполнение один раз
+  при маунте, живой подписки на профиль/д lifespan нет (stale).
+- `srpe-store`: только append/clear, нет правки/удаления одной записи, нет импорта из `SessionPlayer`/дневника → двойной ввод.
+- Нативный `<input type=date>` без 16px (iOS-зум), sticky-навигация без `aria`, SVG-графики без табличного fallback.
+- **Ноль тестов:** ни одного `*.test.*` на хаб/движки пульса (поиск по `UnifiedIntelligence|intelligence-hub` в тестах — пусто).
+- Экспорта нет (HTML/CSV/ICS) — в отличие от ББ/ТА/СМ-хабов; `bbRecs`-секция читает 6 ключей localStorage напрямую
+  (`:200-234`) — хрупко, сломается при смене ключей.
+
+## §2. Интернет-синтез (на чём стоим)
+
+- **sRPE (Foster et al. 2001; Haddad et al. 2017, Front Neurosci):** `load = RPE × мин`, валиден против HR-TRIMP
+  (r≈0.75–0.90), monotony=`mean/SD`, strain=`load×monotony`. Статус: золотой стандарт полевого мониторинга. Наш движок — паритет.
+- **ACWR (Gabbett 2016; Williams et al. 2017 EWMA; Impellizzeri et al. 2020 IJSPP; Menaspà et al. 2020 Sports Med;
+  BMC Sports Sci Med Rehab 2025, мета 22 когорты):** sweet-spot **0.8–1.3**, EWMA чувствительнее на высоких нагрузках;
+  критика: ACWR — рескейлинг острой нагрузки, c-statistic ≈0.57, coupled-смещение, low-chronic артефакт.
+  Вывод для плана: оставить как **мониторинговую эвристику с дисклеймером**, перейти на **uncoupled + EWMA + пол хронической**.
+- **Banister (1980) TRIMP / fitness-fatigue:** `performance = k1·fitness − k2·fatigue`, τ≈42/7. Вывод: показывать только
+  тренд формы, прятать сырые AU, калибровать k по истории (или фиксировать дисплей в z-оценках).
+- **HRV (Plews et al. 2013; Buchheit 2014; Sensors 2026 narrative review; Elite HRV нормы):** метрика — **RMSSD/lnRMSSD**,
+  протокол 1 мин стабилизация + 1 мин запись утром сидя, ≥5 дн/нед, интерпретация — **7-дневное среднее + CV против
+  собственного baseline + SWC**, популяционные пороги запрещены (20–100 мс — всё норма).
+- **Wellness (Hooper & Mackinnon 1995):** 5-пунктный опросник (сон/стресс/усталость/DOMS/настроение) — валидный ранний
+  детектор перетрена (r≈0.6–0.8 с объективными маркерами). У нас его фрагменты разбросаны по снапшоту — собрать в один блок.
+- **RIR/RPE (Zourdos et al. 2016; Helms et al. 2016–2018; Graham & Cleather 2021):** RIR = 10 − RPE; новички систематически
+  ошибаются (8.96 vs 9.80 на 1RM), связь RIR-скорость слабее. Вывод: предупреждение + калибровка (уже есть движок — wire).
+- **Velocity-loss (Pareja-Blanco et al. 2017; Chiang et al. 2025 IJSSC):** пороги 10/20/30/40% дают разный RPE и объём,
+  ≤25% — сила, >25% — гипертрофия/стресс; межиндивидуальная вариативность велика. Вывод: VL-зоны по цели, не один порог 40.
+- **Прогноз (Holt 1957):** линейный тренд с затуханием; для ограниченных шкал — демпфированный/клампованный вариант.
+  Вывод: кламп 0–100 + расширяющийся ДИ + минимум 7 точек.
+
+## §3. PRO-план (эпики P1–P7, только Edit/Write + vitest/tsc, чужие WIP не трогать)
+
+### P1. Честный ACWR (ядро доверия)
+- `training-load.engine:acuteChronicRatio` += `method:'ewma_uncoupled'` по умолчанию (Williams γ=2/(N+1), острая неделя
+  исключена из хронической); фолбэк `coupled_ra` для совместимости; пол хронической (если chronic < порога → `ratio` с
+  пометкой `lowBase:true`, без красной зоны); ДИСКЛЕЙМЕР в `trainingLoadReport` и в хабе: «эвристика мониторинга, не
+  предсказание травмы (Impellizzeri 2020, c≈0.57)».
+- Хаб: бейдж метода + тултип coupled/EWMA; дашборд-инлайн пороги заменить импортом `ZONE_META`-канона (убрать дубль).
+- Тесты NEW `intelligence-acwr-pro`: coupled vs uncoupled на синтетике, low-base флаг, EWMA чувствительнее RA на пике,
+  дисклеймер в отчёте. Соседи: training-load-наборы зелёные.
+
+### P2. HRV по науке (убрать ложные красные)
+- NEW `pro/hrv-baseline.engine.ts`: `he_hrv_baseline_v1` (7-дн среднее lnRMSSD + SD + CV + SWC=0.5×SD); `hrvReadiness`
+  (внутри SWC — норма; −1 SWC — лёгкая; −1.5 SWC/CV-всплеск — красная) — вместо абсолютных 50/35.
+- `recovery-optimization:scoreHRV` — тонкая обёртка над baseline (сигнатура сохранена); `hrvRatio` в хабе = `rmssd/baseline`,
+  не `/60`; минимум 3 замера/нед, иначе «недостаточно базы».
+- Хаб: блок «HRV-база» (среднее/CV/SWC/протокол замера 1+1 мин); `analyzeRecovery` без доз (дозы → ссылка на поддержку).
+- Тесты NEW `intelligence-hrv`: baseline/CV/SWC, абсолютный 45 мс при личной базе 40 = норма, при базе 70 = красная.
+
+### P3. Прогноз живой (история + кламп)
+- Хаб пишет `appendReadinessToday(recovery, fatigue)` при каждом пересчёте снапшота (дебаунс уже есть) → прогноз
+  появляется через 3 дня, стабилен через 7; `generateReadinessForecast` += кламп 0–100 + ДИ, растущий с горизонтом +
+  минимум 7 точек для «уверенного» прогноза (3–6 — «ранний», с бейджем).
+- `runWhatIf` — коэффициенты подписать как ориентиры (`±` + «оценка, не физиология»); ААС-слайдер за safety-гейт
+  (предупреждение + ссылка, без рекомендаций доз).
+- Тесты NEW `intelligence-forecast`: кламп, рост ДИ, запись истории из хаба (мок localStorage), what-if пометки.
+
+### P4. Авторегуляция без двойного счёта
+- PRI остаётся **контекстом** (объяснение), `autoRegulate` — **единственным исполнителем** (уже так, закрепить UI-подписью
+  «применится: autoReg; PRI — объяснение»); `RPE↔вес` перевести на `estimate1RMConsensus` (P1-канон) с фолбэком Epley;
+  VL-зоны по цели (`strength ≤20 / hypertrophy ≤25 / deload-гейт ≥40`) вместо плоского 40; предупреждение новичкам
+  о точности RIR (Zourdos) + ссылка на калибровку.
+- Тесты: добивка `autoregulation-pro` (VL-зоны по цели, консенсус-e1RM паритет ±2%, PRI-текст не влияет на цифры).
+
+### P5. Данные: импорт, правки, снапшот, экспорт
+- `srpe-store` += `updateSession/deleteSession` + `importFromDiary` (SessionPlayer/дневник → без двойного ввода);
+  хаб: правка/удаление строки журнала, «📥 Из дневника».
+- Снапшот v2 (миграция с v1): + `e1RM/rpe/reps/topPct/planRIR/what-if/HRV-база`; живая подписка на профиль
+  (паттерн `IndividualPlanContext`: слушатель `he-annual-training-plan-updated`-стиля, без затирания ручного ввода).
+- Экспорт NEW `intelligence-export.engine`: HTML-сводка (XSS-esc) + CSV журнала sRPE + ICS deload-недели; кнопки в
+  итоговой карточке (паритет с ББ/ТА-хабами).
+- Тесты NEW `intelligence-hub-ui` (RTL): снапшот roundtrip, правка/удаление sRPE, импорт, экспорт содержит ACWR/PRI.
+
+### P6. Banister-тренд + recovery-гигиена
+- Banister: показывать **форму (performance) как z-тренд**, сырые fitness/fatigue убрать из UI (оставить в тултипе);
+  `calcSupercompensation` подписать «ориентир» или заменить окном из Banister-пика; deload-гейт добавить ранний
+  (overtrainingRisk≥60 ИЛИ 2 недели monotony>2 → «запланируйте deload», не ждать recovery<35).
+- Сон: реальные bedtime/wake из сна-дневника при наличии (фолбэк 23:00/07:00 с пометкой); wellness-блок Hooper-5
+  одним рядом (сон/стресс/усталость/DOMS/настроение) вместо разрозненных попапов.
+- Тесты: добивка recovery-набора (ранний deload, сон из дневника, без доз в рекомендациях).
+
+### P7. Навигация/доступность (без логики)
+- Дашборд: добавить недостающие карточки (`bb_foundation`, `load_safety`-алиас пометить), ACWR-бейдж через `useMemo`
+  (сейчас считается в рендере); хаб: `aria` sticky-навигации, 16px инпутам, табличный fallback графиков, `role=status`
+  журналу; белый текст уже ок (`DIM=#fff`) — не трогать семафорные цвета зон.
+- Тесты: `rest-hooks-native` добивка (карточки присутствуют, бейджи без NaN при пустом sRPE).
+
+## §4. Не делаем (осознанно)
+- Индивидуальная калибровка Banister k1/k2/τ по истории — данныхbaa нет (нужен ML-этап, только z-тренд).
+- Диагнозы перетрена/травмопрогноз по ACWR — запрещено литературой (только эвристика + дисклеймер).
+- VBT-устройства/живой трекинг штанги — уровень StrengthAnalysisHub, не пульса.
+- Per-muscle ACWR — зона ББ-хаба (`bb-progression-feedback`), сюда только общий.
+
+## §5. Проверка приёмки
+- NEW `intelligence-acwr-pro` + `intelligence-hrv` + `intelligence-forecast` + `intelligence-hub-ui` зелёные;
+  соседи training-load/recovery/autoreg/predictive/rir без регрессий; `tsc --noEmit` 0 по своим файлам;
+  `verify:apk-design` OK. Коммит pathspec своих файлов, без пуша.

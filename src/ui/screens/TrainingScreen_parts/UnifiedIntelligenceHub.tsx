@@ -15,7 +15,7 @@
  */
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { loadSRPESessions, saveSRPESession, clearSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
-import { toDailyLoads, acuteChronicRatio, weeklyMonotony, fitnessFatigue, trainingLoadReport, sessionLoad, type DayLoad } from '../../../engines/pro/training-load.engine';
+import { toDailyLoads, acuteChronicRatio, weeklyMonotony, fitnessFatigue, trainingLoadReport, sessionLoad, ACWR_DISCLAIMER, type DayLoad } from '../../../engines/pro/training-load.engine';
 import { analyzeRecovery, shouldTrain } from '../../../engines/recovery-optimization.engine';
 import { calculatePRI, getPRIThreshold } from '../../../engines/autoregulation.engine';
 import { autoRegulate, loadForRPE, rpeFromLoad, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
@@ -149,7 +149,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
 
   // ——— вычисляем всё один раз ———
   const dailyLoads: DayLoad[] = useMemo(()=> toDailyLoads(sessions), [sessions]);
-  const acwr = useMemo(()=> acuteChronicRatio(dailyLoads), [dailyLoads]);
+  const acwr = useMemo(()=> acuteChronicRatio(dailyLoads, undefined, 7, 28, { method: 'ewma_uncoupled' }), [dailyLoads]);
   const monotony = useMemo(()=> weeklyMonotony(dailyLoads), [dailyLoads]);
   const banister = useMemo(()=> fitnessFatigue(dailyLoads), [dailyLoads]);
   const report = useMemo(()=> trainingLoadReport(sessions), [sessions]);
@@ -378,7 +378,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
             <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.14)', border:'1px solid rgba(59,130,246,0.22)', fontSize:14 }}>📊</span>
             <div>
               <div style={{ fontSize:13, fontWeight:900, color:'#3b82f6' }}>Нагрузка</div>
-              <div style={{ fontSize:10, color:DIM }}>Одна формула ACWR/monotony/Banister — факты из sRPE, без повторов в других секциях</div>
+              <div style={{ fontSize:10, color:DIM }}>Одна формула ACWR/monotony/Banister — факты из sRPE, без повторов в других секциях · метод EWMA uncoupled (Вильямс 2017)</div>
             </div>
             <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 8px', borderRadius:20, background:`${ZONE_META[acwr.zone].color}14`, border:`1px solid ${ZONE_META[acwr.zone].color}33`, color:ZONE_META[acwr.zone].color, fontWeight:800 }}>{ZONE_META[acwr.zone].label}</span>
           </div>
@@ -421,6 +421,8 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                 <div style={{ position:'absolute', top:-4, width:3, height:16, background:'#fff', borderRadius:2, left:`${Math.min(100, Math.max(0, (acwr.ratio/2)*100))}%`, boxShadow:'0 1px 6px rgba(0,0,0,0.4)' }} />
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'#fff', marginTop:2 }}><span>0.0</span><span>0.8</span><span>1.3</span><span>1.5</span><span>2.0</span></div>
+              {acwr.lowBase && <div style={{ marginTop:6, padding:'7px 10px', borderRadius:9, background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.18)', fontSize:10, color:'#fff', lineHeight:1.4 }}>📉 Тонкая база: хроническая нагрузка ниже пола — ratio завышен, красная зона отключена. Набирайте 3–4 недели базы.</div>}
+              <div style={{ marginTop:6, fontSize:9, color:'#fff', lineHeight:1.4, opacity:0.75 }}>ⓘ {ACWR_DISCLAIMER}</div>
 
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6, marginTop:10 }}>
                 <MetricCard title="Нагрузка 7д" accent="#3b82f6"><div style={{ fontSize:16, fontWeight:900, color:'#3b82f6' }}>{monotony.weeklyLoad}</div><div style={SMALL}>AU</div></MetricCard>

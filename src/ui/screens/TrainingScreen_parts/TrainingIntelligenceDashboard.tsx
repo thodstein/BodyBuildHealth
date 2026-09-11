@@ -6,7 +6,7 @@ import type { ManualResult } from './program-types';
 import type { WorkoutLog } from '../../../core/types';
 import type { TrainingTab } from './shared';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
-import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
+import { acuteChronicRatio, toDailyLoads, ACWR_ZONE_META } from '../../../engines/pro/training-load.engine';
 
 interface Props {
   manualResult: ManualResult | null;
@@ -39,9 +39,9 @@ export default function TrainingIntelligenceDashboard(p: Props) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const toggle = (label: string) => setCollapsed(prev => ({ ...prev, [label]: !prev[label] }));
   const srpe = loadSRPESessions();
-  const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
-  const acwrLabel = acwr ? (acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум') : '—';
-  const acwrColor = acwr ? (acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e') : '#888';
+  const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe), undefined, 7, 28, { method: 'ewma_uncoupled' }) : null;
+  const acwrLabel = acwr ? ACWR_ZONE_META[acwr.zone].label.toLowerCase() : '—';
+  const acwrColor = acwr ? ACWR_ZONE_META[acwr.zone].color : '#888';
 
   const categories: Category[] = [
     {
