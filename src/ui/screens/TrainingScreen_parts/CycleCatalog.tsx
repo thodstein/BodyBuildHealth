@@ -295,6 +295,8 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   // ♀ Женские (тег female, Ф5 CYCLE-SYSTEM-FULL-AUDIT) — чип рядом с периодом
   const [femaleOnly, setFemaleOnly] = React.useState(false);
   const [showRec, setShowRec] = React.useState(false);
+  // ── Фильтры сворачиваются: за длинной панелью должны быть видны сами циклы ──
+  const [showFilters, setShowFilters] = React.useState(false);
   // ⭐ Избранные циклы (he_cycle_fav)
   const [favs, setFavs] = React.useState<string[]>(readCycleFavs);
   const [favOnly, setFavOnly] = React.useState(false);
@@ -609,8 +611,25 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 12, fontSize: 12, color: '#fff', background: 'rgba(118,118,128,0.12)', border: '0.5px solid rgba(255,255,255,0.1)', outline: 'none' }}
       />
 
-      {/* ── Подфильтры ── */}
-      <div className="lib-filters" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* ── Подфильтры (сворачиваются — циклы должны быть видны сразу) ── */}
+      {(() => {
+        const activeFilters = (focus !== 'all' ? 1 : 0) + (levelF !== 'all' ? 1 : 0) + (period !== 'all' ? 1 : 0)
+          + (weeks !== 'all' ? 1 : 0) + (freq !== 'all' ? 1 : 0) + (author !== 'all' ? 1 : 0)
+          + (femaleOnly ? 1 : 0) + (favOnly ? 1 : 0);
+        return (
+          <button
+            className="lib-filter-toggle"
+            aria-expanded={showFilters}
+            aria-label={showFilters ? 'Скрыть фильтры' : 'Показать фильтры'}
+            onClick={() => setShowFilters(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', padding: '10px 12px', borderRadius: 12, fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 44, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}
+          >
+            <span>{showFilters ? '▾' : '▸'} 🎛 Фильтры{activeFilters > 0 ? ` · ${activeFilters} акт.` : ''}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>{visibleCount} циклов</span>
+          </button>
+        );
+      })()}
+      <div className="lib-filters" style={{ display: showFilters ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>{focusLabel}</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -1080,6 +1099,8 @@ export const CycleCatalog: React.FC<Props> = (p) => {
           })}
         </div>
       ))}
+      {/* Запас прокрутки: последнюю карточку не должна съедать нижняя навигация */}
+      <div className="lib-bottom-space" aria-hidden="true" style={{ height: 72, flexShrink: 0 }} />
     </div>
   );
 };

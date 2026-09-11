@@ -75,6 +75,8 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     { id: 'advanced', label: 'Продвинутый' },
   ];
   const [methodCat, setMethodCat] = React.useState('all');
+  // ── Категории сворачиваются: за сеткой должны быть видны сами методики ──
+  const [showCats, setShowCats] = React.useState(false);
   const [analysisLoaded, setAnalysisLoaded] = React.useState(false);
   const [volLevel, setVolLevel] = React.useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
   const [expandedSplit, setExpandedSplit] = React.useState<number | null>(null);
@@ -417,7 +419,17 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
 
     {/* ── Method Reference Library (always visible) — карточная сетка как в Encyclopedia ── */}
     <h4 style={{ margin: '12px 0 8px', fontSize: 12, color: 'var(--accent)' }}>📚 Библиотека методик</h4>
-    <div className="lib-cats" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(132px, 1fr))', gap:8, marginBottom:10 }}>
+    <button
+      className="lib-filter-toggle"
+      aria-expanded={showCats}
+      aria-label={showCats ? 'Скрыть категории' : 'Показать категории'}
+      onClick={() => setShowCats(v => !v)}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', padding: '10px 12px', borderRadius: 12, fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 44, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff', marginBottom: 8 }}
+    >
+      <span>{showCats ? '▾' : '▸'} 🗂 Категории{methodCat !== 'all' ? ` · ${CAT_LABELS[methodCat] || methodCat}` : ''}</span>
+      <span style={{ fontSize: 11, fontWeight: 600, color: '#00e68a' }}>{filtered.length} метод.</span>
+    </button>
+    <div className="lib-cats" style={{ display: showCats ? 'grid' : 'none', gridTemplateColumns:'repeat(auto-fill, minmax(132px, 1fr))', gap:8, marginBottom:10 }}>
       {[{id:'all',label:'Все',icon:'📚',hint:'все методики',cnt:methods.length}, ...CAT.map(c=> ({...c, cnt: methods.filter(m=>m.category===c.id).length}))].map(c=>{
         const on = methodCat===c.id;
         return (
@@ -501,5 +513,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
         </div>
       </div>
     )}
+    {/* Запас прокрутки: конец не должен уходить под нижнюю навигацию */}
+    <div className="lib-bottom-space" aria-hidden="true" style={{ height: 72, flexShrink: 0 }} />
   </div>);
 };

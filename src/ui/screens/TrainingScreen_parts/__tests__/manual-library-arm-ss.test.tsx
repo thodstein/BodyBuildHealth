@@ -142,6 +142,8 @@ describe('Ручная библиотека: маппинг фильтров (в
       />,
     );
     fireEvent.click(screen.getByRole('tab', { name: /ПЛ \(/ }));
+    // Фильтры сворачиваются кнопкой — раскрываем перед работой с селектами
+    fireEvent.click(screen.getByRole('button', { name: /Показать фильтры/ }));
     const selects = screen.getAllByRole('combobox');
     fireEvent.change(selects[0], { target: { value: 'beginner' } });
     // 12 novice-циклов: 9 базовых + женский стартовый (P2-13) + 2 второй волны (Ф4)

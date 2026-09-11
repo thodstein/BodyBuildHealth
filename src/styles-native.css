@@ -8346,6 +8346,66 @@ html.app-native .lib-manlib .lib-preview button:focus-visible {
   }
 }
 
+/* ── 84b. LIBRARY STICKY-FIX + COLLAPSIBLE FILTERS ──
+ * Жалоба: фильтры/шапки закрывают циклы и методики, низа не видно.
+ * Корень: hero + seg + filters все были sticky top:0 — три слоя друг на друге.
+ * Фикс: липким остаётся ТОЛЬКО сегмент-контрол; hero и фильтры уезжают со скроллом.
+ * Кнопка .lib-filter-toggle — 44px, press/focus как у остальных чипов.
+ * Внизу: увеличенный запас над пилюлей + scroll-margin якорям, чтобы шапки
+ * ничего не перекрывали. Только APK: TG/web — байт-в-байт как было. */
+html.app-native .train-library .lib-hero {
+  position: static !important;
+}
+html.app-native .train-library .lib-seg {
+  top: 0 !important;
+  z-index: 15 !important;
+}
+html.app-native .train-library .lib-filters {
+  position: static !important;
+  box-shadow: none !important;
+}
+html.app-native .train-library .lib-filter-toggle {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .train-library .lib-filter-toggle:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .train-library .lib-filter-toggle:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.7) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .train-library .lib-group > div:first-child {
+  top: 68px !important;
+}
+html.app-native .train-library {
+  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 72px) !important;
+}
+html.app-native .train-library .lib-bottom-space {
+  height: 72px !important;
+  flex-shrink: 0 !important;
+}
+html.app-native .train-library .lib-exlab .lib-list,
+html.app-native .train-library .lib-manlib .lib-grid,
+html.app-native .lib-manlib .lib-grid {
+  padding-bottom: 72px !important;
+  scroll-padding-bottom: 96px !important;
+}
+html.app-native .train-library .lib-card,
+html.app-native .train-library .lib-group,
+html.app-native .train-library .lib-method,
+html.app-native .train-library .lib-excard {
+  scroll-margin-top: 76px !important;
+  scroll-margin-bottom: 96px !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .train-library .lib-filter-toggle:active {
+    transform: none !important;
+  }
+}
+
 /* 83. NATIVE PROFILE PRO-FULL — топ-подача блока Профиль.
  * Только APK (html.app-native). TG/web — байт-в-байт.
  * Покрывает: hero, шапку вкладок, поднавигацию разделов, quick-jump,

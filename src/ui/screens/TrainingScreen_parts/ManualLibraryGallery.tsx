@@ -115,6 +115,8 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
   const [days, setDays] = useState('all');
   const [favOnly, setFavOnly] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // ── Фильтры сворачиваются: за панелью должны быть видны сами шаблоны ──
+  const [showFilters, setShowFilters] = useState(false);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [bridgeMsg, setBridgeMsg] = useState('');
 
@@ -298,8 +300,23 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
         ))}
       </div>
 
-      {/* Фильтры */}
-      <div className="lib-filters" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Фильтры (сворачиваются — шаблоны должны быть видны сразу) */}
+      {(() => {
+        const activeFilters = (search.trim() ? 1 : 0) + (level !== 'all' ? 1 : 0) + (goal !== 'all' ? 1 : 0) + (days !== 'all' ? 1 : 0) + (favOnly ? 1 : 0);
+        return (
+          <button
+            className="lib-filter-toggle"
+            aria-expanded={showFilters}
+            aria-label={showFilters ? 'Скрыть фильтры' : 'Показать фильтры'}
+            onClick={() => setShowFilters(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 44, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}
+          >
+            <span>{showFilters ? '▾' : '▸'} 🎛 Фильтры{activeFilters > 0 ? ` · ${activeFilters} акт.` : ''}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#00e68a' }}>{filteredBB.length + filteredPL.length + filteredArm.length + filteredSS.length + filteredCardio.length} показано</span>
+          </button>
+        );
+      })()}
+      <div className="lib-filters" style={{ ...CARD, padding: 10, display: showFilters ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <input
             className="lib-search"
@@ -586,6 +603,8 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
           {filteredCardio.length === 0 && <div style={{ gridColumn: '1/-1', padding: 16, textAlign: 'center', color: DIM, fontSize: 12 }}>Ничего не найдено — сбросьте фильтры</div>}
         </div>
       )}
+      {/* Запас прокрутки: последнюю карточку не должна съедать нижняя навигация */}
+      <div className="lib-bottom-space" aria-hidden="true" style={{ height: 72, flexShrink: 0 }} />
     </div>
   );
 };

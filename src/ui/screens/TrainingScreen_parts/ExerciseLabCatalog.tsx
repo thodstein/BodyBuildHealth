@@ -41,6 +41,8 @@ const ExerciseLabCatalog: React.FC<{
   const [difficulty, setDifficulty] = useState('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [visible, setVisible] = useState(40);
+  // ── Фильтры сворачиваются: за панелью должен быть виден сам список упражнений ──
+  const [showFilters, setShowFilters] = useState(false);
 
   const filtered = useMemo(() => {
     let list = EXERCISE_CATALOG;
@@ -99,8 +101,23 @@ const ExerciseLabCatalog: React.FC<{
         Кликните по упражнению для полной информации.
       </div>
 
-      {/* Фильтры */}
-      <div className="lib-filters" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '10px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 8 }}>
+      {/* Фильтры (сворачиваются — список должен быть виден сразу) */}
+      {(() => {
+        const activeFilters = (search.trim() ? 1 : 0) + (group !== 'all' ? 1 : 0) + (type !== 'all' ? 1 : 0) + (equipment !== 'all' ? 1 : 0) + (difficulty !== 'all' ? 1 : 0);
+        return (
+          <button
+            className="lib-filter-toggle"
+            aria-expanded={showFilters}
+            aria-label={showFilters ? 'Скрыть фильтры' : 'Показать фильтры'}
+            onClick={() => setShowFilters(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', padding: '10px 12px', borderRadius: 12, fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 44, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff', marginBottom: 8 }}
+          >
+            <span>{showFilters ? '▾' : '▸'} 🎛 Фильтры{activeFilters > 0 ? ` · ${activeFilters} акт.` : ''}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#00e68a' }}>{filtered.length} упр.</span>
+          </button>
+        );
+      })()}
+      <div className="lib-filters" style={{ display: showFilters ? 'block' : 'none', background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '10px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 8 }}>
         <input className="lib-search" type="text" value={search} onChange={e => { setSearch(e.target.value); setVisible(40); }}
           placeholder="🔍 Поиск по названию, мышце, технике..." style={{ width: '100%', padding: '10px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box', marginBottom: 8 }} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -347,6 +364,8 @@ const ExerciseLabCatalog: React.FC<{
           </button>
         )}
       </div>
+      {/* Запас прокрутки: конец списка не должен уходить под нижнюю навигацию */}
+      <div className="lib-bottom-space" aria-hidden="true" style={{ height: 72, flexShrink: 0 }} />
     </div>
   );
 };

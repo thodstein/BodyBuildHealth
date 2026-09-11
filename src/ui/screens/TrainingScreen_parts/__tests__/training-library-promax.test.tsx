@@ -25,7 +25,8 @@ describe('Библиотека PRO-MAX — хуки', () => {
     const { container } = render(<CycleCatalog {...PROPS} />);
     const seg = container.querySelector('.lib-seg') as HTMLElement;
     const btns = within(seg).getAllByRole('button');
-    expect(btns.length).toBe(5);
+    // 6 сегментов: Все/Силовые/Бодибилдинг/Арм/ТА·Стронг/Кардио (кардио-таб добавлен позже теста)
+    expect(btns.length).toBe(6);
     expect(btns[0].getAttribute('data-active')).toBe('true');
     expect(btns[0].getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(within(seg).getByText('Арм'));
@@ -56,7 +57,8 @@ describe('Библиотека PRO-MAX — хуки', () => {
     );
     const seg = container.querySelector('.lib-manlib .lib-seg') as HTMLElement;
     expect(seg).not.toBeNull();
-    const btns = within(seg).getAllByRole('button');
+    // Табы галереи несут role="tab" (a11y), а не role="button"
+    const btns = within(seg).getAllByRole('tab');
     expect(btns[0].getAttribute('data-active')).toBe('true');
     expect(btns[1].getAttribute('data-active')).toBe('false');
   });

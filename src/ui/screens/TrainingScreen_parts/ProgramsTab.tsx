@@ -43,6 +43,8 @@ export const ProgramsTab: React.FC<{
 }> = ({ selectedProgram: selectedId, setSelectedProgram: setSelectedId, onAddToMyTraining, onLoadToConstructor, goPlannerManual }) => {
   const [goalFilter, setGoalFilter] = React.useState('all');
   const [levelFilter, setLevelFilter] = React.useState('all');
+  // ── Фильтры сворачиваются: за чипами должны быть видны сами программы ──
+  const [showFilters, setShowFilters] = React.useState(false);
   const [detailWeek, setDetailWeek] = React.useState(1);
   const [expandedDay, setExpandedDay] = React.useState<number | null>(null);
   React.useEffect(() => { setDetailWeek(1); setExpandedDay(null); }, [selectedId]);
@@ -130,6 +132,22 @@ export const ProgramsTab: React.FC<{
   };
 
   return (<div className="train-programs lib-programs" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    {(() => {
+      const activeFilters = (goalFilter !== 'all' ? 1 : 0) + (levelFilter !== 'all' ? 1 : 0);
+      return (
+        <button
+          className="lib-filter-toggle"
+          aria-expanded={showFilters}
+          aria-label={showFilters ? 'Скрыть фильтры' : 'Показать фильтры'}
+          onClick={() => setShowFilters(v => !v)}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', padding: '10px 12px', borderRadius: 12, fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 44, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}
+        >
+          <span>{showFilters ? '▾' : '▸'} 🎛 Фильтры{activeFilters > 0 ? ` · ${activeFilters} акт.` : ''}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>{programs.length} прогр.</span>
+        </button>
+      );
+    })()}
+    <div style={{ display: showFilters ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
     <div className="train-programs-filters lib-filters lib-chips" style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
       {GOAL_FILTER_OPTIONS.map(g => (
         <button key={g.value} onClick={() => { setGoalFilter(g.value); setSelectedId(null); }}
@@ -152,6 +170,7 @@ export const ProgramsTab: React.FC<{
             fontWeight: levelFilter === l.v ? 600 : 400,
           }}>{l.l}</button>
       ))}
+    </div>
     </div>
 
     {!selected && (
@@ -419,5 +438,7 @@ export const ProgramsTab: React.FC<{
         </div>
       </div>
     )}
+    {/* Запас прокрутки: конец не должен уходить под нижнюю навигацию */}
+    <div className="lib-bottom-space" aria-hidden="true" style={{ height: 72, flexShrink: 0 }} />
   </div>);
 };
