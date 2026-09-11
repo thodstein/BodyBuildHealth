@@ -1,6 +1,6 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Арм PRO-3 + W5-добивка + W6-свод + АПК §28 (Sep 11 2026, закоммичено c3a2d781, без пуша)
+## Арм PRO-3 + W5-добивка + W6-свод + АПК §28 (Sep 11 2026, запушено: c3a2d781 PRO-3 + 6b223cef W6)
 
 План `docs/ARM-DIAGNOSTICS-HUB-PRO-3.md` (аудит хаба + интернет-синтез 2023–2026: WAF Rules 2025, Marotta EMG 2026, Bezkorovainyi 70,9% RFD, Ogawa перелом 2022, Boufadel biceps 2025, CoC IronMind, Čurović RFD-надежность 2026, Zwerus ROM 2017): W1 честность (VBT-2 замера + `vbtMeasureCount`, Force `filledCount/scoreReliable` ≥2, «нет данных» вместо mock-8, тосты топ-3) + W2 персист/нормы (red-flags `he_arm_diag_redflags` + экспорт/мост, полные сценарии P1+TIQ+матчап, WAF-классы М/Ж `arm-norms-table`) + W-AL отдельный `ArmliftingDiagnosticsHub` (%WR/weakest/многоборье/попытки, маунт-таб + карточка дашборда, приёмник `armDiscipline`) + W3 наука (humerus-чеклист 5 чеков, RFD-подписи, WAF-дриллы старта/лямок, best-of-5/7, Zwerus-эталоны) + W4 гигиена (side_pin-explainer, округления 1 знак, workMax-вес напрямую) + W5 (приёмник-тест 2/2, VBT-канон `@deprecated`, экспорт армлифтинга HTML/CSV/XSS, P7-пометка) + W6 сид армлифтинг-хаба из arm-хаба (односторонний, свой ввод приоритетнее) + АПК §28 (чипы 44px/кнопки 48px/press/focus/хуки lift/waf/humerus/380px/reduced-motion). Только Edit/Write + vitest/tsc; чужие WIP не тронуты (коммит pathspec своих, `git diff -U0` по общим файлам — все ханки свои, CSS чистый append).
 
