@@ -1568,13 +1568,25 @@ export const BbAutoConstructor: React.FC = () => {
         if (labDiag) {
           try { localStorage.setItem('he_bb_last_lab_diagnosis', JSON.stringify(labDiag)); } catch {}
         }
-        // Lab-добивка 7: labDelta персистим и показываем (мост был немым по Δ).
+        // Lab-добивка 7 + п.2: labDelta персистим, показываем и дописываем в rationale
+        // уже собранного плана (порядок «сборка→применение» иначе терял Δ; дедуп по строке).
         const labDelta = bbDiag.labDelta as { summary?: unknown } | null | undefined;
         if (labDelta && typeof labDelta === 'object') {
           try { localStorage.setItem('he_bb_last_lab_delta', JSON.stringify(labDelta)); } catch {}
           if (typeof labDelta.summary === 'string' && labDelta.summary) {
+            const deltaLine = `Δ лаб. коррекции: ${labDelta.summary}`;
             setBridgeMsg((prev: string) => prev ? `${prev} · Δ ${labDelta.summary}` : `🔗 Δ-коррекция из лаборатории: ${labDelta.summary}`);
             setTimeout(() => setBridgeMsg(''), 5000);
+            try {
+              setBuiltPlan((prev) => {
+                if (!prev || !Array.isArray((prev as { weeks?: unknown }).weeks)) return prev;
+                const rat = Array.isArray((prev as { rationale?: unknown }).rationale)
+                  ? (prev as { rationale: string[] }).rationale
+                  : [];
+                if (rat.some((r) => r === deltaLine)) return prev;
+                return { ...prev, rationale: [...rat, deltaLine] };
+              });
+            } catch { /* план тронется при следующей сборке (build-time ветка) */ }
           }
         }
         const labCorr = bbDiag.labCorrection;
