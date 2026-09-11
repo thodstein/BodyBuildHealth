@@ -375,7 +375,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                          <div style={{ marginBottom:3 }}>
                                            <div style={{ fontSize:8, color:'rgba(255,255,255,0.85)', marginBottom:1 }}>Органы-мишени:</div>
                                            <div style={{ display:'flex', gap:2, flexWrap:'wrap' }}>
-                                              {[...new SetsupArr(sub.organs)].map((o: any) => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{ORGAN_LABELS[o]?.replace(/^[^\s]+\s/,'') || o||''}</span>)}
+                                              {[...new Set(supArr(sub.organs))].map((o: any) => <span key={o||''} style={{ fontSize:8, padding:'2px 6px', borderRadius:4, background:'rgba(59,130,246,0.1)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.15)' }}>{ORGAN_LABELS[o]?.replace(/^[^\s]+\s/,'') || o||''}</span>)}
                                            </div>
                                          </div>
                                        )}
@@ -543,18 +543,18 @@ export const SupportCatalogTab: React.FC<{ s: Record<string, any> }> = ({ s }) =
                                 <div style={{ marginBottom: 4 }}>
                                   <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Механизмы действия:</div>
                                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                                    {(sub.mechanisms || []).map((m: any, i: any) => (
+                                    {supArr(sub.mechanisms).map((m: any, i: any) => (
                                       <span key={i} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.06)', color: '#00e68a' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || supStr(m).replace(/_/g, ' ')}</span>
                                     ))}
                                   </div>
                                 </div>
                               )}
                               {/* Organs */}
-                              {sub.organs && sub.organs.length > 0 && (
+                              {supArr(sub.organs).length > 0 && (
                                 <div style={{ marginBottom: 4 }}>
                                   <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 2 }}>Органы-мишени:</div>
                                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                                    {[...new SetsupArr(sub.organs)].map((o: any) => (
+                                    {[...new Set(supArr(sub.organs))].map((o: any) => (
                                       <span key={o} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 4, background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>{ORGAN_LABELS[o]?.replace(/^[^\s]+\s/,'') || o}</span>
                                     ))}
                                   </div>
