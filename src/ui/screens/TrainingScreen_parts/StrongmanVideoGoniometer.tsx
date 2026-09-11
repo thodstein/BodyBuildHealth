@@ -1,5 +1,6 @@
 import React from 'react';
 import { estimateAnglesFromLandmarks, type Landmark } from '../../../engines/strength-sport/strength-sport-pose.engine';
+import { autotrackVideo } from '../../../engines/strength-sport/strength-sport-pose-autotrack.engine';
 
 const SF = '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif';
 
@@ -63,6 +64,8 @@ export const StrongmanVideoGoniometer: React.FC<{
   const [taps, setTaps] = React.useState<Partial<Record<TapId, Landmark>>>({});
   const [frameKey, setFrameKey] = React.useState(0);
   const [note, setNote] = React.useState('');
+  const [autoBusy, setAutoBusy] = React.useState(false);
+  const [autoMsg, setAutoMsg] = React.useState('');
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const camRef = React.useRef<HTMLInputElement | null>(null);
@@ -146,6 +149,33 @@ export const StrongmanVideoGoniometer: React.FC<{
     setNote(`✓ Замер t=${t}с добавлен в таблицу (${lift === 'log_press' ? 'смотри плечо' : 'смотри таз/колено'})`);
   };
 
+  const runAutotrack = async () => {
+    const v = videoRef.current;
+    if (!v || !videoUrl) {
+      setAutoMsg('Сначала сними или выбери видео — без него размечать нечего');
+      return;
+    }
+    setAutoBusy(true);
+    setAutoMsg('Грузим модель поз (CDN)…');
+    try {
+      const res = await autotrackVideo(v, {
+        onProgress: (done, total) => setAutoMsg(`Размечаем… ${done}/${total}`),
+      });
+      if (!res.modelOk) {
+        setAutoMsg('Модель не загрузилась (сеть/CDN) — разметка вручную тапами ниже');
+      } else if (!res.rows.length) {
+        setAutoMsg(`Модель ок, но позы не найдены (кадров ${res.sampled}, мимо ${res.failed}) — сними сбоку в полный рост`);
+      } else {
+        for (const r of res.rows) onAppend(`${r.t},${r.hip},${r.knee},${r.ankle},${r.shoulder}`);
+        setAutoMsg(`✓ Авто-разметка: ${res.rows.length} замеров в таблице${res.failed ? ` (мимо ${res.failed})` : ''} — проверь «🦿 Разобрать углы»`);
+      }
+    } catch {
+      setAutoMsg('Авто-разметка упала — разметка вручную тапами ниже');
+    } finally {
+      setAutoBusy(false);
+    }
+  };
+
   const btn: React.CSSProperties = {
     padding: '13px 16px', minHeight: 52, borderRadius: 14, cursor: 'pointer',
     background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.09)',
@@ -161,6 +191,12 @@ export const StrongmanVideoGoniometer: React.FC<{
         <button type="button" onClick={() => camRef.current?.click()} style={{ ...btn, flex: '1 1 160px', background: 'linear-gradient(135deg,#a855f7,#6366f1)', border: 'none' }}>📷 Снять камерой</button>
         <button type="button" onClick={() => galRef.current?.click()} style={{ ...btn, flex: '1 1 160px' }}>📁 Видео из галереи</button>
       </div>
+      {videoUrl ? (
+        <button type="button" onClick={runAutotrack} disabled={autoBusy} aria-label="Авто-разметка поз по видео" style={{ ...btn, width: '100%', background: autoBusy ? 'rgba(255,255,255,0.06)' : 'linear-gradient(135deg,#0a84ff,#30d158)', border: 'none', opacity: autoBusy ? 0.7 : 1 }}>
+          {autoBusy ? '⏳ Размечаем…' : '✨ Авто-разметка (ИИ по видео → таблица)'}
+        </button>
+      ) : null}
+      {autoMsg ? <div style={{ fontSize: 12, color: autoMsg.startsWith('✓') ? '#22c55e' : '#fff' }}>{autoMsg}</div> : null}
       <input ref={camRef} type="file" accept="video/*" capture="environment" aria-label="Снять видео камерой" style={{ display: 'none' }} onChange={e => pickFile(e.target.files?.[0])} />
       <input ref={galRef} type="file" accept="video/*" aria-label="Выбрать видео из галереи" style={{ display: 'none' }} onChange={e => pickFile(e.target.files?.[0])} />
       {videoUrl ? (

@@ -51,4 +51,8 @@ describe('StrongmanVideoGoniometer', () => {
     render(<StrongmanVideoGoniometer lift="yoke_walk" onAppend={() => {}} />);
     expect(screen.getByRole('button', { name: /Отметить точку: Таз/ })).toBeTruthy();
   });
+  it('без видео кнопки авто-разметки нет, только ручные тапы', () => {
+    render(<StrongmanVideoGoniometer lift="yoke_walk" onAppend={() => {}} />);
+    expect(screen.queryByRole('button', { name: /Авто-разметка/ })).toBeNull();
+  });
 });

@@ -54,7 +54,8 @@
 - P6 классы: `smFarmersWeightClass` (М + Ж×0.6) + калибровка pinch/CoC связана, UI/мост/экспорт.
 - P7 живость: `acwrZone` в скоринг (danger/caution, остальные байт-в-байт), `smWeeklySetsByLift/smLiftKeyForWeakPoint` в причины, `profile-updated/storage` подписка пола.
 - P8 видеогониометр (заглушек ноль): NEW `StrongmanVideoGoniometer` — съёмка камерой АПК (`capture=environment`) / галерея, покадровка ±1/30с, 6 тапов (таз→локоть) → реальные углы `estimateAnglesFromLandmarks` → строкой в таблицу норм (тот же пайплайн `smPoseCheckFromCsv`/авто-углы, мост/экспорт без изменений); мок-поза и фейк live-check удалены из хаба (движок-позы не тронут — WL/ТА-зона чужая). NEW тест 5/5 + hub smoke.
-- Проверено: NEW pro3 17/17 + UI pro3 6/6 + гониометр 5/5 + hub 9/9 + diagnostics-pro 28/28 + зона strength-sport/rest-hooks 879/879 (шумы canvas/DB предсуществующие) + соседи apk-pack/sm-bridge/p0/next 52+42+14 зелёные, `verify:apk-design` OK, `tsc` (12GB) — 1 ошибка, чужая `ArmliftingDiagnosticsHub.tsx:200 weakestWr` (не мой файл, не тронут), свои файлы — 0.
+- P9 авто-разметка (АПК всегда онлайн): NEW `strength-sport-pose-autotrack.engine` — PoseLandmarker lite с CDN (кэш + таймауты seek), маппинг 33 точек BlazePose → 6 точек лучшей по видимости стороны, сэмплинг ≤10 кадров → строки таблицы пачкой; без сети/CDN — честный фолбэк на ручные тапы. NEW тест 5/5.
+- Проверено: NEW pro3 17/17 + автотрек 5/5 + UI pro3 6/6 + гониометр 6/6 + hub 9/9 + diagnostics-pro 28/28 + sm-bridge 14/14, `verify:apk-design` OK, `tsc` (12GB) 0 по проекту.
 - Проверено: NEW pro3 17/17 + UI pro3 5/5 + hub 9/9 + diagnostics-pro 28/28 + зона strength-sport/rest-hooks 879/879 (шумы canvas/DB предсуществующие) + соседи apk-pack/sm-bridge/p0/next 52+42+14 зелёные, `verify:apk-design` OK, `tsc` (12GB) — 1 ошибка, чужая `ArmliftingDiagnosticsHub.tsx:200 weakestWr` (не мой файл, не тронут), свои файлы — 0.
 
 ## 4. Источники
