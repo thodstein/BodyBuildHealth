@@ -193,8 +193,8 @@ export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calibration, calQuality, calStale, measuredVelocity, measuredWeight, metric]);
   // ожидание разминки: личный профиль приоритетнее группового
-  const readyExpected = useMemo(() => {
-    if (calibration && calQuality === 'ok' && !calStale?.stale) return expectedVelocityFromCalib(calibration, 0.6);
+  const readyExpected: number = useMemo(() => {
+    if (calibration && calQuality === 'ok' && !calStale?.stale) return expectedVelocityFromCalib(calibration, 0.6) ?? velocityForPct(lift, 0.6);
     return velocityForPct(lift, 0.6);
   }, [calibration, calQuality, calStale, lift]);
 
