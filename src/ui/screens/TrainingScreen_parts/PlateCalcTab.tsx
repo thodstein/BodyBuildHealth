@@ -21,7 +21,8 @@ type Unit = 'metric' | 'imperial';
 const METRIC_PLATES = [25, 20, 15, 10, 5, 2.5, 1.25];
 const IMPERIAL_PLATES = [45, 35, 25, 10, 5, 2.5];
 
-const BAR_TYPES: Record<Unit, { id: string; label: string; weight: number }[]> = {
+/** К2: экспортирован для теста паритета метрика/империя (оба — 8 грифов). */
+export const BAR_TYPES: Record<Unit, { id: string; label: string; weight: number }[]> = {
   metric: [
     { id: 'men_olympic', label: 'Мужской олимпийский (20 кг)', weight: 20 },
     { id: 'women_olympic', label: 'Женский олимпийский (15 кг)', weight: 15 },
@@ -39,6 +40,8 @@ const BAR_TYPES: Record<Unit, { id: string; label: string; weight: number }[]> =
     { id: 'technique', label: 'Технический гриф (10 фн)', weight: 10 },
     { id: 'standard', label: 'Стандартный гриф (15 фн)', weight: 15 },
     { id: 'trap_bar', label: 'Трэп/Хекс-гриф (55 фн)', weight: 55 },
+    { id: 'ssb', label: 'SSB Safety Squat Bar (45 фн)', weight: 45 },
+    { id: 'swiss_bar', label: 'Swiss/Multi-grip (35 фн)', weight: 35 },
   ],
 };
 
@@ -59,7 +62,7 @@ function lbToKg(lb: number) { return Math.round(lb / KG_TO_LB * 10) / 10; }
 
 const unitOpts = [
   { id: 'metric', label: 'Метрические (кг)', desc: 'кг · блины 25/20/15/10/5/2.5/1.25 кг' },
-  { id: 'imperial', label: 'Имперские (фн)', desc: 'фн · блины 45/35/25/10/5/2.5 фн' },
+  { id: 'imperial', label: 'Имперские (фн)', desc: 'фн · блины 45/35/25/10/5/2.5/1.25 фн' },
 ];
 
 export interface PlateCalcTabProps {

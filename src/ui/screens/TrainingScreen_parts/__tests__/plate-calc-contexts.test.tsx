@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { PlateCalcTab } from '../PlateCalcTab';
+import { PlateCalcTab, BAR_TYPES } from '../PlateCalcTab';
 
 describe('PlateCalcTab — контексты отображения', () => {
   it('без onApply (интеллект тренировки) кнопка «Применить» НЕ рендерится', () => {
@@ -28,6 +28,13 @@ describe('PlateCalcTab — контексты отображения', () => {
   it('без exerciseOptions селектор упражнения отсутствует', () => {
     const html = renderToStaticMarkup(<PlateCalcTab onApply={() => {}} />);
     expect(html).not.toContain('Упражнение текущей сессии');
+  });
+
+  it('К2: метрика и империя — один набор из 8 грифов (паритет)', () => {
+    const metric = BAR_TYPES.metric.map(b => b.id).sort();
+    const imperial = BAR_TYPES.imperial.map(b => b.id).sort();
+    expect(metric).toEqual(imperial);
+    expect(metric).toHaveLength(8);
   });
 
   it('Ж2: локации из стора рендерятся чипами', () => {

@@ -698,7 +698,8 @@ export const VolumeOptimizerTab: React.FC<VolumeOptimizerTabProps> = ({ rows: pr
               if (imp.rows.length === 0) {
                 setFlash(`📥 Дневник: строк за 7 дней нет${imp.skipped > 0 ? ` (пропущено без маппинга: ${imp.skipped})` : ''}`);
               } else {
-                setRows(imp.rows.map((r, i) => ({ id: 'imp' + Date.now() + '_' + i, ...r })));
+                // К2: обогащаем 1RM базлайнами профиля (иначе heavy-детект считает от 100)
+                setRows(imp.rows.map((r, i) => ({ id: 'imp' + Date.now() + '_' + i, ...r, oneRM: getOneRM(r.exerciseId) })));
                 setActiveWeek('all');
                 setFlash(`📥 Импорт: ${imp.rows.length} строк из ${imp.sessions} сессий${imp.skipped > 0 ? `, пропущено: ${imp.skipped}` : ''}`);
               }
