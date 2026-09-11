@@ -15,6 +15,8 @@ import {
 } from './ExerciseLabShared';
 import { getLabResistanceProfile, groupSubregionCoverage } from '../../../engines/lab-exercise-profile.engine';
 import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
+import { rankSubstitutesByDelta } from '../../../engines/lab-exercise-correction.engine';
+import { loadLabPlanFromStorage } from '../../../engines/lab-plan-exercise-audit.engine';
 import { readLabAthleteCtx } from './lab-athlete-ctx';
 
 const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId }) => {
@@ -95,6 +97,17 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
   }, [subEx]);
 
   const subExList = useMemo(() => subEx ? EXERCISE_CATALOG.filter(e => e.group === subEx.group) : [], [subEx]);
+
+  // Добивка 3: ранжир допустимых замен по Δ на плане (рост SFR → снижение усталости).
+  const rankedSubs = useMemo(() => {
+    if (!subEx) return [];
+    try {
+      const plan = loadLabPlanFromStorage();
+      return rankSubstitutesByDelta(plan, subEx.id, subs);
+    } catch {
+      return subs.map(s => ({ ...s, sfrDelta: null as number | null, fatigueDelta: null as number | null, deltaSummary: null as string | null }));
+    }
+  }, [subEx, subs]);
 
   return (
     <div className="train-exlabsub" style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
@@ -177,10 +190,11 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
           <div style={{ fontSize: 11, color: DIM, textAlign: 'center', padding: 12 }}>Выберите упражнение — покажу допустимые/запретные замены без дублирования расчётов.</div>
         ) : (
           <>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>✅ Допустимые ({subs.length})</div>
-            {subs.length ? subs.map(o => (
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>✅ Допустимые ({rankedSubs.length})</div>
+            {rankedSubs.length ? rankedSubs.map(o => (
               <div key={o.id} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderLeft: '3px solid rgba(0,230,138,0.4)', marginBottom: 4 }}>
                 <div style={{ fontSize: 11, fontWeight: 700 }}>{o.name}</div><div style={{ fontSize: 10, color: DIM }}>{o.reason}</div>
+                {o.deltaSummary && <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 2 }}>Δ на плане: {o.deltaSummary}</div>}
               </div>
             )) : <div style={{ fontSize: 10, color: DIM }}>Нет явных — ниже все из группы</div>}
             {forbidden.length > 0 && (

@@ -72,14 +72,22 @@ const ExerciseLabCatalog: React.FC<{
   const secondaryRegions = useMemo(() => selectedBio ? [...new Set((selectedBio.secondaryMuscles || []).map(muscleToRegion).filter(r => r !== 'other'))] : [], [selectedBio]);
   const visibleList = filtered.slice(0, visible);
 
-  // Epic F: SFR/профиль/диагноз-чипы — только видимые строки (лень, кэш в меме).
+  // Epic F + добивка 6: SFR/профиль — всегда; диагноз-чип — только при плане (честно).
+  const labHasPlan = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_bb_plan_saved') || localStorage.getItem('he_bb_plans');
+      if (!raw) return false;
+      const j = JSON.parse(raw);
+      return !!(j?.plan?.weeks?.length || j?.weeks?.length);
+    } catch { return false; }
+  }, [search, group, type, equipment, difficulty]);
   const labMap = useMemo(() => {
     const map = new Map<string, { sfr: number | null; profile: string; estimated: boolean; dx: number | null }>();
     for (const e of visibleList) {
       try {
         const p = getLabResistanceProfile({ id: e.id, name: e.name });
         let dx: number | null = null;
-        if (labCtx) {
+        if (labCtx && labHasPlan) {
           try {
             dx = diagnoseLabExercise(
               { id: e.id, name: e.name, muscle: e.group },
@@ -95,7 +103,7 @@ const ExerciseLabCatalog: React.FC<{
       } catch { /* noop */ }
     }
     return map;
-  }, [visibleList, labCtx]);
+  }, [visibleList, labCtx, labHasPlan]);
 
   const groupOptions = [
     { id: 'all', label: 'Все группы' },

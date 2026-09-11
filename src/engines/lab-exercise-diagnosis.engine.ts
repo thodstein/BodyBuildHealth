@@ -90,7 +90,7 @@ export function labInjuryMatches(
 
 /** Диагноз одного упражнения на материале атлета (план не мутирует). */
 export function diagnoseLabExercise(
-  ex: { id?: string; name: string; muscle?: string; group?: string; tempo?: string; pauseSeconds?: number },
+  ex: { id?: string; name: string; muscle?: string; group?: string; tempo?: string; pauseSeconds?: number; rir?: number },
   ctx: LabDiagnosisInput = {},
 ): ExerciseDiagnosis {
   const muscle = String(ctx.muscle || ex.muscle || (ex as { group?: string }).group || '').toLowerCase();

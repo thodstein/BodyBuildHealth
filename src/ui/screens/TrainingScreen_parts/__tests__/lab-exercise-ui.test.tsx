@@ -7,6 +7,8 @@ import ExerciseLabMerged from '../ExerciseLabMerged';
 import PrescriptionTab from '../ExerciseLabPrescription';
 import ExerciseLabCatalog from '../ExerciseLabCatalog';
 import TechniqueTab from '../ExerciseLabTechnique';
+import ProSubstituteTab from '../ExerciseLabProSubstitute';
+import CompareTab from '../ExerciseLabCompare';
 
 const PLAN_KEY = 'he_bb_plan_saved';
 const LAB_KEY = 'he_exercise_lab_v1';
@@ -107,6 +109,79 @@ describe('lab-exercise-ui', () => {
       }
     }
     expect(found).toBe(true);
+  });
+
+  it('Шаг 1 с планом: бейдж «в плане», singleAngle-флаг и Δ до клика', async () => {
+    localStorage.setItem(
+      PLAN_KEY,
+      JSON.stringify({
+        plan: {
+          weeks: [
+            {
+              sessions: [
+                {
+                  exercises: [
+                    { exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 6, rir: 2 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+    render(<PrescriptionTab selectedId="bench_bar" />);
+    await waitFor(() => {
+      expect(screen.getByText(/Диагноз упражнения/)).toBeTruthy();
+    });
+    expect(screen.getByText(/в плане/)).toBeTruthy();
+    expect(screen.getByText(/1 угол при ≥6 сетов/)).toBeTruthy();
+    expect(screen.getByText(/Δ на плане/)).toBeTruthy();
+  });
+
+  it('Шаг 1: диагноз пишется в историю he_exercise_lab_v1', async () => {
+    render(<PrescriptionTab selectedId="bench_bar" />);
+    await waitFor(() => {
+      expect(screen.getByText(/Диагноз упражнения/)).toBeTruthy();
+    });
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(LAB_KEY) || 'null');
+      expect(saved?.history?.[0]?.exId).toBe('bench_bar');
+    });
+    expect(screen.getByText(/История диагнозов/)).toBeTruthy();
+  });
+
+  it('Шаг 3: замены ранжированы по Δ на плане', async () => {
+    seedPlan();
+    render(<ProSubstituteTab selectedId="bench_bar" />);
+    await waitFor(() => {
+      expect(screen.getAllByText(/Δ на плане/).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('каталог: диагноз-чип только при плане', () => {
+    const { unmount } = render(<ExerciseLabCatalog />);
+    expect(screen.queryAllByText(/^(✓|⚠|🚫) \d+$/)).toHaveLength(0);
+    unmount();
+    seedPlan();
+    render(<ExerciseLabCatalog />);
+    expect(screen.queryAllByText(/^(✓|⚠|🚫) \d+$/).length).toBeGreaterThan(0);
+  });
+
+  it('Шаг 4: травма снижает safety-скор', () => {
+    const readScore = () => {
+      // Строка разбита по элементам (число в <b>) — матчим по полному textContent.
+      const nodes = screen.getAllByText((_, el) => /Безопасность: \d+\/100/.test(el?.textContent || ''));
+      const leaf = nodes.find((n) => n.tagName === 'DIV' && n.textContent?.startsWith('Безопасность:'));
+      const m = /(\d+)\/100/.exec((leaf || nodes[0]).textContent || '');
+      return m ? Number(m[1]) : NaN;
+    };
+    const { unmount } = render(<CompareTab initialId1="dips_chest" initialId2="bench_bar" />);
+    const clean = readScore();
+    unmount();
+    localStorage.setItem(TRAINING_PROFILE_KEY, JSON.stringify({ injuries: [{ muscle: 'импинджмент', exclude: true }] }));
+    render(<CompareTab initialId1="dips_chest" initialId2="bench_bar" />);
+    expect(readScore()).toBeLessThan(clean);
   });
 
   it('персист: выбор в каталоге сохраняется в he_exercise_lab_v1', () => {

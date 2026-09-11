@@ -123,6 +123,82 @@ export function simulateLabCorrection(
   return simulateCorrection(plan, action, targetExId);
 }
 
+function fmtDelta(v: number | null, digits = 1): string | null {
+  if (v == null || !Number.isFinite(v) || v === 0) return null;
+  return `${v > 0 ? '+' : ''}${v.toFixed(digits)}`;
+}
+
+/** Человеческая строка Δ для UI (только ненулевые компоненты). */
+export function formatSimulatorDelta(d: SimulatorDelta | null): string | null {
+  if (!d) return null;
+  const parts: string[] = [];
+  const sfr = fmtDelta(d.sfrDelta);
+  if (sfr) parts.push(`SFR ${sfr}`);
+  const fat = fmtDelta(d.fatigueDelta, 2);
+  if (fat) parts.push(`усталость ${fat}`);
+  const len = d.lengthenedDelta != null && Number.isFinite(d.lengthenedDelta) && d.lengthenedDelta !== 0
+    ? `${d.lengthenedDelta > 0 ? '+' : ''}${Math.round(d.lengthenedDelta * 100)} п.п. lengthened`
+    : null;
+  if (len) parts.push(len);
+  const ang = fmtDelta(d.angleDelta, 2);
+  if (ang) parts.push(`углы ${ang}`);
+  for (const issue of d.issuesResolved.slice(0, 3)) parts.push(`✓ ${issue}`);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+export interface RankedSubstitute {
+  id: string;
+  name: string;
+  reason: string;
+  sfrDelta: number | null;
+  fatigueDelta: number | null;
+  deltaSummary: string | null;
+}
+
+/**
+ * Ранжир кандидатов замены по Δ на плане (п.3 добивки): сначала рост SFR,
+ * затем снижение усталости. Без плана — исходный порядок, Δ null.
+ */
+export function rankSubstitutesByDelta(
+  plan: unknown,
+  exId: string,
+  candidates: Array<{ id: string; name: string; reason: string }>,
+): RankedSubstitute[] {
+  const ranked: RankedSubstitute[] = (candidates || []).map((c) => {
+    let sfrDelta: number | null = null;
+    let fatigueDelta: number | null = null;
+    let deltaSummary: string | null = null;
+    if (plan) {
+      try {
+        const d = simulateCorrection(
+          plan,
+          { type: 'substitute', targetId: c.id, targetName: c.name, reason: c.reason, confidence: 0.8 },
+          exId,
+        );
+        if (d) {
+          sfrDelta = d.sfrDelta;
+          fatigueDelta = d.fatigueDelta;
+          deltaSummary = formatSimulatorDelta(d);
+        }
+      } catch {
+        /* кандидат без Δ — остаётся с null */
+      }
+    }
+    return { id: c.id, name: c.name, reason: c.reason, sfrDelta, fatigueDelta, deltaSummary };
+  });
+  if (plan) {
+    ranked.sort((a, b) => {
+      const sa = a.sfrDelta ?? Number.NEGATIVE_INFINITY;
+      const sb = b.sfrDelta ?? Number.NEGATIVE_INFINITY;
+      if (sb !== sa) return sb - sa;
+      const fa = a.fatigueDelta ?? Number.POSITIVE_INFINITY;
+      const fb = b.fatigueDelta ?? Number.POSITIVE_INFINITY;
+      return fa - fb;
+    });
+  }
+  return ranked;
+}
+
 /** Данные моста `kind:'weakpoints'` — форма совместима с WeakpointsPayload. */
 export function buildLabBridgeData(opts: {
   action: CorrectionAction;

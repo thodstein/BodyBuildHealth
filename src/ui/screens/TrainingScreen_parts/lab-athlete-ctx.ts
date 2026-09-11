@@ -80,6 +80,84 @@ export function readLabAthleteCtx(): LabAthleteCtx {
   };
 }
 
+export interface LabPlanExCtx {
+  inPlan: boolean;
+  sets: number | null;
+  rir: number | null;
+  tempo: string | null;
+  pauseSeconds: number | null;
+  muscle: string | null;
+  singleAngleMuscle: string | null;
+  uncoveredSubregions: string[];
+  strictMissing: string[];
+}
+
+interface LabPlanRawEx {
+  exerciseName?: unknown;
+  id?: unknown;
+  name?: unknown;
+  sets?: unknown;
+  workSets?: unknown;
+  rir?: unknown;
+  tempo?: unknown;
+  pauseSeconds?: unknown;
+  muscle?: unknown;
+}
+
+/**
+ * План-контекст одного упражнения (п.1 добивки): факт из плана (сеты/RIR/темп/пауза)
+ * + missing-списки из аудита (singleAngle/uncovered/strict). Мимо плана — пусто.
+ */
+export function planCtxForExercise(
+  audit: LabPlanAudit | null,
+  plan: unknown,
+  exId: string,
+): LabPlanExCtx {
+  const empty: LabPlanExCtx = {
+    inPlan: false, sets: null, rir: null, tempo: null, pauseSeconds: null, muscle: null,
+    singleAngleMuscle: null, uncoveredSubregions: [], strictMissing: [],
+  };
+  if (!audit || !plan || !exId) return empty;
+  try {
+    const needle = String(exId).toLowerCase();
+    let found: LabPlanRawEx | null = null;
+    const weeks = (plan as { weeks?: Array<{ sessions?: Array<{ exercises?: LabPlanRawEx[] }> }> }).weeks || [];
+    outer: for (const w of weeks) {
+      for (const s of w.sessions || []) {
+        for (const raw of s.exercises || []) {
+          const id = String(raw.exerciseName || raw.id || raw.name || '').toLowerCase();
+          if (id && (id === needle || String(raw.name || '').toLowerCase() === needle)) {
+            found = raw;
+            break outer;
+          }
+        }
+      }
+    }
+    if (!found) return empty;
+    const muscle = String(found.muscle || '').toLowerCase() || null;
+    const sets = Array.isArray(found.workSets)
+      ? found.workSets.length
+      : Number.isFinite(Number(found.sets)) ? Number(found.sets) : null;
+    const byMuscle = muscle ? audit.audit.byMuscle[muscle] : undefined;
+    return {
+      inPlan: true,
+      sets,
+      rir: Number.isFinite(Number(found.rir)) ? Number(found.rir) : null,
+      tempo: typeof found.tempo === 'string' && found.tempo ? found.tempo : null,
+      pauseSeconds: Number.isFinite(Number(found.pauseSeconds)) ? Number(found.pauseSeconds) : null,
+      muscle,
+      singleAngleMuscle:
+        byMuscle && byMuscle.angleCoverage.covered === 1 && byMuscle.totalSets >= 6 && muscle
+          ? muscle
+          : null,
+      uncoveredSubregions: byMuscle ? [...byMuscle.regionalCoverage.missing] : [],
+      strictMissing: byMuscle ? [...byMuscle.strictCoverage.missing] : [],
+    };
+  } catch {
+    return empty;
+  }
+}
+
 /** План + аудит + score для ленты (null без плана — вызыватель показывает пустой стейт). */
 export function readLabPlanAudit(ctx?: Pick<LabAthleteCtx, 'injuries'>): LabPlanAudit | null {
   const plan = loadLabPlanFromStorage();

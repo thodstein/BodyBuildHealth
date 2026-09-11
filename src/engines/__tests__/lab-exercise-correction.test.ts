@@ -6,6 +6,8 @@ import {
   prescribeLabCorrections,
   simulateLabCorrection,
   buildLabBridgeData,
+  formatSimulatorDelta,
+  rankSubstitutesByDelta,
 } from '../lab-exercise-correction.engine';
 import { diagnoseLabExercise } from '../lab-exercise-diagnosis.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -184,6 +186,34 @@ describe('lab-exercise-correction', () => {
     expect(
       simulateLabCorrection(null, { type: 'add', reason: 'x', confidence: 1 } as never),
     ).toBeNull();
+  });
+
+  it('formatSimulatorDelta: только ненулевые компоненты', () => {
+    expect(formatSimulatorDelta(null)).toBeNull();
+    expect(formatSimulatorDelta({ sfrDelta: 0, fatigueDelta: 0, lengthenedDelta: 0, unilateralDelta: 0, angleDelta: 0, issuesResolved: [], summary: '' } as never)).toBeNull();
+    const s = formatSimulatorDelta({ sfrDelta: 1, fatigueDelta: -0.5, lengthenedDelta: 0.17, unilateralDelta: null, angleDelta: null, issuesResolved: ['lowSFR'], summary: 'x' } as never);
+    expect(s).toMatch(/SFR \+1/);
+    expect(s).toMatch(/усталость -0/);
+    expect(s).toMatch(/lengthened/);
+    expect(s).toMatch(/✓ lowSFR/);
+  });
+
+  it('rankSubstitutesByDelta: сортировка по SFR, затем усталость', () => {
+    const plan = planWith(['bench_bar']);
+    const ranked = rankSubstitutesByDelta(plan, 'bench_bar', [
+      { id: 'bench_db', name: 'b', reason: 'r' },
+      { id: 'fly_db', name: 'f', reason: 'r' },
+    ]);
+    expect(ranked.map((r) => r.id)).toEqual(['fly_db', 'bench_db']);
+    expect(ranked[0].deltaSummary).toMatch(/SFR/);
+  });
+
+  it('rankSubstitutesByDelta: без плана — исходный порядок, Δ null', () => {
+    const ranked = rankSubstitutesByDelta(null, 'bench_bar', [
+      { id: 'bench_db', name: 'b', reason: 'r' },
+    ]);
+    expect(ranked.map((r) => r.id)).toEqual(['bench_db']);
+    expect(ranked[0].deltaSummary).toBeNull();
   });
 
   it('мост: форма WeakpointsPayload (preferred/swap/labDiagnosis/labCorrection/labDelta)', () => {

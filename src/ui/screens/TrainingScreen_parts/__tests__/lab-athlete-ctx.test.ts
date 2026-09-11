@@ -2,7 +2,8 @@
  * lab-athlete-ctx.test.ts — Epic G: контекст атлета (дефолты + legacy-профиль).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { readLabAthleteCtx } from '../lab-athlete-ctx';
+import { readLabAthleteCtx, planCtxForExercise } from '../lab-athlete-ctx';
+import { auditLabPlan } from '../../../../engines/lab-plan-exercise-audit.engine';
 
 describe('lab-athlete-ctx', () => {
   beforeEach(() => {
@@ -41,5 +42,39 @@ describe('lab-athlete-ctx', () => {
     expect(ctx.mobilityRestrictions).toEqual(['ankle']);
     expect(ctx.weakZones).toEqual(['delt_mid']);
     expect(ctx.asymPct).toBe(9);
+  });
+
+  it('planCtxForExercise: факт из плана + singleAngle/missing из аудита', () => {
+    const plan = {
+      weeks: [
+        {
+          sessions: [
+            {
+              exercises: [
+                { exerciseName: 'bench_bar', name: 'Жим', muscle: 'chest', sets: 6, rir: 2, tempo: '2-0-2-0' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const audit = auditLabPlan(plan);
+    expect(audit).not.toBeNull();
+    const c = planCtxForExercise(audit, plan, 'bench_bar');
+    expect(c.inPlan).toBe(true);
+    expect(c.sets).toBe(6);
+    expect(c.rir).toBe(2);
+    expect(c.tempo).toBe('2-0-2-0');
+    expect(c.muscle).toBe('chest');
+    expect(c.singleAngleMuscle).toBe('chest');
+    expect(c.uncoveredSubregions.length).toBeGreaterThan(0);
+  });
+
+  it('planCtxForExercise: мимо плана — пусто', () => {
+    const plan = { weeks: [{ sessions: [{ exercises: [] }] }] };
+    const audit = auditLabPlan({ weeks: [{ sessions: [{ exercises: [{ exerciseName: 'bench_bar', name: 'x', muscle: 'chest', sets: 3 }] }] }] });
+    const c = planCtxForExercise(audit, plan, 'bench_bar');
+    expect(c.inPlan).toBe(false);
+    expect(c.singleAngleMuscle).toBeNull();
   });
 });

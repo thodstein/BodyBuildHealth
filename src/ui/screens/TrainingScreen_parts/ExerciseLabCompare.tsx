@@ -35,13 +35,19 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
     setGoal((profile?.settings as any)?.training?.primaryGoal ?? 'hypertrophy');
   }, [profile]);
 
-  const getExData = (ex: any) => {
+  const labInjuries = useMemo(() => {
+    try {
+      const ctx = readLabAthleteCtx();
+      return ctx.injuries.map(x => (typeof x === 'string' ? x : String(x?.muscle || '')).toLowerCase()).filter(Boolean);
+    } catch { return []; }
+  }, [id1, id2]);
+  const getExData = (ex: any, injuries: string[] = []) => {
     if (!ex) return null;
     const presc = calcExercisePrescription(ex, goal, level, false, false, 1);
     const map = getMappedIds(ex.id);
     const lookupId = map.bio || map.movement || ex.id;
     const score = calcTechniqueScore(ex);
-    const safety = assessSafety(ex.id, [], score.total / 100);
+    const safety = assessSafety(ex.id, injuries, score.total / 100);
     return {
       exercise: ex, presc, bio: getExerciseBio(lookupId), technique: getTechnique(ex.name),
       score, cues: getCues(ex.name), errors: getErrorsForExercise(ex.name),
@@ -52,8 +58,8 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
     };
   };
 
-  const d1 = useMemo(() => getExData(ex1), [ex1, goal, level]);
-  const d2 = useMemo(() => getExData(ex2), [ex2, goal, level]);
+  const d1 = useMemo(() => getExData(ex1, labInjuries), [ex1, goal, level, labInjuries]);
+  const d2 = useMemo(() => getExData(ex2, labInjuries), [ex2, goal, level, labInjuries]);
 
   // Epic F: профили из данных + Δ-диагноз A vs B на материале атлета.
   const labCtx = useMemo(() => {

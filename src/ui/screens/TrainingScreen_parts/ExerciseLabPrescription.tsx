@@ -21,9 +21,10 @@ import { tempoFor, tutForSet, REST_BY_CHARACTER } from '../../../engines/bb/bb-t
 import { techniquesFor } from '../../../engines/bb/bb-intensity-techniques';
 import { resolveLabWorkingWeight, getLabResistanceProfile } from '../../../engines/lab-exercise-profile.engine';
 import { diagnoseLabExercise } from '../../../engines/lab-exercise-diagnosis.engine';
-import { prescribeLabCorrections, simulateLabCorrection, buildLabBridgeData } from '../../../engines/lab-exercise-correction.engine';
+import { prescribeLabCorrections, simulateLabCorrection, buildLabBridgeData, formatSimulatorDelta } from '../../../engines/lab-exercise-correction.engine';
 import { loadLabPlanFromStorage } from '../../../engines/lab-plan-exercise-audit.engine';
-import { readLabAthleteCtx } from './lab-athlete-ctx';
+import { readLabAthleteCtx, planCtxForExercise } from './lab-athlete-ctx';
+import { auditLabPlan } from '../../../engines/lab-plan-exercise-audit.engine';
 import { applyToPlanner } from './planner-bridge';
 
 const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?: (ex: any) => void }> = ({ selectedId, onSelectExercise }) => {
@@ -126,24 +127,50 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
     }));
   }, [genGroup, genGoal, genLevel, genCount, labBaselines, labWorkMax]);
 
-  // Epic F: диагноз упражнения на материале атлета + топ-коррекции с мостом в ББ-авто.
+  // Epic F + добивка 1/2/5: диагноз на материале атлета И плана + Δ до клика + история.
   const [labMsg, setLabMsg] = useState('');
   const [labShowAll, setLabShowAll] = useState(false);
+  const [labHistory, setLabHistory] = useState<Array<{ exId: string; name: string; score: number; flags: string[]; date: string }>>(() => {
+    try {
+      const j = JSON.parse(localStorage.getItem('he_exercise_lab_v1') || 'null');
+      return Array.isArray(j?.history) ? j.history : [];
+    } catch { return []; }
+  });
+  const labPlan = useMemo(() => {
+    try {
+      const plan = loadLabPlanFromStorage();
+      if (!plan) return null;
+      const athlete = readLabAthleteCtx();
+      const injuries = athlete.injuries.map(x => (typeof x === 'string' ? x : String(x?.muscle || '')).toLowerCase()).filter(Boolean);
+      const audit = auditLabPlan(plan, { injuries });
+      return audit ? { plan, audit, athlete } : null;
+    } catch { return null; }
+  }, [ex, goal, level]);
   const labDx = useMemo(() => {
     if (!ex) return null;
     try {
-      const ctx = readLabAthleteCtx();
+      const ctx = labPlan?.athlete || readLabAthleteCtx();
+      const planEx = labPlan ? planCtxForExercise(labPlan.audit, labPlan.plan, ex.id) : null;
+      const muscle = planEx?.muscle || ex.group;
       const d = diagnoseLabExercise(
-        { id: ex.id, name: ex.name, muscle: ex.group, tempo: manualTempo || presc?.tempo, pauseSeconds: ex.pauseSeconds },
+        {
+          id: ex.id, name: ex.name, muscle,
+          tempo: manualTempo || planEx?.tempo || presc?.tempo,
+          pauseSeconds: planEx?.pauseSeconds ?? ex.pauseSeconds,
+          rir: planEx?.rir ?? undefined,
+        },
         {
           goal, level, weakZones: ctx.weakZones, weakMusclesCanonical: ctx.weakMusclesCanonical,
-          asymPct: ctx.asymPct, muscle: ex.group, mobilityRestrictions: ctx.mobilityRestrictions,
+          asymPct: ctx.asymPct, muscle, mobilityRestrictions: ctx.mobilityRestrictions,
           injuries: ctx.injuries, equipment: ctx.equipment,
+          singleAngleMuscle: planEx?.singleAngleMuscle,
+          uncoveredSubregions: planEx && planEx.uncoveredSubregions.length ? planEx.uncoveredSubregions : undefined,
+          strictMissing: planEx && planEx.strictMissing.length ? planEx.strictMissing : undefined,
         },
       );
-      return { ctx, d };
+      return { ctx, d, inPlan: planEx?.inPlan || false };
     } catch { return null; }
-  }, [ex, goal, level, manualTempo, presc]);
+  }, [ex, goal, level, manualTempo, presc, labPlan]);
   const labCorrections = useMemo(() => {
     if (!labDx || !ex) return [];
     try {
@@ -158,6 +185,32 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
     if (!ex) return null;
     try { return getLabResistanceProfile({ id: ex.id, name: ex.name }); } catch { return null; }
   }, [ex]);
+  // Добивка 2: числовой Δ топ-коррекций на плане — до клика, не в тосте после.
+  const labDeltas = useMemo(() => {
+    const m = new Map<number, string>();
+    if (!labPlan || !ex) return m;
+    labCorrections.slice(0, 4).forEach((a, i) => {
+      try {
+        const s = formatSimulatorDelta(simulateLabCorrection(labPlan.plan, a, ex.id));
+        if (s) m.set(i, s);
+      } catch {}
+    });
+    return m;
+  }, [labPlan, ex, labCorrections]);
+  // Добивка 5: история диагнозов (кап 10, дедуп по упражнению).
+  useEffect(() => {
+    if (!labDx || !ex) return;
+    const entry = { exId: ex.id, name: ex.name, score: labDx.d.score, flags: [...labDx.d.flags], date: new Date().toISOString().slice(0, 10) };
+    setLabHistory(prev => {
+      if (prev[0]?.exId === entry.exId && prev[0]?.score === entry.score) return prev;
+      const next = [entry, ...prev.filter(h => h.exId !== entry.exId)].slice(0, 10);
+      try {
+        const raw = JSON.parse(localStorage.getItem('he_exercise_lab_v1') || 'null') || {};
+        localStorage.setItem('he_exercise_lab_v1', JSON.stringify({ ...raw, history: next }));
+      } catch {}
+      return next;
+    });
+  }, [ex?.id, labDx]);
   const applyLabCorrection = useCallback((a: (typeof labCorrections)[number]) => {
     if (!ex || !labDx) return;
     try {
@@ -465,11 +518,14 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
                 <span style={{ fontSize: 9, color: '#fff', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 10 }}>профиль ориентировочный</span>
               )}
             </div>
+            {labDx.inPlan && (
+              <div style={{ fontSize: 9, color: ACCENT, marginBottom: 4 }}>в плане · диагноз с учётом сетов/темпа и покрытия</div>
+            )}
             {labDx.d.issues.length === 0 ? (
               <div style={{ fontSize: 10, color: '#22c55e' }}>✅ Проблем нет — упражнение подходит под цель «{goal}».</div>
             ) : (
               <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
-                {labDx.d.issues.slice(0, 4).map((iss, i) => <div key={i}>• {iss}</div>)}
+                {labDx.d.issues.map((iss, i) => <div key={i}>• {iss}</div>)}
               </div>
             )}
             {labCorrections.length > 0 && (
@@ -478,7 +534,8 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
                 <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700 }}>{labCorrections[0].targetName || labCorrections[0].type}</div>
                   <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{labCorrections[0].reason}</div>
-                  {labCorrections[0].deltaPreview && <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 2 }}>Δ: {labCorrections[0].deltaPreview}</div>}
+                  {labDeltas.get(0) && <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 2 }}>Δ на плане: {labDeltas.get(0)}</div>}
+                  {!labDeltas.get(0) && labCorrections[0].deltaPreview && <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 2 }}>Δ: {labCorrections[0].deltaPreview}</div>}
                   {labCorrections[0].beginnerNote && <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 2 }}>⚠ {labCorrections[0].beginnerNote}</div>}
                   <button
                     onClick={() => applyLabCorrection(labCorrections[0])}
@@ -494,10 +551,28 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
                   <div key={i} style={{ marginTop: 4, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <div style={{ fontSize: 11, fontWeight: 700 }}>{a.targetName || a.type}</div>
                     <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{a.reason}</div>
+                    {labDeltas.get(i + 1) && <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 2 }}>Δ на плане: {labDeltas.get(i + 1)}</div>}
                     <button onClick={() => applyLabCorrection(a)} style={{ marginTop: 4, width: '100%', padding: 8, borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: ACCENT, cursor: 'pointer', fontSize: 11, fontWeight: 700, minHeight: 44 }}>▶ Применить</button>
                   </div>
                 ))}
                 {labMsg && <div style={{ marginTop: 6, fontSize: 11, color: ACCENT, fontWeight: 700 }}>{labMsg}</div>}
+                {labHistory.length > 0 && (
+                  <details style={{ marginTop: 6 }}>
+                    <summary style={{ fontSize: 10, color: DIM, cursor: 'pointer' }}>🕘 История диагнозов ({labHistory.length})</summary>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                      {labHistory.map(h => (
+                        <button
+                          key={h.exId}
+                          onClick={() => {
+                            const found = EXERCISE_CATALOG.find(e => e.id === h.exId);
+                            if (found) { setGroup(found.group); setExId(found.id); }
+                          }}
+                          style={{ padding: '4px 8px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
+                        >{h.name} · {h.score}</button>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
             )}
           </div>
