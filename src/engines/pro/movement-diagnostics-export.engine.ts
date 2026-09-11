@@ -9,6 +9,7 @@
  */
 import type { Lift, WeakPoint } from '../lms/weakpoint-pl';
 import type { BarPathIssue } from './lift-diagnostics.engine';
+import { barLoopFlag } from './bar-path-core.engine';
 
 export interface MovementDiagnosticsExportInput {
   lift: Lift;
@@ -87,7 +88,7 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
     + li('VBT', vbtLine)
     + (inp.vbtWeightKg != null ? li('VBT вес', `${fmt(inp.vbtWeightKg, 1)} кг`) : '')
     + (inp.kinoveaXLoop != null
-      ? li('Kinovea xLoop', `${fmt(inp.kinoveaXLoop, 1)} см ${inp.kinoveaXLoop >= 6 ? '(крит. >6)' : inp.kinoveaXLoop >= 4 ? '(внимание ≥4)' : '(норма)'}`)
+      ? li('Kinovea xLoop', `${fmt(inp.kinoveaXLoop, 1)} см ${barLoopFlag(inp.kinoveaXLoop) === 'crit' ? '(крит. >6)' : barLoopFlag(inp.kinoveaXLoop) === 'warn' ? '(внимание ≥4)' : '(норма)'}`)
       : '')
     + li('Видео', inp.videoNote || '—')
     + `</table><p style="font-size:11px;color:#666;">Скорость из видео — оценка (не LPT). Снимайте строго сбоку 90°, штатив, 2–3 м.</p></body></html>`;

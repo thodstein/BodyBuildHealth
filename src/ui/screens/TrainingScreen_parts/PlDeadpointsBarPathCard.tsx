@@ -15,7 +15,7 @@ import {
   type BarPathIssue,
 } from '../../../engines/pro/lift-diagnostics.engine';
 import { analyzePhaseAssistance, analyzeBarPathAssistance, analyzeStickingCorrections, protocolFromCycle, type AssistanceAnalysis } from '../../../engines/pro/lift-assistance.engine';
-import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-builder.engine';
+import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '../../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { detectWeakMusclesByE1rm } from '../../../engines/pro/weak-muscle-detection.engine';
 import { diagnoseVelocity } from '../../../engines/pro/vbt.engine';
@@ -478,18 +478,26 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
     if (!names.length) return;
     setSelected(cur => ({ ...cur, [key]: [...new Set([...(cur[key] || []), ...names])] }));
   };
-  const applySelected = () => applyToPlanner({
-    kind: 'weakpoints',
-    label: 'Диагностика движения: слабые мышцы + слабые точки + коррекции',
-    data: {
-      groups: [...new Set([...weakMuscleSubs.map(k => k.split('|')[0]), ...planWeakPoints.map(p => LIFT_TO_GROUP[p.lift]).filter(Boolean)])],
-      plWeakPoints: planWeakPoints.map(p => ({ lift: p.lift, weakPoint: p.weakPoint, days: days[`${p.lift}|${p.weakPoint}`] ?? [] })),
-      weakGroupExerciseMap: Object.fromEntries(weakMuscleSubs.map(k => [k.split('|')[0], selected[k] ?? []])),
-      weakGroupDayMap: Object.fromEntries(weakMuscleSubs.map(k => [k.split('|')[0], days[k] ?? []])),
-      diagnosticExerciseMap: selected,
-      diagnosticDayMap: days,
-    },
-  });
+  const applySelected = () => {
+    // P5: протокол каждого имени из раскладки цикла — мост вставит показанное, не фикс
+    const diagnosticProtocolMap: Record<string, { pct: number; reps: number; sets: number; rir: number }> = {};
+    for (const names of Object.values(selected)) for (const n of names ?? []) {
+      if (typeof n === 'string' && !(n in diagnosticProtocolMap)) diagnosticProtocolMap[n] = diagnosticProtocolFromCycle(template ?? undefined, n);
+    }
+    return applyToPlanner({
+      kind: 'weakpoints',
+      label: 'Диагностика движения: слабые мышцы + слабые точки + коррекции',
+      data: {
+        groups: [...new Set([...weakMuscleSubs.map(k => k.split('|')[0]), ...planWeakPoints.map(p => LIFT_TO_GROUP[p.lift]).filter(Boolean)])],
+        plWeakPoints: planWeakPoints.map(p => ({ lift: p.lift, weakPoint: p.weakPoint, days: days[`${p.lift}|${p.weakPoint}`] ?? [] })),
+        weakGroupExerciseMap: Object.fromEntries(weakMuscleSubs.map(k => [k.split('|')[0], selected[k] ?? []])),
+        weakGroupDayMap: Object.fromEntries(weakMuscleSubs.map(k => [k.split('|')[0], days[k] ?? []])),
+        diagnosticExerciseMap: selected,
+        diagnosticDayMap: days,
+        diagnosticProtocolMap,
+      },
+    });
+  };
   const saveFocus = () => {
     const group = LIFT_TO_GROUP[lift];
     const p = loadTrainingProfile();

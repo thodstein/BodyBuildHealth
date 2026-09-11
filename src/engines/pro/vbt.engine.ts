@@ -39,6 +39,55 @@ export const MVT: Record<VBTLift, number> = {
 };
 export function mvtForLift(lift: VBTLift): number { return MVT[lift] ?? 0.20; }
 
+/**
+ * P3: MVT для всех 12 ПЛ-движений. Канон (Gonzalez-Badillo/Banyard) — 5 базовых;
+ * остальное — ориентиры по ближайшему паттерну (isEstimate: true — не выдавать за замер).
+ */
+export function mvtForPLLift(lift: Lift): { mvt: number; isEstimate: boolean } {
+  switch (lift) {
+    case 'squat': return { mvt: 0.25, isEstimate: false };
+    case 'bench': return { mvt: 0.15, isEstimate: false };
+    case 'deadlift': return { mvt: 0.16, isEstimate: false };
+    case 'ohp': return { mvt: 0.15, isEstimate: false };
+    case 'row': return { mvt: 0.20, isEstimate: false };
+    case 'pulldown': return { mvt: 0.20, isEstimate: true };
+    case 'incline_press': return { mvt: 0.15, isEstimate: true };
+    case 'sumo': return { mvt: 0.16, isEstimate: true };
+    case 'biceps': return { mvt: 0.25, isEstimate: true };
+    case 'triceps': return { mvt: 0.20, isEstimate: true };
+    case 'calf': return { mvt: 0.30, isEstimate: true };
+    case 'shrug': return { mvt: 0.25, isEstimate: true };
+    default: return { mvt: 0.20, isEstimate: true };
+  }
+}
+
+/** P3: порог потери скорости под цель (Pareja-Blanco/Weakley: 10 скорость, 20 сила, 25 масса). */
+export type VBTGoal = 'strength' | 'speed' | 'mass';
+export function thresholdForGoal(goal: string | null | undefined): VelocityLossThreshold {
+  const g = String(goal ?? '').toLowerCase();
+  if (/speed|скорост|мощн|power|взрыв/.test(g)) return 10;
+  if (/mass|масс|гипер|hyp/.test(g)) return 25;
+  return 20;
+}
+
+/** P3: диагностика с порогом под цель (обёртка над diagnoseVelocity). */
+export function diagnoseVelocityForGoal(
+  lift: Lift,
+  bestVelocity: number,
+  lastVelocity: number,
+  weightKg: number | undefined,
+  goal: string | null | undefined,
+): VelocityDiagnosis {
+  return diagnoseVelocity(lift, bestVelocity, lastVelocity, weightKg, thresholdForGoal(goal));
+}
+
+/** P3: stale-проверка LVP (профиль старше 6 недель врёт). null-вход → null. */
+export function lvrStale(lastCalibratedAt: number | null | undefined, nowMs: number = Date.now()): { stale: boolean; weeksAgo: number } | null {
+  if (!Number.isFinite(lastCalibratedAt as number) || (lastCalibratedAt as number) <= 0) return null;
+  const weeksAgo = Math.floor((nowMs - (lastCalibratedAt as number)) / (7 * 24 * 3600 * 1000));
+  return { stale: weeksAgo > 6, weeksAgo: Math.max(0, weeksAgo) };
+}
+
 /** LVP калибровка: по 3-4 точкам (вес/скорость) строит персональный LVP (линейная регрессия) */
 export function calibrateLVP(points: Array<{ pct: number; velocity: number }>): { slope: number; intercept: number; r2: number } | null {
   if (points.length < 3) return null;
@@ -197,7 +246,7 @@ const VELOCITY_STICKING_PHASE: Record<Lift, WeakPoint> = {
   bench: 'off_chest', squat: 'bottom', deadlift: 'start',
   ohp: 'ohp_start', row: 'row_start', pulldown: 'pd_top', incline_press: 'inc_off',
   sumo: 'sumo_start', biceps: 'biceps_start',
-  triceps: 'triceps_mid', calf: 'calf_mid', shrug: 'shrug_mid',
+  triceps: 'triceps_start', calf: 'calf_bottom', shrug: 'shrug_start',
 };
 
 export interface VelocityDiagnosis {

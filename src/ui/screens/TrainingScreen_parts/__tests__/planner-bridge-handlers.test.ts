@@ -240,6 +240,62 @@ describe('planner bridge handlers', () => {
     expect(applied.pl.weakPoints).toEqual(['legs']);
     expect(ctx.showToast).toHaveBeenCalledWith('🔗 Слабые группы: legs');
   });
+
+  it('P5: diagnosticProtocolMap — вставляется показанный протокол, не фикс', () => {
+    const ctx = context('pl');
+    ctx.program = createBlank('pl');
+    applyBridgePayloadDispatch(payload('weakpoints', {
+      groups: ['chest'],
+      diagnosticExerciseMap: { 'bench|lockout': ['Протокольный'] },
+      diagnosticProtocolMap: { 'Протокольный': { pct: 0.7, reps: 8, sets: 4, rir: 1 } },
+    }), ctx);
+    const applied = ctx.onChange.mock.calls[0][0];
+    const ex = applied.pl.customWeeks[0].days.flatMap((d: any) => d.exercises).find((e: any) => e.name === 'Протокольный');
+    expect(ex).toBeTruthy();
+    expect(ex.sets[0]).toMatchObject({ pct: 0.7, reps: 8, sets: 4, rir: 1 });
+  });
+
+  it('P5: битая protocol-карта и мусорные числа — fallback 3×10@60% RIR2', () => {
+    const ctx = context('pl');
+    ctx.program = createBlank('pl');
+    applyBridgePayloadDispatch(payload('weakpoints', {
+      groups: [],
+      diagnosticExerciseMap: { 'bench|lockout': ['Мусорный'] },
+      diagnosticProtocolMap: { 'Мусорный': { pct: NaN, reps: 999, sets: -2, rir: 'x' } },
+    }), ctx);
+    const applied = ctx.onChange.mock.calls[0][0];
+    const ex = applied.pl.customWeeks[0].days.flatMap((d: any) => d.exercises).find((e: any) => e.name === 'Мусорный');
+    expect(ex).toBeTruthy();
+    // NaN→дефолт, выход за границы→кламп (reps ≤30, sets ≥1): ничего не бросает
+    expect(ex.sets[0]).toMatchObject({ pct: 0.6, reps: 30, sets: 1, rir: 2 });
+  });
+
+  it('P2/P4: weakSide +1 унилатеральному, redBlocked стопает вставку', () => {
+    const ctx = context('pl');
+    ctx.program = createBlank('pl');
+    applyBridgePayloadDispatch(payload('weakpoints', {
+      groups: [],
+      diagnosticExerciseMap: { 'bench|barpath|asymmetric': ['Жим гантелей лёжа'] },
+      diagnosticWeakSide: 'right',
+    }), ctx);
+    const applied = ctx.onChange.mock.calls[0][0];
+    const ex = applied.pl.customWeeks[0].days.flatMap((d: any) => d.exercises).find((e: any) => String(e.name).startsWith('Жим гантелей лёжа'));
+    expect(ex).toBeTruthy();
+    expect(ex.name).toContain('правая');
+    expect(ex.sets[0].sets).toBe(4);
+
+    const ctx2 = context('pl');
+    ctx2.program = createBlank('pl');
+    applyBridgePayloadDispatch(payload('weakpoints', {
+      groups: ['chest'],
+      diagnosticExerciseMap: { 'bench|lockout': ['Стоп-упражнение'] },
+      redBlocked: true,
+    }), ctx2);
+    const applied2 = ctx2.onChange.mock.calls[0][0];
+    const names2 = applied2.pl.customWeeks[0].days.flatMap((d: any) => d.exercises.map((e: any) => e.name));
+    expect(names2).not.toContain('Стоп-упражнение');
+    expect(ctx2.showToast).toHaveBeenCalledWith(expect.stringContaining('red-flag'));
+  });
 });
 
 describe('annual_block bridge (блок года → редактор → обратно)', () => {

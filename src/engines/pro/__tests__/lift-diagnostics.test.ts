@@ -19,6 +19,27 @@ describe('lift-diagnostics', () => {
     expect(diagnoseLift('incline_press', 'inc_lockout')).not.toBeNull();
     expect(diagnoseLift('ohp', 'mid')).toBeNull();
   });
+  it('P1: углы для triceps/calf/shrug (все 3 фазы, diagnoseLift не null)', () => {
+    const t = diagnoseLift('triceps', 'triceps_mid');
+    expect(t).not.toBeNull();
+    expect(t!.angleRangeDeg).toEqual([30, 100]);
+    expect(t!.weakMuscles.join(' ')).toContain('Трицепс');
+    const c = diagnoseLift('calf', 'calf_bottom');
+    expect(c).not.toBeNull();
+    expect(c!.keyJoint).toContain('голеностоп');
+    const s = diagnoseLift('shrug', 'shrug_top');
+    expect(s).not.toBeNull();
+    expect(s!.corrections.length).toBeGreaterThan(0);
+    expect(stickingPhases('triceps')).toEqual(['triceps_start', 'triceps_mid', 'triceps_lockout']);
+    expect(stickingPhases('calf')).toEqual(['calf_bottom', 'calf_mid', 'calf_top']);
+    expect(stickingPhases('shrug')).toEqual(['shrug_start', 'shrug_mid', 'shrug_top']);
+  });
+  it('P1: сумо-ссылки едины (deadlift и sumo делят объекты)', () => {
+    expect(diagnoseLift('deadlift', 'sumo_start')).not.toBeNull();
+    expect(diagnoseLift('sumo', 'sumo_start')).not.toBeNull();
+    expect(diagnoseLift('deadlift', 'sumo_start')!.angleRangeDeg).toEqual(diagnoseLift('sumo', 'sumo_start')!.angleRangeDeg);
+    expect(diagnoseLift('deadlift', 'sumo_lockout')!.corrections).toEqual(diagnoseLift('sumo', 'sumo_lockout')!.corrections);
+  });
   it('sumo-тяга: отдельные фазы с углами (сумо-старт и замыкание)', () => {
     const start = diagnoseLift('deadlift', 'sumo_start');
     expect(start).not.toBeNull();
@@ -93,6 +114,9 @@ describe('phaseForReps — каноническая эвристика фазы 
     expect(phaseForReps(2, 'row')).toBe('row_start');
     expect(phaseForReps(1, 'pulldown')).toBe('pd_top');
     expect(phaseForReps(2, 'incline_press')).toBe('inc_off');
+    expect(phaseForReps(1, 'triceps')).toBe('triceps_start');
+    expect(phaseForReps(2, 'calf')).toBe('calf_bottom');
+    expect(phaseForReps(1, 'shrug')).toBe('shrug_start');
   });
 
   it('reps 3–5 → середина амплитуды (mid), если фаза есть у движения', () => {

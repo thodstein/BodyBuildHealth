@@ -111,6 +111,8 @@ function appendDiagnosticsToPL(
   plWeakPoints: { lift: string; weakPoint: string; days?: number[] }[],
   diagnosticExerciseMap: Record<string, string[]>,
   diagnosticDayMap: Record<string, number[]>,
+  weakSide?: 'left' | 'right' | null,
+  protocolMap?: Record<string, { pct?: number; reps?: number; sets?: number; rir?: number }>,
 ): PLProgramBody | null {
   const diagNames = Object.values(diagnosticExerciseMap ?? {}).flatMap(list =>
     Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : []);
@@ -135,12 +137,33 @@ function appendDiagnosticsToPL(
   };
 
   // Диагностические упражнения: per-key списки, дни из diagnosticDayMap (1-based), циклом.
+  // P5: протокол из diagnosticProtocolMap (карточка считает из раскладки цикла —
+  // показанное = вставленное); без карты — legacy фикс 3×10@60% RIR2.
+  // P2: слабая сторона — +1 сет унилатеральным (гантель/одна рука/выпады/болгарские).
+  const isUni = (n: string) => /гантел|одной рук|выпад|болгарск|одной ног|одна ног|single|unilateral|сплит/i.test(n ?? '');
+  const protoMap: Record<string, { pct?: number; reps?: number; sets?: number; rir?: number }> =
+    (protocolMap && typeof protocolMap === 'object' ? protocolMap : {}) as Record<string, { pct?: number; reps?: number; sets?: number; rir?: number }>;
+  const cleanProto = (name: string): { pct: number; reps: number; sets: number; rir: number } => {
+    const raw = protoMap[name];
+    const num = (v: unknown, fb: number, lo: number, hi: number) =>
+      typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fb;
+    if (!raw) return { pct: 0.6, reps: 10, sets: 3, rir: 2 };
+    return {
+      pct: num(raw.pct, 0.6, 0.3, 1),
+      reps: Math.round(num(raw.reps, 10, 1, 30)),
+      sets: Math.round(num(raw.sets, 3, 1, 10)),
+      rir: num(raw.rir, 2, 0, 5),
+    };
+  };
   for (const [key, list] of Object.entries(diagnosticExerciseMap ?? {})) {
     const names = Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : [];
     const configuredDays = (diagnosticDayMap?.[key] ?? []).filter((d): d is number => typeof d === 'number');
     names.forEach((name, index) => {
       const dayIdx = configuredDays.length > 0 ? dayOf(configuredDays[index % configuredDays.length]) : dayOf(undefined);
-      pushExercise(dayIdx, name, [{ pct: 0.6, reps: 10, sets: 3, rir: 2 }], 'accessory');
+      const bonus = weakSide && isUni(name) ? 1 : 0;
+      const label = bonus ? `${name} (слабая: ${weakSide === 'left' ? 'левая' : 'правая'})` : name;
+      const pr = cleanProto(name);
+      pushExercise(dayIdx, label, [{ pct: pr.pct, reps: pr.reps, sets: pr.sets + bonus, rir: pr.rir }], 'accessory');
     });
   }
 
@@ -169,22 +192,31 @@ const weakpointsHandler: Handler = (payload, { program: p, onChange, showToast, 
   const plWeakPoints: { lift: string; weakPoint: string; days?: number[] }[] = Array.isArray(payload.data.plWeakPoints) ? payload.data.plWeakPoints : [];
   const diagnosticExerciseMap: Record<string, string[]> = payload.data.diagnosticExerciseMap ?? {};
   const diagnosticDayMap: Record<string, number[]> = payload.data.diagnosticDayMap ?? {};
+  const diagnosticWeakSide: 'left' | 'right' | null = payload.data.diagnosticWeakSide === 'left' || payload.data.diagnosticWeakSide === 'right' ? payload.data.diagnosticWeakSide : null;
+  const redBlocked = payload.data.redBlocked === true;
   const hasDiagnostics = plWeakPoints.length > 0 || Object.keys(diagnosticExerciseMap).length > 0;
   let next = { ...p };
   if (p.bb) next = { ...next, bb: { ...p.bb, constraints: { ...(p.bb.constraints ?? { equipment: [] }) } } };
   let skippedDiagnostics = false;
+  let skipReason = '';
   if (p.pl) {
     const plBody: PLProgramBody = { ...p.pl, weakPoints: groups };
     next = { ...next, pl: plBody };
-    if (hasDiagnostics) {
-      const extended = appendDiagnosticsToPL(plBody, plWeakPoints, diagnosticExerciseMap, diagnosticDayMap);
+    if (redBlocked) {
+      skippedDiagnostics = true;
+      skipReason = '⛔ red-flag стоп — к врачу (вставка заблокирована)';
+    } else if (hasDiagnostics) {
+      const rawProtoMap: unknown = (payload as { data?: { diagnosticProtocolMap?: unknown } }).data?.diagnosticProtocolMap;
+      const diagnosticProtocolMap = (rawProtoMap && typeof rawProtoMap === 'object' ? rawProtoMap : undefined) as
+        | Record<string, { pct?: number; reps?: number; sets?: number; rir?: number }> | undefined;
+      const extended = appendDiagnosticsToPL(plBody, plWeakPoints, diagnosticExerciseMap, diagnosticDayMap, diagnosticWeakSide, diagnosticProtocolMap);
       if (extended) next = { ...next, pl: extended };
-      else skippedDiagnostics = true;
+      else { skippedDiagnostics = true; skipReason = 'диагностические упражнения пропущены (программа из каталога циклов, не custom)'; }
     }
   }
   onChange(next);
   saveTrainingProfile({ ...tprofile, weakPoints: groups });
-  showToast('🔗 Слабые группы: ' + (groups.join(', ') || 'нет') + (skippedDiagnostics ? ' · диагностические упражнения пропущены (программа из каталога циклов, не custom)' : ''));
+  showToast('🔗 Слабые группы: ' + (groups.join(', ') || 'нет') + (skippedDiagnostics ? ' · ' + skipReason : ''));
 };
 
 /** Калькулятор «Лимитирующие факторы движения»: добавляет выбранные упражнения с

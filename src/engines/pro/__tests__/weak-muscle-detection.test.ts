@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   detectWeakMusclesByE1rm, groupOfExerciseName, WEAK_MUSCLE_GROUP_LABELS,
+  snapshotWeakE1rm, diffWeakE1rm,
   type WeakMuscleSession,
 } from '../weak-muscle-detection.engine';
 
@@ -103,6 +104,31 @@ describe('detectWeakMusclesByE1rm — авто-детекция слабых г�
   it('пустой дневник / без данных — пусто', () => {
     expect(detectWeakMusclesByE1rm([])).toEqual([]);
     expect(detectWeakMusclesByE1rm([{ date: daysAgo(1), exercises: [] }])).toEqual([]);
+  });
+
+  it('P7: snapshotWeakE1rm хранит ts + e1rm, diffWeakE1rm считает дельту', () => {
+    const snap = snapshotWeakE1rm([
+      { group: 'chest', label: 'Грудь', currentE1rm: 100, priorE1rm: 110, deltaPct: -9, sessions: 3, status: 'weak' },
+    ]);
+    expect(snap.ts).toBeGreaterThan(0);
+    expect(snap.e1rms).toEqual({ chest: 100 });
+    const d = diffWeakE1rm(snap, [
+      { group: 'chest', label: 'Грудь', currentE1rm: 105, priorE1rm: 110, deltaPct: -4.5, sessions: 3, status: 'plateau' },
+    ]);
+    expect(d).toHaveLength(1);
+    expect(d[0].deltaPct).toBe(5);
+    expect(d[0].recovered).toBe(false);
+  });
+
+  it('P7: группа вне текущих слабых — recovered, пустой снапшот — []', () => {
+    const snap = snapshotWeakE1rm([
+      { group: 'back', label: 'Спина', currentE1rm: 120, priorE1rm: 130, deltaPct: -7.7, sessions: 2, status: 'weak' },
+    ]);
+    const d = diffWeakE1rm(snap, []);
+    expect(d[0].recovered).toBe(true);
+    expect(d[0].after).toBeNull();
+    expect(diffWeakE1rm(null, [])).toEqual([]);
+    expect(diffWeakE1rm(undefined, [])).toEqual([]);
   });
 
   it('все группы имеют русские лейблы', () => {

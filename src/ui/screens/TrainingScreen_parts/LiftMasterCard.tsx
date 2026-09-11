@@ -23,12 +23,16 @@ import { unifiedLiftDiagnosis, groupsForPhase } from '../../../engines/pro/unifi
 import { diagnoseMovement, barPathIssuesForLift, BAR_PATH_ISSUES, phaseForReps, type BarPathIssue } from '../../../engines/pro/lift-diagnostics.engine';
 import { analyzePhaseAssistance, analyzeStickingCorrections, analyzeBarPathAssistance, protocolFromCycle } from '../../../engines/pro/lift-assistance.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
-import { detectWeakMusclesByE1rm } from '../../../engines/pro/weak-muscle-detection.engine';
-import { diagnoseVelocity } from '../../../engines/pro/vbt.engine';
-import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-builder.engine';
+import { detectWeakMusclesByE1rm, snapshotWeakE1rm, diffWeakE1rm, type E1rmSnapshot } from '../../../engines/pro/weak-muscle-detection.engine';
+import { diagnoseVelocity, thresholdForGoal, mvtForPLLift, lvrStale } from '../../../engines/pro/vbt.engine';
+import { getPLWeakGroupExerciseCandidates, diagnosticProtocolFromCycle } from '../../../engines/lms/lms-builder.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { barLoopFlag } from '../../../engines/pro/bar-path-core.engine';
+import { diagnoseAsymmetry } from '../../../engines/pro/pl-asymmetry.engine';
+import { RULE_CHECKS, checkLiftRules } from '../../../engines/pro/pl-competition-rules.engine';
+import { RED_FLAGS, checkRedFlags, type RedFlagId } from '../../../engines/pro/pl-red-flags.engine';
 import { buildMovementDiagnosticsHtml, buildMovementDiagnosticsCsv, movementDiagnosticsFilename } from '../../../engines/pro/movement-diagnostics-export.engine';
 import { copyOrShareText, saveCsvApk, printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { VideoCaptureCard } from './VideoCaptureCard';
@@ -131,6 +135,16 @@ const WEAK_MUSCLE_DETAIL: Array<{ id: string; label: string; subs: Array<{ sub: 
 ];
 
 const MASTER_KEY = 'he_lift_master_v1';
+const TREND_KEY = 'he_lift_master_trend_v1';
+
+function loadTrend(): E1rmSnapshot | null {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TREND_KEY) || 'null');
+    if (!raw || typeof raw.ts !== 'number' || !raw.e1rms || typeof raw.e1rms !== 'object') return null;
+    return raw as E1rmSnapshot;
+  } catch { return null; }
+}
+function saveTrend(s: E1rmSnapshot) { try { localStorage.setItem(TREND_KEY, JSON.stringify(s)); } catch {} }
 
 interface MasterState {
   lift: Lift;
@@ -143,7 +157,11 @@ interface MasterState {
   weakMuscleGroups: string[];
   weakMuscleSubs: string[];
   asymSide: 'left' | 'right' | null;
+  asymL: string; asymR: string;
   vbtBest: string; vbtLast: string; vbtWeight: string;
+  vbtGoal: string; vbtUpdatedAt: number | null;
+  redFlags: RedFlagId[];
+  ruleChecks: Record<string, boolean>;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -185,13 +203,27 @@ function loadMaster(): MasterState {
       weakMuscleGroups: Array.isArray(raw.weakMuscleGroups) ? raw.weakMuscleGroups.filter((g: unknown): g is string => typeof g==='string' && WEAK_MUSCLE_DETAIL.some(d=>d.id===g)) : [],
       weakMuscleSubs: Array.isArray(raw.weakMuscleSubs) ? raw.weakMuscleSubs.filter((s: unknown) => typeof s==='string' && (s as string).includes('|')) as string[] : [],
       asymSide: raw.asymSide==='left'||raw.asymSide==='right'?raw.asymSide:null,
+      asymL: typeof raw.asymL==='string'?raw.asymL.slice(0,20):'',
+      asymR: typeof raw.asymR==='string'?raw.asymR.slice(0,20):'',
       vbtBest: typeof raw.vbtBest==='string'?raw.vbtBest.slice(0,20):'',
       vbtLast: typeof raw.vbtLast==='string'?raw.vbtLast.slice(0,20):'',
       vbtWeight: typeof raw.vbtWeight==='string'?raw.vbtWeight.slice(0,20):'',
+      vbtGoal: typeof raw.vbtGoal==='string'?raw.vbtGoal.slice(0,20):'strength',
+      vbtUpdatedAt: typeof raw.vbtUpdatedAt==='number' && Number.isFinite(raw.vbtUpdatedAt) ? raw.vbtUpdatedAt : null,
+      redFlags: Array.isArray(raw.redFlags) ? raw.redFlags.filter((f: unknown): f is RedFlagId => f === 'sharp_pain' || f === 'swelling' || f === 'numbness' || f === 'dizzy' || f === 'painful_click') : [],
+      ruleChecks: cleanRuleChecks(raw.ruleChecks),
     };
-  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, vbtBest:'', vbtLast:'', vbtWeight:'' }; }
+  } catch { return { lift:'bench', phase:'' as WeakPoint|'', issues:[], selectedGeom:{}, daysGeom:{}, selectedDiag:{}, daysDiag:{}, weakMuscleGroups:[], weakMuscleSubs:[], asymSide:null, asymL:'', asymR:'', vbtBest:'', vbtLast:'', vbtWeight:'', vbtGoal:'strength', vbtUpdatedAt:null, redFlags:[], ruleChecks:{} }; }
 }
 function saveMaster(s: MasterState) { try{ localStorage.setItem(MASTER_KEY, JSON.stringify(s)); }catch{} }
+function cleanRuleChecks(raw: unknown): Record<string, boolean> {
+  if (!isRecord(raw)) return {};
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v === 'boolean') out[k.slice(0, 80)] = v;
+  }
+  return out;
+}
 
 const protocolText = (p: { sets:number; reps:number; pct:number; rir:number; tempo?:string; rest?:string; holdSec?:number; note?:string }) => {
   const base = `${p.sets}×${p.reps} @${Math.round(p.pct*100)}% RIR ${p.rir}`;
@@ -232,9 +264,38 @@ export const LiftMasterCard: React.FC<{
   const [weakMuscleGroups, setWeakMuscleGroups] = useState<string[]>(initial.weakMuscleGroups);
   const [weakMuscleSubs, setWeakMuscleSubs] = useState<string[]>(initial.weakMuscleSubs);
   const [asymSide, setAsymSide] = useState<'left'|'right'|null>(initial.asymSide);
+  const [asymL, setAsymL] = useState(initial.asymL);
+  const [asymR, setAsymR] = useState(initial.asymR);
+  const asymDiag = useMemo(()=>{
+    const l = parseFloat(asymL), r = parseFloat(asymR);
+    if (!Number.isFinite(l) || !Number.isFinite(r)) return null;
+    return diagnoseAsymmetry(l, r);
+  }, [asymL, asymR]);
   const [vbtBest, setVbtBest] = useState(initial.vbtBest);
   const [vbtLast, setVbtLast] = useState(initial.vbtLast);
   const [vbtWeight, setVbtWeight] = useState(initial.vbtWeight);
+  const [vbtGoal, setVbtGoal] = useState(initial.vbtGoal || 'strength');
+  const [vbtUpdatedAt, setVbtUpdatedAt] = useState<number | null>(initial.vbtUpdatedAt);
+  const [redFlags, setRedFlags] = useState<RedFlagId[]>(initial.redFlags);
+  const [ruleChecks, setRuleChecks] = useState<Record<string, boolean>>(initial.ruleChecks);
+  const redRes = useMemo(()=> checkRedFlags(redFlags), [redFlags]);
+  const ruleDefs = useMemo(()=> RULE_CHECKS[lift] ?? [], [lift]);
+  const ruleRes = useMemo(()=>{
+    const per: Record<string, boolean | null> = {};
+    for (const d of ruleDefs) {
+      const k = `${lift}|${d.id}`;
+      per[d.id] = k in ruleChecks ? ruleChecks[k] : null;
+    }
+    return checkLiftRules(lift, per);
+  }, [lift, ruleChecks, ruleDefs]);
+  const toggleRed = (id: RedFlagId)=> setRedFlags(cur=> cur.includes(id) ? cur.filter(x=>x!==id) : [...cur, id]);
+  const setRule = (id: string, v: boolean | null)=>{
+    const k = `${lift}|${id}`;
+    setRuleChecks(cur=>{ if (v == null) { const n = { ...cur }; delete n[k]; return n; } return { ...cur, [k]: v }; });
+  };
+  const touchVbt = ()=> setVbtUpdatedAt(Date.now());
+  const vbtStale = useMemo(()=> lvrStale(vbtUpdatedAt), [vbtUpdatedAt]);
+  const vbtMvt = useMemo(()=> mvtForPLLift(lift), [lift]);
   const [armSpanInput, setArmSpanInput] = useState('');
   const [shoulderInput, setShoulderInput] = useState('');
   const [kinoveaText, setKinoveaText] = useState('');
@@ -252,7 +313,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, vbtBest, vbtLast, vbtWeight }); }, [phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, vbtBest, vbtLast, vbtWeight]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks }); }, [phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, asymL, asymR, vbtBest, vbtLast, vbtWeight, vbtGoal, vbtUpdatedAt, redFlags, ruleChecks]);
 
   const diag = useMemo(()=> unifiedLiftDiagnosis({ lift, phase, barPathIssues: issues, vbtBest, vbtLast, vbtWeight, sessions, template }), [lift, phase, issues, vbtBest, vbtLast, vbtWeight, sessions, template]);
   const effectivePhase = diag.phases.effectivePhase;
@@ -261,6 +322,9 @@ export const LiftMasterCard: React.FC<{
   const geomRawOptions = useMemo(()=> limiterOptionsFor('technique_geometry', lift), [lift]);
   const geomOptions = useMemo(()=> geomRawOptions.map(analyzeLimiterOption), [geomRawOptions]);
   const weakHints = useMemo(()=> detectWeakMusclesByE1rm(sessions), [sessions]);
+  const [trendBase, setTrendBase] = useState<E1rmSnapshot | null>(null);
+  useEffect(()=>{ setTrendBase(loadTrend()); }, []);
+  const trendDelta = useMemo(()=> diffWeakE1rm(trendBase, weakHints), [trendBase, weakHints]);
 
   const phaseAnalysis = useMemo(()=> effectivePhase ? analyzePhaseAssistance(lift, effectivePhase as WeakPoint, template ?? undefined) : null, [lift, effectivePhase, template]);
   const stickingAnalysis = useMemo(()=> effectivePhase ? analyzeStickingCorrections(lift, effectivePhase as WeakPoint, template ?? undefined) : null, [lift, effectivePhase, template]);
@@ -329,6 +393,19 @@ export const LiftMasterCard: React.FC<{
   const toggleDiagDay = (k:string, day:number)=> setDaysDiag(cur=>{ const s=new Set(cur[k]||[]); if(s.has(day)) s.delete(day); else s.add(day); return {...cur, [k]:[...s].sort((a,b)=>a-b)}; });
 
   const applyAll = ()=>{
+    // P4: red-flag стоп — вставка заблокирована, к врачу
+    const red = checkRedFlags(redFlags);
+    if (red.blocked) {
+      setShareMsg(red.text);
+      setTimeout(()=>setShareMsg(null), 4000);
+      return;
+    }
+    // P7: baseline «было» для Δ-тренда
+    if (weakHints.length) {
+      const snap = snapshotWeakE1rm(weakHints);
+      saveTrend(snap);
+      setTrendBase(snap);
+    }
     // 1) слабые мышцы + слабые точки + bar-path + sticking через weakpoints
     const weakGroups = [...new Set([...weakMuscleSubs.map(k=>k.split('|')[0]), ...groupsForPhase(lift, effectivePhase as WeakPoint).filter(Boolean)])];
     const plWeakPoints = effectivePhase ? [{ lift, weakPoint: effectivePhase, days: daysDiag[`${lift}|${effectivePhase}`] ?? [] }] : [];
@@ -346,10 +423,16 @@ export const LiftMasterCard: React.FC<{
       void cands;
       void key;
     }
-    // weakpoints apply
+    // weakpoints apply (P2: слабая сторона едет только при замере ≥10%)
+    const weakSide = asymDiag && asymDiag.verdict !== 'ok' ? asymDiag.weaker : (asymSide ?? null);
+    // P5: протокол каждого имени из раскладки цикла — мост вставит показанное, не фикс
+    const diagnosticProtocolMap: Record<string, { pct: number; reps: number; sets: number; rir: number }> = {};
+    for (const names of Object.values(diagnosticExerciseMap)) for (const n of names ?? []) {
+      if (typeof n === 'string' && !(n in diagnosticProtocolMap)) diagnosticProtocolMap[n] = diagnosticProtocolFromCycle(template ?? undefined, n);
+    }
     const hasWeak = weakGroups.length>0 || plWeakPoints.length>0 || Object.keys(diagnosticExerciseMap).length>0;
     if (hasWeak) {
-      applyToPlanner({ kind:'weakpoints', label:`Мастер ${LIFT_RU[lift]}: слабые ${weakGroups.join(', ')||'—'} + фаза ${effectivePhase||'—'}`, data:{ groups: weakGroups, plWeakPoints, diagnosticExerciseMap, diagnosticDayMap: daysDiag, weakGroupExerciseMap: {}, weakGroupDayMap:{} } });
+      applyToPlanner({ kind:'weakpoints', label:`Мастер ${LIFT_RU[lift]}: слабые ${weakGroups.join(', ')||'—'} + фаза ${effectivePhase||'—'}`, data:{ groups: weakGroups, plWeakPoints, diagnosticExerciseMap, diagnosticDayMap: daysDiag, weakGroupExerciseMap: {}, weakGroupDayMap:{}, diagnosticWeakSide: weakSide, diagnosticProtocolMap, redBlocked: false } });
     }
     // 2) лимитеры (геометрия + остальные 10 категорий) — один kind limiter
     const limiterExerciseMap: Record<string,string[]> = { ...selectedGeom };
@@ -453,6 +536,40 @@ export const LiftMasterCard: React.FC<{
         </div>
       </div>}</div>
 
+      {/* ── 0. Безопасность: red-флаги + зачёт IPF ── */}
+      <div style={collapsibleCard(redRes.blocked ? '#ef4444' : '#f59e0b')}>
+        <button data-lift="safety" aria-label="Безопасность и зачёт" onClick={()=> toggleCollapsed('sec0')} aria-expanded={!collapsed['sec0']} style={headerBtnStyle(redRes.blocked ? '#ef4444' : '#f59e0b', !!collapsed['sec0'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background: redRes.blocked ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow:'0 2px 8px rgba(245,158,11,0.35)', fontSize:13, flexShrink:0 }}>🛡</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color: redRes.blocked ? '#f87171' : '#f59e0b' }}>0 · Безопасность и зачёт {redRes.blocked ? '· СТОП' : ruleRes.verdict === 'clean' ? '· чисто' : ruleRes.verdict === 'fail' ? '· незачёт' : ''}</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Red-флаги · чек-лист IPF/USAPL</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec0'] ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.18)', border:`1px solid ${collapsed['sec0'] ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.28)'}`, color: collapsed['sec0'] ? 'rgba(255,255,255,0.5)' : '#f59e0b', fontSize:10, transform: collapsed['sec0'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['sec0'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec0'] && <div style={{ padding:12 }}>
+          <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b' }}>🚩 Red-флаги (стоп вставки → к врачу, не диагноз)</div>
+          <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
+            {RED_FLAGS.map(f=>{ const on = redFlags.includes(f.id); return <button key={f.id} data-lift="red-flag" aria-label={`Флаг ${f.label}`} aria-pressed={on} onClick={()=>toggleRed(f.id)} style={{ minHeight:44, padding:'10px 12px', borderRadius:8, cursor:'pointer', border: on ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(239,68,68,0.15)' : 'transparent', color: on ? '#f87171' : DIM, fontSize:12, fontWeight:700 }}>{f.label}{on ? ' ✓' : ''}</button>; })}
+          </div>
+          <div role="status" style={{ marginTop:6, fontSize:10, color: redRes.blocked ? '#f87171' : redRes.cautionItems.length ? '#fbbf24' : '#4ade80', lineHeight:1.4 }}>{redRes.text}</div>
+          <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa', marginTop:10 }}>🏁 Зачёт {LIFT_RU[lift]} (IPF/USAPL)</div>
+          {ruleDefs.length === 0 && <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Чек-листа для этого движения нет — только базовые лифты.</div>}
+          {ruleDefs.map(d=>{
+            const k = `${lift}|${d.id}`;
+            const v = k in ruleChecks ? ruleChecks[k] : null;
+            return (
+              <div key={d.id} style={{ display:'flex', gap:6, alignItems:'center', marginTop:6, flexWrap:'wrap' }}>
+                <span style={{ flex:1, minWidth:180, fontSize:10, color:'#fff' }}>{d.label}{d.critical ? ' · крит.' : ''}</span>
+                <button data-lift="rule-ok" aria-label={`Соблюдено: ${d.label}`} onClick={()=>setRule(d.id, v === true ? null : true)} style={{ minHeight:44, minWidth:52, borderRadius:8, cursor:'pointer', border: v === true ? '1px solid #4ade80' : '1px solid rgba(255,255,255,0.1)', background: v === true ? 'rgba(74,222,128,0.15)' : 'transparent', color: v === true ? '#4ade80' : DIM, fontSize:12, fontWeight:700 }}>✓</button>
+                <button data-lift="rule-fail" aria-label={`Нарушено: ${d.label}`} onClick={()=>setRule(d.id, v === false ? null : false)} style={{ minHeight:44, minWidth:52, borderRadius:8, cursor:'pointer', border: v === false ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)', background: v === false ? 'rgba(239,68,68,0.15)' : 'transparent', color: v === false ? '#f87171' : DIM, fontSize:12, fontWeight:700 }}>✕</button>
+              </div>
+            );
+          })}
+          <div role="status" style={{ marginTop:6, fontSize:10, color: ruleRes.verdict === 'clean' ? '#4ade80' : ruleRes.verdict === 'fail' ? '#f87171' : '#fbbf24', lineHeight:1.4 }}>{ruleRes.text}</div>
+        </div>}</div>
+
       {/* ── 1. Слабые мышцы + BB-грануляр ── */}
       <div style={collapsibleCard('#4ade80')}>
         <button onClick={()=> toggleCollapsed('sec1')} aria-expanded={!collapsed['sec1']} style={headerBtnStyle('#4ade80', !!collapsed['sec1'])}>
@@ -506,6 +623,16 @@ export const LiftMasterCard: React.FC<{
           </div>
         )}
         {!template && <div style={{ marginTop:6, fontSize:10, color:'#ffffff' }}>Выберите цикл в ПЛ-авто — ассистенты подбираются по его раскладке.</div>}
+        {trendDelta.length>0 && (
+          <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>📈 Было → стало (с применения {trendBase ? new Date(trendBase.ts).toLocaleDateString('ru-RU') : '—'})</div>
+            {trendDelta.map(d=> (
+              <div key={d.group} style={{ fontSize:10, color:DIM, marginTop:2 }}>
+                {d.label}: {d.before} → {d.after ?? '—'} кг{d.deltaPct != null ? ` (${d.deltaPct > 0 ? '+' : ''}${d.deltaPct}%)` : ''}{d.recovered ? ' · вне слабых (восстановилась или мало данных)' : ''}
+              </div>
+            ))}
+          </div>
+        )}
         {weakMuscleGroups.map(group=>{
           const detail=WEAK_MUSCLE_DETAIL.find(d=>d.id===group); if(!detail) return null;
           return (
@@ -618,9 +745,15 @@ export const LiftMasterCard: React.FC<{
         </div>
         {issues.includes('asymmetric' as BarPathIssue) && (
           <div style={{ marginTop:6, padding:6, borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-            <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>⚖️ Какая сторона слабее?</div>
+            <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>⚖️ Замер сторон (e1RM или вес×повторы одной схемы):</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+              <label style={{ fontSize:10, color:DIM }}>Левая: <input data-lift="asym-l" aria-label="Левая сторона, кг" type="number" step="0.5" min="0" value={asymL} onChange={e=>setAsymL(e.target.value)} placeholder="100" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:12 }} /></label>
+              <label style={{ fontSize:10, color:DIM }}>Правая: <input data-lift="asym-r" aria-label="Правая сторона, кг" type="number" step="0.5" min="0" value={asymR} onChange={e=>setAsymR(e.target.value)} placeholder="100" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:12 }} /></label>
+            </div>
+            {asymDiag && <div role="status" style={{ marginTop:4, fontSize:10, color: asymDiag.verdict==='ok' ? '#4ade80' : asymDiag.verdict==='watch' ? '#fbbf24' : '#f87171', lineHeight:1.4 }}>{asymDiag.text}</div>}
+            <div style={{ fontSize:10, color:DIM, marginTop:4, marginBottom:4 }}>Какая сторона слабее (если замера нет)?</div>
             <div style={{ display:'flex', gap:5 }}>
-              {(['left','right'] as const).map(side=>{ const on=asymSide===side; return <button key={side} onClick={()=>setAsymSide(cur=> cur===side?null:side)} style={{ minHeight:30, padding:'4px 12px', borderRadius:7, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.18)':'transparent', color: on?'#c084fc':DIM, fontSize:10, fontWeight:700 }}>{side==='left'?'Левая':'Правая'}{on?' ✓':''}</button>; })}
+              {(['left','right'] as const).map(side=>{ const on=asymSide===side; return <button key={side} onClick={()=>setAsymSide(cur=> cur===side?null:side)} style={{ minHeight:44, padding:'10px 14px', borderRadius:7, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.18)':'transparent', color: on?'#c084fc':DIM, fontSize:12, fontWeight:700 }}>{side==='left'?'Левая':'Правая'}{on?' ✓':''}</button>; })}
             </div>
           </div>
         )}
@@ -685,17 +818,22 @@ export const LiftMasterCard: React.FC<{
         </button>
         {!collapsed['sec6'] && <div style={{ padding:12 }}>
         <div style={{ fontSize:11, fontWeight:800, color:'#f472b6', display:'none' }}>6 · VBT: скорость штанги (м/с)</div>
-        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Лучший vs последний повтор → потеря скорости → зона → вероятная фаза срыва (максимальный момент). План не меняется — диагностика.</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Лучший vs последний повтор → потеря скорости → зона → вероятная фаза срыва (максимальный момент). План не меняется — диагностика. MVT {LIFT_RU[lift]}: {vbtMvt.mvt.toFixed(2)} м/с{vbtMvt.isEstimate ? ' (ориентир, не замер)' : ''}.</div>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
+          <span style={{ fontSize:10, color:DIM }}>Цель:</span>
+          {([['strength','Сила · 20%'],['speed','Скорость · 10%'],['mass','Масса · 25%']] as const).map(([g,label])=>{ const on=vbtGoal===g; return <button key={g} data-lift="vbt-goal" aria-label={`VBT цель ${label}`} onClick={()=>{ setVbtGoal(g); touchVbt(); }} style={{ minHeight:44, padding:'10px 12px', borderRadius:8, cursor:'pointer', border: on?'1px solid #f472b6':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(244,114,182,0.15)':'transparent', color: on?'#f472b6':DIM, fontSize:12, fontWeight:700 }}>{label}{on?' ✓':''}</button>; })}
+        </div>
+        {vbtStale?.stale && <div role="status" style={{ marginTop:6, fontSize:10, color:'#fbbf24', lineHeight:1.4 }}>⚠ Замеру {vbtStale.weeksAgo} нед. — LVP дрейфует, перекалибруйте (введите свежие скорости).</div>}
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
-          <label style={{ fontSize:10, color:DIM }}>Лучший (м/с): <input type="number" step="0.01" min="0" value={vbtBest} onChange={e=>setVbtBest(e.target.value)} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-          <label style={{ fontSize:10, color:DIM }}>Последний (м/с): <input type="number" step="0.01" min="0" value={vbtLast} onChange={e=>setVbtLast(e.target.value)} placeholder="0.40" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
-          <label style={{ fontSize:10, color:DIM }}>Вес (кг): <input type="number" step="0.5" min="0" value={vbtWeight} onChange={e=>setVbtWeight(e.target.value)} placeholder="100" style={{ width:64, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <label style={{ fontSize:10, color:DIM }}>Лучший (м/с): <input type="number" step="0.01" min="0" value={vbtBest} onChange={e=>{ setVbtBest(e.target.value); touchVbt(); }} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <label style={{ fontSize:10, color:DIM }}>Последний (м/с): <input type="number" step="0.01" min="0" value={vbtLast} onChange={e=>{ setVbtLast(e.target.value); touchVbt(); }} placeholder="0.40" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <label style={{ fontSize:10, color:DIM }}>Вес (кг): <input type="number" step="0.5" min="0" value={vbtWeight} onChange={e=>{ setVbtWeight(e.target.value); touchVbt(); }} placeholder="100" style={{ width:64, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
         </div>
         {(()=>{
           const best=parseFloat(vbtBest), last=parseFloat(vbtLast);
           if (!Number.isFinite(best)||!Number.isFinite(last)||best<=0||last<=0||last>best) return <div style={{ marginTop:6, fontSize:10, color:'#ffffff' }}>Введите скорости (последний не может быть быстрее лучшего).</div>;
           const weight=parseFloat(vbtWeight);
-          const d=diagnoseVelocity(lift, best, last, Number.isFinite(weight)&&weight>0?weight:undefined);
+          const d=diagnoseVelocity(lift, best, last, Number.isFinite(weight)&&weight>0?weight:undefined, thresholdForGoal(vbtGoal));
           const vbtPhase=(d.suggestedPhase ?? effectivePhase) as WeakPoint|null;
           const vbtSticking = vbtPhase ? analyzeStickingCorrections(lift, vbtPhase, template ?? undefined) : null;
           const vbtKey=`${lift}|vbt|${vbtPhase??'none'}`;
@@ -733,6 +871,7 @@ export const LiftMasterCard: React.FC<{
               const v = r.barVelocity;
               setVbtBest((v+0.15).toFixed(2));
               setVbtLast(v.toFixed(2));
+              touchVbt();
             }
             setVideoNote(`Локти ${r.elbowAvgDeg ?? '—'}° · хват ${r.gripRatio ?? '—'} · скорость ${r.barVelocity ?? '—'} м/с · ${r.note}`);
           }} />
@@ -757,7 +896,7 @@ export const LiftMasterCard: React.FC<{
                 if (!pts) { setKinoveaMsg('CSV не распознан — нужны колонки t,x,y (разделитель , или ;).'); return; }
                 const r = analyzeBarTracking(pts);
                 if (!r) { setKinoveaMsg('Точек мало для анализа (нужно ≥2).'); return; }
-                const badge = r.xLoop >= 6 ? 'крит. >6' : r.xLoop >= 4 ? 'внимание ≥4' : 'норма';
+                const badge = barLoopFlag(r.xLoop) === 'crit' ? 'крит. >6' : barLoopFlag(r.xLoop) === 'warn' ? 'внимание ≥4' : 'норма';
                 setKinoveaMsg(`xLoop ${r.xLoop} см (${badge}) · yMax ${r.yMax} см · vmax ${r.vmax} м/с (оценка) · точек ${r.points.length}`);
               }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'rgba(14,165,233,0.15)', color:'#0ea5e9', border:'1px solid rgba(14,165,233,0.3)', fontWeight:700, fontSize:12 }}>📊 Разобрать CSV</button>
               <button data-lift="clear-kinovea" aria-label="Очистить Kinovea" onClick={()=>{ setKinoveaText(''); setKinoveaMsg(null); }} style={{ minHeight:44, padding:'10px 14px', borderRadius:10, cursor:'pointer', background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:700, fontSize:12 }}>✕ Очистить</button>

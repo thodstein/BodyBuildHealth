@@ -148,3 +148,44 @@ export function detectWeakMusclesByE1rm(
   }
   return signals.sort((a, b) => a.deltaPct - b.deltaPct);
 }
+
+/** P7: снапшот e1RM слабых групп на момент применения коррекций («было»). */
+export interface E1rmSnapshot {
+  ts: number;
+  e1rms: Record<string, number>;
+}
+
+export function snapshotWeakE1rm(signals: WeakMuscleSignal[]): E1rmSnapshot {
+  const e1rms: Record<string, number> = {};
+  for (const s of signals) {
+    if (typeof s.group === 'string' && Number.isFinite(s.currentE1rm)) e1rms[s.group] = s.currentE1rm;
+  }
+  return { ts: Date.now(), e1rms };
+}
+
+export interface E1rmDelta {
+  group: string;
+  label: string;
+  before: number;
+  after: number | null;
+  deltaPct: number | null;
+  /** recovered = группы нет среди текущих слабых (восстановилась или мало данных). */
+  recovered: boolean;
+}
+
+/** P7: «было → стало» по снапшоту применения. Чистая функция. */
+export function diffWeakE1rm(prev: E1rmSnapshot | null | undefined, now: WeakMuscleSignal[]): E1rmDelta[] {
+  if (!prev || !prev.e1rms) return [];
+  const cur = new Map(now.map(s => [s.group, s.currentE1rm]));
+  return Object.entries(prev.e1rms).map(([group, before]) => {
+    const after = cur.has(group) ? (cur.get(group) as number) : null;
+    return {
+      group,
+      label: WEAK_MUSCLE_GROUP_LABELS[group] ?? group,
+      before,
+      after,
+      deltaPct: after != null && before > 0 ? Math.round(((after - before) / before) * 1000) / 10 : null,
+      recovered: after == null,
+    };
+  });
+}

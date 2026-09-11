@@ -31,6 +31,10 @@ export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' |
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
 export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedic?: unknown; currentPain?: string[]; diagnosticExerciseMap?: Record<string, string[]>; diagnosticDayMap?: Record<string, number[]>; plWeakPoints?: { lift: string; weakPoint: string; days?: number[] }[]; weakGroupExerciseMap?: Record<string, string[]>; weakGroupDayMap?: Record<string, number[]>;
+  /** Movement PRO P2/P4/P5 (LiftMasterCard/PlDeadpoints → ПЛ/ручной): всё опционально, приёмник валидирует. */
+  diagnosticWeakSide?: 'left' | 'right' | null;
+  diagnosticProtocolMap?: Record<string, { pct?: number; reps?: number; sets?: number; rir?: number }>;
+  redBlocked?: boolean;
   /** ББ-диагностика (BBDiagnosticsHub → BbAutoConstructor, kind 'weakpoints', source 'intellectual').
    *  Все поля опциональны — ПЛ/ручной путь их игнорирует. Раньше ехали через `as any` с обеих сторон. */
   weakPoints?: string[]; weakZonesGranular?: string[]; weakMusclesCanonical?: string[];

@@ -105,7 +105,12 @@ export interface UnifiedLiftInput {
   vbtThreshold?: VelocityLossThreshold;
   /** Сессии дневника для weak-muscle и diary-sticking. */
   sessions?: WeakMuscleSession[];
-  /** Шаблон цикла для подбора ассистентов по раскладке. */
+  /**
+   * Шаблон цикла — зарезервировано для цикл-протоколов.
+   * Агрегатор протоколы не считает (их считают карточки через protocolFromCycle /
+   * diagnosticProtocolFromCycle — паритет покрыт diagnostic-protocol-parity.test),
+   * поле оставлено для совместимости и будущего использования.
+   */
   template?: SRCycleTemplate | null;
 }
 
@@ -146,7 +151,7 @@ function effectivePhaseFor(lift: Lift, phase?: WeakPoint | ''): WeakPoint | '' {
  * bar-path + VBT + лимитеры геометрии. Числа идентичны существующим карточкам.
  */
 export function unifiedLiftDiagnosis(input: UnifiedLiftInput): UnifiedLiftDiagnosis {
-  const { lift, barPathIssues = [], sessions = [], template } = input;
+  const { lift, barPathIssues = [], sessions = [] } = input;
   const eff = effectivePhaseFor(lift, input.phase);
   const movement = eff ? diagnoseMovement(lift, eff) : null;
 
@@ -206,7 +211,6 @@ export function unifiedLiftDiagnosis(input: UnifiedLiftInput): UnifiedLiftDiagno
   if (techniqueGeometry.length) parts.push(`геометрия: ${techniqueGeometry.length} парам.`);
   const headerHint = parts.join(' · ');
 
-  void template;
   return { lift, weakMuscles, phases, barPath, vbt, limiter, headerHint };
 }
 

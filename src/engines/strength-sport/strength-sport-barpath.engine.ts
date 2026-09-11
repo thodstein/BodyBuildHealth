@@ -12,6 +12,8 @@
  * Полевая методика Ang 2023: Kinovea 12Hz Butterworth → дифференцирование → v
  */
 
+import { barLoopFlag } from '../pro/bar-path-core.engine';
+
 export type TrajectoryType = 'type1' | 'type2' | 'type3' | 'unknown';
 export type BarPathDeviationPro = 'forward' | 'backward' | 'loop' | 'early_pull' | 'soft_lockout';
 
@@ -203,9 +205,10 @@ export function diagnoseBarPathFromMetrics(metrics: BarPathMetrics | null, lift:
   if (!metrics) return { deviation: null, severity: 'ok', text: 'Нет данных тяги' };
   const liftLow = lift.toLowerCase();
   const isOverhead = liftLow.includes('snatch') || liftLow.includes('jerk');
-  // Порог SRD 4-6см (Frontiers)
-  if (metrics.xLoop > 6) return { deviation: 'loop', severity: 'critical', text: `Петля ${metrics.xLoop}см >6см SRD — критично` };
-  if (metrics.xLoop > 4) return { deviation: 'loop', severity: 'warn', text: `Петля ${metrics.xLoop}см >4см — требует внимания` };
+  // P6: петля — через единый канон SRD 4/6 (pro/bar-path-core, инклюзивный ≥4).
+  const loop = barLoopFlag(metrics.xLoop);
+  if (loop === 'crit') return { deviation: 'loop', severity: 'critical', text: `Петля ${metrics.xLoop}см >6см SRD — критично` };
+  if (loop === 'warn') return { deviation: 'loop', severity: 'warn', text: `Петля ${metrics.xLoop}см ≥4см — требует внимания` };
   if (metrics.vMax > 0 && metrics.vMax < 1.5 && isOverhead) return { deviation: 'early_pull', severity: 'warn', text: `Низкая пиковая скорость ${metrics.vMax} м/с — ранний срыв или недовзрыв` };
   if (metrics.yMax > 0 && metrics.yMax < 5) return { deviation: 'soft_lockout', severity: 'warn', text: 'Низкая высота бара — риск недокрута' };
   return { deviation: null, severity: 'ok', text: `Траектория ${metrics.trajectoryType} в допуске (${metrics.xLoop}см)` };

@@ -314,6 +314,28 @@ describe('PL-auto key coverage 4.1-4.15', () => {
       expect(perDayCounts.every(c => c <= 1)).toBe(true);
     });
 
+    it('4.28 diagnostic assistant: weakSide +1 сет унилатеральным, билатеральные без бонуса', () => {
+      const uni = 'Жим гантелей лёжа';
+      const bi = 'Контрольный билатеральный ассистент';
+      const base = { template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural' as const, currentReadiness: 100 };
+      const p = buildLMSPlan({ ...base,
+        diagnosticExerciseMap: { 'bench|barpath|asymmetric': [uni, bi] },
+        diagnosticWeakSide: 'left' });
+      const all = p.weeks[0].days.flatMap(d => d.exercises);
+      const injectedUni = all.find(e => e.name.startsWith(uni));
+      expect(injectedUni).toBeTruthy();
+      expect(injectedUni!.name).toContain('слабая: левая');
+      const protocol = diagnosticProtocolFromCycle(CYCLE_01, uni);
+      expect(injectedUni!.workSets[0].sets).toBe(protocol.sets + 1);
+      const injectedBi = all.find(e => e.name === bi);
+      if (injectedBi) expect(injectedBi.workSets[0].sets).toBe(diagnosticProtocolFromCycle(CYCLE_01, bi).sets);
+      // без weakSide — бонуса нет
+      const p2 = buildLMSPlan({ ...base, diagnosticExerciseMap: { 'bench|barpath|asymmetric': [uni] } });
+      const uni2 = p2.weeks[0].days.flatMap(d => d.exercises).find(e => e.name.startsWith(uni));
+      expect(uni2).toBeTruthy();
+      expect(uni2!.name).not.toContain('слабая');
+    });
+
     it('4.27 diagnostic assistant: MRV-бюджет группы — при переборе пропускается с note', () => {
       const chestNames = Array.from(new Set(getExercisesByGroup('chest').map(e => e.name)));
       const protocol = diagnosticProtocolFromCycle(CYCLE_01, chestNames[0]);

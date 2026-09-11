@@ -44,8 +44,9 @@ function groupsForLiftPhase(lift: Lift, phase: WeakPoint): string[] {
       if (group) groups.add(group);
     }
   }
-  // Fallback: для движений без угловой диагностики (ohp/row/pulldown/incline_press)
-  // слабые мышцы не распознаются — используем типичные группы движения.
+  // Дополнение: угловая диагностика покрывает все 12 движений (P1), но пул
+  // каталога может не содержать точных совпадений — типичные группы движения
+  // страхуют пустой подбор.
   const LIFT_FALLBACK_GROUPS: Record<Lift, string[]> = {
     bench: ['chest', 'arms'],
     squat: ['legs'],
@@ -365,8 +366,7 @@ export function analyzeBarPathAssistance(lift: Lift, issue: BarPathIssue, templa
 /**
  * Анализ упражнений-коррекций мёртвой точки (sticking.corrections → ПЛ-пул) —
  * для секции «2 · Мёртвые точки»: коррекции углов становятся выбираемыми.
- * Для движений без угловой диагностики (ohp/row/pulldown/incline_press) —
- * мёртвых точек нет → items пуст (в UI пояснение).
+ * Без угловой записи (diagnoseLift null) → items пуст (в UI пояснение).
  */
 export function analyzeStickingCorrections(lift: Lift, phase: WeakPoint, template?: SRCycleTemplate): AssistanceAnalysis {
   const sticking = diagnoseLift(lift, phase);

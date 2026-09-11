@@ -20,4 +20,11 @@ describe('movement-diagnostics APK hooks', () => {
     expect(html).toContain('data-lift="export-csv"');
     expect(html).toContain('data-lift="share"');
   });
+  it('LiftMasterCard: L/R-замер при выбранной асимметрии', () => {
+    try { localStorage.setItem('he_lift_master_v1', JSON.stringify({ lift: 'bench', phase: '', issues: ['asymmetric'] })); } catch {}
+    const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
+    try { localStorage.removeItem('he_lift_master_v1'); } catch {}
+    expect(html).toContain('data-lift="asym-l"');
+    expect(html).toContain('data-lift="asym-r"');
+  });
 });

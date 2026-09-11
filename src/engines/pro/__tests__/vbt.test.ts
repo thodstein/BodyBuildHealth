@@ -149,4 +149,47 @@ describe('diagnoseVelocity — ручной ввод скорости → пот
     expect(d.exceeded).toBe(false);
     expect(d.suggestedPhase).toBeNull();
   });
+
+  it('P1-синк: triceps/calf/shrug дают *_start-фазу при превышении', () => {
+    expect(diagnoseVelocity('triceps', 0.6, 0.4).suggestedPhase).toBe('triceps_start');
+    expect(diagnoseVelocity('calf', 0.6, 0.4).suggestedPhase).toBe('calf_bottom');
+    expect(diagnoseVelocity('shrug', 0.6, 0.4).suggestedPhase).toBe('shrug_start');
+  });
+});
+
+describe('P3: цель-пороги + MVT всех лифтов + stale-профиль', () => {
+  it('thresholdForGoal: сила 20 / скорость 10 / масса 25 (RU+EN)', async () => {
+    const { thresholdForGoal, diagnoseVelocityForGoal, mvtForPLLift, lvrStale } = await import('../vbt.engine');
+    expect(thresholdForGoal('strength')).toBe(20);
+    expect(thresholdForGoal('Сила')).toBe(20);
+    expect(thresholdForGoal('speed')).toBe(10);
+    expect(thresholdForGoal('Скорость')).toBe(10);
+    expect(thresholdForGoal('mass')).toBe(25);
+    expect(thresholdForGoal('Масса')).toBe(25);
+    expect(thresholdForGoal(null)).toBe(20);
+    expect(thresholdForGoal('???')).toBe(20);
+  });
+  it('diagnoseVelocityForGoal: та же потеря 15% — сила ок, скорость превышена', async () => {
+    const { diagnoseVelocityForGoal } = await import('../vbt.engine');
+    const s = diagnoseVelocityForGoal('bench', 0.6, 0.51, undefined, 'strength');
+    expect(s.exceeded).toBe(false);
+    const v = diagnoseVelocityForGoal('bench', 0.6, 0.51, undefined, 'speed');
+    expect(v.exceeded).toBe(true);
+  });
+  it('mvtForPLLift: 5 канон + 7 ориентиров с флагом', async () => {
+    const { mvtForPLLift } = await import('../vbt.engine');
+    expect(mvtForPLLift('bench')).toEqual({ mvt: 0.15, isEstimate: false });
+    expect(mvtForPLLift('squat').isEstimate).toBe(false);
+    expect(mvtForPLLift('triceps').isEstimate).toBe(true);
+    expect(mvtForPLLift('calf').mvt).toBeGreaterThan(0);
+    expect(mvtForPLLift('shrug').mvt).toBeGreaterThan(0);
+  });
+  it('lvrStale: >6 недель — stale, свежее — нет, мусор — null', async () => {
+    const { lvrStale } = await import('../vbt.engine');
+    const now = Date.now();
+    expect(lvrStale(now - 50 * 24 * 3600 * 1000, now)!.stale).toBe(true);
+    expect(lvrStale(now - 7 * 24 * 3600 * 1000, now)!.stale).toBe(false);
+    expect(lvrStale(null)).toBeNull();
+    expect(lvrStale(NaN)).toBeNull();
+  });
 });

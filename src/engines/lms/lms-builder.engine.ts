@@ -60,6 +60,8 @@ export interface LMSBuildInput {
   /** Выбранные ассистенты из биомеханической диагностики и bar-path. */
   diagnosticExerciseMap?: Record<string, string[]>;
   diagnosticDayMap?: Record<string, number[]>;
+  /** P2: слабая сторона (асимметрия ≥10%) — +1 сет унилатеральным в пределах MRV. */
+  diagnosticWeakSide?: 'left' | 'right' | null;
   /** Калькулятор «Лимитирующие факторы движения»: выбранные упражнения per option key
    *  (key = `${lift}|${category}|${optionId}`). */
   limiterExerciseMap?: Record<string, string[]>;
@@ -589,7 +591,10 @@ export function getPLWeakPointRecommendations(lift: Lift, weakPoint: WeakPoint):
  * Для каждого {lift, weakPoint} подбираем до MAX_CORRECTIONS упражнений из diagnoseWeakPoint
  * (проверенный каталог weakpoint-pl), которые ещё не присутствуют в дне,
  * и добавляем их (3 подхода на %ПМ) в день, содержащий основной лифт.
- * Не дублирует уже назначенные упражнения; соблюдает MRV soft-cap группы.
+ * Не дублирует уже назначенные упражнения.
+ * ОСОЗНАННО без MRV-капа (P5): пользователь явно выбрал эти слабые точки —
+ * максимум 2 коррекции на точку, перебор виден в валидаторе (mrv_overflow),
+ * в отличие от injectDiagnosticExercises где пропуск молча терял выбор.
  */
 function injectPLWeakPoints(
   days: LMSPlanDay[],
@@ -829,6 +834,7 @@ function injectDiagnosticExercises(
   template?: SRCycleTemplate,
   mrvParams?: DiagnosticMrvParams,
   notes?: string[],
+  weakSide?: 'left' | 'right' | null,
 ): void {
   if (!exerciseMap) return;
 
@@ -900,26 +906,29 @@ function injectDiagnosticExercises(
       const pm = pmRow[name] ?? fallbackPm;
       const protocol = diagnosticProtocolFromCycle(template, name);
       const group = diagnosticGroupForExercise(name);
+      // P2: слабая сторона получает +1 сет на унилатеральных (в пределах MRV).
+      const uniBonus = weakSide && /гантел|одной рук|выпад|болгарск|одной ног|одна ног|single|unilateral|сплит/i.test(name) ? 1 : 0;
+      const effSets = protocol.sets + uniBonus;
       // MRV-бюджет группы: не добавляем, если недельный объём группы выйдет за MRV.
       if (group) {
         const budget = groupMrvBudget(group);
-        const addedSets = Math.max(1, protocol.sets);
+        const addedSets = Math.max(1, effSets);
         if (budget != null && weeklyGroupSets(group) + addedSets > budget) {
           notes?.push(`⚠ Диагностика: ${name} не добавлен — объём группы ${group} ${weeklyGroupSets(group) + addedSets} сетов > MRV ${budget} (уровень ×${Math.max(1, mrvParams!.combinedMrvMult).toFixed(2)} PED/восст ×${mrvParams!.acwrVolMod} ACWR ×${mrvParams!.arVolMult} авторег).`);
           continue;
         }
       }
       day.exercises.push({
-        name,
+        name: uniBonus ? `${name} (слабая: ${weakSide === 'left' ? 'левая' : 'правая'})` : name,
         group: group ?? 'accessory',
         coef: 0.3,
         mnosz: 1,
         load: 'Средняя',
         pm,
         rir: protocol.rir,
-        workSets: [{ pct: protocol.pct, reps: protocol.reps, sets: protocol.sets, weight: workWeight(pm, protocol.pct), rir: protocol.rir }],
+        workSets: [{ pct: protocol.pct, reps: protocol.reps, sets: effSets, weight: workWeight(pm, protocol.pct), rir: protocol.rir }],
       });
-      notes?.push(`🔥 Диагностика: ${name} → день ${dayIndex + 1} (${protocol.sets}×${protocol.reps} @${Math.round(protocol.pct * 100)}% RIR ${protocol.rir}) · группа ${group ?? '—'}${group ? ` ≤ MRV ${groupMrvBudget(group) ?? '—'}` : ''}.`);
+      notes?.push(`🔥 Диагностика: ${name} → день ${dayIndex + 1} (${effSets}×${protocol.reps} @${Math.round(protocol.pct * 100)}% RIR ${protocol.rir}${uniBonus ? `, +1 слабой стороне` : ''}) · группа ${group ?? '—'}${group ? ` ≤ MRV ${groupMrvBudget(group) ?? '—'}` : ''}.`);
     }
   }
 }
@@ -1342,7 +1351,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     if (input.plWeakPoints && input.plWeakPoints.length) {
       injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.plWeakPointExerciseMap, input.orthopedicBlockedPatterns ?? [], input.fallbackPm ?? 80);
     }
-    injectDiagnosticExercises(days, input.diagnosticExerciseMap, input.diagnosticDayMap, pmRow, input.fallbackPm ?? 80, template, { vrLevel, combinedMrvMult, acwrVolMod, arVolMult }, weakNotes);
+    injectDiagnosticExercises(days, input.diagnosticExerciseMap, input.diagnosticDayMap, pmRow, input.fallbackPm ?? 80, template, { vrLevel, combinedMrvMult, acwrVolMod, arVolMult }, weakNotes, input.diagnosticWeakSide ?? null);
     injectLimiterExercises(days, input.limiterExerciseMap, input.limiterProtocolMap, input.limiterDayMap, pmRow, input.fallbackPm ?? 80, template, { vrLevel, combinedMrvMult, acwrVolMod, arVolMult }, weakNotes);
 
     // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
