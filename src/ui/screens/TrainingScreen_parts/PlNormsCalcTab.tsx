@@ -6,6 +6,7 @@ import {
   classifyTotal,
   classifyTotalForCategory,
   progressToNextRank,
+  resolveFederation,
   NORM_EXPLANATIONS,
   RANK_DESCRIPTIONS,
   CATEGORY_EXPLANATION,
@@ -18,7 +19,7 @@ import {
   type Sex,
   type AgeGroup,
 } from '../../../engines/pl-norms.engine';
-import { wilksScore, dotsScore, ipfGLPoints, allometricScore, relativeStrength, liftRelativeStrength } from '../../../engines/pro/relative-strength.engine';
+import { wilksScore, dotsScore, ipfGLPoints, ipfGLPointsFor, allometricScore, relativeStrength, liftRelativeStrength, mccullochCoeff, ageAdjustedScore } from '../../../engines/pro/relative-strength.engine';
 import { calcGlossbrenner } from '../../../engines/pl-points.engine';
 import { applyToPlanner } from './planner-bridge';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
@@ -30,10 +31,11 @@ const DIM = '#fff';
 const SMALL: React.CSSProperties = { color: DIM, fontSize: 12, lineHeight: 1.5 };
 const CARD: React.CSSProperties = { padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.5)', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 10 };
 const SECTION: React.CSSProperties = { fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 6 };
-const rankColor: Record<string, string> = { КМС: '#60a5fa', МС: '#a855f7', МСМК: '#f59e0b', ЭЛИТА: '#ef4444', 'нет разряда': '#fff' };
+const rankColor: Record<string, string> = { КМС: '#60a5fa', МС: '#a855f7', МСМК: '#f59e0b', ЭЛИТА: '#ef4444', I: '#34d399', II: '#2dd4bf', III: '#38bdf8', 'I(ю)': '#94a3b8', 'II(ю)': '#94a3b8', 'III(ю)': '#94a3b8', 'нет разряда': '#fff' };
 
 const FEDS_ALL: { id: Federation; label: string }[] = [
-  { id: 'fpr_ipf', label: 'ФПР / IPF (с ДК)' },
+  { id: 'fpr_classic', label: 'ФПР / IPF — классика' },
+  { id: 'fpr_equipped', label: 'ФПР — экипировка' },
   { id: 'wrpf_untested', label: 'WRPF / СПР (без ДК)' },
   { id: 'wrpf_tested', label: 'WRPF / СПР (с ДК)' },
 ];
@@ -61,7 +63,10 @@ interface Props {
 export const PlNormsCalcTab: React.FC<Props> = ({ snapshot, onSnapshotChange }) => {
   const initialSex = (() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' as Sex : 'male' as Sex; } catch { return 'male' as Sex; } })();
   const [sexLocal, setSexLocal] = useState<Sex>(initialSex);
-  const [fed, setFed] = useState<Federation>('fpr_ipf');
+  const [fed, setFed] = useState<Federation>('fpr_classic');
+  const [ageNum, setAgeNum] = useState<number>(30);
+  const [mcOn, setMcOn] = useState(false);
+  const [bwDelta, setBwDelta] = useState<number>(0);
   const [disc, setDisc] = useState<Discipline>('total');
   const [ageGroup, setAgeGroup] = useState<AgeGroup>('open');
   const [bwLocal, setBwLocal] = useState<number>(() => { try { return Number((getProfile().settings as any)?.personal?.weight) || 83; } catch { return 83; } });
@@ -92,23 +97,28 @@ export const PlNormsCalcTab: React.FC<Props> = ({ snapshot, onSnapshotChange }) 
     setBenchLocal(snapshot.bench);
     setDeadLocal(snapshot.dead);
     setTotalLocal(snapshot.squat + snapshot.bench + snapshot.dead);
-    // WRPF для женщин — скрыт: если сейчас выбрана WRPF, а пол стал женский — переключить на ФПР
+    // WRPF для женщин — скрыт (официальных таблиц нет): переключить на классику
     if (snapshot.sex === 'female' && (fed === 'wrpf_untested' || fed === 'wrpf_tested')) {
-      setFed('fpr_ipf');
+      setFed('fpr_classic');
       setManualCat('');
     }
   }, [snapshot?.sex, snapshot?.bw, snapshot?.squat, snapshot?.bench, snapshot?.dead]);
 
-  // WRPF для женщин — скрыть (официальных таблиц нет, было масштабирование ×1.12 — скрываем по требованию)
+  // legacy-миграция id федерации (fpr_ipf → fpr_classic)
+  useEffect(() => {
+    if (fed === 'fpr_ipf') setFed('fpr_classic');
+  }, [fed]);
+
+  // Женщинам — только ФПР (официальных женских WRPF-таблиц нет)
   const FEDS = useMemo(() => {
-    if (sex === 'female') return FEDS_ALL.filter(f => f.id === 'fpr_ipf');
+    if (sex === 'female') return FEDS_ALL.filter(f => f.id === 'fpr_classic' || f.id === 'fpr_equipped');
     return FEDS_ALL;
   }, [sex]);
 
   // если текущая фед стала недоступна — сбросить
   useEffect(() => {
-    if (sex === 'female' && fed !== 'fpr_ipf') {
-      setFed('fpr_ipf');
+    if (sex === 'female' && fed !== 'fpr_classic' && fed !== 'fpr_equipped' && (fed as string) !== 'fpr_ipf') {
+      setFed('fpr_classic');
       setManualCat('');
       if (disc !== 'total' && disc !== 'bench') setDisc('total');
     }
@@ -138,16 +148,18 @@ export const PlNormsCalcTab: React.FC<Props> = ({ snapshot, onSnapshotChange }) 
   }, [table, effectiveCat, effectiveTotal, result, showLifts, disc]);
   const displayResult = effectiveResult || result;
   const displayTotal = effectiveTotal;
+  const fedGear = fed === 'fpr_equipped' ? 'equipped' : 'classic';
 
+  const mcCoeff = mcOn ? mccullochCoeff(ageNum) : 1;
   const points = useMemo(() => {
     const w = wilksScore(displayTotal, bw, sex);
     const d = dotsScore(displayTotal, bw, sex);
-    const gl = ipfGLPoints(displayTotal, bw, sex);
+    const gl = ipfGLPointsFor(displayTotal, bw, sex, fedGear, disc === 'bench' ? 'bench' : 'total');
     const al = allometricScore(displayTotal, bw);
     const rel = relativeStrength(displayTotal, bw);
     const gb = sex === 'male' ? calcGlossbrenner(bw, displayTotal) : 0;
     const list = [
-      { label: 'IPF GL', value: gl, scale: '0-120', hint: explainPoints('0-120'), accent: '#00e68a' },
+      { label: `IPF GL ${fedGear === 'equipped' ? 'экип' : 'клас'}`, value: gl, scale: '0-120', hint: explainPoints('0-120'), accent: '#00e68a' },
       { label: 'DOTS', value: d, scale: '300-500', hint: explainPoints('300-500'), accent: '#60a5fa' },
       { label: 'Wilks', value: w, scale: '300-500', hint: explainPoints('300-500'), accent: '#a855f7' },
     ];
@@ -158,17 +170,19 @@ export const PlNormsCalcTab: React.FC<Props> = ({ snapshot, onSnapshotChange }) 
       { label: 'Отн. сила', value: rel, scale: '×BW', hint: 'Тотал / вес тела. 5× у мужчин — элита, 7.5× — мировой. У женщин 3×/4×/5×.', accent: '#ec4899' },
       { label: 'Allometric', value: al, scale: '×BW⅔', hint: 'Тотал / BW^0.67 — учитывает аллометрию.', accent: '#22c55e' },
     );
+    if (mcOn && ageNum >= 40) {
+      list.push({ label: `DOTS ×McC ${ageNum}`, value: ageAdjustedScore(d, ageNum), scale: 'возраст', hint: `DOTS × McCulloch ${mcCoeff} (возраст ${ageNum}). Только 40+, юниорские поправки — по регламентам.`, accent: '#f472b6' });
+    }
     return list;
-  }, [displayTotal, bw, sex]);
+  }, [displayTotal, bw, sex, fedGear, disc, mcOn, ageNum, mcCoeff]);
 
   const availDisc = useMemo(() => {
     if (!table) return DISC;
-    if (fed === 'fpr_ipf') {
-      if (sex === 'female') return DISC.filter(d => d.id === 'total' || d.id === 'bench');
-      return DISC.filter(d => d.id === 'total');
-    }
+    const f = resolveFederation(fed);
+    if (f === 'fpr_classic') return DISC.filter(d => d.id === 'total' || d.id === 'bench');
+    if (f === 'fpr_equipped') return DISC.filter(d => d.id === 'total');
     return DISC;
-  }, [fed, sex, table]);
+  }, [fed, table]);
 
   const progress = useMemo(() => displayResult ? progressToNextRank(displayResult, displayTotal) : 0, [displayResult, displayTotal]);
   const eligibleSet = useMemo(() => new Set(eligibleRanksForAge(ageGroup)), [ageGroup]);
@@ -181,8 +195,10 @@ export const PlNormsCalcTab: React.FC<Props> = ({ snapshot, onSnapshotChange }) 
 
   // бейдж федерации: какой показывать
   const fedBadge = useMemo(() => {
-    if (fed === 'fpr_ipf') return { label: 'IPF 2024 → смотрите IPF GL', desc: 'Актуальный для ФПР/IPF с 2019 — DOTS, с 2024 — IPF GL.' };
-    if (fed === 'wrpf_untested') return { label: 'WRPF без ДК → смотрите DOTS', desc: 'Коммерческие федерации — DOTS для сравнения.' };
+    const f = resolveFederation(fed);
+    if (f === 'fpr_classic') return { label: 'ФПР классика → смотрите IPF GL classic', desc: 'Классика: IPF GL classic/total. Экипировка считается отдельно (пороги и очки выше).' };
+    if (f === 'fpr_equipped') return { label: 'ФПР экипировка → смотрите IPF GL equipped', desc: 'Экипировка: IPF GL equipped/total. Сравнение с классикой напрямую некорректно.' };
+    if (f === 'wrpf_untested') return { label: 'WRPF без ДК → смотрите DOTS', desc: 'Коммерческие федерации — DOTS для сравнения.' };
     return { label: 'WRPF с ДК → смотрите DOTS', desc: 'С допинг-контролем — DOTS.' };
   }, [fed]);
 
@@ -236,7 +252,7 @@ export const PlNormsCalcTab: React.FC<Props> = ({ snapshot, onSnapshotChange }) 
         <div style={SECTION}>⚙️ Параметры расчёта {snapshot ? <span style={{ color: ACCENT, fontWeight: 800 }}>· из хаба</span> : null}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <PopupSelect label="Пол" value={sex} options={SEX_OPTS as any} onChange={v => handleSexChange(v as Sex)} />
-          <PopupSelect label="Федерация" value={fed} options={FEDS.map(f => ({ id: f.id, label: f.label }))} onChange={v => { const nf = v as Federation; setFed(nf); setManualCat(''); if (nf === 'fpr_ipf' && disc !== 'total' && sex === 'male') setDisc('total'); }} />
+          <PopupSelect label="Федерация" value={fed} options={FEDS.map(f => ({ id: f.id, label: f.label }))} onChange={v => { const nf = v as Federation; setFed(nf); setManualCat(''); if (resolveFederation(nf) === 'fpr_equipped' && disc !== 'total') setDisc('total'); }} />
           <PopupSelect label="Дисциплина" value={disc} options={availDisc.map(d => ({ id: d.id, label: d.label }))} onChange={v => { setDisc(v as Discipline); setManualCat(''); }} />
           <PopupSelect label="Возрастная группа" value={ageGroup} options={AGE_GROUPS.map(a => ({ id: a.id, label: a.label, desc: a.desc }))} onChange={v => setAgeGroup(v as AgeGroup)} />
           <PopupSelect
@@ -289,6 +305,37 @@ export const PlNormsCalcTab: React.FC<Props> = ({ snapshot, onSnapshotChange }) 
             )}
           </div>
         )}
+      </div>
+
+      {/* what-if вес + McCulloch */}
+      <div style={CARD}>
+        <div style={SECTION}>⚖️ Что если вес изменится + возрастная поправка</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <PopupNumber label="Δ веса (сгонка/набор), кг" value={bwDelta} min={-5} max={5} step={0.5} suffix=" кг" hint="-5…+5 кг к текущему весу" onChange={setBwDelta} />
+          <PopupNumber label="Возраст (McCulloch 40+)" value={ageNum} min={12} max={90} suffix=" лет" onChange={setAgeNum} />
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#f472b6', marginTop: 8 }}>
+          <input type="checkbox" checked={mcOn} onChange={e => setMcOn(e.target.checked)} style={{ accentColor: '#f472b6' }} />
+          McCulloch-поправка DOTS (только 40+)
+        </label>
+        {(() => {
+          if (!table) return null;
+          const bw2 = Math.max(30, Math.min(250, bw + bwDelta));
+          const cat2 = findCategory(table, bw2);
+          const r2 = classifyTotalForCategory(table, cat2, displayTotal);
+          const d2 = dotsScore(displayTotal, bw2, sex);
+          const d0 = dotsScore(displayTotal, bw, sex);
+          return (
+            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)', fontSize: 11, color: '#fff', lineHeight: 1.5 }}>
+              {bwDelta === 0 ? (
+                <>Вес {bw} кг → категория «{cat2.label}», разряд <b>{r2.achievedLabel}</b>, DOTS {d2}.</>
+              ) : (
+                <>Вес {bw} → <b>{bw2} кг</b>: категория «{cat2.label}», разряд <b>{r2.achievedLabel}</b>, DOTS {d0} → <b style={{ color: d2 >= d0 ? '#22c55e' : '#f59e0b' }}>{d2}</b> ({d2 >= d0 ? '+' : ''}{Math.round((d2 - d0) * 10) / 10}).</>
+              )}
+              {mcOn && (ageNum >= 40 ? <> McCulloch {ageNum} лет: ×{mccullochCoeff(ageNum)} → DOTS <b>{ageAdjustedScore(d2, ageNum)}</b>.</> : ' McCulloch: моложе 40 — поправка 1.0 (юниорские — по регламентам).')}
+            </div>
+          );
+        })()}
       </div>
 
       {displayResult && effectiveCat && table && (

@@ -197,7 +197,7 @@ export const TaperPlannerTab: React.FC = () => {
   const cls = useMemo(() => {
     return selectWeightClassForSex(taperSex, bw, fed);
   }, [taperSex, bw, fed]);
-  const taperFedLabel = useMemo(() => ({ fpr_ipf: 'ФПР/IPF', wrpf_untested: 'WRPF без ДК', wrpf_tested: 'WRPF с ДК' }[taperFed] || taperFed), [taperFed]);
+  const taperFedLabel = useMemo(() => ({ fpr_ipf: 'ФПР/IPF', fpr_classic: 'ФПР классика', fpr_equipped: 'ФПР экип', wrpf_untested: 'WRPF без ДК', wrpf_tested: 'WRPF с ДК' }[taperFed] || taperFed), [taperFed]);
   const timeline = useMemo(() => generateCompetitionTimeline(weighIn, start), [weighIn, start]);
   const recovery = useMemo(() => getRecoveryProtocols(), []);
   const mental = useMemo(() => getMentalRoutines(), []);

@@ -8,45 +8,114 @@ export type Sex = "male" | "female";
 
 function r1(v: number) { return Math.round(v * 10) / 10; }
 function r2(v: number) { return Math.round(v * 100) / 100; }
+function r3(v: number) { return Math.round(v * 1000) / 1000; }
 
-/** Wilks (классический, IPF до 2019). */
+/**
+ * Wilks original (Robert Wilks 1994, полином 5-й степени).
+ * Верифицировано: 90 кг / 600 кг (М) → 383.0 (LiftVault-якорь, сходится до 0.1).
+ * Источник констант: IPF_GL_Coefficients-2020.pdf (там же таблица) + concalculator-разбор.
+ */
 export function wilksScore(total: number, bw: number, sex: Sex): number {
   if (bw <= 0 || total <= 0) return 0;
   const x = bw;
   let denom: number;
   if (sex === "male") {
-    const a = -216.0475145, b = 16.2606339, c = -2.1688383e-3, d = 1.1375105e-5, e = -3.49e-9;
-    denom = a + b * x + c * x * x + d * x ** 3 + e * x ** 4;
+    denom = -0.00000001291 * x ** 5 + 0.00000701863 * x ** 4 - 0.00113732 * x ** 3
+      - 0.002388645 * x * x + 16.2606339 * x - 216.0475144;
   } else {
-    const a = 594.3161, b = -27.2384, c = 0.8211, d = -9.7974e-3, e = 4.3923e-5;
-    denom = a + b * x + c * x * x + d * x ** 3 + e * x ** 4;
+    denom = -0.000000009054 * x ** 5 + 0.00004731582 * x ** 4 - 0.00930733913 * x ** 3
+      + 0.82112226871 * x * x - 27.23842536447 * x + 594.31747775582;
   }
   if (denom <= 0) return 0;
   return r2(total * 500 / denom);
 }
 
-/** DOTS (IPF с 2019). Коэффициенты из performance-analytics (проверены). */
+/**
+ * DOTS (Tim Konertz 2019, BVDK).
+ * Верифицировано по реальным протоколам: М 73.9/682.5 → 494.3 (факт USAPL 494.11);
+ * Ж 72.9/305 → 301.6 (факт 301.50). Женские константы — официальные BVDK
+ * (b=0.0005158568, c=−0.1126655495, d=13.6175032, e=−57.96288).
+ */
 export function dotsScore(total: number, bw: number, sex: Sex): number {
   if (bw <= 0 || total <= 0) return 0;
-  const a = sex === "male" ? -0.0000010930 : -0.0000010702;
-  const b = sex === "male" ? 0.0007391293 : 0.0007195833;
-  const c = sex === "male" ? -0.1918759221 : -0.1881243692;
-  const d = sex === "male" ? 24.0900756 : 22.8480074;
-  const e = sex === "male" ? -307.75076 : -281.2251;
+  const a = sex === "male" ? -0.0000010930 : -0.0000010706;
+  const b = sex === "male" ? 0.0007391293 : 0.0005158568;
+  const c = sex === "male" ? -0.1918759221 : -0.1126655495;
+  const d = sex === "male" ? 24.0900756 : 13.6175032;
+  const e = sex === "male" ? -307.75076 : -57.96288;
   const denom = a * bw ** 4 + b * bw ** 3 + c * bw * bw + d * bw + e;
   if (denom <= 0) return 0;
   return r2(total * 500 / denom);
 }
 
-/** IPF GLI Points (Goodleigh). */
-export function ipfGLPoints(total: number, bw: number, sex: Sex): number {
+/**
+ * IPF GL Points (Goodlift, официален с 01.05.2020, IPF_GL_Coefficients-2020.pdf).
+ * Верифицировано: Ж 46.8/435 классика → 121.0 (факт ЧМ-2025 120.97);
+ * М 90/600 классика → 79.8 (факт LiftVault 79.8).
+ * ВАЖНО: старые значения движка для М использовали equipped-параметры, для Ж — смесь.
+ */
+export interface IPFGLParams { A: number; B: number; C: number }
+export const IPF_GL_PARAMS: Record<Sex, Record<'classic' | 'equipped', Record<'total' | 'bench', IPFGLParams>>> = {
+  male: {
+    classic: {
+      total: { A: 1199.72839, B: 1025.18162, C: 0.00921 },
+      bench: { A: 320.98041, B: 281.40258, C: 0.01008 },
+    },
+    equipped: {
+      total: { A: 1236.25115, B: 1449.21864, C: 0.01644 },
+      bench: { A: 381.22073, B: 733.79378, C: 0.02398 },
+    },
+  },
+  female: {
+    classic: {
+      total: { A: 610.32796, B: 1045.59282, C: 0.03048 },
+      bench: { A: 142.40398, B: 442.52671, C: 0.04724 },
+    },
+    equipped: {
+      total: { A: 758.63878, B: 949.31382, C: 0.02435 },
+      bench: { A: 221.82209, B: 357.00377, C: 0.02937 },
+    },
+  },
+};
+
+export function ipfGLPointsFor(total: number, bw: number, sex: Sex, gear: 'classic' | 'equipped' = 'classic', event: 'total' | 'bench' = 'total'): number {
   if (bw <= 0 || total <= 0) return 0;
-  const A = sex === "male" ? 1236.25115 : 758.63878;
-  const B = sex === "male" ? 1449.21864 : 949.31382;
-  const C = sex === "male" ? 0.01644 : 0.00936;
+  const { A, B, C } = IPF_GL_PARAMS[sex][gear][event];
   const denom = A - B * Math.exp(-C * bw);
   if (denom <= 0) return 0;
   return r1((100 / denom) * total);
+}
+
+/** IPF GL по умолчанию — классика/троеборье (backward-compat сигнатура). */
+export function ipfGLPoints(total: number, bw: number, sex: Sex): number {
+  return ipfGLPointsFor(total, bw, sex, 'classic', 'total');
+}
+
+/**
+ * McCulloch age-коэффициент (множитель к DOTS/очкам для мастерс).
+ * Якоря — публикация таблицы McCulloch (StrengthBasecamp 2026, помечены ~):
+ * 40:1.000, 45:~1.052, 50:~1.130, 55:~1.220, 60:~1.305, 65:~1.420, 70:~1.522, 75:~1.730, 80:~1.961.
+ * Между якорями — линейная интерполяция; моложе 40 — 1.0 (юниорские поправки — по регламентам федераций, не McCulloch).
+ */
+const MCCULLOCH_ANCHORS: Array<[number, number]> = [
+  [40, 1.0], [45, 1.052], [50, 1.13], [55, 1.22], [60, 1.305], [65, 1.42], [70, 1.522], [75, 1.73], [80, 1.961],
+];
+export function mccullochCoeff(age: number): number {
+  if (!Number.isFinite(age) || age < 40) return 1.0;
+  const anchors = MCCULLOCH_ANCHORS;
+  if (age >= anchors[anchors.length - 1][0]) return anchors[anchors.length - 1][1];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const [a0, c0] = anchors[i];
+    const [a1, c1] = anchors[i + 1];
+    if (age >= a0 && age <= a1) return r3(c0 + (c1 - c0) * (age - a0) / (a1 - a0));
+  }
+  return 1.0;
+}
+
+/** Очки с поправкой на возраст (McCulloch, только 40+; моложе — как есть). */
+export function ageAdjustedScore(score: number, age: number): number {
+  if (!Number.isFinite(score) || score <= 0) return 0;
+  return r1(score * mccullochCoeff(age));
 }
 
 /** Allometric scaling: strength ∝ bw^(2/3). */
