@@ -717,7 +717,6 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           <span style={{ color:'#ef4444', fontSize:15, opacity:0.9, flexShrink:0 }}>→</span>
         </button>
       )}
-      <div style={{ marginTop:12, textAlign:'center', fontSize:12, color:'#fff', textShadow:'0 1px 8px rgba(0,0,0,0.6)', fontWeight:600 }}>Нажми на раздел — откроются инструменты и данные</div>
             </div>
           </div>
         </div>

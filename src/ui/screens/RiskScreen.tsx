@@ -900,7 +900,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         <div className="risk-hero" style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', zIndex:100, display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a' }}>
           <HeroImg webp="/risk-hero.webp?v=20250827h" src="/risk-hero.png?v=20250827h" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} className="hero-fullscreen-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center center', background:'#07070a', filter:'brightness(1.06) saturate(1.04)' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 78%, rgba(0,0,0,0.06) 88%, rgba(0,0,0,0.18) 100%)' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'12px 12px calc(64px + env(safe-area-inset-bottom,0px))', gap:10, overflowY:'auto' }}>
+          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'12px 12px calc(102px + env(safe-area-inset-bottom,0px))', gap:10, overflowY:'auto' }}>
             <div>
               <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:20, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.22)', color:'#ef4444', fontSize:9, fontWeight:800, letterSpacing:'0.4px' }}>
                 <span style={{ width:5, height:5, borderRadius:5, background:'#ef4444', boxShadow:'0 0 8px rgba(239,68,68,0.6)', display:'inline-block' }} /> РИСКИ

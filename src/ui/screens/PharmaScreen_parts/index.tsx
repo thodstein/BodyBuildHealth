@@ -144,7 +144,6 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
               </button>
             ))}
           </div>
-          <div style={{ marginTop:10, textAlign:'center', fontSize:10, color:'#fff' }}>Нажми на раздел — откроются инструменты и данные</div>
         </div>
       </div>
     );
