@@ -29,6 +29,8 @@ const MODE_DEFS: Array<{ m: PeriodizationHubMode; label: string; icon: string; d
 
 export const PeriodizationHub: React.FC<{ initialMode?: PeriodizationHubMode }> = ({ initialMode }) => {
   const [mode, setMode] = useState<PeriodizationHubMode>(initialMode ?? 'designer');
+  // PRO-план хаба: в taper-режиме два контура рядом — блоки дизайна + калькулятор (TaperPlannerTab).
+  const [taperView, setTaperView] = useState<'blocks' | 'calc'>('blocks');
 
   const [heroOpen, setHeroOpen] = useState(false);
   return (
@@ -61,7 +63,7 @@ export const PeriodizationHub: React.FC<{ initialMode?: PeriodizationHubMode }> 
       {heroOpen && (
         <div style={{ ...CARD, padding:'10px 12px', background:'linear-gradient(135deg,rgba(168,85,247,0.10),rgba(0,230,138,0.07))', border:'1px solid rgba(168,85,247,0.18)', position:'relative', overflow:'hidden', marginBottom:10 }}>
           <div style={{ fontSize:11, fontWeight:900, color:'#fff', marginBottom:4 }}>📈 Периодизация — Макро · Микро · Тапер/Пик <span style={{ fontSize:9, padding:'2px 7px', borderRadius:20, background:'rgba(168,85,247,0.12)', border:'1px solid rgba(168,85,247,0.22)', color:'#a78bfa', fontWeight:800 }}>актуальная</span></div>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.45 }}>Блочная модель (Issurin/Bompa): собери дизайн на таймлайне → переключай <b>🗓️ Микро</b> / <b>🧘 Делод</b> / <b>📈 Прогрессия</b> / <b>📊 Трекер</b> / <b>🔻 Тейпер</b> — всё на одних данных.</div>
+          <div style={{ fontSize:10, color:'#fff', lineHeight:1.45 }}>Блочная модель (Issurin/Bompa): собери дизайн на таймлайне → переключай <b>🗓️ Микро</b> / <b>🧘 Делод</b> / <b>📈 Прогрессия</b> / <b>📊 Трекер</b> / <b>🔻 Тейпер</b> — всё на одних данных (режимы — виды одного дизайна, не отдельные калькуляторы; калькулятор тейпера — внутри 🔻).</div>
           <button onClick={() => setHeroOpen(false)} style={{ marginTop:8, padding:'6px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:DIM, fontSize:10, fontWeight:700, cursor:'pointer', minHeight:32 }}>Скрыть</button>
         </div>
       )}
@@ -72,7 +74,26 @@ export const PeriodizationHub: React.FC<{ initialMode?: PeriodizationHubMode }> 
       {mode === 'tracker' && <PeriodizationDesignerTab initialUnifiedMode="tracker" />}
       {mode === 'micro' && <PeriodizationDesignerTab initialUnifiedMode="micro" />}
       {mode === 'deload' && <PeriodizationDesignerTab initialUnifiedMode="deload" />}
-      {mode === 'taper' && <PeriodizationDesignerTab initialUnifiedMode="taper" />}
+      {mode === 'taper' && (
+        <div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            {([
+              { id: 'blocks' as const, label: '🧱 Блоки дизайна' },
+              { id: 'calc' as const, label: '🔻 Калькулятор тейпера' },
+            ]).map(v => (
+              <button key={v.id} onClick={() => setTaperView(v.id)} aria-pressed={taperView === v.id} style={{
+                flex: 1, padding: '6px 10px', borderRadius: 9, minHeight: 44, whiteSpace: 'nowrap',
+                border: taperView === v.id ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)',
+                background: taperView === v.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                color: taperView === v.id ? ACCENT : DIM, cursor: 'pointer', fontSize: 11, fontWeight: 800,
+              }}>
+                {v.label}
+              </button>
+            ))}
+          </div>
+          {taperView === 'blocks' ? <PeriodizationDesignerTab initialUnifiedMode="taper" /> : <TaperPlannerTab />}
+        </div>
+      )}
       {mode === 'splits' && <PeriodizationDesignerTab initialActivePanel="splits" />}
       {mode === 'history' && <CompetitionPlansView />}
       </div>

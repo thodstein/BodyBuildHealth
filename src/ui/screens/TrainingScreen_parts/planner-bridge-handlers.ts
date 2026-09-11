@@ -506,7 +506,22 @@ const peakHandler: Handler = (payload, { program: p, update, showToast }) => {
         })),
       }
     : w);
-  update({ bb: { ...p.bb, weeks } });
+  // PRO-план хаба «Периодизация и Тапер»: мост несёт showDate/дозу trial/трек/пик-неделю —
+  // приёмник сохраняет их в meta.notes (тренерские заметки в PDF/CSV) + revisions. Без extras — как было.
+  const extraLines: string[] = [];
+  if (typeof payload.data.showDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payload.data.showDate)) extraLines.push(`Шоу/старт: ${payload.data.showDate}`);
+  if (Number.isFinite(Number(payload.data.carbDoseGPerKg)) && Number(payload.data.carbDoseGPerKg) > 0) extraLines.push(`Доза trial: ${Number(payload.data.carbDoseGPerKg)} г/кг`);
+  if (payload.data.postShowTrack === 'recovery' || payload.data.postShowTrack === 'reverse') extraLines.push(`Post-show трек: ${payload.data.postShowTrack}`);
+  if (typeof payload.data.peakCycleId === 'string' && payload.data.peakCycleId) extraLines.push(`Пик-цикл: ${payload.data.peakCycleId}`);
+  if (extraLines.length > 0) {
+    const stamp = `🏁 Пик (${extraLines.join(' · ')})`;
+    const prevNotes = typeof p.meta.notes === 'string' ? p.meta.notes : '';
+    const notes = prevNotes.includes(stamp) ? prevNotes : (prevNotes ? prevNotes + '\n' + stamp : stamp);
+    const revisions = [...(p.meta.revisions ?? []), { ts: new Date().toISOString(), note: stamp }].slice(-50);
+    update({ bb: { ...p.bb, weeks }, meta: { ...p.meta, notes, revisions } });
+  } else {
+    update({ bb: { ...p.bb, weeks } });
+  }
   showToast('🔗 Пиковая неделя: ' + payload.label);
 };
 

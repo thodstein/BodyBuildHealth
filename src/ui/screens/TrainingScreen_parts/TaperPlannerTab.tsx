@@ -12,7 +12,9 @@ import {
 import type { BBPeakingOutput } from '../../../engines/peaking-engine';
 import { buildPLTaperCurve, type TaperMode } from '../../../engines/lms/lms-taper.engine';
 import { getPeakCycles, buildPeakCycleTaperCurve } from '../../../engines/lms/pl-peak-cycle-taper.engine';
-import { buildBBContestPrep, isoToday, isoAddDays, normalizeContestCategory, planFromStored, configFromPlan, type BBContestPrepConfig } from '../../../engines/bb/bb-contest-prep.engine';
+import { buildBBContestPrep, normalizeContestCategory, planFromStored, configFromPlan, manipulationLockNote, recommendBBTaperConfig, TAPER_VS_DELOAD_NOTE, type BBContestPrepConfig, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
+import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import {
   selectWeightClassForSex, generateCompetitionTimeline,
   getRecoveryProtocols, getMentalRoutines, recommendWeightCut,
@@ -20,7 +22,7 @@ import {
 import { applyToPlanner } from './planner-bridge';
 import { getProfile } from '../../../core/profile-manager';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
-import { LMS_CYCLES, getCyclesByTrainingDirection } from '../../../data/lms-cycles/lms-cycle-index';
+import { getCyclesByTrainingDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { AGE_GROUPS, eligibleRanksForAge, ageEligibilityNote, resolveFederation, type AgeGroup, type Federation, type Sex } from '../../../engines/pl-norms.engine';
 
 const ACCENT = '#00e68a';
@@ -66,6 +68,72 @@ function getProfileStrengthBaselines(): { squat: number; bench: number; dead: nu
   return null;
 }
 
+/** P4/P5: residual-подсказки блоков (Issurin: сила ~30д / гипертрофия ~15д / выносливость ~7д). Только порядок, без математики объёма. */
+export const TAPER_RESIDUAL_HINTS: Array<{ key: string; label: string; days: string; hint: string }> = [
+  { key: 'strength', label: 'Сила', days: '~30 дн', hint: 'Пик держится дольше — тапер можно короче, прекращение до 7 дн' },
+  { key: 'hypertrophy', label: 'Гипертрофия', days: '~15 дн', hint: 'Памп-форма уходит за 2 нед — пик-памп backstage обязателен' },
+  { key: 'endurance', label: 'Выносливость', days: '~7 дн', hint: 'Аэробная форма тает за неделю — кардио держим до конца' },
+];
+
+/** P5: снапшоты пика (паритет с MacrocyclePanel 📸). Кап 6, битый стор → []. */
+export interface TaperScenario { id: string; savedAt: number; kind: 'pl' | 'bb'; meetDate: string; weeks: number; volumePct: number; rir: string; dose?: number; label: string; }
+const TAPER_SCENARIOS_KEY = 'he_taper_scenarios_v1';
+export function loadTaperScenarios(): TaperScenario[] {
+  try {
+    const raw = localStorage.getItem(TAPER_SCENARIOS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(s => s && typeof s.id === 'string' && (s.kind === 'pl' || s.kind === 'bb')).slice(0, 6);
+  } catch { return []; }
+}
+export function saveTaperScenario(s: TaperScenario): TaperScenario[] {
+  try {
+    const arr = [s, ...loadTaperScenarios().filter(x => x.id !== s.id)].slice(0, 6);
+    localStorage.setItem(TAPER_SCENARIOS_KEY, JSON.stringify(arr));
+    return arr;
+  } catch { return loadTaperScenarios(); }
+}
+export function removeTaperScenario(id: string): TaperScenario[] {
+  try {
+    const arr = loadTaperScenarios().filter(x => x.id !== id);
+    localStorage.setItem(TAPER_SCENARIOS_KEY, JSON.stringify(arr));
+    return arr;
+  } catch { return loadTaperScenarios(); }
+}
+
+/** P5: префилл даты старта/шоу из годового плана (he_pl_macro/he_bb_macro → competitions[].date). */
+export function macroCompetitionDate(): { date: string; name: string } | null {
+  for (const key of ['he_pl_macro', 'he_bb_macro']) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const m = JSON.parse(raw);
+      const comps = Array.isArray(m?.competitions) ? m.competitions : [];
+      const withDate = comps.filter((c: any) => c && typeof c.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.date)).sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
+      if (withDate.length > 0) return { date: withDate[0].date, name: String(withDate[0].name || 'Соревнование') };
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
+/** P5: XSS-escape + защита от формульных инъекций CSV (префикс ' для =+-@). */
+export function taperEscHtml(s: string): string {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+export function taperCsvCell(v: string | number): string {
+  const s = String(v ?? '');
+  const guarded = /^[=+\-@]/.test(s) ? `'${s}` : s;
+  return `"${guarded.replace(/"/g, '""')}"`;
+}
+
+/** P1: валидация прикидов (Travis: интенсивность держать ≥85%, но опенер консервативнее 90–93%). */
+export function attemptWarnings(strategy: AttemptStrategy): string[] {
+  if (strategy === 'aggressive') return ['⚠ Опенер 93% — верхняя граница (держите ≥85%, но открывайтесь консервативно). Третья 105% — только с запасом и trial-прикидками.'];
+  if (strategy === 'balanced') return [];
+  return [];
+}
+
 export const TaperPlannerTab: React.FC = () => {
   const [kind, setKind] = useState<'pl' | 'bb'>('pl');
   const [selectedPlCycle, setSelectedPlCycle] = useState<string>('');
@@ -101,12 +169,19 @@ export const TaperPlannerTab: React.FC = () => {
   const [weighIn, setWeighIn] = useState('08:00');
   const [start, setStart] = useState('11:00');
 
-  // ── BB: шоу ──
-  const [showDate, setShowDate] = useState<string>(addDays(7));
-  const [conditioning, setConditioning] = useState(0.7);
-  const [fullness, setFullness] = useState(0.6);
-  const [dryness, setDryness] = useState(0.6);
-  const [carbTol, setCarbTol] = useState(0.7);
+  // ── BB: шоу (P2: мёртвые слайдеры кондиция/наполнение/сухость/carbTol удалены — входы не влияли на расчёт; настройка в ББ-авто → шаг Contest) ──
+  const [showDate, setShowDate] = useState<string>(() => macroCompetitionDate()?.date ?? addDays(7));
+  const [macroBadge, setMacroBadge] = useState<string | null>(() => macroCompetitionDate()?.name ?? null);
+  // P1: per-lift последний тяжёлый день (Travis 2–7д; дефолт = канон LAST_HEAVY_DAYS 12/8/4)
+  const [lastSquat, setLastSquat] = useState(8);
+  const [lastBench, setLastBench] = useState(4);
+  const [lastDead, setLastDead] = useState(12);
+  // P3: адаптив из дневника
+  const [srpeApplied, setSrpeApplied] = useState(false);
+  // P5: сценарии + экспорт
+  const [scenarios, setScenarios] = useState<TaperScenario[]>(() => loadTaperScenarios());
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
 
   const fatigue = fatigueRaw === 'low' ? 8 : fatigueRaw === 'high' ? 9 : fatigueNum;
 
@@ -205,12 +280,13 @@ export const TaperPlannerTab: React.FC = () => {
 
   // ── Расчёты BB — единый план из профиля (bb-contest-prep-sync) ──
   // Хардкод weeksOut=1 / minimal / constant удалён — читаем сохранённый план, иначе подсказка настроить в ББ-авто/питании.
-  const bb: BBPeakingOutput | null = useMemo(() => {
+  // P2: таблица несёт PRO-2 поля (клетчатка/калий/доза trial), мост — реальную кривую, trial-замок виден.
+  const bb: (BBPeakingOutput & { fiber: string; potassium: string } & { storedPlan: BBContestPrepPlan | null; peakCfg: BBContestPrepConfig | null; dose: number | null; lockNote: string | null; isPreview: boolean }) | null = useMemo(() => {
     if (kind !== 'bb') return null;
     try {
       const s: any = (() => { try { return (getProfile().settings as any) || {}; } catch { return {}; } })();
       // Приоритет — сохранённый версионированный план
-      const storedPlan = planFromStored(s?.goals?.bbContestPrepPlan, s?.goals?.bbPeakConfig, s?.goals, s?.personal);
+      const storedPlan = planFromStored(s?.goals?.bbContestPrepPlan, s?.goals?.bbPeakConfig, s?.goals, s?.personal) as BBContestPrepPlan | null;
       if (storedPlan) {
         const cfgForPeak = (() => { try { return configFromPlan(storedPlan); } catch { return null; } })();
         const res = cfgForPeak ? buildBBContestPrep(cfgForPeak) : null;
@@ -223,12 +299,21 @@ export const TaperPlannerTab: React.FC = () => {
               water: `${d.waterLiters} л`,
               sodium: `${d.sodiumMg} мг`,
               posing: `${d.posingMinutes} мин`,
+              fiber: `${d.fiberMaxG} г`,
+              potassium: `${d.potassiumMg} мг`,
             })),
             recommendations: [
               ...res.warnings,
-              `План: шоу ${storedPlan.showDate} · ${storedPlan.category} · тапер ${storedPlan.taper.weeks} нед`,
+              `План: шоу ${storedPlan.showDate} · ${storedPlan.category} · тапер ${storedPlan.taper.weeks} нед · трек ${storedPlan.postShowTrack ?? 'recovery'}`,
               'Вода и натрий стабильны по умолчанию; резкие манипуляции — только с подтверждением.',
             ],
+            fiber: '',
+            potassium: '',
+            storedPlan,
+            peakCfg: cfgForPeak,
+            dose: storedPlan.peakWeek.carbDoseGPerKg ?? null,
+            lockNote: cfgForPeak ? manipulationLockNote(cfgForPeak) : null,
+            isPreview: false,
           };
         }
       }
@@ -259,22 +344,69 @@ export const TaperPlannerTab: React.FC = () => {
           water: `${d.waterLiters} л`,
           sodium: `${d.sodiumMg} мг`,
           posing: `${d.posingMinutes} мин`,
+          fiber: `${d.fiberMaxG} г`,
+          potassium: `${d.potassiumMg} мг`,
         })),
         recommendations: [
           ...res2.warnings,
           'Нет сохранённого плана — показано превью на выбранную дату. Настройте полный тапер в ББ-авто или во вкладке «🏁 Тапер ББ» питания.',
         ],
+        fiber: '',
+        potassium: '',
+        storedPlan: null,
+        peakCfg: cfg,
+        dose: null,
+        lockNote: manipulationLockNote(cfg),
+        isPreview: true,
       };
     } catch { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, showDate]);
 
+  // P3: адаптив из дневника (sRPE + ACWR) — PL предлагает недели, BB зеркалит recommendBBTaperConfig
+  const adaptive = useMemo(() => {
+    try {
+      const sessions = loadSRPESessions();
+      if (sessions.length < 2) return null;
+      const daily = toDailyLoads(sessions as any);
+      const acwr = acuteChronicRatio(daily);
+      const ratio = Number((acwr as any)?.ratio);
+      const mean = sessions.reduce((a, s) => a + (Number(s.sRPE) || 0), 0) / Math.max(1, sessions.length);
+      const rec = recommendBBTaperConfig({ fatigue: Math.round(mean * 10), acwrRatio: ratio, recentSessions: sessions.map(s => ({ sRPE: s.sRPE })) });
+      const suggest: 'low' | 'med' | 'high' = !Number.isFinite(ratio) ? 'med' : ratio > 1.5 ? 'high' : ratio > 1.3 ? 'med' : ratio < 0.8 ? 'low' : 'med';
+      return { n: sessions.length, mean: Math.round(mean * 10) / 10, ratio, rec, suggest };
+    } catch { return null; }
+  }, []);
+
+  // P4: мёртвые storage he_taper_plan/he_bb_peak_plan больше не пишем (P5-снапшоты — единственный сейв)
   const handleSave = () => {
-    if (kind === 'pl' && plan) {
-      localStorage.setItem('he_taper_plan', JSON.stringify({ meetDate, squat1RM, bench1RM, deadlift1RM, fatigue, strategy, savedAt: Date.now() }));
+    if (kind === 'pl' && plan && canonicalCurve) {
+      const last = canonicalCurve[canonicalCurve.length - 1];
+      const sc: TaperScenario = {
+        id: `pl-${Date.now()}`,
+        savedAt: Date.now(),
+        kind: 'pl',
+        meetDate,
+        weeks: adjustedTaperWeeks,
+        volumePct: last?.volumePct ?? 0.5,
+        rir: last?.rirTarget != null ? `RIR→${last.rirTarget}` : `+${last?.rirShift ?? 0}`,
+        label: `PL ${meetDate} · ${adjustedTaperWeeks} нед · объём ×${last?.volumePct ?? 0.5}`,
+      };
+      setScenarios(saveTaperScenario(sc));
     }
     if (kind === 'bb' && bb) {
-      localStorage.setItem('he_bb_peak_plan', JSON.stringify({ showDate, conditioning, fullness, dryness, carbTol, savedAt: Date.now() }));
+      const sc: TaperScenario = {
+        id: `bb-${Date.now()}`,
+        savedAt: Date.now(),
+        kind: 'bb',
+        meetDate: showDate,
+        weeks: bb.storedPlan?.taper.weeks ?? 1,
+        volumePct: bb.storedPlan?.taper.volumeProfile?.slice(-1)[0] ?? 0.6,
+        rir: 'RIR 2–4',
+        dose: bb.dose ?? undefined,
+        label: `BB ${showDate} · тапер ${bb.storedPlan?.taper.weeks ?? 1} нед${bb.dose != null ? ` · доза ${bb.dose} г/кг` : ''}`,
+      };
+      setScenarios(saveTaperScenario(sc));
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
@@ -297,6 +429,11 @@ export const TaperPlannerTab: React.FC = () => {
         <button onClick={() => setKind('bb')} style={{ ...BTN_GHOST, flex: 1, border: kind === 'bb' ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)', background: kind === 'bb' ? 'rgba(0,230,138,0.12)' : 'transparent', color: kind === 'bb' ? ACCENT : DIM }}>
           🏆 BB: Шоу-пик
         </button>
+      </div>
+
+      {/* P4: тапер ≠ делод (Bell 2025 / Rogerson-Bell 2024) */}
+      <div style={{ ...CARD_GLASS, border: '1px solid rgba(0,230,138,0.16)', background: 'rgba(0,230,138,0.05)' }}>
+        <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>{TAPER_VS_DELOAD_NOTE}</div>
       </div>
 
       {/* ── Выбор цикла по направлению (ПЛ vs ББ — учитываем разные циклы) ── */}
@@ -449,29 +586,28 @@ export const TaperPlannerTab: React.FC = () => {
           </div>
         )}
 
-        {/* Кривая taper — теперь с учётом возраста (effectiveFatigue → adjustedTaperWeeks) */}
+        {/* P1: per-lift последний тяжёлый день + прекращение (Travis 2–7д; дефолт = канон 12/8/4) */}
         {plan && (
           <div style={CARD}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📊 Кривая taper (объём / интенсивность / RIR) {adjustedTaperWeeks !== baseTaperWeeks ? <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 400 }}>· {adjustedTaperWeeks} нед с возр. (база {baseTaperWeeks})</span> : null}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 4 }}>⏱ Последний тяжёлый день по лифтам</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>Тяга раньше всех (самая taxing), жим позже всех. После своего дня — только разминка/прайминг, прекращение 2–7 дн до старта.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <PopupSelect label="Тяга (10–14)" value={String(lastDead)} options={[{ id: '10', label: 'D-10' }, { id: '12', label: 'D-12 · канон' }, { id: '14', label: 'D-14' }]} onChange={v => setLastDead(Number(v) || 12)} />
+              <PopupSelect label="Присед (7–9)" value={String(lastSquat)} options={[{ id: '7', label: 'D-7' }, { id: '8', label: 'D-8 · канон' }, { id: '9', label: 'D-9' }]} onChange={v => setLastSquat(Number(v) || 8)} />
+              <PopupSelect label="Жим (3–5)" value={String(lastBench)} options={[{ id: '3', label: 'D-3' }, { id: '4', label: 'D-4 · канон' }, { id: '5', label: 'D-5' }]} onChange={v => setLastBench(Number(v) || 4)} />
+            </div>
+            <div style={{ fontSize: 10, color: DIM, marginTop: 6, lineHeight: 1.4 }}>Прекращение: тяжёлая тяга за {lastDead} дн · присед за {lastSquat} дн · жим за {lastBench} дн → дальше прайминг 60% ×1–2, полный отдых за 2 дн.</div>
+          </div>
+        )}
+
+        {/* P1: главная кривая — канон ПЛ-авто (lms-taper.engine); pro-кривая — collapsible-альтернатива с дельтой */}
+        {plan && canonicalCurve && (
+          <div style={CARD}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>📊 Главная кривая — канон ПЛ-авто {plPeakCycleId ? `· из цикла ${plPeakCycleId}` : '· режим pl'} {adjustedTaperWeeks !== baseTaperWeeks ? <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 400 }}>· {adjustedTaperWeeks} нед с возр. (база {baseTaperWeeks})</span> : null}</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 6, lineHeight: 1.4 }}>Тапер-пик здесь = тапер-пик в ПЛ-авто (lms-taper.engine): buildPLTaperCurve{plPeakCycleId ? ' + buildPeakCycleTaperCurve' : ''}. Интенсивность ≥85%, объём −30…−70% (Bosquet/Travis).</div>
             {ageTaperNote && adjustedTaperWeeks !== baseTaperWeeks && (
               <div style={{ marginBottom: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 10, color: '#f59e0b' }}>{ageTaperNote} — план построен с эффективной усталостью {effectiveFatigue}.</div>
             )}
-            {plan.taperCurve.map(tw => (
-              <div key={tw.week} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 11 }}>
-                <span style={{ color: ACCENT, fontWeight: 700 }}>Нед {tw.week}</span>
-                <span style={{ color: '#fff' }}>Объём: <b style={{ color: '#fff' }}>{Math.round(tw.volumePctOfPeak * 100)}%</b></span>
-                <span style={{ color: '#fff' }}>Инт.: <b style={{ color: '#fff' }}>{Math.round(tw.intensityPct * 100)}%</b></span>
-                <span style={{ color: '#fff' }}>RIR: <b style={{ color: '#fff' }}>{tw.rir}</b></span>
-                <div style={{ gridColumn: '1 / -1', fontSize: 10, color: DIM, marginTop: 2 }}>{tw.rationale}</div>
-              </div>
-            ))}
-          </div>
-        )}
-        {/* Канон ПЛ-авто ↔ интеллектуальные тренировки — соответствие кривых */}
-        {plan && canonicalCurve && (
-          <div style={CARD}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🔗 Канон ПЛ-авто (соответствие) {plPeakCycleId ? `· из цикла ${plPeakCycleId}` : '· режим pl'}</div>
-            <div style={{ fontSize: 10, color: DIM, marginBottom: 6, lineHeight: 1.4 }}>Кривая тапера здесь = кривая в ПЛ-авто (lms-taper.engine). Интеллектуальные тренировки соответствуют ПЛ-авто — один канон, оба используют buildPLTaperCurve{plPeakCycleId ? ' + buildPeakCycleTaperCurve' : ''}.</div>
             {canonicalCurve.map(pt => (
               <div key={pt.week} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 11 }}>
                 <span style={{ color: '#a78bfa', fontWeight: 700 }}>Нед {pt.week}</span>
@@ -481,6 +617,25 @@ export const TaperPlannerTab: React.FC = () => {
                 <div style={{ gridColumn: '1 / -1', fontSize: 10, color: DIM, marginTop: 2 }}>{pt.label}{pt.focus ? ` · ${pt.focus}` : ''}</div>
               </div>
             ))}
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ fontSize: 11, fontWeight: 700, color: DIM, cursor: 'pointer', minHeight: 32 }}>Альтернатива: усталость/прайминг (pro/taper.engine) — показать с дельтой</summary>
+              {(() => {
+                const lastAlt = plan.taperCurve[plan.taperCurve.length - 1];
+                const lastMain = canonicalCurve[canonicalCurve.length - 1];
+                const dVol = Math.round((lastAlt.volumePctOfPeak - lastMain.volumePct) * 100);
+                const dVolStr = `${dVol >= 0 ? '+' : ''}${dVol} п.п.`;
+                return <div style={{ fontSize: 10, color: DIM, margin: '6px 0', lineHeight: 1.4 }}>Дельта финала vs канон: объём {dVolStr} · RIR alt {lastAlt.rir} vs канон {lastMain.rirTarget != null ? `→${lastMain.rirTarget}` : `+${lastMain.rirShift}`} — прайминг/DE-день, не основной план.</div>;
+              })()}
+              {plan.taperCurve.map(tw => (
+                <div key={tw.week} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 11 }}>
+                  <span style={{ color: ACCENT, fontWeight: 700 }}>Нед {tw.week}</span>
+                  <span style={{ color: '#fff' }}>Объём: <b style={{ color: '#fff' }}>{Math.round(tw.volumePctOfPeak * 100)}%</b></span>
+                  <span style={{ color: '#fff' }}>Инт.: <b style={{ color: '#fff' }}>{Math.round(tw.intensityPct * 100)}%</b></span>
+                  <span style={{ color: '#fff' }}>RIR: <b style={{ color: '#fff' }}>{tw.rir}</b></span>
+                  <div style={{ gridColumn: '1 / -1', fontSize: 10, color: DIM, marginTop: 2 }}>{tw.rationale}</div>
+                </div>
+              ))}
+            </details>
           </div>
         )}
 
@@ -516,6 +671,9 @@ export const TaperPlannerTab: React.FC = () => {
         {plan && (
           <div style={CARD}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>🏆 Прикиды ({strategyOpts.find(s => s.id === strategy)?.label})</div>
+            {attemptWarnings(strategy).map((w, i) => (
+              <div key={i} style={{ marginBottom: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 10, color: '#f59e0b', lineHeight: 1.4 }}>{w}</div>
+            ))}
             {(['squat', 'bench', 'deadlift'] as Lift[]).map(l => (
               <div key={l} style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: LIFT_COLOR[l], marginBottom: 4 }}>{LIFT_RU[l]}</div>
@@ -545,11 +703,15 @@ export const TaperPlannerTab: React.FC = () => {
               ))}
             </div>
             <div style={CARD}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>⏱ Последние тяжёлые (дн. до старта)</div>
-              {(['squat', 'bench', 'deadlift'] as Lift[]).map(l => (
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>⏱ Последние тяжёлые (дн. до старта) — ваш выбор выше</div>
+              {([
+                { l: 'squat' as Lift, v: lastSquat, canon: plan.lastHeavyDays.squat },
+                { l: 'bench' as Lift, v: lastBench, canon: plan.lastHeavyDays.bench },
+                { l: 'deadlift' as Lift, v: lastDead, canon: plan.lastHeavyDays.deadlift },
+              ]).map(({ l, v, canon }) => (
                 <div key={l} style={ROW}>
                   <span style={{ color: LIFT_COLOR[l], fontWeight: 700 }}>{LIFT_RU[l]}</span>
-                  <span style={{ color: '#fff' }}><b>{plan.lastHeavyDays[l]}</b> дн.</span>
+                  <span style={{ color: '#fff' }}><b>{v}</b> дн.{v !== canon ? <span style={{ color: '#f59e0b' }}> (канон {canon})</span> : null}</span>
                 </div>
               ))}
               <div style={{ fontSize: 11, color: '#fff', marginTop: 8 }}>
@@ -638,7 +800,7 @@ export const TaperPlannerTab: React.FC = () => {
         {plan && (<>
           <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
             <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
-              🔗 Применить ПМ ({squat1RM}/{bench1RM}/{deadlift1RM} кг) и taper-план (объём ×{plan.taperCurve[plan.taperCurve.length - 1]?.volumePctOfPeak ?? 0.5}, RIR→0) к планировщику.
+              🔗 Применить ПМ ({squat1RM}/{bench1RM}/{deadlift1RM} кг) и taper-план (канон: объём ×{canonicalCurve?.[canonicalCurve.length - 1]?.volumePct ?? 0.5}{canonicalCurve?.[canonicalCurve.length - 1]?.rirTarget != null ? `, RIR→${canonicalCurve?.[canonicalCurve.length - 1]?.rirTarget}` : ''}) к планировщику.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => applyToPlanner({ kind: 'pm', label: 'ПМ taper: ' + squat1RM + '/' + bench1RM + '/' + deadlift1RM + ' кг', data: { squat: squat1RM, bench: bench1RM, dead: deadlift1RM } })} style={{ ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }}>
@@ -655,7 +817,7 @@ export const TaperPlannerTab: React.FC = () => {
             </div>
           </div>
           <button onClick={handleSave} disabled={saved} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: saved ? 'not-allowed' : 'pointer', background: saved ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12, marginTop: 8, opacity: saved ? 0.4 : 1 }}>
-            {saved ? '✓ План сохранён' : '💾 Сохранить taper-план'}
+            {saved ? '✓ Сценарий сохранён' : '📸 Сохранить сценарий пика'}
           </button>
         </>)}
       </>)}
@@ -666,20 +828,24 @@ export const TaperPlannerTab: React.FC = () => {
           <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📝 Параметры шоу-пика</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div><div style={LABEL}>📅 Дата шоу</div><input type="date" style={IN} value={showDate} onChange={e => setShowDate(e.target.value)} /></div>
-            <PopupNumber label="Кондиция (0-1)" value={conditioning} min={0} max={1} step={0.05} onChange={v => setConditioning(v)} />
-            <PopupNumber label="Наполненность (0-1)" value={fullness} min={0} max={1} step={0.05} onChange={v => setFullness(v)} />
-            <PopupNumber label="Сухость (0-1)" value={dryness} min={0} max={1} step={0.05} onChange={v => setDryness(v)} />
-            <PopupNumber label="Толерантность к углеводам" value={carbTol} min={0} max={1} step={0.05} onChange={v => setCarbTol(v)} />
+            <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
+              <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4 }}>
+                {macroBadge ? <span>📍 <b style={{ color: ACCENT }}>{macroBadge}</b> — дата из годового плана</span> : <span>Кондиция/наполнение/сухость настраиваются в <b style={{ color: '#fff' }}>ББ-авто → шаг Contest</b> (единый контур)</span>}
+              </div>
+            </div>
           </div>
         </div>
         {bb && (
           <div style={CARD}>
-            <div style={H}>⬇ Неделя пика (шоу)</div>
-            <div style={ROW}><span>День</span><span>Тренировка · Углеводы · Вода · Na · Поза</span></div>
+            <div style={H}>⬇ Неделя пика (шоу){bb.isPreview ? <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 400 }}> · превью (нет сохранённого плана)</span> : <span style={{ fontSize: 10, color: ACCENT, fontWeight: 400 }}> · из сохранённого плана</span>}{bb.dose != null ? <span style={{ fontSize: 10, color: ACCENT, fontWeight: 400 }}> · 🧪 доза trial {bb.dose} г/кг</span> : null}</div>
+            {bb.lockNote && (
+              <div style={{ marginBottom: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 10, color: '#f59e0b', lineHeight: 1.4 }}>{bb.lockNote}</div>
+            )}
+            <div style={ROW}><span>День</span><span>Тренировка · Углеводы · Вода · Na · Клетч. · Калий · Поза</span></div>
             {bb.weekPlan.map(d => (
               <div key={d.day} style={{ ...ROW, flexWrap: 'wrap', gap: 4 }}>
                 <span style={{ color: ACCENT, fontWeight: 700, width: 28 }}>Д{d.day}</span>
-                <span style={{ color: '#fff', fontSize: 11 }}>{d.training} · {d.carbs} · {d.water} · {d.sodium} · {d.posing}</span>
+                <span style={{ color: '#fff', fontSize: 11 }}>{d.training} · {d.carbs} · {d.water} · {d.sodium} · {(d as any).fiber} · {(d as any).potassium} · {d.posing}</span>
               </div>
             ))}
             {bb.recommendations.length > 0 && (
@@ -696,16 +862,158 @@ export const TaperPlannerTab: React.FC = () => {
               <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
                 🔗 Применить BB шоу-пик к планировщику (карб-загрузка, водная манипуляция, памп).
               </div>
-              <button onClick={() => applyToPlanner({ kind: 'peak', label: 'BB шоу-пик: карб-загрузка, вода и натрий стабильны, RIR 2-4', data: { volumeMult: 0.6, rirTarget: 2 } })} style={{ width: '100%', ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }}>
+              <button onClick={() => {
+                const vol = bb.storedPlan?.taper.volumeProfile?.slice(-1)[0] ?? 0.6;
+                applyToPlanner({ kind: 'peak', label: `BB шоу-пик ${showDate}: объём ×${vol}, RIR 2–4${bb.dose != null ? `, доза trial ${bb.dose} г/кг` : ''}`, data: { volumeMult: vol, rirTarget: 2, showDate, carbDoseGPerKg: bb.dose ?? undefined, postShowTrack: bb.storedPlan?.postShowTrack ?? 'recovery', peakWeek: bb.storedPlan?.peakWeek ?? undefined } } as any);
+              }} style={{ width: '100%', ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }}>
                 🛠 Применить шоу-пик к планировщику
               </button>
             </div>
             <button onClick={handleSave} disabled={saved} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: saved ? 'not-allowed' : 'pointer', background: saved ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12, marginTop: 8, opacity: saved ? 0.4 : 1 }}>
-              {saved ? '✓ План сохранён' : '💾 Сохранить шоу-пик план'}
+              {saved ? '✓ Сценарий сохранён' : '📸 Сохранить сценарий пика'}
             </button>
           </>
         )}
       </>)}
+
+      {/* P3: адаптив из дневника (sRPE + ACWR). PL — применить недели; BB — зеркало recommendBBTaperConfig, сборка в ББ-авто */}
+      <div style={CARD}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🤖 Адаптив из дневника</div>
+        {!adaptive ? (
+          <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>Нет данных sRPE (нужно ≥2 сессий с RPE в дневнике тренировок). Усталость задаётся вручную выше; пик-дата не двигается адаптивом никогда.</div>
+        ) : (
+          <div>
+            <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5, marginBottom: 6 }}>
+              sRPE: {adaptive.n} сесс. · сред. RPE {adaptive.mean}{Number.isFinite(adaptive.ratio) ? ` · ACWR ${adaptive.ratio.toFixed(2)}` : ' · ACWR —'} · Пик-дата не двигается.
+              {adaptive.rec.reasons.length > 0 ? ` ${adaptive.rec.reasons.join('; ')}.` : ' Нагрузка в норме.'}
+            </div>
+            {kind === 'pl' ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => {
+                    setFatigueRaw(adaptive.suggest);
+                    if (adaptive.suggest === 'high') setFatigueNum(9);
+                    else if (adaptive.suggest === 'low') setFatigueNum(4);
+                    else setFatigueNum(6);
+                    setSrpeApplied(true);
+                    setTimeout(() => setSrpeApplied(false), 2500);
+                  }}
+                  style={{ ...BTN, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff' }}
+                >
+                  {srpeApplied ? '✓ Применено' : `Применить: усталость «${adaptive.suggest === 'high' ? 'Высокая' : adaptive.suggest === 'low' ? 'Низкая' : 'Средняя'}»`}
+                </button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>
+                BB: рекомендовано тапер {adaptive.rec.weeksOut} нед{adaptive.rec.volumeMult !== 1 ? `, объём ×${adaptive.rec.volumeMult}` : ''} — применяется в <b style={{ color: '#fff' }}>ББ-авто → шаг Contest → «Адаптивный тапер»</b> (здесь только зеркало).
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* P5: сценарии пика (⇄ сравнить) + экспорт */}
+      <div style={CARD}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📸 Сценарии пика {scenarios.length > 0 ? `(${scenarios.length}/6)` : ''}</div>
+        {scenarios.length === 0 ? (
+          <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>Пока пусто — кнопка «📸 Сохранить сценарий пика» выше сохраняет текущий расчёт. Паритет с MacrocyclePanel 📸.</div>
+        ) : (
+          <div>
+            {scenarios.map(sc => {
+              const checked = compareIds.includes(sc.id);
+              return (
+                <div key={sc.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 10 }}>
+                  <input type="checkbox" aria-label={`Сравнить ${sc.label}`} checked={checked} onChange={() => setCompareIds(prev => prev.includes(sc.id) ? prev.filter(x => x !== sc.id) : [...prev, sc.id].slice(-2))} style={{ width: 20, height: 20 }} />
+                  <span style={{ flex: 1, color: '#fff', lineHeight: 1.4 }}>{sc.label}</span>
+                  <button onClick={() => setScenarios(removeTaperScenario(sc.id))} aria-label={`Удалить ${sc.label}`} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: DIM, fontSize: 10, cursor: 'pointer', minHeight: 32 }}>✕</button>
+                </div>
+              );
+            })}
+            {compareIds.length === 2 && (() => {
+              const [a, b] = compareIds.map(id => scenarios.find(s => s.id === id)).filter(Boolean) as TaperScenario[];
+              if (!a || !b) return null;
+              return (
+                <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                  ⇄ {a.label} vs {b.label}: недель {a.weeks}→{b.weeks} · объём ×{a.volumePct}→×{b.volumePct} · {a.rir}→{b.rir}{a.dose != null || b.dose != null ? ` · доза ${a.dose ?? '—'}→${b.dose ?? '—'} г/кг` : ''}
+                </div>
+              );
+            })()}
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => {
+                  try {
+                    const rows = kind === 'pl' && plan && canonicalCurve
+                      ? canonicalCurve.map(pt => [pt.week, Math.round(pt.volumePct * 100) + '%', pt.intensityMode === 'preserve' ? 'сохр.' : Math.round(pt.intensityPct * 100) + '%', pt.rirTarget != null ? pt.rirTarget : `+${pt.rirShift}`, pt.label])
+                      : kind === 'bb' && bb ? bb.weekPlan.map(d => [d.day, d.training, d.carbs, d.water, d.sodium, (d as any).fiber, (d as any).potassium, d.posing]) : [];
+                    const csv = rows.map(r => r.map(taperCsvCell).join(',')).join('\n');
+                    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `taper-${kind}-${kind === 'pl' ? meetDate : showDate}.csv`;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                    setExportMsg('✓ CSV выгружен');
+                  } catch { setExportMsg('⚠ Не удалось выгрузить CSV'); }
+                  setTimeout(() => setExportMsg(null), 2500);
+                }}
+                style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }}
+              >📥 CSV</button>
+              <button
+                onClick={() => {
+                  try {
+                    const dt = (kind === 'pl' ? meetDate : showDate).replace(/-/g, '');
+                    const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BodyBuildHealth//Taper//RU', `BEGIN:VEVENT`, `UID:taper-${Date.now()}@bbh`, `DTSTAMP:${dt}T080000`, `DTSTART:${dt}T080000`, `SUMMARY:${kind === 'pl' ? 'Старт ПЛ' : 'Шоу ББ'} — пик`, `DESCRIPTION:${kind === 'pl' ? `Тапер ${adjustedTaperWeeks} нед` : `Шоу-пик${bb?.dose != null ? `, доза ${bb.dose} г/кг` : ''}`}`, 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+                    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `taper-${kind}.ics`;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                    setExportMsg('✓ ICS выгружен');
+                  } catch { setExportMsg('⚠ Не удалось выгрузить ICS'); }
+                  setTimeout(() => setExportMsg(null), 2500);
+                }}
+                style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }}
+              >📅 ICS</button>
+              <button
+                onClick={() => {
+                  try {
+                    const title = kind === 'pl' ? `Тапер ПЛ к ${meetDate}` : `Шоу-пик ББ ${showDate}`;
+                    const body = kind === 'pl' && plan && canonicalCurve
+                      ? canonicalCurve.map(pt => `<tr><td>Нед ${pt.week}</td><td>${Math.round(pt.volumePct * 100)}%</td><td>${pt.intensityMode === 'preserve' ? 'сохр.' : Math.round(pt.intensityPct * 100) + '%'}</td><td>${taperEscHtml(String(pt.rirTarget ?? '+' + pt.rirShift))}</td><td>${taperEscHtml(pt.label)}</td></tr>`).join('')
+                      : kind === 'bb' && bb ? bb.weekPlan.map(d => `<tr><td>Д${d.day}</td><td>${taperEscHtml(d.training)}</td><td>${taperEscHtml(d.carbs)}</td><td>${taperEscHtml(d.water)}</td><td>${taperEscHtml(d.sodium)}</td><td>${taperEscHtml((d as any).fiber)}</td><td>${taperEscHtml((d as any).potassium)}</td></tr>`).join('') : '';
+                    const w = window.open('', '_blank');
+                    if (!w) { setExportMsg('⚠ Блокировано всплывающее окно'); setTimeout(() => setExportMsg(null), 2500); return; }
+                    w.document.write(`<html><head><meta charset="utf-8"><title>${taperEscHtml(title)}</title></head><body><h1>${taperEscHtml(title)}</h1><table border="1" cellpadding="6" cellspacing="0"><tbody>${body}</tbody></table></body></html>`);
+                    w.document.close();
+                    w.print();
+                    setExportMsg('✓ Печать открыта');
+                  } catch { setExportMsg('⚠ Не удалось открыть печать'); }
+                  setTimeout(() => setExportMsg(null), 2500);
+                }}
+                style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }}
+              >🖨 Печать</button>
+            </div>
+            {exportMsg && <div style={{ marginTop: 6, fontSize: 10, color: exportMsg.startsWith('✓') ? ACCENT : '#f59e0b' }}>{exportMsg}</div>}
+          </div>
+        )}
+      </div>
+
+      {/* P6: residual-подсказки блоков (Issurin) */}
+      <div style={CARD_GLASS}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🧬 Residual-эффекты (Issurin)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+          {TAPER_RESIDUAL_HINTS.map(r => (
+            <div key={r.key} title={r.hint} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#fff' }}>{r.label}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT }}>{r.days}</div>
+              <div style={{ fontSize: 9, color: DIM, marginTop: 2, lineHeight: 1.35 }}>{r.hint}</div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };

@@ -11,6 +11,7 @@
 - **P5**: снапшоты `he_taper_scenarios_v1` (кап 6, CRUD, ⇄ сравнение 2 шт: недели/объём/RIR/доза) + префилл дат из `he_pl_macro`/`he_bb_macro` competitions[].date + бейдж + экспорт CSV (BOM/антиформула)/ICS/печать (XSS-escape).
 - **P6**: `TAPER_RESIDUAL_HINTS` (сила ~30д / гипертрофия ~15д / выносливость ~7д) в планере + чипы в дизайнере; разрез god-файла не делал (P1–P5 зелёные, риск вне скоупа «мелких» — честно).
 - **Проверено**: NEW `taper-hub-pro` 16/16 + соседи taper-planner 6/6 + lms-taper-curve 13/13 + taper-coach 38/38 + bb-taper-pro2 33/33 + designer-overlap 14/14 + rest-hooks 68/68 (canvas/DB-шум предсуществующий); `tsc` 0 по своим (6 ошибок — чужой ExerciseLab WIP); `verify:apk-design` OK. НЕ КОММИТИЛ/НЕ ПУШИЛ.
+- **Добивка «всё полностью»**: закрыты 3 честных остатка — мост (peakHandler пишет showDate/дозу/трек в `meta.notes` + revisions, без extras байт-в-байт; поймано своим тестом: патч частичный — `meta` отсутствует без extras), шелл (hub-taper = подтабы «🧱 Блоки/🔻 Калькулятор», дефолт блоки; hero честно: режимы — виды одного дизайна), разрез (`PeriodizationPopups` + `PeriodizationTaperSection`, логика 1-в-1, реэкспорт попапов). Тесты +3 (мост/хаб/разрез, итого 19/19); соседи 137/137 (planner-bridge 33 + taper-planner 6 + curves/coach/pro2/overlap) + rest-hooks 68/68; `tsc --noEmit` **0 по всему проекту**; `verify:apk-design` OK. НЕ КОММИТИЛ/НЕ ПУШИЛ.
 
 ## Лаборатория упражнений PRO: план + полное выполнение A–G кодом (Sep 12 2026, 7 этапных коммитов, без пуша)
 
