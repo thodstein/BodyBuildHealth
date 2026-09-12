@@ -122,12 +122,7 @@ export const SS_BLOCK_MODELS: Array<{ id: SsBlockModel; label: string; desc: str
   { id: 'toro4', label: 'Torokhtiy 4-фаз', desc: '3/3/3/1 + тапер 65% (нед.10)' },
   { id: 'wave', label: 'Wave/DUP', desc: 'волна heavy/medium/light по неделям' },
 ];
-
-/** Множитель объёма тапер-недели по модели. strong5/wave → Winwood (байт-в-байт через вызывателя). */
-export function taperMultForWeek(blockModel: SsBlockModel, weekFromEnd: number): number | null {
-  if (blockModel === 'toro4' && weekFromEnd <= 1) return 0.65;
-  return null;
-}
+// taperMultForWeek — канон в strength-sport-taper.engine.ts (дубль здесь удалён, P6).
 
 export function deloadWeeksFor(totalWeeks: number, autoDeload: boolean): number[] {
   if (autoDeload === false) return [];
@@ -136,14 +131,8 @@ export function deloadWeeksFor(totalWeeks: number, autoDeload: boolean): number[
 }
 
 export const DELOAD_VS_TAPER_NOTE = 'Делод (нед 4/7/11) — плановый сброс внутри цикла; тапер — острый пик к дате старта (Rogerson 2024)';
-
-/** Wave/DUP-раскладка недели: heavy/medium/light по остатку (зеркалит dup-wave движок). */
-export function waveForWeek(week: number): 'heavy' | 'medium' | 'light' {
-  const m = week % 3;
-  if (m === 1) return 'heavy';
-  if (m === 2) return 'medium';
-  return 'light';
-}
+// waveForWeek удалён: волна считается внутри applyDUP (strength-sport-dup.ts, idx%3),
+// отдельный хелпер с другой индексацией врал бы. P6.
 
 // ——— P6: гигиена входов ———
 /** Stale-VBT: смена цикла/режима инвалидирует замеры week-day-ex-set. */

@@ -7,10 +7,11 @@ import {
   applyRpeCap, RPE_CAP_DEFAULT,
   deadliftGripWarning, STONE_ARMS_CUE, VIKING_GATE_NOTE, isStoneId, isDeadliftId,
   scoreCheckin, pushCheckin, SS_CHECKIN_CAP,
-  taperMultForWeek, deloadWeeksFor, waveForWeek, DELOAD_VS_TAPER_NOTE,
+  deloadWeeksFor, DELOAD_VS_TAPER_NOTE,
   shouldClearVbt, progHashOf,
   cessationDaysFor, OPENER_SINGLE_NOTE,
 } from '../strength-sport-planner-pro.engine';
+import { taperMultForWeek } from '../strength-sport-taper.engine';
 
 describe('P1 весовая категория', () => {
   it('граница 105/105.1 → разные классы (М)', () => {
@@ -85,9 +86,6 @@ describe('P5 block-модель', () => {
     expect(deloadWeeksFor(12, true)).toEqual([4, 7, 11]);
     expect(deloadWeeksFor(12, false)).toEqual([]);
     expect(deloadWeeksFor(5, true)).toEqual([4]);
-    expect(waveForWeek(1)).toBe('heavy');
-    expect(waveForWeek(2)).toBe('medium');
-    expect(waveForWeek(3)).toBe('light');
     expect(DELOAD_VS_TAPER_NOTE).toContain('Rogerson');
   });
 });

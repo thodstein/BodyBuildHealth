@@ -33,7 +33,7 @@ import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/str
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
 import { collectSsVelocityHistory } from './sm-bridge-intake';
-import { weightClassFor, weightClassLine, smWeightClassesFor, RPE_CAP_OPTIONS, SS_BLOCK_MODELS, DELOAD_VS_TAPER_NOTE, scoreCheckin, pushCheckin, loadCheckins, saveCheckins, type SsCheckin } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
+import { weightClassFor, weightClassLine, smWeightClassesFor, RPE_CAP_OPTIONS, SS_BLOCK_MODELS, DELOAD_VS_TAPER_NOTE, scoreCheckin, pushCheckin, loadCheckins, saveCheckins, progHashOf, type SsCheckin } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
 import { CARD_STRONG, CARD_HERO, ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, SELECT, TEXT_2, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, ProgressBar, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
 import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, STEP_PILL } from '../TrainingScreen_parts/training-ui';
 
@@ -217,7 +217,7 @@ export const StrengthSportConstructor: React.FC = () => {
       // НЕ должен снова накручивать ПМ (+2% за клик, кумулятивно). Хэш входа
       // до прогрессии стабилен между одинаковыми сборками; смена любого
       // параметра — новый мезоцикл, прогрессия применяется один раз.
-      const progHash = JSON.stringify({ mode, goal, level, weeks, days, workMax, focus, methodology, dupMode, intensityTech, equipment, injuries, mobility, sex, bodyweight, age, competitionDate, patternId, cycleId, cycleMode, weakPoints, contestStrategy, contestId: (contest as any)?.id || (contest as any)?.events?.map((e:any)=>e.id).join('+') || '', diagnosticLevel, weightClass, rpeCap, deadliftGrip, blockModel, autoDeload, conditioningDay });
+      const progHash = progHashOf({ mode, goal, level, weeks, days, workMax, focus, methodology, dupMode, intensityTech, equipment, injuries, mobility, sex, bodyweight, age, competitionDate, patternId, cycleId, cycleMode, weakPoints, contestStrategy, contestId: (contest as any)?.id || (contest as any)?.events?.map((e:any)=>e.id).join('+') || '', diagnosticLevel, weightClass, rpeCap, deadliftGrip, blockModel, autoDeload, conditioningDay });
       const lastHash = (() => { try { return localStorage.getItem('he_ss_prog_hash_v1'); } catch { return null; } })();
       if (prev && lastHash !== progHash) {
         input = applyMesocycleProgression(prev, input) as any;

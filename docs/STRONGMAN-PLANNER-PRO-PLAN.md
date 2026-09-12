@@ -1,6 +1,9 @@
 # Стронг-планировщик PRO — аудит + план доработки (Sep 12 2026)
 
-> Статус: ПЛАН (код не тронут). Покрывает только планировщик (конструктор + визард + билдер + выдача).
+> Статус: ВЫПОЛНЕНО кодом полностью P1–P7 + добивки (коммиты `f50ded8e`, `e648d6b5`, P6-чистка — pathspec, без пуша).
+> Реализация: NEW `strength-sport-planner-pro.engine` + `strength-sport-planner-pro-build.test` + вшивка в types/taper/builder/wizard/Constructor.
+> Добивка-чистка: дубль `taperMultForWeek` удалён из planner-pro (канон — taper.engine), мёртвый `waveForWeek` удалён (волна живёт в applyDUP), `progHashOf` используется в Constructor.
+> Остатки осознанно (не делаем): D5-cloud/D7-год/D8-экспорты/D9-rationale (чужие зоны); opener — только строка плана; чекины — предложение делода кнопкой, не авто.
 > Хаб диагностики закрыт отдельно: `docs/STRONGMAN-DIAGNOSTICS-HUB-PRO.md` (P1–P9 выполнены).
 > Старые планы: `docs/STRONG_TA_PRO_PLAN.md` (PRO v2.2 закрыт), `docs/STRONGMAN_TA_AUDIT_NEXT_PLAN.md` (аудит + P0–P3 бэклог).
 
