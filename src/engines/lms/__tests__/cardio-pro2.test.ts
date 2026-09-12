@@ -91,6 +91,28 @@ describe('P4 red-flags', () => {
     expect(v.issues.some(i => i.code === 'medical_block' && i.level === 'error')).toBe(true);
     expect(v.valid).toBe(false);
   });
+  it('prep-путь: redFlags режут HIIT/MISS (№3-добивка)', async () => {
+    const { buildCardioCycleFromPrep } = await import('../cardio.engine');
+    const prep = {
+      id: 'p1', showDate: '2026-06-01', category: 'mens_bb', sex: 'male' as const,
+      preparation: { startDate: '2026-01-05', weeks: 12, finalWeeks: 2, targetRatePctPerWeek: 0.5, startingWeightKg: 90, currentCalories: 2800, stepsPerDay: 8000, cardioMinutesPerWeek: 120 },
+      taper: { enabled: true, weeks: 2 },
+      peakWeek: { enabled: true },
+    };
+    const plain = buildCardioCycleFromPrep(prep, {})!;
+    expect(plain.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'))).toBe(true);
+    const blocked = buildCardioCycleFromPrep(prep, { redFlags: ['syncope'], age: 30 })!;
+    expect(blocked.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'))).toBe(false);
+    expect(blocked.weeks.flatMap(w => w.rationale).join(' ')).toContain('Мед-скрининг');
+  });
+  it('rationale: честный Z2 при <150 мин (№6), молчит при мед-блоке и шаблоне', () => {
+    const low = buildCardioCycle({ goal: 'mass', totalWeeks: 6 });
+    expect(low.rationale.join(' ')).toContain('Storoschuk');
+    const med = buildCardioCycle({ goal: 'mass', totalWeeks: 6, redFlags: ['chest_pain'] });
+    expect(med.rationale.join(' ')).not.toContain('Storoschuk');
+    const tpl = buildCardioCycle({ goal: 'mass', totalWeeks: 6, templateId: 'x' });
+    expect(tpl.rationale.join(' ')).not.toContain('Storoschuk');
+  });
 });
 
 // ─── P3: интервалы ───

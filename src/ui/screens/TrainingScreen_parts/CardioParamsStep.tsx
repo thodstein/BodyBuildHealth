@@ -106,6 +106,10 @@ export interface CardioParamsModel {
   tempoPace?: string;
   intervalPace?: string;
   mesoMult?: number;
+  /** №2 PRO-2-добивка: hero 1-в-1 с финалом — те же 3 флага, что в сборке. */
+  redFlags?: string[];
+  tidSwitchWeek?: number;
+  durabilitySession?: boolean;
 }
 
 /** Живой предпросмотр цикла из параметров мастера (та же сборка, что была в шаге 1). */
@@ -117,7 +121,8 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
   const { goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight,
     taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment,
     lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula,
-    lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoMult } = m;
+    lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoMult,
+    redFlags, tidSwitchWeek, durabilitySession } = m;
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -170,6 +175,9 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
         talkZone2Hr: talkNum,
         tempC: tempNum,
         altitudeM: altNum,
+        redFlags: redFlags && redFlags.length > 0 ? [...redFlags] : undefined,
+        tidSwitchWeek,
+        durabilitySession,
         source: 'auto',
       });
       if (daysAvailable > 0 && daysAvailable < 7) {
@@ -191,7 +199,7 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
       });
       return { cycle: finished, warnings };
     } catch { return { cycle: null, warnings }; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoMult]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoMult, redFlags, tidSwitchWeek, durabilitySession]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
   // PRO: TID Polarization Index превью-цикла (раунд 9)

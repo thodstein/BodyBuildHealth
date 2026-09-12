@@ -846,6 +846,7 @@ export const CardioConstructor: React.FC = () => {
       talkZone2Hr: Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined,
       tempC: tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined,
       altitudeM: altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined,
+      redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
     });
     if (!c) { flashMsg('⚠ Не удалось собрать кардио из prep-плана'); return; }
     setGoal('bb_prep');
@@ -992,6 +993,10 @@ export const CardioConstructor: React.FC = () => {
     if (!same(cfg.talkZone2Hr, Number(talkHr) >= 80 && Number(talkHr) <= 200 ? Math.round(Number(talkHr)) : undefined)) return true;
     if (!same(cfg.tempC, tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined)) return true;
     if (!same(cfg.altitudeM, altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined)) return true;
+    // №4 PRO-2-добивка: новые флаги тоже пачкают параметры.
+    if (!same((cfg as { redFlags?: string[] }).redFlags ?? [], redFlags)) return true;
+    if (((cfg as { tidSwitchWeek?: number }).tidSwitchWeek != null) !== tidSwitch) return true;
+    if (((cfg as { durabilitySession?: boolean }).durabilitySession === true) !== durabilityOn) return true;
     // Пост-обработка из config-штампа finish-хелпера (темпы VDOT + мезо-флаг).
     const stamped = cfg as unknown as { paceEasySec?: number; paceTempoSec?: number; paceIntervalSec?: number; mesoOn?: boolean };
     if (!same(stamped.paceEasySec, parsePaceText(easyPace) ?? undefined)) return true;
@@ -999,7 +1004,7 @@ export const CardioConstructor: React.FC = () => {
     if (!same(stamped.paceIntervalSec, parsePaceText(intervalPace) ?? undefined)) return true;
     if ((stamped.mesoOn === true) !== mesoOn) return true;
     return false;
-  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn]);
+  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn, redFlags, tidSwitch, durabilityOn]);
 
   const resetParams = () => {
     setGoal('cut');
@@ -1125,6 +1130,9 @@ export const CardioConstructor: React.FC = () => {
     lthr, ftpWatts, talkHr, tempC, altitudeM,
     easyPace, tempoPace, intervalPace,
     mesoMult: mesoOn ? mesoInfo.mult : 1,
+    redFlags,
+    tidSwitchWeek: tidSwitch ? Math.max(2, Math.ceil(totalWeeks / 2)) : undefined,
+    durabilitySession: durabilityOn || undefined,
   });
 
   const stepLabels: Record<CardioStep, string> = {

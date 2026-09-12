@@ -54,6 +54,7 @@ export type { RacePrediction } from './cardio-race-predictor.engine';
 export { predictRaceTimes, predictorNote, RACE_WEEK_CHECKLIST, raceChecklistIcsLine } from './cardio-race-predictor.engine';
 export { zone2HonestyNote } from './cardio-zone2-honesty.engine';
 import { fuelingForSession as fuelForSessionLocal, heatAcclimationPlan as heatAcclLocal, altitudeNote as altitudeNoteLocal } from './cardio-fueling.engine';
+import { zone2HonestyNote as honestyNoteLocal } from './cardio-zone2-honesty.engine';
 export type { CardioRedFlagId, CardioRedFlagScreen } from './cardio-red-flags.engine';
 export { CARDIO_RED_FLAGS, screenCardioRedFlags, needsMedicalBlock } from './cardio-red-flags.engine';
 import { screenCardioRedFlags as screenRedFlagsLocal } from './cardio-red-flags.engine';
@@ -828,6 +829,17 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   if (input.age != null) cycle.rationale.push(`Возраст ${input.age}${input.sex === 'female' ? ' (жен.)' : ''} — целевые пульс-зоны сессий заданы${input.restingHr != null && input.restingHr > 0 ? ` (ЧСС покоя ${input.restingHr})` : ''}.`);
   if (recoveryLow) cycle.rationale.push('Низкое восстановление: HIIT исключён.');
   if (tidSwitch != null) cycle.rationale.push(`🔀 PYR→POL с нед ${tidSwitch} (Filipas 2021 +3% к VO2max на смене модели; любителю решает объём, не модель — Rivera-2025).`);
+  // №6 PRO-2-добивка: честный Z2 — та же строка, что в валидаторе, но в rationale.
+  // Скип: мед-блок (HIIT запрещён врачом — совет неуместен) и авторские шаблоны.
+  if (!medicalBlock && !input.templateId) {
+    const workWeeks = weeks.filter(w => !w.deload && !w.taper);
+    if (workWeeks.length > 0) {
+      const avg = workWeeks.reduce((s, w) => s + w.totalMinutes, 0) / workWeeks.length;
+      const hiitCount = workWeeks.reduce((s, w) => s + w.sessions.filter(x => x.type === 'hiit').length, 0);
+      const honest = honestyNoteLocal(avg, hiitCount);
+      if (honest) cycle.rationale.push(honest);
+    }
+  }
   if (competitions.length > 0) {
     const starts = competitions.map(c => `${c.name} (нед ${c.week})`).join(', ');
     if (taperEnabled) {
@@ -895,6 +907,8 @@ export interface CardioPrepBuildOptions {
   /** Среда (раунд 7): жара/высота сдвигают зоны вверх. */
   tempC?: number;
   altitudeM?: number;
+  /** №3 PRO-2-добивка: красные флаги — HIIT/MISS запрещены до врача. */
+  redFlags?: string[];
 }
 
 /** Шаги пик-недели prep по дням (зеркало STEPS_BY_DAY bb-contest-prep.engine). */
@@ -1067,7 +1081,9 @@ export function buildCardioCycleFromPrep(
       const progress = Math.min(1.3, 1 + 0.04 * (w - 1));
       const minutes = Math.round(prepMinutes * progress * (isFinal ? 0.9 : 1) * prepVolumeMult);
       sessions = splitZone2(minutes);
-      if (!isFinal && sex === 'male' && catProfile.hiitAllowed && w > Math.ceil(prepWeeks / 2)) {
+      // №3 PRO-2-добивка: мед-блок режет интенсив и в prep-пути.
+      const prepMedicalBlock = screenRedFlagsLocal(opts.redFlags, opts.age).blockHiit;
+      if (!isFinal && sex === 'male' && catProfile.hiitAllowed && !prepMedicalBlock && w > Math.ceil(prepWeeks / 2)) {
         const intense = w % 2 === 0
           ? mkSession('hiit', 15, 1, 'HIIT: метаболический стимул без большого объёма (чередование)', bw, undefined, sex, ffmPrep)
           : mkSession('miss', 20, 1, 'MISS (Z3): аэробная выносливость без ударной нагрузки (чередование)', bw, undefined, sex, ffmPrep);
@@ -1076,6 +1092,7 @@ export function buildCardioCycleFromPrep(
       if (isFinal) rationale.push('Финальная подготовка: объём ×0.9, только zone2 (Helms 2022).');
       else if (phase === 'build') rationale.push('Наращивание: минуты по prep-плану + прогрессия, HIIT/MISS чередуются.');
       else rationale.push('База: вход в подготовку, щадящий старт.');
+      if (prepMedicalBlock) rationale.push('Мед-скрининг: HIIT/MISS запрещены до врача — только zone2/recovery.');
     }
     // Персонализация: уровень (объём), оборудование, целевые пульс-зоны, ккал.
     sessions = sessions.map(s => {
