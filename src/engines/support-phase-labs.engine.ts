@@ -617,6 +617,41 @@ export function needsLpaBaseline(lpaDone?: boolean): boolean {
   return !lpaDone;
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  ДЕДУП ИСТОЧНИКОВ МОНИТОРИНГА (§2-дефект №8 плана).
+//  Один и тот же препарат описан в трех местах: catalog.monitoring,
+//  LAB_MONITOR_DB (+LAB_TOP20), SUBSTANCE_MONITORING_DB.
+//  mergeMonitoringLists сливает их с приоритетом первого списка:
+//  существующие what не перезаписываются, пустые when/target добиваются.
+// ════════════════════════════════════════════════════════════════════
+export interface UnifiedMonitor {
+  what: string;
+  when: string;
+  target: string;
+}
+
+export function mergeMonitoringLists(
+  primary: UnifiedMonitor[],
+  ...rest: UnifiedMonitor[][]
+): UnifiedMonitor[] {
+  const map = new Map<string, UnifiedMonitor>();
+  const key = (w: string) => String(w || '').trim().toLowerCase();
+  for (const list of [primary, ...rest]) {
+    for (const m of list || []) {
+      const k = key(m.what);
+      if (!k) continue;
+      const cur = map.get(k);
+      if (!cur) {
+        map.set(k, { what: m.what, when: m.when || '', target: m.target || '' });
+      } else {
+        if (!cur.when && m.when) cur.when = m.when;
+        if (!cur.target && m.target) cur.target = m.target;
+      }
+    }
+  }
+  return [...map.values()];
+}
+
 /**
  * Тайминг маркера: когда сдавать (для подписей «когда» в UI).
  * Возвращает null, если маркер неизвестен движку (честно, без выдумки).

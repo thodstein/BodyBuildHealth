@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   PHASE_LAB_CARDS, CLASS_LAB_ADDONS, phaseLabCardById,
   phaseCardsFor, addonsFor, labTimingFor, pctVariantFor, needsLpaBaseline,
-  isLongEsterHalfLife, isInjectableCourse,
+  isLongEsterHalfLife, isInjectableCourse, mergeMonitoringLists,
 } from '../support-phase-labs.engine';
 
 const ids = (cards: Array<{ id: string }>) => cards.map(c => c.id);
@@ -164,5 +164,28 @@ describe('isLongEsterHalfLife / isInjectableCourse', () => {
     expect(isInjectableCourse([{ id: 'test_enan' }], { hasAAS: true })).toBe(true);
     expect(isInjectableCourse([], { hasAAS: true })).toBe(false);
     expect(isInjectableCourse(null)).toBe(false);
+  });
+});
+
+describe('mergeMonitoringLists — дедуп трех источников (§2-дефект №8)', () => {
+  it('приоритет первого списка, пустые when/target добиваются', () => {
+    const out = mergeMonitoringLists(
+      [{ what: 'АЛТ', when: 'Каждые 4 нед', target: '' }],
+      [{ what: 'алт', when: 'Каждые 2 нед', target: '<40' }],
+      [{ what: 'АЛТ', when: '', target: '<50' }],
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].when).toBe('Каждые 4 нед');
+    expect(out[0].target).toBe('<40');
+  });
+  it('разные маркеры не сливаются, пустые отбрасываются', () => {
+    const out = mergeMonitoringLists(
+      [{ what: 'АЛТ', when: 'w4', target: 't' }],
+      [{ what: 'АСТ', when: 'w4', target: 't' }, { what: '  ', when: 'x', target: 'y' }],
+    );
+    expect(out.map(m => m.what)).toEqual(['АЛТ', 'АСТ']);
+  });
+  it('пустые входы — пустой выход', () => {
+    expect(mergeMonitoringLists([], [])).toEqual([]);
   });
 });

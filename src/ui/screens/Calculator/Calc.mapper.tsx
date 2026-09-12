@@ -45,6 +45,10 @@ import { computeOverdueSystems, type SystemOverdue } from '../../../engines/labs
 import { LabsDueBanner } from './LabsDueBanner';
 import { getSupportPlanQueueIds, readSupportPlanQueue, removeFromSupportPlanQueue, deleteFavRecommendation } from '../../../engines/training-plan-save.engine';
 import { CalcPhaseLabCards } from './CalcPhaseLabCards';
+import { LAB_MONITOR_DB } from '../SupportScreen_parts/UnifiedSynergyCalculator';
+import { LAB_TOP20, resolveLabMonitor, type HubLabMon } from '../../../engines/support-hub-labs.engine';
+import { getSubstanceMonitoring } from '../../../data/substance-monitoring-db';
+import { phaseCardsFor, addonsFor, isInjectableCourse, mergeMonitoringLists } from '../../../engines/support-phase-labs.engine';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -3097,19 +3101,43 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         const hasCns = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('cns')));
         const hasRepro = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('rep')));
 
-        // ── Персональный список маркеров, привязанный к конкретным веществам плана ──
+        // ── Персональный список маркеров: единый мердж трех источников (§2-дефект №8) ──
+        // catalog.monitoring (приоритет, поведение 1-в-1) + LAB_MONITOR_DB/LAB_TOP20 +
+        // SUBSTANCE_MONITORING_DB. Дедуп по нормализованному what через mergeMonitoringLists.
         const personalMarkers = (() => {
           const map: Record<string, { what: string; when: string; target: string; subs: string[] }> = {};
-          for (const s of subs) {
-            const cat = SUPPORT_CATALOG_DATA[s.substanceId];
-            if (!cat?.monitoring) continue;
-            for (const m of cat.monitoring) {
+          const pushMerged = (items: Array<{ what: string; when: string; target: string }>, subName: string) => {
+            const merged = mergeMonitoringLists(items);
+            for (const m of merged) {
               const key = (m.what || '').trim().toLowerCase();
               if (!key) continue;
-              if (!map[key]) map[key] = { what: m.what, when: m.when || '', target: m.targetRange || '', subs: [] };
-              const nm = cat.nameRu || cat.name || s.substanceId;
-              if (!map[key].subs.includes(nm)) map[key].subs.push(nm);
+              if (!map[key]) map[key] = { what: m.what, when: m.when || '', target: m.target || '', subs: [] };
+              else {
+                if (!map[key].when && m.when) map[key].when = m.when;
+                if (!map[key].target && m.target) map[key].target = m.target;
+              }
+              if (!map[key].subs.includes(subName)) map[key].subs.push(subName);
             }
+          };
+          const FREQ_RU: Record<string, string> = { daily: 'Ежедневно', week2: 'Каждые 2 нед', week4: 'Каждые 4 нед', week8: 'Каждые 8 нед' };
+          let labDb: Record<string, HubLabMon[]> = {};
+          try {
+            labDb = { ...(LAB_MONITOR_DB as Record<string, HubLabMon[]>), ...LAB_TOP20 };
+          } catch { labDb = {}; }
+          for (const s of subs) {
+            const cat = SUPPORT_CATALOG_DATA[s.substanceId];
+            const nm = (cat as any)?.nameRu || (cat as any)?.name || s.substanceId;
+            if ((cat as any)?.monitoring) {
+              pushMerged(((cat as any).monitoring as Array<{ what: string; when?: string; targetRange?: string }>).map(m => ({ what: m.what, when: m.when || '', target: m.targetRange || '' })), nm);
+            }
+            try {
+              const dbLabs = resolveLabMonitor(labDb, s.substanceId) || [];
+              pushMerged(dbLabs.map(e => ({ what: e.markerRu, when: e.when || '', target: e.target || '' })), nm);
+            } catch { /* мониторинг не должен ронять карточку */ }
+            try {
+              const sm = getSubstanceMonitoring([s.substanceId]) || [];
+              pushMerged(sm.map(e => ({ what: e.marker, when: FREQ_RU[e.freq] || e.freq, target: e.target || '' })), nm);
+            } catch { /* мониторинг не должен ронять карточку */ }
           }
           return Object.values(map).sort((a, b) => b.subs.length - a.subs.length);
         })();
@@ -3957,6 +3985,23 @@ function buildPlanText(rec: SupportRecommendation): string {
       for (const it of sec.items) lines.push(`    ${it.marker} — ${it.reason}${it.target ? ` (цель: ${it.target})` : ''}${it.escalation ? ` ⚠ ${it.escalation}` : ''}`);
     }
   }
+  try {
+    const recSubs: string[] = (rec.subs || []).map((s: any) => s?.substanceId).filter(Boolean);
+    const cards = phaseCardsFor((rec as any)?.pedFlags || null, (rec as any)?.phase);
+    const addons = addonsFor(recSubs);
+    if (cards.length > 0 || addons.length > 0) {
+      lines.push('');
+      lines.push('КАРТОЧКИ АНАЛИЗОВ ПО ФАЗАМ (K0–K10):');
+      for (const c of cards) {
+        lines.push(`• ${c.id} · ${c.title} (${c.when}):`);
+        for (const gr of c.groups) {
+          lines.push(`  ${gr.label}:`);
+          for (const m of gr.items) lines.push(`    ${m.marker}${m.target ? ` (цель: ${m.target})` : ''}${m.red ? ` ⚠ ${m.red}` : ''}`);
+        }
+      }
+      for (const a of addons) lines.push(`• 💊 ${a.label} → ${a.attachTo.join(', ')}: ${a.items.map(m => m.marker).join('; ')}`);
+    }
+  } catch {}
   if (rec.guardrails.length > 0) {
     lines.push('');
     lines.push('GUARDRAILS:');
@@ -4112,6 +4157,26 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
       for (const it of sec.items) lines.push(`    ${it.marker} — ${it.reason}${it.target ? ` (цель: ${it.target})` : ''}${it.escalation ? ` ⚠ ${it.escalation}` : ''}`);
     }
   }
+  try {
+    const aasIds: string[] = (((state as any)?.pharma?.aas || []).map((a: any) => a?.id).filter(Boolean)) as string[];
+    const recSubs: string[] = (rec.subs || []).map((s: any) => s?.substanceId).filter(Boolean);
+    const cards = phaseCardsFor((rec as any)?.pedFlags || null, (rec as any)?.phase, {
+      injectable: isInjectableCourse(aasIds.map(id => ({ id })), (rec as any)?.pedFlags || null),
+    });
+    const addons = addonsFor([...aasIds, ...recSubs]);
+    if (cards.length > 0 || addons.length > 0) {
+      lines.push('');
+      lines.push('КАРТОЧКИ АНАЛИЗОВ ПО ФАЗАМ (K0–K10):');
+      for (const c of cards) {
+        lines.push(`- ${c.id} · ${c.title} (${c.when}):`);
+        for (const gr of c.groups) {
+          lines.push(`  ${gr.label}:`);
+          for (const m of gr.items) lines.push(`    ${m.marker}${m.target ? ` (цель: ${m.target})` : ''}${m.red ? ` ⚠ ${m.red}` : ''}`);
+        }
+      }
+      for (const a of addons) lines.push(`- 💊 ${a.label} → ${a.attachTo.join(', ')}: ${a.items.map(m => m.marker).join('; ')}`);
+    }
+  } catch {}
   lines.push('');
   lines.push('СВОДКА ДВИЖКА:');
   lines.push(rec.summary);
