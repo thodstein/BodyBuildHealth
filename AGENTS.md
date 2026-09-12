@@ -1,5 +1,15 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Арм-планировщик PRO-5: аудит + синтез 2025–2026 + выполнение P1–P7 кодом (Sep 12 2026, закоммичено pathspec, без пуша)
+
+По команде «проведи полный анализ планировщика арм + исследования сети + план» → NEW `docs/ARM-PLANNER-PRO-5.md` (аудит: buildArmPlan 914 строк/~60 входов + 78 движков + 19 циклов + 8 сплитов + визард 8 шагов + топ-10 долгов; синтез: StrengthLog 8-week RPE, Larratt-синглы 17–18, ImproveYourGrip-периодизация 2026, Marotta sEMG-hook 2026, humerus video-analysis, WAF Rules 2025, IronMind CoC, GripStrength CoC 8/12, Armlifting USA 2026, IronMind RT/Hub). Честный реаудит показал: половина уже существует (лесенка/синглы/axis/sim-фолы/медли/ACWR) — дубли не писал, только реальные гэпы. Только Edit/Write + vitest/tsc; чужие WIP не тронуты.
+- **NEW 6 движков**: `arm-pro5-core` (degraded-причины/G2 PED-пометка/G3 распил correctionPct/G4 taperStateFor/G6 живой ACWR/G7 вес-ориентир/G8 чужой пул) + `arm-pro5-safety` (axis-gate high→техника+blocked, warmup/losing-гейты, hook-кап 12 + Marotta-эксцентрик) + `arm-pro5-platform-rules` (9 снарядов 2026; Raptor/FatGripz честно без % + LMS-канон) + `arm-pro5-coc-gate` (crush не в день тяг + Expand Bands) + `arm-pro5-singles` (RPE↔RIR + StrengthLog + Larratt 5×1 @92%) + `arm-pro5-ux` (suggestSplitForCycle + consentPreview + deloadEnforcement + ARM_PHASE_PRESETS) + тесты 40/40→41/41.
+- **MOD 4**: types (7 полей + `blocked[]`), builder (degraded[] + все гейты, дефолт байт-в-байт), validator (`blocked[]` + каденс 4/3), contest-sim (WAF-2025 7 фолов).
+- **Добивка «продолжай»**: P7-поверхность (consent-превью было/стало + фикс сплита в 1 клик в шаге сплита, UI 3/3→5/5) + хаб-правила 2026 (per-implement блок + LMS-канон + список 9) + annual-пресеты в warnings блоков.
+- **Поймано своим тестом**: hook-кап считал супинацию hook-объёмом при balanced (ложные варнинги — гейт только hook/явный кап); deload-тест vs гвард последней недели.
+- **Отклонения (честно)**: PED-формула сохранена (test_e) + warning; синглы 5 зачётных + лесенка строкой (17 сломали бы MRV); версионирование `he_arm_*` не делал (риск соседям).
+- **Проверено**: движки+UI **924/924 (88 файлов)** + `tsc` **0 по всему проекту**. Коммиты pathspec своих (`d4d1bdfd` + добивка). НЕ ПУШИЛ.
+
 ## Кардио PRO-2: план + полное выполнение P1–P7 кодом (Sep 12 2026, закоммичено pathspec, без пуша)
 
 По команде «проведи полный анализ кардиоконструктора + исследования сети + план» → NEW `docs/CARDIO-PRO-2-PLAN.md` (§1 аудит: god-file 208КБ/~3587 строк + 24 сателлита + 26 шаблонов + 25 UI-файлов + 10 пробелов D1–D10; §2 синтез 2024–2026: Rivera POL≈PYR/Filipas PYR→POL/Storoschuk Zone2-оговорка/Wilson-бег/Yang NMA 51-1261/Hov 4×4/Bosquet taper/Smyth decouple 82k; §3 эпики P1–P7). Затем «выполняй полностью» — все 7 закрыты кодом. Только Edit/Write + vitest/tsc; чужие WIP (pharma/support/Articles/Risk) не тронуты.

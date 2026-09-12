@@ -25,8 +25,9 @@ import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { ladderAdvice } from '../../../engines/arm/arm-implement-ladder.engine';
 import { buildArmCalendar, superSeriesYear } from '../../../engines/arm/arm-calendar.engine';
 import { buildContestSimWeek } from '../../../engines/arm/arm-contest-sim.engine';
+import { suggestSplitForCycle, consentPreview } from '../../../engines/arm/arm-pro5-ux.engine';
 import { buildGripRpe } from '../../../engines/arm/arm-grip-rpe.engine';
-import { ARM_CYCLE_LIBRARY, fitCycleToWeeks } from '../../../engines/arm/arm-cycle-library.engine';
+import { ARM_CYCLE_LIBRARY, fitCycleToWeeks, getArmCycle } from '../../../engines/arm/arm-cycle-library.engine';
 import { rankArmCycles } from '../../../engines/arm/arm-cycle-selector.engine';
 import { GRIP_IMPLEMENTS, type ArmImplement } from '../../../engines/arm/arm-grip.engine';
 import { ARM_MEDLEYS, getMedley } from '../../../engines/arm/arm-medley.engine';
@@ -1520,7 +1521,25 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             {cycId && (()=>{
               try {
                 const f = fitCycleToWeeks(cycId, weeks);
-                return <div className="ad-tip">Цикл: {f.note}{f.needsConsent && !cycConsent ? ' — поставьте согласие или недели = длине цикла.' : ''}</div>;
+                const c = getArmCycle(cycId);
+                const prev = c ? consentPreview({ fit: f.fit, cycleWeeks: c.weeks, targetWeeks: weeks, cycleName: c.name }) : null;
+                // PRO-5 P7: несочетаемый сплит чинится в 1 клик (вместо голого warning).
+                const splitFix = (()=>{
+                  try {
+                    if (!c) return null;
+                    const cur = patternId ? (ARM_SPLIT_PATTERNS.find(p=>p.id===patternId) ?? ARM_SPLIT_PATTERNS[0]) : ARM_SPLIT_PATTERNS[0];
+                    const curPerWeek = (cur.sessionsPerRotation * 7) / Math.max(1, cur.rotationDays);
+                    if (Math.abs(curPerWeek - c.daysPerWeek) < 2) return null;
+                    const sug = suggestSplitForCycle({ id: c.id, name: c.name, daysPerWeek: c.daysPerWeek, tablePerWeek: c.tablePerWeek, discipline: c.discipline }, ARM_SPLIT_PATTERNS as any);
+                    if (!sug || sug.id === patternId) return null;
+                    return sug;
+                  } catch { return null; }
+                })();
+                return (<>
+                  <div className="ad-tip">Цикл: {f.note}{f.needsConsent && !cycConsent ? ' — поставьте согласие или недели = длине цикла.' : ''}</div>
+                  {prev && prev.lines.map((l, i)=>(<div key={i} className="ad-tip" data-arm="consent-preview">{l}</div>))}
+                  {splitFix && <AdBtn variant="ghost" block onClick={()=>pickSplit(splitFix.id)} data-arm="split-fix">🔧 Подходит сплит «{splitFix.name}» — применить в 1 клик</AdBtn>}
+                </>);
               } catch { return null; }
             })()}
           </AdSec>

@@ -8,6 +8,7 @@ import { finalizeArmPlan } from './arm-finalize.engine';
 import { applyArmTaperToWeeks, buildArmTaperCurve } from './arm-taper.engine';
 import { getArmCycle } from './arm-cycle-library.engine';
 import { suggestCycleForMacroPhase } from './arm-cycle-selector.engine';
+import { ARM_PHASE_PRESETS } from './arm-pro5-ux.engine';
 import { superSeriesYear } from './arm-calendar.engine';
 import type { UserWeek } from '../user-program/user-program.types';
 
@@ -137,6 +138,13 @@ export function buildArmBlock(
   const weeksOut = armPlanToUserWeeks(plan);
   const warnings: string[] = [];
   if (plan.validation && !plan.validation.valid) warnings.push(...(plan.validation.warnings || []));
+  // PRO-5 P5: годовая лестница — фазовый пресет блока виден в warnings
+  // (объём/RIR уже заданы goal-маппингом выше; здесь только честная подпись).
+  try {
+    const key = block.phase === 'peaking' ? 'peaking' : block.phase === 'transition' ? 'off_season' : 'strength_power';
+    const preset = ARM_PHASE_PRESETS[key];
+    if (preset) warnings.push(`Фаза года «${block.phase}»: ${preset.note}`);
+  } catch { /* опционально */ }
 
   const configHash = stableHash({ input, blockWeeks: weeks, taperApplied });
 

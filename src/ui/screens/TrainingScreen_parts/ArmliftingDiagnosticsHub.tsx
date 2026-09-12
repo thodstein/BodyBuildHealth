@@ -16,6 +16,7 @@ import {
 import { buildArmliftingHtml, buildArmliftingCsv } from '../../../engines/arm/armlifting-diagnostics.engine';
 import { downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { savePlatformLogEntry, loadPlatformLog, planLastManStanding } from '../../../engines/arm/arm-platform.engine';
+import { platformRuleFor, PLATFORM_RULES_2026, LMS_RULES_2026 } from '../../../engines/arm/arm-pro5-platform-rules.engine';
 import { armliftClassFor, armliftClassLine } from '../../../engines/arm/armlift-weight-class.engine';
 import { applyToPlanner } from './planner-bridge';
 import { AdRoot, AdCard, AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdCta } from './arm-design-system';
@@ -375,6 +376,32 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             ))}
           </div>
           <div className="ad-muted" data-arm="lift-rules">{rulesRes.note}</div>
+          {(()=>{
+            const map: Record<string, string> = { raptor_175: 'raptor_1h' };
+            const rule = platformRuleFor(map[state.attImplement] || state.attImplement);
+            return (<>
+              {rule && (
+                <div className="ad-muted" data-arm="lift-rule-2026">
+                  <b>{rule.name} (2026):</b> {rule.grip} · {rule.timing} · {rule.attempts} · Фолы: {rule.fouls.join('; ')} · {rule.wrNote}
+                </div>
+              )}
+              <div className="ad-muted" data-arm="lift-lms-rules">{LMS_RULES_2026}</div>
+            </>);
+          })()}
+        </AdSec>
+      </AdCard>
+
+      <AdCard>
+        <AdSec title="📜 Правила снарядов 2026" collapsible defaultOpen={false} summary="9 снарядов · IronMind/AUSA">
+          <div className="ad-list" data-arm="lift-rules-2026">
+            {PLATFORM_RULES_2026.map((r) => (
+              <div key={r.implement} className="ad-row">
+                <span><b>{r.name}</b></span>
+                <span className="ad-muted">{r.grip} · {r.timing} · {r.attempts}</span>
+                <span className="ad-muted">Фолы: {r.fouls.join('; ')} · {r.wrNote}</span>
+              </div>
+            ))}
+          </div>
         </AdSec>
       </AdCard>
 

@@ -13,6 +13,7 @@ import { checkCocGates } from '../arm-pro5-coc-gate.engine';
 import { rirForRpe, strengthLogRir, larrattSinglesFor, isSinglesCandidate } from '../arm-pro5-singles.engine';
 import { suggestSplitForCycle, consentPreview, deloadEnforcement, ARM_PHASE_PRESETS } from '../arm-pro5-ux.engine';
 import { buildContestSimWeek, waf2025FoulChecklist } from '../arm-contest-sim.engine';
+import { buildArmBlock } from '../arm-annual';
 
 const BASE: any = { discipline: 'armwrestling', patternId: 'arm_3_full', level: 'intermediate', goal: 'strength', technique: 'toproll', weeks: 8 };
 
@@ -295,11 +296,18 @@ describe('arm-pro5 builder wiring', () => {
     const plain: any = buildArmPlan({ ...BASE });
     expect(validateArmPlan(plain).blocked).toEqual([]);
   });
-  it('WAF-2025: чек-лист фолов в contest-sim', () => {
-    const s = buildContestSimWeek({ discipline: 'armwrestling' });
+  it('WAF-2025: чек-лист фолов в contest-sim', () => {    const s = buildContestSimWeek({ discipline: 'armwrestling' });
     expect(s.checklist.some((c) => c.includes('центрлайн'))).toBe(true);
     expect(waf2025FoulChecklist().length).toBe(7);
     const lift = buildContestSimWeek({ discipline: 'armlifting', targetKg: 100 });
     expect(lift.attempts).toEqual([90, 96, 102]);
+  });
+  it('annual: фазовый пресет виден в warnings блока', () => {
+    const t = buildArmBlock({ blockKey: 'b1', weeks: 4, phase: 'transition' }, {});
+    expect(t.warnings.some((w) => w.includes('Фаза года'))).toBe(true);
+    expect(t.warnings.some((w) => w.includes('transition'))).toBe(true);
+    const p = buildArmBlock({ blockKey: 'b2', weeks: 4, phase: 'peaking' }, {});
+    expect(p.peakApplied).toBe(true);
+    expect(p.warnings.some((w) => w.includes('peaking'))).toBe(true);
   });
 });
