@@ -10,6 +10,13 @@
 - **E-раунд (`207f464e`)**: `downloadCsv`/`clearCalcHistory` + CSV во всех 5 табах + «Вся история CSV» + счётчик маркеров в матрице + NEW `pharma-calc-hub` UI-guard 7/7. Проверено 133/133; `tsc` 0; apk-verify OK.
 - **F-раунд (`2bdff781`)**: Bateman-оверлей на графике (нормировано к Cmax, дефолт выкл; пойман свой scope-баг `batemanPathD` своим же UI-тестом); `PairResult.source` + CSV-колонка; экспорт истории. Тесты hub 8/8 + pro 20/20; `tsc` 0; apk-verify OK.
 - **G-раунд (этот коммит)**: BioAge-бейдж «эвристика» + список маркеров честного возраста; честная единица дозы из БД (`МЕ/день`, `мкг/день`, `мг/день` вместо всегда `мг/нед`) + bridge несёт реальный `doseUnit`.
+- **H-раунд**: живой мост в курс (`db.put course_log` + `notifyDataChange`, прецедент `CatalogTab`); частоты пептидов + кнопка; удаление истории по одной (поймана коллизия id в одну мс); log-шкала графика.
+- **I-раунд (этот коммит)**: канон-оверрайд t½ в `advanced-diagnostics` (опциональный 5-й параметр, legacy и Python-зеркало untouched) + тоггл в диагностике (дефолт ВКЛ) + канон в подписях эфиров; фильтр истории по табам; аудит `InteractionCheckerTab` (только чтение — чужой файл, найдены 2 реальных дефекта, см. ниже).
+
+## Аудит InteractionCheckerTab (I2, только чтение — файл чужой, не тронут)
+
+1. `synergyToPharmaId` маппит в несуществующие id: `drostanolone_propionate → masteron`, `drostanolone_enanthate → masteron_enan`, `raloxifene` — таких id в `PHARMA_DB` нет (реальные: `drostanolone_prop`/`drostanolone_enan`, ралоксифена нет вовсе). Гард `pharmaIds.has` молча дропает эти синергии — мастерон без синергий в UI. Фикс 2-строчный — за владельцем таба.
+2. Доза захардкожена 300 мг/нед для всех (`alerts`/`courseRecs`/`classInstructions`/`unifiedView`): оралам/пептидам/SERM в IU/мкг сила алертов считается от неверной базы. Фикс — тянуть дозу/единицу из курса или из `dosageRange` — за владельцем таба.
 
 ## 1. Что есть сейчас (5 калькуляторов, `PharmaScreen_parts/index.tsx:232-241`)
 

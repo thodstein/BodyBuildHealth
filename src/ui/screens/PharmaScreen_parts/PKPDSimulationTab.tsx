@@ -55,6 +55,7 @@ export const PKPDSimulationTab: React.FC = () => {
   const [, setHistTick] = useState(0);
   const [showBateman, setShowBateman] = useState(false);
   const [logScale, setLogScale] = useState(false);
+  const [histFilter, setHistFilter] = useState('all');
 
   const allSubstances = useMemo(() => {
     const PKPD_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','dht_inject','insulin','gh','glp1','clenbuterol','thyroid','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other','igf1','mgf']);
@@ -484,7 +485,14 @@ export const PKPDSimulationTab: React.FC = () => {
                       {loadCalcHistory().length > 0 && <button onClick={() => { clearCalcHistory(); setHistTick((t) => t + 1); }} style={{ marginLeft:'auto', minHeight:44, padding:'6px 12px', borderRadius:9, border:'1px solid rgba(239,68,68,0.22)', background:'rgba(239,68,68,0.10)', color:'#f87171', fontWeight:800, fontSize:11, cursor:'pointer' }}>🗑 Очистить</button>}
                     </div>
                     {loadCalcHistory().length === 0 && <div style={{ fontSize:11, color:'#fff' }}>Пока пусто — нажми «В историю» в любом табе.</div>}
-                    {loadCalcHistory().slice(0, 5).map((h) => (
+                    {loadCalcHistory().length > 0 && (
+                      <div style={{ display:'flex', gap:4, flexWrap:'wrap', margin:'6px 0' }}>
+                        {['all', 'pkpd', 'dosage', 'peptides', 'mapper', 'diagnostics'].map((f) => (
+                          <button key={f} onClick={() => setHistFilter(f)} style={{ minHeight:44, padding:'5px 10px', borderRadius:20, fontSize:10, fontWeight:800, cursor:'pointer', background: histFilter === f ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.07)' }}>{f === 'all' ? 'Все' : f}</button>
+                        ))}
+                      </div>
+                    )}
+                    {loadCalcHistory().filter((h) => histFilter === 'all' || h.tab === histFilter).slice(0, 5).map((h) => (
                       <div key={h.id} style={{ fontSize:10, color:'#fff', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', display:'flex', alignItems:'center', gap:6 }}>
                         <span style={{ flex:1 }}>{h.tab} · {h.summary}</span>
                         <button onClick={() => { removeCalcSnapshot(h.id); setHistTick((t) => t + 1); }} aria-label="Удалить запись" style={{ width:32, height:32, minWidth:32, minHeight:32, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>✕</button>

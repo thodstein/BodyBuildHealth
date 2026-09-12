@@ -58,6 +58,18 @@ describe('pharma hub E-guard: новые панели живы', () => {
     const { container } = render(<DiagnosticsTab />);
     expect(container.textContent).toMatch(/5-Engine/);
   });
+  it('Диагностика: тоггл канона t½ виден сразу', () => {
+    const { container } = render(<DiagnosticsTab />);
+    expect(container.textContent).toMatch(/Канон t½/);
+  });
+  it('PK: фильтр истории показывает чипы табов', async () => {
+    const share = await import('../../../../engines/pharma-calc-share.engine');
+    share.saveCalcSnapshot('pkpd', 'probe-filter');
+    const { container } = render(<PKPDSimulationTab />);
+    fireEvent.click(screen.getByText(/Запустить симуляцию/));
+    expect(container.textContent).toMatch(/Все/);
+    share.clearCalcHistory();
+  });
   it('История: save → load → clear roundtrip', () => {
     clearCalcHistory();
     expect(loadCalcHistory().length).toBe(0);

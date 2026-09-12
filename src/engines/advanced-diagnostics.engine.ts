@@ -64,11 +64,22 @@ export interface PKPDOutput {
  * Formula: C_t = C_0 * exp(-k * t), where k = ln(2) / T1/2.
  * Peak/trough delta > 40% → hormonal swing flag.
  */
-export function computePKPD(drugs: DrugDoseInput[]): PKPDOutput[] {
+export interface DiagnosticsOpts {
+  /** Канон-оверрайд t½ (OptiPin): ester -> дни. Без него — legacy ESTER_HALF_LIFE_DAYS (совместимость + Python-зеркало). */
+  halfLifeOverride?: Record<string, number>;
+}
+
+function resolveHalfLife(ester: string, fallback: number, opts?: DiagnosticsOpts): number {
+  const ov = opts?.halfLifeOverride?.[String(ester || '').toLowerCase()];
+  if (Number.isFinite(ov) && (ov as number) > 0) return ov as number;
+  return fallback;
+}
+
+export function computePKPD(drugs: DrugDoseInput[], opts?: DiagnosticsOpts): PKPDOutput[] {
   if (!Array.isArray(drugs)) return [];
   return drugs.filter(Boolean).map((drug) => {
     const injPerWeek = Math.max(drug.injectionsPerWeek || 0, 0.1);
-    const tHalf = ESTER_HALF_LIFE_DAYS[drug.ester] || (7.0 / injPerWeek);
+    const tHalf = resolveHalfLife(drug.ester, ESTER_HALF_LIFE_DAYS[drug.ester] || (7.0 / injPerWeek), opts);
     const k = Math.log(2) / Math.max(tHalf, 0.01);
     const dosePerInjection = (drug.mgPerWeek || 0) / Math.max(drug.injectionsPerWeek || 0, 1);
     const intervalDays = 7.0 / injPerWeek;
@@ -299,7 +310,11 @@ export interface PCTRebootOutput {
   recommendation: string;
 }
 
-export function computePCTReboot(input: PCTRebootInput): PCTRebootOutput {
+export interface PCTRebootInputEx extends PCTRebootInput {
+  halfLifeOverride?: Record<string, number>;
+}
+
+export function computePCTReboot(input: PCTRebootInputEx): PCTRebootOutput {
   if (!input || !Array.isArray(input.drugs) || input.drugs.length === 0) {
     return {
       pctStartDay: 0,
@@ -318,7 +333,7 @@ export function computePCTReboot(input: PCTRebootInput): PCTRebootOutput {
 
   for (const drug of input.drugs) {
     if (!drug) continue;
-    const th = ESTER_HALF_LIFE_DAYS[drug.ester] || 7.0;
+    const th = resolveHalfLife(drug.ester, ESTER_HALF_LIFE_DAYS[drug.ester] || 7.0, { halfLifeOverride: (input as PCTRebootInputEx).halfLifeOverride });
     if (th > longestTH) {
       longestTH = th;
       longestDrug = drug;
@@ -392,16 +407,17 @@ export function runAdvancedDiagnostics(
   drugs: DrugDoseInput[],
   vitals: VitalsInput,
   has19NorHistory: boolean,
+  opts?: DiagnosticsOpts,
 ): AdvancedDiagnosticsResult {
   const safeDrugs = Array.isArray(drugs) ? drugs : [];
-  const pkpd = computePKPD(safeDrugs);
+  const pkpd = computePKPD(safeDrugs, opts);
   const interactions = computeInteractions(safeDrugs.filter(Boolean).map(d => d.name || ''));
   const vitalsResult = computeVitals(vitals);
 
   const totalMg = safeDrugs.reduce((sum, d) => sum + (d?.mgPerWeek || 0), 0);
   const bioage = computeBioAge({ chronologicalAge: age, vitals, totalWeeklyMg: totalMg });
 
-  const pctReboot = computePCTReboot({ drugs: safeDrugs, has19NorInHistory: has19NorHistory });
+  const pctReboot = computePCTReboot({ drugs: safeDrugs, has19NorInHistory: has19NorHistory, halfLifeOverride: opts?.halfLifeOverride });
 
   // Build summary
   const parts: string[] = [];

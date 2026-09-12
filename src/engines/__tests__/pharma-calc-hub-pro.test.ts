@@ -163,6 +163,23 @@ describe('H раунд', () => {
   });
 });
 
+describe('I раунд: канон-оверрайд движка', () => {
+  it('override перекрывает legacy t½', async () => {
+    const eng = await import('../advanced-diagnostics.engine');
+    const base = eng.computePKPD([{ name: 't', ester: 'enanthate', mgPerWeek: 250, injectionsPerWeek: 2 }]);
+    const over = eng.computePKPD([{ name: 't', ester: 'enanthate', mgPerWeek: 250, injectionsPerWeek: 2 }], { halfLifeOverride: { enanthate: 7.2 } });
+    expect(base[0].halfLifeDays).toBeCloseTo(4.5, 1);
+    expect(over[0].halfLifeDays).toBeCloseTo(7.2, 1);
+    expect(over[0].peakConcMg).not.toBe(base[0].peakConcMg);
+  });
+  it('runAdvancedDiagnostics прокидывает override в PK и ПКТ', async () => {
+    const eng = await import('../advanced-diagnostics.engine');
+    const r = eng.runAdvancedDiagnostics(30, [{ name: 't', ester: 'enanthate', mgPerWeek: 250, injectionsPerWeek: 2 }], { hrv: 55, rhr: 62, bpSys: 125, bpDia: 80 }, false, { halfLifeOverride: { enanthate: 7.2 } });
+    expect(r.pkpd[0].halfLifeDays).toBeCloseTo(7.2, 1);
+    expect(r.pctReboot.longestHalfLifeDays).toBeCloseTo(7.2, 1);
+  });
+});
+
 describe('P7 share export', () => {
   it('csv anti-formula + esc', () => {
     expect(csvCell('=cmd')).toMatch(/^"/);

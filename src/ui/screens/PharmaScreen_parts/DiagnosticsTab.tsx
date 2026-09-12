@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { runAdvancedDiagnostics, ESTER_HALF_LIFE_DAYS } from '../../../engines/advanced-diagnostics.engine';
 import { planPctStart, halfLifeOf, pctWindowLabel } from '../../../engines/pct-timing.engine';
+import { resolveEsterCanon } from '../../../engines/pk-bateman.engine';
 import { saveCalcSnapshot, buildCalcCsv, buildCalcHtml, downloadCsv, printHtml } from '../../../engines/pharma-calc-share.engine';
 import type { DrugDoseInput, VitalsInput, AdvancedDiagnosticsResult } from '../../../engines/advanced-diagnostics.engine';
 import { useDataLink } from '../../../core/data-link';
@@ -48,6 +49,7 @@ export const DiagnosticsTab: React.FC = () => {
 
   const [result, setResult] = useState<AdvancedDiagnosticsResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [canonOn, setCanonOn] = useState(true);
 
   const esterOptions = Object.keys(ESTER_HALF_LIFE_DAYS);
 
@@ -81,7 +83,14 @@ export const DiagnosticsTab: React.FC = () => {
   const handleRun = () => {
     setLoading(true);
     const vitals: VitalsInput = { hrv, rhr, bpSys, bpDia };
-    const res = runAdvancedDiagnostics(age, diagDrugs, vitals, has19Nor);
+    const override: Record<string, number> = {};
+    if (canonOn) {
+      for (const d of diagDrugs) {
+        const c = resolveEsterCanon(d.ester);
+        override[String(d.ester || '').toLowerCase()] = c.tHalfDays;
+      }
+    }
+    const res = runAdvancedDiagnostics(age, diagDrugs, vitals, has19Nor, canonOn ? { halfLifeOverride: override } : undefined);
     setResult(res);
     setLoading(false);
   };
@@ -123,7 +132,7 @@ export const DiagnosticsTab: React.FC = () => {
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8, alignItems:'center' }}>
             <input value={manName} onChange={e => setManName(e.target.value)} placeholder="Название" style={{ flex:'1 1 110px', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:600, outline:'none' }} />
             <select value={manEster} onChange={e => setManEster(e.target.value)} style={{ flex:'1 1 120px', padding:'8px 8px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, fontWeight:600, outline:'none' }}>
-              {esterOptions.map(e => (<option key={e} value={e} style={{ background:'#1a1a1f' }}>{e} ({ESTER_HALF_LIFE_DAYS[e]}д)</option>))}
+              {esterOptions.map(e => { const c = resolveEsterCanon(e); return (<option key={e} value={e} style={{ background:'#1a1a1f' }}>{e} (движок {ESTER_HALF_LIFE_DAYS[e]}д · канон {c.tHalfDays}д)</option>); })}
             </select>
             <input type="number" value={manMg} onChange={e => setManMg(parseFloat(e.target.value) || 0)} placeholder="мг/нед" style={{ width:78, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, outline:'none' }} />
             <input type="number" value={manFreq} onChange={e => setManFreq(parseFloat(e.target.value) || 0)} placeholder="×/нед" style={{ width:64, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, outline:'none' }} />
@@ -144,6 +153,9 @@ export const DiagnosticsTab: React.FC = () => {
           </div>
         )}
         {diagDrugs.length===0 && <div style={{ fontSize:11, color:'#fff', textAlign:'center', padding:8, background:'rgba(255,255,255,0.02)', borderRadius:10, border:'1px dashed rgba(255,255,255,0.06)' }}>Добавь препараты — из курса или вручную</div>}
+        <button onClick={() => setCanonOn((v) => !v)} aria-pressed={canonOn} style={{ marginTop:8, width:'100%', minHeight:44, borderRadius:10, fontSize:11, fontWeight:800, cursor:'pointer', background: canonOn ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(59,130,246,0.22)' }}>
+          {canonOn ? 'Канон t½ OptiPin: ВКЛ (движок-legacy перекрыт)' : 'Канон t½ OptiPin: ВЫКЛ (legacy движка + Python-зеркало)'}
+        </button>
       </div>
 
       <div style={card}>
