@@ -166,6 +166,24 @@ export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetiti
   return next;
 }
 
+/**
+ * №2: авто-год из истории планов + тапер из даты боя свежего плана.
+ * Склейка buildAnnualFromCB + addCompetitionToAnnual (main, 2нед); без даты боя — как раньше.
+ * Чистая, тестируемая; конструктор — тонкий вызов.
+ */
+export function autoAnnualWithFightTaper(hist: CombatPlan[]): AnnualCB {
+  let ann = buildAnnualFromCB(hist);
+  try {
+    const latest: any = hist[0];
+    const fd = latest?.inputSnapshot?.fightDate;
+    const sd = latest?.inputSnapshot?.startDate || null;
+    if (typeof fd === 'string' && fd) {
+      ann = addCompetitionToAnnual(ann, { id: `auto_${latest.id || 'plan'}`, name: 'Бой (из плана)', date: fd } as AnnualCBCompetition, sd);
+    }
+  } catch { /* no-op */ }
+  return ann;
+}
+
 export function buildAnnualPrintHtml(annual: AnnualCB): string {
   const esc = (s:string)=> String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   const phaseColor: Record<string,string> = { accumulation:'#3b82f6', transmutation:'#a855f7', realization:'#ef4444', transition:'#f59e0b', gpp:'#10b981', power:'#f97316', taper:'#06b6d4', deload:'#eab308', conjugate:'#6366f1' };

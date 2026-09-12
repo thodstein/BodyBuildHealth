@@ -13,7 +13,7 @@ import { COMBAT_CYCLE_LIBRARY, getCombatCycle } from '../../../engines/combat/co
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveCombatPlan, loadCombatPlans, migrateAllCombatStorage } from '../../../engines/combat/combat-storage';
 import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
-import { buildAnnualFromCB, buildAnnualATR, saveAnnualCB, loadAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual } from '../../../engines/combat/combat-annual';
+import { buildAnnualATR, saveAnnualCB, loadAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual, autoAnnualWithFightTaper } from '../../../engines/combat/combat-annual';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
 import { downloadCombatXlsx } from '../../../engines/combat/combat-xlsx.engine';
 import { saveUserProgram } from '../../../engines/user-program/program-store';
@@ -400,6 +400,14 @@ export const CombatConstructor: React.FC = () => {
     let p = buildCombatPlan(input);
     p = finalizeCombatPlan(p);
     setPlan(p);
+    // №1 hard-block: при errors план показываем (красный блок), но не сохраняем,
+    // не рассылаем в питание/кардио и не трогаем годовой — сначала исправления/врач
+    if ((p.validation?.errors?.length || 0) > 0) {
+      setMsg(`⛔ Сборка заблокирована: ошибок ${p.validation!.errors.length} — исправьте и соберите заново`);
+      setTimeout(() => setMsg(''), 4000);
+      setStep('plan');
+      return;
+    }
     saveCombatPlan(p);
     try {
       const nut: CombatNutritionPayload = { planId: p.id, ...combatToNutritionPayload(p), bodyweight, discipline, goal };
@@ -411,7 +419,7 @@ export const CombatConstructor: React.FC = () => {
       if (cardio) localStorage.setItem('he_combat_cardio_payload', JSON.stringify(cardio));
       window.dispatchEvent(new CustomEvent('he-combat-updated', { detail: { planId: p.id, nutrition: nut, cardio } }));
     } catch {}
-    try { const hist = loadCombatPlans().slice(0, 6); const ann = buildAnnualFromCB(hist); saveAnnualCB(ann); setAnnual(ann); } catch {}
+    try { const hist = loadCombatPlans().slice(0, 6); const ann = autoAnnualWithFightTaper(hist); saveAnnualCB(ann); setAnnual(ann); } catch {}
     setMsg('✦ План собран · ' + (periodizationModel || 'atr_10') + (fightDate ? ' · тапер к бою' : '') + (wcProtocol ? ' · весогонка ' + wcProtocol.targetLossKg + 'кг' : ''));
     setTimeout(() => setMsg(''), 3000);
     setStep('plan');

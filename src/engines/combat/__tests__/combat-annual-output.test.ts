@@ -3,6 +3,7 @@ import { buildCombatPlan } from '../combat-builder.engine';
 import {
   buildAnnualATR,
   addCompetitionToAnnual,
+  autoAnnualWithFightTaper,
 } from '../combat-annual';
 import {
   buildCombatPrintHtml,
@@ -97,8 +98,7 @@ describe('combat fight-week output', () => {
   });
 });
 
-describe('combat storage quotas', () => {
-  beforeEach(() => { try { localStorage.clear(); } catch { /* ignore */ } });
+describe('combat storage quotas', () => {  beforeEach(() => { try { localStorage.clear(); } catch { /* ignore */ } });
   it('isCombatPlanShape: план — да, мусор — нет', () => {
     const plan = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3 } as any);
     expect(isCombatPlanShape(plan)).toBe(true);
@@ -126,5 +126,41 @@ describe('combat storage quotas', () => {
     expect(loadCombatPlan()).toBeNull();
     expect(localStorage.getItem('he_combat_nutrition_payload')).toBeNull();
     expect(localStorage.getItem('he_combat_cardio_payload')).not.toBeNull();
+  });
+});
+
+describe('autoAnnualWithFightTaper (№2)', () => {
+  const planWithFight = () => buildCombatPlan({
+    discipline: 'mma', goal: 'camp', level: 'intermediate', weeks: 6, daysPerWeek: 3,
+    fightDate: '2026-08-29', startDate: '2026-08-01', taperWeeks: 2,
+  } as any);
+
+  it('дата боя из свежего плана → тапер 2нед в авто-годе, сумма 6', () => {
+    const ann = autoAnnualWithFightTaper([planWithFight()]);
+    const taper = ann.blocks.filter(b => b.phase === 'taper' && b.fightDate === '2026-08-29');
+    expect(taper.length).toBe(1);
+    expect(taper[0].weeks).toBe(2);
+    expect(ann.blocks.reduce((a, b) => a + b.weeks, 0)).toBe(6);
+    expect(ann.competitions.some(c => c.date === '2026-08-29')).toBe(true);
+  });
+
+  it('без даты боя — как раньше: таперов нет', () => {
+    const plain = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 6, daysPerWeek: 3 } as any);
+    const ann = autoAnnualWithFightTaper([plain]);
+    expect(ann.blocks.filter(b => b.phase === 'taper').length).toBe(0);
+    expect(ann.competitions).toEqual([]);
+  });
+
+  it('мусорная дата — без тапера и без throw', () => {
+    const bad = buildCombatPlan({ discipline: 'mma', goal: 'camp', level: 'intermediate', weeks: 6, daysPerWeek: 3, fightDate: '2025-02-30' } as any);
+    let ann: any = null;
+    expect(() => { ann = autoAnnualWithFightTaper([bad]); }).not.toThrow();
+    expect(ann.blocks.filter((b: any) => b.phase === 'taper').length).toBe(0);
+  });
+
+  it('пустая история — пустой год без throw', () => {
+    let ann: any = null;
+    expect(() => { ann = autoAnnualWithFightTaper([]); }).not.toThrow();
+    expect(ann.blocks).toEqual([]);
   });
 });
