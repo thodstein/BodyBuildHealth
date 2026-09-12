@@ -238,3 +238,18 @@ describe('phaseLabTeaser — тизер свернутого мониторин�
     expect(phaseLabTeaser(null, 'pct', 0)).toBe('K0–K10 · 4 карт · 🎯 0 маркеров');
   });
 });
+
+describe('labTimingFor — расширенное покрытие (round-7)', () => {
+  it('почки/липиды/глюкоза/щитовидка/T/ОАК', () => {
+    expect(labTimingFor('Креатинин')).toContain('K3');
+    expect(labTimingFor('ЛПНП')).toContain('K2');
+    expect(labTimingFor('Глюкоза натощак')).toContain('K2');
+    expect(labTimingFor('ТТГ')).toContain('K2');
+    expect(labTimingFor('Тестостерон общий')).toContain('K6');
+    expect(labTimingFor('Гемоглобин')).toContain('K3');
+  });
+  it('старые правила не перебиты новыми (порядок)', () => {
+    expect(labTimingFor('Гематокрит')).toContain('K2');
+    expect(labTimingFor('Эстрадиол')).toContain('48 ч');
+  });
+});

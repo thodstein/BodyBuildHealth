@@ -48,7 +48,7 @@ import { CalcPhaseLabCards } from './CalcPhaseLabCards';
 import { LAB_MONITOR_DB } from '../SupportScreen_parts/UnifiedSynergyCalculator';
 import { LAB_TOP20, resolveLabMonitor, type HubLabMon } from '../../../engines/support-hub-labs.engine';
 import { getSubstanceMonitoring } from '../../../data/substance-monitoring-db';
-import { phaseCardsFor, addonsFor, isInjectableCourse, mergeMonitoringLists, withLabTiming, phaseLabTeaser } from '../../../engines/support-phase-labs.engine';
+import { phaseCardsFor, addonsFor, isInjectableCourse, mergeMonitoringLists, withLabTiming, phaseLabTeaser, matrixAddonKeys } from '../../../engines/support-phase-labs.engine';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -3499,6 +3499,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     <div style={{ fontSize: 8, fontWeight: 800, color: '#fbbf24', marginBottom: 3 }}>{cls.icon} {cls.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>· фаза: {cls.phase}</span></div>
                     <div style={rowStyle}>{lbl('Механизмы')}{cls.mechs.join(', ')}</div>
                     <div style={rowStyle}>{lbl('Анализы')}{cls.labs.join(', ')} <span style={{ color: 'rgba(255,255,255,0.45)' }}>({cls.freq})</span></div>
+                    {matrixAddonKeys(cls.id).length > 0 && (
+                      <div style={{ ...rowStyle, color: '#93c5fd' }}>{lbl('📋 Детали в K-карточках')}аддон {matrixAddonKeys(cls.id).join(' + ')} — блок «Мониторинг анализов» ниже</div>
+                    )}
                     <div style={{ ...rowStyle, color: '#4ade80' }}>{lbl('Обязательная поддержка')}{cls.mandatory.join(', ')}</div>
                     {cls.conditional.length > 0 && <div style={{ ...rowStyle, color: '#fbbf24' }}>{lbl('Условная')}{cls.conditional.join(', ')}</div>}
                     {cls.doctorOnly.length > 0 && <div style={{ ...rowStyle, color: '#fca5a5' }}>{lbl('👨‍⚕️ Под контролем врача')}{cls.doctorOnly.join(', ')}</div>}

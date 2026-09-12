@@ -671,6 +671,12 @@ const MARKER_TIMING: Array<{ re: RegExp; when: string }> = [
   { re: /hba1c|гликирован/i, when: 'Baseline + каждые 12 нед при GH/GLP-1 (K2/K3)' },
   { re: /lh|fsh|лг|фсг/i, when: 'Baseline K0 + PCT нед 2/6 (K6); на курсе не сдавать' },
   { re: /d-?димер|d-?dimer/i, when: 'При HCT>52% и в K3; экстренно при ТГВ-симптомах (K8)' },
+  { re: /креатинин|egfr|скф|мочевина|моча|уакр|uacr|оам|creatinine/i, when: 'K1 при трене/клене (q2w) + K3 q8–12 нед; цистатин C при мышцах' },
+  { re: /липид|холестерин|лпнп|лпвп|триглицерид|ldl|hdl/i, when: 'Доза ≥500/оралы — каждые 4 нед (K2); иначе K3 q8–12 нед' },
+  { re: /глюкоз|glucose|hba1c|инсулин|homa/i, when: 'Каждые 4 нед (K2); HbA1c q12w при GH' },
+  { re: /ттг|tsh|тирео/i, when: 'Baseline K0 + каждые 4 нед при T3/T4 (K2)' },
+  { re: /тестостерон|testosterone/i, when: 'Baseline K0 (×2 утром) + PCT нед 2/6 (K6); на курсе не сдавать' },
+  { re: /оак|cbc|гемоглобин|hemoglobin/i, when: 'Baseline K0 + K3 q8–12 нед' },
 ];
 
 export function labTimingFor(marker: string): string | null {
