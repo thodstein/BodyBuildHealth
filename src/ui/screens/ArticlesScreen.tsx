@@ -153,6 +153,18 @@ export function extractArticleToc(md: string): { id: string; title: string }[] {
   return out;
 }
 
+export function highlightMatch(text: string, q: string): React.ReactNode {
+  const query = (q || '').trim();
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx < 0) return text;
+  return (<>
+    {text.slice(0, idx)}
+    <mark style={{ background:artA(0.35), color:'#fff', borderRadius:4, padding:'0 2px' }}>{text.slice(idx, idx + query.length)}</mark>
+    {text.slice(idx + query.length)}
+  </>);
+}
+
 export function renderMarkdown(md: string, bodyPx = 14): string {
   let h2Seen = false;
   let h3Idx = 0;
@@ -668,9 +680,11 @@ export const ArticlesScreen: React.FC = () => {
               <div aria-hidden="true" style={{ position:'absolute', inset:0, background:`radial-gradient(420px 130px at 12% 0%, ${catColor}30, transparent 65%), radial-gradient(300px 120px at 95% 100%, ${catColor}18, transparent 60%)`, pointerEvents:'none' }} />
               <div style={{ position:'relative', padding:'16px 16px 14px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, flexWrap:'wrap' }}>
-                  <span style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 11px', borderRadius:999, background:`${catColor}1c`, border:`1px solid ${catColor}33`, color:catColor, fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.06em' }}>
-                    <NativeIcon name={CAT_ICON[readingArticle.category] || 'file'} size={12} /> {catLabel}
-                  </span>
+                  <button onClick={() => { setReadingArticle(null); setSearch(''); setCategory(readingArticle.category); }}
+                    aria-label={`Все статьи категории ${catLabel}`} className="articles-cover-cat"
+                    style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 11px', borderRadius:999, background:`${catColor}1c`, border:`1px solid ${catColor}33`, color:catColor, fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.06em', cursor:'pointer', fontFamily:FONT, minHeight:44 }}>
+                    <NativeIcon name={CAT_ICON[readingArticle.category] || 'file'} size={12} /> {catLabel} →
+                  </button>
                   <span style={{ padding:'5px 11px', borderRadius:999, background:artA(0.10), border:`1px solid ${artA(0.22)}`, color:ART_ACC, fontWeight:800, fontSize:11 }}>⏱ {mins} мин</span>
                   <span style={{ padding:'5px 11px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontWeight:700, fontSize:11 }}>📅 {readingArticle.date}</span>
                 </div>
@@ -904,11 +918,11 @@ export const ArticlesScreen: React.FC = () => {
                 </div>
 
                 <div style={{ fontWeight:800, fontSize:13, color:'#fff', marginBottom:5, lineHeight:1.32, letterSpacing:'-0.015em', display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight: 41, position:'relative' }}>
-                  {article.title}
+                  {highlightMatch(article.title, search)}
                 </div>
 
                 <div style={{ fontSize:12, color:'#fff', lineHeight:1.45, marginBottom:9, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight: 35, position:'relative' }}>
-                  {article.description}
+                  {highlightMatch(article.description, search)}
                 </div>
 
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, position:'relative' }}>

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/react';
-import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds } from '../screens/ArticlesScreen';
+import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds, highlightMatch } from '../screens/ArticlesScreen';
 import { resetAppPlatformCache } from '../../core/app-platform';
 
 beforeEach(() => {
@@ -325,6 +325,40 @@ describe('ArticlesScreen PRO TOP', () => {
     const recent = container.querySelector('.articles-hero-recent') as HTMLElement;
     expect(recent).not.toBeNull();
     expect(recent.textContent).toContain('Полный гид по анализам');
+  });
+
+  it('25. highlightMatch подсвечивает первое вхождение', () => {
+    const { container } = render(<div>{highlightMatch('Как Тренболон влияет', 'трен')}</div>);
+    const mark = container.querySelector('mark');
+    expect(mark).not.toBeNull();
+    expect(mark?.textContent).toBe('Трен');
+    const plain = render(<div>{highlightMatch('Текст', '')}</div>);
+    expect(plain.container.querySelector('mark')).toBeNull();
+  });
+
+  it('26. поиск подсвечивает совпадения в карточках', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const search = container.querySelector('.articles-search') as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'трен' } });
+    const marks = container.querySelectorAll('.articles-grid mark');
+    expect(marks.length).toBeGreaterThan(0);
+  });
+
+  it('27. пилюля категории в обложке ведёт в категорию', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const grid = container.querySelector('.articles-grid') as HTMLElement;
+    for (const child of Array.from(grid.children)) {
+      const el = child as HTMLElement;
+      if (el.textContent && el.textContent.includes('PDF')) continue;
+      fireEvent.click(el);
+      if (container.querySelector('.articles-reader')) break;
+    }
+    expect(container.querySelector('.articles-reader')).not.toBeNull();
+    fireEvent.click(container.querySelector('.articles-cover-cat') as HTMLElement);
+    expect(container.querySelector('.articles-reader')).toBeNull();
+    expect(container.querySelector('.articles-list-title')?.textContent).toContain('Анализы');
   });
 
   it('6. PDF-карточка зовёт читать внутри', () => {
