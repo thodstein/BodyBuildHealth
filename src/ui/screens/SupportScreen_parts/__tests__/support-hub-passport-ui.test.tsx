@@ -7,6 +7,7 @@ import { render, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { SupportSubstancePassport } from '../SupportSubstancePassport';
 import { SupportCalcToolsHub } from '../SupportCalcToolsHub';
+import { SupportTimingPlanner } from '../SupportTimingPlanner';
 
 describe('P7 паспорт UI', () => {
   it('паспорт рендерится с поиском', () => {
@@ -83,5 +84,40 @@ describe('P7 паспорт UI', () => {
     expect((r2.container.textContent || '')).toMatch(/400 мг/);
     r2.unmount();
     try { localStorage.removeItem('he_bio_dose_v1'); } catch { /* noop */ }
+  });
+});
+
+describe('AAS-тайминг UI (отдельная зона)', () => {
+  it('зона открывается с дисклеймером, AAS не в общем пикере', () => {
+    const { container, unmount } = render(<SupportTimingPlanner />);
+    expect(container.textContent || '').toMatch(/AAS-тайминг/);
+    fireEvent.click(Array.from(container.querySelectorAll('div[role="button"]')).find(d => (d.textContent || '').includes('AAS-тайминг'))!);
+    expect(container.textContent || '').toMatch(/не назначение/);
+    unmount();
+    try { localStorage.removeItem('he_bio_timing_aas_v1'); } catch { /* noop */ }
+  });
+
+  it('выбор тестостерона показывает T½-карточку из данных БД', () => {
+    const { container, unmount } = render(<SupportTimingPlanner />);
+    fireEvent.click(Array.from(container.querySelectorAll('div[role="button"]')).find(d => (d.textContent || '').includes('AAS-тайминг'))!);
+    const search = Array.from(container.querySelectorAll('input')).find(i => (i.getAttribute('placeholder') || '').includes('ААС'));
+    expect(search).toBeTruthy();
+    fireEvent.change(search!, { target: { value: 'тестостерон' } });
+    // Чип строго внутри AAS-зоны (в общем пикере ААС быть не должно — lock)
+    const zone = container.querySelector('[data-aas="zone"]')!;
+    expect(zone.textContent || '').toMatch(/пропионат/);
+    const mains = Array.from(container.querySelectorAll('.sup-timing > div')[0]?.querySelectorAll('div') || []);
+    expect(mains.some(d => /^\+ Тестостерон/.test((d.textContent || '').trim()))).toBe(false);
+    const chip = Array.from(zone.querySelectorAll('[data-aas="chip"]')).find(d =>
+      /пропионат/i.test(d.textContent || ''),
+    );
+    expect(chip).toBeTruthy();
+    fireEvent.click(chip as Element);
+    const card = zone.querySelector('[data-aas="card"]');
+    expect(card).toBeTruthy();
+    expect(card!.textContent || '').toMatch(/T½/);
+    expect(card!.textContent || '').toMatch(/EOD|2×\/нед|ED/);
+    unmount();
+    try { localStorage.removeItem('he_bio_timing_aas_v1'); } catch { /* noop */ }
   });
 });

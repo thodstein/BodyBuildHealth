@@ -5,6 +5,9 @@ import {
 } from './SupportBioavailabilityData';
 import { timingHintsFor } from '../../../engines/support-hub-timing.engine';
 import { isAASHonest } from '../../../engines/support-hub-aas.engine';
+import { aasTimingFor, fmtHalfLife, AAS_TIMING_DISCLAIMER } from '../../../engines/support-hub-aas-timing.engine';
+import { PHARMA_DB, getPharmaDetail } from '../../../core/pharma-database';
+import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { S } from './SupportShared';
 
 // ─── Build enriched catalog ───
@@ -34,6 +37,27 @@ export const SupportTimingPlanner: React.FC = () => {
     setSelectedSubs(next);
     localStorage.setItem('he_bio_timing_subs', JSON.stringify(next));
   };
+
+  // AAS-зона: отдельный список, в общее расписание не попадает (не смешиваем)
+  const [showAas, setShowAas] = useState(false);
+  const [aasSearch, setAasSearch] = useState('');
+  const [aasIds, setAasIds] = useState<string[]>(() => {
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem('he_bio_timing_aas_v1') || '[]');
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string').slice(0, 6) : [];
+    } catch {
+      return [];
+    }
+  });
+  const toggleAas = (id: string) => {
+    const next = aasIds.includes(id) ? aasIds.filter(x => x !== id) : [...aasIds, id].slice(0, 6);
+    setAasIds(next);
+    try { localStorage.setItem('he_bio_timing_aas_v1', JSON.stringify(next)); } catch { /* quota */ }
+  };
+  // AAS-зона: ААС из любого источника (фарма-БД + записи каталога вроде 'testosterone')
+  const aasEntries = useMemo(() => catalog.filter(e =>
+    isAASHonest(e.category, e.nameRu, e.nameEn).isAAS,
+  ), [catalog]);
 
   const CATEGORY_PRIORITY: Record<string, number> = {
     enzyme: 1, fibrinolytic: 1, mucolytic: 1, proteolytic: 1, hemorheologic: 1, anticoagulant: 1,
@@ -136,10 +160,10 @@ export const SupportTimingPlanner: React.FC = () => {
     return slots;
   }, [selectedSubs, catalog]);
 
+  // Общий пикер: всё, кроме ААС — из ЛЮБОГО источника (ААС есть и в самом
+  // каталоге, напр. id 'testosterone' с category ['pharma','hormonal']).
   const suppEntries = useMemo(() => catalog.filter(e =>
-    e.source === 'catalog' ||
-    // Фарма и пептиды — тоже в планировщик; ААС остаются отдельно (не смешиваем)
-    ((e.source === 'pharma' || e.source === 'peptide') && !isAASHonest(e.category, e.nameRu, e.nameEn).isAAS),
+    !isAASHonest(e.category, e.nameRu, e.nameEn).isAAS,
   ), [catalog]);
 
   return (
@@ -240,6 +264,74 @@ export const SupportTimingPlanner: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* AAS-тайминг: отдельная зона, в общее расписание не попадает */}
+      <div data-aas="zone" style={{ ...S.card, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.04)' }}>
+        <div onClick={() => setShowAas(v => !v)} role="button" tabIndex={0} aria-expanded={showAas}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAas(v => !v); } }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#f87171', flex: 1 }}>💉 AAS-тайминг (отдельно{showAas ? '' : ` · ${aasEntries.length} преп.`})</div>
+          <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{showAas ? '▲' : '▼'}</span>
+        </div>
+        {showAas && (
+          <div style={{ marginTop: 6 }}>
+            <div style={{ fontSize: 8, color: '#f59e0b', lineHeight: 1.45, marginBottom: 6 }}>{AAS_TIMING_DISCLAIMER}</div>
+            <input value={aasSearch} onChange={e => setAasSearch(e.target.value)} placeholder="Поиск ААС (тестостерон, трен...)..."
+              style={{ width: '100%', padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-light)', fontSize: 10, marginBottom: 6 }} />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, maxHeight: 120, overflowY: 'auto', marginBottom: 6 }}>
+              {aasEntries.filter(e => !aasIds.includes(e.id) && (!aasSearch || e.nameRu.toLowerCase().includes(aasSearch.toLowerCase()))).slice(0, 40).map(e => (
+                <div key={e.id} data-aas="chip" onClick={() => toggleAas(e.id)}
+                  style={{ padding: '3px 6px', borderRadius: 5, cursor: 'pointer', fontSize: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-light)', whiteSpace: 'nowrap' }}>+ {e.nameRu}</div>
+              ))}
+            </div>
+            {aasIds.length > 0 && <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 4 }}>Выбрано: {aasIds.length} из 6. Нажмите для удаления.</div>}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
+              {aasIds.map(sid => {
+                const e = catalog.find(x => x.id === sid);
+                return e ? <div key={sid} onClick={() => toggleAas(sid)}
+                  style={{ padding: '3px 6px', borderRadius: 5, cursor: 'pointer', fontSize: 8, border: '1px solid #f87171', background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>{e.nameRu}</div> : null;
+              })}
+            </div>
+            {aasIds.map(sid => {
+              const raw: any = (PHARMA_DB as any)[sid];
+              const catRaw: any = (SUPPORT_CATALOG_DATA as any)[sid];
+              const entry = catalog.find(x => x.id === sid);
+              if (!raw && !entry && !catRaw) return null;
+              const det: any = raw ? getPharmaDetail(sid) || {} : {};
+              const cls = raw?.class || entry?.category?.[1] || entry?.category?.[0] || '';
+              const info = aasTimingFor({
+                id: sid,
+                name: raw?.name || entry?.nameRu || catRaw?.nameRu || sid,
+                cls,
+                tHalfHours: raw?.pk?.halfLifeHours ?? det?.pk?.halfLifeHours ?? null,
+                dbFrequency: det?.dosageRange?.frequency || raw?.dosageRange?.frequency || catRaw?.dosage?.timing || null,
+                instructions: raw?.specialInstructions,
+              });
+              return (
+                <div key={sid} data-aas="card" style={{ marginBottom: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(239,68,68,0.12)' }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: '#fff', marginBottom: 2 }}>{info.name}</div>
+                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 3 }}>
+                    <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(239,68,68,0.12)', color: '#f87171' }}>
+                      {info.route === 'inject' ? '💉 инъекции' : info.route === 'oral' ? '💊 орально' : '❓ путь?'}
+                    </span>
+                    <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: '#fff' }}>
+                      T½ {info.halfLifeHours !== null ? fmtHalfLife(info.halfLifeHours) : '— нет в БД'}
+                    </span>
+                    <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4, background: 'rgba(0,230,138,0.1)', color: '#00e68a' }}>
+                      {info.suggested}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 7, color: 'var(--text-dim)', lineHeight: 1.4 }}>{info.suggestedDetail}</div>
+                  {info.dbFrequency && <div style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 2 }}>В справочнике БД: {info.dbFrequency}</div>}
+                  {info.splitNote && <div style={{ fontSize: 7, color: '#f59e0b', marginTop: 2 }}>{info.splitNote}</div>}
+                  {info.instructions.slice(0, 2).map((t, i) => <div key={i} style={{ fontSize: 7, color: 'var(--text-dim)', marginTop: 1 }}>• {t}</div>)}
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>🩸 LAB — таб «Синергия» → Мониторинг анализов.</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

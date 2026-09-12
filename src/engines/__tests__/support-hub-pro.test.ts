@@ -3,9 +3,10 @@
  * Калькулятор поддержки не тронут.
  */
 import { describe, it, expect } from 'vitest';
-import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, evidenceOutcomesFor, stackEvidenceGrade, migratedGet, migratedSet, personDoseHints, passesGradeFilter, filterCatalogGroups, resolvePersonDefaults } from '../support-hub-evidence.engine';
+import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, evidenceOutcomesFor, stackEvidenceGrade, migratedGet, migratedSet, personDoseHints, passesGradeFilter, filterCatalogGroups, resolvePersonDefaults, OUTCOME_MATRIX_SIZE } from '../support-hub-evidence.engine';
 import { LAB_TOP20, LAB_ID_ALIASES, resolveLabMonitor } from '../support-hub-labs.engine';
 import { getCachedPubmed, writePubmedCache, readPubmedCache } from '../support-hub-research.engine';
+import { aasRouteOf, suggestAasFrequency, aasTimingFor, fmtHalfLife, AAS_TIMING_DISCLAIMER } from '../support-hub-aas-timing.engine';
 import { dedupeDepletions, stackOverlap, stackScore } from '../support-hub-stack.engine';
 import { timingHintsFor, TIMING_CANON } from '../support-hub-timing.engine';
 import { isAASHonest } from '../support-hub-aas.engine';
@@ -369,8 +370,7 @@ describe('Раунд-8: грейд стеков, исходы, миграция 
     expect(evidenceGradeExFor('magnesium', 'sleep')).toBe('B');
     expect(evidenceGradeExFor('magnesium')).toBe('A');
   });
-  it('migratedGet: новый побеждает, legacy мигрирует и чистится, мусор → null', () => {
-    const m = new Map<string, string>();
+  it('migratedGet: новый побеждает, legacy мигрирует и чистится, мусор → null', () => {    const m = new Map<string, string>();
     const store = {
       getItem: (k: string) => (m.has(k) ? m.get(k)! : null),
       setItem: (k: string, v: string) => { m.set(k, v); },
@@ -389,5 +389,73 @@ describe('Раунд-8: грейд стеков, исходы, миграция 
     expect(m.get('s_k')).toBe('v');
     migratedSet(store, 's_k', null);
     expect(m.has('s_k')).toBe(false);
+  });
+});
+
+describe('Матрица исходов: покрытие и ноты', () => {  it('размер матрицы — сотни пар', () => {
+    expect(OUTCOME_MATRIX_SIZE).toBeGreaterThanOrEqual(130);
+  });
+  it('новые пары резолвятся с нотами', () => {
+    expect(evidenceGradeExFor('magnesium', 'migraine')).toBe('B');
+    expect(evidenceGradeExFor('zinc_carnosine', 'gut')).toBe('B');
+    expect(evidenceGradeExFor('diosmin', 'veins')).toBe('B');
+    expect(evidenceGradeExFor('betaine', 'homocysteine')).toBe('B');
+    expect(evidenceGradeExFor('l_carnitine', 'fertility')).toBe('B');
+    expect(evidenceGradeExFor('ashwagandha', 'strength')).toBe('B');
+    expect(evidenceGradeExFor('fish_oil', 'triglycerides')).toBe('A');
+    expect(evidenceGradeExFor('magnesium_glycinate', 'sleep')).toBe('B');
+    const outs = evidenceOutcomesFor('magnesium');
+    expect(outs.some(o => o.outcome === 'migraine' && !!o.note)).toBe(true);
+    expect(evidenceOutcomesFor('tribulus').some(o => o.grade === 'D')).toBe(true);
+  });
+});
+
+describe('AAS-тайминг (строго из данных БД)', () => {
+  it('route: классы эфиров — inject, оралка/SARM — oral, прочее — other', () => {
+    expect(aasRouteOf('testosterone')).toBe('inject');
+    expect(aasRouteOf('trenbolone')).toBe('inject');
+    expect(aasRouteOf('oral_17aa')).toBe('oral');
+    expect(aasRouteOf('sarm')).toBe('oral');
+    expect(aasRouteOf('mystery_class')).toBe('other');
+    expect(aasRouteOf('oral_17aa', ['tablet'])).toBe('oral');
+  });
+  it('ступени частоты по T½ (границы)', () => {
+    expect(suggestAasFrequency(8, 'inject').label).toMatch(/ED/);
+    expect(suggestAasFrequency(48, 'inject').label).toMatch(/EOD/);
+    expect(suggestAasFrequency(100, 'inject').label).toMatch(/2/);
+    expect(suggestAasFrequency(200, 'inject').label).toBe('2×/нед');
+    expect(suggestAasFrequency(336, 'inject').label).toBe('1–2×/нед');
+    expect(suggestAasFrequency(null, 'inject').label).toBe('По справочнику');
+    expect(suggestAasFrequency(8, 'oral').label).toMatch(/2 приёма/);
+  });
+  it('aasTimingFor: пропионат EOD, энантат 2×/нед, супердрол — сплит+печень', () => {
+    const prop = aasTimingFor({ id: 'test_prop', name: 'Тестостерон пропионат', cls: 'testosterone', tHalfHours: 48, dbFrequency: '2x/wk', instructions: ['Инъекции 2x/нед'] });
+    expect(prop.route).toBe('inject');
+    expect(prop.suggested).toMatch(/EOD/);
+    expect(prop.dbFrequency).toBe('2x/wk');
+    expect(prop.instructions.length).toBe(1);
+    const enan = aasTimingFor({ id: 'test_enan', name: 'Тестостерон энантат', cls: 'testosterone', tHalfHours: 336 });
+    expect(enan.suggested).toBe('1–2×/нед');
+    const sdrol = aasTimingFor({ id: 'superdrol', name: 'Superdrol', cls: 'oral_17aa', tHalfHours: 8, instructions: ['Курс не более 4 нед'] });
+    expect(sdrol.route).toBe('oral');
+    expect(sdrol.splitNote).toMatch(/2 приёма/);
+    expect(sdrol.hasData).toBe(true);
+  });
+  it('без данных — честно hasData:false', () => {
+    const empty = aasTimingFor({ id: 'x', name: 'X', cls: 'mystery_class' });
+    expect(empty.hasData).toBe(false);
+    expect(empty.halfLifeHours).toBeNull();
+  });
+  it('fmtHalfLife: часы и дни', () => {
+    expect(fmtHalfLife(8)).toBe('8 ч');
+    expect(fmtHalfLife(336)).toBe('14 дн');
+    expect(fmtHalfLife(-5)).toBe('—');
+  });
+  it('дисклеймер снижения вреда на месте', () => {
+    expect(AAS_TIMING_DISCLAIMER).toMatch(/не назначение/);
+  });
+  it('каталожный ААС (testosterone + hormonal, без класса) ловится гейтом', () => {
+    // Реальный кейс: запись каталога id 'testosterone', category ['pharma','hormonal']
+    expect(isAASHonest(['pharma', 'hormonal'], 'Тестостерон', 'Testosterone').isAAS).toBe(true);
   });
 });

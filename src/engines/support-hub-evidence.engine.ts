@@ -89,21 +89,87 @@ export const EVIDENCE_GRADE_RU: Record<EvidenceGradeEx, string> = {
   D: 'D — данных почти нет / эффект нулевой',
 };
 
-/** Исход-зависимые грейды ключевых пар (Examine-стиль: грейд = вещество→исход). */
+/**
+ * Исход-зависимые грейды (Examine-стиль: грейд = вещество→исход).
+ * Источники: Examine Database (A–F по исходам), ISSN position stands
+ * (креатин 2017, протеин 2017, review 2018/2010, nutrient timing 2019),
+ * NIH ODS fact sheets (железо/цинк/магний/D), Cochrane (омега-3/депрессия).
+ * Дефолт C честно означает «не размечено», а не «плохо».
+ */
 const OUTCOME_GRADES: Record<string, EvidenceGradeEx> = {
+  // ── Спорт/сила (ISSN + Examine) ──
   'creatine|muscle': 'A', 'creatine|strength': 'A', 'creatine|power': 'A',
-  'vitamin_d3|deficiency': 'A', 'iron|deficiency': 'A', 'magnesium|deficiency': 'A',
-  'zinc|immunity': 'A', 'nac|liver': 'A', 'omega3|triglycerides': 'A',
-  'melatonin|sleep': 'A', 'caffeine|performance': 'A', 'nitrate|performance': 'B',
-  'ashwagandha|stress': 'B', 'rhodiola|fatigue': 'B', 'curcumin|joint': 'B',
-  'berberine|glucose': 'B', 'coq10|statin': 'B', 'probiotics|gut': 'B',
-  'collagen|joint': 'C', 'glutathione|oral': 'D', 'resveratrol|longevity': 'C',
-  'melatonin|jetlag': 'A',
-  'magnesium|sleep': 'B', 'zinc|cold': 'B', 'vitamin_d|immunity': 'B',
-  'vitamin_d3|immunity': 'B', 'vitamin_c|cold': 'B', 'omega3|depression': 'B',
-  'berberine|cholesterol': 'B', 'ashwagandha|sleep': 'B', 'rhodiola|stress': 'B',
-  'probiotics|antibiotic': 'B', 'collagen|skin': 'B', 'beta_alanine|endurance': 'B',
-  'citrulline|performance': 'B', 'theanine|stress': 'B',
+  'creatine|endurance': 'B', 'creatine|recovery': 'B', 'creatine|sprint': 'B',
+  'caffeine|performance': 'A', 'caffeine|endurance': 'A', 'caffeine|alertness': 'A',
+  'caffeine|strength': 'B', 'caffeine|fatigue': 'B',
+  'beta_alanine|endurance': 'B', 'beta_alanine|fatigue': 'B',
+  'citrulline|performance': 'B', 'citrulline|endurance': 'B',
+  'nitrate|endurance': 'B', 'nitrate|bp': 'B',
+  'beetroot|endurance': 'B', 'beetroot|bp': 'B',
+  'protein|muscle': 'A', 'whey|muscle': 'A',
+  'whey|strength': 'B', 'protein|strength': 'B',
+  'casein|muscle': 'B', 'soy|muscle': 'B', 'eaa|muscle': 'B', 'leucine|muscle': 'B',
+  'hmb|damage': 'A', 'hmb|muscle': 'B', 'hmb|strength': 'C',
+  'glutamine|muscle': 'D',
+  // ── Витамины/минералы (NIH ODS + Examine) ──
+  'vitamin_d3|deficiency': 'A', 'vitamin_d|deficiency': 'A',
+  'vitamin_d|bone': 'A', 'vitamin_d3|bone': 'A',
+  'vitamin_d|immunity': 'B', 'vitamin_d3|immunity': 'B',
+  'calcium|bone': 'A',
+  'iron|deficiency': 'A', 'iron|anemia': 'A',
+  'iron|fatigue': 'B', 'iron|cognition': 'B', 'iron|pregnancy': 'B',
+  'magnesium|deficiency': 'A',
+  'magnesium|sleep': 'B', 'magnesium|bone': 'B', 'magnesium|bp': 'B', 'magnesium|anxiety': 'B',
+  'magnesium|migraine': 'B',
+  'zinc|immunity': 'A', 'zinc|cold': 'B',
+  'vitamin_c|deficiency': 'A', 'vitamin_c|cold': 'B',
+  'vitamin_b12|deficiency': 'A', 'b12|deficiency': 'A',
+  'vitamin_b12|anemia': 'A', 'b12|anemia': 'A',
+  'folate|deficiency': 'A', 'folate|anemia': 'A', 'folate|pregnancy': 'A',
+  'vitamin_a|deficiency': 'A', 'vitamin_a|vision': 'B',
+  'selenium|thyroid': 'B',
+  'iodine|deficiency': 'A', 'iodine|thyroid': 'B',
+  'potassium|bp': 'B',
+  'lutein|vision': 'B', 'zeaxanthin|vision': 'B',
+  // ── Адаптогены/травы (Examine) ──
+  'melatonin|sleep': 'A', 'melatonin|jetlag': 'A',
+  'ashwagandha|anxiety': 'A', 'ashwagandha|stress': 'A',
+  'ashwagandha|sleep': 'B', 'ashwagandha|cortisol': 'B',
+  'rhodiola|fatigue': 'B', 'rhodiola|stress': 'B', 'rhodiola|performance': 'B',
+  'ginseng|immunity': 'B', 'ginseng|fatigue': 'B',
+  'garlic|bp': 'B',
+  'ginger|nausea': 'B',
+  'boswellia|joint': 'B',
+  'saw_palmetto|prostate': 'B',
+  'bacopa|memory': 'B',
+  'tyrosine|stress': 'B',
+  'glycine|sleep': 'B',
+  'theanine|stress': 'B',
+  '5htp|mood': 'B',
+  'zinc_carnosine|gut': 'B',
+  'diosmin|veins': 'B', 'hesperidin|veins': 'B',
+  'maitake|immunity': 'B', 'shiitake|immunity': 'B', 'turkey_tail|immunity': 'B',
+  // ── Метаболика/сердце ──
+  'omega3|triglycerides': 'A', 'omega3|depression': 'B', 'omega3|bp': 'B',
+  'berberine|glucose': 'B', 'berberine|cholesterol': 'B',
+  'berberine|triglycerides': 'B', 'berberine|liver': 'B',
+  'coq10|statin': 'B', 'coq10|depression': 'B', 'coq10|fertility': 'B',
+  'nac|liver': 'A',
+  'ala|glucose': 'B', 'ala|neuropathy': 'B',
+  'tudca|liver': 'B',
+  'red_yeast|cholesterol': 'B', 'bergamot|cholesterol': 'B', 'niacin|cholesterol': 'B',
+  'cinnamon|glucose': 'B',
+  // ── Суставы/мозг/ЖКТ/гормоны ──
+  'curcumin|joint': 'B', 'curcumin|anxiety': 'A', 'curcumin|inflammation': 'B',
+  'collagen|joint': 'B', 'collagen|skin': 'B',
+  'probiotics|gut': 'B', 'probiotics|antibiotic': 'B', 'probiotics|diarrhea': 'B',
+  'same|mood': 'B', 'same|joint': 'B',
+  'inositol|pcos': 'B', 'inositol|anxiety': 'B',
+  'betaine|homocysteine': 'B', 'l_carnitine|fertility': 'B',
+  'ashwagandha|strength': 'B',
+  'tribulus|testosterone': 'D',
+  'glutathione|oral': 'D', 'resveratrol|longevity': 'C',
+  'nitrate|performance': 'B',
 };
 
 const BASE_GRADES: Record<string, EvidenceGradeEx> = {
@@ -113,13 +179,82 @@ const BASE_GRADES: Record<string, EvidenceGradeEx> = {
   tudca: 'A', berberine: 'A', curcumin: 'B', ashwagandha: 'B', melatonin: 'A',
   rhodiola: 'B', resveratrol: 'C', glutathione_reduced: 'D', collagen: 'C',
   caffeine: 'A', beta_alanine: 'B', citrulline: 'B', theanine: 'B', probiotics: 'B',
+  protein: 'A', whey: 'A', casein: 'B', soy: 'B', eaa: 'B', leucine: 'B',
+  bcaa: 'C', glutamine: 'C', hmb: 'B',
 };
 
+/** Алиасы веществ к каноническому id (тот же массив доказательств). */
+const SUBSTANCE_ALIASES: Record<string, string> = {
+  fish_oil: 'omega3', krill_oil: 'omega3', epa: 'omega3', dha: 'omega3',
+  whey_protein: 'protein',
+};
+
+function canonSubstance(id: string): string {
+  const k = (id || '').toLowerCase();
+  return SUBSTANCE_ALIASES[k] || k;
+}
+
+/** Нюансы популяций/доз (без них грейд вводит в заблуждение). */
+const OUTCOME_NOTES: Record<string, string> = {
+  'hmb|muscle': 'Эффект у новичков и пожилых; у тренированных атлетов не показан (ISSN, Examine).',
+  'hmb|strength': 'У тренированных эффекта нет; новички — см. muscle.',
+  'glutamine|muscle': 'У здоровых тренирующихся эффекта нет (ISSN).',
+  'omega3|depression': 'Эффект мал, в основном при тяжёлой депрессии (Cochrane).',
+  'vitamin_d|immunity': 'Вне дефицита эффект не доказан (AHRQ).',
+  'probiotics|gut': 'Эффект штамм-зависим.',
+  'curcumin|joint': 'Только улучшенные формы (с жиром/пиперином/фитосома).',
+  'collagen|joint': 'UC-II/пептиды; эффект за 8–12 нед.',
+  'iron|fatigue': 'Только при дефиците.',
+  'berberine|glucose': 'Эффект за 2–4 нед; частые ЖКТ-побочки.',
+  'nitrate|endurance': 'Свекольный сок за 2–3 ч до нагрузки; у элиты эффект слабее.',
+  'caffeine|performance': '3–6 мг/кг за ~60 мин; толерантность снижает эффект.',
+  'magnesium|sleep': 'Эффект умеренный.',
+  'creatine|recovery': 'По ISSN; приём около тренировки.',
+  'protein|muscle': '1.4–2.0 г/кг/сут (ISSN).',
+  'whey|muscle': '20–40 г; важен лейцин-порог.',
+  'vitamin_c|cold': 'Сокращает длительность, не частоту.',
+  'melatonin|sleep': '0.5–3 мг за 30–60 мин до сна.',
+  'folate|pregnancy': 'До зачатия и в I триместре; только вместе с B12.',
+  'saw_palmetto|prostate': 'Симптомы, не размер; маскирует ПСА.',
+  'ginseng|immunity': 'С вакцинацией от гриппа.',
+  'tribulus|testosterone': 'Эффекта нет — маркетинг.',
+  '5htp|mood': 'С СИОЗС — риск серотонинового синдрома.',
+  'inositol|pcos': 'Мио-инозитол 2–4 г/сут.',
+  'inositol|anxiety': 'Паническое расстройство; дозы граммовые.',
+  'betaine|homocysteine': 'Только с B12/фолатом/B6.',
+  'l_carnitine|fertility': 'Подвижность сперматозоидов; эффект умеренный.',
+  'coq10|fertility': 'Эффект умеренный; курсовая 3+ мес.',
+  'zinc_carnosine|gut': 'Гастрит/язвы; не путать с обычным цинком.',
+  'diosmin|veins': 'Венозная недостаточность; обычно с гесперидином.',
+  'ashwagandha|strength': 'Умеренно; сильнее эффект на стресс/сон.',
+  'rhodiola|performance': 'Умеренно; сильнее на усталость.',
+  'ginseng|fatigue': 'Данные скромные.',
+  'magnesium|migraine': 'Профилактика; эффект умеренный.',
+  'ginger|nausea': 'Беременность — малые дозы.',
+};
+
+/** Размер матрицы «вещество→исход» (для тестов покрытия). */
+export const OUTCOME_MATRIX_SIZE = Object.keys(OUTCOME_GRADES).length;
+
+/** Кандидаты базы для id: сам + алиас + префиксные базы (magnesium_glycinate → magnesium). */
+function baseCandidates(id: string): string[] {
+  const key = canonSubstance(id);
+  const out = [key];
+  for (const base of Object.keys(BASE_GRADES)) {
+    if (base === key) continue;
+    if (key.startsWith(base) || key.includes(base)) out.push(base);
+  }
+  return out;
+}
+
 export function evidenceGradeExFor(id: string, outcome?: string): EvidenceGradeEx {
-  const key = id.toLowerCase();
+  const key = canonSubstance(id);
   if (outcome) {
-    const hit = OUTCOME_GRADES[`${key}|${outcome.toLowerCase()}`];
-    if (hit) return hit;
+    const o = outcome.toLowerCase();
+    for (const cand of baseCandidates(id)) {
+      const hit = OUTCOME_GRADES[`${cand}|${o}`];
+      if (hit) return hit;
+    }
   }
   if (BASE_GRADES[key]) return BASE_GRADES[key];
   // Префикс-матчинг: magnesium_glycinate -> magnesium и т.п.
@@ -130,13 +265,20 @@ export function evidenceGradeExFor(id: string, outcome?: string): EvidenceGradeE
 }
 
 /** Размеченные исходы вещества (из OUTCOME_GRADES). Пусто = только базовый грейд. */
-export function evidenceOutcomesFor(id: string): Array<{ outcome: string; grade: EvidenceGradeEx }> {
-  const key = id.toLowerCase();
-  const out: Array<{ outcome: string; grade: EvidenceGradeEx }> = [];
-  for (const [k, g] of Object.entries(OUTCOME_GRADES)) {
-    const sep = k.indexOf('|');
-    if (sep < 0) continue;
-    if (k.slice(0, sep) === key) out.push({ outcome: k.slice(sep + 1), grade: g });
+export function evidenceOutcomesFor(id: string): Array<{ outcome: string; grade: EvidenceGradeEx; note?: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ outcome: string; grade: EvidenceGradeEx; note?: string }> = [];
+  for (const cand of baseCandidates(id)) {
+    for (const [k, g] of Object.entries(OUTCOME_GRADES)) {
+      const sep = k.indexOf('|');
+      if (sep < 0) continue;
+      if (k.slice(0, sep) !== cand) continue;
+      const outcome = k.slice(sep + 1);
+      if (seen.has(outcome)) continue;
+      seen.add(outcome);
+      const note = OUTCOME_NOTES[k];
+      out.push(note ? { outcome, grade: g, note } : { outcome, grade: g });
+    }
   }
   return out;
 }

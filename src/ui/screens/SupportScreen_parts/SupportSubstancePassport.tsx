@@ -110,7 +110,11 @@ export const SupportSubstancePassport: React.FC = () => {
           {passport.outcomes.length > 0 && (
             <div style={{ marginTop: 3 }}>
               <div style={{ fontSize: 8, fontWeight: 800, color: '#a78bfa', marginBottom: 2 }}>🎯 Размеченные исходы</div>
-              {passport.outcomes.map((o, i) => <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.4 }}>• {o.outcome} — <b style={{ color: '#fff' }}>{o.grade}</b></div>)}
+              {passport.outcomes.map((o, i) => (
+                <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                  • {o.outcome} — <b style={{ color: '#fff' }}>{o.grade}</b>{o.note ? ` · ${o.note}` : ''}
+                </div>
+              ))}
             </div>
           )}
           {passport.timing.slice(0, 3).map((t, i) => <div key={i} style={{ fontSize: 8, color: '#00e68a', lineHeight: 1.4 }}>⏰ {t}</div>)}
