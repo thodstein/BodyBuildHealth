@@ -173,6 +173,55 @@ export function doseWindowFor(
 
 export interface PersonCtx { weightKg?: number; sex?: 'male' | 'female'; age?: number }
 
+// ─── P3-добавка: фильтр каталога по грейду (локальный, без SupportScreen) ───
+
+export type GradeFilter = 'all' | 'AB';
+
+export function passesGradeFilter(id: string, f: GradeFilter): boolean {
+  if (f === 'all') return true;
+  const g = evidenceGradeExFor(id || '');
+  return g === 'A' || g === 'B';
+}
+
+interface GradeGroup {
+  id?: string;
+  items?: GradeItem[];
+  classItems?: Record<string, GradeItem[]>;
+  count?: number;
+}
+
+interface GradeItem {
+  id?: string;
+}
+
+/**
+ * Фильтрует сгруппированные списки каталога (формы групп type/organ/tier разные —
+ * обрабатываются обе: items[] и classItems{}). Пустые группы дропаются, count пересчитывается.
+ */
+export function filterCatalogGroups(groups: GradeGroup[], f: GradeFilter): GradeGroup[] {
+  if (f === 'all' || !Array.isArray(groups)) return groups;
+  const out: GradeGroup[] = [];
+  for (const g of groups) {
+    if (Array.isArray(g.items)) {
+      const items = g.items.filter(s => passesGradeFilter(s && s.id ? s.id : '', f));
+      if (items.length > 0) out.push({ ...g, items, count: items.length });
+    } else if (g.classItems && typeof g.classItems === 'object') {
+      const classItems: Record<string, GradeItem[]> = {};
+      let n = 0;
+      const keys = Object.keys(g.classItems);
+      for (const k of keys) {
+        const arr = g.classItems[k] || [];
+        const kept = arr.filter(s => passesGradeFilter(s && s.id ? s.id : '', f));
+        if (kept.length > 0) { classItems[k] = kept; n += kept.length; }
+      }
+      if (n > 0) out.push({ ...g, classItems, count: n });
+    } else {
+      out.push(g);
+    }
+  }
+  return out;
+}
+
 /** Вес/пол/возраст-хинты (информация, не назначение). */
 export function personDoseHints(id: string, person: PersonCtx): string[] {
   const hints: string[] = [];

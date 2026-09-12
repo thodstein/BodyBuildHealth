@@ -9,7 +9,7 @@ import { readSupportArr, readSupportStrArr, writeSupportJSON } from './support-s
 import { PopupSelect } from '../../components/PopupXxx';
 import { InfoErrorBoundary, getCategoryInfo, CLASS_BASE_NAMES, MECH_TRANSLATIONS_RU, TYPE_LABELS_RU, MECH_LABELS, CATEGORY_LABELS } from './SupportScreenData';
 import { ALL_STACKS, ALL_INTERACTIONS, SUPPORT_CATALOG_DATA, getSubstanceTier, TIER_LABELS, SYSTEM_LABELS_CATALOG, ORGAN_LABELS, type SupportSubstance } from '../../../data/support-database';
-import { evidenceGradeExFor } from '../../../engines/support-hub-evidence.engine';
+import { evidenceGradeExFor, filterCatalogGroups, type GradeFilter } from '../../../engines/support-hub-evidence.engine';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../../data/support-db';
 import { UnifiedSynergyCalculator } from './UnifiedSynergyCalculator';
 
@@ -43,6 +43,10 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
     renderCatalogDetail,
     toast,
   } = s;
+  // P3: локальный фильтр грейдов (состояние внутри хаба, SupportScreen не тронут)
+  const [gradeFilter, setGradeFilter] = React.useState<GradeFilter>('all');
+  const typeGroupsF = React.useMemo(() => filterCatalogGroups((typeGroupedSubstances || []) as any, gradeFilter), [typeGroupedSubstances, gradeFilter]);
+  const organGroupsF = React.useMemo(() => filterCatalogGroups((OrganGroupedSubstances || []) as any, gradeFilter), [OrganGroupedSubstances, gradeFilter]);
   return (
               <div className="sup-catalogview">
                  {/* Sub-tabs: По типам / По органам / Стеки / Взаимодействия */}
@@ -55,7 +59,14 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                         border: `1px solid ${catalogSubTab === t ? 'var(--accent)' : 'var(--border)'}`,
                       }}>{t === 'stack' ? '🧩 Готовые стеки' : t === 'type' ? '📋 По типам' : t === 'organ' ? '🫀 По органам' : '⚠ Взаимодействия'}</button>
                     ))}
-                 </div>
+                    {/* P3: локальный фильтр грейдов (только вещества; стеки не фильтруются) */}
+                    <button className="support-pill" data-active={gradeFilter === 'AB'} title="Показать только вещества с высокой/умеренной доказательностью (A/B). Стеки не фильтруются." onClick={() => setGradeFilter(g => g === 'all' ? 'AB' : 'all')} style={{
+                      padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
+                      background: gradeFilter === 'AB' ? 'rgba(34,197,94,0.15)' : 'var(--bg-secondary)',
+                      color: gradeFilter === 'AB' ? '#22c55e' : 'var(--text-dim)',
+                      border: `1px solid ${gradeFilter === 'AB' ? '#22c55e' : 'var(--border)'}`,
+                    }}>{gradeFilter === 'AB' ? '⭐ Только A/B ✓' : '⭐ Все грейды'}</button>
+                  </div>
                 <div style={{ display:'flex', gap:6, marginBottom:8, alignItems:'center' }}>
                   <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-light)', fontSize:12 }} />
                 </div>
@@ -66,7 +77,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                 {catalogSubTab === 'organ' && (
                   /* По органам */
                   <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                    {(OrganGroupedSubstances||[]).map((group: any) => {
+                    {organGroupsF.map((group: any) => {
                       const isExpanded = expandedCategories[group.key] ?? (group.count <= 5);
                       return (
                         <div key={group.key} style={{ background:'var(--bg-secondary)', borderRadius:10, overflow:'hidden', border:'1px solid var(--border)' }}>
@@ -82,7 +93,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                               <div key={sub?.id||'x'}>
                                 <div onClick={() => setSelectedSub(isSelected ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 18px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
                                   <div style={{ flex:1, minWidth:0 }}>
-                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
+                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())} <span style={{ fontSize:7, fontWeight:800, padding:'1px 5px', borderRadius:4, background: (() => { const g = evidenceGradeExFor(sub?.id||''); return g === 'A' ? 'rgba(34,197,94,0.15)' : g === 'B' ? 'rgba(245,158,11,0.15)' : g === 'D' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)'; })(), color: (() => { const g = evidenceGradeExFor(sub?.id||''); return g === 'A' ? '#22c55e' : g === 'B' ? '#f59e0b' : g === 'D' ? '#ef4444' : '#fff'; })() }}>{evidenceGradeExFor(sub?.id||'')}</span></div>
                                     <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                       {supArr(sub?.categories).slice(0,3).map((c: any) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
                                           {supArr(sub?.mechanisms).slice(0,4).map((m: any) => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || supStr(m).replace(/_/g, ' ')}</span>)}
@@ -250,7 +261,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                 {(catalogSubTab === 'type' || !catalogSubTab) && (
                 /* По типам — все 280 препаратов, сгруппированы по типу (без органов/функций) */
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                  {(typeGroupedSubstances||[]).map((group: any) => {
+                  {typeGroupsF.map((group: any) => {
                     const catInfo = getCategoryInfo(group.cat);
                     const isExpanded = expandedCategories[group.cat] ?? (group.count <= 5);
                     return (
@@ -435,12 +446,21 @@ export const SupportCatalogTab: React.FC<{ s: Record<string, any> }> = ({ s }) =
     mergedInteractions,
     resolveSubName,
   } = s;
+  // P3: локальный фильтр грейдов (состояние внутри хаба, SupportScreen не тронут)
+  const [gradeFilter2, setGradeFilter2] = React.useState<GradeFilter>('all');
+  const tierGroupsF = React.useMemo(() => filterCatalogGroups((groupedSubstances || []) as any, gradeFilter2), [groupedSubstances, gradeFilter2]);
   return (
     <>
       {(section === 'home' || section === 'info') && tab === 'catalog' && catalogSubTab !== 'stack' && (<InfoErrorBoundary label="Каталог">
         <div className="sup-catalog">
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Поиск по названию, категориям, механизмам" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-light)', fontSize: 12 }} />
+            <button title="Показать только вещества с высокой/умеренной доказательностью (A/B)" onClick={() => setGradeFilter2(g => g === 'all' ? 'AB' : 'all')} style={{
+              padding: '8px 12px', borderRadius: 8, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer',
+              background: gradeFilter2 === 'AB' ? 'rgba(34,197,94,0.15)' : 'var(--bg-secondary)',
+              color: gradeFilter2 === 'AB' ? '#22c55e' : 'var(--text-dim)',
+              border: `1px solid ${gradeFilter2 === 'AB' ? '#22c55e' : 'var(--border-color)'}`,
+            }}>{gradeFilter2 === 'AB' ? '⭐ A/B ✓' : '⭐ Все'}</button>
           </div>
           {/* ── ТЗ-системы фильтр (Popup) ── */}
           <div style={{ marginBottom: 6 }}>
@@ -496,10 +516,10 @@ export const SupportCatalogTab: React.FC<{ s: Record<string, any> }> = ({ s }) =
             )}
           </div>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
-            {searchQuery ? `Найдено: ${groupedSubstances.reduce((a: any, g: any) => a + g.count, 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`}
+            {searchQuery ? `Найдено: ${tierGroupsF.reduce((a: any, g: any) => a + (g.count || 0), 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`}{gradeFilter2 === 'AB' ? ' · фильтр A/B' : ''}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '68vh', overflowY: 'auto', paddingRight: 2 }}>
-            {groupedSubstances.map((group: any) => {
+            {tierGroupsF.map((group: any) => {
               const catInfo = getCategoryInfo(group.cat);
               const isExpanded = expandedCategories[group.cat] ?? (group.count <= 5);
               return (
@@ -519,7 +539,7 @@ export const SupportCatalogTab: React.FC<{ s: Record<string, any> }> = ({ s }) =
                         <div key={sub.id}>
                           <div onClick={() => setSelectedSub(selectedSub === sub.id ? null : sub.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '7px 12px 7px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}{' '}<span style={{fontSize:8,padding:'0 3px',borderRadius:3,fontWeight:700,color:TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)',background:(TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)')+'18'}}>{TIER_LABELS[getSubstanceTier(sub.id)]?.label||'Стд'}</span></div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}{' '}<span style={{fontSize:8,padding:'0 3px',borderRadius:3,fontWeight:700,color:TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)',background:(TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)')+'18'}}>{TIER_LABELS[getSubstanceTier(sub.id)]?.label||'Стд'}</span>{' '}<span style={{fontSize:8,padding:'0 3px',borderRadius:3,fontWeight:800,color:(()=>{const g=evidenceGradeExFor(sub.id||'');return g==='A'?'#22c55e':g==='B'?'#f59e0b':g==='D'?'#ef4444':'#fff';})(),background:'rgba(255,255,255,0.06)'}}>{evidenceGradeExFor(sub.id||'')}</span></div>
                               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 2 }}>
                                  {supArr(sub.categories).slice(0, 3).map((c: any) => (
                                    <span key={c} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{CATEGORY_LABELS[c]?.label || c}</span>

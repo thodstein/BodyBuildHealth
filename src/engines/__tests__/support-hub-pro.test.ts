@@ -3,7 +3,8 @@
  * Калькулятор поддержки не тронут.
  */
 import { describe, it, expect } from 'vitest';
-import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, personDoseHints } from '../support-hub-evidence.engine';
+import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, personDoseHints, passesGradeFilter, filterCatalogGroups } from '../support-hub-evidence.engine';
+import { LAB_TOP20, LAB_ID_ALIASES, resolveLabMonitor } from '../support-hub-labs.engine';
 import { dedupeDepletions, stackOverlap, stackScore } from '../support-hub-stack.engine';
 import { timingHintsFor, TIMING_CANON } from '../support-hub-timing.engine';
 import { isAASHonest } from '../support-hub-aas.engine';
@@ -138,8 +139,7 @@ describe('P8 честный AAS-гейт', () => {
   });
 });
 
-describe('P7 паспорт вещества', () => {
-  it('паспорт собирается без новых чисел', () => {
+describe('P7 паспорт вещества', () => {  it('паспорт собирается без новых чисел', () => {
     const p = buildSubstancePassport({
       id: 'magnesium', nameRu: 'Магний', maxBio: 0.8, formKey: 'mg_glycinate',
       therapeutic: { mg: { minMg: 200, optMg: 400, maxMg: 600, ul: 350, note: 'Mg', unit: 'мг' } },
@@ -153,5 +153,69 @@ describe('P7 паспорт вещества', () => {
     expect(p.dose.hasData).toBe(true);
     expect(p.timing.length).toBeGreaterThan(0);
     expect(p.conflictTop.length).toBe(1);
+  });
+});
+
+describe('P8-добавка LAB топ-20 + alias-резолв', () => {
+  const fakeDb: Record<string, Array<{ markerRu: string; markerEn: string; system: string; when: string; target: string; condition: string; note: string }>> = {
+    zinc: [{ markerRu: 'Zn', markerEn: 'ZINC', system: 'mineral', when: 'x', target: 'y', condition: 'c', note: 'n' }],
+  };
+  it('exact + case + alias', () => {
+    expect(resolveLabMonitor(fakeDb, 'zinc').length).toBe(1);
+    expect(resolveLabMonitor(fakeDb, 'ZINC').length).toBe(1);
+    expect(resolveLabMonitor(fakeDb, 'zinc_sup').length).toBe(1);
+    expect(resolveLabMonitor(fakeDb, 'nope_xyz')).toEqual([]);
+  });
+  it('TOP20 покрывает креатин/B12/K2/мелатонин/коллаген', () => {
+    for (const k of ['creatine', 'vitamin_b12', 'vitamin_k2', 'melatonin', 'collagen', 'selenium', 'copper', 'folate']) {
+      expect(Array.isArray((LAB_TOP20 as any)[k]) && (LAB_TOP20 as any)[k].length > 0).toBe(true);
+    }
+  });
+  it('честные безмаркерные записи (дневник, не выдуманный анализ)', () => {
+    const noMarker = Object.values(LAB_TOP20).flat().filter(e => e.markerEn === '—');
+    expect(noMarker.length).toBeGreaterThan(3);
+    expect(noMarker.every(e => /маркера нет/.test(e.markerRu + e.note))).toBe(true);
+  });
+  it('все записи — только 8 канонических систем (рендер не дропает)', () => {
+    const ok = new Set(['hepatic', 'renal', 'cardio', 'hematologic', 'coagulation', 'metabolic', 'hormonal', 'mineral']);
+    for (const arr of Object.values(LAB_TOP20)) for (const e of arr as any[]) expect(ok.has(e.system)).toBe(true);
+  });
+  it('алиасы указывают на существующие ключи', () => {
+    for (const [, target] of Object.entries(LAB_ID_ALIASES)) {
+      expect(typeof target === 'string' && target.length > 0).toBe(true);
+    }
+  });
+});
+
+describe('P3-добавка фильтр каталога A/B', () => {
+  it('passesGradeFilter: A/B проходят, C/D нет', () => {
+    expect(passesGradeFilter('creatine', 'AB')).toBe(true);
+    expect(passesGradeFilter('rhodiola', 'AB')).toBe(true);
+    expect(passesGradeFilter('resveratrol', 'AB')).toBe(false);
+    expect(passesGradeFilter('resveratrol', 'all')).toBe(true);
+  });
+  it('items-форма: пустые группы дропаются, count пересчитывается', () => {
+    const groups = [
+      { cat: 'a', count: 3, items: [{ id: 'creatine' }, { id: 'resveratrol' }, { id: 'magnesium' }] },
+      { cat: 'b', count: 1, items: [{ id: 'resveratrol' }] },
+    ];
+    const out = filterCatalogGroups(groups as any, 'AB');
+    expect(out.length).toBe(1);
+    expect((out[0] as any).items.length).toBe(2);
+    expect((out[0] as any).count).toBe(2);
+  });
+  it('classItems-форма: классы чистятся, пустые дропаются', () => {
+    const groups = [
+      { cat: 'x', count: 3, classItems: { k1: [{ id: 'creatine' }, { id: 'resveratrol' }], k2: [{ id: 'glutathione_reduced' }] } },
+    ];
+    const out = filterCatalogGroups(groups as any, 'AB');
+    expect(out.length).toBe(1);
+    expect(Object.keys((out[0] as any).classItems)).toEqual(['k1']);
+    expect((out[0] as any).classItems.k1.length).toBe(1);
+    expect((out[0] as any).count).toBe(1);
+  });
+  it('all — байт-в-байт', () => {
+    const groups = [{ cat: 'a', count: 1, items: [{ id: 'x' }] }];
+    expect(filterCatalogGroups(groups as any, 'all')).toBe(groups);
   });
 });

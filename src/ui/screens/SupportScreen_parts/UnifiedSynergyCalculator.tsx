@@ -7,6 +7,7 @@ import type { SubstanceEntry, MasterDB } from '../../../core/types';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
 import { dedupeDepletions, stackOverlap, stackScore as calcHubStackScore } from '../../../engines/support-hub-stack.engine';
 import { evidenceGradeExFor } from '../../../engines/support-hub-evidence.engine';
+import { LAB_TOP20, resolveLabMonitor } from '../../../engines/support-hub-labs.engine';
 
 
 /* ──────────────── DEPLETION DB ──────────────── */
@@ -524,8 +525,9 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
     const collected: LabMon[] = [];
     const seen = new Set<string>();
     for (const id of validIds) {
-      // Explicit DB entries
-      const dbEntry = LAB_MONITOR_DB[id] || [];
+      // Explicit DB entries: LAB_MONITOR_DB + LAB_TOP20, резолв exact/case/alias
+      // (честно чинит промахи zinc_sup vs zinc, TUDCA-case, methylcobalamin vs vitamin_b12)
+      const dbEntry = resolveLabMonitor({ ...LAB_MONITOR_DB, ...LAB_TOP20 }, id);
       for (const item of dbEntry) {
         const key = item.markerEn + '|' + (item.condition || '');
         if (!seen.has(key)) { seen.add(key); collected.push(item); }
