@@ -188,6 +188,50 @@ export const IvStationaryGate: React.FC = () => (
   </div>
 );
 
+// ── P4-аудит 2026-09: живой сумматор кросс-модульных капов ──
+export const CROSS_CAPS: Array<{ key: string; label: string; cap: number; unit: string; step: number }> = [
+  { key: 'nac', label: 'NAC (сумма всех модулей)', cap: 4000, unit: 'мг/сут', step: 100 },
+  { key: 'mg', label: 'Магний (сумма всех модулей)', cap: 800, unit: 'мг/сут', step: 50 },
+  { key: 'telmi', label: 'Телмисартан (все модули)', cap: 80, unit: 'мг/сут', step: 10 },
+  { key: 'zn', label: 'Цинк (сумма всех модулей)', cap: 50, unit: 'мг/сут', step: 5 },
+  { key: 'd3', label: 'Витамин D3 (хронически)', cap: 4000, unit: 'МЕ/сут', step: 500 },
+];
+
+/** Живой калькулятор кросс-капов: впишите СУММАРНЫЕ сутки из всех протоколов — покажет превышения. */
+export const CrossCapCalculator: React.FC = () => {
+  const [vals, setVals] = React.useState<Record<string, number>>({ nac: 0, mg: 0, telmi: 0, zn: 0, d3: 0 });
+  const over = CROSS_CAPS.filter((c) => (vals[c.key] || 0) > c.cap);
+  return (
+    <div data-capcalc="root" style={{ borderRadius: 14, padding: '12px 14px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)' }}>
+      <div style={{ fontSize: 12, fontWeight: 850, color: '#60a5fa', marginBottom: 4 }}>🧮 Кросс-капы: просуммируйте дозы из ВСЕХ протоколов</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 8, lineHeight: 1.4 }}>Баннеры лимитов в протоколах — статичны. Впишите сюда свои суммарные сутки: калькулятор подсветит превышение.</div>
+      {CROSS_CAPS.map((c) => {
+        const v = vals[c.key] || 0;
+        const isOver = v > c.cap;
+        return (
+          <div key={c.key} data-capcalc={c.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', flex: '1 1 160px' }}>{c.label} (кап {c.cap} {c.unit})</span>
+            <input
+              type="number" min={0} step={c.step} value={v}
+              aria-label={c.label}
+              onChange={(e) => setVals((p) => ({ ...p, [c.key]: Math.max(0, Number(e.target.value) || 0) }))}
+              style={{ width: 90, padding: '8px 10px', borderRadius: 8, fontSize: 14, background: 'rgba(255,255,255,0.06)', color: '#fff', border: `1px solid ${isOver ? '#ef4444' : 'rgba(255,255,255,0.12)'}` }}
+            />
+            <span style={{ fontSize: 11, fontWeight: 800, color: isOver ? '#ef4444' : '#22c55e' }}>
+              {isOver ? `ПРЕВЫШЕНИЕ: ${v} / ${c.cap}` : `${v} / ${c.cap} — норма`}
+            </span>
+          </div>
+        );
+      })}
+      {over.length > 0 && (
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#fca5a5', marginTop: 6 }}>
+          🛑 Превышено позиций: {over.length} — снизьте суммарную дозу до капа, иначе риск из баннеров протоколов ({over.map((c) => c.label).join('; ')})
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const StopBanner: React.FC<{ title: string; thresholds: string[] }> = ({ title, thresholds }) => (
   <div style={{ borderRadius: 14, padding: '14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', backdropFilter: 'blur(10px)' }}>
     <div style={{ fontSize: 12, fontWeight: 850, color: '#ef4444', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(239,68,68,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🛑</span> {title}</div>

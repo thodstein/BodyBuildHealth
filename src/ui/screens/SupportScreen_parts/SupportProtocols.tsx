@@ -6,7 +6,7 @@ import React from 'react';
 import { FertilityPCTScreen } from '../FertilityPCTScreen';
 import { InfoErrorBoundary } from './SupportScreenData';
 import { SymptomSolverTab } from './SymptomSolverTab';
-import { cardBg, pillActive, pillInactive, PROTOCOL_CARDS, PreCycleChecklist, EVIDENCE_LEGEND } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PROTOCOL_CARDS, PreCycleChecklist, EVIDENCE_LEGEND, CrossCapCalculator } from './supportProtocolsShared';
 import { SupportProtocolNeuro } from './supportProtocolNeuro';
 import { SupportProtocolCardio } from './supportProtocolCardio';
 import { SupportProtocolHepatic } from './supportProtocolHepatic';
@@ -128,6 +128,8 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
               </div>
             </div>
           </div>
+
+          <CrossCapCalculator />
 
           {(['pct','fertility','hrt'] as string[]).includes(protocolTab) && (
             <InfoErrorBoundary label="Протоколы ПКТ/Фертильность/HRT">

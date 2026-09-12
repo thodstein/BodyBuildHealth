@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner, ProtocolDisclaimer } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolThyroid: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,8 @@ export const SupportProtocolThyroid: React.FC<{ s: Record<string, any> }> = ({ s
                 <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:2 }}>🦋 Тиреоидная поддержка на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Контроль функции щитовидной железы: T3, T4, ТТГ. ААС могут подавлять ось HPTA и влиять на метаболизм тиреоидных гормонов.</p>
               </div>
+
+              <ProtocolDisclaimer />
 
               <ContraBanner items={[
                 'L-T4 без титрования по св. T4/T3 — риск ятрогенного гипер/гипотиреоза (доза ≠ весу 1.6 мкг/кг)',

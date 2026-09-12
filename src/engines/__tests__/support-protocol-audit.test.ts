@@ -123,10 +123,13 @@ describe('support-protocol-audit: печень UDCA (P0-7)', () => {
 });
 
 describe('support-protocol-audit: P1-лестницы и гейты', () => {
-  it('RYR — вторая линия после эзетимиба', () => {
-    expect(P('supportProtocolCardio.tsx')).toContain('ВТОРАЯ линия после эзетимиба');
+  it('RYR — НЕ ступень лестницы (нет CV-пользы по ESC/EAS)', () => {
+    const t = P('supportProtocolCardio.tsx');
+    expect(t).not.toContain('ВТОРАЯ линия после эзетимиба');
+    expect(t).toContain('НЕ ступень лестницы');
     const pc = P('supportProtocolPostCycle.tsx');
-    expect(pc.indexOf('Эзетимиб')).toBeLessThan(pc.indexOf('ферм. рис'));
+    expect(pc).not.toContain('вторая линия');
+    expect(pc).toContain('НЕ ступень');
   });
   it('NAC: кросс-лимит ≤4000 во всех назначающих модулях', () => {
     for (const f of [
@@ -206,14 +209,15 @@ describe('support-protocol-audit: реестр доз синхронен с пр
     expect(w).toContain('continue_2_4_weeks');
     expect(r.phaseDosing?.Hepatic_Phase3.frequency).not.toBe('bid');
   });
-  it('аспирин 75-100 + ИПП-гейт; NAC с кросс-капом; берберин кап 1500; RYR вторая линия', () => {
+  it('аспирин 75-100 + ИПП-гейт; NAC с кросс-капом; берберин кап 1500; RYR не ступень', () => {
     expect(SUPPORT_DOSING.aspirin.doseRange.min).toBe(75);
     expect(SUPPORT_DOSING.aspirin.warnings.join(' ')).toContain('ppi_mandatory');
     expect(SUPPORT_DOSING.nac.warnings.join(' ')).toContain('cross_module_cap_4000');
     expect(SUPPORT_DOSING.berberine.warnings.join(' ')).toContain('max_1500_mg_day');
     expect(SUPPORT_DOSING.red_yeast_rice.warnings.join(' ')).toContain(
-      'second_line_after_ezetimibe',
+      'not_a_ladder_step_no_cv_benefit',
     );
+    expect(SUPPORT_DOSING.red_yeast_rice.evidenceLevel).toBe('C');
   });
   it('мелатонин: старт 0.5, кап 5 без врача', () => {
     expect(SUPPORT_DOSING.melatonin.doseRange.min).toBe(0.5);
@@ -348,5 +352,21 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
   });
   it('пептиды: WADA-метка', () => {
     expect(P('supportProtocolPeptide.tsx')).toContain('лист WADA');
+  });
+  it('гейты смонтированы: ProtocolDisclaimer ×3, IvStationaryGate ×3', () => {
+    for (const f of [
+      'supportProtocolWomen.tsx',
+      'supportProtocolThyroid.tsx',
+      'supportProtocolAcne.tsx',
+    ]) {
+      expect(P(f)).toContain('ProtocolDisclaimer');
+    }
+    for (const f of [
+      'supportProtocolImmune.tsx',
+      'supportProtocolHepatic.tsx',
+      'supportProtocolElectrolytes.tsx',
+    ]) {
+      expect(P(f)).toContain('IvStationaryGate');
+    }
   });
 });

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, CrossModuleLimitBanner } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, CrossModuleLimitBanner, IvStationaryGate } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolImmune: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,8 @@ export const SupportProtocolImmune: React.FC<{ s: Record<string, any> }> = ({ s 
                 <div style={{ fontSize:13, fontWeight:800, color:'#6366f1', marginBottom:2 }}>🛡️ Иммунная поддержка на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Укрепление иммунитета, профилактика инфекций на фоне иммуносупрессии от высоких доз ААС, коррекция микробиома и L-глутаминового статуса.</p>
               </div>
+
+              <IvStationaryGate />
 
               <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
                 {[

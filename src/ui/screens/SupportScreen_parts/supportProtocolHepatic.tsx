@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, CrossModuleLimitBanner, Phase34RxGate } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, CrossModuleLimitBanner, Phase34RxGate, IvStationaryGate } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolHepatic: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,8 @@ export const SupportProtocolHepatic: React.FC<{ s: Record<string, any> }> = ({ s
                 <div style={{ fontSize:13, fontWeight:800, color:'#84cc16', marginBottom:2 }}>🫁 Гепатопротекция на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Защита печени от токсического повреждения, холестаза и стеатоза. Особенно важно для оральных (17α-алкилированных) ААС.</p>
               </div>
+
+              <IvStationaryGate />
 
               <StopBanner title="Критические печёночные пороги — показание к остановке курса" thresholds={[
                 'АЛТ/АСТ >5×ВГН — остановка курса, УЗИ печени, исключение ОПП',
