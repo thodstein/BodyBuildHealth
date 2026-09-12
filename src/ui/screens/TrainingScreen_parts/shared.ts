@@ -46,7 +46,7 @@ export type TrainingTab =
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
    | 'strength_analysis' | 'load_management' | 'diagnostics' | 'diagnostics_hub' | 'quality_hub' | 'periodization_hub' | 'periodization_taper_hub' | 'quality_diagnostics' | 'quality_joint_hub' | 'volume_hub'
     | 'training_mix_hub' | 'mix_presets' | 'mix_hub' | 'warmup' | 'cooldown' | 'rir_calibration' | 'readiness_forecast' | 'rir_forecast_hub' | 'tools_hub' | 'taper_planner' | 'joint_health' | 'joints_ortho' | 'intelligence_hub' | 'metabolic_hub' | 'tempo_hub'
-    | 'arm_diagnostics' | 'arm_diagnostics_hub'
+     | 'arm_diagnostics' | 'arm_diagnostics_hub' | 'arm_lifting_diagnostics'
     | 'wl_diagnostics' | 'wl_diagnostics_hub' | 'strongman_diagnostics' | 'strongman_diagnostics_hub'
     | 'bb_diagnostics' | 'bb_diagnostics_hub'
     | 'rituals' | 'tools';
@@ -123,8 +123,9 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
    intelligence_hub: '⚡ Интеллект — единый пульт',
    metabolic_hub: '⚖️ Метаболика',
    tempo_hub: '⏱️ Темп повторений',
-   arm_diagnostics: '🤝 Арм-диагностика',
-   arm_diagnostics_hub: '🤝 Арм-диагностика',
+    arm_diagnostics: '🤝 Арм-диагностика',
+    arm_diagnostics_hub: '🤝 Арм-диагностика',
+    arm_lifting_diagnostics: '🏋️ Армлифтинг-диагностика',
    wl_diagnostics: '🏋️ ТА-диагностика',
    wl_diagnostics_hub: '🏋️ ТА-диагностика',
     strongman_diagnostics: '🏋️‍♂️ Стронг-диагностика',
