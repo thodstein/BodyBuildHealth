@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/react';
-import { ArticlesScreen, renderMarkdown, extractArticleToc } from '../screens/ArticlesScreen';
+import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds } from '../screens/ArticlesScreen';
 import { resetAppPlatformCache } from '../../core/app-platform';
 
 beforeEach(() => {
@@ -288,6 +288,43 @@ describe('ArticlesScreen PRO TOP', () => {
     const { container } = render(<ArticlesScreen />);
     goToList(container);
     expect(container.querySelector('.article-card-save')).toBeNull();
+  });
+
+  it('22. recent: порядок/дедуп/кап-5', () => {
+    expect(pushRecentArticleId('a', [])).toEqual(['a']);
+    expect(pushRecentArticleId('b', ['a'])).toEqual(['b', 'a']);
+    expect(pushRecentArticleId('a', ['b', 'a'])).toEqual(['a', 'b']);
+    expect(pushRecentArticleId('f', ['e', 'd', 'c', 'b', 'a'])).toEqual(['f', 'e', 'd', 'c', 'b']);
+    expect(loadRecentArticleIds().length).toBeLessThanOrEqual(5);
+  });
+
+  it('23. recent: миграция со старого ключа', () => {
+    localStorage.setItem('he_articles_last_v1', 'trenbolone-kidneys');
+    expect(loadRecentArticleIds()).toEqual(['trenbolone-kidneys']);
+  });
+
+  it('24. hero: continue — свежая, рядом «Недавно» со старой', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    // открыть lab-guide (вторая карточка без PDF)
+    const grid = container.querySelector('.articles-grid') as HTMLElement;
+    const lab = Array.from(grid.children).find(
+      (c) => !(c as HTMLElement).textContent?.includes('PDF'),
+    ) as HTMLElement;
+    fireEvent.click(lab);
+    expect(container.querySelector('.articles-reader')).not.toBeNull();
+    fireEvent.click(container.querySelector('.articles-reader-bar button') as HTMLElement);
+    // открыть featured (trenbolone) — станет головой recent
+    fireEvent.click(container.querySelector('.articles-featured') as HTMLElement);
+    expect(container.querySelector('.articles-reader')).not.toBeNull();
+    fireEvent.click(container.querySelector('.articles-reader-bar button') as HTMLElement);
+    fireEvent.click(container.querySelector('.articles-toolbar button') as HTMLElement);
+    expect(container.querySelector('.articles-hero')).not.toBeNull();
+    const cont = container.querySelector('.articles-hero-continue') as HTMLElement;
+    expect(cont.textContent).toContain('Тренболон');
+    const recent = container.querySelector('.articles-hero-recent') as HTMLElement;
+    expect(recent).not.toBeNull();
+    expect(recent.textContent).toContain('Полный гид по анализам');
   });
 
   it('6. PDF-карточка зовёт читать внутри', () => {

@@ -19,13 +19,45 @@ const artA = (alpha: number): string => {
 const SAVED_KEY = 'he_articles_saved_v1';
 const LAST_KEY = 'he_articles_last_v1';
 
-export function loadLastArticleId(): string {
+const RECENT_KEY = 'he_articles_recent_v1';
+const RECENT_CAP = 5;
+
+export function loadRecentArticleIds(): string[] {
   try {
-    const v = localStorage.getItem(LAST_KEY) || '';
-    return typeof v === 'string' ? v : '';
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (raw) {
+      const v = JSON.parse(raw);
+      if (Array.isArray(v)) return v.filter(x => typeof x === 'string').slice(0, RECENT_CAP);
+    }
+    // миграция со старого одиночного ключа
+    const legacy = localStorage.getItem(LAST_KEY) || '';
+    if (legacy) {
+      const seeded = [legacy];
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(seeded));
+      } catch {
+        /* quota — только сессия */
+      }
+      return seeded;
+    }
   } catch {
-    return '';
+    /* битый стор → пусто */
   }
+  return [];
+}
+
+export function pushRecentArticleId(id: string, prev: string[] = loadRecentArticleIds()): string[] {
+  const next = [id, ...prev.filter(x => x !== id)].slice(0, RECENT_CAP);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    /* quota — только сессия */
+  }
+  return next;
+}
+
+export function loadLastArticleId(): string {
+  return loadRecentArticleIds()[0] || '';
 }
 
 export function lastArticleEntry(): ArticleManifestEntry | null {
@@ -221,11 +253,11 @@ export const ArticlesScreen: React.FC = () => {
   const [pdfTitle, setPdfTitle] = useState<string>('PDF-документ');
   const [saved, setSaved] = useState<string[]>(() => loadSavedArticles());
   const [copied, setCopied] = useState(false);
-  const [lastRead, setLastRead] = useState<string>(() => loadLastArticleId());
+  const [recent, setRecent] = useState<string[]>(() => loadRecentArticleIds());
 
   const rememberLast = (id: string) => {
     if (!id) return;
-    setLastRead(id);
+    setRecent(pushRecentArticleId(id));
     try {
       localStorage.setItem(LAST_KEY, id);
     } catch {
@@ -413,10 +445,14 @@ export const ArticlesScreen: React.FC = () => {
               </div>
             ))}
             {(() => {
-              const last = ARTICLES_MANIFEST.find(a => a.id === lastRead);
+              const entries = recent
+                .map(id => ARTICLES_MANIFEST.find(a => a.id === id))
+                .filter((a): a is ArticleManifestEntry => Boolean(a));
+              const last = entries[0];
+              const tail = entries.slice(1, 3);
               if (!last) return null;
               const catColor = CATEGORIES.find(c => c.value === last.category)?.color || '#6b7280';
-              return (
+              return (<>
                 <div key="continue" role="button" tabIndex={0} onClick={() => resumeEntry(last)}
                   className="articles-hero-continue" data-id="continue"
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); resumeEntry(last); } }}
@@ -428,6 +464,22 @@ export const ArticlesScreen: React.FC = () => {
                   </div>
                   <span style={{ minHeight:44, display:'inline-flex', alignItems:'center', padding:'10px 16px', borderRadius:999, background:ART_ACC, color:'#000', fontSize:12, fontWeight:800, flexShrink:0 }}>Читать</span>
                 </div>
+                {tail.length > 0 && (
+                  <div className="articles-hero-recent" style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    <div style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.6, textTransform:'uppercase', letterSpacing:'0.08em', paddingLeft:4 }}>Недавно</div>
+                    {tail.map(a => (
+                      <div key={`recent-${a.id}`} role="button" tabIndex={0} onClick={() => resumeEntry(a)}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); resumeEntry(a); } }}
+                        className="articles-hero-recent-item"
+                        style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:12, cursor:'pointer', background:'rgba(18,18,20,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
+                        <span style={{ color:ART_ACC, fontSize:12, fontWeight:800, flexShrink:0 }}>↺</span>
+                        <span style={{ flex:1, minWidth:0, fontSize:12, fontWeight:700, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.title}</span>
+                        <span style={{ color:'#fff', opacity:0.6, fontSize:12, fontWeight:800, flexShrink:0 }}>→</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
               );
             })()}
           </div>
