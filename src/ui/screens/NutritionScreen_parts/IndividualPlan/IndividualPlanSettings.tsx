@@ -363,8 +363,8 @@ export const IndividualPlanSettings: React.FC = () => {
             {MINIMAL_GOALS.map(g => <PillBtn key={g.id} active={goal === g.id} onClick={() => { setGoal(g.id); setGoalUserSet(true); }} color="#f59e0b">{g.icon} {g.label}</PillBtn>)}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:7 }}>
-            <div style={{ padding:7, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#00e68a' }}>{effectiveKcal}</div><div style={{ fontSize:8, color:'rgba(255,255,255,0.65)' }}>ккал</div></div>
-            <div style={{ padding:7, borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#3b82f6' }}>Б {effectiveP} / Ж {effectiveF} / У {effectiveC}</div><div style={{ fontSize:8, color:'rgba(255,255,255,0.65)' }}>граммы в день</div></div>
+            <div style={{ padding:7, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#00e68a' }}>{effectiveKcal}</div><div style={{ fontSize:9, color:'rgba(255,255,255,0.65)' }}>ккал</div></div>
+            <div style={{ padding:7, borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#3b82f6' }}>Б {effectiveP} / Ж {effectiveF} / У {effectiveC}</div><div style={{ fontSize:9, color:'rgba(255,255,255,0.65)' }}>граммы в день</div></div>
           </div>
           {carbCapClipped && (
             <div style={{ fontSize:9, color:'#fbbf24', padding:'6px 8px', marginBottom:7, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:8, lineHeight:1.5 }}>
@@ -458,17 +458,17 @@ export const IndividualPlanSettings: React.FC = () => {
           <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.45, marginBottom:6 }}>
             <b>Метаболик-хаб → Кровь:</b> HCT {hematAdv.hct}% · вода {hematAdv.waterTargetMl}мл · {hematAdv.ironRec==='zero' ? '⛔ ZERO железо' : hematAdv.ironRec==='cap_15' ? '⚠ кап 15мг' : 'железо норма'} · {hematAdv.donation?.needed ? `🩸 ${hematAdv.donation.text}` : 'донация не требуется'}
           </div>
-          {hematAdv.ironRec==='zero' && <div style={{ fontSize:8, color:'#ef4444', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)', borderRadius:6, padding:'5px 7px', marginBottom:6 }}>⛔ При HCT&gt;51 гемовое железо (говядина/печень) штрафуется в скоринге. План автоматически деприоритизирует красное мясо — выбирай курицу/индейку/рыбу.</div>}
+          {hematAdv.ironRec==='zero' && <div style={{ fontSize:9, color:'#ef4444', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)', borderRadius:6, padding:'5px 7px', marginBottom:6 }}>⛔ При HCT&gt;51 гемовое железо (говядина/печень) штрафуется в скоринге. План автоматически деприоритизирует красное мясо — выбирай курицу/индейку/рыбу.</div>}
           <div style={{ display:'flex', gap:6 }}>
             <button onClick={()=>{
               try{ localStorage.removeItem('he_hematology_advice'); setHematAdv(null); }catch{}
-            }} style={{ flex:1, padding:'6px 8px', borderRadius:7, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.6)', fontSize:8, fontWeight:600, cursor:'pointer' }}>✕ Скрыть</button>
+            }} style={{ flex:1, padding:'6px 8px', borderRadius:7, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.6)', fontSize:9, fontWeight:600, cursor:'pointer' }}>✕ Скрыть</button>
             <button onClick={()=>{
               if(hematAdv.ironRec==='zero'){
                 const highIronIds=['beef_lean','beef_minced','liver','pork_liver','beef_liver'];
                 const cur=new Set(excludedFoods||[]); highIronIds.forEach(id=> cur.add(id)); setExcludedFoods([...cur]);
               }
-            }} style={{ flex:1, padding:'6px 8px', borderRadius:7, border:'1px solid rgba(249,115,22,0.18)', background:'rgba(249,115,22,0.08)', color:'#f97316', fontSize:8, fontWeight:600, cursor:'pointer' }}>🍽 Применить к плану</button>
+            }} style={{ flex:1, padding:'6px 8px', borderRadius:7, border:'1px solid rgba(249,115,22,0.18)', background:'rgba(249,115,22,0.08)', color:'#f97316', fontSize:9, fontWeight:600, cursor:'pointer' }}>🍽 Применить к плану</button>
           </div>
         </GlassCard>
       )}
@@ -483,7 +483,7 @@ export const IndividualPlanSettings: React.FC = () => {
              { id:'minimal' as const, label:'⚡ Быстрый', color:'#f59e0b', hint:'Минимум данных' },
            ].map(mode => <button key={mode.id} onClick={() => setPlannerMode(mode.id)} title={mode.hint} style={{ padding:'7px 3px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:700, background: plannerMode === mode.id ? `${mode.color}22` : '#202023', border: plannerMode === mode.id ? `1px solid ${mode.color}` : '1px solid rgba(255,255,255,0.06)', color: plannerMode === mode.id ? mode.color : 'rgba(255,255,255,0.7)' }}>{mode.label}</button>)}
          </div>
-         <div style={{ fontSize:8, color:'rgba(255,255,255,0.65)', marginBottom:8 }}>{plannerMode === 'pro' ? 'Полный подбор с V2-скорингом, микроанализом и расширенными рекомендациями.' : plannerMode === 'simple' ? 'Рацион подбирается по КБЖУ и ограничениям без V2-оценок.' : 'Остаются базовые параметры и сухое КБЖУ; необязательные настройки не используются.'}</div>
+         <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', marginBottom:8 }}>{plannerMode === 'pro' ? 'Полный подбор с V2-скорингом, микроанализом и расширенными рекомендациями.' : plannerMode === 'simple' ? 'Рацион подбирается по КБЖУ и ограничениям без V2-оценок.' : 'Остаются базовые параметры и сухое КБЖУ; необязательные настройки не используются.'}</div>
         {errorMsg && <div style={{ fontSize: 9, color: '#ef4444', padding: '4px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 6, marginBottom: 6 }}>⚠️ {errorMsg}</div>}
         {/* Два режима генерации: «по продуктам» (классика) и «по рецептам» */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, margin: '8px 0' }}>
@@ -605,14 +605,14 @@ export const IndividualPlanSettings: React.FC = () => {
               const logLen = getCycleLog().length;
               return (
                 <div style={{ padding: '6px 8px', borderRadius: 8, marginTop: 4, background: logLen > 0 ? 'rgba(236,72,153,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${logLen > 0 ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.05)'}` }}>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
                     {logLen > 0
                       ? `📅 Календарь: ${logLen} ${logLen === 1 ? 'отметка' : 'отметок'} · длина цикла ~${cal.length} дн · сейчас: ${CYCLE_PHASE_RU[cal.phase]}${cyclePhase && cyclePhase !== 'none' ? ' (ручной оверрайд)' : ' (авто)'}`
                       : '📅 Календарь цикла: отметьте день начала периода — фаза будет рассчитываться автоматически.'}
                   </div>
                   <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                    <button onClick={() => { saveCyclePeriod(_toLocalIso(new Date())); }} style={{ flex: 1, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 8, fontWeight: 700, background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.25)', color: '#f472b6' }}>📅 Отметить начало (сегодня)</button>
-                    {logLen > 0 && <button onClick={() => { clearCycleLog(); }} style={{ flex: 1, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Сбросить лог</button>}
+                    <button onClick={() => { saveCyclePeriod(_toLocalIso(new Date())); }} style={{ flex: 1, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700, background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.25)', color: '#f472b6' }}>📅 Отметить начало (сегодня)</button>
+                    {logLen > 0 && <button onClick={() => { clearCycleLog(); }} style={{ flex: 1, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Сбросить лог</button>}
                   </div>
                 </div>
               );
@@ -627,8 +627,8 @@ export const IndividualPlanSettings: React.FC = () => {
                 const col = _ea.status === 'risk' ? '#ef4444' : '#f59e0b';
                 return (
                   <div style={{ padding: '6px 8px', borderRadius: 8, marginTop: 4, background: `${col}0a`, border: `1px solid ${col}22` }}>
-                    <div style={{ fontSize: 8, color: col, lineHeight: 1.5 }}>⚠️ {_ea.note}</div>
-                    <button onClick={() => { switchKbjuMode('manual'); setManualKcal(Math.max(1200, (manualKcal ?? effectiveKcal) + 250)); }} style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 8, fontWeight: 700, background: `${col}14`, border: `1px solid ${col}30`, color: col }}>⚡ +250 ккал к цели (защита энергии)</button>
+                    <div style={{ fontSize: 9, color: col, lineHeight: 1.5 }}>⚠️ {_ea.note}</div>
+                    <button onClick={() => { switchKbjuMode('manual'); setManualKcal(Math.max(1200, (manualKcal ?? effectiveKcal) + 250)); }} style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700, background: `${col}14`, border: `1px solid ${col}30`, color: col }}>⚡ +250 ккал к цели (защита энергии)</button>
                   </div>
                 );
               } catch { return null; }
@@ -644,7 +644,7 @@ export const IndividualPlanSettings: React.FC = () => {
       {/* 🏁 Contest Prep — статус (единый план) + контест-настройки, перенесённые из «Пользователь» (P10) */}
        {(plannerMode === 'pro' || !!bbPrepConfig || sex === 'female') && (
         <GlassCard title="Contest Prep · тапер ББ" icon="🏁" color="#f59e0b">
-           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 6, lineHeight: 1.45 }}>
+           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 6, lineHeight: 1.45 }}>
              Контест-настройки собраны здесь: категория шоу и жизненный этап (гейт сушки) + пикинг ниже.
            </div>
            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
@@ -690,7 +690,7 @@ export const IndividualPlanSettings: React.FC = () => {
         {/* v2 Scoring Profile — moved to top */}
        {plannerMode === 'pro' && (
          <GlassCard title="🧬 v2 Скоринг" icon="🧬" color="#00e68a">
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.3 }}>
             <div style={{ marginBottom: 4 }}>Качество рациона оценивается по шкале 0–10 на основе: состава макронутриентов, содержания клетчатки, профиля аминокислот и микронутриентной плотности. Результат влияет на подбор продуктов и расчёт итогового скоринга каждого приёма пищи.</div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               <span style={{ padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#22c55e', fontSize:10 }}>7–10 — 🟢 Отлично</span>
@@ -703,7 +703,7 @@ export const IndividualPlanSettings: React.FC = () => {
             <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
               {['LEAN_MASS', 'EXTREME_CUT', 'PEAK_WEEK', 'POST_CYCLE', 'MOST'].map(ph => (
                 <button key={ph} onClick={() => setV2Phase(ph)} style={{
-                  padding: '4px 10px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+                  padding: '4px 10px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
                   background: v2Phase === ph ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
                   border: v2Phase === ph ? 'none' : '1px solid rgba(255,255,255,0.06)',
                   color: v2Phase === ph ? '#000' : 'rgba(255,255,255,0.7)',
@@ -713,7 +713,7 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
           <div style={{ marginBottom: 6 }}>
             {/* Чистка-2026 (P11): фарм-чипы перенесены в «Фаза и препараты» — один ввод курса */}
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 2, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 2, lineHeight: 1.4 }}>
               💊 Фармакология (ААС/ГР/инсулин/диуретики/…) — единый ввод в карточке «Фаза и препараты» (фарм-флаги V2-скоринга — там же).
             </div>
           </div>
@@ -745,7 +745,7 @@ export const IndividualPlanSettings: React.FC = () => {
           <div style={{ marginBottom: 6 }}>
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Чувствительность к гистамину</div>
             <button onClick={() => setHistamineSensitive(!histamineSensitive)} style={{
-              padding: '4px 10px', borderRadius: 10, fontSize: 8, fontWeight: 700, cursor: 'pointer',
+              padding: '4px 10px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
               background: histamineSensitive ? 'rgba(239,68,68,0.15)' : '#202023',
               border: histamineSensitive ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.06)',
               color: histamineSensitive ? '#ef4444' : 'rgba(255,255,255,0.5)',
@@ -762,12 +762,12 @@ export const IndividualPlanSettings: React.FC = () => {
           {GOALS.map(g => (
             <PillBtn key={g.id} active={goal === g.id} onClick={() => { setGoal(g.id); setGoalUserSet(true); }} color={goal === g.id ? '#00e68a' : undefined}>
               {g.icon} {g.label}
-              {autoGoal === g.id && !goalUserSet && <span style={{ marginLeft: 3, fontSize: 7, color: '#00e68a', fontWeight: 800 }}>⚡</span>}
+              {autoGoal === g.id && !goalUserSet && <span style={{ marginLeft: 3, fontSize: 9, color: '#00e68a', fontWeight: 800 }}>⚡</span>}
             </PillBtn>
           ))}
         </div>
         {autoGoal !== goal && goalUserSet && (
-          <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.85)', textAlign: 'center' }}>
+          <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.85)', textAlign: 'center' }}>
             Профиль → рекомендована цель «{GOALS.find(g => g.id === autoGoal)?.label}».
             <span onClick={() => { setGoal(autoGoal); setGoalUserSet(false); }} style={{ color: '#00e68a', cursor: 'pointer', fontWeight: 600, marginLeft: 2 }}>Применить</span>
           </div>
@@ -779,10 +779,10 @@ export const IndividualPlanSettings: React.FC = () => {
               <span style={{ fontSize: 11, fontWeight: 700, color: '#00e68a', background: 'rgba(0,230,138,0.1)', padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.15)' }}>
                 +{Math.round((kbjuMode !== 'manual' ? effectiveKcal : (manualKcal ?? effectiveKcal)) * surplusPct / 100)} ккал
               </span>
-              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)' }}>{surplusPct < 10 ? 'Мягкий' : surplusPct < 18 ? 'Умеренный' : 'Агрессивный'}</span>
+              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)' }}>{surplusPct < 10 ? 'Мягкий' : surplusPct < 18 ? 'Умеренный' : 'Агрессивный'}</span>
             </div>
             <input type="range" min="5" max="25" value={surplusPct} onChange={e => { const v = +e.target.value; setSurplusPct(v); try { localStorage.setItem('he_surplus_pct', v.toString()); } catch {} }} style={{ width:'100%', margin:'2px 0' }} />
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize: 7, color: 'rgba(255,255,255,0.75)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>
               <span>+5% (мин.)</span>
               <span>+15%</span>
               <span>+25% (макс.)</span>
@@ -794,7 +794,7 @@ export const IndividualPlanSettings: React.FC = () => {
 
       {plannerMode === 'pro' && (
       <GlassCard title="Фаза и препараты" icon="💉" color="#06b6d4">
-        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)', marginBottom: 6, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginBottom: 6, lineHeight: 1.5 }}>
           Фаза — фарма-контекст (курс/ПКТ/мост/восстановление): влияет на фарма-гейты и рекомендации, но НЕ меняет направление калорий — его задаёт цель выше. Препараты и инъекции (ААС/инсулин/ГР/GLP) применяют свои правила белка и жиров автоматически. <span style={{ color: '#00e68a' }}>Не путать с «Фазой (V2-скоринг)» в карточке 🧬 — та влияет только на оценку качества рациона, не на состав дня.</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
@@ -824,7 +824,7 @@ export const IndividualPlanSettings: React.FC = () => {
                     if (!linkToTraining) setLinkToTraining(true);
                     setInjections(injections.map((j2, j) => j === i ? { ...j2, trainLinked: !j2.trainLinked, trainTiming: !j2.trainLinked ? 'before' : 'none' } : j2));
                   }} style={{
-                    fontSize: 7, padding: '2px 5px', borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                    fontSize: 9, padding: '2px 5px', borderRadius: 4, cursor: 'pointer', fontWeight: 600,
                     background: inj.trainLinked ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
                     border: inj.trainLinked ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
                     color: inj.trainLinked ? '#00e68a' : '#fff',
@@ -973,14 +973,14 @@ export const IndividualPlanSettings: React.FC = () => {
               { id: 'GUT_SUPPORT', label: '🫃 Поддержка ЖКТ', color: '#22c55e' },
             ].map(p => (
               <button key={p.id} onClick={() => setV2Pharma((prev: Record<string, boolean>) => ({ ...prev, [p.id]: !prev[p.id] }))} style={{
-                padding: '3px 8px', borderRadius: 8, fontSize: 7, fontWeight: 600, cursor: 'pointer',
+                padding: '3px 8px', borderRadius: 8, fontSize: 9, fontWeight: 600, cursor: 'pointer',
                 background: v2Pharma[p.id] ? p.color + '20' : '#202023',
                 border: v2Pharma[p.id] ? `1px solid ${p.color}40` : '1px solid rgba(255,255,255,0.04)',
                 color: v2Pharma[p.id] ? p.color : 'rgba(255,255,255,0.5)',
               }}>{p.label}</button>
             ))}
           </div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>Инъекции из курса выше учитываются автоматически; флаги — дополнение для V2-оценки качества рациона.</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>Инъекции из курса выше учитываются автоматически; флаги — дополнение для V2-оценки качества рациона.</div>
         </div>
         <div style={{ marginTop:10, padding:'10px 12px', borderRadius:10, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.1)' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
@@ -1083,7 +1083,7 @@ export const IndividualPlanSettings: React.FC = () => {
                 { id: 'pattern' as const, label: '🔢 Цикл N+M' },
               ]).map(opt => (
                 <button key={opt.id} onClick={() => setTrainScheduleType(opt.id)} style={{
-                  flex: 1, padding: '5px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600,
+                  flex: 1, padding: '5px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600,
                   background: trainScheduleType === opt.id ? 'rgba(34,197,94,0.2)' : '#202023',
                   border: trainScheduleType === opt.id ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.06)',
                   color: trainScheduleType === opt.id ? '#22c55e' : 'rgba(255,255,255,0.7)',
@@ -1101,7 +1101,7 @@ export const IndividualPlanSettings: React.FC = () => {
             )}
             {trainScheduleType === 'weekly' && (
               <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)', marginBottom: 6 }}>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Выберите тренировочные дни:</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Выберите тренировочные дни:</div>
                 <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                   {DAY_LABELS.map((label, idx) => {
                     const isTrain = trainingDays[idx];
@@ -1130,7 +1130,7 @@ export const IndividualPlanSettings: React.FC = () => {
             {/* Эпик 6: день тяжёлых ног/объёма — угли +25%, ккал +5% */}
             {trainScheduleType === 'weekly' && (
               <div style={{ marginBottom: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.1)' }}>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>🏋️ День тяжёлых ног/объёма (углеводы +25%):</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>🏋️ День тяжёлых ног/объёма (углеводы +25%):</div>
                 <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                   {DAY_LABELS.map((label, idx) => (
                     <button key={idx} onClick={() => setHeavyTrainDay(heavyTrainDay === label ? '' : label)} style={{
@@ -1141,15 +1141,15 @@ export const IndividualPlanSettings: React.FC = () => {
                     }}>{label}</button>
                   ))}
                 </div>
-                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>Только при недельном графике. Helms 2014/2019: legs/high-volume — максимальная гликогеновая ёмкость.</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>Только при недельном графике. Helms 2014/2019: legs/high-volume — максимальная гликогеновая ёмкость.</div>
               </div>
             )}
             {/* Синхронизация с профилем — только по кнопке. FIX audit (C3): заголовки
                 обещали синк «графика тренировок», а вызывался полный синк профиля —
                 переименованы честно (тот же ctx.autofillFromProfile/saveToProfile). */}
             <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={autofillFromProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: '#202023', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }} title="Полный автозаполнение всех полей планировщика из Профиля">📋 Из профиля (весь профиль)</button>
-              <button onClick={saveToProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a' }} title="Полное сохранение всех полей планировщика в Профиль">💾 Сохранить (весь профиль)</button>
+              <button onClick={autofillFromProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, background: '#202023', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }} title="Полный автозаполнение всех полей планировщика из Профиля">📋 Из профиля (весь профиль)</button>
+              <button onClick={saveToProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a' }} title="Полное сохранение всех полей планировщика в Профиль">💾 Сохранить (весь профиль)</button>
             </div>
           </>
         )}
@@ -1164,7 +1164,7 @@ export const IndividualPlanSettings: React.FC = () => {
             const colors: Record<string, string> = { auto: '#00e68a', manual: '#f59e0b', profile: '#60a5fa' };
             return (
               <button key={mode} onClick={() => switchKbjuMode(mode)} style={{
-                flex: 1, padding: '5px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600,
+                flex: 1, padding: '5px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600,
                 background: kbjuMode === mode ? `${colors[mode]}20` : '#202023',
                 border: kbjuMode === mode ? `1px solid ${colors[mode]}` : '1px solid rgba(255,255,255,0.06)',
                 color: kbjuMode === mode ? '#000' : 'rgba(255,255,255,0.7)',
@@ -1183,7 +1183,7 @@ export const IndividualPlanSettings: React.FC = () => {
           } catch {}
           if (!_incomplete) return null;
           return (
-            <div style={{ fontSize: 8, color: '#f59e0b', marginBottom: 8, padding: '5px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
+            <div style={{ fontSize: 9, color: '#f59e0b', marginBottom: 8, padding: '5px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
               ⚠️ В профиле не заполнены метрики тела (вес/рост/возраст/пол) — КБЖУ считается по дефолтам (80кг / 180см / 30л). Откройте «Профиль → Пользователь» или нажмите «👤 Из профиля».
             </div>
           );
@@ -1252,13 +1252,13 @@ export const IndividualPlanSettings: React.FC = () => {
               const cPct = cKcal / total * 100;
               return (
                 <div style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Распределение макронутриентов</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Распределение макронутриентов</div>
                   <div style={{ height: 8, borderRadius: 4, background: '#202023', overflow: 'hidden', display: 'flex' }}>
                     <div style={{ height: '100%', width: `${pPct}%`, background: '#3b82f6', transition: 'width 0.3s', minWidth: 2 }} title={`Белки ${Math.round(pPct)}%`} />
                     <div style={{ height: '100%', width: `${fPct}%`, background: '#f59e0b', transition: 'width 0.3s', minWidth: 2 }} title={`Жиры ${Math.round(fPct)}%`} />
                     <div style={{ height: '100%', width: `${cPct}%`, background: '#f97316', transition: 'width 0.3s', minWidth: 2 }} title={`Углеводы ${Math.round(cPct)}%`} />
                   </div>
-                  <div style={{ display: 'flex', gap: 8, fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
+                  <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
                     <span style={{ color: '#3b82f6' }}>● Б {Math.round(pPct)}%</span>
                     <span style={{ color: '#f59e0b' }}>● Ж {Math.round(fPct)}%</span>
                     <span style={{ color: '#f97316' }}>● У {Math.round(cPct)}%</span>
@@ -1274,7 +1274,7 @@ export const IndividualPlanSettings: React.FC = () => {
               const trainDayC = Math.round(effectiveC * _t.dayCarbMod);
               const restDayK = Math.round(effectiveKcal * _r.dayKcalMod);
               const restDayC = Math.round(effectiveC * _r.dayCarbMod);
-              return <div style={{ fontSize: 8, color: 'rgba(59,130,246,0.5)', marginTop: 2, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.08)' }}>{carbPeriodizationLabel(carbPeriodization)}: в тренировочный день ~{trainDayK} ккал / {trainDayC}г угл. · в день отдыха ~{restDayK} ккал / {restDayC}г угл.</div>;
+              return <div style={{ fontSize: 9, color: 'rgba(59,130,246,0.5)', marginTop: 2, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.08)' }}>{carbPeriodizationLabel(carbPeriodization)}: в тренировочный день ~{trainDayK} ккал / {trainDayC}г угл. · в день отдыха ~{restDayK} ккал / {restDayC}г угл.</div>;
             })()}
           </div>
         ) : (
@@ -1326,7 +1326,7 @@ export const IndividualPlanSettings: React.FC = () => {
                 })}
               </div>
                 <div style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Распределение макронутриентов</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Распределение макронутриентов</div>
                   <div style={{ height: 8, borderRadius: 4, background: '#202023', overflow: 'hidden', display: 'flex' }}>
                     <div style={{ height:'100%', width:`${pPct}%`, background:'#3b82f6', transition:'width 0.3s', minWidth:2 }} />
                     <div style={{ height:'100%', width:`${fPct}%`, background:'#f59e0b', transition:'width 0.3s', minWidth:2 }} />
@@ -1362,7 +1362,7 @@ export const IndividualPlanSettings: React.FC = () => {
                   ))}
                 </div>
                 <div style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:4}}>Введите любые значения — недостающие рассчитаются автоматически</div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 4, lineHeight: 1.4 }}>💡 Бюджет и пресет белка скрыты — в ручном режиме они не применяются.</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 4, lineHeight: 1.4 }}>💡 Бюджет и пресет белка скрыты — в ручном режиме они не применяются.</div>
                 {/* Keep manual mode active: switching to auto here discarded the user's values on generation. */}
                 {/* FIX audit (B1): кнопка «✓ Применить» была no-op (setKbjuMode('manual') внутри
                     уже-manual ветки) — значения сохраняются автоматически (авто-сейв контекста) */}
@@ -1459,7 +1459,7 @@ export const IndividualPlanSettings: React.FC = () => {
             }}>
               <div style={{ fontSize: 14, marginBottom: 2 }}>{v.icon}</div>
               <div style={{ fontWeight: 700, fontSize: 10 }}>{v.label}</div>
-              <div style={{ fontSize: 7, color: varietyLevel === v.id ? `${v.color}aa` : 'rgba(255,255,255,0.85)', marginTop: 2 }}>{v.desc}</div>
+              <div style={{ fontSize: 9, color: varietyLevel === v.id ? `${v.color}aa` : 'rgba(255,255,255,0.85)', marginTop: 2 }}>{v.desc}</div>
             </button>
           ))}
         </div>
@@ -1477,7 +1477,7 @@ export const IndividualPlanSettings: React.FC = () => {
               color: varietyStrictness === id ? '#c4b5fd' : 'rgba(255,255,255,0.7)',
             }}>
               <div style={{ fontSize: 10, fontWeight: 700 }}>{label}</div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
             </button>
           ))}
         </div>
@@ -1498,7 +1498,7 @@ export const IndividualPlanSettings: React.FC = () => {
               color: hvStyle === id ? '#86efac' : 'rgba(255,255,255,0.7)',
             }}>
               <div style={{ fontSize: 10, fontWeight: 700 }}>{label}</div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
             </button>
           ))}
         </div>
@@ -1524,8 +1524,8 @@ export const IndividualPlanSettings: React.FC = () => {
             }}>
               <div style={{ fontSize: 14, marginBottom: 2 }}>{p.icon}</div>
               <div style={{ fontWeight: 700 }}>{p.label}</div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{p.desc}</div>
-              <div style={{ fontSize: 8, color: proteinPreset === p.id ? '#00e68a' : 'rgba(255,255,255,0.8)', marginTop: 1 }}>{p.gPerKg} г/кг</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{p.desc}</div>
+              <div style={{ fontSize: 9, color: proteinPreset === p.id ? '#00e68a' : 'rgba(255,255,255,0.8)', marginTop: 1 }}>{p.gPerKg} г/кг</div>
             </button>
           ))}
         </div>
@@ -1547,7 +1547,7 @@ export const IndividualPlanSettings: React.FC = () => {
             >
               🌅 Загрузка под утреннюю тренировку: {morningTrainLoad ? 'ВКЛ' : 'ВЫКЛ'}
             </button>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.35 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.35 }}>
               При утренней тренировке (старт до 14:00) вечером — много углеводов, минимум жиров, умеренный белок (гликоген к утренней сессии).
               {morningTrainLoad && <span style={{ color: '#fbbf24' }}> ⚠ Взаимоисключает «Вечерний режим» — он выключен автоматически.</span>}
             </div>
@@ -1567,7 +1567,7 @@ export const IndividualPlanSettings: React.FC = () => {
               const awakeH = Math.round((bMin - wMin) / 60);
               const recCount = recommendMealCount(awakeH, effectiveP, effectiveC);
               const byMacros = recCount > (awakeH >= 16 ? 5 : awakeH >= 14 ? 4 : 3);
-              return <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>⏰ Бодрствование {awakeH} ч{byMacros ? ` + Б${Math.round(effectiveP)}/У${Math.round(effectiveC)}` : ''} → рекомендуется {recCount} приёмов (каждые {Math.round(awakeH / recCount)} ч{byMacros ? ', иначе >50 г белка / >120 г углей на приём' : ''}).<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
+              return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>⏰ Бодрствование {awakeH} ч{byMacros ? ` + Б${Math.round(effectiveP)}/У${Math.round(effectiveC)}` : ''} → рекомендуется {recCount} приёмов (каждые {Math.round(awakeH / recCount)} ч{byMacros ? ', иначе >50 г белка / >120 г углей на приём' : ''}).<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
             })()}
         </div>
       </GlassCard>
@@ -1675,7 +1675,7 @@ export const IndividualPlanSettings: React.FC = () => {
             <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Еда на работе</label>
             {pickerBtn('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setShowWorkFoodPicker)}
             {pickerModal('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setWorkFood, showWorkFoodPicker, setShowWorkFoodPicker)}
-            <div style={{fontSize:8,color:'rgba(255,255,255,0.6)',marginTop:3,lineHeight:1.35}}>
+            <div style={{fontSize:9,color:'rgba(255,255,255,0.6)',marginTop:3,lineHeight:1.35}}>
               «Только порошок/хлопья/протеин» — в рабочие часы только портативная еда (протеин, хлопья, орехи, фрукты, хлеб, йогурт). Супы, каши, жареное — исключаются.
             </div>
           </div>
@@ -1697,7 +1697,7 @@ export const IndividualPlanSettings: React.FC = () => {
 
         <div style={{ marginBottom: 6 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
-            <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>🚫 Исключённые продукты ({excludedFoods.length})</label>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>🚫 Исключённые продукты ({excludedFoods.length})</label>
             <button onClick={() => { setExclSearch(''); setShowExclFoodModal(true); }} style={{
               padding:'4px 10px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:600,
               background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444',
@@ -1716,7 +1716,7 @@ export const IndividualPlanSettings: React.FC = () => {
               return excludedFoods.map(ef => {
                 const name = findName(ef);
                 return name ? (
-                  <span key={ef} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span key={ef} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3 }}>
                     {name}
                     <span onClick={() => { const upd = excludedFoods.filter(p => p !== ef); setExcludedFoods(upd); persistPlannerValue('he_excluded_foods', upd); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
                   </span>
@@ -1810,7 +1810,7 @@ export const IndividualPlanSettings: React.FC = () => {
                   background: active ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.04)', fontSize: 16 }}>{h.icon}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 11, color: active ? '#06b6d4' : '#fff', marginBottom: 1 }}>{h.label}</div>
-                  <div style={{ fontSize: 8, color: active ? 'rgba(6,182,212,0.8)' : 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>{h.desc}</div>
+                  <div style={{ fontSize: 9, color: active ? 'rgba(6,182,212,0.8)' : 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>{h.desc}</div>
                 </div>
                 <div style={{ width: 20, height: 20, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   background: active ? '#06b6d4' : 'rgba(255,255,255,0.06)', color: active ? '#000' : 'rgba(255,255,255,0.5)', fontWeight: 800, fontSize: 10, transition: 'all 0.2s' }}>
@@ -1832,7 +1832,7 @@ export const IndividualPlanSettings: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 10, background: eveningLowCarb ? 'rgba(99,102,241,0.12)' : '#202023', border: `1px solid ${eveningLowCarb ? '#6366f1' : 'rgba(255,255,255,0.06)'}` }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 600, color: eveningLowCarb ? '#6366f1' : '#fff' }}>Вечер — минимум углеводов</div>
-            <div style={{ fontSize: 8, color: eveningLowCarb ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.6)' }}>Углеводы ужина → обед</div>
+            <div style={{ fontSize: 9, color: eveningLowCarb ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.6)' }}>Углеводы ужина → обед</div>
           </div>
           <button onClick={() => { const nv = !eveningLowCarb; setEveningLowCarb(nv); try { localStorage.setItem('he_evening_low_carb', nv ? 'true' : 'false'); } catch {} if (nv && morningTrainLoad) { setMorningTrainLoad(false); flash('🌅 Загрузка под утреннюю тренировку выключена: конфликтует с вечерним режимом (ужин ×0.5 углеводов vs ×3.0)'); } }} style={{
             width: 48, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s',
@@ -1847,7 +1847,7 @@ export const IndividualPlanSettings: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 6, padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>Ночь — угли</div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>0 — только казеин · 20/40 — хлеб+мёд к казеину</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)' }}>0 — только казеин · 20/40 — хлеб+мёд к казеину</div>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             {[0, 20, 40].map(v => (
@@ -1868,7 +1868,7 @@ export const IndividualPlanSettings: React.FC = () => {
             </PillBtn>
           ))}
         </div>
-        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 1.5 }}>
           🥑 «Кето» — угли ≤6% ккал, жиры = остаток; 🍚 «Высоко-углеводный» — жиры на полу 0.8 г/кг, угли до потолка. Эти два стиля реально меняют цели дня (видно в 🧮-разборе). «Средиземноморский» — вкусовой пул (рыба/оливки/овощи). 🌱 «Вегетарианский» — единый ввод растительного питания (в «Исключениях» чип не нужен).
         </div>
         {/* Эпик-хвост (5): кето-цель не сходится жирами — действие переключения */}
@@ -1877,7 +1877,7 @@ export const IndividualPlanSettings: React.FC = () => {
           if (ketoOk) return null;
           return (
             <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.07)', border: '1px solid rgba(249,115,22,0.2)' }}>
-              <div style={{ fontSize: 8, color: '#fbbf24', lineHeight: 1.5, marginBottom: 4 }}>
+              <div style={{ fontSize: 9, color: '#fbbf24', lineHeight: 1.5, marginBottom: 4 }}>
                 ⚠ Кето-цель не закрывается жирами в безопасном капе 3 г/кг — угли подняты до минимума закрытия. Для полного кето снизьте цель калорий (дефицит), либо переключитесь на высоко-углеводный профиль.
               </div>
               <button onClick={() => setPlanType('highcarb')} style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.14)', border: '1px solid rgba(249,115,22,0.35)', color: '#fb923c' }}>🍚 Переключить на «Высоко-углеводный»</button>
@@ -1943,10 +1943,10 @@ export const IndividualPlanSettings: React.FC = () => {
           ]},
         ] as { cat: string; color: string; presets: { id: string; label: string; desc: string; fn: () => void }[] }[]).map(group => (
           <div key={group.cat} style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 8, fontWeight: 700, color: group.color, marginBottom: 4, letterSpacing: 0.3 }}>{group.cat}</div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: group.color, marginBottom: 4, letterSpacing: 0.3 }}>{group.cat}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {group.presets.map(p => (
-                <button key={p.id} onClick={() => { p.fn(); setRecentPreset(p.id); }} style={{ flex: 1, minWidth: 75, padding: '7px 5px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', background: recentPreset === p.id ? group.color : '#202023', border: recentPreset === p.id ? '2px solid '+group.color : '1px solid rgba(255,255,255,0.06)', color: recentPreset === p.id ? '#000' : 'rgba(255,255,255,0.85)', fontSize: 7, fontWeight: recentPreset === p.id ? 800 : 600, transition: 'all 0.15s' }}
+                <button key={p.id} onClick={() => { p.fn(); setRecentPreset(p.id); }} style={{ flex: 1, minWidth: 75, padding: '7px 5px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', background: recentPreset === p.id ? group.color : '#202023', border: recentPreset === p.id ? '2px solid '+group.color : '1px solid rgba(255,255,255,0.06)', color: recentPreset === p.id ? '#000' : 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: recentPreset === p.id ? 800 : 600, transition: 'all 0.15s' }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = group.color + '30'; (e.currentTarget as HTMLElement).style.borderColor = group.color; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#202023'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'; }}>
                   <div style={{ fontSize: 14, marginBottom: 2 }}>{p.label.slice(0,2)}</div>
@@ -1965,7 +1965,7 @@ export const IndividualPlanSettings: React.FC = () => {
       <GlassCard title="Предпочтения" icon="🍎" color="#f59e0b">
         <div style={{ marginBottom: 8 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
-            <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>🌟 Любимые продукты ({preferredFoods.length})</label>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>🌟 Любимые продукты ({preferredFoods.length})</label>
             <button onClick={() => { setPrefSearch(''); setShowPrefFoodModal(true); }} style={{
               padding:'4px 10px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:600,
               background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a',
@@ -1984,7 +1984,7 @@ export const IndividualPlanSettings: React.FC = () => {
               return preferredFoods.slice(0, 10).map(pf => {
                 const name = findName(pf);
                 return name ? (
-                  <span key={pf} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span key={pf} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', display: 'flex', alignItems: 'center', gap: 3 }}>
                     {name}
                     <span onClick={() => { const upd = preferredFoods.filter(p => p !== pf); setPreferredFoods(upd); persistPlannerValue('he_preferred_foods', upd); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
                   </span>
@@ -2024,7 +2024,7 @@ export const IndividualPlanSettings: React.FC = () => {
               }}>{o.label}</span>
             ))}
           </div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>
             Молоко включено в пресеты каши/хлопьев и не добавляется при «Без молочных». Пресеты с блюдом задают точный шаблон завтрака; «(свободно)» — пул основы без фиксированных ингредиентов.
           </div>
         </div>
@@ -2123,7 +2123,7 @@ export const IndividualPlanSettings: React.FC = () => {
 
       {plannerMode === 'pro' && (
       <GlassCard title="⚡ Периодизация и адаптация" icon="🔄" color="#3b82f6">
-        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>Углеводная периодизация, адаптация веса/метаболизма, гибкие дни и спецприём — в одной карточке (общие для дня механизмы).</div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>Углеводная периодизация, адаптация веса/метаболизма, гибкие дни и спецприём — в одной карточке (общие для дня механизмы).</div>
         <div style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', marginBottom: 4 }}>🔄 Периодизация углеводов</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
           {CARB_PERIODIZATION_OPTIONS.map(opt => (
@@ -2139,10 +2139,10 @@ export const IndividualPlanSettings: React.FC = () => {
         )}
         {/* Чистка-2026 (P8): потолок углеводов может ограничивать режим периодизации — честная подсказка */}
         {carbPeriodization !== 'none' && carbCapClipped && (
-          <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 8, color: '#fbbf24', lineHeight: 1.5 }}>
+          <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 9, color: '#fbbf24', lineHeight: 1.5 }}>
             ⚠ Диетологический потолок углеводов {carbCapGPerKg} г/кг ограничивает режим «{CARB_PERIODIZATION_OPTIONS.find(o=>o.id===carbPeriodization)?.label}» — цели тренировочных дней могут не дотягиваться до волны. Потолок задаётся стилем питания (кето/высоко-углеводный); снять — в ручном КБЖУ.
             {/* P1-9: явный чекпоинт «Снять потолок» (дубль кнопки из карточки КБЖУ — тот же оверрайд) */}
-            <button onClick={() => { setCarbCapOverride(true); try { (window as any).showToast?.('🔓 Потолок углей снят — периодизация больше не режется', 'success'); } catch {} }} style={{ display:'block', marginTop:4, padding:'3px 8px', borderRadius:6, cursor:'pointer', fontSize:8, fontWeight:800, background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.4)', color:'#fbbf24' }}>🔓 Снять потолок</button>
+            <button onClick={() => { setCarbCapOverride(true); try { (window as any).showToast?.('🔓 Потолок углей снят — периодизация больше не режется', 'success'); } catch {} }} style={{ display:'block', marginTop:4, padding:'3px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:800, background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.4)', color:'#fbbf24' }}>🔓 Снять потолок</button>
           </div>
         )}
         {(carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch') && (
@@ -2170,7 +2170,7 @@ export const IndividualPlanSettings: React.FC = () => {
                 );
               })}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
               <span>🏋️ {trainingDays.filter(Boolean).length} тренировочных</span>
               <span>😴 {trainingDays.filter(d => !d).length} выходных</span>
             </div>

@@ -1063,13 +1063,13 @@ const doImportPlan = (raw: string): boolean => {
                     <span style={{ fontSize: 8, fontWeight: 600, color: '#06b6d4', minWidth: 40 }}>{m.time}</span>
                     <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{m.label}</span>
                     {m.mpsCheck && (m.mpsCheck.triggers_mTOR
-                      ? <span style={{ fontSize: 6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', marginLeft:4 }}>⚡ mTOR</span>
-                      : <span style={{ fontSize: 6, padding:'1px 4px', borderRadius:3, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.2)', color:'#f59e0b', marginLeft:4 }}>⚠ {Math.round(m.mpsCheck.leucineG * 10) / 10}г лейц</span>)}
+                      ? <span style={{ fontSize: 9, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', marginLeft:4 }}>⚡ mTOR</span>
+                      : <span style={{ fontSize: 9, padding:'2px 6px', borderRadius:4, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.2)', color:'#f59e0b', marginLeft:4 }}>⚠ {Math.round(m.mpsCheck.leucineG * 10) / 10}г лейц</span>)}
                     {m.rationale && m.rationale.length > 0 && (() => {
                       const _inter = (m.rationale as string[]).filter(r => r.startsWith('⚠') || r.includes('Синергия'));
                       const _regular = (m.rationale as string[]).filter(r => !r.startsWith('⚠') && !r.includes('Синергия')).slice(0, 2);
                       return (
-                        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.4, fontStyle: 'italic' }}>
+                        <div style={{ fontSize: 9, color: '#fff', marginTop: 3, lineHeight: 1.5, fontStyle: 'italic', overflowWrap: 'break-word' }}>
                           {_regular.map((r: string, i: number) => <div key={i}>• {r}</div>)}
                           {_inter.map((r: string, i: number) => (
                             <div key={'i'+i} style={{ marginTop: 2, padding: '1px 4px', borderRadius: 3, fontStyle: 'normal', fontWeight: 600,
@@ -1080,15 +1080,15 @@ const doImportPlan = (raw: string): boolean => {
                         </div>
                       );
                     })()}
-                    <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 700 }}>{k} ккал</span>
-                    <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Б {Math.round(m.totals?.p || 0)} Ж {Math.round(m.totals?.f || 0)} У {Math.round(m.totals?.c || 0)}</span>
+                    <span style={{ fontSize: 9, color: '#00e68a', fontWeight: 700 }}>{k} ккал</span>
+                    <span style={{ fontSize: 9, color: '#fff' }}>Б {Math.round(m.totals?.p || 0)} Ж {Math.round(m.totals?.f || 0)} У {Math.round(m.totals?.c || 0)}</span>
                   </div>
                   <div style={{ height: 4, borderRadius: 2, background: '#202023', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${w}%`, background: 'linear-gradient(90deg, #06b6d4, #00e68a)', borderRadius: 2 }} />
                   </div>
-                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 9, color: '#fff', marginTop: 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {(m.items || []).map((it: any, ii: number) => (
-                      <span key={ii} style={{ background: '#202023', padding: '1px 5px', borderRadius: 4 }}>{it.name} {it.amount}г</span>
+                      <span key={ii} style={{ background: '#202023', padding: '2px 6px', borderRadius: 4, overflowWrap: 'break-word' }}>{it.name} {it.amount}г</span>
                     ))}
                   </div>
                 </div>
