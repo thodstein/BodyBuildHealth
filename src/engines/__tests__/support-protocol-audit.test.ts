@@ -343,4 +343,10 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
   it('постцикл: HCT — доза первее донации', () => {
     expect(P('supportProtocolPostCycle.tsx')).toContain('ни донация, ни аспирин');
   });
+  it('glp1: запрет off-label «на массу»', () => {
+    expect(P('supportProtocolGLP1.tsx')).toContain('чтобы есть больше на массе');
+  });
+  it('пептиды: WADA-метка', () => {
+    expect(P('supportProtocolPeptide.tsx')).toContain('лист WADA');
+  });
 });

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolGLP1: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -12,6 +12,10 @@ export const SupportProtocolGLP1: React.FC<{ s: Record<string, any> }> = ({ s })
                 <div style={{ fontSize:13, fontWeight:800, color:'#f59e0b', marginBottom:2 }}>🍪 GLP-1 и метаболическая поддержка</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Управление аппетитом, гликемией и весом через GLP-1 агонисты (семаглутид, лираглутид) и природные GLP-1 секретагоги. Контроль побочных эффектов.</p>
               </div>
+
+              <ContraBanner items={[
+                'GLP-1 «чтобы есть больше на массе» — off-label запрет: MTC/MEN2 в анамнезе (Boxed Warning), панкреатит, холелитиаз, ОПП при рвоте/дегидратации, илеус/гастропарез. Агонист для набора — противоречие механизму (замедление желудка + тошнота)',
+              ]} />
 
               <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
                 {[
