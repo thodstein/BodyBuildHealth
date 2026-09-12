@@ -2,8 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../../engines/pk-pd.engine';
 import { calculateMultiSubstancePKPD } from '../../../engines/pkpd-superposition.engine';
-import { resolveEsterCanon, peakTroughRatio, ratioVerdict, suggestIntervalDays, timeToSteadyDays, timeToClearDays, PK_DISCLAIMER } from '../../../engines/pk-bateman.engine';
-import { saveCalcSnapshot, buildCalcCsv, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
+import { resolveEsterCanon, peakTroughRatio, ratioVerdict, suggestIntervalDays, timeToSteadyDays, timeToClearDays, batemanCourse, PK_DISCLAIMER } from '../../../engines/pk-bateman.engine';
+import { saveCalcSnapshot, loadCalcHistory, buildCalcCsv, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
 import type { CourseEntry } from '../../../core/types';
 import { useDataLink } from '../../../core/data-link';
 import { CLASS_LABELS, INJECTABLE_WITH_ESTERS, type PharmaClass } from './constants';
@@ -237,6 +237,17 @@ export const PKPDSimulationTab: React.FC = () => {
                     background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.18)', whiteSpace:'nowrap' }}>
                     {CLASS_LABELS[sub?.class as string] || sub?.class}
                   </span>
+                  {(() => {
+                    const canon = resolveEsterCanon(String((sub as any)?.esters?.[0] || dd.substanceId));
+                    return (
+                      <span title={canon.source} style={{ fontSize:10, padding:'3px 8px', borderRadius:20, fontWeight:700, whiteSpace:'nowrap',
+                        background: canon.estimated ? 'rgba(245,158,11,0.10)' : 'rgba(59,130,246,0.10)',
+                        color: canon.estimated ? '#fbbf24' : '#60a5fa',
+                        border: `1px solid ${canon.estimated ? 'rgba(245,158,11,0.18)' : 'rgba(59,130,246,0.18)'}` }}>
+                        t½ {canon.tHalfDays}д · conf {canon.confidence}/5{canon.estimated ? ' · оценка' : ''}
+                      </span>
+                    );
+                  })()}
                 </div>
                 {drugDoses.length > 1 && (
                   <button onClick={() => removeDrug(idx)} style={{
@@ -424,6 +435,9 @@ export const PKPDSimulationTab: React.FC = () => {
               const ratio = peakTroughRatio(simResult.peak, simResult.trough);
               const v = ratioVerdict(ratio);
               const iv = suggestIntervalDays(canon.tHalfDays);
+              const bat = batemanCourse(drugDoses[0]?.doseMg || 0, canon.tHalfDays, (canon as any).tmaxDays, drugDoses[0]?.frequencyDays || [1, 4], 30);
+              const batPeak = bat.length ? Math.max(...bat) : 0;
+              const batPeakDay = bat.length ? bat.indexOf(batPeak) + 1 : 0;
               return (
                 <div style={{ marginTop:8, padding:'10px 11px', borderRadius:12, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.14)' }}>
                   <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:6 }}>Честный PK · Bateman-канон</div>
@@ -432,12 +446,20 @@ export const PKPDSimulationTab: React.FC = () => {
                     <span style={{ background: v.ok ? 'rgba(0,230,138,0.10)' : 'rgba(245,158,11,0.10)', padding:'4px 8px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)', color: v.ok ? '#00e68a' : '#fbbf24', fontWeight:800 }}>peak:trough {Number.isFinite(ratio) ? ratio.toFixed(2) : '—'} · {v.label}</span>
                     <span style={{ background:'rgba(0,0,0,0.18)', padding:'4px 8px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>Для ≤1.5 коли каждые ~{iv} дн</span>
                     <span style={{ background:'rgba(0,0,0,0.18)', padding:'4px 8px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>Стационар ~{timeToSteadyDays(canon.tHalfDays)} дн · вымывание ~{timeToClearDays(canon.tHalfDays)} дн</span>
+                    <span style={{ background:'rgba(0,0,0,0.18)', padding:'4px 8px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>Bateman-пик: день {batPeakDay} · {batPeak.toFixed(1)} отн. ед (первый препарат)</span>
                   </div>
                   <div style={{ fontSize:10, color:'#fff', marginTop:6, lineHeight:1.4 }}>{PK_DISCLAIMER} Cmax/Cmin шапки — 1-компартмент оценка, график — суперпозиция.</div>
                   <div style={{ display:'flex', gap:6, marginTop:8 }}>
                     <button onClick={() => saveCalcSnapshot('pkpd', `Cmax ${simResult.peak.toFixed(1)} Cmin ${simResult.trough.toFixed(1)} ratio ${Number.isFinite(ratio) ? ratio.toFixed(2) : '—'}`)} style={{ flex:1, minHeight:44, borderRadius:10, border:'1px solid rgba(59,130,246,0.22)', background:'rgba(59,130,246,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>💾 В историю</button>
                     <button onClick={() => printHtml(buildCalcHtml('PK/PD сводка', [['Cmax', simResult.peak.toFixed(1)], ['Cmin', simResult.trough.toFixed(1)], ['Стационар, дн', String(simResult.ssDays)], ['t½ канон', `${canon.tHalfDays} дн (${canon.source})`]]))} style={{ flex:1, minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>🖨 Печать</button>
                     <button onClick={() => { const blob = new Blob([buildCalcCsv([['Cmax', 'Cmin', 'steadyDays'], [simResult.peak.toFixed(1), simResult.trough.toFixed(1), simResult.ssDays]])], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pkpd.csv'; a.click(); }} style={{ flex:1, minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📥 CSV</button>
+                  </div>
+                  <div style={{ marginTop:8, padding:'9px 10px', borderRadius:10, background:'rgba(0,0,0,0.16)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:4 }}>🕘 История расчётов (все калькуляторы)</div>
+                    {loadCalcHistory().length === 0 && <div style={{ fontSize:11, color:'#fff' }}>Пока пусто — нажми «В историю» в любом табе.</div>}
+                    {loadCalcHistory().slice(0, 5).map((h) => (
+                      <div key={h.id} style={{ fontSize:10, color:'#fff', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>{h.tab} · {h.summary}</div>
+                    ))}
                   </div>
                 </div>
               );

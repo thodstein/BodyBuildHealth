@@ -308,16 +308,27 @@ export const DiagnosticsTab: React.FC = () => {
 
           <div style={card}>
             <div style={{ fontSize:12, fontWeight:800, color:'#f472b6', marginBottom:8, display:'flex', alignItems:'center', gap:7 }}>5. ПКТ-таймер и HPTA рестарт · честный план</div>
-            {(() => {
-              const pct = planPctStart(diagDrugs.map((d) => ({ substanceId: d.name, ester: d.ester, weeksOn: 12 })), 'combo');
+            {(function () {
+              const [proto, setProto] = React.useState<'nolva' | 'combo' | 'scally'>('combo');
+              const weeksOf = (name: string): number => {
+                const hit = course.find((c: any) => String(c.substanceId || '').toLowerCase() === String(name || '').toLowerCase());
+                const w = hit ? (Number(hit.endWeek || 12) - Number(hit.startWeek || 0)) : 12;
+                return Number.isFinite(w) && w > 0 ? w : 12;
+              };
+              const pct = planPctStart(diagDrugs.map((d) => ({ substanceId: d.name, ester: d.ester, weeksOn: weeksOf(d.name) })), proto);
               const hl = halfLifeOf(pct.longestId);
               const win = pctWindowLabel(pct.longestId);
               return (
                 <div style={{ marginBottom:8, padding:'9px 10px', borderRadius:10, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.14)' }}>
                   <div style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Честный старт: <b style={{ color:'#f472b6' }}>{pct.startLabel}</b> · по {pct.longestId} (t½ {hl.tHalf} дн, {hl.source})</div>
                   <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>{pct.note}{win ? ` Канон окна: ${win}.` : ''} Sustanon считается по max-эфиру (decanoate 10.2), не 4.5.</div>
+                  <div style={{ display:'flex', gap:6, marginTop:6 }}>
+                    {(['nolva', 'combo', 'scally'] as const).map((p) => (
+                      <button key={p} onClick={() => setProto(p)} style={{ flex:1, minHeight:44, borderRadius:10, fontSize:11, fontWeight:800, cursor:'pointer', background: proto === p ? 'linear-gradient(135deg, #ec4899, #8b5cf6)' : 'rgba(255,255,255,0.04)', color:'#fff', border:`1px solid ${proto === p ? 'rgba(236,72,153,0.35)' : 'rgba(255,255,255,0.07)'}` }}>{p === 'nolva' ? 'Nolva' : p === 'combo' ? 'Clom+Nolva' : 'Scally-lite'}</button>
+                    ))}
+                  </div>
                   <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Протокол: {pct.protocol}</div>
-                  <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>{pct.bloodworkAfter}</div>
+                  <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>{pct.bloodworkAfter} · недели курса честные (из course_log, фолбэк 12)</div>
                   <button onClick={() => { saveCalcSnapshot('diagnostics', `ПКТ ${pct.startLabel} via ${pct.longestId}`); printHtml(buildCalcHtml('ПКТ-план', [['Старт', pct.startLabel], ['По препарату', pct.longestId], ['Протокол', pct.protocol], ['Кровь', pct.bloodworkAfter]])); }} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(236,72,153,0.22)', background:'rgba(236,72,153,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>💾 В историю + 🖨 Печать</button>
                 </div>
               );

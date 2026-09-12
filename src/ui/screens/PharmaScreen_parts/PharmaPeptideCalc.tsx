@@ -7,7 +7,7 @@ import {
   generatePeptideProtocol, getPeptideSynergiesFor, getPeptideConflictsFor,
   ROUTE_LABELS, SYRINGE_TYPES,
 } from '../../../engines/peptide-calculator.engine';
-import { drawForDose, waterForTargetUnits, recommendPeptideSyringe, PEPTIDE_DOSE_REF } from '../../../engines/peptide-pro.engine';
+import { drawForDose, waterForTargetUnits, recommendPeptideSyringe, weeklySchedule, PEPTIDE_DOSE_REF } from '../../../engines/peptide-pro.engine';
 import { saveCalcSnapshot, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
 import { CLASS_LABELS } from './constants';
 
@@ -262,6 +262,10 @@ export const PharmaPeptideCalc: React.FC = () => {
         </div>
         <div style={{ marginBottom:10 }}>
           <PopupNumber label="📅 Длительность" value={pepTotalDays} min={1} max={365} step={1} suffix="дн" onChange={v => setPepTotalDays(Math.max(1, v))} />
+        </div>
+        <div style={{ fontSize:11, color:'#fff', marginBottom:10, background:'rgba(245,158,11,0.06)', padding:'7px 9px', borderRadius:9, border:'1px solid rgba(245,158,11,0.12)' }}>
+          Рекомендуемая сетка для частоты {pepSchedule.length}×/нед: <b>{weeklySchedule(peptideId || 'pep', pepSchedule.length).join(' · ') || '—'}</b>
+          {peptideId === 'cjc1295' ? ' · GHRH+GHRP (CJC+Ipamorelin) — разные рецепторы, синергия; два GHRH вместе — avoid' : ''}
         </div>
         <div style={{ padding:'10px 11px', borderRadius:12, background:'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.03))', border:'1px solid rgba(245,158,11,0.14)' }}>
           <div style={{ fontSize:10, color:'#fff', marginBottom:6, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Итого</div>

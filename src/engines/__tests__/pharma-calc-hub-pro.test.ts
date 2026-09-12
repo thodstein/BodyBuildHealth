@@ -110,6 +110,26 @@ describe('P6 pct', () => {
   });
 });
 
+describe('D добивка', () => {
+  it('batemanCourse 30 дней: пик после старта, спад к концу', async () => {
+    const { batemanCourse } = await import('../pk-bateman.engine');
+    const c = batemanCourse(250, 7.2, 2.0, [1, 4], 30);
+    expect(c.length).toBe(30);
+    expect(Math.max(...c)).toBeGreaterThan(c[c.length - 1]);
+  });
+  it('pct накопление: длинный курс стартует позже', async () => {
+    const { planPctStart } = await import('../pct-timing.engine');
+    const s = planPctStart([{ substanceId: 'testosterone_enanthate', weeksOn: 4 }]);
+    const l = planPctStart([{ substanceId: 'testosterone_enanthate', weeksOn: 24 }]);
+    expect(l.startDay).toBeGreaterThanOrEqual(s.startDay);
+  });
+  it('weeklySchedule сетки', async () => {
+    const { weeklySchedule } = await import('../peptide-pro.engine');
+    expect(weeklySchedule('x', 1)).toEqual(['Пн']);
+    expect(weeklySchedule('x', 3)).toEqual(['Пн', 'Ср', 'Пт']);
+  });
+});
+
 describe('P7 share export', () => {
   it('csv anti-formula + esc', () => {
     expect(csvCell('=cmd')).toMatch(/^"/);
