@@ -117,6 +117,8 @@ export interface AnnualCardioBuildOptions {
   legDays?: number[];
   bodyWeight?: number;
   bodyFatPct?: number;
+  /** №2 PRO-2-добивки: красные флаги — мед-блок применяется к каждому циклу года. */
+  redFlags?: string[];
 }
 
 export interface AnnualCardioBuildOutcome {
@@ -174,6 +176,7 @@ export function buildAnnualCardioCycles(
       hrvMs: opts.hrvMs,
       enhanced: opts.enhanced,
       legDays: opts.legDays,
+      redFlags: opts.redFlags ? [...opts.redFlags] : undefined,
       id: `annual-cardio-${s.blockKey}`,
       name: `Кардио · ${s.description}`,
       source: 'auto',

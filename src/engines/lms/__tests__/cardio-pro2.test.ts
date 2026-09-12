@@ -123,8 +123,7 @@ describe('P4 red-flags', () => {
     expect(improvedMed.cycle.weeks.some(w => w.sessions.some(s => s.type === 'hiit'))).toBe(false);
     expect(improvedMed.cycle.rationale.join(' ')).toContain('Мед-блок');
   });
-  it('шаблоны: генератор применяет блок, явный — честно предупреждает (№4-добивка)', async () => {
-    const { buildCardioCycleFromTemplateId } = await import('../cardio-templates.engine');
+    it('шаблоны: генератор применяет блок, явный — честно предупреждает (№4-добивка)', async () => {    const { buildCardioCycleFromTemplateId } = await import('../cardio-templates.engine');
     // Явный C25K без интенсива — тихо даже с флагами.
     const c25k = buildCardioCycleFromTemplateId('cardio-run-c25k-9', { redFlags: ['chest_pain'], age: 30 })!;
     expect(c25k.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'))).toBe(false);
@@ -134,6 +133,24 @@ describe('P4 red-flags', () => {
     if (hard && hard.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'))) {
       expect(hard.rationale.join(' ')).toContain('мед-блок');
     }
+  });
+  it('годовые сборки: redFlags режут интенсив (№2-третий круг)', { timeout: 30000 }, async () => {
+    const { buildAnnualCardioCycles } = await import('../../annual-training/annual-training-cardio.engine');
+    const { annualPlanFromMacro } = await import('../../annual-training/block-builders.engine');
+    const plan = annualPlanFromMacro({
+      blocks: [
+        { phase: 'hypertrophy', weeks: 8, weekOffset: 1, description: 'Гипертрофия', trainingFocus: 'hypertrophy' },
+        { phase: 'contest_prep', weeks: 6, weekOffset: 9, description: 'Prep', trainingFocus: 'endurance' },
+      ],
+      totalWeeks: 14,
+      trainingFocus: 'hypertrophy',
+      rationale: [],
+    } as never);
+    const plain = buildAnnualCardioCycles(plan, {});
+    const plainIntense = Object.values(plain.cycles).some(c => c.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss')));
+    expect(plainIntense).toBe(true);
+    const blocked = buildAnnualCardioCycles(plan, { redFlags: ['chest_pain'], age: 30 });
+    expect(Object.values(blocked.cycles).every(c => !c.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss')))).toBe(true);
   });
 });
 
@@ -233,6 +250,18 @@ describe('P6 predictor/durability/checklist', () => {
     });
     const ics = buildCardioIcs(c, '2026-01-05');
     expect(ics).toContain('Чек-лист гоночной недели');
+  });
+  it('печать: чек-лист только при taper-неделях (№3-третий круг)', async () => {
+    const { buildCardioPrintHtml } = await import('../cardio.engine');
+    const race = buildCardioCycle({
+      goal: 'cut', totalWeeks: 8,
+      competitions: [{ id: 'r1', name: 'Старт', week: 8 }],
+    });
+    const html = buildCardioPrintHtml(race);
+    expect(html).toContain('Гоночная неделя');
+    expect(html).toContain('Shakeout');
+    const plain = buildCardioCycle({ goal: 'mass', totalWeeks: 4 });
+    expect(buildCardioPrintHtml(plain)).not.toContain('Гоночная неделя');
   });
 });
 

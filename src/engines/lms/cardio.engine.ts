@@ -55,6 +55,7 @@ export { predictRaceTimes, predictorNote, RACE_WEEK_CHECKLIST, raceChecklistIcsL
 export { zone2HonestyNote } from './cardio-zone2-honesty.engine';
 import { fuelingForSession as fuelForSessionLocal, heatAcclimationPlan as heatAcclLocal, altitudeNote as altitudeNoteLocal } from './cardio-fueling.engine';
 import { zone2HonestyNote as honestyNoteLocal } from './cardio-zone2-honesty.engine';
+import { RACE_WEEK_CHECKLIST as RACE_CHECKLIST_LOCAL } from './cardio-race-predictor.engine';
 export type { CardioRedFlagId, CardioRedFlagScreen } from './cardio-red-flags.engine';
 export { CARDIO_RED_FLAGS, screenCardioRedFlags, needsMedicalBlock } from './cardio-red-flags.engine';
 import { screenCardioRedFlags as screenRedFlagsLocal } from './cardio-red-flags.engine';
@@ -2645,6 +2646,9 @@ export function buildCardioPrintHtml(cycle: CardioCycle): string {
     .filter(h => h.kind !== 'work')
     .map(h => `<tr><td>${h.week}</td><td>${escHtml(CARDIO_PHASE_LABELS[h.phase])}</td><td>${escHtml(h.text)}</td></tr>`)
     .join('');
+  // №3 PRO-2-третий круг: гоночный чек-лист в печать (был только в UI/ICS).
+  const hasTaper = cycle.weeks.some(w => w.taper);
+  const checklistRows = hasTaper ? RACE_CHECKLIST_LOCAL.map(t => `<tr><td>☐</td><td>${escHtml(t)}</td></tr>`).join('') : '';
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${escHtml(cycle.name)}</title>
 <style>@page{margin:14mm}body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;padding:24px;color:#111;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}table{border-collapse:collapse;width:100%;margin-top:12px;page-break-inside:auto}
 th,td{border:1px solid #ccc;padding:7px 10px;font-size:13px;text-align:left}th{background:#0f766e;color:#fff;text-transform:uppercase;font-size:11px;letter-spacing:.4px}tr:nth-child(even) td{background:#f7faf9}h2{font-size:22px;margin:0 0 4px;padding-bottom:8px;border-bottom:3px solid #00e68a}h3{font-size:15px;margin:18px 0 4px;color:#0f766e;text-transform:uppercase;letter-spacing:.4px}tr{page-break-inside:avoid}</style></head>
@@ -2659,7 +2663,8 @@ ${cycle.rationale.map(r => `<p style="font-size:12px;color:#555">${escHtml(r)}</
 <h3>Фазы</h3><table><tr><th>Фаза</th><th>Недель</th></tr>${phaseRows}</table>
 <h3>Недели</h3><table><tr><th>Нед</th><th>Фаза</th><th>Сессии</th><th>Мин</th><th>Ккал</th><th>Метки</th></tr>${weekRows}</table>
 ${hintRows ? `<h3>💡 Ключевые недели</h3><table><tr><th>Нед</th><th>Фаза</th><th>Что делать</th></tr>${hintRows}</table>` : ''}
-<h3>🗓 Недели по дням (Пн-Вс)</h3><table><tr><th>Неделя</th><th>Пн</th><th>Вт</th><th>Ср</th><th>Чт</th><th>Пт</th><th>Сб</th><th>Вс</th></tr>${dayRows}</table>
+ <h3>🗓 Недели по дням (Пн-Вс)</h3><table><tr><th>Неделя</th><th>Пн</th><th>Вт</th><th>Ср</th><th>Чт</th><th>Пт</th><th>Сб</th><th>Вс</th></tr>${dayRows}</table>
+${checklistRows ? `<h3>📋 Гоночная неделя — чек-лист</h3><table><tr><th>✓</th><th>Пункт</th></tr>${checklistRows}</table>` : ''}
 </body></html>`;
 }
 

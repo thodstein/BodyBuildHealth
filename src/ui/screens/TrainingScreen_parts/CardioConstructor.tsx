@@ -755,6 +755,7 @@ export const CardioConstructor: React.FC = () => {
       recoveryLow,
       legDays,
       bodyWeight,
+      redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
     };
     const outcome = buildAnnualCardioCycles(plan, opts);
     const map: Record<string, string> = {};
@@ -971,6 +972,9 @@ export const CardioConstructor: React.FC = () => {
     if (!cycle?.config) return false;
     const cfg = cycle.config;
     const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    // Множество строк без учёта порядка (флаги скрининга).
+    const sortedStrArr = (xs: unknown): string[] =>
+      (Array.isArray(xs) ? (xs as unknown[]).filter((x): x is string => typeof x === 'string') : []).slice().sort();
     if (cfg.goal !== goal) return true;
     if (cfg.totalWeeks != null && cfg.totalWeeks !== totalWeeks) return true;
     if (cfg.daysAvailable != null && cfg.daysAvailable !== daysAvailable) return true;
@@ -999,7 +1003,8 @@ export const CardioConstructor: React.FC = () => {
     if (!same(cfg.tempC, tempC !== '' && Number.isFinite(Number(tempC)) ? Number(tempC) : undefined)) return true;
     if (!same(cfg.altitudeM, altitudeM !== '' && Number.isFinite(Number(altitudeM)) ? Math.round(Number(altitudeM)) : undefined)) return true;
     // №4 PRO-2-добивка: новые флаги тоже пачкают параметры.
-    if (!same((cfg as { redFlags?: string[] }).redFlags ?? [], redFlags)) return true;
+    // Флаги — множество: порядок кликов не важен (сортированные копии).
+    if (JSON.stringify(sortedStrArr((cfg as { redFlags?: string[] }).redFlags)) !== JSON.stringify(sortedStrArr(redFlags))) return true;
     if (((cfg as { tidSwitchWeek?: number }).tidSwitchWeek != null) !== tidSwitch) return true;
     if (((cfg as { durabilitySession?: boolean }).durabilitySession === true) !== durabilityOn) return true;
     // Пост-обработка из config-штампа finish-хелпера (темпы VDOT + мезо-флаг).
