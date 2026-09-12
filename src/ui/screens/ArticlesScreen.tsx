@@ -333,6 +333,23 @@ export const ArticlesScreen: React.FC = () => {
     else setReadingArticle(a);
   };
 
+  /** Единая точка открытия: PDF — в inline-просмотр, markdown — в читалку. */
+  const activateArticle = (a: ArticleManifestEntry) => {
+    if (a.content_type === 'pdf') {
+      setReadingArticle(null);
+      openPDF(a.file_url || '', a.title, a.id);
+    } else {
+      setReadingArticle(a);
+    }
+  };
+
+  const activateKeyDown = (a: ArticleManifestEntry) => (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      activateArticle(a);
+    }
+  };
+
   const copyArticleLink = async (a: ArticleManifestEntry) => {
     const text = `${a.title} — Health Engine · Статьи`;
     try {
@@ -653,11 +670,8 @@ export const ArticlesScreen: React.FC = () => {
               const idx = order.findIndex(a => a.id === readingArticle.id);
               const prev = idx > 0 ? order[idx - 1] : null;
               const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
-              const openEntry = (a: ArticleManifestEntry) => {
-                if (a.content_type === 'pdf') { setReadingArticle(null); openPDF(a.file_url || '', a.title, a.id); }
-                else setReadingArticle(a);
-              };
               if (!prev && !next) return null;
+              const openEntry = activateArticle;
               const btn = (a: ArticleManifestEntry | null, dir: 'prev' | 'next') => (
                 <button key={dir} onClick={() => a && openEntry(a)} disabled={!a}
                   aria-label={dir === 'prev' ? 'Предыдущая статья' : 'Следующая статья'}
@@ -686,9 +700,9 @@ export const ArticlesScreen: React.FC = () => {
                   <div style={{ fontSize:11, fontWeight:800, color:'#fff', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10, opacity:0.85 }}>Читайте также</div>
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                     {related.map(r => (
-                      <div key={r.id} role="button" tabIndex={0}
-                        onClick={() => { if (r.content_type === 'pdf') { setReadingArticle(null); openPDF(r.file_url || '', r.title, r.id); } else setReadingArticle(r); }}
-                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (r.content_type === 'pdf') { setReadingArticle(null); openPDF(r.file_url || '', r.title, r.id); } else setReadingArticle(r); } }}
+                      <div key={r.id} role="button" tabIndex={0} aria-label={r.title}
+                        onClick={() => activateArticle(r)}
+                        onKeyDown={activateKeyDown(r)}
                         style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, cursor:'pointer', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
                         <span style={{ width:32, height:32, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`${CATEGORIES.find(c => c.value === r.category)?.color || '#6b7280'}1c`, border:`1px solid ${CATEGORIES.find(c => c.value === r.category)?.color || '#6b7280'}30`, color: CATEGORIES.find(c => c.value === r.category)?.color || '#6b7280' }}>
                           <NativeIcon name={CAT_ICON[r.category] || 'file'} size={14} />
@@ -759,7 +773,8 @@ export const ArticlesScreen: React.FC = () => {
         const catColor = CATEGORIES.find(c => c.value === f.category)?.color || '#6b7280';
         const isPDF = f.content_type === 'pdf';
         return (
-          <div key={`featured-${f.id}`} data-featured="true" onClick={() => { if (isPDF) { openPDF(f.file_url || '', f.title, f.id); } else { setReadingArticle(f); } }}
+          <div key={`featured-${f.id}`} data-featured="true" role="button" tabIndex={0} aria-label={f.title}
+            onClick={() => activateArticle(f)} onKeyDown={activateKeyDown(f)}
             className="articles-featured" style={{ borderRadius:20, overflow:'hidden', marginBottom:10, cursor:'pointer', position:'relative',
               background:`linear-gradient(135deg, ${catColor}30 0%, rgba(16,16,24,0.95) 55%, rgba(10,10,15,0.98) 100%)`,
               border:'1px solid rgba(255,255,255,0.10)', boxShadow:'0 16px 44px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)' }}>
@@ -789,10 +804,9 @@ export const ArticlesScreen: React.FC = () => {
           const isPDF = article.content_type === 'pdf';
 
           return (
-              <div key={article.id} onClick={() => {
-                if (isPDF) { openPDF(article.file_url || '', article.title, article.id); }
-                else { setReadingArticle(article); }
-              }} style={{
+              <div key={article.id} role="button" tabIndex={0} aria-label={article.title}
+                onClick={() => activateArticle(article)} onKeyDown={activateKeyDown(article)}
+                className="articles-card" style={{
               borderRadius:16, overflow:'hidden',
               background:'rgba(255,255,255,0.04)',
               border:'1px solid rgba(255,255,255,0.07)',

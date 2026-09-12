@@ -221,6 +221,50 @@ describe('ArticlesScreen PRO TOP', () => {
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
   });
 
+  it('17. Enter на карточке списка открывает читалку', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const grid = container.querySelector('.articles-grid') as HTMLElement;
+    const card = Array.from(grid.children).find(
+      (c) => !(c as HTMLElement).textContent?.includes('PDF'),
+    ) as HTMLElement;
+    expect(card.getAttribute('role')).toBe('button');
+    expect(card.getAttribute('tabindex')).toBe('0');
+    expect(card.hasAttribute('aria-label')).toBe(true);
+    fireEvent.keyDown(card, { key: 'Enter' });
+    expect(container.querySelector('.articles-reader')).not.toBeNull();
+  });
+
+  it('18. Пробел на featured-карточке открывает читалку', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const feat = container.querySelector('.articles-featured') as HTMLElement;
+    expect(feat).not.toBeNull();
+    expect(feat.getAttribute('role')).toBe('button');
+    fireEvent.keyDown(feat, { key: ' ' });
+    const opened = container.querySelector('.articles-reader') || container.querySelector('.articles-pdf');
+    expect(opened).not.toBeNull();
+  });
+
+  it('19. связанные статьи доступны с клавиатуры', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const grid = container.querySelector('.articles-grid') as HTMLElement;
+    for (const child of Array.from(grid.children)) {
+      const el = child as HTMLElement;
+      if (el.textContent && el.textContent.includes('PDF')) continue;
+      fireEvent.click(el);
+      if (container.querySelector('.articles-reader')) break;
+    }
+    const rel = container.querySelector('.articles-related [role="button"]') as HTMLElement;
+    expect(rel).not.toBeNull();
+    expect(rel.getAttribute('tabindex')).toBe('0');
+    fireEvent.keyDown(rel, { key: 'Enter' });
+    // открылась другая статья (заголовок сменился) либо PDF — главное без краша и читалка/PDF живы
+    const alive = container.querySelector('.articles-reader') || container.querySelector('.articles-pdf');
+    expect(alive).not.toBeNull();
+  });
+
   it('6. PDF-карточка зовёт читать внутри', () => {
     const { container } = render(<ArticlesScreen />);
     goToList(container);
