@@ -9,6 +9,10 @@ import { buildBioavailabilityCatalog, THERAPEUTIC_WINDOWS, LAB_MARKERS, detectFo
 import { DOSE_RANGES } from './SupportEffectiveDose';
 import { buildSubstancePassport } from '../../../engines/support-hub-passport.engine';
 import { LAB_TOP20, resolveLabMonitor } from '../../../engines/support-hub-labs.engine';
+import { LAB_MONITOR_DB } from './UnifiedSynergyCalculator';
+import { isAASHonest } from '../../../engines/support-hub-aas.engine';
+import { aasTimingFor, fmtHalfLife } from '../../../engines/support-hub-aas-timing.engine';
+import { PHARMA_DB, getPharmaDetail } from '../../../core/pharma-database';
 import { getProfile } from '../../../core/profile-manager';
 import { S } from './SupportShared';
 
@@ -45,12 +49,12 @@ export const SupportSubstancePassport: React.FC = () => {
     } catch { /* без профиля */ }
     const labKey = entry.windowKey;
     const windowLabs = labKey && (LAB_MARKERS as any)[labKey] ? (LAB_MARKERS as any)[labKey].map((l: any) => ({ marker: l.marker, target: l.target })) : [];
-    // P8-добавка: TOP20-лабы синергии (креатин/медь/K2/...) + дедуп по маркеру
+    // P8-добавка + раунд-10: TOP20 + полная synergy-БД (tudca/цинк/железо/омега — которых нет в LAB_MARKERS), дедуп по маркеру
     const seenLab = new Set(windowLabs.map((l: any) => l.marker));
-    const topLabs = resolveLabMonitor(LAB_TOP20, entry.id)
+    const dbLabs = resolveLabMonitor({ ...LAB_MONITOR_DB, ...LAB_TOP20 }, entry.id)
       .filter(l => !seenLab.has(l.markerRu))
       .map(l => ({ marker: `${l.markerRu}${l.markerEn === '—' ? '' : ` (${l.markerEn})`}`, target: l.target || l.when }));
-    const labs = [...windowLabs, ...topLabs];
+    const labs = [...windowLabs, ...dbLabs];
     // P1: formKey — через канон detectFormBioKey (id форм каталога вроде magtein_2000
     // не совпадают с ключами био-таблицы; без маппинга всё падало в claim)
     const best = entry.bestForm || entry.forms[0];
@@ -73,6 +77,24 @@ export const SupportSubstancePassport: React.FC = () => {
       labMarkers: labs,
       person,
       resolveName,
+    });
+  }, [selectedId, catalog]);
+
+  // AAS-подпись: для AAS-веществ — краткий тайминг из данных фарм-БД + отсылка в AAS-зону
+  const aasInfo = useMemo(() => {
+    if (!selectedId) return null;
+    const entry = catalog.find(e => e.id === selectedId);
+    if (!entry || !isAASHonest(entry.category, entry.nameRu, entry.nameEn).isAAS) return null;
+    const raw: any = (PHARMA_DB as any)[selectedId];
+    const det: any = raw ? getPharmaDetail(selectedId) || {} : {};
+    const catRaw: any = (SUPPORT_CATALOG_DATA as any)[selectedId];
+    return aasTimingFor({
+      id: selectedId,
+      name: raw?.name || entry.nameRu,
+      cls: raw?.class || entry.category?.[1] || '',
+      tHalfHours: raw?.pk?.halfLifeHours ?? det?.pk?.halfLifeHours ?? null,
+      dbFrequency: det?.dosageRange?.frequency || raw?.dosageRange?.frequency || catRaw?.dosage?.timing || null,
+      instructions: raw?.specialInstructions,
     });
   }, [selectedId, catalog]);
 
@@ -120,6 +142,16 @@ export const SupportSubstancePassport: React.FC = () => {
           {passport.timing.slice(0, 3).map((t, i) => <div key={i} style={{ fontSize: 8, color: '#00e68a', lineHeight: 1.4 }}>⏰ {t}</div>)}
           {passport.conflictTop.slice(0, 3).map((t, i) => <div key={i} style={{ fontSize: 8, color: '#f59e0b', lineHeight: 1.4 }}>⚠ {t}</div>)}
           {passport.labs.slice(0, 3).map((t, i) => <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.4 }}>🩸 {t}</div>)}
+          {aasInfo && (
+            <div style={{ marginTop: 4, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
+              <div style={{ fontSize: 8, fontWeight: 800, color: '#f87171', marginBottom: 2 }}>💉 AAS-тайминг: {aasInfo.suggested}</div>
+              <div style={{ fontSize: 7, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                {aasInfo.route === 'inject' ? 'Инъекции' : aasInfo.route === 'oral' ? 'Орально' : 'Путь?'} · T½ {aasInfo.halfLifeHours !== null ? fmtHalfLife(aasInfo.halfLifeHours) : '— нет в БД'}
+                {aasInfo.dbFrequency ? ` · в справочнике: ${aasInfo.dbFrequency}` : ''}
+              </div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Детали — тайминг → 💉 AAS-зона. Не назначение.</div>
+            </div>
+          )}
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>{passport.analogHint}</div>
         </div>
       )}

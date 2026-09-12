@@ -6,7 +6,7 @@ import {
 } from './SupportBioavailabilityData';
 import { PopupSelect, PopupNumber, PopupBool } from '../../components/PopupXxx';
 import { S } from './SupportShared';
-import { doseWindowFor, personDoseHints, bioEvidenceLabel, bioEvidenceFor, resolvePersonDefaults } from '../../../engines/support-hub-evidence.engine';
+import { doseWindowFor, personDoseHints, bioEvidenceLabel, bioEvidenceFor, resolvePersonDefaults, migratedGet, migratedSet } from '../../../engines/support-hub-evidence.engine';
 import { getProfile } from '../../../core/profile-manager';
 
 // ─── Therapeutic ranges for key supplements ───
@@ -152,7 +152,7 @@ export const SupportEffectiveDose: React.FC = () => {
   }, [sub1Id, sub2Id, dose1, dose2, form1Idx, form2Idx]);
   const [activeAdjusters, setActiveAdjusters] = useState<string[]>(() => {
     try {
-      const parsed: unknown = JSON.parse(localStorage.getItem('he_bio_adjusters') || '[]');
+      const parsed: unknown = JSON.parse(migratedGet(localStorage, 'he_bio_adjusters_v1', 'he_bio_adjusters') || '[]');
       return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
     } catch {
       return [];
@@ -256,7 +256,7 @@ export const SupportEffectiveDose: React.FC = () => {
       ? activeAdjusters.filter((k: string) => k !== key)
       : [...activeAdjusters, key];
     setActiveAdjusters(next);
-    localStorage.setItem('he_bio_adjusters', JSON.stringify(next));
+    migratedSet(localStorage, 'he_bio_adjusters_v1', JSON.stringify(next));
   };
 
   return (

@@ -65,7 +65,8 @@ interface LabMon {
   tier2?: string;     // что делать при treatment
   tier3?: string;     // экстренно
 }
-const LAB_MONITOR_DB: Record<string, LabMon[]> = {
+// Экспортируется для паспорта вещества (единый источник, без дублей таблицы).
+export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
   // ── AAS & гормональные препараты ── (маркеры общие для всех AAS)
   '': [
     { markerRu:'ЛПВП (HDL)', markerEn:'HDL', system:'cardio', when:'Каждые 4 нед', target:'>1.2 ммоль/л', condition:'↓ HDL → ↑ атерогенности', note:'Особенно под оральными (окси, станозолол). Если HDL <0.5 — риск острого атеротромбоза.', tier1:'0.9-1.2 — ниацин 500-1000 мг', tier2:'<0.9 — ниацин+омега-3+бергамот', tier3:'<0.3 ммоль/л — STOP оральные AAS, добавить эзетимиб' },

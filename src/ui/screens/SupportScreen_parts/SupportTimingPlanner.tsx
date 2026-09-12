@@ -4,6 +4,7 @@ import {
   TIMING_SLOTS, CATEGORY_TIMING, buildBioavailabilityCatalog,
 } from './SupportBioavailabilityData';
 import { timingHintsFor } from '../../../engines/support-hub-timing.engine';
+import { migratedGet, migratedSet } from '../../../engines/support-hub-evidence.engine';
 import { isAASHonest } from '../../../engines/support-hub-aas.engine';
 import { aasTimingFor, fmtHalfLife, AAS_TIMING_DISCLAIMER } from '../../../engines/support-hub-aas-timing.engine';
 import { PHARMA_DB, getPharmaDetail } from '../../../core/pharma-database';
@@ -21,7 +22,7 @@ function buildCatalog(): EnrichedEntry[] {
 export const SupportTimingPlanner: React.FC = () => {
   const [selectedSubs, setSelectedSubs] = useState<string[]>(() => {
     try {
-      const parsed: unknown = JSON.parse(localStorage.getItem('he_bio_timing_subs') || '[]');
+      const parsed: unknown = JSON.parse(migratedGet(localStorage, 'he_bio_timing_subs_v1', 'he_bio_timing_subs') || '[]');
       return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
     } catch {
       return [];
@@ -35,7 +36,7 @@ export const SupportTimingPlanner: React.FC = () => {
   const toggleSub = (id: string) => {
     const next = selectedSubs.includes(id) ? selectedSubs.filter(x => x !== id) : [...selectedSubs, id];
     setSelectedSubs(next);
-    localStorage.setItem('he_bio_timing_subs', JSON.stringify(next));
+    migratedSet(localStorage, 'he_bio_timing_subs_v1', JSON.stringify(next));
   };
 
   // AAS-зона: отдельный список, в общее расписание не попадает (не смешиваем)

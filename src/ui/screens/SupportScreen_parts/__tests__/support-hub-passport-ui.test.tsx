@@ -73,6 +73,47 @@ describe('P7 паспорт UI', () => {
     }
   });
 
+  it('паспорт ААС показывает AAS-timing блок из данных БД', () => {
+    try { localStorage.setItem('he_bio_passport', 'test_prop'); } catch { /* noop */ }
+    try {
+      const { container, unmount } = render(<SupportSubstancePassport />);
+      expect(container.textContent || '').toMatch(/AAS-тайминг/);
+      expect(container.textContent || '').toMatch(/EOD/);
+      unmount();
+    } finally {
+      try { localStorage.removeItem('he_bio_passport'); } catch { /* noop */ }
+    }
+  });
+
+  it('паспорт тянет лабы из synergy-БД (креатин → креатинин)', () => {
+    try { localStorage.setItem('he_bio_passport', 'creatine'); } catch { /* noop */ }
+    try {
+      const { container, unmount } = render(<SupportSubstancePassport />);
+      expect(container.textContent || '').toMatch(/Креатинин/);
+      unmount();
+    } finally {
+      try { localStorage.removeItem('he_bio_passport'); } catch { /* noop */ }
+    }
+  });
+
+  it('тайминг мигрирует legacy-ключ выбора', () => {
+    try {
+      localStorage.removeItem('he_bio_timing_subs_v1');
+      localStorage.setItem('he_bio_timing_subs', JSON.stringify(['magnesium']));
+    } catch { /* noop */ }
+    try {
+      const { container, unmount } = render(<SupportTimingPlanner />);
+      expect(container.textContent || '').toMatch(/Магний/);
+      expect(localStorage.getItem('he_bio_timing_subs_v1')).toMatch(/magnesium/);
+      expect(localStorage.getItem('he_bio_timing_subs')).toBeNull();
+      unmount();
+    } finally {
+      try { localStorage.removeItem('he_bio_timing_subs_v1'); } catch { /* noop */ }
+      try { localStorage.removeItem('he_bio_timing_subs'); } catch { /* noop */ }
+    }
+  });
+});
+
   it('доза: битый стор не роняет, валидный префиллит дозу', async () => {
     const { SupportEffectiveDose } = await import('../SupportEffectiveDose');
     try { localStorage.setItem('he_bio_dose_v1', '{broken'); } catch { /* noop */ }
@@ -85,7 +126,6 @@ describe('P7 паспорт UI', () => {
     r2.unmount();
     try { localStorage.removeItem('he_bio_dose_v1'); } catch { /* noop */ }
   });
-});
 
 describe('AAS-тайминг UI (отдельная зона)', () => {
   it('зона открывается с дисклеймером, AAS не в общем пикере', () => {
