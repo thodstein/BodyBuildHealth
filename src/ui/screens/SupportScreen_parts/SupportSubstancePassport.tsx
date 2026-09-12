@@ -5,7 +5,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
-import { buildBioavailabilityCatalog, THERAPEUTIC_WINDOWS, LAB_MARKERS } from './SupportBioavailabilityData';
+import { buildBioavailabilityCatalog, THERAPEUTIC_WINDOWS, LAB_MARKERS, detectFormBioKey } from './SupportBioavailabilityData';
 import { DOSE_RANGES } from './SupportEffectiveDose';
 import { buildSubstancePassport } from '../../../engines/support-hub-passport.engine';
 import { getProfile } from '../../../core/profile-manager';
@@ -44,11 +44,15 @@ export const SupportSubstancePassport: React.FC = () => {
     } catch { /* без профиля */ }
     const labKey = entry.windowKey;
     const labs = labKey && (LAB_MARKERS as any)[labKey] ? (LAB_MARKERS as any)[labKey].map((l: any) => ({ marker: l.marker, target: l.target })) : [];
+    // P1: formKey — через канон detectFormBioKey (id форм каталога вроде magtein_2000
+    // не совпадают с ключами био-таблицы; без маппинга всё падало в claim)
+    const best = entry.bestForm || entry.forms[0];
+    const formKey = best ? detectFormBioKey(best.name || '', best.nameRu || '', (best as any).notes) : 'standard';
     return buildSubstancePassport({
       id: entry.id,
       nameRu: entry.nameRu,
       maxBio: entry.maxBio,
-      formKey: entry.bestForm?.id || 'standard',
+      formKey,
       therapeutic: THERAPEUTIC_WINDOWS as any,
       ranges: DOSE_RANGES as any,
       category: entry.category,

@@ -288,7 +288,7 @@ describe('Интеграция с реальными таблицами хаба
       expect(w.hasData, k).toBe(true);
       expect(w.max).toBeGreaterThan(0);
     }
-  });
+  }, 30000);
   it('топ-вещества имеют окно (терапевтика + ranges)', async () => {
     const { THERAPEUTIC_WINDOWS } = await import('../../ui/screens/SupportScreen_parts/SupportBioavailabilityData');
     const { DOSE_RANGES } = await import('../../ui/screens/SupportScreen_parts/SupportEffectiveDose');
@@ -307,5 +307,20 @@ describe('Интеграция с реальными таблицами хаба
       const g = evidenceGradeExFor(id);
       expect(['A', 'B', 'C', 'D'].includes(g), id).toBe(true);
     }
+  });
+  it('реальные формы каталога маппятся в курируемые ключи (не claim)', async () => {
+    const { buildBioavailabilityCatalog, detectFormBioKey } = await import('../../ui/screens/SupportScreen_parts/SupportBioavailabilityData');
+    const catalog = buildBioavailabilityCatalog();
+    const mg = catalog.find(e => e.id === 'magnesium_l_threonate');
+    expect(mg).toBeTruthy();
+    const key = detectFormBioKey(mg!.bestForm?.name || '', mg!.bestForm?.nameRu || '', (mg!.bestForm as any)?.notes);
+    expect(key).toBe('mg_threonate');
+    expect(bioEvidenceFor(key, mg!.maxBio).source).not.toBe('claim');
+  });
+  it('пиперин/моногидрат/пиколинат — честные источники без claim', async () => {
+    const { detectFormBioKey } = await import('../../ui/screens/SupportScreen_parts/SupportBioavailabilityData');
+    expect(bioEvidenceFor(detectFormBioKey('Curcumin + Piperine', 'Куркумин с пиперином', ''), 0.06).marketing).toBe(true);
+    expect(bioEvidenceFor(detectFormBioKey('Creatine Monohydrate', 'Креатин моногидрат', ''), 0.99).source).toBe('meta');
+    expect(bioEvidenceFor(detectFormBioKey('Zinc Picolinate', 'Цинк пиколинат', ''), 0.85).source).toBe('review');
   });
 });

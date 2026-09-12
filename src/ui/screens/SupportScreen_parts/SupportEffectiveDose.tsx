@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   type EnrichedEntry, type FormWithBio,
   PERSONAL_ADJUSTERS, bioColor, THERAPEUTIC_WINDOWS, MODIFIERS, COST_PER_GRAM,
-  buildBioavailabilityCatalog,
+  buildBioavailabilityCatalog, detectFormBioKey,
 } from './SupportBioavailabilityData';
 import { PopupSelect, PopupNumber, PopupBool } from '../../components/PopupXxx';
 import { S } from './SupportShared';
@@ -219,6 +219,15 @@ export const SupportEffectiveDose: React.FC = () => {
   const eff1 = calcEffDose(f1, dose1, sub1Id);
   const eff2 = calcEffDose(f2, dose2, sub2Id);
 
+  // P2-добавка: окна для стрелок сравнения — через единый doseWindowFor (без окна — '•', а не ложная '✓')
+  const win1 = useMemo(() => doseWindowFor(sub1Id, THERAPEUTIC_WINDOWS as any, DOSE_RANGES as any), [sub1Id]);
+  const win2 = useMemo(() => doseWindowFor(sub2Id, THERAPEUTIC_WINDOWS as any, DOSE_RANGES as any), [sub2Id]);
+  const arrowFor = (dose: number, win: { hasData: boolean; min: number; max: number }) =>
+    !win.hasData ? '•' : dose < win.min ? '⬆' : dose > win.max ? '⬇' : '✓';
+  // P1-добавка: formKey через канон detectFormBioKey (id форм каталога не совпадают с ключами био-таблицы)
+  const formKeyOf = (f: FormWithBio | undefined) =>
+    f ? detectFormBioKey(f.name || '', f.nameRu || '', (f as any).notes) : 'standard';
+
   const costPerGram1 = sub1?.costPerGram ?? null;
   const costPerGram2 = sub2?.costPerGram ?? null;
   const costEff1 = costPerGram1 && eff1.absorbed > 0 ? (costPerGram1 / eff1.absorbed * 1000) : null;
@@ -304,7 +313,7 @@ export const SupportEffectiveDose: React.FC = () => {
             </div>
           );
         })()}
-        {f1 && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Био-диапазон формы: {bioEvidenceLabel(bioEvidenceFor(f1.id || 'standard', f1.bioavailability))}</div>}
+        {f1 && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Био-диапазон формы: {bioEvidenceLabel(bioEvidenceFor(formKeyOf(f1), f1.bioavailability))}</div>}
       </div>
 
       {/* ─── Comparison section ─── */}
@@ -327,7 +336,7 @@ export const SupportEffectiveDose: React.FC = () => {
                 background: eff1.status.includes('терапевтическом') ? 'rgba(34,197,94,0.12)' : eff1.status.includes('Ниже') ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)',
                 color: eff1.status.includes('терапевтическом') ? '#22c55e' : eff1.status.includes('Ниже') ? '#f59e0b' : '#ef4444',
               }}>
-                {dose1} мг {dose1 < (DOSE_RANGES[Object.keys(DOSE_RANGES).find(k => sub1Id.toLowerCase().includes(k)) || '']?.therMin ?? 0) ? '⬆' : dose1 > (DOSE_RANGES[Object.keys(DOSE_RANGES).find(k => sub1Id.toLowerCase().includes(k)) || '']?.therMax ?? 9999) ? '⬇' : '✓'}
+                {dose1} мг {arrowFor(dose1, win1)}
               </div>
             </div>
 
@@ -354,7 +363,7 @@ export const SupportEffectiveDose: React.FC = () => {
                 background: eff2.status.includes('терапевтическом') ? 'rgba(34,197,94,0.12)' : eff2.status.includes('Ниже') ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)',
                 color: eff2.status.includes('терапевтическом') ? '#22c55e' : eff2.status.includes('Ниже') ? '#f59e0b' : '#ef4444',
               }}>
-                {dose2} мг {dose2 < (DOSE_RANGES[Object.keys(DOSE_RANGES).find(k => sub2Id.toLowerCase().includes(k)) || '']?.therMin ?? 0) ? '⬆' : dose2 > (DOSE_RANGES[Object.keys(DOSE_RANGES).find(k => sub2Id.toLowerCase().includes(k)) || '']?.therMax ?? 9999) ? '⬇' : '✓'}
+                {dose2} мг {arrowFor(dose2, win2)}
               </div>
             </div>
           </div>
