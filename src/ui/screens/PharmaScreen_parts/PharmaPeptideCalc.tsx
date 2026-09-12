@@ -8,7 +8,7 @@ import {
   ROUTE_LABELS, SYRINGE_TYPES,
 } from '../../../engines/peptide-calculator.engine';
 import { drawForDose, waterForTargetUnits, recommendPeptideSyringe, weeklySchedule, PEPTIDE_DOSE_REF } from '../../../engines/peptide-pro.engine';
-import { saveCalcSnapshot, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
+import { saveCalcSnapshot, buildCalcCsv, buildCalcHtml, downloadCsv, printHtml } from '../../../engines/pharma-calc-share.engine';
 import { CLASS_LABELS } from './constants';
 
 export const PharmaPeptideCalc: React.FC = () => {
@@ -169,6 +169,7 @@ export const PharmaPeptideCalc: React.FC = () => {
               <div style={{ fontSize:11, color:'#fff', marginTop:4 }}>Реверс: чтобы доза была ровно 10u — воды {rev} мл</div>
               {sel && (sel.fridgeLifeDays || sel.rtLifeHours) && <div style={{ fontSize:11, color:'#fff', marginTop:4 }}>Стабильность: холодильник {sel.fridgeLifeDays ?? '—'} дн · комната {sel.rtLifeHours ?? '—'} ч</div>}
               <button onClick={() => { saveCalcSnapshot('peptides', `${sel?.shortName || peptideId} ${pepDose}мкг → ${dilution.syringeUnitsDisplay}`); printHtml(buildCalcHtml('Пептид', [['Пептид', sel?.shortName || peptideId], ['Доза', `${pepDose} мкг`], ['Объём', `${dilution.doseVolumeMl.toFixed(3)} мл`], ['Шприц', dilution.syringeUnitsDisplay]])); }} style={{ marginTop:8, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(59,130,246,0.22)', background:'rgba(59,130,246,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>💾 В историю + 🖨 Печать</button>
+              <button onClick={() => downloadCsv('peptide.csv', [['Пептид', 'Доза мкг', 'Объём мл', 'Шприц', 'Доз/флакон'], [sel?.shortName || peptideId, pepDose, dilution.doseVolumeMl.toFixed(3), dilution.syringeUnitsDisplay, dilution.dosesPerVial.toFixed(1)]])} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📥 Разведение CSV</button>
               <div style={{ marginTop:8, fontSize:10, color:'#fff' }}>Стартовые ориентиры: {PEPTIDE_DOSE_REF.map((r) => `${r.id} ${r.doseMcg}мкг=${r.units}u`).join(' · ')}</div>
             </div>
           );

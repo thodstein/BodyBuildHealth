@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { runAdvancedDiagnostics, ESTER_HALF_LIFE_DAYS } from '../../../engines/advanced-diagnostics.engine';
 import { planPctStart, halfLifeOf, pctWindowLabel } from '../../../engines/pct-timing.engine';
-import { saveCalcSnapshot, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
+import { saveCalcSnapshot, buildCalcCsv, buildCalcHtml, downloadCsv, printHtml } from '../../../engines/pharma-calc-share.engine';
 import type { DrugDoseInput, VitalsInput, AdvancedDiagnosticsResult } from '../../../engines/advanced-diagnostics.engine';
 import { useDataLink } from '../../../core/data-link';
 import { weeklyDose, injectionsPerWeek } from '../../../engines/pharma-frequency';
@@ -330,6 +330,7 @@ export const DiagnosticsTab: React.FC = () => {
                   <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Протокол: {pct.protocol}</div>
                   <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>{pct.bloodworkAfter} · недели курса честные (из course_log, фолбэк 12)</div>
                   <button onClick={() => { saveCalcSnapshot('diagnostics', `ПКТ ${pct.startLabel} via ${pct.longestId}`); printHtml(buildCalcHtml('ПКТ-план', [['Старт', pct.startLabel], ['По препарату', pct.longestId], ['Протокол', pct.protocol], ['Кровь', pct.bloodworkAfter]])); }} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(236,72,153,0.22)', background:'rgba(236,72,153,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>💾 В историю + 🖨 Печать</button>
+                  <button onClick={() => downloadCsv('pct-plan.csv', [['Старт', 'По препарату', 'Протокол', 'Кровь'], [pct.startLabel, pct.longestId, pct.protocol, pct.bloodworkAfter]])} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📥 ПКТ CSV</button>
                 </div>
               );
             })()}

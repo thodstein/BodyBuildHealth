@@ -3,7 +3,7 @@ import { PHARMA_DB } from '../../../core/pharma-database';
 import { steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../../engines/pk-pd.engine';
 import { calculateMultiSubstancePKPD } from '../../../engines/pkpd-superposition.engine';
 import { resolveEsterCanon, peakTroughRatio, ratioVerdict, suggestIntervalDays, timeToSteadyDays, timeToClearDays, batemanCourse, PK_DISCLAIMER } from '../../../engines/pk-bateman.engine';
-import { saveCalcSnapshot, loadCalcHistory, buildCalcCsv, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
+import { saveCalcSnapshot, loadCalcHistory, clearCalcHistory, downloadCsv, buildCalcCsv, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
 import type { CourseEntry } from '../../../core/types';
 import { useDataLink } from '../../../core/data-link';
 import { CLASS_LABELS, INJECTABLE_WITH_ESTERS, type PharmaClass } from './constants';
@@ -52,6 +52,7 @@ export const PKPDSimulationTab: React.FC = () => {
   const [showAllDrugs, setShowAllDrugs] = useState(true);
   const [visibleDrugs, setVisibleDrugs] = useState<Set<string>>(new Set());
   const [pkEsterPopup, setPkEsterPopup] = useState<{ baseClass: string; label: string } | null>(null);
+  const [, setHistTick] = useState(0);
 
   const allSubstances = useMemo(() => {
     const PKPD_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','dht_inject','insulin','gh','glp1','clenbuterol','thyroid','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other','igf1','mgf']);
@@ -455,7 +456,9 @@ export const PKPDSimulationTab: React.FC = () => {
                     <button onClick={() => { const blob = new Blob([buildCalcCsv([['Cmax', 'Cmin', 'steadyDays'], [simResult.peak.toFixed(1), simResult.trough.toFixed(1), simResult.ssDays]])], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pkpd.csv'; a.click(); }} style={{ flex:1, minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📥 CSV</button>
                   </div>
                   <div style={{ marginTop:8, padding:'9px 10px', borderRadius:10, background:'rgba(0,0,0,0.16)', border:'1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:4 }}>🕘 История расчётов (все калькуляторы)</div>
+                    <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>🕘 История расчётов (все калькуляторы)
+                      {loadCalcHistory().length > 0 && <button onClick={() => { clearCalcHistory(); setHistTick((t) => t + 1); }} style={{ marginLeft:'auto', minHeight:44, padding:'6px 12px', borderRadius:9, border:'1px solid rgba(239,68,68,0.22)', background:'rgba(239,68,68,0.10)', color:'#f87171', fontWeight:800, fontSize:11, cursor:'pointer' }}>🗑 Очистить</button>}
+                    </div>
                     {loadCalcHistory().length === 0 && <div style={{ fontSize:11, color:'#fff' }}>Пока пусто — нажми «В историю» в любом табе.</div>}
                     {loadCalcHistory().slice(0, 5).map((h) => (
                       <div key={h.id} style={{ fontSize:10, color:'#fff', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>{h.tab} · {h.summary}</div>

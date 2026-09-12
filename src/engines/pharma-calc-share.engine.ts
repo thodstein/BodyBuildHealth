@@ -32,6 +32,27 @@ export function saveCalcSnapshot(tab: string, summary: string): CalcSnapshot[] {
   return next;
 }
 
+export function clearCalcHistory(): void {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* молча */
+  }
+}
+
+export function downloadCsv(filename: string, rows: (string | number)[][]): void {
+  try {
+    const blob = new Blob([buildCalcCsv(rows)], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch {
+    /* молча */
+  }
+}
+
 export function escHtml(s: string): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
