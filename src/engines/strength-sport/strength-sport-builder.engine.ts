@@ -919,12 +919,13 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         };
         exercises.push(ex);
         // Planner PRO P7-opener: +1 сингл 90% к первому primary последней недели (sets/workSets в синке).
+        // Первым сетом (не последним): срезы с конца и DUP-волны бьют по хвосту, opener-репетиция идёт первой.
         if (openerOn && !openerDone && w === weeks && isPrimary && tag !== 'cond_day') {
           try {
             const openerW = Math.round(basePmFor(id, input.workMax || {}) * 0.9 / 2.5) * 2.5;
             if (openerW > 0) {
-              ex.workSets.push({ reps: 1, rir: 1, weight: openerW, pct: 90, tempo: 'X-0-X-0', restSeconds: 180 } as any);
-              (ex.workSets[ex.workSets.length - 1] as any).opener = true;
+              const openerWs = { reps: 1, rir: 1, weight: openerW, pct: 90, tempo: 'X-0-X-0', restSeconds: 180, opener: true } as any;
+              ex.workSets.unshift(openerWs);
               ex.sets = ex.workSets.length;
               ex.comment = ex.comment ? `${ex.comment} · Opener 90% 1×1` : 'Opener 90% 1×1';
               openerDone = true;

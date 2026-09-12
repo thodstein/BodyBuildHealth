@@ -24,12 +24,21 @@ export function applyDUP(plan: StrengthSportPlan, mode: DUPMode = 'heavy_light')
           const isStone = ['stone','sandbag','keg','tire'].some(k=> ex.id.includes(k));
           if (wave === 0 && isCarry) { // max
             ex.rir = Math.max(0, ex.rir - 1);
-            ex.workSets = ex.workSets.map(s=> ({...s, rir: ex.rir, pct: Math.min(95,(s.pct||80)+5), weight: Math.round(s.weight*1.05/2.5)*2.5 }));
+            ex.workSets = ex.workSets.map(s=> {
+              if ((s as any).opener) return s; // Planner PRO: opener-сингл волна не трогает
+              return ({...s, rir: ex.rir, pct: Math.min(95,(s.pct||80)+5), weight: Math.round(s.weight*1.05/2.5)*2.5 });
+            });
           } else if (wave === 1 && isStone) { // dynamic — скорость
-            ex.workSets = ex.workSets.map(s=> ({...s, tempo: 'X-0-X-0', rir: Math.min(3, ex.rir+1)}));
+            ex.workSets = ex.workSets.map(s=> {
+              if ((s as any).opener) return s; // Planner PRO: opener-сингл волна не трогает
+              return ({...s, tempo: 'X-0-X-0', rir: Math.min(3, ex.rir+1)});
+            });
           } else if (wave === 2) { // rep — объём
             ex.rir = Math.min(4, ex.rir+1);
-            ex.workSets = ex.workSets.map(s=> ({...s, rir: ex.rir, reps: Math.min(6, s.reps+1), pct: Math.max(60,(s.pct||80)-5), weight: Math.round(s.weight*0.95/2.5)*2.5 }));
+            ex.workSets = ex.workSets.map(s=> {
+              if ((s as any).opener) return s; // Planner PRO: opener-сингл волна не трогает (иначе 1×90 → 2×82)
+              return ({...s, rir: ex.rir, reps: Math.min(6, s.reps+1), pct: Math.max(60,(s.pct||80)-5), weight: Math.round(s.weight*0.95/2.5)*2.5 });
+            });
           }
         }
         return;
@@ -41,6 +50,7 @@ export function applyDUP(plan: StrengthSportPlan, mode: DUPMode = 'heavy_light')
           if (wave === 0) {
             ex.rir = Math.max(0, ex.rir - 1);
             ex.workSets = ex.workSets.map(s => {
+              if ((s as any).opener) return s; // Planner PRO: opener-сингл волна не трогает
               const basePct = s.pct || 80;
               const targetPct = Math.min(95, Math.max(60, basePct + 5));
               const w = Math.round(s.weight * (targetPct / basePct) / 2.5) * 2.5;
@@ -50,6 +60,7 @@ export function applyDUP(plan: StrengthSportPlan, mode: DUPMode = 'heavy_light')
           } else {
             ex.rir = Math.min(4, ex.rir + 1);
             ex.workSets = ex.workSets.map(s => {
+              if ((s as any).opener) return s; // Planner PRO: opener-сингл волна не трогает (иначе 1×90 → 2×82)
               const basePct = s.pct || 80;
               const targetPct = Math.max(60, basePct - 8);
               const w = Math.round(s.weight * (targetPct / basePct) / 2.5) * 2.5;
@@ -63,6 +74,7 @@ export function applyDUP(plan: StrengthSportPlan, mode: DUPMode = 'heavy_light')
           if (isHeavy) {
             ex.rir = Math.max(0, ex.rir - 1);
             ex.workSets = ex.workSets.map(s => {
+              if ((s as any).opener) return s; // Planner PRO: opener-сингл волна не трогает
               // тяж — вес +5% если был 1-3 повт, иначе как есть + корректировка reps
               const w = Math.round(s.weight * 1.03 / 2.5) * 2.5;
               return { ...s, rir: ex.rir, reps: Math.max(1, s.reps - 1), weight: w, pct: Math.min(95, (s.pct || 80) + 3) };
@@ -70,6 +82,7 @@ export function applyDUP(plan: StrengthSportPlan, mode: DUPMode = 'heavy_light')
           } else {
             ex.rir = Math.min(4, ex.rir + 1);
             ex.workSets = ex.workSets.map(s => {
+              if ((s as any).opener) return s; // Planner PRO: opener-сингл волна не трогает
               const w = Math.round(s.weight * 0.95 / 2.5) * 2.5;
               return { ...s, rir: ex.rir, reps: Math.min(12, s.reps + 1), weight: w, pct: Math.max(60, (s.pct || 80) - 3) };
             });

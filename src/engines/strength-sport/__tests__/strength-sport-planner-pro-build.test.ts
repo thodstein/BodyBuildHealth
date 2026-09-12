@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildStrengthSportPlan } from '../strength-sport-builder.engine';
+import { finalizeStrengthSportPlan } from '../strength-sport-finalize.engine';
 import { buildStrengthPrintHtml } from '../strength-sport-export';
 
 const WM_SM = { backSquat: 140, deadlift: 180, overheadPress: 70, yokeWalk: 320, farmersWalk: 140, atlasStone: 120 } as any;
@@ -105,8 +106,7 @@ describe('PRO build: toro4 + opener', () => {
   });
 });
 
-describe('D8 печать: PRO-секция', () => {
-  it('план с PRO-входами → секция Стронг-PRO в HTML', () => {
+describe('D8 печать: PRO-секция', () => {  it('план с PRO-входами → секция Стронг-PRO в HTML', () => {
     const p = buildStrengthSportPlan(baseInput({ weightClass: '<105', rpeCap: 9.5, deadliftGrip: 'mixed', blockModel: 'toro4', openerSingles: true, competitionDate: '2026-12-01' }));
     const html = buildStrengthPrintHtml(p);
     expect(html).toContain('Стронг-PRO');
@@ -116,5 +116,22 @@ describe('D8 печать: PRO-секция', () => {
   it('план без PRO-входов → секции нет (байт-в-байт)', () => {
     const p = buildStrengthSportPlan(baseInput());
     expect(buildStrengthPrintHtml(p)).not.toContain('Стронг-PRO');
+  });
+});
+
+describe('Opener × волны/финализатор', () => {
+  it('opener переживает DUP-wave + cluster + finalize: синк + 1×90 цел', () => {
+    const built = buildStrengthSportPlan(baseInput({
+      goal: 'peaking', competitionDate: '2026-12-01', openerSingles: true,
+      blockModel: 'wave', intensityTech: 'cluster',
+    }));
+    const p = finalizeStrengthSportPlan(built, { outsideLoad: null });
+    for (const w of p.weeksData) for (const s of w.sessions) for (const e of s.exercises) {
+      expect(e.sets, `${e.id} Н${w.week}`).toBe(e.workSets.length);
+    }
+    const openers = p.weeksData.flatMap((w: any) => w.sessions.flatMap((s: any) => s.exercises.flatMap((e: any) => e.workSets))).filter((ws: any) => (ws as any).opener);
+    expect(openers.length).toBe(1);
+    expect(openers[0].reps).toBe(1);
+    expect(openers[0].pct).toBe(90);
   });
 });

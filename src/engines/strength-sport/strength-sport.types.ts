@@ -105,7 +105,7 @@ export interface StrengthSportInput {
   blockModel?: 'strong5' | 'toro4' | 'wave'; // P5: модель периодизации (дефолт strong5)
   autoDeload?: boolean; // P5: делоды 4/7/11 (дефолт вкл)
   conditioningDay?: boolean; // P5: отдельный cond_day (дефолт вкл)
-  openerSingles?: boolean; // P7: opener-синглы в последнюю неделю (дефолт вкл)
+  openerSingles?: boolean; // P7: opener-сингл 90% в последнюю неделю — только при явном true (конструктор включает; без флага байт-в-байт)
 }
 
 export interface StrengthSportSet {
