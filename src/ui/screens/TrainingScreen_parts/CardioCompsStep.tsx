@@ -7,6 +7,7 @@ import React from 'react';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
 import { peakBlockHint, type CardioCompPriority } from '../../../engines/lms/cardio-peak-block.engine';
 import { predictRaceTimes, predictorNote, RACE_WEEK_CHECKLIST } from '../../../engines/lms/cardio-race-predictor.engine';
+import { loadCardioRecords, bestCardioRecord, formatCardioTime } from '../../../engines/lms/cardio-records.engine';
 import { SectionCard, GroupHeading, HINT, HINT_SM, BTN_CTA, BTN_DANGER, NumberInput, InfoBanner, Badge, EmptyState } from './CardioUI';
 
 export interface CompDraft { name: string; week: string; date?: string }
@@ -147,10 +148,25 @@ export const CardioCompsStep: React.FC<{
   );
 };
 
-/** Предиктор результата по Riegel — автономный (свой ввод, без пропсов). */
+/** Предиктор результата по Riegel — автономный (свой ввод + подтяжка из рекордов). */
 const CardioRacePredictor: React.FC = () => {
   const [dist, setDist] = React.useState('10');
   const [time, setTime] = React.useState('');
+  const [recMsg, setRecMsg] = React.useState<string | null>(null);
+  const fromRecords = () => {
+    // №4 PRO-2: лучший рекорд из журнала (10К → 5К → полумарафон).
+    const found = (['run10k', 'run5k', 'runHalf'] as const)
+      .map(k => ({ kind: k, rec: bestCardioRecord(k) }))
+      .find(x => x.rec != null);
+    if (!found?.rec) {
+      setRecMsg('В журнале рекордов пусто — введи результат вручную (раздел «Рекорды»).');
+      return;
+    }
+    const km = found.kind === 'run10k' ? '10' : found.kind === 'run5k' ? '5' : '21.1';
+    setDist(km);
+    setTime(formatCardioTime(found.rec.value));
+    setRecMsg(null);
+  };
   const distNum = Number(String(dist).replace(',', '.'));
   const m = /^(\d{1,3})[:.](\d{1,2})(?:[:.](\d{1,2}))?$/.exec(time.trim());
   let secs: number | undefined;
@@ -175,7 +191,12 @@ const CardioRacePredictor: React.FC = () => {
           <input value={time} onChange={e => setTime(e.target.value)} inputMode="text" aria-label="Время лучшего результата"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, width: 150 }} placeholder="44:30" />
         </label>
+        <button onClick={fromRecords} aria-label="Взять лучший результат из журнала рекордов"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 14, minHeight: 48, cursor: 'pointer' }}>
+          📥 Из рекордов
+        </button>
       </div>
+      {recMsg && <div style={HINT_SM}>{recMsg}</div>}
       {preds && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontVariantNumeric: 'tabular-nums' }}>
           {preds.map(p => (

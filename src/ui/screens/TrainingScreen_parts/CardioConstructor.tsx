@@ -1297,7 +1297,7 @@ export const CardioConstructor: React.FC = () => {
         />
         <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }}>
           <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>🩺 Кардио-скрининг (честно, не диагноз)</div>
-          <div style={{ color: '#fff', fontSize: 12, marginBottom: 8 }}>Любой пункт → только Z2/recovery до врача. 14–15 лет — щадящий режим всегда.</div>
+          <div style={{ color: '#fff', fontSize: 12, marginBottom: 8 }}>Любой пункт → только Z2/recovery до врача. До 16 лет — щадящий режим всегда.</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {CARDIO_RED_FLAGS.map(f => {
               const on = redFlags.includes(f.id);
@@ -1420,7 +1420,7 @@ export const CardioConstructor: React.FC = () => {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button style={BTN_GHOST} onClick={migrateFromPlan}>📦 Мигрировать недельный план</button>
           </div>
-          <CardioValidationCard cycle={cycle} beginner={level === 'beginner'} strict={strictValidate} onToggleStrict={() => setStrictValidate(v => !v)} />
+          <CardioValidationCard cycle={cycle} beginner={level === 'beginner'} strict={strictValidate} onToggleStrict={() => setStrictValidate(v => !v)} onAddHiit={() => addHiitToCycle('sit-8x20', {}, 1)} />
           <CardioMesoRow advice={mesoInfo.advice} mult={mesoInfo.mult} on={mesoOn} onToggle={() => setMesoOn(v => !v)} />
           <CardioHiitSection onAdd={addHiitToCycle} totalWeeks={cycle?.totalWeeks} disabled={!cycle} />
         </>

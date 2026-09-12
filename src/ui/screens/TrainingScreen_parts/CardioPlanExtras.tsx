@@ -13,7 +13,9 @@ export const CardioValidationCard: React.FC<{
   beginner: boolean;
   strict?: boolean;
   onToggleStrict?: () => void;
-}> = ({ cycle, beginner, strict, onToggleStrict }) => {
+  /** №3 PRO-2: кнопка «+HIIT» при варнинге z2_without_hiit_low_volume. */
+  onAddHiit?: () => void;
+}> = ({ cycle, beginner, strict, onToggleStrict, onAddHiit }) => {
   const v = useMemo(() => {
     if (!cycle) return null;
     const cfg = cycle.config as unknown as { redFlags?: string[]; age?: number } | undefined;
@@ -45,6 +47,12 @@ export const CardioValidationCard: React.FC<{
         </div>
       ))}
       {v.issues.length > 8 && <div style={HINT_SM}>…и ещё {v.issues.length - 8}</div>}
+      {onAddHiit && v.issues.some(i => i.code === 'z2_without_hiit_low_volume') && (
+        <button style={{ ...BTN_SMALL, minHeight: 44 }} onClick={onAddHiit}
+          aria-label="Добавить HIIT в неделю 1" data-cardio="add-hiit">
+          ⚡ +HIIT в неделю 1 (SIT 8×20)
+        </button>
+      )}
     </div>
   );
 };
