@@ -2,7 +2,7 @@
  * articles-pro-top.test.tsx — TOP-подача статей: featured, TOC, PDF-inline,
  * закладка везде, богатый markdown. Только подача, логика не тронута.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/react';
 import { ArticlesScreen, renderMarkdown, extractArticleToc } from '../screens/ArticlesScreen';
 import { resetAppPlatformCache } from '../../core/app-platform';
@@ -166,6 +166,59 @@ describe('ArticlesScreen PRO TOP', () => {
     fireEvent.click(screen.getByLabelText('Сохранённые статьи'));
     expect(container.querySelector('.articles-list-title')?.textContent).toContain('Сохранённые');
     expect(container.textContent).toContain('Пока пусто');
+  });
+
+  it('13. поиск находит слово из тела статьи (FSGS)', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const search = container.querySelector('.articles-search') as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'FSGS' } });
+    const grid = container.querySelector('.articles-grid') as HTMLElement;
+    expect(grid.children.length).toBe(1);
+    expect(grid.textContent).toContain('Тренболон');
+  });
+
+  it('14. чипы категорий показывают счётчики', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    expect(container.textContent).toContain('Фарма · 3');
+  });
+
+  it('15. в баре читалки есть процент прогресса', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const grid = container.querySelector('.articles-grid') as HTMLElement;
+    for (const child of Array.from(grid.children)) {
+      const el = child as HTMLElement;
+      if (el.textContent && el.textContent.includes('PDF')) continue;
+      fireEvent.click(el);
+      if (container.querySelector('.articles-reader')) break;
+    }
+    expect(container.querySelector('.articles-progress-label')?.textContent).toBe('0%');
+    expect(container.querySelector('.articles-top')).toBeNull();
+  });
+
+  it('16. после прокрутки появляется «Наверх» и возвращает топ', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const grid = container.querySelector('.articles-grid') as HTMLElement;
+    for (const child of Array.from(grid.children)) {
+      const el = child as HTMLElement;
+      if (el.textContent && el.textContent.includes('PDF')) continue;
+      fireEvent.click(el);
+      if (container.querySelector('.articles-reader')) break;
+    }
+    const body = container.querySelector('.articles-reader-body') as HTMLElement;
+    Object.defineProperty(body, 'scrollHeight', { value: 2000, configurable: true });
+    Object.defineProperty(body, 'clientHeight', { value: 600, configurable: true });
+    body.scrollTop = 600;
+    const scrollTo = vi.fn();
+    (body as unknown as { scrollTo: unknown }).scrollTo = scrollTo;
+    fireEvent.scroll(body);
+    const top = container.querySelector('.articles-top') as HTMLElement;
+    expect(top).not.toBeNull();
+    fireEvent.click(top);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
   });
 
   it('6. PDF-карточка зовёт читать внутри', () => {

@@ -238,6 +238,7 @@ export const ArticlesScreen: React.FC = () => {
   }, [readingArticle?.id]);
   const [readerFont, setReaderFont] = useState<number>(() => loadReaderFont());
   const [readProgress, setReadProgress] = useState(0);
+  const [showTop, setShowTop] = useState(false);
   const readerBodyRef = React.useRef<HTMLDivElement | null>(null);
   const changeReaderFont = (delta: number) => {
     setReaderFont(prev => {
@@ -252,6 +253,21 @@ export const ArticlesScreen: React.FC = () => {
     if (!el) return;
     const max = el.scrollHeight - el.clientHeight;
     setReadProgress(max > 0 ? Math.min(100, Math.max(0, (el.scrollTop / max) * 100)) : 0);
+    setShowTop(el.scrollTop > 400);
+  };
+
+  const scrollReaderTop = () => {
+    const el = readerBodyRef.current;
+    if (!el) return;
+    if (typeof el.scrollTo === 'function') {
+      try {
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      } catch {
+        /* fallthrough — старый WebView */
+      }
+    }
+    el.scrollTop = 0;
   };
   const [offline, setOffline] = useState(() => {
     try {
@@ -263,6 +279,7 @@ export const ArticlesScreen: React.FC = () => {
 
   React.useEffect(() => {
     setReadProgress(0);
+    setShowTop(false);
     readerBodyRef.current?.scrollTo?.(0, 0);
   }, [readingArticle?.id]);
 
@@ -288,7 +305,8 @@ export const ArticlesScreen: React.FC = () => {
       list = list.filter(a =>
         a.title.toLowerCase().includes(q) ||
         a.description.toLowerCase().includes(q) ||
-        a.tags.some(t => t.includes(q))
+        a.tags.some(t => t.includes(q)) ||
+        (a.content || '').toLowerCase().includes(q)
       );
     }
     return list;
@@ -427,7 +445,7 @@ export const ArticlesScreen: React.FC = () => {
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Поиск статей — заголовок, тег, категория..." className="articles-search" style={{
+          placeholder="Поиск — заголовок, тег или слово из текста..." className="articles-search" style={{
             width:'100%', minHeight:48, padding:'12px 44px 12px 38px', borderRadius:14,
             background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.09)',
             color:'#fff', fontSize:16, outline:'none', fontFamily: FONT,
@@ -464,6 +482,7 @@ export const ArticlesScreen: React.FC = () => {
         )}
         {CATEGORIES.map(c => {
           const isActive = category === c.value;
+          const catCount = c.value === 'all' ? ARTICLES_MANIFEST.length : ARTICLES_MANIFEST.filter(x => x.category === c.value).length;
           return (
             <button key={c.value} onClick={() => setCategory(c.value)} className="article-chip" data-active={isActive} style={{
               minHeight:44, padding:'10px 16px', borderRadius:999, fontSize:13, cursor:'pointer', fontFamily: FONT, flexShrink:0, whiteSpace:'nowrap',
@@ -477,7 +496,7 @@ export const ArticlesScreen: React.FC = () => {
               display:'flex', alignItems:'center', gap:6,
             }}>
               {CAT_ICON[c.value] && <span style={{ display:'inline-flex', color: isActive ? c.color : '#fff' }}><NativeIcon name={CAT_ICON[c.value]} size={13} /></span>}
-              {c.label}
+              {c.label} · {catCount}
             </button>
           );
         })}
@@ -531,6 +550,7 @@ export const ArticlesScreen: React.FC = () => {
               </div>
             </div>
             <span style={{ padding:'5px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>{estimateReadTime(readingArticle.content||'')}′</span>
+            <span className="articles-progress-label" style={{ padding:'5px 10px', borderRadius:999, background:`${artA(0.10)}`, border:`1px solid ${artA(0.22)}`, fontSize:11, fontWeight:800, color:ART_ACC, flexShrink:0, fontVariantNumeric:'tabular-nums' }}>{Math.round(readProgress)}%</span>
             <button
               onClick={() => copyArticleLink(readingArticle)}
               aria-label="Скопировать название статьи"
@@ -693,6 +713,12 @@ export const ArticlesScreen: React.FC = () => {
               Health Engine · {readingArticle.date}
             </div>
           </div>
+
+          {/* Кнопка «Наверх» — видна после прокрутки */}
+          {showTop && (
+            <button onClick={scrollReaderTop} aria-label="Наверх к началу статьи" className="articles-top"
+              style={{ position:'absolute', right:12, bottom:'calc(78px + env(safe-area-inset-bottom,0px))', zIndex:5, width:44, height:44, borderRadius:999, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(14,14,18,0.85)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', color:'#fff', fontSize:16, fontWeight:800, cursor:'pointer', boxShadow:'0 10px 30px rgba(0,0,0,0.45)' }}>↑</button>
+          )}
 
           {/* Плавающая панель размера шрифта — читабельность на телефоне */}
           <div className="articles-fontbar" style={{ position:'absolute', left:'50%', transform:'translateX(-50%)', bottom:'calc(18px + env(safe-area-inset-bottom,0px))', zIndex:5, display:'flex', alignItems:'center', gap:4, padding:'5px', borderRadius:999, background:'rgba(14,14,18,0.82)', border:'1px solid rgba(255,255,255,0.10)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', boxShadow:'0 10px 30px rgba(0,0,0,0.45)' }}>
