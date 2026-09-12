@@ -126,12 +126,30 @@ const DosingCard: React.FC<DosingCardProps> = ({
 
 // ─── Main component ───
 export const SupportEffectiveDose: React.FC = () => {
-  const [sub1Id, setSub1Id] = useState('');
-  const [sub2Id, setSub2Id] = useState('');
-  const [dose1, setDose1] = useState(500);
-  const [dose2, setDose2] = useState(500);
-  const [form1Idx, setForm1Idx] = useState(0);
-  const [form2Idx, setForm2Idx] = useState(0);
+  // P2-добавка: помним выбор (как he_bio_selected) — валидируем типы, мусор → дефолт
+  const [doseInit] = useState(() => {
+    try {
+      const p: any = JSON.parse(localStorage.getItem('he_bio_dose_v1') || 'null');
+      if (!p || typeof p !== 'object') return null;
+      return {
+        sub1Id: typeof p.sub1Id === 'string' ? p.sub1Id : '',
+        sub2Id: typeof p.sub2Id === 'string' ? p.sub2Id : '',
+        dose1: Number.isFinite(Number(p.dose1)) && Number(p.dose1) >= 0 ? Number(p.dose1) : 500,
+        dose2: Number.isFinite(Number(p.dose2)) && Number(p.dose2) >= 0 ? Number(p.dose2) : 500,
+        form1Idx: Number.isInteger(p.form1Idx) && p.form1Idx >= 0 ? p.form1Idx : 0,
+        form2Idx: Number.isInteger(p.form2Idx) && p.form2Idx >= 0 ? p.form2Idx : 0,
+      };
+    } catch { return null; }
+  });
+  const [sub1Id, setSub1Id] = useState(doseInit?.sub1Id || '');
+  const [sub2Id, setSub2Id] = useState(doseInit?.sub2Id || '');
+  const [dose1, setDose1] = useState(doseInit?.dose1 ?? 500);
+  const [dose2, setDose2] = useState(doseInit?.dose2 ?? 500);
+  const [form1Idx, setForm1Idx] = useState(doseInit?.form1Idx || 0);
+  const [form2Idx, setForm2Idx] = useState(doseInit?.form2Idx || 0);
+  useEffect(() => {
+    try { localStorage.setItem('he_bio_dose_v1', JSON.stringify({ sub1Id, sub2Id, dose1, dose2, form1Idx, form2Idx })); } catch { /* quota/private */ }
+  }, [sub1Id, sub2Id, dose1, dose2, form1Idx, form2Idx]);
   const [activeAdjusters, setActiveAdjusters] = useState<string[]>(() => {
     try {
       const parsed: unknown = JSON.parse(localStorage.getItem('he_bio_adjusters') || '[]');

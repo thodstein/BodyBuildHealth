@@ -33,11 +33,24 @@ export function buildSubstancePassport(args: {
   conflicts?: Array<{ with?: string; effect?: string }>;
   labMarkers?: Array<{ marker: string; target: string }>;
   person?: PersonCtx;
+  /** Резолв id → человеческое имя (без него в строках светятся сырые id). */
+  resolveName?: (id: string) => string;
 }): SubstancePassport {
   const ev = bioEvidenceFor(args.formKey || 'standard', args.maxBio);
   const dose = doseWindowFor(args.id, args.therapeutic, args.ranges);
   const grade = evidenceGradeExFor(args.id);
   const gradeLabel = grade === 'A' ? 'A — высокий' : grade === 'B' ? 'B — умеренный' : grade === 'C' ? 'C — низкий' : 'D — данных почти нет';
+  const nameOf = (id: string | undefined): string => {
+    const raw = (id || '').trim();
+    if (!raw) return '';
+    if (args.resolveName) {
+      try {
+        const resolved = args.resolveName(raw);
+        if (resolved && resolved !== raw) return resolved;
+      } catch { /* fallback ниже */ }
+    }
+    return raw;
+  };
   return {
     id: args.id,
     nameRu: args.nameRu,
@@ -52,8 +65,8 @@ export function buildSubstancePassport(args: {
     dose,
     personHints: personDoseHints(args.id, args.person || {}),
     timing: timingHintsFor(args.nameRu, args.category).map(r => `${r.label}: ${r.detail}`),
-    synergyTop: (args.synergies || []).slice(0, 3).map(s => `${s.with || ''} — ${s.effect || ''}`.trim()),
-    conflictTop: (args.conflicts || []).slice(0, 3).map(s => `${s.with || ''} — ${s.effect || ''}`.trim()),
+    synergyTop: (args.synergies || []).slice(0, 3).map(s => `${nameOf(s.with)} — ${s.effect || ''}`.trim()),
+    conflictTop: (args.conflicts || []).slice(0, 3).map(s => `${nameOf(s.with)} — ${s.effect || ''}`.trim()),
     labs: (args.labMarkers || []).slice(0, 4).map(l => `${l.marker} → ${l.target}`),
     analogHint: 'Аналог подбирается в табе «Аналоги» по механизму + классу + грейду (профиль — из Профиля, не 30/80/180 по умолчанию).',
   };

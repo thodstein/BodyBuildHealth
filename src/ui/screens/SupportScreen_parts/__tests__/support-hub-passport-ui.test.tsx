@@ -71,4 +71,17 @@ describe('P7 паспорт UI', () => {
       try { localStorage.removeItem('he_bio_passport'); } catch { /* noop */ }
     }
   });
+
+  it('доза: битый стор не роняет, валидный префиллит дозу', async () => {
+    const { SupportEffectiveDose } = await import('../SupportEffectiveDose');
+    try { localStorage.setItem('he_bio_dose_v1', '{broken'); } catch { /* noop */ }
+    const r1 = render(<SupportEffectiveDose />);
+    expect((r1.container.textContent || '')).toMatch(/Расчёт эффективной дозы/);
+    r1.unmount();
+    try { localStorage.setItem('he_bio_dose_v1', JSON.stringify({ sub1Id: 'magnesium', sub2Id: '', dose1: 400, dose2: 500, form1Idx: 0, form2Idx: 0 })); } catch { /* noop */ }
+    const r2 = render(<SupportEffectiveDose />);
+    expect((r2.container.textContent || '')).toMatch(/400 мг/);
+    r2.unmount();
+    try { localStorage.removeItem('he_bio_dose_v1'); } catch { /* noop */ }
+  });
 });

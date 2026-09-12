@@ -8,6 +8,7 @@ import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { buildBioavailabilityCatalog, THERAPEUTIC_WINDOWS, LAB_MARKERS, detectFormBioKey } from './SupportBioavailabilityData';
 import { DOSE_RANGES } from './SupportEffectiveDose';
 import { buildSubstancePassport } from '../../../engines/support-hub-passport.engine';
+import { LAB_TOP20, resolveLabMonitor } from '../../../engines/support-hub-labs.engine';
 import { getProfile } from '../../../core/profile-manager';
 import { S } from './SupportShared';
 
@@ -43,11 +44,22 @@ export const SupportSubstancePassport: React.FC = () => {
       person = { weightKg: Number(p?.personal?.weight) || undefined, sex: p?.personal?.sex, age: Number(p?.personal?.age) || undefined };
     } catch { /* без профиля */ }
     const labKey = entry.windowKey;
-    const labs = labKey && (LAB_MARKERS as any)[labKey] ? (LAB_MARKERS as any)[labKey].map((l: any) => ({ marker: l.marker, target: l.target })) : [];
+    const windowLabs = labKey && (LAB_MARKERS as any)[labKey] ? (LAB_MARKERS as any)[labKey].map((l: any) => ({ marker: l.marker, target: l.target })) : [];
+    // P8-добавка: TOP20-лабы синергии (креатин/медь/K2/...) + дедуп по маркеру
+    const seenLab = new Set(windowLabs.map((l: any) => l.marker));
+    const topLabs = resolveLabMonitor(LAB_TOP20, entry.id)
+      .filter(l => !seenLab.has(l.markerRu))
+      .map(l => ({ marker: `${l.markerRu}${l.markerEn === '—' ? '' : ` (${l.markerEn})`}`, target: l.target || l.when }));
+    const labs = [...windowLabs, ...topLabs];
     // P1: formKey — через канон detectFormBioKey (id форм каталога вроде magtein_2000
     // не совпадают с ключами био-таблицы; без маппинга всё падало в claim)
     const best = entry.bestForm || entry.forms[0];
     const formKey = best ? detectFormBioKey(best.name || '', best.nameRu || '', (best as any).notes) : 'standard';
+    // Имена синергий/конфликтов — через каталог, а не сырые id
+    const resolveName = (rid: string): string => {
+      const hit: any = (SUPPORT_CATALOG_DATA as any)[rid];
+      return (hit && (hit.nameRu || hit.name)) || rid;
+    };
     return buildSubstancePassport({
       id: entry.id,
       nameRu: entry.nameRu,
@@ -60,6 +72,7 @@ export const SupportSubstancePassport: React.FC = () => {
       conflicts: (raw.conflicts || []).map((x: any) => ({ with: x.with, effect: x.effect })),
       labMarkers: labs,
       person,
+      resolveName,
     });
   }, [selectedId, catalog]);
 

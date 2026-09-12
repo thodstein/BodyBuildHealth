@@ -207,6 +207,7 @@ interface GradeGroup {
   id?: string;
   items?: GradeItem[];
   classItems?: Record<string, GradeItem[]>;
+  classBadges?: Array<{ clsKey: string; count?: number; [k: string]: unknown }>;
   count?: number;
 }
 
@@ -234,7 +235,16 @@ export function filterCatalogGroups(groups: GradeGroup[], f: GradeFilter): Grade
         const kept = arr.filter(s => passesGradeFilter(s && s.id ? s.id : '', f));
         if (kept.length > 0) { classItems[k] = kept; n += kept.length; }
       }
-      if (n > 0) out.push({ ...g, classItems, count: n });
+      if (n > 0) {
+        const g2: GradeGroup = { ...g, classItems, count: n };
+        // Бейджи классов тоже пересчитываем, иначе показывают дофильтровые counts
+        if (Array.isArray(g.classBadges)) {
+          g2.classBadges = g.classBadges
+            .filter(b => classItems[b.clsKey] && classItems[b.clsKey].length > 0)
+            .map(b => ({ ...b, count: classItems[b.clsKey].length }));
+        }
+        out.push(g2);
+      }
     } else {
       out.push(g);
     }

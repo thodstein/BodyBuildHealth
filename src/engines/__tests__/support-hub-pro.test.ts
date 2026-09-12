@@ -155,6 +155,20 @@ describe('P7 паспорт вещества', () => {  it('паспорт со�
     expect(p.timing.length).toBeGreaterThan(0);
     expect(p.conflictTop.length).toBe(1);
   });
+  it('resolveName раскрывает сырые id, без резолвера — как есть', () => {
+    const base = {
+      id: 'magnesium', nameRu: 'Магний', maxBio: 0.8, formKey: 'mg_glycinate',
+      therapeutic: {}, ranges: {}, category: ['mineral'],
+      synergies: [{ with: 'l_theanine', effect: 'сон' }],
+      conflicts: [{ with: 'calcium', effect: 'конкуренция' }],
+      labMarkers: [], person: {},
+    };
+    const raw = buildSubstancePassport(base as any);
+    expect(raw.synergyTop[0]).toMatch(/l_theanine/);
+    const named = buildSubstancePassport({ ...base, resolveName: (id: string) => (id === 'l_theanine' ? 'L-Теанин' : id) } as any);
+    expect(named.synergyTop[0]).toMatch(/L-Теанин/);
+    expect(named.synergyTop[0]).not.toMatch(/l_theanine/);
+  });
 });
 
 describe('P8-добавка LAB топ-20 + alias-резолв', () => {
@@ -218,6 +232,19 @@ describe('P3-добавка фильтр каталога A/B', () => {
   it('all — байт-в-байт', () => {
     const groups = [{ cat: 'a', count: 1, items: [{ id: 'x' }] }];
     expect(filterCatalogGroups(groups as any, 'all')).toBe(groups);
+  });
+  it('classBadges пересчитываются, пустые классы дропаются', () => {
+    const groups = [{
+      cat: 'x', count: 3,
+      classBadges: [
+        { clsKey: 'k1', emoji: '💊', count: 2 },
+        { clsKey: 'k2', emoji: '🧪', count: 1 },
+      ],
+      classItems: { k1: [{ id: 'creatine' }, { id: 'resveratrol' }], k2: [{ id: 'glutathione_reduced' }] },
+    }];
+    const out = filterCatalogGroups(groups as any, 'AB');
+    expect(out.length).toBe(1);
+    expect((out[0] as any).classBadges).toEqual([{ clsKey: 'k1', emoji: '💊', count: 1 }]);
   });
 });
 
