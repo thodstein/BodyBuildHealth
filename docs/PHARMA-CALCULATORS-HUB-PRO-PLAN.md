@@ -13,6 +13,11 @@
 - **H-раунд**: живой мост в курс (`db.put course_log` + `notifyDataChange`, прецедент `CatalogTab`); частоты пептидов + кнопка; удаление истории по одной (поймана коллизия id в одну мс); log-шкала графика.
 - **I-раунд (этот коммит)**: канон-оверрайд t½ в `advanced-diagnostics` (опциональный 5-й параметр, legacy и Python-зеркало untouched) + тоггл в диагностике (дефолт ВКЛ) + канон в подписях эфиров; фильтр истории по табам; аудит `InteractionCheckerTab` (только чтение — чужой файл, найдены 2 реальных дефекта, см. ниже).
 
+## J-раунд: 2 дефекта InteractionCheckerTab закрыты кодом (разрешение владельца, pathspec)
+
+- `masteron/masteron_enan → drostanolone_prop/drostanolone_enan` (id сверены с `pharma-db/`); `raloxifene` оставлен — вещества нет в каталоге genuinely.
+- Дозы: `courseDoseById` (факт из `course_log` через `weeklyDose` + мг-конверсия, паритет `MapperTab`; IU как есть) приоритетнее ручного поля; ручное — фолбэк. Все 4 точки (`alerts`/`courseRecs`/`classInstructions`/`unifiedView`) + guard-тест (id живы/мёртвы + «из курса» в UI).
+
 ## Аудит InteractionCheckerTab (I2, только чтение — файл чужой, не тронут)
 
 1. `synergyToPharmaId` маппит в несуществующие id: `drostanolone_propionate → masteron`, `drostanolone_enanthate → masteron_enan`, `raloxifene` — таких id в `PHARMA_DB` нет (реальные: `drostanolone_prop`/`drostanolone_enan`, ралоксифена нет вовсе). Гард `pharmaIds.has` молча дропает эти синергии — мастерон без синергий в UI. Фикс 2-строчный — за владельцем таба.

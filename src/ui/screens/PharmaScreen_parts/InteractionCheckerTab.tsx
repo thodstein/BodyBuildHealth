@@ -12,6 +12,7 @@ import {
 import { UnifiedInteractionCard } from '../../components/UnifiedInteractionCard';
 import { TimingTelemetryPanel } from '../../components/TimingTelemetryPanel';
 import type { CourseEntry } from '../../../core/types';
+import { weeklyDose } from '../../../engines/pharma-frequency';
 import { resolveInteractionId, type Interaction as SupportInteraction } from '../../../data/support-interactions-db';
 import { SYNERGY_PAIRS } from '../../../engines/support.engine';
 import { decodeGarbled } from '../../../utils/text-sanitizer';
@@ -36,7 +37,7 @@ export const InteractionCheckerTab: React.FC = () => {
       trenbolone_acetate: 'tren_acet', trenbolone_enanthate: 'tren_enan', nandrolone_decanoate: 'deca',
       nandrolone_phenylprop: 'npp', boldenone_undecylenate: 'bold_undec', methenolone_enanthate: 'prim_enan',
       methandienone: 'methand', oxandrolone: 'oxan', oxymetholone: 'anadrol', stanozolol: 'stan',
-      drostanolone_propionate: 'masteron', drostanolone_enanthate: 'masteron_enan',
+      drostanolone_propionate: 'drostanolone_prop', drostanolone_enanthate: 'drostanolone_enan',
       cabergoline: 'caberg', anastrozole: 'anastro', hcg: 'hcg', tamoxifen: 'tamox',
       clomiphene: 'clomi', letrozole: 'letrozole', raloxifene: 'raloxifene',
     };
@@ -66,6 +67,25 @@ export const InteractionCheckerTab: React.FC = () => {
 
   const [selectedIds, setSelectedIds] = useState<string[]>(['', '']);
   const [doseMgWk, setDoseMgWk] = useState(300);
+  // Доза из курса (факт) приоритетнее ручного поля: мг-эквивалент недельной дозы (паритет MapperTab)
+  const courseDoseById = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of (linked.course || [])) {
+      const sid = String((c as any).substanceId || '');
+      if (!sid || m.has(sid)) continue;
+      try {
+        const wk = weeklyDose((c as any).doseValue, (c as any).doseUnit, (c as any).frequency);
+        const unit = String((c as any).doseUnit || '').toLowerCase();
+        let mg = wk;
+        if (unit.includes('mcg') || unit.includes('µg')) mg = wk / 1000;
+        else if (unit.includes('g') && !unit.includes('mg')) mg = wk * 1000;
+        // IU как есть (GH/инсулин — свои единицы, честно без конверсии в мг)
+        if (Number.isFinite(mg) && mg > 0) m.set(sid, mg);
+      } catch { /* битая запись курса — пропуск */ }
+    }
+    return m;
+  }, [linked.course]);
+  const doseForId = (id: string): number => courseDoseById.get(id) ?? doseMgWk;
   useEffect(() => {
     const courseIds = (linked.course || []).map(c => c.substanceId).filter(Boolean);
     if (courseIds.length > 0 && selectedIds.every(id => !id)) {
@@ -91,26 +111,26 @@ export const InteractionCheckerTab: React.FC = () => {
   const alerts = useMemo(() => {
     if (validIds.length < 2) return [];
     const course: CourseEntry[] = validIds.map((id, i) => ({
-      id: `${id}-${i}`, substanceId: id, doseValue: doseMgWk, doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12,
+      id: `${id}-${i}`, substanceId: id, doseValue: doseForId(id), doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12,
     }));
     try { return checkDrugInteractions(course); } catch { return []; }
-  }, [selectedIds, doseMgWk]);
+  }, [selectedIds, doseMgWk, courseDoseById]);
 
   const courseRecs = useMemo(() => {
     if (validIds.length < 1) return [];
     const course: CourseEntry[] = validIds.map((id, i) => ({
-      id: `${id}-${i}`, substanceId: id, doseValue: doseMgWk, doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12,
+      id: `${id}-${i}`, substanceId: id, doseValue: doseForId(id), doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12,
     }));
     try { return getCourseRecommendations(course); } catch { return []; }
-  }, [validIds, doseMgWk]);
+  }, [validIds, doseMgWk, courseDoseById]);
 
   const classInstructions = useMemo(() => {
     if (validIds.length < 1) return [];
     const course: CourseEntry[] = validIds.map((id, i) => ({
-      id: `${id}-${i}`, substanceId: id, doseValue: doseMgWk, doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12,
+      id: `${id}-${i}`, substanceId: id, doseValue: doseForId(id), doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12,
     }));
     try { return getClassInstructions(course); } catch { return []; }
-  }, [validIds]);
+  }, [validIds, doseMgWk, courseDoseById]);
 
   const hasAlerts = alerts.length > 0;
   const hasRecs = courseRecs.length > 0;
@@ -149,7 +169,7 @@ export const InteractionCheckerTab: React.FC = () => {
   const unifiedView = useMemo((): React.ReactElement => {
     const validIdsForUnified = validIds.length > 0 ? validIds : [''];
     const courseForUnified: CourseEntry[] = validIdsForUnified.filter(Boolean).map((id, i) => ({
-      id: `${id}-${i}`, substanceId: id, doseValue: doseMgWk, doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12,
+      id: `${id}-${i}`, substanceId: id, doseValue: doseForId(id), doseUnit: 'mg/wk', frequency: '2x/week', startWeek: 0, endWeek: 12,
     }));
     try {
       const result = calculateInteractions({
@@ -201,7 +221,7 @@ export const InteractionCheckerTab: React.FC = () => {
     } catch (e) {
       return <div style={{ textAlign:'center', padding:20, color:'#f87171', fontSize:12, ...card }}>Ошибка: {String(e)}</div>;
     }
-  }, [validIds, doseMgWk, unifiedOnlyCritical, unifiedSeverity]);
+  }, [validIds, doseMgWk, courseDoseById, unifiedOnlyCritical, unifiedSeverity]);
 
   return (
     <div className="pharma-interact" style={{ display:'flex', flexDirection:'column', gap:10 }}>
@@ -233,12 +253,12 @@ export const InteractionCheckerTab: React.FC = () => {
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
           <div>
-            <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>Доза на препарат (мг/нед)</label>
+            <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>Доза на препарат (мг/нед — если нет в курсе)</label>
             <input type="number" value={doseMgWk} onChange={e=>setDoseMgWk(parseFloat(e.target.value)||0)} style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
           </div>
           <div style={{ display:'flex', alignItems:'flex-end' }}>
             <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)', flex:1 }}>
-              Подсказка: доза влияет на силу алертов. Оставь 300 для теста.
+              Дозы тянутся из курса, иначе — поле. Доза влияет на силу алертов.
             </div>
           </div>
         </div>

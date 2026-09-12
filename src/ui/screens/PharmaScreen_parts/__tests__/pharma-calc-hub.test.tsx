@@ -6,6 +6,8 @@ import { PharmaPeptideCalc } from '../PharmaPeptideCalc';
 import { MapperTab } from '../MapperTab';
 import { DiagnosticsTab } from '../DiagnosticsTab';
 import { saveCalcSnapshot, loadCalcHistory, clearCalcHistory } from '../../../../engines/pharma-calc-share.engine';
+import { InteractionCheckerTab } from '../InteractionCheckerTab';
+import { PHARMA_DB } from '../../../../core/pharma-database';
 
 describe('pharma hub E-guard: новые панели живы', () => {
   it('PK: канон-бейдж conf/5 на карточке по умолчанию', () => {
@@ -69,6 +71,14 @@ describe('pharma hub E-guard: новые панели живы', () => {
     fireEvent.click(screen.getByText(/Запустить симуляцию/));
     expect(container.textContent).toMatch(/Все/);
     share.clearCalcHistory();
+  });
+  it('Взаимодействия: мастерон-id живы в каталоге, дозы из курса', () => {
+    expect(PHARMA_DB['drostanolone_prop']?.name).toBeTruthy();
+    expect(PHARMA_DB['drostanolone_enan']?.name).toBeTruthy();
+    expect(PHARMA_DB['masteron']).toBeUndefined();
+    expect(PHARMA_DB['masteron_enan']).toBeUndefined();
+    const { container } = render(<InteractionCheckerTab />);
+    expect(container.textContent).toMatch(/из курса/);
   });
   it('История: save → load → clear roundtrip', () => {
     clearCalcHistory();
