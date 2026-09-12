@@ -3,8 +3,9 @@
  * закладка везде, богатый markdown. Только подача, логика не тронута.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup, screen } from '@testing-library/react';
 import { ArticlesScreen, renderMarkdown, extractArticleToc } from '../screens/ArticlesScreen';
+import { resetAppPlatformCache } from '../../core/app-platform';
 
 beforeEach(() => {
   try {
@@ -18,6 +19,17 @@ afterEach(() => {
   cleanup();
   try {
     localStorage.clear();
+  } catch {
+    /* ignore */
+  }
+  try {
+    delete (window as unknown as { Capacitor?: unknown }).Capacitor;
+    delete (window as unknown as { Telegram?: unknown }).Telegram;
+  } catch {
+    /* ignore */
+  }
+  try {
+    resetAppPlatformCache();
   } catch {
     /* ignore */
   }
@@ -116,6 +128,44 @@ describe('ArticlesScreen PRO TOP', () => {
     const { container } = render(<ArticlesScreen />);
     const first = container.querySelector('.articles-hero-card') as HTMLElement;
     expect(first.textContent).toContain('ст.');
+  });
+
+  it('10. hero: «Продолжить чтение» появляется после открытия статьи', () => {
+    const { container } = render(<ArticlesScreen />);
+    expect(container.querySelector('.articles-hero-continue')).toBeNull();
+    goToList(container);
+    const grid = container.querySelector('.articles-grid') as HTMLElement;
+    for (const child of Array.from(grid.children)) {
+      const el = child as HTMLElement;
+      if (el.textContent && el.textContent.includes('PDF')) continue;
+      fireEvent.click(el);
+      if (container.querySelector('.articles-reader')) break;
+    }
+    expect(container.querySelector('.articles-reader')).not.toBeNull();
+    // назад: читалка → список → hero
+    fireEvent.click(container.querySelector('.articles-reader-bar button') as HTMLElement);
+    fireEvent.click(container.querySelector('.articles-toolbar button') as HTMLElement);
+    expect(container.querySelector('.articles-hero')).not.toBeNull();
+    const cont = container.querySelector('.articles-hero-continue') as HTMLElement;
+    expect(cont).not.toBeNull();
+    expect(cont.textContent).toContain('Продолжить чтение');
+  });
+
+  it('11. заголовок списка отражает раздел', () => {
+    const { container } = render(<ArticlesScreen />);
+    const card = container.querySelector('.articles-hero-card[data-id="new"]') as HTMLElement;
+    fireEvent.click(card);
+    expect(container.querySelector('.articles-list-title')?.textContent).toContain('Новые');
+  });
+
+  it('12. native: пустые сохранённые с подсказкой про ★', () => {
+    (window as unknown as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true };
+    resetAppPlatformCache();
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    fireEvent.click(screen.getByLabelText('Сохранённые статьи'));
+    expect(container.querySelector('.articles-list-title')?.textContent).toContain('Сохранённые');
+    expect(container.textContent).toContain('Пока пусто');
   });
 
   it('6. PDF-карточка зовёт читать внутри', () => {

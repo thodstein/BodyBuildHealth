@@ -17,6 +17,22 @@ const artA = (alpha: number): string => {
 };
 
 const SAVED_KEY = 'he_articles_saved_v1';
+const LAST_KEY = 'he_articles_last_v1';
+
+export function loadLastArticleId(): string {
+  try {
+    const v = localStorage.getItem(LAST_KEY) || '';
+    return typeof v === 'string' ? v : '';
+  } catch {
+    return '';
+  }
+}
+
+export function lastArticleEntry(): ArticleManifestEntry | null {
+  const id = loadLastArticleId();
+  if (!id) return null;
+  return ARTICLES_MANIFEST.find(a => a.id === id) || null;
+}
 
 export function loadSavedArticles(): string[] {
   try {
@@ -205,6 +221,21 @@ export const ArticlesScreen: React.FC = () => {
   const [pdfTitle, setPdfTitle] = useState<string>('PDF-документ');
   const [saved, setSaved] = useState<string[]>(() => loadSavedArticles());
   const [copied, setCopied] = useState(false);
+  const [lastRead, setLastRead] = useState<string>(() => loadLastArticleId());
+
+  const rememberLast = (id: string) => {
+    if (!id) return;
+    setLastRead(id);
+    try {
+      localStorage.setItem(LAST_KEY, id);
+    } catch {
+      /* quota — только сессия */
+    }
+  };
+
+  React.useEffect(() => {
+    if (readingArticle?.id) rememberLast(readingArticle.id);
+  }, [readingArticle?.id]);
   const [readerFont, setReaderFont] = useState<number>(() => loadReaderFont());
   const [readProgress, setReadProgress] = useState(0);
   const readerBodyRef = React.useRef<HTMLDivElement | null>(null);
@@ -272,9 +303,16 @@ export const ArticlesScreen: React.FC = () => {
     }
   };
 
-  const openPDF = (url: string, title?: string) => {
+  const openPDF = (url: string, title?: string, id?: string) => {
     setPdfTitle(title || 'PDF-документ');
     setPdfViewer(url);
+    if (id) rememberLast(id);
+  };
+
+  const resumeEntry = (a: ArticleManifestEntry) => {
+    setPage('list');
+    if (a.content_type === 'pdf') openPDF(a.file_url || '', a.title, a.id);
+    else setReadingArticle(a);
   };
 
   const copyArticleLink = async (a: ArticleManifestEntry) => {
@@ -339,6 +377,24 @@ export const ArticlesScreen: React.FC = () => {
                 <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:`${s.color}12`, border:`1px solid ${s.color}18`, color:s.color, fontSize:13, flexShrink:0, fontWeight:700 }}>→</span>
               </div>
             ))}
+            {(() => {
+              const last = ARTICLES_MANIFEST.find(a => a.id === lastRead);
+              if (!last) return null;
+              const catColor = CATEGORIES.find(c => c.value === last.category)?.color || '#6b7280';
+              return (
+                <div key="continue" role="button" tabIndex={0} onClick={() => resumeEntry(last)}
+                  className="articles-hero-continue" data-id="continue"
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); resumeEntry(last); } }}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%', border:`1px solid ${artA(0.30)}`, boxShadow:`0 3px 12px rgba(0,0,0,0.30), 0 0 16px ${artA(0.12)}`, background:'rgba(18,18,20,0.72)' }}>
+                  <div style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${artA(0.22)}, ${artA(0.08)})`, border:`1px solid ${artA(0.30)}`, color:ART_ACC, fontSize:16, fontWeight:900 }}>▶</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:10, fontWeight:800, color:ART_ACC, textTransform:'uppercase', letterSpacing:'0.08em' }}>Продолжить чтение</div>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fff', letterSpacing:'-0.2px', lineHeight:1.25, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{last.title}</div>
+                  </div>
+                  <span style={{ minHeight:44, display:'inline-flex', alignItems:'center', padding:'10px 16px', borderRadius:999, background:ART_ACC, color:'#000', fontSize:12, fontWeight:800, flexShrink:0 }}>Читать</span>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -578,7 +634,7 @@ export const ArticlesScreen: React.FC = () => {
               const prev = idx > 0 ? order[idx - 1] : null;
               const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
               const openEntry = (a: ArticleManifestEntry) => {
-                if (a.content_type === 'pdf') { setReadingArticle(null); openPDF(a.file_url || '', a.title); }
+                if (a.content_type === 'pdf') { setReadingArticle(null); openPDF(a.file_url || '', a.title, a.id); }
                 else setReadingArticle(a);
               };
               if (!prev && !next) return null;
@@ -611,8 +667,8 @@ export const ArticlesScreen: React.FC = () => {
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                     {related.map(r => (
                       <div key={r.id} role="button" tabIndex={0}
-                        onClick={() => { if (r.content_type === 'pdf') { setReadingArticle(null); openPDF(r.file_url || '', r.title); } else setReadingArticle(r); }}
-                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (r.content_type === 'pdf') { setReadingArticle(null); openPDF(r.file_url || '', r.title); } else setReadingArticle(r); } }}
+                        onClick={() => { if (r.content_type === 'pdf') { setReadingArticle(null); openPDF(r.file_url || '', r.title, r.id); } else setReadingArticle(r); }}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (r.content_type === 'pdf') { setReadingArticle(null); openPDF(r.file_url || '', r.title, r.id); } else setReadingArticle(r); } }}
                         style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, cursor:'pointer', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
                         <span style={{ width:32, height:32, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`${CATEGORIES.find(c => c.value === r.category)?.color || '#6b7280'}1c`, border:`1px solid ${CATEGORIES.find(c => c.value === r.category)?.color || '#6b7280'}30`, color: CATEGORIES.find(c => c.value === r.category)?.color || '#6b7280' }}>
                           <NativeIcon name={CAT_ICON[r.category] || 'file'} size={14} />
@@ -651,11 +707,25 @@ export const ArticlesScreen: React.FC = () => {
       {articles.length === 0 && (
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'44px 20px', gap:12, marginTop:10, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px dashed rgba(255,255,255,0.12)' }}>
           <div style={{ width:64, height:64, borderRadius:18, background:'radial-gradient(120% 120% at 30% 20%, rgba(139,92,246,0.18), transparent 65%)', border:'1px solid rgba(139,92,246,0.18)', display:'flex', alignItems:'center', justifyContent:'center', color:'#a78bfa', boxShadow:'0 10px 28px rgba(139,92,246,0.14)' }}><NativeIcon name="inbox" size={26} /></div>
-          <div style={{ fontSize:15, color:'#fff', fontWeight:800, letterSpacing:'-0.02em' }}>Статьи не найдены</div>
-          <div style={{ fontSize:13, color:'#fff', textAlign:'center', maxWidth:300, lineHeight:1.5 }}>Попробуйте изменить запрос или сбросить фильтры — покажем всё снова.</div>
+          <div style={{ fontSize:15, color:'#fff', fontWeight:800, letterSpacing:'-0.02em' }}>{category === 'saved' ? 'Пока пусто' : 'Статьи не найдены'}</div>
+          <div style={{ fontSize:13, color:'#fff', textAlign:'center', maxWidth:300, lineHeight:1.5 }}>{category === 'saved' ? 'Откройте любую статью и нажмите ★ — она сохранится для офлайн-чтения.' : 'Попробуйте изменить запрос или сбросить фильтры — покажем всё снова.'}</div>
           <button onClick={() => { setSearch(''); setCategory('all'); }} style={{ marginTop:6, minHeight:44, padding:'10px 22px', borderRadius:999, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.07)', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', backdropFilter:'blur(10px)' }}>Сбросить фильтры</button>
         </div>
       )}
+
+      {/* Заголовок раздела — контекст выдачи */}
+      {(() => {
+        const title = category === 'saved' ? 'Сохранённые' : listSection === 'new' ? 'Новые статьи' : listSection === 'recommended' ? 'Рекомендуемое' : 'Все статьи';
+        const catLabel = category !== 'all' && category !== 'saved' ? CATEGORIES.find(c => c.value === category)?.label : null;
+        return (
+          <div className="articles-list-title" style={{ margin:'2px 0 10px' }}>
+            <div style={{ fontSize:17, fontWeight:900, color:'#fff', letterSpacing:'-0.02em', lineHeight:1.2 }}>{title}</div>
+            <div style={{ fontSize:12, color:'#fff', opacity:0.75, marginTop:2 }}>
+              {catLabel ? `${catLabel} · ` : ''}{articles.length} ст.{listSection === 'new' && category === 'all' ? ' · свежие сверху' : ''}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Featured — материал номера (без фильтров) */}
       {category === 'all' && !search.trim() && articles.length > 1 && (() => {
@@ -663,7 +733,7 @@ export const ArticlesScreen: React.FC = () => {
         const catColor = CATEGORIES.find(c => c.value === f.category)?.color || '#6b7280';
         const isPDF = f.content_type === 'pdf';
         return (
-          <div key={`featured-${f.id}`} data-featured="true" onClick={() => { if (isPDF) { openPDF(f.file_url || '', f.title); } else { setReadingArticle(f); } }}
+          <div key={`featured-${f.id}`} data-featured="true" onClick={() => { if (isPDF) { openPDF(f.file_url || '', f.title, f.id); } else { setReadingArticle(f); } }}
             className="articles-featured" style={{ borderRadius:20, overflow:'hidden', marginBottom:10, cursor:'pointer', position:'relative',
               background:`linear-gradient(135deg, ${catColor}30 0%, rgba(16,16,24,0.95) 55%, rgba(10,10,15,0.98) 100%)`,
               border:'1px solid rgba(255,255,255,0.10)', boxShadow:'0 16px 44px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)' }}>
@@ -694,7 +764,7 @@ export const ArticlesScreen: React.FC = () => {
 
           return (
               <div key={article.id} onClick={() => {
-                if (isPDF) { openPDF(article.file_url || '', article.title); }
+                if (isPDF) { openPDF(article.file_url || '', article.title, article.id); }
                 else { setReadingArticle(article); }
               }} style={{
               borderRadius:16, overflow:'hidden',
