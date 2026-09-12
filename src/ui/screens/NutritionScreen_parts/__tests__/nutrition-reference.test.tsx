@@ -152,4 +152,31 @@ describe('nutrition-reference UI', () => {
     expect(container.textContent).toContain('Результатов:');
     expect(container.textContent).toContain('инсулинорезистентность');
   });
+
+  it('топ: правила открыты по умолчанию, тоглы несут aria-expanded', () => {
+    const { container } = render(<NutritionReference />);
+    // Заголовки правил видны без кликов
+    expect(screen.getByText('Белковая оптимизация')).not.toBeNull();
+    const toggles = container.querySelectorAll('[data-ref="section"] > button[aria-expanded]');
+    expect(toggles.length).toBeGreaterThan(0);
+    const rulesToggle = container.querySelector('[data-ref="section"] > button[aria-label*="Правила питания"]');
+    expect(rulesToggle!.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('топ: FAQ раскрывается по клику (ответ скрыт до клика)', () => {
+    const { container } = render(<NutritionReference />);
+    fireEvent.click(screen.getByText(new RegExp('Нутрициолог — частые вопросы')));
+    expect(container.textContent).not.toContain('инсулинорезистентность');
+    fireEvent.click(screen.getByText(/Почему у продукта низкий рейтинг/));
+    expect(container.textContent).toContain('Overall Dietary Score');
+  });
+
+  it('топ: кнопка очистки поиска гасит результаты', () => {
+    const { container } = render(<NutritionReference />);
+    const input = container.querySelector('input[aria-label="Поиск по справочнику"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'креатин' } });
+    expect(container.textContent).toContain('Результатов:');
+    fireEvent.click(screen.getByText(/Очистить поиск/));
+    expect(container.textContent).not.toContain('Результатов:');
+  });
 });

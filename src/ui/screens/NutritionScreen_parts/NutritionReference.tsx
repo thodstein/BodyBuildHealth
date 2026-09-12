@@ -40,7 +40,7 @@ function liveScoreFor(name: string): number | null {
 type GoalFilter = 'all' | 'mass' | 'cut' | 'health';
 
 export const NutritionReference: React.FC = () => {
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(['rules']));
   const toggle = (k: string) => setOpenSections(prev => { const s = new Set(prev); if (s.has(k)) s.delete(k); else s.add(k); return s; });
   const [search, setSearch] = useState('');
   const [goal, setGoal] = useState<GoalFilter>('all');
@@ -90,15 +90,18 @@ export const NutritionReference: React.FC = () => {
         { k: 'Категорий', v: counts.cats, sub: 'продуктов', col: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
       ]} />
 
-      {/* Единственный поиск (дубль удалён) */}
-      <div style={{ ...modernCardBg, padding: 12 }}>
+      {/* Единственный поиск (дубль удалён) — липкий, как положено топ-уровню */}
+      <div data-ref="search" style={{ ...modernCardBg, padding: 12, position: 'sticky', top: 0, zIndex: 5 }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="🔍 Поиск по правилам, синергиям, продуктам, нормам…"
           aria-label="Поиск по справочнику"
-          style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: '#202023', color: '#fff', fontSize: 13, outline: 'none', boxSizing: 'border-box', boxShadow: search ? '0 0 0 1px rgba(0,230,138,0.3)' : 'none' }}
+          style={{ width: '100%', padding: '12px 14px', minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: '#202023', color: '#fff', fontSize: 16, outline: 'none', boxSizing: 'border-box', boxShadow: search ? '0 0 0 1px rgba(0,230,138,0.3)' : 'none' }}
         />
+        {search && (
+          <button onClick={() => setSearch('')} aria-label="Очистить поиск" style={{ marginTop: 8, width: '100%', minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>✕ Очистить поиск</button>
+        )}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
           {([['all', 'Все'], ['mass', 'Масса'], ['cut', 'Сушка'], ['health', 'Здоровье']] as [GoalFilter, string][]).map(([v, label]) => (
             <ModernPill key={v} active={goal === v} onClick={() => setGoal(v)}>{label}</ModernPill>
@@ -128,9 +131,9 @@ export const NutritionReference: React.FC = () => {
       <SectionCard title={`🧮 Мои нормы (вес ${wKg} кг)`} isOpen={openSections.has('calc')} onToggle={() => toggle('calc')}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
           <span style={{ fontSize: 12, color: '#fff' }}>Вес, кг:</span>
-          <input value={weight} onChange={e => setWeight(e.target.value)} inputMode="decimal" aria-label="Вес для расчёта норм" style={{ width: 80, padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: '#202023', color: '#fff', fontSize: 13 }} />
+          <input value={weight} onChange={e => setWeight(e.target.value)} inputMode="decimal" aria-label="Вес для расчёта норм" style={{ width: 88, padding: '10px 12px', minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: '#202023', color: '#fff', fontSize: 16 }} />
         </div>
-        <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.7 }}>
+        <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.7, fontVariantNumeric: 'tabular-nums' }}>
           <div>🥩 Белок: <b>{protLow}–{protHigh} г/сут</b> (1.6–2.2 г/кг)</div>
           <div>🍽 На приём: <b>{perMealLow}–{perMealHigh} г</b> (0.4–0.55 г/кг ×4+)</div>
           <div>💧 Вода: <b>{waterLow}–{waterHigh} л/сут</b> (30–40 мл/кг + 0.5–1 л/ч тренировки)</div>
@@ -210,12 +213,7 @@ export const NutritionReference: React.FC = () => {
 
       <SectionCard title={`🧑‍⚕️ Нутрициолог — частые вопросы (${NUTRI_ADVISOR_FAQ.length})`} isOpen={openSections.has('faq')} onToggle={() => toggle('faq')}>
         <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>Те же ответы, что в табе «Нутрициолог» (единый источник). Полная версия с фильтром по тегам — в табе.</div>
-        {NUTRI_ADVISOR_FAQ.map((f, i) => (
-          <div key={i} style={{ padding: '6px 8px', borderRadius: 8, background: '#202023', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{f.icon} {f.q}</div>
-            <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.6, marginTop: 2 }}>{f.a}</div>
-          </div>
-        ))}
+        {NUTRI_ADVISOR_FAQ.map((f, i) => <FaqItem key={i} icon={f.icon} q={f.q} a={f.a} />)}
       </SectionCard>
 
       <SectionCard title={`🍽 Сочетаемость продуктов (${FOOD_SYNERGIES.length} пар)`} isOpen={openSections.has('synergy')} onToggle={() => toggle('synergy')}>
@@ -267,8 +265,8 @@ export const NutritionReference: React.FC = () => {
 };
 
 const SectionCard: React.FC<{ title: string; isOpen: boolean; onToggle: () => void; color?: string; children: React.ReactNode }> = ({ title, isOpen, onToggle, color, children }) => (
-  <div style={{ ...modernCardBg, padding: 12, border: isOpen ? `1px solid ${color || '#00e68a'}18` : '1px solid rgba(255,255,255,0.06)', background: isOpen ? `${color || '#00e68a'}06` : '#18181b' }}>
-    <button onClick={onToggle} style={{ width: '100%', padding: '8px 10px', cursor: 'pointer', background: isOpen ? `${color || '#00e68a'}10` : 'rgba(255,255,255,0.02)', border: '1px solid transparent', borderRadius: 10, color: color || '#fff', fontWeight: 700, fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
+  <div data-ref="section" style={{ ...modernCardBg, padding: 12, border: isOpen ? `1px solid ${color || '#00e68a'}18` : '1px solid rgba(255,255,255,0.06)', background: isOpen ? `${color || '#00e68a'}06` : '#18181b' }}>
+    <button onClick={onToggle} aria-expanded={isOpen} aria-label={title} style={{ width: '100%', minHeight: 44, padding: '10px 12px', cursor: 'pointer', background: isOpen ? `${color || '#00e68a'}10` : 'rgba(255,255,255,0.02)', border: '1px solid transparent', borderRadius: 10, color: color || '#fff', fontWeight: 700, fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ width: 22, height: 22, borderRadius: 8, background: isOpen ? (color || '#00e68a') + '18' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', color: isOpen ? (color || '#00e68a') : '#fff' }}>›</span>
       {title}
       <span style={{ marginLeft: 'auto', fontSize: 9, padding: '2px 6px', borderRadius: 999, background: isOpen ? (color || '#00e68a') + '14' : 'rgba(255,255,255,0.04)', color: isOpen ? (color || '#00e68a') : '#fff', border: `1px solid ${isOpen ? (color || '#00e68a') + '20' : 'rgba(255,255,255,0.06)'}` }}>{isOpen ? '▲' : '▼'}</span>
@@ -281,7 +279,7 @@ const RuleItem: React.FC<{ rule: ReferenceRule }> = ({ rule }) => {
   const [expanded, setExpanded] = useState(false);
   return (
     <div style={{ borderRadius: 12, overflow: 'hidden', border: expanded ? `1px solid ${rule.color}20` : '1px solid rgba(255,255,255,0.06)', background: expanded ? `${rule.color}08` : '#202023', boxShadow: expanded ? `0 4px 12px ${rule.color}10` : 'none' }}>
-      <button onClick={() => setExpanded(!expanded)} style={{ width: '100%', padding: '10px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, background: expanded ? `${rule.color}12` : 'transparent', border: 'none', color: '#fff', textAlign: 'left', fontSize: 12, fontWeight: 600 }}>
+      <button onClick={() => setExpanded(!expanded)} aria-expanded={expanded} aria-label={rule.title} style={{ width: '100%', minHeight: 44, padding: '10px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, background: expanded ? `${rule.color}12` : 'transparent', border: 'none', color: '#fff', textAlign: 'left', fontSize: 12, fontWeight: 600 }}>
         <span style={{ width: 24, height: 24, borderRadius: 8, background: expanded ? rule.color + '20' : 'rgba(255,255,255,0.06)', color: expanded ? rule.color : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', border: `1px solid ${expanded ? rule.color + '30' : 'rgba(255,255,255,0.06)'}` }}>›</span>
         <span style={{ flex: 1 }}>{rule.title}</span>
         <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 999, background: expanded ? rule.color + '14' : 'rgba(255,255,255,0.04)', color: expanded ? rule.color : '#fff', border: `1px solid ${expanded ? rule.color + '20' : 'rgba(255,255,255,0.06)'}` }}>{expanded ? 'Свернуть' : 'Подробнее'}</span>
@@ -297,6 +295,20 @@ const RuleItem: React.FC<{ rule: ReferenceRule }> = ({ rule }) => {
   );
 };
 
+const FaqItem: React.FC<{ icon: string; q: string; a: string }> = ({ icon, q, a }) => {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div style={{ borderRadius: 8, overflow: 'hidden', background: '#202023', border: '1px solid rgba(255,255,255,0.05)' }}>
+      <button onClick={() => setExpanded(!expanded)} aria-expanded={expanded} aria-label={q} style={{ width: '100%', minHeight: 44, padding: '10px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: 'none', color: '#fff', textAlign: 'left', fontSize: 12, fontWeight: 600 }}>
+        <span style={{ flexShrink: 0 }}>{icon}</span>
+        <span style={{ flex: 1 }}>{q}</span>
+        <span style={{ fontSize: 9, color: '#fff' }}>{expanded ? '▲' : '▼'}</span>
+      </button>
+      {expanded && <div style={{ padding: '0 12px 10px 34px', fontSize: 11, color: '#fff', lineHeight: 1.6 }}>{a}</div>}
+    </div>
+  );
+};
+
 const ScoreSection: React.FC<{ label: string; color: string; items: { name: string; score: number }[] }> = ({ label, color, items }) => (
   <>
     <h5 style={{ margin: '6px 0 4px', fontSize: 12, color, letterSpacing: 0.3 }}>{label}</h5>
@@ -304,7 +316,7 @@ const ScoreSection: React.FC<{ label: string; color: string; items: { name: stri
       const live = liveScoreFor(p.name);
       const shown = live ?? p.score;
       return (
-        <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+        <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontVariantNumeric: 'tabular-nums' }}>
           <div style={{ minWidth: 44, height: 20, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', background: scoreColor(shown) + '15', color: scoreColor(shown), fontWeight: 800, fontSize: 10 }}>{shown}/10</div>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{p.name}</span>
           {live != null && <span style={{ fontSize: 9, color: '#00e68a' }}>· из базы</span>}
