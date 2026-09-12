@@ -25,6 +25,64 @@ export function combatACWRFromLoads(dailyLoads: number[]): ACWRReport | null {
   return combatACWR(acute, chronicAvg);
 }
 
+// ── P6 PRO: честный ACWR — EWMA-uncoupled дефолт (BMC meta 2025: EWMA чувствительнее
+// на высоких; uncoupled чище — острая неделя не входит в хроническую).
+// RA-coupled (выше) оставлен фолбэком при <14д истории. ──
+
+function ewmaLast(vals: number[], n: number): number | null {
+  const clean = vals.filter(v => typeof v === 'number' && Number.isFinite(v) && v >= 0);
+  if (!clean.length) return null;
+  const lambda = 2 / (n + 1);
+  let ew = clean[0];
+  for (let i = 1; i < clean.length; i++) ew = clean[i] * lambda + ew * (1 - lambda);
+  return ew;
+}
+
+function zoneForRatio(ratio: number): { zone: ACWRZone; recommendation: string } {
+  if (ratio < 0.8) return { zone: 'undertrained', recommendation: 'Недогруз <0.8 — добавьте 10% объёма или 1 сессию.' };
+  if (ratio > 1.5) return { zone: 'dangerous', recommendation: 'Перегруз >1.5 — делод 40% объёма, RIR+2, сон 8ч+.' };
+  if (ratio > 1.3) return { zone: 'caution', recommendation: 'Погранично 1.3-1.5 — снизьте объём 15%, RIR+1.' };
+  return { zone: 'optimal', recommendation: 'Нагрузка в оптимуме (0.8-1.3) — продолжайте.' };
+}
+
+/**
+ * EWMA-uncoupled ACWR по дневным нагрузкам (sRPE×мин, одна шкала).
+ * Нужно ≥14 дневных точек; lowBase: хроника <100 AU/день → не выше caution
+ * (хрупкая форма — резкие скачки опасны, даже при ratio 1.0).
+ * Оговорка: в ударных видах травмы сидят и в sweet spot (тхэквондо-2025) — зона ориентир, не гарантия.
+ */
+export function combatACWRUncoupled(dailyLoads: number[]): (ACWRReport & { method: 'ewma_uncoupled'; lowBase: boolean }) | null {
+  if (!Array.isArray(dailyLoads) || dailyLoads.length < 14) return null;
+  const acuteVals = dailyLoads.slice(-7);
+  const chronicVals = dailyLoads.slice(0, -7);
+  const acute = ewmaLast(acuteVals, 7);
+  const chronic = ewmaLast(chronicVals, 28);
+  if (acute == null || chronic == null) return null;
+  const ratio = chronic > 0 ? acute / chronic : acute > 0 ? 2 : 1;
+  let { zone, recommendation } = zoneForRatio(ratio);
+  let lowBase = false;
+  if (chronic < 100 && zone === 'optimal') {
+    zone = 'caution';
+    lowBase = true;
+    recommendation = 'База <100 AU/день — хрупкая форма: держите ratio 0.8–1.3 без скачков, EWMA-uncoupled.';
+  }
+  return {
+    acute: Math.round(acute * 7), chronic: Math.round(chronic * 7),
+    ratio: Math.round(ratio * 100) / 100, zone, recommendation, method: 'ewma_uncoupled', lowBase,
+  };
+}
+
+/**
+ * Честная точка входа: EWMA-uncoupled при ≥14д, иначе RA-coupled с пометкой.
+ * Возвращает отчёт + метод + честное предупреждение о короткой истории.
+ */
+export function combatACWRHonest(dailyLoads: number[]): { report: ACWRReport | null; method: 'ewma_uncoupled' | 'ra_coupled'; shortHistory: boolean } {
+  const ewma = combatACWRUncoupled(dailyLoads);
+  if (ewma) return { report: ewma, method: 'ewma_uncoupled', shortHistory: false };
+  const ra = combatACWRFromLoads(dailyLoads);
+  return { report: ra, method: 'ra_coupled', shortHistory: true };
+}
+
 // VBT velocity zones (по %1RM) — Vitruve
 const VBT_ZONES: Array<{ pct: [number, number]; velocity: [number, number]; quality: string }> = [
   { pct: [90, 100], velocity: [0.15, 0.35], quality: 'max_strength' },
@@ -121,6 +179,29 @@ export function combatHrvReport(): { grade:'optimal'|'caution'|'dangerous'; note
   if (!h) return null;
   const g = hrvGrade(h.last, h.mean, h.sd);
   return { ...g, mean: Math.round(h.mean), sd: Math.round(h.sd), last: h.last };
+}
+
+/**
+ * P6: честный HRV-отчёт с источником. Один замер → optimal условно с пометкой
+ * «ведите 7+ дней» (раньше — молчаливый null, UI ничего не показывал).
+ */
+export function combatHrvReportWithSource(): {
+  grade: 'optimal' | 'caution' | 'dangerous'; note: string; mean: number; sd: number; last: number;
+  source: 'history' | 'single';
+} | null {
+  const hist = loadHrvHistory();
+  const h = hrvFromHistory(hist);
+  if (h) {
+    const g = hrvGrade(h.last, h.mean, h.sd);
+    return { ...g, mean: Math.round(h.mean), sd: Math.round(h.sd), last: h.last, source: 'history' };
+  }
+  if (hist.length === 1) {
+    return {
+      grade: 'optimal', note: 'HRV один замер — оптимально условно, ведите 7+ дней для тренда',
+      mean: hist[0], sd: 8, last: hist[0], source: 'single',
+    };
+  }
+  return null;
 }
 
 // P3: EWMA для HRV — устойчивее к выбросам (alpha 0.3)

@@ -25,7 +25,7 @@ import { femaleCutTempoDefault, femaleCombatNotes, travelPoolFilter, travelVolum
 import { isExcludeInjuryCB } from './combat-selection';
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import { COMBAT_LANDMARKS } from './combat-volume';
-import { vbtRecommendationCombat, vbtHistoryForLift, vbtEwma, diagnoseVelocityLossCombat } from './combat-vbt.engine';
+import { vbtRecommendationCombat, vbtHistoryForLift, vbtEwma, diagnoseVelocityLossCombat, vbtTrendForLift, atrTransitionHintForTrend, combatLossThresholdForGoal } from './combat-vbt.engine';
 import type { VbtHistoryEntry } from './combat-vbt.engine';
 import { coreWeeklyPlan } from './combat-core.engine';
 import { neckWeeklyPlan, NECK_IDS } from './combat-neck.engine';
@@ -400,6 +400,16 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     rationale.push(`Тапер-сплит fight week: зал ×${splitEx.sc} · кондиция ×${splitEx.cond} · hard spar ×${splitEx.sparringHard} (интенсивность 90–95%, частота та же) · рекомендовано ${recTw}нед от объёма ${daysPerWeek + outsideSessions}×/нед`);
   }
   if ((input as any).conditioningMode !== 'off') rationale.push(...buildConditioningRationale(goal, outsideSessions, weeks));
+  // P6: MCV-критерий перехода ATR — EWMA-тренд скорости по штанговым лифтам (баллистика не калибрована — скип)
+  if (Array.isArray(input.vbtHistory) && (input.vbtHistory as unknown[]).length >= 6) {
+    try {
+      for (const lift of ['squat', 'bench_bar', 'row_bar']) {
+        const t = vbtTrendForLift(input.vbtHistory as VbtHistoryEntry[], lift);
+        const hint = atrTransitionHintForTrend(lift, t.changePct);
+        if (hint) rationale.push(hint);
+      }
+    } catch { /* no-op */ }
+  }
 
   const weeksData: CombatWeek[] = [];
   // periodization model: atr_10 для >=9 нед, иначе linear; camp → camp_8; conjugate явный
@@ -525,7 +535,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
             if (vels.length >= 2) {
               const best = Math.max(...vels.slice(-7, -1));
               const last = vels[vels.length-1];
-              const d = diagnoseVelocityLossCombat(best, last, 20, weight, id);
+              // P6: порог по цели (power/camp 20, endurance 30), а не дефолт 20 везде
+              const d = diagnoseVelocityLossCombat(best, last, combatLossThresholdForGoal(goal), weight, id);
               if (d.lossPct > 15) vLossEffective = d.lossPct;
             }
           } catch {}

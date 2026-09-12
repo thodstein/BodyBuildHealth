@@ -152,3 +152,38 @@ export async function getDiaryTrendCBAsync(): Promise<DiaryTrendCB[] | null> {
   const logs = await loadDiaryLogsCBAsync();
   return buildDiaryTrendCB(logs);
 }
+
+// ── P6: per-exercise индекс (порт bb-progression-feedback buildLastResultIndex):
+// лучший e1RM за 28д по каждому упражнению. Мезоцикл читает его для покрытия,
+// веса не меняет (без выдуманной математики — только покрытие + summary). ──
+export interface CombatLastResultEntry { exerciseId: string; e1rm: number; date: string; sets: number }
+
+function epleyForEntry(weight: number, reps: number): number {
+  return weight * (1 + reps / 30);
+}
+
+/** Лучший e1RM за последние 28 дней по каждому exerciseId (Epley; записи старше — игнор). */
+export function combatLastResultIndex(logs: any[]): Record<string, CombatLastResultEntry> {
+  const out: Record<string, CombatLastResultEntry> = {};
+  if (!Array.isArray(logs) || logs.length === 0) return out;
+  const now = Date.now();
+  const dayMs = 24 * 3600 * 1000;
+  for (const e of logs) {
+    const id = String(e.exerciseId || e.exerciseName || e.name || '').toLowerCase();
+    if (!id || !Array.isArray(e.sets) || e.sets.length === 0) continue;
+    const t = new Date(String(e.date || '')).getTime();
+    if (!Number.isFinite(t) || now - t < 0 || now - t > 28 * dayMs) continue;
+    let best = 0;
+    for (const s of e.sets as any[]) {
+      const w = Number(s.weight) || 0;
+      const r = Number(s.reps) || 0;
+      if (w > 0 && r > 0) best = Math.max(best, epleyForEntry(w, r));
+    }
+    if (best <= 0) continue;
+    const prev = out[id];
+    if (!prev || best > prev.e1rm) {
+      out[id] = { exerciseId: id, e1rm: Math.round(best * 10) / 10, date: String(e.date || '').slice(0, 10), sets: (e.sets as any[]).length };
+    }
+  }
+  return out;
+}

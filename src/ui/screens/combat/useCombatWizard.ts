@@ -7,7 +7,7 @@ import { useState, useMemo, useEffect } from 'react';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { defaultOutsideLoadFor, computeOutsideMetrics } from '../../../engines/outside-load.engine';
-import { combatACWR, combatHrvReport } from '../../../engines/combat/combat-monitoring.engine';
+import { combatACWR, combatACWRHonest, combatHrvReport, combatHrvReportWithSource } from '../../../engines/combat/combat-monitoring.engine';
 import { loadVbtHistoryCB } from '../../../engines/combat/combat-vbt.engine';
 import type { VbtHistoryEntry } from '../../../engines/combat/combat-vbt.engine';
 import { loadAnnualCB } from '../../../engines/combat/combat-annual';
@@ -54,7 +54,7 @@ export function useCombatWizard() {
   const [fightDate, setFightDate] = useState('');
   const [taperWeeks, setTaperWeeks] = useState(2);
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0,10));
-  const [acwr, setAcwr] = useState<{ ratio:number; zone:string }|null>(null);
+  const [acwr, setAcwr] = useState<{ ratio:number; zone:string; method?: 'ewma_uncoupled' | 'ra_coupled'; shortHistory?: boolean }|null>(null);
   const [velocityLoss, setVelocityLoss] = useState(0);
   const [vbtBest, setVbtBest] = useState(0);
   const [vbtLast, setVbtLast] = useState(0);
@@ -95,20 +95,26 @@ export function useCombatWizard() {
         const week = arr.slice(-7).reduce((a:any, s:any)=> a + (s.load || s.sRPE || s.rpe || 0), 0);
         setDiaryLoad(week);
         try{
+          // P6: честный ACWR — EWMA-uncoupled при ≥14д, иначе RA-coupled с пометкой (одна шкала sRPE×мин)
           const daily: Record<string, number> = {};
           for(const s of arr){ const d=(s.date||'').slice(0,10); if(d) daily[d]=(daily[d]||0)+(s.load||s.sRPE||s.rpe||0); }
           const vals = Object.values(daily).slice(-28);
-          if(vals.length>=14){
-            const acute = vals.slice(-7).reduce((a,c)=>a+c,0)/7;
-            const chronic = vals.reduce((a,c)=>a+c,0)/vals.length;
-            const r = combatACWR(acute*7, chronic*7);
-            setAcwr({ ratio: r.ratio, zone: r.zone });
+          if(vals.length>=7){
+            const h = combatACWRHonest(vals);
+            if (h.report) setAcwr({ ratio: h.report.ratio, zone: h.report.zone, method: h.method, shortHistory: h.shortHistory });
+            else {
+              const acute = vals.slice(-7).reduce((a,c)=>a+c,0)/7;
+              const chronic = vals.reduce((a,c)=>a+c,0)/vals.length;
+              const r = combatACWR(acute*7, chronic*7);
+              setAcwr({ ratio: r.ratio, zone: r.zone, method: 'ra_coupled', shortHistory: true });
+            }
           }
         }catch{}
       }
       try{
-        const h = combatHrvReport();
-        if(h) setHrvLine(`HRV ${h.last}мс (ср ${h.mean}±${h.sd}) — ${h.grade}: ${h.note}`);
+        // P6: HRV с источником — один замер честно помечен, а не молчаливый null
+        const h = combatHrvReportWithSource() || combatHrvReport();
+        if(h) setHrvLine(`HRV ${h.last}мс (ср ${h.mean}±${h.sd}) — ${h.grade}: ${h.note}${(h as any).source === 'single' ? ' (1 замер)' : ''}`);
         else setHrvLine(null);
       }catch{ setHrvLine(null); }
       try{

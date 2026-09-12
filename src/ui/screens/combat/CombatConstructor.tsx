@@ -376,6 +376,13 @@ export const CombatConstructor: React.FC = () => {
       if (!trend) try { trend = getDiaryTrendCB(); } catch {}
       if (trend && trend.length) (input as any).diaryTrendCB = trend;
     } catch {}
+    // P6: per-exercise индекс (лучший e1RM 28д) — мезоцикл читает покрытие, веса не меняет
+    try {
+      const { combatLastResultIndex, loadDiaryLogsCBAsync } = await import('../../../engines/combat/combat-diary.engine');
+      const logs = await loadDiaryLogsCBAsync();
+      const idx = combatLastResultIndex(logs || []);
+      if (idx && Object.keys(idx).length) (input as any).diaryLastResultIndex = idx;
+    } catch {}
     try { const prev = loadCombatPlans()[0]; if (prev) input = applyCombatMesocycle(prev, input) as any; } catch {}
     let p = buildCombatPlan(input);
     p = finalizeCombatPlan(p);
@@ -753,7 +760,7 @@ export const CombatConstructor: React.FC = () => {
               )}
               {acwr && (
                 <InfoBanner tone={acwr.zone === 'dangerous' ? 'warn' : acwr.zone === 'caution' ? 'warn' : 'ok'}>
-                  ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone === 'dangerous' ? '— объём ×0.60, RIR+2' : acwr.zone === 'caution' ? '— ×0.85, RIR+1' : acwr.zone === 'undertrained' ? '— добавить объём' : '— оптимум'} · дневник sRPE 28д
+                   ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone === 'dangerous' ? '— объём ×0.60, RIR+2' : acwr.zone === 'caution' ? '— ×0.85, RIR+1' : acwr.zone === 'undertrained' ? '— добавить объём' : '— оптимум'} · {(acwr as any).method === 'ewma_uncoupled' ? 'EWMA-uncoupled' : 'RA (мало данных)'} · дневник sRPE 28д
                 </InfoBanner>
               )}
               {hrvLine && <InfoBanner tone={hrvLine.includes('dangerous') ? 'warn' : hrvLine.includes('caution') ? 'warn' : 'ok'}>{hrvLine}</InfoBanner>}

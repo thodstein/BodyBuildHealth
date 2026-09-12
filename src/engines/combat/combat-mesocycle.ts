@@ -65,5 +65,11 @@ export function combatMesocycleSummary(prev: CombatPlan | null, next: CombatInpu
   const nEx = (next as any).workMaxByExercise || {};
   for (const k of Object.keys(pEx)) if (pEx[k] !== nEx[k]) lines.push(`${k}: ${pEx[k]} → ${nEx[k]} кг`);
   if (lines.length === 1) lines.push('Веса сохранены (weight_cut/ACWR caution — без бампа)');
+  // P6: per-exercise покрытие дневника (без смены весов — только видимость)
+  const idx = (next as any).diaryLastResultIndex as Record<string, { e1rm: number }> | undefined;
+  if (idx && typeof idx === 'object') {
+    const keys = Object.keys(idx);
+    if (keys.length) lines.push(`Дневник per-exercise: ${keys.length} упр. с e1RM за 28д (${keys.slice(0, 4).join(', ')}${keys.length > 4 ? '…' : ''})`);
+  }
   return lines;
 }

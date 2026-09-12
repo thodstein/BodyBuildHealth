@@ -16,42 +16,59 @@ import {
 
 export type CombatLiftId = string;
 
-function mapCombatLift(id: string): VBTLift {
+/**
+ * P6: честный маппинг. Баллистика (медболы/кувалда/канаты/прыжки/мах) — null
+ * (нет калибровки кривой «скорость-%1RM» для ударов; калибровать жимом/приседом — врать).
+ * Неизвестное — null, а не молчаливый squat.
+ */
+const BALLISTIC_RE = /med_ball|sledge|battle_rope|box_jump|depth_jump|broad_jump|kb_swing|throw|slam/i;
+
+export function isCombatLiftCalibrated(id: string | null | undefined): boolean {
+  return mapCombatLift(id || '') !== null;
+}
+
+function mapCombatLift(id: string): VBTLift | null {
   const low = id.toLowerCase();
-  // ротационные/взрывные — скорость выше, ближе к жиму/скоростно-силовой (1.0-1.6м/с), не присед 0.30
-  if (low.includes('landmine_rotation') || low.includes('landmine_180') || low.includes('med_ball_rot') || low.includes('med_ball_throw') || low.includes('med_ball_slam') || low.includes('sledge') || low.includes('battle_rope')) return 'bench';
+  if (BALLISTIC_RE.test(low)) return null;
+  if (low.includes('landmine_rotation') || low.includes('landmine_180')) return null;
   if (low.includes('bench') || low.includes('ohp') || low.includes('push_press') || low.includes('landmine_press')) return 'bench';
-  if (low.includes('squat') || low.includes('lunge') || low.includes('step_up') || low.includes('jump')) return 'squat';
+  if (low.includes('squat') || low.includes('lunge') || low.includes('step_up')) return 'squat';
   if (low.includes('dead') || low.includes('rdl') || low.includes('trap_bar') || low.includes('pull') || low.includes('row')) return 'deadlift';
   if (low.includes('press')) return 'bench';
-  return 'squat';
+  return null;
 }
 
 export function velocityForCombat(pct1RM: number, liftId?: string): number {
-  const lift = mapCombatLift(liftId || 'squat');
+  // liftId не передан — legacy generic (squat-кривая, как раньше); явный id — честный маппинг (null → NaN)
+  const lift = mapCombatLift(liftId == null ? 'squat' : liftId);
+  if (!lift) return NaN;
   return baseVelocityForPct(lift, pct1RM);
 }
 
 export function estimate1RMFromVelocityCombat(weight: number, velocity: number, liftId?: string): number {
-  const lift = mapCombatLift(liftId || 'squat');
+  const lift = mapCombatLift(liftId == null ? 'squat' : liftId);
+  if (!lift) return 0;
   if (velocity <= 0 || weight <= 0) return 0;
   return baseEstimate(lift, velocity, weight).e1RM || 0;
 }
 
 export function diagnoseVelocityLossCombat(bestVel: number, lastVel: number, threshold: 20 | 10 | 25 | 40 = 20, weight?: number, liftId?: string): {
-  lossPct: number; zone: string; exceeded: boolean; e1RMByVelocity: number | null; recommendation: string;
+  lossPct: number; zone: string; exceeded: boolean; e1RMByVelocity: number | null; recommendation: string; calibrated: boolean;
 } {
   const vl = baseVelocityLoss([bestVel, lastVel], threshold as any);
   const lossPct = vl?.lossPct ?? 0;
   const exceeded = !!vl?.exceeded;
   const zone = baseZone(lossPct);
-  const e1RMByVelocity = weight && weight > 0 && lastVel > 0 ? estimate1RMFromVelocityCombat(weight, lastVel, liftId) : null;
+  // liftId не передан — legacy generic (squat, как раньше); явный id — честный маппинг
+  const calibrated = liftId == null ? true : isCombatLiftCalibrated(liftId);
+  const e1RMByVelocity = calibrated && weight && weight > 0 && lastVel > 0 ? estimate1RMFromVelocityCombat(weight, lastVel, liftId) : null;
   let rec = '';
   if (lossPct > 30) rec = 'Стоп сет — ЦНС устала';
   else if (lossPct > 25) rec = 'Снизьте вес 5%, RIR+1';
   else if (lossPct > 20) rec = 'RIR+1 — контроль';
   else rec = 'Оптимально — можно добавить сет';
-  return { lossPct, zone, exceeded, e1RMByVelocity, recommendation: rec };
+  if (!calibrated) rec = `Нет калибровки скорости для ${liftId || 'движения'} (баллистика) — loss ${lossPct}% ориентировочный, e1RM не считаем`;
+  return { lossPct, zone, exceeded, e1RMByVelocity, recommendation: rec, calibrated };
 }
 
 export function vbtRecommendationCombat(lossPct: number): { action: string; rirAdd: number; volumeMult: number } {
@@ -108,8 +125,29 @@ export function vbtEwma(velocities: number[], alpha = 0.3): number | null {
 }
 
 export function vbtHistoryForLift(history: VbtHistoryEntry[], liftId: string): number[] {
-  const low = (liftId||'').toLowerCase();
-  return history.filter(e => e.liftId.toLowerCase()===low || e.liftId.toLowerCase().includes(low) || low.includes(e.liftId.toLowerCase())).map(e=> e.velocity);
+  // P6: точный матч по id (lowercase). Двусторонний includes врал: row ловил battle_rope, press — всё.
+  const low = (liftId || '').toLowerCase();
+  return history.filter(e => (e.liftId || '').toLowerCase() === low).map(e => e.velocity);
+}
+
+/**
+ * P6: порог потери по цели (вместо дефолта 20 везде):
+ * power/camp — 20 (сила, жёстко), endurance — 30 (терпит), остальное — 25.
+ */
+export function combatLossThresholdForGoal(goal: string | null | undefined): 20 | 25 | 30 {
+  if (goal === 'endurance') return 30;
+  if (goal === 'power' || goal === 'camp') return 20;
+  return 25;
+}
+
+/**
+ * P6: MCV-критерий перехода ATR (PoinT GO): EWMA-тренд скорости ≥+5% к прошлому блоку
+ * подтверждает адаптацию для Transmutation. Возвращает hint-строку или null.
+ */
+export function atrTransitionHintForTrend(liftId: string, changePct: number | null): string | null {
+  if (typeof changePct !== 'number' || !Number.isFinite(changePct)) return null;
+  if (changePct >= 5) return `VBT ${liftId} +${changePct}% — адаптация подтверждает переход к Transmutation (MCV-критерий +5%)`;
+  return null;
 }
 
 export function diagnoseVelocityLossEwma(bestVel: number, history: number[]|VbtHistoryEntry[], liftId?: string, threshold: 20|10|25|40 = 20, weight?: number): { lossPct: number; zone: string; exceeded: boolean; e1RMByVelocity: number | null; ewma: number | null; recommendation: string } {
