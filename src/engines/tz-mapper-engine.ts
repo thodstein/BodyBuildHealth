@@ -71,6 +71,7 @@ import {
 import { assessPedRisk, type PedRiskAssessment } from './ped-risk-matrix';
 import { buildAssayWarningsFromDb } from '../data/assay-interference-db';
 import { getSubstanceMonitoring } from '../data/substance-monitoring-db';
+import { addonsFor, isInjectableCourse, isLongEsterHalfLife } from './support-phase-labs.engine';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 import { canonId, sameClassIds } from './support-plan/shared-constants';
 import { getPrioritySubstances, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
@@ -1190,7 +1191,7 @@ export interface MonitoringItemLine {
 }
 
 export interface MonitoringSection {
-  id: 'baseline' | 'daily' | 'week2' | 'week4' | 'week8' | 'week12' | 'post' | 'urgent';
+  id: 'baseline' | 'daily' | 'week2' | 'week4' | 'week8' | 'week12' | 'post' | 'urgent' | 'preanalytics';
   label: string;
   period: string;
   icon: string;
@@ -1379,6 +1380,102 @@ export function buildMonitoringSchedule(
     };
     const sec = sections.find(s => s.id === sm.freq);
     if (sec) sec.items.push(item);
+  }
+
+  // ── K-карточки фаз (support-phase-labs.engine, канон docs/SUPPORT-PHASE-LABS-PLAN.md) ──
+  // Строго аддитивно: существующие строки выше не меняются (контракты тестов).
+  try {
+    const peds = ctx.pedDoses || [];
+    const activeClasses: string[] = [];
+    for (const p of peds) {
+      const pid = (p as { id?: unknown })?.id;
+      const pcl = (p as { pClass?: unknown })?.pClass;
+      if (typeof pid === 'string' && pid) activeClasses.push(pid);
+      if (typeof pcl === 'string' && pcl) activeClasses.push(pcl);
+    }
+    for (const pid of planIdSet) activeClasses.push(pid);
+    const secById = (id: MonitoringSection['id']) => sections.find(s => s.id === id);
+    const onPed = flags.hasAAS || flags.hasSarm || flags.hasGH || flags.hasInsulin || flags.hasIGF;
+    // Аддоны классов → в секции их карточек (K1→week2, K2→week4, K3→week8/week12, K5/K4/K7→week8, K6→post)
+    const cardToSection: Record<string, MonitoringSection['id'][]> = {
+      K1: ['week2'], K2: ['week4'], K3: ['week8', 'week12'],
+      K4: ['week8'], K5: ['week8'], K6: ['post'], K7: ['week8'],
+    };
+    for (const a of addonsFor(activeClasses)) {
+      for (const cardId of a.attachTo) {
+        const targets = cardToSection[cardId] || ['post'];
+        const dst = targets.map(secById).find(Boolean) || secById('post') || secById('baseline');
+        if (!dst) continue;
+        for (const item of a.items) {
+          const marker = `[${a.label}] ${item.marker}`;
+          if (dst.items.some(i => i.marker === marker)) continue;
+          dst.items.push({
+            marker,
+            reason: `${item.why || 'Аддон класса'} (карточка ${cardId})`,
+            target: item.target,
+            drug: a.key,
+            escalation: item.red,
+          });
+        }
+      }
+    }
+    // Hcy/АпоВ/hs-CRP/Лп(a) в baseline (K0) — главный гэп §7.1 плана
+    const base = secById('baseline');
+    if (base && onPed) {
+      const pushBase = (marker: string, reason: string, target?: string, escalation?: string) => {
+        if (base.items.some(i => i.marker === marker)) return;
+        base.items.push({ marker, reason, target, escalation });
+      };
+      pushBase('Гомоцистеин + B12 + фолат', 'Метилирование: ААС ↑Hcy (Graham BJSM 2006)', 'Hcy<10 мкмоль/л', 'Hcy>15 — B-триада + TMG 1000; >30 — срочно врач');
+      pushBase('АпоВ', 'Атерогенность точнее LDL (ESC/EAS, NLA)', 'АпоВ<80/<65', '≥130 — риск-энхансер');
+      pushBase('Лп(a) — один раз в жизни', 'Генетический риск, стабилен', '<50 мг/дл', '≥50 — риск-энхансер, не повторять');
+      pushBase('hs-CRP', 'Системное воспаление (JUPITER)', '<1 оптимум', '>3 — персистирующее воспаление');
+      pushBase('Электролиты: добавить Cl⁻/CO₂', 'CMP-стандарт к Na/K/Mg/Ca', undefined, undefined);
+      if (isInjectableCourse(peds, flags)) {
+        pushBase('BBV: HIV + HBsAg/anti-HBs + anti-HCV + вакцинация HBV', 'Инъекционный курс (NICE PH52, WHO 2022)', 'Ежегодно; вакцина 0–1–6 мес', 'Позитив — инфекционист');
+      }
+    }
+    // Mg при клене (нед 2), DHT при DHT-инъектах (нед 4)
+    const w2 = secById('week2');
+    if (w2 && flags.hasClenbut && !w2.items.some(i => i.marker.includes('Mg²⁺ (клен)'))) {
+      w2.items.push({ marker: 'Mg²⁺ (кленбутерол)', reason: 'Клен вымывает Mg (судороги/аритмии)', target: 'Mg 0.75–1.0 ммоль/л' });
+    }
+    const w4 = secById('week4');
+    if (w4 && flags.hasDhtInject && !w4.items.some(i => i.marker.includes('DHT'))) {
+      w4.items.push({ marker: 'DHT-симптомы + PSA (DHT-производные)', reason: 'Андрогенная нагрузка мастерона/DHT', target: 'DHT — верх нормы, в ноль не давить', drug: 'dht' });
+    }
+    // Hcy/АпоВ/hs-CRP на длинном курсе (нед 8), кортизол + PCT-ветвление в post
+    const w8 = secById('week8');
+    if (w8 && onPed) {
+      if (!w8.items.some(i => i.marker.includes('Гомоцистеин (контроль)'))) {
+        w8.items.push({ marker: 'Гомоцистеин (контроль) + B12/фолат', reason: 'Динамика метилирования на длинном курсе', target: 'Hcy<10', escalation: 'Hcy>15 — B-триада + TMG' });
+      }
+      if (!w8.items.some(i => i.marker.includes('АпоВ (контроль)'))) {
+        w8.items.push({ marker: 'АпоВ (контроль) + hs-CRP', reason: 'Динамика атерогенного риска', target: 'АпоВ<80/<65, hsCRP<3' });
+      }
+    }
+    const post = secById('post');
+    if (post && phase === 'pct') {
+      if (!post.items.some(i => i.marker.includes('Кортизол (выход)'))) {
+        post.items.push({ marker: 'Кортизол (выход, утро)', reason: 'Перетрен/восстановление HPA', target: '140–690 нмоль/л' });
+      }
+      const longEster = isLongEsterHalfLife(ctx.phaseCtx?.esterHalfLifeHours);
+      const pctNote = longEster
+        ? 'Длинные эфиры → hCG-bridge 500–1000 МЕ 2×/нед × 2–3 нед → затем SERM (карточка K6)'
+        : 'Короткие эфиры → SERM сразу (тамоксифен 20 мг ИЛИ энкломифен 12.5–25 мг ИЛИ кломифен 25–50 мг; карточка K6)';
+      if (!post.items.some(i => i.marker.includes('PCT-ветвление'))) {
+        post.items.push({ marker: 'PCT-ветвление по эфирам', reason: pctNote, drug: 'pct' });
+      }
+    }
+    // Преаналитика K9 — всегда (ошибки сдачи ломают любые анализы)
+    add('preanalytics', 'Преаналитика и тайминг', 'перед каждой сдачей', '🧫', [
+      { marker: '7 дней без тяжелых тренировок перед АЛТ/АСТ/КФК', reason: 'Мышцы дают трансаминазы (JFMPС 2023)' },
+      { marker: 'Биотин-стоп: 8 ч при ≤10 мг/сут, ≥72 ч при мегадозах', reason: 'Иначе ложные ТТГ/PRL/тропонин (JAMA 2017, FDA)' },
+      { marker: 'Утро натощак (T/LH/FSH/глюкоза); T — два замера; E2 — чувств. метод', reason: 'Циркадность и точность (Rosner 2013)' },
+      { marker: 'T на курсе — в trough; креатинин у мышечных → цистатин C', reason: 'Сравнимость и NICE NG203' },
+    ]);
+  } catch {
+    // мониторинг не должен ронять план
   }
 
   return sections;

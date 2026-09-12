@@ -44,6 +44,7 @@ import { checkNotifications, type NotificationRule } from '../../../engines/noti
 import { computeOverdueSystems, type SystemOverdue } from '../../../engines/labs-overdue';
 import { LabsDueBanner } from './LabsDueBanner';
 import { getSupportPlanQueueIds, readSupportPlanQueue, removeFromSupportPlanQueue, deleteFavRecommendation } from '../../../engines/training-plan-save.engine';
+import { CalcPhaseLabCards } from './CalcPhaseLabCards';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -3200,6 +3201,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                       ))}
                     </div>
                   ))}
+
+                  {/* ── Карточки анализов по фазам K0–K10 (единый движок support-phase-labs) ── */}
+                  <CalcPhaseLabCards
+                    phase={((finalRec as any)?.phase || 'course') as PhaseKey}
+                    flags={((finalRec as any)?.pedFlags || null) as any}
+                    peds={((((ctx as any)?.pedDoses || (ctx as any)?.aasIds?.map((id: string) => ({ id })) || []) as any[]))}
+                    subs={(((finalRec as any)?.subs || []).map((s: any) => s?.substanceId) as string[])}
+                    esterHalfLifeHours={(ctx as any)?.phaseCtx?.esterHalfLifeHours}
+                  />
 
                   {/* Персональный список маркеров (привязка к веществам плана) */}
                   <div style={{ padding:'6px 7px', borderRadius:6, background:'rgba(96,165,250,0.10)', border:'1px solid rgba(96,165,250,0.18)', marginBottom:4 }}>
