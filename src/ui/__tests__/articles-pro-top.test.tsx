@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/react';
-import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds, highlightMatch } from '../screens/ArticlesScreen';
+import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds, highlightMatch, rankRecommended } from '../screens/ArticlesScreen';
+import { ARTICLES_MANIFEST } from '../../data/articles-manifest';
 import { resetAppPlatformCache } from '../../core/app-platform';
 
 beforeEach(() => {
@@ -425,6 +426,32 @@ describe('ArticlesScreen PRO TOP', () => {
   it('33. hero считает категории из каталога', () => {
     const { container } = render(<ArticlesScreen />);
     expect(container.textContent).toContain('5 категорий');
+  });
+
+  it('34. rankRecommended: своя категория и непрочитанное — вверх', () => {
+    const base = [...ARTICLES_MANIFEST].sort((a, b) => b.date.localeCompare(a.date));
+    expect(rankRecommended(base, []).map(a => a.id)).toEqual(base.map(a => a.id));
+    const ranked = rankRecommended(base, ['lab-guide-course']);
+    expect(ranked[0].id).toBe('gid-po-analizam');
+    expect(ranked[1].id).toBe('lab-biomarkers-guide');
+    // прочитанное — ниже непрочитанного той же категории
+    expect(ranked.findIndex(a => a.id === 'lab-guide-course')).toBeGreaterThan(1);
+  });
+
+  it('35. раздел «Рекомендуемое» строится по недавним', () => {
+    localStorage.setItem('he_articles_recent_v1', JSON.stringify(['lab-guide-course']));
+    const { container } = render(<ArticlesScreen />);
+    const card = container.querySelector('.articles-hero-card[data-id="recommended"]') as HTMLElement;
+    fireEvent.click(card);
+    expect(container.querySelector('.articles-list-title')?.textContent).toContain('Рекомендуемое');
+    expect(container.querySelector('.articles-featured')?.textContent).toContain('Гид по анализам');
+  });
+
+  it('36. без истории «Рекомендуемое» — свежие сверху', () => {
+    const { container } = render(<ArticlesScreen />);
+    const card = container.querySelector('.articles-hero-card[data-id="recommended"]') as HTMLElement;
+    fireEvent.click(card);
+    expect(container.querySelector('.articles-featured')?.textContent).toContain('Тренболон');
   });
 
   it('6. PDF-карточка зовёт читать внутри', () => {

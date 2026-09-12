@@ -99,7 +99,7 @@ const CATEGORIES = [
 
 const ARTICLE_SECTIONS: { id: string; icon: NativeIconName; title: string; desc: string; color: string }[] = [
   { id: 'new', icon: 'zap', title: 'Новые статьи', desc: 'Последние добавленные', color: '#00e68a' },
-  { id: 'recommended', icon: 'star', title: 'Рекомендуемое', desc: 'Популярные и избранные', color: '#3b82f6' },
+  { id: 'recommended', icon: 'star', title: 'Рекомендуемое', desc: 'Подборка под ваши темы', color: '#3b82f6' },
   { id: 'all', icon: 'bookOpen', title: 'Все статьи', desc: 'Полная библиотека', color: '#8b5cf6' },
 ];
 
@@ -151,6 +151,26 @@ export function extractArticleToc(md: string): { id: string; title: string }[] {
     i += 1;
   }
   return out;
+}
+
+/**
+ * Честное «Рекомендуемое»: без бэкенда популярности не выдумываем —
+ * ранжируем по недавнему чтению (та же категория +2, непрочитанное +1),
+ * ties держат исходный порядок (свежие сверху). Без истории — как было.
+ */
+export function rankRecommended(list: ArticleManifestEntry[], recentIds: string[]): ArticleManifestEntry[] {
+  if (recentIds.length === 0) return list;
+  const cats = new Set(
+    recentIds
+      .map(id => ARTICLES_MANIFEST.find(a => a.id === id)?.category)
+      .filter((c): c is ArticleManifestEntry['category'] => Boolean(c)),
+  );
+  const read = new Set(recentIds);
+  return [...list].sort((a, b) => {
+    const sa = (cats.has(a.category) ? 2 : 0) + (read.has(a.id) ? 0 : 1);
+    const sb = (cats.has(b.category) ? 2 : 0) + (read.has(b.id) ? 0 : 1);
+    return sb - sa;
+  });
 }
 
 export function highlightMatch(text: string, q: string): React.ReactNode {
@@ -348,6 +368,7 @@ export const ArticlesScreen: React.FC = () => {
   const articles = useMemo(() => {
     let list = getSortedArticles();
     if (listSection === 'new') list = list.slice(0, 3);
+    else if (listSection === 'recommended') list = rankRecommended(list, recent);
     if (category === 'saved') list = list.filter(a => saved.includes(a.id));
     else if (category !== 'all') list = list.filter(a => a.category === category);
     if (search.trim()) {
@@ -362,7 +383,7 @@ export const ArticlesScreen: React.FC = () => {
     // Сортировка: в «Новых» всегда свежие сверху по определению, иначе — по переключателю.
     if (sortDir === 'asc' && listSection !== 'new') list = [...list].reverse();
     return list;
-  }, [category, search, listSection, saved, sortDir]);
+  }, [category, search, listSection, saved, sortDir, recent]);
 
   const openPDFExternal = (url: string) => {
     const tg = (window as any).Telegram?.WebApp;
@@ -840,9 +861,9 @@ export const ArticlesScreen: React.FC = () => {
           <div className="articles-list-title" style={{ margin:'2px 0 10px', display:'flex', alignItems:'center', gap:8 }}>
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontSize:17, fontWeight:900, color:'#fff', letterSpacing:'-0.02em', lineHeight:1.2 }}>{title}</div>
-              <div style={{ fontSize:12, color:'#fff', opacity:0.75, marginTop:2 }}>
-                {catLabel ? `${catLabel} · ` : ''}{articles.length} ст.{listSection === 'new' && category === 'all' ? ' · свежие сверху' : ''}
-              </div>
+            <div style={{ fontSize:12, color:'#fff', opacity:0.75, marginTop:2 }}>
+              {catLabel ? `${catLabel} · ` : ''}{articles.length} ст.{listSection === 'new' && category === 'all' ? ' · свежие сверху' : ''}{listSection === 'recommended' && recent.length > 0 ? ' · под ваши темы' : ''}
+            </div>
             </div>
             {listSection !== 'new' && (
               <button onClick={() => setSortDir(d => (d === 'desc' ? 'asc' : 'desc'))}
