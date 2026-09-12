@@ -730,7 +730,22 @@ export const CombatConstructor: React.FC = () => {
                 ]} />
                 <CombatPopupNumber label="Вес тела" value={bodyweight} min={40} max={140} suffix="кг" onChange={v=> setBodyweight(v)} />
                 <CombatPopupNumber label="Возраст" value={age} min={14} max={65} onChange={v=> setAge(v)} />
+                <CombatPopupNumber label="Сотрясения за 12 мес" value={concussionHistory} min={0} max={9} onChange={v=> setConcussionHistory(v)} />
               </div>
+              {age <= 15 && (
+                <InfoBanner tone="warn">Подросток 14–15: только изометрия шеи (мост/динамика/плио/сани убраны), hard spar запрещён, весогонка-манипуляции запрещены — только gradual под врачом</InfoBanner>
+              )}
+              {concussionHistory >= 2 && (
+                <InfoBanner tone="warn">⛔ Сотрясения ×{concussionHistory} за 12 мес — сборка заблокирована до врача (return-протокол: покой → аэробка → тех-работа → спарринг)</InfoBanner>
+              )}
+              {concussionHistory === 1 && (
+                <InfoBanner tone="warn">1 сотрясение за 12 мес — лимиты: hard spar ≤1×, шея ≥L2, flex/ext ≤0.74</InfoBanner>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <CombatPopupNumber label="Экстензия шеи" value={neckExtensionKg} min={0} max={120} suffix="кг" onChange={v=> setNeckExtensionKg(v)} />
+                <CombatPopupNumber label="Шея flex/ext" value={neckFlexExtRatio} min={0} max={2} step={0.01} onChange={v=> setNeckFlexExtRatio(v)} />
+              </div>
+              <div style={{ fontSize: 10.5, color: '#fff' }}>Cutoff экстензии 3.71 N/кг (≈{(bodyweight * 0.378).toFixed(1)}кг при {bodyweight}кг) · flex/ext &gt;0.74 — риск ×3 (подростки регби 2024) · шея — модифицируемый фактор, не гарантия (JOSPT)</div>
               {acwr && (
                 <InfoBanner tone={acwr.zone === 'dangerous' ? 'warn' : acwr.zone === 'caution' ? 'warn' : 'ok'}>
                   ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone === 'dangerous' ? '— объём ×0.60, RIR+2' : acwr.zone === 'caution' ? '— ×0.85, RIR+1' : acwr.zone === 'undertrained' ? '— добавить объём' : '— оптимум'} · дневник sRPE 28д
@@ -1187,6 +1202,14 @@ export const CombatConstructor: React.FC = () => {
               </InfoBanner>
             )}
           </SectionCard>
+          {plan.validation?.errors?.length ? (
+            <div className="cb-errors" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.24)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>⛔ Сборка заблокирована ({plan.validation.errors.length}) — до врача/исправления</div>
+              {plan.validation.errors.map((e, i) => (
+                <div key={i} style={{ fontSize: 11, color: '#fff' }}>• {e}</div>
+              ))}
+            </div>
+          ) : null}
           {plan.validation?.warnings.map((w, i) => (
             <InfoBanner key={i} tone="warn">{w}</InfoBanner>
           ))}

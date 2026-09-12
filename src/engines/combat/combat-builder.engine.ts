@@ -19,6 +19,8 @@ import { applyCombatDUP } from './combat-dup';
 import { applyCombatIntensity } from './combat-intensity';
 import { weightForCombatExerciseResolved } from './combat-workmax';
 import { sparringToOutsideLoad, sparringWeeklyLoad, sparringSummary } from './combat-sparring.engine';
+import { teenCombatGates, hasWeightManipulation, neckExtensionCutoffKg, concussionProtocol, sparringSafetyErrors } from './combat-safety.engine';
+import { isExcludeInjuryCB } from './combat-selection';
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import { COMBAT_LANDMARKS } from './combat-volume';
 import { vbtRecommendationCombat, vbtHistoryForLift, vbtEwma, diagnoseVelocityLossCombat } from './combat-vbt.engine';
@@ -212,6 +214,11 @@ function filterPool(ids: string[], input: CombatInput): string[] {
   if (input.excludedExercises?.length) {
     const excl = new Set(input.excludedExercises.map(s => s.toLowerCase()));
     out = out.filter(id => !excl.has(id.toLowerCase()));
+  }
+  // P3 teen-гейт 14–15: только изометрия шеи, без моста/динамики/плио/саней (даже при явном уровне)
+  if (typeof input.age === 'number' && Number.isFinite(input.age) && input.age <= 15) {
+    const teen = teenCombatGates(input.age);
+    if (teen.bannedExerciseIds.length) out = out.filter(id => !teen.bannedExerciseIds.includes(id));
   }
   const eq = (input.equipment || []).map(s => String(s).toLowerCase());
   const hasCable = eq.includes('cable') || eq.includes('other') || eq.length===0;
@@ -788,6 +795,56 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         errors.push(`Fight week (нед ${fw}): ${fwSets} сетов >65% пика ${peak} — тапер недостаточен, срежьте объём (Bosquet −41…−60%)`);
       }
     }
+  }
+
+  // P3: teen-гейт + concussion-протокол + спарринг-гейты (мед-блок)
+  {
+    const hardSpar = (input.sparringLoad as any)?.hardSparSessions || 0;
+    const teen = teenCombatGates(input.age);
+    const manip = hasWeightManipulation(wcProtocol);
+    if (teen.isTeen) {
+      if (hardSpar > 0) errors.push('Подросток 14–15: hard spar запрещён — только technical/дриллинг');
+      if (manip) errors.push('Подросток 14–15: весогонка-манипуляции запрещены (вода-load / Na-срез / угле-слив / сауна)');
+      if (input.weightCutKg && input.weightCutKg > 0 && !manip) warnings.push('Подросток: любая сгонка — только gradual под врачом, без RWL (Frontiers 2025: RWL запрещён <18)');
+    }
+    const conc = concussionProtocol(input.concussionHistory);
+    if (conc.stage === 'blocked') {
+      errors.push(`Сотрясения ×${Math.round(input.concussionHistory || 0)} за 12 мес — сборка заблокирована до врача (return-протокол: покой → аэробка → тех-работа → спарринг)`);
+    } else if (conc.stage === 'limited' && hardSpar > conc.maxHardSpar) {
+      errors.push(`1 сотрясение за 12 мес: hard spar ${hardSpar}× > лимита ${conc.maxHardSpar}× — снизьте до technical`);
+    }
+    // flex/ext-баланс шеи (cutoff 0.74 — риск ×3)
+    if (typeof input.neckFlexExtRatio === 'number' && Number.isFinite(input.neckFlexExtRatio) && input.neckFlexExtRatio > 0) {
+      if (input.neckFlexExtRatio > 0.74) {
+        if (hardSpar > 0) errors.push(`Шея flex/ext ${input.neckFlexExtRatio.toFixed(2)} >0.74 (риск ×3) при hard spar — сначала экстензия`);
+        else warnings.push(`Шея flex/ext ${input.neckFlexExtRatio.toFixed(2)} >0.74 — добейте экстензию (cutoff подростков регби)`);
+      }
+    }
+    // измеренная экстензия vs cutoff 3.71 N/кг
+    const cutoff = neckExtensionCutoffKg(input.bodyweight);
+    if (cutoff != null && typeof input.neckExtensionKg === 'number' && input.neckExtensionKg > 0 && input.neckExtensionKg < cutoff) {
+      if (hardSpar > 0) errors.push(`Экстензия шеи ${input.neckExtensionKg}кг < cutoff ${cutoff}кг (3.71 N/кг) при hard spar — сначала сила шеи`);
+      else warnings.push(`Экстензия шеи ${input.neckExtensionKg}кг < cutoff ${cutoff}кг — приоритет экстензии (Collins −5%/0.45кг)`);
+    }
+    // спарринг-гейты к делоду/ACWR/HRV/шее/травме (fight-week покрыт P1 taper-split гейтом: tw1 error / tw2 warning)
+    const lmNeck = (COMBAT_LANDMARKS as any)[level]?.neck;
+    const mevNeck = lmNeck?.mev ?? 6;
+    const neckBelowMev = weeksData.some(wk => {
+      if (wk.deload || wk.taper) return false;
+      const ns = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('neck')).reduce((a, e) => a + e.sets, 0), 0);
+      return ns < mevNeck;
+    });
+    const hasExclude = Array.isArray(input.injuries) && input.injuries.some(isExcludeInjuryCB);
+    const hasDeloadWeek = weeksData.some(w => w.deload);
+    for (const e of sparringSafetyErrors(hardSpar, {
+      isFightWeek: false, // см. P1 taper-split гейт выше
+      isDeloadWeek: hasDeloadWeek,
+      isTaperWeek: false,
+      acwrZone: input.acwr?.zone ?? null,
+      hrvGrade: (input as any).hrvGrade ?? null,
+      neckBelowMev,
+      hasExcludeInjury: hasExclude,
+    })) errors.push(e);
   }
 
   const snap: any = { ...input, outsideLoad: effectiveOutsideLoad, weightCutProtocol: wcProtocol || (input as any).weightCutProtocol || null };
