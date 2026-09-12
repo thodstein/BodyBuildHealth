@@ -1,6 +1,11 @@
 # Стронг-планировщик PRO — аудит + план доработки (Sep 12 2026)
 
 > Статус: ВЫПОЛНЕНО кодом полностью P1–P7 + добивки (коммиты `f50ded8e`, `e648d6b5`, P6-чистка — pathspec, без пуша).
+> Добивка-4 (`fd17666e`): opener настоящий сингл + живой чек-ин + PRO-секция печати + PRO-ключи в cloud-touch + taperWeeks в год + lock-тесты моста + UI 4/4 + превью волны.
+> Добивка-5 (`3a93efb4`): opener первым сетом + DUP-гарды + edge-тест wave+cluster+finalize.
+> Добивка-6 (`7c6a0b80`, чужие зоны по разрешению): cloud `touchKvKeys` + маркеры экспорта в строках/ICS.
+> Добивка-7: WL-класс гейт (`weightClassForInput` — SM-шкала только стронгу) + кнопка «☁ В облако» в экспорте + sync no-throw тест.
+> Границы (by design): opener/RPE-cap/дедолы — только параметрический путь (cycle faithful = дословно); blockModel в annual не прокидывается (нет входа у annual-билдеров); wl/sm-экспорты и spec-ICS — снапшоты хабов, не планов.
 > Реализация: NEW `strength-sport-planner-pro.engine` + `strength-sport-planner-pro-build.test` + вшивка в types/taper/builder/wizard/Constructor.
 > Добивка-чистка: дубль `taperMultForWeek` удалён из planner-pro (канон — taper.engine), мёртвый `waveForWeek` удалён (волна живёт в applyDUP), `progHashOf` используется в Constructor.
 > Остатки осознанно (не делаем): D5-cloud/D7-год/D8-экспорты/D9-rationale (чужие зоны); opener — только строка плана; чекины — предложение делода кнопкой, не авто.

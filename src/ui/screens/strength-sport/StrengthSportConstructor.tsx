@@ -21,7 +21,7 @@ import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasT
 import { buildSpecProtocols } from './sm-bridge-intake';
 import type { WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
 import { injectSMWeakPoints } from '../../../engines/strength-sport/strength-sport-sm-injection.engine';
-import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
+import { saveStrengthSportPlan, loadStrengthSportPlans, syncStrengthSportToCloud } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, buildAnnualWithTaper, buildAnnualMultiPeak, saveAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
 import { saveUserProgram } from '../../../engines/user-program/program-store';
@@ -33,7 +33,7 @@ import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/str
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
 import { collectSsVelocityHistory } from './sm-bridge-intake';
-import { weightClassFor, weightClassLine, smWeightClassesFor, RPE_CAP_OPTIONS, SS_BLOCK_MODELS, DELOAD_VS_TAPER_NOTE, scoreCheckin, pushCheckin, loadCheckins, saveCheckins, progHashOf, autoDeloadEffective, type SsCheckin } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
+import { weightClassFor, weightClassLine, weightClassForInput, smWeightClassesFor, RPE_CAP_OPTIONS, SS_BLOCK_MODELS, DELOAD_VS_TAPER_NOTE, scoreCheckin, pushCheckin, loadCheckins, saveCheckins, progHashOf, autoDeloadEffective, type SsCheckin } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
 import { CARD_STRONG, CARD_HERO, ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, SELECT, TEXT_2, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, ProgressBar, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
 import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, STEP_PILL } from '../TrainingScreen_parts/training-ui';
 
@@ -207,7 +207,7 @@ export const StrengthSportConstructor: React.FC = () => {
       taperWeeks: goal==='peaking' ? taperWeeks : undefined,
       weakPoints: weakPoints.length ? weakPoints : undefined,
       // Planner PRO P1–P7 (дефолты движка = старое поведение)
-      weightClass: weightClass || weightClassFor(bodyweight, sex as any),
+      weightClass: weightClassForInput(mode, weightClass, bodyweight, sex as any),
       rpeCap,
       deadliftGrip,
       blockModel,
@@ -690,14 +690,14 @@ export const StrengthSportConstructor: React.FC = () => {
             <button onClick={pullFromProfile} style={{ ...BTN, flex:1 }}>⟡ Из профиля</button>
           </SectionCard>
 
-          <SectionCard icon="🏆" title="Стронг-PRO" subtitle="Класс · хват · RPE-cap · модель" collapsible defaultOpen={false} summary={`${weightClass || weightClassFor(bodyweight, sex as any)} · RPE≤${rpeCap} · ${blockModel}`}>
+          <SectionCard icon="🏆" title="Стронг-PRO" subtitle="Класс · хват · RPE-cap · модель" collapsible defaultOpen={false} summary={`${mode === 'strongman' ? (weightClass || weightClassFor(bodyweight, sex as any)) + ' · ' : ''}RPE≤${rpeCap} · ${blockModel}`}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              <StrengthPopupSelect label="Весовая" value={weightClass || weightClassFor(bodyweight, sex as any)} onChange={v=> setWeightClass(v)} options={[{id:'',label:`Авто (${weightClassFor(bodyweight, sex as any)})`}, ...smWeightClassesFor(sex as any).filter(c=>c.id!=='open').map(c=>({id:c.id,label:c.label})), {id:'open',label:'Open'}]} />
+              {mode === 'strongman' && <StrengthPopupSelect label="Весовая" value={weightClass || weightClassFor(bodyweight, sex as any)} onChange={v=> setWeightClass(v)} options={[{id:'',label:`Авто (${weightClassFor(bodyweight, sex as any)})`}, ...smWeightClassesFor(sex as any).filter(c=>c.id!=='open').map(c=>({id:c.id,label:c.label})), {id:'open',label:'Open'}]} />}
               <StrengthPopupSelect label="Хват становой" value={deadliftGrip} onChange={v=> setDeadliftGrip(v as any)} options={[{id:'overhand',label:'Верхний'},{id:'straps',label:'Лямки'},{id:'mixed',label:'Разнохват'}]} />
               <StrengthPopupSelect label="RPE-cap топа" value={String(rpeCap)} onChange={v=> setRpeCap(Number(v))} options={RPE_CAP_OPTIONS.map(r=>({id:String(r),label:`RPE ${r}`,desc:r===9.5?'дефолт':''}))} />
               <StrengthPopupSelect label="Модель" value={blockModel} onChange={v=> setBlockModel(v as any)} options={SS_BLOCK_MODELS.map(m=>({id:m.id,label:m.label,desc:m.desc}))} />
             </div>
-            <div style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'7px 10px', borderRadius:9 }}>{weightClassLine(bodyweight, weightClass || weightClassFor(bodyweight, sex as any), sex as any)}</div>
+            <div style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'7px 10px', borderRadius:9 }}>{mode === 'strongman' ? weightClassLine(bodyweight, weightClass || weightClassFor(bodyweight, sex as any), sex as any) : 'Весовая категория — только для стронга (у ТА — IWF-категории)'}</div>
             {deadliftGrip==='mixed' && <InfoBanner tone="warn">Разнохват: на ≥85% — 100% разрывов бицепса на супинированной руке (PMC8237209) → hook/лямки. Камень: руки-канаты, локти прямые.</InfoBanner>}
             <label style={{ display:'flex', gap:8, alignItems:'center', fontSize:12, color:'#fff', fontWeight:700, cursor:'pointer', minHeight:44 }}>
               <input type="checkbox" checked={autoDeload} onChange={e=> setAutoDeload(e.target.checked)} style={{ width:20, height:20, accentColor:'#30d158' }} /> Делоды 4/7/11 (≥8 нед)
@@ -1054,6 +1054,7 @@ export const StrengthSportConstructor: React.FC = () => {
                     <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV'); }} style={BTN}>📊 CSV</button>
                     <button onClick={() => { downloadStrengthXlsx(plan); setMsg('XLS'); }} style={{ ...BTN, background:'rgba(48,209,88,0.12)', color:'#30d158', border:'0.5px solid rgba(48,209,88,0.20)' }}>📗 XLSX</button>
                     <button onClick={() => { downloadStrengthIcs(plan, (plan as any).inputSnapshot?.startDate); setMsg('ICS'); }} style={BTN}>📅 План .ics</button>
+                    <button onClick={() => { try { syncStrengthSportToCloud(); setMsg('☁ Синхронизация запущена'); } catch { setMsg('☁ Недоступно вне TG'); } setTimeout(()=>setMsg(''),1800); }} style={BTN}>☁ В облако</button>
                     <button onClick={exportToUserProgram} style={BTN_PRIMARY}>✦ В программу</button>
                   </div>
                   <Divider />

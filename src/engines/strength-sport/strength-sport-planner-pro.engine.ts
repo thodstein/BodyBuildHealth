@@ -55,6 +55,12 @@ export function weightClassLine(bodyweightKg: number, cls: string, sex: SmSex): 
   return `Класс ${cls} · до границы −${to} кг`;
 }
 
+/** Класс в input сборки: только strongman (у ТА — свои IWF-категории через getIWFCategory, SM-шкалу не подсовываем). */
+export function weightClassForInput(mode: string, weightClass: string, bodyweightKg: number, sex: SmSex): string | undefined {
+  if (mode !== 'strongman') return undefined;
+  return weightClass || weightClassFor(bodyweightKg, sex);
+}
+
 // ——— P2: RPE-cap топ-сингла ———
 export const RPE_CAP_DEFAULT = 9.5;
 export const RPE_CAP_OPTIONS = [8.5, 9, 9.5, 10];

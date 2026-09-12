@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  weightClassFor, weightToClassBoundary, weightClassLine,
+  weightClassFor, weightToClassBoundary, weightClassLine, weightClassForInput,
   applyRpeCap, RPE_CAP_DEFAULT,
   deadliftGripWarning, STONE_ARMS_CUE, VIKING_GATE_NOTE, isStoneId, isDeadliftId,
   scoreCheckin, pushCheckin, SS_CHECKIN_CAP,
@@ -28,6 +28,12 @@ describe('P1 весовая категория', () => {
     expect(weightToClassBoundary(106, '<105', 'male')).toBeCloseTo(-1, 1);
     expect(weightToClassBoundary(120, 'open', 'male')).toBeNull();
     expect(weightClassLine(104.1, '<105', 'male')).toContain('−0.9');
+  });
+  it('в input сборки: класс только для стронга (ТА — IWF, SM-шкалу не подсовываем)', () => {
+    expect(weightClassForInput('strongman', '', 104.1, 'male')).toBe('<105');
+    expect(weightClassForInput('strongman', '<90', 104.1, 'male')).toBe('<90');
+    expect(weightClassForInput('weightlifting', '', 104.1, 'male')).toBeUndefined();
+    expect(weightClassForInput('hybrid', '<105', 104.1, 'male')).toBeUndefined();
   });
 });
 

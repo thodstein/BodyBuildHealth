@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { migrateStrengthSportStorage, loadStrengthSportPlans, saveStrengthSportPlan } from '../strength-sport-storage';
+import { migrateStrengthSportStorage, loadStrengthSportPlans, saveStrengthSportPlan, syncStrengthSportToCloud } from '../strength-sport-storage';
 import { buildStrengthSportPlan } from '../strength-sport-builder.engine';
 
 describe('storage v1→v3 migration', () => {
@@ -59,5 +59,9 @@ describe('storage v1→v3 migration', () => {
       // after migration load, still may lack distanceM but sets sync should hold
       expect(loaded.length).toBeGreaterThan(0);
     }
+  });
+
+  it('syncStrengthSportToCloud: no-throw вне TG (ленивый импорт cloud-kv)', () => {
+    expect(() => syncStrengthSportToCloud()).not.toThrow();
   });
 });

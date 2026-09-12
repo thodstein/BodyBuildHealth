@@ -58,4 +58,18 @@ describe('Planner PRO UI', () => {
     goToSplit();
     expect(document.body.textContent || '').not.toContain('Превью волны');
   });
+
+  it('export: кнопка В облако (явный синк) кликается без падения', async () => {
+    render(<StrengthSportConstructor />);
+    goToSplit();
+    fireEvent.click(screen.getByText(/Собрать план/));
+    await screen.findByText('Сводка плана', {}, { timeout: 8000 });
+    const steps = document.querySelector("[data-ss='steps']")!;
+    fireEvent.click(steps.querySelectorAll('button')[6]);
+    const btn = screen.getByText(/В облако/);
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.body.textContent || '').toContain('В облако');
+  }, 15000);
 });
