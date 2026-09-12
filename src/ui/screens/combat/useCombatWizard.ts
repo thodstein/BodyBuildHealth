@@ -75,6 +75,15 @@ export function useCombatWizard() {
   const [competitionName, setCompetitionName] = useState('');
   const [competitionDate, setCompetitionDate] = useState('');
   const [competitionWeight, setCompetitionWeight] = useState('');
+  // P2/P3 приёмник диагностики + безопасность: сотрясения/измеренная шея (опционально, дефолт = старое)
+  const [concussionHistory, setConcussionHistory] = useState(0);
+  const [neckExtensionKg, setNeckExtensionKg] = useState(0);
+  const [neckFlexExtRatio, setNeckFlexExtRatio] = useState(0);
+  // P4/P5: весовая категория + travel + лютеиновая пометка (опционально)
+  const [weightClass, setWeightClass] = useState('');
+  const [weightClassLimitKg, setWeightClassLimitKg] = useState(0);
+  const [travelMode, setTravelMode] = useState<'off' | 'hotel'>('off');
+  const [lutealPhase, setLutealPhase] = useState(false);
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
 
@@ -127,6 +136,8 @@ export function useCombatWizard() {
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
     annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
+    concussionHistory, setConcussionHistory, neckExtensionKg, setNeckExtensionKg, neckFlexExtRatio, setNeckFlexExtRatio,
+    weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, travelMode, setTravelMode, lutealPhase, setLutealPhase,
     outsideMetrics,
   };
 }

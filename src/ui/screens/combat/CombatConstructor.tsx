@@ -9,7 +9,7 @@ import React from 'react';
 import { buildCombatPlan, cbExerciseName, resolveCombatSwapMeta } from '../../../engines/combat/combat-builder.engine';
 import { finalizeCombatPlan, buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
 import { COMBAT_PATTERNS, recommendCombatPattern } from '../../../engines/combat/combat-split-patterns';
-import { COMBAT_CYCLE_LIBRARY } from '../../../engines/combat/combat-cycle-library';
+import { COMBAT_CYCLE_LIBRARY, getCombatCycle } from '../../../engines/combat/combat-cycle-library';
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveCombatPlan, loadCombatPlans } from '../../../engines/combat/combat-storage';
 import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
@@ -22,6 +22,8 @@ import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
 import { validateSparringLoad } from '../../../engines/combat/combat-sparring.engine';
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
+import type { CombatNutritionPayload, CombatCardioPayload } from '../../../engines/combat/combat-integration.engine';
+import { getPlannerApply, subscribePlannerApply } from '../TrainingScreen_parts/planner-bridge';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { diagnoseVelocityLossCombat } from '../../../engines/combat/combat-vbt.engine';
 import { getDiaryTrendCB, getDiaryTrendCBAsync } from '../../../engines/combat/combat-diary.engine';
@@ -118,11 +120,68 @@ export const CombatConstructor: React.FC = () => {
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
     annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
+    concussionHistory, setConcussionHistory, neckExtensionKg, setNeckExtensionKg, neckFlexExtRatio, setNeckFlexExtRatio,
+    weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, travelMode, setTravelMode, lutealPhase, setLutealPhase,
     outsideMetrics,
   } = useCombatWizard();
   const [cycFilter, setCycFilter] = React.useState<string>('all');
 
   const go = (s: Step) => { buzzStep(); setStep(s); };
+
+  /* P2: приём моста combat_cycle (каталог/библиотека → конструктор) + weakpoints-combat (диагностика/орто).
+   * Mount — pending из каталога; live — событие planner-apply. Невалидный id — честная ошибка, стейт не трогаем. */
+  React.useEffect(() => {
+    const applyCombatCycle = (cycleId: string): boolean => {
+      const tpl = getCombatCycle(cycleId);
+      if (!tpl) {
+        setMsg(`⚠ Цикл «${cycleId}» не найден в библиотеке единоборств`);
+        setTimeout(() => setMsg(''), 2600);
+        return false;
+      }
+      setDiscipline(tpl.discipline); setGoal(tpl.goal); setLevel(tpl.level);
+      setWeeks(tpl.weeks); setDays(tpl.daysPerWeek); setPatternId(tpl.patternId);
+      setPeriodizationModel(tpl.periodizationModel);
+      setStep('split');
+      setMsg(`✦ Цикл «${tpl.name}» применён — проверьте сплит`);
+      setTimeout(() => setMsg(''), 2600);
+      return true;
+    };
+    const applyWeakpointsCombat = (data: any): void => {
+      if (!data || typeof data !== 'object') return;
+      const touched: string[] = [];
+      if (typeof data.combatConcussion === 'number' && Number.isFinite(data.combatConcussion)) {
+        setConcussionHistory(Math.max(0, Math.min(9, Math.round(data.combatConcussion))));
+        touched.push('сотрясения');
+      }
+      if (typeof data.combatNeckLevel === 'number' && Number.isFinite(data.combatNeckLevel)) touched.push('шея');
+      if (data.combatAsymmetry === 'left' || data.combatAsymmetry === 'right') touched.push(`асимметрия ${data.combatAsymmetry}`);
+      if (typeof data.combatSparringCap === 'number' && Number.isFinite(data.combatSparringCap) && data.combatSparringCap >= 0) {
+        const cap = Math.round(data.combatSparringCap);
+        setSparringHard(h => Math.min(h, cap));
+        touched.push('лимит спарринга');
+      }
+      if (Array.isArray(data.orthoFlags) && data.orthoFlags.length) {
+        const mobAdd = data.orthoFlags.map((f: any) => f?.action).filter((a: any) => typeof a === 'string' && a);
+        if (mobAdd.length) {
+          setMobility(m => [...new Set([...m, ...mobAdd])]);
+          touched.push('орто');
+        }
+      }
+      if (touched.length) {
+        setMsg(`📥 Из диагностики: ${touched.join(', ')}`);
+        setTimeout(() => setMsg(''), 2600);
+      }
+    };
+    const route = (payload: any): void => {
+      if (!payload) return;
+      if (payload.kind === 'combat_cycle' && payload?.data?.cycleId) applyCombatCycle(String(payload.data.cycleId));
+      else if (payload.kind === 'weakpoints' && payload?.data) applyWeakpointsCombat(payload.data);
+    };
+    try { route(getPlannerApply()); } catch { /* no-op */ }
+    const unsub = subscribePlannerApply(route);
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* Смена уровня/дней сбрасывает вручную выбранный сплит под новые условия —
    * иначе UI показывал бы combat_4, а движок молча строил бы на другом. */
@@ -299,6 +358,15 @@ export const CombatConstructor: React.FC = () => {
       avoidAxialLoad: avoidAxialLoad as any,
       equipment, injuries, mobilityRestrictions: mobility as any,
       patternId: patternId || undefined,
+      // P2/P3 приёмник диагностики + безопасность (опционально, без значений — как раньше)
+      concussionHistory: concussionHistory || undefined,
+      neckExtensionKg: neckExtensionKg || undefined,
+      neckFlexExtRatio: neckFlexExtRatio || undefined,
+      // P4/P5 весовая категория + travel + лютеиновая (опционально)
+      weightClass: weightClass || undefined,
+      weightClassLimitKg: weightClassLimitKg || undefined,
+      travelMode: travelMode !== 'off' ? travelMode : undefined,
+      lutealPhase: lutealPhase || undefined,
       ...extra,
     } as any;
     try {
@@ -313,10 +381,13 @@ export const CombatConstructor: React.FC = () => {
     setPlan(p);
     saveCombatPlan(p);
     try {
-      const nut = combatToNutritionPayload(p);
-      localStorage.setItem('he_combat_nutrition_payload', JSON.stringify({ planId: p.id, ...nut, bodyweight, discipline, goal }));
-      const cardio = combatToCardioPayload(p);
-      if (cardio) localStorage.setItem('he_combat_cardio_payload', JSON.stringify({ planId: p.id, ...cardio }));
+      const nut: CombatNutritionPayload = { planId: p.id, ...combatToNutritionPayload(p), bodyweight, discipline, goal };
+      localStorage.setItem('he_combat_nutrition_payload', JSON.stringify(nut));
+      const cardio: CombatCardioPayload | null = (() => {
+        const c = combatToCardioPayload(p);
+        return c ? { planId: p.id, ...c } : null;
+      })();
+      if (cardio) localStorage.setItem('he_combat_cardio_payload', JSON.stringify(cardio));
       window.dispatchEvent(new CustomEvent('he-combat-updated', { detail: { planId: p.id, nutrition: nut, cardio } }));
     } catch {}
     try { const hist = loadCombatPlans().slice(0, 6); const ann = buildAnnualFromCB(hist); saveAnnualCB(ann); setAnnual(ann); } catch {}

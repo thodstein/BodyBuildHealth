@@ -83,3 +83,14 @@ export function combatNutritionEventPayload(plan: CombatPlan): Record<string, an
   const cardio = combatToCardioPayload(plan);
   return { planId: plan.id, discipline: plan.discipline, goal: plan.goal, weeks: plan.weeks, ...nut, cardio, weighInType: (nut as any).weighInType };
 }
+
+// ── P2: типизированные исходящие (тот же канал localStorage + he-combat-updated,
+// потребители: IndividualPlanContext слушает he-combat-updated, CardioConstructor читает payload) ──
+/** Питание → IndividualPlanContext (слушатель `he-combat-updated`, ключ `he_combat_nutrition_payload`). */
+export type CombatNutritionPayload = ReturnType<typeof combatToNutritionPayload> & {
+  planId: string; bodyweight: number; discipline: string; goal: string;
+};
+/** Кардио → CardioConstructor (читает `he_combat_cardio_payload`, кнопка «Применить Zone2»). */
+export type CombatCardioPayload = NonNullable<ReturnType<typeof combatToCardioPayload>> & {
+  planId: string;
+};

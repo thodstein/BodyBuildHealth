@@ -23,11 +23,12 @@
  *                  при сохранении программы изменения возвращаются в блок (he_annual_block_pending)
  *  - arm_cycle: { cycleId } — именной цикл арм-библиотеки → ArmAutoConstructor (ставит cycId)
  *  - ss_cycle  : { cycleId } — интернет-цикл ТА/стронга → StrengthSportConstructor (ставит cycleId+режим)
+ *  - combat_cycle: { cycleId } — именной цикл единоборств → CombatConstructor (ставит discipline/goal/level/weeks/days/patternId)
  */
 const KEY = 'he_planner_apply';
 type Listener = (payload: PlannerApply | null) => void;
 
-export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'tempo_rollback' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter' | 'bb_nutrition' | 'arm_cycle' | 'ss_cycle';
+export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'tempo_rollback' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter' | 'bb_nutrition' | 'arm_cycle' | 'ss_cycle' | 'combat_cycle';
 
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
@@ -80,6 +81,11 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   orthoFlags?: Array<{ id: string; joint: string; level: string; label: string; action: string }>;
   orthoSummary?: string;
   orthoGuards?: { pauseOverhead?: boolean; limitDeepSquat?: boolean; yokeGate?: boolean; closedChainOnly?: boolean; blockedPatterns?: string[]; mobilityAdd?: string[] };
+  /** PRO combat (диагностика/орто → CombatConstructor, kind 'weakpoints'): всё опционально, приёмник только сохраняет. */
+  combatNeckLevel?: number | null;
+  combatConcussion?: number | null;
+  combatAsymmetry?: 'left' | 'right' | null;
+  combatSparringCap?: number | null;
 }
 export interface PriPayload { volumeMult: number; rirShift: number }
 export type TempoApplyMode = 'all' | 'compound' | 'isolation' | 'skip_deload';
@@ -102,6 +108,8 @@ export interface AnnualBlockPayload { blockKey: string; program?: unknown }
 export interface ArmCyclePayload { cycleId: string }
 /** Интернет-цикл ТА/стронга из каталога библиотеки → конструктор ТА/стронга. */
 export interface SSCyclePayload { cycleId: string }
+/** Именной цикл единоборств из библиотеки → CombatConstructor (дисциплина/цель/уровень/недели/дни/паттерн). */
+export interface CombatCyclePayload { cycleId: string }
 
 /** Калькулятор «Лимитирующие факторы движения»: выбранные упражнения + категорийные протоколы.
  *  key = `${lift}|${category}|${optionId}`. Протокол — из опции (не из раскладки цикла). */
@@ -112,7 +120,7 @@ export interface LimiterPayload {
   limiterDayMap?: Record<string, number[]>;
 }
 
-export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | TempoRollbackPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload | BBNutritionPayload | ArmCyclePayload | SSCyclePayload;
+export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | TempoRollbackPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload | BBNutritionPayload | ArmCyclePayload | SSCyclePayload | CombatCyclePayload;
 
 /** Типобезопасная карта данных для публичного канала. */
 export interface PlannerApplyDataByKind {
@@ -138,6 +146,7 @@ export interface PlannerApplyDataByKind {
   bb_nutrition: BBNutritionPayload;
   arm_cycle: ArmCyclePayload;
   ss_cycle: SSCyclePayload;
+  combat_cycle: CombatCyclePayload;
 }
 
 export type PlannerSource = 'pl-auto' | 'bb-auto' | 'intellectual' | 'manual' | string;
