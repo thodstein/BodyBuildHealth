@@ -234,3 +234,17 @@
 ---
 
 *Следующий шаг — выполнение P1 кодом (Edit/Write + vitest/tsc): гейты errors + единый тапер-движок + тесты `combat-pro-validation`.*
+
+---
+
+## §5. Выполнение P1–P7 кодом (статус: ВЫПОЛНЕНО, 8 коммитов pathspec, без пуша)
+
+- **P1** (`4a8e645d`): 6 блокирующих errors (мусорные даты / перегруз 1500+4× / сгонка >5% без weight_cut / same-day >5% / шея<MEV при hard / HIIT≥4 / hard в fight-week при tw1 + fight-week >65% пика) + единый тапер (`taperSplitForWeek` раздельные кривые, `recommendTaperWeeks`, `validateTaperConfig`) + красный стоп-блок позже в P3. NEW `combat-pro-validation` 13/13. Поймано своим тестом ×2 (ошибка ассерта «шея» vs «шее»; HIIT-сценарий с 5 внезальными честно <4 — кондиция схлопывается).
+- **P2** (`ad478e03`): kind `combat_cycle` + `CombatCyclePayload` + combat-поля в `WeakpointsPayload` + приёмник в конструкторе (mount + live, невалидный id — честная ошибка) + типизированные исходящие (`CombatNutritionPayload/CardioPayload`, потребители уже слушали). NEW `combat-bridge` 5/5.
+- **P3** (`b55b9d9d`): NEW `combat-safety` (teen 14–15 banned-лист/изометрия-only/без hard и манипуляций; concussion 0/1/2+; cutoff 3.71 N/кг; flex/ext 0.74; `sparringSafetyErrors`; `screenCombatRedFlags`) + проводка в билдер (пул-фильтр + errors) + UI (анамнез/замеры/teen-баннеры + красный `cb-errors` блок — раньше показывались только warnings). NEW `combat-safety` 12/12.
+- **P4** (`d2f4dac2`): NEW `combat-weight-class` (бокс-Olympic/MMA-UFC/борьба-UWW/кик-типовые М/Ж + `weightClassFor/boundary/line`) + гейты (недовод до лимита — error; +15% вне кэмпа — warning; ISSN-медпункты → errors, советы → warnings с дедупом P1) + селект категории в весогонке. NEW `combat-weight` 8/8. Поймано: темп >1.5 — совет, не мед-блок (тест уточнён, не движок).
+- **P5** (`3f5b21c5`): NEW `combat-female-travel` (темп Ж 0.4, железо/кальций/RED-S/лютеиновая ноты, `HOTEL_POOL`, `travelPoolFilter`, ×0.9, тапер-нота) + проводка (пул/бюджет/rationale/гейт same-day×отель) + UI (отель-тумблер, лютеиновая). NEW 7/7. Пойман свой TDZ (`warnings` раньше объявления — перенесено) и дубль деструктуризации.
+- **P6** (`b8143cd6` + `1c449165`): EWMA-uncoupled дефолт + RA-фолбэк с пометкой + lowBase-кап + честная оговорка sweet spot; VBT — баллистика/неизвестное → null (generic без id — legacy, соседский тест поймал верно); exact-match истории; пороги по цели; MCV-hint; HRV-single с пометкой; per-exercise индекс + покрытие в мезоцикле. NEW 17/17.
+- **P7** (`f60b34be`): год — main 2нед / secondary 1нед таперы (дефолт main), сумма 52 на 2 боях; выдача — fight-week шаблон 14–10/9–5/4–1 + чек-лист + errors-секция + ICS бой/взвешивание; персист — quota-фолбэк + shape-отбраковка + чистка payload-связей. NEW 11/11. Поймано: shape-гейт vs legacy-фикстура без id — смягчён честно (id мигрируется, мусор без weeksData отбраковывается).
+- **Проверено:** движки+UI **471/471 (27 файлов)** + switch-sheet 17/17 + bridge/catalog/library/handlers/cardio соседи + `tsc --noEmit` **0 по всему проекту** (12GB heap) + `verify:apk-design` OK. Чужие WIP не тронуты (arm PRO-5/strongman/support в worktree — в коммиты взяты только свои pathspec, сверено `git status`/`git diff`).
+- **Отклонения от плана (честно):** полный разрез god-file `CombatConstructor` не делан (точечные встройки — риск соседям); хаб диагностики с нуля не строился (только приёмник + concussion-анамнез); дедуп печати/legacy-фаз не тронут (гигиена без влияния на корректность).
