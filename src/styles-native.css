@@ -5588,6 +5588,15 @@ html.app-native .articles-card:active {
   transform: scale(0.985) !important;
 }
 
+html.app-native .article-card-save:active {
+  transform: scale(0.9) !important;
+}
+
+html.app-native .article-card-save:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
 @media (max-width: 380px) {
   html.app-native .articles-featured {
     border-radius: 16px !important;

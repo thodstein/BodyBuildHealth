@@ -265,6 +265,31 @@ describe('ArticlesScreen PRO TOP', () => {
     expect(alive).not.toBeNull();
   });
 
+  it('20. native: ★ на карточке сохраняет без открытия', () => {
+    (window as unknown as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true };
+    resetAppPlatformCache();
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const saveBtn = container.querySelector('.article-card-save') as HTMLElement;
+    expect(saveBtn).not.toBeNull();
+    fireEvent.click(saveBtn);
+    // статья сохранилась, но ни читалка, ни PDF не открылись
+    expect(container.querySelector('.articles-reader')).toBeNull();
+    expect(container.querySelector('.articles-pdf')).toBeNull();
+    const raw = localStorage.getItem('he_articles_saved_v1') || '[]';
+    expect(JSON.parse(raw).length).toBe(1);
+    expect(saveBtn.getAttribute('data-active')).toBe('true');
+    // повторный клик — снять
+    fireEvent.click(container.querySelector('.article-card-save') as HTMLElement);
+    expect(JSON.parse(localStorage.getItem('he_articles_saved_v1') || '[]').length).toBe(0);
+  });
+
+  it('21. web: кнопки ★ на карточках нет (контракт волны D)', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    expect(container.querySelector('.article-card-save')).toBeNull();
+  });
+
   it('6. PDF-карточка зовёт читать внутри', () => {
     const { container } = render(<ArticlesScreen />);
     goToList(container);

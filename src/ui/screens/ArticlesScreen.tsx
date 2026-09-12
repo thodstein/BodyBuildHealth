@@ -819,6 +819,25 @@ export const ArticlesScreen: React.FC = () => {
             onMouseLeave={e=>{ e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.07)'; }}
             >
               <div style={{ height:4, background: isPDF ? 'linear-gradient(90deg, #ef4444, #f97316)' : catColor, width:'100%', opacity:0.95 }} />
+              {/* Быстрое ★ — только native (контракт волны D: сохранённые = офлайн-фича АПК) */}
+              {isNativeApp() && (
+                <button
+                  onClick={e => { e.stopPropagation(); setSaved(toggleSavedArticle(article.id)); }}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+                  aria-label={saved.includes(article.id) ? 'Убрать из сохранённых' : 'Сохранить статью'}
+                  className="article-card-save"
+                  data-active={saved.includes(article.id)}
+                  style={{
+                    position:'absolute', top:10, right:10, zIndex:2, width:44, height:44, borderRadius:999, cursor:'pointer',
+                    background: saved.includes(article.id) ? 'rgba(var(--accent-rgb, 0,230,138),0.20)' : 'rgba(10,10,15,0.55)',
+                    border: saved.includes(article.id) ? '1px solid rgba(var(--accent-rgb, 0,230,138),0.45)' : '1px solid rgba(255,255,255,0.14)',
+                    backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
+                    boxShadow: saved.includes(article.id) ? '0 0 14px rgba(0,230,138,0.30)' : '0 4px 14px rgba(0,0,0,0.35)',
+                    color: saved.includes(article.id) ? 'var(--accent, #00e68a)' : '#fff',
+                    fontSize:15, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center',
+                  }}
+                >{saved.includes(article.id) ? '★' : '☆'}</button>
+              )}
               <div style={{ padding:'12px 12px 11px', position:'relative' }}>
                 <div aria-hidden="true" style={{ position:'absolute', inset:0, background:`radial-gradient(520px 100px at 14% 0%, ${catColor}10, transparent 62%)`, pointerEvents:'none' }} />
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, marginBottom:8, position:'relative' }}>
@@ -849,6 +868,7 @@ export const ArticlesScreen: React.FC = () => {
               {isPDF ? (
                 <div style={{ padding:'0 12px 11px', display:'flex', alignItems:'center', gap:6, position:'relative' }}>
                   <span style={{ fontSize:11, color:'#fff', fontWeight:800, display:'flex', alignItems:'center', gap:5 }}><NativeIcon name="file" size={12} /> Читать внутри <span>→</span></span>
+                  {saved.includes(article.id) && <span aria-label="Сохранена" style={{ marginLeft:'auto', color:ART_ACC, fontSize:12 }}>★</span>}
                 </div>
               ) : (
                 <div style={{ padding:'0 12px 11px', display:'flex', alignItems:'center', gap:6, position:'relative' }}>
