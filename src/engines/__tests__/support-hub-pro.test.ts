@@ -3,7 +3,7 @@
  * Калькулятор поддержки не тронут.
  */
 import { describe, it, expect } from 'vitest';
-import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, personDoseHints, passesGradeFilter, filterCatalogGroups, resolvePersonDefaults } from '../support-hub-evidence.engine';
+import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, evidenceOutcomesFor, stackEvidenceGrade, migratedGet, migratedSet, personDoseHints, passesGradeFilter, filterCatalogGroups, resolvePersonDefaults } from '../support-hub-evidence.engine';
 import { LAB_TOP20, LAB_ID_ALIASES, resolveLabMonitor } from '../support-hub-labs.engine';
 import { getCachedPubmed, writePubmedCache, readPubmedCache } from '../support-hub-research.engine';
 import { dedupeDepletions, stackOverlap, stackScore } from '../support-hub-stack.engine';
@@ -288,8 +288,7 @@ describe('P8 кэш PubMed (движок)', () => {
   });
 });
 
-describe('P2-добавка resolvePersonDefaults (стор > профиль > дефолт)', () => {
-  it('пусто везде — 80/муж/30', () => {
+describe('P2-добавка resolvePersonDefaults (стор > профиль > дефолт)', () => {  it('пусто везде — 80/муж/30', () => {
     expect(resolvePersonDefaults(null, null)).toEqual({ wKg: 80, sex: 'male', age: 30 });
   });
   it('профиль побеждает дефолт', () => {
@@ -349,5 +348,46 @@ describe('Интеграция с реальными таблицами хаба
     expect(bioEvidenceFor(detectFormBioKey('Curcumin + Piperine', 'Куркумин с пиперином', ''), 0.06).marketing).toBe(true);
     expect(bioEvidenceFor(detectFormBioKey('Creatine Monohydrate', 'Креатин моногидрат', ''), 0.99).source).toBe('meta');
     expect(bioEvidenceFor(detectFormBioKey('Zinc Picolinate', 'Цинк пиколинат', ''), 0.85).source).toBe('review');
+  });
+});
+
+describe('Раунд-8: грейд стеков, исходы, миграция ключей', () => {
+  it('stackEvidenceGrade: все A → A, слабое звено тянет вниз, пусто → D', () => {
+    expect(stackEvidenceGrade(['creatine', 'magnesium'])).toBe('A');
+    expect(stackEvidenceGrade(['creatine', 'resveratrol'])).toBe('C');
+    expect(stackEvidenceGrade(['creatine', 'glutathione_reduced'])).toBe('D');
+    expect(stackEvidenceGrade([])).toBe('D');
+  });
+  it('evidenceOutcomesFor: креатин размечен, неизвестное — пусто', () => {
+    const outs = evidenceOutcomesFor('creatine');
+    expect(outs.some(o => o.outcome === 'muscle' && o.grade === 'A')).toBe(true);
+    expect(outs.some(o => o.outcome === 'strength')).toBe(true);
+    expect(evidenceOutcomesFor('heptral_unknown_xyz')).toEqual([]);
+  });
+  it('исход перекрывает базу (кофеин: performance A при базе A)', () => {
+    expect(evidenceGradeExFor('caffeine', 'performance')).toBe('A');
+    expect(evidenceGradeExFor('magnesium', 'sleep')).toBe('B');
+    expect(evidenceGradeExFor('magnesium')).toBe('A');
+  });
+  it('migratedGet: новый побеждает, legacy мигрирует и чистится, мусор → null', () => {
+    const m = new Map<string, string>();
+    const store = {
+      getItem: (k: string) => (m.has(k) ? m.get(k)! : null),
+      setItem: (k: string, v: string) => { m.set(k, v); },
+      removeItem: (k: string) => { m.delete(k); },
+    };
+    m.set('new_k', 'NEW');
+    m.set('old_k', 'OLD');
+    expect(migratedGet(store, 'new_k', 'old_k')).toBe('NEW');
+    m.delete('new_k');
+    expect(migratedGet(store, 'new_k', 'old_k')).toBe('OLD');
+    expect(m.has('new_k')).toBe(true);
+    expect(m.has('old_k')).toBe(false);
+    expect(migratedGet({ getItem: () => { throw new Error('x'); }, setItem: () => {}, removeItem: () => {} }, 'a', 'b')).toBeNull();
+    expect(migratedGet({ getItem: () => null, setItem: () => {}, removeItem: () => {} }, 'a', 'b')).toBeNull();
+    migratedSet(store, 's_k', 'v');
+    expect(m.get('s_k')).toBe('v');
+    migratedSet(store, 's_k', null);
+    expect(m.has('s_k')).toBe(false);
   });
 });

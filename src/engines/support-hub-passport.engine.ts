@@ -3,7 +3,7 @@
  * Собирает в одну структуру то, что уже есть в хабе (био/доза/UL/тайминг/
  * синергия/аналоги/лабы/грейд). Новых чисел не выдумывает: чего нет — hasData:false.
  */
-import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, personDoseHints, type PersonCtx } from './support-hub-evidence.engine';
+import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, evidenceOutcomesFor, personDoseHints, type PersonCtx } from './support-hub-evidence.engine';
 import { timingHintsFor } from './support-hub-timing.engine';
 
 export interface SubstancePassport {
@@ -18,6 +18,8 @@ export interface SubstancePassport {
   synergyTop: string[];
   conflictTop: string[];
   labs: string[];
+  /** Размеченные исходы (пусто = только базовый грейд, без выдумок). */
+  outcomes: Array<{ outcome: string; grade: string }>;
   analogHint: string;
 }
 
@@ -68,6 +70,7 @@ export function buildSubstancePassport(args: {
     synergyTop: (args.synergies || []).slice(0, 3).map(s => `${nameOf(s.with)} — ${s.effect || ''}`.trim()),
     conflictTop: (args.conflicts || []).slice(0, 3).map(s => `${nameOf(s.with)} — ${s.effect || ''}`.trim()),
     labs: (args.labMarkers || []).slice(0, 4).map(l => `${l.marker} → ${l.target}`),
+    outcomes: evidenceOutcomesFor(args.id).slice(0, 4).map(o => ({ outcome: o.outcome, grade: o.grade })),
     analogHint: 'Аналог подбирается в табе «Аналоги» по механизму + классу + грейду (профиль — из Профиля, не 30/80/180 по умолчанию).',
   };
 }

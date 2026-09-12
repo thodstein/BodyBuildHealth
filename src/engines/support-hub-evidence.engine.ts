@@ -98,6 +98,12 @@ const OUTCOME_GRADES: Record<string, EvidenceGradeEx> = {
   'ashwagandha|stress': 'B', 'rhodiola|fatigue': 'B', 'curcumin|joint': 'B',
   'berberine|glucose': 'B', 'coq10|statin': 'B', 'probiotics|gut': 'B',
   'collagen|joint': 'C', 'glutathione|oral': 'D', 'resveratrol|longevity': 'C',
+  'melatonin|jetlag': 'A',
+  'magnesium|sleep': 'B', 'zinc|cold': 'B', 'vitamin_d|immunity': 'B',
+  'vitamin_d3|immunity': 'B', 'vitamin_c|cold': 'B', 'omega3|depression': 'B',
+  'berberine|cholesterol': 'B', 'ashwagandha|sleep': 'B', 'rhodiola|stress': 'B',
+  'probiotics|antibiotic': 'B', 'collagen|skin': 'B', 'beta_alanine|endurance': 'B',
+  'citrulline|performance': 'B', 'theanine|stress': 'B',
 };
 
 const BASE_GRADES: Record<string, EvidenceGradeEx> = {
@@ -106,6 +112,7 @@ const BASE_GRADES: Record<string, EvidenceGradeEx> = {
   vitamin_k2: 'A', calcium: 'A', selenium: 'A', iodine: 'A', milk_thistle: 'A',
   tudca: 'A', berberine: 'A', curcumin: 'B', ashwagandha: 'B', melatonin: 'A',
   rhodiola: 'B', resveratrol: 'C', glutathione_reduced: 'D', collagen: 'C',
+  caffeine: 'A', beta_alanine: 'B', citrulline: 'B', theanine: 'B', probiotics: 'B',
 };
 
 export function evidenceGradeExFor(id: string, outcome?: string): EvidenceGradeEx {
@@ -120,6 +127,35 @@ export function evidenceGradeExFor(id: string, outcome?: string): EvidenceGradeE
     if (key.startsWith(base) || key.includes(base)) return g;
   }
   return 'C';
+}
+
+/** Размеченные исходы вещества (из OUTCOME_GRADES). Пусто = только базовый грейд. */
+export function evidenceOutcomesFor(id: string): Array<{ outcome: string; grade: EvidenceGradeEx }> {
+  const key = id.toLowerCase();
+  const out: Array<{ outcome: string; grade: EvidenceGradeEx }> = [];
+  for (const [k, g] of Object.entries(OUTCOME_GRADES)) {
+    const sep = k.indexOf('|');
+    if (sep < 0) continue;
+    if (k.slice(0, sep) === key) out.push({ outcome: k.slice(sep + 1), grade: g });
+  }
+  return out;
+}
+
+const GRADE_ORDER: Record<EvidenceGradeEx, number> = { A: 3, B: 2, C: 1, D: 0 };
+
+/**
+ * Агрегатный грейд стека = минимум участников ( weakest link, честная подпись в UI).
+ * Пустой стек = D (оценивать нечего).
+ */
+export function stackEvidenceGrade(substanceIds: string[]): EvidenceGradeEx {
+  if (!Array.isArray(substanceIds) || substanceIds.length === 0) return 'D';
+  let min: EvidenceGradeEx = 'A';
+  for (const id of substanceIds) {
+    const g = evidenceGradeExFor(id || '');
+    if (GRADE_ORDER[g] < GRADE_ORDER[min]) min = g;
+    if (min === 'D') break;
+  }
+  return min;
 }
 
 // ─── P2: единое окно дозы ───
@@ -191,6 +227,39 @@ export function resolvePersonDefaults(
     sex: sS || (prof && prof.sex === 'female' ? 'female' : 'male'),
     age: Number.isFinite(sA) && (sA as number) > 0 ? (sA as number) : (prof && prof.age && prof.age > 0 ? prof.age : 30),
   };
+}
+
+export interface MiniKV {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+/**
+ * Миграция ключа стора: читаем новый, иначе legacy (переносим и чистим старый).
+ * Не бросает исключений (private/quota → null).
+ */
+export function migratedGet(storage: MiniKV, newKey: string, oldKey: string): string | null {
+  try {
+    const cur = storage.getItem(newKey);
+    if (cur !== null) return cur;
+    const legacy = storage.getItem(oldKey);
+    if (legacy !== null) {
+      try { storage.setItem(newKey, legacy); } catch { /* quota */ }
+      try { storage.removeItem(oldKey); } catch { /* noop */ }
+      return legacy;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function migratedSet(storage: MiniKV, newKey: string, value: string | null): void {
+  try {
+    if (value === null) storage.removeItem(newKey);
+    else storage.setItem(newKey, value);
+  } catch { /* quota/private */ }
 }
 
 // ─── P3-добавка: фильтр каталога по грейду (локальный, без SupportScreen) ───

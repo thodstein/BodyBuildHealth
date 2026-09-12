@@ -12,7 +12,7 @@ import {
   FORM_RECOMMENDER, type FormRecommendation,
   buildBioavailabilityCatalog,
 } from './SupportBioavailabilityData';
-import { bioEvidenceFor, bioEvidenceLabel, evidenceGradeExFor } from '../../../engines/support-hub-evidence.engine';
+import { bioEvidenceFor, bioEvidenceLabel, evidenceGradeExFor, migratedGet, migratedSet } from '../../../engines/support-hub-evidence.engine';
 import { isAASHonest } from '../../../engines/support-hub-aas.engine';
 
 
@@ -60,10 +60,11 @@ export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'bio' | 'name' | 'forms'>('bio');
   const [showAAS, setShowAAS] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(() => localStorage.getItem('he_bio_selected'));
+  // Ключи версионированы (_v1), legacy читается с переносом (миграция без потерь)
+  const [selectedId, setSelectedId] = useState<string | null>(() => migratedGet(localStorage, 'he_bio_selected_v1', 'he_bio_selected'));
   const [compareIds, setCompareIds] = useState<string[]>(() => {
     try {
-      const parsed: unknown = JSON.parse(localStorage.getItem('he_bio_compare') || '[]');
+      const parsed: unknown = JSON.parse(migratedGet(localStorage, 'he_bio_compare_v1', 'he_bio_compare') || '[]');
       return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
     } catch {
       return [];
@@ -85,8 +86,8 @@ export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s
     return list;
   }, [catalog, searchQuery, categoryFilter, sourceFilter, sortBy, showAAS]);
   const selected = selectedId ? catalog.find(e => e.id === selectedId) : null;
-  const handleSelect = useCallback((id: string | null) => { setSelectedId(id); if (id) localStorage.setItem('he_bio_selected', id); else localStorage.removeItem('he_bio_selected'); }, []);
-  const handleCompare = useCallback((id: string) => { let next: string[]; if (compareIds.includes(id)) next = compareIds.filter(x => x !== id); else if (compareIds.length < 4) next = [...compareIds, id]; else return; setCompareIds(next); localStorage.setItem('he_bio_compare', JSON.stringify(next)); }, [compareIds]);
+  const handleSelect = useCallback((id: string | null) => { setSelectedId(id); migratedSet(localStorage, 'he_bio_selected_v1', id); }, []);
+  const handleCompare = useCallback((id: string) => { let next: string[]; if (compareIds.includes(id)) next = compareIds.filter(x => x !== id); else if (compareIds.length < 4) next = [...compareIds, id]; else return; setCompareIds(next); migratedSet(localStorage, 'he_bio_compare_v1', JSON.stringify(next)); }, [compareIds]);
   const compareEntries = showCompare ? compareIds.map(id => catalog.find(e => e.id === id)).filter(Boolean) as EnrichedEntry[] : [];
 
   const stats: StatsInfo = useMemo(() => {

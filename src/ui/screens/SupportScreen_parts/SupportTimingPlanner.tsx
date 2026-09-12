@@ -4,6 +4,7 @@ import {
   TIMING_SLOTS, CATEGORY_TIMING, buildBioavailabilityCatalog,
 } from './SupportBioavailabilityData';
 import { timingHintsFor } from '../../../engines/support-hub-timing.engine';
+import { isAASHonest } from '../../../engines/support-hub-aas.engine';
 import { S } from './SupportShared';
 
 // ─── Build enriched catalog ───
@@ -135,13 +136,17 @@ export const SupportTimingPlanner: React.FC = () => {
     return slots;
   }, [selectedSubs, catalog]);
 
-  const suppEntries = catalog.filter(e => e.source === 'catalog');
+  const suppEntries = useMemo(() => catalog.filter(e =>
+    e.source === 'catalog' ||
+    // Фарма и пептиды — тоже в планировщик; ААС остаются отдельно (не смешиваем)
+    ((e.source === 'pharma' || e.source === 'peptide') && !isAASHonest(e.category, e.nameRu, e.nameEn).isAAS),
+  ), [catalog]);
 
   return (
     <div className="sup-timing" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ ...S.card }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>Тайминг-планировщик приёма БАД</div>
-        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>Выберите свои добавки — система распределит их по времени суток с учётом конкуренции и совместимости.</div>
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>БАДы + фарма/пептиды (ААС — отдельно, не смешиваются). Система распределит по времени суток с учётом конкуренции.</div>
         <input value={timingSearch} onChange={e => setTimingSearch(e.target.value)} placeholder="Поиск БАД..."
           style={{ width: '100%', padding: '6px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-light)', fontSize: 10, marginBottom: 6 }} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, maxHeight: 150, overflowY: 'auto', marginBottom: 6 }}>

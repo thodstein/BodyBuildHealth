@@ -9,7 +9,7 @@ import { readSupportArr, readSupportStrArr, writeSupportJSON } from './support-s
 import { PopupSelect } from '../../components/PopupXxx';
 import { InfoErrorBoundary, getCategoryInfo, CLASS_BASE_NAMES, MECH_TRANSLATIONS_RU, TYPE_LABELS_RU, MECH_LABELS, CATEGORY_LABELS } from './SupportScreenData';
 import { ALL_STACKS, ALL_INTERACTIONS, SUPPORT_CATALOG_DATA, getSubstanceTier, TIER_LABELS, SYSTEM_LABELS_CATALOG, ORGAN_LABELS, type SupportSubstance } from '../../../data/support-database';
-import { evidenceGradeExFor, filterCatalogGroups, type GradeFilter } from '../../../engines/support-hub-evidence.engine';
+import { evidenceGradeExFor, filterCatalogGroups, stackEvidenceGrade, type GradeFilter } from '../../../engines/support-hub-evidence.engine';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../../data/support-db';
 import { UnifiedSynergyCalculator } from './UnifiedSynergyCalculator';
 
@@ -47,6 +47,14 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
   const [gradeFilter, setGradeFilter] = React.useState<GradeFilter>('all');
   const typeGroupsF = React.useMemo(() => filterCatalogGroups((typeGroupedSubstances || []) as any, gradeFilter), [typeGroupedSubstances, gradeFilter]);
   const organGroupsF = React.useMemo(() => filterCatalogGroups((OrganGroupedSubstances || []) as any, gradeFilter), [OrganGroupedSubstances, gradeFilter]);
+  // Стеки: агрегатный грейд = минимум участников (weakest link); фильтр применяется локально
+  const stacksF = React.useMemo(() => {
+    if (gradeFilter === 'all') return filteredStacks || [];
+    return (filteredStacks || []).filter((stk: any) => {
+      const g = stackEvidenceGrade((stk.substances || []).map((s: any) => s.id));
+      return g === 'A' || g === 'B';
+    });
+  }, [filteredStacks, gradeFilter]);
   return (
               <div className="sup-catalogview">
                  {/* Sub-tabs: По типам / По органам / Стеки / Взаимодействия */}
@@ -59,8 +67,8 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                         border: `1px solid ${catalogSubTab === t ? 'var(--accent)' : 'var(--border)'}`,
                       }}>{t === 'stack' ? '🧩 Готовые стеки' : t === 'type' ? '📋 По типам' : t === 'organ' ? '🫀 По органам' : '⚠ Взаимодействия'}</button>
                     ))}
-                    {/* P3: локальный фильтр грейдов (только вещества; стеки не фильтруются) */}
-                    <button className="support-pill" data-active={gradeFilter === 'AB'} title="Показать только вещества с высокой/умеренной доказательностью (A/B). Стеки не фильтруются." onClick={() => setGradeFilter(g => g === 'all' ? 'AB' : 'all')} style={{
+                    {/* P3: локальный фильтр грейдов (вещества + стеки по min-грейду; поиск родителя не трогаем) */}
+                    <button className="support-pill" data-active={gradeFilter === 'AB'} title="Только A/B: вещества — по грейду, стеки — по минимальному грейду участников." onClick={() => setGradeFilter(g => g === 'all' ? 'AB' : 'all')} style={{
                       padding:'6px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
                       background: gradeFilter === 'AB' ? 'rgba(34,197,94,0.15)' : 'var(--bg-secondary)',
                       color: gradeFilter === 'AB' ? '#22c55e' : 'var(--text-dim)',
@@ -72,7 +80,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                 </div>
                 <div style={{height:4}} />
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
-            {catalogSubTab === 'stack' ? (searchQuery ? `Найдено стеков: ${filteredStacks.length} из ${ALL_STACKS.length}` : `Всего стеков: ${ALL_STACKS.length}`) : (searchQuery ? `Найдено: ${groupedSubstances.reduce((a: any, g: any) => a + g.count, 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`)}{gradeFilter === 'AB' && catalogSubTab !== 'stack' ? ' · фильтр A/B (стеки не фильтруются)' : ''}
+            {catalogSubTab === 'stack' ? (searchQuery ? `Найдено стеков: ${stacksF.length} из ${ALL_STACKS.length}` : `Всего стеков: ${ALL_STACKS.length}`) : (searchQuery ? `Найдено: ${groupedSubstances.reduce((a: any, g: any) => a + g.count, 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`)}{gradeFilter === 'AB' && catalogSubTab !== 'stack' ? ' · фильтр A/B (стеки не фильтруются)' : ''}{gradeFilter === 'AB' && catalogSubTab === 'stack' ? ' · фильтр A/B (min-грейд участников)' : ''}
                 </div>
                 {catalogSubTab === 'organ' && (
                   /* По органам */
@@ -192,15 +200,20 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                         <PopupSelect label="🧪 Количество" value={stkFilterQty} options={[{id:'all',label:'🧪 Любое кол-во'},{id:'1-3',label:'1-3 вещества'},{id:'4-7',label:'4-7 веществ'},{id:'8-15',label:'8-15 веществ'},{id:'16-25',label:'16-25 веществ'},{id:'25+',label:'25+ веществ'}]} onChange={setStkFilterQty} />
                         <PopupSelect label="⭐ Рейтинг" value={stkFilterScore} options={[{id:'all',label:'⭐ Любой рейтинг'},{id:'0-50',label:'⭐ до 50'},{id:'51-74',label:'⭐ 51-74'},{id:'75-84',label:'⭐ 75-84'},{id:'85-100',label:'⭐ 85+'}]} onChange={setStkFilterScore} />
                       </div>
-                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', textAlign:'center' }}>{filteredStacks.length} из {ALL_STACKS.length}</div>
-                      {filteredStacks.map((stk: any) => {
+                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', textAlign:'center' }}>{stacksF.length} из {ALL_STACKS.length}{gradeFilter === 'AB' ? ' · A/B' : ''}</div>
+                      {stacksF.map((stk: any) => {
                         const isExp = stackExpanded === stk.id;
+                        const stkGrade = stackEvidenceGrade((stk.substances || []).map((s: any) => s.id));
+                        const stkGradeColor = stkGrade === 'A' ? '#22c55e' : stkGrade === 'B' ? '#f59e0b' : stkGrade === 'D' ? '#ef4444' : '#fff';
                         return (
                         <div key={stk.id} style={{ borderRadius:12, background:'var(--bg-secondary)', border:'1px solid var(--border)', overflow:'hidden' }}>
                           <div style={{ padding:'10px 12px' }}>
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                               <span style={{ fontSize:10, fontWeight:700, color:'var(--accent)' }}>{stk.name}</span>
-                              <span style={{ fontSize:8, padding:'2px 6px', borderRadius:6, background:'rgba(0,230,138,0.1)', color:'#00e68a', fontWeight:600 }}>⭐ {stk.synergyScore}</span>
+                              <span style={{ display:'flex', gap:4, alignItems:'center' }}>
+                                <span title="Грейд стека = минимальный грейд участников" style={{ fontSize:8, padding:'2px 6px', borderRadius:6, background:stkGradeColor+'1a', color:stkGradeColor, fontWeight:700 }}>{stkGrade}</span>
+                                <span style={{ fontSize:8, padding:'2px 6px', borderRadius:6, background:'rgba(0,230,138,0.1)', color:'#00e68a', fontWeight:600 }}>⭐ {stk.synergyScore}</span>
+                              </span>
                             </div>
                             <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, lineHeight:1.4 }}>{stk.problem}</div>
                             <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
