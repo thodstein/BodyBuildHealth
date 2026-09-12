@@ -73,6 +73,15 @@ describe('nutrition-reference data P0', () => {
     const flagged = FOOD_SYNERGIES.filter(s => s.inV2).map(s => s.pair);
     expect(flagged).toEqual(['Натрий + Калий']);
   });
+
+  it('правила с числами имеют источники', () => {
+    const mustHaveSource = ['Гидратация', 'Натрий и электролиты', 'Термический эффект', 'Коллаген', 'голодание', 'Сон и питание', 'Антиоксиданты', 'Старение'];
+    for (const key of mustHaveSource) {
+      const rule = NUTRITION_RULES.find(r => r.title.includes(key));
+      expect(rule, key).toBeDefined();
+      expect(rule!.source, key).toBeDefined();
+    }
+  });
   it('новые таблицы непустые', () => {
     expect(RDA_ROWS.length).toBeGreaterThanOrEqual(10);
     expect(GI_ROWS.length).toBeGreaterThanOrEqual(5);
