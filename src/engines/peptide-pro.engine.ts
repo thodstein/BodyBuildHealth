@@ -46,6 +46,27 @@ export function weeklySchedule(peptideId: string, freqPerWeek: number): string[]
   return [...new Set(out)];
 }
 
+// Частоты по умолчанию (ориентир исследовательских протоколов, не назначение).
+export const PEPTIDE_FREQ_WEEK: Record<string, number> = {
+  bpc157: 7,
+  tb500: 2,
+  cjc1295: 7,
+  ipamorelin: 7,
+  ghrp2: 7,
+  ghrp6: 7,
+  gh: 7,
+  igf1: 7,
+  mots_c: 3,
+  ss31: 7,
+  selank: 7,
+  semax: 7,
+  dsip: 7,
+};
+
+export function defaultFreqWeek(peptideId: string): number {
+  return PEPTIDE_FREQ_WEEK[String(peptideId || '').toLowerCase()] ?? 3;
+}
+
 // Справочник стартовых доз (паритет precision-таблице).
 export const PEPTIDE_DOSE_REF: { id: string; vialMg: number; waterMl: number; doseMcg: number; units: number }[] = [
   { id: 'BPC-157 5мг', vialMg: 5, waterMl: 2, doseMcg: 250, units: 10 },

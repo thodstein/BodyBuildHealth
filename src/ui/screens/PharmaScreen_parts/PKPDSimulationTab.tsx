@@ -3,7 +3,7 @@ import { PHARMA_DB } from '../../../core/pharma-database';
 import { steadyStatePeak, steadyStateTrough, eliminationConstant } from '../../../engines/pk-pd.engine';
 import { calculateMultiSubstancePKPD } from '../../../engines/pkpd-superposition.engine';
 import { resolveEsterCanon, peakTroughRatio, ratioVerdict, suggestIntervalDays, timeToSteadyDays, timeToClearDays, batemanCourse, PK_DISCLAIMER } from '../../../engines/pk-bateman.engine';
-import { saveCalcSnapshot, loadCalcHistory, clearCalcHistory, downloadCsv, buildCalcCsv, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
+import { saveCalcSnapshot, loadCalcHistory, clearCalcHistory, removeCalcSnapshot, downloadCsv, buildCalcCsv, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
 import type { CourseEntry } from '../../../core/types';
 import { useDataLink } from '../../../core/data-link';
 import { CLASS_LABELS, INJECTABLE_WITH_ESTERS, type PharmaClass } from './constants';
@@ -54,6 +54,7 @@ export const PKPDSimulationTab: React.FC = () => {
   const [pkEsterPopup, setPkEsterPopup] = useState<{ baseClass: string; label: string } | null>(null);
   const [, setHistTick] = useState(0);
   const [showBateman, setShowBateman] = useState(false);
+  const [logScale, setLogScale] = useState(false);
 
   const allSubstances = useMemo(() => {
     const PKPD_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','dht_inject','insulin','gh','glp1','clenbuterol','thyroid','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other','igf1','mgf']);
@@ -168,7 +169,10 @@ export const PKPDSimulationTab: React.FC = () => {
     const maxCp = Math.max(...allCp, 1);
     const maxWeek = pts[pts.length - 1].week;
     const toX = (w: number) => PAD + (w / maxWeek) * (W - 2 * PAD);
-    const toY = (cp: number) => H - PAD - (cp / maxCp) * (H - 2 * PAD);
+    const logMax = Math.log10(maxCp + 1);
+    const toY = (cp: number) => logScale
+      ? H - PAD - (Math.log10(Math.max(0, cp) + 1) / logMax) * (H - 2 * PAD)
+      : H - PAD - (cp / maxCp) * (H - 2 * PAD);
     const totalPathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.week).toFixed(1)},${toY(p.cp).toFixed(1)}`).join(' ');
     const effectPathD = pts.map((p, i) => {
       const ey = H - PAD - (p.effect / 100) * (H - 2 * PAD);
@@ -218,7 +222,7 @@ export const PKPDSimulationTab: React.FC = () => {
         <text x={W / 2} y={H - 1} fill="#fff" fontSize="10" textAnchor="middle">Недели</text>
       </svg>
     );
-  }, [simResult, showAllDrugs, visibleDrugs, showBateman, drugDoses]);
+  }, [simResult, showAllDrugs, visibleDrugs, showBateman, logScale, drugDoses]);
 
   return (
     <div className="pharma-pkpd" style={{ display:'flex', flexDirection:'column', gap:10 }}>
@@ -447,6 +451,9 @@ export const PKPDSimulationTab: React.FC = () => {
             <button onClick={() => setShowBateman((v) => !v)} aria-pressed={showBateman} style={{ marginTop:8, width:'100%', minHeight:44, borderRadius:10, fontSize:12, fontWeight:800, cursor:'pointer', background: showBateman ? 'linear-gradient(135deg, #ec4899, #8b5cf6)' : 'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(236,72,153,0.22)' }}>
               {showBateman ? 'Скрыть Bateman-оверлей' : 'Показать Bateman-оверлей (форма первого препарата)'}
             </button>
+            <button onClick={() => setLogScale((v) => !v)} aria-pressed={logScale} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, fontSize:12, fontWeight:800, cursor:'pointer', background: logScale ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(59,130,246,0.22)' }}>
+              {logScale ? 'Шкала: логарифмическая (washout виден)' : 'Шкала: линейная → логарифмическая'}
+            </button>
             {(() => {
               const first = PHARMA_DB[drugDoses[0]?.substanceId];
               const canon = resolveEsterCanon(String((first as any)?.esters?.[0] || drugDoses[0]?.substanceId || 'enanthate'));
@@ -478,7 +485,10 @@ export const PKPDSimulationTab: React.FC = () => {
                     </div>
                     {loadCalcHistory().length === 0 && <div style={{ fontSize:11, color:'#fff' }}>Пока пусто — нажми «В историю» в любом табе.</div>}
                     {loadCalcHistory().slice(0, 5).map((h) => (
-                      <div key={h.id} style={{ fontSize:10, color:'#fff', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>{h.tab} · {h.summary}</div>
+                      <div key={h.id} style={{ fontSize:10, color:'#fff', padding:'3px 0', borderBottom:'1px solid rgba(255,255,255,0.04)', display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ flex:1 }}>{h.tab} · {h.summary}</span>
+                        <button onClick={() => { removeCalcSnapshot(h.id); setHistTick((t) => t + 1); }} aria-label="Удалить запись" style={{ width:32, height:32, minWidth:32, minHeight:32, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>✕</button>
+                      </div>
                     ))}
                     {loadCalcHistory().length > 0 && <button onClick={() => downloadCsv('pharma-history.csv', [['Таб', 'Дата', 'Сводка'], ...loadCalcHistory().map((h) => [h.tab, h.at, h.summary] as (string | number)[])])} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:9, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:800, fontSize:11, cursor:'pointer' }}>📥 Вся история CSV</button>}
                   </div>

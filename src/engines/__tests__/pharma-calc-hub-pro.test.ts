@@ -146,6 +146,23 @@ describe('F раунд', () => {
   });
 });
 
+describe('H раунд', () => {
+  it('частоты пептидов + удаление одного снапшота', async () => {
+    const pro = await import('../peptide-pro.engine');
+    expect(pro.defaultFreqWeek('bpc157')).toBe(7);
+    expect(pro.defaultFreqWeek('tb500')).toBe(2);
+    expect(pro.defaultFreqWeek('unknown')).toBe(3);
+    const share = await import('../pharma-calc-share.engine');
+    share.clearCalcHistory();
+    share.saveCalcSnapshot('t1', 'a');
+    share.saveCalcSnapshot('t2', 'b');
+    expect(share.loadCalcHistory().length).toBe(2);
+    share.removeCalcSnapshot(share.loadCalcHistory()[0].id);
+    expect(share.loadCalcHistory().length).toBe(1);
+    share.clearCalcHistory();
+  });
+});
+
 describe('P7 share export', () => {
   it('csv anti-formula + esc', () => {
     expect(csvCell('=cmd')).toMatch(/^"/);

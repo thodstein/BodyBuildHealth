@@ -25,6 +25,17 @@ describe('pharma hub E-guard: новые панели живы', () => {
     fireEvent.click(screen.getByText(/Bateman-оверлей/));
     expect(container.textContent).toMatch(/нормировано/);
   });
+  it('PK: log-шкала переключается', () => {
+    const { container } = render(<PKPDSimulationTab />);
+    fireEvent.click(screen.getByText(/Запустить симуляцию/));
+    fireEvent.click(screen.getByText(/логарифмическая/));
+    expect(container.textContent).toMatch(/washout виден/);
+  });
+  it('Пептиды: кнопка стартовой частоты применяет сетку', () => {
+    const { container } = render(<PharmaPeptideCalc />);
+    fireEvent.click(screen.getByText(/Применить частоту/));
+    expect(container.textContent).toMatch(/Стартовая частота/);
+  });
   it('Дозировки: таб + андрогенный подтаб', () => {
     const { container } = render(<DosageCalculatorTab />);
     expect(container.textContent).toMatch(/Фармакология/);

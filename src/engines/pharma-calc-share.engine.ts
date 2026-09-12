@@ -21,7 +21,7 @@ export function loadCalcHistory(): CalcSnapshot[] {
 
 export function saveCalcSnapshot(tab: string, summary: string): CalcSnapshot[] {
   const next: CalcSnapshot[] = [
-    { id: `${Date.now()}`, tab, at: new Date().toISOString(), summary: String(summary).slice(0, 500) },
+    { id: `${Date.now()}-${Math.floor(Math.random() * 1e6)}`, tab, at: new Date().toISOString(), summary: String(summary).slice(0, 500) },
     ...loadCalcHistory(),
   ].slice(0, CAP);
   try {
@@ -38,6 +38,16 @@ export function clearCalcHistory(): void {
   } catch {
     /* молча */
   }
+}
+
+export function removeCalcSnapshot(id: string): CalcSnapshot[] {
+  const next = loadCalcHistory().filter((x) => x.id !== id);
+  try {
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    /* quota — молча */
+  }
+  return next;
 }
 
 export function downloadCsv(filename: string, rows: (string | number)[][]): void {

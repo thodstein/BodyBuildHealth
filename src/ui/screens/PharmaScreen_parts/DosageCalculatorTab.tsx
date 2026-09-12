@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PHARMA_DB, getPharmaDetail } from '../../../core/pharma-database';
 import { calculateDose } from '../../../engines/dosage.engine';
+import { db } from '../../../core/db';
+import { notifyDataChange } from '../../../core/data-link';
 import { checkDosageRange, recommendSyringe, dosageGuards } from '../../../engines/dosage-safety.engine';
 import { stackBurdenLite } from '../../../engines/stack-burden.engine';
 import { saveCalcSnapshot, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
@@ -461,7 +463,7 @@ export const DosageCalculatorTab: React.FC = () => {
                     ))}
                     <div style={{ fontSize:10, color:'#fff', marginTop:6 }}>Ротация: ягодица → бедро → плечо. Асептика, иглу не reuse. U-100 шкала: 100u = 1 мл.</div>
                     <button onClick={() => { saveCalcSnapshot('dosage', `${drug} ${weeklyTotal.toFixed(0)}мг/нед → ${doseResult.volumeMl}мл`); printHtml(buildCalcHtml('Дозировка', [['Препарат', drug], ['Нед. доза', `${weeklyTotal.toFixed(0)}`], ['Объём', `${doseResult.volumeMl} мл`], ['Шприц', syr.size]])); }} style={{ marginTop:8, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(139,92,246,0.22)', background:'rgba(139,92,246,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>💾 В историю + 🖨 Печать</button>
-                    <button onClick={() => { const entry = { substanceId: drug, doseValue: weeklyTotal, doseUnit: doseUnitRaw, frequency: `${injectionsPerWeek}x/week`, startWeek: 0, endWeek: 12 }; const txt = JSON.stringify(entry); try { navigator.clipboard?.writeText(txt); } catch { /* clipboard недоступен */ } try { localStorage.setItem('he_pharma_course_pending', txt); } catch { /* quota */ } saveCalcSnapshot('dosage', `→ В курс: ${drug} ${weeklyTotal.toFixed(0)}мг/нед ×${injectionsPerWeek}`); }} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(0,230,138,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📋 → В курс (копия JSON + pending-ключ)</button>
+                    <button onClick={() => { const entry = { id: crypto.randomUUID(), substanceId: drug, doseValue: Math.round(weeklyTotal * 10) / 10, doseUnit: doseUnitRaw, frequency: `${injectionsPerWeek}x/week`, startWeek: 1, endWeek: 12 }; db.put('course_log', entry).then(() => notifyDataChange()).catch(() => {}); const txt = JSON.stringify(entry); try { navigator.clipboard?.writeText(txt); } catch { /* clipboard недоступен */ } try { localStorage.setItem('he_pharma_course_pending', txt); } catch { /* quota */ } saveCalcSnapshot('dosage', `→ В курс: ${drug} ${weeklyTotal.toFixed(0)} ×${injectionsPerWeek}`); }} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(0,230,138,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📋 → В курс (запись + копия JSON)</button>
                   </div>
                 );
               })()}
