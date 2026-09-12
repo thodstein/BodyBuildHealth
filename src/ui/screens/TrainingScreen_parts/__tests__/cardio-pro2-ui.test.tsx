@@ -7,6 +7,9 @@ import React from 'react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { buildCardioCycle, loadCardioCycles } from '../../../../engines/lms/cardio.engine';
+import { buildBbMacrocycle } from '../../../../engines/lms/macrocycle.engine';
+import { annualPlanFromMacro } from '../../../../engines/annual-training/block-builders.engine';
+import { saveAnnualTrainingPlan } from '../../../../engines/annual-training/annual-training-storage';
 import { CardioCompsStep } from '../CardioCompsStep';
 import { CardioHiitSection } from '../CardioHiitSection';
 import { CardioValidationCard } from '../CardioPlanExtras';
@@ -16,6 +19,8 @@ const RECORDS_KEY = 'he_cardio_records';
 const CYCLES_KEY = 'he_cardio_cycles';
 const ACTIVE_KEY = 'he_active_cardio_cycle';
 const WIZARD_KEY = 'he_cardio_wizard_state';
+const ANNUAL_PLAN_KEY = 'he_annual_training_plan_v1';
+const ANNUAL_CARDIO_KEY = 'he_annual_cardio_cycles';
 
 beforeEach(() => {
   try {
@@ -23,8 +28,15 @@ beforeEach(() => {
     localStorage.removeItem(CYCLES_KEY);
     localStorage.removeItem(ACTIVE_KEY);
     localStorage.removeItem(WIZARD_KEY);
+    localStorage.removeItem(ANNUAL_PLAN_KEY);
+    localStorage.removeItem(ANNUAL_CARDIO_KEY);
   } catch { /* ignore */ }
 });
+
+function seedAnnualPlan(): void {
+  const macro = buildBbMacrocycle({ level: 'intermediate', totalWeeks: 52 });
+  saveAnnualTrainingPlan(annualPlanFromMacro(macro));
+}
 
 const compsProps = {
   comps: [],
@@ -180,5 +192,31 @@ describe('Constructor toggles → сборка (№5-добивка)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Ноги: Пн/ })); // вернуть → [3,0]
     next(); next(); // → preview
     expect(screen.queryByText(/Параметры в мастере изменены/)).toBeNull();
+  });
+
+  it('годовой флеш говорит про мед-блок (добивка-8)', () => {
+    seedAnnualPlan();
+    render(<CardioConstructor />);
+    next(); // athlete
+    fireEvent.click(screen.getByRole('button', { name: /Боль\/давление в груди/ }));
+    next(); next(); next(); next(); // load → comps → preview → manage
+    fireEvent.click(screen.getByRole('button', { name: /Собрать кардио по блокам года/ }));
+    expect(screen.getAllByRole('status').some(s => (s.textContent || '').includes('мед-блок'))).toBe(true);
+    const annual = loadCardioCycles().filter(c => c.id.startsWith('annual-cardio-'));
+    expect(annual.length).toBeGreaterThan(0);
+    expect(annual.every(c => !c.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss')))).toBe(true);
+  });
+
+  it('selectVariant сохраняет флаги (добивка-8)', () => {
+    render(<CardioConstructor />);
+    next(); // athlete
+    fireEvent.click(screen.getByRole('button', { name: /Боль\/давление в груди/ }));
+    next(); next(); next(); // load → comps → preview
+    buildHere();
+    fireEvent.click(screen.getByRole('button', { name: /⇄ Варианты/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Вариант: Интенсивный/ }));
+    const saved = loadCardioCycles()[0];
+    expect(saved.config?.redFlags).toContain('chest_pain');
+    expect(saved.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'))).toBe(false);
   });
 });
