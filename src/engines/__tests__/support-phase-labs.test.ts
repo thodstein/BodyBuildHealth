@@ -8,6 +8,7 @@ import {
   phaseCardsFor, addonsFor, labTimingFor, pctVariantFor, needsLpaBaseline,
   isLongEsterHalfLife, isInjectableCourse, mergeMonitoringLists,
   matrixAddonKeys, matrixAddons, withLabTiming, phaseLabTeaser,
+  normalizeLabMarker, findDuplicateLabMarkers,
 } from '../support-phase-labs.engine';
 import { PED_CLASS_MATRIX } from '../../data/ped-class-matrix';
 
@@ -251,5 +252,14 @@ describe('labTimingFor — расширенное покрытие (round-7)', (
   it('старые правила не перебиты новыми (порядок)', () => {
     expect(labTimingFor('Гематокрит')).toContain('K2');
     expect(labTimingFor('Эстрадиол')).toContain('48 ч');
+  });
+});
+
+describe('findDuplicateLabMarkers — lock против дублей (round-8)', () => {
+  it('точных повторов маркеров в карточках и аддонах нет', () => {
+    expect(findDuplicateLabMarkers()).toEqual([]);
+  });
+  it('нормализация: регистр/префиксы/пробелы', () => {
+    expect(normalizeLabMarker('  [Тест]  АЛТ ')).toBe('алт');
   });
 });

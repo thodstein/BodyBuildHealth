@@ -745,3 +745,43 @@ export function matrixAddons(matrixId: string): ClassLabAddon[] {
   if (keys.size === 0) return [];
   return CLASS_LAB_ADDONS.filter(a => keys.has(a.key));
 }
+
+// ════════════════════════════════════════════════════════════════════
+//  Аудит дублей (команда «продолжай и проверь чтоб там дублирования не было»):
+//  точные повторы маркеров внутри карточек/аддонов. Нормализация: нижний
+//  регистр + срезать [...] префиксы + схлопнуть пробелы. Подстроки НЕ считаются
+//  дублями (панели 1/8–8/8 осознанно перечисляют маркеры детальных строк).
+// ════════════════════════════════════════════════════════════════════
+export function normalizeLabMarker(s: string): string {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export interface DuplicateLabMarker {
+  marker: string;
+  where: string[];
+}
+
+export function findDuplicateLabMarkers(): DuplicateLabMarker[] {
+  const seen = new Map<string, string[]>();
+  const push = (marker: string, where: string) => {
+    const k = normalizeLabMarker(marker);
+    if (!k) return;
+    if (!seen.has(k)) seen.set(k, []);
+    seen.get(k)!.push(where);
+  };
+  for (const c of PHASE_LAB_CARDS) {
+    for (const gr of c.groups) {
+      for (const m of gr.items) push(m.marker, `${c.id}/${gr.label}`);
+    }
+  }
+  for (const a of CLASS_LAB_ADDONS) {
+    for (const m of a.items) push(m.marker, `addon:${a.key}`);
+  }
+  return [...seen.entries()]
+    .filter(([, w]) => w.length > 1)
+    .map(([marker, where]) => ({ marker, where }));
+}
