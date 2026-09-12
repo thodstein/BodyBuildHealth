@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner, ProtocolDisclaimer } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner, ProtocolDisclaimer, Phase34RxGate } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolThyroid: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -52,6 +52,7 @@ export const SupportProtocolThyroid: React.FC<{ s: Record<string, any> }> = ({ s
 
               {thyroidTab === 'protocol' && (
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <Phase34RxGate />
                   {[
                     { phase:'ФАЗА 1 · ПРОФИЛАКТИКА', label:'ТТГ/Т3/Т4 в норме', color:'#22c55e', condition:'ТТГ 0.5-2.5, T4 св 10-22, T3 св 3.5-6.5', desc:'Мониторинг + нутритивная поддержка',
                       items:[

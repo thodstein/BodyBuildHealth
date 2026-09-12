@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, RX_NOTE, ContraBanner } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, RX_NOTE, ContraBanner, Phase34RxGate } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolMetabolic: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -60,6 +60,7 @@ export const SupportProtocolMetabolic: React.FC<{ s: Record<string, any> }> = ({
               {/* Protocol phases */}
               {metabolicTab === 'protocol' && (
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <Phase34RxGate />
                   {[
                     { phase:'ФАЗА 1 · ПРОФИЛАКТИКА', label:'Липиды + глюкоза — норма', color:'#22c55e', condition:'ЛПНП {'<'}130, ЛПВП {'>'}40, глюкоза {'<'}5.6', desc:'Поддержка метаболического здоровья на курсе',
                       items:[
@@ -120,7 +121,7 @@ export const SupportProtocolMetabolic: React.FC<{ s: Record<string, any> }> = ({
                     ]},
                     { time:'☀️ День (12:00–16:00)', color:'#f97316', items:[
                       { n:'Метформин 500 мг с обедом', why:'С едой. Снижение постпрандиальной глюкозы' },
-                      { n:'Берберин 500 мг до обеда', why:'За 30 мин до еды. AMPK-активация. ↓ глюкозы на 20-30%' },
+                      { n:'Берберин 500 мг до обеда', why:'За 30 мин до еды. AMPK-активация. ↓ глюкозы в среднем на 20-30% (контроль глюкометром)' },
                     ]},
                     { time:'🌙 Вечер (19:00–22:00)', color:'#6366f1', items:[
                       { n:'Метформин 500 мг с ужином', why:'С едой. Вторая доза' },

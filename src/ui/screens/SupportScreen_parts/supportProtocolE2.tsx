@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, ContraBanner } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, ContraBanner, Phase34RxGate } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolE2: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -57,6 +57,7 @@ export const SupportProtocolE2: React.FC<{ s: Record<string, any> }> = ({ s }) =
 
               {e2Tab === 'protocol' && (
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <Phase34RxGate />
                   {[
                      { phase:'ФАЗА 1 · ПРОФИЛАКТИКА', label:'E2 в норме', color:'#22c55e', condition:'E2 20-60 пг/мл', desc:'Мониторинг + превентивные меры. ЦЕЛЬ E2: 20-40 пг/мл (не ниже, не выше)',
                       items:[

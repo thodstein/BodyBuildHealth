@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, Phase34RxGate } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolProlactin: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -19,10 +19,11 @@ export const SupportProtocolProlactin: React.FC<{ s: Record<string, any> }> = ({
               </div>
               {prolactinTab==='protocol'&&(
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <Phase34RxGate />
                   {[
                     {phase:'ФАЗА 1 · ПРОФИЛАКТИКА (PRL <600 мМЕ/л)', label:'Базовая поддержка нормы', color:'#22c55e', condition:'Все ААС-курсы с нандролоном/тренболоном', desc:'Профилактика гиперпролактинемии без каберголина',
                       items:[
-                        {name:'Витамин B6 (пиридоксин) 50-100 мг', dose:'50-100 мг', timing:'Утро', note:triageBadge('ess')+' Кофактор дофамин-синтеза. Поддерживает D2-тонус. ↓ PRL на 15-25%'},
+                        {name:'Витамин B6 (пиридоксин) 50-100 мг', dose:'50-100 мг', timing:'Утро', note:triageBadge('ess')+' Кофактор дофамин-синтеза. Поддерживает D2-тонус. ↓ PRL в среднем на 15-25% по наблюдениям (не РКИ)'},
                         {name:'Магний (глицинат) 200-400 мг', dose:'200-400 мг', timing:'Вечер', note:triageBadge('rec')+' Кофактор тирозингидроксилазы. ↓ стресс-индуцированного ↑ PRL'},
                         {name:'Ашвагандха 300-600 мг', dose:'300-600 мг', timing:'Вечер', note:triageBadge('opt')+' ↓ кортизол → ↓ PRL. Синергия с магнием'},
                         {name:'Избегать: домперидон, метоклопрамид, нейролептики', dose:'—', timing:'—', note:triageBadge('ess')+' Все блокаторы D2 ↑ PRL. Альтернатива: ондансетрон (5-HT3)'},

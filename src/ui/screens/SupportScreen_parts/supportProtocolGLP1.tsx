@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner, Phase34RxGate } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolGLP1: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -47,10 +47,11 @@ export const SupportProtocolGLP1: React.FC<{ s: Record<string, any> }> = ({ s })
 
               {glp1Tab === 'protocol' && (
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <Phase34RxGate />
                   {[
                     { phase:'ФАЗА 1 · НАТУРАЛЬНАЯ МОДУЛЯЦИЯ', label:'Природные GLP-1 секретагоги', color:'#22c55e', condition:'Преддиабет/ожирение (ИМТ {'>'}27)', desc:'Повышение эндогенного GLP-1 без инъекционных препаратов',
                       items:[
-                        { name:'Берберин 500 мг', dose:'500 мг', timing:'2-3×/день до еды', note:'↑ GLP-1 через ↑ активности L-клеток. ↓ глюкозы на 20-30%. AMPK-активатор. CYP3A4-ингибитор: разнос 2+ ч с оральными ААС/статинами' },
+                        { name:'Берберин 500 мг', dose:'500 мг', timing:'2-3×/день до еды', note:'↑ GLP-1 через ↑ активности L-клеток. ↓ глюкозы в среднем на 20-30% (контроль глюкометром). AMPK-активатор. CYP3A4-ингибитор: разнос 2+ ч с оральными ААС/статинами' },
                         { name:'Клетчатка (гуаровая камедь/пектин/инулин)', dose:'10-20 г', timing:'Перед едой с водой', note:'↑ GLP-1 через ферментацию в толстой кишке → ↑ короткоцепочечных жирных кислот. ↓ аппетита' },
                         { name:'L-глютамин', dose:'5-10 г', timing:'За 30-60 мин до еды', note:'Мощный стимулятор GLP-1 через CaSR-рецепторы L-клеток. ↑ GLP-1 на 2-3× в течение часа' },
                         { name:'Омега-3 (EPA/DHA)', dose:'2-4 г', timing:'С едой', note:'↑ GLP-1 через GPR120 на L-клетках. Системный противовоспалительный эффект' },

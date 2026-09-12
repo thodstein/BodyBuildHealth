@@ -379,4 +379,24 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
       expect(P(f)).toContain('IvStationaryGate');
     }
   });
+  it('phase34-гейт в 8 фазовых протоколах', () => {
+    for (const f of [
+      'supportProtocolCardio.tsx',
+      'supportProtocolHepatic.tsx',
+      'supportProtocolE2.tsx',
+      'supportProtocolThyroid.tsx',
+      'supportProtocolAcne.tsx',
+      'supportProtocolProlactin.tsx',
+      'supportProtocolMetabolic.tsx',
+      'supportProtocolGLP1.tsx',
+    ]) {
+      expect(P(f)).toContain('Phase34RxGate');
+    }
+  });
+  it('%эффекты захеджированы (не РКИ-гарантия)', () => {
+    expect(P('supportProtocolPostCycle.tsx')).toContain('не гарантия');
+    expect(P('supportProtocolWomen.tsx')).not.toContain('вирилизация 30%+');
+    expect(P('supportProtocolSteatosis.tsx')).toContain('по РКИ (индивидуально');
+    expect(P('supportProtocolProlactin.tsx')).toContain('не РКИ');
+  });
 });

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ProtocolDisclaimer } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ProtocolDisclaimer, Phase34RxGate } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolAcne: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -31,6 +31,7 @@ export const SupportProtocolAcne: React.FC<{ s: Record<string, any> }> = ({ s })
               {/* Phases */}
               {acneTab === 'protocol' && (
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                <Phase34RxGate />
                 {[
                   {
                     phase:'ФАЗА 1 · БАЗОВАЯ ГИГИЕНА', label:'Профилактика (обязательно на курсе)', color:'#22c55e',
