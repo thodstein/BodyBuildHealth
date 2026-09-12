@@ -283,7 +283,8 @@ export const DiagnosticsTab: React.FC = () => {
           </div>
 
           <div style={card}>
-            <div style={{ fontSize:12, fontWeight:800, color:'#c4b5fd', marginBottom:8, display:'flex', alignItems:'center', gap:7 }}>4. BioAge — биологическое старение</div>
+            <div style={{ fontSize:12, fontWeight:800, color:'#c4b5fd', marginBottom:8, display:'flex', alignItems:'center', gap:7 }}>4. BioAge — биологическое старение <span style={{ fontSize:10, fontWeight:700, color:'#fbbf24', background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.16)', padding:'2px 7px', borderRadius:20 }}>эвристика</span></div>
+            <div style={{ fontSize:10, color:'#fff', marginBottom:8, background:'rgba(245,158,11,0.06)', padding:'6px 8px', borderRadius:8, border:'1px solid rgba(245,158,11,0.10)' }}>Не phenotypic age: штрафы АД/HRV/токсичности. Честный возраст — по анализам: HbA1c, CRP, альбумин, креатинин, GFR, АЛТ, липиды + давление покоя.</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8, textAlign:'center' }}>
               <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:12, padding:'10px', border:'1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ fontSize:10, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Хронологический</div>

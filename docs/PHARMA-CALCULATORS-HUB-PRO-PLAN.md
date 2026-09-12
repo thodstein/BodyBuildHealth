@@ -4,6 +4,13 @@
 
 Проверено: NEW `pharma-calc-hub-pro` 16/16 + соседи `pharma-fixes-verification` 34/34 + `pharma-catalog-audit` 62/62 + `rest-hooks-native` 68/68 (canvas/DB-шум предсуществующий); `tsc` 0 по своим файлам (6 ошибок — чужой Support-WIP, не тронут); `verify:apk-design` OK.
 
+## Добивки (без пуша)
+
+- **D1–D5 (`cee8bd74`)**: per-drug канон-бейджи `t½ · conf/5` + Bateman-пик первого препарата; мост «→ В курс» (CourseEntry-JSON в clipboard + `he_pharma_course_pending`, прямая запись в IndexedDB-курс осознанно не сделана — чужая зона `data-link`); пептид-сетка `weeklySchedule` + GHRH-синергия; селектор протокола Nolva/Clom+Nolva/Scally-lite + честные недели из `course_log`; история `he_pharma_calc_v1` топ-5. Тесты 19/19; `tsc` 0 по всему проекту.
+- **E-раунд (`207f464e`)**: `downloadCsv`/`clearCalcHistory` + CSV во всех 5 табах + «Вся история CSV» + счётчик маркеров в матрице + NEW `pharma-calc-hub` UI-guard 7/7. Проверено 133/133; `tsc` 0; apk-verify OK.
+- **F-раунд (`2bdff781`)**: Bateman-оверлей на графике (нормировано к Cmax, дефолт выкл; пойман свой scope-баг `batemanPathD` своим же UI-тестом); `PairResult.source` + CSV-колонка; экспорт истории. Тесты hub 8/8 + pro 20/20; `tsc` 0; apk-verify OK.
+- **G-раунд (этот коммит)**: BioAge-бейдж «эвристика» + список маркеров честного возраста; честная единица дозы из БД (`МЕ/день`, `мкг/день`, `мг/день` вместо всегда `мг/нед`) + bridge несёт реальный `doseUnit`.
+
 ## 1. Что есть сейчас (5 калькуляторов, `PharmaScreen_parts/index.tsx:232-241`)
 
 | # | Таб | Файл | Движки | Что делает |

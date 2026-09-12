@@ -233,7 +233,15 @@ export const DosageCalculatorTab: React.FC = () => {
 
   const weeklyTotal = doseMode === 'per_kg' ? mgKg * weight : weeklyMg;
   const perInjectionMg = weeklyTotal / Math.max(1, injectionsPerWeek);
-  const doseUnitLabel = (PHARMA_DB[drug]?.dosageRange?.unit || 'mg/wk').split('/')[0].trim() || 'мг';
+  const doseUnitRaw = PHARMA_DB[drug]?.dosageRange?.unit || 'mg/wk';
+  const doseUnitLabel = (() => {
+    const u = String(doseUnitRaw).toLowerCase();
+    if (u.startsWith('iu')) return 'МЕ/день';
+    if (u.startsWith('mcg')) return u.includes('/d') ? 'мкг/день' : 'мкг/нед';
+    if (u.startsWith('mg') && u.includes('/d')) return 'мг/день';
+    return 'мг/нед';
+  })();
+  const doseShort = doseUnitLabel.startsWith('МЕ') ? 'МЕ' : doseUnitLabel.startsWith('мкг') ? 'мкг' : 'мг';
 
   const KEEP_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','dht_inject','dht_derivative','gh','glp1','clenbuterol','thyroid','pct_gonadotropin']);
   const { pharmaFiltered, grouped, singles } = useMemo(() => {
@@ -363,7 +371,7 @@ export const DosageCalculatorTab: React.FC = () => {
               </>
             ) : (
               <div style={{ gridColumn:'1 / -1' }}>
-                <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Недельная доза ({doseUnitLabel}/нед)</label>
+                <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Доза ({doseUnitLabel}, из справочника БД)</label>
                 <input type="number" value={weeklyMg} onChange={(e) => setWeeklyMg(parseFloat(e.target.value) || 0)}
                   style={{ width:'100%', padding:'12px 12px', borderRadius:12, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, fontWeight:700, boxSizing:'border-box', outline:'none', minHeight:44 }} />
               </div>
@@ -407,12 +415,12 @@ export const DosageCalculatorTab: React.FC = () => {
                 <div style={{ background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04))', border:'1px solid rgba(139,92,246,0.14)', borderRadius:12, padding:'12px 8px', textAlign:'center' }}>
                   <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Недельная доза</div>
                   <div style={{ fontSize:22, fontWeight:900, color:'#a78bfa' }}>{weeklyTotal.toFixed(0)}</div>
-                  <div style={{ fontSize:10, color:'#fff' }}>{doseUnitLabel}/нед</div>
+                  <div style={{ fontSize:10, color:'#fff' }}>{doseUnitLabel}</div>
                 </div>
                 <div style={{ background:'linear-gradient(135deg, rgba(59,130,246,0.10), rgba(59,130,246,0.04))', border:'1px solid rgba(59,130,246,0.14)', borderRadius:12, padding:'12px 8px', textAlign:'center' }}>
                   <div style={{ fontSize:11, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>На инъекцию</div>
                   <div style={{ fontSize:22, fontWeight:900, color:'#60a5fa' }}>{perInjectionMg.toFixed(1)}</div>
-                  <div style={{ fontSize:10, color:'#fff' }}>{doseUnitLabel} × {injectionsPerWeek}/нед</div>
+                  <div style={{ fontSize:10, color:'#fff' }}>{doseShort} × {injectionsPerWeek}/нед</div>
                 </div>
               </div>
               <div style={{ background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,230,138,0.04))', border:'1px solid rgba(0,230,138,0.14)', borderRadius:14, padding:'14px 10px', textAlign:'center' }}>
@@ -453,7 +461,7 @@ export const DosageCalculatorTab: React.FC = () => {
                     ))}
                     <div style={{ fontSize:10, color:'#fff', marginTop:6 }}>Ротация: ягодица → бедро → плечо. Асептика, иглу не reuse. U-100 шкала: 100u = 1 мл.</div>
                     <button onClick={() => { saveCalcSnapshot('dosage', `${drug} ${weeklyTotal.toFixed(0)}мг/нед → ${doseResult.volumeMl}мл`); printHtml(buildCalcHtml('Дозировка', [['Препарат', drug], ['Нед. доза', `${weeklyTotal.toFixed(0)}`], ['Объём', `${doseResult.volumeMl} мл`], ['Шприц', syr.size]])); }} style={{ marginTop:8, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(139,92,246,0.22)', background:'rgba(139,92,246,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>💾 В историю + 🖨 Печать</button>
-                    <button onClick={() => { const entry = { substanceId: drug, doseValue: weeklyTotal, doseUnit: 'mg/wk', frequency: `${injectionsPerWeek}x/week`, startWeek: 0, endWeek: 12 }; const txt = JSON.stringify(entry); try { navigator.clipboard?.writeText(txt); } catch { /* clipboard недоступен */ } try { localStorage.setItem('he_pharma_course_pending', txt); } catch { /* quota */ } saveCalcSnapshot('dosage', `→ В курс: ${drug} ${weeklyTotal.toFixed(0)}мг/нед ×${injectionsPerWeek}`); }} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(0,230,138,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📋 → В курс (копия JSON + pending-ключ)</button>
+                    <button onClick={() => { const entry = { substanceId: drug, doseValue: weeklyTotal, doseUnit: doseUnitRaw, frequency: `${injectionsPerWeek}x/week`, startWeek: 0, endWeek: 12 }; const txt = JSON.stringify(entry); try { navigator.clipboard?.writeText(txt); } catch { /* clipboard недоступен */ } try { localStorage.setItem('he_pharma_course_pending', txt); } catch { /* quota */ } saveCalcSnapshot('dosage', `→ В курс: ${drug} ${weeklyTotal.toFixed(0)}мг/нед ×${injectionsPerWeek}`); }} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(0,230,138,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📋 → В курс (копия JSON + pending-ключ)</button>
                   </div>
                 );
               })()}
