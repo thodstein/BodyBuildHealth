@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 
-const FAQ: { q: string; a: string; icon: string; tag: string }[] = [
+/** Экспорт для Справочника: FAQ переиспользуются read-only, таб «Нутрициолог» живёт отдельно. */
+export const NUTRI_ADVISOR_FAQ: { q: string; a: string; icon: string; tag: string }[] = [
   { icon: '📉', tag: 'рейтинг', q: 'Почему у продукта низкий рейтинг?',
     a: 'Рейтинг (Overall Dietary Score 1–10) зависит от: фазы (сушка/набор/ПКТ), ваших анализов крови, фармакологии и тайминга. Продукт с ок score 5.0 на массе может упасть до 2.0 на сушке из-за высокого ГИ или сахара. Нажмите на продукт — увидите ключевые факторы.' },
   { icon: '🩸', tag: 'homa-ir', q: 'Что такое HOMA-IR?',
@@ -20,12 +21,12 @@ const FAQ: { q: string; a: string; icon: string; tag: string }[] = [
     a: 'Оптимальное K/Na > 2.0. При диуретиках и низком K <3500мг или Mg <400мг — риск судорог и аритмии. Шпинат, курага, авокадо — лучшие источники калия. При K/Na < 2.0 + E2 > 180 → штраф −2.5 к meal score.' },
 ];
 
-const tags = [...new Set(FAQ.map(f => f.tag))];
+const tags = [...new Set(NUTRI_ADVISOR_FAQ.map(f => f.tag))];
 
 export const NutriAdvisor: React.FC = () => {
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const items = filterTag ? FAQ.filter(f => f.tag === filterTag) : FAQ;
+  const items = filterTag ? NUTRI_ADVISOR_FAQ.filter(f => f.tag === filterTag) : NUTRI_ADVISOR_FAQ;
 
   return (
     <div className="nut-advisor" style={{ paddingBottom: 80 }}>

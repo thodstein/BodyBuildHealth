@@ -15,6 +15,7 @@ import {
   GI_ROWS,
   DIAAS_TIERS,
 } from '../nutrition-reference-data';
+import { NUTRI_ADVISOR_FAQ } from '../NutriAdvisor';
 import { NutritionReference } from '../NutritionReference';
 
 describe('nutrition-reference data P0', () => {
@@ -115,5 +116,20 @@ describe('nutrition-reference UI', () => {
     const rulesHeader = screen.getByText(new RegExp(`Правила питания \\(\\d+\\)`));
     const m = rulesHeader.textContent!.match(/\((\d+)\)/);
     expect(Number(m![1])).toBeLessThan(allCount);
+  });
+
+  it('FAQ нутрициолога: единый источник, секция открывается', () => {
+    expect(NUTRI_ADVISOR_FAQ.length).toBeGreaterThanOrEqual(8);
+    const { container } = render(<NutritionReference />);
+    fireEvent.click(screen.getByText(new RegExp('Нутрициолог — частые вопросы')));
+    expect(container.textContent).toContain('HOMA-IR');
+  });
+
+  it('поиск находит FAQ нутрициолога', () => {
+    const { container } = render(<NutritionReference />);
+    const input = container.querySelector('input[aria-label="Поиск по справочнику"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'HOMA-IR' } });
+    expect(container.textContent).toContain('Результатов:');
+    expect(container.textContent).toContain('инсулинорезистентность');
   });
 });

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { FOOD_DB, calcBBQualityScore } from '../../../core/nutrition-database';
 import { ModernHero, ModernPill, modernCardBg } from './nutrition-modern-kit';
+import { NUTRI_ADVISOR_FAQ } from './NutriAdvisor';
 import {
   NUTRITION_RULES,
   INSULIN_GUIDE,
@@ -71,6 +72,7 @@ export const NutritionReference: React.FC = () => {
     ...[...QUALITY_PROTEINS, ...QUALITY_CARBS, ...QUALITY_FATS, ...QUALITY_VEGGIES].map((q, i) => ({ kind: '⭐', title: q.name, body: `Оценка качества: ${q.score}/10`, id: `q${i}` })),
     ...RDA_ROWS.map((r, i) => ({ kind: '🧪', title: r.nutrient, body: `RDA: ${r.rda}. UL: ${r.ul}. ${r.note}`, id: `rda${i}` })),
     ...GI_ROWS.map((r, i) => ({ kind: '📊', title: r.food, body: `ГИ ${r.gi}. ${r.note}`, id: `gi${i}` })),
+    ...NUTRI_ADVISOR_FAQ.map((f, i) => ({ kind: '🧑‍⚕️', title: f.q, body: f.a, id: `faq${i}` })),
   ], []);
 
   const filtered = search.trim().length >= 2
@@ -202,6 +204,16 @@ export const NutritionReference: React.FC = () => {
         {DIAAS_TIERS.map((t, i) => (
           <div key={i} style={{ fontSize: 11, color: '#fff', lineHeight: 1.5, padding: '4px 0' }}>
             <b>{t.tier}:</b> {t.examples}. {t.note}
+          </div>
+        ))}
+      </SectionCard>
+
+      <SectionCard title={`🧑‍⚕️ Нутрициолог — частые вопросы (${NUTRI_ADVISOR_FAQ.length})`} isOpen={openSections.has('faq')} onToggle={() => toggle('faq')}>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>Те же ответы, что в табе «Нутрициолог» (единый источник). Полная версия с фильтром по тегам — в табе.</div>
+        {NUTRI_ADVISOR_FAQ.map((f, i) => (
+          <div key={i} style={{ padding: '6px 8px', borderRadius: 8, background: '#202023', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{f.icon} {f.q}</div>
+            <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.6, marginTop: 2 }}>{f.a}</div>
           </div>
         ))}
       </SectionCard>
