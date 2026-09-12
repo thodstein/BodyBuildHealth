@@ -46,6 +46,28 @@ export const SYSTEM_ANCHORS: SystemAnchor[] = [
   { id: 'reproductive', label: 'Репродуктивная', pos: [0, -0.42, 0.25], r: 0.35 },
 ];
 
+// ── 3D-органы внутри Халка ──
+// Файлы лежат в public/organs (источник моделей: thebuggeddev/anatomy, открытый демо-проект;
+// лицензии отдельных мешей не указаны — при коммерческом релизе заменить на HRA CC-BY 4.0
+// с https://humanatlas.io/3d-reference-library и указать атрибуцию).
+// pos — точка в том же пространстве, что и SYSTEM_ANCHORS (до нормализации группы);
+// size — целевой диаметр органа в финальных единицах сцены (рост тела 3.0).
+// z сознательно уменьшен относительно якорей зон: органы висят чуть вглубь тела,
+// а не на самой поверхности кожи.
+export interface OrganModelDef {
+  system: string;
+  url: string;
+  pos: [number, number, number];
+  size: number;
+}
+
+export const ORGAN_MODELS: OrganModelDef[] = [
+  { system: 'cns', url: '/organs/brain.glb', pos: [0, 0.92, 0.02], size: 0.3 },
+  { system: 'cardio', url: '/organs/heart.glb', pos: [-0.08, 0.32, 0.18], size: 0.3 },
+  { system: 'hepatic', url: '/organs/liver.glb', pos: [0.18, 0.16, 0.12], size: 0.4 },
+  { system: 'renal', url: '/organs/kidneys.glb', pos: [0, 0.02, -0.18], size: 0.36 },
+];
+
 /**
  * Чистая функция: каждому вертексу (x,y,z × N) — индекс якоря (или −1).
  * Экспортируется для тестов.
@@ -90,6 +112,13 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
   const [hoveredSystem, setHoveredSystem] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [showOrgans, setShowOrgans] = useState(true);
+
+  interface OrganEntry {
+    system: string;
+    group: THREE.Group;
+    mats: THREE.MeshStandardMaterial[];
+  }
 
   const sceneRef = useRef<{
     camera: THREE.PerspectiveCamera;
@@ -100,10 +129,14 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     zoneIdx: Int8Array;
     anchorToSystem: string[];
     applyColors: () => void;
+    applyOrganColors: () => void;
   } | null>(null);
 
   const hoverRef = useRef<string | null>(null);
   const selectedRef = useRef('');
+  const showOrgansRef = useRef(true);
+  const organEntriesRef = useRef<OrganEntry[]>([]);
+  const organRootRef = useRef<THREE.Group | null>(null);
 
   const organMap = useMemo(() => {
     const m: Record<string, TzSpecOrganResult> = {};
@@ -317,13 +350,91 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           colorAttr.needsUpdate = true;
         };
 
+        const applyOrganColors = () => {
+          const sel = selectedRef.current;
+          const hover = hoverRef.current;
+          for (const entry of organEntriesRef.current) {
+            const pct = getSystemRiskPct(entry.system);
+            const [r, g, b] = hexToRgb(riskColor(pct));
+            for (const m of entry.mats) {
+              m.emissive.setRGB(r, g, b);
+              if (sel === entry.system) m.emissiveIntensity = 0.85;
+              else if (hover === entry.system) m.emissiveIntensity = 0.7;
+              else if (sel) m.emissiveIntensity = 0.22;
+              else m.emissiveIntensity = 0.45;
+            }
+          }
+        };
+
         sceneRef.current = {
           camera, renderer, controls, animId: 0,
           colorAttr, zoneIdx, anchorToSystem,
-          applyColors,
+          applyColors, applyOrganColors,
         };
         applyColors();
         setLoaded(true);
+
+        // ── Органы: грузим 4 GLB, кладём в те же координаты, что и тело ──
+        // anchorToFinal повторяет нормализацию тела: final = s*(a - center) + group.position.
+        const boxCenter = center;
+        const scaleK = s;
+        const groupPosY = group.position.y;
+        const anchorToFinal = (p: [number, number, number]): [number, number, number] => [
+          (p[0] - boxCenter.x) * scaleK,
+          (p[1] - boxCenter.y) * scaleK + groupPosY,
+          (p[2] - boxCenter.z) * scaleK,
+        ];
+        const organRoot = new THREE.Group();
+        organRootRef.current = organRoot;
+        group.add(organRoot);
+        const organLoader = new GLTFLoader();
+        for (const def of ORGAN_MODELS) {
+          organLoader.load(
+            def.url,
+            (ogltf) => {
+              const content = ogltf.scene;
+              // Нормализация размера: целевой диаметр def.size
+              const obox = new THREE.Box3().setFromObject(content);
+              const osize = obox.getSize(new THREE.Vector3());
+              const ocenter = obox.getCenter(new THREE.Vector3());
+              const maxDim = Math.max(0.001, osize.x, osize.y, osize.z);
+              const k = def.size / maxDim;
+              const holder = new THREE.Group();
+              content.position.set(-ocenter.x, -ocenter.y, -ocenter.z);
+              content.scale.setScalar(k);
+              holder.add(content);
+              const fp = anchorToFinal(def.pos);
+              holder.position.set(fp[0], fp[1], fp[2]);
+              holder.userData.systemId = def.system;
+              content.traverse((o) => { o.userData.systemId = def.system; });
+              const mats: THREE.MeshStandardMaterial[] = [];
+              content.traverse((o) => {
+                if (!(o instanceof THREE.Mesh)) return;
+                const src = (Array.isArray(o.material) ? o.material[0] : o.material) as THREE.MeshStandardMaterial;
+                const nm = new THREE.MeshStandardMaterial({
+                  map: src.map || null,
+                  color: src.color ? src.color.clone() : new THREE.Color('#ffffff'),
+                  roughness: 0.45,
+                  metalness: 0.05,
+                  transparent: true,
+                  opacity: 0.96,
+                  // Всегда поверх тела: органы-маркеры, а не скрытая анатомия.
+                  depthTest: false,
+                  depthWrite: false,
+                });
+                o.material = nm;
+                o.renderOrder = 20;
+                mats.push(nm);
+              });
+              holder.visible = showOrgansRef.current;
+              organRoot.add(holder);
+              organEntriesRef.current.push({ system: def.system, group: holder, mats });
+              applyOrganColors();
+            },
+            undefined,
+            () => { /* орган не загрузился — зоны-подсветка остаётся, молча */ },
+          );
+        }
       },
       undefined,
       () => setFailed(true),
@@ -332,7 +443,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     // ── Raycast: hover + клик (по базовому мешу; overlay делит геометрию) ──
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
-    const rayTargets = () => [baseMesh, overlay].filter(Boolean) as THREE.Object3D[];
+    const rayTargets = () => [organRootRef.current, baseMesh, overlay].filter(Boolean) as THREE.Object3D[];
 
     const systemAt = (event: MouseEvent): string | null => {
       if (!containerRef.current) return null;
@@ -340,8 +451,15 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(rayTargets(), false);
-      if (!hits.length || !hits[0].face) return null;
+      const hits = raycaster.intersectObjects(rayTargets(), true);
+      if (!hits.length) return null;
+      // Органы несут systemId на себе и родителях — приоритет им
+      let o: THREE.Object3D | null = hits[0].object;
+      while (o) {
+        if (o.userData && typeof o.userData.systemId === 'string') return o.userData.systemId as string;
+        o = o.parent;
+      }
+      if (!hits[0].face) return null;
       const face = hits[0].face;
       const verts = [face.a, face.b, face.c];
       const sysInFace = verts.map((vi) => (vi < zoneIdx.length ? zoneIdx[vi] : -1)).filter((z) => z >= 0);
@@ -366,6 +484,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       setHoveredSystem(sys);
       if (containerRef.current) containerRef.current.style.cursor = sys ? 'pointer' : 'grab';
       sceneRef.current?.applyColors();
+      sceneRef.current?.applyOrganColors();
     };
     const handleClick = (event: MouseEvent) => {
       const sys = systemAt(event);
@@ -376,11 +495,13 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         return next;
       });
       sceneRef.current?.applyColors();
+      sceneRef.current?.applyOrganColors();
     };
     const handleLeave = () => {
       hoverRef.current = null;
       setHoveredSystem(null);
       sceneRef.current?.applyColors();
+      sceneRef.current?.applyOrganColors();
     };
 
     container.addEventListener('mousemove', handleMove);
@@ -412,6 +533,8 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       container.removeEventListener('mouseleave', handleLeave);
       controls.dispose();
       renderer.dispose();
+      organEntriesRef.current = [];
+      organRootRef.current = null;
       if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
       scene.traverse((obj) => {
         if (obj instanceof THREE.Mesh) {
@@ -429,7 +552,14 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     const ref = sceneRef.current;
     if (!ref) return;
     ref.applyColors();
+    ref.applyOrganColors();
   }, [tzResult, selectedSystem, hoveredSystem, loaded, getSystemRiskPct]);
+
+  // ── Тоггл видимости органов ──
+  useEffect(() => {
+    showOrgansRef.current = showOrgans;
+    for (const entry of organEntriesRef.current) entry.group.visible = showOrgans;
+  }, [showOrgans]);
 
   // ── Selected system sync from chip buttons ──
   const handleChipClick = useCallback((sys: string) => {
@@ -439,6 +569,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       return next;
     });
     sceneRef.current?.applyColors();
+    sceneRef.current?.applyOrganColors();
   }, []);
 
   const hoverInfo = hoveredSystem ? SYSTEM_ANCHORS.find((a) => a.id === hoveredSystem) : null;
@@ -497,6 +628,16 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
 
       {/* Chip buttons — APK PRO: 44px, белый */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+        <button onClick={() => setShowOrgans(v => !v)} aria-pressed={showOrgans} style={{
+          display: 'flex', alignItems: 'center', gap: 6, minHeight: 44, padding: '10px 16px', borderRadius: 999,
+          fontSize: 13, fontWeight: 800, cursor: 'pointer',
+          background: showOrgans ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${showOrgans ? '#8b5cf6' : 'rgba(255,255,255,0.10)'}`,
+          color: '#fff',
+          transition: 'all 0.15s',
+        }}>
+          🫀 Органы {showOrgans ? 'вкл' : 'выкл'}
+        </button>
         {systemList.map(o => {
           const isSel = selectedSystem === o.system;
           return (
@@ -550,7 +691,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       })()}
 
       <div style={{ fontSize: 12, color: '#fff', textAlign: 'center', marginTop: 10, lineHeight:1.5 }}>
-        🖱 Клик по зоне на теле · Вращайте · Колёсико для зума · Клик по чипу для деталей
+        🖱 Клик по зоне или органу · Вращайте · Колёсико для зума · Клик по чипу для деталей
       </div>
     </div>
   );
