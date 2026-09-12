@@ -398,6 +398,35 @@ describe('ArticlesScreen PRO TOP', () => {
     expect(dl.getAttribute('href')).toContain('.pdf');
   });
 
+  it('31. кегль масштабирует таблицы и списки', () => {
+    const md = '## Раздел\n\n- пункт\n\n| A | B |\n|---|---|\n| 1 | 2 |';
+    const small = renderMarkdown(md, 14);
+    const big = renderMarkdown(md, 18);
+    // дефолт 14 — прежние значения
+    expect(small).toContain('font-size:13px');
+    expect(small).toContain('font-size:12px');
+    // 18: списки 17, ячейки 16, подзаголовки 21
+    expect(big).toContain('font-size:17px');
+    expect(big).toContain('font-size:16px');
+    expect(big).toContain('font-size:21px');
+    expect(big).not.toContain('font-size:13px');
+  });
+
+  it('32. панель фильтров липкая', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const bar = container.querySelector('.articles-filterbar') as HTMLElement;
+    expect(bar).not.toBeNull();
+    expect(bar.getAttribute('style')).toContain('sticky');
+    expect(bar.querySelector('.articles-search')).not.toBeNull();
+    expect(bar.querySelector('.articles-chips')).not.toBeNull();
+  });
+
+  it('33. hero считает категории из каталога', () => {
+    const { container } = render(<ArticlesScreen />);
+    expect(container.textContent).toContain('5 категорий');
+  });
+
   it('6. PDF-карточка зовёт читать внутри', () => {
     const { container } = render(<ArticlesScreen />);
     goToList(container);

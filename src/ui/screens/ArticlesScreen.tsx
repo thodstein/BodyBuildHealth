@@ -166,15 +166,20 @@ export function highlightMatch(text: string, q: string): React.ReactNode {
 }
 
 export function renderMarkdown(md: string, bodyPx = 14): string {
+  // Вся мелкая типографика масштабируется от кегля читалки (A−/A+):
+  // при дефолте 14 все значения совпадают с прежними.
+  const liPx = bodyPx - 1;
+  const smPx = bodyPx - 2;
+  const h3Px = bodyPx + 3;
   let h2Seen = false;
   let h3Idx = 0;
   let html = md
     .replace(/^### (.+)$/gm, (_, h) =>
-      `<h4 style="font-size:13px;font-weight:800;color:#a78bfa;margin:22px 0 8px;letter-spacing:-0.01em;border-left:3px solid ${ART_ACC};padding-left:10px">${h}</h4>`)
+      `<h4 style="font-size:${liPx}px;font-weight:800;color:#a78bfa;margin:22px 0 8px;letter-spacing:-0.01em;border-left:3px solid ${ART_ACC};padding-left:10px">${h}</h4>`)
     .replace(/^## (.+)$/gm, (_, h) => {
       const id = `art-sec-${h3Idx}-${slugifyHeading(h)}`;
       h3Idx += 1;
-      return `<h3 id="${id}" style="font-size:17px;font-weight:800;color:#fff;margin:26px 0 4px;letter-spacing:-0.02em;display:flex;align-items:center;gap:8px"><span style="width:22px;height:22px;border-radius:7px;background:${artA(0.12)};border:1px solid ${artA(0.22)};display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:${ART_ACC};flex-shrink:0">§</span>${h}</h3>`;
+      return `<h3 id="${id}" style="font-size:${h3Px}px;font-weight:800;color:#fff;margin:26px 0 4px;letter-spacing:-0.02em;display:flex;align-items:center;gap:8px"><span style="width:22px;height:22px;border-radius:7px;background:${artA(0.12)};border:1px solid ${artA(0.22)};display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:${ART_ACC};flex-shrink:0">§</span>${h}</h3>`;
     })
     .replace(/^# (.+)$/gm, (_, h) => {
       h2Seen = false;
@@ -196,12 +201,12 @@ export function renderMarkdown(md: string, bodyPx = 14): string {
         inTable = true;
         const headerCells = line.split('|').filter(c => c.trim());
         const headerRow = '<tr>' + headerCells.map(c =>
-          `<th style="padding:9px 12px;text-align:left;font-size:12px;font-weight:800;color:${ART_ACC};text-transform:uppercase;letter-spacing:0.06em;background:${artA(0.09)};border-bottom:1px solid ${artA(0.16)};white-space:nowrap">${c.trim()}</th>`
+          `<th style="padding:9px 12px;text-align:left;font-size:${smPx}px;font-weight:800;color:${ART_ACC};text-transform:uppercase;letter-spacing:0.06em;background:${artA(0.09)};border-bottom:1px solid ${artA(0.16)};white-space:nowrap">${c.trim()}</th>`
         ).join('') + '</tr>';
-        return `<div style="overflow-x:auto;margin:14px -4px 0;padding:0 4px;-webkit-overflow-scrolling:touch"><table style="width:100%;min-width:480px;border-collapse:collapse;border-radius:12px;overflow:hidden;font-size:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)"><thead>${headerRow}</thead><tbody>`;
+        return `<div style="overflow-x:auto;margin:14px -4px 0;padding:0 4px;-webkit-overflow-scrolling:touch"><table style="width:100%;min-width:480px;border-collapse:collapse;border-radius:12px;overflow:hidden;font-size:${smPx}px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)"><thead>${headerRow}</thead><tbody>`;
       }
       return '<tr>' + cells.map((c, i) =>
-        `<td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;line-height:1.5;${i === 0 ? 'font-weight:700;color:#fff' : 'color:#fff'}">${c.trim()}</td>`
+        `<td style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:${smPx}px;line-height:1.5;${i === 0 ? 'font-weight:700;color:#fff' : 'color:#fff'}">${c.trim()}</td>`
       ).join('') + '</tr>';
     } else {
       if (inTable) {
@@ -217,11 +222,11 @@ export function renderMarkdown(md: string, bodyPx = 14): string {
   // с тире-префиксом и чекбокс-паттерны (дефис) больше не матчатся.
   html = html
     .replace(/^- \[ \] (.+)$/gm, (_, t) =>
-      `<span style="display:inline-flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;line-height:1.5;color:#fff"><span style="width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(255,255,255,0.25);display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0"></span>${t}</span><br/>`)
+      `<span style="display:inline-flex;align-items:center;gap:8px;margin:5px 0;font-size:${smPx}px;line-height:1.5;color:#fff"><span style="width:16px;height:16px;border-radius:5px;border:1.5px solid rgba(255,255,255,0.25);display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0"></span>${t}</span><br/>`)
     .replace(/^- \[x\] (.+)$/gm, (_, t) =>
-      `<span style="display:inline-flex;align-items:center;gap:8px;margin:5px 0;font-size:12px;line-height:1.5;color:${ART_ACC}"><span style="width:16px;height:16px;border-radius:5px;background:${ART_ACC};display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;color:#000;font-weight:900">✓</span>${t}</span><br/>`)
+      `<span style="display:inline-flex;align-items:center;gap:8px;margin:5px 0;font-size:${smPx}px;line-height:1.5;color:${ART_ACC}"><span style="width:16px;height:16px;border-radius:5px;background:${ART_ACC};display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;color:#000;font-weight:900">✓</span>${t}</span><br/>`)
     .replace(/^- (.+)$/gm, (_, item) =>
-      `<li style="margin:6px 0;font-size:13px;line-height:1.6;color:#fff;position:relative;padding-left:4px">— ${item}</li>`)
+      `<li style="margin:6px 0;font-size:${liPx}px;line-height:1.6;color:#fff;position:relative;padding-left:4px">— ${item}</li>`)
     .replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:12px 0;padding:0;list-style:none">${m}</ul>`)
     .replace(/^---$/gm, `<hr style="border:none;height:1px;background:linear-gradient(90deg,transparent,${artA(0.22)},transparent);margin:22px 0"/>`);
   // NOTE: `\n\n` в спейсеры — ПОСЛЕ оборачивания абзацев в <p> (иначе строки
@@ -229,13 +234,13 @@ export function renderMarkdown(md: string, bodyPx = 14): string {
 
   html = html
     .replace(/^\d+\. (.+)$/gm, (_, item) =>
-      `<li data-num="1" style="margin:7px 0;font-size:13.5px;line-height:1.65;color:#fff;padding-left:4px">◆ ${item}</li>`)
+      `<li data-num="1" style="margin:7px 0;font-size:${liPx + 0.5}px;line-height:1.65;color:#fff;padding-left:4px">◆ ${item}</li>`)
     .replace(/^> ⚠(.+)$/gm, (_, q) =>
-      `<blockquote style="margin:16px 0;padding:12px 14px;background:rgba(239,68,68,0.08);border-left:3px solid #f87171;border-radius:10px;font-size:13px;color:#fff;line-height:1.6">⚠${q}</blockquote>`)
+      `<blockquote style="margin:16px 0;padding:12px 14px;background:rgba(239,68,68,0.08);border-left:3px solid #f87171;border-radius:10px;font-size:${liPx}px;color:#fff;line-height:1.6">⚠${q}</blockquote>`)
     .replace(/^> 💡(.+)$/gm, (_, q) =>
-      `<blockquote style="margin:16px 0;padding:12px 14px;background:rgba(234,179,8,0.08);border-left:3px solid #eab308;border-radius:10px;font-size:13px;color:#fff;line-height:1.6">💡${q}</blockquote>`)
+      `<blockquote style="margin:16px 0;padding:12px 14px;background:rgba(234,179,8,0.08);border-left:3px solid #eab308;border-radius:10px;font-size:${liPx}px;color:#fff;line-height:1.6">💡${q}</blockquote>`)
     .replace(/^> (.+)$/gm, (_, q) =>
-      `<blockquote style="margin:16px 0;padding:12px 14px;background:${artA(0.07)};border-left:3px solid ${ART_ACC};border-radius:10px;font-size:13px;color:#fff;line-height:1.6;backdrop-filter:blur(8px)">${q}</blockquote>`);
+      `<blockquote style="margin:16px 0;padding:12px 14px;background:${artA(0.07)};border-left:3px solid ${ART_ACC};border-radius:10px;font-size:${liPx}px;color:#fff;line-height:1.6;backdrop-filter:blur(8px)">${q}</blockquote>`);
 
   // Обычные текстовые строки → <p>; первый абзац после заголовка — лид (крупнее, акцентная полоса).
   let leadDone = false;
@@ -444,7 +449,7 @@ export const ArticlesScreen: React.FC = () => {
             <p className="articles-hero-sub" style={{ fontSize:11, color:'#fff', margin:0, lineHeight:1.4, textShadow:'0 1px 6px rgba(0,0,0,0.8)', maxWidth:480 }}>Фармакология · Анализы · Тренировки · Питание · Поддержка — концентрат практики и науки</p>
             <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:8 }}>
               <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:20, background:'rgba(18,18,20,0.55)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>{ARTICLES_MANIFEST.length} материалов</span>
-              <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:20, background:'rgba(18,18,20,0.55)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>5 категорий</span>
+              <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:20, background:'rgba(18,18,20,0.55)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff' }}>{CATEGORIES.length - 1} категорий</span>
               <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:20, background:'rgba(18,18,20,0.55)', border:`1px solid ${artA(0.16)}`, color:ART_ACC }}>Еженедельно</span>
             </div>
           </div>
@@ -523,8 +528,10 @@ export const ArticlesScreen: React.FC = () => {
         <span style={{ fontSize:12, fontWeight:800, color:'#fff', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', padding:'7px 12px', borderRadius:999 }}>{articles.length} ст.</span>
       </div>
 
+      {/* Фильтры — липкая панель: поиск + категории всегда под рукой */}
+      <div className="articles-filterbar" style={{ position:'sticky', top:64, zIndex:15, margin:'0 -6px 12px', padding:'10px 6px 8px', background:'rgba(10,10,15,0.88)', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
       {/* Search bar — glass */}
-      <div style={{ position:'relative', marginBottom:10, marginTop:10 }}>
+      <div style={{ position:'relative', marginBottom:8 }}>
         <svg style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', width:15, height:15, color:'#fff', fill:'none', stroke:'currentColor', strokeWidth:2, strokeLinecap:'round' }} viewBox="0 0 24 24">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
@@ -547,7 +554,7 @@ export const ArticlesScreen: React.FC = () => {
       </div>
 
       {/* Category chips — APK PRO: тач 44px, скролл-лента */}
-      <div className="articles-chips" style={{ display:'flex', gap:8, flexWrap:'nowrap', overflowX:'auto', marginBottom:12, paddingBottom:4, scrollbarWidth:'none' }}>
+      <div className="articles-chips" style={{ display:'flex', gap:8, flexWrap:'nowrap', overflowX:'auto', paddingBottom:2, scrollbarWidth:'none' }}>
         {/* «Сохранённые» — только native: контракт волны D (офлайн-фича АПК), тест home-profile-shop-native */}
         {isNativeApp() && (
           <button key="saved" onClick={() => setCategory('saved')} className="article-chip" data-active={category === 'saved'} aria-label="Сохранённые статьи" style={{
@@ -585,6 +592,7 @@ export const ArticlesScreen: React.FC = () => {
           );
         })}
       </div>
+      </div>{/* /articles-filterbar */}
 
       {/* PDF Viewer — INLINE внутри приложения (iframe + фолбэк наружу) */}
       {pdfViewer && (
