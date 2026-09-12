@@ -21,6 +21,7 @@ import { weightForCombatExerciseResolved } from './combat-workmax';
 import { sparringToOutsideLoad, sparringWeeklyLoad, sparringSummary } from './combat-sparring.engine';
 import { teenCombatGates, hasWeightManipulation, neckExtensionCutoffKg, concussionProtocol, sparringSafetyErrors } from './combat-safety.engine';
 import { weightToClassBoundary, weightClassLine } from './combat-weight-class.engine';
+import { femaleCutTempoDefault, femaleCombatNotes, travelPoolFilter, travelVolumeMult, travelTaperNote } from './combat-female-travel.engine';
 import { isExcludeInjuryCB } from './combat-selection';
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import { COMBAT_LANDMARKS } from './combat-volume';
@@ -255,6 +256,8 @@ function filterPool(ids: string[], input: CombatInput): string[] {
       if (out.length===0) out = ['deadbug','side_plank'];
     }
   }
+  // P5 travel: отель — только свой вес (верх ограничен честно)
+  out = travelPoolFilter(out, (input as any).travelMode);
   return out;
 }
 function gentleFactorCB(id: string, injuries: any[]|undefined): number {
@@ -362,7 +365,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     const effNutrition = Math.max(0.7, Math.min(1.1, nutritionMult));
     const effOutside = Math.max(0.55, Math.min(1, outsideMult));
     const effAcwr = Math.max(0.6, Math.min(1.1, acwrMult));
-    return Math.round(base * lab * effOutside * effRecovery * effNutrition * effAcwr);
+    const effTravel = travelVolumeMult((input as any).travelMode);
+    return Math.round(base * lab * effOutside * effRecovery * effNutrition * effAcwr * effTravel);
   })();
 
   const periodModelEarly = input.periodizationModel || (goal === 'camp' ? 'camp_8' : weeks >= 9 ? 'atr_10' : 'linear');
@@ -375,7 +379,11 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   rationale.push(styleNarrative(input.fightStyle as any, discipline as any));
   if (input.sparringLoad) rationale.push(sparringSummary(input.sparringLoad));
   if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load (${cbRuInterference(outsideMetrics.interference)}) → объём зала ×${outsideMetrics.volumeMultiplier}`);
-  rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)}${acwrMult !== 1 ? ` · ACWR ×${acwrMult.toFixed(2)}` : ''} · Budget ${weeklyBudget}`);
+  rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)}${acwrMult !== 1 ? ` · ACWR ×${acwrMult.toFixed(2)}` : ''}${(input as any).travelMode === 'hotel' ? ' · Travel ×0.9' : ''} · Budget ${weeklyBudget}`);
+  // P5: женские ноты + travel-нота в rationale (без новой математики)
+  for (const n of femaleCombatNotes({ sex: input.sex, lutealPhase: !!(input as any).lutealPhase, weightCutKg: input.weightCutKg, bodyweightKg: input.bodyweight })) rationale.push(n);
+  const travelNote = travelTaperNote((input as any).travelMode, !!input.fightDate);
+  if (travelNote) rationale.push(travelNote);
   if (input.weightCutKg && input.weightCutKg > 0 && !wcProtocol) rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
   if (wcProtocol) {
     rationale.push(`Протокол весогонки: ${wcProtocol.targetLossKg}кг за ${wcProtocol.weeksOut}нед · вода ${CB_RU_MODE[wcProtocol.waterMode] || wcProtocol.waterMode} · Na ${CB_RU_MODE[wcProtocol.sodiumMode] || wcProtocol.sodiumMode} · угли ${CB_RU_MODE[wcProtocol.carbMode] || wcProtocol.carbMode}${wcProtocol.heatSessions?' · сауна':''}`);
@@ -875,6 +883,13 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         if (!warnings.includes(item)) warnings.push(item);
       }
     }
+  }
+
+  // P5: лютеиновая пометка + same-day × отель (не совмещать)
+  if ((input as any).lutealPhase && input.sex === 'female') warnings.push('Лютеиновая фаза: задержка воды +0.5–1 кг — вес оценивайте по среднему за 7 дней');
+  if ((input as any).travelMode === 'hotel') warnings.push('Отель: только свой вес — верх ограничен, объём ×0.9 (поддержание)');
+  if ((input as any).travelMode === 'hotel' && wcProtocol?.weighInType === 'same_day_2h') {
+    errors.push('Отель + same-day взвешивание — не совмещать: нет зала и нет времени на регидратацию');
   }
 
   const snap: any = { ...input, outsideLoad: effectiveOutsideLoad, weightCutProtocol: wcProtocol || (input as any).weightCutProtocol || null };

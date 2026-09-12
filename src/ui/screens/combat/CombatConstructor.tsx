@@ -123,7 +123,6 @@ export const CombatConstructor: React.FC = () => {
     annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
     concussionHistory, setConcussionHistory, neckExtensionKg, setNeckExtensionKg, neckFlexExtRatio, setNeckFlexExtRatio,
     weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, travelMode, setTravelMode, lutealPhase, setLutealPhase,
-    weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, travelMode, setTravelMode, lutealPhase, setLutealPhase,
     outsideMetrics,
   } = useCombatWizard();
   const [cycFilter, setCycFilter] = React.useState<string>('all');
@@ -748,6 +747,10 @@ export const CombatConstructor: React.FC = () => {
                 <CombatPopupNumber label="Шея flex/ext" value={neckFlexExtRatio} min={0} max={2} step={0.01} onChange={v=> setNeckFlexExtRatio(v)} />
               </div>
               <div style={{ fontSize: 10.5, color: '#fff' }}>Cutoff экстензии 3.71 N/кг (≈{(bodyweight * 0.378).toFixed(1)}кг при {bodyweight}кг) · flex/ext &gt;0.74 — риск ×3 (подростки регби 2024) · шея — модифицируемый фактор, не гарантия (JOSPT)</div>
+              <CbSwitch checked={travelMode === 'hotel'} onChange={v => setTravelMode(v ? 'hotel' : 'off')} label="✈️ Отель / дорога" desc="только свой вес, объём ×0.9, верх ограничен" />
+              {sex === 'female' && (
+                <CbSwitch checked={lutealPhase} onChange={setLutealPhase} label="🌙 Лютеиновая фаза" desc="задержка воды +0.5–1кг — анализ по среднему 7д" />
+              )}
               {acwr && (
                 <InfoBanner tone={acwr.zone === 'dangerous' ? 'warn' : acwr.zone === 'caution' ? 'warn' : 'ok'}>
                   ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone === 'dangerous' ? '— объём ×0.60, RIR+2' : acwr.zone === 'caution' ? '— ×0.85, RIR+1' : acwr.zone === 'undertrained' ? '— добавить объём' : '— оптимум'} · дневник sRPE 28д
