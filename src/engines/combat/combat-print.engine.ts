@@ -32,8 +32,10 @@ export function buildCombatPrintHtml(plan: CombatPlan): string {
   const wcut = wcSnap ? `<p><b>Весогонка ISSN 2025:</b> ${wcSnap.targetLossKg}кг · ${wcSnap.weighInType==='same_day_2h'?'взвешивание в день':'взвешивание за 24ч'} · вода ${CB_RU_MODE[wcSnap.waterMode] || escHtml(wcSnap.waterMode)} · Na ${CB_RU_MODE[wcSnap.sodiumMode] || escHtml(wcSnap.sodiumMode)} · угли ${CB_RU_MODE[wcSnap.carbMode] || escHtml(wcSnap.carbMode)} · ORS ${wcSnap.orsSodiumMmolPerDl||65} mmol/дл · волокно ${wcSnap.fiberGPerDay||10}г${wcSnap.confirmedManipulation?' · подтверждено':''}<br/><i style="font-size:10px;color:#6b7280">Post: ORS 1-1.5л/ч 50-90 mmol → ≤60г/ч углей → 8-12г/кг (сильная) / 4-7г/кг (умеренная) за 24ч · 125-150% жидкости · жиры исключить 6ч</i></p>` : '';
   const fstyle = (plan.inputSnapshot as any)?.fightStyle ? `<p><b>Стиль:</b> ${escHtml(CB_RU_STYLE[(plan.inputSnapshot as any).fightStyle] || (plan.inputSnapshot as any).fightStyle)} · ${ (plan.inputSnapshot as any).fightStyle==='striker' ? 'ударник: ротация+плио (удар)' : (plan.inputSnapshot as any).fightStyle==='grappler' ? 'борец: шея/хват+унилатераль (клинч/партер)' : 'гибрид: баланс'}</p>` : '';
   const axial = (plan.inputSnapshot as any)?.avoidAxialLoad ? `<p style="color:#b45309">⚠ Избегать осевой нагрузки (грыжа/перегруз) — осевые заменены</p>` : '';
+  const fight = buildFightWeekTemplateHtml((plan.inputSnapshot as any)?.fightDate || null, wcSnap?.weighInType || null);
   const rationale = plan.rationale.map(r=> `<li>${escHtml(r)}</li>`).join('');
   const warns = (plan.validation?.warnings||[]).map(w=> `<li style="color:#b45309">${escHtml(w)}</li>`).join('');
+  const errs = (plan.validation?.errors||[]).map(e=> `<li style="color:#b91c1c"><b>⛔ ${escHtml(e)}</b></li>`).join('');
   // Gantt + heatmap по неделям
   const ganttSegs = plan.weeksData.map(w=>{
     const col = phaseColor[w.phase] || '#a855f7';
@@ -43,7 +45,28 @@ export function buildCombatPrintHtml(plan: CombatPlan): string {
   const gantt = `<div style="display:flex;height:14px;border-radius:6px;overflow:hidden;border:0.5px solid #e5e7eb;margin:8px 0 4px">${ganttSegs}</div><div style="display:flex;justify-content:space-between;font-size:8px;color:#6b7280"><span>Нед 1</span><span>Нед ${plan.weeks}</span></div>`;
   const hash = `cb-${plan.discipline}-${plan.weeks}w-${plan.patternId}-${plan.weeksData.map(w=> w.phase[0]).join('')}`;
   const qrData = encodeURIComponent(hash);
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Единоборства ${escHtml(cbDisciplineName(plan.discipline))} ${plan.weeks}нед ${escHtml(plan.patternId)}</title><style>body{font-family:Inter,Arial,sans-serif;padding:16px;color:#111}h2{margin:0}h3{margin:12px 0 6px}table th{background:#f3f4f6} @media print{body{padding:8px}}</style></head><body><h2>Единоборства: ${escHtml(cbDisciplineName(plan.discipline))} · ${escHtml(CB_RU_GOAL[plan.goal] || plan.goal)} · ${escHtml(CB_RU_LEVEL[plan.level] || plan.level)} · ${plan.weeks}нед · ${escHtml(plan.patternId)}</h2>${gantt}<p>Модель ${escHtml(CB_RU_MODEL[(plan.inputSnapshot as any)?.periodizationModel] || (plan.inputSnapshot as any)?.periodizationModel || 'ATR 5/3/2')} · DUP ${escHtml(CB_RU_DUP[(plan.inputSnapshot as any)?.dupMode] || (plan.inputSnapshot as any)?.dupMode || 'выкл')} · ${(plan.inputSnapshot as any)?.fightDate?`бой ${(plan.inputSnapshot as any).fightDate} тапер ${(plan.inputSnapshot as any)?.taperWeeks||1}нед`:''}</p>${sparr}${wcut}${fstyle}${axial}${weeks}${cond}<h3>Обоснование</h3><ul>${rationale}</ul>${warns?`<h3>Предупреждения</h3><ul>${warns}</ul>`:''}<div style="margin-top:12px;padding:8px 10px;background:#f3f4f6;border-radius:6px;font-size:10px;color:#6b7280;display:flex;align-items:center;gap:10">hash: ${escHtml(hash)} · #combat-plan · Ctrl+P → PDF <img src="https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=${qrData}" alt="QR ${escHtml(hash)}" style="border-radius:4px;border:0.5px solid #e5e7eb" width="70" height="70"/></div></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Единоборства ${escHtml(cbDisciplineName(plan.discipline))} ${plan.weeks}нед ${escHtml(plan.patternId)}</title><style>body{font-family:Inter,Arial,sans-serif;padding:16px;color:#111}h2{margin:0}h3{margin:12px 0 6px}table th{background:#f3f4f6} @media print{body{padding:8px}}</style></head><body><h2>Единоборства: ${escHtml(cbDisciplineName(plan.discipline))} · ${escHtml(CB_RU_GOAL[plan.goal] || plan.goal)} · ${escHtml(CB_RU_LEVEL[plan.level] || plan.level)} · ${plan.weeks}нед · ${escHtml(plan.patternId)}</h2>${gantt}<p>Модель ${escHtml(CB_RU_MODEL[(plan.inputSnapshot as any)?.periodizationModel] || (plan.inputSnapshot as any)?.periodizationModel || 'ATR 5/3/2')} · DUP ${escHtml(CB_RU_DUP[(plan.inputSnapshot as any)?.dupMode] || (plan.inputSnapshot as any)?.dupMode || 'выкл')} · ${(plan.inputSnapshot as any)?.fightDate?`бой ${(plan.inputSnapshot as any).fightDate} тапер ${(plan.inputSnapshot as any)?.taperWeeks||1}нед`:''}</p>${sparr}${wcut}${fight}${fstyle}${axial}${weeks}${cond}<h3>Обоснование</h3><ul>${rationale}</ul>${errs?`<h3>Ошибки (сборка заблокирована)</h3><ul>${errs}</ul>`:''}${warns?`<h3>Предупреждения</h3><ul>${warns}</ul>`:''}<div style="margin-top:12px;padding:8px 10px;background:#f3f4f6;border-radius:6px;font-size:10px;color:#6b7280;display:flex;align-items:center;gap:10">hash: ${escHtml(hash)} · #combat-plan · Ctrl+P → PDF <img src="https://api.qrserver.com/v1/create-qr-code/?size=70x70&data=${qrData}" alt="QR ${escHtml(hash)}" style="border-radius:4px;border:0.5px solid #e5e7eb" width="70" height="70"/></div></body></html>`;
+}
+
+/**
+ * P7: fight-week шаблон 14–10 / 9–5 / 4–1 (Lau 2025, 369MMAFIT 2026) + чек-лист боя.
+ * Чистый, XSS-safe (все входные через escHtml).
+ */
+export function buildFightWeekTemplateHtml(fightDate: string | null | undefined, weighInType: string | null | undefined): string {
+  if (!fightDate) return '';
+  const sameDay = weighInType === 'same_day_2h';
+  return `<div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:8px;margin:8px 0;border-radius:6px">`
+    + `<h3 style="margin:0 0 6px">🏁 Fight week — бой ${escHtml(fightDate)}${sameDay ? ' · взвешивание в день' : ''}</h3>`
+    + `<ul style="font-size:11px;margin:0;padding-left:18px">`
+    + `<li><b>Дни 14–10:</b> S&C 50% объёма, последний тяжёлый спарринг (контролируемо), кондиция умеренно</li>`
+    + `<li><b>Дни 9–5:</b> S&C 30% или только нейро-активация (3–5 взрывных сетов), спарринг только technical 50%, дриллинг полным объёмом</li>`
+    + `<li><b>Дни 4–1:</b> без S&C — тень 2–3 раунда 50% + пады легко, сон 9ч, знакомая высокоуглеводная еда</li>`
+    + (sameDay
+      ? `<li><b>Взвешивание в день:</b> 0.5–1л ORS + 30–40г углей, без тяжёлой еды, цель +2–3% BM</li>`
+      : `<li><b>После взвешивания:</b> ORS 1–1.5л/ч → ≤60г/ч углей → 8–12г/кг за 24ч, цель +≥10% BM</li>`)
+    + `</ul>`
+    + `<p style="font-size:10px;color:#6b7280;margin:6px 0 0">Чек-лист: ☐ вес сделан ☐ сон 9ч ☐ пады 2–3 быстрых раунда ☐ ORS/еда по протоколу ☐ разминка+нейро-активация</p>`
+    + `</div>`;
 }
 
 export function buildCombatCsv(plan: CombatPlan): string {
@@ -75,6 +98,21 @@ export function buildCombatPlanIcs(plan: CombatPlan, startDate?: string | null):
       lines.push('BEGIN:VEVENT', `UID:cb-${plan.id}-w${w.week}d${s.day}@bodybuild`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(d)}`, `DTEND:${fmt(e)}`, `SUMMARY:${escIcs(`${cbAnnualPhaseName(w.phase)} ${cbSessionTagName(s.sessionTag)} ${s.character} — ${s.exercises.map(x=>x.name).slice(0,3).join(', ')}`)}`, `DESCRIPTION:${escIcs(s.exercises.map(x=> `${x.name} ${x.sets}×${x.reps} ${x.weight}кг RIR${x.rir}`).join('\\n'))}`, 'END:VEVENT');
     }
   }
+  // P7: события боя и взвешивания (day_before → взвешивание за день, same_day → в день боя)
+  try {
+    const snap: any = (plan as any).inputSnapshot || {};
+    if (typeof snap.fightDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(snap.fightDate)) {
+      const fight = new Date(snap.fightDate);
+      const fightEnd = new Date(fight.getTime() + 86400000);
+      lines.push('BEGIN:VEVENT', `UID:cb-${plan.id}-fight@bodybuild`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(fight)}`, `DTEND:${fmt(fightEnd)}`, `SUMMARY:${escIcs(`Бой (${cbDisciplineName(plan.discipline)})`)}`, `DESCRIPTION:${escIcs('Fight week шаблон: дни 14–10 S&C 50%, 9–5 technical only, 4–1 без S&C')}`, 'END:VEVENT');
+      if (snap.weightCutProtocol && snap.weightCutKg > 0) {
+        const sameDay = snap.weightCutProtocol.weighInType === 'same_day_2h';
+        const weigh = sameDay ? fight : new Date(fight.getTime() - 86400000);
+        const weighEnd = new Date(weigh.getTime() + 86400000);
+        lines.push('BEGIN:VEVENT', `UID:cb-${plan.id}-weighin@bodybuild`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(weigh)}`, `DTEND:${fmt(weighEnd)}`, `SUMMARY:${escIcs(`Взвешивание −${snap.weightCutKg}кг`)}`, `DESCRIPTION:${escIcs(sameDay ? 'Same-day: 0.5–1л ORS + 30–40г углей' : 'ORS 1–1.5л/ч → ≤60г/ч углей → 8–12г/кг за 24ч')}`, 'END:VEVENT');
+      }
+    }
+  } catch { /* no-op */ }
   lines.push('END:VCALENDAR');
   return lines.join('\r\n');
 }

@@ -5,20 +5,55 @@ import type { CombatPlan } from './combat.types';
 
 const KEY = 'he_combat_plan_v1';
 const LIST_KEY = 'he_combat_plans_v1';
+// Связанные ключи плана (чистятся вместе с планом по planId)
+const PAYLOAD_KEYS = ['he_combat_nutrition_payload', 'he_combat_cardio_payload'];
+
+/** P7: проверка формы плана (битый стор отбраковывается, а не пропускается). id не требуем — legacy без id мигрируется. */
+export function isCombatPlanShape(raw: any): boolean {
+  if (!raw || typeof raw !== 'object') return false;
+  if (!Array.isArray(raw.weeksData) || raw.weeksData.length === 0) return false;
+  for (const w of raw.weeksData) {
+    if (typeof w?.week !== 'number' || !Array.isArray(w?.sessions)) return false;
+  }
+  return true;
+}
+
+function writeWithQuotaFallback(list: CombatPlan[]): boolean {
+  // P7: quota — режем список пополам до успеха (кап 20 → 10 → 5 → 1), честно без молчаливой потери текущего
+  let cur = list.slice(0, 20);
+  while (cur.length > 0) {
+    try {
+      localStorage.setItem(LIST_KEY, JSON.stringify(cur));
+      return true;
+    } catch {
+      if (cur.length <= 1) return false;
+      cur = cur.slice(0, Math.max(1, Math.floor(cur.length / 2)));
+    }
+  }
+  return false;
+}
 
 export function saveCombatPlan(plan: CombatPlan): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(plan));
+    try {
+      localStorage.setItem(KEY, JSON.stringify(plan));
+    } catch {
+      // текущий план важнее истории: квоту чистим за счёт списка, текущий пишем последним шансом
+      try { localStorage.removeItem(LIST_KEY); } catch { /* no-op */ }
+      try { localStorage.setItem(KEY, JSON.stringify(plan)); } catch { return; }
+    }
     const list: CombatPlan[] = loadCombatPlans();
     const idx = list.findIndex(p => p.id === plan.id);
     if (idx >= 0) list[idx] = plan;
     else list.unshift(plan);
-    localStorage.setItem(LIST_KEY, JSON.stringify(list.slice(0, 20)));
-  } catch {}
+    writeWithQuotaFallback(list);
+  } catch { /* честно молчим только при полном провале — план живёт в памяти конструктора */ }
 }
 
 function migrateCombatPlan(raw: any): CombatPlan {
   if (!raw || typeof raw !== 'object') return raw;
+  // P7: legacy без id — детерминированный id (иначе список/удаление не работает)
+  if (typeof raw.id !== 'string' || !raw.id) raw.id = 'cb_legacy_migrated';
   // v1→v2: normDiscipline
   const discMap: Record<string,string> = { boxing:'boxing', 'бокс':'boxing', mma:'mma', 'мма':'mma', wrestling:'wrestling', 'борьба':'wrestling', kickboxing:'kickboxing', 'кик':'kickboxing', general:'general' };
   if (typeof raw.discipline === 'string') {
@@ -62,6 +97,8 @@ export function loadCombatPlan(): CombatPlan | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
+    // P7: битый weeksData отбраковывается (раньше пропускался как есть)
+    if (!isCombatPlanShape(parsed)) return null;
     return migrateCombatPlan(parsed);
   } catch { return null; }
 }
@@ -72,7 +109,8 @@ export function loadCombatPlans(): CombatPlan[] {
     if (!raw) return [];
     const arr = JSON.parse(raw);
     const list = Array.isArray(arr) ? arr : [];
-    return list.map(migrateCombatPlan);
+    // P7: отбраковка битых записей списка
+    return list.filter(isCombatPlanShape).map(migrateCombatPlan);
   } catch { return []; }
 }
 
@@ -91,5 +129,12 @@ export function removeCombatPlan(id: string): void {
     localStorage.setItem(LIST_KEY, JSON.stringify(list));
     const cur = loadCombatPlan();
     if (cur?.id === id) localStorage.removeItem(KEY);
+    // P7: чистим связанные payload-ключи этого плана (питание/кардио), чужие планы не трогаем
+    for (const k of PAYLOAD_KEYS) {
+      try {
+        const raw = localStorage.getItem(k);
+        if (raw && JSON.parse(raw)?.planId === id) localStorage.removeItem(k);
+      } catch { /* no-op */ }
+    }
   } catch {}
 }

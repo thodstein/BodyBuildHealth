@@ -6,7 +6,7 @@ import type { CombatPlan } from './combat.types';
 import { cbAnnualPhaseName, cbAnnualStatusName, cbDisciplineName } from './combat-builder.engine';
 export type AnnualCBPhase = 'accumulation' | 'transmutation' | 'realization' | 'transition' | 'gpp' | 'power' | 'taper';
 export interface AnnualCBBlock { id: string; startWeek:number; weeks:number; discipline:string; phase: AnnualCBPhase; status:'built'|'planned'|'error'; plan?: CombatPlan; fightDate?: string | null; }
-export interface AnnualCBCompetition { id:string; name:string; date:string; weightClass?:string; }
+export interface AnnualCBCompetition { id:string; name:string; date:string; weightClass?:string; /** P7: main → полный тапер 2нед, secondary → мини-тапер 1нед (−25…−35%) */ priority?: 'main' | 'secondary'; }
 export interface AnnualCB { id:string; totalWeeks:number; discipline:string; blocks: AnnualCBBlock[]; competitions: AnnualCBCompetition[]; createdAt:string; updatedAt?:string; }
 const KEY='he_combat_annual_v1';
 export function saveAnnualCB(a: AnnualCB){ try{ localStorage.setItem(KEY, JSON.stringify(a)); }catch{} }
@@ -124,9 +124,10 @@ export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetiti
     if (d < startRef) return next; // бой до старта — не вставляем тапер
     const w = Math.floor((d - startRef)/ (7*86400000)) +1;
     if (w>=1 && w<=annual.totalWeeks) {
-      // P1-5: вставляем taper-блок 2нед перед боем (w-1..w) если влезает, с проверкой перекрытия таперов
-      if (w >= 2 && w <= annual.totalWeeks) {
-        const taperStart = w - 1;
+      // P1-5 + P7: тапер-блок перед боем (main — 2нед полный, secondary — 1нед мини −25…−35%), с проверкой перекрытия таперов
+      const taperWeeks = comp.priority === 'secondary' ? 1 : 2;
+      if (w >= taperWeeks && w <= annual.totalWeeks) {
+        const taperStart = w - taperWeeks + 1;
         const taperEnd = w;
         const hasOverlap = next.blocks.some(b=> b.phase==='taper' && !(taperEnd < b.startWeek || taperStart > b.startWeek + b.weeks -1));
         if (hasOverlap) {
@@ -147,7 +148,7 @@ export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetiti
             for (let i=0;i<next.blocks.length;i++) {
               if (i !== idx) { newBlocks.push(next.blocks[i]); continue; }
               if (prefixWeeks > 0) newBlocks.push({ ...b, id: `${b.id}_pre`, weeks: prefixWeeks, fightDate: null } as any);
-              newBlocks.push({ id: `taper_${comp.id}`, startWeek: taperStart, weeks: 2, discipline: b.discipline, phase: 'taper' as AnnualCBPhase, status: 'planned' as const, fightDate: comp.date });
+              newBlocks.push({ id: `taper_${comp.id}`, startWeek: taperStart, weeks: taperWeeks, discipline: b.discipline, phase: 'taper' as AnnualCBPhase, status: 'planned' as const, fightDate: comp.date });
               if (suffixWeeks > 0) newBlocks.push({ ...b, id: `${b.id}_post`, weeks: suffixWeeks, fightDate: null } as any);
             }
             // пересчёт startWeek
