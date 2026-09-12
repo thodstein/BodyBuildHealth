@@ -52,7 +52,7 @@ export function estimate1RMFromVelocityCombat(weight: number, velocity: number, 
   return baseEstimate(lift, velocity, weight).e1RM || 0;
 }
 
-export function diagnoseVelocityLossCombat(bestVel: number, lastVel: number, threshold: 20 | 10 | 25 | 40 = 20, weight?: number, liftId?: string): {
+export function diagnoseVelocityLossCombat(bestVel: number, lastVel: number, threshold: 20 | 10 | 25 | 30 | 40 = 20, weight?: number, liftId?: string): {
   lossPct: number; zone: string; exceeded: boolean; e1RMByVelocity: number | null; recommendation: string; calibrated: boolean;
 } {
   const vl = baseVelocityLoss([bestVel, lastVel], threshold as any);
