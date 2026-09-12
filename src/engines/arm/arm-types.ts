@@ -162,6 +162,14 @@ export interface ArmBuilderInput {
   forMode?: boolean; // FOR-7 overreach (гейт advanced/enhanced)
   forSpecialization?: 'crush' | 'support' | 'pinch' | 'open' | 'wrist';
   axisCheck?: { trunkRotatedTowardAttack?: boolean; wristBehindShoulder?: boolean; wristExtendedDorsally?: boolean; coldNoWarmup?: boolean; fightingFromDefense?: boolean; sideMaxAttempt?: boolean }; // humerus-axis 2026
+  // ── PRO-5 (все опциональны, движок обратно совместим) ──
+  cyclePctPerWeek?: number; // PRO-5: внутрицикловой %/нед (распил correctionPct)
+  mesoRatePct?: number; // PRO-5: кросс-мезо ставка %/мезоцикл (распил correctionPct)
+  warmupDone?: boolean; // PRO-5: разминка 10–15 мин выполнена (warmup-gate)
+  hookCapSets?: number; // PRO-5: недельный кап hook-объёма (дефолт 12)
+  elbowPain?: number; // PRO-5: боль медиального локтя 0–10 (hook-cap)
+  rpeParity?: boolean; // PRO-5: RIR по карте StrengthLog (дефолт выкл)
+  larrattStepKg?: number; // PRO-5: микрошаг синглов (дефолт 0.57)
 }
 
 export interface ArmInjury {
@@ -278,6 +286,7 @@ export interface ArmValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
+  blocked?: string[]; // PRO-5: критичные safety-блоки (ось high, humerus-cap) — valid не меняют
   mrvOverflow?: Array<{ muscle: string; sets: number; mrv: number }>;
   humerusWarnings?: string[];
   balanceWarnings?: string[];

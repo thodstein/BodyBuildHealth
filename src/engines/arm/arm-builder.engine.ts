@@ -26,6 +26,12 @@ import { longevityTrackFor } from './arm-longevity.engine';
 import { injectGripProtocol } from './arm-grip-protocol.engine';
 import { cyclePhaseMap, fitCycleToWeeks, getArmCycle } from './arm-cycle-library.engine';
 import { getMedley, medleyRotationForWeek } from './arm-medley.engine';
+// PRO-5: ядро-гигиена + safety + синглы + UX (всё gated, дефолт no-op)
+import { taperStateFor, isCycleTaperActive, resolveProgressionRates, acwrMultFor, pedHonestyNote, weightHonestyMark, foreignPoolWarnings } from './arm-pro5-core.engine';
+import { applyPro5Safety, checkHookCap } from './arm-pro5-safety.engine';
+import { checkCocGates } from './arm-pro5-coc-gate.engine';
+import { larrattSinglesFor, strengthLogRir, isSinglesCandidate } from './arm-pro5-singles.engine';
+import { suggestSplitForCycle } from './arm-pro5-ux.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -275,12 +281,36 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   const focusGroup = input.focusGroup ? input.focusGroup.toLowerCase() : undefined;
 
   // PRO A–J: оркестратор (аддитивно, try/catch внутри — ядро не падает)
+  // PRO-5 G1: честная деградация — каждая опциональная ветка пишет причину, а не молчит.
+  const degraded: string[] = [];
+  const markDegraded = (reason: string) => { degraded.push(reason); };
   let pro: { rationale: string[]; warnings: string[]; volumeMult: number; rirShift: number; replaceSideWithIso: boolean; replaceHeavyPronWithPulses: boolean; workMaxPatch: Record<string, number> };
   try {
     pro = applyArmPro(input);
   } catch {
     pro = { rationale: [], warnings: [], volumeMult: 1, rirShift: 0, replaceSideWithIso: false, replaceHeavyPronWithPulses: false, workMaxPatch: {} };
+    markDegraded('PRO-оркестратор недоступен — план generic');
   }
+  // PRO-5 P1: safety-гейты (без входов — no-op, старые планы целы).
+  let pro5safety = applyPro5Safety({});
+  try {
+    const toStart = ((): number | null => {
+      const iso = String((input as any).competitionDateIso || (input as any).calStartIso || '');
+      if (!iso) return null;
+      const t = Date.parse(iso);
+      if (!Number.isFinite(t)) return null;
+      return Math.max(0, Math.round((t - Date.now()) / (7 * 86400000)));
+    })();
+    pro5safety = applyPro5Safety({
+      axisCheck: (input as any).axisCheck,
+      warmupDone: (input as any).warmupDone,
+      elbowPain: (input as any).elbowPain ?? (Array.isArray((input as any).diary) ? Math.max(0, ...((input as any).diary as any[]).map((d: any) => Number(d.elbowPain ?? 0))) : 0),
+      hookCapSets: (input as any).hookCapSets,
+      technique,
+      level,
+      weeksToStart: toStart,
+    });
+  } catch { markDegraded('PRO-5 safety недоступен — гейты пропущены'); }
   // Бенчи → workMax: явный workMax пользователя приоритетнее
   const mergedWorkMax: Record<string, number> = { ...(pro.workMaxPatch || {}), ...(input.workMax || {}) };
 
@@ -296,7 +326,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         strapExpected: input.strapExpected,
       });
     }
-  } catch { matchupPlan = null; }
+  } catch { matchupPlan = null; markDegraded('матчап недоступен — объём без поправки на оппонента'); }
   let rfdNote: string | null = null;
   try {
     if (input.rfd === true || input.explosivePct != null || input.fastPct != null || input.slowIndex != null) {
@@ -309,7 +339,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       });
       rfdNote = rfd.allowed ? rfd.note : null;
     }
-  } catch { rfdNote = null; }
+  } catch { rfdNote = null; markDegraded('RFD-блок недоступен — speed-протокол пропущен'); }
   const rfdOn = rfdNote != null;
   let lrNote: string | null = null;
   let lrWeak: string | null = null;
@@ -323,13 +353,13 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         lrPct = lr.asymmetryPct;
       }
     }
-  } catch { lrNote = null; lrWeak = null; lrPct = null; }
+  } catch { lrNote = null; lrWeak = null; lrPct = null; markDegraded('L/R-сплит недоступен — добивка пропущена'); }
   // TOP wave-5: Table-IQ рычаги в объём (только при журнале схваток)
   let iqPlan: ReturnType<typeof analyzeTableIq> | null = null;
   try {
     const bouts = (input as any).bouts;
     if (Array.isArray(bouts) && bouts.length) iqPlan = analyzeTableIq({ bouts });
-  } catch { iqPlan = null; }
+  } catch { iqPlan = null; markDegraded('Table-IQ недоступен — рычаги фолов/срывов не применены'); }
 
   // MRV multipliers — через adaptForPEDs с tendonCap 1.5× + fallback для неизвестных педов (тест 'test_e')
   let pedMult = 1;
@@ -365,6 +395,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     pedMult = Math.max(1, Math.min(1.7, pedMult));
     pedAdapt = { combinedMrvMultiplier: pedMult };
   }
+  // PRO-5 G2: честная пометка неизвестных PED-id (формула выше сохранена — тест test_e).
+  let pedNote: string | null = null;
+  try { pedNote = pedHonestyNote(input.pedDoses as any); } catch { markDegraded('PED-пометка недоступна'); }
   const recoveryMult = computeArmRecoveryMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
   const labMult = input.labMrvMultiplier ? Math.max(0.6, Math.min(1.4, input.labMrvMultiplier)) : 1;
   const nutritionMult = computeNutritionMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
@@ -373,8 +406,17 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   // Seeded RNG для детерминизма (как BB planner-carb-periodization he_planner_gen_salt)
   const seedBase = hashString(`${discipline}|${technique}|${level}|${goal}|${pattern.id}|${weeks}|${(input.weakPoints||[]).join(',')}|${focusGroup||''}`);
   const rng = seededRng(seedBase);
-  // ACWR-мультипликатор (если есть данные дневника — режет объём при danger)
+  // PRO-5 G3: распил correctionPct (legacy — фолбэк обоих новых полей).
+  let progRates = { cyclePctPerWeek: 0, mesoRate: 1.025, migrated: false };
+  try { progRates = resolveProgressionRates(input as any); } catch { markDegraded('прогрессия: ставки по умолчанию'); }
+  // PRO-5 G6: живой ACWR по sRPE-дневнику (без diary — ровно 1, старые планы целы).
   let acwrMult = 1;
+  let acwrNote: string | null = null;
+  try {
+    const acwr = acwrMultFor({ diary: (input as any).diary });
+    acwrMult = acwr.mult;
+    acwrNote = acwr.note;
+  } catch { acwrMult = 1; markDegraded('ACWR недоступен — объём без поправки дневника'); }
   // labWarnings уже учтены в labMult, но tendonWarnings отдельно
 
   // Cross-mesocycle continuity: если есть previousPlan — используем его финальные веса как базу для прогрессии (+2.5%/мезоцикл, как BB)
@@ -390,10 +432,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
             const mus = (ex.muscle||'').toString().toLowerCase();
             const w = ex.workSets && ex.workSets[0] ? Number(ex.workSets[0].weight) : 0;
             if (mus && Number.isFinite(w) && w>0) {
-              // Кросс-мезо прогрессия: дефолт +2.5% (Schoenfeld 2016, Kemp 2024),
-              // при заданном correctionPct (СРЦ №4 — 0.5) — ставка цикла.
-              const cp = Number((input as any).correctionPct);
-              const rate = Number.isFinite(cp) && cp >= 0 && cp <= 5 ? 1 + cp / 100 : 1.025;
+              // Кросс-мезо прогрессия: дефолт +2.5%; при заданной ставке
+              // (mesoRatePct, legacy correctionPct) — ставка цикла/мезоцикла.
+              const rate = progRates.mesoRate;
               const progressed = Math.round(w * rate * 2)/2;
               if (!crossMesoWorkMax[mus] || progressed > crossMesoWorkMax[mus]) crossMesoWorkMax[mus] = progressed;
             }
@@ -497,22 +538,18 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       }
     }
   } catch { /* цикл опционален */ }
-  // Хвостовое окно тейпера: непрерывный run делоад/пик-недель с конца плана.
+  // Хвостовое окно тейпера: непрерывный run делоад/пик-недель с конца плана
+  // (PRO-5 G4: явный стейт taperStateFor; поведение 1-в-1 со старым циклом).
   // Только оно идёт под кривую финализатора; срединные делоады (каждая 4-я)
   // режутся обычным weekMult 0.6 как раньше.
-  let taperTailStart = weeks + 1;
-  try {
-    for (let w = weeks; w >= 1; w--) {
-      const ph = String((phaseMap as Record<number, string>)[w] || '');
-      if (ph === 'deload' || ph === 'peaking') taperTailStart = w;
-      else break;
-    }
-  } catch { taperTailStart = weeks + 1; }
+  let taperState = { tailStart: weeks + 1, hasTail: false, tailPhases: [] as string[] };
+  try { taperState = taperStateFor(phaseMap as Record<number, string>, weeks); } catch { markDegraded('тейпер-стейт по умолчанию'); }
   const tableRatio = input.tableTimeRatio ?? (discipline === 'armlifting' ? 0.2 : 0.55);
 
   const planWeeks: ArmWeek[] = [];
   const usedIdsGlobal = new Set<string>();
   const angleHistory: Record<string, ArmWorkingAngle[]> = {};
+  let larrattWeeks = 0; // PRO-5 P4: недель с применёнными синглами
 
   for (let w = 1; w <= weeks; w++) {
     const phase = (phaseMap[w] || 'accumulation') as any;
@@ -520,12 +557,14 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     const isPeaking = phase === 'peaking';
     const weekSpecs = specForWeek(specSchedule, w);
     // Table 3/2/1 периодизация Kuznetsov внутри микроцикла
-    const kind = tableWeekKind(w, weeks);
+    // PRO-5 S4: losing-gate — защита + близкий старт: стресс→heavy в хвосте.
+    let kind = tableWeekKind(w, weeks);
+    if (pro5safety.forbidStressSingles && kind === 'stress' && w > weeks - 2) kind = 'heavy';
     const tableParams = tableWeekParams(kind);
     // weekMult: moderate 1.0, heavy 0.85, stress 0.55 + deload 0.6 + peaking 0.45.
     // Исключение: non-classic тейпер-пресет цикла — ХВОСТОВОЕ окно идёт полным,
     // режет только кривая финализатора (иначе двойной срез 0.45×0.6).
-    const cycleTaperActive = cycleTaperPreset != null && (isDeload || isPeaking) && w >= taperTailStart;
+    const cycleTaperActive = isCycleTaperActive(taperState, phase, w, cycleTaperPreset);
     let weekMult: number;
     if (cycleTaperActive) weekMult = 1;
     else if (isDeload) weekMult = 0.6;
@@ -535,11 +574,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     else weekMult = w <= 3 ? 0.9 : 1;
     // tendon deload первые 4 недели для beginner — ещё ×0.85 сверху уже учтённого tendonMult, но тут дополнительно для объёма
     if (level === 'beginner' && w <= 4) weekMult *= 0.92;
-    // R8: внутрицикловой %прогрессии весов (СРЦ №4 — 0.5%/нед): работает только
-    // при ЯВНО заданном correctionPct (дефолт — ровно 1.0, старые планы целы).
-    // Кросс-мезо ставка из того же поля применяется отдельно (см. выше).
-    const cpRaw = Number((input as any).correctionPct);
-    const cpWeekly = Number.isFinite(cpRaw) && cpRaw > 0 && cpRaw <= 5 ? cpRaw : 0;
+    // R8/PRO-5: внутрицикловой % весов — только при ЯВНО заданном поле
+    // (cyclePctPerWeek, legacy correctionPct). Дефолт — ровно 1.0.
+    const cpWeekly = progRates.cyclePctPerWeek;
     const weekLoadMult = cpWeekly > 0 ? Math.pow(1 + cpWeekly / 100, w - 1) : 1;
     const taper = isPeaking;
     // TOP wave-5/12: Grip-RPE фаза недели (явная или авто-волна по неделям плана)
@@ -556,6 +593,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     } catch { gripPhaseMult = 1; gripRirAdd = 0; gripPhaseName = null; }
     // TOP wave-9: один showcase-протокол хвата в неделю (peak → overcrush, intensification → negatives)
     let gripExecDone = gripPhaseName == null || (gripPhaseName !== 'peak' && gripPhaseName !== 'intensification');
+    // PRO-5 P4: один Larratt-блок синглов на intensification-неделю (advanced+).
+    let singlesDone = false;
 
     const sessions: ArmSession[] = [];
     let sessionIdx = 0;
@@ -566,7 +605,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       const tag = sched.sessionTag || 'FullArm';
       // PRO G: боль ≥4 — side только техника/изометрия (humerus/UCL)
       const isSideTag = tag === 'SidePress' || (TAG_MUSCLES_ARM[tag] || []).includes('side_pressure');
-      if (pro.replaceSideWithIso && isSideTag && ch === 'тяж') ch = 'техника';
+      if ((pro.replaceSideWithIso || pro5safety.forceSideTechnique) && isSideTag && ch === 'тяж') ch = 'техника';
       const muscles = TAG_MUSCLES_ARM[tag] || [tag];
       const exercises: ArmExercise[] = [];
       const usedInSession = new Set<string>();
@@ -606,10 +645,19 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const rfdSpeed = rfdOn && phase === 'intensification' && effCh === 'тяж' && !rfdDone &&
           ['pronators','supinators','wrist_flexors','risers','grip_support','grip_pinch','brachioradialis'].includes(mus);
         if (rfdSpeed) rfdDone = true;
-        const sets = rfdSpeed ? Math.min(5, perExerciseCap(mus, level)) : setsBase;
-        const reps: [number, number] = rfdSpeed ? [3, 3] : repsBase;
+        // PRO-5 P4: Larratt-синглы — первое тяжёлое pron/cup-движение intensification (advanced+).
+        const wantSingles = (input as any).heavySingles === true && (level === 'advanced' || level === 'enhanced') && phase === 'intensification' && effCh === 'тяж' && !singlesDone && !rfdSpeed && isSinglesCandidate(mus);
+        if (wantSingles) { singlesDone = true; larrattWeeks++; }
+        const larratt = wantSingles ? larrattSinglesFor(Number((input as any).larrattStepKg) || 0.57) : null;
+        const sets = wantSingles && larratt ? larratt.sets : rfdSpeed ? Math.min(5, perExerciseCap(mus, level)) : setsBase;
+        const reps: [number, number] = wantSingles ? [1, 1] : rfdSpeed ? [3, 3] : repsBase;
         const iqRir = (mus === 'side_pressure' && iqSide < 1 ? 1 : 0) + (mus.startsWith('grip_') ? gripRirAdd : 0);
-        const rir = Math.max(0, Math.min(5, rirFor(effCh, phase, w, technique) + (pro.rirShift || 0) + iqRir));
+        const hookShift = (mus === 'supinators' || mus === 'wrist_flexors') ? (pro5safety.hookRirShift || 0) : 0;
+        // PRO-5 P4: RIR по карте StrengthLog (только явный rpeParity, делоад/пик — как было).
+        const rirBase = ((input as any).rpeParity === true && !isDeload && phase !== 'peaking')
+          ? strengthLogRir(Math.min(8, Math.max(1, w)), effCh)
+          : rirFor(effCh, phase, w, technique);
+        const rir = wantSingles && larratt ? larratt.rir : Math.max(0, Math.min(5, rirBase + (pro.rirShift || 0) + iqRir + hookShift));
         const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique);
         if (!exTpl) continue;
         usedInSession.add(exTpl.id);
@@ -627,7 +675,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         for (let s = 0; s < sets; s++) {
           const repVal = reps[0] + Math.floor(rng() * (reps[1] - reps[0] + 1));
           // Вес по workMax + cross-meso прогрессия: тяж 82%, техника 60%, памп 68%
-          const pct = effCh === 'тяж' ? 0.82 : effCh === 'техника' ? 0.6 : effCh === 'памп' ? 0.68 : 0.65;
+          const pct = wantSingles && larratt ? larratt.pctOfMax : effCh === 'тяж' ? 0.82 : effCh === 'техника' ? 0.6 : effCh === 'памп' ? 0.68 : 0.65;
           // cross-meso: если есть предыдущий план — его финальный вес +2.5% как база
           let effectiveWorkMax: Record<string, number> = { ...mergedWorkMax };
           if (crossMesoWorkMax && crossMesoWorkMax[mus] != null) {
@@ -664,6 +712,11 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           }
         }
 
+        // PRO-5 G7: честная пометка веса-ориентира (workMax пуст — прогрессия не ведётся).
+        let wEstimated = false;
+        try {
+          wEstimated = weightHonestyMark(mus, mergedWorkMax) && !(crossMesoWorkMax && crossMesoWorkMax[mus] != null);
+        } catch { /* опционально */ }
         exercises.push({
           muscle: mus as any,
           name: exTpl.name,
@@ -686,7 +739,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           comment: ((rfdSpeed
             ? `RFD speed 5×3 @RPE8: ускорение через весь диапазон, отдых 90с · ${exTpl.technique || ''}`
             : (exTpl.technique || ''))
-            + (gripShow === 'over' ? ' · overcrush hold 8–12с (дожим)' : gripShow === 'neg' ? ' · negatives 5с' : '') || undefined),
+            + (gripShow === 'over' ? ' · overcrush hold 8–12с (дожим)' : gripShow === 'neg' ? ' · negatives 5с' : '')
+            + (wantSingles && larratt ? ` · ${larratt.comment}` : '')
+            + (wEstimated ? ' · вес ориентир — задайте workMax' : '') || undefined),
         });
       }
 
@@ -821,8 +876,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   rationale.push(`Периодизация: ${Object.entries(phaseMap).map(([wk, ph]) => `Н${wk}:${ph}`).join(', ')}`);
   if (cycleNote) rationale.push(cycleNote);
   try {
-    const cp = Number((input as any).correctionPct);
-    if (Number.isFinite(cp) && cp > 0 && cp <= 5) rationale.push(`Прогрессия весов +${cp}%/нед внутри цикла (СРЦ) + кросс-мезо из того же поля.`);
+    if (progRates.cyclePctPerWeek > 0) rationale.push(`Прогрессия весов +${progRates.cyclePctPerWeek}%/нед внутри цикла + кросс-мезо ×${progRates.mesoRate.toFixed(3)}${progRates.migrated ? ' (раздельные поля PRO-5)' : ' (legacy correctionPct)'}.`);
   } catch { /* опционально */ }
   if (mastersDeload) rationale.push('Masters 50+: делоад каждая 3-я неделя (longevity Devon-трек).');
   if (specSchedule.active) rationale.push(`Специализация: ${specSchedule.rationale}`);
@@ -854,6 +908,24 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   for (const line of simRationale) rationale.push(line);
   for (const line of tableInjectNotes) rationale.push(line);
   if (uniBonusSets > 0) rationale.push(`L/R добивка: +${uniBonusSets} унилатеральных сетов слабой (${lrWeak}) в клампе MRV.`);
+  // PRO-5: честные строки (деградация/PED/ACWR/safety/синглы/RPE/сплит-подсказка).
+  if (pedNote) rationale.push(pedNote);
+  if (acwrNote) rationale.push(`PRO-5: ${acwrNote}`);
+  for (const line of pro5safety.notes) rationale.push(line);
+  if ((input as any).rpeParity === true) rationale.push('PRO-5: RIR по карте StrengthLog (W1–4 RPE7–8 → RIR2–3; W5–8 RPE8–9 → RIR1–2).');
+  if (larrattWeeks > 0) rationale.push(`PRO-5: Larratt-синглы 5×1 @92% в ${larrattWeeks} нед. (полная лесенка 17–18 — практика, микрошаг ${Number((input as any).larrattStepKg) || 0.57} кг).`);
+  if (degraded.length > 0) rationale.push(`Честная деградация: ${degraded.join('; ')}.`);
+  try {
+    const cid = String((input as any).cycleId || '');
+    const c = cid ? getArmCycle(cid) : undefined;
+    if (c) {
+      const splitPerWeek = (pattern.sessionsPerRotation * 7) / Math.max(1, pattern.rotationDays);
+      if (Math.abs(splitPerWeek - c.daysPerWeek) >= 2) {
+        const sug = suggestSplitForCycle({ id: c.id, name: c.name, daysPerWeek: c.daysPerWeek, tablePerWeek: c.tablePerWeek, discipline: c.discipline }, ARM_SPLIT_PATTERNS as any);
+        if (sug) rationale.push(`PRO-5: под цикл ${c.name} подходит сплит «${sug.name}» — переключите в 1 клик (сейчас ~${splitPerWeek.toFixed(1)}×/нед vs ${c.daysPerWeek}×/нед).`);
+      }
+    }
+  } catch { /* опционально */ }
   // TOP wave-13: отдельный peak-протокол хвата (только явная фаза, не авто)
   try {
     const gp = String(input.gripPhase || '').toLowerCase();
@@ -873,6 +945,27 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     }
   } catch { /* опционально */ }
   const proWarnings = [...pro.warnings];
+  for (const line of pro5safety.warnings) proWarnings.push(line);
+  for (const line of pro5safety.blocked) proWarnings.push(`⛔ ${line}`);
+  // PRO-5: пост-проход честных гейтов (только warnings/строки, объёмы не трогаем).
+  try {
+    for (const line of foreignPoolWarnings(planWeeks as any)) proWarnings.push(line);
+  } catch { markDegraded('пул-чек недоступен'); }
+  // PRO-5 S2: hook-кап — только hook-техника или явный hookCapSets
+  // (у balanced/toproll супинация — норма, не hook-перегруз).
+  try {
+    if (technique === 'hook' || (input as any).hookCapSets != null) {
+      const cap = Number((input as any).hookCapSets) || 12;
+      for (const line of checkHookCap(planWeeks as any, cap)) proWarnings.push(line);
+    }
+  } catch { markDegraded('hook-кап недоступен'); }
+  try {
+    for (const wk of planWeeks) for (const line of checkCocGates(wk as any, wk.week)) proWarnings.push(line);
+  } catch { markDegraded('CoC-гейты недоступны'); }
+  if (pro5safety.warmupRequired && planWeeks.length > 0) {
+    const w1 = planWeeks[0];
+    w1.note = `${w1.note || ''} 🧤 Warmup-блок 10–15 мин обязателен (холод/без разминки).`.trim();
+  }
 
   // Weekly volume
   const weeklyVolume: Record<number, Record<string, any>> = {};
