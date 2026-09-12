@@ -94,7 +94,12 @@ describe('ValidationCard +HIIT (№3)', () => {
 
 describe('Constructor toggles → сборка (№5-добивка)', () => {
   const next = () => fireEvent.click(screen.getByRole('button', { name: /^Далее/ }));
+  const back = () => fireEvent.click(screen.getByRole('button', { name: /Назад/ }));
   const buildHere = () => fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+  const redFlagBtns = () => Array.from(document.querySelectorAll('[data-cardio="red-flag"]')) as HTMLElement[];
+  // data-*={false} React не рендерит — состояние читаем по aria-pressed.
+  const pressedOf = (sel: string) => (document.querySelector(sel) as HTMLElement | null)?.getAttribute('aria-pressed');
+  const redOn = () => redFlagBtns().map(b => b.getAttribute('aria-pressed'));
 
   it('red-flag на Атлете → сборка без HIIT/MISS + rationale к врачу', () => {
     render(<CardioConstructor />);
@@ -132,5 +137,48 @@ describe('Constructor toggles → сборка (№5-добивка)', () => {
     const saved = loadCardioCycles()[0];
     expect(saved.config?.durabilitySession).toBe(true);
     expect(saved.weeks.some(w => w.sessions.some(s => s.purpose.includes('Durability')))).toBe(true);
+  });
+
+  it('editConfig гасит флаги из чужого цикла (№2-финал)', () => {
+    render(<CardioConstructor />);
+    next(); next(); next(); next(); // preview
+    buildHere(); // цикл без флагов
+    back(); back(); back(); // → athlete
+    fireEvent.click(screen.getByRole('button', { name: /Боль\/давление в груди/ }));
+    expect(redOn().some(v => v === 'true')).toBe(true);
+    next(); next(); next(); // → preview
+    fireEvent.click(screen.getByRole('button', { name: /Изменить параметры/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Атлет/ }));
+    expect(redFlagBtns().length).toBeGreaterThan(0);
+    expect(redOn().every(v => v === 'false')).toBe(true);
+  });
+
+  it('reset гасит все тоглы (№3-финал)', () => {
+    render(<CardioConstructor />);
+    next(); next(); // load
+    fireEvent.click(document.querySelector('[data-cardio="tid-switch"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-cardio="durability"]') as HTMLElement);
+    expect(pressedOf('[data-cardio="tid-switch"]')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: /Сбросить параметры/ }));
+    expect(pressedOf('[data-cardio="tid-switch"]')).toBe('false');
+    expect(pressedOf('[data-cardio="durability"]')).toBe('false');
+    fireEvent.click(screen.getByRole('button', { name: /Атлет/ }));
+    expect(redOn().every(v => v === 'false')).toBe(true);
+  });
+
+  it('dirty не зависит от порядка кликов дней ног (№4-финал)', () => {
+    render(<CardioConstructor />);
+    next(); next(); // load
+    const equipHeader = screen.queryByRole('button', { name: /Оборудование и ограничения/ });
+    if (equipHeader && equipHeader.getAttribute('aria-expanded') === 'false') fireEvent.click(equipHeader);
+    fireEvent.click(screen.getByRole('button', { name: /Ноги: Пн/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ноги: Чт/ }));
+    next(); next(); // comps → preview
+    buildHere(); // config legDays [0,3]
+    back(); back(); // → load
+    fireEvent.click(screen.getByRole('button', { name: /Ноги: Пн/ })); // снять → [3]
+    fireEvent.click(screen.getByRole('button', { name: /Ноги: Пн/ })); // вернуть → [3,0]
+    next(); next(); // → preview
+    expect(screen.queryByText(/Параметры в мастере изменены/)).toBeNull();
   });
 });

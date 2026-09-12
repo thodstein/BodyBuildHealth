@@ -642,9 +642,11 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.altitudeM != null) setAltitudeM(String(cfg.altitudeM));
     if (Array.isArray((cfg as { redFlags?: unknown }).redFlags)) {
       setRedFlags(((cfg as { redFlags?: unknown }).redFlags as unknown[]).filter(x => typeof x === 'string') as string[]);
+    } else {
+      setRedFlags([]);
     }
-    if ((cfg as { tidSwitchWeek?: unknown }).tidSwitchWeek != null) setTidSwitch(true);
-    if ((cfg as { durabilitySession?: unknown }).durabilitySession === true) setDurabilityOn(true);
+    setTidSwitch((cfg as { tidSwitchWeek?: unknown }).tidSwitchWeek != null);
+    setDurabilityOn((cfg as { durabilitySession?: unknown }).durabilitySession === true);
     // Пост-обработка из config-штампа finish-хелпера (темпы VDOT + мезо-флаг).
     const stamped = cfg as unknown as { paceEasySec?: number; paceTempoSec?: number; paceIntervalSec?: number; mesoOn?: boolean };
     if (stamped.paceEasySec != null) setEasyPace(formatPace(stamped.paceEasySec));
@@ -976,6 +978,9 @@ export const CardioConstructor: React.FC = () => {
     // Множество строк без учёта порядка (флаги скрининга).
     const sortedStrArr = (xs: unknown): string[] =>
       (Array.isArray(xs) ? (xs as unknown[]).filter((x): x is string => typeof x === 'string') : []).slice().sort();
+    // Множество примитивов без учёта порядка (оборудование/дни ног — порядок кликов не важен).
+    const sortedPrimArr = (xs: unknown): (string | number)[] =>
+      (Array.isArray(xs) ? (xs as unknown[]).filter((x): x is string | number => typeof x === 'string' || typeof x === 'number') : []).slice().sort();
     if (cfg.goal !== goal) return true;
     if (cfg.totalWeeks != null && cfg.totalWeeks !== totalWeeks) return true;
     if (cfg.daysAvailable != null && cfg.daysAvailable !== daysAvailable) return true;
@@ -985,10 +990,10 @@ export const CardioConstructor: React.FC = () => {
     if (!!cfg.taper !== taperEnabled) return true;
     if (!!cfg.peakWeek !== peakWeek) return true;
     if (cfg.level != null && cfg.level !== effLevel) return true;
-    if (!same(cfg.equipment, equipment)) return true;
+    if (JSON.stringify(sortedPrimArr(cfg.equipment)) !== JSON.stringify(sortedPrimArr(equipment))) return true;
     if (!!cfg.lowImpact !== lowImpact) return true;
     if (cfg.age != null && cfg.age !== Math.max(12, Math.min(90, Number(age) || 30))) return true;
-    if (!same(cfg.legDays, legDays)) return true;
+    if (JSON.stringify(sortedPrimArr(cfg.legDays)) !== JSON.stringify(sortedPrimArr(legDays))) return true;
     if (cfg.sex !== sex) return true;
     if (!same(cfg.restingHr, Number(restingHr) > 0 ? Number(restingHr) : undefined)) return true;
     if (!same(cfg.competitions, comps)) return true;
