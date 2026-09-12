@@ -81,6 +81,25 @@ export function isAutoDeloadWeek(week: number, totalWeeks: number): boolean {
   return autoDeloadWeeks(totalWeeks).includes(week);
 }
 
+// Planner PRO P5: Torokhtiy 4-фаз — мягкий тапер нед.10 ×0.65 (vs Winwood 0.45).
+export const TORO_TAPER = { weekFromEnd: 1, volumeMult: 0.65, intensityPctMult: 0.65, assistance: 'reduced' } as const;
+
+/** Множитель объёма тапер-недели по block-модели; null = Winwood у вызывателя (strong5/wave). */
+export function taperMultForWeek(blockModel: string | undefined, weekFromEnd: number): number | null {
+  if (blockModel === 'toro4' && weekFromEnd <= 1) return TORO_TAPER.volumeMult;
+  return null;
+}
+
+// Planner PRO P7: половой cessation (syst.review Sports Medicine 2026: М 4.5 / Ж 3.9).
+// Без пола — база таблицы, байт-в-байт.
+export function cessationDaysFor(eventId: string, sex?: string): number {
+  const base = TAPER_CESSATION_DAYS[eventId] ?? 5;
+  if (sex === 'male') return base + 1;
+  return base;
+}
+
+export const OPENER_SINGLE_NOTE = 'Opener 90% 1×1 — репетиция старта (последняя неделя)';
+
 export function taperForWeekFromEnd(weekFromEnd: number): TaperWeekPlan {
   if (weekFromEnd <= 1) return WINWOOD_TAPER[1];
   if (weekFromEnd === 2) return WINWOOD_TAPER[2];

@@ -98,6 +98,14 @@ export interface StrengthSportInput {
   contest?: import('./strength-sport-contest.types').StrongmanContest | null;
   contestStrategy?: 'conservative' | 'balanced' | 'aggressive';
   useContestTaper?: boolean;
+  // Planner PRO P1–P7 (опционально, дефолты = старое поведение)
+  weightClass?: string; // '<80' | '<90' | '<105' | '105+' | 'open' (+ Ж-шкала), '' = авто
+  rpeCap?: number; // P2: потолок топ-сингла (дефолт 9.5 в UI, undefined = выкл)
+  deadliftGrip?: 'overhand' | 'straps' | 'mixed'; // P3: хват становой
+  blockModel?: 'strong5' | 'toro4' | 'wave'; // P5: модель периодизации (дефолт strong5)
+  autoDeload?: boolean; // P5: делоды 4/7/11 (дефолт вкл)
+  conditioningDay?: boolean; // P5: отдельный cond_day (дефолт вкл)
+  openerSingles?: boolean; // P7: opener-синглы в последнюю неделю (дефолт вкл)
 }
 
 export interface StrengthSportSet {

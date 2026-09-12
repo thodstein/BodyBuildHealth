@@ -5,7 +5,7 @@
  * стратегию, medley-превью, слабые точки, bridge-приём (хаб/библиотека), план/год/дневник/msg, busy-сборку.
  * StrengthSportConstructor остаётся тонким оркестратором шагов; шаг плана — в StrengthSportPlanView.
  */
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { defaultOutsideLoadFor, computeOutsideMetrics, type OutsideLoad } from '../../../engines/outside-load.engine';
 import { acwrEwmaSS } from '../../../engines/strength-sport/strength-sport-diary.engine';
@@ -16,6 +16,7 @@ import { simulateContest } from '../../../engines/strength-sport/strength-sport-
 import { getSSCycleById } from '../../../data/ss-cycles/ss-cycle-index';
 import { subscribePlannerApply, getPlannerApply } from '../TrainingScreen_parts/planner-bridge';
 import { parseSmBridgePayload } from './sm-bridge-intake';
+import { shouldClearVbt } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
 import type { StrongmanContest } from '../../../engines/strength-sport/strength-sport-contest.types';
 import { ensureStrongmanApkStyles } from './strongman-apk-loader';
 
@@ -70,6 +71,19 @@ export function useStrengthSportWizard() {
   const [lvpPoints, setLvpPoints] = useState<Array<{pct:number,velocity:number}>>([{pct:0.5, velocity:2.70},{pct:0.65, velocity:2.15},{pct:0.80, velocity:1.80},{pct:0.90, velocity:1.55}]);
   const [lvpResult, setLvpResult] = useState<any>(null);
   const [taperWeeks, setTaperWeeks] = useState<number>(1);
+  // Planner PRO P1–P7 (персист he_ss_pro_*; дефолты = старое поведение)
+  const [weightClass, setWeightClass] = useState<string>(() => { try { return localStorage.getItem('he_ss_pro_weightclass') || ''; } catch { return ''; } });
+  const [rpeCap, setRpeCap] = useState<number>(() => { try { return Number(localStorage.getItem('he_ss_pro_rpecap')) || 9.5; } catch { return 9.5; } });
+  const [deadliftGrip, setDeadliftGrip] = useState<'overhand'|'straps'|'mixed'>(() => { try { return (localStorage.getItem('he_ss_pro_grip') as any) || 'overhand'; } catch { return 'overhand'; } });
+  const [blockModel, setBlockModel] = useState<'strong5'|'toro4'|'wave'>(() => { try { return (localStorage.getItem('he_ss_pro_block') as any) || 'strong5'; } catch { return 'strong5'; } });
+  const [autoDeload, setAutoDeload] = useState<boolean>(() => { try { const v = localStorage.getItem('he_ss_pro_autodeload'); return v == null ? true : v === '1'; } catch { return true; } });
+  const [conditioningDay, setConditioningDay] = useState<boolean>(() => { try { const v = localStorage.getItem('he_ss_pro_condday'); return v == null ? true : v === '1'; } catch { return true; } });
+  useEffect(() => { try { if (weightClass) localStorage.setItem('he_ss_pro_weightclass', weightClass); else localStorage.removeItem('he_ss_pro_weightclass'); } catch {} }, [weightClass]);
+  useEffect(() => { try { localStorage.setItem('he_ss_pro_rpecap', String(rpeCap)); } catch {} }, [rpeCap]);
+  useEffect(() => { try { localStorage.setItem('he_ss_pro_grip', deadliftGrip); } catch {} }, [deadliftGrip]);
+  useEffect(() => { try { localStorage.setItem('he_ss_pro_block', blockModel); } catch {} }, [blockModel]);
+  useEffect(() => { try { localStorage.setItem('he_ss_pro_autodeload', autoDeload ? '1' : '0'); } catch {} }, [autoDeload]);
+  useEffect(() => { try { localStorage.setItem('he_ss_pro_condday', conditioningDay ? '1' : '0'); } catch {} }, [conditioningDay]);
   const [contest, setContest] = useState<StrongmanContest | null>(null);
   const [contestStrategy, setContestStrategy] = useState<'conservative'|'balanced'|'aggressive'>('balanced');
   const [medleyPreview, setMedleyPreview] = useState<{ id:string; label:string; distanceM:number; timeCapS:number }[]>([
@@ -202,6 +216,16 @@ export function useStrengthSportWizard() {
   const [vbtMap, setVbtMap] = useState<Record<string, number>>(() => {
     try { const raw = localStorage.getItem('he_vbt_ss_v1'); return raw ? JSON.parse(raw) as Record<string,number> : {}; } catch { return {}; }
   });
+  // Planner PRO P6: stale-VBT — смена цикла/режима чистит замеры week-day-ex-set (история не переживает rebuild).
+  const prevCycleRef = React.useRef<{ cycleId: string; mode: string } | null>(null);
+  useEffect(() => {
+    try {
+      const prev = prevCycleRef.current;
+      if (prev && shouldClearVbt(prev.cycleId, cycleId, prev.mode, mode)) setVbtMap({});
+      prevCycleRef.current = { cycleId, mode };
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycleId, mode]);
   const [plan, setPlan] = useState<StrengthSportPlan | null>(null);
   const [annual, setAnnual] = useState(() => loadAnnualSS());
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
@@ -276,6 +300,8 @@ export function useStrengthSportWizard() {
     acwr, setAcwr, hrv, setHrv, velocityLoss, setVelocityLoss,
     vbtPerLift, setVbtPerLift, lvpLift, setLvpLift, lvpPoints, setLvpPoints, lvpResult, setLvpResult,
     taperWeeks, setTaperWeeks, contest, setContest, contestStrategy, setContestStrategy,
+    weightClass, setWeightClass, rpeCap, setRpeCap, deadliftGrip, setDeadliftGrip,
+    blockModel, setBlockModel, autoDeload, setAutoDeload, conditioningDay, setConditioningDay,
     medleyPreview, setMedleyPreview, weakPoints, setWeakPoints, diagnosticLevel, setDiagnosticLevel,
     hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge,
     orthoNote, setOrthoNote,

@@ -24,11 +24,12 @@ import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recove
 import { EVENT_META, STRONG_FALLBACK_COEFF, isCarry as isCarryEvent } from './strength-sport-event-types';
 import { buildMedleyPlan, buildStoneLadder } from './strength-sport-strongman-attempts.engine';
 import { buildWLMeetPlan } from './strength-sport-attempts.engine';
-import { TAPER_CESSATION_DAYS, WINWOOD_TAPER, WL_TAPER, taperForWLWeekFromEnd, taperForWeekFromEnd, buildTaperRationale, isAutoDeloadWeek, autoDeloadWeeks } from './strength-sport-taper.engine';
+import { TAPER_CESSATION_DAYS, WINWOOD_TAPER, WL_TAPER, taperForWLWeekFromEnd, taperForWeekFromEnd, buildTaperRationale, isAutoDeloadWeek, autoDeloadWeeks, taperMultForWeek, cessationDaysFor, OPENER_SINGLE_NOTE } from './strength-sport-taper.engine';
 import { buildConditioningRationale, conditioningForWeek } from './strength-sport-conditioning';
 import { VBT_SS_THRESHOLDS, velocityWeightAdjustFactor, vbtEwma, diagnoseVelocityLossEwma, vbtHistoryForLift } from './strength-sport-vbt.engine';
 import { POOL_BY_TAG, OLY_IDS, STRONG_IDS, isOly, isStrong, STRONG_FALLBACK, filterPool, gentleFactor } from './strength-sport-pool.engine';
 import { hrvReport } from './strength-sport-hrv.engine';
+import { applyRpeCap, deadliftGripWarning, STONE_ARMS_CUE, VIKING_GATE_NOTE, isStoneId as isStoneProId, isDeadliftId as isDeadliftProId, weightClassFor, weightClassLine, OPENER_SINGLE_NOTE as PRO_OPENER_NOTE } from './strength-sport-planner-pro.engine';
 import { carryPhysics, dynamicCarryDistance } from './strength-sport-carry-physics.engine';
 import { stoneMoment } from './strength-sport-stone-moment.engine';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
@@ -611,11 +612,23 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     const cond0 = buildConditioningRationale(1, weeks, mode);
     if (cond0.length) rationale.push(`Кондиция: ${cond0.join(' | ')}`);
   }
-  const autoDeloadWeeksArr = autoDeloadWeeks(weeks);
+  const autoDeloadWeeksArr = (input as any).autoDeload === false ? [] : autoDeloadWeeks(weeks);
   if (autoDeloadWeeksArr.length) rationale.push(`Авто-разгрузка: нед ${autoDeloadWeeksArr.join(', ')} (deload 60% vol, как StrongmanPlan)`);
+  // Planner PRO P1–P7: статические строки (математика ниже, по неделям)
+  try {
+    const proSex: any = (input as any).sex || 'male';
+    const proBw: number = (input as any).bodyweight ?? 80;
+    const proCls: string = (input as any).weightClass || weightClassFor(proBw, proSex);
+    if (mode === 'strongman') rationale.push(weightClassLine(proBw, proCls, proSex));
+    if ((input as any).rpeCap) rationale.push(`RPE-cap ${(input as any).rpeCap}: топ-сингл ≥cap → вес −2.5% (MyStrengthBook)`);
+    if ((input as any).deadliftGrip === 'mixed') rationale.push('Хват становой: разнохват — на ≥85% см. предупреждение в технике (PMC8237209)');
+    if ((input as any).blockModel === 'toro4') rationale.push('Block-модель Torokhtiy 4-фаз (3/3/3/1): тапер нед.10 ×0.65');
+    else if ((input as any).blockModel === 'wave') rationale.push('Block-модель Wave/DUP: heavy/medium/light по неделям');
+    if ((input as any).competitionDate && (input as any).openerSingles !== false && mode === 'strongman') rationale.push(PRO_OPENER_NOTE);
+  } catch { /* rationale-only */ }
 
   // auto-deload 4,7,11 для длительных циклов (StrongmanPlan) — кроме уже deload последней недели
-  const autoDeloadSet = new Set(autoDeloadWeeks(weeks));
+  const autoDeloadSet = new Set(autoDeloadWeeksArr);
   for (let w = 1; w <= weeks; w++) {
     const rawPhase = (input.competitionDate && (input as any).startDate ? phaseForDate(w, weeks, goal, input.competitionDate, (input as any).startDate, mode) : phaseForWeek(w, weeks, goal, mode)) as any;
     const isAutoDeload = autoDeloadSet.has(w) && rawPhase !== 'deload' && rawPhase !== 'peaking';
@@ -760,7 +773,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
             const wkStart = new Date(startDateAny); wkStart.setDate(wkStart.getDate() + (w - 1) * 7);
             const daysOut = Math.round((new Date(compDateAny).getTime() - wkStart.getTime()) / 86400000);
             if (daysOut >= 0 && daysOut <= 14) {
-              const need = (mode === 'weightlifting') ? 4 : ((TAPER_CESSATION_DAYS as any)[id] ?? 5);
+              const need = (mode === 'weightlifting') ? 4 : cessationDaysFor(id, (input as any).sex);
               if (daysOut < need && phase !== 'deload') {
                 finalSets = Math.max(minSets, Math.round(built.sets * (mode === 'weightlifting' ? 0.60 : 0.45)));
                 finalWeight = Math.round(built.weight * (mode === 'weightlifting' ? 0.90 : 0.50) / 2.5) * 2.5;
@@ -776,10 +789,14 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           } catch {}
         }
         if (winwoodTaper) {
+          // Planner PRO P5: toro4 — мягкий тапер последней недели ×0.65 (копия, константу не мутируем)
+          if ((input as any).blockModel === 'toro4' && winwoodTaper.weekFromEnd === 1) {
+            winwoodTaper = { ...winwoodTaper, volumeMult: taperMultForWeek('toro4', 1) ?? winwoodTaper.volumeMult, intensityPctMult: 0.65 };
+          }
           finalSets = Math.max(minSets, Math.round(built.sets * winwoodTaper.volumeMult));
           finalWeight = Math.round(built.weight * winwoodTaper.intensityPctMult / 2.5) * 2.5;
           finalRir = winwoodTaper.assistance === 'none' ? 3 : winwoodTaper.assistance === 'reduced' ? 2 : built.rir;
-        } else if (taper && !deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.55)); finalWeight = Math.round(built.weight * 0.92 / 2.5) * 2.5; finalRir = 1; }
+        } else if (taper && !deload) { const toroLast = (input as any).blockModel === 'toro4' && w === weeks; finalSets = Math.max(minSets, Math.round(built.sets * (toroLast ? 0.65 : 0.55))); finalWeight = Math.round(built.weight * (toroLast ? 0.65 : 0.92) / 2.5) * 2.5; finalRir = 1; }
         else if (taper && deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.45)); finalWeight = Math.round(built.weight * 0.90 / 2.5) * 2.5; finalRir = 1; }
         else if (deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.6)); finalWeight = Math.round(built.weight * 0.6 / 2.5) * 2.5; finalRir = 4; }
         // Contest weight progression: если контест задал вес для этого ивента — подгоняем прогрессию к нему
@@ -803,6 +820,15 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         }
         const workSets: StrengthSportSet[] = built.workSets.slice(0, finalSets).map(s => {
           const ns:any = { ...s, weight: finalWeight, rir: finalRir };
+          // Planner PRO P2: RPE-cap — только топ-синглы primary (RIR≤1), submax не трогаем
+          try {
+            const cap = Number((input as any).rpeCap);
+            const r = Number((ns as any).rpe ?? (10 - finalRir));
+            if (Number.isFinite(cap) && cap > 0 && isPrimary && finalRir <= 1 && r >= cap) {
+              const cut = applyRpeCap(ns.weight, r, cap);
+              if (cut.cut) { ns.weight = cut.weight; (ns as any).rpeCapped = true; }
+            }
+          } catch { /* no-op */ }
           // D3 deload: дистанция у carries ×0.5, камни ×0.7
           if (deload && isCarryEvent(id) && ns.distanceM) ns.distanceM = Math.max(10, Math.round(ns.distanceM * 0.5));
           if (deload && ['atlas_stone_load','atlas_stone_over_bar','sandbag_load','sandbag_over_bar','stone_lift','natural_stone_shoulder'].includes(id)) ns.reps = Math.max(1, Math.round(ns.reps * 0.7));
@@ -812,6 +838,15 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         });
         const gentle = gentleFactor(id, input.injuries as any);
         let techniqueNote: string | undefined = (meta as any).technique || undefined;
+        // Planner PRO P3: cue камня + viking-гейт + mixed-предупреждение (строки, не математика)
+        try {
+          if (isStoneProId(id)) techniqueNote = techniqueNote ? `${techniqueNote} · ${STONE_ARMS_CUE}` : STONE_ARMS_CUE;
+          if (id === 'viking_press') techniqueNote = techniqueNote ? `${techniqueNote} · ${VIKING_GATE_NOTE}` : VIKING_GATE_NOTE;
+          if (isDeadliftProId(id) && (input as any).deadliftGrip) {
+            const gw = deadliftGripWarning((input as any).deadliftGrip, pctFor(phase, goal));
+            if (gw) techniqueNote = techniqueNote ? `${techniqueNote} · ⚠ ${gw}` : `⚠ ${gw}`;
+          }
+        } catch { /* no-op */ }
         const eqFallback = (input.equipment || []).map((s: string)=> String(s).toLowerCase());
         const hasSpec = eqFallback.includes('other') || eqFallback.includes('specialty') || eqFallback.length === 0;
         if (!hasSpec && isStrong(id)) {
@@ -935,7 +970,8 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
       absoluteDay++;
     }
     // P1-5 conditioning day: strongman GPP без outside → отдельный день кондиции на чётных неделях накопления (только intermediate+ чтобы не ломать beginner matrix)
-    if (mode === 'strongman' && !outsideMetrics && phase === 'accumulation' && sessions.length < 5 && w % 2 === 0 && level !== 'beginner') {
+    // Planner PRO P5: opt-out через conditioningDay === false
+    if ((input as any).conditioningDay !== false && mode === 'strongman' && !outsideMetrics && phase === 'accumulation' && sessions.length < 5 && w % 2 === 0 && level !== 'beginner') {
       try {
         const condArr = conditioningForWeek(w, weeks, mode, !!outsideMetrics);
         if (condArr.length && (condArr[0].system !== 'aerobic' || w <= 4)) {

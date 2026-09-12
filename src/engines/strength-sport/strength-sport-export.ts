@@ -33,6 +33,8 @@ export function buildStrengthCsv(plan: StrengthSportPlan): string {
 
 const PHASE_COLOR_SS: Record<string,string> = { accumulation:'#0A84FF', intensification:'#FF9F0A', integration:'#7C3AED', peaking:'#FF3B30', deload:'#8E8E93', transition:'#636366', taper:'#30D158' };
 const PHASE_RU_SS: Record<string,string> = { accumulation:'Накопление', intensification:'Интенсиф.', integration:'Интеграция', peaking:'Пик', deload:'Разгр.', transition:'Переход', taper:'Тапер' };
+// Planner PRO P6: алиас вместо дубля таблицы (StrengthUI.PHASE_RU — канон для UI).
+export const PHASE_RU = PHASE_RU_SS;
 
 function buildPrintHeader(plan: StrengthSportPlan): string {
   const title = `Стронг+ТА ${escHtml(plan.mode)} ${plan.weeks}нед · ${escHtml(plan.level)}`;

@@ -3,7 +3,7 @@
  * Стекло + градиенты, современный мобильный стиль. Полностью изолирован.
  */
 import React from 'react';
-import { useStrengthSportWizard } from './useStrengthSportWizard';
+import { useStrengthSportWizard, type StrengthSportStep } from './useStrengthSportWizard';
 import { StrengthSportPlanView } from './StrengthSportPlanView';
 import { buildStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-builder.engine';
 import { finalizeStrengthSportPlan, buildStrengthSportReport } from '../../../engines/strength-sport/strength-sport-finalize.engine';
@@ -33,10 +33,11 @@ import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/str
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
 import { collectSsVelocityHistory } from './sm-bridge-intake';
+import { weightClassFor, weightClassLine, smWeightClassesFor, RPE_CAP_OPTIONS, SS_BLOCK_MODELS, DELOAD_VS_TAPER_NOTE, scoreCheckin, pushCheckin, loadCheckins, saveCheckins, type SsCheckin } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
 import { CARD_STRONG, CARD_HERO, ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, SELECT, TEXT_2, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, ProgressBar, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
 import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, STEP_PILL } from '../TrainingScreen_parts/training-ui';
 
-type Step = 'params' | 'athlete' | 'outside' | 'split' | 'plan' | 'quality' | 'export';
+type Step = StrengthSportStep;
 const STEP_LABEL_RU: Record<Step,string> = { params:'1 ⚙️ Параметры', athlete:'2 👤 Атлет', outside:'3 🏃 Вне зала', split:'4 🧩 Сплит', plan:'5 📋 План', quality:'6 ✅ Качество', export:'7 📤 Экспорт' };
 const STEP_GROUPS: Record<string, Step[]> = {
   'ПАРАМЕТРЫ': ['params', 'athlete', 'outside', 'split'],
@@ -64,6 +65,8 @@ export const StrengthSportConstructor: React.FC = () => {
     acwr, setAcwr, hrv, setHrv, velocityLoss, setVelocityLoss,
     vbtPerLift, setVbtPerLift, lvpLift, setLvpLift, lvpPoints, setLvpPoints, lvpResult, setLvpResult,
     taperWeeks, setTaperWeeks, contest, setContest, contestStrategy, setContestStrategy,
+    weightClass, setWeightClass, rpeCap, setRpeCap, deadliftGrip, setDeadliftGrip,
+    blockModel, setBlockModel, autoDeload, setAutoDeload, conditioningDay, setConditioningDay,
     medleyPreview, setMedleyPreview, weakPoints, setWeakPoints, diagnosticLevel, setDiagnosticLevel,
     hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge,
     orthoNote,
@@ -76,6 +79,14 @@ export const StrengthSportConstructor: React.FC = () => {
   // Откат спец-блока: снапшот тот же, что в хабе (TA_PLAN_KEY) — кнопки в обоих местах взаимозаменяемы.
   const [hasSpecPrev, setHasSpecPrev] = React.useState<boolean>(() => {
     try { return hasTAPlanPrev(); } catch { return false; }
+  });
+  // Planner PRO P4: чек-ин недели (дефолт 3 = норма, персист he_ss_checkin_v1 кап 12)
+  const [checkin, setCheckin] = React.useState<SsCheckin>(() => {
+    try {
+      const l = loadCheckins();
+      if (l.length) { const { eventFatigue, grip, back, sleep, appetite } = l[l.length - 1]; return { eventFatigue, grip, back, sleep, appetite }; }
+    } catch {}
+    return { eventFatigue: 3, grip: 3, back: 3, sleep: 3, appetite: 3 };
   });
   // Весь стейт/эффекты/мемоизация — в useStrengthSportWizard; здесь только хендлеры и рендер шагов.
   const pullFromProfile = () => {
@@ -183,6 +194,14 @@ export const StrengthSportConstructor: React.FC = () => {
       diaryTrend: diaryTrend || undefined,
       taperWeeks: goal==='peaking' ? taperWeeks : undefined,
       weakPoints: weakPoints.length ? weakPoints : undefined,
+      // Planner PRO P1–P7 (дефолты движка = старое поведение)
+      weightClass: weightClass || weightClassFor(bodyweight, sex as any),
+      rpeCap,
+      deadliftGrip,
+      blockModel,
+      autoDeload,
+      conditioningDay,
+      openerSingles: true,
       contest: mode==='strongman' ? contest : undefined,
       // Стратегия попыток действует и на ТА-раскладку (раньше WL всегда считал 'balanced')
       contestStrategy: contestStrategy || undefined,
@@ -198,7 +217,7 @@ export const StrengthSportConstructor: React.FC = () => {
       // НЕ должен снова накручивать ПМ (+2% за клик, кумулятивно). Хэш входа
       // до прогрессии стабилен между одинаковыми сборками; смена любого
       // параметра — новый мезоцикл, прогрессия применяется один раз.
-      const progHash = JSON.stringify({ mode, goal, level, weeks, days, workMax, focus, methodology, dupMode, intensityTech, equipment, injuries, mobility, sex, bodyweight, age, competitionDate, patternId, cycleId, cycleMode, weakPoints, contestStrategy });
+      const progHash = JSON.stringify({ mode, goal, level, weeks, days, workMax, focus, methodology, dupMode, intensityTech, equipment, injuries, mobility, sex, bodyweight, age, competitionDate, patternId, cycleId, cycleMode, weakPoints, contestStrategy, contestId: (contest as any)?.id || (contest as any)?.events?.map((e:any)=>e.id).join('+') || '', diagnosticLevel, weightClass, rpeCap, deadliftGrip, blockModel, autoDeload, conditioningDay });
       const lastHash = (() => { try { return localStorage.getItem('he_ss_prog_hash_v1'); } catch { return null; } })();
       if (prev && lastHash !== progHash) {
         input = applyMesocycleProgression(prev, input) as any;
@@ -655,6 +674,24 @@ export const StrengthSportConstructor: React.FC = () => {
             <button onClick={pullFromProfile} style={{ ...BTN, flex:1 }}>⟡ Из профиля</button>
           </SectionCard>
 
+          <SectionCard icon="🏆" title="Стронг-PRO" subtitle="Класс · хват · RPE-cap · модель" collapsible defaultOpen={false} summary={`${weightClass || weightClassFor(bodyweight, sex as any)} · RPE≤${rpeCap} · ${blockModel}`}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <StrengthPopupSelect label="Весовая" value={weightClass || weightClassFor(bodyweight, sex as any)} onChange={v=> setWeightClass(v)} options={[{id:'',label:`Авто (${weightClassFor(bodyweight, sex as any)})`}, ...smWeightClassesFor(sex as any).filter(c=>c.id!=='open').map(c=>({id:c.id,label:c.label})), {id:'open',label:'Open'}]} />
+              <StrengthPopupSelect label="Хват становой" value={deadliftGrip} onChange={v=> setDeadliftGrip(v as any)} options={[{id:'overhand',label:'Верхний'},{id:'straps',label:'Лямки'},{id:'mixed',label:'Разнохват'}]} />
+              <StrengthPopupSelect label="RPE-cap топа" value={String(rpeCap)} onChange={v=> setRpeCap(Number(v))} options={RPE_CAP_OPTIONS.map(r=>({id:String(r),label:`RPE ${r}`,desc:r===9.5?'дефолт':''}))} />
+              <StrengthPopupSelect label="Модель" value={blockModel} onChange={v=> setBlockModel(v as any)} options={SS_BLOCK_MODELS.map(m=>({id:m.id,label:m.label,desc:m.desc}))} />
+            </div>
+            <div style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'7px 10px', borderRadius:9 }}>{weightClassLine(bodyweight, weightClass || weightClassFor(bodyweight, sex as any), sex as any)}</div>
+            {deadliftGrip==='mixed' && <InfoBanner tone="warn">Разнохват: на ≥85% — 100% разрывов бицепса на супинированной руке (PMC8237209) → hook/лямки. Камень: руки-канаты, локти прямые.</InfoBanner>}
+            <label style={{ display:'flex', gap:8, alignItems:'center', fontSize:12, color:'#fff', fontWeight:700, cursor:'pointer', minHeight:44 }}>
+              <input type="checkbox" checked={autoDeload} onChange={e=> setAutoDeload(e.target.checked)} style={{ width:20, height:20, accentColor:'#30d158' }} /> Делоды 4/7/11 (≥8 нед)
+            </label>
+            <label style={{ display:'flex', gap:8, alignItems:'center', fontSize:12, color:'#fff', fontWeight:700, cursor:'pointer', minHeight:44 }}>
+              <input type="checkbox" checked={conditioningDay} onChange={e=> setConditioningDay(e.target.checked)} style={{ width:20, height:20, accentColor:'#30d158' }} /> Отдельный cond_day (стронг GPP)
+            </label>
+            <div style={{ fontSize:10, color:'#fff', opacity:0.85 }}>{DELOAD_VS_TAPER_NOTE}</div>
+          </SectionCard>
+
           <SectionCard icon="🏋️" title="Рабочие максимумы" subtitle="Олимпийка + сила · стронг — ниже" collapsible defaultOpen={false} summary={`${(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).filter(k => ((workMax as any)[k] || 0) > 0).length}/6 ПМ`} status={(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).some(k => ((workMax as any)[k] || 0) > 0) ? 'ok' : undefined}>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 }}>
               {(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).map(k => (
@@ -929,6 +966,19 @@ export const StrengthSportConstructor: React.FC = () => {
                 {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них</div>}
               </div>
             )}
+          </SectionCard>
+
+          <SectionCard icon="📋" title="Чек-ин недели" subtitle="Усталость · хват · спина · сон · аппетит (MyStrengthBook)" collapsible defaultOpen={false} summary={(() => { try { const s = scoreCheckin(checkin); return `${s.score}/5${s.suggestDeload ? ' · делод?' : ''}`; } catch { return ''; } })()}>
+            {((['eventFatigue','grip','back','sleep','appetite'] as const).map(k => (
+              <Field key={k} label={k==='eventFatigue'?'Усталость event-дня':k==='grip'?'Хват':k==='back'?'Поясница':k==='sleep'?'Сон':'Аппетит'} hint={`${checkin[k]}/5`}><div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={1} max={5} step={1} value={checkin[k]} onChange={e=> setCheckin(s=> ({...s, [k]: Number(e.target.value)}))} style={{ flex:1 }} /><Highlight color={checkin[k]<=2?'#ff3b30':checkin[k]<=3?'#ff9f0a':'#30d158'}>{checkin[k]}</Highlight></div></Field>
+            )) as any)}
+            {(() => { try {
+              const s = scoreCheckin(checkin);
+              return s.suggestDeload
+                ? <InfoBanner tone="warn">Скор {s.score}/5 — предложен делод (кнопка, не авто): <button onClick={()=> { setAutoDeload(true); setMsg('✦ Делоды 4/7/11 включены'); setTimeout(()=>setMsg(''),2200); }} style={{ ...BTN_SMALL, marginLeft:6 }}>Включить делоды</button></InfoBanner>
+                : <InfoBanner tone="info">Скор {s.score}/5 — восстановление в норме.</InfoBanner>;
+            } catch { return null; } })()}
+            <button onClick={()=> { try { saveCheckins(pushCheckin(loadCheckins(), checkin)); setMsg('✦ Чек-ин сохранён'); setTimeout(()=>setMsg(''),1800); } catch {} }} style={BTN_SMALL}>💾 Сохранить чек-ин</button>
           </SectionCard>
 
           <SectionCard icon="🛡️" title="Оборудование и здоровье" subtitle="Ограничения фильтруют пул и темп" collapsible defaultOpen={false} summary={injuries.length ? `Травмы: ${injuries.length}` : equipment.length ? `Инвентарь: ${equipment.length}` : 'всё доступно'} status={injuries.length ? 'warn' : (equipment.length || mobility.length) ? 'ok' : undefined}>
