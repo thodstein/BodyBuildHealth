@@ -1,11 +1,11 @@
 // CalcPhaseLabCards — карточки анализов по фазам K0–K10 + аддоны классов.
 // Единый движок: src/engines/support-phase-labs.engine.ts (канон docs/SUPPORT-PHASE-LABS-PLAN.md).
 // Чистый рендер по пропсам: phase/flags/peds/subs/esterHalfLifeHours. Без стора, без эффектов.
-import React from 'react';
+import React, { useState } from 'react';
 import type { PhaseKey } from '../../../engines/tz-bridge-phase';
 import {
   phaseCardsFor, addonsFor, pctVariantFor, isLongEsterHalfLife, isInjectableCourse,
-  type PhaseLabFlags,
+  needsLpaBaseline, type PhaseLabFlags,
 } from '../../../engines/support-phase-labs.engine';
 
 export interface PhaseLabPed {
@@ -22,7 +22,30 @@ interface Props {
   esterHalfLifeHours?: number | null;
 }
 
+const LPA_DONE_KEY = 'he_phase_labs_lpa_v1';
+
+function readLpaDone(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(LPA_DONE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export const CalcPhaseLabCards: React.FC<Props> = ({ phase, flags, peds, subs, esterHalfLifeHours }) => {
+  const [lpaDone, setLpaDone] = useState<boolean>(readLpaDone);
+  const toggleLpa = () => {
+    setLpaDone(prev => {
+      const next = !prev;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          if (next) localStorage.setItem(LPA_DONE_KEY, '1');
+          else localStorage.removeItem(LPA_DONE_KEY);
+        }
+      } catch { /* стор недоступен — состояние только на сессию */ }
+      return next;
+    });
+  };
   const pedList = (peds || []).filter(Boolean) as PhaseLabPed[];
   const cards = phaseCardsFor(flags, phase, {
     esterLong: undefined,
@@ -47,7 +70,14 @@ export const CalcPhaseLabCards: React.FC<Props> = ({ phase, flags, peds, subs, e
         📋 Карточки анализов по фазам ({cards.length}) — единый перечень K0–K10
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {cards.map(card => (
+        {cards.map(card => {
+          const showLpa = needsLpaBaseline(lpaDone);
+          const groups = card.id === 'K0' && !showLpa
+            ? card.groups
+              .map(gr => ({ ...gr, items: gr.items.filter(m => !/лп\(a\)|lp\(a\)/i.test(m.marker)) }))
+              .filter(gr => gr.items.length > 0)
+            : card.groups;
+          return (
           <div key={card.id} data-phase-lab-card={card.id} style={{ padding: '4px 6px', borderRadius: 5, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ fontSize: 7, fontWeight: 700, color: '#bfdbfe', marginBottom: 1 }}>
               {card.id} · {card.title} <span style={{ color: '#60a5fa', fontWeight: 600 }}>· {card.when}</span>
@@ -57,7 +87,7 @@ export const CalcPhaseLabCards: React.FC<Props> = ({ phase, flags, peds, subs, e
                 Ваш вариант: {pctV === 'hcg-bridge' ? 'hCG-bridge (длинные эфиры)' : 'SERM сразу (короткие эфиры)'}
               </div>
             )}
-            {card.groups.map((gr, gi) => (
+            {groups.map((gr, gi) => (
               <div key={gi} style={{ marginTop: 2 }}>
                 <div style={{ fontSize: 6, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>{gr.label}</div>
                 {gr.items.map((m, mi) => (
@@ -70,6 +100,12 @@ export const CalcPhaseLabCards: React.FC<Props> = ({ phase, flags, peds, subs, e
                 ))}
               </div>
             ))}
+            {card.id === 'K0' && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, fontSize: 6, color: 'rgba(255,255,255,0.6)', minHeight: 44, cursor: 'pointer' }}>
+                <input type="checkbox" checked={lpaDone} onChange={toggleLpa} style={{ width: 16, height: 16 }} />
+                Лп(a) уже сдан (раз в жизни) — скрыть строку
+              </label>
+            )}
             {card.rxNote && <div style={{ fontSize: 6, color: '#fbbf24', marginTop: 2 }}>{card.rxNote}</div>}
             {(card.preanalytics?.length || 0) > 0 && (
               <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
@@ -77,7 +113,8 @@ export const CalcPhaseLabCards: React.FC<Props> = ({ phase, flags, peds, subs, e
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
       {addons.length > 0 && (
         <div style={{ marginTop: 3 }}>

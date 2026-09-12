@@ -48,7 +48,7 @@ import { CalcPhaseLabCards } from './CalcPhaseLabCards';
 import { LAB_MONITOR_DB } from '../SupportScreen_parts/UnifiedSynergyCalculator';
 import { LAB_TOP20, resolveLabMonitor, type HubLabMon } from '../../../engines/support-hub-labs.engine';
 import { getSubstanceMonitoring } from '../../../data/substance-monitoring-db';
-import { phaseCardsFor, addonsFor, isInjectableCourse, mergeMonitoringLists } from '../../../engines/support-phase-labs.engine';
+import { phaseCardsFor, addonsFor, isInjectableCourse, mergeMonitoringLists, withLabTiming } from '../../../engines/support-phase-labs.engine';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -3139,7 +3139,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               pushMerged(sm.map(e => ({ what: e.marker, when: FREQ_RU[e.freq] || e.freq, target: e.target || '' })), nm);
             } catch { /* мониторинг не должен ронять карточку */ }
           }
-          return Object.values(map).sort((a, b) => b.subs.length - a.subs.length);
+          return withLabTiming(Object.values(map)).sort((a, b) => b.subs.length - a.subs.length);
         })();
 
         // ── Ведущие вещества по каждой системе (привязка панелей к плану) ──

@@ -682,6 +682,18 @@ export function labTimingFor(marker: string): string | null {
   return null;
 }
 
+/**
+ * Добивка пустых when через labTimingFor (для персональных маркеров:
+ * источники без частоты получают честный тайминг движка вместо «—»).
+ */
+export function withLabTiming<T extends UnifiedMonitor>(items: T[]): T[] {
+  return (items || []).map(m => {
+    if (!m || m.when) return m;
+    const when = labTimingFor(m.what);
+    return when ? { ...m, when } : m;
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  Мост к фарм-матрице классов (PED_CLASS_MATRIX, «Фарм-матрица курса»):
 //  matrix id → ключи CLASS_LAB_ADDONS. Lock: правка labs матрицы без правки

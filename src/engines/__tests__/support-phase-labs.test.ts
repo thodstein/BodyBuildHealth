@@ -7,7 +7,7 @@ import {
   PHASE_LAB_CARDS, CLASS_LAB_ADDONS, phaseLabCardById,
   phaseCardsFor, addonsFor, labTimingFor, pctVariantFor, needsLpaBaseline,
   isLongEsterHalfLife, isInjectableCourse, mergeMonitoringLists,
-  matrixAddonKeys, matrixAddons,
+  matrixAddonKeys, matrixAddons, withLabTiming,
 } from '../support-phase-labs.engine';
 import { PED_CLASS_MATRIX } from '../../data/ped-class-matrix';
 
@@ -213,5 +213,21 @@ describe('matrixAddonKeys — мост к фарм-матрице классов
     expect(text(['clenbuterol'])).toContain('Mg');
     expect(text(['glp1'])).toContain('HbA1c');
     expect(text(['sarm'])).toContain('>100 — стоп');
+  });
+});
+
+describe('withLabTiming — добивка пустых when', () => {
+  it('пустой when заполняется из labTimingFor, заполненный не трогается', () => {
+    const out = withLabTiming([
+      { what: 'Гомоцистеин', when: '', target: 'Hcy<10' },
+      { what: 'АЛТ', when: 'Каждые 2 нед', target: '' },
+      { what: 'Неизвестный маркер XYZ', when: '', target: '' },
+    ]);
+    expect(out[0].when).toContain('K3');
+    expect(out[1].when).toBe('Каждые 2 нед');
+    expect(out[2].when).toBe('');
+  });
+  it('пустой вход — пустой выход', () => {
+    expect(withLabTiming([])).toEqual([]);
   });
 });

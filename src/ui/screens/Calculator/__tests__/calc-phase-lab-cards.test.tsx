@@ -59,4 +59,9 @@ describe('CalcPhaseLabCards', () => {
     expect(html).not.toContain('data-phase-lab-card="K10"');
     expect(html).toContain('data-phase-lab-addon="oral_17aa"');
   });
+  it('K0: чекбокс Лп(a) и строка Лп(a) по умолчанию', () => {
+    const html = render({ phase: 'course', flags: { hasAAS: true }, peds: [{ id: 'test_enan' }], subs: [] });
+    expect(html).toContain('Лп(a) уже сдан');
+    expect(html).toContain('Лп(a)');
+  });
 });

@@ -1036,7 +1036,12 @@ function computeProtocolWarnings(protocolIds: string[], flags?: ReturnType<typeo
 // ── H5: структурированный график лабораторного мониторинга ──
 function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDFlags>, phase: PhaseKey): string {
   if (phase === 'pct') {
-    return 'Мониторинг ПКТ:\n• Нед 2 после отмены: ЛГ, ФСГ, общ. тестостерон, эстрадиол, пролактин\n• Нед 6 после отмены: ЛГ, ФСГ, общ. тестостерон, эстрадиол\n• При невосстановлении HPTA (>6 нед, ТТГ/ЛГ < 50% нормы) — эндокринолог';
+    const longEster = isLongEsterHalfLife(ctx.phaseCtx?.esterHalfLifeHours);
+    return 'Мониторинг ПКТ:\n• Нед 2 после отмены: ЛГ, ФСГ, общ. тестостерон, эстрадиол, пролактин\n• Нед 6 после отмены: ЛГ, ФСГ, общ. тестостерон, эстрадиол\n'
+      + (longEster
+        ? '• Длинные эфиры → hCG-bridge 500–1000 МЕ 2×/нед × 2–3 нед → затем SERM (карточка K6)'
+        : '• Короткие эфиры → SERM сразу (тамоксифен 20 мг ИЛИ энкломифен 12.5–25 мг ИЛИ кломифен 25–50 мг; карточка K6)')
+      + '\n• Кортизол (утро) + липиды + HCT на выходе\n• При невосстановлении HPTA (>6 нед, ТТГ/ЛГ < 50% нормы) — эндокринолог';
   }
   const onPED = flags.hasAAS || flags.hasSarm || flags.hasGH || flags.hasInsulin || flags.hasIGF;
   if (!onPED) return '';
@@ -1045,10 +1050,16 @@ function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDF
     lines.push('⚠ Анализы отсутствуют: базовая поддержка рассчитана по фармакологии и фазе, но фактический уровень рисков не подтверждён.');
   }
   lines.push('• 0 нед (исходно): ОАК+БХ (АЛТ/АСТ/ГГТ/билирубин/ЩФ), липидограмма, эстрадиол, пролактин, ТТГ, глюкоза/HbA1c, креатинин/eGFR, АД, ЧСС, PSA (мужчины >40л или при наличии ААС)');
+  lines.push('• 0 нед (исходно, расширенно): гомоцистеин + B12/фолат, АпоВ, Лп(a) однократно, hs-CRP, ОАМ+UACR, ферритин/D3 (карточка K0)');
+  const pedsForBbv = ctx.pedDoses || [];
+  if (isInjectableCourse(pedsForBbv, flags)) {
+    lines.push('• 0 нед (инъекционный курс): BBV — HIV + HBsAg/anti-HBs + anti-HCV + вакцинация HBV (карточка K10)');
+  }
   if (flags.hasOral17) lines.push('• каждые 2 нед: АЛТ/АСТ (орал 17α — гепатотоксичность). При ALT>2×ULN — снизить/отменить орал');
   else lines.push('• 4 нед: АД, ЧСС, HCT/гемоглобин, АЛТ/АСТ');
   lines.push('• 4 нед: HCT, ферритин (управление эритроцитозом), эстрадиол (титрация AI), пролактин (nandrolone/tren)');
   lines.push('• 8 нед: ОАК+БХ+липидограмма, эстрадиол, пролактин, ТТГ, УЗИ печени и предстательной железы, D-димер (при HCT>52%)');
+  lines.push('• 8 нед (расширенно): гомоцистеин/B12/фолат + АпоВ + hs-CRP (карточка K3)');
   lines.push('• 12 нед: как на 8 нед');
   if (flags.hasGH) lines.push('• при GH: глюкоза натощак + HbA1c каждые 4 нед, IGF-1 каждые 6-8 нед (титрация дозы, цель — верхняя граница возрастной нормы)');
   if (flags.hasInsulin) lines.push('• при инсулине: глюкоза натощак + через 2 ч после еды каждые 4 нед, K+ каждые 4 нед');
@@ -1062,6 +1073,7 @@ function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDF
   if (phase === 'fertility') lines.push('• фертильность: спермограмма + LH/FSH/TT/E2/PRL каждые 6-8 нед; hCG/FSH-схема только под врачом');
   if (phase === 'trt') lines.push('• TRT: ОАК/HCT, PSA, E2, TT/FT/SHBG, липиды и АД каждые 8-12 нед после стабилизации, чаще при отклонениях');
   lines.push('• внепланово при симптомах: головная боль, желтуха, отёки, гинекомастия, боль в груди, одышка, тахикардия >100, АД >160/100');
+  lines.push('• дельта-правила (нужен baseline K0): HCT Δ+5 п.п. → флеботомия; АЛТ >2× своего baseline; HDL −40%; E2 −30% от steady-state → AI избыточен');
   return lines.join('\n');
 }
 
