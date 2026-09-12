@@ -26,6 +26,25 @@ export const PK_ESTER_CANON: Record<string, EsterCanon> = {
   oral: { tHalfDays: 0.3, tmaxDays: 0.1, confidence: 4, source: 'OptiPin oral avg' },
 };
 
+// Per-compound t½ оралок, дни (OptiPin: Strong/Moderate; halotestin Limited)
+export const ORAL_CANON: { re: RegExp; tHalfDays: number; source: string }[] = [
+  { re: /turinabol|trena|tbol|chlorodehydro/i, tHalfDays: 0.67, source: 'OptiPin Moderate (16.1ч)' },
+  { re: /proviron|mesterolone/i, tHalfDays: 0.52, source: 'OptiPin Moderate (12.5ч)' },
+  { re: /superdrol|methasterone/i, tHalfDays: 0.42, source: 'OptiPin Limited (10.1ч)' },
+  { re: /winstrol|stanozolol|stan\b/i, tHalfDays: 0.375, source: 'OptiPin Moderate (9ч)' },
+  { re: /anadrol|oxymetholone/i, tHalfDays: 0.33, source: 'OptiPin Moderate (7.9ч)' },
+  { re: /anavar|oxandrolone|oxan/i, tHalfDays: 0.28, source: 'OptiPin Strong (6.7ч)' },
+  { re: /dianabol|methandienone|methand|dbol/i, tHalfDays: 0.22, source: 'OptiPin Moderate (5.3ч)' },
+  { re: /primobolan.*oral|oral.*primo|methenolone/i, tHalfDays: 0.21, source: 'OptiPin Moderate (5ч)' },
+  { re: /halotestin|halo|fluoxymesterone/i, tHalfDays: 0.08, source: 'OptiPin Moderate (2ч)' },
+];
+
+export function oralHalfLifeFor(substanceId: string): { tHalfDays: number; source: string } | null {
+  const s = String(substanceId || '');
+  for (const o of ORAL_CANON) if (o.re.test(s)) return { tHalfDays: o.tHalfDays, source: o.source };
+  return null;
+}
+
 export function resolveEsterCanon(ester: string): EsterCanon & { key: string; estimated: boolean } {
   const key = String(ester || '').toLowerCase();
   const found = PK_ESTER_CANON[key];

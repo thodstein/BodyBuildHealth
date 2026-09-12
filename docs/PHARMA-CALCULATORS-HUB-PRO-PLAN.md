@@ -18,6 +18,11 @@
 - `masteron/masteron_enan → drostanolone_prop/drostanolone_enan` (id сверены с `pharma-db/`); `raloxifene` оставлен — вещества нет в каталоге genuinely.
 - Дозы: `courseDoseById` (факт из `course_log` через `weeklyDose` + мг-конверсия, паритет `MapperTab`; IU как есть) приоритетнее ручного поля; ручное — фолбэк. Все 4 точки (`alerts`/`courseRecs`/`classInstructions`/`unifiedView`) + guard-тест (id живы/мёртвы + «из курса» в UI).
 
+## J-раунд (этот коммит): честные источники + оралки
+
+- Матрица: BPC+TB-500 переведён из `synergy` в честное «Аддитивно, не синергия: только доклиника, human RCT нет» (`safe` + Grade C-источник) — по свежему синтезу (PeptideStacks Grade C, Cureus 2025, peptides.fyi, dosagepeptide: факториальных исследований нет); GHRH+GHRP остался `synergy` с источником JCEM 2006 + Teichman 2006 + Raun 1998 и оговоркой про точную пару (peptidesdefined); трен — Piatkowski 2024 (n=282) + Zelleroth; 19-nor — PMC4462037; GLP-1/двойной GHRH — подписаны как механистический консенсус, не исследования.
+- Оралки: `ORAL_CANON` (9 соединений, OptiPin) + `oralHalfLifeFor` → `halfLifeOf` в ПКТ (oxan старт 1д — в каноне 1–3) + per-name оверрайд в 5-engine и DiagnosticsTab (метан 0.22 vs анадрол 0.33 различаются).
+
 ## Аудит InteractionCheckerTab (I2, только чтение — файл чужой, не тронут)
 
 1. `synergyToPharmaId` маппит в несуществующие id: `drostanolone_propionate → masteron`, `drostanolone_enanthate → masteron_enan`, `raloxifene` — таких id в `PHARMA_DB` нет (реальные: `drostanolone_prop`/`drostanolone_enan`, ралоксифена нет вовсе). Гард `pharmaIds.has` молча дропает эти синергии — мастерон без синергий в UI. Фикс 2-строчный — за владельцем таба.

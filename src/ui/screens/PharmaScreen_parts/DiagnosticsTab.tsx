@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { runAdvancedDiagnostics, ESTER_HALF_LIFE_DAYS } from '../../../engines/advanced-diagnostics.engine';
 import { planPctStart, halfLifeOf, pctWindowLabel } from '../../../engines/pct-timing.engine';
-import { resolveEsterCanon } from '../../../engines/pk-bateman.engine';
+import { resolveEsterCanon, oralHalfLifeFor } from '../../../engines/pk-bateman.engine';
 import { saveCalcSnapshot, buildCalcCsv, buildCalcHtml, downloadCsv, printHtml } from '../../../engines/pharma-calc-share.engine';
 import type { DrugDoseInput, VitalsInput, AdvancedDiagnosticsResult } from '../../../engines/advanced-diagnostics.engine';
 import { useDataLink } from '../../../core/data-link';
@@ -88,6 +88,10 @@ export const DiagnosticsTab: React.FC = () => {
       for (const d of diagDrugs) {
         const c = resolveEsterCanon(d.ester);
         override[String(d.ester || '').toLowerCase()] = c.tHalfDays;
+      }
+      for (const d of diagDrugs) {
+        const o = oralHalfLifeFor(d.name);
+        if (o) override[`name:${String(d.name || '').toLowerCase()}`] = o.tHalfDays;
       }
     }
     const res = runAdvancedDiagnostics(age, diagDrugs, vitals, has19Nor, canonOn ? { halfLifeOverride: override } : undefined);

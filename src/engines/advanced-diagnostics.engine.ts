@@ -69,9 +69,14 @@ export interface DiagnosticsOpts {
   halfLifeOverride?: Record<string, number>;
 }
 
-function resolveHalfLife(ester: string, fallback: number, opts?: DiagnosticsOpts): number {
-  const ov = opts?.halfLifeOverride?.[String(ester || '').toLowerCase()];
-  if (Number.isFinite(ov) && (ov as number) > 0) return ov as number;
+function resolveHalfLife(ester: string, fallback: number, opts?: DiagnosticsOpts, drugName?: string): number {
+  const ov = opts?.halfLifeOverride;
+  if (ov) {
+    const byName = ov[`name:${String(drugName || '').toLowerCase()}`];
+    if (Number.isFinite(byName) && (byName as number) > 0) return byName as number;
+    const byEster = ov[String(ester || '').toLowerCase()];
+    if (Number.isFinite(byEster) && (byEster as number) > 0) return byEster as number;
+  }
   return fallback;
 }
 
@@ -79,7 +84,7 @@ export function computePKPD(drugs: DrugDoseInput[], opts?: DiagnosticsOpts): PKP
   if (!Array.isArray(drugs)) return [];
   return drugs.filter(Boolean).map((drug) => {
     const injPerWeek = Math.max(drug.injectionsPerWeek || 0, 0.1);
-    const tHalf = resolveHalfLife(drug.ester, ESTER_HALF_LIFE_DAYS[drug.ester] || (7.0 / injPerWeek), opts);
+    const tHalf = resolveHalfLife(drug.ester, ESTER_HALF_LIFE_DAYS[drug.ester] || (7.0 / injPerWeek), opts, drug.name);
     const k = Math.log(2) / Math.max(tHalf, 0.01);
     const dosePerInjection = (drug.mgPerWeek || 0) / Math.max(drug.injectionsPerWeek || 0, 1);
     const intervalDays = 7.0 / injPerWeek;
@@ -333,7 +338,7 @@ export function computePCTReboot(input: PCTRebootInputEx): PCTRebootOutput {
 
   for (const drug of input.drugs) {
     if (!drug) continue;
-    const th = resolveHalfLife(drug.ester, ESTER_HALF_LIFE_DAYS[drug.ester] || 7.0, { halfLifeOverride: (input as PCTRebootInputEx).halfLifeOverride });
+    const th = resolveHalfLife(drug.ester, ESTER_HALF_LIFE_DAYS[drug.ester] || 7.0, { halfLifeOverride: (input as PCTRebootInputEx).halfLifeOverride }, drug.name);
     if (th > longestTH) {
       longestTH = th;
       longestDrug = drug;

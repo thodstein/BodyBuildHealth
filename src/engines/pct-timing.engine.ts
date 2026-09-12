@@ -1,6 +1,6 @@
 // PCT timing — честный старт: longest clearance + поправка накопления + окна-канон.
 // Паритет StacksnStats PCT Timing + postcycletherapy.com (last + 3.5×t½).
-import { PK_ESTER_CANON, resolveEsterCanon } from './pk-bateman.engine';
+import { PK_ESTER_CANON, resolveEsterCanon, oralHalfLifeFor } from './pk-bateman.engine';
 import { resolvePedAlias } from '../data/ped-alias-map';
 
 export interface PctCompound {
@@ -59,6 +59,11 @@ export function halfLifeOf(substanceId: string, ester?: string): { tHalf: number
     /* алиас опционален */
   }
   const key = esterOf({ substanceId, ester });
+  // Оралки: per-compound канон точнее плоских 0.3
+  if (key === 'oral') {
+    const o = oralHalfLifeFor(substanceId);
+    if (o) return { tHalf: o.tHalfDays, source: `Оралка per-compound (${o.source})` };
+  }
   // Sustanon: берём max долгого эфира канона (деканоат 10.2) вместо плоских 4.5
   if (key === 'sustanon') return { tHalf: 10.2, source: 'Sustanon max-эфир (decanoate 10.2)' };
   const c = resolveEsterCanon(key);

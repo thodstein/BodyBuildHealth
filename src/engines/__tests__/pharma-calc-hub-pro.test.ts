@@ -180,6 +180,40 @@ describe('I раунд: канон-оверрайд движка', () => {
   });
 });
 
+describe('J раунд: честные источники + оралки', () => {
+  it('bpc+tb аддитивно, не синергия, с источником', async () => {
+    const { pairLevel } = await import('../mapper-matrix.engine');
+    const p = pairLevel('bpc157', 'tb500');
+    expect(p.level).toBe('safe');
+    expect(p.reason).toMatch(/Аддитивно/);
+    expect(p.source).toMatch(/Grade C/);
+    const t = pairLevel('trenbolone_acetate', 'test_enan');
+    expect(t.source).toMatch(/Piatkowski 2024/);
+    const g = pairLevel('cjc1295', 'ipamorelin');
+    expect(g.level).toBe('synergy');
+    expect(g.source).toMatch(/JCEM 2006/);
+  });
+  it('оралки per-compound точнее плоских 0.3', async () => {
+    const { oralHalfLifeFor } = await import('../pk-bateman.engine');
+    expect(oralHalfLifeFor('methand')?.tHalfDays).toBeCloseTo(0.22, 2);
+    expect(oralHalfLifeFor('oxan')?.tHalfDays).toBeCloseTo(0.28, 2);
+    expect(oralHalfLifeFor('test_enan')).toBeNull();
+    const { planPctStart } = await import('../pct-timing.engine');
+    const p = planPctStart([{ substanceId: 'oxan', weeksOn: 6 }]);
+    expect(p.startDay).toBeGreaterThanOrEqual(1);
+    expect(p.startDay).toBeLessThanOrEqual(3);
+  });
+  it('5-engine уважает per-name орал-оверрайд', async () => {
+    const eng = await import('../advanced-diagnostics.engine');
+    const r = eng.computePKPD([
+      { name: 'methand', ester: 'oral', mgPerWeek: 200, injectionsPerWeek: 7 },
+      { name: 'anadrol', ester: 'oral', mgPerWeek: 150, injectionsPerWeek: 7 },
+    ], { halfLifeOverride: { 'name:methand': 0.22, 'name:anadrol': 0.33 } });
+    expect(r[0].halfLifeDays).toBeCloseTo(0.22, 2);
+    expect(r[1].halfLifeDays).toBeCloseTo(0.33, 2);
+  });
+});
+
 describe('P7 share export', () => {
   it('csv anti-formula + esc', () => {
     expect(csvCell('=cmd')).toMatch(/^"/);

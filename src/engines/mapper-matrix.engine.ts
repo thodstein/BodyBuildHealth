@@ -11,12 +11,11 @@ export interface PairResult {
 }
 
 const SYNERGY_PAIRS: [RegExp, RegExp, string][] = [
-  [/cjc|ghrh|tesamorelin|sermorelin/i, /ipamorelin|ghrp|hexarelin/i, 'GHRH+GHRP: разные рецепторы, синергия GH-оси'],
-  [/bpc/i, /tb-?500|thymosin/i, 'BPC+TB-500: NO/ангиогенез + актин — разные пути, часто ко-исследуются'],
+  [/cjc|ghrh|tesamorelin|sermorelin/i, /ipamorelin|ghrp|hexarelin/i, 'GHRH+GHRP: разные рецепторы, синергия GH-оси (класс-эффект; точная пара без крупных RCT)'],
 ];
 
 const CAUTION_PAIRS: [RegExp, RegExp, string][] = [
-  [/tren/i, /.*/, 'Тренболон — доминантный усилитель нейро-пси нагрузки (K_N 1.40)'],
+  [/tren/i, /.*/, 'Тренболон — агрессия дозозависимо (Piatkowski 2024, n=282); нейротоксичность max in vitro (Zelleroth)'],
   [/semaglutide|tirzepatide|retatrutide/i, /semaglutide|tirzepatide|retatrutide/i, 'Два GLP-1 — нет аддитивной пользы, гастро-риск ×'],
   [/cjc-?1295/i, /tesamorelin|sermorelin/i, 'Два GHRH — конкуренция за рецептор, десенситизация'],
   [/nandrolone|deca/i, /tren/i, 'Два 19-nor — пролактин/прогестагенный стек, мониторинг PRL'],
@@ -35,15 +34,20 @@ function matchPair(list: [RegExp, RegExp, string][], a: string, b: string): stri
 }
 
 const SOURCE_BY_TEXT: [RegExp, string][] = [
-  [/GHRH\+GHRP/i, 'GHRH+GHRP синергия: исследовательские стеки GH-оси'],
-  [/BPC\+TB/i, 'BPC+TB-500: ко-исследуемая пара заживления'],
-  [/K_N 1\.40/i, 'AEBM Stack v1.2: тренболон K_N 1.40'],
-  [/GLP-1/i, 'GLP-1: пересечение механизма, исследовательских комбо нет'],
-  [/GHRH/i, 'GHRH: конкуренция за рецептор'],
-  [/19-nor/i, '19-nor: прогестагенный стек, мониторинг PRL'],
-  [/АД\/гематокрит/i, 'Базовый мониторинг курса'],
-  [/АЛТ\/АСТ/i, '17-aa: гепатотоксичность'],
+  [/GHRH\+GHRP/i, 'JCEM 2006 Veldhuis (синергия GHRH+GHRP) + Teichman 2006 (CJC-1295) + Eur J Endocrinol 1998 Raun (ipamorelin); оговорка: точная пара без крупных RCT'],
+  [/Piatkowski 2024/i, 'Piatkowski 2024 (n=282, доза→вербальная агрессия) + Zelleroth cortical cultures (нейротоксичность max)'],
+  [/GLP-1/i, 'Механистический консенсус: комбо двух GLP-1 в RCT нет'],
+  [/Два GHRH/i, 'Механистический консенсус: конкуренция за GHRH-R'],
+  [/19-nor/i, 'PMC4462037 (ND behavior review); мониторинг PRL'],
+  [/Следи АД/i, 'Рутинный мониторинг курса'],
+  [/Оралы 17-aa/i, 'Класс-эффект 17-aa: гепатотоксичность'],
+  [/Аддитивно/i, 'PeptideStacks Grade C + Cureus 2025 review + peptides.fyi: blend-данных (факториальных/RCT) нет'],
 ];
+
+function isBpcTb(a: string, b: string): boolean {
+  const t = `${a} ${b}`.toLowerCase();
+  return /bpc/.test(t) && /tb-?500|thymosin/.test(t);
+}
 
 function sourceFor(reason: string, level: MatrixLevel): string {
   for (const [re, src] of SOURCE_BY_TEXT) if (re.test(reason)) return src;
@@ -53,6 +57,11 @@ function sourceFor(reason: string, level: MatrixLevel): string {
 export function pairLevel(a: string, b: string): PairResult {
   const x = String(a || '');
   const y = String(b || '');
+  // BPC+TB-500: честно аддитивно (не синергия) — только доклиника, факториальных/RCT нет
+  if (isBpcTb(x, y)) {
+    const reason = 'Аддитивно, не синергия: только доклиника, human RCT нет';
+    return { a: x, b: y, level: 'safe', reason, source: sourceFor(reason, 'safe') };
+  }
   const s = matchPair(SYNERGY_PAIRS, x, y);
   if (s) return { a: x, b: y, level: 'synergy', reason: s, source: sourceFor(s, 'synergy') };
   const c = matchPair(CAUTION_PAIRS, x, y);
