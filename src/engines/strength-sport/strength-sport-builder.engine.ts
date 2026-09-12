@@ -1010,9 +1010,11 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   }
 
   // DUP / intensity (изолированно, только зал)
-  if (input.dupMode && input.dupMode !== 'off') {
+  // Planner PRO P5: blockModel 'wave' включает DUP-wave без явного dupMode (дефолт strong5 → off, байт-в-байт)
+  const effDupMode: any = (input.dupMode && input.dupMode !== 'off') ? input.dupMode : ((input as any).blockModel === 'wave' ? 'wave' : 'off');
+  if (effDupMode && effDupMode !== 'off') {
     const tmp: any = { weeksData, level, rationale: [] };
-    applyDUP(tmp as any, input.dupMode as any);
+    applyDUP(tmp as any, effDupMode as any);
   }
   if (input.intensityTech && input.intensityTech !== 'none') {
     const tmp: any = { weeksData, level, rationale: [] };

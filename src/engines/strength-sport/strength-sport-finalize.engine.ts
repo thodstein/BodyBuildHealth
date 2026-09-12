@@ -9,7 +9,9 @@ import { calcDOTS, calcWilks, calcIPFGL } from '../pl-points.engine';
 import { outsideVolumeMultiplier } from '../outside-load.engine';
 import { validateContestPassports } from './strength-sport-passport.engine';
 
-// Sinclair 2024 (IWF 01.06.2025) — обновлённые коэффициенты, fallback 2017 для сравнения
+// Sinclair 2024 (IWF 01.06.2025) — обновлённые коэффициенты, fallback 2017 для сравнения.
+// Planner PRO P6: внешнего справочника Sinclair в проекте нет (pl-points = DOTS/Wilks/IPFGL) —
+// эта таблица остаётся каноном, дубли не заводим.
 export const SINCLAIR_2024 = {
   male: { A: 0.722762521, b: 193.609 },
   female: { A: 0.787004341, b: 153.757 },
