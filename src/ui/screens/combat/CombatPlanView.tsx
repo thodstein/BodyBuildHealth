@@ -129,6 +129,10 @@ export const CombatPlanView: React.FC<Props> = ({
   const [openSess, setOpenSess] = React.useState<Record<string, boolean>>({});
   const doMsg = (m: string) => { setMsg?.(m); setTimeout(() => setMsg?.(''), 2200); };
   const sessOpen = (wk: number, day: number, idx: number) => openSess[`${wk}-${day}`] ?? idx === 0;
+  // №1: заблокированный план (errors) нельзя выгружать ни в каком виде — даже на бумагу
+  const blocked = (plan.validation?.errors?.length || 0) > 0;
+  const blockedTitle = blocked ? 'Сначала исправьте ошибки' : undefined;
+  const blockedDim = blocked ? { opacity: 0.4 } as const : {};
 
   return (
     <div className="combat-planview" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -421,18 +425,21 @@ export const CombatPlanView: React.FC<Props> = ({
       {/* Экспорт — Apple glass */}
       <div className="cb-plan-export">
       <SectionCard icon="📤" title="Экспорт и шаринг" subtitle="Печать · CSV · ICS · в программу">
+        {blocked && (
+          <div className="cb-export-blocked" style={{ fontSize: 11, color: '#fff', background: 'rgba(239,68,68,0.08)', padding: '8px 10px', borderRadius: 10, border: '0.5px solid rgba(239,68,68,0.24)' }}>⛔ Экспорт заблокирован — сначала исправьте ошибки выше (план с мед-флагами нельзя выгружать даже на бумагу)</div>
+        )}
         <GroupHeading icon="⎙" text="Копировать и печать" desc="Быстрый обмен" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 8 }}>
-          <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); doMsg('Скопировано'); }} style={BTN}>⎙ Копировать</button>
-          <button onClick={() => { const html = buildCombatPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); doMsg('HTML скопирован'); } }} style={BTN}>🖨 Печать</button>
-          <button onClick={onExportProgram} style={BTN_PRIMARY}>✦ В программу</button>
+          <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); doMsg('Скопировано'); }} style={{ ...BTN, ...blockedDim }} disabled={blocked} title={blockedTitle}>⎙ Копировать</button>
+          <button onClick={() => { const html = buildCombatPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); doMsg('HTML скопирован'); } }} style={{ ...BTN, ...blockedDim }} disabled={blocked} title={blockedTitle}>🖨 Печать</button>
+          <button onClick={onExportProgram} style={{ ...BTN_PRIMARY, ...blockedDim }} disabled={blocked} title={blockedTitle}>✦ В программу</button>
         </div>
         <Divider />
         <GroupHeading icon="📊" text="Файлы" desc="CSV для Excel · ICS для календаря" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 8 }}>
-          <button onClick={() => { downloadCombatCsv(plan); doMsg('CSV скачан'); }} style={BTN}>📊 CSV</button>
-          <button onClick={() => { downloadCombatXlsx(plan); doMsg('XLS скачан'); }} style={BTN}>📗 XLSX</button>
-          <button onClick={() => { const ics = buildCombatPlanIcs(plan, startDate || null); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `combat-plan-${plan.discipline}-${plan.weeks}w.ics`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); doMsg('ICS скачан'); }} style={BTN}>📅 План .ics</button>
+          <button onClick={() => { downloadCombatCsv(plan); doMsg('CSV скачан'); }} style={{ ...BTN, ...blockedDim }} disabled={blocked} title={blockedTitle}>📊 CSV</button>
+          <button onClick={() => { downloadCombatXlsx(plan); doMsg('XLS скачан'); }} style={{ ...BTN, ...blockedDim }} disabled={blocked} title={blockedTitle}>📗 XLSX</button>
+          <button onClick={() => { const ics = buildCombatPlanIcs(plan, startDate || null); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `combat-plan-${plan.discipline}-${plan.weeks}w.ics`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); doMsg('ICS скачан'); }} style={{ ...BTN, ...blockedDim }} disabled={blocked} title={blockedTitle}>📅 План .ics</button>
         </div>
         <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight>Экспорт</Highlight> — библиотека программ · печать · ICS · CSV</div>
       </SectionCard>

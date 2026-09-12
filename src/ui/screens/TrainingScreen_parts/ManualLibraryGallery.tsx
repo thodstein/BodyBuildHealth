@@ -2,7 +2,7 @@
  * ManualLibraryGallery.tsx — галерея библиотеки для ручного конструктора.
  * Объединяет FullProgram (complete-library + women + custom + originals), LMS-циклы,
  * именные арм-циклы (ARM_CYCLE_LIBRARY, 19), ТА/стронг-циклы (SS_CYCLES, 15)
- * и кардио-циклы (CARDIO_CYCLES, 35).
+ * и кардио-циклы (CARDIO_CYCLES, 35) и циклы единоборств (COMBAT_CYCLE_LIBRARY, 13).
  * Фильтры: поиск / уровень / цель / дни/нед / избранное.
  * Превью недели-1, сравнение 2 программ, 1-клик «Взять за основу».
  * Арм/SS-циклы уходят в свои конструкторы через planner-bridge
@@ -17,6 +17,7 @@ import { SS_CYCLES } from '../../../data/ss-cycles/ss-cycle-index';
 import type { SSCycleTemplate } from '../../../data/ss-cycles/ss-types';
 import { CARDIO_CYCLES } from '../../../data/cardio-cycles/cardio-cycle-index';
 import type { CardioCycleTemplate } from '../../../data/cardio-cycles/cardio-cycle-types';
+import { COMBAT_CYCLE_LIBRARY, type CombatCycleTemplate } from '../../../engines/combat/combat-cycle-library';
 import { requestCardioTemplateBuild } from '../../../engines/lms/cardio-cycle-bridge';
 import { applyToPlanner } from './planner-bridge';
 import { ManualHeader, SectionCard, Badge, InfoBanner, BTN, BTN_GHOST, CARD } from './ManualUI';
@@ -25,7 +26,7 @@ import { ACCENT, DIM } from './training-ui';
 import { loadTrainingProfile } from './training-profile';
 import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
 
-type Tab = 'bb' | 'pl' | 'arm' | 'ss' | 'cardio';
+type Tab = 'bb' | 'pl' | 'arm' | 'ss' | 'cardio' | 'combat';
 
 interface Props {
   bbPrograms: FullProgram[];
@@ -33,6 +34,7 @@ interface Props {
   armCycles?: ArmCycleTemplate[];
   ssCycles?: SSCycleTemplate[];
   cardioCycles?: CardioCycleTemplate[];
+  combatCycles?: CombatCycleTemplate[];
   onSelectBB: (p: FullProgram) => void;
   onSelectPL: (cycleId: string) => void;
   onClose?: () => void;
@@ -41,6 +43,7 @@ interface Props {
 export const ARM_DISC_LABELS_MANUAL: Record<string, string> = { armwrestling: 'Армрестлинг', armlifting: 'Армлифтинг', hybrid: 'Гибрид', any: 'Любая' };
 export const SS_MODE_LABELS_MANUAL: Record<string, string> = { weightlifting: 'Тяжёлая атлетика', strongman: 'Стронг', hybrid: 'Гибрид' };
 export const CARDIO_SPORT_LABELS_MANUAL: Record<string, string> = { run: 'Бег', row: 'Гребля', bike: 'Вело', mixed: 'Смешанные', hiit: 'HIIT' };
+export const COMBAT_DISC_LABELS_MANUAL: Record<string, string> = { boxing: 'Бокс', mma: 'ММА', wrestling: 'Борьба', kickboxing: 'Кикбоксинг', general: 'Общая' };
 
 const LEVEL_OPTS = [
   { id: 'all', label: 'Все уровни' },
@@ -107,7 +110,7 @@ export function plCycleMatchesGoal(period: string, goal: string): boolean {
   return true;
 }
 
-export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, armCycles = ARM_CYCLE_LIBRARY, ssCycles = SS_CYCLES, cardioCycles = CARDIO_CYCLES, onSelectBB, onSelectPL }) => {
+export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, armCycles = ARM_CYCLE_LIBRARY, ssCycles = SS_CYCLES, cardioCycles = CARDIO_CYCLES, combatCycles = COMBAT_CYCLE_LIBRARY, onSelectBB, onSelectPL }) => {
   const [tab, setTab] = useState<Tab>('bb');
   const [search, setSearch] = useState('');
   const [level, setLevel] = useState('all');
@@ -121,12 +124,12 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
   const [bridgeMsg, setBridgeMsg] = useState('');
 
   /** Мост «Библиотека → конструктор» (паритет с CycleCatalog.sendCycle). */
-  const sendCycle = (kind: 'arm_cycle' | 'ss_cycle', cycleId: string, title: string) => {    try {
+  const sendCycle = (kind: 'arm_cycle' | 'ss_cycle' | 'combat_cycle', cycleId: string, title: string) => {    try {
       applyToPlanner({ kind, label: title, data: { cycleId } });
-      const track = kind === 'arm_cycle' ? 'arm' : 'strength';
+      const track = kind === 'arm_cycle' ? 'arm' : kind === 'combat_cycle' ? 'combat' : 'strength';
       try { localStorage.setItem('he_training_planning_track', track); } catch { /* ignore */ }
       try { window.dispatchEvent(new CustomEvent('planning-track-open', { detail: track })); } catch { /* ignore */ }
-      setBridgeMsg(`✅ «${title}» → ${kind === 'arm_cycle' ? 'арм-конструктор' : 'конструктор ТА/стронга'}`);
+      setBridgeMsg(`✅ «${title}» → ${kind === 'arm_cycle' ? 'арм-конструктор' : kind === 'combat_cycle' ? 'combat-конструктор' : 'конструктор ТА/стронга'}`);
       setTimeout(() => setBridgeMsg(''), 5000);
     } catch { setBridgeMsg('⚠ Не удалось отправить цикл'); }
   };
@@ -219,8 +222,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
     });
   }, [ssCycles, search, level, days, favOnly, plFavs]);
 
-  const filteredCardio = useMemo(() => {
-    const q = search.trim().toLowerCase();
+  const filteredCardio = useMemo(() => {    const q = search.trim().toLowerCase();
     return (cardioCycles as CardioCycleTemplate[]).filter(c => {
       const m = c.meta;
       if (favOnly && !plFavs.includes(`cardio:${m.id}`)) return false;
@@ -230,6 +232,17 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
       return true;
     });
   }, [cardioCycles, search, level, days, favOnly, plFavs]);
+
+  const filteredCombat = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (combatCycles as CombatCycleTemplate[]).filter(c => {
+      if (favOnly && !plFavs.includes(`combat:${c.id}`)) return false;
+      if (!proCycleMatchesLevel([c.level], level)) return false;
+      if (!matchesDays(c.daysPerWeek, days)) return false;
+      if (q && !(`${c.name || ''} ${c.blurb || ''} ${c.author || ''}`.toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [combatCycles, search, level, days, favOnly, plFavs]);
 
   const recommendedBB = useMemo(() => {
     try {
@@ -282,8 +295,8 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
     <div className="train-manlib lib-manlib" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <ManualHeader
         title="📚 Библиотека шаблонов"
-        subtitle={`${bbPrograms.length} программ · ${plCycles.length} ПЛ-циклов · ${armCycles.length} арм · ${ssCycles.length} ТА/стронг · ${cardioCycles.length} кардио · фильтры + превью + мост в конструкторы`}
-        chips={[{ label: `${filteredBB.length + filteredPL.length + filteredArm.length + filteredSS.length + filteredCardio.length} показано`, color: ACCENT }]}
+        subtitle={`${bbPrograms.length} программ · ${plCycles.length} ПЛ-циклов · ${armCycles.length} арм · ${ssCycles.length} ТА/стронг · ${cardioCycles.length} кардио · ${combatCycles.length} единоборства · фильтры + превью + мост в конструкторы`}
+        chips={[{ label: `${filteredBB.length + filteredPL.length + filteredArm.length + filteredSS.length + filteredCardio.length + filteredCombat.length} показано`, color: ACCENT }]}
       />
       {bridgeMsg && <div role="status" className="lib-bridge-msg" style={{ fontSize: 12, color: '#fff', background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.30)', borderRadius: 10, padding: '8px 10px' }}>{bridgeMsg}</div>}
 
@@ -295,6 +308,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
           { id: 'arm', label: `🦾 Арм (${filteredArm.length})` },
           { id: 'ss', label: `🏋️ ТА·Стронг (${filteredSS.length})` },
           { id: 'cardio', label: `🏃 Кардио (${filteredCardio.length})` },
+          { id: 'combat', label: `🥋 Единоборства (${filteredCombat.length})` },
         ] as const).map(t => (
           <button key={t.id} role="tab" aria-selected={tab === t.id} data-active={tab === t.id ? 'true' : 'false'} aria-pressed={tab === t.id} onClick={() => { setTab(t.id as Tab); setExpandedId(null); }} style={{ flex: 1, padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: tab === t.id ? 800 : 600, cursor: 'pointer', border: tab === t.id ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: tab === t.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: tab === t.id ? '#00e68a' : '#fff', minHeight: 44 }}>{t.label}</button>
         ))}
@@ -311,8 +325,8 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
             onClick={() => setShowFilters(v => !v)}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 44, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}
           >
-            <span>{showFilters ? '▾' : '▸'} 🎛 Фильтры{activeFilters > 0 ? ` · ${activeFilters} акт.` : ''}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#00e68a' }}>{filteredBB.length + filteredPL.length + filteredArm.length + filteredSS.length + filteredCardio.length} показано</span>
+          <span>{showFilters ? '▾' : '▸'} 🎛 Фильтры{activeFilters > 0 ? ` · ${activeFilters} акт.` : ''}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#00e68a' }}>{filteredBB.length + filteredPL.length + filteredArm.length + filteredSS.length + filteredCardio.length + filteredCombat.length} показано</span>
           </button>
         );
       })()}
@@ -601,6 +615,43 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, ar
             );
           })}
           {filteredCardio.length === 0 && <div style={{ gridColumn: '1/-1', padding: 16, textAlign: 'center', color: DIM, fontSize: 12 }}>Ничего не найдено — сбросьте фильтры</div>}
+        </div>
+      )}
+
+      {/* Список Единоборства (именные циклы → мост в combat-конструктор) */}
+      {tab === 'combat' && (
+        <div className="lib-grid lib-combat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8, maxHeight: '52vh', overflowY: 'auto', paddingRight: 2 }}>
+          {filteredCombat.map(c => {
+            const favId = `combat:${c.id}`;
+            const isFav = plFavs.includes(favId);
+            const isExpanded = expandedId === c.id;
+            return (
+              <div key={c.id} className="lib-card lib-combat-card" data-fav={isFav ? 'true' : 'false'} style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: isExpanded ? '1px solid rgba(168,85,247,0.35)' : '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', flex: 1, lineHeight: 1.2 }}>{c.name}</span>
+                  <button className="lib-icon" aria-label={isFav ? `Убрать из избранного ${c.name}` : `В избранное ${c.name}`} data-fav={isFav ? 'true' : 'false'} onClick={() => togglePlFav(favId)} title={isFav ? 'Убрать из избранного' : 'В избранное'} style={{ padding: '4px 6px', borderRadius: 6, fontSize: 12, cursor: 'pointer', background: isFav ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: isFav ? '#f59e0b' : '#fff', minWidth: 44, minHeight: 44 }}>{isFav ? '★' : '☆'}</button>
+                </div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <Badge color="#a855f7">{COMBAT_DISC_LABELS_MANUAL[c.discipline] || c.discipline}</Badge>
+                  <Badge>{c.weeks} нед</Badge>
+                  <Badge>{c.daysPerWeek} дн/нед</Badge>
+                  <Badge color="#fff">{c.level}</Badge>
+                </div>
+                <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4 }}>{c.blurb?.slice(0, 140)}</div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  <button onClick={() => setExpandedId(isExpanded ? null : c.id)} style={{ ...BTN_GHOST, flex: 1, minHeight: 44, fontSize: 11, borderColor: 'rgba(168,85,247,0.25)', color: '#a855f7' }}>{isExpanded ? 'Свернуть' : 'Превью'}</button>
+                  <button className="lib-apply" onClick={() => sendCycle('combat_cycle', c.id, c.name)} style={{ ...BTN, flex: 1, minHeight: 44, fontSize: 11, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', fontWeight: 800 }}>🥋 Собрать в конструкторе →</button>
+                </div>
+                {isExpanded && (
+                  <div className="lib-preview" style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
+                    <div>{c.blurb}</div>
+                    <div style={{ color: DIM }}>Автор: {c.author} · Модель: {c.periodizationModel}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {filteredCombat.length === 0 && <div style={{ gridColumn: '1/-1', padding: 16, textAlign: 'center', color: DIM, fontSize: 12 }}>Ничего не найдено — сбросьте фильтры</div>}
         </div>
       )}
       {/* Запас прокрутки: последнюю карточку не должна съедать нижняя навигация */}

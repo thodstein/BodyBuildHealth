@@ -72,6 +72,11 @@ function buzzStep(): void {
   try { (navigator as any)?.vibrate?.(8); } catch { /* no-op */ }
 }
 
+/* №1: заблокированный план (errors) нельзя выгружать ни в каком виде */
+function isPlanBlocked(p: CombatPlan | null): boolean {
+  return (p?.validation?.errors?.length || 0) > 0;
+}
+
 /* ── BB-аккордеон: шапка-кнопка + саммари, контент — те же SectionCard 1-в-1 ── */
 const CbSec: React.FC<{
   title: string;
@@ -122,7 +127,7 @@ export const CombatConstructor: React.FC = () => {
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
     annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
     concussionHistory, setConcussionHistory, neckExtensionKg, setNeckExtensionKg, neckFlexExtRatio, setNeckFlexExtRatio,
-    weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, travelMode, setTravelMode, lutealPhase, setLutealPhase,
+    weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, weightClassRuleset, setWeightClassRuleset, travelMode, setTravelMode, lutealPhase, setLutealPhase,
     outsideMetrics,
   } = useCombatWizard();
   const [cycFilter, setCycFilter] = React.useState<string>('all');
@@ -186,16 +191,17 @@ export const CombatConstructor: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* P4-добивка: смена дисциплины/пола сбрасывает чужой лимит категории (бокс 80кг ≠ MMA-лимит) */
+  /* P4-добивка: смена дисциплины/пола/свода сбрасывает чужой лимит категории (бокс 80кг ≠ MMA-лимит) */
   React.useEffect(() => {
-    if (weightClassLimitKg && !weightClassLimitValid(discipline, sex, weightClassLimitKg)) {
+    const key = weightClassRuleset || discipline;
+    if (weightClassLimitKg && !weightClassLimitValid(key, sex, weightClassLimitKg)) {
       setWeightClass('');
       setWeightClassLimitKg(0);
       setMsg('Категория сброшена под дисциплину — выберите заново');
       setTimeout(() => setMsg(''), 2600);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [discipline, sex]);
+  }, [discipline, sex, weightClassRuleset]);
 
   /* Смена уровня/дней сбрасывает вручную выбранный сплит под новые условия —
    * иначе UI показывал бы combat_4, а движок молча строил бы на другом. */
@@ -954,16 +960,31 @@ export const CombatConstructor: React.FC = () => {
                       value={weightClassLimitKg ? String(weightClassLimitKg) : ''}
                       onChange={v => {
                         if (!v) { setWeightClass(''); setWeightClassLimitKg(0); return; }
-                        const row = weightClassesFor(discipline, sex).find(r => String(r.limitKg) === v);
+                        const row = weightClassesFor(weightClassRuleset || discipline, sex).find(r => String(r.limitKg) === v);
                         setWeightClassLimitKg(Number(v));
                         setWeightClass(row ? row.label : v);
                       }}
                       options={[
                         { id: '', label: 'Без категории', desc: 'кг в вакууме' },
-                        ...weightClassesFor(discipline, sex).map(r => ({ id: String(r.limitKg), label: r.label, desc: discipline === 'kickboxing' ? 'типовые' : 'офиц. лимит' })),
+                        ...weightClassesFor(weightClassRuleset || discipline, sex).map(r => ({ id: String(r.limitKg), label: r.label, desc: (weightClassRuleset || discipline) === 'kickboxing' ? 'типовые' : (weightClassRuleset || discipline) === 'bjj' ? 'IBJJF gi' : 'офиц. лимит' })),
                       ]}
                     />
                   </div>
+                  {(discipline === 'wrestling' || discipline === 'general') && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+                      <CombatPopupSelect
+                        label="Свод правил"
+                        value={weightClassRuleset}
+                        onChange={v => { setWeightClassRuleset(v); setWeightClass(''); setWeightClassLimitKg(0); }}
+                        options={[
+                          { id: '', label: discipline === 'wrestling' ? 'Авто — борьба UWW' : 'Авто — без таблиц', desc: 'по дисциплине' },
+                          { id: 'judo', label: 'Дзюдо — IJF', desc: 'М 60–100+ · Ж 48–78+' },
+                          { id: 'sambo', label: 'Самбо — FIAS', desc: 'М 58–98+ · Ж 50–80+' },
+                          { id: 'bjj', label: 'BJJ — IBJJF gi', desc: 'лимиты с кимоно' },
+                        ]}
+                      />
+                    </div>
+                  )}
                   {weightClassLimitKg > 30 && weightClassLine(bodyweight, weightCut, weightClassLimitKg, weightClass) && (
                     <InfoBanner tone={bodyweight - weightCut <= weightClassLimitKg ? 'ok' : 'warn'}>{weightClassLine(bodyweight, weightCut, weightClassLimitKg, weightClass)}</InfoBanner>
                   )}
@@ -1338,18 +1359,21 @@ export const CombatConstructor: React.FC = () => {
           )}
           {plan && (
             <SectionCard icon="📤" title="Экспорт и шаринг" subtitle="Печать · CSV · ICS · в программу">
+              {isPlanBlocked(plan) && (
+                <div className="cb-export-blocked" style={{ fontSize: 11, color: '#fff', background: 'rgba(239,68,68,0.08)', padding: '8px 10px', borderRadius: 10, border: '0.5px solid rgba(239,68,68,0.24)' }}>⛔ Экспорт заблокирован — сначала исправьте ошибки на шаге «План»</div>
+              )}
               <GroupHeading icon="⎙" text="Копировать и печать" desc="Быстрый обмен" />
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 8 }}>
-                <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); doMsg('Скопировано'); }} style={BTN}>⎙ Копировать</button>
-                <button onClick={() => { const html = buildCombatPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); doMsg('HTML скопирован'); } }} style={BTN}>🖨 Печать</button>
-                <button onClick={exportToUserProgram} style={BTN_PRIMARY}>✦ В программу</button>
+                <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); doMsg('Скопировано'); }} style={{ ...BTN, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>⎙ Копировать</button>
+                <button onClick={() => { const html = buildCombatPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); doMsg('HTML скопирован'); } }} style={{ ...BTN, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>🖨 Печать</button>
+                <button onClick={exportToUserProgram} style={{ ...BTN_PRIMARY, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>✦ В программу</button>
               </div>
               <Divider />
               <GroupHeading icon="📊" text="Файлы" desc="CSV для Excel · ICS для календаря" />
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 8 }}>
-                <button onClick={() => { downloadCombatCsv(plan); doMsg('CSV скачан'); }} style={BTN}>📊 CSV</button>
-                <button onClick={() => { downloadCombatXlsx(plan); doMsg('XLS скачан'); }} style={BTN}>📗 XLSX</button>
-                <button onClick={() => { const ics = buildCombatPlanIcs(plan, startDate || null); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `combat-plan-${plan.discipline}-${plan.weeks}w.ics`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); doMsg('ICS скачан'); }} style={BTN}>📅 План .ics</button>
+                <button onClick={() => { downloadCombatCsv(plan); doMsg('CSV скачан'); }} style={{ ...BTN, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>📊 CSV</button>
+                <button onClick={() => { downloadCombatXlsx(plan); doMsg('XLS скачан'); }} style={{ ...BTN, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>📗 XLSX</button>
+                <button onClick={() => { const ics = buildCombatPlanIcs(plan, startDate || null); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `combat-plan-${plan.discipline}-${plan.weeks}w.ics`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); doMsg('ICS скачан'); }} style={{ ...BTN, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>📅 План .ics</button>
               </div>
               <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight>Экспорт</Highlight> — библиотека программ · печать · ICS · CSV</div>
             </SectionCard>

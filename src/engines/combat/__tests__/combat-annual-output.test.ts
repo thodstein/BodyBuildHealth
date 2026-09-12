@@ -163,4 +163,22 @@ describe('autoAnnualWithFightTaper (№2)', () => {
     expect(() => { ann = autoAnnualWithFightTaper([]); }).not.toThrow();
     expect(ann.blocks).toEqual([]);
   });
+
+  it('№4: бои из ВСЕХ планов истории (дедуп по дате)', () => {
+    const a = buildCombatPlan({
+      discipline: 'mma', goal: 'camp', level: 'intermediate', weeks: 6, daysPerWeek: 3,
+      fightDate: '2026-08-15', startDate: '2026-08-01', taperWeeks: 2,
+    } as any);
+    const b = buildCombatPlan({
+      discipline: 'mma', goal: 'camp', level: 'intermediate', weeks: 6, daysPerWeek: 3,
+      fightDate: '2026-10-27', startDate: '2026-09-01', taperWeeks: 2,
+    } as any);
+    const ann = autoAnnualWithFightTaper([b, a]);
+    const tapers = ann.blocks.filter(x => x.phase === 'taper' && x.fightDate);
+    expect(tapers.map(t => t.fightDate).sort()).toEqual(['2026-08-15', '2026-10-27']);
+    expect(ann.blocks.reduce((s, x) => s + x.weeks, 0)).toBe(12);
+    // дубль даты — один тапер
+    const dup = autoAnnualWithFightTaper([b, { ...a, id: 'clone' } as any]);
+    expect(dup.blocks.filter(x => x.phase === 'taper' && x.fightDate).length).toBe(2);
+  });
 });

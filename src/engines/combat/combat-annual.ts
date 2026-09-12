@@ -174,12 +174,20 @@ export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetiti
 export function autoAnnualWithFightTaper(hist: CombatPlan[]): AnnualCB {
   let ann = buildAnnualFromCB(hist);
   try {
-    const latest: any = hist[0];
-    const fd = latest?.inputSnapshot?.fightDate;
-    const sd = latest?.inputSnapshot?.startDate || null;
-    if (typeof fd === 'string' && fd) {
-      ann = addCompetitionToAnnual(ann, { id: `auto_${latest.id || 'plan'}`, name: 'Бой (из плана)', date: fd } as AnnualCBCompetition, sd);
+    // №4: даты боёв из ВСЕХ планов истории (дедуп по дате, от старых к новым);
+    // у каждого — свой startDate-реф, невалидные тихо скипаются внутрь addCompetitionToAnnual
+    const seen = new Set<string>();
+    const fights: Array<{ date: string; ref: string | null; id: string }> = [];
+    for (const p of hist) {
+      const fd = (p as any)?.inputSnapshot?.fightDate;
+      if (typeof fd !== 'string' || !fd || seen.has(fd)) continue;
+      seen.add(fd);
+      fights.push({ date: fd, ref: (p as any)?.inputSnapshot?.startDate || null, id: (p as any)?.id || 'plan' });
     }
+    fights.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    fights.forEach((f, i) => {
+      ann = addCompetitionToAnnual(ann, { id: `auto_${f.id}_${i}`, name: 'Бой (из плана)', date: f.date } as AnnualCBCompetition, f.ref);
+    });
   } catch { /* no-op */ }
   return ann;
 }

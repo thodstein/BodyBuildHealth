@@ -82,6 +82,8 @@ export function useCombatWizard() {
   // P4/P5: весовая категория + travel + лютеиновая пометка (опционально)
   const [weightClass, setWeightClass] = useState('');
   const [weightClassLimitKg, setWeightClassLimitKg] = useState(0);
+  // №3: свод правил для борьбы/общей (UWW по умолчанию; дзюдо/самбо/BJJ — опция)
+  const [weightClassRuleset, setWeightClassRuleset] = useState('');
   const [travelMode, setTravelMode] = useState<'off' | 'hotel'>('off');
   const [lutealPhase, setLutealPhase] = useState(false);
 
@@ -143,7 +145,7 @@ export function useCombatWizard() {
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
     annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
     concussionHistory, setConcussionHistory, neckExtensionKg, setNeckExtensionKg, neckFlexExtRatio, setNeckFlexExtRatio,
-    weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, travelMode, setTravelMode, lutealPhase, setLutealPhase,
+    weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, weightClassRuleset, setWeightClassRuleset, travelMode, setTravelMode, lutealPhase, setLutealPhase,
     outsideMetrics,
   };
 }

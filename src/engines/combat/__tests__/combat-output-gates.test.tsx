@@ -36,6 +36,26 @@ describe('CombatPlanView errors block', () => {
     expect(container.querySelector('.cb-plan-errors')?.textContent).toContain('Сборка заблокирована');
   });
 
+  it('план с errors — все 6 кнопок экспорта disabled + плашка', () => {
+    const plan = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3, fightDate: '2025-02-30' } as any);
+    const { container } = render(<CombatPlanView plan={plan} {...baseProps} />);
+    expect(container.querySelector('.cb-export-blocked')?.textContent).toContain('Экспорт заблокирован');
+    for (const name of ['⎙ Копировать', '🖨 Печать', '✦ В программу', '📊 CSV', '📗 XLSX', '📅 План .ics']) {
+      const btn = screen.getByRole('button', { name }) as HTMLButtonElement;
+      expect(btn.disabled, name).toBe(true);
+    }
+  });
+
+  it('чистый план — кнопки экспорта активны', () => {
+    const plan = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3 } as any);
+    render(<CombatPlanView plan={plan} {...baseProps} />);
+    expect(document.querySelector('.cb-export-blocked')).toBeNull();
+    for (const name of ['⎙ Копировать', '🖨 Печать', '✦ В программу', '📊 CSV', '📗 XLSX', '📅 План .ics']) {
+      const btn = screen.getByRole('button', { name }) as HTMLButtonElement;
+      expect(btn.disabled, name).toBe(false);
+    }
+  });
+
   it('чистый план — блока нет, warnings как раньше', () => {
     const plan = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3 } as any);
     expect(plan.validation!.errors).toEqual([]);

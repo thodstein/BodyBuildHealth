@@ -1,7 +1,8 @@
 /**
  * combat-weight-class.engine.ts — весовые категории единоборств (P4 PRO).
  * Чистые таблицы М/Ж + арифметика до границы (прецедент armlift-weight-class).
- * Источники лимитов: Olympic boxing Paris-2024, UFC (lbs→кг), UWW (FS/W/GR), типовые кик (Glory-подобные).
+ * Источники лимитов: Olympic boxing Paris-2024, UFC (lbs→кг), UWW (FS/W/GR), типовые кик (Glory-подобные),
+ * IJF seniors (дзюдо), FIAS adults 2026 (самбо), IBJJF gi adults (BJJ — лимиты с кимоно).
  * Категория — опциональный селект; без неё поведение 1-в-1 (кг в вакууме, как раньше).
  */
 
@@ -57,6 +58,46 @@ export const COMBAT_WEIGHT_CLASSES: Record<string, Record<'male' | 'female', Wei
     ],
     female: [
       { limitKg: 55, label: '55 кг' }, { limitKg: 60, label: '60 кг' }, { limitKg: 65, label: '65 кг' },
+    ],
+  },
+  judo: {
+    // IJF seniors: M 60/66/73/81/90/100/+100, W 48/52/57/63/70/78/+78
+    male: [
+      { limitKg: 60, label: '60 кг' }, { limitKg: 66, label: '66 кг' }, { limitKg: 73, label: '73 кг' },
+      { limitKg: 81, label: '81 кг' }, { limitKg: 90, label: '90 кг' }, { limitKg: 100, label: '100 кг' },
+      { limitKg: Infinity, label: '100+ кг' },
+    ],
+    female: [
+      { limitKg: 48, label: '48 кг' }, { limitKg: 52, label: '52 кг' }, { limitKg: 57, label: '57 кг' },
+      { limitKg: 63, label: '63 кг' }, { limitKg: 70, label: '70 кг' }, { limitKg: 78, label: '78 кг' },
+      { limitKg: Infinity, label: '78+ кг' },
+    ],
+  },
+  sambo: {
+    // FIAS adults 2026 (sport+combat): M 58/64/71/79/88/98/+98, W 50/54/59/65/72/80/+80
+    male: [
+      { limitKg: 58, label: '58 кг' }, { limitKg: 64, label: '64 кг' }, { limitKg: 71, label: '71 кг' },
+      { limitKg: 79, label: '79 кг' }, { limitKg: 88, label: '88 кг' }, { limitKg: 98, label: '98 кг' },
+      { limitKg: Infinity, label: '98+ кг' },
+    ],
+    female: [
+      { limitKg: 50, label: '50 кг' }, { limitKg: 54, label: '54 кг' }, { limitKg: 59, label: '59 кг' },
+      { limitKg: 65, label: '65 кг' }, { limitKg: 72, label: '72 кг' }, { limitKg: 80, label: '80 кг' },
+      { limitKg: Infinity, label: '80+ кг' },
+    ],
+  },
+  bjj: {
+    // IBJJF gi adults (лимиты С кимоно; no-gi легче на ~2–3 кг — честная подпись в UI):
+    // M 57.5/64/70/76/82.3/88.3/94.3/100.5/ultra, W 48.5/53.5/58.5/64/69/74/79.3/super (без лимита)
+    male: [
+      { limitKg: 57.5, label: '57.5 кг' }, { limitKg: 64, label: '64 кг' }, { limitKg: 70, label: '70 кг' },
+      { limitKg: 76, label: '76 кг' }, { limitKg: 82.3, label: '82.3 кг' }, { limitKg: 88.3, label: '88.3 кг' },
+      { limitKg: 94.3, label: '94.3 кг' }, { limitKg: 100.5, label: '100.5 кг' }, { limitKg: Infinity, label: 'ultra (без лимита)' },
+    ],
+    female: [
+      { limitKg: 48.5, label: '48.5 кг' }, { limitKg: 53.5, label: '53.5 кг' }, { limitKg: 58.5, label: '58.5 кг' },
+      { limitKg: 64, label: '64 кг' }, { limitKg: 69, label: '69 кг' }, { limitKg: 74, label: '74 кг' },
+      { limitKg: 79.3, label: '79.3 кг' }, { limitKg: Infinity, label: 'super (без лимита)' },
     ],
   },
   general: { male: [], female: [] },

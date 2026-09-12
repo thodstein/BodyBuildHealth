@@ -13,10 +13,10 @@ import {
  */
 describe('combat weight classes', () => {
   it('таблицы М/Ж непусты (кроме general), лимиты по возрастанию', () => {
-    for (const disc of ['boxing', 'mma', 'wrestling', 'kickboxing']) {
+    for (const disc of ['boxing', 'mma', 'wrestling', 'kickboxing', 'judo', 'sambo', 'bjj']) {
       for (const sex of ['male', 'female'] as const) {
         const rows = weightClassesFor(disc, sex);
-        expect(rows.length).toBeGreaterThan(0);
+        expect(rows.length, `${disc}/${sex}`).toBeGreaterThan(0);
         const lims = rows.map(r => r.limitKg);
         expect([...lims].sort((a, b) => a - b)).toEqual(lims);
       }
@@ -24,10 +24,22 @@ describe('combat weight classes', () => {
     expect(weightClassesFor('general', 'male')).toEqual([]);
   });
 
+  it('дзюдо/самбо/BJJ — сверка с IJF/FIAS/IBJJF', () => {
+    expect(weightClassesFor('judo', 'male').map(r => r.limitKg)).toEqual([60, 66, 73, 81, 90, 100, Infinity]);
+    expect(weightClassesFor('judo', 'female').map(r => r.limitKg)).toEqual([48, 52, 57, 63, 70, 78, Infinity]);
+    expect(weightClassesFor('sambo', 'male').map(r => r.limitKg)).toEqual([58, 64, 71, 79, 88, 98, Infinity]);
+    expect(weightClassesFor('sambo', 'female').map(r => r.limitKg)).toEqual([50, 54, 59, 65, 72, 80, Infinity]);
+    expect(weightClassesFor('bjj', 'male').map(r => r.limitKg)).toEqual([57.5, 64, 70, 76, 82.3, 88.3, 94.3, 100.5, Infinity]);
+    expect(weightClassesFor('bjj', 'female').map(r => r.limitKg)).toEqual([48.5, 53.5, 58.5, 64, 69, 74, 79.3, Infinity]);
+  });
+
   it('weightClassFor: 80кг боксёр М → 80 кг; 82кг → 92 кг', () => {
     expect(weightClassFor('boxing', 'male', 80)?.limitKg).toBe(80);
     expect(weightClassFor('boxing', 'male', 82)?.limitKg).toBe(92);
     expect(weightClassFor('mma', 'female', 60)?.limitKg).toBe(61.2);
+    expect(weightClassFor('judo', 'male', 74)?.limitKg).toBe(81);
+    expect(weightClassFor('sambo', 'female', 66)?.limitKg).toBe(72);
+    expect(weightClassFor('bjj', 'male', 83)?.limitKg).toBe(88.3);
     expect(weightClassFor('boxing', 'male', null)).toBeNull();
     expect(weightClassFor('general', 'male', 80)).toBeNull();
   });
@@ -90,6 +102,19 @@ describe('combat P4 builder wiring', () => {
     const v = validateCombatPlan(plan);
     expect(v.errors.some(e => e.includes('лимита'))).toBe(false);
     expect(plan.rationale.some(r => r.includes('Категория'))).toBe(false);
+  });
+
+  it('самбо-лимит в сборке: недовод — error, довод — тихо', () => {
+    const short = buildCombatPlan({
+      discipline: 'wrestling', goal: 'weight_cut', level: 'intermediate', weeks: 6, daysPerWeek: 3,
+      bodyweight: 82, weightCutKg: 2, weightClassLimitKg: 79, weightClass: '79 кг',
+    } as any);
+    expect(validateCombatPlan(short).errors.some(e => e.includes('не доводит до лимита'))).toBe(true);
+    const fit = buildCombatPlan({
+      discipline: 'wrestling', goal: 'weight_cut', level: 'intermediate', weeks: 6, daysPerWeek: 3,
+      bodyweight: 82, weightCutKg: 4, weightClassLimitKg: 79, weightClass: '79 кг',
+    } as any);
+    expect(validateCombatPlan(fit).errors.some(e => e.includes('не доводит до лимита'))).toBe(false);
   });
 
   it('строка категории попадает в rationale', () => {
