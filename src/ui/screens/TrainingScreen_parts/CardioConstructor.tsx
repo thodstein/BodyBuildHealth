@@ -435,13 +435,18 @@ export const CardioConstructor: React.FC = () => {
       age: Math.max(12, Math.min(90, Number(age) || 30)),
       restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
       sex, level, daysAvailable, equipment, lowImpact, legDays,
+      redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
       ...previewFactors,
     }));
     saveCardioCycle(c);
     setActiveCardioCycle(c);
     setCycle(c);
     reload();
-    flashMsg(`📚 «${tpl.meta.title}» — собрано и активировано`);
+    if (redFlags.length > 0 && c.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'))) {
+      flashMsg(`📚 «${tpl.meta.title}» — собрано, но в плане есть HIIT/MISS: при ваших флагах запрещены до врача`);
+    } else {
+      flashMsg(`📚 «${tpl.meta.title}» — собрано и активировано`);
+    }
   };
   const applyTemplateRef = React.useRef(applyTemplate);
   applyTemplateRef.current = applyTemplate;
@@ -1038,6 +1043,10 @@ export const CardioConstructor: React.FC = () => {
     setStrictValidate(false);
     setLegDays([]);
     setComps([]);
+    // №3 PRO-2-добивки: сброс гасит и новые тоглы (иначе висят молча).
+    setRedFlags([]);
+    setTidSwitch(false);
+    setDurabilityOn(false);
     flashMsg('⟲ Параметры сброшены к значениям по умолчанию');
   };
 

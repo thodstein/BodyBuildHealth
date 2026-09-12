@@ -831,8 +831,9 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   if (tidSwitch != null) cycle.rationale.push(`🔀 PYR→POL с нед ${tidSwitch} (Filipas 2021 +3% к VO2max на смене модели; любителю решает объём, не модель — Rivera-2025).`);
   // №6 PRO-2-добивка: честный Z2 — та же строка, что в валидаторе, но в rationale.
   // Скип: мед-блок (HIIT запрещён врачом — совет неуместен) и авторские шаблоны.
+  // Гоночные недели скипаются как в валидаторе (нагрузка недели — сама гонка).
   if (!medicalBlock && !input.templateId) {
-    const workWeeks = weeks.filter(w => !w.deload && !w.taper);
+    const workWeeks = weeks.filter(w => !w.deload && !w.taper && !w.sessions.some(s => /старт|race|гонка|соревнов|марафон|полумарафон/i.test(s.purpose ?? '')));
     if (workWeeks.length > 0) {
       const avg = workWeeks.reduce((s, w) => s + w.totalMinutes, 0) / workWeeks.length;
       const hiitCount = workWeeks.reduce((s, w) => s + w.sessions.filter(x => x.type === 'hiit').length, 0);
@@ -3207,10 +3208,13 @@ export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: n
   const s = cardioCycleSummary(cycle);
   let tidThreshold = false;
   try { tidThreshold = classifyTidLocal(calcTimeInZones(cycle)).model === 'threshold'; } catch { /* TID — рекомендательно */ }
+  // №2 PRO-2-добивки: мед-блок из конфига — HIIT-добавка запрещена.
+  let improveMedicalBlock = false;
+  try { improveMedicalBlock = screenRedFlagsLocal(cycle.config?.redFlags, cycle.config?.age).blockHiit; } catch { /* нет конфига — нет блока */ }
   const weeks = cycle.weeks.map(w => {
     let sessions = w.sessions;
-    // 1. HIIT для cut/recomp/подготовки ББ
-    if ((cycle.goal === 'cut' || cycle.goal === 'recomp' || cycle.goal === 'bb_prep') && s.hiitWeeks === 0 && !recoveryLow && daysAvailable >= 3) {
+    // 1. HIIT для cut/recomp/подготовки ББ (скип при мед-блоке).
+    if ((cycle.goal === 'cut' || cycle.goal === 'recomp' || cycle.goal === 'bb_prep') && s.hiitWeeks === 0 && !recoveryLow && !improveMedicalBlock && daysAvailable >= 3) {
       if ((w.phase === 'build' || w.phase === 'maintenance') && !w.deload && !w.taper && !w.sessions.some(x => x.type === 'hiit')) {
         sessions = [...sessions, mkSession('hiit', 15, 1, 'HIIT добавлен авто-улучшением (EPOC, ЖСС)', bw, undefined, sex, ffm)];
         changes.push({ week: w.week, label: 'HIIT 15×1 добавлен', from: 'нет', to: 'HIIT 15×1' });
@@ -3238,6 +3242,9 @@ export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: n
     return rebuildWeek(w, sessions, []);
   });
   const cycle2: CardioCycle = { ...cycle, weeks, source: cycle.source };
+  if (improveMedicalBlock && (cycle.goal === 'cut' || cycle.goal === 'recomp' || cycle.goal === 'bb_prep') && s.hiitWeeks === 0) {
+    cycle2.rationale = [...cycle2.rationale, 'Мед-блок: HIIT-добавка авто-улучшением пропущена — только Z2/recovery до врача.'];
+  }
   const advice: CardioAdviceLike = changes.length > 0
     ? { action: 'increase', reason: `Улучшение: ${changes.length} изменений (недели: ${[...new Set(changes.map(c => c.week))].join(', ')}).` }
     : { action: 'keep', reason: 'План уже соответствует рекомендациям качества.' };

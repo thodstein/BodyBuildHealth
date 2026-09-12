@@ -113,6 +113,28 @@ describe('P4 red-flags', () => {
     const tpl = buildCardioCycle({ goal: 'mass', totalWeeks: 6, templateId: 'x' });
     expect(tpl.rationale.join(' ')).not.toContain('Storoschuk');
   });
+  it('improve: мед-блок режет HIIT-добавку (№2-добивка)', async () => {
+    const { improveCardioCycle } = await import('../cardio.engine');
+    const plain = buildCardioCycle({ goal: 'cut', totalWeeks: 8 });
+    const improved = improveCardioCycle(plain);
+    expect(improved.cycle.weeks.some(w => w.sessions.some(s => s.type === 'hiit'))).toBe(true);
+    const med = buildCardioCycle({ goal: 'cut', totalWeeks: 8, redFlags: ['syncope'] });
+    const improvedMed = improveCardioCycle(med);
+    expect(improvedMed.cycle.weeks.some(w => w.sessions.some(s => s.type === 'hiit'))).toBe(false);
+    expect(improvedMed.cycle.rationale.join(' ')).toContain('Мед-блок');
+  });
+  it('шаблоны: генератор применяет блок, явный — честно предупреждает (№4-добивка)', async () => {
+    const { buildCardioCycleFromTemplateId } = await import('../cardio-templates.engine');
+    // Явный C25K без интенсива — тихо даже с флагами.
+    const c25k = buildCardioCycleFromTemplateId('cardio-run-c25k-9', { redFlags: ['chest_pain'], age: 30 })!;
+    expect(c25k.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'))).toBe(false);
+    expect(c25k.rationale.join(' ')).not.toContain('мед-блок');
+    // Явный интенсивный шаблон с флагами — план цел, предупреждение есть.
+    const hard = buildCardioCycleFromTemplateId('cardio-pro-tri-sprint-8', { redFlags: ['chest_pain'], age: 30 });
+    if (hard && hard.weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'))) {
+      expect(hard.rationale.join(' ')).toContain('мед-блок');
+    }
+  });
 });
 
 // ─── P3: интервалы ───

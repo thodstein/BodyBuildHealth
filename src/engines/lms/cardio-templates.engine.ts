@@ -26,6 +26,7 @@ import type { CardioCycleTemplate } from '../../data/cardio-cycles/cardio-cycle-
 import { getCardioCycleTemplateById } from '../../data/cardio-cycles/cardio-cycle-index';
 import { applyMesoMult } from './cardio-meso-progression.engine';
 import { applyPersonalTargetsToCycle } from './cardio-personal-zones.engine';
+import { screenCardioRedFlags } from './cardio-red-flags.engine';
 
 const INTENSITY_OF: Record<string, 'low' | 'moderate' | 'high'> = {
   zone2: 'moderate',
@@ -50,6 +51,10 @@ export interface CardioTemplateOverrides {
   stressLevel?: number;
   hrvMs?: number;
   enhanced?: boolean;
+  /** №4 PRO-2-добивки: красные флаги — генераторные идут через buildCardioCycle
+   *  (мед-блок применяется), явные НЕ режутся (авторский план), а честно
+   *  помечаются предупреждением в rationale. */
+  redFlags?: string[];
 }
 
 function localToday(): string {
@@ -136,6 +141,13 @@ export function buildCardioCycleFromTemplate(
     tpl.meta.howItWorks,
     `Цель: ${CARDIO_GOAL_LABELS[tpl.meta.goal]} · ${tpl.meta.weeks} нед · ${tpl.meta.sessionsPerWeek} д/нед.`,
   ];
+  // №4 PRO-2-добивки: явный шаблон не режем, но честно предупреждаем.
+  try {
+    const blocked = screenCardioRedFlags(overrides.redFlags, overrides.age).blockHiit;
+    if (blocked && weeks.some(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'))) {
+      rationale.push('⚠ В авторском плане есть HIIT/MISS, а у вас мед-блок — запрещены до очной консультации врача (план не меняли, решайте с врачом).');
+    }
+  } catch { /* скрининг опционален */ }
   return {
     id: `cardio-tpl-${tpl.meta.id}-${Date.now()}`,
     name: tpl.meta.title,

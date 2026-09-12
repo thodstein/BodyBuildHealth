@@ -80,7 +80,7 @@ describe('ValidationCard +HIIT (№3)', () => {
     const onAdd = vi.fn();
     const c = buildCardioCycle({ goal: 'mass', totalWeeks: 6 });
     const { container } = render(<CardioValidationCard cycle={c} beginner={false} onAddHiit={onAdd} />);
-    expect(container.textContent).toContain('<150 мин/нед без HIIT');
+    expect(container.textContent).toContain('Низкий объём (<150 мин/нед) без HIIT');
     const btn = screen.getByLabelText('Добавить HIIT в неделю 1');
     fireEvent.click(btn);
     expect(onAdd).toHaveBeenCalledTimes(1);

@@ -6,6 +6,7 @@
  */
 
 import type { CardioCycle } from './cardio.engine';
+import { zone2HonestyNote } from './cardio-zone2-honesty.engine';
 
 export type CardioIssueLevel = 'error' | 'warn' | 'info';
 export interface CardioPlanIssue {
@@ -140,15 +141,16 @@ export function validateCardioCycle(
       issues.push({ level: 'error', code: 'medical_block', text: `Нед ${bad.week}: HIIT/MISS при мед-блоке — запрещены до врача (только Z2/recovery).` });
     }
   }
-  // P2 PRO-2: честный Z2 — низкий объём без HIIT (Storoschuk 2025).
+  // P2 PRO-2: честный Z2 — единый источник zone2HonestyNote (№5-добивка: без дубля порогов).
   // Авторские шаблоны (faithful) не трогаем: их прошли тысячи атлетов.
   {
     const workWeeks = weeks.filter(w => !w.deload && !w.taper && !weekHasRace(w));
     if (!faithful && workWeeks.length > 0) {
       const avg = workWeeks.reduce((s, w) => s + weekMinutes(w), 0) / workWeeks.length;
       const hiitCount = workWeeks.reduce((s, w) => s + w.sessions.filter(x => x.type === 'hiit').length, 0);
-      if (avg < 150 && hiitCount === 0) {
-        issues.push({ level: 'warn', code: 'z2_without_hiit_low_volume', text: 'Объём <150 мин/нед без HIIT: добавьте 1 HIIT/нед для VO2max — чистый Z2 при таком объёме недодаёт пик (Storoschuk 2025).' });
+      const note = zone2HonestyNote(avg, hiitCount);
+      if (note) {
+        issues.push({ level: 'warn', code: 'z2_without_hiit_low_volume', text: note });
       }
     }
   }
