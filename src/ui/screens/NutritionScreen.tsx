@@ -270,7 +270,7 @@ const ReferenceTab: React.FC = () => (
   <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
     <ModernHero icon="📖" title="Справочник питания" subtitle="Твоя база знаний по нутрициологии — от БЖУ до микронутриентов. Быстрый доступ к проверенной инфо." stats={[
       { k:'Разделов', v: '12+', sub:'тем', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
-      { k:'Проверено', v: '100%', sub:'наука', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
+      { k:'Источники', v: 'ISSN·EFSA', sub:'2026', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
       { k:'Обновлено', v: '2026', sub:'год', col:'#a78bfa', bg:'rgba(167,139,250,0.08)' },
     ]} />
     <div style={{ ...modernCardBg, padding:12 }}>
