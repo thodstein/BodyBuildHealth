@@ -20,6 +20,7 @@ import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
+import { weightClassesFor, weightClassLine } from '../../../engines/combat/combat-weight-class.engine';
 import { validateSparringLoad } from '../../../engines/combat/combat-sparring.engine';
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import type { CombatNutritionPayload, CombatCardioPayload } from '../../../engines/combat/combat-integration.engine';
@@ -121,6 +122,7 @@ export const CombatConstructor: React.FC = () => {
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
     annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
     concussionHistory, setConcussionHistory, neckExtensionKg, setNeckExtensionKg, neckFlexExtRatio, setNeckFlexExtRatio,
+    weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, travelMode, setTravelMode, lutealPhase, setLutealPhase,
     weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, travelMode, setTravelMode, lutealPhase, setLutealPhase,
     outsideMetrics,
   } = useCombatWizard();
@@ -915,6 +917,25 @@ export const CombatConstructor: React.FC = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
                     <CombatPopupSelect label="Взвешивание" value={weighInType} onChange={v=> setWeighInType(v as any)} options={[{id:'day_before_24h',label:'За 24ч (MMA/бокс)',desc:'8-12г/кг рефид'},{id:'same_day_2h',label:'В день (борьба)',desc:'≤3кг, без острой'}]} />
                   </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+                    <CombatPopupSelect
+                      label="Весовая категория"
+                      value={weightClassLimitKg ? String(weightClassLimitKg) : ''}
+                      onChange={v => {
+                        if (!v) { setWeightClass(''); setWeightClassLimitKg(0); return; }
+                        const row = weightClassesFor(discipline, sex).find(r => String(r.limitKg) === v);
+                        setWeightClassLimitKg(Number(v));
+                        setWeightClass(row ? row.label : v);
+                      }}
+                      options={[
+                        { id: '', label: 'Без категории', desc: 'кг в вакууме' },
+                        ...weightClassesFor(discipline, sex).map(r => ({ id: String(r.limitKg), label: r.label, desc: discipline === 'kickboxing' ? 'типовые' : 'офиц. лимит' })),
+                      ]}
+                    />
+                  </div>
+                  {weightClassLimitKg > 30 && weightClassLine(bodyweight, weightCut, weightClassLimitKg, weightClass) && (
+                    <InfoBanner tone={bodyweight - weightCut <= weightClassLimitKg ? 'ok' : 'warn'}>{weightClassLine(bodyweight, weightCut, weightClassLimitKg, weightClass)}</InfoBanner>
+                  )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <CombatPopupSelect label="Вода" value={waterMode} onChange={v=> setWaterMode(v as any)} options={[{id:'stable',label:'Стабильно 35мл/кг'},{id:'load_cut',label:'Load 8л → 2л',desc:'пиковая неделя'}]} />
                     <CombatPopupSelect label="Натрий" value={sodiumMode} onChange={v=> setSodiumMode(v as any)} options={[{id:'stable',label:'Стабильно 5г'},{id:'moderate_cut',label:'5 → 3 → 1.5г',desc:'плавный срез'}]} />

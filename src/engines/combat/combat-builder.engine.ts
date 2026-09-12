@@ -8,7 +8,7 @@ import { getCombatPattern, recommendCombatPattern, type CombatPattern } from './
 import { phaseForCombatWeek, rirForCombat, repsForCombat } from './combat-progression';
 import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadWeekATR, isTaperWeek } from './combat-periodization.engine';
 import { isTaperByFightDate, taperVolumeMultiplier, buildTaperRationale, taperSplitForWeek, validateTaperConfig, fightWeekIndex, recommendTaperWeeks } from './combat-taper.engine';
-import { weightCutVolumeMultiplier, weightCutNutritionForWeek, weightCutRehydrationNotes, buildWeightCutProtocol, weightCutPhaseForWeek } from './combat-weight-cut.engine';
+import { weightCutVolumeMultiplier, weightCutNutritionForWeek, weightCutRehydrationNotes, buildWeightCutProtocol, weightCutPhaseForWeek, validateWeightCutProtocol } from './combat-weight-cut.engine';
 import { buildConditioningRationale, conditioningSessionsForWeek } from './combat-conditioning.engine';
 import { filterByTierCB, filterByInjuryCB, selectDiverseCB, tierForCB, gentleFactorForCB, repsCapForCB } from './combat-selection';
 import { accentForDiscipline, accentForFightStyle, styleNarrative } from './combat-specialization';
@@ -20,6 +20,7 @@ import { applyCombatIntensity } from './combat-intensity';
 import { weightForCombatExerciseResolved } from './combat-workmax';
 import { sparringToOutsideLoad, sparringWeeklyLoad, sparringSummary } from './combat-sparring.engine';
 import { teenCombatGates, hasWeightManipulation, neckExtensionCutoffKg, concussionProtocol, sparringSafetyErrors } from './combat-safety.engine';
+import { weightToClassBoundary, weightClassLine } from './combat-weight-class.engine';
 import { isExcludeInjuryCB } from './combat-selection';
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import { COMBAT_LANDMARKS } from './combat-volume';
@@ -845,6 +846,35 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
       neckBelowMev,
       hasExcludeInjury: hasExclude,
     })) errors.push(e);
+  }
+
+  // P4: весовые категории + ISSN-чеклист весогонки (поверх P1-гейтов, без дублей)
+  {
+    const bw = input.bodyweight;
+    const cut = input.weightCutKg || 0;
+    const limit = (input as any).weightClassLimitKg;
+    if (typeof limit === 'number' && Number.isFinite(limit) && limit > 30 && bw && bw > 30 && cut > 0) {
+      const d = weightToClassBoundary(bw, cut, limit);
+      if (d != null && d < 0) errors.push(`Сгонка ${cut} кг не доводит до лимита ${limit} кг (не хватает ${Math.abs(d)} кг) — увеличьте сгонку или смените категорию`);
+      // ISSN: вне кэмпа держать +12–15% к лимиту максимум
+      if (bw > limit * 1.15) warnings.push(`Вес ${bw} кг — +${Math.round((bw / limit - 1) * 100)}% к лимиту ${limit} кг (ISSN: вне кэмпа держать +12–15% максимум, выше — длинная сгонка)`);
+      const line = weightClassLine(bw, cut, limit, (input as any).weightClass);
+      if (line) rationale.push(line);
+    }
+    // ISSN-чеклист протокола: мед-пункты → errors, советы → warnings (дедуп с P1-гейтами)
+    if (wcProtocol) {
+      const items = validateWeightCutProtocol(wcProtocol, { bodyweightKg: bw, sex: input.sex as any });
+      for (const item of items) {
+        const medical = item.includes('врач') || item.includes('подтвержд');
+        if (medical) {
+          if (!errors.includes(item)) errors.push(item);
+          continue;
+        }
+        if (item.includes('Same-day') && errors.some(e => e.includes('Same-day'))) continue;
+        if (item.includes('Женщины') && errors.some(e => e.includes('Same-day') || e.includes('weight_cut'))) continue;
+        if (!warnings.includes(item)) warnings.push(item);
+      }
+    }
   }
 
   const snap: any = { ...input, outsideLoad: effectiveOutsideLoad, weightCutProtocol: wcProtocol || (input as any).weightCutProtocol || null };
