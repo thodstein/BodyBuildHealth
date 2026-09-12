@@ -485,6 +485,13 @@ export function ArmAutoConstructor() {
   const [cycId, setCycId] = useState<string>('');
   const [cycConsent, setCycConsent] = useState<boolean>(false);
   const [cycCorr, setCycCorr] = useState<string>('');
+  // PRO-5: раздельные ставки + RPE-паритет + шаг синглов + warmup/hook-кап (пусто = как раньше)
+  const [cycPct, setCycPct] = useState<string>('');
+  const [cycMeso, setCycMeso] = useState<string>('');
+  const [cycRpe, setCycRpe] = useState<boolean>(false);
+  const [cycStep, setCycStep] = useState<string>('');
+  const [axWarm, setAxWarm] = useState<boolean>(false);
+  const [cycHookCap, setCycHookCap] = useState<string>('');
   const [cycCoc, setCycCoc] = useState<string>('');
   const [cycFlat, setCycFlat] = useState<boolean>(false);
   const [cycBlood, setCycBlood] = useState<boolean>(false);
@@ -857,6 +864,12 @@ export function ArmAutoConstructor() {
         cycleId: cycId || undefined,
         cycleConsent: cycConsent || undefined,
         correctionPct: parseFloat(cycCorr) >= 0 && parseFloat(cycCorr) <= 5 ? parseFloat(cycCorr) : undefined,
+        // PRO-5: раздельные ставки (приоритет над legacy-коррекцией) + RPE/синглы/hook-кап
+        cyclePctPerWeek: parseFloat(cycPct) >= 0 && parseFloat(cycPct) <= 5 ? parseFloat(cycPct) : undefined,
+        mesoRatePct: parseFloat(cycMeso) >= 0 && parseFloat(cycMeso) <= 5 ? parseFloat(cycMeso) : undefined,
+        rpeParity: cycRpe || undefined,
+        larrattStepKg: cycSingles && parseFloat(cycStep) > 0 ? parseFloat(cycStep) : undefined,
+        hookCapSets: parseFloat(cycHookCap) > 0 ? parseFloat(cycHookCap) : undefined,
         cocWorking: cycCoc || undefined,
         flatPyramid: cycFlat || undefined,
         flatPyramidWeightKg: cycFlat && parseFloat(topLadderVal) > 0 ? parseFloat(topLadderVal) : undefined,
@@ -880,6 +893,8 @@ export function ArmAutoConstructor() {
           ...(axDefense ? { fightingFromDefense: true } : {}),
           ...(axSideMax ? { sideMaxAttempt: true } : {}),
         } : undefined,
+        // PRO-5: разминка выполнена (только при явном флажке; иначе warmup-gate требует блок)
+        warmupDone: cycAxisOn && axCold && axWarm ? true : undefined,
         medleyAttempts: cycMedley ? medAttKg.map((kg, i) => ({ eventIdx: i, weightKg: parseFloat(kg) || 0, success: medAttOk[i] !== false })).filter((a) => a.weightKg > 0) : undefined,
         tableSession: (discipline as string) === 'armwrestling' ? true : undefined,
         tendonFuel: (discipline as string) === 'armwrestling' ? true : undefined,
@@ -1451,6 +1466,12 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <AdField label="Коррекция %/нед (СРЦ 0.5)">
                 <input value={cycCorr} onChange={e=>setCycCorr(e.target.value)} placeholder="0.5" inputMode="decimal" />
               </AdField>
+              <AdField label="PRO-5: цикл %/нед (вместо коррекции)">
+                <input value={cycPct} onChange={e=>setCycPct(e.target.value)} placeholder="—" inputMode="decimal" aria-label="Цикл процентов в неделю" />
+              </AdField>
+              <AdField label="PRO-5: мезо-ставка % (кросс-мезо)">
+                <input value={cycMeso} onChange={e=>setCycMeso(e.target.value)} placeholder="—" inputMode="decimal" aria-label="Мезо-ставка процентов" />
+              </AdField>
               <AdSheetSelect label="CoC рабочий" value={cycCoc} onChange={setCycCoc} options={[
                 { id:'', label:'—' },
                 { id:'guide', label:'Guide', desc:'разминка' },
@@ -1475,6 +1496,15 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <AdSwitch checked={cycBlood} onChange={setCycBlood} label="Приток крови 100×" />
               <AdSwitch checked={cycNever} onChange={setCycNever} label="Без отказов" />
               <AdSwitch checked={cycSingles} onChange={setCycSingles} label="Тяжёлые синглы 17–18" />
+              <AdSwitch checked={cycRpe} onChange={setCycRpe} label="PRO-5: RIR по StrengthLog" />
+              {cycSingles && (
+                <AdField label="PRO-5: микрошаг синглов кг">
+                  <input value={cycStep} onChange={e=>setCycStep(e.target.value)} placeholder="0.57" inputMode="decimal" aria-label="Микрошаг синглов кг" />
+                </AdField>
+              )}
+              <AdField label="PRO-5: hook-кап сетов/нед">
+                <input value={cycHookCap} onChange={e=>setCycHookCap(e.target.value)} placeholder="12" inputMode="decimal" aria-label="Hook-кап сетов в неделю" />
+              </AdField>
               <AdSwitch checked={cycBrzenk} onChange={setCycBrzenk} label="Брзенк 1+1" />
               <AdSwitch checked={cycAkimov} onChange={setCycAkimov} label="Акимов-крюк" />
               {cycAkimov && <AdSwitch checked={cycComp} onChange={setCycComp} label="Соревн. период" />}
@@ -1498,6 +1528,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   <AdSwitch checked={axBehind} onChange={setAxBehind} label="Запястье позади плеча" />
                   <AdSwitch checked={axDorsal} onChange={setAxDorsal} label="Кисть разогнута назад" />
                   <AdSwitch checked={axCold} onChange={setAxCold} label="Холод без разминки" />
+                  {axCold && <AdSwitch checked={axWarm} onChange={setAxWarm} label="PRO-5: разминка 10–15 мин выполнена" />}
                   <AdSwitch checked={axDefense} onChange={setAxDefense} label="Борьба из защиты" />
                   <AdSwitch checked={axSideMax} onChange={setAxSideMax} label="Макс бокового" />
                 </div>
@@ -1674,6 +1705,12 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                       <div className="ad-sec ad-bio" data-valid="bad" data-arm="gate-errors">
                         <div className="ad-sec-t">❌ Ошибки ({builtPlan.validation.errors.length})</div>
                         {builtPlan.validation.errors.map((e: string, i: number) => <div key={i} className="ad-finding" data-level="critical">{e}</div>)}
+                      </div>
+                    )}
+                    {(builtPlan.validation.blocked || []).length>0 && (
+                      <div className="ad-sec ad-bio" data-valid="bad" data-arm="gates-blocked">
+                        <div className="ad-sec-t">⛔ Блоки safety ({(builtPlan.validation.blocked || []).length})</div>
+                        {(builtPlan.validation.blocked || []).map((b: string, i: number) => <div key={i} className="ad-finding" data-level="critical">{b}</div>)}
                       </div>
                     )}
                     {(() => {

@@ -50,8 +50,7 @@ describe('Arm PRO-5 UI (P7)', () => {
   });
 });
 
-describe('Arm PRO-5 UI (P2 hub rules)', () => {
-  it('помост: правило снаряда + LMS-канон', () => {
+describe('Arm PRO-5 UI (P2 hub rules)', () => {  it('помост: правило снаряда + LMS-канон', () => {
     const { container } = render(<ArmliftingDiagnosticsHub />);
     const rule = container.querySelector('[data-arm="lift-rule-2026"]');
     expect(rule).not.toBeNull();
@@ -68,5 +67,39 @@ describe('Arm PRO-5 UI (P2 hub rules)', () => {
     expect(list!.textContent).toContain('Raptor 1.75');
     expect(list!.textContent).toContain('Fat Gripz');
     expect(list!.textContent).toContain('Ориентира нет');
+  });
+});
+
+describe('Arm PRO-5 UI (controls + blocked)', () => {
+  it('контролы PRO-5 видны в именном цикле', () => {
+    const { container } = render(<ArmAutoConstructor />);
+    goSplit(container);
+    expect(screen.getByRole('switch', { name: 'PRO-5: RIR по StrengthLog' })).toBeTruthy();
+    expect(screen.getByLabelText('Цикл процентов в неделю')).toBeTruthy();
+    expect(screen.getByLabelText('Мезо-ставка процентов')).toBeTruthy();
+    expect(screen.getByLabelText('Hook-кап сетов в неделю')).toBeTruthy();
+  });
+
+  it('RPE-паритет сквозит в сборку', () => {
+    const { container } = render(<ArmAutoConstructor />);
+    goSplit(container);
+    fireEvent.click(screen.getByRole('switch', { name: 'PRO-5: RIR по StrengthLog' }));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
+    expect(container.querySelector("[data-arm='rationale']")?.textContent).toContain('StrengthLog');
+  });
+
+  it('ось high: blocked виден в гейтах качества', () => {
+    const { container } = render(<ArmAutoConstructor />);
+    goSplit(container);
+    fireEvent.click(screen.getByRole('switch', { name: 'Ось humerus-2026' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Скрут корпуса в атаку' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Запястье позади плеча' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Кисть разогнута назад' }));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: /Веса и качество/ }));
+    const blocked = container.querySelector('[data-arm="gates-blocked"]');
+    expect(blocked).not.toBeNull();
+    expect(blocked!.textContent).toContain('Ось high');
   });
 });
