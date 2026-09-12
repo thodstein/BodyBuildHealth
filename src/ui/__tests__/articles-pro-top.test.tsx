@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/react';
-import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds, highlightMatch, rankRecommended } from '../screens/ArticlesScreen';
+import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds, highlightMatch, rankRecommended, stripDuplicateTitle } from '../screens/ArticlesScreen';
 import { ARTICLES_MANIFEST } from '../../data/articles-manifest';
 import { resetAppPlatformCache } from '../../core/app-platform';
 
@@ -452,6 +452,24 @@ describe('ArticlesScreen PRO TOP', () => {
     const card = container.querySelector('.articles-hero-card[data-id="recommended"]') as HTMLElement;
     fireEvent.click(card);
     expect(container.querySelector('.articles-featured')?.textContent).toContain('Тренболон');
+  });
+
+  it('37. stripDuplicateTitle режет только точный дубль', () => {
+    expect(stripDuplicateTitle('# Титл\n\nТекст', 'Титл')).toBe('\nТекст');
+    expect(stripDuplicateTitle('\n\n# Титл\n\nТекст', 'титл ')).toBe('\n\n\nТекст');
+    expect(stripDuplicateTitle('# Титл: подзаголовок\n\nТекст', 'Титл')).toContain('# Титл: подзаголовок');
+    expect(stripDuplicateTitle('## Раздел\n\nТекст', 'Раздел')).toContain('## Раздел');
+  });
+
+  it('38. в читалке титул один (обложка), дубля из тела нет', () => {
+    const { container } = render(<ArticlesScreen />);
+    const all = container.querySelector('.articles-hero-card[data-id="all"]') as HTMLElement;
+    fireEvent.click(all);
+    fireEvent.click(screen.getByLabelText('Основы нутрициологии для спортсменов'));
+    expect(container.querySelector('.articles-reader')).not.toBeNull();
+    // h1 обложки жив, h2-дубля из markdown-тела нет
+    expect(container.querySelectorAll('.articles-reader h1').length).toBe(1);
+    expect(container.querySelector('.articles-md h2')).toBeNull();
   });
 
   it('6. PDF-карточка зовёт читать внутри', () => {

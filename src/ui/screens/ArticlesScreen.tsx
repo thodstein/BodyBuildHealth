@@ -173,6 +173,22 @@ export function rankRecommended(list: ArticleManifestEntry[], recentIds: string[
   });
 }
 
+/**
+ * Дубль заголовка: тело markdown часто начинается с `# <тот же титул>`,
+ * а обложка читалки титул уже показывает. Срезаем только точное
+ * совпадение (нормализованное) — похожие, но другие заголовки живут.
+ */
+export function stripDuplicateTitle(md: string, title: string): string {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+  const lines = (md || '').split('\n');
+  const idx = lines.findIndex(l => l.trim().length > 0);
+  if (idx >= 0) {
+    const m = lines[idx].match(/^#\s+(.+)$/);
+    if (m && norm(m[1]) === norm(title)) return [...lines.slice(0, idx), ...lines.slice(idx + 1)].join('\n');
+  }
+  return md;
+}
+
 export function highlightMatch(text: string, q: string): React.ReactNode {
   const query = (q || '').trim();
   if (!query) return text;
@@ -748,7 +764,7 @@ export const ArticlesScreen: React.FC = () => {
               </div>
             )}
             <div style={{ padding:'16px 16px 0' }}>
-            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(readingArticle.content || '', readerFont) }} />
+            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(stripDuplicateTitle(readingArticle.content || '', readingArticle.title), readerFont) }} />
             </div>
               </>);
             })()}
