@@ -353,6 +353,16 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
   it('пептиды: WADA-метка', () => {
     expect(P('supportProtocolPeptide.tsx')).toContain('лист WADA');
   });
+  it('инъекции: HBV/ВИЧ-блок', () => {
+    const t = P('supportProtocolInjections.tsx');
+    expect(t).toContain('гепатита B');
+    expect(t).toContain('ВИЧ/HCV');
+  });
+  it('постцикл: ашваганда с DILI-капом', () => {
+    const t = P('supportProtocolPostCycle.tsx');
+    expect(t).toContain('≤600 мг/сут');
+    expect(t).toContain('DILI');
+  });
   it('гейты смонтированы: ProtocolDisclaimer ×3, IvStationaryGate ×3', () => {
     for (const f of [
       'supportProtocolWomen.tsx',

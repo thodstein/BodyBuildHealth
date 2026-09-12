@@ -626,7 +626,7 @@ export const SupportProtocolInjections: React.FC<{ s: Record<string, any> }> = (
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   <div style={cardBg}>
                     <div style={{ fontSize:13, fontWeight:800, color:'#6366f1', marginBottom:4 }}>🧪 Стерильность и асептика: полный протокол</div>
-                    <p style={{ fontSize:8, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Нарушение стерильности — причина №1 постинъекционных осложнений. Абсцесс, флегмона, сепсис развиваются из-за бактерий, занесённых при инъекции. <b>Асептика — это НЕ опция, это ОБЯЗАТЕЛЬНОЕ УСЛОВИЕ.</b></p>
+                    <p style={{ fontSize:8, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Нарушение стерильности — причина №1 постинъекционных осложнений. Абсцесс, флегмона, сепсис развиваются из-за бактерий, занесённых при инъекции. <b>Асептика — это НЕ опция, это ОБЯЗАТЕЛЬНОЕ УСЛОВИЕ.</b> Вакцинация от гепатита B + тесты на ВИЧ/HCV до курса (общие иглы/флаконы — путь передачи). Чужие иглы/флаконы — никогда.</p>
                   </div>
 
                   {/* Workspace preparation */}
