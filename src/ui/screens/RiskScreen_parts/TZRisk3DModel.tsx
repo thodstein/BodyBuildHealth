@@ -15,6 +15,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { TzSpecResult, TzSpecOrganResult } from '../../../engines/risk-engine-tz-spec';
 import { buildZoneMapping } from '../../../engines/mesh-zone-mapping';
 
@@ -218,6 +219,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     let overlay: THREE.Mesh | null = null;
 
     const loader = new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
     loader.load(
       '/hulk.glb',
       (gltf) => {
@@ -388,6 +390,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         organRootRef.current = organRoot;
         group.add(organRoot);
         const organLoader = new GLTFLoader();
+        organLoader.setMeshoptDecoder(MeshoptDecoder);
         for (const def of ORGAN_MODELS) {
           organLoader.load(
             def.url,
@@ -432,7 +435,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
               applyOrganColors();
             },
             undefined,
-            () => { /* орган не загрузился — зоны-подсветка остаётся, молча */ },
+            (err) => { console.warn('[TZ3D] орган не загрузился:', def.url, err); },
           );
         }
       },
