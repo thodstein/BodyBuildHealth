@@ -233,6 +233,7 @@ export const NutritionReference: React.FC = () => {
                   {p.inV2 && <span style={{ fontSize: 9, color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', padding: '2px 6px', borderRadius: 6 }}>учтено в v2-скоринге</span>}
                 </div>
                 <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>{p.note}</div>
+                {p.source && <div style={{ fontSize: 9, color: '#fff', marginTop: 2 }}>Источник: {p.source}</div>}
               </div>
             </div>
           );

@@ -82,6 +82,13 @@ describe('nutrition-reference data P0', () => {
       expect(rule!.source, key).toBeDefined();
     }
   });
+  it('синергии с числовыми клеймами имеют источники', () => {
+    const numeric = FOOD_SYNERGIES.filter(s => /[0-9]/.test(s.effect));
+    expect(numeric.length).toBeGreaterThan(0);
+    for (const s of numeric) {
+      expect(s.source, s.pair).toBeDefined();
+    }
+  });
   it('новые таблицы непустые', () => {
     expect(RDA_ROWS.length).toBeGreaterThanOrEqual(10);
     expect(GI_ROWS.length).toBeGreaterThanOrEqual(5);
