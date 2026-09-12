@@ -6,6 +6,7 @@
 import React from 'react';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
 import { peakBlockHint, type CardioCompPriority } from '../../../engines/lms/cardio-peak-block.engine';
+import { predictRaceTimes, predictorNote, RACE_WEEK_CHECKLIST } from '../../../engines/lms/cardio-race-predictor.engine';
 import { SectionCard, GroupHeading, HINT, HINT_SM, BTN_CTA, BTN_DANGER, NumberInput, InfoBanner, Badge, EmptyState } from './CardioUI';
 
 export interface CompDraft { name: string; week: string; date?: string }
@@ -136,6 +137,54 @@ export const CardioCompsStep: React.FC<{
         <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.5 }}>Укажи дату — неделя посчитается от сегодня (неделя 1 = сегодня), или введи неделю вручную. Приоритет: A — taper 2 нед + пик; B — taper 1 нед + пик; C — без taper.</div>
         {comps.length > 0 && <InfoBanner tone="ok">Добавлено стартов: {comps.length} — taper/пик будут построены по режиму шага «Параметры».</InfoBanner>}
       </SectionCard>
+      <SectionCard title="📋 Гоночная неделя — чек-лист">
+        {RACE_WEEK_CHECKLIST.map((item, i) => (
+          <div key={i} style={{ fontSize: 12, color: '#fff', lineHeight: 1.5 }}>{item}</div>
+        ))}
+      </SectionCard>
+      <CardioRacePredictor />
     </div>
+  );
+};
+
+/** Предиктор результата по Riegel — автономный (свой ввод, без пропсов). */
+const CardioRacePredictor: React.FC = () => {
+  const [dist, setDist] = React.useState('10');
+  const [time, setTime] = React.useState('');
+  const distNum = Number(String(dist).replace(',', '.'));
+  const m = /^(\d{1,3})[:.](\d{1,2})(?:[:.](\d{1,2}))?$/.exec(time.trim());
+  let secs: number | undefined;
+  if (m) {
+    const a = Number(m[1]); const b = Number(m[2]); const c = m[3] != null ? Number(m[3]) : undefined;
+    secs = c != null ? a * 3600 + b * 60 + c : a * 60 + b;
+  }
+  const preds = distNum > 0 && secs != null && secs > 0 ? predictRaceTimes(distNum, secs) : null;
+  return (
+    <SectionCard title="🔮 Прогноз результата (Riegel)">
+      <div style={{ ...HINT, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '7px 10px' }}>
+        Введи свой лучший результат — получишь ориентир темпа на старт. {predictorNote()}
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={HINT_SM}>Дистанция (км)</span>
+          <input value={dist} onChange={e => setDist(e.target.value)} inputMode="decimal" aria-label="Дистанция лучшего результата, км"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, width: 110 }} placeholder="10" />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={HINT_SM}>Время (М:СС или Ч:ММ:СС)</span>
+          <input value={time} onChange={e => setTime(e.target.value)} inputMode="text" aria-label="Время лучшего результата"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, width: 150 }} placeholder="44:30" />
+        </label>
+      </div>
+      {preds && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontVariantNumeric: 'tabular-nums' }}>
+          {preds.map(p => (
+            <span key={p.label} style={{ fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '6px 10px' }}>
+              {p.label}: <b>{p.timeStr}</b>
+            </span>
+          ))}
+        </div>
+      )}
+    </SectionCard>
   );
 };

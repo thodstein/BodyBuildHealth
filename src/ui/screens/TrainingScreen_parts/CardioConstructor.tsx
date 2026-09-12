@@ -26,6 +26,7 @@ import { consumeCardioTemplatePending, subscribeCardioTemplatePending } from '..
 import { parsePaceText, formatPace } from '../../../engines/lms/cardio-personal-zones.engine';
 import { extractCardioProgression, cardioProgressionAdvice } from '../../../engines/lms/cardio-meso-progression.engine';
 import { getCardioIntervalPreset } from '../../../engines/lms/cardio-interval-presets.engine';
+import { CARDIO_RED_FLAGS } from '../../../engines/lms/cardio-red-flags.engine';
 import { planFromStored, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
 import { buildAnnualCardioCycles, type AnnualCardioBuildOptions } from '../../../engines/annual-training/annual-training-cardio.engine';
 import {
@@ -272,6 +273,12 @@ export const CardioConstructor: React.FC = () => {
   const [mesoOn, setMesoOn] = useState((wizard as WizardState).mesoOn === true);
   // Строгая валидация (по умолчанию advisory для шаблонов).
   const [strictValidate, setStrictValidate] = useState((wizard as WizardState).strictValidate === true);
+  // P4 PRO-2: красные флаги скрининга (мед-блок интенсива).
+  const [redFlags, setRedFlags] = useState<string[]>((wizard as WizardState).redFlags ?? []);
+  // P5 PRO-2: свитч второй половины на polarized (Filipas PYR→POL).
+  const [tidSwitch, setTidSwitch] = useState((wizard as WizardState).tidSwitch === true);
+  // P6 PRO-2: durability-сессия 1×/нед (длинная Z2, только недели ≥150 мин).
+  const [durabilityOn, setDurabilityOn] = useState((wizard as WizardState).durabilityOn === true);
   const [variant, setVariant] = useState<CardioVariant>(wizard.variant ?? 'base');
   const [wizardMode, setWizardMode] = useState<'simple' | 'pro'>((wizard as WizardState).wizardMode ?? 'pro');
   const [legDays, setLegDays] = useState<number[]>(wizard.legDays ?? []);
@@ -526,6 +533,9 @@ export const CardioConstructor: React.FC = () => {
       talkZone2Hr: talkNum,
       tempC: tempNum,
       altitudeM: altNum,
+      redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
+      tidSwitchWeek: tidSwitch ? Math.max(2, Math.ceil(totalWeeks / 2)) : undefined,
+      durabilitySession: durabilityOn || undefined,
     };
     const vOpts = variant === 'gentle'
       ? { level: 'beginner' as CardioLevel, recoveryLow: true }
@@ -581,6 +591,9 @@ export const CardioConstructor: React.FC = () => {
       talkZone2Hr: talkNum2,
       tempC: tempNum2,
       altitudeM: altNum2,
+      redFlags: redFlags.length > 0 ? [...redFlags] : undefined,
+      tidSwitchWeek: tidSwitch ? Math.max(2, Math.ceil(totalWeeks / 2)) : undefined,
+      durabilitySession: durabilityOn || undefined,
     };
     const vOpts = v === 'gentle'
       ? { level: 'beginner' as CardioLevel, recoveryLow: true }
@@ -622,6 +635,11 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.talkZone2Hr != null) setTalkHr(String(cfg.talkZone2Hr));
     if (cfg.tempC != null) setTempC(String(cfg.tempC));
     if (cfg.altitudeM != null) setAltitudeM(String(cfg.altitudeM));
+    if (Array.isArray((cfg as { redFlags?: unknown }).redFlags)) {
+      setRedFlags(((cfg as { redFlags?: unknown }).redFlags as unknown[]).filter(x => typeof x === 'string') as string[]);
+    }
+    if ((cfg as { tidSwitchWeek?: unknown }).tidSwitchWeek != null) setTidSwitch(true);
+    if ((cfg as { durabilitySession?: unknown }).durabilitySession === true) setDurabilityOn(true);
     // Пост-обработка из config-штампа finish-хелпера (темпы VDOT + мезо-флаг).
     const stamped = cfg as unknown as { paceEasySec?: number; paceTempoSec?: number; paceIntervalSec?: number; mesoOn?: boolean };
     if (stamped.paceEasySec != null) setEasyPace(formatPace(stamped.paceEasySec));
@@ -861,11 +879,11 @@ export const CardioConstructor: React.FC = () => {
         factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
         variant, comps, wizardMode,
         lthr, ftpWatts, talkHr, tempC, altitudeM,
-        easyPace, tempoPace, intervalPace, mesoOn, strictValidate,
+        easyPace, tempoPace, intervalPace, mesoOn, strictValidate, redFlags, tidSwitch, durabilityOn,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn, strictValidate]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperModel, periodizationModel, maxHrFormula, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn, strictValidate, redFlags, tidSwitch, durabilityOn]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -1258,6 +1276,7 @@ export const CardioConstructor: React.FC = () => {
         </>
       )}
       {step === 'athlete' && (
+        <>
         <CardioAthleteSection
           age={age} setAge={setAge}
           bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
@@ -1276,6 +1295,40 @@ export const CardioConstructor: React.FC = () => {
           onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr} onFromLog={fromFieldTestLog}
           wizardMode={wizardMode}
         />
+        <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }}>
+          <div style={{ color: '#fff', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>🩺 Кардио-скрининг (честно, не диагноз)</div>
+          <div style={{ color: '#fff', fontSize: 12, marginBottom: 8 }}>Любой пункт → только Z2/recovery до врача. 14–15 лет — щадящий режим всегда.</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {CARDIO_RED_FLAGS.map(f => {
+              const on = redFlags.includes(f.id);
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  aria-pressed={on}
+                  data-cardio="red-flag"
+                  data-on={on}
+                  title={f.hint}
+                  onClick={() => setRedFlags(prev => {
+                    const next = prev.includes(f.id) ? prev.filter(x => x !== f.id) : [...prev, f.id];
+                    try {
+                      localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...loadWizard(), version: 2, redFlags: next }));
+                    } catch { /* ignore */ }
+                    return next;
+                  })}
+                  style={{
+                    minHeight: 44, padding: '8px 12px', borderRadius: 12, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff',
+                    border: on ? '1px solid rgba(255,80,80,0.6)' : '1px solid rgba(255,255,255,0.14)',
+                    background: on ? 'rgba(255,80,80,0.16)' : 'rgba(255,255,255,0.04)',
+                  }}
+                >
+                  {on ? '🔴 ' : '⚪ '}{f.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        </>
       )}
       {step === 'load' && (
         <>
@@ -1287,6 +1340,60 @@ export const CardioConstructor: React.FC = () => {
             factorsSummary={factorsSummary}
             wizardMode={wizardMode}
           />
+          <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>🔀 PYR→POL во 2-й половине</span>
+              <button
+                type="button"
+                aria-pressed={tidSwitch}
+                data-cardio="tid-switch"
+                onClick={() => {
+                  setTidSwitch(v => {
+                    const next = !v;
+                    try {
+                      localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...loadWizard(), version: 2, tidSwitch: next }));
+                    } catch { /* ignore */ }
+                    return next;
+                  });
+                }}
+                style={{
+                  minHeight: 44, padding: '8px 14px', borderRadius: 12, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff',
+                  border: tidSwitch ? '1px solid rgba(0,230,138,0.55)' : '1px solid rgba(255,255,255,0.14)',
+                  background: tidSwitch ? 'rgba(0,230,138,0.16)' : 'rgba(255,255,255,0.04)',
+                }}
+              >
+                {tidSwitch ? 'Вкл — поляризация со 2-й половины' : 'Выкл'}
+              </button>
+            </div>
+            <div style={{ color: '#fff', fontSize: 12, marginTop: 6 }}>Filipas 2021: смена PYR→POL в финале +3% к VO2max. Любителю решает объём, не модель (Rivera-2025). Объём недель не меняется — меняется только смесь MISS/HIIT.</div>
+          </div>
+          <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>🏔 Durability-длинная 1×/нед</span>
+              <button
+                type="button"
+                aria-pressed={durabilityOn}
+                data-cardio="durability"
+                onClick={() => {
+                  setDurabilityOn(v => {
+                    const next = !v;
+                    try {
+                      localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...loadWizard(), version: 2, durabilityOn: next }));
+                    } catch { /* ignore */ }
+                    return next;
+                  });
+                }}
+                style={{
+                  minHeight: 44, padding: '8px 14px', borderRadius: 12, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#fff',
+                  border: durabilityOn ? '1px solid rgba(0,230,138,0.55)' : '1px solid rgba(255,255,255,0.14)',
+                  background: durabilityOn ? 'rgba(0,230,138,0.16)' : 'rgba(255,255,255,0.04)',
+                }}
+              >
+                {durabilityOn ? 'Вкл — длинная Z2 в недели ≥150 мин' : 'Выкл'}
+              </button>
+            </div>
+            <div style={{ color: '#fff', fontSize: 12, marginTop: 6 }}>Длинная Z2 с целью decoupling &lt;5% (Smyth 82k / Hunter 2025). Вело 3 ч / бег 100 мин. В недели &lt;150 мин не вшивается — только совет.</div>
+          </div>
           <CardioParamsPreviewHero
             preview={paramsPreview.preview} s={paramsPreview.s} tidPreview={paramsPreview.tidPreview}
             totalWeeks={totalWeeks} goal={goal} taperEnabled={taperEnabled} taperWeeks={taperWeeks} peakWeek={peakWeek}

@@ -1,19 +1,23 @@
 /**
  * cardio-interval-presets.engine.ts — именные HIIT-протоколы как
- * CardioStructuredBlock-сессии (P0-4 плана).
+ * CardioStructuredBlock-сессии (P0-4 плана + P3 PRO-2).
  *  - Norwegian 4×4 (Helgerud/NTNU 2007: 4×4 мин @85-95% HRmax / 3 мин
- *    @60-70%, +7-13% VO2max за 8 нед, ≤2-3×/нед);
+ *    @60-70%, +7-13% VO2max за 8 нед, ≤2-3×/нед; Hov 2022: +6.5% VO2max,
+ *    лучший выбор для VO2max);
  *  - Billat 30-30 (vVO2max 30с / jog 30с до отказа, 16-24 повтора,
  *    калибровка 6-мин тестом: дистанция/12 на 30 с);
  *  - Tabata (7-8×20с @170% VO2max / 10с, +7 мл/кг VO2max и +28%
  *    анаэробной ёмкости за 6 нед, Tabata 1996).
+ *  - P3 PRO-2 (Yang NMA 2025, 51/1261): RST 10×10с/60с 3×/нед 2 нед;
+ *    SIT 8×20с/10с пассивно 3×/нед; HIIT-opt 140с/165с (WRR 0.85)
+ *    3×/нед 3-6 нед, бег.
  * Калибровка — через параметры, без выдуманных темпов: если HRmax
  * неизвестен — зоны не ставятся, интенсивность задаётся текстом/RPE.
  */
 import type { CardioEquipment, CardioStructuredBlock, CardioType } from './cardio.engine';
 
 export interface CardioIntervalPreset {
-  id: 'norwegian-4x4' | 'billat-30-30' | 'tabata';
+  id: 'norwegian-4x4' | 'billat-30-30' | 'tabata' | 'rst-10x10' | 'sit-8x20' | 'hiit-opt-140';
   title: string;
   protocol: string;
   frequency: string;
@@ -75,6 +79,52 @@ export const CARDIO_INTERVAL_PRESETS: CardioIntervalPreset[] = [
     }),
     warmup: 'Разминка 10 мин + 3×20 с прогрессивно.',
     equipment: ['cycling', 'rowing'],
+  },
+  {
+    id: 'rst-10x10',
+    title: 'RST 10×10 с (повторные спринты)',
+    protocol: '10× (10 с максимум / 60 с легко) — 3×/нед, 2 нед достаточно (Yang NMA 2025)',
+    frequency: '3×/нед 2 нед, не в день ног, не same-session с силой',
+    calibration: 'All-out: максимум на 10 с; восстановление — лёгкий бег/вело',
+    sessionType: 'hiit',
+    build: () => ({
+      workSec: 10, restSec: 60, reps: 10, target: 'rpe',
+      note: 'RST 10×10: 10 с максимум / 60 с легко ×10',
+    }),
+    warmup: 'Разминка 10 мин легко + 4×10 с прогрессивно.',
+    equipment: ['running', 'cycling'],
+  },
+  {
+    id: 'sit-8x20',
+    title: 'SIT 8×20 с (спринт-интервалы)',
+    protocol: '8× (20 с @~150% MAS / 10 с пауза) — 3×/нед (Hov: +3.3% VO2max)',
+    frequency: '3×/нед, не в день ног, не same-session с силой',
+    calibration: 'Скорость ~150% от MAS (темп 5К); пауза — полная остановка/шаг',
+    sessionType: 'hiit',
+    build: () => ({
+      workSec: 20, restSec: 10, reps: 8, target: 'rpe',
+      note: 'SIT 8×20: 20 с спринт / 10 с пауза ×8',
+    }),
+    warmup: 'Разминка 10 мин легко + 3 ускорения.',
+    equipment: ['running', 'cycling', 'rowing'],
+  },
+  {
+    id: 'hiit-opt-140',
+    title: 'HIIT-opt 140/165 с (opt-2025)',
+    protocol: '5-6× (140 с @~95% MAS / 165 с легко, WRR 0.85) — 3×/нед 3–6 нед, бег (Yang NMA 2025)',
+    frequency: '3×/нед 3–6 нед, не в день ног',
+    calibration: 'HRmax: 220-age (или Tanaka); жёсткие — говорить невозможно, лёгкие — разговорно',
+    sessionType: 'hiit',
+    build: (opts = {}) => {
+      const hm = opts.hrMax != null && opts.hrMax >= 120 && opts.hrMax <= 220 ? clampHr(opts.hrMax) : undefined;
+      return {
+        workSec: 140, restSec: 165, reps: 6, target: 'hr',
+        ...(hm ? { targetHr: { min: clampHr(hm * 0.9), max: clampHr(hm * 0.95) } } : {}),
+        note: 'HIIT-opt: 140 с жёстко / 165 с легко ×5-6 (WRR 0.85)',
+      };
+    },
+    warmup: 'Разминка 10 мин легко + 3-4 ускорения.',
+    equipment: ['running'],
   },
 ];
 

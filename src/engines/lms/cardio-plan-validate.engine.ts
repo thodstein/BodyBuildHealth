@@ -48,7 +48,7 @@ function weekHasRace(week: CardioCycle['weeks'][number]): boolean {
  */
 export function validateCardioCycle(
   cycle: CardioCycle,
-  opts: { beginner?: boolean; competitionWeeks?: number[]; strict?: boolean } = {},
+  opts: { beginner?: boolean; competitionWeeks?: number[]; strict?: boolean; medicalBlock?: boolean } = {},
 ): CardioPlanValidation {
   const issues: CardioPlanIssue[] = [];
   const weeks = cycle.weeks ?? [];
@@ -131,6 +131,25 @@ export function validateCardioCycle(
     const before = weeks.filter(w => w.week < cw && w.week >= cw - 2);
     if (before.length > 0 && !before.some(w => w.taper || w.deload)) {
       issues.push({ level: 'warn', code: 'no_taper', text: `Старт на нед ${cw} без taper/deload в предшествующие 2 нед.` });
+    }
+  }
+  // P4 PRO-2: мед-блок — интенсив в плане при запрете.
+  if (opts.medicalBlock) {
+    const bad = weeks.find(w => w.sessions.some(s => s.type === 'hiit' || s.type === 'miss'));
+    if (bad) {
+      issues.push({ level: 'error', code: 'medical_block', text: `Нед ${bad.week}: HIIT/MISS при мед-блоке — запрещены до врача (только Z2/recovery).` });
+    }
+  }
+  // P2 PRO-2: честный Z2 — низкий объём без HIIT (Storoschuk 2025).
+  // Авторские шаблоны (faithful) не трогаем: их прошли тысячи атлетов.
+  {
+    const workWeeks = weeks.filter(w => !w.deload && !w.taper && !weekHasRace(w));
+    if (!faithful && workWeeks.length > 0) {
+      const avg = workWeeks.reduce((s, w) => s + weekMinutes(w), 0) / workWeeks.length;
+      const hiitCount = workWeeks.reduce((s, w) => s + w.sessions.filter(x => x.type === 'hiit').length, 0);
+      if (avg < 150 && hiitCount === 0) {
+        issues.push({ level: 'warn', code: 'z2_without_hiit_low_volume', text: 'Объём <150 мин/нед без HIIT: добавьте 1 HIIT/нед для VO2max — чистый Z2 при таком объёме недодаёт пик (Storoschuk 2025).' });
+      }
     }
   }
   let score = 100;

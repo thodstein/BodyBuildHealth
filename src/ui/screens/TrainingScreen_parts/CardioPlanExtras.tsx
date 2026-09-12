@@ -4,6 +4,7 @@
  */
 import React, { useMemo } from 'react';
 import { validateCardioCycle } from '../../../engines/lms/cardio-plan-validate.engine';
+import { needsMedicalBlock } from '../../../engines/lms/cardio.engine';
 import type { CardioCycle } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, BTN_SMALL, Badge, ProgressBar, HINT_SM } from './CardioUI';
 
@@ -13,7 +14,14 @@ export const CardioValidationCard: React.FC<{
   strict?: boolean;
   onToggleStrict?: () => void;
 }> = ({ cycle, beginner, strict, onToggleStrict }) => {
-  const v = useMemo(() => (cycle ? validateCardioCycle(cycle, { strict }) : null), [cycle, beginner, strict]);
+  const v = useMemo(() => {
+    if (!cycle) return null;
+    const cfg = cycle.config as unknown as { redFlags?: string[]; age?: number } | undefined;
+    const medicalBlock = (() => {
+      try { return needsMedicalBlock(cfg?.redFlags, cfg?.age); } catch { return false; }
+    })();
+    return validateCardioCycle(cycle, { beginner, strict, medicalBlock });
+  }, [cycle, beginner, strict]);
   if (!cycle || !v) return null;
   const color = v.qualityScore >= 85 ? '#22c55e' : v.qualityScore >= 60 ? '#f59e0b' : '#ef4444';
   const bg = v.qualityScore >= 85 ? 'rgba(34,197,94,0.14)' : v.qualityScore >= 60 ? 'rgba(245,158,11,0.14)' : 'rgba(239,68,68,0.14)';

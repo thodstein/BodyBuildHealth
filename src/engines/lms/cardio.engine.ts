@@ -48,9 +48,32 @@ export type { TaperDecay, FatigueClass, PreTaperState, IndividualTaperPlan } fro
 export { exponentialTaperMult, stepTaperMult, recommendTaperDecay, individualizedTaperPlan, performanceGainEstimate, taperCutFromCycle } from './cardio-taper-pro.engine';
 export type { HeatContext, SessionGap, TimingInput, InterferenceV2Input, InterferenceV2Result } from './cardio-safety.engine';
 export { heatAltitudeHrAdd, hydrationAdvice, cardioTimingPenalty, cardioInterferenceV2 } from './cardio-safety.engine';
+export type { FuelingPlan, AcclimationDay } from './cardio-fueling.engine';
+export { fuelingForSession, heatAcclimationPlan, altitudeNote } from './cardio-fueling.engine';
+export type { RacePrediction } from './cardio-race-predictor.engine';
+export { predictRaceTimes, predictorNote, RACE_WEEK_CHECKLIST, raceChecklistIcsLine } from './cardio-race-predictor.engine';
+export { zone2HonestyNote } from './cardio-zone2-honesty.engine';
+import { fuelingForSession as fuelForSessionLocal, heatAcclimationPlan as heatAcclLocal, altitudeNote as altitudeNoteLocal } from './cardio-fueling.engine';
+export type { CardioRedFlagId, CardioRedFlagScreen } from './cardio-red-flags.engine';
+export { CARDIO_RED_FLAGS, screenCardioRedFlags, needsMedicalBlock } from './cardio-red-flags.engine';
+import { screenCardioRedFlags as screenRedFlagsLocal } from './cardio-red-flags.engine';
 // Локальные алиасы для использования внутри движка (реэкспорты выше — только наружу).
 import { zonesFromTalkTest as talkZonesFromTest } from './cardio-field-tests.engine';
 import { timeInZones as calcTimeInZones, classifyTid as classifyTidLocal } from './cardio-tid.engine';
+// P1 PRO-2: доменные типы живут в cardio-cycle-types.engine.ts (zero-runtime).
+// Реэкспорт — импорты потребителей (`from '../cardio.engine'`) не меняются.
+import type {
+  CardioType, CardioEquipment, CardioLevel, CardioStructuredBlock, CardioSession,
+  CardioPlan, CardioGoal, CardioPeriodizationModel, CardioPhase, CardioWeek,
+  CardioCompetitionRef, CardioCycle, CardioCycleInput, CardioProfileFactors,
+  CardioPreset, CardioTaperModel, CardioScenario, CardioVariant,
+} from './cardio-cycle-types.engine';
+export type {
+  CardioType, CardioEquipment, CardioLevel, CardioStructuredBlock, CardioSession,
+  CardioPlan, CardioGoal, CardioPeriodizationModel, CardioPhase, CardioWeek,
+  CardioCompetitionRef, CardioCycle, CardioCycleInput, CardioProfileFactors,
+  CardioPreset, CardioTaperModel, CardioScenario, CardioVariant,
+} from './cardio-cycle-types.engine';
 export {
   cardioHeartZones,
   maxHrClassic,
@@ -74,12 +97,9 @@ export {
   cardioHrDrift,
 } from './cardio-physiology.engine';
 
-// ─── Базовые типы (обратно-совместимо с T7) ───
-
-export type CardioType = 'zone2' | 'hiit' | 'miss' | 'recovery';
+// ─── Базовые типы — см. cardio-cycle-types.engine.ts (P1 PRO-2) ───
 
 /** Оборудование/форма кардио (влияет на подбор при ограничениях суставов). */
-export type CardioEquipment = 'running' | 'cycling' | 'rowing' | 'elliptical' | 'walking' | 'swimming';
 
 export const CARDIO_EQUIPMENT_OPTIONS: { id: CardioEquipment; label: string; icon: string; impact: 'high' | 'low' }[] = [
   { id: 'running', label: 'Бег', icon: '🏃', impact: 'high' },
@@ -95,49 +115,10 @@ export function cardioEquipmentLabel(id: CardioEquipment): string {
 }
 
 /** Уровень подготовки: корректирует стартовый объём. */
-export type CardioLevel = 'beginner' | 'intermediate' | 'advanced';
 export const CARDIO_LEVEL_MULT: Record<CardioLevel, number> = { beginner: 0.8, intermediate: 1, advanced: 1.15 };
 export const CARDIO_LEVEL_LABELS: Record<CardioLevel, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый' };
 
-export interface CardioStructuredBlock {
-  workSec: number;
-  restSec: number;
-  reps: number;
-  target?: 'hr' | 'pace' | 'power' | 'rpe';
-  targetHr?: { min?: number; max?: number };
-  note?: string;
-}
-
-export interface CardioSession {
-  id?: string;
-  type: CardioType;
-  durationMin: number;
-  weeklyFrequency: number;
-  intensity: 'low' | 'moderate' | 'high';
-  kcalPerSession: number;   // оценочно
-  purpose: string;
-  targetHr?: { min?: number; max?: number };
-  dayOfWeek?: number;
-  restrictions?: string[];
-  /** Предпочтительное оборудование для сессии (персонализация подбора). */
-  equipment?: CardioEquipment;
-  /** Структурированные интервалы (если есть — сессия выполняется по интервалам, а не равномерно). */
-  structured?: CardioStructuredBlock[];
-  /** Мощность (Вт) для вело/гребли, если задана. */
-  powerWatts?: number;
-}
-
-export interface CardioPlan {
-  sessions: CardioSession[];
-  totalKcalPerWeek: number;
-  rationale: string[];
-}
-
-// ─── CardioCycle (многонедельный цикл) ───
-
-export type CardioGoal = 'health' | 'mass' | 'cut' | 'recomp' | 'maintenance' | 'recovery' | 'bb_prep' | 'pl_prep' | 'bb_taper';
-
-export type CardioPeriodizationModel = 'linear' | 'polarized' | 'pyramidal' | 'pyramidal_polarized';
+// (CardioStructuredBlock/CardioSession/CardioPlan/CardioGoal/Periodization/Phase/Week/Competition/Cycle/Input — см. cardio-cycle-types.engine.ts)
 export const CARDIO_PERIODIZATION_LABELS: Record<CardioPeriodizationModel, string> = {
   linear: 'Линейная',
   polarized: 'Поляризованная (80/20)',
@@ -145,135 +126,7 @@ export const CARDIO_PERIODIZATION_LABELS: Record<CardioPeriodizationModel, strin
   pyramidal_polarized: 'Пирамида→Поляр. (Seiler 2026)',
 };
 
-export type CardioPhase =
-  | 'base'
-  | 'build'
-  | 'maintenance'
-  | 'contest_prep'
-  | 'taper'
-  | 'peak'
-  | 'transition';
-
-export interface CardioWeek {
-  week: number;
-  phase: CardioPhase;
-  sessions: CardioSession[];
-  totalMinutes: number;
-  totalKcal: number;
-  deload: boolean;
-  taper: boolean;
-  rationale: string[];
-}
-
-export interface CardioCompetitionRef {
-  id: string;
-  name: string;
-  week: number;       // 1-индекс недели соревнования внутри цикла
-  priority?: 'A' | 'B' | 'C';
-}
-
-export interface CardioCycle {
-  id: string;
-  name: string;
-  goal: CardioGoal;
-  totalWeeks: number;
-  weeks: CardioWeek[];
-  totalKcal: number;
-  linkedMacrocycleId?: string;
-  linkedCompetitionIds?: string[];
-  source: 'auto' | 'manual' | 'imported';
-  version: 1;
-  createdAt: string;
-  rationale: string[];
-  /** Дата начала цикла (локальная YYYY-MM-DD) — неделя 1 = startDate.
-   *  Все date-функции (неделя/прогресс/adherence/«Сегодня») должны
-   *  использовать его как reference, иначе прогресс «съезжает». */
-  startDate?: string;
-  /** Снапшот параметров сборки — для «⚙️ Изменить параметры» в мастере. */
-  config?: CardioCycleInput;
-}
-
-export interface CardioCycleInput {
-  goal: CardioGoal;
-  totalWeeks?: number;             // по умолчанию 12
-  bodyWeight?: number;             // по умолчанию 80
-  daysAvailable?: number;          // 0-7 доступных дней (по умолчанию 7)
-  recoveryLow?: boolean;           // низкое восстановление → HIIT убран
-  competitions?: CardioCompetitionRef[];
-  /** Ручная структура фаз (недели base/build/maintenance). Если задано —
-   *  используются эти доли вместо авто-процентов. taper/peak/contest_prep
-   *  по-прежнему определяются соревнованиями. */
-  phaseSplit?: { base?: number; build?: number; maintenance?: number };
-  /** Длина taper-окна перед стартом (1-4, по умолчанию 2). */
-  taperWeeks?: number;
-  /** Модель taper: step (постоянный срез) vs exponential (прогрессивный, Thomas 2009, эффективнее) */
-  taperModel?: 'step' | 'exponential';
-  /** Строить taper перед стартами (по умолчанию true; false → старт без taper-кривой). */
-  taper?: boolean;
-  /** Строить пик-неделю старта (по умолчанию true; false → неделя старта лёгкая taper). */
-  peakWeek?: boolean;
-  /** Уровень подготовки (корректирует стартовый объём: 0.8/1/1.15). */
-  level?: CardioLevel;
-  /** Предпочтительное оборудование (до 3). */
-  equipment?: CardioEquipment[];
-  /** Щадить суставы: исключает ударные виды (бег). */
-  lowImpact?: boolean;
-  /** Возраст — для целевых пульс-зон сессий (Karvonen/ЧССмакс). */
-  age?: number;
-  /** ЧСС покоя — для пульс-зон по резерву (Karvonen). */
-  restingHr?: number;
-  /** Пол — для формулы ЧССмакс (женщины 226-age). */
-  sex?: 'male' | 'female';
-  /** Дни тяжёлых ног (0-6, Пн=0): zone2/miss/hiit не ставятся в эти дни. */
-  legDays?: number[];
-  /** Проблемы суставов из профиля (для autoLowImpact). */
-  jointIssues?: boolean;
-  /** Процент жира (0-70) — для точного расхода через FFM (вес × (1-бф/100)). */
-  bodyFatPct?: number;
-  /** Дата начала цикла (локальная YYYY-MM-DD); по умолчанию — сегодня. */
-  startDate?: string;
-  /** Сон (часы/ночь): <6 → объём ×0.9. */
-  sleepHours?: number;
-  /** Стресс (1-10): ≥7 → HIIT убран, объём ×0.95. */
-  stressLevel?: number;
-  /** HRV (мс, утренний): <25 при >0 → объём ×0.9. */
-  hrvMs?: number;
-  /** PED-курс: повышенное восстановление → объём ×1.05. */
-  enhanced?: boolean;
-  /** Авто-учёт суставов из профиля (chronicConditions) → lowImpact. */
-  autoLowImpact?: boolean;
-  /** Формула ЧССмакс: classic 220/226-age, tanaka 208-0.7×age (точнее), gulati 206-0.88×age (жен) */
-  maxHrFormula?: 'classic' | 'tanaka' | 'gulati';
-  /** Модель периодизации (Seiler 2026): linear / polarized 80/20 / pyramidal / pyramidal→polarized */
-  periodizationModel?: CardioPeriodizationModel;
-  /** PRO-калибровка (Эпик A): LTHR (Friel 30'), FTP (вело 20'×0.95), talk-test потолок Z2. Приоритет LTHR > FTP > talk > age. */
-  lthr?: number;
-  ftpWatts?: number;
-  talkZone2Hr?: number;
-  /** PRO-контекст среды (Эпик G): жара/влажность/высота для поправки HR-зон. */
-  tempC?: number;
-  humidityPct?: number;
-  altitudeM?: number;
-  /** Снапшот параметров сборки (для «⚙️ Изменить параметры»). Заполняется в buildCardioCycle. */
-  config?: CardioCycleInput;
-  id?: string;
-  name?: string;
-  source?: CardioCycle['source'];
-  createdAt?: string;
-  /** Id шаблона библиотеки (ставит buildCardioCycleFromTemplate для явных
-   *  циклов): валидатор относится к острым неделям как к авторским (advisory). */
-  templateId?: string;
-}
-
-// ─── Факторы профиля (сон/стресс/HRV/PED/суставы) и питание ───
-
-export interface CardioProfileFactors {
-  sleepHours?: number;
-  stressLevel?: number;
-  hrvMs?: number;
-  enhanced?: boolean;
-  jointIssues?: boolean;
-}
+// ─── Факторы профиля (сон/стресс/HRV/PED/суставы) и питание (типы — см. cardio-cycle-types) ───
 
 /** Прочитать факторы восстановления/курса/суставов из профиля (чистая функция). */
 export function cardioProfileFactors(profile: {
@@ -327,18 +180,7 @@ export function cardioNutritionNotes(
   return notes;
 }
 
-// ─── Пресеты-шаблоны (быстрые старты) ───
-
-export interface CardioPreset {
-  id: string;
-  name: string;
-  desc: string;
-  icon: string;
-  goal: CardioGoal;
-  totalWeeks: number;
-  daysAvailable: number;
-  recoveryLow: boolean;
-}
+// ─── Пресеты-шаблоны (быстрые старты; тип CardioPreset — см. cardio-cycle-types) ───
 
 export const CARDIO_PRESETS: CardioPreset[] = [
   { id: 'health-8', name: 'Здоровье · 8 нед', desc: 'Zone 2 3-4 дня, аэробная база', icon: '💚', goal: 'health', totalWeeks: 8, daysAvailable: 4, recoveryLow: false },
@@ -791,7 +633,11 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   if (stressHigh) { factorMult *= 0.95; factorNotes.push('Стресс ≥7 → объём ×0.95, HIIT убран.'); }
   if (hrvLow) { factorMult *= 0.9; factorNotes.push('Низкий HRV → объём ×0.9.'); }
   if (enhanced) { factorMult *= 1.05; factorNotes.push('PED-курс: восстановление выше → объём ×1.05.'); }
-  const recoveryLow = !!input.recoveryLow || stressHigh;
+  // P4 PRO-2: мед-скрининг — любой красный флаг или teen → блок интенсива.
+  const medScreen = screenRedFlagsLocal(input.redFlags, input.age);
+  const medicalBlock = medScreen.blockHiit;
+  if (medicalBlock && medScreen.doctorNote) factorNotes.push(medScreen.doctorNote);
+  const recoveryLow = !!input.recoveryLow || stressHigh || medicalBlock;
   const equipmentPool = (input.equipment ?? []).filter(e => !lowImpact || CARDIO_EQUIPMENT_OPTIONS.find(o => o.id === e)?.impact === 'low');
   const fallbackEquipment: CardioEquipment = lowImpact ? 'walking' : equipmentPool[0] ?? 'running';
   // PRO-калибровка зон (Эпик A): LTHR > talk-test > age. Жара/высота (Эпик G) сдвигают зоны вверх.
@@ -807,6 +653,11 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   })();
   const zonesAdj = zones && heatAdd > 0 ? zones.map(z => ({ ...z, bpmMin: z.bpmMin + heatAdd, bpmMax: z.bpmMax + heatAdd })) : zones;
   const profile = profileForGoal(input.goal, input.periodizationModel);
+  // P5 PRO-2: ручной свитч второй половины на polarized (без флага — байт-в-байт).
+  const tidSwitch = input.tidSwitchWeek != null && Number.isFinite(input.tidSwitchWeek)
+    ? Math.max(2, Math.min(totalWeeks, Math.round(input.tidSwitchWeek)))
+    : undefined;
+  const polProfile = tidSwitch != null ? profileForGoal(input.goal, 'polarized') : undefined;
   const weeks: CardioWeek[] = [];
   let totalKcal = 0;
   let totalMinutes = 0;
@@ -829,7 +680,28 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     } else if (!deload && phase !== 'peak' && ['cut', 'recomp', 'health', 'maintenance', 'bb_prep', 'pl_prep'].includes(input.goal)) {
       volumeMult = Math.min(1.3, 1 + 0.04 * (w - 1));
     }
-    let { sessions, rationale } = buildWeekSessions(profile, phase, w, bw, recoveryLow, volumeMult, input.sex, ffmKg);
+    let { sessions, rationale } = buildWeekSessions(
+      tidSwitch != null && polProfile && w >= tidSwitch ? polProfile : profile,
+      phase, w, bw, recoveryLow, volumeMult, input.sex, ffmKg,
+    );
+    // P4 PRO-2: мед-блок режет и MISS (buildWeekSessions режет только HIIT по recoveryLow).
+    if (medicalBlock) {
+      const before = sessions.length;
+      sessions = sessions.filter(s => s.type !== 'miss');
+      if (sessions.length < before) rationale.push('Мед-скрининг: MISS заменён Z2/recovery до врача.');
+    }
+    // P6 PRO-2: durability-сессия — длинная Z2 с целью decoupling <5%
+    // (Smyth 82k/Hunter 2025). Только при флаге И неделе ≥150 мин, иначе — совет.
+    if (input.durabilitySession && (phase === 'build' || phase === 'maintenance' || phase === 'contest_prep') && !deload) {
+      const tentative = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+      if (tentative >= 150) {
+        const longEquip = fallbackEquipment === 'running' ? 100 : fallbackEquipment === 'cycling' ? 180 : 90;
+        sessions.push(mkSession('zone2', longEquip, 1, 'Durability-длинная Z2: цель decoupling <5% (Smyth/Hunter) — пейсинг ровный, HR пик у финиша.', bw, undefined, input.sex, ffmKg));
+        rationale.push('Durability: +1 длинная Z2/нед (decoupling <5% — маркер дюрабилити).');
+      } else {
+        rationale.push('Durability: неделя <150 мин — длинная не вшита (нужен объём); decoupling смотрите в дашборде.');
+      }
+    }
     if (deload) {
       sessions = sessions
         .filter(s => s.type !== 'hiit' && s.type !== 'miss')
@@ -860,6 +732,8 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
         durationMin: dur,
         kcalPerSession: kcalForCardio(s.type, dur, bw, equip, input.sex, ffmKg),
         equipment: equip,
+        // P7 PRO-2: фьюлинг длинных — дозой в purpose (печать/ICS подхватывают).
+        purpose: dur >= 60 ? `${s.purpose} · Фьюлинг: ${fuelForSessionLocal(dur, input.tempC).note}` : s.purpose,
         targetHr,
       };
     });
@@ -929,6 +803,9 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
       tempC: input.tempC,
       humidityPct: input.humidityPct,
       altitudeM: input.altitudeM,
+      redFlags: input.redFlags ? [...input.redFlags] : undefined,
+      tidSwitchWeek: input.tidSwitchWeek,
+      durabilitySession: input.durabilitySession,
     };
   }
   if (ffmKg != null) cycle.rationale.push(`FFM ${ffmKg} кг (жир ${input.bodyFatPct}%) — расход по безжировой массе.`);
@@ -936,6 +813,12 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   else if (input.talkZone2Hr != null && input.talkZone2Hr >= 80 && input.talkZone2Hr <= 200) cycle.rationale.push(`Talk-test: потолок Z2 ${Math.round(input.talkZone2Hr)} уд/мин — зоны оценочные.`);
   if (input.ftpWatts != null && input.ftpWatts >= 30) cycle.rationale.push(`FTP ${Math.round(input.ftpWatts)} Вт — ватт-зоны Coggan первичны для вело.`);
   if (heatAdd > 0) cycle.rationale.push(`Жара/высота: зоны +${heatAdd} уд/мин (терморегуляция/гипоксия) — пейте 500-750 мл/ч, >90' электролиты.`);
+  // P7 PRO-2: акклиматизация к жаре + высотная нота.
+  if (heatAcclLocal(input.tempC) != null) cycle.rationale.push(`Акклиматизация к жаре ${input.tempC}°C: 12 дней (1–4: только Z2 ≤60 мин; 5–10: +10%/день; HIIT после дня 10).`);
+  {
+    const altNote = altitudeNoteLocal(input.altitudeM);
+    if (altNote) cycle.rationale.push(altNote);
+  }
   cycle.rationale.push(`Цель: ${CARDIO_GOAL_LABELS[input.goal].toLowerCase()}, ${totalWeeks} нед, ${daysAvailable} дн/нед.`);
   if (input.level && input.level !== 'intermediate') cycle.rationale.push(`Уровень: ${CARDIO_LEVEL_LABELS[input.level].toLowerCase()} (объём ×${levelMult}).`);
   for (const n of factorNotes) cycle.rationale.push(n);
@@ -944,6 +827,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   else if (lowImpact) cycle.rationale.push('Оборудование: низкоударное (ходьба/вело/эллипс по умолчанию).');
   if (input.age != null) cycle.rationale.push(`Возраст ${input.age}${input.sex === 'female' ? ' (жен.)' : ''} — целевые пульс-зоны сессий заданы${input.restingHr != null && input.restingHr > 0 ? ` (ЧСС покоя ${input.restingHr})` : ''}.`);
   if (recoveryLow) cycle.rationale.push('Низкое восстановление: HIIT исключён.');
+  if (tidSwitch != null) cycle.rationale.push(`🔀 PYR→POL с нед ${tidSwitch} (Filipas 2021 +3% к VO2max на смене модели; любителю решает объём, не модель — Rivera-2025).`);
   if (competitions.length > 0) {
     const starts = competitions.map(c => `${c.name} (нед ${c.week})`).join(', ');
     if (taperEnabled) {
@@ -1023,7 +907,7 @@ export const PREP_PEAK_STEPS_BY_DAY: Record<number, number> = { 1: 12000, 2: 120
  *  режется сильнее силовой prep-кривой — ради гликогена и внешнего вида). */
 export const BB_CARDIO_TAPER_CURVE: Record<number, number> = { 1: 0.6, 2: 0.7, 3: 0.85, 4: 0.9 };
 export const BB_CARDIO_TAPER_CURVE_EXPONENTIAL: Record<number, number> = { 1: 0.5, 2: 0.65, 3: 0.82, 4: 0.88 };
-export type CardioTaperModel = 'step' | 'exponential';
+// (CardioTaperModel — см. cardio-cycle-types.engine.ts)
 
 /** Множитель объёма кардио за `dist` недель до шоу (1 = ближайшая к пику неделя). */
 export function bbCardioTaperMult(dist: number, model?: CardioTaperModel): number {
@@ -1838,12 +1722,7 @@ export function setActiveCardioCycle(cycle: CardioCycle | null): void {
 export const CARDIO_SCENARIOS_KEY = 'he_cardio_scenarios';
 const CARDIO_SCENARIOS_CAP = 6;
 
-export interface CardioScenario {
-  id: string;
-  name: string;
-  savedAt: string;
-  cycle: CardioCycle;
-}
+// (CardioScenario — см. cardio-cycle-types.engine.ts)
 
 export function loadCardioScenarios(): CardioScenario[] {
   try {
@@ -2388,7 +2267,9 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
         const dtStart = toIcsDateTime(isoDate, '06:00');
         const dtEnd = addMinutesToIcsDateTime(dtStart, s.durationMin);
         const summary = `Кардио ${s.type.toUpperCase()} ${s.durationMin} мин · нед ${w.week}`;
-        const desc = `Фаза: ${CARDIO_PHASE_LABELS[w.phase]} · ${s.purpose}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}`;
+        // P6 PRO-2: гоночный чек-лист — в описания taper-сессий.
+        const checklist = w.taper ? ' · Чек-лист гоночной недели: сон 8ч, без нового 48–72ч, привычное питание/гидратация, shakeout 15–20 мин.' : '';
+        const desc = `Фаза: ${CARDIO_PHASE_LABELS[w.phase]} · ${s.purpose}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}${checklist}`;
         lines.push('BEGIN:VEVENT');
         lines.push(`UID:${cycle.id}-w${w.week}-${s.type}-${si}-${k}@bbh`);
         lines.push(`DTSTART:${dtStart}`);
@@ -3210,7 +3091,7 @@ export function configFromCycle(cycle: CardioCycle): CardioCycleInput | null {
 
 // ─── Варианты плана и объяснение выбора (P0) ───
 
-export type CardioVariant = 'gentle' | 'base' | 'intense';
+// (CardioVariant — см. cardio-cycle-types.engine.ts)
 
 export interface CardioVariantInfo {
   id: CardioVariant;

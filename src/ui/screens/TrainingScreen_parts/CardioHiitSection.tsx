@@ -1,7 +1,8 @@
 /**
- * CardioHiitSection.tsx — именные HIIT-протоколы (P0-4): Norwegian 4×4,
- * Billat 30-30, Tabata. Калибровка (HRmax / 6-мин тест) + кнопка
- * «＋ В неделю 1» → onAdd(presetId, opts). Сессия собирается родителем.
+ * CardioHiitSection.tsx — именные HIIT-протоколы (P0-4 + P3 PRO-2): Norwegian 4×4,
+ * Billat 30-30, Tabata + RST 10×10 / SIT 8×20 / HIIT-opt 140/165. Калибровка
+ * (HRmax / 6-мин тест) + кнопка «＋ В неделю 1» → onAdd(presetId, opts).
+ * Сессия собирается родителем.
  */
 import React, { useState } from 'react';
 import { CARDIO_INTERVAL_PRESETS } from '../../../engines/lms/cardio-interval-presets.engine';
@@ -23,7 +24,7 @@ export const CardioHiitSection: React.FC<{
   return (
     <div style={CARD}>
       <div style={LABEL}>⚡ HIIT-протоколы</div>
-      <div style={HINT_SM}>4×4 — по HRmax; 30-30 — по 6-мин тесту (дистанция/12 на отрезок); Tabata — только вело/гребля.</div>
+      <div style={HINT_SM}>4×4 — VO2max-выбор (Hov +6.5%); 140/165 — opt-2025 (WRR 0.85); 30-30 — по 6-мин тесту; RST/SIT — спринты; Tabata — только вело/гребля. Не в день ног, не same-session с силой.</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
         <NumberInput label="HRmax" value={hrMax} onChange={setHrMax} min={120} max={220} step={1} placeholder="190" ariaLabel="HRmax для 4×4" width={90} suffix="уд/мин" />
         <NumberInput label="6-мин тест" value={sixMin} onChange={setSixMin} min={500} max={5000} step={10} placeholder="1720" ariaLabel="Дистанция 6-мин теста" width={100} suffix="м" />

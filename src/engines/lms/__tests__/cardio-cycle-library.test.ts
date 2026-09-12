@@ -144,8 +144,8 @@ describe('HIIT-пресеты', () => {
     expect(b.workSec).toBe(20); expect(b.restSec).toBe(10); expect(b.reps).toBe(8);
     expect(p.equipment).not.toContain('running');
   });
-  it('пресетов ровно 3', () => {
-    expect(CARDIO_INTERVAL_PRESETS.length).toBe(3);
+  it('пресетов ровно 6 (P3 PRO-2: +RST/SIT/HIIT-opt)', () => {
+    expect(CARDIO_INTERVAL_PRESETS.length).toBe(6);
   });
 });
 
