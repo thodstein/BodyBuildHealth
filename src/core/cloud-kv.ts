@@ -260,6 +260,24 @@ export async function flushKvNow(): Promise<void> {
   await flush();
 }
 
+/**
+ * Явный touch ключей для кнопок «синхронизировать сейчас».
+ * Обходит value-diff (перезапись теми же данными иначе не считается правкой —
+ * анти-отскок), поэтому вызывать ТОЛЬКО по жесту пользователя, не в эффектах.
+ * Исключённые ключи молча пропускаются.
+ */
+export function touchKvKeys(keys: string[]): void {
+  try {
+    let touched = false;
+    for (const k of keys || []) {
+      if (typeof k !== 'string' || !k || isKvExcludedKey(k)) continue;
+      dirty.add(k);
+      touched = true;
+    }
+    if (touched) scheduleFlush();
+  } catch { /* no-op */ }
+}
+
 /** Принудительная синхронизация (кнопка в шапке): выгрузка локального + загрузка из облака. */
 export async function syncKvNow(): Promise<number> {
   await flush();

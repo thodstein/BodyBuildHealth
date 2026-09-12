@@ -13,6 +13,7 @@ import {
   getKvSyncState,
   clearKvPendingUpdate,
   reloadKvView,
+  touchKvKeys,
   _resetKvForTests,
   type KvRow,
   type KvTransport,
@@ -285,6 +286,27 @@ describe('синхронизация (движок с фейковым тран�
     const t = new FakeTransport();
     await init(t);
     expect(getKvSyncState().status).toBe('idle');
+  });
+
+  it('touchKvKeys: повторная запись того же значения без touch не пушится, с touch — пушится', async () => {
+    const t = new FakeTransport();
+    await init(t);
+    localStorage.setItem('he_ss_checkin_v1', '[]');
+    await flushKvNow();
+    expect(t.cloud.has('he_ss_checkin_v1')).toBe(true);
+    const pushes = t.replaceCalls.length;
+    await flushKvNow();
+    expect(t.replaceCalls.length).toBe(pushes);
+    // тот же setItem тем же значением — value-diff перехватчика пропускает (доказательство no-op старого touch-трика)
+    localStorage.setItem('he_ss_checkin_v1', '[]');
+    await flushKvNow();
+    expect(t.replaceCalls.length).toBe(pushes);
+    // явный touch по жесту — обходит value-diff и уезжает
+    touchKvKeys(['he_ss_checkin_v1']);
+    await flushKvNow();
+    expect(t.replaceCalls.length).toBeGreaterThan(pushes);
+    // исключённые ключи молча пропускаются, мусор не роняет
+    expect(() => touchKvKeys(['he_session_v2', '', null as any])).not.toThrow();
   });
 });
 

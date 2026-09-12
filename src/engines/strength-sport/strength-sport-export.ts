@@ -16,7 +16,15 @@ export function strengthExportRows(plan: StrengthSportPlan): StrengthExportRow[]
     for(const sess of wk.sessions){
       for(const ex of sess.exercises){
         const ws0: any = ex.workSets[0];
-        rows.push({ week: wk.week, phase: wk.phase, day: sess.day, tag: sess.sessionTag, character: sess.character, exercise: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight, pct: ws0?.pct || 0, rir: ex.rir, tempo: ex.tempo || '', rest: ex.restSeconds || 0, comment: ex.comment || '', distanceM: ws0?.distanceM, timeCapS: ws0?.timeCapS });
+        // Planner PRO: посетовые маркеры в комментарий строки (видны в CSV/печати/XLS разом).
+        // Дедуп: builder уже пишет opener/grip-предупреждения в comment — добавляем только недостающее.
+        let comment = ex.comment || '';
+        try {
+          const sets: any[] = Array.isArray(ex.workSets) ? ex.workSets : [];
+          if (sets.some((s) => s && (s as any).rpeCapped) && !comment.includes('RPE-cap')) comment = comment ? `${comment} · RPE-cap −2.5%` : 'RPE-cap −2.5%';
+          if (sets.some((s) => s && (s as any).opener) && !comment.includes('Opener')) comment = comment ? `${comment} · Opener 90% 1×1` : 'Opener 90% 1×1';
+        } catch { /* no-op */ }
+        rows.push({ week: wk.week, phase: wk.phase, day: sess.day, tag: sess.sessionTag, character: sess.character, exercise: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight, pct: ws0?.pct || 0, rir: ex.rir, tempo: ex.tempo || '', rest: ex.restSeconds || 0, comment, distanceM: ws0?.distanceM, timeCapS: ws0?.timeCapS });
       }
     }
   }
@@ -190,7 +198,12 @@ export function buildStrengthIcs(plan: StrengthSportPlan, startDate?: string): s
       const d = new Date(start); d.setDate(start.getDate() + (wk.week - 1) * 7 + (sess.day - 1));
       const dt = fmt(d);
       const summary = `${plan.mode} Н${wk.week} ${sess.sessionTag} (${sess.character})`;
-      const desc = sess.exercises.map(e => `${e.name} ${e.sets}x${e.reps} ${e.weight}кг`).join('\\n');
+      const desc = sess.exercises.map(e => {
+        // Planner PRO: opener-маркер в событие календаря (видят все ICS-потребители).
+        let extra = '';
+        try { if (Array.isArray(e.workSets) && (e.workSets as any[]).some((ws: any) => ws && ws.opener)) extra = ' · Opener 90% 1×1'; } catch { /* no-op */ }
+        return `${e.name} ${e.sets}x${e.reps} ${e.weight}кг${extra}`;
+      }).join('\\n');
       lines.push('BEGIN:VEVENT', `DTSTART:${dt}`, `DTEND:${dt}`, `SUMMARY:${summary}`, `DESCRIPTION:${desc}`, `UID:ss-${plan.id}-${wk.week}-${sess.day}@bbhealth`, 'END:VEVENT');
     }
   }

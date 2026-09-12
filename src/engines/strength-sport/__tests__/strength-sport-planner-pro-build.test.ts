@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildStrengthSportPlan } from '../strength-sport-builder.engine';
 import { finalizeStrengthSportPlan } from '../strength-sport-finalize.engine';
-import { buildStrengthPrintHtml } from '../strength-sport-export';
+import { buildStrengthPrintHtml, strengthExportRows, buildStrengthIcs } from '../strength-sport-export';
 
 const WM_SM = { backSquat: 140, deadlift: 180, overheadPress: 70, yokeWalk: 320, farmersWalk: 140, atlasStone: 120 } as any;
 
@@ -116,6 +116,16 @@ describe('D8 печать: PRO-секция', () => {  it('план с PRO-вх�
   it('план без PRO-входов → секции нет (байт-в-байт)', () => {
     const p = buildStrengthSportPlan(baseInput());
     expect(buildStrengthPrintHtml(p)).not.toContain('Стронг-PRO');
+  });
+  it('посетовые маркеры: RPE-cap и opener в строках экспорта + opener в ICS', () => {
+    const p = buildStrengthSportPlan(baseInput({ goal: 'peaking', rpeCap: 8, openerSingles: true, competitionDate: '2026-12-01' }));
+    const rows = strengthExportRows(p);
+    expect(rows.some((r) => r.comment.includes('RPE-cap'))).toBe(true);
+    expect(rows.some((r) => r.comment.includes('Opener'))).toBe(true);
+    expect(buildStrengthIcs(p, '2026-10-01')).toContain('Opener 90% 1×1');
+    // без PRO — маркеров нет
+    const plain = strengthExportRows(buildStrengthSportPlan(baseInput()));
+    expect(plain.some((r) => r.comment.includes('RPE-cap') || r.comment.includes('Opener'))).toBe(false);
   });
 });
 

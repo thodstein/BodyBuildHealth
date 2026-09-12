@@ -107,15 +107,12 @@ export function removeStrengthSportPlan(id: string): void {
 // Cloud explicit helper — he_strength_* уже авто-синк через cloud-kv (he_ prefix, не в EXCLUDED), но для явного вызова из UI
 export function syncStrengthSportToCloud(): void {
   try {
-    // триггерит cloud-kv hook: touch mtimes via setItem same value
-    // Planner PRO D5: PRO-ключи (he_ss_pro_*, he_ss_checkin_v1, he_vbt_ss_v1) — тот же he_-автосинк, добавлены в явный touch.
+    // Честный явный синк: touchKvKeys обходит value-diff (перезапись теми же данными
+    // перехватчиком НЕ считается правкой — анти-отскок), поэтому старый touch-трик был no-op.
     const keys = [KEY, LIST_KEY, 'he_strength_annual_v1', 'he_lv_profile_ss_v1', 'he_hrv_log', 'he_grip_profile_v1', 'he_ss_checkin_v1', 'he_vbt_ss_v1', 'he_ss_pro_weightclass', 'he_ss_pro_rpecap', 'he_ss_pro_grip', 'he_ss_pro_block', 'he_ss_pro_autodeload', 'he_ss_pro_condday'];
-    for (const k of keys) {
-      const v = localStorage.getItem(k);
-      if (v != null) {
-        // write same value to trigger markDirty (cloud-kv проверяет prev===v и пропускает, поэтому форсим dirty через временный ключ)
-        localStorage.setItem(k, v);
-      }
-    }
+    // Ленивый импорт: cloud-kv тянет supabase — грузим только по жесту, не в бандл сборки плана.
+    import('../../core/cloud-kv').then((m) => {
+      try { m.touchKvKeys(keys); } catch { /* no-op */ }
+    }).catch(() => { /* вне TG/mini-app — тихо */ });
   } catch {}
 }
