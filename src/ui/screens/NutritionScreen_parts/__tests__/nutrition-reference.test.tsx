@@ -69,6 +69,10 @@ describe('nutrition-reference data P0', () => {
     expect(INSULIN_GUIDE.length).toBeGreaterThanOrEqual(10);
   });
 
+  it('inV2-бейджи честны: только K/Na-пара (прямой ratio в движке)', () => {
+    const flagged = FOOD_SYNERGIES.filter(s => s.inV2).map(s => s.pair);
+    expect(flagged).toEqual(['Натрий + Калий']);
+  });
   it('новые таблицы непустые', () => {
     expect(RDA_ROWS.length).toBeGreaterThanOrEqual(10);
     expect(GI_ROWS.length).toBeGreaterThanOrEqual(5);
