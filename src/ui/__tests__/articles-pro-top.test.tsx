@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/react';
-import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds, highlightMatch, rankRecommended, stripDuplicateTitle } from '../screens/ArticlesScreen';
+import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds, highlightMatch, rankRecommended, stripDuplicateTitle, rankUnreadFirst, normQuery } from '../screens/ArticlesScreen';
 import { ARTICLES_MANIFEST } from '../../data/articles-manifest';
 import { resetAppPlatformCache } from '../../core/app-platform';
 
@@ -470,6 +470,38 @@ describe('ArticlesScreen PRO TOP', () => {
     // h1 обложки жив, h2-дубля из markdown-тела нет
     expect(container.querySelectorAll('.articles-reader h1').length).toBe(1);
     expect(container.querySelector('.articles-md h2')).toBeNull();
+  });
+
+  it('39. ё-поиск: «приемов» находит «приёмов»', () => {
+    expect(normQuery('#Приёмов')).toBe('приемов');
+    const { container } = render(<ArticlesScreen />);
+    const all = container.querySelector('.articles-hero-card[data-id="all"]') as HTMLElement;
+    fireEvent.click(all);
+    const search = container.querySelector('.articles-search') as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'приемов' } });
+    expect(container.querySelector('.articles-grid')?.textContent).toContain('Основы нутрициологии');
+  });
+
+  it('40. TOC только от 2 разделов', () => {
+    const { container } = render(<ArticlesScreen />);
+    const all = container.querySelector('.articles-hero-card[data-id="all"]') as HTMLElement;
+    fireEvent.click(all);
+    // trenbolone: один ## — содержания нет
+    fireEvent.click(container.querySelector('.articles-featured') as HTMLElement);
+    expect(container.querySelector('.articles-reader')).not.toBeNull();
+    expect(container.querySelector('.articles-toc')).toBeNull();
+  });
+
+  it('41. связанные: непрочитанное выше прочитанного', () => {
+    expect(rankUnreadFirst([{ id: 'a' }, { id: 'b' }], []).map(x => x.id)).toEqual(['a', 'b']);
+    expect(rankUnreadFirst([{ id: 'a' }, { id: 'b' }], ['a']).map(x => x.id)).toEqual(['b', 'a']);
+    localStorage.setItem('he_articles_recent_v1', JSON.stringify(['gid-po-analizam']));
+    const { container } = render(<ArticlesScreen />);
+    const all = container.querySelector('.articles-hero-card[data-id="all"]') as HTMLElement;
+    fireEvent.click(all);
+    fireEvent.click(screen.getByLabelText('Анализ крови: расшифровка ключевых biomarkers'));
+    const rel = container.querySelector('.articles-related') as HTMLElement;
+    expect(rel.textContent?.indexOf('Полный гид') || 0).toBeLessThan(rel.textContent?.indexOf('Гид по анализам') || 0);
   });
 
   it('6. PDF-карточка зовёт читать внутри', () => {

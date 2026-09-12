@@ -189,10 +189,26 @@ export function stripDuplicateTitle(md: string, title: string): string {
   return md;
 }
 
+/** Поисковая нормализация: кейс + ё→е + ведущие # (1:1 по длине — индексы честные). */
+export function foldSearch(s: string): string {
+  return (s || '').toLowerCase().replace(/ё/g, 'е');
+}
+
+export function normQuery(q: string): string {
+  return foldSearch((q || '').trim().replace(/^#+/, ''));
+}
+
+/** Непрочитанное — вверх, порядок внутри групп исходный (stable). */
+export function rankUnreadFirst<T extends { id: string }>(list: T[], readIds: string[]): T[] {
+  if (readIds.length === 0) return list;
+  const read = new Set(readIds);
+  return [...list].sort((a, b) => Number(read.has(a.id)) - Number(read.has(b.id)));
+}
+
 export function highlightMatch(text: string, q: string): React.ReactNode {
-  const query = (q || '').trim();
+  const query = normQuery(q);
   if (!query) return text;
-  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  const idx = foldSearch(text).indexOf(query);
   if (idx < 0) return text;
   return (<>
     {text.slice(0, idx)}
@@ -388,12 +404,12 @@ export const ArticlesScreen: React.FC = () => {
     if (category === 'saved') list = list.filter(a => saved.includes(a.id));
     else if (category !== 'all') list = list.filter(a => a.category === category);
     if (search.trim()) {
-      const q = search.toLowerCase().replace(/^#+/, '');
+      const q = normQuery(search);
       list = list.filter(a =>
-        a.title.toLowerCase().includes(q) ||
-        a.description.toLowerCase().includes(q) ||
-        a.tags.some(t => t.includes(q)) ||
-        (a.content || '').toLowerCase().includes(q)
+        foldSearch(a.title).includes(q) ||
+        foldSearch(a.description).includes(q) ||
+        a.tags.some(t => foldSearch(t).includes(q)) ||
+        foldSearch(a.content || '').includes(q)
       );
     }
     // Сортировка: в «Новых» всегда свежие сверху по определению, иначе — по переключателю.
@@ -753,7 +769,8 @@ export const ArticlesScreen: React.FC = () => {
               <div style={{ height:3, background:`linear-gradient(90deg, ${catColor}, transparent)` }} />
             </div>
             {/* Содержание — якоря по разделам */}
-            {toc.length > 0 && (
+            {/* Содержание — от 2 разделов; одиночный § — шум, а не навигация */}
+            {toc.length > 1 && (
               <div className="articles-toc" style={{ margin:'12px 12px 0', padding:'12px', borderRadius:16, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)' }}>
                 <div style={{ fontSize:11, fontWeight:800, color:'#fff', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8, opacity:0.85 }}>§ Содержание</div>
                 <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:2, scrollbarWidth:'none' }}>
@@ -809,7 +826,10 @@ export const ArticlesScreen: React.FC = () => {
             })()}
 
             {(() => {
-              const related = ARTICLES_MANIFEST.filter(a => a.id !== readingArticle.id && a.category === readingArticle.category).slice(0, 3);
+              const related = rankUnreadFirst(
+                ARTICLES_MANIFEST.filter(a => a.id !== readingArticle.id && a.category === readingArticle.category),
+                recent,
+              ).slice(0, 3);
               if (related.length === 0) return null;
               return (
                 <div className="articles-related" style={{ marginTop:16, padding:'14px', borderRadius:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
