@@ -694,11 +694,14 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     }
     // P6 PRO-2: durability-сессия — длинная Z2 с целью decoupling <5%
     // (Smyth 82k/Hunter 2025). Только при флаге И неделе ≥150 мин, иначе — совет.
+    // №5-третий круг: урезка под дни может съесть длинную — тогда честная нота.
+    let durabilityAdded = false;
     if (input.durabilitySession && (phase === 'build' || phase === 'maintenance' || phase === 'contest_prep') && !deload) {
       const tentative = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
       if (tentative >= 150) {
         const longEquip = fallbackEquipment === 'running' ? 100 : fallbackEquipment === 'cycling' ? 180 : 90;
         sessions.push(mkSession('zone2', longEquip, 1, 'Durability-длинная Z2: цель decoupling <5% (Smyth/Hunter) — пейсинг ровный, HR пик у финиша.', bw, undefined, input.sex, ffmKg));
+        durabilityAdded = true;
         rationale.push('Durability: +1 длинная Z2/нед (decoupling <5% — маркер дюрабилити).');
       } else {
         rationale.push('Durability: неделя <150 мин — длинная не вшита (нужен объём); decoupling смотрите в дашборде.');
@@ -743,6 +746,9 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     if (daysAvailable < 7) sessions = capSessionsToDays(sessions, daysAvailable);
     if (daysAvailable < 7 && requestedFreq > daysAvailable) {
       rationale.push(`Дней в неделю ${daysAvailable} < запрошенной частоты ${requestedFreq} — сессии урезаны под доступные дни.`);
+    }
+    if (durabilityAdded && !sessions.some(s => s.purpose.includes('Durability'))) {
+      rationale.push(`Durability-длинная не влезла в ${daysAvailable} дн/нед — добавьте день или поднимите daysAvailable.`);
     }
     sessions = assignSessionDays(sessions, input.legDays, input.startDate);
     const weekMinutes = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);

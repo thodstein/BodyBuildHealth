@@ -768,7 +768,8 @@ export const CardioConstructor: React.FC = () => {
     reload();
     const blockCount = Object.keys(outcome.cycles).length;
     const warn = outcome.warnings.length > 0 ? ` · ${outcome.warnings[0]}` : '';
-    flashMsg(blockCount > 0 ? `❤️ Кардио по блокам года: собрано ${blockCount} циклов${warn}` : `⚠ ${warn}`);
+    const medNote = redFlags.length > 0 ? ' · мед-блок: HIIT/MISS вырезаны до врача' : '';
+    flashMsg(blockCount > 0 ? `❤️ Кардио по блокам года: собрано ${blockCount} циклов${medNote}${warn}` : `⚠ ${warn}`);
   };
 
   /** 🗑 Сбросить кардио-циклы года (маппинг + циклы из библиотеки). */

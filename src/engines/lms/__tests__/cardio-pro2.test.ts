@@ -243,6 +243,13 @@ describe('P6 predictor/durability/checklist', () => {
     expect(withLong.length).toBeGreaterThan(0);
     for (const w of withLong) expect(w.totalMinutes).toBeGreaterThanOrEqual(100);
   });
+  it('durability × мало дней: длинная съедена — честная нота (№5-третий круг)', () => {
+    const tight = buildCardioCycle({ goal: 'cut', totalWeeks: 12, durabilitySession: true, daysAvailable: 2 });
+    const noted = tight.weeks.filter(w => w.rationale.some(r => r.includes('не влезла')));
+    expect(noted.length).toBeGreaterThan(0);
+    const roomy = buildCardioCycle({ goal: 'cut', totalWeeks: 12, durabilitySession: true, daysAvailable: 7 });
+    expect(roomy.weeks.some(w => w.rationale.some(r => r.includes('не влезла')))).toBe(false);
+  });
   it('ICS taper содержит чек-лист', () => {
     const c = buildCardioCycle({
       goal: 'cut', totalWeeks: 8,
