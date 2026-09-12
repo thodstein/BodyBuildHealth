@@ -5,6 +5,8 @@ import { calcStackSynergyScore, suggestSynergyAdditions } from '../../../engines
 import { SynergyEngine } from '../../../engines/synergy-score.engine';
 import type { SubstanceEntry, MasterDB } from '../../../core/types';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
+import { dedupeDepletions, stackOverlap, stackScore as calcHubStackScore } from '../../../engines/support-hub-stack.engine';
+import { evidenceGradeExFor } from '../../../engines/support-hub-evidence.engine';
 
 
 /* ──────────────── DEPLETION DB ──────────────── */
@@ -441,7 +443,8 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
     if (validIds.length<2) return [];
     const idSet = new Set(validIds.map(id=>id.toUpperCase()));
     const out: typeof DEPLETION_DB = [];
-    for (const d of DEPLETION_DB) {
+    // P4: дедуп точных дублей (CURCUMIN→IRON, OMEGA3→VITAMIN_E были по 2 раза)
+    for (const d of dedupeDepletions(DEPLETION_DB)) {
       if (idSet.has(d.depleter) && idSet.has(d.depleted) ||
           idSet.has(d.depleted) && idSet.has(d.depleter)) {
         if (!out.some(x=>x.depleter===d.depleter && x.depleted===d.depleted)) out.push(d);
@@ -449,6 +452,29 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
     }
     return out;
   }, [validIds]);
+
+  // ── P4: overlap дублей + Stack Score 0–100 (аддитивно, enrichedScore не трогаем) ──
+  const overlapData = useMemo(() => {
+    if (validIds.length<2) return [];
+    return stackOverlap(validIds, (id) => (SUPPORT_CATALOG_DATA[id] as any)?.nameRu || (SUPPORT_CATALOG_DATA[id] as any)?.name || id);
+  }, [validIds]);
+  const hubStackScore = useMemo(() => {
+    if (validIds.length<2 || !stackScore) return null;
+    const sev = (enrichedMatrix as any[]).filter((m: any) => m.severity === 'HIGH' && m.type === 'conflict').length;
+    const conf = (enrichedMatrix as any[]).filter((m: any) => m.type === 'conflict').length;
+    const syn = (enrichedMatrix as any[]).filter((m: any) => m.type === 'synergy').length;
+    const grades = validIds.map(id => evidenceGradeExFor(id));
+    return calcHubStackScore({
+      total: validIds.length,
+      conflictCount: conf,
+      severeCount: sev,
+      synergyCount: syn,
+      depletionCount: depletionData.length,
+      overlapCount: overlapData.length,
+      evidenceA: grades.filter(g => g === 'A').length,
+      evidenceD: grades.filter(g => g === 'D').length,
+    });
+  }, [validIds, stackScore, enrichedMatrix, depletionData, overlapData]);
 
   // ── Cumulative load ──
   const cumulativeLoad = useMemo(() => {
@@ -668,6 +694,28 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
           Полный клинический анализ: совместимость, механизмы взаимодействий, органная нагрузка, истощения, CYP450, лекарственные риски
         </div>
       </div>
+
+      {/* P4: Stack Score + дубли (аддитивно) */}
+      {hubStackScore && (
+        <div style={{ ...cardStyle, border: '1px solid rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#a78bfa' }}>{hubStackScore.score}</div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>Stack Score · {hubStackScore.grade}</div>
+              <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>0–100: штрафы за конфликты/дубли/D-грейды, бонусы за синергии/A. Информационно, не вердикт.</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 6 }}>
+            {hubStackScore.breakdown.map((b, i) => <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)' }}>• {b}</div>)}
+          </div>
+          {overlapData.length > 0 && (
+            <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize: 9, fontWeight: 800, color: '#f59e0b', marginBottom: 3 }}>🔁 Дубли нутриента в стеке ({overlapData.length})</div>
+              {overlapData.map((o, i) => <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.4 }}>• {o.note}</div>)}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ─── SECTION 1: SUBSTANCE SELECTOR ─── */}
       <div style={cardStyle}>

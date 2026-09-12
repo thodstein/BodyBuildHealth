@@ -21,6 +21,9 @@ const INPUT_STYLE: React.CSSProperties = {
 };
 
 import type { BioStackProfile } from '../../../engines/biostack-ai.engine';
+import { getProfile } from '../../../core/profile-manager';
+import { estCost } from '../../../data/support-pricing';
+import { evidenceGradeExFor, EVIDENCE_GRADE_RU } from '../../../engines/support-hub-evidence.engine';
 
 export const SupportAnalogCalculator: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -44,18 +47,28 @@ export const SupportAnalogCalculator: React.FC = () => {
     ).slice(0, 15);
   }, [search, allSubstances]);
 
-  const profile: BioStackProfile = useMemo(() => ({
-    age: 30, weight: 80, height: 180, sex: 'male',
-    avoidIds: excludeIds,
-    avoidMeds: [],
-    currentMeds: [],
-    drugAllergies: [],
-    jointSymptoms: [],
-    neuroSymptoms: [],
-    cnsSymptoms: [],
-    currentSupplements: [],
-    autoFilledFields: [],
-  }), [excludeIds]);
+  const profile: BioStackProfile = useMemo(() => {
+    // P6: профиль из Профиля (возраст/вес/пол), а не 30/80/180 по умолчанию
+    let age = 30; let weight = 80; let sex: 'male' | 'female' = 'male';
+    try {
+      const p: any = getProfile();
+      if (p?.personal?.age) age = Number(p.personal.age) || 30;
+      if (p?.personal?.weight) weight = Number(p.personal.weight) || 80;
+      if (p?.personal?.sex === 'female' || p?.personal?.sex === 'male') sex = p.personal.sex;
+    } catch { /* без профиля — дефолт как было */ }
+    return {
+      age, weight, height: 180, sex,
+      avoidIds: excludeIds,
+      avoidMeds: [],
+      currentMeds: [],
+      drugAllergies: [],
+      jointSymptoms: [],
+      neuroSymptoms: [],
+      cnsSymptoms: [],
+      currentSupplements: [],
+      autoFilledFields: [],
+    };
+  }, [excludeIds]);
 
   const replacement: MeaningfulReplacement | null = useMemo(() => {
     if (!selectedId) return null;
@@ -304,6 +317,15 @@ export const SupportAnalogCalculator: React.FC = () => {
                   Терапевтический класс: {replacement.therapeuticClass}
                 </div>
               )}
+
+              {/* P6: почему замена + цена + профиль (аддитивно) */}
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, marginBottom: 6, padding: '6px 8px', background: 'rgba(96,165,250,0.06)', borderRadius: 6 }}>
+                Почему: {replacement.therapeuticClass ? `тот же класс («${replacement.therapeuticClass}»), ` : ''}грейд {selectedId ? getEvidenceGrade(selectedId) : '?'} → {getEvidenceGrade(replacement.replacementId)} · профиль {profile.age} лет / {profile.weight} кг / {profile.sex === 'female' ? 'жен' : 'муж'} (из Профиля).
+                Цена: ~{estCost(replacement.replacementId)} ₽/мес ({selectedId ? `исходник ~${estCost(selectedId)} ₽/мес` : ''}).
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
+                Грейд Ex: {EVIDENCE_GRADE_RU[evidenceGradeExFor(replacement.replacementId)]}.
+              </div>
 
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 8 }}>
                 {replacement.reason}

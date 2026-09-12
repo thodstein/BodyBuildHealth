@@ -10,12 +10,13 @@ import { SupportEffectiveDose } from './SupportEffectiveDose';
 import { UnifiedSynergyCalculator } from './UnifiedSynergyCalculator';
 import { SupportTimingPlanner } from './SupportTimingPlanner';
 import { SupportAnalogCalculator } from './SupportAnalogCalculator';
+import { SupportSubstancePassport } from './SupportSubstancePassport';
 
 const ACCENT = '#00e68a';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' } as any;
 const CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginBottom: 10, transition:'all 0.18s ease' } as any;
 
-type CalcToolsMode = 'bioavailability' | 'dose' | 'synergy_calc' | 'timing' | 'analog';
+type CalcToolsMode = 'bioavailability' | 'dose' | 'synergy_calc' | 'timing' | 'analog' | 'passport';
 
 const MODE_DEFS: Array<{ m: CalcToolsMode; label: string; icon: string; desc: string; accent: string; hint: string }> = [
   { m: 'bioavailability', label: 'Биодоступность', icon: '🧬', desc: 'Формы, эквивалент, усилители', accent: '#a78bfa', hint: 'Био форм · усилители · конкуренция — ААС отдельно' },
@@ -23,6 +24,7 @@ const MODE_DEFS: Array<{ m: CalcToolsMode; label: string; icon: string; desc: st
   { m: 'synergy_calc', label: 'Синергия', icon: '🧬', desc: 'Калькулятор синергии стека', accent: '#60a5fa', hint: 'Совместимость · конфликты · истощения' },
   { m: 'timing', label: 'Тайминг', icon: '⏰', desc: 'Расписание приёма по времени', accent: '#f59e0b', hint: 'Утро/день/вечер · еда · взаимодействия' },
   { m: 'analog', label: 'Аналоги', icon: '🔄', desc: 'Подбор замен по классу', accent: '#ec4899', hint: 'Аналоги по механизму · цена · доступность' },
+  { m: 'passport', label: 'Паспорт', icon: '📄', desc: 'Всё о веществе в одном месте', accent: '#22d3ee', hint: 'Био + доза + тайминг + синергия + лабы' },
 ];
 
 export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode?: CalcToolsMode }> = ({ s, initialMode }) => {
@@ -40,10 +42,10 @@ export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode
             <div style={{ fontSize:16, fontWeight:900, color:'#fff', lineHeight:1.15, letterSpacing:'-0.3px' }}>Расчёты выбора препаратов</div>
             <div style={{ fontSize:12, color:'rgba(255,255,255,0.72)', lineHeight:1.35 }}>Единый центр — 5 калькуляторов без дублей</div>
           </div>
-          <span style={{ fontSize:11, padding:'6px 10px', borderRadius:20, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap', flexShrink:0 }}>5 в 1</span>
+            <span style={{ fontSize:11, padding:'6px 10px', borderRadius:20, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap', flexShrink:0 }}>6 в 1</span>
         </div>
         <div style={{ fontSize:11.5, color:'rgba(255,255,255,0.78)', background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:'10px 12px', lineHeight:1.5, position:'relative' }}>
-          <b style={{ color:'#fff' }}>Как работает:</b> выбери препарат один раз — все 5 расчётов (<span style={{ color:'#a78bfa', fontWeight:700 }}>био</span> → <span style={{ color:ACCENT, fontWeight:700 }}>доза</span> → <span style={{ color:'#60a5fa', fontWeight:700 }}>синергия</span> → <span style={{ color:'#f59e0b', fontWeight:700 }}>тайминг</span> → <span style={{ color:'#ec4899', fontWeight:700 }}>аналоги</span>) на одних данных. ААС вынесены отдельно.
+          <b style={{ color:'#fff' }}>Как работает:</b> выбери препарат один раз — все расчёты (<span style={{ color:'#a78bfa', fontWeight:700 }}>био</span> → <span style={{ color:ACCENT, fontWeight:700 }}>доза</span> → <span style={{ color:'#60a5fa', fontWeight:700 }}>синергия</span> → <span style={{ color:'#f59e0b', fontWeight:700 }}>тайминг</span> → <span style={{ color:'#ec4899', fontWeight:700 }}>аналоги</span> → <span style={{ color:'#22d3ee', fontWeight:700 }}>паспорт</span>) на одних данных. ААС вынесены отдельно.
         </div>
       </div>
 
@@ -102,11 +104,12 @@ export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode
           {mode === 'synergy_calc' && <UnifiedSynergyCalculator s={s} />}
           {mode === 'timing' && <SupportTimingPlanner />}
           {mode === 'analog' && <SupportAnalogCalculator />}
+          {mode === 'passport' && <SupportSubstancePassport />}
         </div>
       </div>
 
       <div style={{ fontSize:10, color:'#fff', textAlign:'center', marginTop:10, opacity:0.9, lineHeight:1.45 }}>
-        Единый хаб без дублей — один выбор препарата питает все 5 расчётов. ААС — отдельно, не смешивается с БАД/фармой.
+        Единый хаб без дублей — один выбор препарата питает все расчёты + паспорт. ААС — отдельно, не смешивается с БАД/фармой.
       </div>
     </div>
   );

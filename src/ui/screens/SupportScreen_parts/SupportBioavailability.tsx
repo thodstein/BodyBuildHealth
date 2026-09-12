@@ -12,6 +12,8 @@ import {
   FORM_RECOMMENDER, type FormRecommendation,
   buildBioavailabilityCatalog,
 } from './SupportBioavailabilityData';
+import { bioEvidenceFor, bioEvidenceLabel, evidenceGradeExFor } from '../../../engines/support-hub-evidence.engine';
+import { isAASHonest } from '../../../engines/support-hub-aas.engine';
 
 
 // ─── Category labels (RU) ───
@@ -49,7 +51,7 @@ const CATEGORY_LABELS_RU: Record<string, string> = {
 const AAS_PHARMA_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','drostanolone','dht_inject','dht_derivative','sarm','sarm_s23','sarms']);
 // категории каталога + фарма-классы ААС (чтобы сустанон/омнадрен и все тестостероны/трен/нандролоны/оралка корректно скрывались)
 const AAS_CATEGORY_SET = new Set(['anabolic','androgen','aas_derivative','steroidal','ai','aromatase_inhibitor','estrogen','androgen_receptor','mTOR','gh_releasing','gh_secretagogue','testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','drostanolone','dht_inject','dht_derivative','sarm']);
-const isAAS = (e: EnrichedEntry) => e.category.some(c => AAS_CATEGORY_SET.has(c.toLowerCase()) || AAS_PHARMA_CLASSES.has(c.toLowerCase())) || /тестостерон|сустанон|омнадрен|sustanon|omnadren|нандролон|тренболон|болденон|станозолол|оксандролон|метандростенолон|метандиенон|метан|данабол|туринабол|мастерон|примоболан|метенолон|дростанолон|анаполон|оксиметолон|халотестин|супердрол|провирон|местеролон|анавар/i.test(e.nameRu + ' ' + e.nameEn) || e.source === 'pharma' && AAS_PHARMA_CLASSES.has((e.category[1] || '').toLowerCase());
+const isAAS = (e: EnrichedEntry) => isAASHonest(e.category, e.nameRu, e.nameEn).isAAS || e.source === 'pharma' && AAS_PHARMA_CLASSES.has((e.category[1] || '').toLowerCase());
 
 export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [tab, setTab] = useState<'catalog'>('catalog');
@@ -235,6 +237,27 @@ const DetailView: React.FC<{ entry: EnrichedEntry; onBack: () => void; catalog: 
       </div>
       {entry.description && <div style={{ ...S.card }}><div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>{entry.description}</div></div>}
       {entry.source === 'pharma' && <div style={{ ...S.card, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}><div style={{ fontSize: 8, color: '#f59e0b', lineHeight: 1.3 }}>⚠ Биодоступность фармпрепаратов зависит от рецептуры, генетики CYP450, состояния ЖКТ и взаимодействий. Значения ориентировочные — для выбора формы, а не расчёта точной дозы.</div></div>}
+      {/* P1+P3: честная био-оценка + грейд доказательности (аддитивно, расчёт не меняем) */}
+      {(() => {
+        const g = evidenceGradeExFor(entry.id);
+        const gColor = g === 'A' ? '#22c55e' : g === 'B' ? '#f59e0b' : g === 'D' ? '#f44336' : '#9ca3af';
+        const topEv = entry.forms.length > 0 ? bioEvidenceFor(entry.forms.slice().sort((a, b) => b.bioavailability - a.bioavailability)[0].id || 'standard', entry.maxBio) : null;
+        return (
+          <div style={{ ...S.card, border: '1px solid rgba(167,139,250,0.18)', background: 'rgba(167,139,250,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 5, background: gColor + '22', color: gColor }}>Доказательность {g}</span>
+              <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>A — много РКИ · B — умеренно · C — механизмы · D — почти нет данных</span>
+            </div>
+            {topEv && (
+              <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.45 }}>
+                Лучшая форма: {bioEvidenceLabel(topEv)} · {topEv.note}
+                {/куркум|curcum/i.test(entry.nameRu) && <span style={{ color: '#f59e0b' }}> С fed-state (с жиром) релиз выше; свободный куркумин остаётся наномолярным даже у «усиленных» форм (Kroon 2025).</span>}
+                {/креатин|creatine/i.test(entry.nameRu) && <span style={{ color: '#22c55e' }}> Моногидрат — золотой стандарт (Kreider 2022); дозы в пересчёте на % креатина по MW.</span>}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Forms table */}
       <div style={{ ...S.card }}>

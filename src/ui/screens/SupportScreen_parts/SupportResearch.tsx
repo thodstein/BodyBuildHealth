@@ -25,6 +25,45 @@ const SUBSTANCE_NAMES_RU: Record<string, string> = {
 };
 
 export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => {
+  const PUBMED_CACHE_KEY = 'he_sup_pubmed_cache_v1';
+  const PUBMED_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+  const PUBMED_CACHE_CAP = 30;
+  const readPubmedCache = (): Record<string, { at: number; results: any[] }> => {
+    try {
+      const raw = localStorage.getItem(PUBMED_CACHE_KEY);
+      if (!raw) return {};
+      const p = JSON.parse(raw);
+      return p && typeof p === 'object' ? p : {};
+    } catch { return {}; }
+  };
+  const cachedPubmedSearch = (q: string) => {
+    const query = (q || '').trim();
+    if (!query) { s.handlePubMedSearch(query); return; }
+    const cache = readPubmedCache();
+    const hit = cache[query.toLowerCase()];
+    if (hit && Date.now() - hit.at < PUBMED_CACHE_TTL_MS && Array.isArray(hit.results)) {
+      s.setPubMedResults(hit.results);
+      return;
+    }
+    // Miss: идём в сеть через родительский handler, результат закэшируем эффектом ниже
+    s.handlePubMedSearch(query);
+    try { (s as any)._pubmedPendingQuery = query; } catch { /* noop */ }
+  };
+  // Кэшируем свежие результаты под последним запросом (TTL 24ч, кап 30)
+  React.useEffect(() => {
+    try {
+      const q = ((s as any)._pubmedPendingQuery || s.pubMedQuery || '').trim();
+      if (!q || !Array.isArray(s.pubMedResults) || s.pubMedResults.length === 0) return;
+      const cache = readPubmedCache();
+      cache[q.toLowerCase()] = { at: Date.now(), results: s.pubMedResults.slice(0, 50) };
+      const keys = Object.keys(cache);
+      if (keys.length > PUBMED_CACHE_CAP) {
+        keys.sort((a, b) => (cache[a]?.at || 0) - (cache[b]?.at || 0));
+        for (const k of keys.slice(0, keys.length - PUBMED_CACHE_CAP)) delete cache[k];
+      }
+      localStorage.setItem(PUBMED_CACHE_KEY, JSON.stringify(cache));
+    } catch { /* quota/private — кэш просто не сохранится */ }
+  }, [s.pubMedResults]);
   const {
     pubMedQuery,
     setPubMedQuery,
@@ -83,11 +122,11 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                   {(researchSource !== 'researchDb' && researchSource !== 'pharma') && (
                   <div style={{display:'flex',gap:6,marginBottom:10}}>
                     <input value={pubMedQuery} onChange={e=>setPubMedQuery(e.target.value)}
-                      onKeyDown={e=>{if(e.key==='Enter'){if(researchSource==='pubmed')handlePubMedSearch(pubMedQuery);if(researchSource==='pubchem')handlePubchemSearch(pubMedQuery);if(researchSource==='fda')handleFDASearch(pubMedQuery);if(researchSource==='scholar'&&pubMedQuery.trim())window.open(`https://scholar.google.com/scholar?q=${encodeURIComponent(pubMedQuery.trim())}`,'_blank','noopener');}}}
+                      onKeyDown={e=>{if(e.key==='Enter'){if(researchSource==='pubmed')cachedPubmedSearch(pubMedQuery);if(researchSource==='pubchem')handlePubchemSearch(pubMedQuery);if(researchSource==='fda')handleFDASearch(pubMedQuery);if(researchSource==='scholar'&&pubMedQuery.trim())window.open(`https://scholar.google.com/scholar?q=${encodeURIComponent(pubMedQuery.trim())}`,'_blank','noopener');}}}
                       placeholder={researchSource==='pubmed'?'creatine muscle, NAC liver...':researchSource==='pubchem'?'caffeine, creatine, NAC...':researchSource==='fda'?'aspirin, metformin...':'Запрос для Scholar...'}
                       style={{flex:1,minWidth:0,minHeight:48,padding:'8px 12px',borderRadius:12,border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text)',fontSize:13,boxSizing:'border-box'}} />
                     <button data-sup-io="research-search" onClick={()=>{
-                      if(researchSource==='pubmed')handlePubMedSearch(pubMedQuery);
+                      if(researchSource==='pubmed')cachedPubmedSearch(pubMedQuery);
                       else if(researchSource==='pubchem')handlePubchemSearch(pubMedQuery);
                       else if(researchSource==='fda')handleFDASearch(pubMedQuery);
                       else if(researchSource==='scholar'&&pubMedQuery.trim())window.open(`https://scholar.google.com/scholar?q=${encodeURIComponent(pubMedQuery.trim())}`,'_blank','noopener');
@@ -104,10 +143,11 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
                     <div className="card" style={{marginBottom:12}}>
                       <h4 style={{margin:'0 0 6px',fontSize:12}}>📚 PubMed — научные статьи</h4>
                       <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
-                        <button onClick={()=>{setPubMedQuery('creatine supplementation strength performance');handlePubMedSearch('creatine supplementation strength performance');}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Креатин</button>
-                        <button onClick={()=>{setPubMedQuery('whey protein muscle hypertrophy');handlePubMedSearch('whey protein muscle hypertrophy');}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Протеин</button>
-                        <button onClick={()=>{setPubMedQuery('beta-alanine carnosine performance');handlePubMedSearch('beta-alanine carnosine performance');}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Бета-аланин</button>
+                        <button onClick={()=>{setPubMedQuery('creatine supplementation strength performance');cachedPubmedSearch('creatine supplementation strength performance');}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Креатин</button>
+                        <button onClick={()=>{setPubMedQuery('whey protein muscle hypertrophy');cachedPubmedSearch('whey protein muscle hypertrophy');}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Протеин</button>
+                        <button onClick={()=>{setPubMedQuery('beta-alanine carnosine performance');cachedPubmedSearch('beta-alanine carnosine performance');}} style={{padding:'8px 10px',borderRadius:10,fontSize:10,minHeight:40,cursor:'pointer',border:'1px solid var(--border)',background:'var(--bg-secondary)',color:'var(--text-light)'}}>Бета-аланин</button>
                       </div>
+                      <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 6 }}>Кэш PubMed: 24 ч · до 30 запросов · повторный запрос — мгновенно из кэша.</div>
                       {pubMedError&&<div style={{padding:8,background:'rgba(239,68,68,0.06)',borderRadius:6,border:'1px solid rgba(239,68,68,0.2)',color:'#f87171',fontSize:10,marginBottom:8}}>⚠ {pubMedError}</div>}
                       {pubMedResults.length>0&&<div style={{fontSize:9,color:'var(--text-dim)',marginBottom:6}}>Найдено: {pubMedResults.length} публикаций</div>}
                       <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:400,overflowY:'auto'}}>

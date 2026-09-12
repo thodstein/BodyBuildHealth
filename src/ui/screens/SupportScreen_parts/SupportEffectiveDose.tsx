@@ -6,6 +6,7 @@ import {
 } from './SupportBioavailabilityData';
 import { PopupSelect, PopupNumber, PopupBool } from '../../components/PopupXxx';
 import { S } from './SupportShared';
+import { doseWindowFor, personDoseHints, bioEvidenceLabel, bioEvidenceFor } from '../../../engines/support-hub-evidence.engine';
 
 // ─── Therapeutic ranges for key supplements ───
 const DOSE_RANGES: Record<string, { therMin: number; therMax: number; label: string }> = {
@@ -137,6 +138,10 @@ export const SupportEffectiveDose: React.FC = () => {
       return [];
     }
   });
+  // P2: вес/пол/возраст из Профиля (фолбэк — ручной ввод, дефолт 80/муж/30 как было у аналогов)
+  const [wKg, setWKg] = useState(80);
+  const [sex, setSex] = useState<'male' | 'female'>('male');
+  const [age, setAge] = useState(30);
 
   const catalog = useMemo(() => buildBioavailabilityCatalog(), []);
 
@@ -164,24 +169,32 @@ export const SupportEffectiveDose: React.FC = () => {
   })), [sub2]);
 
   const calcEffDose = (form: FormWithBio | undefined, doseMg: number, id: string) => {
-    if (!form || !doseMg) return { absorbed: 0, rawAbsorbed: 0, range: null as { therMin: number; therMax: number; label: string } | null, status: '', ulWarning: '' };
+    if (!form || !doseMg) return { absorbed: 0, rawAbsorbed: 0, range: null as { therMin: number; therMax: number; label: string } | null, status: '', ulWarning: '', windowNote: '', hasWindow: false };
     const rawAbsorbed = Math.round(doseMg * form.bioavailability);
     const absorbed = Math.round(rawAbsorbed * adjMult);
+    // P2: единое окно (THERAPEUTIC_WINDOWS приоритетнее, DOSE_RANGES — fallback), без новых чисел
+    const win = doseWindowFor(id, THERAPEUTIC_WINDOWS as any, DOSE_RANGES as any);
     const rangeKey = Object.keys(DOSE_RANGES).find(k => id.toLowerCase().includes(k));
     const range = rangeKey ? DOSE_RANGES[rangeKey] : null;
-    const winKey = Object.keys(THERAPEUTIC_WINDOWS).find(k => id.toLowerCase().includes(k));
-    const win = winKey ? THERAPEUTIC_WINDOWS[winKey] : null;
     let status = '';
     let ulWarning = '';
-    if (range) {
+    if (win.hasData) {
+      if (doseMg < win.min) status = `Ниже терапевтического (мин ${win.min} ${win.unit})`;
+      else if (doseMg > win.max) status = `Выше терапевтического (макс ${win.max} ${win.unit})`;
+      else status = `В терапевтическом диапазоне ${win.min}–${win.max} ${win.unit}`;
+    } else if (range) {
       if (doseMg < range.therMin) status = 'Ниже терапевтического (мин ' + range.therMin + ' мг)';
       else if (doseMg > range.therMax) status = 'Выше терапевтического (макс ' + range.therMax + ' мг)';
       else status = 'В терапевтическом диапазоне ' + range.therMin + '-' + range.therMax + ' мг';
+    } else {
+      status = 'Окна дозы в базе нет — доза не оценивается';
     }
-    if (win && win.ul < 9999 && doseMg > win.ul) {
-      ulWarning = 'Превышен верхний безопасный уровень (UL ' + win.ul + ' мг). Риск побочных эффектов.';
+    if (win.hasData && win.ul < 9999 && doseMg > win.ul) {
+      ulWarning = `Превышен верхний безопасный уровень (UL ${win.ul} ${win.unit}). Риск побочных эффектов.`;
+    } else if (!win.hasData && (win as any).ulWarning) {
+      ulWarning = (win as any).ulWarning;
     }
-    return { absorbed, rawAbsorbed, range, status, ulWarning };
+    return { absorbed, rawAbsorbed, range, status, ulWarning, windowNote: win.note, hasWindow: win.hasData };
   };
 
   const eff1 = calcEffDose(f1, dose1, sub1Id);
@@ -253,6 +266,26 @@ export const SupportEffectiveDose: React.FC = () => {
           adjMult={adjMult}
           costEff={costEff2}
         />
+      </div>
+
+      {/* ─── P2: вес/пол/возраст + честные хинты (аддитивно) ─── */}
+      <div style={{ ...S.card, borderColor: 'rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.05)' }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>👤 Вес / пол / возраст — поправка к дозе (информация, не назначение)</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+          <PopupNumber label="Вес, кг" value={wKg} min={30} max={200} step={1} suffix="кг" onChange={setWKg} />
+          <PopupSelect label="Пол" value={sex} options={[{ id: 'male', label: 'Муж' }, { id: 'female', label: 'Жен' }]} onChange={v => setSex(v as any)} />
+          <PopupNumber label="Возраст" value={age} min={14} max={90} step={1} suffix="лет" onChange={setAge} />
+        </div>
+        {(() => {
+          const hints = [...personDoseHints(sub1Id || '', { weightKg: wKg, sex, age }), ...personDoseHints(sub2Id || '', { weightKg: wKg, sex, age })].filter((v, i, a) => v && a.indexOf(v) === i);
+          if (hints.length === 0) return <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 6 }}>Для выбранных веществ вес/пол/возраст-поправок нет — показана базовая доза.</div>;
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6 }}>
+              {hints.slice(0, 6).map((h, i) => <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.4 }}>• {h}</div>)}
+            </div>
+          );
+        })()}
+        {f1 && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Био-диапазон формы: {bioEvidenceLabel(bioEvidenceFor(f1.id || 'standard', f1.bioavailability))}</div>}
       </div>
 
       {/* ─── Comparison section ─── */}

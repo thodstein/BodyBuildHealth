@@ -5,48 +5,16 @@ import { PEPTIDE_DB } from '../../../engines/peptide-calculator.engine';
 import {
   type EnrichedEntry, type TimeSlot, type TimingSlot, type SubstanceTiming, type FormWithBio,
   TIMING_SLOTS, CATEGORY_TIMING, getCatalogFormBio, detectEnhancers, detectCompetition, classifySubstance,
-  ROUTE_LABELS_MAP, pharmaSummary,
+  ROUTE_LABELS_MAP, pharmaSummary, buildBioavailabilityCatalog,
 } from './SupportBioavailabilityData';
+import { timingHintsFor } from '../../../engines/support-hub-timing.engine';
 import { S } from './SupportShared';
 
 // ─── Build enriched catalog ───
+// P5/P8: единый каталог — делегируем buildBioavailabilityCatalog (дедуп id, один источник truth).
+// Локальный тройной билд удалён осознанно (дрейфовал от канона).
 function buildCatalog(): EnrichedEntry[] {
-  const entries: EnrichedEntry[] = [];
-  for (const [id, entry] of Object.entries(SUPPORT_CATALOG_DATA)) {
-    if (!entry?.nameRu) continue;
-    const forms: FormWithBio[] = (entry.forms || []).map(f => {
-      const bio = getCatalogFormBio(f);
-      return { ...f, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (doseMg: number) => Math.round(doseMg * bio) };
-    });
-    const clinical = classifySubstance(entry.nameRu, entry.category || []);
-    entries.push({
-      id, source: 'catalog', nameRu: entry.nameRu, nameEn: entry.name || id,
-      tier: entry.tier, category: entry.category || [], description: entry.description || '',
-      forms, maxBio: forms.length ? Math.max(...forms.map(f=>f.bioavailability)) : 0,
-      minBio: forms.length ? Math.min(...forms.map(f=>f.bioavailability)) : 0,
-      avgBio: forms.length ? forms.reduce((a, f) => a + f.bioavailability, 0) / forms.length : 0,
-      bestForm: forms.find(f => f.best) || null,
-      enhancers: detectEnhancers(entry), competitors: detectCompetition(entry, entry.nameRu, entry.category || []),
-      absorptionKey: clinical.abs, halfLifeKey: clinical.hl, foodKey: clinical.food, windowKey: clinical.win, costPerGram: clinical.cost,
-    });
-  }
-  for (const [pid, ph] of Object.entries(PHARMA_DB)) {
-    if (!ph || !ph.name) continue;
-    const bio = ph.pk?.bioavailability ?? (ph.bioavailability ? (typeof ph.bioavailability === 'number' ? ph.bioavailability : (typeof ph.bioavailability === 'object' && 'avg' in (ph.bioavailability as any) ? (ph.bioavailability as any).avg : 0.85)) : 0.85);
-    const forms: FormWithBio[] = [{ id: pid, name: ph.name, nameRu: ph.name, dose: ph.dosageRange ? `${ph.dosageRange.min}-${ph.dosageRange.max} ${ph.dosageRange.unit}` : '—', best: true, bioavailability: bio, bioLabel: `${(bio * 100).toFixed(0)}%`, effectiveDose: (d: number) => Math.round(d * bio) }];
-    entries.push({ id: pid, source: 'pharma', nameRu: ph.name, nameEn: ph.name || pid, tier: 'standard', category: ['pharma', (ph as any).class || 'aas'].filter(Boolean), description: pharmaSummary(ph), forms, maxBio: bio, minBio: bio, avgBio: bio, bestForm: forms[0], enhancers: [], competitors: [], absorptionKey: 'stomach', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
-  }
-  for (const [pepId, pp] of Object.entries(PEPTIDE_DB)) {
-    if (!pp?.name) continue;
-    const forms: FormWithBio[] = [];
-    const raw = (pp as any).bioavailability || {};
-    for (const [rt, b] of Object.entries(raw)) {
-      if (typeof b !== 'number') continue;
-      forms.push({ id: `${pepId}_${rt}`, name: `${pp.name} (${ROUTE_LABELS_MAP[rt] || rt})`, nameRu: `${pp.name} (${ROUTE_LABELS_MAP[rt] || rt})`, dose: `${(pp as any).amountMg || '?'} мг`, best: rt === 'sc', bioavailability: b, bioLabel: `${(b * 100).toFixed(0)}%`, notes: '', effectiveDose: (d: number) => Math.round(d * b) });
-    }
-    entries.push({ id: pepId, source: 'peptide', nameRu: pp.name, nameEn: pp.name || pepId, tier: 'advanced', category: ['peptide', (pp as any).className || 'gh_peptide'].filter(Boolean), description: `${((pp as any).effects || []).join(', ') || ''}`, forms, maxBio: forms.length ? Math.max(...forms.map(f=>f.bioavailability)) : 0, minBio: forms.length ? Math.min(...forms.map(f=>f.bioavailability)) : 0, avgBio: forms.length ? forms.reduce((a, f) => a + f.bioavailability, 0) / forms.length : 0, bestForm: forms[0] || null, enhancers: [], competitors: [], absorptionKey: 'sublingual_area', halfLifeKey: '', foodKey: 'antioxidant', windowKey: '', costPerGram: null });
-  }
-  return entries;
+  return buildBioavailabilityCatalog();
 }
 
 // ─── Timing component ───
@@ -247,6 +215,27 @@ export const SupportTimingPlanner: React.FC = () => {
                 <b style={{ color: 'var(--text-light)' }}>{e.nameRu}</b>: {e.competitors.map(c => c.withLabel).join(', ')}
               </div>
             ))}
+          </div>
+        );
+      })()}
+
+      {/* P5: канон тайминга — утро/вечер, разносы, связки (аддитивно) */}
+      {selectedSubs.length > 0 && (() => {
+        const hints = selectedSubs
+          .map(sid => catalog.find(e => e.id === sid))
+          .filter(Boolean)
+          .flatMap(e => timingHintsFor((e as EnrichedEntry).nameRu, (e as EnrichedEntry).category).map(r => ({ name: (e as EnrichedEntry).nameRu, ...r })));
+        const uniq = hints.filter((h, i, a) => a.findIndex(x => x.id + x.name === h.id + h.name) === i);
+        if (uniq.length === 0) return null;
+        return (
+          <div style={{ ...S.card, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.04)' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', marginBottom: 4 }}>⏰ Канон тайминга ({uniq.length})</div>
+            {uniq.slice(0, 8).map((h, i) => (
+              <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.45, marginBottom: 3 }}>
+                <b style={{ color: 'var(--text-light)' }}>{h.name} · {h.label}:</b> {h.detail}
+              </div>
+            ))}
+            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>Источники: NIH ODS, GoodRx 2026, VitaminDB 2026. На один день эффект мал; на месяцы — значим.</div>
           </div>
         );
       })()}

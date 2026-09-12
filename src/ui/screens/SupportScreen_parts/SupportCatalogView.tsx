@@ -9,6 +9,7 @@ import { readSupportArr, readSupportStrArr, writeSupportJSON } from './support-s
 import { PopupSelect } from '../../components/PopupXxx';
 import { InfoErrorBoundary, getCategoryInfo, CLASS_BASE_NAMES, MECH_TRANSLATIONS_RU, TYPE_LABELS_RU, MECH_LABELS, CATEGORY_LABELS } from './SupportScreenData';
 import { ALL_STACKS, ALL_INTERACTIONS, SUPPORT_CATALOG_DATA, getSubstanceTier, TIER_LABELS, SYSTEM_LABELS_CATALOG, ORGAN_LABELS, type SupportSubstance } from '../../../data/support-database';
+import { evidenceGradeExFor } from '../../../engines/support-hub-evidence.engine';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../../data/support-db';
 import { UnifiedSynergyCalculator } from './UnifiedSynergyCalculator';
 
@@ -281,7 +282,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                     <div key={sub?.id||'x'}>
                                       <div onClick={() => setSelectedSub(selectedSub === sub?.id ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 22px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
                                         <div style={{ flex:1, minWidth:0 }}>
-                                          <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</div>
+                                          <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())} <span style={{ fontSize:7, fontWeight:800, padding:'1px 5px', borderRadius:4, background: (() => { const g = evidenceGradeExFor(sub?.id||''); return g === 'A' ? 'rgba(34,197,94,0.15)' : g === 'B' ? 'rgba(245,158,11,0.15)' : g === 'D' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)'; })(), color: (() => { const g = evidenceGradeExFor(sub?.id||''); return g === 'A' ? '#22c55e' : g === 'B' ? '#f59e0b' : g === 'D' ? '#ef4444' : '#fff'; })() }}>{evidenceGradeExFor(sub?.id||'')}</span></div>
                                           <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                       {supArr(sub?.categories).slice(0,3).map((c: any) => { const ci = getCategoryInfo(c); return <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{ci.label||c||''}</span>; })}
                                       {supArr(sub?.mechanisms).slice(0,4).map((m: any) => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || supStr(m).replace(/_/g, ' ')}</span>)}
