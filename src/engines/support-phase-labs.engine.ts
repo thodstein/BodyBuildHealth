@@ -694,6 +694,18 @@ export function withLabTiming<T extends UnifiedMonitor>(items: T[]): T[] {
   });
 }
 
+/**
+ * Тизер свернутого блока мониторинга: число K-карт фазы + число персональных маркеров.
+ */
+export function phaseLabTeaser(
+  flags: PhaseLabFlags | null | undefined,
+  phase: PhaseKey,
+  markerCount: number,
+): string {
+  const n = phaseCardsFor(flags, phase).length;
+  return `K0–K10 · ${n} карт · 🎯 ${markerCount} маркеров`;
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  Мост к фарм-матрице классов (PED_CLASS_MATRIX, «Фарм-матрица курса»):
 //  matrix id → ключи CLASS_LAB_ADDONS. Lock: правка labs матрицы без правки

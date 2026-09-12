@@ -1041,7 +1041,7 @@ function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDF
       + (longEster
         ? '• Длинные эфиры → hCG-bridge 500–1000 МЕ 2×/нед × 2–3 нед → затем SERM (карточка K6)'
         : '• Короткие эфиры → SERM сразу (тамоксифен 20 мг ИЛИ энкломифен 12.5–25 мг ИЛИ кломифен 25–50 мг; карточка K6)')
-      + '\n• Кортизол (утро) + липиды + HCT на выходе\n• При невосстановлении HPTA (>6 нед, ТТГ/ЛГ < 50% нормы) — эндокринолог';
+      + '\n• Кортизол (утро) + липиды + HCT на выходе\n• При невосстановлении HPTA (>6 нед, ЛГ/ФСГ < 50% нормы) — эндокринолог';
   }
   const onPED = flags.hasAAS || flags.hasSarm || flags.hasGH || flags.hasInsulin || flags.hasIGF;
   if (!onPED) return '';

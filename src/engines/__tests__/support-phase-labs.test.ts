@@ -7,7 +7,7 @@ import {
   PHASE_LAB_CARDS, CLASS_LAB_ADDONS, phaseLabCardById,
   phaseCardsFor, addonsFor, labTimingFor, pctVariantFor, needsLpaBaseline,
   isLongEsterHalfLife, isInjectableCourse, mergeMonitoringLists,
-  matrixAddonKeys, matrixAddons, withLabTiming,
+  matrixAddonKeys, matrixAddons, withLabTiming, phaseLabTeaser,
 } from '../support-phase-labs.engine';
 import { PED_CLASS_MATRIX } from '../../data/ped-class-matrix';
 
@@ -229,5 +229,12 @@ describe('withLabTiming — добивка пустых when', () => {
   });
   it('пустой вход — пустой выход', () => {
     expect(withLabTiming([])).toEqual([]);
+  });
+});
+
+describe('phaseLabTeaser — тизер свернутого мониторинга', () => {
+  it('course: 6 карт; pct без флагов: 4 карты', () => {
+    expect(phaseLabTeaser({ hasAAS: true }, 'course', 5)).toBe('K0–K10 · 6 карт · 🎯 5 маркеров');
+    expect(phaseLabTeaser(null, 'pct', 0)).toBe('K0–K10 · 4 карт · 🎯 0 маркеров');
   });
 });

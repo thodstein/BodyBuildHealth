@@ -48,7 +48,7 @@ import { CalcPhaseLabCards } from './CalcPhaseLabCards';
 import { LAB_MONITOR_DB } from '../SupportScreen_parts/UnifiedSynergyCalculator';
 import { LAB_TOP20, resolveLabMonitor, type HubLabMon } from '../../../engines/support-hub-labs.engine';
 import { getSubstanceMonitoring } from '../../../data/substance-monitoring-db';
-import { phaseCardsFor, addonsFor, isInjectableCourse, mergeMonitoringLists, withLabTiming } from '../../../engines/support-phase-labs.engine';
+import { phaseCardsFor, addonsFor, isInjectableCourse, mergeMonitoringLists, withLabTiming, phaseLabTeaser } from '../../../engines/support-phase-labs.engine';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -3160,6 +3160,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               <span style={{ fontSize:10, fontWeight:700, color:'#60a5fa', display:'flex', alignItems:'center', gap:5 }}>
                 🩻 Мониторинг анализов и показателей
                 <span style={{ fontSize:7, fontWeight:600, color:'rgba(96,165,250,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(96,165,250,0.1)' }}>врачебный протокол</span>
+                <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.45)', padding:'1px 5px', borderRadius:4, background:'rgba(255,255,255,0.04)' }}>{(() => {
+                  try {
+                    return phaseLabTeaser((finalRec as any)?.pedFlags || null, (((finalRec as any)?.phase || 'course') as PhaseKey), personalMarkers.length);
+                  } catch { return ''; }
+                })()}</span>
               </span>
               <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showMonitoring ? '▲ скрыть' : '▼ показать'}</span>
             </div>
