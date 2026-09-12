@@ -5537,6 +5537,59 @@ html.app-native .articles-reader-body {
   }
 }
 
+/* ─── 78b. ARTICLES TOP — featured/TOC/PDF-inline (только APK, без hex) ── */
+html.app-native .articles-featured {
+  animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+html.app-native .articles-featured:active {
+  transform: scale(0.985) !important;
+}
+
+html.app-native .articles-toc {
+  scroll-snap-type: x proximity !important;
+}
+
+html.app-native .articles-toc button {
+  min-height: 44px !important;
+  scroll-snap-align: start !important;
+  color: #fff !important;
+}
+
+html.app-native .articles-toc button:active {
+  transform: scale(0.94) !important;
+}
+
+html.app-native .articles-toc button:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+
+html.app-native .articles-pdf-frame {
+  background: #fff !important;
+  min-height: 320px !important;
+}
+
+html.app-native .articles-md h3 {
+  scroll-margin-top: 70px !important;
+}
+
+html.app-native .articles-md a:active {
+  opacity: 0.7 !important;
+}
+
+@media (max-width: 380px) {
+  html.app-native .articles-featured {
+    border-radius: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .articles-featured {
+    animation: none !important;
+  }
+}
+
 /* ─── 79. PHARMA PRO-FULL — топ-подача вкладки «Фарма» (hero не тронут) ──
  * Только APK. TSX уже несёт PRO-инлайны (56px топбар, стекло 18px,
  * белый текст, пилюли-навигация 44px, быстрые якоря); здесь — липкость,

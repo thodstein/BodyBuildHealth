@@ -47,8 +47,12 @@ describe('ProfileHero', () => {
     ) as HTMLImageElement | null;
     expect(img?.getAttribute('src')).toContain('profile-hero.png');
     expect(container.querySelector('.profile-hero-name')).not.toBeNull();
+    // Прогрессбар: role может жить на том же узле, что и класс (слияние
+    // в pf-hero-стекло), либо вложенно — принимаем обе структуры.
     expect(
-      container.querySelector('.profile-hero-progress [role="progressbar"]'),
+      container.querySelector(
+        '.profile-hero-progress[role="progressbar"], .profile-hero-progress [role="progressbar"]',
+      ),
     ).not.toBeNull();
     expect(container.querySelectorAll('.profile-hero-card').length).toBe(4);
   });

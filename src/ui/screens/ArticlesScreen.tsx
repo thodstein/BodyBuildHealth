@@ -88,16 +88,43 @@ function loadReaderFont(): number {
   }
 }
 
+export function slugifyHeading(s: string): string {
+  return s.toLowerCase().replace(/[^a-zа-я0-9ё]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'sec';
+}
+
+export function extractArticleToc(md: string): { id: string; title: string }[] {
+  const out: { id: string; title: string }[] = [];
+  const re = /^## (.+)$/gm;
+  let m: RegExpExecArray | null;
+  let i = 0;
+  while ((m = re.exec(md || '')) && out.length < 12) {
+    const title = m[1].trim();
+    out.push({ id: `art-sec-${i}-${slugifyHeading(title)}`, title });
+    i += 1;
+  }
+  return out;
+}
+
 export function renderMarkdown(md: string, bodyPx = 14): string {
+  let h2Seen = false;
+  let h3Idx = 0;
   let html = md
     .replace(/^### (.+)$/gm, (_, h) =>
       `<h4 style="font-size:13px;font-weight:800;color:#a78bfa;margin:22px 0 8px;letter-spacing:-0.01em;border-left:3px solid ${ART_ACC};padding-left:10px">${h}</h4>`)
-    .replace(/^## (.+)$/gm, (_, h) =>
-      `<h3 style="font-size:16px;font-weight:800;color:#fff;margin:26px 0 10px;letter-spacing:-0.02em">${h}</h3>`)
-    .replace(/^# (.+)$/gm, (_, h) =>
-      `<h2 style="font-size:20px;font-weight:900;color:#fff;margin:28px 0 12px;letter-spacing:-0.03em;background:linear-gradient(135deg,${ART_ACC},#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${h}</h2>`)
+    .replace(/^## (.+)$/gm, (_, h) => {
+      const id = `art-sec-${h3Idx}-${slugifyHeading(h)}`;
+      h3Idx += 1;
+      return `<h3 id="${id}" style="font-size:17px;font-weight:800;color:#fff;margin:26px 0 4px;letter-spacing:-0.02em;display:flex;align-items:center;gap:8px"><span style="width:22px;height:22px;border-radius:7px;background:${artA(0.12)};border:1px solid ${artA(0.22)};display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:${ART_ACC};flex-shrink:0">§</span>${h}</h3>`;
+    })
+    .replace(/^# (.+)$/gm, (_, h) => {
+      h2Seen = false;
+      void h2Seen;
+      return `<h2 style="font-size:22px;font-weight:900;color:#fff;margin:6px 0 12px;letter-spacing:-0.03em;line-height:1.15">${h}</h2>`;
+    })
     .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#fff;font-weight:700">$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em style="color:#fff;font-style:italic">$1</em>');
+    .replace(/`([^`]+?)`/g, '<code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.86em;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.10);padding:1px 6px;border-radius:6px;color:#fff">$1</code>')
+    .replace(/\[([^\]]+?)\]\((https?:[^)]+?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:' + ART_ACC + ';font-weight:700;text-decoration:underline;text-underline-offset:3px">$1</a>')
+    .replace(/(^|\s)\*(.+?)\*/g, '$1<em style="color:#fff;font-style:italic">$2</em>');
 
   const tables: string[] = [];
   let inTable = false;
@@ -136,14 +163,36 @@ export function renderMarkdown(md: string, bodyPx = 14): string {
     .replace(/^- (.+)$/gm, (_, item) =>
       `<li style="margin:6px 0;font-size:13px;line-height:1.6;color:#fff;position:relative;padding-left:4px">— ${item}</li>`)
     .replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:12px 0;padding:0;list-style:none">${m}</ul>`)
-    .replace(/^---$/gm, `<hr style="border:none;height:1px;background:linear-gradient(90deg,transparent,${artA(0.22)},transparent);margin:22px 0"/>`)
-    .replace(/\n\n/g, '<div style="height:8px"></div>');
+    .replace(/^---$/gm, `<hr style="border:none;height:1px;background:linear-gradient(90deg,transparent,${artA(0.22)},transparent);margin:22px 0"/>`);
+  // NOTE: `\n\n` в спейсеры — ПОСЛЕ оборачивания абзацев в <p> (иначе строки
+  // склеиваются в одну и лид-абзац не выделяется).
 
   html = html
+    .replace(/^\d+\. (.+)$/gm, (_, item) =>
+      `<li data-num="1" style="margin:7px 0;font-size:13.5px;line-height:1.65;color:#fff;padding-left:4px">◆ ${item}</li>`)
+    .replace(/^> ⚠(.+)$/gm, (_, q) =>
+      `<blockquote style="margin:16px 0;padding:12px 14px;background:rgba(239,68,68,0.08);border-left:3px solid #f87171;border-radius:10px;font-size:13px;color:#fff;line-height:1.6">⚠${q}</blockquote>`)
+    .replace(/^> 💡(.+)$/gm, (_, q) =>
+      `<blockquote style="margin:16px 0;padding:12px 14px;background:rgba(234,179,8,0.08);border-left:3px solid #eab308;border-radius:10px;font-size:13px;color:#fff;line-height:1.6">💡${q}</blockquote>`)
     .replace(/^> (.+)$/gm, (_, q) =>
       `<blockquote style="margin:16px 0;padding:12px 14px;background:${artA(0.07)};border-left:3px solid ${ART_ACC};border-radius:10px;font-size:13px;color:#fff;line-height:1.6;backdrop-filter:blur(8px)">${q}</blockquote>`);
 
-  return `<div style="line-height:1.8;font-size:${bodyPx}px;color:#fff">${html}</div>`;
+  // Обычные текстовые строки → <p>; первый абзац после заголовка — лид (крупнее, акцентная полоса).
+  let leadDone = false;
+  html = html.split('\n').map(line => {
+    const t = line.trim();
+    if (!t || t.startsWith('<') || t.startsWith('</') || t.startsWith('◆') || t.startsWith('—')) return line;
+    if (/^(#{1,4}\s|[-*>|]|\d+\.)/.test(t)) return line;
+    if (t.length < 2) return line;
+    if (!leadDone && t.length > 40) {
+      leadDone = true;
+      return `<p style="font-size:${bodyPx + 2}px;line-height:1.7;color:#fff;font-weight:500;margin:10px 0 14px;padding-left:12px;border-left:3px solid ${ART_ACC}">${t}</p>`;
+    }
+    return `<p style="font-size:${bodyPx}px;line-height:1.8;color:#fff;margin:9px 0">${t}</p>`;
+  }).join('\n');
+  html = html.replace(/\n\n/g, '<div style="height:8px"></div>');
+
+  return `<div className="articles-md" style="line-height:1.8;font-size:${bodyPx}px;color:#fff">${html}</div>`;
 }
 
 export const ArticlesScreen: React.FC = () => {
@@ -153,7 +202,9 @@ export const ArticlesScreen: React.FC = () => {
   const [category, setCategory] = useState('all');
   const [readingArticle, setReadingArticle] = useState<ArticleManifestEntry | null>(null);
   const [pdfViewer, setPdfViewer] = useState<string | null>(null);
+  const [pdfTitle, setPdfTitle] = useState<string>('PDF-документ');
   const [saved, setSaved] = useState<string[]>(() => loadSavedArticles());
+  const [copied, setCopied] = useState(false);
   const [readerFont, setReaderFont] = useState<number>(() => loadReaderFont());
   const [readProgress, setReadProgress] = useState(0);
   const readerBodyRef = React.useRef<HTMLDivElement | null>(null);
@@ -212,12 +263,45 @@ export const ArticlesScreen: React.FC = () => {
     return list;
   }, [category, search, listSection, saved]);
 
-  const openPDF = (url: string) => {
+  const openPDFExternal = (url: string) => {
     const tg = (window as any).Telegram?.WebApp;
     if (tg?.openLink) {
       tg.openLink(window.location.origin + url);
     } else {
       window.open(url, '_blank');
+    }
+  };
+
+  const openPDF = (url: string, title?: string) => {
+    setPdfTitle(title || 'PDF-документ');
+    setPdfViewer(url);
+  };
+
+  const copyArticleLink = async (a: ArticleManifestEntry) => {
+    const text = `${a.title} — Health Engine · Статьи`;
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const scrollToToc = (id: string) => {
+    const root = readerBodyRef.current;
+    if (!root) return;
+    const el = root.querySelector(`#${CSS.escape(id)}`);
+    if (el && (el as HTMLElement).scrollIntoView) {
+      (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
@@ -250,7 +334,7 @@ export const ArticlesScreen: React.FC = () => {
                 <div style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${s.color}22, ${s.color}10)`, border:`1px solid ${s.color}28`, color:s.color, boxShadow:`0 3px 10px ${s.color}20`, position:'relative' }}><NativeIcon name={s.icon} size={19} /></div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:13, fontWeight:800, marginBottom:2, color:'#fff', letterSpacing:'-0.2px', lineHeight:1.2 }}>{s.title}</div>
-                  <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3 }}>{s.desc}</div>
+                  <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3 }}>{s.desc} · {s.id === 'new' ? Math.min(3, ARTICLES_MANIFEST.length) : ARTICLES_MANIFEST.length} ст.</div>
                 </div>
                 <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:`${s.color}12`, border:`1px solid ${s.color}18`, color:s.color, fontSize:13, flexShrink:0, fontWeight:700 }}>→</span>
               </div>
@@ -306,6 +390,7 @@ export const ArticlesScreen: React.FC = () => {
 
       {/* Category chips — APK PRO: тач 44px, скролл-лента */}
       <div className="articles-chips" style={{ display:'flex', gap:8, flexWrap:'nowrap', overflowX:'auto', marginBottom:12, paddingBottom:4, scrollbarWidth:'none' }}>
+        {/* «Сохранённые» — только native: контракт волны D (офлайн-фича АПК), тест home-profile-shop-native */}
         {isNativeApp() && (
           <button key="saved" onClick={() => setCategory('saved')} className="article-chip" data-active={category === 'saved'} aria-label="Сохранённые статьи" style={{
             minHeight:44, padding:'10px 16px', borderRadius:999, fontSize:13, cursor:'pointer', fontFamily: FONT, flexShrink:0, whiteSpace:'nowrap',
@@ -342,23 +427,26 @@ export const ArticlesScreen: React.FC = () => {
         })}
       </div>
 
-      {/* PDF Viewer Modal — premium */}
+      {/* PDF Viewer — INLINE внутри приложения (iframe + фолбэк наружу) */}
       {pdfViewer && (
-        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(6,6,10,0.88)', display:'flex', flexDirection:'column', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', borderBottom:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)' }}>
-            <span style={{ fontWeight:800, fontSize:13, display:'flex', alignItems:'center', gap:7, letterSpacing:'-0.02em' }}>
-              <span style={{ width:26, height:26, borderRadius:8, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.22)', display:'flex', alignItems:'center', justifyContent:'center', color:'#f87171' }}><NativeIcon name="file" size={13} /></span> PDF
+        <div className="articles-pdf" style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(6,6,10,0.94)', display:'flex', flexDirection:'column', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'10px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)', flexShrink:0 }}>
+            <span style={{ fontWeight:800, fontSize:13, display:'flex', alignItems:'center', gap:7, letterSpacing:'-0.02em', color:'#fff', minWidth:0, flex:1, overflow:'hidden' }}>
+              <span style={{ width:30, height:30, borderRadius:9, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.22)', display:'flex', alignItems:'center', justifyContent:'center', color:'#f87171', flexShrink:0 }}><NativeIcon name="file" size={14} /></span>
+              <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{pdfTitle}</span>
+              <span style={{ fontSize:10, fontWeight:800, padding:'3px 8px', borderRadius:999, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.24)', color:'#fca5a5', flexShrink:0 }}>PDF · внутри</span>
             </span>
-            <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => openPDF(pdfViewer)} style={{ minHeight:44, padding:'10px 20px', borderRadius:999, background:ART_ACC, color:'#000', border:'none', fontWeight:800, fontSize:13, cursor:'pointer', boxShadow:`0 4px 14px ${artA(0.28)}` }}>Открыть</button>
-              <button onClick={() => setPdfViewer(null)} aria-label="Закрыть" style={{ minWidth:44, minHeight:44, padding:'10px 14px', borderRadius:999, background:'rgba(255,255,255,0.07)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:14, fontWeight:800, cursor:'pointer' }}>✕</button>
+            <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+              <button onClick={() => openPDFExternal(pdfViewer)} aria-label="Открыть PDF в браузере" style={{ minHeight:44, padding:'10px 18px', borderRadius:999, background:ART_ACC, color:'#000', border:'none', fontWeight:800, fontSize:13, cursor:'pointer', boxShadow:`0 4px 14px ${artA(0.28)}` }}>↗ Браузер</button>
+              <button onClick={() => setPdfViewer(null)} aria-label="Закрыть PDF" style={{ minWidth:44, minHeight:44, padding:'10px 14px', borderRadius:999, background:'rgba(255,255,255,0.07)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:14, fontWeight:800, cursor:'pointer' }}>✕</button>
             </div>
           </div>
-          <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, padding:24 }}>
-            <div style={{ width:72, height:72, borderRadius:18, background:'radial-gradient(120% 120% at 30% 20%, rgba(239,68,68,0.18), rgba(239,68,68,0.06) 55%, transparent 75%)', border:'1px solid rgba(239,68,68,0.18)', display:'flex', alignItems:'center', justifyContent:'center', color:'#f87171', boxShadow:'0 12px 32px rgba(239,68,68,0.18)' }}><NativeIcon name="file" size={32} /></div>
-            <div style={{ fontSize:16, color:'#fff', fontWeight:800, letterSpacing:'-0.02em' }}>PDF-документ</div>
-            <div style={{ fontSize:13, color:'#fff', textAlign:'center', maxWidth:320, lineHeight:1.55 }}>Для просмотра откроется новая вкладка — браузер покажет файл в встроенном просмотрщике.</div>
-            <button onClick={()=>openPDF(pdfViewer)} style={{ marginTop:8, minHeight:48, padding:'12px 24px', borderRadius:999, background:'#fff', color:'#000', border:'none', fontWeight:800, fontSize:14, cursor:'pointer' }}>Открыть в браузере →</button>
+          <div style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', background:'#101014' }}>
+            <iframe className="articles-pdf-frame" src={pdfViewer} title={pdfTitle} style={{ flex:1, width:'100%', minHeight:0, border:'none', background:'#fff' }} allowFullScreen />
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px 12px calc(10px + env(safe-area-inset-bottom,0px))', background:'rgba(10,10,15,0.92)', borderTop:'1px solid rgba(255,255,255,0.06)', flexShrink:0 }}>
+              <span style={{ fontSize:11, color:'#fff', fontWeight:600 }}>Не видно документ?</span>
+              <button onClick={() => openPDFExternal(pdfViewer)} style={{ minHeight:44, padding:'10px 18px', borderRadius:999, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:800, fontSize:12, cursor:'pointer' }}>Открыть снаружи →</button>
+            </div>
           </div>
         </div>
       )}
@@ -387,21 +475,34 @@ export const ArticlesScreen: React.FC = () => {
               </div>
             </div>
             <span style={{ padding:'5px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>{estimateReadTime(readingArticle.content||'')}′</span>
+            <button
+              onClick={() => copyArticleLink(readingArticle)}
+              aria-label="Скопировать название статьи"
+              title={copied ? 'Скопировано!' : 'Скопировать название'}
+              style={{
+                minWidth:44, height:44, borderRadius:999, cursor:'pointer', flexShrink:0,
+                background: copied ? artA(0.18) : 'rgba(255,255,255,0.07)',
+                border: copied ? `1px solid ${artA(0.40)}` : '1px solid rgba(255,255,255,0.12)',
+                color: copied ? ART_ACC : '#fff',
+                fontSize:14, display:'flex', alignItems:'center', justifyContent:'center',
+              }}
+            >{copied ? '✓' : '⧉'}</button>
+            {/* Закладка — только native: контракт волны D (см. чип выше) */}
             {isNativeApp() && (
-              <button
-                onClick={() => setSaved(toggleSavedArticle(readingArticle.id))}
-                aria-label={saved.includes(readingArticle.id) ? 'Убрать из сохранённых' : 'Сохранить для офлайна'}
-                className="article-bookmark"
-                data-active={saved.includes(readingArticle.id)}
-                style={{
-                  minWidth:44, height:44, borderRadius:999, cursor:'pointer', flexShrink:0,
-                  background: saved.includes(readingArticle.id) ? 'rgba(var(--accent-rgb, 0,230,138),0.18)' : 'rgba(255,255,255,0.07)',
-                  border: saved.includes(readingArticle.id) ? '1px solid rgba(var(--accent-rgb, 0,230,138),0.40)' : '1px solid rgba(255,255,255,0.12)',
-                  boxShadow: saved.includes(readingArticle.id) ? '0 0 14px rgba(0,230,138,0.30)' : 'none',
-                  color: saved.includes(readingArticle.id) ? 'var(--accent, #00e68a)' : '#fff',
-                  fontSize:14, display:'flex', alignItems:'center', justifyContent:'center',
-                }}
-              >{saved.includes(readingArticle.id) ? <NativeIcon name="bookmark" size={17} filled /> : <NativeIcon name="bookmark" size={17} />}</button>
+            <button
+              onClick={() => setSaved(toggleSavedArticle(readingArticle.id))}
+              aria-label={saved.includes(readingArticle.id) ? 'Убрать из сохранённых' : 'Сохранить статью'}
+              className="article-bookmark"
+              data-active={saved.includes(readingArticle.id)}
+              style={{
+                minWidth:44, height:44, borderRadius:999, cursor:'pointer', flexShrink:0,
+                background: saved.includes(readingArticle.id) ? 'rgba(var(--accent-rgb, 0,230,138),0.18)' : 'rgba(255,255,255,0.07)',
+                border: saved.includes(readingArticle.id) ? '1px solid rgba(var(--accent-rgb, 0,230,138),0.40)' : '1px solid rgba(255,255,255,0.12)',
+                boxShadow: saved.includes(readingArticle.id) ? '0 0 14px rgba(0,230,138,0.30)' : 'none',
+                color: saved.includes(readingArticle.id) ? 'var(--accent, #00e68a)' : '#fff',
+                fontSize:14, display:'flex', alignItems:'center', justifyContent:'center',
+              }}
+            >{saved.includes(readingArticle.id) ? <NativeIcon name="bookmark" size={17} filled /> : <NativeIcon name="bookmark" size={17} />}</button>
             )}
           </div>
 
@@ -409,22 +510,55 @@ export const ArticlesScreen: React.FC = () => {
             <div style={{ width:`${readProgress}%`, height:'100%', background:ART_ACC, borderRadius:999, boxShadow:`0 0 8px ${artA(0.5)}`, transition:'width 0.12s linear' }} />
           </div>
 
-          <div ref={readerBodyRef} onScroll={onReaderScroll} className="articles-reader-body" style={{ flex:1, overflow:'auto', padding:'18px 16px 110px', maxWidth: 720, width:'100%', margin:'0 auto' }}>
-            <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:999, background:`${CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280'}14`, border:`1px solid ${CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280'}22`, color: CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280', fontSize:11, fontWeight:800, marginBottom:10 }}>
-              <NativeIcon name={CAT_ICON[readingArticle.category] || 'file'} size={12} /> {CATEGORIES.find(c=>c.value===readingArticle.category)?.label || readingArticle.category}
+          <div ref={readerBodyRef} onScroll={onReaderScroll} className="articles-reader-body" style={{ flex:1, overflow:'auto', padding:'0 0 120px', maxWidth: 720, width:'100%', margin:'0 auto' }}>
+            {(() => {
+              const catColor = CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280';
+              const catLabel = CATEGORIES.find(c=>c.value===readingArticle.category)?.label || readingArticle.category;
+              const toc = extractArticleToc(readingArticle.content || '');
+              const mins = estimateReadTime(readingArticle.content || '');
+              const initial = (readingArticle.authorName || 'H').trim().charAt(0).toUpperCase();
+              return (<>
+            {/* Обложка статьи — журнальная шапка */}
+            <div style={{ margin:'12px 12px 0', borderRadius:20, overflow:'hidden', border:'1px solid rgba(255,255,255,0.09)', background:`linear-gradient(135deg, ${catColor}2e 0%, rgba(16,16,22,0.9) 55%, rgba(10,10,15,0.95) 100%)`, boxShadow:'0 14px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)', position:'relative' }}>
+              <div aria-hidden="true" style={{ position:'absolute', inset:0, background:`radial-gradient(420px 130px at 12% 0%, ${catColor}30, transparent 65%), radial-gradient(300px 120px at 95% 100%, ${catColor}18, transparent 60%)`, pointerEvents:'none' }} />
+              <div style={{ position:'relative', padding:'16px 16px 14px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, flexWrap:'wrap' }}>
+                  <span style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 11px', borderRadius:999, background:`${catColor}1c`, border:`1px solid ${catColor}33`, color:catColor, fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                    <NativeIcon name={CAT_ICON[readingArticle.category] || 'file'} size={12} /> {catLabel}
+                  </span>
+                  <span style={{ padding:'5px 11px', borderRadius:999, background:artA(0.10), border:`1px solid ${artA(0.22)}`, color:ART_ACC, fontWeight:800, fontSize:11 }}>⏱ {mins} мин</span>
+                  <span style={{ padding:'5px 11px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontWeight:700, fontSize:11 }}>📅 {readingArticle.date}</span>
+                </div>
+                <h1 style={{ fontSize:24, fontWeight:900, color:'#fff', margin:'0 0 8px', lineHeight:1.14, letterSpacing:'-0.03em' }}>
+                  {readingArticle.title}
+                </h1>
+                <p style={{ fontSize:13, color:'#fff', margin:'0 0 12px', lineHeight:1.55, opacity:0.92 }}>{readingArticle.description}</p>
+                <div style={{ display:'flex', alignItems:'center', gap:9 }}>
+                  <span style={{ width:34, height:34, borderRadius:999, background:`linear-gradient(135deg, ${catColor}, ${catColor}88)`, display:'flex', alignItems:'center', justifyContent:'center', color:'#000', fontWeight:900, fontSize:15, flexShrink:0 }}>{initial}</span>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{readingArticle.authorName}</div>
+                    <div style={{ fontSize:11, color:'#fff', opacity:0.75 }}>Проверено редакцией · Health Engine</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ height:3, background:`linear-gradient(90deg, ${catColor}, transparent)` }} />
             </div>
-            <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 8px', lineHeight:1.12, letterSpacing:'-0.04em' }}>
-              {readingArticle.title}
-            </h1>
-            <div style={{ fontSize:12, color:'#fff', marginBottom:18, paddingBottom:16, borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              <span style={{ fontWeight:700, color:'#fff' }}>{readingArticle.authorName}</span>
-              <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
-              <span>{readingArticle.date}</span>
-              <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
-              <span style={{ padding:'3px 8px', borderRadius:999, background:`${artA(0.10)}`, border:`1px solid ${artA(0.18)}`, color:ART_ACC, fontWeight:700, fontSize:10 }}>{estimateReadTime(readingArticle.content||'')} мин чтения</span>
-            </div>
-
+            {/* Содержание — якоря по разделам */}
+            {toc.length > 0 && (
+              <div className="articles-toc" style={{ margin:'12px 12px 0', padding:'12px', borderRadius:16, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize:11, fontWeight:800, color:'#fff', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8, opacity:0.85 }}>§ Содержание</div>
+                <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:2, scrollbarWidth:'none' }}>
+                  {toc.map(t => (
+                    <button key={t.id} onClick={() => scrollToToc(t.id)} style={{ flexShrink:0, minHeight:44, padding:'10px 14px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' }}>{t.title}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ padding:'16px 16px 0' }}>
             <div dangerouslySetInnerHTML={{ __html: renderMarkdown(readingArticle.content || '', readerFont) }} />
+            </div>
+              </>);
+            })()}
 
             {readingArticle.tags.length > 0 && (
               <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:26, paddingTop:16, borderTop:'1px solid rgba(255,255,255,0.07)' }}>
@@ -437,6 +571,63 @@ export const ArticlesScreen: React.FC = () => {
                 ))}
               </div>
             )}
+
+            {(() => {
+              const order = articles.length > 0 ? articles : getSortedArticles();
+              const idx = order.findIndex(a => a.id === readingArticle.id);
+              const prev = idx > 0 ? order[idx - 1] : null;
+              const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
+              const openEntry = (a: ArticleManifestEntry) => {
+                if (a.content_type === 'pdf') { setReadingArticle(null); openPDF(a.file_url || '', a.title); }
+                else setReadingArticle(a);
+              };
+              if (!prev && !next) return null;
+              const btn = (a: ArticleManifestEntry | null, dir: 'prev' | 'next') => (
+                <button key={dir} onClick={() => a && openEntry(a)} disabled={!a}
+                  aria-label={dir === 'prev' ? 'Предыдущая статья' : 'Следующая статья'}
+                  className={`articles-nav-${dir}`}
+                  style={{ flex:1, minHeight:48, padding:'12px 14px', borderRadius:14, cursor: a ? 'pointer' : 'default',
+                    background: a ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                    border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:12, fontWeight:800,
+                    opacity: a ? 1 : 0.35, textAlign: dir === 'prev' ? 'left' : 'right',
+                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {dir === 'prev' ? `← ${a ? a.title.slice(0, 26) : 'Начало'}` : `${a ? a.title.slice(0, 26) : 'Конец'} →`}
+                </button>
+              );
+              return (
+                <div className="articles-nav" style={{ display:'flex', gap:8, marginTop:24 }}>
+                  {btn(prev, 'prev')}
+                  {btn(next, 'next')}
+                </div>
+              );
+            })()}
+
+            {(() => {
+              const related = ARTICLES_MANIFEST.filter(a => a.id !== readingArticle.id && a.category === readingArticle.category).slice(0, 3);
+              if (related.length === 0) return null;
+              return (
+                <div className="articles-related" style={{ marginTop:16, padding:'14px', borderRadius:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ fontSize:11, fontWeight:800, color:'#fff', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10, opacity:0.85 }}>Читайте также</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {related.map(r => (
+                      <div key={r.id} role="button" tabIndex={0}
+                        onClick={() => { if (r.content_type === 'pdf') { setReadingArticle(null); openPDF(r.file_url || '', r.title); } else setReadingArticle(r); }}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (r.content_type === 'pdf') { setReadingArticle(null); openPDF(r.file_url || '', r.title); } else setReadingArticle(r); } }}
+                        style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, cursor:'pointer', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                        <span style={{ width:32, height:32, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`${CATEGORIES.find(c => c.value === r.category)?.color || '#6b7280'}1c`, border:`1px solid ${CATEGORIES.find(c => c.value === r.category)?.color || '#6b7280'}30`, color: CATEGORIES.find(c => c.value === r.category)?.color || '#6b7280' }}>
+                          <NativeIcon name={CAT_ICON[r.category] || 'file'} size={14} />
+                        </span>
+                        <span style={{ flex:1, minWidth:0 }}>
+                          <span style={{ display:'block', fontSize:12, fontWeight:800, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.title}</span>
+                          <span style={{ display:'block', fontSize:11, color:'#fff', opacity:0.7 }}>{r.content_type === 'pdf' ? 'PDF · внутри' : `${estimateReadTime(r.content || '')} мин`} · {r.date}</span>
+                        </span>
+                        <span style={{ color:'#fff', fontWeight:800, flexShrink:0 }}>→</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div style={{ marginTop:22, padding:'12px 14px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:10 }}>
               <span style={{ width:32, height:32, borderRadius:999, background:`${artA(0.14)}`, border:`1px solid ${artA(0.20)}`, display:'flex', alignItems:'center', justifyContent:'center', color:ART_ACC, flexShrink:0, fontWeight:800 }}>✓</span>
@@ -466,9 +657,36 @@ export const ArticlesScreen: React.FC = () => {
         </div>
       )}
 
+      {/* Featured — материал номера (без фильтров) */}
+      {category === 'all' && !search.trim() && articles.length > 1 && (() => {
+        const f = articles[0];
+        const catColor = CATEGORIES.find(c => c.value === f.category)?.color || '#6b7280';
+        const isPDF = f.content_type === 'pdf';
+        return (
+          <div key={`featured-${f.id}`} data-featured="true" onClick={() => { if (isPDF) { openPDF(f.file_url || '', f.title); } else { setReadingArticle(f); } }}
+            className="articles-featured" style={{ borderRadius:20, overflow:'hidden', marginBottom:10, cursor:'pointer', position:'relative',
+              background:`linear-gradient(135deg, ${catColor}30 0%, rgba(16,16,24,0.95) 55%, rgba(10,10,15,0.98) 100%)`,
+              border:'1px solid rgba(255,255,255,0.10)', boxShadow:'0 16px 44px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)' }}>
+            <div aria-hidden="true" style={{ position:'absolute', inset:0, background:`radial-gradient(480px 150px at 10% 0%, ${catColor}38, transparent 65%)`, pointerEvents:'none' }} />
+            <div style={{ position:'relative', padding:'16px 16px 14px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                <span style={{ fontSize:10, fontWeight:900, letterSpacing:'0.1em', color:'#000', background:catColor, padding:'4px 10px', borderRadius:999 }}>★ МАТЕРИАЛ НОМЕРА</span>
+                <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.10)', padding:'4px 10px', borderRadius:999 }}>{isPDF ? 'PDF · внутри' : `${estimateReadTime(f.content || '')}′ чтения`}</span>
+              </div>
+              <div style={{ fontSize:17, fontWeight:900, color:'#fff', lineHeight:1.25, letterSpacing:'-0.02em', marginBottom:6 }}>{f.title}</div>
+              <div style={{ fontSize:13, color:'#fff', lineHeight:1.55, marginBottom:12, display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden', opacity:0.92 }}>{f.description}</div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>{f.authorName.replace('Health Engine Team', 'HE Team')} · {f.date}</span>
+                <span style={{ minHeight:44, display:'inline-flex', alignItems:'center', padding:'10px 18px', borderRadius:999, background:'#fff', color:'#000', fontSize:13, fontWeight:800 }}>{isPDF ? 'Открыть PDF внутри →' : 'Читать →'}</span>
+              </div>
+            </div>
+            <div style={{ height:3, background:`linear-gradient(90deg, ${catColor}, transparent)` }} />
+          </div>
+        );
+      })()}
       {/* Article cards — premium magazine grid (мобайл: 2 в ряд на 360, 1 на 320) */}
       <div className="articles-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:10, marginBottom:8 }}>
-        {articles.map(article => {
+        {(category === 'all' && !search.trim() && articles.length > 1 ? articles.slice(1) : articles).map(article => {
           const catColor = CATEGORIES.find(c => c.value === article.category)?.color || '#6b7280';
           const catIcon: NativeIconName = CAT_ICON[article.category] || 'file';
           const readTime = article.content ? estimateReadTime(article.content) : 0;
@@ -476,7 +694,7 @@ export const ArticlesScreen: React.FC = () => {
 
           return (
               <div key={article.id} onClick={() => {
-                if (isPDF) { setPdfViewer(article.file_url || ''); }
+                if (isPDF) { openPDF(article.file_url || '', article.title); }
                 else { setReadingArticle(article); }
               }} style={{
               borderRadius:16, overflow:'hidden',
@@ -518,9 +736,14 @@ export const ArticlesScreen: React.FC = () => {
                 </div>
               </div>
 
-              {isPDF && (
+              {isPDF ? (
                 <div style={{ padding:'0 12px 11px', display:'flex', alignItems:'center', gap:6, position:'relative' }}>
-                  <span style={{ fontSize:11, color:'#fff', fontWeight:800, display:'flex', alignItems:'center', gap:5 }}><NativeIcon name="file" size={12} /> Открыть PDF <span>→</span></span>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:800, display:'flex', alignItems:'center', gap:5 }}><NativeIcon name="file" size={12} /> Читать внутри <span>→</span></span>
+                </div>
+              ) : (
+                <div style={{ padding:'0 12px 11px', display:'flex', alignItems:'center', gap:6, position:'relative' }}>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:800, opacity:0.85 }}>Читать →</span>
+                  {saved.includes(article.id) && <span aria-label="Сохранена" style={{ marginLeft:'auto', color:ART_ACC, fontSize:12 }}>★</span>}
                 </div>
               )}
             </div>
