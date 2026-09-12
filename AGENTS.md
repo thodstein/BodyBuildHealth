@@ -1,6 +1,6 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Кардио PRO-2: план + полное выполнение P1–P7 кодом (Sep 12 2026, в worktree БЕЗ коммита)
+## Кардио PRO-2: план + полное выполнение P1–P7 кодом (Sep 12 2026, закоммичено pathspec, без пуша)
 
 По команде «проведи полный анализ кардиоконструктора + исследования сети + план» → NEW `docs/CARDIO-PRO-2-PLAN.md` (§1 аудит: god-file 208КБ/~3587 строк + 24 сателлита + 26 шаблонов + 25 UI-файлов + 10 пробелов D1–D10; §2 синтез 2024–2026: Rivera POL≈PYR/Filipas PYR→POL/Storoschuk Zone2-оговорка/Wilson-бег/Yang NMA 51-1261/Hov 4×4/Bosquet taper/Smyth decouple 82k; §3 эпики P1–P7). Затем «выполняй полностью» — все 7 закрыты кодом. Только Edit/Write + vitest/tsc; чужие WIP (pharma/support/Articles/Risk) не тронуты.
 
@@ -9,7 +9,7 @@
 - **Сборка** (`cardio.engine.ts`): `redFlags` → мед-блок режет HIIT+MISS + rationale «до врача»; `tidSwitchWeek` (недели ≥ свитча — polarized, объём тот же) + rationale Filipas/Rivera; `durabilitySession` (длинная Z2 вело 3ч/бег 100 мин только недели ≥150 мин); фьюлинг в purpose сессий ≥60 мин; ICS taper-описания с чек-листом; rationale акклиматизации/высоты; конфиг-снапшот += 4 поля.
 - **Валидатор**: `medicalBlock` → error + `z2_without_hiit_low_volume` warn (скип faithful-шаблонов — C25K цел).
 - **UI**: скрининг-блок в Атлете + PYR→POL и durability-тоглы в Нагрузке (44px, `data-cardio`, персист wizard + editConfig) + чек-лист и `CardioRacePredictor` (автономный) в `CardioCompsStep` + валидатор читает мед-блок из `config`; пойман свой JSX-флейк (две JSX-сестры без фрагмента — обёрнут).
-- **Проверено**: NEW 31/31 + движки 443/443 (9 файлов) + импорт/annual/macro 46/46 + UI 182/182 (12 файлов); `cardio-diary-slot` 1 падение — чужой date-флейк (C25K только Пн/Ср/Пт, сегодня Сб — доказано расписанием); `tsc` **0 по всему проекту** (12GB heap); `verify:apk-design` OK. НЕ КОММИТИЛ/НЕ ПУШИЛ.
+- **Проверено**: NEW 31/31 + движки 443/443 (9 файлов) + импорт/annual/macro 46/46 + UI 182/182 (12 файлов); `cardio-diary-slot` date-флейк починен фейковыми часами на Пн (C25K — Пн/Ср/Пт); `tsc` **0 по всему проекту** (12GB heap); `verify:apk-design` OK. Коммит `eacfa0614` pathspec 17 своих. НЕ ПУШИЛ.
 - **Отклонение от плана (честно)**: P1 — вынос типов вместо полного build/io-разреза (при живых параллельных правках того же файла полный разрез рисковал сломать соседей; типы zero-runtime + lock-тест фасада).
 
 ## Стронг-планировщик PRO: полный анализ + интернет-синтез + план P1–P7 (Sep 12 2026, ПЛАН без кода)
