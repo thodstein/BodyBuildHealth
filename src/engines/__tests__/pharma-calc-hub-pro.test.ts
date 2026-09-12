@@ -44,6 +44,13 @@ describe('P2 dosage safety', () => {
   it('range check nullable-safe', () => {
     expect(checkDosageRange('', 0)).toBeNull();
   });
+  it('range check берёт min/max, а не цифры frequency', () => {
+    // test_enan: класс testosterone 250–1000 mg/wk, frequency "2x/week" — lo обязан быть 250, не 2
+    const below = checkDosageRange('test_enan', 100);
+    expect(below?.code).toBe('below_range');
+    expect(checkDosageRange('test_enan', 500)?.code).toBe('in_range');
+    expect(checkDosageRange('test_enan', 2000)?.code).toBe('above_range');
+  });
 });
 
 describe('P3 stack burden', () => {

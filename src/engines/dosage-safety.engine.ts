@@ -12,11 +12,10 @@ export function checkDosageRange(substanceId: string, weeklyMg: number): DosageS
   const det: any = getPharmaDetail(substanceId);
   const range = det?.dosageRange;
   if (!range) return null;
-  // dosageRange: пробуем min/max либо строку — парсим числа
-  const nums = JSON.stringify(range).match(/(\d+(?:\.\d+)?)/g)?.map(Number) ?? [];
-  if (nums.length === 0) return null;
-  const lo = Math.min(...nums);
-  const hi = Math.max(...nums);
+  // Честно: только поля min/max (в JSON есть и frequency "2x/week" — её цифры мапить нельзя)
+  const lo = Number((range as any)?.min);
+  const hi = Number((range as any)?.max);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
   if (weeklyMg < lo)
     return { level: 'warn', code: 'below_range', text: `Ниже справочного диапазона (${lo}–${hi}): эффект может отсутствовать` };
   if (weeklyMg > hi)
