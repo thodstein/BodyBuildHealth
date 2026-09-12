@@ -325,3 +325,22 @@ describe('support-protocol-audit: раунд SUPPORT-PROTOCOLS-AUDIT-PLAN (P1-P6
     expect(P('supportProtocolElectrolytes.tsx')).toContain('только в стационаре');
   });
 });
+
+describe('support-protocol-audit: раунд-2 (гармонизация + гейты в фазах)', () => {
+  it('detox: TUDCA едино с Печенью (с едой), без «строго натощак»', () => {
+    const t = P('supportProtocolDetox.tsx');
+    expect(t).toContain('едино с протоколом Печени');
+    expect(t).not.toContain('TUDCA строго натощак перед сном');
+    expect(t).not.toContain('Строго натощак (2-3 ч после еды)');
+  });
+  it('glp1: берберин с CYP3A4-разносом', () => {
+    expect(P('supportProtocolGLP1.tsx')).toContain('CYP3A4-ингибитор: разнос 2+ ч');
+  });
+  it('phase34-гейт живёт в фазах кардио и печени', () => {
+    expect(P('supportProtocolCardio.tsx')).toContain('Phase34RxGate');
+    expect(P('supportProtocolHepatic.tsx')).toContain('Phase34RxGate');
+  });
+  it('постцикл: HCT — доза первее донации', () => {
+    expect(P('supportProtocolPostCycle.tsx')).toContain('ни донация, ни аспирин');
+  });
+});

@@ -36,7 +36,7 @@ export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({
                 </div>
                 <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 3 · ВОССТАНОВЛЕНИЕ (8-16 нед)</div>
-                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Липиды: омега-3 EPA 4 г, бергамот 1000 мг, ниацин 500 мг<br/>• HCT: кровопускание при {'>'}54 (режим как в гематологии: 52-54% — 300-400 мл 1-2×/нед до {'<'}48%), аспирин 75-100 мг + ИПП (только при ≥2 факторах тромботического риска), куркумин<br/>• Нейро: NAC 1200 мг, АЛК 600 мг, PS 400 мг, Mg 600 мг</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.3 }}>• Липиды: омега-3 EPA 4 г, бергамот 1000 мг, ниацин 500 мг<br/>• HCT: первое — снижение дозы/отмена (ни донация, ни аспирин её не заменяют); кровопускание при {'>'}54 (режим как в гематологии: 52-54% — 300-400 мл 1-2×/нед до {'<'}48% shared decision), аспирин 75-100 мг + ИПП (только при ≥2 факторах тромботического риска), куркумин<br/>• Нейро: NAC 1200 мг, АЛК 600 мг, PS 400 мг, Mg 600 мг</div>
                 </div>
                  <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(139,92,246,0.04)' }}>
                   <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>ФАЗА 4 · МОНИТОРИНГ (16-24+ нед)</div>
