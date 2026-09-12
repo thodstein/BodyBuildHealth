@@ -244,3 +244,84 @@ describe('support-protocol-audit: добивка monitoring-дыр', () => {
     expect(t).toContain('запись голоса');
   });
 });
+
+describe('support-protocol-audit: раунд SUPPORT-PROTOCOLS-AUDIT-PLAN (P1-P6)', () => {
+  it('шелл: фазы 3-4 только врач + в/в только стационар', () => {
+    const t = P('SupportProtocols.tsx');
+    expect(t).toContain('Фазы 3–4');
+    expect(t).toContain('только стационар');
+  });
+  it('shared: единые гейты экспортируются', async () => {
+    const shared = await import(
+      '../../ui/screens/SupportScreen_parts/supportProtocolsShared'
+    );
+    expect(shared.PROTOCOL_DISCLAIMER_TEXT).toContain('Фазы 3–4 — только врач');
+    expect(typeof shared.ProtocolDisclaimer).toBe('function');
+    expect(typeof shared.Phase34RxGate).toBe('function');
+    expect(typeof shared.IvStationaryGate).toBe('function');
+  });
+  it('печень: TUDCA больше не «единственный доказанный», UDCA первее', () => {
+    const t = P('supportProtocolHepatic.tsx');
+    expect(t).not.toContain('единственный доказанный антихолестатик');
+    expect(t).toContain('экстраполяция');
+  });
+  it('печень: bland-холестаз паттерн + отмена первой', () => {
+    const t = P('supportProtocolHepatic.tsx');
+    expect(t).toContain('Bland-холестаз');
+    expect(t).toContain('ОТМЕНА оралки');
+  });
+  it('берберин: CYP3A4-разнос во всех назначающих файлах', () => {
+    for (const f of [
+      'supportProtocolHepatic.tsx',
+      'supportProtocolMetabolic.tsx',
+      'supportProtocolSteatosis.tsx',
+      'supportProtocolMito.tsx',
+    ]) {
+      expect(P(f)).toContain('CYP3A4');
+    }
+  });
+  it('кардио: омега-честность (STRENGTH, без JELIS/REDUCE-IT)', () => {
+    const t = P('supportProtocolCardio.tsx');
+    expect(t).not.toContain('Доказано в JELIS, REDUCE-IT');
+    expect(t).toContain('STRENGTH');
+  });
+  it('кардио: иерархия Hct — доза первее донации/аспирина', () => {
+    const t = P('supportProtocolCardio.tsx');
+    expect(t).not.toContain('Донорство крови НЕ заменяет аспирин');
+    expect(t).toContain('ни аспирин, ни донорство');
+  });
+  it('гемато: Zone 2-базис + покой-замер после HIIE', () => {
+    const t = P('supportProtocolHemato.tsx');
+    expect(t).toContain('Zone 2');
+    expect(t).toContain('24 ч после HIIE');
+  });
+  it('гемато: аспирин без «30-40%», омега без «двойной защиты»', () => {
+    const t = P('supportProtocolHemato.tsx');
+    expect(t).not.toContain('30-40%');
+    expect(t).not.toContain('Двойная кардио+гемато защита');
+  });
+  it('женщины: все препараты + клен-QT + дневник', () => {
+    const t = P('supportProtocolWomen.tsx');
+    for (const s of [
+      'Метенолон',
+      'Метандростенолон',
+      'Болденон',
+      'Дростанолон',
+      'Тренболон',
+      'Флуоксиместерон',
+      'Гестринон',
+      'torsades',
+      'virilism-дневник',
+    ]) {
+      expect(t).toContain(s);
+    }
+  });
+  it('суставы: тендинозный баннер (фторхинолоны)', () => {
+    expect(P('supportProtocolJoints.tsx')).toContain('фторхинолоны');
+  });
+  it('в/в-гейты: дома не вводить', () => {
+    expect(P('supportProtocolImmune.tsx')).toContain('только стационар');
+    expect(P('supportProtocolHepatic.tsx')).toContain('Дома не вводить');
+    expect(P('supportProtocolElectrolytes.tsx')).toContain('только в стационаре');
+  });
+});

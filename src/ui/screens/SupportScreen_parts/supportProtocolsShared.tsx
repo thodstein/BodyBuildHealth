@@ -164,6 +164,30 @@ export const monitoringBlock = (markers: Array<{ marker: string; target: string;
 
 export const RX_NOTE = ' 💊 рецептурно — только по назначению врача';
 
+// ── P1-аудит 2026-09 (план SUPPORT-PROTOCOLS-AUDIT-PLAN): единые дисклеймеры ──
+export const PROTOCOL_DISCLAIMER_TEXT = 'Справочник, а не назначение: примерные ориентиры доз и фаз. Любые рецептурные позиции (💊) — только по назначению врача после очных анализов. Фазы 3–4 — только врач. В/в формы — только стационар.';
+
+/** Единый дисклеймер «примерный справочник» — в шапку каждого протокола. */
+export const ProtocolDisclaimer: React.FC = () => (
+  <div style={{ borderRadius: 14, padding: '12px 14px', background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.25)' }}>
+    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>📋 {PROTOCOL_DISCLAIMER_TEXT}</div>
+  </div>
+);
+
+/** Гейт «Фазы 3–4 — только врач»: ставится перед фазовыми блоками с рецептурными позициями. */
+export const Phase34RxGate: React.FC = () => (
+  <div style={{ borderRadius: 14, padding: '12px 14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+    <div style={{ fontSize: 11, fontWeight: 800, color: '#fca5a5', lineHeight: 1.5 }}>🛑 Фазы 3–4 — только врач: рецептурные позиции (💊) ниже не являются самоназначением. Дозы — ориентиры для обсуждения с врачом после анализов, а не схема приёма.</div>
+  </div>
+);
+
+/** Гейт «В/в — только стационар»: ставится в протоколы с внутривенными формами. */
+export const IvStationaryGate: React.FC = () => (
+  <div style={{ borderRadius: 14, padding: '12px 14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+    <div style={{ fontSize: 11, fontWeight: 800, color: '#fca5a5', lineHeight: 1.5 }}>🏥 Внутривенные формы — только стационар: дома не вводить. Ниже — справочные названия, а не домашняя схема.</div>
+  </div>
+);
+
 export const StopBanner: React.FC<{ title: string; thresholds: string[] }> = ({ title, thresholds }) => (
   <div style={{ borderRadius: 14, padding: '14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', backdropFilter: 'blur(10px)' }}>
     <div style={{ fontSize: 12, fontWeight: 850, color: '#ef4444', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(239,68,68,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🛑</span> {title}</div>

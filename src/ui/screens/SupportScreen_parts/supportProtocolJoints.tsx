@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
 
 export const SupportProtocolJoints: React.FC<{ s: Record<string, any> }> = ({ s }) => {
@@ -14,6 +14,10 @@ export const SupportProtocolJoints: React.FC<{ s: Record<string, any> }> = ({ s 
                 <div style={{ fontSize:13, fontWeight:800, color:'#22c55e', marginBottom:2 }}>🦴 Калькулятор суставов и связок</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Оценка риска суставной патологии и фазовый протокол поддержки хрящевой и соединительной ткани.</p>
               </div>
+
+              <ContraBanner items={[
+                'Разрывы сухожилий на ААС (бицепс/пекторалис/ахилл): сила мышцы растёт быстрее прочности сухожилия; триггеры — фторхинолоны, кортикостероиды, резкие максимумы, «сухость» от станозолола. Никакой БАД прочность сухожилия не доказывает — профилактика: техника/прогрессия нагрузки/отмена триггеров, лечение — ортопед',
+              ]} />
 
               {/* Sub-tabs */}
               <div style={{ display:'flex', gap:4, overflowX:'auto', scrollbarWidth:'none' }}>
