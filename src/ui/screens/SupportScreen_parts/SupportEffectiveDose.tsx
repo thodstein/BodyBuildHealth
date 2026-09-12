@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   type EnrichedEntry, type FormWithBio,
   PERSONAL_ADJUSTERS, bioColor, THERAPEUTIC_WINDOWS, MODIFIERS, COST_PER_GRAM,
@@ -6,7 +6,8 @@ import {
 } from './SupportBioavailabilityData';
 import { PopupSelect, PopupNumber, PopupBool } from '../../components/PopupXxx';
 import { S } from './SupportShared';
-import { doseWindowFor, personDoseHints, bioEvidenceLabel, bioEvidenceFor } from '../../../engines/support-hub-evidence.engine';
+import { doseWindowFor, personDoseHints, bioEvidenceLabel, bioEvidenceFor, resolvePersonDefaults } from '../../../engines/support-hub-evidence.engine';
+import { getProfile } from '../../../core/profile-manager';
 
 // ─── Therapeutic ranges for key supplements ───
 // Экспортируется для паспорта вещества (единый источник, без дублей таблицы).
@@ -139,10 +140,27 @@ export const SupportEffectiveDose: React.FC = () => {
       return [];
     }
   });
-  // P2: вес/пол/возраст из Профиля (фолбэк — ручной ввод, дефолт 80/муж/30 как было у аналогов)
-  const [wKg, setWKg] = useState(80);
-  const [sex, setSex] = useState<'male' | 'female'>('male');
-  const [age, setAge] = useState(30);
+  // P2: вес/пол/возраст — ручное сохранение > Профиль > дефолт 80/муж/30 (консистентно с аналогами)
+  const [personInit] = useState(() => {
+    let stored: unknown = null;
+    try { stored = JSON.parse(localStorage.getItem('he_bio_person_v1') || 'null'); } catch { stored = null; }
+    let prof: { weightKg?: number; sex?: 'male' | 'female'; age?: number } = {};
+    try {
+      const p: any = getProfile();
+      prof = {
+        weightKg: Number(p?.personal?.weight) || undefined,
+        sex: p?.personal?.sex === 'female' ? 'female' : 'male',
+        age: Number(p?.personal?.age) || undefined,
+      };
+    } catch { /* без профиля — дефолт */ }
+    return resolvePersonDefaults(stored as any, prof);
+  });
+  const [wKg, setWKg] = useState(personInit.wKg);
+  const [sex, setSex] = useState<'male' | 'female'>(personInit.sex);
+  const [age, setAge] = useState(personInit.age);
+  useEffect(() => {
+    try { localStorage.setItem('he_bio_person_v1', JSON.stringify({ wKg, sex, age })); } catch { /* quota/private */ }
+  }, [wKg, sex, age]);
 
   const catalog = useMemo(() => buildBioavailabilityCatalog(), []);
 

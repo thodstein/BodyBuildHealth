@@ -59,4 +59,16 @@ describe('P7 паспорт UI', () => {
       console.error = orig;
     }
   });
+
+  it('персист: выбранное вещество переживает ремаунт', () => {
+    try { localStorage.setItem('he_bio_passport', 'magnesium'); } catch { /* noop */ }
+    try {
+      const { container, unmount } = render(<SupportSubstancePassport />);
+      // карточка видна сразу, без поиска
+      expect(container.textContent || '').toMatch(/Доза:|Био:/);
+      unmount();
+    } finally {
+      try { localStorage.removeItem('he_bio_passport'); } catch { /* noop */ }
+    }
+  });
 });

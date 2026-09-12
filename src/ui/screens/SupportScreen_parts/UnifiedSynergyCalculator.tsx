@@ -703,8 +703,8 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ fontSize: 22, fontWeight: 900, color: '#a78bfa' }}>{hubStackScore.score}</div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>Stack Score · {hubStackScore.grade}</div>
-              <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>0–100: штрафы за конфликты/дубли/D-грейды, бонусы за синергии/A. Информационно, не вердикт.</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>Stack Score хаба · {hubStackScore.grade}</div>
+              <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>Дубли + истощения + грейды + нагрузка. Парная совместимость — в карточке «Совместимость стека» выше.</div>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 6 }}>

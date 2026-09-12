@@ -3,7 +3,7 @@
  * Калькулятор поддержки не тронут.
  */
 import { describe, it, expect } from 'vitest';
-import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, personDoseHints, passesGradeFilter, filterCatalogGroups } from '../support-hub-evidence.engine';
+import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, personDoseHints, passesGradeFilter, filterCatalogGroups, resolvePersonDefaults } from '../support-hub-evidence.engine';
 import { LAB_TOP20, LAB_ID_ALIASES, resolveLabMonitor } from '../support-hub-labs.engine';
 import { getCachedPubmed, writePubmedCache, readPubmedCache } from '../support-hub-research.engine';
 import { dedupeDepletions, stackOverlap, stackScore } from '../support-hub-stack.engine';
@@ -258,6 +258,23 @@ describe('P8 кэш PubMed (движок)', () => {
     expect(writePubmedCache(ok, 'k', '  ', [{ x: 1 }])).toBe(false);
     expect(writePubmedCache(ok, 'k', 'a', [])).toBe(false);
     expect(getCachedPubmed(ok, 'k', '')).toBeNull();
+  });
+});
+
+describe('P2-добавка resolvePersonDefaults (стор > профиль > дефолт)', () => {
+  it('пусто везде — 80/муж/30', () => {
+    expect(resolvePersonDefaults(null, null)).toEqual({ wKg: 80, sex: 'male', age: 30 });
+  });
+  it('профиль побеждает дефолт', () => {
+    expect(resolvePersonDefaults(null, { weightKg: 62, sex: 'female', age: 28 })).toEqual({ wKg: 62, sex: 'female', age: 28 });
+  });
+  it('ручное сохранение побеждает профиль', () => {
+    expect(resolvePersonDefaults({ wKg: 95, sex: 'male', age: 40 }, { weightKg: 62, sex: 'female', age: 28 }))
+      .toEqual({ wKg: 95, sex: 'male', age: 40 });
+  });
+  it('мусор в сторе — fallback на профиль, не NaN', () => {
+    const r = resolvePersonDefaults({ wKg: 'abc', sex: 'x', age: -5 }, { weightKg: 70, sex: 'male', age: 35 });
+    expect(r).toEqual({ wKg: 70, sex: 'male', age: 35 });
   });
 });
 

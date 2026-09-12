@@ -13,7 +13,18 @@ import { S } from './SupportShared';
 
 export const SupportSubstancePassport: React.FC = () => {
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // P7: помним последнее вещество (как he_bio_selected в био-каталоге)
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    try { return localStorage.getItem('he_bio_passport') || null; } catch { return null; }
+  });
+  const selectId = (id: string | null, name?: string) => {
+    setSelectedId(id);
+    if (name !== undefined) setSearch(name);
+    try {
+      if (id) localStorage.setItem('he_bio_passport', id);
+      else localStorage.removeItem('he_bio_passport');
+    } catch { /* quota/private */ }
+  };
   const catalog = useMemo(() => buildBioavailabilityCatalog(), []);
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -55,12 +66,12 @@ export const SupportSubstancePassport: React.FC = () => {
       </div>
       <div style={{ ...S.card }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>📄 Паспорт вещества</div>
-        <input value={search} onChange={e => { setSearch(e.target.value); setSelectedId(null); }} placeholder="Введите название (магний, креатин, NAC...)"
+        <input value={search} onChange={e => { selectId(null); setSearch(e.target.value); }} placeholder="Введите название (магний, креатин, NAC...)"
           style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(24,24,27,0.6)', color: '#fff', fontSize: 13, outline: 'none' }} />
         {filtered.length > 0 && !selectedId && (
           <div style={{ marginTop: 6, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden' }}>
             {filtered.map(e => (
-              <div key={e.id} onClick={() => { setSelectedId(e.id); setSearch(e.nameRu); }}
+              <div key={e.id} onClick={() => selectId(e.id, e.nameRu)}
                 style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                 {e.nameRu} <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>({e.id})</span>
               </div>

@@ -173,6 +173,26 @@ export function doseWindowFor(
 
 export interface PersonCtx { weightKg?: number; sex?: 'male' | 'female'; age?: number }
 
+export interface PersonDefaults { wKg: number; sex: 'male' | 'female'; age: number }
+
+/**
+ * Дефолты вес/пол/возраст: ручное сохранение > профиль > константы.
+ * Чистая функция — компонент только читает/пишет стор.
+ */
+export function resolvePersonDefaults(
+  stored: { wKg?: unknown; sex?: unknown; age?: unknown } | null | undefined,
+  prof: PersonCtx | null | undefined,
+): PersonDefaults {
+  const sW = stored && typeof stored.wKg !== 'undefined' ? Number(stored.wKg) : NaN;
+  const sA = stored && typeof stored.age !== 'undefined' ? Number(stored.age) : NaN;
+  const sS = stored && (stored.sex === 'female' || stored.sex === 'male') ? stored.sex : null;
+  return {
+    wKg: Number.isFinite(sW) && (sW as number) > 0 ? (sW as number) : (prof && prof.weightKg && prof.weightKg > 0 ? prof.weightKg : 80),
+    sex: sS || (prof && prof.sex === 'female' ? 'female' : 'male'),
+    age: Number.isFinite(sA) && (sA as number) > 0 ? (sA as number) : (prof && prof.age && prof.age > 0 ? prof.age : 30),
+  };
+}
+
 // ─── P3-добавка: фильтр каталога по грейду (локальный, без SupportScreen) ───
 
 export type GradeFilter = 'all' | 'AB';
