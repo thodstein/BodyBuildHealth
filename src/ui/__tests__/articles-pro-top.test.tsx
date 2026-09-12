@@ -504,6 +504,42 @@ describe('ArticlesScreen PRO TOP', () => {
     expect(rel.textContent?.indexOf('Полный гид') || 0).toBeLessThan(rel.textContent?.indexOf('Гид по анализам') || 0);
   });
 
+  it('42. UI переживает размонтирование: раздел+экран', () => {
+    const first = render(<ArticlesScreen />);
+    const card = first.container.querySelector('.articles-hero-card[data-id="recommended"]') as HTMLElement;
+    fireEvent.click(card);
+    expect(first.container.querySelector('.articles-list-title')?.textContent).toContain('Рекомендуемое');
+    first.unmount();
+    const second = render(<ArticlesScreen />);
+    expect(second.container.querySelector('.articles-hero')).toBeNull();
+    expect(second.container.querySelector('.articles-list-title')?.textContent).toContain('Рекомендуемое');
+  });
+
+  it('43. UI переживает размонтирование: категория+сортировка', () => {
+    const first = render(<ArticlesScreen />);
+    const all = first.container.querySelector('.articles-hero-card[data-id="all"]') as HTMLElement;
+    fireEvent.click(all);
+    const chipsBar = first.container.querySelector('.articles-chips') as HTMLElement;
+    const pharmaChip = Array.from(chipsBar.querySelectorAll('button')).find(
+      b => b.textContent?.includes('Фарма'),
+    ) as HTMLElement;
+    fireEvent.click(pharmaChip);
+    fireEvent.click(first.container.querySelector('.articles-sort') as HTMLElement);
+    first.unmount();
+    const second = render(<ArticlesScreen />);
+    expect(second.container.querySelector('.articles-sort')?.textContent).toContain('Старые');
+    const chips = Array.from(second.container.querySelectorAll('.articles-chips button'));
+    const pharma = chips.find(b => b.textContent?.includes('Фарма')) as HTMLElement | undefined;
+    expect(pharma?.getAttribute('data-active')).toBe('true');
+  });
+
+  it('44. битый UI-стор → дефолты без краша', () => {
+    localStorage.setItem('he_articles_ui_v1', '{oops');
+    const { container } = render(<ArticlesScreen />);
+    expect(container.querySelector('.articles-hero')).not.toBeNull();
+    expect(container.querySelector('.articles-hero-card[data-id="all"]')).not.toBeNull();
+  });
+
   it('6. PDF-карточка зовёт читать внутри', () => {
     const { container } = render(<ArticlesScreen />);
     goToList(container);

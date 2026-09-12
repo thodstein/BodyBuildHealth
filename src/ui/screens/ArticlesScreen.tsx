@@ -18,6 +18,31 @@ const artA = (alpha: number): string => {
 
 const SAVED_KEY = 'he_articles_saved_v1';
 const LAST_KEY = 'he_articles_last_v1';
+const UI_KEY = 'he_articles_ui_v1';
+
+interface ArticlesUIState {
+  page: 'hero' | 'list';
+  listSection: string;
+  category: string;
+  sortDir: 'desc' | 'asc';
+}
+
+export function loadArticlesUI(): ArticlesUIState {
+  const fallback: ArticlesUIState = { page: 'hero', listSection: 'all', category: 'all', sortDir: 'desc' };
+  try {
+    const raw = localStorage.getItem(UI_KEY);
+    if (!raw) return fallback;
+    const v = JSON.parse(raw) as Partial<ArticlesUIState>;
+    return {
+      page: v.page === 'list' ? 'list' : 'hero',
+      listSection: v.listSection === 'new' || v.listSection === 'recommended' ? v.listSection : 'all',
+      category: typeof v.category === 'string' && (v.category === 'all' || v.category === 'saved' || CATEGORIES.some(c => c.value === v.category)) ? v.category : 'all',
+      sortDir: v.sortDir === 'asc' ? 'asc' : 'desc',
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 const RECENT_KEY = 'he_articles_recent_v1';
 const RECENT_CAP = 5;
@@ -313,11 +338,21 @@ export function renderMarkdown(md: string, bodyPx = 14): string {
 }
 
 export const ArticlesScreen: React.FC = () => {
-  const [page, setPage] = useState<'hero' | 'list'>('hero');
-  const [listSection, setListSection] = useState<string>('all');
+  const [initialUI] = useState<ArticlesUIState>(() => loadArticlesUI());
+  const [page, setPage] = useState<'hero' | 'list'>(initialUI.page);
+  const [listSection, setListSection] = useState<string>(initialUI.listSection);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('all');
-  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
+  const [category, setCategory] = useState(initialUI.category);
+  const [sortDir, setSortDir] = useState<'desc' | 'asc'>(initialUI.sortDir);
+
+  // Персист UI: переключение вкладок размонтирует экран — возвращаемся туда же.
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(UI_KEY, JSON.stringify({ page, listSection, category, sortDir }));
+    } catch {
+      /* quota — только сессия */
+    }
+  }, [page, listSection, category, sortDir]);
   const [readingArticle, setReadingArticle] = useState<ArticleManifestEntry | null>(null);
   const [pdfViewer, setPdfViewer] = useState<string | null>(null);
   const [pdfTitle, setPdfTitle] = useState<string>('PDF-документ');
