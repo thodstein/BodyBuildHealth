@@ -6,9 +6,9 @@ import type { ArmBuilderInput } from './arm-types';
 import { buildArmPlan } from './arm-builder.engine';
 import { finalizeArmPlan } from './arm-finalize.engine';
 import { applyArmTaperToWeeks, buildArmTaperCurve } from './arm-taper.engine';
-import { getArmCycle } from './arm-cycle-library.engine';
+import { getArmCycle, fitCycleToWeeks } from './arm-cycle-library.engine';
 import { suggestCycleForMacroPhase } from './arm-cycle-selector.engine';
-import { ARM_PHASE_PRESETS } from './arm-pro5-ux.engine';
+import { ARM_PHASE_PRESETS, consentPreview } from './arm-pro5-ux.engine';
 import { superSeriesYear } from './arm-calendar.engine';
 import type { UserWeek } from '../user-program/user-program.types';
 
@@ -94,6 +94,14 @@ export function buildArmBlock(
     cycleId: (config as any).cycleId,
     cycleConsent: (config as any).cycleConsent,
     correctionPct: (config as any).correctionPct,
+    // PRO-5: раздельные ставки + RPE/синглы/safety (билдер gated, без них — как раньше)
+    cyclePctPerWeek: (config as any).cyclePctPerWeek,
+    mesoRatePct: (config as any).mesoRatePct,
+    rpeParity: (config as any).rpeParity,
+    larrattStepKg: (config as any).larrattStepKg,
+    hookCapSets: (config as any).hookCapSets,
+    warmupDone: (config as any).warmupDone,
+    elbowPain: (config as any).elbowPain,
     cocWorking: (config as any).cocWorking,
     flatPyramid: (config as any).flatPyramid,
     flatPyramidWeightKg: (config as any).flatPyramidWeightKg,
@@ -138,6 +146,15 @@ export function buildArmBlock(
   const weeksOut = armPlanToUserWeeks(plan);
   const warnings: string[] = [];
   if (plan.validation && !plan.validation.valid) warnings.push(...(plan.validation.warnings || []));
+  // PRO-5 P7: consent-превью цикла в warnings блока (было/стало без захода в конструктор).
+  try {
+    const cid = String((config as any).cycleId || '');
+    const c = cid ? getArmCycle(cid) : undefined;
+    if (c) {
+      const prev = consentPreview({ fit: fitCycleToWeeks(cid, weeks).fit, cycleWeeks: c.weeks, targetWeeks: weeks, cycleName: c.name });
+      for (const line of prev.lines) warnings.push(`Цикл: ${line}`);
+    }
+  } catch { /* опционально */ }
   // PRO-5 P5: годовая лестница — фазовый пресет блока виден в warnings
   // (объём/RIR уже заданы goal-маппингом выше; здесь только честная подпись).
   try {

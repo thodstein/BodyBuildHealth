@@ -102,4 +102,32 @@ describe('Arm PRO-5 UI (controls + blocked)', () => {
     expect(blocked).not.toBeNull();
     expect(blocked!.textContent).toContain('Ось high');
   });
+
+  it('hook-кап: значение сквозит в гейты', () => {
+    const { container } = render(<ArmAutoConstructor />);
+    goSplit(container);
+    fireEvent.change(screen.getByLabelText('Hook-кап сетов в неделю'), { target: { value: '2' } });
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: /Веса и качество/ }));
+    expect(container.querySelector("[data-arm='gates']")?.textContent).toContain('hook-объём');
+  });
+
+  it('warmup: без флажка — требование, с флажком — тихо', () => {
+    const c1 = render(<ArmAutoConstructor />);
+    goSplit(c1.container);
+    fireEvent.click(screen.getByRole('switch', { name: 'Ось humerus-2026' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Холод без разминки' }));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: /Веса и качество/ }));
+    expect(c1.container.querySelector("[data-arm='gates']")?.textContent).toContain('Холод без разминки');
+    c1.unmount();
+    const c2 = render(<ArmAutoConstructor />);
+    goSplit(c2.container);
+    fireEvent.click(screen.getAllByRole('switch', { name: 'Ось humerus-2026' })[0]);
+    fireEvent.click(screen.getAllByRole('switch', { name: 'Холод без разминки' })[0]);
+    fireEvent.click(screen.getAllByRole('switch', { name: /разминка 10–15 мин выполнена/ })[0]);
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    fireEvent.click(screen.getByRole('button', { name: /Веса и качество/ }));
+    expect(c2.container.querySelector("[data-arm='gates']")?.textContent).not.toContain('Холод без разминки');
+  });
 });

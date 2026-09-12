@@ -8,7 +8,9 @@ import { checkAntagonistPlan } from './arm-antagonist.engine';
 import { getArmCycle } from './arm-cycle-library.engine';
 import { getArmPattern } from './arm-split-patterns';
 // PRO-5: blocked-уровень + каденс делоадов (valid не меняют — старые контракты целы)
-import { axisScoreOf } from './arm-pro5-safety.engine';
+import { axisScoreOf, checkHookCap } from './arm-pro5-safety.engine';
+import { foreignPoolWarnings } from './arm-pro5-core.engine';
+import { checkCocGates } from './arm-pro5-coc-gate.engine';
 import { deloadEnforcement } from './arm-pro5-ux.engine';
 
 export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationResult {
@@ -16,6 +18,28 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
   const errors: string[] = [];
   const warnings: string[] = [];
   const mrvOverflow: Array<{ muscle: string; sets: number; mrv: number }> = [];
+
+  // PRO-5: safety-постчеки ПЕРВЫМИ — критичное видно в гейтах до объёмной мелочи
+  // (те же чистые функции, что в билдере: структура + снапшот входов).
+  try {
+    const snap = (plan.inputSnapshot as any) || {};
+    const tech = String(plan.technique || 'balanced');
+    if (tech === 'hook' || snap.hookCapSets != null) {
+      const cap = Number(snap.hookCapSets) || 12;
+      for (const line of checkHookCap(plan.weeks as any, cap)) warnings.push(line);
+    }
+  } catch { /* опционально */ }
+  try {
+    const snap = (plan.inputSnapshot as any) || {};
+    if (snap.axisCheck?.coldNoWarmup && snap.warmupDone !== true)
+      warnings.push('Холод без разминки: блок 10–15 мин (кисть/локоть/плечо) обязателен перед столом.');
+  } catch { /* опционально */ }
+  try {
+    for (const wk of plan.weeks) for (const line of checkCocGates(wk as any, wk.week)) warnings.push(line);
+  } catch { /* опционально */ }
+  try {
+    for (const line of foreignPoolWarnings(plan.weeks as any)) warnings.push(line);
+  } catch { /* опционально */ }
 
   for (const wk of plan.weeks) {
     // session cap

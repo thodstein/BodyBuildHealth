@@ -13,7 +13,7 @@ import { checkCocGates } from '../arm-pro5-coc-gate.engine';
 import { rirForRpe, strengthLogRir, larrattSinglesFor, isSinglesCandidate } from '../arm-pro5-singles.engine';
 import { suggestSplitForCycle, consentPreview, deloadEnforcement, ARM_PHASE_PRESETS } from '../arm-pro5-ux.engine';
 import { buildContestSimWeek, waf2025FoulChecklist } from '../arm-contest-sim.engine';
-import { buildArmBlock } from '../arm-annual';
+import { buildArmBlock, buildArmYearBlocks } from '../arm-annual';
 
 const BASE: any = { discipline: 'armwrestling', patternId: 'arm_3_full', level: 'intermediate', goal: 'strength', technique: 'toproll', weeks: 8 };
 
@@ -309,5 +309,46 @@ describe('arm-pro5 builder wiring', () => {
     const p = buildArmBlock({ blockKey: 'b2', weeks: 4, phase: 'peaking' }, {});
     expect(p.peakApplied).toBe(true);
     expect(p.warnings.some((w) => w.includes('peaking'))).toBe(true);
+  });
+  it('annual: PRO-5 passthrough (ставки/RPE/hook-кап)', () => {
+    const r = buildArmBlock({ blockKey: 'r', weeks: 8, phase: 'strength' }, { cycleId: 'strengthlog_8', cycleConsent: true, cyclePctPerWeek: 1, mesoRatePct: 2 } as any);
+    expect(r.armPlan.rationale.some((x: string) => x.includes('раздельные поля PRO-5'))).toBe(true);
+    const h = buildArmBlock({ blockKey: 'h', weeks: 4, phase: 'strength' }, { hookCapSets: 4 } as any);
+    expect(h.armPlan.safetyWarnings.some((w: string) => w.includes('hook-объём'))).toBe(true);
+    const base = buildArmBlock({ blockKey: 'b', weeks: 4, phase: 'strength' }, {});
+    expect(base.armPlan.safetyWarnings.some((w: string) => w.includes('hook-объём'))).toBe(false);
+  });
+  it('annual: consent-превью цикла в warnings', () => {
+    const no = buildArmBlock({ blockKey: 'n', weeks: 8, phase: 'strength' }, { cycleId: 'tableready_12' } as any);
+    expect(no.warnings.some((w) => w.includes('generic'))).toBe(true);
+    const yes = buildArmBlock({ blockKey: 'y', weeks: 8, phase: 'strength' }, { cycleId: 'tableready_12', cycleConsent: true } as any);
+    expect(yes.warnings.some((w) => w.includes('Станет'))).toBe(true);
+  });
+  it('E2E 52 нед: год собирается, тейпер один раз (без двойного среза)', () => {
+    const blocks = buildArmYearBlocks('super_series', 52, { level: 'intermediate' });
+    expect(blocks.reduce((s, b) => s + b.weeks, 0)).toBe(52);
+    let markers = 0;
+    for (const b of blocks) {
+      const res = buildArmBlock(
+        { blockKey: b.blockKey, weeks: b.weeks, phase: b.phase },
+        { level: 'intermediate', taperEnabled: b.phase === 'peaking' } as any,
+      );
+      expect(res.weeks.length).toBeGreaterThan(0);
+      for (const wk of res.armPlan.weeks as any[]) {
+        const hits = String(wk.note || '').split('[arm-taper:').length - 1;
+        expect(hits).toBeLessThanOrEqual(1);
+        markers += hits;
+      }
+    }
+    expect(markers).toBeGreaterThan(0);
+    expect(markers).toBeLessThanOrEqual(3);
+  });
+  it('гард двойного среза: хвост non-classic идёт полным (режет только кривая)', () => {
+    const base: any = { discipline: 'armwrestling', patternId: 'arm_4_upper_lower', level: 'intermediate', goal: 'strength', technique: 'balanced', weeks: 6 };
+    const vol = (p: any, w: number) => p.weeks[w - 1].sessions.reduce((s: number, ss: any) => s + ss.exercises.reduce((a: number, e: any) => a + e.sets, 0), 0);
+    const cyc: any = buildArmPlan({ ...base, cycleId: 'toproll_6', cycleConsent: true });
+    const gen: any = buildArmPlan({ ...base });
+    // хвост toproll-пресета идёт с weekMult 1.0 (generic пик — 0.45): без гарда было бы 0.45×кривая
+    expect(vol(cyc, 6)).toBeGreaterThan(vol(gen, 6));
   });
 });
