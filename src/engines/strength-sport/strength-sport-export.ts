@@ -66,6 +66,23 @@ function buildPhaseGantt(plan: StrengthSportPlan): string {
   return `<section class="gantt" style="margin:12px 0;padding:14px 16px;border:1px solid #e5e7eb;border-radius:12px;background:#fff"><div style="font-size:14px;font-weight:800;margin-bottom:8px;letter-spacing:-0.01em">🗓️ Gantt фаз · taper отдельно</div>${ganttBar}${legend}${weeksRow}</section>`;
 }
 
+function buildStrengthProSection(snap: any): string {
+  // Planner PRO D8: секция из inputSnapshot (билдер кладёт туда весь input 1-в-1). CSV (16 колонок) не тронут.
+  try {
+    if (!snap || typeof snap !== 'object') return '';
+    const parts: string[] = [];
+    if (snap.weightClass) parts.push(`<b>Класс:</b> ${escHtml(snap.weightClass)}${typeof snap.bodyweight === 'number' ? ` · ${escHtml(snap.bodyweight)}кг` : ''}`);
+    if (snap.rpeCap) parts.push(`<b>RPE-cap:</b> ${escHtml(snap.rpeCap)}`);
+    if (snap.deadliftGrip) parts.push(`<b>Хват:</b> ${escHtml(snap.deadliftGrip === 'mixed' ? 'разнохват (≥85% — hook/лямки)' : snap.deadliftGrip)}`);
+    if (snap.blockModel && snap.blockModel !== 'strong5') parts.push(`<b>Модель:</b> ${escHtml(snap.blockModel === 'toro4' ? 'Torokhtiy 4-фаз (тапер ×0.65)' : 'Wave/DUP')}`);
+    if (snap.autoDeload === false) parts.push('<b>Делоды:</b> выкл');
+    if (snap.conditioningDay === false) parts.push('<b>Cond_day:</b> выкл');
+    if (snap.openerSingles === true) parts.push('<b>Opener:</b> 90% 1×1 в последнюю неделю');
+    if (!parts.length) return '';
+    return `<section style="margin:12px 0;padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;background:#fff"><div style="font-size:14px;font-weight:800;margin-bottom:6px;letter-spacing:-0.01em">🏆 Стронг-PRO</div><div style="font-size:11px;margin:4px 0">${parts.join(' · ')}</div></section>`;
+  } catch { return ''; }
+}
+
 function buildMedleySection(plan: StrengthSportPlan): string {
   const contestImplements: string[] | null = (()=> { const c=(plan.inputSnapshot as any)?.contest; if(c?.events?.length){ const ce=c.events.find((e:any)=> e.implements?.length>=2); if(ce) return ce.implements as string[]; } return null; })();
   const hasMedley = plan.weeksData.some(w=> w.sessions.some(s=> s.exercises.some(e=> (e.comment||'').includes('Medley') || (e.comment||'').includes('Contest Medley')))) || !!contestImplements;
@@ -102,10 +119,11 @@ export function buildStrengthPrintHtml(plan: StrengthSportPlan): string {
     }
   } catch {}
   const medleySection = buildMedleySection(plan);
+  const proSection = buildStrengthProSection((plan as any).inputSnapshot);
   const gantt = buildPhaseGantt(plan);
   const headerHtml = buildPrintHeader(plan);
   const summary = `<div style="margin:10px 0;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;font-size:12px;line-height:1.55;color:#1f2937"><b>${title}</b> · ${plan.weeksData.map(w=>`Н${w.week}:${w.phase}${(w as any).taper?' taper':''}${w.deload?' дел':''} ${w.totalSets}сет`).join(' | ')}<br/>Бюджет: ${plan.rationale.join(' | ')}</div>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,-apple-system,'Segoe UI',Arial,sans-serif;padding:20px;max-width:1020px;margin:0 auto;color:#111;line-height:1.45} table{border-collapse:collapse;width:100%} table tr:nth-child(even) td{background:#f8fafc} @media print{body{padding:0;max-width:none} header{break-inside:avoid} section.gantt{break-inside:avoid} table{break-inside:auto} tr{break-inside:avoid}}</style></head><body>${headerHtml}${gantt}${extra}${medleySection}${summary}<table>${header}${body}</table><script>window.onload=()=> setTimeout(()=> window.print(), 300)</script></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,-apple-system,'Segoe UI',Arial,sans-serif;padding:20px;max-width:1020px;margin:0 auto;color:#111;line-height:1.45} table{border-collapse:collapse;width:100%} table tr:nth-child(even) td{background:#f8fafc} @media print{body{padding:0;max-width:none} header{break-inside:avoid} section.gantt{break-inside:avoid} table{break-inside:auto} tr{break-inside:avoid}}</style></head><body>${headerHtml}${gantt}${extra}${proSection}${medleySection}${summary}<table>${header}${body}</table><script>window.onload=()=> setTimeout(()=> window.print(), 300)</script></body></html>`;
 }
 
 export function downloadStrengthCsv(plan: StrengthSportPlan){

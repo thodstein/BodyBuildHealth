@@ -33,7 +33,7 @@ import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/str
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { isNativeApp } from '../../../core/app-platform';
 import { collectSsVelocityHistory } from './sm-bridge-intake';
-import { weightClassFor, weightClassLine, smWeightClassesFor, RPE_CAP_OPTIONS, SS_BLOCK_MODELS, DELOAD_VS_TAPER_NOTE, scoreCheckin, pushCheckin, loadCheckins, saveCheckins, progHashOf, type SsCheckin } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
+import { weightClassFor, weightClassLine, smWeightClassesFor, RPE_CAP_OPTIONS, SS_BLOCK_MODELS, DELOAD_VS_TAPER_NOTE, scoreCheckin, pushCheckin, loadCheckins, saveCheckins, progHashOf, autoDeloadEffective, type SsCheckin } from '../../../engines/strength-sport/strength-sport-planner-pro.engine';
 import { CARD_STRONG, CARD_HERO, ROW, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, SELECT, TEXT_2, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, SectionCard, Badge, InfoBanner, GroupHeading, ProgressBar, ChipToggle, Field, Divider, Highlight, StrengthPopupSelect, StrengthPopupNumber, EventCard, LEVEL_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, MODE_RU, GOAL_RU, ruLabel } from './StrengthUI';
 import { BTN as T_BTN, BTN_GHOST as T_BTN_GHOST, STEP_PILL } from '../TrainingScreen_parts/training-ui';
 
@@ -179,6 +179,18 @@ export const StrengthSportConstructor: React.FC = () => {
     // vbtMap НЕ очищаем: ключи week-day-ex-set стабильны между пересборками,
     // замеры — это история последних сессий, она должна переживать rebuild.
     const velocityHistory = collectSsVelocityHistory(vbtMap, vbtPerLift as any, hubVelocity);
+    // Planner PRO P4-live: скор сохранённого чекина ≤2 включает делоды на сборке (механика штатная).
+    let checkinDeload = false;
+    let checkinScore: number | null = null;
+    try {
+      const l = loadCheckins();
+      if (l.length) {
+        const last = l[l.length - 1];
+        const sc = scoreCheckin({ eventFatigue: last.eventFatigue, grip: last.grip, back: last.back, sleep: last.sleep, appetite: last.appetite });
+        checkinScore = sc.score;
+        checkinDeload = !autoDeload && sc.suggestDeload;
+      }
+    } catch {}
     setBuildStage('Строим недели и сеты…'); await tick();
     let input: StrengthSportInput = {
       mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology, dupMode, intensityTech,
@@ -199,7 +211,7 @@ export const StrengthSportConstructor: React.FC = () => {
       rpeCap,
       deadliftGrip,
       blockModel,
-      autoDeload,
+      autoDeload: (autoDeload || checkinDeload) as boolean,
       conditioningDay,
       openerSingles: true,
       contest: mode==='strongman' ? contest : undefined,
@@ -279,6 +291,10 @@ export const StrengthSportConstructor: React.FC = () => {
     if (orthoNote) {
       p.rationale.push(`🦴 Орто-скрининг: ${orthoNote}`);
     }
+    // Planner PRO P4-live: чекин включил делоды — фиксируем причину в rationale.
+    if (checkinDeload) {
+      p.rationale.push(`📋 Чек-ин недели ${checkinScore}/5 → делоды 4/7/11 включены на сборке`);
+    }
     // V4-добой (G8): заявки/Sinclair/спец-блок ТА-хаба — в rationale (у билдера нет входов — не теряем молча).
     try {
       const tb = taBridge as any;
@@ -327,7 +343,7 @@ export const StrengthSportConstructor: React.FC = () => {
     try {
       setBuildStage('Собираем год…'); await tick();
       const hist = loadStrengthSportPlans().slice(0, 6);
-      const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks: 1 }) : buildAnnualFromSS(hist);
+      const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks }) : buildAnnualFromSS(hist);
       saveAnnualSS(ann);
       setAnnual(ann);
       try { syncStrengthAnnualToGeneral(ann); } catch {}
@@ -518,7 +534,7 @@ export const StrengthSportConstructor: React.FC = () => {
       const picked = (annualCycleSel && annualCycleSel.length ? annualCycleSel.filter(id=> avail.some(r=> r.cycle.meta.id===id)) : avail.slice(0, 3).map(r=> r.cycle.meta.id));
       if (!picked.length) { setMsg('Нет доступных циклов'); setTimeout(()=>setMsg(''),1800); return; }
       const base: any = { mode, goal, level, workMax, equipment, injuries, mobilityRestrictions: mobility, sex, bodyweight, age, methodology, dupMode, intensityTech, outsideLoad: outsideEnabled ? outside : null, acwr: acwr as any, weakPoints: weakPoints.length ? weakPoints : undefined, contest: mode==='strongman' ? contest : undefined, contestStrategy: mode==='strongman' ? contestStrategy : undefined, startDate: new Date().toISOString().slice(0,10) };
-      const ann3 = buildAnnualFromSSCycles(picked, base, { cycleMode, competitionDate: competitionDate || undefined, taperWeeks: 1 });
+      const ann3 = buildAnnualFromSSCycles(picked, base, { cycleMode, competitionDate: competitionDate || undefined, taperWeeks });
       saveAnnualSS(ann3); setAnnual(ann3);
       try { syncStrengthAnnualToGeneral(ann3); } catch {}
       setMsg(`✦ Год из циклов: ${picked.length} блока (${ann3.totalWeeks}нед)`); setTimeout(()=>setMsg(''),2200);
@@ -800,6 +816,15 @@ export const StrengthSportConstructor: React.FC = () => {
             </div>
             <div style={{ fontSize:11, color: '#fff' }}>Дней {days}× · Режим {mode==='weightlifting'?'ТА':mode==='strongman'?'Стронг':'Гибрид'} · Уровень {ruLabel(LEVEL_RU, level)} · {patternId ? 'выбран вручную' : 'авто — тапните карточку ниже'}</div>
           </SectionCard>
+          {blockModel==='wave' && !cycleId && (
+            <SectionCard icon="🌊" title="Превью волны" subtitle="heavy/medium/light по неделям (DUP)">
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {Array.from({ length: weeks }, (_, i) => i + 1).map(wn => (
+                  <span key={wn} style={{ fontSize:10, padding:'3px 7px', borderRadius:8, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.08)', color:'#fff', fontVariantNumeric:'tabular-nums' }}>Н{wn}·{wn%3===1?'тяж':wn%3===2?'средн':'лёгк'}</span>
+                ))}
+              </div>
+            </SectionCard>
+          )}
           <SectionCard icon="📚" title="Интернет-цикл" subtitle="Дословные программы ТА/стронга · перекрывает сплит ниже" accent={!!cycleId}>
             {!cycleId && rankedCycles.filter(r=> !r.blocked).length > 0 && (
               <div style={{ fontSize:11, color:'#fff' }}>💡 Рекомендуем цикл: <Highlight color={modeColor}>{rankedCycles.filter(r=> !r.blocked)[0].cycle.meta.title}</Highlight></div>
@@ -975,7 +1000,7 @@ export const StrengthSportConstructor: React.FC = () => {
             {(() => { try {
               const s = scoreCheckin(checkin);
               return s.suggestDeload
-                ? <InfoBanner tone="warn">Скор {s.score}/5 — предложен делод (кнопка, не авто): <button onClick={()=> { setAutoDeload(true); setMsg('✦ Делоды 4/7/11 включены'); setTimeout(()=>setMsg(''),2200); }} style={{ ...BTN_SMALL, marginLeft:6 }}>Включить делоды</button></InfoBanner>
+                ? <InfoBanner tone="warn">Скор {s.score}/5 — делоды 4/7/11 включатся на следующей сборке (сохрани чек-ин) <button onClick={()=> { setAutoDeload(true); setMsg('✦ Делоды 4/7/11 включены'); setTimeout(()=>setMsg(''),2200); }} style={{ ...BTN_SMALL, marginLeft:6 }}>Включить сейчас</button></InfoBanner>
                 : <InfoBanner tone="info">Скор {s.score}/5 — восстановление в норме.</InfoBanner>;
             } catch { return null; } })()}
             <button onClick={()=> { try { saveCheckins(pushCheckin(loadCheckins(), checkin)); setMsg('✦ Чек-ин сохранён'); setTimeout(()=>setMsg(''),1800); } catch {} }} style={BTN_SMALL}>💾 Сохранить чек-ин</button>

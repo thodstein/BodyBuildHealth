@@ -130,6 +130,15 @@ export function deloadWeeksFor(totalWeeks: number, autoDeload: boolean): number[
   return cand.filter((w) => w < totalWeeks && w >= 4);
 }
 
+/** Живой чек-ин: скор ≤2 включает делоды на сборке (механика существующая, без новой математики). */
+export function autoDeloadEffective(autoDeload: boolean, lastCheckin?: SsCheckin | null): boolean {
+  if (autoDeload) return true;
+  if (lastCheckin) {
+    try { if (scoreCheckin(lastCheckin).suggestDeload) return true; } catch { /* no-op */ }
+  }
+  return false;
+}
+
 export const DELOAD_VS_TAPER_NOTE = 'Делод (нед 4/7/11) — плановый сброс внутри цикла; тапер — острый пик к дате старта (Rogerson 2024)';
 // waveForWeek удалён: волна считается внутри applyDUP (strength-sport-dup.ts, idx%3),
 // отдельный хелпер с другой индексацией врал бы. P6.

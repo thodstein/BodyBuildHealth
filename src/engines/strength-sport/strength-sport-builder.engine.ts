@@ -624,11 +624,15 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     if ((input as any).deadliftGrip === 'mixed') rationale.push('Хват становой: разнохват — на ≥85% см. предупреждение в технике (PMC8237209)');
     if ((input as any).blockModel === 'toro4') rationale.push('Block-модель Torokhtiy 4-фаз (3/3/3/1): тапер нед.10 ×0.65');
     else if ((input as any).blockModel === 'wave') rationale.push('Block-модель Wave/DUP: heavy/medium/light по неделям');
-    if ((input as any).competitionDate && (input as any).openerSingles !== false && mode === 'strongman') rationale.push(PRO_OPENER_NOTE);
   } catch { /* rationale-only */ }
 
   // auto-deload 4,7,11 для длительных циклов (StrongmanPlan) — кроме уже deload последней недели
   const autoDeloadSet = new Set(autoDeloadWeeksArr);
+  // Planner PRO P7-opener: настоящий сингл 90% — только при явном openerSingles===true
+  // (конструктор включает; движок без флага байт-в-байт, старые тесты целы).
+  const openerOn = (input as any).openerSingles === true && mode === 'strongman' && !!(input as any).competitionDate;
+  let openerDone = false;
+  let openerExName = '';
   for (let w = 1; w <= weeks; w++) {
     const rawPhase = (input.competitionDate && (input as any).startDate ? phaseForDate(w, weeks, goal, input.competitionDate, (input as any).startDate, mode) : phaseForWeek(w, weeks, goal, mode)) as any;
     const isAutoDeload = autoDeloadSet.has(w) && rawPhase !== 'deload' && rawPhase !== 'peaking';
@@ -914,6 +918,20 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           isCompetitionLift: isOly(id) || isStrong(id),
         };
         exercises.push(ex);
+        // Planner PRO P7-opener: +1 сингл 90% к первому primary последней недели (sets/workSets в синке).
+        if (openerOn && !openerDone && w === weeks && isPrimary && tag !== 'cond_day') {
+          try {
+            const openerW = Math.round(basePmFor(id, input.workMax || {}) * 0.9 / 2.5) * 2.5;
+            if (openerW > 0) {
+              ex.workSets.push({ reps: 1, rir: 1, weight: openerW, pct: 90, tempo: 'X-0-X-0', restSeconds: 180 } as any);
+              (ex.workSets[ex.workSets.length - 1] as any).opener = true;
+              ex.sets = ex.workSets.length;
+              ex.comment = ex.comment ? `${ex.comment} · Opener 90% 1×1` : 'Opener 90% 1×1';
+              openerDone = true;
+              openerExName = ex.name;
+            }
+          } catch { /* no-op */ }
+        }
       }
       // C2 medley: strongman event_day с ≥2 carries → цепь 2+1 (90с переход cap 180с) PRO: contest medley variable 2-4
       if (tag === 'event_day' && mode === 'strongman') {
@@ -1008,6 +1026,8 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     const isTaperWeek = taperWeeksOuter > 0 && w > weeks - taperWeeksOuter && (goal === 'peaking' || phase === 'peaking' || phase === 'deload');
     weeksData.push({ week: w, phase, deload, taper: isTaperWeek, sessions, totalSets, totalTonnage });
   }
+  // Planner PRO P7-opener: строка только если сингл реально вшит (честно, не декларативно).
+  if (openerDone) rationale.push(`${PRO_OPENER_NOTE}${openerExName ? ` — ${openerExName}` : ''}`);
 
   // DUP / intensity (изолированно, только зал)
   // Planner PRO P5: blockModel 'wave' включает DUP-wave без явного dupMode (дефолт strong5 → off, байт-в-байт)
@@ -1042,9 +1062,10 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           if ((ex as any).role === 'accessory' && ex.sets > 2) { ex.sets -=1; ex.workSets = ex.workSets.slice(0, ex.sets); cur -=1; }
         }
       }
-      // если всё ещё > budget — режем любые с 3+ до 2
+      // если всё ещё > budget — режем любые с 3+ до 2 (opener-сингл не трогаем)
       for (const sess of wk.sessions) for (let i=sess.exercises.length-1; i>=0 && cur > weeklyBudget; i--) {
         const ex = sess.exercises[i];
+        if ((ex.workSets as any[]).some((ws: any) => ws && ws.opener)) continue;
         if (ex.sets > 2) { ex.sets -=1; ex.workSets = ex.workSets.slice(0, ex.sets); cur -=1; }
       }
       wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=>x+e.sets,0),0);

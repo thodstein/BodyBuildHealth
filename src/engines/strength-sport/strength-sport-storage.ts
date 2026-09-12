@@ -108,7 +108,8 @@ export function removeStrengthSportPlan(id: string): void {
 export function syncStrengthSportToCloud(): void {
   try {
     // триггерит cloud-kv hook: touch mtimes via setItem same value
-    const keys = [KEY, LIST_KEY, 'he_strength_annual_v1', 'he_lv_profile_ss_v1', 'he_hrv_log', 'he_grip_profile_v1'];
+    // Planner PRO D5: PRO-ключи (he_ss_pro_*, he_ss_checkin_v1, he_vbt_ss_v1) — тот же he_-автосинк, добавлены в явный touch.
+    const keys = [KEY, LIST_KEY, 'he_strength_annual_v1', 'he_lv_profile_ss_v1', 'he_hrv_log', 'he_grip_profile_v1', 'he_ss_checkin_v1', 'he_vbt_ss_v1', 'he_ss_pro_weightclass', 'he_ss_pro_rpecap', 'he_ss_pro_grip', 'he_ss_pro_block', 'he_ss_pro_autodeload', 'he_ss_pro_condday'];
     for (const k of keys) {
       const v = localStorage.getItem(k);
       if (v != null) {

@@ -230,3 +230,25 @@ describe('collectSsVelocityHistory', () => {
     ).toEqual({ snatch: [1.5, 1.6, 1.3], yoke_walk: [1.5, 1.2] });
   });
 });
+
+describe('D9 ТА-мост: заявки/Sinclair/FvR не теряются', () => {
+  it('taAttempts + taSinclair + taFvr + asym/ohs парсятся позитивно', () => {
+    const p = parseSmBridgePayload({
+      taAttempts: { snatch: [90, 96, 102], cj: [110, 116, 122] },
+      taSinclair: { total: 212, value: 301.5, cycle: '12w', q: 2 },
+      fvr: { snatchTh: 105, pmax: 2400 },
+      asymmetryPct: 9,
+      ohs: { failed: 2 },
+    });
+    expect(p.taAttempts).toEqual({ snatch: [90, 96, 102], cj: [110, 116, 122] });
+    expect(p.taSinclair?.value).toBe(301.5);
+    expect(p.taFvr?.snatchTh).toBe(105);
+    expect(p.taAsymPct).toBe(9);
+    expect(p.taOhsFailed).toBe(2);
+  });
+  it('битые заявки/Sinclair → null, а не мусор', () => {
+    const p = parseSmBridgePayload({ taAttempts: { snatch: 'x' }, taSinclair: { total: 0, value: -5 } });
+    expect(p.taAttempts == null || (p.taAttempts.snatch.length === 0 && p.taAttempts.cj.length === 0)).toBe(true);
+    expect(p.taSinclair).toBeNull();
+  });
+});

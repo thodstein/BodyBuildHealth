@@ -7,11 +7,12 @@ import {
   applyRpeCap, RPE_CAP_DEFAULT,
   deadliftGripWarning, STONE_ARMS_CUE, VIKING_GATE_NOTE, isStoneId, isDeadliftId,
   scoreCheckin, pushCheckin, SS_CHECKIN_CAP,
-  deloadWeeksFor, DELOAD_VS_TAPER_NOTE,
+  deloadWeeksFor, autoDeloadEffective, DELOAD_VS_TAPER_NOTE,
   shouldClearVbt, progHashOf,
   cessationDaysFor, OPENER_SINGLE_NOTE,
 } from '../strength-sport-planner-pro.engine';
 import { taperMultForWeek } from '../strength-sport-taper.engine';
+import { isKvExcludedKey } from '../../../core/cloud-kv';
 
 describe('P1 весовая категория', () => {
   it('граница 105/105.1 → разные классы (М)', () => {
@@ -82,11 +83,19 @@ describe('P5 block-модель', () => {
     expect(taperMultForWeek('strong5', 1)).toBeNull();
     expect(taperMultForWeek('wave', 1)).toBeNull();
   });
-  it('делод 4/7/11 + opt-out; волна heavy/medium/light', () => {
+  it('делод 4/7/11 + opt-out', () => {
     expect(deloadWeeksFor(12, true)).toEqual([4, 7, 11]);
     expect(deloadWeeksFor(12, false)).toEqual([]);
     expect(deloadWeeksFor(5, true)).toEqual([4]);
     expect(DELOAD_VS_TAPER_NOTE).toContain('Rogerson');
+  });
+  it('живой чек-ин: скор ≤2 включает делоды, норма — нет', () => {
+    const bad = { eventFatigue: 1, grip: 2, back: 1, sleep: 2, appetite: 1 };
+    const good = { eventFatigue: 5, grip: 5, back: 5, sleep: 5, appetite: 5 };
+    expect(autoDeloadEffective(false, bad)).toBe(true);
+    expect(autoDeloadEffective(false, good)).toBe(false);
+    expect(autoDeloadEffective(false, null)).toBe(false);
+    expect(autoDeloadEffective(true, good)).toBe(true);
   });
 });
 
@@ -107,5 +116,13 @@ describe('P7 cessation + opener', () => {
     expect(cessationDaysFor(7, 'male')).toBe(8);
     expect(cessationDaysFor(7)).toBe(7);
     expect(OPENER_SINGLE_NOTE).toContain('Opener');
+  });
+});
+
+describe('D5 cloud: PRO-ключи синкаются (he_-автосинк, не в исключениях)', () => {
+  it('he_ss_pro_*, he_ss_checkin_v1, he_vbt_ss_v1 — не excluded', () => {
+    for (const k of ['he_ss_pro_weightclass', 'he_ss_pro_rpecap', 'he_ss_pro_grip', 'he_ss_pro_block', 'he_ss_pro_autodeload', 'he_ss_pro_condday', 'he_ss_checkin_v1', 'he_vbt_ss_v1']) {
+      expect(isKvExcludedKey(k)).toBe(false);
+    }
   });
 });

@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildStrengthSportPlan } from '../strength-sport-builder.engine';
+import { buildStrengthPrintHtml } from '../strength-sport-export';
 
 const WM_SM = { backSquat: 140, deadlift: 180, overheadPress: 70, yokeWalk: 320, farmersWalk: 140, atlasStone: 120 } as any;
 
@@ -86,8 +87,34 @@ describe('PRO build: toro4 + opener', () => {
     const strongTempo = s.weeksData.flatMap((x: any) => x.sessions.flatMap((x2: any) => x2.exercises)).filter((e: any) => String(e.tempo || '').includes('X-0-X-0')).length;
     expect(waveTempo).toBeGreaterThanOrEqual(strongTempo);
   });
-  it('P7: competitionDate → opener-строка', () => {
-    const p = buildStrengthSportPlan(baseInput({ competitionDate: '2026-12-01' }));
-    expect(p.rationale.join(' | ')).toContain('Opener');
+  it('P7: openerSingles → настоящий сингл 90% в последнюю неделю + строка', () => {
+    const off = buildStrengthSportPlan(baseInput({ competitionDate: '2026-12-01' }));
+    expect(off.rationale.join(' | ')).not.toContain('Opener');
+    const on = buildStrengthSportPlan(baseInput({ competitionDate: '2026-12-01', openerSingles: true }));
+    expect(on.rationale.join(' | ')).toContain('Opener');
+    const last = on.weeksData[on.weeksData.length - 1];
+    const openers = last.sessions.flatMap((s: any) => s.exercises.flatMap((e: any) => e.workSets.map((ws: any) => ({ e, ws })))).filter((x: any) => (x.ws as any).opener);
+    expect(openers.length).toBe(1);
+    expect(openers[0].ws.reps).toBe(1);
+    expect(openers[0].ws.pct).toBe(90);
+    // sets/workSets в синке (инвариант матрицы)
+    expect(openers[0].e.sets).toBe(openers[0].e.workSets.length);
+    // без флага — байт-в-байт: ни одного opener-сета во всём плане
+    const offOpeners = off.weeksData.flatMap((w: any) => w.sessions.flatMap((s: any) => s.exercises.flatMap((e: any) => e.workSets))).filter((ws: any) => (ws as any).opener);
+    expect(offOpeners.length).toBe(0);
+  });
+});
+
+describe('D8 печать: PRO-секция', () => {
+  it('план с PRO-входами → секция Стронг-PRO в HTML', () => {
+    const p = buildStrengthSportPlan(baseInput({ weightClass: '<105', rpeCap: 9.5, deadliftGrip: 'mixed', blockModel: 'toro4', openerSingles: true, competitionDate: '2026-12-01' }));
+    const html = buildStrengthPrintHtml(p);
+    expect(html).toContain('Стронг-PRO');
+    expect(html).toContain('105');
+    expect(html).toContain('RPE-cap');
+  });
+  it('план без PRO-входов → секции нет (байт-в-байт)', () => {
+    const p = buildStrengthSportPlan(baseInput());
+    expect(buildStrengthPrintHtml(p)).not.toContain('Стронг-PRO');
   });
 });
