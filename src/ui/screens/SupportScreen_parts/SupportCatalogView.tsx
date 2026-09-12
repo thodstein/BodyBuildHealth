@@ -72,7 +72,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                 </div>
                 <div style={{height:4}} />
                 <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
-            {catalogSubTab === 'stack' ? (searchQuery ? `Найдено стеков: ${filteredStacks.length} из ${ALL_STACKS.length}` : `Всего стеков: ${ALL_STACKS.length}`) : (searchQuery ? `Найдено: ${groupedSubstances.reduce((a: any, g: any) => a + g.count, 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`)}
+            {catalogSubTab === 'stack' ? (searchQuery ? `Найдено стеков: ${filteredStacks.length} из ${ALL_STACKS.length}` : `Всего стеков: ${ALL_STACKS.length}`) : (searchQuery ? `Найдено: ${groupedSubstances.reduce((a: any, g: any) => a + g.count, 0)} из ${catalogSubstances.length}` : `Всего: ${catalogSubstances.length} препаратов`)}{gradeFilter === 'AB' && catalogSubTab !== 'stack' ? ' · фильтр A/B (стеки не фильтруются)' : ''}
                 </div>
                 {catalogSubTab === 'organ' && (
                   /* По органам */

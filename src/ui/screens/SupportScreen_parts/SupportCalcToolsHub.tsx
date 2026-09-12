@@ -1,6 +1,6 @@
 /** SupportCalcToolsHub.tsx — ЕДИНЫЙ хаб «Расчёты выбора препаратов» без дублей.
- * Объединяет 5 калькуляторов вкладки «🧮 Расчёты выбора препаратов»:
- *  🧬 Биодоступность · 🧮 Расчёт дозы · 🧬 Синергия · ⏰ Тайминг · 🔄 Аналоги
+ * Объединяет 6 разделов вкладки «🧮 Расчёты выбора препаратов»:
+ *  🧬 Биодоступность · 🧮 Расчёт дозы · 🧬 Синергия · ⏰ Тайминг · 🔄 Аналоги · 📄 Паспорт
  * Без дублей: один поиск/фильтр — все расчёты на одних данных, без повтора ввода.
  * ААС вынесены отдельно (не показываются с другими препаратами).
  */
@@ -30,6 +30,10 @@ const MODE_DEFS: Array<{ m: CalcToolsMode; label: string; icon: string; desc: st
 export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode?: CalcToolsMode }> = ({ s, initialMode }) => {
   const [mode, setMode] = useState<CalcToolsMode>(initialMode ?? 'bioavailability');
   const active = MODE_DEFS.find(d=> d.m===mode)!;
+  // База карточек режимов без border-shorthand: полоса слева — longhand'ами,
+  // иначе React ругается на mix shorthand/longhand при ререндере (проверено тестом).
+  const { border: _hubBorderOmit, ...CARD_NO_BORDER } = CARD;
+  void _hubBorderOmit;
 
   return (
     <div className="sup-calctools" style={{ padding: '8px 4px 24px', color: '#fff', maxWidth: 760, margin: '0 auto', display:'flex', flexDirection:'column', gap:12 }}>
@@ -40,7 +44,7 @@ export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode
           <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:18, boxShadow:'0 4px 16px rgba(0,230,138,0.35)', flexShrink:0 }}>🧮</div>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:16, fontWeight:900, color:'#fff', lineHeight:1.15, letterSpacing:'-0.3px' }}>Расчёты выбора препаратов</div>
-            <div style={{ fontSize:12, color:'rgba(255,255,255,0.72)', lineHeight:1.35 }}>Единый центр — 5 калькуляторов без дублей</div>
+            <div style={{ fontSize:12, color:'rgba(255,255,255,0.72)', lineHeight:1.35 }}>Единый центр — 6 разделов без дублей</div>
           </div>
             <span style={{ fontSize:11, padding:'6px 10px', borderRadius:20, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap', flexShrink:0 }}>6 в 1</span>
         </div>
@@ -53,7 +57,7 @@ export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode
         {MODE_DEFS.slice(0,3).map(d=> {
           const isActive = mode===d.m;
           return (
-            <div key={d.m} role="button" tabIndex={0} aria-pressed={isActive} data-active={isActive} onClick={()=> setMode(d.m)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode(d.m); } }} onMouseEnter={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = `${d.accent}35`; }} onMouseLeave={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)'; }} style={{ ...CARD, marginBottom:0, padding:12, cursor:'pointer', borderLeft:`4px solid ${d.accent}`, background: isActive ? `${d.accent}14` : 'rgba(24,24,27,0.50)', border: isActive ? `1px solid ${d.accent}45` : '1px solid rgba(255,255,255,0.07)', minHeight:84, boxShadow: isActive ? `0 4px 20px ${d.accent}18` : '0 2px 12px rgba(0,0,0,0.2)', transition:'all 0.18s' }}>
+            <div key={d.m} role="button" tabIndex={0} aria-pressed={isActive} data-active={isActive} onClick={()=> setMode(d.m)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode(d.m); } }} onMouseEnter={e => { if(!isActive) { const st = (e.currentTarget as HTMLDivElement).style; st.borderTopColor = `${d.accent}35`; st.borderRightColor = `${d.accent}35`; st.borderBottomColor = `${d.accent}35`; } }} onMouseLeave={e => { if(!isActive) { const st = (e.currentTarget as HTMLDivElement).style; st.borderTopColor = 'rgba(255,255,255,0.07)'; st.borderRightColor = 'rgba(255,255,255,0.07)'; st.borderBottomColor = 'rgba(255,255,255,0.07)'; } }} style={{ ...CARD_NO_BORDER, marginBottom:0, padding:12, paddingLeft:14, cursor:'pointer', background: isActive ? `${d.accent}14` : 'rgba(24,24,27,0.50)', borderStyle:'solid', borderWidth:1, borderTopColor: isActive ? `${d.accent}45` : 'rgba(255,255,255,0.07)', borderRightColor: isActive ? `${d.accent}45` : 'rgba(255,255,255,0.07)', borderBottomColor: isActive ? `${d.accent}45` : 'rgba(255,255,255,0.07)', borderLeftWidth:4, borderLeftColor:d.accent, minHeight:84, boxShadow: isActive ? `0 4px 20px ${d.accent}18` : '0 2px 12px rgba(0,0,0,0.2)', transition:'all 0.18s' }}>
               <div style={{ fontSize:10, fontWeight:800, color:d.accent, letterSpacing:0.5, textTransform:'uppercase', display:'flex', alignItems:'center', gap:4 }}>{d.icon} {d.label}</div>
               <div style={{ fontSize:12, fontWeight:700, color:'#fff', lineHeight:1.25, marginTop:5 }}>{d.desc}</div>
               <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.5)', lineHeight:1.3, marginTop:4 }}>{d.hint}</div>
@@ -65,7 +69,7 @@ export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode
         {MODE_DEFS.slice(3).map(d=> {
           const isActive = mode===d.m;
           return (
-            <div key={d.m} role="button" tabIndex={0} aria-pressed={isActive} data-active={isActive} onClick={()=> setMode(d.m)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode(d.m); } }} onMouseEnter={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = `${d.accent}35`; }} onMouseLeave={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)'; }} style={{ ...CARD, marginBottom:0, padding:12, cursor:'pointer', borderLeft:`4px solid ${d.accent}`, background: isActive ? `${d.accent}14` : 'rgba(24,24,27,0.50)', border: isActive ? `1px solid ${d.accent}45` : '1px solid rgba(255,255,255,0.07)', minHeight:82, boxShadow: isActive ? `0 4px 20px ${d.accent}18` : '0 2px 12px rgba(0,0,0,0.2)', transition:'all 0.18s' }}>
+            <div key={d.m} role="button" tabIndex={0} aria-pressed={isActive} data-active={isActive} onClick={()=> setMode(d.m)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode(d.m); } }} onMouseEnter={e => { if(!isActive) { const st = (e.currentTarget as HTMLDivElement).style; st.borderTopColor = `${d.accent}35`; st.borderRightColor = `${d.accent}35`; st.borderBottomColor = `${d.accent}35`; } }} onMouseLeave={e => { if(!isActive) { const st = (e.currentTarget as HTMLDivElement).style; st.borderTopColor = 'rgba(255,255,255,0.07)'; st.borderRightColor = 'rgba(255,255,255,0.07)'; st.borderBottomColor = 'rgba(255,255,255,0.07)'; } }} style={{ ...CARD_NO_BORDER, marginBottom:0, padding:12, paddingLeft:14, cursor:'pointer', background: isActive ? `${d.accent}14` : 'rgba(24,24,27,0.50)', borderStyle:'solid', borderWidth:1, borderTopColor: isActive ? `${d.accent}45` : 'rgba(255,255,255,0.07)', borderRightColor: isActive ? `${d.accent}45` : 'rgba(255,255,255,0.07)', borderBottomColor: isActive ? `${d.accent}45` : 'rgba(255,255,255,0.07)', borderLeftWidth:4, borderLeftColor:d.accent, minHeight:82, boxShadow: isActive ? `0 4px 20px ${d.accent}18` : '0 2px 12px rgba(0,0,0,0.2)', transition:'all 0.18s' }}>
               <div style={{ fontSize:10, fontWeight:800, color:d.accent, letterSpacing:0.5, textTransform:'uppercase', display:'flex', alignItems:'center', gap:4 }}>{d.icon} {d.label}</div>
               <div style={{ fontSize:12, fontWeight:700, color:'#fff', lineHeight:1.25, marginTop:5 }}>{d.desc}</div>
               <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.5)', lineHeight:1.3, marginTop:4 }}>{d.hint}</div>

@@ -26,8 +26,7 @@ describe('P7 паспорт UI', () => {
     unmount();
   });
 
-  it('поиск магния строит карточку паспорта', () => {
-    const { container, unmount } = render(<SupportSubstancePassport />);
+  it('поиск магния строит карточку паспорта', () => {    const { container, unmount } = render(<SupportSubstancePassport />);
     const input = container.querySelector('input')!;
     fireEvent.change(input, { target: { value: 'магний' } });
     const hit = Array.from(container.querySelectorAll('div')).find(
@@ -41,5 +40,23 @@ describe('P7 паспорт UI', () => {
     fireEvent.click((cand || hit) as Element);
     expect(container.textContent || '').toMatch(/Доказательность|Био:/);
     unmount();
+  });
+
+  it('обход всех 6 режимов — без style-shorthand warning', () => {
+    const errors: string[] = [];
+    const orig = console.error;
+    console.error = (...a: unknown[]) => { errors.push(a.map(String).join(' ')); };
+    try {
+      const { container, unmount } = render(<SupportCalcToolsHub s={{}} />);
+      for (const label of ['Биодоступность', 'Расчёт дозы', 'Синергия', 'Тайминг', 'Аналоги', 'Паспорт']) {
+        const pill = Array.from(container.querySelectorAll('button')).find(b => (b.textContent || '').includes(label));
+        expect(pill, label).toBeTruthy();
+        fireEvent.click(pill!);
+      }
+      expect(errors.some(e => /shorthand/i.test(e))).toBe(false);
+      unmount();
+    } finally {
+      console.error = orig;
+    }
   });
 });
