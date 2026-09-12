@@ -681,3 +681,37 @@ export function labTimingFor(marker: string): string | null {
   }
   return null;
 }
+
+// ════════════════════════════════════════════════════════════════════
+//  Мост к фарм-матрице классов (PED_CLASS_MATRIX, «Фарм-матрица курса»):
+//  matrix id → ключи CLASS_LAB_ADDONS. Lock: правка labs матрицы без правки
+//  аддона (и наоборот) ловится тестом matrixAddonKeys.
+// ════════════════════════════════════════════════════════════════════
+export const MATRIX_TO_ADDON: Record<string, string[]> = {
+  testosterone: ['testosterone'],
+  trenbolone: ['trenbolone'],
+  nandrolone: ['nandrolone'],
+  boldenone: ['boldenone'],
+  oral17: ['oral_17aa'],
+  gh: ['gh'],
+  igf: ['igf'],
+  insulin: ['insulin'],
+  clenbuterol: ['clenbuterol'],
+  t3: ['thyroid'],
+  sarm: ['sarm'],
+  dht_inject: ['dht', 'boldenone', 'primobolan'],
+  glp1: ['glp1'],
+};
+
+/** Ключи CLASS_LAB_ADDONS для matrix id (case-insensitive, неизвестно → []). */
+export function matrixAddonKeys(matrixId: string): string[] {
+  const k = String(matrixId || '').toLowerCase();
+  return MATRIX_TO_ADDON[k] ? [...MATRIX_TO_ADDON[k]] : [];
+}
+
+/** Аддоны для matrix id (готовые объекты). */
+export function matrixAddons(matrixId: string): ClassLabAddon[] {
+  const keys = new Set(matrixAddonKeys(matrixId));
+  if (keys.size === 0) return [];
+  return CLASS_LAB_ADDONS.filter(a => keys.has(a.key));
+}

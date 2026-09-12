@@ -195,7 +195,7 @@ export function buildExportDataFromRec(
     monitoring: [],
   }));
 
-  const labSchedule: ExportLabSchedule[] = [
+  const FALLBACK_LAB_SCHEDULE: ExportLabSchedule[] = [
     { marker: 'АЛТ', frequency: 'Каждые 4 нед', target: '<40 Ед/л', criticalThreshold: '>200 (стоп курс)' },
     { marker: 'АСТ', frequency: 'Каждые 4 нед', target: '<40 Ед/л', criticalThreshold: '>200 (стоп курс)' },
     { marker: 'ГГТ', frequency: 'Каждые 4 нед', target: '<55 Ед/л' },
@@ -211,6 +211,20 @@ export function buildExportDataFromRec(
     { marker: 'Глюкоза', frequency: 'Каждые 6 нед', target: '3.9-5.5 ммоль/л' },
     { marker: 'ПСА', frequency: 'Каждые 12 нед (40+ лет)', target: '<4.0 нг/мл' },
   ];
+
+  // Персональный график из движка (фаза + классы + поддержка); fallback — статика выше.
+  const schedSections = (rec.monitoringSchedule || []) as Array<{
+    id: string; label: string; period: string;
+    items: Array<{ marker: string; reason: string; target?: string; escalation?: string }>;
+  }>;
+  const labSchedule: ExportLabSchedule[] = schedSections.length > 0
+    ? schedSections.flatMap(sec => sec.items.map(it => ({
+      marker: `[${sec.label}] ${it.marker}`,
+      frequency: sec.period,
+      target: it.target || '—',
+      criticalThreshold: it.escalation || undefined,
+    })))
+    : FALLBACK_LAB_SCHEDULE;
 
   const stopCriteria = [
     'АЛТ/АСТ >200 Ед/л — немедленная отмена ААС, повторить анализ через 7 дней',
@@ -243,6 +257,7 @@ export function buildExportDataFromRec(
     'Препараты с пометкой 💊 — рецептурные. Требуют назначения врача.',
     rec.monitoringPlan ? `График мониторинга: ${rec.monitoringPlan.split('\n')[0]}` : '',
     rec.protocolWarnings?.length ? `Предупреждения: ${rec.protocolWarnings.join('; ')}` : '',
+    ['course', 'bridge', 'trt'].includes(rec.phase) ? 'Дельта-правила (нужен baseline K0): HCT Δ+5 п.п. → флеботомия; АЛТ >2× своего baseline; HDL −40%; E2 −30% от steady-state → AI избыточен.' : '',
   ].filter(Boolean);
 
   return {

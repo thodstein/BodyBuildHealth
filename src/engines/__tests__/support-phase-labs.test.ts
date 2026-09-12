@@ -7,7 +7,9 @@ import {
   PHASE_LAB_CARDS, CLASS_LAB_ADDONS, phaseLabCardById,
   phaseCardsFor, addonsFor, labTimingFor, pctVariantFor, needsLpaBaseline,
   isLongEsterHalfLife, isInjectableCourse, mergeMonitoringLists,
+  matrixAddonKeys, matrixAddons,
 } from '../support-phase-labs.engine';
+import { PED_CLASS_MATRIX } from '../../data/ped-class-matrix';
 
 const ids = (cards: Array<{ id: string }>) => cards.map(c => c.id);
 
@@ -187,5 +189,29 @@ describe('mergeMonitoringLists — дедуп трех источников (§2
   });
   it('пустые входы — пустой выход', () => {
     expect(mergeMonitoringLists([], [])).toEqual([]);
+  });
+});
+
+describe('matrixAddonKeys — мост к фарм-матрице классов (lock против дрейфа)', () => {
+  it('каждый класс матрицы имеет ≥1 аддон', () => {
+    for (const e of PED_CLASS_MATRIX) {
+      expect(matrixAddonKeys(e.id).length).toBeGreaterThan(0);
+    }
+    expect(matrixAddonKeys('unknown_class_xyz')).toEqual([]);
+  });
+  it('dht_inject покрывает мастерон/DHB/приму (3 аддона)', () => {
+    expect(matrixAddonKeys('dht_inject')).toEqual(['dht', 'boldenone', 'primobolan']);
+  });
+  it('ключевые маркеры матрицы есть в текстах аддонов', () => {
+    const text = (keys: string[]) =>
+      JSON.stringify(matrixAddons(keys[0]).flatMap(a => a.items.map(i => `${i.marker} ${i.target || ''} ${i.red || ''}`)));
+    expect(text(['testosterone'])).toContain('HCT');
+    expect(text(['testosterone'])).toContain('PSA');
+    expect(text(['trenbolone'])).toContain('PRL');
+    expect(text(['trenbolone'])).toContain('UACR');
+    expect(text(['oral17'])).toContain('2×ULN');
+    expect(text(['clenbuterol'])).toContain('Mg');
+    expect(text(['glp1'])).toContain('HbA1c');
+    expect(text(['sarm'])).toContain('>100 — стоп');
   });
 });
