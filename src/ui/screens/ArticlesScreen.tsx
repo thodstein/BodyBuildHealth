@@ -260,6 +260,7 @@ export const ArticlesScreen: React.FC = () => {
   const [listSection, setListSection] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
+  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
   const [readingArticle, setReadingArticle] = useState<ArticleManifestEntry | null>(null);
   const [pdfViewer, setPdfViewer] = useState<string | null>(null);
   const [pdfTitle, setPdfTitle] = useState<string>('PDF-документ');
@@ -345,7 +346,7 @@ export const ArticlesScreen: React.FC = () => {
     if (category === 'saved') list = list.filter(a => saved.includes(a.id));
     else if (category !== 'all') list = list.filter(a => a.category === category);
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = search.toLowerCase().replace(/^#+/, '');
       list = list.filter(a =>
         a.title.toLowerCase().includes(q) ||
         a.description.toLowerCase().includes(q) ||
@@ -353,8 +354,10 @@ export const ArticlesScreen: React.FC = () => {
         (a.content || '').toLowerCase().includes(q)
       );
     }
+    // Сортировка: в «Новых» всегда свежие сверху по определению, иначе — по переключателю.
+    if (sortDir === 'asc' && listSection !== 'new') list = [...list].reverse();
     return list;
-  }, [category, search, listSection, saved]);
+  }, [category, search, listSection, saved, sortDir]);
 
   const openPDFExternal = (url: string) => {
     const tg = (window as any).Telegram?.WebApp;
@@ -593,6 +596,8 @@ export const ArticlesScreen: React.FC = () => {
               <span style={{ fontSize:10, fontWeight:800, padding:'3px 8px', borderRadius:999, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.24)', color:'#fca5a5', flexShrink:0 }}>PDF · внутри</span>
             </span>
             <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+              <a href={pdfViewer} download aria-label="Скачать PDF" className="articles-pdf-download"
+                style={{ minHeight:44, padding:'10px 18px', borderRadius:999, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:800, fontSize:13, cursor:'pointer', textDecoration:'none', display:'inline-flex', alignItems:'center' }}>⤓</a>
               <button onClick={() => openPDFExternal(pdfViewer)} aria-label="Открыть PDF в браузере" style={{ minHeight:44, padding:'10px 18px', borderRadius:999, background:ART_ACC, color:'#000', border:'none', fontWeight:800, fontSize:13, cursor:'pointer', boxShadow:`0 4px 14px ${artA(0.28)}` }}>↗ Браузер</button>
               <button onClick={() => setPdfViewer(null)} aria-label="Закрыть PDF" style={{ minWidth:44, minHeight:44, padding:'10px 14px', borderRadius:999, background:'rgba(255,255,255,0.07)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:14, fontWeight:800, cursor:'pointer' }}>✕</button>
             </div>
@@ -824,11 +829,22 @@ export const ArticlesScreen: React.FC = () => {
         const title = category === 'saved' ? 'Сохранённые' : listSection === 'new' ? 'Новые статьи' : listSection === 'recommended' ? 'Рекомендуемое' : 'Все статьи';
         const catLabel = category !== 'all' && category !== 'saved' ? CATEGORIES.find(c => c.value === category)?.label : null;
         return (
-          <div className="articles-list-title" style={{ margin:'2px 0 10px' }}>
-            <div style={{ fontSize:17, fontWeight:900, color:'#fff', letterSpacing:'-0.02em', lineHeight:1.2 }}>{title}</div>
-            <div style={{ fontSize:12, color:'#fff', opacity:0.75, marginTop:2 }}>
-              {catLabel ? `${catLabel} · ` : ''}{articles.length} ст.{listSection === 'new' && category === 'all' ? ' · свежие сверху' : ''}
+          <div className="articles-list-title" style={{ margin:'2px 0 10px', display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:17, fontWeight:900, color:'#fff', letterSpacing:'-0.02em', lineHeight:1.2 }}>{title}</div>
+              <div style={{ fontSize:12, color:'#fff', opacity:0.75, marginTop:2 }}>
+                {catLabel ? `${catLabel} · ` : ''}{articles.length} ст.{listSection === 'new' && category === 'all' ? ' · свежие сверху' : ''}
+              </div>
             </div>
+            {listSection !== 'new' && (
+              <button onClick={() => setSortDir(d => (d === 'desc' ? 'asc' : 'desc'))}
+                aria-label="Порядок сортировки" className="articles-sort"
+                style={{ minHeight:44, padding:'10px 16px', borderRadius:999, cursor:'pointer', flexShrink:0,
+                  background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)',
+                  color:'#fff', fontSize:12, fontWeight:800, fontFamily:FONT }}>
+                {sortDir === 'desc' ? '⇅ Новые' : '⇅ Старые'}
+              </button>
+            )}
           </div>
         );
       })()}

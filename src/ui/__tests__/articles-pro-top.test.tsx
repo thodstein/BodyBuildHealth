@@ -361,6 +361,43 @@ describe('ArticlesScreen PRO TOP', () => {
     expect(container.querySelector('.articles-list-title')?.textContent).toContain('Анализы');
   });
 
+  it('28. #тег ищет как тег (решетка не ломает выдачу)', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const search = container.querySelector('.articles-search') as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'фарма' } });
+    const plainCount = container.querySelector('.articles-grid')?.children.length || 0;
+    fireEvent.change(search, { target: { value: '#фарма' } });
+    const hashGrid = container.querySelector('.articles-grid') as HTMLElement;
+    expect(hashGrid.children.length).toBe(plainCount);
+    expect(hashGrid.textContent).toContain('Тренболон');
+  });
+
+  it('29. сортировка старые→новые меняет первую карточку', () => {
+    const { container } = render(<ArticlesScreen />);
+    const all = container.querySelector('.articles-hero-card[data-id="all"]') as HTMLElement;
+    fireEvent.click(all);
+    const grid = () => container.querySelector('.articles-grid') as HTMLElement;
+    expect(grid().textContent).toContain('Гид по анализам');
+    fireEvent.click(container.querySelector('.articles-sort') as HTMLElement);
+    expect(container.querySelector('.articles-sort')?.textContent).toContain('Старые');
+    expect(grid().textContent).toContain('Основы нутрициологии');
+  });
+
+  it('30. в PDF-тулбаре есть скачивание', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const grid = container.querySelector('.articles-grid') as HTMLElement;
+    const pdf = Array.from(grid.children).find(
+      (c) => (c as HTMLElement).textContent?.includes('PDF'),
+    ) as HTMLElement;
+    fireEvent.click(pdf);
+    const dl = container.querySelector('.articles-pdf-download') as HTMLAnchorElement;
+    expect(dl).not.toBeNull();
+    expect(dl.hasAttribute('download')).toBe(true);
+    expect(dl.getAttribute('href')).toContain('.pdf');
+  });
+
   it('6. PDF-карточка зовёт читать внутри', () => {
     const { container } = render(<ArticlesScreen />);
     goToList(container);
