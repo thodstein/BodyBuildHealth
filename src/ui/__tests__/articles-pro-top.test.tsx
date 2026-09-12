@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, screen } from '@testing-library/react';
-import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds, highlightMatch, rankRecommended, stripDuplicateTitle, rankUnreadFirst, normQuery } from '../screens/ArticlesScreen';
+import { ArticlesScreen, renderMarkdown, extractArticleToc, pushRecentArticleId, loadRecentArticleIds, highlightMatch, rankRecommended, stripDuplicateTitle, rankUnreadFirst, normQuery, markReadId } from '../screens/ArticlesScreen';
 import { ARTICLES_MANIFEST } from '../../data/articles-manifest';
 import { resetAppPlatformCache } from '../../core/app-platform';
 
@@ -538,6 +538,36 @@ describe('ArticlesScreen PRO TOP', () => {
     const { container } = render(<ArticlesScreen />);
     expect(container.querySelector('.articles-hero')).not.toBeNull();
     expect(container.querySelector('.articles-hero-card[data-id="all"]')).not.toBeNull();
+  });
+
+  it('45. markReadId: дедуп и кап', () => {
+    expect(markReadId('a', [])).toEqual(['a']);
+    expect(markReadId('a', ['a', 'b'])).toEqual(['a', 'b']);
+    const full = Array.from({ length: 100 }, (_, i) => `x${i}`);
+    const next = markReadId('new', full);
+    expect(next.length).toBe(100);
+    expect(next[0]).toBe('new');
+  });
+
+  it('46. доскролл до конца ставит «Прочитано» на карточку', () => {
+    const { container } = render(<ArticlesScreen />);
+    goToList(container);
+    const grid = container.querySelector('.articles-grid') as HTMLElement;
+    for (const child of Array.from(grid.children)) {
+      const el = child as HTMLElement;
+      if (el.textContent && el.textContent.includes('PDF')) continue;
+      fireEvent.click(el);
+      if (container.querySelector('.articles-reader')) break;
+    }
+    const body = container.querySelector('.articles-reader-body') as HTMLElement;
+    Object.defineProperty(body, 'scrollHeight', { value: 2000, configurable: true });
+    Object.defineProperty(body, 'clientHeight', { value: 600, configurable: true });
+    body.scrollTop = 1400;
+    fireEvent.scroll(body);
+    expect(JSON.parse(localStorage.getItem('he_articles_read_v1') || '[]')).toContain('lab-guide-course');
+    expect(container.querySelector('.articles-progress-label')?.textContent).toBe('100%');
+    fireEvent.click(container.querySelector('.articles-reader-bar button') as HTMLElement);
+    expect(container.querySelector('.articles-grid [aria-label="Прочитано"]')).not.toBeNull();
   });
 
   it('6. PDF-карточка зовёт читать внутри', () => {

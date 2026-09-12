@@ -27,6 +27,28 @@ interface ArticlesUIState {
   sortDir: 'desc' | 'asc';
 }
 
+const READ_KEY = 'he_articles_read_v1';
+const READ_CAP = 100;
+
+export function loadReadIds(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(READ_KEY) || '[]');
+    return Array.isArray(v) ? v.filter(x => typeof x === 'string').slice(0, READ_CAP) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function markReadId(id: string, prev: string[] = loadReadIds()): string[] {
+  const next = [id, ...prev.filter(x => x !== id)].slice(0, READ_CAP);
+  try {
+    localStorage.setItem(READ_KEY, JSON.stringify(next));
+  } catch {
+    /* quota — только сессия */
+  }
+  return next;
+}
+
 export function loadArticlesUI(): ArticlesUIState {
   const fallback: ArticlesUIState = { page: 'hero', listSection: 'all', category: 'all', sortDir: 'desc' };
   try {
@@ -376,6 +398,7 @@ export const ArticlesScreen: React.FC = () => {
   const [readerFont, setReaderFont] = useState<number>(() => loadReaderFont());
   const [readProgress, setReadProgress] = useState(0);
   const [showTop, setShowTop] = useState(false);
+  const [readIds, setReadIds] = useState<string[]>(() => loadReadIds());
   const readerBodyRef = React.useRef<HTMLDivElement | null>(null);
   const changeReaderFont = (delta: number) => {
     setReaderFont(prev => {
@@ -389,8 +412,13 @@ export const ArticlesScreen: React.FC = () => {
     const el = readerBodyRef.current;
     if (!el) return;
     const max = el.scrollHeight - el.clientHeight;
-    setReadProgress(max > 0 ? Math.min(100, Math.max(0, (el.scrollTop / max) * 100)) : 0);
+    const pct = max > 0 ? Math.min(100, Math.max(0, (el.scrollTop / max) * 100)) : 0;
+    setReadProgress(pct);
     setShowTop(el.scrollTop > 400);
+    // Доскроллил до конца — статья считается прочитанной.
+    if (max > 0 && readingArticle && pct >= 98 && !readIds.includes(readingArticle.id)) {
+      setReadIds(markReadId(readingArticle.id, readIds));
+    }
   };
 
   const scrollReaderTop = () => {
@@ -1042,6 +1070,9 @@ export const ArticlesScreen: React.FC = () => {
                 </div>
 
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, position:'relative' }}>
+                  {readIds.includes(article.id) && (
+                    <span style={{ fontSize:11, color:ART_ACC, fontWeight:800, flexShrink:0 }} aria-label="Прочитано">✓</span>
+                  )}
                   <span style={{ fontSize:11, color:'#fff', fontWeight:700, flexShrink:0, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)', padding:'4px 9px', borderRadius:999 }}>{article.date}</span>
                   <span style={{ fontSize:11, color:'#fff', fontWeight:700, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textAlign:'right' }}>{article.authorName.replace('Health Engine Team', 'HE Team')}</span>
                 </div>
