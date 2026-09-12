@@ -7,6 +7,8 @@ import {
   generatePeptideProtocol, getPeptideSynergiesFor, getPeptideConflictsFor,
   ROUTE_LABELS, SYRINGE_TYPES,
 } from '../../../engines/peptide-calculator.engine';
+import { drawForDose, waterForTargetUnits, recommendPeptideSyringe, PEPTIDE_DOSE_REF } from '../../../engines/peptide-pro.engine';
+import { saveCalcSnapshot, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
 import { CLASS_LABELS } from './constants';
 
 export const PharmaPeptideCalc: React.FC = () => {
@@ -149,17 +151,28 @@ export const PharmaPeptideCalc: React.FC = () => {
             <PopupSelect label="🩹 Путь введения" value={pepRoute} options={Object.entries(ROUTE_LABELS).map(([k, v]) => ({ id: k, label: v }))} onChange={v => setPepRoute(v)} />
           </div>
         </div>
-        {dilution && (
-          <div style={{ marginTop:10, padding:'11px', borderRadius:12, background:'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(59,130,246,0.03))', border:'1px solid rgba(59,130,246,0.14)' }}>
-            <div style={{ fontSize:10, color:'#fff', marginBottom:6, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Результат разведения</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, fontSize:11 }}>
-              <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Конц. <b style={{ color:'#60a5fa' }}>{dilution.concentrationMcgPerMl.toFixed(1)} мкг/мл</b></div>
-              <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Объём <b style={{ color:'#60a5fa' }}>{dilution.doseVolumeMl.toFixed(3)} мл</b></div>
-              <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Единиц <b style={{ color:'#60a5fa' }}>{dilution.syringeUnitsDisplay}</b></div>
-              <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Доз/флакон <b style={{ color:'#60a5fa' }}>{dilution.dosesPerVial.toFixed(1)}</b></div>
+        {dilution && (() => {
+          const cross = drawForDose(pepAmount, pepDilution, pepDose);
+          const rev = waterForTargetUnits(pepAmount, pepDose, 10);
+          return (
+            <div style={{ marginTop:10, padding:'11px', borderRadius:12, background:'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(59,130,246,0.03))', border:'1px solid rgba(59,130,246,0.14)' }}>
+              <div style={{ fontSize:10, color:'#fff', marginBottom:6, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Результат разведения</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, fontSize:11 }}>
+                <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Конц. <b style={{ color:'#60a5fa' }}>{dilution.concentrationMcgPerMl.toFixed(1)} мкг/мл</b></div>
+                <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Объём <b style={{ color:'#60a5fa' }}>{dilution.doseVolumeMl.toFixed(3)} мл</b></div>
+                <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Единиц <b style={{ color:'#60a5fa' }}>{dilution.syringeUnitsDisplay}</b></div>
+                <div style={{ background:'rgba(0,0,0,0.18)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>Доз/флакон <b style={{ color:'#60a5fa' }}>{dilution.dosesPerVial.toFixed(1)}</b></div>
+              </div>
+              <div style={{ fontSize:11, color:'#fff', marginTop:8 }}>Кросс-проверка: {cross.volMl} мл = {cross.units}u · {recommendPeptideSyringe(cross.units)}</div>
+              {cross.units > 0 && cross.units < 5 && <div style={{ fontSize:11, color:'#fbbf24', fontWeight:700, marginTop:4 }}>⚠ Доза &lt;5u — добавь воды для точности метки</div>}
+              {cross.units > 100 && <div style={{ fontSize:11, color:'#f87171', fontWeight:700, marginTop:4 }}>⛔ &gt;100u — не влезет, дели или уменьши воду</div>}
+              <div style={{ fontSize:11, color:'#fff', marginTop:4 }}>Реверс: чтобы доза была ровно 10u — воды {rev} мл</div>
+              {sel && (sel.fridgeLifeDays || sel.rtLifeHours) && <div style={{ fontSize:11, color:'#fff', marginTop:4 }}>Стабильность: холодильник {sel.fridgeLifeDays ?? '—'} дн · комната {sel.rtLifeHours ?? '—'} ч</div>}
+              <button onClick={() => { saveCalcSnapshot('peptides', `${sel?.shortName || peptideId} ${pepDose}мкг → ${dilution.syringeUnitsDisplay}`); printHtml(buildCalcHtml('Пептид', [['Пептид', sel?.shortName || peptideId], ['Доза', `${pepDose} мкг`], ['Объём', `${dilution.doseVolumeMl.toFixed(3)} мл`], ['Шприц', dilution.syringeUnitsDisplay]])); }} style={{ marginTop:8, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(59,130,246,0.22)', background:'rgba(59,130,246,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>💾 В историю + 🖨 Печать</button>
+              <div style={{ marginTop:8, fontSize:10, color:'#fff' }}>Стартовые ориентиры: {PEPTIDE_DOSE_REF.map((r) => `${r.id} ${r.doseMcg}мкг=${r.units}u`).join(' · ')}</div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {pk && (

@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { PHARMA_DB, getPharmaDetail } from '../../../core/pharma-database';
 import { calculateDose } from '../../../engines/dosage.engine';
+import { checkDosageRange, recommendSyringe, dosageGuards } from '../../../engines/dosage-safety.engine';
+import { stackBurdenLite } from '../../../engines/stack-burden.engine';
+import { saveCalcSnapshot, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
 import { DRUG_THRESHOLDS } from '../../../core/constants';
 import {
   CLASS_LABELS, INJECTABLE_WITH_ESTERS, PHARMA_CLASSES, formatHalfLife, type PharmaClass,
@@ -136,15 +139,23 @@ const AndrogenicIndexCalculator: React.FC = () => {
         }}>Рассчитать</button>
       </div>
 
-      {aiResult !== null && (
-        <div style={{ marginTop:12, background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,230,138,0.04))', border:'1px solid rgba(0,230,138,0.16)', borderRadius:14, padding:14, textAlign:'center' }}>
-          <div style={{ fontSize:10, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Андрогенный индекс стека</div>
-          <div style={{ fontSize:30, fontWeight:900, color: aiResult > 2 ? '#f87171' : aiResult > 1 ? '#fbbf24' : '#00e68a', letterSpacing:-0.8 }}>{aiResult.toFixed(2)}</div>
-          <div style={{ fontSize:11, color:'#fff', marginTop:4, fontWeight:600 }}>
-            {aiResult > 2 ? '⚡ Высокая андрогенная нагрузка' : aiResult > 1 ? '⚠ Умеренная — следи за давлением и липидами' : '✓ Низкая — мягкий курс'}
+      {aiResult !== null && (() => {
+        const lite = stackBurdenLite(entries);
+        return (
+          <div style={{ marginTop:12, background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,230,138,0.04))', border:'1px solid rgba(0,230,138,0.16)', borderRadius:14, padding:14, textAlign:'center' }}>
+            <div style={{ fontSize:10, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Андрогенный индекс стека (сырой Σ)</div>
+            <div style={{ fontSize:30, fontWeight:900, color: aiResult > 2 ? '#f87171' : aiResult > 1 ? '#fbbf24' : '#00e68a', letterSpacing:-0.8 }}>{aiResult.toFixed(2)}</div>
+            <div style={{ fontSize:11, color:'#fff', marginTop:4, fontWeight:600 }}>
+              {aiResult > 2 ? '⚡ Высокая андрогенная нагрузка' : aiResult > 1 ? '⚠ Умеренная — следи за давлением и липидами' : '✓ Низкая — мягкий курс'}
+            </div>
+            <div style={{ marginTop:10, padding:'10px', borderRadius:12, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.14)', textAlign:'left' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#fff' }}>Stack-burden lite: <span style={{ color:'#a78bfa' }}>{lite.index.toFixed(2)}</span> · {lite.label}</div>
+              <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>SFY {lite.sfy.toFixed(2)} (затухание 1.0/0.4/0.2/0.1, cap 5) · SBB {lite.sbb.toFixed(2)} · сырой Σ {lite.raw.toFixed(2)}</div>
+              <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>{lite.note}</div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {aiEsterPopup && (
         <div style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.64)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:12 }} onClick={() => setAiEsterPopup(null)}>
@@ -428,6 +439,23 @@ export const DosageCalculatorTab: React.FC = () => {
                   ✓ Готово к введению — проверь асептику и ротацию зон
                 </div>
               )}
+              {drug && (() => {
+                const range = checkDosageRange(drug, weeklyTotal);
+                const syr = recommendSyringe(doseResult.volumeMl);
+                const guards = dosageGuards(doseResult.volumeMl, `${syringeMl}ml-U100`);
+                return (
+                  <div style={{ marginTop:8, padding:'10px 11px', borderRadius:12, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.14)' }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:6 }}>Безопасность дозы</div>
+                    {range && <div style={{ fontSize:11, color: range.level === 'ok' ? '#00e68a' : '#fbbf24', fontWeight:700, marginBottom:4 }}>{range.level === 'ok' ? '✓' : '⚠'} {range.text}</div>}
+                    <div style={{ fontSize:11, color:'#fff' }}>Шприц: <b>{syr.size}</b> — {syr.note}</div>
+                    {guards.map((g, i) => (
+                      <div key={i} style={{ fontSize:11, marginTop:4, color: g.level === 'ok' ? '#00e68a' : g.level === 'warn' ? '#fbbf24' : '#f87171', fontWeight:700 }}>{g.level === 'ok' ? '✓' : '⚠'} {g.text}</div>
+                    ))}
+                    <div style={{ fontSize:10, color:'#fff', marginTop:6 }}>Ротация: ягодица → бедро → плечо. Асептика, иглу не reuse. U-100 шкала: 100u = 1 мл.</div>
+                    <button onClick={() => { saveCalcSnapshot('dosage', `${drug} ${weeklyTotal.toFixed(0)}мг/нед → ${doseResult.volumeMl}мл`); printHtml(buildCalcHtml('Дозировка', [['Препарат', drug], ['Нед. доза', `${weeklyTotal.toFixed(0)}`], ['Объём', `${doseResult.volumeMl} мл`], ['Шприц', syr.size]])); }} style={{ marginTop:8, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(139,92,246,0.22)', background:'rgba(139,92,246,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>💾 В историю + 🖨 Печать</button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ) : (

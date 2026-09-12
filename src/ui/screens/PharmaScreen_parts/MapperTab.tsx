@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { mapStackToPathologies, getKnownDrugNames, DRUG_DATABASE } from '../../../engines/drug-mapper.engine';
+import { stackMatrix, worstLevel, suggestClosest } from '../../../engines/mapper-matrix.engine';
+import { saveCalcSnapshot, buildCalcHtml, printHtml } from '../../../engines/pharma-calc-share.engine';
 import type { DrugEntry, MapperResult } from '../../../engines/drug-mapper.engine';
 import { useDataLink } from '../../../core/data-link';
 import { weeklyDose } from '../../../engines/pharma-frequency';
@@ -221,10 +223,32 @@ export const MapperTab: React.FC = () => {
                 Неизвестные препараты: {(mapperResult.unknownDrugs || []).join(', ')}
               </div>
               <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>
-                Отсутствуют в графе знаний — исключены из расчёта. Проверь написание.
+                Отсутствуют в графе знаний — исключены из расчёта. {(mapperResult.unknownDrugs || []).map((u) => {
+                  const s = suggestClosest(u, knownNames);
+                  return s.length ? `«${u}» → похоже: ${s.join(', ')}` : '';
+                }).filter(Boolean).join(' · ') || 'Проверь написание.'}
               </div>
             </div>
           )}
+          {mapperResult && (() => {
+            const names = useCourse && course.length > 0 ? course.map((c) => String((c as any).substanceId || '')) : manualDrugs.map((d) => d.name);
+            const pairs = stackMatrix(names);
+            const worst = worstLevel(pairs);
+            const colors: Record<string, string> = { synergy: '#22c55e', safe: '#eab308', monitor: '#f59e0b', caution: '#ef4444' };
+            return (
+              <div style={card}>
+                <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:8 }}>Pairwise-матрица {worst ? `· худший: ${worst}` : ''}</div>
+                {pairs.length === 0 && <div style={{ fontSize:11, color:'#fff' }}>Нужны ≥2 препарата для матрицы пар.</div>}
+                {pairs.map((p, i) => (
+                  <div key={i} style={{ padding:'8px 10px', borderRadius:10, marginBottom:6, background:'rgba(0,0,0,0.18)', borderLeft:`3px solid ${colors[p.level]}`, borderTop:'1px solid rgba(255,255,255,0.04)', borderRight:'1px solid rgba(255,255,255,0.04)', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                    <div style={{ fontSize:11, fontWeight:800, color: colors[p.level] }}>{p.a} + {p.b} — {p.level}</div>
+                    <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{p.reason}</div>
+                  </div>
+                ))}
+                <button onClick={() => { saveCalcSnapshot('mapper', `пар ${pairs.length}, худший ${worst ?? '—'}`); printHtml(buildCalcHtml('Маппер', pairs.map((p) => [`${p.a}+${p.b}`, `${p.level}: ${p.reason}`]))); }} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(139,92,246,0.22)', background:'rgba(139,92,246,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>💾 В историю + 🖨 Печать</button>
+              </div>
+            );
+          })()}
         </>
       )}
 
