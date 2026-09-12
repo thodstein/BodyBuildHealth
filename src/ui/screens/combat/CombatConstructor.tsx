@@ -11,7 +11,7 @@ import { finalizeCombatPlan, buildCombatReport } from '../../../engines/combat/c
 import { COMBAT_PATTERNS, recommendCombatPattern } from '../../../engines/combat/combat-split-patterns';
 import { COMBAT_CYCLE_LIBRARY, getCombatCycle } from '../../../engines/combat/combat-cycle-library';
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
-import { saveCombatPlan, loadCombatPlans } from '../../../engines/combat/combat-storage';
+import { saveCombatPlan, loadCombatPlans, migrateAllCombatStorage } from '../../../engines/combat/combat-storage';
 import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
 import { buildAnnualFromCB, buildAnnualATR, saveAnnualCB, loadAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual } from '../../../engines/combat/combat-annual';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
@@ -20,7 +20,7 @@ import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
-import { weightClassesFor, weightClassLine } from '../../../engines/combat/combat-weight-class.engine';
+import { weightClassesFor, weightClassLine, weightClassLimitValid } from '../../../engines/combat/combat-weight-class.engine';
 import { validateSparringLoad } from '../../../engines/combat/combat-sparring.engine';
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import type { CombatNutritionPayload, CombatCardioPayload } from '../../../engines/combat/combat-integration.engine';
@@ -180,9 +180,22 @@ export const CombatConstructor: React.FC = () => {
     };
     try { route(getPlannerApply()); } catch { /* no-op */ }
     const unsub = subscribePlannerApply(route);
+    // P7: мёртвый migrateAllCombatStorage оживлён — прогон миграций персиста при входе
+    try { migrateAllCombatStorage(); } catch { /* no-op */ }
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* P4-добивка: смена дисциплины/пола сбрасывает чужой лимит категории (бокс 80кг ≠ MMA-лимит) */
+  React.useEffect(() => {
+    if (weightClassLimitKg && !weightClassLimitValid(discipline, sex, weightClassLimitKg)) {
+      setWeightClass('');
+      setWeightClassLimitKg(0);
+      setMsg('Категория сброшена под дисциплину — выберите заново');
+      setTimeout(() => setMsg(''), 2600);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discipline, sex]);
 
   /* Смена уровня/дней сбрасывает вручную выбранный сплит под новые условия —
    * иначе UI показывал бы combat_4, а движок молча строил бы на другом. */

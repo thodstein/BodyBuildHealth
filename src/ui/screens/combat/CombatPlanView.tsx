@@ -201,6 +201,14 @@ export const CombatPlanView: React.FC<Props> = ({
       </SectionCard>
       </div>
 
+      {plan.validation?.errors?.length ? (
+        <div className="cb-plan-errors" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.24)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>⛔ Сборка заблокирована ({plan.validation.errors.length}) — до врача/исправления</div>
+          {plan.validation.errors.map((e, i) => (
+            <div key={i} style={{ fontSize: 11, color: '#fff' }}>• {e}</div>
+          ))}
+        </div>
+      ) : null}
       {plan.validation?.warnings.map((w, i) => (
         <InfoBanner key={i} tone="warn">{w}</InfoBanner>
       ))}

@@ -112,3 +112,16 @@ export function weightClassLine(
   const fit = d >= 0 ? `запас +${d} кг` : `не хватает ${Math.abs(d)} кг`;
   return `Категория ${classLabel || lim}: цель ${target} кг vs лимит ${lim} — ${fit}`;
 }
+
+/**
+ * Валиден ли выбранный лимит для дисциплины × пола (против stale после смены дисциплины:
+ * бокс 80кг ≠ MMA-лимит). Пустой лимит — валиден (категория не выбрана).
+ */
+export function weightClassLimitValid(
+  discipline: string,
+  sex: 'male' | 'female',
+  classLimitKg: number | null | undefined
+): boolean {
+  if (classLimitKg == null || classLimitKg === 0) return true;
+  return weightClassesFor(discipline, sex).some(r => r.limitKg === classLimitKg);
+}
