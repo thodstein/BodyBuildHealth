@@ -53,6 +53,7 @@ import { DiaryHistoryView } from './DiaryHistoryView';
 import { DiaryToolsView } from './DiaryToolsView';
 import { MixDiarySection } from './MixDiarySection';
 import { MixEffectivenessCard } from './MixEffectivenessCard';
+import { attachMixGoalsToWorkouts } from '../../../engines/training-plan-save.engine';
 import { DiaryHubContext, type DiaryHubCtx } from './diary-hub-context';
 import { CompetitionPlansView } from './CompetitionPlansView';
 import { BBRecommendationsTab } from './BBRecommendationsTab';
@@ -912,7 +913,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
           <DiaryAnalyticsView hub={hub} />
-          <MixEffectivenessCard workouts={historyWorkouts} />
+          <MixEffectivenessCard workouts={attachMixGoalsToWorkouts(historyWorkouts)} />
           <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)', fontSize:11, lineHeight:1.5, color:'#fff' }}>
             <div style={{ fontWeight:800, color:'#3b82f6', marginBottom:4 }}>🔗 Глубже — в Интеллекте</div>
             <div>ACWR/монотонность/напряжение → <b>⚡ Интеллект → Нагрузка</b> · MEV/MAV/MRV → <b>📐 Объём-хаб</b> · 1RM/VBT/DOTS → <b>🏋️ Анализ силы</b> · прогноз → <b>🔮 Прогноз</b></div>

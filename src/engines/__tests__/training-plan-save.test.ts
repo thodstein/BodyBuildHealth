@@ -327,6 +327,8 @@ describe('analyzePresetEffect (эффект пресета через недел
       { date: daysAgo(10), weight: 82 },
       { date: daysAgo(9), weight: 81.5 },
       { date: daysAgo(8), weight: 81.2 },
+      { date: daysAgo(1), weight: 80.8 },
+      { date: daysAgo(0), weight: 80.5 },
     ]));
     const record = saveMixToDiary({ ...jointInput(), goal: 'fat_loss', kind: 'preset' }, daysAgo(3));
     const eff = analyzePresetEffect(record);

@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDataLink } from '../../../core/data-link';
 import {
-  buildDefaultStack, calculateMixScore,
+  buildDefaultStack, calculateMixScore, buildBestRecipe,
 } from '../../../engines/training-mix-scoring.engine';
 import type { MixSubstance, MixProfile, TrainingMixScore } from '../../../engines/training-mix-scoring.engine';
+import { mixSafetyGates } from '../../../engines/mix-safety-gates.engine';
+import { isUnderdosed, evidenceFor } from '../../../engines/mix-evidence-doses.engine';
 import { loadTrainingProfile } from './training-profile';
 import { pushSubsToPlan } from './support-plan-bridge';
 import {
@@ -31,6 +33,8 @@ const GOAL_OPTIONS: { id: string; label: string; emoji: string }[] = [
   { id: 'hiit', label: 'HIIT', emoji: '💨' },
   { id: 'mma', label: 'MMA', emoji: '🥊' },
   { id: 'sprint', label: 'Спринт', emoji: '🏃' },
+  { id: 'competition', label: 'Соревнования', emoji: '🏆' },
+  { id: 'post_comp', label: 'Пост-соревн.', emoji: '🔄' },
 ];
 
 const WO_TYPE: { id: string; label: string }[] = [
@@ -68,6 +72,20 @@ const chip = (active: boolean, accent = '#a78bfa'): React.CSSProperties => ({
   border: active ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.08)',
   color: active ? accent : '#fff', transition: 'all 0.15s',
 });
+
+/** П9: доступный чип-селектор (кнопка + клавиатура + aria-pressed). */
+const MixChip: React.FC<{ active: boolean; label: string; onSelect: () => void; accent?: string; style?: React.CSSProperties }> = ({ active, label, onSelect, accent, style }) => (
+  <button
+    type="button"
+    role="option"
+    aria-selected={active}
+    aria-pressed={active}
+    aria-label={label}
+    onClick={onSelect}
+    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
+    style={{ ...chip(active, accent), fontFamily: 'inherit', textAlign: 'left', minHeight: 44, ...(style || {}) }}
+  >{label}</button>
+);
 
 const ScoreBar: React.FC<{ label: string; value: number; color: string }> = ({ label, value, color }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -139,8 +157,15 @@ const SaveResultPopup: React.FC<{
 export const TrainingMixTab: React.FC = () => {
   const linked = useDataLink();
   const prof = useMemo(() => loadTrainingProfile(), []);
-  const [mixGoal, setMixGoal] = useState('pump');
-  const [mixTiming, setMixTiming] = useState<'pre' | 'intra' | 'post'>('pre');
+  const [mixGoal, setMixGoal] = useState(() => {
+    try { return (JSON.parse(localStorage.getItem('he_mix_hub_v1') || '{}').mixGoal) || 'pump'; } catch { return 'pump'; }
+  });
+  const [mixTiming, setMixTiming] = useState<'pre' | 'intra' | 'post'>(() => {
+    try {
+      const t = JSON.parse(localStorage.getItem('he_mix_hub_v1') || '{}').mixTiming;
+      return t === 'intra' || t === 'post' || t === 'pre' ? t : 'pre';
+    } catch { return 'pre'; }
+  });
   const [mixWorkoutType, setMixWorkoutType] = useState<'heavy' | 'moderate' | 'light'>('moderate');
   const [mixTimeOfDay, setMixTimeOfDay] = useState<'morning' | 'afternoon' | 'evening'>('morning');
   const [mixExperience, setMixExperience] = useState<'novice' | 'intermediate' | 'advanced'>('intermediate');
@@ -177,15 +202,15 @@ export const TrainingMixTab: React.FC = () => {
   const bw = linked.profile?.settings?.weight ?? 80;
   const hasCourse = (linked.course || []).length > 0;
   const isOnCycle = hasCourse;
-  const multiplier = isOnCycle ? 1.25 : 1.0;
+  // Дозы только по весу/эталону — авто-наценок нет.
   const avgMin = linked.profile?.settings?.avgWorkoutMinutes ?? 90;
   const durHrs = (mixGoal === 'endurance' ? Math.max(1.5, avgMin / 60) : Math.min(2, avgMin / 60)) || 1.5;
 
   // тренировочный стек
   const stack = useMemo(() => {
-    try { return buildDefaultStack(mixGoal, mixTiming, bw, multiplier, durHrs, mixGoal === 'competition'); }
+    try { return buildDefaultStack(mixGoal, mixTiming, bw, durHrs); }
     catch { return []; }
-  }, [mixGoal, mixTiming, bw, multiplier, durHrs]);
+  }, [mixGoal, mixTiming, bw, durHrs]);
 
   const hasNandrolone = (linked.course || []).some((c: any) => {
     const id = (c.substanceId || '').toLowerCase();
@@ -196,15 +221,55 @@ export const TrainingMixTab: React.FC = () => {
   const kVal = ((linked.labs as any[]) || []).find((l: any) => l.code === 'POTASSIUM')?.value || 4.2;
   const cl = ((linked.labs as any[]) || []).find((l: any) => l.code === 'CHLORIDE')?.value || 102;
 
-  const mixSubstances: MixSubstance[] = useMemo(() =>
-    stack.filter(s => s.mg > 0).map(s => ({ id: s.id, name: s.name, doseMg: s.mg })), [stack]);
-
-  const planSubstances: PlanSubstance[] = useMemo(() =>
-    stack.filter(s => s.mg > 0).map(s => ({
-      id: s.id, name: s.name, dose: String(s.dose ?? ''), unit: s.unit || 'мг', mg: s.mg, note: s.note, timing: mixTiming,
-    })), [stack, mixTiming]);
+  // П6: id применённого коктейля (сам extraStack — после recipe-мемо, иначе TDZ)
+  const [appliedRecipeId, setAppliedRecipeId] = useState<string | null>(null);
+  useEffect(() => { setAppliedRecipeId(null); }, [mixGoal, mixTiming, bw]);
 
   const mixTitle = `${mixGoal === 'pump' ? 'Памп' : GOAL_OPTIONS.find(g => g.id === mixGoal)?.label || mixGoal} (${mixTiming === 'pre' ? 'пред' : mixTiming === 'intra' ? 'интра' : 'пост'})`;
+
+  // Эпик D: фарма-коктейль (оживление buildBestRecipe) — слой поверх базового стека
+  const recipe = useMemo(() => {
+    try {
+      const aasIds = (linked.course || []).map((c: any) => (c.substanceId || '').toLowerCase()).filter(Boolean);
+      const p: MixProfile = {
+        goal: mixGoal as any, timing: mixTiming, weightKg: bw, isOnCycle,
+        drugs: {
+          insulin: mixInsulin > 0, igf: mixDrugIGF > 0, gh: mixDrugGH > 0, mgf: mixDrugMGF > 0, glp1: mixDrugGLP1,
+          insulinDose: mixInsulin, insulinTiming: 'post' as const,
+          igfDose: mixDrugIGF, igfTiming: 'post' as const,
+          ghDose: mixDrugGH, ghTiming: 'pre' as const,
+          mgfDose: mixDrugMGF, mgfTiming: 'pre' as const,
+        },
+        hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: kVal, chlorideMmolL: cl },
+        workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay,
+        workoutDurationMin: Math.round(durHrs * 60),
+        experience: mixExperience, dayType: mixDayType, aas: aasIds,
+      };
+      return buildBestRecipe(p);
+    } catch { return null; }
+  }, [mixGoal, mixTiming, bw, isOnCycle, mixInsulin, mixDrugIGF, mixDrugGH, mixDrugMGF, mixDrugGLP1, hasNandrolone, na, kVal, cl, mixWorkoutType, mixTimeOfDay, durHrs, mixExperience, mixDayType, linked.course]);
+
+  // П6 (продолжение): extraStack после recipe — со скоринга идёт полный стек
+  const extraStack = useMemo(() => {
+    if (!appliedRecipeId) return [];
+    try {
+      const items = recipe && recipe.recipe.id === appliedRecipeId ? recipe.items : [];
+      const seen = new Set(stack.map(s => `${s.id}`));
+      return items.filter(it => !seen.has(it.id)).map(it => ({
+        name: it.id, id: it.id, dose: String(it.dose), unit: it.unit, note: `${it.note} (фарма-коктейль)`, mg: it.mg,
+      }));
+    } catch { return []; }
+  }, [appliedRecipeId, recipe, stack]);
+
+  const fullStack = useMemo(() => [...stack, ...extraStack], [stack, extraStack]);
+
+  const mixSubstances: MixSubstance[] = useMemo(() =>
+    fullStack.filter(s => s.mg > 0).map(s => ({ id: s.id, name: s.name, doseMg: s.mg })), [fullStack]);
+
+  const planSubstances: PlanSubstance[] = useMemo(() =>
+    fullStack.filter(s => s.mg > 0).map(s => ({
+      id: s.id, name: s.name, dose: String(s.dose ?? ''), unit: s.unit || 'мг', mg: s.mg, note: s.note, timing: mixTiming,
+    })), [fullStack, mixTiming]);
 
   const score: TrainingMixScore = useMemo(() => {
     if (mixSubstances.length === 0) return {
@@ -246,6 +311,46 @@ export const TrainingMixTab: React.FC = () => {
     }
   }, [mixSubstances, mixGoal, mixTiming, bw, isOnCycle, mixInsulin, mixDrugIGF, mixDrugGH, mixDrugMGF, mixDrugGLP1, hasNandrolone, na, kVal, cl, mixWorkoutType, mixTimeOfDay, durHrs, mixExperience, mixDayType, linked.course]);
 
+  // Эпик C+G: гейты безопасности (добивка — из профиля, не false) + персист параметров
+  const [caffeineSensitive, setCaffeineSensitive] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('he_mix_hub_v1') || '{}').caffeineSensitive === true; } catch { return false; }
+  });
+  const caffeineMg = useMemo(() => fullStack.find(s => s.id === 'caffeine')?.mg ?? 0, [fullStack]);
+  const gateCtx = useMemo(() => {
+    const s: any = (linked.profile?.settings as any) || {};
+    const personal = s.personal || {};
+    const health = s.health || {};
+    const goals = s.goals || {};
+    const age = Number(personal.age ?? s.age) || undefined;
+    const sex = String(personal.sex ?? s.sex ?? '').toLowerCase();
+    const lifeStage = String(goals.lifeStage ?? '').toLowerCase();
+    const chronic: string[] = Array.isArray(health.chronicConditions) ? health.chronicConditions : [];
+    const bpStage = String(health.bpStage ?? s.cardio?.bpStage ?? '');
+    const hasHypertension = /hypertension/i.test(bpStage) || chronic.some(c => /hyperton|гипертон|hypertension|давлен/i.test(String(c)));
+    const isPregnant = sex === 'female' && /pregnan|беремен|lactat|лактация/.test(lifeStage);
+    const courseIds = (linked.course || []).map((c: any) => String(c.substanceId || '').toLowerCase()).join(' ');
+    const takesAnticoagulant = /aspirin|warfarin|heparin|clopidogrel|apixaban|rivaroxaban|dabigatran|anticoag|аспирин|варфарин|гепарин/.test(courseIds);
+    return { age, hasHypertension, isPregnant, isTeen: age != null && age < 18, takesAnticoagulant };
+  }, [linked.profile?.settings, linked.course]);
+  const gates = useMemo(() => {
+    try {
+      return mixSafetyGates(fullStack.map(s => ({ id: s.id, mg: s.mg })), {
+        caffeineMg, bwKg: bw, hasInsulin: mixInsulin > 0,
+        timeOfDay: mixTimeOfDay,
+        hasHypertension: gateCtx.hasHypertension,
+        isPregnant: gateCtx.isPregnant,
+        isTeen: gateCtx.isTeen,
+        takesAnticoagulant: gateCtx.takesAnticoagulant,
+        ageYears: gateCtx.age,
+        caffeineSensitive,
+      });
+    } catch { return []; }
+  }, [fullStack, caffeineMg, bw, mixInsulin, mixTimeOfDay, gateCtx, caffeineSensitive]);
+
+  useEffect(() => {
+    try { localStorage.setItem('he_mix_hub_v1', JSON.stringify({ mixGoal, mixTiming, mixWorkoutType, mixTimeOfDay, mixExperience, mixDayType, caffeineSensitive })); } catch {}
+  }, [mixGoal, mixTiming, mixWorkoutType, mixTimeOfDay, mixExperience, mixDayType, caffeineSensitive]);
+
   const timingLabel = mixTiming === 'pre' ? 'За 30-60 мин до тренировки' : mixTiming === 'intra' ? 'В течение тренировки' : 'Сразу после тренировки';
   const stackTitle = mixTiming === 'pre' ? '🔥 Пред-тренировочный стек' : mixTiming === 'intra' ? '💧 Интра-тренировочный стек' : '🍗 Пост-тренировочный стек';
 
@@ -260,9 +365,9 @@ export const TrainingMixTab: React.FC = () => {
         <h4 style={{ margin: '0 0 8px', fontSize: 13, color: '#fff' }}>⚙️ Параметры</h4>
 
         <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>🎯 Цель</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }} role="listbox" aria-label="Цель микса">
           {GOAL_OPTIONS.map(o => (
-            <div key={o.id} onClick={() => setMixGoal(o.id)} style={chip(mixGoal === o.id)}>{o.emoji} {o.label}</div>
+            <MixChip key={o.id} active={mixGoal === o.id} label={`${o.emoji} ${o.label}`} onSelect={() => setMixGoal(o.id)} />
           ))}
         </div>
 
@@ -277,13 +382,13 @@ export const TrainingMixTab: React.FC = () => {
                 { id: 'intra', label: '💧 Интра-тренировочный' },
                 { id: 'post', label: '🍗 Пост-тренировочный' },
               ].map(o => (
-                <div key={o.id} onClick={() => setMixTiming(o.id as any)} style={{ ...chip(mixTiming === o.id), marginBottom: 3 }}>{o.label}</div>
+                <MixChip key={o.id} active={mixTiming === o.id} label={o.label} onSelect={() => setMixTiming(o.id as any)} style={{ marginBottom: 3 }} />
               ))}
             </div>
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>🏋️ Тип тренировки</div>
               {WO_TYPE.map(o => (
-                <div key={o.id} onClick={() => setMixWorkoutType(o.id as any)} style={{ ...chip(mixWorkoutType === o.id), marginBottom: 3 }}>{o.label}</div>
+                <MixChip key={o.id} active={mixWorkoutType === o.id} label={o.label} onSelect={() => setMixWorkoutType(o.id as any)} style={{ marginBottom: 3 }} />
               ))}
             </div>
           </div>
@@ -294,13 +399,13 @@ export const TrainingMixTab: React.FC = () => {
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>🌅 Время суток</div>
               {TOD.map(o => (
-                <div key={o.id} onClick={() => setMixTimeOfDay(o.id as any)} style={{ ...chip(mixTimeOfDay === o.id), marginBottom: 3 }}>{o.label}</div>
+                <MixChip key={o.id} active={mixTimeOfDay === o.id} label={o.label} onSelect={() => setMixTimeOfDay(o.id as any)} style={{ marginBottom: 3 }} />
               ))}
             </div>
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>🎓 Опыт</div>
               {EXP.map(o => (
-                <div key={o.id} onClick={() => setMixExperience(o.id as any)} style={{ ...chip(mixExperience === o.id), marginBottom: 3 }}>{o.label}</div>
+                <MixChip key={o.id} active={mixExperience === o.id} label={o.label} onSelect={() => setMixExperience(o.id as any)} style={{ marginBottom: 3 }} />
               ))}
             </div>
           </div>
@@ -311,7 +416,7 @@ export const TrainingMixTab: React.FC = () => {
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>📆 Тип дня</div>
               {DAY_TYPES.map(o => (
-                <div key={o.id} onClick={() => setMixDayType(o.id as any)} style={{ ...chip(mixDayType === o.id), marginBottom: 3 }}>{o.label}</div>
+                <MixChip key={o.id} active={mixDayType === o.id} label={o.label} onSelect={() => setMixDayType(o.id as any)} style={{ marginBottom: 3 }} />
               ))}
             </div>
           </div>
@@ -320,7 +425,16 @@ export const TrainingMixTab: React.FC = () => {
         {(
           <div style={{ fontSize: 12, color: '#fff', marginBottom: 4 }}>
             ⚖️ Вес тела: <b style={{ color: '#fff' }}>{bw} кг</b>
-            {isOnCycle ? <span style={{ color: '#a78bfa', marginLeft: 6 }}>🔥 Курс (×1.25)</span> : ''}
+            {isOnCycle ? <span style={{ color: '#a78bfa', marginLeft: 6 }}>🔥 Курс (дозы по весу, без ×-наценки)</span> : ''}
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6, cursor: 'pointer', fontSize: 12 }}>
+              <input type="checkbox" checked={caffeineSensitive} onChange={e => setCaffeineSensitive(e.target.checked)} style={{ width: 18, height: 18 }} aria-label="Чувствительность к кофеину" />
+              <span>☕ Чувствительность к кофеину (начну с малой дозы)</span>
+            </label>
+            {(gateCtx.hasHypertension || gateCtx.isPregnant || gateCtx.isTeen || gateCtx.takesAnticoagulant) && (
+              <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>
+                Профиль: {[gateCtx.hasHypertension && 'АГ', gateCtx.isPregnant && 'беременность/лактация', gateCtx.isTeen && 'подросток', gateCtx.takesAnticoagulant && 'антикоагулянт'].filter(Boolean).join(' · ')} — гейты ниже учтены.
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -355,6 +469,7 @@ export const TrainingMixTab: React.FC = () => {
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 24, fontWeight: 800, color: score.color }}>{score.compositeScore}</div>
               <div style={{ fontSize: 12, color: score.color }}>{score.label}</div>
+              <div style={{ fontSize: 9, color: '#fff', marginTop: 2, maxWidth: 120 }}>ориентир покрытия, не прогноз кг/ватт</div>
             </div>
           </div>
 
@@ -374,10 +489,44 @@ export const TrainingMixTab: React.FC = () => {
           {score.drugModifiers.length > 0 && (
             <div style={{ marginBottom: 6 }}>
               {score.drugModifiers.map((dm, i) => (
-                <div key={i} style={{ fontSize: 12, color: dm.bonus >= 0 ? '#22c55e' : '#ef4444', marginBottom: 2 }}>
-                  • {dm.drug}: {dm.effect} ({dm.bonus >= 0 ? '+' : ''}{dm.bonus}%)
+                <div key={i} style={{ fontSize: 12, color: dm.bonus > 0 ? '#22c55e' : dm.bonus < 0 ? '#ef4444' : '#fff', marginBottom: 2 }}>
+                  • {dm.drug}: {dm.effect}{dm.bonus !== 0 ? ` (${dm.bonus > 0 ? '+' : ''}${dm.bonus}%)` : ' (инфо, на скор не влияет)'}
                 </div>
               ))}
+            </div>
+          )}
+
+          {gates.length > 0 && (
+            <div style={{ marginBottom: 6 }} role="alert">
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', marginBottom: 2 }}>🛡️ Гейты безопасности:</div>
+              {gates.map((g, i) => (
+                <div key={i} style={{ fontSize: 12, color: g.level === 'block' ? '#ef4444' : g.level === 'warn' ? '#f59e0b' : '#fff', marginBottom: 1 }}>• {g.text}</div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ marginBottom: 6, padding: 8, borderRadius: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.2)' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 2 }}>🥤 Нормы приёма (из расчёта)</div>
+            <div style={{ fontSize: 12, color: '#fff' }}>Углеводы: <b>{score.recommendedCarbsG} г</b> · EAA/белок: <b>{score.recommendedEAAG} г</b></div>
+            <div style={{ fontSize: 12, color: '#fff' }}>Вода: <b>{score.recommendedWaterMl} мл</b> · Na <b>{score.recommendedNaMg}</b> / K <b>{score.recommendedKMg}</b> / Cl <b>{score.recommendedClMg} мг</b></div>
+            {score.electrolyteWarnings.slice(0, 3).map((w, i) => (
+              <div key={i} style={{ fontSize: 11, color: '#f59e0b' }}>• {w}</div>
+            ))}
+          </div>
+
+          {recipe && (
+            <div style={{ marginBottom: 6, padding: 8, borderRadius: 8, background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.25)' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa' }}>🧬 Фарма-коктейль: {recipe.recipe.name}</div>
+              <div style={{ fontSize: 11, color: '#fff', marginBottom: 4 }}>{recipe.recipe.synergyNote}</div>
+              {recipe.items.map((it, i) => (
+                <div key={i} style={{ fontSize: 11, color: '#fff' }}>• {it.id}: {it.dose}{it.unit} — {it.note} ({it.timing})</div>
+              ))}
+              {(mixInsulin > 0) && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>⛔ С инсулином — только врач + глюкометр + быстрые угли. Хаб не дозирует инсулин.</div>}
+              {appliedRecipeId === recipe.recipe.id ? (
+                <button onClick={() => setAppliedRecipeId(null)} style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(139,92,246,0.4)', background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', fontWeight: 700, fontSize: 12, cursor: 'pointer', minHeight: 44 }}>✕ Убрать коктейль из стека</button>
+              ) : (
+                <button onClick={() => setAppliedRecipeId(recipe.recipe.id)} style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', minHeight: 44 }}>➕ Добавить коктейль в стек ({recipe.items.length})</button>
+              )}
             </div>
           )}
 
@@ -399,8 +548,8 @@ export const TrainingMixTab: React.FC = () => {
               const kit = {
                 id: Date.now(), type: 'mix',
                 goal: mixGoal, timing: mixTiming, workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay,
-                bw, multiplier, isOnCycle,
-                stack: stack.filter(sItem => sItem.mg > 0),
+                bw, isOnCycle,
+                stack: fullStack.filter(sItem => sItem.mg > 0),
                 score: score.compositeScore,
                 date: new Date().toISOString(),
               };
@@ -413,26 +562,38 @@ export const TrainingMixTab: React.FC = () => {
             }} style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a' }}>💾 Комплект</button>
           </div>
           <button onClick={() => {
-            const ids = stack.filter(sItem => sItem.mg > 0 && sItem.id).map(sItem => sItem.id as string);
+            const ids = fullStack.filter(sItem => sItem.mg > 0 && sItem.id).map(sItem => sItem.id as string);
             const n = pushSubsToPlan(ids, 'mix', `Микс: ${mixGoal} (${mixTiming === 'pre' ? 'пред' : mixTiming === 'intra' ? 'интра' : 'пост'})`);
             if (n > 0) { setMixPushed(true); setTimeout(() => setMixPushed(false), 1800); }
-            else alert('Все вещества микса относятся к питанию (белок/креатин/аминокислоты) — в план поддержки не добавлены.');
+            else {
+              try { (window as any).showToast?.('Все вещества микса — питание (белок/креатин/аминокислоты) — в план поддержки не добавлены.', 'info'); } catch {}
+              if (!(window as any).showToast) { setMixPushed(false); }
+            }
           }} style={{ marginTop: 6, width: '100%', padding: '10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, background: mixPushed ? 'rgba(0,230,138,0.9)' : 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.3)', color: mixPushed ? '#0b0b0d' : '#00e68a', transition: 'all 0.2s' }}>
             {mixPushed ? '✓ Добавлено в план поддержки' : '📋 В план поддержки'}
           </button>
         </div>
       )}
 
-      {stack.filter(sItem => sItem.mg > 0).length > 0 && (
+      {fullStack.filter(sItem => sItem.mg > 0).length > 0 && (
         <div style={CARD}>
-          <h4 style={{ margin: '0 0 8px', fontSize: 13, color: '#fff' }}>📋 Состав стека</h4>
-          {stack.filter(sItem => sItem.mg > 0).map((sItem, i) => (
+          <h4 style={{ margin: '0 0 8px', fontSize: 13, color: '#fff' }}>📋 Состав стека{extraStack.length > 0 ? ` (база + коктейль +${extraStack.length})` : ''}</h4>
+          {fullStack.filter(sItem => sItem.mg > 0).map((sItem, i) => {
+            const under = isUnderdosed(sItem.id, sItem.mg);
+            const ev = evidenceFor(sItem.id);
+            return (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 3 }}>
-              <span style={{ flex: '1 1 auto', minWidth: 0, fontSize: 12, fontWeight: 600, color: '#fff', wordBreak: 'break-word' }}>{sItem.name}</span>
+              <span style={{ flex: '1 1 auto', minWidth: 0, fontSize: 12, fontWeight: 600, color: '#fff', wordBreak: 'break-word' }}>
+                {sItem.name}
+                {under && <span style={{ marginLeft: 6, fontSize: 10, color: '#f59e0b', border: '1px solid rgba(245,158,11,0.4)', borderRadius: 6, padding: '1px 5px' }}>ниже эталона</span>}
+                {ev?.chronicOnly && <span style={{ marginLeft: 6, fontSize: 10, color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', borderRadius: 6, padding: '1px 5px' }}>курсом</span>}
+                {ev?.grade === 'WADA' && <span style={{ marginLeft: 6, fontSize: 10, color: '#ef4444', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 6, padding: '1px 5px' }}>WADA</span>}
+              </span>
               <span style={{ flex: '0 0 auto', fontSize: 12, color: ACCENT, fontWeight: 700, whiteSpace: 'nowrap' }}>{sItem.dose} {sItem.unit}</span>
               <span style={{ flex: '0 0 auto', fontSize: 12, color: '#fff', wordBreak: 'break-word' }}>{sItem.note}</span>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

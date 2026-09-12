@@ -1,7 +1,7 @@
 /** MixEffectivenessCard.tsx — карточка «🎯 Эффективность миксов» в аналитике дневника тренировок.
  *  Сравнивает качество сессий (RPE, объём, длительность) в дни с приёмом микса/пресета
  *  против дней без — корреляция «принял микс → качество тренировки» (analyzeMixEffectiveness). */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { analyzeMixEffectiveness, type MixEffectiveness } from '../../../engines/training-plan-save.engine';
 
 const CARD: React.CSSProperties = {
@@ -14,21 +14,31 @@ function fmtVolume(v: number): string {
   return v >= 1000 ? `${(v / 1000).toFixed(1)}т` : `${Math.round(v)}кг`;
 }
 
-export const MixEffectivenessCard: React.FC<{ workouts: { date: string; overallRPE?: number; duration?: number; exercises?: { totalVolume?: number }[] }[] }> = ({ workouts }) => {
+export const MixEffectivenessCard: React.FC<{ workouts: { date: string; overallRPE?: number; duration?: number; goal?: string; exercises?: { totalVolume?: number }[] }[]; goal?: string }> = ({ workouts, goal }) => {
+  // П4: живой goal-сплит — селектор виден, когда тренировки несут goal (иначе скрыт, проп goal — фолбэк)
+  const availableGoals = useMemo(() => [...new Set((workouts || []).map(w => (w as any).goal).filter(Boolean))], [workouts]);
+  const [innerGoal, setInnerGoal] = useState<string>('all');
+  const effGoal = goal ?? (innerGoal === 'all' ? undefined : innerGoal);
   const data = useMemo<MixEffectiveness | null>(() => {
     try {
       return analyzeMixEffectiveness((workouts || []).map(w => ({
         date: w.date,
         overallRPE: w.overallRPE,
         duration: w.duration,
+        goal: (w as any).goal,
         totalVolume: (w.exercises || []).reduce((s, e) => s + (e.totalVolume || 0), 0),
-      })));
+      })), { minPerGroup: 5, goal: effGoal });
     } catch {
       return null;
     }
-  }, [workouts]);
+  }, [workouts, effGoal]);
 
-  if (!data) return null;
+  if (!data) return (
+    <div style={CARD}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa', marginBottom: 2 }}>🎯 Эффективность миксов</div>
+      <div style={{ fontSize: 10, color: '#fff' }}>Нужно ≥5 сессий с миксом и ≥5 без — пока данных мало для выводов.</div>
+    </div>
+  );
 
   const volPct = data.withoutMix.avgVolume > 0 ? Math.round((data.volumeDelta / data.withoutMix.avgVolume) * 100) : 0;
   const volumeBetter = data.volumeDelta > 0;
@@ -46,7 +56,22 @@ export const MixEffectivenessCard: React.FC<{ workouts: { date: string; overallR
       <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa', marginBottom: 2 }}>🎯 Эффективность миксов</div>
       <div style={{ fontSize: 9, color: '#fff', marginBottom: 8 }}>
         Сравнение сессий в дни с приёмом микса/пресета и без него (RPE, объём, длительность).
+        {effGoal ? ` Фильтр: ${effGoal}.` : ''}
       </div>
+      {!goal && availableGoals.length > 0 && (
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, color: '#fff', marginBottom: 8 }}>
+          <span>Цель:</span>
+          <select
+            value={innerGoal}
+            onChange={e => setInnerGoal(e.target.value)}
+            aria-label="Фильтр эффективности по цели"
+            style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', fontSize: 12, minHeight: 44 }}
+          >
+            <option value="all">Все цели</option>
+            {availableGoals.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </label>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
         <Cell label={`С миксом (${data.withMix.sessions})`} value={`RPE ${data.withMix.avgRpe}`} />
         <Cell label={`Без микса (${data.withoutMix.sessions})`} value={`RPE ${data.withoutMix.avgRpe}`} />

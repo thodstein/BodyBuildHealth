@@ -3,11 +3,12 @@
  *  (жиросжигание, суставы, ЖКТ, сон, гидратация, противовоспалительный, иммунитет).
  *  REUSE: training-mix-scoring.engine (MIX_TEMPLATES, getDefaultTemplate, resolveTemplateItems),
  *  support-plan-bridge (pushSubsToPlan), training-profile, TrainingPopups (PopupNumber). */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useDataLink } from '../../../core/data-link';
 import {
-  MIX_TEMPLATES, resolveTemplateItems, type MixTemplate, type MixRenderItem,
+  MIX_TEMPLATES, resolveTemplateItems, calculateMixScore, type MixTemplate, type MixRenderItem,
 } from '../../../engines/training-mix-scoring.engine';
+import { mixSafetyGates } from '../../../engines/mix-safety-gates.engine';
 import { loadTrainingProfile } from './training-profile';
 import { pushSubsToPlan } from './support-plan-bridge';
 import { PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
@@ -29,9 +30,15 @@ const HEALTH_GOALS = ['fat_loss', 'joint', 'gut', 'sleep', 'hydration', 'antiinf
 export const MixPresetsCard: React.FC = () => {
   const linked = useDataLink();
   const prof = useMemo(() => loadTrainingProfile(), []);
-  const [goal, setGoal] = useState<string>('fat_loss');
-  const [bwInput, setBwInput] = useState<number>(prof.bodyWeight || 80);
-  const [mult, setMult] = useState<number>(1);
+  const [goal, setGoal] = useState<string>(() => {
+    try { return (JSON.parse(localStorage.getItem('he_mix_preset_v1') || '{}').goal) || 'fat_loss'; } catch { return 'fat_loss'; }
+  });
+  const [bwInput, setBwInput] = useState<number>(() => {
+    try { return Number(JSON.parse(localStorage.getItem('he_mix_preset_v1') || '{}').bw) || prof.bodyWeight || 80; } catch { return prof.bodyWeight || 80; }
+  });
+  const [mult, setMult] = useState<number>(() => {
+    try { const m = Number(JSON.parse(localStorage.getItem('he_mix_preset_v1') || '{}').mult); return m >= 0.5 && m <= 2 ? m : 1; } catch { return 1; }
+  });
   const [pushed, setPushed] = useState(false);
   const [savePopup, setSavePopup] = useState<{ step: 'confirm' | 'done'; toPlan: boolean; result: SaveMixResult | null } | null>(null);
 
@@ -67,6 +74,52 @@ export const MixPresetsCard: React.FC = () => {
 
   const presetTitle = tpl ? tpl.name.replace(/^[^\s]+\s/, '') : goal;
 
+  useEffect(() => {
+    try { localStorage.setItem('he_mix_preset_v1', JSON.stringify({ goal, bw: bwInput, mult })); } catch {}
+  }, [goal, bwInput, mult]);
+
+  // Эпик B+C: скор пресетов + гейты (цинк/вит.C/омега/мелатонин)
+  const presetScore = useMemo(() => {
+    if (!phases) return null;
+    try {
+      const subs = (['pre', 'intra', 'post'] as const).flatMap(t => phases[t].map(r => ({ id: r.id, name: r.name, doseMg: r.mg })));
+      const withDose = subs.filter(s => s.doseMg > 0);
+      if (withDose.length === 0) return null;
+      return calculateMixScore(withDose, {
+        goal: (tpl?.goal as any) || 'recovery', timing: 'post', weightKg: bwInput, isOnCycle: false,
+        drugs: { insulin: false, igf: false, gh: false, mgf: false, glp1: false },
+        hasNandrolone: false,
+        userElectrolytes: { sodiumMmolL: 140, potassiumMmolL: 4.2, chlorideMmolL: 102 },
+        workoutType: 'moderate', timeOfDay: 'morning', workoutDurationMin: 90,
+      });
+    } catch { return null; }
+  }, [phases, tpl, bwInput]);
+
+  const presetGates = useMemo(() => {
+    if (!phases) return [];
+    try {
+      const items = (['pre', 'intra', 'post'] as const).flatMap(t => phases[t].map(r => ({ id: r.id, mg: r.mg })));
+      const zinc = items.filter(i => i.id === 'zinc').reduce((a, s) => a + (s.mg || 0), 0);
+      const vc = items.filter(i => i.id === 'vitamin_c').reduce((a, s) => a + (s.mg || 0), 0);
+      const om = items.filter(i => i.id === 'omega3').reduce((a, s) => a + (s.mg || 0), 0);
+      const mel = items.filter(i => i.id === 'melatonin').reduce((a, s) => a + (s.mg || 0), 0);
+      const s: any = (linked.profile?.settings as any) || {};
+      const personal = s.personal || {};
+      const goals = s.goals || {};
+      const age = Number(personal.age ?? s.age) || undefined;
+      const sex = String(personal.sex ?? s.sex ?? '').toLowerCase();
+      const lifeStage = String(goals.lifeStage ?? '').toLowerCase();
+      const courseIds = (linked.course || []).map((c: any) => String(c.substanceId || '').toLowerCase()).join(' ');
+      return mixSafetyGates(items, {
+        caffeineMg: 0, bwKg: bwInput, hasInsulin: false,
+        zincMgTotal: zinc, vitaminCMgTotal: vc, omega3MgTotal: om, melatoninMg: mel,
+        ageYears: age, isTeen: age != null && age < 18,
+        isPregnant: sex === 'female' && /pregnan|беремен|lactat|лактация/.test(lifeStage),
+        takesAnticoagulant: /aspirin|warfarin|heparin|clopidogrel|apixaban|rivaroxaban|dabigatran|anticoag|аспирин|варфарин|гепарин/.test(courseIds),
+      });
+    } catch { return []; }
+  }, [phases, bwInput, linked.profile?.settings, linked.course]);
+
   const chip = (active: boolean) => ({
     padding: '6px 10px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 700,
     background: active ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
@@ -78,7 +131,9 @@ export const MixPresetsCard: React.FC = () => {
   const onPush = () => {
     const n = pushSubsToPlan(allIds, 'mix', `Микс: ${tpl?.name || goal}`);
     if (n > 0) { setPushed(true); setTimeout(() => setPushed(false), 1800); }
-    else alert('Все вещества микса относятся к питанию (белок/креатин/аминокислоты) — в план поддержки не добавлены.');
+    else {
+      try { (window as any).showToast?.('Все вещества микса — питание — в план поддержки не добавлены.', 'info'); } catch {}
+    }
   };
 
   const Item: React.FC<{ r: MixRenderItem }> = ({ r }) => (
@@ -89,7 +144,7 @@ export const MixPresetsCard: React.FC = () => {
       </div>
       <div style={{ flex: '0 0 auto', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700 }}>{r.dose}{r.unit}</div>
-        <div style={{ fontSize: 10, color: DIM, whiteSpace: 'nowrap' }}>{r.mg >= 1000 ? (r.mg / 1000).toFixed(1) + 'г' : r.mg + 'мг'}</div>
+        <div style={{ fontSize: 10, color: DIM, whiteSpace: 'nowrap' }}>{r.mg > 0 ? (r.mg >= 1000 ? (r.mg / 1000).toFixed(1) + 'г' : r.mg + 'мг') : 'доза в упаковке'}</div>
       </div>
     </div>
   );
@@ -119,9 +174,29 @@ export const MixPresetsCard: React.FC = () => {
         <div style={CARD}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>{tpl.name}</div>
           <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>{tpl.description}</div>
+          {presetScore && (
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: presetScore.color, fontWeight: 800 }}>
+                Скор покрытия: {presetScore.compositeScore} · {presetScore.label}
+              </div>
+              <div style={{ fontSize: 9, color: '#fff' }}>ориентир покрытия, не прогноз эффекта</div>
+            </div>
+          )}
+          {presetGates.length > 0 && (
+            <div style={{ marginBottom: 6 }} role="alert">
+              {presetGates.map((g, i) => (
+                <div key={i} style={{ fontSize: 11, color: g.level === 'block' ? '#ef4444' : '#f59e0b' }}>• {g.text}</div>
+              ))}
+            </div>
+          )}
           {(['pre', 'intra', 'post'] as const).map(t => {
             const items = phases[t];
-            if (!items || items.length === 0) return null;
+            if (!items || items.length === 0) {
+              if (tpl && tpl.id === 'sleep' && t === 'intra') {
+                return <div key={t} style={{ fontSize: 11, color: '#fff', margin: '6px 0 4px' }}>⏱️ Во время: интра не нужен — сон-пресет принимается до/после сна.</div>;
+              }
+              return null;
+            }
             return (
               <div key={t} style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', margin: '6px 0 4px' }}>⏱️ {TIMING_RU[t]} ({items.length})</div>

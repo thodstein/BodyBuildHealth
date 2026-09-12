@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { TrainingMixTab } from './TrainingMixTab';
 import { MixPresetsCard } from './MixPresetsCard';
+import { readDiaryMixes, buildMixExportHtml, buildMixExportCsv } from '../../../engines/training-plan-save.engine';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -41,7 +42,7 @@ export const MixHub: React.FC<{ initialMode?: MixHubMode }> = ({ initialMode }) 
         {MODE_DEFS.map(d=> {
           const isActive = mode===d.m;
           return (
-            <div key={d.m} onClick={()=> setMode(d.m)} style={{ ...CARD, marginBottom:0, padding:10, cursor:'pointer', borderLeft:`3px solid ${d.accent}`, background: isActive ? `${d.accent}12` : 'rgba(24,24,27,0.42)', border: isActive ? `1px solid ${d.accent}55` : '1px solid rgba(255,255,255,0.07)', minHeight:72 }}>
+            <div key={d.m} role="tab" aria-selected={isActive} tabIndex={0} onClick={()=> setMode(d.m)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMode(d.m); } }} style={{ ...CARD, marginBottom:0, padding:10, cursor:'pointer', borderLeft:`3px solid ${d.accent}`, background: isActive ? `${d.accent}12` : 'rgba(24,24,27,0.42)', border: isActive ? `1px solid ${d.accent}55` : '1px solid rgba(255,255,255,0.07)', minHeight:72 }}>
               <div style={{ fontSize:9, fontWeight:800, color:d.accent, letterSpacing:0.4, textTransform:'uppercase' }}>{d.icon} {d.label}</div>
               <div style={{ fontSize:11, fontWeight:800, color:'#fff', lineHeight:1.2, marginTop:4 }}>{d.desc}</div>
               <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>{d.hint}</div>
@@ -50,23 +51,7 @@ export const MixHub: React.FC<{ initialMode?: MixHubMode }> = ({ initialMode }) 
         })}
       </div>
 
-      <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
-        {MODE_DEFS.map(({ m, label, icon, desc, accent }) => {
-          const isActive = mode===m;
-          return (
-            <button key={m} onClick={() => setMode(m)} title={desc} style={{
-              flex:'0 0 auto', display:'flex', alignItems:'center', gap:6, padding:'7px 11px', borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:800, whiteSpace:'nowrap',
-              border: isActive ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.08)',
-              background: isActive ? `${accent}18` : 'rgba(255,255,255,0.04)',
-              color: isActive ? accent : '#fff', transition:'all 0.16s',
-            }}>
-              <span>{icon}</span> {label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div style={{ ...CARD, padding:0, overflow:'hidden', background:'rgba(24,24,27,0.30)' }}>
+      <div style={{ ...CARD, padding:0, overflow:'hidden', background:'rgba(24,24,27,0.30)' }} role="tablist" aria-label="Режимы миксов">
         <div style={{ padding:'8px 10px', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8 }}>
           <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:`${active.accent}18`, border:`1px solid ${active.accent}33`, fontSize:14 }}>{active.icon}</span>
           <div>
@@ -80,6 +65,34 @@ export const MixHub: React.FC<{ initialMode?: MixHubMode }> = ({ initialMode }) 
         </div>
       </div>
 
+      <div style={{ display:'flex', gap:6, marginTop:10 }}>
+        <button
+          data-mix="export-html"
+          onClick={() => {
+            try {
+              const html = buildMixExportHtml(readDiaryMixes());
+              const w = window.open('', '_blank');
+              if (w) { w.document.write(html); w.document.close(); w.print(); }
+            } catch {}
+          }}
+          style={{ flex:1, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer', minHeight:44 }}
+        >🖨 Печать миксов</button>
+        <button
+          data-mix="export-csv"
+          onClick={() => {
+            try {
+              const csv = buildMixExportCsv(readDiaryMixes());
+              const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = 'mixes.csv';
+              a.click();
+              setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            } catch {}
+          }}
+          style={{ flex:1, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer', minHeight:44 }}
+        >📥 CSV миксов</button>
+      </div>
       <div style={{ fontSize:10, color:'#fff', textAlign:'center', marginTop:10, opacity:0.9, lineHeight:1.45 }}>
         Единый хаб без дублей — тренировочные миксы (цель → пред/интра/пост) + пресеты здоровья (7 стеков) в одном месте.
       </div>

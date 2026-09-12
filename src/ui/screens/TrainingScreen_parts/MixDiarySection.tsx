@@ -25,26 +25,43 @@ function todayStr(): string {
   return localIsoDate();
 }
 
-/** Напоминание «Принять микс/пресет» через N минут (Notification API + localStorage pref). */
-export function scheduleMixReminder(title: string, minutes = 30): void {
+const MIX_REMINDERS_KEY = 'he_mix_reminders_v1';
+
+export interface MixReminder { id: string; title: string; at: number; minutes: number; }
+
+/** Активные (не истекшие) напоминания — персистентны между перезагрузками. */
+export function readMixReminders(): MixReminder[] {
+  try {
+    const arr = JSON.parse(localStorage.getItem(MIX_REMINDERS_KEY) || '[]');
+    if (!Array.isArray(arr)) return [];
+    const now = Date.now();
+    return arr.filter(r => r && typeof r.at === 'number' && now - r.at < (r.minutes || 30) * 60000);
+  } catch { return []; }
+}
+
+/** Напоминание «Принять микс/пресет» через N минут (Notification API + персистентный флаг). */
+export function scheduleMixReminder(title: string, minutes = 30, id?: string): void {
+  try {
+    const arr = readMixReminders().filter(r => r.id !== (id || title));
+    arr.unshift({ id: id || title, title, at: Date.now(), minutes });
+    localStorage.setItem(MIX_REMINDERS_KEY, JSON.stringify(arr.slice(0, 10)));
+    localStorage.setItem('he_mix_reminder', JSON.stringify({ title, at: new Date().toISOString(), minutes }));
+  } catch {}
   if (typeof Notification === 'undefined') return;
   if (Notification.permission === 'default') {
-    void Notification.requestPermission().then(p => { if (p === 'granted') scheduleMixReminder(title, minutes); });
+    void Notification.requestPermission().then(p => { if (p === 'granted') scheduleMixReminder(title, minutes, id); });
     return;
   }
   if (Notification.permission !== 'granted') return;
   setTimeout(() => {
     try { new Notification('💊 Принять: ' + title, { body: 'Тренировочный микс / пресет здоровья — не забудьте принять препараты.' }); } catch {}
   }, minutes * 60000);
-  try {
-    localStorage.setItem('he_mix_reminder', JSON.stringify({ title, at: new Date().toISOString(), minutes }));
-  } catch {}
 }
 
 export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasTrainingToday }) => {
   const [records, setRecords] = useState<DiaryMixRecord[]>([]);
   const [expanded, setExpanded] = useState(false);
-  const [reminderMsg, setReminderMsg] = useState<string | null>(null);
+  const [reminderMsg, setReminderMsg] = useState<{ id: string; text: string } | null>(null);
   const [intakeTick, setIntakeTick] = useState(0);
 
   // Старые записи миксов могли содержать substances={} или повреждённые
@@ -110,16 +127,16 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
                 try { eff = analyzePresetEffect(r); } catch { eff = null; }
                 if (!eff) return null;
                 const better = eff.type === 'sleep' ? eff.delta > 0 : eff.delta < 0;
-                const arrow = eff.delta === 0 ? '→' : (better ? '↑' : '↓');
+                const arrow = better ? '↑' : '↓';
                 return (
-                  <div style={{ fontSize: 10, color: better ? '#00e68a' : eff.delta === 0 ? '#fff' : '#f59e0b', marginTop: 2 }}>
-                    📈 {eff.label}: {eff.before} → {eff.after} {eff.type === 'sleep' ? 'ч' : 'кг'} ({arrow} {Math.abs(eff.delta)}) {eff.samplesAfter === 0 ? `· данных после: ${eff.samplesBefore} зап. до` : ''}
+                  <div style={{ fontSize: 10, color: better ? '#00e68a' : '#f59e0b', marginTop: 2 }}>
+                    📈 {eff.label}: {eff.before} → {eff.after} {eff.type === 'sleep' ? 'ч' : 'кг'} ({arrow} {Math.abs(eff.delta)})
                   </div>
                 );
               })()}
             </div>
-            <button onClick={() => { scheduleMixReminder(r.title, 30); setReminderMsg(`🔔 Напоминание «${r.title}» через 30 мин`); setTimeout(() => setReminderMsg(null), 3000); }}
-              title="Напомнить принять через 30 мин" style={{ fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>🔔</button>
+            <button onClick={() => { scheduleMixReminder(r.title, 30, r.id); setReminderMsg({ id: r.id, text: `🔔 Напоминание «${r.title}» активно 30 мин` }); setTimeout(() => setReminderMsg(null), 3000); }}
+              title="Напомнить принять через 30 мин" aria-label={`Напомнить принять ${r.title}`} style={{ fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px', minWidth: 44, minHeight: 44 }}>🔔</button>
             <button onClick={() => { deleteDiaryMix(r.id); setRecords(readSafeRecords()); }}
               style={{ fontSize: 10, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>🗑</button>
           </div>
@@ -140,7 +157,17 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
               })}
             </div>
           )}
-          {reminderMsg && <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 4 }}>{reminderMsg}</div>}
+          {reminderMsg && reminderMsg.id === r.id && <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 4 }}>{reminderMsg.text}</div>}
+          {(() => {
+            try {
+              const p = readMixReminders().find(x => x.id === r.id);
+              if (!p) return null;
+              const until = new Date(p.at + p.minutes * 60000);
+              const hh = String(until.getHours()).padStart(2, '0');
+              const mm = String(until.getMinutes()).padStart(2, '0');
+              return <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 4 }}>🔔 Напоминание активно до {hh}:{mm}</div>;
+            } catch { return null; }
+          })()}
           {r.substances.length > 0 && (
             <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginTop: 4 }}>
               {r.substances.slice(0, 6).map((s, i) => (

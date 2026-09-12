@@ -496,9 +496,11 @@ export function analyzePresetEffect(record: DiaryMixRecord, windowDays = 7): Pre
     const before = vals.filter(e => e.t < base && e.t >= base - windowDays * 86400000).map(e => e.v);
     const after = vals.filter(e => e.t > base && e.t <= base + windowDays * 86400000).map(e => e.v);
     if (before.length < 3) return null;
+    // Добивка П8: без замеров после — честный null (а не delta 0 «→»).
+    if (after.length === 0) return null;
     const avg = (arr: number[]) => arr.reduce((s, x) => s + x, 0) / arr.length;
     const bAvg = avg(before);
-    const aAvg = after.length > 0 ? avg(after) : bAvg;
+    const aAvg = avg(after);
     return {
       type: isSleep ? 'sleep' : 'weight',
       label: isSleep ? 'сон' : 'вес',
@@ -558,6 +560,64 @@ export function toggleMixPhaseIntake(date: string, mixId: string, phase: string)
   return mixIntake;
 }
 
+// ─── экспорт миксов (эпик G): HTML/CSV с XSS-защитой ───
+
+function escHtml(s: unknown): string {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function csvCell(s: unknown): string {
+  const t = String(s ?? '');
+  return /[",\n;=+\-@]/.test(t) ? `'${t.replace(/'/g, "''")}` : t;
+}
+
+/** HTML-сводка дневника миксов для печати. */
+export function buildMixExportHtml(records: DiaryMixRecord[]): string {
+  const rows = records.map(r => {
+    const subs = (r.substances || []).map(s => `${escHtml(s.name)} — ${escHtml(s.dose)}${escHtml(s.unit)}`).join('<br>');
+    return `<tr><td>${escHtml(r.date)}</td><td>${escHtml(r.title)}</td><td>${r.substances.length}</td><td>${subs}</td><td>${r.score ?? ''}</td></tr>`;
+  }).join('');
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Миксы — экспорт</title></head><body>` +
+    `<h1>🧪 Миксы и пресеты (${records.length})</h1>` +
+    `<table border="1" cellpadding="4"><thead><tr><th>Дата</th><th>Название</th><th>N</th><th>Состав</th><th>Скор</th></tr></thead><tbody>${rows}</tbody></table>` +
+    `</body></html>`;
+}
+
+/** CSV дневника миксов (BOM + антиформула). */
+export function buildMixExportCsv(records: DiaryMixRecord[]): string {
+  const head = 'date;title;kind;goal;substances;score';
+  const lines = records.map(r => {
+    const subs = (r.substances || []).map(s => `${s.name} ${s.dose}${s.unit}`).join(' | ');
+    return [r.date, r.title, r.kind, r.goal, subs, r.score ?? ''].map(csvCell).join(';');
+  });
+  return `﻿${head}\n${lines.join('\n')}`;
+}
+
+// ─── goal тренировок из дневника миксов (для сплита эффективности в проде) ───
+
+/** Привязать goal микса к тренировкам по дате: intake дня → id записи → goal записи.
+ *  Без goal (нет приёма/запись удалена) — тренировка остаётся без goal и попадает в «Все». */
+export function attachMixGoalsToWorkouts<W extends { date: string }>(
+  workouts: W[],
+): (W & { goal?: string })[] {
+  if (!Array.isArray(workouts) || workouts.length === 0) return [];
+  let byId = new Map<string, string>();
+  try {
+    byId = new Map(readDiaryMixes().map(r => [r.id, r.goal]));
+  } catch { /* ignore */ }
+  return workouts.map(w => {
+    try {
+      const intake = getMixIntake(w.date);
+      for (const mid of Object.keys(intake || {})) {
+        const taken = Object.values(intake[mid] || {}).some(v => v);
+        const goal = byId.get(mid);
+        if (taken && goal) return { ...w, goal };
+      }
+    } catch { /* ignore */ }
+    return w;
+  });
+}
+
 // ─── эффективность миксов: микс-дни → качество сессии ───
 
 export interface MixEffectiveness {
@@ -580,9 +640,17 @@ function avgOf(nums: number[]): number {
 }
 
 /** Корреляция «принял микс → качество сессии»: сравнивает средние RPE/объём/длительность
- *  тренировок в дни с приёмом микса (любая фаза) против дней без микса. */
-export function analyzeMixEffectiveness(workouts: EffectivenessWorkout[]): MixEffectiveness | null {
+ *  тренировок в дни с приёмом микса (любая фаза) против дней без микса.
+ *  Эпик F: `opts.minPerGroup` (дефолт 1 для совместимости; UI передаёт 5) и `opts.goal`
+ *  (split по цели); при недоборе — честный null вместо «1 vs 1». */
+export function analyzeMixEffectiveness(
+  workouts: EffectivenessWorkout[],
+  opts?: { minPerGroup?: number; goal?: string },
+): MixEffectiveness | null {
   if (!Array.isArray(workouts) || workouts.length === 0) return null;
+  const minPerGroup = opts?.minPerGroup ?? 1;
+  const goal = opts?.goal;
+  if (goal) workouts = workouts.filter(w => (w as any).goal === goal || !(w as any).goal);
   const withMix = { sessions: 0, rpes: [] as number[], volumes: [] as number[], durations: [] as number[] };
   const withoutMix = { sessions: 0, rpes: [] as number[], volumes: [] as number[], durations: [] as number[] };
   for (const w of workouts) {
@@ -596,6 +664,7 @@ export function analyzeMixEffectiveness(workouts: EffectivenessWorkout[]): MixEf
     if (typeof w.duration === 'number' && w.duration > 0) bucket.durations.push(w.duration);
   }
   if (withMix.sessions === 0 || withoutMix.sessions === 0) return null;
+  if (withMix.sessions < minPerGroup || withoutMix.sessions < minPerGroup) return null;
   const rpeDelta = Math.round((avgOf(withMix.rpes) - avgOf(withoutMix.rpes)) * 10) / 10;
   const volumeDelta = Math.round(avgOf(withMix.volumes) - avgOf(withoutMix.volumes));
   return {
