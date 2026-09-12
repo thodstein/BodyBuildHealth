@@ -119,14 +119,14 @@ const IndividualPlanInner: React.FC<{ embedded?: boolean }> = ({ embedded }) => 
 
   return (
     <>
-      <div className="plan-root" style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 20, maxWidth: 560, margin: '0 auto', paddingLeft: 2, paddingRight: 2 }}>
+      <div className="plan-root" style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 12, maxWidth: 560, margin: '0 auto', paddingLeft: 2, paddingRight: 2 }}>
         <div className="plan-tabbar plan-tabbar-sticky" style={{
           display:'flex', gap:4, padding:4, overflowX:'auto', scrollbarWidth:'none',
           background:'linear-gradient(180deg, rgba(32,32,36,0.92), rgba(18,18,20,0.96))',
           border:'1px solid rgba(255,255,255,0.07)', borderRadius:16,
           boxShadow:'0 8px 28px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06)',
           backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
-          position:'sticky', top: 0, zIndex: 20,
+          position: embedded ? 'static' : 'sticky', top: 0, zIndex: 20,
         }}>
           {visibleTabs.map(t => {
             const active = activeTab === t.key;

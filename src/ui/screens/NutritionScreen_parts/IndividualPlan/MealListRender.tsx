@@ -125,17 +125,19 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
     const pKcalPct = totalKcal > 0 ? (totalP * 4 / totalKcal) * 100 : 0; const fKcalPct = totalKcal > 0 ? (totalF * 9 / totalKcal) * 100 : 0; const cKcalPct = totalKcal > 0 ? (totalC * 4 / totalKcal) * 100 : 0;
     return (
       <div>
-        {/* per100 — компактный инфо-бейдж */}
-        <div style={{
-          marginBottom:10, padding:'9px 12px', borderRadius:12,
+        {/* per100 — свернут по умолчанию, чтобы не съедать вертикаль дня */}
+        <details style={{
+          marginBottom:8, padding:'7px 10px', borderRadius:12,
           background:'linear-gradient(135deg, rgba(0,230,138,0.07), rgba(0,200,160,0.03))',
-          border:'1px solid rgba(0,230,138,0.14)', fontSize:10, color:'rgba(255,255,255,0.82)', lineHeight:1.5,
-          boxShadow:'0 2px 12px rgba(0,230,138,0.06)', backdropFilter:'blur(8px)',
+          border:'1px solid rgba(0,230,138,0.14)', fontSize:10, color:'#fff', lineHeight:1.5,
+          boxShadow:'0 2px 12px rgba(0,230,138,0.06)',
         }}>
-          <span style={{display:'inline-flex',alignItems:'center',gap:6, fontWeight:800,color:'#00e68a', marginRight:6, padding:'1px 7px', borderRadius:999, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)', fontSize:9}}>ⓘ per100</span>
+          <summary style={{ cursor:'pointer', fontSize:10, fontWeight:800, color:'#00e68a', listStyle:'none' }}>ⓘ per100 — КБЖУ на 100 г (готовый · сухой · порошок · как есть)</summary>
+          <div style={{ marginTop:6, color:'rgba(255,255,255,0.82)' }}>
           КБЖУ на <b>100 г</b> съедобной части: <span style={{color:'#00e68a',fontWeight:700}}>готовый</span> · <span style={{color:'#f59e0b',fontWeight:700}}>сухой</span> · <span style={{color:'#a78bfa',fontWeight:700}}>порошок</span> · <span style={{color:'#60a5fa',fontWeight:700}}>как есть</span>
-          <span style={{color:'rgba(255,255,255,0.45)', marginLeft:6}}>КБЖУ<sub>порции</sub> = per100 × г/100 — честный вес в указанном виде.</span>
-        </div>
+          <span style={{color:'#fff', marginLeft:6}}>КБЖУ<sub>порции</sub> = per100 × г/100 — честный вес в указанном виде.</span>
+          </div>
+        </details>
         <div style={{
           marginBottom:12, borderRadius:16, overflow:'hidden',
           border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.22)' : '1px solid rgba(255,255,255,0.07)',
@@ -144,10 +146,10 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
           position:'relative',
         }}>
           <div style={{position:'absolute', top:0, left:0, right:0, height:1, background: d.isTrainingDay ? 'linear-gradient(90deg, #00e68a 0%, #00e68a22 60%, transparent 100%)' : 'linear-gradient(90deg, rgba(255,255,255,0.08), transparent)'}} />
-          <div style={{padding:'14px 16px 12px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+          <div style={{padding:'10px 12px 8px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
               <span style={{
-                width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0,
+                width:34, height:34, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0,
                 background: d.isTrainingDay ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.10))' : 'rgba(255,255,255,0.06)',
                 border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.22)' : '1px solid rgba(255,255,255,0.08)',
                 boxShadow: d.isTrainingDay ? '0 2px 12px rgba(0,230,138,0.18)' : 'none',
@@ -193,7 +195,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
             <div style={{fontSize:10,color:'rgba(255,255,255,0.38)',lineHeight:1.4, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.04)'}}>
               Цель: <b style={{color:'#60a5fa'}}>{calcTargets.protein} г базы</b> <span style={{color:'rgba(255,255,255,0.25)'}}>→</span> <b style={{color:'#00e68a'}}>{_proteinPreset} г/кг</b> <span style={{color:'rgba(255,255,255,0.25)'}}>·</span> фаза <b style={{color:'#c4b5fd'}}>«{phase}»</b>{(injections as any[]).some((i: any)=>i.type==='ААС')?(<><span style={{color:'rgba(255,255,255,0.25)'}}> · </span><span style={{color:'#f472b6'}}>+AAS +{Math.round(weight*0.3)} г</span></>):''} <span style={{color:'rgba(255,255,255,0.25)'}}>→</span> <b style={{color:'#fff'}}>{effectiveP} г</b> / <b style={{color:'#fff'}}>{effectiveKcal} ккал</b>{weight>0?<><span style={{color:'rgba(255,255,255,0.25)'}}> · </span><b style={{color:'#22c55e'}}>{(totalP/weight).toFixed(1)} г/кг</b></>:''}</div>
           </div>
-          {nutritionReport && (() => { const r = nutritionReport; const chip = (ok: boolean, label: string, val: string) => (<div style={{display:'inline-flex',alignItems:'center',gap:5,padding:'4px 8px',borderRadius:999,fontSize:10,fontWeight:700, background: ok ? 'rgba(34,197,94,0.10)' : 'rgba(245,158,11,0.10)', border:`1px solid ${ok?'rgba(34,197,94,0.20)':'rgba(245,158,11,0.22)'}`,color: ok ? '#86efac' : '#fbbf24'}}><span style={{width:6,height:6,borderRadius:'50%',background:ok?'#22c55e':'#f59e0b'}} />{label} <span style={{color:'#fff'}}>{val}</span></div>); const mpsOk = (r.proteinTiming?.evennessScore||0) >= 70; const fibOk = (r.fiberAnalysis?.pct||0) >= 80; const glOk = r.glycemicLoad?.status !== 'high'; const satOk = (r.fatQuality?.satPct||0) <= 15; const nakOk = r.sodiumPotassium?.status === 'ok'; const pralOk = r.pral?.status === 'ok' || r.pral?.status === 'mild'; const o3 = r.fatQuality?.omega3G||0; const o3Ok = o3 >= 1.6; return (<div style={{margin:'0 12px 10px',padding:'8px 10px',borderRadius:12,background:'rgba(139,92,246,0.06)',border:'1px solid rgba(139,92,246,0.14)'}}><div style={{fontSize:10,fontWeight:800,color:'#c4b5fd',marginBottom:6, letterSpacing:'0.2px', display:'flex', alignItems:'center', gap:6}}><span style={{width:18,height:18,borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(139,92,246,0.16)',border:'1px solid rgba(139,92,246,0.2)',fontSize:10}}>🩺</span> Диетология</div><div style={{display:'flex',flexWrap:'wrap',gap:5}}>{chip(mpsOk,'MPS',(r.proteinTiming?.evennessScore||0).toFixed(0)+'%')}{chip(fibOk,'Клетч.',(r.fiberAnalysis?.totalG||0).toFixed(0)+'г')}{chip(glOk,'ГН',r.glycemicLoad?.status==='high'?'выс.':r.glycemicLoad?.status==='low'?'низк.':'норма')}{chip(satOk,'Нас.жир',(r.fatQuality?.satPct||0).toFixed(0)+'%')}{chip(nakOk,'Na:K',(r.sodiumPotassium?.ratio||0).toFixed(1)+':1')}{chip(pralOk,'PRAL',(r.pral?.mEq||0)+'мэкв')}{chip(o3Ok,'Ω3',o3.toFixed(1)+'г')}</div></div>); })()}
+          {nutritionReport && (() => { const r = nutritionReport; const chip = (ok: boolean, label: string, val: string) => (<div style={{display:'inline-flex',alignItems:'center',gap:5,padding:'4px 8px',borderRadius:999,fontSize:10,fontWeight:700, background: ok ? 'rgba(34,197,94,0.10)' : 'rgba(245,158,11,0.10)', border:`1px solid ${ok?'rgba(34,197,94,0.20)':'rgba(245,158,11,0.22)'}`,color: ok ? '#86efac' : '#fbbf24'}}><span style={{width:6,height:6,borderRadius:'50%',background:ok?'#22c55e':'#f59e0b'}} />{label} <span style={{color:'#fff'}}>{val}</span></div>); const mpsOk = (r.proteinTiming?.evennessScore||0) >= 70; const fibOk = (r.fiberAnalysis?.pct||0) >= 80; const glOk = r.glycemicLoad?.status !== 'high'; const satOk = (r.fatQuality?.satPct||0) <= 15; const nakOk = r.sodiumPotassium?.status === 'ok'; const pralOk = r.pral?.status === 'ok' || r.pral?.status === 'mild'; const o3 = r.fatQuality?.omega3G||0; const o3Ok = o3 >= 1.6; return (<details style={{margin:'0 12px 10px',padding:'0 10px',borderRadius:12,background:'rgba(139,92,246,0.06)',border:'1px solid rgba(139,92,246,0.14)'}}><summary style={{cursor:'pointer',padding:'8px 0',fontSize:11,fontWeight:800,color:'#c4b5fd',listStyle:'none'}}>🩺 Диетология · раскрыть</summary><div style={{display:'flex',flexWrap:'wrap',gap:5,paddingBottom:10}}>{chip(mpsOk,'MPS',(r.proteinTiming?.evennessScore||0).toFixed(0)+'%')}{chip(fibOk,'Клетч.',(r.fiberAnalysis?.totalG||0).toFixed(0)+'г')}{chip(glOk,'ГН',r.glycemicLoad?.status==='high'?'выс.':r.glycemicLoad?.status==='low'?'низк.':'норма')}{chip(satOk,'Нас.жир',(r.fatQuality?.satPct||0).toFixed(0)+'%')}{chip(nakOk,'Na:K',(r.sodiumPotassium?.ratio||0).toFixed(1)+':1')}{chip(pralOk,'PRAL',(r.pral?.mEq||0)+'мэкв')}{chip(o3Ok,'Ω3',o3.toFixed(1)+'г')}</div></details>); })()}
           {drugCompatReport?.warnings && drugCompatReport.warnings.length > 0 && drugCompatReport.warnings[0] && !drugCompatReport.warnings[0].includes('совместимы') && (<div style={{margin:'0 12px 10px',padding:'8px 10px',borderRadius:12,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.14)'}}><div style={{fontSize:10,fontWeight:800,color:'#fca5a5',marginBottom:6, display:'flex', alignItems:'center', gap:6}}><span style={{width:18,height:18,borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(239,68,68,0.14)',fontSize:10}}>⚠</span> Лекарства × питание</div>{drugCompatReport.warnings.slice(0,4).map((w: string, i: number) => <div key={i} style={{fontSize:10,color:'rgba(255,255,255,0.78)',marginBottom:2, lineHeight:1.4}}>• {w}</div>)}</div>)}
 
           <div style={{height:5,display:'flex', gap:1, padding:'0 1px 1px'}}>
@@ -253,17 +255,17 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                     >★{d.timingScores[mi].score}/10</span>
                   )}
                 </div>
-                <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <div style={{display:'flex',alignItems:'center',gap:6, overflowX:'auto', maxWidth:'100%', paddingBottom:2, scrollbarWidth:'none'}}>
                   <span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.85)'}}>{mealKcal} ккал</span>
-                  <span onClick={()=>{ const ov = readMealTarget(m.label); setMealTargetEditor({ mi, label: m.label, p: ov?.p ? String(ov.p) : '', f: ov?.f ? String(ov.f) : '', c: ov?.c ? String(ov.c) : '' }); }} className="plan-mact" style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(249,115,22,0.08)',border:'1px solid rgba(249,115,22,0.15)',color:'#fb923c',cursor:'pointer',fontWeight:600}} title="Цель приёма (Б/Ж/У слота)">🎯</span>
-                  <span onClick={()=>timeEdit.open(mi, dayPlan)} className="plan-mact" style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
-                  <span onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} className="plan-mact" style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🍳</span>
-                  <span onClick={()=>{setQuickAddMealIdx(mi);setQuickAddSearch('');}} className="plan-mact" style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontWeight:600}}>+</span>
+                  <span onClick={()=>{ const ov = readMealTarget(m.label); setMealTargetEditor({ mi, label: m.label, p: ov?.p ? String(ov.p) : '', f: ov?.f ? String(ov.f) : '', c: ov?.c ? String(ov.c) : '' }); }} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:32,minWidth:32,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(249,115,22,0.08)',border:'1px solid rgba(249,115,22,0.15)',color:'#fb923c',cursor:'pointer',fontWeight:600}} title="Цель приёма (Б/Ж/У слота)">🎯</span>
+                  <span onClick={()=>timeEdit.open(mi, dayPlan)} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:32,minWidth:32,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
+                  <span onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:32,minWidth:32,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🍳</span>
+                  <span onClick={()=>{setQuickAddMealIdx(mi);setQuickAddSearch('');}} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:32,minWidth:32,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontWeight:600}}>+</span>
                   <span onClick={()=>{ try { // E7: локальная дата (toISOString уезжал на завтра вечером в UTC+3..+12)
                     const _d = new Date(); const _iso = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
-                    const data=readDiaryV2(); if(!data[_iso]) data[_iso]={meals:{}}; const label=m.label||'Приём пищи'; if(!data[_iso].meals[label]) data[_iso].meals[label]=[]; (m.items||[]).forEach((it:any)=>{ (data[_iso].meals[label] as any).push({ name:it.name, qty:`${it.amount||100} г` as any, kcal:Math.round(it.kcal||0), p:Math.round((it.p||0)*10)/10, f:Math.round((it.f||0)*10)/10, c:Math.round((it.c||0)*10)/10, category:it.category, foodId:it.id, micros:it.micros });}); writeDiaryV2(data); if(typeof (window as any).showToast==='function') (window as any).showToast(`📒 ${label} → дневник`, 'success'); } catch {} }} className="plan-mact" style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.2)',color:'#00e68a',cursor:'pointer',fontWeight:600}} title="Добавить приём в дневник">📒</span>
-                  <span onClick={()=>{ /* E2: единый ctx-хелпер — синк в weekPlan при weekEditDay */ (ctx as any).duplicateMeal?.(mi); }} className="plan-mact" style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.12)',color:'#818cf8',cursor:'pointer',fontWeight:600}}>📋</span>
-                  <span onClick={()=>removeMealRebalanced(dayIdx, mi)} title="Пропустить приём — день пересоберётся без него" className="plan-mact" style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.12)',color:'#ef4444',cursor:'pointer',fontWeight:600}}>✕</span>
+                    const data=readDiaryV2(); if(!data[_iso]) data[_iso]={meals:{}}; const label=m.label||'Приём пищи'; if(!data[_iso].meals[label]) data[_iso].meals[label]=[]; (m.items||[]).forEach((it:any)=>{ (data[_iso].meals[label] as any).push({ name:it.name, qty:`${it.amount||100} г` as any, kcal:Math.round(it.kcal||0), p:Math.round((it.p||0)*10)/10, f:Math.round((it.f||0)*10)/10, c:Math.round((it.c||0)*10)/10, category:it.category, foodId:it.id, micros:it.micros });}); writeDiaryV2(data); if(typeof (window as any).showToast==='function') (window as any).showToast(`📒 ${label} → дневник`, 'success'); } catch {} }} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:32,minWidth:32,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.2)',color:'#00e68a',cursor:'pointer',fontWeight:600}} title="Добавить приём в дневник">📒</span>
+                  <span onClick={()=>{ /* E2: единый ctx-хелпер — синк в weekPlan при weekEditDay */ (ctx as any).duplicateMeal?.(mi); }} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:32,minWidth:32,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.12)',color:'#818cf8',cursor:'pointer',fontWeight:600}}>📋</span>
+                  <span onClick={()=>removeMealRebalanced(dayIdx, mi)} title="Пропустить приём — день пересоберётся без него" className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:32,minWidth:32,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.12)',color:'#ef4444',cursor:'pointer',fontWeight:600}}>✕</span>
                 </div>
               </div>
               <div style={{padding:'6px 10px 8px',background:'#18181b'}}>
@@ -274,8 +276,9 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                   </span>;})}</div>
                 {m.totals&&<div style={{display:'flex',gap:6,marginTop:8,padding:'6px 8px',borderRadius:10,background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.05)',fontSize:10,alignItems:'center',flexWrap:'wrap'}}>{(() => { const tg = m.target; const fmt = (v: number, t: number|undefined, color: string) => { if (!t || t <= 0) return <span style={{color,fontWeight:700, fontSize:11}}>{v}г</span>; const dev = v - t; const ok = Math.abs(dev) <= 3; return <span style={{color,fontWeight:700, fontSize:11, display:'inline-flex', alignItems:'center', gap:3}}>{v}<span style={{color:'rgba(255,255,255,0.35)'}}>/ {t}г</span>{ok?null:<span style={{fontSize:9,color:dev>0?'#f87171':'#fbbf24',fontWeight:800, background: dev>0?'rgba(239,68,68,0.10)':'rgba(245,158,11,0.10)', padding:'1px 5px', borderRadius:999, border:`1px solid ${dev>0?'rgba(239,68,68,0.18)':'rgba(245,158,11,0.18)'}`}}>{dev>0?('+'+Math.round(dev)):(''+Math.round(dev))}</span>}</span>; }; return <span style={{display:'contents'}}>{fmt(mealP,tg?.p,'#60a5fa')}<span style={{color:'rgba(255,255,255,0.14)',margin:'0 4px'}}>·</span>{fmt(mealF,tg?.f,'#fbbf24')}<span style={{color:'rgba(255,255,255,0.14)',margin:'0 4px'}}>·</span>{fmt(mealC,tg?.c,'#fb923c')}</span>; })()}{plannerMode === 'pro' && mealDiaas.diaas > 0 && <span style={{fontSize:10,fontWeight:800,color:mealDiaas.diaas >= 1 ? '#86efac' : mealDiaas.diaas >= 0.75 ? '#fbbf24' : '#fca5a5',background:(mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.12)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)'),padding:'2px 7px',borderRadius:999, border:`1px solid ${mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.18)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`}}>DIAAS {mealDiaas.diaas.toFixed(2)}</span>}{plannerMode === 'pro' && mealGL > 0 && <span style={{fontSize:10,fontWeight:800,color:mealGL<10?'#86efac':mealGL<=20?'#fbbf24':'#fca5a5',background:(mealGL<10?'rgba(34,197,94,0.12)':mealGL<=20?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)'),padding:'2px 7px',borderRadius:999, border:`1px solid ${mealGL<10?'rgba(34,197,94,0.18)':mealGL<=20?'rgba(245,158,11,0.18)':'rgba(239,68,68,0.18)'}`}} title={'Glycemic Load: ' + mealGL + (isPostWorkout ? ' (high GL ok post-workout)' : '')}>GL {mealGL}</span>}{plannerMode === 'pro' && mealII > 0 && <span style={{fontSize:10,fontWeight:800,color:mealII<40?'#86efac':mealII<=70?'#fbbf24':'#fca5a5',background:(mealII<40?'rgba(34,197,94,0.12)':mealII<=70?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)'),padding:'2px 7px',borderRadius:999, border:`1px solid ${mealII<40?'rgba(34,197,94,0.18)':mealII<=70?'rgba(245,158,11,0.18)':'rgba(239,68,68,0.18)'}`}} title={'Insulin Index (kcal-weighted): ' + mealII}>II {mealII}</span>}{plannerMode === 'pro' && m.mpsCheck && m.mpsCheck.triggers_mTOR && <span style={{fontSize:10,fontWeight:600,color:'#00e68a',background:'rgba(0,230,138,0.08)',padding:'1px 5px',borderRadius:4}} title={'+' + m.mpsCheck.leucineG + 'g leucine, MPS triggered'}>{'\uD83E\uDDEC mTOR'}</span>}{plannerMode === 'pro' && m.mpsCheck && !m.mpsCheck.triggers_mTOR && m.mpsCheck.proteinG > 0 && <span style={{fontSize:10,fontWeight:600,color:'#f59e0b',background:'rgba(245,158,11,0.08)',padding:'1px 5px',borderRadius:4}} title={'Leucine ' + m.mpsCheck.leucineG + 'g < 2.5g threshold'}>{'\u26A0\uFE0F ' + m.mpsCheck.leucineG + 'g'}</span>}{m.synergyNotes&&m.synergyNotes.length>0&&<span style={{fontSize:10,color:'#22c55e',fontWeight:600}} title={m.synergyNotes.join('; ')}>✅ {(m.synergyNotes as string[]).length} синерги{((m.synergyNotes as string[]).length>1?'й':'я')}</span>}{m.conflictWarnings&&m.conflictWarnings.length>0&&<span style={{fontSize:10,color:'#ef4444',fontWeight:600}} title={m.conflictWarnings.join('; ')}>⚠️ {(m.conflictWarnings as string[]).length} конфликт{((m.conflictWarnings as string[]).length>1?'ов':'')}</span>}</div>}
                 {Array.isArray(m.recipeOptions) && m.recipeOptions.length > 0 && (
-                  <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:3}}>
-                    <div style={{fontSize:8,fontWeight:700,color:'#f97316',padding:'2px 0'}}>🍳 Варианты рецептов — выберите один, рацион перестроится:{m.recipeApplied ? <span style={{color:'#22c55e',fontWeight:600}}> выбрано «{m.recipeApplied}»{m.recipeApplied2 ? ` + «${m.recipeApplied2}»` : ''}</span> : null}</div>
+                  <details style={{marginTop:6,borderRadius:10,border:'1px solid rgba(249,115,22,0.16)',background:'rgba(249,115,22,0.04)',overflow:'hidden'}}>
+                    <summary style={{cursor:'pointer',padding:'8px 10px',fontSize:11,fontWeight:800,color:'#f97316',listStyle:'none'}}>🍳 Варианты рецептов ({(m.recipeOptions as any[]).length}){m.recipeApplied ? <span style={{color:'#22c55e',fontWeight:700}}> · выбрано «{m.recipeApplied}»{m.recipeApplied2 ? ` + «${m.recipeApplied2}»` : ''}</span> : <span style={{color:'#fff',fontWeight:600}}> · раскрыть</span>}</summary>
+                  <div style={{padding:'0 8px 8px',display:'flex',flexDirection:'column',gap:3}}>
                     {/* Пресеты подбора (масса = большое У, сушка, белок…) */}
                     {renderPresetRow(m.recipeOptions as any[])}
                     {(m.recipeOptions as any[]).filter((r:any)=>recipeMatchesPreset(r, recipePreset)).map((r: any, ri: number) => {
@@ -311,8 +314,9 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                         </details>
                       );
                     })}
-                    <button onClick={()=>moreRecipeOptions(dayIdx,mi)} title="Подобрать другие варианты рецептов" style={{alignSelf:'flex-start',marginTop:1,padding:'2px 7px',borderRadius:6,border:'1px solid rgba(249,115,22,0.25)',background:'transparent',color:'#f97316',cursor:'pointer',fontSize:8,fontWeight:700}}>🔄 Другие варианты</button>
+                    <button onClick={()=>moreRecipeOptions(dayIdx,mi)} title="Подобрать другие варианты рецептов" style={{alignSelf:'flex-start',marginTop:1,padding:'6px 10px',borderRadius:8,border:'1px solid rgba(249,115,22,0.25)',background:'transparent',color:'#f97316',cursor:'pointer',fontSize:10,fontWeight:700,minHeight:36}}>🔄 Другие варианты</button>
                   </div>
+                  </details>
                 )}
                 {m.recipeApplied && (
                   <button onClick={() => setRecipePickerMeal({ dayIdx, mealIdx: mi, label: m.label })}
@@ -341,11 +345,9 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                   </div>
                 )}
                 {m.recipeSuggestions && Array.isArray(m.recipeSuggestions) && m.recipeSuggestions.length > 0 && (
-                  <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:3}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'2px 0'}}>
-                      <div style={{fontSize:8,fontWeight:700,color:'#f97316'}}>🍲 Рецепты для этого приёма:</div>
-                      <span onClick={()=>refreshRecipeSuggestions(dayIdx)} title="Подобрать другие рецепты" style={{cursor:'pointer',fontSize:9,padding:'1px 6px',borderRadius:5,border:'1px solid rgba(249,115,22,0.25)',color:'#f97316',fontWeight:700}}>🔄</span>
-                    </div>
+                  <details style={{marginTop:6,borderRadius:10,border:'1px solid rgba(249,115,22,0.14)',background:'rgba(249,115,22,0.03)',overflow:'hidden'}}>
+                    <summary style={{cursor:'pointer',padding:'8px 10px',fontSize:11,fontWeight:800,color:'#f97316',listStyle:'none'}}>🍲 Подсказки рецептов ({(m.recipeSuggestions as any[]).length}) · раскрыть</summary>
+                  <div style={{padding:'0 8px 8px',display:'flex',flexDirection:'column',gap:3}}>
                     {/* Пресеты подбора — фиксированный набор */}
                     {renderPresetRow(m.recipeSuggestions as any[])}
                     {(m.recipeSuggestions as any[]).filter((r:any)=>recipeMatchesPreset(r, recipePreset)).slice(0, 3).map((r: any, ri: number) => (
@@ -372,11 +374,12 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                               </ol>
                             </div>
                           )}
-                          <button onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} style={{marginTop:3,padding:'2px 6px',borderRadius:4,border:'1px solid rgba(249,115,22,0.3)',background:'rgba(249,115,22,0.1)',color:'#f97316',cursor:'pointer',fontSize:7,fontWeight:600}}>🍳 Заменить приём этим рецептом</button>
+                          <button onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} style={{marginTop:3,padding:'6px 10px',borderRadius:8,border:'1px solid rgba(249,115,22,0.3)',background:'rgba(249,115,22,0.1)',color:'#f97316',cursor:'pointer',fontSize:10,fontWeight:700,minHeight:36}}>🍳 Заменить приём этим рецептом</button>
                         </div>
                       </details>
                     ))}
                   </div>
+                  </details>
                 )}
                 {quickAddMealIdx === mi && (
                   <div style={{padding:'4px 10px 8px',background:'#18181b',borderTop:'1px solid rgba(255,255,255,0.04)'}}>
@@ -474,28 +477,28 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
             _dayMicrosCache.set(d, _mc);
           }
           const visibleMicros = _mc ? _mc.visibleMicros : [];
-          return visibleMicros.length > 0 ? (<div style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(34,197,94,0.15)'}}><div style={{padding:'6px 10px',background:'rgba(34,197,94,0.03)'}}><div style={{fontSize:9,fontWeight:700,color:'#22c55e',marginBottom:4}}>🧪 Микронутриенты (покрытие RDA)</div><div style={{display:'flex',flexWrap:'wrap',gap:4}}>{visibleMicros.map((m,i)=>{const pct=Math.min(100,Math.round(m.val/Math.max(1,m.rda)*100));return(<div key={i} style={{display:'flex',alignItems:'center',gap:3,fontSize:8,padding:'2px 6px',borderRadius:4,background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.1)'}}><span style={{fontWeight:700,color:pct>=80?'#22c55e':pct>=50?'#f59e0b':'#ef4444'}}>{m.label}</span><span style={{color:'rgba(255,255,255,0.7)'}}>{m.val}{m.unit}</span><span style={{fontSize:10,color:pct>=80?'#22c55e':pct>=50?'#f59e0b':'#ef4444',fontWeight:600}}>{pct}%</span></div>)})}</div></div></div>) : null; })()}
+          return visibleMicros.length > 0 ? (<details style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(34,197,94,0.15)'}}><summary style={{cursor:'pointer',padding:'8px 10px',fontSize:11,fontWeight:800,color:'#22c55e',listStyle:'none'}}>🧪 Микронутриенты ({visibleMicros.length}) · раскрыть</summary><div style={{padding:'0 10px 10px',background:'rgba(34,197,94,0.03)'}}><div style={{display:'flex',flexWrap:'wrap',gap:4}}>{visibleMicros.map((m,i)=>{const pct=Math.min(100,Math.round(m.val/Math.max(1,m.rda)*100));return(<div key={i} style={{display:'flex',alignItems:'center',gap:3,fontSize:9,padding:'3px 7px',borderRadius:6,background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.1)',overflowWrap:'break-word',minWidth:0}}><span style={{fontWeight:700,color:pct>=80?'#22c55e':pct>=50?'#f59e0b':'#ef4444'}}>{m.label}</span><span style={{color:'#fff'}}>{m.val}{m.unit}</span><span style={{fontSize:10,color:pct>=80?'#22c55e':pct>=50?'#f59e0b':'#ef4444',fontWeight:600}}>{pct}%</span></div>)})}</div></div></details>) : null; })()}
         {d.supplementTimeline && d.supplementTimeline.length > 0 && (
-          <div style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(139,92,246,0.2)'}}>
-            <div style={{padding:'8px 10px',background:'rgba(139,92,246,0.04)'}}>
-              <div style={{fontSize:9,fontWeight:700,color:'#a78bfa',marginBottom:6}}>💊 Добавки по времени</div>
+          <details style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(139,92,246,0.2)'}}>
+            <summary style={{cursor:'pointer',padding:'8px 10px',fontSize:11,fontWeight:800,color:'#a78bfa',listStyle:'none',background:'rgba(139,92,246,0.04)'}}>💊 Добавки по времени ({d.supplementTimeline.length}) · раскрыть</summary>
+            <div style={{padding:'0 10px 10px',background:'rgba(139,92,246,0.04)'}}>
               {d.supplementTimeline.map((st: any, si: number) => (
                 <div key={si} style={{display:'flex',alignItems:'flex-start',gap:6,marginBottom:4,padding:'4px 6px',borderRadius:6,background:'rgba(139,92,246,0.04)'}}>
                   <span style={{fontSize:10,color:'#a78bfa',fontWeight:600,minWidth:32}}>{st.time}</span>
                   <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
                     {st.items.map((s: any, ii: number) => (
-                      <span key={ii} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(139,92,246,0.1)',border:'1px solid rgba(139,92,246,0.15)',color:'#c4b5fd',fontWeight:600}} title={s.note}>{s.name} {s.dose}</span>
+                      <span key={ii} style={{fontSize:11,padding:'5px 8px',minHeight:32,minWidth:32,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(139,92,246,0.1)',border:'1px solid rgba(139,92,246,0.15)',color:'#c4b5fd',fontWeight:600}} title={s.note}>{s.name} {s.dose}</span>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </details>
         )}
         {d.waterTimeline && d.waterTimeline.length > 0 && (
-          <div style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(59,130,246,0.2)'}}>
-            <div style={{padding:'8px 10px',background:'rgba(59,130,246,0.04)'}}>
-              <div style={{fontSize:9,fontWeight:700,color:'#60a5fa',marginBottom:6}}>💧 Гидратация (~{d.waterTimeline.reduce((s:number,w:any)=>s+w.ml,0)} мл/день)</div>
+          <details style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(59,130,246,0.2)'}}>
+            <summary style={{cursor:'pointer',padding:'8px 10px',fontSize:11,fontWeight:800,color:'#60a5fa',listStyle:'none',background:'rgba(59,130,246,0.04)'}}>💧 Гидратация (~{d.waterTimeline.reduce((s:number,w:any)=>s+w.ml,0)} мл/день) · раскрыть</summary>
+            <div style={{padding:'0 10px 10px',background:'rgba(59,130,246,0.04)'}}>
               <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
                 {d.waterTimeline.map((w: any, wi: number) => (
                   <span key={wi} style={{fontSize:10,padding:'2px 6px',borderRadius:4,background:'rgba(59,130,246,0.08)',border:'1px solid rgba(59,130,246,0.12)',color:'#93c5fd',fontWeight:600}} title={w.note}>{w.time} — {w.ml}мл</span>
@@ -504,15 +507,15 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
               {waterCalc?.electrolytes && (
                 <div style={{marginTop:6,padding:'5px 8px',borderRadius:6,background:'rgba(59,130,246,0.06)',fontSize:10}}>
                   <span style={{color:'#93c5fd',fontWeight:600}}>⚡ Na {waterCalc.electrolytes.sodiumMg}мг</span>
-                  <span style={{margin:'0 6px',color:'rgba(255,255,255,0.15)'}}>|</span>
+                  <span style={{margin:'0 6px',color:'#fff'}}>|</span>
                   <span style={{color:'#f59e0b',fontWeight:600}}>K {waterCalc.electrolytes.potassiumMg}мг</span>
-                  <span style={{margin:'0 6px',color:'rgba(255,255,255,0.15)'}}>|</span>
+                  <span style={{margin:'0 6px',color:'#fff'}}>|</span>
                   <span style={{color:'#a78bfa',fontWeight:600}}>Mg {waterCalc.electrolytes.magnesiumMg}мг</span>
-                  <div style={{color:'rgba(255,255,255,0.5)',marginTop:2}}>{waterCalc.electrolytes.note}</div>
+                  <div style={{color:'#fff',marginTop:2,overflowWrap:'break-word'}}>{waterCalc.electrolytes.note}</div>
                 </div>
               )}
             </div>
-          </div>
+          </details>
         )}
         {d.meals && d.meals.length > 0 && (() => {
           const toMin = (t: string) => { const [h, m] = (t || '00:00').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
@@ -527,12 +530,9 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
           const trainEndMin = (trainMin != null && trainEnd && trainEnd.includes(':')) ? toMin(trainEnd) : (trainMin != null ? trainMin + 90 : null);
           const hourTicks: number[] = []; for (let t = Math.floor(startMin / 60) * 60; t <= endMin; t += 60) hourTicks.push(t);
           return (
-            <div style={{ marginTop: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,230,138,0.18)' }}>
-              <div style={{ padding: '8px 10px', background: 'rgba(0,230,138,0.04)' }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span>Таймлайн дня</span>
-                  {trainMin != null && <span style={{fontSize:7, padding:'2px 6px', borderRadius:20, background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444'}}>T {String(Math.floor(trainMin/60)).padStart(2,'0')}:{String(trainMin%60).padStart(2,'0')}–{String(Math.floor((trainEndMin||trainMin+90)/60)%24).padStart(2,'0')}:{String((trainEndMin||trainMin+90)%60).padStart(2,'0')}</span>}
-                </div>
+            <details style={{ marginTop: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,230,138,0.18)' }}>
+              <summary style={{cursor:'pointer', padding: '8px 10px', fontSize: 11, fontWeight: 800, color: '#00e68a', listStyle:'none', background: 'rgba(0,230,138,0.04)'}}>🕒 Таймлайн дня · раскрыть</summary>
+              <div style={{ padding: '0 10px 10px', background: 'rgba(0,230,138,0.04)' }}>
                 {/* Горизонтальная шкала — скролл если много приёмов, перенос на след строку через flex-wrap */}
                 <div style={{ display:'flex', flexWrap:'wrap', gap:6, padding:'8px 6px', background:'#202023', borderRadius:6, border:'1px solid rgba(255,255,255,0.06)' }}>
                   {mealPts.map((m: any, i: number) => {
@@ -553,14 +553,13 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                     return <div key={'inj'+idx} style={{display:'flex', alignItems:'center', gap:4, padding:'4px 8px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.18)', fontSize:8}} title={(inj.time||'')+' — укол '+(inj.name||inj.type)}><span>{iGlyph}</span><span style={{fontWeight:700}}>{inj.time}</span><span style={{color:'rgba(255,255,255,0.7)'}}>{inj.name||inj.type}</span></div>;
                   })}
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 6, color: 'rgba(255,255,255,0.6)', flexWrap:'wrap' }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 9, color: '#fff', flexWrap:'wrap' }}>
                   <span><span style={{ color: '#00e68a' }}>●</span> Приёмы</span>
                   <span><span style={{ color: '#8b5cf6' }}>●</span> Peri-workout</span>
                   {trainMin != null && <span><span style={{ color: '#ef4444' }}>●</span> Тренировка</span>}
-                  <span style={{marginLeft:'auto', fontSize:6, color:'rgba(255,255,255,0.4)'}}>перенос на след. строку разрешён — не сжато</span>
                 </div>
               </div>
-            </div>
+            </details>
           );
         })()}
         {timeEdit.modal}

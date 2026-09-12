@@ -956,7 +956,7 @@ const doImportPlan = (raw: string): boolean => {
              <span style={{ color: '#f59e0b' }}>● Ж: {Math.round(weekPlan.totals?.f || 0)}г</span>
              <span style={{ color: '#f97316' }}>● У: {Math.round(weekPlan.totals?.c || 0)}г</span>
           </div>
-          <div style={{ maxHeight: 500, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
              {(Array.isArray(weekPlan.days) ? weekPlan.days : []).map((d: any, di: number) => {
               const wKcal = Math.round(d.totals?.kcal || 0);
               const wP = Math.round(d.totals?.p || 0);
@@ -1007,7 +1007,7 @@ const doImportPlan = (raw: string): boolean => {
           {(() => {
              const allMealLabels = Array.from(new Set((Array.isArray(weekPlan.days) ? weekPlan.days : []).flatMap((d: any) => (Array.isArray(d?.meals) ? d.meals : []).map((m: any) => m.label))));
             return <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 3, fontSize: 7 }}>
+              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 3, fontSize: 9 }}>
                 <thead>
                   <tr>
                     <th style={{ padding: '4px 6px', textAlign: 'center', background: '#202023', borderRadius: 6, fontSize: 7, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>Приём</th>
@@ -1028,12 +1028,12 @@ const doImportPlan = (raw: string): boolean => {
                         if (!meal) return <td key={di} style={{ padding: '4px', textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 6 }}>—</td>;
                         const kcal = Math.round(meal.totals?.kcal || 0);
                         return (
-                          <td key={di} style={{ padding: '4px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 6, verticalAlign: 'top' }}>
-                            <div style={{ color: '#00e68a', fontWeight: 700, fontSize: 7, marginBottom: 2 }}>{kcal} ккал</div>
+                          <td key={di} style={{ padding: '6px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 9, verticalAlign: 'top', minWidth: 92, overflowWrap: 'break-word' }}>
+                            <div style={{ color: '#00e68a', fontWeight: 700, fontSize: 9, marginBottom: 2 }}>{kcal} ккал</div>
                             {(meal.items || []).slice(0, 2).map((it: any, ii: number) => (
-                              <div key={ii} style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, fontSize: 6 }}>{it.name} {it.amount}г</div>
+                              <div key={ii} style={{ color: '#fff', lineHeight: 1.4, fontSize: 9, overflowWrap: 'break-word' }}>{it.name} {it.amount}г</div>
                             ))}
-                             {(Array.isArray(meal.items) ? meal.items.length : 0) > 2 && <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 5 }}>+{(meal.items?.length || 0) - 2} ещё</div>}
+                             {(Array.isArray(meal.items) ? meal.items.length : 0) > 2 && <div style={{ color: '#fff', fontSize: 9 }}>+{(meal.items?.length || 0) - 2} ещё</div>}
                           </td>
                         );
                       })}

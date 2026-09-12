@@ -24,14 +24,14 @@ export const GlassCard: React.FC<{ title?: string; icon?: string; color?: string
   }}>
     {color && <div style={{ height: 3, background: `linear-gradient(90deg, ${color} 0%, ${color}cc 42%, ${color}22 74%, transparent 100%)`, opacity: 0.95 }} />}
     {color && <div style={{ position:'absolute', top: 0, left: 0, right: 0, height: 28, background: `radial-gradient(520px 28px at 18% 0%, ${color}18, transparent 68%)`, pointerEvents:'none' }} />}
-    {title && <div style={{ padding: '16px 18px 0', fontSize: 13.5, color: color || '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 10, letterSpacing: '-0.35px', lineHeight: 1.1 }}>
+    {title && <div style={{ padding: '12px 14px 0', fontSize: 13, color: color || '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8, letterSpacing: '-0.35px', lineHeight: 1.1 }}>
       {icon && <span style={{
-        width: 30, height: 30, borderRadius: 10, display:'flex', alignItems:'center', justifyContent:'center',
+        width: 26, height: 26, borderRadius: 9, display:'flex', alignItems:'center', justifyContent:'center',
         background: color ? `${color}18` : 'rgba(255,255,255,0.07)', border: `1px solid ${color ? `${color}28` : 'rgba(255,255,255,0.08)'}`,
-        fontSize: 15, flexShrink: 0, boxShadow: color ? `0 2px 12px ${color}22` : 'none',
+        fontSize: 14, flexShrink: 0, boxShadow: color ? `0 2px 12px ${color}22` : 'none',
       }}>{icon}</span>}{title}
     </div>}
-    <div style={{ padding: title ? '14px 18px 18px' : 18 }}>
+    <div style={{ padding: title ? '10px 14px 14px' : 14 }}>
       {children}
     </div>
   </div>

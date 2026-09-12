@@ -1566,7 +1566,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   return (
     <div className="screen nutrition nutrition-screen nutrition-tabs" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden', padding:0 }}>
       <div className="nutrition-tabs-head" style={{
-        display:'flex', flexDirection:'column', alignItems:'stretch', gap:0, padding:'8px 12px 0', flexShrink:0,
+        display:'flex', flexDirection:'column', alignItems:'stretch', gap:0, padding:'6px 12px 0', flexShrink:0,
         background:'#18181b',
         borderBottom:'1px solid rgba(255,255,255,0.06)',
         position:'sticky', top:0, zIndex:20,
@@ -1600,7 +1600,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         </div>
         {/* Переключатель разделов: внутри ленты было не выйти из hero-секции */}
         <div className="nutrition-sections" style={{
-          display:'flex', gap:6, overflowX:'auto', padding:'8px 0',
+          display:'flex', gap:6, overflowX:'auto', padding:'6px 0',
           scrollbarWidth:'none', flexShrink:0,
         }}>
           {([
@@ -1622,18 +1622,18 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           ))}
         </div>
         <div className="nutrition-chips nutrition-chips-head" style={{
-          display:'flex', gap:6, flexWrap:'nowrap', overflowX:'auto', overflowY:'hidden',
-          padding:'10px 12px 12px', margin:0,
+          display:'flex', gap:6, flexWrap:'wrap', overflowX:'visible', overflowY:'visible',
+          padding:'8px 12px 8px', margin:0,
           scrollbarWidth:'none', msOverflowStyle:'none',
-          WebkitOverflowScrolling:'touch', whiteSpace:'nowrap', flexShrink:0,
+          WebkitOverflowScrolling:'touch', flexShrink:0,
           background:'#18181b', borderTop:'1px solid rgba(255,255,255,0.06)',
         }}>
           {(SECTION_TABS[nutritionSection] || SECTION_TABS.all).map(t => {
             const isActive = tab === t;
             return (
               <button key={t} onClick={() => setTab(t as ActiveTab)} className="nutrition-chip" data-active={isActive} style={{
-                flexShrink:0, padding:'10px 16px', borderRadius:14, cursor:'pointer',
-                fontSize:13, fontWeight: isActive ? 800 : 600, letterSpacing:-0.2,
+                flexShrink:0, padding:'8px 12px', borderRadius:12, cursor:'pointer',
+                fontSize:12, fontWeight: isActive ? 800 : 600, letterSpacing:-0.2,
                 border: isActive ? '1.5px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
                 background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
                 color: isActive ? '#000' : '#fff',
@@ -1686,7 +1686,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         );
       })()}
 
-      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 24px' }}>
+      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px var(--tabbar-clear,140px)' }}>
         <NutritionPlanScope profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis}>
         <div style={{ animation:'fadeSlideIn 0.3s ease' }}>
           {renderContent()}
