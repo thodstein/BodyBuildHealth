@@ -64,6 +64,15 @@ export interface CombatInput {
   velocityLossPct?: number | null;
   vbtHistory?: import('./combat-vbt.engine').VbtHistoryEntry[] | null;
   velocityLossPerLift?: Record<string, number> | null;
+  // P3 безопасность: сотрясения за 12 мес + измеренная шея (cutoff 32.1кг / 3.71 N/кг, flex/ext 0.74)
+  concussionHistory?: number;
+  neckExtensionKg?: number;
+  neckFlexExtRatio?: number;
+  // P4 весовая категория (лимит кг) + P5: travel-режим + лютеиновая пометка
+  weightClass?: string | null;
+  weightClassLimitKg?: number | null;
+  travelMode?: 'off' | 'hotel';
+  lutealPhase?: boolean;
 }
 
 export interface CombatSet {

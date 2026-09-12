@@ -7,7 +7,7 @@ import { computeOutsideMetrics, outsideVolumeMultiplier, outsideFrequencyPenalty
 import { getCombatPattern, recommendCombatPattern, type CombatPattern } from './combat-split-patterns';
 import { phaseForCombatWeek, rirForCombat, repsForCombat } from './combat-progression';
 import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadWeekATR, isTaperWeek } from './combat-periodization.engine';
-import { isTaperByFightDate, taperVolumeMultiplier, buildTaperRationale } from './combat-taper.engine';
+import { isTaperByFightDate, taperVolumeMultiplier, buildTaperRationale, taperSplitForWeek, validateTaperConfig, fightWeekIndex, recommendTaperWeeks } from './combat-taper.engine';
 import { weightCutVolumeMultiplier, weightCutNutritionForWeek, weightCutRehydrationNotes, buildWeightCutProtocol, weightCutPhaseForWeek } from './combat-weight-cut.engine';
 import { buildConditioningRationale, conditioningSessionsForWeek } from './combat-conditioning.engine';
 import { filterByTierCB, filterByInjuryCB, selectDiverseCB, tierForCB, gentleFactorForCB, repsCapForCB } from './combat-selection';
@@ -375,7 +375,14 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     if (nut.kcal) rationale.push(`Питание W1: ${nut.kcal}ккал P${nut.proteinG}/C${nut.carbsG} · вода ${nut.waterMl}мл Na ${nut.sodiumMg}мг`);
     rationale.push(weightCutRehydrationNotes(wcProtocol.targetLossKg)[0]);
   }
-  if (taperCfg) rationale.push(...buildTaperRationale(taperCfg, weeks));
+  if (taperCfg) {
+    rationale.push(...buildTaperRationale(taperCfg, weeks));
+    // P1: раздельные кривые + рекомендуемая длительность — одной строкой, калибровки не трогаем
+    const recTw = recommendTaperWeeks(daysPerWeek, outsideSessions);
+    const splitFw = fightWeekIndex(taperCfg.fightDate, taperCfg.startDate, weeks);
+    const splitEx = taperSplitForWeek(splitFw, weeks, taperCfg, false);
+    rationale.push(`Тапер-сплит fight week: зал ×${splitEx.sc} · кондиция ×${splitEx.cond} · hard spar ×${splitEx.sparringHard} (интенсивность 90–95%, частота та же) · рекомендовано ${recTw}нед от объёма ${daysPerWeek + outsideSessions}×/нед`);
+  }
   if ((input as any).conditioningMode !== 'off') rationale.push(...buildConditioningRationale(goal, outsideSessions, weeks));
 
   const weeksData: CombatWeek[] = [];
@@ -702,11 +709,59 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
 
   const warnings: string[] = [];
   const errors: string[] = [];
+  // P1-гейт: мусорные даты боя — error, а не молчаливый totalWeeks
+  if (input.fightDate) {
+    for (const e of validateTaperConfig(input.fightDate, input.startDate ?? null, input.taperWeeks)) errors.push(e);
+  }
   if (outsideMetrics && outsideMetrics.weeklyLoad > 1500 && pattern.sessionsPerRotation >= 4) {
     warnings.push(`Высокая внезальная ${outsideMetrics.weeklyLoad} + ${pattern.sessionsPerRotation}× зал — перегруз. Рекомендуем 2-3× зал.`);
+    // P1-гейт: перегруз с 4× залом — блокирующий (а не только warning)
+    errors.push(`Перегруз: внезальная ${outsideMetrics.weeklyLoad} + ${pattern.sessionsPerRotation}× зал — снизьте зал до 2–3× или внезальную`);
   }
   if (input.weightCutKg && input.weightCutKg > 3 && goal !== 'weight_cut') {
     warnings.push(`Весогонка ${input.weightCutKg} кг без режима weight_cut — объём не снижен должным образом.`);
+  }
+  // P1-гейт: сгонка >5% массы без weight_cut-режима — блок (ISSN)
+  if (input.weightCutKg && input.bodyweight && input.bodyweight > 30 && goal !== 'weight_cut') {
+    const pct = input.weightCutKg / input.bodyweight;
+    if (pct > 0.05) errors.push(`Сгонка ${(pct * 100).toFixed(1)}% массы без режима weight_cut — включите weight_cut или уменьшите до ≤5%`);
+  }
+  // P1-гейт: same-day взвешивание + сгонка >5% — блок (нет времени на регидратацию, GSSI/ISSN)
+  if (wcProtocol?.weighInType === 'same_day_2h' && input.weightCutKg && input.bodyweight && input.bodyweight > 30) {
+    const pct = input.weightCutKg / input.bodyweight;
+    if (pct > 0.05) errors.push(`Same-day взвешивание (1–2ч) + сгонка ${(pct * 100).toFixed(1)}% >5% — нет времени на регидратацию, режьте до ≤5%`);
+  }
+  // P1-гейт: шея ниже MEV при жёстких спаррингах — блок (Collins: шея = защита)
+  {
+    const hardSpar = (input.sparringLoad as any)?.hardSparSessions || 0;
+    if (hardSpar > 0) {
+      const lmNeck = (COMBAT_LANDMARKS as any)[level]?.neck;
+      const mev = lmNeck?.mev ?? 6;
+      const badWeek = weeksData.find(wk => {
+        if (wk.deload || wk.taper) return false;
+        const neckSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('neck')).reduce((a, e) => a + e.sets, 0), 0);
+        return neckSets < mev;
+      });
+      if (badWeek) errors.push(`Hard spar ${hardSpar}×/нед при шее ниже MEV ${mev} (нед ${badWeek.week}) — добавьте шею или уберите hard spar`);
+    }
+  }
+  // P1-гейт: HIIT-нагрузка ≥4×/нед (lactic/aerobic-high + hard spar) — разнос ≥36ч невозможен (Ruddock)
+  {
+    const hardSpar = (input.sparringLoad as any)?.hardSparSessions || 0;
+    let maxHiit = hardSpar;
+    if ((input as any).conditioningMode !== 'off') {
+      for (const wk of weeksData) {
+        const cond = conditioningSessionsForWeek(wk.week, wk.phase as any, goal, outsideSessions).filter(c => c.modality === 'lactic' || (c.modality === 'alactic' && (c.rpe || 0) >= 8)).length;
+        if (hardSpar + cond > maxHiit) maxHiit = hardSpar + cond;
+      }
+    }
+    if (maxHiit >= 4) errors.push(`HIIT-нагрузка ${maxHiit}×/нед (hard spar + lactic/alactic) — разнос ≥36ч невозможен, снизьте до ≤3×`);
+  }
+  // P1: hard spar в fight week — запрет (дни 9–5 только technical 50%); при тапере 2нед — warning про последний hard spar
+  if (taperCfg && (input.sparringLoad as any)?.hardSparSessions > 0) {
+    const tw = Math.max(1, Math.min(2, Math.round((input.taperWeeks as any) || (goal === 'camp' ? 2 : 1))));
+    if (tw <= 1) errors.push('Hard spar в fight week (тапер 1нед) запрещён — только technical 50%, дриллинг полным объёмом');
+    else warnings.push('Последний hard spar — за 10–14 дней до боя (дни 14–10), дальше только technical 50%');
   }
   // проверка шеи: группа neck или id содержит neck
   const hasNeck = weeksData.some(w => w.sessions.some(s => s.exercises.some(e => e.group === 'neck' || e.id.includes('neck'))));
@@ -719,6 +774,19 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     if ((wk.totalSets || 0) > effectiveBudget) {
       warnings.push(`Нед ${wk.week}: ${wk.totalSets} сетов > бюджета ${effectiveBudget} (зал ${weeklyBudget} - кондиц ${condCost}).`);
       break;
+    }
+  }
+
+  // P1-гейт: fight-week объём >65% пика при дате боя — блок (Bosquet: −41…−60%, интенсивность та же)
+  if (taperCfg && taperCfg.fightDate) {
+    const fw = fightWeekIndex(taperCfg.fightDate, taperCfg.startDate, weeks);
+    const fwData = weeksData.find(w => w.week === fw);
+    if (fwData && !fwData.deload) {
+      const peak = Math.max(0, ...weeksData.filter(w => w.week < fw - 1 && !w.deload && !w.taper).map(w => w.totalSets || 0));
+      const fwSets = fwData.totalSets || 0;
+      if (peak > 0 && fwSets > peak * 0.65) {
+        errors.push(`Fight week (нед ${fw}): ${fwSets} сетов >65% пика ${peak} — тапер недостаточен, срежьте объём (Bosquet −41…−60%)`);
+      }
     }
   }
 
