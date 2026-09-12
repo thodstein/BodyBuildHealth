@@ -280,6 +280,9 @@ export function evidenceOutcomesFor(id: string): Array<{ outcome: string; grade:
       out.push(note ? { outcome, grade: g, note } : { outcome, grade: g });
     }
   }
+  // Сильные грейды первыми (паспорт показывает топ-4)
+  const w: Record<EvidenceGradeEx, number> = { A: 0, B: 1, C: 2, D: 3 };
+  out.sort((a, b) => w[a.grade] - w[b.grade]);
   return out;
 }
 

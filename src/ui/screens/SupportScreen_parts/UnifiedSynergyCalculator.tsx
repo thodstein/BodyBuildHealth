@@ -7,6 +7,7 @@ import type { SubstanceEntry, MasterDB } from '../../../core/types';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
 import { dedupeDepletions, stackOverlap, stackScore as calcHubStackScore } from '../../../engines/support-hub-stack.engine';
 import { evidenceGradeExFor } from '../../../engines/support-hub-evidence.engine';
+import { isAASHonest } from '../../../engines/support-hub-aas.engine';
 import { LAB_TOP20, resolveLabMonitor } from '../../../engines/support-hub-labs.engine';
 
 
@@ -525,16 +526,20 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
     if (validIds.length===0) return [];
     const collected: LabMon[] = [];
     const seen = new Set<string>();
+    const pushUnique = (item: LabMon) => {
+      const key = item.markerEn + '|' + (item.condition || '');
+      if (!seen.has(key)) { seen.add(key); collected.push(item); }
+    };
+    let hasAas = false;
     for (const id of validIds) {
       // Explicit DB entries: LAB_MONITOR_DB + LAB_TOP20, резолв exact/case/alias
       // (честно чинит промахи zinc_sup vs zinc, TUDCA-case, methylcobalamin vs vitamin_b12)
       const dbEntry = resolveLabMonitor({ ...LAB_MONITOR_DB, ...LAB_TOP20 }, id);
-      for (const item of dbEntry) {
-        const key = item.markerEn + '|' + (item.condition || '');
-        if (!seen.has(key)) { seen.add(key); collected.push(item); }
-      }
-      // Fallback to catalog monitoring
+      for (const item of dbEntry) pushUnique(item);
+      // AAS-маркер: общий блок '' раньше был мёртвым (по id не резолвится никогда)
       const cat = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
+      if (cat && isAASHonest(cat.category || [], cat.nameRu || '', cat.name || '').isAAS) hasAas = true;
+      // Fallback to catalog monitoring
       if (cat?.monitoring?.length > 0) {
         for (const m of cat.monitoring) {
           const what = (m.what||'').toLowerCase().trim();
@@ -549,11 +554,15 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
           }
           const sys = MARKER_SYSTEM[resolvedEn] || 'metabolic';
           const organNote = resolvedEn ? `Маркер: ${resolvedEn}. ` : '';
-          collected.push({ markerRu: m.what||'', markerEn: resolvedEn, system: sys, when: m.when||'', target: m.targetRange||'',
+            collected.push({ markerRu: m.what||'', markerEn: resolvedEn, system: sys, when: m.when||'', target: m.targetRange||'',
             condition: organNote ? `Контроль по каталогу (${resolvedEn})` : 'По каталогу',
             note: organNote + 'Контроль '+(m.what||'')+'. '+(m.targetRange?'Цель: '+m.targetRange+'. ':'')+'Регулярность: '+(m.when||'') });
         }
       }
+    }
+    // Общий AAS-блок (''): HDL/HCT/E2/PRL — только если в стеке есть ААС
+    if (hasAas) {
+      for (const item of (LAB_MONITOR_DB[''] || [])) pushUnique(item);
     }
     return collected;
   }, [validIds]);

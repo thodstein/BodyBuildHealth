@@ -370,6 +370,14 @@ describe('Раунд-8: грейд стеков, исходы, миграция 
     expect(evidenceGradeExFor('magnesium', 'sleep')).toBe('B');
     expect(evidenceGradeExFor('magnesium')).toBe('A');
   });
+  it('исходы отсортированы: A первыми (паспорт показывает топ-4)', () => {
+    const w = { A: 0, B: 1, C: 2, D: 3 } as Record<string, number>;
+    for (const id of ['creatine', 'magnesium', 'omega3', 'ashwagandha']) {
+      const grades = evidenceOutcomesFor(id).map(o => w[o.grade]);
+      const sorted = [...grades].sort((a, b) => a - b);
+      expect(grades, id).toEqual(sorted);
+    }
+  });
   it('migratedGet: новый побеждает, legacy мигрирует и чистится, мусор → null', () => {    const m = new Map<string, string>();
     const store = {
       getItem: (k: string) => (m.has(k) ? m.get(k)! : null),

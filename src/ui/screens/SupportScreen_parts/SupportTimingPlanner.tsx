@@ -60,6 +60,30 @@ export const SupportTimingPlanner: React.FC = () => {
     isAASHonest(e.category, e.nameRu, e.nameEn).isAAS,
   ), [catalog]);
 
+  // Миграция legacy: ААС, выбранные до гейта, переезжают из общего расписания в AAS-зону
+  const migratedAasRef = React.useRef(false);
+  React.useEffect(() => {
+    if (migratedAasRef.current) return;
+    migratedAasRef.current = true;
+    try {
+      const byId = new Map(catalog.map(e => [e.id, e] as const));
+      const stay: string[] = [];
+      const move: string[] = [];
+      for (const sid of selectedSubs) {
+        const e = byId.get(sid);
+        if (e && isAASHonest(e.category, e.nameRu, e.nameEn).isAAS) move.push(sid);
+        else stay.push(sid);
+      }
+      if (move.length === 0) return;
+      const mergedAas = [...aasIds, ...move.filter(id => !aasIds.includes(id))].slice(0, 6);
+      setSelectedSubs(stay);
+      setAasIds(mergedAas);
+      migratedSet(localStorage, 'he_bio_timing_subs_v1', JSON.stringify(stay));
+      try { localStorage.setItem('he_bio_timing_aas_v1', JSON.stringify(mergedAas)); } catch { /* quota */ }
+    } catch { /* noop */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const CATEGORY_PRIORITY: Record<string, number> = {
     enzyme: 1, fibrinolytic: 1, mucolytic: 1, proteolytic: 1, hemorheologic: 1, anticoagulant: 1,
     dopamine: 2, peptide: 2, gh_secretagogue: 2,

@@ -160,4 +160,41 @@ describe('AAS-тайминг UI (отдельная зона)', () => {
     unmount();
     try { localStorage.removeItem('he_bio_timing_aas_v1'); } catch { /* noop */ }
   });
+
+  it('синергия: ААС в стеке тянет общий AAS-блок (HCT)', async () => {
+    const { UnifiedSynergyCalculator } = await import('../UnifiedSynergyCalculator');
+    try {
+      localStorage.removeItem('he_bio_timing_aas_v1');
+      localStorage.setItem('he_unified_ids', JSON.stringify(['testosterone', 'magnesium', '']));
+    } catch { /* noop */ }
+    try {
+      const { container, unmount } = render(<UnifiedSynergyCalculator s={{}} />);
+      expect(container.textContent || '').toMatch(/Гематокрит/);
+      unmount();
+    } finally {
+      try { localStorage.removeItem('he_unified_ids'); } catch { /* noop */ }
+    }
+  });
+
+  it('тайминг: legacy-ААС переезжает из расписания в AAS-зону', () => {
+    try {
+      localStorage.removeItem('he_bio_timing_subs_v1');
+      localStorage.removeItem('he_bio_timing_aas_v1');
+      localStorage.setItem('he_bio_timing_subs', JSON.stringify(['testosterone', 'magnesium']));
+    } catch { /* noop */ }
+    try {
+      const { container, unmount } = render(<SupportTimingPlanner />);
+      // Зона схлопнута по умолчанию — открываем
+      fireEvent.click(Array.from(container.querySelectorAll('div[role="button"]')).find(d => (d.textContent || '').includes('AAS-тайминг'))!);
+      const zone = container.querySelector('[data-aas="zone"]')!;
+      expect(zone.querySelector('[data-aas="card"]')?.textContent || '').toMatch(/Тестостерон/);
+      expect(localStorage.getItem('he_bio_timing_subs_v1')).toBe(JSON.stringify(['magnesium']));
+      expect(localStorage.getItem('he_bio_timing_subs')).toBeNull();
+      unmount();
+    } finally {
+      try { localStorage.removeItem('he_bio_timing_subs_v1'); } catch { /* noop */ }
+      try { localStorage.removeItem('he_bio_timing_subs'); } catch { /* noop */ }
+      try { localStorage.removeItem('he_bio_timing_aas_v1'); } catch { /* noop */ }
+    }
+  });
 });
