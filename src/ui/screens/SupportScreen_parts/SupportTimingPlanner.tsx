@@ -1,11 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
-import { PHARMA_DB } from '../../../core/pharma-database';
-import { PEPTIDE_DB } from '../../../engines/peptide-calculator.engine';
 import {
-  type EnrichedEntry, type TimeSlot, type TimingSlot, type SubstanceTiming, type FormWithBio,
-  TIMING_SLOTS, CATEGORY_TIMING, getCatalogFormBio, detectEnhancers, detectCompetition, classifySubstance,
-  ROUTE_LABELS_MAP, pharmaSummary, buildBioavailabilityCatalog,
+  type EnrichedEntry, type TimeSlot, type SubstanceTiming,
+  TIMING_SLOTS, CATEGORY_TIMING, buildBioavailabilityCatalog,
 } from './SupportBioavailabilityData';
 import { timingHintsFor } from '../../../engines/support-hub-timing.engine';
 import { S } from './SupportShared';

@@ -8,6 +8,7 @@ import { searchPubMed, type PubMedArticle } from '../../../engines/pubmed-search
 import { SUPPORT_RESEARCH } from '../../../engines/support.engine';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { InfoErrorBoundary } from './SupportScreenData';
+import { getCachedPubmed, writePubmedCache } from '../../../engines/support-hub-research.engine';
 
 const SUBSTANCE_NAMES_RU: Record<string, string> = {
   telmisartan: 'Телмисартан', nebivolol: 'Небиволол', nac: 'NAC', tudca: 'TUDCA',
@@ -26,23 +27,13 @@ const SUBSTANCE_NAMES_RU: Record<string, string> = {
 
 export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const PUBMED_CACHE_KEY = 'he_sup_pubmed_cache_v1';
-  const PUBMED_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-  const PUBMED_CACHE_CAP = 30;
-  const readPubmedCache = (): Record<string, { at: number; results: any[] }> => {
-    try {
-      const raw = localStorage.getItem(PUBMED_CACHE_KEY);
-      if (!raw) return {};
-      const p = JSON.parse(raw);
-      return p && typeof p === 'object' ? p : {};
-    } catch { return {}; }
-  };
   const cachedPubmedSearch = (q: string) => {
     const query = (q || '').trim();
     if (!query) { s.handlePubMedSearch(query); return; }
-    const cache = readPubmedCache();
-    const hit = cache[query.toLowerCase()];
-    if (hit && Date.now() - hit.at < PUBMED_CACHE_TTL_MS && Array.isArray(hit.results)) {
-      s.setPubMedResults(hit.results);
+    // Hit: мгновенно из кэша (TTL 24ч) — сеть не дёргаем
+    const hit = getCachedPubmed(localStorage, PUBMED_CACHE_KEY, query);
+    if (hit) {
+      s.setPubMedResults(hit);
       return;
     }
     // Miss: идём в сеть через родительский handler, результат закэшируем эффектом ниже
@@ -51,18 +42,9 @@ export const SupportResearch: React.FC<{ s: Record<string, any> }> = ({ s }) => 
   };
   // Кэшируем свежие результаты под последним запросом (TTL 24ч, кап 30)
   React.useEffect(() => {
-    try {
-      const q = ((s as any)._pubmedPendingQuery || s.pubMedQuery || '').trim();
-      if (!q || !Array.isArray(s.pubMedResults) || s.pubMedResults.length === 0) return;
-      const cache = readPubmedCache();
-      cache[q.toLowerCase()] = { at: Date.now(), results: s.pubMedResults.slice(0, 50) };
-      const keys = Object.keys(cache);
-      if (keys.length > PUBMED_CACHE_CAP) {
-        keys.sort((a, b) => (cache[a]?.at || 0) - (cache[b]?.at || 0));
-        for (const k of keys.slice(0, keys.length - PUBMED_CACHE_CAP)) delete cache[k];
-      }
-      localStorage.setItem(PUBMED_CACHE_KEY, JSON.stringify(cache));
-    } catch { /* quota/private — кэш просто не сохранится */ }
+    const q = ((s as any)._pubmedPendingQuery || s.pubMedQuery || '').trim();
+    if (!q || !Array.isArray(s.pubMedResults) || s.pubMedResults.length === 0) return;
+    writePubmedCache(localStorage, PUBMED_CACHE_KEY, q, s.pubMedResults);
   }, [s.pubMedResults]);
   const {
     pubMedQuery,

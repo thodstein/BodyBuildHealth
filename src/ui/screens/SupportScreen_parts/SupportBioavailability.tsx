@@ -49,8 +49,8 @@ const CATEGORY_LABELS_RU: Record<string, string> = {
 // ─── Main component ───
 
 const AAS_PHARMA_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','drostanolone','dht_inject','dht_derivative','sarm','sarm_s23','sarms']);
-// категории каталога + фарма-классы ААС (чтобы сустанон/омнадрен и все тестостероны/трен/нандролоны/оралка корректно скрывались)
-const AAS_CATEGORY_SET = new Set(['anabolic','androgen','aas_derivative','steroidal','ai','aromatase_inhibitor','estrogen','androgen_receptor','mTOR','gh_releasing','gh_secretagogue','testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','drostanolone','dht_inject','dht_derivative','sarm']);
+// P8: AAS-гейт — канон isAASHonest (класс первым, имена только точным словом).
+// Старый regex-сет удалён осознанно (ловил «метаболизм» по подстроке «метан»).
 const isAAS = (e: EnrichedEntry) => isAASHonest(e.category, e.nameRu, e.nameEn).isAAS || e.source === 'pharma' && AAS_PHARMA_CLASSES.has((e.category[1] || '').toLowerCase());
 
 export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s }) => {

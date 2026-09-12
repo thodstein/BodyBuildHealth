@@ -6,17 +6,10 @@
 import React, { useMemo, useState } from 'react';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-database';
 import { buildBioavailabilityCatalog, THERAPEUTIC_WINDOWS, LAB_MARKERS } from './SupportBioavailabilityData';
+import { DOSE_RANGES } from './SupportEffectiveDose';
 import { buildSubstancePassport } from '../../../engines/support-hub-passport.engine';
 import { getProfile } from '../../../core/profile-manager';
 import { S } from './SupportShared';
-
-const DOSE_RANGES_LOCAL: Record<string, { therMin: number; therMax: number; label: string }> = {
-  nac: { therMin: 600, therMax: 1800, label: 'N-ацетилцистеин' },
-  tudca: { therMin: 500, therMax: 1500, label: 'TUDCA' },
-  magnesium: { therMin: 300, therMax: 600, label: 'Магний (элемент)' },
-  zinc: { therMin: 15, therMax: 50, label: 'Цинк (элемент)' },
-  creatine: { therMin: 3000, therMax: 5000, label: 'Креатин' },
-};
 
 export const SupportSubstancePassport: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -46,7 +39,7 @@ export const SupportSubstancePassport: React.FC = () => {
       maxBio: entry.maxBio,
       formKey: entry.bestForm?.id || 'standard',
       therapeutic: THERAPEUTIC_WINDOWS as any,
-      ranges: DOSE_RANGES_LOCAL as any,
+      ranges: DOSE_RANGES as any,
       category: entry.category,
       synergies: (raw.synergies || []).map((x: any) => ({ with: x.with, effect: x.effect })),
       conflicts: (raw.conflicts || []).map((x: any) => ({ with: x.with, effect: x.effect })),

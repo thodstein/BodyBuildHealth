@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, personDoseHints, passesGradeFilter, filterCatalogGroups } from '../support-hub-evidence.engine';
 import { LAB_TOP20, LAB_ID_ALIASES, resolveLabMonitor } from '../support-hub-labs.engine';
+import { getCachedPubmed, writePubmedCache, readPubmedCache } from '../support-hub-research.engine';
 import { dedupeDepletions, stackOverlap, stackScore } from '../support-hub-stack.engine';
 import { timingHintsFor, TIMING_CANON } from '../support-hub-timing.engine';
 import { isAASHonest } from '../support-hub-aas.engine';
@@ -217,5 +218,77 @@ describe('P3-добавка фильтр каталога A/B', () => {
   it('all — байт-в-байт', () => {
     const groups = [{ cat: 'a', count: 1, items: [{ id: 'x' }] }];
     expect(filterCatalogGroups(groups as any, 'all')).toBe(groups);
+  });
+});
+
+describe('P8 кэш PubMed (движок)', () => {
+  const mem = () => {
+    const m = new Map<string, string>();
+    return {
+      getItem: (k: string) => (m.has(k) ? m.get(k)! : null),
+      setItem: (k: string, v: string) => { m.set(k, v); },
+    };
+  };
+  it('miss → write → hit', () => {
+    const s = mem();
+    expect(getCachedPubmed(s, 'k', 'creatine')).toBeNull();
+    expect(writePubmedCache(s, 'k', 'Creatine', [{ pmid: '1' }])).toBe(true);
+    expect(getCachedPubmed(s, 'k', 'creatine')).toEqual([{ pmid: '1' }]);
+  });
+  it('TTL: протухшее не отдаём', () => {
+    const s = mem();
+    writePubmedCache(s, 'k', 'zinc', [{ pmid: '2' }], 1000);
+    expect(getCachedPubmed(s, 'k', 'zinc', 1000 + 24 * 3600 * 1000 + 1)).toBeNull();
+    expect(getCachedPubmed(s, 'k', 'zinc', 1000 + 1000)).toEqual([{ pmid: '2' }]);
+  });
+  it('кап 30: старые дропаются', () => {
+    const s = mem();
+    for (let i = 0; i < 35; i++) writePubmedCache(s, 'k', `q${i}`, [{ pmid: String(i) }], 1000 + i);
+    const cache = readPubmedCache(s, 'k');
+    expect(Object.keys(cache).length).toBe(30);
+    expect(cache['q0']).toBeUndefined();
+    expect(cache['q34']).toBeDefined();
+  });
+  it('битый стор и пустые входы', () => {
+    const s = mem();
+    (s as any).setItem = (k: string, _v: string) => { throw new Error('quota'); };
+    expect(writePubmedCache({ getItem: () => '{broken', setItem: s.setItem }, 'k', 'a', [{ x: 1 }])).toBe(false);
+    expect(getCachedPubmed({ getItem: () => '{broken', setItem: () => {} }, 'k', 'a')).toBeNull();
+    const ok = mem();
+    expect(writePubmedCache(ok, 'k', '  ', [{ x: 1 }])).toBe(false);
+    expect(writePubmedCache(ok, 'k', 'a', [])).toBe(false);
+    expect(getCachedPubmed(ok, 'k', '')).toBeNull();
+  });
+});
+
+describe('Интеграция с реальными таблицами хаба', () => {
+  it('каждый ключ THERAPEUTIC_WINDOWS резолвится в окно', async () => {
+    const { THERAPEUTIC_WINDOWS } = await import('../../ui/screens/SupportScreen_parts/SupportBioavailabilityData');
+    const keys = Object.keys(THERAPEUTIC_WINDOWS);
+    expect(keys.length).toBeGreaterThan(20);
+    for (const k of keys) {
+      const w = doseWindowFor(k, THERAPEUTIC_WINDOWS as any, {});
+      expect(w.hasData, k).toBe(true);
+      expect(w.max).toBeGreaterThan(0);
+    }
+  });
+  it('топ-вещества имеют окно (терапевтика + ranges)', async () => {
+    const { THERAPEUTIC_WINDOWS } = await import('../../ui/screens/SupportScreen_parts/SupportBioavailabilityData');
+    const { DOSE_RANGES } = await import('../../ui/screens/SupportScreen_parts/SupportEffectiveDose');
+    for (const id of ['magnesium', 'zinc', 'creatine', 'omega3', 'vitamin_d3', 'nac', 'tudca', 'iron', 'berberine', 'curcumin']) {
+      const w = doseWindowFor(id, THERAPEUTIC_WINDOWS as any, DOSE_RANGES as any);
+      expect(w.hasData, id).toBe(true);
+    }
+    // Честный no-data путь на реальных таблицах (heptral ни в одном ключе/алиасе)
+    expect(doseWindowFor('heptral', THERAPEUTIC_WINDOWS as any, DOSE_RANGES as any).hasData).toBe(false);
+  });
+  it('грейды определены для выборки каталога', async () => {
+    const { SUPPORT_CATALOG_DATA } = await import('../../data/support-database');
+    const ids = Object.keys(SUPPORT_CATALOG_DATA).slice(0, 60);
+    expect(ids.length).toBeGreaterThan(10);
+    for (const id of ids) {
+      const g = evidenceGradeExFor(id);
+      expect(['A', 'B', 'C', 'D'].includes(g), id).toBe(true);
+    }
   });
 });

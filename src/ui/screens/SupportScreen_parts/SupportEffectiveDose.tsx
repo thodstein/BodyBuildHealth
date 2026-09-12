@@ -9,7 +9,8 @@ import { S } from './SupportShared';
 import { doseWindowFor, personDoseHints, bioEvidenceLabel, bioEvidenceFor } from '../../../engines/support-hub-evidence.engine';
 
 // ─── Therapeutic ranges for key supplements ───
-const DOSE_RANGES: Record<string, { therMin: number; therMax: number; label: string }> = {
+// Экспортируется для паспорта вещества (единый источник, без дублей таблицы).
+export const DOSE_RANGES: Record<string, { therMin: number; therMax: number; label: string }> = {
   nac: { therMin: 600, therMax: 1800, label: 'N-ацетилцистеин' },
   tudca: { therMin: 500, therMax: 1500, label: 'TUDCA' },
   milk_thistle: { therMin: 280, therMax: 840, label: 'Силимарин' },
