@@ -12,10 +12,18 @@ import { HUMERUS_CHECKS, checkHumerusChecklist } from '../../../engines/arm/arm-
 import { AdSec, AdGrid, AdField, AdChip, AdSwitch, AdSheetSelect, AdBtn, AdBanner } from './arm-design-system';
 import { WP_LABEL_SHORT } from './arm-hub-shared';
 
-/** PRO-3 P8: позиционный чек-лист — локальный стейт ритуала (не персистится: проверка «сегодня»). */
+/** PRO-3 P8: позиционный чек-лист — локальный стейт ритуала (не персистится: проверка «сегодня»).
+ * PRO-5 №5: провалы дублируются в he_arm_humerus_checks — мост в конструктор (ось/warmup). */
+const HUMERUS_CHECKS_KEY = 'he_arm_humerus_checks';
 function HumerusChecklist() {
   const [failed, setFailed] = React.useState<string[]>([]);
-  const toggle = (id: string) => setFailed((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const toggle = (id: string) => setFailed((p) => {
+    const next = p.includes(id) ? p.filter((x) => x !== id) : [...p, id];
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(HUMERUS_CHECKS_KEY, JSON.stringify({ failed: next, touchedAt: new Date().toISOString().slice(0, 10) }));
+    } catch { /* noop */ }
+    return next;
+  });
   const res = checkHumerusChecklist(failed);
   return (
     <div>

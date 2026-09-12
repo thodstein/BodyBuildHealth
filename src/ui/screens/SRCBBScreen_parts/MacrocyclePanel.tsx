@@ -2394,6 +2394,24 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                         </div>
                       );
                     })()}
+                    {b.ref.kind === 'ARM' && (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+                        <PopupNumber label="PRO-5 цикл %/нед" value={Number(b.config.cyclePctPerWeek ?? 0)} min={0} max={5} step={0.5}
+                          hint="Внутрицикловой % (0 — legacy-коррекция)"
+                          onChange={v => applyAnnualConfig(b.ref.blockKey, { cyclePctPerWeek: v > 0 ? Math.min(5, v) : undefined })} />
+                        <PopupNumber label="PRO-5 мезо %" value={Number(b.config.mesoRatePct ?? 0)} min={0} max={5} step={0.5}
+                          hint="Кросс-мезо ставка (0 — legacy/дефолт)"
+                          onChange={v => applyAnnualConfig(b.ref.blockKey, { mesoRatePct: v > 0 ? Math.min(5, v) : undefined })} />
+                        <PopupNumber label="PRO-5 hook-кап" value={Number(b.config.hookCapSets ?? 0)} min={0} max={30} step={1}
+                          hint="Кап hook-объёма/нед (0 — по умолчанию)"
+                          onChange={v => applyAnnualConfig(b.ref.blockKey, { hookCapSets: v > 0 ? Math.round(v) : undefined })} />
+                        <button type="button" aria-pressed={!!b.config.rpeParity} aria-label="PRO-5 RIR-паритет"
+                          onClick={() => applyAnnualConfig(b.ref.blockKey, { rpeParity: !b.config.rpeParity ? true : undefined })}
+                          style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: b.config.rpeParity ? 'rgba(34,197,94,0.45)' : 'rgba(255,255,255,0.12)', color: b.config.rpeParity ? '#22c55e' : '#fff' }}>
+                          📊 RIR-паритет{b.config.rpeParity ? ' ✓' : ''}
+                        </button>
+                      </div>
+                    )}
                     {b.ref.kind === 'BB' && (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
                         <PopupSelect label="Сплит блока" value={b.config.splitPattern ?? ''}

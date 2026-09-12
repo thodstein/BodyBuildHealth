@@ -77,6 +77,9 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   armLifting?: { weakest: string | null; avgPct: number | null; totalKg: number; rows: Array<{ implement: string; display: string; scorePct: number | null; level: string; internal: boolean }>; weakestWr?: string | null; avgWrPct?: number | null; avgInternalPct?: number | null; prescription?: string; weightClass?: string; rulesNote?: string; lms?: { label: string; steps: number[] } };
   armRedFlags?: string[];
   armProfile?: { leftKg?: number; rightKg?: number; bwKg?: number; rtKg?: number; pinchKg?: number; hubKg?: number };
+  /** PRO-5 №5: ось/warmup из humerus-чеклиста хаба (всё опционально, приёмник только добавляет флаги). */
+  armAxisCheck?: { trunkRotatedTowardAttack?: boolean; wristElbowShoulderAligned?: boolean; wristBehindShoulder?: boolean; fightingFromDefense?: boolean; wristExtendedDorsally?: boolean; coldNoWarmup?: boolean; sideMaxAttempt?: boolean };
+  armWarmupDone?: boolean;
   /** J7 орто-скрининг (OrthoScreenCard → конструкторы): всё опционально, приёмники только сохраняют/гарды. */
   orthoFlags?: Array<{ id: string; joint: string; level: string; label: string; action: string }>;
   orthoSummary?: string;

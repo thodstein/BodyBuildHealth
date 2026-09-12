@@ -6,9 +6,11 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import React from 'react';
 import { ArmAutoConstructor } from '../ArmAutoConstructor';
 import { ArmliftingDiagnosticsHub } from '../ArmliftingDiagnosticsHub';
+import { applyToPlanner, clearPlannerApply } from '../planner-bridge';
 
 beforeEach(() => {
   localStorage.clear();
+  try { clearPlannerApply(); } catch { /* noop */ }
 });
 
 function goSplit(container: Element) {
@@ -70,8 +72,7 @@ describe('Arm PRO-5 UI (P2 hub rules)', () => {  it('помост: правил�
   });
 });
 
-describe('Arm PRO-5 UI (controls + blocked)', () => {
-  it('контролы PRO-5 видны в именном цикле', () => {
+describe('Arm PRO-5 UI (controls + blocked)', () => {  it('контролы PRO-5 видны в именном цикле', () => {
     const { container } = render(<ArmAutoConstructor />);
     goSplit(container);
     expect(screen.getByRole('switch', { name: 'PRO-5: RIR по StrengthLog' })).toBeTruthy();
@@ -129,5 +130,37 @@ describe('Arm PRO-5 UI (controls + blocked)', () => {
     fireEvent.click(screen.getByText('⚡ Собрать план'));
     fireEvent.click(screen.getByRole('button', { name: /Веса и качество/ }));
     expect(c2.container.querySelector("[data-arm='gates']")?.textContent).not.toContain('Холод без разминки');
+  });
+});
+
+describe('Arm PRO-5 bridge (ось/warmup из хаба)', () => {
+  it('payload armAxisCheck включает свитчи оси + флеш', () => {
+    applyToPlanner({
+      kind: 'weakpoints',
+      label: 'Арм диагностика: ось',
+      data: {
+        groups: [],
+        armAxisCheck: { trunkRotatedTowardAttack: true, wristBehindShoulder: true, coldNoWarmup: true },
+        armWarmupDone: true,
+      },
+      source: 'intellectual',
+    });
+    const { container } = render(<ArmAutoConstructor />);
+    expect(document.body.textContent).toContain('Ось из диагностики');
+    goSplit(container);
+    const axisHead = screen.getAllByRole('switch', { name: 'Ось humerus-2026' })[0];
+    expect(axisHead.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: 'Скрут корпуса в атаку' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: 'Запястье позади плеча' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: 'Холод без разминки' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: /разминка 10–15 мин выполнена/ }).getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('без armAxisCheck — свитчи не трогаем', () => {
+    applyToPlanner({ kind: 'weakpoints', label: 'Арм диагностика', data: { groups: ['wrist_flexors'] }, source: 'intellectual' });
+    const { container } = render(<ArmAutoConstructor />);
+    goSplit(container);
+    expect(screen.getAllByRole('switch', { name: 'Ось humerus-2026' })[0].getAttribute('aria-checked')).toBe('false');
+    expect(document.body.textContent).not.toContain('Ось из диагностики');
   });
 });

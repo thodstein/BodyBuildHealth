@@ -122,3 +122,43 @@ export function flexorPronatorEccentric(): { name: string; sets: number; reps: s
     note: 'Медленное опускание 4с + пауза; при острой боли — к врачу, не в план.',
   };
 }
+
+/**
+ * PRO-5 №5: humerus-чеклист хаба → axisCheck/warmupDone моста.
+ * Маппинг (документирован, без выдумок):
+ * - 'axis' (ось разорвана) → wristElbowShoulderAligned: false;
+ * - 'wrist' (запястье позади) → wristBehindShoulder: true;
+ * - 'shoulder' (плечо внутрь) → trunkRotatedTowardAttack: true (плечо внутрь ≈ ротация в атаку);
+ * - 'warmup' провален → coldNoWarmup: true; пройден → warmupDone: true;
+ * - 'elbow' (локоть едет) — прямого флага оси нет, честно не маппим.
+ */
+export function humerusChecksToAxis(failedIds: string[]): { axisCheck?: Pro5AxisInput; warmupDone?: true } {
+  const failed = new Set((failedIds || []).map(String));
+  const axisCheck: Pro5AxisInput = {};
+  if (failed.has('axis')) axisCheck.wristElbowShoulderAligned = false;
+  if (failed.has('wrist')) axisCheck.wristBehindShoulder = true;
+  if (failed.has('shoulder')) axisCheck.trunkRotatedTowardAttack = true;
+  if (failed.has('warmup')) axisCheck.coldNoWarmup = true;
+  const out: { axisCheck?: Pro5AxisInput; warmupDone?: true } = {};
+  if (Object.keys(axisCheck).length > 0) out.axisCheck = axisCheck;
+  if (!failed.has('warmup')) out.warmupDone = true;
+  return out;
+}
+
+/** Чтение моста из стора: нет записи → null (неизвестно ≠ сделано). */
+export function readHumerusBridge(getItem: (key: string) => string | null): { armAxisCheck?: Pro5AxisInput; armWarmupDone?: true } | null {
+  try {
+    const raw = getItem('he_arm_humerus_checks');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { failed?: unknown };
+    if (!parsed || !Array.isArray(parsed.failed)) return null;
+    const mapped = humerusChecksToAxis(parsed.failed as string[]);
+    if (!mapped.axisCheck && mapped.warmupDone !== true) return null;
+    const out: { armAxisCheck?: Pro5AxisInput; armWarmupDone?: true } = {};
+    if (mapped.axisCheck) out.armAxisCheck = mapped.axisCheck;
+    if (mapped.warmupDone === true) out.armWarmupDone = true;
+    return out;
+  } catch {
+    return null;
+  }
+}

@@ -44,6 +44,7 @@ import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary } from '../..
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
 import { loadRedFlags, redFlagLabels } from '../../../engines/arm/arm-redflags.store';
+import { readHumerusBridge } from '../../../engines/arm/arm-pro5-safety.engine';
 import { wafClassFor } from '../../../engines/arm/arm-norms-table.engine';
 import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
@@ -993,6 +994,14 @@ export const ArmDiagnosticsHub: React.FC = () => {
         const mets = Object.values(((dynamicReport as any)?.metrics || {})) as any[];
         const expl = mets.filter((m) => m && Number.isFinite(Number(m.explosivePct))).map((m) => Number(m.explosivePct));
         if (expl.length) (payload as any).armRfd = { explosivePct: Math.round((expl.reduce((a, b) => a + b, 0) / expl.length) * 10) / 10 };
+      } catch {}
+      // PRO-5 №5: humerus-чеклист → ось/warmup моста (только затронутый чеклист)
+      try {
+        const hb = readHumerusBridge((k) => { try { return typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null; } catch { return null; } });
+        if (hb) {
+          if (hb.armAxisCheck) (payload as any).armAxisCheck = hb.armAxisCheck;
+          if (hb.armWarmupDone === true) (payload as any).armWarmupDone = true;
+        }
       } catch {}
     } catch {}
     applyToPlanner({

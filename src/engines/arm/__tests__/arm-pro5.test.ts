@@ -7,6 +7,7 @@ import {
 } from '../arm-pro5-core.engine';
 import {
   axisScoreOf, applyPro5Safety, hookVolumeOf, checkHookCap, flexorPronatorEccentric,
+  humerusChecksToAxis, readHumerusBridge,
 } from '../arm-pro5-safety.engine';
 import { PLATFORM_RULES_2026, platformRuleFor, LMS_RULES_2026, lmsLadderTo } from '../arm-pro5-platform-rules.engine';
 import { checkCocGates } from '../arm-pro5-coc-gate.engine';
@@ -119,6 +120,23 @@ describe('arm-pro5 safety (P1)', () => {
     const b = flexorPronatorEccentric();
     expect(b.sets).toBe(3);
     expect(b.tempo).toBe('4-0-1-0');
+  });
+  it('humerusChecksToAxis: маппинг чеклиста (elbow честно скипаем)', () => {
+    expect(humerusChecksToAxis([])).toEqual({ warmupDone: true });
+    const m = humerusChecksToAxis(['axis', 'wrist', 'shoulder', 'warmup']);
+    expect(m.axisCheck).toEqual({ wristElbowShoulderAligned: false, wristBehindShoulder: true, trunkRotatedTowardAttack: true, coldNoWarmup: true });
+    expect(m.warmupDone).toBeUndefined();
+    expect(humerusChecksToAxis(['elbow'])).toEqual({ warmupDone: true });
+  });
+  it('readHumerusBridge: нет записи → null; битая → null', () => {
+    expect(readHumerusBridge(() => null)).toBeNull();
+    expect(readHumerusBridge(() => '{oops')).toBeNull();
+    const r = readHumerusBridge(() => JSON.stringify({ failed: ['axis', 'warmup'], touchedAt: '2026-09-12' }));
+    expect(r?.armAxisCheck).toEqual({ wristElbowShoulderAligned: false, coldNoWarmup: true });
+    expect(r?.armWarmupDone).toBeUndefined();
+    const ok = readHumerusBridge(() => JSON.stringify({ failed: [], touchedAt: '2026-09-12' }));
+    expect(ok?.armWarmupDone).toBe(true);
+    expect(ok?.armAxisCheck).toBeUndefined();
   });
 });
 

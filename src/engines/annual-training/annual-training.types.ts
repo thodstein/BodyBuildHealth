@@ -105,6 +105,14 @@ export interface AnnualBlockConfig {
   templateFromBlockKey?: string;
   /** ARM: WAF весовая категория (−55..+110) — side/back нормализация. */
   weightClass?: string;
+  /** ARM PRO-5: внутрицикловой %/нед (распил correctionPct; пусто — legacy). */
+  cyclePctPerWeek?: number;
+  /** ARM PRO-5: кросс-мезо ставка %/мезоцикл (пусто — legacy/дефолт). */
+  mesoRatePct?: number;
+  /** ARM PRO-5: RIR по карте StrengthLog. */
+  rpeParity?: boolean;
+  /** ARM PRO-5: недельный кап hook-объёма (пусто — кап 12 только для hook). */
+  hookCapSets?: number;
   /** Заметки пользователя к блоку. */
   notes?: string;
 }

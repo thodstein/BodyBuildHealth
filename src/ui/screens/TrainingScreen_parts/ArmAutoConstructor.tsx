@@ -731,6 +731,24 @@ export function ArmAutoConstructor() {
           flash(`↩ Table-IQ: ${bouts.length} схваток из диагностики`);
         }
       } catch {}
+      // PRO-5 №5: ось/warmup из humerus-чеклиста хаба — только добавляем флаги, снятие вручную.
+      try {
+        const ax = payload.data?.armAxisCheck;
+        const bits: string[] = [];
+        if (ax && typeof ax === 'object') {
+          if ((ax as any).trunkRotatedTowardAttack) { setAxTrunk(true); bits.push('скрут'); }
+          if ((ax as any).wristElbowShoulderAligned === false) { setAxMisalign(true); bits.push('ось'); }
+          if ((ax as any).wristBehindShoulder) { setAxBehind(true); bits.push('запястье'); }
+          if ((ax as any).wristExtendedDorsally) { setAxDorsal(true); bits.push('кисть'); }
+          if ((ax as any).coldNoWarmup) { setAxCold(true); bits.push('холод'); }
+          if ((ax as any).fightingFromDefense) { setAxDefense(true); bits.push('защита'); }
+          if ((ax as any).sideMaxAttempt) { setAxSideMax(true); bits.push('макс'); }
+          if (bits.length) setCycAxisOn(true);
+        }
+        let warmed = false;
+        if ((payload.data as any)?.armWarmupDone === true) { setAxWarm(true); warmed = true; }
+        if (bits.length || warmed) flash(`🦴 Ось из диагностики${bits.length ? `: ${bits.join(' + ')}` : ''}${warmed ? ' · разминка выполнена' : ''} — гейты применены`);
+      } catch {}
       const bench = payload.data?.armBench;
       if (bench?.level) {
         const map: Record<string,string> = { beginner:'beginner', intermediate:'intermediate', advanced:'advanced', competitive:'advanced', elite:'enhanced' };
