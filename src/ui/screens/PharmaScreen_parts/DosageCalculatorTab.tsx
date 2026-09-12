@@ -15,7 +15,7 @@ const DRUG_OPTIONS = Object.keys(DRUG_THRESHOLDS);
 
 const AndrogenicIndexCalculator: React.FC = () => {
   const [entries, setEntries] = useState<{ drug: string; doseMgWeek: number }[]>([
-    { drug: 'testosterone_enanthate', doseMgWeek: 300 }
+    { drug: 'test_enan', doseMgWeek: 300 }
   ]);
   const [aiResult, setAiResult] = useState<number | null>(null);
   const [aiEsterPopup, setAiEsterPopup] = useState<{ baseClass: string; label: string; entryIdx: number } | null>(null);
@@ -39,7 +39,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
     return { aiGrouped: grouped, aiSingles: singles };
   }, [aiFiltered]);
 
-  const addEntry = () => setEntries([...entries, { drug: 'testosterone_enanthate', doseMgWeek: 300 }]);
+  const addEntry = () => setEntries([...entries, { drug: 'test_enan', doseMgWeek: 300 }]);
   const removeEntry = (i: number) => setEntries(entries.filter((_, idx) => idx !== i));
   const setDrugFor = (i: number, drugId: string) => {
     const next = [...entries];
