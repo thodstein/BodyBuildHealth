@@ -7,6 +7,7 @@ export interface PairResult {
   b: string;
   level: MatrixLevel;
   reason: string;
+  source: string;
 }
 
 const SYNERGY_PAIRS: [RegExp, RegExp, string][] = [
@@ -33,16 +34,33 @@ function matchPair(list: [RegExp, RegExp, string][], a: string, b: string): stri
   return null;
 }
 
+const SOURCE_BY_TEXT: [RegExp, string][] = [
+  [/GHRH\+GHRP/i, 'GHRH+GHRP синергия: исследовательские стеки GH-оси'],
+  [/BPC\+TB/i, 'BPC+TB-500: ко-исследуемая пара заживления'],
+  [/K_N 1\.40/i, 'AEBM Stack v1.2: тренболон K_N 1.40'],
+  [/GLP-1/i, 'GLP-1: пересечение механизма, исследовательских комбо нет'],
+  [/GHRH/i, 'GHRH: конкуренция за рецептор'],
+  [/19-nor/i, '19-nor: прогестагенный стек, мониторинг PRL'],
+  [/АД\/гематокрит/i, 'Базовый мониторинг курса'],
+  [/АЛТ\/АСТ/i, '17-aa: гепатотоксичность'],
+];
+
+function sourceFor(reason: string, level: MatrixLevel): string {
+  for (const [re, src] of SOURCE_BY_TEXT) if (re.test(reason)) return src;
+  return level === 'safe' ? 'Граф знаний v1: связок нет' : 'Граф знаний v1';
+}
+
 export function pairLevel(a: string, b: string): PairResult {
   const x = String(a || '');
   const y = String(b || '');
   const s = matchPair(SYNERGY_PAIRS, x, y);
-  if (s) return { a: x, b: y, level: 'synergy', reason: s };
+  if (s) return { a: x, b: y, level: 'synergy', reason: s, source: sourceFor(s, 'synergy') };
   const c = matchPair(CAUTION_PAIRS, x, y);
-  if (c) return { a: x, b: y, level: 'caution', reason: c };
+  if (c) return { a: x, b: y, level: 'caution', reason: c, source: sourceFor(c, 'caution') };
   const m = matchPair(MONITOR_PAIRS, x, y);
-  if (m) return { a: x, b: y, level: 'monitor', reason: m };
-  return { a: x, b: y, level: 'safe', reason: 'Известных негативных связок нет — базовый мониторинг' };
+  if (m) return { a: x, b: y, level: 'monitor', reason: m, source: sourceFor(m, 'monitor') };
+  const fb = 'Известных негативных связок нет — базовый мониторинг';
+  return { a: x, b: y, level: 'safe', reason: fb, source: sourceFor(fb, 'safe') };
 }
 
 export function stackMatrix(names: string[]): PairResult[] {

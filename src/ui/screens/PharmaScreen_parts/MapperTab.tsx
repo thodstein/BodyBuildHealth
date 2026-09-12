@@ -243,10 +243,11 @@ export const MapperTab: React.FC = () => {
                   <div key={i} style={{ padding:'8px 10px', borderRadius:10, marginBottom:6, background:'rgba(0,0,0,0.18)', borderLeft:`3px solid ${colors[p.level]}`, borderTop:'1px solid rgba(255,255,255,0.04)', borderRight:'1px solid rgba(255,255,255,0.04)', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
                     <div style={{ fontSize:11, fontWeight:800, color: colors[p.level] }}>{p.a} + {p.b} — {p.level}</div>
                     <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{p.reason}</div>
+                    <div style={{ fontSize:10, color:'#fff', marginTop:2, opacity: 0.85 }}>Источник: {p.source}</div>
                   </div>
                 ))}
                 <button onClick={() => { saveCalcSnapshot('mapper', `пар ${pairs.length}, худший ${worst ?? '—'}`); printHtml(buildCalcHtml('Маппер', pairs.map((p) => [`${p.a}+${p.b}`, `${p.level}: ${p.reason}`]))); }} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(139,92,246,0.22)', background:'rgba(139,92,246,0.10)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>💾 В историю + 🖨 Печать</button>
-                <button onClick={() => downloadCsv('mapper-matrix.csv', [['Пара A', 'Пара B', 'Уровень', 'Причина'], ...pairs.map((p) => [p.a, p.b, p.level, p.reason] as (string | number)[])])} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📥 Матрица CSV</button>
+                <button onClick={() => downloadCsv('mapper-matrix.csv', [['Пара A', 'Пара B', 'Уровень', 'Причина', 'Источник'], ...pairs.map((p) => [p.a, p.b, p.level, p.reason, p.source] as (string | number)[])])} style={{ marginTop:6, width:'100%', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer' }}>📥 Матрица CSV</button>
               </div>
             );
           })()}

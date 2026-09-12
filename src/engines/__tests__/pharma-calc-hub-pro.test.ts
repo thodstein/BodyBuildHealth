@@ -130,6 +130,15 @@ describe('D добивка', () => {
   });
 });
 
+describe('F раунд', () => {
+  it('пары несут источник', async () => {
+    const { pairLevel } = await import('../mapper-matrix.engine');
+    expect(pairLevel('cjc-1295', 'ipamorelin').source.length).toBeGreaterThan(0);
+    expect(pairLevel('semaglutide', 'tirzepatide').source.length).toBeGreaterThan(0);
+    expect(pairLevel('a', 'b').source).toMatch(/Граф знаний/);
+  });
+});
+
 describe('P7 share export', () => {
   it('csv anti-formula + esc', () => {
     expect(csvCell('=cmd')).toMatch(/^"/);

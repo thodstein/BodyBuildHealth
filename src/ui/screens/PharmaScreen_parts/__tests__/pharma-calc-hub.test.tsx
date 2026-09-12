@@ -19,6 +19,12 @@ describe('pharma hub E-guard: новые панели живы', () => {
     expect(container.textContent).toMatch(/Bateman-канон/);
     expect(container.textContent).toMatch(/История расчётов/);
   });
+  it('PK: оверлей включается и легенда видна', () => {
+    const { container } = render(<PKPDSimulationTab />);
+    fireEvent.click(screen.getByText(/Запустить симуляцию/));
+    fireEvent.click(screen.getByText(/Bateman-оверлей/));
+    expect(container.textContent).toMatch(/нормировано/);
+  });
   it('Дозировки: таб + андрогенный подтаб', () => {
     const { container } = render(<DosageCalculatorTab />);
     expect(container.textContent).toMatch(/Фармакология/);
