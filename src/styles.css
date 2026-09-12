@@ -5,7 +5,8 @@
   --bg-tertiary: #1A1A1A;
   --text: #FFFFFF;
   --text-dim: #fff;
-  --text-light: rgba(255,255,255,0.92);
+  --text-light: #ffffff;
+  --text-muted: #ffffff;
   --card-bg: #1A1A1A;
   --card-bg-hover: #222222;
   --card-bg-active: #2A2A2A;
@@ -56,7 +57,7 @@
   /* Apple-style card defaults (для data-theme=light) */
   --card-shadow: 0 4px 16px rgba(0,0,0,0.18);
   --hover-bg: rgba(255,255,255,0.04);
-  --text-faint: rgba(255,255,255,0.5);
+  --text-faint: #ffffff;
 }
 
 /* Светлая тема: активируется через data-theme="light" на documentElement.
@@ -647,8 +648,8 @@ button.editor-schedule-cell {
    любой теме (светлая/Telegram). Выбор значений по кнопке: карточки + попап-чипы. */
 .macrocycle-panel {
   --text: #FFFFFF;
-  --text-dim: rgba(255,255,255,0.66);
-  --text-light: rgba(255,255,255,0.92);
+  --text-dim: #ffffff;
+  --text-light: #ffffff;
   --card-bg: #181b22;
   --border-light: rgba(255,255,255,0.12);
   --input-bg: rgba(118,118,128,0.14);
@@ -1150,7 +1151,7 @@ pre, .output {
   padding:14px;
   border-radius:var(--radius-sm);
   font-size:13px;
-  color:#ccc;
+  color:#fff;
   overflow-x:auto;
   white-space:pre-wrap;
   word-break:break-word;
@@ -1570,7 +1571,7 @@ main::-webkit-scrollbar-thumb { background:var(--accent-dim); border-radius:2px;
   right: 8px;
   background: rgba(0,0,0,0.5);
   border: 1px solid rgba(255,255,255,0.2);
-  color: #aaa;
+  color: #fff;
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 10px;
@@ -2202,7 +2203,7 @@ body { overscroll-behavior: none; position: fixed; width: 100%; height: 100%; ov
   --bg-tertiary: #1A1A1A;
   --text: #FFFFFF;
   --text-dim: #fff;
-  --text-light: rgba(255,255,255,0.92);
+  --text-light: #ffffff;
   --accent: #00e68a;
   --accent-dim: rgba(0,230,138,0.12);
   --accent-glow: rgba(0,230,138,0.35);
@@ -2771,13 +2772,15 @@ select option {
 }
 
 /* ────────── DIM-ТЕКСТ ────────── */
+/* Правило проекта: никакого серого текста — вторичный текст тоже белый (#fff).
+   Иерархия держится размером/жирностью, а не приглушением цвета. */
 .training-screen div[style*="rgba(255,255,255,0.5)"],
 .training-screen span[style*="rgba(255,255,255,0.5)"] {
-  color: rgba(235,235,245,0.55) !important;
+  color: #fff !important;
 }
 .training-screen div[style*="rgba(255,255,255,0.3)"],
 .training-screen span[style*="rgba(255,255,255,0.3)"] {
-  color: rgba(235,235,245,0.35) !important;
+  color: #fff !important;
 }
 
 /* ────────── ЧИСЛОВЫЕ ЗНАЧЕНИЯ ────────── */
@@ -3467,8 +3470,8 @@ html.app-native main {
   --border-light: rgba(120, 180, 255, 0.18);
   --border-bright: rgba(120, 180, 255, 0.28);
   --text: #f4f7ff;
-  --text-dim: rgba(226, 236, 255, 0.72);
-  --text-light: rgba(226, 236, 255, 0.92);
+  --text-dim: #ffffff;
+  --text-light: #ffffff;
   --accent: #c9f73a;
   --accent-2: #00e68a;
   --accent-dim: rgba(201, 247, 58, 0.12);
@@ -3804,4 +3807,69 @@ html.app-native {
     border-bottom: none;
     padding: 8px 6px max(env(safe-area-inset-bottom, 0px), var(--tg-safe-bottom, 0px), 12px);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * GRAY-TEXT → WHITE (правило проекта, тёмная тема).
+ * Никакого серого текста: вторичный/приглушённый текст — чисто белый.
+ * Иерархия держится размером/жирностью, а не приглушением цвета.
+ * Рамки/фоны/семантика (зелёный/янтарь/красный/синий) НЕ трогаем —
+ * только `color:`/`fill:` инлайн-стили и серые CSS-токены.
+ * Светлые темы ([data-theme="light"], [data-apk-theme="light"]) и
+ * печатные HTML-строки (window.print — отдельный документ без этого
+ * CSS) — исключения: там белый текст был бы невидим на белой бумаге.
+ * ═══════════════════════════════════════════════════════════════════ */
+html:not([data-theme="light"]):not([data-apk-theme="light"]) {
+  --text-dim: #fff;
+  --text-light: #fff;
+  --text-muted: #fff;
+  --text-faint: #fff;
+}
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color: rgba(255,255,255,0."],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color:rgba(255,255,255,0"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color: rgba(255, 255, 255, 0."],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color:rgba(255, 255, 255, 0."],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color: rgba(235,235,245,0."],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color:rgba(235,235,245,0"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color: rgba(235, 235, 245, 0."],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color:rgba(235, 235, 245, 0."],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="var(--text-dim"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="var(--text-light"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="var(--text-muted"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="var(--text-faint"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="var(--text-secondary"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="var(--ad-dim"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="var(--ad-faint"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color: gray"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color:gray"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color: grey"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="color:grey"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#888"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#999"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#aaa"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#AAA"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#bbb"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#ccc"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#CCC"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#8e8e93"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#8E8E93"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#94a3b8"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#64748b"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#6b7280"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="#9ca3af"] {
+  color: #fff !important;
+}
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="fill: var(--text-dim)"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="fill:var(--text-dim)"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="fill: var(--text-light)"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [style*="fill:var(--text-light)"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [fill="var(--text-dim)"],
+html:not([data-theme="light"]):not([data-apk-theme="light"]) [fill="var(--text-light)"] {
+  fill: #fff !important;
+}
+html:not([data-theme="light"]):not([data-apk-theme="light"]) input::placeholder,
+html:not([data-theme="light"]):not([data-apk-theme="light"]) select::placeholder,
+html:not([data-theme="light"]):not([data-apk-theme="light"]) textarea::placeholder {
+  color: #fff !important;
+  opacity: 1 !important;
 }

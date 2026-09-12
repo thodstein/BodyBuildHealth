@@ -25,9 +25,9 @@ html.app-native {
   --border-light: rgba(120, 180, 255, 0.18);
   --border-bright: rgba(120, 180, 255, 0.28);
   --text: #f4f7ff;
-  --text-dim: rgba(226, 236, 255, 0.72);
-  --text-light: rgba(226, 236, 255, 0.92);
-  --text-faint: rgba(226, 236, 255, 0.52);
+  --text-dim: #ffffff;
+  --text-light: #ffffff;
+  --text-faint: #ffffff;
   --accent: #c9f73a;
   --accent-rgb: 201, 247, 58;
   --accent-2: #00e68a;

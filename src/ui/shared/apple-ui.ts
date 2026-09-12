@@ -11,8 +11,8 @@ export const GLASS_SHADOW = '0 1px 3px rgba(0,0,0,0.30), 0 4px 16px rgba(0,0,0,0
 export const VIBRANCY = 'blur(20px) saturate(180%)';
 export const SEPARATOR = 'rgba(84,84,88,0.36)';
 export const TEXT_1 = '#FFFFFF';
-export const TEXT_2 = 'rgba(235,235,245,0.60)';
-export const TEXT_3 = 'rgba(235,235,245,0.30)';
+export const TEXT_2 = '#FFFFFF';
+export const TEXT_3 = '#FFFFFF';
 export const RADIUS_LG = 14;
 export const RADIUS_MD = 10;
 

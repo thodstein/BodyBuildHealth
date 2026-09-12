@@ -25,7 +25,7 @@
   --ad-text: var(--text, #fff);
   /* Белый вместо серого: вторичный текст — чисто белый на тёмном стекле */
   --ad-dim: #ffffff;
-  --ad-faint: rgba(255, 255, 255, 0.85);
+  --ad-faint: #ffffff;
   --ad-acc: var(--accent, #00e68a);
   --ad-acc-ink: var(--accent-contrast, #06281c);
   --ad-amber: #f59e0b;
