@@ -13906,3 +13906,113 @@ html.app-native [data-bb="quality-v2"] span {
     transform: none !important;
   }
 }
+
+/* === §118. SESSION-WIDGETS PACK: проведение + таймеры + календарь уколов/БАД === */
+html.app-native [data-widget="workout-pult"] {
+  border-radius: 18px !important;
+}
+html.app-native [data-widget="workout-pult"][style*="sticky"] {
+  top: calc(env(safe-area-inset-top, 0px) + 56px) !important;
+}
+html.app-native [data-widget="workout-panel"] [role="tab"],
+html.app-native [data-widget="timers-panel"] [role="tab"],
+html.app-native [data-widget="medcal-panel"] [role="tab"] {
+  min-height: 44px !important;
+}
+html.app-native [data-widget="workout-pult"] button,
+html.app-native [data-widget="workout-daycard"] button,
+html.app-native [data-widget="workout-big"] button,
+html.app-native [data-widget="timers-panel"] button,
+html.app-native [data-widget="medcal-panel"] button,
+html.app-native [data-timer="rest"] button,
+html.app-native [data-timer="interval"] button,
+html.app-native [data-timer="session"] button {
+  min-height: 44px !important;
+}
+html.app-native [data-widget="workout-pult"] button:active,
+html.app-native [data-widget="workout-daycard"] button:active,
+html.app-native [data-widget="workout-big"] button:active,
+html.app-native [data-timer="rest"] button:active,
+html.app-native [data-timer="interval"] button:active,
+html.app-native [data-timer="session"] button:active,
+html.app-native [data-widget="medcal-panel"] button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native [data-widget="workout-pult"] button:focus-visible,
+html.app-native [data-widget="workout-daycard"] button:focus-visible,
+html.app-native [data-widget="workout-big"] button:focus-visible,
+html.app-native [data-timer="rest"] button:focus-visible,
+html.app-native [data-timer="interval"] button:focus-visible,
+html.app-native [data-timer="session"] button:focus-visible,
+html.app-native [data-widget="medcal-panel"] button:focus-visible {
+  outline: 2px solid rgba(0, 230, 138, 0.8) !important;
+  outline-offset: 2px !important;
+}
+html.app-native [data-widget="workout-big"] [data-act="big-done"] {
+  min-height: 64px !important;
+}
+html.app-native [data-cal="daystrip"] > div:last-child {
+  scroll-snap-type: x mandatory !important;
+}
+html.app-native [data-cal="weekmatrix"] {
+  overflow-x: auto !important;
+}
+html.app-native [data-cal="monthheat"] [data-date] {
+  min-height: 34px !important;
+}
+@media (max-width: 380px) {
+  html.app-native [data-widget="workout-big"] [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  html.app-native [data-cal="monthheat"] [data-date] {
+    font-size: 9px !important;
+  }
+  html.app-native [data-widget="workout-pult"] [data-act="pult-open"] {
+    min-width: 44px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native [data-widget="workout-pult"] button:active,
+  html.app-native [data-widget="workout-daycard"] button:active,
+  html.app-native [data-widget="workout-big"] button:active,
+  html.app-native [data-timer="rest"] button:active,
+  html.app-native [data-timer="interval"] button:active,
+  html.app-native [data-timer="session"] button:active,
+  html.app-native [data-widget="medcal-panel"] button:active {
+    transform: none !important;
+  }
+  html.app-native [data-widget="session-dock"] button:active {
+    transform: none !important;
+  }
+}
+
+/* === §118.2 SESSION-DOCK: липкий низ телефона над пилюлей === */
+html.app-native [data-widget="session-dock"] [data-dock] {
+  min-height: 48px !important;
+}
+html.app-native [data-widget="session-dock"] [data-act="dock-toggle"] {
+  min-width: 48px !important;
+  min-height: 48px !important;
+}
+html.app-native [data-widget="session-dock"] [data-sub] {
+  min-height: 44px !important;
+}
+html.app-native [data-widget="session-dock"] [data-dock]:active,
+html.app-native [data-widget="session-dock"] [data-sub]:active,
+html.app-native [data-widget="session-dock"] [data-act="dock-toggle"]:active {
+  transform: scale(0.97) !important;
+}
+html.app-native [data-widget="session-dock"] [data-dock]:focus-visible,
+html.app-native [data-widget="session-dock"] [data-sub]:focus-visible,
+html.app-native [data-widget="session-dock"] [data-act="dock-toggle"]:focus-visible {
+  outline: 2px solid rgba(0, 230, 138, 0.8) !important;
+  outline-offset: 2px !important;
+}
+html.app-native [data-widget="session-dock"] {
+  padding-bottom: var(--tabbar-clear, 0px) !important;
+}
+@media (max-width: 380px) {
+  html.app-native [data-widget="session-dock"] [data-dock] {
+    font-size: 12px !important;
+  }
+}

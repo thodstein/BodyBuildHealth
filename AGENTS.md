@@ -4428,3 +4428,13 @@ ull → default. Реальные значения лежат в UnifiedSettings
 - **R7 (эпик тегов)**: легенда (омега — только ТГ, RYR — C) + `[A]/[B]/[C]` на карточках всех 26 фазовых протоколов тремя волнами (референсы без тегов осознанно); lock-тесты 61→**63/63** (итог 91/91); `tsc` 0. Урок шторма: параллельный checkout revert'ил worktree между заходами (Renal/GLP1-правки «не находились», дифф показывал мой ханк) — правило «`git status/diff` ДО правок».
 - **Проверено итогом**: аудит 58/58 + calc 3/3 + SupportScreen_parts 111/111 + движки поддержки 229/229; `tsc` 0 по своим (чужие WIP-ошибки combat — не мои, доказано диффом, не тронуты). НЕ ПУШИЛ.
 - **Осознанно не тронуто (чужие зоны)**: `UnifiedSynergyCalculator` HCT-tier, `SupportBioavailabilityData` night_empty-TUDCA, нарингенин-Hct, движки калькулятора (сверены чтением); схем злоупотребления (попрепаратные дозы/курсы) не публиковал нигде — только клиника из лейблов + агрегаты исследований.
+
+## Виджеты зала для АПК: проведение + таймеры + календарь уколов/БАД (Sep 13 2026, закоммичено pathspec, без пуша)
+
+По команде «предложи 2-3 варианта виджета проведения + 2-3 таймера + 2-3 календаря» → предложены все 9, выбраны все 9 → реализованы кодом как in-app виджеты (АПК-телефон). Только Edit/Write + vitest/tsc; чужие WIP (`docs/COMBAT-DIAGNOSTICS-HUB-PLAN.md`, `zz-pro5-dbg.test.tsx`) не тронуты.
+- **NEW `WorkoutSessionWidgets.tsx`** (A1 Пульт-липкая полоса sticky+прогресс/`+ Сет`, A2 Карточка дня, A3 BIG-режим 64px `ГОТОВО` для зала одной рукой; `WorkoutWidgetsPanel` с табами) — читает `he_workout_log_v2`, поверх `SessionPlayer`, самодостаточные.
+- **NEW `WorkoutTimersPanel.tsx`** (B1 пилюля отдыха 30–180с +15, B2 интервалы раунды×работа/отдых, B3 часы сессии с целью; звук+вибро как `CardioSessionTimer`; `formatTimer` тестируемая).
+- **NEW `MedScheduleCalendar.tsx`** (C1 лента ±3 дня, C2 матрица 7×3, C3 теплокарта месяца 0–3 трека; живые ключи `he_injection_diary`/`he_supplement_diary`+`he_pharma_diary`/`he_workout_log_v2`/`he_cardio_sessions`; чистые `buildDayStatus`/`buildWeekMatrix`/`buildMonthCells`).
+- **NEW `SessionWidgetsDock.tsx`** (продолжение): единый док 🏋️ Зал / ⏳ Таймеры / 📅 График + саб-табы + сворачивание, отступ над пилюлей `var(--tabbar-clear)`; монтаж 1 строкой (`ExecutionZone` осознанно не тронут — огромный файл правится параллельно).
+- **CSS `§118 + §118.2`** (`styles-native.css`, только `html.app-native`, без hex): табы/кнопки 44–48px, press 0.97, focus-visible лайм, tabular, safe-area top+56 для пульта, 380px-схлопывания, reduced-motion.
+- **Проверено**: NEW `session-widgets-pack` **15/15** (9 виджетов + helpers + §118-guard + док) + `tsc --noEmit` **0 по всему проекту** + `verify:apk-design` OK. НЕ ПУШИЛ.
