@@ -12,13 +12,15 @@ import { SS_CYCLES } from '../../../data/ss-cycles/ss-cycle-index';
 import type { SSCycleTemplate } from '../../../data/ss-cycles/ss-types';
 import { CARDIO_CYCLES } from '../../../data/cardio-cycles/cardio-cycle-index';
 import type { CardioCycleTemplate } from '../../../data/cardio-cycles/cardio-cycle-types';
+import { COMBAT_CYCLE_LIBRARY } from '../../../engines/combat/combat-cycle-library';
+import type { CombatCycleTemplate } from '../../../engines/combat/combat-cycle-library';
 import { requestCardioTemplateBuild } from '../../../engines/lms/cardio-cycle-bridge';
 import { rankCardioCycles, type CardioSelectorInput } from '../../../engines/lms/cardio-cycle-selector.engine';
 import { rankCycles } from '../../../engines/lms/lms-selector.engine';
 import { ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { applyToPlanner } from './planner-bridge';
 
-type CatFilter = 'all' | 'strength' | 'bodybuilding' | 'arm' | 'strong' | 'cardio';
+type CatFilter = 'all' | 'strength' | 'bodybuilding' | 'arm' | 'strong' | 'cardio' | 'combat';
 type UserGoal = 'strength' | 'mass' | 'endurance' | 'peak' | 'mixed' | 'speed';
 type UserLevel = 'novice' | 'II-KMS' | 'KMS-MS' | 'MS-MSMK' | 'II-MS' | 'intermediate';
 
@@ -66,6 +68,11 @@ export function matchSSPeriod(c: SSCycleTemplate, period: string): boolean {
   if (period === 'endurance') return false;
   if (period === 'mixed') return c.meta.period === 'mixed';
   return true;
+}
+/** Совпадение combat-цикла с LMS-фильтром уровня (level — одиночный). */
+export function matchCombatLevel(c: CombatCycleTemplate, levelF: string): boolean {
+  if (levelF === 'all') return true;
+  return proLevelsFor(levelF).includes(String(c.level));
 }
 /** Совпадение кардио-цикла с LMS-фильтром уровня (шкала beginner/intermediate/advanced). */
 export function matchCardioLevel(c: CardioCycleTemplate, levelF: string): boolean {
@@ -136,6 +143,8 @@ const SS_MODE_LABELS: Record<string, string> = { weightlifting: 'Тяжёлая 
 const ARM_DISC_LABELS: Record<string, string> = { armwrestling: 'Армрестлинг', armlifting: 'Армлифтинг', hybrid: 'Гибрид', any: 'Любая' };
 // ── Подписи видов кардио (sport-ось раздела) ──
 const CARDIO_SPORT_LABELS: Record<string, string> = { run: 'Бег', row: 'Гребля', bike: 'Вело', mixed: 'Смешанные', hiit: 'HIIT' };
+// ── Подписи дисциплин единоборств (ось раздела combat) ──
+const COMBAT_DISC_LABELS: Record<string, string> = { boxing: 'Бокс', mma: 'ММА', wrestling: 'Борьба', kickboxing: 'Кикбоксинг', general: 'Общая' };
 const CARDIO_PERIOD_LABELS: Record<string, string> = { base: 'База', build: 'Напор', peak: 'Пик', mixed: 'Смешанный', taper: 'Тапер', recovery: 'Восстановление' };
 const CARDIO_TYPE_LABELS: Record<string, string> = { zone2: 'Zone 2', miss: 'MISS', hiit: 'HIIT', recovery: 'Rec' };
 
@@ -310,12 +319,12 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   // ── Мост «Библиотека → конструктор»: именной цикл уходит в planner-bridge
   // (kind arm_cycle/ss_cycle), конструктор подхватывает при открытии + живьём.
   const [bridgeMsg, setBridgeMsg] = React.useState('');
-  const sendCycle = (kind: 'arm_cycle' | 'ss_cycle', cycleId: string, title: string) => {    try {
+  const sendCycle = (kind: 'arm_cycle' | 'ss_cycle' | 'combat_cycle', cycleId: string, title: string) => {    try {
       applyToPlanner({ kind, label: title, data: { cycleId } });
-      const track = kind === 'arm_cycle' ? 'arm' : 'strength';
+      const track = kind === 'arm_cycle' ? 'arm' : kind === 'combat_cycle' ? 'combat' : 'strength';
       try { localStorage.setItem('he_training_planning_track', track); } catch { /* ignore */ }
       try { window.dispatchEvent(new CustomEvent('planning-track-open', { detail: track })); } catch { /* ignore */ }
-      setBridgeMsg(`✅ «${title}» → ${kind === 'arm_cycle' ? 'арм-конструктор' : 'конструктор ТА/стронга'}`);
+      setBridgeMsg(`✅ «${title}» → ${kind === 'arm_cycle' ? 'арм-конструктор' : kind === 'combat_cycle' ? 'combat-конструктор' : 'конструктор ТА/стронга'}`);
       setTimeout(() => setBridgeMsg(''), 5000);
     } catch { setBridgeMsg('⚠ Не удалось отправить цикл'); }
   };
@@ -348,7 +357,11 @@ export const CycleCatalog: React.FC<Props> = (p) => {
     () => (Array.isArray(favs) ? CARDIO_CYCLES.filter(c => favs.includes(`cardio:${c.meta.id}`)) : []),
     [favs],
   );
-  const favTotal = favCycles.length + favArmCycles.length + favSSCycles.length + favCardioCycles.length;
+  const favCombatCycles = React.useMemo(
+    () => (Array.isArray(favs) ? COMBAT_CYCLE_LIBRARY.filter(c => favs.includes(`combat:${c.id}`)) : []),
+    [favs],
+  );
+  const favTotal = favCycles.length + favArmCycles.length + favSSCycles.length + favCardioCycles.length + favCombatCycles.length;
 
   const base = React.useMemo(() => {
     if (cat === 'all') return LMS_CYCLES;
@@ -409,6 +422,20 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       return true;
     });
   }, [search, focus, levelF, period, weeks, freq, favOnly, favs, cat]);
+  // ── Combat-библиотека (13 именных циклов): фильтры поиска/дисциплины/уровня/недель/частоты ──
+  // (период/автор/female — не применяются, как у арм-раздела; в «Все» LMS-фокус combat не прячет)
+  const combatFiltered = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return COMBAT_CYCLE_LIBRARY.filter(c => {
+      if (favOnly && !favs.includes(`combat:${c.id}`)) return false;
+      if (cat === 'combat' && focus !== 'all' && c.discipline !== focus) return false;
+      if (!matchCombatLevel(c, levelF)) return false;
+      if (weeks !== 'all' && weeksBucket(c.weeks) !== weeks) return false;
+      if (freq !== 'all' && String(c.daysPerWeek) !== freq) return false;
+      if (q && !(`${c.name || ''} ${c.blurb || ''} ${c.author || ''}`.toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [search, focus, levelF, weeks, freq, favOnly, favs, cat]);
   // ── SS-библиотека (ТА/стронг, 15 циклов): фильтры поиска/режима/уровня/периода/недель/частоты ──
   const ssFiltered = React.useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -467,8 +494,19 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       (CARDIO_SPORT_LABELS[a[0]] || a[0]).localeCompare(CARDIO_SPORT_LABELS[b[0]] || b[0], 'ru'));
   }, [cardioFiltered]);
 
+  const combatGrouped = React.useMemo(() => {
+    const map = new Map<string, CombatCycleTemplate[]>();
+    for (const c of combatFiltered) {
+      if (!map.has(c.discipline)) map.set(c.discipline, []);
+      map.get(c.discipline)!.push(c);
+    }
+    return [...map.entries()].sort((a, b) =>
+      (COMBAT_DISC_LABELS[a[0]] || a[0]).localeCompare(COMBAT_DISC_LABELS[b[0]] || b[0], 'ru'));
+  }, [combatFiltered]);
+
   const availableFocus = React.useMemo(() => {
     if (cat === 'arm') return [...new Set(ARM_CYCLE_LIBRARY.map(c => c.discipline))].sort((a, b) => (ARM_DISC_LABELS[a] || a).localeCompare(ARM_DISC_LABELS[b] || b, 'ru'));
+    if (cat === 'combat') return [...new Set(COMBAT_CYCLE_LIBRARY.map(c => c.discipline))].sort((a, b) => (COMBAT_DISC_LABELS[a] || a).localeCompare(COMBAT_DISC_LABELS[b] || b, 'ru'));
     if (cat === 'strong') return [...new Set(SS_CYCLES.map(c => c.meta.mode))].sort((a, b) => (SS_MODE_LABELS[a] || a).localeCompare(SS_MODE_LABELS[b] || b, 'ru'));
     if (cat === 'cardio') return [...new Set(CARDIO_CYCLES.map(c => c.meta.sport))].sort((a, b) => (CARDIO_SPORT_LABELS[a] || a).localeCompare(CARDIO_SPORT_LABELS[b] || b, 'ru'));
     return uniqKeys(base, cat);
@@ -479,12 +517,14 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const visibleCount = cat === 'arm' ? armFiltered.length
     : cat === 'strong' ? ssFiltered.length
     : cat === 'cardio' ? cardioFiltered.length
-    : cat === 'all' ? filtered.length + armFiltered.length + ssFiltered.length + cardioFiltered.length
+    : cat === 'combat' ? combatFiltered.length
+    : cat === 'all' ? filtered.length + armFiltered.length + ssFiltered.length + cardioFiltered.length + combatFiltered.length
     : filtered.length;
   const totalCount = cat === 'arm' ? ARM_CYCLE_LIBRARY.length
     : cat === 'strong' ? SS_CYCLES.length
     : cat === 'cardio' ? CARDIO_CYCLES.length
-    : cat === 'all' ? LMS_CYCLES.length + ARM_CYCLE_LIBRARY.length + SS_CYCLES.length + CARDIO_CYCLES.length
+    : cat === 'combat' ? COMBAT_CYCLE_LIBRARY.length
+    : cat === 'all' ? LMS_CYCLES.length + ARM_CYCLE_LIBRARY.length + SS_CYCLES.length + CARDIO_CYCLES.length + COMBAT_CYCLE_LIBRARY.length
     : LMS_CYCLES.length;
 
   const recommendations = React.useMemo(() => {
@@ -522,10 +562,12 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const focusLabel = cat === 'strength' ? 'Направление'
     : cat === 'bodybuilding' ? 'Специализация'
     : cat === 'arm' ? 'Дисциплина'
+    : cat === 'combat' ? 'Дисциплина'
     : cat === 'cardio' ? 'Вид спорта'
     : cat === 'strong' ? 'Режим' : 'Специализация / направление';
   const focusChipLabel = (k: string): string => {
     if (cat === 'arm') return ARM_DISC_LABELS[k] || k;
+    if (cat === 'combat') return COMBAT_DISC_LABELS[k] || k;
     if (cat === 'strong') return SS_MODE_LABELS[k] || k;
     if (cat === 'cardio') return CARDIO_SPORT_LABELS[k] || k;
     return FOCUS_LABELS[k] || k;
@@ -542,6 +584,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const freqOpts = React.useMemo(() => {
     if (cat === 'strong') return CYCLE_FREQ_OPTS.filter(f => SS_CYCLES.some(c => String(c.meta.sessionsPerWeek) === f));
     if (cat === 'arm') return CYCLE_FREQ_OPTS.filter(f => ARM_CYCLE_LIBRARY.some(c => String(c.daysPerWeek) === f));
+    if (cat === 'combat') return CYCLE_FREQ_OPTS.filter(f => COMBAT_CYCLE_LIBRARY.some(c => String(c.daysPerWeek) === f));
     if (cat === 'cardio') return CYCLE_FREQ_OPTS.filter(f => CARDIO_CYCLES.some(c => String(c.meta.sessionsPerWeek) === f || String(c.meta.sessionsPerWeekMax ?? c.meta.sessionsPerWeek) === f));
     return CYCLE_FREQ_OPTS;
   }, [cat]);
@@ -549,6 +592,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
     const keys = Object.keys(WEEKS_LABELS);
     if (cat === 'strong') return keys.filter(w => SS_CYCLES.some(c => weeksBucket(c.meta.weeks) === w));
     if (cat === 'arm') return keys.filter(w => ARM_CYCLE_LIBRARY.some(c => weeksBucket(c.weeks) === w));
+    if (cat === 'combat') return keys.filter(w => COMBAT_CYCLE_LIBRARY.some(c => weeksBucket(c.weeks) === w));
     if (cat === 'cardio') return keys.filter(w => CARDIO_CYCLES.some(c => weeksBucket(c.meta.weeks) === w));
     return keys;
   }, [cat]);
@@ -569,6 +613,10 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       if (freq !== 'all' && !ARM_CYCLE_LIBRARY.some(c => String(c.daysPerWeek) === freq)) setFreq('all');
       if (weeks !== 'all' && !ARM_CYCLE_LIBRARY.some(c => weeksBucket(c.weeks) === weeks)) setWeeks('all');
       setAuthor('all');
+    } else if (id === 'combat') {
+      if (freq !== 'all' && !COMBAT_CYCLE_LIBRARY.some(c => String(c.daysPerWeek) === freq)) setFreq('all');
+      if (weeks !== 'all' && !COMBAT_CYCLE_LIBRARY.some(c => weeksBucket(c.weeks) === weeks)) setWeeks('all');
+      setAuthor('all');
     } else if (id === 'cardio') {
       if (period !== 'all' && !CARDIO_CYCLES.some(c => matchCardioPeriod(c, period))) setPeriod('all');
       if (freq !== 'all' && !CARDIO_CYCLES.some(c => String(c.meta.sessionsPerWeek) === freq || String(c.meta.sessionsPerWeekMax ?? c.meta.sessionsPerWeek) === freq)) setFreq('all');
@@ -579,9 +627,9 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
   return (
     <div className="train-cycles lib-cycles" style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div className="lib-intro" style={{ fontSize: 11, color: '#fff' }}>Справочник готовых циклов: ПЛ и ББ ({LMS_CYCLES.length}), армрестлинг и армлифтинг ({ARM_CYCLE_LIBRARY.length}), тяжёлая атлетика и стронг ({SS_CYCLES.length}), кардио ({CARDIO_CYCLES.length}). Выберите тип, уточните специализацию, уровень, период и другие параметры — каталог перестроится автоматически.</div>
+      <div className="lib-intro" style={{ fontSize: 11, color: '#fff' }}>Справочник готовых циклов: ПЛ и ББ ({LMS_CYCLES.length}), армрестлинг и армлифтинг ({ARM_CYCLE_LIBRARY.length}), тяжёлая атлетика и стронг ({SS_CYCLES.length}), кардио ({CARDIO_CYCLES.length}), единоборства ({COMBAT_CYCLE_LIBRARY.length}). Выберите тип, уточните специализацию, уровень, период и другие параметры — каталог перестроится автоматически.</div>
 
-      {/* ── Сегмент-контрол: Все / Силовые / Бодибилдинг / Арм / ТА·Стронг / Кардио ── */}
+      {/* ── Сегмент-контрол: Все / Силовые / Бодибилдинг / Арм / ТА·Стронг / Кардио / Единоборства ── */}
       <div className="lib-seg" style={{ display: 'flex', gap: 4, padding: '6px', borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)' }}>
         {([
           { id: 'all' as CatFilter, label: 'Все', icon: '📚' },
@@ -590,6 +638,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
           { id: 'arm' as CatFilter, label: 'Арм', icon: '💪' },
           { id: 'strong' as CatFilter, label: 'ТА·Стронг', icon: '🏋️' },
           { id: 'cardio' as CatFilter, label: 'Кардио', icon: '🏃' },
+          { id: 'combat' as CatFilter, label: 'Единоборства', icon: '🥋' },
         ]).map(s => (
           <button key={s.id} data-active={cat === s.id ? 'true' : 'false'} aria-pressed={cat === s.id} onClick={() => switchCat(s.id)} style={{
             flex: 1, padding: '8px 4px', borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: cat === s.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
@@ -762,6 +811,15 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                 </div>
               );
             })}
+            {favCombatCycles.map(c => (
+              <div key={`combat:${c.id}`} style={{ background: 'rgba(24,24,27,0.4)', borderRadius: 10, padding: 8, border: '1px solid rgba(250,204,21,0.15)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#facc15', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+                  <button aria-label={`Убрать из избранного ${c.name}`} data-fav="true" onClick={() => toggleFav(`combat:${c.id}`)} style={{ minWidth: 44, minHeight: 44, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15 }} title="Убрать из избранного">⭐</button>
+                </div>
+                <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>🥋 {COMBAT_DISC_LABELS[c.discipline] || c.discipline} · {c.weeks} нед · {c.daysPerWeek} дн/нед</div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -1033,6 +1091,73 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                       width: '100%', marginTop: 8, padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer',
                       background: 'var(--accent)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 48,
                     }}>🏃 Собрать в кардио-конструкторе →</button>
+                  </div>
+                }
+              />
+            );
+          })}
+        </div>
+      ))}
+      {/* ── Combat-циклы (именная библиотека единоборств: бокс/ММА/борьба/кик, ATR/linear/conjugate) ── */}
+      {(cat === 'combat' || cat === 'all') && combatFiltered.length > 0 && (
+        <div className="lib-group lib-combat-group">
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, margin: '6px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>🥋 Единоборства</span>
+            <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '1px 7px', color: '#fff' }}>{combatFiltered.length}</span>
+          </div>
+        </div>
+      )}
+      {(cat === 'combat' || cat === 'all' ? combatGrouped : []).map(([dk, cycles]) => (
+        <div key={`combat-${dk}`} className="lib-group lib-cat-combat">
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, margin: '6px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>{COMBAT_DISC_LABELS[dk] || dk}</span>
+            <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '1px 7px', color: '#fff' }}>{cycles.length}</span>
+          </div>
+          {cycles.map(c => {
+            const favId = `combat:${c.id}`;
+            const chips = [`${c.weeks} нед`, `${c.daysPerWeek} дн/нед`, c.level, c.periodizationModel];
+            return (
+              <ExpandableCard
+                key={favId}
+                title={c.name}
+                icon=""
+                accent="#a855f7"
+                short={
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {chips.map((ch, i) => (
+                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
+                        ))}
+                      </div>
+                      <button aria-label={favs.includes(favId) ? `Убрать из избранного ${c.name}` : `В избранное ${c.name}`}
+                        data-fav={favs.includes(favId) ? 'true' : 'false'}
+                        onClick={e => { e.stopPropagation(); toggleFav(favId); }}
+                        style={{ minWidth: 40, minHeight: 40, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15, flexShrink: 0, filter: favs.includes(favId) ? 'none' : 'grayscale(1)', opacity: favs.includes(favId) ? 1 : 0.4 }}
+                        title={favs.includes(favId) ? 'Убрать из избранного' : 'В избранное'}>⭐</button>
+                    </div>
+                    <div>{c.blurb}</div>
+                  </div>
+                }
+                full={
+                  <div>
+                    <div style={{ marginBottom: 6 }}>{c.blurb}</div>
+                    <div>
+                      <b style={{ fontSize: 11 }}>Параметры:</b>
+                      <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: 11 }}>
+                        <li style={{ marginBottom: 2 }}>Автор: {c.author}</li>
+                        <li style={{ marginBottom: 2 }}>Цель: {c.goal}</li>
+                        <li style={{ marginBottom: 2 }}>Уровень: {c.level}</li>
+                        <li style={{ marginBottom: 2 }}>Сплит: {c.patternId}</li>
+                      </ul>
+                    </div>
+                    <div className="lib-combat-note" style={{ marginTop: 8, fontSize: 11, color: '#fff', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.22)', borderRadius: 8, padding: '6px 8px' }}>
+                      🥋 Именной цикл — одной кнопкой уходит в combat-конструктор.
+                    </div>
+                    <button className="lib-apply" onClick={() => sendCycle('combat_cycle', c.id, c.name)} style={{
+                      width: '100%', marginTop: 8, padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer',
+                      background: 'var(--accent)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 48,
+                    }}>🥋 Собрать в combat-конструкторе →</button>
                   </div>
                 }
               />

@@ -5,7 +5,7 @@
 import React from 'react';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
-import { buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
+import { buildCombatReport, isCombatPlanBlocked } from '../../../engines/combat/combat-finalize.engine';
 import { ruLabel, PHASE_RU, SESSION_TAG_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
 import { cbExerciseName } from '../../../engines/combat/combat-builder.engine';
 import { combatMesocycleSummary } from '../../../engines/combat/combat-mesocycle';
@@ -34,6 +34,8 @@ type Props = {
   setCompetitionDate?: (s: string) => void;
   competitionWeight?: string;
   setCompetitionWeight?: (s: string) => void;
+  competitionPriority?: 'main' | 'secondary';
+  setCompetitionPriority?: (p: 'main' | 'secondary') => void;
   startDate?: string;
   outside?: any;
   outsideMetrics?: any;
@@ -121,7 +123,7 @@ export const CbDiaryCard: React.FC<{ trends: DiaryTrendCB[] | null }> = ({ trend
 
 export const CombatPlanView: React.FC<Props> = ({
   plan, historyLen, onUndo, onUpdateEx, onMoveEx, onSwapEx,
-  annual, annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
+  annual, annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight, competitionPriority, setCompetitionPriority,
   startDate, outside, outsideMetrics, diaryLoad, acwr, msg, setMsg,
   onBuildATR, onAddCompetition, onPrintAnnual, onDownloadIcs, onExportProgram,
 }) => {
@@ -129,8 +131,8 @@ export const CombatPlanView: React.FC<Props> = ({
   const [openSess, setOpenSess] = React.useState<Record<string, boolean>>({});
   const doMsg = (m: string) => { setMsg?.(m); setTimeout(() => setMsg?.(''), 2200); };
   const sessOpen = (wk: number, day: number, idx: number) => openSess[`${wk}-${day}`] ?? idx === 0;
-  // №1: заблокированный план (errors) нельзя выгружать ни в каком виде — даже на бумагу
-  const blocked = (plan.validation?.errors?.length || 0) > 0;
+  // №1: заблокированный план (errors) нельзя выгружать ни в каком виде — канон isCombatPlanBlocked из finalize
+  const blocked = isCombatPlanBlocked(plan);
   const blockedTitle = blocked ? 'Сначала исправьте ошибки' : undefined;
   const blockedDim = blocked ? { opacity: 0.4 } as const : {};
 
@@ -402,7 +404,7 @@ export const CombatPlanView: React.FC<Props> = ({
           {annual.competitions?.length > 0 && (
             <div style={{ background: 'rgba(239,68,68,0.06)', border: '0.5px solid rgba(239,68,68,0.14)', borderRadius: 12, padding: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', display:'flex', alignItems:'center', gap:6 }}>🏁 Бои <Highlight color="#ff3b30">{annual.competitions.length}</Highlight></div>
-              {annual.competitions.map((c: any) => <div key={c.id} style={{ fontSize: 11, color: '#fff', marginTop:4 }}><Highlight color="#ff3b30">🏁 {c.name}</Highlight> — {c.date} {c.weightClass ? <Highlight>{c.weightClass}</Highlight> : ''}</div>)}
+              {annual.competitions.map((c: any) => <div key={c.id} style={{ fontSize: 11, color: '#fff', marginTop:4 }}><Highlight color="#ff3b30">🏁 {c.name}</Highlight> — {c.date} {c.weightClass ? <Highlight>{c.weightClass}</Highlight> : ''} {c.priority === 'secondary' ? <Highlight color="#f59e0b">мини</Highlight> : <Highlight color="#ef4444">main</Highlight>}</div>)}
             </div>
           )}
 
@@ -411,6 +413,12 @@ export const CombatPlanView: React.FC<Props> = ({
               <input placeholder="Название боя" value={competitionName} onChange={e => setCompetitionName(e.target.value)} style={{ ...INPUT, flex: 1, minWidth: 140, padding: '8px 10px', fontSize: 11 }} />
               <input type="date" value={competitionDate} onChange={e => setCompetitionDate!(e.target.value)} style={{ ...INPUT, width: 150, padding: '8px 10px', fontSize: 11 }} />
               <input placeholder="Вес.кат." value={competitionWeight} onChange={e => setCompetitionWeight!(e.target.value)} style={{ ...INPUT, width: 110, padding: '8px 10px', fontSize: 11 }} />
+              {setCompetitionPriority && (
+                <CombatPopupSelect label="Приоритет боя" value={competitionPriority || 'main'} onChange={v => setCompetitionPriority(v as any)} options={[
+                  { id: 'main', label: 'main · тапер 2нед', desc: 'главный бой' },
+                  { id: 'secondary', label: 'secondary · мини 1нед', desc: 'второстепенный' },
+                ]} />
+              )}
               <button onClick={onAddCompetition} style={{ ...BTN_SMALL, background: '#ef4444', color: '#fff', border: 'none' }}>+ Бой</button>
             </div>
           )}

@@ -8,6 +8,7 @@ import {
   sparringSafetyErrors,
   screenCombatRedFlags,
   needsCombatMedicalBlock,
+  teenNeckIsoFallback,
   TEEN_BANNED_EXERCISES,
 } from '../combat-safety.engine';
 
@@ -154,5 +155,46 @@ describe('combat P3 builder wiring', () => {
     expect(validateCombatPlan(acwr).errors.some(e => e.includes('ACWR dangerous'))).toBe(true);
     const excl = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3, sparringLoad: spar, injuries: [{ location: 'shoulder', exclude: true }] } as any);
     expect(validateCombatPlan(excl).errors.some(e => e.includes('травме'))).toBe(true);
+  });
+});
+
+describe('combat №4 diagnostics wiring', () => {
+  it('teenNeckIsoFallback: динамика → изометрия той же плоскости, изометрия — как есть', () => {
+    expect(teenNeckIsoFallback('neck_harness_ext')).toBe('neck_isometric_back');
+    expect(teenNeckIsoFallback('neck_bridge_wrestler')).toBe('neck_isometric_back');
+    expect(teenNeckIsoFallback('neck_flexion')).toBe('neck_isometric_front');
+    expect(teenNeckIsoFallback('neck_lateral_flex')).toBe('neck_isometric_side');
+    expect(teenNeckIsoFallback('neck_harness_rotation')).toBe('neck_band_rotation_isometric');
+    expect(teenNeckIsoFallback('neck_isometric_front')).toBe('neck_isometric_front');
+    expect(teenNeckIsoFallback('squat')).toBe('squat');
+  });
+
+  it('teen + override динамики: авто-добавка даёт только изометрию', () => {
+    const plan = buildCombatPlan({ discipline: 'wrestling', goal: 'power', level: 'advanced', weeks: 4, daysPerWeek: 3, age: 15, neckLevelOverride: 4 } as any);
+    const ids = plan.weeksData.flatMap(w => w.sessions.flatMap(s => s.exercises.map(e => e.id)));
+    expect(ids).not.toContain('neck_bridge_wrestler');
+    expect(ids).not.toContain('neck_harness_ext');
+    expect(ids.some(id => id.includes('neck_isometric'))).toBe(true);
+    expect(plan.rationale.some((r: string) => r.includes('уровень L4 из диагностики'))).toBe(true);
+  });
+
+  it('neckLevelOverride без teen: строка override в rationale', () => {
+    const plan = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'beginner', weeks: 4, daysPerWeek: 3, neckLevelOverride: 3 } as any);
+    expect(plan.rationale.some((r: string) => r.includes('уровень L3 из диагностики'))).toBe(true);
+    const plain = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'beginner', weeks: 4, daysPerWeek: 3 } as any);
+    expect(plain.rationale.some((r: string) => r.includes('из диагностики'))).toBe(false);
+  });
+
+  it('weakSide: след в rationale + warning без унилатеральных', () => {
+    const uni = ['bulgarian_split_heavy', 'single_leg_rdl_combat', 'cossack_squat', 'step_up'];
+    const plan = buildCombatPlan({
+      discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3,
+      weakSide: 'left', excludedExercises: uni,
+    } as any);
+    expect(plan.rationale.some((r: string) => r.includes('слабее левая'))).toBe(true);
+    expect(validateCombatPlan(plan).warnings.some(w => w.includes('Асимметрия') && w.includes('левой'))).toBe(true);
+    const ok = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3, weakSide: 'right' } as any);
+    expect(ok.rationale.some((r: string) => r.includes('слабее правая'))).toBe(true);
+    expect(validateCombatPlan(ok).warnings.some(w => w.includes('Асимметрия'))).toBe(false);
   });
 });

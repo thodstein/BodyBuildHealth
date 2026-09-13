@@ -19,7 +19,7 @@ import { applyCombatDUP } from './combat-dup';
 import { applyCombatIntensity } from './combat-intensity';
 import { weightForCombatExerciseResolved } from './combat-workmax';
 import { sparringToOutsideLoad, sparringWeeklyLoad, sparringSummary } from './combat-sparring.engine';
-import { teenCombatGates, hasWeightManipulation, neckExtensionCutoffKg, concussionProtocol, sparringSafetyErrors } from './combat-safety.engine';
+import { teenCombatGates, hasWeightManipulation, neckExtensionCutoffKg, concussionProtocol, sparringSafetyErrors, teenNeckIsoFallback } from './combat-safety.engine';
 import { weightToClassBoundary, weightClassLine } from './combat-weight-class.engine';
 import { femaleCutTempoDefault, femaleCombatNotes, travelPoolFilter, travelVolumeMult, travelTaperNote } from './combat-female-travel.engine';
 import { isExcludeInjuryCB } from './combat-selection';
@@ -28,7 +28,7 @@ import { COMBAT_LANDMARKS } from './combat-volume';
 import { vbtRecommendationCombat, vbtHistoryForLift, vbtEwma, diagnoseVelocityLossCombat, vbtTrendForLift, atrTransitionHintForTrend, combatLossThresholdForGoal } from './combat-vbt.engine';
 import type { VbtHistoryEntry } from './combat-vbt.engine';
 import { coreWeeklyPlan } from './combat-core.engine';
-import { neckWeeklyPlan, NECK_IDS } from './combat-neck.engine';
+import { neckWeeklyPlan, neckProgressionFor, NECK_IDS } from './combat-neck.engine';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet, CombatPhase } from './combat.types';
 
 const POOL_BY_TAG: Record<string, string[]> = {
@@ -384,6 +384,11 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   for (const n of femaleCombatNotes({ sex: input.sex, lutealPhase: !!(input as any).lutealPhase, weightCutKg: input.weightCutKg, bodyweightKg: input.bodyweight })) rationale.push(n);
   const travelNote = travelTaperNote((input as any).travelMode, !!input.fightDate);
   if (travelNote) rationale.push(travelNote);
+  // №4: слабая сторона из диагностики — след в rationale (унилатеральная добивка)
+  if ((input as any).weakSide === 'left' || (input as any).weakSide === 'right') {
+    const sideRu = (input as any).weakSide === 'left' ? 'левая' : 'правая';
+    rationale.push(`Асимметрия: слабее ${sideRu} сторона (из диагностики) → унилатеральная добивка слабой стороне (болгарский/румынка одной/тяга одной)`);
+  }
   if (input.weightCutKg && input.weightCutKg > 0 && !wcProtocol) rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
   if (wcProtocol) {
     rationale.push(`Протокол весогонки: ${wcProtocol.targetLossKg}кг за ${wcProtocol.weeksOut}нед · вода ${CB_RU_MODE[wcProtocol.waterMode] || wcProtocol.waterMode} · Na ${CB_RU_MODE[wcProtocol.sodiumMode] || wcProtocol.sodiumMode} · угли ${CB_RU_MODE[wcProtocol.carbMode] || wcProtocol.carbMode}${wcProtocol.heatSessions?' · сауна':''}`);
@@ -639,7 +644,13 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     if (neckNeed && !deload && !taper) {
       const targetNeck = sessions.find(s=> s.sessionTag.includes('neck_grip') || s.sessionTag.includes('full_conditioning') || s.sessionTag.includes('upper_power')) || sessions[0];
       if (targetNeck && targetNeck.exercises.length < 8 && targetNeck.exercises.reduce((a,e)=>a+e.sets,0) < 22) {
-        const neckPlan = neckWeeklyPlan(level, w, phase);
+        // №4: override уровня шеи из диагностики (1–4) важнее автовыбора; teen — только изометрия
+        const ovr = (input as any).neckLevelOverride;
+        const ovrLvl = typeof ovr === 'number' && Number.isFinite(ovr) ? Math.max(1, Math.min(4, Math.round(ovr))) : null;
+        const neckPlan = ovrLvl != null
+          ? (() => { try { return neckProgressionFor(ovrLvl).exercises; } catch { return neckWeeklyPlan(level, w, phase); } })()
+          : neckWeeklyPlan(level, w, phase);
+        if (ovrLvl != null) rationale.push(`Шея: уровень L${ovrLvl} из диагностики (override автовыбора)`);
         // выбираем первую missing плоскость
         let pick: string | null = null;
         if (!hasFlex) pick = neckPlan.find(e=> ['neck_flexion','neck_isometric_front','neck_eccentric_flexion'].includes(e.id))?.id || 'neck_isometric_front';
@@ -647,6 +658,11 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         else if (!hasLat) pick = 'neck_isometric_side';
         else if (!hasRot) pick = 'neck_band_rotation_isometric';
         else pick = neckPlan[0]?.id || 'neck_isometric_front';
+        // №4: teen-фолбэк — авто-добавка шла мимо filterPool и могла дать banned-динамику
+        if (pick && teenCombatGates(input.age).isTeen) {
+          const fb = teenNeckIsoFallback(pick);
+          if (fb !== pick) { rationale.push(`Шея teen: динамика ${pick} → изометрия ${fb}`); pick = fb; }
+        }
         if (pick && !targetNeck.exercises.some(e=> e.id===pick)) {
           const nm = getExerciseMeta(pick) || { name: pick, group: 'neck', pattern: 'isolation' };
           const neckProg = neckPlan.find(p=> p.id===pick);
@@ -784,11 +800,15 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     }
     if (maxHiit >= 4) errors.push(`HIIT-нагрузка ${maxHiit}×/нед (hard spar + lactic/alactic) — разнос ≥36ч невозможен, снизьте до ≤3×`);
   }
-  // P1: hard spar в fight week — запрет (дни 9–5 только technical 50%); при тапере 2нед — warning про последний hard spar
+  // P1: hard spar в fight week — запрет (дни 9–5 только technical 50%); при тапере 2нед — warning про последний hard spar.
+  // Гейт потребляет taperSplitForWeek().sparringHard: 0 во всех тапер-неделях = некуда деть hard (tw1) → error;
+  // есть неделя 0.5 (tw2, дни 14–10) → warning. Без taperCfg сплит нейтрален (1) — гейт молчит.
   if (taperCfg && (input.sparringLoad as any)?.hardSparSessions > 0) {
-    const tw = Math.max(1, Math.min(2, Math.round((input.taperWeeks as any) || (goal === 'camp' ? 2 : 1))));
-    if (tw <= 1) errors.push('Hard spar в fight week (тапер 1нед) запрещён — только technical 50%, дриллинг полным объёмом');
-    else warnings.push('Последний hard spar — за 10–14 дней до боя (дни 14–10), дальше только technical 50%');
+    const splits = weeksData.map(wk => taperSplitForWeek(wk.week, weeks, taperCfg, !!wk.deload).sparringHard);
+    const hasZero = splits.some(s => s === 0);
+    const hasHalf = splits.some(s => s === 0.5);
+    if (hasZero && !hasHalf) errors.push('Hard spar в fight week (тапер 1нед) запрещён — только technical 50%, дриллинг полным объёмом');
+    else if (hasZero && hasHalf) warnings.push('Последний hard spar — за 10–14 дней до боя (дни 14–10), дальше только technical 50%');
   }
   // проверка шеи: группа neck или id содержит neck
   const hasNeck = weeksData.some(w => w.sessions.some(s => s.exercises.some(e => e.group === 'neck' || e.id.includes('neck'))));
@@ -898,6 +918,12 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
 
   // P5: лютеиновая пометка + same-day × отель (не совмещать)
   if ((input as any).lutealPhase && input.sex === 'female') warnings.push('Лютеиновая фаза: задержка воды +0.5–1 кг — вес оценивайте по среднему за 7 дней');
+  // №4: слабая сторона без унилатеральных ног — предупреждение с указанием стороны
+  if ((input as any).weakSide === 'left' || (input as any).weakSide === 'right') {
+    const sideRu = (input as any).weakSide === 'left' ? 'левой' : 'правой';
+    const uniTotal = weeksData.reduce((s, wk) => s + wk.sessions.reduce((a, sess) => a + sess.exercises.filter(e => ['bulgarian_split_heavy', 'single_leg_rdl_combat', 'cossack_squat', 'step_up'].includes(e.id)).reduce((x, e) => x + e.sets, 0), 0), 0);
+    if (uniTotal === 0) warnings.push(`Асимметрия (${sideRu} слабее): нет унилатеральных ног в плане — добавьте болгарский/казачий/step-up для слабой стороны`);
+  }
   if ((input as any).travelMode === 'hotel') warnings.push('Отель: только свой вес — верх ограничен, объём ×0.9 (поддержание)');
   if ((input as any).travelMode === 'hotel' && wcProtocol?.weighInType === 'same_day_2h') {
     errors.push('Отель + same-day взвешивание — не совмещать: нет зала и нет времени на регидратацию');

@@ -48,4 +48,14 @@ describe('Combat hard-block сборки', () => {
     expect(localStorage.getItem('he_combat_plan_v1')).not.toBeNull();
     expect(localStorage.getItem('he_combat_nutrition_payload')).not.toBeNull();
   }, 20000);
+
+  it('redflags-скринер живёт в шаге Атлет: тихо по умолчанию, мед-блок при concussion×2', () => {
+    render(<CombatConstructor />);
+    go('2 Атлет');
+    expect(document.querySelector('.cb-redflags')).toBeNull();
+    setPopupNumber(/Сотрясения за 12 мес/, '2');
+    const box = document.querySelector('.cb-redflags');
+    expect(box).not.toBeNull();
+    expect(box?.textContent).toContain('до врача');
+  }, 20000);
 });

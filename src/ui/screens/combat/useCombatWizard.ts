@@ -75,10 +75,15 @@ export function useCombatWizard() {
   const [competitionName, setCompetitionName] = useState('');
   const [competitionDate, setCompetitionDate] = useState('');
   const [competitionWeight, setCompetitionWeight] = useState('');
+  // №5: приоритет ручного боя (main — полный тапер 2нед, secondary — мини 1нед)
+  const [competitionPriority, setCompetitionPriority] = useState<'main' | 'secondary'>('main');
   // P2/P3 приёмник диагностики + безопасность: сотрясения/измеренная шея (опционально, дефолт = старое)
   const [concussionHistory, setConcussionHistory] = useState(0);
   const [neckExtensionKg, setNeckExtensionKg] = useState(0);
   const [neckFlexExtRatio, setNeckFlexExtRatio] = useState(0);
+  // №4: уровень шеи из диагностики (override 1–4) + слабая сторона (дефолт = нет)
+  const [neckLevelOverride, setNeckLevelOverride] = useState(0);
+  const [weakSide, setWeakSide] = useState<'left' | 'right' | ''>('');
   // P4/P5: весовая категория + travel + лютеиновая пометка (опционально)
   const [weightClass, setWeightClass] = useState('');
   const [weightClassLimitKg, setWeightClassLimitKg] = useState(0);
@@ -143,8 +148,9 @@ export function useCombatWizard() {
     patternId, setPatternId,
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
-    annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
+    annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight, competitionPriority, setCompetitionPriority,
     concussionHistory, setConcussionHistory, neckExtensionKg, setNeckExtensionKg, neckFlexExtRatio, setNeckFlexExtRatio,
+    neckLevelOverride, setNeckLevelOverride, weakSide, setWeakSide,
     weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, weightClassRuleset, setWeightClassRuleset, travelMode, setTravelMode, lutealPhase, setLutealPhase,
     outsideMetrics,
   };

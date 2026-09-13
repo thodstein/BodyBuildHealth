@@ -25,8 +25,8 @@ describe('Библиотека PRO-MAX — хуки', () => {
     const { container } = render(<CycleCatalog {...PROPS} />);
     const seg = container.querySelector('.lib-seg') as HTMLElement;
     const btns = within(seg).getAllByRole('button');
-    // 6 сегментов: Все/Силовые/Бодибилдинг/Арм/ТА·Стронг/Кардио (кардио-таб добавлен позже теста)
-    expect(btns.length).toBe(6);
+    // 7 сегментов: Все/Силовые/Бодибилдинг/Арм/ТА·Стронг/Кардио/Единоборства (кардио- и combat-табы добавлены позже теста)
+    expect(btns.length).toBe(7);
     expect(btns[0].getAttribute('data-active')).toBe('true');
     expect(btns[0].getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(within(seg).getByText('Арм'));

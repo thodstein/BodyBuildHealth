@@ -48,17 +48,7 @@ export function isTaperByFightDate(week: number, totalWeeks: number, cfg: TaperC
 }
 
 export function taperVolumeMultiplier(week: number, totalWeeks: number, cfg: TaperConfig | null | undefined, isDeload?: boolean): number {
-  if (isDeload) return 0.60;
-  if (!cfg || !cfg.fightDate) return 1;
-  const fw = fightWeekIndex(cfg.fightDate, cfg.startDate, totalWeeks);
-  const tw = Math.max(1, Math.min(2, Math.round(cfg.taperWeeks || 1)));
-  if (tw === 2) {
-    if (week === fw - 1) return 0.65; // предпоследняя
-    if (week === fw) return 0.45; // последняя
-  } else {
-    if (week === fw) return 0.55;
-  }
-  return 1;
+  return scMult(week, totalWeeks, cfg, isDeload);
 }
 
 export function buildTaperRationale(cfg: TaperConfig | null | undefined, totalWeeks: number): string[] {
@@ -70,6 +60,31 @@ export function buildTaperRationale(cfg: TaperConfig | null | undefined, totalWe
 
 // ── P1 PRO: единый тапер (Bosquet 2007 + Boxing Science + fight-week практика) ──
 // Один источник «тейпера»: conditioning/sparring-ветки делегируют сюда, дубли не плодятся.
+
+/**
+ * Единые факторы тапера — один источник для зала, кондиции и сплита.
+ * Кондиция (×0.7/×0.6) и делод (×0.6) берутся отсюда же (см. combat-conditioning.engine).
+ */
+export const TAPER_SC_PRE = 0.65;
+export const TAPER_SC_FIGHT = 0.45;
+export const TAPER_SC_FIGHT_SHORT = 0.55;
+export const TAPER_COND = 0.7;
+export const TAPER_DELOAD = 0.6;
+
+/** Единственная реализация S&C-кривой (taperVolumeMultiplier и сплит — тонкие обёртки). */
+function scMult(week: number, totalWeeks: number, cfg: TaperConfig | null | undefined, isDeload?: boolean): number {
+  if (isDeload) return TAPER_DELOAD;
+  if (!cfg || !cfg.fightDate) return 1;
+  const fw = fightWeekIndex(cfg.fightDate, cfg.startDate, totalWeeks);
+  const tw = Math.max(1, Math.min(2, Math.round(cfg.taperWeeks || 1)));
+  if (tw === 2) {
+    if (week === fw - 1) return TAPER_SC_PRE; // предпоследняя
+    if (week === fw) return TAPER_SC_FIGHT; // последняя
+  } else {
+    if (week === fw) return TAPER_SC_FIGHT_SHORT;
+  }
+  return 1;
+}
 
 /** Раздельные кривые тапера: S&C-зал / кондиция / жёсткий спарринг. */
 export interface TaperSplit { sc: number; cond: number; sparringHard: number; }
@@ -85,7 +100,7 @@ export function taperSplitForWeek(
   cfg: TaperConfig | null | undefined,
   isDeload?: boolean
 ): TaperSplit {
-  const sc = taperVolumeMultiplier(week, totalWeeks, cfg, isDeload);
+  const sc = scMult(week, totalWeeks, cfg, isDeload);
   if (!cfg || !cfg.fightDate) return { sc, cond: 1, sparringHard: 1 };
   const fw = fightWeekIndex(cfg.fightDate, cfg.startDate, totalWeeks);
   const tw = Math.max(1, Math.min(2, Math.round(cfg.taperWeeks || 1)));
@@ -93,8 +108,8 @@ export function taperSplitForWeek(
   const isFightWeek = week === fw;
   return {
     sc,
-    // кондиция-тапер дольше и мягче: ×0.7 в окне (тип интервалов не менять — см. conditioning engine)
-    cond: isDeload ? 0.6 : inTaper ? 0.7 : 1,
+    // кондиция-тапер дольше и мягче (тип интервалов не менять — см. conditioning engine, тот же TAPER_COND)
+    cond: isDeload ? TAPER_DELOAD : inTaper ? TAPER_COND : 1,
     // дни 14–10 — последний hard spar (0.5 = technical only), fight week — 0 (запрет)
     sparringHard: isFightWeek ? 0 : inTaper ? 0.5 : 1,
   };

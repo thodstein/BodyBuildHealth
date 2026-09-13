@@ -170,6 +170,15 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
   return plan;
 }
 
+/**
+ * Канон «заблокированности» плана: один источник для гейтов UI (кнопки экспорта)
+ * и прямых вызовов (exportToUserProgram). UI дублировать проверку inline запрещено.
+ */
+export function isCombatPlanBlocked(plan: CombatPlan | null | undefined): boolean {
+  if (!plan) return false;
+  return (plan.validation?.errors?.length || 0) > 0;
+}
+
 export function buildCombatReport(plan: CombatPlan): string {
   const lines: string[] = [];
   lines.push(`Единоборства: ${plan.discipline} · ${plan.goal} · ${plan.level} · ${plan.weeks} нед · ${plan.patternId}`);

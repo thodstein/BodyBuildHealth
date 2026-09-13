@@ -63,6 +63,24 @@ export function hasWeightManipulation(proto: {
 }
 
 /**
+ * №4: teen-фолбэк динамики шеи в изометрию той же плоскости.
+ * Авто-добавка шеи идёт мимо filterPool — без этого teen получал бы banned-динамику.
+ */
+const TEEN_NECK_ISO_FALLBACK: Record<string, string> = {
+  neck_harness_ext: 'neck_isometric_back',
+  neck_bridge_wrestler: 'neck_isometric_back',
+  neck_flexion: 'neck_isometric_front',
+  neck_eccentric_flexion: 'neck_isometric_front',
+  neck_lateral_flex: 'neck_isometric_side',
+  neck_rotation: 'neck_band_rotation_isometric',
+  neck_harness_rotation: 'neck_band_rotation_isometric',
+};
+
+export function teenNeckIsoFallback(id: string): string {
+  return TEEN_NECK_ISO_FALLBACK[id] || id;
+}
+
+/**
  * Порог экстензии шеи в кг из относительного cutoff 3.71 N/кг (подростки регби 2024):
  * kg = 3.71 × BW / 9.81 ≈ 0.378 × BW (для 80кг ≈ 30кг, рядом с абс. 32.1кг).
  */

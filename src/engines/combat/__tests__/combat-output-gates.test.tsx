@@ -5,10 +5,12 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import React from 'react';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { buildCombatPlan } from '../combat-builder.engine';
+import { isCombatPlanBlocked } from '../combat-finalize.engine';
 import { weightClassLimitValid } from '../combat-weight-class.engine';
 import { CombatPlanView } from '../../../ui/screens/combat/CombatPlanView';
+import { buildAnnualATR } from '../combat-annual';
 
 describe('weightClassLimitValid', () => {
   it('пусто — валидно; свой лимит — валиден; чужой — нет', () => {
@@ -54,6 +56,43 @@ describe('CombatPlanView errors block', () => {
       const btn = screen.getByRole('button', { name }) as HTMLButtonElement;
       expect(btn.disabled, name).toBe(false);
     }
+  });
+
+  it('isCombatPlanBlocked — канон: errors ↔ true, чисто ↔ false, пусто ↔ false', () => {
+    const bad = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3, fightDate: '2025-02-30' } as any);
+    expect(isCombatPlanBlocked(bad)).toBe(true);
+    const ok = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3 } as any);
+    expect(isCombatPlanBlocked(ok)).toBe(false);
+    expect(isCombatPlanBlocked(null)).toBe(false);
+    expect(isCombatPlanBlocked(undefined)).toBe(false);
+  });
+
+  it('селект приоритета боя виден при годовом (main/secondary)', () => {
+    const plan = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 4, daysPerWeek: 3 } as any);
+    const ann = buildAnnualATR('mma', 12, null, { cycles: 1 } as any);
+    const noop = () => undefined;
+    render(
+      <CombatPlanView
+        plan={plan}
+        historyLen={0}
+        onUndo={noop}
+        onUpdateEx={noop}
+        onMoveEx={noop}
+        onSwapEx={noop}
+        annual={ann}
+        onBuildATR={noop}
+        onPrintAnnual={noop}
+        onDownloadIcs={noop}
+        competitionName="Бой"
+        setCompetitionName={noop}
+        competitionDate="2026-09-01"
+        setCompetitionDate={noop}
+        competitionPriority="main"
+        setCompetitionPriority={noop}
+        onAddCompetition={noop}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Приоритет боя/ })).toBeTruthy();
   });
 
   it('чистый план — блока нет, warnings как раньше', () => {

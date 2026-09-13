@@ -73,6 +73,9 @@ export interface CombatInput {
   weightClassLimitKg?: number | null;
   travelMode?: 'off' | 'hotel';
   lutealPhase?: boolean;
+  // №4: уровень шеи из диагностики (1–4, переопределяет автовыбор) + слабая сторона
+  neckLevelOverride?: number | null;
+  weakSide?: 'left' | 'right' | null;
 }
 
 export interface CombatSet {

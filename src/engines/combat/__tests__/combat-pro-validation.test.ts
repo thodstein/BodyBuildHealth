@@ -5,7 +5,13 @@ import {
   recommendTaperWeeks,
   validateTaperConfig,
   taperVolumeMultiplier,
+  TAPER_SC_PRE,
+  TAPER_SC_FIGHT,
+  TAPER_SC_FIGHT_SHORT,
+  TAPER_COND,
+  TAPER_DELOAD,
 } from '../combat-taper.engine';
+import { conditioningSessionsForWeek } from '../combat-conditioning.engine';
 
 /**
  * combat-pro-validation (P1): блокирующие errors + единый тапер.
@@ -122,5 +128,24 @@ describe('combat P1 unified taper', () => {
     expect(validateTaperConfig(null, null)).toEqual([]);
     expect(validateTaperConfig('2025-02-30', '2026-01-01').length).toBeGreaterThan(0);
     expect(validateTaperConfig('2026-01-01', '2026-06-01').some(e => e.includes('раньше старта'))).toBe(true);
+  });
+
+  it('lock: сплит и кондиция на одних константах (TAPER_*)', () => {
+    expect(TAPER_SC_PRE).toBe(0.65);
+    expect(TAPER_SC_FIGHT).toBe(0.45);
+    expect(TAPER_SC_FIGHT_SHORT).toBe(0.55);
+    expect(TAPER_COND).toBe(0.7);
+    expect(TAPER_DELOAD).toBe(0.6);
+    // кондиция: база aerobic 28′ (power, вне зала <5) → тапер 20, делод 17 — те же факторы, что в сплите
+    const taper = conditioningSessionsForWeek(8, 'taper', 'power', 0);
+    expect(taper.length).toBe(1);
+    expect(taper[0].durationMin).toBe(Math.round(28 * TAPER_COND));
+    const deload = conditioningSessionsForWeek(4, 'deload', 'power', 0);
+    expect(deload.length).toBe(1);
+    expect(deload[0].durationMin).toBe(Math.round(28 * TAPER_DELOAD));
+    // сплит cond повторяет тот же фактор
+    const cfg = { fightDate: '2026-08-29', taperWeeks: 2, startDate: '2026-07-04' } as any;
+    expect(taperSplitForWeek(8, 8, cfg, false).cond).toBe(TAPER_COND);
+    expect(taperSplitForWeek(4, 8, cfg, true).cond).toBe(TAPER_DELOAD);
   });
 });

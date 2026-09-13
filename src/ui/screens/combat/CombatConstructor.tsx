@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { buildCombatPlan, cbExerciseName, resolveCombatSwapMeta } from '../../../engines/combat/combat-builder.engine';
-import { finalizeCombatPlan, buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
+import { finalizeCombatPlan, buildCombatReport, isCombatPlanBlocked } from '../../../engines/combat/combat-finalize.engine';
 import { COMBAT_PATTERNS, recommendCombatPattern } from '../../../engines/combat/combat-split-patterns';
 import { COMBAT_CYCLE_LIBRARY, getCombatCycle } from '../../../engines/combat/combat-cycle-library';
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
@@ -22,6 +22,7 @@ import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
 import { weightClassesFor, weightClassLine, weightClassLimitValid } from '../../../engines/combat/combat-weight-class.engine';
 import { validateSparringLoad } from '../../../engines/combat/combat-sparring.engine';
+import { screenCombatRedFlags } from '../../../engines/combat/combat-safety.engine';
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import type { CombatNutritionPayload, CombatCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import { getPlannerApply, subscribePlannerApply } from '../TrainingScreen_parts/planner-bridge';
@@ -72,10 +73,7 @@ function buzzStep(): void {
   try { (navigator as any)?.vibrate?.(8); } catch { /* no-op */ }
 }
 
-/* №1: заблокированный план (errors) нельзя выгружать ни в каком виде */
-function isPlanBlocked(p: CombatPlan | null): boolean {
-  return (p?.validation?.errors?.length || 0) > 0;
-}
+/* №1: заблокированный план (errors) нельзя выгружать ни в каком виде — канон isCombatPlanBlocked из finalize */
 
 /* ── BB-аккордеон: шапка-кнопка + саммари, контент — те же SectionCard 1-в-1 ── */
 const CbSec: React.FC<{
@@ -125,8 +123,9 @@ export const CombatConstructor: React.FC = () => {
     patternId, setPatternId,
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
     plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
-    annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
+    annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight, competitionPriority, setCompetitionPriority,
     concussionHistory, setConcussionHistory, neckExtensionKg, setNeckExtensionKg, neckFlexExtRatio, setNeckFlexExtRatio,
+    neckLevelOverride, setNeckLevelOverride, weakSide, setWeakSide,
     weightClass, setWeightClass, weightClassLimitKg, setWeightClassLimitKg, weightClassRuleset, setWeightClassRuleset, travelMode, setTravelMode, lutealPhase, setLutealPhase,
     outsideMetrics,
   } = useCombatWizard();
@@ -159,8 +158,16 @@ export const CombatConstructor: React.FC = () => {
         setConcussionHistory(Math.max(0, Math.min(9, Math.round(data.combatConcussion))));
         touched.push('сотрясения');
       }
-      if (typeof data.combatNeckLevel === 'number' && Number.isFinite(data.combatNeckLevel)) touched.push('шея');
-      if (data.combatAsymmetry === 'left' || data.combatAsymmetry === 'right') touched.push(`асимметрия ${data.combatAsymmetry}`);
+      if (typeof data.combatNeckLevel === 'number' && Number.isFinite(data.combatNeckLevel)) {
+        // №4: уровень шеи реально переопределяет планирование (движок neckLevelOverride), а не только флеш
+        setNeckLevelOverride(Math.max(1, Math.min(4, Math.round(data.combatNeckLevel))));
+        touched.push('уровень шеи');
+      }
+      if (data.combatAsymmetry === 'left' || data.combatAsymmetry === 'right') {
+        // №4: слабая сторона — состояние + след (движок пишет rationale + warning, приёмник хранит)
+        setWeakSide(data.combatAsymmetry);
+        touched.push(`слабая сторона ${data.combatAsymmetry === 'left' ? 'левая' : 'правая'}`);
+      }
       if (typeof data.combatSparringCap === 'number' && Number.isFinite(data.combatSparringCap) && data.combatSparringCap >= 0) {
         const cap = Math.round(data.combatSparringCap);
         setSparringHard(h => Math.min(h, cap));
@@ -382,6 +389,9 @@ export const CombatConstructor: React.FC = () => {
       concussionHistory: concussionHistory || undefined,
       neckExtensionKg: neckExtensionKg || undefined,
       neckFlexExtRatio: neckFlexExtRatio || undefined,
+      // №4: override шеи + слабая сторона (опционально)
+      neckLevelOverride: neckLevelOverride || undefined,
+      weakSide: weakSide || undefined,
       // P4/P5 весовая категория + travel + лютеиновая (опционально)
       weightClass: weightClass || undefined,
       weightClassLimitKg: weightClassLimitKg || undefined,
@@ -517,6 +527,8 @@ export const CombatConstructor: React.FC = () => {
 
   const exportToUserProgram = () => {
     if (!plan) return;
+    // Гейт внутри функции (оборона в глубину: кнопки disabled, но прямой вызов тоже блочится)
+    if (isCombatPlanBlocked(plan)) { setMsg('⛔ Экспорт заблокирован — сначала исправьте ошибки'); setTimeout(() => setMsg(''), 2600); return; }
     const prog: any = {
       id: plan.id,
       meta: { id: plan.id, title: `Единоборства ${plan.discipline} ${plan.weeks}нед`, direction: 'combat', createdAt: new Date().toISOString(), source: 'combat', discipline: plan.discipline, level: plan.level, methodology: plan.inputSnapshot?.methodology, dupMode: (plan.inputSnapshot as any)?.dupMode, intensityTech: (plan.inputSnapshot as any)?.intensityTech, periodizationModel: (plan.inputSnapshot as any)?.periodizationModel, fightDate: (plan.inputSnapshot as any)?.fightDate },
@@ -538,8 +550,8 @@ export const CombatConstructor: React.FC = () => {
     if (!annual || !competitionName || !competitionDate) { setMsg('Укажите название и дату боя'); setTimeout(() => setMsg(''), 1800); return; }
     const ann = loadAnnualCB();
     if (!ann) return;
-    const next = addCompetitionToAnnual(ann, { id: `comp_${Date.now()}`, name: competitionName, date: competitionDate, weightClass: competitionWeight || undefined } as any, startDate || null);
-    saveAnnualCB(next); setAnnual(next); setMsg('✦ Бой добавлен'); setTimeout(() => setMsg(''), 1800);
+    const next = addCompetitionToAnnual(ann, { id: `comp_${Date.now()}`, name: competitionName, date: competitionDate, weightClass: competitionWeight || undefined, priority: competitionPriority } as any, startDate || null);
+    saveAnnualCB(next); setAnnual(next); setMsg(`✦ Бой добавлен (${competitionPriority === 'secondary' ? 'мини-тапер 1нед' : 'тапер 2нед'})`); setTimeout(() => setMsg(''), 1800);
     setCompetitionName(''); setCompetitionDate(''); setCompetitionWeight('');
   };
   const handlePrintAnnual = () => {
@@ -776,9 +788,38 @@ export const CombatConstructor: React.FC = () => {
               {concussionHistory === 1 && (
                 <InfoBanner tone="warn">1 сотрясение за 12 мес — лимиты: hard spar ≤1×, шея ≥L2, flex/ext ≤0.74</InfoBanner>
               )}
+              {(() => {
+                // №1: живой скринер red-flags (мёртвый в проде — только тесты). Консолидирует teen/concussion/сгонку.
+                try {
+                  const scr = screenCombatRedFlags({
+                    age, concussionHistory, weightCutKg: weightCut, bodyweightKg: bodyweight,
+                    manipulation: waterMode === 'load_cut' || sodiumMode === 'moderate_cut' || carbMode === 'deplete_reload' || heatSessions,
+                  });
+                  if (!scr.flags.length) return null;
+                  return (
+                    <div className="cb-redflags" style={{ fontSize: 11, color: '#fff', background: scr.blocked ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', padding: '8px 10px', borderRadius: 10, border: scr.blocked ? '0.5px solid rgba(239,68,68,0.24)' : '0.5px solid rgba(245,158,11,0.18)' }}>
+                      {scr.text}
+                    </div>
+                  );
+                } catch { return null; }
+              })()}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <CombatPopupNumber label="Экстензия шеи" value={neckExtensionKg} min={0} max={120} suffix="кг" onChange={v=> setNeckExtensionKg(v)} />
                 <CombatPopupNumber label="Шея flex/ext" value={neckFlexExtRatio} min={0} max={2} step={0.01} onChange={v=> setNeckFlexExtRatio(v)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <CombatPopupSelect label="Уровень шеи (диагностика)" value={neckLevelOverride ? String(neckLevelOverride) : ''} onChange={v => setNeckLevelOverride(v ? Number(v) : 0)} options={[
+                  { id: '', label: 'Авто по уровню', desc: 'как раньше' },
+                  { id: '1', label: 'L1 изометрия', desc: 'база 4 плоскости' },
+                  { id: '2', label: 'L2 динамика', desc: '12–20 повт' },
+                  { id: '3', label: 'L3 Iron Neck', desc: 'эксцентрика 3с' },
+                  { id: '4', label: 'L4 мост', desc: 'только продвинутые' },
+                ]} />
+                <CombatPopupSelect label="Слабая сторона" value={weakSide || ''} onChange={v => setWeakSide((v as any) || '')} options={[
+                  { id: '', label: 'Нет', desc: 'симметрия' },
+                  { id: 'left', label: 'Левая слабее', desc: 'добивка слева' },
+                  { id: 'right', label: 'Правая слабее', desc: 'добивка справа' },
+                ]} />
               </div>
               <div style={{ fontSize: 10.5, color: '#fff' }}>Cutoff экстензии 3.71 N/кг (≈{(bodyweight * 0.378).toFixed(1)}кг при {bodyweight}кг) · flex/ext &gt;0.74 — риск ×3 (подростки регби 2024) · шея — модифицируемый фактор, не гарантия (JOSPT)</div>
               <CbSwitch checked={travelMode === 'hotel'} onChange={v => setTravelMode(v ? 'hotel' : 'off')} label="✈️ Отель / дорога" desc="только свой вес, объём ×0.9, верх ограничен" />
@@ -1229,6 +1270,8 @@ export const CombatConstructor: React.FC = () => {
           setCompetitionDate={setCompetitionDate}
           competitionWeight={competitionWeight}
           setCompetitionWeight={setCompetitionWeight}
+          competitionPriority={competitionPriority}
+          setCompetitionPriority={setCompetitionPriority}
           startDate={startDate}
           outside={outside}
           outsideMetrics={outsideMetrics}
@@ -1359,21 +1402,21 @@ export const CombatConstructor: React.FC = () => {
           )}
           {plan && (
             <SectionCard icon="📤" title="Экспорт и шаринг" subtitle="Печать · CSV · ICS · в программу">
-              {isPlanBlocked(plan) && (
+              {isCombatPlanBlocked(plan) && (
                 <div className="cb-export-blocked" style={{ fontSize: 11, color: '#fff', background: 'rgba(239,68,68,0.08)', padding: '8px 10px', borderRadius: 10, border: '0.5px solid rgba(239,68,68,0.24)' }}>⛔ Экспорт заблокирован — сначала исправьте ошибки на шаге «План»</div>
               )}
               <GroupHeading icon="⎙" text="Копировать и печать" desc="Быстрый обмен" />
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 8 }}>
-                <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); doMsg('Скопировано'); }} style={{ ...BTN, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>⎙ Копировать</button>
-                <button onClick={() => { const html = buildCombatPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); doMsg('HTML скопирован'); } }} style={{ ...BTN, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>🖨 Печать</button>
-                <button onClick={exportToUserProgram} style={{ ...BTN_PRIMARY, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>✦ В программу</button>
+                <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); doMsg('Скопировано'); }} style={{ ...BTN, ...(isCombatPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isCombatPlanBlocked(plan)} title={isCombatPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>⎙ Копировать</button>
+                <button onClick={() => { const html = buildCombatPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); doMsg('HTML скопирован'); } }} style={{ ...BTN, ...(isCombatPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isCombatPlanBlocked(plan)} title={isCombatPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>🖨 Печать</button>
+                <button onClick={exportToUserProgram} style={{ ...BTN_PRIMARY, ...(isCombatPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isCombatPlanBlocked(plan)} title={isCombatPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>✦ В программу</button>
               </div>
               <Divider />
               <GroupHeading icon="📊" text="Файлы" desc="CSV для Excel · ICS для календаря" />
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 8 }}>
-                <button onClick={() => { downloadCombatCsv(plan); doMsg('CSV скачан'); }} style={{ ...BTN, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>📊 CSV</button>
-                <button onClick={() => { downloadCombatXlsx(plan); doMsg('XLS скачан'); }} style={{ ...BTN, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>📗 XLSX</button>
-                <button onClick={() => { const ics = buildCombatPlanIcs(plan, startDate || null); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `combat-plan-${plan.discipline}-${plan.weeks}w.ics`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); doMsg('ICS скачан'); }} style={{ ...BTN, ...(isPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isPlanBlocked(plan)} title={isPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>📅 План .ics</button>
+                <button onClick={() => { downloadCombatCsv(plan); doMsg('CSV скачан'); }} style={{ ...BTN, ...(isCombatPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isCombatPlanBlocked(plan)} title={isCombatPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>📊 CSV</button>
+                <button onClick={() => { downloadCombatXlsx(plan); doMsg('XLS скачан'); }} style={{ ...BTN, ...(isCombatPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isCombatPlanBlocked(plan)} title={isCombatPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>📗 XLSX</button>
+                <button onClick={() => { const ics = buildCombatPlanIcs(plan, startDate || null); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `combat-plan-${plan.discipline}-${plan.weeks}w.ics`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); doMsg('ICS скачан'); }} style={{ ...BTN, ...(isCombatPlanBlocked(plan) ? { opacity: 0.4 } : {}) }} disabled={isCombatPlanBlocked(plan)} title={isCombatPlanBlocked(plan) ? 'Сначала исправьте ошибки' : undefined}>📅 План .ics</button>
               </div>
               <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight>Экспорт</Highlight> — библиотека программ · печать · ICS · CSV</div>
             </SectionCard>

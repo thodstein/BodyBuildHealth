@@ -55,6 +55,20 @@ describe('Мост combat_cycle → CombatConstructor', () => {
     clearPlannerApply();
   });
 
+  it('weakpoints: neckLevel и сторона реально меняют состояние (не только флеш)', () => {
+    const { container } = render(<CombatConstructor />);
+    act(() => {
+      applyToPlanner({
+        kind: 'weakpoints', label: 'diag',
+        data: { combatNeckLevel: 3, combatAsymmetry: 'right' },
+      });
+    });
+    expect(container.querySelector('.cb-msg')?.textContent).toContain('Из диагностики');
+    expect(container.querySelector('.cb-msg')?.textContent).toContain('уровень шеи');
+    expect(container.querySelector('.cb-msg')?.textContent).toContain('правая');
+    clearPlannerApply();
+  });
+
   it('payload-тип combat_cycle: только cycleId', () => {
     seedBridge('combat_cycle', { cycleId: 'cb-box-base-8' });
     const saved = JSON.parse(localStorage.getItem('he_planner_apply') || 'null');

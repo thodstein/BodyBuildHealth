@@ -3,7 +3,9 @@
  * 3 системы: alactic (ATP-PCr 5-10с/50с), lactic (30с-3мин/пауза 1:1), aerobic (Zone2 30-45′).
  * Источники: Vitruve Off/Pre/Camp, Phil Daru Block, ISSN.
  * Изолировано.
+ * Факторы тапера/делода — из combat-taper.engine (TAPER_COND/TAPER_DELOAD), дубли запрещены.
  */
+import { TAPER_COND, TAPER_DELOAD } from './combat-taper.engine';
 export type ConditioningModality = 'alactic' | 'lactic' | 'aerobic' | 'mixed' | 'off';
 export type ConditioningPhase = 'accumulation' | 'transmutation' | 'realization' | 'gpp' | 'power' | 'taper' | 'deload' | 'conjugate';
 
@@ -168,9 +170,9 @@ export function conditioningSessionsForWeek(
       }
     }
   }
-  // deload — сокращаем
-  if (phase === 'deload') return out.map(s => ({ ...s, durationMin: Math.round(s.durationMin * 0.6), intervals: s.intervals + ' (делод ×0.6)' }));
-  if (phase === 'realization' || phase === 'taper') return out.filter(s => s.modality === 'aerobic').map(s => ({ ...s, durationMin: Math.round(s.durationMin * 0.7) }));
+  // deload — сокращаем (фактор из единого источника combat-taper.engine)
+  if (phase === 'deload') return out.map(s => ({ ...s, durationMin: Math.round(s.durationMin * TAPER_DELOAD), intervals: s.intervals + ' (делод ×0.6)' }));
+  if (phase === 'realization' || phase === 'taper') return out.filter(s => s.modality === 'aerobic').map(s => ({ ...s, durationMin: Math.round(s.durationMin * TAPER_COND) }));
   return out;
 }
 
