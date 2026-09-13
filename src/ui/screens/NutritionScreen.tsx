@@ -1308,6 +1308,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
     }
   };
   const [nutritionSection, setNutritionSection] = useState<NutritionSection>('all');
+  const [navOpen, setNavOpen] = useState(false);
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
 
@@ -1598,58 +1599,78 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           {nutritionSection === 'diary' ? 'Дневник' : nutritionSection === 'ration' ? 'Рацион' : nutritionSection === 'kitchen' ? 'Кухня' : nutritionSection === 'analysis' ? 'Анализ' : 'Всё'}
         </span>
         </div>
-        {/* Переключатель разделов: внутри ленты было не выйти из hero-секции */}
-        <div className="nutrition-sections" style={{
-          display:'flex', gap:6, overflowX:'auto', padding:'6px 0',
-          scrollbarWidth:'none', flexShrink:0,
+        {/* Компакт-навигация: одна строка + ☰-меню сбоку (было 3 ряда лент — съедали ~150px экрана телефона) */}
+        <div className="nutrition-nav-compact" style={{
+          display:'flex', alignItems:'center', gap:8, padding:'6px 12px',
+          flexShrink:0, background:'#18181b',
+          borderTop:'1px solid rgba(255,255,255,0.06)',
         }}>
-          {([
-            { id: 'all' as NutritionSection, label: 'Все' },
-            { id: 'diary' as NutritionSection, label: 'Дневник' },
-            { id: 'ration' as NutritionSection, label: 'Рацион' },
-            { id: 'kitchen' as NutritionSection, label: 'Кухня' },
-            { id: 'analysis' as NutritionSection, label: 'Анализ' },
-            { id: 'overview' as NutritionSection, label: 'Обзор' },
-          ]).map(s => (
-            <button key={s.id} onClick={() => setNutritionSection(s.id)} className="nutrition-section" data-active={nutritionSection === s.id} aria-pressed={nutritionSection === s.id} style={{
-              flexShrink:0, padding:'10px 14px', borderRadius:999, cursor:'pointer', minHeight:44,
-              fontSize:12, fontWeight: nutritionSection === s.id ? 800 : 600,
-              border: nutritionSection === s.id ? '1px solid var(--nut-accent, #00e68a)' : '1px solid rgba(255,255,255,0.08)',
-              background: nutritionSection === s.id ? 'rgba(var(--nut-accent-rgb, 0,230,138),0.14)' : 'transparent',
-              color: nutritionSection === s.id ? 'var(--nut-accent, #00e68a)' : '#fff',
-              whiteSpace:'nowrap',
-            }}>{s.label}</button>
-          ))}
+          <button onClick={() => setNavOpen(v => !v)} aria-label="Меню питания" aria-expanded={navOpen} style={{
+            width:44, height:44, borderRadius:12, cursor:'pointer', fontSize:20, flexShrink:0,
+            background: navOpen ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+            border: navOpen ? 'none' : '1px solid rgba(255,255,255,0.08)',
+            color: navOpen ? '#000' : '#fff', display:'flex', alignItems:'center', justifyContent:'center',
+          }}>☰</button>
+          <div style={{ flex:1, minWidth:0, fontSize:13, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+            {TAB_LABELS[tab] || tab}
+          </div>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)', flexShrink:0 }}>
+            {nutritionSection === 'diary' ? 'Дневник' : nutritionSection === 'ration' ? 'Рацион' : nutritionSection === 'kitchen' ? 'Кухня' : nutritionSection === 'analysis' ? 'Анализ' : 'Всё'}
+          </span>
         </div>
-        <div className="nutrition-chips nutrition-chips-head" style={{
-          display:'flex', gap:6, flexWrap:'wrap', overflowX:'visible', overflowY:'visible',
-          padding:'8px 12px 8px', margin:0,
-          scrollbarWidth:'none', msOverflowStyle:'none',
-          WebkitOverflowScrolling:'touch', flexShrink:0,
-          background:'#18181b', borderTop:'1px solid rgba(255,255,255,0.06)',
-        }}>
-          {(SECTION_TABS[nutritionSection] || SECTION_TABS.all).map(t => {
-            const isActive = tab === t;
-            return (
-              <button key={t} onClick={() => setTab(t as ActiveTab)} className="nutrition-chip" data-active={isActive} style={{
-                flexShrink:0, padding:'8px 12px', borderRadius:12, cursor:'pointer',
-                fontSize:12, fontWeight: isActive ? 800 : 600, letterSpacing:-0.2,
-                border: isActive ? '1.5px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
-                background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-                color: isActive ? '#000' : '#fff',
-                transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
-                boxShadow: isActive ? '0 4px 16px rgba(0,230,138,0.25), 0 1px 0 rgba(255,255,255,0.1) inset' : '0 2px 8px rgba(0,0,0,0.12)',
-                minHeight:44, display:'inline-flex', alignItems:'center', gap:6,
-                transform: isActive ? 'translateY(-1px)' : 'none',
-              }}>
-                {TAB_LABELS[t] || t}
-                {t === 'cart' && cartCount > 0 && (
-                  <span style={{ marginLeft:2, background: isActive ? 'rgba(0,0,0,0.12)' : 'rgba(0,230,138,0.12)', borderRadius:999, padding:'2px 7px', fontSize:10, fontWeight:800, color: isActive ? '#000' : '#00e68a', border: isActive ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(0,230,138,0.18)' }}>{cartCount}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        {navOpen && (
+          <div role="dialog" aria-label="Меню питания" style={{ position:'fixed', inset:0, zIndex:1000 }} onClick={e => { if (e.target === e.currentTarget) setNavOpen(false); }}>
+            <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.6)' }} onClick={() => setNavOpen(false)} />
+            <div className="nutrition-nav-drawer" style={{
+              position:'absolute', top:0, bottom:0, left:0, width:'min(84vw,320px)',
+              background:'#18181b', borderRight:'1px solid rgba(255,255,255,0.08)',
+              boxShadow:'8px 0 32px rgba(0,0,0,0.5)', overflowY:'auto',
+              padding:'12px 12px calc(16px + max(env(safe-area-inset-bottom,0px),0px))',
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                <div style={{ flex:1, fontSize:14, fontWeight:800, color:'#fff' }}>Питание</div>
+                <button onClick={() => setNavOpen(false)} aria-label="Закрыть меню" style={{ width:44, height:44, borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:16 }}>✕</button>
+              </div>
+              {([
+                { id: 'diary' as NutritionSection, label: 'Дневник' },
+                { id: 'ration' as NutritionSection, label: 'Рацион' },
+                { id: 'kitchen' as NutritionSection, label: 'Кухня' },
+                { id: 'analysis' as NutritionSection, label: 'Анализ' },
+                { id: 'overview' as NutritionSection, label: 'Обзор' },
+                { id: 'all' as NutritionSection, label: 'Все' },
+              ]).map(s => (
+                <div key={s.id} style={{ marginBottom:10 }}>
+                  <button onClick={() => { setNutritionSection(s.id); const first = (SECTION_TABS[s.id] || [])[0]; if (first) setTab(first as ActiveTab); }} className="nutrition-section" data-active={nutritionSection === s.id} aria-pressed={nutritionSection === s.id} style={{
+                    width:'100%', padding:'10px 12px', borderRadius:10, cursor:'pointer', minHeight:44, textAlign:'left',
+                    fontSize:12, fontWeight:800,
+                    border: nutritionSection === s.id ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                    background: nutritionSection === s.id ? 'rgba(0,230,138,0.12)' : 'transparent',
+                    color: nutritionSection === s.id ? '#00e68a' : '#fff',
+                  }}>{s.label}</button>
+                  <div className="nutrition-chips" style={{ display:'flex', flexDirection:'column', gap:4, marginTop:4 }}>
+                    {(SECTION_TABS[s.id] || []).map(t => {
+                      const isActive = tab === t;
+                      return (
+                        <button key={t} onClick={() => { setTab(t as ActiveTab); setNutritionSection(s.id); setNavOpen(false); }} className="nutrition-chip" data-active={isActive} style={{
+                          width:'100%', padding:'10px 12px', borderRadius:10, cursor:'pointer', minHeight:44, textAlign:'left',
+                          fontSize:12, fontWeight: isActive ? 800 : 600,
+                          border: isActive ? '1.5px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
+                          background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                          color: isActive ? '#000' : '#fff',
+                        }}>
+                          {TAB_LABELS[t] || t}
+                          {t === 'cart' && cartCount > 0 && (
+                            <span style={{ marginLeft:6, background: isActive ? 'rgba(0,0,0,0.12)' : 'rgba(0,230,138,0.12)', borderRadius:999, padding:'2px 7px', fontSize:10, fontWeight:800, color: isActive ? '#000' : '#00e68a' }}>{cartCount}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       {isNativeApp() && scanOpen && (
         <BarcodeScanner onProductFound={(p) => onScanProduct(p)} onClose={() => setScanOpen(false)} />
@@ -1686,7 +1707,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         );
       })()}
 
-      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px var(--tabbar-clear,140px)' }}>
+      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'8px 8px calc(var(--tabbar-clear,140px) + max(env(safe-area-inset-bottom,0px),0px))' }}>
         <NutritionPlanScope profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis}>
         <div style={{ animation:'fadeSlideIn 0.3s ease' }}>
           {renderContent()}

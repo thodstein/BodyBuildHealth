@@ -58,6 +58,11 @@ describe('NutritionScreen native hero', () => {
     expect(container.querySelectorAll('.nutrition-hero-card').length).toBe(4);
   });
 
+  const openNav = (container: HTMLElement): void => {
+    const burger = container.querySelector('[aria-label="Меню питания"]') as HTMLElement | null;
+    if (burger) fireEvent.click(burger);
+  };
+
   it('3. навигация hero → вкладки → назад работает на native', async () => {
     setCapacitorNative();
     await resetPlatform();
@@ -67,6 +72,9 @@ describe('NutritionScreen native hero', () => {
     ) as HTMLElement;
     expect(diary).not.toBeNull();
     fireEvent.click(diary);
+    // Бургер-навигация: чипы живут в ☰-меню сбоку (одна строка вместо 3 рядов).
+    expect(container.querySelector('.nutrition-nav-compact')).not.toBeNull();
+    openNav(container);
     expect(container.querySelector('.nutrition-chips')).not.toBeNull();
     const back = container.querySelector(
       '.nutrition-tabs-head button',
@@ -82,6 +90,8 @@ describe('NutritionScreen native hero', () => {
       '.nutrition-hero-card[data-section="ration"]',
     ) as HTMLElement;
     fireEvent.click(ration);
+    expect(container.querySelector('.nutrition-nav-compact')).not.toBeNull();
+    openNav(container);
     expect(container.querySelector('.nutrition-chips')).not.toBeNull();
   });
 
@@ -93,6 +103,7 @@ describe('NutritionScreen native hero', () => {
         '.nutrition-hero-card[data-section="diary"]',
       ) as HTMLElement,
     );
+    openNav(container);
     const chips = Array.from(container.querySelectorAll('.nutrition-chip'));
     const charts = chips.find((c) => c.textContent?.includes('Графики')) as HTMLElement;
     expect(charts).not.toBeNull();
@@ -142,13 +153,14 @@ describe('NutritionScreen native hero', () => {
     fireEvent.click(
       container.querySelector('.nutrition-hero-card[data-section="diary"]') as HTMLElement,
     );
+    openNav(container);
     const sections = container.querySelectorAll('.nutrition-section');
     expect(sections.length).toBe(6);
     const ration = Array.from(sections).find((s) => s.textContent === 'Рацион') as HTMLElement;
     fireEvent.click(ration);
     expect(ration.dataset.active).toBe('true');
+    // Бургер-меню показывает все группы разом — План и Тапер обязаны быть в группе Рациона.
     const chips = Array.from(container.querySelectorAll('.nutrition-chip'));
-    expect(chips.length).toBe(4);
     expect(chips.some((c) => c.textContent?.includes('План'))).toBe(true);
     expect(chips.some((c) => c.textContent?.includes('Тапер'))).toBe(true);
   });
@@ -159,6 +171,7 @@ describe('NutritionScreen native hero', () => {
     fireEvent.click(
       container.querySelector('.nutrition-hero-card[data-section="ration"]') as HTMLElement,
     );
+    openNav(container);
     expect(container.querySelectorAll('.nutrition-section').length).toBe(6);
   });
 
@@ -168,12 +181,16 @@ describe('NutritionScreen native hero', () => {
     fireEvent.click(
       container.querySelector('.nutrition-hero-card[data-section="analysis"]') as HTMLElement,
     );
+    openNav(container);
     const chips = Array.from(container.querySelectorAll('.nutrition-chip'));
-    expect(chips.length).toBe(6);
-    const report = chips.find((c) => c.textContent?.includes('Отчёт')) as HTMLElement;
+    expect(chips.some((c) => c.textContent?.includes('Отчёт'))).toBe(true);
+    // В меню есть и «Отчёты» (дневник) — берём точный «📊 Отчёт» (топ-таб анализа).
+    const report = chips.find((c) => (c.textContent || '').trim() === '📊 Отчёт') as HTMLElement;
     fireEvent.click(report);
     expect(document.body.textContent).toMatch(/Сгенерировать отчёт/);
-    const load = chips.find((c) => c.textContent?.includes('Нагрузка')) as HTMLElement;
+    openNav(container);
+    const chips2 = Array.from(container.querySelectorAll('.nutrition-chip'));
+    const load = chips2.find((c) => c.textContent?.includes('Нагрузка')) as HTMLElement;
     fireEvent.click(load);
     expect(document.body.textContent).toMatch(/Нагрузка БЖУ на органы/);
   });
@@ -184,6 +201,7 @@ describe('NutritionScreen native hero', () => {
     fireEvent.click(
       container.querySelector('.nutrition-hero-card[data-section="ration"]') as HTMLElement,
     );
+    openNav(container);
     const chips = Array.from(container.querySelectorAll('.nutrition-chip'));
     const peak = chips.find((c) => c.textContent?.includes('Тапер')) as HTMLElement;
     fireEvent.click(peak);

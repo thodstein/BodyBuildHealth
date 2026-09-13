@@ -135,6 +135,47 @@ export function writeWeightMode(mode: WeightMode): void {
 }
 
 /**
+ * Отображаемое имя продукта без технической пометки меры.
+ * Проблема: FOOD_DB держит меру в имени («Овсяные хлопья (сухие)»),
+ * поэтому в режиме «как на тарелке (гот.)» пользователь видел в скобках
+ * «(сухой)» и думал что режим не применился — хотя граммы уже
+ * пересчитаны в displayAmount. Бейдж «гот./сух.» рядом с весом и так
+ * однозначно помечает меру, дубль в имени только шумит.
+ * В режиме cooked режем dry-маркеры, в режиме raw — cooked-маркеры.
+ */
+export function displayFoodName(foodId: string, fallbackName: string, mode: WeightMode): string {
+  const base = (() => {
+    try {
+      const f: any = FOOD_DB.find(x => x.id === foodId);
+      return String(f?.name || fallbackName || '');
+    } catch {
+      return String(fallbackName || '');
+    }
+  })();
+  if (!base) return String(fallbackName || '');
+  try {
+    if (mode === 'cooked') {
+      // «(сухие)», «(сухой)», «(сухая)», «(dry)», хвост «сух.» — только в скобках/хвосте,
+      // «сухофрукты» и прочие корни внутри слов не трогаем (требуем границу/скобку).
+      const cleaned = base
+        .replace(/\s*\([^)]*сух[^)]*\)/gi, '')
+        .replace(/\s*\(dry\)/gi, '')
+        .replace(/\s+сух\.\s*$/i, '')
+        .trim();
+      return cleaned || base;
+    }
+    // raw: симметрично режем пометки готового (в именах редки, но пусть честно).
+    const cleaned = base
+      .replace(/\s*\([^)]*гот[^)]*\)/gi, '')
+      .replace(/\s*\(cooked\)/gi, '')
+      .trim();
+    return cleaned || base;
+  } catch {
+    return base;
+  }
+}
+
+/**
  * Линт рецепта: ДВЕ КРУПЯНЫЕ ОСНОВЫ в разных мерах в одном блюде (напр. рис 150 гот. +
  * гречка 80 сух.) — пользователь не поймёт, что взвешивать сухим, а что готовым.
  * Мелкая сухая панировка/связка (<50 г: oats_dry 20 в фарш) — не нарушение: это не

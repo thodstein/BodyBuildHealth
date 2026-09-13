@@ -105,9 +105,14 @@ describe('labs/risk deep nav', () => {
         '.nutrition-hero-card[data-section="ration"]',
       ) as HTMLElement,
     );
+    // Бургер-меню: чипы открываются по ☰ — жмём именно «План», первый чип теперь Дневник.
     fireEvent.click(
-      container.querySelector('.nutrition-chip') as HTMLElement,
+      container.querySelector('[aria-label="Меню питания"]') as HTMLElement,
     );
+    const planChip = Array.from(container.querySelectorAll('.nutrition-chip')).find((c) =>
+      c.textContent?.includes('План'),
+    ) as HTMLElement;
+    fireEvent.click(planChip);
     expect(container.querySelector('.plan-tabbar')).not.toBeNull();
     expect(
       container.querySelectorAll('.plan-tab').length,
