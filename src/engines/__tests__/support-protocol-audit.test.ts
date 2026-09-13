@@ -353,6 +353,17 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
   it('женщины: финастерид/дутастерид запрещены', () => {
     expect(P('supportProtocolWomen.tsx')).toContain('Финастерид / дутастерид');
   });
+  it('эпик тегов: легенда квалифицирует омегу/RYR + теги в карточках', () => {
+    expect(EVIDENCE_LEGEND).toContain('только ↓ТГ');
+    expect(EVIDENCE_LEGEND).toContain('красный рис');
+    expect(EVIDENCE_LEGEND).toContain('Теги [A]/[B]/[C]');
+    expect(P('supportProtocolCardio.tsx')).toContain('[A]');
+    expect(P('supportProtocolCardio.tsx')).toContain('[B — только ТГ]');
+    expect(P('supportProtocolCardio.tsx')).toContain('[C — нет CV-пользы]');
+    expect(P('supportProtocolPostCycle.tsx')).toContain('[B]');
+    expect(P('supportProtocolPostCycle.tsx')).toContain('[C]');
+    expect(P('supportProtocolWomen.tsx')).toContain('[A — вирилизация');
+  });
   it('glp1: запрет off-label «на массу»', () => {
     expect(P('supportProtocolGLP1.tsx')).toContain('чтобы есть больше на массе');
   });
