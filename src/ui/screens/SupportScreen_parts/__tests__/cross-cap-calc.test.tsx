@@ -16,7 +16,7 @@ describe('cross-cap-calc: рендер и гейты', () => {
     for (const c of CROSS_CAPS) {
       expect(container.querySelector(`[data-capcalc="${c.key}"]`)).not.toBeNull();
     }
-    expect(CROSS_CAPS.map((c) => c.cap)).toEqual([4000, 800, 80, 50, 4000]);
+    expect(CROSS_CAPS.map((c) => c.cap)).toEqual([4000, 800, 80, 50, 4000, 600]);
   });
   it('превышение NAC подсвечивается', () => {
     const { container, getByLabelText, getByText } = render(<CrossCapCalculator />);
@@ -31,5 +31,12 @@ describe('cross-cap-calc: рендер и гейты', () => {
     expect(queryByText(/ПРЕВЫШЕНИЕ/)).toBeNull();
     fireEvent.change(getByLabelText(/Телмисартан/), { target: { value: '90' } });
     expect(queryByText(/ПРЕВЫШЕНИЕ: 90 \/ 80/)).not.toBeNull();
+  });
+  it('ашаваганда: кап 600 ловится', () => {
+    const { getByLabelText, queryByText } = render(<CrossCapCalculator />);
+    fireEvent.change(getByLabelText(/Ашваганда/), { target: { value: '600' } });
+    expect(queryByText(/ПРЕВЫШЕНИЕ/)).toBeNull();
+    fireEvent.change(getByLabelText(/Ашваганда/), { target: { value: '700' } });
+    expect(queryByText(/ПРЕВЫШЕНИЕ: 700 \/ 600/)).not.toBeNull();
   });
 });

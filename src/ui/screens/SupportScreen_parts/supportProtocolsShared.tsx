@@ -195,11 +195,12 @@ export const CROSS_CAPS: Array<{ key: string; label: string; cap: number; unit: 
   { key: 'telmi', label: 'Телмисартан (все модули)', cap: 80, unit: 'мг/сут', step: 10 },
   { key: 'zn', label: 'Цинк (сумма всех модулей)', cap: 50, unit: 'мг/сут', step: 5 },
   { key: 'd3', label: 'Витамин D3 (хронически)', cap: 4000, unit: 'МЕ/сут', step: 500 },
+  { key: 'ashwa', label: 'Ашваганда (сумма всех модулей)', cap: 600, unit: 'мг/сут', step: 100 },
 ];
 
 /** Живой калькулятор кросс-капов: впишите СУММАРНЫЕ сутки из всех протоколов — покажет превышения. */
 export const CrossCapCalculator: React.FC = () => {
-  const [vals, setVals] = React.useState<Record<string, number>>({ nac: 0, mg: 0, telmi: 0, zn: 0, d3: 0 });
+  const [vals, setVals] = React.useState<Record<string, number>>({ nac: 0, mg: 0, telmi: 0, zn: 0, d3: 0, ashwa: 0 });
   const over = CROSS_CAPS.filter((c) => (vals[c.key] || 0) > c.cap);
   return (
     <div data-capcalc="root" style={{ borderRadius: 14, padding: '12px 14px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)' }}>

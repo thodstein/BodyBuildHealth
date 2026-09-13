@@ -347,6 +347,12 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
   it('постцикл: HCT — доза первее донации', () => {
     expect(P('supportProtocolPostCycle.tsx')).toContain('ни донация, ни аспирин');
   });
+  it('постцикл: кабергейт со ссылкой на Пролактин', () => {
+    expect(P('supportProtocolPostCycle.tsx')).toContain('строго по протоколу «Пролактин»');
+  });
+  it('женщины: финастерид/дутастерид запрещены', () => {
+    expect(P('supportProtocolWomen.tsx')).toContain('Финастерид / дутастерид');
+  });
   it('glp1: запрет off-label «на массу»', () => {
     expect(P('supportProtocolGLP1.tsx')).toContain('чтобы есть больше на массе');
   });
