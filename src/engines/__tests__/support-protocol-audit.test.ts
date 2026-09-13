@@ -357,6 +357,11 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
     expect(P('supportProtocolAdaptogen.tsx')).toContain('[B]');
     expect(P('supportProtocolDetox.tsx')).toContain('[C]');
   });
+  it('эпик тегов волна-5: липидные строки постцикла/метаболика/гемато', () => {
+    expect(P('supportProtocolPostCycle.tsx')).toContain('[A]');
+    expect(P('supportProtocolMetabolic.tsx')).toContain('[B — только липиды]');
+    expect(P('supportProtocolHemato.tsx')).toContain('[B — только липиды/реология]');
+  });
   it('эпик тегов волна-4: CYP3A4 на всех строках берберина + глюкарат', () => {
     const cyp = (f: string) => P(f).split('CYP3A4').length - 1;
     expect(cyp('supportProtocolHepatic.tsx')).toBeGreaterThanOrEqual(2);
