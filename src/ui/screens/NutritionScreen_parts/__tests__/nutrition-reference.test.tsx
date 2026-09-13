@@ -98,6 +98,12 @@ describe('nutrition-reference data P0', () => {
       expect(row!.source, key).toBeDefined();
     }
   });
+  it('инсулин-карточки: все с источниками (ADA/гайдлайны)', () => {
+    expect(INSULIN_GUIDE.length).toBeGreaterThanOrEqual(10);
+    for (const r of INSULIN_GUIDE) {
+      expect(r.source, r.title).toBeDefined();
+    }
+  });
   it('новые таблицы непустые', () => {
     expect(RDA_ROWS.length).toBeGreaterThanOrEqual(10);
     expect(GI_ROWS.length).toBeGreaterThanOrEqual(5);
