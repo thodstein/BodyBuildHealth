@@ -100,6 +100,34 @@ describe('C календарь (3)', () => {
     const css = fs.readFileSync('src/styles-native.css', 'utf-8');
     expect(css).toContain('data-widget="session-dock"');
   });
+  it('встройка: ExecutionZone runtime несет док (lock против silent-drop)', async () => {
+    const { render } = await import('@testing-library/react');
+    const { ExecutionZone } = await import('../ExecutionZone');
+    const noop = () => {};
+    const Wrapper: React.FC = () => {
+      const [d, setD] = React.useState(0);
+      const [e, setE] = React.useState(0);
+      const [l, setL] = React.useState<Record<string, any>>({});
+      const [s, setS] = React.useState(false);
+      const [o, setO] = React.useState(false);
+      const [w, setW] = React.useState(0);
+      const [r, setR] = React.useState(0);
+      const [rp, setRp] = React.useState(0);
+      const [ri, setRi] = React.useState(0);
+      return (
+        <ExecutionZone tab="runtime" goal="" level="" recovery={0} trainingOutput={null} macrocycle={null}
+          selectedWeek={1} currentMicrocycle={null} runtimeDay={d} setRuntimeDay={setD}
+          runtimeExIdx={e} setRuntimeExIdx={setE} runtimeLogs={l} setRuntimeLogs={setL}
+          runtimeStarted={s} setRuntimeStarted={setS} plRuntime={null} plRunOpen={o} setPlRunOpen={setO}
+          runtimeSetW={w} setRuntimeSetW={setW} runtimeSetR={r} setRuntimeSetR={setR}
+          runtimeSetRP={rp} setRuntimeSetRP={setRp} runtimeSetRI={ri} setRuntimeSetRI={setRi}
+          diary={{} as any} onRefresh={noop} />
+      );
+    };
+    const { container, unmount } = render(<Wrapper />);
+    expect(container.querySelector('[data-widget="session-dock"]')).not.toBeNull();
+    unmount();
+  });
   it('все три календаря рендерятся + панель', () => {
     expect(renderToStaticMarkup(<ScheduleDayStrip />)).toContain('data-cal="daystrip"');
     expect(renderToStaticMarkup(<ScheduleWeekMatrix />)).toContain('data-cal="weekmatrix"');
