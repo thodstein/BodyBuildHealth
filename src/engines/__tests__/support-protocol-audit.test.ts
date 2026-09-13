@@ -372,6 +372,12 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
       'supportProtocolJoints.tsx',
       'supportProtocolMito.tsx',
       'supportProtocolPostCycle.tsx',
+      'supportProtocolProlactin.tsx',
+      'supportProtocolAcne.tsx',
+      'supportProtocolAdaptogen.tsx',
+      'supportProtocolGLP1.tsx',
+      'supportProtocolElectrolytes.tsx',
+      'supportProtocolSteatosis.tsx',
     ]) {
       const t = P(f);
       expect(t.includes('[A]') || t.includes('[B]') || t.includes('[C]')).toBe(true);
