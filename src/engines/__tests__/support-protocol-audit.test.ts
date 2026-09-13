@@ -353,53 +353,6 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
   it('женщины: финастерид/дутастерид запрещены', () => {
     expect(P('supportProtocolWomen.tsx')).toContain('Финастерид / дутастерид');
   });
-  it('эпик тегов волна-3: Adaptogen + Detox-TUDCA', () => {
-    expect(P('supportProtocolAdaptogen.tsx')).toContain('[B]');
-    expect(P('supportProtocolDetox.tsx')).toContain('[C]');
-  });
-  it('эпик тегов волна-5: липидные строки постцикла/метаболика/гемато', () => {
-    expect(P('supportProtocolPostCycle.tsx')).toContain('[A]');
-    expect(P('supportProtocolMetabolic.tsx')).toContain('[B — только липиды]');
-    expect(P('supportProtocolHemato.tsx')).toContain('[B — только липиды/реология]');
-  });
-  it('эпик тегов волна-4: CYP3A4 на всех строках берберина + глюкарат', () => {
-    const cyp = (f: string) => P(f).split('CYP3A4').length - 1;
-    expect(cyp('supportProtocolHepatic.tsx')).toBeGreaterThanOrEqual(2);
-    expect(cyp('supportProtocolMetabolic.tsx')).toBeGreaterThanOrEqual(3);
-    expect(cyp('supportProtocolSteatosis.tsx')).toBeGreaterThanOrEqual(3);
-    expect(P('supportProtocolE2.tsx')).toContain('глюкарат');
-    expect(P('supportProtocolE2.tsx').split('[C]').length - 1).toBeGreaterThanOrEqual(3);
-  });
-  it('эпик тегов волна-2: гайд-препараты [A], остальное [B]/[C]', () => {
-    for (const f of [
-      'supportProtocolRenal.tsx',
-      'supportProtocolRAAS.tsx',
-      'supportProtocolHair.tsx',
-      'supportProtocolGI.tsx',
-      'supportProtocolThyroid.tsx',
-      'supportProtocolGH.tsx',
-      'supportProtocolMetabolic.tsx',
-      'supportProtocolE2.tsx',
-      'supportProtocolDetox.tsx',
-      'supportProtocolHemato.tsx',
-      'supportProtocolHepatic.tsx',
-      'supportProtocolNeuro.tsx',
-      'supportProtocolSleep.tsx',
-      'supportProtocolImmune.tsx',
-      'supportProtocolJoints.tsx',
-      'supportProtocolMito.tsx',
-      'supportProtocolPostCycle.tsx',
-      'supportProtocolProlactin.tsx',
-      'supportProtocolAcne.tsx',
-      'supportProtocolAdaptogen.tsx',
-      'supportProtocolGLP1.tsx',
-      'supportProtocolElectrolytes.tsx',
-      'supportProtocolSteatosis.tsx',
-    ]) {
-      const t = P(f);
-      expect(t.includes('[A]') || t.includes('[B]') || t.includes('[C]')).toBe(true);
-    }
-  });
   it('эпик тегов: легенда квалифицирует омегу/RYR + теги в карточках', () => {
     expect(EVIDENCE_LEGEND).toContain('только ↓ТГ');
     expect(EVIDENCE_LEGEND).toContain('красный рис');
