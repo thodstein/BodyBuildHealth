@@ -357,6 +357,14 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
     expect(P('supportProtocolAdaptogen.tsx')).toContain('[B]');
     expect(P('supportProtocolDetox.tsx')).toContain('[C]');
   });
+  it('эпик тегов волна-4: CYP3A4 на всех строках берберина + глюкарат', () => {
+    const cyp = (f: string) => P(f).split('CYP3A4').length - 1;
+    expect(cyp('supportProtocolHepatic.tsx')).toBeGreaterThanOrEqual(2);
+    expect(cyp('supportProtocolMetabolic.tsx')).toBeGreaterThanOrEqual(3);
+    expect(cyp('supportProtocolSteatosis.tsx')).toBeGreaterThanOrEqual(3);
+    expect(P('supportProtocolE2.tsx')).toContain('глюкарат');
+    expect(P('supportProtocolE2.tsx').split('[C]').length - 1).toBeGreaterThanOrEqual(3);
+  });
   it('эпик тегов волна-2: гайд-препараты [A], остальное [B]/[C]', () => {
     for (const f of [
       'supportProtocolRenal.tsx',
