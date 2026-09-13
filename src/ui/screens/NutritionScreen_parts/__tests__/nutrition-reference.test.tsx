@@ -11,6 +11,7 @@ import {
   INSULIN_DISCLAIMER,
   RECOMMENDED_FOODS,
   FOOD_SYNERGIES,
+  RESTRICTED,
   RDA_ROWS,
   GI_ROWS,
   DIAAS_TIERS,
@@ -87,6 +88,14 @@ describe('nutrition-reference data P0', () => {
     expect(numeric.length).toBeGreaterThan(0);
     for (const s of numeric) {
       expect(s.source, s.pair).toBeDefined();
+    }
+  });
+  it('ограничения с числовыми клеймами имеют источники', () => {
+    const keys = ['Трансжиры', 'Молочные продукты', 'добавленный сахар', 'Глютен', 'Обезжиренные', 'Газированные', 'Копчёности'];
+    for (const key of keys) {
+      const row = RESTRICTED.find(r => r.item.includes(key));
+      expect(row, key).toBeDefined();
+      expect(row!.source, key).toBeDefined();
     }
   });
   it('новые таблицы непустые', () => {

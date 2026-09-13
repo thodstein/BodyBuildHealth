@@ -245,6 +245,7 @@ export const NutritionReference: React.FC = () => {
             <div>
               <span style={{ fontWeight: 600, color: '#ef4444' }}>{w.item}</span>
               <span style={{ color: '#fff', marginLeft: 2 }}>— {w.note}</span>
+              {w.source && <div style={{ fontSize: 9, marginTop: 2 }}>Источник: {w.source}</div>}
             </div>
           </div>
         ))}
