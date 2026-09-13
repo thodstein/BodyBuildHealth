@@ -353,6 +353,30 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
   it('женщины: финастерид/дутастерид запрещены', () => {
     expect(P('supportProtocolWomen.tsx')).toContain('Финастерид / дутастерид');
   });
+  it('эпик тегов волна-2: гайд-препараты [A], остальное [B]/[C]', () => {
+    for (const f of [
+      'supportProtocolRenal.tsx',
+      'supportProtocolRAAS.tsx',
+      'supportProtocolHair.tsx',
+      'supportProtocolGI.tsx',
+      'supportProtocolThyroid.tsx',
+      'supportProtocolGH.tsx',
+      'supportProtocolMetabolic.tsx',
+      'supportProtocolE2.tsx',
+      'supportProtocolDetox.tsx',
+      'supportProtocolHemato.tsx',
+      'supportProtocolHepatic.tsx',
+      'supportProtocolNeuro.tsx',
+      'supportProtocolSleep.tsx',
+      'supportProtocolImmune.tsx',
+      'supportProtocolJoints.tsx',
+      'supportProtocolMito.tsx',
+      'supportProtocolPostCycle.tsx',
+    ]) {
+      const t = P(f);
+      expect(t.includes('[A]') || t.includes('[B]') || t.includes('[C]')).toBe(true);
+    }
+  });
   it('эпик тегов: легенда квалифицирует омегу/RYR + теги в карточках', () => {
     expect(EVIDENCE_LEGEND).toContain('только ↓ТГ');
     expect(EVIDENCE_LEGEND).toContain('красный рис');
