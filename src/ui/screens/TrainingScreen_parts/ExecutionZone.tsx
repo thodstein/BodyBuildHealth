@@ -8,6 +8,7 @@ import type { TrainingOutput, MovementPattern } from '../../../core/types';
 import type { MacrocyclePlan, Microcycle } from '../../../engines/training-periodization.engine';
 import { SessionPlayer, type PlayerDay } from '../SRCBBScreen_parts/SessionPlayer';
 import { TimersTab } from './TimersTab';
+import { SessionWidgetsDock } from './SessionWidgetsDock';
 import { selectSetScheme } from '../../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
 import { getCachedProgressForExercise } from '../../../engines/workout-logger.engine';
@@ -140,6 +141,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
       {tab === 'runtime' && (
         <InfoErrorBoundary label="Тренировка">
         <div className="hub-exec" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Док зала: пульт/таймеры/график уколов-БАД (session-widgets-pack, сворачивается). */}
+          <SessionWidgetsDock />
           {/* Запуск построенного плана ПЛ/ББ — единая сворачиваемая карточка.
               SessionPlayer НЕ размонтируется при сворачивании: прогресс сессии сохраняется. */}
           {plRuntime && plRuntime.days.length > 0 && (
