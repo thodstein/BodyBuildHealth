@@ -166,3 +166,14 @@ export function weightClassLimitValid(
   if (classLimitKg == null || classLimitKg === 0) return true;
   return weightClassesFor(discipline, sex).some(r => r.limitKg === classLimitKg);
 }
+
+/**
+ * №3: пометка свода правил для UI/печати. BJJ: лимиты IBJJF — вес В кимоно
+ * (взвешивание прямо перед схваткой; no-gi легче на ~2–3 кг). Остальным — null.
+ */
+export function weightClassRulesetNote(rulesetOrDiscipline: string | null | undefined): string | null {
+  if (normDisc(rulesetOrDiscipline) === 'bjj') {
+    return 'IBJJF: лимиты — вес в кимоно (взвешивание перед схваткой); закладывайте ~2 кг на ги, no-gi лимиты легче на ~2–3 кг';
+  }
+  return null;
+}

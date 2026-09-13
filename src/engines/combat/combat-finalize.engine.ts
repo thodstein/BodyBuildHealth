@@ -100,12 +100,18 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
     if (hasUpper) {
       const prehab = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['face_pull','band_external_rotation','band_pull_apart','ytw_raise'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
       if (prehab < 3) {
-        warnings.push(`Нед ${wk.week}: prehab <3 сетов (${prehab}) — авто-добавлен face_pull 3×15 для плеча.`);
         const target = wk.sessions.find(s=> s.sessionTag.includes('upper_power')) || wk.sessions.find(s=> s.sessionTag.includes('full_power'));
-        if (target && target.exercises.length < lim.maxExercises && target.exercises.reduce((a,e)=>a+e.sets,0) + 3 <= lim.maxSets) {
-          const prePerEx = Math.min(3, lim.perExerciseCap);
-          target.exercises.push({ id:'face_pull', name:'Тяга к лицу', group:'shoulders', pattern:'isolation', role:'accessory', character:'памп', sets: prePerEx, reps:'12-15', rir:3, weight: 15, workSets: Array.from({length:prePerEx},()=>({reps:13, rir:3, weight:15, tempo:'2-0-1-0', restSeconds:60})), tempo:'2-0-1-0', restSeconds:60, comment:'Prehab: скапула/ротаторы — авто' } as any);
-          target.durationMin = (target.durationMin||0)+6;
+        // №1: face_pull уже в целевой сессии (напр. 2 сета из пула) — второй экземпляр дал бы
+        // дубль key={ex.id} в рендере; не пушим, а честно просим добить вручную
+        if (target && target.exercises.some(e => e.id === 'face_pull')) {
+          warnings.push(`Нед ${wk.week}: prehab <3 сетов (${prehab}), face_pull уже в плане — добейте его до 3×15 вручную (дубль не вставляем).`);
+        } else {
+          warnings.push(`Нед ${wk.week}: prehab <3 сетов (${prehab}) — авто-добавлен face_pull 3×15 для плеча.`);
+          if (target && target.exercises.length < lim.maxExercises && target.exercises.reduce((a,e)=>a+e.sets,0) + 3 <= lim.maxSets) {
+            const prePerEx = Math.min(3, lim.perExerciseCap);
+            target.exercises.push({ id:'face_pull', name:'Тяга к лицу', group:'shoulders', pattern:'isolation', role:'accessory', character:'памп', sets: prePerEx, reps:'12-15', rir:3, weight: 15, workSets: Array.from({length:prePerEx},()=>({reps:13, rir:3, weight:15, tempo:'2-0-1-0', restSeconds:60})), tempo:'2-0-1-0', restSeconds:60, comment:'Prehab: скапула/ротаторы — авто' } as any);
+            target.durationMin = (target.durationMin||0)+6;
+          }
         }
       }
     }

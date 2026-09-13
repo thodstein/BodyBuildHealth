@@ -5,6 +5,7 @@ import {
   weightClassFor,
   weightToClassBoundary,
   weightClassLine,
+  weightClassRulesetNote,
 } from '../combat-weight-class.engine';
 
 /**
@@ -52,6 +53,15 @@ describe('combat weight classes', () => {
     expect(line).toContain('цель 76 кг');
     expect(line).toContain('запас +1.1 кг');
     expect(weightClassLine(80, 2, 77.1, null)).toContain('не хватает 0.9 кг');
+  });
+
+  it('ruleset-пометка: только BJJ (вес в кимоно), остальным — null', () => {
+    expect(weightClassRulesetNote('bjj')).toContain('кимоно');
+    expect(weightClassRulesetNote('BJJ')).toContain('кимоно');
+    expect(weightClassRulesetNote('judo')).toBeNull();
+    expect(weightClassRulesetNote('mma')).toBeNull();
+    expect(weightClassRulesetNote(null)).toBeNull();
+    expect(weightClassRulesetNote('general')).toBeNull();
   });
 });
 

@@ -7,7 +7,6 @@ import {
   concussionProtocol,
   sparringSafetyErrors,
   screenCombatRedFlags,
-  needsCombatMedicalBlock,
   teenNeckIsoFallback,
   TEEN_BANNED_EXERCISES,
 } from '../combat-safety.engine';
@@ -73,7 +72,7 @@ describe('combat-safety engine', () => {
     expect(screenCombatRedFlags({ concussionHistory: 2 }).blocked).toBe(true);
     expect(screenCombatRedFlags({ concussionHistory: 1 }).blocked).toBe(false);
     expect(screenCombatRedFlags({ weightCutKg: 8, bodyweightKg: 80 }).blocked).toBe(true);
-    expect(needsCombatMedicalBlock({ age: 28 })).toBe(false);
+    expect(screenCombatRedFlags({ age: 28 }).flags).toEqual([]);
   });
 });
 

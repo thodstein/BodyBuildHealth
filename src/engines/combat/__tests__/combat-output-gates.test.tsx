@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { buildCombatPlan } from '../combat-builder.engine';
-import { isCombatPlanBlocked } from '../combat-finalize.engine';
+import { finalizeCombatPlan, isCombatPlanBlocked } from '../combat-finalize.engine';
 import { weightClassLimitValid } from '../combat-weight-class.engine';
 import { CombatPlanView } from '../../../ui/screens/combat/CombatPlanView';
 import { buildAnnualATR } from '../combat-annual';
@@ -56,6 +56,23 @@ describe('CombatPlanView errors block', () => {
       const btn = screen.getByRole('button', { name }) as HTMLButtonElement;
       expect(btn.disabled, name).toBe(false);
     }
+  });
+
+  it('prehab-дедуп: имеющийся face_pull не дублируется (key={ex.id})', () => {
+    const plan = buildCombatPlan({ discipline: 'mma', goal: 'power', level: 'intermediate', weeks: 2, daysPerWeek: 3 } as any);
+    const wk = plan.weeksData.find(w => w.sessions.some(s => s.sessionTag.includes('upper_power') || s.sessionTag.includes('full_power')))!;
+    const sess = wk.sessions.find(s => s.sessionTag.includes('upper_power')) || wk.sessions.find(s => s.sessionTag.includes('full_power'))!;
+    sess.exercises = sess.exercises.filter(e => !['face_pull', 'band_external_rotation', 'band_pull_apart', 'ytw_raise'].includes(e.id));
+    sess.exercises.push({ id: 'face_pull', name: 'Тяга к лицу', group: 'shoulders', pattern: 'isolation', role: 'accessory', character: 'памп', sets: 2, reps: '12-15', rir: 3, weight: 15, workSets: [{ reps: 13, rir: 3, weight: 15 }, { reps: 13, rir: 3, weight: 15 }], tempo: '2-0-1-0', restSeconds: 60 } as any);
+    const fin = finalizeCombatPlan(plan);
+    // ключ key={ex.id} уникален в пределах сессии — дублей face_pull нигде нет
+    for (const w of fin.weeksData) {
+      for (const s of w.sessions) {
+        const faces = s.exercises.filter(e => e.id === 'face_pull');
+        expect(faces.length, `нед ${w.week} день ${s.day}`).toBeLessThanOrEqual(1);
+      }
+    }
+    expect(fin.validation.warnings.some(w => w.includes('prehab') && w.includes('вручную'))).toBe(true);
   });
 
   it('isCombatPlanBlocked — канон: errors ↔ true, чисто ↔ false, пусто ↔ false', () => {

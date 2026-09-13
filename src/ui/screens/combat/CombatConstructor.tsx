@@ -20,7 +20,7 @@ import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
-import { weightClassesFor, weightClassLine, weightClassLimitValid } from '../../../engines/combat/combat-weight-class.engine';
+import { weightClassesFor, weightClassLine, weightClassLimitValid, weightClassRulesetNote } from '../../../engines/combat/combat-weight-class.engine';
 import { validateSparringLoad } from '../../../engines/combat/combat-sparring.engine';
 import { screenCombatRedFlags } from '../../../engines/combat/combat-safety.engine';
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
@@ -1028,6 +1028,9 @@ export const CombatConstructor: React.FC = () => {
                   )}
                   {weightClassLimitKg > 30 && weightClassLine(bodyweight, weightCut, weightClassLimitKg, weightClass) && (
                     <InfoBanner tone={bodyweight - weightCut <= weightClassLimitKg ? 'ok' : 'warn'}>{weightClassLine(bodyweight, weightCut, weightClassLimitKg, weightClass)}</InfoBanner>
+                  )}
+                  {weightClassRulesetNote(weightClassRuleset || discipline) && (
+                    <InfoBanner tone="info">{weightClassRulesetNote(weightClassRuleset || discipline)}</InfoBanner>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <CombatPopupSelect label="Вода" value={waterMode} onChange={v=> setWaterMode(v as any)} options={[{id:'stable',label:'Стабильно 35мл/кг'},{id:'load_cut',label:'Load 8л → 2л',desc:'пиковая неделя'}]} />

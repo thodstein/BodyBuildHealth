@@ -186,14 +186,3 @@ export function screenCombatRedFlags(input: {
     : 'Флагов безопасности нет';
   return { flags, blocked, text };
 }
-
-/** Нужен ли мед-блок (для UI красного баннера + гейта сборки). */
-export function needsCombatMedicalBlock(input: {
-  age?: number | null;
-  concussionHistory?: number | null;
-  weightCutKg?: number | null;
-  bodyweightKg?: number | null;
-  manipulation?: boolean;
-}): boolean {
-  return screenCombatRedFlags(input).blocked;
-}
