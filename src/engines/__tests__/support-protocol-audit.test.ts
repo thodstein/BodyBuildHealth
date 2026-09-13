@@ -353,6 +353,10 @@ describe('support-protocol-audit: раунд-2 (гармонизация + ге�
   it('женщины: финастерид/дутастерид запрещены', () => {
     expect(P('supportProtocolWomen.tsx')).toContain('Финастерид / дутастерид');
   });
+  it('эпик тегов волна-3: Adaptogen + Detox-TUDCA', () => {
+    expect(P('supportProtocolAdaptogen.tsx')).toContain('[B]');
+    expect(P('supportProtocolDetox.tsx')).toContain('[C]');
+  });
   it('эпик тегов волна-2: гайд-препараты [A], остальное [B]/[C]', () => {
     for (const f of [
       'supportProtocolRenal.tsx',
