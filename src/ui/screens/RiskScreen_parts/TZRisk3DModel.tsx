@@ -51,22 +51,29 @@ export const SYSTEM_ANCHORS: SystemAnchor[] = [
 // Файлы лежат в public/organs (источник моделей: thebuggeddev/anatomy, открытый демо-проект;
 // лицензии отдельных мешей не указаны — при коммерческом релизе заменить на HRA CC-BY 4.0
 // с https://humanatlas.io/3d-reference-library и указать атрибуцию).
-// pos — точка в том же пространстве, что и SYSTEM_ANCHORS (до нормализации группы);
-// size — целевой диаметр органа в финальных единицах сцены (рост тела 3.0).
-// z сознательно уменьшен относительно якорей зон: органы висят чуть вглубь тела,
-// а не на самой поверхности кожи.
+// kind 'glb' — реалистичная модель; kind 'node' — схематичный узел для систем без отдельного
+// органа в наборе (селезёнка при крови, гонады при HPG-оси): обе эти системы по природе
+// системные, а не одноорганные, поэтому узел-маркер здесь честен.
+// pos — точка-наводка в том же пространстве, что и SYSTEM_ANCHORS (до нормализации группы);
+// face — с какой стороны тела пускать луч до поверхности; size — диаметр в финальных
+// единицах сцены (рост тела 3.0); deep — дополнительное заглубление под кожу (мозг — в черепе).
 export interface OrganModelDef {
   system: string;
-  url: string;
+  kind: 'glb' | 'spleen' | 'gonads';
+  url?: string;
   pos: [number, number, number];
+  face: 'front' | 'back' | 'left';
   size: number;
+  deep: number;
 }
 
 export const ORGAN_MODELS: OrganModelDef[] = [
-  { system: 'cns', url: '/organs/brain.glb', pos: [0, 0.92, 0.02], size: 0.3 },
-  { system: 'cardio', url: '/organs/heart.glb', pos: [-0.08, 0.32, 0.18], size: 0.3 },
-  { system: 'hepatic', url: '/organs/liver.glb', pos: [0.18, 0.16, 0.12], size: 0.4 },
-  { system: 'renal', url: '/organs/kidneys.glb', pos: [0, 0.02, -0.18], size: 0.36 },
+  { system: 'cns', kind: 'glb', url: '/organs/brain.glb', pos: [0, 0.92, 0], face: 'front', size: 0.3, deep: 0.16 },
+  { system: 'cardio', kind: 'glb', url: '/organs/heart.glb', pos: [-0.08, 0.32, 0], face: 'front', size: 0.3, deep: 0.02 },
+  { system: 'hepatic', kind: 'glb', url: '/organs/liver.glb', pos: [0.18, 0.16, 0], face: 'front', size: 0.42, deep: 0.02 },
+  { system: 'hematologic', kind: 'spleen', pos: [-0.25, 0.16, 0], face: 'left', size: 0.22, deep: 0.02 },
+  { system: 'renal', kind: 'glb', url: '/organs/kidneys.glb', pos: [0, 0.02, 0], face: 'back', size: 0.36, deep: 0.02 },
+  { system: 'reproductive', kind: 'gonads', pos: [0, -0.42, 0], face: 'front', size: 0.16, deep: 0.02 },
 ];
 
 /**
@@ -138,6 +145,16 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
   const showOrgansRef = useRef(true);
   const organEntriesRef = useRef<OrganEntry[]>([]);
   const organRootRef = useRef<THREE.Group | null>(null);
+  const hulkMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+
+  const setXray = useCallback((on: boolean) => {
+    for (const m of hulkMatsRef.current) {
+      m.transparent = true;
+      m.opacity = on ? 0.32 : 1;
+      m.depthWrite = !on;
+      m.needsUpdate = true;
+    }
+  }, []);
 
   const organMap = useMemo(() => {
     const m: Record<string, TzSpecOrganResult> = {};
@@ -230,6 +247,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         //    Если материал GLB был unlit (MeshBasicMaterial/emissive) — свет наконец работает,
         //    «выбеленность» исчезает, текстура остаётся родной.
         const meshes: THREE.Mesh[] = [];
+        const hulkMats: THREE.MeshStandardMaterial[] = [];
         model.traverse((child) => {
           if (!(child instanceof THREE.Mesh)) return;
           meshes.push(child);
@@ -248,6 +266,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
             if (src.color && src.color.getHex() !== 0xffffff) n.color.copy(src.color);
             // Лёгкое приглушение — если сама JPEG-текстура яркая, модель не «выбелена»
             n.color.multiplyScalar(0.88);
+            hulkMats.push(n);
             return n;
           });
           child.material = Array.isArray(child.material) ? converted : converted[0];
@@ -376,8 +395,13 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         applyColors();
         setLoaded(true);
 
-        // ── Органы: грузим 4 GLB, кладём в те же координаты, что и тело ──
-        // anchorToFinal повторяет нормализацию тела: final = s*(a - center) + group.position.
+        // ── Органы v2: посадка ВНУТРЬ тела по лучу + рентген ──
+        // Луч пускаем снаружи тела к точке-наводке: где бьёт в кожу — оттуда
+        // заглубляем на полразмера органа. Промах мимо тела = стоим на наводке.
+        // Всё в мировых координатах (group уже нормирован, bivariate нет).
+        hulkMatsRef.current = hulkMats;
+        setXray(showOrgansRef.current);
+        group.updateMatrixWorld(true);
         const boxCenter = center;
         const scaleK = s;
         const groupPosY = group.position.y;
@@ -386,14 +410,68 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           (p[1] - boxCenter.y) * scaleK + groupPosY,
           (p[2] - boxCenter.z) * scaleK,
         ];
+        const FACE_DIR: Record<OrganModelDef['face'], THREE.Vector3> = {
+          front: new THREE.Vector3(0, 0, 1),
+          back: new THREE.Vector3(0, 0, -1),
+          left: new THREE.Vector3(-1, 0, 0),
+        };
+        const surfRay = new THREE.Raycaster();
+        const placeInside = (def: OrganModelDef): THREE.Vector3 => {
+          const fp = anchorToFinal(def.pos);
+          const seed = new THREE.Vector3(fp[0], fp[1], fp[2]);
+          const out = FACE_DIR[def.face];
+          surfRay.set(seed.clone().addScaledVector(out, 5), out.clone().negate());
+          if (!baseMesh) return seed;
+          const hits = surfRay.intersectObject(baseMesh, false);
+          if (!hits.length) return seed;
+          return hits[0].point.clone().addScaledVector(out.clone().negate(), def.size / 2 + def.deep);
+        };
+        // Общий финиш холдера: системный id для рейкаста, непрозрачные материалы
+        // с корректным depth-тестом (видны только сквозь рентген-кожу).
+        const finishHolder = (def: OrganModelDef, content: THREE.Object3D, mats: THREE.MeshStandardMaterial[]) => {
+          const holder = new THREE.Group();
+          holder.add(content);
+          holder.position.copy(placeInside(def));
+          holder.userData.systemId = def.system;
+          content.traverse((o) => { o.userData.systemId = def.system; });
+          holder.visible = showOrgansRef.current;
+          organRoot.add(holder);
+          organEntriesRef.current.push({ system: def.system, group: holder, mats });
+          applyOrganColors();
+        };
         const organRoot = new THREE.Group();
         organRootRef.current = organRoot;
-        group.add(organRoot);
+        scene.add(organRoot);
         const organLoader = new GLTFLoader();
         organLoader.setMeshoptDecoder(MeshoptDecoder);
         for (const def of ORGAN_MODELS) {
+          if (def.kind === 'spleen') {
+            // Схематичная селезёнка: уплощённый эллипсоид, тёмно-красный
+            const geo = new THREE.SphereGeometry(0.5, 24, 18);
+            const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#7f2430'), roughness: 0.5, metalness: 0.05 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.scale.set(1, 0.62, 0.5);
+            const content = new THREE.Group();
+            content.add(mesh);
+            content.scale.setScalar(def.size);
+            finishHolder(def, content, [mat]);
+            continue;
+          }
+          if (def.kind === 'gonads') {
+            // Схематичные гонады: пара сфер в тазу
+            const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#caa183'), roughness: 0.55, metalness: 0.05 });
+            const content = new THREE.Group();
+            for (const sx of [-0.55, 0.55]) {
+              const m = new THREE.Mesh(new THREE.SphereGeometry(0.32, 20, 14), mat);
+              m.position.set(sx * def.size, 0, 0);
+              content.add(m);
+            }
+            content.scale.setScalar(def.size);
+            finishHolder(def, content, [mat]);
+            continue;
+          }
           organLoader.load(
-            def.url,
+            def.url as string,
             (ogltf) => {
               const content = ogltf.scene;
               // Нормализация размера: целевой диаметр def.size
@@ -402,14 +480,8 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
               const ocenter = obox.getCenter(new THREE.Vector3());
               const maxDim = Math.max(0.001, osize.x, osize.y, osize.z);
               const k = def.size / maxDim;
-              const holder = new THREE.Group();
               content.position.set(-ocenter.x, -ocenter.y, -ocenter.z);
               content.scale.setScalar(k);
-              holder.add(content);
-              const fp = anchorToFinal(def.pos);
-              holder.position.set(fp[0], fp[1], fp[2]);
-              holder.userData.systemId = def.system;
-              content.traverse((o) => { o.userData.systemId = def.system; });
               const mats: THREE.MeshStandardMaterial[] = [];
               content.traverse((o) => {
                 if (!(o instanceof THREE.Mesh)) return;
@@ -419,20 +491,11 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
                   color: src.color ? src.color.clone() : new THREE.Color('#ffffff'),
                   roughness: 0.45,
                   metalness: 0.05,
-                  transparent: true,
-                  opacity: 0.96,
-                  // Всегда поверх тела: органы-маркеры, а не скрытая анатомия.
-                  depthTest: false,
-                  depthWrite: false,
                 });
                 o.material = nm;
-                o.renderOrder = 20;
                 mats.push(nm);
               });
-              holder.visible = showOrgansRef.current;
-              organRoot.add(holder);
-              organEntriesRef.current.push({ system: def.system, group: holder, mats });
-              applyOrganColors();
+              finishHolder(def, content, mats);
             },
             undefined,
             (err) => { console.warn('[TZ3D] орган не загрузился:', def.url, err); },
@@ -538,6 +601,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       renderer.dispose();
       organEntriesRef.current = [];
       organRootRef.current = null;
+      hulkMatsRef.current = [];
       if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
       scene.traverse((obj) => {
         if (obj instanceof THREE.Mesh) {
@@ -558,11 +622,12 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     ref.applyOrganColors();
   }, [tzResult, selectedSystem, hoveredSystem, loaded, getSystemRiskPct]);
 
-  // ── Тоггл видимости органов ──
+  // ── Тоггл органов: показ мешей + рентген кожи (иначе органы внутри не видны) ──
   useEffect(() => {
     showOrgansRef.current = showOrgans;
     for (const entry of organEntriesRef.current) entry.group.visible = showOrgans;
-  }, [showOrgans]);
+    setXray(showOrgans);
+  }, [showOrgans, setXray]);
 
   // ── Selected system sync from chip buttons ──
   const handleChipClick = useCallback((sys: string) => {
@@ -639,7 +704,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           color: '#fff',
           transition: 'all 0.15s',
         }}>
-          🫀 Органы {showOrgans ? 'вкл' : 'выкл'}
+          🫀 Органы · рентген {showOrgans ? 'вкл' : 'выкл'}
         </button>
         {systemList.map(o => {
           const isSel = selectedSystem === o.system;
