@@ -40,7 +40,7 @@ export function analyzeCombatStrikePath(csvText: string): CombatStrikePathResult
     pts = null;
   }
   if (!pts || pts.length < 3) {
-    return { verdict: 'bad_data', xLoopCm: null, yMaxCm: null, vMaxCm: null, classification: null, text: 'CSV не распознан — проверьте формат Kinovea (t,x,y)', corrections: ['Экспортируйте trajectory из Kinovea как CSV с колонками времени и координат'] };
+    return { verdict: 'bad_data', xLoopCm: null, yMaxCm: null, vMaxMs: null, classification: null, text: 'CSV не распознан — проверьте формат Kinovea (t,x,y)', corrections: ['Экспортируйте trajectory из Kinovea как CSV с колонками времени и координат'] };
   }
   const xs = pts.map(p => p.x);
   const ys = pts.map(p => p.y);
