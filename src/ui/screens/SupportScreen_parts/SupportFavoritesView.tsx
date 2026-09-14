@@ -33,7 +33,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
     reportGenerated, setReportGenerated,    mixGoals, setMixGoals,
     mixWorkoutType, setMixWorkoutType,
     mixTimeOfDay, setMixTimeOfDay,
-    setSection, setTab, setSupportView, setCalcView,
+    setSection, setTab, setSupportView, setCalcView, setGenTab,
     linked,
   } = s;
   // Инлайн-выбор стека для добавления в план (без prompt/reload)
@@ -107,7 +107,9 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button onClick={() => {
                         queueMixToSupportPlan(rec);
-                        setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('calculator');
+                        // P0-фикс навигации: раньше section='info' не проходил гейт калькулятора
+                        // (нужен section='generator' + tab='calculator') — кнопка не работала.
+                        setSection('generator'); setTab('calculator'); if (setGenTab) setGenTab('calculator'); setSupportView('calc'); setCalcView('calculator');
                       }}
                         style={{ fontSize: 12, minHeight: 44, color: '#00e68a', background: 'none', border: '1px solid rgba(0,230,138,0.3)', borderRadius: 12, cursor: 'pointer', padding: '10px 12px', whiteSpace: 'nowrap' }}>🧮 В калькулятор</button>
                       <button onClick={() => { deleteFavRecommendation(rec.id); setFavRefresh((prev: number) => prev + 1); }}
@@ -606,12 +608,24 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                       </div>
                       <div style={{ display:'flex', gap:4 }}>
                         <button onClick={() => {
-                          setMixGoals([kit.goal]);
-                          setMixWorkoutType(kit.workoutType);
-                          setMixTimeOfDay(kit.timeOfDay);
-                          setPlanSaved('✅ Комплект загружен, переключите тайминги');
+                          // P0-фикс навигации: раньше вёл в несуществующий вид 'mixcalc' (пустой экран),
+                          // а mix-настройки никто не читал. Теперь: вещества комплекта — в очередь
+                          // калькулятора поддержки + переход в калькулятор.
+                          const kitIds = (kit.stack || []).filter((x: any) => x && x.id && x.mg !== 0).map((x: any) => x.id);
+                          if (kitIds.length > 0) {
+                            queueMixToSupportPlan({
+                              id: `kit:${kit.id || kit.date}`,
+                              title: `Комплект: ${kit.goal || ''}`.trim(),
+                              kind: 'mix',
+                              goal: kit.goal || '',
+                              substances: kitIds.map((id: string) => ({ id, found: true })),
+                            } as any);
+                            setPlanSaved(`✅ Комплект в очереди калькулятора (${kitIds.length})`);
+                          } else {
+                            setPlanSaved('⚠ В комплекте нет распознанных веществ');
+                          }
                           setTimeout(() => setPlanSaved(''), 3000);
-                          setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('mixcalc');
+                          setSection('generator'); setTab('calculator'); if (setGenTab) setGenTab('calculator'); setSupportView('calc'); setCalcView('calculator');
                         }} style={{ padding:'6px 10px', borderRadius:10, fontSize:12, minHeight:44, minWidth:44, cursor:'pointer', background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa' }}>📂</button>
                         <button onClick={() => {
                           const arr: any[] = readSupportArr('he_saved_calc_results');
