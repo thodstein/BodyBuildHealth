@@ -343,6 +343,21 @@ export const TOPUP_CARB_IDS = ['cream_of_rice', 'rice_white', 'rice_basmati', 'p
 export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'peanut_butter', 'avocado'];
 
 /**
+ * FIX vedro-330: по-продуктовые капы углеводных топ-апов рецептурного пути.
+ * ЕДИНЫЙ источник для сайдов сборки (tryBuild) и топ-апов ребаланса —
+ * раньше ребаланс капался общим 400 г и лил «батат 330» в обед при рецепте ×0.5.
+ * Неизвестный id — кап 200 (как дефолт сайдов сборки).
+ */
+export const RECIPE_SIDE_CAP: Record<string, number> = {
+  bulgur: 200, rice_white: 250, rice_basmati: 250, buckwheat: 200,
+  potato_boiled: 300, pasta_durum: 200, sweet_potato: 300,
+};
+export const RECIPE_SIDE_CAP_HV: Record<string, number> = {
+  bulgur: 150, rice_white: 300, rice_basmati: 300, buckwheat: 250,
+  potato_boiled: 350, pasta_durum: 300, sweet_potato: 250, cream_of_rice: 150,
+};
+
+/**
  * Удобство углеводного добора: угли на единицу клетчатки. Рис/рисовый крем
  * (fiber ≤1) >> хлеб/паста >> картофель/гречка >> батат/овёс >> булгур (fiber 4.5
  * при 18.6У — самый «дорогой» по ЖКТ и объёму тарелки).
@@ -631,6 +646,13 @@ export function rebalanceDayAfterRecipes(
       if (_hv) {
         const _hvComfort: Record<string, number> = { pryaniki: 80, jam: 55, honey: 60, dates: 60, raisins: 60, marmalade: 35, zefir: 50, pastila: 50, prunes: 60, dates_dried: 60, dried_apricots: 60, fruit_date_medjool: 60, dried_pineapple: 60, dried_mango: 60, dried_cranberry: 60, dried_blueberry: 60, dried_kiwi: 60, dried_pear: 60, dried_peach: 60, dried_banana_chips: 40 };
         if (_hvComfort[chosen.id] !== undefined) grams = Math.min(grams, _hvComfort[chosen.id]);
+      }
+      // FIX vedro-330: углеводный топ-ап ребаланса уважает по-продуктовые капы
+      // сайдов (батат 300 вне HV) — иначе «батат 340» в обед при рецепте ×0.5.
+      // Белок/жиры не трогаем (у них свои капы выше/ниже).
+      if (chosenRole === 'c') {
+        const _capMap = _hv ? RECIPE_SIDE_CAP_HV : RECIPE_SIDE_CAP;
+        grams = Math.min(grams, _capMap[chosen.id] ?? 200);
       }
       grams = Math.floor(Math.min(grams, 400) / 10) * 10;
       if (grams < 30) {
@@ -949,7 +971,15 @@ export function rebalanceDayAfterRecipes(
           if (_g2.length > 0) _groups.push({ key: `${mi}:2`, name: (m as any).recipeApplied2, idx: _g2 });
           if (_groups.length === 0) _groups.push({ key: mi, name: (m as any).recipeApplied, idx: (m.items || []).map((_: any, ii: number) => ii) });
         } else {
-          _groups.push({ key: mi, name: (m as any).recipeApplied, idx: (m.items || []).map((_: any, ii: number) => ii) });
+          // FIX vedro-330: посадка масштабирует только ЯДРО рецепта (ingredientIds),
+          // сайд-добивка (не из ids) не трогается — иначе «батат 340 ×110% = 374».
+          // Без ids в данных — весь приём ядро (как раньше).
+          const _core = _idsOf((m as any).recipeAppliedData);
+          const _allIdx = (m.items || []).map((_: any, ii: number) => ii);
+          const _coreIdx = _core
+            ? _allIdx.filter((ii) => _core.has(((m.items || [])[ii] as any)?.id))
+            : _allIdx;
+          _groups.push({ key: mi, name: (m as any).recipeApplied, idx: _coreIdx.length > 0 ? _coreIdx : _allIdx });
         }
         let bestG: (typeof _groups)[number] | null = null;
         let bestS = 1; let bestDev = devFinal;
@@ -1619,9 +1649,8 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           // HV-капы сайдов: сухая мера рисового крема 150 г (=123У) — один сайд
           // закрывает больше без раздувания тарелки; булгур ужа́т до 150 г.
           // Обычные дни — legacy-капы.
-          const _SIDE_CAP: Record<string, number> = _dayHighCarb
-            ? { bulgur: 150, rice_white: 300, rice_basmati: 300, buckwheat: 250, potato_boiled: 350, pasta_durum: 300, sweet_potato: 250, cream_of_rice: 150 }
-            : { bulgur: 200, rice_white: 250, rice_basmati: 250, buckwheat: 200, potato_boiled: 300, pasta_durum: 200, sweet_potato: 300 };
+          // Капы сайдов — единый RECIPE_SIDE_CAP(_HV) выше (см. FIX vedro-330).
+          const _SIDE_CAP: Record<string, number> = _dayHighCarb ? RECIPE_SIDE_CAP_HV : RECIPE_SIDE_CAP;
           const _sideCap = _SIDE_CAP[side.id] ?? 200;
           let g = Math.floor(Math.min(dMacro / macroOf(side) * 100, _sideCap) / 10) * 10;
           // Peri-слот: сайд не выводит приём за физиологический кап (предтрен 60/
