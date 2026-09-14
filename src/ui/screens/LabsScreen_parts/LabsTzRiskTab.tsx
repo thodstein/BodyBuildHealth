@@ -37,6 +37,10 @@ const LAB_MARKERS_CONFIG: { code: string; name: string; unit: string; systems: s
 export const LabsTzRiskTab: React.FC = () => {
   const linked = useDataLink();
   const labs = linked.labs || [];
+  // Женский слой: женские референсы подписей (HCT/HGB/ALT/TT/E2) — только отображение placeholder.
+  const profileSex: 'male' | 'female' = (linked as any)?.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
+  const FEMALE_RANGE: Record<string, string> = { HCT: '<48', HGB: '120-140', ALT: '<31', AST: '<31', GGT: '<32', CREATININE: '44-80', TT: '0.5-2.5', E2: '30-400', PRL: '100-500' };
+  const rangeFor = (m: { code: string; normalRange: string }) => (profileSex === 'female' ? FEMALE_RANGE[m.code] || m.normalRange : m.normalRange);
 
   const [labValues, setLabValues] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -95,6 +99,7 @@ export const LabsTzRiskTab: React.FC = () => {
       labCoverage: dCov,
       labValues: numLabValues,
       supportSubstances: supportIds,
+      ...(profileSex === 'female' ? { sex: 'female' as const } : {}),
     });
     setResult(result);
     setShowResult(true);
@@ -175,7 +180,7 @@ export const LabsTzRiskTab: React.FC = () => {
                 <input type="text" inputMode="decimal"
                   value={labValues[m.code] || ''}
                   onChange={e => setLabValues(prev => ({ ...prev, [m.code]: e.target.value }))}
-                  placeholder={m.normalRange}
+                  placeholder={rangeFor(m)}
                   style={{
                     flex:1, padding:'10px 10px', borderRadius:10, fontSize:13, fontWeight:700, minHeight:44,
                     background:'rgba(0,0,0,0.30)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', textAlign:'center', boxSizing:'border-box',

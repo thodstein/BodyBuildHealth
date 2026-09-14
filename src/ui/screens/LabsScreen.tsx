@@ -514,8 +514,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     const oral = course.some((c:any)=>{const s=(c.substanceId||'').toLowerCase();return s.includes('oral')||s.includes('oxy')||s.includes('dbol')||s.includes('anadrol')||s.includes('winstrol')||s.includes('stanozo')||s.includes('turinabol');});
     let sup: string[] = [];
     try { const sr = JSON.parse(localStorage.getItem('he_support_risk')||'null'); if(sr?.subs) sup = sr.subs.map((id:string)=>id.toLowerCase()); } catch {}
-    return calculateTzSpecRisk({ drugClass:dc, drugName:fd?.substanceId||'custom', dose:Math.max(50,Math.round(totalDose)), duration:dur, form:oral?'oral':'inject', combinations:Math.max(1,course.length), labCoverage:cov, labValues:m, supportSubstances:sup });
-  }, [hasLabs, tzLabValues, linked.course]);
+    return calculateTzSpecRisk({ drugClass:dc, drugName:fd?.substanceId||'custom', dose:Math.max(50,Math.round(totalDose)), duration:dur, form:oral?'oral':'inject', combinations:Math.max(1,course.length), labCoverage:cov, labValues:m, supportSubstances:sup, ...(profileSex === 'female' ? { sex: 'female' as const } : {}) });
+  }, [hasLabs, tzLabValues, linked.course, profileSex]);
 
   const toggleGlobalNoLabs = useCallback(() => {
     const next = !globalNoLabs;

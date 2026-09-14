@@ -83,6 +83,8 @@ export interface TzSpecInput {
   training?: { hasHIIT: boolean; weeklyMinutes: number; volumeTonnes: number; lissMinutesPerWeek: number; };
   courseWeek?: number;
   phaseDoseMultiplier?: number;
+  /** Женский слой (опционально): female включает женские лабораторные пороги. Отсутствие = мужской путь байт-в-байт. */
+  sex?: 'male' | 'female';
 }
 export interface TzSpecMechanismResult {
   id: string; name: string; weight: number; m_i: number;
@@ -193,22 +195,27 @@ const MECH_LAB_MARKERS:Record<string,string[]>={
 // НЕЗАВИСИМО от таргетов препарата (eGFR 25 опасен и без ренального таргета).
 export interface ClinicalFloor{organId:string;label:string;level:number}
 
-export function clinicalFloorsForLabs(labValues:Record<string,number>):ClinicalFloor[]{
+export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'male'|'female'):ClinicalFloor[]{
   const floors:ClinicalFloor[]=[];
+  const fem = sex === 'female';
   const v=(k:string)=>labValues[k];
   const push=(cond:boolean,organId:string,label:string,level:number)=>{if(cond)floors.push({organId,label,level});};
-  push(v('HCT')!==undefined&&v('HCT')!>=54,'hematologic','HCT ≥ 54% — эритроцитоз (порог флеботомии)',50);
-  push(v('HCT')!==undefined&&v('HCT')!>=51,'hematologic','HCT ≥ 51% — эритроцитоз',25);
+  // HCT: женские зоны 48/52 (мужские 51/54) — Hct 36–48% норма у женщин (Endocrine/WADA)
+  push(v('HCT')!==undefined&&v('HCT')!>=(fem?52:54),'hematologic',fem?'HCT ≥ 52% — эритроцитоз (женский порог флеботомии)':'HCT ≥ 54% — эритроцитоз (порог флеботомии)',50);
+  push(v('HCT')!==undefined&&v('HCT')!>=(fem?48:51),'hematologic',fem?'HCT ≥ 48% — эритроцитоз (женский порог)':'HCT ≥ 51% — эритроцитоз',25);
   push(v('LDL')!==undefined&&v('LDL')!>=4.9,'cardio','LDL ≥ 4.9 ммоль/л (ESC/EAS: очень высокий риск)',50);
   push(v('LDL')!==undefined&&v('LDL')!>=3.4,'cardio','LDL ≥ 3.4 ммоль/л',25);
   push(v('eGFR')!==undefined&&v('eGFR')!<30,'renal','eGFR < 30 — ХБП G4',75);
   push(v('eGFR')!==undefined&&v('eGFR')!<60,'renal','eGFR < 60 — ХБП G3',50);
   push(v('UACR')!==undefined&&v('UACR')!>300,'renal','UACR > 300 — альбуминурия A3',50);
   push(v('UACR')!==undefined&&v('UACR')!>30,'renal','UACR > 30 — альбуминурия A2',25);
-  push((v('ALT')!==undefined&&v('ALT')!>200)||(v('AST')!==undefined&&v('AST')!>200),'hepatic','АЛТ/АСТ > 5×ULN — гепатоцеллюлярное повреждение',50);
-  push((v('ALT')!==undefined&&v('ALT')!>80)||(v('AST')!==undefined&&v('AST')!>80),'hepatic','АЛТ/АСТ > 2×ULN',25);
+  // ALT/AST: женский ULN 31 (женские пороги строже: 2×/3×ULN вместо мужских 80/200)
+  push((v('ALT')!==undefined&&v('ALT')!>(fem?93:200))||(v('AST')!==undefined&&v('AST')!>(fem?93:200)),'hepatic',fem?'АЛТ/АСТ > 3× женской нормы (ULN 31) — гепатоцеллюлярное повреждение':'АЛТ/АСТ > 5×ULN — гепатоцеллюлярное повреждение',50);
+  push((v('ALT')!==undefined&&v('ALT')!>(fem?62:80))||(v('AST')!==undefined&&v('AST')!>(fem?62:80)),'hepatic',fem?'АЛТ/АСТ > 2× женской нормы (ULN 31)':'АЛТ/АСТ > 2×ULN',25);
   push(v('K')!==undefined&&v('K')!<3.0,'cardio','K < 3.0 ммоль/л — аритмогенный риск',50);
   push(v('LH')!==undefined&&v('FSH')!==undefined&&v('LH')!<0.5&&v('FSH')!<0.5,'reproductive','LH/FSH < 0.5 — полная супрессия HPTA',50);
+  // Тестостерон: женский порог вирилизации >6 нмоль/л (мужского floor нет — у мужчин низкий TT)
+  push(fem&&v('TT')!==undefined&&v('TT')!>6,'reproductive','Тестостерон > 6 нмоль/л — вирилизация (женский порог), отмена',50);
   push(v('PRL')!==undefined&&v('PRL')!>50,'cns','Пролактин > 50 нг/мл',50);
   push(v('PRL')!==undefined&&v('PRL')!>25,'cns','Пролактин > 25 нг/мл',25);
   push(v('GLU')!==undefined&&v('GLU')!<2.8,'cns','Глюкоза < 2.8 ммоль/л — нейроглюкопения',50);
@@ -231,7 +238,7 @@ export const PROCEDURE_DB: Record<string, Array<{organId:string;mechId:string;k:
 };
 
 // ── m_i из лабораторных значений (таблица T4) + коррекция по дозе ──
-function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:number,mechWeight?:number,rawDose?:number):number{
+function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:number,mechWeight?:number,rawDose?:number,sex?:'male'|'female'):number{
   // Базовые defaults с учётом guaranteed эффектов ААС
   const baseDefaults:Record<string,number>={cv1:1,cv2:2,cv3:1,cv4:2,cv5:1,liv1:2,liv2:1,liv3:0,ren1:1,ren2:1,ren3:0,ren4:1,cns1:2,cns2:2,cns3:0,cns4:1,cns5:0,cns6:0,rep1:3,rep2:3,rep3:2,rep4:1,rep5:2,hem1:2,hem2:0,hem3:0,hem4:0,hem5:0};
   // Масштабируем по дозе: doseFactor 1.0-2.0 → умножаем m_i
@@ -280,6 +287,9 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
   };
 
   let labResult: number | undefined;
+  // Женский слой: только при sex='female' — женские лабораторные пороги (HCT/HGB/RBC, ALT/AST/GGT,
+  // TT/FT/SHBG/E2, креатинин). Отсутствие sex = мужской путь байт-в-байт.
+  const fem = sex === 'female';
 
   switch(mechId){
     // ── ССС ──
@@ -306,7 +316,7 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       break;
     }
     case'cv4': { // протромботический: HCT, D-dimer, Fibrinogen, Platelets
-      const hctMi = labMi(hct,[48,51,54]);
+      const hctMi = labMi(hct,fem?[44,48,52]:[48,51,54]);
       const dMi = labMi(dDimer,[0.5,1.0,2.0]);
       const fibMi = labMi(fib,[4.0,5.0,6.0]);
       const pltMi = labMi(plt,[400,500,600]);
@@ -316,21 +326,21 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
     }
     case'cv5': { // аритмогенный: K (low), HCT (high = hyperviscosity)
       const kMi = labMiInv(k,[3.5,3.0,2.5]);
-      const hctMi = labMi(hct,[50,54,58]);
+      const hctMi = labMi(hct,fem?[46,50,54]:[50,54,58]);
       const vals = [kMi,hctMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
     // ── Печень ──
-    case'liv1': { // гепатоцеллюлярная: ALT, AST
-      const altMi = labMi(alt,[40,80,200]);
-      const astMi = labMi(ast,[40,80,200]);
+    case'liv1': { // гепатоцеллюлярная: ALT, AST (женский ULN 31: пороги 31/62/93)
+      const altMi = labMi(alt,fem?[31,62,93]:[40,80,200]);
+      const astMi = labMi(ast,fem?[31,62,93]:[40,80,200]);
       const vals = [altMi,astMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
-    case'liv2': { // холестаз: GGT, Bilirubin
-      const ggtMi = labMi(ggt,[55,110,220]);
+    case'liv2': { // холестаз: GGT, Bilirubin (женский ULN ГГТ 32)
+      const ggtMi = labMi(ggt,fem?[32,48,96]:[55,110,220]);
       const bilMi = labMi(bil,[21,50,100]);
       const vals = [ggtMi,bilMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
@@ -347,9 +357,9 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       break;
     }
     // ── Почки ──
-    case'ren1': { // гемодинамическое: eGFR, creatinine, urea, uric acid
+    case'ren1': { // гемодинамическое: eGFR, creatinine, urea, uric acid (женский креатинин ниже: 97/110/120)
       const egfrMi = labMiInv(egfr,[90,60,30]);
-      const crMi = labMi(creat,[90,130,200]);
+      const crMi = labMi(creat,fem?[97,110,120]:[90,130,200]);
       const ureaMi = labMi(urea,[8,12,20]);
       const uricMi = labMi(uric,[420,480,540]);
       const vals = [egfrMi,crMi,ureaMi,uricMi].filter(v=>v!==undefined) as number[];
@@ -426,9 +436,11 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       break;
     }
     case'rep2': { // ↓ интратестикулярного T: TT (низкий=плохо), FT (низкий=плохо), SHBG (высокий=↓free T)
-      const ttMi = labMiInv(tt,[12,8,4]);
-      const ftMi = labMiInv(ft,[250,150,50]);
-      const shbgMi = labMi(shbg,[60,80,100]);
+      // Женщины: TT ВЫСОКИЙ = вирилизация (прямая шкала 2.5/4/6), FT высокая = вирилизация (10/15/25),
+      // SHBG высокие физиологичны до 100 (пороги выше).
+      const ttMi = fem ? labMi(tt,[2.5,4,6]) : labMiInv(tt,[12,8,4]);
+      const ftMi = fem ? labMi(ft,[10,15,25]) : labMiInv(ft,[250,150,50]);
+      const shbgMi = labMi(shbg,fem?[100,150,200]:[60,80,100]);
       const vals = [ttMi,ftMi,shbgMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
@@ -439,22 +451,23 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       break;
     }
     case'rep4': { // эстрогенный сдвиг: E2 (нормализовано в pg/mL)
-      const e2Mi = labMi(e2,[40,55,80]);
+      // Женщины: физиологические E2 до ~200 pg/mL — мужская шкала [40,55,80] дала бы ложный m2/m3.
+      const e2Mi = fem ? labMi(e2,[150,220,400]) : labMi(e2,[40,55,80]);
       if (e2Mi !== undefined) labResult = e2Mi;
       break;
     }
     case'rep5': { // постцикловая супрессия: LH+TT combined
       const lhMi = labMiInv(lh,[2.0,1.0,0.5]);
-      const ttMi = labMiInv(tt,[12,8,4]);
+      const ttMi = fem ? labMi(tt,[2.5,4,6]) : labMiInv(tt,[12,8,4]);
       const vals = [lhMi,ttMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
     // ── Гематолого-метаболический ──
-    case'hem1': { // эритроцитоз: HCT, Hemoglobin, RBC, WBC
-      const hctMi = labMi(hct,[48,51,54]);
-      const hgbMi = labMi(hgb,[170,180,190]);
-      const rbcMi = labMi(rbcVal,[5.5,6.0,6.5]);
+    case'hem1': { // эритроцитоз: HCT, Hemoglobin, RBC, WBC (женские зоны 48/52, HGB 150/165, RBC 5.2/5.6)
+      const hctMi = labMi(hct,fem?[44,48,52]:[48,51,54]);
+      const hgbMi = labMi(hgb,fem?[150,165,180]:[170,180,190]);
+      const rbcMi = labMi(rbcVal,fem?[5.2,5.6,6.0]:[5.5,6.0,6.5]);
       const wbcMi = labMi(wbc,[11,13,15]);
       const vals = [hctMi,hgbMi,rbcMi,wbcMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
@@ -712,7 +725,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
         // Per-drug duration (timeline: drug B started week 6, now week 8 → 2 weeks, not 8)
         const drugDuration = drug.effDuration ?? duration;
         const T_drug=getDurationFactor(drugDuration);
-        const m_i=getMiFromLab(mech.id,labValues,D_i,mechWeight,drug.dose);
+        const m_i=getMiFromLab(mech.id,labValues,D_i,mechWeight,drug.dose,input.sex);
         // Генетический множитель для этого механизма
         const gMult = geneticBoost[mech.id] || 1.0;
         const m_i_adj = m_i * gMult * nutritionMult * trainingMult;
@@ -798,7 +811,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
   // Процедуры (эритроцитаферез/флеботомия) МЕНЯЮТ состояние (HCT падает),
   // поэтому для hematologic они пробивают якорь на afterPercent:
   // «до процедуры — high, после — ниже».
-  const floors=clinicalFloorsForLabs(labValues);
+  const floors=clinicalFloorsForLabs(labValues,input.sex);
   const hasBloodProcedure=supportLookup.has('erythrocytapheresis')||supportLookup.has('phlebotomy');
   for(const f of floors){
     const organ=organResults.find(o=>o.id===f.organId);

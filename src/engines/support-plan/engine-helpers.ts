@@ -1058,6 +1058,8 @@ export function buildTzInput(state: CalculatorState, supportSubs: string[]): TzS
     genetics, nutrition, training,
     courseWeek: state.courseWeek,
     phaseDoseMultiplier: PHASE_PROTOCOL[phaseKey].doseTier,
+    // Женский слой: пол ставим только для female — мужской вход байт-в-байт прежний.
+    ...(state.profile?.sex === 'female' ? { sex: 'female' as const } : {}),
   };
 }
 
@@ -1076,6 +1078,8 @@ export interface TzInputCoreParams {
   genetics?: TzSpecInput['genetics'];
   nutrition?: TzSpecInput['nutrition'];
   training?: TzSpecInput['training'];
+  /** Женский слой (опционально): female включает женские лабораторные пороги движка риска. */
+  sex?: 'male' | 'female';
 }
 
 export function buildTzInputCore(params: TzInputCoreParams, supportSubs: string[]): TzSpecInput {
@@ -1090,6 +1094,8 @@ export function buildTzInputCore(params: TzInputCoreParams, supportSubs: string[
     genetics: params.genetics, nutrition: params.nutrition, training: params.training,
     courseWeek: params.courseWeek,
     phaseDoseMultiplier: params.phaseKey ? PHASE_PROTOCOL[params.phaseKey].doseTier : 1,
+    // Женский слой: только для female — мужской вход байт-в-байт прежний.
+    ...(params.sex === 'female' ? { sex: 'female' as const } : {}),
   };
 }
 
