@@ -9,7 +9,7 @@ import { MINERAL_SEPARATION_HOURS } from '../../../engines/support-plan/types';
 import { detectActivePedClasses } from '../../../data/ped-class-matrix';
 import type { LabSlice } from '../../../engines/support-plan';
 import type { CalculatorState } from '../../../engines/support-plan';
-import { resolvePlan, isDoctorControlled, type SupportRisk } from '../../../engines/tz-mapper-engine';
+import { resolvePlan, isDoctorControlled } from '../../../engines/tz-mapper-engine';
 import type { MapperCtx, SupportRecommendation } from '../../../engines/tz-mapper-engine';
 import type { SupportLevel } from '../../../engines/tz-bridge-mechanism';
 import type { PhaseContext, PhaseKey } from '../../../engines/tz-bridge-phase';
@@ -21,27 +21,21 @@ import { buildMapperCtx, labSliceToValues } from '../../../engines/support-plan/
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import { registerCatalogExtras } from '../../../data/support-catalog-extras';
 registerCatalogExtras(SUPPORT_CATALOG_DATA);
-import { SafetyGuardrails, SafetyAlerts, SafetyConflicts, SafetyProcedures, SafetyAssayWarnings, SafetyGaps, SafetyLabFindings, SafetyDepletion, SafetyCumulativeLoad, SafetyPillBurden, SafetyPedEscalation, SafetyPctTiming, SafetyInjections } from './CalcSafetyLayer';
-import { CalcSystemPanel, SYSTEM_PANELS, SYSTEM_TO_PANEL, type SubRiskGroup } from './CalcSystemPanel';
+import { SafetyGuardrails, SafetyConflicts, SafetyProcedures, SafetyAssayWarnings, SafetyGaps, SafetyLabFindings, SafetyCumulativeLoad, SafetyPillBurden, SafetyPedEscalation, SafetyInjections } from './CalcSafetyLayer';
+import { CalcSystemPanel, SYSTEM_PANELS, SYSTEM_TO_PANEL } from './CalcSystemPanel';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
-import { getSubstanceForm, type SubstanceForm } from '../../../data/substance-forms';
 import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
 import { SYNERGY_NETWORK } from '../../../data/support-synergy-network';
-import { getTitrationProtocol, type TitrationProtocol } from '../../../data/titration-protocols';
-import { CONTRAINDICATIONS, getContraindications, checkContraindications, type ContraindicationRule } from '../../../data/substance-contraindications';
+import { CONTRAINDICATIONS, getContraindications, checkContraindications } from '../../../data/substance-contraindications';
 import { GLASS, BADGE } from './Calc.types';
 import { CalcSubstanceDetail, buildStackSynergyDescription, filterSynergiesCoveredByNetwork } from './CalcSubstanceDetail';
 import { StackExpandableRow, SelectedStackChips } from './CalcStackComponents';
-import { CalcPEDCard } from './CalcPEDCard';
-import { CalcProfileCard } from './CalcProfileCard';
-import { CalcLabsCard } from './CalcLabsCard';
 import { ALL_STACKS } from '../../../data/support-stacks';
-import { MECH_TRANSLATIONS_RU, MECH_LABELS } from '../SupportScreen_parts/SupportScreenData';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
 import { printProtocol, buildExportDataFromRec } from '../../../ui/components/ProtocolExport';
-import { checkNotifications, type NotificationRule } from '../../../engines/notification-engine';
+import { checkNotifications } from '../../../engines/notification-engine';
 import { computeOverdueSystems, type SystemOverdue } from '../../../engines/labs-overdue';
 import { LabsDueBanner } from './LabsDueBanner';
 import { getSupportPlanQueueIds, readSupportPlanQueue, removeFromSupportPlanQueue, deleteFavRecommendation } from '../../../engines/training-plan-save.engine';
@@ -702,11 +696,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showManualPopup, setShowManualPopup] = useState(false);
   const [manualTab, setManualTab] = useState<'stacks' | 'catalog' | 'saved' | 'favorites'>('stacks');
   const [catalogSearch, setCatalogSearch] = useState('');
-  const [savedSearch, setSavedSearch] = useState('');
-  const [manualSubInput] = useState('');
   const [manualStackSearch, setManualStackSearch] = useState('');
   const [expandedManualStack, setExpandedManualStack] = useState<string | null>(null);
-  const catalogSubsCount = useMemo(() => Object.keys(SUPPORT_CATALOG_DATA).length, []);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [showPrescription, setShowPrescription] = useState(true);
   const [showSynergy, setShowSynergy] = useState(true);
@@ -757,7 +748,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showRebound, setShowRebound] = useState(false);
   const [showSymptoms, setShowSymptoms] = useState(true);
   const [showNutrition, setShowNutrition] = useState(false);
-  const [showInteractions, setShowInteractions] = useState(false);
   const [showEnhancementPopup, setShowEnhancementPopup] = useState(false);
   const [enhancementSearch, setEnhancementSearch] = useState('');
   const [enhancementSystem, setEnhancementSystem] = useState<string>('all');
@@ -1058,6 +1048,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       </div>
 
+      {/* Пикер из внешнего экрана (SupportManualPicker) — раньше был недостижим (onOpenManualPicker не вызывался) */}
+      {onOpenManualPicker && (
+        <button data-manual-picker onClick={onOpenManualPicker} style={{ width:'100%', marginBottom:8, padding:'10px 12px', borderRadius:12, fontSize:10, fontWeight:700, cursor:'pointer', background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.2)', color:'#a5b4fc', textAlign:'left' }}>
+          📚 Расширенный ручной пикер — база веществ и избранное
+        </button>
+      )}
+
       {/* ── Попап интеллектуального выбора ── */}
       {showIntellPopup && ReactDOM.createPortal(
         <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowIntellPopup(false)}>
@@ -1102,7 +1099,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               {/* Tab bar */}
               <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', flexWrap:'wrap' }}>
                 {['stacks','catalog','saved','favorites'].map((id) => (
-                  <button key={id} onClick={() => { setManualTab(id as any); setCatalogSearch(''); setSavedSearch(''); setManualStackSearch(''); }}
+                  <button key={id} onClick={() => { setManualTab(id as any); setCatalogSearch(''); setManualStackSearch(''); }}
                     style={{
                       padding:'6px 10px', borderRadius:8, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer',
                       background: manualTab === id ? '#818cf8' : 'rgba(255,255,255,0.05)',
@@ -1431,7 +1428,12 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(24,24,27,0.3)', border:'1px solid rgba(255,255,255,0.04)' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
             <span style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'0.3px' }}>Усиление ({ALL_STACKS.length} стеков)</span>
-            <button onClick={() => setShowEnhancementPopup(true)} style={{ fontSize:11, fontWeight:700, cursor:'pointer', padding:'5px 10px', borderRadius:6, background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.2)', color:'#f87171' }}>📋 Все стеки</button>
+            <span style={{ display:'flex', gap:6 }}>
+              {megaSuggestions.length > 0 && (
+                <button data-mega-open onClick={() => setShowMegaPopup(true)} style={{ fontSize:11, fontWeight:700, cursor:'pointer', padding:'5px 10px', borderRadius:6, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.24)', color:'#fca5a5' }}>🚀 Мега ({megaSuggestions.length})</button>
+              )}
+              <button onClick={() => setShowEnhancementPopup(true)} style={{ fontSize:11, fontWeight:700, cursor:'pointer', padding:'5px 10px', borderRadius:6, background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.2)', color:'#f87171' }}>📋 Все стеки</button>
+            </span>
           </div>
            <button onClick={() => setShowEnhancementPopup(true)} style={{ width:'100%', padding:'10px 12px', borderRadius:9, fontSize:11, fontWeight:800, cursor:'pointer', background:'linear-gradient(135deg,rgba(248,113,113,0.16),rgba(99,102,241,0.12))', border:'1px solid rgba(248,113,113,0.28)', color:'#fff', textAlign:'left' }}>
              🚀 Усиление <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)', fontWeight:500 }}>— системы, нейро, кровь, суставы и дополнительные стеки</span>
