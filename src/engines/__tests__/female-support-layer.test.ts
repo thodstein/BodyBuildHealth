@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { applyFemaleSupport, FEMALE_LAYER_SUBS } from '../female-support-layer';
+import { SUPPORT_DOSING } from '../../data/support-dosing';
 import { resolvePlan } from '../tz-mapper-engine';
 import { buildMapperCtx } from '../support-plan/mapper-ctx';
 import { canonId } from '../support-plan/shared-constants';
@@ -102,6 +103,14 @@ describe('female-support-layer: unit', () => {
   it('состав слоя: 2 позиции, обе OTC-усилители', () => {
     expect(FEMALE_LAYER_SUBS.length).toBe(2);
     expect(FEMALE_LAYER_SUBS.map((s) => s.substanceId)).toEqual(['vitex', 'inositol']);
+  });
+  it('все женские добавки имеют запись дозировки в реестре SUPPORT_DOSING (полнота приложения)', () => {
+    for (const s of FEMALE_LAYER_SUBS) {
+      const rec = SUPPORT_DOSING[s.substanceId];
+      expect(rec, s.substanceId).toBeTruthy();
+      expect(rec.doseRange.min, s.substanceId).toBeGreaterThan(0);
+      expect(rec.doseRange.max, s.substanceId).toBeGreaterThanOrEqual(rec.doseRange.min);
+    }
   });
 });
 

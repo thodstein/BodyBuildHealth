@@ -967,6 +967,32 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
     lastUpdated: '2026-08-06',
     protocolRefs: ['Joints_LV1'],
   },
+
+  // ═══════════════════════════════════════════════════════════════
+  // ЖЕНСКИЙ СЛОЙ (docs/FEMALE_AAS_PROTOCOLS.md §5.1; female-support-layer)
+  // ═══════════════════════════════════════════════════════════════
+  vitex: {
+    id: 'vitex', name: 'Vitex agnus-castus', nameRu: 'Витекс (прутняк)',
+    category: 'herb',
+    doseRange: { min: 20, max: 40, unit: 'mg', frequency: 'daily' },
+    indications: ['female_hormonal_balance', 'prolactin_support', 'cycle_support'],
+    mechanisms: ['D2_AGONISM', 'PROLACTIN_REDUCTION'],
+    warnings: ['pregnancy_contraindicated', 'dopamine_side_effects'],
+    evidenceLevel: 'B',
+    lastUpdated: '2026-09-14',
+    protocolRefs: ['Women_AAS', 'Prolactin'],
+  },
+  inositol: {
+    id: 'inositol', name: 'Myo-Inositol', nameRu: 'Инозитол (мио)',
+    category: 'supplement',
+    doseRange: { min: 2000, max: 4000, unit: 'mg', frequency: 'daily' },
+    indications: ['pcos', 'insulin_sensitivity', 'ovarian_function'],
+    mechanisms: ['INSULIN_SIGNALING', 'IPG_SECOND_MESSENGER'],
+    warnings: ['gi_side_effects_high_dose'],
+    evidenceLevel: 'C',
+    lastUpdated: '2026-09-14',
+    protocolRefs: ['Women_AAS', 'Metabolic_Phase1'],
+  },
 };
 
 // ════════════════════════════════════════════════════════════════════════════
