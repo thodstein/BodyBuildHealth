@@ -19,8 +19,17 @@ import { savePlatformLogEntry, loadPlatformLog, planLastManStanding } from '../.
 import { platformRuleFor, PLATFORM_RULES_2026, LMS_RULES_2026 } from '../../../engines/arm/arm-pro5-platform-rules.engine';
 import { armliftClassFor, armliftClassLine } from '../../../engines/arm/armlift-weight-class.engine';
 import { applyToPlanner } from './planner-bridge';
-import { AdRoot, AdCard, AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdCta } from './arm-design-system';
+import { AdRoot, AdCard, AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdCta, AdStat } from './arm-design-system';
 import { haptics } from '../../../core/native-bridge';
+
+/** PRO-визуал: уровень → цвет точки (строки/aria 1-в-1, только подача). */
+const LIFT_LEVEL_COLOR: Record<string, string> = {
+  elite: '#22c55e',
+  comp: '#38bdf8',
+  base: '#f59e0b',
+  none: '#94a3b8',
+};
+const liftLevelColor = (level: string): string => LIFT_LEVEL_COLOR[level] ?? '#f59e0b';
 
 const STORAGE_KEY = 'he_armlifting_diag_v1';
 
@@ -283,8 +292,64 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     set({ rules: next });
   };
 
+  const avgShown = report.avgWrPct != null
+    ? report.avgWrPct
+    : report.avgPct != null ? report.avgPct : null;
+  const weakestLabel = report.rows.find((r) => r.implement === (report.weakestWr || report.weakest))?.label
+    || report.weakestWr || report.weakest || '—';
+
   return (
     <AdRoot rootClass="train-armdiag" maxWidth={860}>
+      <style>{`
+        .train-armdiag [data-arm="lift-head"] { padding: 10px 12px; }
+        .train-armdiag [data-arm="lift-head"] .ad-head { gap: 8px; }
+        .train-armdiag [data-arm="lift-head"] .ad-head-tx { min-width: 0; }
+        .train-armdiag .ad-card { padding: 12px; margin: 0 0 8px; }
+        .train-armdiag .ad-sec { padding: 10px; margin-top: 8px; }
+        .train-armdiag .ad-sec-t { margin: 0 0 6px; }
+        .train-armdiag .ad-grid { gap: 8px; }
+        .train-armdiag .ad-row { gap: 6px; }
+        .train-armdiag .ad-muted { color: #fff; }
+        .train-armdiag .ad-sec-sum { color: #fff; }
+        .train-armdiag .ad-fl { color: #fff; }
+        .train-armdiag [data-arm="lift-tiles"] { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; margin: 8px 0; }
+        .train-armdiag [data-arm="lift-tiles"] .ad-stat { border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 8px 6px; text-align: center; }
+        .train-armdiag [data-arm="lift-tiles"] .ad-stat-v { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; color: #fff; }
+        .train-armdiag [data-arm="lift-tiles"] .ad-stat-l { font-size: 10px; font-weight: 700; color: #fff; }
+        .train-armdiag [data-arm="lift-table"] .ad-row { align-items: center; }
+        .train-armdiag .lift-bar { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.12); overflow: hidden; min-width: 64px; flex: 1 1 64px; }
+        .train-armdiag .lift-bar > span { display: block; height: 100%; border-radius: 4px; }
+        .train-armdiag .lift-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .train-armdiag .lift-row-main { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 2 1 160px; }
+        .train-armdiag .lift-row-meta { font-variant-numeric: tabular-nums; white-space: nowrap; }
+      `}</style>
+      <AdCard>
+        <div className="ad-head" data-arm="lift-head">
+          <div className="ad-head-ic" aria-hidden>🏋️</div>
+          <div className="ad-head-tx">
+            <h2 className="ad-head-title">Армлифтинг — диагностика</h2>
+            <p className="ad-head-sub">RT · Axle · Pinch · CoC · Hub · Excalibur · %WR · помост · мост</p>
+          </div>
+          <div className="ad-head-side">
+            <div style={{ fontSize: 17, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#fff' }}>
+              {report.filled ? `${report.filled} сн.` : '—'}
+              {avgShown != null ? ` · ${avgShown}%` : ''}
+            </div>
+            <div className="ad-muted">слабейший: {report.filled ? weakestLabel : 'введи замеры'}</div>
+          </div>
+        </div>
+        <div className="ad-row" data-arm="lift-tags">
+          <span className="ad-tag">{classLine}</span>
+          {report.rtAsymPct != null && <span className="ad-tag">RT-асимметрия {report.rtAsymPct}%</span>}
+          {report.hubAsymPct != null && <span className="ad-tag">Hub-асимметрия {report.hubAsymPct}%</span>}
+          {lms.steps.length > 0 && <span className="ad-tag">LMS: {lms.label}</span>}
+        </div>
+        <AdSec title="ℹ️ Как пользоваться" collapsible defaultOpen={false} summary="4 шага до помоста">
+          <div className="ad-muted"><b>1 Замеры</b> — вбей снаряды ниже · <b>2 Вердикт</b> — %WR и слабейший снаряд · <b>3 Помост</b> — запиши попытки 90/96/102 · <b>4 Мост</b> — отправка в конструктор внизу.</div>
+        </AdSec>
+        {toast && <AdBanner tone="ok">{toast}</AdBanner>}
+      </AdCard>
+
       <AdCard>
         <AdSec title="🏋️ Армлифтинг — замеры снарядов" defaultOpen summary="RT · Axle · Pinch · CoC · Hub · Excalibur">
           <AdGrid cols="auto-sm">
@@ -408,6 +473,12 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       <AdCard>
         <AdSec title="📊 Вердикт по снарядам" defaultOpen summary={report.filled ? `${report.filled} сн.` : 'введи замеры'}>
           <div data-arm="lift-verdict"><b>{report.verdict}</b></div>
+          <div data-arm="lift-tiles">
+            <AdStat value={report.filled ? `${report.filled} сн.` : '—'} label="Замерено" />
+            <AdStat value={avgShown != null ? `${avgShown}%` : '—'} label={report.avgWrPct != null ? 'Среднее %WR' : 'Среднее %'} />
+            <AdStat value={report.filled ? weakestLabel : '—'} label="Слабейший" />
+            <AdStat value={report.totalKg != null && report.totalKg > 0 ? `${report.totalKg}` : '—'} label="Тотал кг" />
+          </div>
           {report.rtAsymPct != null && (
             <div className="ad-muted">RT-асимметрия L/R: {report.rtAsymPct}% (фон щипка 5–10%; &gt;15% — на осмотр)</div>
           )}
@@ -419,8 +490,16 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <div className="ad-list" data-arm="lift-table">
               {report.rows.map((r) => (
                 <div key={r.implement} className="ad-row">
-                  <span><b>{r.label}</b> {r.display}</span>
-                  <span className="ad-muted">{r.scorePct != null ? `${r.scorePct}% ${r.internal ? '(ориентир)' : 'WR'}` : 'без %'} · {r.level === 'none' ? 'факт' : r.level === 'elite' ? 'элита' : r.level === 'comp' ? 'соревн.' : 'база'}</span>
+                  <span className="lift-row-main">
+                    <span className="lift-dot" style={{ background: liftLevelColor(r.level) }} aria-hidden />
+                    <span><b>{r.label}</b> {r.display}</span>
+                  </span>
+                  {r.scorePct != null && (
+                    <span className="lift-bar" aria-hidden>
+                      <span style={{ width: `${Math.max(0, Math.min(100, r.scorePct))}%`, background: liftLevelColor(r.level) }} />
+                    </span>
+                  )}
+                  <span className="ad-muted lift-row-meta">{r.scorePct != null ? `${r.scorePct}% ${r.internal ? '(ориентир)' : 'WR'}` : 'без %'} · {r.level === 'none' ? 'факт' : r.level === 'elite' ? 'элита' : r.level === 'comp' ? 'соревн.' : 'база'}</span>
                   <span className="ad-muted">{r.note}</span>
                 </div>
               ))}
