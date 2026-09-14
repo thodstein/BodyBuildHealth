@@ -130,11 +130,6 @@ export const CombatConstructor: React.FC = () => {
     outsideMetrics,
   } = useCombatWizard();
   const [cycFilter, setCycFilter] = React.useState<string>('all');
-  /* Combat-диагностика: сводка моста (слабейшие точки + дни вставки + bar-path).
-   * Только отображение и персист — сборка не меняется; движок уже читает weakSide/neck. */
-  const [diagBridge, setDiagBridge] = React.useState<string>(() => {
-    try { return localStorage.getItem('he_combat_diag_bridge_v1') || ''; } catch { return ''; }
-  });
 
   const go = (s: Step) => { buzzStep(); setStep(s); };
 
@@ -159,48 +154,6 @@ export const CombatConstructor: React.FC = () => {
     const applyWeakpointsCombat = (data: any): void => {
       if (!data || typeof data !== 'object') return;
       const touched: string[] = [];
-      /* Combat-диагностика: слабейшие точки groups[] + дни вставки + bar-path.
-       * Формат групп: 'strike:<point>' / 'takedown:<point>' (см. buildCombatBridgeData). */
-      const STRIKE_RU: Record<string, string> = {
-        jab: 'джеб', cross: 'кросс', lead_hook: 'хук передней', rear_hook: 'хук задней',
-        uppercut: 'апперкот', lowkick: 'лоукик', elbow: 'локоть', knee: 'колено',
-      };
-      const TAKEDOWN_RU: Record<string, string> = {
-        double: 'дабл-лег', single: 'сингл-лег', body_lock: 'боди-лок',
-        clinch_entry: 'вход в клинч', sprawl_defense: 'спрол-защита',
-      };
-      if (Array.isArray(data.groups) && data.groups.length) {
-        const pts = data.groups
-          .filter((g: any) => typeof g === 'string' && /^(strike|takedown):[a-z_]+$/.test(g))
-          .slice(0, 6)
-          .map((g: string) => {
-            const [kind, id] = g.split(':');
-            const ru = kind === 'strike' ? STRIKE_RU[id] : TAKEDOWN_RU[id];
-            return ru ? `${kind === 'strike' ? 'удар' : 'тейкдаун'} ${ru}` : null;
-          })
-          .filter(Boolean) as string[];
-        let specNote = '';
-        const spec = data.specBlock as any;
-        if (spec && typeof spec === 'object') {
-          const days = spec.dayMap && typeof spec.dayMap === 'object'
-            ? Object.entries(spec.dayMap as Record<string, unknown>)
-              .filter(([, v]) => Array.isArray(v))
-              .map(([k, v]) => `${k}: дни ${(v as unknown[]).join('+')}`)
-              .slice(0, 4)
-              .join('; ')
-            : '';
-          const rationale = typeof spec.rationale === 'string' ? spec.rationale.slice(0, 160) : '';
-          specNote = [rationale, days ? `вставка — ${days}` : ''].filter(Boolean).join(' · ');
-        }
-        const barNote = data.barPath && typeof data.barPath.text === 'string' && data.barPath.text
-          ? ` · bar-path: ${data.barPath.text.slice(0, 120)}` : '';
-        if (pts.length || specNote || barNote) {
-          const summary = `📥 Диагностика: слабейшие ${pts.length ? pts.join(' + ') : '—'}${specNote ? ` · ${specNote}` : ''}${barNote}`;
-          setDiagBridge(summary);
-          try { localStorage.setItem('he_combat_diag_bridge_v1', summary); } catch { /* ignore */ }
-          touched.push(`слабейшие: ${pts.length ? pts.join(', ') : '—'}`);
-        }
-      }
       if (typeof data.combatConcussion === 'number' && Number.isFinite(data.combatConcussion)) {
         setConcussionHistory(Math.max(0, Math.min(9, Math.round(data.combatConcussion))));
         touched.push('сотрясения');
@@ -716,23 +669,6 @@ export const CombatConstructor: React.FC = () => {
               boxShadow: '0 4px 16px rgba(0,0,0,0.18)', animation: 'fadeInUp 0.22s ease',
             }}>{msg}</span>
           )}
-          {diagBridge && (
-            <span className="cb-msg-diag" data-combat="bridge-diag" style={{
-              fontSize: 11.5, fontWeight: 700, color: '#fff',
-              border: '1px solid rgba(236,72,153,0.30)', padding: '6px 12px', borderRadius: 20,
-            }}>{diagBridge}</span>
-          )}
-          <button
-            type="button"
-            aria-label="Открыть диагностику единоборств"
-            data-combat="open-diagnostics"
-            onClick={() => window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'combat_diagnostics' }))}
-            style={{
-              minHeight: 44, fontSize: 12, fontWeight: 700, color: '#fff',
-              border: '1px solid rgba(236,72,153,0.40)', padding: '6px 14px', borderRadius: 20,
-              background: 'transparent', cursor: 'pointer',
-            }}
-          >🔬 Диагностика</button>
         </div>
       </div>
 
