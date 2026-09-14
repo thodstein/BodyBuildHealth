@@ -1,15 +1,10 @@
 /**
- * TZRisk3DModel.tsx — 3D-модель рисков (ТЗ) на модели Халка (hulk.glb). ПЕРЕСБОРКА С НУЛЯ.
+ * TZRisk3DModel.tsx — 3D-модель рисков (ТЗ) на теле бодибилдера (bodybuilder.glb,
+ * автор 3dUVpro, лицензия CC Attribution — атрибуция под моделью).
  *
- * Почему было «засветлено»: у hulk.glb материал, скорее всего, нереактивный к свету
- * (MeshBasicMaterial / высокий emissive) — сколько ни уменьшай освещение, текстура
- * рендерилась «выбеленной». Решение: при загрузке ВСЕ меши переводятся на
- * MeshStandardMaterial с сохранением оригинальной текстуры (map) — свет начинает
- * работать, тона подбираются мягкие (hemisphere + key + fill + rim).
- *
- * Подсветка систем: overlay-меш на геометрии тела с NORMAL-смешиванием и
- * прозрачностью (не additive — additive давал клиппинг в белый при множителях >1).
- * Вне зон — чёрный (текстура чистая). Клик по телу выбирает систему, hover — предпросмотр.
+ * Тело всегда чистое: риск-цветом красится ТОЛЬКО орган. Кожа чуть прозрачна
+ * (рентген), чтобы органы внутри было видно; зоны на теле не рисуются,
+ * их индексы используются лишь для кликов.
  */
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import * as THREE from 'three';
@@ -30,7 +25,7 @@ const TZ_SYSTEM_ICONS: Record<string, string> = {
   cardio: '❤️', hepatic: '🫁', renal: '🫘', cns: '🧠', reproductive: '🧬', hematologic: '🩸',
 };
 
-// ── Якоря систем в мировых координатах hulk.glb (y: −1 стопы … +1 голова, фронт = +z) ──
+// ── Якоря систем в координатах тела (y: −1 стопы … +1 голова, фронт = +z) ──
 export interface SystemAnchor {
   id: string;
   label: string;
@@ -107,8 +102,6 @@ export function assignVertexSystems(positions: Float32Array, anchors: SystemAnch
   return out;
 }
 
-const WHITE = new THREE.Color('#ffffff');
-
 function hexToRgb(hex: string): [number, number, number] {
   const c = hex.replace('#', '');
   return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255];
@@ -137,10 +130,8 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     renderer: THREE.WebGLRenderer;
     controls: OrbitControls;
     animId: number;
-    colorAttr: THREE.BufferAttribute;
     zoneIdx: Int8Array;
     anchorToSystem: string[];
-    applyColors: () => void;
     applyOrganColors: () => void;
   } | null>(null);
 
@@ -181,7 +172,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     })).sort((a, b) => b.riskPct - a.riskPct);
   }, [tzResult]);
 
-  // ── Init scene (пересборка: lit-материалы + мягкий свет + normal-blend overlay) ──
+  // ── Init scene: lit-материалы + мягкий свет, тело без раскраски ──
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -232,17 +223,14 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     const group = new THREE.Group();
     scene.add(group);
 
-    let colorAttr: THREE.BufferAttribute | null = null;
     let zoneIdx: Int8Array = new Int8Array(0);
-    let zoneWeights: Float32Array = new Float32Array(0);
     let anchorToSystem: string[] = [];
     let baseMesh: THREE.Mesh | null = null;
-    let overlay: THREE.Mesh | null = null;
 
     const loader = new GLTFLoader();
     loader.setMeshoptDecoder(MeshoptDecoder);
     loader.load(
-      '/hulk.glb',
+      '/bodybuilder.glb',
       (gltf) => {
         const model = gltf.scene;
         model.updateMatrixWorld(true);
@@ -300,7 +288,6 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           SYSTEM_ANCHORS.map((a) => ({ id: a.id, pos: a.pos, radius: a.r * 1.4 })),
         );
         zoneIdx = mapping.zoneIdx;
-        zoneWeights = mapping.weights;
         anchorToSystem = SYSTEM_ANCHORS.map((a) => a.id);
 
         // 3) Нормализация: высота → 3.0, центровка
@@ -314,66 +301,8 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         group.add(model);
         model.updateMatrixWorld(true);
 
-        // 4) Overlay: ADDITIVE с множителями ≤1.0 — вне зон чёрный (ничего не добавляется,
-        //    текстура остаётся чистой), зоны добавляют цвет без клиппинга в белый.
-        //    depthTest выключен — тонировка всегда поверх силуэта тела.
-        colorAttr = new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3);
-        colorAttr.setUsage(THREE.DynamicDrawUsage);
-        (baseMesh.geometry as THREE.BufferGeometry).setAttribute('color', colorAttr);
-        const overlayMat = new THREE.MeshBasicMaterial({
-          vertexColors: true,
-          transparent: true,
-          opacity: 1.0,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-          depthTest: false,
-        });
-        overlay = new THREE.Mesh(baseMesh.geometry as THREE.BufferGeometry, overlayMat);
-        overlay.renderOrder = 10;
-        baseMesh.add(overlay);
-
-        const applyColors = () => {
-          if (!colorAttr || !zoneIdx.length) return;
-          const sel = selectedRef.current;
-          const hover = hoverRef.current;
-          const arr = colorAttr.array as Float32Array;
-          const zoneColor = new THREE.Color();
-          const lerp = new THREE.Color();
-          for (let i = 0; i < zoneIdx.length; i++) {
-            const ai = zoneIdx[i];
-            if (ai < 0) {
-              arr[i * 3] = 0;
-              arr[i * 3 + 1] = 0;
-              arr[i * 3 + 2] = 0;
-              continue;
-            }
-            const sysId = anchorToSystem[ai];
-            const pct = getSystemRiskPct(sysId);
-            const [r, g, b] = hexToRgb(riskColor(pct));
-            zoneColor.setRGB(r, g, b);
-            // Мягкий вес вершины (smoothstep от центра зоны) — края зон плавные
-            const wgt = zoneWeights[i] || 0;
-            if (sel === sysId) {
-              lerp.copy(zoneColor).lerp(WHITE, 0.25);
-              arr[i * 3] = lerp.r * 0.85 * wgt;
-              arr[i * 3 + 1] = lerp.g * 0.85 * wgt;
-              arr[i * 3 + 2] = lerp.b * 0.85 * wgt;
-            } else if (hover === sysId) {
-              arr[i * 3] = zoneColor.r * 0.7 * wgt;
-              arr[i * 3 + 1] = zoneColor.g * 0.7 * wgt;
-              arr[i * 3 + 2] = zoneColor.b * 0.7 * wgt;
-            } else if (sel) {
-              arr[i * 3] = zoneColor.r * 0.32 * wgt;
-              arr[i * 3 + 1] = zoneColor.g * 0.32 * wgt;
-              arr[i * 3 + 2] = zoneColor.b * 0.32 * wgt;
-            } else {
-              arr[i * 3] = zoneColor.r * 0.55 * wgt;
-              arr[i * 3 + 1] = zoneColor.g * 0.55 * wgt;
-              arr[i * 3 + 2] = zoneColor.b * 0.55 * wgt;
-            }
-          }
-          colorAttr.needsUpdate = true;
-        };
+        // Тело остаётся чистым: красится ТОЛЬКО орган (риск-цветом), кожа — нет.
+        // zoneIdx выше нужен лишь для кликов по телу (выбор системы).
 
         const applyOrganColors = () => {
           const sel = selectedRef.current;
@@ -393,10 +322,9 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
 
         sceneRef.current = {
           camera, renderer, controls, animId: 0,
-          colorAttr, zoneIdx, anchorToSystem,
-          applyColors, applyOrganColors,
+          zoneIdx, anchorToSystem,
+          applyOrganColors,
         };
-        applyColors();
         setLoaded(true);
 
         // ── Органы v2: посадка ВНУТРЬ тела по лучу + рентген ──
@@ -426,7 +354,14 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           const dirIn = out.clone().negate();
           surfRay.set(seed.clone().addScaledVector(out, 5), dirIn);
           if (!baseMesh) return seed;
-          const hits = surfRay.intersectObject(baseMesh, false);
+          let hits = surfRay.intersectObject(baseMesh, false);
+          if (!hits.length) {
+            // Страховка от зеркальной модели (фронт с другой стороны): бьём сзади
+            surfRay.set(seed.clone().addScaledVector(out, -5), out.clone());
+            hits = surfRay.intersectObject(baseMesh, false);
+            if (!hits.length) return seed;
+            return hits[0].point.clone().addScaledVector(out.clone(), def.size / 2 + def.deep);
+          }
           if (def.middle) {
             // Луч с противоположной стороны: точка гарантированно внутри тела
             surfRay.set(seed.clone().addScaledVector(out, -5), out.clone());
@@ -522,10 +457,10 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       () => setFailed(true),
     );
 
-    // ── Raycast: hover + клик (по базовому мешу; overlay делит геометрию) ──
+    // ── Raycast: hover + клик (органы в приоритете, затем зоны тела) ──
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
-    const rayTargets = () => [organRootRef.current, baseMesh, overlay].filter(Boolean) as THREE.Object3D[];
+    const rayTargets = () => [organRootRef.current, baseMesh].filter(Boolean) as THREE.Object3D[];
 
     const systemAt = (event: MouseEvent): string | null => {
       if (!containerRef.current) return null;
@@ -565,7 +500,6 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       hoverRef.current = sys;
       setHoveredSystem(sys);
       if (containerRef.current) containerRef.current.style.cursor = sys ? 'pointer' : 'grab';
-      sceneRef.current?.applyColors();
       sceneRef.current?.applyOrganColors();
     };
     const handleClick = (event: MouseEvent) => {
@@ -576,13 +510,11 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         selectedRef.current = next || '';
         return next;
       });
-      sceneRef.current?.applyColors();
       sceneRef.current?.applyOrganColors();
     };
     const handleLeave = () => {
       hoverRef.current = null;
       setHoveredSystem(null);
-      sceneRef.current?.applyColors();
       sceneRef.current?.applyOrganColors();
     };
 
@@ -634,7 +566,6 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
   useEffect(() => {
     const ref = sceneRef.current;
     if (!ref) return;
-    ref.applyColors();
     ref.applyOrganColors();
   }, [tzResult, selectedSystem, hoveredSystem, loaded, getSystemRiskPct]);
 
@@ -652,7 +583,6 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       selectedRef.current = next || '';
       return next;
     });
-    sceneRef.current?.applyColors();
     sceneRef.current?.applyOrganColors();
   }, []);
 
@@ -776,6 +706,9 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
 
       <div style={{ fontSize: 12, color: '#fff', textAlign: 'center', marginTop: 10, lineHeight:1.5 }}>
         🖱 Клик по зоне или органу · Вращайте · Колёсико для зума · Клик по чипу для деталей
+      </div>
+      <div style={{ fontSize: 11, color: '#fff', textAlign: 'center', marginTop: 4, opacity: 0.7 }}>
+        Тело: 3dUVpro (CC-BY) · Цветом подсвечены только органы — цвет = риск системы
       </div>
     </div>
   );
