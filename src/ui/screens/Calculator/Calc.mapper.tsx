@@ -31,6 +31,7 @@ import { getTitrationProtocol, type TitrationProtocol } from '../../../data/titr
 import { CONTRAINDICATIONS, getContraindications, checkContraindications, type ContraindicationRule } from '../../../data/substance-contraindications';
 import { GLASS, BADGE } from './Calc.types';
 import { CalcSubstanceDetail, buildStackSynergyDescription, filterSynergiesCoveredByNetwork } from './CalcSubstanceDetail';
+import { StackExpandableRow, SelectedStackChips } from './CalcStackComponents';
 import { CalcPEDCard } from './CalcPEDCard';
 import { CalcProfileCard } from './CalcProfileCard';
 import { CalcLabsCard } from './CalcLabsCard';
@@ -1171,17 +1172,12 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               {selectedStacks.length > 0 && (
                 <div style={{ marginBottom:8 }}>
                   <div style={{ fontSize:12, fontWeight:700, color:'#c084fc', marginBottom:4 }}>📦 Выбранные стеки поддержки ({selectedStacks.length})</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-                    {selectedStacks.map((stId) => {
-                      const st = (ALL_STACKS as any[]).find(s => s.id === stId);
-                      return (
-                        <span key={stId} style={{ fontSize:11, padding:'3px 8px', borderRadius:6, fontWeight:600, background:'rgba(168,85,247,0.12)', color:'#c084fc', display:'inline-flex', alignItems:'center', gap:4, margin:1 }}>
-                          {st?.name || stId}
-                          <span onClick={() => setSelectedStacks(prev => prev.filter(s => s !== stId))} style={{ cursor:'pointer', color:'rgba(255,255,255,0.5)', fontSize:13 }}>✕</span>
-                        </span>
-                      );
-                    })}
-                  </div>
+                  <SelectedStackChips
+                    variant="manual"
+                    testId="manual-stacks"
+                    items={selectedStacks.map((stId) => ({ id: stId, label: (ALL_STACKS as any[]).find(s => s.id === stId)?.name || stId }))}
+                    onRemove={(stId) => setSelectedStacks(prev => prev.filter(s => s !== stId))}
+                  />
                 </div>
               )}
               <div style={{ fontSize:13, fontWeight:700, color:'#ffffff', marginBottom:4, marginTop:4 }}>📦 Добавить стек из {ALL_STACKS.length} готовых</div>
@@ -1197,78 +1193,17 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   })
                   .map((st: any) => {
                     const active = selectedStacks.includes(st.id);
-                    const subCount = (st.substances||[]).length;
                     const isExpanded = expandedManualStack === st.id;
                     return (
-                      <div key={st.id}
-                        style={{ borderRadius:7,
-                          background: active ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.02)',
-                          border: active ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(255,255,255,0.04)' }}>
-                        <div onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.id) : [...prev, st.id])}
-                          style={{ padding:'8px 10px', cursor:'pointer', display:'flex', alignItems:'flex-start', gap:6 }}>
-                          <span style={{ fontSize:13, minWidth:14, color: active ? '#c084fc' : 'rgba(255,255,255,0.4)', marginTop:1 }}>{active ? '✓' : '○'}</span>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:13, fontWeight:700, color: active ? '#c084fc' : 'rgba(255,255,255,0.9)', lineHeight:1.25 }}>{st.name || st.id.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}</div>
-                            <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.35 }}>{st.system || ''} · {subCount} веществ{st.synergyScore ? ` · син: ${st.synergyScore}` : ''}</div>
-                          </div>
-                          <span onClick={(e) => { e.stopPropagation(); setExpandedManualStack(isExpanded ? null : st.id); }}
-                            style={{ fontSize:13, color:'rgba(255,255,255,0.55)', cursor:'pointer', marginTop:1, padding:'0 2px', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
-                        </div>
-                        {isExpanded && (
-                          <div style={{ padding:'0 8px 8px', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
-                            {st.anatomicalMapping?.organMechanisms && (
-                              <div style={{ fontSize:11, color:'rgba(240,240,245,0.9)', lineHeight:1.45, marginTop:6 }}>
-                                <b style={{ color:'#a78bfa' }}>🧬 Механизм действия:</b> {st.anatomicalMapping.organMechanisms}
-                              </div>
-                            )}
-                            {st.synergyPrinciple && (
-                              <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.45, marginTop:3 }}>
-                                <b>Принцип синергии:</b> {st.synergyPrinciple}
-                              </div>
-                            )}
-                            {st.anatomicalMapping?.finalEffect && (
-                              <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.45, marginTop:3 }}>
-                                <b>Итоговый эффект:</b> {st.anatomicalMapping.finalEffect}
-                              </div>
-                            )}
-                            {st.anatomicalMapping?.mechanismCodes?.length > 0 && (
-                              <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginTop:4 }}>
-                                {st.anatomicalMapping.mechanismCodes.map((m: string) => (
-                                  <span key={m} style={{ fontSize:10, padding:'2px 6px', borderRadius:4, background:'rgba(168,85,247,0.1)', color:'#c084fc' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g,' ')}</span>
-                                ))}
-                              </div>
-                            )}
-                            <div style={{ fontSize:12, fontWeight:700, color:'#00e68a', marginTop:8, marginBottom:3 }}>💊 Перечень препаратов ({subCount}):</div>
-                            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                              {(st.substances||[]).map((sd: any) => {
-                                const cat = SUPPORT_CATALOG_DATA[sd.id];
-                                return (
-                                  <div key={sd.id} style={{ fontSize:11, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.12)' }}>
-                                    <span style={{ fontWeight:600, color:'rgba(240,240,245,0.9)' }}>{cat?.nameRu || cat?.name || sd.id}</span>
-                                    {sd.dose && <span style={{ color:'#00e68a', marginLeft:4 }}>{sd.dose}</span>}
-                                    {sd.timing && <span style={{ color:'rgba(255,255,255,0.55)', marginLeft:4 }}>{sd.timing}</span>}
-                                    {sd.mechanism && <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.35, marginTop:2 }}>— {sd.mechanism}</div>}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            {(st.contraindications || st.warnings) && (
-                              <div style={{ marginTop:8 }}>
-                                {st.contraindications && (
-                                  <div style={{ fontSize:11, color:'#f87171', lineHeight:1.45 }}>
-                                    <b>⛔ Противопоказания:</b> {st.contraindications}
-                                  </div>
-                                )}
-                                {st.warnings && (
-                                  <div style={{ fontSize:11, color:'#fbbf24', lineHeight:1.45, marginTop:3 }}>
-                                    <b>⚠ Осторожности / предосторожности:</b> {st.warnings}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <StackExpandableRow
+                        key={st.id}
+                        st={st}
+                        active={active}
+                        expanded={isExpanded}
+                        compact
+                        onToggleSelect={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.id) : [...prev, st.id])}
+                        onToggleExpand={() => setExpandedManualStack(isExpanded ? null : st.id)}
+                      />
                     );
                   })}
               </div>
@@ -1502,13 +1437,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
              🚀 Усиление <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)', fontWeight:500 }}>— системы, нейро, кровь, суставы и дополнительные стеки</span>
            </button>
           {selectedStacks.filter(id => !['articular_stack','neuroprotection_stack','mega_total_support_35'].includes(id)).length > 0 && (
-            <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
-              {selectedStacks.filter(id => !['articular_stack','neuroprotection_stack','mega_total_support_35'].includes(id)).map(sid => (
-                <span key={sid} style={{ fontSize:10, padding:'3px 7px', borderRadius:6, fontWeight:600, background:'rgba(168,85,247,0.12)', color:'#c084fc', display:'inline-flex', alignItems:'center', gap:4 }}>
-                  {sid.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}
-                  <span onClick={() => setSelectedStacks(prev => prev.filter(s => s !== sid))} style={{ cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:12 }}>✕</span>
-                </span>
-              ))}
+            <div style={{ marginTop:4 }}>
+              <SelectedStackChips
+                variant="enhance"
+                testId="enhance-stacks"
+                items={selectedStacks
+                  .filter(id => !['articular_stack','neuroprotection_stack','mega_total_support_35'].includes(id))
+                  .map(sid => ({ id: sid, label: sid.replace(/_stack|_support|_35/g,'').replace(/_/g,' ') }))}
+                onRemove={(sid) => setSelectedStacks(prev => prev.filter(s => s !== sid))}
+              />
             </div>
           )}
         </div>
@@ -1623,86 +1560,18 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                  })
                 .map((st: any) => {
                   const active = selectedStacks.includes(st.id);
-                  const subCount = (st.substances||[]).length;
                   const trigger = STACK_BOOSTER_TRIGGERS.find(t => t.stackId === st.id);
                   const isExpanded = expandedManualStack === st.id;
                   return (
-                    <div key={st.id}
-                      style={{ borderRadius:8, marginBottom:4, overflow:'hidden',
-                        background: active ? 'rgba(168,85,247,0.12)' : 'rgba(255,255,255,0.02)',
-                        border: active ? '1px solid rgba(168,85,247,0.3)' : '1px solid transparent',
-                      }}>
-                      <div onClick={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.id) : [...prev, st.id])}
-                        style={{ padding:'9px 11px', cursor:'pointer', display:'flex', alignItems:'flex-start', gap:6 }}>
-                        <span style={{ fontSize:13, minWidth:14, color: active ? '#c084fc' : 'rgba(255,255,255,0.4)', marginTop:1 }}>{active ? '✓' : '○'}</span>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:13, fontWeight:700, color: active ? '#c084fc' : 'rgba(255,255,255,0.9)', lineHeight:1.25 }}>{st.name || st.id.replace(/_stack|_support|_35/g,'').replace(/_/g,' ')}</div>
-                          <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.35, marginTop:2 }}>{st.problem || st.system || ''}</div>
-                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginTop:3, display:'flex', gap:5, flexWrap:'wrap' }}>
-                            <span>{subCount} веществ</span>
-                            {st.synergyScore ? <span>· синергия: {st.synergyScore}</span> : null}
-                            {st.system ? <span>· {st.system}</span> : null}
-                            {trigger ? <span style={{color:'#f87171',fontWeight:700}}>· авто-триггер</span> : null}
-                          </div>
-                        </div>
-                        <span onClick={(e) => { e.stopPropagation(); setExpandedManualStack(isExpanded ? null : st.id); }}
-                          style={{ fontSize:13, color:'rgba(255,255,255,0.55)', cursor:'pointer', marginTop:1, padding:'0 2px', flexShrink:0 }}>{isExpanded ? '▲' : '▼'}</span>
-                      </div>
-                      {isExpanded && (
-                        <div style={{ padding:'0 10px 10px', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
-                          {st.anatomicalMapping?.organMechanisms && (
-                            <div style={{ fontSize:11, color:'rgba(240,240,245,0.9)', lineHeight:1.45, marginTop:6 }}>
-                              <b style={{ color:'#a78bfa' }}>🧬 Механизм действия:</b> {st.anatomicalMapping.organMechanisms}
-                            </div>
-                          )}
-                          {st.synergyPrinciple && (
-                            <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.45, marginTop:3 }}>
-                              <b>Принцип синергии:</b> {st.synergyPrinciple}
-                            </div>
-                          )}
-                          {st.anatomicalMapping?.finalEffect && (
-                            <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.45, marginTop:3 }}>
-                              <b>Итоговый эффект:</b> {st.anatomicalMapping.finalEffect}
-                            </div>
-                          )}
-                          {st.anatomicalMapping?.mechanismCodes?.length > 0 && (
-                            <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginTop:4 }}>
-                              {st.anatomicalMapping.mechanismCodes.map((m: string) => (
-                                <span key={m} style={{ fontSize:10, padding:'2px 6px', borderRadius:4, background:'rgba(168,85,247,0.1)', color:'#c084fc' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || m.replace(/_/g,' ')}</span>
-                              ))}
-                            </div>
-                          )}
-                          <div style={{ fontSize:12, fontWeight:700, color:'#00e68a', marginTop:8, marginBottom:3 }}>💊 Перечень препаратов ({subCount}):</div>
-                          <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                            {(st.substances||[]).map((sd: any) => {
-                              const cat = SUPPORT_CATALOG_DATA[sd.id];
-                              return (
-                                <div key={sd.id} style={{ fontSize:11, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.12)' }}>
-                                  <span style={{ fontWeight:600, color:'rgba(240,240,245,0.9)' }}>{cat?.nameRu || cat?.name || sd.id}</span>
-                                  {sd.dose && <span style={{ color:'#00e68a', marginLeft:4 }}>{sd.dose}</span>}
-                                  {sd.timing && <span style={{ color:'rgba(255,255,255,0.55)', marginLeft:4 }}>{sd.timing}</span>}
-                                  {sd.mechanism && <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.35, marginTop:2 }}>— {sd.mechanism}</div>}
-                                </div>
-                              );
-                            })}
-                          </div>
-                          {(st.contraindications || st.warnings) && (
-                            <div style={{ marginTop:8 }}>
-                              {st.contraindications && (
-                                <div style={{ fontSize:11, color:'#f87171', lineHeight:1.45 }}>
-                                  <b>⛔ Противопоказания:</b> {st.contraindications}
-                                </div>
-                              )}
-                              {st.warnings && (
-                                <div style={{ fontSize:11, color:'#fbbf24', lineHeight:1.45, marginTop:3 }}>
-                                  <b>⚠ Осторожности / предосторожности:</b> {st.warnings}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <StackExpandableRow
+                      key={st.id}
+                      st={st}
+                      active={active}
+                      expanded={isExpanded}
+                      autoTrigger={!!trigger}
+                      onToggleSelect={() => setSelectedStacks(prev => active ? prev.filter(s => s !== st.id) : [...prev, st.id])}
+                      onToggleExpand={() => setExpandedManualStack(isExpanded ? null : st.id)}
+                    />
                   );
                 })}
             </div>
