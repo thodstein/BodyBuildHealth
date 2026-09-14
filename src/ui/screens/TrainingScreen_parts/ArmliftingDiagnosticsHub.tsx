@@ -353,6 +353,10 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         .train-armdiag .lift-hist-row { display: flex; align-items: center; gap: 6px; }
         .train-armdiag .lift-hist-bar { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.12); overflow: hidden; flex: 1 1 48px; min-width: 48px; }
         .train-armdiag .lift-hist-bar > span { display: block; height: 100%; border-radius: 4px; background: #38bdf8; }
+        .train-armdiag [data-arm="lift-nav"] { position: sticky; top: 0; z-index: 5; padding: 6px 0; background: linear-gradient(180deg, rgba(10,10,12,0.92), rgba(10,10,12,0.75)); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+        .train-armdiag [data-arm="lift-nav"] .ad-chip { min-height: 44px; }
+        .train-armdiag [id="lift-measures"], .train-armdiag [id="lift-verdict-sec"], .train-armdiag [id="lift-platform"], .train-armdiag [id="lift-bridge"] { scroll-margin-top: 70px; }
+        .train-armdiag [data-arm="lift-export"] .ad-btn { min-height: 48px; font-weight: 700; }
       `}</style>
       <AdCard>
         <div className="ad-head" data-arm="lift-head">
@@ -381,7 +385,21 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         {toast && <AdBanner tone="ok">{toast}</AdBanner>}
       </AdCard>
 
+      <div className="ad-row" data-arm="lift-nav" aria-label="Разделы диагностики">
+        {[['lift-measures', 'Замеры'], ['lift-verdict-sec', 'Вердикт'], ['lift-platform', 'Помост'], ['lift-bridge', 'Мост']].map(([id, label]) => (
+          <AdChip
+            key={id}
+            onClick={() => {
+              try { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch { /* noop */ }
+            }}
+          >
+            {label}
+          </AdChip>
+        ))}
+      </div>
+
       <AdCard>
+        <div id="lift-measures" />
         <AdSec title="🏋️ Армлифтинг — замеры снарядов" defaultOpen summary="RT · Axle · Pinch · CoC · Hub · Excalibur">
           <div className="lift-group">✊ Основные</div>
           <AdGrid cols="auto-sm">
@@ -472,8 +490,12 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       </AdCard>
 
       <AdCard>
+        <div id="lift-verdict-sec" />
         <AdSec title="📊 Вердикт по снарядам" defaultOpen summary={report.filled ? `${report.filled} сн.` : 'введи замеры'}>
           <div data-arm="lift-verdict"><b>{report.verdict}</b></div>
+          {!report.filled && (
+            <AdBanner tone="info">Введи хотя бы один снаряд выше — %WR, слабейший снаряд и попытки 90/96/102 появятся здесь.</AdBanner>
+          )}
           <div data-arm="lift-tiles">
             <AdStat value={report.filled ? `${report.filled} сн.` : '—'} label="Замерено" />
             <AdStat value={avgShown != null ? `${avgShown}%` : '—'} label={report.avgWrPct != null ? 'Среднее %WR' : 'Среднее %'} />
@@ -510,12 +532,13 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <div className="ad-muted">Попытки (90/96/102): {report.rows.filter((r) => r.attempts.length).map((r) => `${r.label} ${r.attempts.join('/')}`).join(' · ')}</div>
           )}
           {lms.steps.length > 0 && (
-            <div className="ad-muted" data-arm="lift-lms">Last-man-standing ({lms.label}): {lms.steps.join(' → ')} (промах = выбыл, вниз нельзя — Armlifting USA 2026)</div>
+            <AdBanner tone="info"><div data-arm="lift-lms">Last-man-standing ({lms.label}): {lms.steps.join(' → ')} (промах = выбыл, вниз нельзя — Armlifting USA 2026)</div></AdBanner>
           )}
         </AdSec>
       </AdCard>
 
       <AdCard>
+        <div id="lift-platform" />
         <AdSec title="🏟 Помост — факт попытки" collapsible defaultOpen={false} summary="журнал he_arm_platform_log">
           <div className="ad-row">
             {IMPLEMENT_OPTS.map((o) => (
@@ -549,6 +572,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       </AdCard>
 
       <AdCard>
+        <div id="lift-bridge" />
         <AdSec title="📦 Что уедет в конструктор" collapsible defaultOpen={false} summary={report.filled ? 'армлифтинг' : 'пока пусто'}>
           <div className="ad-muted">Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину «Армлифтинг». Слабейший снаряд, класс, рецепт и last-man-standing — в payload.</div>
         </AdSec>
