@@ -83,15 +83,12 @@
 - Закрыты дефекты «по умолчанию»: женский TT 10 нмоль/л больше не m=0; E2 100 pg/mL не ложный m2/m3; HCT 50 виден.
 - **Проверка полноты (этот раунд):** женские протоколы приложения — 59/59 тестов (`support-protocol-women-female-aas` 25 + `women-protocol-menu-e2e` 1 + `female-support-layer` 15 + `female-aas-risk` 19); найден гэп — добавки женского слоя `vitex`/`inositol` не имели записей в `support-dosing.ts` → **закрыт** (2 записи + lock-тест «все FEMALE_LAYER_SUBS имеют дозировку»).
 ### §6.2 Осталось (низкий риск, отдельным раундом)
-- `risk-verification.engine.ts` (`VERIFICATION_SYSTEMS:45-220`, floors `:216`) — женские пороги в отчёте верификации (сейчас мужские).
-- `LAB_MONITOR_DB`/`support-phase-labs`/`substance-monitoring-db` — женские пометки текстов (источник — `FEMALE_LAB_GROUPS`, без дублирования чисел).
-- `Calc.mapper.tsx:2349` (HCT-градация 48/52/57) и `Calc.labs-derived.ts:247-253` (HCT 52/56/60 → `cardio.hctElevation`) — женские ветки; внимание: второй влияет на движок поддержки.
-- `risk-engine-v7-matrix.ts:658-708` (`LAB_REFERENCES` мужские) и `training-calendar.engine.ts:686` — по желанию.
-- `notification-engine.ts:89-123` (HCT 52, E2 <15/>80) — женские алерты.
-- `estimateCardioRisk(entries, {sex})` (`bp-hr-data.ts:466`) — пол в сигнатуре есть, но в теле не используется (BD: BPDiary передаёт впустую) — уточнить контракт.
+- ✅ `risk-verification.engine.ts` — женские пороги в отчёте верификации выполнены (P1, `7ffd3e93`): femaleThresholds/femaleDirection маркеров + femaleValue/femaleLabel/femaleOnly floors, пол из профиля (`RiskVerificationList`).
+- ✅ `LAB_MONITOR_DB`/`support-phase-labs`/`substance-monitoring-db` — женские пометки текстов выполнены в `support-phase-labs` (K0/K2/K5/K7 femaleNote, рендер при sex=female); `LAB_MONITOR_DB` — покрыт женскими протоколами/паспортом (отдельные пометки не дублируются — см. §6.4).
+- Остаётся (P2): `Calc.mapper.tsx:2349` (HCT-градация), `Calc.labs-derived.ts:247-253`, `risk-engine-v7-matrix`/`training-calendar`, `notification-engine`, `estimateCardioRisk(entries, {sex})` — по желанию.
 
 ### §6.4 Женские ПРОТОКОЛЫ «Женщины и ААС» — сверка с приложением (P1)
-> Протокол внедрён (13 табов, коммиты `7c9dc7f08/8f0df35f9/e9e9cfdfa/4fe56401`) и покрыт тестами (25/25 + e2e). Осталось — согласованность контента протокола с движками после §16.3:
+> ✅ **Выполнено (P1, `7ffd3e93`, без пуша).** Протокол внедрён (13 табов, коммиты `7c9dc7f08/8f0df35f9/e9e9cfdfa/4fe56401`) и покрыт тестами (25/25 + e2e). Согласованность контента протокола с движками после §16.3:
 1. **Единый источник порогов**: движок `FEMALE_AAS_PROFILES` (22 профиля, `female-aas-risk.ts`) ↔ UI `FEMALE_VIRILIZATION_CALC` (14 AAS, `supportProtocolWomenData.ts`) ↔ таблицы доз таба «Дозы» — свести или кросс-лок-тест на согласование red-порогов (сейчас значения совпадают, но два источника).
 2. **Сверка 11 «примерных протоколов поддержки»** женского таба с общими протоколами приложения (Печень, Гематология, Пролактин, Липиды/E2, PostCycle): дозы/пороги не конфликтуют, нет дублей, кросс-ссылки двусторонние.
 3. **Женские пометки в общих протоколах** (там, где показываются мужские нормы): Печень (ULN 31), Гематология (HCT 48/52), Пролактин (женские пороги), E2 (фаза-зависимо) — добавить «♀ …» строки по образцу таба «Лабы».
@@ -118,13 +115,18 @@
 **Остаток Д10 (перенесено в P1):** правки попапов (добавить/убрать вещество вручную) не отражаются в верхней карточке — движок считает по `deferredState`, не зная `manualSubs/addedSubs/removedSubs` из `CalcMapper`. Требуется callback-лифт `onRiskChange` (CalcMapperCard → AutoCalculator) — отдельный заход.
 
 ### P1 (UX/честность)
-3. Дедуп Д3 (алерты) + Д4 (pedFlags): однострочные дубли заменить ссылкой на развёрнутый блок.
-4. Дедуп Д5 (синергии — единый источник), Д6 (взаимодействия — один блок), Д7 (дедуп между 4 перечнями мониторинга).
-5. Д8/Д9: вынести раскрытую карточку стека и чипы в общий компонент.
-6. §6.2: женская верификация (`risk-verification`) + женские пометки мониторинга.
-7. Живые находки мёртвого кода: решить судьбу `showMegaPopup`/`onOpenManualPicker` (монтировать или удалить), чистка мёртвых импортов.
-8. **Callback-лифт риска**: `onRiskChange` из CalcMapperCard → AutoCalculator, чтобы верхняя карточка учитывала ручные правки попапов (см. остаток Д10).
-9. **Женские протоколы «Женщины и ААС» — сверка с приложением** (см. §6.4): единый источник порогов, сверка 11 протоколов поддержки с общими, женские пометки в общих протоколах, каталог спиронолактона, паспорт/дозы, фертильность/ПКТ.
+
+**Статус: ✅ выполнен (Sep 14 2026, коммиты `0d48196c`/`aa3a5505`/`5e62c84d`/`7ffd3e93`/`b1ef31e9`/`8f9763b8`, без пуша).**
+
+3. ✅ **Д3+Д4** (`0d48196c`): алерты `rec.alerts` — единственная точка показа (якорь `#calc-alerts-summary`, в мониторинге — бейдж `data-alerts-badge` + ссылка «↑ К тревогам»); однострочники pedFlags убраны, детали — `SafetyPedEscalation` (+`has17AlphaAndGH` переехал туда); тест `calc-dedup-p1` 3/3.
+4. ✅ **Д5/Д6/Д7** (`aa3a5505`): синергии — сеть приоритетна (`filterSynergiesCoveredByNetwork` + `synergyLinePairs`); взаимодействия — один блок с приоритетом `checkInteractions` (`SafetyConflicts` только fallback/≤1 вещество); мониторинг — 4 подписи источников; тест `calc-synergy-monitor-p1` 6/6.
+5. ✅ **Д8/Д9** (`5e62c84d`): общие компоненты `StackExpandableRow` + `SelectedStackChips` (`CalcStackComponents.tsx`) в ручном попапе и попапе «Усиление»; тест `calc-stack-components` 5/5.
+6. ✅ **§6.2** (`7ffd3e93`): женские пороги `risk-verification.engine` (маркеры + floors, пол из профиля в `RiskVerificationList`), ♀ пометки `support-phase-labs` (K0/K2/K5/K7 + рендер в `CalcPhaseLabCards`); тесты `risk-verification-female` 12 + `female-phase-lab-notes` 5.
+7. ✅ **Мёртвый код** (`b1ef31e9`): `showMegaPopup` оживлён (кнопка «🚀 Мега (N)»), `onOpenManualPicker` оживлён (кнопка «📚 Расширенный ручной пикер»); удалены `showInteractions`/`savedSearch`/`manualSubInput`/`catalogSubsCount` и мёртвые импорты карточек; тест `calc-deadcode-p1` 4/4.
+8. ✅ **Callback-лифт риска** (`8f9763b8`): `onRiskChange` CalcMapperCard → AutoCalculator (`mapperRisk ?? result.tzSpecResult`, маркер «📝 Учтены ручные правки»); без правок — прежний путь; тест `calc-risk-lift-p1` 2/2.
+9. ✅ **§6.4** (`7ffd3e93`): сверка `FEMALE_VIRILIZATION_CALC ↔ FEMALE_AAS_PROFILES` (найдены и закрыты реальные гэпы: `drostanolone⊂stan`-коллизия — мастерон ловился станом; алиасы `nand_phenyl`/`drost_prop`/`drost_enan`), ♀ пометки 4 общих протоколов, спиронолактон-каталог («только врач» + креатинин/беременность), vitex/inositol в `THERAPEUTIC_WINDOWS`+`DEFAULT_DOSAGES` (паспорт без «нет данных»), оговорка `FertilityPCTScreen` для женщин; тест `female-protocol-engine-parity` 8/8 + `fertility-pct-female-note` 2/2.
+
+Проверено: support/risk-круг **332/332** + rest-hooks/labs-risk **76/76**; `tsc --noEmit` — 0 по своим файлам (24 чужие ошибки параллельных WIP: bb-builder/meal-plan-engine/BbAutoConstructor); `verify:apk-design` OK. НЕ ПУШИЛ.
 
 ### P2 (полировка)
 9. Д1/Д2 (полный/компакт): оставить один источник на экран, второй — ссылкой.
