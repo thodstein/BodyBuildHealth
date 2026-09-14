@@ -79,14 +79,10 @@ export function exerciseTempoOverride(name: string): string | undefined {
 /** Темп под характер + опционально phase (ACSM 2023: eccentric 2-4с) + интенс-технику. */
 export function tempoFor(character: DayCharacter, technique?: string, phase?: string, exerciseName?: string): TempoSpec {
   const base = { ...TEMPO_BY_CHARACTER[character] };
-  // Deload фаза доминирует над per-exercise override (восстановление важнее специфики)
-  if (phase === 'deload' && exerciseName) {
-    const override = exerciseTempoOverride(exerciseName);
-    // для deload всё равно используем фазовый темп 4-2-2-0, но сохраняем логику tut
-    if (override) {
-      // пропускаем override, переходим к фазе
-    }
-  } else if (exerciseName) {
+  // Deload-фаза доминирует над per-exercise override (восстановление важнее
+  // специфики) — override в deload НЕ применяем, темп придёт из фазовой карты.
+  // Аудит 2026-09: здесь была пустая ветка-заглушка (только комментарий).
+  if (phase !== 'deload' && exerciseName) {
     const override = exerciseTempoOverride(exerciseName);
     if (override) {
       const parts = override.split('-').map(Number);
@@ -96,12 +92,12 @@ export function tempoFor(character: DayCharacter, technique?: string, phase?: st
         base.concentric = parts[2];
         base.notation = override;
         base.tutPerRep = base.eccentric + base.pause + base.concentric + parts[3];
-        // если фаза deload —Override игнорируется, перезапишется ниже
-        if (phase !== 'deload') return base;
+        return base;
       }
     }
   }
   // Phase-based eccentric emphasis (ACSM 2023: accumulation 3с, peaking 2с, deload 4с — восстановление)
+  // Аудит 2026-09: фактический deload-темп = 4-1-1-0 (комментарий раньше врал про 4-2-2-0).
   if (phase) {
     const phaseTempo: Record<string, string> = {
       accumulation: '3-1-1-0',

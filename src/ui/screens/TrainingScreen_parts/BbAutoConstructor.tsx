@@ -2446,7 +2446,16 @@ export const BbAutoConstructor: React.FC = () => {
       for (const corr of executionCorrections) {
         const t = String(corr.type || '').toLowerCase();
         if (t === 'modifytempo' && corr.tempo) {
-          for (const w of (plan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) { (ex as any).tempo = corr.tempo; (ex as any).comment = ((ex as any).comment ? (ex as any).comment + ' · ' : '') + `🧬 PROF темп ${corr.tempo}`; }
+          // Волна-1 (аудит 2026-09): правка темпа писала только ex.tempo —
+          // исполнение/карточки читают workSets[].tempo и tempoSpec, поэтому
+          // коррекция была невидимой. Пишем во ВСЕ три места.
+          for (const w of (plan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) {
+            const exr: any = ex;
+            exr.tempo = corr.tempo;
+            exr.tempoSpec = corr.tempo;
+            if (Array.isArray(exr.workSets)) for (const st of exr.workSets) { st.tempo = corr.tempo; }
+            exr.comment = (exr.comment ? exr.comment + ' · ' : '') + `🧬 PROF темп ${corr.tempo}`;
+          }
         } else if (t === 'modifyrom') {
           for (const w of (plan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) { (ex as any).pauseSeconds = 1; (ex as any).stretchPhase = true; (ex as any).comment = ((ex as any).comment ? (ex as any).comment + ' · ' : '') + `🧬 PROF ${corr.rom || 'пауза 1с в растянутой'}`; }
         } else if (t === 'modifyexecution' && Array.isArray(corr.execCues)) {

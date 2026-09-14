@@ -22,7 +22,7 @@ import { applyPlateRoundingToPlan } from './bb-plates.engine';
 import { cycleVolumeFactor } from './bb-cycle.engine';
 import { mergeWearableIntoRecovery, wearableRecoveryFactor, type WearableDaily } from './bb-wearable.engine';
 import { bodyCompVolumeFactor } from './bb-bodycomp.engine';
-import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
+import { tempoFor } from './bb-tempo-rest';
 import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { selectExercisesSmart, isAxialLoadExercise } from '../exercise-selector.engine';

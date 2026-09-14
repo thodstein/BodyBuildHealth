@@ -35,3 +35,17 @@ describe('Волна-1 — углы хамстрингов: seated_curl дост
     expect(cls?.name).toBe('curl');
   });
 });
+
+describe('Волна-1 — темпы: чистка tempoFor (deload доминирует, override работает)', () => {
+  it('per-exercise override применяется вне deload', () => {
+    expect(tempoFor('тяж', undefined, 'accumulation', 'Румынская тяга').notation).toBe('3-1-1-0');
+  });
+
+  it('deload подавляет override — фазовый темп 4-1-1-0', () => {
+    expect(tempoFor('тяж', undefined, 'deload', 'Румынская тяга').notation).toBe('4-1-1-0');
+  });
+
+  it('интенс-техника negatives → 4-0-1-0', () => {
+    expect(tempoFor('тяж', 'negatives', 'accumulation').notation).toBe('4-0-1-0');
+  });
+});
