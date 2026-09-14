@@ -644,6 +644,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           tz={result.tzSpecResult}
           before={result.overallRiskBefore}
           after={result.overallRiskAfter}
+          peakWeek={result.peakWeek}
         />
       ) : result.risk.systems.filter(s => s.rawScore > 0).length > 0 ? (
         <div style={{ marginTop: 6 }}>

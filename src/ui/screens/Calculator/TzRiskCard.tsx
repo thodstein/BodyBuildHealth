@@ -32,9 +32,11 @@ interface Props {
   tz: TzSpecResult;
   before: number;
   after: number;
+  /** Неделя пика курса (значения before/after — пиковые, а не текущие). */
+  peakWeek?: number;
 }
 
-export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
+export const TzRiskCard: React.FC<Props> = ({ tz, before, after, peakWeek }) => {
   const [expandedOrgan, setExpandedOrgan] = useState<string | null>(null);
   const organs = Array.isArray(tz?.organs) ? tz.organs : [];
 
@@ -76,7 +78,7 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
           border: `1px solid ${riskColor(after)}33`,
           fontSize: 10, fontWeight: 700, color: riskColor(after),
         }}>
-          {riskLabel(after)} &middot; Kp={tz.k_protect_overall}%
+          {riskLabel(after)} &middot; Kp={tz.k_protect_overall}%{peakWeek ? ` · пик курса — нед ${peakWeek}` : ''}
         </div>
       </div>
 

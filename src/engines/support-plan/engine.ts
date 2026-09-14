@@ -654,6 +654,11 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
           // still contained the current-week organ percentages, producing
           // inconsistent overall-vs-system cards.
           if (tzResultFinal) {
+            // Согласованность P0 (аудит Д10): overall-поля тоже переводим на пик курса —
+            // tzSpecResult должен быть внутренне однородным (органы уже пиковые),
+            // чтобы карточка риска и её данные показывали один и тот же срез.
+            tzResultFinal.overallRaw = peak.overallRaw;
+            tzResultFinal.overallAfter = peak.overallAfter;
             for (const organ of tzResultFinal.organs) {
               const peakRaw = peak.organPercents[organ.id];
               const peakAfter = peak.organAfterPercents[organ.id];
