@@ -12,6 +12,7 @@ import {
   FEMALE_SUPPORT_PROTOCOLS, FEMALE_LAB_GROUPS, FEMALE_STOP_THRESHOLDS, FEMALE_STOP_SYMPTOMS,
   FEMALE_TIMELINE, FEMALE_GOALS, FEMALE_AGE_GROUPS, FEMALE_SAFE_COMBOS, FEMALE_DANGER_COMBOS,
   FEMALE_FORBIDDEN_COMBOS, FEMALE_LIBIDO_EFFECTS, FEMALE_EMERGENCY_CRITICAL, FEMALE_EMERGENCY_URGENT,
+  FEMALE_FERTILITY_PLAN, FEMALE_PSYCHE_EFFECTS,
   FEMALE_VIRILIZATION_CALC, femaleVirilizationScore,
 } from '../supportProtocolWomenData';
 
@@ -84,6 +85,8 @@ describe('women-aas: данные — полнота', () => {
     expect(FEMALE_LIBIDO_EFFECTS.length).toBe(13);
     expect(FEMALE_EMERGENCY_CRITICAL.length).toBe(9);
     expect(FEMALE_EMERGENCY_URGENT.length).toBe(6);
+    expect(FEMALE_FERTILITY_PLAN.length).toBe(5);
+    expect(FEMALE_PSYCHE_EFFECTS.length).toBe(7);
     expect(FEMALE_VIRILIZATION_CALC.length).toBe(14);
   });
 });
@@ -159,14 +162,14 @@ describe('women-aas: UI — новые табы и калькулятор', () =
   it('таб «Дозы»: DHB, мастерон, GH/IGF-1/MGF, инсулин, SARMs', () => {
     const { container, getByText } = P();
     fireEvent.click(getByText('⚖️ Дозы веществ'));
-    for (const needle of ['Дигидроболденон', 'Дростанолон', 'соматропин', 'IGF-1 LR3', 'MGF', 'Инсулин быстрый', 'Остарин', 'YK-11', '125']) {
+    for (const needle of ['Дигидроболденон', 'Дростанолон', 'соматропин', 'IGF-1 LR3', 'MGF', 'Инсулин быстрый', 'Остарин', 'YK-11', '125', 'Множители чувствительности']) {
       expect(container.textContent, needle).toContain(needle);
     }
   });
   it('таб «Поддержка»: спиронолактон, TUDCA, каберголин, женский PCT', () => {
     const { container, getByText } = P();
     fireEvent.click(getByText('🧪 Поддержка'));
-    for (const needle of ['Спиронолактон', 'TUDCA', 'Каберголин', 'Женское восстановление', 'Низкое либидо']) {
+    for (const needle of ['Спиронолактон', 'TUDCA', 'Каберголин', 'Женское восстановление', 'Низкое либидо', 'Психические эффекты']) {
       expect(container.textContent, needle).toContain(needle);
     }
   });
@@ -219,6 +222,7 @@ describe('women-aas: UI — новые табы и калькулятор', () =
     expect(container.textContent).toContain('Финастерид / дутастерид');
     fireEvent.click(getByText('💊 Контрацепция'));
     expect(container.textContent).toContain('ВМС');
+    expect(container.textContent).toContain('Фертильность');
     fireEvent.click(getByText('🔬 Пороги гормонов'));
     expect(container.textContent).toContain('DHT');
   });

@@ -7,6 +7,7 @@ import {
   FEMALE_SUPPORT_PROTOCOLS, FEMALE_LAB_GROUPS, FEMALE_STOP_THRESHOLDS, FEMALE_STOP_SYMPTOMS,
   FEMALE_TIMELINE, FEMALE_GOALS, FEMALE_AGE_GROUPS, FEMALE_SAFE_COMBOS, FEMALE_DANGER_COMBOS,
   FEMALE_FORBIDDEN_COMBOS, FEMALE_LIBIDO_EFFECTS, FEMALE_EMERGENCY_CRITICAL, FEMALE_EMERGENCY_URGENT,
+  FEMALE_FERTILITY_PLAN, FEMALE_PSYCHE_EFFECTS,
   FEMALE_VIRILIZATION_CALC, femaleVirilizationScore,
 } from './supportProtocolWomenData';
 
@@ -43,6 +44,7 @@ const VirilizationScoreCalculator: React.FC = () => {
     <div style={cardBg} data-vircalc="root">
       <div style={{ fontSize:11, fontWeight:800, color:'#f472b6', marginBottom:4 }}>🧮 Калькулятор Virilization Score</div>
       <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8, lineHeight:1.35 }}>Справочная оценка риска вирилизации (0–100): доза против красного порога × андрогенный индекс × длительность × чувствительность 3.0. Не диагноз и не гарантия — решение принимает врач.</div>
+      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8, lineHeight:1.4 }}>Множители чувствительности: база 3.0 · генетическая ×1.5 · прошлые циклы ×1.2 · до 25 лет ×1.3 · после 45 лет ×0.8. Андрогенный индекс: тестостерон 1.0 · тренболон 1.5 · нор-группа (нандролон) 0.35 · примоболан 0.2.</div>
       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         <select value={subId} onChange={(e) => setSubId(e.target.value)} aria-label="Вещество" style={wInput}>
           {FEMALE_VIRILIZATION_CALC.map((x: any) => (
@@ -224,6 +226,16 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
                 ) : null}
               </div>
             ))}
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>🧠 Психические эффекты — диагностика и тактика</div>
+              {FEMALE_PSYCHE_EFFECTS.map((x: any, i: number) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#f9a8d4' }}>{x.problem}</div>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2 }}>Триггеры: {x.trigger}</div>
+                  <div style={{ fontSize:8, color:'#fca5a5', marginTop:2, lineHeight:1.35 }}>→ {x.action}</div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -411,6 +423,16 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
               'Изотретиноин (акне) + беременность = тяжёлые пороки развития плода → двойная контрацепция обязательна',
               'Финастерид/дутастерид + беременность = феминизация плода мужского пола → женщинам репродуктивного возраста НЕ назначать',
             ]} />
+
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>👶 Фертильность: планирование</div>
+              {FEMALE_FERTILITY_PLAN.map((x: any, i: number) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#f9a8d4' }}>{x.when}</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.35 }}>{x.action}</div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
