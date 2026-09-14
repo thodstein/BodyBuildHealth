@@ -11,6 +11,9 @@ export const SupportProtocolHepatic: React.FC<{ s: Record<string, any> }> = ({ s
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#84cc16', marginBottom:2 }}>🫁 Гепатопротекция на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Защита печени от токсического повреждения, холестаза и стеатоза. Особенно важно для оральных (17α-алкилированных) ААС.</p>
+                <div data-female-protocol-note style={{ marginTop:6, fontSize:9, color:'#f9a8d4', lineHeight:1.45, background:'rgba(244,114,182,0.08)', border:'1px solid rgba(244,114,182,0.2)', borderRadius:8, padding:'6px 8px' }}>
+                  ♀ Женщины: ULN АЛТ/АСТ — 31 Ед/л, ГГТ — 32 (пороговые уровни ниже мужских); контроль по женским порогам — см. таб «Лабы».
+                </div>
               </div>
 
               <IvStationaryGate />

@@ -3178,6 +3178,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     peds={((((ctx as any)?.pedDoses || (ctx as any)?.aasIds?.map((id: string) => ({ id })) || []) as any[]))}
                     subs={(((finalRec as any)?.subs || []).map((s: any) => s?.substanceId) as string[])}
                     esterHalfLifeHours={(ctx as any)?.phaseCtx?.esterHalfLifeHours}
+                    sex={state.profile?.sex === 'female' ? 'female' : 'male'}
                   />
 
                   {/* Персональный список маркеров (привязка к веществам плана) */}

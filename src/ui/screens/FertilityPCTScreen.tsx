@@ -250,6 +250,18 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
   return (
     <div className="screen fertility-pct" style={{ paddingBottom: 70 }}>
 
+      {/* §6.4.6: экран — про мужскую фертильность; женщинам мужские меры (кломифен/hCG «по-мужски») неприменимы */}
+      {(() => {
+        let sex: 'male' | 'female' = 'male';
+        try { sex = (getProfile() as any)?.settings?.personal?.sex === 'female' ? 'female' : 'male'; } catch { /* без профиля */ }
+        if (sex !== 'female') return null;
+        return (
+          <div data-female-fertility-note role="note" style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(244,114,182,0.08)', border: '1px solid rgba(244,114,182,0.22)', fontSize: 10, color: '#f9a8d4', lineHeight: 1.45 }}>
+            ♀ Этот экран — про мужскую фертильность: кломифен/hCG «по-мужски» женщинам НЕ применяются. Женские шаги (гормоны по фазе цикла, УЗИ, AMH) — см. таб «Женщины и ААС» → «Контрацепция/Фертильность».
+          </div>
+        );
+      })()}
+
       <div style={{
         display: 'flex', gap: 5, marginBottom: 10, overflowX: 'auto', scrollbarWidth: 'none' as const,
         WebkitOverflowScrolling: 'touch', paddingBottom: 4, msOverflowStyle: 'none' as const,

@@ -11,6 +11,9 @@ export const SupportProtocolE2: React.FC<{ s: Record<string, any> }> = ({ s }) =
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#f472b6', marginBottom:2 }}>🔬 Контроль эстрадиола на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Поддержание оптимального уровня эстрадиола (E2). Профилактика гинекомастии, контроль ароматизации, управление эстроген-зависимыми побочными эффектами.</p>
+                <div data-female-protocol-note style={{ marginTop:6, fontSize:9, color:'#f9a8d4', lineHeight:1.45, background:'rgba(244,114,182,0.08)', border:'1px solid rgba(244,114,182,0.2)', borderRadius:8, padding:'6px 8px' }}>
+                  ♀ Женщины: целевой E2 — по фазе менструального цикла (фолликулярная/лютеиновая), не мужские 20–40 пг/мл; AI — только по назначению врача.
+                </div>
               </div>
 
               <ContraBanner items={[

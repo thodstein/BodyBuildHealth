@@ -11,6 +11,9 @@ export const SupportProtocolProlactin: React.FC<{ s: Record<string, any> }> = ({
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:2 }}>🤱 Пролактин/Прогестерон</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Гиперпролактинемия от ААС (нандролон, тренболон) и антипсихотиков. Протокол коррекции по уровню PRL.</p>
+                <div data-female-protocol-note style={{ marginTop:6, fontSize:9, color:'#f9a8d4', lineHeight:1.45, background:'rgba(244,114,182,0.08)', border:'1px solid rgba(244,114,182,0.2)', borderRadius:8, padding:'6px 8px' }}>
+                  ♀ Женщины: референс PRL ниже мужского; при аменорее/галакторее — гинеколог-эндокринолог; каберголин — только по назначению врача.
+                </div>
               </div>
               <div style={{ display:'flex', gap:4, overflowX:'auto' }}>
                 {[{id:'protocol',label:'Протокол'},{id:'timing',label:'⏰ Тайминг'},{id:'monitoring',label:'🧪 Мониторинг'}].map((t:any)=>(

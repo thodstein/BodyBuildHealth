@@ -3132,6 +3132,9 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   piperine: { mg: 10, timing: 'с куркумином' }, chondroitin: { mg: 1200, timing: 'с едой' },
   msm: { mg: 2000, timing: 'с едой' }, copper: { mg: 2, timing: 'отдельно от цинка (мг)' },
   vitamin_k2: { mg: 200, timing: 'с едой (мкг)' }, iron: { mg: 18, timing: 'натощак' },
+  // ── Женский слой (FEMALE_AAS_PROTOCOLS §5.1; female-support-layer) ──
+  vitex: { mg: 30, timing: 'утром (D2-агонист, контроль PRL)' },
+  inositol: { mg: 3000, timing: '2 г 2×/д с едой (мио-инозитол)' },
   // ── Tier-system препараты (v4) ──
   niacin: { mg: 500, timing: 'на ночь (с едой, ↑ постепенно)' },
   phosphatidylserine: { mg: 300, timing: 'с едой' },

@@ -20,6 +20,8 @@ interface Props {
   peds?: Array<PhaseLabPed | null | undefined> | null;
   subs?: Array<string | null | undefined> | null;
   esterHalfLifeHours?: number | null;
+  /** §6.2: ♀ женские пометки карточек (показываются только при sex=female). */
+  sex?: 'male' | 'female';
 }
 
 const LPA_DONE_KEY = 'he_phase_labs_lpa_v1';
@@ -32,7 +34,7 @@ function readLpaDone(): boolean {
   }
 }
 
-export const CalcPhaseLabCards: React.FC<Props> = ({ phase, flags, peds, subs, esterHalfLifeHours }) => {
+export const CalcPhaseLabCards: React.FC<Props> = ({ phase, flags, peds, subs, esterHalfLifeHours, sex }) => {
   const [lpaDone, setLpaDone] = useState<boolean>(readLpaDone);
   const toggleLpa = () => {
     setLpaDone(prev => {
@@ -85,6 +87,11 @@ export const CalcPhaseLabCards: React.FC<Props> = ({ phase, flags, peds, subs, e
             {card.id === 'K6' && pctV !== 'unknown' && (
               <div style={{ fontSize: 6, color: '#fbbf24', marginBottom: 2 }}>
                 Ваш вариант: {pctV === 'hcg-bridge' ? 'hCG-bridge (длинные эфиры)' : 'SERM сразу (короткие эфиры)'}
+              </div>
+            )}
+            {sex === 'female' && card.femaleNote && (
+              <div data-female-note={card.id} style={{ fontSize: 6, color: '#f9a8d4', lineHeight: 1.45, marginBottom: 2, padding: '3px 5px', borderRadius: 4, background: 'rgba(244,114,182,0.08)', border: '1px solid rgba(244,114,182,0.18)' }}>
+                {card.femaleNote}
               </div>
             )}
             {groups.map((gr, gi) => (

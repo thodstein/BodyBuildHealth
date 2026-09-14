@@ -18,7 +18,7 @@ const PED_ALIAS_MAP: Record<string, string> = {
   // ── Нандролоны ──
   nandrolone: 'deca', nandrolone_decanoate: 'deca', nandrolone_deca: 'deca', nand_dec: 'deca',
   deca_durabolin: 'deca', decadurabolin: 'deca',
-  nandrolone_phenylprop: 'npp', nandrolone_phenylpropionate: 'npp', nand_pp: 'npp', nand_pheny: 'npp', nandrolone_phenyl: 'npp',
+  nandrolone_phenylprop: 'npp', nandrolone_phenylpropionate: 'npp', nand_pp: 'npp', nand_pheny: 'npp', nandrolone_phenyl: 'npp', nand_phenyl: 'npp',
   // ── Трестолон (19-нор) ──
   trest: 'trest_enan', trestolone: 'trest_enan', ment: 'trest_enan', trest_ace: 'trest_acet', trestol_acetate: 'trest_acet',
   // ── Болденон / DHB ──
@@ -32,6 +32,7 @@ const PED_ALIAS_MAP: Record<string, string> = {
   masteron: 'drostanolone_prop', masterone: 'drostanolone_prop', masteron_prop: 'drostanolone_prop',
   masteron_enan: 'drostanolone_enan', drostanolone_propionate: 'drostanolone_prop',
   drostanolone_enanthate: 'drostanolone_enan',
+  drost_prop: 'drostanolone_prop', drost_enan: 'drostanolone_enan',
   // ── 17α-оралы ──
   methandienone: 'methand', metandienone: 'methand', dianabol: 'methand', dbol: 'methand',
   methandrostenolone: 'methand',

@@ -11,6 +11,9 @@ export const SupportProtocolHemato: React.FC<{ s: Record<string, any> }> = ({ s 
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#ef4444', marginBottom:2 }}>🩸 Гематологическая поддержка на курсе ААС</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Контроль полицитемии, коагуляции и анемии. Профилактика тромбозов при высоком Hct.</p>
+                <div data-female-protocol-note style={{ marginTop:6, fontSize:9, color:'#f9a8d4', lineHeight:1.45, background:'rgba(244,114,182,0.08)', border:'1px solid rgba(244,114,182,0.2)', borderRadius:8, padding:'6px 8px' }}>
+                  ♀ Женщины: Hct 36–48% — физиологическая норма; пороги вмешательства — 48% (усиленный контроль) и 52% (флеботомия), не мужские 51/54. HGB/RBC — по женским зонам.
+                </div>
               </div>
 
               <StopBanner title="Критические гематологические пороги" thresholds={[

@@ -14,6 +14,7 @@ import {
 } from '../../../engines/risk-verification.engine';
 import { TZ_MECH_LABELS } from '../../../data/support-db';
 import { copyOrShareText, saveCsvApk, printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { getProfile } from '../../../core/profile-manager';
 
 const ACCENT = '#00e68a';
 const CARD: React.CSSProperties = { padding: 16, borderRadius: 18, background: 'rgba(20,22,30,0.55)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 12px 30px rgba(0,0,0,0.20)', marginBottom: 12 };
@@ -24,7 +25,7 @@ const EXPORT_BTN: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; result?: TzSpecResult | null }> = ({ labMap, result }) => {
+export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; result?: TzSpecResult | null; sex?: 'male' | 'female' }> = ({ labMap, result, sex }) => {
   const [copied, setCopied] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const flashShare = (msg: string) => {
@@ -32,7 +33,13 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
     try { setTimeout(() => setShareStatus(null), 2500); } catch {}
   };
 
-  const report = useMemo(() => buildVerificationReport(labMap || {}), [labMap]);
+  // §6.2: женские пороги — явный проп или пол из профиля (без sex — мужской путь байт-в-байт).
+  const effectiveSex = useMemo<'male' | 'female'>(() => {
+    if (sex === 'female' || sex === 'male') return sex;
+    try { return getProfile()?.settings?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; }
+  }, [sex]);
+
+  const report = useMemo(() => buildVerificationReport(labMap || {}, effectiveSex), [labMap, effectiveSex]);
 
   // Верификация из движка ТЗ (risk-engine-tz-spec) — те же числа, что в карточках
   // «Индекс риска · верифицировано анализами», чтобы вкладка и карточка совпадали.
@@ -58,7 +65,7 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
   }, [result]);
 
   const copyText = async () => {
-    const text = buildVerificationText(labMap || {});
+    const text = buildVerificationText(labMap || {}, effectiveSex);
     const o = await copyOrShareText(text, 'Верификация рисков');
     if (o === 'failed') return;
     setCopied(true);
@@ -67,13 +74,13 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
   };
 
   const downloadCsv = async () => {
-    const csv = buildVerificationCsv(labMap || {});
+    const csv = buildVerificationCsv(labMap || {}, effectiveSex);
     flashShare(shareOutcomeLabel(await saveCsvApk(`verification-risks-${new Date().toISOString().slice(0, 10)}.csv`, csv)));
   };
 
   const printPdf = async () => {
-    const html = buildVerificationHtml(labMap || {});
-    const text = buildVerificationText(labMap || {});
+    const html = buildVerificationHtml(labMap || {}, effectiveSex);
+    const text = buildVerificationText(labMap || {}, effectiveSex);
     flashShare(shareOutcomeLabel(await printHtmlApk(html, `verification-risks-${new Date().toISOString().slice(0, 10)}.html`, text)));
   };
 
@@ -83,9 +90,10 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
     <div className="risk-verify" style={{ padding: '4px 0 80px' }}>
       {/* HERO — APK PRO: белый текст, крупно */}
       <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.10) 0%, rgba(20,22,30,0.60) 100%)', border: '1px solid rgba(0,230,138,0.22)' }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 4 }}>🔬 Верификация рисков анализами</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 4 }}>🔬 Верификация рисков анализами{effectiveSex === 'female' ? ' · ♀ женские пороги' : ''}</div>
         <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, marginBottom: 10 }}>
           Перечень анализов по 6 системам и 28 механизмам · пороги m_i = 1/2/3 (таблица T4) · якорные floors по лабораторным порогам
+          {effectiveSex === 'female' ? ' · HCT/HGB/RBC, АЛТ/АСТ/ГГТ (ULN 31), TT/FT/E2 и креатинин — по женским порогам' : ''}
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ minWidth: 120, flex:1, padding:'12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', textAlign:'center' }}>
@@ -177,7 +185,7 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
                   {mech.markers.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {mech.markers.map((mk, i) => (
-                        <div key={i} title={`${mk.name}: пороги ${thresholdText(mk)} ${mk.unit}`} style={{
+                        <div key={i} title={`${mk.name}: пороги ${thresholdText(mk, effectiveSex)} ${mk.unit}`} style={{
                           display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 10, fontSize: 12, fontWeight:600,
                           background: mk.present ? `${statusColor(mk.status)}1e` : 'rgba(255,255,255,0.04)',
                           border: `1px solid ${mk.present ? `${statusColor(mk.status)}40` : 'rgba(255,255,255,0.08)'}`,

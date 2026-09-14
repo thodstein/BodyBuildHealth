@@ -12,6 +12,10 @@ export interface VerifMarker {
   unit: string;
   direction: VerifDirection;
   thresholds: [number, number, number];
+  /** Женские пороги m_i=1/2/3 (женская физиология: HCT/HGB/RBC, ALT/AST/GGT ULN 31, TT/FT как HIGH и т.д.). */
+  femaleThresholds?: [number, number, number];
+  /** Женское направление (для маркеров-«перевёртышей»: TT/FT у женщин высокий = вирилизация). */
+  femaleDirection?: VerifDirection;
 }
 
 export interface VerifFloor {
@@ -20,6 +24,11 @@ export interface VerifFloor {
   value: number;
   label: string;
   risk: number;
+  /** Женский порог пола (Endocrine/WADA): напр. HCT 48/52 вместо 51/54, АЛТ/АСТ 62/93 вместо 80/200. */
+  femaleValue?: number;
+  femaleLabel?: string;
+  /** Якорь показывается только женщинам (напр. TT > 6 — вирилизация). */
+  femaleOnly?: boolean;
 }
 
 export interface VerifMechanism {
@@ -39,8 +48,23 @@ export interface VerifSystem {
 }
 
 // ── Каталог маркеров (T4) — пороги m_i: 1/2/3 ──
-const M = (code: string, name: string, unit: string, direction: VerifDirection, thresholds: [number, number, number]): VerifMarker =>
-  ({ code, name, unit, direction, thresholds });
+const M = (
+  code: string,
+  name: string,
+  unit: string,
+  direction: VerifDirection,
+  thresholds: [number, number, number],
+  female?: { thresholds: [number, number, number]; direction?: VerifDirection },
+): VerifMarker =>
+  ({ code, name, unit, direction, thresholds, ...(female ? { femaleThresholds: female.thresholds, femaleDirection: female.direction } : {}) });
+
+/** Пороги маркера с учётом пола (женские ветки — иначе мужские; отсутствие sex = мужской путь). */
+export function markerThresholds(m: VerifMarker, sex?: 'male' | 'female'): [number, number, number] {
+  return sex === 'female' && m.femaleThresholds ? m.femaleThresholds : m.thresholds;
+}
+export function markerDirection(m: VerifMarker, sex?: 'male' | 'female'): VerifDirection {
+  return sex === 'female' && m.femaleDirection ? m.femaleDirection : m.direction;
+}
 
 export const VERIFICATION_SYSTEMS: VerifSystem[] = [
   {
@@ -60,14 +84,14 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
         M('NA', 'Натрий', 'ммоль/л', 'high', [145, 148, 155]),
       ] },
       { id: 'cv4', weight: 1.0, markers: [
-        M('HCT', 'Гематокрит', '%', 'high', [48, 51, 54]),
+        M('HCT', 'Гематокрит', '%', 'high', [48, 51, 54], { thresholds: [44, 48, 52] }),
         M('D_DIMER', 'D-димер', 'мг/л', 'high', [0.5, 1.0, 2.0]),
         M('FIBRINOGEN', 'Фибриноген', 'г/л', 'high', [4.0, 5.0, 6.0]),
         M('PLT', 'Тромбоциты', '10⁹/л', 'high', [400, 500, 600]),
       ] },
       { id: 'cv5', weight: 0.7, markers: [
         M('K', 'Калий', 'ммоль/л', 'low', [3.5, 3.0, 2.5]),
-        M('HCT', 'Гематокрит', '%', 'high', [50, 54, 58]),
+        M('HCT', 'Гематокрит', '%', 'high', [50, 54, 58], { thresholds: [46, 50, 54] }),
       ] },
     ],
     floors: [
@@ -79,22 +103,24 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
     id: 'hepatic', name: TZ_SYSTEM_LABELS.hepatic, icon: TZ_SYSTEM_ICONS.hepatic, color: '#f59e0b',
     mechanisms: [
       { id: 'liv1', weight: 1.0, markers: [
-        M('ALT', 'АЛТ', 'Ед/л', 'high', [40, 80, 200]),
-        M('AST', 'АСТ', 'Ед/л', 'high', [40, 80, 200]),
+        M('ALT', 'АЛТ', 'Ед/л', 'high', [40, 80, 200], { thresholds: [31, 62, 93] }),
+        M('AST', 'АСТ', 'Ед/л', 'high', [40, 80, 200], { thresholds: [31, 62, 93] }),
       ] },
       { id: 'liv2', weight: 0.7, markers: [
-        M('GGT', 'ГГТ', 'Ед/л', 'high', [55, 110, 220]),
+        M('GGT', 'ГГТ', 'Ед/л', 'high', [55, 110, 220], { thresholds: [32, 48, 96] }),
         M('BIL', 'Билирубин общий', 'мкмоль/л', 'high', [21, 50, 100]),
         M('ALP', 'Щелочная фосфатаза', 'Ед/л', 'high', [150, 200, 300]),
       ] },
       { id: 'liv3', weight: 1.0, markers: [
-        M('AST', 'АСТ', 'Ед/л', 'high', [40, 80, 200]),
-        M('ALT', 'АЛТ', 'Ед/л', 'high', [40, 80, 200]),
+        M('AST', 'АСТ', 'Ед/л', 'high', [40, 80, 200], { thresholds: [31, 62, 93] }),
+        M('ALT', 'АЛТ', 'Ед/л', 'high', [40, 80, 200], { thresholds: [31, 62, 93] }),
       ], note: 'соотношение АСТ/АЛТ > 1.5 (расчёт из значений)' },
     ],
     floors: [
-      { code: 'ALT', op: '>=', value: 200, label: 'АЛТ > 200 Ед/л — гепатотоксичность', risk: 50 },
-      { code: 'AST', op: '>=', value: 200, label: 'АСТ > 200 Ед/л — гепатотоксичность', risk: 50 },
+      { code: 'ALT', op: '>=', value: 200, label: 'АЛТ > 200 Ед/л — гепатотоксичность', risk: 50, femaleValue: 93, femaleLabel: 'АЛТ > 93 Ед/л (3× женской ULN 31) — гепатотоксичность' },
+      { code: 'AST', op: '>=', value: 200, label: 'АСТ > 200 Ед/л — гепатотоксичность', risk: 50, femaleValue: 93, femaleLabel: 'АСТ > 93 Ед/л (3× женской ULN 31) — гепатотоксичность' },
+      { code: 'ALT', op: '>=', value: 80, label: 'АЛТ > 80 Ед/л — 2×ULN', risk: 25, femaleValue: 62, femaleLabel: 'АЛТ > 62 Ед/л (2× женской ULN 31)' },
+      { code: 'AST', op: '>=', value: 80, label: 'АСТ > 80 Ед/л — 2×ULN', risk: 25, femaleValue: 62, femaleLabel: 'АСТ > 62 Ед/л (2× женской ULN 31)' },
     ],
   },
   {
@@ -102,7 +128,7 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
     mechanisms: [
       { id: 'ren1', weight: 1.0, markers: [
         M('eGFR', 'СКФ (eGFR)', 'мл/мин', 'low', [90, 60, 30]),
-        M('CREAT', 'Креатинин', 'мкмоль/л', 'high', [90, 130, 200]),
+        M('CREAT', 'Креатинин', 'мкмоль/л', 'high', [90, 130, 200], { thresholds: [97, 110, 120] }),
         M('UREA', 'Мочевина', 'ммоль/л', 'high', [8, 12, 20]),
         M('URIC', 'Мочевая кислота', 'мкмоль/л', 'high', [420, 480, 540]),
       ] },
@@ -166,32 +192,33 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
         M('FSH', 'ФСГ', 'МЕ/л', 'low', [2.0, 1.0, 0.5]),
       ] },
       { id: 'rep2', weight: 0.8, markers: [
-        M('TT', 'Тестостерон общий', 'нмоль/л', 'low', [12, 8, 4]),
-        M('FT', 'Тестостерон свободный', 'пмоль/л', 'low', [250, 150, 50]),
-        M('SHBG', 'ГСПГ', 'нмоль/л', 'high', [60, 80, 100]),
+        M('TT', 'Тестостерон общий', 'нмоль/л', 'low', [12, 8, 4], { thresholds: [2.5, 4, 6], direction: 'high' }),
+        M('FT', 'Тестостерон свободный', 'пмоль/л', 'low', [250, 150, 50], { thresholds: [10, 15, 25], direction: 'high' }),
+        M('SHBG', 'ГСПГ', 'нмоль/л', 'high', [60, 80, 100], { thresholds: [100, 150, 200] }),
       ] },
       { id: 'rep3', weight: 0.8, markers: [
         M('FSH', 'ФСГ', 'МЕ/л', 'low', [2.0, 1.0, 0.5]),
       ], note: 'олигозооспермия при супрессии ФСГ' },
       { id: 'rep4', weight: 0.5, markers: [
-        M('E2', 'Эстрадиол', 'пмоль/л', 'high', [40, 55, 80]),
+        M('E2', 'Эстрадиол', 'пмоль/л', 'high', [40, 55, 80], { thresholds: [150, 220, 400] }),
       ] },
       { id: 'rep5', weight: 0.6, markers: [
         M('LH', 'ЛГ', 'МЕ/л', 'low', [2.0, 1.0, 0.5]),
-        M('TT', 'Тестостерон общий', 'нмоль/л', 'low', [12, 8, 4]),
+        M('TT', 'Тестостерон общий', 'нмоль/л', 'low', [12, 8, 4], { thresholds: [2.5, 4, 6], direction: 'high' }),
       ], note: 'восстановление после цикла (PCT)' },
     ],
     floors: [
       { code: 'LH', op: '<=', value: 0.5, label: 'ЛГ < 0.5 МЕ/л — глубокая супрессия HPG-оси', risk: 50 },
+      { code: 'TT', op: '>=', value: 6, label: 'Тестостерон > 6 нмоль/л — вирилизация (женский порог), отмена', risk: 50, femaleOnly: true },
     ],
   },
   {
     id: 'hematologic', name: TZ_SYSTEM_LABELS.hematologic, icon: TZ_SYSTEM_ICONS.hematologic, color: '#14b8a6',
     mechanisms: [
       { id: 'hem1', weight: 1.0, markers: [
-        M('HCT', 'Гематокрит', '%', 'high', [48, 51, 54]),
-        M('HGB', 'Гемоглобин', 'г/л', 'high', [170, 180, 190]),
-        M('RBC', 'Эритроциты', '10¹²/л', 'high', [5.5, 6.0, 6.5]),
+        M('HCT', 'Гематокрит', '%', 'high', [48, 51, 54], { thresholds: [44, 48, 52] }),
+        M('HGB', 'Гемоглобин', 'г/л', 'high', [170, 180, 190], { thresholds: [150, 165, 180] }),
+        M('RBC', 'Эритроциты', '10¹²/л', 'high', [5.5, 6.0, 6.5], { thresholds: [5.2, 5.6, 6.0] }),
         M('WBC', 'Лейкоциты', '10⁹/л', 'high', [11, 13, 15]),
       ] },
       { id: 'hem2', weight: 0.7, markers: [
@@ -213,7 +240,8 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
       ] },
     ],
     floors: [
-      { code: 'HCT', op: '>=', value: 54, label: 'Гематокрит ≥ 54% — порог флеботомии', risk: 50 },
+      { code: 'HCT', op: '>=', value: 54, label: 'Гематокрит ≥ 54% — порог флеботомии', risk: 50, femaleValue: 52, femaleLabel: 'Гематокрит ≥ 52% — женский порог флеботомии' },
+      { code: 'HCT', op: '>=', value: 51, label: 'Гематокрит ≥ 51% — эритроцитоз', risk: 25, femaleValue: 48, femaleLabel: 'Гематокрит ≥ 48% — эритроцитоз (женский порог)' },
       { code: 'HOMA', op: '>=', value: 5, label: 'HOMA-IR > 5 — выраженная инсулинорезистентность', risk: 25 },
     ],
   },
@@ -225,10 +253,11 @@ const COMPUTED_CODES = new Set<string>(['AST', 'ALT']);
 export const VERIFICATION_TOTAL_MECHANISMS = VERIFICATION_SYSTEMS.reduce((s, x) => s + x.mechanisms.length, 0);
 
 // ── Статус маркера по порогам m_i (1/2/3) ──
-export function markerStatus(m: VerifMarker, value: number): 0 | 1 | 2 | 3 {
+// sex='female' → женские пороги/направление (если заданы); без sex — прежний мужской путь байт-в-байт.
+export function markerStatus(m: VerifMarker, value: number, sex?: 'male' | 'female'): 0 | 1 | 2 | 3 {
   if (!isFinite(value)) return 0;
-  const [t1, t2, t3] = m.thresholds;
-  if (m.direction === 'high') {
+  const [t1, t2, t3] = markerThresholds(m, sex);
+  if (markerDirection(m, sex) === 'high') {
     if (value < t1) return 0;
     if (value < t2) return 1;
     if (value < t3) return 2;
@@ -254,9 +283,9 @@ export function statusLabel(status: 0 | 1 | 2 | 3): string {
   return 'критический';
 }
 
-export function thresholdText(m: VerifMarker): string {
-  const [t1, t2, t3] = m.thresholds;
-  const op = m.direction === 'high' ? '≥' : '≤';
+export function thresholdText(m: VerifMarker, sex?: 'male' | 'female'): string {
+  const [t1, t2, t3] = markerThresholds(m, sex);
+  const op = markerDirection(m, sex) === 'high' ? '≥' : '≤';
   return `${op}${t1} · ${op}${t2} · ${op}${t3}`;
 }
 
@@ -300,8 +329,9 @@ export function labAliasMap(labMap: Record<string, number>): Record<string, numb
   return m;
 }
 
-export function buildVerificationReport(rawLabMap: Record<string, number>): VerifReport {
+export function buildVerificationReport(rawLabMap: Record<string, number>, sex?: 'male' | 'female'): VerifReport {
   const labMap = labAliasMap(rawLabMap);
+  const female = sex === 'female';
   const systems: VerifSystemRow[] = VERIFICATION_SYSTEMS.map(sys => {
     const mechanisms: VerifMechanismRow[] = sys.mechanisms.map(mech => {
       const markers: VerifMarkerRow[] = mech.markers.map(mk => {
@@ -310,7 +340,7 @@ export function buildVerificationReport(rawLabMap: Record<string, number>): Veri
           ...mk,
           value,
           present: value !== undefined,
-          status: value !== undefined ? markerStatus(mk, value) : 0,
+          status: value !== undefined ? markerStatus(mk, value, sex) : 0,
         };
       });
       const present = markers.length > 0 && markers.some(x => x.present);
@@ -319,9 +349,11 @@ export function buildVerificationReport(rawLabMap: Record<string, number>): Veri
     const presentCount = mechanisms.filter(m => m.present).length;
     const verification = mechanisms.length > 0 ? presentCount / mechanisms.length : 0;
     const floorHits = sys.floors.filter(f => {
+      if (f.femaleOnly && !female) return false;
       const v = labMap[f.code];
       if (v === undefined) return false;
-      return f.op === '>=' ? v >= f.value : v <= f.value;
+      const thr = female && f.femaleValue !== undefined ? f.femaleValue : f.value;
+      return f.op === '>=' ? v >= thr : v <= thr;
     });
     return { ...sys, mechanisms, presentCount, total: mechanisms.length, verification, floorHits };
   });
@@ -342,11 +374,20 @@ export function buildVerificationReport(rawLabMap: Record<string, number>): Veri
   return { systems, totalMarkers, presentMarkers, overall, floorsCount };
 }
 
+/** Эффективный порог якоря с учётом пола. */
+export function floorThreshold(f: VerifFloor, sex?: 'male' | 'female'): number {
+  return sex === 'female' && f.femaleValue !== undefined ? f.femaleValue : f.value;
+}
+/** Эффективная подпись якоря с учётом пола. */
+export function floorLabel(f: VerifFloor, sex?: 'male' | 'female'): string {
+  return sex === 'female' && f.femaleLabel ? f.femaleLabel : f.label;
+}
+
 // ── Экспорт: текст ──
-export function buildVerificationText(rawLabMap: Record<string, number>): string {
-  const rep = buildVerificationReport(rawLabMap);
+export function buildVerificationText(rawLabMap: Record<string, number>, sex?: 'male' | 'female'): string {
+  const rep = buildVerificationReport(rawLabMap, sex);
   const lines: string[] = [];
-  lines.push(`🔬 ВЕРИФИКАЦИЯ РИСКОВ АНАЛИЗАМИ · ${Math.round(rep.overall * 100)}% систем (${rep.presentMarkers}/${rep.totalMarkers} маркеров)`);
+  lines.push(`🔬 ВЕРИФИКАЦИЯ РИСКОВ АНАЛИЗАМИ${sex === 'female' ? ' (♀ женские пороги)' : ''} · ${Math.round(rep.overall * 100)}% систем (${rep.presentMarkers}/${rep.totalMarkers} маркеров)`);
   for (const sys of rep.systems) {
     lines.push('');
     lines.push(`${sys.icon} ${sys.name} — верификация ${Math.round(sys.verification * 100)}% (${sys.presentCount}/${sys.total} механизмов)`);
@@ -359,19 +400,19 @@ export function buildVerificationText(rawLabMap: Record<string, number>): string
       }
       for (const mk of mech.markers) {
         const val = mk.present ? `${mk.value} ${mk.unit}` : '—';
-        lines.push(`      ${mk.name} (${mk.code}): ${val} · пороги ${thresholdText(mk)} ${mk.unit} → ${statusLabel(mk.status)}`);
+        lines.push(`      ${mk.name} (${mk.code}): ${val} · пороги ${thresholdText(mk, sex)} ${mk.unit} → ${statusLabel(mk.status)}`);
       }
     }
     if (sys.floorHits.length > 0) {
-      for (const f of sys.floorHits) lines.push(`  ⚓ ${f.label} — якорный риск ≥${f.risk}%`);
+      for (const f of sys.floorHits) lines.push(`  ⚓ ${floorLabel(f, sex)} — якорный риск ≥${f.risk}%`);
     }
   }
   return lines.join('\n');
 }
 
 // ── Экспорт: CSV ──
-export function buildVerificationCsv(rawLabMap: Record<string, number>): string {
-  const rep = buildVerificationReport(rawLabMap);
+export function buildVerificationCsv(rawLabMap: Record<string, number>, sex?: 'male' | 'female'): string {
+  const rep = buildVerificationReport(rawLabMap, sex);
   const esc = (s: string) => {
     const v = String(s);
     return /[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
@@ -381,11 +422,11 @@ export function buildVerificationCsv(rawLabMap: Record<string, number>): string 
     for (const mech of sys.mechanisms) {
       const mechName = TZ_MECH_LABELS[mech.id] || mech.id;
       for (const mk of mech.markers) {
-        const [t1, t2, t3] = mk.thresholds;
+        const [t1, t2, t3] = markerThresholds(mk, sex);
         rows.push([
           esc(sys.name), esc(mechName), esc(mk.name), esc(mk.code), esc(mk.unit),
           mk.present ? esc(String(mk.value)) : '',
-          String(t1), String(t2), String(t3), mk.direction === 'high' ? 'выше нормы' : 'ниже нормы',
+          String(t1), String(t2), String(t3), markerDirection(mk, sex) === 'high' ? 'выше нормы' : 'ниже нормы',
           mk.present ? statusLabel(mk.status) : 'нет данных',
         ].join(';'));
       }
@@ -398,8 +439,8 @@ export function buildVerificationCsv(rawLabMap: Record<string, number>): string 
 }
 
 // ── Экспорт: печать (HTML, XSS-экранированный) ──
-export function buildVerificationHtml(rawLabMap: Record<string, number>): string {
-  const rep = buildVerificationReport(rawLabMap);
+export function buildVerificationHtml(rawLabMap: Record<string, number>, sex?: 'male' | 'female'): string {
+  const rep = buildVerificationReport(rawLabMap, sex);
   const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const cards = rep.systems.map(sys => {
     const mechs = sys.mechanisms.map(mech => {
@@ -412,11 +453,11 @@ export function buildVerificationHtml(rawLabMap: Record<string, number>): string
           const color = mk.present ? statusColor(mk.status) : '#888';
           return `<tr><td>${esc(mk.name)} <span style="color:#888;font-size:9px">${esc(mk.code)}</span></td>` +
             `<td style="text-align:center">${val} <span style="color:#888;font-size:9px">${esc(mk.unit)}</span></td>` +
-            `<td style="text-align:center">${esc(thresholdText(mk))} <span style="color:#888;font-size:9px">${esc(mk.unit)}</span></td>` +
+            `<td style="text-align:center">${esc(thresholdText(mk, sex))} <span style="color:#888;font-size:9px">${esc(mk.unit)}</span></td>` +
             `<td style="text-align:center;color:${color};font-weight:600">${mk.present ? esc(statusLabel(mk.status)) : 'нет данных'}</td></tr>`;
         }).join('');
       const floorLine = sys.floorHits.length > 0
-        ? `<div style="font-size:10px;color:#b91c1c;margin:2px 0">⚓ ${sys.floorHits.map(f => esc(f.label)).join(' · ')}</div>`
+        ? `<div style="font-size:10px;color:#b91c1c;margin:2px 0">⚓ ${sys.floorHits.map(f => esc(floorLabel(f, sex))).join(' · ')}</div>`
         : '';
       return `<div style="border:1px solid #ddd;border-radius:8px;padding:8px;margin:6px 0">
         <div style="font-weight:600;font-size:11px">${label} <span style="color:#888">(w=${mech.weight})</span></div>
@@ -442,9 +483,9 @@ export function buildVerificationHtml(rawLabMap: Record<string, number>): string
   <h1 style="font-size:18px">🔬 Верификация рисков анализами</h1>
   <div style="font-size:12px;color:#555;margin-bottom:8px">
     Систем верифицировано: <b>${Math.round(rep.overall * 100)}%</b> (${rep.systems.filter(s => s.verification >= 0.5).length}/${rep.systems.length}) ·
-    маркеров: ${rep.presentMarkers}/${rep.totalMarkers} · якорных попаданий: ${rep.floorsCount}
+    маркеров: ${rep.presentMarkers}/${rep.totalMarkers} · якорных попаданий: ${rep.floorsCount}${sex === 'female' ? ' · <b>♀ женские пороги</b>' : ''}
   </div>
-  <div style="font-size:10px;color:#888;margin-bottom:16px">Пороги — таблица T4 механизм-ориентированной модели (m_i = 1/2/3). Якорные floors поднимают риск системы независимо от препаратов.</div>
+  <div style="font-size:10px;color:#888;margin-bottom:16px">Пороги — таблица T4 механизм-ориентированной модели (m_i = 1/2/3)${sex === 'female' ? '; для женщины применены женские пороги (HCT, HGB, RBC, АЛТ/АСТ/ГГТ ULN 31, ТТ/FT, E2, креатинин)' : ''}. Якорные floors поднимают риск системы независимо от препаратов.</div>
   ${cards}
 </body></html>`;
 }

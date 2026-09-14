@@ -232,6 +232,9 @@ export const THERAPEUTIC_WINDOWS: Record<string, { minMg: number; optMg: number;
   beetroot: { minMg: 250, optMg: 500, maxMg: 2000, ul: 9999, note: 'Нитраты→NO. Pre-workout.' },
   magnesium: { minMg: 200, optMg: 400, maxMg: 600, ul: 350, note: 'Бисглицинат/таурат. UL 350 мг из добавок.' },
   calcium: { minMg: 500, optMg: 800, maxMg: 1200, ul: 2500, note: 'С D3+K2. Не более 500 мг за раз.' },
+  // ── Женский слой (docs/FEMALE_AAS_PROTOCOLS.md §5.1; female-support-layer) ──
+  vitex: { minMg: 20, optMg: 30, maxMg: 40, ul: 9999, note: 'Прутняк: D2-агонизм → ↓PRL. Беременность — противопоказано; контроль PRL.' },
+  inositol: { minMg: 2000, optMg: 3000, maxMg: 4000, ul: 9999, note: 'Мио-инозитол: СПКЯ/инсулиночувствительность. 2 г 2×/д с едой; ЖКТ при высоких дозах.' },
 };
 
 export const HALF_LIFE_INFO: Record<string, { t12h: number; freq: string; steadyState: string }> = {

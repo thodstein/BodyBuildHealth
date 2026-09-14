@@ -44,9 +44,10 @@ export const FEMALE_AAS_PROFILES: FemaleAasProfile[] = [
   // 'test' ДО 'stan': иначе 'sustanon' матчится на станозолол ('stan' ⊆ 'sustanon') и наоборот.
   { patterns: ['test', 'testosterone', 'sustanon', 'sust', 'omnadren'], name: 'Тестостерон', yellow: 10, red: 20, androgenIndex: 1.0 },
   { patterns: ['nandrolone', 'deca', 'npp'], name: 'Нандролон', yellow: 50, red: 75, androgenIndex: 0.35 },
+  // Дростанолон ДО 'stan': 'drostanolone' содержит подстроку 'stan' — иначе мастерон ловится станозолольным профилем.
+  { patterns: ['drostanolone', 'drost_', 'masteron'], name: 'Дростанолон (мастерон)', yellow: 75, red: 100, androgenIndex: 0.3 },
   { patterns: ['stan', 'winstrol', 'winny', 'stanozolol'], name: 'Станозолол', yellow: 70, red: 140, androgenIndex: 0.3 },
   { patterns: ['dhb', 'dihydroboldenone'], name: 'Дигидроболденон (DHB)', yellow: 50, red: 75, androgenIndex: 0.4 },
-  { patterns: ['masteron', 'drostanolone'], name: 'Дростанолон (мастерон)', yellow: 75, red: 100, androgenIndex: 0.3 },
   { patterns: ['primobolan', 'methenolone', 'primo', 'prim_'], name: 'Примоболан', yellow: 50, red: 75, androgenIndex: 0.2 },
   { patterns: ['bold', 'equipoise', 'eq'], name: 'Болденон', yellow: 50, red: 100, androgenIndex: 0.3 },
   { patterns: ['dbol', 'dianabol', 'methand', 'methandrostenolone'], name: 'Метандиенон', yellow: 35, red: 70, androgenIndex: 0.5 },

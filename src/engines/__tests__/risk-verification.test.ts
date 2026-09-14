@@ -189,7 +189,8 @@ describe('buildVerificationReport', () => {
     const ren = rep.systems.find(s => s.id === 'renal')!;
     expect(hem.floorHits.map(f => f.code)).toContain('HCT');
     expect(ren.floorHits.map(f => f.code)).toEqual(['eGFR', 'eGFR']);
-    expect(rep.floorsCount).toBe(3);
+    // HCT 55 ≥ 54 (risk 50) и ≥ 51 (risk 25) — два якоря, HCT-якорь расширен женским порогом 48/52
+    expect(rep.floorsCount).toBe(4);
   });
 
   it('флоры не срабатывают без значения', () => {
