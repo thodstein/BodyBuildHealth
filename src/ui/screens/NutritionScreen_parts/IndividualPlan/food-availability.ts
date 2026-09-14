@@ -50,6 +50,8 @@ export const EXOTIC_FOOD_IDS: ReadonlySet<string> = new Set([
   'crucian',
   // прочее
   'meat_ostrich', 'meat_kangaroo', 'meat_alligator', 'meat_bison_ribeye',
+  // FIX base-2026-09: реальные id экзотики из FOOD_DB (иначе «кенгуру в предтрен»).
+  'exotic_kangaroo_loin', 'exotic_crocodile', 'exotic_ostrich',
 ]);
 
 // ─── 2. Specialty: только по явному предпочтению пользователя ─────────
@@ -235,6 +237,18 @@ export function creamMealCap(_hv?: boolean, ts?: number): number {
   return _ts >= 1.5 ? 3 : 2;
 }
 
+/**
+ * FIX base-2026-09: порционный кап цитруса (единая точка для движка и корректора).
+ * Лимон/лайм — приправа (30 г: сок одного лимона), грейпфрут/апельсин — фрукт
+ * (80 г: половина грейпфрута — нормальная порция, FRUIT_CAP 150 избыточен как добор).
+ */
+export function citrusFruitCapG(id: string): number {
+  const lid = (id || '').toLowerCase();
+  if (/lemon|lime/.test(lid)) return 30;
+  if (/grapefruit|orange|citrus/.test(lid)) return 80;
+  return 150;
+}
+
 /** Сколько приёмов дня уже несут то же семейство гарнира (по id — если семейства нет). */
 export function familyMealUses(meals: Array<{ items?: Array<{ id?: string }> }>, id: string): number {
   const fam = stapleFamilyOf(id);
@@ -259,6 +273,9 @@ export const EXCLUDED_FAMILIES_FROM_PLATE: ReadonlySet<string> = new Set(['oils_
 export function foodAvailableForPlan(f: { id: string }, preferredIds?: Set<string>): boolean {
   const id = f.id || '';
   if (EXOTIC_FOOD_IDS.has(id)) return false; // экзотика — никогда (даже в любимых не предлагаем в авто-план)
+  // FIX base-2026-09: семейство exotic_* и кенгуру под любым id — никогда в автоплан
+  // (иначе 'exotic_kangaroo_loin' проскакивает мимо точного Set).
+  if (/^exotic_/i.test(id) || /kangaroo/i.test(id)) return false;
   // P1 (HV-рацион): консервы — вообще не автоплан (пользователь: «не бич-пакет»).
   // Вручную через поиск добавить можно; в БД id остаются.
   if (isCannedFoodId(id)) return false;
@@ -552,7 +569,7 @@ export function isBreakfastBannedProtein(id: string): boolean {
 }
 /** В завтраке никогда как жир: наливаемые масла/животные жиры (соевое масло в творог — мусор).
  * Завтрак-жир = орехи/авокадо/сливочное мало/молоко, не ложка масла. */
-const BREAKFAST_OIL_RE = /^oil_|_oil$|tallow|lard|goose_fat|duck_fat|mayonnaise|mayo_/;
+const BREAKFAST_OIL_RE = /^oil_|_oil$|tallow|lard|goose_fat|duck_fat|mayonnaise|mayo|sauce_mayo|ketchup/;
 export function isBreakfastBannedFat(id: string): boolean {
   if (!id) return false;
   return BREAKFAST_OIL_RE.test(id.toLowerCase());

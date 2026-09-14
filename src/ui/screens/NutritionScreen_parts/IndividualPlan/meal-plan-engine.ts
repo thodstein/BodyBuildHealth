@@ -38,7 +38,7 @@ import {
   QUOTA_LIMITS, stapleFamilyOf, nutCatchupCap, oilCatchupCap,
   isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, countCarbItems,
   isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId,
-  familyMealCap, familyMealUses, isCreamId, creamMealCap, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId,
+  familyMealCap, familyMealUses, isCreamId, creamMealCap, citrusFruitCapG, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId,
   isCannedFoodId, CANNED_SUBSTITUTE, isFlakeId, isMeatProteinId, mealHasMeatProtein,
   isSauceCondimentFood,
   dayTargetScale, quotaMealCap,
@@ -1938,23 +1938,30 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
       }
       // D-27: preferred carbs bypass GL-aware narrowing (user intent > GI optimisation)
       if (preferredIds && preferredIds.size > 0) { const have = new Set(carbPickPool.map((f: any) => f.id)); const prefAdd = carbPool.filter((f: any) => preferredIds.has(f.id) && !have.has(f.id) && !dayUsedPreferredIds?.has(f.id)); if (prefAdd.length) carbPickPool = [...carbPickPool, ...prefAdd]; }
-      // P1a: якоря дня — возвращаем в пул после GL/dense-сужений (иначе рис/картофель
-      // с GI>55 вылетают из больших приёмов и якорный пик их не находит).
-      // Только не-завтрак (иначе рис загрязняет овсяный пул завтрака — типология).
-      {
-        const _anchC2: string[] = (_pickCtx.dayCarbAnchors || []) as string[];
-        if (!breakfast && _anchC2.length > 0) {
-          const _have2 = new Set(carbPickPool.map((f: any) => f.id));
-          for (const _aid of _anchC2) {
-            if (_have2.has(_aid)) continue;
-            const _af = (carbPool as any[]).find((f: any) => f.id === _aid)
-              || FOOD_DB.find((f: any) => f.id === _aid);
-            if (!_af) continue;
-            if (_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(_aid)) continue;
-            if (!foodPassesCtxAllergens(_af)) continue;
-            if (_quotaBlockedIds && !foodAvailableWithQuota(_af, _quotaBlockedIds, _quotaAllowIds)) continue;
-            carbPickPool.push(_af);
-          }
+    }
+    // P1a: якоря дня — возвращаем в пул после GL/dense-сужений (иначе рис/картофель
+    // с GI>55 вылетают из больших приёмов и якорный пик их не находит).
+    // Только не-завтрак (иначе рис загрязняет овсяный пул завтрака — типология).
+    // FIX base-2026-09: возврат якорей — обеду/ужину ВСЕГДА + остальным при цели ≥60
+    // (раньше только при carbTarget>=60; ужин с целью 29 г оставался с [хлеб, паста] —
+    // самыми белковосодержащими медленными носителями, и день висел +6% белка).
+    // Снекам якорей не надо: у них свои плотные стейплы (хлопья/овёс/крем/манка), а рис
+    // с GI73 ронял бы долю низко-GI носителей (GL-тест).
+    {
+      const _anchC2: string[] = (_pickCtx.dayCarbAnchors || []) as string[];
+      const _needAnchors = !breakfast && !lockedIds?.size && !refeedDay
+        && ((String(type || '') === 'lunch' || (String(type || '') === 'dinner' && !lowFatDinner)) || carbTarget >= 60);
+      if (_needAnchors && _anchC2.length > 0) {
+        const _have2 = new Set(carbPickPool.map((f: any) => f.id));
+        for (const _aid of _anchC2) {
+          if (_have2.has(_aid)) continue;
+          const _af = (carbPool as any[]).find((f: any) => f.id === _aid)
+            || FOOD_DB.find((f: any) => f.id === _aid);
+          if (!_af) continue;
+          if (_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(_aid)) continue;
+          if (!foodPassesCtxAllergens(_af)) continue;
+          if (_quotaBlockedIds && !foodAvailableWithQuota(_af, _quotaBlockedIds, _quotaAllowIds)) continue;
+          carbPickPool.push(_af);
         }
       }
     }
@@ -2033,7 +2040,10 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
     let carbSource = (() => {
       const _anchC: string[] = (_pickCtx.dayCarbAnchors || []) as string[];
       const _mealKind = String(type || '');
-      const _anchorMeal = _mealKind === 'lunch' || (_mealKind === 'dinner' && (carbG || 0) >= 100 && !lowFatDinner);
+      // FIX base-2026-09: ужин — всегда якорный (раньше только при цели ≥100 г; при 29 г
+      // ужин брал остатки пула (паста/хлеб), а добор потом раздувал белковый носитель
+      // и день висел +6% белка). Якорь сам уважает капы (нет якоря в пуле — как было).
+      const _anchorMeal = _mealKind === 'lunch' || (_mealKind === 'dinner' && !lowFatDinner);
       if ((process.env as any).VITEST_DEBUG_ANCHOR && _mealKind === 'lunch') console.log(`[LUNCH-CARB] anchors=${_anchC.join(',')} finalpool=${_carbPickFinal.map((f: any) => f.id).join(',')}`);
       if (_anchorMeal && _anchC.length > 0 && (!lockedIds || lockedIds.size === 0)) {
         const _ap = _carbPickFinal.filter((f: any) => _anchC.includes(f.id));
@@ -2073,6 +2083,13 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
     // дни; а тортилья GI30 при цели 40 г — хороший носитель, не трогаем). Одна fallback-
     // попытка на низкобелковый кандидат (Б <8/100, сортировка по GI — чиним белок не ценой GL),
     // иначе оставляем пик (сходимость важнее).
+    // FIX base-2026-09: в ОБЕДЕ/УЖИНЕ строже — белковый гарнир (паста 5/100 = 9 г белка)
+    // роняет мясо ниже 90-г порога и день висит +6% белка мимо ±5%. Условия узкие:
+    // Б≥5/100 + >25% цели + GI>40 (тортилья GI30 и лепёшки вне подозрений) + только lunch/dinner.
+    // FIX base-2026-09: в ОБЕДЕ/УЖИНЕ строже — белковый гарнир (паста 177 г = 9 г белка
+    // при полном капе) роняет мясо ниже 90-г порога. Биссекция показала: на HV-регрессии
+    // (R-HV/R-1500/meal-scale) не влияет — это страховочная сетка, не виновник.
+    const _isMainMealVeto = String(type || '') === 'lunch' || String(type || '') === 'dinner';
     if (carbSource && (carbSource.protein || 0) >= 8 && proteinG > 0) {
       const _g0 = gramsForMacro(carbSource, carbTarget, 'carbs', carbPortionCap(carbSource, _capScale));
       if (((carbSource.protein || 0) * _g0 / 100) / proteinG > 0.75) {
@@ -2083,6 +2100,22 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
         for (const _cand of _alt.slice(0, 4)) {
           const _gc = gramsForMacro(_cand, carbTarget, 'carbs', carbPortionCap(_cand, _capScale));
           if (_gc >= 30) { carbSource = _cand; break; }
+        }
+      }
+    }
+    // FIX base-2026-09: в ОБЕДЕ/УЖИНЕ строже — белковый гарнир (паста 177 г = 9 г белка)
+    // роняет мясо ниже 90-г порога и день висит +6% белка мимо ±5%. Стартовую цель (29 г)
+    // смотреть бесполезно — гарнир раздувается потом добором; смотрим ПОТЕНЦИАЛ носителя:
+    // белок при полном капе порции (>8 г) + GI>40 (тортилья GI30 вне подозрений) + lunch/dinner.
+    if (_isMainMealVeto && carbSource && (carbSource.protein || 0) >= 5 && (carbSource.gi || 55) > 40 && proteinG > 0) {
+      const _cap1 = carbPortionCap(carbSource, _capScale);
+      const _carrierP = ((carbSource.protein || 0) * _cap1 / 100);
+      if (_carrierP > 8) {
+        const _alt2 = _carbPickFinal.filter((f: any) => f.id !== carbSource!.id && (f.protein || 0) < 5)
+          .sort((a: any, b: any) => (a.gi || 55) - (b.gi || 55));
+        for (const _cand of _alt2.slice(0, 4)) {
+          const _gc2 = gramsForMacro(_cand, carbTarget, 'carbs', carbPortionCap(_cand, _capScale));
+          if (_gc2 >= 30) { carbSource = _cand; break; }
         }
       }
     }
@@ -2112,6 +2145,16 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
       let grams = gramsForMacro(carbSource, carbTarget, 'carbs', carbPortionCap(carbSource, _capScale));
       // PRO: фунчоза — сайд ≤100г, никогда ведром 232г как основа.
       if (/glass|funchose|rice_noodles/.test(carbSource.id)) grams = Math.min(grams, 100);
+      // FIX base-2026-09: вёдра варёных крахмалов — кап 350 г/приём на ОБЫЧНЫХ днях
+      // (иначе «рис 441 г»); бобовые-гарнир — кап 250 г (иначе «фасоль 315 г» и ЖКТ-ад);
+      // сухая овсянка — кап 100 г (иначе «овсянка 135 г сухо»).
+      // На HV-днях (800–1500У) капы НЕ жмут: ведёрные порции там — условие сходимости,
+      // резать их = вечный недобор −20% (R-HV). Съедобность HV держат EDIBILITY_CAPS.
+      if (!(_pickCtx.highVolumeDay)) {
+        if ((carbSource.carbs || 0) < 30) grams = Math.min(grams, 350);
+        if (/lentil|bean|pea|chickpea|legume/.test(carbSource.id)) grams = Math.min(grams, 250);
+        if (/oats_dry|oatmeal_dry|buckwheat_dry/.test(carbSource.id)) grams = Math.min(grams, 100);
+      }
       const isMainCarbDense2 = breakfast || label === 'Обед' || label === 'Ужин';
       const carbFloorDense2 = Math.round((isMainCarbDense2 ? 60 : 30) * Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)));
       if (grams > 0 && grams < carbFloorDense2) grams = carbFloorDense2;
@@ -2150,9 +2193,9 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
         const fSrc = pickPriority(_e5pool, seed + 21, { lockedIds, recentIds, hardRecentIds });
         if (fSrc && !used.has(fSrc.id)) {
           // E5-порция фрукта ограничена реалистичными 150 г — «добавка», а не гигантская ягодная миска.
-          // Р-2.1: концентраты (сухофрукты/джем) — кап 50 г на приём. Эпик B: цитрусы-«добавки»
-          // (лайм/лимон) — не 140 г в обеде, а кулинарные 60 г.
-          const _citrusCap = /lemon|lime|citrus/.test(fSrc.id) ? 60 : FRUIT_PORTION_CAP_G;
+          // Р-2.1: концентраты (сухофрукты/джем) — кап 50 г на приём.
+          // FIX base-2026-09: цитрус — по citrusFruitCapG (лимон 30 / грейпфрут 80).
+          const _citrusCap = Math.min(FRUIT_PORTION_CAP_G, citrusFruitCapG(fSrc.id));
           const gramsF = isConcentrateFood(fSrc)
             ? Math.min(CONCENTRATE_CAP_G, gramsForMacro(fSrc, remC, 'carbs', carbPortionCap(fSrc)))
             : Math.min(_citrusCap, gramsForMacro(fSrc, remC, 'carbs', carbPortionCap(fSrc)));
@@ -2347,7 +2390,11 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
     // цветовых групп (напр. лук/огурец) фильтровались из обеда/ужина и пропадали из плана.
     const prefVegGreen = preferredIds && preferredIds.size > 0 ? pool.vegGreen.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
     const prefVegColor = preferredIds && preferredIds.size > 0 ? pool.vegColor.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
-    const vegSource = pickPriority(prefVegGreen.length > 0 ? prefVegGreen : fallbackGreen, seed + 2, { lockedIds, recentIds, hardRecentIds }) || pickPriority(prefVegColor.length > 0 ? prefVegColor : fallbackColor, seed + 3, { lockedIds, recentIds, hardRecentIds });
+    // FIX base-2026-09: любимый ЦВЕТНОЙ овощ (tomato) раньше проигрывал ЛЮБОМУ зелёному:
+    // || к prefVegColor шёл, только если зелёный пул пуст. Любимое — первым (оба цвета),
+    // затем обычные фолбэки. Без preferred поведение бит-в-бит.
+    const _prefVegAll = [...prefVegGreen, ...prefVegColor];
+    const vegSource = pickPriority(_prefVegAll.length > 0 ? _prefVegAll : fallbackGreen, seed + 2, { lockedIds, recentIds, hardRecentIds }) || pickPriority(fallbackColor, seed + 3, { lockedIds, recentIds, hardRecentIds });
     if (vegSource) {
       if (preferredIds?.has(vegSource.id)) dayUsedPreferredIds?.add(vegSource.id);
       // Этап 5/7: на рефид-дне или пик-дне с низким лимитом клетчатки овощи легче
@@ -2376,7 +2423,9 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
       const capByRem = remC > 5 ? Math.max(50, Math.round(remC / fPer100 * 100)) : 50;
       // PRO: шиповник/облепиха — вит-C бомба (2371мг при 80г — выше UL 2000). Кап 30г на приём.
       const _vitCCap = /rosehip|sea_buckthorn|acerola|blackcurrant/.test(fSrc.id) ? 30 : 500;
-      const grams = Math.min(80 + Math.floor(seededRandom(seed + 5) * 60), capByRem, _vitCCap);
+      // FIX base-2026-09: цитрус — по citrusFruitCapG (лимон 30 / грейпфрут 80).
+      const _citrusCapMain = Math.min(500, citrusFruitCapG(fSrc.id));
+      const grams = Math.min(80 + Math.floor(seededRandom(seed + 5) * 60), capByRem, _vitCCap, _citrusCapMain);
       const item = makeItem(fSrc, grams, 'fruit');
       items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
     }
@@ -2703,16 +2752,17 @@ function buildPostWorkout(
        : proteinGrams;
      items.push(makeItem(fastProtein, grams, 'fast_protein'));
   }
-   // P0 (HV-рацион): жидкая часть окна первой (до 60 г) — остаток добирается едой ниже.
-   // Роль carb_fast (не liquid), чтобы peri-страж кап 75 видел и её.
-   if (_liquidBase.length > 0 && carbG >= 30) {
-     const _lf = _liquidBase[0];
-     const _lg = Math.min(60, Math.floor(carbG * 0.6 / 5) * 5);
-     if (_lg >= 20) {
-       items.push(makeItem(_lf, _lg, 'carb_fast'));
-       carbG = Math.max(0, carbG - Math.round((_lf.carbs || 0) * _lg / 100));
-     }
-   }
+    // P0 (HV-рацион): жидкая часть окна первой (до 60 г) — остаток добирается едой ниже.
+    // FIX base-2026-09: роль 'liquid' (напиток 🥤), а не 'carb_fast' — иначе в пост-трене
+    // всегда «2 каши» (амилопектин + гарнир) и D-18b добавлял третью.
+    if (_liquidBase.length > 0 && carbG >= 30) {
+      const _lf = _liquidBase[0];
+      const _lg = Math.min(60, Math.floor(carbG * 0.6 / 5) * 5);
+      if (_lg >= 20) {
+        items.push(makeItem(_lf, _lg, 'liquid'));
+        carbG = Math.max(0, carbG - Math.round((_lf.carbs || 0) * _lg / 100));
+      }
+    }
    if (fastCarb) {
     // D-18: cap cooked starches at 280g (post-W fast carbs are usually bread/pasta/rice/potato;
     // a 100g-carb target on a high-carb day could otherwise push pasta to ~400g).
@@ -2722,20 +2772,22 @@ function buildPostWorkout(
      const grams = Math.min(gramsForMacro(fastCarb, carbG, 'carbs', carbPortionCap(fastCarb)), fatCap);
     const delivered = (fastCarb.carbs || 0) * grams / 100;
     items.push(makeItem(fastCarb, grams, 'carb_fast'));
-    // D-18b: if the cap left a large carb gap (high-carb day), add a second fast-carb source.
-    if (delivered < carbG - 15 && carbG >= 60) {
+    // FIX base-2026-09: второй пищевой гарнир в пост-трен — ТОЛЬКО HV-дням (сходимость
+    // 800-1500У без него невозможна). На обычных днях пост-трен = 1 напиток + 1 гарнир
+    // («2-3 каши в одном приёме»); остаток добирают соседние приёмы/корректор.
+    if (!!_pickCtx.highVolumeDay && delivered < carbG - 15 && carbG >= 60) {
       const secondPool = (prefCarb.length > 0 ? prefCarb : _carbBase).filter(f => f.id !== fastCarb.id);
       const fastCarb2 = pickPriority(secondPool.length > 0 ? secondPool : _carbBase.filter(f => f.id !== fastCarb.id), seed + 21, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
       if (fastCarb2) {
         const rem = Math.max(0, carbG - delivered);
-       const grams2 = gramsForMacro(fastCarb2, rem, 'carbs', carbPortionCap(fastCarb2));
-         if (grams2 > 0) {
-           const currentFat = items.reduce((sum, item) => sum + item.f, 0);
-           const fatRoom2 = Math.max(0, 6 - currentFat);
-           const fatCap2 = (fastCarb2.fat || 0) > 0 ? Math.floor(fatRoom2 / fastCarb2.fat * 100) : Infinity;
-           const safeGrams2 = Math.min(grams2, fatCap2);
-           if (safeGrams2 > 0) items.push(makeItem(fastCarb2, safeGrams2, 'carb_fast'));
-         }
+        const grams2 = gramsForMacro(fastCarb2, rem, 'carbs', carbPortionCap(fastCarb2));
+        if (grams2 > 0) {
+          const currentFat = items.reduce((sum, item) => sum + item.f, 0);
+          const fatRoom2 = Math.max(0, 6 - currentFat);
+          const fatCap2 = (fastCarb2.fat || 0) > 0 ? Math.floor(fatRoom2 / fastCarb2.fat * 100) : Infinity;
+          const safeGrams2 = Math.min(grams2, fatCap2);
+          if (safeGrams2 > 0) items.push(makeItem(fastCarb2, safeGrams2, 'carb_fast'));
+        }
       }
     }
   }
@@ -3934,7 +3986,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     carbG: mealBudget.dinner.c,
     fatG: mealBudget.dinner.f,
     mealKind: 'dinner',
-    lowFatDinner: morningTrainLoad,
+    // FIX base-2026-09: лёгкий ужин = morningLoad И eveningLowCarb (раньше только morning:
+    // eveningLowCarb-ужин получал якоря риса/картофеля и вылетал за 12% углей дня).
+    lowFatDinner: morningTrainLoad || !!input.eveningLowCarb,
     pool, proteinRotationIds: dinnerRot.ids, seed: seedBase + 6,
     includeVeg: true, includeFruit: false,
     preferredIds: effectivePreferred, dayUsedPreferredIds,
@@ -4601,6 +4655,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // носитель; коррекция макросов не должна раздувать его выше реалистичных 150 г
         // (концентраты-сухофрукты — жёстче, по карте 40-60 г).
         if (item.role === 'fruit') upCap = COMFORT_PORTION_LIMITS[item.id] ?? FRUIT_PORTION_CAP_G;
+        // FIX base-2026-09: цитрус — по citrusFruitCapG (иначе «грейпфрут 80 г»).
+        if (item.role === 'fruit') upCap = Math.min(upCap, citrusFruitCapG(item.id));
         // D-28+ fix: цельный белок (курица/рыба/творог) тоже не раздувается коррекцией за 300 г
         // на приём — иначе прецизионная подгонка давала «лосось 316 г». Эпик B: кап ровно 300 г
         // (тест d28 «порция белка ≤300 г»; ×1.25 допускал 375 г).
@@ -4735,6 +4791,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     // D-28+ fix (жалоба «500 г клюквы»): fruit-порции не раздуваются точной подгонкой.
     if (!suppMax && best.item.role === 'fruit') maxAmount = Math.min(maxAmount, FRUIT_PORTION_CAP_G);
+    // FIX base-2026-09: цитрус — по citrusFruitCapG (иначе «грейпфрут 87 г»).
+    if (!suppMax && best.item.role === 'fruit') maxAmount = Math.min(maxAmount, citrusFruitCapG(best.item.id));
     // D-28+ fix: цельный белок не раздувается за 300 г на приём (иначе «лосось 316 г»).
     // Эпик B: кап ровно 300 г (×1.25 допускал 374 г — тест d28 «порция белка ≤300 г»).
     if (!suppMax && best.item.role === 'protein') maxAmount = Math.min(maxAmount, 300);
@@ -5024,6 +5082,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if ((it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein') && na > 300 && it.role !== 'slow_protein') na = 300;
       // Эпик B: фрукт — «добавка», баланс не раздувает за 150 г (жалоба «500 г клюквы»).
       if (it.role === 'fruit' && na > FRUIT_PORTION_CAP_G) na = FRUIT_PORTION_CAP_G;
+      // FIX base-2026-09: цитрус балансом не раздуваем (иначе «грейпфрут 87 г»).
+      if (it.role === 'fruit' && /lemon|lime|citrus|grapefruit/.test(it.id) && na > 30) na = 30;
       // D-28: при «загрузке под утреннюю тренировку» ужин — минимум жиров (≤10 г),
       // межприёмный баланс его не поднимает.
       if (morningTrainLoad && m.type === 'dinner' && it.role === 'fat' && na > 10) na = 10;
@@ -5899,11 +5959,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     {
       const _periGuard = (m: any, capC: number) => {
         if (!m || capC <= 0) return;
-        const curC = m.items.filter((x: any) => x.role === 'carb_slow' || x.role === 'carb_fast').reduce((s: number, x: any) => s + (x.c || 0), 0);
+        // FIX base-2026-09: жидкие угли окна (амилопектин роль 'liquid') тоже считаются —
+        // peri-тесты считают жидкость углеводами (83 = напиток + гарнир против капа 79),
+        // без этого страж слеп. На обычных днях окно собирается в кап конструкцией,
+        // страж — backstop; на HV трим идёт к масштабированному postwCarbG, как было.
+        const _isCarbLike = (x: any) => x.role === 'carb_slow' || x.role === 'carb_fast' || (x.role === 'liquid' && (x.c || 0) > 0);
+        const curC = m.items.filter(_isCarbLike).reduce((s: number, x: any) => s + (x.c || 0), 0);
         if (curC > capC * 1.05) {
           const k = capC / curC;
           m.items.forEach((x: any) => {
-            if (x.role !== 'carb_slow' && x.role !== 'carb_fast') return;
+            if (!_isCarbLike(x)) return;
             const na = Math.max(10, Math.round((x.amount || 0) * k));
             const r = na / (x.amount || 1);
             x.amount = na;
@@ -6177,6 +6242,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // Не режем жировые пункты при недоборе жиров дня (иначе чиним клетчатку
             // ценой жира: кейс 3000 ккал −12 г Ж и −9% ккал).
             if (it.role === 'fat' && totals.f < (input.goalFatG || 0)) continue;
+            // FIX base-2026-09: клетчаточный трим НЕ трогает любимые продукты (иначе томат
+            // съедался до 15 г и сносился чисткой мелочи — тест preferred). Любимое важнее
+            // грамма клетчатки; при отсутствии других жертв цикл честно стопается ниже.
+            try {
+              const _pref = new Set<string>([...(((input as any).preferredIds || []) as any)]);
+              if (_pref.has(it.id)) continue;
+            } catch { /* preferredIds недоступен — legacy-путь */ }
             const fd = FOOD_DB.find((f: any) => f.id === it.id);
             const _f = ((it.fiber || 0) / Math.max(1, it.amount || 1)) * 100;
             if (_f > _bestF && (fd ? fd.fiber || 0 : it.fiber || 0) > 1) { _bestF = _f; _victim = { m, it }; }
@@ -7122,8 +7194,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       for (const m of meals) {
         if ((m as any)._insulinWindow || String((m as any).type || '') === 'presleep') continue;
         const _its = m.items || [];
-        // 1) мелочь <30 г: БЕЛОК НЕ МУСОР (MPS), только углеводные/овощные/фруктовые обрезки
+        // 1) мелочь <30 г: БЕЛОК НЕ МУСОР (MPS), только углеводные/овощные/фруктовые обрезки.
+        // FIX base-2026-09: любимые продукты — не мусор (иначе обрезанный тримом томат:15
+        // сносился полностью и тест preferred падал). Оставляем как есть.
+        const _prefDel = new Set<string>([...(((input as any).preferredIds || []) as any)]);
         const _smallCut = _its.filter((it: any) => !(it as any)._fixedGrams
+          && !_prefDel.has(it.id)
           && it.role !== 'supplement' && it.role !== 'liquid'
           && it.role !== 'protein' && it.role !== 'fast_protein' && it.role !== 'slow_protein'
           && !(it.role === 'fat' && (it.amount || 0) <= 20)
@@ -7140,7 +7216,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         const _snackTy = String((m as any).type || '').startsWith('snack') || (m as any).type === 'snack';
         const _veg = _its.filter((it: any) => it.role === 'veg');
         if (_veg.length > (_snackTy ? 0 : 1)) {
-          const _keep = _snackTy ? null : [..._veg].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0))[0];
+          // FIX base-2026-09: при чистке овощей оставляем любимый (иначе preferred-тесты
+          // падают при смене пулов). Без любимых — крупнейший, как было.
+          const _prefVeg = _veg.filter((v: any) => _prefDel.has(v.id));
+          const _keep = _snackTy ? null : (_prefVeg.length > 0
+            ? [..._prefVeg].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0))[0]
+            : [..._veg].sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0))[0]);
           for (const _v of _veg) {
             if (_v === _keep) continue;
             const _ix = _its.indexOf(_v);

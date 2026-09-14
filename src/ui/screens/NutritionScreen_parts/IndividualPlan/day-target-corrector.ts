@@ -12,7 +12,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
-import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein, dayTargetScale, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS } from './food-availability';
+import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, citrusFruitCapG, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein, dayTargetScale, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS } from './food-availability';
 // Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
 // Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
 const POWDER_PORTION_CAP_G = 60;
@@ -905,6 +905,8 @@ export function correctDayToTargets(
         else if (isProteinPowderId(cand.it.id)) cap = POWDER_PORTION_CAP_G;
         else if (eff === 'p' && (cand.it.role === 'protein' || cand.it.role === 'fast_protein' || cand.it.role === 'slow_protein')) cap = 300;
         else if (cand.it.role === 'fruit') cap = 150;
+        // FIX base-2026-09: цитрус ростом не раздуваем — по citrusFruitCapG.
+        if (cand.it.role === 'fruit') cap = Math.min(cap, citrusFruitCapG(cand.it.id));
         if (newAmount > cap) continue;
         const beforeTotals = sumTotals(meals);
         const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);
@@ -1085,6 +1087,8 @@ export function correctDayToTargets(
         bread_white: 100, bread_rye: 100, bread_borodinsky: 100, bread_fitness: 100, whole_grain_bread: 100,
         // PRO: шиповник/облепиха — вит-C бомба (80г = 2371мг > UL 2000). Кап 30г на добор.
         fruit_rosehip: 30, sea_buckthorn: 30, acerola: 30, blackcurrant: 60,
+        // FIX base-2026-09: цитрус — по citrusFruitCapG (лимон 30 / грейпфрут 80).
+        lemon: 30, lime: 30, grapefruit: 80, fruit_grapefruit: 80, fruit_grapefruit_pink: 80, orange: 80,
         // PRO: фунчоза — только сайд ≤100г, никогда ведром.
         pasta_glass_noodles: 100, glass_noodles: 100, rice_noodles: 120,
       };
