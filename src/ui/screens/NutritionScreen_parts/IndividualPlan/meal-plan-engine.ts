@@ -2148,9 +2148,11 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
       // FIX base-2026-09: вёдра варёных крахмалов — кап 350 г/приём на ОБЫЧНЫХ днях
       // (иначе «рис 441 г»); бобовые-гарнир — кап 250 г (иначе «фасоль 315 г» и ЖКТ-ад);
       // сухая овсянка — кап 100 г (иначе «овсянка 135 г сухо»).
-      // На HV-днях (800–1500У) капы НЕ жмут: ведёрные порции там — условие сходимости,
-      // резать их = вечный недобор −20% (R-HV). Съедобность HV держат EDIBILITY_CAPS.
-      if (!(_pickCtx.highVolumeDay)) {
+      // На HV-днях (800–1500У) капы НЕ жмут основные приёмы: ведёрные порции там —
+      // условие сходимости, резать их = вечный недобор −20% (R-HV). Съедобность HV
+      // держат EDIBILITY_CAPS. Но СНЕКИ — всегда под капами: перекус типологически
+      // маленький приём, картошка 366 г в перекусе — mislabeled meal, не порция.
+      if (!(_pickCtx.highVolumeDay) || !!(snack || String(type || '').startsWith('snack'))) {
         if ((carbSource.carbs || 0) < 30) grams = Math.min(grams, 350);
         if (/lentil|bean|pea|chickpea|legume/.test(carbSource.id)) grams = Math.min(grams, 250);
         if (/oats_dry|oatmeal_dry|buckwheat_dry/.test(carbSource.id)) grams = Math.min(grams, 100);
@@ -7145,8 +7147,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // в лёгком ужине» (eveningLowCarb-тест). Фолбэк — legacy (сходимость не блокируем).
         let _g3 = 8;
         const _carbCeil = (input.goalCarbsG || 0) * 1.10;
-        if ((process.env as any).VITEST_DEBUG_DOBOR) { console.log(`[DOBOR] enter kcal=${totals.kcal} goal=${input.goalKcal} c=${totals.c} goalC=${input.goalCarbsG} p=${totals.p}`); for (const mm of meals) { console.log(`[DOBOR-IN] ${(mm as any).label}: kcal=${(mm as any).totals?.kcal} c=${(mm as any).totals?.c} p=${(mm as any).totals?.p} :: ` + ((mm as any).items || []).map((x: any) => `${x.role}:${x.id}:${x.amount}`).join(' | ')); } }
-        while (totals.kcal < (input.goalKcal || 0) * 0.97 && totals.c < (input.goalCarbsG || 0) - 5 && totals.c < _carbCeil - 5 && _g3-- > 0) {
+        // FIX P0-vedro (ребаланс): kcal-гейт 97% душил углеводы при перекосе макрос
+        // (ккал 98% за счёт жиров/белка, угли −10% — добор вообще не запускался, а потом
+        // чистка сносила stubs и день терял ~250 ккал безвозвратно: кейс presleep).
+        // Режим свопа: угли<цели−5 при ккал<цели×1.03 — растим угли, перебор ккал ≤3%
+        // приемлем (девиация в духе MIGP; пер-приёмные гарды ниже целы).
+        while (totals.c < (input.goalCarbsG || 0) - 5 && totals.c < _carbCeil - 5 && totals.kcal < (input.goalKcal || 0) * 1.03 && _g3-- > 0) {
           const cands: any[] = [];
           for (const m of meals) {
             if (_p0aSkip(m)) continue;
@@ -7175,7 +7181,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (cands.length === 0) break;
           cands.sort((a: any, b: any) => (b.it.c || 0) - (a.it.c || 0));
           const { m, it, fd, cap } = cands[0];
-          const needC = Math.min(_carbCeil - totals.c, ((input.goalKcal || 0) - totals.kcal) / 4);
+          // FIX P0-vedro: в своп-режиме (ккал уже у цели) need из ккал-комнаты
+          // отрицательный — берём углеводный гэп (иначе break и недобор навсегда).
+          const needC = Math.min(_carbCeil - totals.c, Math.max((((input.goalKcal || 0) - totals.kcal) / 4), ((input.goalCarbsG || 0) - totals.c)));
           if (needC < 5) break;
           let addG = Math.min(Math.ceil(needC / Math.max(1, fd.carbs) * 100), cap - (it.amount || 0));
           // P1a: шаг роста ≤60 г за итерацию (иначе весь дневной недобор одним махом
