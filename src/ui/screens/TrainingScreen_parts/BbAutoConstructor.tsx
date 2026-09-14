@@ -3838,7 +3838,7 @@ export const BbAutoConstructor: React.FC = () => {
           />
           <PopupSelect
             label='📦 Схема объёма памп-дней'
-            value={volumeScheme}
+            value={(trainingVolumeMode === 'high' && volumeScheme === 'standard') ? 'gvt' : volumeScheme}
             onChange={v => setVolumeScheme(v as any)}
             hint={'Методики для памп-изоляций (кап 5 сетов/упр; FST-7 финишер — 7 одним движением) — в коде: standard / gvt / fst7 / gironda' + (bbLevel !== 'enhanced' ? ' · FST-7 7-in-1: только enhanced.' : '') + (((pedDoses.insulin || 0) > 0 && !((computeAASEquivDose(pedDoses)) > 0) && !((pedDoses.GH || 0) > 0)) ? ' · Соло-инсулин: FST-7 запрещён.' : '')}
             options={[
@@ -3887,6 +3887,11 @@ export const BbAutoConstructor: React.FC = () => {
               icon: '🔀', title: 'A/B ротация паттернов',
               desc: 'Одинаковые дни недели — разные движения (generic + adapt; faithful дословно)',
               on: abRotation, set: setAbRotation, accent: '#22d3ee', enabled: true,
+            },
+            {
+              icon: '🤖', title: 'Авто-регуляция по готовности',
+              desc: 'Объём/вес/RIR корректируются по сну, HRV, стрессу и ACWR (P0-10: ранее тогл был мёртвым)',
+              on: autoRegOn, set: setAutoRegOn, accent: '#22c55e', enabled: true,
             },
             {
               icon: '📦', title: 'Packing заливка',
