@@ -1,6 +1,6 @@
 # Хаб диагностики единоборств — план эпика (отдельно от планировщика)
 
-**Дата:** 13 сен 2026 · **Автор:** OpenCode (Muse Spark) · **Статус:** ПЛАН, код не тронут
+**Дата:** 13 сен 2026 · **Автор:** OpenCode (Muse Spark) · **Статус:** ВЫПОЛНЕН кодом P1–P8 (6 этапных коммитов + 1 фикс, чужие файлы не тронуты)
 **Область:** NEW `src/engines/combat-diagnostics/*` + NEW `CombatDiagnosticsHub.tsx` (+ табы) · планировщик (`src/engines/combat/*`, `src/ui/screens/combat/*`) НЕ трогается, только читается как потребитель моста
 **Предшественник:** `docs/COMBAT-PLANNER-PRO-PLAN.md` — планировщик строит ТОЛЬКО силовую часть зала (POOL_BY_TAG — жимы/тяги/приседы/шея/хват/медбол-ротация; удар/тейкдаун — лишь строки). Настоящий план — отдельный эпик диагностики: точки ударов/тейкдауны/bar-path. Дубли не пишем.
 
@@ -47,7 +47,7 @@
 
 ---
 
-## §3. Эпики P1–P7 (хаб, не планировщик)
+## §3. Эпики P1–P8 (хаб, не планировщик)
 
 ### P1 — Ударный блок: точки + фазы + COMBAT_BIOMECH (ядро хаба)
 - NEW `combat-strike-biomech.engine.ts`: `COMBAT_STRIKE_BIOMECH` 8 точек (jab/cross/lead-hook/rear-hook/uppercut/lowkick/elbow/knee) × фазы (старт/разгон/контакт/возврат) с `angleRangeDeg/keyJoint/weakMuscles/intensityPct/biomechanicalReason/loadCues/references` (Kacprzak/Dinu/Walilko) + `diagnoseCombatStrikePoint`.
@@ -86,10 +86,30 @@
 - NEW `combat-diagnostics-injection.engine.ts` (`injectCombatCorrections` per-day dedup + budget-cap + protocol из intensityPct + snapshot/rollback `he_combat_plan_v1/prev`) + NEW `combat-diagnostics-export` (HTML/XSS + CSV/BOM + ICS) + NEW `CombatDiagnosticsHub.tsx` (6 табов: strikes/takedowns/video/safety/recovery/summary; персист `he_combat_diagnostics_hub_v1` + `he_combat_*_hist`; mount рядом с CombatConstructor, трек combat; CTA «→ Применить в конструктор» `kind:'weakpoints'` + `planning-track-open detail 'combat'`).
 - Тесты: RSS-свойства + floors + verification; инъекция/откат; экспорт XSS/CSV; мост roundtrip.
 
+### P8 — Постановка удара: школа + подсобка («как бить правильно», диагностическая ветка)
+- NEW `combat-strike-school.engine.ts`: `STRIKE_SCHOOL` 6 ударов (jab/cross/hook/uppercut/lowkick/elbow) — для каждого: стойка/гард, кинематическая цепь («ноги→бедро→торс→кисть», опора GRF-нота P1), 3–4 типовые ошибки (толкание плечом, локоть оторван/провис, подбородок вверх, недоворот стопы/бедра, нет возврата), чекпоинты (подбородок/локоть/стопа/возврат), прогрессия дриллов (бой с тенью → лапы → мешок → ограниченный спарринг) + `assistanceFor` — маппинг ТОЛЬКО на существующие id зала (`CB_EX_META`: медбол-ротация/кувалда/плио/жим/тяга/шея — новых упражнений не выдумываем) + `schoolDrillFor(weakPoint)` (слабая фаза → 1–2 дрилла + 2–3 подсобных).
+- Таб `strikes`: блок «🥊 Как поставить удар» — эталон → твои замеры (P1/P3/P4) → разрыв → назначение (подсобка из зала + дриллы вне зала); инъекция — через общий P7-механизм (dayMap + budget-cap + snapshot/rollback), отдельным мостом не идёт.
+- Тесты: 6 ударов имеют школу (стойка/ошибки/чекпоинты/дриллы); assistance — только реальные id пула; слабая фаза маппится в дрилл (golden-таблица).
+
 ---
 
 ## §4. Не делаем + критерии приёмки
 
 **Не делаем (осознанно):** силовую генерацию (планировщик цел); весогонку как процесс (только чек); судейство/Compubox-скоринг боя; on-device ML-классификацию ударов (только импорт готовых типов); медицинские диагнозы (скрининг + «к врачу»); дубли barpath/video/ohs/vbt-канона (reuse).
-**Приёмка:** NEW движки P1–P7 + hub 6 табов; `scoreCombat` RSS + verification + floors; мост `kind:'weakpoints'` доходит до CombatConstructor (план меняется только через существующий приёмник weakpoints/combat_cycle, сборка не меняется); персист/экспорт/печать; соседние combat-тесты зелёные; `tsc` 0 по своим; `verify:apk-design` OK. Стиль: белый текст `#fff` (правило проекта), 44px-тачи, `data-combat` хуки, светлая/печать — исключения.
-**Очередь:** годовой мост (annual-bridge) и VBT-калибровка ротации — только если P1–P7 зелёные и по отдельному согласию.
+**Приёмка:** NEW движки P1–P8 + hub 6 табов; `scoreCombat` RSS + verification + floors; мост `kind:'weakpoints'` доходит до CombatConstructor (план меняется только через существующий приёмник weakpoints/combat_cycle, сборка не меняется); школа P8 покрывает 6 ударов + подсобка только из реального пула; персист/экспорт/печать; соседние combat-тесты зелёные; `tsc` 0 по своим; `verify:apk-design` OK. Стиль: белый текст `#fff` (правило проекта), 44px-тачи, `data-combat` хуки, светлая/печать — исключения.
+**Очередь:** годовой мост (annual-bridge) и VBT-калибровка ротации — только если P1–P8 зелёные и по отдельному согласию.
+
+---
+
+## §5. Выполнение (13 сен 2026, 6 этапных коммитов + 1 фикс, без пуша)
+
+Только Edit/Write + vitest/tsc; чужие файлы не тронуты (коммиты строго pathspec своих; shared `planner-bridge.ts` НЕ правлен — мост едет существующими полями `groups/diagnosticWeakSide/barPath/combat*/specBlock`).
+
+- **P1 (`013a47bc`)**: NEW `combat-strike-biomech` (8 точек × 4 фазы + effective mass = импульс/скорость + SPEED_FLOOR/MASS_BAND) + тест 6/6. Поймано своим тестом: MASS_BAND из Kacprzak-абсолюта (30 кг) несовместим со скоростью кисти (~8 м/с) — перекалиброван на 4–12/2.5–8.
+- **P2 (`2c17e31a`)**: NEW `combat-takedown` (5 точек × фазы + elite-ориентиры + спрол-гейт `takedownReadiness` + гильотина-нота) + тест 5/5.
+- **P3+P4 (`984b200d`)**: NEW `combat-strike-path` (REUSE parseKinoveaCSV/classifyTrajectoryType + SRD 4/6) + NEW `combat-tracker-import` (Hykso/Corner/StrikeTec + дисклеймер JSCR + приоритет ручного) + тест 6/6.
+- **P5+P6 (`7178ba1b`)**: NEW `combat-safety-screen` (redflags-стоп + teen 14–15 + шея 35% веса + честная inconclusive-формулировка) + NEW `combat-load-screen` (ACWR-зоны + L/R 7/12 + e1RM-кандидаты) + тест 6/6.
+- **P7 (`dea75f55`)**: NEW `combat-scoring` (RSS + floors cap 49 + verification .35/.30/.35) + NEW `combat-correction` (причины/топ-3/Δ-ориентир/спец-блок 4–8/дни 1,3/аудит) + NEW `combat-diagnostics-injection` (мост + snapshot/rollback `he_combat_plan_v1/prev`) + NEW `combat-diagnostics-export` (HTML/XSS + CSV/BOM/антиформула) + NEW `CombatDiagnosticsHub` (6 табов, `#fff`, 44px, `data-combat`, персист `he_combat_diagnostics_hub_v1`) + тесты 10/10 + UI 3/3.
+- **P8 (`abafa249`)**: NEW `combat-strike-school` (6 ударов: стойка/цепь/ошибки/чекпоинты/дриллы + подсобка только из реального `CB_EX_META`-пула + `schoolDrillFor`) + блок «Как поставить удар» в табе ударов + тест 3/3 (итого своих **40/40**) + UI 4/4. Поймано: `getByText(/Назначение:/)` ×6 — переведено на `getAllByText`.
+- **Фикс (`93638089`)**: `vMaxCm → vMaxMs` (поймал `tsc`; свой тест bad_data-ветку покрывал, но поле не ловил).
+- **Проверено**: свои 40/40 (7 файлов) + соседи `src/engines/combat` 519/519 (32 файла) + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ (очередь чужих WIP в worktree).
