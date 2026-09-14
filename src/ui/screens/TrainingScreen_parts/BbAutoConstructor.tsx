@@ -23,6 +23,7 @@ import { buildBBPlan, buildWarmup, applyMacrocycleToBBPlan, type BBPlan, type BB
 import { collectPlanExercises, recalibratePlanWeights, autoCalibrateFromStored, groupWeightEntries, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyDUPOverlay, recommendDUPMode } from '../../../engines/bb/bb-dup.engine';
+import { applyExecutionCorrections, type ExecutionCorrection } from '../../../engines/bb/bb-execution-corrections.engine';
 import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
 import { isPackingActive } from '../../../engines/bb/bb-packing.engine';
 import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../../../engines/bb/bb-finalize.engine';
@@ -1557,9 +1558,15 @@ export const BbAutoConstructor: React.FC = () => {
         setBridgeMsg(`🔗 Программа загружена: ${cycle.meta.title}`);
         setTimeout(() => setBridgeMsg(''), 5000);
         setStep('params');
-      } else if (payload.kind === 'weakpoints' && (Array.isArray((payload.data as WeakpointsPayload).weakZonesGranular) || Array.isArray((payload.data as WeakpointsPayload).groups))) {
+      } else if (payload.kind === 'weakpoints' && (() => {
+        const d = payload.data as WeakpointsPayload;
+        // 3.9: принимаем любой из источников групп (гранулярные → канонические → общие).
+        return Array.isArray(d.weakZonesGranular) || Array.isArray(d.weakMusclesCanonical)
+          || Array.isArray(d.weakPoints) || Array.isArray(d.groups);
+      })()) {
         const bbDiag = payload.data as WeakpointsPayload;
-        const groups = (bbDiag.weakZonesGranular ?? bbDiag.groups) as string[];
+        // 3.9: гранулярные зоны приоритетны, но канонические/общие группы — честный fallback.
+        const groups = (bbDiag.weakZonesGranular ?? bbDiag.weakMusclesCanonical ?? bbDiag.weakPoints ?? bbDiag.groups) as string[];
         const normalized = normalizeSpecializationTargets(groups.slice(0, 2));
         if (normalized.length > 0) {
           setSpecBlocks([{ id: 'spec-block-1', weeks: 5, targets: normalized, tradeoffMode: 'none' as const, donors: [] }]);
@@ -1584,10 +1591,6 @@ export const BbAutoConstructor: React.FC = () => {
           });
           setBridgeMsg((prev: string) => prev ? `${prev} · замена ${entry.oldId}→${entry.newId}` : `🔗 Замена → ББ-авто: ${entry.oldId}→${entry.newId}`);
           setTimeout(() => setBridgeMsg(''), 5000);
-        }
-        const labDiag = bbDiag.labDiagnosis;
-        if (labDiag) {
-          try { localStorage.setItem('he_bb_last_lab_diagnosis', JSON.stringify(labDiag)); } catch {}
         }
         // Lab-добивка 7 + п.2: labDelta персистим, показываем и дописываем в rationale
         // уже собранного плана (порядок «сборка→применение» иначе терял Δ; дедуп по строке).
@@ -1627,13 +1630,8 @@ export const BbAutoConstructor: React.FC = () => {
           const wks = Math.max(3, Math.min(6, Math.round(typeof specRaw.lengthWeeks === 'number' ? specRaw.lengthWeeks : 5)));
           const donors = Array.isArray(specRaw.donors) ? specRaw.donors.map((d) => String(d)).slice(0, 2) : [];
           setSpecBlocks([{ id: 'spec-block-1', weeks: wks, targets: normalized, tradeoffMode: donors.length ? 'reduce_direct_to_floor' as const : 'none' as const, donors }]);
-          try { localStorage.setItem('he_bb_last_spec_block', JSON.stringify(specRaw)); } catch {}
           setBridgeMsg((prev: string) => prev ? `${prev} · спец-блок ${wks} нед` : `🔗 Спец-блок → ББ-авто: ${wks} нед`);
           setTimeout(() => setBridgeMsg(''), 5000);
-        }
-        const causes = bbDiag.weakCauses;
-        if (causes && typeof causes === 'object') {
-          try { localStorage.setItem('he_bb_last_weak_causes', JSON.stringify(causes)); } catch {}
         }
         // Слабые головки стимула — persist для будущих сборок и смены углов
         const heads = bbDiag.weakHeads;
@@ -1646,26 +1644,16 @@ export const BbAutoConstructor: React.FC = () => {
         // PRO-2: L/R, готовность, флаги, штанга, поза, teen — только сохраняем, сборку не меняем
         const pro2parts: string[] = [];
         if (Array.isArray(bbDiag.lrVerdicts) && bbDiag.lrVerdicts.length) {
-          try { localStorage.setItem('he_bb_last_lr', JSON.stringify(bbDiag.lrVerdicts)); } catch {}
           const worst = bbDiag.lrVerdicts.filter((v) => v && (v.verdict === 'topup' || v.verdict === 'watch'))[0];
           if (worst) pro2parts.push(`L/R ${worst.group}: ${worst.text}`);
         }
         if (bbDiag.readiness && typeof bbDiag.readiness === 'object' && (bbDiag.readiness as { level?: unknown }).level) {
-          try { localStorage.setItem('he_bb_last_readiness', JSON.stringify(bbDiag.readiness)); } catch {}
           pro2parts.push(`готовность ${(bbDiag.readiness as { level: string }).level}`);
         }
         if (bbDiag.redFlags && typeof bbDiag.redFlags === 'object' && Array.isArray((bbDiag.redFlags as { items?: unknown }).items)) {
-          try { localStorage.setItem('he_bb_last_red_flags', JSON.stringify(bbDiag.redFlags)); } catch {}
           if ((bbDiag.redFlags as { blocked?: boolean }).blocked) pro2parts.push('⛔ флаги — только техника');
         }
-        if (bbDiag.barPath && typeof bbDiag.barPath === 'object') {
-          try { localStorage.setItem('he_bb_last_bar', JSON.stringify(bbDiag.barPath)); } catch {}
-        }
-        if (bbDiag.poseAngles && typeof bbDiag.poseAngles === 'object') {
-          try { localStorage.setItem('he_bb_last_pose', JSON.stringify(bbDiag.poseAngles)); } catch {}
-        }
         if (typeof bbDiag.teenNote === 'string' && bbDiag.teenNote) {
-          try { localStorage.setItem('he_bb_last_teen', bbDiag.teenNote); } catch {}
           pro2parts.push('🧒 teen-режим');
         }
         // J7 орто-скрининг: гарды ПРИМЕНЯЮТСЯ (не только сохраняются).
@@ -1699,10 +1687,8 @@ export const BbAutoConstructor: React.FC = () => {
               }
               pro2parts.push(`🦴 Beighton+: light + без отказных + повторы + ${risky.length} раскрытий исключено`);
             }
-            try { localStorage.setItem('he_bb_ortho_guards', JSON.stringify((bbDiag as any).orthoGuards ?? null)); } catch {}
           }
         if (Array.isArray(bbDiag.orthoFlags) && bbDiag.orthoFlags.length) {
-          try { localStorage.setItem('he_bb_ortho_flags', JSON.stringify(bbDiag.orthoFlags)); } catch {}
           if (typeof bbDiag.orthoSummary === 'string' && bbDiag.orthoSummary) pro2parts.push(`🦴 ${bbDiag.orthoSummary.slice(0, 80)}`);
         }
         // Э3: мост без орто-полей снимает ранее отслеженные гарды (только свои id — чужое/своё юзера цело).
@@ -1721,8 +1707,6 @@ export const BbAutoConstructor: React.FC = () => {
             }
             localStorage.removeItem('he_bb_ortho_mobility');
             localStorage.removeItem('he_bb_ortho_excluded');
-            localStorage.removeItem('he_bb_ortho_guards');
-            localStorage.removeItem('he_bb_ortho_flags');
           } catch {}
           if (cleaned) pro2parts.push(`🦴 орто-гарды сняты (${cleaned})`);
         }
@@ -1730,20 +1714,16 @@ export const BbAutoConstructor: React.FC = () => {
         // не к мезоциклу — острая готовность не должна переписывать структуру блока).
         // Остальное (LVP/сухожилия/return-to/MMC/веса) — сохраняется + тост, сборку не меняет.
         if (bbDiag.lvp && typeof bbDiag.lvp === 'object' && (bbDiag.lvp as { text?: unknown }).text) {
-          try { localStorage.setItem('he_bb_last_lvp', JSON.stringify(bbDiag.lvp)); } catch {}
           pro2parts.push(`LVP ${(bbDiag.lvp as { text: string }).text}`);
         }
         if (bbDiag.tendon && typeof bbDiag.tendon === 'object') {
-          try { localStorage.setItem('he_bb_last_tendon', JSON.stringify(bbDiag.tendon)); } catch {}
           const t = bbDiag.tendon as { elbowLevel?: string; shoulderLevel?: string };
           if (t.elbowLevel === 'stop' || t.shoulderLevel === 'stop') pro2parts.push('⛔ сухожилия — стоп');
         }
         if (bbDiag.returnTo && typeof bbDiag.returnTo === 'object' && (bbDiag.returnTo as { text?: unknown }).text) {
-          try { localStorage.setItem('he_bb_last_return_to', JSON.stringify(bbDiag.returnTo)); } catch {}
           pro2parts.push('возврат 3 ступени');
         }
         if (bbDiag.readinessAction && typeof bbDiag.readinessAction === 'object') {
-          try { localStorage.setItem('he_bb_diag_readiness_action', JSON.stringify(bbDiag.readinessAction)); } catch {}
           const ra = bbDiag.readinessAction as { level?: string; volumeMult?: number; rirShift?: number };
           if (ra.level === 'red') pro2parts.push(`готовность red → вставка ×${ra.volumeMult ?? 0.75} RIR+${ra.rirShift ?? 1}`);
         }
@@ -1763,14 +1743,7 @@ export const BbAutoConstructor: React.FC = () => {
           setLrTopUp({});
           try { localStorage.removeItem('he_bb_lr_topup'); } catch {}
         }
-        if (Array.isArray(bbDiag.lrDirection) && bbDiag.lrDirection.length) {
-          try { localStorage.setItem('he_bb_lr_direction', JSON.stringify(bbDiag.lrDirection)); } catch {}
-        }
-        if (typeof bbDiag.mmc === 'string' && bbDiag.mmc) {
-          try { localStorage.setItem('he_bb_last_mmc', bbDiag.mmc); } catch {}
-        }
         if (typeof bbDiag.workingRange === 'string' && bbDiag.workingRange) {
-          try { localStorage.setItem('he_bb_last_working_range', bbDiag.workingRange); } catch {}
           pro2parts.push('рабочий вес-ориентир');
         }
         if (bbDiag.returnAction && typeof bbDiag.returnAction === 'object' && Number.isFinite((bbDiag.returnAction as any).volumeMult)) {
@@ -1785,6 +1758,52 @@ export const BbAutoConstructor: React.FC = () => {
           setReturnAction(null);
           try { localStorage.removeItem('he_bb_return_action'); } catch {}
         }
+        // 3.9: ранее неиспользуемые payload-поля диагностики сводим в одну строку моста —
+        // ничего не приходит «в никуда» (payload↔потребитель 1:1, без плановых изменений).
+        const diagBits: string[] = [];
+        if (typeof bbDiag.bbDiagScore === 'number' && Number.isFinite(bbDiag.bbDiagScore)) diagBits.push(`скор ${Math.round(bbDiag.bbDiagScore)}`);
+        if (typeof bbDiag.bbDiagLevel === 'string' && bbDiag.bbDiagLevel) diagBits.push(`уровень ${bbDiag.bbDiagLevel}`);
+        if (typeof bbDiag.verification === 'number' && Number.isFinite(bbDiag.verification)) diagBits.push(`вериф ${Math.round(bbDiag.verification <= 1 ? bbDiag.verification * 100 : bbDiag.verification)}%`);
+        else if (typeof bbDiag.verification === 'string' && bbDiag.verification) diagBits.push(`вериф ${bbDiag.verification}`);
+        const symD = bbDiag.symmetry as { score?: number; asymPct?: number; verdict?: string } | null | undefined;
+        if (symD && typeof symD === 'object') {
+          if (Number.isFinite(symD.asymPct)) diagBits.push(`асимметрия ${Math.round(Number(symD.asymPct))}%`);
+          else if (Number.isFinite(symD.score)) diagBits.push(`симметрия ${Math.round(Number(symD.score))}`);
+          else if (symD.verdict) diagBits.push(`симметрия ${symD.verdict}`);
+        }
+        const stD = bbDiag.stimulus as { score?: number; verdict?: string } | null | undefined;
+        if (stD && typeof stD === 'object') {
+          if (Number.isFinite(stD.score)) diagBits.push(`стимул ${Math.round(Number(stD.score))}`);
+          else if (stD.verdict) diagBits.push(`стимул ${stD.verdict}`);
+        }
+        if (bbDiag.perMuscleAcwr && typeof bbDiag.perMuscleAcwr === 'object') {
+          const hot = Object.entries(bbDiag.perMuscleAcwr).find(([, v]) => v && (v.zone === 'dangerous' || v.zone === 'caution'));
+          if (hot && hot[1]) diagBits.push(`ACWR ${hot[0]} ${Number(hot[1].ratio).toFixed(2)}`);
+        }
+        const ohsD = bbDiag.ohs as { totalScore?: number } | null | undefined;
+        if (ohsD && typeof ohsD === 'object' && Number.isFinite(ohsD.totalScore)) diagBits.push(`OHS ${Math.round(Number(ohsD.totalScore))}`);
+        const vbtD = bbDiag.vbt as { lossPct?: number } | null | undefined;
+        if (vbtD && typeof vbtD === 'object' && Number.isFinite(vbtD.lossPct)) diagBits.push(`VBT −${Math.round(Number(vbtD.lossPct))}%`);
+        if (typeof bbDiag.sleepHours === 'number' && Number.isFinite(bbDiag.sleepHours)) diagBits.push(`сон ${bbDiag.sleepHours}ч`);
+        const labD = bbDiag.labDiagnosis as { summary?: unknown; type?: unknown } | null | undefined;
+        if (labD && typeof labD === 'object') {
+          const s = typeof labD.summary === 'string' ? labD.summary : (typeof labD.type === 'string' ? labD.type : 'есть');
+          diagBits.push(`лаб-диагноз: ${s}`);
+        }
+        const bpD = bbDiag.barPath as { type?: string } | null | undefined;
+        if (bpD && typeof bpD === 'object' && bpD.type) diagBits.push(`траектория ${bpD.type}`);
+        if (bbDiag.poseAngles && typeof bbDiag.poseAngles === 'object') diagBits.push('углы позы');
+        const causesD = bbDiag.weakCauses as Record<string, unknown> | null | undefined;
+        if (causesD && typeof causesD === 'object') {
+          const n = Object.keys(causesD).length;
+          if (n) diagBits.push(`причины×${n}`);
+        }
+        if (Array.isArray(bbDiag.lrDirection) && bbDiag.lrDirection.length) {
+          const first = bbDiag.lrDirection[0] as { text?: unknown } | undefined;
+          if (first && typeof first.text === 'string') diagBits.push(`L/R: ${first.text}`);
+        }
+        if (typeof bbDiag.mmc === 'string' && bbDiag.mmc) diagBits.push('MMC-акцент');
+        if (diagBits.length) pro2parts.push(`диагностика: ${diagBits.join(', ')}`);
         if (pro2parts.length) {
           setBridgeMsg((prev: string) => prev ? `${prev} · ${pro2parts.join(' · ')}` : `🔗 Диагностика PRO-3: ${pro2parts.join(' · ')}`);
           setTimeout(() => setBridgeMsg(''), 5000);
@@ -2460,27 +2479,9 @@ export const BbAutoConstructor: React.FC = () => {
           }
         }
       }
-      // PROF-коррекции выполнения (темп/ROM/техника) — меняем tempo/pause/comment у существующих упражнений
-      for (const corr of executionCorrections) {
-        const t = String(corr.type || '').toLowerCase();
-        if (t === 'modifytempo' && corr.tempo) {
-          // Волна-1 (аудит 2026-09): правка темпа писала только ex.tempo —
-          // исполнение/карточки читают workSets[].tempo и tempoSpec, поэтому
-          // коррекция была невидимой. Пишем во ВСЕ три места.
-          for (const w of (plan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) {
-            const exr: any = ex;
-            exr.tempo = corr.tempo;
-            exr.tempoSpec = corr.tempo;
-            if (Array.isArray(exr.workSets)) for (const st of exr.workSets) { st.tempo = corr.tempo; }
-            exr.comment = (exr.comment ? exr.comment + ' · ' : '') + `🧬 PROF темп ${corr.tempo}`;
-          }
-        } else if (t === 'modifyrom') {
-          for (const w of (plan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) { (ex as any).pauseSeconds = 1; (ex as any).stretchPhase = true; (ex as any).comment = ((ex as any).comment ? (ex as any).comment + ' · ' : '') + `🧬 PROF ${corr.rom || 'пауза 1с в растянутой'}`; }
-        } else if (t === 'modifyexecution' && Array.isArray(corr.execCues)) {
-          const cues = corr.execCues.slice(0, 2).join(' · ');
-          for (const w of (plan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) { (ex as any).comment = ((ex as any).comment ? (ex as any).comment + ' · ' : '') + `🧬 PROF ${cues}`; }
-        }
-      }
+      // PROF-коррекции выполнения (темп/ROM/техника) — 3.10: гейт по targetId/targetName,
+      // иначе правка выбранного упражнения меняла ВСЕ упражнения всех недель.
+      applyExecutionCorrections(plan, executionCorrections as ExecutionCorrection[]);
       const profParts: string[] = [];
       // S3: возврат — главный план тоже режется (ступень 2 ×0.5, ступень 1 = только техника)
       if (returnAction && Number.isFinite(returnAction.volumeMult) && returnAction.volumeMult < 1) {

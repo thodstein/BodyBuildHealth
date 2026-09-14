@@ -473,9 +473,29 @@
   - Проверено: bb-круг **2333/2334** (единственное — пред-существующее чужое `bb-diagnostics-max-pro`
     female-symmetry), `tsc --noEmit` **0 по проекту**, `verify:apk-design` OK; `planner-bridge-handlers`
     33/33, целевые program-пути 247/247.
-- [ ] Волна 3 (UI-остаток): 3.9–3.11 хаб (payload↔потребитель 1:1, modifyTempo/ROM/Execution по
-  `targetExId`, единый парсинг storage) — **требует новой сессии** (хаб + параллельные агенты).
+- [x] **Волна 3 — UI-часть 2 (3.9 + 3.10 + 3.11)** — коммит этого раунда:
+  - **3.9 payload↔потребитель 1:1**: 11 ранее неиспользуемых полей `WeakpointsPayload`
+    (`symmetry/stimulus/perMuscleAcwr/ohs/vbt/sleepHours/bbDiagScore/bbDiagLevel/verification/
+    weakPoints/weakMusclesCanonical`) теперь потребляются — группы получают fallback-цепочку
+    (гранулярные → канонические → общие), а диагностические поля идут в строку «диагностика: …»
+    моста. Удалены 18 write-only localStorage-ключей (`he_bb_last_lab_diagnosis/spec_block/
+    weak_causes/lr/readiness/red_flags/bar/pose/teen`, `he_bb_ortho_guards/flags`,
+    `he_bb_last_lvp/tendon/return_to`, `he_bb_diag_readiness_action`, `he_bb_lr_direction`,
+    `he_bb_last_mmc/working_range`); read-ключи сохранены. NEW `bb-hub-payload-consume` 3/3.
+  - **3.10 PROF-коррекции по цели**: NEW `bb-execution-corrections.engine` — `modifyTempo/ROM/
+    Execution` гейтятся по `targetId`/`targetName` (раньше применялись ко всем упражнениям всех
+    недель); хаб теперь кладёт цель в `labCorrection` (`targetId || targetExId || selectedExRaw.id`).
+    NEW `bb-execution-corrections` 5/5.
+  - **3.11 дедуп хаба**: единый `pickPlanFromSaved`/`readSavedBbPlan` (было 4 копии парсинга
+    `he_bb_plan_saved`); `rankCorrectionsForWeak` — один вызов (мемо `top3ByZone`, было 3);
+    факт-объём через канонический `aggregateBBVolume` (direct + EMG-indirect вместо «direct=effective»).
+    NEW `bb-hub-dedup` 5/5.
+  - Проверено: bb-круг **2339/2340** (единственное — пред-существующее чужое `bb-diagnostics-max-pro`
+    female-symmetry), `bb-diagnostics-hub` **27/3** (те же пред-существующие 3), `tsc --noEmit`
+    **0 по проекту**, `verify:apk-design` OK.
+- [ ] Волна 3 (UI-остаток): закрыт полностью (3.6–3.11 готовы).
 - [ ] Волна 4 — UI/quality/валидатор
 - [ ] Волна 5 — каталог/данные
+
 
 

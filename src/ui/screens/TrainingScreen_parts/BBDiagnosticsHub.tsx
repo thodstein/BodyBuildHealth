@@ -279,6 +279,23 @@ const BbSheetSelect: React.FC<{ label: string; value: string; options: Array<{ i
   );
 };
 
+/* 3.11: единый парсинг плана ББ из localStorage (было 4 копии). */
+export function pickPlanFromSaved(parsed: unknown): any | null {
+  const j: any = parsed;
+  if (Array.isArray(j) && j[0]?.plan?.weeks) return j[0].plan;
+  if (j?.plan?.weeks) return j.plan;
+  if (j?.weeks) return j;
+  return null;
+}
+function readSavedBbPlanRaw(): string | null {
+  try { return localStorage.getItem('he_bb_plan_saved') || localStorage.getItem('he_bb_plans'); } catch { return null; }
+}
+function readSavedBbPlan(): any | null {
+  const raw = readSavedBbPlanRaw();
+  if (!raw) return null;
+  try { return pickPlanFromSaved(JSON.parse(raw)); } catch { return null; }
+}
+
 export const BBDiagnosticsHub: React.FC = () => {
   const [state, setState] = useState<BBState>(() => {
     try {
@@ -339,17 +356,17 @@ export const BBDiagnosticsHub: React.FC = () => {
         return t && now - t <= 7 * DAY;
       });
       if (recent.length === 0) return null;
-      // агрегируем sets per muscle (diary muscleGroup)
-      const agg: Record<string, { directSets: number; effectiveSets: number }> = {};
-      for (const s of recent) for (const ex of (s.exercises || []) as any[]) {
-        const m = String(ex.muscleGroup || ex.muscle || '').toLowerCase();
-        if (!m) continue;
-        const cnt = Array.isArray(ex.sets) ? ex.sets.length : 0;
-        if (!agg[m]) agg[m] = { directSets: 0, effectiveSets: 0 };
-        agg[m].directSets += cnt;
-        agg[m].effectiveSets += cnt;
-      }
-      return agg;
+      // 3.11: факт-объём через канонический aggregateBBVolume (direct + EMG-indirect),
+      // а не своя сумма «direct = effective» без косвенной нагрузки.
+      const exercises = recent.flatMap((s: any) => ((s.exercises || []) as any[]).map((ex) => ({
+        name: String(ex.exerciseName || ex.name || ''),
+        muscle: String(ex.muscleGroup || ex.muscle || '').toLowerCase(),
+        sets: Array.isArray(ex.sets) ? ex.sets.length : Math.max(0, Number(ex.sets) || 0),
+        rir: Number(ex.rir) || 2,
+        role: 'accessory' as const,
+      })).filter((e) => e.muscle && e.sets > 0));
+      if (exercises.length === 0) return null;
+      return aggregateBBVolume([{ exercises }]);
     } catch { return null; }
   }, [diarySessions]);
 
@@ -367,14 +384,7 @@ export const BBDiagnosticsHub: React.FC = () => {
 
   const balance = useMemo(() => {
     try {
-      const raw = localStorage.getItem('he_bb_plan_saved') || localStorage.getItem('he_bb_plans');
-      let plan: any = null;
-      if (raw) {
-        const j = JSON.parse(raw);
-        if (Array.isArray(j) && j[0]?.plan?.weeks) plan = j[0].plan;
-        else if (j?.plan?.weeks) plan = j.plan;
-        else if (j?.weeks) plan = j;
-      }
+      const plan = readSavedBbPlan();
       if (plan?.weeks) return analyzeBBBalance(plan);
       return null;
     } catch { return null; }
@@ -540,7 +550,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     sessions: diarySessions as any,
     meas: measNum as any,
     heightCm: measNum.heightCm ?? null,
-    plan: (() => { try { const raw = localStorage.getItem('he_bb_plan_saved'); if (raw) { const j = JSON.parse(raw); if (j?.plan?.weeks) return j.plan; if (j?.weeks) return j; } return null; } catch { return null; } })(),
+    plan: readSavedBbPlan(),
     balance,
     perMuscleAcwr: perMuscleAcwr as any,
     mobilityFails: ohs.failed,
@@ -669,7 +679,8 @@ export const BBDiagnosticsHub: React.FC = () => {
         const wh = weakHeadForZone(z);
         if (wh && !heads.includes(wh)) heads.push(wh);
         try {
-          for (const r of rankCorrectionsForWeak(z, null, { level, sex: state.sex || undefined, weakHead: wh, equipment: profileEquipment }).slice(0, 3)) {
+          // 3.11: единый источник ранжирования — мемо top3ByZone (без повторного вызова).
+          for (const r of (top3ByZone[z] || [])) {
             const id = String(r.id).toLowerCase();
             if (!seen.has(id)) { seen.add(id); topIds.push(r.id); }
           }
@@ -1164,15 +1175,8 @@ export const BBDiagnosticsHub: React.FC = () => {
 
   // ── Упражнения → эффект (единый инструмент) ──
   const bbPlan = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('he_bb_plan_saved') || localStorage.getItem('he_bb_plans');
-      if (!raw) return null;
-      const j = JSON.parse(raw);
-      if (j?.plan?.weeks) return j.plan;
-      if (Array.isArray(j) && j[0]?.plan?.weeks) return j[0].plan;
-      if (j?.weeks) return j;
-      return null;
-    } catch { return null; }
+    const plan = readSavedBbPlan();
+    return plan && plan.weeks ? plan : null;
   }, [diarySessions, state.exerciseSelectedId, planNonce]);
 
   const planAudit = useMemo(() => {
@@ -1383,7 +1387,9 @@ export const BBDiagnosticsHub: React.FC = () => {
         preferredExerciseIds: action.targetId ? [action.targetId] : [],
         exerciseSwap: action.targetId && targetExId ? { oldId: targetExId, newId: action.targetId } : action.targetId && selectedExRaw?.id ? { oldId: selectedExRaw.id, newId: action.targetId } : undefined,
         labDiagnosis: selectedDiagnosis ? { flags: selectedDiagnosis.flags, issues: selectedDiagnosis.issues, score: selectedDiagnosis.score } : null,
-        labCorrection: action, labDelta: delta,
+        // 3.10: цель коррекции (id/имя упражнения) — иначе приёмник менял все упражнения.
+        labCorrection: { ...action, targetId: action.targetId || targetExId || selectedExRaw?.id || null, targetName: action.targetName || selectedExRaw?.name || null },
+        labDelta: delta,
         bbDiagScore: score, bbDiagLevel: sLevel, verification: report.score.verification,
       },
       source: 'intellectual',
@@ -1499,7 +1505,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2500);
       return;
     }
-    const plan = parsed?.plan?.weeks ? parsed.plan : parsed?.weeks ? parsed : null;
+    const plan = pickPlanFromSaved(parsed);
     if (!plan) {
       setToast('План не распознан — пересобери в ББ-авто');
       setTimeout(() => setToast(''), 2500);
@@ -1524,7 +1530,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     const preferredIds: Record<string, string> = {};
     for (const z of zones) {
       try {
-        const top = rankCorrectionsForWeak(z, null, { level, sex: state.sex || undefined, weakHead: weakHeadForZone(z), equipment: profileEquipment }).slice(0, 1)[0];
+        const top = (top3ByZone[z] || [])[0];
         if (top) preferredIds[z] = top.id;
       } catch { /* noop */ }
     }
