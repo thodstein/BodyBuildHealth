@@ -686,6 +686,21 @@ export const PharmaCourseScreen: React.FC = () => {
               <div style={{ fontSize:11, color:'#fff' }}>Классов <b style={{ color:'#fff' }}>{[...new Set(course.map(e => subClass(e.substanceId)).filter(Boolean))].length}</b></div>
             </div>
           )}
+          {/* Постоянный CTA внизу списка: кнопка «+ Добавить» живёт только в шапке
+              (на телефоне уезжает вверх за экран), а empty-state кнопка исчезает
+              после первого препарата — пользователь видел «кнопки нет». */}
+          {course.length > 0 && (
+            <button onClick={() => setShowPicker(true)} className="pc-btn2" aria-label="Добавить ещё препарат" style={{
+              background:'rgba(139,92,246,0.10)', color:'#fff',
+              border:'1px dashed rgba(139,92,246,0.40)', borderRadius:14,
+              padding:'12px 16px', fontWeight:800, fontSize:12,
+              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+              width:'100%', cursor:'pointer',
+            }}>
+              <span style={{ fontSize:14, lineHeight:1, background:'rgba(139,92,246,0.25)', width:20, height:20, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center' }}>+</span>
+              Добавить ещё препарат
+            </button>
+          )}
         </>
       )}
 
