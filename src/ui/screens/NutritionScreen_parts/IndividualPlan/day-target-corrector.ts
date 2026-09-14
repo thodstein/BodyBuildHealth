@@ -106,6 +106,14 @@ export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'avocado', 'pea
 export const RELIEF_DESSERT_IDS: ReadonlyArray<string> = ['pryaniki', 'jam', 'honey', 'dates'];
 
 /**
+ * P1-2 (план «ведро»): плотные сухие носители relief-клапана — единый пул.
+ * Второй гарнир при структурном недоборе дня (>8% углей) разрешён только
+ * из этого списка и из другого семейства (хлеб+рис, крем+паста).
+ * Правится в одном месте; используется в placement-гейте и push-гейте ниже.
+ */
+export const DRY_DENSE_IDS: ReadonlyArray<string> = ['cream_of_rice', 'corn_flakes', 'bread_white', 'whole_grain_bread', 'bread_fitness', 'pasta_durum', 'rice_semolina', 'cream_rice', 'rice_white', 'oats_dry'];
+
+/**
  * P1a: проверка консистентности целей приёмов с целью дня. Таргет-гарды (не растим
  * закрытый приём) верны, только если цели суммируются в цель (рефид/инсулин-инфляция/
  * recipe-сборка могут давать stale-цели — тогда гарды душат сходимость).
@@ -1175,7 +1183,7 @@ export function correctDayToTargets(
       // Aug-28 гейт: второй гарнир — только в БОЛЬШОЙ приём (target.c ≥ 100);
       // умеренный обед (~95У) держит один крупяной источник, иначе «гречка+рис».
       // P2: плотные сухие носители relief-клапана (второй гарнир при большом недоборе дня).
-      const _dryDenseIds = ['cream_of_rice', 'corn_flakes', 'bread_white', 'whole_grain_bread', 'bread_fitness', 'pasta_durum', 'rice_semolina', 'cream_rice', 'rice_white', 'oats_dry'];
+      // Пул — единый DRY_DENSE_IDS выше.
       if (eff === 'c' && best) {
         const _roomy = _pickFrom.filter(m => {
           const _carbs = (m.items || []).filter(it => it.role === 'carb_slow' || it.role === 'carb_fast').length;
@@ -1197,7 +1205,7 @@ export function correctDayToTargets(
           // после 2 итераций). Обычные дни (недобор <8%) — типология «1 гарнир» целая.
           const _dayDefC = safeTargets.c - sumTotals(meals).c;
           const _reliefOk = _dayDefC > Math.max(40, (safeTargets.c || 0) * 0.08)
-            && _dryDenseIds.includes((best as FoodItem).id)
+            && (DRY_DENSE_IDS as ReadonlyArray<string>).includes((best as FoodItem).id)
             && !(m.items || []).some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === stapleFamilyOf((best as FoodItem).id))
             && (m.totals?.c || 0) < ((m as any).target?.c || 0) * 1.25;
           // P2 (типология, жалоба «нахъера везде по 2-3 вида каши»): ОДИН углевод в
@@ -1671,7 +1679,7 @@ export function correctDayToTargets(
         // сухой плотный носитель из другого семейства разрешён (иначе push-вето глотало
         // весь прогресс: фильтр placement проходил, а здесь откатывало).
         const _reliefOkPush = (safeTargets.c - sumTotals(meals).c) > Math.max(40, (safeTargets.c || 0) * 0.08)
-          && _dryDenseIds.includes(best.id)
+          && (DRY_DENSE_IDS as ReadonlyArray<string>).includes(best.id)
           && !targetMeal.items.some(it => (it.role === 'carb_slow' || it.role === 'carb_fast') && stapleFamilyOf(it.id) === stapleFamilyOf(best.id))
           && ((targetMeal.totals?.c || 0) < ((targetMeal as any).target?.c || 0) * 1.25);
         if (!_reliefOkPush) continue;
