@@ -11,6 +11,7 @@ import { MechanismView } from './Calc.result';
 import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
 import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
+import type { TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 
 export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, onOpenLabs, planResult }) => {
   const [state, setState] = useState<CalculatorState>(() => {
@@ -20,6 +21,9 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   const [fillStatus, setFillStatus] = useState('');
   const [labDerivedFields, setLabDerivedFields] = useState<string[]>([]);
   const [labSyncFlash, setLabSyncFlash] = useState(false);
+  // Д10 (остаток): риск с учётом ручных правок попапов (CalcMapperCard → onRiskChange).
+  // null — правок нет, верхняя карточка показывает расчёт движка (как раньше).
+  const [mapperRisk, setMapperRisk] = useState<TzSpecResult | null>(null);
   const lastFullPanelRef = React.useRef<string>('');
 
   const effectiveWeek = propWeek || Math.min(state.goals.cycleWeeks || 12, Math.max(1, ...state.pharma.aas.map(a => a.weeks || 12), 6));
@@ -639,25 +643,35 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       )}
 
       {/* ── РИСК: механизм-ориентированная модель (TZ) ── */}
-      {result.tzSpecResult && Array.isArray(result.tzSpecResult.organs) ? (
-        <TzRiskCard
-          tz={result.tzSpecResult}
-          before={result.overallRiskBefore}
-          after={result.overallRiskAfter}
-          peakWeek={result.peakWeek}
-        />
-      ) : result.risk.systems.filter(s => s.rawScore > 0).length > 0 ? (
-        <div style={{ marginTop: 6 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)', marginBottom: 4, paddingLeft: 4 }}>📊 Риск: {result.overallRiskBefore}% → <span style={{ color: '#00e68a' }}>{result.overallRiskAfter}%</span></div>
-          {result.risk.systems.filter(s => s.rawScore > 0).map(sys =>
-            <div key={sys.id} style={{ ...GLASS, padding: '4px 10px', marginBottom: 3 }}>
-              <MechanismView sys={sys} />
-            </div>
-          )}
-        </div>
-      ) : null}
+      {(() => {
+        const tz = mapperRisk ?? result.tzSpecResult;
+        return tz && Array.isArray(tz.organs) ? (
+          <div style={{ marginTop: 6 }}>
+            {mapperRisk && (
+              <div data-manual-risk style={{ fontSize: 8, color: '#a5b4fc', padding: '4px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)', marginBottom: 4, lineHeight: 1.4 }}>
+                📝 Учтены ручные правки состава (попапы калькулятора) — {mapperRisk.overallRaw}% → {mapperRisk.overallAfter}%
+              </div>
+            )}
+            <TzRiskCard
+              tz={tz}
+              before={result.overallRiskBefore}
+              after={mapperRisk ? (mapperRisk.overallAfter ?? result.overallRiskAfter) : result.overallRiskAfter}
+              peakWeek={result.peakWeek}
+            />
+          </div>
+        ) : result.risk.systems.filter(s => s.rawScore > 0).length > 0 ? (
+          <div style={{ marginTop: 6 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)', marginBottom: 4, paddingLeft: 4 }}>📊 Риск: {result.overallRiskBefore}% → <span style={{ color: '#00e68a' }}>{result.overallRiskAfter}%</span></div>
+            {result.risk.systems.filter(s => s.rawScore > 0).map(sys =>
+              <div key={sys.id} style={{ ...GLASS, padding: '4px 10px', marginBottom: 3 }}>
+                <MechanismView sys={sys} />
+              </div>
+            )}
+          </div>
+        ) : null;
+      })()}
 
-      <CalcMapperCard state={state} onStateChange={(n) => setState(n)} onApply={(rec) => {
+      <CalcMapperCard state={state} onStateChange={(n) => setState(n)} onRiskChange={setMapperRisk} onApply={(rec) => {
         const subIds = rec.subs.map(s => s.substanceId);
         onApply({ level: rec.level, subs: subIds, tzRec: rec });
       }} onOpenManualPicker={onOpenManualPicker} onOpenLabs={onOpenLabs} planResult={planResult} />

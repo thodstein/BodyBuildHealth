@@ -1,7 +1,7 @@
 ﻿import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { buildTzInput } from '../../../engines/support-plan/engine-helpers';
-import { calculateTzSpecRisk } from '../../../engines/risk-engine-tz-spec';
+import { calculateTzSpecRisk, type TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 import { getAdministrationRules } from '../../../data/administration-rules-db';
 import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
 import { findSeparationRules } from '../../../data/separation-timing-db';
@@ -686,9 +686,14 @@ export interface CalcMapperProps {
   onOpenManualPicker?: () => void;
   onOpenLabs?: () => void;
   planResult?: import('../../../engines/support-plan').PlanResult;
+  /**
+   * Д10 (остаток): риск с учётом ручных правок попапов (добавить/убрать вещество).
+   * null — правок нет, верхняя карточка считает по движку как раньше (мужской путь не меняется).
+   */
+  onRiskChange?: (risk: TzSpecResult | null) => void;
 }
 
-export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange, onApply, onOpenManualPicker, onOpenLabs, planResult }) => {
+export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange, onApply, onOpenManualPicker, onOpenLabs, planResult, onRiskChange }) => {
   const [level, setLevel] = useState<SupportLevel>('medium');
   const [manualSubs, setManualSubs] = useState<string[]>([]);
   const [selectedStacks, setSelectedStacks] = useState<string[]>([]);
@@ -901,6 +906,14 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     }
   }, [finalRec, state]);
   const systemRiskOf = (sysId: string) => tzFinalRisk?.organs.find(o => o.id === sysId) || null;
+
+  // Д10 (остаток): лифт риска с ручными правками наверх (верхняя карточка AutoCalculator).
+  // Без правок → null: верхняя карточка считает по движку, как раньше (поведение не меняется).
+  const hasManualEdits = removedSubs.length > 0 || addedSubs.length > 0 || manualSubs.length > 0 || selectedStacks.length > 0;
+  useEffect(() => {
+    if (!onRiskChange) return;
+    onRiskChange(hasManualEdits ? tzFinalRisk : null);
+  }, [onRiskChange, hasManualEdits, tzFinalRisk]);
 
   const pairSynergies = useMemo(() => {
     if (!finalRec || finalRec.subs.length <= 1) return [] as { group: string[]; effect: string; mechanism: string; severity: string; score: number }[];

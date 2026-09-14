@@ -99,7 +99,6 @@ export const StackExpandableRow: React.FC<StackExpandableRowProps> = ({ st, acti
   const title = st.name || st.id.replace(/_stack|_support|_35/g, '').replace(/_/g, ' ');
   return (
     <div
-      data-stack-row={st.id}
       style={{
         borderRadius: compact ? 7 : 8,
         marginBottom: compact ? 0 : 4,
@@ -110,7 +109,7 @@ export const StackExpandableRow: React.FC<StackExpandableRowProps> = ({ st, acti
           : (compact ? '1px solid rgba(255,255,255,0.04)' : '1px solid transparent'),
       }}
     >
-      <div onClick={onToggleSelect} style={{ padding: compact ? '8px 10px' : '9px 11px', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+      <div data-stack-row={st.id} onClick={onToggleSelect} style={{ padding: compact ? '8px 10px' : '9px 11px', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
         <span style={{ fontSize: 13, minWidth: 14, color: active ? '#c084fc' : 'rgba(255,255,255,0.4)', marginTop: 1 }}>{active ? '✓' : '○'}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: active ? '#c084fc' : 'rgba(255,255,255,0.9)', lineHeight: 1.25 }}>{title}</div>
