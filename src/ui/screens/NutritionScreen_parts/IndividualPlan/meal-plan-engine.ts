@@ -3060,6 +3060,61 @@ export const HARDCODED_ID_POOLS: Record<string, string[]> = {
   concentrates: CONCENTRATE_IDS,
 };
 
+// ─── P2-3 (план «ведро»): excess-control второго гарнира ─────────────────
+// «Ведро» = второй крахмал-гарнир размером с полноценную порцию (батат 330
+// к рису, тортилья 374): типология «один гарнир» такое обычно не пропускает,
+// но как страховочная сетка режем любой НЕ-главный carb-пункт свыше 30% ккал
+// приёма. Главный пункт (rank0) exempt — основа тарелки (рис 315 в обед = 52%
+// и это норма; medRxiv: main-dish 70%). Белок/жиры/овощи/фрукты exempt —
+// у них своя физика (мясная пара, плотность орехов) и свои капы; peri/pre-sleep —
+// фиксированные физиологические бюджеты. Живой максимум матрицы — 29%,
+// т.е. сегодня сетка не срабатывает (чистый guard); §5-«25% для всех»
+// недостижим без сноса legit-структуры (доказано дампом: 119/263 items >25% —
+// в основном мясо/жиры/peri-окна).
+export function capSecondaryStapleExcess(meals: any[]): string[] {
+  const out: string[] = [];
+  for (const m of meals) {
+    const t = String((m as any)?.type || '');
+    if (t !== 'breakfast' && t !== 'lunch' && t !== 'dinner' && !t.startsWith('snack')) continue;
+    if ((m as any)._insulinWindow) continue;
+    const items = ((m as any).items || []) as any[];
+    if (items.length < 2) continue;
+    let mealKcal = items.reduce((s: number, x: any) => s + (x.kcal || 0), 0);
+    if (mealKcal <= 0) continue;
+    const rank0 = [...items].sort((a, b) => (b.kcal || 0) - (a.kcal || 0))[0];
+    for (const it of items) {
+      if (it === rank0) continue;
+      if ((it as any)._fixedGrams) continue;
+      const role = String(it.role || '');
+      if (role !== 'carb_slow' && role !== 'carb_fast') continue;
+      if ((it.kcal || 0) / mealKcal <= 0.30) continue;
+      // Фиксированная точка доли: k'/M' ≤ 0.3 ⇔ k' ≤ 0.3/0.7 × (M − k).
+      // Режем ккал пункта к 3/7 от остального приёма (одним проходом, точно).
+      const restKcal = mealKcal - (it.kcal || 0);
+      if (restKcal <= 0) continue;
+      const targetKcal = 0.30 / 0.70 * restKcal;
+      if ((it.kcal || 0) <= targetKcal) continue;
+      const r0 = targetKcal / Math.max(1, it.kcal || 1);
+      let ng = Math.floor((it.amount || 0) * r0 / 5) * 5;
+      ng = Math.max(30, ng);
+      if (ng >= (it.amount || 0)) continue;
+      const cut = (it.amount || 0) - ng;
+      const r = ng / Math.max(1, it.amount || 1);
+      it.amount = ng;
+      it.p = Math.round((it.p || 0) * r * 10) / 10;
+      it.f = Math.round((it.f || 0) * r * 10) / 10;
+      it.c = Math.round((it.c || 0) * r * 10) / 10;
+      it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+      it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
+      if (it.leucine_mg != null) it.leucine_mg = Math.round(it.leucine_mg * r);
+      (m as any).totals = mealTotalsOf((m as any).items);
+      mealKcal = (m as any).totals?.kcal || mealKcal;
+      out.push(`✂️ «${(m as any).label}»: ${it.name} ужат ${cut} г — второй гарнир ≤30% ккал приёма`);
+    }
+  }
+  return out;
+}
+
 // ─── ОСНОВНОЙ ВХОД: построить дневной план ───────────────────────────
 export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // P0-fix: валидация mealsCount — undefined/0/NaN ломают сравнения _roles.length <= N,
@@ -7604,6 +7659,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       } else {
         notes.push(`🍽 «${m.label}»: снек долит до ≥60% углеводной цели (${(m.totals.c || 0).toFixed(0)}У из ${m.target.c}У)`);
       }
+    }
+
+    // ─── P2-3: excess-control второго гарнира — самой последней сеткой ───
+    // (позже P3-долива; режет только вёдра, которых в матрице нет).
+    // HV exempt (прецедент P2-0): на 1500У крупные вторые гарниры — несущие
+    // для сходимости (R-HV), резать их ради эстетики = вредить dev дня.
+    if (!_pickCtx.highVolumeDay) {
+      const _exNotes = capSecondaryStapleExcess(meals);
+      if (_exNotes.length > 0) { notes.push(..._exNotes); recalcDayTotals(meals, totals); }
     }
 
     return {
