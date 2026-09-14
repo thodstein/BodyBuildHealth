@@ -69,6 +69,7 @@ import {
   type AppliedBooster,
 } from './tz-bridge-boosters';
 import { assessPedRisk, type PedRiskAssessment } from './ped-risk-matrix';
+import { applyFemaleSupport } from './female-support-layer';
 import { buildAssayWarningsFromDb } from '../data/assay-interference-db';
 import { getSubstanceMonitoring } from '../data/substance-monitoring-db';
 import { addonsFor, isInjectableCourse, isLongEsterHalfLife } from './support-phase-labs.engine';
@@ -162,6 +163,8 @@ export interface SupportRecommendation {
   monitoringSchedule?: MonitoringSection[]; // H6: структурированный мониторинг (до курса → экстренно)
   supportRisks?: SupportRisk[];  // H7: комбинаторные риски самого плана поддержки
   pedRisk?: PedRiskAssessment;   // v6: оценка PED-риска нейро/суставы (для UI-баннеров)
+  /** Женский слой (только sex='female'): что добавлено усилением + флаги риска */
+  femaleLayer?: { added: string[]; flags: string[] };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -2153,13 +2156,18 @@ export function resolveManualPlan(ctx: MapperCtx): SupportRecommendation {
 
 // Универсальный ресолвер
 export function resolvePlan(ctx: MapperCtx): SupportRecommendation {
-  switch (ctx.level) {
-    case 'base': return resolveBasePlan(ctx);
-    case 'medium': return resolveMediumPlan(ctx);
-    case 'max': return resolveMaxPlan(ctx);
-    case 'manual': return resolveManualPlan(ctx);
-  }
-  return resolveBasePlan(ctx);
+  const r = (() => {
+    switch (ctx.level) {
+      case 'base': return resolveBasePlan(ctx);
+      case 'medium': return resolveMediumPlan(ctx);
+      case 'max': return resolveMaxPlan(ctx);
+      case 'manual': return resolveManualPlan(ctx);
+    }
+    return resolveBasePlan(ctx);
+  })();
+  // Женский слой: аддитивное усиление поверх мужского набора.
+  // Мужской путь (ctx.sex отсутствует) — тот же объект, байт-в-байт.
+  return applyFemaleSupport(r, ctx);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
