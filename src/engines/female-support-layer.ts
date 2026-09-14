@@ -13,7 +13,7 @@
  */
 import type { MapperCtx, SupportRecommendation, RecommendedSub } from './tz-mapper-engine';
 import type { TzCategory } from './tz-bridge-mechanism';
-import { TOTAL_LIMIT } from './tz-bridge-mechanism';
+import { TOTAL_LIMIT, CATEGORY_LIMITS } from './tz-bridge-mechanism';
 import type { TzMechId } from './tz-bridge-marker';
 import { canonId } from './support-plan/shared-constants';
 
@@ -77,9 +77,15 @@ export function applyFemaleSupport(rec: SupportRecommendation, ctx: MapperCtx): 
   const subs: RecommendedSub[] = [...rec.subs];
   const added: string[] = [];
 
+  // Счётчик по категориям: женский слой не должен выбивать CATEGORY_LIMITS уровня.
+  const categoryCount = new Map<string, number>();
+  for (const s of rec.subs) categoryCount.set(s.category, (categoryCount.get(s.category) || 0) + 1);
+
   for (const layer of FEMALE_LAYER_SUBS) {
     if (existing.has(canonId(layer.substanceId))) continue;
     if (subs.length >= TOTAL_LIMIT[ctx.level]) break;
+    const catLimit = CATEGORY_LIMITS[ctx.level]?.[layer.category] ?? 0;
+    if ((categoryCount.get(layer.category) || 0) >= catLimit) continue;
     subs.push({
       substanceId: layer.substanceId,
       category: layer.category,
@@ -90,6 +96,7 @@ export function applyFemaleSupport(rec: SupportRecommendation, ctx: MapperCtx): 
       priority: layer.priority,
     });
     existing.add(canonId(layer.substanceId));
+    categoryCount.set(layer.category, (categoryCount.get(layer.category) || 0) + 1);
     added.push(layer.substanceId);
   }
 

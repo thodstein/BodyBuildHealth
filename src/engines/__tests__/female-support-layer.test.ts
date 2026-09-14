@@ -83,6 +83,22 @@ describe('female-support-layer: unit', () => {
     expect(out.subs.length).toBeLessThanOrEqual(28);
     expect((out as any).femaleLayer).toBeUndefined(); // нечего добавить, флагов нет → исходный объект
   });
+  it('категорийный лимит: hormonal заполнен (base=1) → витекс пропущен, инозитол добавлен', () => {
+    const rec = baseRec([{ substanceId: 'hcg', category: 'hormonal', k: 0.2, q: 'A', reason: 'x', mechsCovered: [] }]);
+    const out = applyFemaleSupport(rec, { sex: 'female', onCourse: true, level: 'base' } as any);
+    const ids = out.subs.map((s: any) => s.substanceId);
+    expect(ids).not.toContain('vitex');
+    expect(ids).toContain('inositol');
+    expect((out as any).femaleLayer.added).toEqual(['inositol']);
+  });
+  it('категорийный лимит: hormonal 2/2 на medium → витекс пропущен', () => {
+    const rec = baseRec([
+      { substanceId: 'hcg', category: 'hormonal', k: 0.2, q: 'A', reason: 'x', mechsCovered: [] },
+      { substanceId: 'anastrozole', category: 'hormonal', k: 0.3, q: 'A', reason: 'x', mechsCovered: [] },
+    ]);
+    const out = applyFemaleSupport(rec, { sex: 'female', onCourse: true, level: 'medium' } as any);
+    expect(out.subs.map((s: any) => s.substanceId)).not.toContain('vitex');
+  });
   it('состав слоя: 2 позиции, обе OTC-усилители', () => {
     expect(FEMALE_LAYER_SUBS.length).toBe(2);
     expect(FEMALE_LAYER_SUBS.map((s) => s.substanceId)).toEqual(['vitex', 'inositol']);
