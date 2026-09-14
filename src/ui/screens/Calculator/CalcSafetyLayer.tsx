@@ -304,6 +304,12 @@ export const SafetyPedEscalation: React.FC<{ rec: SupportRecommendation }> = ({ 
           <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>Экстремальный суставной/сухожильный риск + гепатотокс. Не комбинировать. Если уже взято — УЗИ суставов + эластичные стропы, NAC/TUDCA двойная доза.</div>
         </div>
       )}
+      {flags.has17AlphaAndGH && (
+        <div style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.24)' }}>
+          <div style={{ fontSize: 7, fontWeight: 700, color: '#ef4444', marginBottom: 1 }}>17α-Орал + GH — синергичная гепатотоксичность</div>
+          <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>Оральный 17α-алкил + GH одновременно: аддитивный удар по печени через разные пути (CYP-нагрузка + IGF-1-опосредованная пролиферация). АЛТ/АСТ/ГГТ каждые 2 нед, TUDCA/NAC в полной дозе, не превышать 6–8 нед орального блока.</div>
+        </div>
+      )}
       {flags.hasNandrolone && (
         <div style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
           <div style={{ fontSize: 7, fontWeight: 700, color: '#22c55e', marginBottom: 1 }}>Нандролон — пролактин и соединительная ткань</div>

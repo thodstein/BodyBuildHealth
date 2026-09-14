@@ -2775,19 +2775,21 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       )}
 
-      {/* STOP COURSE banner (TIER 3) */}
-      {rec && rec.stopCourse && (
-        <div style={{ margin:'5px 0', padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.12)', border:'1.5px solid rgba(239,68,68,0.3)' }}>
-          <div style={{ fontSize:11, fontWeight:800, color:'#ef4444', marginBottom:3 }}>⛔ ОСТАНОВИТЬ КУРС</div>
-          {rec.alerts?.map((a, i) => <div key={i} style={{ fontSize:8, color:'#fca5a5', marginBottom:1, lineHeight:1.4 }}>{a.message}</div>)}
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:3 }}>Рекомендации — для специалиста. Не заменяют консультацию врача.</div>
-        </div>
-      )}
-
-      {/* TIER alerts (без stopCourse) */}
-      {rec && !rec.stopCourse && rec.alerts && rec.alerts.length > 0 && (
-        <div style={{ margin:'5px 0', padding:'7px 9px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)' }}>
-          {rec.alerts.map((a, i) => <div key={i} style={{ fontSize:8, color:'#fbbf24', marginBottom:1, lineHeight:1.4 }}>⚠ {a.message}</div>)}
+      {/* Алерты курса — ЕДИНСТВЕННОЕ место показа текстов (Д3): якорь calc-alerts-summary.
+          В «Мониторинге» — только ссылка на этот блок (см. ниже). */}
+      {rec && rec.alerts && rec.alerts.length > 0 && (
+        <div id="calc-alerts-summary">
+          {rec.stopCourse ? (
+            <div style={{ margin:'5px 0', padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.12)', border:'1.5px solid rgba(239,68,68,0.3)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#ef4444', marginBottom:3 }}>⛔ ОСТАНОВИТЬ КУРС</div>
+              {rec.alerts.map((a, i) => <div key={i} style={{ fontSize:8, color:'#fca5a5', marginBottom:1, lineHeight:1.4 }}>{a.message}</div>)}
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:3 }}>Рекомендации — для специалиста. Не заменяют консультацию врача.</div>
+            </div>
+          ) : (
+            <div style={{ margin:'5px 0', padding:'7px 9px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              {rec.alerts.map((a, i) => <div key={i} style={{ fontSize:8, color:'#fbbf24', marginBottom:1, lineHeight:1.4 }}>⚠ {a.message}</div>)}
+            </div>
+          )}
         </div>
       )}
 
@@ -3139,6 +3141,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ===== МОНИТОРИНГ АНАЛИЗОВ (врачебный протокол) ===== */}
       {finalRec && finalRec.subs.length > 0 && (() => {
         const subs = finalRec.subs;
+        // Д3: алерты курса показываются ОДИН раз — в сводке (calc-alerts-summary);
+        // здесь только бейдж и ссылка, чтобы не дублировать тексты сообщений.
+        const alertsCount = ((finalRecWithResidual ?? finalRec)?.alerts || []).length;
         const hasHepatic = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('liv')));
         const hasCardio = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('cv')));
         const hasRenal = subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('ren')));
@@ -3210,6 +3215,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     return phaseLabTeaser((finalRec as any)?.pedFlags || null, (((finalRec as any)?.phase || 'course') as PhaseKey), personalMarkers.length);
                   } catch { return ''; }
                 })()}</span>
+                {alertsCount > 0 && (
+                  <span data-alerts-badge style={{ fontSize:7, fontWeight:700, color:'#fbbf24', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.14)' }}>🟠 тревоги: {alertsCount} — в сводке</span>
+                )}
               </span>
               <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showMonitoring ? '▲ скрыть' : '▼ показать'}</span>
             </div>
@@ -3409,10 +3417,19 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   </div>
                 </div>
 
-                {/* Лабораторные находки + интерпретация + тревоги — единый блок анализов */}
+                {/* Лабораторные находки + интерпретация — единый блок анализов.
+                    Алерты (rec.alerts) здесь НЕ дублируются (Д3) — только ссылка на сводку. */}
                 <SafetyLabFindings planResult={planResult} />
                 <SafetyAssayWarnings rec={finalRecWithResidual ?? finalRec} />
-                <SafetyAlerts rec={finalRecWithResidual ?? finalRec} />
+                {alertsCount > 0 && (
+                  <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 7px', borderRadius:6, marginBottom:3, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.22)', fontSize:7, color:'#fbbf24', lineHeight:1.4 }}>
+                    <span>🟠 Лабораторные тревоги: {alertsCount} — показаны один раз в блоке «Сводка» выше</span>
+                    <button
+                      onClick={() => { try { document.getElementById('calc-alerts-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {} }}
+                      style={{ marginLeft:'auto', flexShrink:0, padding:'3px 8px', borderRadius:6, cursor:'pointer', fontSize:7, fontWeight:700, background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.3)', color:'#fbbf24' }}
+                    >↑ К тревогам</button>
+                  </div>
+                )}
 
                 {/* ===== ПРЕАНАЛИТИКА, ПРИЁМ И РАЗНЕСЕНИЕ (полная карточка, сворачиваемая) ===== */}
       {finalRec && (() => {
@@ -3490,29 +3507,27 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         );
       })()}
 
-      {/* Warnings: multi-oral, GH+insulin, winny+oxy */}
+      {/* Предупреждения курса (Д4): однострочные дубли pedFlags убраны —
+          детали с рекомендациями показывает SafetyPedEscalation (единый развёрнутый блок). */}
       {finalRec && (() => {
-        const warnings: string[] = [];
         const flags = finalRec.pedFlags;
-        if (flags) {
-          if (flags.isMultiOral) warnings.push('⚠ Более 1 орального 17α — резко ↑ гепатотоксичность');
-          if (flags.isGHPlusInsulin) warnings.push('⚠ GH + Инсулин — высокий риск гипогликемии');
-          if (flags.isWinnyPlusOxy) warnings.push('🛑 WINSTROL + ANADROL — критическая комбинация (гепатотоксичность + ↓HDL до 50%). ОБЯЗАТЕЛЬНЫЙ протокол защиты включён. LFT каждые 2 нед, не дольше 4 нед');
-          if (flags.has17AlphaAndGH) warnings.push('⚠ 17α-Орал + GH — синергичная гепатотоксичность');
-        }
-        if (warnings.length === 0) return null;
+        const escalationCount = flags ? [
+          flags.hasOral17, flags.isMultiOral, flags.hasTren, flags.isGHPlusInsulin,
+          flags.isWinnyPlusOxy, flags.hasNandrolone, flags.hasGH, flags.has17AlphaAndGH,
+        ].filter(Boolean).length : 0;
+        const guardrailsCount = (finalRecWithResidual ?? finalRec)?.guardrails?.length || 0;
+        if (escalationCount === 0 && guardrailsCount === 0) return null;
         return (
           <div style={{ marginTop: 8 }}>
             <div onClick={() => setShowCourseWarnings(!showCourseWarnings)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '7px 9px', borderRadius: showCourseWarnings ? '8px 8px 0 0' : 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)' }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', display: 'flex', alignItems: 'center', gap: 5 }}>
                 ⚠️ Предупреждения о курсе
-                <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(168,85,247,0.6)', padding: '1px 5px', borderRadius: 4, background: 'rgba(168,85,247,0.12)' }}>{warnings.length}</span>
+                <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(168,85,247,0.6)', padding: '1px 5px', borderRadius: 4, background: 'rgba(168,85,247,0.12)' }}>{escalationCount}</span>
               </span>
               <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{showCourseWarnings ? '▲ скрыть' : '▼ показать'}</span>
             </div>
             {showCourseWarnings && (
               <div style={{ padding: '7px 10px', borderRadius: '0 0 8px 8px', background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.1)', borderTop: 'none' }}>
-                {warnings.map((w, i) => <div key={i} style={{ fontSize: 8, color: '#c4b5fd', marginBottom: 1, lineHeight: 1.4 }}>{w}</div>)}
                 <SafetyGuardrails rec={finalRecWithResidual ?? finalRec} />
                 <SafetyPedEscalation rec={finalRecWithResidual ?? finalRec} />
               </div>
