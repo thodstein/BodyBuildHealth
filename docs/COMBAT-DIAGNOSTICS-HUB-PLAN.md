@@ -101,7 +101,7 @@
 
 ---
 
-## §5. Выполнение (13–14 сен 2026, 8 этапных коммитов + 1 фикс, без пуша)
+## §5. Выполнение (13–14 сен 2026, 11 этапных коммитов + 1 фикс, без пуша)
 
 Только Edit/Write + vitest/tsc; чужие файлы не тронуты (коммиты строго pathspec своих; shared `planner-bridge.ts` НЕ правлен — мост едет существующими полями `groups/diagnosticWeakSide/barPath/combat*/specBlock`).
 
@@ -114,4 +114,7 @@
 - **Фикс (`93638089`)**: `vMaxCm → vMaxMs` (поймал `tsc`; свой тест bad_data-ветку покрывал, но поле не ловил).
 - **Монтаж (`997a4fea`)**: таб `combat_diagnostics` по прецеденту Armlifting (union + label + ZONES.tabs + категория + алиас + CALC_TABS + effectiveTab + mount с InfoErrorBoundary + карточка дашборда) + NEW nav-тест 2/2. Поймано: ассерт `toContain('Единоборств')` vs подпись `единоборств` — чинил тест. Общие файлы до правок были чисты, дифф — только свои ханки (проверено `git diff -U0`).
 - **Приёмник (`bec83353`, по добру — чужой `CombatConstructor.tsx`)**: `applyWeakpointsCombat` принимает `groups` (`strike:/takedown:` → русские сводки, мусор-фильтр, кап 6) + `specBlock` (rationale ≤160 + dayMap «дни 1+3») + `barPath.text` (≤120) → сводка `cb-msg-diag[data-combat=bridge-diag]` + персист `he_combat_diag_bridge_v1` (ремаунт держит) + флеш; сборка и движки не меняются. NEW тест 3/3 (сводка/мусор/персист). Дифф — только 3 своих ханка (`+`, без `-`).
-- **Проверено**: свои **45/45** (9 файлов) + соседи `src/ui/screens/combat` 33/33 (5 файлов) + `src/engines/combat` 519/519 + arm-lifting-nav 2/2 + `tsc` 0 по своим (**1 ошибка — чужой параллельный BB-WIP `BbAutoConstructor: buildBBPlanWithDUP`, моих строк там ноль**). НЕ ПУШИЛ (очередь чужих WIP в worktree).
+- **P9 (`2aa02334`)**: NEW `combat-annual-bridge` (overlay спец-блока на год по образцу TA/SM: отдельный ключ `he_cb_annual_sync_v1`, `annual-training` не тронут) + тест 3/3. Поймано: нет.
+- **P10 (`0b71496a`)**: NEW `combat-rotation-vbt` (ротация всегда `calibrated:false`, порог по цели 20/25/30 из `combatLossThresholdForGoal`, зона из канона `velocityLossZone`, e1RM — никогда) + тест 4/4. Поймано: ассерт `/Введите/` vs строка «введите» — чинил тест.
+- **Обратный путь (`be91c8cc`, чужой `CombatConstructor.tsx` по добру)**: кнопка «🔬 Диагностика» 44px в статус-ряду → `training-open-tab` detail `combat_diagnostics` (паттерн `BbAutoConstructor:6296`, слушатель `TrainingScreen:153` уже принимает любой таб) + тест (подписка на событие). Тест приёмника 4/4.
+- **Проверено**: свои **56/56** (12 файлов) + широкий круг combat **564/564 (40 файлов)** + `tsc` 0 по своим (**ошибки только чужие параллельные WIP: `bb-builder`/`meal-plan-engine`/`BbAutoConstructor`, моих строк там ноль — доказано списком файлов**) + `verify:apk-design` OK. НЕ ПУШИЛ (очередь чужих WIP в worktree).
