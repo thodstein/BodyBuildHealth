@@ -104,7 +104,7 @@ describe('Проф-методики ББ (Библиотека → Методи�
       for (const e of exs) expect(e.sets).toBeLessThanOrEqual(5);
     });
 
-    it('Gironda 8×8: 8 сетов суммарно, reps 8-10, отдых 60с', () => {
+    it('Gironda 8×8: 8 сетов суммарно, reps 8, отдых 45с (канон REP_SCHEMES)', () => {
       const plan: any = {
         weeks: [{ phase: 'accumulation', sessions: [
           { day: 1, exercises: [mkEx('triceps', 'Разгибания на блоке'), mkEx('triceps', 'Французский')] },
@@ -114,7 +114,7 @@ describe('Проф-методики ББ (Библиотека → Методи�
       const exs = plan.weeks[0].sessions[0].exercises;
       expect(exs.reduce((s: number, e: any) => s + e.sets, 0)).toBe(8);
       expect(exs[0].repsRange[0]).toBe(8);
-      expect(exs[0].restSeconds).toBe(60);
+      expect(exs[0].restSeconds).toBe(45);
     });
 
     it('primary/тяж упражнения не меняются', () => {

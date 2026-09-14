@@ -430,7 +430,35 @@
     Откат: `git reset` + `git restore --source=HEAD --worktree` для файлов стеша
     (стеш НЕ удалён — чужое не потеряно); baseline-прогоны — только через `git worktree`,
     чужие стеши не трогать.
-- [ ] Волна 3 — методики/библиотека/хаб
+- [~] **Волна 3 — методики/библиотека/хаб** (инженерное ядро выполнено — коммит этого раунда;
+  UI-часть 3.6/3.8–3.11 — отдельная сессия):
+  - **3.3 rep-schemes**: реальная фаза плана (`schemePhase` из `phaseDist`) передаётся в
+    `recommendPEDMethodology` — **dc_rp/cluster достижимы** (было жёстко 'accumulation');
+    `applySchemeToPlan` уважает `minLevel` (уровень неизвестен — не блокируем, легаси-вызовы целы).
+  - **3.4 единые схемы объёма**: `VOLUME_SCHEMES` выведены из `REP_SCHEMES` (один источник);
+    **GVT = ровно 10×10** (было 12 повторов), Gironda = 8×8/45с (было 10/60с).
+  - **3.5 единый BFR**: `applyBfrPattern` (30-15-15-15 @25% workMax, 30с) — общий для
+    `scheme='bfr'` и `builder.bfrMode` (убрано «всем сетам reps=23»).
+  - **3.1** `bb-pro-presets.engine` удалён (мёртвый: единственный потребитель — тест; ручной
+    UI-выбор пресета остаётся).
+  - **3.2** `BbToolsHub.tsx` удалён (0 импортёров); no-op «Применить техники» — уже живой путь
+    (`methodologyHandler` пишет loadStrategy, техники применяет builder через `input.intensityTechnique`).
+  - **3.7 DUP**: `buildBBPlanWithDUP` удалён (импорт-хвост в BbAutoConstructor почищен);
+    live API — `applyDUPOverlay` (+ `recommendDUPMode` — для UI-подсказки в след. сессии).
+  - **3.12 VBT в генерацию**: `BBBuilderInput.vbt` (потеря ≥25% → объём ×0.9/RIR+1;
+    ≥40% → ×0.8/RIR+2; merge с `autoRegResult` при наличии, иначе standalone-проход) + rationale.
+  - **3.13 overreaching**: `BBBuilderInput.deloadReadiness` → `overreachingCheck`; не «очищено» →
+    вторая микро-разгрузка (−20% объём, RIR+2) на неделе после первого делода + rationale.
+  - **3.14 RIR-волна между мезо**: `rirEscalationFromPreviousPlan` (+ поле в `MesocycleProgression`) —
+    прошлый мезо закончился у отказа (средний RIR primary ≤0.5) → стартовый RIR +1.
+  - Re-baseline осознанно: bb-pro-methods Gironda (rest 45с — канон REP_SCHEMES).
+  - Проверено: bb **2328/2329** (единственное — пред-существующее чужое female-symmetry),
+    `tsc --noEmit` **0 по проекту**, `verify:apk-design` OK; NEW `bb-wave3-schemes` 9/9,
+    `bb-wave3-hooks` 7/7.
+- [ ] Волна 3 (UI-остаток): 3.6 MethodologyEncyclopedia (мёртвый импорт/kind 'methodology'),
+  3.8 библиотека (`bbSource='cycle'`, аудит 39 BB-циклов), 3.9–3.11 хаб (payload↔потребитель 1:1,
+  modifyTempo/ROM/Execution по `targetExId`, единый парсинг storage) — **требует новой сессии**
+  (хаб/конструктор + параллельные агенты).
 - [ ] Волна 4 — UI/quality/валидатор
 - [ ] Волна 5 — каталог/данные
 

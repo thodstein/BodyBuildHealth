@@ -286,6 +286,36 @@ export function schemeLabel(id: RepSchemeId): string {
 /** Целевой тип упражнения для применения схемы: тяж-primary (сила) или памп-accessory (памп/GVT). */
 export type SchemeTarget = 'heavy_primary' | 'pump_accessory';
 
+/** Волна-3.3: порядок уровней для гейта minLevel (ниже — недоступно).
+ *  Уровень неизвестен (легаси-вызовы без level) — не блокируем: гейт
+ *  применяется только когда уровень явно передан. */
+const LEVEL_ORDER: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2, enhanced: 3 };
+export function levelMeetsMin(level: string | undefined, minLevel: string | undefined): boolean {
+  if (!minLevel) return true;
+  if (level == null || level === '') return true;
+  return (LEVEL_ORDER[String(level).toLowerCase()] ?? 1) >= (LEVEL_ORDER[minLevel] ?? 0);
+}
+
+/**
+ * Волна-3.5: ЕДИНЫЙ BFR-протокол (Loenneke 2012): 4 сета 30-15-15-15 на 25%
+ * workMax, отдых 30с, темп 2-1-1-0. Используется и `applySchemeToPlan`
+ * (scheme='bfr'), и builder-блоком `input.bfrMode` — одно представление
+ * вместо прежних «всем сетам reps=23».
+ */
+export function applyBfrPattern(ex: any, workMaxValue: number): void {
+  const bfrW = Math.max(5, Math.round(workMaxValue * 0.25 * 10) / 10);
+  const reps = [30, 15, 15, 15];
+  ex.sets = 4;
+  ex.repsRange = [15, 30];
+  ex.rir = 2;
+  ex.restSeconds = 30;
+  ex.tempoSpec = '2-1-1-0';
+  ex.workSets = reps.map((r, i) => ({ reps: r, rir: i === 3 ? 3 : 2, weight: bfrW, tempo: '2-1-1-0', restSeconds: 30 }));
+  if (!String(ex.comment || '').includes('BFR')) {
+    ex.comment = `${ex.comment || ''} | 🩸 BFR 30-15-15-15 @${bfrW}кг (20-30% 1RM, 30с)`.trim().replace(/^\|\s*/, '');
+  }
+}
+
 /**
  * Применяет rep-схему к реальной загрузке упражнений плана.
  * Это закрывает «декоративность» схем: раньше schemeFor давал только строку rationale,
@@ -308,9 +338,13 @@ export function applySchemeToPlan(
     defaultWorkMax?: (muscle: string) => number;
     proWorkmaxRatio?: (muscle: string) => ((wm: Record<string, number>) => number) | undefined;
     intensityMult?: number;
+    /** Волна-3.3: уровень атлета — гейт scheme.minLevel (dc_rp/cluster недоступны новичку). */
+    level?: string;
   },
 ): number {
   if (!scheme) return 0;
+  // Волна-3.3: minLevel схемы уважается (dc_rp — advanced, cluster — advanced…).
+  if (!levelMeetsMin(opts.level, scheme.minLevel)) return 0;
   const { weightForRepMax, workMax, defaultWorkMax, proWorkmaxRatio, intensityMult = 1 } = opts;
   const loading = schemeToLoading(scheme);
   const isHeavyTarget = target === 'heavy_primary';
@@ -335,6 +369,15 @@ export function applySchemeToPlan(
         const setCount = Math.max(1, Math.min(5, ex.workSets?.length || ex.sets || 3));
         // Вес: Brzycki от workMax мышцы (как в buildSession), с intensityMult.
         const wm = workMax[ex.muscle] || proWorkmaxRatio?.(ex.muscle)?.(workMax) || defaultWorkMax?.(ex.muscle) || 50;
+        // Волна-3.5: BFR — единый протокол 30-15-15-15 на 25% workMax (не uniform 23).
+        if (scheme.id === 'bfr') {
+          applyBfrPattern(ex, wm);
+          if (!ex.comment?.includes(scheme.nameRu)) {
+            ex.comment = `${ex.comment || ''} | 📋 ${scheme.nameRu} (${scheme.evidence})`.trim().replace(/^\|\s*/, '');
+          }
+          applied++;
+          continue;
+        }
         const weight = weightForRepMax(loading.reps, wm, loading.rir, intensityMult);
         ex.repsRange = [scheme.repRange[0], scheme.repRange[1]];
         ex.rir = loading.rir;

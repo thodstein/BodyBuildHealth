@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildBBPlan, buildBBPlanWithDUP } from '../bb-builder.engine';
+import { buildBBPlan } from '../bb-builder.engine';
+import { applyDUPOverlay } from '../bb-dup.engine';
 
 /**
  * Матрица проф-методик по уровням (как настроено в проекте):
@@ -49,7 +50,7 @@ describe('Проф-методики × уровни (матрица)', () => {
       const isBeginner = level === 'beginner';
 
       it(`${name} × ${split}: DUP full_dup — инварианты, характеры меняются, deload чист`, () => {
-        const plan = buildBBPlanWithDUP(base, { mode: 'full_dup', cycleDays: 3 });
+        const plan = applyDUPOverlay(buildBBPlan(base), { mode: 'full_dup', cycleDays: 3 });
         const inv = invariants(plan);
         expect(inv).toEqual({ over5: 0, single: 0, ovf: 0 });
         const workingChars = new Set(plan.weeks.filter((w: any) => w.phase !== 'deload').flatMap((w: any) => w.sessions.map((s: any) => s.character)));
@@ -127,7 +128,7 @@ describe('Проф-методики × уровни (матрица)', () => {
   it('комбо (DUP + суперсеты + GVT) — все инварианты чисты на ключевых уровнях', () => {
     for (const [name, level, years] of LEVELS) {
       const base = { patternId: 'upper_lower_4', level, trainingYears: years, goal: 'mass', weeks: 4, workMax: WM };
-      const dup = buildBBPlanWithDUP(base, { mode: 'heavy_light', cycleDays: 2 });
+      const dup = applyDUPOverlay(buildBBPlan(base), { mode: 'heavy_light', cycleDays: 2 });
       const combo = buildBBPlan({ ...base, supersetMode: 'antagonist', volumeScheme: 'gvt' });
       for (const p of [dup, combo]) {
         expect(invariants(p)).toEqual({ over5: 0, single: 0, ovf: 0 });

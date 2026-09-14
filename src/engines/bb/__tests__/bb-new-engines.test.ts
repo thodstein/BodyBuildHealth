@@ -5,7 +5,7 @@
  * - bb-dup.engine.ts (Daily Undulating Periodization)
  */
 import { describe, expect, it } from 'vitest';
-import { buildBBPlan, buildBBPlanWithDUP } from '../bb-builder.engine';
+import { buildBBPlan } from '../bb-builder.engine';
 import { makeInput } from './bb-test-helpers';
 import {
   extractRotationHistory,
@@ -161,8 +161,8 @@ describe('bb-injury-prevention.engine', () => {
 });
 
 describe('bb-dup.engine', () => {
-  it('buildBBPlanWithDUP — явно применяет DUP к базовому плану', () => {
-    const plan = buildBBPlanWithDUP(makeInput({ weeks: 8 }), { mode: 'full_dup', cycleDays: 3 });
+  it('buildBBPlan + applyDUPOverlay — явно применяет DUP к базовому плану', () => {
+    const plan = applyDUPOverlay(buildBBPlan(makeInput({ weeks: 8 })), { mode: 'full_dup', cycleDays: 3 });
     expect(plan.rationale.some(r => r.includes('DUP: full_dup'))).toBe(true);
   });
 

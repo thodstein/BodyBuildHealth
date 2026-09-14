@@ -17,7 +17,7 @@ import { SPLIT_PATTERNS, getPattern, sessionsOf, type SplitPattern, type Schedul
 import { FORCE_HEAVY_GROUPS, resolveCharacter, TAG_MUSCLES, type DayCharacter, type MuscleSlot } from './bb-day-types';
 import { getAllVolumeLandmarks, getVolumeLandmarks, normLevel, type TrainingLevel, type MuscleVolumeLandmarks } from '../volume-landmarks.engine';
 import { calibratedLandmarksFor, loadMEVCalibration, type MEVCalibration } from './bb-mev-calibration.engine';
-import { applyRehabToPlan, rehabNotes, tonnageProgression } from './bb-recovery.engine';
+import { applyRehabToPlan, rehabNotes, tonnageProgression, overreachingCheck } from './bb-recovery.engine';
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
 import { cycleVolumeFactor } from './bb-cycle.engine';
 import { mergeWearableIntoRecovery, wearableRecoveryFactor, type WearableDaily } from './bb-wearable.engine';
@@ -63,11 +63,12 @@ import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
 import { insulinWindowActive } from './bb-insulin-window.engine';
 import { recommendPEDMethodology, applyPEDMethodologyToPlan } from './bb-ped-methodology.engine';
-import { REP_SCHEMES, schemeFor, schemeToLoading, applySchemeToPlan } from './bb-rep-schemes.engine';
+import { REP_SCHEMES, schemeFor, schemeToLoading, applySchemeToPlan, applyBfrPattern } from './bb-rep-schemes.engine';
+import { bbVbtRecommendation } from './bb-vbt.engine';
 import type { BBRotationReport } from './bb-rotation.engine';
 import type { BBSessionCost } from './bb-fatigue.engine';
 import type { BBPlanReport } from './bb-report.engine';
-import { applyDUPOverlay, type DUPConfig } from './bb-dup.engine';
+
 import type { BBPlanValidationResult } from './bb-validator.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
 import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationResolution, type SpecializationBlock } from './bb-specialization.engine';
@@ -214,6 +215,19 @@ export interface BBBuilderInput {
    *  ротационное «понижение приоритета» (мягкое избегание повторов в течение
    *  cooldown-окна), совместимо с cross-meso rotation. */
   cooldownHistory?: Array<{ exerciseName: string; pattern?: string }>;
+  /**
+   * Волна-3.12: VBT-вход из дневника/хаба — потеря скорости лучший→последний
+   * повтор прошлой сессии. Порог ≥25% → объём ×0.9/RIR+1; ≥40% → ×0.8/RIR+2
+   * (Pareja-Blanco 2020: дальше только усталость без прибавки). Не мутирует
+   * капы; без входа план байт-в-байт прежний.
+   */
+  vbt?: { lift?: string; bestVelocity: number; lastVelocity: number; weightKg?: number };
+  /**
+   * Волна-3.13: readiness до/после последней разгрузки (из дневника/хаба).
+   * Если overreachingCheck не «очищен» — после первой разгрузки плана ставится
+   * вторая микро-разгрузка (−20% объём, RIR+2) с rationale.
+   */
+  deloadReadiness?: { before: number; after: number; soreness?: number };
   /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
   supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
@@ -1682,6 +1696,8 @@ export interface BuildSessionParams {
   cooldownNames?: string[];
   /** Волна-2.7: per-muscle сессионный MRV-потолок (min(perSessionMuscleCap, challengeMrv/freq×tol)). */
   mrvRotByMuscle?: Record<string, number>;
+  /** Волна-3.14: эскалация стартового RIR из прошлого мезо (0/1). */
+  rirEscalation?: number;
 }
 
 function buildSession(
@@ -1739,6 +1755,7 @@ function buildSession(
   isPPL: boolean = false,
   cooldownNames: string[] = [],
   mrvRotByMuscle: Record<string, number> = {},
+  rirEscalation: number = 0,
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -1963,7 +1980,8 @@ function buildSession(
     // (больше reps = легче вес для разгрузки).
     const reps = phase === 'deload' ? Math.round((shiftedMin + shiftedMax) / 2) : shiftedMin;
     // RIR: bbRir (учитывает phase + phaseWeek + характер + PED дрифт). Делод → RIR 3-4.
-    const rir = bbRir(resolved, phase, phaseWeek, trainingFocus, pedDoses, level);
+    // Волна-3.14: эскалация из прошлого мезо (закончился у отказа → +1 RIR старту).
+    const rir = clampRir(bbRir(resolved, phase, phaseWeek, trainingFocus, pedDoses, level) + (rirEscalation || 0));
     const wm = workMax[repKey] || PRO_WORKMAX_RATIO[repKey]?.(workMax) || defaultWorkMax(repKey);
     // P1-4 (audit 2026-07): Brzycki inverse %1RM formula — реп-корректный вес.
     // Раньше: weight = workMax × intensityMult × PCT_FOR_RIR[rir] (не учитывала reps).
@@ -2907,7 +2925,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.mobilityRestrictions, p.trainingYears, p.bodyweightCapability,
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
     p.skipStrictCoverage, p.abAvoidPatterns, p.abSibIndex ?? 0,
-    p.packingV2 ?? false, p.isPPL ?? false, p.cooldownNames ?? [], p.mrvRotByMuscle ?? {},
+    p.packingV2 ?? false, p.isPPL ?? false, p.cooldownNames ?? [], p.mrvRotByMuscle ?? {}, p.rirEscalation ?? 0,
   );
 }
 
@@ -3480,7 +3498,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // (финализатор копирует сессии поверхностно, поле переживает).
         // Без флага — undefined, legacy 1-в-1 байт-в-байт.
         const abAvoid = input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRotByMuscle, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRotByMuscle, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames, rirEscalation: mesoProgression?.rirEscalation ?? 0 });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       if (abAvoid && abAvoid.length > 0) (sess as any).abAvoidPatterns = [...abAvoid];
       // A/B-ротация: фиксируем паттерны сессии для sibling-сессий того же тега.
@@ -3861,8 +3879,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   };
   const pedsForMethEarly: any[] = pedAdapt?.activePEDs || (onCourse ? (Object.keys(input.pedDoses || {}).filter(k => parseMethDoseEarly((input.pedDoses as any)[k]) > 0) as any) : []);
   const hasAnyPedInput = pedsForMethEarly.length > 0 || (input.pedDoses && Object.keys(input.pedDoses).length > 0);
+  // Волна-3.3: реальная фаза плана для rep-схем (было жёстко 'accumulation' —
+  // dc_rp/cluster были недостижимы). Планы без intensification/peaking → accumulation.
+  const schemePhase: BBPhase = phaseDist.some(pd => pd.phase === 'peaking') ? 'peaking'
+    : phaseDist.some(pd => pd.phase === 'intensification') ? 'intensification'
+      : 'accumulation';
   const methForGates: any = hasAnyPedInput
-    ? recommendPEDMethodology({ peds: pedsForMethEarly, pedDoses: input.pedDoses || {}, level, goal: input.goal, focus: input.trainingFocus, targetMuscles: specRes?.active ? specRes.targets : [], totalWeeks: input.weeks, phaseOverride: input.pedPhaseOverride || 'auto' })
+    ? recommendPEDMethodology({ peds: pedsForMethEarly, pedDoses: input.pedDoses || {}, level, goal: input.goal, focus: input.trainingFocus, targetMuscles: specRes?.active ? specRes.targets : [], totalWeeks: input.weeks, phaseOverride: input.pedPhaseOverride || 'auto', phase: schemePhase })
     : null;
   const soloInsulinGate = !!(methForGates?.insulinSafety?.soloWithoutAasGh);
   // FST-7 7-in-1 гейт (Rambod — только enhanced без joint-проблем) + запрет
@@ -3889,11 +3912,35 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     schemeDowngradeNotes.push('⛔ Соло-инсулин: rest-pause (DC) отключён — отказные техники без анаболической базы запрещены. Техника: выкл.');
   }
   const fst7Seven = effVolumeScheme === 'fst7' && level === 'enhanced' && !methForGates?.jointGuard && !soloInsulinGate;
+  // Волна-3.12: VBT в генерацию — потеря скорости режет объём/RIR (см. input.vbt).
+  let vbtRec: ReturnType<typeof bbVbtRecommendation> | null = null;
+  let vbtReg: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number } | null = null;
+  if (input.vbt && Number.isFinite(input.vbt.bestVelocity) && Number.isFinite(input.vbt.lastVelocity)) {
+    vbtRec = bbVbtRecommendation(input.vbt.lift || '', input.vbt.bestVelocity, input.vbt.lastVelocity, input.vbt.weightKg, {
+      goal: input.goal === 'strength_mass' ? 'strength' : 'mass',
+    });
+    if (vbtRec.lossPct >= 40) vbtReg = { volumeMultiplier: 0.8, topSetPctMultiplier: 1, rirShift: 2 };
+    else if (vbtRec.lossPct >= 25) vbtReg = { volumeMultiplier: 0.9, topSetPctMultiplier: 1, rirShift: 1 };
+  }
+  const mergeAutoReg = (
+    base?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number },
+    extra?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number } | null,
+  ) => {
+    if (!base && !extra) return undefined;
+    if (!extra) return base;
+    if (!base) return extra;
+    return {
+      volumeMultiplier: Math.min(base.volumeMultiplier, extra.volumeMultiplier),
+      topSetPctMultiplier: base.topSetPctMultiplier,
+      rirShift: Math.max(base.rirShift, extra.rirShift),
+    };
+  };
+  const effAutoReg = input.autoRegResult ? mergeAutoReg(input.autoRegResult, vbtReg) : input.autoRegResult;
   // Применяем пост-обработку (техники/фидеры/авто-делод/загрузка/авторег) внутри buildBBPlan,
   // чтобы оба вызывающих пути (BbAutoConstructor и TrainingConstructor) получали результат.
   // Условие покрывает ВСЕ признаки, а не только technique/weakPoints — иначе loadStrategy
   // и autoDeload теряются (баг: dfa8842fb убрал дубль-вызов из BbAutoConstructor, но не расширил guard).
-  if ((effIntensityTechnique && effIntensityTechnique !== 'none') || weakPoints.length > 0 || input.loadStrategy || input.autoDeload || input.autoRegResult) {
+  if ((effIntensityTechnique && effIntensityTechnique !== 'none') || weakPoints.length > 0 || input.loadStrategy || input.autoDeload || effAutoReg) {
     finalPlan = applyPostPhaseProcessing({
       plan: basePlan,
       totalWeeks: input.weeks,
@@ -3902,7 +3949,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       autoDeload: input.autoDeload,
       deloadType: input.deloadType,
       acwrRatio,
-      autoRegResult: input.autoRegResult,
+      autoRegResult: effAutoReg,
       skipPhaseRedistribution: true,
       intensityTechnique: effIntensityTechnique,
       weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
@@ -4610,6 +4657,66 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     }
   }
   if (dcCadenceNote && !finalized.rationale.includes(dcCadenceNote)) finalized.rationale.push(dcCadenceNote);
+  // Волна-3.12: VBT-вход — рекомендация + честная пометка применённой коррекции.
+  if (vbtRec) {
+    finalized.rationale.push(`⚡ VBT: ${vbtRec.recommendation}`);
+    if (vbtReg) finalized.rationale.push(`⚡ VBT-коррекция применена: объём ×${vbtReg.volumeMultiplier}, RIR +${vbtReg.rirShift} (потеря скорости ${vbtRec.lossPct.toFixed(0)}%).`);
+  }
+  // Standalone-коррекция VBT (без авто-регуляции): отдельный проход, чтобы не
+  // активировать весь пост-процессинг (тот добавлял MEV-добивки и перекрывал срез).
+  if (vbtReg && !input.autoRegResult) {
+    for (const week of finalized.weeks as any[]) {
+      if (week.deload === true || week.phase === 'deload') continue;
+      for (const s of week.sessions || []) {
+        for (const e of s.exercises || []) {
+          if ((e as any).warmupActivator) continue;
+          const newSets = Math.max(1, Math.round((e.sets || 0) * vbtReg.volumeMultiplier));
+          e.sets = newSets;
+          if (Array.isArray(e.workSets)) {
+            e.workSets = e.workSets.slice(0, newSets);
+            while (e.workSets.length < newSets) e.workSets.push({ ...(e.workSets[e.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 }) });
+          }
+          e.rir = clampRir((Number(e.rir) || 2) + vbtReg.rirShift);
+          if (Array.isArray(e.workSets)) for (const ws of e.workSets) ws.rir = e.rir;
+          e.comment = `${e.comment || ''} ⚡ VBT: объём ×${vbtReg.volumeMultiplier}, RIR +${vbtReg.rirShift} (${vbtRec?.lossPct.toFixed(0)}% потеря скорости)`.trim();
+        }
+      }
+    }
+    syncBBPlanSetShape(finalized);
+  }
+  // Волна-3.14: RIR-эскалация из прошлого мезо (закончился у отказа).
+  if ((mesoProgression?.rirEscalation ?? 0) > 0) {
+    finalized.rationale.push(`🌊 RIR-волна: прошлый мезо закончился у отказа — стартовый RIR повышен на 1 (Martikainen 2025: результат тот же, RPE ниже).`);
+  }
+  // Волна-3.13: overreaching-проверка после разгрузки — не «очищено» → вторая
+  // микро-разгрузка (−20% объём, RIR+2) на первой рабочей неделе после первой делод-недели.
+  if (input.deloadReadiness) {
+    const oc = overreachingCheck(input.deloadReadiness.before, input.deloadReadiness.after, { muscleSoreness: input.deloadReadiness.soreness });
+    finalized.rationale.push(oc.cleared
+      ? `✅ Overreaching-проверка: ${oc.recommendation}`
+      : `⚠ Overreaching-проверка: ${oc.recommendation}`);
+    if (!oc.cleared) {
+      const weeksArr = finalized.weeks as any[];
+      const firstDeloadIdx = weeksArr.findIndex(w => w.deload === true || w.phase === 'deload');
+      const targetIdx = firstDeloadIdx >= 0 ? firstDeloadIdx + 1 : 0;
+      const target = weeksArr[targetIdx];
+      if (target && !(target.deload === true || target.phase === 'deload')) {
+        for (const s of target.sessions || []) {
+          for (const e of s.exercises || []) {
+            const newSets = Math.max(1, Math.round((e.sets || 0) * 0.8));
+            e.sets = newSets;
+            if (Array.isArray(e.workSets) && e.workSets.length > newSets) e.workSets = e.workSets.slice(0, newSets);
+            e.rir = clampRir((Number(e.rir) || 2) + 2);
+            if (Array.isArray(e.workSets)) for (const ws of e.workSets) ws.rir = e.rir;
+            e.comment = `${e.comment || ''} ⚠ Overreaching: вторая разгрузка (объём ×0.8, RIR +2)`.trim();
+          }
+        }
+        (target as any).overreachingDeload = true;
+        syncBBPlanSetShape(finalized);
+        finalized.rationale.push(`⚠ Вторая разгрузка: нед ${target.week} снижена (объём ×0.8, RIR +2) — readiness не восстановилась (Rogerson/Bell 2024: делод неэффективен → дополнительная разгрузка).`);
+      }
+    }
+  }
   // PED-методика + insulin window + rep-схемы: overlay после финализации, не ломает тяж/памп.
   // Joint-guard уже отработал на уровне пула (buildExercisePool), здесь — только rationale/подсказки.
   try {
@@ -4649,6 +4756,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           defaultWorkMax,
           proWorkmaxRatio: (m: string) => PRO_WORKMAX_RATIO[m] as any,
           intensityMult: 1,
+          // Волна-3.3: гейт minLevel схемы (dc_rp/cluster — advanced+).
+          level,
         };
         // Применяем rep-схему к РЕАЛЬНОЙ загрузке. Важно: дефолтная схема памп
         // (hypertrophy_8_12, которую schemeFor возвращает без специализированного PED-профиля)
@@ -4682,21 +4791,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           if (ex.role !== 'accessory') continue;
           const isIso = (ex as any).exerciseType === 'isolation' || (ex as any).type === 'isolation' || /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц/i.test(ex.name || '');
           if (!isIso) continue;
-          // BFR: 4 сета 30-15-15-15 @ 25% workMax, RIR 2-3, rest 30с, tempo 2-1-1-0
-          const baseW = workMax[ex.muscle] || 50;
-          const bfrW = Math.max(5, Math.round(baseW * 0.25 * 10) / 10);
-          ex.sets = 4;
-          ex.repsRange = [15, 30];
-          ex.rir = 2;
-          ex.restSeconds = 30;
-          ex.tempoSpec = '2-1-1-0';
-          ex.workSets = [
-            { reps: 30, rir: 2, weight: bfrW, tempo: '2-1-1-0', restSeconds: 30 },
-            { reps: 15, rir: 2, weight: bfrW, tempo: '2-1-1-0', restSeconds: 30 },
-            { reps: 15, rir: 2, weight: bfrW, tempo: '2-1-1-0', restSeconds: 30 },
-            { reps: 15, rir: 3, weight: bfrW, tempo: '2-1-1-0', restSeconds: 30 },
-          ];
-          if (!ex.comment?.includes('BFR')) ex.comment = `${ex.comment || ''} | 🩸 BFR 30-15-15-15 @${bfrW}кг (20-30% 1RM, 30с)`.trim().replace(/^\|\s*/, '');
+          // Волна-3.5: единый BFR-протокол (30-15-15-15 @25% workMax) из
+          // bb-rep-schemes — тот же, что применяет scheme='bfr'.
+          applyBfrPattern(ex, workMax[ex.muscle] || 50);
           bfrApplied++;
         }
       }
@@ -4801,19 +4898,6 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     (finalized as any).packingV2 = true;
   }
   return finalized;
-}
-
-/**
- * Явный DUP-вариант генерации. Обычный buildBBPlan сохраняет прежнее
- * поведение, а undulating periodization включается только через этот API.
- */
-export function buildBBPlanWithDUP(
-  input: BBBuilderInput,
-  dup: DUPConfig,
-  pedAdapt?: PEDAdaptation,
-): BBPlan {
-  const plan = buildBBPlan(input, pedAdapt);
-  return applyDUPOverlay(plan, dup);
 }
 
 /* ───────────────────────── Cross-Day WeakPoints Compensation ───────────────────────── */

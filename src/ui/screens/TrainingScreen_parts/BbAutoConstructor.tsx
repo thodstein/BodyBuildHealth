@@ -19,7 +19,7 @@ import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../..
 import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
-import { buildBBPlan, buildWarmup, applyMacrocycleToBBPlan, buildBBPlanWithDUP, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
+import { buildBBPlan, buildWarmup, applyMacrocycleToBBPlan, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
 import { collectPlanExercises, recalibratePlanWeights, autoCalibrateFromStored, groupWeightEntries, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyDUPOverlay } from '../../../engines/bb/bb-dup.engine';

@@ -60,6 +60,12 @@ export interface PEDMethodologyInput {
    * Применяется к pedPhase и pedPhaseByWeek целиком.
    */
   phaseOverride?: 'auto' | 'proliferation' | 'differentiation';
+  /**
+   * Волна-3.3: реальная фаза плана для выбора rep-схем. Раньше здесь было
+   * жёстко 'accumulation' — dc_rp/cluster были недостижимы на PED-пути.
+   * По умолчанию accumulation (обратная совместимость).
+   */
+  phase?: BBPhase;
 }
 
 function has(peds: PED[], k: PED): boolean { return peds.includes(k); }
@@ -158,13 +164,16 @@ export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodol
   const safety = insulinSafetyCheck(peds, pedDoses);
   for (const w of safety.warnings) rationale.push(`🛡 ${w}`);
 
-  // Рекомендованные схемы (не форсируют, а подсказывают schemeFor)
+  // Рекомендованные схемы (не форсируют, а подсказывают schemeFor).
+  // Волна-3.3: фаза из плана (input.phase) — intensification/peaking делают
+  // достижимыми dc_rp/cluster; без неё — прежнее accumulation-поведение.
+  const schemePhase = input.phase || ('accumulation' as BBPhase);
   const pedProfile: SchemeForInput['pedProfile'] = {
     hasAAS, hasGH, hasInsulin: hasIns, hasMGF, hasIGF1, ghPlusInsulin,
     pedPhase: pedPhase === 'both' ? 'both' : pedPhase === 'none' ? undefined : pedPhase,
   };
-  const heavy = schemeFor({ ...input, phase: 'accumulation' as BBPhase, character: 'тяж', pedProfile });
-  const pump = schemeFor({ ...input, phase: 'accumulation' as BBPhase, character: 'памп', pedProfile });
+  const heavy = schemeFor({ ...input, phase: schemePhase, character: 'тяж', pedProfile });
+  const pump = schemeFor({ ...input, phase: schemePhase, character: 'памп', pedProfile });
 
   // Peri-workout
   let periWorkout: PEDMethodology['periWorkout'] = { carbs: 'moderate' };

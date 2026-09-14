@@ -25,6 +25,29 @@ export interface MesocycleProgression {
   needsDeload: boolean;
   /** Рекомендуемая прогрессия весов (кг) по мышцам. */
   weightProgression: Record<string, number>;
+  /**
+   * Волна-3.14: эскалация стартового RIR нового мезо. Если прошлый мезо
+   * закончился у отказа (средний RIR primary ≤0.5) — новое мезо начинается
+   * на 1 RIR выше (Martikainen 2025: волна RIR 4→1 = постоянный RIR 1 по
+   * результату при меньшем RPE; страх перетрена без потери гипертрофии).
+   */
+  rirEscalation: number;
+}
+
+/** Волна-3.14: эскалация RIR из прошлого плана (последние 2 рабочие недели, primary). */
+export function rirEscalationFromPreviousPlan(previousPlan: BBPlan | null | undefined): number {
+  if (!previousPlan || !Array.isArray(previousPlan.weeks) || previousPlan.weeks.length === 0) return 0;
+  const nonDeload = previousPlan.weeks.filter(w => !(w as any).deload && String((w as any).phase || '') !== 'deload');
+  const tail = nonDeload.slice(-2);
+  if (tail.length === 0) return 0;
+  const rirs = tail
+    .flatMap(w => w.sessions.flatMap(s => s.exercises
+      .filter(e => e.role === 'primary')
+      .map(e => Number(e.rir))))
+    .filter(Number.isFinite);
+  if (rirs.length === 0) return 0;
+  const mean = rirs.reduce((a, b) => a + b, 0) / rirs.length;
+  return mean <= 0.5 ? 1 : 0;
 }
 
 /**
@@ -108,6 +131,7 @@ export function extractMesocycleProgression(
     volumeDelta,
     needsDeload,
     weightProgression,
+    rirEscalation: rirEscalationFromPreviousPlan(previousPlan),
   };
 }
 

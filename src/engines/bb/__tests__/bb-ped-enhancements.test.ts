@@ -7,7 +7,6 @@ import { recommendPEDMethodology, applyPEDMethodologyToPlan } from '../bb-ped-me
 import { computeAASEquivDose, AAS_SUBSTANCE_TEQ } from '../bb-ped-adaptation.engine';
 import { jointGuardActive, jointGuardScorePenalty } from '../bb-joint-guard.engine';
 import { insulinWindowActive } from '../bb-insulin-window.engine';
-import { PRO_PRESETS } from '../bb-pro-presets.engine';
 import { buildBBPlan } from '../bb-builder.engine';
 import { rankBBSplits } from '../bb-selector.engine';
 
@@ -69,10 +68,6 @@ describe('bb-insulin-window', () => {
   it('GH+insulin → active', () => { expect(insulinWindowActive({ hasGH: true, ghDose: 4, hasInsulin: true, insulinDose: 10 })).toBe(true); });
   it('только инсулин → false', () => { expect(insulinWindowActive({ hasGH: false, hasInsulin: true, insulinDose: 10 })).toBe(false); });
   it('малые дозы → false', () => { expect(insulinWindowActive({ hasGH: true, ghDose: 1, hasInsulin: true, insulinDose: 4 })).toBe(false); });
-});
-
-describe('pro-presets', () => {
-  it('3 пресета + none', () => { expect(Object.keys(PRO_PRESETS).length).toBe(4); });
 });
 
 describe('MGF/IGF1 target (Фаза 2.9)', () => {

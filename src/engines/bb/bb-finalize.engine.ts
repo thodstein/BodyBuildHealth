@@ -20,6 +20,7 @@ function indirectToMuscle(ex: any, muscle: string): number {
   return v;
 }
 import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine';
+import { REP_SCHEMES } from './bb-rep-schemes.engine';
 import { analyzeBBRotation } from './bb-rotation.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf, derivePattern } from '../movement-pattern';
@@ -2662,11 +2663,13 @@ export function markGiantSets(plan: BBPlan): void {
 }
 
 /** Схемы объёма памп-дней: суммарный target на мышцу распределяется по
- *  памп-изоляциям сессии (cap 5 сетов/упражнение сохраняется). */
+ *  памп-изоляциям сессии (cap 5 сетов/упражнение сохраняется).
+ *  Волна-3.4: единый источник — REP_SCHEMES (repRange/rest/имя): GVT = ровно
+ *  10×10 (ранее reps[1]=12 → фактически 12 повторов), Gironda = 8×8 (было 10). */
 const VOLUME_SCHEMES: Record<string, { target: number; reps: [number, number]; rest: number; label: string }> = {
-  gvt: { target: 10, reps: [10, 12], rest: 75, label: 'GVT 10×10' },
-  fst7: { target: 7, reps: [8, 12], rest: 40, label: 'FST-7' },
-  gironda: { target: 8, reps: [8, 10], rest: 60, label: '8×8 Gironda' },
+  gvt: { target: 10, reps: REP_SCHEMES.gvt.repRange, rest: REP_SCHEMES.gvt.restSec, label: REP_SCHEMES.gvt.nameRu },
+  fst7: { target: 7, reps: REP_SCHEMES.fst7.repRange, rest: REP_SCHEMES.fst7.restSec, label: REP_SCHEMES.fst7.nameRu },
+  gironda: { target: 8, reps: REP_SCHEMES.gironda_8x8.repRange, rest: REP_SCHEMES.gironda_8x8.restSec, label: REP_SCHEMES.gironda_8x8.nameRu },
 };
 /** Применить схему объёма к одному упражнению (сеты/reps/отдых/workSets/коммент). */
 function assignSchemeSets(ex: any, sets: number, cfg: { reps: [number, number]; rest: number; label: string }): void {
