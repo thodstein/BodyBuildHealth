@@ -439,6 +439,9 @@ const STARCH_FLOUR_BAN: ReadonlySet<string> = new Set(['grain_tapioca_starch', '
 const COMFORT_PORTION_LIMITS: Record<string, number> = {
   honey: 40, raisins: 60, dates_dried: 60, dates: 60, dried_apricots: 60, fruit_date_medjool: 60, dried_apple_rings: 50, prunes: 60,
   dried_pineapple: 60, dried_mango: 60, dried_cranberry: 60, dried_blueberry: 60, dried_kiwi: 60, dried_pear: 60, dried_peach: 60, dried_banana_chips: 40,
+  // P3: кап джема 20 ОТКАЧЕН (A/B: w120/train dC 0.13→0.21 — глобальный кап рвёт
+  // сходимость каскадом через merge-room/ceiling; вкус держится стейпл-приоритетом
+  // снек-пасса ниже + сахарными капами дня, а не картой).
   pryaniki: 50, jam: 35, zefir: 50, pastila: 45, sushki: 40, sugar_cookies: 40, marmalade: 35,
   bread_white: 110, bread_rye: 110, bread_borodinsky: 110, bread_fitness: 110, whole_grain_bread: 110,
 };
@@ -7504,6 +7507,103 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         if (_pClamped) m.totals = mealTotalsOf(m.items || []);
       }
       if (_pClamped) recalcDayTotals(meals, totals);
+    }
+
+    // ─── P3 (план «ведро»): минимум снека — ≥60% углеводной цели приёма ───
+    // Стоит ПОСЛЕДНИМ writer-проходом сборки (позже баланса Р-2.3, догона, чисток
+    // и клампов): баланс режет снек по ккал-цели, а чистка мелочи добивает ужатый
+    // гарнир (кейс HV Перекус 5: 79 → баланс 66 → чистка сносит крем 29 г → 39.6).
+    // Гарантия чинит итог, а не промежуточное состояние. Снек ниже пола —
+    // доливаем staple-углеводом в комнате ккал дня: сначала ростом существующего
+    // гарнира (merge), иначе наименее использованным не-сахарным стейплом с капами
+    // (uses/семейство/крем-субкап/клетчатка). Сахар — не закрыватель (джем только
+    // вкус ≤20 г, см. COMFORT-карту). Не вышло — честная нота «не сошлось» (§5).
+    for (const m of meals) {
+      if (m.type !== 'snack' && m.type !== 'snack2' && m.type !== 'snack3' && m.type !== 'snack4' && m.type !== 'snack5' && m.type !== 'snack6') continue;
+      if ((m as any)._insulinWindow) continue;
+      if (!m.target || (m.target.c || 0) <= 5) continue;
+      const _floorC = 0.6 * (m.target.c || 0);
+      if ((m.totals.c || 0) >= _floorC - 0.51) continue;
+      const _hvP3 = !!_pickCtx.highVolumeDay;
+      // Белковая комната дня: долив снека не должен раздувать перебор белка
+      // (кейс «3 болюса»: белок окон + доливы = перебор; критерий §5 — тогда нота).
+      // Ноль/нет цели — гейт не применяем.
+      const _pGoalP3 = input.goalProteinG || 0;
+      let _pRoomP3 = _pGoalP3 > 0 ? _pGoalP3 * 1.03 - totals.p : Infinity;
+      const _fibCapP3 = _hvP3
+        ? (() => { const _cc = input.goalCarbsG || 0; const _step = _cc >= 700 ? 115 : _cc >= 500 ? 65 : 50; const _kb = Math.round((input.goalKcal || 0) / 1000 * 14); const _fl = _cc >= 700 ? 105 : _cc >= 500 ? 60 : 0; return Math.max(25, Math.min(_step, Math.max(_kb, _fl))); })()
+        : Math.max(25, Math.min(50, Math.round((input.goalKcal || 0) / 1000 * 14)));
+      let _needP3 = _floorC - (m.totals.c || 0);
+      // 1) рост существующего гарнира
+      const _growP3 = (m.items || [])
+        .filter((x: any) => (x.role === 'carb_slow' || x.role === 'carb_fast') && !(x as any)._fixedGrams)
+        .map((x: any) => {
+          const _fd = FOOD_DB.find((f: any) => f.id === x.id);
+          if (!_fd || !(_fd.carbs > 0)) return null;
+          const _cc = (COMFORT_PORTION_LIMITS as Record<string, number>)[x.id];
+          const _cap = _cc !== undefined ? _cc : carbPortionCap(_fd, mealCapScaleOf(m as any));
+          return { x, fd: _fd, room: _cap - (x.amount || 0) };
+        })
+        .filter((g): g is { x: any; fd: any; room: number } => !!g && g.room >= 5)
+        .sort((a: any, b: any) => b.room - a.room);
+      for (const g of _growP3) {
+        if (_needP3 <= 0.5) break;
+        const _kRoom = (input.goalKcal || 0) * 1.03 - totals.kcal;
+        if (_kRoom < 20) break;
+        _pRoomP3 = _pGoalP3 > 0 ? _pGoalP3 * 1.03 - totals.p : Infinity;
+        if ((g.fd.protein || 0) > 0 && _pRoomP3 < 1) break;
+        let _gg = Math.min(_needP3 / Math.max(1, g.fd.carbs || 1) * 100, _kRoom / Math.max(1, g.fd.kcal || 1) * 100, g.room);
+        if ((g.fd.protein || 0) > 0 && _pRoomP3 < Infinity) _gg = Math.min(_gg, Math.floor(_pRoomP3 / (g.fd.protein || 1) * 100 / 5) * 5);
+        _gg = Math.ceil(_gg / 5) * 5;
+        if (_gg < 5) continue;
+        const _gr = ((g.x.amount || 0) + _gg) / Math.max(1, g.x.amount || 1);
+        g.x.amount = (g.x.amount || 0) + _gg;
+        g.x.p = +((g.x.p || 0) * _gr).toFixed(1); g.x.f = +((g.x.f || 0) * _gr).toFixed(1); g.x.c = +((g.x.c || 0) * _gr).toFixed(1);
+        g.x.kcal = Math.round(4 * g.x.p + 9 * g.x.f + 4 * g.x.c);
+        g.x.fiber = Math.round(((g.x.fiber || 0) * _gr) * 10) / 10;
+        m.totals = mealTotalsOf(m.items);
+        recalcDayTotals(meals, totals);
+        _needP3 = _floorC - (m.totals.c || 0);
+      }
+      // 2) новый staple-пункт (ремонт голодающего снека, дозируем строго до пола)
+      if (_needP3 > 0.5) {
+        const _haveIds = new Set((m.items || []).map((x: any) => x.id));
+        const _cands = (pool.carbSlow || [])
+          .filter((f: any) => f && (f.carbs || 0) > 0 && !_haveIds.has(f.id) && !CONCENTRATE_IDS.includes(f.id))
+          .filter((f: any) => !(_hvP3 && (HV_BANNED_CARB_IDS.has(f.id) || isHvStapleBanned(f.id))))
+          .filter((f: any) => ((_pickCtx.dayCarbUses.get(f.id) || 0) < 2))
+          .filter((f: any) => { const _fam = stapleFamilyOf(f.id); return !_fam || ((_pickCtx.dayCarbFamilyUses.get(_fam) || 0) < familyMealCap(_fam, { hv: _hvP3, ts: _pickCtx.dayTargetScale })); })
+          .filter((f: any) => !(isCreamId(f.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(_hvP3, _pickCtx.dayTargetScale))))
+          .sort((a: any, b: any) => ((_pickCtx.dayCarbUses.get(a.id) || 0) - (_pickCtx.dayCarbUses.get(b.id) || 0)) || ((b as any).bb_quality_score || 0) - ((a as any).bb_quality_score || 0));
+        for (const _cf of _cands) {
+          if (_needP3 <= 0.5) break;
+          const _kRoom2 = (input.goalKcal || 0) * 1.03 - totals.kcal;
+          if (_kRoom2 < 30) break;
+          _pRoomP3 = _pGoalP3 > 0 ? _pGoalP3 * 1.03 - totals.p : Infinity;
+          if ((_cf.protein || 0) > 0 && _pRoomP3 < 1) break;
+          const _cap2 = Math.min(carbPortionCap(_cf, mealCapScaleOf(m as any)), 200);
+          let _g2 = Math.min(_needP3 / Math.max(1, _cf.carbs || 1) * 100, _kRoom2 / Math.max(1, _cf.kcal || 1) * 100, _cap2);
+          if ((_cf.protein || 0) > 0 && _pRoomP3 < Infinity) _g2 = Math.min(_g2, Math.floor(_pRoomP3 / (_cf.protein || 1) * 100 / 5) * 5);
+          _g2 = Math.floor(_g2 / 5) * 5;
+          if (_g2 < 10) continue;
+          if (totals.fiber + (_cf.fiber || 0) * _g2 / 100 > _fibCapP3) continue;
+          const _r2 = _g2 / 100;
+          const _p2 = Math.round((_cf.protein || 0) * _r2), _f2 = Math.round((_cf.fat || 0) * _r2), _c2 = Math.round((_cf.carbs || 0) * _r2);
+          (m.items || []).push({ id: _cf.id, name: _cf.name, amount: _g2, role: 'carb_slow' as const, kcal: Math.round(4 * _p2 + 9 * _f2 + 4 * _c2), p: _p2, f: _f2, c: _c2, fiber: Math.round((_cf.fiber || 0) * _r2), leucine_mg: Math.round(getLeucine(_cf) * _r2) });
+          _pickCtx.dayCarbUses.set(_cf.id, ((_pickCtx.dayCarbUses.get(_cf.id) || 0) + 1));
+          const _fam2 = stapleFamilyOf(_cf.id);
+          if (_fam2) _pickCtx.dayCarbFamilyUses.set(_fam2, ((_pickCtx.dayCarbFamilyUses.get(_fam2) || 0) + 1));
+          m.totals = mealTotalsOf(m.items);
+          recalcDayTotals(meals, totals);
+          _needP3 = _floorC - (m.totals.c || 0);
+          break;
+        }
+      }
+      if (_needP3 > 0.5) {
+        notes.push(`⚠ «${m.label}»: ${(m.totals.c || 0).toFixed(0)}У из цели ${m.target.c}У (<60%) — не сошлось: капы семейств/комната ккал не дали долить, дотяните вручную`);
+      } else {
+        notes.push(`🍽 «${m.label}»: снек долит до ≥60% углеводной цели (${(m.totals.c || 0).toFixed(0)}У из ${m.target.c}У)`);
+      }
     }
 
     return {
