@@ -1632,6 +1632,17 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
             if (_roomC < 10) break;
             g = Math.min(g, Math.floor(_roomC / Math.max(1, macroOf(side)) * 100 / 10) * 10);
           }
+          // FIX vedro-recipe: сайд не переливает обычный приём сверх цели+15%
+          // (батат 330 в полный обед при пустых снеках). Комната считается от цели
+          // приёма; peri-слоты выше уже ограничены физиологией — их не трогаем.
+          if (!(periType === 'preworkout' || periType === 'postworkout')) {
+            const _tCc = (tgt.c || 0);
+            if (_tCc > 0) {
+              const _roomCc = Math.max(0, Math.floor(((_tCc * 1.15 + 10) - (tNow.c || 0)) / Math.max(1, macroOf(side)) * 100 / 10) * 10);
+              if (_roomCc < 30) break;
+              g = Math.min(g, _roomCc);
+            }
+          }
           if (g < 30) break;
           finalItems = [...finalItems, scaleItem({
             name: side.name, id: side.id, amount: 100,
