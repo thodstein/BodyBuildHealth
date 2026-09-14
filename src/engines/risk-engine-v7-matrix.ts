@@ -655,7 +655,9 @@ export const DRUG_THRESHOLDS_V7: Record<string, DrugThreshold> = {
 
 // --- Lab reference ranges ---
 
-export const LAB_REFERENCES: Record<string, { mean: number; sd: number; uln: number; sensitive: boolean; alpha: number }> = {
+export interface LabReference { mean: number; sd: number; uln: number; sensitive: boolean; alpha: number }
+
+export const LAB_REFERENCES: Record<string, LabReference> = {
   ALT: { mean: 25, sd: 10, uln: 40, sensitive: true, alpha: 0.5 },
   AST: { mean: 22, sd: 8, uln: 35, sensitive: true, alpha: 0.5 },
   GGT: { mean: 30, sd: 15, uln: 50, sensitive: false, alpha: 0.2 },
@@ -707,6 +709,33 @@ export const LAB_REFERENCES: Record<string, { mean: number; sd: number; uln: num
   RBC: { mean: 5.0, sd: 0.4, uln: 5.8, sensitive: false, alpha: 0.2 },
 };
 
+/**
+ * §6.2 (P2) — женские нормы V7-референсов (только маркеры с однозначным направлением
+ * «выше = хуже»: цитолиз/холестаз, эритроцитоз, креатинин, ферритин). Половые гормоны
+ * (TT/E2/PRL) намеренно НЕ переопределяются: их V7-семантика (z-термы) требует женской
+ * фазовой модели — она живёт в женском слое/TZ (§16.3), а не в этой таблице.
+ * Источники: ULN 31 (АЛТ/АСТ/ГГТ — Endocrine/WADA), Hct 36–48%, Hb 120–150, RBC 4.0–5.2,
+ * креатинин ниже мужского, ферритин ниже (WHO).
+ */
+export const LAB_REFERENCES_FEMALE: Record<string, Partial<LabReference>> = {
+  ALT: { mean: 20, sd: 8, uln: 31 },
+  AST: { mean: 19, sd: 7, uln: 31 },
+  GGT: { mean: 20, sd: 10, uln: 32 },
+  Hct: { mean: 0.42, sd: 0.035, uln: 0.48 },
+  Hb: { mean: 135, sd: 11, uln: 155 },
+  RBC: { mean: 4.6, sd: 0.35, uln: 5.2 },
+  Creatinine: { mean: 65, sd: 12, uln: 97 },
+  Ferritin: { mean: 70, sd: 40, uln: 200 },
+};
+
+/** Единый резолвер референса с учётом пола: без sex (или male) — прежняя мужская таблица байт-в-байт. */
+export function getLabReference(code: string, sex?: 'male' | 'female'): LabReference | undefined {
+  const base = LAB_REFERENCES[code];
+  if (!base || sex !== 'female') return base;
+  const fem = LAB_REFERENCES_FEMALE[code];
+  return fem ? { ...base, ...fem } : base;
+}
+
 // --- Matrix Input/Output types ---
 
 export interface MatrixInput {
@@ -730,6 +759,8 @@ export interface MatrixInput {
   mode: ProtocolMode;
   stazhWeeks: number;
   continuousWeeks: number;
+  /** §6.2: пол для женских V7-референсов (без sex/`male` — мужской путь байт-в-байт). */
+  sex?: 'male' | 'female';
 }
 
 export interface MechanismRisk {
@@ -893,13 +924,13 @@ function resolveSupportReductionId(id: string): string {
   return SUPPORT_REDUCTION_ALIAS[c] || c;
 }
 
-function computeLabFactorForMech(labs: LabPoint[], system: string, mechIdx: number): number {
+function computeLabFactorForMech(labs: LabPoint[], system: string, mechIdx: number, sex?: 'male' | 'female'): number {
   const labNames = LAB_MECH_MAP[system]?.[mechIdx];
   if (!labNames || !labNames.length) return 1.0;
 
   let factor = 1.0;
   for (const labName of labNames) {
-    const ref = LAB_REFERENCES[labName];
+    const ref = getLabReference(labName, sex);
     if (!ref) continue;
     const points = labs.filter(l => l.code === labName || l.name === labName);
     if (!points.length) continue;
@@ -1025,7 +1056,7 @@ export function computeV7Matrix(input: MatrixInput, supportIds: string[] = []): 
       const base = baseRisks[mechIdx] ?? 0.02;
 
       const geneticMult = getGeneticMultiplier(input.genetics, sys, mechIdx);
-      const labF = computeLabFactorForMech(input.labs, sys, mechIdx);
+      const labF = computeLabFactorForMech(input.labs, sys, mechIdx, input.sex);
 
       let drugContrib = 0;
       for (const [substanceId, contribs] of Object.entries(drugContribs)) {

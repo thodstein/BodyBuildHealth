@@ -11,6 +11,7 @@
 import {
   DRUG_THRESHOLDS_V7,
   LAB_REFERENCES,
+  getLabReference,
   getGeneticMultiplier,
   MECHANISM_NAMES,
   SYSTEM_NAMES_RU,
@@ -186,7 +187,7 @@ function getDrugContribution(substanceId: string, system: string, mechIdx: numbe
 
 // ─── Lab Factor: L = (value/ULN)^β × (1 + α × trend) ───
 
-function computeLabFactor(labs: LabPoint[], system: string, mechIdx: number): { factor: number; markersFound: number; markersTotal: number } {
+function computeLabFactor(labs: LabPoint[], system: string, mechIdx: number, sex?: 'male' | 'female'): { factor: number; markersFound: number; markersTotal: number } {
   const labNames = LAB_MECH_MAP[system]?.[mechIdx];
   if (!labNames || !labNames.length) return { factor: 1.0, markersFound: 0, markersTotal: 0 };
 
@@ -195,7 +196,7 @@ function computeLabFactor(labs: LabPoint[], system: string, mechIdx: number): { 
   const totalCount = labNames.length;
 
   for (const labName of labNames) {
-    const ref = LAB_REFERENCES[labName];
+    const ref = getLabReference(labName, sex);
     if (!ref) continue;
     const points = labs.filter(l => l.code === labName || l.name === labName);
     if (!points.length) continue;
@@ -549,8 +550,8 @@ export function calculateTZRisk(input: TZRiskInput): TZRiskResult {
       // Genetic multiplier
       const G = getGeneticMultiplier(genetics, sys, mechIdx);
 
-      // Lab factor
-      const labResult = computeLabFactor(labs, sys, mechIdx);
+      // Lab factor (§6.2: женские референсы при sex=female; без sex — мужской путь байт-в-байт)
+      const labResult = computeLabFactor(labs, sys, mechIdx, sex);
       const L = labResult.factor;
       if (!labMultipliers[sys]) labMultipliers[sys] = {};
       labMultipliers[sys][mechIdx] = L;

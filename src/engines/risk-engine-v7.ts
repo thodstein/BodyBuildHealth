@@ -19,7 +19,7 @@ import {
   type OrganInput,
 } from './risk-engine-v7-organs';
 import {
-  computeV7Matrix, type MatrixInput, type MatrixResult, LAB_REFERENCES, RISK_SYSTEMS_V7,
+  computeV7Matrix, type MatrixInput, type MatrixResult, LAB_REFERENCES, RISK_SYSTEMS_V7, getLabReference,
 } from './risk-engine-v7-matrix';
 import {
   stazhChronicMultiplier, computeInterOrganDamage, lifestyleRecoveryFactors,
@@ -68,6 +68,8 @@ export interface V7RiskInput {
   supportIds?: string[];
   mcRuns?: number;
   simulationDays?: number;  // T days for time-series simulation
+  /** §6.2: пол для женских лабораторных референсов V7 (без sex — мужской путь байт-в-байт). */
+  sex?: 'male' | 'female';
 }
 
 export interface V7OrganSummary {
@@ -111,7 +113,7 @@ function buildOrganInput(input: V7RiskInput): OrganInput {
     return pts.length ? pts[pts.length - 1].value : 0;
   };
   const lastLabZ = (code: string): number => {
-    const ref = LAB_REFERENCES[code];
+    const ref = getLabReference(code, input.sex);
     if (!ref) return 0;
     const val = lastLab(code);
     return (val - ref.mean) / Math.max(0.01, ref.sd);
@@ -176,7 +178,7 @@ function buildOrganInput(input: V7RiskInput): OrganInput {
   const labRefs: Record<string, { mean: number; sd: number }> = {};
   for (const l of labs) {
     labValues[l.code] = l.value;
-    const ref = LAB_REFERENCES[l.code];
+    const ref = getLabReference(l.code, input.sex);
     if (ref) labRefs[l.code] = { mean: ref.mean, sd: ref.sd };
   }
 
@@ -362,6 +364,7 @@ export function runV7Simulation(input: V7RiskInput): V7RiskResult {
     labs: input.labs, course: input.course, genetics: input.genetics,
     nutrition: input.nutrition, training: input.training,
     mode: input.mode, stazhWeeks: input.stazhWeeks, continuousWeeks: input.continuousWeeks,
+    sex: input.sex,
   };
   const matrix = computeV7Matrix(matrixInput, input.supportIds ?? []);
 

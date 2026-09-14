@@ -74,6 +74,9 @@ export function useV7Risk(): { v7Result: V7RiskResult | null; legacyResult: Risk
       // NOT system names from supportCoverage. Use profile's currentSupplements.
       supportIds: (s.nutrition.currentSupplements || []).map((s_: any) => s_.id).filter(Boolean),
       mcRuns: s.system.mcRuns ?? 0,
+      // §6.2: женские лабораторные референсы V7 (HCT/Hb/RBC, АЛТ/АСТ/ГГТ ULN 31, креатинин).
+      // Для male поле не передаётся — мужской путь байт-в-байт.
+      ...(s.personal?.sex === 'female' ? { sex: 'female' as const } : {}),
     };
 
     try {
