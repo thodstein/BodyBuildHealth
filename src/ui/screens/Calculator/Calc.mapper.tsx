@@ -1382,6 +1382,36 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       )}
 
+      {/* ===== ЖЕНСКИЙ СЛОЙ: вирилизация/флаги + усиление (только sex=female) ===== */}
+      {finalRecWithResidual?.pedRisk?.sex === 'female' && ((finalRecWithResidual.pedRisk.femaleFlags?.length || 0) > 0 || finalRecWithResidual.femaleLayer) && (() => {
+        const pr = finalRecWithResidual.pedRisk!;
+        const layer = finalRecWithResidual.femaleLayer;
+        return (
+          <div data-female-layer="root" style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)' }}>
+            <div style={{ fontSize:9, fontWeight:800, color:'#f9a8d4', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.3px' }}>
+              ♀ Женский слой: вирилизация и усиление
+            </div>
+            {pr.femaleVirilizationIndex != null && (
+              <div style={{ fontSize:8, color:'#fff', lineHeight:1.4, marginBottom:3 }}>
+                <b>Дозо-индекс вирилизации: {pr.femaleVirilizationIndex}/100</b>
+                <span style={{ color:'rgba(255,255,255,0.5)', marginLeft:4, fontSize:7 }}>без длительности; полный расчёт — в протоколе «Женщины и ААС»</span>
+              </div>
+            )}
+            {(pr.femaleFlags || []).map((f, i) => (
+              <div key={i} style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4, marginBottom:2, display:'flex', alignItems:'flex-start', gap:4 }}>
+                <span style={{ fontSize:9 }}>{f.includes('АБСОЛЮТНОЕ') ? '🔴' : '⚠️'}</span>
+                <div>{f}</div>
+              </div>
+            ))}
+            {layer?.added?.length ? (
+              <div style={{ fontSize:8, color:'#f9a8d4', lineHeight:1.4, marginTop:2 }}>
+                💊 Усиление поверх мужского набора: +{layer.added.join(', ')}
+              </div>
+            ) : null}
+          </div>
+        );
+      })()}
+
       {/* ===== СИНХРОНИЗАЦИЯ С ПРОФИЛЕМ (neuro/oda/pharma/symptoms) ===== */}
       {onStateChange && (
         <div style={{ marginBottom:6, display:'flex', gap:4 }}>
@@ -2727,6 +2757,21 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               {finalRecWithResidual.pedRisk.triggeredBy.slice(0,3).map((r,i) => <div key={i}>• {r}</div>)}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Женский слой — компактная строка в деталях подбора (только sex=female) */}
+      {finalRecWithResidual?.pedRisk?.sex === 'female' && ((finalRecWithResidual.pedRisk.femaleFlags?.length || 0) > 0 || finalRecWithResidual.femaleLayer) && (
+        <div data-female-layer="details" style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(244,114,182,0.05)', border:'1px solid rgba(244,114,182,0.14)' }}>
+          <div style={{ fontSize:8, fontWeight:700, color:'#f9a8d4', marginBottom:2 }}>
+            ♀ Женский слой{finalRecWithResidual.pedRisk.femaleVirilizationIndex != null ? ` · дозо-индекс вирилизации ${finalRecWithResidual.pedRisk.femaleVirilizationIndex}/100` : ''}
+          </div>
+          {(finalRecWithResidual.pedRisk.femaleFlags || []).slice(0, 4).map((f, i) => (
+            <div key={i} style={{ fontSize:7, color:'#fca5a5', lineHeight:1.4 }}>• {f}</div>
+          ))}
+          {finalRecWithResidual.femaleLayer?.added?.length ? (
+            <div style={{ fontSize:7, color:'#f9a8d4', lineHeight:1.4, marginTop:2 }}>💊 +{finalRecWithResidual.femaleLayer.added.join(', ')} поверх мужского набора</div>
+          ) : null}
         </div>
       )}
 
