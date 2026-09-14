@@ -152,7 +152,16 @@ export function labPointsToSlice(input: any): LabSlice | null {
   return count > 0 ? slice : null;
 }
 
-export function deriveStateFromLabs(fp: LabSlice): {
+/**
+ * §6.2 (P2): UI-градация гематокрита. Мужские пороги 48/52/57 — как было;
+ * женские 44/48/52 — паритет с движком (hem1 [44,48,52], floors 48/52).
+ */
+export function hctGradationLabel(hct: number, sex?: 'male' | 'female'): string {
+  if (sex === 'female') return hct >= 52 ? '🔴 ургент' : hct >= 48 ? '🟠 терапия' : hct >= 44 ? '🟡 коррекция' : '🟢 норма';
+  return hct >= 57 ? '🔴 ургент' : hct >= 52 ? '🟠 терапия' : hct >= 48 ? '🟡 коррекция' : '🟢 норма';
+}
+
+export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
   hepatobiliary: Partial<CalculatorState['hepatobiliary']>;
   cardio: Partial<CalculatorState['cardio']>;
   urinary: Partial<CalculatorState['urinary']>;
@@ -245,9 +254,12 @@ export function deriveStateFromLabs(fp: LabSlice): {
   }
 
   if (hct !== null) {
-    if (hct < 52) card.hctElevation = 'none';
-    else if (hct < 56) card.hctElevation = 'mild';
-    else if (hct < 60) card.hctElevation = 'moderate';
+    // §6.2: женские пороги ниже (48/52/56 против мужских 52/56/60) — паритет с движком.
+    const fem = sex === 'female';
+    const t1 = fem ? 48 : 52, t2 = fem ? 52 : 56, t3 = fem ? 56 : 60;
+    if (hct < t1) card.hctElevation = 'none';
+    else if (hct < t2) card.hctElevation = 'mild';
+    else if (hct < t3) card.hctElevation = 'moderate';
     else card.hctElevation = 'severe';
     derived.push('cardio.hctElevation');
   }

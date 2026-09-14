@@ -11,6 +11,7 @@ import { MechanismView } from './Calc.result';
 import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
 import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
+import { deriveCourseLinkPatch } from './calc-course-link';
 import type { TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 
 export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, onOpenLabs, planResult }) => {
@@ -27,12 +28,6 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   const lastFullPanelRef = React.useRef<string>('');
 
   const effectiveWeek = propWeek || Math.min(state.goals.cycleWeeks || 12, Math.max(1, ...state.pharma.aas.map(a => a.weeks || 12), 6));
-
-  const courseFrequency = (value: unknown): number => {
-    if (typeof value === 'number' && Number.isFinite(value)) return Math.max(1, value);
-    const match = String(value ?? '').match(/\d+(?:[.,]\d+)?/);
-    return match ? Math.max(1, Number(match[0].replace(',', '.'))) : 1;
-  };
 
   // Дебаунс тяжёлого пересчёта: каждое нажатие в маппере правит state,
   // а calculateSupportTZ гоняет 400+ веществ × 28 механизмов синхронно —
@@ -70,78 +65,31 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   }, [state]);
 
   React.useEffect(() => {
-    if (!courseLinked || courseLinked.length === 0) return;
-    // Расширяем: AAS + SARM + пептиды (ghrh/ghrp/gnrh/fat_loss/other) + IGF/MGF + insulin
-    const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','dht_inject','dht_derivative','sarm','drostanolone','boldenone','primobolan','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other','igf1','mgf','insulin'];
-    const linkedAas = courseLinked
-      .filter(c => c && typeof c.substanceId === 'string')
-      .filter(c => {
-        const ph = PHARMA_DB[c.substanceId];
-        // AAS/SARM/пептиды из PHARMA_DB
-        if (ph?.class && aasClasses.includes(ph.class)) return true;
-        // HCG / AI / SERM / caberg / clen / T3 — не имеют записи в PHARMA_DB, но важны
-        const id = c.substanceId.toLowerCase();
-        if (id === 'hcg' || id === 'caberg' || id === 'cabergoline' ||
-            id === 'anastrozole' || id === 'anastro' || id === 'letrozole' || id === 'exemestane' ||
-            id === 'tamoxifen' || id === 'clomiphene' || id === 'enclomiphene' ||
-            id === 'clenbuterol' || id === 'clen' || id === 't3' || id === 'liothyronine' ||
-            id === 'somatropin' || id === 'hgh' || id === 'gh' ||
-            id === 'ins_short' || id === 'ins_long' || id === 'ins_aspart' || id === 'ins_detemir' ||
-            id === 'igf1_lr3' || id === 'igf1_des' || id === 'mgf') return true;
-        return false;
-      })
-      .map(c => ({
-        id: c.substanceId,
-        doseMgWeek: (Number(c.doseValue) || 0) * courseFrequency(c.frequency),
-        weeks: (c.endWeek || 12) - (c.startWeek || 0),
-        startWeek: c.startWeek || 1,
-        endWeek: c.endWeek || 12,
-      }));
-    if (linkedAas.length === 0) return;
-    // Также тянем флаги hasHCG/hasAI/hasSERM/hasCaber/hasGH/hasIGF/hasInsulin/hasSARMs/hasMGF
-    const ids = new Set(courseLinked.map(c => c.substanceId));
-    const hasHCG = ids.has('hcg');
-    const hasAI = ['anastrozole','anastro','letrozole','exemestane'].some(id => ids.has(id));
-    const hasSERM = ['tamoxifen','clomiphene','enclomiphene'].some(id => ids.has(id));
-    const hasCaber = ids.has('caberg') || ids.has('cabergoline');
-    const hasGH = ids.has('somatropin') || ids.has('hgh') || ids.has('gh');
-    const hasIGF = ids.has('igf1_lr3') || ids.has('igf1_des');
-    const hasInsulin = ['ins_short','ins_long','ins_aspart','ins_detemir'].some(id => ids.has(id));
-    const hasSARMs = ['ostarine','lgd','rad140','s23','andarine'].some(id => ids.has(id));
-    const hasMGF = ids.has('mgf');
-    // Дозовые поля GH/insulin/IGF/clen/T3
-    let ghIU = 0, insulinIU = 0, igfMcg = 0, clenMcg = 0, t3Mcg = 0;
-    for (const c of courseLinked) {
-      const dose = Number(c.doseValue) || 0;
-      const id = c.substanceId;
-      if (id === 'somatropin' || id === 'hgh' || id === 'gh') ghIU += dose;
-      if (['ins_short','ins_long','ins_aspart','ins_detemir'].includes(id)) insulinIU += dose;
-      if (id === 'igf1_lr3' || id === 'igf1_des') igfMcg += dose;
-      if (id === 'clenbuterol' || id === 'clen') clenMcg += dose;
-      if (id === 't3' || id === 'liothyronine') t3Mcg += dose;
-    }
+    // Д12 (P2): единый маппер курса (тот же, что в «Фарма курс») — без дублирования логики.
+    const patch = deriveCourseLinkPatch(courseLinked);
+    if (!patch) return;
     setState(s => {
       const existingIds = new Set(s.pharma.aas.map(a => a.id));
-      const newAas = linkedAas.filter(a => !existingIds.has(a.id));
+      const newAas = patch.aas.filter(a => !existingIds.has(a.id));
       return {
         ...s,
         pharma: {
           ...s.pharma,
           aas: [...s.pharma.aas, ...newAas],
-          hasHCG: s.pharma.hasHCG || hasHCG,
-          hasAI: s.pharma.hasAI || hasAI,
-          hasSERM: s.pharma.hasSERM || hasSERM,
-          hasCaber: s.pharma.hasCaber || hasCaber,
-          hasGH: s.pharma.hasGH || hasGH,
-          hasIGF: s.pharma.hasIGF || hasIGF,
-          hasInsulin: s.pharma.hasInsulin || hasInsulin,
-          hasSARMs: s.pharma.hasSARMs || hasSARMs,
-          hasMGF: s.pharma.hasMGF || hasMGF,
-          ghIU: ghIU > 0 ? ghIU : s.pharma.ghIU,
-          insulinIU: insulinIU > 0 ? insulinIU : s.pharma.insulinIU,
-          igfMcg: igfMcg > 0 ? igfMcg : s.pharma.igfMcg,
-          clenMcg: clenMcg > 0 ? clenMcg : s.pharma.clenMcg,
-          t3Mcg: t3Mcg > 0 ? t3Mcg : s.pharma.t3Mcg,
+          hasHCG: s.pharma.hasHCG || patch.flags.hasHCG,
+          hasAI: s.pharma.hasAI || patch.flags.hasAI,
+          hasSERM: s.pharma.hasSERM || patch.flags.hasSERM,
+          hasCaber: s.pharma.hasCaber || patch.flags.hasCaber,
+          hasGH: s.pharma.hasGH || patch.flags.hasGH,
+          hasIGF: s.pharma.hasIGF || patch.flags.hasIGF,
+          hasInsulin: s.pharma.hasInsulin || patch.flags.hasInsulin,
+          hasSARMs: s.pharma.hasSARMs || patch.flags.hasSARMs,
+          hasMGF: s.pharma.hasMGF || patch.flags.hasMGF,
+          ghIU: patch.doses.ghIU > 0 ? patch.doses.ghIU : s.pharma.ghIU,
+          insulinIU: patch.doses.insulinIU > 0 ? patch.doses.insulinIU : s.pharma.insulinIU,
+          igfMcg: patch.doses.igfMcg > 0 ? patch.doses.igfMcg : s.pharma.igfMcg,
+          clenMcg: patch.doses.clenMcg > 0 ? patch.doses.clenMcg : s.pharma.clenMcg,
+          t3Mcg: patch.doses.t3Mcg > 0 ? patch.doses.t3Mcg : s.pharma.t3Mcg,
         },
       };
     });
@@ -154,7 +102,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     const fpStr = JSON.stringify(fp);
     if (fpStr === lastFullPanelRef.current) return;
     lastFullPanelRef.current = fpStr;
-    const derived = deriveStateFromLabs(fp);
+    const derived = deriveStateFromLabs(fp, state.profile?.sex === 'female' ? 'female' : 'male');
     if (derived.derivedFields.length === 0) { setLabDerivedFields([]); return; }
     setState(s => ({
       ...s,
@@ -199,60 +147,28 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
 
   const fillPharma = () => {
     try {
-      if (!courseLinked || courseLinked.length === 0) { setFillStatus('❌ Нет активного курса'); setTimeout(() => setFillStatus(''), 2000); return; }
-      const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','dht_inject','dht_derivative','sarm','drostanolone','boldenone','primobolan','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other','igf1','mgf','insulin'];
-      const linkedAas = courseLinked.filter(c => c && typeof c.substanceId === 'string').filter(c => {
-        const ph = PHARMA_DB[c.substanceId];
-        if (ph?.class && aasClasses.includes(ph.class)) return true;
-        const id = c.substanceId.toLowerCase();
-        if (id === 'hcg' || id === 'caberg' || id === 'cabergoline' ||
-            id === 'anastrozole' || id === 'anastro' || id === 'letrozole' || id === 'exemestane' ||
-            id === 'tamoxifen' || id === 'clomiphene' || id === 'enclomiphene' ||
-            id === 'clenbuterol' || id === 'clen' || id === 't3' || id === 'liothyronine' ||
-            id === 'somatropin' || id === 'hgh' || id === 'gh' ||
-            id === 'ins_short' || id === 'ins_long' || id === 'ins_aspart' || id === 'ins_detemir' ||
-            id === 'igf1_lr3' || id === 'igf1_des' || id === 'mgf') return true;
-        return false;
-      }).map(c => ({ id: c.substanceId, doseMgWeek: (Number(c.doseValue) || 0) * courseFrequency(c.frequency), weeks: Math.max(1, (Number(c.endWeek) || 12) - (Number(c.startWeek) || 0)), startWeek: Number(c.startWeek) || 1, endWeek: Number(c.endWeek) || 12 }));
-      const ids = new Set(courseLinked.map(c => c.substanceId));
-      const hasHCG = ids.has('hcg');
-      const hasAI = ['anastrozole','anastro','letrozole','exemestane'].some(id => ids.has(id));
-      const hasSERM = ['tamoxifen','clomiphene','enclomiphene'].some(id => ids.has(id));
-      const hasCaber = ids.has('caberg') || ids.has('cabergoline');
-      const hasGH = ids.has('somatropin') || ids.has('hgh') || ids.has('gh');
-      const hasIGF = ids.has('igf1_lr3') || ids.has('igf1_des');
-      const hasInsulin = ['ins_short','ins_long','ins_aspart','ins_detemir'].some(id => ids.has(id));
-      const hasSARMs = ['ostarine','lgd','rad140','s23','andarine'].some(id => ids.has(id));
-      const hasMGF = ids.has('mgf');
-      let ghIU = 0, insulinIU = 0, igfMcg = 0, clenMcg = 0, t3Mcg = 0;
-      for (const c of courseLinked) {
-        const dose = Number(c.doseValue) || 0;
-        const id = c.substanceId;
-        if (id === 'somatropin' || id === 'hgh' || id === 'gh') ghIU += dose;
-        if (['ins_short','ins_long','ins_aspart','ins_detemir'].includes(id)) insulinIU += dose;
-        if (id === 'igf1_lr3' || id === 'igf1_des') igfMcg += dose;
-        if (id === 'clenbuterol' || id === 'clen') clenMcg += dose;
-        if (id === 't3' || id === 'liothyronine') t3Mcg += dose;
-      }
+      // Д12 (P2): единый маппер курса (тот же, что в эффекте монтирования) — без дублирования.
+      const patch = deriveCourseLinkPatch(courseLinked);
+      if (!patch) { setFillStatus('❌ Нет активного курса'); setTimeout(() => setFillStatus(''), 2000); return; }
       uPharm({
-        aas: linkedAas,
-        hasHCG: hasHCG || state.pharma.hasHCG,
-        hasAI: hasAI || state.pharma.hasAI,
-        hasSERM: hasSERM || state.pharma.hasSERM,
-        hasCaber: hasCaber || state.pharma.hasCaber,
-        hasGH: hasGH || state.pharma.hasGH,
-        hasIGF: hasIGF || state.pharma.hasIGF,
-        hasInsulin: hasInsulin || state.pharma.hasInsulin,
-        hasSARMs: hasSARMs || state.pharma.hasSARMs,
-        hasMGF: hasMGF || state.pharma.hasMGF,
-        ghIU: ghIU > 0 ? ghIU : state.pharma.ghIU,
-        insulinIU: insulinIU > 0 ? insulinIU : state.pharma.insulinIU,
-        igfMcg: igfMcg > 0 ? igfMcg : state.pharma.igfMcg,
-        clenMcg: clenMcg > 0 ? clenMcg : state.pharma.clenMcg,
-        t3Mcg: t3Mcg > 0 ? t3Mcg : state.pharma.t3Mcg,
+        aas: patch.aas,
+        hasHCG: patch.flags.hasHCG || state.pharma.hasHCG,
+        hasAI: patch.flags.hasAI || state.pharma.hasAI,
+        hasSERM: patch.flags.hasSERM || state.pharma.hasSERM,
+        hasCaber: patch.flags.hasCaber || state.pharma.hasCaber,
+        hasGH: patch.flags.hasGH || state.pharma.hasGH,
+        hasIGF: patch.flags.hasIGF || state.pharma.hasIGF,
+        hasInsulin: patch.flags.hasInsulin || state.pharma.hasInsulin,
+        hasSARMs: patch.flags.hasSARMs || state.pharma.hasSARMs,
+        hasMGF: patch.flags.hasMGF || state.pharma.hasMGF,
+        ghIU: patch.doses.ghIU > 0 ? patch.doses.ghIU : state.pharma.ghIU,
+        insulinIU: patch.doses.insulinIU > 0 ? patch.doses.insulinIU : state.pharma.insulinIU,
+        igfMcg: patch.doses.igfMcg > 0 ? patch.doses.igfMcg : state.pharma.igfMcg,
+        clenMcg: patch.doses.clenMcg > 0 ? patch.doses.clenMcg : state.pharma.clenMcg,
+        t3Mcg: patch.doses.t3Mcg > 0 ? patch.doses.t3Mcg : state.pharma.t3Mcg,
         phase: 'course',
       });
-      setFillStatus(`✅ Курс: ${linkedAas.length} веществ`); setTimeout(() => setFillStatus(''), 2000);
+      setFillStatus(`✅ Курс: ${patch.aas.length} веществ`); setTimeout(() => setFillStatus(''), 2000);
     } catch { setFillStatus('❌ Ошибка курса'); setTimeout(() => setFillStatus(''), 2000); }
   };
 
@@ -479,6 +395,10 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
               color:'rgba(255,255,255,0.7)',
             }}>
               {protoDesc}
+              {/* Д13 (P2): единый источник фазового протокола — PHASE_PROTOCOL движка (блок «📋 Фаза» в карточке подбора) */}
+              <div data-phase-source style={{ marginTop:3, paddingTop:3, borderTop:'1px solid rgba(255,255,255,0.06)', fontSize:6.5, color:'rgba(255,255,255,0.5)' }}>
+                Источник: PHASE_PROTOCOL движка — подробности в блоке «📋 Фаза» карточки подбора ниже.
+              </div>
             </div>
           </div>
         );
@@ -676,10 +596,15 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         onApply({ level: rec.level, subs: subIds, tzRec: rec });
       }} onOpenManualPicker={onOpenManualPicker} onOpenLabs={onOpenLabs} planResult={planResult} />
 
+      {/* Д11 (P2): источник — ограничения ПО СОСТОЯНИЮ ЗДОРОВЬЯ (движок поддержки);
+          противопоказания конкретных веществ — в блоке «Противопоказания» карточки подбора выше (дедуп по источнику). */}
       {result.contraindicationAlerts.length > 0 && (
-        <div style={{ ...GLASS, padding: 8, marginTop: 6 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>⚠ Противопоказания</div>
+        <div data-health-restrictions style={{ ...GLASS, padding: 8, marginTop: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>⚠ Медицинские ограничения (по состоянию здоровья)</div>
           {result.contraindicationAlerts.map((a, i) => <div key={i} style={{ fontSize: 8, color: 'var(--text)', marginBottom: 2 }}>{a}</div>)}
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.4 }}>
+            Противопоказания конкретных веществ — в блоке «Противопоказания» карточки подбора выше.
+          </div>
         </div>
       )}
     </div>

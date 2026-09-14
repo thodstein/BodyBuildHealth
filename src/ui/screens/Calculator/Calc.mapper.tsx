@@ -32,6 +32,7 @@ import { CalcSubstanceDetail, buildStackSynergyDescription, filterSynergiesCover
 import { StackExpandableRow, SelectedStackChips } from './CalcStackComponents';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
+import { hctGradationLabel } from './Calc.labs-derived';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
 import { printProtocol, buildExportDataFromRec } from '../../../ui/components/ProtocolExport';
@@ -1009,6 +1010,14 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     catch { return false; }
   });
 
+  // P2-UX: якорный индекс — чип списка скроллит к карточке вещества (если свёрнуто — раскрыть список).
+  const scrollToSubstance = (id: string) => {
+    const anchorId = `calc-sub-${canonIdLocal(id)}`;
+    const go = () => { try { document.getElementById(anchorId)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* jsdom/старые браузеры */ } };
+    if (document.getElementById(anchorId)) go();
+    else { try { setShowPrescription(true); } catch { /* noop */ } setTimeout(go, 0); }
+  };
+
   return (
     <React.Fragment>
       {/* Sticky-баннер «Сдайте анализы» — вверху карточки, не перекрывает нижние кнопки */}
@@ -1023,8 +1032,16 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       />
 
       <div style={{ ...GLASS, padding: 10, marginBottom: 8, border: '2px solid rgba(0,230,138,0.2)' }}>
-      <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', marginBottom: 6 }}>
-        🧬 Механизм-ориентированная модель (ТЗ-28)
+      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)' }}>
+          🧬 Механизм-ориентированная модель (ТЗ-28)
+        </span>
+        {/* P2-UX: PillBurden-число в hero (сводка из planResult, без новых расчётов) */}
+        {planResult?.pillBurden && (
+          <span data-pill-hero style={{ fontSize:7, fontWeight:700, color:'#60a5fa', padding:'2px 6px', borderRadius:5, background:'rgba(96,165,250,0.1)', border:'1px solid rgba(96,165,250,0.22)' }}>
+            💊 {planResult.pillBurden.estimatedPillsPerDay} табл/сут · {planResult.pillBurden.totalSubstances} преп.
+          </span>
+        )}
       </div>
 
       
@@ -1235,7 +1252,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         const gH = pr.grossHematoTier ?? pr.hematoBoosterTier;
         return gN > 0 || gJ > 0 || gH > 0;
       })() && (
-        <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)' }}>
+        <div id="calc-ped-risk-summary" style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)' }}>
           <div style={{ fontSize:9, fontWeight:800, color:'#a5b4fc', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.3px' }}>
             ⚡ Авто-защита по стеку PED (gross→net)
           </div>
@@ -1340,7 +1357,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         const pr = finalRecWithResidual.pedRisk!;
         const layer = finalRecWithResidual.femaleLayer;
         return (
-          <div data-female-layer="root" style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)' }}>
+          <div id="calc-female-layer-summary" data-female-layer="root" style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)' }}>
             <div style={{ fontSize:9, fontWeight:800, color:'#f9a8d4', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.3px' }}>
               ♀ Женский слой: вирилизация и усиление
             </div>
@@ -2238,7 +2255,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                       ]}
                     />
                     <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>
-                      {hct != null && <div>• Гематокрит: {hct}% {hct >= 57 ? '🔴 ургент' : hct >= 52 ? '🟠 терапия' : hct >= 48 ? '🟡 коррекция' : '🟢 норма'}</div>}
+                      {hct != null && <div>• Гематокрит: {hct}% {hctGradationLabel(hct, state.profile?.sex === 'female' ? 'female' : 'male')}</div>}
                       {hgb != null && <div>• Гемоглобин: {hgb} г/л {hgb > 175 ? '⚠️' : '✓'}</div>}
                       {plt != null && <div>• Тромбоциты: {plt} {plt > 400 ? '⚠️' : '✓'}</div>}
                       {fibrinogen != null && <div>• Фибриноген: {fibrinogen} г/л {fibrinogen > 4 ? '⚠️' : '✓'}</div>}
@@ -2615,55 +2632,45 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       )}
 
-      {/* PED-risk детали (если есть) */}
-      {finalRecWithResidual?.pedRisk && (finalRecWithResidual.pedRisk.grossNeuroTier! > 0 || finalRecWithResidual.pedRisk.grossJointsTier! > 0 || finalRecWithResidual.pedRisk.grossHematoTier! > 0) && (
-        <div style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(99,102,241,0.04)', border:'1px solid rgba(99,102,241,0.1)' }}>
-          <div style={{ fontSize:8, fontWeight:700, color:'#a5b4fc', marginBottom:3 }}>⚡ О подборе (PED-risk, gross→net)</div>
-          {(() => { const pr = finalRecWithResidual.pedRisk!; const gN = pr.grossNeuroTier ?? pr.neuroBoosterTier; const gJ = pr.grossJointsTier ?? pr.jointsBoosterTier; const gH = pr.grossHematoTier ?? pr.hematoBoosterTier; return (
-            <>
-          {gN > 0 && (
-            <div style={{ fontSize:7, color: pr.neuroBoosterTier === 0 ? '#4ade80' : '#818cf8', lineHeight:1.4, marginBottom:2 }}>
-              🧠 <b>Нейрозащита LV{gN}{pr.neuroBoosterTier !== gN ? ` → LV${pr.neuroBoosterTier}` : ''}</b> — {pr.neuroRisk}
-              {pr.perSubstance.filter(ps => ps.neuro === 'high' || ps.neuro === 'moderate').slice(0,3).map(ps => ` · ${ps.substanceId}`).join('')}
-              {pr.neuroCoverage != null && pr.neuroRecommended && pr.neuroBoosterTier === 0 ? ` ✓ (${pr.neuroCovered}/${pr.neuroRecommended})` : pr.neuroCoverage != null && pr.neuroRecommended ? ` (${pr.neuroCovered}/${pr.neuroRecommended})` : ''}
+      {/* Д1 (P2): детали PED-risk не дублируются — единая сводка с якорем calc-ped-risk-summary выше;
+          здесь только строка уровней/веществ + ссылка (полные риски, покрытие и обоснования — в сводке). */}
+      {finalRecWithResidual?.pedRisk && (finalRecWithResidual.pedRisk.grossNeuroTier! > 0 || finalRecWithResidual.pedRisk.grossJointsTier! > 0 || finalRecWithResidual.pedRisk.grossHematoTier! > 0) && (() => {
+        const pr = finalRecWithResidual.pedRisk!;
+        const gN = pr.grossNeuroTier ?? pr.neuroBoosterTier;
+        const gJ = pr.grossJointsTier ?? pr.jointsBoosterTier;
+        const gH = pr.grossHematoTier ?? pr.hematoBoosterTier;
+        const subsOf = (k: 'neuro' | 'joints' | 'hemato') => pr.perSubstance.filter(ps => ps[k] === 'high' || ps[k] === 'moderate').slice(0, 3).map(ps => ps.substanceId).join(', ');
+        const arrow = (gross: number, net: number) => gross !== net ? `→LV${net}` : '';
+        return (
+          <div style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(99,102,241,0.04)', border:'1px solid rgba(99,102,241,0.1)' }}>
+            <div style={{ fontSize:7, fontWeight:700, color:'#a5b4fc', marginBottom:2 }}>⚡ О подборе: авто-защита по стеку PED</div>
+            <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', lineHeight:1.5 }}>
+              {gN > 0 && <>🧠 LV{gN}{arrow(gN, pr.neuroBoosterTier)}{subsOf('neuro') ? ` (${subsOf('neuro')})` : ''}{(gJ > 0 || gH > 0) ? ' · ' : ''}</>}
+              {gJ > 0 && <>🦴 LV{gJ}{arrow(gJ, pr.jointsBoosterTier)}{subsOf('joints') ? ` (${subsOf('joints')})` : ''}{gH > 0 ? ' · ' : ''}</>}
+              {gH > 0 && <>🩸 LV{gH}{arrow(gH, pr.hematoBoosterTier)}{subsOf('hemato') ? ` (${subsOf('hemato')})` : ''}</>}
             </div>
-          )}
-          {gJ > 0 && (
-            <div style={{ fontSize:7, color: pr.jointsBoosterTier === 0 ? '#4ade80' : '#4ade80', lineHeight:1.4, marginBottom:2 }}>
-              🦴 <b>Суставы LV{gJ}{pr.jointsBoosterTier !== gJ ? ` → LV${pr.jointsBoosterTier}` : ''}</b> — {pr.jointsRisk}
-              {pr.perSubstance.filter(ps => ps.joints === 'high' || ps.joints === 'moderate').slice(0,3).map(ps => ` · ${ps.substanceId}`).join('')}
-              {pr.jointsCoverage != null && pr.jointsRecommended && pr.jointsBoosterTier === 0 ? ` ✓ (${pr.jointsCovered}/${pr.jointsRecommended})` : pr.jointsCoverage != null && pr.jointsRecommended ? ` (${pr.jointsCovered}/${pr.jointsRecommended})` : ''}
-            </div>
-          )}
-          {gH > 0 && (
-            <div style={{ fontSize:7, color: pr.hematoBoosterTier === 0 ? '#4ade80' : '#14b8a6', lineHeight:1.4, marginBottom:2 }}>
-              🩸 <b>Гемато LV{gH}{pr.hematoBoosterTier !== gH ? ` → LV${pr.hematoBoosterTier}` : ''}</b> — {pr.hematoRisk}
-              {pr.perSubstance.filter(ps => ps.hemato === 'high' || ps.hemato === 'moderate').slice(0,3).map(ps => ` · ${ps.substanceId}`).join('')}
-              {pr.hematoCoverage != null && pr.hematoRecommended && pr.hematoBoosterTier === 0 ? ` ✓ (${pr.hematoCovered}/${pr.hematoRecommended})` : pr.hematoCoverage != null && pr.hematoRecommended ? ` (${pr.hematoCovered}/${pr.hematoRecommended})` : ''}
-            </div>
-          )}
-            </>
-          ); })()}
-          {finalRecWithResidual.pedRisk.triggeredBy.length > 0 && (
-            <div style={{ fontSize:6, color:'rgba(255,255,255,0.35)', lineHeight:1.3, marginTop:2 }}>
-              {finalRecWithResidual.pedRisk.triggeredBy.slice(0,3).map((r,i) => <div key={i}>• {r}</div>)}
-            </div>
-          )}
-        </div>
-      )}
+            <button
+              data-ped-risk-link
+              onClick={() => { try { document.getElementById('calc-ped-risk-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* клик без скролла */ } }}
+              style={{ marginTop:3, padding:'2px 7px', borderRadius:5, cursor:'pointer', fontSize:6.5, fontWeight:700, background:'rgba(99,102,241,0.1)', border:'1px solid rgba(99,102,241,0.24)', color:'#a5b4fc' }}
+            >↑ Полная сводка выше</button>
+          </div>
+        );
+      })()}
 
-      {/* Женский слой — компактная строка в деталях подбора (только sex=female) */}
+      {/* Д2 (P2): женский слой — единая сводка с якорем calc-female-layer-summary выше;
+          здесь одна строка-индекс + ссылка (флаги/усиление/дозо-индекс — в сводке). */}
       {finalRecWithResidual?.pedRisk?.sex === 'female' && ((finalRecWithResidual.pedRisk.femaleFlags?.length || 0) > 0 || finalRecWithResidual.femaleLayer) && (
         <div data-female-layer="details" style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(244,114,182,0.05)', border:'1px solid rgba(244,114,182,0.14)' }}>
-          <div style={{ fontSize:8, fontWeight:700, color:'#f9a8d4', marginBottom:2 }}>
-            ♀ Женский слой{finalRecWithResidual.pedRisk.femaleVirilizationIndex != null ? ` · дозо-индекс вирилизации ${finalRecWithResidual.pedRisk.femaleVirilizationIndex}/100` : ''}
+          <div style={{ fontSize:7, color:'#f9a8d4', lineHeight:1.5 }}>
+            ♀ Женский слой: индекс {finalRecWithResidual.pedRisk.femaleVirilizationIndex ?? 0}/100 · флагов {(finalRecWithResidual.pedRisk.femaleFlags || []).length}
+            {finalRecWithResidual.femaleLayer?.added?.length ? ` · усиление: +${finalRecWithResidual.femaleLayer.added.join(', ')}` : ''}
           </div>
-          {(finalRecWithResidual.pedRisk.femaleFlags || []).slice(0, 4).map((f, i) => (
-            <div key={i} style={{ fontSize:7, color:'#fca5a5', lineHeight:1.4 }}>• {f}</div>
-          ))}
-          {finalRecWithResidual.femaleLayer?.added?.length ? (
-            <div style={{ fontSize:7, color:'#f9a8d4', lineHeight:1.4, marginTop:2 }}>💊 +{finalRecWithResidual.femaleLayer.added.join(', ')} поверх мужского набора</div>
-          ) : null}
+          <button
+            data-female-layer-link
+            onClick={() => { try { document.getElementById('calc-female-layer-summary')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* клик без скролла */ } }}
+            style={{ marginTop:3, padding:'2px 7px', borderRadius:5, cursor:'pointer', fontSize:6.5, fontWeight:700, background:'rgba(244,114,182,0.1)', border:'1px solid rgba(244,114,182,0.26)', color:'#f9a8d4' }}
+          >↑ Подробности выше</button>
         </div>
       )}
 
@@ -2737,15 +2744,24 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     const mg = doseInfo ? (titrF && titrF > 1 ? Math.round(doseInfo.mg * titrF) : doseInfo.mg) : null;
                     const isTitr = !!titrF && titrF > 1;
                     return (
-                      <span key={i} style={{
-                        fontSize: 7, padding: '2px 6px', borderRadius: 5, fontWeight: 600,
+                      <span
+                        key={i}
+                        data-sub-chip={canonIdLocal(s.substanceId)}
+                        role="button"
+                        tabIndex={0}
+                        title="Перейти к карточке вещества"
+                        aria-label={`Перейти к карточке: ${subNameRu(s.substanceId)}`}
+                        onClick={() => scrollToSubstance(s.substanceId)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSubstance(s.substanceId); } }}
+                        style={{
+                        fontSize: 7, padding: '2px 6px', borderRadius: 5, fontWeight: 600, cursor: 'pointer',
                         background: mixPlanIds.has(canonIdLocal(s.substanceId)) ? 'rgba(139,92,246,0.12)' : (isTitr ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.08)'),
                         border: mixPlanIds.has(canonIdLocal(s.substanceId)) ? '1px solid rgba(139,92,246,0.3)' : (isTitr ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(99,102,241,0.12)'),
                         color: mixPlanIds.has(canonIdLocal(s.substanceId)) ? '#c4b5fd' : '#a5b4fc',
                       }}>
                          {planItemKind(s.substanceId) === 'База' ? '🧭 ' : planItemKind(s.substanceId) === 'Минерал' ? '⚡ ' : ''}{subNameRu(s.substanceId)}{mg ? ` ${mg}мг` : ''}
                         {mixPlanIds.has(canonIdLocal(s.substanceId)) && <span style={{ marginLeft: 3, fontSize: 6, color: '#c4b5fd', fontWeight: 800 }}>🏋️</span>}
-                        {isDoctorControlled(s.substanceId) && <span style={{ marginLeft: 3, fontSize: 6, color: '#fca5a5', fontWeight: 800 }}>👨⚕️</span>}
+                        {isDoctorControlled(s.substanceId) && <span style={{ marginLeft: 3, fontSize: 6, color: '#fca5a5', fontWeight: 800 }}>👨‍⚕️</span>}
                         {isTitr && ` ↑${((titrF! - 1) * 100).toFixed(0)}%`}
                       </span>
                     );
@@ -2771,18 +2787,19 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               {/* Таблеточная нагрузка — сводка плана */}
               <SafetyPillBurden planResult={planResult} />
 
-              {/* Детальные карточки веществ — без базы курса */}
+              {/* Детальные карточки веществ — без базы курса (якоря calc-sub-*: индекс-чипы выше скроллят сюда) */}
               {finalRec.subs.filter(s => !NON_DRUG_IDS.has(s.substanceId)).map((s, i) => (
-                <CalcSubstanceDetail
-                  key={s.substanceId + i}
-                  sub={s}
-                  rec={finalRecWithResidual ?? finalRec}
-                  subNameRu={subNameRu}
-                  subDosage={subDosage}
-                  subTier={subTier}
-                  titrationFactors={finalRec.titrationFactors}
-                  canonIdLocal={canonIdLocal}
-                />
+                <div key={s.substanceId + i} id={`calc-sub-${canonIdLocal(s.substanceId)}`} style={{ scrollMarginTop: 90 }}>
+                  <CalcSubstanceDetail
+                    sub={s}
+                    rec={finalRecWithResidual ?? finalRec}
+                    subNameRu={subNameRu}
+                    subDosage={subDosage}
+                    subTier={subTier}
+                    titrationFactors={finalRec.titrationFactors}
+                    canonIdLocal={canonIdLocal}
+                  />
+                </div>
               ))}
             </>
           )}
