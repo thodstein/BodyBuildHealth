@@ -98,6 +98,14 @@ export const TOPUP_CARB_IDS = ['rice_white', 'oats_dry', 'buckwheat', 'potato_bo
 export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'avocado', 'peanut_butter', 'coconut_oil', 'cashew'];
 
 /**
+ * P4 (план «ведро»): relief-десерты — явный именованный пул. Единственное
+ * исключение типологии «один гарнир»: сладкий топ-ап в обед после мяса
+ * (рис + пряник/джем ≤60, правило №3). Тот же список в placement-гейте
+ * и push-гейте ниже — правится в одном месте.
+ */
+export const RELIEF_DESSERT_IDS: ReadonlyArray<string> = ['pryaniki', 'jam', 'honey', 'dates'];
+
+/**
  * P1a: проверка консистентности целей приёмов с целью дня. Таргет-гарды (не растим
  * закрытый приём) верны, только если цели суммируются в цель (рефид/инсулин-инфляция/
  * recipe-сборка могут давать stale-цели — тогда гарды душат сходимость).
@@ -1179,7 +1187,7 @@ export function correctDayToTargets(
           // Legacy MC3 — только большой приём (≥100У): умеренные (~65У) — один гарнир.
           const _legacyFewC = !_capHv && meals.length < 5 && ((m as any).target?.c || 0) >= 100;
           const _dsrtOkC = String(m.type || '') === 'lunch'
-            && ['pryaniki', 'jam', 'honey', 'dates'].includes((best as FoodItem).id);
+            && (RELIEF_DESSERT_IDS as ReadonlyArray<string>).includes((best as FoodItem).id);
           // P2 (типология): хлопья — снековая еда, к мясу в одном приёме не идём.
           if (isFlakeId((best as FoodItem).id) && mealHasMeatProtein(m)) return false;
           // Relief-клапан (P2): при структурном недоборе дня (>8% углей и >40 г) приём
@@ -1658,7 +1666,7 @@ export function correctDayToTargets(
       // Глубокий недобор — исключение (сначала калории).
       if (eff === 'c' && !(!!opts?.refeedDay || (meals.length < 5 && ((targetMeal as any).target?.c || 0) >= 100)) &&
         countCarbItems(targetMeal as any) >= 1 && !targetMeal.items.some(it => it.id === best.id)
-        && !(String(targetMeal.type || '') === 'lunch' && ['pryaniki', 'jam', 'honey', 'dates'].includes(best.id))) {
+        && !(String(targetMeal.type || '') === 'lunch' && (RELIEF_DESSERT_IDS as ReadonlyArray<string>).includes(best.id))) {
         // Relief-клапан (P2): тот же, что в placement — при недоборе дня >8% второй
         // сухой плотный носитель из другого семейства разрешён (иначе push-вето глотало
         // весь прогресс: фильтр placement проходил, а здесь откатывало).

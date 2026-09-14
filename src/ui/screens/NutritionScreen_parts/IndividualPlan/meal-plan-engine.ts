@@ -76,6 +76,11 @@ export interface DayPlanV2 {
   diversity: { uniqueFoods: number; categories: Record<string, number> };
   microSummary?: { coverage: MicroCoverageEntry[]; topDeficitNutrient: string | null };
   notes: string[];
+  /** P4 (план «ведро»): честный флаг сходимости products-пути. max-dev ≤8% —
+    осознанно мягче recipe-порога 3% (products собирает из отдельных продуктов,
+    а не авторских рецептов). deviationPct — то же отклонение в %. */
+  withinTolerance?: boolean;
+  deviationPct?: number;
 }
 
 export interface MealPlanInput {
@@ -7629,7 +7634,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           .filter((f: any) => ((_pickCtx.dayCarbUses.get(f.id) || 0) < 2))
           .filter((f: any) => { const _fam = stapleFamilyOf(f.id); return !_fam || ((_pickCtx.dayCarbFamilyUses.get(_fam) || 0) < familyMealCap(_fam, { hv: _hvP3, ts: _pickCtx.dayTargetScale })); })
           .filter((f: any) => !(isCreamId(f.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(_hvP3, _pickCtx.dayTargetScale))))
-          .sort((a: any, b: any) => ((_pickCtx.dayCarbUses.get(a.id) || 0) - (_pickCtx.dayCarbUses.get(b.id) || 0)) || ((b as any).bb_quality_score || 0) - ((a as any).bb_quality_score || 0));
+          .sort((a: any, b: any) => {
+            // P4: снековый пул явно по HV — на high-volume дне плотные носители
+            // первыми (угли на единицу клетчатки; паритет с ранжированием ребаланса),
+            // иначе низкоплотный гарнир раздувает тарелку и ЖКТ. Обычные дни — legacy.
+            if (_hvP3) {
+              const _ca = (a.carbs || 0) / (1 + 2 * (a.fiber || 0));
+              const _cb = (b.carbs || 0) / (1 + 2 * (b.fiber || 0));
+              if (Math.abs(_ca - _cb) > 0.5) return _cb - _ca;
+            }
+            return ((_pickCtx.dayCarbUses.get(a.id) || 0) - (_pickCtx.dayCarbUses.get(b.id) || 0)) || ((b as any).bb_quality_score || 0) - ((a as any).bb_quality_score || 0);
+          });
         for (const _cf of _cands) {
           if (_needP3 <= 0.5) break;
           const _kRoom2 = (input.goalKcal || 0) * 1.03 - totals.kcal;
@@ -7670,6 +7685,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_exNotes.length > 0) { notes.push(..._exNotes); recalcDayTotals(meals, totals); }
     }
 
+    // ─── P4 (план «ведро»): честный флаг сходимости products-пути ───
+    // Паритет с recipe-путём (withinTolerance/deviationPct), но порог 8%,
+    // а не 3%: вместо молчаливого мусора при большом недоборе — флаг + нота.
+    const _dayDevP4 = Math.max(
+      (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+      (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+      (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
+      (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
+    );
+    const _dayDevPctP4 = Math.round(_dayDevP4 * 1000) / 10;
+    if (_dayDevPctP4 > 8) {
+      notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (>8%) — пулы/капы не закрыли цели, итог честный best-effort, а не подгонка мусором`);
+    }
+
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
@@ -7677,9 +7706,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     totals,
      mpsSummary,
      diversity: { uniqueFoods, categories },
-     microSummary: { coverage: _microRes.coverage, topDeficitNutrient: _microRes.topDeficitNutrient },
-     notes,
-   };
+      microSummary: { coverage: _microRes.coverage, topDeficitNutrient: _microRes.topDeficitNutrient },
+      notes,
+      withinTolerance: _dayDevPctP4 <= 8,
+      deviationPct: _dayDevPctP4,
+    };
   } finally {
     // P0-4: освобождаем pickCtx — даже если генерация выбросила исключение, prefs не утекут в следующий план.
     _pickCtx._locked = false;
