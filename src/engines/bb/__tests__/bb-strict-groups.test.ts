@@ -148,6 +148,20 @@ describe('ensureStrictGroupCoverage — обязательное присутс�
     expect(exDatas.some(e => e.id === 'rdl')).toBe(false);
     expect(exDatas.length).toBe(2);
   });
+
+  it('accessory-сессия (isPrimary: false) тоже получает покрытие — upper_lower ham_hack (аудит 2026-09)', () => {
+    const pool = mkPool(['leg_curl', 'leg_curl_seated', 'hack_squat_ham']);
+    const exDatas: any[] = [pool[0], pool[1]];
+    const selectedIds: string[] = [];
+    const selectedNames: string[] = [];
+    // Раньше стоял ранний return `if (isPrimary === false)` — гакк на бицепс бедра
+    // не попадал в accessory-дни (на upper_lower хамы часто только accessory).
+    ensureStrictGroupCoverage(exDatas, pool, 'hamstrings', 4, selectedIds, selectedNames, { isPrimary: false });
+    expect(exDatas.length).toBe(2);
+    expect(exDatas.some(e => e.id === 'hack_squat_ham')).toBe(true);
+    // Слоты/количество не изменились (замена, не добавление)
+    expect(exDatas.filter((e: any) => e.id === 'leg_curl').length).toBe(1);
+  });
 });
 
 describe('buildBBPlan — жёсткие группы присутствуют в программе', () => {

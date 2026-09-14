@@ -306,7 +306,8 @@ export function strictGroupMembersOf(ex: { id?: string; name?: string }, muscle?
  *    обязательной группы (иначе создадим дыру); lead (позиция 0) НЕ трогается;
  *  - выбор детерминирован (лучший _score из пула, без freshness недели) —
  *    primary-упражнения стабильны между неделями (включая deload);
- *  - применяется ТОЛЬКО для primary-мышц (accessory-дни не трогаются).
+ *  - применяется и для primary-, и для accessory-мышц (upper_lower: хамы бывают
+ *    только accessory — ham_hack иначе выпадал из программы целиком).
  */
 export function ensureStrictGroupCoverage(
   exDatas: any[],
@@ -317,7 +318,6 @@ export function ensureStrictGroupCoverage(
   sessionSelectedNames: string[],
   opts?: { isPrimary?: boolean; rotationMode?: string; avoidPatterns?: string[] },
 ): void {
-  if (opts?.isPrimary === false) return;
   // Аудит Sep 2026: покрытие работало только на primary-сессиях — на upper_lower
   // хамы бывают только accessory, и ham_hack (гакк-бицепс/колодец|колодце) выпадал из
   // программы целиком. Same-class замена объём-нейтральна: разрешаем и для

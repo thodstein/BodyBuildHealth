@@ -63,9 +63,12 @@ describe('computeMrvMult — единый MRV-конвейер (Фаза 2.11)',
     expect(computeMrvMult({ onCourse: true })).toBe(2.0);
     expect(computeMrvMult({ onCourse: true })).toBe(computeRegimeMrvMult({ onCourse: true }));
   });
-  it('на курсе с doseAware → отслеживает PED-кривую (нижний флор 1.9)', () => {
+  it('на курсе с doseAware → непрерывная PED-кривая (флор 1.9 снят, аудит 2026-09)', () => {
     expect(computeMrvMult({ onCourse: true, doseAwareMrv: 2.0 })).toBe(2.0);
-    expect(computeMrvMult({ onCourse: true, doseAwareMrv: 1.3 })).toBe(1.9);
+    // Лёгкий курс (TRT/250 мг) больше не поднимается до плоского 1.9.
+    expect(computeMrvMult({ onCourse: true, doseAwareMrv: 1.3 })).toBe(1.3);
+    expect(computeMrvMult({ onCourse: true, doseAwareMrv: 1.1 })).toBe(1.1);
+    expect(computeMrvMult({ onCourse: true, doseAwareMrv: 3.0 })).toBe(2.15);
   });
   it('не на курсе, но doseAware передан → 1.0', () => {
     expect(computeMrvMult({ onCourse: false, doseAwareMrv: 2.0 })).toBe(1.0);

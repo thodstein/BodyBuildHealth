@@ -83,9 +83,11 @@ export function computeMrvMult(input: {
   if (!onCourse) return 1.0;
   const dose = Number(input.doseAwareMrv);
   if (Number.isFinite(dose) && dose > 1) {
-    // Дозо-зависимый: отслеживает PED-кривую (лёгкий курс → меньше, мега-стек → до 2.15).
-    // Нижний флор 1.9 сохраняет «режим курса» (не ниже нативного расширения объёма).
-    return Math.min(2.15, Math.max(1.9, dose));
+    // Дозо-зависимая кривая adaptForPEDs: TRT 125 мг → ~1.1, лёгкий 250 → ~1.18,
+    // средний 500 → ~1.30, мега-стек → до 2.15.
+    // Аудит 2026-09: нижний флор 1.9 убивал дозо-зависимость (TRT получал ×1.9) —
+    // флор снят, кривая непрерывна. Без doseAwareMrv — прежнее плоское ×2.0.
+    return Math.min(2.15, dose);
   }
   return computeRegimeMrvMult(input);
 }

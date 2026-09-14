@@ -10,6 +10,7 @@ import { bbExerciseTier, isInappropriateBB } from './bb/bb-exercise-tier.engine'
 import { getExerciseById } from '../core/exercise-catalog';
 import { EXERCISE_BIOMECHANICS_DB } from '../data/exercise-biomechanics-db';
 import { getMappedBioId } from '../data/exercise-id-mapping';
+import { ANGLE_CLASSES } from './bb/bb-exercise-selection.engine';
 
 /** Быстрый индекс биомеханики по id упражнения */
 const BIO_MAP = new Map<string, typeof EXERCISE_BIOMECHANICS_DB[number]>();
@@ -481,7 +482,6 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
   function isTooSimilar(ex: Exercise, selected: SelectedExercise[]): boolean {
     // Проверка ANGLE_CLASSES: разные углы одной мышцы — не похожи
     try {
-      const { ANGLE_CLASSES } = require('./bb/bb-exercise-selection.engine');
       const exMuscle = (ex as any).muscle || (ex as any).group || '';
       for (const s of selected) {
         const sMuscle = (s as any).muscle || (s as any).group || '';
