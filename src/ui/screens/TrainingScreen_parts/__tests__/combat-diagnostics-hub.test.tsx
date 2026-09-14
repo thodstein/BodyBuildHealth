@@ -26,4 +26,11 @@ describe('CombatDiagnosticsHub shell', () => {
     fireEvent.click(screen.getByText(/Применить в конструктор/));
     expect(screen.getByRole('status').textContent).toMatch(/заблокирован/);
   });
+
+  it('P8 школа: 6 ударов с назначением в табе ударов', () => {
+    const { container } = render(<CombatDiagnosticsHub />);
+    expect(container.querySelector("[data-combat='strike-school']")).not.toBeNull();
+    expect(screen.getByText(/Как поставить удар/)).toBeTruthy();
+    expect(screen.getAllByText(/Назначение:/).length).toBe(6);
+  });
 });

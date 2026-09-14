@@ -1,5 +1,5 @@
 /**
- * CombatDiagnosticsHub — P7 шелл хаба диагностики единоборств (6 табов).
+ * CombatDiagnosticsHub — P7 шелл + P8 школа хаба диагностики единоборств (6 табов).
  * Отдельный эпик от планировщика: строится диагноз, план не меняется.
  * Мост — kind:'weakpoints' существующими полями (без правок shared-моста).
  * Стиль: белый текст #fff, тачи 44px+, хуки data-combat.
@@ -30,6 +30,10 @@ import {
 import {
   buildCombatDiagnosticsCsv, buildCombatDiagnosticsHtml, downloadCombatFile,
 } from '../../../engines/combat-diagnostics/combat-diagnostics-export.engine';
+import {
+  COMBAT_SCHOOL_LABELS, COMBAT_SCHOOL_STRIKES, STRIKE_SCHOOL, schoolDrillFor,
+  type CombatSchoolStrike,
+} from '../../../engines/combat-diagnostics/combat-strike-school.engine';
 import { applyToPlanner } from './planner-bridge';
 
 export type CombatHubTab = 'strikes' | 'takedowns' | 'video' | 'safety' | 'recovery' | 'summary';
@@ -166,6 +170,26 @@ export function CombatDiagnosticsHub(): React.ReactElement {
             <input aria-label="Трекер CSV" placeholder="type,speed …" value={vals.tracker_csv ?? ''} onChange={e => set('tracker_csv', e.target.value)} style={{ ...NUM, width: 220 }} />
             <span style={{ color: WHITE, fontSize: 12 }}>{tracker.total ? `Импорт: ${tracker.total} уд., средняя ${tracker.avgSpeedMs?.toFixed(1) ?? '—'} м/с` : ''}</span>
           </label>
+          <div data-combat="strike-school" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+            <span style={{ ...LBL, fontSize: 14 }}>🥊 Как поставить удар — школа + подсобка</span>
+            {COMBAT_SCHOOL_STRIKES.map(s => {
+              const card = STRIKE_SCHOOL[s as CombatSchoolStrike];
+              const gap = path === 'loop' ? 'path' : asym.verdict === 'fix' ? 'asym' : 'speed';
+              const rx = schoolDrillFor(s as CombatSchoolStrike, gap as 'speed' | 'mass' | 'asym' | 'path');
+              return (
+                <details key={s}>
+                  <summary style={{ color: WHITE, fontSize: 13, fontWeight: 700, minHeight: 44 }}>{COMBAT_SCHOOL_LABELS[s as CombatSchoolStrike]}: {card.chain}</summary>
+                  <div style={{ color: WHITE, fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span>Стойка: {card.stance}</span>
+                    <span>Ошибки: {card.errors.join('; ')}</span>
+                    <span>Чек: {card.checkpoints.join('; ')}</span>
+                    <span>Назначение: {rx.text}</span>
+                    <span>Зал: {card.assistance.join(', ')}</span>
+                  </div>
+                </details>
+              );
+            })}
+          </div>
         </div>
       )}
 
