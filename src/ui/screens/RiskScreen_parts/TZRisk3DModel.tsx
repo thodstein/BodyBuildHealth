@@ -62,17 +62,21 @@ export interface OrganModelDef {
   kind: 'glb' | 'spleen' | 'gonads';
   url?: string;
   pos: [number, number, number];
-  face: 'front' | 'back' | 'left';
+  face: 'front' | 'back';
   size: number;
   deep: number;
+  // middle: точка между передней и задней поверхностью (мозг — центр черепа,
+  // почки — к спине); bias — доля от задней поверхности к передней.
+  middle?: boolean;
+  bias?: number;
 }
 
 export const ORGAN_MODELS: OrganModelDef[] = [
-  { system: 'cns', kind: 'glb', url: '/organs/brain.glb', pos: [0, 0.92, 0], face: 'front', size: 0.3, deep: 0.16 },
+  { system: 'cns', kind: 'glb', url: '/organs/brain.glb', pos: [0, 0.92, 0], face: 'front', size: 0.3, deep: 0, middle: true, bias: 0.5 },
   { system: 'cardio', kind: 'glb', url: '/organs/heart.glb', pos: [-0.08, 0.32, 0], face: 'front', size: 0.3, deep: 0.02 },
   { system: 'hepatic', kind: 'glb', url: '/organs/liver.glb', pos: [0.18, 0.16, 0], face: 'front', size: 0.42, deep: 0.02 },
-  { system: 'hematologic', kind: 'spleen', pos: [-0.25, 0.16, 0], face: 'left', size: 0.22, deep: 0.02 },
-  { system: 'renal', kind: 'glb', url: '/organs/kidneys.glb', pos: [0, 0.02, 0], face: 'back', size: 0.36, deep: 0.02 },
+  { system: 'hematologic', kind: 'spleen', pos: [-0.25, 0.16, 0], face: 'front', size: 0.22, deep: 0.02 },
+  { system: 'renal', kind: 'glb', url: '/organs/kidneys.glb', pos: [0, 0.02, 0], face: 'back', size: 0.36, deep: 0, middle: true, bias: 0.3 },
   { system: 'reproductive', kind: 'gonads', pos: [0, -0.42, 0], face: 'front', size: 0.16, deep: 0.02 },
 ];
 
@@ -413,18 +417,28 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         const FACE_DIR: Record<OrganModelDef['face'], THREE.Vector3> = {
           front: new THREE.Vector3(0, 0, 1),
           back: new THREE.Vector3(0, 0, -1),
-          left: new THREE.Vector3(-1, 0, 0),
         };
         const surfRay = new THREE.Raycaster();
         const placeInside = (def: OrganModelDef): THREE.Vector3 => {
           const fp = anchorToFinal(def.pos);
           const seed = new THREE.Vector3(fp[0], fp[1], fp[2]);
           const out = FACE_DIR[def.face];
-          surfRay.set(seed.clone().addScaledVector(out, 5), out.clone().negate());
+          const dirIn = out.clone().negate();
+          surfRay.set(seed.clone().addScaledVector(out, 5), dirIn);
           if (!baseMesh) return seed;
           const hits = surfRay.intersectObject(baseMesh, false);
+          if (def.middle) {
+            // Луч с противоположной стороны: точка гарантированно внутри тела
+            surfRay.set(seed.clone().addScaledVector(out, -5), out.clone());
+            const other = surfRay.intersectObject(baseMesh, false);
+            if (hits.length && other.length) {
+              return hits[0].point.clone().lerp(other[0].point, def.bias ?? 0.5);
+            }
+            if (hits.length) return hits[0].point.clone().addScaledVector(dirIn, def.size / 2 + def.deep);
+            return seed;
+          }
           if (!hits.length) return seed;
-          return hits[0].point.clone().addScaledVector(out.clone().negate(), def.size / 2 + def.deep);
+          return hits[0].point.clone().addScaledVector(dirIn, def.size / 2 + def.deep);
         };
         // Общий финиш холдера: системный id для рейкаста, непрозрачные материалы
         // с корректным depth-тестом (видны только сквозь рентген-кожу).
@@ -433,7 +447,9 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           holder.add(content);
           holder.position.copy(placeInside(def));
           holder.userData.systemId = def.system;
-          content.traverse((o) => { o.userData.systemId = def.system; });
+          // Органы рисуются ПОВЕРХ аддитивной зоны-подсветки (у неё renderOrder 10),
+          // но с честным depth-тестом между собой и кожей.
+          content.traverse((o) => { o.userData.systemId = def.system; if (o instanceof THREE.Mesh) o.renderOrder = 11; });
           holder.visible = showOrgansRef.current;
           organRoot.add(holder);
           organEntriesRef.current.push({ system: def.system, group: holder, mats });
