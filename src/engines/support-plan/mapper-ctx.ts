@@ -90,7 +90,9 @@ export function buildMapperCtx(
   if (t3Mcg > 0) pedDoses.push({ id: 't3', pClass: 't3', mcgPerDay: t3Mcg, form: 'oral' } as any);
 
   // ── PED-risk assessment (Фаза 1: нейро/суставы по стеку PED) ──
-  const pedRisk = assessPedRisk(pedDoses, level);
+  // Женский слой: пол из профиля калькулятора (state.profile.sex). Мужской путь без изменений.
+  const sex: 'male' | 'female' = state.profile?.sex === 'female' ? 'female' : 'male';
+  const pedRisk = assessPedRisk(pedDoses, level, sex);
   const symptomsList = state.symptoms || [];
 
   const boosterCtx: BoosterTriggerCtx = {
@@ -133,5 +135,7 @@ export function buildMapperCtx(
     symptoms: symptomsList,
     healthConditions: state.healthConditions || [],
     pedRisk,
+    // Пол ставим только для женщины: мужской ctx остаётся байт-в-байт прежним.
+    ...(sex === 'female' ? { sex: 'female' as const } : {}),
   };
 }

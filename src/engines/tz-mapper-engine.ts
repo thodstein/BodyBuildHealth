@@ -193,6 +193,8 @@ export interface MapperCtx {
   healthConditions?: string[];  // заболевания пользователя для проверки противопоказаний
   symptoms?: string[];         // симптомы: gynecomastia, edema_severe, joint_pain, insomnia, anxiety, low_libido, hair_loss, prostate_symptoms
   pedRisk?: PedRiskAssessment;  // v6: оценка PED-риска нейро/суставы
+  /** Женский слой: 'female' включает женское усиление (mapper-ctx ставит из профиля). По умолчанию отсутствует = мужской путь. */
+  sex?: 'male' | 'female';
 }
 
 // Импорт PED-типов и helpers
@@ -2095,7 +2097,9 @@ function cacheKey(ctx: MapperCtx): string {
   const boostKey = ctx.boosterCtx ? JSON.stringify(ctx.boosterCtx) : '';
   const pedKey = (ctx.pedDoses||[]).map(p=>`${p.id}:${p.pClass}:${p.mgPerWeek||p.iuPerDay||p.mcgPerDay||0}`).join(',');
   const symKey = (ctx.symptoms||[]).join(',');
-  return `${ctx.level}|${labsKey}|${phaseKey}|${boostKey}|${JSON.stringify(ctx.manualChoices||{})}|${ctx.onCourse||''}|${ctx.e2Level||''}|${ctx.hasHCG||''}|${ctx.hasAI||''}|${ctx.hasCabergoline||''}|${(ctx.aasIds||[]).join(',')}|${pedKey}|${symKey}`;
+  // Женский слой: суффикс только для female — мужской ключ байт-в-байт прежний.
+  const sexKey = ctx.sex === 'female' ? '|f' : '';
+  return `${ctx.level}|${labsKey}|${phaseKey}|${boostKey}|${JSON.stringify(ctx.manualChoices||{})}|${ctx.onCourse||''}|${ctx.e2Level||''}|${ctx.hasHCG||''}|${ctx.hasAI||''}|${ctx.hasCabergoline||''}|${(ctx.aasIds||[]).join(',')}|${pedKey}|${symKey}${sexKey}`;
 }
 
 function getFromCache(ctx: MapperCtx): SupportRecommendation | null {

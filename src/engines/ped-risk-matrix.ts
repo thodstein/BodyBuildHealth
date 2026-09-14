@@ -26,6 +26,7 @@ import { classifyPed } from '../data/ped-potency-table';
 import { resolvePedAlias } from '../data/ped-alias-map';
 import type { SupportLevel } from './tz-bridge-mechanism';
 import { getNeuroBoosterSubstanceIds, getJointsBoosterSubstanceIds, getHematoBoosterSubstanceIds } from './tz-bridge-boosters';
+import { assessFemaleAas } from './female-aas-risk';
 
 export type PedRisk = 'none' | 'low' | 'moderate' | 'high' | 'protective';
 
@@ -91,6 +92,12 @@ export interface PedRiskAssessment {
   thrombosisCovered?: number;
   thrombosisRecommended?: number;
   thrombosisTier?: 0 | 1 | 2 | 3;  // net tier для тромбоза
+  // Женский слой (заполняется ТОЛЬКО при sex === 'female'; мужской путь не меняется)
+  sex?: 'female';
+  femaleFlags?: string[];
+  femaleMaxRatio?: number;
+  femaleContraindicated?: string[];
+  femaleVirilizationIndex?: number;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -648,7 +655,8 @@ function riskToTier(risk: PedRisk, level: SupportLevel, domain: 'neuro' | 'joint
 
 export function assessPedRisk(
   pedDoses: PEDDose[],
-  level: SupportLevel = 'medium'
+  level: SupportLevel = 'medium',
+  sex?: 'male' | 'female',
 ): PedRiskAssessment {
   if (!pedDoses || pedDoses.length === 0) {
     return {
@@ -767,6 +775,39 @@ export function assessPedRisk(
     reasons.push('Эскалация: 2+ AAS с эритропоэз-эффектом → синергия, гемато high');
   }
 
+  // 3e. Женский слой (ТОЛЬКО sex === 'female'; мужской путь не меняется):
+  //     вирилизация → reproductive; оральные пороги → hepatic; флаги для UI.
+  const femaleFields: Pick<PedRiskAssessment, 'sex' | 'femaleFlags' | 'femaleMaxRatio' | 'femaleContraindicated' | 'femaleVirilizationIndex'> = {};
+  if (sex === 'female') {
+    femaleFields.sex = 'female';
+    const fem = assessFemaleAas(pedDoses);
+    if (fem.findings.length > 0) {
+      femaleFields.femaleFlags = fem.flags;
+      femaleFields.femaleMaxRatio = fem.maxRatio;
+      femaleFields.femaleVirilizationIndex = fem.virilizationDoseIndex;
+      if (fem.contraindicated.length > 0) {
+        femaleFields.femaleContraindicated = fem.contraindicated;
+        aggRepro = maxSystemRisk(aggRepro, 'high');
+        reasons.push(`♀ Абсолютное противопоказание: ${fem.contraindicated.join(', ')}`);
+      } else if (fem.maxRatio > 1) {
+        aggRepro = maxSystemRisk(aggRepro, 'high');
+        reasons.push(`♀ Вирилизация: доза выше красного женского порога (${fem.maxRatio.toFixed(2)}×)`);
+      } else if (fem.maxRatio > 0.66) {
+        aggRepro = maxSystemRisk(aggRepro, 'moderate');
+        reasons.push('♀ Вирилизация: доза в жёлтой женской зоне');
+      } else if (fem.maxRatio > 0) {
+        aggRepro = maxSystemRisk(aggRepro, 'low');
+      }
+      if (fem.oralMaxRatio > 1) {
+        aggHepatic = maxSystemRisk(aggHepatic, 'high');
+        reasons.push('♀ Оральный AAS: женский печёночный порог превышен — АЛТ/АСТ каждые 2 нед');
+      } else if (fem.oralMaxRatio > 0.66) {
+        aggHepatic = maxSystemRisk(aggHepatic, 'moderate');
+        reasons.push('♀ Оральный AAS: печёночная нагрузка у верхней женской границы');
+      }
+    }
+  }
+
   // Per-substance reasons
   for (const ps of perSubstance) {
     if (ps.neuro === 'high' || ps.neuro === 'moderate') {
@@ -798,6 +839,7 @@ export function assessPedRisk(
   const hematoTier = riskToTier(aggHemato, level, 'hemato');
 
   return {
+    ...femaleFields,
     neuroRisk: aggNeuro,
     jointsRisk: aggJoints,
     hematoRisk: aggHemato,
