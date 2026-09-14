@@ -240,18 +240,34 @@ export default function App() {
 
   // Native APK: системная кнопка «назад» Android.
   // В Telegram Mini App эта ветка не выполняется — там свой BackButton выше.
+  // Подписка ОДНА (по initialized), текущий таб читается через ref:
+  // раньше эффект зависел от [tab] и переподписывался при каждой смене вкладки,
+  // а off назначался асинхронно — при быстрых переходах старые слушатели
+  // не успевали сняться и дублировали setTab('home') (лишний «вылет назад»).
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
   useEffect(() => {
-    if (!isNativeApp()) return;
+    if (!isNativeApp() || !initialized) return;
     let off: (() => void) | undefined;
+    let cancelled = false;
     void setupNativeBackButton(() => {
-      if (tab !== 'home') {
+      if (tabRef.current !== 'home') {
         setTab('home');
         return true;
       }
       return false; // на главной — свернуть приложение штатно
-    }).then((fn) => { off = fn; });
-    return () => { try { off?.(); } catch { /* ignore */ } };
-  }, [tab]);
+    }).then((fn) => {
+      if (cancelled) {
+        try { fn(); } catch { /* ignore */ }
+        return;
+      }
+      off = fn;
+    });
+    return () => {
+      cancelled = true;
+      try { off?.(); } catch { /* ignore */ }
+    };
+  }, [initialized]);
 
   const go = useCallback((t: Tab, st: string | null = null) => {
     // Тактильный отклик — ТОЛЬКО APK. В Telegram ветка не выполняется вообще.

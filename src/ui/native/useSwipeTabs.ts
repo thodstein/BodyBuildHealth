@@ -5,6 +5,8 @@
  * Свайп влево → следующая вкладка, вправо → предыдущая.
  * Гарды (свайп игнорируется):
  * - жесты < 90px, вертикальные (> 70px по Y) или дольше 700мс;
+ * - диагональ без доминирования горизонтали (|dx| < |dy| × 1.5);
+ * - вертикаль победила по ходу жеста (direction-lock в touchmove);
  * - мультитач;
  * - старт на input/textarea/select/contenteditable/range или [data-no-swipe];
  * - старт внутри горизонтально скроллящегося контейнера (ряды чипов и т.п.);
@@ -76,6 +78,10 @@ export function classifySwipe(
 ): 'left' | 'right' | null {
   if (Math.abs(dy) > MAX_DY) return null;
   if (dtMs > MAX_DT) return null;
+  // Диагональный скролл (вертикаль сопоставима с горизонталью) — не свайп вкладки.
+  // Иначе обычный скролл ленты с дрейфом ~90px по X периодически «выкидывал»
+  // пользователя на соседнюю вкладку — та самая жалоба «вылетает назад».
+  if (Math.abs(dx) < Math.abs(dy) * 1.5) return null;
   if (dx <= -MIN_DX) return 'left';
   if (dx >= MIN_DX) return 'right';
   return null;
@@ -124,6 +130,31 @@ export function useSwipeTabs(
       }
     };
 
+    // Direction-lock: как только вертикаль побеждает — это скролл, не свайп вкладки.
+    // Без этого любой диагональный скролл с дрейфом ≥90px по X долетал до touchend
+    // и переключал вкладку (жалобы «вылетает назад при просмотре вкладок»).
+    const onMove = (e: TouchEvent) => {
+      try {
+        if (!tracking) return;
+        if (e.touches.length !== 1) {
+          tracking = false;
+          return;
+        }
+        const t = e.touches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        if (Math.abs(dy) > MAX_DY) {
+          tracking = false;
+          return;
+        }
+        if (Math.abs(dy) > 12 && Math.abs(dx) < Math.abs(dy) * 1.5) {
+          tracking = false;
+        }
+      } catch {
+        tracking = false;
+      }
+    };
+
     const onEnd = (e: TouchEvent) => {
       try {
         if (!tracking) return;
@@ -143,10 +174,12 @@ export function useSwipeTabs(
     };
 
     root.addEventListener('touchstart', onStart, { passive: true });
+    root.addEventListener('touchmove', onMove, { passive: true });
     root.addEventListener('touchend', onEnd, { passive: true });
     root.addEventListener('touchcancel', onCancel, { passive: true });
     return () => {
       root.removeEventListener('touchstart', onStart);
+      root.removeEventListener('touchmove', onMove);
       root.removeEventListener('touchend', onEnd);
       root.removeEventListener('touchcancel', onCancel);
     };

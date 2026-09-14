@@ -77,6 +77,13 @@ describe('classifySwipe', () => {
     expect(classifySwipe(-200, 0, 701)).toBeNull();
     expect(classifySwipe(-200, 70, 700)).toBe('left');
   });
+
+  it('2b. диагональ без доминирования горизонтали — не свайп вкладки', () => {
+    // Обычный скролл с дрейфом: раньше выкидывал на соседнюю вкладку.
+    expect(classifySwipe(-120, 100, 200)).toBeNull();
+    expect(classifySwipe(120, 90, 200)).toBeNull();
+    expect(classifySwipe(-200, 70, 200)).toBe('left');
+  });
 });
 
 describe('useSwipeTabs (native)', () => {
@@ -114,6 +121,23 @@ describe('useSwipeTabs (native)', () => {
     act(() => {
       root.dispatchEvent(touchEvent('touchstart', [{ clientX: 200, clientY: 100 }]));
       root.dispatchEvent(touchEvent('touchend', [{ clientX: 60, clientY: 300 }]));
+    });
+    expect(onL).not.toHaveBeenCalled();
+    expect(onR).not.toHaveBeenCalled();
+  });
+
+  it('4b. direction-lock: вертикаль по ходу жеста отменяет свайп', async () => {
+    setCapacitorNative();
+    await resetPlatform();
+    const onL = vi.fn();
+    const onR = vi.fn();
+    const { getByTestId } = render(<Harness onL={onL} onR={onR} />);
+    const root = getByTestId('swipe-root');
+    act(() => {
+      root.dispatchEvent(touchEvent('touchstart', [{ clientX: 300, clientY: 200 }]));
+      // Палец ушёл вниз сильнее, чем вбок — это скролл, дальше жест мёртв.
+      root.dispatchEvent(touchEvent('touchmove', [{ clientX: 260, clientY: 320 }]));
+      root.dispatchEvent(touchEvent('touchend', [{ clientX: 120, clientY: 330 }]));
     });
     expect(onL).not.toHaveBeenCalled();
     expect(onR).not.toHaveBeenCalled();
