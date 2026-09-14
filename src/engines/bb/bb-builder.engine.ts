@@ -51,7 +51,8 @@ import { orderSessionExercises, type SessionMethodology } from './bb-session-ord
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
-import { ANGLE_CLASSES, lengthenedBonus, ensureStrictGroupCoverage, STRICT_EXERCISE_GROUPS, strictGroupMatches } from './bb-exercise-selection.engine';
+import { ANGLE_CLASSES, lengthenedBonus, lengthenedBonusForExercise, ensureStrictGroupCoverage, STRICT_EXERCISE_GROUPS, strictGroupMatches } from './bb-exercise-selection.engine';
+import { sfrSelectionBonus } from './bb-sfr-db';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
@@ -1417,6 +1418,8 @@ export interface BuildExercisePoolOpts {
   /** PED для joint-guard (GH+AAS) — не ломает тяж/памп, только отбор. */
   pedDoses?: Record<string, number>;
   labMrvMultiplier?: number;
+  /** Волна-1: фаза — для фазозависимого SFR/lengthened-бонуса в _score. */
+  phase?: string;
 }
 
 /** 3.1 — вынесенный слой selection: построение скорированного пула упражнений.
@@ -1562,6 +1565,10 @@ export function buildExercisePool(muscle: string, role: string, opts: BuildExerc
     if (/армейск|жим.*стоя|standing.*press|military/i.test(n)) score -= 25;
     // Joint-guard штраф (не меняет характер дня, только отбор)
     if (_jgActive) score += jointGuardScorePenalty(ex, _jgInput);
+    // Волна-1 (аудит 2026-09): SFR/профиль сопротивления в отборе — мягкий
+    // бонус (данные 60 записей раньше влияли только на тай-брейк жёстких групп
+    // с захардкоженной фазой 'accumulation'). Сеты не меняются.
+    if (opts.phase) score += sfrSelectionBonus(ex, opts.phase);
     return { ...ex, _score: score };
   }).sort((a: any, b: any) => (b._score || 0) - (a._score || 0));
   // Generic-план (без специализации/слабых точек): убираем слишком специфичные вариации
@@ -2048,6 +2055,11 @@ function buildSession(
       avoidAxialLoad, mobilityRestrictions, bodyweightCapability,
       favoriteIds, muscle, focusGroup, weakPoints, fewerCompound,
       pedDoses, labMrvMultiplier,
+      // Волна-1: фаза для SFR-бонуса. 'forbid' = контракт «одни и те же
+      // упражнения весь мезоцикл» — фазозависимая часть (lengthened+3 в
+      // intensification) пиннится к нейтральной фазе, иначе primary менялся
+      // бы между неделями (паритет с selWeek-пиннингом выше).
+      phase: rotationMode === 'forbid' ? 'accumulation' : phase,
     });
     // Pro primary: только канонические tier 1, иначе tier 1-2, чтобы hex/svend/TRX не лезли в primary Pro
     if (role === 'primary' && (level === 'advanced' || level === 'enhanced')) {
@@ -2234,8 +2246,8 @@ function buildSession(
           candidates = candidates.sort((a, b) => {
             const sa = (a as any)._score ?? 0;
             const sb = (b as any)._score ?? 0;
-            const la = lengthenedBonus(a.name || '', trainingFocus);
-            const lb = lengthenedBonus(b.name || '', trainingFocus);
+            const la = lengthenedBonusForExercise(a, trainingFocus);
+            const lb = lengthenedBonusForExercise(b, trainingFocus);
             const saTotal = sa + la;
             const sbTotal = sb + lb;
             if (saTotal !== sbTotal) return sbTotal - saTotal;

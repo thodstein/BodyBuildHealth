@@ -54,8 +54,13 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // Re-baseline 2 (Sep 2026, keep-first каталог): пулы канонических
     // упражнений вернули ягодицы 7→9, квадры 16→20; хамы 12→10 (гакк-хамы
     // в пуле перераспределили сеты). Валидатор зелёный.
+    // Re-baseline 3 (аудит 2026-09, Волна-1): SFR/профиль сопротивления вошли
+    // в _score отбора (ранее только тай-брейк) + флаг каталога stretchPhase —
+    // выбор стал качественнее: спина 16→20 (SFR-сильные тяги/подтягивания),
+    // бицепс 17→16 и задняя дельта 17→16 (лучший баланс при большем indirect
+    // спины). Валидатор зелёный.
     expect(directVolume(plan)).toEqual({
-      abs: 8, back: 16, biceps: 17, calves: 18, chest: 16, delt_front: 5, delt_mid: 3, delt_rear: 17, forearms: 7, glutes: 9, hamstrings: 10, quads: 20, shoulders: 3, traps: 10, triceps: 16,
+      abs: 8, back: 20, biceps: 16, calves: 18, chest: 16, delt_front: 5, delt_mid: 3, delt_rear: 16, forearms: 7, glutes: 9, hamstrings: 10, quads: 20, shoulders: 3, traps: 10, triceps: 16,
     });
   });
 

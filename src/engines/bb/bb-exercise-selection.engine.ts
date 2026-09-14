@@ -56,8 +56,11 @@ export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
     { name: 'belt_stepup', match: (e) => /поясн.*присед|belt.?squat|step.?up|вставан.*скам|зашагиван/i.test(e.name) },
   ],
   hamstrings: [
-    { name: 'curl', match: (e) => /сгибан.*ног|leg.?curl|сгибания ног/i.test(e.name) },
+    // Волна-1 (аудит 2026-09): seated_curl ПЕРЕД curl — раньше `curl`
+    // (/сгибан.*ног/) перехватывал «сгибания ног сидя», класс seated_curl был
+    // недостижим, и P9-мультиугол не различал лежа/сидя (мёртвое покрытие).
     { name: 'seated_curl', match: (e) => /сгибан.*сидя|seated.*curl/i.test(e.name) },
+    { name: 'curl', match: (e) => /сгибан.*ног|leg.?curl|сгибания ног/i.test(e.name) },
     // Plotkin 2023: hip thrust — гликово-специфичен (хамсы ~0 роста); мост/траст живут в классе
     // glutes.hip_thrust. Здесь только шарнир таза: RDL/гакк-на-бицепс/колодец|колодце.
     { name: 'rdl_bridge', match: (e) => /румын|rdl|гакк.*бицепс|hack.*(hamstring|колодец|колодце)|колодец|колодце/i.test(e.name) },
@@ -108,6 +111,22 @@ export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
 export function lengthenedBonus(name: string, focus?: BBTrainingFocus): number {
   const n = (name || '').toLowerCase();
   if (/наклон.*скам|incline|наклонн|rdl|румынская|good.?morning|гудморнинг|сисси|sissy|overhead.*tricep|француз|french|за голов|behind.?neck|сгибан.*наклон|incline.*curl|пуловер|pullover|дефицит|deficit|атг|atg|глубок.*присед|ass.?to.?grass/i.test(n)) {
+    const mult = focus === 'strength' ? 0.5 : focus === 'endurance' ? 1.5 : 1.0;
+    return Math.round(10 * mult);
+  }
+  return 0;
+}
+
+/**
+ * Волна-1 (аудит 2026-09): флаг-осведомлённый lengthened-бонус.
+ * Каталог несёт `stretchPhase` (109 записей) — раньше он НЕ читался, всё решал
+ * regex по имени. Здесь флаг уважается: если regex не поймал, но каталог
+ * помечает упражнение растянутой фазой — бонус выдаётся (и наоборот).
+ */
+export function lengthenedBonusForExercise(ex: { name?: string; stretchPhase?: boolean }, focus?: BBTrainingFocus): number {
+  const byName = lengthenedBonus(ex.name || '', focus);
+  if (byName > 0) return byName;
+  if ((ex as any).stretchPhase === true) {
     const mult = focus === 'strength' ? 0.5 : focus === 'endurance' ? 1.5 : 1.0;
     return Math.round(10 * mult);
   }

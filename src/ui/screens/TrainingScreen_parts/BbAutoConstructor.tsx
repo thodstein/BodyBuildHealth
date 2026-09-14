@@ -3367,8 +3367,9 @@ export const BbAutoConstructor: React.FC = () => {
             </>
           )}
 
-          {bbSource === 'program' && (
+          {(bbSource === 'program' || bbSource === 'cycle') && (
             <>
+              {bbSource === 'program' && (<>
               <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📚 Готовая программа из библиотеки</div>
               <BbProgramLibraryPicker
                 label='Программа'
@@ -3406,16 +3407,22 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                 );
               })()}
+              </>)}
 
-              {/* 🔧 Дополнительная настройка выбранной программы (применяется к генерации ББ-цикла) */}
-              {bbSource === 'program' && selectedProgramId && (
+              {/* 🔧 Дополнительная настройка выбранного источника (программа/цикл) */}
+              {((bbSource === 'program' && selectedProgramId) || (bbSource === 'cycle' && selectedCycleId)) && (
                 <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.18)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 8, display:'flex', alignItems:'center', gap:6 }}>
-                    🔧 Дополнительная настройка программы
+                    🔧 Дополнительная настройка {bbSource === 'cycle' ? 'цикла' : 'программы'}
                   </div>
                   <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 10 }}>
-                    Переопределяет параметры выбранной программы под ваш профиль — слабые группы, интенсивность и стратегию прогрессии.
+                    Переопределяет параметры выбранного источника под ваш профиль — слабые группы, интенсивность и стратегию прогрессии.
                     Если не менять — берутся разумные дефолты.
+                  </div>
+                  {/* 0c-3 (аудит 2026-09): честная пометка build-only опций — они живут
+                      только в generic-пути и здесь не влияют (не тихий no-op). */}
+                  <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 10, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                    ⚠ В режиме источника не действуют (только «Генерик-сплит»): женский цикл, целевой % жира, packing-заливка.
                   </div>
 
                   {/* Режим адаптации (faithful vs adapt) */}
