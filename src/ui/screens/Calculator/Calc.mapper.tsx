@@ -30,7 +30,7 @@ import { SYNERGY_NETWORK } from '../../../data/support-synergy-network';
 import { getTitrationProtocol, type TitrationProtocol } from '../../../data/titration-protocols';
 import { CONTRAINDICATIONS, getContraindications, checkContraindications, type ContraindicationRule } from '../../../data/substance-contraindications';
 import { GLASS, BADGE } from './Calc.types';
-import { CalcSubstanceDetail, buildStackSynergyDescription } from './CalcSubstanceDetail';
+import { CalcSubstanceDetail, buildStackSynergyDescription, filterSynergiesCoveredByNetwork } from './CalcSubstanceDetail';
 import { CalcPEDCard } from './CalcPEDCard';
 import { CalcProfileCard } from './CalcProfileCard';
 import { CalcLabsCard } from './CalcLabsCard';
@@ -874,7 +874,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     }
   }, [finalRec]);
 
-  const synergyDesc = finalRec ? buildStackSynergyDescription(finalRec) : [];
+  // Строки хардкод-синергий (Д5): показываются ТОЛЬКО для пар, которых нет в SYNERGY_NETWORK —
+  // дедуп ниже после расчёта pairSynergies (единый источник парного описания — сеть).
+  const synergyDescRaw = finalRec ? buildStackSynergyDescription(finalRec) : [];
 
   // ══ ЕДИНЫЙ РАСЧЁТ РИСКА ПО МЕХАНИЗМ-МОДЕЛИ (ТЗ) ══
   // Пересчитывается по ФИНАЛЬНОМУ составу (с учётом попап-правок), чтобы
@@ -934,6 +936,12 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     }
     return synergies.sort((a, b) => b.score - a.score);
   }, [finalRec]);
+
+  // Д5: единый источник — сеть. Хардкод-строки остаются только для пар, не покрытых сетью.
+  const synergyDesc = useMemo(
+    () => filterSynergiesCoveredByNetwork(synergyDescRaw, pairSynergies.map(s => s.group)),
+    [synergyDescRaw, pairSynergies],
+  );
 
   // РУЧНОЙ РЕЖИМ: план строится НАПРЯМУЮ из выбранных стеков (независимо от движка).
   // Это гарантирует, что выбранные стеки всегда видны, даже если resolvePlan упадёт.
@@ -3076,9 +3084,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   ))}
                 </>
               )}
+              {/* Д6: взаимодействия — ОДИН блок с приоритетом checkInteractions (drug-DB);
+                  SafetyConflicts (конфликты плана поддержки) показывается только когда drug-DB пуста. */}
               {finalRec.subs.length > 1 && (() => {
                 const interactions = checkInteractions(finalRec.subs.map(s => s.substanceId));
-                if (interactions.length === 0) return null;
+                if (interactions.length === 0) return <SafetyConflicts rec={finalRecWithResidual ?? finalRec} planResult={planResult} />;
                 function fmtSub(id: string): string {
                   if (id.startsWith('@')) {
                     const classLabels: Record<string, string> = {
@@ -3131,7 +3141,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 );
               })()}
               <SafetyGaps rec={finalRecWithResidual ?? finalRec} />
-              <SafetyConflicts rec={finalRecWithResidual ?? finalRec} planResult={planResult} />
+              {finalRec.subs.length <= 1 && <SafetyConflicts rec={finalRecWithResidual ?? finalRec} planResult={planResult} />}
             </div>
           )}
         </div>
@@ -3273,7 +3283,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     );
                   })()}
 
-                  {/* Полный структурированный график: до курса → ежедневно → 2/4/8 нед → после → экстренно */}
+                  {/* Полный структурированный график: до курса → ежедневно → 2/4/8 нед → после → экстренно.
+                      Д7: явная подпись источника — протокол фазы; ниже персональные маркеры (приоритетные) и свод панелей. */}
+                  <div style={{ fontSize:6, color:'rgba(255,255,255,0.55)', marginBottom:3, lineHeight:1.4 }}>
+                    🗓 Источник: график фазы курса (клинический протокол) — пересечения с панелями ниже сняты подписями источников.
+                  </div>
                   {(finalRec.monitoringSchedule || []).map(sec => (
                     <div key={sec.id} style={{ padding:'5px 7px', borderRadius:6, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.1)', marginBottom:4 }}>
                       <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:2 }}>{sec.icon} {sec.label} <span style={{ color:'#60a5fa', fontWeight:600 }}>· {sec.period}</span></div>
@@ -3299,7 +3313,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
                   {/* Персональный список маркеров (привязка к веществам плана) */}
                   <div style={{ padding:'6px 7px', borderRadius:6, background:'rgba(96,165,250,0.10)', border:'1px solid rgba(96,165,250,0.18)', marginBottom:4 }}>
-                    <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:3 }}>🎯 Персональные маркеры ({personalMarkers.length}) — по вашему плану из {subs.length} веществ</div>
+                    <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:3 }}>🎯 Персональные маркеры ({personalMarkers.length}) — приоритетный источник: привязка к веществам плана ({subs.length})</div>
                     {personalMarkers.length === 0 && (
                       <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.4 }}>Для назначенных веществ не заданы специфические маркеры мониторинга — см. базовые панели ниже.</div>
                     )}
@@ -3324,7 +3338,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
                   {/* ── Панели по системам (с привязкой к веществам) ── */}
                 <div style={{ marginBottom:7 }}>
-                  <div style={{ fontSize:8, fontWeight:700, color:'#ffffff', marginBottom:4 }}>📋 Системные панели ({subs.length} веществ в плане)</div>
+                  <div style={{ fontSize:8, fontWeight:700, color:'#ffffff', marginBottom:4 }}>📋 Системные панели ({subs.length} веществ в плане) — свод по системам (включает маркеры выше; частота/цели базовые)</div>
 
                   {SYSTEM_PANELS.map(panel => {
                     const drivers = driversBySystem[panel.id] || [];

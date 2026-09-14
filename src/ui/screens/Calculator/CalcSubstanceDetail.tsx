@@ -368,3 +368,60 @@ export function buildStackSynergyDescription(rec: SupportRecommendation): string
 
   return lines;
 }
+
+// ── Д5: привязка хардкод-строк к парам (для дедупа против SYNERGY_NETWORK) ──
+// Единый источник парного описания — SYNERGY_NETWORK (детальные карточки с механизмом);
+// хардкод-строки выше показываются ТОЛЬКО для пар, которых в сети нет.
+interface StackSynergyKey { match: RegExp; pairs: string[][] }
+const STACK_SYNERGY_KEYS: StackSynergyKey[] = [
+  { match: /D3 \+ K2 \+ Mg/, pairs: [['vitamin_d3', 'vitamin_k2', 'magnesium']] },
+  { match: /D3 \+ K2 —/, pairs: [['vitamin_d3', 'vitamin_k2']] },
+  { match: /NAC \+ TUDCA/, pairs: [['nac', 'tudca']] },
+  { match: /NAC \+ Glycine/, pairs: [['nac', 'glycine']] },
+  { match: /3 независимых пути фибринолиза/, pairs: [['serrapeptase', 'nattokinase'], ['nattokinase', 'bromelain'], ['serrapeptase', 'bromelain']] },
+  { match: /Berberine \+ α-Lipoic/, pairs: [['berberine', 'alpha_lipoic']] },
+  { match: /Telmisartan \+ Tadalafil/, pairs: [['telmisartan', 'tadalafil']] },
+  { match: /Curcumin \+ Piperine/, pairs: [['curcumin', 'piperine']] },
+  { match: /Astragalus \+ Cordyceps/, pairs: [['astragalus', 'cordyceps']] },
+  { match: /Mg \+ D3/, pairs: [['magnesium', 'vitamin_d3']] },
+  { match: /TMG \+ B-Complex/, pairs: [['tmg', 'b_complex']] },
+  { match: /Vit C \+ Vit E/, pairs: [['vitamin_c', 'vitamin_e']] },
+  { match: /Omega-3 \+ CoQ10/, pairs: [['omega3', 'coq10']] },
+  { match: /Iron \+ Vit C/, pairs: [['iron', 'vitamin_c']] },
+  { match: /TUDCA \+ Силимарин/, pairs: [['tudca', 'milk_thistle']] },
+  { match: /Saw Palmetto \+ Tadalafil/, pairs: [['saw_palmetto', 'tadalafil']] },
+  { match: /Selenium \+ Iodine/, pairs: [['selenium', 'iodine']] },
+  { match: /Bergamot \+ CoQ10/, pairs: [['bergamot', 'coq10']] },
+  { match: /Ниацин \+ Чеснок/, pairs: [['niacin', 'garlic']] },
+  { match: /Ниацин \+ Омега-3/, pairs: [['niacin', 'omega3']] },
+  { match: /Ashwagandha \+ Rhodiola/, pairs: [['ashwagandha', 'rhodiola']] },
+  { match: /Zinc \+ Boron/, pairs: [['zinc', 'boron']] },
+  { match: /Citicoline \+ Phosphatidylserine/, pairs: [['citicoline', 'phosphatidylserine']] },
+  { match: /Glucosamine \+ Chondroitin/, pairs: [['glucosamine', 'chondroitin']] },
+  { match: /Citrulline \+ Arginine/, pairs: [['citrulline', 'arginine']] },
+  { match: /Melatonin \+ Glycine/, pairs: [['melatonin', 'glycine']] },
+  { match: /Probiotics \+ L-Glutamine/, pairs: [['probiotics', 'l_glutamine'], ['probiotics', 'glutamine']] },
+  { match: /Berberine \+ Chromium/, pairs: [['berberine', 'chromium']] },
+  { match: /Taurine \+ Magnesium/, pairs: [['taurine', 'magnesium']] },
+  { match: /Collagen \+ Vitamin C/, pairs: [['collagen', 'vitamin_c']] },
+];
+
+/** Пары хардкод-строки синергий (для дедупа против сети). Пусто — строка без пары. */
+export function synergyLinePairs(line: string): string[][] {
+  const entry = STACK_SYNERGY_KEYS.find(k => k.match.test(line));
+  return entry ? entry.pairs : [];
+}
+
+/**
+ * Д5: убрать хардкод-строки, чьи пары УЖЕ показаны сетью (SYNERGY_NETWORK).
+ * `networkGroups` — группы id из pairSynergies (нижний регистр). Пустая сеть → всё как раньше.
+ */
+export function filterSynergiesCoveredByNetwork(lines: string[], networkGroups: string[][]): string[] {
+  if (networkGroups.length === 0) return lines;
+  return lines.filter(line => {
+    const pairs = synergyLinePairs(line);
+    if (pairs.length === 0) return true;
+    const covered = pairs.some(pair => networkGroups.some(group => pair.every(id => group.includes(id))));
+    return !covered;
+  });
+}
