@@ -722,6 +722,17 @@ export const CombatConstructor: React.FC = () => {
               border: '1px solid rgba(236,72,153,0.30)', padding: '6px 12px', borderRadius: 20,
             }}>{diagBridge}</span>
           )}
+          <button
+            type="button"
+            aria-label="Открыть диагностику единоборств"
+            data-combat="open-diagnostics"
+            onClick={() => window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'combat_diagnostics' }))}
+            style={{
+              minHeight: 44, fontSize: 12, fontWeight: 700, color: '#fff',
+              border: '1px solid rgba(236,72,153,0.40)', padding: '6px 14px', borderRadius: 20,
+              background: 'transparent', cursor: 'pointer',
+            }}
+          >🔬 Диагностика</button>
         </div>
       </div>
 

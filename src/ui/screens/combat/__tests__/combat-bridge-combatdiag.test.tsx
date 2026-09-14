@@ -60,4 +60,17 @@ describe('Приёмник combat-диагностики', () => {
     expect(second.container.querySelector('[data-combat="bridge-diag"]')?.textContent).toContain('кросс');
     clearPlannerApply();
   });
+
+  it('обратный путь: кнопка шлёт training-open-tab с combat_diagnostics', () => {
+    render(<CombatConstructor />);
+    let detail: unknown = null;
+    const onOpen = (e: Event) => { detail = (e as CustomEvent).detail; };
+    window.addEventListener('training-open-tab', onOpen);
+    act(() => {
+      screen.getByLabelText('Открыть диагностику единоборств').click();
+    });
+    window.removeEventListener('training-open-tab', onOpen);
+    expect(detail).toBe('combat_diagnostics');
+    clearPlannerApply();
+  });
 });
