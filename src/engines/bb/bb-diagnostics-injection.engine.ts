@@ -6,7 +6,7 @@
 import type { BBPlan, BBSession, BBExercise } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { canonicalMuscle } from './bb-specialization.engine';
-import { sessionLimitsFor } from './bb-volume.engine';
+import { sessionLimitsFor, computeBBWeeklyBudget, computeBBRecoveryScore } from './bb-volume.engine';
 
 const BB_WEAK_CORRECTION: Record<string, string[]> = {
   delt_mid: ['lateral_raise', 'cable_lateral', 'lateral_raise_machine'],
@@ -77,9 +77,29 @@ export interface BBInjectionResult {
 }
 
 function computeBudgetBB(plan: BBPlan, level?: string): number {
-  const lvl = (level || (plan as any).level || (plan as any).inputSnapshot?.level || 'intermediate') as string;
-  const map: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
-  if (map[lvl] != null) return map[lvl];
+  const snap: any = (plan as any).inputSnapshot || {};
+  const lvl = (level || (plan as any).level || snap.level || 'intermediate') as string;
+  // Волна-2.11: бюджет инъекции = КАНОН computeBBWeeklyBudget (112 × режим ×
+  // recovery × nutrition × lab). Раньше — хардкод 60/85/110/135, из-за которого
+  // вставки отклонялись чаще, чем позволяет бюджет плана (хаб и билдер
+  // расходились в два раза). Недельный бюджет — мягкий ориентир (не кап).
+  const recoveryScore = computeBBRecoveryScore({
+    bodyFat: snap.bodyFat,
+    leanMass: snap.leanMass,
+    hrvMs: snap.hrvMs,
+    sleepHours: snap.sleepHours,
+    stressLevel: snap.stressLevel,
+  });
+  const onCourse = snap.courseIntensity != null || lvl === 'enhanced';
+  const weekly = computeBBWeeklyBudget({
+    onCourse,
+    courseIntensity: snap.courseIntensity,
+    recoveryScore,
+    calorieSurplus: snap.calorieSurplus,
+    proteinPerKg: snap.proteinPerKg,
+    labMrvMultiplier: snap.labMrvMultiplier,
+  });
+  if (weekly > 0) return weekly;
   const limits = sessionLimitsFor({ level: lvl } as any);
   return limits.weeklyWorkingSets || 85;
 }

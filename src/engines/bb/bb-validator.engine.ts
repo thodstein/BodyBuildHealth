@@ -1,7 +1,7 @@
 import type { BBPlan, BBSession } from './bb-builder.engine';
 import { trueMuscleOf } from '../movement-pattern';
 import { estimateBBSessionCost } from './bb-fatigue.engine';
-import { aggregateBBVolume, sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
+import { aggregateBBVolume, aggregateFractionalVolume, PUOS_SESSION_FRACTIONAL, BB_MRV_TOLERANCE, sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -23,7 +23,10 @@ export interface BBPlanValidationResult {
   issues: BBPlanValidationIssue[];
 }
 
-export const BB_MRV_TOLERANCE = 1.15;
+// Волна-2.6: канон допуска живёт в bb-volume.engine (один источник для
+// валидатора, cap-adjust, MRV-трима и сессионных потолков) — ре-экспорт для
+// существующих импортёров (тесты/финализатор).
+export { BB_MRV_TOLERANCE };
 
 export interface BBPlanValidationOptions {
   level?: string;
@@ -204,7 +207,33 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       .reduce((sum, exercise) => sum + exercise.sets, 0);
     const { maxWorkingSets } = sessionLimitsFor(resolvedOptions);
     if (sessionSets > maxWorkingSets) {
-      issues.push({ level: 'warning', code: 'session_working_set_cap', message: `Сессия содержит ${sessionSets} рабочих сетов; target/session cap равен ${maxWorkingSets}.`, week: week.week || wi + 1, session: si + 1 });
+      // Волна-2.9 (симметрия валидатора): перебор сетов — hard для новичка
+      // (натуральный кап 24/10 — это гарантия присутствия и восстановления),
+      // warning для intermediate+ (там кап — ориентир, а не обрыв).
+      const severe = (resolvedOptions.level || '').toLowerCase() === 'beginner';
+      issues.push({
+        level: severe ? 'error' : 'warning',
+        code: 'session_working_set_cap',
+        message: `Сессия содержит ${sessionSets} рабочих сетов; target/session cap равен ${maxWorkingSets}.`,
+        week: week.week || wi + 1, session: si + 1,
+      });
+    }
+    // Волна-2.8 (PUOS, Remmert 2025): fractional-объём на мышцу за сессию > 11 —
+    // точка неотличимости по гипертрофии; не error — предупреждение о diminishing
+    // returns и рекомендация распределить на 2+ сессии (только при известном уровне).
+    if (resolvedOptions.level) {
+      const frac = aggregateFractionalVolume([session]);
+      for (const [muscle, fractional] of Object.entries(frac)) {
+        if (fractional > PUOS_SESSION_FRACTIONAL + 0.001) {
+          const label = MUSCLE_LABEL_RU[muscle] || muscle;
+          issues.push({
+            level: 'warning',
+            code: 'session_volume_puos',
+            message: `${label}: ${Math.round(fractional * 10) / 10} fractional сетов за сессию > ${PUOS_SESSION_FRACTIONAL} — diminishing returns (Remmert 2025); распределите на 2+ сессии.`,
+            week: week.week || wi + 1, session: si + 1,
+          });
+        }
+      }
     }
   }));
   for (let index = 1; index < plan.weeks.length; index++) {

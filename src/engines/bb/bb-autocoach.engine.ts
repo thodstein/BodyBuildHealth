@@ -143,6 +143,27 @@ export const DELOAD_PROTOCOLS: Record<DeloadType, DeloadProtocol> = {
   mini: { type: 'mini', volumeMultiplier: 0.70, intensityMultiplier: 0.92, rirTarget: 3, repRange: [6, 12], restSeconds: 120, keepOriginalReps: true, description: 'Мини-делоад', instructions: '70% объёма, 92% веса, RIR 3.' },
 };
 
+/**
+ * Волна-2.3 (единая таблица делоада): ЕДИНСТВЕННЫЙ resolver BB-протокола
+ * разгрузки. Раньше cycle-to-plan делал `DELOAD_PROTOCOLS[deloadType || 'pump']`
+ * — неизвестный legacy-токен давал `undefined` (краш в applyDeloadToWeek).
+ * Здесь: алиасы (pump/deload/full/full_rest/neural/mini), дефолт pump.
+ * PL-таблица `getDeloadOverride` (phase-periodization) — отдельный домен
+ * (repRange-оверрайды по PL-целям), НЕ дубль: BB-протокол описывает неделю
+ * целиком (объём/интенсивность/RIR/отдых/repRange).
+ */
+export function resolveDeloadProtocol(type?: DeloadType | string): DeloadProtocol {
+  const t = String(type || '').toLowerCase().trim();
+  const alias: Record<string, DeloadType> = {
+    pump: 'pump', deload: 'pump', разгрузка: 'pump',
+    neural: 'neural', нейро: 'neural', 'нейральная': 'neural',
+    full_rest: 'full_rest', full: 'full_rest', rest: 'full_rest', 'полный': 'full_rest',
+    mini: 'mini', мини: 'mini',
+  };
+  const key = alias[t] || 'pump';
+  return DELOAD_PROTOCOLS[key];
+}
+
 const DELOAD_SWAP_MAP: Record<string, string> = {
   'жим штанги лёжа': 'жим гантелей лёжа',
   'жим гантелей лёжа': 'жим в тренажёре',

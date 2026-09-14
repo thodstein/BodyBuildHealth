@@ -1,5 +1,5 @@
 import type { BBPlan } from './bb-builder.engine';
-import { syncBBPlanSetShape, validateBBPlan, resolveExerciseCatalogEntry } from './bb-validator.engine';
+import { syncBBPlanSetShape, validateBBPlan, resolveExerciseCatalogEntry, BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { tidySessionExercises, orderSessionExercises, isCompoundEx, type SessionMethodology } from './bb-session-order.engine';
 import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, normalizeBBMuscle, sessionLimitsFor as centralizedSessionLimits, perExerciseCap } from './bb-volume.engine';
 
@@ -2726,7 +2726,7 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
             if ((e as any).warmupActivator) continue;
             weekIndirect += indirectToMuscle(e, muscle);
           }
-          if (newTotal + weekIndirect > cap * 1.15) continue;
+          if (newTotal + weekIndirect > cap * BB_MRV_TOLERANCE) continue;
         }
         schemeApplied.add(muscle);
         // FST-7 (Rambod): 7 сетов ОДНИМ финишером — только с явного разрешения
@@ -3896,7 +3896,9 @@ for (const week of next.weeks) {
         const cap = caps[muscle];
         if (!cap) continue;
         const eff = volume[muscle]?.effectiveSets || 0;
-        if (eff <= cap * 1.05) continue;
+        // Волна-2.6 (единый допуск): порог резки = канонический BB_MRV_TOLERANCE
+        // (раньше 1.05 — резал строже валидатора 1.15: план «зелёный», но урезанный).
+        if (eff <= cap * BB_MRV_TOLERANCE) continue;
         let indirectTotal = 0;
         for (const s of week.sessions) for (const e of s.exercises) {
           if ((e as any).warmupActivator) continue;
@@ -3924,7 +3926,7 @@ for (const week of next.weeks) {
         let targetDirect = Math.max(0, Math.floor(cap - indirectTotal));
         // Ниже флора не режем — но только если сам флор влезает в cap×1.15
         // с учётом indirect (иначе флор противоречит MRV и уступает: новичок).
-        if (pplFloor != null && pplFloor + indirectTotal <= cap * 1.15) {
+        if (pplFloor != null && pplFloor + indirectTotal <= cap * BB_MRV_TOLERANCE) {
           targetDirect = Math.max(targetDirect, pplFloor);
         }
         let need = Math.max(0, directTotal - targetDirect);
@@ -4071,9 +4073,9 @@ for (const week of next.weeks) {
           // флора и флор влезает в кап — режем compounds, пока не влезет флор
           // целиком (иначе топ-ап упрётся в MRV и минимум не восстановится).
           // Без флора/дона — старый порог cap×1.15.
-          let effTarget = cap * 1.15;
-          if (pplFloor != null && direct2 < Math.min(pplFloor, cap) && pplFloor + indirect2 <= cap * 1.15 + 2) {
-            effTarget = cap * 1.15 - (Math.min(pplFloor, cap) - direct2);
+          let effTarget = cap * BB_MRV_TOLERANCE;
+          if (pplFloor != null && direct2 < Math.min(pplFloor, cap) && pplFloor + indirect2 <= cap * BB_MRV_TOLERANCE + 2) {
+            effTarget = cap * BB_MRV_TOLERANCE - (Math.min(pplFloor, cap) - direct2);
           }
           if (eff2 <= effTarget) break;
           const target2 = Math.max(0, Math.floor(cap - indirect2));
@@ -4146,7 +4148,7 @@ for (const week of next.weeks) {
           const sessTotal = s.exercises
             .filter((e: any) => !(e as any).warmupActivator && !(e as any).optional)
             .reduce((a: number, e: any) => a + (e.sets || 0), 0);
-          if ((!cap0 || d + ind + 1 <= cap0 * 1.15) && (target.sets || 0) < exCap) {
+          if ((!cap0 || d + ind + 1 <= cap0 * BB_MRV_TOLERANCE) && (target.sets || 0) < exCap) {
             // Сессия полная — забираем 1 сет у крупнейшего accessory НЕ-минимума
             // (вторые жимы/тяги, пресс), итог сессии не меняется. Донор не роняет
             // СВОЮ мышцу ниже её PPL-минимума (иначе чиним одно, ломаем другое).
@@ -4470,7 +4472,7 @@ for (const week of next.weeks) {
             const smp = target.workSets?.[target.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
             if (Array.isArray(target.workSets)) target.workSets.push({ ...smp });
           };
-          if (!cap0 || d + ind + 1 <= cap0 * 1.15) { addOne(); continue; }
+          if (!cap0 || d + ind + 1 <= cap0 * BB_MRV_TOLERANCE) { addOne(); continue; }
           const sib = week.sessions
             .filter((ss: any) => ss !== s)
             .map((ss: any) => ({

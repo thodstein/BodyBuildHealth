@@ -9,6 +9,15 @@ import { trueMuscleOf } from '../movement-pattern';
 
 export type BBVolumeKind = 'direct' | 'effective';
 
+/**
+ * Волна-2.6 (аудит 2026-09): ЕДИНЫЙ допуск MRV для всех точек конвейера —
+ * валидатор (overflow), cap-adjust финализатора, MRV-трим, per-muscle сессионные
+ * потолки. Раньше cap-adjust резал по локальному ×1.05, строже валидатора ×1.15:
+ * план «зелёный», но урезанный. Канон живёт здесь (bb-volume), validator
+ * ре-экспортирует для обратной совместимости.
+ */
+export const BB_MRV_TOLERANCE = 1.15;
+
 const ALIASES: Record<string, string> = {
   delts: 'shoulders',
   arms: 'arms',
@@ -550,6 +559,128 @@ export function aggregateBBVolume(
     }
   }
   return totals;
+}
+
+/* ── Волна-2.5: каноническая fractional-модель (Pelland 2024/26, Remmert 2025) ──
+ * Планировочная метрика PUOS: direct = 1.0 fractional сета, indirect = 0.5
+ * (независимо от EMG-коэффициента). EMG-коэффициенты (0.2–0.6) остаются
+ * каноном для пер-мышечных MRV-кап-проверок (безопасность), а fractional —
+ * для бюджета/PUOS-предупреждения (diminishing returns ≈11 fractional/сессию). */
+export const INDIRECT_FRACTION = 0.5;
+
+export interface CanonicalFractionalSets {
+  direct: number;
+  indirect: number;
+  effective: number;
+}
+
+/** Fractional-объём ОДНОГО упражнения: direct 1.0 / indirect 0.5. */
+export function canonicalEffectiveSets(exercise: BBExerciseVolumeLike): CanonicalFractionalSets {
+  const sets = setCount(exercise);
+  if (!sets || (exercise as any).warmupActivator) return { direct: 0, indirect: 0, effective: 0 };
+  const indirectPairs = indirectMuscleContributions(exercise).length;
+  const indirect = indirectPairs * sets * INDIRECT_FRACTION;
+  return { direct: sets, indirect, effective: sets + indirect };
+}
+
+/** Per-muscle fractional-наборы сессий: muscle → fractional-сеты (direct+0.5×indirect). */
+export function aggregateFractionalVolume(
+  sessions: Array<{ exercises: BBExerciseVolumeLike[] }>,
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const session of sessions) {
+    for (const exercise of session.exercises || []) {
+      if ((exercise as any).warmupActivator) continue;
+      const sets = setCount(exercise);
+      if (!sets) continue;
+      let direct = normalizeBBMuscle(exercise.muscle || trueMuscleOf(exercise as any));
+      if (!direct) continue;
+      if (direct === 'shoulders') {
+        const nm = String((exercise as any).name || '').toLowerCase();
+        if (/задн|rear|обратн|лиц.*тяга|face.*pull/i.test(nm)) direct = 'delt_rear';
+        else if (/жим|press|армей|overhead|военный/i.test(nm) && !/мах|lateral|отведен/i.test(nm)) direct = 'delt_front';
+        else if (/мах|lateral|отведен|raise|подъем/i.test(nm)) direct = 'delt_mid';
+      }
+      totals[direct] = (totals[direct] || 0) + sets;
+      for (const secondary of indirectMuscleContributions(exercise)) {
+        const muscle = normalizeBBMuscle(secondary.muscle);
+        if (!muscle || muscle === direct) continue;
+        totals[muscle] = (totals[muscle] || 0) + sets * INDIRECT_FRACTION;
+      }
+    }
+  }
+  return totals;
+}
+
+/**
+ * Волна-2.4: ЕДИНЫЙ resolver недельного MRV-капа мышцы — все слагаемые явно.
+ * Сводит две ветки билдера (основная по muscleSessionCount и PRO-ключи) в один
+ * источник; порядок округлений сохранён 1-в-1 (критерий «0 регрессий матрицы»).
+ * armBoost: 'main' — руки/ягодицы/плечи (стаж выводится из уровня, PPL ×1.6),
+ * 'pro' — PRO-ключи (буст только biceps/triceps и только при явном стаже).
+ */
+export function resolveMrvCap(input: {
+  baseMrv: number;
+  /** Режимный множитель мышцы (regimeMrvMultFor). */
+  regimeMult: number;
+  labMrvMultiplier?: number;
+  recoveryMult: number;
+  nutritionMult: number;
+  /** Ноги: max(1, частота/2) — распределённый объём переносится лучше. */
+  legFreqMult?: number;
+  /** Дополнительный recovery-оверрайд плана. */
+  recoveryOverride?: number;
+  highVolume?: boolean;
+  level?: string;
+  trainingYears?: number;
+  isPPL?: boolean;
+  armBoost?: 'none' | 'main' | 'pro';
+  specFactor?: number;
+  blast?: boolean;
+}): number {
+  const lab = input.labMrvMultiplier ?? 1;
+  const legF = input.legFreqMult ?? 1;
+  const recOv = input.recoveryOverride ?? 1;
+  let cap = Math.round(input.baseMrv * input.regimeMult * lab * input.recoveryMult * input.nutritionMult * legF * recOv);
+  if (input.highVolume) {
+    const isMax = input.level === 'enhanced' && (input.trainingYears ?? 0) >= 6;
+    cap = Math.round(cap * (isMax ? 1.25 : 1.15));
+  }
+  if (input.armBoost === 'main') {
+    const effYears = input.trainingYears ?? (input.level === 'beginner' ? 1 : input.level === 'intermediate' ? 3 : input.level === 'advanced' ? 5 : 6);
+    if (effYears >= 3) cap = Math.round(cap * (effYears >= 8 ? 1.8 : effYears >= 6 ? 1.6 : input.isPPL ? 1.6 : 1.3));
+  } else if (input.armBoost === 'pro') {
+    const years = input.trainingYears;
+    if (years !== undefined && years >= 3) cap = Math.round(cap * (years >= 8 ? 1.8 : years >= 6 ? 1.6 : 1.3));
+  }
+  if (input.specFactor && input.specFactor !== 1) cap = Math.round(cap * input.specFactor);
+  if (input.blast) cap = Math.round(cap * 1.15);
+  return cap;
+}
+
+/** Fractional-порог diminishing returns на мышцу за сессию (Remmert 2025: PUOS ≈ 11). */
+export const PUOS_SESSION_FRACTIONAL = 11;
+
+/**
+ * Волна-2.7: сессионный потолок мышцы по ЕЁ challenge-MRV и частоте.
+ * Формула `ceil(challengeMrv/частота × BB_MRV_TOLERANCE)` ограничивает только
+ * «малые» мышцы — те, у кого честная доля ниже старого флора 12 (задняя дельта,
+ * предплечья, трапы, икры). Для крупных мышц остаётся perSessionMuscleCap:
+ * иначе MEV-фидеры финализатора возвращают срезанное и ломается инвариант
+ * packing-v2 «объём ±2» (доказано дампом upper_lower_4/enhanced/back: 29→32).
+ * Заменяет `mrvRot = max(12, …)` по самой большой мышце дня.
+ */
+export function sessionMrvRotCap(input: {
+  perSessionMuscleCap: number;
+  challengeMrv?: number;
+  frequency?: number;
+}): number {
+  const cap = Math.max(1, Math.round(input.perSessionMuscleCap));
+  const challenge = Number(input.challengeMrv) || 0;
+  const freq = Math.max(1, Math.round(input.frequency || 1));
+  if (challenge <= 0) return cap;
+  const formula = Math.ceil((challenge / freq) * BB_MRV_TOLERANCE);
+  return formula < 12 ? Math.min(cap, formula) : cap;
 }
 
 export function computeMuscleBalance(

@@ -58,7 +58,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan } from './bb-finalize.engine';
-import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap } from './bb-volume.engine';
+import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, resolveMrvCap, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
 import { insulinWindowActive } from './bb-insulin-window.engine';
@@ -1137,29 +1137,49 @@ export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<
       // Теперь: floor для большинства + распределение остатка на первые упражнения.
       const target = cap;
       const factor = target / info.total;
-      let allocated = 0;
       const rawSets = info.exs.map(ex => ex.sets * factor);
-      // FIX-A7: floor=2 (не 1) — 1 сет = разминка, не рабочий объём (Schoenfeld 2016: минимум 2-3 рабочих сета).
-      // C6: deload → floor=1 (разгрузка допускает 1 сет на упражнение).
       const floored = rawSets.map(v => Math.max(floor, Math.floor(v)));
-      allocated = floored.reduce((s, v) => s + v, 0);
-      // Если allocated > target (мало упражнений, все ≥floor), урезаем последние до floor.
+      const allocated = floored.reduce((s, v) => s + v, 0);
+      for (let i = 0; i < info.exs.length; i++) info.exs[i].sets = Math.max(floor, floored[i]);
+      // Волна-2.7-extra: срезы и остаток распределяются СИММЕТРИЧНО по сессиям
+      // (раньше хвостовая сессия отдавала весь излишек — back 24/15 по двум
+      // Upper-сессиям). Внутри сессии резерв — с хвоста (accessory), остаток —
+      // с начала (compound first).
+      const sessionLists: BBExercise[][] = [];
+      for (const s of weekSessions) {
+        const list = info.exs.filter(ex => s.exercises.includes(ex));
+        if (list.length) sessionLists.push(list);
+      }
       let overflow = allocated - target;
-      for (let i = info.exs.length - 1; i >= 0 && overflow > 0; i--) {
-        const cut = Math.min(overflow, Math.max(0, floored[i] - floor));
-        floored[i] -= cut;
-        overflow -= cut;
+      while (overflow > 0) {
+        let bestList: BBExercise[] | null = null; let bestSum = -1;
+        for (const list of sessionLists) {
+          const sum = list.reduce((a, ex) => a + ex.sets, 0);
+          if (sum > bestSum) { bestSum = sum; bestList = list; }
+        }
+        const pool = bestList && bestList.some(ex => ex.sets > floor) ? bestList : info.exs;
+        const donor = [...pool].reverse().find(ex => ex.sets > floor);
+        if (!donor) break;
+        donor.sets -= 1;
+        overflow -= 1;
       }
-      // Распределить остаток (target - allocated) на первые упражнения (compound primary первыми)
-      let remainder = target - floored.reduce((s, v) => s + v, 0);
-      for (let i = 0; i < info.exs.length && remainder > 0; i++) {
-        floored[i]++;
-        remainder--;
+      let remainder = target - info.exs.reduce((s, ex) => s + ex.sets, 0);
+      let round = 0;
+      while (remainder > 0 && sessionLists.length > 0 && round < info.exs.length * 2) {
+        let progressed = false;
+        for (const list of sessionLists) {
+          if (remainder <= 0) break;
+          const pick = list[round % list.length];
+          if (pick.sets + 1 <= perExCapFor(pick.muscle)) { pick.sets += 1; remainder--; progressed = true; }
+          else if (list.some(ex => ex.sets + 1 <= perExCapFor(ex.muscle))) {
+            const alt = list.find(ex => ex.sets + 1 <= perExCapFor(ex.muscle))!;
+            alt.sets += 1; remainder--; progressed = true;
+          }
+        }
+        round++;
+        if (!progressed) break;
       }
-      for (let i = 0; i < info.exs.length; i++) {
-        info.exs[i].sets = Math.max(floor, floored[i]);
-        syncWorkSets(info.exs[i]);
-      }
+      for (const ex of info.exs) syncWorkSets(ex);
     }
   }
 }
@@ -1660,6 +1680,8 @@ export interface BuildSessionParams {
   isPPL?: boolean;
   /** Волна-1.4: accessory-имена в cooldown-окне (жёсткий фильтр пула при наличии альтернатив). */
   cooldownNames?: string[];
+  /** Волна-2.7: per-muscle сессионный MRV-потолок (min(perSessionMuscleCap, challengeMrv/freq×tol)). */
+  mrvRotByMuscle?: Record<string, number>;
 }
 
 function buildSession(
@@ -1716,6 +1738,7 @@ function buildSession(
   packingV2: boolean = false,
   isPPL: boolean = false,
   cooldownNames: string[] = [],
+  mrvRotByMuscle: Record<string, number> = {},
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -1912,8 +1935,11 @@ function buildSession(
       const sessCap = perSessionMuscleCap({ level, trainingYears, onCourse: onCourse || (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3, muscle });
       if (sets > sessCap) sets = sessCap;
     }
-    // MRV-кап: одна сессия не превышает недельный MRV мышцы (fix D)
-    if (mrvRot > 0) sets = Math.max(1, Math.min(sets, mrvRot));
+    // MRV-кап: одна сессия не превышает недельный MRV мышцы (fix D).
+    // Волна-2.7: per-muscle потолок (малая мышца не берёт 12 за сессию, если её
+    // честный challenge-MRV/частота меньше); legacy-скаляр `mrvRot` — fallback.
+    const mrvCapForMuscle = mrvRotByMuscle[muscle] ?? mrvRot;
+    if (mrvCapForMuscle > 0) sets = Math.max(1, Math.min(sets, mrvCapForMuscle));
     // P1: reps/tempo/rest берутся из фазового конфига с учётом trainingFocus — единый источник.
     // (Ранее дубль: buildSession ставил charReps → applyPostPhaseProcessing перезаписывал).
     const phaseCfg = getPhaseConfig(phase, trainingFocus);
@@ -2628,8 +2654,10 @@ function buildSession(
         }
       }
     }
-    // Для primary больших мышц (chest/back/quads) — ограничить per-exercise sets до 5
-    // чтобы не забирать весь бюджет (7 sets на жим = 35 fatigue = весь день)
+    // Для primary больших мышц (chest/back/quads) — ограничить per-exercise sets
+    // чтобы не забирать весь бюджет (7 sets на жим = 35 fatigue = весь день).
+    // Волна-2.12: единый per-exercise кап из bb-volume (perExerciseCap) вместо
+    // локального 5/8 — одна модель для builder/normalize/финализатора.
     for (let ei = 0; ei < pl.exDatas.length; ei++) {
       const exData = pl.exDatas[ei];
       const wPct = (exData as any).substitutionWeightPct ?? 1.0;
@@ -2637,11 +2665,9 @@ function buildSession(
       const isSubstituted = (exData as any).substituted === true;
       const repsCap = (exData as any).repsCap ?? 20;
       // P1-4: минимум 2 сета на упражнение (1 сет = разминка, не рабочий объём для гипертрофии).
-       // back target уже масштабирован на недельном prescription-уровне выше;
-       // не умножаем каждый exercise повторно, иначе стаж давал бы двойной boost.
-       const setCap = (pl.muscle === 'back' && level === 'advanced' && !(trainingYears !== undefined && (trainingYears as number) >= 3)) ? 8
-         : (['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && level === 'advanced' && !(trainingYears !== undefined && (trainingYears as number) >= 3)) ? 8
-         : 5;
+      // back target уже масштабирован на недельном prescription-уровне выше;
+      // не умножаем каждый exercise повторно, иначе стаж давал бы двойной boost.
+      const setCap = perExerciseCap(level, pl.muscle, trainingYears, onCourse);
         const exSetsRaw = Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct);
         // Минимум 3 сета на упражнение для enhanced 3+ — 2 сета недостаточно
         // для гипертрофии опытного атлета.
@@ -2881,7 +2907,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.mobilityRestrictions, p.trainingYears, p.bodyweightCapability,
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
     p.skipStrictCoverage, p.abAvoidPatterns, p.abSibIndex ?? 0,
-    p.packingV2 ?? false, p.isPPL ?? false, p.cooldownNames ?? [],
+    p.packingV2 ?? false, p.isPPL ?? false, p.cooldownNames ?? [], p.mrvRotByMuscle ?? {},
   );
 }
 
@@ -3122,10 +3148,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   });
   // Общая цепочка модификаторов целевого объёма (уровень/стаж/PED/lab/meso) —
   // применяется к ЛЮБОМУ варианту целевого объёма (спец-блок или баланс).
-  const applyRotationModifiers = (m: string, v: number): number => {
+  const applyRotationModifiers = (m: string, v: number, spec?: SpecializationResolution): number => {
     // Goal→объём: cut 0.72 (дефицит -28%), recomp 0.92 (рекомп ~ -8%), maintenance 0.80 (MV),
     // mass 1.05, strength_mass 1.03 (чуть ниже mass — сила优先). Различаем recomp vs maintenance.
-    if (input.goal === 'cut') v = Math.round(v * 0.72);
+    // Волна-2.10 (Frontiers 2025, пред-соревновательная практика): cut НЕ режет
+    // специализацию равномерно — цель блока сохраняет объём (0.92 вместо 0.72):
+    // дефицит уже ограничивает восстановление, а фокус-мышца — приоритет.
+    const isSpecCutTarget = !!spec?.active && (isSpecializationWeak(m, spec) || isSpecializationFocus(m, spec));
+    if (input.goal === 'cut') v = Math.round(v * (isSpecCutTarget ? 0.92 : 0.72));
     else if (input.goal === 'recomp') v = Math.round(v * 0.92);
     else if (input.goal === 'maintenance') v = Math.round(v * 0.80);
     else if (input.goal === 'mass') v = Math.round(v * 1.05);
@@ -3177,7 +3207,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const lm = lmFor(m, pattern.rotationDays);
     if (lm) {
       let v = baseRotationFor(m, lm, specRes);
-      v = applyRotationModifiers(m, v);
+      v = applyRotationModifiers(m, v, specRes);
       v = muscleVolumeRotation[m] = v;
       volumeTargets[m] = buildBBVolumeTarget({
         muscle: m,
@@ -3187,48 +3217,36 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         volumeGoal: input.volumeGoal || 'mav',
         weakPoint: isSpecializationWeak(m, specRes),
         focus: isSpecializationFocus(m, specRes),
-        // BUG-FIX: recoveryMultiplier уже применён к rotationSets (v) на строках выше
-        // (v *= recoveryMult * nutritionMult * pedAdapt * labMrvMultiplier * goal).
-        // Передаём 1.0 чтобы избежать двойного применения.
-        // MRV cap (mrvByMuscle[m]) вычисляется отдельно на строке 1977 с учётом recovery.
-        recoveryMultiplier: 1,
-      });
-      // fix D: истинный MRV — потолок для капа.
-      // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
-      // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
-      // PED: базовый MRV умножается на combinedMrvMultiplier ДО корректировок
-      // Ноги: недельный кап масштабируется частотой сессий (3×/нед переносится
-      // лучше, чем тот же объём за 2× — распределённый объём, Helms 2019).
-      const legFreqMult = ['quads', 'hamstrings', 'glutes'].includes(m) ? Math.max(1, (muscleSessionCount[m] || 1) / 2) : 1;
-      // Единый режим-множитель (×2 на курсе на главные мышцы) — без стэкинга
-      // pedAdapt × backProfile/legProfile/torsoProfile capMult.
-      let capMrv = Math.round(lm.mrv * regimeMrvMultFor(m, regimeMult) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * legFreqMult * recoveryMultOverride);
-      if (input.trainingVolumeMode === 'high') {
-        const capBoost = level === 'enhanced' && (input.trainingYears ?? 0) >= 6 ? 1.25 : 1.15;
-        capMrv = Math.round(capMrv * capBoost);
-      }
-      // Руки/ягодицы/плечи: при больших тягах/жимах/приседаниях косвенный
-      // объём закрывает часть target, но потолок тоже должен расти со стажем
-      // (иначе ложный MRV-overflow на enhanced-планах). 3–5 лет: ×1.6 —
-      // PPL-минимумы (biceps 8/Pull, triceps 10/Push) + indirect иначе не
-      // влезают даже в кап intermediate (14 → 22.4, eff ≤ 25.8).
-      // PPL считает дельты по пучкам (delt_*) — им тот же мульт, иначе
-      // задняя дельта (mrv 12) переполняется от GVT/памп-добивок.
-      // Стаж не передан — выводим из уровня (intermediate ≈ 3г): иначе планы
-      // без trainingYears душат руки до bare-mrv и ломают PPL-минимумы.
-      // ×1.6 — ТОЛЬКО PPL (там по-сессионные минимумы рук иначе не влезают в
-      // кап); остальные сплиты держат консервативные ×1.3 — их тесты зелёные.
-      const effYears = input.trainingYears ?? (level === 'beginner' ? 1 : level === 'intermediate' ? 3 : level === 'advanced' ? 5 : 6);
-      const isPPLSplit = /ppl/i.test(pattern.id || '');
-      if (['biceps', 'triceps', 'glutes', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear'].includes(m) && effYears >= 3) {
-        capMrv = Math.round(capMrv * (effYears >= 8 ? 1.8 : effYears >= 6 ? 1.6 : isPPLSplit ? 1.6 : 1.3));
-      }
-      const specMrv = specializationMrvFactor(m, specRes);
-      if (specMrv !== 1) capMrv = Math.round(capMrv * specMrv);
-      // Blast/Cruise: потолок должен позволять blast-неделю (+15%), иначе blast overflow
-      if (input.blastCruiseEnabled) capMrv = Math.round(capMrv * 1.15);
-      mrvByMuscle[m] = capMrv;
-    }
+      // BUG-FIX: recoveryMultiplier уже применён к rotationSets (v) на строках выше
+      // (v *= recoveryMult * nutritionMult * pedAdapt * labMrvMultiplier * goal).
+      // Передаём 1.0 чтобы избежать двойного применения.
+      // MRV cap (mrvByMuscle[m]) вычисляется отдельно ниже с учётом recovery.
+      recoveryMultiplier: 1,
+    });
+    // fix D: истинный MRV — потолок для капа.
+    // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
+    // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
+    // Волна-2.4: единый resolver (явные слагаемые) — порядок округлений 1-в-1
+    // с прежними ветками (ниже PRO-ключи используют armBoost: 'pro').
+    const legFreqMult = ['quads', 'hamstrings', 'glutes'].includes(m) ? Math.max(1, (muscleSessionCount[m] || 1) / 2) : 1;
+    const capMrv = resolveMrvCap({
+      baseMrv: lm.mrv,
+      regimeMult: regimeMrvMultFor(m, regimeMult),
+      labMrvMultiplier: input.labMrvMultiplier,
+      recoveryMult,
+      nutritionMult,
+      legFreqMult,
+      recoveryOverride: recoveryMultOverride,
+      highVolume: input.trainingVolumeMode === 'high',
+      level,
+      trainingYears: input.trainingYears,
+      isPPL: /ppl/i.test(pattern.id || ''),
+      armBoost: ['biceps', 'triceps', 'glutes', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear'].includes(m) ? 'main' : 'none',
+      specFactor: specializationMrvFactor(m, specRes),
+      blast: !!input.blastCruiseEnabled,
+    });
+    mrvByMuscle[m] = capMrv;
+  }
   }
   // B6: расширяем mrvByMuscle для PRO-ключей (delt_front/mid/rear, forearms, traps,
   // lower_back, abs, calves) и рук (biceps/triceps — в сплитах с 'arms' они не
@@ -3242,15 +3260,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     if (excludedMuscles.has(m) || excludedMuscles.has(collapseKey(m))) continue;
     const lm = lmFor(m, pattern.rotationDays);
     if (lm) {
-      let capMrv = Math.round(lm.mrv * regimeMrvMultFor(m, regimeMult) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * recoveryMultOverride);
-      // Руки/ягодицы/плечи: косвенный объём от тяг/жимов требует стажевый кап-буст.
-      if (['biceps', 'triceps'].includes(m) && input.trainingYears !== undefined && input.trainingYears >= 3) {
-        capMrv = Math.round(capMrv * (input.trainingYears >= 8 ? 1.8 : input.trainingYears >= 6 ? 1.6 : 1.3));
-      }
-      const specMrvPro = specializationMrvFactor(m, specRes);
-      if (specMrvPro !== 1) capMrv = Math.round(capMrv * specMrvPro);
-      if (input.blastCruiseEnabled) capMrv = Math.round(capMrv * 1.15);
-      mrvByMuscle[m] = capMrv;
+      mrvByMuscle[m] = resolveMrvCap({
+        baseMrv: lm.mrv,
+        regimeMult: regimeMrvMultFor(m, regimeMult),
+        labMrvMultiplier: input.labMrvMultiplier,
+        recoveryMult,
+        nutritionMult,
+        recoveryOverride: recoveryMultOverride,
+        armBoost: ['biceps', 'triceps'].includes(m) ? 'pro' : 'none',
+        trainingYears: input.trainingYears,
+        specFactor: specializationMrvFactor(m, specRes),
+        blast: !!input.blastCruiseEnabled,
+      });
     }
   }
 
@@ -3269,7 +3290,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     for (const m of Object.keys(muscleSessionCount)) {
       const lm = lmFor(m, pattern.rotationDays);
       if (!lm) continue;
-      map[m] = applyRotationModifiers(m, baseRotationFor(m, lm, res));
+      map[m] = applyRotationModifiers(m, baseRotationFor(m, lm, res), res);
     }
     rotationMapByKey.set(key, map);
   }
@@ -3434,7 +3455,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // Бюджет сессии масштабируется по volumeMultiplier фазы (focus-aware), MRV-потолок не трогаем.
       const phaseVol = getPhaseVolumeMult(phase, input.trainingFocus) ?? 1.0;
       const sessDailyCap = Math.round((sessMuscles.length <= 2 ? dailyCap * 1.5 : dailyCap) * phaseVol);
-      const mrvRot = Math.max(12, ...sessMuscles.map(m => mrvByMuscle[m] || 0));
+      // Волна-2.7: per-muscle сессионный MRV-потолок вместо max(12,…) по самой
+      // большой мышце дня: малая мышца (бицепс/предплечья/задняя дельта) не
+      // должна временно брать 12 сетов. min(perSessionMuscleCap,
+      // ceil(challengeMrv/частота × BB_MRV_TOLERANCE)).
+      const freqOfMuscle = (m: string) => Math.max(1, muscleSessionCount[collapseKey(m)] || muscleSessionCount[m] || 1);
+      const mrvRotByMuscle: Record<string, number> = {};
+      for (const m of sessMuscles) {
+        const sessCapM = perSessionMuscleCap({ level, trainingYears: input.trainingYears, onCourse: onCourse || (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3, muscle: m });
+        mrvRotByMuscle[m] = sessionMrvRotCap({ perSessionMuscleCap: sessCapM, challengeMrv: mrvByMuscle[m] ?? mrvByMuscle[collapseKey(m)], frequency: freqOfMuscle(m) });
+      }
       // fix F: per-week оценка травм относительно даты недели (а не только «сегодня»).
       // Травма с from > даты недели ещё неактивна; травма с to < даты недели уже зажила.
       const weekDate = input.planStartWeek ? addDaysISO(input.planStartWeek, (w - 1) * 7) : today;
@@ -3450,7 +3480,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // (финализатор копирует сессии поверхностно, поле переживает).
         // Без флага — undefined, legacy 1-в-1 байт-в-байт.
         const abAvoid = input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRotByMuscle, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       if (abAvoid && abAvoid.length > 0) (sess as any).abAvoidPatterns = [...abAvoid];
       // A/B-ротация: фиксируем паттерны сессии для sibling-сессий того же тега.

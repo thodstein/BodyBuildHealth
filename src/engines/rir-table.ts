@@ -11,8 +11,21 @@
  * RIR 3 =  88% workMax
  * RIR 4 =  84% workMax
  * RIR 5 =  80% workMax
+ *
+ * Волна-2.2 (аудит 2026-09): те же числа — ОДНОЙ формулой; `PCT_FOR_RIR` —
+ * legacy-алиас, производный от `pctForRir` (0 расхождений по определению).
  */
-export const PCT_FOR_RIR: Record<number, number> = { 0: 1.0, 1: 0.96, 2: 0.92, 3: 0.88, 4: 0.84, 5: 0.80 };
+export function pctForRir(rir: number): number {
+  const r = Math.max(0, Math.min(5, Math.round(Number(rir) || 0)));
+  return Math.max(0.8, 1.0 - r * 0.04);
+}
+
+export const PCT_FOR_RIR: Record<number, number> = Object.freeze(
+  [0, 1, 2, 3, 4, 5].reduce<Record<number, number>>((acc, r) => {
+    acc[r] = pctForRir(r);
+    return acc;
+  }, {}),
+);
 
 /**
  * S-MRV: Системный бюджет утомления на день.

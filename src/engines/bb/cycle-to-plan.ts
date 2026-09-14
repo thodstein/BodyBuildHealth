@@ -20,7 +20,7 @@ import { applyRehabToPlan, rehabNotes } from './bb-recovery.engine';
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
 import { mergeWearableIntoRecovery, type WearableDaily } from './bb-wearable.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
-import { applyPostPhaseProcessing, applyDeloadToWeek, DELOAD_PROTOCOLS, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
+import { applyPostPhaseProcessing, applyDeloadToWeek, resolveDeloadProtocol, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { tidySessionExercises, SESSION_TIDY_RATIONALE, isIsolationByName, type SessionMethodology } from './bb-session-order.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf, derivePattern } from '../movement-pattern';
@@ -1258,9 +1258,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     // Apply deload if this week is a deload week
     const isDeload = effDeloadWeeks.includes(w);
     if (isDeload) {
-      const protocol = DELOAD_PROTOCOLS[deloadType || 'pump'];
-      // Волна-1.10 (Delphi Bell/Rogerson 2023/24): упражнения на разгрузке
-      // СОХРАНЯЮТСЯ — меняются объём/интенсивность/RIR, а не моторный паттерн.
+      // Волна-2.3: единый resolver BB-протокола (неизвестный токен → pump,
+      // без undefined-краша); Волна-1.10 (Delphi): упражнения СОХРАНЯЮТСЯ.
+      const protocol = resolveDeloadProtocol(deloadType);
       const deloadWeek = applyDeloadToWeek({ week: w, sessions }, protocol);
       sessions.splice(0, sessions.length, ...deloadWeek.sessions);
       rationale.push(`🔋 Разгрузка нед ${w}: ${protocol.description} — ${protocol.instructions}`);

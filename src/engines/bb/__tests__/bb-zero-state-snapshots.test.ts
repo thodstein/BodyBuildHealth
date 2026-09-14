@@ -59,8 +59,12 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // выбор стал качественнее: спина 16→20 (SFR-сильные тяги/подтягивания),
     // бицепс 17→16 и задняя дельта 17→16 (лучший баланс при большем indirect
     // спины). Валидатор зелёный.
+    // Re-baseline 4 (аудит 2026-09, Волна-2.6): единый допуск cap-adjust =
+    // BB_MRV_TOLERANCE 1.15 (был локальный 1.05) — план больше не режется
+    // строже валидатора: бицепс 16→18 (PPL-флор доехал без преждевременной
+    // резки). Валидатор зелёный (overflow ≤ допуска).
     expect(directVolume(plan)).toEqual({
-      abs: 8, back: 20, biceps: 16, calves: 18, chest: 16, delt_front: 5, delt_mid: 3, delt_rear: 16, forearms: 7, glutes: 9, hamstrings: 10, quads: 20, shoulders: 3, traps: 10, triceps: 16,
+      abs: 8, back: 20, biceps: 18, calves: 18, chest: 16, delt_front: 5, delt_mid: 3, delt_rear: 16, forearms: 7, glutes: 9, hamstrings: 10, quads: 20, shoulders: 3, traps: 10, triceps: 16,
     });
   });
 
