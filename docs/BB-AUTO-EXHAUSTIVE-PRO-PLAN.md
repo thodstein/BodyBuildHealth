@@ -316,7 +316,7 @@
 ## 7. Прогресс исполнения
 
 - [x] **Волна 0a — P0-1..P0-3** (коммит `b5c8eb88`): accessory-покрытие строгих групп; статический `ANGLE_CLASSES` вместо `require()`; дозо-зависимая MRV-кривая (флор 1.9 снят).
-- [x] **Волна 0b — P0-4..P0-9** (коммит этого этапа):
+- [x] **Волна 0b — P0-4..P0-9** (коммит `e44fc33f`):
   - P0-4: `getPhaseVolumeMult(phase, trainingFocus)` — единый focus-aware множитель.
   - P0-5: двойной `syncBBPlanSetShape` убран.
   - P0-6: session-лимиты финализатора → `centralizedSessionLimits` (один источник).
@@ -329,7 +329,20 @@
     `bb-ped-enhancements` (blast/cruise допуск ±8→±12, root-fix в Волне 2.4).
   - Пре-существующие чужие падения (не трогаю): `bb-diagnostics-max-pro` female-symmetry
     (движок симметрии — чужая зона, последний коммит `b0eabf155`).
-- [ ] **Волна 0c — P0-10..P0-13** (UI-контролы: BB-цикл, program-passthrough, wearable, autoReg, дубли)
+- [x] **Волна 0c-1 — P0-11..P0-13** (коммит `e1b6f02e`):
+  - P0-11: «📋 ПРОФ-цикл» реально собирается (`cycleTemplateToFullProgram` → `programToBBPlan`).
+  - P0-12: паритет program-пути — `wearable` (merge в recovery), `availablePlates` (пост-округление),
+    `rehabMuscles` (рампа возврата), `dcMode` (widowmaker по гейту уровень+AAS≥750) + rationale.
+    Тест `bb-program-passthrough` 5/5.
+  - P0-13: wearable-инпуты пишут state-tick → сборка видит свежие данные.
+- [x] **Волна 0c-2 — P0-10 + 0.13** (коммит `07e8007f`):
+  - P0-10: мёртвый `autoRegOn` оживлён тоглом «🤖 Авто-регуляция по готовности» (payload реально уходит).
+  - 0.13: селект схемы объёма показывает фактический `gvt` при `trainingVolumeMode='high'`.
+- [ ] **Волна 0c-3 (остаток, следующий этап)**: удаление 7 визуальных дублей в блоке
+  «Дополнительная настройка программы» (loadStrategy/intensityTech/autoDeload/deloadType/
+  bbEquipment/injuries/mobility — вторые экземпляры биндятся к тем же state);
+  скрытие/явная пометка build-only контролов program-режима (`packingV2`, `pedPhaseOverride`,
+  `cycleDay`, `targetBodyFat` — живут только в generic-пути).
 - [ ] Волна 1 — выбор/порядок/темпы
 - [ ] Волна 2 — единая модель нагрузки и капы
   - Задача 2.4-extra: blast-множитель ×1.15 должен доходить до сессионных лимитов
