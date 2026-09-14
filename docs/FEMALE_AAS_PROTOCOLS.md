@@ -1569,4 +1569,10 @@ const FEMALE_UI_FLAGS = {
 - ✅ Проброс: `buildTzInput` (из `state.profile.sex`), `buildTzInputCore(sex?)`, `LabsTzRiskTab` (+ женские placeholder-нормы), `LabsScreen:517`.
 - ✅ Мужской путь байт-в-байт (lock-тесты), 13 новых тестов, круг 194/194.
 - **Остатки (§6.2 аудита, низкий риск, отдельный раунд):** `risk-verification.engine` (женские пороги отчёта), `LAB_MONITOR_DB`/`substance-monitoring-db` (женские пометки текстов), HCT-градации в `Calc.mapper`/`Calc.labs-derived`, `risk-engine-v7` LAB_REFERENCES, `notification-engine`, `estimateCardioRisk` (пол в сигнатуре не используется).
+  - ✅ **Закрыты позже:** `risk-verification.engine` жен пороги+floors (`7ffd3e93`, тест `risk-verification-female` 12/12); HCT-градация `Calc.mapper` (`hctGradationLabel`) и `Calc.labs-derived` (`deriveStateFromLabs(fp, sex)`) — `239cebdb`; `risk-engine-v7` LAB_REFERENCES — `LAB_REFERENCES_FEMALE`+`getLabReference(code,sex)` (`b6f826cf`, тест 7/7); `LAB_MONITOR_DB`-пометки — покрыты женскими протоколами/паспортом (осознанно без дублей).
+  - ⏳ **Осознанно отложено:** `notification-engine` (женские E2-алерты требуют фазовой модели), `estimateCardioRisk(entries,{sex})` (контракт без клинической модели).
+
+### 16.4 Фаза 2 (план Sep 14 2026): риски по препаратам фармакологии + вкладка «Анализы» — ✅ план, код НЕ тронут
+- Аудит: риски препаратов во вкладке «Риски» (`RiskScreen` карточка порогов, `RiskOverview`, `DRUG_THRESHOLDS(_V7)`, `androgenicLoad`, `mapStackToPathologies`, `lab-pharma-correlation`) и вкладка «Анализы» (справочник `LabsCatalog` из `UCUM_MAP`, статусы `LabsScreen`, спутники `LabsScreen_parts`, `role-view`, `clinical-pathology-db`) — **женский слой не подключён** (единый источник `FEMALE_AAS_PROFILES`/`assessFemaleAas` живёт только в калькуляторе).
+- План P1 (риски препаратов: Ж1–Ж5) + P2 («Анализы»: Л8–Л11) + критерии + **готовый стартовый промпт новой сессии** — `docs/SUPPORT-CALC-FULL-AUDIT-PLAN.md` §10–§11.
 - Обязательные условия соблюдены: `sex` — опционален (дефолт = мужской путь), lock-тесты, прогон support/risk-круга.

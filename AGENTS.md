@@ -1,5 +1,9 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## План «Фаза 2 женского слоя»: риски препаратов + вкладка «Анализы» (Sep 14 2026, только доки, кода нет)
+
+По команде «добавь в план риски для женщин по препаратам фармакологии адаптировать, вкладку анализы адаптировать отображение и индикацию под женщин тоже; план обнови и напиши что написать агенту в новой сессии». Выполнен аудит чтением кода (grep-инвентарь, код НЕ менялся) и записаны: **§10** (`docs/SUPPORT-CALC-FULL-AUDIT-PLAN.md`) — таблицы Ж-1…Ж-8 (риски препаратов: `RiskScreen.tsx:773-814` карточка порогов, `RiskOverview.tsx:273-281`, `DRUG_THRESHOLDS_V7`+`computeDrugContributions` `risk-engine-v7-matrix.ts:144/~978`, `androgenicLoad` `risk-engine-v7-extensions.ts:124-154`, `mapStackToPathologies` без sex, `lab-pharma-correlation.ts:123-168` муж пороги; единый источник `FEMALE_AAS_PROFILES`/`assessFemaleAas` не подключён к «Рискам») и Л-1…Л-7 («Анализы»: `LabsCatalog.tsx:76-84` нормы без пола, `UCUM_MAP.sexFactor` только TT/HCT/E2 и симметричный ×0.85 у HCT, статусы `LabsScreen.tsx:443-444/1127-1128`, спутники `LabsScreen_parts` без пола, `role-view.engine.ts:21-22`, `clinical-pathology-db.ts:67`) + план P1 Ж1–Ж5 / P2 Л8–Л11 + критерии (male JSON-lock, «♀ скрыто при male») + **§11 — готовый стартовый промпт новой сессии**. Обновлён `FEMALE_AAS_PROTOCOLS.md` §16.3 (остатки отмечены: закрыто `7ffd3e93`/`239cebdb`/`b6f826cf`, отложено notification-engine/estimateCardioRisk) и NEW §16.4 (план-фаза 2). Код/тесты не менялись; пуш — очередь проверена.
+
 ## Калькулятор поддержки: P1 аудита — Д3–Д9 + §6.2/§6.4 (женское) + мёртвый код + лифт риска (Sep 14 2026, 6 коммитов pathspec, без пуша)
 
 По стартовому промпту §9 `docs/SUPPORT-CALC-FULL-AUDIT-PLAN.md` («Выполни P1: Д3–Д9, §6.2+§6.4, мёртвый код, onRiskChange»). Только Edit/Write + vitest/tsc; чужие WIP (`bb-*`/`meal-plan-engine`/`BbAutoConstructor`) не тронуты; коммиты строго pathspec.

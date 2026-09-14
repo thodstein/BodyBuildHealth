@@ -170,4 +170,84 @@
 Правила проекта (обязательны): только Edit/Write + vitest/tsc; НЕ трогать чужие файлы; коммиты строго `git commit -m "…" -- <свои файлы>` (pathspec); после любых скриптов перечитывать файл перед Edit; НЕ использовать PowerShell для правок файлов; чекаут запрещён; каждый пункт — с тестом на регресс; мужской путь байт-в-байт (lock-тесты); финал: support/risk-круг + `tsc --noEmit` (NODE_OPTIONS=12GB) + `verify:apk-design`; пуш — только когда очередь origin/main..HEAD состоит ТОЛЬКО из своих коммитов.
 ```
 
-**Напоминание из прошлой сессии:** P0 выполнен (`a5ce655f`, `706c5b81`, `14e1df74d`, запушены); женские протоколы в приложении полные (59/59 тестов + закрыт гэп дозировок vitex/inositol).
+**Напоминание из прошлой сессии:** P0 выполнен (`a5ce655f`, `706c5b81`, `14e1df74d`, запушены); женские протоколы в приложении полные (59/59 тестов + закрыт гэп дозировок vitex/inositol); P1/P2 аудита калькулятора выполнены (`0d48196c`–`239cebdb`), v7-женские LAB_REFERENCES — `b6f826cf` (запушены).
+
+---
+
+## §10. Женский слой — фаза 2 (Sep 14 2026): риски по препаратам фармакологии + вкладка «Анализы»
+
+**Основание:** запрос пользователя: «добавь в план риски для женщин по препаратам фармакологии адаптировать, вкладку анализы адаптировать отображение и индикацию под женщин тоже». **Аудит выполнен чтением кода (grep-инвентарь потребителей), код НЕ менялся — это план.** Единый женский источник уже существует: `FEMALE_AAS_PROFILES` (22 профиля: yellow/red мг/нед, androgenIndex, contraindicated) + `assessFemaleAas` (`engines/female-aas-risk.ts:31/92`) — сейчас подключён только к калькулятору поддержки, но НЕ к вкладке «Риски» и НЕ к фарма-контурам.
+
+### §10.1 Аудит: риски по препаратам (фармакология) — что показывается сейчас
+
+| # | Точка | Файл:строка | Сейчас | Женского нет |
+|---|-------|-------------|--------|--------------|
+| Ж-1 | Карточка «Пороги и препараты (ААС, ГЧ, инсулин)» | `RiskScreen.tsx:773-814` | `DRUG_THRESHOLDS`: dosePerWeek + androgenicity-градация (муж) | нет женских yellow/red, нет «⛔ абсолютно противопоказано», нет дозо-индекса вирилизации |
+| Ж-2 | Таблица порогов по андрогенности | `RiskScreen_parts/RiskOverview.tsx:273-281` | то же, компакт | то же |
+| Ж-3 | Реестр порогов | `core/constants.ts:11-110+` (`DRUG_THRESHOLDS`) | единый муж-реестр | женский источник (`FEMALE_AAS_PROFILES`) не подключён ни к одной точке RiskScreen |
+| Ж-4 | V7-дозовые тиры и вклад препаратов | `risk-engine-v7-matrix.ts:144+` (`DRUG_THRESHOLDS_V7`), `computeDrugContributions` (~`:978` `doseRatio × weight × androgenicity`) | пол не влияет на тиры/AR-вклад | женские пороги в 1/4–1/10 мужских, абсолютные противопоказания не эскалируют контур |
+| Ж-5 | AR-нагрузка | `risk-engine-v7-extensions.ts:124-154` (`androgenicLoad`), `stack-burden.engine.ts:13-58`, `support.engine.ts:835-845`, `PharmaScreen_parts/DosageCalculatorTab.tsx:58-128,176` | муж пороги | женские AR/дозовые пороги |
+| Ж-6 | Патологии стека | `drug-mapper.engine.ts` (`mapStackToPathologies`; вызов `RiskScreen.tsx:1541-1567`) | только муж патологии (HPTA, гемато, липиды…) | нет женских патологий: вирилизация, нарушение цикла, фертильность, голос/клитор, кости/волосы; функция без `sex` |
+| Ж-7 | Латентный дубль-слой | `assessPedRisk(peds, level, sex)` (`ped-risk-matrix`) уже возвращает `femaleFlags/femaleVirilizationIndex/femaleContraindicated` и показывается в `Calc.mapper`, но НЕ в RiskScreen | — | подключить как UI-слой без новой математики |
+| Ж-8 | Lab-pharma корреляции | `lab-pharma-correlation.engine.ts:123-168` | «HCT >54% — флеботомия», «TT high → контроль PSA» (муж) | женские пороги (HCT 48/52; TT>6 = вирилизация → отмена/эскалация; PRL женский; E2 по фазе — с оговоркой) |
+
+### §10.2 Аудит: вкладка «Анализы» — отображение и индикация
+
+| # | Точка | Файл:строка | Сейчас | Женского нет |
+|---|-------|-------------|--------|--------------|
+| Л-1 | Справочник норм | `LabsScreen_parts/LabsCatalog.tsx:76-84` | min/max из `UCUM_MAP` (lln/uln) без пола | женские границы; описания гормонов мужские (`AMH:70`, `INHB:71`, `PSA:72`, `DHEA_S:69` — «сперматогенез/простата» без женского контекста) |
+| Л-2 | Динамические границы T/TT/HCT/E2 | `core/constants.ts:440-447` (`UCUM_MAP.dynamic`) | `sexFactor` только у TT/HCT/E2; **HCT female ×0.85 применяется к ОБОИМ границам** (LLN 36→30.6 — заниженная анемия-граница; корректно 36–48) | Hb/RBC/ALT/AST/GGT/креатинин/ферритин/PRL вообще без пола |
+| Л-3 | Статусы (стрелки, цвета, «отклонение») | `LabsScreen.tsx:443-444` (ULN/LLN из `refLow/refHigh`/LAB_MARKERS), `:1127-1128` (`isHigh/isLow` по муж порогам) | без пола | женские пороги в индикации |
+| Л-4 | Точка «в норме» (sex-aware) | `LabsScreen.tsx:2263` (`normalizedRatio(..., profileSex)`) | работает, но только для dynamic-маркеров TT/HCT/E2 | расширить резолвер норм (единый `getLabNorm(code, sex)`) |
+| Л-5 | Остальные части | `LabsScreen_parts/*` кроме `LabsTzRiskTab` — 0 упоминаний пола (`LabsResults`, `LabsOverview`, `LabDiaryTab`, `ExtendedLabsTab`, `LabsSchedule`, `LabsProblemPanelsTab`, `LabsInvestigations`) | муж нормы в таблицах/панелях/дневнике | женские нормы + бейдж «♀» |
+| Л-6 | Роль-вид | `role-view.engine.ts:21-22` | ULN/LLN через тот же огрублённый `sexFactor` | уточнить женские границы |
+| Л-7 | Клиническая база | `data/clinical-pathology-db.ts:67` (`Hematocrit ec50 52`) → `clinical-analyzer.engine.ts`, динамический импорт `RiskScreen.tsx:1528` | муж ec50 | женский ec50/сепаратор (осторожно — движок общий) |
+| — | **Уже сделано (не дублировать)** | `risk-verification.engine` жен пороги+floors (`7ffd3e93`); `support-phase-labs` femaleNote K0/K2/K5/K7; `LAB_REFERENCES_FEMALE`+`getLabReference` (`b6f826cf`); TZ `clinicalFloorsForLabs/getMiFromLab(sex)` (§16.3); `LabsTzRiskTab` жен placeholder-нормы; `LabsScoreCard` получает `sex` (LabsScreen:1823) | | |
+
+### §10.3 План P1 (женские риски по препаратам — фармакология)
+
+1. **Ж1. Карточки порогов в RiskScreen**: адаптер `femaleDrugThresholdView(pedIds, sex)` (без новых чисел — из `FEMALE_AAS_PROFILES`/`assessFemaleAas`): при sex=female карточка «Пороги и препараты» (`RiskScreen.tsx:800+`) и `RiskOverview` показывают женские yellow/red, androgenIndex, «⛔ абсолютное противопоказание», дозо-индекс вирилизации; мужской путь 1-в-1.
+2. **Ж2. Дозовые тиры движков**: резолвер `getDrugThreshold(id, sex)` (женский override из `FEMALE_AAS_PROFILES`: red → тир-эквивалент, contraindicated → жёсткая эскалация) → `computeDrugContributions` / `androgenicLoad` / `weekly-risk-dynamics` (пол уже течёт в `V7RiskInput.sex`/`TZRiskInput.sex`); lock мужского JSON байт-в-байт.
+3. **Ж3. Женские патологии стека**: `mapStackToPathologies(drugs, sex?)` + 4–6 женских патологий (вирилизация, менструальный цикл, фертильность, либидо, кости/волосы) с source-текстами из `FEMALE_AAS_PROFILES`; `RiskScreen.tsx:1541` передаёт пол профиля; без sex — прежний результат.
+4. **Ж4. Lab-pharma рекомендации**: `lab-pharma-correlation.engine.ts` — женские пороги (HCT 48/52; TT>6 = вирилизация; PRL женский; E2 фаза-зависимо — честная оговорка «интерпретация по фазе цикла»).
+5. **Ж5. Честные подписи**: у женских строк/карточек — бейдж «♀ женские пороги (1/4–1/10 мужских)», источник (`FEMALE_AAS_PROFILES`) и кросс-ссылка «Женщины и ААС → Дозы/Лабы»; женские алерты не дублировать в двух местах (правило Д3).
+
+### §10.4 План P2 (вкладка «Анализы» — отображение и индикация)
+
+1. **Л8. Единый резолвер норм**: `getLabNorm(code, sex)` (новый, поверх `LAB_REFERENCES_FEMALE` (уже есть) + `FEMALE_LAB_GROUPS`) → `LabsCatalog` (женские min/max + чип «♀»), `LabsScreen` статусы (443-444/1127-1128), `role-view` (замена симметричного ×0.85 на асимметричные женские границы: HCT 36–48, Hb 120–150, RBC 4.0–5.2, АЛТ/АСТ/ГГТ ULN 31, креатинин ≤97, ферритин ≤200).
+2. **Л9. Индикация**: легенда «♀ пороги по полу» в шапке списка анализов + бейдж «♀» у строк с женскими границами; нейтральные описания гормонов (`AMH/INHB/PSA/DHEA_S`) с «у мужчин / у женщин».
+3. **Л10. Панели/дневник**: `LabDiaryTab`/`ExtendedLabsTab`/`LabsOverview` — строка-пометка femaleNote (по образцу K-карточек) и переход на женские нормы; `LabsResults` — женские границы в таблицах.
+4. **Л11. Клинический contур**: `clinical-pathology-db` — женские ec50 для HCT/гемато (или честный сепаратор), только при sex=female; муж путь байт-в-байт.
+5. **Осознанно вне**: фазовые женские нормы E2/прогестерона по фазам цикла (нужна фазовая модель — §16.3/§10.5), notification-engine (отложено ранее).
+
+### §10.5 Критерии готовности (фаза 2)
+
+- Мужской путь байт-в-байт: JSON-lock на `computeDrugContributions`/`mapStackToPathologies`/`getLabNorm`/`DRUG_THRESHOLDS`-строки; UI-тесты «♀ видно при female / скрыто при male».
+- Каждый пункт — с тестом; финал: support/risk-круг + labs-круг + `tsc --noEmit` (12GB) + `verify:apk-design`; коммиты строго pathspec; пуш — только при чистой очереди.
+
+---
+
+## §11. Стартовый промпт для новой сессии (женские риски препаратов + «Анализы»)
+
+> Скопировать агенту в новую сессию (контекст — §10 этого файла + §16 `FEMALE_AAS_PROTOCOLS.md`).
+
+```
+Проект: D:\BodyBuildHealth. Выполни «Фазу 2 женского слоя» из docs/SUPPORT-CALC-FULL-AUDIT-PLAN.md (§10):
+
+P1 — риски по препаратам (фармакология), адаптировать под женщин:
+1) Ж1: RiskScreen карточка «Пороги и препараты (ААС, ГЧ, инсулин)» (RiskScreen.tsx:773-814) и таблица RiskOverview.tsx:273-281 — при sex=female показывать женские пороги из ЕДИНОГО источника FEMALE_AAS_PROFILES/assessFemaleAas (engines/female-aas-risk.ts:31/92): yellow/red мг/нед, androgenIndex, «⛔ абсолютное противопоказание», дозо-индекс вирилизации; мужской путь 1-в-1; бейдж «♀ (1/4–1/10 мужских)» + ссылка на таб «Женщины и ААС»;
+2) Ж2: женские дозовые тиры в контурах — getDrugThreshold(id, sex) поверх DRUG_THRESHOLDS_V7 (risk-engine-v7-matrix.ts:144+; computeDrugContributions ~:978) и androgenicLoad (risk-engine-v7-extensions.ts:124-154), weekly-risk-dynamics; пол уже в V7RiskInput.sex/TZRiskInput.sex; мужской JSON байт-в-байт (lock-тест);
+3) Ж3: женские патологии стека — mapStackToPathologies(drugs, sex?) (engines/drug-mapper.engine.ts; вызов RiskScreen.tsx:1541-1567): вирилизация, нарушение цикла, фертильность, либидо, кости/волосы (тексты из FEMALE_AAS_PROFILES, без новых чисел); без sex — как раньше;
+4) Ж4: lab-pharma рекомендации (engines/lab-pharma-correlation.engine.ts:123-168) — женские пороги: HCT 48/52, TT>6=вирилизация, PRL женский, E2 по фазе с оговоркой;
+5) Ж5: честные подписи/кросс-ссылки; алерты не дублировать (правило Д3 из §7).
+
+P2 — вкладка «Анализы»: отображение и индикация под женщин:
+6) Л8: единый getLabNorm(code, sex) поверх LAB_REFERENCES_FEMALE (risk-engine-v7-matrix, уже есть) + FEMALE_LAB_GROUPS → LabsCatalog.tsx:76-84 (женские min/max + «♀»), LabsScreen.tsx:443-444/1127-1128 (статусы), role-view.engine.ts:21-22 (заменить симметричный HCT ×0.85 на женские границы 36–48, Hb 120–150, RBC 4.0–5.2, АЛТ/АСТ/ГГТ ULN 31, креатинин ≤97, ферритин ≤200);
+7) Л9: легенда «♀ пороги по полу» + бейдж у строк; нейтральные описания AMH/INHB/PSA/DHEA_S;
+8) Л10: femaleNote-строка в LabsOverview/LabDiaryTab/ExtendedLabsTab/LabsResults;
+9) Л11: clinical-pathology-db женский ec50 для гемато (или сепаратор) — осторожно, движок общий.
+
+Правила проекта (обязательны): только Edit/Write + vitest/tsc; НЕ трогать чужие файлы; коммиты строго `git commit -m "…" -- <свои файлы>` (pathspec); после любых скриптов перечитывать файл перед Edit; НЕ использовать PowerShell для правок файлов; чекаут запрещён; каждый пункт — с тестом; мужской путь без sex — байт-в-байт (JSON-lock + UI «♀ скрыто при male»); финал: support/risk+labs-круг + `tsc --noEmit` (NODE_OPTIONS=12GB) + `verify:apk-design`; пуш — только когда очередь origin/main..HEAD состоит ТОЛЬКО из своих коммитов.
+
+Напоминание (сделано, не дублировать): женские пороги risk-verification (`7ffd3e93`), v7-LAB_REFERENCES женские (`b6f826cf`), TZ женские floors/m_i (§16.3, `2f02892c`), K-карточки femaleNote, спиронолактон/дозы/фертильность (§6.4, `7ffd3e93`).
+```
