@@ -101,7 +101,7 @@
 
 ---
 
-## §5. Выполнение (13 сен 2026, 7 этапных коммитов + 1 фикс, без пуша)
+## §5. Выполнение (13–14 сен 2026, 8 этапных коммитов + 1 фикс, без пуша)
 
 Только Edit/Write + vitest/tsc; чужие файлы не тронуты (коммиты строго pathspec своих; shared `planner-bridge.ts` НЕ правлен — мост едет существующими полями `groups/diagnosticWeakSide/barPath/combat*/specBlock`).
 
@@ -113,4 +113,5 @@
 - **P8 (`abafa249`)**: NEW `combat-strike-school` (6 ударов: стойка/цепь/ошибки/чекпоинты/дриллы + подсобка только из реального `CB_EX_META`-пула + `schoolDrillFor`) + блок «Как поставить удар» в табе ударов + тест 3/3 (итого своих **40/40**) + UI 4/4. Поймано: `getByText(/Назначение:/)` ×6 — переведено на `getAllByText`.
 - **Фикс (`93638089`)**: `vMaxCm → vMaxMs` (поймал `tsc`; свой тест bad_data-ветку покрывал, но поле не ловил).
 - **Монтаж (`997a4fea`)**: таб `combat_diagnostics` по прецеденту Armlifting (union + label + ZONES.tabs + категория + алиас + CALC_TABS + effectiveTab + mount с InfoErrorBoundary + карточка дашборда) + NEW nav-тест 2/2. Поймано: ассерт `toContain('Единоборств')` vs подпись `единоборств` — чинил тест. Общие файлы до правок были чисты, дифф — только свои ханки (проверено `git diff -U0`).
-- **Проверено**: свои **42/42** (8 файлов) + соседи `src/engines/combat` 519/519 (32 файла) + arm-lifting-nav 2/2 + `tsc --noEmit` **0 по всему проекту** + `verify:apk-design` OK. НЕ ПУШИЛ (очередь чужих WIP в worktree).
+- **Приёмник (`bec83353`, по добру — чужой `CombatConstructor.tsx`)**: `applyWeakpointsCombat` принимает `groups` (`strike:/takedown:` → русские сводки, мусор-фильтр, кап 6) + `specBlock` (rationale ≤160 + dayMap «дни 1+3») + `barPath.text` (≤120) → сводка `cb-msg-diag[data-combat=bridge-diag]` + персист `he_combat_diag_bridge_v1` (ремаунт держит) + флеш; сборка и движки не меняются. NEW тест 3/3 (сводка/мусор/персист). Дифф — только 3 своих ханка (`+`, без `-`).
+- **Проверено**: свои **45/45** (9 файлов) + соседи `src/ui/screens/combat` 33/33 (5 файлов) + `src/engines/combat` 519/519 + arm-lifting-nav 2/2 + `tsc` 0 по своим (**1 ошибка — чужой параллельный BB-WIP `BbAutoConstructor: buildBBPlanWithDUP`, моих строк там ноль**). НЕ ПУШИЛ (очередь чужих WIP в worktree).
