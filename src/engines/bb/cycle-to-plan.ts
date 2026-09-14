@@ -6,6 +6,7 @@
  */
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection, SRLevel, SRPeriod } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
+import type { BBPhase } from './bb-types';
 import { getBBVolumeLandmarks, isWeak, WEAK_TO_MUSCLE, abDominantPattern, normalizeWeekMrv } from './bb-builder.engine';
 import { syncBBPlanSetShape } from './bb-validator.engine';
 import { aggregateBBVolume, perExerciseCap } from './bb-volume.engine';
@@ -2334,7 +2335,15 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       rationale.push(`🔋 Разгрузка нед ${weekNum}: объём -50%, RIR +1, вес -15%`);
     }
 
-    weeks.push({ week: weekNum, sessions });
+    // 3.8 (аудит BB-AUTO-EXHAUSTIVE): фаза/делод недели переносятся из источника.
+    // Раньше program-путь терял их (weeks[].phase = ''), а applyPostPhaseProcessing
+    // вызывался только при наличии опций → faithful и «минимальный» adapt шли без фаз,
+    // а post-phase видел все недели как accumulation (делодные получали loadStrategy).
+    const srcPhase = String(pw.phase || '').toLowerCase();
+    const normPhase: BBPhase = srcPhase === 'deload' || isDeload ? 'deload'
+      : srcPhase === 'peaking' || srcPhase === 'peak' ? 'peaking'
+        : srcPhase === 'intensification' ? 'intensification' : 'accumulation';
+    weeks.push({ week: weekNum, phase: normPhase, ...(isDeload ? { deload: true } : {}), sessions });
   }
 
   // Compute rotationMuscleVolume from week 1

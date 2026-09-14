@@ -66,9 +66,9 @@ export const MethodologyEncyclopedia: React.FC = () => {
     <div className="train-methodology" style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', padding: 12, margin: '6px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 4px' }}>
         <span style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>🧠 Энциклопедия методик</span>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>карточки-кнопки · человеческие пояснения · без калькулятора</span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>карточки-кнопки · только ручной редактор ББ-программы · без калькулятора</span>
       </div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.60)', lineHeight: 1.4, marginBottom: 8 }}>Нажмите категорию-карточку ниже — увидите методики с подсказками «как применить руками». BB-фичи (дроп-сеты, фидеры, DUP) — как карточки-советы, не как расчёты.</div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.60)', lineHeight: 1.4, marginBottom: 8 }}>Нажмите категорию-карточку ниже — увидите методики с подсказками «как применить руками». «Применить» работает в ручном редакторе ББ-программы: если методика совпадает со стратегией прогрессии (линейная / двойная / волновая / RPE) — меняет стратегию; иначе это карточка-подсказка (план не меняется). BB-фичи (дроп-сеты, фидеры, DUP) — как карточки-советы, не как расчёты.</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8, marginBottom: 10 }}>
         {CAT.map(c => {
           const on = cat === c.id;

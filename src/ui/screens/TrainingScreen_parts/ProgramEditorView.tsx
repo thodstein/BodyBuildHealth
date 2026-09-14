@@ -954,7 +954,7 @@ return (
       {isPro && editorLibOpen === 'methods' && (
         <TrainingModal title="📚 Справочник методик" onClose={() => setEditorLibOpen(null)} wide>
           <div style={{ fontSize: 11, color: DIM, marginBottom: 8 }}>
-            Энциклопедия тренировочных методик по категориям. Клик «Применить» → отправляет методику в planning-bridge (loadStrategy/intensityTechniques). Двойной клик по карточке разворачивает детали.
+            Энциклопедия тренировочных методик по категориям. «Применить» → в ручном редакторе ББ-программы: если методика совпадает со стратегией прогрессии (линейная / двойная / волновая / RPE) — меняет её; иначе это карточка-подсказка (план не меняется). Клик по карточке разворачивает детали.
           </div>
           <MethodologyEncyclopedia />
         </TrainingModal>

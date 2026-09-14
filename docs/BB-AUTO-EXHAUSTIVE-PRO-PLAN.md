@@ -455,10 +455,27 @@
   - Проверено: bb **2328/2329** (единственное — пред-существующее чужое female-symmetry),
     `tsc --noEmit` **0 по проекту**, `verify:apk-design` OK; NEW `bb-wave3-schemes` 9/9,
     `bb-wave3-hooks` 7/7.
-- [ ] Волна 3 (UI-остаток): 3.6 MethodologyEncyclopedia (мёртвый импорт/kind 'methodology'),
-  3.8 библиотека (`bbSource='cycle'`, аудит 39 BB-циклов), 3.9–3.11 хаб (payload↔потребитель 1:1,
-  modifyTempo/ROM/Execution по `targetExId`, единый парсинг storage) — **требует новой сессии**
-  (хаб/конструктор + параллельные агенты).
+- [~] **Волна 3 — UI-часть 1 (3.6 + 3.7-UI + 3.8)** — коммит этого раунда:
+  - **3.6 MethodologyEncyclopedia**: мёртвый импорт в `TrainingScreen.tsx` убран; `methodologyHandler`
+    больше не пишет мусор в `loadStrategy` (название карточки ≠ стратегия прогрессии): точные
+    значения канона (`linear/double_progression/wave/rpe_based`) применяются, иначе честный тост
+    «карточка-подсказка»; без ББ-программы (ПЛ/гибрид) — честная подпись «только ручной редактор ББ»
+    вместо тихого no-op. Копирайт энциклопедии и модаля редактора приведён к факту.
+  - **3.7-UI DUP**: `recommendDUPMode` подключён к селектору `dupMode` чипом «💡 Рекомендуем: …»
+    (клик применяет; авто-применения нет). NEW `bb-dup-recommend` 2/2.
+  - **3.8 библиотека BB-циклов**: аудит реального UI-пути (`cycleTemplateToFullProgram` →
+    `programToBBPlan`, adapt+faithful) по всем 38 циклам — NEW `bb-cycle-library` 5/5.
+    **Пойман и починен P0**: `programToBBPlan` терял `week.phase` (`weeks.push` без phase) —
+    faithful и «минимальный» adapt шли вообще без фаз, а post-phase видел все недели как
+    accumulation (делодные получали loadStrategy). Фаза/делод теперь переносятся из источника.
+  - Отклонено осознанно: отдельные «фильтры» селектора ПРОФ-цикла — `PopupSelect` уже даёт поиск,
+    а карточка цикла показывает уровень/фокус/делоды/RIR/фазы/описание (превью есть).
+  - Проверено: bb-круг **2333/2334** (единственное — пред-существующее чужое `bb-diagnostics-max-pro`
+    female-symmetry), `tsc --noEmit` **0 по проекту**, `verify:apk-design` OK; `planner-bridge-handlers`
+    33/33, целевые program-пути 247/247.
+- [ ] Волна 3 (UI-остаток): 3.9–3.11 хаб (payload↔потребитель 1:1, modifyTempo/ROM/Execution по
+  `targetExId`, единый парсинг storage) — **требует новой сессии** (хаб + параллельные агенты).
 - [ ] Волна 4 — UI/quality/валидатор
 - [ ] Волна 5 — каталог/данные
+
 

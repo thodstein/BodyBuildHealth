@@ -525,11 +525,25 @@ const peakHandler: Handler = (payload, { program: p, update, showToast }) => {
   showToast('🔗 Пиковая неделя: ' + payload.label);
 };
 
+/** Методики энциклопедии применимы ТОЛЬКО к ручному редактору ББ-программы (kind 'methodology'). */
+const VALID_LOAD_STRATEGIES = new Set(['double_progression', 'linear', 'wave', 'rpe_based']);
 const methodologyHandler: Handler = (payload, { program: p, update, showToast }) => {
-  if (!p.bb) return;
-  const prog = { ...(p.bb.progression ?? { loadStrategy: 'double_progression' as const, deloadProtocol: 'pump', intensityTechniques: ['none'] }), loadStrategy: String(payload.data.methodName ?? 'double_progression') as import('../../../engines/user-program/user-program.types').LoadStrategy };
+  // 3.6 (план BB-AUTO-EXHAUSTIVE): без ББ-программы (ПЛ/гибрид/авто) — честная подпись,
+  // а не тихий no-op. Методика из энциклопедии — «только ручной редактор ББ».
+  if (!p.bb) {
+    showToast('📚 Методика — только для ручного редактора ББ-программы: план не изменён (' + payload.label + ')');
+    return;
+  }
+  const methodName = String(payload.data?.methodName ?? '');
+  // Название карточки-методики (напр. «Gironda 8×8») — это подсказка, а не стратегия
+  // прогрессии. Пишем loadStrategy только при точном совпадении с каноном.
+  if (!VALID_LOAD_STRATEGIES.has(methodName)) {
+    showToast('📚 Карточка-подсказка (стратегия прогрессии не менялась): ' + payload.label);
+    return;
+  }
+  const prog = { ...(p.bb.progression ?? { loadStrategy: 'double_progression' as const, deloadProtocol: 'pump', intensityTechniques: ['none'] }), loadStrategy: methodName as import('../../../engines/user-program/user-program.types').LoadStrategy };
   update({ bb: { ...p.bb, progression: prog } });
-  showToast('🔗 Методика: ' + payload.label);
+  showToast('🔗 Методика прогрессии: ' + payload.label);
 };
 
 const programHandler: Handler = (payload, { onChange, showToast }) => {

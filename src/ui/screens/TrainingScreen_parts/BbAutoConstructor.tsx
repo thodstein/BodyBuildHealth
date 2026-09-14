@@ -22,7 +22,7 @@ import { rankBBSplits, getMuscleFrequencies, type BBRankedPattern } from '../../
 import { buildBBPlan, buildWarmup, applyMacrocycleToBBPlan, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
 import { collectPlanExercises, recalibratePlanWeights, autoCalibrateFromStored, groupWeightEntries, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
-import { applyDUPOverlay } from '../../../engines/bb/bb-dup.engine';
+import { applyDUPOverlay, recommendDUPMode } from '../../../engines/bb/bb-dup.engine';
 import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
 import { isPackingActive } from '../../../engines/bb/bb-packing.engine';
 import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../../../engines/bb/bb-finalize.engine';
@@ -615,6 +615,24 @@ export const BbAutoConstructor: React.FC = () => {
   const [volumeScheme, setVolumeScheme] = useState<'standard' | 'gvt' | 'fst7' | 'gironda'>('standard');
   const [pedPhaseOverride, setPedPhaseOverride] = useState<'auto' | 'proliferation' | 'differentiation'>('auto');
   const [dcMode, setDcMode] = useState<boolean>(false);
+
+  // 3.7-UI (план BB-AUTO-EXHAUSTIVE): рекомендация DUP по цели/уровню/дням —
+  // показываем чипом, БЕЗ авто-применения (пользователь решает сам).
+  const dupRecommendation = useMemo(
+    () => recommendDUPMode(bbGoal, bbLevel === 'enhanced' ? 'advanced' : bbLevel, bbDays),
+    [bbGoal, bbLevel, bbDays],
+  );
+  const dupRecommendChip = (dupRecommendation.mode !== 'none' && dupMode !== dupRecommendation.mode) ? (
+    <button
+      onClick={() => setDupMode(dupRecommendation.mode)}
+      title="Рекомендация по цели, уровню и дням — нажмите, чтобы применить"
+      style={{
+        marginTop: 4, padding: '5px 9px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 30,
+        background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.35)', color: '#22d3ee',
+      }}>
+      💡 Рекомендуем: {dupRecommendation.mode === 'full_dup' ? 'Полный DUP (3 дня)' : dupRecommendation.mode === 'strength_hypertrophy' ? 'Сила/гипертрофия (2 дня)' : 'Тяж/лёг (2 дня)'}
+    </button>
+  ) : null;
 
   // P-ext: calorieSurplus (ккал/день) и eccentricMult (1.0=норма, 1.1-1.2=eccentric overload).
   // calorieSurplus: из профиля nutrition (если есть) или manual input. Нет в профиле → 0 (нейтрально).
@@ -3504,6 +3522,7 @@ export const BbAutoConstructor: React.FC = () => {
                         { id: 'full_dup', label: 'Полный DUP (3 дня)', desc:'Сила/гипер/выносл.' },
                       ]}
                     />
+                    {dupRecommendChip}
                     {dupMode !== 'none' && (
                       <div style={{ marginTop:6 }}>
                         <div style={{ fontSize:9, fontWeight:700, color:'#22d3ee', marginBottom:4 }}>🎯 Per-muscle DUP (пусто = ко всем primary):</div>
@@ -3840,6 +3859,7 @@ export const BbAutoConstructor: React.FC = () => {
               { id: 'full_dup', label: 'Полный DUP (3 дня)', desc:'Три стимула: сила / гипертрофия / выносливость. Максимум вариативности, нужен опыт ≥2 года.' },
             ]}
           />
+          {dupRecommendChip}
           <PopupSelect
             label='🔗 Суперсеты'
             value={supersetMode}
