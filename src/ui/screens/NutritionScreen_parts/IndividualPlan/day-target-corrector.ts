@@ -1058,11 +1058,22 @@ export function correctDayToTargets(
           })()
         : _candIterRaw0;
       // P1a-fix2: крем-субкап держим и в least-used фолбэке (иначе 3-й крем оттуда).
-      const _candIter = _creamUses() >= creamMealCap(hv, _tsCap)
+      let _candIter: FoodItem[] = _creamUses() >= creamMealCap(hv, _tsCap)
         ? (_candIterRaw.filter(c => eff !== 'c' || !isCreamId(c.id)).length > 0
             ? _candIterRaw.filter(c => eff !== 'c' || !isCreamId(c.id))
             : _candIterRaw)
         : _candIterRaw;
+      // FIX P0-vedro: least-used фолбэк обходил и протеиновый гейт (пряники 50 г
+      // в полный обед при переборе белка). При белке дня ≥ цели — только lean (Б<5).
+      // Нечего класть — break ниже по пустым _candIter (гэп честнее перебора).
+      if (eff === 'c') {
+        try {
+          if ((sumTotals(meals).p || 0) >= (safeTargets.p || 0)) {
+            const _leanOnly = _candIter.filter(c => (c.protein || 0) < 5);
+            if (_leanOnly.length > 0) _candIter = _leanOnly;
+          }
+        } catch { /* totals недоступны — legacy-путь */ }
+      }
       for (const cand of _candIter) {
         if (_deadBest.has(eff + ':' + cand.id)) continue;
         if (isProteinPowderId(cand.id)) {
@@ -1100,6 +1111,10 @@ export function correctDayToTargets(
       };
       let grams = Math.max(20, Math.min(200, Math.round(need / per100Best * 100 / 10) * 10));
       if (COMFORT_CAP[best.id] !== undefined) grams = Math.min(grams, COMFORT_CAP[best.id]);
+      // FIX P0-vedro: десертная четвёрка (_dsrtOkC: пряники/джем/мёд/финики) — гарнир-приправа,
+      // а не закрыватель гэпов: вне HV кап 30 г (пряники 50 г к рису в обед — «свалка»).
+      // На HV legacy-капы (там сладости — легитимные закрыватели недоборов).
+      if (!hv && ['pryaniki', 'jam', 'honey', 'dates'].includes(best.id)) grams = Math.min(grams, 30);
       // Сухие плотные крупы (крем риса 82У, хлопья 80У, oats_dry 60У) — потолок 150 г
       // за добавку, ТОЛЬКО HV: иначе корректор растит «крем 250 г» поверх primary 150 г
       // (ведро 400 г). На обычных днях — legacy 200 (иначе 3-приёмные дни не сходятся).
@@ -1226,9 +1241,15 @@ export function correctDayToTargets(
       }
       let targetMeal: CorrectorMeal | undefined;
       if (_pickFrom.length > 0) {
-        targetMeal = _pickFrom.reduce((a, b) => {
-          const aShare = a.totals ? a.totals.kcal / Math.max(1, (a as any).target ? ((a as any).target.p * 4 + (a as any).target.c * 4 + (a as any).target.f * 9) : 500) : 0;
-          const bShare = b.totals ? b.totals.kcal / Math.max(1, (b as any).target ? ((b as any).target.p * 4 + (b as any).target.c * 4 + (b as any).target.f * 9) : 500) : 0;
+        // FIX P0-vedro: топап — в НЕДОЛИТЫЙ приём (<100% своей ккал-цели); в полный обед
+        // не льём, пока есть недолитые альтернативы (было: батат 330 в полный обед при
+        // пустом полднике). Фолбэк на всех — сходимость важнее (как _lightFree выше).
+        const _shareOf = (m: any) => m.totals ? m.totals.kcal / Math.max(1, (m as any).target ? ((m as any).target.p * 4 + (m as any).target.c * 4 + (m as any).target.f * 9) : 500) : 0;
+        const _underfilled = _pickFrom.filter(m => _shareOf(m) < 1);
+        const _pool = _underfilled.length > 0 ? _underfilled : _pickFrom;
+        targetMeal = _pool.reduce((a, b) => {
+          const aShare = _shareOf(a);
+          const bShare = _shareOf(b);
           return aShare <= bShare ? a : b;
         });
       }
@@ -1237,9 +1258,12 @@ export function correctDayToTargets(
       if (targetMeal && _needPortM(targetMeal) && best && !isPortableFood(best as any)) {
         const _nonWork = _freeMeals.filter(m => !_needPortM(m));
         if (_nonWork.length > 0) {
-          targetMeal = _nonWork.reduce((a, b) => {
-            const aShare = a.totals ? a.totals.kcal / Math.max(1, (a as any).target ? ((a as any).target.p * 4 + (a as any).target.c * 4 + (a as any).target.f * 9) : 500) : 0;
-            const bShare = b.totals ? b.totals.kcal / Math.max(1, (b as any).target ? ((b as any).target.p * 4 + (b as any).target.c * 4 + (b as any).target.f * 9) : 500) : 0;
+          // FIX P0-vedro: и здесь — сначала недолитые (<100%), иначе полный обед.
+          const _shareOf2 = (m: any) => m.totals ? m.totals.kcal / Math.max(1, (m as any).target ? ((m as any).target.p * 4 + (m as any).target.c * 4 + (m as any).target.f * 9) : 500) : 0;
+          const _under2 = _nonWork.filter(m => _shareOf2(m) < 1);
+          targetMeal = (_under2.length > 0 ? _under2 : _nonWork).reduce((a, b) => {
+            const aShare = _shareOf2(a);
+            const bShare = _shareOf2(b);
             return aShare <= bShare ? a : b;
           });
         } else {
