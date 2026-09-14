@@ -1,6 +1,8 @@
 /**
  * bb-tempo-rest.ts — темп, TUT, интервалы отдыха по характеру дня (Этап BB12, NEW).
  */
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+
 export type DayCharacter = 'тяж' | 'памп' | 'лёг';
 
 export interface TempoSpec { eccentric: number; pause: number; concentric: number; notation: string; tutPerRep: number; }
@@ -76,29 +78,45 @@ export function exerciseTempoOverride(name: string): string | undefined {
   return undefined;
 }
 
+/* ── Волна-1.9: паузы каталога (pauseSeconds, 109 записей) ──
+ * Каталог хранит не только темп-паттерн, но и ПРЕДПИСАННУЮ паузу и её позицию:
+ * stretchPhase → пауза в растянутой позиции (2-я цифра нотации),
+ * peakContraction → пауза в укороченной (4-я цифра, пиковое сокращение).
+ * Раньше pauseSeconds не влиял на темп вообще (только диагностика хаба). */
+interface CatalogTempoHint { pauseSeconds: number; stretchPhase: boolean; peakContraction: boolean }
+let _catalogTempoHints: Map<string, CatalogTempoHint> | null = null;
+
+/** Подсказка каталога по имени упражнения (ленивая карта, ~590 записей). */
+export function catalogTempoHints(name: string): CatalogTempoHint | undefined {
+  if (!_catalogTempoHints) {
+    _catalogTempoHints = new Map();
+    for (const ex of EXERCISE_CATALOG as any[]) {
+      const n = String(ex?.name || '').toLowerCase().trim();
+      if (!n || _catalogTempoHints.has(n)) continue;
+      _catalogTempoHints.set(n, {
+        pauseSeconds: Number(ex?.pauseSeconds || 0),
+        stretchPhase: !!ex?.stretchPhase,
+        peakContraction: !!ex?.peakContraction,
+      });
+    }
+  }
+  return _catalogTempoHints.get((name || '').toLowerCase().trim());
+}
+
 /** Темп под характер + опционально phase (ACSM 2023: eccentric 2-4с) + интенс-технику. */
 export function tempoFor(character: DayCharacter, technique?: string, phase?: string, exerciseName?: string): TempoSpec {
   const base = { ...TEMPO_BY_CHARACTER[character] };
+  let notation: string | null = null;
   // Deload-фаза доминирует над per-exercise override (восстановление важнее
   // специфики) — override в deload НЕ применяем, темп придёт из фазовой карты.
   // Аудит 2026-09: здесь была пустая ветка-заглушка (только комментарий).
   if (phase !== 'deload' && exerciseName) {
     const override = exerciseTempoOverride(exerciseName);
-    if (override) {
-      const parts = override.split('-').map(Number);
-      if (parts.length === 4 && parts.every(p => !isNaN(p))) {
-        base.eccentric = parts[0];
-        base.pause = parts[1];
-        base.concentric = parts[2];
-        base.notation = override;
-        base.tutPerRep = base.eccentric + base.pause + base.concentric + parts[3];
-        return base;
-      }
-    }
+    if (override) notation = override;
   }
   // Phase-based eccentric emphasis (ACSM 2023: accumulation 3с, peaking 2с, deload 4с — восстановление)
   // Аудит 2026-09: фактический deload-темп = 4-1-1-0 (комментарий раньше врал про 4-2-2-0).
-  if (phase) {
+  if (!notation && phase) {
     const phaseTempo: Record<string, string> = {
       accumulation: '3-1-1-0',
       intensification: '2-1-1-0',
@@ -106,15 +124,30 @@ export function tempoFor(character: DayCharacter, technique?: string, phase?: st
       deload: '4-1-1-0',
     };
     const pt = phaseTempo[phase];
-    if (pt) {
-      const parts = pt.split('-').map(Number);
+    if (pt) notation = pt;
+  }
+  // Волна-1.9: длинная пауза каталога (≥2с) садится в свою позицию нотации.
+  // Только вне deload и без интенс-техник (негативы/слоу сами диктуют темп).
+  if (notation && exerciseName && phase !== 'deload'
+    && technique !== 'slow_eccentric' && technique !== 'negatives') {
+    const hint = catalogTempoHints(exerciseName);
+    if (hint && hint.pauseSeconds >= 2) {
+      const parts = notation.split('-').map(Number);
       if (parts.length === 4 && parts.every(p => !isNaN(p))) {
-        base.eccentric = parts[0];
-        base.pause = parts[1];
-        base.concentric = parts[2];
-        base.notation = pt;
-        base.tutPerRep = parts[0] + parts[1] + parts[2] + parts[3];
+        if (hint.stretchPhase) parts[1] = Math.max(parts[1], Math.min(3, hint.pauseSeconds));
+        else if (hint.peakContraction) parts[3] = Math.max(parts[3], Math.min(2, hint.pauseSeconds));
+        notation = parts.join('-');
       }
+    }
+  }
+  if (notation) {
+    const parts = notation.split('-').map(Number);
+    if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+      base.eccentric = parts[0];
+      base.pause = parts[1];
+      base.concentric = parts[2];
+      base.notation = notation;
+      base.tutPerRep = parts[0] + parts[1] + parts[2] + parts[3];
     }
   }
   if (technique === 'slow_eccentric' || technique === 'negatives') {

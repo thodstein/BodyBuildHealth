@@ -162,11 +162,19 @@ function findDeloadSwap(exName: string): string | null {
   return null;
 }
 
-export function applyDeloadToWeek(week: BBWeek, protocol: DeloadProtocol): BBWeek {
+/**
+ * Делоад недели. Волна-1.10 (Delphi Bell/Rogerson 2023/24): упражнения
+ * СОХРАНЯЮТСЯ на разгрузке — снижаются объём/интенсивность/RIR, частота и
+ * выбор движений те же (моторный паттерн не меняется, техника не деградирует).
+ * Свап на лёгкие варианты (DELOAD_SWAP_MAP) — только явный opt-in
+ * `{ swapExercises: true }` (например, при суставных ограничениях/травмах).
+ */
+export function applyDeloadToWeek(week: BBWeek, protocol: DeloadProtocol, opts?: { swapExercises?: boolean }): BBWeek {
+  const swapExercises = opts?.swapExercises === true;
   const w2 = JSON.parse(JSON.stringify(week)) as BBWeek;
   for (const s of w2.sessions) {
     for (const e of s.exercises) {
-      const swapName = findDeloadSwap(e.exerciseName || e.name || '');
+      const swapName = swapExercises ? findDeloadSwap(e.exerciseName || e.name || '') : null;
       if (swapName) {
         const swapEx = (EXERCISE_CATALOG as any).find((ex: any) =>
           (ex.name || '').toLowerCase().includes(swapName.toLowerCase()) ||
@@ -397,6 +405,10 @@ function applyIntensityTechniqueToExercise(
       break;
     }
   }
+  // Волна-1.7 (темп-конвейер): техника меняет workSets[].tempo — синхронизируем
+  // tempoSpec, иначе карточки/печать показывают старый темп (расхождение каналов).
+  const firstTempo = e.workSets[0]?.tempo;
+  if (firstTempo) (e as any).tempoSpec = firstTempo;
 }
 
 /* ──────────── Feeder sets ──────────── */

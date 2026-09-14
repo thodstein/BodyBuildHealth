@@ -27,13 +27,23 @@ function makeWeek(): BBWeek {
 }
 
 describe('BB critical regressions', () => {
-  it('reduces sets and keeps set shape when deload swaps an exercise', () => {
-    const result = applyDeloadToWeek(makeWeek(), DELOAD_PROTOCOLS.pump);
+  it('reduces sets and keeps set shape when deload swap is explicitly opted in', () => {
+    const result = applyDeloadToWeek(makeWeek(), DELOAD_PROTOCOLS.pump, { swapExercises: true });
     const exercise = result.sessions[0].exercises[0];
     expect(exercise.name).not.toBe('Жим штанги лёжа');
     expect(exercise.sets).toBe(2);
     expect(exercise.workSets).toHaveLength(2);
     expect(exercise.workSets.every(set => set.rir === 4)).toBe(true);
+  });
+
+  it('Волна-1.10 (Delphi): по умолчанию разгрузка СОХРАНЯЕТ упражнения', () => {
+    const result = applyDeloadToWeek(makeWeek(), DELOAD_PROTOCOLS.pump);
+    const exercise = result.sessions[0].exercises[0];
+    expect(exercise.name).toBe('Жим штанги лёжа');
+    expect(exercise.sets).toBe(2);
+    expect(exercise.workSets).toHaveLength(2);
+    expect(exercise.workSets.every(set => set.rir === 4)).toBe(true);
+    expect(exercise.workSets.every(set => set.weight === 55)).toBe(true); // ×0.55 pump
   });
 
   it('reduces non-swapped exercises and keeps workSets synchronized', () => {

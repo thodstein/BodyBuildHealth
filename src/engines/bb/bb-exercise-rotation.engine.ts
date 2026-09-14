@@ -30,6 +30,36 @@ export interface RotationRecommendation {
 const COOLDOWN_WEEKS = 4;
 const MAX_REPEATS_PER_MESO = 3;
 
+/* ── Волна-1.4: cooldown-окно как enforced-состояние генерации ──
+ * История «мышца → упражнение → {последняя неделя, счётчик}». Из неё строится
+ * список заблокированных имён: та же неделя (внутринедельная ротация),
+ * gap 1..3 недель (4-недельное окно тишины) и исчерпанный лимит повторов
+ * (max 3 за мезоцикл). Семантика совпадает с canUseExercise, но состояние
+ * пригодно для инкрементальной генерации плана. */
+export interface CooldownUseRecord { lastWeek: number; count: number }
+export type CooldownHistory = Map<string, Map<string, CooldownUseRecord>>;
+
+export function cooldownBlockedNames(history: CooldownHistory, muscle: string, week: number): string[] {
+  const map = history.get(muscle);
+  if (!map || map.size === 0) return [];
+  const out: string[] = [];
+  for (const [name, rec] of map) {
+    const gap = week - rec.lastWeek;
+    // Та же неделя = упражнение уже взято в предыдущей сессии недели.
+    if (rec.lastWeek === week || (gap > 0 && gap < COOLDOWN_WEEKS) || rec.count >= MAX_REPEATS_PER_MESO) out.push(name);
+  }
+  return out;
+}
+
+export function recordCooldownUse(history: CooldownHistory, muscle: string, name: string, week: number): void {
+  if (!name) return;
+  if (!history.has(muscle)) history.set(muscle, new Map());
+  const map = history.get(muscle)!;
+  const rec = map.get(name);
+  if (rec && rec.lastWeek === week) return; // неделя уже учтена
+  map.set(name, { lastWeek: week, count: (rec ? rec.count : 0) + 1 });
+}
+
 /**
  * Извлечь историю упражнений из плана (для анализа ротации).
  */

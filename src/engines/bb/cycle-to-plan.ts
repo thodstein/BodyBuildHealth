@@ -1259,6 +1259,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     const isDeload = effDeloadWeeks.includes(w);
     if (isDeload) {
       const protocol = DELOAD_PROTOCOLS[deloadType || 'pump'];
+      // Волна-1.10 (Delphi Bell/Rogerson 2023/24): упражнения на разгрузке
+      // СОХРАНЯЮТСЯ — меняются объём/интенсивность/RIR, а не моторный паттерн.
       const deloadWeek = applyDeloadToWeek({ week: w, sessions }, protocol);
       sessions.splice(0, sessions.length, ...deloadWeek.sessions);
       rationale.push(`🔋 Разгрузка нед ${w}: ${protocol.description} — ${protocol.instructions}`);

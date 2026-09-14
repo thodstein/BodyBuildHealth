@@ -988,6 +988,26 @@ export function applyPrepVolumeCascade(
     });
   }
 
+  // Инвариант sets === workSets.length (как syncBBPlanSetShape). Каскад считает
+  // baseSets от `_baseSets` (сила до prep-модуляции), а минимальная мышца могла
+  // быть урезана позже → slice-only давал sets > workSets (дрейф, невидимый UI).
+  // Добор — копией последнего сета; обрезка — slice.
+  for (const wk of weeks) {
+    for (const s of (wk.sessions || [])) {
+      for (const e of (s.exercises || [])) {
+        const target = Math.max(0, Number(e.sets) || 0);
+        const ws = Array.isArray(e.workSets) ? e.workSets : [];
+        if (ws.length === target) continue;
+        if (ws.length > target) {
+          e.workSets = ws.slice(0, target);
+        } else {
+          const template = ws[ws.length - 1] || { reps: (e as any).repsRange?.[0] || 8, rir: e.rir ?? 2, weight: 0 };
+          e.workSets = [...ws, ...Array.from({ length: target - ws.length }, () => ({ ...template }))];
+        }
+      }
+    }
+  }
+
   return { ...plan, weeks } as BBPlanWithPrep;
 }
 

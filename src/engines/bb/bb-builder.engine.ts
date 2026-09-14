@@ -27,7 +27,7 @@ import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { selectExercisesSmart, isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern';
-import { findPatternAlternative } from './bb-exercise-rotation.engine';
+import { findPatternAlternative, cooldownBlockedNames as cooldownBlockedForMuscle, recordCooldownUse, type CooldownHistory } from './bb-exercise-rotation.engine';
 import { S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
 import { adaptForPEDs, computeAASEquivDose } from './bb-ped-adaptation.engine';
@@ -1658,6 +1658,8 @@ export interface BuildSessionParams {
   packingV2?: boolean;
   /** PPL-паттерн (мандаты ensurePPL*: packing не сбрасывает мандатные). */
   isPPL?: boolean;
+  /** Волна-1.4: accessory-имена в cooldown-окне (жёсткий фильтр пула при наличии альтернатив). */
+  cooldownNames?: string[];
 }
 
 function buildSession(
@@ -1713,6 +1715,7 @@ function buildSession(
   abSibIndex: number = 0,
   packingV2: boolean = false,
   isPPL: boolean = false,
+  cooldownNames: string[] = [],
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -2069,6 +2072,14 @@ function buildSession(
         const tier12 = pool.filter(e => bbExerciseTier(e) <= 2);
         if (tier12.length >= exerciseCount) pool = tier12;
       }
+    }
+    // Волна-1.4: cooldown-фильтр пула ДО всех проходов отбора (первый слой,
+    // P9-фолбэки и «добор»). Применяется только если альтернатив достаточно
+    // (≥ count) — иначе лучше повтор, чем пустая сессия (pool-исчерпание).
+    // Primary не трогаем: база стабильна по фазе (контракт bb-rotation).
+    if (cooldownNames.length > 0 && role === 'accessory') {
+      const fresh = pool.filter(e => !cooldownNames.includes(e.name));
+      if (fresh.length >= Math.max(2, exerciseCount)) pool = fresh;
     }
 
     // 3.1 — вынесенный слой selection: selectExercisesForMuscle (selectExercisesSmart + фиксация выбора)
@@ -2870,7 +2881,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.mobilityRestrictions, p.trainingYears, p.bodyweightCapability,
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
     p.skipStrictCoverage, p.abAvoidPatterns, p.abSibIndex ?? 0,
-    p.packingV2 ?? false, p.isPPL ?? false,
+    p.packingV2 ?? false, p.isPPL ?? false, p.cooldownNames ?? [],
   );
 }
 
@@ -3314,12 +3325,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const phaseWeekCounter: Record<string, number> = { accumulation: 0, intensification: 0, deload: 0, peaking: 0 };
 
   const weeks: BBWeek[] = [];
-  // FIX-1: Ротация упражнений — НАКАПЛИВАЕТ использованные упражнения весь план.
-  // НЕ сбрасываем каждые 4 нед — вместо этого selectExercisesSmart исключает
-  // все ранее использованные → недели получают РАЗНЫЕ упражнения (ротация).
-  // Fallback: если пул исчерпан (все исключены) — selectExercisesSmart вернёт 0,
-  // тогда buildSession очистит rotationIds для этой мышцы и пересоберёт.
-  const rotationUsedByMuscle = new Map<string, string[]>(); // muscle → [exerciseName, ...]
+  // Волна-1.4 (аудит 2026-09): cooldown-ротация ENFORCED — accessory-упражнение
+  // не берётся, пока с последнего использования прошло < 4 недель и пока оно не
+  // исчерпало 3 использования за мезоцикл (canUseExercise, bb-exercise-rotation:
+  // системная ротация паттернов полезна — Kassiano 2022/24, но случайный частый
+  // обмен вредит). Раньше список просто накапливался навсегда и никогда не
+  // «остывал»; при исчерпании пула fallback-проходы P9/добор идут без фильтра.
+  // Правила окна — в bb-exercise-rotation.engine (cooldownBlockedNames/recordCooldownUse).
+  const rotationUseByMuscle: CooldownHistory = new Map();
   const primaryBySlot = new Map<string, string>();
   const weekRotationByMuscle = new Map<string, Set<string>>(); // muscle →Set<name> внутри недели
   const prevWeekUsedByMuscle = new Map<string, Set<string>>(); // muscle →Set<name> за предыдущую неделю
@@ -3385,12 +3398,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // fix Z: sessMuscles по collapseKey (delt heads→shoulders) для mrvByMuscle-lookup
       const sessMuscles = [...new Set(musclesForTag(s.sessionTag).map(m => collapseKey(m)))];
       // Ротация: собираем ID упражнений, использованных ранее для этих мышц.
-      // rotationUsedByMuscle хранит exerciseName (имена) → конвертируем в IDs для selectExercisesSmart.
+      // cooldown-история хранит exerciseName (имена) → конвертируем в IDs для selectExercisesSmart.
       const rotationIds: string[] = [];
       const rotationNames: string[] = [];
+      // Волна-1.4: только cooldown-окно (жёсткий фильтр пула) — мягкие
+      // fresh/meso/cooldownHistory имена идут лишь в rotationNames.
+      const cooldownNames: string[] = [];
       for (const m of sessMuscles) {
-        const prevNames = rotationUsedByMuscle.get(m) || [];
+        const prevNames = cooldownBlockedForMuscle(rotationUseByMuscle, m, w);
         rotationNames.push(...prevNames);
+        for (const n of prevNames) if (!cooldownNames.includes(n)) cooldownNames.push(n);
         // Конвертировать имена в IDs через каталог
         for (const name of prevNames) {
           const cat = EXERCISE_CATALOG.find((e: any) => e.name === name);
@@ -3433,7 +3450,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // (финализатор копирует сессии поверхностно, поле переживает).
         // Без флага — undefined, legacy 1-в-1 байт-в-байт.
         const abAvoid = input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl') });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       if (abAvoid && abAvoid.length > 0) (sess as any).abAvoidPatterns = [...abAvoid];
       // A/B-ротация: фиксируем паттерны сессии для sibling-сессий того же тега.
@@ -3458,23 +3475,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // Ротация: запоминаем только accessory-упражнения для следующих недель.
       // Primary lifts are deliberately stable across the phase block; putting
       // them into the rotation blacklist made the main compound change weekly.
-      // BUG-B19: при накоплении на 12-нед плане пул упражнений исчерпывается → fallback на
-      // повтор упражнений. Сбрасываем каждые 4 недели (ротация обновляется), сохраняя свежесть.
+      // Волна-1.4: запись идёт в cooldown-историю с неделей последнего
+      // использования и счётчиком — окно тишины истекает само (strict-сброс
+      // каждые 4 недели удалён как ручная копия этого окна; strict/variety
+      // теперь используют одно точное окно, forbid пиннит accessory как раньше).
       const rotationMode = input.rotationMode || 'variety';
-      if (rotationMode === 'strict' && w > 1 && (w - 1) % 4 === 0) {
-        // Оставляем только последние 4 недели упражнений (свежая память)
-        for (const [m, arr] of rotationUsedByMuscle) {
-          if (arr.length > 8) rotationUsedByMuscle.set(m, arr.slice(-8));
-        }
-      }
       // «Запрет» (forbid): accessory-упражнения НЕ ротируются — строго те же каждую неделю.
       if (rotationMode !== 'forbid') {
         for (const ex of sess.exercises) {
           if (ex.role === 'primary') continue;
           const m = collapseKey(ex.muscle);
-          if (!rotationUsedByMuscle.has(m)) rotationUsedByMuscle.set(m, []);
-          const arr = rotationUsedByMuscle.get(m)!;
-          if (ex.exerciseName && !arr.includes(ex.exerciseName)) arr.push(ex.exerciseName);
+          const name = ex.exerciseName || ex.name || '';
+          if (!name) continue;
+          recordCooldownUse(rotationUseByMuscle, m, name, w);
         }
       }
       // fix L: фиксируем паттерны основных упражнений отстающих групп этой недели,

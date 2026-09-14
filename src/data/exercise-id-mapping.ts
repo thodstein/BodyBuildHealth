@@ -386,6 +386,7 @@ export const EXERCISE_ID_MAP: Record<string, ExerciseIdMapping> = {
   plank_v2: { bio: 'plank' },
   dead_bug_v2: { bio: 'dead_bug' },
   pallof_press_v2: { bio: 'pallof_press' },
+  pallof_press_v3: { bio: 'pallof_press' },
   decline_crunch: { bio: 'cable_crunch' },
   leg_raise: { bio: 'hanging_leg_raise' },
   leg_raise_hanging: { bio: 'hanging_leg_raise' },

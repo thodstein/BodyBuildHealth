@@ -446,7 +446,18 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     // Минимальная мышца — флор 0.25×MEV (~2-4 сета/нед), а не полный объём.
     // Аудит Sep 2026 (фазы-фикс): делод-неделя теперь корректно тоже подрезана;
     // на делоде косвенное покрытие минимально → флор-формула даёт до 4 сетов.
-    expect(Math.max(...weeklyQuads)).toBeLessThanOrEqual(4);
+    // Волна-1.4 (аудит 2026-09): cooldown-ротация сменила упражнение слота —
+    // компаунд-слот минимальной мышцы держит до per-exercise капа (5 сетов)
+    // в одной неделе; флор применяется к прямой изоляции. Инвариант
+    // sets === workSets.length теперь обеспечен в prep-конвейере (см. ниже).
+    expect(Math.max(...weeklyQuads)).toBeLessThanOrEqual(5);
+    for (const w of prepWeeks) {
+      for (const s of (w.sessions || [])) {
+        for (const e of ((s as any).exercises || [])) {
+          expect((e as any).workSets?.length ?? 0, `${(e as any).name}: sets=${(e as any).sets}, workSets=${(e as any).workSets?.length ?? 0}`).toBe((e as any).sets);
+        }
+      }
+    }
   });
 
   it('при исключении ног пустые Legs-дни убираются (нет сессии <6 сетов)', () => {
