@@ -19,7 +19,7 @@ import { savePlatformLogEntry, loadPlatformLog, planLastManStanding } from '../.
 import { platformRuleFor, PLATFORM_RULES_2026, LMS_RULES_2026 } from '../../../engines/arm/arm-pro5-platform-rules.engine';
 import { armliftClassFor, armliftClassLine } from '../../../engines/arm/armlift-weight-class.engine';
 import { applyToPlanner } from './planner-bridge';
-import { AdRoot, AdCard, AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdCta, AdStat } from './arm-design-system';
+import { AdRoot, AdCard, AdSec, AdGrid, AdChip, AdBtn, AdBanner, AdCta, AdStat } from './arm-design-system';
 import { haptics } from '../../../core/native-bridge';
 
 /** PRO-визуал: уровень → цвет точки (строки/aria 1-в-1, только подача). */
@@ -30,6 +30,24 @@ const LIFT_LEVEL_COLOR: Record<string, string> = {
   none: '#94a3b8',
 };
 const liftLevelColor = (level: string): string => LIFT_LEVEL_COLOR[level] ?? '#f59e0b';
+
+/** PRO-визуал: карточка числового замера 48px (HubNum-стиль).
+ *  Контракты 1-в-1: input с тем же aria-label/inputMode/placeholder/value/onChange. */
+function LiftNum({ label, value, onChange, placeholder, aria }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder: string; aria: string;
+}) {
+  return (
+    <div className="lift-num">
+      <span className="ad-fl">{label}</span>
+      <div className="lift-num-row">
+        <input inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={aria} />
+        {value ? (
+          <button type="button" className="lift-num-clear" aria-label="Очистить" title={`Очистить ${aria}`} onClick={() => onChange('')}>✕</button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 const STORAGE_KEY = 'he_armlifting_diag_v1';
 
@@ -322,6 +340,19 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         .train-armdiag .lift-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .train-armdiag .lift-row-main { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 2 1 160px; }
         .train-armdiag .lift-row-meta { font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .train-armdiag .lift-num { display: flex; flex-direction: column; gap: 6px; min-width: 0; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 8px; background: rgba(255,255,255,0.03); }
+        .train-armdiag .lift-num-row { display: flex; gap: 6px; align-items: center; }
+        .train-armdiag .lift-num input { flex: 1 1 auto; min-width: 0; min-height: 48px; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 0 10px; }
+        .train-armdiag .lift-num input::placeholder { color: rgba(255,255,255,0.75); }
+        .train-armdiag .lift-num-clear { min-width: 44px; min-height: 44px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #fff; font-size: 14px; }
+        .train-armdiag .lift-group { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: #fff; margin: 8px 0 0; }
+        .train-armdiag [data-arm="lift-rules-checks"] .ad-chip { min-height: 44px; }
+        .train-armdiag [data-arm="lift-rules-2026"] .ad-row { gap: 6px; align-items: baseline; }
+        .train-armdiag .lift-rule-name { font-weight: 800; color: #fff; white-space: nowrap; }
+        .train-armdiag .lift-rule-sub { font-size: 11px; }
+        .train-armdiag .lift-hist-row { display: flex; align-items: center; gap: 6px; }
+        .train-armdiag .lift-hist-bar { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.12); overflow: hidden; flex: 1 1 48px; min-width: 48px; }
+        .train-armdiag .lift-hist-bar > span { display: block; height: 100%; border-radius: 4px; background: #38bdf8; }
       `}</style>
       <AdCard>
         <div className="ad-head" data-arm="lift-head">
@@ -352,46 +383,27 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
 
       <AdCard>
         <AdSec title="🏋️ Армлифтинг — замеры снарядов" defaultOpen summary="RT · Axle · Pinch · CoC · Hub · Excalibur">
+          <div className="lift-group">✊ Основные</div>
           <AdGrid cols="auto-sm">
-            <AdField label="RT кг">
-              <input inputMode="decimal" value={state.rtKg} onChange={(e) => set({ rtKg: e.target.value })} placeholder="60" aria-label="RT кг" />
-            </AdField>
-            <AdField label="RT левая кг">
-              <input inputMode="decimal" value={state.rtL} onChange={(e) => set({ rtL: e.target.value })} placeholder="L" aria-label="RT левая кг" />
-            </AdField>
-            <AdField label="RT правая кг">
-              <input inputMode="decimal" value={state.rtR} onChange={(e) => set({ rtR: e.target.value })} placeholder="R" aria-label="RT правая кг" />
-            </AdField>
-            <AdField label="Axle кг">
-              <input inputMode="decimal" value={state.axleKg} onChange={(e) => set({ axleKg: e.target.value })} placeholder="100" aria-label="Axle кг" />
-            </AdField>
-            <AdField label="Pinch кг">
-              <input inputMode="decimal" value={state.pinchKg} onChange={(e) => set({ pinchKg: e.target.value })} placeholder="макс кг" aria-label="Pinch кг" />
-            </AdField>
-            <AdField label="Pinch сек">
-              <input inputMode="decimal" value={state.pinchSec} onChange={(e) => set({ pinchSec: e.target.value })} placeholder="15" aria-label="Pinch сек" />
-            </AdField>
-            <AdField label="CoC уровень">
-              <input inputMode="decimal" value={state.cocLevel} onChange={(e) => set({ cocLevel: e.target.value })} placeholder="1.5" aria-label="CoC уровень" />
-            </AdField>
-            <AdField label="Silver сек">
-              <input inputMode="decimal" value={state.silverSec} onChange={(e) => set({ silverSec: e.target.value })} placeholder="время" aria-label="Silver сек" />
-            </AdField>
-            <AdField label="Hub кг">
-              <input inputMode="decimal" value={state.hubKg} onChange={(e) => set({ hubKg: e.target.value })} placeholder="30" aria-label="Hub кг" />
-            </AdField>
-            <AdField label="Hub L/R кг">
-              <input inputMode="decimal" value={state.hubL} onChange={(e) => set({ hubL: e.target.value })} placeholder="L" aria-label="Hub левая кг" />
-            </AdField>
-            <AdField label="Hub R кг">
-              <input inputMode="decimal" value={state.hubR} onChange={(e) => set({ hubR: e.target.value })} placeholder="R" aria-label="Hub правая кг" />
-            </AdField>
-            <AdField label="Excalibur кг">
-              <input inputMode="decimal" value={state.excalKg} onChange={(e) => set({ excalKg: e.target.value })} placeholder="40" aria-label="Excalibur кг" />
-            </AdField>
-            <AdField label="Вес тела кг">
-              <input inputMode="decimal" value={state.bwKg} onChange={(e) => set({ bwKg: e.target.value })} placeholder="80" aria-label="Вес тела кг" />
-            </AdField>
+            <LiftNum label="RT кг" value={state.rtKg} onChange={(v) => set({ rtKg: v })} placeholder="60" aria="RT кг" />
+            <LiftNum label="Axle кг" value={state.axleKg} onChange={(v) => set({ axleKg: v })} placeholder="100" aria="Axle кг" />
+            <LiftNum label="Pinch кг" value={state.pinchKg} onChange={(v) => set({ pinchKg: v })} placeholder="макс кг" aria="Pinch кг" />
+            <LiftNum label="Pinch сек" value={state.pinchSec} onChange={(v) => set({ pinchSec: v })} placeholder="15" aria="Pinch сек" />
+            <LiftNum label="CoC уровень" value={state.cocLevel} onChange={(v) => set({ cocLevel: v })} placeholder="1.5" aria="CoC уровень" />
+            <LiftNum label="Silver сек" value={state.silverSec} onChange={(v) => set({ silverSec: v })} placeholder="время" aria="Silver сек" />
+            <LiftNum label="Hub кг" value={state.hubKg} onChange={(v) => set({ hubKg: v })} placeholder="30" aria="Hub кг" />
+            <LiftNum label="Excalibur кг" value={state.excalKg} onChange={(v) => set({ excalKg: v })} placeholder="40" aria="Excalibur кг" />
+          </AdGrid>
+          <div className="lift-group">↔️ Асимметрия L/R</div>
+          <AdGrid cols="auto-sm">
+            <LiftNum label="RT левая кг" value={state.rtL} onChange={(v) => set({ rtL: v })} placeholder="L" aria="RT левая кг" />
+            <LiftNum label="RT правая кг" value={state.rtR} onChange={(v) => set({ rtR: v })} placeholder="R" aria="RT правая кг" />
+            <LiftNum label="Hub левая кг" value={state.hubL} onChange={(v) => set({ hubL: v })} placeholder="L" aria="Hub левая кг" />
+            <LiftNum label="Hub правая кг" value={state.hubR} onChange={(v) => set({ hubR: v })} placeholder="R" aria="Hub правая кг" />
+          </AdGrid>
+          <div className="lift-group">⚖️ Класс</div>
+          <AdGrid cols="auto-sm">
+            <LiftNum label="Вес тела кг" value={state.bwKg} onChange={(v) => set({ bwKg: v })} placeholder="80" aria="Вес тела кг" />
           </AdGrid>
           <div className="ad-row">
             <AdChip active={state.axleImpl !== 'apollon'} onClick={() => set({ axleImpl: 'saxon' })}>Saxon (ориентир)</AdChip>
@@ -411,21 +423,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       <AdCard>
         <AdSec title="🧲 Новые снаряды 2025–2026" collapsible defaultOpen={false} summary="Raptor · Crush · Clock · Anvil · Medley">
           <AdGrid cols="auto-sm">
-            <AdField label="Raptor 1.75 кг">
-              <input inputMode="decimal" value={state.raptorKg} onChange={(e) => set({ raptorKg: e.target.value })} placeholder="факт" aria-label="Raptor кг" />
-            </AdField>
-            <AdField label="Country Crush кг">
-              <input inputMode="decimal" value={state.crushKg} onChange={(e) => set({ crushKg: e.target.value })} placeholder="факт" aria-label="Country Crush кг" />
-            </AdField>
-            <AdField label="Clock кг">
-              <input inputMode="decimal" value={state.clockKg} onChange={(e) => set({ clockKg: e.target.value })} placeholder="факт" aria-label="Grandfather Clock кг" />
-            </AdField>
-            <AdField label="Anvil кг">
-              <input inputMode="decimal" value={state.anvilKg} onChange={(e) => set({ anvilKg: e.target.value })} placeholder="факт" aria-label="Anvil кг" />
-            </AdField>
-            <AdField label="Saxon medley кг">
-              <input inputMode="decimal" value={state.medleyKg} onChange={(e) => set({ medleyKg: e.target.value })} placeholder="факт" aria-label="Saxon medley кг" />
-            </AdField>
+            <LiftNum label="Raptor 1.75 кг" value={state.raptorKg} onChange={(v) => set({ raptorKg: v })} placeholder="факт" aria="Raptor кг" />
+            <LiftNum label="Country Crush кг" value={state.crushKg} onChange={(v) => set({ crushKg: v })} placeholder="факт" aria="Country Crush кг" />
+            <LiftNum label="Clock кг" value={state.clockKg} onChange={(v) => set({ clockKg: v })} placeholder="факт" aria="Grandfather Clock кг" />
+            <LiftNum label="Anvil кг" value={state.anvilKg} onChange={(v) => set({ anvilKg: v })} placeholder="факт" aria="Anvil кг" />
+            <LiftNum label="Saxon medley кг" value={state.medleyKg} onChange={(v) => set({ medleyKg: v })} placeholder="факт" aria="Saxon medley кг" />
           </AdGrid>
           <div className="ad-muted">Факт без %: разрядных таблиц нет, только живые лидерборды Armlifting USA</div>
         </AdSec>
@@ -433,7 +435,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
 
       <AdCard>
         <AdSec title="📏 Замер по правилам" collapsible defaultOpen={false} summary="IronMind/AUSA чек-лист">
-          <div className="ad-row">
+          <div className="ad-row" data-arm="lift-rules-checks">
             {RULE_LABELS.map((label, i) => (
               <AdChip key={label} active={state.rules[i]} onClick={() => toggleRule(i)} aria-label={`Правило ${i + 1}: ${label}`}>
                 {state.rules[i] ? '✓ ' : ''}{label}
@@ -461,9 +463,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <div className="ad-list" data-arm="lift-rules-2026">
             {PLATFORM_RULES_2026.map((r) => (
               <div key={r.implement} className="ad-row">
-                <span><b>{r.name}</b></span>
-                <span className="ad-muted">{r.grip} · {r.timing} · {r.attempts}</span>
-                <span className="ad-muted">Фолы: {r.fouls.join('; ')} · {r.wrNote}</span>
+                <span className="lift-rule-name">{r.name}</span>
+                <span className="ad-muted lift-rule-sub">{r.grip} · {r.timing} · {r.attempts} · Фолы: {r.fouls.join('; ')} · {r.wrNote}</span>
               </div>
             ))}
           </div>
@@ -522,13 +523,23 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             ))}
           </div>
           <div className="ad-row">
-            <AdField label="Вес попытки кг">
-              <input inputMode="decimal" value={state.attTarget} onChange={(e) => set({ attTarget: e.target.value })} placeholder="вес" aria-label="Вес попытки кг" />
-            </AdField>
+            <LiftNum label="Вес попытки кг" value={state.attTarget} onChange={(v) => set({ attTarget: v })} placeholder="вес" aria="Вес попытки кг" />
             <AdChip active={state.attOk} tone={state.attOk ? 'green' : 'red'} onClick={() => set({ attOk: !state.attOk })}>{state.attOk ? '✓ взята' : '✗ сорвана'}</AdChip>
             <AdBtn variant="dark" onClick={logAttempt}>💾 Попытку</AdBtn>
           </div>
-          {hist.length > 0 && <div className="ad-muted">Журнал: {hist.map((h: any) => `${h.implement} ${h.weightKg}${h.success ? '✓' : '✗'} ${h.wrPct}%`).join(' · ')}</div>}
+          {hist.length > 0 && (
+            <div className="ad-list">
+              {hist.slice(0, 6).map((h: any, i: number) => (
+                <div key={`${h.implement}-${h.weightKg}-${i}`} className="ad-row lift-hist-row">
+                  <span><b>{h.implement}</b> {h.weightKg}кг {h.success ? '✓' : '✗'}</span>
+                  <span className="lift-hist-bar" aria-hidden>
+                    <span style={{ width: `${Math.max(0, Math.min(100, Number(h.wrPct) || 0))}%` }} />
+                  </span>
+                  <span className="ad-muted lift-row-meta">{h.wrPct}%</span>
+                </div>
+              ))}
+            </div>
+          )}
           {trend.length > 0 && (
             <div className="ad-muted" data-arm="lift-trend">
               Тренд: {trend.map((t) => `${t.implement} ${t.deltaKg >= 0 ? '+' : ''}${t.deltaKg}кг (${t.deltaPct >= 0 ? '+' : ''}${t.deltaPct}%, n=${t.n})`).join(' · ')}
