@@ -1032,6 +1032,12 @@ export function correctDayToTargets(
           // P1a-fix2: нулевое семейное использование — но крем-субкап всё равно держим
           // (иначе первый крем дня проходит мимо субкапа при свежем семействе).
           if (isCreamId(c.id) && _creamUses() >= creamMealCap(hv, _tsCap)) return false;
+          // FIX base-2026-09: свежий белковый топап при переборе белка дня — скип
+          // (пряники 50 г = +2.5 г белка-невидимки; болюсный день висел +3.5 г мимо капа).
+          // День и так недобирает угли — гэп честнее перебора (топ-ап вернётся lean).
+          try {
+            if ((sumTotals(meals).p || 0) >= (safeTargets.p || 0) && (c.protein || 0) >= 5) return false;
+          } catch { /* totals недоступны — legacy-путь */ }
           return true;
         }
         if (_u >= _useCapFor(c.id)) return false;

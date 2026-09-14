@@ -2332,6 +2332,11 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
           for (const step of liveLadderSteps()) {
             if (remC <= 60) break;
             if (usedIds3.has(step.id)) continue;
+            // FIX base-2026-09: сладость — не гарнир в обед/ужин (пряники к рису с мясом:
+            // белок-невидимка + «свалка»; измерено: без блока R-HV 28%, с блоком 20%).
+            // Снекам сладости можно (десертный контекст). isSweetBaseId: мёд/джем/
+            // мармелад/зефир/пастила/пряники/сушки/печенье.
+            if ((String(type || '') === 'lunch' || String(type || '') === 'dinner') && isSweetBaseId(step.id)) continue;
             // P0 (HV-рацион): хлопья — не ужинная еда.
             if (String(type || '') === 'dinner' && /flake/i.test(step.id)) continue;
             // P1b: вето «тунец + крем» — крем-ступень к рыбе не кладём.
@@ -6358,7 +6363,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             const _pa = isProteinPowderId(a.it.id) ? 0 : 1, _pb = isProteinPowderId(b.it.id) ? 0 : 1;
             return (_pa - _pb) || ((b.it.amount || 0) - (a.it.amount || 0));
           });
-          const _cand = _pItems[0];
+          // FIX base-2026-09: перебор кандидатов вместо сдачи на первом (порошок на полу
+          // 20 г блокировал резку мяса 80→75 и болюсный день висел +3.5 г мимо капа).
+          // Мердж-ветка ниже итерирует сама; здесь для резки выбираем первого РЕЖУЩЕГОСЯ.
+          // Без режущихся — legacy (_pItems[0] + break внутри резки).
+          const _cutPick = (_pDev <= 0) ? (() => {
+            for (const _c of _pItems) {
+              const _f = FOOD_DB.find((f: any) => f.id === _c.it.id);
+              if (!_f || !(_f.protein || 0)) continue;
+              const _isM = ['breakfast', 'lunch', 'dinner'].includes(_c.m.type || '');
+              const _fl = _f.category === 'supplement' ? 20 : (_isM ? 75 : 50);
+              if (Math.max(_fl, Math.round((_c.it.amount || 0) * 0.88)) < (_c.it.amount || 0)) return _c;
+            }
+            return null;
+          })() : null;
+          const _cand = (_cutPick || _pItems[0]) as any;
           const fd = FOOD_DB.find((f: any) => f.id === _cand.it.id);
           if (!fd || !(fd.protein || 0)) break;
           if (_pDev > 0) {
@@ -7126,6 +7145,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // в лёгком ужине» (eveningLowCarb-тест). Фолбэк — legacy (сходимость не блокируем).
         let _g3 = 8;
         const _carbCeil = (input.goalCarbsG || 0) * 1.10;
+        if ((process.env as any).VITEST_DEBUG_DOBOR) { console.log(`[DOBOR] enter kcal=${totals.kcal} goal=${input.goalKcal} c=${totals.c} goalC=${input.goalCarbsG} p=${totals.p}`); for (const mm of meals) { console.log(`[DOBOR-IN] ${(mm as any).label}: kcal=${(mm as any).totals?.kcal} c=${(mm as any).totals?.c} p=${(mm as any).totals?.p} :: ` + ((mm as any).items || []).map((x: any) => `${x.role}:${x.id}:${x.amount}`).join(' | ')); } }
         while (totals.kcal < (input.goalKcal || 0) * 0.97 && totals.c < (input.goalCarbsG || 0) - 5 && totals.c < _carbCeil - 5 && _g3-- > 0) {
           const cands: any[] = [];
           for (const m of meals) {
@@ -7197,9 +7217,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // 1) мелочь <30 г: БЕЛОК НЕ МУСОР (MPS), только углеводные/овощные/фруктовые обрезки.
         // FIX base-2026-09: любимые продукты — не мусор (иначе обрезанный тримом томат:15
         // сносился полностью и тест preferred падал). Оставляем как есть.
+        // FIX base-2026-09: порция в realistic-полах — не мусор, даже если <30 г
+        // (чиа 22 г = 105 ккал и шоколад 27 г = 150 ккал сносились, день терял ~250 ккал
+        // безвозвратно и сходимость рвалась; при этом крошки ниже полов — всё ещё мусор).
         const _prefDel = new Set<string>([...(((input as any).preferredIds || []) as any)]);
+        const _snackTyUp = String((m as any).type || '').startsWith('snack') || (m as any).type === 'snack';
+        const _isFullPortion = (it: any): boolean => {
+          try {
+            const _fd = FOOD_DB.find((f: any) => f.id === it.id);
+            if (!_fd) return false;
+            return (it.amount || 0) >= realisticFloorG(_fd, it.role, _snackTyUp, (input.weightKg || 80) as number);
+          } catch { return false; }
+        };
         const _smallCut = _its.filter((it: any) => !(it as any)._fixedGrams
           && !_prefDel.has(it.id)
+          && !_isFullPortion(it)
           && it.role !== 'supplement' && it.role !== 'liquid'
           && it.role !== 'protein' && it.role !== 'fast_protein' && it.role !== 'slow_protein'
           && !(it.role === 'fat' && (it.amount || 0) <= 20)

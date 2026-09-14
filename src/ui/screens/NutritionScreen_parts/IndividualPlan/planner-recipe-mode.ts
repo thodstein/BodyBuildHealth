@@ -1460,13 +1460,24 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // C2: обычные слоты НЕ получают peri-рецепты; peri-слот — только свой тип.
     if (periType) cands = cands.filter(r => r.meal === periType);
     else cands = cands.filter(r => !PERI_TYPES_SET.has(r.meal));
+    // FIX base-2026-09: на HV в пост-трен — только быстрые угли (булгур/гречка GI45-46
+    // медленные + клетчатка тормозят окно; тест R-1500 требует булгур 0 г).
+    // Продуктовый движок в пост-трен берёт пул GI≥70 — паритет здесь.
+    if (periType === 'postworkout' && _dayHighCarb) {
+      const _noSlow = cands.filter(r => !(r.ingredientIds || []).some((id: string) => /bulgur|buckwheat/i.test(id || '')));
+      if (_noSlow.length > 0) cands = _noSlow;
+    }
     // Aug 28: fallback — если скоринг с жёсткими гейтами опустошил выборку (экстремальные
     // цели: hardReject по девиации отсеял всё), основной приём НЕ должен остаться пустым.
     // Берём лучшие по макро-дистанции среди рецептов своего типа приёма (с ingredientIds).
     if (cands.length === 0) {
       const mealType = periType ?? mealTypeFromLabel(label || undefined);
       const sameType = pool.filter(r => r.meal === mealType && !excludeNames.has(r.name) && r.ingredientIds && r.ingredientIds.length > 0);
-      cands = rankCands(sameType).slice(0, 6);
+      // FIX base-2026-09: тот же HV-посттрен-гейт в фолбэке (иначе булгур вернётся здесь).
+      const _sameFiltered = (periType === 'postworkout' && _dayHighCarb)
+        ? sameType.filter(r => !(r.ingredientIds || []).some((id: string) => /bulgur|buckwheat/i.test(id || '')))
+        : sameType;
+      cands = rankCands((_sameFiltered.length > 0 ? _sameFiltered : sameType)).slice(0, 6);
     }
     if (cands.length === 0) return;
     // D4: порошковый гейт — если 2 приёма дня уже с порошком (продуктом или рецептом),
