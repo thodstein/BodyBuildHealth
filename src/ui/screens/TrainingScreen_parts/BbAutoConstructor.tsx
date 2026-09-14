@@ -722,8 +722,11 @@ export const BbAutoConstructor: React.FC = () => {
       return Number.isFinite(g) ? Number(g) : undefined;
     } catch { return undefined; }
   });
-  // P2 D: дневные данные носимого (he_wearable_daily) — если есть, учитываются в recovery.
-  const wearableData = (() => { try { const raw = localStorage.getItem('he_wearable_daily'); return raw ? JSON.parse(raw) : null; } catch { return null; } })();
+  // P2 D: дневные данные носимого (he_wearable_daily) — учитываются в recovery.
+  // P0-13 (аудит 2026-09): tick — ручной ввод ниже пишет в localStorage, но без
+  // ре-рендера сборка видела СТАРЫЕ данные. Tick форсит пересчёт.
+  const [wearableTick, setWearableTick] = useState(0);
+  const wearableData = useMemo(() => { try { const raw = localStorage.getItem('he_wearable_daily'); return raw ? JSON.parse(raw) : null; } catch { return null; } }, [wearableTick]);
   // P1: VBT — ввод скорости лучшего/последнего повтора для рекомендации нагрузки.
   const [vbtInput, setVbtInput] = useState<{ lift: string; best: string; last: string }>({ lift: 'bench', best: '', last: '' });
   // PRO: mobility restrictions — biomechanics-based exercise filtering
@@ -2232,10 +2235,19 @@ export const BbAutoConstructor: React.FC = () => {
 
     try {
 
-    if (planMode === 'programs') {
+    // P0-11 (аудит 2026-09): источник «📋 ПРОФ-цикл» раньше не собирался —
+    // селектор писал selectedCycleId, но plan шёл в «Выберите программу».
+    // Цикл конвертируется тем же cycleTemplateToFullProgram, что и в библиотеке,
+    // и собирается через проверенный programToBBPlan (faithful/adapt).
+    const cycleSourceProgram = (bbSource === 'cycle' && selectedCycleId)
+      ? (() => { const c = getCycleById(selectedCycleId); return c ? cycleTemplateToFullProgram(c) : null; })()
+      : null;
+    const effectiveProgram = bbSource === 'cycle' ? cycleSourceProgram : customProgram;
+
+    if (planMode === 'programs' || effectiveProgram) {
       // Единственный путь: FullProgram → programToBBPlan (faithful / adapt)
-      if (customProgram) {
-        plan = programToBBPlan(customProgram, {
+      if (effectiveProgram) {
+        plan = programToBBPlan(effectiveProgram, {
           workMax: bbWorkMax,
           weakPoints,
           focusGroup: '',
@@ -2288,14 +2300,18 @@ export const BbAutoConstructor: React.FC = () => {
             blastWeeks,
             cruiseWeeks,
             previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
+            wearable: wearableData,
+            availablePlates: platePreset === 'machine' ? undefined : (PLATE_SET_PRESETS.find(p => p.id === platePreset)?.plates ?? undefined),
+            rehabMuscles: rehabMuscles.length ? rehabMuscles : undefined,
+            dcMode,
            });
-          if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
-         if (bbWeeks !== customProgram.durationWeeks) {
-           const clamped = Math.max(4, Math.min(24, Math.round(Number(customProgram.durationWeeks) || 8)));
+          if (bbDays !== effectiveProgram.daysPerWeek) setBbDays(effectiveProgram.daysPerWeek);
+         if (bbWeeks !== effectiveProgram.durationWeeks) {
+           const clamped = Math.max(4, Math.min(24, Math.round(Number(effectiveProgram.durationWeeks) || 8)));
            if (Number.isFinite(clamped)) setBbWeeks(clamped);
          }
       } else {
-        flash('Выберите программу из библиотеки');
+        flash('Выберите цикл или программу из библиотеки');
         setIsBuilding(false);
         return;
       }
@@ -3633,9 +3649,9 @@ export const BbAutoConstructor: React.FC = () => {
                     <div style={{ fontSize:11, fontWeight:700, color:'#93c5fd', marginBottom:4 }}>📱 Восстановление (носимое / ручной)</div>
                     <div style={{ fontSize:9, opacity:0.8, marginBottom:6 }}>Утренний HRV и сон перекрывают профиль в recovery (или введите вручную — пишется в he_wearable_daily).</div>
                     <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                      <input type="number" placeholder="утр. HRV (мс)" onChange={e => { try { const v = Number(e.target.value); if (v > 0) localStorage.setItem('he_wearable_daily', JSON.stringify({ ...wearableData, morningHRV: v })); } catch { /* noop */ } }}
+                      <input type="number" placeholder="утр. HRV (мс)" onChange={e => { try { const v = Number(e.target.value); if (v > 0) { localStorage.setItem('he_wearable_daily', JSON.stringify({ ...wearableData, morningHRV: v })); setWearableTick(t => t + 1); } } catch { /* noop */ } }}
                         style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:11, padding:'4px 8px', width:110 }} />
-                      <input type="number" step="0.5" placeholder="сон (ч)" onChange={e => { try { const v = Number(e.target.value); if (v > 0) localStorage.setItem('he_wearable_daily', JSON.stringify({ ...wearableData, sleepHours: v })); } catch { /* noop */ } }}
+                      <input type="number" step="0.5" placeholder="сон (ч)" onChange={e => { try { const v = Number(e.target.value); if (v > 0) { localStorage.setItem('he_wearable_daily', JSON.stringify({ ...wearableData, sleepHours: v })); setWearableTick(t => t + 1); } } catch { /* noop */ } }}
                         style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:11, padding:'4px 8px', width:90 }} />
                     </div>
                   </div>

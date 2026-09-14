@@ -15,7 +15,10 @@ import { PCT_FOR_RIR } from '../rir-table';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
-import { adaptForPEDs, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
+import { adaptForPEDs, computeAASEquivDose, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
+import { applyRehabToPlan, rehabNotes } from './bb-recovery.engine';
+import { applyPlateRoundingToPlan } from './bb-plates.engine';
+import { mergeWearableIntoRecovery, type WearableDaily } from './bb-wearable.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 import { applyPostPhaseProcessing, applyDeloadToWeek, DELOAD_PROTOCOLS, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { tidySessionExercises, SESSION_TIDY_RATIONALE, isIsolationByName, type SessionMethodology } from './bb-session-order.engine';
@@ -1667,6 +1670,20 @@ export interface ProgramToBBPlanOpts {
   cruiseWeeks?: number;
   /** P1-7 (audit 2026-08): предыдущий мезоцикл — для cross-mesocycle continuity. */
   previousPlan?: BBPlan;
+  // ── P0-12 (аудит 2026-09): паритет program↔generic. ─────────────────────────
+  // Реально исполняются в program-пути: wearable (сливается в recovery-вход),
+  // availablePlates (пост-округление), rehabMuscles (пост-рампа), dcMode
+  // (widowmaker в finalize). packingV2/pedPhaseOverride/cycleDay/targetBodyFat
+  // остаются buildSession-механиками generic-пути — UI не показывает их в
+  // режиме программ (честная недоступность вместо тихого no-op).
+  wearable?: WearableDaily | null;
+  /** Гимназический набор пластин — пост-округление весов плана. */
+  availablePlates?: number[];
+  /** Реабилитация: прогрессивная рампа возврата мышц. */
+  rehabMuscles?: string[];
+  rehabWeekStart?: number;
+  /** DC-лайт: widowmaker по гейту (уровень+доза ААС), как в builder. */
+  dcMode?: boolean;
 }
 
 function parseReps(repsStr: string | undefined): number {
@@ -1870,7 +1887,21 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]));
   const pedAdapt = adaptForPEDs(opts.peds || [], landmarks, opts.pedDoses, opts.courseIntensity);
   const mrvMult = pedAdapt.combinedMrvMultiplier || 1.0;
-  const recoveryMult = computeBBRecoveryMultiplier(opts);
+  // P0-12 (аудит 2026-09): wearable-данные сливаются в recovery-вход — паритет с generic.
+  const wearableRecoveryProgram = mergeWearableIntoRecovery(
+    { hrvMs: opts.hrvMs, sleepHours: opts.sleepHours, stressLevel: opts.stressLevel },
+    opts.wearable ?? null,
+  );
+  const recoveryMult = computeBBRecoveryMultiplier({
+    ...opts,
+    hrvMs: wearableRecoveryProgram.hrvMs,
+    sleepHours: wearableRecoveryProgram.sleepHours,
+    stressLevel: wearableRecoveryProgram.stressLevel,
+  });
+  // P0-12: DC-лайт в program-пути — тот же гейт, что в builder
+  // (уровень advanced/enhanced + AAS-эквивалент ≥750 мг/нед).
+  const dcDoseProgram = computeAASEquivDose(opts.pedDoses);
+  const dcGateProgram = !!opts.dcMode && (level === 'advanced' || level === 'enhanced') && dcDoseProgram >= 750;
   const nutritionMult = computeBBNutritionMultiplier(opts);
   const _labMultProgram = opts.labMrvMultiplier ?? 1;
   const effectiveMrvMult = mrvMult * recoveryMult * nutritionMult * _labMultProgram;
@@ -1892,6 +1923,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   if (excludedMuscles.size > 0) rationale.push(`⚠ Исключены мышцы (травма): ${[...excludedMuscles].join(', ')}`);
   if (opts.peds && opts.peds.length > 0) rationale.push(`💉 PED: MRV ×${mrvMult.toFixed(2)}`);
   if ((opts as any).bfrMode) rationale.push(`🩸 BFR включен (памп-добивка 30-15-15-15)`);
+  if (dcGateProgram) rationale.push(`🎯 DC-лайт: widowmaker 20 повторов (гейт: ${level} + AAS-экв ${dcDoseProgram} мг/нед ≥ 750)`);
+  else if (opts.dcMode) rationale.push(`⚠ DC-лайт пропущен: гейт не пройден (нужен уровень advanced/enhanced и AAS-эквивалент ≥750 мг/нед).`);
   if ((opts as any).blastCruiseEnabled) rationale.push(`🔄 Blast/Cruise: ${ (opts as any).blastWeeks || 8 }н blast / ${ (opts as any).cruiseWeeks || 4 }н cruise`);
   if (opts.avoidAxialLoad) rationale.push(`🦴 Без осевой нагрузки`);
   if (_labMultProgram < 1) {
@@ -2464,8 +2497,21 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     bodyweightCapability: opts.bodyweightCapability,
     supersetMode: (opts as any).supersetMode,
     volumeScheme: (opts as any).volumeScheme,
+    dcWidowmaker: dcGateProgram,
   });
+  // P0-12: платформенные пост-проходы program-пути — паритет с generic.
+  if (Array.isArray(opts.availablePlates) && opts.availablePlates.length > 0) {
+    const pl = applyPlateRoundingToPlan(finalized as any, opts.availablePlates, 20);
+    if (pl.changed > 0) finalized.rationale.push(`🏋️ Пластины: ${pl.changed} весов приведены к доступному набору.`);
+  }
+  if (opts.rehabMuscles && opts.rehabMuscles.length > 0) {
+    const rehabResult = applyRehabToPlan(finalized as any, opts.rehabMuscles, opts.rehabWeekStart ?? 1);
+    if (rehabResult.changes.length > 0) {
+      for (const m of opts.rehabMuscles) finalized.rationale.push(rehabNotes(m, opts.rehabWeekStart ?? 1));
+    }
+  }
   (finalized as any).trainingVolumeMode = (opts as any).trainingVolumeMode || 'standard';
+  (finalized as any).mrvMultiplier = pedMrvMult;
   (finalized as any).volumeGoal = opts.volumeGoal;
   (finalized as any).goal = (opts as any).goal;
   (finalized as any).trainingFocus = opts.trainingFocus;
@@ -2511,6 +2557,10 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     weakPoints: opts.weakPoints,
     focusGroup: opts.focusGroup,
     specialization: opts.specialization,
+    availablePlates: opts.availablePlates,
+    rehabMuscles: opts.rehabMuscles,
+    dcMode: opts.dcMode,
+    wearable: opts.wearable ? true : undefined,
   };
   return finalized;
 }
