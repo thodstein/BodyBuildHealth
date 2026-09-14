@@ -3610,7 +3610,7 @@ for (const week of next.weeks) {
       }
     }
 
-    syncBBPlanSetShape(next);    syncBBPlanSetShape(next);
+    syncBBPlanSetShape(next);
   }
   // Taper is a source-independent final phase pass. It is deliberately here
   // rather than in the generic builder so cycle/program outputs get it too.
@@ -3627,6 +3627,13 @@ for (const week of next.weeks) {
     const excludedMusclesFinal = new Set(options.excludedMuscles || []);
     const gradedMusclesFinal = new Set(options.gradedMuscles || []);
     const fillSets = (muscle: string) => ['calves', 'abs', 'traps', 'forearms'].includes(muscle) ? 3 : (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 4 : 3);
+    // P0-6 (аудит 2026-09): единый источник сессионных лимитов — centralizedSessionLimits
+    // (level/стаж/PPL-оверрайд), а не локальный хардкод 18/14/10 и 60/40/24, который
+    // разошёлся бы при изменении капов (tier 6+ = 65/20, PPL = 36/11).
+    const execLimits = centralizedSessionLimits(
+      { level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any,
+      (next as any).pattern ? { id: (next as any).pattern.id } as any : undefined,
+    );
     for (const week of next.weeks) {
       // Ф1.1: deload-недели не добираются fill'ом — иначе pump-разгрузка (×0.5
       // сетов) откатывается добором до паритета с рабочей неделей (73=73).
@@ -3644,12 +3651,12 @@ for (const week of next.weeks) {
       const present = new Set(session.exercises.map((e: any) => e.muscle));
       const template = session.exercises[0];
       if (!template) continue;
-      // Не превышаем level-aware лимит упражнений в сессии (10 natural / 18 enhanced).
-      const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
+      // Не превышаем level-aware лимит упражнений в сессии (единый источник — см. execLimits).
+      const maxEx = execLimits.maxExercises;
       const workingCount = () => session.exercises.filter((e: any) => !(e as any).warmupActivator).length;
       if (workingCount() >= maxEx) continue;
-      // Сетовой лимит сессии (60 enhanced 3+ / 24 natural) не превышаем.
-      const maxSessionSets = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 60 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 40 : 24;
+      // Сетовой лимит сессии — единый источник (см. execLimits).
+      const maxSessionSets = execLimits.maxWorkingSets;
       const sessionSets = () => session.exercises.reduce((sum: number, e: any) => sum + (e.sets || 0), 0);
       const isPPLPattern2 = String((next && next.pattern && next.pattern.id) || (options && options.patternId) || '').toLowerCase().includes('ppl');
       const needMuscles = /FullBody/.test(tag)

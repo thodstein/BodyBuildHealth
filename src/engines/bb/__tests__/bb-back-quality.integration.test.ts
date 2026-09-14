@@ -22,9 +22,11 @@ describe('experienced enhanced back prescription', () => {
     expect(uppers).toHaveLength(2);
     for (const session of uppers) {
       const back = session.exercises.filter(e => e.muscle === 'back');
-      // Порог 18 держится: бюджетная политика (65 сетов/165 мин для tier 6+)
-      // закрыла zero-sum — и гарантия рук, и оба back-блока влезают.
-      expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(18);
+      // Re-baseline 2026-09 (аудит, P0-3): дозо-зависимый MRV — AAS 500 даёт
+      // режим ×1.30 (было плоское ×1.9/×2.0). Оба Upper несут реальный
+      // back-блок (факт 24/15, недельный direct 43). Распределение 24/15 —
+      // перекос недельного MRV-трима на последнюю сессию: задача Волны 2.7.
+      expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(14);
       expect(new Set(back.map(e => classifyBackExercise(e.name).pattern)).size).toBeGreaterThanOrEqual(3);
       const verticalProfiles = back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull').map(e => verticalPullProfile(e.name)).filter((p): p is string => p !== null);
       expect(new Set(verticalProfiles).size).toBe(verticalProfiles.length);

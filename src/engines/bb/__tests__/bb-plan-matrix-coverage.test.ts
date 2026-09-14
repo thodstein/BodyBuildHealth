@@ -16,12 +16,14 @@ describe('BB test matrix coverage (Этап 11)', () => {
   it('arms: прямые сеты редуцируются при большом indirect от тяг/жимов', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, pedDoses: { AAS: 500 }, courseIntensity: 'moderate' });
     const backRotation = plan.rotationMuscleVolume?.back || 0;
+    const chestRotation = plan.rotationMuscleVolume?.chest || 0;
     const bicepsDirect = plan.weeklyVolume?.[1]?.biceps?.directSets ?? 0;
     const tricepsDirect = plan.weeklyVolume?.[1]?.triceps?.directSets ?? 0;
-    // 46 тяг × 0.4 = ~18 косвенных; прямые сеты не должны дублировать их сверху
-    // (верхняя граница: не более ~30% от объёма тяг/жимов).
+    // Косвенные для бицепса — тяги (спина), для трицепса — жимы (грудь):
+    // прокси-объём должен соответствовать источнику косвенной нагрузки.
+    // (Ранее трицепс считался от спины — семантическая ошибка прокси.)
     expect(bicepsDirect).toBeLessThanOrEqual(Math.max(6, Math.round(backRotation * 0.3)));
-    expect(tricepsDirect).toBeLessThanOrEqual(Math.max(6, Math.round(backRotation * 0.2)));
+    expect(tricepsDirect).toBeLessThanOrEqual(Math.max(6, Math.round(chestRotation * 0.3)));
     // Эффективный объём рук не превышает фактический кап.
     expect((plan.weeklyVolume?.[1]?.biceps?.effectiveSets ?? 0)).toBeLessThanOrEqual((plan.mrvByMuscle?.biceps || 0) * 1.15);
     expect((plan.weeklyVolume?.[1]?.triceps?.effectiveSets ?? 0)).toBeLessThanOrEqual((plan.mrvByMuscle?.triceps || 0) * 1.15);

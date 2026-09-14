@@ -28,7 +28,7 @@ import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { selectExercisesSmart, isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern';
 import { findPatternAlternative } from './bb-exercise-rotation.engine';
-import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
+import { S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
 import { adaptForPEDs, computeAASEquivDose } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
@@ -1881,8 +1881,10 @@ function buildSession(
     sets = computeMuscleSets(muscle, sets, { level, trainingYears, phase, role, muscleVolumeRotation, isHeavy: /Upper|Chest|Push|Legs|Lower/.test(sched.sessionTag || ''), onCourse: onCourse || (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3 });
     const specVol = specializationEmphasisFactor(muscle, specRes);
     if (specVol !== 1) sets = Math.round(sets * specVol);
-    // Фазовая модуляция объёма (deload/intensification/peaking снижают)
-    sets = Math.round(sets * getPhaseVolumeMult(phase));
+    // Фазовая модуляция объёма (deload/intensification/peaking снижают).
+    // P0-4 (аудит 2026-09): focus обязателен — та же ф-я в dailyCap (:3401) и
+    // reps/intensity (:1907) уже focus-aware; без него один план мешал два множителя.
+    sets = Math.round(sets * getPhaseVolumeMult(phase, trainingFocus));
     // MEV-гарантия на этапе распределения: мышца не опускается ниже MEV/частота
     // в рабочей фазе (иначе natural-планы получают deficit, а fill не может
     // добавить — сессии на лимите). Deload — исключение (восстановление).
@@ -1931,7 +1933,7 @@ function buildSession(
     // Раньше: weight = workMax × intensityMult × PCT_FOR_RIR[rir] (не учитывала reps).
     // Теперь: weight = workMax × (1.0278 − 0.0278 × reps) × rirAdj × intensityMult.
     // Для 18 reps → ~52% (памп), для 6 reps → ~86% (тяж), для 10 reps → ~75%.
-    const pct = PCT_FOR_RIR[rir] ?? 0.9; // fallback если Brzycki не подходит
+    // Аудит 2026-09: мёртвая `const pct = PCT_FOR_RIR[rir]` удалена — вес считает Brzycki.
     // Аудит Sep 2026: spec-мышцы (focusGroup/weakPoints) без дневник-фидбека шли
     // со статичным весом 12 недель (B-stance 45.5 → 23.7 кг — только дрифт вниз).
     // Прогрессия нагрузки +2%/нед внутри фазы (double progression, кап +6%;
@@ -1956,7 +1958,7 @@ function buildSession(
     // В multi-днях (Push/Pull с 3+ мышцами) ограничить big muscle primary до 3 —
     // оставить бюджет для arms. В solo-днях (Chest/Back) — 4 (вся сессия на одну мышцу).
     const isMultiDay = musclePlans.length > 2;
-    const pedBoost = pedAdapt ? Math.max(0, Math.round((pedAdapt.combinedMrvMultiplier - 1.0) / 0.2)) : 0;
+    // Аудит 2026-09: мёртвый `pedBoost` удалён (не читался; exerciseCount считается ниже).
     // B13: levelBase монотонно растёт с уровнем (beginner=1, intermediate=2, advanced=3, enhanced=4).
     const levelBase = level === 'beginner' ? 1 : level === 'intermediate' ? 2 : level === 'enhanced' ? 4 : 3;
     const isSingleFreq = (muscleSessionCount[muscle] || 1) === 1;
@@ -3029,7 +3031,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   });
   // Фаза 4.28: ручной оверрайд множителя восстановления из визарда.
   const recoveryMultOverride = Number.isFinite(input.recoveryMultOverride) ? Math.max(0.6, Math.min(1.5, input.recoveryMultOverride as number)) : 1;
-  const weeklyBudget = Math.round(computeBBWeeklyBudget({
+  // P0-7 (аудит 2026-09): это ОЦЕНКА для rationale/отображения, а не кап —
+  // реальные потолки: per-muscle mrvByMuscle + sessionLimitsFor (ниже).
+  // Имя переименовано, чтобы не читалось как жёсткий бюджет.
+  const weeklyBudgetEstimate = Math.round(computeBBWeeklyBudget({
     onCourse,
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
     recoveryScore,
@@ -4602,11 +4607,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         }
       }
       // Все сплиты адаптируются: показать адаптированный объём для выбранного сплита
-      const adaptNote = `🔄 Сплит «${pattern.name}» адаптирован: целевые объёмы пересчитаны под фарму (режим ×${regimeMult.toFixed(2)}, бюджет ${weeklyBudget} сетов/нед) — все сплиты масштабируются, выбор сохранён`;
+      const adaptNote = `🔄 Сплит «${pattern.name}» адаптирован: целевые объёмы пересчитаны под фарму (режим ×${regimeMult.toFixed(2)}, оценка бюджета ${weeklyBudgetEstimate} сетов/нед) — все сплиты масштабируются, выбор сохранён`;
       if (!withMeth.rationale.includes(adaptNote)) withMeth.rationale.push(adaptNote);
       finalized = withMeth;
     } else {
-      finalized.rationale.push(`🔄 Сплит «${pattern.name}» адаптирован: бюджет ${weeklyBudget} сетов/нед (натурал) — все сплиты масштабируются под режим`);
+      finalized.rationale.push(`🔄 Сплит «${pattern.name}» адаптирован: оценка бюджета ${weeklyBudgetEstimate} сетов/нед (натурал) — все сплиты масштабируются под режим`);
     }
   } catch (e) { /* ped overlay не должен ломать план */ }
 

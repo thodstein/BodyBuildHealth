@@ -7,7 +7,7 @@
 import type { BBWeek, BBSession, BBExercise, BBSet, BBPlan } from './bb-builder.engine';
 import { defaultWorkMax } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
-import { PHASE_CONFIGS, distributePhases } from '../periodization';
+import { PHASE_CONFIGS } from '../periodization';
 import { PCT_FOR_RIR } from '../rir-table';
 import { classifyBackExercise } from './bb-back-quality.engine';
 
@@ -662,39 +662,28 @@ export interface PostPhaseInput {
  *  6. Авто-регуляция (readiness → volumeMultiplier, weight, rirShift)
  */
 export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
-  const { plan, totalWeeks, workMax, loadStrategy, autoDeload, deloadType, acwrRatio, autoRegResult, skipPhaseRedistribution } = input;
+  const { plan, totalWeeks, workMax, loadStrategy, autoDeload, deloadType, acwrRatio, autoRegResult } = input;
 
   // P0-7 (audit 2026-07): enforce deload только при ACWR>1.5 (danger zone).
   // 1.3-1.5 = caution (display only, handled in buildBBPlan rationale).
   const needsDeload = !!autoDeload && acwrRatio != null && acwrRatio > 1.5;
   const deloadProtocol = needsDeload && deloadType ? DELOAD_PROTOCOLS[deloadType] : null;
 
-  // FIX-5: если skipPhaseRedistribution — используем фазы из buildBBPlan (уже распределены).
-  // Иначе — перестраиваем distributePhases заново (legacy-поведение).
+  // FIX-5: источник фаз владеет разметкой — берём phase/deload из плана как есть.
   const phaseMap = new Map<number, BBPhase>();
-  if (skipPhaseRedistribution) {
-    // The source plan already owns phase labels. Never replace explicit
-    // cycle/program phases with a guessed 60/40 map.
-    for (const week of plan.weeks) {
-      const raw = String((week as any).phase || '').toLowerCase();
-      const phase: BBPhase = raw === 'deload' || (week as any).deload ? 'deload'
-        : raw === 'peaking' || raw === 'peak' ? 'peaking'
-          : raw === 'intensification' ? 'intensification' : 'accumulation';
-      phaseMap.set(week.week, phase);
-    }
-    for (let wk = 1; wk <= totalWeeks; wk++) {
-      if (!phaseMap.has(wk)) phaseMap.set(wk, 'accumulation');
-    }
-  } else {
-    // B20: legacy path — перестраивает фазы заново. Предупредить, если кто-то вызовет без skipPhaseRedistribution.
-    console.warn('[bb-autocoach] applyPostPhaseProcessing вызван БЕЗ skipPhaseRedistribution — фазы перестроены заново (legacy). Это может рассинхронизировать с buildBBPlan.');
-    const phaseDist = distributePhases(totalWeeks, totalWeeks >= 6 ? 4 : 0, 'mass');
-    for (const pd of phaseDist) {
-      for (const w of pd.weeks) phaseMap.set(w, pd.phase as BBPhase);
-    }
-    for (let wk = 1; wk <= totalWeeks; wk++) {
-      if (!phaseMap.has(wk)) phaseMap.set(wk, 'accumulation');
-    }
+  // P0-9 (аудит 2026-09): legacy-ветка пересборки фаз удалена — ВСЕ продовые
+  // вызывающие (bb-builder, cycle-to-plan ×2) и тесты передают
+  // skipPhaseRedistribution: true: источник фаз всегда владеет разметкой,
+  // иначе двойное распределение рассинхронизировало план.
+  for (const week of plan.weeks) {
+    const raw = String((week as any).phase || '').toLowerCase();
+    const phase: BBPhase = raw === 'deload' || (week as any).deload ? 'deload'
+      : raw === 'peaking' || raw === 'peak' ? 'peaking'
+        : raw === 'intensification' ? 'intensification' : 'accumulation';
+    phaseMap.set(week.week, phase);
+  }
+  for (let wk = 1; wk <= totalWeeks; wk++) {
+    if (!phaseMap.has(wk)) phaseMap.set(wk, 'accumulation');
   }
 
   // Счётчик недель в каждой фазе (для RIR-дрейфа)

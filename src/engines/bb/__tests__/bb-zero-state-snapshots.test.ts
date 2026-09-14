@@ -36,8 +36,12 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // не мирился в horizontal_push/chest (movement-pattern: leg press →
     // squat/quads) — quad-бакет честный: quads 25→21 (валидатор зелёный,
     // инварианты целы).
+    // Re-baseline 4 (аудит 2026-09, P0-3): дозо-зависимая MRV-кривая — AAS 500
+    // даёт режим ×1.30 (было плоское ×1.9): спина 45→43 (первой упёрлась в
+    // свой честный кап; сессионные капы держат остальные мышцы). Валидатор
+    // зелёный, инварианты целы, дозо-зависимость восстановлена.
     expect(directVolume(plan)).toEqual({
-      abs: 16, back: 45, biceps: 8, calves: 10, chest: 36, delt_mid: 7, delt_rear: 5, forearms: 8, glutes: 10, hamstrings: 23, quads: 21, shoulders: 0, traps: 7, triceps: 7,
+      abs: 16, back: 43, biceps: 8, calves: 10, chest: 36, delt_mid: 7, delt_rear: 5, forearms: 8, glutes: 10, hamstrings: 23, quads: 21, shoulders: 0, traps: 7, triceps: 7,
     });
   });
 
