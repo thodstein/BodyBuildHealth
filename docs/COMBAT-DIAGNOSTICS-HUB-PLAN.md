@@ -101,7 +101,7 @@
 
 ---
 
-## §5. Выполнение (13 сен 2026, 6 этапных коммитов + 1 фикс, без пуша)
+## §5. Выполнение (13 сен 2026, 7 этапных коммитов + 1 фикс, без пуша)
 
 Только Edit/Write + vitest/tsc; чужие файлы не тронуты (коммиты строго pathspec своих; shared `planner-bridge.ts` НЕ правлен — мост едет существующими полями `groups/diagnosticWeakSide/barPath/combat*/specBlock`).
 
@@ -112,4 +112,5 @@
 - **P7 (`dea75f55`)**: NEW `combat-scoring` (RSS + floors cap 49 + verification .35/.30/.35) + NEW `combat-correction` (причины/топ-3/Δ-ориентир/спец-блок 4–8/дни 1,3/аудит) + NEW `combat-diagnostics-injection` (мост + snapshot/rollback `he_combat_plan_v1/prev`) + NEW `combat-diagnostics-export` (HTML/XSS + CSV/BOM/антиформула) + NEW `CombatDiagnosticsHub` (6 табов, `#fff`, 44px, `data-combat`, персист `he_combat_diagnostics_hub_v1`) + тесты 10/10 + UI 3/3.
 - **P8 (`abafa249`)**: NEW `combat-strike-school` (6 ударов: стойка/цепь/ошибки/чекпоинты/дриллы + подсобка только из реального `CB_EX_META`-пула + `schoolDrillFor`) + блок «Как поставить удар» в табе ударов + тест 3/3 (итого своих **40/40**) + UI 4/4. Поймано: `getByText(/Назначение:/)` ×6 — переведено на `getAllByText`.
 - **Фикс (`93638089`)**: `vMaxCm → vMaxMs` (поймал `tsc`; свой тест bad_data-ветку покрывал, но поле не ловил).
-- **Проверено**: свои 40/40 (7 файлов) + соседи `src/engines/combat` 519/519 (32 файла) + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ (очередь чужих WIP в worktree).
+- **Монтаж (`997a4fea`)**: таб `combat_diagnostics` по прецеденту Armlifting (union + label + ZONES.tabs + категория + алиас + CALC_TABS + effectiveTab + mount с InfoErrorBoundary + карточка дашборда) + NEW nav-тест 2/2. Поймано: ассерт `toContain('Единоборств')` vs подпись `единоборств` — чинил тест. Общие файлы до правок были чисты, дифф — только свои ханки (проверено `git diff -U0`).
+- **Проверено**: свои **42/42** (8 файлов) + соседи `src/engines/combat` 519/519 (32 файла) + arm-lifting-nav 2/2 + `tsc --noEmit` **0 по всему проекту** + `verify:apk-design` OK. НЕ ПУШИЛ (очередь чужих WIP в worktree).
