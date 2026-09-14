@@ -1,7 +1,83 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { cardBg, pillActive, pillInactive, StopBanner, ContraBanner, ProtocolDisclaimer } from './supportProtocolsShared';
+import { cardBg, pillActive, pillInactive, StopBanner, ContraBanner, ProtocolDisclaimer, ItemRow } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
+import {
+  FEMALE_INJECT_DOSES, FEMALE_ORAL_DOSES, FEMALE_PEPTIDE_DOSES, FEMALE_SARM_DOSES, DECA_125_NOTE,
+  FEMALE_SUPPORT_PROTOCOLS, FEMALE_LAB_GROUPS, FEMALE_STOP_THRESHOLDS, FEMALE_STOP_SYMPTOMS,
+  FEMALE_TIMELINE, FEMALE_GOALS, FEMALE_AGE_GROUPS, FEMALE_SAFE_COMBOS, FEMALE_DANGER_COMBOS,
+  FEMALE_FORBIDDEN_COMBOS, FEMALE_LIBIDO_EFFECTS, FEMALE_EMERGENCY_CRITICAL, FEMALE_EMERGENCY_URGENT,
+  FEMALE_VIRILIZATION_CALC, femaleVirilizationScore,
+} from './supportProtocolWomenData';
+
+const wInput: React.CSSProperties = {
+  background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+  padding: '9px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box', minHeight: 40,
+};
+
+const bandColor = (band: string): string =>
+  band === 'critical' || band === 'high' ? '#ef4444' : band === 'risk' ? '#f97316' : band === 'caution' ? '#f59e0b' : '#22c55e';
+
+/** Живой калькулятор Virilization Score: Σ (доза/красный порог × андрогенный индекс × недели/4 × 3.0 × 10). */
+const VirilizationScoreCalculator: React.FC = () => {
+  const [subId, setSubId] = useState('nand_deca');
+  const [dose, setDose] = useState('50');
+  const [weeks, setWeeks] = useState('8');
+  const [age, setAge] = useState('30');
+  const [genetic, setGenetic] = useState(false);
+  const [prev, setPrev] = useState(false);
+  const item = FEMALE_VIRILIZATION_CALC.find((x: any) => x.id === subId) || FEMALE_VIRILIZATION_CALC[0];
+  const res = femaleVirilizationScore(
+    [{ id: item.id, dose: parseFloat(dose) || 0 }],
+    parseFloat(weeks) || 0,
+    { age: parseFloat(age) || 30, geneticSensitivity: genetic, previousCycles: prev },
+  );
+  const color = bandColor(res.band);
+  const toggle = (on: boolean): React.CSSProperties => ({
+    flex: '1 1 140px', padding: '9px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 40,
+    background: on ? 'rgba(244,114,182,0.16)' : 'rgba(255,255,255,0.05)',
+    color: on ? '#f9a8d4' : '#fff',
+    border: `1px solid ${on ? 'rgba(244,114,182,0.4)' : 'rgba(255,255,255,0.08)'}`,
+  });
+  return (
+    <div style={cardBg} data-vircalc="root">
+      <div style={{ fontSize:11, fontWeight:800, color:'#f472b6', marginBottom:4 }}>🧮 Калькулятор Virilization Score</div>
+      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8, lineHeight:1.35 }}>Справочная оценка риска вирилизации (0–100): доза против красного порога × андрогенный индекс × длительность × чувствительность 3.0. Не диагноз и не гарантия — решение принимает врач.</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+        <select value={subId} onChange={(e) => setSubId(e.target.value)} aria-label="Вещество" style={wInput}>
+          {FEMALE_VIRILIZATION_CALC.map((x: any) => (
+            <option key={x.id} value={x.id}>{x.name} ({x.unit})</option>
+          ))}
+        </select>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          <input type="number" inputMode="decimal" min={0} value={dose} onChange={(e)=>setDose(e.target.value)}
+            aria-label={`Доза, ${item.unit}`} placeholder={`Доза, ${item.unit}`} style={{ ...wInput, flex:'1 1 130px', width:'auto' }} />
+          <input type="number" inputMode="numeric" min={1} max={52} value={weeks} onChange={(e)=>setWeeks(e.target.value)}
+            aria-label="Длительность, недель" placeholder="Недель" style={{ ...wInput, flex:'1 1 90px', width:'auto' }} />
+          <input type="number" inputMode="numeric" min={14} max={70} value={age} onChange={(e)=>setAge(e.target.value)}
+            aria-label="Возраст" placeholder="Возраст" style={{ ...wInput, flex:'1 1 90px', width:'auto' }} />
+        </div>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          <button type="button" aria-pressed={genetic} onClick={() => setGenetic((v) => !v)} style={toggle(genetic)}>Генет. чувствительность (акне/гирсутизм до курса)</button>
+          <button type="button" aria-pressed={prev} onClick={() => setPrev((v) => !v)} style={toggle(prev)}>Предыдущие циклы</button>
+        </div>
+      </div>
+      <div data-vircalc="result" style={{ marginTop:8, padding:'10px 12px', borderRadius:10, background: color + '12', border: `1px solid ${color}30` }}>
+        <div style={{ fontSize:15, fontWeight:850, color }}>{res.score} / 100 — {res.bandLabel}</div>
+        {res.breakdown.length > 0 && (
+          <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:4 }}>
+            {res.breakdown.map((b: any, i: number) => (
+              <div key={i}>• {b.name}: вклад {b.contribution.toFixed(1)}</div>
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize:10, color:'#fca5a5', marginTop:4, lineHeight:1.4 }}>
+          {res.recommendations.map((r: any, i: number) => (<div key={i}>→ {r}</div>))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [womenTab, setWomenTab] = useState('virilization');
@@ -10,7 +86,7 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
       <div className="sup-proto-women" style={{ paddingBottom:30, display:'flex', flexDirection:'column', gap:8 }}>
         <div style={cardBg}>
           <div style={{ fontSize:13, fontWeight:800, color:'#f472b6', marginBottom:2 }}>♀️ Женский цикл и ААС</div>
-          <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Абсолютные противопоказания, необратимые риски вирилизации, пороги андрогенов для женщин, беременность и контрацепция на ААС.</p>
+          <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Абсолютные противопоказания, необратимые риски вирилизации, пороги андрогенов для женщин, беременность и контрацепция на ААС. Расширено: дозы веществ (ААС/пептиды/SARMs), примерные протоколы поддержки с дозировками, женские лабораторные референсы, таймлайн цикла, либидо, взаимодействия, цели/возраст, экстренные ситуации.</p>
         </div>
 
         <ProtocolDisclaimer />
@@ -27,6 +103,14 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
           {[
             { id:'virilization', label:'⚠️ Вирилизация' },
             { id:'hormones', label:'🔬 Пороги гормонов' },
+            { id:'doses', label:'⚖️ Дозы веществ' },
+            { id:'support', label:'🧪 Поддержка' },
+            { id:'labs', label:'🧬 Лабы и СТОП' },
+            { id:'libido', label:'❤️ Либидо' },
+            { id:'timeline', label:'🗓 Таймлайн цикла' },
+            { id:'goals', label:'🏆 Цели и возраст' },
+            { id:'interactions', label:'⚡ Взаимодействия' },
+            { id:'emergency', label:'🚑 Экстренно' },
             { id:'contraception', label:'💊 Контрацепция' },
             { id:'pregnancy', label:'🤰 Беременность' },
             { id:'drugs', label:'💊 Препараты' },
@@ -81,6 +165,218 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
                   <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:2 }}>♀ Норма: <b style={{color:'#f9a8d4'}}>{x.femaleRange}</b></div>
                   <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(239,68,68,0.06)' }}>🛑 {x.dangerThreshold}</div>
                   <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2 }}>💡 {x.note}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Дозы веществ */}
+        {womenTab === 'doses' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>⚖️ Дозы веществ: женские пороги</div>
+              <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 8px', lineHeight:1.3 }}>Справочные ориентиры для обсуждения с врачом. Женские пороги в 4–10 раз ниже мужских. Это НЕ назначение — официальные рекомендации «что можно / что нельзя» в табе «Препараты».</p>
+              <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>🛑 {DECA_125_NOTE}</div>
+            </div>
+            <VirilizationScoreCalculator />
+            {[
+              { title:'💉 Инъекционные ААС', rows:FEMALE_INJECT_DOSES },
+              { title:'💊 Пероральные ААС (17α-алкилы)', rows:FEMALE_ORAL_DOSES },
+              { title:'🧬 Пептиды и гормоны (GH/IGF-1/MGF/инсулин)', rows:FEMALE_PEPTIDE_DOSES },
+              { title:'⚗️ SARMs', rows:FEMALE_SARM_DOSES },
+            ].map((g: any) => (
+              <div key={g.title} style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>{g.title}</div>
+                {g.rows.map((x: any, i: number) => (
+                  <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6 }}>
+                      <span style={{ fontSize:9, fontWeight:700, color:'#f9a8d4' }}>{x.name}</span>
+                      <span style={{ fontSize:9, fontWeight:800 }}>{x.overall}</span>
+                    </div>
+                    <div style={{ fontSize:8, color:'#fff', marginTop:2 }}>🟢 {x.green} · 🟡 {x.yellow} · 🔴 {x.red}</div>
+                    <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>Вирилизация: {x.vir} · Либидо: {x.libido}</div>
+                    <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3 }}>{x.risks}</div>
+                    {x.note ? <div style={{ fontSize:7, color:'#fca5a5', marginTop:2, lineHeight:1.3 }}>💡 {x.note}</div> : null}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Примерные протоколы поддержки */}
+        {womenTab === 'support' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>🧪 Примерные протоколы поддержки (женщины на ААС)</div>
+              <p style={{ fontSize:8, color:'var(--text-dim)', margin:0, lineHeight:1.35 }}>Ориентиры доз для обсуждения с врачом. Рецептурные позиции (каберголин, спиронолактон, метформин) — только врач. Кросс-капы NAC/Mg/Zn/D3 суммируйте калькулятором в меню протоколов.</p>
+            </div>
+            {FEMALE_SUPPORT_PROTOCOLS.map((p: any) => (
+              <div key={p.id} style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:800, color:'#f9a8d4', marginBottom:2 }}>{p.icon} {p.title}</div>
+                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, lineHeight:1.3 }}>Показания: {p.indication}</div>
+                {p.rows.map((r: any, i: number) => (
+                  <ItemRow key={i} name={r.name} dose={r.dose} timing={r.timing} note={r.note} color="#f472b6" />
+                ))}
+                {p.footer ? (
+                  <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.35, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>⚠ {p.footer}</div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Лабы и СТОП */}
+        {womenTab === 'labs' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>🧬 Женские лабораторные референсы</div>
+              <p style={{ fontSize:8, color:'var(--text-dim)', margin:0, lineHeight:1.35 }}>Референсы отличаются от мужских (Hct, липиды, половые гормоны). Забор гормонов — 3–5 день цикла (фолликулярная фаза), пролактин — утро/покой 30 мин.</p>
+            </div>
+            {FEMALE_LAB_GROUPS.map((grp: any) => (
+              <div key={grp.id} style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>{grp.icon} {grp.title}</div>
+                {grp.rows.map((x: any, i: number) => (
+                  <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(59,130,246,0.05)', border:'1px solid rgba(59,130,246,0.10)' }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#93c5fd' }}>{x.marker}</div>
+                    <div style={{ fontSize:7, color:'var(--text-dim)' }}>Норма: {x.normal}</div>
+                    <div style={{ fontSize:8, color:'#fff', marginTop:2 }}>🟢 {x.green} · 🟡 {x.yellow} · 🔴 {x.red}</div>
+                    {x.symptom ? <div style={{ fontSize:7, color:'#fca5a5', marginTop:2 }}>🛑 {x.symptom}</div> : null}
+                  </div>
+                ))}
+              </div>
+            ))}
+            <StopBanner title="КРИТИЧЕСКИЕ ПОРОГИ — СТОП ДЛЯ ЖЕНЩИН" thresholds={FEMALE_STOP_THRESHOLDS.map((x: any) => `${x.marker} ${x.threshold} — ${x.action}`)} />
+          </div>
+        )}
+
+        {/* Либидо */}
+        {womenTab === 'libido' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>❤️ Либидо на ААС — критический фактор</div>
+              <p style={{ fontSize:8, color:'var(--text-dim)', margin:0, lineHeight:1.35 }}>У женщин либидо зависит от обоих драйверов: андрогенов и эстрадиола. Станозолол/тренболон/AI часто дают «нулевое» либидо; тестостерон/мастерон — иногда чрезмерное. Не обнулять E2 ингибиторами ароматазы.</p>
+            </div>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>⚖️ Эффекты веществ</div>
+              {FEMALE_LIBIDO_EFFECTS.map((x: any, i: number) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#f9a8d4' }}>{x.substance}</span>
+                    <span style={{ fontSize:8, fontWeight:800, color:'#fff' }}>{x.effect}</span>
+                  </div>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{x.mechanism}</div>
+                </div>
+              ))}
+            </div>
+            {FEMALE_SUPPORT_PROTOCOLS.filter((p: any) => p.id === 'libidoLow' || p.id === 'libidoHigh').map((p: any) => (
+              <div key={p.id} style={cardBg}>
+                <div style={{ fontSize:11, fontWeight:800, color:'#f9a8d4', marginBottom:2 }}>{p.icon} {p.title}</div>
+                <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, lineHeight:1.3 }}>Показания: {p.indication}</div>
+                {p.rows.map((r: any, i: number) => (
+                  <ItemRow key={i} name={r.name} dose={r.dose} timing={r.timing} note={r.note} color="#f472b6" />
+                ))}
+                {p.footer ? (
+                  <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.35, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>⚠ {p.footer}</div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Таймлайн цикла */}
+        {womenTab === 'timeline' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>🗓 Таймлайн женского цикла ААС</div>
+              <p style={{ fontSize:8, color:'var(--text-dim)', margin:0, lineHeight:1.35 }}>Женский протокол строже мужского: чаще лабы, обязательная запись голоса, обязательная контрацепция. Короче цикл — меньше необратимого.</p>
+            </div>
+            {FEMALE_TIMELINE.map((ph: any) => (
+              <div key={ph.id} style={{ borderRadius:14, background:'rgba(244,114,182,0.05)', border:'1px solid rgba(244,114,182,0.14)', padding:12 }}>
+                <div style={{ fontSize:11, fontWeight:850, color:'#f9a8d4' }}>{ph.icon} {ph.title}</div>
+                <div style={{ fontSize:8, fontWeight:700, color:'#f472b6', marginBottom:6 }}>{ph.when}</div>
+                {ph.rows.map((r: any, i: number) => (
+                  <div key={i} style={{ padding:'7px 9px', borderRadius:8, marginBottom:4, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{r.what}</div>
+                    <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.35 }}>{r.action}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Цели и возраст */}
+        {womenTab === 'goals' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>🏆 Специфика по цели/спорту</div>
+              <p style={{ fontSize:8, color:'var(--text-dim)', margin:0, lineHeight:1.35 }}>Практика по категориям: от «мягких» составов до отказа от ААС вовсе (бег/циклические). Все схемы — справочные, с контролем вирилизации.</p>
+            </div>
+            {FEMALE_GOALS.map((g: any, i: number) => (
+              <div key={i} style={cardBg}>
+                <div style={{ fontSize:10, fontWeight:800, color:'#f9a8d4', marginBottom:4 }}>{g.icon} {g.title}</div>
+                <div style={{ fontSize:8, color:'#fff', lineHeight:1.4 }}>Схема: {g.scheme}</div>
+                <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2 }}>Длительность: {g.weeks} · Support: {g.support}</div>
+                <div style={{ fontSize:7, color:'#fca5a5', marginTop:3, lineHeight:1.3 }}>💡 {g.note}</div>
+              </div>
+            ))}
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>👤 Возрастная специфика</div>
+              {FEMALE_AGE_GROUPS.map((a: any, i: number) => (
+                <div key={i} style={{ padding:'9px 10px', borderRadius:8, marginBottom:5, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#f9a8d4', marginBottom:3 }}>{a.age} лет</div>
+                  {a.rows.map((row: any, ri: number) => (
+                    <div key={ri} style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
+                      <b style={{ color:'#fff' }}>{row[0]}:</b> {row[1]}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Взаимодействия */}
+        {womenTab === 'interactions' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>✅ Практичные сочетания (с мониторингом)</div>
+              {FEMALE_SAFE_COMBOS.map((x: any, i: number) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(34,197,94,0.05)', border:'1px solid rgba(34,197,94,0.12)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{x.combo}</span>
+                    <span style={{ fontSize:9 }}>{x.level}</span>
+                  </div>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{x.note}</div>
+                </div>
+              ))}
+            </div>
+            <ContraBanner items={FEMALE_DANGER_COMBOS.map((x: any) => `${x.combo} — ${x.why}`)} />
+            <StopBanner title="ЗАПРЕЩЁННЫЕ КОМБИНАЦИИ (женщина + препарат)" thresholds={FEMALE_FORBIDDEN_COMBOS.map((x: any) => `${x.combo} → ${x.action}`)} />
+          </div>
+        )}
+
+        {/* Экстренно */}
+        {womenTab === 'emergency' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <StopBanner title="КРИТИЧНО — НЕМЕДЛЕННАЯ ОТМЕНА" thresholds={FEMALE_EMERGENCY_CRITICAL.map((x: any) => `${x.situation} → ${x.action}`)} />
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>⚡ Срочно (24–48 ч)</div>
+              {FEMALE_EMERGENCY_URGENT.map((x: any, i: number) => (
+                <div key={i} style={{ fontSize:9, color:'#fcd34d', lineHeight:1.45, marginBottom:3, paddingLeft:8, borderLeft:'2px solid rgba(245,158,11,0.25)' }}>
+                  • <b>{x.situation}</b> → {x.action}
+                </div>
+              ))}
+            </div>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>🚨 Критические симптомы — немедленная отмена</div>
+              {FEMALE_STOP_SYMPTOMS.map((x: any, i: number) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#fca5a5' }}>{x.symptom}</div>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2 }}>Причина: {x.cause}</div>
+                  <div style={{ fontSize:8, color:'#fca5a5', marginTop:2, lineHeight:1.35 }}>→ {x.action}</div>
                 </div>
               ))}
             </div>
