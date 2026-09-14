@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ANGLE_CLASSES, lengthenedBonus, lengthenedBonusForExercise } from '../bb-exercise-selection.engine';
+import { tempoFor } from '../bb-tempo-rest';
 
 /** Волна-1 (аудит 2026-09): отбор упражнений — флаг-осведомлённый lengthened
  *  и живые угловые классы (seated_curl больше не перехватывается curl). */
