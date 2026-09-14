@@ -3,14 +3,15 @@
  * Без логинов/паролей: ТГ генерирует код на 10 мин, АПК вводит код один раз
  * и получает tg-токен для user_kv. Дальше оба устройства синкаются как одно.
  *
- * Видимость: секция общая (Профиль → Настройки), внутри — ветвление по платформе:
+ * Видимость: секция общая (Профиль → Настройки), внутри — ветвление по живому контексту:
  * - telegram → генерация кода;
- * - native → ввод кода / статус / отвязка;
- * - web → подсказка.
+ * - native/web (всё, что НЕ Telegram) → ввод кода / статус / отвязка.
+ *   Ввод НЕ ограничен native: иначе АПК со сбоем детекции Capacitor или dist,
+ *   собранный с VITE_APP_PLATFORM=telegram, молча прятал поле кода.
  */
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { isNativeApp, isTelegramApp, getSyncIdentity } from '../../../core/app-platform';
+import { isCapacitorNative, isTelegramContext } from '../../../core/app-platform';
 import {
   initKvSync,
   onKvSyncStatus,
@@ -20,6 +21,7 @@ import {
   clearLinkedTgToken,
   deriveSyncToken,
 } from '../../../core/cloud-kv';
+import { getSyncIdentity } from '../../../core/app-platform';
 import {
   generateLinkCode,
   normalizeLinkCode,
@@ -44,10 +46,26 @@ function linkClient(tgToken?: string) {
   });
 }
 
+/**
+ * Режим привязки по ЖИВЫМ детекторам (без мемоизации и без VITE_APP_PLATFORM):
+ * - telegram — строгий контекст Mini App (есть initData/user): генерация кода;
+ * - native — Capacitor WebView (АПК): ввод кода;
+ * - web — всё остальное (браузер/PWA): тоже ввод кода (второй экран),
+ *   а не «только просмотр». Иначе АПК со сбоем детекции Capacitor или dist,
+ *   собранный с форсированной платформой, молча прятал ввод кода.
+ */
+export function resolveLinkMode(): 'telegram' | 'native' | 'web' {
+  try {
+    if (isTelegramContext()) return 'telegram';
+  } catch { /* no-op */ }
+  try {
+    if (isCapacitorNative()) return 'native';
+  } catch { /* no-op */ }
+  return 'web';
+}
+
 export const SyncLinkSection: React.FC = () => {
-  const [mode, setMode] = useState<'telegram' | 'native' | 'web'>(() =>
-    isTelegramApp() ? 'telegram' : isNativeApp() ? 'native' : 'web',
-  );
+  const [mode, setMode] = useState<'telegram' | 'native' | 'web'>(() => resolveLinkMode());
   const [code, setCode] = useState('');
   const [expiresAt, setExpiresAt] = useState<number>(0);
   const [now, setNow] = useState(Date.now());
@@ -69,14 +87,19 @@ export const SyncLinkSection: React.FC = () => {
   }, [expiresAt]);
 
   useEffect(() => {
-    setMode(isTelegramApp() ? 'telegram' : isNativeApp() ? 'native' : 'web');
+    setMode(resolveLinkMode());
   }, []);
 
   if (!SUPABASE_URL || !SUPABASE_ANON) {
     return (
       <div style={box} aria-label="Синхронизация ТГ и АПК">
         <div style={title}>🔗 Синхронизация ТГ ↔ АПК</div>
-        <div style={sub}>Облако не настроено (нет Supabase-ключей) — привязка недоступна.</div>
+        <div style={sub}>Облако не настроено в ЭТОЙ сборке (нет Supabase-ключей) — поле ввода кода скрыто.</div>
+        <div style={hint}>
+          Что делать: соберите АПК из того же окружения, что и ТГ-билд — в корне проекта должен быть .env
+          с VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY, затем npm run build:native и cap sync.
+          В Telegram Mini App (где ключи есть) код создаётся как обычно.
+        </div>
       </div>
     );
   }
@@ -164,7 +187,7 @@ export const SyncLinkSection: React.FC = () => {
       <div style={sub}>
         {mode === 'telegram' && 'Создайте код — введите его в АПК один раз. Логин и пароль не нужны.'}
         {mode === 'native' && (linked ? `Привязано · облако: ${syncStatus}` : 'Введите код из Telegram — данные станут общими.')}
-        {mode === 'web' && 'Привязка работает между Telegram Mini App и АПК (в браузере — только просмотр).'}
+        {mode === 'web' && (linked ? `Привязано · облако: ${syncStatus}` : 'Введите код из Telegram — этот браузер станет вторым устройством.')}
       </div>
 
       {mode === 'telegram' && (
@@ -188,7 +211,7 @@ export const SyncLinkSection: React.FC = () => {
         </div>
       )}
 
-      {mode === 'native' && !linked && (
+      {mode !== 'telegram' && !linked && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input
             value={input}
@@ -206,9 +229,9 @@ export const SyncLinkSection: React.FC = () => {
         </div>
       )}
 
-      {mode === 'native' && linked && (
+      {mode !== 'telegram' && linked && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={hint}>✅ АПК привязан к ТГ-аккаунту · облако: {syncStatus}</div>
+          <div style={hint}>✅ Привязано к ТГ-аккаунту · облако: {syncStatus}</div>
           <button onClick={unlink} style={btnGhost}>✕ Отвязать</button>
         </div>
       )}
