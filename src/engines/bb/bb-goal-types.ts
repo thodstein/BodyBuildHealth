@@ -44,21 +44,9 @@ export const FOCUS_REPS_TABLE: Record<BBTrainingFocus, FocusRepsConfig> = {
   endurance:   { heavy: [8, 12], pump: [15, 30], light: [10, 20] },
 };
 
-/** @deprecated дублирует bb-tempo-rest.ts phaseTempo; каноника — bb-tempo-rest */
-export const PHASE_TEMPO: Record<string, { notation: string; eccentric: number }> = {
-  accumulation:     { notation: '3-1-1-0', eccentric: 3 },
-  intensification:  { notation: '2-1-1-0', eccentric: 2 },
-  peaking:          { notation: '2-0-1-0', eccentric: 2 },
-  deload:           { notation: '4-2-2-0', eccentric: 4 },
-};
-
-/** @deprecated не используется */
-export const LEVEL_REP_MOD: Record<string, number> = {
-  beginner: 0,
-  intermediate: 1,
-  advanced: 2,
-  enhanced: 4,
-};
+// Волна-1 (аудит 2026-09): удалены мёртвые дубли канона —
+// PHASE_TEMPO (дублировал bb-tempo-rest и врал про deload 4-2-2-0) и
+// LEVEL_REP_MOD (ни одного потребителя). Канон темпов — только bb-tempo-rest.
 
 /**
  * Focus-специфичные оверрайды фаз.
