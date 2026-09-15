@@ -296,8 +296,7 @@ export const STRICT_EXERCISE_GROUPS: Record<string, StrictExerciseGroup[]> = {
   // Плечи: жим (масса) + махи в стороны (середина) + задняя дельта (осанка/толщина).
   // Жим меняется только на жим, махи — только на махи: иначе специализация средней дельты
   // тихо сползает в жимы, а задняя — в тяги спины.
-  shoulders: [
-    {
+  shoulders: [    {
       key: 'shoulder_press', label: 'Жим стоя/сидя (гантели/штанга)',
       ids: ['ohp', 'db_press', 'ohp_seated', 'push_press'],
       re: /жим.*(стоя|сидя)|overhead.*press|военн.*жим|арнольд|arnold/i,
@@ -314,6 +313,49 @@ export const STRICT_EXERCISE_GROUPS: Record<string, StrictExerciseGroup[]> = {
       ids: ['rear_delt_fly', 'rear_delt_machine', 'face_pull', 'face_pull_sh'],
       re: /задн.*дельт|rear.?delt|лиц.*тяга|face.?pull|обратн.*(бабоч|дельт)|махи.*наклон/i,
       not: /жим|press|махи.*сторон|lateral.*raise/i,
+    },
+  ],
+  // Руки: каталог держит бицепс+трицепс в группе arms — строгие ключи идут по
+  // каноническим мышцам (biceps/triceps), как их видит weak-зона и аудит.
+  // База + брахиалис/длинная + пиковая: сгибание не меняется на разгибание никогда.
+  biceps: [
+    {
+      key: 'bicep_base', label: 'Сгибания со штангой/гантелями (база)',
+      ids: ['curl_bar', 'curl_bar_v2', 'curl_db', 'curl_db_standing', 'curl_ez', 'curl_cable', 'curl_21s'],
+      re: /сгибан.*(штанг|гантел)|подъём.*штанг.*бицепс|подъем.*штанг.*бицепс|barbell.*curl|dumbbell.*curl|сгибан.*блок|cable.*curl|21-.*сгибан/i,
+      not: /молот|hammer|наклон|incline|проповед|preacher|концентр|concentrat|пауч|spider|трицепс|tricep|француз|разгибан/i,
+    },
+    {
+      key: 'bicep_hammer', label: 'Молотки (брахиалис)',
+      ids: ['hammer_curl', 'curl_hammer', 'curl_reverse'],
+      re: /молот|hammer.*curl|обратн.*сгибан|reverse.*curl/i,
+      not: /трицепс|tricep|разгибан/i,
+    },
+    {
+      key: 'bicep_peak', label: 'Пиковая: проповедник/концентрация/паук + наклонная',
+      ids: ['preacher_curl', 'curl_concentration', 'curl_spider', 'curl_spider_db', 'curl_incline', 'curl_cable_high'],
+      re: /проповед|preacher|концентр|concentrat|пауч|spider|сгибан.*наклон|incline.*curl|скотт/i,
+      not: /молот|hammer|трицепс|tricep|разгибан/i,
+    },
+  ],
+  triceps: [
+    {
+      key: 'tricep_push', label: 'Разгибания на блоке/кикбэк (латеральная)',
+      ids: ['kickback', 'tricep_cable', 'tricep_pushdown_rope', 'tricep_pushdown_bar'],
+      re: /разгибан.*блок|pushdown|трицепс.*блок|канат|кикбэк|kickback|разгибан.*гантел/i,
+      not: /из.?за|overhead|француз|french|жим|press|брус|dip/i,
+    },
+    {
+      key: 'tricep_overhead', label: 'Разгибания из-за головы (длинная)',
+      ids: ['overhead_tricep_ext', 'tricep_overhead_rope', 'db_skullcrusher', 'french_press_bar'],
+      re: /разгибан.*из.?за|overhead.*triceps|француз|french|череп|skull/i,
+      not: /блок|pushdown|жим|press|брус|dip/i,
+    },
+    {
+      key: 'tricep_press', label: 'Жимовая база: брусья/узкий жим',
+      ids: ['dips_tricep', 'bench_dips', 'bench_closegrip', 'jm_press'],
+      re: /отжим.*брус|dip|брусь|жим.*узк|close.?grip|обратн.*отжиман/i,
+      not: /груд|chest|разгибан.*блок|pushdown|из.?за|overhead|француз/i,
     },
   ],
 };

@@ -992,6 +992,7 @@ export const BBDiagnosticsHub: React.FC = () => {
           equipment: profileEquipment,
           missingAngles: aud?.angleCoverage.missing || [],
           missingStrict: aud?.strictCoverage.missing || [],
+          missingShort: (aud?.totalSets ?? 0) >= 6 && (aud?.shortened ?? 0) === 0,
           inPlanIds: inPlan,
           sex: effSex || undefined,
         }).slice(0, 3);

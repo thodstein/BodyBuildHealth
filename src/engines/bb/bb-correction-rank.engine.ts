@@ -19,6 +19,8 @@ export interface RankCtx {
   level?: string;
   missingAngles?: string[];
   missingStrict?: string[];
+  /** Мышце не хватает пиковой/добивочной (сечка) — short-профиль получает +3. */
+  missingShort?: boolean;
   inPlanIds?: string[];
   sex?: string;
 }
@@ -107,6 +109,7 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     const sfr = sfrOf({ id, name });
     const profile = resistanceProfileOf({ id, name });
     const lengthened = profile === 'lengthened';
+    const shortProfile = profile === 'short';
     const unilateral = isUnilateralExercise({ id, name }) || /kick.?back|single|bulgarian|split.?squat|lunge|step.?up|одной/i.test(`${id} ${name}`);
     let angleClass: string | null = null;
     try {
@@ -131,6 +134,12 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     if (strictKey && missingStrict.has(norm(strictKey))) {
       score += 2;
       closesStrict = strictKey;
+    }
+    // сечка: мышце не хватает пиковой — short-профиль первым
+    let closesShort = false;
+    if (shortProfile && ctx.missingShort) {
+      score += 3;
+      closesShort = true;
     }
     if (unilateral && (ctx.asymPct ?? 0) >= 7) score += 5;
     else if (unilateral) score += 1;
@@ -157,6 +166,7 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     if (lengthened) why.push('lengthened');
     if (closesAngle) why.push(`закрывает угол ${closesAngle}`);
     if (closesStrict) why.push(`строгая ${closesStrict}`);
+    if (closesShort) why.push('пиковая (сечка)');
     if (unilateral && (ctx.asymPct ?? 0) >= 7) why.push('unilateral чинит асимметрию');
     if (js === 'low') why.push('сустав low');
 
