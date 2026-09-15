@@ -573,8 +573,20 @@
     `PopupSelect` ≥8).
   - Проверено: bb-UI + широкий круг **129/129** (10 файлов, 1 чужой unhandled ReportsScreen),
     `tsc` 0, `verify:apk-design` OK.
-- [ ] Волна 4 — остаток: **4.3** (вынос шаговых render-компонентов `renderQuality`/`renderContestPrep`
-  со state-props) — отдельным этапом: ~100 состояний, файл правят параллельные агенты.
+- [x] **Волна 4 — 4.3 этап 2 (шаговые компоненты, паттерн props)**: NEW `bb-step-split.tsx` (шаг 3
+  «🏆 Выбор сплита», 12 явных props) и `bb-step-ped.tsx` (шаг 2 «💉 Фармакология и рабочие веса»,
+  35 props: state-сеттеры передаются напрямую) — перенос 1-в-1 (логика/тексты/стили не менялись),
+  оба шага в `BbAutoConstructor.tsx` стали тонкими вызовами `<BbSplitStep/>`/`<BbPedWorkMaxStep/>`;
+  файл −~376 строк (8624→8248), осиротевшие импорты почищены. Проверено: bb-UI + широкий круг
+  **132/132** (11 файлов, 1 чужой unhandled ReportsScreen), `tsc` **0 по проекту**, `verify:apk-design` OK.
+- [ ] **4.3 — остаток (новая сессия)**: вынести оставшиеся шаги тем же паттерном
+  (`bb-step-<name>.tsx` + явные props, перенос 1-в-1): `renderParams` (~848), `renderPlanWithComments`
+  (~626), `renderWeights` (~104), `renderAdjust` (~367), `renderPrepCycleMode` (~488),
+  `renderExSwapModal` (~167); самые большие — `renderQuality` (~1143) и `renderContestPrep` (~1378):
+  у них ~80-100 state-ссылок, рекомендуется резать их **под-секциями** (каждая секция — компонент
+  с 8-15 props) или через контекст-объект, а не целиком. Инварианты для каждого этапа: `tsc` 0,
+  bb-UI паки (bb-auto-smoke/annual/prep-cycle/dup/volume-toggle/reproductive/a11y/apk-controls) +
+  rest-hooks-native/apk-top-pack, `verify:apk-design`; коммит строго pathspec своих файлов.
 - [ ] Волна 5 — каталог/данные
 
 ---
