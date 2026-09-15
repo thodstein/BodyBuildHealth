@@ -32,7 +32,75 @@ import {
 import { activeBlockForWeek, weekForDate } from '../../../engines/annual-training/block-builders.engine';
 import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
 import type { BBExercise } from '../../../engines/bb/bb-builder.engine';
-import { CARD } from './training-ui';
+import { ACCENT, CARD } from './training-ui';
+
+/* ── 4.5 (мобилка): APK-кит — переключатели вместо нативных checkbox.
+      Касание ≥44px, шрифты ≥10px, aria role=switch/aria-checked. ── */
+
+/** Переключатель-строка: заголовок + описание + трек/тамб (минимальная высота 44px). */
+export const BbRowSwitch: React.FC<{
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  title: React.ReactNode;
+  desc?: React.ReactNode;
+  icon?: string;
+  accent?: string;
+  ariaLabel?: string;
+}> = ({ checked, onChange, title, desc, icon, accent = ACCENT, ariaLabel }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={ariaLabel}
+    onClick={() => onChange(!checked)}
+    style={{
+      width: '100%', display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 6px',
+      padding: '10px 12px', minHeight: 44, borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+      boxSizing: 'border-box', fontFamily: 'inherit',
+      background: checked ? `linear-gradient(135deg, ${accent}1e, rgba(24,24,27,0.35))` : 'rgba(255,255,255,0.03)',
+      border: checked ? `1px solid ${accent}66` : '1px solid rgba(255,255,255,0.08)',
+      transition: 'all .15s',
+    }}
+  >
+    {icon && <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>}
+    <span style={{ flex: 1, minWidth: 0 }}>
+      <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: checked ? accent : '#fff', lineHeight: 1.25 }}>{title}</span>
+      {desc && <span style={{ display: 'block', fontSize: 10, color: '#fff', lineHeight: 1.35, marginTop: 2 }}>{desc}</span>}
+    </span>
+    <span style={{ marginLeft: 'auto', width: 36, height: 20, borderRadius: 10, flexShrink: 0, position: 'relative', background: checked ? accent : 'rgba(255,255,255,0.15)', transition: 'background .2s' }}>
+      <span style={{ position: 'absolute', top: 2, left: checked ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
+    </span>
+  </button>
+);
+
+/** Компактный чип-переключатель (чек-листы, инлайн-ряды): ≥44px, aria-pressed-семантика. */
+export const BbToggleChip: React.FC<{
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: React.ReactNode;
+  accent?: string;
+  ariaLabel?: string;
+}> = ({ checked, onChange, label, accent = '#22c55e', ariaLabel }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={ariaLabel}
+    onClick={() => onChange(!checked)}
+    style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44, padding: '6px 12px',
+      borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+      fontSize: 11, fontWeight: checked ? 800 : 600,
+      background: checked ? `${accent}22` : 'rgba(255,255,255,0.04)',
+      border: checked ? `1px solid ${accent}66` : '1px solid rgba(255,255,255,0.1)',
+      color: checked ? accent : '#fff',
+    }}
+  >
+    <span aria-hidden style={{ fontSize: 12 }}>{checked ? '✓' : '○'}</span>
+    <span style={{ minWidth: 0 }}>{label}</span>
+  </button>
+);
+
 
 /* ── CollapsibleCard helper для шага 5 (заголовок-кнопка карточки) ── */
 export const CollapsibleCard: React.FC<{

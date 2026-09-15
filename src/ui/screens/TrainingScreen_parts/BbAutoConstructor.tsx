@@ -151,6 +151,7 @@ import {
   annualBlockCtxToPrepPatch, annualActiveBlockLine,
   getPhaseMap, phaseForWeek, isWeakMuscle, DONOR_GROUPS, normalizeDonorTargets,
   computePhases, exerciseComment, chipBtn, useInlineDialogA11y,
+  BbRowSwitch, BbToggleChip,
   type Step, type BBPhase, type PlanMode,
 } from './bb-auto-constructor-shared';
 export {
@@ -3832,11 +3833,15 @@ export const BbAutoConstructor: React.FC = () => {
         </span>
       </button>
       {savedPlans.length > 0 && (
-        <div style={{ marginTop:8, display:'flex', alignItems:'center', gap:8 }}>
-          <label style={{ fontSize:11, color:'#fff', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
-            <input type="checkbox" checked={usePreviousPlan} onChange={e => setUsePreviousPlan(e.target.checked)} style={{ accentColor: ACCENT }} />
-            🔗 Cross-mesocycle: прогрессия из последнего плана ({savedPlans[0]?.name || ''})
-          </label>
+        <div style={{ marginTop:8 }}>
+          <BbRowSwitch
+            checked={usePreviousPlan}
+            onChange={setUsePreviousPlan}
+            icon="🔗"
+            title="Cross-mesocycle: прогрессия из последнего плана"
+            desc={savedPlans[0]?.name || ''}
+            ariaLabel="Прогрессия из последнего плана"
+          />
         </div>
       )}
       {autoDeload && (
@@ -4858,9 +4863,19 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
             <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginBottom:8 }}>
               <span style={{ fontSize:9, opacity:0.8 }}>⚡ VBT скорость (м/с):</span>
-              <select value={vbtInput.lift} onChange={e => setVbtInput({ ...vbtInput, lift: e.target.value })} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:10, padding:'2px 6px' }}>
-                {['bench','squat','deadlift','ohp','row','pulldown'].map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
+              <PopupSelect
+                label="Движение"
+                value={vbtInput.lift}
+                onChange={v => setVbtInput({ ...vbtInput, lift: v })}
+                options={[
+                  { id: 'bench', label: 'Жим лёжа' },
+                  { id: 'squat', label: 'Присед' },
+                  { id: 'deadlift', label: 'Тяга' },
+                  { id: 'ohp', label: 'Жим стоя' },
+                  { id: 'row', label: 'Тяга в наклоне' },
+                  { id: 'pulldown', label: 'Верхний блок' },
+                ]}
+              />
               <input type="number" step="0.01" placeholder="лучший" value={vbtInput.best} onChange={e => setVbtInput({ ...vbtInput, best: e.target.value })} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:10, padding:'2px 6px', width:64 }} />
               <input type="number" step="0.01" placeholder="последний" value={vbtInput.last} onChange={e => setVbtInput({ ...vbtInput, last: e.target.value })} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:10, padding:'2px 6px', width:76 }} />
             </div>
@@ -6128,25 +6143,19 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)' }}>
               <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:8 }}>🎭 Пик-неделя (тапер ББ) · шоу {peakPrep.config.showDate}</div>
               <div style={{ marginBottom:10, fontSize:11 }}>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ color:'#fff' }}>Категория:</span>
-                  <select value={peakWeekCategory} onChange={e => applyPeakWeekToCurrentPlan(e.target.value as BBContestCategory)} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', fontSize:11 }}>
-                    <option value="mens_physique">{CONTEST_CATEGORY_LABELS.mens_physique}</option>
-                    <option value="classic_physique">{CONTEST_CATEGORY_LABELS.classic_physique}</option>
-                    <option value="bb_212">{CONTEST_CATEGORY_LABELS.bb_212}</option>
-                    <option value="mens_bb">{CONTEST_CATEGORY_LABELS.mens_bb}</option>
-                    <option value="bikini">{CONTEST_CATEGORY_LABELS.bikini}</option>
-                    <option value="figure">{CONTEST_CATEGORY_LABELS.figure}</option>
-                    <option value="wellness">{CONTEST_CATEGORY_LABELS.wellness}</option>
-                    <option value="womens_physique">{CONTEST_CATEGORY_LABELS.womens_physique}</option>
-                    <option value="womens_bb">{CONTEST_CATEGORY_LABELS.womens_bb}</option>
-                  </select>
-                  <span style={{ color:'#fff' }}>⭐ Специализация:</span>
-                  <select value={peakSpec} onChange={e => applyPeakWeekToCurrentPlan(peakWeekCategory, e.target.value as ContestSpecialization)} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', color:'#c084fc', border:'1px solid rgba(168,85,247,0.3)', fontSize:11 }}>
-                    {(Object.keys(CONTEST_SPECIALIZATION_LABELS) as ContestSpecialization[]).map(s => (
-                      <option key={s} value={s}>{CONTEST_SPECIALIZATION_LABELS[s]}</option>
-                    ))}
-                  </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <PopupSelect
+                    label="🎭 Категория"
+                    value={peakWeekCategory}
+                    onChange={v => applyPeakWeekToCurrentPlan(v as BBContestCategory)}
+                    options={(Object.keys(CONTEST_CATEGORY_LABELS) as BBContestCategory[]).map(c => ({ id: c, label: CONTEST_CATEGORY_LABELS[c] }))}
+                  />
+                  <PopupSelect
+                    label="⭐ Специализация"
+                    value={peakSpec}
+                    onChange={v => applyPeakWeekToCurrentPlan(peakWeekCategory, v as ContestSpecialization)}
+                    options={(Object.keys(CONTEST_SPECIALIZATION_LABELS) as ContestSpecialization[]).map(s => ({ id: s, label: CONTEST_SPECIALIZATION_LABELS[s] }))}
+                  />
                 </div>
               </div>
               {/* Единый рендер протокола (Э0.3): ContestPeakWeekCard */}
@@ -6238,15 +6247,18 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
               <div style={{ fontSize:11, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>⚡ Пакетное редактирование — неделя {bbWeekSel}</div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
-                <select value={bulkField} onChange={e2 => setBulkField(e2.target.value as any)} style={{ ...IN, fontSize:11, width:'auto' }}>
-                  <option value="sets">Сеты</option>
-                  <option value="reps">Повторы</option>
-                  <option value="weight">Вес, кг</option>
-                </select>
-                <select value={bulkMode} onChange={e2 => setBulkMode(e2.target.value as any)} style={{ ...IN, fontSize:11, width:'auto' }}>
-                  <option value="set">= задать</option>
-                  <option value="mult">× умножить</option>
-                </select>
+                <PopupSelect
+                  label="Поле"
+                  value={bulkField}
+                  onChange={v => setBulkField(v as any)}
+                  options={[{ id: 'sets', label: 'Сеты' }, { id: 'reps', label: 'Повторы' }, { id: 'weight', label: 'Вес, кг' }]}
+                />
+                <PopupSelect
+                  label="Режим"
+                  value={bulkMode}
+                  onChange={v => setBulkMode(v as any)}
+                  options={[{ id: 'set', label: '= задать' }, { id: 'mult', label: '× умножить' }]}
+                />
                 <input type="number" value={bulkValue} onChange={e2 => setBulkValue(parseFloat(e2.target.value) || 0)} style={{ width:60, ...IN }} />
                 <button onClick={() => {
                   const next: any = { ...editsRef.current };
@@ -6291,19 +6303,29 @@ export const BbAutoConstructor: React.FC = () => {
                     </div>
                     <div style={{ display:'flex', gap:8, marginBottom:6, flexWrap:'wrap', alignItems:'center' }}>
                       <span style={{ ...SMALL, fontSize:11, fontWeight:800, color:'#c084fc' }}>⚙️ Фичи и методики</span>
-                      <select value={edit.technique ?? ((e as any).technique || 'none')} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, technique: e2.target.value } }))} style={{ ...IN, fontSize:11, width:'auto' }}>
-                        <option value="none">— интенсив-техника —</option>
-                        <option value="drop_set">💥 Дроп-сет</option>
-                        <option value="rest_pause">⏱ Рест-пауза</option>
-                        <option value="myo_rep">🧬 Мио-репс</option>
-                        <option value="negative">⬇️ Негативы</option>
-                        <option value="21s">2️⃣1️⃣ 21s</option>
-                      </select>
-                      <select value={edit.supersetWith ?? ((e as any).supersetWith || 'none')} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, supersetWith: e2.target.value } }))} style={{ ...IN, fontSize:11, width:'auto' }}>
-                        <option value="none">— суперсет —</option>
-                        <option value="антагонист">🔗 Антагонист</option>
-                        <option value="та же группа">🔗 Та же группа</option>
-                      </select>
+                      <PopupSelect
+                        label="Интенсив-техника"
+                        value={edit.technique ?? ((e as any).technique || 'none')}
+                        onChange={v => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, technique: v } }))}
+                        options={[
+                          { id: 'none', label: '— интенсив-техника —' },
+                          { id: 'drop_set', label: '💥 Дроп-сет' },
+                          { id: 'rest_pause', label: '⏱ Рест-пауза' },
+                          { id: 'myo_rep', label: '🧬 Мио-репс' },
+                          { id: 'negative', label: '⬇️ Негативы' },
+                          { id: '21s', label: '2️⃣1️⃣ 21s' },
+                        ]}
+                      />
+                      <PopupSelect
+                        label="Суперсет"
+                        value={edit.supersetWith ?? ((e as any).supersetWith || 'none')}
+                        onChange={v => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, supersetWith: v } }))}
+                        options={[
+                          { id: 'none', label: '— суперсет —' },
+                          { id: 'антагонист', label: '🔗 Антагонист' },
+                          { id: 'та же группа', label: '🔗 Та же группа' },
+                        ]}
+                      />
                       <div style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ ...SMALL, fontSize:11 }}>Темп</span><input type="text" defaultValue={(e as any).tempoSpec || edit.tempo || ''} onBlur={e2 => { const v=e2.target.value.trim(); setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, tempo: v || undefined } })); }} placeholder="3-1-1-0" style={{ width:62, ...IN }} /></div>
                       {(edit.technique && edit.technique !== 'none') || (edit.supersetWith && edit.supersetWith !== 'none') ? <span style={{ fontSize:9, color:'#f59e0b' }}>⚠ применяется при «💾 Сохранить план» / экспорте</span> : null}
                     </div>
@@ -6369,20 +6391,20 @@ export const BbAutoConstructor: React.FC = () => {
               <input type="date" value={prepShowDate} onChange={e => handleShiftPrepShowDate(e.target.value)} style={{ ...IN, width:'100%' }} />
             </div>
             <div>
-              <div style={{ ...SMALL, marginBottom:4 }}>🎭 Категория</div>
-              <select value={peakWeekCategory} onChange={e => setPeakWeekCategory(e.target.value as BBContestCategory)} style={{ ...IN, width:'100%' }}>
-                {(Object.keys(CATEGORY_PROFILES) as BBContestCategory[]).map(c => (
-                  <option key={c} value={c}>{CONTEST_CATEGORY_LABELS[c]}</option>
-                ))}
-              </select>
+              <PopupSelect
+                label="🎭 Категория"
+                value={peakWeekCategory}
+                onChange={v => setPeakWeekCategory(v as BBContestCategory)}
+                options={(Object.keys(CATEGORY_PROFILES) as BBContestCategory[]).map(c => ({ id: c, label: CONTEST_CATEGORY_LABELS[c] }))}
+              />
             </div>
             <div>
-              <div style={{ ...SMALL, marginBottom:4 }}>⭐ Специализация</div>
-              <select value={peakSpec} onChange={e => setPeakSpec(e.target.value as ContestSpecialization)} style={{ ...IN, width:'100%' }}>
-                {(Object.keys(CONTEST_SPECIALIZATION_LABELS) as ContestSpecialization[]).map(s => (
-                  <option key={s} value={s}>{CONTEST_SPECIALIZATION_LABELS[s]}</option>
-                ))}
-              </select>
+              <PopupSelect
+                label="⭐ Специализация"
+                value={peakSpec}
+                onChange={v => setPeakSpec(v as ContestSpecialization)}
+                options={(Object.keys(CONTEST_SPECIALIZATION_LABELS) as ContestSpecialization[]).map(s => ({ id: s, label: CONTEST_SPECIALIZATION_LABELS[s] }))}
+              />
             </div>
             <div>
               <div style={{ ...SMALL, marginBottom:4 }}>Противопоказания (из профиля + ручные)</div>
@@ -6411,9 +6433,12 @@ export const BbAutoConstructor: React.FC = () => {
                   <div key={c.id} style={{ display:'flex', gap:6, alignItems:'center', padding:'4px 6px', borderRadius:6, background:'rgba(255,255,255,0.04)', border: c.id===prepMainCompetitionId ? '1px solid rgba(251,191,36,0.4)' : '1px solid rgba(255,255,255,0.06)' }}>
                     <button onClick={() => setPrepMainCompetitionId(c.id===prepMainCompetitionId ? undefined : c.id)} style={{ fontSize:11, padding:'2px 6px', borderRadius:4, background: c.id===prepMainCompetitionId ? 'rgba(251,191,36,0.2)' : 'transparent', color: c.id===prepMainCompetitionId ? '#fbbf24' : 'rgba(255,255,255,0.5)', border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer' }}>{c.id===prepMainCompetitionId ? '★' : '☆'}</button>
                     <input value={c.name} onChange={e => setPrepCompetitions(prev => (prev||[]).map(x => x.id===c.id ? {...x, name:e.target.value} : x))} style={{ flex:1, background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'2px 6px', fontSize:11 }} />
-                    <select value={c.priority || 'B'} onChange={e => setPrepCompetitions(prev => (prev||[]).map(x => x.id===c.id ? {...x, priority:e.target.value as any} : x))} style={{ background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, fontSize:10 }}>
-                      <option value="A">A главный</option><option value="B">B контроль</option><option value="C">C тренир.</option>
-                    </select>
+                    <PopupSelect
+                      label="Приоритет"
+                      value={c.priority || 'B'}
+                      onChange={v => setPrepCompetitions(prev => (prev||[]).map(x => x.id===c.id ? {...x, priority: v as any} : x))}
+                      options={[{ id: 'A', label: 'A главный' }, { id: 'B', label: 'B контроль' }, { id: 'C', label: 'C тренир.' }]}
+                    />
                     <input type="date" value={c.date || ''} onChange={e => setPrepCompetitions(prev => (prev||[]).map(x => x.id===c.id ? {...x, date:e.target.value || undefined} : x))} style={{ background:'transparent', color:'#fbbf24', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, fontSize:10 }} />
                     <button onClick={() => setPrepCompetitions(prev => (prev||[]).filter(x => x.id!==c.id))} style={{ color:'#f87171', background:'transparent', border:'none', cursor:'pointer', fontSize:12 }}>✕</button>
                   </div>
@@ -6495,12 +6520,20 @@ export const BbAutoConstructor: React.FC = () => {
                 ))}
               </div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-                <label style={{ display:'flex', gap:6, alignItems:'center', fontSize:11, color: prepPreferLowFiber ? '#22c55e' : 'rgba(255,255,255,0.6)', cursor:'pointer' }}>
-                  <input type="checkbox" checked={prepPreferLowFiber} onChange={e => setPrepPreferLowFiber(e.target.checked)} /> Низковолокнистые карбс
-                </label>
-                <label style={{ display:'flex', gap:6, alignItems:'center', fontSize:11, color: prepCreatineStop ? '#f87171' : 'rgba(255,255,255,0.6)', cursor:'pointer' }}>
-                  <input type="checkbox" checked={prepCreatineStop} onChange={e => setPrepCreatineStop(e.target.checked)} /> Стоп креатин
-                </label>
+                <BbToggleChip
+                  checked={prepPreferLowFiber}
+                  onChange={setPrepPreferLowFiber}
+                  label="Низковолокнистые карбс"
+                  accent="#22c55e"
+                  ariaLabel="Низковолокнистые углеводы"
+                />
+                <BbToggleChip
+                  checked={prepCreatineStop}
+                  onChange={setPrepCreatineStop}
+                  label="Стоп креатин"
+                  accent="#f87171"
+                  ariaLabel="Отмена креатина"
+                />
               </div>
             </div>
             <div>
@@ -6520,10 +6553,15 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
           </div>
           {(prepWaterMode !== 'stable' || prepSodiumMode !== 'stable') && (
-            <label style={{ display:'flex', gap:8, alignItems:'flex-start', marginBottom:8, fontSize:11, color:'#fbbf24', background:'rgba(245,158,11,0.08)', padding:10, borderRadius:8 }}>
-              <input type="checkbox" checked={prepConfirmedManip} onChange={e => setPrepConfirmedManip(e.target.checked)} />
-              <span>⚠ Я понимаю: умеренная модуляция воды/натрия допустима только при стабильном здоровье, без противопоказаний; диуретики не назначаются; при симптомах нарушения электролитов — план остановить. Подтверждаю выбор.</span>
-            </label>
+            <BbRowSwitch
+              checked={prepConfirmedManip}
+              onChange={setPrepConfirmedManip}
+              icon="⚠"
+              accent="#fbbf24"
+              title="Я понимаю: умеренная модуляция воды/натрия допустима только при стабильном здоровье, без противопоказаний"
+              desc="Диуретики не назначаются; при симптомах нарушения электролитов — план остановить. Подтверждаю выбор."
+              ariaLabel="Подтверждаю модуляцию воды и натрия"
+            />
           )}
           {/* PRO-2 P1: замок high-манипуляций без trial (движок back-compat, гейт на поверхности сборки) */}
           {(() => {
@@ -7022,21 +7060,22 @@ export const BbAutoConstructor: React.FC = () => {
                     const key = `${prepPlan.showDate}_${item.id}`;
                     const checked = !!showCheck[key];
                     return (
-                      <label key={item.id} style={{ display:'flex', gap:8, alignItems:'flex-start', fontSize:10, color: checked ? '#fff' : '#fff', opacity: checked ? 0.55 : 1, cursor:'pointer', padding:'3px 0' }}>
-                        <input
-                          type="checkbox"
+                      <div key={item.id} style={{ padding:'2px 0' }}>
+                        <BbToggleChip
                           checked={checked}
+                          ariaLabel={item.label}
                           onChange={() => {
                             try { setShowCheck(toggleShowChecklistItem(prepPlan.showDate, item.id)); } catch { /* ignore */ }
                           }}
-                          style={{ marginTop:2 }}
+                          label={(
+                            <span style={{ textDecoration: checked ? 'line-through' : 'none' }}>
+                              <b style={{ color:'#fbbf24' }}>{item.dayOffset === 0 ? 'D-0' : `D-${item.dayOffset}`}</b>
+                              {' · '}{item.date.slice(5).replace('-','.')} · {item.label}
+                              {item.detail && <span style={{ color:'#fff' }}> — {item.detail}</span>}
+                            </span>
+                          )}
                         />
-                        <span>
-                          <b style={{ color:'#fbbf24' }}>{item.dayOffset === 0 ? 'D-0' : `D-${item.dayOffset}`}</b>
-                          {' · '}{item.date.slice(5).replace('-','.')} · {checked ? <s>{item.label}</s> : item.label}
-                          {item.detail && <span style={{ color:'#fff' }}> — {item.detail}</span>}
-                        </span>
-                      </label>
+                      </div>
                     );
                   })}
                   <div style={{ marginTop:8, paddingTop:8, borderTop:'1px solid rgba(251,191,36,0.2)' }}>
@@ -7349,12 +7388,17 @@ export const BbAutoConstructor: React.FC = () => {
                         <button key={v} onClick={() => setPostLogHunger(v)} style={{ width:24, height:24, borderRadius:6, fontSize:10, cursor:'pointer', color:'#fff', border:'1px solid rgba(34,197,94,0.35)', background: postLogHunger === v ? 'rgba(34,197,94,0.45)' : 'rgba(255,255,255,0.03)' }}>{v}</button>
                       ))}
                     </span>
-                    <select value={postLogCycle} onChange={e => setPostLogCycle(e.target.value as typeof postLogCycle)} style={{ ...IN, fontSize:10 }}>
-                      <option value="na">М — н/п</option>
-                      <option value="restored">Цикл вернулся</option>
-                      <option value="irregular">Нерегулярно</option>
-                      <option value="absent">Нет цикла</option>
-                    </select>
+                    <PopupSelect
+                      label="Цикл"
+                      value={postLogCycle}
+                      onChange={v => setPostLogCycle(v as typeof postLogCycle)}
+                      options={[
+                        { id: 'na', label: 'М — н/п' },
+                        { id: 'restored', label: 'Цикл вернулся' },
+                        { id: 'irregular', label: 'Нерегулярно' },
+                        { id: 'absent', label: 'Нет цикла' },
+                      ]}
+                    />
                     <input type="number" step={1} placeholder="Сила %" value={postLogStrength} onChange={e => setPostLogStrength(e.target.value)} style={{ width:64, ...IN }} />
                     <button
                       style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#4ade80' }}
@@ -7719,10 +7763,12 @@ export const BbAutoConstructor: React.FC = () => {
         {prepStep === 'params' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 800 }}>⚙️ Параметры Prep-цикла</div>
-            <label style={{ fontSize: 10, color: '#fff' }}>Категория ({prepSex === 'female' ? 'женские' : 'мужские'})</label>
-            <select value={prepCat} onChange={e => setPrepCat(e.target.value as BBContestCategory)} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12 }}>
-              {catOpts.map(c => <option key={c} value={c}>{CATEGORY_PROFILES[c].label}</option>)}
-            </select>
+            <PopupSelect
+              label={`🎭 Категория (${prepSex === 'female' ? 'женские' : 'мужские'})`}
+              value={prepCat}
+              onChange={v => setPrepCat(v as BBContestCategory)}
+              options={catOpts.map(c => ({ id: c, label: CATEGORY_PROFILES[c].label }))}
+            />
             {prepProfile.balanceNote && <div style={{ fontSize: 10, color: '#fff', padding: '8px 10px', borderRadius: 10, background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.2)' }}>💡 {prepProfile.balanceNote}</div>}
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -7762,9 +7808,12 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               <input value={prepCompDraft.name} placeholder="Название" onChange={e => setPrepCompDraft(d => ({ ...d, name: e.target.value }))} style={{ flex: 1, minWidth: 90, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 10 }} />
               <input type="date" value={prepCompDraft.date} onChange={e => setPrepCompDraft(d => ({ ...d, date: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 10 }} />
-              <select value={prepCompDraft.priority} onChange={e => setPrepCompDraft(d => ({ ...d, priority: e.target.value as 'A' | 'B' | 'C' }))} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 10 }}>
-                <option value="A">A</option><option value="B">B</option><option value="C">C</option>
-              </select>
+              <PopupSelect
+                label="Приоритет"
+                value={prepCompDraft.priority}
+                onChange={v => setPrepCompDraft(d => ({ ...d, priority: v as 'A' | 'B' | 'C' }))}
+                options={[{ id: 'A', label: 'A' }, { id: 'B', label: 'B' }, { id: 'C', label: 'C' }]}
+              />
               <button onClick={() => {
                 const name = prepCompDraft.name.trim();
                 const date = prepCompDraft.date;
@@ -7822,13 +7871,15 @@ export const BbAutoConstructor: React.FC = () => {
         {prepStep === 'split' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 800 }}>📐 Сплит подготовки</div>
-            <label style={{ fontSize: 10, color: '#fff' }}>Рекомендуемые для {CATEGORY_PROFILES[prepCat].label}:</label>
-            <select value={prepSplit} onChange={e => setPrepSplit(e.target.value)} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12 }}>
-              {prepProfile.recommendedSplits.map(id => {
+            <PopupSelect
+              label={`📐 Сплит (рекомендуемые для ${CATEGORY_PROFILES[prepCat].label})`}
+              value={prepSplit}
+              onChange={setPrepSplit}
+              options={prepProfile.recommendedSplits.map(id => {
                 const p = getPattern(id);
-                return <option key={id} value={id}>{p ? p.name : id}</option>;
+                return { id, label: p ? p.name : id };
               })}
-            </select>
+            />
             {(() => {
               const p = getPattern(prepSplit);
               if (!p) return null;
