@@ -433,6 +433,12 @@ describe('BBDiagnosticsHub', () => {
     expect((screen.getByTestId('bb-ktw-l') as HTMLInputElement).value).toBe('7');
     expect((screen.getByTestId('bb-ktw-r') as HTMLInputElement).value).toBe('7');
   });
+  it('стимул-карта: мышце без пиковой подсвечивает сечку', () => {
+    localStorage.setItem('he_bb_plan_saved', JSON.stringify({ weeks: [{ sessions: [{ exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 6, rir: 2 }] }] }] }));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Стимул-карта/ }));
+    expect(screen.getAllByText(/пиковая \(сечка\)/)[0]).toBeInTheDocument();
+  });
   it('гонометр + наклон корпуса — драйвер голеностоп в карточке', () => {
     render(<BBDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /Скрининг/ }));

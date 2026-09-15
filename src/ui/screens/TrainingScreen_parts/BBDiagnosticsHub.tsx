@@ -1670,7 +1670,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                 </div>
                 {planAudit.flags.length > 0 && <div style={{ color: '#f59e0b', fontSize: 10 }}>Замечания: {planAudit.flags.map((f) => {
                   const base = String(f).split(':')[0];
-                  const ru: Record<string, string> = { lowSFR: 'низкий стимул', midSFR: 'стимул средний', missingLengthened: 'мало растянутой', lowUnilateral: 'мало односторонних', highFatigue: 'усталость высокая', singleAngle: 'один угол' };
+                  const ru: Record<string, string> = { lowSFR: 'низкий стимул', midSFR: 'стимул средний', missingLengthened: 'мало растянутой', missingShortened: 'нет пиковой (сечка)', lowUnilateral: 'мало односторонних', highFatigue: 'усталость высокая', singleAngle: 'один угол' };
                   const tail = String(f).includes(':') ? ` (${String(f).split(':').slice(1).map((m) => MUSCLE_LABEL_RU[m] || m).join(', ')})` : '';
                   return `${ru[base] || f}${tail}`;
                 }).join(' · ')}</div>}
@@ -1890,14 +1890,15 @@ export const BBDiagnosticsHub: React.FC = () => {
                   const badLen = bm.totalSets >= 6 && lenPct < 30;
                   const badAngle = bm.angleCoverage.total > 1 && bm.angleCoverage.covered === 1 && bm.totalSets >= 6;
                   const badStrict = bm.strictCoverage.total > 0 && bm.strictCoverage.covered === 0 && bm.totalSets >= 6;
-                  const col = badLen || badAngle || badStrict ? '#f59e0b' : '#22c55e';
+                  const badShort = bm.totalSets >= 6 && bm.shortened === 0;
+                  const col = badLen || badAngle || badStrict || badShort ? '#f59e0b' : '#22c55e';
                   return (
                     <div key={m} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${col}33`, fontSize: 10, lineHeight: 1.5 }}>
                       <b style={{ color: '#fff', fontSize: 11 }}>{MUSCLE_LABEL_RU[m] || m}</b>
                       <span style={{ color: col, marginLeft: 6 }}>{bm.totalSets} сет · SFR {bm.avgSfr ?? '—'} · раст. {lenPct}% · углы {bm.angleCoverage.covered}/{bm.angleCoverage.total} · строгие {bm.strictCoverage.covered}/{bm.strictCoverage.total}</span>
-                      {(badLen || badAngle || badStrict) && (
+                      {(badLen || badAngle || badStrict || badShort) && (
                         <div style={{ color: '#fbbf24', marginTop: 2 }}>
-                          Чинить: {[badLen ? 'добавь растянутую (наклон 30°/RDL/разводка с паузой)' : null, badAngle ? `второй угол (нет: ${bm.angleCoverage.missing.slice(0, 2).join(', ')})` : null, badStrict ? `строгая группа (нет: ${bm.strictCoverage.missing.slice(0, 2).join(', ')})` : null].filter(Boolean).join(' · ')}
+                          Чинить: {[badLen ? 'добавь растянутую (наклон 30°/RDL/разводка с паузой)' : null, badAngle ? `второй угол (нет: ${bm.angleCoverage.missing.slice(0, 2).join(', ')})` : null, badStrict ? `строгая группа (нет: ${bm.strictCoverage.missing.slice(0, 2).join(', ')})` : null, badShort ? 'пиковая (сечка): добей изоляцией с паузой в пике' : null].filter(Boolean).join(' · ')}
                         </div>
                       )}
                     </div>

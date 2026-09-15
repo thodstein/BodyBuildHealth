@@ -150,6 +150,9 @@ export function auditPlanExercises(plan: any): PlanExerciseAudit | null {
 
   // singleAngle flag: мышца с 1 углом при ≥6 сетов
   for (const [m, bm] of Object.entries(byMuscle)) if (bm.angleCoverage.total > 1 && bm.angleCoverage.covered === 1 && bm.totalSets >= 6) flags.push(`singleAngle:${m}`);
+  // missingShortened flag («сечка»): мышца с объёмом ≥6 сетов без пиковой работы —
+  // детализация/сепарация без короткой позиции не строится (зеркало lengthenedRatio<0.3)
+  for (const [m, bm] of Object.entries(byMuscle)) if (bm.totalSets >= 6 && bm.shortened === 0) flags.push(`missingShortened:${m}`);
 
   return {
     totalExercises: allEff.length,

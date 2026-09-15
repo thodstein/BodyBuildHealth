@@ -106,6 +106,7 @@ export function simulateCorrection(plan: any, action: CorrectionAction, targetEx
   const issuesResolved: string[] = [];
   if (before.flags.includes('lowSFR') && !after.flags.includes('lowSFR')) issuesResolved.push('lowSFR');
   if (before.flags.includes('missingLengthened') && !after.flags.includes('missingLengthened')) issuesResolved.push('lengthened');
+  if (before.flags.some((f) => f === 'missingShortened' || f.startsWith('missingShortened:')) && !after.flags.some((f) => f === 'missingShortened' || f.startsWith('missingShortened:'))) issuesResolved.push('shortened');
   if (before.flags.includes('highFatigue') && !after.flags.includes('highFatigue')) issuesResolved.push('fatigue');
   if (before.flags.includes('lowUnilateral') && !after.flags.includes('lowUnilateral')) issuesResolved.push('unilateral');
 

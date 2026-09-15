@@ -99,6 +99,14 @@ export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
     { name: 'leg_raise', match: (e) => /подъём.*ног|подъем.*ног|leg.?raise|подниман.*ног/i.test(e.name) },
     { name: 'cable_crunch', match: (e) => /пресс.*блок|cable.*crunch|скручиван.*блок/i.test(e.name) },
   ],
+  // Плечи: три головки — три угла (середина/задняя/передняя + вертикальный жим).
+  // Дельты — топ слабых зон, без угловых классов стимул-карта слепая.
+  shoulders: [
+    { name: 'overhead_press', match: (e) => (/жим.*(стоя|сидя)|overhead.*press|военн.*жим|\b-ohp\b|^ohp|push.?press|арнольд|arnold/i.test(e.name) || /^(ohp|db_press|ohp_seated|push_press)$/i.test(e.id || '')) && !/наклон.*скам|incline.*bench/i.test(e.name) },
+    { name: 'lateral_raise', match: (e) => /махи.*сторон|разведен.*сторон|lateral.*raise|махи.*гантел/i.test(e.name) || /^(lateral_raise|cable_lateral)$/i.test(e.id || '') },
+    { name: 'rear_delt', match: (e) => /задн.*дельт|rear.?delt|лиц.*тяга|face.?pull|обратн.*(бабоч|дельт)/i.test(e.name) || /^(rear_delt_fly|rear_delt_machine|face_pull|face_pull_sh)$/i.test(e.id || '') },
+    { name: 'upright_row', match: (e) => /тяга.*подбород|upright/i.test(e.name) },
+  ],
 };
 
 /**
@@ -283,6 +291,29 @@ export const STRICT_EXERCISE_GROUPS: Record<string, StrictExerciseGroup[]> = {
       ids: ['cable_kickback', 'donkey_kick'],
       re: /отведен.*(бедр|ног)|abduction|разведен.*ног|кикбэк|kick.?back|ослин.*удар|donkey.?kick|мах.*ног/i,
       not: /тяга.*лиц|face.?pull/i,
+    },
+  ],
+  // Плечи: жим (масса) + махи в стороны (середина) + задняя дельта (осанка/толщина).
+  // Жим меняется только на жим, махи — только на махи: иначе специализация средней дельты
+  // тихо сползает в жимы, а задняя — в тяги спины.
+  shoulders: [
+    {
+      key: 'shoulder_press', label: 'Жим стоя/сидя (гантели/штанга)',
+      ids: ['ohp', 'db_press', 'ohp_seated', 'push_press'],
+      re: /жим.*(стоя|сидя)|overhead.*press|военн.*жим|арнольд|arnold/i,
+      not: /наклон.*скам|incline.*bench|махи|lateral|задн.*дельт|rear.?delt|лиц.*тяга|face.?pull/i,
+    },
+    {
+      key: 'shoulder_lateral', label: 'Махи в стороны (середина дельты)',
+      ids: ['lateral_raise', 'cable_lateral'],
+      re: /махи.*сторон|разведен.*сторон|lateral.*raise|махи.*гантел/i,
+      not: /жим|press|задн.*дельт|rear.?delt|лиц.*тяга|face.?pull|подбород|upright/i,
+    },
+    {
+      key: 'shoulder_rear', label: 'Задняя дельта (махи в наклоне/тренажёр/лицевая)',
+      ids: ['rear_delt_fly', 'rear_delt_machine', 'face_pull', 'face_pull_sh'],
+      re: /задн.*дельт|rear.?delt|лиц.*тяга|face.?pull|обратн.*(бабоч|дельт)|махи.*наклон/i,
+      not: /жим|press|махи.*сторон|lateral.*raise/i,
     },
   ],
 };
