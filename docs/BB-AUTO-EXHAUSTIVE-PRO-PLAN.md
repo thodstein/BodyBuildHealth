@@ -516,8 +516,15 @@
     `generateActionableRecommendations` + базовый `buildBBPlanReportText` (был мёртвый экспорт движка).
     NEW `bb-export-report` 7/7 (движок рекомендаций + source-guard проводки).
   - Проверено: целевые 7/7, `tsc` — мои файлы чисты (чужая ошибка `ArmliftingDiagnosticsHub.tsx` WIP).
-- [ ] Волна 4 — остаток: 4.1 (единая шкала качества) / 4.3 (разрез god-component) / 4.4 (a11y) / 4.5 (мобилка)
+- [x] **Волна 4 — часть 3 (4.4 a11y)** — коммит этого раунда:
+  - единый `useInlineDialogA11y` (фокус на диалог + возврат + Escape) для 3 inline-модалок
+    ББ-авто (замена упражнения, ввод имени, «Начать заново») — `role="dialog"` + `aria-modal`
+    + `aria-label`; `role="status"` (live) у flash/моста сохранён. NEW `bb-a11y-dialogs` 4/4.
+  - Проверено: целевые 4/4, `tsc` — мои файлы чисты (чужие WIP: `ArmliftingDiagnosticsHub.tsx`,
+    `RiskScreen.tsx` — не тронуты).
+- [ ] Волна 4 — остаток: 4.1 (единая шкала качества) / 4.3 (разрез god-component) / 4.5 (мобилка)
 - [ ] Волна 5 — каталог/данные
+
 
 
 

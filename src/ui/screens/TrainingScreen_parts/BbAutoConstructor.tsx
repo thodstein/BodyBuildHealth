@@ -430,6 +430,25 @@ const chipBtn = (label: string, on = false, danger = false): React.CSSProperties
   color: on ? (danger ? '#f87171' : '#ec4899') : '#fff',
 });
 
+/**
+ * 4.4: единый a11y-паттерн inline-модалок ББ-авто — role=dialog/aria-modal + Escape +
+ * фокус на диалог/возврат фокуса (как TrainingModal; без визуального churn).
+ */
+function useInlineDialogA11y(active: boolean, onClose: () => void) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (!active) return;
+    const prev = document.activeElement as HTMLElement | null;
+    const t = setTimeout(() => ref.current?.focus(), 0);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeRef.current(); };
+    document.addEventListener('keydown', onKey);
+    return () => { clearTimeout(t); document.removeEventListener('keydown', onKey); prev?.focus?.(); };
+  }, [active]);
+  return ref;
+}
+
 export const BbAutoConstructor: React.FC = () => {
   const linked = useDataLink();
   const prof = useMemo(() => loadTrainingProfile(), []);
@@ -858,6 +877,10 @@ export const BbAutoConstructor: React.FC = () => {
   const [startDateInput, setStartDateInput] = useState<string>(() => { try { return new Date().toISOString().slice(0, 10); } catch { return ''; } });
   // 🔄 «Начать заново»: подтверждение сброса сборки.
   const [resetAsk, setResetAsk] = useState(false);
+  // 4.4: a11y inline-модалок (фокус на диалог, Escape закрывает, возврат фокуса).
+  const exSwapDialogRef = useInlineDialogA11y(!!exSwapModal, () => { setExSwapModal(null); setExSwapSearch(''); });
+  const namePromptDialogRef = useInlineDialogA11y(!!namePrompt, () => setNamePrompt(null));
+  const resetAskDialogRef = useInlineDialogA11y(!!resetAsk, () => setResetAsk(false));
   // PRO: cross-mesocycle continuity — auto-load последнего сохранённого плана
   const [usePreviousPlan, setUsePreviousPlan] = useState(true);
   // PRO: peak week — единая система тапера ББ (bb-contest-prep.engine)
@@ -8423,7 +8446,7 @@ export const BbAutoConstructor: React.FC = () => {
     return (
       <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)' }}
         onClick={() => { setExSwapModal(null); setExSwapSearch(''); }}>
-        <div onClick={e => e.stopPropagation()} style={{ width:'88%', maxWidth:400, maxHeight:'78vh', borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden' }}>
+        <div onClick={e => e.stopPropagation()} ref={exSwapDialogRef} role="dialog" aria-modal="true" aria-label={`Замена упражнения: ${exSwapModal.currentName}`} tabIndex={-1} style={{ width:'88%', maxWidth:400, maxHeight:'78vh', borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', outline:'none' }}>
           <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
           <div style={{ padding:'14px 16px', maxHeight:'calc(78vh - 3px)', overflowY:'auto' }}>
             <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:10 }}>🔄 Замена: {exSwapModal.currentName}</div>
@@ -8549,7 +8572,7 @@ export const BbAutoConstructor: React.FC = () => {
       {namePrompt && (
         <div style={{ position:'fixed', inset:0, zIndex:260, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)', padding:16 }}
           onClick={() => setNamePrompt(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.12)', padding:16, boxSizing:'border-box', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
+          <div onClick={e => e.stopPropagation()} ref={namePromptDialogRef} role="dialog" aria-modal="true" aria-label={namePrompt.title} tabIndex={-1} style={{ width:'100%', maxWidth:400, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.12)', padding:16, boxSizing:'border-box', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', outline:'none' }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#00e68a', marginBottom:10 }}>{namePrompt.title}</div>
             <input autoFocus value={namePrompt.value}
               onChange={e => setNamePrompt({ ...namePrompt, value: e.target.value })}
@@ -8566,7 +8589,7 @@ export const BbAutoConstructor: React.FC = () => {
       {resetAsk && (
         <div style={{ position:'fixed', inset:0, zIndex:260, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)', padding:16 }}
           onClick={() => setResetAsk(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.12)', padding:16, boxSizing:'border-box', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
+          <div onClick={e => e.stopPropagation()} ref={resetAskDialogRef} role="dialog" aria-modal="true" aria-label="Начать заново?" tabIndex={-1} style={{ width:'100%', maxWidth:400, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.12)', padding:16, boxSizing:'border-box', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', outline:'none' }}>
             <div style={{ fontSize:14, fontWeight:800, color:'#fb7185', marginBottom:8 }}>🔄 Начать заново?</div>
             <div style={{ fontSize:12, color:'#fff', lineHeight:1.5, marginBottom:12 }}>
               Собранный план, все правки и contest prep будут сброшены. Параметры останутся на месте — можно собрать план заново с шага 1.
