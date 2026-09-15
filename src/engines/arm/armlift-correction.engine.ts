@@ -35,6 +35,10 @@ export interface ArmliftRankCtx {
   asymPct?: number | null;
   inPlanIds?: string[];
   failurePoint?: string;
+  /** D10 E3: дисбаланс сгибатели/разгибатели — экстензоры первыми. */
+  extImbalance?: boolean;
+  /** D11 E2: уровень CoC — лесенка рабочий/целевой. */
+  cocLevel?: number | null;
 }
 
 interface PoolEntry {
@@ -147,6 +151,49 @@ function toCorrection(p: PoolEntry, reason: string, score: number): ArmliftCorre
   };
 }
 
+/**
+ * D11 E2: CoC-лестница по уровню (ступени IronMind; правило 10–12).
+ * Рабочий гриппер (5–7 в отказ) + целевой (негативы/частички/холды 3–5с).
+ * Возвращает PoolEntry для ранжира (имена — из каталога в toCorrection).
+ */
+export function cocLadderFor(level: number | null | undefined): { workId: string; goalId: string | null } {
+  const lv = Number(level);
+  if (!Number.isFinite(lv) || lv < 0) return { workId: 'coc_trainer', goalId: 'coc_no1' };
+  if (lv < 1) return { workId: 'coc_trainer', goalId: 'coc_no1' };
+  if (lv < 1.5) return { workId: 'coc_no1', goalId: 'coc_no1_5' };
+  if (lv < 2) return { workId: 'coc_no1_5', goalId: 'coc_no2' };
+  if (lv < 2.5) return { workId: 'coc_no2', goalId: null };
+  return { workId: 'coc_no2', goalId: null };
+}
+
+function cocLadderPool(level: number | null | undefined): PoolEntry[] {
+  const { workId, goalId } = cocLadderFor(level);
+  const pool: PoolEntry[] = [{
+    exId: workId, protocol: 'Рабочий: 5–7 в отказ, 1–3 сета (здесь прогресс)', dose: '3×5–7',
+    freq: '2–3×/нед', source: 'CoC-канон work', sets: 3, reps: [5, 7], restSec: 120,
+    dayTag: 'CrushGrip', fixes: ['close_fail'],
+  }];
+  if (goalId) {
+    pool.push({
+      exId: goalId, protocol: 'Целевой: негативы/частички/холд 3–5с (не закрывается — только так)', dose: '3×негатив',
+      freq: '2×/нед', source: 'CoC-канон challenge (Kinney)', sets: 3, reps: [3, 3], restSec: 150,
+      dayTag: 'CrushGrip', fixes: ['close_fail'],
+    });
+  } else {
+    pool.push({
+      exId: workId, protocol: 'Overcrush-холд в закрытом 6–10с (дожим)', dose: '4×холд',
+      freq: '1×/нед', source: 'CoC overcrush', sets: 4, reps: [1, 1], holdSeconds: 8, restSec: 120,
+      dayTag: 'CrushGrip', fixes: ['close_fail', 'hold_short'],
+    });
+  }
+  pool.push({
+    exId: 'silver_bullet_hold', protocol: 'Патрон в закрытом на время (финиш crush)', dose: '3×макс',
+    freq: '2×/нед', source: 'IronMind Silver', sets: 3, reps: [1, 1], holdSeconds: 20, restSec: 120,
+    dayTag: 'CrushGrip', fixes: ['hold_short', 'hold_long'],
+  });
+  return pool;
+}
+
 export function rankArmliftCorrections(
   weakLink: ArmliftWeakLink,
   implement?: string,
@@ -155,8 +202,19 @@ export function rankArmliftCorrections(
   // Crush-снаряды чинятся crush-пулом независимо от звена (эспандер ≠ штанга).
   const impl = String(implement || '');
   let pool: PoolEntry[];
-  if (impl === 'coc_gripper' || impl === 'silver_bullet') pool = CRUSH;
+  // D11 E2: уровень CoC включает лесенку рабочий→целевой вместо общего пула.
+  if ((impl === 'coc_gripper' || impl === 'silver_bullet') && ctx.cocLevel != null && Number.isFinite(Number(ctx.cocLevel))) {
+    pool = cocLadderPool(Number(ctx.cocLevel));
+  } else if (impl === 'coc_gripper' || impl === 'silver_bullet') pool = CRUSH;
   else pool = [...(BASE_POOL[weakLink] || BASE_POOL.fingers)];
+  // D10 E3: дисбаланс — экстензор втягивается в любой пул (CTD: extensors во всех программах).
+  if (ctx.extImbalance && !pool.some((p) => p.exId === 'wrist_ext_bb')) {
+    pool = [...pool, {
+      exId: 'wrist_ext_bb', protocol: 'Ладони вниз на жжение + Expand 2×15', dose: '3×15–25',
+      freq: '3–4×/нед', source: 'Баланс flex/ext', sets: 3, reps: [15, 25], restSec: 60,
+      dayTag: 'SupportGrip', fixes: ['mid'],
+    }];
+  }
   // Практика своим снарядом — первой, если звено/причина про технику (специфичность).
   const implEx = IMPLEMENT_TO_EX[impl];
   if (implEx && (weakLink === 'technique' || ctx.cause === 'technique')) {
@@ -188,6 +246,10 @@ export function rankArmliftCorrections(
     if (ctx.asymPct != null && ctx.asymPct >= 7 && (cat?.equipment === 'dumbbell' || p.exId === 'wrist_curl_db')) { score += 5; reasons.push('унилатеральная'); }
     // D8: чинит фазу срыва — приоритет
     if (ctx.failurePoint && (p.fixes || []).includes(ctx.failurePoint)) { score += 6; reasons.push('чинит срыв'); }
+    // D10 E3: дисбаланс — экстензоры первыми (Expand-протокол словами, id из каталога)
+    if (ctx.extImbalance && /wrist_ext_bb|wrist_roller|reverse_ez_curl/.test(p.exId)) {
+      score += 10; reasons.push('баланс: экстензия + Expand 2×15');
+    }
     return { p, score, reason: reasons.join(', ') };
   });
   scored.sort((a, b) => b.score - a.score);
@@ -205,27 +267,34 @@ export interface ArmliftSpecWeek {
   dayMap: Record<string, string>;
 }
 
-/** Мини спец-блок 4 нед: волна 3/2/1 (накопление/объём/интенс/делод). */
+/** Спец-блок 4 нед (волна 3/2/1) или 6 нед (накопление ×3 + интенс + пик + делод). */
 export function buildArmliftSpecBlock(
   weakLink: ArmliftWeakLink,
   implement: string,
   corrections?: ArmliftCorrection[],
+  weeks: 4 | 6 = 4,
 ): ArmliftSpecWeek[] {
   const top = (corrections && corrections.length ? corrections : rankArmliftCorrections(weakLink, implement)).slice(0, 2);
   const impl = String(implement || 'rolling_thunder');
-  const mult = [1, 1, 0.85, 0.5];
-  const sess = ['3 сессии', '3 сессии', '2 сессии', '2 лёгкие'];
-  const notes = ['База 100%', 'Объём +5–10%', 'Интенс: вес ↑, объём 85%', 'Делод 50% + тест точки срыва'];
-  return [0, 1, 2, 3].map((k) => {
+  const n = weeks === 6 ? 6 : 4;
+  const mult = n === 6 ? [1, 1.05, 1, 0.9, 0.85, 0.5] : [1, 1, 0.85, 0.5];
+  const sess = n === 6
+    ? ['3 сессии', '3 сессии', '3 сессии', '2 сессии', '2 сессии', '2 лёгкие']
+    : ['3 сессии', '3 сессии', '2 сессии', '2 лёгкие'];
+  const notes = n === 6
+    ? ['База 100%', 'Объём +5%', 'Объём 100%', 'Интенс: вес ↑', 'Пик: вес ↑↑, объём 85%', 'Делод 50% + тест точки срыва']
+    : ['База 100%', 'Объём +5–10%', 'Интенс: вес ↑, объём 85%', 'Делод 50% + тест точки срыва'];
+  return Array.from({ length: n }, (_, k) => {
     const targetSets: Record<string, number> = {};
     const dayMap: Record<string, string> = {};
     for (const c of top) {
       targetSets[c.exId] = Math.max(1, Math.round(c.sets * mult[k]));
       dayMap[c.exId] = c.dayTag;
     }
+    const last = k === n - 1;
     return {
       week: k + 1,
-      focus: k === 0 ? `База: ${top[0]?.title || '—'}` : k === 3 ? 'Делод хвату + тест' : `${top[0]?.title || '—'} · ${notes[k]}`,
+      focus: k === 0 ? `База: ${top[0]?.title || '—'}` : last ? 'Делод хвату + тест' : `${top[0]?.title || '—'} · ${notes[k]}`,
       target: impl, volume: `${sess[k]} · ${notes[k]}`,
       targetSets, dayMap,
     };

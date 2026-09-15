@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { failuresFor, faultsFor, movementFor } from '../armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../armlift-diagnosis.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../armlift-correction.engine';
-import { diagnoseArmliftCause, countGripSessions } from '../armlift-cause.engine';
+import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../armlift-cause.engine';
 import { injectArmliftCorrections, correctionsToInjectionItems, applyArmliftSpecWave } from '../armlift-injection.engine';
+import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, overallGripLevel } from '../armlift-benchmarks.engine';
+import { cocLadderFor } from '../armlift-correction.engine';
+import { saveDiagSnapshot, loadDiagHistory, lastSnapshotFor, retestVerdict, weeksBetween } from '../armlift-history.engine';
 import { getArmExerciseById } from '../../../core/exercise-catalog-arm';
 import { buildArmliftingReport, buildArmliftingHtml, buildArmliftingCsv } from '../armlifting-diagnostics.engine';
 
@@ -327,5 +330,131 @@ describe('PRO-5 добивка: диагноз в экспорте (аддити
     const html = buildArmliftingHtml({ ...base(), diagTitle: '<script>alert(1)</script>' });
     expect(html).not.toContain('<script>alert(1)');
     expect(html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('PRO-5 D10 E1: уровни тест-батареи', () => {
+  it('пороги pinch/farmer/CoC + итог по слабейшему', () => {
+    expect(benchmarkPinchHold(5)).toBe('beginner');
+    expect(benchmarkPinchHold(15)).toBe('intermediate');
+    expect(benchmarkPinchHold(30)).toBe('advanced');
+    expect(benchmarkPinchHold(50)).toBe('elite');
+    expect(benchmarkFarmerHold(10)).toBe('beginner');
+    expect(benchmarkFarmerHold(50)).toBe('elite');
+    expect(benchmarkCoc(0)).toBe('beginner');
+    expect(benchmarkCoc(1.5)).toBe('intermediate');
+    expect(benchmarkCoc(2)).toBe('advanced');
+    expect(benchmarkCoc(3)).toBe('elite');
+    expect(benchmarkPinchHold(null)).toBeNull();
+    expect(benchmarkPinchHold(-5)).toBeNull();
+    expect(overallGripLevel(['advanced', 'intermediate', 'elite'])).toBe('intermediate');
+    expect(overallGripLevel([null, null])).toBeNull();
+  });
+});
+
+describe('PRO-5 D10 E3/E6: баланс и кожа', () => {
+  it('flexExtRatio: норма и дисбаланс', () => {
+    expect(flexExtRatio(30, 25)).toBe(1.2);
+    expect(flexExtRatio(40, 20)).toBe(2);
+    expect(flexExtRatio(null, 20)).toBeNull();
+    expect(flexExtRatio(30, 0)).toBeNull();
+  });
+  it('ratio >1.5 — mobility с evidence про экстензоры', () => {
+    const r = diagnoseArmliftCause({ implement: 'rolling_thunder', flexHoldSec: 40, extHoldSec: 20 });
+    expect(r.cause).toBe('mobility');
+    expect(r.evidence.join(' ')).toContain('2');
+  });
+  it('ratio в норме — не стреляет', () => {
+    const r = diagnoseArmliftCause({ implement: 'rolling_thunder', flexHoldSec: 30, extHoldSec: 25 });
+    expect(r.cause).not.toBe('mobility');
+  });
+  it('сорвана кожа — гейт pain с щипковым фиксом', () => {
+    const r = diagnoseArmliftCause({ implement: 'saxon_bar', skinTear: true });
+    expect(r.cause).toBe('pain');
+    expect(r.fix).toContain('щипка');
+  });
+  it('перепонка — гейт pain', () => {
+    expect(diagnoseArmliftCause({ thumbWebPain: true }).cause).toBe('pain');
+  });
+  it('дисбаланс поднимает экстензоры в топ', () => {
+    const plain = rankArmliftCorrections('support_endurance', 'rolling_thunder', {});
+    const imb = rankArmliftCorrections('support_endurance', 'rolling_thunder', { extImbalance: true });
+    expect(imb.some((c) => /wrist_ext_bb|wrist_roller|reverse_ez_curl/.test(c.exId))).toBe(true);
+    expect(JSON.stringify(imb.map((c) => c.id))).not.toBe(JSON.stringify(plain.map((c) => c.id)));
+  });
+});
+
+describe('PRO-5 D11 E2: CoC-лестница', () => {
+  it('ступени рабочий→целевой', () => {
+    expect(cocLadderFor(null)).toEqual({ workId: 'coc_trainer', goalId: 'coc_no1' });
+    expect(cocLadderFor(0)).toEqual({ workId: 'coc_trainer', goalId: 'coc_no1' });
+    expect(cocLadderFor(1)).toEqual({ workId: 'coc_no1', goalId: 'coc_no1_5' });
+    expect(cocLadderFor(1.5)).toEqual({ workId: 'coc_no1_5', goalId: 'coc_no2' });
+    expect(cocLadderFor(2)).toEqual({ workId: 'coc_no2', goalId: null });
+    expect(cocLadderFor(3)).toEqual({ workId: 'coc_no2', goalId: null });
+  });
+  it('ранжир с уровнем строит лесенку, без — общий пул', () => {
+    const ladder = rankArmliftCorrections('crush', 'coc_gripper', { cocLevel: 1 });
+    expect(ladder[0].exId).toBe('coc_no1');
+    expect(ladder.some((c) => /негатив|частичк/.test(c.protocol))).toBe(true);
+    const generic = rankArmliftCorrections('crush', 'coc_gripper', {});
+    expect(generic[0].exId).toBe('coc_trainer');
+  });
+});
+
+describe('PRO-5 D11 E4 / D12 E7: перетест и история', () => {
+  it('вердикты: рост/падение/стагнация/холд/нет данных', () => {
+    expect(retestVerdict(20, 25).verdict).toBe('up');
+    expect(retestVerdict(20, 15).verdict).toBe('deload');
+    expect(retestVerdict(20, 20.5, 5).verdict).toBe('stagnant');
+    expect(retestVerdict(20, 20.5, 2).verdict).toBe('hold');
+    expect(retestVerdict(null, 20).verdict).toBe('no_data');
+  });
+  it('weeksBetween считает недели', () => {
+    expect(weeksBetween('2026-09-01', '2026-09-01')).toBe(0);
+    expect(weeksBetween('2026-09-01', '2026-09-29')).toBe(4);
+    expect(weeksBetween('2026-09-29', '2026-09-01')).toBe(0);
+  });
+  it('снапшоты: запись/чтение/последний по снаряду', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    saveDiagSnapshot({ date: '2026-09-01', implement: 'saxon_bar', weakLink: 'thumb', cause: 'max_strength', pinchHoldSec: 10 });
+    saveDiagSnapshot({ date: '2026-09-10', implement: 'saxon_bar', weakLink: 'thumb', cause: 'endurance', pinchHoldSec: 15 });
+    saveDiagSnapshot({ date: '2026-09-10', implement: 'rolling_thunder', weakLink: 'fingers', cause: 'volume' });
+    expect(loadDiagHistory().length).toBe(3);
+    expect(lastSnapshotFor('saxon_bar', false)?.cause).toBe('endurance');
+    expect(lastSnapshotFor('hub', false)).toBeNull();
+  });
+});
+
+describe('PRO-5 D12 E5: дозы и волны', () => {
+  const plan6 = () => ({
+    level: 'intermediate', rationale: [] as string[],
+    weeks: [1, 2, 3, 4, 5, 6].map((week) => ({
+      week, sessions: [{ sessionTag: 'PinchGrip', exercises: [] }],
+    })),
+  });
+  it('спец 6 нед: волна 6 значений, делод в конце', () => {
+    const spec = buildArmliftSpecBlock('thumb', 'saxon_bar', undefined, 6);
+    expect(spec.length).toBe(6);
+    expect(spec[5].focus).toContain('Делод');
+    expect(spec[1].targetSets['plate_pinch_hold']).toBeGreaterThanOrEqual(spec[5].targetSets['plate_pinch_hold']);
+    expect(buildArmliftSpecBlock('thumb', 'saxon_bar').length).toBe(4);
+  });
+  it('волна применяется на 6 недель плана', () => {
+    const spec = buildArmliftSpecBlock('thumb', 'saxon_bar', undefined, 6);
+    const r = applyArmliftSpecWave(plan6(), spec, [{ exId: 'plate_pinch_hold', sets: 3, dayTag: 'PinchGrip' }], { workMax: { grip_pinch: 40 } });
+    expect(r.injected).toBe(6);
+    expect(r.plan.weeks[5].sessions[0].exercises[0].sets).toBe(2);
+  });
+  it('новичку −1 сет (минимум 1)', () => {
+    const plan = {
+      level: 'beginner', rationale: [] as string[],
+      weeks: [{ week: 1, sessions: [{ sessionTag: 'SupportGrip', exercises: [] }] }],
+    };
+    const r = injectArmliftCorrections(plan, [{ exId: 'rolling_thunder', sets: 3 }], { level: 'beginner', workMax: { grip_support: 80 } });
+    expect(r.injected).toBe(1);
+    expect(r.plan.weeks[0].sessions[0].exercises[0].sets).toBe(2);
+    const r1 = injectArmliftCorrections(plan, [{ exId: 'rolling_thunder', sets: 1 }], { level: 'beginner', workMax: { grip_support: 80 } });
+    expect(r1.plan.weeks[0].sessions[0].exercises[0].sets).toBe(1);
   });
 });

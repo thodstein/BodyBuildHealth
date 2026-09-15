@@ -17,7 +17,9 @@ import { downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.eng
 import { loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
 import { failuresFor, faultsFor, movementFor, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
-import { diagnoseArmliftCause, countGripSessions } from '../../../engines/arm/armlift-cause.engine';
+import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../../../engines/arm/armlift-cause.engine';
+import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU } from '../../../engines/arm/armlift-benchmarks.engine';
+import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween } from '../../../engines/arm/armlift-history.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
 import { correctionsToInjectionItems } from '../../../engines/arm/armlift-injection.engine';
 import { applyToPlanner } from './planner-bridge';
@@ -58,14 +60,20 @@ type DiagTab = 'pomost' | 'diag' | 'corr';
 type DiagState = {
   implement: string; failurePoint: string; faultIds: string[];
   pinchHoldSec: string; farmerHoldSec: string; wristExtWeak: boolean;
+  flexHoldSec: string; extHoldSec: string;
   thumbStiff: boolean; wristExtLimited: boolean; wristFlexLimited: boolean;
   hipHingePoor: boolean; pain: boolean; elbowPain: boolean;
+  skinTear: boolean; thumbWebPain: boolean;
+  specWeeks: 4 | 6;
 };
 const DEFAULT_DIAG: DiagState = {
   implement: 'rolling_thunder', failurePoint: '', faultIds: [],
   pinchHoldSec: '', farmerHoldSec: '', wristExtWeak: false,
+  flexHoldSec: '', extHoldSec: '',
   thumbStiff: false, wristExtLimited: false, wristFlexLimited: false,
   hipHingePoor: false, pain: false, elbowPain: false,
+  skinTear: false, thumbWebPain: false,
+  specWeeks: 4,
 };
 function loadDiag(): DiagState {
   try {
@@ -75,6 +83,7 @@ function loadDiag(): DiagState {
     return {
       ...DEFAULT_DIAG, ...j,
       faultIds: Array.isArray((j as any).faultIds) ? (j as any).faultIds.filter((x: any) => typeof x === 'string') : [],
+      specWeeks: (j as any).specWeeks === 6 ? 6 : 4,
     };
   } catch { return DEFAULT_DIAG; }
 }
@@ -247,21 +256,61 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     wristFlexLimited: diag.wristFlexLimited,
     hipHingePoor: diag.hipHingePoor,
     gripFreqPerWeek: logStats.gripFreqPerWeek,
+    flexHoldSec: diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
+    extHoldSec: diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
     elbowPain: diag.elbowPain,
     pain: diag.pain,
+    skinTear: diag.skinTear,
+    thumbWebPain: diag.thumbWebPain,
   }), [diag, asymForDiag, logStats, state.cocLevel, state.silverSec]);
+  const extRatio = flexExtRatio(
+    diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
+    diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
+  );
   const corrections = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
     cause: cause.cause === 'pain' ? undefined : cause.cause,
     asymPct: asymForDiag,
     failurePoint: diag.failurePoint || undefined,
-  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint]);
-  const moveChain = useMemo(() => movementFor(diag.implement), [diag.implement]);
+    extImbalance: extRatio != null && extRatio > 1.5,
+    cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
+  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel]);
   const specBlock = useMemo(
-    () => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections),
-    [diagnosis.weakLink, diag.implement, corrections],
+    () => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections, diag.specWeeks),
+    [diagnosis.weakLink, diag.implement, corrections, diag.specWeeks],
   );
+  /** D10 E1: уровни тестов + итог по слабейшему. */
+  const levels = useMemo(() => {
+    const pinch = benchmarkPinchHold(diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null);
+    const farmer = benchmarkFarmerHold(diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null);
+    const coc = benchmarkCoc(state.cocLevel ? parseFloat(state.cocLevel) : null);
+    const silver = benchmarkSilverHold(state.silverSec ? parseFloat(state.silverSec) : null);
+    return { pinch, farmer, coc, silver, overall: overallGripLevel([pinch, farmer, coc, silver]) };
+  }, [diag.pinchHoldSec, diag.farmerHoldSec, state.cocLevel, state.silverSec]);
+  /** D11 E4 / D12 E7: перетест против прошлого снапшота + история. */
+  const retests = useMemo(() => {
+    const prev = lastSnapshotFor(diag.implement);
+    if (!prev) return { prev: null as null | { date: string }, list: [] as Array<{ test: string; text: string }> };
+    const weeks = weeksBetween(prev.date, new Date().toISOString().slice(0, 10));
+    const num = (s: string): number | null => {
+      const v = parseFloat(s);
+      return Number.isFinite(v) && v > 0 ? v : null;
+    };
+    const pairs: Array<[string, number | null | undefined, number | null]> = [
+      ['Pinch', prev.pinchHoldSec, num(diag.pinchHoldSec)],
+      ['Farmer', prev.farmerHoldSec, num(diag.farmerHoldSec)],
+      ['CoC', prev.cocLevel, num(state.cocLevel)],
+      ['Silver', prev.silverSec, num(state.silverSec)],
+    ];
+    return {
+      prev: { date: prev.date },
+      list: pairs
+        .filter(([, p, c]) => p != null && c != null)
+        .map(([t, p, c]) => ({ test: t, text: `${t}: ${retestVerdict(p, c, weeks).text}` })),
+    };
+  }, [diag.implement, diag.pinchHoldSec, diag.farmerHoldSec, state.cocLevel, state.silverSec]);
   const diagFaults = useMemo(() => faultsFor(diag.implement), [diag.implement]);
   const diagFailures = useMemo(() => failuresFor(diag.implement), [diag.implement]);
+  const moveChain = useMemo(() => movementFor(diag.implement), [diag.implement]);
 
   const applyToConstructor = () => {
     if (!report.filled) {
@@ -311,6 +360,18 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       },
       source: 'intellectual',
     });
+    try {
+      saveDiagSnapshot({
+        date: new Date().toISOString().slice(0, 10),
+        implement: diag.implement,
+        weakLink: diagnosis.weakLink,
+        cause: cause.cause,
+        pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
+        farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
+        cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
+        silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
+      });
+    } catch { /* noop */ }
     setToast(`✓ В Арм-конструктор (армлифтинг): ${report.verdict}`);
     setTimeout(() => setToast(''), 3000);
     try {
@@ -577,11 +638,26 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <AdGrid cols="auto-sm">
             <LiftNum label="Pinch-hold сек" value={diag.pinchHoldSec} onChange={(v) => setD({ pinchHoldSec: v })} placeholder="20" aria="Pinch-hold сек" />
             <LiftNum label="Farmer-hold сек" value={diag.farmerHoldSec} onChange={(v) => setD({ farmerHoldSec: v })} placeholder="30" aria="Farmer-hold сек" />
+            <LiftNum label="Сгибатели холд сек" value={diag.flexHoldSec} onChange={(v) => setD({ flexHoldSec: v })} placeholder="кулак" aria="Сгибатели холд сек" />
+            <LiftNum label="Разгибатели холд сек" value={diag.extHoldSec} onChange={(v) => setD({ extHoldSec: v })} placeholder="раскрытие" aria="Разгибатели холд сек" />
           </AdGrid>
+          <div className="ad-row" data-arm="lift-levels" aria-label="Диагностика: уровни тестов">
+            {levels.pinch && <span className="ad-tag">Pinch: {ARMLIFT_LEVEL_RU[levels.pinch]}</span>}
+            {levels.farmer && <span className="ad-tag">Farmer: {ARMLIFT_LEVEL_RU[levels.farmer]}</span>}
+            {levels.coc && <span className="ad-tag">CoC: {ARMLIFT_LEVEL_RU[levels.coc]}</span>}
+            {levels.silver && <span className="ad-tag">Silver: {ARMLIFT_LEVEL_RU[levels.silver]}</span>}
+            {levels.overall && <span className="ad-tag">Итог (по слабейшему): {ARMLIFT_LEVEL_RU[levels.overall]}</span>}
+            {extRatio != null && <span className="ad-tag">Сгиб/разгиб {extRatio}{extRatio > 1.5 ? ' — дисбаланс' : ''}</span>}
+          </div>
           <div className="ad-row">
             <AdChip active={diag.wristExtWeak} onClick={() => setD({ wristExtWeak: !diag.wristExtWeak })}>Слабая экстензия запястья</AdChip>
             {asymForDiag != null && <span className="ad-tag">Асимметрия из замеров: {asymForDiag}%</span>}
           </div>
+          {retests.prev && retests.list.length > 0 && (
+            <div className="ad-muted" data-arm="lift-retest">
+              Прошлый замер {retests.prev.date}: {retests.list.map((r) => r.text).join(' · ')}
+            </div>
+          )}
           <div className="lift-group">Мобильность</div>
           <div className="ad-row" aria-label="Диагностика: мобильность">
             <AdChip active={diag.thumbStiff} onClick={() => setD({ thumbStiff: !diag.thumbStiff })}>Большой жёсткий</AdChip>
@@ -592,6 +668,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <div className="ad-row">
             <AdChip active={diag.pain} tone={diag.pain ? 'red' : undefined} onClick={() => setD({ pain: !diag.pain })}>{diag.pain ? '🔴 Боль есть — стоп' : 'Боли нет'}</AdChip>
             <AdChip active={diag.elbowPain} tone={diag.elbowPain ? 'red' : undefined} onClick={() => setD({ elbowPain: !diag.elbowPain })}>{diag.elbowPain ? '🔴 Локоть/запястье болит' : 'Локоть в норме'}</AdChip>
+            <AdChip active={diag.skinTear} tone={diag.skinTear ? 'red' : undefined} onClick={() => setD({ skinTear: !diag.skinTear })}>{diag.skinTear ? '🔴 Сорвана кожа — щипок стоп' : 'Кожа цела'}</AdChip>
+            <AdChip active={diag.thumbWebPain} tone={diag.thumbWebPain ? 'red' : undefined} onClick={() => setD({ thumbWebPain: !diag.thumbWebPain })}>{diag.thumbWebPain ? '🔴 Перепонка болит' : 'Перепонка в норме'}</AdChip>
             {logStats.sessions28d != null && <span className="ad-tag">Журнал: {logStats.sessions28d} хват-сессий/28д</span>}
           </div>
           <div data-arm="lift-diag-result"><b>{diagnosis.title}</b> · {cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
@@ -617,7 +695,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               </div>
             ))}
           </div>
-          <div className="lift-group">Мини спец-блок 4 нед (волна 3/2/1)</div>
+          <div className="lift-group">Спец-блок волной</div>
+          <div className="ad-row" aria-label="Длина спец-блока">
+            <AdChip active={diag.specWeeks !== 6} onClick={() => setD({ specWeeks: 4 })}>4 нед</AdChip>
+            <AdChip active={diag.specWeeks === 6} onClick={() => setD({ specWeeks: 6 })}>6 нед</AdChip>
+          </div>
           <div className="ad-list" data-arm="lift-corr-spec">
             {specBlock.map((w) => (
               <div key={w.week} className="ad-row">

@@ -120,7 +120,10 @@ export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[
       if (seen.has(dk) || (target.exercises || []).some((e: any) => e.exerciseId === t.exId)) {
         skippedDup++; notes.push(`⊘ ${t.exId} уже есть в ${target.sessionTag} (нед ${wi + 1})`); continue;
       }
-      const sets = Math.max(1, Math.min(6, Math.round(Number(t.sets) || 3)));
+      const rawSets = Math.max(1, Math.min(6, Math.round(Number(t.sets) || 3)));
+      // D12 E5: новичку −1 сет (минимум 1) — сухожилия адаптируются 8–12 нед.
+      const lvl = String(opts.level || '').toLowerCase();
+      const sets = lvl === 'beginner' ? Math.max(1, rawSets - 1) : rawSets;
       const weeklySets = week.sessions.reduce((a: number, s: any) =>
         a + (s.exercises || []).reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
       if (weeklySets + sets > budget) {
@@ -197,9 +200,10 @@ export function applyArmliftSpecWave(
   baseItems: ArmliftInjectionItem[],
   opts: ArmliftInjectionOpts = {},
 ): ArmliftInjectionResult {
+  const want = Math.min(6, Math.max(1, (spec || []).length || 4));
   const weeks: number[] = [];
   try {
-    for (let i = 0; i < (plan?.weeks || []).length && weeks.length < 4; i++) {
+    for (let i = 0; i < (plan?.weeks || []).length && weeks.length < want; i++) {
       if (!(plan.weeks[i] as any)?.deload) weeks.push(i);
     }
   } catch { /* noop */ }
@@ -210,7 +214,7 @@ export function applyArmliftSpecWave(
     plan: JSON.parse(JSON.stringify(plan || {})),
     injected: 0, skippedBudget: 0, skippedDup: 0, skippedDeload: 0, notes: [],
   };
-  (spec || []).slice(0, 4).forEach((sw, k) => {
+  (spec || []).slice(0, want).forEach((sw, k) => {
     const wi = weeks[k];
     if (wi == null) return;
     const items = baseItems.map((b) => {

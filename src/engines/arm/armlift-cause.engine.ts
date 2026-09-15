@@ -30,8 +30,21 @@ export interface ArmliftCauseInput {
   hipHingePoor?: boolean;
   /** Хват-сессий в неделю сейчас (частота). */
   gripFreqPerWeek?: number | null;
+  /** D10 E3: баланс сгибатели/разгибатели — холды секунд (кулак vs раскрытие). */
+  flexHoldSec?: number | null;
+  extHoldSec?: number | null;
   elbowPain?: boolean;
   pain?: boolean;
+  /** D10 E6: кожа — сорвана мозоль / болит перепонка большого (щит щипка первым). */
+  skinTear?: boolean;
+  thumbWebPain?: boolean;
+}
+
+/** D10 E3: ratio сгибатели/экстензоры. Норма 1.0–1.3, >1.5 — значимый дисбаланс. */
+export function flexExtRatio(flexSec: number | null | undefined, extSec: number | null | undefined): number | null {
+  if (flexSec == null || extSec == null) return null;
+  if (!Number.isFinite(flexSec) || !Number.isFinite(extSec) || flexSec <= 0 || extSec <= 0) return null;
+  return Math.round((flexSec / extSec) * 100) / 100;
 }
 
 export interface ArmliftCauseResult {
@@ -106,6 +119,14 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
       fix: FIX_TEXT.pain,
     };
   }
+  // D10 E6: кожа — стоп щипка (support без боли — можно), не общий стоп.
+  if (i.skinTear || i.thumbWebPain) {
+    return {
+      cause: 'pain', confidence: 0.9,
+      evidence: [i.skinTear ? 'Сорвана мозоль/кожа — щипок запрещён до заживления' : 'Болит перепонка большого — щипок запрещён'],
+      fix: 'Кожа: пауза щипка до заживления + крем/тейп; support без боли — можно; экстензия лёгкая',
+    };
+  }
 
   // TECHNIQUE: фолы из чек-листа правил; срыв на локауте при силе = тоже техника.
   if (faults.length >= 2) { scores.technique += 0.6; ev.push(`Фолы техники: ${faults.length} (${faults.slice(0, 2).join(', ')})`); }
@@ -140,6 +161,16 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
   // Тренд стоит ПРИ объёме — это уже техника, не объём (классика PL/BB).
   if (trend != null && trend <= 1 && sess28 != null && sess28 >= 8) {
     scores.technique += 0.35; ev.push(`Тренд ${trend}% стоит при объёме — угол/техника`);
+  }
+
+  // D10 E3: баланс сгибатели/разгибатели (норма 1.0–1.3, >1.5 — значимо).
+  const ratio = flexExtRatio(num(i.flexHoldSec), num(i.extHoldSec));
+  if (ratio != null && ratio > 1.5) {
+    scores.mobility += 0.45;
+    ev.push(`Дисбаланс сгибатели/разгибатели ${ratio} (>1.5) — экстензоры первыми`);
+  } else if (ratio != null && ratio > 1.3) {
+    scores.mobility += 0.2;
+    ev.push(`Крен в сгибатели ${ratio} — добавить экстензию`);
   }
 
   // MOBILITY: явные ограничения под снаряд.

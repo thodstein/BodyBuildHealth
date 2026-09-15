@@ -31,7 +31,7 @@ describe('PRO-5 UI: помост + диагностика + коррекция',
     fireEvent.click(chips[1]);
     expect(document.body.textContent).toContain('техника');
     fireEvent.click(screen.getByText(/К коррекции/));
-    expect(screen.getByText(/Мини спец-блок/)).toBeTruthy();
+    expect(screen.getByText(/Спец-блок волной/)).toBeTruthy();
     expect(document.body.textContent).toContain('Нед 4');
   });
   it('цепочка движения: фазы + подсветка срыва', () => {
@@ -52,10 +52,38 @@ describe('PRO-5 UI: помост + диагностика + коррекция',
     expect(document.body.textContent).toContain('дробление (crush)');
     expect(document.body.textContent).not.toContain('Поиск причины');
   });
+  it('D10: уровни тестов, дисбаланс и кожа', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    expect(screen.getByLabelText('Диагностика: уровни тестов')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Pinch-hold сек/), { target: { value: '50' } });
+    expect(document.body.textContent).toContain('Элита');
+    fireEvent.change(screen.getByLabelText(/Сгибатели холд сек/), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText(/Разгибатели холд сек/), { target: { value: '20' } });
+    expect(document.body.textContent).toContain('дисбаланс');
+    fireEvent.click(screen.getByText('Кожа цела'));
+    expect(document.body.textContent).toContain('щипок запрещён');
+  });
+  it('D11/D12: перетест из истории + спец 6 нед', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    try {
+      localStorage.setItem('he_armlifting_diag_history', JSON.stringify([
+        { date: '2026-08-01', implement: 'rolling_thunder', weakLink: 'fingers', cause: 'volume', pinchHoldSec: 10 },
+      ]));
+    } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    fireEvent.change(screen.getByLabelText(/Pinch-hold сек/), { target: { value: '15' } });
+    expect(document.body.textContent).toContain('Прошлый замер');
+    fireEvent.click(screen.getByText('🔧 Коррекция'));
+    fireEvent.click(screen.getByText('6 нед'));
+    expect(document.body.textContent).toContain('Нед 6');
+  });
   it('Коррекция напрямую открывается с топ-3', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);
     fireEvent.click(screen.getByText('🔧 Коррекция'));
-    expect(screen.getByText(/Мини спец-блок/)).toBeTruthy();
+    expect(screen.getByText(/Спец-блок волной/)).toBeTruthy();
   });
 });

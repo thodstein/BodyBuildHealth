@@ -56,12 +56,14 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   sleepHours?: number | null;
   /** PRO-2 (BBDiagnosticsHub P1–P5/P7 → BbAutoConstructor): всё опционально, приёмник только сохраняет. */
   lrVerdicts?: Array<{ group: string; left: number; right: number; asymPct: number | null; weakSide: string | null; verdict: string; topUpSets: number; text: string }>;
+  /** LEGACY-чтение: movement-мост v2 эти поля НЕ шлёт (нагрузка — чужие хабы).
+   * Оставлены для чтения старых сохранённых payloads; новым кодом не заполнять. */
   readiness?: { level: string; advice: string; reasons: string[] };
   redFlags?: { active: boolean; blocked: boolean; items: string[]; text: string };
   barPath?: { xLoop: number; yMax: number; type: string; text: string } | null;
   poseAngles?: { hip?: number; knee?: number; ankle?: number; shoulder?: number; n: number } | null;
   teenNote?: string | null;
-  /** PRO-3 (BBDiagnosticsHub R1–R7 → BbAutoConstructor): всё опционально. */
+  /** PRO-3 (BBDiagnosticsHub R1–R7 → BbAutoConstructor): LEGACY-чтение, см. выше. */
   lvp?: { lift: string; r2: number; e1rm: number | null; text: string } | null;
   tendon?: { elbow: string; shoulder: string; elbowLevel: string; shoulderLevel: string } | null;
   returnTo?: { text: string; stages: Array<{ stage: number; title: string; volume: string; rir: string; note: string; action?: { volumeMult: number; rirShift: number; bannedPatterns: string[] } }> } | null;

@@ -446,7 +446,7 @@ export function ArmAutoConstructor() {
       if (j && typeof j === 'object') {
         return {
           items: cleanItems((j as any).items),
-          spec: Array.isArray((j as any).spec) ? (j as any).spec.slice(0, 4) : [],
+          spec: Array.isArray((j as any).spec) ? (j as any).spec.slice(0, 6) : [],
           ...(((j as any).weakArmNote && typeof (j as any).weakArmNote === 'string') ? { weakArmNote: String((j as any).weakArmNote) } : {}),
         };
       }
@@ -635,7 +635,7 @@ export function ArmAutoConstructor() {
               ...(Number.isFinite(Number(t.rir)) ? { rir: Number(t.rir) } : {}),
             }));
           const specRaw = Array.isArray(al?.armliftSpec) ? al.armliftSpec : [];
-          const specClean = specRaw.slice(0, 4).filter((w: any) => w && typeof w === 'object').map((w: any) => ({
+          const specClean = specRaw.slice(0, 6).filter((w: any) => w && typeof w === 'object').map((w: any) => ({
             week: Number(w.week) || 0,
             targetSets: (w.targetSets && typeof w.targetSets === 'object' ? w.targetSets : {}) as Record<string, number>,
             dayMap: (w.dayMap && typeof w.dayMap === 'object' ? w.dayMap : {}) as Record<string, string>,
