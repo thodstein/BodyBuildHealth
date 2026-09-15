@@ -17,6 +17,7 @@ import { buildArmPrintHtml, buildArmIcs } from '../../../engines/arm/arm-export.
 import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
+import { injectArmliftCorrections, type ArmliftInjectionItem } from '../../../engines/arm/armlift-injection.engine';
 import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
 import { PLATFORM_WR, planAttempts, platformWrFor, platformIsInternal } from '../../../engines/arm/arm-platform.engine';
 import { WAF_FOULS, WAF_FOULS_OUT_AFTER } from '../../../engines/arm/arm-start-strap.engine';
@@ -433,6 +434,15 @@ export function ArmAutoConstructor() {
   const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [diagWeakPoints, setDiagWeakPoints] = useState<ArmWeakPoint[]>([]);
+  /** PRO-5 real: grip-коррекции из армлифтинг-хаба (только дисциплина armlifting; стол не трогаем). */
+  const [armliftCorrections, setArmliftCorrections] = useState<ArmliftInjectionItem[]>(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_armlifting_corrections') : null;
+      const arr = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(arr)) return [];
+      return arr.filter((t: any) => t && typeof t.exId === 'string').slice(0, 3);
+    } catch { return []; }
+  });
   const [focusGroup, setFocusGroup] = useState<string>('');
   const [specialization, setSpecialization] = useState<boolean>(false);
   const [patternId, setPatternId] = useState<string>('');
@@ -601,6 +611,27 @@ export function ArmAutoConstructor() {
           setDiscipline('armlifting');
           const vv = (payload.data as any)?.armLiftingVerdict;
           flash(`↩ Армлифтинг-диагностика${vv ? `: ${vv}` : ''} → дисциплина «Армлифтинг»`);
+          // PRO-5 real: упражнения коррекции хвата — только armlifting-ветка (валидация + персист)
+          const al = (payload.data as any)?.armLifting;
+          const items = Array.isArray(al?.armliftExercises) ? al.armliftExercises : [];
+          const clean: ArmliftInjectionItem[] = items
+            .filter((t: any) => t && typeof t.exId === 'string' && t.exId.length > 0)
+            .slice(0, 3)
+            .map((t: any) => ({
+              exId: String(t.exId),
+              sets: Math.max(1, Math.min(6, Math.round(Number(t.sets) || 3))),
+              ...(typeof t.dayTag === 'string' && t.dayTag ? { dayTag: String(t.dayTag) } : {}),
+              ...(Number.isFinite(Number(t.intensityPct)) ? { intensityPct: Number(t.intensityPct) } : {}),
+              ...(Number.isFinite(Number(t.rir)) ? { rir: Number(t.rir) } : {}),
+            }));
+          if (clean.length) {
+            setArmliftCorrections(clean);
+            try { localStorage.setItem('he_armlifting_corrections', JSON.stringify(clean)); } catch {}
+            flash(`↩ Хват-коррекции: ${clean.map((c) => c.exId).join(', ')} → встанут в план при сборке`);
+          } else {
+            setArmliftCorrections([]);
+            try { localStorage.removeItem('he_armlifting_corrections'); } catch {}
+          }
         }
       } catch {}
       // PRO-3 P4: red-flags из диагностики — стоп-баннер (сборку не ломаем)
@@ -950,6 +981,16 @@ export function ArmAutoConstructor() {
           if (inj.injected>0) plan.rationale = [...(plan.rationale||[]), `Инъекция мёртвых точек: ${inj.notes.join(' · ')}`];
         }
       } catch {}
+      // PRO-5 real: инъекция хват-коррекций армлифтинга — ТОЛЬКО дисциплина armlifting
+      try {
+        if ((discipline as string) === 'armlifting' && armliftCorrections.length) {
+          const inj = injectArmliftCorrections(plan, armliftCorrections, { level, workMax });
+          plan = inj.plan;
+          if (inj.injected > 0 || inj.notes.length) {
+            plan.rationale = [...(plan.rationale || []), `Армлифтинг-коррекции: ${inj.notes.join(' · ')}`];
+          }
+        }
+      } catch {}
       const v = validateArmPlan(plan, level);
       plan.validation = v;
       plan.report = buildArmReport(plan);
@@ -1176,6 +1217,20 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <div className="ad-row">
                 <AdBtn variant="dark" onClick={()=>{ setDiagWeakPoints([]); try{ localStorage.removeItem('he_arm_last_weakpoints'); } catch{} }}>✕ Сбросить мёртвые точки</AdBtn>
                 <span className="ad-muted">Инъекция: per-day dedup, budget 85, humerus guard</span>
+              </div>
+            </AdBanner>
+          )}
+          {armliftCorrections.length>0 && (discipline as string) === 'armlifting' && (
+            <AdBanner tone="info">
+              <b>🏋️ Хват-коррекции из армлифтинг-диагностики (встанут в план при сборке)</b>
+              <div className="ad-row">
+                {armliftCorrections.map(c=> (
+                  <span key={c.exId} className="ad-tag">{c.exId} {c.sets}×{c.dayTag || ''}</span>
+                ))}
+              </div>
+              <div className="ad-row">
+                <AdBtn variant="dark" onClick={()=>{ setArmliftCorrections([]); try{ localStorage.removeItem('he_armlifting_corrections'); } catch{} }}>✕ Сбросить хват-коррекции</AdBtn>
+                <span className="ad-muted">Инъекция: per-day dedup, budget, кап сессии 8, делод-скип</span>
               </div>
             </AdBanner>
           )}

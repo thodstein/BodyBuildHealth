@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { failuresFor, faultsFor } from '../armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../armlift-diagnosis.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../armlift-correction.engine';
+import { diagnoseArmliftCause } from '../armlift-cause.engine';
+import { injectArmliftCorrections, correctionsToInjectionItems } from '../armlift-injection.engine';
+import { getArmExerciseById } from '../../../core/exercise-catalog-arm';
 import { buildArmliftingReport, buildArmliftingHtml, buildArmliftingCsv } from '../armlifting-diagnostics.engine';
 
 describe('PRO-5 D1: точки срыва и фолы per-implement', () => {
@@ -75,14 +78,120 @@ describe('PRO-5 D2: коррекции и спец-блок', () => {
       expect(new Set(top.map((t) => t.id)).size).toBe(3);
     }
   });
-  it('thumb ведёт plate pinch (NSCA)', () => {
-    expect(rankArmliftCorrections('thumb')[0].id).toBe('plate_pinch');
+  it('thumb ведёт plate_pinch_hold из каталога (NSCA)', () => {
+    const top = rankArmliftCorrections('thumb');
+    expect(top[0].id).toBe('plate_pinch_hold');
+    expect(top.every((c) => getArmExerciseById(c.exId) != null)).toBe(true);
+  });
+  it('crush-снаряды чинятся crush-пулом (CoC), а не штангой', () => {
+    const top = rankArmliftCorrections('fingers', 'coc_gripper');
+    expect(top[0].exId).toMatch(/coc_|silver/);
+  });
+  it('все коррекции всех звеньев — реальные id каталога', () => {
+    for (const wl of ['thumb', 'fingers', 'wrist_ext', 'support_endurance', 'technique', 'asymmetry', 'conditioning'] as const) {
+      for (const c of rankArmliftCorrections(wl)) {
+        expect(getArmExerciseById(c.exId)).toBeTruthy();
+      }
+    }
   });
   it('спец-блок 4 нед волной, таргет — снаряд', () => {
     const spec = buildArmliftSpecBlock('thumb', 'saxon_bar');
     expect(spec.length).toBe(4);
     expect(spec[3].focus).toContain('Делод');
     expect(spec.every((w) => w.target === 'saxon_bar')).toBe(true);
+  });
+});
+
+describe('PRO-5 real: поиск причины со скорингом', () => {
+  it('боль — гейт pain 0.95, не скоринг', () => {
+    const r = diagnoseArmliftCause({ implement: 'rolling_thunder', pain: true });
+    expect(r.cause).toBe('pain');
+    expect(r.confidence).toBe(0.95);
+  });
+  it('локоть — тоже pain', () => {
+    expect(diagnoseArmliftCause({ elbowPain: true }).cause).toBe('pain');
+  });
+  it('2 фола — technique с evidence', () => {
+    const r = diagnoseArmliftCause({ implement: 'rolling_thunder', faultIds: ['not_center', 'body_drag'] });
+    expect(r.cause).toBe('technique');
+    expect(r.evidence.join(' ')).toContain('Фолы');
+    expect(r.fix.length).toBeGreaterThan(0);
+  });
+  it('редкие сессии — volume', () => {
+    const r = diagnoseArmliftCause({ implement: 'saxon_bar', gripSessions28d: 1, gripFreqPerWeek: 1 });
+    expect(r.cause).toBe('volume');
+  });
+  it('тренд стоит при объёме — technique, а не volume', () => {
+    const r = diagnoseArmliftCause({ implement: 'rolling_thunder', gripSessions28d: 10, trendDeltaPct: 0 });
+    expect(r.cause).toBe('technique');
+  });
+  it('тренд падает при объёме + частота 5 — fatigue', () => {
+    const r = diagnoseArmliftCause({ implement: 'rolling_thunder', gripSessions28d: 12, trendDeltaPct: -5, gripFreqPerWeek: 5 });
+    expect(r.cause).toBe('fatigue');
+  });
+  it('срыв внизу + pinch 6с — max_strength', () => {
+    const r = diagnoseArmliftCause({ implement: 'saxon_bar', failurePoint: 'off_floor', pinchHoldSec: 6 });
+    expect(r.cause).toBe('max_strength');
+  });
+  it('середина + farmer 20с — endurance', () => {
+    const r = diagnoseArmliftCause({ implement: 'rolling_thunder', failurePoint: 'mid', farmerHoldSec: 20 });
+    expect(r.cause).toBe('endurance');
+  });
+  it('жёсткий большой на щипке — mobility', () => {
+    const r = diagnoseArmliftCause({ implement: 'saxon_bar', thumbStiff: true });
+    expect(r.cause).toBe('mobility');
+  });
+  it('пусто — честный low confidence', () => {
+    const r = diagnoseArmliftCause({});
+    expect(r.confidence).toBeLessThan(0.5);
+    expect(r.evidence.length).toBeGreaterThan(0);
+  });
+});
+
+describe('PRO-5 real: инъекция коррекций в план', () => {
+  const fakePlan = () => ({
+    level: 'intermediate',
+    rationale: [] as string[],
+    weeks: [
+      { week: 1, sessions: [{ sessionTag: 'SupportGrip', exercises: [] }, { sessionTag: 'PinchGrip', exercises: [] }] },
+      { week: 2, deload: true, sessions: [{ sessionTag: 'SupportGrip', exercises: [] }] },
+    ],
+  });
+  it('plate_pinch_hold встаёт в PinchGrip с холдами и весом из workMax', () => {
+    const r = injectArmliftCorrections(fakePlan(), [{ exId: 'plate_pinch_hold', sets: 3, dayTag: 'PinchGrip' }], { workMax: { grip_pinch: 40 } });
+    expect(r.injected).toBe(1);
+    const sess = r.plan.weeks[0].sessions.find((s: any) => s.sessionTag === 'PinchGrip');
+    const ex = sess.exercises[0];
+    expect(ex.exerciseId).toBe('plate_pinch_hold');
+    expect(ex.muscle).toBe('grip_pinch');
+    expect(ex.workSets[0].weight).toBe(26);
+    expect(ex.isStatic).toBe(true);
+    expect(r.plan.rationale.join(' ')).toContain('инъецировано');
+  });
+  it('делод скипается, дубли давятся, бюджет держит', () => {
+    const dup = injectArmliftCorrections(fakePlan(), [{ exId: 'plate_pinch_hold', sets: 3 }], { weekIdxs: [0] });
+    expect(dup.injected).toBe(1);
+    const again = injectArmliftCorrections(dup.plan, [{ exId: 'plate_pinch_hold', sets: 3 }], { weekIdxs: [0] });
+    expect(again.injected).toBe(0);
+    expect(again.skippedDup).toBe(1);
+    const deload = injectArmliftCorrections(fakePlan(), [{ exId: 'rolling_thunder', sets: 3 }], { weekIdxs: [1] });
+    expect(deload.injected).toBe(0);
+    expect(deload.skippedDeload).toBe(1);
+    const over = injectArmliftCorrections(fakePlan(), [{ exId: 'rolling_thunder', sets: 6 }], { budget: 5 });
+    expect(over.injected).toBe(0);
+    expect(over.skippedBudget).toBe(1);
+  });
+  it('неизвестный exId — честный варнинг без падения', () => {
+    const r = injectArmliftCorrections(fakePlan(), [{ exId: 'zzz_nope', sets: 3 }]);
+    expect(r.injected).toBe(0);
+    expect(r.notes.join(' ')).toContain('нет в каталоге');
+  });
+  it('correctionsToInjectionItems берёт топ-3 с дозами', () => {
+    const top = rankArmliftCorrections('thumb');
+    const items = correctionsToInjectionItems(top);
+    expect(items.length).toBe(3);
+    expect(items[0].exId).toBe('plate_pinch_hold');
+    expect(items.every((t) => t.sets >= 1 && t.sets <= 6)).toBe(true);
   });
 });
 

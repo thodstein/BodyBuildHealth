@@ -18,7 +18,9 @@ import { downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.eng
 import { savePlatformLogEntry, loadPlatformLog, planLastManStanding } from '../../../engines/arm/arm-platform.engine';
 import { failuresFor, faultsFor, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
+import { diagnoseArmliftCause } from '../../../engines/arm/armlift-cause.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
+import { correctionsToInjectionItems } from '../../../engines/arm/armlift-injection.engine';
 import { platformRuleFor, PLATFORM_RULES_2026, LMS_RULES_2026 } from '../../../engines/arm/arm-pro5-platform-rules.engine';
 import { armliftClassFor, armliftClassLine } from '../../../engines/arm/armlift-weight-class.engine';
 import { applyToPlanner } from './planner-bridge';
@@ -60,13 +62,13 @@ type DiagState = {
   implement: string; failurePoint: string; faultIds: string[];
   pinchHoldSec: string; farmerHoldSec: string; wristExtWeak: boolean;
   thumbStiff: boolean; wristExtLimited: boolean; wristFlexLimited: boolean;
-  tSpineTight: boolean; hipHingePoor: boolean; pain: boolean;
+  tSpineTight: boolean; hipHingePoor: boolean; pain: boolean; elbowPain: boolean;
 };
 const DEFAULT_DIAG: DiagState = {
   implement: 'rolling_thunder', failurePoint: '', faultIds: [],
   pinchHoldSec: '', farmerHoldSec: '', wristExtWeak: false,
   thumbStiff: false, wristExtLimited: false, wristFlexLimited: false,
-  tSpineTight: false, hipHingePoor: false, pain: false,
+  tSpineTight: false, hipHingePoor: false, pain: false, elbowPain: false,
 };
 function loadDiag(): DiagState {
   try {
@@ -264,8 +266,49 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     hipHingePoor: diag.hipHingePoor,
     pain: diag.pain,
   }), [diag, asymForDiag]);
-  const corrections = useMemo(() => rankArmliftCorrections(diagnosis.weakLink), [diagnosis.weakLink]);
-  const specBlock = useMemo(() => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement), [diagnosis.weakLink, diag.implement]);
+  /** PRO-5 real: объём и тренд из журнала помоста (хештег — только свой лог). */
+  const logStats = useMemo(() => {
+    let sessions28d: number | null = null;
+    try {
+      const log = loadPlatformLog();
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 28);
+      const cut = cutoff.toISOString().slice(0, 10);
+      sessions28d = log.filter((e: any) => String(e.date || '') >= cut).length;
+    } catch { sessions28d = null; }
+    const tr = trend.find((t) => t.implement === diag.implement) || trend[0];
+    return {
+      sessions28d,
+      trendDeltaPct: tr ? tr.deltaPct : null,
+      gripFreqPerWeek: sessions28d != null ? Math.round((sessions28d / 4) * 10) / 10 : null,
+    };
+  }, [logTick, trend, diag.implement]);
+  /** PRO-5 real: причина со скорингом и evidence (свой движок, не стол). */
+  const cause = useMemo(() => diagnoseArmliftCause({
+    implement: diag.implement,
+    failurePoint: diag.failurePoint || undefined,
+    faultIds: diag.faultIds,
+    pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
+    farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
+    wristExtWeak: diag.wristExtWeak,
+    gripSessions28d: logStats.sessions28d,
+    trendDeltaPct: logStats.trendDeltaPct,
+    asymmetryPct: asymForDiag,
+    thumbStiff: diag.thumbStiff,
+    wristExtLimited: diag.wristExtLimited,
+    wristFlexLimited: diag.wristFlexLimited,
+    hipHingePoor: diag.hipHingePoor,
+    gripFreqPerWeek: logStats.gripFreqPerWeek,
+    elbowPain: diag.elbowPain,
+    pain: diag.pain,
+  }), [diag, asymForDiag, logStats]);
+  const corrections = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
+    cause: cause.cause === 'pain' ? undefined : cause.cause,
+    asymPct: asymForDiag,
+  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag]);
+  const specBlock = useMemo(
+    () => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections),
+    [diagnosis.weakLink, diag.implement, corrections],
+  );
   const diagFaults = useMemo(() => faultsFor(diag.implement), [diag.implement]);
   const diagFailures = useMemo(() => failuresFor(diag.implement), [diag.implement]);
 
@@ -306,6 +349,10 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           diagCues: diagnosis.cues,
           diagCorrections: corrections.map((c) => ({ id: c.id, title: c.title, protocol: c.protocol })),
           diagSpecBlock: specBlock,
+          /** PRO-5 real: упражнения в план — только armlifting-ветка конструктора читает. */
+          diagCauseDetail: { cause: cause.cause, confidence: cause.confidence, evidence: cause.evidence, fix: cause.fix },
+          armliftExercises: correctionsToInjectionItems(corrections),
+          armliftSpec: specBlock.map((w) => ({ week: w.week, targetSets: w.targetSets, dayMap: w.dayMap })),
         },
         armProfile: {
           ...(Number.isFinite(bw) && bw > 0 ? { bwKg: bw } : {}),
@@ -699,10 +746,15 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           </div>
           <div className="ad-row">
             <AdChip active={diag.pain} tone={diag.pain ? 'red' : undefined} onClick={() => setD({ pain: !diag.pain })}>{diag.pain ? '🔴 Боль есть — стоп' : 'Боли нет'}</AdChip>
+            <AdChip active={diag.elbowPain} tone={diag.elbowPain ? 'red' : undefined} onClick={() => setD({ elbowPain: !diag.elbowPain })}>{diag.elbowPain ? '🔴 Локоть/запястье болит' : 'Локоть в норме'}</AdChip>
+            {logStats.sessions28d != null && <span className="ad-tag">Журнал: {logStats.sessions28d} хват-сессий/28д</span>}
           </div>
           <div data-arm="lift-diag-result"><b>{diagnosis.title}</b> · причина: {diagnosis.cause} · уверенность: {diagnosis.confidence}</div>
           <div className="ad-muted">{diagnosis.cues.join(' · ')}</div>
           <div className="ad-muted">{diagnosis.ruleNote}</div>
+          <div data-arm="lift-cause-result"><b>Поиск причины: {cause.cause}</b> (уверенность {Math.round(cause.confidence * 100)}%)</div>
+          <div className="ad-muted">Факты: {cause.evidence.join(' · ')}</div>
+          <div className="ad-muted">Чинить: {cause.fix}</div>
           <AdCta>
             <AdBtn variant="amber" block hero onClick={() => setTab('corr')}>→ К коррекции ({corrections[0]?.title})</AdBtn>
           </AdCta>
@@ -712,12 +764,13 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       {tab === 'corr' && (<>
       <AdCard>
         <AdSec title="🔧 Коррекция" defaultOpen summary={`${diagnosis.weakLink} · топ-3`}>
-          <div data-arm="lift-corr-result"><b>{diagnosis.title}</b> · {diagnosis.cause}/{diagnosis.confidence}</div>
+          <div data-arm="lift-corr-result"><b>{diagnosis.title}</b> · причина {cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
+          <div className="ad-muted">Чинить: {cause.fix}</div>
           <div className="ad-list" data-arm="lift-corr-top">
             {corrections.map((c, idx) => (
               <div key={c.id} className="ad-row">
                 <span><b>{idx + 1}. {c.title}</b> — {c.protocol}</span>
-                <span className="ad-muted">{c.dose} · {c.freq} · {c.source}</span>
+                <span className="ad-muted">{c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq} · {c.source} · день {c.dayTag}</span>
               </div>
             ))}
           </div>
@@ -740,7 +793,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       <AdCard>
         <div id="lift-bridge" />
         <AdSec title="📦 Что уедет в конструктор" collapsible defaultOpen={false} summary={report.filled ? 'армлифтинг' : 'пока пусто'}>
-          <div className="ad-muted">Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину «Армлифтинг». Слабейший снаряд, класс, рецепт и last-man-standing — в payload.</div>
+          <div className="ad-muted">Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину «Армлифтинг». Слабейший снаряд, класс, рецепт, last-man-standing — в payload. Упражнения коррекции ({corrections.map((c) => c.exId).join(', ') || '—'}) встанут в недели плана при сборке в дисциплине «Армлифтинг».</div>
         </AdSec>
         <AdCta>
           <AdBtn variant="amber" block hero onClick={applyToConstructor}>→ В Арм-конструктор (армлифтинг)</AdBtn>
