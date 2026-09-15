@@ -52,23 +52,19 @@ describe('Arm PRO-5 UI (P7)', () => {
   });
 });
 
-describe('Arm PRO-5 UI (P2 hub rules)', () => {  it('помост: правило снаряда + LMS-канон', () => {
+describe('Arm PRO-5 UI (P2 hub rules)', () => {  it('соревы удалены: нет правил-2026 и LMS-канона', () => {
     const { container } = render(<ArmliftingDiagnosticsHub />);
-    const rule = container.querySelector('[data-arm="lift-rule-2026"]');
-    expect(rule).not.toBeNull();
-    expect(rule!.textContent).toContain('Rolling Thunder');
-    const lms = container.querySelector('[data-arm="lift-lms-rules"]');
-    expect(lms).not.toBeNull();
-    expect(lms!.textContent).toContain('60с');
+    expect(container.querySelector('[data-arm="lift-rule-2026"]')).toBeNull();
+    expect(container.querySelector('[data-arm="lift-rules-2026"]')).toBeNull();
+    expect(container.querySelector('[data-arm="lift-lms-rules"]')).toBeNull();
   });
 
-  it('все 9 правил 2026 в списке (Raptor/FatGripz честно без %)', () => {
+  it('диагностика движений на месте: табы и фолы per-implement', () => {
     const { container } = render(<ArmliftingDiagnosticsHub />);
-    const list = container.querySelector('[data-arm="lift-rules-2026"]');
-    expect(list).not.toBeNull();
-    expect(list!.textContent).toContain('Raptor 1.75');
-    expect(list!.textContent).toContain('Fat Gripz');
-    expect(list!.textContent).toContain('Ориентира нет');
+    expect(container.querySelector('[data-arm="lift-tabs"]')).not.toBeNull();
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    expect(screen.getByLabelText('Диагностика: снаряд')).toBeTruthy();
+    expect(screen.getByLabelText('Диагностика: фолы')).toBeTruthy();
   });
 });
 

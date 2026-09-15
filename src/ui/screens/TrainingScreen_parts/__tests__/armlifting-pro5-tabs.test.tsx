@@ -3,11 +3,14 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ArmliftingDiagnosticsHub } from '../ArmliftingDiagnosticsHub';
 
 describe('PRO-5 UI: помост + диагностика + коррекция', () => {
-  it('дефолт — помост со старыми контрактами', () => {
+  it('дефолт — замеры со старыми контрактами, соревы удалены', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);
     expect(screen.getByLabelText(/RT кг/)).toBeTruthy();
-    expect(screen.getByText('🏟 Помост')).toBeTruthy();
+    expect(screen.getByText('📏 Замеры')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('Last-man-standing');
+    expect(document.body.textContent).not.toContain('90/96/102');
+    expect(screen.queryByLabelText(/Вес попытки кг/)).toBeNull();
   });
   it('Диагностика: снаряд → срыв → фолы → диагноз', () => {
     try { localStorage.clear(); } catch { /* noop */ }

@@ -15,26 +15,28 @@ describe('PRO-4 UI: хаб армлифтинга', () => {
     expect(screen.getByLabelText(/Вес тела кг/)).toBeTruthy();
     expect(screen.getByLabelText(/Raptor кг/)).toBeTruthy();
   });
-  it('класс по весу: 85кг М → М-90', () => {
+  it('вес тела едет в конструктор, классов нет (соревы удалены)', () => {
     clear();
     render(<ArmliftingDiagnosticsHub />);
     fireEvent.change(screen.getByLabelText(/Вес тела кг/), { target: { value: '85' } });
-    expect(document.body.textContent).toContain('М-90');
+    expect(document.body.textContent).not.toContain('М-90');
+    expect((screen.getByLabelText(/Вес тела кг/) as HTMLInputElement).value).toBe('85');
   });
-  it('L/R дают асимметрию, рецепт и last-man-standing', () => {
+  it('L/R дают асимметрию и рецепт, без last-man-standing', () => {
     clear();
     render(<ArmliftingDiagnosticsHub />);
     fireEvent.change(screen.getByLabelText(/RT левая кг/), { target: { value: '60' } });
     fireEvent.change(screen.getByLabelText(/RT правая кг/), { target: { value: '66' } });
     expect(document.body.textContent).toContain('асимметрия');
     expect(document.body.textContent).toContain('Рецепт:');
-    expect(document.body.textContent).toContain('Last-man-standing');
+    expect(document.body.textContent).not.toContain('Last-man-standing');
   });
-  it('чек-лист правил: клик меняет подпись', () => {
+  it('чек-листа правил нет (соревы удалены), фолы живут в диагностике', () => {
     clear();
     render(<ArmliftingDiagnosticsHub />);
-    fireEvent.click(screen.getByLabelText(/Правило 1/));
-    expect(document.body.textContent).toContain('тренировочный');
+    expect(screen.queryByLabelText(/Правило 1/)).toBeNull();
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    expect(screen.getByLabelText('Диагностика: фолы')).toBeTruthy();
   });
   it('старые контракты целы: RT кг, CoC, Excalibur, Введи замеры, экспорт', () => {
     clear();

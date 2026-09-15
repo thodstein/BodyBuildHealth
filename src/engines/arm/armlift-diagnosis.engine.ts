@@ -27,7 +27,6 @@ export interface ArmliftDiagInput {
   thumbStiff?: boolean;
   wristExtLimited?: boolean;
   wristFlexLimited?: boolean;
-  tSpineTight?: boolean;
   hipHingePoor?: boolean;
   pain?: boolean;
   painNote?: string;
