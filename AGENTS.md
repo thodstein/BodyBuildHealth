@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-диагностика движений: живой гейт + профиль-канон (Sep 15 2026, коммит pathspec `0f3064dd`, без пуша — в очереди чужой `2490792e9` armlift)
+
+По команде «продолжай» (поверх чистки `33bdf8d5`, уже в origin/main). Только свой хаб + свой тест; чужие WIP и чужой активный `BbAutoConstructor` (M3) не тронуты.
+- **Живой гейт вставки**: после выноса recovery-таба стоп-флаги (`acutePain/swelling/numbness/jointClickPain`) остались без входов — stale `true` в сторе вечно блочил бы вставку без возможности снять. Теперь компактный ряд `data-bb="stop-flags"` (4 чипа 44px, `data-bb="stop-flag"`) в weak над кнопкой вставки + `data-bb="stop-note"`; гейт `handleInjectToPlan` без изменений. Полного суставного скрининга тут нет осознанно — он в хабе «Суставы и ортопедия», здесь только гейт.
+- **Профиль — единый источник**: `profileSex` (`settings.personal.sex`) + `profileSleep` (`settings.lifestyle.sleepHours`); `effSex = profileSex || state.sex` (легаси-фолбэк) заменён во всех 8 местах (`buildSpecBlock`×6/top3/corrections + deps); сон в readiness/weakCauses/мост — из профиля; боль сегодня — `null` (в хабе не спрашиваем, честно без штрафа). Удалён замороженный стейт `sleepHours/pain010` (UI-входов больше не было).
+- NEW тесты: стоп-гейт (чип → `Стоп:` → план цел, prev пуст) + профиль-канон (female/7ч → своих селектов нет, мост несёт `sleepHours: 7`).
+- Проверено: hub 35/35 + movement 13/13 + bridge/handlers/pro/pro2/pro3/injection 132/132 + max-pro 93/94 (**1 — чужое предсуществующее `female норма→тихо` в `bb-symmetry`, не мой файл**); `tsc --noEmit` **0 по всему проекту**; `verify:apk-design` OK. НЕ ПУШИЛ.
+- **Граница для владельца ББ-авто (повтор)**: приёмник не читает `movementDriver/singleLeg/vbtLossPct`; stale `he_bb_lr_topup`/`he_bb_return_action` чистятся только полным старым мостом — правит владелец приёмника.
+
 ## ББ-диагностика движений: чистка мёртвого кода (Sep 15 2026, коммит pathspec `33bdf8d5`, запушен — очередь была чистая)
 
 По команде «продолжай» (поверх v2 `9a4577cb`, уже в origin/main). Только свой хаб + свой тест; чужие WIP (labs-mapping/IndividualPlan/Risk/Labs/armlift/bb-finalize) и чужой активный `BbAutoConstructor` (M3-срез владельца) не тронуты.
