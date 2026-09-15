@@ -45,6 +45,10 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   bbDiagScore?: number; bbDiagLevel?: string; verification?: unknown;
   symmetry?: unknown; stimulus?: unknown; perMuscleAcwr?: Record<string, { ratio: number; zone: string }>;
   ohs?: { totalScore: number; failed: number }; vbt?: { lossPct: number; zone: string } | null;
+  /** Движения ББ v2 (BBDiagnosticsHub → BbAutoConstructor): драйвер скрининга + односторонний + VBT-флаг (всё опционально). */
+  movementDriver?: { driver: string; label: string; fix: string; confidence: number } | null;
+  singleLeg?: { weakSide: 'left' | 'right' | null; text: string } | null;
+  vbtLossPct?: number | null;
   weakCauses?: unknown; weakHeads?: string[];
   /** Форма свободная (движок SpecBlock: weeks/lengthWeeks/donors/dayMap/rationale);
    *  приёмник валидирует поля перед применением. */

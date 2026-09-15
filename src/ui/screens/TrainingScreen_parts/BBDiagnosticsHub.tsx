@@ -1,7 +1,8 @@
 /**
- * BBDiagnosticsHub.tsx — ББ-диагностика PRO (единый инструмент: мышца + упражнение → эффект → коррекция).
- * 7 табов: weak/symmetry/exercise(диагностика+PROF-коррекция+Δ)/stimulus/volume/recovery/mobility.
- * Хедер RSS 0-100 + verification + ACWR/SFR-чипы. Мост weakpoints (+preferredExerciseIds/exerciseSwap/labDiagnosis) → BbAutoConstructor.
+ * BBDiagnosticsHub.tsx — диагностика ДВИЖЕНИЙ под бодибилдинг (мышца + упражнение → стимул → коррекция).
+ * 4 таба: screening (OHS-скрининг + односторонний + драйвер)/exercise (разбор+PROF-техника+Δ)/stimulus (стимул-карта)/symmetry (пропорции).
+ * Нагрузка/восстановление/объём/VBT/LVP/видео/ортопедия — НЕ дублируются, только ссылки на свои хабы.
+ * Хедер RSS 0-100 (движения: слабые/симметрия/стимул/скрининг/SFR/углы/длина) + verification. Мост weakpoints → BbAutoConstructor.
  */
 import React, { useMemo, useState, useEffect } from 'react';
 import { CARD, ACCENT } from './training-ui';
@@ -49,16 +50,22 @@ import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes, teenTrainingNote, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
-import { OrthoScreenCard } from './OrthoScreenCard';
+import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, movementDelta, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
-type BBTab = 'weak' | 'symmetry' | 'exercise' | 'stimulus' | 'volume' | 'recovery' | 'mobility';
+type BBTab = 'weak' | 'screening' | 'exercise' | 'stimulus' | 'symmetry';
 
 type BBState = {
   weakManual: string[];
   circ: Record<string, string>;
   ohsHeelsFlat: boolean; ohsKneeValgus: boolean; ohsHipBelowParallel: boolean; ohsTrunkUpright: boolean; ohsArmsOverMidfoot: boolean; ohsLumbarNeutral: boolean;
-  kneeToWallCm: string; ankleDeg: string; heelRetest: '' | 'better' | 'same';
+  kneeToWallCm: string; ankleDeg: string;   heelRetest: '' | 'better' | 'same';
+  /** Скрининг v2: руки на бёдрах чистят поясницу (тест на широчайшие) + односторонний + снимок. */
+  handsOnHipsBetter: boolean;
+  splitL: '' | 'pass' | 'fail';
+  splitR: '' | 'pass' | 'fail';
+  rdlL: '' | 'pass' | 'fail';
+  rdlR: '' | 'pass' | 'fail';
   vbtBest: string; vbtLast: string; vbtWeight: string;
   csvText: string;
   exerciseSelectedId: string | null;
@@ -99,6 +106,8 @@ const DEFAULT_STATE: BBState = {
   circ: { heightCm: '175', weightKg: '80', bodyFat: '', neck: '', chest: '', waist: '', hips: '', bicepL: '', bicepR: '', thighL: '', thighR: '', calfL: '', calfR: '', shoulderWidth: '', forearmL: '', forearmR: '' },
   ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
   kneeToWallCm: '', ankleDeg: '', heelRetest: '',
+  handsOnHipsBetter: false,
+  splitL: '', splitR: '', rdlL: '', rdlR: '',
   vbtBest: '', vbtLast: '', vbtWeight: '',
   csvText: '',
   exerciseSelectedId: null,
@@ -132,13 +141,11 @@ const DEFAULT_STATE: BBState = {
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
-  { id: 'weak', label: 'Слабые', icon: '🎯', desc: 'зоны 1–2 + сила + пропорции' },
-  { id: 'symmetry', label: 'Симметрия', icon: '⚖️', desc: 'лево/право + конус + индекс массы' },
-  { id: 'exercise', label: 'Упражнения', icon: '🏋️', desc: 'разбор + техника + изменение' },
-  { id: 'stimulus', label: 'Стимул', icon: '💪', desc: 'растянутая + рисунок + жгуты' },
-  { id: 'volume', label: 'Объём', icon: '📊', desc: 'минимум/норма/максимум' },
-  { id: 'recovery', label: 'Восстановление', icon: '🔋', desc: 'нагрузка по мышцам + сон' },
-  { id: 'mobility', label: 'Подвижность', icon: '🦿', desc: 'присед-тест + скорость 20–25%' },
+  { id: 'weak', label: 'Слабые', icon: '🎯', desc: 'зоны 1–2 + причина + топ-3' },
+  { id: 'screening', label: 'Скрининг', icon: '🦿', desc: 'присед-тест + драйвер + 1 нога' },
+  { id: 'exercise', label: 'Разбор', icon: '🏋️', desc: 'упражнение + техника + замена' },
+  { id: 'stimulus', label: 'Стимул-карта', icon: '🎯', desc: 'SFR + длина + углы + читинг' },
+  { id: 'symmetry', label: 'Пропорции', icon: '⚖️', desc: 'замеры + лево/право + дельты' },
 ];
 
 const GRANULAR_OPTS: Array<{ id: string; label: string }> = [
@@ -552,14 +559,59 @@ export const BBDiagnosticsHub: React.FC = () => {
     heightCm: measNum.heightCm ?? null,
     plan: readSavedBbPlan(),
     balance,
-    perMuscleAcwr: perMuscleAcwr as any,
+    // Движения, не нагрузка: ACWR/VBT в скоринг не входят (их хабы — Интеллект/Анализ силы).
+    // perMuscleAcwr остаётся тихим входом причин (weakCauses), но не штрафа баллов.
+    perMuscleAcwr: null,
     mobilityFails: ohs.failed,
-    vbtLossPct: vbt?.lossPct ?? null,
+    vbtLossPct: null,
     hasDiary: diarySessions.length > 0,
     hasCircumf: Object.keys(measNum).some(k => ['chest','waist','bicepL','bicepR','thighL','thighR'].includes(k)),
-    hasVbt: !!vbt,
+    hasVbt: false,
     manualWeak: state.weakManual,
-  }), [level, factVolume, diarySessions, measNum, balance, perMuscleAcwr, ohs.failed, vbt, state.weakManual]);
+  }), [level, factVolume, diarySessions, measNum, balance, ohs.failed, state.weakManual]);
+
+  // Скрининг v2: драйвер + односторонний + коды/снимок (чистые функции движка)
+  const moveDriver = useMemo(() => {
+    try {
+      return resolveMovementDriver({
+        heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
+        trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
+        kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
+        ankleDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
+        heelRetest: state.heelRetest === 'better' ? 'better' : state.heelRetest === 'same' ? 'same' : null,
+        handsOnHipsBetter: state.handsOnHipsBetter || null,
+      });
+    } catch { return { driver: 'none', label: '—', fix: '', confidence: 0 } as any; }
+  }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.kneeToWallCm, state.ankleDeg, state.heelRetest, state.handsOnHipsBetter]);
+  const singleLeg = useMemo(() => {
+    try {
+      return singleLegVerdict({
+        splitSquatL: (state.splitL || null) as any, splitSquatR: (state.splitR || null) as any,
+        rdlL: (state.rdlL || null) as any, rdlR: (state.rdlR || null) as any,
+      });
+    } catch { return { weakSide: null, text: '' } as any; }
+  }, [state.splitL, state.splitR, state.rdlL, state.rdlR]);
+  const ohsCodes = useMemo(() => {
+    try {
+      return ohsFailCodes({
+        heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
+        trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
+      });
+    } catch { return []; }
+  }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral]);
+  const [screenHist, setScreenHist] = useState<MovementSnapshot[]>(() => {
+    try {
+      const raw = localStorage.getItem('he_bb_screen_history');
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter((s) => s && typeof s.date === 'string' && Array.isArray(s.fails)) : [];
+    } catch { return []; }
+  });
+  const screenDelta = useMemo(() => {
+    try {
+      const prev = screenHist.length ? screenHist[screenHist.length - 1] : null;
+      return movementDelta(prev, ohsCodes);
+    } catch { return { fixed: [], regressed: [], text: '' } as any; }
+  }, [screenHist, ohsCodes]);
 
   const score = report.score.score;
   const sLevel = report.score.level;
@@ -708,106 +760,33 @@ export const BBDiagnosticsHub: React.FC = () => {
         weakZonesGranular: report.weakZonesGranular,
         weakMusclesCanonical: report.weakMusclesCanonical,
         bbDiagScore: score, bbDiagLevel: sLevel, verification: report.score.verification,
-        symmetry: report.symmetry, stimulus: report.stimulus, perMuscleAcwr,
+        symmetry: report.symmetry, stimulus: report.stimulus,
+        // Движения, не нагрузка: скрининг + односторонний драйвер (ACWR/readiness/VBT/LVP/сон/боль — чужие хабы, в мост не едут)
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
-        vbt: vbt ? { lossPct: vbt.lossPct, zone: vbt.zone } : null,
+        movementDriver: (() => { try {
+          return resolveMovementDriver({
+            heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
+            trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
+            kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
+            ankleDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
+            heelRetest: state.heelRetest === 'better' ? 'better' : state.heelRetest === 'same' ? 'same' : null,
+            handsOnHipsBetter: state.handsOnHipsBetter || null,
+          });
+        } catch { return null; } })(),
+        singleLeg: (() => { try {
+          return singleLegVerdict({
+            splitSquatL: (state.splitL || null) as any, splitSquatR: (state.splitR || null) as any,
+            rdlL: (state.rdlL || null) as any, rdlR: (state.rdlR || null) as any,
+          });
+        } catch { return null; } })(),
+        vbtLossPct: null,
         weakCauses: weakCausesPayload,
         preferredExerciseIds: topIds,
         weakHeads,
         specBlock: specPayload,
         sleepHours: Number.isFinite(sleepNum as number) ? sleepNum : null,
-        // PRO-2: L/R, готовность, флаги, штанга, поза, teen (лениво — мемы ниже недоступны из-за TDZ)
+        // Симметрия L/R — движения (остаётся); направление перекоса — из истории
         lrVerdicts: (() => { try { return lrVerdictsFromSessions(diarySessions as any); } catch { return []; } })(),
-        readiness: (() => {
-          try {
-            const pain = state.pain010 ? parseFloat(state.pain010) : null;
-            const sl = state.sleepHours ? parseFloat(state.sleepHours) : null;
-            const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
-            return assessBbReadiness({
-              sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
-              pain010: Number.isFinite(pain as number) ? (pain as number) : null,
-              vbtLossPct: vbt?.lossPct ?? null,
-              dangerMuscles: danger,
-            });
-          } catch { return undefined; }
-        })(),
-        redFlags: (() => {
-          try { return assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain }); } catch { return undefined; }
-        })(),
-        barPath: (() => {
-          try {
-            const pts = parseKinoveaCSV(state.csvText);
-            const res = pts ? analyzeBarTracking(pts as any) : null;
-            if (!res) return null;
-            const vd = bbBarPathVerdict(res.xLoop, res.yMax);
-            return { xLoop: res.xLoop, yMax: res.yMax, type: vd.type, text: vd.text };
-          } catch { return null; }
-        })(),
-        poseAngles: (() => {
-          try {
-            const samples = parsePoseAnglesCsv(state.poseCsvText);
-            const sum = samples ? summarizePoseAngles(samples) : null;
-            if (!sum) return null;
-            const avg = avgAnglesOfSummary(sum);
-            return { hip: avg.hip, knee: avg.knee, ankle: avg.ankle, shoulder: avg.shoulder, n: sum.n };
-          } catch { return null; }
-        })(),
-        teenNote: (() => { try { return teenTrainingNote(state.age ? parseFloat(state.age) : null); } catch { return null; } })(),
-        // PRO-3 R1–R7 (лениво — мемы ниже недоступны из-за TDZ, считаем теми же движками)
-        lvp: (() => {
-          try {
-            const pts = parseBbLvpText(state.lvpText);
-            if (pts.length < 3) return null;
-            const p = calibrateBbLvp(state.lvpLift || 'squat', pts);
-            return p ? { lift: p.lift, r2: p.r2, e1rm: p.e1rm, text: p.text } : null;
-          } catch { return null; }
-        })(),
-        tendon: (() => {
-          try {
-            const g = assessBbTendonGuard(diarySessions as any, { elbowPain: state.elbowPain, shoulderOhsFail: !state.ohsArmsOverMidfoot, level });
-            return { elbow: g.elbow.text, shoulder: g.shoulder.text, elbowLevel: g.elbow.level, shoulderLevel: g.shoulder.level };
-          } catch { return null; }
-        })(),
-        returnTo: (() => {
-          try {
-            const gate = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
-            return buildReturnToPlan(gate as any);
-          } catch { return null; }
-        })(),
-        returnStage: state.returnStage || null,
-        returnAction: (() => {
-          try {
-            const gate = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
-            const plan = buildReturnToPlan(gate as any);
-            const act = activeReturnToStage(plan as any, state.returnStage as any);
-            return act ? act.action : null;
-          } catch { return null; }
-        })(),
-        readinessAction: (() => {
-          try {
-            const pain = state.pain010 ? parseFloat(state.pain010) : null;
-            const sl = state.sleepHours ? parseFloat(state.sleepHours) : null;
-            const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
-            const r = assessBbReadiness({
-              sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
-              pain010: Number.isFinite(pain as number) ? (pain as number) : null,
-              vbtLossPct: vbt?.lossPct ?? null,
-              dangerMuscles: danger,
-            });
-            return r.level === 'red' ? { level: 'red', volumeMult: 0.75, rirShift: 1 } : null;
-          } catch { return null; }
-        })(),
-        lrTopUp: (() => {
-          try {
-            const out: Record<string, { side: 'left' | 'right'; sets: number }> = {};
-            for (const v of lrVerdictsFromSessions(diarySessions as any)) {
-              if ((v.verdict === 'topup' || v.verdict === 'watch') && v.weakSide) {
-                out[v.group] = { side: v.weakSide, sets: Math.max(1, Math.min(3, v.topUpSets)) };
-              }
-            }
-            return out;
-          } catch { return {}; }
-        })(),
         lrDirection: (() => {
           try {
             const raw = localStorage.getItem('he_bb_lr_history');
@@ -819,26 +798,6 @@ export const BBDiagnosticsHub: React.FC = () => {
             }
             return out;
           } catch { return []; }
-        })(),
-        mmc: (() => {
-          try {
-            const iso = (report.weakZonesGranular || []).length > 0;
-            const pctRaw = state.mmcLoadPct ? parseFloat(state.mmcLoadPct) : null;
-            const loadPct = Number.isFinite(pctRaw as number) && (pctRaw as number) > 0 ? (pctRaw as number) / 100 : null;
-            const a = mmcAdviceFor({ isolation: iso, loadPct1RM: loadPct, explosive: false });
-            return `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}`;
-          } catch { return null; }
-        })(),
-        workingRange: (() => {
-          try {
-            const pts = parseBbLvpText(state.lvpText);
-            const fresh = pts.length >= 3 ? calibrateBbLvp(state.lvpLift || 'squat', pts) : null;
-            const stored = pts.length >= 3 ? null : (loadBbLvpProfiles()[state.lvpLift || 'squat'] ?? null);
-            const e = (fresh && fresh.valid ? fresh.e1rm : null) ?? (stored && stored.valid ? stored.e1rm : null) ?? vbt?.e1RMByVelocity ?? null;
-            if (e == null) return null;
-            const r = bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass');
-            return r ? r.text : null;
-          } catch { return null; }
         })(),
       },
       source: 'intellectual',
@@ -883,15 +842,9 @@ export const BBDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 3000);
   };
 
-  // PRO-3: общий сбор для экспорта (HTML/CSV) и моста — те же движки, что мемы экрана
+  // Экспорт движений: направление перекоса L/R (нагрузка в файл не едет — её хабы свои)
   const buildPro3Export = (): Record<string, unknown> => {
     try {
-      const lvpPts = parseBbLvpText(state.lvpText);
-      const lvpP = lvpPts.length >= 3 ? calibrateBbLvp(state.lvpLift || 'squat', lvpPts) : null;
-      const tg = assessBbTendonGuard(diarySessions as any, { elbowPain: state.elbowPain, shoulderOhsFail: !state.ohsArmsOverMidfoot, level });
-      const gate = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
-      const rt = buildReturnToPlan(gate as any);
-      const rtActive = activeReturnToStage(rt as any, state.returnStage as any);
       const raw = localStorage.getItem('he_bb_lr_history');
       const hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
       const dir: Array<{ group: string; text: string }> = [];
@@ -899,25 +852,8 @@ export const BBDiagnosticsHub: React.FC = () => {
         const d = summarizeLrDirection(hist, v.group);
         if (d) dir.push({ group: v.group, text: d.text });
       }
-      const lvpStored = lvpPts.length >= 3 ? null : (loadBbLvpProfiles()[state.lvpLift || 'squat'] ?? null);
-      const e = vbt?.e1RMByVelocity ?? null;
-      const eEff = (lvpP && lvpP.valid ? lvpP.e1rm : null) ?? (lvpStored && lvpStored.valid ? lvpStored.e1rm : null) ?? e;
-      const isIndiv = !!(lvpP && lvpP.valid ? true : lvpStored && lvpStored.valid);
-      const wr0 = eEff != null ? bbWorkingRange(eEff, state.vbtGoal === 'strength' ? 'strength' : 'mass') : null;
-      const wr = wr0 ? { ...wr0, text: wr0.text + (isIndiv ? ' · индивид.' : ' · популяц.') } : null;
-      const iso = (report.weakZonesGranular || []).length > 0;
-      const pctRaw = state.mmcLoadPct ? parseFloat(state.mmcLoadPct) : null;
-      const loadPct = Number.isFinite(pctRaw as number) && (pctRaw as number) > 0 ? (pctRaw as number) / 100 : null;
-      const mmc = mmcAdviceFor({ isolation: iso, loadPct1RM: loadPct, explosive: false });
       return {
-        lvp: lvpP ? { lift: lvpP.lift, r2: lvpP.r2, e1rm: lvpP.e1rm, text: lvpP.text } : null,
-        tendon: { elbow: tg.elbow.text, shoulder: tg.shoulder.text },
-        mmc: `${mmc.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${mmc.cue} — ${mmc.text}`,
-        returnTo: rt,
-        returnStage: state.returnStage || null,
-        returnAction: rtActive ? rtActive.action : null,
         lrDirection: dir,
-        workingRange: wr ? wr.text : null,
       };
     } catch { return {}; }
   };
@@ -959,57 +895,39 @@ export const BBDiagnosticsHub: React.FC = () => {
       const f: Record<string, number> = {};
       spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
     } catch { /* noop */ }
-    // PRO-2 в экспорт: считаем теми же движками, что мемы экрана (мемы ниже недоступны из-за TDZ)
+    // Экспорт движений: L/R + скрининг-драйвер + односторонний (нагрузка — чужие хабы, в файл не едет)
     let pro2: Record<string, unknown> = {};
     try {
       const lr = lrVerdictsFromSessions(diarySessions as any).map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
-      const pain = state.pain010 ? parseFloat(state.pain010) : null;
-      const sl = state.sleepHours ? parseFloat(state.sleepHours) : null;
-      const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
-      const readinessEx = assessBbReadiness({
-        sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
-        pain010: Number.isFinite(pain as number) ? (pain as number) : null,
-        vbtLossPct: vbt?.lossPct ?? null,
-        dangerMuscles: danger,
-      });
-      const redEx = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
-      let barEx: Record<string, unknown> | null = null;
+      let moveDriverEx: unknown = null;
       try {
-        const pts = parseKinoveaCSV(state.csvText);
-        const res = pts ? analyzeBarTracking(pts as any) : null;
-        if (res) barEx = { xLoop: res.xLoop, yMax: res.yMax, type: bbBarPathVerdict(res.xLoop, res.yMax).type, text: bbBarPathVerdict(res.xLoop, res.yMax).text };
+        moveDriverEx = resolveMovementDriver({
+          heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
+          trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
+          kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
+          ankleDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
+          heelRetest: state.heelRetest === 'better' ? 'better' : state.heelRetest === 'same' ? 'same' : null,
+          handsOnHipsBetter: (state as any).handsOnHipsBetter || null,
+        });
       } catch { /* noop */ }
-      let poseEx: Record<string, unknown> | null = null;
+      let singleLegEx: unknown = null;
       try {
-        const samples = parsePoseAnglesCsv(state.poseCsvText);
-        const sum = samples ? summarizePoseAngles(samples) : null;
-        if (sum) {
-          const avg = avgAnglesOfSummary(sum);
-          poseEx = { hip: avg.hip, knee: avg.knee, ankle: avg.ankle, shoulder: avg.shoulder, n: sum.n, faults: [] as string[] };
-        }
+        singleLegEx = singleLegVerdict({
+          splitSquatL: ((state as any).splitL || null) as any, splitSquatR: ((state as any).splitR || null) as any,
+          rdlL: ((state as any).rdlL || null) as any, rdlR: ((state as any).rdlR || null) as any,
+        });
       } catch { /* noop */ }
-      const w = parseFloat(state.circ.waist || '');
-      const h = parseFloat(state.circ.hips || '');
-      const tRaw = parseFloat(state.circ.thighL || '') || parseFloat(state.circ.thighR || '');
       pro2 = {
         lr,
-        readiness: { level: readinessEx.level, advice: readinessEx.advice, reasons: readinessEx.reasons },
-        redFlags: { active: redEx.active, blocked: redEx.blocked, items: redEx.items, text: redEx.text },
-        bar: barEx,
-        pose: poseEx,
-        teen: teenTrainingNote(state.age ? parseFloat(state.age) : null),
-        femaleNotes: state.sex === 'female'
-          ? femaleSymmetryNotes(
-            { waist: Number.isFinite(w) ? w : null, hips: Number.isFinite(h) ? h : null, thigh: Number.isFinite(tRaw) ? tRaw : null },
-            { cyclePhase: (state.cyclePhase || 'any') as any },
-          )
-          : [],
+        movementDriver: moveDriverEx,
+        singleLeg: singleLegEx,
+        ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
       };
       try { Object.assign(pro2, buildPro3Export()); } catch { /* noop */ }
     } catch { /* noop */ }
     const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan, weakHeads: heads, weakCauses: causes as any, specBlock: spec as any, ...pro2 } as any);
     downloadHtml(html, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
-    setToast('✓ HTML экспорт (причины + спец-блок + упражнения + PRO-2)');
+    setToast('✓ HTML экспорт (движения: причины + спец-блок + разбор + скрининг)');
     setTimeout(() => setToast(''), 2000);
   };
   const handleExportCsv = () => {
@@ -1052,53 +970,27 @@ export const BBDiagnosticsHub: React.FC = () => {
     let pro2csv: Record<string, unknown> = {};
     try {
       const lr = lrVerdictsFromSessions(diarySessions as any).map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
-      const pain = state.pain010 ? parseFloat(state.pain010) : null;
-      const sl = state.sleepHours ? parseFloat(state.sleepHours) : null;
-      const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
-      const readinessEx = assessBbReadiness({
-        sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
-        pain010: Number.isFinite(pain as number) ? (pain as number) : null,
-        vbtLossPct: vbt?.lossPct ?? null,
-        dangerMuscles: danger,
-      });
-      const redEx = assessBbRedFlags({ acutePain: state.acutePain, swelling: state.swelling, numbness: state.numbness, jointClickPain: state.jointClickPain });
-      let barEx: Record<string, unknown> | null = null;
+      let moveDriverCsv: unknown = null;
       try {
-        const pts = parseKinoveaCSV(state.csvText);
-        const res = pts ? analyzeBarTracking(pts as any) : null;
-        if (res) barEx = { xLoop: res.xLoop, yMax: res.yMax, type: bbBarPathVerdict(res.xLoop, res.yMax).type, text: bbBarPathVerdict(res.xLoop, res.yMax).text };
+        moveDriverCsv = resolveMovementDriver({
+          heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
+          trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
+          kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
+          ankleDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
+          heelRetest: state.heelRetest === 'better' ? 'better' : state.heelRetest === 'same' ? 'same' : null,
+          handsOnHipsBetter: (state as any).handsOnHipsBetter || null,
+        });
       } catch { /* noop */ }
-      let poseEx: Record<string, unknown> | null = null;
-      try {
-        const samples = parsePoseAnglesCsv(state.poseCsvText);
-        const sum = samples ? summarizePoseAngles(samples) : null;
-        if (sum) {
-          const avg = avgAnglesOfSummary(sum);
-          poseEx = { hip: avg.hip, knee: avg.knee, ankle: avg.ankle, shoulder: avg.shoulder, n: sum.n, faults: [] as string[] };
-        }
-      } catch { /* noop */ }
-      const w = parseFloat(state.circ.waist || '');
-      const h = parseFloat(state.circ.hips || '');
-      const tRaw = parseFloat(state.circ.thighL || '') || parseFloat(state.circ.thighR || '');
       pro2csv = {
         lr,
-        readiness: { level: readinessEx.level, advice: readinessEx.advice, reasons: readinessEx.reasons },
-        redFlags: { active: redEx.active, blocked: redEx.blocked, items: redEx.items, text: redEx.text },
-        bar: barEx,
-        pose: poseEx,
-        teen: teenTrainingNote(state.age ? parseFloat(state.age) : null),
-        femaleNotes: state.sex === 'female'
-          ? femaleSymmetryNotes(
-            { waist: Number.isFinite(w) ? w : null, hips: Number.isFinite(h) ? h : null, thigh: Number.isFinite(tRaw) ? tRaw : null },
-            { cyclePhase: (state.cyclePhase || 'any') as any },
-          )
-          : [],
+        movementDriver: moveDriverCsv,
+        ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
       };
       try { Object.assign(pro2csv, buildPro3Export()); } catch { /* noop */ }
     } catch { /* noop */ }
     const csv = buildBBDiagnosticsCsv(report, bbPlan as any, { weakCauses: causes, weakHeads: heads, specBlock: spec, ...pro2csv });
     downloadCsv(csv, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
-    setToast('✓ CSV экспорт (причины + спец-блок + упражнения + PRO-2)');
+    setToast('✓ CSV экспорт (движения: причины + спец-блок + разбор + скрининг)');
     setTimeout(() => setToast(''), 2000);
   };
 
@@ -1653,8 +1545,8 @@ export const BBDiagnosticsHub: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#a855f7)', color: '#fff', fontWeight: 900, fontSize: 16 }}>💪</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>ББ-диагностика — хаб PRO</div>
-            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Отстающие × сила/пропорции + симметрия + 🏋️ Упражнения (стимул/растянутая/рисунок/темп/техника) + объём + нагрузка + присед-тест + скорость.</div>
+            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Движения ББ — диагностика</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Скрининг + разбор упражнения + стимул-карта + пропорции. Нагрузка — ⚡ Интеллект, объём — 📐 Объём-хаб, суставы — 🦴 Ортопедия (здесь только ссылки).</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
@@ -1662,7 +1554,7 @@ export const BBDiagnosticsHub: React.FC = () => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>Драйвер: {moveDriver.driver === 'none' ? '—' : moveDriver.label}</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{report.weakMusclesCanonical.length ? `${report.weakMusclesCanonical.length} слабые` : 'баланс'}</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: report.symmetry.score < 70 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>Симметрия {report.symmetry.score}</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>Стимул {report.stimulus.scorePenalty ? `−${report.stimulus.scorePenalty}` : 'порядок'}</span>
@@ -1674,11 +1566,9 @@ export const BBDiagnosticsHub: React.FC = () => {
           Выбери слабые зоны + упражнение → разбор 12 признаков + «как дать в мышцу» → изменение эффекта. Кнопка <b style={{ color: '#00e68a' }}>«Применить в ББ-авто»</b> отправит зоны + технику/темп/замену в конструктор (стимул + растянутая позиция + рисунок движения).
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, fontSize: 10 }}>
-          <span style={{ padding: '4px 8px', borderRadius: 999, background: Object.keys(measNum).length >= 3 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: Object.keys(measNum).length >= 3 ? '#22c55e' : '#f59e0b' }}>1.Замеры {Object.keys(measNum).length >= 3 ? '✓' : '→ Симметрия'}</span>
+          <span style={{ padding: '4px 8px', borderRadius: 999, background: Object.keys(measNum).length >= 3 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: Object.keys(measNum).length >= 3 ? '#22c55e' : '#f59e0b' }}>1.Замеры {Object.keys(measNum).length >= 3 ? '✓' : '→ Пропорции'}</span>
           <span style={{ padding: '4px 8px', borderRadius: 999, background: diarySessions.length >= 4 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: diarySessions.length >= 4 ? '#22c55e' : '#f59e0b' }}>2.Дневник/план {diarySessions.length >= 4 ? `✓ ${diarySessions.length}` : '→ введи тренировки'}</span>
           <span style={{ padding: '4px 8px', borderRadius: 999, background: report.weakZonesGranular.length ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: report.weakZonesGranular.length ? '#22c55e' : '#fff' }}>3.Коррекция {report.weakZonesGranular.length ? `→ ${report.weakZonesGranular.join(', ')}` : '— выбери зону'}</span>
-          <span style={{ marginLeft: 'auto', minWidth: 150, flex: '0 1 170px' }}><BbSheetSelect label="Пол" value={state.sex} onChange={(v) => setState(s => ({ ...s, sex: v as any }))} options={[{ id: '', label: 'Не указан' }, { id: 'male', label: 'Мужской' }, { id: 'female', label: 'Женский' }]} testId="bb-sex" /></span>
-          <span style={{ minWidth: 130, flex: '0 1 150px' }}><BbNum label="Сон, ч" value={state.sleepHours} onChange={(v) => setState(s => ({ ...s, sleepHours: v }))} placeholder="7,5" step={0.5} /></span>
         </div>
         {toast && <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 11 }}>{toast}</div>}
       </div>
@@ -1773,76 +1663,17 @@ export const BBDiagnosticsHub: React.FC = () => {
                 ))}
               </div>
             )}
-            {/* PRO-3 R1–R7: скорость/LVP, сухожилия, возврат, фокус, веса, направление, календарь */}
+            {/* Движения, не нагрузка: скорость/LVP/сухожилия/возврат — в своих хабах, здесь только ссылки */}
             <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, lineHeight: 1.5 }} data-bb="pro3-card">
-              <b style={{ color: '#fff' }}>🧪 PRO-3 — скорость, сухожилия, возврат</b>
-              {tendonGuard && (
-                <div style={{ marginTop: 4 }} data-bb="tendon-card">
-                  <div style={{ color: tendonGuard.elbow.level === 'ok' ? '#22c55e' : tendonGuard.elbow.level === 'warn' ? '#f59e0b' : '#ef4444' }}>{tendonGuard.elbow.text}</div>
-                  <div style={{ color: tendonGuard.shoulder.level === 'ok' ? '#22c55e' : tendonGuard.shoulder.level === 'warn' ? '#f59e0b' : '#ef4444', marginTop: 2 }}>{tendonGuard.shoulder.text}</div>
-                </div>
-              )}
-              {returnToPlan && (
-                <div style={{ marginTop: 4, color: '#fff' }} data-bb="return-to">
-                  <b>↩ {returnToPlan.text}</b>
-                  {returnToPlan.stages.map((s) => (
-                    <div key={s.stage} style={{ marginTop: 2, fontWeight: returnActive?.stage === s.stage ? 800 : 400, color: returnActive?.stage === s.stage ? '#22c55e' : '#fff' }}>{returnActive?.stage === s.stage ? '● ' : ''}Ступень {s.stage}: {s.title} — {s.volume}, {s.rir}. {s.note}</div>
-                  ))}
-                  <div style={{ marginTop: 6 }}>
-                    <BbSheetSelect label="Ступень возврата" value={state.returnStage} onChange={(v) => setState((s) => ({ ...s, returnStage: v as any }))} options={[{ id: '', label: 'Ступень 1 — техника (дефолт)' }, { id: '1', label: 'Ступень 1 — техника' }, { id: '2', label: 'Ступень 2 — половина' }, { id: '3', label: 'Ступень 3 — полный' }]} testId="bb-return-stage" />
-                  </div>
-                  {returnActive && <div style={{ marginTop: 4, color: '#f59e0b' }} data-bb="return-active">Активна ступень {returnActive.stage}: объём ×{returnActive.action.volumeMult}, RIR+{returnActive.action.rirShift}{returnActive.action.bannedPatterns.length ? ` · запрет: ${returnActive.action.bannedPatterns.join(', ')}` : ''}</div>}
-                </div>
-              )}
-              <div style={{ marginTop: 6 }}>
-                <BbSheetSelect label="Движение LVP" value={state.lvpLift} onChange={(v) => setState((s) => ({ ...s, lvpLift: v }))} options={[{ id: 'squat', label: 'Присед' }, { id: 'bench', label: 'Жим лёжа' }, { id: 'deadlift', label: 'Становая' }, { id: 'ohp', label: 'Жим стоя' }, { id: 'row', label: 'Тяга' }]} testId="bb-lvp-lift" />
+              <b style={{ color: '#fff' }}>🔗 Смежные хабы (без дублей)</b>
+              <div style={{ color: '#fff', marginTop: 4, fontSize: 10, lineHeight: 1.5 }}>
+                Скорость/VBT — <b>⚡ Анализ силы → VBT</b> · Сухожилия/возврат/боль — <b>🦴 Суставы и ортопедия</b> · Нагрузка/сон/готовность — <b>⚡ Интеллект</b> · Объём MEV/MRV — <b>📐 Объём-хаб</b> · Видеоразбор траектории — <b>ТА/СМ-хаб</b>
               </div>
-              <div style={{ marginTop: 6 }}>
-                <label style={{ display: 'block', color: '#fff', marginBottom: 3 }}>LVP-точки «вес скорость» — по строке на замер (мин. 3)</label>
-                <textarea value={state.lvpText} onChange={(e) => setState((s) => ({ ...s, lvpText: e.target.value }))} placeholder="100 0.62&#10;110 0.55&#10;120 0.47" aria-label="LVP-точки вес скорость" data-bb="lvp-input" style={{ width: '100%', height: 56, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, fontFamily: 'monospace', boxSizing: 'border-box' }} />
-                <div style={{ color: '#fff', marginTop: 4 }} data-bb="lvp-line">
-                  {state.lvpText.trim() === '' && lvpProfile && 'Индивидуальный LVP активен — популяционный fallback не нужен.'}
-                  {state.lvpText.trim() === '' && !lvpProfile && 'LVP пуст — e1RM считаем по популяционному профилю из скорости сета.'}
-                  {state.lvpText.trim() !== '' && !lvpProfile && 'Точек мало или мусор — нужно 3+ с разбросом веса ≥10 кг.'}
-                  {lvpProfile && (lvpProfile.valid ? `✓ ${lvpProfile.text} · индивид.` : `⚠ ${lvpProfile.text}`)}
-                </div>
-                {lvpProfile && (
-                  <button onClick={() => { clearBbLvpProfiles(); setState((s) => ({ ...s, lvpText: '' })); }} data-bb="lvp-clear" style={{ marginTop: 6, minHeight: 36, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>Очистить LVP</button>
-                )}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-                <BbSheetSelect label="Цель VBT" value={state.vbtGoal} onChange={(v) => setState((s) => ({ ...s, vbtGoal: v as any }))} options={[{ id: '', label: 'Не указана' }, { id: 'mass', label: 'Масса' }, { id: 'strength', label: 'Сила' }]} testId="bb-vbt-goal" />
-                <BbCheckCard active={state.elbowPain} title="Боль в локте" desc="сухожилие бицепса — стоп" onToggle={() => setState((s) => ({ ...s, elbowPain: !s.elbowPain }))} accent="#f87171" />
-              </div>
-              {vbt?.e1RMByVelocity != null && (
-                <div style={{ color: '#fff', marginTop: 4 }} data-bb="vbt-e1rm">e1RM по скорости ≈ {vbt.e1RMByVelocity} кг (популяционный LVP).</div>
-              )}
-              <button
-                onClick={() => {
-                  const fn = (window as any).__navigateToTrainingTab;
-                  if (typeof fn === 'function') fn('calc_vbt');
-                  else { try { (window as any).showToast?.('⚡ VBT: Тренировки → Анализ силы → VBT'); } catch {} }
-                }}
-                data-bb="vbt-hub-link"
-                style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.25)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontWeight: 700, fontSize: 11, cursor: 'pointer', width: '100%' }}
-              >
-                ⚡ Полная VBT — Анализ силы → VBT (профиль, калибровка, readiness)
-              </button>
-              {workingRange && (
-                <div style={{ color: '#fff', marginTop: 2 }} data-bb="working-range">{workingRange.text}</div>
-              )}
               {mmcAdvice && (
                 <div style={{ color: '#fff', marginTop: 4 }} data-bb="mmc-line">
                   {mmcAdvice.focus === 'internal' ? '🧠 Внутренний' : '🎯 Внешний'} фокус: {mmcAdvice.cue} — {mmcAdvice.text}
                 </div>
               )}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-                <BbNum label="Нагрузка изоляции, %1RM" value={state.mmcLoadPct} onChange={(v) => setState((s) => ({ ...s, mmcLoadPct: v }))} placeholder="60" step={5} testId="bb-mmc-load" />
-                <BbSheetSelect label="Блок года" value={state.annualBlockKey} onChange={(v) => setState((s) => ({ ...s, annualBlockKey: v }))} options={[{ id: '', label: 'Первый ББ-блок' }, ...annualBbBlocks.map((b: any) => ({ id: b.key, label: b.label }))]} testId="bb-annual-block" />
-              </div>
-              <div style={{ marginTop: 6 }}>
-                <BbCheckCard active={state.posingIso} title="Позинг 30 с в отдыхе (квадрицепс)" desc={posingIsoNote()} onToggle={() => setState((s) => ({ ...s, posingIso: !s.posingIso }))} accent="#a78bfa" />
-              </div>
               {lrDirection.length > 0 && (
                 <div style={{ marginTop: 4 }} data-bb="lr-direction">
                   {lrDirection.map((d) => (
@@ -1875,7 +1706,8 @@ export const BBDiagnosticsHub: React.FC = () => {
 
         {tab === 'symmetry' && (
           <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Симметрия — замеры (см) + идеал Ривса/Маккаллума</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Пропорции — замеры (см) + лево/право + идеал Маккаллума</div>
+            <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px', marginBottom: 6 }}>Пол/возраст/цикл — в <b>профиле</b> (здесь только сантиметры и дельты, без дублей).</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="circ-main">
               {[{ k: 'heightCm', ru: 'Рост, см' }, { k: 'weightKg', ru: 'Вес, кг' }, { k: 'chest', ru: 'Грудь, см' }, { k: 'waist', ru: 'Талия, см' }, { k: 'hips', ru: 'Бёдра, см' }, { k: 'shoulderWidth', ru: 'Плечи (ширина), см' }, { k: 'neck', ru: 'Шея, см' }].map(({ k, ru }) => (
                 <BbNum key={k} label={ru} value={state.circ[k] || ''} onChange={(v) => setState(s => ({ ...s, circ: { ...s.circ, [k]: v } }))} placeholder="—" step={0.5} />
@@ -1888,14 +1720,9 @@ export const BBDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
               <BbNum label="Запястье, см (Маккаллум)" value={state.wristCm} onChange={(v) => setState(s => ({ ...s, wristCm: v }))} placeholder="17,5" step={0.5} />
-              <BbSheetSelect label="Пол" value={state.sex} onChange={(v) => setState(s => ({ ...s, sex: v as any }))} options={[{ id: '', label: 'Не указан' }, { id: 'male', label: 'Мужской' }, { id: 'female', label: 'Женский' }]} testId="bb-sex-sym" />
-              <BbNum label="Возраст, лет" value={state.age} onChange={(v) => setState(s => ({ ...s, age: v }))} placeholder="—" step={1} />
-              <BbSheetSelect label="Фаза цикла" value={state.cyclePhase} onChange={(v) => setState(s => ({ ...s, cyclePhase: v as any }))} options={[{ id: '', label: 'Неважно' }, { id: 'follicular', label: 'Фолликулярная' }, { id: 'luteal', label: 'Лютеиновая (+вода)' }]} testId="bb-cycle" />
-              {mcCallum && <span style={{ fontSize: 10, color: '#60a5fa', alignSelf: 'end' }}>Маккаллум: грудь {mcCallum.chest} · биц {mcCallum.bicep} · икры {mcCallum.calf} · талия {mcCallum.waist}</span>}
+              <span style={{ alignSelf: 'end' }}>{mcCallum && <span style={{ fontSize: 10, color: '#60a5fa' }}>Маккаллум: грудь {mcCallum.chest} · биц {mcCallum.bicep} · икры {mcCallum.calf} · талия {mcCallum.waist}</span>}</span>
               {triadDev != null && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: triadDev >= 12 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: '1px solid rgba(255,255,255,0.06)', color: triadDev >= 12 ? '#ef4444' : '#22c55e', alignSelf: 'end' }}>Триада шея=биц=икры Δ {triadDev}%</span>}
             </div>
-            {femaleNotes.length > 0 && <div style={{ fontSize: 10, color: '#f9a8d4', background: 'rgba(249,168,212,0.06)', border: '1px solid rgba(249,168,212,0.14)', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }} data-bb="female-notes">{femaleNotes.join(' · ')}</div>}
-            {teenNote && <div style={{ fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }} data-bb="teen-note">🧒 {teenNote} — это не диагноз, при сомнениях к тренеру/врачу.</div>}
             <div style={{ padding: '8px 10px', borderRadius: 8, background: report.symmetry.score < 70 ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${report.symmetry.score < 70 ? 'rgba(239,68,68,0.18)' : 'rgba(34,197,94,0.18)'}`, marginBottom: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: report.symmetry.score < 70 ? '#ef4444' : '#22c55e' }}>Симметрия {report.symmetry.score}/100</div>
               <div style={{ fontSize: 10, color: '#fff' }}>{Object.entries(report.symmetry.ratios).map(([k, v]) => `${circRu(k)} ${typeof v === 'number' ? v.toFixed(2) : v}`).join(' · ') || '— замеры не введены'}</div>
@@ -1934,7 +1761,7 @@ export const BBDiagnosticsHub: React.FC = () => {
 
         {tab === 'exercise' && (
           <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Упражнения — разбор + техника → эффект в плане (подробно)</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Разбор — упражнение + техника → стимул в плане (подробно)</div>
             {/* Лента аудита */}
             {planAudit ? (
               <div style={{ padding: '8px 10px', borderRadius: 10, background: 'linear-gradient(135deg,rgba(0,230,138,0.08),rgba(168,85,247,0.06))', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 8, fontSize: 10, lineHeight: 1.5 }}>
@@ -2153,81 +1980,46 @@ export const BBDiagnosticsHub: React.FC = () => {
 
         {tab === 'stimulus' && (
           <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Стимул — растянутая позиция / рисунок / база (из плана)</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Стимул-карта — где теряется рост (из плана, без объёмов)</div>
             <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: '#fff' }}>Всего: растянутых {report.stimulus.global.lengthened} · средних {report.stimulus.global.midRange} · пиковых {report.stimulus.global.shortened} · база {report.stimulus.global.compound} / изоляция {report.stimulus.global.isolation}</div>
               <div style={{ fontSize: 10, color: report.stimulus.issues.length ? '#f59e0b' : '#22c55e', marginTop: 4 }}>{report.stimulus.issues.join(' · ') || 'Стимул сбалансирован'}</div>
               {report.stimulus.bfrEligible.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>Жгуты подходят: {report.stimulus.bfrEligible.join(', ')} (20–30%, схема 30-15-15-15, пауза 30 с)</div>}
-              <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }} data-bb="stimulus-chip">Детали углов и строгих групп — во вкладке <b>🏋️ Упражнения → Аудит портфеля</b> (здесь только вердикт, без дублей).</div>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }} data-bb="stimulus-chip">Разбор каждого упражнения — во вкладке <b>🏋️ Разбор → Аудит портфеля</b> (здесь карта, без дублей).</div>
             </div>
-            <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 10px' }}>
-              План-баланс: {balance ? balance.issues.slice(0, 2).join(' · ') : '— нет плана (собери в ББ-авто)'} · <span style={{ color: ACCENT }}>→ Качество: детали в QualityHub</span>
-            </div>
-          </div>
-        )}
-
-        {tab === 'volume' && (
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Объём — минимум / норма / максимум (из дневника за 7 дней)</div>
-            {factVolume ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                {Object.entries(factVolume).slice(0, 8).map(([m, v]) => {
-                  const lm = getVolumeLandmarks(level, m);
-                  if (!lm) return null;
-                  const sets = v.effectiveSets ?? v.directSets ?? 0;
-                  const pct = lm.mrv ? Math.round(sets / lm.mrv * 100) : 0;
-                  const status = sets < lm.mev ? 'ниже MEV' : sets <= lm.mav ? 'оптимум' : sets <= lm.mrv ? '→MRV' : '>MRV';
-                  const col = sets < lm.mev ? '#f59e0b' : sets > lm.mrv ? '#ef4444' : '#22c55e';
-                  return <div key={m} style={{ padding: '6px 8px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: '#fff' }}><b style={{ color: '#fff' }}>{MUSCLE_LABEL_RU[m] || m}</b> {sets} сет · MEV{lm.mev} MAV{lm.mav} MRV{lm.mrv} · <span style={{ color: col }}>{status} {pct}%</span></div>;
+            {planAudit ? (
+              <div style={{ display: 'grid', gap: 6 }} data-bb="stimulus-map">
+                {Object.entries(planAudit.byMuscle).map(([m, bm]) => {
+                  const lenPct = bm.totalSets ? Math.round((bm.lengthened / bm.totalSets) * 100) : 0;
+                  const badLen = bm.totalSets >= 6 && lenPct < 30;
+                  const badAngle = bm.angleCoverage.total > 1 && bm.angleCoverage.covered === 1 && bm.totalSets >= 6;
+                  const badStrict = bm.strictCoverage.total > 0 && bm.strictCoverage.covered === 0 && bm.totalSets >= 6;
+                  const col = badLen || badAngle || badStrict ? '#f59e0b' : '#22c55e';
+                  return (
+                    <div key={m} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${col}33`, fontSize: 10, lineHeight: 1.5 }}>
+                      <b style={{ color: '#fff', fontSize: 11 }}>{MUSCLE_LABEL_RU[m] || m}</b>
+                      <span style={{ color: col, marginLeft: 6 }}>{bm.totalSets} сет · SFR {bm.avgSfr ?? '—'} · раст. {lenPct}% · углы {bm.angleCoverage.covered}/{bm.angleCoverage.total} · строгие {bm.strictCoverage.covered}/{bm.strictCoverage.total}</span>
+                      {(badLen || badAngle || badStrict) && (
+                        <div style={{ color: '#fbbf24', marginTop: 2 }}>
+                          Чинить: {[badLen ? 'добавь растянутую (наклон 30°/RDL/разводка с паузой)' : null, badAngle ? `второй угол (нет: ${bm.angleCoverage.missing.slice(0, 2).join(', ')})` : null, badStrict ? `строгая группа (нет: ${bm.strictCoverage.missing.slice(0, 2).join(', ')})` : null].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                  );
                 })}
               </div>
-            ) : <div style={{ fontSize: 10, color: '#fff', background: '#0a1629', border: '1px solid #1f3a5f', borderRadius: 8, padding: '8px 10px' }}>Нет дневника за 7д — объём не посчитан. Введи тренировки или открой <b>→ Объём-хаб</b> для детальной таблицы.</div>}
-            <div style={{ fontSize: 10, color: '#fff', marginTop: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.14)', borderRadius: 8, padding: '8px 10px' }}>
-              Нормы минимума/оптимума/максимума — в <b>📐 Объём-хаб → Объём</b>. Здесь — факт за 7 дней. Тоннаж — в <b>→ Тоннаж</b>.
-            </div>
-          </div>
-        )}
-
-        {tab === 'recovery' && (
-          <div data-bb="recovery-tab">
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Восстановление — нагрузка по мышцам + сон + скорость + общий снимок</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="recovery-inputs">
-              <BbNum label="Сон, часов за ночь" value={state.sleepHours} onChange={(v) => setState(s => ({ ...s, sleepHours: v }))} placeholder="7,5" step={0.5} />
-              <BbNum label="Боль сегодня, 0–10" value={state.pain010} onChange={(v) => setState(s => ({ ...s, pain010: v }))} placeholder="0" step={1} />
-            </div>
-            <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: readiness.level === 'green' ? 'rgba(34,197,94,0.08)' : readiness.level === 'yellow' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, lineHeight: 1.5 }} data-bb="readiness">
-              <b style={{ color: '#fff' }}>{readiness.level === 'green' ? '🟢 Готовность: зелёный' : readiness.level === 'yellow' ? '🟡 Готовность: жёлтый' : '🔴 Готовность: красный'}</b>
-              <div style={{ color: '#fff', marginTop: 2 }}>{readiness.advice}</div>
-              {readiness.reasons.length > 0 && <div style={{ color: '#fff', opacity: 0.9, marginTop: 2 }}>{readiness.reasons.join(' · ')}</div>}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="red-flags">
-              <BbCheckCard active={state.acutePain} title="Острая боль" desc="в суставе или мышце" onToggle={() => setState(s => ({ ...s, acutePain: !s.acutePain }))} accent="#ef4444" />
-              <BbCheckCard active={state.swelling} title="Отёк" desc="сустав опух" onToggle={() => setState(s => ({ ...s, swelling: !s.swelling }))} accent="#ef4444" />
-              <BbCheckCard active={state.numbness} title="Онемение" desc="покалывание в руке/ноге" onToggle={() => setState(s => ({ ...s, numbness: !s.numbness }))} accent="#ef4444" />
-              <BbCheckCard active={state.jointClickPain} title="Щелчки с болью" desc="щёлкает и болит" onToggle={() => setState(s => ({ ...s, jointClickPain: !s.jointClickPain }))} accent="#f59e0b" />
-            </div>
-            {(redFlags as any).active && (
-              <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: (redFlags as any).blocked ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#fff' }} data-bb="red-flags-note">
-                {(redFlags as any).blocked ? '⛔ ' : '⚠ '}{(redFlags as any).text} — это скрининг, не диагноз: при сомнениях к врачу.
-              </div>
+            ) : (
+              <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: '#fff' }}>Нет плана ББ — собери в ББ-авто, карта построится по упражнениям.</div>
             )}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-              {Object.entries(perMuscleAcwr).length ? Object.entries(perMuscleAcwr).map(([m, v]) => {
-                const col = v.zone === 'dangerous' ? '#ef4444' : v.zone === 'caution' ? '#f59e0b' : v.zone === 'undertrained' ? '#3b82f6' : '#22c55e';
-                const zRu = v.zone === 'dangerous' ? 'перегруз' : v.zone === 'caution' ? 'осторожно' : v.zone === 'undertrained' ? 'недогруз' : 'норма';
-                return <span key={m} style={{ padding: '4px 8px', borderRadius: 999, background: `${col}14`, border: `1px solid ${col}33`, color: col, fontSize: 10, fontWeight: 700 }}>{MUSCLE_LABEL_RU[m] || m} {v.ratio} {zRu}</span>;
-              }) : <span style={{ fontSize: 10, color: '#fff' }}>Недостаточно дневника (≥4 сессии)</span>}
+            <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 10px', marginTop: 8 }}>
+              План-баланс: {balance ? balance.issues.slice(0, 2).join(' · ') : '— нет плана (собери в ББ-авто)'} · Объёмы MEV/MRV — <b>📐 Объём-хаб</b> · Качество плана — <b>→ Качество</b>
             </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#fff' }}>
-              Общее: нагрузка {acwr ? `${acwr.ratio.toFixed(2)}` : '—'} · однообразие {unifiedSnap?.monotony ?? '—'} · восстановление {unifiedSnap?.recovery ?? '—'} · <span style={{ color: '#fff' }}>→ Интеллект → Нагрузка/Восстановление</span>
-            </div>
-            {report.score.floors.some(f => f.includes('ACWR')) && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 6 }}>⚠ Перегруз — снизь объём на 25% для перегруженных мышц</div>}
           </div>
         )}
 
-        {tab === 'mobility' && (
+        {tab === 'screening' && (
           <div data-bb="mobility-tab">
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Мобильность — присед с руками вверх (6 признаков) + скорость штанги 20–25%</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Скрининг — присед с руками вверх (6 признаков) + одна нога + драйвер</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ohs-grid">
               <BbCheckCard active={state.ohsHeelsFlat} title="Пятки плоско" desc="стопы не отрываются" onToggle={() => setState(s => ({ ...s, ohsHeelsFlat: !s.ohsHeelsFlat }))} />
               <BbCheckCard active={!state.ohsKneeValgus} title="Без вальгуса" desc="колени не сводятся" onToggle={() => setState(s => ({ ...s, ohsKneeValgus: !s.ohsKneeValgus }))} />
@@ -2240,6 +2032,39 @@ export const BBDiagnosticsHub: React.FC = () => {
               <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Присед-тест {ohs.totalScore}/6 · {ohs.level === 'ok' ? 'хорошо' : ohs.level === 'warn' ? 'есть замечания' : 'нужна работа'} · несдано {ohs.failed}{ohs.primaryDriver ? ` · ${ohs.primaryDriver}` : ''}</div>
               <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>{ohs.recommendation}</div>
             </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.07)', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 6 }} data-bb="driver-card">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#00e68a' }}>🎯 Драйвер: {moveDriver.label} ({Math.round(moveDriver.confidence * 100)}%)</div>
+              <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>{moveDriver.fix}</div>
+              <div style={{ marginTop: 6 }}>
+                <BbCheckCard active={state.handsOnHipsBetter} title="Руки на бёдрах чистят поясницу" desc="присед с руками на бёдрах лучше — виноваты широчайшие" onToggle={() => setState((s) => ({ ...s, handsOnHipsBetter: !s.handsOnHipsBetter }))} accent="#60a5fa" />
+              </div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="single-leg">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Одна нога — сплит-присед + RDL (5 повторов на сторону, качество)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                <BbSheetSelect label="Сплит-присед Л" value={state.splitL} onChange={(v) => setState((s) => ({ ...s, splitL: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-split-l" />
+                <BbSheetSelect label="Сплит-присед П" value={state.splitR} onChange={(v) => setState((s) => ({ ...s, splitR: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-split-r" />
+                <BbSheetSelect label="RDL на ноге Л" value={state.rdlL} onChange={(v) => setState((s) => ({ ...s, rdlL: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-rdl-l" />
+                <BbSheetSelect label="RDL на ноге П" value={state.rdlR} onChange={(v) => setState((s) => ({ ...s, rdlR: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-rdl-r" />
+              </div>
+              <div style={{ fontSize: 11, color: singleLeg.weakSide ? '#f59e0b' : '#22c55e' }} data-bb="single-leg-verdict">{singleLeg.text}</div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="screen-history">
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+                <b style={{ fontSize: 11, color: '#fff' }}>📸 Снимки скрининга ({screenHist.length})</b>
+                <button onClick={() => {
+                  const entry = { date: new Date().toISOString().slice(0, 10), fails: ohsCodes };
+                  setScreenHist((prev) => {
+                    const next = [...prev, entry].slice(-10);
+                    try { localStorage.setItem('he_bb_screen_history', JSON.stringify(next)); } catch { /* noop */ }
+                    return next;
+                  });
+                  setToast(`✓ Снимок скрининга ${entry.date} сохранён`);
+                  setTimeout(() => setToast(''), 2000);
+                }} data-bb="screen-snapshot" style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Снимок сегодня</button>
+              </div>
+              <div style={{ fontSize: 11, color: '#fff' }} data-bb="screen-delta">{screenDelta.text}</div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ankle-grid">
               <BbNum label="Колено к стене, см" value={state.kneeToWallCm} onChange={(v) => setState(s => ({ ...s, kneeToWallCm: v }))} placeholder="12" step={0.5} />
               <BbNum label="Голеностоп, °" value={state.ankleDeg} onChange={(v) => setState(s => ({ ...s, ankleDeg: v }))} placeholder="35" step={1} />
@@ -2251,39 +2076,10 @@ export const BBDiagnosticsHub: React.FC = () => {
               <button onClick={() => setState(s => ({ ...s, heelRetest: '' }))} data-bb="heel-reset" style={{ minHeight: 44, padding: '8px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>Сброс</button>
               <span style={{ fontSize: 11, color: '#fff' }}>Норма ≥{OHS_NORMS.kneeToWallCm.optimal} см</span>
             </div>
-            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="vbt-card">
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Скорость штанги — падение за подход (норма роста 20–25%)</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
-                <BbNum label="Лучшая, м/с" value={state.vbtBest} onChange={(v) => setState(s => ({ ...s, vbtBest: v }))} placeholder="0,85" step={0.05} />
-                <BbNum label="Последняя, м/с" value={state.vbtLast} onChange={(v) => setState(s => ({ ...s, vbtLast: v }))} placeholder="0,62" step={0.05} />
-                <BbNum label="Вес, кг" value={state.vbtWeight} onChange={(v) => setState(s => ({ ...s, vbtWeight: v }))} placeholder="80" step={2.5} />
-              </div>
-              {vbt && <div style={{ fontSize: 11, color: vbt.exceeded ? '#ef4444' : '#22c55e', marginTop: 6 }}>{vbt.recommendation} {vbt.suggestedRirShift ? `(запас ${vbt.suggestedRirShift > 0 ? '+' : ''}${vbt.suggestedRirShift})` : ''}</div>}
-            </div>
-            <textarea value={state.csvText} onChange={e => setState(s => ({ ...s, csvText: e.target.value }))} placeholder="Таблица траектории из видеоразбора (время, x, y) — необязательно" aria-label="Таблица траектории из видеоразбора" data-bb="csv-input" style={{ width: '100%', height: 56, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, fontFamily: 'monospace', boxSizing: 'border-box' }} />
-            {barLast && (
-              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: barLast.verdict.flag === 'ok' ? 'rgba(34,197,94,0.08)' : barLast.verdict.flag === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#fff' }} data-bb="bar-srd">
-                <b>Петля {barLast.xLoop} см · {barLast.verdict.type}</b> — {barLast.verdict.text} (порог 4/6 см)
-              </div>
-            )}
             <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-              <button onClick={handleCsvParse} data-bb="csv-parse" style={{ minHeight: 48, flex: '1 1 200px', padding: '10px 14px', borderRadius: 10, background: 'rgba(0,230,138,0.14)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>📊 Разобрать таблицу траектории</button>
               <button onClick={applyMobilityToProfile} data-bb="mobility-to-profile" style={{ minHeight: 48, flex: '1 1 200px', padding: '10px 14px', borderRadius: 10, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>→ В профиль {ohs.failed ? `(${ohs.failed}/6)` : '(порядок)'}</button>
             </div>
-            <div style={{ marginTop: 6 }} data-bb="ortho-screen">
-              <OrthoScreenCard compact />
-            </div>
-            <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 11, color: '#fff' }} data-bb="pose-live">
-              <b>📐 Углы из таблицы (трекер поз/замер по кадрам: время, таз, колено, голеностоп, плечо)</b>
-              <textarea value={state.poseCsvText} onChange={e => setState(s => ({ ...s, poseCsvText: e.target.value }))} placeholder="0;90;80;40;170 — строки по кадрам, необязательно" aria-label="Таблица углов суставов" data-bb="pose-input" style={{ width: '100%', height: 52, marginTop: 6, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, fontFamily: 'monospace', boxSizing: 'border-box' }} />
-              {!poseLive && <div style={{ marginTop: 4 }}>Пока пусто — вставь таблицу, появятся средние углы и замечания. Без твоих данных углов нет.</div>}
-              {poseLive && (
-                <div style={{ marginTop: 4 }}>
-                  Средние: таз {poseLive.avg.hip ?? '—'}° · колено {poseLive.avg.knee ?? '—'}° · голеностоп {poseLive.avg.ankle ?? '—'}° · плечо {poseLive.avg.shoulder ?? '—'}° (кадров: {poseLive.summary.n}) — {poseLive.status.faults.join(' · ') || 'замечаний нет'}
-                </div>
-              )}
-            </div>
-            <div style={{ fontSize: 11, color: '#fff', marginTop: 6 }}>Тест из методики взятия штанги · скорость 20–25% для роста · разбор траектории из видео. Углы — только из твоей таблицы, порог петли 4/6 см. <span style={{ color: '#fff' }}>→ Суставы и ортопедия</span> · <span style={{ color: '#fff' }}>→ Анализ силы → скорость</span></div>
+            <div style={{ fontSize: 11, color: '#fff', marginTop: 6 }}>Скорость/VBT — <b>⚡ Анализ силы</b> · Траектория/углы из видео — <b>ТА/СМ видеоразбор</b> · Суставы — <b>🦴 Суставы и ортопедия</b> · Нагрузка — <b>⚡ Интеллект</b> (здесь только скрининг, без дублей).</div>
           </div>
         )}
       </div>
