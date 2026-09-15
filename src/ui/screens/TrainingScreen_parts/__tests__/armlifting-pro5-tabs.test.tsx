@@ -80,6 +80,18 @@ describe('PRO-5 UI: помост + диагностика + коррекция',
     fireEvent.click(screen.getByText('6 нед'));
     expect(document.body.textContent).toContain('Нед 6');
   });
+  it('D13: pinch L/R и ROM-градусы', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    expect(screen.getByLabelText(/Pinch левая кг/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Pinch левая кг/), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText(/Pinch правая кг/), { target: { value: '50' } });
+    expect(document.body.textContent).toContain('Pinch-асимметрия');
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    expect(screen.getByLabelText(/Разгибание запястья градусы/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Разгибание запястья градусы/), { target: { value: '55' } });
+    expect(document.body.textContent).toContain('ROM-провал');
+  });
   it('Коррекция напрямую открывается с топ-3', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

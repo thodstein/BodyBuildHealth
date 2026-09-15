@@ -7,6 +7,7 @@ import { injectArmliftCorrections, correctionsToInjectionItems, applyArmliftSpec
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, overallGripLevel } from '../armlift-benchmarks.engine';
 import { cocLadderFor } from '../armlift-correction.engine';
 import { saveDiagSnapshot, loadDiagHistory, lastSnapshotFor, retestVerdict, weeksBetween } from '../armlift-history.engine';
+import { assessArmliftMobility } from '../armlift-mobility.engine';
 import { getArmExerciseById } from '../../../core/exercise-catalog-arm';
 import { buildArmliftingReport, buildArmliftingHtml, buildArmliftingCsv } from '../armlifting-diagnostics.engine';
 
@@ -456,5 +457,45 @@ describe('PRO-5 D12 E5: дозы и волны', () => {
     expect(r.plan.weeks[0].sessions[0].exercises[0].sets).toBe(2);
     const r1 = injectArmliftCorrections(plan, [{ exId: 'rolling_thunder', sets: 1 }], { level: 'beginner', workMax: { grip_support: 80 } });
     expect(r1.plan.weeks[0].sessions[0].exercises[0].sets).toBe(1);
+  });
+});
+
+describe('PRO-5 D13: мобильность ROM + pinch L/R', () => {
+  it('ROM: нормы, погранично, провалы', () => {
+    expect(assessArmliftMobility({ wristExtDeg: 75, wristFlexDeg: 80, thumbOppOk: true }).passed).toBe(true);
+    const r = assessArmliftMobility({ wristExtDeg: 55, wristFlexDeg: 60, thumbOppOk: false });
+    expect(r.fails).toEqual(['wrist_ext', 'wrist_flex', 'thumb_opp']);
+    expect(assessArmliftMobility({}).passed).toBe(true);
+    expect(assessArmliftMobility({ wristExtDeg: 65 }).notes.join(' ')).toContain('погранично');
+  });
+  it('ROM-провалы идут в причину mobility', () => {
+    const r = diagnoseArmliftCause({ implement: 'saxon_bar', mobilityFails: ['wrist_ext', 'thumb_opp'] });
+    expect(r.cause).toBe('mobility');
+    expect(r.evidence.join(' ')).toContain('ретест');
+  });
+  it('pinch L/R: строки + асимметрия в вердикте', () => {
+    const r = buildArmliftingReport({ pinchL: 40, pinchR: 50, sex: 'male' });
+    expect(r.rows.some((x) => x.implement === 'pinch_block_L')).toBe(true);
+    expect(r.rows.some((x) => x.implement === 'pinch_block_R')).toBe(true);
+    expect(r.pinchAsymPct).toBe(20);
+    expect(r.verdict).toContain('Pinch-асимметрия');
+  });
+  it('pinch single как раньше, без асимметрии', () => {
+    const r = buildArmliftingReport({ pinchKg: 40, sex: 'male' });
+    expect(r.rows.some((x) => x.implement === 'pinch_block')).toBe(true);
+    expect(r.pinchAsymPct).toBeNull();
+  });
+});
+
+describe('PRO-5 D14: ACWR в причине', () => {
+  it('dangerous/caution → fatigue с evidence', () => {
+    expect(diagnoseArmliftCause({ acwrZone: 'dangerous' }).cause).toBe('fatigue');
+    const r = diagnoseArmliftCause({ acwrZone: 'caution' });
+    expect(r.evidence.join(' ')).toContain('ACWR');
+  });
+  it('optimal/пусто — fatigue не стреляет', () => {
+    expect(diagnoseArmliftCause({ acwrZone: 'optimal' }).cause).not.toBe('fatigue');
+    expect(diagnoseArmliftCause({ acwrZone: 'undertrained' }).cause).not.toBe('fatigue');
+    expect(diagnoseArmliftCause({}).cause).not.toBe('fatigue');
   });
 });

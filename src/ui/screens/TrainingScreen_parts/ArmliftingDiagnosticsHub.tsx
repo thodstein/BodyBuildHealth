@@ -20,6 +20,9 @@ import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../../../engines/arm/armlift-cause.engine';
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU } from '../../../engines/arm/armlift-benchmarks.engine';
 import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween } from '../../../engines/arm/armlift-history.engine';
+import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.engine';
+import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
 import { correctionsToInjectionItems } from '../../../engines/arm/armlift-injection.engine';
 import { applyToPlanner } from './planner-bridge';
@@ -62,6 +65,7 @@ type DiagState = {
   pinchHoldSec: string; farmerHoldSec: string; wristExtWeak: boolean;
   flexHoldSec: string; extHoldSec: string;
   thumbStiff: boolean; wristExtLimited: boolean; wristFlexLimited: boolean;
+  wristExtDeg: string; wristFlexDeg: string; thumbOppOk: boolean;
   hipHingePoor: boolean; pain: boolean; elbowPain: boolean;
   skinTear: boolean; thumbWebPain: boolean;
   specWeeks: 4 | 6;
@@ -71,6 +75,7 @@ const DEFAULT_DIAG: DiagState = {
   pinchHoldSec: '', farmerHoldSec: '', wristExtWeak: false,
   flexHoldSec: '', extHoldSec: '',
   thumbStiff: false, wristExtLimited: false, wristFlexLimited: false,
+  wristExtDeg: '', wristFlexDeg: '', thumbOppOk: true,
   hipHingePoor: false, pain: false, elbowPain: false,
   skinTear: false, thumbWebPain: false,
   specWeeks: 4,
@@ -91,7 +96,7 @@ function loadDiag(): DiagState {
 type LiftState = {
   rtKg: string; rtL: string; rtR: string;
   axleKg: string; axleImpl: string;
-  pinchSec: string; pinchKg: string;
+  pinchSec: string; pinchKg: string; pinchL: string; pinchR: string;
   cocLevel: string; silverSec: string; silverGripper: string;
   excalKg: string; hubKg: string; hubL: string; hubR: string;
   raptorKg: string; crushKg: string; clockKg: string; anvilKg: string; medleyKg: string;
@@ -100,7 +105,7 @@ type LiftState = {
 
 const DEFAULT_STATE: LiftState = {
   rtKg: '', rtL: '', rtR: '', axleKg: '', axleImpl: 'saxon',
-  pinchSec: '', pinchKg: '', cocLevel: '', silverSec: '', silverGripper: '3',
+  pinchSec: '', pinchKg: '', pinchL: '', pinchR: '', cocLevel: '', silverSec: '', silverGripper: '3',
   excalKg: '', hubKg: '', hubL: '', hubR: '',
   raptorKg: '', crushKg: '', clockKg: '', anvilKg: '', medleyKg: '',
   sex: 'male', bwKg: '80',
@@ -140,6 +145,7 @@ function loadState(): LiftState {
       rtKg: pick(j, 'rtKg', ''), rtL: pick(j, 'rtL', ''), rtR: pick(j, 'rtR', ''),
       axleKg: pick(j, 'axleKg', ''), axleImpl: pick(j, 'axleImpl', 'saxon') === 'apollon' ? 'apollon' : 'saxon',
       pinchSec: pick(j, 'pinchSec', ''), pinchKg: pick(j, 'pinchKg', ''),
+      pinchL: pick(j, 'pinchL', ''), pinchR: pick(j, 'pinchR', ''),
       cocLevel: pick(j, 'cocLevel', ''), silverSec: pick(j, 'silverSec', ''),
       silverGripper: ['2', '3', '4'].includes(pick(j, 'silverGripper', '3')) ? pick(j, 'silverGripper', '3') : '3',
       excalKg: pick(j, 'excalKg', ''), hubKg: pick(j, 'hubKg', ''),
@@ -188,6 +194,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     axleImpl: state.axleImpl,
     pinchSec: f(state.pinchSec),
     pinchKg: f(state.pinchKg),
+    pinchL: f(state.pinchL), pinchR: f(state.pinchR),
     cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : undefined,
     silverSec: f(state.silverSec),
     silverGripper: state.silverGripper,
@@ -197,7 +204,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     raptorKg: f(state.raptorKg), crushKg: f(state.crushKg),
     clockKg: f(state.clockKg), anvilKg: f(state.anvilKg), saxonMedleyKg: f(state.medleyKg),
     sex: state.sex,
-  }), [state.rtKg, state.rtL, state.rtR, state.axleKg, state.axleImpl, state.pinchSec, state.pinchKg, state.cocLevel, state.silverSec, state.silverGripper, state.excalKg, state.hubKg, state.hubL, state.hubR, state.raptorKg, state.crushKg, state.clockKg, state.anvilKg, state.medleyKg, state.sex]);
+  }), [state.rtKg, state.rtL, state.rtR, state.axleKg, state.axleImpl, state.pinchSec, state.pinchKg, state.pinchL, state.pinchR, state.cocLevel, state.silverSec, state.silverGripper, state.excalKg, state.hubKg, state.hubL, state.hubR, state.raptorKg, state.crushKg, state.clockKg, state.anvilKg, state.medleyKg, state.sex]);
 
   const trend = useMemo(() => {
     try { return liftTrendFromLog(loadPlatformLog()); } catch { return []; }
@@ -205,8 +212,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
 
   const prescription = report.prescription || prescriptionForWeakest(report.weakestWr || report.weakest);
 
-  /** PRO-5: диагноз из помоста (асимметрия) + ручной диагностики. */
-  const asymForDiag = report.rtAsymPct ?? report.hubAsymPct ?? null;
+  /** PRO-5: диагноз из замеров (макс. асимметрия RT/Hub/Pinch) + ручной диагностики. */
+  const asymForDiag = (() => {
+    const all = [report.rtAsymPct, report.hubAsymPct, report.pinchAsymPct].filter((v): v is number => v != null);
+    return all.length ? Math.max(...all) : null;
+  })();
   const diagnosis = useMemo(() => diagnoseArmlift({
     implement: diag.implement,
     failurePoint: diag.failurePoint || undefined,
@@ -238,6 +248,20 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       gripFreqPerWeek: sessions28d != null ? Math.round((sessions28d / 4) * 10) / 10 : null,
     };
   }, [trend, diag.implement]);
+  /** D14: системная нагрузка из sRPE (пусто — null, без ложных флагов). */
+  const acwr = useMemo(() => {
+    try {
+      const sess = loadSRPESessions();
+      if (!sess.length) return null;
+      return acuteChronicRatio(toDailyLoads(sess as any));
+    } catch { return null; }
+  }, []);
+  /** D13: измеренная мобильность — до причины (TDZ-порядок). */
+  const mobility = useMemo(() => assessArmliftMobility({
+    wristExtDeg: diag.wristExtDeg ? parseFloat(diag.wristExtDeg) : null,
+    wristFlexDeg: diag.wristFlexDeg ? parseFloat(diag.wristFlexDeg) : null,
+    thumbOppOk: diag.thumbOppOk,
+  }), [diag.wristExtDeg, diag.wristFlexDeg, diag.thumbOppOk]);
   /** PRO-5 real: причина со скорингом и evidence (свой движок, не стол). */
   const cause = useMemo(() => diagnoseArmliftCause({
     implement: diag.implement,
@@ -258,11 +282,13 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     gripFreqPerWeek: logStats.gripFreqPerWeek,
     flexHoldSec: diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
     extHoldSec: diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
+    mobilityFails: mobility.fails,
+    acwrZone: acwr?.zone ?? null,
     elbowPain: diag.elbowPain,
     pain: diag.pain,
     skinTear: diag.skinTear,
     thumbWebPain: diag.thumbWebPain,
-  }), [diag, asymForDiag, logStats, state.cocLevel, state.silverSec]);
+  }), [diag, asymForDiag, logStats, acwr, state.cocLevel, state.silverSec]);
   const extRatio = flexExtRatio(
     diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
     diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
@@ -478,6 +504,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         <div className="ad-row" data-arm="lift-tags">
           {report.rtAsymPct != null && <span className="ad-tag">RT-асимметрия {report.rtAsymPct}%</span>}
           {report.hubAsymPct != null && <span className="ad-tag">Hub-асимметрия {report.hubAsymPct}%</span>}
+          {report.pinchAsymPct != null && <span className="ad-tag">Pinch-асимметрия {report.pinchAsymPct}%</span>}
         </div>
         <AdSec title="ℹ️ Как пользоваться" collapsible defaultOpen={false} summary="3 шага до коррекции">
           <div className="ad-muted"><b>1 Замеры</b> — вбей снаряды ниже · <b>2 Диагностика</b> — точка срыва, фолы, тесты, причина · <b>3 Коррекция</b> — упражнения волной в план через мост внизу.</div>
@@ -512,6 +539,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <LiftNum label="RT правая кг" value={state.rtR} onChange={(v) => set({ rtR: v })} placeholder="R" aria="RT правая кг" />
             <LiftNum label="Hub левая кг" value={state.hubL} onChange={(v) => set({ hubL: v })} placeholder="L" aria="Hub левая кг" />
             <LiftNum label="Hub правая кг" value={state.hubR} onChange={(v) => set({ hubR: v })} placeholder="R" aria="Hub правая кг" />
+            <LiftNum label="Pinch левая кг" value={state.pinchL} onChange={(v) => set({ pinchL: v })} placeholder="L" aria="Pinch левая кг" />
+            <LiftNum label="Pinch правая кг" value={state.pinchR} onChange={(v) => set({ pinchR: v })} placeholder="R" aria="Pinch правая кг" />
           </AdGrid>
           <div className="lift-group">⚖️ Вес тела (едет в конструктор)</div>
           <AdGrid cols="auto-sm">
@@ -562,6 +591,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           )}
           {report.hubAsymPct != null && (
             <div className="ad-muted">Hub-асимметрия L/R: {report.hubAsymPct}%</div>
+          )}
+          {report.pinchAsymPct != null && (
+            <div className="ad-muted">Pinch-асимметрия L/R: {report.pinchAsymPct}%</div>
           )}
           {prescription && <div className="ad-muted" data-arm="lift-recipe">Рецепт: {prescription}</div>}
           {report.rows.length > 0 && (
@@ -658,12 +690,15 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               Прошлый замер {retests.prev.date}: {retests.list.map((r) => r.text).join(' · ')}
             </div>
           )}
-          <div className="lift-group">Мобильность</div>
+          <div className="lift-group">Мобильность (градусы, норма разгиб 70 / сгиб 75)</div>
+          <AdGrid cols="auto-sm">
+            <LiftNum label="Разгибание запястья °" value={diag.wristExtDeg} onChange={(v) => setD({ wristExtDeg: v })} placeholder="70" aria="Разгибание запястья градусы" />
+            <LiftNum label="Сгибание запястья °" value={diag.wristFlexDeg} onChange={(v) => setD({ wristFlexDeg: v })} placeholder="75" aria="Сгибание запястья градусы" />
+          </AdGrid>
           <div className="ad-row" aria-label="Диагностика: мобильность">
-            <AdChip active={diag.thumbStiff} onClick={() => setD({ thumbStiff: !diag.thumbStiff })}>Большой жёсткий</AdChip>
-            <AdChip active={diag.wristExtLimited} onClick={() => setD({ wristExtLimited: !diag.wristExtLimited })}>Разгибание запястья ограничено</AdChip>
-            <AdChip active={diag.wristFlexLimited} onClick={() => setD({ wristFlexLimited: !diag.wristFlexLimited })}>Сгибание запястья ограничено</AdChip>
+            <AdChip active={diag.thumbOppOk} onClick={() => setD({ thumbOppOk: !diag.thumbOppOk })}>{diag.thumbOppOk ? '✓ Большой достаёт до мизинца' : 'Большой до мизинца: проверить'}</AdChip>
             <AdChip active={diag.hipHingePoor} onClick={() => setD({ hipHingePoor: !diag.hipHingePoor })}>Hip hinge слабый</AdChip>
+            {mobility.fails.length > 0 && <span className="ad-tag">ROM-провал: {mobility.fails.join(', ')} · ретест через 2 нед</span>}
           </div>
           <div className="ad-row">
             <AdChip active={diag.pain} tone={diag.pain ? 'red' : undefined} onClick={() => setD({ pain: !diag.pain })}>{diag.pain ? '🔴 Боль есть — стоп' : 'Боли нет'}</AdChip>
@@ -671,6 +706,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <AdChip active={diag.skinTear} tone={diag.skinTear ? 'red' : undefined} onClick={() => setD({ skinTear: !diag.skinTear })}>{diag.skinTear ? '🔴 Сорвана кожа — щипок стоп' : 'Кожа цела'}</AdChip>
             <AdChip active={diag.thumbWebPain} tone={diag.thumbWebPain ? 'red' : undefined} onClick={() => setD({ thumbWebPain: !diag.thumbWebPain })}>{diag.thumbWebPain ? '🔴 Перепонка болит' : 'Перепонка в норме'}</AdChip>
             {logStats.sessions28d != null && <span className="ad-tag">Журнал: {logStats.sessions28d} хват-сессий/28д</span>}
+            {acwr && <span className="ad-tag">ACWR {acwr.ratio} ({acwr.zone})</span>}
           </div>
           <div data-arm="lift-diag-result"><b>{diagnosis.title}</b> · {cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
           <div className="ad-muted">Факты: {cause.evidence.join(' · ')}</div>

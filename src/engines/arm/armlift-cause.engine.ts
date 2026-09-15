@@ -27,9 +27,13 @@ export interface ArmliftCauseInput {
   thumbStiff?: boolean;
   wristExtLimited?: boolean;
   wristFlexLimited?: boolean;
+  /** D13: проваленные ROM-тесты (wrist_ext/wrist_flex/thumb_opp) — измерено, не toggles. */
+  mobilityFails?: string[];
   hipHingePoor?: boolean;
   /** Хват-сессий в неделю сейчас (частота). */
   gripFreqPerWeek?: number | null;
+  /** D14: зона ACWR из sRPE (undertrained/optimal/caution/dangerous; null — нет данных). */
+  acwrZone?: string | null;
   /** D10 E3: баланс сгибатели/разгибатели — холды секунд (кулак vs раскрытие). */
   flexHoldSec?: number | null;
   extHoldSec?: number | null;
@@ -177,7 +181,17 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
   const pinchImpl = ['saxon_bar', 'hub', 'pinch_block', 'anvil', 'grandfather_clock'].includes(String(i.implement || ''));
   if (pinchImpl && i.thumbStiff) { scores.mobility += 0.55; ev.push('Большой жёсткий на щипковом снаряде'); }
   if (i.wristExtLimited || i.wristFlexLimited) { scores.mobility += 0.45; ev.push('Ограничение запястья режет позицию'); }
+  // D13: измеренные ROM-провалы бьют сильнее toggles.
+  const fails = Array.isArray(i.mobilityFails) ? i.mobilityFails.filter(Boolean) : [];
+  if (fails.length) {
+    scores.mobility += Math.min(0.7, 0.4 + 0.15 * fails.length);
+    ev.push(`ROM-провал: ${fails.join(', ')} — ретест через 2 нед`);
+  }
   if (i.wristExtWeak) { scores.max_strength += 0.25; ev.push('Слабая экстензия — теряет позицию под весом'); }
+
+  // D14: системная нагрузка по sRPE (тот же движок, что у арм-хаба, свой вход).
+  if (i.acwrZone === 'dangerous') { scores.fatigue += 0.4; ev.push('ACWR dangerous — системный перегруз'); }
+  else if (i.acwrZone === 'caution') { scores.fatigue += 0.2; ev.push('ACWR caution'); }
 
   // FATIGUE: частота выше восстановления + падающий тренд при объёме.
   if (freq != null && freq >= 5) { scores.fatigue += 0.4; ev.push(`Частота ${freq}×/нед — сухожилия не успевают (8–12 нед адаптация)`); }

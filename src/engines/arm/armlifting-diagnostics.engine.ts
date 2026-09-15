@@ -21,6 +21,9 @@ export interface ArmliftInput {
   pinchSec?: number;
   /** PRO-4 A2: силовой щипок в кг (турнирный), отдельно от удержания. */
   pinchKg?: number;
+  /** D13: щипок по рукам (приоритетнее общего pinchKg). */
+  pinchL?: number;
+  pinchR?: number;
   cocLevel?: number; // 0 Trainer, 1 №1 140lb, 1.5, 2, 2.5, 3 280lb
   /** PRO-4 A3: удержание Silver Bullet (с) + гриппер. */
   silverSec?: number;
@@ -68,6 +71,8 @@ export interface ArmliftingReport {
   /** PRO-4 A7: асимметрия RT/Hub в % (|R−L|/max), null — нет пары. */
   rtAsymPct: number | null;
   hubAsymPct: number | null;
+  /** D13: асимметрия щипка L/R в %. */
+  pinchAsymPct: number | null;
   totalKg: number;
   verdict: string;
   /** PRO-4 A10: рецепт по слабейшему (строки CoC FAQ / pinch-протокола, без новой математики). */
@@ -81,6 +86,8 @@ const IMPLEMENT_LABEL: Record<string, string> = {
   apollon_axle: 'Apollon Axle',
   saxon_bar: 'Saxon Bar',
   pinch_block: 'Pinch-блок кг',
+  pinch_block_L: 'Pinch левая',
+  pinch_block_R: 'Pinch правая',
   pinch_hold: 'Pinch-удержание',
   coc_gripper: 'CoC гриппер',
   silver_bullet: 'Silver Bullet',
@@ -260,16 +267,37 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
   // Pinch кг отдельно от удержания (A2 + добивка: единого WR нет —
   // рекорды зависят от ширины/1H-2H/федерации, Gods of Grip 2024–2025,
   // поэтому 80/45 — внутренний ориентир, в avgWR не входит)
-  const pinchKg = num(input.pinchKg);
-  if (pinchKg != null) {
+  // Pinch: по-рукам приоритетнее общего (D13, прецедент RT/Hub A7)
+  const pinchL = num(input.pinchL);
+  const pinchR = num(input.pinchR);
+  const pinchAsymPct = asymPct(pinchL, pinchR);
+  const pinchNote = (wr: number): string => `внутренний ориентир ${wr} кг (единого WR нет — ширина/1H-2H/федерация)`;
+  if (pinchL != null || pinchR != null) {
     const wr = platformWrFor('pinch_block', sex);
-    const p = pctOf(pinchKg, wr);
-    rows.push({
-      implement: 'pinch_block', label: IMPLEMENT_LABEL.pinch_block,
-      display: `${pinchKg} кг`, scorePct: p, internal: true,
-      level: lvlOf(p), attempts: planAttempts(pinchKg),
-      note: `внутренний ориентир ${wr} кг (единого WR нет — ширина/1H-2H/федерация)`,
-    });
+    const push = (v: number | null, impl: string) => {
+      if (v == null) return;
+      const p = pctOf(v, wr);
+      rows.push({
+        implement: impl, label: IMPLEMENT_LABEL[impl] || impl,
+        display: `${v} кг`, scorePct: p, internal: true,
+        level: lvlOf(p), attempts: planAttempts(v),
+        note: pinchNote(wr),
+      });
+    };
+    push(pinchL, 'pinch_block_L');
+    push(pinchR, 'pinch_block_R');
+  } else {
+    const pinchKg = num(input.pinchKg);
+    if (pinchKg != null) {
+      const wr = platformWrFor('pinch_block', sex);
+      const p = pctOf(pinchKg, wr);
+      rows.push({
+        implement: 'pinch_block', label: IMPLEMENT_LABEL.pinch_block,
+        display: `${pinchKg} кг`, scorePct: p, internal: true,
+        level: lvlOf(p), attempts: planAttempts(pinchKg),
+        note: pinchNote(wr),
+      });
+    }
   }
   const pin = num(input.pinchSec);
   if (pin != null) {
@@ -382,7 +410,7 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
   avgInternalPct = avg(intScored);
   // PRO-4 A9: тотал — только кг одной природы (секунды/CoC-уровни не суммируем)
   const kgParts: Array<number | null> = [
-    rtL, rtR, num(input.rtKg), ax, pinchKg, hubL, hubR, num(input.hubKg), ex,
+    rtL, rtR, num(input.rtKg), ax, pinchL, pinchR, num(input.pinchKg), hubL, hubR, num(input.hubKg), ex,
     num(input.raptorKg), num(input.crushKg), num(input.clockKg), num(input.anvilKg), num(input.saxonMedleyKg),
   ];
   const totalKg = Math.round(
@@ -397,11 +425,12 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
     const wrPart = avgWrPct != null ? ` · WR-среднее ${avgWrPct}% по ${wrScored.length} сн.` : '';
     const intPart = avgInternalPct != null ? ` · ориентиры ${avgInternalPct}%` : '';
     const asymPart = rtAsymPct != null ? ` · RT-асимметрия ${rtAsymPct}%` : '';
-    verdict = `Отстаёт: ${w.label} (${w.scorePct}%) — бить его. Многоборье: среднее ${avgPct}% по ${scored.length} сн.${wrPart}${intPart}${asymPart}`;
+    const pinchPart = pinchAsymPct != null ? ` · Pinch-асимметрия ${pinchAsymPct}%` : '';
+    verdict = `Отстаёт: ${w.label} (${w.scorePct}%) — бить его. Многоборье: среднее ${avgPct}% по ${scored.length} сн.${wrPart}${intPart}${asymPart}${pinchPart}`;
   } else {
     verdict = `Только факты без % (${rows.map((r) => r.label).join(', ')}) — добавь RT/Hub/Pinch-кг для %WR`;
   }
-  return { rows, filled: rows.length, weakest, weakestWr, avgPct, avgWrPct, avgInternalPct, rtAsymPct, hubAsymPct, totalKg, verdict, prescription };
+  return { rows, filled: rows.length, weakest, weakestWr, avgPct, avgWrPct, avgInternalPct, rtAsymPct, hubAsymPct, pinchAsymPct, totalKg, verdict, prescription };
 }
 
 // ── PRO-3 W5c + PRO-4: экспорт вердикта (HTML/CSV) ─────────────────────────
