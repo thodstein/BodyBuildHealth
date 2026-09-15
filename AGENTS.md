@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-диагностика движений D2–D4: флип-гейт + драйвер/угломер + экспорт-паритет (Sep 15 2026, коммит pathspec `404757b2`, без пуша — в очереди чужой `dcf87d478` armlift)
+
+По команде «выполняй полностью, в бб-авто пока не лезь» (план из полного анализа: наука JBMT-2025/BMJ-SEM-2025/Wolf-2025/Kassiano-2025/ACSM-2026 + аудит разрывов G1–G12). Только свои файлы; чужой `BbAutoConstructor` (M3) и чужие WIP не тронуты. **Шторм-инцидент**: мой LEGACY-коммент в `planner-bridge.ts` уехал в чужой коммит `dcf87d478` через их `add -A` — побайтово сверен, код цел, файл повторно не коммичу.
+- **D2 честная асимметрия**: флип-гейт прямо в `lrVerdicts` (история `he_bb_lr_history` → `summarizeLrDirection`: `flipped && !persistent` → `watch` + topUpSets 0 + «шум измерения», вся цепочка карта→мост→экспорт→вставка); пороги 7/12 подписаны рабочими (Bishop-линия) в `bb-lr-volume`; `mmc`-строка в мост (приёмник её уже ждал) + в HTML/CSV-экспорт.
+- **D3 драйвер v2**: `ankleDeg<35°` заведен в драйвер (PoinT GO 35–38°; изолированный гонометр без компенсаций — честно не драйвер, тест фиксирует); провод OHS→диагноз уже был (`mobilityFails→jointRisk`) — NEW lock-тест `bb-exercise-mobility-gate` 2/2; `computePerMuscleACWR` замерен — O(сессии×упражнения), дёшев, оставлен + задокументирован; re-screen бейдж (>42 дней от снимка).
+- **D4 разбор v2**: темп уже warning (вес 6, не штраф — по ACSM-2026, покрыт `pro.test.ts`); FPPA-угломер опционально (`fppaL/fppaR`, только tiebreak при чистой качественной оценке, разрыв ≥10° рабочий); `movementDriver/singleLeg` в HTML+CSV (`BBDiagnosticsPro2Meta` + рендер + строки).
+- Проверено: NEW export-movement 3/3 + mobility-gate 2/2 + movement 19/19 + hub 40/40 + bridge/handlers/pro/pro2/pro3/injection — итого **196/196 (10 файлов)** + max-pro 93/94 (**1 — чужое предсуществующее `female норма→тихо` в `bb-symmetry`**); `tsc --noEmit` **0 по всему проекту**; `verify:apk-design` OK. НЕ ПУШИЛ.
+- **Граница для владельца ББ-авто (остаток D1)**: приёмник не применяет `movementDriver/singleLeg/vbtLossPct`; stale `he_bb_lr_topup`/`he_bb_return_action` чистятся только полным старым мостом.
+
 ## ББ-диагностика движений: живой гейт + профиль-канон (Sep 15 2026, коммит pathspec `0f3064dd`, без пуша — в очереди чужой `2490792e9` armlift)
 
 По команде «продолжай» (поверх чистки `33bdf8d5`, уже в origin/main). Только свой хаб + свой тест; чужие WIP и чужой активный `BbAutoConstructor` (M3) не тронуты.
