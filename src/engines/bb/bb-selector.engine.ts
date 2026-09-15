@@ -77,23 +77,39 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
 
     if (input.daysPerWeek != null) {
       const eff = p.sessionsPerRotation * 7 / p.rotationDays;
-      const overage = eff - input.daysPerWeek;
-      // FIX-B6: graduated penalty вместо бинарного +25/-20.
-      // 0 дней сверх → +25, 1 день сверх → +10, 2 дня сверх → -5, 3+ → -15
-      if (overage <= 0.5) {
-        score += 25;
-        rationale.push(`~${eff.toFixed(1)} сессий/нед — укладывается`);
-      } else if (overage <= 1.5) {
-        score += 10;
-        rationale.push(`~${eff.toFixed(1)} сессий/нед — чуть больше ${input.daysPerWeek}, но допустимо`);
-      } else if (overage <= 2.5) {
-        score -= 5;
-        warnings.push(`~${eff.toFixed(1)} сессий/нед > ${input.daysPerWeek} (превышение +${overage.toFixed(1)})`);
+      const diff = eff - input.daysPerWeek;
+      // СИММЕТРИЧНЫЙ day-fit (был баг: сплит с МЕНЬШИМ числом дней получал +25,
+      // поэтому fullbody_3 «выигрывал» и при 6 днях). Теперь:
+      //  • точно под дни → +25;
+      //  • недобор 1 день → +12, 2 → +4, ≥3 → −10 (нельзя рекомендовать 3-дневку на 6 дней);
+      //  • перебор 1 день → +8, 2 → −5, ≥3 → −15.
+      if (Math.abs(diff) <= 0.5) {
+        score += 60;
+        rationale.push(`~${eff.toFixed(1)} сессий/нед — точно под ${input.daysPerWeek} дн.`);
+      } else if (diff < 0) {
+        const under = -diff;
+        if (under <= 1.5) {
+          score += 30;
+          rationale.push(`~${eff.toFixed(1)} сессий/нед — на ${under.toFixed(1)} меньше ${input.daysPerWeek} (допустимо)`);
+        } else if (under <= 2.5) {
+          score += 12;
+          rationale.push(`~${eff.toFixed(1)} сессий/нед — на ${under.toFixed(1)} меньше ${input.daysPerWeek}`);
+        } else {
+          score -= 12;
+          warnings.push(`~${eff.toFixed(1)} сессий/нед сильно меньше ${input.daysPerWeek} (−${under.toFixed(1)})`);
+        }
+      } else if (diff <= 1.5) {
+        score += 12;
+        rationale.push(`~${eff.toFixed(1)} сессий/нед — чуть больше ${input.daysPerWeek}`);
+      } else if (diff <= 2.5) {
+        score -= 10;
+        warnings.push(`~${eff.toFixed(1)} сессий/нед > ${input.daysPerWeek} (превышение +${diff.toFixed(1)})`);
       } else {
-        score -= 15;
-        warnings.push(`~${eff.toFixed(1)} сессий/нед > ${input.daysPerWeek} (превышение +${overage.toFixed(1)})`);
+        score -= 25;
+        warnings.push(`~${eff.toFixed(1)} сессий/нед > ${input.daysPerWeek} (превышение +${diff.toFixed(1)})`);
       }
     }
+
 
     // частота: 2-3×/нед = оптимально для гипертрофии
     if (avgFreq >= 2 && avgFreq <= 3) { score += 18; rationale.push(`частота ${avgFreq.toFixed(1)}×/нед на группу — оптимум гипертрофии`); }
@@ -258,7 +274,18 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
 
     out.push({ pattern: p, score, rationale, warnings });
   }
-  return out.sort((a, b) => b.score - a.score);
+  // Сортировка: скор, затем близость к запрошенным дням, затем больше сессий.
+  // (при равном скоре 6-дневный bro_6 должен бить 4-дневный rolling_4_1 на «6 дн.»)
+  const _target = input.daysPerWeek;
+  return out.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (_target != null) {
+      const da = Math.abs(a.pattern.sessionsPerRotation - _target);
+      const db = Math.abs(b.pattern.sessionsPerRotation - _target);
+      if (da !== db) return da - db;
+    }
+    return b.pattern.sessionsPerRotation - a.pattern.sessionsPerRotation;
+  });
 }
 
 export function selectBestBBSplit(input: BBSelectorInput): BBRankedPattern | null {

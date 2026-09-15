@@ -771,6 +771,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [mobilityRestrictions, setMobilityRestrictions] = useState<string[]>(prof.mobilityRestrictions || []);
 
   const [selectedSplitId, setSelectedSplitId] = useState<string>('');
+  // Пользователь трогал сплит вручную → авто-рекомендация больше не перезаписывает выбор.
+  const splitTouched = useRef(false);
   const [builtPlan, setBuiltPlan] = useState<BBPlan | null>(null);
   const [bbWeekSel, setBbWeekSel] = useState<number>(1);
   // Понедельный просмотр качества: номер недели или 'avg' (среднее по неделям).
@@ -1425,7 +1427,10 @@ export const BbAutoConstructor: React.FC = () => {
           bbMethodology, bbVolGoal, trainingVolumeMode, loadStrategy,
           autoDeload, deloadType, specBlocks, pedPhaseOverride, dcMode, volumeScheme,
         }));
-        if (builtPlan) localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: builtPlan, date: new Date().toISOString() }));
+        // BUG-FIX (выбор сплита): НЕ пишем he_bb_plan_saved отсюда — эффект срабатывает
+        // на КАЖДУЮ смену параметров (в т.ч. selectedSplitId) и сохранял СТАРЫЙ builtPlan,
+        // который потом авто-загружался (FIX-19) вместо только что выбранного сплита.
+        // План сохраняется явно при сборке/сохранении/экспорте.
       } catch { /* storage may be unavailable */ }
     };
     persist();
@@ -1922,7 +1927,7 @@ export const BbAutoConstructor: React.FC = () => {
     preset: proPreset,
   }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, peds, pedDoses, bbEquipment, injuries, mobilityRestrictions, proPreset]);
   const bestSplit = ranked[0];
-  useEffect(() => { if (bestSplit && !selectedSplitId) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit]);
+  useEffect(() => { if (bestSplit && !selectedSplitId && !splitTouched.current) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit, selectedSplitId]);
 
   const allLandmarks = useMemo(() => getAllVolumeLandmarks(bbLevel), [bbLevel]);
   // Расчётный объём целей специализации для подсказки: цель = MAV × (1.0 + 0.1×зон)
@@ -2304,7 +2309,12 @@ export const BbAutoConstructor: React.FC = () => {
       : null;
     const effectiveProgram = bbSource === 'cycle' ? cycleSourceProgram : customProgram;
 
-    if (planMode === 'programs' || effectiveProgram) {
+    // BUG-FIX (выбор сплита): раньше ветка программы срабатывала и при
+    // `planMode==='generic_split'`, если оставался `customProgram` от прошлой
+    // сессии (`|| effectiveProgram`) — тогда выбор сплита игнорировался и
+    // собирался случайный/старый план. Программная ветка — ТОЛЬКО в режиме
+    // «Программы» (bbSource cycle/program внутри него).
+    if (planMode === 'programs') {
       // Единственный путь: FullProgram → programToBBPlan (faithful / adapt)
       if (effectiveProgram) {
         plan = programToBBPlan(effectiveProgram, {
@@ -4327,6 +4337,9 @@ export const BbAutoConstructor: React.FC = () => {
   const renderSplit = () => (
     <div>
       <div style={H}>🏆 Шаг 3: Выбор сплита</div>
+      <div style={{ marginBottom:8, padding:'6px 10px', borderRadius:10, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.22)', fontSize:12, color:'#00e68a', fontWeight:800 }}>
+        ✅ Будет собран: {SPLIT_PATTERNS.find(p => p.id === selectedSplitId)?.name || '— выберите сплит ниже —'}
+      </div>
       <div style={{ marginBottom:8, padding:'6px 10px', borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)', fontSize:11, color:'#fff' }}>
         📅 Фазы: {phases.filter((p,i,a) => p.phase !== a[i-1]?.phase).map((p,i) => <span key={i} style={{ color:PHASE_COLORS[p.phase], fontWeight:700 }}>{PHASE_LABELS[p.phase]}{i < phases.length - 1 ? ' → ' : ''}</span>)}
       </div>
@@ -4343,7 +4356,7 @@ export const BbAutoConstructor: React.FC = () => {
           <div style={{ fontSize:11, color:'#fff', marginBottom:6 }}>{bestSplit.pattern.description}</div>
           {bestSplit.rationale.slice(0, 3).map((x,i) => <div key={i} style={{ fontSize:11, color:'#fff' }}>✓ {x}</div>)}
           <div style={{ display:'flex', gap:8, marginTop:8 }}>
-            <button onClick={() => { setSelectedSplitId(bestSplit.pattern.id); }} style={{ padding:'6px 16px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background:'rgba(250,204,21,0.15)', border:'1px solid rgba(250,204,21,0.3)', color:'#facc15' }}>✅ Применить</button>
+            <button onClick={() => { splitTouched.current = true; setSelectedSplitId(bestSplit.pattern.id); }} style={{ padding:'6px 16px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background:'rgba(250,204,21,0.15)', border:'1px solid rgba(250,204,21,0.3)', color:'#facc15' }}>✅ Применить</button>
             <button onClick={buildBb} disabled={isBuilding} style={{ padding:'6px 16px', borderRadius:10, fontSize:11, fontWeight:700, cursor: isBuilding ? 'default' : 'pointer', opacity: isBuilding ? 0.6 : 1, background:'rgba(0,230,138,0.15)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a' }}>{isBuilding ? '⏳ Сборка…' : '⚡ Собрать план'}</button>
           </div>
         </div>
@@ -4367,7 +4380,7 @@ export const BbAutoConstructor: React.FC = () => {
                 <span key={f.tag} style={{ fontSize:11, padding:'1px 6px', borderRadius:4, background:f.freq >= 2 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', color:f.freq >= 2 ? '#00e68a' : '#fff' }}>{TAG_LABELS_RU[f.tag] || f.tag} ~ {f.freq}×/нед</span>
               ))}
             </div>
-            <button onClick={() => setSelectedSplitId(r.pattern.id)} style={{ marginTop:8, padding:'6px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', background:sel?'#00e68a':'rgba(255,255,255,0.06)', color:sel?'#000':'#fff', border:'1px solid '+(sel?'#00e68a':'rgba(255,255,255,0.1)'), width:'100%' }}>{sel ? '✓ Выбран' : 'Выбрать этот сплит'}</button>
+            <button onClick={() => { splitTouched.current = true; setSelectedSplitId(r.pattern.id); }} style={{ marginTop:8, padding:'6px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', background:sel?'#00e68a':'rgba(255,255,255,0.06)', color:sel?'#000':'#fff', border:'1px solid '+(sel?'#00e68a':'rgba(255,255,255,0.1)'), width:'100%' }}>{sel ? '✓ Выбран' : 'Выбрать этот сплит'}</button>
           </div>;
         })}
       </div>

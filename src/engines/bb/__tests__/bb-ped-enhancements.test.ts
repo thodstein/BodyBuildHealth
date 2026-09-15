@@ -154,10 +154,16 @@ describe('builder PED overlay не ломает тяж/памп', () => {
 });
 
 describe('selector PED мягкий бонус', () => {
-  it('GH+insulin не форсирует один сплит, все в топе', () => {
-    const ranked = rankBBSplits({ level: 'enhanced', goal: 'mass', daysPerWeek: 4, peds: ['GH','insulin'] as any, pedDoses: { GH: 4, insulin: 10 } });
-    expect(ranked.length).toBeGreaterThan(5);
-    expect(ranked[0].score - ranked[4].score).toBeLessThan(35); // разрыв не огромный
+  it('GH+insulin не форсирует один сплит (мягкий бонус ≤8, день-фит остаётся главным)', () => {
+    const base = rankBBSplits({ level: 'enhanced', goal: 'mass', daysPerWeek: 4 } as any);
+    const withPed = rankBBSplits({ level: 'enhanced', goal: 'mass', daysPerWeek: 4, peds: ['GH', 'insulin'] as any, pedDoses: { GH: 4, insulin: 10 } });
+    expect(withPed.length).toBeGreaterThan(5);
+    // Прирост от PED-подсказок мягкий (≤8) и не подменяет day-fit-рекомендацию.
+    for (const p of withPed) {
+      const b = base.find(x => x.pattern.id === p.pattern.id);
+      expect(p.score - (b ? b.score : 0)).toBeLessThanOrEqual(8);
+    }
+    expect(withPed[0].pattern.sessionsPerRotation).toBeGreaterThanOrEqual(3);
   });
 });
 
