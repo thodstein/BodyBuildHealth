@@ -16,6 +16,9 @@ export interface ArmliftCauseInput {
   pinchHoldSec?: number | null;
   farmerHoldSec?: number | null;
   wristExtWeak?: boolean;
+  /** Crush-тесты с помоста: уровень CoC (0–4) и Silver-hold (с). */
+  cocLevel?: number | null;
+  silverSec?: number | null;
   /** Журнал помоста: хват-сессий за 28д (по записям he_arm_platform_log). */
   gripSessions28d?: number | null;
   /** Тренд снаряда по журналу: +растёт / 0 стоит / -падает (процент). */
@@ -54,6 +57,34 @@ function num(v: number | null | undefined): number | null {
   return v != null && Number.isFinite(v) ? (v as number) : null;
 }
 
+/**
+ * Хват-сессии за 28д из журнала помоста. Без implement — все снаряды,
+ * со снарядом — только он (честный объём под точку диагностики).
+ */
+export function countGripSessions(
+  log: Array<{ date?: string; implement?: string }>,
+  implement?: string,
+  days = 28,
+): number | null {
+  try {
+    if (!Array.isArray(log)) return null;
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+    const cut = cutoff.toISOString().slice(0, 10);
+    const impl = String(implement || '');
+    let n = 0;
+    for (const e of log) {
+      if (!e || String(e.date || '') < cut) continue;
+      if (impl && String(e.implement || '') !== impl && String(e.implement || '') !== '') {
+        // L/R-суффиксы (rolling_thunder_L) маппим на базу
+        const base = String(e.implement || '').replace(/_[LR]$/, '');
+        if (base !== impl) continue;
+      }
+      n++;
+    }
+    return n;
+  } catch { return null; }
+}
+
 export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
   const ev: string[] = [];
   const scores: Record<Exclude<ArmliftCause, 'pain'>, number> = {
@@ -83,10 +114,15 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
     scores.technique += 0.3; ev.push('Сила холдов есть, падает стойка 1с — техника локаута');
   }
 
-  // MAX_STRENGTH: срыв внизу + короткие холды.
+  // MAX_STRENGTH: срыв внизу + короткие холды + слабый crush.
   if (fp === 'off_floor' || fp === 'close_fail') { scores.max_strength += 0.45; ev.push('Срыв внизу/не закрыл — пик силы'); }
   if (pinch != null && pinch < 10) { scores.max_strength += 0.35; ev.push(`Pinch-hold ${pinch}с < 10с`); }
   if (farmer != null && farmer < 15) { scores.max_strength += 0.25; ev.push(`Farmer-hold ${farmer}с < 15с`); }
+  const coc = num(i.cocLevel);
+  if (coc != null && coc < 2) { scores.max_strength += 0.35; ev.push(`CoC №${coc} < №2 — crush-пик`); }
+  const silv = num(i.silverSec);
+  if (silv != null && silv < 20) { scores.endurance += 0.3; ev.push(`Silver-hold ${silv}с < 20с — crush-выносливость`); }
+  else if (silv != null && silv >= 20 && silv < 45) { scores.endurance += 0.15; ev.push(`Silver-hold ${silv}с — середина`); }
 
   // ENDURANCE: срыв в удержании/середине при живом старте.
   if (fp === 'hold_long' || fp === 'mid') { scores.endurance += 0.45; ev.push('Держит старт, плывёт дальше — выносливость'); }

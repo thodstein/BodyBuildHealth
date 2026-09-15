@@ -17,7 +17,7 @@ import { buildArmPrintHtml, buildArmIcs } from '../../../engines/arm/arm-export.
 import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
-import { injectArmliftCorrections, type ArmliftInjectionItem } from '../../../engines/arm/armlift-injection.engine';
+import { injectArmliftCorrections, applyArmliftSpecWave, type ArmliftInjectionItem } from '../../../engines/arm/armlift-injection.engine';
 import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
 import { PLATFORM_WR, planAttempts, platformWrFor, platformIsInternal } from '../../../engines/arm/arm-platform.engine';
 import { WAF_FOULS, WAF_FOULS_OUT_AFTER } from '../../../engines/arm/arm-start-strap.engine';
@@ -435,13 +435,23 @@ export function ArmAutoConstructor() {
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [diagWeakPoints, setDiagWeakPoints] = useState<ArmWeakPoint[]>([]);
   /** PRO-5 real: grip-коррекции из армлифтинг-хаба (только дисциплина armlifting; стол не трогаем). */
-  const [armliftCorrections, setArmliftCorrections] = useState<ArmliftInjectionItem[]>(() => {
+  const [armliftCorrections, setArmliftCorrections] = useState<{ items: ArmliftInjectionItem[]; spec: Array<{ week: number; targetSets: Record<string, number>; dayMap: Record<string, string> }>; weakArmNote?: string }>(() => {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_armlifting_corrections') : null;
-      const arr = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(arr)) return [];
-      return arr.filter((t: any) => t && typeof t.exId === 'string').slice(0, 3);
-    } catch { return []; }
+      const j = raw ? JSON.parse(raw) : null;
+      const cleanItems = (arr: any): ArmliftInjectionItem[] => Array.isArray(arr)
+        ? arr.filter((t: any) => t && typeof t.exId === 'string').slice(0, 3)
+        : [];
+      if (Array.isArray(j)) return { items: cleanItems(j), spec: [] }; // миграция старого формата
+      if (j && typeof j === 'object') {
+        return {
+          items: cleanItems((j as any).items),
+          spec: Array.isArray((j as any).spec) ? (j as any).spec.slice(0, 4) : [],
+          ...(((j as any).weakArmNote && typeof (j as any).weakArmNote === 'string') ? { weakArmNote: String((j as any).weakArmNote) } : {}),
+        };
+      }
+      return { items: [], spec: [] };
+    } catch { return { items: [], spec: [] }; }
   });
   const [focusGroup, setFocusGroup] = useState<string>('');
   const [specialization, setSpecialization] = useState<boolean>(false);
@@ -624,12 +634,20 @@ export function ArmAutoConstructor() {
               ...(Number.isFinite(Number(t.intensityPct)) ? { intensityPct: Number(t.intensityPct) } : {}),
               ...(Number.isFinite(Number(t.rir)) ? { rir: Number(t.rir) } : {}),
             }));
+          const specRaw = Array.isArray(al?.armliftSpec) ? al.armliftSpec : [];
+          const specClean = specRaw.slice(0, 4).filter((w: any) => w && typeof w === 'object').map((w: any) => ({
+            week: Number(w.week) || 0,
+            targetSets: (w.targetSets && typeof w.targetSets === 'object' ? w.targetSets : {}) as Record<string, number>,
+            dayMap: (w.dayMap && typeof w.dayMap === 'object' ? w.dayMap : {}) as Record<string, string>,
+          }));
+          const note = typeof al?.armliftWeakArmNote === 'string' && al.armliftWeakArmNote ? String(al.armliftWeakArmNote) : undefined;
           if (clean.length) {
-            setArmliftCorrections(clean);
-            try { localStorage.setItem('he_armlifting_corrections', JSON.stringify(clean)); } catch {}
-            flash(`↩ Хват-коррекции: ${clean.map((c) => c.exId).join(', ')} → встанут в план при сборке`);
+            const pack = { items: clean, spec: specClean, ...(note ? { weakArmNote: note } : {}) };
+            setArmliftCorrections(pack);
+            try { localStorage.setItem('he_armlifting_corrections', JSON.stringify(pack)); } catch {}
+            flash(`↩ Хват-коррекции: ${clean.map((c) => c.exId).join(', ')} → волной ${specClean.length || 1} нед в план при сборке`);
           } else {
-            setArmliftCorrections([]);
+            setArmliftCorrections({ items: [], spec: [] });
             try { localStorage.removeItem('he_armlifting_corrections'); } catch {}
           }
         }
@@ -981,10 +999,12 @@ export function ArmAutoConstructor() {
           if (inj.injected>0) plan.rationale = [...(plan.rationale||[]), `Инъекция мёртвых точек: ${inj.notes.join(' · ')}`];
         }
       } catch {}
-      // PRO-5 real: инъекция хват-коррекций армлифтинга — ТОЛЬКО дисциплина armlifting
+      // PRO-5 real: волна хват-коррекций армлифтинга — ТОЛЬКО дисциплина armlifting
       try {
-        if ((discipline as string) === 'armlifting' && armliftCorrections.length) {
-          const inj = injectArmliftCorrections(plan, armliftCorrections, { level, workMax });
+        if ((discipline as string) === 'armlifting' && armliftCorrections.items.length) {
+          const inj = armliftCorrections.spec.length
+            ? applyArmliftSpecWave(plan, armliftCorrections.spec, armliftCorrections.items, { level, workMax, weakArmNote: armliftCorrections.weakArmNote })
+            : injectArmliftCorrections(plan, armliftCorrections.items, { level, workMax, weakArmNote: armliftCorrections.weakArmNote });
           plan = inj.plan;
           if (inj.injected > 0 || inj.notes.length) {
             plan.rationale = [...(plan.rationale || []), `Армлифтинг-коррекции: ${inj.notes.join(' · ')}`];
@@ -1220,16 +1240,17 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </div>
             </AdBanner>
           )}
-          {armliftCorrections.length>0 && (discipline as string) === 'armlifting' && (
+          {armliftCorrections.items.length>0 && (discipline as string) === 'armlifting' && (
             <AdBanner tone="info">
-              <b>🏋️ Хват-коррекции из армлифтинг-диагностики (встанут в план при сборке)</b>
+              <b>🏋️ Хват-коррекции из армлифтинг-диагностики (волной {armliftCorrections.spec.length || 1} нед в план при сборке)</b>
               <div className="ad-row">
-                {armliftCorrections.map(c=> (
+                {armliftCorrections.items.map(c=> (
                   <span key={c.exId} className="ad-tag">{c.exId} {c.sets}×{c.dayTag || ''}</span>
                 ))}
+                {armliftCorrections.weakArmNote && <span className="ad-tag">{armliftCorrections.weakArmNote}</span>}
               </div>
               <div className="ad-row">
-                <AdBtn variant="dark" onClick={()=>{ setArmliftCorrections([]); try{ localStorage.removeItem('he_armlifting_corrections'); } catch{} }}>✕ Сбросить хват-коррекции</AdBtn>
+                <AdBtn variant="dark" onClick={()=>{ setArmliftCorrections({ items: [], spec: [] }); try{ localStorage.removeItem('he_armlifting_corrections'); } catch{} }}>✕ Сбросить хват-коррекции</AdBtn>
                 <span className="ad-muted">Инъекция: per-day dedup, budget, кап сессии 8, делод-скип</span>
               </div>
             </AdBanner>

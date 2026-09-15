@@ -24,6 +24,8 @@ export interface ArmliftInjectionOpts {
   workMax?: Record<string, number>;
   budget?: number;
   weekIdxs?: number[];
+  /** Асимметрия: пометка «слабой рукой первой» в комментарий упражнения. */
+  weakArmNote?: string | null;
 }
 
 export interface ArmliftInjectionResult {
@@ -136,6 +138,7 @@ export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[
       const sg = String(cat.substitutionGroup || '');
       const muscle = MUSCLE_BY_SG[sg] || 'grip_support';
       const repsAvg = isHold ? 1 : 5;
+      const weakNote = opts.weakArmNote ? ` · ${opts.weakArmNote}` : '';
       const newEx: any = {
         muscle,
         name: cat.name,
@@ -156,7 +159,7 @@ export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[
         substitutionGroup: cat.substitutionGroup,
         exerciseId: t.exId,
         equipment: cat.equipment,
-        comment: `Армлифтинг-коррекция @${Math.round(intensityPct * 100)}%`,
+        comment: `Армлифтинг-коррекция @${Math.round(intensityPct * 100)}%${weakNote}`,
         rationale: `Коррекция слабого звена хвата: ${cat.name} ${sets}×${isHold ? 'холд' : 'повт'} (${(cat as any).technique || ''})`.slice(0, 140),
       };
       sess.exercises.push(newEx);
@@ -176,4 +179,53 @@ export function correctionsToInjectionItems(corrections: ArmliftCorrection[], n 
   return (corrections || []).slice(0, n).map((c) => ({
     exId: c.exId, sets: c.sets, dayTag: c.dayTag, intensityPct: 0.65, rir: 2,
   }));
+}
+
+export interface ArmliftSpecWaveWeek {
+  week: number;
+  targetSets: Record<string, number>;
+  dayMap: Record<string, string>;
+}
+
+/**
+ * Волна спеца по неделям: первые 4 не-делод недели получают свои сеты
+ * из targetSets (накопление/объём/интенс/делод). Возвращает merged-результат.
+ */
+export function applyArmliftSpecWave(
+  plan: any,
+  spec: ArmliftSpecWaveWeek[],
+  baseItems: ArmliftInjectionItem[],
+  opts: ArmliftInjectionOpts = {},
+): ArmliftInjectionResult {
+  const weeks: number[] = [];
+  try {
+    for (let i = 0; i < (plan?.weeks || []).length && weeks.length < 4; i++) {
+      if (!(plan.weeks[i] as any)?.deload) weeks.push(i);
+    }
+  } catch { /* noop */ }
+  if (!weeks.length || !baseItems.length) {
+    return injectArmliftCorrections(plan, [], opts);
+  }
+  let acc: ArmliftInjectionResult = {
+    plan: JSON.parse(JSON.stringify(plan || {})),
+    injected: 0, skippedBudget: 0, skippedDup: 0, skippedDeload: 0, notes: [],
+  };
+  (spec || []).slice(0, 4).forEach((sw, k) => {
+    const wi = weeks[k];
+    if (wi == null) return;
+    const items = baseItems.map((b) => {
+      const s = sw?.targetSets?.[b.exId];
+      return { ...b, sets: s != null && Number.isFinite(Number(s)) ? Math.max(1, Math.min(6, Math.round(Number(s)))) : b.sets };
+    });
+    const r = injectArmliftCorrections(acc.plan, items, { ...opts, weekIdxs: [wi] });
+    acc = {
+      plan: r.plan,
+      injected: acc.injected + r.injected,
+      skippedBudget: acc.skippedBudget + r.skippedBudget,
+      skippedDup: acc.skippedDup + r.skippedDup,
+      skippedDeload: acc.skippedDeload + r.skippedDeload,
+      notes: [...acc.notes, ...r.notes],
+    };
+  });
+  return acc;
 }

@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { failuresFor, faultsFor } from '../armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../armlift-diagnosis.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../armlift-correction.engine';
-import { diagnoseArmliftCause } from '../armlift-cause.engine';
-import { injectArmliftCorrections, correctionsToInjectionItems } from '../armlift-injection.engine';
+import { diagnoseArmliftCause, countGripSessions } from '../armlift-cause.engine';
+import { injectArmliftCorrections, correctionsToInjectionItems, applyArmliftSpecWave } from '../armlift-injection.engine';
 import { getArmExerciseById } from '../../../core/exercise-catalog-arm';
 import { buildArmliftingReport, buildArmliftingHtml, buildArmliftingCsv } from '../armlifting-diagnostics.engine';
 
@@ -146,6 +146,30 @@ describe('PRO-5 real: поиск причины со скорингом', () => 
     expect(r.confidence).toBeLessThan(0.5);
     expect(r.evidence.length).toBeGreaterThan(0);
   });
+  it('CoC ниже №2 — max_strength crush', () => {
+    const r = diagnoseArmliftCause({ implement: 'coc_gripper', cocLevel: 1 });
+    expect(r.cause).toBe('max_strength');
+    expect(r.evidence.join(' ')).toContain('CoC');
+  });
+  it('Silver 10с — endurance crush', () => {
+    const r = diagnoseArmliftCause({ implement: 'silver_bullet', silverSec: 10 });
+    expect(r.cause).toBe('endurance');
+  });
+  it('объём считается по снаряду, L/R маппятся на базу', () => {
+    const iso = (back: number): string => {
+      const d = new Date(); d.setDate(d.getDate() - back);
+      return d.toISOString().slice(0, 10);
+    };
+    const log = [
+      { date: iso(5), implement: 'rolling_thunder_L', weightKg: 60, success: true },
+      { date: iso(3), implement: 'rolling_thunder_R', weightKg: 62, success: true },
+      { date: iso(3), implement: 'hub', weightKg: 30, success: true },
+      { date: iso(200), implement: 'rolling_thunder', weightKg: 50, success: true },
+    ];
+    expect(countGripSessions(log, 'rolling_thunder')).toBe(2);
+    expect(countGripSessions(log)).toBe(3);
+    expect(countGripSessions([])).toBe(0);
+  });
 });
 
 describe('PRO-5 real: инъекция коррекций в план', () => {
@@ -192,6 +216,33 @@ describe('PRO-5 real: инъекция коррекций в план', () => {
     expect(items.length).toBe(3);
     expect(items[0].exId).toBe('plate_pinch_hold');
     expect(items.every((t) => t.sets >= 1 && t.sets <= 6)).toBe(true);
+  });
+  it('волна спеца раскладывает сеты по 4 неделям', () => {
+    const plan = {
+      level: 'intermediate', rationale: [] as string[],
+      weeks: [1, 2, 3, 4, 5].map((week) => ({
+        week, sessions: [{ sessionTag: 'PinchGrip', exercises: [] }],
+      })),
+    };
+    const spec = [
+      { week: 1, targetSets: { plate_pinch_hold: 3 }, dayMap: { plate_pinch_hold: 'PinchGrip' } },
+      { week: 2, targetSets: { plate_pinch_hold: 4 }, dayMap: { plate_pinch_hold: 'PinchGrip' } },
+      { week: 3, targetSets: { plate_pinch_hold: 3 }, dayMap: { plate_pinch_hold: 'PinchGrip' } },
+      { week: 4, targetSets: { plate_pinch_hold: 2 }, dayMap: { plate_pinch_hold: 'PinchGrip' } },
+    ];
+    const r = applyArmliftSpecWave(plan, spec, [{ exId: 'plate_pinch_hold', sets: 3, dayTag: 'PinchGrip' }], { workMax: { grip_pinch: 40 } });
+    expect(r.injected).toBe(4);
+    expect(r.plan.weeks[1].sessions[0].exercises[0].sets).toBe(4);
+    expect(r.plan.weeks[3].sessions[0].exercises[0].sets).toBe(2);
+  });
+  it('пометка слабой руки идёт в комментарий', () => {
+    const plan = {
+      level: 'intermediate', rationale: [] as string[],
+      weeks: [{ week: 1, sessions: [{ sessionTag: 'SupportGrip', exercises: [] }] }],
+    };
+    const r = injectArmliftCorrections(plan, [{ exId: 'rolling_thunder', sets: 3 }], { workMax: { grip_support: 80 }, weakArmNote: 'слабой рукой первой' });
+    expect(r.injected).toBe(1);
+    expect(r.plan.weeks[0].sessions[0].exercises[0].comment).toContain('слабой рукой первой');
   });
 });
 

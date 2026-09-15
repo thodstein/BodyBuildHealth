@@ -171,7 +171,7 @@ export function rankArmliftCorrections(
     if (!equipmentOk(cat?.equipment, ctx.equipment)) { score -= 40; reasons.push('нет оборудования'); }
     if (inPlan.has(p.exId.toLowerCase())) { score -= 12; reasons.push('уже в плане'); }
     if (ctx.cause === 'fatigue' && (p.holdSeconds != null || /roller|ext/i.test(p.exId))) { score += 8; reasons.push('щадящая при усталости'); }
-    if ((ctx.cause === 'max_strength' || ctx.cause === 'strength') && (p.sets >= 4 && p.reps[1] <= 5)) { score += 6; reasons.push('силовая'); }
+    if (ctx.cause === 'max_strength' && (p.sets >= 4 && p.reps[1] <= 5)) { score += 6; reasons.push('силовая'); }
     if (ctx.cause === 'mobility' && p.reps[0] >= 10) { score += 6; reasons.push('мобильная high-rep'); }
     if (ctx.cause === 'endurance' && (p.holdSeconds != null || /farmer|towel/i.test(p.exId))) { score += 6; reasons.push('под выносливость'); }
     if (ctx.asymPct != null && ctx.asymPct >= 7 && (cat?.equipment === 'dumbbell' || p.exId === 'wrist_curl_db')) { score += 5; reasons.push('унилатеральная'); }

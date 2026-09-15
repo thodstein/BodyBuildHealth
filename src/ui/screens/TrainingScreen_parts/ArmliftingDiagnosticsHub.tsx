@@ -18,7 +18,7 @@ import { downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.eng
 import { savePlatformLogEntry, loadPlatformLog, planLastManStanding } from '../../../engines/arm/arm-platform.engine';
 import { failuresFor, faultsFor, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
-import { diagnoseArmliftCause } from '../../../engines/arm/armlift-cause.engine';
+import { diagnoseArmliftCause, countGripSessions } from '../../../engines/arm/armlift-cause.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
 import { correctionsToInjectionItems } from '../../../engines/arm/armlift-injection.engine';
 import { platformRuleFor, PLATFORM_RULES_2026, LMS_RULES_2026 } from '../../../engines/arm/arm-pro5-platform-rules.engine';
@@ -266,16 +266,14 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     hipHingePoor: diag.hipHingePoor,
     pain: diag.pain,
   }), [diag, asymForDiag]);
-  /** PRO-5 real: объём и тренд из журнала помоста (хештег — только свой лог). */
+  /** PRO-5 real: объём и тренд из журнала помоста (только свой лог; объём — по снаряду). */
   const logStats = useMemo(() => {
     let sessions28d: number | null = null;
-    try {
-      const log = loadPlatformLog();
-      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 28);
-      const cut = cutoff.toISOString().slice(0, 10);
-      sessions28d = log.filter((e: any) => String(e.date || '') >= cut).length;
-    } catch { sessions28d = null; }
-    const tr = trend.find((t) => t.implement === diag.implement) || trend[0];
+    try { sessions28d = countGripSessions(loadPlatformLog(), diag.implement); } catch { sessions28d = null; }
+    const tr = trend.find((t) => t.implement === diag.implement)
+      || trend.find((t) => t.implement === `${diag.implement}_L`)
+      || trend.find((t) => t.implement === `${diag.implement}_R`)
+      || null;
     return {
       sessions28d,
       trendDeltaPct: tr ? tr.deltaPct : null,
@@ -290,6 +288,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
     farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
     wristExtWeak: diag.wristExtWeak,
+    cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
+    silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
     gripSessions28d: logStats.sessions28d,
     trendDeltaPct: logStats.trendDeltaPct,
     asymmetryPct: asymForDiag,
@@ -300,7 +300,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     gripFreqPerWeek: logStats.gripFreqPerWeek,
     elbowPain: diag.elbowPain,
     pain: diag.pain,
-  }), [diag, asymForDiag, logStats]);
+  }), [diag, asymForDiag, logStats, state.cocLevel, state.silverSec]);
   const corrections = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
     cause: cause.cause === 'pain' ? undefined : cause.cause,
     asymPct: asymForDiag,
@@ -353,6 +353,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           diagCauseDetail: { cause: cause.cause, confidence: cause.confidence, evidence: cause.evidence, fix: cause.fix },
           armliftExercises: correctionsToInjectionItems(corrections),
           armliftSpec: specBlock.map((w) => ({ week: w.week, targetSets: w.targetSets, dayMap: w.dayMap })),
+          armliftWeakArmNote: asymForDiag != null && asymForDiag > 15 ? 'слабой рукой первой' : undefined,
         },
         armProfile: {
           ...(Number.isFinite(bw) && bw > 0 ? { bwKg: bw } : {}),
