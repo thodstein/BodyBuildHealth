@@ -2,6 +2,9 @@
  * bb-movement-screen.engine.ts — скрининг движений под бодибилдинг (чистые функции, без стора).
  * Канон: NASM OHSA + Brookbush (сегментный скоринг + re-test) + PoinT GO (подпятка дифференцирует
  * голеностоп vs верх цепи) + knee-to-wall норма ≥9–12 см.
+ * Нормы КТС (McBride 2026, n=899: середина-50% до 50 лет 8–14 см М / 8.6–13.8 Ж; типично ~11):
+ * <9 — ограничение, ≥12 — норма для приседающих; межсторонняя разница ≥2 см — клинически значима
+ * (PoinT GO: >2 см чинить независимо от абсолюта; Lashien 2024: FPPA>10° = вальгус).
  * Нагрузка/восстановление/объём сюда НЕ входят — это чужие хабы (Интеллект/Объём).
  */
 
@@ -12,7 +15,10 @@ export interface OhsScreenInput {
   trunkUpright: boolean;
   armsOverMidfoot: boolean;
   lumbarNeutral: boolean;
-  kneeToWallCm?: number | null;
+  kneeToWallCm?: number | null; // legacy: одно значение (миграция → L/R)
+  /** КТС левая/правая (см, носок-стена). Эффектив — худшая; разница ≥2 см — клинически значима. */
+  kneeToWallL?: number | null;
+  kneeToWallR?: number | null;
   /** Гонометр дорсифлексии (градусы). <35° — драйвер голеностоп даже без heel-retest (рабочий порог PoinT GO 35–38°). */
   ankleDeg?: number | null;
   /** re-test с подпяткой 2.5 см: 'better' | 'same' | null (не делали) */
@@ -32,25 +38,47 @@ export interface MovementDriverResult {
 
 /** Приоритет distal→proximal: голеностоп первичен (PoinT GO), дальше ТБС/грудь/плечо/кор. */
 export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResult {
-  const ktw = input.kneeToWallCm;
+  const fin = (v: unknown): number | null => (v != null && Number.isFinite(v as number) ? (v as number) : null);
+  const ktwL = fin(input.kneeToWallL) ?? fin(input.kneeToWallCm);
+  const ktwR = fin(input.kneeToWallR) ?? fin(input.kneeToWallCm);
+  const ktw = ktwL != null && ktwR != null ? Math.min(ktwL, ktwR) : (ktwL ?? ktwR);
+  const ktwGap = ktwL != null && ktwR != null ? Math.abs(ktwL - ktwR) : null;
   const deg = input.ankleDeg;
   const goniBad = deg != null && Number.isFinite(deg) && (deg as number) < 35;
-  const ankleBad = !input.heelsFlat || (ktw != null && Number.isFinite(ktw) && (ktw as number) < 9) || goniBad;
-  // 1. Голеностоп: пятки рвутся ИЛИ knee-to-wall <9 ИЛИ гонометр <35° ИЛИ подпятка чинит паттерн
+  const ankleBad = !input.heelsFlat || (ktw != null && ktw < 9) || goniBad;
+  const ankleAsymNote =
+    ktwGap != null && ktwGap >= 2 && ktwL != null && ktwR != null
+      ? ` + асимметрия КТС ${ktwL} vs ${ktwR} см (≥2 см — клинически значимо): мобилизируй отстающую первой, цель — разница <1.5 см`
+      : '';
+  // 1. Голеностоп: пятки рвутся ИЛИ худшая КТС <9 ИЛИ гонометр <35° ИЛИ подпятка чинит паттерн
   if (input.heelRetest === 'better' || (ankleBad && (!input.hipBelowParallel || !input.trunkUpright || input.kneeValgus))) {
     return {
       driver: 'ankle',
       label: 'Голеностоп (дорсифлексия)',
-      fix: 'Мобилизация голеностопа ежедневно (колено к стене, MWM с лентой) + подъём пятки 2.5 см в приседе до нормы ≥12 см, перепроверка через 4–6 нед',
+      fix: 'Мобилизация голеностопа ежедневно (колено к стене, MWM с лентой) + подъём пятки 2.5 см в приседе до нормы ≥12 см, перепроверка через 4–6 нед' + ankleAsymNote,
       confidence: input.heelRetest === 'better' ? 0.9 : 0.7,
     };
   }
-  // 2. ТБС: вальгус без голеностопа / нет глубины при плоских пятках
+  // 1b. Только асимметрия КТС при чистом паттерне: видимых компенсаций нет, но разрыв значим —
+  // честный слабый драйвер (чинить отстающую, не весь паттерн).
+  if (ankleAsymNote && input.heelsFlat && input.hipBelowParallel && input.trunkUpright && !input.kneeValgus) {
+    return {
+      driver: 'ankle',
+      label: 'Голеностоп (асимметрия сторон)',
+      fix: 'Паттерн чистый, но стороны разъехались' + ankleAsymNote,
+      confidence: 0.55,
+    };
+  }
+  // 2. ТБС: вальгус без голеностопа / нет глубины при плоских пятках.
+  // Комплексно, не только ягодица: изолированная закачка средней ягодичной часто НЕ двигает
+  // кинематику (Palmer 2015, Wilczyński 2021); работает связка проксимально+дистально 8 нед
+  // (CCEP: отведения + наружная ротация бедра + голеностоп/стопа — BMC 2022; Razi 2023: изолированная
+  // сила отводящих+ротаторов чинит вальгус на приземлении). Cue «раздвинь пол стопами».
   if (input.kneeValgus || !input.hipBelowParallel) {
     return {
       driver: 'hip',
       label: 'Тазобедренный (отведение/глубина)',
-      fix: 'Средняя ягодичная (отведения, кламшеллы, сплит-присед с темпом) + глубокие 90/90 и казак-присед 3×/нед, cue «раздвинь пол стопами»',
+      fix: 'Комплекс 3×/нед 8 нед: средняя ягодичная + наружные ротаторы бедра (отведения, кламшеллы, сплит-присед с темпом) + голеностоп/стопа дистально (икры, свод) + cue «раздвинь пол стопами»; перепроверка SLS',
       confidence: 0.7,
     };
   }
@@ -130,6 +158,12 @@ export function ohsFailCodes(input: OhsScreenInput): string[] {
   if (!input.trunkUpright) out.push('trunk');
   if (!input.armsOverMidfoot) out.push('arms');
   if (!input.lumbarNeutral) out.push('lumbar');
+  try {
+    const fin = (v: unknown): number | null => (v != null && Number.isFinite(v as number) ? (v as number) : null);
+    const l = fin(input.kneeToWallL) ?? fin(input.kneeToWallCm);
+    const r = fin(input.kneeToWallR) ?? fin(input.kneeToWallCm);
+    if (l != null && r != null && Math.abs(l - r) >= 2) out.push('ankle_asym');
+  } catch { /* noop */ }
   return out;
 }
 

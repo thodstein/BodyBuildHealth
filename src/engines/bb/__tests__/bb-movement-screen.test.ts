@@ -65,6 +65,32 @@ describe('bb-movement-screen', () => {
     expect(d.regressed).toEqual(['arms']);
     expect(d.text).toMatch(/исправлено heels/);
   });
+  it('КТС L/R: худшая решает + асимметрия ≥2 см в тексте', () => {
+    const r = resolveMovementDriver({ ...clean, kneeToWallL: 6, kneeToWallR: 13, kneeValgus: true });
+    expect(r.driver).toBe('ankle');
+    expect(r.fix).toMatch(/асимметрия/);
+  });
+  it('КТС legacy-значение работает как обе стороны', () => {
+    const r = resolveMovementDriver({ ...clean, kneeToWallCm: 6, kneeValgus: true });
+    expect(r.driver).toBe('ankle');
+  });
+  it('чистый паттерн + разрыв КТС ≥2 — слабый ankle-драйвер асимметрии', () => {
+    const r = resolveMovementDriver({ ...clean, kneeToWallL: 8, kneeToWallR: 13 });
+    expect(r.driver).toBe('ankle');
+    expect(r.label).toMatch(/асимметрия/);
+    expect(r.confidence).toBeLessThan(0.7);
+  });
+  it('разрыв КТС <2 — тихо', () => {
+    expect(resolveMovementDriver({ ...clean, kneeToWallL: 11, kneeToWallR: 12 }).driver).toBe('none');
+  });
+  it('коды провалов ловят ankle_asym', () => {
+    expect(ohsFailCodes({ ...clean, kneeToWallL: 8, kneeToWallR: 13 } as any)).toContain('ankle_asym');
+  });
+  it('хип-фикс — комплексный (ягодица + дистально + 8 нед)', () => {
+    const r = resolveMovementDriver({ ...clean, kneeValgus: true, kneeToWallCm: 13 });
+    expect(r.fix).toMatch(/8 нед/);
+    expect(r.fix).toMatch(/дистально/);
+  });
   it('гонометр <35° + наклон корпуса — драйвер голеностоп', () => {
     const r = resolveMovementDriver({ ...clean, ankleDeg: 28, trunkUpright: false });
     expect(r.driver).toBe('ankle');

@@ -418,6 +418,21 @@ describe('BBDiagnosticsHub', () => {
     fireEvent.change(screen.getByTestId('bb-fppa-r'), { target: { value: '6' } });
     expect(screen.getAllByText(/угломер/)[0]).toBeInTheDocument();
   });
+  it('КТС L/R: разрыв ≥2 см — асимметрия в драйвере', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Скрининг/ }));
+    fireEvent.change(screen.getByTestId('bb-ktw-l'), { target: { value: '6' } });
+    fireEvent.change(screen.getByTestId('bb-ktw-r'), { target: { value: '13' } });
+    fireEvent.click(screen.getByRole('switch', { name: /Корпус вертикально/ }));
+    expect(document.querySelector('[data-bb="driver-card"]')!.textContent).toMatch(/асимметрия/);
+  });
+  it('legacy КТС-одиночка мигрирует в обе стороны', () => {
+    localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ kneeToWallCm: '7' }));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Скрининг/ }));
+    expect((screen.getByTestId('bb-ktw-l') as HTMLInputElement).value).toBe('7');
+    expect((screen.getByTestId('bb-ktw-r') as HTMLInputElement).value).toBe('7');
+  });
   it('гонометр + наклон корпуса — драйвер голеностоп в карточке', () => {
     render(<BBDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /Скрининг/ }));

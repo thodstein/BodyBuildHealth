@@ -51,7 +51,9 @@ type BBState = {
   weakManual: string[];
   circ: Record<string, string>;
   ohsHeelsFlat: boolean; ohsKneeValgus: boolean; ohsHipBelowParallel: boolean; ohsTrunkUpright: boolean; ohsArmsOverMidfoot: boolean; ohsLumbarNeutral: boolean;
-  kneeToWallCm: string; ankleDeg: string;   heelRetest: '' | 'better' | 'same';
+  kneeToWallCm: string; ankleDeg: string; heelRetest: '' | 'better' | 'same';
+  /** КТС левая/правая (см). kneeToWallCm — legacy (мигрирует в обе при загрузке). */
+  ktwL: string; ktwR: string;
   /** Скрининг v2: руки на бёдрах чистят поясницу (тест на широчайшие) + односторонний + снимок. */
   handsOnHipsBetter: boolean;
   splitL: '' | 'pass' | 'fail';
@@ -85,6 +87,7 @@ const DEFAULT_STATE: BBState = {
   circ: { heightCm: '175', weightKg: '80', bodyFat: '', neck: '', chest: '', waist: '', hips: '', bicepL: '', bicepR: '', thighL: '', thighR: '', calfL: '', calfR: '', shoulderWidth: '', forearmL: '', forearmR: '' },
   ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
   kneeToWallCm: '', ankleDeg: '', heelRetest: '',
+  ktwL: '', ktwR: '',
   handsOnHipsBetter: false,
   splitL: '', splitR: '', rdlL: '', rdlR: '',
   fppaL: '', fppaR: '',
@@ -269,11 +272,26 @@ function readSavedBbPlan(): any | null {
   try { return pickPlanFromSaved(JSON.parse(raw)); } catch { return null; }
 }
 
+/** КТС: L/R приоритетнее legacy-одиночки; eff — худшая сторона (разница ≥2 см — см. драйвер). */
+function ktwOf(s: { ktwL?: string; ktwR?: string; kneeToWallCm?: string }): { l: number | null; r: number | null; eff: number | null } {
+  const num = (v: unknown): number | null => { const n = parseFloat(String(v ?? '')); return Number.isFinite(n) && n >= 0 ? n : null; };
+  const l = num(s.ktwL) ?? num(s.kneeToWallCm);
+  const r = num(s.ktwR) ?? num(s.kneeToWallCm);
+  return { l, r, eff: l != null && r != null ? Math.min(l, r) : (l ?? r) };
+}
+
 export const BBDiagnosticsHub: React.FC = () => {
   const [state, setState] = useState<BBState>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return { ...DEFAULT_STATE, ...JSON.parse(raw), circ: { ...DEFAULT_STATE.circ, ...(JSON.parse(raw).circ || {}) } };
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Миграция legacy: одно значение КТС → обе стороны (дальше живут раздельно)
+        if ((parsed.ktwL == null || parsed.ktwL === '') && (parsed.ktwR == null || parsed.ktwR === '') && parsed.kneeToWallCm) {
+          parsed.ktwL = parsed.ktwR = parsed.kneeToWallCm;
+        }
+        return { ...DEFAULT_STATE, ...parsed, circ: { ...DEFAULT_STATE.circ, ...(parsed.circ || {}) } };
+      }
     } catch {}
     return DEFAULT_STATE;
   });
@@ -376,10 +394,10 @@ export const BBDiagnosticsHub: React.FC = () => {
   const ohs = useMemo(() => assessOHS({
     heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
     trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
-    kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
+    kneeToWallCm: ktwOf(state).eff,
     ankleDorsiflexDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
     heelRaiseRetest: state.heelRetest === 'better' ? true : state.heelRetest === 'same' ? false : null,
-  }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.kneeToWallCm, state.ankleDeg, state.heelRetest]);
+  }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.ktwL, state.ktwR, state.kneeToWallCm, state.ankleDeg, state.heelRetest]);
 
   // P1: L/R-объём из дневника + флип-гейт по истории (D2: сторона плавает — шум измерения,
   // добивку не фиксируем; стабильная сторона ≥3 замеров — добивка оправдана).
@@ -479,13 +497,15 @@ export const BBDiagnosticsHub: React.FC = () => {
       return resolveMovementDriver({
         heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
         trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
-        kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
+        kneeToWallCm: ktwOf(state).eff,
+        kneeToWallL: ktwOf(state).l,
+        kneeToWallR: ktwOf(state).r,
         ankleDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
         heelRetest: state.heelRetest === 'better' ? 'better' : state.heelRetest === 'same' ? 'same' : null,
         handsOnHipsBetter: state.handsOnHipsBetter || null,
       });
     } catch { return { driver: 'none', label: '—', fix: '', confidence: 0 } as any; }
-  }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.kneeToWallCm, state.ankleDeg, state.heelRetest, state.handsOnHipsBetter]);
+  }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.ktwL, state.ktwR, state.kneeToWallCm, state.ankleDeg, state.heelRetest, state.handsOnHipsBetter]);
   const singleLeg = useMemo(() => {
     try {
       const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n >= 0 ? n : null; };
@@ -642,16 +662,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         symmetry: report.symmetry, stimulus: report.stimulus,
         // Движения, не нагрузка: скрининг + односторонний драйвер (ACWR/readiness/VBT/LVP/сон/боль — чужие хабы, в мост не едут)
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
-        movementDriver: (() => { try {
-          return resolveMovementDriver({
-            heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
-            trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
-            kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
-            ankleDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
-            heelRetest: state.heelRetest === 'better' ? 'better' : state.heelRetest === 'same' ? 'same' : null,
-            handsOnHipsBetter: state.handsOnHipsBetter || null,
-          });
-        } catch { return null; } })(),
+        movementDriver: moveDriver,
         singleLeg,
         vbtLossPct: null,
         weakCauses: weakCausesPayload,
@@ -683,7 +694,8 @@ export const BBDiagnosticsHub: React.FC = () => {
     if (!state.ohsTrunkUpright) restrictions.push('hip');
     if (!state.ohsArmsOverMidfoot) restrictions.push('shoulder');
     if (!state.ohsLumbarNeutral) restrictions.push('lower_back');
-    if (state.kneeToWallCm && Number.isFinite(parseFloat(state.kneeToWallCm)) && parseFloat(state.kneeToWallCm) < 12) restrictions.push('ankle');
+    const ktwEff = ktwOf(state).eff;
+    if (ktwEff != null && ktwEff < 12) restrictions.push('ankle');
     const uniq = [...new Set(restrictions)];
     try {
       const raw = localStorage.getItem('he_profile_v2');
@@ -757,14 +769,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       const lr = lrVerdicts.map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
       let moveDriverEx: unknown = null;
       try {
-        moveDriverEx = resolveMovementDriver({
-          heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
-          trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
-          kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
-          ankleDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
-          heelRetest: state.heelRetest === 'better' ? 'better' : state.heelRetest === 'same' ? 'same' : null,
-          handsOnHipsBetter: (state as any).handsOnHipsBetter || null,
-        });
+        moveDriverEx = moveDriver;
       } catch { /* noop */ }
       let singleLegEx: unknown = null;
       try {
@@ -832,14 +837,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       const lr = lrVerdicts.map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
       let moveDriverCsv: unknown = null;
       try {
-        moveDriverCsv = resolveMovementDriver({
-          heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
-          trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
-          kneeToWallCm: state.kneeToWallCm ? parseFloat(state.kneeToWallCm) : null,
-          ankleDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
-          heelRetest: state.heelRetest === 'better' ? 'better' : state.heelRetest === 'same' ? 'same' : null,
-          handsOnHipsBetter: (state as any).handsOnHipsBetter || null,
-        });
+        moveDriverCsv = moveDriver;
       } catch { /* noop */ }
       pro2csv = {
         lr,
@@ -1979,8 +1977,9 @@ export const BBDiagnosticsHub: React.FC = () => {
                 } catch { return null; }
               })()}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ankle-grid">
-              <BbNum label="Колено к стене, см" value={state.kneeToWallCm} onChange={(v) => setState(s => ({ ...s, kneeToWallCm: v }))} placeholder="12" step={0.5} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ankle-grid">
+              <BbNum label="КТС левая, см" value={state.ktwL} onChange={(v) => setState(s => ({ ...s, ktwL: v }))} placeholder="12" step={0.5} testId="bb-ktw-l" />
+              <BbNum label="КТС правая, см" value={state.ktwR} onChange={(v) => setState(s => ({ ...s, ktwR: v }))} placeholder="12" step={0.5} testId="bb-ktw-r" />
               <BbNum label="Голеностоп, °" value={state.ankleDeg} onChange={(v) => setState(s => ({ ...s, ankleDeg: v }))} placeholder="35" step={1} testId="bb-ankle-deg" />
             </div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center', flexWrap: 'wrap' }} data-bb="heel-row">
@@ -1988,7 +1987,7 @@ export const BBDiagnosticsHub: React.FC = () => {
               <button onClick={() => setState(s => ({ ...s, heelRetest: 'better' }))} aria-pressed={state.heelRetest === 'better'} data-bb="heel-better" style={{ minHeight: 44, padding: '8px 14px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'better' ? '#22c55e' : 'rgba(255,255,255,0.12)', background: state.heelRetest === 'better' ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.04)', color: state.heelRetest === 'better' ? '#22c55e' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Стало лучше</button>
               <button onClick={() => setState(s => ({ ...s, heelRetest: 'same' }))} aria-pressed={state.heelRetest === 'same'} data-bb="heel-same" style={{ minHeight: 44, padding: '8px 14px', borderRadius: 999, border: '1px solid', borderColor: state.heelRetest === 'same' ? '#f59e0b' : 'rgba(255,255,255,0.12)', background: state.heelRetest === 'same' ? 'rgba(245,158,11,0.14)' : 'rgba(255,255,255,0.04)', color: state.heelRetest === 'same' ? '#f59e0b' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Без изменений</button>
               <button onClick={() => setState(s => ({ ...s, heelRetest: '' }))} data-bb="heel-reset" style={{ minHeight: 44, padding: '8px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>Сброс</button>
-              <span style={{ fontSize: 11, color: '#fff' }}>Норма ≥{OHS_NORMS.kneeToWallCm.optimal} см</span>
+              <span style={{ fontSize: 11, color: '#fff' }}>Норма ≥{OHS_NORMS.kneeToWallCm.optimal} см · разница Л/П ≥2 см — чинить отстающую</span>
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
               <button onClick={applyMobilityToProfile} data-bb="mobility-to-profile" style={{ minHeight: 48, flex: '1 1 200px', padding: '10px 14px', borderRadius: 10, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>→ В профиль {ohs.failed ? `(${ohs.failed}/6)` : '(порядок)'}</button>
