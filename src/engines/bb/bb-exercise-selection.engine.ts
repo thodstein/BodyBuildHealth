@@ -107,6 +107,20 @@ export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
     { name: 'rear_delt', match: (e) => /задн.*дельт|rear.?delt|лиц.*тяга|face.?pull|обратн.*(бабоч|дельт)/i.test(e.name) || /^(rear_delt_fly|rear_delt_machine|face_pull|face_pull_sh)$/i.test(e.id || '') },
     { name: 'upright_row', match: (e) => /тяга.*подбород|upright/i.test(e.name) },
   ],
+  forearms: [
+    { name: 'wrist_flexion', match: (e) => /сгибан.*запяст|сгибан.*кист|wrist.*curl|сгибан.*предплеч/i.test(e.name) },
+    { name: 'wrist_extension', match: (e) => /разгибан.*запяст|разгибан.*кист|wrist.*extension|обратн.*сгибан.*кист|reverse.*curl/i.test(e.name) },
+    { name: 'hammer_roller', match: (e) => /молот.*предплеч|hammer.*forearm|валик|roller|пронац/i.test(e.name) },
+  ],
+  traps: [
+    { name: 'shrug_vertical', match: (e) => /шраг.*(штанг|гантел|смит)|shrug.*(bar|db|dumbbell)/i.test(e.name) },
+    { name: 'shrug_cable', match: (e) => /шраг.*блок|shrug.*cable/i.test(e.name) },
+    { name: 'upright_trap', match: (e) => /тяга.*подбород|upright.*row|протяжк/i.test(e.name) },
+  ],
+  lower_back: [
+    { name: 'back_extension', match: (e) => /гиперэкстенз|back.*extension|разгибан.*спины/i.test(e.name) },
+    { name: 'good_morning', match: (e) => /гудморнинг|good.?morning|наклон.*штанг/i.test(e.name) },
+  ],
 };
 
 /**
@@ -356,6 +370,34 @@ export const STRICT_EXERCISE_GROUPS: Record<string, StrictExerciseGroup[]> = {
       ids: ['dips_tricep', 'bench_dips', 'bench_closegrip', 'jm_press'],
       re: /отжим.*брус|dip|брусь|жим.*узк|close.?grip|обратн.*отжиман/i,
       not: /груд|chest|разгибан.*блок|pushdown|из.?за|overhead|француз/i,
+    },
+  ],
+  forearms: [
+    {
+      key: 'forearm_flex', label: 'Сгибания запястий (сгибатели)',
+      ids: ['wrist_curl', 'wrist_curl_behind'],
+      re: /сгибан.*запяст|сгибан.*кист|wrist.*curl/i,
+      not: /разгибан|extension|обратн|reverse|молот|hammer/i,
+    },
+    {
+      key: 'forearm_ext', label: 'Разгибания запястий (разгибатели)',
+      ids: ['wrist_extension', 'reverse_wrist_curl', 'wrist_roller'],
+      re: /разгибан.*запяст|разгибан.*кист|wrist.*extension|обратн.*сгибан|reverse.*curl|валик|roller/i,
+      not: /сгибан.*запяст.*сидя|hammer/i,
+    },
+  ],
+  traps: [
+    {
+      key: 'trap_shrug', label: 'Шраги (гантели/штанга/Смит)',
+      ids: ['shrug_db', 'shrug_bar', 'shrug_smith'],
+      re: /шраг/i,
+      not: /тяга.*подбород|upright/i,
+    },
+    {
+      key: 'trap_upright', label: 'Тяга к подбородку (трапеции/дельты)',
+      ids: ['upright_row', 'upright_row_cable'],
+      re: /тяга.*подбород|upright.*row|протяжк/i,
+      not: /шраг|shrug/i,
     },
   ],
 };
