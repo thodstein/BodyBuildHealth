@@ -105,6 +105,18 @@ describe('PRO-5 UI: помост + диагностика + коррекция',
     fireEvent.click(screen.getByText('🔍 Диагностика'));
     expect(document.body.textContent).toContain('rolling_thunder');
   });
+  it('D16: релевантные тесты и перетест-due', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    try {
+      localStorage.setItem('he_armlifting_diag_history', JSON.stringify([
+        { date: '2026-01-01', implement: 'rolling_thunder', weakLink: 'fingers', cause: 'volume' },
+      ]));
+    } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    expect(document.body.textContent).toContain('релевантны: Farmer-hold');
+    expect(document.body.textContent).toContain('пора перетест');
+  });
   it('Коррекция напрямую открывается с топ-3', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

@@ -15,7 +15,7 @@ import {
 import { buildArmliftingHtml, buildArmliftingCsv } from '../../../engines/arm/armlifting-diagnostics.engine';
 import { downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
-import { failuresFor, faultsFor, movementFor, diagImplementForReportWeakest, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
+import { failuresFor, faultsFor, movementFor, relevantTestsFor, diagImplementForReportWeakest, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../../../engines/arm/armlift-cause.engine';
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU } from '../../../engines/arm/armlift-benchmarks.engine';
@@ -24,7 +24,7 @@ import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.eng
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
-import { correctionsToInjectionItems } from '../../../engines/arm/armlift-injection.engine';
+import { correctionsToInjectionItems, intensityForCause } from '../../../engines/arm/armlift-injection.engine';
 import { applyToPlanner } from './planner-bridge';
 import { AdRoot, AdCard, AdSec, AdGrid, AdChip, AdBtn, AdBanner, AdCta, AdStat } from './arm-design-system';
 import { haptics } from '../../../core/native-bridge';
@@ -321,7 +321,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   /** D11 E4 / D12 E7: перетест против прошлого снапшота + история. */
   const retests = useMemo(() => {
     const prev = lastSnapshotFor(diag.implement);
-    if (!prev) return { prev: null as null | { date: string }, list: [] as Array<{ test: string; text: string }> };
+    if (!prev) return { prev: null as null | { date: string }, list: [] as Array<{ test: string; text: string }>, due: null as string | null };
     const weeks = weeksBetween(prev.date, new Date().toISOString().slice(0, 10));
     const num = (s: string): number | null => {
       const v = parseFloat(s);
@@ -333,11 +333,13 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       ['CoC', prev.cocLevel, num(state.cocLevel)],
       ['Silver', prev.silverSec, num(state.silverSec)],
     ];
+    const list = pairs
+      .filter(([, p, c]) => p != null && c != null)
+      .map(([t, p, c]) => ({ test: t, text: `${t}: ${retestVerdict(p, c, weeks).text}` }));
     return {
       prev: { date: prev.date },
-      list: pairs
-        .filter(([, p, c]) => p != null && c != null)
-        .map(([t, p, c]) => ({ test: t, text: `${t}: ${retestVerdict(p, c, weeks).text}` })),
+      list,
+      due: list.length === 0 && weeks >= 4 ? `Прошло ${weeks} нед с замера ${prev.date} — пора перетест` : null,
     };
   }, [diag.implement, diag.pinchHoldSec, diag.farmerHoldSec, state.cocLevel, state.silverSec]);
   const diagFaults = useMemo(() => faultsFor(diag.implement), [diag.implement]);
@@ -379,7 +381,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           diagSpecBlock: specBlock,
           /** PRO-5 real: упражнения в план — только armlifting-ветка конструктора читает. */
           diagCauseDetail: { cause: cause.cause, confidence: cause.confidence, evidence: cause.evidence, fix: cause.fix },
-          armliftExercises: correctionsToInjectionItems(corrections),
+          armliftExercises: correctionsToInjectionItems(corrections, 3, intensityForCause(cause.cause)),
           armliftSpec: specBlock.map((w) => ({ week: w.week, targetSets: w.targetSets, dayMap: w.dayMap })),
           armliftWeakArmNote: asymForDiag != null && asymForDiag > 15 ? 'слабой рукой первой' : undefined,
         },
@@ -687,7 +689,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           {diag.faultIds.length > 0 && (
             <div className="ad-muted">Кью: {diagFaults.filter((x) => diag.faultIds.includes(x.id)).map((x) => x.cue).join(' · ')}</div>
           )}
-          <div className="lift-group">Тест-батарея (холды)</div>
+          <div className="lift-group">Тест-батарея (холды) · релевантны: {relevantTestsFor(diag.implement).join(' + ')}</div>
           <AdGrid cols="auto-sm">
             <LiftNum label="Pinch-hold сек" value={diag.pinchHoldSec} onChange={(v) => setD({ pinchHoldSec: v })} placeholder="20" aria="Pinch-hold сек" />
             <LiftNum label="Farmer-hold сек" value={diag.farmerHoldSec} onChange={(v) => setD({ farmerHoldSec: v })} placeholder="30" aria="Farmer-hold сек" />
@@ -710,6 +712,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <div className="ad-muted" data-arm="lift-retest">
               Прошлый замер {retests.prev.date}: {retests.list.map((r) => r.text).join(' · ')}
             </div>
+          )}
+          {retests.due && (
+            <div className="ad-muted" data-arm="lift-retest-due">{retests.due}</div>
           )}
           {diagHistory.length > 0 && (
             <div className="ad-list" data-arm="lift-history" aria-label="Диагностика: история диагнозов">

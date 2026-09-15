@@ -220,6 +220,24 @@ export function movementFor(implement: string): ArmliftMovePhase[] {
 }
 
 /**
+ * D16: какие тесты релевантны снаряду (подсказка в диагностике, не гейт).
+ * Support → farmer-hold, pinch → pinch-hold, crush → CoC/Silver.
+ */
+const RELEVANT_TESTS: Record<string, string[]> = {
+  rolling_thunder: ['Farmer-hold'], apollon_axle: ['Farmer-hold'],
+  raptor_175: ['Farmer-hold'], excalibur: ['Farmer-hold'],
+  grandfather_clock: ['Farmer-hold'], fat_gripz: ['Farmer-hold'],
+  saxon_bar: ['Pinch-hold'], hub: ['Pinch-hold'], pinch_block: ['Pinch-hold'],
+  country_crush: ['Pinch-hold'], anvil: ['Pinch-hold'],
+  coc_gripper: ['CoC', 'Silver'], silver_bullet: ['Silver', 'CoC'],
+  saxon_medley: ['Pinch-hold', 'Farmer-hold'],
+};
+
+export function relevantTestsFor(implement: string): string[] {
+  return RELEVANT_TESTS[String(implement || '')] || ['Pinch-hold', 'Farmer-hold'];
+}
+
+/**
  * D15: слабейший снаряд вердикта → снаряд диагностики.
  * L/R-суффиксы режем (рука — в асимметрии, не в снаряде); чужое — null.
  */

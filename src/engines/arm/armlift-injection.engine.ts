@@ -177,10 +177,26 @@ export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[
   return { plan: copy, injected, skippedBudget, skippedDup, skippedDeload, notes };
 }
 
+/**
+ * D16: интенсивность инъекции от причины (тяжесть дозы).
+ * Боль/усталость/мобильность — щадяще 0.5; сила — 0.7; остальное — 0.65.
+ */
+export function intensityForCause(cause: string | null | undefined): number {
+  const c = String(cause || '');
+  if (c === 'pain' || c === 'fatigue' || c === 'mobility') return 0.5;
+  if (c === 'max_strength') return 0.7;
+  return 0.65;
+}
+
 /** Мост-обёртка: ranked-коррекции → injection items (топ-N). */
-export function correctionsToInjectionItems(corrections: ArmliftCorrection[], n = 3): ArmliftInjectionItem[] {
+export function correctionsToInjectionItems(
+  corrections: ArmliftCorrection[],
+  n = 3,
+  intensityPct = 0.65,
+): ArmliftInjectionItem[] {
+  const pct = Number.isFinite(Number(intensityPct)) ? Number(intensityPct) : 0.65;
   return (corrections || []).slice(0, n).map((c) => ({
-    exId: c.exId, sets: c.sets, dayTag: c.dayTag, intensityPct: 0.65, rir: 2,
+    exId: c.exId, sets: c.sets, dayTag: c.dayTag, intensityPct: pct, rir: 2,
   }));
 }
 

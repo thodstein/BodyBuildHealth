@@ -8,7 +8,8 @@ import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, overallGripLevel
 import { cocLadderFor } from '../armlift-correction.engine';
 import { saveDiagSnapshot, loadDiagHistory, lastSnapshotFor, retestVerdict, weeksBetween } from '../armlift-history.engine';
 import { assessArmliftMobility } from '../armlift-mobility.engine';
-import { diagImplementForReportWeakest } from '../armlift-failure-modes.engine';
+import { diagImplementForReportWeakest, relevantTestsFor } from '../armlift-failure-modes.engine';
+import { intensityForCause } from '../armlift-injection.engine';
 import { clearDiagHistory } from '../armlift-history.engine';
 import { getArmExerciseById } from '../../../core/exercise-catalog-arm';
 import { buildArmliftingReport, buildArmliftingHtml, buildArmliftingCsv } from '../armlifting-diagnostics.engine';
@@ -521,5 +522,29 @@ describe('PRO-5 D15: слабейший в диагностику, размин�
     expect(loadDiagHistory().length).toBe(1);
     clearDiagHistory();
     expect(loadDiagHistory().length).toBe(0);
+  });
+});
+
+describe('PRO-5 D16: релевантные тесты и доза от причины', () => {
+  it('каждый снаряд знает свои тесты', () => {
+    expect(relevantTestsFor('rolling_thunder')).toEqual(['Farmer-hold']);
+    expect(relevantTestsFor('saxon_bar')).toEqual(['Pinch-hold']);
+    expect(relevantTestsFor('coc_gripper')).toEqual(['CoC', 'Silver']);
+    expect(relevantTestsFor('saxon_medley')).toEqual(['Pinch-hold', 'Farmer-hold']);
+    expect(relevantTestsFor('zzz')).toEqual(['Pinch-hold', 'Farmer-hold']);
+  });
+  it('интенсивность от причины: щадяще/база/сила', () => {
+    expect(intensityForCause('pain')).toBe(0.5);
+    expect(intensityForCause('fatigue')).toBe(0.5);
+    expect(intensityForCause('mobility')).toBe(0.5);
+    expect(intensityForCause('max_strength')).toBe(0.7);
+    expect(intensityForCause('technique')).toBe(0.65);
+    expect(intensityForCause(null)).toBe(0.65);
+  });
+  it('items несут интенсивность причины', () => {
+    const items = correctionsToInjectionItems(rankArmliftCorrections('thumb'), 3, intensityForCause('mobility'));
+    expect(items.every((t) => t.intensityPct === 0.5)).toBe(true);
+    const def = correctionsToInjectionItems(rankArmliftCorrections('thumb'));
+    expect(def.every((t) => t.intensityPct === 0.65)).toBe(true);
   });
 });
