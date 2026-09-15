@@ -26,7 +26,7 @@ import { applyDUPOverlay, recommendDUPMode } from '../../../engines/bb/bb-dup.en
 import { applyExecutionCorrections, type ExecutionCorrection } from '../../../engines/bb/bb-execution-corrections.engine';
 import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
 import { isPackingActive } from '../../../engines/bb/bb-packing.engine';
-import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../../../engines/bb/bb-finalize.engine';
+import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
 import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechnique, techniqueChainParts } from './bb-technique-display';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { buildBBMethodologySummary } from '../../../engines/bb/bb-report.engine';
@@ -120,7 +120,7 @@ import { buildBBQualityReport, bbQualityReportSummary, bbQualityBadge } from '..
 import { bbPlanQualityV2 } from '../../../engines/bb/bb-quality-v2.engine';
 import BbQualityV2Card from './BbQualityV2Card';
 import { unilateralRatioOf } from '../../../engines/bb/bb-sfr-db';
-import { overreachingCheck, rehabNotes } from '../../../engines/bb/bb-recovery.engine';
+import { overreachingCheck } from '../../../engines/bb/bb-recovery.engine';
 import { PLATE_SET_PRESETS } from '../../../engines/bb/bb-plates.engine';
 import { estimateSessionTimeWithSupersets } from '../../../engines/bb/bb-fatigue.engine';
 import { suggestSupersetPairs } from '../../../engines/bb/bb-fatigue.engine';

@@ -493,9 +493,24 @@
   - Проверено: bb-круг **2339/2340** (единственное — пред-существующее чужое `bb-diagnostics-max-pro`
     female-symmetry), `bb-diagnostics-hub` **27/3** (те же пред-существующие 3), `tsc --noEmit`
     **0 по проекту**, `verify:apk-design` OK.
-- [ ] Волна 3 (UI-остаток): закрыт полностью (3.6–3.11 готовы).
-- [ ] Волна 4 — UI/quality/валидатор
+- [x] Волна 3 (UI-остаток): закрыт полностью (3.6–3.11).
+- [~] **Волна 4 — часть 1 (4.2 + 4.6)** — коммит этого раунда:
+  - **4.2 «двойной SafetyScore» — оказалось уже исправлено**: `calculatePlanSafetyScore` вызывается
+    один раз через `useMemo` (`safetyScore`), остальные вызовы — событийные (сохранение/экспорт),
+    не per-render. Изменений не требовалось (проверено чтением/грепом).
+  - **4.6 мёртвое UI**: удалены `BbToolsCard.tsx` (дублирует контролы конструктора: темп/техники/
+    слабые/демография) и `BBMetricsSummaryCard.tsx` (дублирует «Объём на мышцу» в шаге «Качество»),
+    их smoke-использования в `rest-hooks-native` убраны. Удалены мёртвые импорты конструктора
+    (`markAntagonistSupersets`, `applyVolumeScheme`, `rehabNotes`).
+  - **Проверка стейл-клеймов**: `expandedSummary` НЕ мёртв — читается `bb-quality-report.engine`
+    (totalWorkingSets) и `bb-report.engine`; `buildBBPlanReportText` — экспорт движка с тестами
+    (UI-привязку делаем в 4.7/4.8).
+  - Проверено: `rest-hooks-native` **68/68** (+1 пред-существующий unhandled-шум ReportsScreen),
+    `tsc` — мои файлы чисты (в проекте чужая ошибка синтаксиса `ArmliftingDiagnosticsHub.tsx` WIP,
+    не тронут), `verify:apk-design` OK.
+- [ ] Волна 4 — остаток: 4.1/4.3/4.4/4.5/4.7/4.8
 - [ ] Волна 5 — каталог/данные
+
 
 
 

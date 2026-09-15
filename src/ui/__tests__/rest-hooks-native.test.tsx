@@ -129,7 +129,6 @@ import { SupportGeneratorInfo } from '../screens/SupportScreen_parts/SupportGene
 import { SupportProtocolElectrolytes } from '../screens/SupportScreen_parts/supportProtocolElectrolytes';
 import { SupportProtocolInteractions } from '../screens/SupportScreen_parts/supportProtocolInteractions';
 import { BBFeedbackCard } from '../screens/TrainingScreen_parts/BBFeedbackCard';
-import { BbToolsCard } from '../screens/TrainingScreen_parts/BbToolsCard';
 import { BbProgramLibraryPicker } from '../screens/TrainingScreen_parts/BbProgramLibraryPicker';
 import { default as ExerciseLabPro } from '../screens/TrainingScreen_parts/ExerciseLabPro';
 import { default as ExerciseLabProSubstitute } from '../screens/TrainingScreen_parts/ExerciseLabProSubstitute';
@@ -204,7 +203,6 @@ import { TechniqueCalcTab } from '../screens/TrainingScreen_parts/TechniqueCalcT
 import { VolumeTrendCard } from '../screens/TrainingScreen_parts/VolumeTrendCard';
 import { TrainingProfileCard } from '../screens/TrainingScreen_parts/TrainingProfileCard';
 import { PlNormsCalcTab } from '../screens/TrainingScreen_parts/PlNormsCalcTab';
-import { BBMetricsSummaryCard } from '../screens/TrainingScreen_parts/BBMetricsSummaryCard';
 import { ArmGripCard } from '../screens/TrainingScreen_parts/ArmGripCard';
 import { BBContestPrepActiveCard } from '../screens/TrainingScreen_parts/BBContestPrepActiveCard';
 import { VolumeBudgetCard } from '../screens/TrainingScreen_parts/VolumeBudgetCard';
@@ -899,9 +897,6 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c3 } = render(<BBFeedbackCard />);
     expect(c3.querySelector('.train-bbfeedback'), 'bbfeedback').not.toBeNull();
-    cleanup();
-    const { container: c4 } = render(<BbToolsCard />);
-    expect(c4.querySelector('.train-bbtools'), 'bbtools').not.toBeNull();
     // CardioCompsStep/ExerciseLabSubstitute/MesoHeatmap/DayCard требуют
     // сложные входные объекты — хуки живут в прод-ветках.
   });
@@ -1409,41 +1404,6 @@ describe('market + pharma + labs roots', () => {
     cleanup();
     const { container: c6 } = render(<PlNormsCalcTab />);
     expect(c6.querySelector('.train-plnorms'), 'plnorms').not.toBeNull();
-    cleanup();
-    const { container: c7 } = render(
-      <BBMetricsSummaryCard
-        metrics={
-          {
-            тяжPct: 0.5,
-            пампPct: 0.3,
-            avgRir: 2,
-            totalSets: 40,
-            hardSets: 4,
-            hardSetWarning: null,
-            sessionsPerRotation: 4,
-            mrvMultiplier: 1,
-            perMuscle: [
-              {
-                muscle: 'chest',
-                totalSets: 10,
-                directSets: 8,
-                effectiveSets: 9,
-                тяжSets: 6,
-                пампSets: 4,
-                лёгSets: 0,
-                avgRir: 2,
-                frequencyPerRotation: 2,
-                mev: 6,
-                mav: 12,
-                mrv: 20,
-                status: 'optimal',
-              },
-            ],
-          } as never
-        }
-      />,
-    );
-    expect(c7.querySelector('.train-bbmetrics'), 'bbmetrics').not.toBeNull();
   });
 
   it('51. Batch-17 корни: хват, бюджет, прогнозы, хаб', () => {
