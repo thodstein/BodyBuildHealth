@@ -48,6 +48,7 @@ import { getFoodAllergenTags } from "./planner-restrictions";
 import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay } from "./planner-carb-density";
 import { computeEA } from "./planner-ea.engine";
 import { planTypeFloorMods } from "./planner-day-targets";
+import { perMealProteinCapG } from "./planner-meal-count";
 
 // ─── Публичные типы ────────────────────────────────────────────────────
 export interface MealItem {
@@ -3128,16 +3129,35 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     input = { ...input, mealsCount: 5 };
   }
   if (input.mealsCount > 10) input = { ...input, mealsCount: 10 };
-  // Экстрим углей: 1300У+ в 7 приёмов физически не влезают без вёдер
-  // (макс ~1250У: 3×200 + 4×120 + peri 225). Интернет-практика — 8-10 приёмов
-  // + intra. Авто-расширяем эффективные приёмы с честной нотой (настройка UI не трогается).
+  // Guardrail физической вместимости (рекомендация живёт в UI — planner-meal-count).
+  // Явный mealsCount пользователя — КОНТРАКТ (D-24: «3→3, 8→8»), поэтому движок
+  // расширяет приёмы только когда день физически не влезает:
+  //  • дефолтные 5 приёмов + крупные макросы (≤130 г углей/приём, ≤75 г белка/приём,
+  //    ≤1100 ккал/приём) — жалоба «HC800 на 5 = −50% углей»;
+  //  • legacy-экстрим углей (≥1100/≥1300) — как раньше, при любом счёте.
+  // Нормальные дни (≤180 г углей/приём, ≤75 г белка/приём) счёт НЕ трогают.
   let _autoMealsNote: string | null = null;
-  if ((input.goalCarbsG || 0) >= 1300 && input.mealsCount < 9) {
-    input = { ...input, mealsCount: 9 };
-    _autoMealsNote = '🍽 Экстрим углей ≥1300 г: приёмов расширено до 9 — иначе тарелки-вёдра (капы 170 г сух / 700 г/приём).';
-  } else if ((input.goalCarbsG || 0) >= 1100 && input.mealsCount < 8) {
-    input = { ...input, mealsCount: 8 };
-    _autoMealsNote = '🍽 Высокоуглеводный день ≥1100 г: приёмов расширено до 8 — иначе перегруз тарелок.';
+  {
+    let _need = input.mealsCount;
+    const _carb = input.goalCarbsG || 0;
+    if (input.mealsCount <= 5) {
+      const _heavy = _carb >= 600 || (input.goalKcal || 0) >= 4200;
+      const _carbCap = _heavy ? 130 : 180;
+      _need = Math.max(
+        _need,
+        Math.ceil(_carb / _carbCap),
+        _heavy ? Math.ceil((input.goalKcal || 0) / 1100) : 0,
+        Math.ceil((input.goalProteinG || 0) / 75),
+      );
+    }
+    if (_carb >= 1300 && _need < 9) _need = 9;
+    else if (_carb >= 1100 && _need < 8) _need = 8;
+    _need = Math.max(3, Math.min(10, _need));
+    if (_need > input.mealsCount) {
+      const _pCap = perMealProteinCapG(input.weightKg);
+      _autoMealsNote = `🍽 День требует ${_need} приёмов (было ${input.mealsCount}): нормальная тарелка — ≤${_pCap} г белка / ≤120 г углей / ≤900 ккал на приём.`;
+      input = { ...input, mealsCount: _need };
+    }
   }
   // Light athletes cannot realistically eat 7-8 full meals without degenerate <40g protein / <15g carb portions
   if (input.weightKg <= 70 && input.mealsCount >= 7) {

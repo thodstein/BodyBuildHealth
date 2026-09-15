@@ -32,16 +32,6 @@ const clickBtn = (re: RegExp) => {
   if (found.length === 0) throw new Error(`button not found: ${re}`);
   fireEvent.click(found[found.length - 1]);
 };
-const clickExactLast = (text: string) => {
-  const found = allButtons().filter((b) => (b.textContent || '').trim() === text);
-  if (found.length === 0) throw new Error(`button not found (exact): ${text}`);
-  fireEvent.click(found[found.length - 1]);
-};
-const activePillLast = (text: string) => {
-  const found = allButtons().filter((b) => (b.textContent || '').trim() === text);
-  if (found.length === 0) throw new Error(`pill not found (exact): ${text}`);
-  return found[found.length - 1].getAttribute('data-active') === 'true';
-};
 // Самый глубокий div с подписью и (кнопкой|чекбоксом) — строка-контрол.
 const deepestDivWith = (labelRe: RegExp, sel: string) =>
   allDivs().filter((d) => labelRe.test(d.textContent || '') && d.querySelector(sel)).pop();
@@ -143,10 +133,14 @@ describe('Кнопки настроек: клик → состояние (бат
     expect(document.body.textContent || '').toMatch(/⚙️ Настроить/);
   });
 
-  it('приёмы пищи: пилюля 6 активна', () => {
+  it('число приёмов — АВТО: ручного выбора нет, показано число по тарелке', () => {
     boot();
-    clickExactLast('6');
-    expect(activePillLast('6')).toBe(true);
+    const txt = document.body.textContent || '';
+    expect(txt).toMatch(/Количество приёмов пищи — автоматически/);
+    expect(txt).toMatch(/\d+ приёмов/);
+    // ручных пилюль 3..10 в блоке количества больше нет
+    const numericPills = allButtons().filter((b) => /^([3-9]|10)$/.test((b.textContent || '').trim()));
+    expect(numericPills.length).toBe(0);
   });
 });
 

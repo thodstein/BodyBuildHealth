@@ -13,6 +13,7 @@ import { getProfile } from "../../../../core/profile-manager";
 import { categoriesForSex } from "./planner-categories";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 import { plannerWeightAdjustAdvice } from './planner-targets';
+import { recommendMealCount, recommendMealCountDetailed } from './planner-meal-count';
 
 /**
  * FIX audit (C1): «Заполнить анализы» дублировалась в двух карточках (~30 строк копии).
@@ -100,19 +101,10 @@ const CollapsibleSection: React.FC<{ id: string; title: string; icon: string; co
   );
 };
 
-/**
- * Рекомендация числа приёмов: часы бодрствования + объём макросов.
- * Раньше считались только часы (максимум 5) — 800У/300Б на 5 приёмах дают
- * 160У/60Б на приём (ведро). MPS/тарелка: >50 г белка или >120 г углей
- * в приём не кладём → такие дни требуют 6–7 приёмов.
- */
-export function recommendMealCount(awakeH: number, proteinG: number, carbsG: number): number {
-  const h = Number.isFinite(awakeH) ? awakeH : 16;
-  const byAwake = h >= 16 ? 5 : h >= 14 ? 4 : 3;
-  const byProtein = Math.ceil(Math.max(0, Number.isFinite(proteinG) ? proteinG : 0) / 50);
-  const byCarbs = Math.ceil(Math.max(0, Number.isFinite(carbsG) ? carbsG : 0) / 120);
-  return Math.max(3, Math.min(10, Math.max(byAwake, byProtein, byCarbs)));
-}
+// Рекомендация числа приёмов — единый источник в planner-meal-count (ёмкость
+// нормальной тарелки: белок 0.45 г/кг 45–70 г, угли ≤120 г, ккал ≤900; часы —
+// только физиологический пол). Реэкспорт сохранён для тестов/потребителей.
+export { recommendMealCount } from './planner-meal-count';
 
 export const IndividualPlanSettings: React.FC = () => {
   const {
@@ -145,7 +137,7 @@ export const IndividualPlanSettings: React.FC = () => {
     diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel, hvStyle, setHvStyle, carbCapOverride, setCarbCapOverride,
     wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime,
-    workFood, setWorkFood, mealsCount, setMealsCount,
+    workFood, setWorkFood, mealsCount,
     morningTrainLoad, setMorningTrainLoad,
     allergens, toggleAllergen,
     healthIssues, toggleHealthIssue,
@@ -352,9 +344,8 @@ export const IndividualPlanSettings: React.FC = () => {
             <PopupNumber label="Рост" value={height} min={100} max={250} suffix="см" onChange={setHeight} />
             <PopupNumber label="Возраст" value={age} min={14} max={100} suffix="лет" onChange={setAge} />
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:6 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:5, marginBottom:6 }}>
             <PopupSelect label="Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
-            <PopupNumber label="Приёмов пищи" value={mealsCount} min={3} max={10} onChange={setMealsCount} />
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:5, marginBottom:6 }}>
             <PopupSelect label="Еда на работе" value={workFood} options={[{id:'any',label:'Любая (можно разогреть)'},{id:'portable',label:'Только порошок/хлопья/протеин'}]} onChange={v=>setWorkFood(v as any)} />
@@ -1554,20 +1545,15 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
         </div>
         <div>
-          <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:4,display:'block'}}>Количество приёмов пищи</label>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {[3,4,5,6,7,8,9,10].map(n => (
-              <PillBtn key={n} active={mealsCount === n} onClick={() => setMealsCount(n)} color={mealsCount === n ? '#06b6d4' : undefined}>{n}</PillBtn>
-            ))}
-          </div>
+          <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:4,display:'block'}}>Количество приёмов пищи — автоматически</label>
             {(() => {
               const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
               const wMin = toMin(wakeTime);
               const bMin = toMin(bedTime);
               const awakeH = Math.round((bMin - wMin) / 60);
-              const recCount = recommendMealCount(awakeH, effectiveP, effectiveC);
-              const byMacros = recCount > (awakeH >= 16 ? 5 : awakeH >= 14 ? 4 : 3);
-              return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>⏰ Бодрствование {awakeH} ч{byMacros ? ` + Б${Math.round(effectiveP)}/У${Math.round(effectiveC)}` : ''} → рекомендуется {recCount} приёмов (каждые {Math.round(awakeH / recCount)} ч{byMacros ? ', иначе >50 г белка / >120 г углей на приём' : ''}).<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
+              const rec = recommendMealCountDetailed(awakeH, effectiveP, effectiveC, { weightKg: weight, kcal: effectiveKcal });
+              const why = rec.binding === 'protein' ? `белок ${Math.round(effectiveP)} г` : rec.binding === 'carbs' ? `угли ${Math.round(effectiveC)} г` : rec.binding === 'kcal' ? `${Math.round(effectiveKcal)} ккал` : `день ${awakeH} ч`;
+              return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>🍽 Нормальная тарелка: ≤{rec.pCap} г белка · ≤120 г углей · ≤900 ккал → <b>{rec.count} приёмов</b> ({why}; пол по бодрствованию {rec.awakeFloor} ч). Число приёмов подбирается по объёму дня и не настраивается вручную.<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
             })()}
         </div>
       </GlassCard>

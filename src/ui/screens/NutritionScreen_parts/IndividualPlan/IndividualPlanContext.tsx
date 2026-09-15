@@ -16,6 +16,7 @@ import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrit
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets, contextualCarbCapGPerKg, plannerGoalCategory } from "./planner-targets";
 import { buildDayTargets } from "./planner-day-targets";
+import { recommendMealCount, awakeHoursFromTimes } from "./planner-meal-count";
 import { applyCarbPeriodizationMods, carbPeriodizationLabel, isHeavyDayForOffset } from "./planner-carb-periodization";
 import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, repairDiaasWeakLinks } from "./planner-micro-pools";
 import { applyMealTargetOverrides } from "./planner-meal-targets";
@@ -149,7 +150,7 @@ export interface PlanCtx {
   bedTime: string; setBedTime: (v: string) => void;
   lunchTime: string; setLunchTime: (v: string) => void;
   dinnerTime: string; setDinnerTime: (v: string) => void;
-  mealsCount: number; setMealsCount: (v: number) => void;
+  mealsCount: number;
   workFood: string; setWorkFood: (v: any) => void;
   morningTrainLoad: boolean; setMorningTrainLoad: (v: boolean) => void;
   allergens: string[]; setAllergens: (v: any) => void;
@@ -1028,17 +1029,16 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [workFood, setWorkFood] = useState<'any' | 'portable'>(_pf.workFood === 'portable' ? 'portable' : 'any');
   // D-28: «загрузка под утреннюю тренировку» — вечером много углеводов, минимум жиров.
   const [morningTrainLoad, setMorningTrainLoad] = useState<boolean>(!!_pf.morningTrainLoad);
-  // P1-fix: mealsCount из Profile (UnifiedSettings.nutrition.mealsPerDay) + legacy
-  const [mealsCount, setMealsCount] = useState<number>(() => {
-    try {
-      const v = (s as any)?.nutrition?.mealsPerDay;
-      if (typeof v === 'number' && v >= 2 && v <= 10) return v;
-    } catch {}
-    return 4;
-  });
-  // P0-fix Aug 23 2026: не перезаписываем выбор пользователя — awakeHours влияет только на рекомендацию в UI
-  // (раньше сбрасывал mealsCount 8→5 при смене wakeTime). Рекомендация показывается в IndividualPlanSettings.
-  useEffect(() => {}, [wakeTime, bedTime]);
+  // Число приёмов — АВТО (выбор пользователя убран): ёмкость нормальной тарелки
+  // (белок 0.45 г/кг 45–70 г, угли ≤120 г, ккал ≤900/приём) + физиологический пол
+  // по часам бодрствования. Единый источник — planner-meal-count (тот же расчёт
+  // показывается в настройках и используется движком как guardrail).
+  const mealsCount = recommendMealCount(
+    awakeHoursFromTimes(wakeTime, bedTime),
+    effectiveP,
+    effectiveC,
+    { weightKg: weight, kcal: effectiveKcal },
+  );
 
   const [allergens, setAllergens] = useState<string[]>(() => {
     // P1-fix: читаем из Profile (UnifiedSettings), а не из мёртвых ключей he_food_allergens/he_contraindications
@@ -2783,7 +2783,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (s.nutrition.dietType && s.nutrition.dietType !== 'omnivore') {
           setDietPrefs([s.nutrition.dietType as 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'paleo' | 'mediterranean']);
         }
-        if (s.nutrition.mealsPerDay) setMealsCount(s.nutrition.mealsPerDay);
+        // mealsPerDay теперь АВТО (ёмкость тарелки) — из профиля не подтягиваем.
         if (s.nutrition.foodAllergies) setAllergens(s.nutrition.foodAllergies);
         if (s.nutrition.foodIntolerances) setIntolerances({ ...intolerances, ...Object.fromEntries((Array.isArray(s.nutrition.foodIntolerances) ? s.nutrition.foodIntolerances : []).map((a: string) => [a, true])) });
         if (s.nutrition.excludedFoods) setExcludedFoods(s.nutrition.excludedFoods);
@@ -3946,7 +3946,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     resultsRef, budget, setBudget, proteinPreset, setProteinPreset,
     variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel, hvStyle, setHvStyle, carbCapOverride, setCarbCapOverride, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, bbPrepConfig, setBBPrepConfig, applyBBPeakToPlan, applyCombatNutrition, lifeStage, setLifeStage, wakeTime, setWakeTime, bedTime, setBedTime,
-    lunchTime, setLunchTime, dinnerTime, setDinnerTime, mealsCount, setMealsCount,
+    lunchTime, setLunchTime, dinnerTime, setDinnerTime, mealsCount,
     workFood, setWorkFood, allergens, setAllergens, healthIssues, setHealthIssues,
     morningTrainLoad, setMorningTrainLoad,
     eveningLowCarb, setEveningLowCarb, nightCarbs: nightCarbs, setNightCarbs: setNightCarbsPersist, planType, setPlanType,

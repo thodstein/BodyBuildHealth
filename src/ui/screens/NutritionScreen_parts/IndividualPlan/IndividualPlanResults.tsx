@@ -47,7 +47,7 @@ export const IndividualPlanResults: React.FC = () => {
     monthPlanMode, setMonthPlanMode, monthPlan, setMonthPlan,
     selectedWeek, setSelectedWeek,
     generated, setGenerated, dayPlan, threeDayPlan, resultsRef, planBusy,
-    mealsCount, setMealsCount,
+    mealsCount,
     renderMealList, effectiveKcal, effectiveP, effectiveF, effectiveC,
     dayPlanNotes, setDayPlanNotes,
     autoCorrectPlan, allergens, allergenExcludedCount, excludedFoods, healthIssues,
@@ -408,10 +408,7 @@ const doImportPlan = (raw: string): boolean => {
         {generated && dayPlan && Array.isArray(dayPlan.notes) && dayPlan.notes.some((n: string) => (n || '').includes('Перегрузка приёма')) && (
           <div role="alert" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: '#fbbf24', lineHeight: 1.4, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12 }}>⚠️</span>
-            <span style={{ flex: 1, minWidth: 180 }}>Часть приёмов перегружена (каша/крупа упирается в лимит порции) — углеводы дня не добиваются.</span>
-            <button onClick={() => { const next = Math.min(10, mealsCount + 1); setMealsCount(next); try { localStorage.setItem('he_planner_prefs', JSON.stringify({ ...(JSON.parse(localStorage.getItem('he_planner_prefs') || '{}')), mealsPerDay: next })); } catch {} generatePlan(1, undefined, selectedDayIndex, { overrides: { mealsCount: next } }); }} style={{ padding: '5px 10px', borderRadius: 7, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#f97316)', color: '#000', fontWeight: 700, fontSize: 9, cursor: 'pointer' }}>
-              ➕ +1 приём ({mealsCount} → {Math.min(10, mealsCount + 1)}) и пересобрать
-            </button>
+            <span style={{ flex: 1, minWidth: 180 }}>Часть приёмов перегружена (каша/крупа упирается в лимит порции) — число приёмов подбирается автоматически; увеличьте объём дня или смените бюджет/разнообразие.</span>
           </div>
         )}
         <GlassCard title="Выбор дней" icon="📅" color="#00e68a">
