@@ -4498,14 +4498,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
     }
   }
-  // R1: явный rehab-возврат мышц (прогрессивная рампа). Не стекается с graded-травмами.
-  if (input.rehabMuscles?.length) {
-    const rehabResult = applyRehabToPlan(finalPlan, input.rehabMuscles, input.rehabWeekStart ?? 1);
-    if (rehabResult.changes.length) {
-      rationale.push(`🩹 Rehab-возврат: ${rehabResult.changes.slice(0, 6).join(' · ')}`);
-      for (const m of input.rehabMuscles) rationale.push(rehabNotes(m, input.rehabWeekStart ?? 1));
-    }
-  }
+  // R1: rehab-возврат применяется ПОСЛЕ finalizeBBPlan (ниже) — иначе MEV-фидер
+  // финализатора возвращал объём и рампа не работала (паритет с program-путём).
   // P1: гимназическая микрозагрузка — округлить веса к достижимым на наборе пластин.
   if (Array.isArray(input.availablePlates) && input.availablePlates.length > 0) {
     const pl = applyPlateRoundingToPlan(finalPlan, input.availablePlates, 20);
@@ -4651,6 +4645,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     dcWidowmaker: dcGatePass,
     rotationMode: input.rotationMode,
   });
+  // R1: rehab-возврат ПОСЛЕ finalize (паритет с program-путём) — иначе MEV-фидер
+  // финализатора возвращал объём целевой мышцы и рампа не соблюдалась.
+  if (input.rehabMuscles?.length) {
+    const rehabResult = applyRehabToPlan(finalized, input.rehabMuscles, input.rehabWeekStart ?? 1);
+    if (rehabResult.changes.length) {
+      finalized.rationale.push(`🩹 Rehab-возврат: ${rehabResult.changes.slice(0, 6).join(' · ')}`);
+      for (const m of input.rehabMuscles) finalized.rationale.push(rehabNotes(m, input.rehabWeekStart ?? 1));
+    }
+  }
   if (schemeDowngradeNotes.length) {
     for (const n of schemeDowngradeNotes) {
       if (!finalized.rationale.includes(n)) finalized.rationale.push(n);

@@ -572,6 +572,19 @@
 ### Порядок работ
 M1 (аудит + мёртвые настройки) → M2 (женские сплиты) → M3 (матрица выдачи). Каждый этап — отчёт + коммит pathspec.
 
+### 8.4 Прогресс
+- [x] **M1 — влияние методик (коммит этого раунда)**: NEW `bb-methodology-influence` (21/21) —
+  property-матрица «настройка → план изменился» + точечные маркеры для generic `buildBBPlan`:
+  methodology (pre/post_exhaust), loadStrategy, intensityTechnique (drop/negative), volumeScheme
+  (GVT 10 / Gironda 8), supersetMode, trainingFocus, volumeGoal (mev<mrv), trainingVolumeMode high,
+  bfrMode (30-15-15-15), eccentricMult, abPatternRotation, intensityLevel, allowStrengthLifts,
+  packingV2, pedPhaseOverride (MGF+IGF1), DUP (`applyDUPOverlay`). **Найден и починен реальный баг**:
+  `rehabMuscles` в generic-пути применялся ДО `finalizeBBPlan`, и MEV-фидер возвращал объём —
+  рампа не работала (объём даже рос). Теперь применяется ПОСЛЕ finalize (паритет с program-путём).
+- [ ] M2 — женские сплиты в выборе.
+- [ ] M3 — полный аудит качества выдачи по всем циклам.
+
+
 
 
 
