@@ -7,29 +7,21 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { CARD, ACCENT } from './training-ui';
 import { applyToPlanner } from './planner-bridge';
-import { loadSRPESessions } from '../../../engines/pro/srpe-store';
-import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { scoreColor as bbScoreColor } from '../../../engines/bb/bb-scoring.engine';
 import { buildBBDiagnosticsReport } from '../../../engines/bb/bb-diagnostics-hub.engine';
 import { buildBBDiagnosticsHtml, buildBBDiagnosticsCsv, downloadHtml, downloadCsv } from '../../../engines/bb/bb-diagnostics-export.engine';
-import { getVolumeLandmarks, MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
+import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { aggregateBBVolume } from '../../../engines/bb/bb-volume.engine';
 import { analyzeBBBalance } from '../../../engines/bb/bb-balance.engine';
 import { computePerMuscleACWR } from '../../../engines/bb/bb-progression-feedback.engine';
 import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
-import { parseKinoveaCSV, analyzeBarTracking } from '../../../engines/strength-sport/strength-sport-video.engine';
-import { livePoseStatus, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { lrVerdictsFromSessions } from '../../../engines/bb/bb-lr-volume.engine';
 import { assessBbReadiness } from '../../../engines/bb/bb-readiness.engine';
 import { assessBbRedFlags } from '../../../engines/bb/bb-red-flags.engine';
-import { bbBarPathVerdict } from '../../../engines/bb/bb-bar-path.engine';
-import { bbVbtRecommendation } from '../../../engines/bb/bb-vbt.engine';
-import { calibrateBbLvp, parseBbLvpText, loadBbLvpProfiles, saveBbLvpProfile, clearBbLvpProfiles } from '../../../engines/bb/bb-lvp.engine';
-import { assessBbTendonGuard } from '../../../engines/bb/bb-tendon-guard.engine';
 import { buildReturnToPlan, activeReturnToStage } from '../../../engines/bb/bb-return-to.engine';
-import { mmcAdviceFor, posingIsoNote } from '../../../engines/bb/bb-mmc-gate.engine';
+import { mmcAdviceFor } from '../../../engines/bb/bb-mmc-gate.engine';
 import { pushLrSnapshot, summarizeLrDirection, type BbLrSnapshot } from '../../../engines/bb/bb-lr-history.engine';
-import { buildBBSpecIcs, downloadBBSpecIcs, bbWorkingRange } from '../../../engines/bb/bb-spec-ics.engine';
+import { buildBBSpecIcs, downloadBBSpecIcs } from '../../../engines/bb/bb-spec-ics.engine';
 import { bbSpecToAnnualPatch } from '../../../engines/bb/bb-spec-annual.engine';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { setAnnualBlockConfig } from '../../../engines/annual-training/block-builders.engine';
@@ -48,7 +40,7 @@ import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-dete
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
-import { idealMcCallumMap, symmetryTriadDeviation, femaleSymmetryNotes, teenTrainingNote, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
+import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
 import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, movementDelta, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
 
@@ -66,8 +58,6 @@ type BBState = {
   splitR: '' | 'pass' | 'fail';
   rdlL: '' | 'pass' | 'fail';
   rdlR: '' | 'pass' | 'fail';
-  vbtBest: string; vbtLast: string; vbtWeight: string;
-  csvText: string;
   exerciseSelectedId: string | null;
   exerciseFilterSfr: number;
   exerciseFilterProfile: string;
@@ -76,27 +66,15 @@ type BBState = {
   sex: '' | 'male' | 'female';
   sleepHours: string;
   pain010: string;
-  age: string;
-  cyclePhase: '' | 'follicular' | 'luteal';
   specWeeks: string;
   showSpecBlock: boolean;
   stimCheating: boolean;
   stimShortRom: boolean;
   stimSetupNote: string;
-  poseCsvText: string;
   acutePain: boolean;
   swelling: boolean;
   numbness: boolean;
   jointClickPain: boolean;
-  /** PRO-3: LVP-строки «вес скорость», цель VBT, позинг-опция, боль в локте. */
-  lvpText: string;
-  lvpLift: string;
-  vbtGoal: '' | 'mass' | 'strength';
-  posingIso: boolean;
-  elbowPain: boolean;
-  /** PRO-3: нагрузка для MMC-гейта (%1RM изоляции) + целевой BB-блок года. */
-  mmcLoadPct: string;
-  annualBlockKey: string;
   /** PRO-4 S3: подтверждённая ступень возврата ('' — авто: ступень 1). */
   returnStage: '' | '1' | '2' | '3';
 };
@@ -108,8 +86,6 @@ const DEFAULT_STATE: BBState = {
   kneeToWallCm: '', ankleDeg: '', heelRetest: '',
   handsOnHipsBetter: false,
   splitL: '', splitR: '', rdlL: '', rdlR: '',
-  vbtBest: '', vbtLast: '', vbtWeight: '',
-  csvText: '',
   exerciseSelectedId: null,
   exerciseFilterSfr: 0,
   exerciseFilterProfile: 'all',
@@ -118,25 +94,15 @@ const DEFAULT_STATE: BBState = {
   sex: '',
   sleepHours: '',
   pain010: '',
-  age: '',
-  cyclePhase: '',
   specWeeks: '8',
   showSpecBlock: false,
   stimCheating: false,
   stimShortRom: false,
   stimSetupNote: '',
-  poseCsvText: '',
   acutePain: false,
   swelling: false,
   numbness: false,
   jointClickPain: false,
-  lvpText: '',
-  lvpLift: 'squat',
-  vbtGoal: '',
-  posingIso: false,
-  elbowPain: false,
-  mmcLoadPct: '',
-  annualBlockKey: '',
   returnStage: '',
 };
 
@@ -381,14 +347,6 @@ export const BBDiagnosticsHub: React.FC = () => {
     try { return computePerMuscleACWR(diarySessions as any); } catch { return {}; }
   }, [diarySessions]);
 
-  const acwr = useMemo(() => {
-    try {
-      const srpe = loadSRPESessions();
-      if (srpe.length < 2) return null;
-      return acuteChronicRatio(toDailyLoads(srpe as any));
-    } catch { return null; }
-  }, [diarySessions]);
-
   const balance = useMemo(() => {
     try {
       const plan = readSavedBbPlan();
@@ -405,36 +363,6 @@ export const BBDiagnosticsHub: React.FC = () => {
     heelRaiseRetest: state.heelRetest === 'better' ? true : state.heelRetest === 'same' ? false : null,
   }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.kneeToWallCm, state.ankleDeg, state.heelRetest]);
 
-  const vbt = useMemo(() => {
-    const best = parseFloat(state.vbtBest), last = parseFloat(state.vbtLast);
-    if (!Number.isFinite(best) || !Number.isFinite(last) || !best) return null;
-    const w = state.vbtWeight ? parseFloat(state.vbtWeight) : undefined;
-    // PRO-3 R5: совет под цель (масса — допустить 20–30%, сила — кап 20–25%)
-    return bbVbtRecommendation('squat', best, last, w, state.vbtGoal ? { goal: state.vbtGoal } : undefined);
-  }, [state.vbtBest, state.vbtLast, state.vbtWeight, state.vbtGoal]);
-
-  // P4: разбор траектории из поля ввода (без нового ввода — тот же csvText)
-  const barLast = useMemo(() => {
-    try {
-      const pts = parseKinoveaCSV(state.csvText);
-      if (!pts) return null;
-      const res = analyzeBarTracking(pts as any);
-      if (!res) return null;
-      return { xLoop: res.xLoop, yMax: res.yMax, vmax: res.vmax, verdict: bbBarPathVerdict(res.xLoop, res.yMax) };
-    } catch { return null; }
-  }, [state.csvText]);
-  // P5: живые углы из вставленной таблицы (трекер поз/ручной замер), вместо мока
-  const poseLive = useMemo(() => {
-    try {
-      const samples = parsePoseAnglesCsv(state.poseCsvText);
-      if (!samples) return null;
-      const sum = summarizePoseAngles(samples);
-      if (!sum) return null;
-      const avg = avgAnglesOfSummary(sum);
-      const status = livePoseStatus({ hip: avg.hip ?? 0, knee: avg.knee ?? 0, ankle: avg.ankle ?? 0, shoulder: avg.shoulder ?? 0, trunk: avg.hip ?? 0, t: 0 } as any);
-      return { summary: sum, avg, status };
-    } catch { return null; }
-  }, [state.poseCsvText]);
   // P1: L/R-объём из дневника
   const lrVerdicts = useMemo(() => {
     try { return lrVerdictsFromSessions(diarySessions as any); } catch { return []; }
@@ -453,61 +381,19 @@ export const BBDiagnosticsHub: React.FC = () => {
       return assessBbReadiness({
         sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
         pain010: Number.isFinite(pain as number) ? (pain as number) : null,
-        vbtLossPct: vbt?.lossPct ?? null,
+        // VBT живёт в Анализе силы — сюда не входит (movement-only)
+        vbtLossPct: null,
         dangerMuscles: danger,
       });
     } catch { return { level: 'green', reasons: [], advice: '' } as any; }
-  }, [state.pain010, state.sleepHours, perMuscleAcwr, vbt]);
-  const teenNote = useMemo(() => {
-    try { return teenTrainingNote(state.age ? parseFloat(state.age) : null); } catch { return null; }
-  }, [state.age]);
-  // PRO-3 R1 + PRO-4 S2: LVP-лайт из строк; пусто — сохранённый индивидуальный профиль
-  const lvpProfile = useMemo(() => {
-    try {
-      const lift = state.lvpLift || 'squat';
-      const pts = parseBbLvpText(state.lvpText);
-      if (pts.length >= 3) return calibrateBbLvp(lift, pts);
-      const stored = loadBbLvpProfiles()[lift];
-      return stored && stored.valid ? stored : null;
-    } catch { return null; }
-  }, [state.lvpText, state.lvpLift]);
-  // S2: валидный свежий профиль запоминаем (популяционный — только fallback с пометкой)
-  useEffect(() => {
-    try {
-      const pts = parseBbLvpText(state.lvpText);
-      if (pts.length >= 3 && lvpProfile && lvpProfile.valid) saveBbLvpProfile(lvpProfile);
-    } catch { /* noop */ }
-  }, [lvpProfile, state.lvpText]);
-  // PRO-3 R3: сухожилия (тяжёлые сеты недели + боль/плечо из присед-теста, пороги по уровню)
-  const tendonGuard = useMemo(() => {
-    try {
-      return assessBbTendonGuard(diarySessions as any, {
-        elbowPain: state.elbowPain,
-        shoulderOhsFail: !state.ohsArmsOverMidfoot,
-        level,
-      });
-    } catch { return null; }
-  }, [diarySessions, state.elbowPain, state.ohsArmsOverMidfoot, level]);
-  // PRO-3 R2 + PRO-4 S3: return-to после стоп-флагов (ступень выбирается вручную)
+  }, [state.pain010, state.sleepHours, perMuscleAcwr]);
+  // PRO-3 R2 + PRO-4 S3: return-to после стоп-флагов (ступень выбирается вручную) — гейт вставки
   const returnToPlan = useMemo(() => {
     try { return buildReturnToPlan(redFlags as any); } catch { return null; }
   }, [redFlags]);
   const returnActive = useMemo(() => {
     try { return activeReturnToStage(returnToPlan as any, state.returnStage as any); } catch { return null; }
   }, [returnToPlan, state.returnStage]);
-  // PRO-3 R7 + S2: рабочий вес-ориентир — индивид. e1RM первым, популяц. fallback с пометкой
-  const workingRange = useMemo(() => {
-    try {
-      const indiv = lvpProfile?.e1rm ?? null;
-      const pop = vbt?.e1RMByVelocity ?? null;
-      const e = indiv ?? pop;
-      if (e == null) return null;
-      const r = bbWorkingRange(e, state.vbtGoal === 'strength' ? 'strength' : 'mass');
-      if (!r) return null;
-      const badge = indiv != null ? ' · индивид. LVP' : ' · популяц. LVP';
-      return { ...r, text: r.text + badge };
-    } catch { return null; }
-  }, [vbt, lvpProfile, state.vbtGoal]);
   // PRO-3 R6: направление перекоса (история слабых сторон)
   const lrDirection = useMemo(() => {
     try {
@@ -521,26 +407,6 @@ export const BBDiagnosticsHub: React.FC = () => {
       return out;
     } catch { return []; }
   }, [lrVerdicts]);
-  // PRO-3 R2: добивка слабой стороны + острая готовность для моста/вставки
-  // S3: на ступени возврата 1 — добивку не применяем (0% объёма)
-  const lrTopUpMap = useMemo(() => {
-    if (returnActive && returnActive.action.volumeMult <= 0) return {};
-    const out: Record<string, { side: 'left' | 'right'; sets: number }> = {};
-    try {
-      for (const v of lrVerdicts) {
-        if ((v.verdict === 'topup' || v.verdict === 'watch') && v.weakSide) {
-          out[v.group] = { side: v.weakSide, sets: Math.max(1, Math.min(3, v.topUpSets)) };
-        }
-      }
-    } catch { /* noop */ }
-    return out;
-  }, [lrVerdicts, returnActive]);
-  const readinessAction = useMemo(() => {
-    try {
-      if (readiness?.level === 'red') return { level: 'red', volumeMult: 0.75, rirShift: 1 };
-      return null;
-    } catch { return null; }
-  }, [readiness]);
 
   const measNum: Record<string, number> = useMemo(() => {
     const out: Record<string, number> = {};
@@ -616,27 +482,13 @@ export const BBDiagnosticsHub: React.FC = () => {
   const score = report.score.score;
   const sLevel = report.score.level;
   const sColor = bbScoreColor(sLevel);
-  // PRO-3 R4: фокус внимания (после report — изоляция/средний вес → внутренний, иначе внешний)
+  // Фокус внимания: изоляция слабой зоны → внутренний, иначе внешний (нагрузка %1RM — в Анализе силы)
   const mmcAdvice = useMemo(() => {
     try {
       const iso = (report.weakZonesGranular || []).length > 0;
-      const pctRaw = state.mmcLoadPct ? parseFloat(state.mmcLoadPct) : null;
-      const loadPct = Number.isFinite(pctRaw as number) && (pctRaw as number) > 0 ? (pctRaw as number) / 100 : null;
-      return mmcAdviceFor({ isolation: iso, loadPct1RM: loadPct, explosive: false });
+      return mmcAdviceFor({ isolation: iso, loadPct1RM: null, explosive: false });
     } catch { return null; }
-  }, [report, state.mmcLoadPct]);
-  // PRO-3 R7: годовой план (только BB-блоки — спец-блок ложится в конфиг)
-  const annualBbBlocks = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('he_annual_training_plan_v1');
-      if (!raw) return [];
-      const j = JSON.parse(raw);
-      const blocks = Array.isArray(j?.blocks) ? j.blocks : [];
-      return blocks
-        .filter((b: any) => b?.ref?.kind === 'BB')
-        .map((b: any) => ({ key: String(b.ref.blockKey), label: `${b.ref.description || b.ref.phase} · ${b.ref.weeks} нед` }));
-    } catch { return []; }
-  }, [diarySessions, planNonce]);
+  }, [report]);
 
   // ── MAX PRO: причины слабых + McCallum + триада + спец-блок + топ-3 ──
   const wristNum = state.wristCm ? parseFloat(state.wristCm) : NaN;
@@ -650,17 +502,6 @@ export const BBDiagnosticsHub: React.FC = () => {
       return symmetryTriadDeviation({ neck: nk, bicep: b, calf: c });
     } catch { return null; }
   }, [state.circ, measNum]);
-  const femaleNotes = useMemo(() => {
-    try {
-      if (state.sex !== 'female') return [];
-      const w = parseFloat(state.circ.waist || ''); const h = parseFloat(state.circ.hips || '');
-      const tRaw = parseFloat(state.circ.thighL || '') || parseFloat(state.circ.thighR || '');
-      return femaleSymmetryNotes(
-        { waist: Number.isFinite(w) ? w : null, hips: Number.isFinite(h) ? h : null, thigh: Number.isFinite(tRaw) ? tRaw : null },
-        { cyclePhase: (state.cyclePhase || 'any') as any },
-      );
-    } catch { return []; }
-  }, [state.sex, state.circ, state.cyclePhase]);
   const sleepNum = state.sleepHours ? parseFloat(state.sleepHours) : null;
 
   const toggleWeak = (id: string) => {
@@ -711,7 +552,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         factVolume: factVolume as any,
         perMuscleAcwr: perMuscleAcwr as any,
         sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
-        vbtLossPct: vbt?.lossPct ?? null,
+        vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
         hist28: histLazy as any,
         e1rmTrend: trendLazy as any,
         meas: measLazy as any,
@@ -833,15 +674,6 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch {}
   };
 
-  const handleCsvParse = () => {
-    const pts = parseKinoveaCSV(state.csvText);
-    if (!pts) { setToast('CSV не распознан'); setTimeout(() => setToast(''), 2000); return; }
-    const res = analyzeBarTracking(pts as any);
-    if (!res) { setToast('Нет точек'); return; }
-    setToast(`✓ Разбор: петля ${res.xLoop} см, высота ${res.yMax} см, скорость ${res.vmax} м/с`);
-    setTimeout(() => setToast(''), 3000);
-  };
-
   // Экспорт движений: направление перекоса L/R (нагрузка в файл не едет — её хабы свои)
   const buildPro3Export = (): Record<string, unknown> => {
     try {
@@ -880,7 +712,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         factVolume: factVolume as any,
         perMuscleAcwr: perMuscleAcwr as any,
         sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
-        vbtLossPct: vbt?.lossPct ?? null,
+        vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
         hist28: histLazy as any,
         e1rmTrend: trendLazy as any,
         meas: measLazy as any,
@@ -956,7 +788,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         factVolume: factVolume as any,
         perMuscleAcwr: perMuscleAcwr as any,
         sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
-        vbtLossPct: vbt?.lossPct ?? null,
+        vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
         hist28: histLazy as any,
         e1rmTrend: trendLazy as any,
         meas: measLazy as any,
@@ -1014,7 +846,8 @@ export const BBDiagnosticsHub: React.FC = () => {
         setTimeout(() => setToast(''), 2500);
         return;
       }
-      const key = state.annualBlockKey || bbBlocks[0].ref.blockKey;
+      // Блок года выбирает годовой план сам (первый ББ-блок) — селекта в диагностике нет, без дублей
+      const key = bbBlocks[0].ref.blockKey;
       const f: Record<string, number> = {};
       const sb = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
       const patch = bbSpecToAnnualPatch(sb, report.weakZonesGranular);
@@ -1061,10 +894,6 @@ export const BBDiagnosticsHub: React.FC = () => {
     }
   };
 
-  const unifiedSnap = useMemo(() => {
-    try { const raw = localStorage.getItem('he_unified_intel_snapshot_v1'); return raw ? JSON.parse(raw) : null; } catch { return null; }
-  }, [diarySessions]);
-
   // ── Упражнения → эффект (единый инструмент) ──
   const bbPlan = useMemo(() => {
     const plan = readSavedBbPlan();
@@ -1089,7 +918,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         factVolume: factVolume as any,
         perMuscleAcwr: perMuscleAcwr as any,
         sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
-        vbtLossPct: vbt?.lossPct ?? null,
+        vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
         hist28: hist28 as any,
         e1rmTrend: e1rmTrend as any,
         meas: measNum as any,
@@ -1108,7 +937,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         },
       });
     } catch { return {}; }
-  }, [report.weakZonesGranular, level, factVolume, perMuscleAcwr, sleepNum, vbt, planAudit, hist28, e1rmTrend, measNum, state.circ.heightCm, state.wristCm]);
+  }, [report.weakZonesGranular, level, factVolume, perMuscleAcwr, sleepNum, planAudit, hist28, e1rmTrend, measNum, state.circ.heightCm, state.wristCm]);
   const specBlock = useMemo(() => {
     try {
       if (!report.weakZonesGranular.length) return null;

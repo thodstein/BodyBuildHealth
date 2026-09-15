@@ -4,6 +4,21 @@ import { BBDiagnosticsHub } from '../BBDiagnosticsHub';
 
 describe('BBDiagnosticsHub', () => {
   beforeEach(() => { localStorage.clear(); });
+  it('legacy-стор v1 с удалёнными ключами грузится без краша (миграция спредом)', () => {
+    localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({
+      weakManual: ['chest_upper'],
+      vbtBest: '0.85', vbtLast: '0.62', vbtWeight: '80', csvText: 't,x,y', poseCsvText: 't',
+      lvpText: '100 0.6', lvpLift: 'squat', vbtGoal: 'mass', elbowPain: true,
+      mmcLoadPct: '60', annualBlockKey: 'b1', posingIso: true, age: '30', cyclePhase: 'luteal',
+    }));
+    render(<BBDiagnosticsHub />);
+    expect(screen.getAllByText(/Движения ББ — диагностика/)[0]).toBeInTheDocument();
+    // ручной выбор из легаси-стора подхвачен
+    expect(screen.getAllByText('Верх груди')[0].getAttribute('aria-pressed')).toBe('true');
+    // удалённые вводы в UI отсутствуют
+    expect(screen.queryByLabelText(/LVP-точки/)).toBeNull();
+    expect(screen.queryByTestId('bb-vbt-goal')).toBeNull();
+  });
   it('renders header and tabs', () => {
     render(<BBDiagnosticsHub />);
     expect(screen.getAllByText(/Движения ББ — диагностика/)[0]).toBeInTheDocument();
