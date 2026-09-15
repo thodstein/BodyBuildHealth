@@ -699,7 +699,7 @@ export const BBDiagnosticsHub: React.FC = () => {
   };
 
   // Экспорт движений: направление перекоса L/R (нагрузка в файл не едет — её хабы свои)
-  const buildPro3Export = (): Record<string, unknown> => {
+  const buildMovementExport = (): Record<string, unknown> => {
     try {
       const raw = localStorage.getItem('he_bb_lr_history');
       const hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
@@ -783,7 +783,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
         mmc: mmcEx,
       };
-      try { Object.assign(pro2, buildPro3Export()); } catch { /* noop */ }
+      try { Object.assign(pro2, buildMovementExport()); } catch { /* noop */ }
     } catch { /* noop */ }
     const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan, weakHeads: heads, weakCauses: causes as any, specBlock: spec as any, ...pro2 } as any);
     downloadHtml(html, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
@@ -848,7 +848,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
         mmc: (() => { try { const a = mmcAdvice; return a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null; } catch { return null; } })(),
       };
-      try { Object.assign(pro2csv, buildPro3Export()); } catch { /* noop */ }
+      try { Object.assign(pro2csv, buildMovementExport()); } catch { /* noop */ }
     } catch { /* noop */ }
     const csv = buildBBDiagnosticsCsv(report, bbPlan as any, { weakCauses: causes, weakHeads: heads, specBlock: spec, ...pro2csv });
     downloadCsv(csv, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
@@ -1981,7 +1981,7 @@ export const BBDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ankle-grid">
               <BbNum label="Колено к стене, см" value={state.kneeToWallCm} onChange={(v) => setState(s => ({ ...s, kneeToWallCm: v }))} placeholder="12" step={0.5} />
-              <BbNum label="Голеностоп, °" value={state.ankleDeg} onChange={(v) => setState(s => ({ ...s, ankleDeg: v }))} placeholder="35" step={1} />
+              <BbNum label="Голеностоп, °" value={state.ankleDeg} onChange={(v) => setState(s => ({ ...s, ankleDeg: v }))} placeholder="35" step={1} testId="bb-ankle-deg" />
             </div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center', flexWrap: 'wrap' }} data-bb="heel-row">
               <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>Подпятка 2,5 см</span>

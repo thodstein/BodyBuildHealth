@@ -418,6 +418,14 @@ describe('BBDiagnosticsHub', () => {
     fireEvent.change(screen.getByTestId('bb-fppa-r'), { target: { value: '6' } });
     expect(screen.getAllByText(/угломер/)[0]).toBeInTheDocument();
   });
+  it('гонометр + наклон корпуса — драйвер голеностоп в карточке', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Скрининг/ }));
+    fireEvent.change(screen.getByTestId('bb-ankle-deg'), { target: { value: '28' } });
+    fireEvent.click(screen.getByRole('switch', { name: /Корпус вертикально/ }));
+    expect(document.querySelector('[data-bb="driver-card"]')).not.toBeNull();
+    expect(document.querySelector('[data-bb="driver-card"]')!.textContent).toMatch(/Голеностоп/);
+  });
   it('старому снимку >42 дней — бейдж перепроверки', () => {
     const old = new Date(Date.now() - 50 * 86400000).toISOString().slice(0, 10);
     localStorage.setItem('he_bb_screen_history', JSON.stringify([{ date: old, fails: ['heels'] }]));
