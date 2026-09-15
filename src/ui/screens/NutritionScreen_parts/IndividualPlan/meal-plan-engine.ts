@@ -3189,8 +3189,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // в одну тарелку). День упирается в съедобность обеда/ужина и честно не сходится
       // (движок сам пишет «минимум 6 приёмов»), max-бюджет тоже −12%. Считаем долю
       // главного приёма по весам распределения (CARB_W) и добираем приёмы до плато
-      // ≤200 г углей на обед. Только обычные дни: HV/Bolus-тарelки крупнее по дизайну (P2-0).
-      if (!_heavy) {
+      // ≤200 г углей на обед. Только обычные 5-приёмные дни: HV/Bolus-тарелки крупнее
+      // по дизайну (P2-0), а 3-4-приёмные используют legacy-режим MC3 (второй гарнир
+      // и большие капы — исторический контракт тестов диетологии).
+      if (!_heavy && input.mealsCount === 5) {
         const _wSumFor = (mc: number): number => {
           let s = 1.0 + 1.7 + 0.7; // breakfast + lunch + dinner
           if (mc >= 4) s += 0.5;   // snack
@@ -3737,9 +3739,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     preworkout: _keep.has('prew'),
     postworkout: _keep.has('postw'),
   });
-  const _prewP = periBudget.preworkoutG;
-  const _postwP = periBudget.postworkoutG;
-  const periProteinFixed = periBudget.totalG;
+  const _prewP0 = periBudget.preworkoutG;
+  const _postwP0 = periBudget.postworkoutG;
+  let _prewP = _prewP0;
+  let _postwP = _postwP0;
+  let periProteinFixed = periBudget.totalG;
   const evenRegularP = (() => {
     if (regularCount === 0) return 0;
     if (trainWindow) {
@@ -3753,7 +3757,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _isMainRole = (r: string) => r === 'breakfast' || r === 'lunch' || r === 'dinner';
   const _mainRoles = _regular.filter(_isMainRole);
   const _snackRoles = _regular.filter(r => !_isMainRole(r) && r !== 'preSleep');
-  const _preSleepFixedP = (_keep.has('preSleep') && wantPreSleep) ? 28 : 0;
+  let _preSleepFixedP = (_keep.has('preSleep') && wantPreSleep) ? 28 : 0;
+  // §7.2-3: ужатый бюджет ночного приёма при низкой дневной цели белка (null — не ужимали;
+  // тогда полы 28/30 г остаются бит-в-бит прежними).
+  let _presleepUpscaled: number | null = null;
+  // §7.2-3: полы цельного белка P4b (мейн 80 / перекус 50 г) на низкобелковых днях ужимаются
+  // до реалистичного минимума 60/40 — иначе P4b не может дотянуть день до цели (тест
+  // «по всем комбо 120/90кг»: 9 приёмов × пол 80 г мяса ≈ +31% к цели 144 г).
+  let _p4bFloorWholeMain = 80;
+  let _p4bFloorWholeSnack = 50;
   // MealTargets: белок болюс-окон заранее вычтен из дневной цели — окна строятся
   // ПОСЛЕ бюджетов с фиксированными ~20 г белка каждый, и регулярные приёмы их
   // не знали: 3 окна = +60 г поверх цели, мейны добирали их же (перебор +14-23%).
@@ -3775,6 +3787,29 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     while (_sumP() > _regP && guard-- > 0) { if (_snkP > 14) _snkP--; else if (_mainP > 18) _mainP--; else break; }
     guard = 80;
     while (_sumP() < _regP && guard-- > 0) { if (_mainP < _mainPCap) _mainP++; else if (_snkP < 40) _snkP++; else break; }
+  }
+  // §7.2-3 (planner-dietology-fixes «по всем комбо 120/90кг»): при НИЗКОЙ дневной цели
+  // фиксированные окна (peri + pre-sleep) вместе с MPS-полами приёмов превышают цель ещё
+  // до сборки: 144 г → peri 50 + ночь 28 + полы (3×18 + 2×14 = 82) = 160, и день честно
+  // уходил на +31% (полы и окна резать «нельзя» — P4b упирался в них же). Полы приёмов
+  // неприкосновенны (MPS-минимумы), окна ужимаются пропорционально остатку цели.
+  // Цели выше суммы полов+окон — бит-в-бит прежнее поведение.
+  {
+    const _dayPT = adjustedProteinG || input.goalProteinG;
+    const _regularFloorTotal = _mainRoles.length * 18 + _snackRoles.length * 14;
+    const _fixedTotalP = periProteinFixed + _preSleepFixedP + _windowProteinReserved;
+    const _fixedAllowance = Math.max(0, _dayPT - _regularFloorTotal);
+    if (_fixedTotalP > _fixedAllowance && _fixedTotalP > 0) {
+      const _kFx = Math.max(0.5, _fixedAllowance / _fixedTotalP);
+      _prewP = Math.round(_prewP * _kFx);
+      _postwP = Math.round(_postwP * _kFx);
+      periProteinFixed = _prewP + _postwP;
+      _preSleepFixedP = Math.max(18, Math.round(_preSleepFixedP * _kFx));
+      _presleepUpscaled = _preSleepFixedP > 0 ? _preSleepFixedP : null;
+      _p4bFloorWholeMain = 60;
+      _p4bFloorWholeSnack = 40;
+      notes.push(`⚖️ Цель белка ${_dayPT} г ниже полов приёмов (${_regularFloorTotal} г) + окна: peri ужат до ${periProteinFixed} г, pre-sleep до ${_preSleepFixedP} г — иначе день уходил бы за цель на +20-30%.`);
+    }
   }
   const roleP: Record<string, number> = {};
   for (const r of _regular) {
@@ -3818,7 +3853,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // preSleep — 28–45 г медленного белка (казеин/творог), floor задаётся fit'ом выше.
   // v3: угли ночи — фиксированный бюджет nightCarbsG (0 = legacy).
   if (_keep.has('preSleep') && wantPreSleep) {
-    (mealBudget as any).preSleep = { p: Math.max(28, Math.min(45, roleP.preSleep ?? evenRegularP)), c: _nightCarbs, f: preSleepFatG };
+    (mealBudget as any).preSleep = { p: Math.max(_presleepUpscaled ?? 28, Math.min(45, roleP.preSleep ?? evenRegularP)), c: _nightCarbs, f: preSleepFatG };
   }
 
   // E6 (спецприём → замена приёма): override РЕАЛЬНО перестраивает целевой приём.
@@ -4177,7 +4212,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Эпик B: если дневной лимит порошка исчерпан (postw + перекус) — pre-sleep получает
   // ЦЕЛЬНЫЙ медленный белок (творог 200–250 г ≈ 36–45 г), а не «третий шейк».
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const _preSleepBudgetP = Math.max(30, Math.min(45, ((mealBudget as any).preSleep?.p) || Math.max(residualP, evenRegularP)));
+  const _preSleepBudgetP = Math.max(_presleepUpscaled ?? 30, Math.min(45, ((mealBudget as any).preSleep?.p) || Math.max(residualP, evenRegularP)));
   const _powderCapReached = quota.powderMeals >= QUOTA_LIMITS.maxPowderMeals;
   const _poolPresleep = _powderCapReached
     ? { ...pool, slowProtein: pool.slowProtein.filter((f: FoodItem) => !isProteinPowderId(f.id)), fastProtein: [] as FoodItem[] } as ReturnType<typeof buildFoodPools>
@@ -5395,7 +5430,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _canCutWhole = whole4b.some(({ item, meal }) => {
         const _fdW = FOOD_DB.find(f => f.id === item.id); if (!_fdW) return false;
         const _mMain0 = ['breakfast','lunch','dinner','preworkout'].includes(meal.type);
-        const _fl0 = item.role === 'protein' ? (_mMain0 ? (_fdW.category === 'supplement' ? 20 : 80) : 50) : 0;
+        const _fl0 = item.role === 'protein' ? (_mMain0 ? (_fdW.category === 'supplement' ? 20 : _p4bFloorWholeMain) : _p4bFloorWholeSnack) : 0;
         return item.amount > _fl0 + 5;
       });
       const _powder4b = all4b.filter(({ item }) => item.role === 'fast_protein' || item.role === 'slow_protein');
@@ -5416,7 +5451,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // порошок 20 г; иначе посадка резала ночной творог до 70 г / 19 г белка.
             ? (food.category === 'supplement' ? 20 : (meal.type === 'presleep' ? 100 : 60))
             : (item.role === 'veg' ? 30 : 10),
-          item.role === 'protein' ? (_mMain4b ? (food.category === 'supplement' ? 20 : 80) : 50) : 0,
+          item.role === 'protein' ? (_mMain4b ? (food.category === 'supplement' ? 20 : _p4bFloorWholeMain) : _p4bFloorWholeSnack) : 0,
         );
         const newAmount = Math.max(floor4b, Math.round(item.amount - reduceGrams));
         if (newAmount >= item.amount) return;
