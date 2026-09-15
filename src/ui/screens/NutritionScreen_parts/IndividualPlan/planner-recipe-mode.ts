@@ -18,6 +18,7 @@ import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { Recipe } from '../../../../engines/nutrition-periodization.engine';
 import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount } from './recipe-engine';
+import { optimizeRecipePortionScales, maxRelativeDeviation } from './planner-recipe-optimizer';
 import { isHighCarbDay } from './planner-carb-density';
 import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf, isPortableFood, isWorkWindowMeal, isBreakfastBannedCarb, isBreakfastBannedProtein, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS } from './food-availability';
 import { applyRealisticFloors } from './meal-plan-engine';
@@ -1846,6 +1847,70 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     try { registerMealInQuota(quota, finalItems as any); } catch {}
     appliedCount++;
   });
+
+  // E4 (MIGP-lite): совместный подбор дискретных шагов порций основных приёмов.
+  // Раньше каждый мейн выбирал ближайший шаг к СВОЕЙ цели — сумма дня уезжала.
+  // Здесь перебираем шаги по всем «чистым» мейнам (в приёме только ингредиенты
+  // рецепта, без сайдов/доборов) и применяем, ТОЛЬКО если максимальное отклонение
+  // дня строго улучшилось. Сайды/перекусы не трогаются (учитываются как fixed).
+  try {
+    const _pureMains: Array<{ meal: any; core: { kcal: number; p: number; f: number; c: number }; ps: number }> = [];
+    for (const m of meals as any[]) {
+      const d: any = m?.recipeAppliedData;
+      if (!d || !isMainMealLabel(m.label || '')) continue;
+      const ids: string[] = d.ingredientIds || [];
+      const items: any[] = Array.isArray(m.items) ? m.items : [];
+      if (ids.length === 0 || items.length === 0) continue;
+      if (!items.every((it: any) => ids.includes(it.id))) continue; // есть сайды/доборы
+      const ps = Number(d.portionScale) || 1;
+      if (ps <= 0) continue;
+      _pureMains.push({
+        meal: m,
+        core: { kcal: (m.totals?.kcal || 0) / ps, p: (m.totals?.p || 0) / ps, f: (m.totals?.f || 0) / ps, c: (m.totals?.c || 0) / ps },
+        ps,
+      });
+    }
+    if (_pureMains.length >= 2 && targets) {
+      const _optSteps = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5];
+      const _others = (meals as any[]).reduce((s, m) => {
+        if (_pureMains.some(p => p.meal === m)) return s;
+        return { kcal: s.kcal + (m.totals?.kcal || 0), p: s.p + (m.totals?.p || 0), f: s.f + (m.totals?.f || 0), c: s.c + (m.totals?.c || 0) };
+      }, { kcal: 0, p: 0, f: 0, c: 0 });
+      const dayTarget = { kcal: targets.kcal || 0, p: targets.p || 0, f: targets.f || 0, c: targets.c || 0 };
+      const _sum = (scales: number[]) => _pureMains.reduce((s, p, i) => ({
+        kcal: s.kcal + p.core.kcal * scales[i], p: s.p + p.core.p * scales[i],
+        f: s.f + p.core.f * scales[i], c: s.c + p.core.c * scales[i],
+      }), { ..._others });
+      const curScales = _pureMains.map(p => p.ps);
+      const curDev = maxRelativeDeviation(_sum(curScales), dayTarget);
+      const opt = optimizeRecipePortionScales(_pureMains.map(p => p.core), dayTarget, _optSteps, _others);
+      // Инвариант: ядро рецепта НЕ ужимаем ниже выбранной порции (property-тест
+      // «core не ниже целей») — совместный подбор работает только на рост.
+      if (opt.devPct < curDev - 1e-6 && opt.scales.every((ns, i) => ns >= _pureMains[i].ps - 1e-9)) {
+        _pureMains.forEach((p, i) => {
+          const ns = opt.scales[i];
+          if (!ns || ns === p.ps) return;
+          const k = ns / p.ps;
+          for (const it of (p.meal.items as any[])) {
+            it.amount = Math.round((it.amount || 0) * k);
+            it.kcal = Math.round((it.kcal || 0) * k);
+            it.p = Math.round((it.p || 0) * k * 10) / 10;
+            it.f = Math.round((it.f || 0) * k * 10) / 10;
+            it.c = Math.round((it.c || 0) * k * 10) / 10;
+            if (it.fiber != null) it.fiber = Math.round(it.fiber * k * 10) / 10;
+            if (it.leucine_mg != null) it.leucine_mg = Math.round(it.leucine_mg * k);
+          }
+          const t = (p.meal.items as any[]).reduce((acc: any, it: any) => ({
+            kcal: (acc.kcal || 0) + (it.kcal || 0), p: (acc.p || 0) + (it.p || 0),
+            f: (acc.f || 0) + (it.f || 0), c: (acc.c || 0) + (it.c || 0),
+            fiber: (acc.fiber || 0) + (it.fiber || 0), leucine_mg: (acc.leucine_mg || 0) + (it.leucine_mg || 0),
+          }), {} as any);
+          p.meal.totals = t;
+          (p.meal.recipeAppliedData as any).portionScale = ns;
+        });
+      }
+    }
+  } catch {}
 
   // Ребаланс дня: недобор закрываем топ-апом в перекус, перебор режем по гибким слотам
   // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%. C5: субротация пулов.
