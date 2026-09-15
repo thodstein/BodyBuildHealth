@@ -64,3 +64,4 @@ superseded в части армлифтинга, физически не уда�
 | D1 | `armlift-failure-modes.engine.ts` (per-implement точки срыва + фолы + кью) + `armlift-diagnosis.engine.ts` (слабое звено + причина) + тесты | NEW тесты зелёные, `tsc` 0 по своим |
 | D2 | `armlift-correction.engine.ts` (топ-3 + спец-блок 4 нед) + тесты | NEW тесты зелёные, `tsc` 0 |
 | D3 | Хаб: 3 таба (Помост = старое 1-в-1 + Диагностика + Коррекция), персист `he_armlifting_diag2_v1`, мост обогащён аддитивно, экспорт +строки | старые `armlifting-hub` 10/10 + UI 7/7 целы, NEW UI-тесты табов, `tsc` 0 |
+| D4 (добивка) | Экспорт несёт диагноз (`diagTitle/diagCorrections/diagSpec`, без диагноза — байт-в-байт + XSS-тест) + приёмник в `ArmAutoConstructor` (диагноз видимой строкой + 🔴 стоп при боли, сборка не меняется) | NEW 19/19 (16+3), круг 68/68, `tsc` 0 по своим (1 чужая — `RiskScreen` WIP `profileSex`) |

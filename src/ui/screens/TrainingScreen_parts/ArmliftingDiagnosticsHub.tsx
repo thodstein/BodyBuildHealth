@@ -330,6 +330,10 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     report,
     lmsAttempts: lms.steps,
     lmsLabel: lms.label,
+    /** PRO-5 добивка: диагноз + коррекция в экспорт (аддитивно). */
+    diagTitle: `${diagnosis.title} · ${diagnosis.cause}/${diagnosis.confidence}`,
+    diagCorrections: corrections.map((c) => `${c.title} — ${c.protocol}`),
+    diagSpec: specBlock.map((w) => `Нед ${w.week}: ${w.focus}`),
   });
 
   const handleExportHtml = () => {

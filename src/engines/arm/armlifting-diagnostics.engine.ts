@@ -429,6 +429,10 @@ export interface ArmliftExportData {
   /** PRO-4: лесенка last-man-standing по слабейшему кг-снаряду (опционально). */
   lmsAttempts?: number[];
   lmsLabel?: string;
+  /** PRO-5: диагноз движений + коррекция (опционально, старые вызовы целы). */
+  diagTitle?: string;
+  diagCorrections?: string[];
+  diagSpec?: string[];
 }
 
 export function buildArmliftingHtml(data: ArmliftExportData): string {
@@ -478,6 +482,13 @@ export function buildArmliftingHtml(data: ArmliftExportData): string {
       ? '<div class="meta">Last-man-standing' +
         (data.lmsLabel ? ' (' + esc(data.lmsLabel) + ')' : '') +
         ': ' + esc(data.lmsAttempts.join(' → ')) + ' (промах = выбыл, вниз нельзя)</div>'
+      : '') +
+    (data.diagTitle ? '<div class="meta"><b>Диагноз движений:</b> ' + esc(data.diagTitle) + '</div>' : '') +
+    (data.diagCorrections && data.diagCorrections.length
+      ? '<div class="meta">Коррекция: ' + esc(data.diagCorrections.join(' · ')) + '</div>'
+      : '') +
+    (data.diagSpec && data.diagSpec.length
+      ? '<div class="meta">Спец-блок: ' + esc(data.diagSpec.join(' · ')) + '</div>'
       : '');
   const foot = '<p class="meta">Скрининг, не диагноз. WR-ориентиры: IronMind/Armlifting USA; pinch-сек/CoC/Silver — внутренние ориентиры хаба; несверенные снаряды — факт без %.</p></body></html>';
   return (
@@ -500,5 +511,12 @@ export function buildArmliftingCsv(data: ArmliftExportData): string {
   const lms = data.lmsAttempts && data.lmsAttempts.length
     ? '\nlast_man_standing;' + csvCell(data.lmsAttempts.join('>'))
     : '';
-  return EXCEL_BOM + head + '\n' + lines.join('\n') + '\n' + verdict + recipe + lms + '\n';
+  const diag = data.diagTitle ? '\ndiagnosis;' + csvCell(data.diagTitle) : '';
+  const corr = data.diagCorrections && data.diagCorrections.length
+    ? '\ncorrections;' + csvCell(data.diagCorrections.join(' | '))
+    : '';
+  const spec = data.diagSpec && data.diagSpec.length
+    ? '\nspec_block;' + csvCell(data.diagSpec.join(' | '))
+    : '';
+  return EXCEL_BOM + head + '\n' + lines.join('\n') + '\n' + verdict + recipe + lms + diag + corr + spec + '\n';
 }

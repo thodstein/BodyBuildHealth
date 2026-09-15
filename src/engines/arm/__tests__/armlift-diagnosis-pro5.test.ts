@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { failuresFor, faultsFor } from '../armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../armlift-diagnosis.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../armlift-correction.engine';
+import { buildArmliftingReport, buildArmliftingHtml, buildArmliftingCsv } from '../armlifting-diagnostics.engine';
 
 describe('PRO-5 D1: точки срыва и фолы per-implement', () => {
   it('RT имеет срыв/середину/локаут и фол рамки', () => {
@@ -82,5 +83,38 @@ describe('PRO-5 D2: коррекции и спец-блок', () => {
     expect(spec.length).toBe(4);
     expect(spec[3].focus).toContain('Делод');
     expect(spec.every((w) => w.target === 'saxon_bar')).toBe(true);
+  });
+});
+
+describe('PRO-5 добивка: диагноз в экспорте (аддитивно)', () => {
+  const base = () => ({
+    date: '2026-09-15', sex: 'М',
+    report: buildArmliftingReport({ rtKg: 65.25, sex: 'male' }),
+    lmsAttempts: [60, 65.25] as number[], lmsLabel: 'Rolling Thunder',
+  });
+  it('без диагноза — как раньше (без строк diagnosis)', () => {
+    expect(buildArmliftingHtml(base())).not.toContain('Диагноз движений');
+    expect(buildArmliftingCsv(base())).not.toContain('diagnosis;');
+  });
+  it('с диагнозом — HTML и CSV несут строки', () => {
+    const data = {
+      ...base(),
+      diagTitle: 'Слабое звено: большой палец (pinch) · strength/med',
+      diagCorrections: ['Plate pinch 3×20–30с — 2 плиты'],
+      diagSpec: ['Нед 1: База', 'Нед 4: Делод хвату'],
+    };
+    const html = buildArmliftingHtml(data);
+    expect(html).toContain('Диагноз движений');
+    expect(html).toContain('Plate pinch');
+    expect(html).toContain('Нед 4');
+    const csv = buildArmliftingCsv(data);
+    expect(csv).toContain('diagnosis;');
+    expect(csv).toContain('corrections;');
+    expect(csv).toContain('spec_block;');
+  });
+  it('XSS в диагнозе экранируется', () => {
+    const html = buildArmliftingHtml({ ...base(), diagTitle: '<script>alert(1)</script>' });
+    expect(html).not.toContain('<script>alert(1)');
+    expect(html).toContain('&lt;script&gt;');
   });
 });

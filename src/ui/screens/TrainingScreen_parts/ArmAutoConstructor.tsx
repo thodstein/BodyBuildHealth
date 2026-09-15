@@ -722,6 +722,14 @@ export function ArmAutoConstructor() {
               parts.push(`LMS${al.lms.label ? ` (${al.lms.label})` : ''}: ${(al.lms.steps as number[]).join(' → ')}`);
             }
             if (al.rulesNote) parts.push(String(al.rulesNote));
+            // PRO-5 добивка: диагноз движений из армлифтинг-хаба — видимой строкой (сборку не меняем)
+            if ((al as any).diagWeakLink) {
+              const dw = String((al as any).diagWeakLink);
+              const dc = (al as any).diagCorrections;
+              const top1 = Array.isArray(dc) && dc.length && (dc[0] as any).title ? String((dc[0] as any).title) : '';
+              parts.push(`диагноз: ${dw}${top1 ? ` → ${top1}` : ''}`);
+              if (dw === 'conditioning') flash('🔴 Диагноз армлифтинга: боль — нагрузку не ставим, сначала врач');
+            }
             if (parts.length) flash(`🏋️ Армлифтинг-мост: ${parts.join(' · ')}`);
           }
         } catch {}
