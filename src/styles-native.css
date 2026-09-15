@@ -5004,8 +5004,8 @@ html.app-native .labs-bottomtabs {
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35) !important;
-  /* Над поднятой пилюлей: инлайн bottom считал от битого env=0 и уходил под неё. */
-  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 10px) !important;
+  /* Док вплотную к дашборду (без floating-зазора +10px) — по ТЗ. */
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + var(--tabbar-offset, 0px)) !important;
 }
 
 html.app-native .labs-bottomtabs button {

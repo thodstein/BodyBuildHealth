@@ -72,17 +72,18 @@ describe('plan kit (ui.tsx)', () => {
 });
 
 describe('labs/risk deep nav', () => {
-  it('3. Labs: раздел → сабтабы с хуками', async () => {
+  it('3. Labs: раздел → нижняя навигация (верхние сабтабы убраны)', async () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<LabsScreen />);
     fireEvent.click(
       container.querySelector('.labs-hero-card[data-id="lab"]') as HTMLElement,
     );
-    const subtabs = container.querySelectorAll('.labs-subtab');
-    expect(subtabs.length).toBeGreaterThan(0);
+    expect(container.querySelector('.labs-subtabs')).toBeNull();
+    const navBtns = container.querySelectorAll('.labs-bottomtabs button');
+    expect(navBtns.length).toBeGreaterThan(0);
     expect(
-      container.querySelector('.labs-subtab[data-active="true"]'),
+      container.querySelector('.labs-bottomtabs button[aria-pressed="true"]'),
     ).not.toBeNull();
   });
 

@@ -746,30 +746,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       {mainTab !== 'hero' && (
       <div className="labs-body" style={{ flex: 1, minHeight: 0, overflowY: 'visible', padding: '0 12px calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom,0px))' }}>
 
-      {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
+      {/* ≡≡≡ LAB CONTENT (only when mainTab === 'lab') — верхняя плавающая панель subtabs убрана, навигация только нижней labs-bottomtabs ≡≡≡ */}
       {mainTab === 'lab' && (
         <>
-          {/* Sub-tab pills — FIX: липкая под шапкой (топнав ~77px: minHeight 56 + паддинги 20 + бордер 1), без перекрытия/полупилюль */}
-          <div className="labs-subtabs" style={{ display:'flex', gap:8, overflowX:'auto', overflowY:'hidden', padding:'12px 2px 10px', scrollbarWidth:'none', flexWrap:'nowrap' as const, position:'sticky', top:'calc(env(safe-area-inset-top, 0px) + 77px)', zIndex:19, background:'linear-gradient(180deg, rgba(5,11,22,0.92), rgba(5,11,22,0.75))', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', margin:'0 -12px', paddingLeft:12, paddingRight:12, scrollSnapType:'x proximity' }}>
-            {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => {
-              const active = subTab === t.id;
-              return (
-                <button key={t.id} onClick={() => setSubTab(t.id)} className="labs-subtab" data-active={active} aria-pressed={active} style={{
-                  padding:'10px 16px', fontSize:12, fontWeight:800, whiteSpace:'nowrap',
-                  cursor:'pointer', flexShrink:0, transition:'all 0.18s ease', scrollSnapAlign:'start',
-                  background: active ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(21,38,66,0.70)',
-                  border: active ? '1px solid transparent' : '1px solid rgba(140,190,255,0.14)',
-                  borderRadius:999, minHeight:44,
-                  color: active ? '#0a1a08' : '#fff',
-                  boxShadow: active ? '0 6px 18px rgba(var(--labs-accent-rgb, 0,230,138),0.35)' : 'none',
-                  display:'inline-flex', alignItems:'center', gap:7,
-                }}>
-                  <NativeIcon name={t.icon} size={14} /> {t.label}
-                </button>
-              );
-            })}
-          </div>
-
           {/* ≡≡≡ OVERVIEW TAB ≡≡≡ */}
       {subTab === 'overview' && (
         <div style={{ padding: '10px 0' }}>
@@ -2191,9 +2170,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       </div>
        )}
-      {/* ─── BOTTOM TABS — TOP APK: липкая CTA-панель 52px, safe-area, nowrap ─── */}
+      {/* ─── BOTTOM TABS — док вплотную к дашборду (без floating-зазора), навигация разделов ─── */}
       {mainTab === 'lab' && (
-        <div className="labs-bottomtabs" style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:10, overflowX:'auto', padding:'12px 12px calc(12px + env(safe-area-inset-bottom,0px))', background:'linear-gradient(180deg, rgba(21,38,66,0.90), rgba(12,23,40,0.92))', backdropFilter:'blur(22px)', WebkitBackdropFilter:'blur(22px)', borderTop:'1px solid rgba(140,190,255,0.16)', scrollbarWidth:'none', boxShadow:'0 -12px 32px rgba(0,0,0,0.40)' }}>
+        <div className="labs-bottomtabs" style={{ position:'fixed', bottom:'calc(var(--tabbar-h, var(--nav-height,76px)) + var(--tabbar-safe, max(env(safe-area-inset-bottom,0px), 28px)))', left:0, right:0, zIndex:25, display:'flex', gap:10, overflowX:'auto', padding:'10px 12px calc(10px + env(safe-area-inset-bottom,0px))', background:'linear-gradient(180deg, rgba(21,38,66,0.90), rgba(12,23,40,0.92))', backdropFilter:'blur(22px)', WebkitBackdropFilter:'blur(22px)', borderTop:'1px solid rgba(140,190,255,0.16)', scrollbarWidth:'none', boxShadow:'0 -12px 32px rgba(0,0,0,0.40)' }}>
           {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => {
             const active = subTab===t.id;
             return (

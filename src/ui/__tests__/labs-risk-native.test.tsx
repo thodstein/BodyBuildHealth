@@ -130,7 +130,7 @@ describe('волна 12: липкая внутренняя навигация', 
     }
   });
 
-  it('8. labs: сабтабы остаются в DOM после входа в раздел', async () => {
+  it('8. labs: верхняя панель убрана, навигация только нижней labs-bottomtabs (док к дашборду)', async () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<LabsScreen />);
@@ -138,7 +138,8 @@ describe('волна 12: липкая внутренняя навигация', 
       '.labs-hero-card[data-id="lab"]',
     ) as HTMLElement;
     fireEvent.click(card);
-    expect(container.querySelector('.labs-subtabs')).not.toBeNull();
-    expect(container.querySelectorAll('.labs-subtab').length).toBeGreaterThan(0);
+    expect(container.querySelector('.labs-subtabs')).toBeNull();
+    expect(container.querySelector('.labs-bottomtabs')).not.toBeNull();
+    expect(container.querySelectorAll('.labs-bottomtabs button').length).toBeGreaterThan(0);
   });
 });

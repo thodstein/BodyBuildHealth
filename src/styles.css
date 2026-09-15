@@ -3769,8 +3769,9 @@ html.app-native {
 .support-subbar {
   bottom: var(--tabbar-lift) !important;
 }
+/* Анализы: нижняя панель доком вплотную к дашборду (без floating-зазора 8px) — по ТЗ. */
 .labs-bottomtabs {
-  bottom: var(--tabbar-lift) !important;
+  bottom: calc(var(--tabbar-h) + var(--tabbar-offset) + var(--tabbar-safe)) !important;
 }
 .manual-constructor--editor .editor-bottomnav {
   bottom: var(--tabbar-lift) !important;
