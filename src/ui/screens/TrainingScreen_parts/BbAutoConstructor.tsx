@@ -156,6 +156,7 @@ import {
 import { BbSplitStep } from './bb-step-split';
 import { BbPedWorkMaxStep } from './bb-step-ped';
 import { BbWeightsStep } from './bb-step-weights';
+import { BbExSwapModal } from './bb-step-ex-swap';
 export {
   PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive,
   annualBlockCtxToPrepPatch, annualActiveBlockLine,
@@ -7991,41 +7992,17 @@ export const BbAutoConstructor: React.FC = () => {
   };
 
   // ── Exercise swap modal ──
-  const renderExSwapModal = () => {
-    if (!exSwapModal || !builtPlan) return null;
-    const filtered = EXERCISE_CATALOG
-      .filter(e => (e.group || '') === exSwapModal.muscle)
-      .filter(e => e.name.toLowerCase().includes(exSwapSearch.toLowerCase()));
-    return (
-      <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)' }}
-        onClick={() => { setExSwapModal(null); setExSwapSearch(''); }}>
-        <div onClick={e => e.stopPropagation()} ref={exSwapDialogRef} role="dialog" aria-modal="true" aria-label={`Замена упражнения: ${exSwapModal.currentName}`} tabIndex={-1} style={{ width:'88%', maxWidth:400, maxHeight:'78vh', borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', outline:'none' }}>
-          <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
-          <div style={{ padding:'14px 16px', maxHeight:'calc(78vh - 3px)', overflowY:'auto' }}>
-            <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:10 }}>🔄 Замена: {exSwapModal.currentName}</div>
-            <input type="text" placeholder="Поиск упражнений..." value={exSwapSearch} autoFocus
-              onChange={e => setExSwapSearch(e.target.value)}
-              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:13, boxSizing:'border-box', marginBottom:10 }} />
-            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {filtered.slice(0, 30).map(ex => {
-                const isCurrent = ex.name === exSwapModal.currentName;
-                return <button key={ex.id} disabled={isCurrent} onClick={() => { handleReplaceExercise(exSwapModal.si, exSwapModal.ei, ex.name); setExSwapModal(null); setExSwapSearch(''); }}
-                  style={{ display:'block', width:'100%', padding:'8px 10px', borderRadius:10, cursor:isCurrent?'default':'pointer', textAlign:'left', fontSize:11, fontWeight:isCurrent?400:500, background:isCurrent?'rgba(255,255,255,0.02)':'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:isCurrent?'#fff':'#fff', opacity:isCurrent?0.5:1 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between' }}>
-                    <span>{ex.name}</span>
-                    <span style={{ fontSize:11, color:'#fff' }}>{ex.type} · {ex.equipment}</span>
-                  </div>
-                  {isCurrent && <div style={{ fontSize:11, color:'#00e68a', marginTop:2 }}>✓ текущее</div>}
-                </button>;
-              })}
-              {filtered.length === 0 && <div style={{ padding:12, textAlign:'center', fontSize:11, color:'#fff' }}>Ничего не найдено</div>}
-            </div>
-            <button onClick={() => { setExSwapModal(null); setExSwapSearch(''); }} style={{ width:'100%', marginTop:10, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>Закрыть</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const renderExSwapModal = () => (
+    <BbExSwapModal
+      builtPlan={builtPlan}
+      exSwapModal={exSwapModal}
+      exSwapSearch={exSwapSearch}
+      setExSwapSearch={setExSwapSearch}
+      dialogRef={exSwapDialogRef}
+      onReplace={handleReplaceExercise}
+      onClose={() => { setExSwapModal(null); setExSwapSearch(''); }}
+    />
+  );
 
   return (
     <div>
