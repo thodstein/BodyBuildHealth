@@ -214,7 +214,7 @@ dietology P 0.3118→0.3111, fiber-порог 55.5→53.2 — оба всё ра
   convergence-Этап6, dietology, edibility, high-volume-bolus, hv-adequacy, R-HV, recipe-e2e×2)**;
   `tsc --noEmit` **0 по всему проекту**.
 
-### Раунд «АВТО-число приёмов + честная рекомендация» (Sep 15 2026)
+### Раунд «АВТО-число приёмов + честная рекомендация» (Sep 15 2026, коммит `15680038`)
 
 - **NEW `planner-meal-count.ts`** — единый расчёт: `recommendMealCount(awakeH, P, C, {weightKg, kcal})` +
   `recommendMealCountDetailed` (binding) + `perMealProteinCapG` (0.45 г/кг, зажато 45–70) +
