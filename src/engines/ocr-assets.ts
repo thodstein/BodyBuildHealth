@@ -94,6 +94,12 @@ export async function localAssetAvailable(url: string): Promise<boolean> {
  * Resolve Tesseract worker options with automatic CDN fallback.
  * If the local worker.min.js is unreachable (e.g. assets not synced),
  * we transparently fall back to the CDN so OCR still works.
+ *
+ * АПК-фикс Sep 2026: раньше проверялся ТОЛЬКО worker.min.js. При этом
+ * *-lstm ядра (обязательные для OEM.LSTM_ONLY, см. sync-ocr-assets.mjs)
+ * могли отсутствовать — резолвер возвращал 'local', а воркер падал уже
+ * внутри с "Failed to load TesseractCore". Теперь пробуем и ядро, и
+ * русский traineddata: любой провал → честный fallback на CDN.
  */
 export async function resolveTesseractOptions(): Promise<{
   workerPath: string;
@@ -102,11 +108,24 @@ export async function resolveTesseractOptions(): Promise<{
   source: 'local' | 'cdn';
 }> {
   const local = getOcrAssetPaths('local');
-  const localOk = await localAssetAvailable(local.workerPath);
-  if (localOk) {
-    return { workerPath: local.workerPath, corePath: local.corePath, langPath: local.langPath, source: 'local' };
+  const workerOk = await localAssetAvailable(local.workerPath);
+  if (workerOk) {
+    // Ядро, которое getCore запросит первым на большинстве современных
+    // телефонов (relaxed-SIMD + LSTM). Плюс русская модель — без неё
+    // русскоязычные бланки не разбираются даже при живом воркере.
+    const coreProbe = `${local.corePath.replace(/\/$/, '')}/tesseract-core-lstm.wasm.js`;
+    const langProbe = `${local.langPath.replace(/\/$/, '')}/rus.traineddata.gz`;
+    const [coreOk, langOk] = await Promise.all([
+      localAssetAvailable(coreProbe),
+      localAssetAvailable(langProbe),
+    ]);
+    if (coreOk && langOk) {
+      return { workerPath: local.workerPath, corePath: local.corePath, langPath: local.langPath, source: 'local' };
+    }
+    console.warn('[ocr-assets] local tesseract core/lang incomplete, falling back to CDN.');
+  } else {
+    console.warn('[ocr-assets] local tesseract worker not reachable, falling back to CDN.');
   }
-  console.warn('[ocr-assets] local tesseract worker not reachable, falling back to CDN.');
   const cdn = getOcrAssetPaths('cdn');
   return { workerPath: cdn.workerPath, corePath: cdn.corePath, langPath: cdn.langPath, source: 'cdn' };
 }

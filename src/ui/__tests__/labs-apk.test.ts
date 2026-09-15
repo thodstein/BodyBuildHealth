@@ -75,7 +75,34 @@ describe('labs-apk-loader', () => {
     }
   });
 
-  it('4. anti-zoom: поля ввода ≥16px на телефоне (iOS не зумит)', async () => {
+  it('4. АПК-фикс Sep 2026: нативный таймаут 120с (оффлайн-OCR не убивается на 30с)', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'ui', 'screens', 'LabsScreen.tsx'),
+      'utf-8',
+    );
+    // Нативный путь ждёт до 2 минут (первая загрузка WASM+моделей 45–90с).
+    expect(src).toContain('120000');
+    expect(src).toContain('isNativeApp() ? 120000 : 30000');
+  });
+
+  it('5. АПК-фикс Sep 2026: фото идёт через dataUrlToFileAsync (без atob-OOM)', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'ui', 'screens', 'LabsScreen.tsx'),
+      'utf-8',
+    );
+    expect(src).toContain('dataUrlToFileAsync');
+    const share = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'core', 'apk-share.ts'),
+      'utf-8',
+    );
+    expect(share).toContain('dataUrlToFileAsync');
+  });
+
+  it('6. anti-zoom: поля ввода ≥16px на телефоне (iOS не зумит)', async () => {
     const fs = await import('fs');
     const path = await import('path');
     const css = fs.readFileSync(

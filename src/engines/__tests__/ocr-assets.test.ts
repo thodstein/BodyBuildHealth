@@ -75,12 +75,40 @@ describe('ocr-assets: local path configuration', () => {
   });
 
   it('resolveTesseractOptions prefers local when assets are reachable', async () => {
-    fetchMock.mockResolvedValueOnce({ ok: true, status: 200 });
+    // worker + lstm-core + rus-lang probes (АПК-фикс Sep 2026: 3 пробы).
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: true, status: 200 });
     const opts = await resolveTesseractOptions();
     expect(opts.source).toBe('local');
     expect(opts.workerPath).toMatch(/(?:^|\/)tesseract\/worker\.min\.js$/);
     expect(opts.corePath).toMatch(/(?:^|\/)tesseract\/core$/);
     expect(opts.langPath).toMatch(/(?:^|\/)tesseract\/lang$/);
+  });
+
+  it('resolveTesseractOptions falls back to CDN when lstm core is missing (stale APK build)', async () => {
+    // localAssetAvailable делает HEAD, при 404 — ещё и GET Range. Итого:
+    // worker HEAD 200, core HEAD 404 + core GET 404 (false), lang HEAD 200.
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: true, status: 200 });
+    const opts = await resolveTesseractOptions();
+    expect(opts.source).toBe('cdn');
+    expect(opts.workerPath).toContain('cdn.jsdelivr.net');
+  });
+
+  it('resolveTesseractOptions falls back to CDN when rus traineddata is missing', async () => {
+    // worker HEAD 200, core HEAD 200, lang HEAD 404 + lang GET 404 (false).
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: false, status: 404 });
+    const opts = await resolveTesseractOptions();
+    expect(opts.source).toBe('cdn');
   });
 
   it('resolveTesseractOptions falls back to CDN when local assets are unreachable', async () => {

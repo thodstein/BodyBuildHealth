@@ -17,6 +17,14 @@ const targets = [
   },
   // Tesseract.js core (WASM). We ship both SIMD and non-SIMD variants so the
   // runtime can pick the right one for the device; SIMD is ~2x faster.
+  //
+  // ВАЖНО (АПК-фикс Sep 2026): весь оффлайн-путь приложения вызывает
+  // createWorker('rus+eng', 1, ...) где 1 = OEM.LSTM_ONLY. При lstmOnly=true
+  // getCore внутри tesseract.js запрашивает ТОЛЬКО *-lstm.wasm.js файлы
+  // (relaxedsimd-lstm → simd-lstm → lstm). Без них оффлайн-OCR в АПК падал на
+  // 100% фото с "Failed to load TesseractCore", а в web это маскировалось
+  // серверным ./api/* путём. Поэтому lstm-варианты обязательны, non-lstm
+  // оставлены как fallback для OEM.DEFAULT.
   {
     src: 'node_modules/tesseract.js-core/tesseract-core-simd.wasm.js',
     dest: 'public/tesseract/core/tesseract-core-simd.wasm.js',
@@ -36,6 +44,48 @@ const targets = [
     src: 'node_modules/tesseract.js-core/tesseract-core.wasm',
     dest: 'public/tesseract/core/tesseract-core.wasm',
     label: 'tesseract core (wasm)',
+  },
+  // LSTM-варианты — обязательны для оффлайн-OCR (OEM.LSTM_ONLY, см. выше).
+  {
+    src: 'node_modules/tesseract.js-core/tesseract-core-lstm.wasm.js',
+    dest: 'public/tesseract/core/tesseract-core-lstm.wasm.js',
+    label: 'tesseract core (lstm.wasm.js)',
+  },
+  {
+    src: 'node_modules/tesseract.js-core/tesseract-core-lstm.wasm',
+    dest: 'public/tesseract/core/tesseract-core-lstm.wasm',
+    label: 'tesseract core (lstm.wasm)',
+  },
+  {
+    src: 'node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm.js',
+    dest: 'public/tesseract/core/tesseract-core-simd-lstm.wasm.js',
+    label: 'tesseract core (simd-lstm.wasm.js)',
+  },
+  {
+    src: 'node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm',
+    dest: 'public/tesseract/core/tesseract-core-simd-lstm.wasm',
+    label: 'tesseract core (simd-lstm.wasm)',
+  },
+  {
+    src: 'node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js',
+    dest: 'public/tesseract/core/tesseract-core-relaxedsimd-lstm.wasm.js',
+    label: 'tesseract core (relaxedsimd-lstm.wasm.js)',
+  },
+  {
+    src: 'node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm',
+    dest: 'public/tesseract/core/tesseract-core-relaxedsimd-lstm.wasm',
+    label: 'tesseract core (relaxedsimd-lstm.wasm)',
+  },
+  // Relaxed-SIMD non-LSTM — для полноты матрицы OEM.DEFAULT на новых чипах.
+  {
+    src: 'node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm.js',
+    dest: 'public/tesseract/core/tesseract-core-relaxedsimd.wasm.js',
+    label: 'tesseract core (relaxedsimd.wasm.js)',
+  },
+  {
+    src: 'node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm',
+    dest: 'public/tesseract/core/tesseract-core-relaxedsimd.wasm',
+    label: 'tesseract core (relaxedsimd.wasm)',
   },
   // Russian + English trained data ("best_int" = smaller, fast load, enough for lab reports)
   {

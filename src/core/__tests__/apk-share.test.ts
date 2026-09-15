@@ -14,6 +14,7 @@ import { isNativeApp } from '../app-platform';
 import { shareText, saveTextFile } from '../native-bridge';
 import {
   dataUrlToFile,
+  dataUrlToFileAsync,
   copyOrShareText,
   saveTextFileApk,
   saveCsvApk,
@@ -45,6 +46,19 @@ describe('apk-share (Labs/Pharma/Risks выдача в АПК)', () => {
     expect(f!.name).toBe('lab-photo.jpg');
     expect(f!.type).toBe('image/jpeg');
     expect(dataUrlToFile('not-a-data-url')).toBeNull();
+  });
+
+  it('dataUrlToFileAsync: fetch-путь даёт тот же File (АПК-фикс Sep 2026)', async () => {
+    const bytes = new Uint8Array([10, 20, 30, 40]);
+    let bin = '';
+    bytes.forEach(b => { bin += String.fromCharCode(b); });
+    const url = `data:image/jpeg;base64,${btoa(bin)}`;
+    const f = await dataUrlToFileAsync(url, 'lab-photo.jpg');
+    expect(f).not.toBeNull();
+    expect(f!.name).toBe('lab-photo.jpg');
+    expect(f!.type).toBe('image/jpeg');
+    expect(f!.size).toBe(4);
+    expect(await dataUrlToFileAsync('not-a-data-url')).toBeNull();
   });
 
   it('copyOrShareText: web — clipboard', async () => {

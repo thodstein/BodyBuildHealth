@@ -34,7 +34,7 @@ import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { isNativeApp } from '../../core/app-platform';
 import { ensureLabsApkStyles } from './LabsScreen_parts/labs-apk-loader';
-import { dataUrlToFile, saveCsvApk, printHtmlApk, copyOrShareText, shareOutcomeLabel } from '../../core/apk-share';
+import { dataUrlToFile, dataUrlToFileAsync, saveCsvApk, printHtmlApk, copyOrShareText, shareOutcomeLabel } from '../../core/apk-share';
 
 ensureLabsApkStyles();
 
@@ -589,9 +589,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     setOcrResult(null);
     setSelectedLabs(new Set());
     try {
+      // АПК-фикс Sep 2026: оффлайн-OCR на устройстве (WASM 3.4МБ + 2 языковые
+      // модели 5.6МБ + компиляция + распознавание) на первом запуске занимает
+      // 45–90с на среднем телефоне. Общий таймаут 30с убивал его всегда —
+      // пользователь видел "Таймаут" и считал, что "не работает".
+      const ocrTimeoutMs = isNativeApp() ? 120000 : 30000;
+      const ocrTimeoutLabel = isNativeApp() ? '120с' : '30с';
       const result: any = await Promise.race([
         processUploadedFile(file),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('Таймаут обработки файла (30с)')), 30000)),
+        new Promise((_, rej) => setTimeout(() => rej(new Error(`Таймаут обработки файла (${ocrTimeoutLabel}). На телефоне первое распознавание может занять до 2 минут — попробуйте ещё раз (модели уже закэшированы).`)), ocrTimeoutMs)),
       ]);
       if (requestId !== ocrRequestRef.current) return;
       setOcrResult(result);
@@ -634,10 +640,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     try {
       const { pickPhoto } = await import('../../core/native-bridge');
       const photo = await pickPhoto();
+      // Отмена системного диалога (назад/свайп) — не ошибка, тихо выходим.
       if (!photo?.uri) return;
-      const file = dataUrlToFile(photo.uri, `lab-photo.${photo.format || 'jpg'}`);
+      // Async-путь первым (без atob-OOM на 12МП фото), sync — запасной.
+      const file = (await dataUrlToFileAsync(photo.uri, `lab-photo.${photo.format || 'jpg'}`))
+        || dataUrlToFile(photo.uri, `lab-photo.${photo.format || 'jpg'}`);
       if (!file) {
-        setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Не удалось прочитать фото из галереи'] });
+        setOcrResult({ text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Не удалось прочитать фото из галереи. Попробуйте «Выбрать PDF или фото» или вставьте текст вручную.'] });
         return;
       }
       await handleFileUpload(file);

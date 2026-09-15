@@ -16,6 +16,26 @@ import { shareText, saveTextFile } from './native-bridge';
 
 export type ApkShareOutcome = 'shared' | 'copied' | 'saved' | 'failed';
 
+/**
+ * dataUrl (из pickPhoto) → File для handleFileUpload/processUploadedFile.
+ * АПК-фикс Sep 2026: нативный decode через fetch(Blob) вместо atob-цикла —
+ * atob на фото 5–8МБ (12МП камера) рвал WebView OOM и молча возвращал null
+ * ("Не удалось прочитать фото"). fetch идёт тем же путём, что и загрузка,
+ * без гигантской JS-строки в памяти.
+ */
+export async function dataUrlToFileAsync(dataUrl: string, filename = 'photo.jpg'): Promise<File | null> {
+  try {
+    if (typeof fetch === 'function' && dataUrl.startsWith('data:')) {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      if (blob.size > 0) return new File([blob], filename, { type: blob.type || 'image/jpeg' });
+    }
+  } catch {
+    /* fallback ниже на синхронный путь */
+  }
+  return dataUrlToFile(dataUrl, filename);
+}
+
 /** dataUrl (из pickPhoto) → File для handleFileUpload/processUploadedFile. */
 export function dataUrlToFile(dataUrl: string, filename = 'photo.jpg'): File | null {
   try {
