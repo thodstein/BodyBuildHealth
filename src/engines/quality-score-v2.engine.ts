@@ -29,6 +29,11 @@ export const QUALITY_WEIGHTS = {
 
 export const QUALITY_WEIGHT_SUM = 40 + 15 + 10 + 10 + 10 + 10 + 5; // 100
 
+/** 4.1 (план BB-AUTO-EXHAUSTIVE): единые границы грейда (пороги) — один источник
+ *  для V2/report/weekly. Ярлыки поверхностей могут отличаться (обратная
+ *  совместимость), но СТУПЕНИ обязаны совпадать. */
+export const QUALITY_GRADE_THRESHOLDS = { excellent: 85, good: 65, fair: 45 } as const;
+
 /** Канонический грейд V2. Legacy-грейды S1 («🟢 Профессионально ≥85») совпадают по границам;
  *  S3 («A ≥90») и S5 (riskLevel) оставлены как есть, V2-грейд — для новых поверхностей. */
 export type QualityV2Grade =
@@ -38,9 +43,9 @@ export type QualityV2Grade =
   | '🔴 Требует доработки';
 
 export function gradeQualityScore(score: number): QualityV2Grade {
-  if (score >= 85) return '🟢 Профессионально';
-  if (score >= 65) return '🟡 Хорошо';
-  if (score >= 45) return '🟠 Удовлетворительно';
+  if (score >= QUALITY_GRADE_THRESHOLDS.excellent) return '🟢 Профессионально';
+  if (score >= QUALITY_GRADE_THRESHOLDS.good) return '🟡 Хорошо';
+  if (score >= QUALITY_GRADE_THRESHOLDS.fair) return '🟠 Удовлетворительно';
   return '🔴 Требует доработки';
 }
 

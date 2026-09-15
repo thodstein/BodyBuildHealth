@@ -20,6 +20,7 @@
  */
 import type { BBPlan } from './bb-builder.engine';
 import { BB_MRV_TOLERANCE } from './bb-validator.engine';
+import { QUALITY_GRADE_THRESHOLDS } from '../quality-score-v2.engine';
 import { getVolumeLandmarks, MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import {
   normalizeBBMuscle,
@@ -146,10 +147,12 @@ export interface BBAverageQuality {
 
 // ─── Шкала ───
 
+// 4.1 (план BB-AUTO-EXHAUSTIVE): ступени — из единого канона (QUALITY_GRADE_THRESHOLDS);
+// ярлыки недельной поверхности сохранены (обратная совместимость UI/тестов).
 export function gradeFor(score: number): string {
-  if (score >= 85) return '🟢 Отлично';
-  if (score >= 65) return '🟡 Хорошо';
-  if (score >= 45) return '🟠 Средне';
+  if (score >= QUALITY_GRADE_THRESHOLDS.excellent) return '🟢 Отлично';
+  if (score >= QUALITY_GRADE_THRESHOLDS.good) return '🟡 Хорошо';
+  if (score >= QUALITY_GRADE_THRESHOLDS.fair) return '🟠 Средне';
   return '🔴 Слабо';
 }
 
