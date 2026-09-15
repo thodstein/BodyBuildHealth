@@ -199,6 +199,13 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       }
     }
 
+    // M2: женские сплиты — мягкий бонус для female, штраф для male (не навязываем).
+    if (input.sex === 'female') {
+      if (p.id.startsWith('female_')) { score += 8; rationale.push('♀ женский сплит профиля'); }
+    } else if (input.sex === 'male') {
+      if (p.id.startsWith('female_')) { score -= 12; warnings.push('♀-специфичный сплит — для женского профиля'); }
+    }
+
     if (lvl === 'enhanced') {
       if (p.id === 'ppl_6') score += 8;
       else if (['arnold_6', 'fullbody_4'].includes(p.id)) score += 6;
