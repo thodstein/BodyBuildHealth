@@ -44,7 +44,11 @@ export const RiskOverview: React.FC<{
   sex?: 'male' | 'female';
   /** Ж1: женские пороги из FEMALE_AAS_PROFILES (единый источник, без новых чисел). */
   femaleThresholds?: import('../../../engines/female-aas-risk').FemaleDrugThresholdRow[];
-}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk, weeklyDynamics, hideRecs, sex, femaleThresholds }) => {
+  /** Ж1: дозо-индекс вирилизации 0–100 (Σ min(ratio,2)×AI×10, без длительности). */
+  femaleDoseIndex?: number;
+  /** Ж1: переход на таб «Женщины и ААС» (Поддержка → Протоколы). */
+  onOpenWomenTab?: () => void;
+}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk, weeklyDynamics, hideRecs, sex, femaleThresholds, femaleDoseIndex, onOpenWomenTab }) => {
   const [chartWeek, setChartWeek] = useState<number | null>(null);
   const [chartMode, setChartMode] = useState<'week' | 'average'>('average');
   const [showSections, setShowSections] = useState<Record<string, boolean>>({
@@ -272,7 +276,15 @@ export const RiskOverview: React.FC<{
         {sex === 'female' && femaleThresholds && femaleThresholds.length > 0 ? (
           <>
             <div data-female-thresholds="badge" style={{ fontSize:12, color:'#fff', marginBottom:10, lineHeight:1.5, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)' }}>
-              ♀ Женские пороги (1/4–1/10 мужских) — единый источник FEMALE_AAS_PROFILES. Полная версия: Поддержка → «Женщины и ААС» → Дозы / Лабы.
+              ♀ Женские пороги (1/4–1/10 мужских) — единый источник FEMALE_AAS_PROFILES.
+              <div data-female-dose-index style={{ marginTop:6, fontWeight:800 }}>
+                Дозо-индекс вирилизации: {femaleDoseIndex ?? 0}/100 — по текущему стеку (доза×AI, без длительности)
+              </div>
+              {onOpenWomenTab && (
+                <button type="button" data-female-aas-link onClick={onOpenWomenTab} style={{ marginTop:8, width:'100%', minHeight:44, padding:'10px 12px', borderRadius:12, cursor:'pointer', background:'rgba(244,114,182,0.10)', border:'1px solid rgba(244,114,182,0.30)', color:'#f9a8d4', fontSize:12, fontWeight:800 }}>
+                  ♀ Открыть «Женщины и ААС» → Дозы / Лабы →
+                </button>
+              )}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, fontSize:12 }}>
               {femaleThresholds.map((r) => (

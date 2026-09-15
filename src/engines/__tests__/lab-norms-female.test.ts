@@ -4,6 +4,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { UCUM_MAP } from '../../core/constants';
+import { normalizedRatio } from '../../core/labs-mapping';
 import { LAB_REFERENCES_FEMALE } from '../risk-engine-v7-matrix';
 import {
   getLabNorm,
@@ -82,6 +83,19 @@ describe('Л8: role-view getDynamicRef — HCT по женским границ�
     // курсовая фаза: женские границы × phaseFactor(1.1), а не ×0.85 у обеих
     expect(getDynamicRef('HCT', 30, 'female', 'course' as never)).toEqual({ uln: 53, lln: 40 });
     expect(getDynamicRef('TT', 30, 'female', 'baseline')).toEqual(getDynamicRef('TT', 30, 'male', 'baseline'));
+  });
+});
+
+describe('Л8: normalizedRatio (OCR-превью %) — HCT female 36–48', () => {
+  it('female границы = getLabNorm; male/без sex — байт-в-байт прежние', () => {
+    // female: середина 36–48 = 42 → ровно 0.5; выше женского ULN 48 → > 1
+    expect(normalizedRatio('HCT', 42, '%', 30, 'female')).toBeCloseTo(0.5, 5);
+    expect(normalizedRatio('HCT', 49, '%', 30, 'female')!).toBeGreaterThan(1);
+    // male: середина 36–52 = 44 → 42 = 0.375; без sex — та же статика
+    const male = normalizedRatio('HCT', 42, '%', 30, 'male')!;
+    expect(male).toBeCloseTo(0.375, 5);
+    expect(normalizedRatio('HCT', 42, '%')).toBe(male);
+    expect(getLabNorm('HCT', 'female')).toMatchObject({ lln: 36, uln: 48 });
   });
 });
 

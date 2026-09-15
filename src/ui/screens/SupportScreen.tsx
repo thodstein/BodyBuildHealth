@@ -109,6 +109,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       setCombinedFavDiaryTab('diary');
     } else if (initialSubTab === 'symptoms') {
       setTab('main'); setSection('protocols'); setProtocolTab('symptoms');
+    } else if (initialSubTab === 'women') {
+      // Ж1/Ж5 (фаза 2): кросс-ссылка из «Рисков» → женский протокол «Женщины и ААС» (Дозы/Лабы).
+      setTab('main'); setSection('protocols'); setProtocolTab('women'); setProtocolView('detail');
     }
   }, [initialSubTab]);
   const [tab, setTab] = useState<SupportTab>(resolveTab());

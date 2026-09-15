@@ -5,10 +5,11 @@
  *  - без sex (мужской путь) — ни одного ♀-хука, прежние границы (36–52 у HCT).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { LabsOverview } from '../screens/LabsScreen_parts/LabsOverview';
 import { LabsResults } from '../screens/LabsScreen_parts/LabsResults';
 import { LabDiaryTab } from '../screens/LabsScreen_parts/LabDiaryTab';
+import { LabsInvestigations } from '../screens/LabsScreen_parts/LabsInvestigations';
 import LabsCatalogTab from '../screens/LabsScreen_parts/LabsCatalogTab';
 import type { LabPoint } from '../../core/types';
 
@@ -109,5 +110,19 @@ describe('Л8: паритет FEMALE_LAB_BOUNDS ↔ FEMALE_LAB_GROUPS (таб «
     expect(FEMALE_LAB_BOUNDS.CREATININE.uln).toBe(97);
     // RBC верх 5.2
     expect(FEMALE_LAB_BOUNDS.RBC.uln).toBe(5.2);
+  });
+});
+
+describe('LabsInvestigations: нормы обследований по полу', () => {
+  it('female: HCT 36–48 с ♀; без sex: прежние 36–52', () => {
+    const fem = render(<LabsInvestigations sex="female" />);
+    fireEvent.click(screen.getByText('Общий анализ крови (расширенный)')); // раскрыть карточку
+    expect(fem.container.textContent).toContain('36–48');
+    expect(fem.container.textContent).not.toContain('36–52');
+    cleanup();
+    const male = render(<LabsInvestigations />);
+    fireEvent.click(screen.getByText('Общий анализ крови (расширенный)'));
+    expect(male.container.textContent).toContain('36–52');
+    expect(male.container.textContent).not.toContain('36–48');
   });
 });

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UCUM_MAP } from '../../../core/constants';
+import { getLabNorm } from '../../../engines/lab-norms.engine';
 
 interface InvestigationItem {
   id: string;
@@ -156,7 +157,7 @@ const INVESTIGATIONS: InvestigationItem[] = [
     markers: ['BP_SYSTOLIC', 'BP_DIASTOLIC'], isInstrumental: true },
 ];
 
-export const LabsInvestigations: React.FC = () => {
+export const LabsInvestigations: React.FC<{ sex?: 'male' | 'female' }> = ({ sex }) => {
   const [expandedTypes, setExpandedTypes] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     for (const t of Object.keys(TYPE_CONFIG)) init[t] = true;
@@ -224,10 +225,11 @@ export const LabsInvestigations: React.FC = () => {
                                   <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginBottom: 4 }}>Контролируемые параметры:</div>
                                   {inv.markers.map(code => {
                                     const info = UCUM_MAP[code];
+                                    const norm = getLabNorm(code, sex);
                                     return (
                                       <div key={code} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: 10, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                                         <span style={{ color: 'var(--text)' }}>{info?.name || code}</span>
-                                        {info && <span style={{ color: '#fff' }}>{info.lln}–{info.uln} {info.prefUnit}</span>}
+                                        {norm && <span style={{ color: '#fff' }}>{norm.lln}–{norm.uln} {norm.unit}{norm.female ? ' ♀' : ''}</span>}
                                       </div>
                                     );
                                   })}
@@ -242,6 +244,7 @@ export const LabsInvestigations: React.FC = () => {
                               <div style={{ display: 'grid', gap: 2 }}>
                                 {inv.markers.map(code => {
                                   const info = UCUM_MAP[code];
+                                  const norm = getLabNorm(code, sex);
                                   return (
                                     <div key={code} style={{
                                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -251,8 +254,8 @@ export const LabsInvestigations: React.FC = () => {
                                     }}>
                                       <span style={{ fontWeight: 600, color: 'var(--text)' }}>{info?.name || code}</span>
                                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                        <span style={{ color: '#fff' }}>{info?.lln || '—'}–{info?.uln || '—'}</span>
-                                        <span style={{ color:'#fff', fontSize:11, fontWeight:600 }}>{info?.prefUnit || ''}</span>
+                                        <span style={{ color: '#fff' }}>{norm ? `${norm.lln}–${norm.uln}` : '—'}{norm?.female ? ' ♀' : ''}</span>
+                                        <span style={{ color:'#fff', fontSize:11, fontWeight:600 }}>{norm?.unit || ''}</span>
                                       </div>
                                     </div>
                                   );

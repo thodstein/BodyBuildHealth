@@ -9,6 +9,8 @@ import { weeklyDose } from '../../../engines/pharma-frequency';
 export const MapperTab: React.FC = () => {
   const linked = useDataLink();
   const course = linked.course || [];
+  /** Ж3/Л11 (фаза 2 женского слоя): пол профиля — женские патологии стека и женские ec50 гемато. */
+  const profileSex: 'male' | 'female' = linked.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
   const [manualDrugs, setManualDrugs] = useState<DrugEntry[]>([]);
   const [newDrugName, setNewDrugName] = useState('');
   const [newDrugDose, setNewDrugDose] = useState(0);
@@ -30,9 +32,9 @@ export const MapperTab: React.FC = () => {
         else if (unit.includes('g') && !unit.includes('mg')) mg = wk * 1000;
         return { name: (c.substanceId||'').toLowerCase(), dosageMg: mg };
       });
-      setMapperResult(mapStackToPathologies(drugs));
+      setMapperResult(mapStackToPathologies(drugs, profileSex === 'female' ? 'female' : undefined));
     }
-  }, [course]);
+  }, [course, profileSex]);
 
   const handleRunManual = () => {
     const drugs = useCourse && course.length > 0
@@ -46,7 +48,7 @@ export const MapperTab: React.FC = () => {
         })
       : [...manualDrugs];
     if (drugs.length === 0) return;
-    setMapperResult(mapStackToPathologies(drugs));
+    setMapperResult(mapStackToPathologies(drugs, profileSex === 'female' ? 'female' : undefined));
     import('../../../engines/clinical-analyzer.engine').then(({ analyzeClinicalRisks }) => {
       const compoundNames = course.length > 0
         ? course.map(c => (c.substanceId||'').toLowerCase())
@@ -57,7 +59,10 @@ export const MapperTab: React.FC = () => {
       const labDates = (linked.labs || []).map(l => l.date).filter(Boolean).sort().reverse();
       const weeksSinceLab = labDates[0] ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000) : 52;
       const tWeeks = course.length > 0 ? course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0) : 4;
-      setClinicalResult(analyzeClinicalRisks({ compounds: compoundNames, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics }));
+      setClinicalResult(analyzeClinicalRisks({
+        compounds: compoundNames, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics,
+        ...(profileSex === 'female' ? { sex: 'female' as const } : {}),
+      }));
     }).catch(console.error);
   };
 

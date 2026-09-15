@@ -311,6 +311,14 @@ export function normalizedRatio(code: string, value: number, unit: string, age?:
     uln = dynamic.baseULN * ageF * sexF;
   }
 
+  // Л8 (фаза 2 женского слоя): HCT у женщин — асимметричные границы 36–48 вместо
+  // симметричного ×0.85 (LLN 30.6 → 36). Паритет с getLabNorm/FEMALE_LAB_BOUNDS;
+  // мужской путь и остальные маркеры — байт-в-байт.
+  if (code.toUpperCase() === 'HCT' && sex === 'female') {
+    lln = 36;
+    uln = 48;
+  }
+
   const span = uln - lln;
   if (span <= 0) return null;
   const midpoint = (lln + uln) / 2;

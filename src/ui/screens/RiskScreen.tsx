@@ -26,7 +26,7 @@ import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } from '../../engines/compliance-engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
-import { femaleDrugThresholdView, type FemaleDrugThresholdRow } from '../../engines/female-aas-risk';
+import { femaleDrugThresholdView, assessFemaleAas, type FemaleDrugThresholdRow } from '../../engines/female-aas-risk';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
 import { readRiskBridge, type RiskBridgeData } from '../../engines/risk-bridge';
@@ -90,7 +90,7 @@ const RiskDisclaimer: React.FC = () => (
   </div>
 );
 
-export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
+export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen: string) => void }> = ({ initialSubTab, onNavigate }) => {
   const linked = useDataLink();
   /** Ж1/Ж4/Ж2 (фаза 2): пол профиля — единственный вход женского слоя; без female всё как раньше. */
   const profileSex: 'male' | 'female' = linked.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
@@ -162,16 +162,24 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
   // Ж1 (фаза 2): женские пороги препаратов — единый источник FEMALE_AAS_PROFILES
   // (только sex=female; мужской путь карточки не трогается).
-  const femaleThresholds = useMemo<FemaleDrugThresholdRow[]>(() => {
-    if (profileSex !== 'female') return [];
+  const FEMALE_LAYER_EMPTY = { rows: [] as FemaleDrugThresholdRow[], doseIndex: 0, hasData: false };
+  const femaleLayer = useMemo(() => {
+    if (profileSex !== 'female') return FEMALE_LAYER_EMPTY;
     try {
       const doses = (linked.course || []).map((c) => ({
         id: c.substanceId,
+        pClass: 'other' as const,
         mgPerWeek: (Number(c.doseValue) || 0) * (typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 1),
       }));
-      return femaleDrugThresholdView(doses, 'female');
-    } catch { return []; }
+      return {
+        rows: femaleDrugThresholdView(doses, 'female'),
+        // Дозо-индекс вирилизации 0–100 (Σ min(ratio,2)×AI×10; без длительности) — assessFemaleAas.
+        doseIndex: assessFemaleAas(doses).virilizationDoseIndex,
+        hasData: doses.length > 0,
+      };
+    } catch { return FEMALE_LAYER_EMPTY; }
   }, [linked.course, profileSex]);
+  const femaleThresholds = femaleLayer.rows;
 
   // Read penalty state from LabsScreen's global storage
   const [globalNoLabsState, setGlobalNoLabsState] = useState(getGlobalNoLabs());
@@ -623,7 +631,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     const effectiveLabContrib = labRiskContributions || syntheticLabContrib;
     const isSyntheticLab = !hasLabs && shouldApplyPenalty; // lab contrib came from penalty, not real labs
     switch (subTab) {
-      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} sex={profileSex} femaleThresholds={femaleThresholds} />;
+      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} sex={profileSex} femaleThresholds={femaleThresholds} femaleDoseIndex={femaleLayer.doseIndex} onOpenWomenTab={onNavigate ? () => onNavigate('support-women') : undefined} />;
       case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} /> : <div style={{ textAlign: 'center', padding: 40, color: '#fff' }}>Загрузка V7...</div>;
 
@@ -634,7 +642,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       case 'compliance': return <ComplianceDisplay />;
       case 'clinical': return <ClinicalRiskDisplay />;
       case 'labs_risks': return <LabsRisksTab />;
-      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} />;
+      default: return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} sex={profileSex} femaleThresholds={femaleThresholds} femaleDoseIndex={femaleLayer.doseIndex} onOpenWomenTab={onNavigate ? () => onNavigate('support-women') : undefined} />;
     }
   };
 
@@ -820,7 +828,13 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             {profileSex === 'female' ? (
               <>
                 <div data-female-thresholds="badge" style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)', fontSize:12, color:'#fff', lineHeight:1.5 }}>
-                  ♀ Женские пороги (1/4–1/10 мужских) — без новых чисел, единый источник <b>FEMALE_AAS_PROFILES</b>. Полная версия: Поддержка → «Женщины и ААС» → Дозы / Лабы.
+                  ♀ Женские пороги (1/4–1/10 мужских) — без новых чисел, единый источник <b>FEMALE_AAS_PROFILES</b>.
+                  <div data-female-dose-index style={{ marginTop:6, fontWeight:800 }}>
+                    Дозо-индекс вирилизации: {femaleLayer.doseIndex}/100{femaleLayer.hasData ? ' — по текущему стеку (доза×AI, без длительности)' : ' — стек не задан'}
+                  </div>
+                  <button type="button" data-female-aas-link onClick={() => onNavigate?.('support-women')} style={{ marginTop:8, width:'100%', minHeight:44, padding:'10px 12px', borderRadius:12, cursor:'pointer', background:'rgba(244,114,182,0.10)', border:'1px solid rgba(244,114,182,0.30)', color:'#f9a8d4', fontSize:12, fontWeight:800 }}>
+                    ♀ Открыть «Женщины и ААС» → Дозы / Лабы →
+                  </button>
                 </div>
                 <div style={{ display:'grid', gap:8 }}>
                   {femaleThresholds.map(r => {

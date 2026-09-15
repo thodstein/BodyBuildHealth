@@ -5,7 +5,7 @@
  *  - RiskOverview компакт-таблица порогов: та же логика;
  *  - «♀ не дублируется»: бейдж ровно один на экран.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
 import { RiskScreen } from '../screens/RiskScreen';
 import { RiskOverview } from '../screens/RiskScreen_parts/RiskOverview';
@@ -30,10 +30,11 @@ beforeEach(() => {
 });
 
 describe('Ж1: RiskOverview — женская компакт-таблица порогов', () => {
-  it('female + femaleThresholds → бейдж и женские строки', () => {
+  it('female + femaleThresholds → бейдж, дозо-индекс и клик-ссылка на «Женщины и ААС»', () => {
     const rows = femaleDrugThresholdView([{ id: 'test_enan', mgPerWeek: 25 }], 'female');
+    const onOpen = vi.fn();
     const { container } = render(
-      <RiskOverview riskResult={riskResult()} globalNoLabs={false} noLabsSystems={[]} labRiskContributions={null} sex="female" femaleThresholds={rows} />,
+      <RiskOverview riskResult={riskResult()} globalNoLabs={false} noLabsSystems={[]} labRiskContributions={null} sex="female" femaleThresholds={rows} femaleDoseIndex={37} onOpenWomenTab={onOpen} />,
     );
     // секция порогов открыта по умолчанию (showSections.thresholds=true)
     expect(container.querySelector('[data-female-thresholds="badge"]')).not.toBeNull();
@@ -41,6 +42,11 @@ describe('Ж1: RiskOverview — женская компакт-таблица п�
     expect(screen.getByText(/Женские пороги \(1\/4–1\/10 мужских\)/)).toBeTruthy();
     // доза из стека отображается персонально
     expect(screen.getByText(/25 мг\/нед/)).toBeTruthy();
+    // дозо-индекс вирилизации (Ж1)
+    expect(container.querySelector('[data-female-dose-index]')!.textContent).toContain('37/100');
+    // клик-ссылка ведёт в «Женщины и ААС»
+    fireEvent.click(container.querySelector('[data-female-aas-link]')!);
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
   it('без sex (мужской путь) — байт-в-байт: прежняя таблица, нет ♀', () => {
@@ -55,9 +61,10 @@ describe('Ж1: RiskOverview — женская компакт-таблица п�
 });
 
 describe('Ж1: RiskScreen — карточка препаратов в истории', () => {
+  const nav = vi.fn();
   const goToHistory = async () => {
     localStorage.setItem('he_nav_risks', '1');
-    render(<RiskScreen />);
+    render(<RiskScreen onNavigate={nav} />);
     await waitFor(() => expect(screen.getByText('Вероятностная модель')).toBeTruthy());
     fireEvent.click(screen.getByText('Вероятностная модель'));
     await waitFor(() => expect(screen.getByText('История и пороги препаратов')).toBeTruthy());
@@ -65,7 +72,8 @@ describe('Ж1: RiskScreen — карточка препаратов в исто�
     await waitFor(() => expect(screen.getByText(/История рисков/)).toBeTruthy());
   };
 
-  it('female: заголовок «♀ Препараты и пороги (женские)», бейдж, полный каталог профилей', async () => {
+  it('female: заголовок «♀ Препараты и пороги (женские)», бейдж, индекс, каталог профилей, клик-ссылка', async () => {
+    nav.mockClear();
     seedProfile('female');
     await goToHistory();
     const { container } = { container: document.body };
@@ -77,6 +85,11 @@ describe('Ж1: RiskScreen — карточка препаратов в исто�
     expect(container.querySelectorAll('[data-female-threshold]').length).toBeGreaterThanOrEqual(20);
     // абсолютные противопоказания подписаны
     expect(screen.getAllByText(/абсолютное противопоказание \(любая доза\)/).length).toBeGreaterThanOrEqual(7);
+    // дозо-индекс вирилизации (Ж1) — пустой стек → 0/100
+    expect(container.querySelector('[data-female-dose-index]')!.textContent).toContain('0/100');
+    // клик-ссылка → support-women (App NAV_TARGETS)
+    fireEvent.click(container.querySelector('[data-female-aas-link]')!);
+    expect(nav).toHaveBeenCalledWith('support-women');
   });
 
   it('male: прежний заголовок и мужская таблица, ♀ скрыто', async () => {
@@ -84,6 +97,7 @@ describe('Ж1: RiskScreen — карточка препаратов в исто�
     await goToHistory();
     expect(screen.getByText('Препараты и пороги (ААС, ГР, инсулины)')).toBeTruthy();
     expect(document.querySelector('[data-female-thresholds="badge"]')).toBeNull();
+    expect(document.querySelector('[data-female-dose-index]')).toBeNull();
     expect(screen.queryByText(/♀ Препараты и пороги \(женские\)/)).toBeNull();
   });
 });
