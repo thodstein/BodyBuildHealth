@@ -3585,7 +3585,11 @@ body {
 }
 
 main {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 28px);
+  /* NUTRITION-FULLHEIGHT: App.tsx держит main как overflow:hidden flex-колонку,
+   * скролл — внутри экранов (.nutrition-tabs-body и др.) со своим
+   * var(--tabbar-clear). Паддинг main давал мёртвую чёрную полосу под каждым
+   * экраном поверх фиксированного .tabs — обнуляем, clearance только внутри. */
+  padding-bottom: 0;
 }
 
 /* ─── Заголовки экранов ─── */
@@ -3757,6 +3761,21 @@ main,
   display: block;
   height: 20px;
   flex: 0 0 auto;
+}
+
+/* NUTRITION-FULLHEIGHT: корень питания — flex-hidden с внутренним скроллом,
+ * ::after становился 3-м flex-ребёнком ПОД скролл-телом (постоянные 20px
+ * чёрной полосы). Прячем — зазор уже даёт .nutrition-tabs-body. */
+.screen.nutrition-screen::after,
+.screen.nutrition-tabs::after {
+  display: none;
+  height: 0;
+}
+
+/* NUTRITION-FULLHEIGHT: единственный источник нижнего зазора — скролл-тело.
+ * Без двойного учёта safe-area (tabbar-clear его уже содержит). */
+.nutrition-tabs-body {
+  padding-bottom: var(--tabbar-clear, 110px) !important;
 }
 
 /* В APK WebView часто отдаёт env(bottom)=0 при реальном жест-баре ~28px:

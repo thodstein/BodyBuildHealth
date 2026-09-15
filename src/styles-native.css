@@ -71,7 +71,10 @@ html.app-native .app {
  * уходят под пилюлю навигации. */
 html.app-native main {
   padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 28px);
+  /* NUTRITION-FULLHEIGHT: App.tsx — overflow:hidden flex, скролл внутри экранов.
+   * Паддинг main давал постоянную чёрную полосу над доком .tabs. Обнуляем,
+   * clearance — только внутри скролл-тел (var(--tabbar-clear)). */
+  padding-bottom: 0;
   scrollbar-width: none;
 }
 html.app-native main::-webkit-scrollbar {
@@ -13240,26 +13243,30 @@ html.app-native .nutrition-chips-head {
 html.app-native .nutrition-chips-head::-webkit-scrollbar {
   display: none !important;
 }
+/* NUTRITION-FULLHEIGHT: .nut-* живут ВНУТРИ .nutrition-tabs-body,
+ * у которого уже есть var(--tabbar-clear). Двойной tabbar-clear давал ~250px
+ * чёрной полосы. Внутренним оставляем 12px — зазор только у скролл-тела.
+ * Чужие экраны (labs/risk/support) не трогаем — у них свой скролл. */
 html.app-native .labs-labdiary {
   padding-bottom: var(--tabbar-clear) !important;
 }
 html.app-native .nut-advisor {
-  padding-bottom: var(--tabbar-clear) !important;
+  padding-bottom: 12px !important;
 }
 html.app-native .risk-info {
   padding-bottom: var(--tabbar-clear) !important;
 }
 html.app-native .nut-progress {
-  padding-bottom: var(--tabbar-clear) !important;
+  padding-bottom: 12px !important;
 }
 html.app-native .nut-quests {
-  padding-bottom: var(--tabbar-clear) !important;
+  padding-bottom: 12px !important;
 }
 html.app-native .nut-customproducts {
-  padding-bottom: var(--tabbar-clear) !important;
+  padding-bottom: 12px !important;
 }
 html.app-native .nut-achieve {
-  padding-bottom: var(--tabbar-clear) !important;
+  padding-bottom: 12px !important;
 }
 html.app-native .sup-diary {
   padding-bottom: var(--tabbar-clear) !important;

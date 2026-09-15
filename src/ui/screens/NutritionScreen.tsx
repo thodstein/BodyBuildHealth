@@ -1191,7 +1191,7 @@ const FavoritesTab: React.FC = () => {
   const pill = (t: string, icon: string, label: string) => (
     <button onClick={() => setFavTab(t as any)} aria-pressed={favTab === t} style={{ padding:'10px 14px', borderRadius:999, fontSize:12, fontWeight: favTab === t ? 700 : 500, cursor:'pointer', minHeight:44, border: favTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)', background: favTab === t ? 'linear-gradient(135deg,rgba(0,230,138,0.18),rgba(0,200,160,0.12))' : '#202023', color: favTab === t ? '#00e68a' : 'rgba(255,255,255,0.7)', boxShadow: favTab === t ? '0 2px 8px rgba(0,230,138,0.2)' : 'none' }}>{icon} {label}</button>
   );
-  return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}><ModernHero icon="⭐" title="Избранное" subtitle="Твои сохранённые продукты и блюда — быстрый доступ к любимому." /><div style={{ display:'flex', flexDirection:'column', gap:8, paddingBottom:'var(--tabbar-clear, 140px)' }}>
+  return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}><ModernHero icon="⭐" title="Избранное" subtitle="Твои сохранённые продукты и блюда — быстрый доступ к любимому." /><div style={{ display:'flex', flexDirection:'column', gap:8, paddingBottom:12 }}>
     <div style={{ display:'flex', gap:3, flexWrap:'wrap', padding:'4px 0' }}>
       {pill('products','⭐','Продукты')}{pill('recipes','🍳','Рецепты')}{pill('plans','📋','Планы')}{pill('stacks','🧩','Стеки')}
     </div>
@@ -1707,7 +1707,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         );
       })()}
 
-      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'8px 8px calc(var(--tabbar-clear,140px) + max(env(safe-area-inset-bottom,0px),0px))' }}>
+      <div className="nutrition-tabs-body" style={{ flex:1, minHeight:0, overflowY:'auto', padding:'8px 8px var(--tabbar-clear,110px)' }}>
         <NutritionPlanScope profile={linked.profile} course={linked.course} labs={linked.labs} labAnalysis={linked.labAnalysis}>
         <div style={{ animation:'fadeSlideIn 0.3s ease' }}>
           {renderContent()}
