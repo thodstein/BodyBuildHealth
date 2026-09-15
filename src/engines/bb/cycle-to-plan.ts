@@ -1620,6 +1620,9 @@ export interface ProgramToBBPlanOpts {
     assistedPullUpLoad?: number;
   };
   volumeGoal?: BBVolumeGoal;
+  /** Цель пользователя (mass/cut/recomp/maintenance/strength_mass): объём-множитель
+   *  adapt-пути (паритет с generic/convert). Без поля — 'mass' (легаси-вызовы). */
+  goal?: string;
   specialization?: boolean;
   /** Явное расписание блоков специализации (недели + цели 1-2 мышцы; [] = баланс). */
   specializationSchedule?: SpecializationBlock[];
@@ -2319,12 +2322,17 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       });
     }
 
-    // Deload: в adapt — дополнительное снижение (поверх volumeMultiplier программы).
-    // Faithful: НЕ применяется — программа уже учитывает deload через volumeMultiplier/intensityMultiplier.
+    // Deload: в adapt — снижение объёма (единственная точка применения
+    // volumeMultiplier источника). Раньше формула 0.5/max(0.5, volMult) при
+    // volMult=0.5 (cycleTemplateToFullProgram помечает делоды ×0.5) давала ×1 —
+    // объём делода НЕ снижался (cycle-bb-m-beginner-ul-8 W8: 69 → 69 на enhanced,
+    // dumbbell-8 W8 даже рос за счёт добивок). Faithful: НЕ применяется —
+    // программа уже учитывает deload через volumeMultiplier/intensityMultiplier.
     if (isDeload && mode !== 'faithful') {
+      const deloadVolMult = volMult < 1 ? volMult : 0.5;
       for (const sess of sessions) {
         for (const ex of sess.exercises) {
-          ex.sets = Math.max(1, Math.round(ex.sets * 0.5 / Math.max(0.5, volMult)));
+          ex.sets = Math.max(1, Math.round(ex.sets * deloadVolMult));
           ex.rir = Math.min(5, ex.rir + 1);
           for (const ws of ex.workSets) {
             ws.weight = Math.round(ws.weight * 0.85 * 10) / 10;
@@ -2332,7 +2340,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           }
         }
       }
-      rationale.push(`🔋 Разгрузка нед ${weekNum}: объём -50%, RIR +1, вес -15%`);
+      rationale.push(`🔋 Разгрузка нед ${weekNum}: объём ×${deloadVolMult}, RIR +1, вес -15%`);
     }
 
     // 3.8 (аудит BB-AUTO-EXHAUSTIVE): фаза/делод недели переносятся из источника.
@@ -2471,6 +2479,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // Строгий A/B (adapt-only; faithful дословно — флаг игнится).
   if (mode === 'adapt' && opts.abPatternRotation) stashAbAvoidForWeekSessions(finalPlan.weeks);
 
+  const programSessionLimits = centralizedSessionLimits({
+    level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears, peds: opts.peds, courseIntensity: opts.courseIntensity,
+  });
   const finalized = finalizeBBPlan({
     ...finalPlan,
     volumeLandmarks,
@@ -2479,8 +2490,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     specializationSchedule: specSchedule,
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
     mrvMultiplier: pedMrvMult,
-    maxWorkingSets: centralizedSessionLimits({ level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears, peds: opts.peds, courseIntensity: opts.courseIntensity }).maxWorkingSets,
-    maxExercises: centralizedSessionLimits({ level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears, peds: opts.peds, courseIntensity: opts.courseIntensity }).maxExercises,
+    maxWorkingSets: programSessionLimits.maxWorkingSets,
+    maxExercises: programSessionLimits.maxExercises,
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
     mobilityRestrictions: opts.mobilityRestrictions,
   }, {
@@ -2500,6 +2511,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     gradedInjuries: gradedInjuries.map(inj => ({ muscle: inj.muscle, exclude: inj.exclude, weightPct: inj.weightPct, volumePct: inj.volumePct, repsCap: inj.repsCap })),
     mobilityRestrictions: opts.mobilityRestrictions,
     ensureMinimumVolume: mode !== 'faithful',
+    // Dense-циклы (авторские сессии 11-13 упражнений при капе 14-20) упирались
+    // в hardcoded-10 MEV-фидера — даём реальный лимит сессии.
+    feederMaxExercises: programSessionLimits.maxExercises,
     workMax,
     mrvMultiplier: pedMrvMult,
     checkOrder: mode !== 'faithful',
@@ -2510,6 +2524,109 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     volumeScheme: (opts as any).volumeScheme,
     dcWidowmaker: dcGateProgram,
   });
+  // M3 (аудит BB-AUTO-EXHAUSTIVE §8.3): недельный MRV-кап program-пути —
+  // паритет с convert-путём и generic. Раньше цикловой UI-путь
+  // (cycleTemplateToFullProgram → programToBBPlan) не нёс ни mrvByMuscle,
+  // ни недельного капа: cycle-08 beginner давал hamstrings effective 18 при
+  // MRV 12, glutes 17.6 при 12 (валидатор — overflow на каждой неделе).
+  if (mode === 'adapt') {
+    const onCourseProgram = (opts.peds?.length || 0) > 0;
+    const mrvByMuscle: Record<string, number> = {};
+    for (const [m, lmRaw] of Object.entries(allLandmarks as Record<string, { mrv?: number } | undefined>)) {
+      const mrv = lmRaw?.mrv;
+      if (!mrv) continue;
+      let capMrv = Math.round(mrv * pedMrvMult);
+      // Female posterior boost: кап поднимается в такт объёмному ×1.2 (glutes/hams),
+      // иначе кап стирает женский акцент (паритет convert/generic).
+      if (opts.sex === 'female' && (m === 'glutes' || m === 'hamstrings')) capMrv = Math.round(capMrv * 1.2);
+      mrvByMuscle[m] = capMrv;
+    }
+    const specTargetsProgram = new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets)]);
+    for (const t of specTargetsProgram) {
+      const lmSpec = (allLandmarks as any)[t];
+      if (lmSpec?.mrv) mrvByMuscle[t] = Math.round(mrvByMuscle[t] * specializationMrvFactor(t, specResForWeekSchedule(specSchedule, 1)) || mrvByMuscle[t]);
+    }
+    const floorSetsFor = (muscle: string, _ex: any): number => Math.min(2, perExerciseCap(level, muscle, opts.trainingYears, onCourseProgram));
+    for (const w of finalized.weeks) {
+      const isDeloadWeek = w.phase === 'deload' || (w as any).deload === true;
+      const caps: Record<string, number> = { ...mrvByMuscle };
+      const weekRes = specResForWeekSchedule(specSchedule, w.week);
+      for (const t of weekRes.targets) {
+        const lmSpec = (allLandmarks as any)[t];
+        if (lmSpec?.mrv) caps[t] = Math.round(caps[t] * specializationMrvFactor(t, weekRes));
+      }
+      normalizeWeekMrv(w.sessions, caps, isDeloadWeek, { level, trainingYears: opts.trainingYears, onCourse: onCourseProgram });
+      // Эффективный трим: валидатор меряет direct+indirect против plan.mrvByMuscle.
+      // Ключи aggregateBBVolume канонические (core→abs, delt_*→shoulders), а
+      // e.muscle может быть сырым — матчим через trueMuscleOf.
+      for (let guard = 0; guard < 40; guard++) {
+        const vol = aggregateBBVolume(w.sessions);
+        let worst: { muscle: string; over: number } | null = null;
+        for (const [muscle, values] of Object.entries(vol)) {
+          const cap = caps[muscle] || mrvByMuscle[muscle];
+          if (cap > 0 && values.effectiveSets > cap) {
+            const over = values.effectiveSets - cap;
+            if (!worst || over > worst.over) worst = { muscle, over };
+          }
+        }
+        if (!worst) break;
+        const canon = (e: any): string => { try { return trueMuscleOf(e as any) || e.muscle; } catch { return e.muscle; } };
+        const all = w.sessions
+          .flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && canon(e) === worst!.muscle));
+        const cands = all
+          .filter((e: any) => e.role !== 'primary' && e.sets > floorSetsFor(worst!.muscle, e))
+          .sort((a: any, b: any) => a.sets - b.sets);
+        if (cands.length > 0) {
+          const victim = cands[0];
+          victim.sets -= 1;
+          if (Array.isArray(victim.workSets) && victim.workSets.length > victim.sets) victim.workSets = victim.workSets.slice(0, victim.sets);
+        } else if (all.length > 1) {
+          // Все на floor: удаляем самое мелкое упражнение мышцы за неделю
+          // (accessory первыми; при их отсутствии — дубль-primary: cycle-bb-01
+          // beginner держал 3 primary-упражнения хамстрингов → effective 15 > 12).
+          // Сессию не опустошаем (последнее рабочее упражнение не трогаем).
+          const accessories = all.filter((e: any) => e.role !== 'primary').sort((a: any, b: any) => a.sets - b.sets);
+          const pool = accessories.length ? accessories : [...all].sort((a: any, b: any) => a.sets - b.sets);
+          const victim = pool.find((e: any) => {
+            const s = w.sessions.find(ss => ss.exercises.includes(e));
+            return !!s && s.exercises.filter((x: any) => !(x as any).warmupActivator).length > 1;
+          });
+          if (!victim) break;
+          const s = w.sessions.find(ss => ss.exercises.includes(victim));
+          if (s) s.exercises = s.exercises.filter((e: any) => e !== victim);
+        } else if (all.length === 1 && all[0].role === 'primary' && all[0].sets > 2) {
+          // Единственное упражнение мышцы — режем сеты до floor 2.
+          const only = all[0];
+          only.sets -= 1;
+          if (Array.isArray(only.workSets) && only.workSets.length > only.sets) only.workSets = only.workSets.slice(0, only.sets);
+        } else {
+          break;
+        }
+      }
+    }
+    // Сессионный кап рабочих сетов (beginner — hard-гарантия восстановления,
+    // Волна-2.9): недельный MRV-трим мог оставить сессию выше бюджет-капа
+    // (cycle-08 beginner: 25 > 24). Режем самый мелкий accessory (sets > 1,
+    // не primary, не MGF-слот), сохраняя состав упражнений источника.
+    for (const w of finalized.weeks) {
+      for (const s of w.sessions) {
+        for (let guard = 0; guard < 60; guard++) {
+          const working = s.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
+          const totalSets = working.reduce((a: number, e: any) => a + e.sets, 0);
+          if (totalSets <= programSessionLimits.maxWorkingSets) break;
+          const cands = working
+            .filter((e: any) => e.role !== 'primary' && e.sets > 1 && !/MGF\/IGF1 слот/.test(String(e.comment || '')))
+            .sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+          if (cands.length === 0) break;
+          const victim = cands[0];
+          victim.sets -= 1;
+          if (Array.isArray(victim.workSets) && victim.workSets.length > victim.sets) victim.workSets = victim.workSets.slice(0, victim.sets);
+        }
+      }
+    }
+    syncBBPlanSetShape(finalized as any);
+    (finalized as any).mrvByMuscle = mrvByMuscle;
+  }
   // P0-12: платформенные пост-проходы program-пути — паритет с generic.
   if (Array.isArray(opts.availablePlates) && opts.availablePlates.length > 0) {
     const pl = applyPlateRoundingToPlan(finalized as any, opts.availablePlates, 20);

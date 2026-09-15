@@ -2344,6 +2344,9 @@ export const BbAutoConstructor: React.FC = () => {
             trainingYears: bbTrainingYears,
             bodyweightCapability: prof.bodyweightCapability,
            volumeGoal: effectiveVolGoal,
+           // M3 (§8.3): цель пользователя доезжает в program-путь (был тихий игнор:
+           // сушка/масса не влияли на объём циклового UI-пути — паритет с generic).
+           goal: bbGoal,
           specialization: specializationMode,
            mode: bbAdaptMode,
            methodology: bbMethodology,

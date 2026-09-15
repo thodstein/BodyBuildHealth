@@ -1,5 +1,22 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто M3-остаток: полный аудит выдачи по ВСЕМ BB-циклам (UI-путь ПРОФ-цикл) — 5 реальных дефектов (Sep 15 2026, коммит pathspec, без пуша — очередь чужих)
+
+По команде «продолжи ББ-авто по плану §8.3/§8.4». Только свои файлы; чужие WIP (arm/armlift/BBDiagnosticsHub/IndividualPlan-тесты) не тронуты.
+- **NEW аудит по реальному UI-пути** `cycleTemplateToFullProgram → programToBBPlan` (adapt+faithful), 6 файлов:
+  `bb-cycle-audit-library` (лёгкий, **всегда в круге**: состав 38 циклов без embed-*, паритет цели/пола, faithful-дословность, маркеры методик drop_set/rest_pause/negative/loadStrategy/pre_exhaust/GVT/суперсеты) +
+  `bb-cycle-audit-{beginner,intermediate,advanced,enhanced}` (матрица 38 циклов × 2 пола × 2 цели adapt + faithful: структура/NaN/sets===workSets/reps 1–30/RIR 0–6/дубли/пустые сессии/фазы/MRV×1.15/валидатор/делод).
+- **Тяжёлая матрица (~760 сборок, ~20 мин CPU) гейтится env** `BB_CYCLE_AUDIT_FULL=1` (в общем круге 20 тестов скипаются; круг вернулся к ~6.8 мин). Запуск: `$env:BB_CYCLE_AUDIT_FULL='1'; npx vitest run src/engines/bb/__tests__/bb-cycle-audit-*.test.ts` → **20/20 за ~3.5 мин** (уровни параллельно; helper в `__tests__/helpers/bb-cycle-audit.helper.ts`).
+- **Найдено и починено 5 реальных дефектов циклового пути**:
+  1. **Недельного MRV-капа не было** (`cycle-08` beginner: hamstrings 18 эффективных при MRV 12) — добавлен полный блок паритета convert/generic в `programToBBPlan`: `mrvByMuscle` (×PED/recovery/nutrition/lab, female glutes/hams ×1.2, spec-фактор) + `normalizeWeekMrv` + effective-трим + `plan.mrvByMuscle` для валидатора.
+  2. **Сессионный кап сетов не соблюдался** (`cycle-08` beginner 25 > 24) — пост-пасс срезки мельчайшего accessory (после MRV-трима; MGF-слот не трогаем).
+  3. **Делод не снижал объём** (формула `0.5/max(0.5, volMult)` давала ×1; W8 69→69, dumbbell-8 даже рос) — делод применяет `volumeMultiplier` источника напрямую; enhanced leg-инвариант больше не раздувает deload-недели.
+  4. **`goal` UI не доезжал** в `programToBBPlan` (сушка/масса не влияли на объём цикла — тихий игнор выбора) — типизированное поле + проброс `goal: bbGoal` из BbAutoConstructor.
+  5. **Дубли упражнений**: `ensureArmHeadCoverage` переименовывал слот в имя, уже бывшее в сессии (incline-curl источника с мышцей `arms`), + ключ дедупа `exerciseName||name` не склеивал `name||` vs `name||name` — оба закрыты.
+  - Плюс: MEV-фидер получил реальный лимит сессии (`feederMaxExercises`; dense-циклы 11-13 упражнений упирались в hardcoded-10).
+- **Проверено**: гейт-аудит **20/20** + лёгкий 4/4; bb-круг (гейт) **2419 passed / 1 failed (чужое предсуществующее `bb-diagnostics-max-pro` female-symmetry) / 20 skipped**, ~6.8 мин; `tsc --noEmit` **0 по проекту**; `verify:apk-design` OK. Инварианты целы: `sets === workSets.length`, BB_MRV_TOLERANCE 1.15, strict-groups, мужской путь без sex.
+- **Осознанно**: `target_volume_deficit` (warning) — не дефект матрицы (тот же паттерн у convert и generic на enhanced; доказано дампами 29/30 сплитов); дроп/рест-пауз мини-сеты остаются render-only (комментарий-маркер — дизайн «цепочка в UI»). Урок: PowerShell-замена контента снова дала mojibake на тест-файле — восстановлено Write-инструментом; для контента только Edit/Write.
+
 ## ББ-диагностика движений: шторм-восстановление + мелочь (Sep 15 2026, коммит pathspec `5f71c9a2`, запушен — очередь была чистая)
 
 По команде «продолжай пока свои файлы, бб-авто чуть позже». Re-audit своих файлов (мертвых импортов/мемов/стейта — 0; все счётчики >1 использования). По пути пойман шторм: worktree между раундами был откачен — движки/тесты D2–D4 восстанавливал своими же правками, сошлось побайтово с `404757b2` (проверено `git diff HEAD` — пусто, дубли `it(` — 0). Реально нового: переименование `buildPro3Export→buildMovementExport` (имя врало), `testId="bb-ankle-deg"` + UI-тест ankle-драйвера в карточке.

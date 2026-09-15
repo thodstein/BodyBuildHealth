@@ -1209,6 +1209,10 @@ function ensureArmHeadCoverage(session: any, week: any, options: BBFinalizeOptio
     return EXERCISE_CATALOG.find((x: any) => {
       if (trueMuscleOf(x) !== muscle) return false;
       if (!pattern.test(x.name || '')) return false;
+      // M3 FIX: кандидат с именем, уже присутствующим в сессии, создавал дубль
+      // (cycle-bb-m-arms-8: источник нёс incline-curl с композитной мышцей 'arms',
+      // а head-coverage переименовывал в него молотки → два одинаковых имени).
+      if (session.exercises.some((e: any) => String(e.name || e.exerciseName || '') === String(x.name || ''))) return false;
       if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
       if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
       if (options.equipment?.length) {
@@ -2284,6 +2288,10 @@ export interface BBFinalizeOptions {
    *  Добавляемые финализатором упражнения тоже фильтруются. */
   mobilityRestrictions?: string[];
   ensureMinimumVolume?: boolean;
+  /** Кап упражнений сессии для MEV-фидеров (dense-циклы: авторские сессии
+   *  11-13 упражнений при реальном лимите 14-20 — hardcoded-10 блокировал
+   *  добивку до MEV). Без поля — legacy 10. */
+  feederMaxExercises?: number;
   workMax?: Record<string, number>;
   mrvMultiplier?: number;
   checkOrder?: boolean;
@@ -2805,7 +2813,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
       const weekHasBuilderFeeder = week.sessions.some(s => s.exercises.some(e => e.muscle === muscle && /MEV coverage/.test(e.rationale || '')));
       if (weekHasBuilderFeeder) continue;
       const session = week.sessions.find(item => item.exercises.some(exercise => (trueMuscleOf({ name: exercise.name, muscle: exercise.muscle, type: (exercise as any).exerciseType } as any) || exercise.muscle) === muscle));
-      if (!session || session.exercises.length >= 10) continue;
+      if (!session || session.exercises.length >= (options.feederMaxExercises ?? 10)) continue;
       // Feeder volume is capped by MEV deficit, not full target deficit,
       // to avoid overloading the session with isolation feeders.
       let remaining = Math.max(0, landmarks.mev - effectiveSets);
@@ -2835,7 +2843,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
         });
       }
       for (const candidate of feederQueue) {
-        if (remaining <= 0 || session.exercises.length >= 10 || feederSlots >= 2) break;
+        if (remaining <= 0 || session.exercises.length >= (options.feederMaxExercises ?? 10) || feederSlots >= 2) break;
         // remaining — float (effectiveSets из aggregateBBVolume несёт косвенные
         // доли); без округления второй слот пушит sets=2.4000000000000004 →
         // sets_mismatch валидатора (female-beginner матрица).
@@ -3154,6 +3162,10 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
     for (const week of next.weeks) {
       if (isPrepControlled(week) || isGenericTaperWeek(week)) continue; // prep/taper-недели не раздуваем
+      // M3 FIX: deload-недели тоже не раздуваем — leg-инвариант поднимал
+      // quad/hams/glutes до 10-12 сетов поверх ×0.5-разгрузки (cycle-bb-m-beginner-ul-8
+      // W8: объём делода 95% от рабочей недели вместо ≤75%).
+      if ((week as any).phase === 'deload' || (week as any).deload) continue;
       for (const session of week.sessions) {
       if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) continue;
       const target = (options.trainingYears ?? 0) >= 6 ? 12 : 10;
@@ -4676,7 +4688,12 @@ for (const week of next.weeks) {
       const passthrough: Array<{ ex: any; pos: number }> = [];
       let order = 0;
       for (const ex of s.exercises as any[]) {
-        const key = `${String(ex.exerciseName || '').toLowerCase().trim()}||${String(ex.name || '').toLowerCase().trim()}`;
+        // Ключ = оба поля с фолбэком друг на друга: раньше отсутствие `exerciseName`
+        // у одного из дублей давало ключи `name||` vs `name||name` и дубль выживал
+        // (cycle-bb-m-arms-8 beginner: два «Подъём гантелей на наклонной скамье»).
+        const primary = String(ex.exerciseName || ex.name || '').toLowerCase().trim();
+        const alias = String(ex.name || ex.exerciseName || '').toLowerCase().trim();
+        const key = `${primary}||${alias}`;
         if (key === '||') { passthrough.push({ ex, pos: order++ }); continue; }
         const g = groups.get(key);
         if (!g) { groups.set(key, { survivor: ex, pos: order++, extras: [] }); continue; }

@@ -587,7 +587,7 @@ M1 (аудит + мёртвые настройки) → M2 (женские сп�
   `glute_focus_4`. `rankBBSplits`: мягкий бонус `female_*` для `sex='female'` (+8) и штраф для
   `sex='male'` (−12, не навязываем). NEW `bb-female-splits` 4/4 (состав/инварианты/сборка без error/
   sex-скоринг); соседи 50/50. Мужской путь без `sex` не затронут.
-- [~] **M3 — аудит качества выдачи (срез 1, коммит этого раунда)**: NEW `bb-output-quality` 3/3 —
+- [x] **M3 — аудит качества выдачи (срез 1)**: NEW `bb-output-quality` 3/3 —
   все 30 generic-сплитов × {beginner/intermediate/enhanced} × {male,female}, 3 нед: нет NaN/undefined,
   `sets === workSets.length`, повторы 1–30, RIR 0–6, вес конечный, нет дублей упражнений в сессии,
   нет пустых сессий, фазы на всех неделях, маркеры методик (drop/rest-pause/pre-exhaust) видны.
@@ -595,8 +595,45 @@ M1 (аудит + мёртвые настройки) → M2 (женские сп�
   и то же упражнение — дубль внутри сессии (напр. «Разгибания ног в тренажёре»). Добавлен центральный
   пост-проход дедупа в `finalizeBBPlan` (survivor = PRIMARY, сеты сливаются до per-exercise капа,
   порядок сохраняется); ключ `exerciseName||name` (не склеивать разные движения с общим id).
-  - **Остаток M3 (новый срез)**: полный аудит по ВСЕМ BB-циклам (adapt+faithful) × цели × уровни × пол —
-    MEV–MRV/frequency/сессии, маркеры методик в цикловом пути, достижимость веса, тапер/делод/фазы.
+- [x] **M3 — остаток: полный аудит по ВСЕМ BB-циклам (коммит этого раунда)**. NEW 6 файлов аудита
+  по реальному UI-пути «📋 ПРОФ-цикл» (`cycleTemplateToFullProgram → programToBBPlan`):
+  - `bb-cycle-audit-library` (лёгкий, **всегда в круге**): состав библиотеки (38 циклов, без embed-*),
+    паритет generic↔program по цели/полу, дословность faithful, маркеры методик в цикловом пути
+    (drop_set/rest_pause comments, negative — темп, loadStrategy/linear, pre_exhaust, GVT 10, суперсеты).
+  - `bb-cycle-audit-{beginner,intermediate,advanced,enhanced}` (по уровню; матрица 38 циклов × 2 пола ×
+    2 цели adapt + faithful; структура/MRV/валидатор/делод). **Тяжёлая матрица (~760 сборок, ~20 мин CPU)
+    идёт ОТДЕЛЬНО** (env-гейт `BB_CYCLE_AUDIT_FULL=1`; в общем круге 20 тестов скипаются, круг ~7 мин):
+    `$env:BB_CYCLE_AUDIT_FULL='1'; npx vitest run src/engines/bb/__tests__/bb-cycle-audit-*.test.ts`
+    → **20/20 за ~3.5 мин** (4 уровня параллельно).
+  - **Найдено и починено 5 реальных дефектов циклового UI-пути** (все — lock-аудит):
+    1. **Недельного MRV-капа не было вовсе**: program-путь не нёс `mrvByMuscle` и не звал
+       `normalizeWeekMrv`/effective-трим → `cycle-08` beginner давал hamstrings 18 effective при MRV 12,
+       glutes 17.6 > 12 на каждой неделе. Добавлен полный блок паритета convert/generic
+       (`mrvByMuscle` × PED/recovery/nutrition/lab + female ×1.2 + spec-фактор, недельный кап +
+       effective-трим, `plan.mrvByMuscle` для валидатора).
+    2. **Сессионный кап рабочих сетов не соблюдался** (beginner — hard-гарантия): `cycle-08` beginner
+       держал 25 сетов при капе 24. Добавлен пост-пасс (режем самый мелкий accessory до floor 1,
+       MGF-слот не трогаем) после MRV-трима.
+    3. **Делод не снижал объём** (`volumeMultiplier ×0.5` источника нигде не применялся; формула
+       `0.5/max(0.5, volMult)` давала ×1): `cycle-bb-m-beginner-ul-8` W8 69→69, `dumbbell-8` W8 даже
+       рос. Теперь делод применяет `volumeMultiplier` напрямую (×0.5), а enhanced leg-инвариант
+       больше не раздувает deload-недели.
+    4. **`goal` из UI не доезжал** в `programToBBPlan` (сушка/масса не влияли на объём циклового пути —
+       тихий игнор выбора пользователя): добавлено типизированное поле + проброс `goal: bbGoal`;
+       lock-тест «цель/пол влияют».
+    5. **Дубли упражнений**: `ensureArmHeadCoverage` переименовывал слот в имя, уже присутствующее в
+       сессии (источник нёс incline-curl с композитной мышцей `arms`) → два одинаковых имени; плюс
+       ключ дедупа `exerciseName||name` не склеивал `name||` vs `name||name`. Оба закрыты.
+  - Дополнительно: MEV-фидер получил честный лимит сессии (`feederMaxExercises` — dense-циклы 11-13
+    упражнений упирались в hardcoded-10).
+  - **Проверено**: полный гейт-аудит **20/20** (4 уровня, ~3.5 мин) + лёгкий файл 4/4; bb-круг с гейтом
+    **2419 passed / 1 failed (предсуществующее чужое `bb-diagnostics-max-pro` female-symmetry) /
+    20 skipped**, ~6.8 мин; `tsc --noEmit` **0 по проекту**; `verify:apk-design` OK.
+  - **Осознанно**: `target_volume_deficit` (warning) не считается дефектом матрицы — одинаковые
+    дефициты даёт и convert-путь (arms-8 → chest 4<6; hotel-4 → hamstrings 2<4), и generic на enhanced
+    (дамп 29/30 сплитов: calves/delt_*/quads/forearms/abs/traps/shoulders); аудит строг к ERROR-уровню
+    («volume 0») и к overflow. Дроп/рест-пауз мини-сеты остаются render-only (комментарий-маркер;
+    инвариант `sets === workSets.length` — дизайн «цепочка в UI», Aug-2026).
 
 
 
