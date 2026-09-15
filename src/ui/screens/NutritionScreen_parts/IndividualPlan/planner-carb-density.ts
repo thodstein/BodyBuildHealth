@@ -52,8 +52,11 @@ export const DENSE_CARB_LADDER: DenseCarbStep[] = [
  */
 export const EDIBILITY_CAPS: Record<string, number> = {
   // Каши готовые / сухие
-  rice_white: 450, rice_brown: 450, buckwheat: 450, pasta_durum: 450, potato_boiled: 450,
-  oats: 450, oats_dry: 100, cream_of_rice: 400, corn_flakes: 150, bulgur: 450, millet: 400, barley: 450, quinoa: 400,
+  rice_white: 450, rice_brown: 450, buckwheat: 450, pasta_durum: 450, potato_boiled: 300,
+  oats: 450, oats_dry: 100, cream_of_rice: 400, corn_flakes: 150, bulgur: 300, millet: 400, barley: 450, quinoa: 400,
+  // E-PLATE (planner-edibility): низкоплотные варёные крахмалы — «не горы» никогда:
+  // картофель/батат/булгур ≤300 г в одни руки (угли дня несут плотные носители: крем/рис/хлеб).
+  sweet_potato: 300, potato_baked: 300,
   // Хлеб/выпечка/сладости
   bread_white: 165, bread_rye: 165, pryaniki: 80, sushki: 80, sugar_cookies: 60,
   honey: 60, jam: 55, marmalade: 50, zefir: 50, pastila: 50,

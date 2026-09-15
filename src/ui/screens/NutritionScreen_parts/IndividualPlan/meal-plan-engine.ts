@@ -45,7 +45,7 @@ import {
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale } from "./day-target-corrector";
 import { getFoodAllergenTags } from "./planner-restrictions";
-import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay } from "./planner-carb-density";
+import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay, EDIBILITY_CAPS } from "./planner-carb-density";
 import { computeEA } from "./planner-ea.engine";
 import { planTypeFloorMods } from "./planner-day-targets";
 import { perMealProteinCapG } from "./planner-meal-count";
@@ -7825,6 +7825,35 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // ВВЕРХ добавляло белок за кап (253 > 253.0, meal-target-scale). Движок
     // откалиброван на целочисленной точности; «рваные» 78/133 — косметика,
     // вёдра чинят капы, а не сетка. Инвариант ниже: все граммовки — целые.
+
+    // ─── E-PLATE (planner-edibility): низкоплотные носители — не горы ───
+    // На HV-днях (инсулин/1500У) «картофель 355» в перекусе — мусор-ведро: картофель/
+    // батат/булгур/запечённый картофель режутся до съедобных 300 г (E-PLATE/planner-carb-
+    // density). Носители углей на таком дне — плотные (крем риса/рис/хлеб/сухофрукты).
+    // Обычные дни не трогаем: там низкоплотные гарниры несут сходимость 5-приёмных.
+    if (_pickCtx.highVolumeDay) {
+      let _lowDensityCut = false;
+      for (const m of meals) {
+        for (const it of (m.items || [])) {
+          const _capLD = EDIBILITY_CAPS[it.id];
+          if (typeof _capLD !== 'number' || (it.amount || 0) <= _capLD) continue;
+          const _rLD = _capLD / (it.amount || 1);
+          it.amount = _capLD;
+          it.p = Math.round((it.p || 0) * _rLD * 10) / 10;
+          it.f = Math.round((it.f || 0) * _rLD * 10) / 10;
+          it.c = Math.round((it.c || 0) * _rLD * 10) / 10;
+          it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+          it.fiber = Math.round((it.fiber || 0) * _rLD * 10) / 10;
+          if (it.leucine_mg != null) it.leucine_mg = Math.round(it.leucine_mg * _rLD);
+          m.totals = mealTotalsOf(m.items);
+          _lowDensityCut = true;
+        }
+      }
+      if (_lowDensityCut) {
+        recalcDayTotals(meals, totals);
+        notes.push('🥔 Низкоплотные носители ужаты до съедобных порций (≤300 г) — угли дня несут плотные (крем риса/рис/хлеб).');
+      }
+    }
 
     // ─── P4 (план «ведро»): честный флаг сходимости products-пути ───
     // Паритет с recipe-путём (withinTolerance/deviationPct), но порог 8%,
