@@ -545,6 +545,34 @@
 - [ ] Волна 4 — остаток: 4.1 (единая шкала качества) / 4.3 (разрез god-component) / 4.5 (мобилка)
 - [ ] Волна 5 — каталог/данные
 
+---
+
+## 8. Запрос пользователя (2026-09-15): методики, женские сплиты, аудит выдачи
+
+> Добавлено по команде: «проверить что методики реально выбираются и строятся — ВСЕ МЕТОДИКИ ВЫБРАННЫЕ; добавить женские сплиты к выбору (сейчас там не все); проверить качество выдаваемой программы и объём сетов/повторений/RIR, применение методик — полный анализ выдачи тренировочного плана по всем циклам».
+
+### 8.1 M1 — «все выбранные методики реально строятся» (аудит влияния)
+Матрица «настройка → где применяется → видимый маркер в плане → тест» для **всех** входов ББ-авто, по трём путям (`buildBBPlan` generic / `convertCycleToBBPlan` cycle / `programToBBPlan` program):
+- `bbMethodology` (compound_first / pre_exhaust / post_exhaust / mountain_dog / fst7 / hyperemia), `loadStrategy` (double/linear/wave/rpe_based), `intensityTech` (rest_pause/drop_set/myo_reps/pause_rep/mechanical_drop/negative/twenty_ones), `volumeScheme` (GVT 10×10 / FST-7 / Gironda 8×8), `supersetMode`, `dupMode` (+per-muscle), `deloadType`/`autoDeload`, `bbTrainingFocus`, `bbVolGoal`/`trainingVolumeMode`, `pedPhaseOverride`, `dcMode`, `bfrMode`, `packingV2`, `abPatternRotation`, `rotationMode`, `intensityLevel`, `allowStrengthLifts`, `eccentricMult`, `blastCruise`, `cycleDay`, `targetBodyFat`, `rehabMuscles`, `platePreset`.
+- Критерий: 0 настроек, которые не читаются в выбранном пути (или честная подпись «только X»), у каждой — видимый маркер (rationale/техника/comment/фаза/RIR) + lock-тест «выбрал → видно».
+
+### 8.2 M2 — женские сплиты в выборе
+Сейчас `SPLIT_PATTERNS` имеет только `female_glute_5` (+`glute_focus_4`), а `rankBBSplits` учитывает `sex` только для `female + glutes`. Добавить научно обоснованные женские сплиты (Schoenfeld 2016 частота 2–3×; Kassiano 2024 glute/ham; Barbalho присед vs thrust; верх для баланса):
+- `female_lower_upper_4` (низ-доминанта 4×/нед: 2 низа + 2 верха), `female_glute_upper_5` (глуты 3× + верх 2×), `female_bikini_5` (свип-пропорции: плечи/ягодицы/квадр), `female_wellness_5` (низ-доминанта с акцентом КМС-МС), `female_upper_glute_4` (верх + глуты).
+- Учитывать `sex` в ранжировании (мягкий бонус женским для female, штраф нижне-доминантных для male), показывать в шаге сплита; не ломать мужской путь (байт-в-байт без sex=female).
+
+### 8.3 M3 — полный аудит качества выдачи по всем циклам
+Матрица: все BB-циклы × {male, female} × {mass,cut} × {novice/intermediate/advanced/enhanced} + все generic-сплиты × все методики. Проверять:
+- **sets/reps/RIR**: соответствие методике (dc_rp/cluster/GVT ровно 10×10 / Gironda 8×8 / BFR 30-15-15-15 / 21s / negatives), RIR в диапазоне фазы, reps в диапазоне характера дня, `sets === workSets.length`;
+- **объём**: effectiveSets ≤ MRV×1.15, ≥ MEV-флор, частота группы ≥2×/нед (флаг при 1×), сессии ≤ session-капов;
+- **методики**: каждая выбранная отражена (rationale/technique/comment); отказные техники не в peaking/taper/prep;
+- **структура**: фазы/делоды/тапер на месте, нет NaN/пустых сессий/дублей упражнений, вес достижим (пластины);
+- human-readable дампы + property-тесты. Критерий: 0 ошибок на всей матрице (кроме осознанных warning-гейтов).
+
+### Порядок работ
+M1 (аудит + мёртвые настройки) → M2 (женские сплиты) → M3 (матрица выдачи). Каждый этап — отчёт + коммит pathspec.
+
+
 
 
 
