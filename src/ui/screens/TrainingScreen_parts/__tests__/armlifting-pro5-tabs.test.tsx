@@ -92,6 +92,19 @@ describe('PRO-5 UI: помост + диагностика + коррекция',
     fireEvent.change(screen.getByLabelText(/Разгибание запястья градусы/), { target: { value: '55' } });
     expect(document.body.textContent).toContain('ROM-провал');
   });
+  it('D15: слабейший → диагностика, разминка, история', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.change(screen.getByLabelText(/RT кг/), { target: { value: '30' } });
+    fireEvent.change(screen.getByLabelText(/Axle кг/), { target: { value: '120' } });
+    fireEvent.click(screen.getByText(/Диагностировать слабейший/));
+    expect(screen.getByLabelText('Диагностика: цепочка движения')).toBeTruthy();
+    fireEvent.click(screen.getByText('🔧 Коррекция'));
+    expect(document.body.textContent).toContain('Нед 4');
+    fireEvent.click(screen.getByText(/В Арм-конструктор/));
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    expect(document.body.textContent).toContain('rolling_thunder');
+  });
   it('Коррекция напрямую открывается с топ-3', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

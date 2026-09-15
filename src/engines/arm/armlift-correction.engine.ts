@@ -27,6 +27,8 @@ export interface ArmliftCorrection {
   dayTag: string;
   /** Фазы срыва, которые чинит (id точек). */
   fixesPhase: string[];
+  /** D15: разминка перед работой. */
+  warmup?: string;
 }
 
 export interface ArmliftRankCtx {
@@ -54,6 +56,8 @@ interface PoolEntry {
   dayTag: string;
   /** D8: фазы срыва, которые чинит. */
   fixes?: string[];
+  /** D15: разминка перед работой (CoC-канон). */
+  warmup?: string;
 }
 
 /** D8: пул чинит свои фазы; без явного — фазы пула по умолчанию. */
@@ -148,6 +152,7 @@ function toCorrection(p: PoolEntry, reason: string, score: number): ArmliftCorre
     protocol: p.protocol, dose: p.dose, freq: p.freq, source: `${p.source}${reason ? ` (${reason})` : ''}`,
     sets: p.sets, reps: p.reps, holdSeconds: p.holdSeconds, restSec: p.restSec, dayTag: p.dayTag,
     fixesPhase: [...(p.fixes || [])],
+    ...(p.warmup ? { warmup: p.warmup } : {}),
   };
 }
 
@@ -172,18 +177,21 @@ function cocLadderPool(level: number | null | undefined): PoolEntry[] {
     exId: workId, protocol: 'Рабочий: 5–7 в отказ, 1–3 сета (здесь прогресс)', dose: '3×5–7',
     freq: '2–3×/нед', source: 'CoC-канон work', sets: 3, reps: [5, 7], restSec: 120,
     dayTag: 'CrushGrip', fixes: ['close_fail'],
+    warmup: 'Разминка: гриппером легче 1×10–12 до жжения, не в отказ',
   }];
   if (goalId) {
     pool.push({
       exId: goalId, protocol: 'Целевой: негативы/частички/холд 3–5с (не закрывается — только так)', dose: '3×негатив',
       freq: '2×/нед', source: 'CoC-канон challenge (Kinney)', sets: 3, reps: [3, 3], restSec: 150,
       dayTag: 'CrushGrip', fixes: ['close_fail'],
+      warmup: 'Только после рабочих сетов, свежим — не в конце убитой сессии',
     });
   } else {
     pool.push({
       exId: workId, protocol: 'Overcrush-холд в закрытом 6–10с (дожим)', dose: '4×холд',
       freq: '1×/нед', source: 'CoC overcrush', sets: 4, reps: [1, 1], holdSeconds: 8, restSec: 120,
       dayTag: 'CrushGrip', fixes: ['close_fail', 'hold_short'],
+      warmup: 'Разминка: гриппером легче 1×10–12',
     });
   }
   pool.push({

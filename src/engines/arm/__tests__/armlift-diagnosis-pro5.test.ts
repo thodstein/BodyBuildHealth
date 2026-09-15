@@ -8,6 +8,8 @@ import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, overallGripLevel
 import { cocLadderFor } from '../armlift-correction.engine';
 import { saveDiagSnapshot, loadDiagHistory, lastSnapshotFor, retestVerdict, weeksBetween } from '../armlift-history.engine';
 import { assessArmliftMobility } from '../armlift-mobility.engine';
+import { diagImplementForReportWeakest } from '../armlift-failure-modes.engine';
+import { clearDiagHistory } from '../armlift-history.engine';
 import { getArmExerciseById } from '../../../core/exercise-catalog-arm';
 import { buildArmliftingReport, buildArmliftingHtml, buildArmliftingCsv } from '../armlifting-diagnostics.engine';
 
@@ -497,5 +499,27 @@ describe('PRO-5 D14: ACWR в причине', () => {
     expect(diagnoseArmliftCause({ acwrZone: 'optimal' }).cause).not.toBe('fatigue');
     expect(diagnoseArmliftCause({ acwrZone: 'undertrained' }).cause).not.toBe('fatigue');
     expect(diagnoseArmliftCause({}).cause).not.toBe('fatigue');
+  });
+});
+
+describe('PRO-5 D15: слабейший в диагностику, разминка, очистка истории', () => {
+  it('маппинг вердикт → снаряд (L/R режем, чужое — null)', () => {
+    expect(diagImplementForReportWeakest('saxon_bar')).toBe('saxon_bar');
+    expect(diagImplementForReportWeakest('rolling_thunder_L')).toBe('rolling_thunder');
+    expect(diagImplementForReportWeakest('hub_R')).toBe('hub');
+    expect(diagImplementForReportWeakest(null)).toBeNull();
+    expect(diagImplementForReportWeakest('zzz_nope')).toBeNull();
+  });
+  it('лесенка несёт разминку', () => {
+    const ladder = rankArmliftCorrections('crush', 'coc_gripper', { cocLevel: 1 });
+    expect(ladder[0].warmup).toContain('Разминка');
+    expect(ladder.some((c) => c.warmup)).toBe(true);
+  });
+  it('очистка истории работает', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    saveDiagSnapshot({ date: '2026-09-01', implement: 'hub', weakLink: 'thumb', cause: 'volume' });
+    expect(loadDiagHistory().length).toBe(1);
+    clearDiagHistory();
+    expect(loadDiagHistory().length).toBe(0);
   });
 });

@@ -15,11 +15,11 @@ import {
 import { buildArmliftingHtml, buildArmliftingCsv } from '../../../engines/arm/armlifting-diagnostics.engine';
 import { downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
-import { failuresFor, faultsFor, movementFor, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
+import { failuresFor, faultsFor, movementFor, diagImplementForReportWeakest, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../../../engines/arm/armlift-cause.engine';
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU } from '../../../engines/arm/armlift-benchmarks.engine';
-import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween } from '../../../engines/arm/armlift-history.engine';
+import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween, loadDiagHistory, clearDiagHistory } from '../../../engines/arm/armlift-history.engine';
 import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
@@ -168,6 +168,7 @@ const f = (s: string): number | undefined => {
 export const ArmliftingDiagnosticsHub: React.FC = () => {
   const [state, setState] = useState<LiftState>(loadState);
   const [toast, setToast] = useState('');
+  const [histTick, setHistTick] = useState(0);
   /** PRO-5 D7: 3 таба — Замеры + Диагностика движений + Коррекция. Соревы удалены из хаба. */
   const [tab, setTab] = useState<DiagTab>('pomost');
   const [diag, setDiag] = useState<DiagState>(loadDiag);
@@ -312,6 +313,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     const silver = benchmarkSilverHold(state.silverSec ? parseFloat(state.silverSec) : null);
     return { pinch, farmer, coc, silver, overall: overallGripLevel([pinch, farmer, coc, silver]) };
   }, [diag.pinchHoldSec, diag.farmerHoldSec, state.cocLevel, state.silverSec]);
+  /** D15: история диагнозов списком (обновляется после моста). */
+  const diagHistory = useMemo(() => {
+    try { return loadDiagHistory(); } catch { return []; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [histTick]);
   /** D11 E4 / D12 E7: перетест против прошлого снапшота + история. */
   const retests = useMemo(() => {
     const prev = lastSnapshotFor(diag.implement);
@@ -398,6 +404,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
       });
     } catch { /* noop */ }
+    setHistTick((x) => x + 1);
     setToast(`✓ В Арм-конструктор (армлифтинг): ${report.verdict}`);
     setTimeout(() => setToast(''), 3000);
     try {
@@ -596,6 +603,20 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <div className="ad-muted">Pinch-асимметрия L/R: {report.pinchAsymPct}%</div>
           )}
           {prescription && <div className="ad-muted" data-arm="lift-recipe">Рецепт: {prescription}</div>}
+          {(() => {
+            const target = diagImplementForReportWeakest(report.weakestWr || report.weakest);
+            if (!target) return null;
+            return (
+              <AdCta>
+                <AdBtn
+                  variant="amber" block hero
+                  onClick={() => { setD({ implement: target, failurePoint: '', faultIds: [] }); setTab('diag'); }}
+                >
+                  → Диагностировать слабейший: {target}
+                </AdBtn>
+              </AdCta>
+            );
+          })()}
           {report.rows.length > 0 && (
             <div className="ad-list" data-arm="lift-table">
               {report.rows.map((r) => (
@@ -690,6 +711,17 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               Прошлый замер {retests.prev.date}: {retests.list.map((r) => r.text).join(' · ')}
             </div>
           )}
+          {diagHistory.length > 0 && (
+            <div className="ad-list" data-arm="lift-history" aria-label="Диагностика: история диагнозов">
+              {diagHistory.slice(-5).reverse().map((s, idx) => (
+                <div key={`${s.date}-${s.implement}-${idx}`} className="ad-row">
+                  <span>{s.date} · {s.implement}</span>
+                  <span className="ad-muted">{s.weakLink} / {s.cause}</span>
+                </div>
+              ))}
+              <AdBtn variant="ghost" onClick={() => { clearDiagHistory(); setHistTick((x) => x + 1); }}>✕ Очистить историю</AdBtn>
+            </div>
+          )}
           <div className="lift-group">Мобильность (градусы, норма разгиб 70 / сгиб 75)</div>
           <AdGrid cols="auto-sm">
             <LiftNum label="Разгибание запястья °" value={diag.wristExtDeg} onChange={(v) => setD({ wristExtDeg: v })} placeholder="70" aria="Разгибание запястья градусы" />
@@ -731,6 +763,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               </div>
             ))}
           </div>
+          {corrections.some((c) => c.warmup) && (
+            <div className="ad-muted" data-arm="lift-corr-warmup">
+              Разминка: {corrections.filter((c) => c.warmup).map((c) => c.warmup).join(' · ')}
+            </div>
+          )}
           <div className="lift-group">Спец-блок волной</div>
           <div className="ad-row" aria-label="Длина спец-блока">
             <AdChip active={diag.specWeeks !== 6} onClick={() => setD({ specWeeks: 4 })}>4 нед</AdChip>

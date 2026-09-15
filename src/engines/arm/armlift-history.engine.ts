@@ -37,6 +37,10 @@ export function saveDiagSnapshot(s: ArmliftDiagSnapshot): ArmliftDiagSnapshot[] 
   return next;
 }
 
+export function clearDiagHistory(): void {
+  try { localStorage.removeItem(HISTORY_KEY); } catch { /* noop */ }
+}
+
 export function loadDiagHistory(): ArmliftDiagSnapshot[] {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(HISTORY_KEY) : null;

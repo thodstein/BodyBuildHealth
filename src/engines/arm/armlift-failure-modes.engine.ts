@@ -219,6 +219,16 @@ export function movementFor(implement: string): ArmliftMovePhase[] {
   return ARMLIFT_MOVEMENT[implement as ArmliftDiagImplement] || ARMLIFT_MOVEMENT.rolling_thunder;
 }
 
+/**
+ * D15: слабейший снаряд вердикта → снаряд диагностики.
+ * L/R-суффиксы режем (рука — в асимметрии, не в снаряде); чужое — null.
+ */
+export function diagImplementForReportWeakest(weakest: string | null): ArmliftDiagImplement | null {
+  if (!weakest) return null;
+  const base = String(weakest).replace(/_[LR]$/, '') as ArmliftDiagImplement;
+  return (ARMLIFT_MOVEMENT[base] ? base : null);
+}
+
 export const ARMLIFT_DIAG_IMPLEMENT_OPTS: Array<{ id: ArmliftDiagImplement; label: string }> = [
   { id: 'rolling_thunder', label: 'RT' },
   { id: 'apollon_axle', label: 'Axle' },
