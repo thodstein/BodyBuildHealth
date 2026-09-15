@@ -132,6 +132,19 @@ describe('PRO-5 UI: помост + диагностика + коррекция',
     fireEvent.click(screen.getByText('Срыв с пола'));
     expect(document.body.textContent).toContain('Полнота диагностики: 40%');
   });
+  it('D19: протокол тестов и дельта истории', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    try {
+      localStorage.setItem('he_armlifting_diag_history', JSON.stringify([
+        { date: '2026-08-01', implement: 'rolling_thunder', weakLink: 'fingers', cause: 'volume' },
+        { date: '2026-09-01', implement: 'rolling_thunder', weakLink: 'fingers', cause: 'endurance' },
+      ]));
+    } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    expect(document.body.textContent).toContain('Свежим');
+    expect(document.body.textContent).toContain('причина: volume → endurance');
+  });
   it('Коррекция напрямую открывается с топ-3', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

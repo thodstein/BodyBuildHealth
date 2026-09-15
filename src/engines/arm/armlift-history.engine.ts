@@ -68,6 +68,24 @@ export function retestVerdict(prev: number | null | undefined, curr: number | nu
   return { verdict: 'hold', text: 'Держится — продолжай блок до 4 нед, потом решай' };
 }
 
+/**
+ * D19: дельта двух последних снапшотов снаряда (звено/причина сменились?).
+ * null — сравнивать нечего (меньше 2 снапшотов).
+ */
+export function historyDeltaFor(history: ArmliftDiagSnapshot[], implement: string): string | null {
+  try {
+    const list = (Array.isArray(history) ? history : []).filter((s) => s && s.implement === implement);
+    if (list.length < 2) return null;
+    const a = list[list.length - 2];
+    const b = list[list.length - 1];
+    const bits: string[] = [];
+    if (a.weakLink !== b.weakLink) bits.push(`звено: ${a.weakLink} → ${b.weakLink}`);
+    if (a.cause !== b.cause) bits.push(`причина: ${a.cause} → ${b.cause}`);
+    if (!bits.length) return `без смены (${b.weakLink}/${b.cause} держится с ${a.date})`;
+    return bits.join(' · ');
+  } catch { return null; }
+}
+
 /** Недель между датами ISO (округление вниз, минимум 0). */
 export function weeksBetween(aIso: string, bIso: string): number {
   try {

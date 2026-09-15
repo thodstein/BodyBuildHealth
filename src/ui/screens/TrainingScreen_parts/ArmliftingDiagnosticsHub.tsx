@@ -18,8 +18,8 @@ import { loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
 import { failuresFor, faultsFor, movementFor, relevantTestsFor, diagImplementForReportWeakest, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../../../engines/arm/armlift-cause.engine';
-import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU } from '../../../engines/arm/armlift-benchmarks.engine';
-import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween, loadDiagHistory, clearDiagHistory } from '../../../engines/arm/armlift-history.engine';
+import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';
+import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween, loadDiagHistory, clearDiagHistory, historyDeltaFor } from '../../../engines/arm/armlift-history.engine';
 import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
@@ -709,6 +709,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <div className="ad-muted">Кью: {diagFaults.filter((x) => diag.faultIds.includes(x.id)).map((x) => x.cue).join(' · ')}</div>
           )}
           <div className="lift-group">Тест-батарея (холды) · релевантны: {relevantTestsFor(diag.implement).join(' + ')}</div>
+          <div className="ad-muted">Протокол: {relevantTestsFor(diag.implement).map((t) => `${t} — ${testProtocolFor(t)}`).join(' · ')}</div>
           <AdGrid cols="auto-sm">
             <LiftNum label="Pinch-hold сек" value={diag.pinchHoldSec} onChange={(v) => setD({ pinchHoldSec: v })} placeholder="20" aria="Pinch-hold сек" />
             <LiftNum label="Farmer-hold сек" value={diag.farmerHoldSec} onChange={(v) => setD({ farmerHoldSec: v })} placeholder="30" aria="Farmer-hold сек" />
@@ -735,6 +736,10 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           {retests.due && (
             <div className="ad-muted" data-arm="lift-retest-due">{retests.due}</div>
           )}
+          {(() => {
+            const delta = historyDeltaFor(diagHistory, diag.implement);
+            return delta ? (<div className="ad-muted" data-arm="lift-history-delta">Динамика: {delta}</div>) : null;
+          })()}
           {diagHistory.length > 0 && (
             <div className="ad-list" data-arm="lift-history" aria-label="Диагностика: история диагнозов">
               {diagHistory.slice(-5).reverse().map((s, idx) => (

@@ -48,6 +48,25 @@ export function benchmarkSilverHold(sec: number | null | undefined): ArmliftTest
   return benchmarkFarmerHold(sec);
 }
 
+/**
+ * D19: протокол выполнения теста (сравнимость замеров).
+ * Свежим, лучший из 3 попыток — иначе динамика врёт.
+ */
+export function testProtocolFor(test: string): string {
+  switch (String(test || '')) {
+    case 'Pinch-hold':
+      return 'Свежим, 3 попытки, лучший; гладкие стороны наружу, мел';
+    case 'Farmer-hold':
+      return 'Свежим, DOH без лямок, лучший из 3';
+    case 'CoC':
+      return 'Разминка легче, по 3 попытки каждой рукой, лучший';
+    case 'Silver':
+      return 'Новый гриппер, вертикаль, лучший из 3';
+    default:
+      return 'Свежим, лучший из 3 попыток';
+  }
+}
+
 /** Итог — слабейший из заполненных (нет данных — null, честно). */
 export function overallGripLevel(levels: Array<ArmliftTestLevel | null>): ArmliftTestLevel | null {
   const filled = levels.filter((l): l is ArmliftTestLevel => l != null);

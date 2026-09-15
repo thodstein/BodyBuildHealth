@@ -6,7 +6,8 @@ import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../armlif
 import { injectArmliftCorrections, correctionsToInjectionItems, applyArmliftSpecWave } from '../armlift-injection.engine';
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, overallGripLevel } from '../armlift-benchmarks.engine';
 import { cocLadderFor } from '../armlift-correction.engine';
-import { saveDiagSnapshot, loadDiagHistory, lastSnapshotFor, retestVerdict, weeksBetween } from '../armlift-history.engine';
+import { saveDiagSnapshot, loadDiagHistory, lastSnapshotFor, retestVerdict, weeksBetween, historyDeltaFor } from '../armlift-history.engine';
+import { testProtocolFor } from '../armlift-benchmarks.engine';
 import { assessArmliftMobility } from '../armlift-mobility.engine';
 import { diagImplementForReportWeakest, relevantTestsFor } from '../armlift-failure-modes.engine';
 import { intensityForCause } from '../armlift-injection.engine';
@@ -613,5 +614,30 @@ describe('PRO-5 D18: полнота диагностики + Silver-контек
   it('без гриппера — тоже работает', () => {
     const r = diagnoseArmliftCause({ implement: 'silver_bullet', silverSec: 10 });
     expect(r.cause).toBe('endurance');
+  });
+});
+
+describe('PRO-5 D19: протокол тестов + дельта истории', () => {
+  it('протокол по каждому тесту + дефолт', () => {
+    expect(testProtocolFor('Pinch-hold')).toContain('Свежим');
+    expect(testProtocolFor('Farmer-hold')).toContain('DOH');
+    expect(testProtocolFor('CoC')).toContain('Разминка');
+    expect(testProtocolFor('Silver')).toContain('вертикаль');
+    expect(testProtocolFor('zzz')).toContain('Свежим');
+  });
+  it('дельта: смена звена/причины, стабильность, нечего сравнивать', () => {
+    const hist = [
+      { date: '2026-09-01', implement: 'hub', weakLink: 'thumb', cause: 'volume' },
+      { date: '2026-09-10', implement: 'hub', weakLink: 'fingers', cause: 'endurance' },
+      { date: '2026-09-10', implement: 'saxon_bar', weakLink: 'thumb', cause: 'volume' },
+    ];
+    expect(historyDeltaFor(hist, 'hub')).toBe('звено: thumb → fingers · причина: volume → endurance');
+    expect(historyDeltaFor(hist, 'saxon_bar')).toBeNull();
+    expect(historyDeltaFor([], 'hub')).toBeNull();
+    const stable = [
+      { date: '2026-09-01', implement: 'hub', weakLink: 'thumb', cause: 'volume' },
+      { date: '2026-09-10', implement: 'hub', weakLink: 'thumb', cause: 'volume' },
+    ];
+    expect(historyDeltaFor(stable, 'hub')).toContain('без смены');
   });
 });
