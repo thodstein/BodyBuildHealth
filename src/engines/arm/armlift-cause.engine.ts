@@ -44,6 +44,9 @@ export interface ArmliftCauseInput {
   /** D10 E6: кожа — сорвана мозоль / болит перепонка большого (щит щипка первым). */
   skinTear?: boolean;
   thumbWebPain?: boolean;
+  /** D21: щипок по рукам (кг) — если обе заполнены и есть асимметрия, evidence указывает слабую руку. */
+  pinchL?: number | null;
+  pinchR?: number | null;
 }
 
 /** D10 E3: ratio сгибатели/экстензоры. Норма 1.0–1.3, >1.5 — значимый дисбаланс. */
@@ -127,6 +130,14 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
   }
   // D10 E6: кожа — стоп щипка (support без боли — можно), не общий стоп.
   if (i.skinTear || i.thumbWebPain) {
+    // D21: thumbWebPain без skinTear — щипок запрещён, но pinch-контекст в evidence.
+    if (i.thumbWebPain && !i.skinTear) {
+      return {
+        cause: 'pain', confidence: 0.9,
+        evidence: ['Болит перепонка большого — щипок запрещён (перепонка)'],
+        fix: 'Перепонка: пауза щипка + тейп большого; support без боли — можно; экстензия лёгкая',
+      };
+    }
     return {
       cause: 'pain', confidence: 0.9,
       evidence: [i.skinTear ? 'Сорвана мозоль/кожа — щипок запрещён до заживления' : 'Болит перепонка большого — щипок запрещён'],
@@ -145,6 +156,15 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
   if (fp === 'off_floor' || fp === 'close_fail') { scores.max_strength += 0.45; ev.push('Срыв внизу/не закрыл — пик силы'); }
   if (pinch != null && pinch < 10) { scores.max_strength += 0.35; ev.push(`Pinch-hold ${pinch}с < 10с`); }
   if (farmer != null && farmer < 15) { scores.max_strength += 0.25; ev.push(`Farmer-hold ${farmer}с < 15с`); }
+  // D21: per-hand щипок в evidence — если обе руки заполнены, указываем слабую.
+  const pinchL = num((i as any).pinchL);
+  const pinchR = num((i as any).pinchR);
+  const asym = num((i as any).asymmetryPct);
+  if (pinchL != null && pinchR != null && asym != null && asym >= 10) {
+    const weak = pinchL < pinchR ? `левая ${pinchL}кг слабее правой ${pinchR}кг` : `правая ${pinchR}кг слабее левой ${pinchL}кг`;
+    // Техника/асимметрия — не сила, поэтому evidence, без очков (асимметрия уже скорит).
+    ev.push(`Щипок по рукам: ${weak} (асимметрия ${asym}%)`);
+  }
   const coc = num(i.cocLevel);
   if (coc != null && coc < 2) { scores.max_strength += 0.35; ev.push(`CoC №${coc} < №2 — crush-пик`); }
   const silv = num(i.silverSec);

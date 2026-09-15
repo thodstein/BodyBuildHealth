@@ -6,7 +6,7 @@ import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../armlif
 import { injectArmliftCorrections, correctionsToInjectionItems, applyArmliftSpecWave } from '../armlift-injection.engine';
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, overallGripLevel } from '../armlift-benchmarks.engine';
 import { cocLadderFor } from '../armlift-correction.engine';
-import { saveDiagSnapshot, loadDiagHistory, lastSnapshotFor, retestVerdict, weeksBetween, historyDeltaFor } from '../armlift-history.engine';
+import { saveDiagSnapshot, loadDiagHistory, lastSnapshotFor, retestVerdict, weeksBetween, historyDeltaFor, completenessTrend } from '../armlift-history.engine';
 import { testProtocolFor } from '../armlift-benchmarks.engine';
 import { assessArmliftMobility } from '../armlift-mobility.engine';
 import { diagImplementForReportWeakest, relevantTestsFor } from '../armlift-failure-modes.engine';
@@ -453,6 +453,21 @@ describe('PRO-5 D12 E5: дозы и волны', () => {
     expect(r.injected).toBe(6);
     expect(r.plan.weeks[5].sessions[0].exercises[0].sets).toBe(2);
   });
+  it('D21: pinch L/R попадает в evidence с рукой', () => {
+    const r = diagnoseArmliftCause({
+      implement: 'saxon_bar', pinchL: 35, pinchR: 45, asymmetryPct: 22, pinchHoldSec: 15,
+    });
+    expect(r.evidence.join(' ')).toContain('левая 35кг');
+  });
+  it('D21: перепонка без кожи — свой текст (не кожа)', () => {
+    const r = diagnoseArmliftCause({ implement: 'saxon_bar', thumbWebPain: true });
+    expect(r.evidence.join(' ')).toContain('перепонка');
+    expect(r.fix).toContain('Перепонка');
+  });
+  it('D21: кожа — приоритет над перепонкой', () => {
+    const r = diagnoseArmliftCause({ implement: 'saxon_bar', skinTear: true, thumbWebPain: true });
+    expect(r.evidence.join(' ')).toContain('мозоль');
+  });
   it('fatigue-first волна начинает с делода', () => {
     const spec = buildArmliftSpecBlock('fingers', 'rolling_thunder', undefined, 6, { fatigueFirst: true });
     expect(spec[0].focus).toContain('Делод');
@@ -657,5 +672,25 @@ describe('PRO-5 D19: протокол тестов + дельта истории
       { date: '2026-09-10', implement: 'hub', weakLink: 'thumb', cause: 'volume' },
     ];
     expect(historyDeltaFor(stable, 'hub')).toContain('без смены');
+  });
+});
+
+describe('PRO-5 D21: completeness в истории и дельта полноты', () => {
+  it('дельта ловит смену полноты', () => {
+    const hist = [
+      { date: '2026-09-01', implement: 'hub', weakLink: 'thumb', cause: 'volume', completenessPct: 40 },
+      { date: '2026-09-10', implement: 'hub', weakLink: 'thumb', cause: 'volume', completenessPct: 100 },
+    ];
+    expect(historyDeltaFor(hist, 'hub')).toContain('полнота: 40% → 100%');
+    expect(historyDeltaFor(hist, 'saxon_bar')).toBeNull();
+  });
+  it('completenessTrend берёт только свой снаряд', () => {
+    const hist = [
+      { date: '2026-09-01', implement: 'hub', weakLink: 'thumb', cause: 'volume', completenessPct: 40 },
+      { date: '2026-09-02', implement: 'hub', weakLink: 'thumb', cause: 'volume', completenessPct: 80 },
+      { date: '2026-09-03', implement: 'saxon_bar', weakLink: 'thumb', cause: 'volume', completenessPct: 100 },
+    ];
+    expect(completenessTrend(hist, 'hub')).toEqual([40, 80]);
+    expect(completenessTrend([], 'hub')).toEqual([]);
   });
 });

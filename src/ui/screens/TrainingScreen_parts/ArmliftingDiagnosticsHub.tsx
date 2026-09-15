@@ -19,7 +19,7 @@ import { failuresFor, faultsFor, movementFor, relevantTestsFor, diagImplementFor
 import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../../../engines/arm/armlift-cause.engine';
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';
-import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween, loadDiagHistory, clearDiagHistory, historyDeltaFor } from '../../../engines/arm/armlift-history.engine';
+import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween, loadDiagHistory, clearDiagHistory, historyDeltaFor, completenessTrend } from '../../../engines/arm/armlift-history.engine';
 import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
@@ -286,6 +286,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     flexHoldSec: diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
     extHoldSec: diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
     mobilityFails: mobility.fails,
+    pinchL: state.pinchL ? parseFloat(state.pinchL) : null,
+    pinchR: state.pinchR ? parseFloat(state.pinchR) : null,
     silverGripper: state.silverGripper,
     acwrZone: acwr?.zone ?? null,
     elbowPain: diag.elbowPain,
@@ -424,6 +426,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
         cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
         silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
+        completenessPct: completeness.pct,
       });
     } catch { /* noop */ }
     setHistTick((x) => x + 1);
@@ -734,12 +737,21 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               Прошлый замер {retests.prev.date}: {retests.list.map((r) => r.text).join(' · ')}
             </div>
           )}
+          {completeness.missing.includes('мобильность') && (
+            <div className="ad-muted" data-arm="lift-mob-hint">Для честного вердикта — вбей градусы разгибания/сгибания и проверь мизинец большим</div>
+          )}
           {retests.due && (
             <div className="ad-muted" data-arm="lift-retest-due">{retests.due}</div>
           )}
           {(() => {
             const delta = historyDeltaFor(diagHistory, diag.implement);
-            return delta ? (<div className="ad-muted" data-arm="lift-history-delta">Динамика: {delta}</div>) : null;
+            const trend = completenessTrend(diagHistory, diag.implement);
+            return (
+              <>
+                {delta ? (<div className="ad-muted" data-arm="lift-history-delta">Динамика: {delta}</div>) : null}
+                {trend.length >= 2 ? (<div className="ad-muted" data-arm="lift-completeness-trend">Полнота: {trend.slice(-5).join(' → ')}%</div>) : null}
+              </>
+            );
           })()}
           {diagHistory.length > 0 && (
             <div className="ad-list" data-arm="lift-history" aria-label="Диагностика: история диагнозов">

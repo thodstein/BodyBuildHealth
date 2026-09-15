@@ -435,7 +435,7 @@ export function ArmAutoConstructor() {
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [diagWeakPoints, setDiagWeakPoints] = useState<ArmWeakPoint[]>([]);
   /** PRO-5 real: grip-коррекции из армлифтинг-хаба (только дисциплина armlifting; стол не трогаем). */
-  const [armliftCorrections, setArmliftCorrections] = useState<{ items: ArmliftInjectionItem[]; spec: Array<{ week: number; targetSets: Record<string, number>; dayMap: Record<string, string> }>; weakArmNote?: string; orderNote?: string }>(() => {
+  const [armliftCorrections, setArmliftCorrections] = useState<{ items: ArmliftInjectionItem[]; spec: Array<{ week: number; targetSets: Record<string, number>; dayMap: Record<string, string> }>; weakArmNote?: string; orderNote?: string; completeness?: { pct: number; missing: string[] } }>(() => {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_armlifting_corrections') : null;
       const j = raw ? JSON.parse(raw) : null;
@@ -449,6 +449,7 @@ export function ArmAutoConstructor() {
           spec: Array.isArray((j as any).spec) ? (j as any).spec.slice(0, 6) : [],
           ...(((j as any).weakArmNote && typeof (j as any).weakArmNote === 'string') ? { weakArmNote: String((j as any).weakArmNote) } : {}),
           ...(((j as any).orderNote && typeof (j as any).orderNote === 'string') ? { orderNote: String((j as any).orderNote) } : {}),
+          ...(((j as any).completeness && typeof (j as any).completeness === 'object') ? { completeness: (j as any).completeness as { pct: number; missing: string[] } } : {}),
         };
       }
       return { items: [], spec: [] };
@@ -645,7 +646,7 @@ export function ArmAutoConstructor() {
           const ord = typeof al?.armliftOrderNote === 'string' && al.armliftOrderNote ? String(al.armliftOrderNote) : undefined;
           const comp = al?.armliftCompleteness && typeof al.armliftCompleteness === 'object' ? al.armliftCompleteness as { pct: number; missing: string[] } : null;
           if (clean.length) {
-            const pack = { items: clean, spec: specClean, ...(note ? { weakArmNote: note } : {}), ...(ord ? { orderNote: ord } : {}) };
+            const pack = { items: clean, spec: specClean, ...(note ? { weakArmNote: note } : {}), ...(ord ? { orderNote: ord } : {}), ...(comp ? { completeness: comp } : {}) };
             setArmliftCorrections(pack);
             try { localStorage.setItem('he_armlifting_corrections', JSON.stringify(pack)); } catch {}
             const compNote = comp && typeof comp.pct === 'number' && comp.pct < 60 ? ` · полнота ${comp.pct}% — ${comp.missing?.join(', ') || ''}` : '';
@@ -1012,6 +1013,11 @@ export function ArmAutoConstructor() {
           plan = inj.plan;
           if (inj.injected > 0 || inj.notes.length) {
             plan.rationale = [...(plan.rationale || []), `Армлифтинг-коррекции: ${inj.notes.join(' · ')}`];
+          }
+          const cp = (armliftCorrections as any).completeness as { pct: number; missing: string[] } | undefined;
+          if (cp && typeof cp.pct === 'number') {
+            const tag = cp.pct < 100 ? ` · полнота ${cp.pct}% — довбей: ${cp.missing?.join(', ') || ''}` : ` · полнота ${cp.pct}%`;
+            plan.rationale = [...(plan.rationale || []), `Диагностика полнота:${tag}`];
           }
         }
       } catch {}

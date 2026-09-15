@@ -14,6 +14,8 @@ export interface ArmliftDiagSnapshot {
   farmerHoldSec?: number | null;
   cocLevel?: number | null;
   silverSec?: number | null;
+  /** D21: полнота диагностики на момент снапшота (0–100). */
+  completenessPct?: number | null;
 }
 
 export type ArmliftRetestVerdict = 'up' | 'hold' | 'stagnant' | 'deload' | 'no_data';
@@ -81,9 +83,22 @@ export function historyDeltaFor(history: ArmliftDiagSnapshot[], implement: strin
     const bits: string[] = [];
     if (a.weakLink !== b.weakLink) bits.push(`звено: ${a.weakLink} → ${b.weakLink}`);
     if (a.cause !== b.cause) bits.push(`причина: ${a.cause} → ${b.cause}`);
+    if (a.completenessPct != null && b.completenessPct != null && a.completenessPct !== b.completenessPct) {
+      bits.push(`полнота: ${a.completenessPct}% → ${b.completenessPct}%`);
+    }
     if (!bits.length) return `без смены (${b.weakLink}/${b.cause} держится с ${a.date})`;
     return bits.join(' · ');
   } catch { return null; }
+}
+
+/** D21: простые sparkline данные полноты по истории снаряда. */
+export function completenessTrend(history: ArmliftDiagSnapshot[], implement: string): number[] {
+  try {
+    return (Array.isArray(history) ? history : [])
+      .filter((s) => s && s.implement === implement && s.completenessPct != null)
+      .map((s) => Number(s.completenessPct))
+      .filter((n) => Number.isFinite(n));
+  } catch { return []; }
 }
 
 /** Недель между датами ISO (округление вниз, минимум 0). */
