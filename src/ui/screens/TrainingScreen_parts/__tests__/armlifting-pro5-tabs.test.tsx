@@ -117,6 +117,12 @@ describe('PRO-5 UI: помост + диагностика + коррекция',
     expect(document.body.textContent).toContain('релевантны: Farmer-hold');
     expect(document.body.textContent).toContain('пора перетест');
   });
+  it('D17: порядок в дне виден в коррекции', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.click(screen.getByText('🔧 Коррекция'));
+    expect(document.body.textContent).toContain('в конце тренировки');
+  });
   it('Коррекция напрямую открывается с топ-3', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

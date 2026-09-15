@@ -25,6 +25,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
 import { correctionsToInjectionItems, intensityForCause } from '../../../engines/arm/armlift-injection.engine';
+import { orderCorrectionsForDay, sessionOrderNote } from '../../../engines/arm/armlift-session-rules.engine';
 import { applyToPlanner } from './planner-bridge';
 import { AdRoot, AdCard, AdSec, AdGrid, AdChip, AdBtn, AdBanner, AdCta, AdStat } from './arm-design-system';
 import { haptics } from '../../../core/native-bridge';
@@ -381,7 +382,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           diagSpecBlock: specBlock,
           /** PRO-5 real: упражнения в план — только armlifting-ветка конструктора читает. */
           diagCauseDetail: { cause: cause.cause, confidence: cause.confidence, evidence: cause.evidence, fix: cause.fix },
-          armliftExercises: correctionsToInjectionItems(corrections, 3, intensityForCause(cause.cause)),
+          armliftExercises: correctionsToInjectionItems(orderCorrectionsForDay(corrections), 3, intensityForCause(cause.cause)),
+          armliftOrderNote: sessionOrderNote(corrections),
           armliftSpec: specBlock.map((w) => ({ week: w.week, targetSets: w.targetSets, dayMap: w.dayMap })),
           armliftWeakArmNote: asymForDiag != null && asymForDiag > 15 ? 'слабой рукой первой' : undefined,
         },
@@ -773,6 +775,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               Разминка: {corrections.filter((c) => c.warmup).map((c) => c.warmup).join(' · ')}
             </div>
           )}
+          <div className="ad-muted" data-arm="lift-corr-order">{sessionOrderNote(corrections)}</div>
           <div className="lift-group">Спец-блок волной</div>
           <div className="ad-row" aria-label="Длина спец-блока">
             <AdChip active={diag.specWeeks !== 6} onClick={() => setD({ specWeeks: 4 })}>4 нед</AdChip>

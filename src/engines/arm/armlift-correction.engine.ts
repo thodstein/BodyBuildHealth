@@ -96,8 +96,9 @@ const ENDURANCE: PoolEntry[] = [
 
 const WRIST_EXT: PoolEntry[] = [
   { exId: 'wrist_ext_bb', protocol: 'Ладони вниз, разгибание к себе на жжение', dose: '3×15–25', freq: '3–4×/нед', source: 'Баланс flex/ext', sets: 3, reps: [15, 25], restSec: 60, dayTag: 'SupportGrip' },
-  { exId: 'wrist_roller', protocol: 'Вверх-вниз без провала запястья в сгиб', dose: '3 подъёма', freq: '2×/нед', source: 'Gripnatic roller', sets: 3, reps: [1, 3], restSec: 90, dayTag: 'SupportGrip' },
+  { exId: 'wrist_roller', protocol: 'Вверх-вниз без провала запястья в сгиб (на время 60с — тоже зачёт)', dose: '3 подъёма', freq: '2×/нед', source: 'Gripnatic roller', sets: 3, reps: [1, 3], restSec: 90, dayTag: 'SupportGrip' },
   { exId: 'reverse_ez_curl', protocol: 'Пронированный хват, строго — двойной эффект на экстензоры', dose: '3×12', freq: '2×/нед', source: 'NSCA ext balance', sets: 3, reps: [10, 12], restSec: 90, dayTag: 'SupportGrip' },
+  { exId: 'lever_top', protocol: 'Удержание рычага горизонтально 10–15с (контроль, incl. девиации)', dose: '3×холд', freq: '2×/нед', source: 'Sledge levering', sets: 3, reps: [1, 1], holdSeconds: 12, restSec: 90, dayTag: 'SupportGrip', fixes: ['mid', 'lockout'] },
 ];
 
 /** Снаряд → его же упражнение в каталоге (практика по правилам). */

@@ -10,6 +10,7 @@ import { saveDiagSnapshot, loadDiagHistory, lastSnapshotFor, retestVerdict, week
 import { assessArmliftMobility } from '../armlift-mobility.engine';
 import { diagImplementForReportWeakest, relevantTestsFor } from '../armlift-failure-modes.engine';
 import { intensityForCause } from '../armlift-injection.engine';
+import { orderCorrectionsForDay, sessionOrderNote } from '../armlift-session-rules.engine';
 import { clearDiagHistory } from '../armlift-history.engine';
 import { getArmExerciseById } from '../../../core/exercise-catalog-arm';
 import { buildArmliftingReport, buildArmliftingHtml, buildArmliftingCsv } from '../armlifting-diagnostics.engine';
@@ -546,5 +547,41 @@ describe('PRO-5 D16: релевантные тесты и доза от прич
     expect(items.every((t) => t.intensityPct === 0.5)).toBe(true);
     const def = correctionsToInjectionItems(rankArmliftCorrections('thumb'));
     expect(def.every((t) => t.intensityPct === 0.65)).toBe(true);
+  });
+});
+
+describe('PRO-5 D17: порядок в дне, рычаг, orderNote', () => {
+  it('макс первым, экстензоры последними (стабильно)', () => {
+    const mixed = rankArmliftCorrections('support_endurance', 'rolling_thunder', {});
+    const wrist = rankArmliftCorrections('wrist_ext', 'rolling_thunder', {});
+    const ordered = orderCorrectionsForDay([...wrist, ...mixed]);
+    expect(ordered[0].exId).toBe('farmer_walk_fat');
+    expect(ordered[ordered.length - 1].exId).toMatch(/wrist_ext_bb|wrist_roller|reverse_ez_curl|lever_top/);
+  });
+  it('нота: размещение + Saxon→Hub + широкий→узкий', () => {
+    expect(sessionOrderNote([])).toContain('в конце тренировки');
+    const note = sessionOrderNote([
+      { exId: 'saxon_bar' }, { exId: 'hub_pinch' }, { exId: 'plate_pinch_hold' },
+    ] as any);
+    expect(note).toContain('Saxon до Hub');
+    expect(note).toContain('широкий');
+  });
+  it('рычаг — реальный id каталога в пуле запястья', () => {
+    const cands = rankArmliftCorrections('wrist_ext', 'rolling_thunder', {
+      inPlanIds: ['wrist_ext_bb', 'wrist_roller', 'reverse_ez_curl'],
+    });
+    expect(cands.some((c) => c.exId === 'lever_top')).toBe(true);
+    expect(cands.every((c) => getArmExerciseById(c.exId) != null)).toBe(true);
+  });
+  it('orderNote попадает в rationale плана', () => {
+    const plan = {
+      level: 'intermediate', rationale: [] as string[],
+      weeks: [{ week: 1, sessions: [{ sessionTag: 'SupportGrip', exercises: [] }] }],
+    };
+    const r = injectArmliftCorrections(plan, [{ exId: 'rolling_thunder', sets: 3 }], {
+      workMax: { grip_support: 80 }, orderNote: 'Хват — в конце тренировки',
+    });
+    expect(r.injected).toBe(1);
+    expect(r.plan.rationale.join(' ')).toContain('Порядок в дне');
   });
 });

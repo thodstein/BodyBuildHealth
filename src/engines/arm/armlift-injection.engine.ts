@@ -26,6 +26,8 @@ export interface ArmliftInjectionOpts {
   weekIdxs?: number[];
   /** Асимметрия: пометка «слабой рукой первой» в комментарий упражнения. */
   weakArmNote?: string | null;
+  /** D17: порядок/размещение в дне — строкой в rationale плана. */
+  orderNote?: string | null;
 }
 
 export interface ArmliftInjectionResult {
@@ -173,6 +175,9 @@ export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[
   }
   if (injected > 0) {
     copy.rationale = [...(copy.rationale || []), `Армлифтинг-диагностика: инъецировано ${injected} коррекций хвата`];
+  }
+  if (opts.orderNote) {
+    copy.rationale = [...(copy.rationale || []), `Порядок в дне: ${opts.orderNote}`];
   }
   return { plan: copy, injected, skippedBudget, skippedDup, skippedDeload, notes };
 }
