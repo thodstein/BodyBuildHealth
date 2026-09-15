@@ -340,6 +340,34 @@ describe('BBDiagnosticsHub', () => {
     expect(screen.getByRole('button', { name: /Спец-блок \(.ics\)/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /в годовой план/ })).toBeInTheDocument();
   });
+  it('стоп-флаги вставки: острая боль блочит вставку, план цел', () => {
+    const saved = JSON.stringify({ plan: { weeks: [
+      { sessions: [{ day: 1, exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 4, rir: 2, role: 'primary' }] }] },
+    ] }, date: '2026-01-01' });
+    localStorage.setItem('he_bb_plan_saved', saved);
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    const chip = document.querySelector('[data-bb="stop-flag"][aria-label="Острая боль"]');
+    expect(chip).not.toBeNull();
+    fireEvent.click(chip!);
+    expect(chip!.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getAllByText(/Стоп:/)[0]).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Вставить коррекции в план/ }));
+    expect(localStorage.getItem('he_bb_plan_saved')).toBe(saved);
+    expect(localStorage.getItem('he_bb_plan_saved_prev')).toBeNull();
+  });
+  it('пол и сон берутся из профиля, своих селектов в хабе нет', () => {
+    localStorage.setItem('he_profile_v2', JSON.stringify({ settings: { personal: { sex: 'female' }, lifestyle: { sleepHours: 7 } } }));
+    localStorage.setItem('he_bb_plan_saved', JSON.stringify({ weeks: [{ sessions: [{ exercises: [{ exerciseName: 'bench_bar', name: 'Жим штанги лёжа', muscle: 'chest', sets: 4, rir: 2, role: 'primary' }] }] }] }));
+    render(<BBDiagnosticsHub />);
+    expect(screen.queryByTestId('bb-sex')).toBeNull();
+    expect(screen.queryByLabelText(/Сон, часов/)).toBeNull();
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /В ББ-авто/ }));
+    const payload = JSON.parse(localStorage.getItem('he_planner_apply') || '{}');
+    expect(payload.kind).toBe('weakpoints');
+    expect(payload.data.sleepHours).toBe(7);
+  });
   it('мост несёт движения (movementDriver/singleLeg), без нагрузки', () => {
     render(<BBDiagnosticsHub />);
     fireEvent.click(screen.getAllByText('Верх груди')[0]);

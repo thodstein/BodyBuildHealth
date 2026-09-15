@@ -64,8 +64,6 @@ type BBState = {
   exerciseFilterUnilateral: boolean;
   wristCm: string;
   sex: '' | 'male' | 'female';
-  sleepHours: string;
-  pain010: string;
   specWeeks: string;
   showSpecBlock: boolean;
   stimCheating: boolean;
@@ -92,8 +90,6 @@ const DEFAULT_STATE: BBState = {
   exerciseFilterUnilateral: false,
   wristCm: '',
   sex: '',
-  sleepHours: '',
-  pain010: '',
   specWeeks: '8',
   showSpecBlock: false,
   stimCheating: false,
@@ -311,6 +307,24 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { return undefined; }
   }, []);
 
+  // Пол и сон — из профиля (единый источник; в хабе своих селектов нет, без дублей)
+  const profileSex = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const s = p?.settings?.personal?.sex ?? p?.personal?.sex;
+      return s === 'female' || s === 'male' ? (s as 'male' | 'female') : '';
+    } catch { return ''; }
+  }, []);
+  const profileSleep = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const n = Number(p?.settings?.lifestyle?.sleepHours ?? p?.lifestyle?.sleepHours);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch { return null; }
+  }, []);
+  // state.sex — замороженный легаси-фолбэк (UI-селекта больше нет); профиль приоритетнее
+  const effSex = ((profileSex || state.sex || '') as '' | 'male' | 'female');
+
   const diarySessions: any[] = useMemo(() => {
     try {
       const raw = localStorage.getItem('he_workout_log_v1') || localStorage.getItem('he_training_log') || localStorage.getItem('he_workout_log_v2') || '[]';
@@ -375,18 +389,18 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, [state.acutePain, state.swelling, state.numbness, state.jointClickPain]);
   const readiness = useMemo(() => {
     try {
-      const pain = state.pain010 ? parseFloat(state.pain010) : null;
-      const sl = state.sleepHours ? parseFloat(state.sleepHours) : null;
+      // Сон — из профиля; боль сегодня в хабе не спрашиваем (нет данных — нет штрафа, честно)
+      const sl = profileSleep;
       const danger = Object.values(perMuscleAcwr as any).filter((v: any) => v?.zone === 'dangerous').length;
       return assessBbReadiness({
         sleepHours: Number.isFinite(sl as number) ? (sl as number) : null,
-        pain010: Number.isFinite(pain as number) ? (pain as number) : null,
+        pain010: null,
         // VBT живёт в Анализе силы — сюда не входит (movement-only)
         vbtLossPct: null,
         dangerMuscles: danger,
       });
     } catch { return { level: 'green', reasons: [], advice: '' } as any; }
-  }, [state.pain010, state.sleepHours, perMuscleAcwr]);
+  }, [profileSleep, perMuscleAcwr]);
   // PRO-3 R2 + PRO-4 S3: return-to после стоп-флагов (ступень выбирается вручную) — гейт вставки
   const returnToPlan = useMemo(() => {
     try { return buildReturnToPlan(redFlags as any); } catch { return null; }
@@ -502,7 +516,6 @@ export const BBDiagnosticsHub: React.FC = () => {
       return symmetryTriadDeviation({ neck: nk, bicep: b, calf: c });
     } catch { return null; }
   }, [state.circ, measNum]);
-  const sleepNum = state.sleepHours ? parseFloat(state.sleepHours) : null;
 
   const toggleWeak = (id: string) => {
     setState(s => {
@@ -551,7 +564,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         level,
         factVolume: factVolume as any,
         perMuscleAcwr: perMuscleAcwr as any,
-        sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
+        sleepHours: Number.isFinite(profileSleep as number) ? (profileSleep as number) : null,
         vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
         hist28: histLazy as any,
         e1rmTrend: trendLazy as any,
@@ -564,7 +577,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     try {
       const f: Record<string, number> = {};
       for (const [k, v] of Object.entries((factVolume as any) || {})) f[k] = (v as any)?.effectiveSets ?? (v as any)?.directSets ?? 0;
-      specPayload = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      specPayload = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
       // топ-3 на каждую слабую зону с бонусом слабой головки (макс 6) + сами головки
       const seen = new Set<string>();
       const heads: string[] = [];
@@ -625,7 +638,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         preferredExerciseIds: topIds,
         weakHeads,
         specBlock: specPayload,
-        sleepHours: Number.isFinite(sleepNum as number) ? sleepNum : null,
+        sleepHours: Number.isFinite(profileSleep as number) ? profileSleep : null,
         // Симметрия L/R — движения (остаётся); направление перекоса — из истории
         lrVerdicts: (() => { try { return lrVerdictsFromSessions(diarySessions as any); } catch { return []; } })(),
         lrDirection: (() => {
@@ -711,7 +724,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         level,
         factVolume: factVolume as any,
         perMuscleAcwr: perMuscleAcwr as any,
-        sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
+        sleepHours: Number.isFinite(profileSleep as number) ? (profileSleep as number) : null,
         vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
         hist28: histLazy as any,
         e1rmTrend: trendLazy as any,
@@ -725,7 +738,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         if (wh && !heads.includes(wh)) heads.push(wh);
       }
       const f: Record<string, number> = {};
-      spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
     } catch { /* noop */ }
     // Экспорт движений: L/R + скрининг-драйвер + односторонний (нагрузка — чужие хабы, в файл не едет)
     let pro2: Record<string, unknown> = {};
@@ -787,7 +800,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         level,
         factVolume: factVolume as any,
         perMuscleAcwr: perMuscleAcwr as any,
-        sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
+        sleepHours: Number.isFinite(profileSleep as number) ? (profileSleep as number) : null,
         vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
         hist28: histLazy as any,
         e1rmTrend: trendLazy as any,
@@ -797,7 +810,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         canonicalOf: canonicalMuscle,
       });
       const f: Record<string, number> = {};
-      spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
     } catch { /* noop */ }
     let pro2csv: Record<string, unknown> = {};
     try {
@@ -849,7 +862,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       // Блок года выбирает годовой план сам (первый ББ-блок) — селекта в диагностике нет, без дублей
       const key = bbBlocks[0].ref.blockKey;
       const f: Record<string, number> = {};
-      const sb = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      const sb = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
       const patch = bbSpecToAnnualPatch(sb, report.weakZonesGranular);
       if (!patch) {
         setToast('Не удалось собрать патч спец-блока');
@@ -875,7 +888,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         return;
       }
       const f: Record<string, number> = {};
-      const sb = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      const sb = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
       const ics = buildBBSpecIcs(
         { weeks: (sb.weeks || []).map((w) => ({ week: w.week, targetSets: w.targetSets, note: w.note })), weakZones: report.weakZonesGranular },
         { title: 'ББ спец-блок' },
@@ -917,7 +930,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         level,
         factVolume: factVolume as any,
         perMuscleAcwr: perMuscleAcwr as any,
-        sleepHours: Number.isFinite(sleepNum as number) ? (sleepNum as number) : null,
+        sleepHours: Number.isFinite(profileSleep as number) ? (profileSleep as number) : null,
         vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
         hist28: hist28 as any,
         e1rmTrend: e1rmTrend as any,
@@ -937,15 +950,15 @@ export const BBDiagnosticsHub: React.FC = () => {
         },
       });
     } catch { return {}; }
-  }, [report.weakZonesGranular, level, factVolume, perMuscleAcwr, sleepNum, planAudit, hist28, e1rmTrend, measNum, state.circ.heightCm, state.wristCm]);
+  }, [report.weakZonesGranular, level, factVolume, perMuscleAcwr, profileSleep, planAudit, hist28, e1rmTrend, measNum, state.circ.heightCm, state.wristCm]);
   const specBlock = useMemo(() => {
     try {
       if (!report.weakZonesGranular.length) return null;
       const f: Record<string, number> = {};
       for (const [k, v] of Object.entries((factVolume as any) || {})) f[k] = (v as any)?.effectiveSets ?? (v as any)?.directSets ?? 0;
-      return buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      return buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
     } catch { return null; }
-  }, [report.weakZonesGranular, factVolume, level, state.specWeeks, state.sex]);
+  }, [report.weakZonesGranular, factVolume, level, state.specWeeks, effSex]);
   const top3ByZone = useMemo(() => {
     const out: Record<string, ReturnType<typeof rankCorrectionsForWeak>> = {};
     for (const z of report.weakZonesGranular.slice(0, 2)) {
@@ -965,12 +978,12 @@ export const BBDiagnosticsHub: React.FC = () => {
           missingAngles: aud?.angleCoverage.missing || [],
           missingStrict: aud?.strictCoverage.missing || [],
           inPlanIds: inPlan,
-          sex: state.sex || undefined,
+          sex: effSex || undefined,
         }).slice(0, 3);
       } catch { out[z] = []; }
     }
     return out;
-  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, state.sex, planAudit, bbPlan, profileEquipment]);
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, effSex, planAudit, bbPlan, profileEquipment]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {
@@ -1066,9 +1079,9 @@ export const BBDiagnosticsHub: React.FC = () => {
           if (hm === m || (LEGS.has(hm) && LEGS.has(m))) { weakHead = h; break; }
         }
       } catch { /* noop */ }
-      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, weakHead, asymPct: asym, equipment: profileEquipment, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: state.sex || undefined });
+      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, weakHead, asymPct: asym, equipment: profileEquipment, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: effSex || undefined });
     } catch { return []; }
-  }, [selectedDiagnosis, selectedExRaw, level, report.symmetry.ratios, report.weakZonesGranular, planAudit, state.sex, profileEquipment]);
+  }, [selectedDiagnosis, selectedExRaw, level, report.symmetry.ratios, report.weakZonesGranular, planAudit, effSex, profileEquipment]);
 
   const selectedProf = useMemo(() => {
     if (!selectedExRaw) return null;
@@ -1237,7 +1250,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     let specWeeks: Array<{ targetSets: Record<string, number> }> = [];
     try {
       const f: Record<string, number> = {};
-      const sb = buildSpecBlock({ weakZones: zones, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: state.sex || undefined });
+      const sb = buildSpecBlock({ weakZones: zones, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
       dayMap = sb.dayMap;
       specWeeks = sb.weeks || [];
     } catch { /* noop */ }
@@ -1513,6 +1526,45 @@ export const BBDiagnosticsHub: React.FC = () => {
               <button onClick={handleSpecIcs} data-bb="export-ics" style={{ width: '100%', minHeight: 48, marginTop: 6, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>📅 Спец-блок (.ics)</button>
               <button onClick={handleAnnualApply} data-bb="annual-apply" style={{ width: '100%', minHeight: 48, marginTop: 6, padding: '10px 14px', borderRadius: 10, background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.30)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>🗓 Спец-блок → в годовой план</button>
             </div>
+            {report.weakZonesGranular.length > 0 && (
+              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, lineHeight: 1.5 }} data-bb="stop-flags">
+                <b style={{ color: '#fff' }}>⛔ Стоп-флаги вставки (скрининг, не диагноз)</b>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  {([
+                    ['acutePain', 'Острая боль', 'в суставе/мышце'],
+                    ['swelling', 'Отёк', 'сустав опух'],
+                    ['numbness', 'Онемение', 'покалывание'],
+                    ['jointClickPain', 'Щелчки с болью', 'щёлкает и болит'],
+                  ] as Array<['acutePain' | 'swelling' | 'numbness' | 'jointClickPain', string, string]>).map(([k, title, desc]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      role="switch"
+                      aria-checked={state[k]}
+                      aria-pressed={state[k]}
+                      aria-label={title}
+                      data-bb="stop-flag"
+                      data-on={state[k] ? '1' : '0'}
+                      onClick={() => setState((s) => ({ ...s, [k]: !s[k] }))}
+                      style={{
+                        minHeight: 44, padding: '8px 12px', borderRadius: 999, border: '1px solid',
+                        borderColor: state[k] ? '#ef4444' : 'rgba(255,255,255,0.12)',
+                        background: state[k] ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.04)',
+                        color: state[k] ? '#ef4444' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      }}
+                    >
+                      {title}
+                    </button>
+                  ))}
+                </div>
+                {(redFlags as any).active && (
+                  <div style={{ marginTop: 6, color: '#fff' }} data-bb="stop-note">
+                    {(redFlags as any).blocked ? '⛔ ' : '⚠ '}{(redFlags as any).text} — при сомнениях к врачу.
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }}>Полный суставной скрининг — <b>🦴 Суставы и ортопедия</b> (здесь только гейт вставки).</div>
+              </div>
+            )}
             {report.weakZonesGranular.length > 0 && (
               <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                 <button onClick={handleInjectToPlan} data-bb="inject" style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>💉 Вставить коррекции в план</button>
