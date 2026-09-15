@@ -176,6 +176,11 @@
 
 ## §10. Женский слой — фаза 2 (Sep 14 2026): риски по препаратам фармакологии + вкладка «Анализы»
 
+> **Статус: ✅ ВЫПОЛНЕНО КОДОМ (Sep 15 2026, 2 коммита pathspec, без пуша):**
+> - **P1 `2df69c82`** (Ж1–Ж5): `getDrugThreshold(id,sex)` + контуры (V7/TZ/weekly/AR-нагрузка), `femaleDrugThresholdView` + карточки RiskScreen/RiskOverview (бейдж ♀ 1/4–1/10 + ссылка), `mapStackToPathologies(drugs,sex)` (5 женских патологий), lab-pharma женские пороги. Тесты: `female-phase2-risk` 25/25 + `risk-female-thresholds` UI 4/4; мужской JSON-lock.
+> - **P2 `7271a215`** (Л8–Л11): NEW `lab-norms.engine.ts` (`getLabNorm`/`FEMALE_LAB_BOUNDS` из `LAB_REFERENCES_FEMALE`; Hb ULN 155→150, GGT 32→31, +LLN), LabsCatalog/LabsCatalogTab/LabsScreen/LabsResults/LabsOverview/LabDiaryTab/ExtendedLabsTab, role-view (HCT 36–48 вместо ×0.85), легенда/бейджи ♀, femaleNote в 4 панелях, `FEMALE_MARKER_EC50` в clinical-analyzer. Тесты: `lab-norms-female` 10/10 + `labs-female-p2` UI 7/7 + паритет FEMALE_LAB_GROUPS; круг labs 804 + risk 65; `tsc --noEmit` 0 по проекту; `verify:apk-design` OK.
+> - Осознанное отклонение: `clinical-pathology-db` НЕ менялся — женский ec50 сделан сепаратором `FEMALE_MARKER_EC50` в analyzer (общая база в других контурах цела).
+
 **Основание:** запрос пользователя: «добавь в план риски для женщин по препаратам фармакологии адаптировать, вкладку анализы адаптировать отображение и индикацию под женщин тоже». **Аудит выполнен чтением кода (grep-инвентарь потребителей), код НЕ менялся — это план.** Единый женский источник уже существует: `FEMALE_AAS_PROFILES` (22 профиля: yellow/red мг/нед, androgenIndex, contraindicated) + `assessFemaleAas` (`engines/female-aas-risk.ts:31/92`) — сейчас подключён только к калькулятору поддержки, но НЕ к вкладке «Риски» и НЕ к фарма-контурам.
 
 ### §10.1 Аудит: риски по препаратам (фармакология) — что показывается сейчас
