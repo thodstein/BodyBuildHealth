@@ -101,7 +101,10 @@ export function lrAsymPct(left: number, right: number): number | null {
 
 const SIDE_RU: Record<string, string> = { left: 'левая', right: 'правая' };
 
-/** Вердикт по группе: норма / наблюдение / добивка слабой (+15–25%). */
+/** Вердикт по группе: норма / наблюдение / добивка слабой (+15–25%).
+ * Пороги 7%/12% — РАБОЧИЕ, не медицинские (литература: универсальный 10–15% порог
+ * асимметрии не имеет прочной базы, Bishop-линия; важно направление, а не величина).
+ * Направление контролирует флип-гейт хаба (bb-lr-history): сторона плавает — без добивки. */
 export function lrVerdictFor(group: string, left: number, right: number): LrGroupVerdict {
   const l = Number(left) || 0;
   const r = Number(right) || 0;

@@ -65,4 +65,28 @@ describe('bb-movement-screen', () => {
     expect(d.regressed).toEqual(['arms']);
     expect(d.text).toMatch(/исправлено heels/);
   });
+  it('гонометр <35° + наклон корпуса — драйвер голеностоп', () => {
+    const r = resolveMovementDriver({ ...clean, ankleDeg: 28, trunkUpright: false });
+    expect(r.driver).toBe('ankle');
+  });
+  it('изолированный гонометр без видимых компенсаций — не драйвер (честно)', () => {
+    expect(resolveMovementDriver({ ...clean, ankleDeg: 28 }).driver).toBe('none');
+  });
+  it('гонометр в норме не ломает чистый паттерн', () => {
+    expect(resolveMovementDriver({ ...clean, ankleDeg: 38 }).driver).toBe('none');
+  });
+  it('FPPA tiebreak: качественная чистая, разрыв ≥10° — слабая сторона угломером', () => {
+    const v = singleLegVerdict({ splitSquatL: 'pass', splitSquatR: 'pass', rdlL: 'pass', rdlR: 'pass', fppaL: 18, fppaR: 6 });
+    expect(v.weakSide).toBe('left');
+    expect(v.text).toMatch(/угломер/);
+  });
+  it('FPPA: разрыв <10° — тихо', () => {
+    const v = singleLegVerdict({ splitSquatL: 'pass', splitSquatR: 'pass', rdlL: null, rdlR: null, fppaL: 12, fppaR: 6 });
+    expect(v.weakSide).toBeNull();
+  });
+  it('FPPA не перебивает качественный провал', () => {
+    const v = singleLegVerdict({ splitSquatL: 'fail', splitSquatR: 'pass', rdlL: null, rdlR: null, fppaL: 5, fppaR: 20 });
+    expect(v.weakSide).toBe('left');
+    expect(v.text).not.toMatch(/угломер/);
+  });
 });

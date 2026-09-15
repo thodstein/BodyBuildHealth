@@ -368,6 +368,71 @@ describe('BBDiagnosticsHub', () => {
     expect(payload.kind).toBe('weakpoints');
     expect(payload.data.sleepHours).toBe(7);
   });
+  it('флип стороны в истории — добивка не фиксируется (шум измерения)', () => {
+    const s = (n: number) => Array.from({ length: n }, () => ({ weightKg: 20, reps: 10 }));
+    localStorage.setItem('he_workout_log_v1', JSON.stringify([
+      { date: '2026-09-01', exercises: [{ muscleGroup: 'biceps', side: 'left', sets: s(2) }, { muscleGroup: 'biceps', side: 'right', sets: s(5) }] },
+    ]));
+    localStorage.setItem('he_bb_lr_history', JSON.stringify([
+      { date: '2026-08-01', group: 'biceps', weakSide: 'left', asymPct: 15, verdict: 'topup' },
+      { date: '2026-08-08', group: 'biceps', weakSide: 'right', asymPct: 14, verdict: 'topup' },
+      { date: '2026-08-15', group: 'biceps', weakSide: 'left', asymPct: 16, verdict: 'topup' },
+    ]));
+    render(<BBDiagnosticsHub />);
+    expect(screen.getAllByText(/шум измерения/)[0]).toBeInTheDocument();
+    // в мост уехал watch без добивки
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /В ББ-авто/ }));
+    const payload = JSON.parse(localStorage.getItem('he_planner_apply') || '{}');
+    const bic = (payload.data.lrVerdicts as any[]).find((v) => v.group === 'biceps');
+    expect(bic.verdict).toBe('watch');
+    expect(bic.topUpSets).toBe(0);
+  });
+  it('стабильная сторона ≥3 замеров — добивка сохраняется', () => {
+    const s = (n: number) => Array.from({ length: n }, () => ({ weightKg: 20, reps: 10 }));
+    localStorage.setItem('he_workout_log_v1', JSON.stringify([
+      { date: '2026-09-01', exercises: [{ muscleGroup: 'biceps', side: 'left', sets: s(2) }, { muscleGroup: 'biceps', side: 'right', sets: s(5) }] },
+    ]));
+    localStorage.setItem('he_bb_lr_history', JSON.stringify([
+      { date: '2026-08-01', group: 'biceps', weakSide: 'right', asymPct: 15, verdict: 'topup' },
+      { date: '2026-08-08', group: 'biceps', weakSide: 'right', asymPct: 14, verdict: 'topup' },
+      { date: '2026-08-15', group: 'biceps', weakSide: 'right', asymPct: 16, verdict: 'topup' },
+    ]));
+    render(<BBDiagnosticsHub />);
+    expect(screen.queryByText(/шум измерения/)).toBeNull();
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /В ББ-авто/ }));
+    const payload = JSON.parse(localStorage.getItem('he_planner_apply') || '{}');
+    const bic = (payload.data.lrVerdicts as any[]).find((v) => v.group === 'biceps');
+    expect(bic.verdict).toBe('topup');
+    expect(bic.topUpSets).toBeGreaterThan(0);
+  });
+  it('FPPA tiebreak: чистая качественная + разрыв ≥10° — слабая сторона угломером', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Скрининг/ }));
+    fireEvent.click(screen.getByTestId('bb-split-l'));
+    fireEvent.click(screen.getAllByText('Чисто')[0]);
+    fireEvent.click(screen.getByTestId('bb-split-r'));
+    fireEvent.click(screen.getAllByText('Чисто')[0]);
+    fireEvent.change(screen.getByTestId('bb-fppa-l'), { target: { value: '18' } });
+    fireEvent.change(screen.getByTestId('bb-fppa-r'), { target: { value: '6' } });
+    expect(screen.getAllByText(/угломер/)[0]).toBeInTheDocument();
+  });
+  it('старому снимку >42 дней — бейдж перепроверки', () => {
+    const old = new Date(Date.now() - 50 * 86400000).toISOString().slice(0, 10);
+    localStorage.setItem('he_bb_screen_history', JSON.stringify([{ date: old, fails: ['heels'] }]));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Скрининг/ }));
+    expect(screen.getAllByText(/пора перепроверить/)[0]).toBeInTheDocument();
+  });
+  it('мост несёт MMC-строку из карточки', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /В ББ-авто/ }));
+    const payload = JSON.parse(localStorage.getItem('he_planner_apply') || '{}');
+    expect(typeof payload.data.mmc).toBe('string');
+    expect(payload.data.mmc).toMatch(/фокус/);
+  });
   it('мост несёт движения (movementDriver/singleLeg), без нагрузки', () => {
     render(<BBDiagnosticsHub />);
     fireEvent.click(screen.getAllByText('Верх груди')[0]);

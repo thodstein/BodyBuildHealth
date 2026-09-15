@@ -58,6 +58,9 @@ type BBState = {
   splitR: '' | 'pass' | 'fail';
   rdlL: '' | 'pass' | 'fail';
   rdlR: '' | 'pass' | 'fail';
+  /** Опциональный угломер FPPA (градусы, замер с фото). Только tiebreak при чистой качественной оценке. */
+  fppaL: string;
+  fppaR: string;
   exerciseSelectedId: string | null;
   exerciseFilterSfr: number;
   exerciseFilterProfile: string;
@@ -84,6 +87,7 @@ const DEFAULT_STATE: BBState = {
   kneeToWallCm: '', ankleDeg: '', heelRetest: '',
   handsOnHipsBetter: false,
   splitL: '', splitR: '', rdlL: '', rdlR: '',
+  fppaL: '', fppaR: '',
   exerciseSelectedId: null,
   exerciseFilterSfr: 0,
   exerciseFilterProfile: 'all',
@@ -377,9 +381,28 @@ export const BBDiagnosticsHub: React.FC = () => {
     heelRaiseRetest: state.heelRetest === 'better' ? true : state.heelRetest === 'same' ? false : null,
   }), [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.kneeToWallCm, state.ankleDeg, state.heelRetest]);
 
-  // P1: L/R-объём из дневника
+  // P1: L/R-объём из дневника + флип-гейт по истории (D2: сторона плавает — шум измерения,
+  // добивку не фиксируем; стабильная сторона ≥3 замеров — добивка оправдана).
   const lrVerdicts = useMemo(() => {
-    try { return lrVerdictsFromSessions(diarySessions as any); } catch { return []; }
+    try {
+      const base = lrVerdictsFromSessions(diarySessions as any);
+      let hist: BbLrSnapshot[] = [];
+      try {
+        const raw = localStorage.getItem('he_bb_lr_history');
+        hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
+      } catch { /* noop */ }
+      return base.map((v) => {
+        if ((v.verdict === 'topup' || v.verdict === 'watch') && v.weakSide) {
+          try {
+            const d = summarizeLrDirection(hist, v.group);
+            if (d && d.flipped && !d.persistent) {
+              return { ...v, verdict: 'watch' as const, topUpSets: 0, text: `${v.text} · сторона плавает — шум измерения, добивку не фиксируем` };
+            }
+          } catch { /* noop */ }
+        }
+        return v;
+      });
+    } catch { return []; }
   }, [diarySessions]);
   // P2/P3: готовность + красные флаги
   const redFlags = useMemo(() => {
@@ -465,12 +488,14 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.kneeToWallCm, state.ankleDeg, state.heelRetest, state.handsOnHipsBetter]);
   const singleLeg = useMemo(() => {
     try {
+      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n >= 0 ? n : null; };
       return singleLegVerdict({
         splitSquatL: (state.splitL || null) as any, splitSquatR: (state.splitR || null) as any,
         rdlL: (state.rdlL || null) as any, rdlR: (state.rdlR || null) as any,
+        fppaL: num(state.fppaL), fppaR: num(state.fppaR),
       });
     } catch { return { weakSide: null, text: '' } as any; }
-  }, [state.splitL, state.splitR, state.rdlL, state.rdlR]);
+  }, [state.splitL, state.splitR, state.rdlL, state.rdlR, state.fppaL, state.fppaR]);
   const ohsCodes = useMemo(() => {
     try {
       return ohsFailCodes({
@@ -627,32 +652,18 @@ export const BBDiagnosticsHub: React.FC = () => {
             handsOnHipsBetter: state.handsOnHipsBetter || null,
           });
         } catch { return null; } })(),
-        singleLeg: (() => { try {
-          return singleLegVerdict({
-            splitSquatL: (state.splitL || null) as any, splitSquatR: (state.splitR || null) as any,
-            rdlL: (state.rdlL || null) as any, rdlR: (state.rdlR || null) as any,
-          });
-        } catch { return null; } })(),
+        singleLeg,
         vbtLossPct: null,
         weakCauses: weakCausesPayload,
         preferredExerciseIds: topIds,
         weakHeads,
         specBlock: specPayload,
+        // MMC-строка: приёмник ББ-авто её уже читает (typeof string) — шлём тот же текст, что в карточке
+        mmc: (() => { try { const a = mmcAdvice; return a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null; } catch { return null; } })(),
         sleepHours: Number.isFinite(profileSleep as number) ? profileSleep : null,
-        // Симметрия L/R — движения (остаётся); направление перекоса — из истории
-        lrVerdicts: (() => { try { return lrVerdictsFromSessions(diarySessions as any); } catch { return []; } })(),
-        lrDirection: (() => {
-          try {
-            const raw = localStorage.getItem('he_bb_lr_history');
-            const hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
-            const out: Array<{ group: string; text: string }> = [];
-            for (const v of lrVerdictsFromSessions(diarySessions as any).slice(0, 2)) {
-              const d = summarizeLrDirection(hist, v.group);
-              if (d) out.push({ group: v.group, text: d.text });
-            }
-            return out;
-          } catch { return []; }
-        })(),
+        // Симметрия L/R — движения, с флип-гейтом (сторона плавает — без добивки); направление — из истории
+        lrVerdicts,
+        lrDirection,
       },
       source: 'intellectual',
     });
@@ -743,7 +754,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     // Экспорт движений: L/R + скрининг-драйвер + односторонний (нагрузка — чужие хабы, в файл не едет)
     let pro2: Record<string, unknown> = {};
     try {
-      const lr = lrVerdictsFromSessions(diarySessions as any).map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
+      const lr = lrVerdicts.map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
       let moveDriverEx: unknown = null;
       try {
         moveDriverEx = resolveMovementDriver({
@@ -757,16 +768,20 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { /* noop */ }
       let singleLegEx: unknown = null;
       try {
-        singleLegEx = singleLegVerdict({
-          splitSquatL: ((state as any).splitL || null) as any, splitSquatR: ((state as any).splitR || null) as any,
-          rdlL: ((state as any).rdlL || null) as any, rdlR: ((state as any).rdlR || null) as any,
-        });
+        singleLegEx = singleLeg;
+      } catch { /* noop */ }
+      // MMC-строка в экспорт (приёмник ББ-авто её уже читает; в мост добавлена тем же релизом)
+      let mmcEx: string | null = null;
+      try {
+        const a = mmcAdvice;
+        mmcEx = a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null;
       } catch { /* noop */ }
       pro2 = {
         lr,
         movementDriver: moveDriverEx,
         singleLeg: singleLegEx,
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
+        mmc: mmcEx,
       };
       try { Object.assign(pro2, buildPro3Export()); } catch { /* noop */ }
     } catch { /* noop */ }
@@ -814,7 +829,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
     let pro2csv: Record<string, unknown> = {};
     try {
-      const lr = lrVerdictsFromSessions(diarySessions as any).map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
+      const lr = lrVerdicts.map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
       let moveDriverCsv: unknown = null;
       try {
         moveDriverCsv = resolveMovementDriver({
@@ -829,7 +844,9 @@ export const BBDiagnosticsHub: React.FC = () => {
       pro2csv = {
         lr,
         movementDriver: moveDriverCsv,
+        singleLeg,
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
+        mmc: (() => { try { const a = mmcAdvice; return a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null; } catch { return null; } })(),
       };
       try { Object.assign(pro2csv, buildPro3Export()); } catch { /* noop */ }
     } catch { /* noop */ }
@@ -1929,6 +1946,11 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <BbSheetSelect label="RDL на ноге П" value={state.rdlR} onChange={(v) => setState((s) => ({ ...s, rdlR: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Гуляет' }]} testId="bb-rdl-r" />
               </div>
               <div style={{ fontSize: 11, color: singleLeg.weakSide ? '#f59e0b' : '#22c55e' }} data-bb="single-leg-verdict">{singleLeg.text}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                <BbNum label="Угломер FPPA Л, ° (необязательно)" value={state.fppaL} onChange={(v) => setState(s => ({ ...s, fppaL: v }))} placeholder="—" step={1} testId="bb-fppa-l" />
+                <BbNum label="Угломер FPPA П, ° (необязательно)" value={state.fppaR} onChange={(v) => setState(s => ({ ...s, fppaR: v }))} placeholder="—" step={1} testId="bb-fppa-r" />
+              </div>
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }}>Угломер — только tiebreak при чистой качественной оценке (разрыв ≥10°). Без угломера вердикт не меняется.</div>
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="screen-history">
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
@@ -1945,6 +1967,17 @@ export const BBDiagnosticsHub: React.FC = () => {
                 }} data-bb="screen-snapshot" style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Снимок сегодня</button>
               </div>
               <div style={{ fontSize: 11, color: '#fff' }} data-bb="screen-delta">{screenDelta.text}</div>
+              {(() => {
+                try {
+                  const last = screenHist.length ? screenHist[screenHist.length - 1] : null;
+                  if (!last) return null;
+                  const days = Math.floor((Date.now() - new Date(last.date + 'T12:00:00').getTime()) / 86400000);
+                  if (days > 42) {
+                    return <div style={{ marginTop: 4, color: '#f59e0b' }} data-bb="screen-stale">⏰ Снимку {days} дн — пора перепроверить (норма re-screen 4–6 нед).</div>;
+                  }
+                  return null;
+                } catch { return null; }
+              })()}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ankle-grid">
               <BbNum label="Колено к стене, см" value={state.kneeToWallCm} onChange={(v) => setState(s => ({ ...s, kneeToWallCm: v }))} placeholder="12" step={0.5} />

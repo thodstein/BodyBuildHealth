@@ -13,6 +13,7 @@ export interface OhsScreenInput {
   armsOverMidfoot: boolean;
   lumbarNeutral: boolean;
   kneeToWallCm?: number | null;
+  /** Гонометр дорсифлексии (градусы). <35° — драйвер голеностоп даже без heel-retest (рабочий порог PoinT GO 35–38°). */
   ankleDeg?: number | null;
   /** re-test с подпяткой 2.5 см: 'better' | 'same' | null (не делали) */
   heelRetest?: 'better' | 'same' | null;
@@ -32,8 +33,10 @@ export interface MovementDriverResult {
 /** Приоритет distal→proximal: голеностоп первичен (PoinT GO), дальше ТБС/грудь/плечо/кор. */
 export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResult {
   const ktw = input.kneeToWallCm;
-  const ankleBad = !input.heelsFlat || (ktw != null && Number.isFinite(ktw) && (ktw as number) < 9);
-  // 1. Голеностоп: пятки рвутся ИЛИ knee-to-wall <9 ИЛИ подпятка чинит паттерн
+  const deg = input.ankleDeg;
+  const goniBad = deg != null && Number.isFinite(deg) && (deg as number) < 35;
+  const ankleBad = !input.heelsFlat || (ktw != null && Number.isFinite(ktw) && (ktw as number) < 9) || goniBad;
+  // 1. Голеностоп: пятки рвутся ИЛИ knee-to-wall <9 ИЛИ гонометр <35° ИЛИ подпятка чинит паттерн
   if (input.heelRetest === 'better' || (ankleBad && (!input.hipBelowParallel || !input.trunkUpright || input.kneeValgus))) {
     return {
       driver: 'ankle',
@@ -81,12 +84,30 @@ export interface SingleLegScreen {
   splitSquatR: 'pass' | 'fail' | null;
   rdlL: 'pass' | 'fail' | null; // потеря баланса / скругление поясницы
   rdlR: 'pass' | 'fail' | null;
+  /** Опциональный угломер FPPA (градусы фронтальной проекции колена, ручной замер с фото).
+   * Рабочая норма: межсторонняя разница <10° (литература: MDD<19°, пороги task-specific;
+   * 10° — рабочий watch-порог, не медицинский). Без угломера — только качественная оценка. */
+  fppaL?: number | null;
+  fppaR?: number | null;
 }
+
+export const FPPA_SIDE_GAP_DEG = 10;
 
 export function singleLegVerdict(s: SingleLegScreen): { weakSide: 'left' | 'right' | null; text: string } {
   const failsL = [s.splitSquatL, s.rdlL].filter((v) => v === 'fail').length;
   const failsR = [s.splitSquatR, s.rdlR].filter((v) => v === 'fail').length;
-  if (failsL === 0 && failsR === 0) return { weakSide: null, text: 'Односторонний: обе стороны чистые' };
+  if (failsL === 0 && failsR === 0) {
+    // Угломер как tiebreak: качественная оценка чистая, но угломер видит разрыв
+    const fl = s.fppaL, fr = s.fppaR;
+    if (fl != null && fr != null && Number.isFinite(fl) && Number.isFinite(fr) && Math.abs(fl - fr) >= FPPA_SIDE_GAP_DEG) {
+      const weak = fl > fr ? 'left' : 'right';
+      return {
+        weakSide: weak as 'left' | 'right',
+        text: `Односторонний: качественная оценка чистая, но угломер FPPA ${fl}° vs ${fr}° (разрыв ≥${FPPA_SIDE_GAP_DEG}°) — слабее ${weak === 'left' ? 'левая' : 'правая'}, перепроверь движением`,
+      };
+    }
+    return { weakSide: null, text: 'Односторонний: обе стороны чистые' };
+  }
   if (failsL === failsR) return { weakSide: null, text: `Односторонний: обе стороны с замечаниями (${failsL}/${failsR}) — чинить симметрично` };
   const weak = failsL > failsR ? 'left' : 'right';
   return {
