@@ -549,11 +549,18 @@
   - NEW `bb-quality-grade-scale` — лок-тест: канон + границы обеих функций + «одинаковый
     уровень при одних баллах»; потребители (quality-score-v2/parity/quality-weekly/v2/report/
     quality-actions) 84/84.
-- [ ] Волна 4 — остаток: 4.3 (разрез god-component) / 4.5 (мобилка) — **отложено осознанно**:
-  4.3 — `BbAutoConstructor.tsx` 8418 строк, файл весь день правят параллельные агенты
-  (в спокойном окне нужен отдельный этап: вынос 5-7 компонентов шагов + перепрогон UI-тестов);
-  4.5 — в том же файле 19 нативных select/checkbox (замена на АПК-кит) — широкий UI-свип
-  поверх активной параллельной работы, риск конфликтов выше пользы; `verify:apk-design` зелёный.
+- [x] **Волна 4 — 4.3 этап 1 (служебный слой)**: NEW `bb-auto-constructor-shared.tsx` — вынесены
+  `CollapsibleCard`, типы шагов/фаз (`Step`/`BBPhase`/`PlanMode`), константы (`WEAK_GROUPS`/
+  `BB_WM_KEYS`/`BB_WM_RU`/`TAG_LABELS_RU`/`PHASE_TECHNIQUES`/`DONOR_GROUPS`) и все чистые хелперы
+  (`getPhaseMap`/`phaseForWeek`/`isWeakMuscle`/`normalizeDonorTargets`/`computePhases`/
+  `exerciseComment`/`annualBlockCtxToPrepPatch`/`annualActiveBlockLine`/`backSubgroupLabel`/
+  `armHeadLabel`/`isAbRotationActive`/`chipBtn`/`useInlineDialogA11y`) — перенос 1-в-1, публичные
+  символы ре-экспортированы (потребители/тесты не менялись); `BbAutoConstructor.tsx` −~300 строк
+  (в т.ч. чистка устаревших импортов). Проверено: bb-UI 8 файлов 30/30 (в т.ч. `bb-a11y-dialogs`
+  читает оба файла), `rest-hooks-native`+`apk-top-pack` 99/99 (1 чужой unhandled ReportsScreen),
+  `tsc` 0. **Остаток 4.3** (вынос шаговых render-компонентов со state-props) и **4.5** (19 нативных
+  select/checkbox → АПК-кит) — отдельными этапами: файл правят параллельные агенты, широкий
+  UI-свип в шторме рискованнее пользы; `verify:apk-design` зелёный.
 - [ ] Волна 5 — каталог/данные
 
 ---

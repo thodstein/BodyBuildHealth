@@ -2,18 +2,20 @@
  * 4.4 (план BB-AUTO-EXHAUSTIVE-PRO): a11y inline-модалок ББ-авто.
  * Полный jsdom-рендер god-component виснет, поэтому guard по исходнику:
  * role=dialog + aria-modal + Escape + возврат фокуса; сообщения — role=status.
+ * Этап 1 §4.3: a11y-хук вынесен в `bb-auto-constructor-shared.tsx` (guard читает оба файла).
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const SRC = readFileSync(resolve(__dirname, '..', 'BbAutoConstructor.tsx'), 'utf8');
+const SHARED = readFileSync(resolve(__dirname, '..', 'bb-auto-constructor-shared.tsx'), 'utf8');
 
 describe('4.4 a11y inline-модалок ББ-авто (source-guard)', () => {
   it('единый a11y-хук присутствует (роль/esc/фокус)', () => {
-    expect(SRC).toContain('function useInlineDialogA11y');
-    expect(SRC).toContain("e.key === 'Escape'");
-    expect(SRC).toContain('ref.current?.focus()');
+    expect(SHARED).toContain('function useInlineDialogA11y');
+    expect(SHARED).toContain("e.key === 'Escape'");
+    expect(SHARED).toContain('ref.current?.focus()');
   });
 
   it('все 3 inline-модалки — role=dialog + aria-modal', () => {

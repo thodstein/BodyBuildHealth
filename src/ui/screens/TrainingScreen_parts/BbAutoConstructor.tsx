@@ -35,7 +35,7 @@ import { averageWeeklyScores, scoreVolumeWeek, scoreProWeek, gradeFor } from '..
 import { computeRegimeMrvMult, sessionLimitsFor, aggregateBBVolume } from '../../../engines/bb/bb-volume.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
-import { PATTERN_RU as SUMMARY_PATTERN_RU, SUBGROUP_MAP, SUBGROUP_LABEL_RU as SUMMARY_SUBGROUP_LABEL_RU } from '../../../engines/bb/bb-summary.engine';
+import { PATTERN_RU as SUMMARY_PATTERN_RU } from '../../../engines/bb/bb-summary.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { buildMEVCalibration, recordMEVCalibrationWeek, resolveMEVAfterCalibration, isMEVCalibrationComplete, mevCalibrationProgress, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, mevSignalDegradation, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
 import { adaptForPEDs, computeAASEquivDose, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
@@ -51,7 +51,6 @@ import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from '
 import { subscribePlannerApply, applyToPlanner, type WeakpointsPayload } from './planner-bridge';
 import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
-import { activeBlockForWeek, weekForDate } from '../../../engines/annual-training/block-builders.engine';
 import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip } from './training-ui';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
@@ -74,7 +73,7 @@ import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
 
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
-import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, getPhaseConfig, type PhaseDistribution } from '../../../engines/periodization';
+import { getPhaseConfig } from '../../../engines/periodization';
 import { PlanExportCard } from './PlanExportCard';
 import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
@@ -86,7 +85,6 @@ import {
   prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,   buildShowTimeline, configFromPlan,
   computeReadiness, spillRiskScore, isShortCycle,
   saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice, recommendCarbStrategyFromTrial, liveAdjustForPeakDay,
-  canonicalWaterStrategy, canonicalSodiumStrategy,
   recommendBBTaperConfig, sRPEAdjustment,
   buildShowChecklist, loadShowChecklist, toggleShowChecklistItem,
   type BBTaperRecommendation,
@@ -145,309 +143,24 @@ import {
 } from '../../../engines/bb/bb-prep-post-show-log.engine';
 import { PREP_LAB_PANEL, PREP_PROCEDURES, PREP_HYDRATION_GUIDELINES } from '../../../engines/bb/bb-prep-process.engine';
 
-/* ── CollapsibleCard helper для шага 5 (заголовок-кнопка карточки) ── */
-const CollapsibleCard: React.FC<{
-  title: string;
-  defaultOpen?: boolean;
-  headerStyle?: React.CSSProperties;
-  badge?: string;
-  children: React.ReactNode;
-}> = ({ title, defaultOpen = false, headerStyle, badge, children }) => {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div style={{ ...CARD, padding: 0, overflow: 'hidden', marginTop: 8 }}>
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        aria-expanded={open}
-        style={{
-          width: '100%',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '11px 12px',
-          cursor: 'pointer',
-          background: headerStyle?.background || 'linear-gradient(135deg, rgba(96,165,250,0.10), rgba(96,165,250,0.03))',
-          border: 'none',
-          borderBottom: open ? '1px solid rgba(255,255,255,0.06)' : 'none',
-          textAlign: 'left',
-          ...headerStyle,
-        }}
-      >
-        <span style={{ fontSize: 12, fontWeight: 800, color: headerStyle?.color || '#fff' }}>{title}</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(255,255,255,0.07)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>{badge}</span>}
-          <span style={{ fontSize: 11, color: '#fff', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
-        </span>
-      </button>
-      <div style={{ display: open ? 'block' : 'none', padding: '10px 12px' }}>{children}</div>
-    </div>
-  );
+/* ── Вынесенный служебный слой (этап 1 §4.3): CollapsibleCard, типы шагов/фаз,
+   константы групп и чистые хелперы — в `bb-auto-constructor-shared.tsx`. ── */
+import {
+  CollapsibleCard, WEAK_GROUPS, BB_WM_KEYS, BB_WM_RU, TAG_LABELS_RU, PHASE_TECHNIQUES,
+  backSubgroupLabel, armHeadLabel, isAbRotationActive,
+  annualBlockCtxToPrepPatch, annualActiveBlockLine,
+  getPhaseMap, phaseForWeek, isWeakMuscle, DONOR_GROUPS, normalizeDonorTargets,
+  computePhases, exerciseComment, chipBtn, useInlineDialogA11y,
+  type Step, type BBPhase, type PlanMode,
+} from './bb-auto-constructor-shared';
+export {
+  PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive,
+  annualBlockCtxToPrepPatch, annualActiveBlockLine,
 };
-
-type Step = 'params' | 'ped' | 'split' | 'plan' | 'weights' | 'quality' | 'adjust' | 'contest' | 'annual' | 'tools';
-type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
-type PlanMode = 'generic_split' | 'bb_cycle' | 'programs';
-
-const WEAK_GROUPS = [
-  ['chest','Грудь'],['chest_upper','Верх груди'],['chest_lower','Низ груди'],
-  ['back','Спина'],['back_width','Ширина спины'],['back_thickness','Толщина спины'],
-  ['shoulders','Плечи (общее)'],['delt_front','Передняя дельта'],['delt_mid','Средняя дельта'],['delt_rear','Задняя дельта'],
-  ['quads','Квадрицепс'],['hamstrings','Бицепс бедра'],['glutes','Ягодицы'],['calves','Икры'],
-  ['biceps','Бицепс'],['triceps','Трицепс'],['forearms','Предплечья'],
-  ['abs','Пресс'],['traps','Трапеции'],
-] as const;
-const BB_WM_KEYS = ['chest','back','quads','hamstrings','shoulders','biceps','triceps','glutes','calves','abs'] as const;
-const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
-const TAG_LABELS_RU: Record<string, string> = {
-  Push: 'Толкающие', Pull: 'Тянущие', Legs: 'Ноги', Upper: 'Верх', Lower: 'Низ',
-  FullBody: 'Всё тело', Chest: 'Грудь', Back: 'Спина', Shoulders: 'Плечи', Arms: 'Руки',
-  ChestBack: 'Грудь+Спина', ShouldersArms: 'Плечи+Руки', Torso: 'Торс', Limbs: 'Конечности',
-  UpperPower: 'Верх(сила)', LowerPower: 'Низ(сила)', UpperHyp: 'Верх(гиперт)', LowerHyp: 'Низ(гиперт)',
-  };
-export const PHASE_TECHNIQUES: Record<BBPhase, string[]> = {
-  accumulation: ['Темповые повторы (TUT)', 'Пауза в растянутой позиции', 'Суперсеты антагонистов'],
-  intensification: ['Дроп-сеты (последний подход)', 'Рест-пауза (compounds)', 'Форсированные повторы (с партнёром)'],
-  deload: ['Медленные негативы', 'Стрейч-пауза'],
-  peaking: ['Околопредельные веса (RIR 0)', 'Кластеры 5×2'],
-};
-
-// P2-6: ограниченный кеш (max 8 записей — достаточно для типичных значений weeks 4-24).
-const _phaseMapCache = new Map<string, Map<number, BBPhase>>();
-function getPhaseMap(totalWeeks: number, goal: string = 'mass'): Map<number, BBPhase> {
-  const cacheKey = `${totalWeeks}:${goal}`;
-  if (_phaseMapCache.has(cacheKey)) return _phaseMapCache.get(cacheKey)!;
-  // P2-6: evict oldest if cache > 8 entries (anti-leak)
-  if (_phaseMapCache.size >= 8) {
-    const firstKey = _phaseMapCache.keys().next().value;
-    if (firstKey) _phaseMapCache.delete(firstKey);
-  }
-  // P1: синхронизируем deloadFreq с движком buildBBPlan (deloadFreq = weeks>=6 ? 4 : 0),
-  // иначе календарь/баннер показывал «без делода», а сгенерированный план содержал deload-неделю.
-  const deloadFreq = totalWeeks >= 6 ? 4 : 0;
-  const dist: PhaseDistribution[] = distributePhasesUnified(totalWeeks, deloadFreq, goal as any);
-  const map = new Map<number, BBPhase>();
-  for (const d of dist) {
-    for (const w of d.weeks) {
-      map.set(w, d.phase as BBPhase);
-    }
-  }
-  for (let w = 1; w <= totalWeeks; w++) {
-    if (!map.has(w)) map.set(w, 'accumulation' as BBPhase);
-  }
-  _phaseMapCache.set(cacheKey, map);
-  return map;
-}
-
-function phaseForWeek(week: number, totalWeeks: number, goal: string = 'mass'): BBPhase {
-  return getPhaseMap(totalWeeks, goal).get(week) || 'accumulation';
-}
-
-/** Проверка: мышца в списке слабых групп (с учётом родительских групп). */
-function isWeakMuscle(muscle: string, weakPoints: string[]): boolean {
-  if (weakPoints.includes(muscle)) return true;
-  const PARENT: Record<string, string> = { delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders' };
-  return weakPoints.includes(PARENT[muscle] ?? '');
-}
-
-const DONOR_GROUPS: readonly (readonly [string, string])[] = [
-  ['legs', 'Ноги (квадры+хамсы+ягодицы+икры)'],
-  ['arms', 'Руки (бицепс+трицепс+предплечья)'],
-  ['core', 'Кор'],
-  ...WEAK_GROUPS,
-];
-
-function normalizeDonorTargets(donors: string[], targets: string[] = []): string[] {
-  const targetCanonical = targets.map(canonicalMuscle);
-  const out: string[] = [];
-  const expandedOut: string[] = [];
-  for (const donor of donors) {
-    if (!donor || out.includes(donor) || out.length >= 2) continue;
-    const expanded = expandDonorMuscles([donor]);
-    if (expanded.some(m => targetCanonical.includes(canonicalMuscle(m)))) continue;
-    if (expanded.some(m => expandedOut.includes(canonicalMuscle(m)))) continue;
-    out.push(donor);
-    expandedOut.push(...expanded.map(canonicalMuscle));
-  }
-  return out;
-}
+export type { AnnualBlockCtxToPrepPatch } from './bb-auto-constructor-shared';
 
 
-/** Метка подгруппы спины (backSubgroup) для UI-бейджа. */
-export function backSubgroupLabel(sub: string): string {
-  switch (sub) {
-    case 'back_width': return '📐 Ширина (латы)';
-    case 'back_thickness': return '📐 Толщина';
-    case 'upper_back': return '📐 Верх спины';
-    case 'rear_delts': return '📐 Задние дельты';
-    case 'traps': return '📐 Трапеции';
-    case 'erectors': return '📐 Разгибатели';
-    default: return '';
-  }
-}
-
-/** Метка головки руки (movementPattern) для UI-бейджа. */
-export function armHeadLabel(pattern: string): string {
-  switch (pattern) {
-    case 'biceps_lengthened': return '🦴 Длинная гол. (растяжка)';
-    case 'biceps_shortened': return '🦴 Короткая гол.';
-    case 'biceps_hammer': return '🦴 Брахиалис (молот)';
-    case 'triceps_overhead': return '🦴 Длинная гол. (overhead)';
-    case 'triceps_pushdown': return '🦴 Латер./мед. (pushdown)';
-    case 'triceps_compound': return '🦴 Compound (жим узк.)';
-    case 'forearm': return '🦴 Предплечья';
-    default: return '';
-  }
-}
-
-/** A/B-ротация реально применена в плане: хотя бы одна сессия несёт
- *  stash'нутый avoid (abAvoidPatterns). Тогл вкл ≠ применена: faithful
- *  дословно и недели без sibling-сессий ротацию не включают. */
-export function isAbRotationActive(plan: any): boolean {
-  try {
-    return (plan?.weeks || []).some((w: any) => (w?.sessions || []).some((s: any) => ((s as any).abAvoidPatterns || []).length > 0));
-  } catch { return false; }
-}
-
-/** Мини-чип для параметров упражнения (общий из training-ui). */
-
-/* ─── Годовой план → ББ-авто: маппер контекста блока (he_bb_plan_saved_ctx) ─── */
-
-/** Параметры шага «🏁 Contest prep», предзаполненные из контекста блока года. */
-export interface AnnualBlockCtxToPrepPatch {
-  peakWeekCategory: BBContestCategory;
-  peakSpec: ContestSpecialization;
-  prepShowDate: string;
-  prepTaperWeeks: number;
-  prepWeeks: number;
-  prepWaterMode: WaterStrategy;
-  prepSodiumMode: SodiumStrategy;
-  prepCarbMode: CarbLoadStrategy;
-  prepConfirmedManip: boolean;
-}
-
-/** Чистый маппер peakConfig блока годового плана → предзаполнение шага contest. */
-export function annualBlockCtxToPrepPatch(
-  ctx: { peakWeek?: boolean; weeks?: number; peakConfig?: Record<string, unknown> | null },
-): AnnualBlockCtxToPrepPatch | null {
-  if (!ctx.peakWeek || !ctx.peakConfig) return null;
-  const cfg = ctx.peakConfig as Partial<BBContestPrepConfig>;
-  const category = cfg.category && cfg.category in CATEGORY_PROFILES
-    ? (cfg.category as BBContestCategory) : 'mens_physique';
-  return {
-    peakWeekCategory: category,
-    peakSpec: cfg.specialization ?? 'none',
-    prepShowDate: cfg.showDate ?? isoAddDays(isoToday(), 8 * 7),
-    prepTaperWeeks: Number.isFinite(cfg.weeksOut) ? Math.min(4, Math.max(1, Math.round(cfg.weeksOut!))) : 2,
-    prepWeeks: ctx.weeks && ctx.weeks > 0 ? Math.min(52, Math.max(1, Math.round(ctx.weeks))) : 12,
-    prepWaterMode: canonicalWaterStrategy(cfg.waterStrategy ?? 'stable') as unknown as WaterStrategy,
-    prepSodiumMode: canonicalSodiumStrategy(cfg.sodiumStrategy ?? 'stable') as unknown as SodiumStrategy,
-    prepCarbMode: (cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : 'moderate') as unknown as CarbLoadStrategy,
-    prepConfirmedManip: !!cfg.confirmedManipulation,
-  };
-}
-
-function computePhases(totalWeeks: number, goal: string = 'mass'): { week: number; phase: BBPhase }[] {
-  const phases: { week: number; phase: BBPhase }[] = [];
-  for (let w = 1; w <= totalWeeks; w++) {
-    const p = phaseForWeek(w, totalWeeks, goal);
-    phases.push({ week: w, phase: p });
-  }
-  return phases;
-}
-
-function exerciseComment(ex: BBExercise, weakPoints: string[], focusGroup: string, phase: BBPhase): string {
-  const parts: string[] = [];
-  const ruMuscle = (MUSCLE_LABEL_RU as any)[ex.muscle] || ex.muscle;
-  // Роль упражнения — подробно
-  if (ex.role === 'primary') {
-    parts.push(`🎯 Основное движение для «${ruMuscle}» — тяжёлая база, главный стимул гипертрофии этой группы`);
-    if (weakPoints.includes(ex.muscle)) parts.push(`🔥 Акцент на отстающую «${ruMuscle}» — дополнительный объём и приоритет в начале дня`);
-    if (focusGroup === ex.muscle) parts.push(`⭐ Группа специализации «${ruMuscle}» — повышенный приоритет объёма`);
-  } else {
-    parts.push(`📌 Добивочное для «${ruMuscle}» — изоляция/добивка после базы, RIR 2-3, контроль техники`);
-  }
-  // Характер нагрузки — развёрнуто
-  if (ex.character === 'тяж') parts.push('💪 Характер: тяж — 6-10 повторов, RIR 1-2, максимум механического натяга, отдых 2-3 мин');
-  else if (ex.character === 'памп') parts.push('🩸 Характер: памп — 12-20 повторов, RIR 3, метаболический стресс и жжение, пауза 45-60 сек');
-  else parts.push('🌿 Характер: лёгкий — техника/восстановление, RIR 4');
-  // Фаза — адаптация
-  const phaseDesc: Record<string, string> = {
-    accumulation: 'Фаза «Накопление»: умеренный вес, больший объём, темп 3-1-1-0, акцент на растянутой позиции',
-    intensification: 'Фаза «Интенсификация»: тяжёлый вес, RIR 1-2, темп 2-0-1-0, максимум напряжения',
-    deload: 'Фаза «Разгрузка»: 50% объёма, RIR 3-4, лёгкие веса — восстановление ЦНС и суставов',
-    peaking: 'Фаза «Пик»: минимальный объём, околопредельные веса RIR 0-1 — реализация силы',
-  };
-  if (phaseDesc[phase]) parts.push(`📅 ${phaseDesc[phase]}`);
-  // Паттерн движения — по-русски, из каталога или movementPattern упражнения
-  const catalogEx: any = EXERCISE_CATALOG.find((e: any) => e.name === ex.name || e.id === (ex as any).exerciseName);
-  const rawPat = catalogEx?.movementPattern || (ex as any).movementPattern || '';
-  const patRu = rawPat ? (SUMMARY_PATTERN_RU[rawPat] || rawPat) : '';
-  if (patRu) parts.push(`🧬 Паттерн: ${patRu}`);
-  // Дополнительные мышцы (синергисты) — по-русски
-  if (catalogEx?.targetMuscle) {
-    const targets = String(catalogEx.targetMuscle).split(',').map((t: string) => t.trim()).filter((t: string) => t && t !== ex.muscle);
-    if (targets.length) parts.push(`🎯 Дополнительно нагружает: ${targets.map((t: string) => (MUSCLE_LABEL_RU as any)[t] || t).join(', ')}`);
-  }
-  // Суперсет / техника
-  const ss = (ex as any).supersetWith;
-  if (ss) parts.push(`🔗 Суперсет с «${ss}» — выполняется без отдыха между упражнениями пары`);
-  const lastTech: any = (ex as any).workSets?.[ (ex as any).workSets.length - 1]?.technique;
-  if (lastTech) {
-    const tLabel = techniqueLabel(lastTech);
-    if (tLabel) parts.push(`💥 Интенсив-техника: ${tLabel} на последнем подходе — продлевает сет за отказом`);
-  }
-  // Вес / RIR / отдых — факт плана
-  const w = (ex as any).workSets?.[0]?.weight ?? 0;
-  const r = (ex as any).workSets?.[0]?.reps ?? ex.sets;
-  const rir = (ex as any).rir ?? 2;
-  const rest = (ex as any).restSeconds ?? (ex as any).workSets?.[0]?.restSeconds;
-  if (w) parts.push(`⚙️ Нагрузка плана: ${ex.sets}×${r} @ ${w} кг, RIR ${rir}${rest ? `, отдых ${rest} сек` : ''}`);
-  return parts.join(' · ');
-}
-
-/** п.18: строка карточки «📍 Текущий блок года» для даты (null — нет плана/активного блока). */
-export function annualActiveBlockLine(plan: AnnualTrainingPlan | null, iso: string): string | null {
-  if (!plan) return null;
-  const w = weekForDate(iso);
-  const active = w != null ? activeBlockForWeek(plan, w) : null;
-  if (!active) return null;
-  const statusIcon = active.status === 'built' ? '✅' : active.status === 'stale' ? '⚠' : active.status === 'error' ? '❌' : '·';
-  const statusLabel = active.status === 'built' ? 'собран' : active.status === 'stale' ? 'устарел' : active.status === 'error' ? 'ошибка' : 'не собран';
-  const kindLabel = active.ref.kind === 'PL' ? 'ПЛ' : active.ref.kind === 'BB' ? 'ББ' : '✍ Ручной';
-  const prepNote = active.ref.kind === 'BB' && active.ref.phase === 'contest_prep' && active.status === 'built'
-    ? ' · 🏁 contest prep — настройте пик в «🏁 Contest prep»' : '';
-  return `📍 Текущий блок года: нед ${w} · ${active.ref.phase} (${active.ref.startWeek}–${active.ref.startWeek + active.ref.weeks - 1}) · ${kindLabel} ${statusIcon} ${statusLabel}${prepNote}`;
-}
-
-
-/** Чип-кнопка для выбора акцентов/минимума/режима в Prep-цикле. */
-const chipBtn = (label: string, on = false, danger = false): React.CSSProperties => ({
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 11px', borderRadius: 12, cursor: 'pointer',
-  minHeight: 36, fontSize: 11, fontWeight: on ? 800 : 600,
-  background: on ? (danger ? 'rgba(239,68,68,0.18)' : 'rgba(236,72,153,0.18)') : 'rgba(255,255,255,0.04)',
-  border: on ? `1px solid ${danger ? '#ef4444' : '#ec4899'}66` : '1px solid rgba(255,255,255,0.1)',
-  color: on ? (danger ? '#f87171' : '#ec4899') : '#fff',
-});
-
-/**
- * 4.4: единый a11y-паттерн inline-модалок ББ-авто — role=dialog/aria-modal + Escape +
- * фокус на диалог/возврат фокуса (как TrainingModal; без визуального churn).
- */
-function useInlineDialogA11y(active: boolean, onClose: () => void) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
-  useEffect(() => {
-    if (!active) return;
-    const prev = document.activeElement as HTMLElement | null;
-    const t = setTimeout(() => ref.current?.focus(), 0);
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeRef.current(); };
-    document.addEventListener('keydown', onKey);
-    return () => { clearTimeout(t); document.removeEventListener('keydown', onKey); prev?.focus?.(); };
-  }, [active]);
-  return ref;
-}
+/* Все служебные хелперы вынесены в './bb-auto-constructor-shared' (этап 1 §4.3). */
 
 export const BbAutoConstructor: React.FC = () => {
   const linked = useDataLink();
