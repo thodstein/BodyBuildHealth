@@ -155,8 +155,8 @@ describe('NutritionScreen native hero', () => {
     );
     openNav(container);
     const sections = container.querySelectorAll('.nutrition-section');
-    expect(sections.length).toBe(6);
-    const ration = Array.from(sections).find((s) => s.textContent === 'Рацион') as HTMLElement;
+    expect(sections.length).toBe(4);
+    const ration = Array.from(sections).find((s) => s.textContent?.includes('Рацион')) as HTMLElement;
     fireEvent.click(ration);
     expect(ration.dataset.active).toBe('true');
     // Бургер-меню показывает все группы разом — План и Тапер обязаны быть в группе Рациона.
@@ -172,7 +172,7 @@ describe('NutritionScreen native hero', () => {
       container.querySelector('.nutrition-hero-card[data-section="ration"]') as HTMLElement,
     );
     openNav(container);
-    expect(container.querySelectorAll('.nutrition-section').length).toBe(6);
+    expect(container.querySelectorAll('.nutrition-section').length).toBe(4);
   });
 
   it('11. распил-2: Анализ держит Отчёт и Нагрузку как топ-табы со скоупом плана', async () => {

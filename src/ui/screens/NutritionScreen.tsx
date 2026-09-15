@@ -1567,17 +1567,33 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   return (
     <div className="screen nutrition nutrition-screen nutrition-tabs" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden', padding:0 }}>
       <div className="nutrition-tabs-head" style={{
-        display:'flex', flexDirection:'column', alignItems:'stretch', gap:0, padding:'6px 12px 0', flexShrink:0,
+        display:'flex', flexDirection:'column', alignItems:'stretch', gap:0, padding:'8px 12px 8px', flexShrink:0,
         background:'#18181b',
         borderBottom:'1px solid rgba(255,255,255,0.06)',
         position:'sticky', top:0, zIndex:20,
       }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-        <button onClick={() => setPage('hero')} aria-label="Назад" style={{
-          width:44, height:44, borderRadius:12, cursor:'pointer', fontSize:20, color:'#fff',
-          border:'none', background:'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-        }}>←</button>
-        <div style={{ flex:1, fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>Питание</div>
+        {/* Единый ряд навигации: назад + бургер + текущий раздел. Дубль-подпись раздела убран. */}
+        <div className="nutrition-nav-compact" style={{
+          display:'flex', alignItems:'center', gap:10,
+          flexShrink:0, background:'#18181b',
+        }}>
+          <button onClick={() => setPage('hero')} aria-label="Назад" style={{
+            width:48, height:48, borderRadius:14, cursor:'pointer', fontSize:20, color:'#fff',
+            border:'1px solid rgba(255,255,255,0.08)', background:'#202023', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+          }}>←</button>
+          <button onClick={() => setNavOpen(v => !v)} aria-label="Меню питания" aria-expanded={navOpen} className="nutrition-burger" style={{
+            width:48, height:48, borderRadius:14, cursor:'pointer', fontSize:22, fontWeight:800, flexShrink:0,
+            background: navOpen ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+            border: navOpen ? 'none' : '1px solid rgba(255,255,255,0.14)',
+            color: navOpen ? '#000' : '#fff', display:'flex', alignItems:'center', justifyContent:'center',
+          }}>☰</button>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', letterSpacing:-0.3, lineHeight:1.15 }}>Питание</div>
+            <div style={{ fontSize:11, fontWeight:600, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.3 }}>
+              {TAB_LABELS[tab] || tab}
+              <span style={{ color:'rgba(255,255,255,0.55)', fontWeight:400 }}> · {nutritionSection === 'diary' ? 'Дневник' : nutritionSection === 'ration' ? 'Рацион' : nutritionSection === 'kitchen' ? 'Кухня' : nutritionSection === 'analysis' ? 'Анализ' : nutritionSection === 'overview' ? 'Обзор' : 'Всё'}</span>
+            </div>
+          </div>
         {isNativeApp() && (
           <button
             onClick={() => setScanOpen(true)}
@@ -1585,38 +1601,16 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
             title="Сканировать штрихкод"
             className="nutrition-scan-btn"
             style={{
-              width:44, height:44, borderRadius:12, cursor:'pointer', flexShrink:0,
+              width:48, height:48, borderRadius:14, cursor:'pointer', flexShrink:0,
               display:'flex', alignItems:'center', justifyContent:'center',
               background:'rgba(var(--nut-accent-rgb, 0,230,138),0.12)',
               border:'1px solid rgba(var(--nut-accent-rgb, 0,230,138),0.25)',
               color:'var(--nut-accent, #00e68a)',
             }}
           >
-            <NativeIcon name="scan" size={17} />
+            <NativeIcon name="scan" size={18} />
           </button>
         )}
-        <span style={{ fontSize:9, color:'#fff' }}>
-          {nutritionSection === 'diary' ? 'Дневник' : nutritionSection === 'ration' ? 'Рацион' : nutritionSection === 'kitchen' ? 'Кухня' : nutritionSection === 'analysis' ? 'Анализ' : 'Всё'}
-        </span>
-        </div>
-        {/* Компакт-навигация: одна строка + ☰-меню сбоку (было 3 ряда лент — съедали ~150px экрана телефона) */}
-        <div className="nutrition-nav-compact" style={{
-          display:'flex', alignItems:'center', gap:8, padding:'6px 12px',
-          flexShrink:0, background:'#18181b',
-          borderTop:'1px solid rgba(255,255,255,0.06)',
-        }}>
-          <button onClick={() => setNavOpen(v => !v)} aria-label="Меню питания" aria-expanded={navOpen} style={{
-            width:44, height:44, borderRadius:12, cursor:'pointer', fontSize:20, flexShrink:0,
-            background: navOpen ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-            border: navOpen ? 'none' : '1px solid rgba(255,255,255,0.08)',
-            color: navOpen ? '#000' : '#fff', display:'flex', alignItems:'center', justifyContent:'center',
-          }}>☰</button>
-          <div style={{ flex:1, minWidth:0, fontSize:13, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-            {TAB_LABELS[tab] || tab}
-          </div>
-          <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)', flexShrink:0 }}>
-            {nutritionSection === 'diary' ? 'Дневник' : nutritionSection === 'ration' ? 'Рацион' : nutritionSection === 'kitchen' ? 'Кухня' : nutritionSection === 'analysis' ? 'Анализ' : 'Всё'}
-          </span>
         </div>
         {navOpen && (
           <div role="dialog" aria-label="Меню питания" style={{ position:'fixed', inset:0, zIndex:1000 }} onClick={e => { if (e.target === e.currentTarget) setNavOpen(false); }}>
@@ -1632,12 +1626,10 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
                 <button onClick={() => setNavOpen(false)} aria-label="Закрыть меню" style={{ width:44, height:44, borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:16 }}>✕</button>
               </div>
               {([
-                { id: 'diary' as NutritionSection, label: 'Дневник' },
-                { id: 'ration' as NutritionSection, label: 'Рацион' },
-                { id: 'kitchen' as NutritionSection, label: 'Кухня' },
-                { id: 'analysis' as NutritionSection, label: 'Анализ' },
-                { id: 'overview' as NutritionSection, label: 'Обзор' },
-                { id: 'all' as NutritionSection, label: 'Все' },
+                { id: 'diary' as NutritionSection, label: '📓 Дневник' },
+                { id: 'ration' as NutritionSection, label: '🥗 Рацион' },
+                { id: 'kitchen' as NutritionSection, label: '🍳 Кухня' },
+                { id: 'analysis' as NutritionSection, label: '📊 Анализ' },
               ]).map(s => (
                 <div key={s.id} style={{ marginBottom:10 }}>
                   <button onClick={() => { setNutritionSection(s.id); const first = (SECTION_TABS[s.id] || [])[0]; if (first) setTab(first as ActiveTab); }} className="nutrition-section" data-active={nutritionSection === s.id} aria-pressed={nutritionSection === s.id} style={{

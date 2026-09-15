@@ -13234,6 +13234,18 @@ html.app-native .nutrition-tabs-head {
   top: 0 !important;
   z-index: 30 !important;
 }
+html.app-native .nutrition-nav-compact {
+  min-height: 64px !important;
+}
+html.app-native .nutrition-burger {
+  width: 48px !important;
+  height: 48px !important;
+  font-size: 22px !important;
+}
+html.app-native .nutrition-nav-drawer .nutrition-chip,
+html.app-native .nutrition-nav-drawer .nutrition-section {
+  min-height: 44px !important;
+}
 html.app-native .nutrition-tabs-body {
   padding-bottom: var(--tabbar-clear) !important;
 }
