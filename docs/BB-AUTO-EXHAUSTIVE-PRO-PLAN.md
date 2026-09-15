@@ -579,12 +579,23 @@
   оба шага в `BbAutoConstructor.tsx` стали тонкими вызовами `<BbSplitStep/>`/`<BbPedWorkMaxStep/>`;
   файл −~376 строк (8624→8248), осиротевшие импорты почищены. Проверено: bb-UI + широкий круг
   **132/132** (11 файлов, 1 чужой unhandled ReportsScreen), `tsc` **0 по проекту**, `verify:apk-design` OK.
-- [ ] **4.3 — остаток (новая сессия)**: вынести оставшиеся шаги тем же паттерном
-  (`bb-step-<name>.tsx` + явные props, перенос 1-в-1): `renderParams` (~848), `renderPlanWithComments`
-  (~626), `renderWeights` (~104), `renderAdjust` (~367), `renderPrepCycleMode` (~488),
-  `renderExSwapModal` (~167); самые большие — `renderQuality` (~1143) и `renderContestPrep` (~1378):
-  у них ~80-100 state-ссылок, рекомендуется резать их **под-секциями** (каждая секция — компонент
-  с 8-15 props) или через контекст-объект, а не целиком. Инварианты для каждого этапа: `tsc` 0,
+- [x] **Волна 4 — 4.3 этап 3 (оставшиеся шаги, паттерн props)**: вынесены все 6 шагов 1-в-1
+  (`bb-step-<name>.tsx`, критерий переноса — Node-сверка тела против HEAD «identical modulo indent»):
+  - `bb-step-weights.tsx` (10 props) — шаг «⚖️ Реальные веса»;
+  - `bb-step-ex-swap.tsx` (7 props) — модалка замены упражнения (a11y-ref `useInlineDialogA11y` прокинут);
+  - `bb-step-adjust.tsx` (62 props) — шаг 6 «🛠 Ручная коррекция» (4 секции: фидбэк/наглядность/план-факт/редактор);
+  - `bb-step-prep-cycle.tsx` (49 props) — режим «🏁 Prep-цикл» (локальные чистые деривации catOpts/prepProfile/muscleRu перенесены внутрь);
+  - `bb-step-params.tsx` (101 prop) — шаг 1 «📋 Базовые параметры» (единственные отличия: `specializationSelection` и `isFemaleProfile` как props);
+  - `bb-step-plan.tsx` (26 props) — шаг 4 «📋 План» (единственное отличие: `actionRow` prop);
+  `BbAutoConstructor.tsx` 8061→6070 строк (−~2 тыс.), 30+ осиротевших импортов убрано; guard-тесты
+  `bb-a11y-dialogs`/`bb-auto-apk-controls` теперь читают `bb-step-*.tsx` (все 3 модалки и 0 нативных
+  контролов держатся по сумме файлов). Проверено по каждому этапу: bb-UI паки (8 файлов, вкл.
+  volume-toggle-e2e/dup/prep-cycle) + `rest-hooks-native`/`apk-top-pack` + `tsc` 0 по проекту +
+  `verify:apk-design` OK. **Шторм-инцидент**: параллельный `checkout` снёс незакоммиченные правки
+  Prep-цикла — переприменено и закоммичено сразу (урок: коммит в ту же минуту после зелёных тестов).
+- [ ] **4.3 — остаток (новая сессия)**: только `renderQuality` (~1143) и `renderContestPrep` (~1378):
+  у них ~80-100 state-ссылок, резать **под-секциями** (каждая секция — компонент с 8-15 props)
+  или через контекст-объект, а не целиком. Инварианты для каждого этапа: `tsc` 0,
   bb-UI паки (bb-auto-smoke/annual/prep-cycle/dup/volume-toggle/reproductive/a11y/apk-controls) +
   rest-hooks-native/apk-top-pack, `verify:apk-design`; коммит строго pathspec своих файлов.
 - [ ] Волна 5 — каталог/данные
