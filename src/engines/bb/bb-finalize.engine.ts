@@ -4664,6 +4664,54 @@ for (const week of next.weeks) {
     }
   }
 
+  // M3 FIX: пост-проход — убрать дубли упражнений внутри сессии (в beginner-планах
+  // leg-pump и feeder-проходы добавляли одно и то же, напр. «Разгибания ног в тренажёре»).
+  // Survivor — PRIMARY (если есть), иначе первое вхождение; сеты остальных сливаются в
+  // survivor до per-exercise капа; порядок сохраняется. Ключ = ОБА поля (exerciseName
+  // может совпадать у разных движений — напр. два пуловера).
+  for (const w of next.weeks) {
+    for (const s of w.sessions) {
+      if (!Array.isArray(s.exercises)) continue;
+      const groups = new Map<string, { survivor: any; pos: number; extras: any[] }>();
+      const passthrough: Array<{ ex: any; pos: number }> = [];
+      let order = 0;
+      for (const ex of s.exercises as any[]) {
+        const key = `${String(ex.exerciseName || '').toLowerCase().trim()}||${String(ex.name || '').toLowerCase().trim()}`;
+        if (key === '||') { passthrough.push({ ex, pos: order++ }); continue; }
+        const g = groups.get(key);
+        if (!g) { groups.set(key, { survivor: ex, pos: order++, extras: [] }); continue; }
+        if (g.survivor.role !== 'primary' && ex.role === 'primary') {
+          g.extras.push(g.survivor);
+          g.survivor = ex;
+        } else {
+          g.extras.push(ex);
+        }
+      }
+      for (const g of groups.values()) {
+        if (!g.extras.length) continue;
+        let cap = 5;
+        try { cap = perExerciseCap(options.level, g.survivor.muscle, options.trainingYears, options.onCourse); } catch { cap = 5; }
+        let cur = Array.isArray(g.survivor.workSets) ? g.survivor.workSets.length : (Number(g.survivor.sets) || 0);
+        const add: any[] = [];
+        for (const extra of g.extras) {
+          const ws = Array.isArray(extra.workSets) ? extra.workSets : [];
+          for (const st of ws) { if (cur + add.length >= cap) break; add.push(st); }
+          if (cur + add.length >= cap) break;
+        }
+        if (add.length) {
+          if (!Array.isArray(g.survivor.workSets)) g.survivor.workSets = [];
+          g.survivor.workSets.push(...add);
+          g.survivor.sets = g.survivor.workSets.length;
+        }
+      }
+      const entries = [
+        ...passthrough,
+        ...[...groups.values()].map(g => ({ ex: g.survivor, pos: g.pos })),
+      ].sort((a, b) => a.pos - b.pos);
+      s.exercises = entries.map(e => e.ex);
+    }
+  }
+
   // weeklyVolume нужен ДО validateBBPlan: target_volume_deficit проверяет
   // фактический объём, а не пустой/устаревший объект.
   next.weeklyVolume = Object.fromEntries(next.weeks.map(week => [
