@@ -14,6 +14,22 @@ export interface LabDrugAlert {
   recommendation: string;
 }
 
+/**
+ * Ж4 (фаза 2 женского слоя): женские верхние границы для lab-pharma корреляций.
+ * Числа — из женского лаб-слоя (FEMALE_LAB_GROUPS таба «Женщины и ААС») без новых
+ * клинических порогов: HCT 48 (флеботомия >52), HGB 150, RBC 5.2,
+ * TT 173 нг/дл ≈ 6 нмоль/л (порог вирилизации), PRL 25 нг/мл (женский верх),
+ * E2 400 пг/мл (фолликулярный верх; лютеиновая до 500 — оговорка в тексте).
+ */
+const FEMALE_LAB_ULN: Record<string, number> = {
+  HCT: 48,
+  HGB: 150,
+  RBC: 5.2,
+  TT: 173,
+  PRL: 25,
+  E2: 400,
+};
+
 function getDrugClassName(id: string): string {
   const p = PHARMA_DB[id] as any;
   if (!p?.class) return 'unknown';
@@ -105,7 +121,8 @@ function getDrugMarkerEffect(drugId: string, marker: string): { effect: 'up' | '
 export function analyzeLabDrugCorrelation(
   labs: LabPoint[],
   course: CourseEntry[],
-  currentPhase: string
+  currentPhase: string,
+  sex?: 'male' | 'female'
 ): LabDrugAlert[] {
   const alerts: LabDrugAlert[] = [];
   // Только активные по фазе: on_cycle — в курсе, pct — недавно оконченные, иначе все
@@ -123,7 +140,9 @@ export function analyzeLabDrugCorrelation(
     // На курсе — сужаем верхнюю границу для HCT/ALT/E2, в ПКТ — нижнюю для LH/TT
     const isOnCycleCrit = currentPhase === 'on_cycle' && ['HCT','HGB','RBC','ALT','AST','E2','LDL','CHOL'].includes(marker);
     const isPctCrit = currentPhase === 'pct' && ['LH','FSH','TT','FT','SHBG'].includes(marker);
-    const uln = meta.uln * (isOnCycleCrit ? 0.95 : 1);
+    // Ж4: женские верхние границы (без sex — прежняя мужская шкала байт-в-байт).
+    const femaleUln = sex === 'female' ? FEMALE_LAB_ULN[marker] : undefined;
+    const uln = (femaleUln ?? meta.uln) * (isOnCycleCrit ? 0.95 : 1);
     const lln = meta.lln * (isPctCrit ? 1.05 : 1);
 
     const impactingDrugs: string[] = [];
@@ -166,6 +185,15 @@ export function analyzeLabDrugCorrelation(
       }
       if (impactingDrugs.some(id => id.includes('caberg'))) {
         if (marker === 'PRL' && isLow) rec = 'Каберголин может чрезмерно снизить пролактин. Рассмотреть снижение дозы.';
+      }
+
+      // Ж4 (фаза 2): женские тексты — порог/тактика отличаются (только sex=female).
+      if (sex === 'female') {
+        if (marker === 'HCT' && isHigh) rec = '♀ Гидратация + контроль АД. Флеботомия у женщин — при HCT >52% (муж 54%). Контроль ферритина и донации.';
+        if (marker === 'TT' && isHigh) rec = '♀ Тестостерон выше женского порога (~6 нмоль/л) — ВИРИЛИЗАЦИЯ: отмена/эскалация, контроль голоса/клитора, к гинекологу-эндокринологу.';
+        if (marker === 'PRL' && isHigh) rec = '♀ Гиперпролактинемия (женский верх ~25 нг/мл). Каберголин — только по назначению врача; контроль менструального цикла.';
+        if (marker === 'E2' && isHigh) rec = '♀ Эстрадиол выше женского коридора — интерпретация ТОЛЬКО по фазе цикла (фолликулярная 40–200, лютеиновая 70–500 пг/мл): без фазы оценка условна.';
+        if (marker === 'E2' && isLow) rec = '♀ Дефицит E2 = риск остеопороза и нарушения цикла; интерпретация по фазе цикла, к гинекологу-эндокринологу.';
       }
 
       alerts.push({

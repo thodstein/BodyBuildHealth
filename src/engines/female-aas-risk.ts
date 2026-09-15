@@ -9,6 +9,7 @@
  * Источник: docs/FEMALE_AAS_PROTOCOLS.md (Endocrine Society, WADA/IOC, практика).
  */
 import type { PEDDose } from '../data/ped-potency-table';
+import { classifyPed } from '../data/ped-potency-table';
 import { resolvePedAlias } from '../data/ped-alias-map';
 
 export interface FemaleAasProfile {
@@ -79,6 +80,15 @@ export interface FemaleAasRisk {
   virilizationDoseIndex: number;
 }
 
+/**
+ * Единый резолвер женского профиля по id препарата (алиасы → канон → паттерны).
+ * Порядок паттернов в FEMALE_AAS_PROFILES важен (см. комментарии таблицы).
+ */
+export function resolveFemaleAasProfile(id: string): FemaleAasProfile | null {
+  const canon = resolvePedAlias(id || '');
+  return FEMALE_AAS_PROFILES.find((p) => p.patterns.some((pat) => canon.includes(pat))) || null;
+}
+
 /** Нормализация дозы как в ped-risk-matrix: oral < 100 мг/нед → дневная ×7. */
 function femaleDoseMgWeek(ped: PEDDose): number {
   const mg = Number(ped.mgPerWeek) || 0;
@@ -96,7 +106,7 @@ export function assessFemaleAas(pedDoses: PEDDose[]): FemaleAasRisk {
 
   for (const ped of pedDoses || []) {
     const id = resolvePedAlias(ped.id || '');
-    const profile = FEMALE_AAS_PROFILES.find((p) => p.patterns.some((pat) => id.includes(pat)));
+    const profile = resolveFemaleAasProfile(id);
     if (!profile) continue;
 
     const dose = femaleDoseMgWeek(ped);
@@ -143,4 +153,64 @@ export function assessFemaleAas(pedDoses: PEDDose[]): FemaleAasRisk {
     flags,
     virilizationDoseIndex: Math.min(100, Math.round(idx)),
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ж1 (фаза 2): женский вид порогов для карточек «Риски» / «Обзор».
+// Ноль новых чисел: значения — только из FEMALE_AAS_PROFILES/assessFemaleAas.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Минимальный структурный вход (CourseEntry-подобный): id + доза + форма. */
+export interface FemaleThresholdDoseInput {
+  id: string;
+  mgPerWeek?: number;
+  form?: 'inject' | 'oral' | 'subq' | 'im';
+}
+
+export interface FemaleDrugThresholdRow {
+  /** Ключ профиля (первый паттерн) — React key и подпись источника. */
+  key: string;
+  name: string;
+  /** Жёлтый порог, мг/нед */
+  yellow: number;
+  /** Красный порог, мг/нед */
+  red: number;
+  /** Андрогенный индекс (тестостерон = 1.0) */
+  androgenIndex: number;
+  /** Абсолютное противопоказание для женщин */
+  contraindicated: boolean;
+  /** Доза из текущего стека (мг/нед, после нормализации), 0 — нет в стеке. */
+  doseMgWeek: number;
+  /** Персональный уровень по дозе; not_in_stack — препарата нет в стеке. */
+  level: 'ok' | 'yellow' | 'red' | 'contraindicated' | 'not_in_stack';
+}
+
+/**
+ * Женский каталог порогов со статусом по текущему стеку.
+ * Без sex/male → пустой массив (мужской путь не трогается: 1-в-1 прежний).
+ */
+export function femaleDrugThresholdView(
+  pedDoses: FemaleThresholdDoseInput[],
+  sex?: 'male' | 'female',
+): FemaleDrugThresholdRow[] {
+  if (sex !== 'female') return [];
+  const normalized = (pedDoses || []).map((p) => ({
+    ...p,
+    form: p.form ?? (classifyPed(String(p.id || '')).startsWith('aas_oral') ? 'oral' : 'inject'),
+  })) as PEDDose[];
+  const assessed = assessFemaleAas(normalized);
+  const byName = new Map(assessed.findings.map((f) => [f.name, f]));
+  return FEMALE_AAS_PROFILES.map((p) => {
+    const f = byName.get(p.name);
+    return {
+      key: p.patterns[0],
+      name: p.name,
+      yellow: p.yellow,
+      red: p.red,
+      androgenIndex: p.androgenIndex,
+      contraindicated: !!p.contraindicated,
+      doseMgWeek: f?.doseMgWeek ?? 0,
+      level: f ? f.level : ('not_in_stack' as const),
+    };
+  });
 }

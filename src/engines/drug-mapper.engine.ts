@@ -10,6 +10,8 @@
  * @module drug-mapper.engine
  */
 
+import { resolveFemaleAasProfile } from './female-aas-risk';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -68,6 +70,28 @@ const PATHOLOGY_LABELS: Record<string, string> = {
   cns_aggression: 'Андрогенная агрессия и тревожность (ЦНС)',
   hepatic_necrosis: 'Гепатоцеллюлярный некроз',
   cardiac_necrosis: 'Некроз кардиомиоцитов',
+  // Ж3 (фаза 2 женского слоя): женские патологии стека (только sex=female).
+  // Сила триггера = androgenIndex из FEMALE_AAS_PROFILES (единый источник, без новых чисел);
+  // противопоказание поднимается до 2.0 — порог «высокого риска» существующей шкалы UI.
+  female_virilization: '♀ Вирилизация (голос, клитор, гирсутизм)',
+  female_menstrual_disruption: '♀ Нарушение менструального цикла (аменорея/дисменорея)',
+  female_fertility_suppression: '♀ Подавление фертильности (ановуляция)',
+  female_libido_dysregulation: '♀ Дисрегуляция либидо',
+  female_bone_hair_effects: '♀ Кости и волосы (андроген-зависимые эффекты)',
+};
+
+/**
+ * Ж3 (фаза 2): женские патологии и их маркеры.
+ * Маркеры согласованы с женскими лаб-группами («Женщины и ААС → Лабы»):
+ * вирилизация — андрогены; цикл — гонадотропины+E2+прогестерон; фертильность — AMH/ингибин;
+ * либидо — TT/E2/PRL; кости/волосы — E2/DHT/SHBG.
+ */
+const FEMALE_PATHOLOGY_MARKERS: Record<string, string[]> = {
+  female_virilization: ['TT', 'FT', 'DHT'],
+  female_menstrual_disruption: ['LH', 'FSH', 'E2', 'PROG'],
+  female_fertility_suppression: ['AMH', 'INHB', 'FSH', 'LH'],
+  female_libido_dysregulation: ['TT', 'E2', 'PRL'],
+  female_bone_hair_effects: ['E2', 'DHT', 'SHBG'],
 };
 
 // ---------------------------------------------------------------------------
@@ -418,10 +442,15 @@ interface PathologyAgg {
  *  4. Collect all required markers into a unique set (no duplicates).
  *  5. Flag unknown drugs.
  *
+ * Ж3 (фаза 2): при sex='female' дополнительно добавляются женские патологии
+ * (вирилизация/цикл/фертильность/либидо/кости-волосы) с силой = androgenIndex
+ * из FEMALE_AAS_PROFILES. Без sex — прежний результат байт-в-байт.
+ *
  * @param drugs - Array of drug entries from the user's stack.
+ * @param sex - Пол (только 'female' включает женский слой).
  * @returns MapperResult with sorted pathologies, unique biomarkers, and unknown drugs.
  */
-export function mapStackToPathologies(drugs: DrugEntry[]): MapperResult {
+export function mapStackToPathologies(drugs: DrugEntry[], sex?: 'male' | 'female'): MapperResult {
   if (!drugs || !Array.isArray(drugs)) {
     return { activePathologies: [], requiredBiomarkers: [], unknownDrugs: [], totalDrugs: 0, knownDrugs: 0 };
   }
@@ -460,6 +489,22 @@ export function mapStackToPathologies(drugs: DrugEntry[]): MapperResult {
       }
       pathologyAgg[pid].cumulativeTriggerStrength += strength;
       pathologyAgg[pid].contributingDrugs.push(rawName);
+    }
+
+    // Ж3 (фаза 2): женские патологии — только sex=female, сила из FEMALE_AAS_PROFILES.
+    if (sex === 'female') {
+      const profile = resolveFemaleAasProfile(name);
+      if (profile) {
+        const strength = Math.max(profile.androgenIndex, profile.contraindicated ? 2 : 0);
+        for (const [pid, markers] of Object.entries(FEMALE_PATHOLOGY_MARKERS)) {
+          for (const m of markers) allMarkers.add(m);
+          if (!pathologyAgg[pid]) {
+            pathologyAgg[pid] = { cumulativeTriggerStrength: 0, contributingDrugs: [] };
+          }
+          pathologyAgg[pid].cumulativeTriggerStrength += strength;
+          pathologyAgg[pid].contributingDrugs.push(rawName);
+        }
+      }
     }
   }
 

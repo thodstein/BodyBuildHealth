@@ -26,6 +26,7 @@ import { useV7Risk } from '../hooks/useV7Risk';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } from '../../engines/compliance-engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
+import { femaleDrugThresholdView, type FemaleDrugThresholdRow } from '../../engines/female-aas-risk';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
 import { readRiskBridge, type RiskBridgeData } from '../../engines/risk-bridge';
@@ -91,6 +92,8 @@ const RiskDisclaimer: React.FC = () => (
 
 export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
+  /** Ж1/Ж4/Ж2 (фаза 2): пол профиля — единственный вход женского слоя; без female всё как раньше. */
+  const profileSex: 'male' | 'female' = linked.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
   const labAnalysis = linked.labAnalysis;
   const readinessData = linked.readiness;
   const [mainTab, setMainTab] = useState<'hero' | 'calculations' | 'clinical' | 'info' | 'tz_spec'>('hero');
@@ -151,10 +154,24 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         trainingFactor: linked.profile.settings.trainingFactor ?? 0.7,
         activeDrugs: linked.activeDrugs,
         supportCoverage: linked.supportCoverage,
+        ...(profileSex === 'female' ? { sex: 'female' as const } : {}),
       },
       linked.course || [],
     );
-  }, [linked.profile, linked.activeDrugs, linked.supportCoverage, linked.course]);
+  }, [linked.profile, linked.activeDrugs, linked.supportCoverage, linked.course, profileSex]);
+
+  // Ж1 (фаза 2): женские пороги препаратов — единый источник FEMALE_AAS_PROFILES
+  // (только sex=female; мужской путь карточки не трогается).
+  const femaleThresholds = useMemo<FemaleDrugThresholdRow[]>(() => {
+    if (profileSex !== 'female') return [];
+    try {
+      const doses = (linked.course || []).map((c) => ({
+        id: c.substanceId,
+        mgPerWeek: (Number(c.doseValue) || 0) * (typeof c.frequency === 'number' ? c.frequency : parseFloat(String(c.frequency)) || 1),
+      }));
+      return femaleDrugThresholdView(doses, 'female');
+    } catch { return []; }
+  }, [linked.course, profileSex]);
 
   // Read penalty state from LabsScreen's global storage
   const [globalNoLabsState, setGlobalNoLabsState] = useState(getGlobalNoLabs());
@@ -230,7 +247,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           volumeTonnes: 8000, lissMinutesPerWeek: 60,
         },
         weight: s.weight ?? 80, age: s.age ?? 30,
-        sex: (s.sex ?? 'male') as 'male' | 'female',
+        sex: profileSex,
         supportSubstances: supportSubstanceIds,
       });
       const compat = toCompatibleResult(tzResult);
@@ -242,7 +259,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         mechanismDetail: compat.mechanismDetail as any,
       } as unknown as RiskResult;
     } catch { return null; }
-  }, [linked.profile, linked.course, linked.labs, supportSubstanceIds]);
+  }, [linked.profile, linked.course, linked.labs, supportSubstanceIds, profileSex]);
 
   // Compute lab risk contributions
   const labRiskContributions = useMemo(() => {
@@ -606,7 +623,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     const effectiveLabContrib = labRiskContributions || syntheticLabContrib;
     const isSyntheticLab = !hasLabs && shouldApplyPenalty; // lab contrib came from penalty, not real labs
     switch (subTab) {
-      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} />;
+      case 'overview': return <RiskOverview riskResult={riskResult} globalNoLabs={globalNoLabs} noLabsSystems={noLabsSystems} labRiskContributions={effectiveLabContrib} riskHistory={riskHistory} aggregatedRisk={aggregatedRisk} weeklyDynamics={weeklyDynamics} sex={profileSex} femaleThresholds={femaleThresholds} />;
       case 'mechanisms': return <RiskDetails riskResult={riskResult} labRiskContributions={effectiveLabContrib} isSyntheticLab={isSyntheticLab} />;
       case 'v7': return v7Result ? <V7RiskDisplay result={v7Result} organWeek={organWeek} onWeekChange={setOrganWeek} mcEnabled={mcEnabled} onToggleMC={toggleMC} /> : <div style={{ textAlign: 'center', padding: 40, color: '#fff' }}>Загрузка V7...</div>;
 
@@ -799,7 +816,41 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
           {/* Drug Thresholds — only AAS/GH/Insulin, Russian names, no duplicates */}
           <div className="card" style={{ marginBottom:10, padding:14, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
-            <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:10, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width:30, height:30, borderRadius:10, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.24)', color:'#a78bfa' }}><NativeIcon name="pill" size={15} /></span> Препараты и пороги (ААС, ГР, инсулины)</div>
+            <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginBottom:10, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width:30, height:30, borderRadius:10, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.24)', color:'#a78bfa' }}><NativeIcon name="pill" size={15} /></span> {profileSex === 'female' ? '♀ Препараты и пороги (женские)' : 'Препараты и пороги (ААС, ГР, инсулины)'}</div>
+            {profileSex === 'female' ? (
+              <>
+                <div data-female-thresholds="badge" style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)', fontSize:12, color:'#fff', lineHeight:1.5 }}>
+                  ♀ Женские пороги (1/4–1/10 мужских) — без новых чисел, единый источник <b>FEMALE_AAS_PROFILES</b>. Полная версия: Поддержка → «Женщины и ААС» → Дозы / Лабы.
+                </div>
+                <div style={{ display:'grid', gap:8 }}>
+                  {femaleThresholds.map(r => {
+                    const anColor = r.androgenIndex < 0.3 ? '#22c55e' : r.androgenIndex < 0.7 ? '#eab308' : r.androgenIndex < 1.2 ? '#f97316' : '#ef4444';
+                    const levelChip = r.level === 'contraindicated' ? { text:'⛔ нельзя', color:'#ef4444' }
+                      : r.level === 'red' ? { text:'↑ выше красного', color:'#ef4444' }
+                      : r.level === 'yellow' ? { text:'≈ верхняя граница', color:'#eab308' }
+                      : r.level === 'ok' ? { text:'✓ в женском коридоре', color:'#22c55e' } : null;
+                    return (
+                      <div key={r.key} data-female-threshold={r.key} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)' }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>{r.contraindicated ? '⛔ ' : ''}{r.name}</div>
+                          <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>
+                            {r.contraindicated
+                              ? 'абсолютное противопоказание (любая доза)'
+                              : `жёлтый ${r.yellow} → красный ${r.red} мг/нед`}
+                            {r.doseMgWeek > 0 ? ` · ваш стек ${Math.round(r.doseMgWeek)} мг/нед` : ''}
+                          </div>
+                          {levelChip && <div style={{ fontSize:11, color:levelChip.color, fontWeight:800, marginTop:3 }}>{levelChip.text}</div>}
+                        </div>
+                        <div style={{ textAlign:'right', flexShrink:0 }}>
+                          <div style={{ fontSize:11, color:'#fff' }}>Андрог.</div>
+                          <div style={{ fontSize:16, fontWeight:800, color:anColor }}>{r.androgenIndex.toFixed(1)}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
             <div style={{ display:'grid', gap:8 }}>
               {deduped.map(d => {
                 const anColor = d.androgenicity < 0.3 ? '#22c55e' : d.androgenicity < 0.7 ? '#eab308' : d.androgenicity < 1.2 ? '#f97316' : '#ef4444';
@@ -817,6 +868,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 );
               })}
             </div>
+            )}
           </div>
         </div>
       );
@@ -1539,8 +1591,9 @@ const ClinicalRiskDisplay: React.FC = () => {
       const clinical = analyzeClinicalRisks({ compounds, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics });
 
       // Also run drug mapper to capture ALL drug-based pathologies
+      // Ж3 (фаза 2): при sex=female добавляются женские патологии стека (вирилизация/цикл/…).
       const mapperDrugs = course.map(c => ({ name: (c.substanceId||'').toLowerCase(), dosageMg: c.doseValue }));
-      const mapper = mapStackToPathologies(mapperDrugs);
+      const mapper = mapStackToPathologies(mapperDrugs, profileSex === 'female' ? 'female' : undefined);
 
       // Merge mapper pathologies into clinical results
       const existingIds = new Set(clinical.results.map((r: any) => r.pathologyId));
@@ -1550,12 +1603,14 @@ const ClinicalRiskDisplay: React.FC = () => {
         if (!existingIds.has(mp.pathologyId)) {
           // Find matching clinical pathology or create one
           const cp = CLINICAL_PATHOLOGIES[mp.pathologyId];
-          if (cp) {
+          // Ж3: женские патологии не обязаны быть в CLINICAL_PATHOLOGIES — берём метку маппера.
+          const isFemalePathology = mp.pathologyId.startsWith('female_');
+          if (cp || isFemalePathology) {
             newResults.push({
               pathologyId: mp.pathologyId,
-              pathologyName: cp.name,
-              systemName: cp.systemName,
-              systemIcon: cp.systemIcon,
+              pathologyName: cp?.name ?? mp.pathologyLabel,
+              systemName: cp?.systemName ?? '♀ Женские',
+              systemIcon: cp?.systemIcon ?? '♀',
               hillScore: 0,
               severity95: 0,
               riskPercent: Math.min(80, Math.round(mp.cumulativeTriggerStrength * 25 * 10) / 10),
@@ -1563,7 +1618,7 @@ const ClinicalRiskDisplay: React.FC = () => {
               alertLevel: mp.cumulativeTriggerStrength >= 2 ? 2 : mp.cumulativeTriggerStrength >= 1.2 ? 1 : 0,
               markersUsed: [],
               pharmaTriggers: mp.contributingDrugs,
-              instrumental: cp.instrumentalVerification,
+              instrumental: cp?.instrumentalVerification ?? [],
               contributingCompounds: mp.contributingDrugs,
             });
           }

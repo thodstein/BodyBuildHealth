@@ -7,6 +7,7 @@
 import { zScore, hillEffect, hillTox, nutritionMultipliers, trainingMultipliers, stazhFactors, type ProtocolMode, getModeMultiplier } from './risk-engine-v7-core';
 import type { LabPoint, CourseEntry } from '../core/types';
 import { PHARMA_DB } from '../core/pharma-database';
+import { resolveFemaleAasProfile, type FemaleAasProfile } from './female-aas-risk';
 
 // --- 7x7 Risk Systems & Mechanisms ---
 
@@ -125,6 +126,10 @@ export interface DrugThreshold {
   dosePerWeek: number;
   androgenicity: number;
   systems: Record<string, Record<number, number>>;
+  /** Ж2 (фаза 2): женский профиль порогов — только при sex=female (без sex/male — undefined). */
+  female?: Pick<FemaleAasProfile, 'name' | 'yellow' | 'red' | 'androgenIndex' | 'contraindicated'>;
+  /** Ж2: множитель жёсткой эскалации женских противопоказаний (только sex=female). */
+  femaleEscalation?: number;
 }
 
 // Mapping rules from PD params to 7x7 mechanisms:
@@ -653,6 +658,40 @@ export const DRUG_THRESHOLDS_V7: Record<string, DrugThreshold> = {
   foxo4_dri: { dosePerWeek: 5, androgenicity: 0, systems: {} }
 };
 
+/**
+ * Ж2 (фаза 2 женского слоя): женский резолвер порогов поверх DRUG_THRESHOLDS_V7.
+ *
+ * - без sex / sex='male' → ровно тот же объект таблицы (мужской путь байт-в-байт);
+ * - sex='female' → копия с женскими порогами из FEMALE_AAS_PROFILES (единый источник):
+ *   красный порог = тир-эквивалент (doseRatio → 2.0 = кап движков), противопоказания —
+ *   жёсткая эскалация ×3 на любую дозу. Числа не создаются: только yellow/red/AI профиля.
+ */
+export function getDrugThreshold(id: string, sex?: 'male' | 'female'): DrugThreshold | undefined {
+  const base = DRUG_THRESHOLDS_V7[id];
+  if (!base || sex !== 'female') return base;
+  const profile = resolveFemaleAasProfile(id);
+  if (!profile) return base;
+  const dosePerWeek = profile.contraindicated ? 1 : Math.max(1, profile.red / 2);
+  return {
+    ...base,
+    dosePerWeek,
+    female: {
+      name: profile.name,
+      yellow: profile.yellow,
+      red: profile.red,
+      androgenIndex: profile.androgenIndex,
+      contraindicated: !!profile.contraindicated,
+    },
+    femaleEscalation: profile.contraindicated ? 3 : undefined,
+  };
+}
+
+/** Ж2: масштаб вклада препарата с учётом женского override (без sex — ровно 1, мужской путь цел). */
+export function drugContributionScale(id: string, sex?: 'male' | 'female'): number {
+  if (sex !== 'female') return 1;
+  return getDrugThreshold(id, sex)?.femaleEscalation ?? 1;
+}
+
 // --- Lab reference ranges ---
 
 export interface LabReference { mean: number; sd: number; uln: number; sensitive: boolean; alpha: number }
@@ -965,17 +1004,20 @@ function computeLabFactorForMech(labs: LabPoint[], system: string, mechIdx: numb
   return Math.max(0.5, Math.min(3.0, factor));
 }
 
-function computeDrugContributions(course: CourseEntry[]): Record<string, Record<string, Record<number, number>>> {
+function computeDrugContributions(course: CourseEntry[], sex?: 'male' | 'female'): Record<string, Record<string, Record<number, number>>> {
   const result: Record<string, Record<string, Record<number, number>>> = {};
   for (const entry of course) {
-    const drug = DRUG_THRESHOLDS_V7[entry.substanceId];
+    const drug = getDrugThreshold(entry.substanceId, sex);
     if (!drug) continue;
-    const doseRatio = (entry.doseValue ?? 0) / Math.max(1, drug.dosePerWeek);
+    const rawRatio = (entry.doseValue ?? 0) / Math.max(1, drug.dosePerWeek);
+    // Ж2: женский тир — красный порог = кап 2.0; противопоказания — жёсткая эскалация.
+    const doseRatio = sex === 'female' ? Math.min(2, rawRatio) : rawRatio;
+    const scale = sex === 'female' ? (drug.femaleEscalation ?? 1) : 1;
     const substanceContrib: Record<string, Record<number, number>> = {};
     for (const [sys, mechs] of Object.entries(drug.systems)) {
       const mechContrib: Record<number, number> = {};
       for (const [mechStr, weight] of Object.entries(mechs)) {
-        mechContrib[Number(mechStr)] = doseRatio * weight * drug.androgenicity;
+        mechContrib[Number(mechStr)] = doseRatio * weight * drug.androgenicity * scale;
       }
       substanceContrib[sys] = mechContrib;
     }
@@ -1040,7 +1082,7 @@ function computeTrainingFactor(training: MatrixInput['training'], system: string
 
 export function computeV7Matrix(input: MatrixInput, supportIds: string[] = []): MatrixResult {
   const systems: Record<string, SystemRisk> = {};
-  const drugContribs = computeDrugContributions(input.course);
+  const drugContribs = computeDrugContributions(input.course, input.sex);
 
   const stazhLife = input.stazhWeeks / 52;
   const stazhCont = input.continuousWeeks / 12;

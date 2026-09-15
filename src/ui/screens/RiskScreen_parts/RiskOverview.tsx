@@ -40,7 +40,11 @@ export const RiskOverview: React.FC<{
   aggregatedRisk?: AggregatedRisk | null;
   weeklyDynamics?: WeeklyRiskDynamics | null;
   hideRecs?: boolean;
-}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk, weeklyDynamics, hideRecs }) => {
+  /** Ж1 (фаза 2): пол — женская таблица порогов вместо мужской (без sex — прежняя таблица). */
+  sex?: 'male' | 'female';
+  /** Ж1: женские пороги из FEMALE_AAS_PROFILES (единый источник, без новых чисел). */
+  femaleThresholds?: import('../../../engines/female-aas-risk').FemaleDrugThresholdRow[];
+}> = ({ riskResult, globalNoLabs, noLabsSystems, riskHistory, labRiskContributions, aggregatedRisk, weeklyDynamics, hideRecs, sex, femaleThresholds }) => {
   const [chartWeek, setChartWeek] = useState<number | null>(null);
   const [chartMode, setChartMode] = useState<'week' | 'average'>('average');
   const [showSections, setShowSections] = useState<Record<string, boolean>>({
@@ -264,7 +268,32 @@ export const RiskOverview: React.FC<{
       )}
 
       {/* Drug Thresholds */}
-      <Section id="thresholds" icon="pill" title="Пороги препаратов">
+      <Section id="thresholds" icon="pill" title={sex === 'female' ? '♀ Пороги препаратов (женские)' : 'Пороги препаратов'}>
+        {sex === 'female' && femaleThresholds && femaleThresholds.length > 0 ? (
+          <>
+            <div data-female-thresholds="badge" style={{ fontSize:12, color:'#fff', marginBottom:10, lineHeight:1.5, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)' }}>
+              ♀ Женские пороги (1/4–1/10 мужских) — единый источник FEMALE_AAS_PROFILES. Полная версия: Поддержка → «Женщины и ААС» → Дозы / Лабы.
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, fontSize:12 }}>
+              {femaleThresholds.map((r) => (
+                <div key={r.key} data-female-threshold={r.key} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px', borderRadius:12 }}>
+                  <div style={{ fontWeight:800, fontSize:12, color:'#fff' }}>{r.contraindicated ? '⛔ ' : ''}{r.name}</div>
+                  <div style={{ color:'#fff', fontSize:11, marginTop:2 }}>
+                    {r.contraindicated ? 'абсолютное противопоказание' : `Ж ${r.yellow} → К ${r.red} мг/нед`}
+                  </div>
+                  <div style={{ color:'#fff', fontSize:11, marginTop:2 }}>Андрог: {r.androgenIndex.toFixed(1)}</div>
+                  {r.level !== 'not_in_stack' && (
+                    <div style={{ fontSize:11, fontWeight:800, marginTop:3, color: r.level === 'red' || r.level === 'contraindicated' ? '#ef4444' : r.level === 'yellow' ? '#eab308' : '#22c55e' }}>
+                      {r.level === 'red' ? '↑ выше красного' : r.level === 'contraindicated' ? '⛔ нельзя' : r.level === 'yellow' ? '≈ верхняя граница' : '✓ в коридоре'}
+                      {r.doseMgWeek > 0 ? ` · ${Math.round(r.doseMgWeek)} мг/нед` : ''}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
         <div style={{ fontSize:12, color:'#fff', marginBottom:10, lineHeight:1.5 }}>Максимальные дозировки — превышение кратно увеличивает риски</div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8, fontSize:12 }}>
           {(() => {
@@ -284,6 +313,8 @@ export const RiskOverview: React.FC<{
               });
           })()}
         </div>
+          </>
+        )}
       </Section>
     </div>
   );

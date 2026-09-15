@@ -13,6 +13,7 @@ import {
   LAB_REFERENCES,
   getLabReference,
   getGeneticMultiplier,
+  getDrugThreshold,
   MECHANISM_NAMES,
   SYSTEM_NAMES_RU,
   CORE_SYSTEMS_V7,
@@ -127,9 +128,10 @@ const LAB_MECH_MAP: Record<string, Record<number, string[]>> = {
 
 // ─── Drug Dose Factor: D_i = min(2.0, (dose/threshold)^γ) × accumulation ───
 
-function computeDrugDoseFactor(substanceId: string, dosePerWeek: number, courseWeek: number): number {
+function computeDrugDoseFactor(substanceId: string, dosePerWeek: number, courseWeek: number, sex?: 'male' | 'female'): number {
   const GAMMA = 1.2;
-  const threshold = DRUG_THRESHOLDS_V7[substanceId];
+  // Ж2: женские дозовые тиры (без sex — та же таблица, мужской путь байт-в-байт).
+  const threshold = getDrugThreshold(substanceId, sex);
   if (!threshold || !threshold.dosePerWeek) return 1.0;
   const ratio = dosePerWeek / threshold.dosePerWeek;
   let doseF = Math.min(2.0, Math.pow(ratio, GAMMA));
@@ -140,13 +142,15 @@ function computeDrugDoseFactor(substanceId: string, dosePerWeek: number, courseW
   const dosesPerHalfLife = halfLifeDays <= 0 ? 1 : Math.min(4, halfLifeDays / 1.5);
   const accumFactor = Math.min(1.5, 1 + 0.08 * dosesPerHalfLife);
 
-  return doseF * accumFactor;
+  // Ж2: женские противопоказания — жёсткая эскалация (для остальных множитель 1 = no-op).
+  const escalation = sex === 'female' ? (threshold.femaleEscalation ?? 1) : 1;
+  return doseF * accumFactor * escalation;
 }
 
 // ─── Compute Drug Contribution per Mechanism ───
 
-function getDrugContribution(substanceId: string, system: string, mechIdx: number): number {
-  const threshold = DRUG_THRESHOLDS_V7[substanceId];
+function getDrugContribution(substanceId: string, system: string, mechIdx: number, sex?: 'male' | 'female'): number {
+  const threshold = getDrugThreshold(substanceId, sex);
   if (!threshold || !threshold.systems) return 0;
 
   // 1. Explicit mapping exists → use it directly
@@ -530,7 +534,7 @@ export function calculateTZRisk(input: TZRiskInput): TZRiskResult {
     weeklyDoses[id] = (weeklyDoses[id] || 0) + weekly;
   }
   for (const [id, dose] of Object.entries(weeklyDoses)) {
-    doseFactors[id] = computeDrugDoseFactor(id, dose, effectiveWeek);
+    doseFactors[id] = computeDrugDoseFactor(id, dose, effectiveWeek, sex);
   }
 
   // 2. Ensure support reductions loaded
@@ -569,7 +573,7 @@ export function calculateTZRisk(input: TZRiskInput): TZRiskResult {
       let product = 1.0;
       for (const [substanceId, dosePerWeek] of Object.entries(weeklyDoses)) {
         if (dosePerWeek <= 0) continue;
-        const drugContribution = getDrugContribution(substanceId, sys, mechIdx);
+        const drugContribution = getDrugContribution(substanceId, sys, mechIdx, sex);
         if (drugContribution <= 0) continue; // Only contribute to mechanisms the drug actually affects
         const Di = doseFactors[substanceId] || 1.0;
         // Cell risk contribution from drug i

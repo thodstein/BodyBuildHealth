@@ -3,6 +3,8 @@
 // From spec: Section 5 (inter-organ) and Section 3 (stazh)
 // ============================================================
 
+import { getDrugThreshold } from './risk-engine-v7-matrix';
+
 // Inter-organ influence matrix: Impact_{orgA → orgB}
 // Value = multiplier of State_k applied to Damage_org
 export const INTER_ORGAN_MATRIX: Record<string, Record<string, number>> = {
@@ -132,9 +134,15 @@ export interface ReproductiveDrugInput {
   sermFactor: number;        // 0-1 reduction factor
 }
 
+/**
+ * Ж2 (фаза 2): при sex='female' AR-нагрузка считается от ЖЕНСКИХ дозовых порогов
+ * (getDrugThreshold: красный порог = тир-эквивалент, противопоказания ×3).
+ * Без sex/male — прежняя формула байт-в-байт (drug.threshold из входа).
+ */
 export function computeReproductiveRisk(
   drugs: ReproductiveDrugInput[],
-  genetics: Record<string, string>
+  genetics: Record<string, string>,
+  sex?: 'male' | 'female'
 ): {
   atrophy: number;
   oligospermia: number;
@@ -150,8 +158,12 @@ export function computeReproductiveRisk(
   let sermReduction = 0;
 
   for (const drug of drugs) {
-    const doseRatio = drug.threshold > 0 ? (drug.dosePerWeek / drug.threshold) : 0;
-    androgenicLoad += Math.pow(doseRatio, 2) * drug.androgenicity;
+    const fem = sex === 'female' ? getDrugThreshold(drug.substanceId, 'female') : undefined;
+    const threshold = fem?.dosePerWeek ?? drug.threshold;
+    const rawRatio = threshold > 0 ? (drug.dosePerWeek / threshold) : 0;
+    const doseRatio = sex === 'female' ? Math.min(2, rawRatio) : rawRatio;
+    const escalation = sex === 'female' ? (fem?.femaleEscalation ?? 1) : 1;
+    androgenicLoad += Math.pow(doseRatio, 2) * drug.androgenicity * escalation;
     if (drug.isHCG && drug.hcgDose > 0) hcgReduction += 0.6;
     if (drug.isSERM) sermReduction += drug.sermFactor;
   }

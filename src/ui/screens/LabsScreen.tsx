@@ -474,8 +474,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
   const labPharmaAlerts = useMemo(() => {
     if (!hasLabs || linked.course.length === 0) return [];
-    return analyzeLabDrugCorrelation(currentLabs, linked.course, (linked.profile?.settings as any)?.pharma?.phase || 'on_cycle');
-  }, [hasLabs, currentLabs, linked.course]);
+    return analyzeLabDrugCorrelation(currentLabs, linked.course, (linked.profile?.settings as any)?.pharma?.phase || 'on_cycle', profileSex === 'female' ? 'female' : undefined);
+  }, [hasLabs, currentLabs, linked.course, profileSex]);
 
   // ── Механизм-ориентированная модель (ТЗ) — данные из фазы ──
   // лаб. значения: code → number (единый источник для движка и вкладки верификации,

@@ -7,7 +7,7 @@ import { ALL_RISK_SYSTEMS } from '../core/constants';
 import { PHARMA_DB } from '../core/pharma-database';
 import type { RiskResult, CourseEntry } from '../core/types';
 import { eliminationConstant } from './pk-pd.engine';
-import { DRUG_THRESHOLDS_V7, getGeneticMultiplier, CORE_SYSTEMS_V7 } from './risk-engine-v7-matrix';
+import { getGeneticMultiplier, getDrugThreshold, CORE_SYSTEMS_V7 } from './risk-engine-v7-matrix';
 
 // TZ-compatible base risk values (mirrors risk-engine-tz.ts BASE_RISK)
 const BASE_RISK_V7: Record<string, Record<number, number>> = {
@@ -94,6 +94,8 @@ export function calculateWeeklyRiskDynamics(
     trainingFactor?: number;
     activeDrugs?: Record<string, { dosePerWeek: number }>;
     supportCoverage?: Record<string, number>;
+    /** Ж2: женские дозовые тиры (без sex — та же таблица V7, мужской путь байт-в-байт). */
+    sex?: 'male' | 'female';
   },
   course: CourseEntry[]
 ): WeeklyRiskDynamics {
@@ -180,7 +182,7 @@ export function calculateWeeklyRiskDynamics(
         // Cumulative product over drugs that affect this (system, mechanism)
         let hasDrugContrib = false;
         for (const [drug, d] of Object.entries(scaledDrugs)) {
-          const threshold = DRUG_THRESHOLDS_V7[drug];
+          const threshold = getDrugThreshold(drug, baseInput.sex);
           let contr = 0;
           if (threshold?.systems?.[s]?.[m] !== undefined) {
             contr = threshold.systems[s][m];
@@ -194,7 +196,9 @@ export function calculateWeeklyRiskDynamics(
           if (contr > 0) {
             hasDrugContrib = true;
             const doseF = Math.min(2.0, Math.pow((d.dosePerWeek || 0) / Math.max(1, threshold?.dosePerWeek || 300), 1.2));
-            const cellRisk = baseRisk * contr * doseF * G * N * T;
+            // Ж2: женские противопоказания — жёсткая эскалация (без sex множитель 1 = no-op).
+            const escalation = baseInput.sex === 'female' ? (threshold?.femaleEscalation ?? 1) : 1;
+            const cellRisk = baseRisk * contr * doseF * escalation * G * N * T;
             if (cellRisk > 0.001) {
               prod *= (1 - Math.min(0.99, cellRisk));
             }
