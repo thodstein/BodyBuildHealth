@@ -4317,7 +4317,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         if (dt < _nearDt) { _nearDt = dt; _near = m; }
       }
       const _nearC = _near ? (_near.totals?.c || 0) : 0;
-      if (_near && _nearDt <= 60 && _nearC < needC * 0.8) {
+      // §7.2-5 (planner-high-volume «болюс рядом с приёмом»): ОСНОВНОЙ приём (завтрак/
+      // обед/ужин) в пределах 60 мин — покрывает болюс сам (угли приёма живут в его
+      // бюджете и доливаются корректором); отдельное окно-дубль к обеду не создаём
+      // (12:20-болюс при обеде 12:30 → окна нет). Перекус по-прежнему должен нести
+      // ≥80% потребности — иначе честный топ-ап (перекус 35 г не держит 10 ЕД).
+      const _isMainNear = _near && ['breakfast', 'lunch', 'dinner'].includes(String(_near.type || ''));
+      if (_near && _nearDt <= 60 && !_isMainNear && _nearC < needC * 0.8) {
         const topC = Math.max(30, Math.min(120, needC - Math.round(_nearC)));
         const label = `⚡ Углеводы под инсулин (${inj.name || 'инсулин'})`;
         _injectMealAt(injMin, label, `${label} — топ-ап ${topC} г к приёму «${_near.label}» (${Math.round(_nearC)} г мало для ${dose} ЕД, нужно ~${needC} г)`, topC, 15, { insulinWindow: true });
