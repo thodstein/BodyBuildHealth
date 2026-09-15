@@ -38,10 +38,10 @@ function latestByCode(entries: LabPoint[], codes: string[]): LabPoint | null {
   return filtered.sort((a, b) => b.date.localeCompare(a.date))[0];
 }
 
-function ratioFrom(entries: LabPoint[], codes: string[]): number {
+function ratioFrom(entries: LabPoint[], codes: string[], sex?: 'male' | 'female'): number {
   const point = latestByCode(entries, codes);
   if (!point) return 0;
-  return normalizedRatio(point.code, point.value, point.unit) ?? 0;
+  return normalizedRatio(point.code, point.value, point.unit, undefined, sex) ?? 0;
 }
 
 function rawValue(entries: LabPoint[], codes: string[]): number | null {
@@ -50,40 +50,41 @@ function rawValue(entries: LabPoint[], codes: string[]): number | null {
   return point.value;
 }
 
-function weightedRatio(entries: LabPoint[], codes: string[], weight: number): { ratio: number; code: string; name: string; value: number; weight: number } {
+function weightedRatio(entries: LabPoint[], codes: string[], weight: number, sex?: 'male' | 'female'): { ratio: number; code: string; name: string; value: number; weight: number } {
   const point = latestByCode(entries, codes);
   if (!point) return { ratio: 0, code: codes[0], name: codes[0], value: 0, weight };
-  const r = normalizedRatio(point.code, point.value, point.unit) ?? 0;
+  const r = normalizedRatio(point.code, point.value, point.unit, undefined, sex) ?? 0;
   return { ratio: r, code: point.code, name: point.code, value: point.value, weight };
 }
 
-export function computeLabIndices(entries: LabPoint[]): LabIndices {
-  const crp = ratioFrom(entries, ['CRP']);
-  const ferritin = ratioFrom(entries, ['FERRITIN']);
-  const glucose = ratioFrom(entries, ['GLU', 'GLUCOSE']);
-  const hba1c = ratioFrom(entries, ['HbA1c', 'HBA1C']);
-  const tsh = ratioFrom(entries, ['TSH']);
-  const ft4 = ratioFrom(entries, ['FT4']);
-  const ft3 = ratioFrom(entries, ['FT3']);
-  const ldl = ratioFrom(entries, ['LDL']);
-  const hdl = ratioFrom(entries, ['HDL']);
-  const tg = ratioFrom(entries, ['TG']);
+export function computeLabIndices(entries: LabPoint[], sex?: 'male' | 'female'): LabIndices {
+  const rf = (codes: string[]) => ratioFrom(entries, codes, sex);
+  const crp = rf(['CRP']);
+  const ferritin = rf(['FERRITIN']);
+  const glucose = rf(['GLU', 'GLUCOSE']);
+  const hba1c = rf(['HbA1c', 'HBA1C']);
+  const tsh = rf(['TSH']);
+  const ft4 = rf(['FT4']);
+  const ft3 = rf(['FT3']);
+  const ldl = rf(['LDL']);
+  const hdl = rf(['HDL']);
+  const tg = rf(['TG']);
 
-  const alt = ratioFrom(entries, ['ALT', 'GPT']);
-  const ast = ratioFrom(entries, ['AST', 'GOT']);
-  const ggt = ratioFrom(entries, ['GGT']);
-  const bilirubin = ratioFrom(entries, ['BILIRUBIN_TOTAL', 'BIL_T']);
-  const alp = ratioFrom(entries, ['ALP']);
+  const alt = rf(['ALT', 'GPT']);
+  const ast = rf(['AST', 'GOT']);
+  const ggt = rf(['GGT']);
+  const bilirubin = rf(['BILIRUBIN_TOTAL', 'BIL_T']);
+  const alp = rf(['ALP']);
 
-  const creatinine = ratioFrom(entries, ['CREATININE']);
-  const bun = ratioFrom(entries, ['BUN']);
-  const egfr = ratioFrom(entries, ['EGFR']);
-  const protein_total = ratioFrom(entries, ['PROTEIN_TOTAL']);
+  const creatinine = rf(['CREATININE']);
+  const bun = rf(['BUN']);
+  const egfr = rf(['EGFR']);
+  const protein_total = rf(['PROTEIN_TOTAL']);
 
-  const prolactin = ratioFrom(entries, ['PROLACTIN', 'PRL']);
-  const cortisol = ratioFrom(entries, ['CORTISOL']);
-  const homocysteine = ratioFrom(entries, ['HOMOCYSTEINE']);
-  const ins = ratioFrom(entries, ['INSULIN', 'INS']);
+  const prolactin = rf(['PROLACTIN', 'PRL']);
+  const cortisol = rf(['CORTISOL']);
+  const homocysteine = rf(['HOMOCYSTEINE']);
+  const ins = rf(['INSULIN', 'INS']);
 
   return {
     inflammation: crp * 0.6 + ferritin * 0.4,
@@ -118,9 +119,9 @@ export function computeLabIndices(entries: LabPoint[]): LabIndices {
   };
 }
 
-export function computeLabIndexDetails(entries: LabPoint[]): Record<string, LabIndexDetail> {
-  const indices = computeLabIndices(entries);
-  const mk = (code: string[], w: number) => weightedRatio(entries, code, w);
+export function computeLabIndexDetails(entries: LabPoint[], sex?: 'male' | 'female'): Record<string, LabIndexDetail> {
+  const indices = computeLabIndices(entries, sex);
+  const mk = (code: string[], w: number) => weightedRatio(entries, code, w, sex);
 
   return {
     inflammation: {

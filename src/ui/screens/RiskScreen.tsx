@@ -1751,6 +1751,8 @@ export const LabsRisksTab: React.FC = () => {
   const linked = useDataLink();
   const labs = linked.labs || [];
   const hasLabs = labs.length > 0;
+  /** Ж4 (фаза 2): женские пороги lab-pharma в «Анализы → Риски» (без female — мужской путь). */
+  const profileSex: 'male' | 'female' = linked.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
   const [riskSections, setRiskSections] = useState<Record<string,boolean>>({ pharma:true, indices:true, systems:true, markers:true });
 
   // NOTE: объявлено ДО labRisks — useMemo-фабрика выполняется синхронно при
@@ -1770,8 +1772,9 @@ export const LabsRisksTab: React.FC = () => {
 
   const labPharmaAlerts = useMemo(() => {
     if (!hasLabs || linked.course.length === 0) return [] as LabDrugAlert[];
-    return analyzeLabDrugCorrelation(labs, linked.course, linked.profile?.settings?.phase || 'on_cycle');
-  }, [hasLabs, labs, linked.course]);
+    // Ж4 (фаза 2): женские пороги HCT 48/52, TT>6=вирилизация, PRL, E2-оговорка — только sex=female.
+    return analyzeLabDrugCorrelation(labs, linked.course, linked.profile?.settings?.phase || 'on_cycle', profileSex === 'female' ? 'female' : undefined);
+  }, [hasLabs, labs, linked.course, profileSex]);
 
   const labAnalysisRes = useMemo(() => {
     if (!hasLabs) return null;

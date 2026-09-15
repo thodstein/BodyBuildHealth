@@ -97,6 +97,43 @@ describe('Л8: normalizedRatio (OCR-превью %) — HCT female 36–48', () 
     expect(normalizedRatio('HCT', 42, '%')).toBe(male);
     expect(getLabNorm('HCT', 'female')).toMatchObject({ lln: 36, uln: 48 });
   });
+
+  it('остальные женские маркеры тоже по женским границам (АЛТ/ГГТ/Hb/креатинин/ферритин/…), мужской путь цел', () => {
+    // АЛТ 35: женский ULN 31 → ratio > 1; мужской ULN 40 → 0.5..1
+    const altFem = normalizedRatio('ALT', 35, 'U/L', 30, 'female')!;
+    const altMale = normalizedRatio('ALT', 35, 'U/L', 30, 'male')!;
+    expect(altFem).toBeGreaterThan(1);
+    expect(altMale).toBeLessThan(1);
+    expect(normalizedRatio('ALT', 35, 'U/L')).toBe(altMale);
+    // ГГТ 40: женский ULN 31 → >1, мужской 55 → <1
+    expect(normalizedRatio('GGT', 40, 'U/L', 30, 'female')!).toBeGreaterThan(1);
+    expect(normalizedRatio('GGT', 40, 'U/L', 30, 'male')!).toBeLessThan(1);
+    // Hb: UCUM хранит в г/дл с coeff 10 → 14.5 = 145 г/л; женский коридор 120–150 → в норме
+    const hbFem = normalizedRatio('HGB', 14.5, 'g/dL', 30, 'female')!;
+    const hbMale = normalizedRatio('HGB', 14.5, 'g/dL', 30, 'male')!;
+    expect(hbFem).toBeGreaterThan(hbMale);
+    expect(hbFem).toBeLessThan(1);
+    // креатинин 100 мкмоль/л: женский ULN 97 → >1, мужской 110 → <1
+    expect(normalizedRatio('CREATININE', 100, 'umol/L', 30, 'female')!).toBeGreaterThan(1);
+    expect(normalizedRatio('CREATININE', 100, 'umol/L', 30, 'male')!).toBeLessThan(1);
+    // ферритин 250 мкг/л: женский ULN 200 → >1, мужской 300 → <1
+    expect(normalizedRatio('FERRITIN', 250, 'ug/L', 30, 'female')!).toBeGreaterThan(1);
+    expect(normalizedRatio('FERRITIN', 250, 'ug/L', 30, 'male')!).toBeLessThan(1);
+  });
+});
+
+describe('Л8: labs-indices — женские нормы в индексах (АЛТ→печёночный стресс)', () => {
+  const altLab: import('../../core/types').LabPoint[] = [
+    { id: '1', code: 'ALT', name: 'АЛТ', value: 35, unit: 'U/L', date: '2026-09-01', phase: 'mid' } as never,
+  ];
+
+  it('female hepaticStress выше мужского; без sex === male (JSON-lock)', async () => {
+    const { computeLabIndices } = await import('../labs-indices.engine');
+    const male = computeLabIndices(altLab, 'male');
+    const fem = computeLabIndices(altLab, 'female');
+    expect(fem.hepaticStress).toBeGreaterThan(male.hepaticStress);
+    expect(JSON.stringify(computeLabIndices(altLab))).toBe(JSON.stringify(male));
+  });
 });
 
 describe('Л11: clinical-analyzer женские ec50 гемато (честный сепаратор)', () => {

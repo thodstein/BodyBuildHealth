@@ -466,8 +466,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
   const labIndexDetails = useMemo(() => {
     if (!hasLabs) return {} as Record<string, LabIndexDetail>;
-    return computeLabIndexDetails(currentLabs);
-  }, [hasLabs, currentLabs]);
+    return computeLabIndexDetails(currentLabs, profileSex as 'male' | 'female');
+  }, [hasLabs, currentLabs, profileSex]);
 
   const labAnalysisResult = useMemo(() => {
     if (!hasLabs) return null;

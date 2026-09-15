@@ -7,6 +7,8 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
+import * as fs from 'fs';
+import * as path from 'path';
 import { RiskScreen } from '../screens/RiskScreen';
 import { RiskOverview } from '../screens/RiskScreen_parts/RiskOverview';
 import { femaleDrugThresholdView } from '../../engines/female-aas-risk';
@@ -99,5 +101,26 @@ describe('Ж1: RiskScreen — карточка препаратов в исто�
     expect(document.querySelector('[data-female-thresholds="badge"]')).toBeNull();
     expect(document.querySelector('[data-female-dose-index]')).toBeNull();
     expect(screen.queryByText(/♀ Препараты и пороги \(женские\)/)).toBeNull();
+  });
+});
+
+describe('Ж4: проводка пола в lab-pharma (guard исходников)', () => {
+  const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), 'utf8');
+
+  it('RiskScreen: оба вызова analyzeLabDrugCorrelation получают пол при female', () => {
+    const src = read('src/ui/screens/RiskScreen.tsx');
+    const calls = src.split('analyzeLabDrugCorrelation(').slice(1);
+    expect(calls.length).toBeGreaterThanOrEqual(1); // вызов в ClinicalRiskDisplay (labPharmaAlerts)
+    for (const c of calls) {
+      expect(c.slice(0, 260)).toContain("profileSex === 'female'");
+    }
+  });
+
+  it('LabsScreen и labs-indices: женские нормы включены через profileSex/sex', () => {
+    const labs = read('src/ui/screens/LabsScreen.tsx');
+    expect(labs).toContain("analyzeLabDrugCorrelation(currentLabs, linked.course, (linked.profile?.settings as any)?.pharma?.phase || 'on_cycle', profileSex === 'female' ? 'female' : undefined)");
+    expect(labs).toContain('computeLabIndexDetails(currentLabs, profileSex');
+    const indices = read('src/engines/labs-indices.engine.ts');
+    expect(indices).toContain('normalizedRatio(point.code, point.value, point.unit, undefined, sex)');
   });
 });

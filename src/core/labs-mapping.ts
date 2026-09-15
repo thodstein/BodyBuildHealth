@@ -1,5 +1,6 @@
 import synonyms from '../data/labs-synonyms.json';
 import { UCUM_MAP, DYNAMIC_REFS } from './constants';
+import { getLabNorm } from '../engines/lab-norms.engine';
 
 const SYNONYM_MAP = synonyms as Record<string, string>;
 
@@ -311,12 +312,16 @@ export function normalizedRatio(code: string, value: number, unit: string, age?:
     uln = dynamic.baseULN * ageF * sexF;
   }
 
-  // Л8 (фаза 2 женского слоя): HCT у женщин — асимметричные границы 36–48 вместо
-  // симметричного ×0.85 (LLN 30.6 → 36). Паритет с getLabNorm/FEMALE_LAB_BOUNDS;
-  // мужской путь и остальные маркеры — байт-в-байт.
-  if (code.toUpperCase() === 'HCT' && sex === 'female') {
-    lln = 36;
-    uln = 48;
+  // Л8 (фаза 2 женского слоя): женские границы из единого источника
+  // (getLabNorm/FEMALE_LAB_BOUNDS — HCT 36–48, Hb 120–150, RBC 4.0–5.2,
+  // АЛТ/АСТ/ГГТ 31, креатинин 44–97, ферритин 15–200) вместо симметричного ×0.85.
+  // Мужской путь и маркеры без женских отличий — байт-в-байт.
+  if (sex === 'female') {
+    const fem = getLabNorm(code, 'female');
+    if (fem?.female) {
+      lln = fem.lln;
+      uln = fem.uln;
+    }
   }
 
   const span = uln - lln;
