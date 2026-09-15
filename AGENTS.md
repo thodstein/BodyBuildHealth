@@ -1,5 +1,13 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-диагностика движений: чистка мёртвого кода (Sep 15 2026, коммит pathspec `33bdf8d5`, запушен — очередь была чистая)
+
+По команде «продолжай» (поверх v2 `9a4577cb`, уже в origin/main). Только свой хаб + свой тест; чужие WIP (labs-mapping/IndividualPlan/Risk/Labs/armlift/bb-finalize) и чужой активный `BbAutoConstructor` (M3-срез владельца) не тронуты.
+- Удалено ~190 строк мёртвого: мемы `acwr/barLast/poseLive/teenNote/lvpProfile(+save-эффект)/tendonGuard/workingRange/lrTopUpMap/readinessAction/annualBbBlocks/femaleNotes/unifiedSnap`, `handleCsvParse`; импорты srpe/training-load/video/pose/bar-path/vbt/lvp/tendon/bbWorkingRange/volume-landmarks/posingIsoNote/femaleSymmetryNotes/teenTrainingNote; стейт `vbtBest/vbtLast/vbtWeight/csvText/poseCsvText/lvpText/lvpLift/vbtGoal/elbowPain/mmcLoadPct/annualBlockKey/posingIso/age/cyclePhase`. `vbtLossPct` в readiness/weakCauses → `null`; `mmcAdvice` — isolation-only; `handleAnnualApply` — первый ББ-блок (селекта нет). Живое не тронуто: гейт вставки (redFlags/readiness/returnActive/lrVerdicts), weakCauses, мост, экспорт, spec/annual/ICS, OHS→профиль.
+- NEW тест legacy-совместимости (v1-стор с удалёнными ключами грузится, weakManual подхвачен).
+- Проверено: hub 33/33 + movement 13/13 + bridge/handlers/pro/pro2/pro3/injection 132/132 + max-pro 93/94 (**1 — чужое предсуществующее `female норма→тихо` в `bb-symmetry`, не мой файл**); `tsc --noEmit` **0 по всему проекту**; `verify:apk-design` OK. Запушен (`5d5aaf485..33bdf8d51`).
+- **Граница для владельца ББ-авто**: приёмник не читает `movementDriver/singleLeg/vbtLossPct` (мост несёт в никуда — чужой файл, не лезу); раз мост больше не шлёт `lrTopUp:{}`/`returnStage`, stale `he_bb_lr_topup`/`he_bb_return_action` чистятся только полным старым мостом — правит владелец приёмника.
+
 ## ББ-диагностика движений v2: 7 табов → 4, дубли нагрузки вынесены (Sep 15 2026, коммит pathspec `9a4577cb`, без пуша)
 
 По команде «нагрузка и восстановление убрать, дубли других хабов удалить, диагностика движений под ББ + интернет-исследование, жду план-отчёт» → сначала план-отчёт в чате (аудит 2248 строк/7 табов + синтез NASM OHSA/Brookbush/PoinT GO 2026 + lengthened-наука Wolf/Strey/McMahon + MMC Schoenfeld/Grgic), затем «выполняй полностью». Только Edit/Write + vitest/tsc; чужие WIP (App/labs-mapping/armlift/IndividualPlan/Risk/Support/ArmliftingDiagnosticsHub, bb-finalize) не тронуты; коммит строго pathspec 5 своих; движки объёма/нагрузки/симметрии не менялись.
