@@ -9,7 +9,7 @@ import {
 } from '../../../engines/lab-diary.engine';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
-import { UCUM_MAP } from '../../../core/constants';
+import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
 
@@ -30,7 +30,7 @@ const normBg = (v: number, lln?: number, uln?: number): string => {
   return 'rgba(0,230,138,0.06)';
 };
 
-export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
+export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }> = ({ labs, sex }) => {
   const [diary, setDiary] = useState<LabDiaryEntry[]>(getLabDiary);
   const [mode, setMode] = useState<'overview' | 'chart' | 'abnormal' | 'timeline'>('overview');
   const [selectedMarker, setSelectedMarker] = useState<string>('');
@@ -45,15 +45,15 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
     for (const lab of labs) {
       const key = (lab.code || '').toUpperCase();
       if (!markerNorms[key]) {
-        const info = UCUM_MAP[key] || UCUM_MAP[key.toLowerCase()];
-        markerNorms[key] = { lln: info?.lln, uln: info?.uln };
+        const norm = getLabNorm(key, sex);
+        markerNorms[key] = norm ? { lln: norm.lln, uln: norm.uln } : { lln: undefined, uln: undefined };
       }
     }
     const prevLen = getLabDiary().length;
     importLabsToDiary(labs, markerNorms);
     const updated = getLabDiary();
     if (updated.length !== prevLen) setDiary(updated);
-  }, [labs]);
+  }, [labs, sex]);
 
   const stats = useMemo(() => getLabDiaryStats(diary), [diary]);
   const topMarkers = useMemo(() => getTopTestedMarkers(diary, 20), [diary]);
@@ -82,8 +82,8 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
     for (const lab of labs) {
       const key = (lab.code || '').toUpperCase();
       if (!markerNorms[key]) {
-        const info = UCUM_MAP[key] || UCUM_MAP[key.toLowerCase()];
-        markerNorms[key] = { lln: info?.lln, uln: info?.uln };
+        const norm = getLabNorm(key, sex);
+        markerNorms[key] = norm ? { lln: norm.lln, uln: norm.uln } : { lln: undefined, uln: undefined };
       }
     }
     importLabsToDiary(labs, markerNorms);
@@ -139,6 +139,12 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
           </div>
           {stats.firstDate && <span style={{ fontSize:11, padding:'6px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontWeight:700, flexShrink:0 }}>📅 {stats.firstDate} → {stats.lastDate}</span>}
         </div>
+        {/* Л10: пометка женских порогов (только sex=female) */}
+        {sex === 'female' && (
+          <div data-female-labs-note style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
+            {FEMALE_LABS_TAB_NOTE}
+          </div>
+        )}
         <div className="labs-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:8 }}>
           <MiniStat label="Дней" value={`${stats.totalDays}`} color="#3b82f6" />
           <MiniStat label="Маркеров" value={`${stats.totalMarkers}`} color={LABS_ACCENT} />

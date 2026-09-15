@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
+import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, LabsEmpty, sysPillStyle, labsWithAlpha, getLabsSystem } from './LabsUI';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
@@ -8,10 +9,17 @@ const sysLabels: Record<string, string> = LABS_SYS_LABEL;
 const sysColors: Record<string, string> = LABS_SYS_COLOR;
 const sysIcons: Record<string, NativeIconName> = LABS_SYS_ICON;
 
-function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
+function getLabStatus(lab: LabPoint, sex?: 'male' | 'female'): 'normal' | 'high' | 'low' | 'unknown' {
+  // Сохранённые диапазоны из бланка лаборатории приоритетнее справочных.
   if (lab.refLow !== undefined && lab.refHigh !== undefined) {
     if (lab.value > lab.refHigh) return 'high';
     if (lab.value < lab.refLow) return 'low';
+    return 'normal';
+  }
+  const norm = getLabNorm(lab.code, sex);
+  if (norm) {
+    if (lab.value > norm.uln) return 'high';
+    if (lab.value < norm.lln) return 'low';
     return 'normal';
   }
   const info = UCUM_MAP[lab.code] || UCUM_MAP[lab.code.toUpperCase()];
@@ -21,7 +29,7 @@ function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
   return 'normal';
 }
 
-export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
+export const LabsResults: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }> = ({ labs, sex }) => {
   const [filterSystem, setFilterSystem] = useState<string>('all');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set([labs[0]?.date].filter(Boolean) as string[]));
 
@@ -34,10 +42,16 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
   const toggleDate = (date: string) => setExpandedDates(prev=>{ const n=new Set(prev); if(n.has(date)) n.delete(date); else n.add(date); return n; });
 
   // summary for filter bar
-  const abnormalCount = useMemo(()=> filteredLabs.filter(l=> { const s=getLabStatus(l); return s==='high'||s==='low'; }).length, [filteredLabs]);
+  const abnormalCount = useMemo(()=> filteredLabs.filter(l=> { const s=getLabStatus(l, sex); return s==='high'||s==='low'; }).length, [filteredLabs, sex]);
 
   return (
     <div className="labs-results">
+      {/* Л10: пометка женских порогов (только sex=female) */}
+      {sex === 'female' && (
+        <div data-female-labs-note style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
+          {FEMALE_LABS_TAB_NOTE}
+        </div>
+      )}
       {/* Filters — TOP APK pills 44px, скролл-лента */}
       <div className="labs-filter-row" style={{ display:'flex', gap:8, marginBottom:12, alignItems:'center', overflowX:'auto', padding:'2px 2px 6px', scrollbarWidth:'none' }}>
         <button onClick={()=>setFilterSystem('all')} style={filterSystem==='all' ? sysPillStyle(true, LABS_ACCENT) : { padding:'10px 14px', borderRadius:999, border:'1px solid rgba(140,190,255,0.14)', background:'rgba(21,38,66,0.60)', color:'#fff', fontSize:11, fontWeight:800, cursor:'pointer', minHeight:44, whiteSpace:'nowrap', flexShrink:0 }}>
@@ -59,7 +73,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {Object.entries(groupedByDate).map(([date, dateLabs])=>{
             const isOpen = expandedDates.has(date);
-            const dateAbn = dateLabs.filter(l=>{ const s=getLabStatus(l); return s==='high'||s==='low'; }).length;
+            const dateAbn = dateLabs.filter(l=>{ const s=getLabStatus(l, sex); return s==='high'||s==='low'; }).length;
             const dateStr = new Date(date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' });
             return (
               <div key={date} style={{ ...LABS_CARD, padding:0, overflow:'hidden', background:'rgba(20,22,30,0.40)', backdropFilter:'blur(10px)' }}>
@@ -79,8 +93,9 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                 {isOpen && (
                   <div style={{ padding:'10px 10px 10px', display:'grid', gap:6, background:'rgba(0,0,0,0.08)' }}>
                     {dateLabs.map(lab=>{
-                      const status=getLabStatus(lab);
-                      const info=UCUM_MAP[lab.code.toUpperCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === lab.code.toLowerCase())?.[1] as any);
+                      const status=getLabStatus(lab, sex);
+                      const norm = getLabNorm(lab.code, sex);
+                      const info = norm ?? (UCUM_MAP[lab.code.toUpperCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === lab.code.toLowerCase())?.[1] as any));
                       const sys=getLabsSystem(lab.code)||'other';
                       const sysColor=sysColors[sys]||'#6b7280';
                       const isAbn=status==='high'||status==='low';
@@ -97,7 +112,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                             <div style={{ fontWeight:800, fontSize:13, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.name || lab.code}</div>
                             <div style={{ fontSize:11, color:'#fff', marginTop:2, display:'flex', gap:6, alignItems:'center' }}>
                               <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><NativeIcon name={sysIcons[sys] || 'file'} size={11} /> {sysLabels[sys]||sys}</span>
-                              {info && <span style={{ padding:'2px 7px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>{info.lln}–{info.uln} {info.prefUnit||''}</span>}
+                              {info && <span style={{ padding:'2px 7px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>{info.lln}–{info.uln} {(info as any).prefUnit || (info as any).unit || ''}{norm?.female ? ' ♀' : ''}</span>}
                             </div>
                           </div>
                           <div style={{ textAlign:'right', flexShrink:0, minWidth:92 }}>

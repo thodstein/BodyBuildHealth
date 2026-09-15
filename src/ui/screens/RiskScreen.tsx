@@ -1566,6 +1566,8 @@ const ClinicalRiskDisplay: React.FC = () => {
   const course = linked.course || [];
   const labs = linked.labs || [];
   const s = linked.profile?.settings;
+  /** Ж3/Л11 (фаза 2): пол профиля для женских патологий стека и женских ec50 гемато. */
+  const profileSex: 'male' | 'female' = (s as any)?.personal?.sex === 'female' ? 'female' : 'male';
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1588,7 +1590,10 @@ const ClinicalRiskDisplay: React.FC = () => {
       const tWeeks = course.length > 0 ? course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0) : 4;
 
       // Run clinical analysis
-      const clinical = analyzeClinicalRisks({ compounds, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics });
+      const clinical = analyzeClinicalRisks({
+        compounds, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics,
+        ...(profileSex === 'female' ? { sex: 'female' as const } : {}),
+      });
 
       // Also run drug mapper to capture ALL drug-based pathologies
       // Ж3 (фаза 2): при sex=female добавляются женские патологии стека (вирилизация/цикл/…).

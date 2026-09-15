@@ -1,6 +1,7 @@
 import React from 'react';
 import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
+import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsSectionHeader, LabsKpiCard, LabsBadge, LabsEmpty, getLabsSystem } from './LabsUI';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
@@ -9,10 +10,17 @@ Object.entries(UCUM_MAP).forEach(([code, info]) => {
   LAB_RANGES[code] = { min: info.lln, max: info.uln, name: info.name, unit: info.prefUnit };
 });
 
-function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
+function getLabStatus(lab: LabPoint, sex?: 'male' | 'female'): 'normal' | 'high' | 'low' | 'unknown' {
   if (lab.refLow !== undefined && lab.refHigh !== undefined) {
     if (lab.value > lab.refHigh) return 'high';
     if (lab.value < lab.refLow) return 'low';
+    return 'normal';
+  }
+  // Л8: женские нормы из единого резолвера (без sex — прежний LAB_RANGES байт-в-байт)
+  const norm = getLabNorm(lab.code, sex);
+  if (norm) {
+    if (lab.value > norm.uln) return 'high';
+    if (lab.value < norm.lln) return 'low';
     return 'normal';
   }
   const range = LAB_RANGES[lab.code] || LAB_RANGES[lab.code.toUpperCase()];
@@ -22,8 +30,10 @@ function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
   return 'normal';
 }
 
-function getLabRefInfo(lab: LabPoint): string {
+function getLabRefInfo(lab: LabPoint, sex?: 'male' | 'female'): string {
   if (lab.refLow !== undefined && lab.refHigh !== undefined) return `${lab.refLow}–${lab.refHigh} ${lab.unit || ''}`;
+  const norm = getLabNorm(lab.code, sex);
+  if (norm) return `${norm.lln}–${norm.uln} ${norm.unit || lab.unit || ''}${norm.female ? ' ♀' : ''}`;
   const range = LAB_RANGES[lab.code] || LAB_RANGES[lab.code.toUpperCase()];
   if (!range) return '';
   return `${range.min}–${range.max} ${range.unit}`;
@@ -34,10 +44,12 @@ export const LabsOverview: React.FC<{
   hasLabs: boolean;
   forceNoLabs: boolean;
   setForceNoLabs: (v: boolean) => void;
-}> = ({ labs, hasLabs, forceNoLabs, setForceNoLabs }) => {
-  const normalCount = labs.filter(l => getLabStatus(l) === 'normal').length;
-  const highCount = labs.filter(l => getLabStatus(l) === 'high').length;
-  const lowCount = labs.filter(l => getLabStatus(l) === 'low').length;
+  /** Л8/Л10: пол профиля — женские нормы + пометка (без sex — мужской путь 1-в-1). */
+  sex?: 'male' | 'female';
+}> = ({ labs, hasLabs, forceNoLabs, setForceNoLabs, sex }) => {
+  const normalCount = labs.filter(l => getLabStatus(l, sex) === 'normal').length;
+  const highCount = labs.filter(l => getLabStatus(l, sex) === 'high').length;
+  const lowCount = labs.filter(l => getLabStatus(l, sex) === 'low').length;
   const abnormalCount = highCount + lowCount;
 
   const systemGroups: Record<string, LabPoint[]> = {};
@@ -71,6 +83,14 @@ export const LabsOverview: React.FC<{
             <div style={{ fontSize:11, color:'#fff', marginTop:2, lineHeight:1.5 }}>Риски рассчитываются с повышающим коэффициентом. Снимите штраф после ввода данных.</div>
           </div>
           <button onClick={()=>setForceNoLabs(false)} style={{ padding:'10px 14px', borderRadius:999, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff', fontSize:12, fontWeight:800, cursor:'pointer', minHeight:44 }}>Снять</button>
+        </div>
+      )}
+
+      {/* Л10: пометка женских порогов (только sex=female) */}
+      {sex === 'female' && (
+        <div data-female-labs-note style={{ ...LABS_CARD, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)', display:'flex', gap:10, alignItems:'center' }}>
+          <span style={{ width:30, height:30, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(244,114,182,0.14)', border:'1px solid rgba(244,114,182,0.22)', fontSize:13, flexShrink:0 }}>♀</span>
+          <div style={{ flex:1, fontSize:11, color:'#fff', lineHeight:1.5 }}>{FEMALE_LABS_TAB_NOTE}</div>
         </div>
       )}
 
@@ -108,7 +128,7 @@ export const LabsOverview: React.FC<{
               const color = LABS_SYS_COLOR[system] || '#6b7280';
               const icon: NativeIconName = LABS_SYS_ICON[system] || 'file';
               const label = LABS_SYS_LABEL[system] || system;
-              const sysAbn = systemLabs.filter(l=> { const s=getLabStatus(l); return s==='high'||s==='low'; }).length;
+              const sysAbn = systemLabs.filter(l=> { const s=getLabStatus(l, sex); return s==='high'||s==='low'; }).length;
               return (
                 <div key={system} style={{ borderRadius:14, overflow:'hidden', border:`1px solid ${color}18`, background:'rgba(255,255,255,0.02)' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 11px', background: color+'10', borderBottom:`1px solid ${color}14` }}>
@@ -120,10 +140,10 @@ export const LabsOverview: React.FC<{
                   <div className="labs-sys-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, padding:10 }}>
                     {systemLabs.sort((a,b)=> {
                       const pa: Record<string,number> = { high:0, low:1, unknown:2, normal:3 };
-                      return (pa[getLabStatus(a)]??2) - (pa[getLabStatus(b)]??2);
+                      return (pa[getLabStatus(a, sex)]??2) - (pa[getLabStatus(b, sex)]??2);
                     }).map(lab=>{
-                      const status = getLabStatus(lab);
-                      const refInfo = getLabRefInfo(lab);
+                      const status = getLabStatus(lab, sex);
+                      const refInfo = getLabRefInfo(lab, sex);
                       const statusColor = status==='high'? '#ef4444' : status==='low'? '#f97316' : status==='unknown'? '#6b7280' : LABS_ACCENT;
                       const statusIcon = status==='high'?'↑': status==='low'?'↓': status==='unknown'?'•':'✓';
                       const isAbn = status==='high'||status==='low';

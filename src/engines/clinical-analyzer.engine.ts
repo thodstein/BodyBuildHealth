@@ -45,7 +45,20 @@ export interface ClinicalAnalysisInput {
   tWeeks: number;            // weeks on cycle
   weeksSinceLab: number;     // compliance penalty
   genetics: string[];        // patient genetics
+  /** Л11 (фаза 2 женского слоя): женские ec50 гемато (HCT/Hb/RBC). Без sex — мужская база 1-в-1. */
+  sex?: 'male' | 'female';
 }
+
+/**
+ * Л11: женские ec50 гематологических маркеров — честный сепаратор.
+ * Общая база (CLINICAL_MARKERS) НЕ меняется; женские значения = женские ULN
+ * из единого лаб-слоя (HCT 48%, Hb 15.0 г/дл, RBC 5.2) — паритет с LAB_REFERENCES_FEMALE.
+ */
+const FEMALE_MARKER_EC50: Record<string, number> = {
+  Hematocrit: 48,
+  Hemoglobin: 15.0,
+  RBC: 5.2,
+};
 
 export interface ClinicalAnalysisOutput {
   results: PathologyResult[];
@@ -186,7 +199,11 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
     for (const m of userMarkers) {
       const markerDef = CLINICAL_MARKERS[m.code];
       if (!markerDef) continue;
-      hillScores.push(hillScore(m.value, markerDef.ec50, markerDef.isInverted));
+      // Л11: женский ec50 гемато (только sex=female; без sex — база 1-в-1).
+      const ec50 = (input.sex === 'female' && FEMALE_MARKER_EC50[m.code] !== undefined)
+        ? FEMALE_MARKER_EC50[m.code]
+        : markerDef.ec50;
+      hillScores.push(hillScore(m.value, ec50, markerDef.isInverted));
     }
 
     if (hillScores.length === 0) continue;

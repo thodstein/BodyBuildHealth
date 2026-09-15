@@ -694,7 +694,7 @@ export function drugContributionScale(id: string, sex?: 'male' | 'female'): numb
 
 // --- Lab reference ranges ---
 
-export interface LabReference { mean: number; sd: number; uln: number; sensitive: boolean; alpha: number }
+export interface LabReference { mean: number; sd: number; uln: number; sensitive: boolean; alpha: number; /** Л8: нижняя граница (только женские частичные записи; базовая таблица её не использует). */ lln?: number }
 
 export const LAB_REFERENCES: Record<string, LabReference> = {
   ALT: { mean: 25, sd: 10, uln: 40, sensitive: true, alpha: 0.5 },
@@ -757,14 +757,14 @@ export const LAB_REFERENCES: Record<string, LabReference> = {
  * креатинин ниже мужского, ферритин ниже (WHO).
  */
 export const LAB_REFERENCES_FEMALE: Record<string, Partial<LabReference>> = {
-  ALT: { mean: 20, sd: 8, uln: 31 },
-  AST: { mean: 19, sd: 7, uln: 31 },
-  GGT: { mean: 20, sd: 10, uln: 32 },
-  Hct: { mean: 0.42, sd: 0.035, uln: 0.48 },
-  Hb: { mean: 135, sd: 11, uln: 155 },
-  RBC: { mean: 4.6, sd: 0.35, uln: 5.2 },
-  Creatinine: { mean: 65, sd: 12, uln: 97 },
-  Ferritin: { mean: 70, sd: 40, uln: 200 },
+  ALT: { mean: 20, sd: 8, uln: 31, lln: 7 },
+  AST: { mean: 19, sd: 7, uln: 31, lln: 8 },
+  GGT: { mean: 20, sd: 10, uln: 31, lln: 7 },
+  Hct: { mean: 0.42, sd: 0.035, uln: 0.48, lln: 0.36 },
+  Hb: { mean: 135, sd: 11, uln: 150, lln: 120 },
+  RBC: { mean: 4.6, sd: 0.35, uln: 5.2, lln: 4.0 },
+  Creatinine: { mean: 65, sd: 12, uln: 97, lln: 44 },
+  Ferritin: { mean: 70, sd: 40, uln: 200, lln: 15 },
 };
 
 /** Единый резолвер референса с учётом пола: без sex (или male) — прежняя мужская таблица байт-в-байт. */

@@ -28,6 +28,7 @@ import { processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResul
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
 import { normalizedRatio } from '../../core/labs-mapping';
+import { getLabNorm } from '../../engines/lab-norms.engine';
 import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, type LabTrend } from '../../engines/lab-trend.engine';
 import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
@@ -439,9 +440,10 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       const coeff = ref.coeff || 1;
       const norm = lab.value * coeff;
       // Prefer stored reference ranges from parsed lab forms;
-      // fall back to UCUM_MAP defaults when not available.
-      const uln = lab.refHigh !== undefined ? lab.refHigh * coeff : ref.uln;
-      const lln = lab.refLow !== undefined ? lab.refLow * coeff : ref.lln;
+      // fall back to UCUM_MAP defaults (Л8: женские границы при sex=female) when not available.
+      const fallbackNorm = getLabNorm(lab.code, profileSex as 'male' | 'female');
+      const uln = lab.refHigh !== undefined ? lab.refHigh * coeff : (fallbackNorm?.uln ?? ref.uln);
+      const lln = lab.refLow !== undefined ? lab.refLow * coeff : (fallbackNorm?.lln ?? ref.lln);
       let deviation = 0;
       if (norm > uln) deviation = (norm - uln) / uln;
       else if (norm < lln) deviation = -((lln - norm) / lln);
@@ -757,6 +759,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             hasLabs={!!hasLabs}
             forceNoLabs={globalNoLabs}
             setForceNoLabs={(v: boolean) => { setGlobalNoLabs(v); if (v) setNoLabsSystemsState([]); notifyDataChange(); }}
+            sex={profileSex as 'male' | 'female'}
           />
           {/* Динамика маркеров (перенесено из вкладки chart) */}
           {(() => {
@@ -1124,8 +1127,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     const info = UCUM_MAP[code.toUpperCase()];
                     const isSubmitted = submittedCodes.has(code.toUpperCase());
                     const latest = currentLabs.find(l => l.code.toUpperCase() === code.toUpperCase());
-                    const isHigh = latest && info ? (latest.value * (info.coeff || 1)) > info.uln : false;
-                    const isLow = latest && info ? (latest.value * (info.coeff || 1)) < info.lln : false;
+                    // Л8: статус по женским границам при sex=female (без sex — UCUM 1-в-1).
+                    const norm = getLabNorm(code, profileSex as 'male' | 'female');
+                    const refUln = norm?.uln ?? info?.uln;
+                    const refLln = norm?.lln ?? info?.lln;
+                    const isHigh = latest && info ? (latest.value * (info.coeff || 1)) > (refUln ?? Infinity) : false;
+                    const isLow = latest && info ? (latest.value * (info.coeff || 1)) < (refLln ?? -Infinity) : false;
                     return (
                       <button key={code} onClick={() => { setInputCode(code); setInputUnit(info?.prefUnit || ''); setShowLabInput(true); }} style={{
                         padding:'8px 12px', borderRadius:12, fontSize:12, cursor:'pointer', transition:'all 0.15s', minHeight:40,
@@ -1153,7 +1160,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {currentLabs.length > 0 && (
             <div style={{ marginTop: 4 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>📋 Результаты текущей фазы</div>
-              <LabsResults labs={currentLabs} />
+              <LabsResults labs={currentLabs} sex={profileSex as 'male' | 'female'} />
             </div>
           )}
 
@@ -1256,7 +1263,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
           {/* ≡≡≡ DIARY SUB-VIEW ≡≡≡ */}
           {journalSubView === 'diary' && (
-            <LabDiaryTab labs={labs} />
+            <LabDiaryTab labs={labs} sex={profileSex as 'male' | 'female'} />
           )}
 
           {/* ≡≡≡ REPORTS SUB-VIEW ≡≡≡ */}
@@ -1372,7 +1379,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <span style={{ fontSize: 14, fontWeight: 700 }}>Архив результатов</span>
                 <span style={{ fontSize: 11, color: '#fff', marginLeft: 'auto' }}>{archiveLabs.length} записей • {new Set(archiveLabs.map(l => l.code.toUpperCase())).size} тестов</span>
               </div>
-              <LabsResults labs={archiveLabs} />
+              <LabsResults labs={archiveLabs} sex={profileSex as 'male' | 'female'} />
             </div>
           )}
         </div>
@@ -1670,6 +1677,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               selectedPhase={selectedPhase}
               onPhaseChange={handlePhaseChange}
               tick={tick}
+              sex={profileSex as 'male' | 'female'}
             />
           )}
 
@@ -1761,6 +1769,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               selectedPhase={selectedPhase}
               onPhaseChange={handlePhaseChange}
               tick={tick}
+              sex={profileSex as 'male' | 'female'}
             />
           )}
         </div>

@@ -3,6 +3,7 @@ import { UCUM_MAP } from '../../../core/constants';
 import type { LabPoint } from '../../../core/types';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
+import { getLabNorm, FEMALE_LABS_NOTE } from '../../../engines/lab-norms.engine';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, labsWithAlpha } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
 
@@ -123,9 +124,10 @@ const CATALOG_LAB_DESCRIPTIONS: Record<string, string> = {
   'TP': 'Общий белок плазмы. Отражает нутритивный статус и функцию печени.',
   'EGFR': 'Расчётная скорость клубочковой фильтрации. Ключевой маркёр функции почек.',
   'UA': 'Мочевая кислота. Пуриновый обмен. Повышается на ААС — риск подагры.',
-  'DHEA_S': 'ДГЭА-С. Надпочечниковый андроген. Предшественник тестостерона.',
-  'AMH': 'Антимюллеров гормон. Маркёр овариального резерва и функции тестикул.',
-  'PSA': 'Простатический специфический антиген. Скрининг патологии простаты.',
+  'DHEA_S': 'ДГЭА-С. Надпочечниковый андроген. Предшественник тестостерона; у женщин — маркер андроген-продуцирующих состояний.',
+  'AMH': 'Антимюллеров гормон. У женщин — овариальный резерв; у мужчин — функция клеток Сертоли.',
+  'INHB': 'Ингибин B. У мужчин — маркер сперматогенеза и функции тестикул; у женщин — фолликулярной/гранулёзной функции.',
+  'PSA': 'Простатический специфический антиген. Скрининг патологии простаты у мужчин (>40/на курсе); у женщин не оценивается.',
   'K': 'Калий. Основной внутриклеточный катион. Контроль электролитов на курсе.',
   'NA': 'Натрий. Основной внеклеточный катион. Регуляция водного баланса.',
   'CA': 'Кальций. Минерал для костей и мышечного сокращения.',
@@ -150,6 +152,8 @@ const systemOrder = ['hepatic','renal','endocrine','hematologic','cardio','metab
 type CatalogEntry = {
   code: string; name: string; unit: string; uln: number; lln: number;
   system: string; description: string;
+  /** Л8: норма взята из женского слоя (бейдж «♀»). */
+  female?: boolean;
 };
 
 function deviationColor(value: number, info: { uln: number; lln: number }): string {
@@ -163,11 +167,14 @@ export default function LabsCatalogTab({
   selectedPhase,
   onPhaseChange,
   tick,
+  sex,
 }: {
   labs: LabPoint[];
   selectedPhase: string;
   onPhaseChange: (phase: string) => void;
   tick: number;
+  /** Л8: пол профиля — женские нормы в каталоге (без sex — мужской путь 1-в-1). */
+  sex?: 'male' | 'female';
 }) {
   const [search, setSearch] = useState('');
   const [filterSys, setFilterSys] = useState('all');
@@ -208,8 +215,11 @@ export default function LabsCatalogTab({
         if (map[code]) continue;
         const info = UCUM_MAP[code];
         if (info) {
+          const norm = getLabNorm(code, sex);
           map[code] = {
-            code, name: info.name, unit: info.prefUnit, uln: info.uln, lln: info.lln, system: sys,
+            code, name: info.name, unit: info.prefUnit,
+            uln: norm?.uln ?? info.uln, lln: norm?.lln ?? info.lln, female: norm?.female,
+            system: sys,
             description: CATALOG_LAB_DESCRIPTIONS[code] || '',
           };
         }
@@ -218,13 +228,16 @@ export default function LabsCatalogTab({
     for (const code of Object.keys(UCUM_MAP)) {
       if (map[code]) continue;
       const info = UCUM_MAP[code];
+      const norm = getLabNorm(code, sex);
       map[code] = {
-        code, name: info.name, unit: info.prefUnit, uln: info.uln, lln: info.lln, system: 'other',
+        code, name: info.name, unit: info.prefUnit,
+        uln: norm?.uln ?? info.uln, lln: norm?.lln ?? info.lln, female: norm?.female,
+        system: 'other',
         description: CATALOG_LAB_DESCRIPTIONS[code] || '',
       };
     }
     return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
-  }, []);
+  }, [sex]);
 
   const filtered = useMemo(() => {
     let entries = catalogEntries;
@@ -328,6 +341,13 @@ export default function LabsCatalogTab({
         <LabsBadge color={catalogMode==='markers'? LABS_ACCENT : '#a855f7'}>{catalogMode === 'markers' ? `${catalogEntries.length}` : `${INVESTIGATIONS.length}`}</LabsBadge>
       </div>
 
+      {/* Л9: легенда женских порогов (только при sex=female) */}
+      {sex === 'female' && catalogMode === 'markers' && (
+        <div data-female-labs-legend style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
+          {FEMALE_LABS_NOTE}
+        </div>
+      )}
+
       {/* Mode toggle — TOP APK segmented 48px */}
       <div style={{ display:'flex', gap:6, padding:5, borderRadius:16, background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', marginBottom:10 }}>
         <button onClick={() => setCatalogMode('markers')} aria-pressed={catalogMode==='markers'} style={{
@@ -398,10 +418,11 @@ export default function LabsCatalogTab({
                                       <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:6 }}>Контролируемые параметры:</div>
                                       {inv.markers.map(code => {
                                         const info = UCUM_MAP[code];
+                                        const norm = getLabNorm(code, sex);
                                         return (
                                           <div key={code} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'8px 10px', fontSize:12, background:'rgba(255,255,255,0.02)', borderRadius:10, marginBottom:4, border:'1px solid rgba(140,190,255,0.08)' }}>
                                             <span style={{ color:'#fff', fontWeight:600 }}>{info?.name || code}</span>
-                                            {info && <span style={{ color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>{info.lln}–{info.uln} {info.prefUnit}</span>}
+                                            {norm && <span style={{ color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>{norm.lln}–{norm.uln} {norm.unit}{norm.female ? ' ♀' : ''}</span>}
                                           </div>
                                         );
                                       })}
@@ -416,6 +437,7 @@ export default function LabsCatalogTab({
                                   <div style={{ display:'grid', gap:6 }}>
                                     {inv.markers.map(code => {
                                       const info = UCUM_MAP[code];
+                                      const norm = getLabNorm(code, sex);
                                       return (
                                         <div key={code} style={{
                                           display:'flex', justifyContent:'space-between', alignItems:'center', gap:8,
@@ -425,8 +447,9 @@ export default function LabsCatalogTab({
                                         }}>
                                           <span style={{ fontWeight:700, color:'#fff' }}>{info?.name || code}</span>
                                           <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
-                                            <span style={{ color:'#fff', fontWeight:700 }}>{info?.lln || '—'}–{info?.uln || '—'}</span>
-                                            <span style={{ color:'#fff', fontSize:11 }}>{info?.prefUnit || ''}</span>
+                                            <span style={{ color:'#fff', fontWeight:700 }}>{norm ? `${norm.lln}–${norm.uln}` : '—'}</span>
+                                            <span style={{ color:'#fff', fontSize:11 }}>{norm?.unit || ''}</span>
+                                            {norm?.female && <span style={{ fontSize:10, fontWeight:800, color:'#f9a8d4' }}>♀</span>}
                                           </div>
                                         </div>
                                       );
@@ -575,8 +598,9 @@ export default function LabsCatalogTab({
                           <div style={{ fontWeight:800, fontSize:13, marginBottom:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:'#fff' }}>
                             {entry.name}
                           </div>
-                          <div style={{ fontSize:11, color:'#fff' }}>
+                          <div style={{ fontSize:11, color:'#fff', display:'flex', alignItems:'center', gap:5 }}>
                             {entry.lln}–{entry.uln} {entry.unit}
+                            {entry.female && <span data-female-lab-row={entry.code} style={{ fontSize:9, fontWeight:800, padding:'1px 5px', borderRadius:999, background:'rgba(244,114,182,0.14)', border:'1px solid rgba(244,114,182,0.30)', color:'#f9a8d4' }}>♀</span>}
                           </div>
                         </div>
                         {/* Value input — 320px-safe: группа ужата, инпут 44px */}
@@ -654,7 +678,7 @@ export default function LabsCatalogTab({
                 </div>
                 <div style={{ padding:'10px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(140,190,255,0.10)', borderRadius:12 }}>
                   <div style={{ fontSize:11, color:'#fff', marginBottom:3, fontWeight:700 }}>Референс</div>
-                  <div style={{ fontSize:13, fontWeight:800, color:'var(--accent)' }}>{detailEntry.lln}–{detailEntry.uln}</div>
+                  <div style={{ fontSize:13, fontWeight:800, color:'var(--accent)' }}>{detailEntry.lln}–{detailEntry.uln}{detailEntry.female ? ' ♀' : ''}</div>
                 </div>
                 <div style={{ padding:'10px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(140,190,255,0.10)', borderRadius:12 }}>
                   <div style={{ fontSize:11, color:'#fff', marginBottom:3, fontWeight:700 }}>Единица</div>

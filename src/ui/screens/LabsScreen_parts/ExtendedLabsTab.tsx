@@ -3,6 +3,7 @@ import { UCUM_MAP } from '../../../core/constants';
 import type { LabPoint } from '../../../core/types';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
+import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
 const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`; } catch { return `${Date.now()}_${Math.random().toString(36).slice(2)}`; } };
 
 const PANELS: { id: string; icon: string; label: string; codes: string[] }[] = [
@@ -55,11 +56,14 @@ export default function ExtendedLabsTab({
   selectedPhase,
   onPhaseChange,
   tick,
+  sex,
 }: {
   labs: LabPoint[];
   selectedPhase: string;
   onPhaseChange: (phase: string) => void;
   tick: number;
+  /** Л8: пол профиля — женские нормы (без sex — мужской путь 1-в-1). */
+  sex?: 'male' | 'female';
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -158,6 +162,13 @@ export default function ExtendedLabsTab({
         Все маркеры из каталога UCUM, сгруппированные по панелям. Ввод с авто-заполнением из существующих анализов для выбранной фазы. Коррекция референсов под разные лаборатории.
       </div>
 
+      {/* Л10: пометка женских порогов (только sex=female) */}
+      {sex === 'female' && (
+        <div data-female-labs-note style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
+          {FEMALE_LABS_TAB_NOTE}
+        </div>
+      )}
+
       <div className="labs-phase-row" style={{ display:'flex', gap:10, overflowX:'auto', marginBottom:10, scrollbarWidth:'none', padding:'2px 2px 6px', scrollSnapType:'x proximity' }}>
         {Object.entries(PHASE_LABELS).map(([key, label]) => {
           const active = selectedPhase===key;
@@ -217,6 +228,8 @@ export default function ExtendedLabsTab({
                   {uniqueCodes.map(code => {
                     const info = UCUM_MAP[code];
                     if (!info) return null;
+                    // Л8: женские нормы (getLabNorm; без sex — UCUM 1-в-1)
+                    const norm = getLabNorm(code, sex) ?? { lln: info.lln, uln: info.uln, unit: info.prefUnit, female: false };
                     const existing = existingCodes[code];
                     const val = values[code] ?? '';
                     const numVal = parseFloat(val);
@@ -238,13 +251,13 @@ export default function ExtendedLabsTab({
                           step="any" aria-label={info.name}
                           style={{
                             width:64, padding:'8px 8px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', minHeight:40,
-                            borderRadius:10, color: hasVal ? deviationColor(numVal, info) : '#fff',
+                            borderRadius:10, color: hasVal ? deviationColor(numVal, norm) : '#fff',
                             fontSize:12, fontWeight:700, textAlign:'right',
                           }}
                         />
                         <span style={{ fontSize:10, color:'#fff', minWidth:32, fontWeight:600 }}>{info.prefUnit}</span>
-                        <span style={{ fontSize:10, color:'#fff', minWidth:56, fontWeight:600 }}>
-                          {info.lln}–{info.uln}
+                        <span data-female-lab-row={norm.female ? code : undefined} style={{ fontSize:10, color:'#fff', minWidth:56, fontWeight:600 }}>
+                          {norm.lln}–{norm.uln}{norm.female ? ' ♀' : ''}
                         </span>
                         {existing && !hasVal && (
                           <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background:'rgba(59,130,246,0.15)', color:'#3b82f6', fontWeight:700 }}>
@@ -253,10 +266,10 @@ export default function ExtendedLabsTab({
                         )}
                         {hasVal && (
                           <span style={{ fontSize:10, padding:'3px 7px', borderRadius:999, fontWeight:800,
-                            background: numVal > info.uln ? 'rgba(239,68,68,0.15)' : numVal < info.lln ? 'rgba(249,115,22,0.15)' : 'rgba(0,230,138,0.15)',
-                            color: numVal > info.uln ? '#ef4444' : numVal < info.lln ? '#f97316' : 'var(--accent)',
+                            background: numVal > norm.uln ? 'rgba(239,68,68,0.15)' : numVal < norm.lln ? 'rgba(249,115,22,0.15)' : 'rgba(0,230,138,0.15)',
+                            color: numVal > norm.uln ? '#ef4444' : numVal < norm.lln ? '#f97316' : 'var(--accent)',
                           }}>
-                            {numVal > info.uln ? '↑' : numVal < info.lln ? '↓' : '✓'}
+                            {numVal > norm.uln ? '↑' : numVal < norm.lln ? '↓' : '✓'}
                           </span>
                         )}
                       </div>

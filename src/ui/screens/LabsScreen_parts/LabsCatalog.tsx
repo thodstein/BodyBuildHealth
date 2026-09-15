@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UCUM_MAP } from '../../../core/constants';
+import { getLabNorm, FEMALE_LABS_NOTE } from '../../../engines/lab-norms.engine';
 
 interface LabCatalogEntry {
   code: string;
@@ -9,6 +10,8 @@ interface LabCatalogEntry {
   max: number;
   system: string;
   description: string;
+  /** Л8: женская норма (бейдж «♀»). */
+  female?: boolean;
 }
 
 const LAB_SYSTEM_MAP: Record<string, string> = {
@@ -66,26 +69,33 @@ const LAB_DESCRIPTIONS: Record<string, string> = {
   'EGFR': 'Расчётная скорость клубочковой фильтрации. Ключевой маркёр функции почек.',
   'HOMOCYSTEINE': 'Гомоцистеин. Фактор риска тромбоза и сердечно-сосудистых заболеваний.',
   'UA': 'Мочевая кислота. Пуриновый обмен. Повышается на ААС — риск подагры.',
-  'DHEA_S': 'ДГЭА-С. Надпочечниковый андроген. Предшественник тестостерона.',
-  'AMH': 'Антимюллеров гормон. Маркёр овариального резерва и функции тестикул.',
-  'INHB': 'Ингибин B. Маркёр сперматогенеза и функции тестикул.',
-  'PSA': 'Простатический специфический антиген. Скрининг патологии простаты.',
+  'DHEA_S': 'ДГЭА-С. Надпочечниковый андроген. Предшественник тестостерона; у женщин — маркер андроген-продуцирующих состояний.',
+  'AMH': 'Антимюллеров гормон. У женщин — овариальный резерв; у мужчин — функция клеток Сертоли.',
+  'INHB': 'Ингибин B. У мужчин — маркер сперматогенеза и функции тестикул; у женщин — фолликулярной/гранулёзной функции.',
+  'PSA': 'Простатический специфический антиген. Скрининг патологии простаты у мужчин (>40/на курсе); у женщин не оценивается.',
 };
 
 // Build catalog entries from UCUM_MAP
-const catalogEntries: LabCatalogEntry[] = Object.entries(UCUM_MAP).map(([code, info]) => ({
-  code,
-  name: info.name,
-  unit: info.prefUnit,
-  min: info.lln,
-  max: info.uln,
-  system: LAB_SYSTEM_MAP[code] || '',
-  description: LAB_DESCRIPTIONS[code] || '',
-}));
+function buildCatalogEntries(sex?: 'male' | 'female'): LabCatalogEntry[] {
+  return Object.entries(UCUM_MAP).map(([code, info]) => {
+    const norm = getLabNorm(code, sex);
+    return {
+      code,
+      name: info.name,
+      unit: info.prefUnit,
+      min: norm?.lln ?? info.lln,
+      max: norm?.uln ?? info.uln,
+      system: LAB_SYSTEM_MAP[code] || '',
+      description: LAB_DESCRIPTIONS[code] || '',
+      female: norm?.female,
+    };
+  });
+}
 
-export const LabsCatalog: React.FC = () => {
+export const LabsCatalog: React.FC<{ sex?: 'male' | 'female' }> = ({ sex }) => {
   const [search, setSearch] = useState('');
   const [filterSystem, setFilterSystem] = useState<string>('all');
+  const catalogEntries = React.useMemo(() => buildCatalogEntries(sex), [sex]);
 
   const systems = [...new Set(catalogEntries.map(e => e.system))].sort();
 
@@ -105,6 +115,11 @@ export const LabsCatalog: React.FC = () => {
         <p style={{ fontSize: 12, color: '#fff', marginBottom: 12 }}>
           Справочник лабораторных маркеров с референсными значениями и описаниями. Всего: {catalogEntries.length} маркеров.
         </p>
+        {sex === 'female' && (
+          <div data-female-labs-legend style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
+            {FEMALE_LABS_NOTE}
+          </div>
+        )}
 
         {/* Search */}
         <input
@@ -147,7 +162,7 @@ export const LabsCatalog: React.FC = () => {
                   <span style={{ fontSize: 11, color: '#fff', marginLeft: 6 }}>({entry.code})</span>
                 </div>
                 <div style={{ fontSize: 11, background: 'rgba(var(--labs-accent-rgb, 0,230,138),0.1)', padding: '2px 8px', borderRadius: 4 }}>
-                  {entry.min}–{entry.max} {entry.unit}
+                  {entry.min}–{entry.max} {entry.unit}{entry.female ? ' ♀' : ''}
                 </div>
               </div>
               <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2 }}>{entry.system}</div>

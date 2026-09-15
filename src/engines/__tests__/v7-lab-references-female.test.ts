@@ -27,10 +27,14 @@ describe('getLabReference', () => {
     expect(fem.sensitive).toBe(LAB_REFERENCES.ALT.sensitive);
     expect(fem.alpha).toBe(LAB_REFERENCES.ALT.alpha);
     // Hct/Hb/RBC/креатинин — женские
+    // (фаза 2 Л8: Hb ULN выровнен 155→150 и добавлены LLN — единый источник getLabNorm/FEMALE_LAB_GROUPS)
     expect(getLabReference('Hct', 'female')!.uln).toBe(0.48);
-    expect(getLabReference('Hb', 'female')!.uln).toBe(155);
+    expect(getLabReference('Hb', 'female')!.uln).toBe(150);
+    expect(getLabReference('Hb', 'female')!.lln).toBe(120);
     expect(getLabReference('RBC', 'female')!.uln).toBe(5.2);
+    expect(getLabReference('RBC', 'female')!.lln).toBe(4.0);
     expect(getLabReference('Creatinine', 'female')!.uln).toBe(97);
+    expect(getLabReference('GGT', 'female')!.uln).toBe(31);
     // маркеры без женских отличий — базовая
     expect(getLabReference('TSH', 'female')).toBe(LAB_REFERENCES.TSH);
   });
