@@ -54,7 +54,7 @@ describe('режим «по рецептам»: E2E', () => {
     try { localStorage.removeItem('he_planner_gen_mode'); } catch {}
     render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
     clickBtn(/✨ Сгенерировать план питания/);
-    await waitFor(() => { expect(bodyHas(/Рецепты для этого приёма/)).toBe(true); }, { timeout: 30000 });
+    await waitFor(() => { expect(bodyHas(/Подсказки рецептов/)).toBe(true); }, { timeout: 30000 });
     // открыть пикер замены: кнопка внутри раскрытой подсказки рецепта
     const openPicker = Array.from(document.querySelectorAll<HTMLElement>('button'))
       .find(b => (b.textContent || '').includes('Заменить приём этим рецептом'));
@@ -101,7 +101,7 @@ describe('режим «по рецептам»: E2E', () => {
     if (fastBtn) fireEvent.click(fastBtn);
     // simple/minimal имеют свой экран генерации
     clickBtn(/Рассчитать и создать рацион/);
-    await waitFor(() => { expect(bodyHas(/Рецепты для этого приёма/)).toBe(true); }, { timeout: 30000 });
+    await waitFor(() => { expect(bodyHas(/Подсказки рецептов/)).toBe(true); }, { timeout: 30000 });
     const openPicker = Array.from(document.querySelectorAll<HTMLElement>('button'))
       .find(b => (b.textContent || '').includes('Заменить приём этим рецептом'));
     if (!openPicker) throw new Error('«Заменить приём этим рецептом» not found');
