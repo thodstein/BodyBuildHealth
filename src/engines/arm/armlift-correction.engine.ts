@@ -25,6 +25,8 @@ export interface ArmliftCorrection {
   restSec: number;
   /** Сессия плана: SupportGrip | PinchGrip | CrushGrip | GripHeavy. */
   dayTag: string;
+  /** Фазы срыва, которые чинит (id точек). */
+  fixesPhase: string[];
 }
 
 export interface ArmliftRankCtx {
@@ -32,6 +34,7 @@ export interface ArmliftRankCtx {
   cause?: ArmliftCause;
   asymPct?: number | null;
   inPlanIds?: string[];
+  failurePoint?: string;
 }
 
 interface PoolEntry {
@@ -45,19 +48,25 @@ interface PoolEntry {
   holdSeconds?: number;
   restSec: number;
   dayTag: string;
+  /** D8: фазы срыва, которые чинит. */
+  fixes?: string[];
 }
+
+/** D8: пул чинит свои фазы; без явного — фазы пула по умолчанию. */
+const withFixes = (pool: PoolEntry[], fixes: string[]): PoolEntry[] =>
+  pool.map((p) => ({ ...p, fixes: p.fixes ?? fixes }));
 
 const SUPPORT_MAX: PoolEntry[] = [
   { exId: 'rolling_thunder', protocol: 'Тяжёлые тройки DOH + холд 10с на последнем подходе', dose: '5×3', freq: '2×/нед', source: 'SBS DOH holds', sets: 5, reps: [3, 3], holdSeconds: 10, restSec: 180, dayTag: 'SupportGrip' },
   { exId: 'apollon_axle', protocol: 'Все разминки двойным пронированным, лямки только на максе', dose: 'до 85% 1ПМ', freq: 'каждая тяга', source: 'AUSA Beginners', sets: 4, reps: [3, 5], restSec: 180, dayTag: 'SupportGrip' },
   { exId: 'fat_bar_deadlift', protocol: '50мм гриф DOH, без лямок/разнохвата', dose: '4×5', freq: '1–2×/нед', source: 'NSCA thick bar', sets: 4, reps: [5, 5], restSec: 150, dayTag: 'SupportGrip' },
   { exId: 'inch_dumbbell', protocol: '78кг одной рукой, контроль 1с вверху', dose: '3×1', freq: '1×/нед', source: 'Inch-классика', sets: 3, reps: [1, 1], holdSeconds: 3, restSec: 180, dayTag: 'GripHeavy' },
-  { exId: 'wrist_wrench_60', protocol: 'Вращающаяся 60мм как RT, лёгкий вес на технику', dose: '3×5', freq: '1×/нед', source: 'RT-перенос', sets: 3, reps: [5, 5], restSec: 120, dayTag: 'SupportGrip' },
+  { exId: 'wrist_wrench_60', protocol: 'Вращающаяся 60мм как RT, лёгкий вес на технику', dose: '3×5', freq: '1×/нед', source: 'RT-перенос', sets: 3, reps: [5, 5], restSec: 120, dayTag: 'SupportGrip', fixes: ['mid', 'hold_short'] },
 ];
 
 const PINCH: PoolEntry[] = [
-  { exId: 'plate_pinch_hold', protocol: '2 плиты гладкими наружу, удержание до отказа формы', dose: '3×20–30с', freq: '2–3×/нед', source: 'NSCA plate pinch', sets: 3, reps: [1, 1], holdSeconds: 25, restSec: 120, dayTag: 'PinchGrip' },
-  { exId: 'hub_pinch', protocol: '5 подушечек на базе, без «дверной ручки»', dose: '3×5', freq: '2×/нед', source: 'IronMind Hub', sets: 3, reps: [5, 5], holdSeconds: 3, restSec: 120, dayTag: 'PinchGrip' },
+  { exId: 'plate_pinch_hold', protocol: '2 плиты гладкими наружу, удержание до отказа формы', dose: '3×20–30с', freq: '2–3×/нед', source: 'NSCA plate pinch', sets: 3, reps: [1, 1], holdSeconds: 25, restSec: 120, dayTag: 'PinchGrip', fixes: ['hold_short', 'hold_long', 'off_floor'] },
+  { exId: 'hub_pinch', protocol: '5 подушечек на базе, без «дверной ручки»', dose: '3×5', freq: '2×/нед', source: 'IronMind Hub', sets: 3, reps: [5, 5], holdSeconds: 3, restSec: 120, dayTag: 'PinchGrip', fixes: ['off_floor', 'hold_short'] },
   { exId: 'pinch_block_80', protocol: 'Деревянный блок 80мм двумя руками, тяга', dose: '5×3', freq: '2×/нед', source: 'Pinch-практика', sets: 5, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip' },
   { exId: 'saxon_bar', protocol: 'Прямоугольник 3″ щипком двумя руками', dose: '4×3', freq: '1–2×/нед', source: 'Saxon-практика', sets: 4, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip' },
   { exId: 'country_crush_2', protocol: '2″ блок щипком двумя руками', dose: '3×3', freq: '1×/нед', source: 'AUSA Crush', sets: 3, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip' },
@@ -67,14 +76,14 @@ const PINCH: PoolEntry[] = [
 const CRUSH: PoolEntry[] = [
   { exId: 'coc_trainer', protocol: 'Warm: 10–12 лёгко, без отказа', dose: '1×12', freq: '2–3×/нед', source: 'CoC FAQ warm', sets: 1, reps: [10, 12], restSec: 60, dayTag: 'CrushGrip' },
   { exId: 'coc_no1', protocol: 'Work: 5–7 до отказа, 1–3 сета', dose: '3×5–7', freq: '2–3×/нед', source: 'CoC FAQ work', sets: 3, reps: [5, 7], restSec: 90, dayTag: 'CrushGrip' },
-  { exId: 'coc_gripper', protocol: 'Work + challenge: частички/негативы после отказа', dose: '3×5 + негативы', freq: '2×/нед', source: 'CoC FAQ challenge', sets: 3, reps: [5, 5], restSec: 120, dayTag: 'CrushGrip' },
-  { exId: 'silver_bullet_hold', protocol: 'Удержание патрона в закрытом гриппере на время', dose: '3×макс', freq: '2×/нед', source: 'IronMind Silver', sets: 3, reps: [1, 1], holdSeconds: 20, restSec: 120, dayTag: 'CrushGrip' },
+  { exId: 'coc_gripper', protocol: 'Work + challenge: частички/негативы после отказа', dose: '3×5 + негативы', freq: '2×/нед', source: 'CoC FAQ challenge', sets: 3, reps: [5, 5], restSec: 120, dayTag: 'CrushGrip', fixes: ['close_fail', 'hold_short'] },
+  { exId: 'silver_bullet_hold', protocol: 'Удержание патрона в закрытом гриппере на время', dose: '3×макс', freq: '2×/нед', source: 'IronMind Silver', sets: 3, reps: [1, 1], holdSeconds: 20, restSec: 120, dayTag: 'CrushGrip', fixes: ['hold_short', 'hold_long'] },
 ];
 
 const ENDURANCE: PoolEntry[] = [
-  { exId: 'farmer_walk_fat', protocol: '50–80% веса тела в руку, отказ хвата на 40–45с', dose: '3×20–40м', freq: '2×/нед', source: 'NSCA carries', sets: 3, reps: [20, 40], restSec: 120, dayTag: 'SupportGrip' },
-  { exId: 'towel_pullup', protocol: 'Полотенце через перекладину, DOH, без лямок', dose: '3×8', freq: '1–2×/нед', source: 'NSCA towel', sets: 3, reps: [6, 8], restSec: 120, dayTag: 'SupportGrip' },
-  { exId: 'fat_gripz_curl', protocol: 'Любые сгибания с накладками 50мм', dose: '3×10', freq: '1–2×/нед', source: 'AUSA Fat Gripz', sets: 3, reps: [8, 12], restSec: 90, dayTag: 'SupportGrip' },
+  { exId: 'farmer_walk_fat', protocol: '50–80% веса тела в руку, отказ хвата на 40–45с', dose: '3×20–40м', freq: '2×/нед', source: 'NSCA carries', sets: 3, reps: [20, 40], restSec: 120, dayTag: 'SupportGrip', fixes: ['hold_long', 'mid'] },
+  { exId: 'towel_pullup', protocol: 'Полотенце через перекладину, DOH, без лямок', dose: '3×8', freq: '1–2×/нед', source: 'NSCA towel', sets: 3, reps: [6, 8], restSec: 120, dayTag: 'SupportGrip', fixes: ['mid', 'hold_long'] },
+  { exId: 'fat_gripz_curl', protocol: 'Любые сгибания с накладками 50мм', dose: '3×10', freq: '1–2×/нед', source: 'AUSA Fat Gripz', sets: 3, reps: [8, 12], restSec: 90, dayTag: 'SupportGrip', fixes: ['mid', 'hold_short'] },
 ];
 
 const WRIST_EXT: PoolEntry[] = [
@@ -102,10 +111,10 @@ export const IMPLEMENT_TO_EX: Record<string, string> = {
 };
 
 const BASE_POOL: Record<ArmliftWeakLink, PoolEntry[]> = {
-  thumb: PINCH,
-  fingers: SUPPORT_MAX,
-  wrist_ext: WRIST_EXT,
-  support_endurance: ENDURANCE,
+  thumb: withFixes(PINCH, ['off_floor', 'hold_short', 'hold_long']),
+  fingers: withFixes(SUPPORT_MAX, ['off_floor', 'mid', 'lockout', 'close_fail']),
+  wrist_ext: withFixes(WRIST_EXT, ['mid', 'lockout', 'hold_short']),
+  support_endurance: withFixes(ENDURANCE, ['hold_long', 'hold_short', 'mid']),
   technique: [...SUPPORT_MAX.slice(0, 1), ...PINCH.slice(0, 1), ...ENDURANCE.slice(0, 1)],
   asymmetry: [...PINCH.slice(0, 1), ...SUPPORT_MAX.slice(0, 1), ...WRIST_EXT.slice(0, 1)],
   conditioning: [
@@ -133,6 +142,7 @@ function toCorrection(p: PoolEntry, reason: string, score: number): ArmliftCorre
     title: `${name} ${p.dose}`,
     protocol: p.protocol, dose: p.dose, freq: p.freq, source: `${p.source}${reason ? ` (${reason})` : ''}`,
     sets: p.sets, reps: p.reps, holdSeconds: p.holdSeconds, restSec: p.restSec, dayTag: p.dayTag,
+    fixesPhase: [...(p.fixes || [])],
   };
 }
 
@@ -175,6 +185,8 @@ export function rankArmliftCorrections(
     if (ctx.cause === 'mobility' && p.reps[0] >= 10) { score += 6; reasons.push('мобильная high-rep'); }
     if (ctx.cause === 'endurance' && (p.holdSeconds != null || /farmer|towel/i.test(p.exId))) { score += 6; reasons.push('под выносливость'); }
     if (ctx.asymPct != null && ctx.asymPct >= 7 && (cat?.equipment === 'dumbbell' || p.exId === 'wrist_curl_db')) { score += 5; reasons.push('унилатеральная'); }
+    // D8: чинит фазу срыва — приоритет
+    if (ctx.failurePoint && (p.fixes || []).includes(ctx.failurePoint)) { score += 6; reasons.push('чинит срыв'); }
     return { p, score, reason: reasons.join(', ') };
   });
   scored.sort((a, b) => b.score - a.score);

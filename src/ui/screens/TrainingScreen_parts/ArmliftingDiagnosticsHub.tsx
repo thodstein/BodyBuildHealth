@@ -15,7 +15,7 @@ import {
 import { buildArmliftingHtml, buildArmliftingCsv } from '../../../engines/arm/armlifting-diagnostics.engine';
 import { downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
-import { failuresFor, faultsFor, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
+import { failuresFor, faultsFor, movementFor, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions } from '../../../engines/arm/armlift-cause.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
@@ -253,7 +253,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   const corrections = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
     cause: cause.cause === 'pain' ? undefined : cause.cause,
     asymPct: asymForDiag,
-  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag]);
+    failurePoint: diag.failurePoint || undefined,
+  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint]);
+  const moveChain = useMemo(() => movementFor(diag.implement), [diag.implement]);
   const specBlock = useMemo(
     () => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections),
     [diagnosis.weakLink, diag.implement, corrections],
@@ -540,6 +542,28 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             ))}
           </div>
           {diag.failurePoint && <div className="ad-muted">{diagFailures.find((x) => x.id === diag.failurePoint)?.hint}</div>}
+          <div className="lift-group">Движение (где рвётся)</div>
+          <div className="ad-row" data-arm="lift-chain" aria-label="Диагностика: цепочка движения">
+            {moveChain.map((ph, idx) => {
+              const failed = diag.failurePoint === ph.id;
+              const phaseFaults = diagFaults.filter((fl) => ph.faultIds.includes(fl.id));
+              const marked = phaseFaults.filter((fl) => diag.faultIds.includes(fl.id));
+              return (
+                <span key={ph.id} className="ad-tag" title={`${ph.good}${phaseFaults.length ? ` · Фолы: ${phaseFaults.map((fl) => fl.label).join(', ')}` : ''}`}>
+                  {idx + 1}. {ph.label}{failed ? ' ✗' : ''}{marked.length ? ` (${marked.length})` : ''}
+                </span>
+              );
+            })}
+          </div>
+          {diag.failurePoint && (
+            <div className="ad-muted">
+              {(() => {
+                const ph = moveChain.find((x) => x.id === diag.failurePoint);
+                if (!ph) return null;
+                return (<>Фаза «{ph.label}»: норма — {ph.good}. Фолы фазы: {ph.faultIds.length ? ph.faultIds.map((fid) => diagFaults.find((fl) => fl.id === fid)?.label || fid).join(', ') : 'чистая сила, без фолов'}.</>);
+              })()}
+            </div>
+          )}
           <div className="lift-group">Фолы техники (честно — с фолами замер тренировочный)</div>
           <div className="ad-row" aria-label="Диагностика: фолы">
             {diagFaults.map((fl) => (
@@ -591,7 +615,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             {corrections.map((c, idx) => (
               <div key={c.id} className="ad-row">
                 <span><b>{idx + 1}. {c.title}</b> — {c.protocol}</span>
-                <span className="ad-muted">{c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq} · {c.source} · день {c.dayTag}</span>
+                <span className="ad-muted">{c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq} · {c.source} · день {c.dayTag} · чинит: {c.fixesPhase.map((fid) => diagFailures.find((fp) => fp.id === fid)?.label || fid).join(', ')}</span>
               </div>
             ))}
           </div>

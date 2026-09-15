@@ -34,6 +34,15 @@ describe('PRO-5 UI: помост + диагностика + коррекция',
     expect(screen.getByText(/Мини спец-блок/)).toBeTruthy();
     expect(document.body.textContent).toContain('Нед 4');
   });
+  it('цепочка движения: фазы + подсветка срыва', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    expect(screen.getByLabelText('Диагностика: цепочка движения')).toBeTruthy();
+    fireEvent.click(screen.getByText('Срыв с пола'));
+    expect(document.body.textContent).toContain('Отрыв');
+    expect(document.body.textContent).toContain('✗');
+  });
   it('Коррекция напрямую открывается с топ-3', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

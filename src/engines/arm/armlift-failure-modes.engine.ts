@@ -116,6 +116,109 @@ export function faultsFor(implement: string): ArmliftFault[] {
   return ARMLIFT_FAULTS[implement as ArmliftDiagImplement] || [F_CENTER, F_WIPE, F_BODY, F_BREATH];
 }
 
+/**
+ * D8: карта движения — фазы per-implement (PRO-5, real).
+ * Каждая фаза: что правильно (good) + какие фолы её ломают (только id из faultsFor!).
+ * id фазы 'setup' — подготовка (не срыв), остальные = id точек срыва.
+ */
+export interface ArmliftMovePhase {
+  id: string;
+  label: string;
+  good: string;
+  faultIds: string[];
+}
+
+const SETUP: Omit<ArmliftMovePhase, 'faultIds'> = { id: 'setup', label: 'Подход', good: 'Центр, мел, спокойная минута' };
+
+export const ARMLIFT_MOVEMENT: Record<ArmliftDiagImplement, ArmliftMovePhase[]> = {
+  rolling_thunder: [
+    { ...SETUP, faultIds: ['not_center', 'no_wipe', 'uncalib', 'rush'] },
+    { id: 'off_floor', label: 'Отрыв', good: 'Полный замок большим, ручка параллельна', faultIds: ['thumbless', 'not_parallel'] },
+    { id: 'mid', label: 'Протяжка', good: 'Ручка крутится свободно, без опоры о бедро', faultIds: ['touch_frame', 'body_drag'] },
+    { id: 'lockout', label: 'Стойка 1с', good: 'В рост, плоскость держится, down-сигнал', faultIds: ['not_parallel', 'body_drag'] },
+  ],
+  apollon_axle: [
+    { ...SETUP, faultIds: ['no_wipe', 'uncalib', 'rush'] },
+    { id: 'off_floor', label: 'Отрыв', good: 'DOH, костяшки вперёд, полный замок', faultIds: ['not_doh', 'thumbless'] },
+    { id: 'mid', label: 'Тяга', good: 'Одним движением, без полки на бёдра', faultIds: ['hip_shelf', 'body_drag'] },
+    { id: 'lockout', label: 'Стойка 1с', good: 'В рост, без движения вниз', faultIds: ['hip_shelf', 'body_drag'] },
+  ],
+  saxon_bar: [
+    { ...SETUP, faultIds: ['no_wipe', 'rush'] },
+    { id: 'off_floor', label: 'Отрыв', good: 'Большой давит в плоскость', faultIds: ['thumb_weak', 'wrist_break'] },
+    { id: 'mid', label: 'Тяга', good: 'Запястье нейтрально до верха', faultIds: ['thumb_weak', 'wrist_break'] },
+    { id: 'lockout', label: 'Стойка 1с', good: 'Плоскость не раскрылась', faultIds: ['body_drag', 'wrist_break'] },
+  ],
+  hub: [
+    { ...SETUP, faultIds: ['no_fingertips', 'doorknob', 'no_wipe'] },
+    { id: 'off_floor', label: 'Подъём', good: 'Щипок сверху, 5 подушечек на базе', faultIds: ['doorknob'] },
+    { id: 'hold_short', label: 'Удержание', good: 'Хаб параллелен земле', faultIds: ['no_fingertips', 'not_parallel'] },
+    { id: 'lockout', label: 'Стойка 1с', good: 'Без протяжки по ноге', faultIds: ['not_parallel', 'body_drag'] },
+  ],
+  pinch_block: [
+    { ...SETUP, faultIds: ['not_center', 'no_wipe'] },
+    { id: 'off_floor', label: 'Отрыв', good: 'Центр блока, полный замок', faultIds: ['thumbless'] },
+    { id: 'hold_short', label: 'Холд 0–3с', good: 'Блок параллелен земле', faultIds: ['thumbless', 'not_parallel'] },
+    { id: 'hold_long', label: 'Холд 3с+', good: 'Дыхание ровное, без опоры о тело', faultIds: ['not_parallel', 'body_drag'] },
+  ],
+  coc_gripper: [
+    { ...SETUP, faultIds: ['bad_set', 'old_gripper'] },
+    { id: 'close_fail', label: 'Закрытие', good: 'Сет не глубже кромки, дожим', faultIds: ['bad_set'] },
+    { id: 'hold_short', label: 'Дожим', good: 'Вертикаль, мизинец не касается', faultIds: ['off_vertical'] },
+  ],
+  silver_bullet: [
+    { ...SETUP, faultIds: ['bad_set'] },
+    { id: 'hold_short', label: 'Старт холда', good: 'Вертикаль, 4 пальца на ручке', faultIds: ['off_vertical', 'bad_set'] },
+    { id: 'hold_long', label: 'Холд на время', good: 'Без спешки, патрон не плывёт', faultIds: ['off_vertical', 'rush'] },
+  ],
+  excalibur: [
+    { ...SETUP, faultIds: ['not_center', 'no_wipe', 'uncalib'] },
+    { id: 'off_floor', label: 'Отрыв', good: 'Центр ручки 50мм', faultIds: ['not_center'] },
+    { id: 'mid', label: 'Тяга', good: 'Без опоры о бедро', faultIds: ['body_drag'] },
+    { id: 'lockout', label: 'Стойка 1с', good: 'Контроль до пола', faultIds: ['body_drag'] },
+  ],
+  raptor_175: [
+    { ...SETUP, faultIds: ['not_center', 'no_wipe', 'rush'] },
+    { id: 'off_floor', label: 'Отрыв', good: 'Полный замок, запястье нейтрально', faultIds: ['thumbless', 'wrist_break'] },
+    { id: 'mid', label: 'Тяга', good: 'Кулак — продолжение предплечья', faultIds: ['wrist_break', 'body_drag'] },
+    { id: 'lockout', label: 'Стойка 1с', good: 'Без протяжки', faultIds: ['body_drag'] },
+  ],
+  country_crush: [
+    { ...SETUP, faultIds: ['not_center', 'no_wipe'] },
+    { id: 'off_floor', label: 'Отрыв', good: 'Щипок 2″ блока двумя руками', faultIds: [] },
+    { id: 'mid', label: 'Тяга', good: 'Запястье не ломается', faultIds: ['wrist_break'] },
+    { id: 'lockout', label: 'Стойка 1с', good: 'Без опоры о бедро', faultIds: ['body_drag'] },
+  ],
+  grandfather_clock: [
+    { ...SETUP, faultIds: ['not_center', 'no_wipe'] },
+    { id: 'off_floor', label: 'Отрыв', good: 'Вертикальная труба, DOH', faultIds: ['wrist_break'] },
+    { id: 'hold_short', label: 'Удержание', good: 'Труба не кренится', faultIds: ['wrist_break'] },
+    { id: 'lockout', label: 'Стойка 1с', good: 'Без протяжки', faultIds: ['body_drag'] },
+  ],
+  anvil: [
+    { ...SETUP, faultIds: ['not_center', 'no_wipe'] },
+    { id: 'off_floor', label: 'Отрыв', good: 'Щипок наковальни', faultIds: ['wrist_break'] },
+    { id: 'hold_short', label: 'Удержание', good: 'Нейтраль запястья', faultIds: ['wrist_break'] },
+    { id: 'lockout', label: 'Стойка 1с', good: 'Без опоры о тело', faultIds: ['body_drag'] },
+  ],
+  saxon_medley: [
+    { ...SETUP, faultIds: ['no_wipe', 'no_rotate'] },
+    { id: 'mid', label: 'Серия', good: 'Ротация support→pinch по событиям', faultIds: ['no_rotate', 'wrist_break'] },
+    { id: 'hold_long', label: 'Длинная серия', good: 'Темп ровный, без спешки', faultIds: ['wrist_break', 'rush'] },
+    { id: 'lockout', label: 'Финиш', good: 'Каждое событие со стойкой', faultIds: ['body_drag'] },
+  ],
+  fat_gripz: [
+    { ...SETUP, faultIds: ['straps'] },
+    { id: 'mid', label: 'Движение', good: 'DOH без лямок', faultIds: ['straps', 'wrist_break'] },
+    { id: 'hold_long', label: 'Под нагрузкой', good: 'Запястье нейтрально', faultIds: ['wrist_break'] },
+    { id: 'lockout', label: 'Финиш', good: 'Без спешки', faultIds: ['rush'] },
+  ],
+};
+
+export function movementFor(implement: string): ArmliftMovePhase[] {
+  return ARMLIFT_MOVEMENT[implement as ArmliftDiagImplement] || ARMLIFT_MOVEMENT.rolling_thunder;
+}
+
 export const ARMLIFT_DIAG_IMPLEMENT_OPTS: Array<{ id: ArmliftDiagImplement; label: string }> = [
   { id: 'rolling_thunder', label: 'RT' },
   { id: 'apollon_axle', label: 'Axle' },

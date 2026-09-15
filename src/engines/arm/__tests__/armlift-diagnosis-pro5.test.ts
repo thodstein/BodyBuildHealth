@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { failuresFor, faultsFor } from '../armlift-failure-modes.engine';
+import { failuresFor, faultsFor, movementFor } from '../armlift-failure-modes.engine';
 import { diagnoseArmlift } from '../armlift-diagnosis.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../armlift-correction.engine';
 import { diagnoseArmliftCause, countGripSessions } from '../armlift-cause.engine';
@@ -29,6 +29,42 @@ describe('PRO-5 D1: точки срыва и фолы per-implement', () => {
   it('неизвестный снаряд — безопасный fallback', () => {
     expect(failuresFor('zzz').length).toBeGreaterThan(0);
     expect(faultsFor('zzz').length).toBeGreaterThan(0);
+  });
+});
+
+describe('PRO-5 D8: карта движений', () => {
+  const IMPLS = ['rolling_thunder', 'apollon_axle', 'saxon_bar', 'hub', 'pinch_block', 'coc_gripper', 'silver_bullet', 'excalibur', 'raptor_175', 'country_crush', 'grandfather_clock', 'anvil', 'saxon_medley', 'fat_gripz'];
+  it('у каждого снаряда цепочка setup → фазы срыва', () => {
+    for (const impl of IMPLS) {
+      const chain = movementFor(impl);
+      expect(chain[0].id).toBe('setup');
+      expect(chain.length).toBeGreaterThanOrEqual(3);
+      expect(chain.every((ph) => ph.label && ph.good)).toBe(true);
+    }
+  });
+  it('фолы фаз — только из чек-листа снаряда (без выдуманных)', () => {
+    for (const impl of IMPLS) {
+      const allowed = new Set(faultsFor(impl).map((fl) => fl.id));
+      for (const ph of movementFor(impl)) {
+        for (const fid of ph.faultIds) {
+          expect(allowed.has(fid)).toBe(true);
+        }
+      }
+    }
+  });
+  it('фазы срыва покрывают точки срыва снаряда', () => {
+    for (const impl of IMPLS) {
+      const phases = new Set(movementFor(impl).map((ph) => ph.id));
+      for (const fp of failuresFor(impl)) {
+        expect(phases.has(fp.id)).toBe(true);
+      }
+    }
+  });
+  it('ранжир поднимает коррекцию, чинящую фазу срыва', () => {
+    const plain = rankArmliftCorrections('support_endurance', 'rolling_thunder', {});
+    expect(plain.map((c) => c.id)).toEqual(['farmer_walk_fat', 'towel_pullup', 'fat_gripz_curl']);
+    const withPhase = rankArmliftCorrections('support_endurance', 'rolling_thunder', { failurePoint: 'hold_short' });
+    expect(withPhase.map((c) => c.id)).toEqual(['farmer_walk_fat', 'fat_gripz_curl', 'towel_pullup']);
   });
 });
 
