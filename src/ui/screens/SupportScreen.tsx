@@ -3147,13 +3147,12 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     weeklyPlan,
   };
 
-  // ── Нижняя навигация: внутренний таббар (52) + глобальный таб приложения (nav-height) + safe-area.
-  // Контент не прячется ни под одной из двух панелей.
-  const BOTTOM_NAV_H = 56;
+  // ── Нижняя навигация убрана: остался только глобальный таб приложения (nav-height) + safe-area.
+  // Контент чистит только глобальную панель.
   React.useEffect(() => { ensureSupportApkStyles(); }, []);
   const supApk = isNativeApp() ? ' train-sup sup-apk' : ' train-sup';
   return (
-    <div ref={rootRef} className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '108px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '112px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
+    <div ref={rootRef} className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '108px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '112px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(16px + var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (glass) ===== */}
       {section === 'generator' && (
@@ -3580,37 +3579,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       />
       )}
 
-      {/* ===== BOTTOM TAB BAR — всегда видимый app-таббар 4 разделов (hero под ним, размеры hero не меняем) ===== */}
-      {/* Стоит НАД глобальной навигацией приложения (не перекрывает её): bottom = высота глобального таба + safe-area */}
-      {/* Каждый таб выставляет ПОЛНОЕ состояние раздела — иначе экраны stack'аются (было: Инфо вело в пустоту, Протоколы не сбрасывали tab) */}
-      <div className="support-subbar" data-sup="nav" style={{ position:'fixed', bottom:'calc(var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))', left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
-        {[
-          { id:'home', label:'Главная', icon:'🏠', accent:'#00e68a' },
-          { id:'generator', label:'Генератор', icon:'🧩', accent:'#60a5fa' },
-          { id:'info', label:'Инфо', icon:'📚', accent:'#a78bfa' },
-          { id:'protocols', label:'Протоколы', icon:'📋', accent:'#f59e0b' },
-        ].map(item => {
-          const active = section === item.id;
-          return (
-          <button key={item.id} aria-label={item.label} aria-pressed={active} data-active={active} onClick={() => {
-            setCalcView('main');
-            if (item.id === 'home') { setSection('home'); setTab('main'); setSupportView('main'); }
-            if (item.id === 'generator') { setSection('generator'); setTab('calculator'); setSupportView('calc'); setGenTab('calculator'); }
-            if (item.id === 'info') { setSection('home'); setTab('main'); setSupportView('calc'); setCalcView('info'); setInfoView('catalog'); }
-            if (item.id === 'protocols') { setSection('protocols'); setTab('main'); setSupportView('main'); setProtocolTab(''); setProtocolView('menu'); }
-          }} style={{
-            flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
-            padding:'4px 2px', background: active ? `${item.accent}12` : 'transparent', border: active ? `1px solid ${item.accent}28` : '1px solid transparent', cursor:'pointer',
-            color: active ? item.accent : '#fff',
-            fontSize:9, fontWeight: active ? 800 : 500,
-            borderRadius:10, transition:'all 0.2s cubic-bezier(0.25,0.46,0.45,0.94)', minHeight:40,
-          }}>
-            <span style={{ fontSize:18, lineHeight:1, filter: active ? `drop-shadow(0 0 8px ${item.accent}60)` : 'none', transform: active ? 'scale(1.05)' : 'none', transition:'transform 0.2s' }}>{item.icon}</span>
-            <span style={{ letterSpacing: active ? '0.2px' : '0px', lineHeight:1 }}>{item.label}</span>
-            {active && <span style={{ width:18, height:2, borderRadius:2, background:item.accent, marginTop:1, boxShadow:`0 0 8px ${item.accent}70` }} />}
-          </button>
-        );})}
-      </div>
+      {/* ===== BOTTOM TAB BAR — УБРАН по требованию (навигация: hero-карточки + BackNav в шапках) ===== */}
 
       {/* ===== STACK BUILDER FLOATING BADGE ===== */}
       {stackBuilder.length > 0 && (

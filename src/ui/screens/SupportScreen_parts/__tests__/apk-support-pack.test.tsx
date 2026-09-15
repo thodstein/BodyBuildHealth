@@ -194,19 +194,21 @@ describe('APK support pack', () => {
     );
     const { container } = render(<SupportScreen />);
     expect(container.querySelector('.support-hero'), 'fallback home').not.toBeNull();
-    expect(container.querySelector("[data-sup='nav']"), 'nav alive').not.toBeNull();
+    // внутренняя нижняя панель убрана — навигация только hero-карточки + BackNav
+    expect(container.querySelector("[data-sup='nav']"), 'nav removed').toBeNull();
   });
 
-  it('Таббар из 4 разделов: Инфо открывает каталог, Протоколы не тянут чужой контент', () => {
+  it('Навигация без таббара: hero-карточки открывают разделы изолированно', () => {
     const { container } = render(<SupportScreen />);
     expect(
-      container.querySelectorAll("[data-sup='nav'] button").length,
-      'four tabs',
-    ).toBe(4);
-    const infoBtn = container.querySelector(
-      "[data-sup='nav'] button[aria-label='Инфо']",
+      container.querySelector("[data-sup='nav']"),
+      'no bottom nav',
+    ).toBeNull();
+    const infoCard = container.querySelector(
+      '.support-hero-card[data-key="info"]',
     ) as HTMLElement;
-    fireEvent.click(infoBtn);
+    expect(infoCard, 'info hero card').not.toBeNull();
+    fireEvent.click(infoCard);
     // каталог реально виден, а не пустая шапка
     expect(
       container.querySelector("[data-sup='catalog']"),
@@ -216,10 +218,17 @@ describe('APK support pack', () => {
       (container.textContent || '').length,
       'non-empty content',
     ).toBeGreaterThan(500);
-    const protoBtn = container.querySelector(
-      "[data-sup='nav'] button[aria-label='Протоколы']",
+    // назад на главную через BackNav, затем в протоколы через hero
+    const backBtn = container.querySelector(
+      "[data-sup='backnav'] button",
     ) as HTMLElement;
-    fireEvent.click(protoBtn);
+    expect(backBtn, 'back nav').not.toBeNull();
+    fireEvent.click(backBtn);
+    const protoCard = container.querySelector(
+      '.support-hero-card[data-key="protocols"]',
+    ) as HTMLElement;
+    expect(protoCard, 'protocols hero card').not.toBeNull();
+    fireEvent.click(protoCard);
     // только протоколы: ни каталога, ни чужого долгоживущего tab-контента
     expect(container.querySelector("[data-sup='protocols']")).not.toBeNull();
     expect(container.querySelector("[data-sup='catalog']")).toBeNull();
@@ -244,19 +253,19 @@ describe('APK support pack', () => {
 
   it('Смена раздела сбрасывает скролл наверх', () => {
     const { container } = render(<SupportScreen />);
-    // таббар виден сразу на home — в единственном экземпляре
-    expect(container.querySelectorAll("[data-sup='nav']").length, 'single nav').toBe(1);
+    // нижней панели нет — навигация через hero-карточки
+    expect(container.querySelectorAll("[data-sup='nav']").length, 'no nav').toBe(0);
     const root = container.querySelector('.support-screen') as HTMLElement;
     root.scrollTop = 999;
-    const navBtn = container.querySelector(
-      "[data-sup='nav'] button[aria-label='Протоколы']",
+    const protoCard = container.querySelector(
+      '.support-hero-card[data-key="protocols"]',
     ) as HTMLElement;
-    expect(navBtn, 'nav button').not.toBeNull();
-    fireEvent.click(navBtn);
+    expect(protoCard, 'protocols hero card').not.toBeNull();
+    fireEvent.click(protoCard);
     expect(container.querySelector("[data-sup='protocols']")).not.toBeNull();
     expect(root.scrollTop, 'scroll reset').toBe(0);
-    // и после перехода таббар всё ещё один
-    expect(container.querySelectorAll("[data-sup='nav']").length, 'still single').toBe(1);
+    // и после перехода нижней панели по-прежнему нет
+    expect(container.querySelectorAll("[data-sup='nav']").length, 'still none').toBe(0);
   });
 
   it('Дневник: data-theme на корне + carve-out светлой темы из-под белого', () => {
