@@ -867,8 +867,11 @@ function buildBreakfastFromTemplate(
 }
 
 // Подбор завтрашнего пула углеводов (fallback → курируемый «завтрашний» набор, не весь пул).
-function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: BreakfastStyle = 'auto'): { carbs: FoodItem[]; fruits: FoodItem[] } {
-  const source = pool.carbSlow.length > 0 ? pool.carbSlow : pool.carbFast;
+// lowFiber (§7.2-1, пик-день ББ с fiberCapG<35): завтрак собирается из низкоклетчаточных
+// носителей (рисовый крем/манка/кукурузные хлопья) вместо овсянки — 100 г овса ≈ 11 г
+// клетчатки, при капе 20 г овсяная каша одна съедает весь лимит дня.
+function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: BreakfastStyle = 'auto', lowFiber = false): { carbs: FoodItem[]; fruits: FoodItem[] } {
+  const source = lowFiber && pool.carbFast.length > 0 ? pool.carbFast : (pool.carbSlow.length > 0 ? pool.carbSlow : pool.carbFast);
   const match = (f: FoodItem, kws: string[]) => {
     const name = (f.name || '').toLowerCase(); const id = (f.id || '').toLowerCase();
     return kws.some(k => name.includes(k) || id.includes(k));
@@ -906,11 +909,11 @@ function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: Break
     if (/bread|хлеб/.test(id + ' ' + n)) return 1;
     return 0;
   };
-  const oatFamily = carbs.filter((f) => oatScore(f) >= 2);
-  if (oatFamily.length >= 2) carbs = oatFamily; // овсяное семейство приоритетно (≥2 вариантов)
+  const oatFamily = lowFiber ? [] : carbs.filter((f) => oatScore(f) >= 2);
+  if (!lowFiber && oatFamily.length >= 2) carbs = oatFamily; // овсяное семейство приоритетно (≥2 вариантов)
   // D-28+1: если oatFamily <2 из-за variety-лимита, дополняем из FOOD_DB (иначе flakes/завтрак может дать лапшу)
   // Распространяем на любой завтрак (включая auto), иначе generic завтрак ловит rice_noodles
-  if (carbs.length > 0 && oatFamily.length < 2) {
+  if (!lowFiber && carbs.length > 0 && oatFamily.length < 2) {
     const styleKwsForOat = style !== 'auto' ? BREAKFAST_STYLE_CARBS[style] : BREAKFAST_CARB_KEYWORDS;
     const matchOat = (f: FoodItem) => {
       const name = (f.name || '').toLowerCase(); const id = (f.id || '').toLowerCase();
@@ -942,6 +945,12 @@ function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: Break
     const fb = FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && oatScore(f) >= 2 && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)));
     if (fb.length > 0) carbs = fb.slice(0, 2);
     else carbs = source.filter(f => !BREAKFAST_FORBIDDEN_RE.test(f.id) && !_forbiddenIds.has(f.id)).slice(0, 3);
+  }
+  // §7.2-1: пик-день — низкоклетчаточные завтраки (рисовый крем/манка/кукурузные хлопья),
+  // если их ≥2 в пуле; иначе честный fallback на общий пул.
+  if (lowFiber) {
+    const low = carbs.filter(f => (f.fiber || 0) <= 2.5);
+    if (low.length >= 2) carbs = low;
   }
   return {
     carbs: carbs.length > 0 ? carbs : [...source.filter(f => !BREAKFAST_FORBIDDEN_RE.test(f.id) && !_forbiddenIds.has(f.id))],
@@ -991,13 +1000,20 @@ function isBreakfastProtein(f: FoodItem): boolean {
 const SNACK_CARB_KEYWORDS = ['хлопья','овсян','рисов','манк','мюсли','гречк','сухар','рисовый крем','хлеб','рис '];
 const SNACK_FRUIT_KEYWORDS = ['изюм','кураг','черносл','финик','сухофрук','ягод','банан','инжир','черника','малин'];
 const SNACK_NUT_KEYWORDS = ['орех','миндаль','кешью','грецкий','арахис','фундук','пекан','кокос','тыквенные семечки','чиа','семечк'];
-function snackCarbPool(pool: ReturnType<typeof buildFoodPools>): { carbs: FoodItem[]; fruits: FoodItem[] } {
-  const source = pool.carbSlow.length > 0 ? pool.carbSlow : pool.carbFast;
+function snackCarbPool(pool: ReturnType<typeof buildFoodPools>, lowFiber = false): { carbs: FoodItem[]; fruits: FoodItem[] } {
+  const source = lowFiber && pool.carbFast.length > 0 ? pool.carbFast : (pool.carbSlow.length > 0 ? pool.carbSlow : pool.carbFast);
   const match = (f: FoodItem, kws: string[]) => {
     const name = (f.name || '').toLowerCase(); const id = (f.id || '').toLowerCase();
     return kws.some(k => name.includes(k) || id.includes(k));
   };
-  const carbs = source.filter((f) => match(f, SNACK_CARB_KEYWORDS));
+  let carbs = source.filter((f) => match(f, SNACK_CARB_KEYWORDS));
+  if (carbs.length === 0) carbs = [...source];
+  // §7.2-1: пик-день — низкоклетчаточные снековые носители (рисовый крем/хлебцы/хлеб),
+  // если их ≥2; иначе честный общий пул.
+  if (lowFiber) {
+    const low = carbs.filter(f => (f.fiber || 0) <= 2.5);
+    if (low.length >= 2) carbs = low;
+  }
   const fruits = pool.carbFruit.filter((f) => match(f, SNACK_FRUIT_KEYWORDS));
   return {
     carbs: carbs.length > 0 ? carbs : [...source],
@@ -1650,11 +1666,12 @@ function buildWholeMeal(
     } as ReturnType<typeof buildFoodPools>;
   })();
   // E1: завтрак использует собственный продуктовый пул (каши/хлопья + ягоды/банан/сухофрукты).
-  const _breakfastPools = breakfast ? breakfastCarbPool(pool, breakfastStyle || 'auto') : null;
+  const _lowFiberDay = typeof fiberCapG === 'number' && fiberCapG < 35;
+  const _breakfastPools = breakfast ? breakfastCarbPool(pool, breakfastStyle || 'auto', _lowFiberDay) : null;
   // N1: предпочтение белковой основы завтрака по стилю (яйца/творог).
   const _breakfastProtein = breakfast ? breakfastProteinPref(pool, breakfastStyle || 'auto', proteinG) : null;
   // E7: перекус использует собственный пул (порошок + хлопья + сухофрукты + орехи).
-  let _snackPools = snack ? snackCarbPool(pool) : null;
+  let _snackPools = snack ? snackCarbPool(pool, _lowFiberDay) : null;
   // v3: на HV из снекового пула тоже выкидываем гречку/киноа (иначе «гречка 200 г в перекус»).
   // Фолбэк только если пул ПУСТ. Плюс подмешиваем плотные стейплы из carbFast
   // (крем/хлопья/хлеб живут там из-за GI 70-80 и иначе в снеки не попадают вообще).
@@ -1878,6 +1895,15 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
     if (_pickCtx.highVolumeDay) {
       const _unbanned = carbPickPool.filter(f => !_hvBan(f.id));
       if (_unbanned.length >= 1) carbPickPool = _unbanned;
+    }
+    // Этап 7-фикс (fiber peak cap, §7.2-1): явный низкий лимит клетчатки дня (<35 г,
+    // провайдер ББ — _peakTargets.fiberMaxG/пик-день) — гарнир выбирается из низко-
+    // клетчаточных носителей (белый рис/рисовый крем/картофель/паста): 100 г овса ≈ 11 г
+    // клетчатки, при капе 20 лимит физически недостижим на цельных крупах. Без явного
+    // капа/на обычных днях пул бит-в-бит прежний.
+    if (typeof fiberCapG === 'number' && fiberCapG < 35) {
+      const _lowFibCarb = carbPickPool.filter(f => (f.fiber || 0) <= 2.5);
+      if (_lowFibCarb.length >= 2) carbPickPool = _lowFibCarb;
     }
     // P1b: вето «тунец + рисовый крем» — ВРЕМЕННО ОТКЛЮЧЕНО (подозрение на convergence).
     // if (proteinSource && isFleshProteinId(proteinSource.id)) {
@@ -2451,9 +2477,16 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
   if (remF > 5) {
     // PRO: завтраку — сразу без наливаемых масел/сала (иначе pick заменит, но топ-ап вернёт).
     const _fatPoolBase = (snack && _snackNuts && _snackNuts.length > 0) ? _snackNuts : pool.fats;
-    const fatSourcePool = breakfast
+    const _fatPoolTyped = breakfast
       ? _fatPoolBase.filter(f => !isBreakfastBannedFat(f.id) && !isHeavyAnimalFat(f.id))
       : _fatPoolBase.filter(f => !isHeavyAnimalFat(f.id));
+    // §7.2-1 (пик-день, лимит клетчатки <35): жиры без клетчаточных носителей — орехи/
+    // семена/авокадо несут 3-14 г клетчатки на 100 г (чиа 34!), масла/какао-масло — 0.
+    const fatSourcePool = (() => {
+      if (!_lowFiberDay) return _fatPoolTyped;
+      const low = _fatPoolTyped.filter(f => (f.fiber || 0) <= 2);
+      return low.length >= 1 ? low : _fatPoolTyped;
+    })();
     const isNutId = (id: string) => /nut|almond|cashew|walnut|hazel|pistach|peanut|seed|chia|flax|hemp|pumpkin|sunflower/.test(id) || stapleFamilyOf(id) === 'nuts' || stapleFamilyOf(id) === 'seeds';
     // Предпочитаем не-ореховые жиры (масло, авокадо) для основного закрытия, орехи — только топиинг
     const nonNutPool = fatSourcePool.filter(f => !isNutId(f.id));
@@ -3151,6 +3184,26 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         Math.ceil((input.goalProteinG || 0) / 75),
         _bolusCount > 0 ? Math.min(9, _bolusCount + 3) : 0,
       );
+      // §7.2-2 (planner-convergence «max vs medium»): средний кап на приём не спасает,
+      // когда ОБЕД несёт долю 1.7/wSum — на 5 приёмах это 44% углей дня (500 г → 218 г
+      // в одну тарелку). День упирается в съедобность обеда/ужина и честно не сходится
+      // (движок сам пишет «минимум 6 приёмов»), max-бюджет тоже −12%. Считаем долю
+      // главного приёма по весам распределения (CARB_W) и добираем приёмы до плато
+      // ≤200 г углей на обед. Только обычные дни: HV/Bolus-тарelки крупнее по дизайну (P2-0).
+      if (!_heavy) {
+        const _wSumFor = (mc: number): number => {
+          let s = 1.0 + 1.7 + 0.7; // breakfast + lunch + dinner
+          if (mc >= 4) s += 0.5;   // snack
+          if (mc >= 6) s += 0.5;   // snack2 (на 5 приёмах вытесняется preSleep-ом)
+          if (mc >= 7) s += 0.4;   // snack3
+          if (mc >= 8) s += 0.4;   // snack4
+          if (mc >= 9) s += 0.4;   // snack5
+          return s;
+        };
+        let _needByMain = _need;
+        while (_needByMain < 10 && _carb * 1.7 / _wSumFor(_needByMain) > 200) _needByMain++;
+        _need = Math.max(_need, _needByMain);
+      }
     }
     if (_carb >= 1300 && _need < 9) _need = 9;
     else if (_carb >= 1100 && _need < 8) _need = 8;
@@ -3875,8 +3928,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (_bfTmpl) {
     const _tmplTargetKcal = mealBudget.breakfast ? mealBudget.breakfast.p * 4 + mealBudget.breakfast.c * 4 + mealBudget.breakfast.f * 9 : undefined;
     breakfast = buildBreakfastFromTemplate(_bfTmpl, tBreakfast, combinedExcluded, input.allergenTags, _tmplTargetKcal);
-    const _extraSeed = FOOD_DB.find(f => f.id === 'chia_seeds' && !combinedExcluded.has(f.id))
-      || FOOD_DB.find(f => f.id === 'flaxseed' && !combinedExcluded.has(f.id));
+    // §7.2-1: на пик-дне (явный лимит клетчатки <35) ALA-семена не добавляем — чиа 34 г
+    // клетчатки/100 г сносит весь дневной кап; омега-3 закрывается белком дня.
+    const _extraSeed = (typeof input.fiberCapG === 'number' && input.fiberCapG < 35) ? null : (FOOD_DB.find(f => f.id === 'chia_seeds' && !combinedExcluded.has(f.id))
+      || FOOD_DB.find(f => f.id === 'flaxseed' && !combinedExcluded.has(f.id)));
     if (_extraSeed && !breakfast.items.some(it => it.id === _extraSeed.id)) breakfast.items.push(makeItem(_extraSeed, 10, 'fat'));
     breakfast.totals = breakfast.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
   } else {
@@ -3889,8 +3944,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   // D-28 П10: омега-3 семена (чиа/льняное) в завтрак — небольшой ALA-буст к утреннему приёму
   // (жирорастворимые + клетчатка), с учётом исключений пользователя.
-  const _seed = FOOD_DB.find(f => f.id === 'chia_seeds' && !combinedExcluded.has(f.id))
-    || FOOD_DB.find(f => f.id === 'flaxseed' && !combinedExcluded.has(f.id));
+  // §7.2-1: на пик-дне (fiberCapG<35) семена не добавляем (чиа/лён — 27-34 г клетчатки/100 г).
+  const _seed = (typeof input.fiberCapG === 'number' && input.fiberCapG < 35) ? undefined : (FOOD_DB.find(f => f.id === 'chia_seeds' && !combinedExcluded.has(f.id))
+    || FOOD_DB.find(f => f.id === 'flaxseed' && !combinedExcluded.has(f.id)));
   if (_seed) _breakfastExtras.push({ food: _seed, grams: 10, role: 'fat' });
   breakfast = buildWholeMeal({
     label: 'Завтрак', time: tBreakfast, type: 'breakfast', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
@@ -5987,13 +6043,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
       // P1b: HV-дням больше итераций (жиры/угли морит protein/carbs-ось; 40 не хватало).
-      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0, hvStyle: input.hvStyle, weekIndex: Math.floor((input.dayOffset || 0) / 7) });
+      let _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0, hvStyle: input.hvStyle, weekIndex: Math.floor((input.dayOffset || 0) / 7), fiberCapG: input.fiberCapG });
       // P1b-фолбэк: lbm-коридор (_corrFull) на экстремальных днях дерейлит корректор
       // в плохой фикс-поинт (доказано: 800У/95LBM — dev 21 с lbm против 6.8 без).
       // Если первый прогон плох — повторяем без lbmKg и берём лучший
       // (монотонно, цена только плохим дням).
       if (_corr.deviationPct > 8 && input.lbmKg) {
-        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0, hvStyle: input.hvStyle, weekIndex: Math.floor((input.dayOffset || 0) / 7) });
+        const _corrNoLbm = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40, weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay, anchorCarbIds: _pickCtx.dayCarbAnchors, refeedDay: !!(input as any).refeedDay, budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0, hvStyle: input.hvStyle, weekIndex: Math.floor((input.dayOffset || 0) / 7), fiberCapG: input.fiberCapG });
         if (_corrNoLbm.meals && _corrNoLbm.meals.length > 0 && _corrNoLbm.deviationPct < _corr.deviationPct) {
           _corr = _corrNoLbm;
           notes.push(`🧭 LBM-коридор мешал сходимости — взят прогон без него (dev ${_corr.deviationPct}%)`);

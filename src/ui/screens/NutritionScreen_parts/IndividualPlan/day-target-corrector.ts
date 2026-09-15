@@ -157,7 +157,7 @@ function allergenOkCorr(f: { id: string; allergens?: string[] }, allergenTags?: 
   return ![...allergenTags].some(t => tags.includes(t));
 }
 
-function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCarbs?: boolean, highCarb?: boolean, allergenTags?: Set<string>, daySalt?: number, hvStyle?: string, weekIndex?: number): FoodItem[] {
+function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCarbs?: boolean, highCarb?: boolean, allergenTags?: Set<string>, daySalt?: number, hvStyle?: string, weekIndex?: number, fiberCapG?: number): FoodItem[] {
   let ids = macro === 'p' ? TOPUP_PROTEIN_IDS : macro === 'c' ? TOPUP_CARB_IDS : TOPUP_FAT_IDS;
   // P1-7 (план разнообразия): недельная субротация топапов — сдвиг порядка по
   // ledger-неделе (0/7/14…), НЕ по сиду (сид калиброван). Содержимое/квоты инвариантны.
@@ -212,6 +212,19 @@ function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCa
       if (lowGi.length >= 2) pool = lowGi;
     }
   }
+  // Этап 7-фикс (fiber peak cap, §7.2-1): пик-день с явным низким лимитом клетчатки —
+  // добивки только низкоклетчаточными носителями (лимит 20 г недостижим на овсянке/
+  // цельнозерновых; белый рис/рисовый крем/паста/картофель держат кап). Жиры — без
+  // клетчаточных носителей (авокадо/орехи: 7-14 г/100). Без явного капа — бит-в-бит.
+  if (typeof fiberCapG === 'number' && fiberCapG < 35) {
+    if (macro === 'c') {
+      const lowFib = pool.filter(f => (f.fiber || 0) <= 2.5);
+      if (lowFib.length >= 2) pool = lowFib;
+    } else if (macro === 'f') {
+      const lowFibF = pool.filter(f => (f.fiber || 0) <= 2);
+      if (lowFibF.length >= 2) pool = lowFibF;
+    }
+  }
   return pool;
 }
 
@@ -231,7 +244,7 @@ function currentFiber(meals: CorrectorMeal[]): number {
 export function correctDayToTargets(
   mealsIn: CorrectorMeal[],
   targets: DayTargets,
-  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number; convenientCarbs?: boolean; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; anchorCarbIds?: string[]; lbmKg?: number; hvStyle?: string; refeedDay?: boolean; budget?: string; allergenTags?: Set<string>; daySalt?: number; weekIndex?: number },
+  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number; convenientCarbs?: boolean; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; anchorCarbIds?: string[]; lbmKg?: number; hvStyle?: string; refeedDay?: boolean; budget?: string; allergenTags?: Set<string>; daySalt?: number; weekIndex?: number; fiberCapG?: number },
 ): { meals: CorrectorMeal[]; withinTolerance: boolean; deviationPct: number } {
   const maxIter = opts?.maxIter ?? 80;
   const weightKg = opts?.weightKg ?? 80;
@@ -282,9 +295,14 @@ export function correctDayToTargets(
   // ступеней движка (_fiberCapDay): 50 / 65 (500-700У) / 115 (700У+); не-HV — legacy 85
   // (движок на обычных днях тримит по 85 — формула 25-50 заводила корректор в лишние
   // тримы, меняя траекторию: белок уплывал +5% на simple 3000).
-  const _corrFiberCap = hv
+  const _corrFiberBase = hv
     ? ((safeTargets.c || 0) >= 700 ? 115 : (safeTargets.c || 0) >= 500 ? 65 : 50)
     : 85;
+  // Этап 7-фикс (fiber peak cap, §7.2-1): явный лимит клетчатки дня (пик-неделя ББ —
+  // _peakTargets.fiberMaxG) главнее построек — трим корректора уважает его (было 85).
+  const _corrFiberCap = (typeof opts?.fiberCapG === 'number' && opts.fiberCapG < _corrFiberBase)
+    ? Math.max(15, Math.round(opts.fiberCapG))
+    : _corrFiberBase;
   // Орехи/семена: квота × (вес × цель, кламп 2.0) + запас — зеркало катчелла движка.
   const _corrNutCap = Math.round(60 * Math.min(2, weightScaleCorr * _tsCap)) + 10;
   // P1a: stale-цели (рефид/инфляция) — таргет-гарды ниже отключаются, иначе душат сходимость.
@@ -374,7 +392,7 @@ export function correctDayToTargets(
         const over = overs[0];
         const needFor = (f: FoodItem) => under === 'p' ? (f.protein || 0) : under === 'c' ? (f.carbs || 0) : (f.fat || 0);
         const overFor = (f: FoodItem) => over === 'p' ? (f.protein || 0) : over === 'c' ? (f.carbs || 0) : (f.fat || 0);
-        const underPool = poolFor(under, opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex).filter(f => needFor(f) > 0);
+        const underPool = poolFor(under, opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex, opts?.fiberCapG).filter(f => needFor(f) > 0);
         if (underPool.length > 0) {
           // Углеводы в convenient-режиме: удобство первым (низкая клетчатка) — иначе swap тащит батат.
           const _sortU = [...underPool].sort((a, b) => {
@@ -551,7 +569,7 @@ export function correctDayToTargets(
       const _dC = safeTargets.c - totals.c;
       const _hasOver = (safeTargets.p - totals.p) < -5 || (safeTargets.f - totals.f) < -2 || (safeTargets.c - totals.c) < -5;
         if (_dC > 30 && !_hasOver) {
-        const _pool = poolFor('c', opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex).filter(f => (f.carbs || 0) >= 45);
+        const _pool = poolFor('c', opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex, opts?.fiberCapG).filter(f => (f.carbs || 0) >= 45);
         if (_pool.length > 0) {
           let _vMi = -1, _vIi = -1;
           let _vWorst = 0;
@@ -971,7 +989,7 @@ export function correctDayToTargets(
         if (Math.abs(need) < 0.3) continue;
       }
       // 2) не нашли куда нарастить — добавляем новый item из пула
-      let pool = poolFor(eff, opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex);
+      let pool = poolFor(eff, opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex, opts?.fiberCapG);
       // Сахарный потолок дня — скользящий: 15% база, 20% при ≥1000У, 25% при ≥1300У.
       // Интернет-практика высокоуровневых дней (рис/крем + мёд/джем/финики/сок):
       // 1500У из одних круп — 190У/приём сверх сухих капов, без сахара не закрыть.
