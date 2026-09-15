@@ -24,12 +24,12 @@ import { collectPlanExercises, recalibratePlanWeights, autoCalibrateFromStored, 
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyDUPOverlay, recommendDUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyExecutionCorrections, type ExecutionCorrection } from '../../../engines/bb/bb-execution-corrections.engine';
-import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
+import { validateBBPlan, generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { isPackingActive } from '../../../engines/bb/bb-packing.engine';
 import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
 import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechnique, techniqueChainParts } from './bb-technique-display';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
-import { buildBBMethodologySummary } from '../../../engines/bb/bb-report.engine';
+import { buildBBMethodologySummary, buildBBPlanReportText } from '../../../engines/bb/bb-report.engine';
 import { tempoExplain, buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
 import { averageWeeklyScores, scoreVolumeWeek, scoreProWeek, gradeFor } from '../../../engines/bb/bb-quality-weekly.engine';
 import { computeRegimeMrvMult, sessionLimitsFor, aggregateBBVolume } from '../../../engines/bb/bb-volume.engine';
@@ -114,7 +114,7 @@ import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../..
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
-import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants, buildBBFitnessFatigue, buildBBMesocycleTable } from '../../../engines/bb/bb-visual.engine';
+import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants, buildBBFitnessFatigue, buildBBMesocycleTable, buildBBPlanPrintHtml } from '../../../engines/bb/bb-visual.engine';
 import { buildBBPlanFact, bbPlanFactSummary, bbAdherenceBadge } from '../../../engines/bb/bb-plan-fact.engine';
 import { buildBBQualityReport, bbQualityReportSummary, bbQualityBadge } from '../../../engines/bb/bb-quality-report.engine';
 import { bbPlanQualityV2 } from '../../../engines/bb/bb-quality-v2.engine';
@@ -3068,6 +3068,55 @@ export const BbAutoConstructor: React.FC = () => {
       URL.revokeObjectURL(url);
       flash('📅 Календарь .ics скачан (по неделям/дням от ' + startDate + ')');
     } catch { flash('⚠ Не удалось сформировать .ics'); }
+  };
+
+  /** 4.7: печать «таблицы мезоцикла» — единый движковый buildBBPlanPrintHtml (фазы/таблица/heatmap). */
+  const handlePrintMesocycleTable = () => {
+    if (!builtPlan) return;
+    const plan = applyEditsToPlan(builtPlan);
+    try {
+      const html = buildBBPlanPrintHtml(plan, { heatmap: true });
+      const w = window.open('', '_blank');
+      if (!w) { flash('Разрешите всплывающие окна для печати'); return; }
+      w.document.write(html.replace('</body>', '<script>window.print()</script></body>'));
+      w.document.close();
+    } catch { flash('⚠ Не удалось сформировать таблицу мезоцикла'); }
+  };
+
+  /** 4.8: отчёт качество/безопасность/валидатор/рекомендации (txt) — единый движок + issues. */
+  const handleExportQualityReport = () => {
+    if (!builtPlan) return;
+    const plan = applyEditsToPlan(builtPlan);
+    try {
+      const issues = (((builtPlan as any).validation?.issues ?? []) as Array<{ level?: string; code?: string; message: string }>);
+      const recs = generateActionableRecommendations(plan, issues as any);
+      const lines: string[] = [`ББ-ПЛАН: ${plan.pattern?.name || 'план'} · ${plan.weeks.length} нед`, ''];
+      try { lines.push(buildBBPlanReportText(plan)); } catch { /* базовая сводка недоступна */ }
+      if (qualityReport) {
+        lines.push('', `КАЧЕСТВО: ${qualityReport.score}/100 (${qualityReport.riskLevel})`);
+        for (const i of (qualityReport.issues || []).slice(0, 15)) lines.push(`  • [${i.source}]${i.week ? ` нед ${i.week}` : ''} ${i.message}`);
+      }
+      const safety = calculatePlanSafetyScore(plan, { acwrRatio: acwrData?.ratio, injuryCount: injuries.length });
+      lines.push('', `БЕЗОПАСНОСТЬ: ${safety.score}/100 (${safety.riskLevel})`);
+      for (const r of (safety.recommendations || []).slice(0, 5)) lines.push(`  • ${r}`);
+      const errs = issues.filter(i => i.level === 'error');
+      const warns = issues.filter(i => i.level === 'warning');
+      lines.push('', `ВАЛИДАТОР: ${errs.length} ошибок, ${warns.length} предупреждений`);
+      for (const i of issues.slice(0, 20)) lines.push(`  [${i.level}] ${i.message}`);
+      if (recs.length) {
+        lines.push('', 'РЕКОМЕНДАЦИИ:');
+        for (const r of recs.slice(0, 10)) lines.push(`  (${r.priority}) ${r.action}`);
+      }
+      const text = lines.join('\n');
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bb-report-${plan.pattern?.id || 'plan'}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      flash('📄 Отчёт скачан: качество · безопасность · валидатор · рекомендации');
+    } catch (e) { flash('⚠ Не удалось сформировать отчёт: ' + ((e as Error)?.message || e)); }
   };
 
   /** Фаза 4.23: календарные диапазоны недель от даты старта + «📍 текущая неделя». */
@@ -6317,7 +6366,8 @@ export const BbAutoConstructor: React.FC = () => {
               <button style={{ ...BTN_GHOST, borderColor:'#38bdf8', color:'#38bdf8' }} aria-label="Открыть ББ-диагностику" onClick={() => { try { window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'bb_diagnostics_hub' })); } catch {} }}>🎯 ББ-диагностика</button>
              <button style={BTN_GHOST} onClick={handlePrintPlan}>🖨 PDF</button>
               <button style={BTN_GHOST} onClick={handleExportIcs}>📅 .ics</button>
-              <button style={BTN_GHOST} onClick={handlePrintPlan}>📋 Вся таблица</button>
+              <button style={BTN_GHOST} onClick={handlePrintMesocycleTable}>📋 Вся таблица</button>
+             <button style={BTN_GHOST} onClick={handleExportQualityReport}>📄 Отчёт (txt)</button>
              <button style={BTN_GHOST} onClick={handleExportCSV}>📥 CSV</button>
            </div>
 
