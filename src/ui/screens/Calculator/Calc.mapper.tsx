@@ -1005,10 +1005,33 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     } catch { return []; }
   }, [state.labs?.fullPanel, rec?.phase]);
 
-  const [bannerDismissed, setBannerDismissed] = useState<boolean>(() => {
-    try { return localStorage.getItem('he_calc_labs_banner_dismissed') === '1'; }
-    catch { return false; }
+  const [bannerDismissSig, setBannerDismissSig] = useState<string | null>(() => {
+    try { return localStorage.getItem('he_calc_labs_banner_dismissed'); }
+    catch { return null; }
   });
+
+  // Сигнатура состава просрочки: скрытие ✕ действует только до смены состава
+  // (сдал анализы / сменилась фаза / новые маркеры) — закреплённая карточка возвращается.
+  const overdueSig: string = useMemo(() => {
+    try {
+      return JSON.stringify({
+        p: rec?.phase || '',
+        d: state.labs?.fullPanel?.date || '',
+        s: overdueSystems.map((s) => [s.system, s.count, ...s.markers]),
+      });
+    } catch { return ''; }
+  }, [overdueSystems, rec?.phase, state.labs?.fullPanel]);
+
+  // Миграция legacy-флага '1' (вечное скрытие): приравниваем к текущей сигнатуре,
+  // чтобы карточка вернулась при смене состава просрочки.
+  useEffect(() => {
+    if (bannerDismissSig === '1') {
+      setBannerDismissSig(overdueSig);
+      try { localStorage.setItem('he_calc_labs_banner_dismissed', overdueSig); } catch { /* noop */ }
+    }
+  }, [bannerDismissSig, overdueSig]);
+
+  const bannerDismissed = !!overdueSig && bannerDismissSig === overdueSig;
 
   // P2-UX: якорный индекс — чип списка скроллит к карточке вещества (если свёрнуто — раскрыть список).
   const scrollToSubstance = (id: string) => {
@@ -1025,8 +1048,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         systems={overdueSystems}
         onOpenLabs={onOpenLabs}
         onDismiss={() => {
-          setBannerDismissed(true);
-          try { localStorage.setItem('he_calc_labs_banner_dismissed', '1'); } catch {}
+          setBannerDismissSig(overdueSig);
+          try { localStorage.setItem('he_calc_labs_banner_dismissed', overdueSig); } catch {}
         }}
         dismissed={bannerDismissed}
       />
