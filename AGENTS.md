@@ -1,5 +1,11 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ТА-коррекция движений: структурированная библиотека + таб «Коррекция» (Sep 15 2026, коммит pathspec, без пуша — очередь чужих)
+
+По команде «добавить и проработать коррекцию движений + анализ + интернет + план + сразу структуризация». Аудит: конвейер V3–V4 зрел (16 фаз, биомеханика, причина-лимитер, топ-3, симулятор, спец-блок, инъекция+откат), но коррекция — россыпь (3 id-строки/фазу без техники, свободный текст в TA_BIOMECH мимо ранжира, без словаря ошибок/сессии/волны с именами, топ-3 размазаны по 4 табам). Синтез: Everett-лимитеры + segment/halting/slow-pull/high-pull/muscle/tall/balances; QWA-матрица взятия/толчка; PoinT GO пороги (ранняя >1.2 м/с, горизонталь ±10 см, уход >0.45 с); Torokhtiy (не смешивать snatch/clean-технику); Big Bend (dip/no-feet/tall-jerk/behind-neck/double-pause); Burgener (80% ошибок — стопы). Только свои файлы; чужие WIP (BbAutoConstructor 964 строк, meal-plan-engine, bb-step-params) не тронуты.
+- Код: NEW `ta-corrective.engine` (~450 строк, 43 записи: targets+errors+causes+level+phase technique/strength/stability + protocol + cues + progression/regression + source) — все 16 фаз ≥3; `correctivesForWeakPoint` (ранг под причину+уровень; volume 4×5 / strength 4×4+5% / mobility-fatigue −5%) + `correctivesByError` + `correctiveSessionFor` (техника→сила→стабильность, ≤6) + `correctiveBlockFor` (волна 3,3,4,4,4,4,3,3 с именами); хаб — 8-й таб 🛠️ «Коррекция» (фаза→причина→пики с дозой/кью/прогрессией/Δ + ⭐ в preferredCorr + сессия + волна + 💉); ранжир/инъекция/экспорт не тронуты (контент-слой, без дублей).
+- Проверено: NEW `ta-corrective` 11/11 + UI `ta-corrective-ui` 3/3 + движки 99/99 (rank/simulator/weak-cause/v4/plan-audit/injection) + v4-ui 5/5 + wl-hub 39/39; `tsc` **0 по своим** (1 ошибка — чужой `bb-step-params.tsx onUserIntensityTech`); `verify:apk-design` OK. НЕ ПУШИЛ.
+
 ## ББ-упражнения: строгие группы рук + пиковая в топ-3 (Sep 15 2026, коммит pathspec `e2c4f1b2`, запушен)
 
 По команде «продолжай с места обрыва» (без ББ-авто). Только свои файлы; чужие WIP (armlift/BBDiagnosticsHub не тронуты, кроме своих 4) не задеты. **Фикс шторма**: чужой `git status` показывал мои 3 последних коммита уже в origin/main (параллельный пуш), `git diff HEAD` по движкам пуст — дубли не писал.

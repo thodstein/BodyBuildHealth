@@ -46,10 +46,11 @@ import { meetPlan } from '../../../engines/strength-sport/strength-sport-ta-meet
 import { ymaxVerdict, femalePhaseNorm, femaleLevelOf, femalePhaseVerdict } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
 import { shrinkMVT, mvtPosterior, isVelocityShiftReal, velocityMetricFlag, mvtRetestNote, TA_POPULATION_MVT } from '../../../engines/strength-sport/strength-sport-ta-mvt.engine';
 import { imtpEnduranceDrop } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
+import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
-type WLTab = 'snatch' | 'clean' | 'jerk' | 'aux' | 'mobility' | 'vbt' | 'video';
+type WLTab = 'snatch' | 'clean' | 'jerk' | 'aux' | 'mobility' | 'vbt' | 'video' | 'correction';
 
 type WLState = {
   snatchWeak: WLWeakPoint[];
@@ -234,6 +235,7 @@ const TAB_DEFS: Array<{ id: WLTab; label: string; icon: string; desc: string }> 
   { id: 'vbt', label: 'VBT/FvR', icon: '⚡', desc: 'пик-зоны + FvR2' },
   { id: 'video', label: 'Видео', icon: '📹', desc: 'Kinovea/Enode' },
   { id: 'mobility', label: 'Мобильность', icon: '🧘', desc: 'OHS 6 + асимметрия' },
+  { id: 'correction', label: 'Коррекция', icon: '🛠️', desc: 'упражнения + дозы' },
 ];
 
 export const WLDiagnosticsHub: React.FC = () => {
@@ -1831,6 +1833,58 @@ export const WLDiagnosticsHub: React.FC = () => {
             <div style={{ marginTop: 8 }} data-wl="ortho-screen">
               <OrthoScreenCard compact />
             </div>
+          </div>
+        )}
+
+        {tab === 'correction' && (
+          <div data-wl="corrective">
+            <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🛠️ Коррекция движений — структурировано: фаза → причина → упражнения с дозами</div>
+            {!weakPoints.length && <div style={{ fontSize: 11, color: '#fff', padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>Выбери 1–3 слабые фазы в табах Рывок/Взятие/Толчок/База — здесь соберётся коррекционный план с техникой и дозами.</div>}
+            {weakPoints.map(wp => {
+              let cause: string | null = null;
+              try { cause = causeFor(wp)?.cause ?? null; } catch { cause = null; }
+              let list: ReturnType<typeof correctivesForWeakPoint> = [];
+              try { list = correctivesForWeakPoint(wp, { cause: cause as any, level: taLevel, limit: 5 }); } catch { list = []; }
+              const pref = (state.preferredCorr || {})[wp];
+              return (
+                <div key={wp} data-wl="corrective-phase" style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp] || wp}{cause ? <span style={{ color: '#f59e0b' }}> · причина: {(TA_WEAK_CAUSE_LABELS as Record<string, string>)[cause as string] || cause}</span> : null}</div>
+                  {list.map(c => {
+                    const d = planData ? simulateTACorrection(planData, { weakPoint: wp, corrId: c.id, sets: c.protocolAdj.sets, reps: c.protocolAdj.reps }) : null;
+                    const isPref = pref === c.id;
+                    return (
+                      <div key={c.id} data-wl="corrective-pick" style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: `1px solid ${isPref ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.14)'}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button onClick={() => togglePreferredCorr(wp, c.id)} aria-pressed={isPref} aria-label={`Выбрать ${c.nameRu}`} style={{ minWidth: 32, minHeight: 32, borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(59,130,246,0.3)', background: isPref ? '#3b82f6' : 'transparent', color: isPref ? '#fff' : '#60a5fa', fontSize: 13, fontWeight: 800 }}>{isPref ? '⭐' : '☆'}</button>
+                          <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: '#fff' }}>{c.nameRu} <span style={{ color: '#60a5fa' }}>{c.protocolAdj.sets}×{c.protocolAdj.reps} @{c.protocolAdj.pct}% · RIR{c.protocolAdj.rir} · отдых {c.protocolAdj.restSeconds}с</span></div>
+                        </div>
+                        <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>🎯 {c.cues[0] || ''}{c.cues[1] ? ` · ${c.cues[1]}` : ''}</div>
+                        <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>📈 {c.progression} · 📉 {c.regression}</div>
+                        <div style={{ fontSize: 9, color: '#fff', marginTop: 2, opacity: 0.85 }}>{c.matchReason} · {c.source}{d ? ` · Δ ${d.summary}` : ''}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            {weakPoints.length > 0 && (() => {
+              let steps: ReturnType<typeof correctiveSessionFor> = [];
+              let block: ReturnType<typeof correctiveBlockFor> = [];
+              try {
+                const causeMap: Record<string, any> = {};
+                for (const wp of weakPoints) { try { causeMap[wp] = causeFor(wp)?.cause ?? null; } catch { causeMap[wp] = null; } }
+                steps = correctiveSessionFor(weakPoints, causeMap);
+                block = correctiveBlockFor(weakPoints, Math.max(4, Math.min(8, planAudit.workWeeks || 6)));
+              } catch { steps = []; block = []; }
+              return (
+                <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.16)', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e' }}>📋 Коррекционная сессия 20–30 мин (техника → сила → стабильность)</div>
+                  {steps.map(s => <div key={s.order} style={{ fontSize: 10, color: '#fff', marginTop: 3 }}>{s.order}. {s.nameRu} — {s.protocol.sets}×{s.protocol.reps} @{s.protocol.pct}% · {s.cue}</div>)}
+                  {block.length > 0 && <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>📅 Волна {block.length} нед: {block.map(w => `Н${w.week} ${w.focus.split(' — ')[0]}`).join(' → ')}</div>}
+                  <button data-wl="inject" onClick={handleInjectToPlan} style={{ width: '100%', marginTop: 8, minHeight: 48, padding: '10px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план (⭐ — первыми)</button>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
