@@ -43,6 +43,15 @@ describe('PRO-5 UI: помост + диагностика + коррекция',
     expect(document.body.textContent).toContain('Отрыв');
     expect(document.body.textContent).toContain('✗');
   });
+  it('единый вердикт: звено + причина, без дубля', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    fireEvent.click(screen.getByText('CoC'));
+    fireEvent.click(screen.getByText('Не закрыл'));
+    expect(document.body.textContent).toContain('дробление (crush)');
+    expect(document.body.textContent).not.toContain('Поиск причины');
+  });
   it('Коррекция напрямую открывается с топ-3', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

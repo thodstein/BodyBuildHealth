@@ -104,6 +104,21 @@ describe('PRO-5 D1: диагноз слабого звена', () => {
     const d = diagnoseArmlift({});
     expect(d.confidence).toBe('low');
   });
+  it('CoC не закрыл — crush, а не thumb', () => {
+    const d = diagnoseArmlift({ implement: 'coc_gripper', failurePoint: 'close_fail' });
+    expect(d.weakLink).toBe('crush');
+  });
+  it('Silver плывёт — crush endurance', () => {
+    const d = diagnoseArmlift({ implement: 'silver_bullet', failurePoint: 'hold_long' });
+    expect(d.weakLink).toBe('crush');
+    expect(d.cause).toBe('endurance');
+  });
+  it('crush чинится crush-пулом каталога', () => {
+    const top = rankArmliftCorrections('crush');
+    expect(top.length).toBe(3);
+    expect(top[0].exId).toMatch(/coc_|silver/);
+    expect(top.every((c) => getArmExerciseById(c.exId) != null)).toBe(true);
+  });
 });
 
 describe('PRO-5 D2: коррекции и спец-блок', () => {

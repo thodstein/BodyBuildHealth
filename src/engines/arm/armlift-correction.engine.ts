@@ -115,6 +115,7 @@ const BASE_POOL: Record<ArmliftWeakLink, PoolEntry[]> = {
   fingers: withFixes(SUPPORT_MAX, ['off_floor', 'mid', 'lockout', 'close_fail']),
   wrist_ext: withFixes(WRIST_EXT, ['mid', 'lockout', 'hold_short']),
   support_endurance: withFixes(ENDURANCE, ['hold_long', 'hold_short', 'mid']),
+  crush: withFixes(CRUSH, ['close_fail', 'hold_short', 'hold_long']),
   technique: [...SUPPORT_MAX.slice(0, 1), ...PINCH.slice(0, 1), ...ENDURANCE.slice(0, 1)],
   asymmetry: [...PINCH.slice(0, 1), ...SUPPORT_MAX.slice(0, 1), ...WRIST_EXT.slice(0, 1)],
   conditioning: [

@@ -10,6 +10,7 @@ export type ArmliftWeakLink =
   | 'fingers'
   | 'wrist_ext'
   | 'support_endurance'
+  | 'crush'
   | 'technique'
   | 'asymmetry'
   | 'conditioning';
@@ -46,6 +47,7 @@ const TITLES: Record<ArmliftWeakLink, string> = {
   fingers: 'Слабое звено: сгибатели пальцев (support)',
   wrist_ext: 'Слабое звено: разгибатели запястья',
   support_endurance: 'Слабое звено: выносливость удержания',
+  crush: 'Слабое звено: дробление (crush)',
   technique: 'Слабое звено: техника (фолы правил)',
   asymmetry: 'Слабое звено: асимметрия рук',
   conditioning: 'Стоп: боль — сначала к врачу, не грузить',
@@ -133,18 +135,33 @@ export function diagnoseArmlift(i: ArmliftDiagInput): ArmliftDiagnosis {
     };
   }
   // P5: точка срыва как fallback (без тестов — низкая уверенность).
+  // D9: crush-снаряды идут своим звеном, а не щипком/поддержкой.
+  const crushLike = impl === 'coc_gripper' || impl === 'silver_bullet';
   if (fp === 'off_floor' || fp === 'close_fail') {
-    const pinchLike = pinchImpl || impl === 'coc_gripper' || impl === 'silver_bullet';
+    if (crushLike) {
+      return {
+        weakLink: 'crush', cause: 'strength', confidence: 'low', title: TITLES.crush,
+        cues: ['CoC: warm 10–12 → work 5–7 до отказа 1–3 сета → негативы'],
+        ruleNote: 'Не закрыл — пик crush (нужен уровень CoC для уверенности).',
+      };
+    }
     return {
-      weakLink: pinchLike ? 'thumb' : 'fingers', cause: 'strength', confidence: 'low',
-      title: pinchLike ? TITLES.thumb : TITLES.fingers,
-      cues: pinchLike
+      weakLink: pinchImpl ? 'thumb' : 'fingers', cause: 'strength', confidence: 'low',
+      title: pinchImpl ? TITLES.thumb : TITLES.fingers,
+      cues: pinchImpl
         ? ['Макс-щипок: блок 5×3 тяж + холд 10с']
         : ['Макс-support: RT/axle 5×3 + DOH-тяги без лямок до 85%'],
       ruleNote: 'Срыв внизу — пик силы (нужна тест-батарея для уверенности).',
     };
   }
   if (fp === 'hold_short' || fp === 'hold_long' || fp === 'mid') {
+    if (crushLike) {
+      return {
+        weakLink: 'crush', cause: 'endurance', confidence: 'low', title: TITLES.crush,
+        cues: ['Silver-hold на время + work-подходы CoC'],
+        ruleNote: 'Срыв в удержании эспандера — crush-выносливость.',
+      };
+    }
     return {
       weakLink: 'support_endurance', cause: 'endurance', confidence: 'low', title: TITLES.support_endurance,
       cues: ['Холды 30–60с + carries 20–50м', 'Отдых 90–120с между хватовыми сетами'],

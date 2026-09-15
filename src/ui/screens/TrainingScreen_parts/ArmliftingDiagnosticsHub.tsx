@@ -594,12 +594,10 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <AdChip active={diag.elbowPain} tone={diag.elbowPain ? 'red' : undefined} onClick={() => setD({ elbowPain: !diag.elbowPain })}>{diag.elbowPain ? '🔴 Локоть/запястье болит' : 'Локоть в норме'}</AdChip>
             {logStats.sessions28d != null && <span className="ad-tag">Журнал: {logStats.sessions28d} хват-сессий/28д</span>}
           </div>
-          <div data-arm="lift-diag-result"><b>{diagnosis.title}</b> · причина: {diagnosis.cause} · уверенность: {diagnosis.confidence}</div>
-          <div className="ad-muted">{diagnosis.cues.join(' · ')}</div>
-          <div className="ad-muted">{diagnosis.ruleNote}</div>
-          <div data-arm="lift-cause-result"><b>Поиск причины: {cause.cause}</b> (уверенность {Math.round(cause.confidence * 100)}%)</div>
+          <div data-arm="lift-diag-result"><b>{diagnosis.title}</b> · {cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
           <div className="ad-muted">Факты: {cause.evidence.join(' · ')}</div>
-          <div className="ad-muted">Чинить: {cause.fix}</div>
+          <div className="ad-muted">Чинить: {cause.fix} · {diagnosis.cues.join(' · ')}</div>
+          <div className="ad-muted">{diagnosis.ruleNote}</div>
           <AdCta>
             <AdBtn variant="amber" block hero onClick={() => setTab('corr')}>→ К коррекции ({corrections[0]?.title})</AdBtn>
           </AdCta>
