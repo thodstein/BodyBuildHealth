@@ -74,3 +74,16 @@ export function comfortFindings(
   }
   return out;
 }
+
+/** Сводка комфорта для плана дня (то, что показывает UI). */
+export function comfortSummaryForPlan(
+  plan: { meals?: Array<{ label?: string; items?: Array<{ id?: string; amount?: number; role?: string }> }> } | null | undefined,
+  opts?: { maxSweetsPerDay?: number; maxStapleRepeats?: number; maxSolidGPerMeal?: number },
+): string[] {
+  try {
+    const meals = plan && Array.isArray(plan.meals) ? plan.meals : [];
+    return comfortFindings(meals as any, opts).map(f => f.text);
+  } catch {
+    return [];
+  }
+}

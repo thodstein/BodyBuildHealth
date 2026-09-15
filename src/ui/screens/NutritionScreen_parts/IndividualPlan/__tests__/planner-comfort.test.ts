@@ -2,7 +2,7 @@
  * planner-comfort.test.ts — E5: проверки «вкусно и комфортно».
  */
 import { describe, it, expect } from 'vitest';
-import { comfortFindings, COMFORT_PORTION_CAPS } from '../planner-comfort';
+import { comfortFindings, comfortSummaryForPlan, COMFORT_PORTION_CAPS } from '../planner-comfort';
 
 const meal = (label: string, items: Array<{ id: string; amount: number; role?: string }>) =>
   ({ label, items: items.map(i => ({ ...i, role: i.role || 'carb' })) });
@@ -50,5 +50,19 @@ describe('E5: comfortFindings', () => {
       { id: 'whey_protein', amount: 400, role: 'liquid' },
     ])]);
     expect(ok.some(x => x.kind === 'solid')).toBe(false);
+  });
+
+  it('comfortSummaryForPlan — то, что показывает UI (и без падений на мусоре)', () => {
+    expect(comfortSummaryForPlan(null)).toEqual([]);
+    expect(comfortSummaryForPlan({} as any)).toEqual([]);
+    expect(comfortSummaryForPlan({ meals: 'nope' } as any)).toEqual([]);
+    const plan = { meals: [
+      meal('Завтрак', [{ id: 'jam', amount: 30 }]),
+      meal('Обед', [{ id: 'honey', amount: 20 }]),
+      meal('Ужин', [{ id: 'pryaniki', amount: 40 }]),
+    ] };
+    const lines = comfortSummaryForPlan(plan as any);
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.join(' ')).toMatch(/Комфорт/);
   });
 });

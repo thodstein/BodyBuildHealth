@@ -9,6 +9,7 @@ import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { carbPeriodizationLabel, expectedWeekKcal } from "./planner-carb-periodization";
+import { comfortSummaryForPlan } from "./planner-comfort";
 import { computeDayScoreTrend, loadDayScores, clearDayScores } from "../../../../engines/day-score-trend";
 import { DailyDietDashboard } from "../DailyDietDashboard";
 import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
@@ -405,6 +406,17 @@ const doImportPlan = (raw: string): boolean => {
       )}
       {generated && (<>
         <MealQuickControls />
+        {generated && (() => {
+          // E5 (встройка): вкус/комфорт — адресные замечания по дню (advisory, не режет КБЖУ).
+          const _cf = comfortSummaryForPlan(dayPlan as any);
+          if (_cf.length === 0) return null;
+          return (
+            <div data-comfort="1" role="status" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.22)', fontSize: 9, color: '#fff', lineHeight: 1.45 }}>
+              <div style={{ fontWeight: 800, marginBottom: 2 }}>🍽 Комфорт дня</div>
+              {_cf.slice(0, 3).map((t, i) => <div key={i}>{t}</div>)}
+            </div>
+          );
+        })()}
         {generated && dayPlan && Array.isArray(dayPlan.notes) && dayPlan.notes.some((n: string) => (n || '').includes('Перегрузка приёма')) && (
           <div role="alert" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: '#fbbf24', lineHeight: 1.4, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12 }}>⚠️</span>
