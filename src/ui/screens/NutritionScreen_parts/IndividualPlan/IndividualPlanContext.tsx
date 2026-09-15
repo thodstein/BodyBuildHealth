@@ -16,7 +16,8 @@ import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrit
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets, contextualCarbCapGPerKg, plannerGoalCategory } from "./planner-targets";
 import { buildDayTargets } from "./planner-day-targets";
-import { recommendMealCount, awakeHoursFromTimes } from "./planner-meal-count";
+import { awakeHoursFromTimes, planMealStructure } from "./planner-meal-count";
+import { isWorkDayForIndex } from "./planner-work";
 import { applyCarbPeriodizationMods, carbPeriodizationLabel, isHeavyDayForOffset } from "./planner-carb-periodization";
 import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, repairDiaasWeakLinks } from "./planner-micro-pools";
 import { applyMealTargetOverrides } from "./planner-meal-targets";
@@ -1030,15 +1031,19 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // D-28: «загрузка под утреннюю тренировку» — вечером много углеводов, минимум жиров.
   const [morningTrainLoad, setMorningTrainLoad] = useState<boolean>(!!_pf.morningTrainLoad);
   // Число приёмов — АВТО (выбор пользователя убран): ёмкость нормальной тарелки
-  // (белок 0.45 г/кг 45–70 г, угли ≤120 г, ккал ≤900/приём) + физиологический пол
-  // по часам бодрствования. Единый источник — planner-meal-count (тот же расчёт
-  // показывается в настройках и используется движком как guardrail).
-  const mealsCount = recommendMealCount(
-    awakeHoursFromTimes(wakeTime, bedTime),
-    effectiveP,
-    effectiveC,
-    { weightKg: weight, kcal: effectiveKcal },
-  );
+  // (белок 0.45 г/кг, на курсе/ААС 0.55; угли ≤130 г; ккал ≤950/приём) + окна
+  // инсулина (каждый болюс — отдельный приём-хозяин) + физиологический пол часов.
+  const _insulinBolusCount = (injections || []).filter((i: any) => /инсулин/i.test(String(i?.type || i?.name || ''))).length;
+  const _onCourse = phase === 'course' || (injections || []).some((i: any) => /инсулин|аас|тест|трен|нандрол|болд|мастер|станаз|метан|оксандр/i.test(String(i?.type || i?.name || '')));
+  const mealsCount = planMealStructure({
+    awakeH: awakeHoursFromTimes(wakeTime, bedTime),
+    proteinG: effectiveP,
+    carbsG: effectiveC,
+    kcal: effectiveKcal,
+    weightKg: weight,
+    onCourse: _onCourse,
+    insulinBoluses: _insulinBolusCount,
+  }).regularMeals;
 
   const [allergens, setAllergens] = useState<string[]>(() => {
     // P1-fix: читаем из Profile (UnifiedSettings), а не из мёртвых ключей he_food_allergens/he_contraindications
@@ -1800,7 +1805,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (!dayData?.meals?.[mealIdx]) return;
     const mk = (f: any, grams: number) => { const p = Math.round((f.protein || 0) * grams / 100), f2 = Math.round((f.fat || 0) * grams / 100), c = Math.round((f.carbs || 0) * grams / 100); return { name: f.name, id: f.id, amount: grams, kcal: Math.round(4 * p + 9 * f2 + 4 * c), p, f: f2, c, fiber: Math.round((f.fiber || 0) * grams / 100) }; };
     const whey = FOOD_DB.find(f => f.id === 'whey_isolate') || FOOD_DB.find(f => f.id === 'whey_protein');
-    const isWorkDayForAdd = (()=>{ try{ if(!workScheduleEnabled) return false; if(workScheduleType==='standard') return !!workDays[dayIdx%7]; if(workScheduleType==='sliding'||workScheduleType==='custom') return !!workDays[dayIdx%7]; return !!workDays[dayIdx%7]; }catch{ return false; }})();
+    // E3b: единый учёт графика (в т.ч. смены) вместо локальной копии без shift_*.
+    const isWorkDayForAdd = isWorkDayForIndex(dayIdx, { enabled: workScheduleEnabled, scheduleType: workScheduleType, workDays, dowBase: 0 });
     const usePortable = workFood === 'portable' && isWorkDayForAdd;
     const oats = FOOD_DB.find(f => f.id === (usePortable ? 'oats_dry' : 'oats')) || FOOD_DB.find(f => f.id === 'oats_dry') || FOOD_DB.find(f => f.id === 'oats');
     const additions = [] as any[];
@@ -2245,7 +2251,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try {
       const pws = String(workStartTime || '09:00').split(':').map(Number);
       const pwe = String(workEndTime || '18:00').split(':').map(Number);
-      const isW = workFood === 'portable' && (!workScheduleEnabled ? true : !!workDays[(dayIdx || 0) % 7]);
+      // E3b: смены учитываются и в ребалансе ручных правок (раньше только дни недели).
+      const isWork = !workScheduleEnabled ? true : isWorkDayForIndex(dayIdx || 0, { enabled: true, scheduleType: workScheduleType, workDays, dowBase: 0 });
+      const isW = workFood === 'portable' && isWork;
       return { portableMode: workFood === 'portable', isWorkDay: isW, workStartMin: pws[0] * 60 + (pws[1] || 0), workEndMin: pwe[0] * 60 + (pwe[1] || 0) };
     } catch { return { portableMode: false, isWorkDay: false, workStartMin: 9 * 60, workEndMin: 18 * 60 }; }
   };
@@ -3374,7 +3382,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             // Работа: окно смены для сдвига обеда/ужина (раньше только классика)
             workStartMin: (()=>{ try{ const [h,m]=(workStartTime||'09:00').split(':').map(Number); return h*60+m; }catch{ return 9*60; }})(),
             workEndMin: (()=>{ try{ const [h,m]=(workEndTime||'18:00').split(':').map(Number); return h*60+m; }catch{ return 18*60; }})(),
-            isWorkDay: (()=>{ try{ if(!workScheduleEnabled) return workFood === 'portable'; const ws = workScheduleType; if (ws === 'shift_day_night') { return (offset % 4) < 2; } if (typeof ws === 'string' && ws.startsWith('shift_')) { const parts = ws.split('_'); const workLen = parseInt(parts[1]) || 1; const offLen = parseInt(parts[2]) || workLen; const cycleLen = workLen + offLen; const pos = ((offset % cycleLen) + cycleLen) % cycleLen; return pos < workLen; } const dow=(new Date().getDay()+6)%7; return !!workDays[(dow+offset)%7]; }catch{ return false; }})(),
+            isWorkDay: (()=>{ try{ if(!workScheduleEnabled) return workFood === 'portable'; return isWorkDayForIndex(offset, { enabled: true, scheduleType: workScheduleType, workDays }); }catch{ return false; }})(),
           };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
         const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);

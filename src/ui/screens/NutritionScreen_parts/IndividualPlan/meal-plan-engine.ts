@@ -3143,11 +3143,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (input.mealsCount <= 5) {
       const _heavy = _carb >= 600 || (input.goalKcal || 0) >= 4200;
       const _carbCap = _heavy ? 130 : 180;
+      const _bolusCount = (input.injections || []).filter((i: any) => /инсулин/i.test(String(i?.type || i?.name || ''))).length;
       _need = Math.max(
         _need,
         Math.ceil(_carb / _carbCap),
         _heavy ? Math.ceil((input.goalKcal || 0) / 1100) : 0,
         Math.ceil((input.goalProteinG || 0) / 75),
+        _bolusCount > 0 ? Math.min(9, _bolusCount + 3) : 0,
       );
     }
     if (_carb >= 1300 && _need < 9) _need = 9;
@@ -3725,6 +3727,26 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   for (const r of _regular) {
     if (r === 'preSleep') roleP[r] = _preSleepFixedP;
     else roleP[r] = _isMainRole(r) ? _mainP : _snkP;
+  }
+  // E2: утренний белок. При белке ≥2.2 г/кг завтрак должен нести ≥0.5 г/кг
+  // (или ≥30% дня), а не «12 г хлопьев»; перераспределяем БЕЗ роста дневной цели
+  // (донор — обед/ужин), потолок — _mainPCap (MPS-коридор 0.62 г/кг LBM).
+  {
+    const _dayP = adjustedProteinG || input.goalProteinG;
+    const _hiP = _dayP / Math.max(40, input.weightKg || 80) >= 2.4;
+    if (roleP.breakfast && _hiP) {
+      const _floor = Math.min(_mainPCap, Math.max(Math.round((input.weightKg || 80) * 0.5), Math.round(_dayP * 0.30)));
+      if (roleP.breakfast < _floor) {
+        const _donors = (['lunch', 'dinner'] as const).filter(r => roleP[r] !== undefined && roleP[r] > 25);
+        let _take = _floor - roleP.breakfast;
+        for (const r of _donors) _take = Math.min(_take, roleP[r] - 25);
+        if (_take > 0) {
+          roleP.breakfast += _take;
+          const _per = Math.floor(_take / Math.max(1, _donors.length));
+          for (const r of _donors) roleP[r] = Math.max(25, roleP[r] - _per);
+        }
+      }
+    }
   }
   const mealBudget = {
     breakfast: { p: roleP.breakfast ?? evenRegularP, c: breakC, f: Math.round(fatTotal * 0.20) },

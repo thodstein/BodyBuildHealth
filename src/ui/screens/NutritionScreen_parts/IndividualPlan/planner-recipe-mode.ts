@@ -1486,7 +1486,23 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       })
       .sort((a, b) => a.d - b.d)
       .map(x => x.r);
+    // E3a: рабочее окно → только портативные блюда (иначе суп/паста не влезают в офис).
+    const _inPortableWindow = !!args.portableMode && !!args.isWorkDay
+      && isWorkWindowMeal(mealAny?.time, args.workStartMin, args.workEndMin);
+    const _recPortable = (r: Recipe): boolean => {
+      const ids: string[] = (r as any).ingredientIds || [];
+      if (ids.length === 0) return false;
+      return ids.every(id => { const f = FOOD_DB.find(x => x.id === id); return !!f && isPortableFood(f as any); });
+    };
     let cands = pickRecipeOptions(pool, matchOpts, 6, excludeNames);
+    if (_inPortableWindow) {
+      const _pc = cands.filter(_recPortable);
+      // В рабочее окно рецепт ставим ТОЛЬКО если он целиком портативный
+      // (порошок/хлопья/орехи/фрукты/хлеб/йогурт). Иначе приём остаётся
+      // продуктовым — продуктовый движок сам держит портативный гейт по времени.
+      if (_pc.length === 0) return;
+      cands = _pc;
+    }
     // C2: обычные слоты НЕ получают peri-рецепты; peri-слот — только свой тип.
     if (periType) cands = cands.filter(r => r.meal === periType);
     else cands = cands.filter(r => !PERI_TYPES_SET.has(r.meal));
@@ -1502,7 +1518,8 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // Берём лучшие по макро-дистанции среди рецептов своего типа приёма (с ingredientIds).
     if (cands.length === 0) {
       const mealType = periType ?? mealTypeFromLabel(label || undefined);
-      const sameType = pool.filter(r => r.meal === mealType && !excludeNames.has(r.name) && r.ingredientIds && r.ingredientIds.length > 0);
+      const sameType = pool.filter(r => r.meal === mealType && !excludeNames.has(r.name) && r.ingredientIds && r.ingredientIds.length > 0)
+        .filter(r => !_inPortableWindow || _recPortable(r));
       // FIX base-2026-09: тот же HV-посттрен-гейт в фолбэке (иначе булгур вернётся здесь).
       const _sameFiltered = (periType === 'postworkout' && _dayHighCarb)
         ? sameType.filter(r => !(r.ingredientIds || []).some((id: string) => /bulgur|buckwheat/i.test(id || '')))

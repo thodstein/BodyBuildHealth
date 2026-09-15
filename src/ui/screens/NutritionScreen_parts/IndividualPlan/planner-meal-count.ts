@@ -21,14 +21,14 @@ export interface RecommendMealCountOpts {
   onCourse?: boolean;
 }
 
-/** Нормальная тарелка белка (г/приём): 0.45 г/кг (на курсе 0.5), зажато 45–70. */
+/** Нормальная тарелка белка (г/приём): 0.45 г/кг, на курсе/ААС 0.55 (верх 0.4–0.55), зажато 45–75. */
 export function perMealProteinCapG(weightKg?: number, onCourse?: boolean): number {
   const w = Number.isFinite(weightKg) && (weightKg as number) > 0 ? (weightKg as number) : 80;
-  const perKg = onCourse ? 0.5 : 0.45;
-  return Math.max(45, Math.min(70, Math.round(w * perKg)));
+  const perKg = onCourse ? 0.55 : 0.45;
+  return Math.max(45, Math.min(75, Math.round(w * perKg)));
 }
 
-export type MealCountBinding = 'awake' | 'protein' | 'carbs' | 'kcal';
+export type MealCountBinding = 'awake' | 'protein' | 'carbs' | 'kcal' | 'insulin';
 
 export interface MealCountRecommendation {
   count: number;
@@ -69,6 +69,63 @@ export function recommendMealCount(
   opts: RecommendMealCountOpts = {},
 ): number {
   return recommendMealCountDetailed(awakeH, proteinG, carbsG, opts).count;
+}
+
+// ─── E1: структура дня — приёмы, окна инсулина, peri ────────────────────────
+export interface MealStructureInput {
+  awakeH: number;
+  proteinG: number;
+  carbsG: number;
+  kcal?: number;
+  weightKg?: number;
+  /** Курс/ААС: белок на приём тянется к верхней границе 0.5–0.55 г/кг. */
+  onCourse?: boolean;
+  /** Число болюсов инсулина: каждое окно dose×10 г У требует своего приёма. */
+  insulinBoluses?: number;
+  isTrainingDay?: boolean;
+  allowIntraWorkout?: boolean;
+}
+
+export interface MealStructure {
+  /** Число ОСНОВНЫХ приёмов (завтрак/обед/ужин/перекусы/pre-sleep). */
+  regularMeals: number;
+  /** Peri-приёмы сверх основных (предтрен/пост-трен/intra). */
+  periMeals: number;
+  /** Окна болюсов (инжектируются движком отдельными приёмами). */
+  insulinWindows: number;
+  /** Итог для показа и guardrail. */
+  totalMeals: number;
+  binding: MealCountBinding;
+  pCap: number;
+}
+
+/**
+ * Оптимальная структура дня. Белок 0.4–0.55 г/кг на приём (на курсе — к верхней
+ * границе), углеводы ≤130 г и ккал ≤950 на приём; окна инсулина не «съедают»
+ * обычные приёмы (идут сверх, как в движке); часы — только пол.
+ */
+export function planMealStructure(input: MealStructureInput): MealStructure {
+  const onCourse = !!input.onCourse;
+  const opts: RecommendMealCountOpts = { weightKg: input.weightKg, kcal: input.kcal, onCourse };
+  const rec = recommendMealCountDetailed(input.awakeH, input.proteinG, input.carbsG, opts);
+  const pCap = perMealProteinCapG(input.weightKg, onCourse);
+  const byProtein = Math.ceil(Math.max(0, input.proteinG) / pCap);
+  const byCarbs = Math.ceil(Math.max(0, input.carbsG) / 130);
+  const byKcal = Number.isFinite(input.kcal) && (input.kcal as number) > 0 ? Math.ceil((input.kcal as number) / 950) : 0;
+  const insulinWindows = Math.max(0, Math.min(6, Math.round(input.insulinBoluses || 0)));
+  let regular = Math.max(rec.awakeFloor, byProtein, byCarbs, byKcal, 3);
+  // Каждому болюсному окну нужен «свой» регулярный приём-хозяин (движок инжектирует
+  // окно отдельным приёмом — но раскладка остальных углеводов требует минимум +1 слот).
+  if (insulinWindows > 0) regular = Math.max(regular, Math.min(9, insulinWindows + 3));
+  regular = Math.max(3, Math.min(10, regular));
+  const periMeals = input.isTrainingDay ? (input.allowIntraWorkout ? 3 : 2) : 0;
+  const binding: MealCountBinding =
+    regular === rec.awakeFloor ? 'awake'
+      : regular === byKcal ? 'kcal'
+        : regular === byCarbs ? 'carbs'
+          : regular === byProtein ? 'protein'
+            : 'insulin';
+  return { regularMeals: regular, periMeals, insulinWindows, totalMeals: regular + periMeals, binding, pCap };
 }
 
 /** Часы бодрствования из строк «HH:MM» (учитывает переход через полночь). */
