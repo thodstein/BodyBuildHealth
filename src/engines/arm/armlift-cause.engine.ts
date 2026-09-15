@@ -19,6 +19,8 @@ export interface ArmliftCauseInput {
   /** Crush-тесты с помоста: уровень CoC (0–4) и Silver-hold (с). */
   cocLevel?: number | null;
   silverSec?: number | null;
+  /** D18: гриппер Silver (№2/3/4) — контекст времени удержания. */
+  silverGripper?: string | null;
   /** Журнал помоста: хват-сессий за 28д (по записям he_arm_platform_log). */
   gripSessions28d?: number | null;
   /** Тренд снаряда по журналу: +растёт / 0 стоит / -падает (процент). */
@@ -146,8 +148,9 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
   const coc = num(i.cocLevel);
   if (coc != null && coc < 2) { scores.max_strength += 0.35; ev.push(`CoC №${coc} < №2 — crush-пик`); }
   const silv = num(i.silverSec);
-  if (silv != null && silv < 20) { scores.endurance += 0.3; ev.push(`Silver-hold ${silv}с < 20с — crush-выносливость`); }
-  else if (silv != null && silv >= 20 && silv < 45) { scores.endurance += 0.15; ev.push(`Silver-hold ${silv}с — середина`); }
+  const grip = i.silverGripper ? ` (№${i.silverGripper})` : '';
+  if (silv != null && silv < 20) { scores.endurance += 0.3; ev.push(`Silver-hold ${silv}с${grip} < 20с — crush-выносливость`); }
+  else if (silv != null && silv >= 20 && silv < 45) { scores.endurance += 0.15; ev.push(`Silver-hold ${silv}с${grip} — середина`); }
 
   // ENDURANCE: срыв в удержании/середине при живом старте.
   if (fp === 'hold_long' || fp === 'mid') { scores.endurance += 0.45; ev.push('Держит старт, плывёт дальше — выносливость'); }

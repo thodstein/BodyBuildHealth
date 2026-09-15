@@ -11,6 +11,7 @@ import { assessArmliftMobility } from '../armlift-mobility.engine';
 import { diagImplementForReportWeakest, relevantTestsFor } from '../armlift-failure-modes.engine';
 import { intensityForCause } from '../armlift-injection.engine';
 import { orderCorrectionsForDay, sessionOrderNote } from '../armlift-session-rules.engine';
+import { diagnosticCompleteness } from '../armlift-completeness.engine';
 import { clearDiagHistory } from '../armlift-history.engine';
 import { getArmExerciseById } from '../../../core/exercise-catalog-arm';
 import { buildArmliftingReport, buildArmliftingHtml, buildArmliftingCsv } from '../armlifting-diagnostics.engine';
@@ -583,5 +584,34 @@ describe('PRO-5 D17: порядок в дне, рычаг, orderNote', () => {
     });
     expect(r.injected).toBe(1);
     expect(r.plan.rationale.join(' ')).toContain('Порядок в дне');
+  });
+});
+
+describe('PRO-5 D18: полнота диагностики + Silver-контекст', () => {
+  it('пусто — 0% и три дыры', () => {
+    const r = diagnosticCompleteness({ implement: 'rolling_thunder' });
+    expect(r.pct).toBe(0);
+    expect(r.missing).toEqual(['точка срыва', 'релевантный тест (Farmer-hold)', 'мобильность']);
+  });
+  it('полный ввод — 100% без дыр', () => {
+    const r = diagnosticCompleteness({
+      implement: 'saxon_bar', failurePoint: 'off_floor',
+      pinchHoldSec: 20, farmerHoldSec: null, cocLevel: null, silverSec: null,
+      hasMobilityData: true,
+    });
+    expect(r.pct).toBe(100);
+    expect(r.missing).toEqual([]);
+  });
+  it('частично — 40/60/80', () => {
+    expect(diagnosticCompleteness({ implement: 'hub', failurePoint: 'off_floor' }).pct).toBe(40);
+    expect(diagnosticCompleteness({ implement: 'hub', pinchHoldSec: 20, hasMobilityData: true }).pct).toBe(60);
+  });
+  it('Silver идёт с номером гриппера', () => {
+    const r = diagnoseArmliftCause({ implement: 'silver_bullet', silverSec: 10, silverGripper: '4' });
+    expect(r.evidence.join(' ')).toContain('№4');
+  });
+  it('без гриппера — тоже работает', () => {
+    const r = diagnoseArmliftCause({ implement: 'silver_bullet', silverSec: 10 });
+    expect(r.cause).toBe('endurance');
   });
 });

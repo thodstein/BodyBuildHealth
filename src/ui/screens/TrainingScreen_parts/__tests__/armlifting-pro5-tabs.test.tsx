@@ -123,6 +123,15 @@ describe('PRO-5 UI: помост + диагностика + коррекция',
     fireEvent.click(screen.getByText('🔧 Коррекция'));
     expect(document.body.textContent).toContain('в конце тренировки');
   });
+  it('D18: полнота диагностики растёт с вводом', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    expect(screen.getByLabelText('Диагностика: полнота')).toBeTruthy();
+    expect(document.body.textContent).toContain('Полнота диагностики: 0%');
+    fireEvent.click(screen.getByText('Срыв с пола'));
+    expect(document.body.textContent).toContain('Полнота диагностики: 40%');
+  });
   it('Коррекция напрямую открывается с топ-3', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

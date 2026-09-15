@@ -26,6 +26,7 @@ import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-l
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
 import { correctionsToInjectionItems, intensityForCause } from '../../../engines/arm/armlift-injection.engine';
 import { orderCorrectionsForDay, sessionOrderNote } from '../../../engines/arm/armlift-session-rules.engine';
+import { diagnosticCompleteness } from '../../../engines/arm/armlift-completeness.engine';
 import { applyToPlanner } from './planner-bridge';
 import { AdRoot, AdCard, AdSec, AdGrid, AdChip, AdBtn, AdBanner, AdCta, AdStat } from './arm-design-system';
 import { haptics } from '../../../core/native-bridge';
@@ -285,12 +286,13 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     flexHoldSec: diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
     extHoldSec: diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
     mobilityFails: mobility.fails,
+    silverGripper: state.silverGripper,
     acwrZone: acwr?.zone ?? null,
     elbowPain: diag.elbowPain,
     pain: diag.pain,
     skinTear: diag.skinTear,
     thumbWebPain: diag.thumbWebPain,
-  }), [diag, asymForDiag, logStats, acwr, state.cocLevel, state.silverSec]);
+  }), [diag, asymForDiag, logStats, acwr, state.cocLevel, state.silverSec, state.silverGripper]);
   const extRatio = flexExtRatio(
     diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
     diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
@@ -346,6 +348,21 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   const diagFaults = useMemo(() => faultsFor(diag.implement), [diag.implement]);
   const diagFailures = useMemo(() => failuresFor(diag.implement), [diag.implement]);
   const moveChain = useMemo(() => movementFor(diag.implement), [diag.implement]);
+  /** D18: полнота диагностики (что довбить для честного вердикта). */
+  const completeness = useMemo(() => diagnosticCompleteness({
+    implement: diag.implement,
+    failurePoint: diag.failurePoint || undefined,
+    pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
+    farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
+    cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
+    silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
+    hasMobilityData: Boolean(
+      (diag.wristExtDeg && diag.wristExtDeg.trim() !== '')
+      || (diag.wristFlexDeg && diag.wristFlexDeg.trim() !== '')
+      || diag.thumbOppOk === false || diag.thumbStiff || diag.wristExtLimited || diag.wristFlexLimited
+      || mobility.fails.length > 0,
+    ),
+  }), [diag, mobility.fails, state.cocLevel, state.silverSec]);
 
   const applyToConstructor = () => {
     if (!report.filled) {
@@ -746,6 +763,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <AdChip active={diag.thumbWebPain} tone={diag.thumbWebPain ? 'red' : undefined} onClick={() => setD({ thumbWebPain: !diag.thumbWebPain })}>{diag.thumbWebPain ? '🔴 Перепонка болит' : 'Перепонка в норме'}</AdChip>
             {logStats.sessions28d != null && <span className="ad-tag">Журнал: {logStats.sessions28d} хват-сессий/28д</span>}
             {acwr && <span className="ad-tag">ACWR {acwr.ratio} ({acwr.zone})</span>}
+          </div>
+          <div data-arm="lift-completeness" aria-label="Диагностика: полнота">
+            Полнота диагностики: {completeness.pct}%{completeness.missing.length > 0 ? ` — довбей: ${completeness.missing.join(', ')}` : ' — вердикт честный'}
           </div>
           <div data-arm="lift-diag-result"><b>{diagnosis.title}</b> · {cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
           <div className="ad-muted">Факты: {cause.evidence.join(' · ')}</div>
