@@ -643,11 +643,13 @@ export function ArmAutoConstructor() {
           }));
           const note = typeof al?.armliftWeakArmNote === 'string' && al.armliftWeakArmNote ? String(al.armliftWeakArmNote) : undefined;
           const ord = typeof al?.armliftOrderNote === 'string' && al.armliftOrderNote ? String(al.armliftOrderNote) : undefined;
+          const comp = al?.armliftCompleteness && typeof al.armliftCompleteness === 'object' ? al.armliftCompleteness as { pct: number; missing: string[] } : null;
           if (clean.length) {
             const pack = { items: clean, spec: specClean, ...(note ? { weakArmNote: note } : {}), ...(ord ? { orderNote: ord } : {}) };
             setArmliftCorrections(pack);
             try { localStorage.setItem('he_armlifting_corrections', JSON.stringify(pack)); } catch {}
-            flash(`↩ Хват-коррекции: ${clean.map((c) => c.exId).join(', ')} → волной ${specClean.length || 1} нед в план при сборке`);
+            const compNote = comp && typeof comp.pct === 'number' && comp.pct < 60 ? ` · полнота ${comp.pct}% — ${comp.missing?.join(', ') || ''}` : '';
+            flash(`↩ Хват-коррекции: ${clean.map((c) => c.exId).join(', ')} → волной ${specClean.length || 1} нед в план при сборке${compNote}`);
           } else {
             setArmliftCorrections({ items: [], spec: [] });
             try { localStorage.removeItem('he_armlifting_corrections'); } catch {}
@@ -1005,8 +1007,8 @@ export function ArmAutoConstructor() {
       try {
         if ((discipline as string) === 'armlifting' && armliftCorrections.items.length) {
           const inj = armliftCorrections.spec.length
-            ? applyArmliftSpecWave(plan, armliftCorrections.spec, armliftCorrections.items, { level, workMax, weakArmNote: armliftCorrections.weakArmNote, orderNote: armliftCorrections.orderNote })
-            : injectArmliftCorrections(plan, armliftCorrections.items, { level, workMax, weakArmNote: armliftCorrections.weakArmNote, orderNote: armliftCorrections.orderNote });
+            ? applyArmliftSpecWave(plan, armliftCorrections.spec, armliftCorrections.items, { level, workMax, weakArmNote: (armliftCorrections as any).weakArmNote, orderNote: (armliftCorrections as any).orderNote })
+            : injectArmliftCorrections(plan, armliftCorrections.items, { level, workMax, weakArmNote: (armliftCorrections as any).weakArmNote, orderNote: (armliftCorrections as any).orderNote });
           plan = inj.plan;
           if (inj.injected > 0 || inj.notes.length) {
             plan.rationale = [...(plan.rationale || []), `Армлифтинг-коррекции: ${inj.notes.join(' · ')}`];

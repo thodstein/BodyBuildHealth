@@ -65,20 +65,20 @@ const withFixes = (pool: PoolEntry[], fixes: string[]): PoolEntry[] =>
   pool.map((p) => ({ ...p, fixes: p.fixes ?? fixes }));
 
 const SUPPORT_MAX: PoolEntry[] = [
-  { exId: 'rolling_thunder', protocol: 'Тяжёлые тройки DOH + холд 10с на последнем подходе', dose: '5×3', freq: '2×/нед', source: 'SBS DOH holds', sets: 5, reps: [3, 3], holdSeconds: 10, restSec: 180, dayTag: 'SupportGrip' },
-  { exId: 'apollon_axle', protocol: 'Все разминки двойным пронированным, лямки только на максе', dose: 'до 85% 1ПМ', freq: 'каждая тяга', source: 'AUSA Beginners', sets: 4, reps: [3, 5], restSec: 180, dayTag: 'SupportGrip' },
-  { exId: 'fat_bar_deadlift', protocol: '50мм гриф DOH, без лямок/разнохвата', dose: '4×5', freq: '1–2×/нед', source: 'NSCA thick bar', sets: 4, reps: [5, 5], restSec: 150, dayTag: 'SupportGrip' },
-  { exId: 'inch_dumbbell', protocol: '78кг одной рукой, контроль 1с вверху', dose: '3×1', freq: '1×/нед', source: 'Inch-классика', sets: 3, reps: [1, 1], holdSeconds: 3, restSec: 180, dayTag: 'GripHeavy' },
-  { exId: 'wrist_wrench_60', protocol: 'Вращающаяся 60мм как RT, лёгкий вес на технику', dose: '3×5', freq: '1×/нед', source: 'RT-перенос', sets: 3, reps: [5, 5], restSec: 120, dayTag: 'SupportGrip', fixes: ['mid', 'hold_short'] },
+  { exId: 'rolling_thunder', protocol: 'Тяжёлые тройки DOH + холд 10с на последнем подходе', dose: '5×3', freq: '2×/нед', source: 'SBS DOH holds', sets: 5, reps: [3, 3], holdSeconds: 10, restSec: 180, dayTag: 'SupportGrip', warmup: 'Разминка: круги запястий + лёгкие сжимания 1×10–12 до жжения, не в отказ' },
+  { exId: 'apollon_axle', protocol: 'Все разминки двойным пронированным, лямки только на максе', dose: 'до 85% 1ПМ', freq: 'каждая тяга', source: 'AUSA Beginners', sets: 4, reps: [3, 5], restSec: 180, dayTag: 'SupportGrip', warmup: 'Разминка: круги запястий + 1×10–12 лёгким гриппером' },
+  { exId: 'fat_bar_deadlift', protocol: '50мм гриф DOH, без лямок/разнохвата', dose: '4×5', freq: '1–2×/нед', source: 'NSCA thick bar', sets: 4, reps: [5, 5], restSec: 150, dayTag: 'SupportGrip', warmup: 'Разминка: DOH без лямок на лёгком, кисть нейтрально' },
+  { exId: 'inch_dumbbell', protocol: '78кг одной рукой, контроль 1с вверху', dose: '3×1', freq: '1×/нед', source: 'Inch-классика', sets: 3, reps: [1, 1], holdSeconds: 3, restSec: 180, dayTag: 'GripHeavy', warmup: 'Разминка: сжимания + раскрытия 2×10' },
+  { exId: 'wrist_wrench_60', protocol: 'Вращающаяся 60мм как RT, лёгкий вес на технику', dose: '3×5', freq: '1×/нед', source: 'RT-перенос', sets: 3, reps: [5, 5], restSec: 120, dayTag: 'SupportGrip', fixes: ['mid', 'hold_short'], warmup: 'Разминка: круги + лёгкий гриппер 1×10' },
 ];
 
 const PINCH: PoolEntry[] = [
-  { exId: 'plate_pinch_hold', protocol: '2 плиты гладкими наружу, удержание до отказа формы', dose: '3×20–30с', freq: '2–3×/нед', source: 'NSCA plate pinch', sets: 3, reps: [1, 1], holdSeconds: 25, restSec: 120, dayTag: 'PinchGrip', fixes: ['hold_short', 'hold_long', 'off_floor'] },
-  { exId: 'hub_pinch', protocol: '5 подушечек на базе, без «дверной ручки»', dose: '3×5', freq: '2×/нед', source: 'IronMind Hub', sets: 3, reps: [5, 5], holdSeconds: 3, restSec: 120, dayTag: 'PinchGrip', fixes: ['off_floor', 'hold_short'] },
-  { exId: 'pinch_block_80', protocol: 'Деревянный блок 80мм двумя руками, тяга', dose: '5×3', freq: '2×/нед', source: 'Pinch-практика', sets: 5, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip' },
-  { exId: 'saxon_bar', protocol: 'Прямоугольник 3″ щипком двумя руками', dose: '4×3', freq: '1–2×/нед', source: 'Saxon-практика', sets: 4, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip' },
-  { exId: 'country_crush_2', protocol: '2″ блок щипком двумя руками', dose: '3×3', freq: '1×/нед', source: 'AUSA Crush', sets: 3, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip' },
-  { exId: 'anvil_hub', protocol: 'Наковальня щипком, hub-вариант', dose: '3×5', freq: '1×/нед', source: 'Anvil-практика', sets: 3, reps: [5, 5], holdSeconds: 3, restSec: 120, dayTag: 'PinchGrip' },
+  { exId: 'plate_pinch_hold', protocol: '2 плиты гладкими наружу, удержание до отказа формы', dose: '3×20–30с', freq: '2–3×/нед', source: 'NSCA plate pinch', sets: 3, reps: [1, 1], holdSeconds: 25, restSec: 120, dayTag: 'PinchGrip', fixes: ['hold_short', 'hold_long', 'off_floor'], warmup: 'Разминка: пальцы — круги + лёгкий экстензор 1×15' },
+  { exId: 'hub_pinch', protocol: '5 подушечек на базе, без «дверной ручки»', dose: '3×5', freq: '2×/нед', source: 'IronMind Hub', sets: 3, reps: [5, 5], holdSeconds: 3, restSec: 120, dayTag: 'PinchGrip', fixes: ['off_floor', 'hold_short'], warmup: 'Разминка: круги запястий + 1×10 лёгким щипком' },
+  { exId: 'pinch_block_80', protocol: 'Деревянный блок 80мм двумя руками, тяга', dose: '5×3', freq: '2×/нед', source: 'Pinch-практика', sets: 5, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip', warmup: 'Разминка: мел + 1×10–12 лёгким блоком' },
+  { exId: 'saxon_bar', protocol: 'Прямоугольник 3″ щипком двумя руками', dose: '4×3', freq: '1–2×/нед', source: 'Saxon-практика', sets: 4, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip', warmup: 'Разминка: пальцы тщательно прогреть — 1×10–12 лёгким щипком' },
+  { exId: 'country_crush_2', protocol: '2″ блок щипком двумя руками', dose: '3×3', freq: '1×/нед', source: 'AUSA Crush', sets: 3, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip', warmup: 'Разминка: круги + лёгкий щипок 1×10' },
+  { exId: 'anvil_hub', protocol: 'Наковальня щипком, hub-вариант', dose: '3×5', freq: '1×/нед', source: 'Anvil-практика', sets: 3, reps: [5, 5], holdSeconds: 3, restSec: 120, dayTag: 'PinchGrip', warmup: 'Разминка: круги запястий + 1×10 лёгкой наковальней' },
 ];
 
 const CRUSH: PoolEntry[] = [
@@ -89,16 +89,16 @@ const CRUSH: PoolEntry[] = [
 ];
 
 const ENDURANCE: PoolEntry[] = [
-  { exId: 'farmer_walk_fat', protocol: '50–80% веса тела в руку, отказ хвата на 40–45с', dose: '3×20–40м', freq: '2×/нед', source: 'NSCA carries', sets: 3, reps: [20, 40], restSec: 120, dayTag: 'SupportGrip', fixes: ['hold_long', 'mid'] },
-  { exId: 'towel_pullup', protocol: 'Полотенце через перекладину, DOH, без лямок', dose: '3×8', freq: '1–2×/нед', source: 'NSCA towel', sets: 3, reps: [6, 8], restSec: 120, dayTag: 'SupportGrip', fixes: ['mid', 'hold_long'] },
-  { exId: 'fat_gripz_curl', protocol: 'Любые сгибания с накладками 50мм', dose: '3×10', freq: '1–2×/нед', source: 'AUSA Fat Gripz', sets: 3, reps: [8, 12], restSec: 90, dayTag: 'SupportGrip', fixes: ['mid', 'hold_short'] },
+  { exId: 'farmer_walk_fat', protocol: '50–80% веса тела в руку, отказ хвата на 40–45с', dose: '3×20–40м', freq: '2×/нед', source: 'NSCA carries', sets: 3, reps: [20, 40], restSec: 120, dayTag: 'SupportGrip', fixes: ['hold_long', 'mid'], warmup: 'Разминка: круги + лёгкие сжимания 2×15@30–40%' },
+  { exId: 'towel_pullup', protocol: 'Полотенце через перекладину, DOH, без лямок', dose: '3×8', freq: '1–2×/нед', source: 'NSCA towel', sets: 3, reps: [6, 8], restSec: 120, dayTag: 'SupportGrip', fixes: ['mid', 'hold_long'], warmup: 'Разминка: вис лёгкий + круги 1 мин' },
+  { exId: 'fat_gripz_curl', protocol: 'Любые сгибания с накладками 50мм', dose: '3×10', freq: '1–2×/нед', source: 'AUSA Fat Gripz', sets: 3, reps: [8, 12], restSec: 90, dayTag: 'SupportGrip', fixes: ['mid', 'hold_short'], warmup: 'Разминка: лёгкие сжимания 1×15' },
 ];
 
 const WRIST_EXT: PoolEntry[] = [
-  { exId: 'wrist_ext_bb', protocol: 'Ладони вниз, разгибание к себе на жжение', dose: '3×15–25', freq: '3–4×/нед', source: 'Баланс flex/ext', sets: 3, reps: [15, 25], restSec: 60, dayTag: 'SupportGrip' },
-  { exId: 'wrist_roller', protocol: 'Вверх-вниз без провала запястья в сгиб (на время 60с — тоже зачёт)', dose: '3 подъёма', freq: '2×/нед', source: 'Gripnatic roller', sets: 3, reps: [1, 3], restSec: 90, dayTag: 'SupportGrip' },
-  { exId: 'reverse_ez_curl', protocol: 'Пронированный хват, строго — двойной эффект на экстензоры', dose: '3×12', freq: '2×/нед', source: 'NSCA ext balance', sets: 3, reps: [10, 12], restSec: 90, dayTag: 'SupportGrip' },
-  { exId: 'lever_top', protocol: 'Удержание рычага горизонтально 10–15с (контроль, incl. девиации)', dose: '3×холд', freq: '2×/нед', source: 'Sledge levering', sets: 3, reps: [1, 1], holdSeconds: 12, restSec: 90, dayTag: 'SupportGrip', fixes: ['mid', 'lockout'] },
+  { exId: 'wrist_ext_bb', protocol: 'Ладони вниз, разгибание к себе на жжение', dose: '3×15–25', freq: '3–4×/нед', source: 'Баланс flex/ext', sets: 3, reps: [15, 25], restSec: 60, dayTag: 'SupportGrip', warmup: 'Разминка: круги запястий + лёгкий экстензор 1×15' },
+  { exId: 'wrist_roller', protocol: 'Вверх-вниз без провала запястья в сгиб (на время 60с — тоже зачёт)', dose: '3 подъёма', freq: '2×/нед', source: 'Gripnatic roller', sets: 3, reps: [1, 3], restSec: 90, dayTag: 'SupportGrip', warmup: 'Разминка: круги + лёгкий валик' },
+  { exId: 'reverse_ez_curl', protocol: 'Пронированный хват, строго — двойной эффект на экстензоры', dose: '3×12', freq: '2×/нед', source: 'NSCA ext balance', sets: 3, reps: [10, 12], restSec: 90, dayTag: 'SupportGrip', warmup: 'Разминка: круги + лёгкий прямой гриф' },
+  { exId: 'lever_top', protocol: 'Удержание рычага горизонтально 10–15с (контроль, incl. девиации)', dose: '3×холд', freq: '2×/нед', source: 'Sledge levering', sets: 3, reps: [1, 1], holdSeconds: 12, restSec: 90, dayTag: 'SupportGrip', fixes: ['mid', 'lockout'], warmup: 'Разминка: круги запястий 2 мин' },
 ];
 
 /** Снаряд → его же упражнение в каталоге (практика по правилам). */
@@ -276,23 +276,26 @@ export interface ArmliftSpecWeek {
   dayMap: Record<string, string>;
 }
 
-/** Спец-блок 4 нед (волна 3/2/1) или 6 нед (накопление ×3 + интенс + пик + делод). */
+/** Спец-блок 4 нед (волна base→объём→интенс→делод) или 6 нед (base×3 + интенс + пик + делод). */
 export function buildArmliftSpecBlock(
   weakLink: ArmliftWeakLink,
   implement: string,
   corrections?: ArmliftCorrection[],
   weeks: 4 | 6 = 4,
+  opts: { fatigueFirst?: boolean } = {},
 ): ArmliftSpecWeek[] {
   const top = (corrections && corrections.length ? corrections : rankArmliftCorrections(weakLink, implement)).slice(0, 2);
   const impl = String(implement || 'rolling_thunder');
   const n = weeks === 6 ? 6 : 4;
-  const mult = n === 6 ? [1, 1.05, 1, 0.9, 0.85, 0.5] : [1, 1, 0.85, 0.5];
-  const sess = n === 6
+  let mult = n === 6 ? [1, 1.05, 1, 0.9, 0.85, 0.5] : [1, 1, 0.85, 0.5];
+  let sess = n === 6
     ? ['3 сессии', '3 сессии', '3 сессии', '2 сессии', '2 сессии', '2 лёгкие']
     : ['3 сессии', '3 сессии', '2 сессии', '2 лёгкие'];
-  const notes = n === 6
+  let notes = n === 6
     ? ['База 100%', 'Объём +5%', 'Объём 100%', 'Интенс: вес ↑', 'Пик: вес ↑↑, объём 85%', 'Делод 50% + тест точки срыва']
     : ['База 100%', 'Объём +5–10%', 'Интенс: вес ↑, объём 85%', 'Делод 50% + тест точки срыва'];
+  if (opts.fatigueFirst && n === 4) { mult = [0.5, 1, 1, 0.85]; sess = ['2 лёгкие', '3 сессии', '3 сессии', '2 сессии']; notes = ['Делод 50% (сброс усталости)', 'База 100%', 'Объём +5–10%', 'Интенс: вес ↑, объём 85%']; }
+  if (opts.fatigueFirst && n === 6) { mult = [0.5, 1, 1.05, 1, 0.9, 0.85]; sess = ['2 лёгкие', '3 сессии', '3 сессии', '3 сессии', '2 сессии', '2 сессии']; notes = ['Делод 50% (сброс усталости)', 'База 100%', 'Объём +5%', 'Объём 100%', 'Интенс: вес ↑', 'Пик: вес ↑↑, объём 85%']; }
   return Array.from({ length: n }, (_, k) => {
     const targetSets: Record<string, number> = {};
     const dayMap: Record<string, string> = {};
@@ -301,9 +304,10 @@ export function buildArmliftSpecBlock(
       dayMap[c.exId] = c.dayTag;
     }
     const last = k === n - 1;
+    const firstFatigue = opts.fatigueFirst && k === 0;
     return {
       week: k + 1,
-      focus: k === 0 ? `База: ${top[0]?.title || '—'}` : last ? 'Делод хвату + тест' : `${top[0]?.title || '—'} · ${notes[k]}`,
+      focus: firstFatigue ? 'Делод 50% (сброс усталости)' : k === 0 ? `База: ${top[0]?.title || '—'}` : last ? 'Делод хвату + тест' : `${top[0]?.title || '—'} · ${notes[k]}`,
       target: impl, volume: `${sess[k]} · ${notes[k]}`,
       targetSets, dayMap,
     };

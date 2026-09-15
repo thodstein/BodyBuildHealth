@@ -305,8 +305,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
   }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel]);
   const specBlock = useMemo(
-    () => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections, diag.specWeeks),
-    [diagnosis.weakLink, diag.implement, corrections, diag.specWeeks],
+    () => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, { fatigueFirst: cause.cause === 'fatigue' || cause.cause === 'pain' }),
+    [diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, cause.cause],
   );
   /** D10 E1: уровни тестов + итог по слабейшему. */
   const levels = useMemo(() => {
@@ -401,6 +401,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           diagCauseDetail: { cause: cause.cause, confidence: cause.confidence, evidence: cause.evidence, fix: cause.fix },
           armliftExercises: correctionsToInjectionItems(orderCorrectionsForDay(corrections), 3, intensityForCause(cause.cause)),
           armliftOrderNote: sessionOrderNote(corrections),
+          armliftCompleteness: completeness,
           armliftSpec: specBlock.map((w) => ({ week: w.week, targetSets: w.targetSets, dayMap: w.dayMap })),
           armliftWeakArmNote: asymForDiag != null && asymForDiag > 15 ? 'слабой рукой первой' : undefined,
         },

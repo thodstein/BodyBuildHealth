@@ -453,6 +453,24 @@ describe('PRO-5 D12 E5: дозы и волны', () => {
     expect(r.injected).toBe(6);
     expect(r.plan.weeks[5].sessions[0].exercises[0].sets).toBe(2);
   });
+  it('fatigue-first волна начинает с делода', () => {
+    const spec = buildArmliftSpecBlock('fingers', 'rolling_thunder', undefined, 6, { fatigueFirst: true });
+    expect(spec[0].focus).toContain('Делод');
+    expect(spec[0].volume).toContain('лёгкие');
+    const plain = buildArmliftSpecBlock('fingers', 'rolling_thunder', undefined, 6, {});
+    expect(plain[0].focus).toContain('База');
+  });
+  it('warmup на каждом пуле (не только crush)', () => {
+    const pools = [
+      rankArmliftCorrections('thumb', 'saxon_bar', {}),
+      rankArmliftCorrections('fingers', 'rolling_thunder', {}),
+      rankArmliftCorrections('wrist_ext', 'rolling_thunder', {}),
+      rankArmliftCorrections('support_endurance', 'rolling_thunder', {}),
+    ];
+    for (const pool of pools) {
+      expect(pool.some((c) => c.warmup)).toBe(true);
+    }
+  });
   it('новичку −1 сет (минимум 1)', () => {
     const plan = {
       level: 'beginner', rationale: [] as string[],
