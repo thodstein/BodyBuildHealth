@@ -53,7 +53,7 @@ export interface DayTargetsInput {
   presetGPerKg: number;          // пресет белка пользователя (1.6-2.6), v6
   fatFloorGPerKg: number;        // физиологический пол жиров (0.8)
   kbjuMode: 'auto' | 'manual' | 'profile';
-  manual?: { kcal?: number | null; p?: number | null; f?: number | null; c?: number | null };
+  manual?: { kcal?: number | null; p?: number | null; f?: number | null; c?: number | null; gPerKg?: { protein?: number | null; fat?: number | null; carbs?: number | null } | null };
   /** Научная цепочка целиком (phase/pharma/weight-adapt/metabolic/female gate) — для auto. */
   calcTargets: PlannerTargets;
   /** Нейтральные цели профиля (maintenance, без модификаторов) — для mode 'profile'. */
@@ -89,12 +89,28 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   const prof = input.profileTargets || fallback;
 
   // ─── manual: прежнее поведение (обратно-совместимо) ─────────────────────────
+  // FIX manual-card: г/кг-инпуты карточки («Ввод в г/кг веса») писали только в
+  // manualGPerKg → computePlannerTargets (calcTargets), который manual-ветка
+  // игнорирует целиком. Итог: в ручном режиме г/кг были мертвы, а при пустых
+  // граммах цели схлопывались в ~0 («рацион не собирается»). Теперь г/кг —
+  // фолбэк граммов: явные граммы приоритетнее, недостающие считаются из г/кг.
   if (mode === 'manual') {
-    const p = Math.max(0, Math.round(Number(manual.p) || 0));
-    const f = Math.max(Math.round(weight * fatFloor), Math.max(0, Math.round(Number(manual.f) || 0)));
+    const gpk = (manual as any)?.gPerKg || {};
+    const gProtein = Number((gpk as any)?.protein) > 0 ? Math.round(weight * Number((gpk as any).protein)) : 0;
+    const gFat = Number((gpk as any)?.fat) > 0 ? Math.round(weight * Number((gpk as any).fat)) : 0;
+    const gCarbs = Number((gpk as any)?.carbs) > 0 ? Math.round(weight * Number((gpk as any).carbs)) : 0;
+    const p = manual.p !== null && manual.p !== undefined && Number(manual.p) > 0
+      ? Math.max(0, Math.round(Number(manual.p)))
+      : gProtein;
+    const fRaw = manual.f !== null && manual.f !== undefined && Number(manual.f) > 0
+      ? Math.max(0, Math.round(Number(manual.f)))
+      : gFat;
+    const f = Math.max(Math.round(weight * fatFloor), fRaw);
     let c: number;
     if (manual.c !== null && manual.c !== undefined && Number(manual.c) > 0) {
       c = Math.round(Number(manual.c));
+    } else if (gCarbs > 0) {
+      c = gCarbs;
     } else if (Number(manual.kcal) > 0 && p > 0 && Number(manual.f) > 0) {
       c = Math.max(0, Math.round((Number(manual.kcal) - p * 4 - Number(manual.f) * 9) / 4));
     } else {

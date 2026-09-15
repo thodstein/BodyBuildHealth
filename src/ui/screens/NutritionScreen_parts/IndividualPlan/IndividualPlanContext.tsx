@@ -942,7 +942,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     presetGPerKg: _proteinGPerKg,
     fatFloorGPerKg: 0.8,
     kbjuMode,
-    manual: { kcal: manualKcal, p: manualP, f: manualF, c: manualC },
+    manual: { kcal: manualKcal, p: manualP, f: manualF, c: manualC, gPerKg: { protein: manualGPerKg.protein || 0, fat: manualGPerKg.fat || 0, carbs: manualGPerKg.carbs || 0 } },
     calcTargets,
     profileTargets,
     goal,
@@ -950,7 +950,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     budget,
     insulinTotalUnits: _insulinUnits,
     dietStyle: planType,
-  }), [weight, _proteinGPerKg, kbjuMode, manualKcal, manualP, manualF, manualC, calcTargets, profileTargets, goal, _trainVolMin, budget, _insulinUnits, planType]);
+  }), [weight, _proteinGPerKg, kbjuMode, manualKcal, manualP, manualF, manualC, manualGPerKg, calcTargets, profileTargets, goal, _trainVolMin, budget, _insulinUnits, planType]);
   const dayTargetsBreakdown: string[] = [...dayTargets.breakdown];
   // Ф4.25: читаем заметку ББ-плана (he_bb_nutrition_note) — калораж + трен-дни для
   // циклирования углеводов. Применяется только если есть данные (no-op иначе).
@@ -2785,7 +2785,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         }
         if (s.nutrition.mealsPerDay) setMealsCount(s.nutrition.mealsPerDay);
         if (s.nutrition.foodAllergies) setAllergens(s.nutrition.foodAllergies);
-        if (s.nutrition.foodIntolerances) setIntolerances({ ...intolerances, ...Object.fromEntries(s.nutrition.foodIntolerances.map((a: string) => [a, true])) });
+        if (s.nutrition.foodIntolerances) setIntolerances({ ...intolerances, ...Object.fromEntries((Array.isArray(s.nutrition.foodIntolerances) ? s.nutrition.foodIntolerances : []).map((a: string) => [a, true])) });
         if (s.nutrition.excludedFoods) setExcludedFoods(s.nutrition.excludedFoods);
         if (s.nutrition.preferredFoods) setPreferredFoods(s.nutrition.preferredFoods);
         if (s.nutrition.preferredByMeal) setPreferredByMeal(s.nutrition.preferredByMeal);
@@ -2930,10 +2930,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => {
     const safeInjections = Array.isArray(injections) ? injections : [];
     const aasCount = safeInjections.filter(i => i.type === 'ААС').length;
-    if (aasCount > 0 && goal === 'mass') {
+    // FIX manual-card: это ПОДСКАЗКА, а не перезапись. Старый код форсил 2.5
+    // поверх любого значения при ААС+масса и клампил к 1.8 без ААС — молча
+    // снося ручной ввод г/кг (и сид 2.5 умирал при монтировании). Теперь только
+    // заполняем пустое (suggest-if-empty), явный ввод пользователя свят.
+    if (aasCount > 0 && goal === 'mass' && !(manualGPerKgRef.current.protein > 0)) {
       setManualGPerKg(prev => ({ ...prev, protein: 2.5 }));
-    } else if (aasCount === 0 && manualGPerKgRef.current.protein > 2.2) {
-      setManualGPerKg(prev => ({ ...prev, protein: 1.8 }));
     }
     const insulinCount = safeInjections.filter(i => i.type === 'инсулин').length;
     if (insulinCount > 0) {
