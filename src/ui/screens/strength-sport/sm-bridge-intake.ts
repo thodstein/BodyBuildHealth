@@ -272,10 +272,12 @@ export function buildSpecProtocols(
     if (!wp) continue;
     try {
       const cause = (causes?.[wp] ?? null) as any;
-      // C9: ⭐ из Коррекции (библиотечный id) — доза карточки; явный выбор
-      // пользователя, поэтому без equipment/mobility-фильтра ранжира.
+      // C9: ⭐ из Коррекции (библиотечный id) — доза карточки. Но только когда
+      // equipment/mobility-фильтры пусты: при активных фильтрах — строгий путь
+      // ранжира (иначе вставили бы штангу в зал без штанги — регрессия C10).
       const prefId = prefCorr?.[wp];
-      const libProto = protocolForPreferred(wp as WLWeakPoint, prefId, cause, null);
+      const hasFilters = (equipment && equipment.length > 0) || (mobilityRestrictions && mobilityRestrictions.length > 0);
+      const libProto = !hasFilters ? protocolForPreferred(wp as WLWeakPoint, prefId, cause, null) : null;
       if (libProto) {
         out[wp] = { sets: libProto.sets, reps: libProto.reps, pct: libProto.pct };
         continue;

@@ -96,6 +96,14 @@ describe('parseSmBridgePayload', () => {
     expect(alien.jerk_dip).not.toEqual({ sets: 5, reps: 3, pct: 40 });
   });
 
+  it('C10: при активных equipment/mobility-фильтрах — строгий путь ранжира (без library-дозы)', () => {
+    // штанги нет: ранжир скипает фазу, library-доза НЕ просачивается
+    const filtered = buildSpecProtocols(['snatch_mid'], { snatch_mid: 'tall_snatch' }, { snatch_mid: 'technique' }, ['dumbbell'], []);
+    expect(filtered.snatch_mid).toBeUndefined();
+    const mobFiltered = buildSpecProtocols(['snatch_mid'], { snatch_mid: 'pause_snatch' }, { snatch_mid: 'technique' }, [], ['ankle']);
+    expect(mobFiltered.snatch_mid.sets).toBeGreaterThan(0);
+  });
+
   it('контест без events отклоняется, smContest — фолбэк', () => {
     expect(parseSmBridgePayload({ contest: { name: 'битый' } }).contest).toBeNull();
     const p = parseSmBridgePayload({
