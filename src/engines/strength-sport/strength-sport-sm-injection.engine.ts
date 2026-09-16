@@ -57,6 +57,10 @@ export interface SMInjectionOpts {
   preferredCorr?: Record<string, string>;
   /** Дозы карточек: фаза → {sets, reps, pct} (buildSMSpecProtocols). */
   protocols?: Record<string, { sets: number; reps: number | string; pct: number }>;
+  /** Недели вставки (индексы weeksData). Дефолт [0] — поведение 1-в-1 как раньше. */
+  weekIdxs?: number[];
+  /** L/R-добивка слабой стороны: фаза → 'left' | 'right' (+1 сет, честная пометка). */
+  unilateralBoost?: Record<string, string>;
 }
 
 export interface SMInjectionResult {
@@ -118,8 +122,18 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
       exName = libValid.target;
       starMark = ` (⭐ ${libValid.id})`;
     }
-    const week = copy.weeksData[0];
-    if (!week || week.deload) { notes.push(`⚠ ${wp} — делод, пропуск`); continue; }
+    const weekIdxs = Array.isArray(opts.weekIdxs) && opts.weekIdxs.length
+      ? opts.weekIdxs.filter((wi) => Number.isInteger(wi) && wi >= 0)
+      : [0];
+    const multiWeek = weekIdxs.length > 1;
+    // L/R-добивка: +1 сет слабой стороне (хаб шлёт только grip-фазы при асимметрии ≥7%).
+    const uniSide = opts.unilateralBoost?.[wp];
+    const uni = uniSide === 'left' || uniSide === 'right' ? uniSide : null;
+    const uniMark = uni ? ` +1 слаб. ${uni === 'left' ? 'слева' : 'справа'}` : '';
+    const weekAddSets = addSets + (uni ? 1 : 0);
+    for (const wi of weekIdxs) {
+    const week = copy.weeksData[wi];
+    if (!week || week.deload) { notes.push(`⚠ ${wp} — делод, пропуск${multiWeek ? ` (нед ${wi + 1})` : ''}`); continue; }
     const configuredDays = opts.dayMap?.[wp];
     let targetSession: StrengthSportSession | null = null;
     if (configuredDays && configuredDays.length) {
@@ -127,13 +141,13 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
       targetSession = week.sessions[dayIdx] ?? null;
     }
     if (!targetSession) targetSession = sessionForSMInjection(week, wp);
-    if (!targetSession) { notes.push(`⚠ ${wp} — нет сессии`); continue; }
+    if (!targetSession) { notes.push(`⚠ ${wp} — нет сессии${multiWeek ? ` (нед ${wi + 1})` : ''}`); continue; }
     if (targetSession.exercises.some(e => e.id === corrId || e.id.toLowerCase() === corrId.toLowerCase())) {
-      skippedDup++; notes.push(`⊘ ${wp} → ${corrId} уже есть в ${targetSession.sessionTag}`); continue;
+      skippedDup++; notes.push(`⊘ ${wp} → ${corrId} уже есть в ${targetSession.sessionTag}${multiWeek ? ` (нед ${wi + 1})` : ''}`); continue;
     }
-    const weeklySets = copy.weeksData[0].sessions.reduce((a: number, s: any) => a + s.exercises.reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
-    if (weeklySets + addSets > budget) {
-      skippedBudget++; notes.push(`⊘ ${wp} → ${corrId} превысит Budget ${budget} (сейчас ${weeklySets}+${addSets})`); continue;
+    const weeklySets = week.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
+    if (weeklySets + weekAddSets > budget) {
+      skippedBudget++; notes.push(`⊘ ${wp} → ${corrId} превысит Budget ${budget} (сейчас ${weeklySets}+${weekAddSets})${multiWeek ? ` (нед ${wi + 1})` : ''}`); continue;
     }
     const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
     const basePm = basePmForSM(corrId, wm);
@@ -151,19 +165,20 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
       name: exName ?? bio?.corrections?.[0] ?? corrId,
       group: corrId.includes('carry') || corrId.includes('walk') ? 'back' : corrId.includes('plank') ? 'core' : 'legs',
       pattern: corrId.includes('carry') || corrId.includes('walk') ? 'carry' : corrId.includes('squat') ? 'squat' : 'hinge',
-      sets: addSets,
+      sets: weekAddSets,
       reps: finalReps,
       rir,
       tempo,
       restSeconds: rest,
       weight,
-      workSets: Array.from({ length: addSets }, () => ({ reps: typeof finalReps === 'number' ? finalReps : (corrId.includes('carry') ? 1 : 5), rir, weight, pct: Math.round(intensityPct * 100), tempo, restSeconds: rest, distanceM: distM } as any)),
+      workSets: Array.from({ length: weekAddSets }, () => ({ reps: typeof finalReps === 'number' ? finalReps : (corrId.includes('carry') ? 1 : 5), rir, weight, pct: Math.round(intensityPct * 100), tempo, restSeconds: rest, distanceM: distM } as any)),
       warmupSets: [],
     } as any;
     targetSession.exercises.push(ex);
-    if (typeof week.totalSets === 'number') week.totalSets += addSets;
+    if (typeof week.totalSets === 'number') week.totalSets += weekAddSets;
     injected++;
-    notes.push(`✓ ${wp} → ${corrId}${starMark} в ${targetSession.sessionTag} ${addSets}×${finalReps} @${Math.round(intensityPct * 100)}%`);
+    notes.push(`✓ ${wp} → ${corrId}${starMark} в ${targetSession.sessionTag} ${weekAddSets}×${finalReps} @${Math.round(intensityPct * 100)}%${uniMark}${multiWeek ? ` (нед ${wi + 1})` : ''}`);
+    }
   }
   if (injected > 0) {
     copy.rationale = [...(copy.rationale || []), `Стронг-диагностика: инъецировано ${injected} коррекций (${uniq.join(', ')})`];

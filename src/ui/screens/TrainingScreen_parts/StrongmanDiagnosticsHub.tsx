@@ -919,6 +919,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       smPreferredCorr: Object.keys(smPrefCorr).length ? smPrefCorr : null,
       smWeakCauses: Object.keys(smCauseByPhase).length ? smCauseByPhase : null,
       smCorrectiveDetail: smCorrSession.length ? smCorrSession.map((c) => `${c.target} — ${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}% · ${c.cues[0]}`.slice(0, 160)).slice(0, 9) : null,
+      // SM-C5: слабая сторона grip-фаз при асимметрии ≥7% (добивка +1 сет в план)
+      smUnilateral: (() => {
+        if (!asymmetry || !asymmetry.isAsym) return null;
+        const grips = (smWeakPoints as string[]).filter((wp) => wp === 'farmers_grip' || wp === 'grip_support');
+        return grips.length ? Object.fromEntries(grips.map((wp) => [wp, asymmetry.weaker])) : null;
+      })(),
       contestSim,
       attempts: attemptsBridge,
       carryPhysics: carryPhys,
@@ -1543,7 +1549,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Нормы колено-стена (Knee-to-wall) ≥{OHS_NORMS.kneeToWallCm.optimal} см (порог {OHS_NORMS.kneeToWallCm.cutoff}), голеностоп {OHS_NORMS.ankleDeg.range}</div>
               {ohs.failed >= 2 && (
                 <div data-sm="corr-mobility" style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)' }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛠️ OHS {ohs.failed}/6 → сначала мобильность (щадящие дозы −5%): yoke_pickup → пауза-присед · stone_lap → фронт-присед с паузой · log_clean → перекат + RDL</div>
+                  <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛠️ OHS {ohs.failed}/6 → сначала мобильность (щадящие дозы −5%): {(smWeakPoints as string[]).filter((wp) => (smCauseByPhase as Record<string, string>)[wp] === 'mobility').join(', ') || 'yoke_pickup, stone_lap, log_clean'} · пауза-присед / фронт-присед с паузой / перекат + RDL</div>
                   <button onClick={() => setTab('correction')} style={{ marginTop:8, padding:'12px 16px', minHeight:48, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>→ Открыть Коррекцию</button>
                 </div>
               )}

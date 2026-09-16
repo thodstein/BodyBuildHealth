@@ -20,7 +20,7 @@ import { intensityZoneFor } from '../../../engines/strength-sport/strength-sport
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev, TA_PLAN_KEY } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
 import { buildSpecProtocols, buildSMSpecProtocols } from './sm-bridge-intake';
 import type { WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
-import { injectSMWeakPoints } from '../../../engines/strength-sport/strength-sport-sm-injection.engine';
+import { injectSMWeakPoints, snapshotSMPlanForInject, rollbackSMPlanInject, hasSMPlanPrev, SM_INJECT_PREV_KEY } from '../../../engines/strength-sport/strength-sport-sm-injection.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans, syncStrengthSportToCloud } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, buildAnnualWithTaper, buildAnnualMultiPeak, saveAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
@@ -79,6 +79,10 @@ export const StrengthSportConstructor: React.FC = () => {
   // Откат спец-блока: снапшот тот же, что в хабе (TA_PLAN_KEY) — кнопки в обоих местах взаимозаменяемы.
   const [hasSpecPrev, setHasSpecPrev] = React.useState<boolean>(() => {
     try { return hasTAPlanPrev(); } catch { return false; }
+  });
+  // SM-C5: откат волны СМ-коррекции (свой снапшот SM_INJECT_PREV_KEY).
+  const [hasSMSpecPrev, setHasSMSpecPrev] = React.useState<boolean>(() => {
+    try { return hasSMPlanPrev(); } catch { return false; }
   });
   // Planner PRO P4: чек-ин недели (дефолт 3 = норма, персист he_ss_checkin_v1 кап 12)
   const [checkin, setCheckin] = React.useState<SsCheckin>(() => {
@@ -262,9 +266,10 @@ export const StrengthSportConstructor: React.FC = () => {
       const isSM = weakPoints.some((wp: string) => /^(log_|yoke_|farmers_|stone_|grip_|core_|conditioning)/.test(String(wp)));
       if (isSM || mode === 'strongman') {
         // SM-C3: ⭐ хаба + дозы карточек — в инъекцию (без ⭐ — legacy-путь 1-в-1)
+        // SM-C5: + слабая сторона grip-фаз.
         const smTb = taBridge as any;
         const smProtos = buildSMSpecProtocols(weakPoints, smTb?.smPrefCorr ?? null, smTb?.smWeakCauses ?? null, equipment, mobility);
-        const inj = injectSMWeakPoints(p, weakPoints as any, { workMax: p.workMax, preferredCorr: smTb?.smPrefCorr ?? {}, protocols: smProtos } as any);
+        const inj = injectSMWeakPoints(p, weakPoints as any, { workMax: p.workMax, preferredCorr: smTb?.smPrefCorr ?? {}, protocols: smProtos, unilateralBoost: smTb?.smUnilateral ?? {} } as any);
         if (inj.injected > 0) p.rationale = inj.plan.rationale;
         p = inj.plan;
         if (inj.notes.length) { try { console.info('[SM injection]', inj.notes.join(' | ')); } catch {} }
@@ -371,6 +376,8 @@ export const StrengthSportConstructor: React.FC = () => {
     setMsg('✦ План собран'); setTimeout(()=>setMsg(''), 2200);
     setStep('plan');
     setHasSpecPrev(false); // новый id плана — старый снапшот stale, откат его честно отклонит
+    setHasSMSpecPrev(false); // то же для волны СМ-коррекции
+    try { sessionStorage.removeItem(SM_INJECT_PREV_KEY); } catch {}
     } finally {
       setBuilding(false);
     }
@@ -410,6 +417,78 @@ export const StrengthSportConstructor: React.FC = () => {
     } catch { /* noop */ }
     setMsg(`✓ Спец-блок встроен: коррекций ${r.injected} (нед: ${r.plan.weeksData.length})`);
     setTimeout(()=>setMsg(''), 3000);
+  };
+
+  // SM-C5: волна СМ-коррекции во все недели (opt-in, по клику — авто-сборка шьёт только нед 1).
+  // Снапшот до вставки, бюджет/дедуп/делод честно по каждой неделе.
+  const handleApplySMCorrective = () => {
+    const smTb = taBridge as any;
+    if (!plan || !weakPoints.length) {
+      setMsg('Волну не из чего строить — нужен план + слабые фазы из СМ-хаба');
+      setTimeout(()=>setMsg(''), 2500);
+      return;
+    }
+    try {
+      const snap = snapshotSMPlanForInject(plan);
+      sessionStorage.setItem(SM_INJECT_PREV_KEY, JSON.stringify({ id: (plan as any).id ?? null, plan: snap }));
+    } catch { /* noop */ }
+    let r;
+    try {
+      const weekIdxs = (plan.weeksData || []).map((_: any, i: number) => i).filter((i: number) => !(plan.weeksData[i] as any)?.deload);
+      const protocols = buildSMSpecProtocols(weakPoints, smTb?.smPrefCorr ?? null, smTb?.smWeakCauses ?? null, equipment, mobility);
+      r = injectSMWeakPoints(plan, weakPoints as any, { weekIdxs, preferredCorr: smTb?.smPrefCorr ?? {}, protocols, unilateralBoost: smTb?.smUnilateral ?? {}, workMax } as any);
+    } catch {
+      setMsg('Ошибка вставки волны — план не тронут');
+      setTimeout(()=>setMsg(''), 2500);
+      return;
+    }
+    if (!r.injected) {
+      setMsg(`⊘ Волна не вставлена (бюджет-скип: ${r.skippedBudget}, дубли: ${r.skippedDup})`);
+      setTimeout(()=>setMsg(''), 3000);
+      return;
+    }
+    try {
+      const p2 = { ...r.plan, rationale: [...(r.plan.rationale || []), ...r.notes] };
+      setPlan(p2);
+      saveStrengthSportPlan(p2);
+      setHasSMSpecPrev(true);
+    } catch { /* noop */ }
+    setMsg(`✓ Волна коррекции встроена: ${r.injected} (нед: ${r.plan.weeksData.length})`);
+    setTimeout(()=>setMsg(''), 3000);
+  };
+
+  // Откат волны СМ-коррекции (тот же снапшот; id сверяется — пересборка инвалидирует).
+  const handleRollbackSMCorrective = () => {
+    let raw: string | null = null;
+    try { raw = sessionStorage.getItem(SM_INJECT_PREV_KEY); } catch { /* noop */ }
+    if (!raw) {
+      setHasSMSpecPrev(false);
+      setMsg('Откатывать нечего — волны не было');
+      setTimeout(()=>setMsg(''), 2500);
+      return;
+    }
+    try {
+      const snap = JSON.parse(raw);
+      const curId = (plan as any)?.id ?? null;
+      if (snap?.id !== curId) {
+        try { sessionStorage.removeItem(SM_INJECT_PREV_KEY); } catch {}
+        setHasSMSpecPrev(false);
+        setMsg('План пересобран после вставки — откат отклонён');
+        setTimeout(()=>setMsg(''), 2500);
+        return;
+      }
+      const p2 = rollbackSMPlanInject(snap.plan);
+      setPlan(p2);
+      saveStrengthSportPlan(p2);
+      try { sessionStorage.removeItem(SM_INJECT_PREV_KEY); } catch {}
+    } catch {
+      setMsg('Ошибка отката — план не тронут');
+      setTimeout(()=>setMsg(''), 2500);
+      return;
+    }
+    setHasSMSpecPrev(false);
+    setMsg('↩ Волна коррекции откачена');
+    setTimeout(()=>setMsg(''), 2500);
   };
 
   // Откат вставки спец-блока (тот же снапшот, что снимает handleApplySpecBlock и хаб).
@@ -619,6 +698,8 @@ export const StrengthSportConstructor: React.FC = () => {
             {((taBridge as any).smPrefCorr || (taBridge as any).smCorrectiveDetail?.length) && <Badge color="#f5b04c" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">📥 СМ-хаб{(taBridge as any).smPrefCorr ? ` · ⭐ ${Object.keys((taBridge as any).smPrefCorr).length}` : ''}{(taBridge as any).smCorrectiveDetail?.length ? ` · коррекция ${(taBridge as any).smCorrectiveDetail.length}` : ''}</Badge>}
             {plan && weakPoints.length > 0 && (taBridge.specTargets?.length ?? 0) > 0 && <button data-ss="apply-spec" onClick={handleApplySpecBlock} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(56,189,248,0.35)', background: 'rgba(56,189,248,0.14)', color: '#7dd3fc', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📥 Спец-блок ({taBridge.specTargets!.length} нед)</button>}
             {plan && hasSpecPrev && <button data-ss="rollback-spec" onClick={handleRollbackSpec} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат спец-блока</button>}
+            {plan && weakPoints.length > 0 && ((taBridge as any).smPrefCorr || (taBridge as any).smCorrectiveDetail?.length) && <button data-ss="apply-sm-corrective" onClick={handleApplySMCorrective} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.14)', color: '#f5b04c', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🌊 Волна коррекции ({weakPoints.length} фазы)</button>}
+            {plan && hasSMSpecPrev && <button data-ss="rollback-sm-corrective" onClick={handleRollbackSMCorrective} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат волны</button>}
             {outsideMetrics && <Badge color="#c4b5fd" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
             {acwr && <Badge color={acwr.zone==='dangerous'?'#fecaca': acwr.zone==='caution'?'#fde68a': acwr.zone==='caution'?'#fde68a':'#86efac'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)': acwr.zone==='caution'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.08)'} border={acwr.zone==='dangerous'?'rgba(239,68,68,0.22)': acwr.zone==='caution'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.16)'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)}</Badge>}
             {hrv && <Badge color={hrv.zone==='dangerous'?'#fecaca': hrv.zone==='caution'?'#fde68a':'#86efac'} bg={hrv.zone==='dangerous'?'rgba(239,68,68,0.12)': hrv.zone==='caution'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.08)'} border={hrv.zone==='dangerous'?'rgba(239,68,68,0.22)': hrv.zone==='caution'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.16)'}>HRV {hrv.ewma ?? hrv.last} мс · {hrv.zone}</Badge>}

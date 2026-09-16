@@ -21,13 +21,20 @@ describe('sm-corrective-bridge (C3)', () => {
     const many = Array.from({ length: 12 }, (_, i) => `line ${i}`);
     expect(parseSmBridgePayload({ smCorrectiveDetail: many }).smCorrectiveDetail!.length).toBe(9);
   });
-  it('buildSMSpecProtocols берёт дозу библиотечной ⭐, чужой — ранжир', () => {
-    const lib = buildSMSpecProtocols(['stone_off_floor'], { stone_off_floor: 'sm_stone_off_floor_tech' }, { stone_off_floor: 'technique' }, [], []);
+  it('buildSMSpecProtocols берёт дозу библиотечной ⭐, чужой — ранжир', () => {    const lib = buildSMSpecProtocols(['stone_off_floor'], { stone_off_floor: 'sm_stone_off_floor_tech' }, { stone_off_floor: 'technique' }, [], []);
     expect(lib.stone_off_floor.sets).toBe(4);
     expect(lib.stone_off_floor.pct).toBeLessThanOrEqual(90);
     const rank = buildSMSpecProtocols(['yoke_walk'], { yoke_walk: 'nope' }, {}, [], []);
     expect(rank.yoke_walk.sets).toBeGreaterThan(0);
     expect(rank.yoke_walk.pct).toBeGreaterThanOrEqual(50);
     expect(buildSMSpecProtocols([], null, null)).toEqual({});
+  });
+  it('C5: smUnilateral санитизируется (только left/right, кап 4)', () => {
+    expect(parseSmBridgePayload({}).smUnilateral).toBeNull();
+    expect(parseSmBridgePayload({ smUnilateral: 'мусор' }).smUnilateral).toBeNull();
+    const p = parseSmBridgePayload({
+      smUnilateral: { farmers_grip: 'right', grip_support: 'left', stone_load: 'middle', yoke_walk: 'RIGHT' },
+    });
+    expect(p.smUnilateral).toEqual({ farmers_grip: 'right', grip_support: 'left' });
   });
 });

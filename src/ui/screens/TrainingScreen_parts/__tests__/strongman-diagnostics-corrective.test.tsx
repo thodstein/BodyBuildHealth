@@ -84,4 +84,14 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
     expect(localStorage.getItem('he_planner_apply')).toContain('smPreferredCorr');
     expect(localStorage.getItem('he_planner_apply')).toContain('smCorrectiveDetail');
   });
+  it('C5: асимметрия + grip-фаза → мост несёт smUnilateral', async () => {
+    localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ gripWeak: ['grip'], leftMax: '100', rightMax: '90' }));
+    render(<StrongmanDiagnosticsHub />);
+    const btns = screen.getAllByText(/Применить в Стронг/);
+    fireEvent.click(btns[btns.length - 1]);
+    await waitFor(() => expect(document.body.textContent).toContain('Применено'), { timeout: 2000 });
+    const raw = localStorage.getItem('he_planner_apply') || '';
+    expect(raw).toContain('smUnilateral');
+    expect(raw).toContain('farmers_grip');
+  });
 });

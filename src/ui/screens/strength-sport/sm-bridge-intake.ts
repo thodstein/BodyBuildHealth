@@ -75,6 +75,8 @@ export interface SmBridgePatch {
   smWeakCauses: Record<string, string> | null;
   /** SM-C3: детальные строки коррекции СМ-хаба для rationale или null. */
   smCorrectiveDetail: string[] | null;
+  /** SM-C5: слабая сторона grip-фаз {phase: 'left'|'right'} или null. */
+  smUnilateral: Record<string, string> | null;
   /** J7 орто-скрининг: заблокированные паттерны (orthopedic.blockedPatterns + orthoGuards.blockedPatterns). */
   orthoBlocked: string[];
   /** J7: mobility-merge (только ключи MOBILITY_RU). */
@@ -181,6 +183,19 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
   // SM-C3: то же для СМ-хаба (библиотечные sm_* id + причины + детальные строки).
   const smPreferredCorr = strRecord((d as any).smPreferredCorr);
   const smWeakCauses = strRecord((d as any).smWeakCauses);
+  // SM-C5: слабая сторона — только 'left'/'right', кап 4.
+  let smUnilateral: Record<string, string> | null = null;
+  try {
+    const raw = (d as any).smUnilateral;
+    if (raw != null && typeof raw === 'object' && !Array.isArray(raw)) {
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (Object.keys(out).length >= 4) break;
+        if (v === 'left' || v === 'right') out[String(k).slice(0, 40)] = v;
+      }
+      if (Object.keys(out).length) smUnilateral = out;
+    }
+  } catch { /* noop */ }
   let smCorrectiveDetail: string[] | null = null;
   try {
     if (Array.isArray((d as any).smCorrectiveDetail)) {
@@ -273,6 +288,7 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     smPreferredCorr,
     smWeakCauses,
     smCorrectiveDetail,
+    smUnilateral,
     orthoBlocked,
     orthoMobility,
     orthoYokeGate,

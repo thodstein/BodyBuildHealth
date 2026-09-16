@@ -32,4 +32,18 @@ describe('sm-corrective-wizard (C3)', () => {
     expect(result.current.weakPoints).toEqual(['stone_off_floor']);
     expect(result.current.mode).toBe('strongman');
   });
+  it('C5: smUnilateral доходит до taBridge', () => {
+    const { result } = renderHook(() => useStrengthSportWizard());
+    act(() => {
+      applyToPlanner({
+        kind: 'weakpoints',
+        label: 't',
+        data: {
+          smWeakPoints: ['farmers_grip'],
+          smUnilateral: { farmers_grip: 'right' },
+        } as any,
+      });
+    });
+    expect((result.current.taBridge as any).smUnilateral).toEqual({ farmers_grip: 'right' });
+  });
 });
