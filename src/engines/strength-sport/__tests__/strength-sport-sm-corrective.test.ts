@@ -15,6 +15,8 @@ import {
   protocolForSMPreferred,
 } from '../strength-sport-sm-corrective.engine';
 import { buildSMDiagnosticsHtml, buildSMCsv } from '../strength-sport-sm-export.engine';
+import { rankCorrectionsForSM } from '../strength-sport-sm-correction-rank.engine';
+import { SM_FALLBACK_BY_WP } from '../strength-sport-sm-correction-rank.engine';
 
 describe('sm-corrective library', () => {
   it('16 фаз × 3 вида = 48 записей', () => {
@@ -125,8 +127,7 @@ describe('sm-corrective library', () => {
     }
     expect(seen.size).toBeGreaterThanOrEqual(10);
   });
-  it('protocolForSMPreferred: библиотечная ⭐ с дозой; чужая/мусор → null', () => {
-    const lib = protocolForSMPreferred('stone_off_floor', 'sm_stone_off_floor_tech', 'technique');
+  it('protocolForSMPreferred: библиотечная ⭐ с дозой; чужая/мусор → null', () => {    const lib = protocolForSMPreferred('stone_off_floor', 'sm_stone_off_floor_tech', 'technique');
     expect(lib).not.toBeNull();
     expect(lib!.exId).toBe('deadlift');
     expect(lib!.sets).toBeGreaterThan(0);
@@ -137,5 +138,16 @@ describe('sm-corrective library', () => {
     expect(protocolForSMPreferred('stone_off_floor', null, 'technique')).toBeNull();
     expect(libraryEntryForSM('nope')).toBeNull();
     expect(libraryEntryForSM('sm_log_dip_tech')!.phase).toBe('log_dip');
+  });
+  it('C4: в топе ранжира ноль фантомов — все id из канона фаз', () => {
+    const known = new Set(Object.values(SM_FALLBACK_BY_WP));
+    for (const ph of SM_CORRECTIVE_PHASES) {
+      const top = rankCorrectionsForSM(ph, {});
+      expect(top.length).toBeGreaterThan(0);
+      for (const c of top) {
+        expect(known.has(c.id)).toBe(true);
+        expect(c.name.length).toBeGreaterThan(0);
+      }
+    }
   });
 });

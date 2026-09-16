@@ -96,7 +96,8 @@ export function smCorrIdFromLabel(raw: string): string {
   return String(raw).split(' ')[0].trim();
 }
 
-const SM_FALLBACK_BY_WP: Record<string, string> = {
+/** Канон коррекция-на-фазу (реальные id; единый источник для ранжира и инъекции). */
+export const SM_FALLBACK_BY_WP: Record<string, string> = {
   log_dip: 'jerk_dip',
   log_drive: 'push_press',
   log_lockout: 'pin_press',
@@ -124,7 +125,14 @@ export interface SMRankOpts {
 
 export function rankCorrectionsForSM(wp: SMWeakPoint, opts: SMRankOpts = {}): SMCorrectionCandidate[] {
   const rawList = (SM_WEAKPOINT_CORRECTION as Record<string, string[]>)[wp] || [];
-  const ids = rawList.map(smCorrIdFromLabel).filter((s) => s && !/[А-Яа-я]/.test(s));
+  const extracted = rawList.map(smCorrIdFromLabel).filter((s) => s && !/[А-Яа-я]/.test(s));
+  if (extracted.length === 0 && SM_FALLBACK_BY_WP[wp]) extracted.push(SM_FALLBACK_BY_WP[wp]);
+  // Валидация id: первое слово строки без скобок ('Yoke'/'Pinch'/'Prowler') — фантом,
+  // в топ/план не идёт; заменяется каноном фазы (паритет с инъекцией C3).
+  const KNOWN = new Set(Object.values(SM_FALLBACK_BY_WP));
+  const ids = Array.from(new Set(
+    extracted.map((id) => (KNOWN.has(id) ? id : SM_FALLBACK_BY_WP[wp] ?? id)),
+  ));
   if (ids.length === 0 && SM_FALLBACK_BY_WP[wp]) ids.push(SM_FALLBACK_BY_WP[wp]);
   if (ids.length === 0) return [];
   const bio = (SM_BIOMECH as Record<string, { intensityPct?: number; label?: string; corrections?: string[] }>)[wp];

@@ -9,7 +9,10 @@ import type { StrengthSportPlan, StrengthSportSession, StrengthSportExercise } f
 import { SM_WEAKPOINT_CORRECTION, type SMWeakPoint } from './strength-sport-sm-biomechanics.engine';
 import { SM_BIOMECH } from './strength-sport-sm-biomechanics.engine';
 import { libraryEntryForSM, protocolForSMPreferred, type SMCorrective } from './strength-sport-sm-corrective.engine';
+import { SM_FALLBACK_BY_WP } from './strength-sport-sm-correction-rank.engine';
 import '../../core/exercise-catalog-ta-supplement';
+
+const KNOWN_SM_CORR_IDS = new Set(Object.values(SM_FALLBACK_BY_WP));
 
 function basePmForSM(id: string, wm: any): number {
   const low = id.toLowerCase();
@@ -88,16 +91,8 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
       corrId = m ? m[1].trim() : raw.split(' ')[0].trim();
       // fallback на фазу (канон): извлечённый id обязан быть известным,
       // иначе в план вшивался мусор ('Yoke'/'tacky'/'Prowler' — первое слово строки).
-      const fallbackByWP: Record<string, string> = {
-        log_dip: 'jerk_dip', log_drive: 'push_press', log_lockout: 'pin_press', log_clean: 'rdl',
-        yoke_pickup: 'pause_squat', yoke_walk: 'sandbag_carry', yoke_turn: 'side_plank',
-        farmers_pickup: 'deadlift', farmers_carry: 'farmers_walk_heavy', farmers_grip: 'plate_pinch',
-        stone_off_floor: 'deficit_pull', stone_lap: 'front_squat', stone_load: 'push_press',
-        grip_support: 'plate_pinch', core_brace: 'sandbag_carry', conditioning: 'sled_push_sprint',
-      };
-      const KNOWN = new Set(Object.values(fallbackByWP));
-      if (!corrId || corrId.length < 2 || /[А-Яа-я]/.test(corrId) || !KNOWN.has(corrId)) {
-        corrId = fallbackByWP[wp] || corrId;
+      if (!corrId || corrId.length < 2 || /[А-Яа-я]/.test(corrId) || !KNOWN_SM_CORR_IDS.has(corrId)) {
+        corrId = SM_FALLBACK_BY_WP[wp] || corrId;
       }
       // if still cyrillic, fallback
       if (!corrId || /[А-Яа-я]/.test(corrId)) corrId = 'farmers_walk_heavy';
