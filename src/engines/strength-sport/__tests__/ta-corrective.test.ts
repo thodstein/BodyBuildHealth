@@ -106,6 +106,28 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     expect(lines.length).toBeGreaterThanOrEqual(3);
     for (const l of lines) expect(l).toMatch(/@/);
   });
+  it('C6: каждый из 22 тегов ошибок имеет ≥1 упражнение', () => {
+    for (const tag of Object.keys(TA_ERROR_TAG_RU) as Array<keyof typeof TA_ERROR_TAG_RU>) {
+      expect(correctivesByError(tag).length, tag).toBeGreaterThanOrEqual(1);
+    }
+  });
+  it('C6: гигиена библиотеки — имена уникальны, протоколы в коридорах', () => {
+    const names = TA_CORRECTIVES.map((e) => e.nameRu);
+    expect(new Set(names).size).toBe(names.length);
+    for (const e of TA_CORRECTIVES) {
+      expect(e.causes.length, `${e.id}/causes`).toBeGreaterThanOrEqual(1);
+      expect(e.protocol.sets, `${e.id}/sets`).toBeGreaterThanOrEqual(1);
+      expect(e.protocol.sets, `${e.id}/sets`).toBeLessThanOrEqual(6);
+      expect(e.protocol.reps, `${e.id}/reps`).toBeGreaterThanOrEqual(1);
+      expect(e.protocol.reps, `${e.id}/reps`).toBeLessThanOrEqual(10);
+      expect(e.protocol.pct, `${e.id}/pct`).toBeGreaterThanOrEqual(20);
+      expect(e.protocol.pct, `${e.id}/pct`).toBeLessThanOrEqual(110);
+      expect(e.protocol.rir, `${e.id}/rir`).toBeGreaterThanOrEqual(0);
+      expect(e.protocol.rir, `${e.id}/rir`).toBeLessThanOrEqual(4);
+      expect(e.protocol.restSeconds, `${e.id}/rest`).toBeGreaterThanOrEqual(60);
+      expect(e.protocol.restSeconds, `${e.id}/rest`).toBeLessThanOrEqual(300);
+    }
+  });
   it('паритет с ранжиром: топ-3 каждой фазы × каждой причины — в библиотеке', () => {
     const causes: Array<TAWeakCause | null> = [null, 'volume', 'technique', 'mobility', 'fatigue', 'strength'];
     for (const wp of allWLWeakPoints()) {
