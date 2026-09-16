@@ -69,3 +69,39 @@ export function doseLabel(d: ArmDose): string {
   if (d.adjusted) parts.push(`(${d.note})`);
   return parts.join(' · ');
 }
+
+const CAUSE_IDS = ['volume', 'technique', 'mobility', 'fatigue', 'strength'] as const;
+
+export interface BridgeDose {
+  causes: Record<string, ArmWeakCause>;
+  rankedIds: Record<string, string[]>;
+}
+
+/**
+ * Мост хаб → конструктор: вынимает causes + rankedIds из payload моста.
+ * Честная валидация: мусор (не-канон cause, не-строки) отбрасывается;
+ * пусто/битый payload → null (приёмник идёт базовым путём).
+ */
+export function bridgeDoseFromPayload(data: unknown): BridgeDose | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  const causes: Record<string, ArmWeakCause> = {};
+  const wc = d.armWeakCauses;
+  if (wc && typeof wc === 'object') {
+    for (const [wp, v] of Object.entries(wc as Record<string, unknown>)) {
+      const c = (v as Record<string, unknown> | null)?.cause;
+      if (typeof c === 'string' && (CAUSE_IDS as readonly string[]).includes(c)) causes[String(wp)] = c as ArmWeakCause;
+    }
+  }
+  const rankedIds: Record<string, string[]> = {};
+  const ri = d.armRankedIds;
+  if (ri && typeof ri === 'object') {
+    for (const [wp, v] of Object.entries(ri as Record<string, unknown>)) {
+      if (!Array.isArray(v)) continue;
+      const ids = v.filter((s) => typeof s === 'string' && s).map(String).slice(0, 8);
+      if (ids.length) rankedIds[String(wp)] = ids;
+    }
+  }
+  if (!Object.keys(causes).length && !Object.keys(rankedIds).length) return null;
+  return { causes, rankedIds };
+}

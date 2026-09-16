@@ -98,6 +98,12 @@ dayTags — TableCup/TableTech/Hammer/SidePress/BackPress/GripHeavy и др.
   из `doseForCause` (targetSets спец-блока приоритетнее dose.sets; без causes — база);
   пометка «доза: …» в comment/notes; паритет в симуляторе; проводка causes из хаба
   и таба; lock-тесты (база/fatigue/strength/сим-инъекция).
-- Проверено: hub 49/49 + p0 35/35 + injection 7/7 + parity 147/147 + dose 6/6 + phase 19/19;
-  движки `src/engines/arm` 948/948 (79 файлов); арм-UI 160/160 (22 файла);
-  `verify:apk-design` OK; `tsc --noEmit` 0 по всему проекту.
+- Доза в мост конструктора ✅: хаб аттачит `armRankedIds` в payload (прецедент armMatchup;
+  `armWeakCauses` уже нес мост); NEW `bridgeDoseFromPayload` (валидация, мусор → null);
+  приёмник `ArmAutoConstructor` — персист `he_arm_last_causes/rankedids` только на свежий
+  мост точек + чтение в инъекцию + чистка на «✕ Сбросить»; без ключей — базовый путь.
+  Lock-тесты (валидный/мусор/сквозной мост→план).
+- Проверено: hub 49/49 + p0 35/35 + injection 7/7 + parity 147/147 + dose 6/6 + phase 22/22
+  + bridge/discipline/ortho/wizard/top 29/29; движки `src/engines/arm` 948/948 (79 файлов);
+  арм-UI 160/160 (22 файла); `verify:apk-design` OK; `tsc` 0 по своим
+  (ошибки — чужие активные WIP bb/sm, не тронуты).

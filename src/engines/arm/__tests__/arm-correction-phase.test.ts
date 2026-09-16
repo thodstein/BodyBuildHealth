@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { bridgeDoseFromPayload } from '../arm-correction-dose.engine';
 import { rankCorrectionsForArm } from '../arm-correction-rank.engine';
 import { suggestWeakPointsForTrack } from '../arm-video-analysis.engine';
 import { simulateArmInjection } from '../arm-simulator.engine';
@@ -19,6 +20,13 @@ function planExerciseIds(plan: any): string[] {
   for (const w of plan.weeks || []) for (const s of w.sessions || []) for (const e of s.exercises || []) if (e.exerciseId) out.push(String(e.exerciseId));
   return out;
 }
+
+const findInjected = (plan: any, ids: string[]) => {
+  for (const w of plan.weeks || []) for (const s of w.sessions || []) for (const e of s.exercises || []) {
+    if (e.exerciseId && ids.includes(String(e.exerciseId)) && String(e.rationale || '').startsWith('Коррекция мёртвой точки')) return e;
+  }
+  return null;
+};
 
 describe('arm P2 failurePoint', () => {
   it('без фазы — базовый топ-1', () => {
@@ -58,6 +66,37 @@ describe('arm P4 video→точка', () => {
   });
 });
 
+describe('arm мост дозы в конструктор', () => {
+  it('валидный payload → causes + rankedIds', () => {
+    const bd = bridgeDoseFromPayload({
+      armWeakCauses: { cup_hold: { cause: 'fatigue', confidence: 0.7, fix: 'x' } },
+      armRankedIds: { cup_hold: ['wrist_curl_belt', 'riser_lift'] },
+    })!;
+    expect(bd.causes).toEqual({ cup_hold: 'fatigue' });
+    expect(bd.rankedIds).toEqual({ cup_hold: ['wrist_curl_belt', 'riser_lift'] });
+  });
+  it('мусор отбрасывается, пусто → null', () => {
+    expect(bridgeDoseFromPayload(null)).toBeNull();
+    expect(bridgeDoseFromPayload({})).toBeNull();
+    const bd = bridgeDoseFromPayload({
+      armWeakCauses: { cup_hold: { cause: 'nope' }, side_mid: { cause: 'strength' } },
+      armRankedIds: { cup_hold: ['a', 42, ''], side_mid: 'oops' },
+    })!;
+    expect(bd.causes).toEqual({ side_mid: 'strength' });
+    expect(bd.rankedIds).toEqual({ cup_hold: ['a'] });
+  });
+  it('доза из моста применяется в план (сквозной)', () => {
+    const bd = bridgeDoseFromPayload({
+      armWeakCauses: { cup_hold: { cause: 'fatigue', confidence: 0.7, fix: 'x' } },
+      armRankedIds: { cup_hold: ['wrist_curl_behind'] },
+    })!;
+    const r = injectArmCorrections(testPlan(), ['cup_hold'] as any, { weekIdxs: [0], ...bd });
+    const ex = findInjected(r.plan, ARM_CORRECTIONS.cup_hold.exercises)!;
+    expect(ex.exerciseId).toBe('wrist_curl_behind');
+    expect(ex.sets).toBe(2);
+  });
+});
+
 describe('arm П.1 ранжир едет в план', () => {
   it('без rankedIds — первый из базы', () => {
     const r = injectArmCorrections(testPlan(), ['pron_open'] as any, { weekIdxs: [0] });
@@ -73,12 +112,6 @@ describe('arm П.1 ранжир едет в план', () => {
 });
 
 describe('arm доза по причине применяется в план', () => {
-  const findInjected = (plan: any, ids: string[]) => {
-    for (const w of plan.weeks || []) for (const s of w.sessions || []) for (const e of s.exercises || []) {
-      if (e.exerciseId && ids.includes(String(e.exerciseId)) && String(e.rationale || '').startsWith('Коррекция мёртвой точки')) return e;
-    }
-    return null;
-  };
   it('без causes — база (3×, RIR базы)', () => {
     const r = injectArmCorrections(testPlan(), ['cup_hold'] as any, { weekIdxs: [0] });
     const ex = findInjected(r.plan, ARM_CORRECTIONS.cup_hold.exercises)!;

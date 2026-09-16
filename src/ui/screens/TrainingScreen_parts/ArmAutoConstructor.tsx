@@ -17,6 +17,7 @@ import { buildArmPrintHtml, buildArmIcs } from '../../../engines/arm/arm-export.
 import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
+import { bridgeDoseFromPayload } from '../../../engines/arm/arm-correction-dose.engine';
 import { injectArmliftCorrections, applyArmliftSpecWave, type ArmliftInjectionItem } from '../../../engines/arm/armlift-injection.engine';
 import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
 import { PLATFORM_WR, planAttempts, platformWrFor, platformIsInternal } from '../../../engines/arm/arm-platform.engine';
@@ -599,6 +600,17 @@ export function ArmAutoConstructor() {
         setSpecialization(true);
         setStep('params');
         flash(`↩ Мёртвые точки: ${clean.join(', ')}`);
+        // доза из диагностики (causes + порядок ранжира) — свежий мост перезаписывает
+        try {
+          const bd = bridgeDoseFromPayload(payload.data);
+          if (bd) {
+            localStorage.setItem('he_arm_last_causes', JSON.stringify(bd.causes));
+            localStorage.setItem('he_arm_last_rankedids', JSON.stringify(bd.rankedIds));
+          } else {
+            localStorage.removeItem('he_arm_last_causes');
+            localStorage.removeItem('he_arm_last_rankedids');
+          }
+        } catch {}
       } else if (Array.isArray(payload.data?.armBiomechCards) && payload.data.armBiomechCards.length) {
         const fromCards = (payload.data.armBiomechCards as any[]).map((c:any)=> String(c.weakPoint)).slice(0,3) as ArmWeakPoint[];
         if (fromCards.length) setDiagWeakPoints(fromCards);
@@ -999,7 +1011,15 @@ export function ArmAutoConstructor() {
       try {
         const toInject: ArmWeakPoint[] = diagWeakPoints.length ? diagWeakPoints : (()=>{ try{ const raw=localStorage.getItem('he_arm_last_weakpoints'); if(raw){ const arr=JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr as ArmWeakPoint[]; } } catch{} return []; })();
         if (toInject.length) {
-          const inj = injectArmCorrections(plan, toInject as ArmWeakPoint[], { level, workMax });
+          // доза из диагностики (нет ключей — базовый путь)
+          const doseOpts: { causes?: Record<string, any>; rankedIds?: Record<string, string[]> } = {};
+          try {
+            const cRaw = localStorage.getItem('he_arm_last_causes');
+            const rRaw = localStorage.getItem('he_arm_last_rankedids');
+            if (cRaw) { const c = JSON.parse(cRaw); if (c && typeof c === 'object') doseOpts.causes = c; }
+            if (rRaw) { const r = JSON.parse(rRaw); if (r && typeof r === 'object') doseOpts.rankedIds = r; }
+          } catch {}
+          const inj = injectArmCorrections(plan, toInject as ArmWeakPoint[], { level, workMax, ...doseOpts });
           plan = inj.plan;
           if (inj.injected>0) plan.rationale = [...(plan.rationale||[]), `Инъекция мёртвых точек: ${inj.notes.join(' · ')}`];
         }
@@ -1245,7 +1265,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 ))}
               </div>
               <div className="ad-row">
-                <AdBtn variant="dark" onClick={()=>{ setDiagWeakPoints([]); try{ localStorage.removeItem('he_arm_last_weakpoints'); } catch{} }}>✕ Сбросить мёртвые точки</AdBtn>
+                <AdBtn variant="dark" onClick={()=>{ setDiagWeakPoints([]); try{ localStorage.removeItem('he_arm_last_weakpoints'); localStorage.removeItem('he_arm_last_causes'); localStorage.removeItem('he_arm_last_rankedids'); } catch{} }}>✕ Сбросить мёртвые точки</AdBtn>
                 <span className="ad-muted">Инъекция: per-day dedup, budget 85, humerus guard</span>
               </div>
             </AdBanner>

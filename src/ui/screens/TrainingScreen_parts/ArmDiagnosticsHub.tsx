@@ -993,6 +993,17 @@ export const ArmDiagnosticsHub: React.FC = () => {
       // PRO-3 P4: red-flags скрининга — в конструктор
       redFlags: (() => { try { return loadRedFlags(); } catch { return []; } })(),
     });
+    // доза в мост: порядок ранжира по точкам (приёмник применит + дозу по armWeakCauses)
+    try {
+      const ranked: Record<string, string[]> = {};
+      for (const wp of weakPoints || []) {
+        const top = ((armTop3P0 as any)?.[wp] || []).map((t: any) => String(t.id));
+        const rest = ((ARM_CORRECTIONS as any)?.[wp]?.exercises || []).map(String);
+        const order = [...top, ...rest].filter((v, i, a) => a.indexOf(v) === i);
+        if (order.length) ranked[wp] = order;
+      }
+      if (Object.keys(ranked).length) (payload as any).armRankedIds = ranked;
+    } catch { /* noop */ }
     // TOP: матчап + Table-IQ едут в конструктор тем же payload (аддитивно)
     try {
       (payload as any).armMatchup = { oppStyle: muState.opp, oppHand: muState.hand, weightDeltaKg: parseFloat(muState.wd) || 0 };
