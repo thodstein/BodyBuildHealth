@@ -282,6 +282,10 @@ function allocateExperiencedBackSession(session: any, week: any, options: BBFina
     const added: any = structuredClone(template);
     added.name = candidate.name;
     added.exerciseName = candidate.name;
+    // Аудит Sep 2026 (качество цикла): не тащим чужой профиль/комментарий
+    // лид-упражнения — enrich достроит инструкции по собственному имени.
+    added.executionProfile = undefined;
+    added.comment = undefined;
     added.movementPattern = tagged.movementPattern;
     added.backSubgroup = tagged.backSubgroup;
     added.role = 'primary';
@@ -328,6 +332,9 @@ function allocateExperiencedBackSession(session: any, week: any, options: BBFina
       const added: any = structuredClone(template);
       added.name = candidate.name;
       added.exerciseName = candidate.name;
+      // Аудит Sep 2026: чужой профиль/комментарий не переносим (enrich пересоберёт).
+      added.executionProfile = undefined;
+      added.comment = undefined;
       added.movementPattern = candidatePattern;
       added.backSubgroup = annotateBackExercise({ ...template, name: candidate.name } as any).backSubgroup;
       added.role = 'primary';
@@ -1289,10 +1296,12 @@ function ensureArmHeadCoverage(session: any, week: any, options: BBFinalizeOptio
           const take = Math.min(must.sets - 3, 2);
           must.sets -= take;
           if (Array.isArray(must.workSets) && must.workSets.length > must.sets) must.workSets = must.workSets.slice(0, must.sets);
-          const template = session.exercises[0];
           const sample = must.workSets?.[0] || { reps: 12, rir: 3, weight: 0, restSeconds: 60 };
+          // Аудит Sep 2026 (качество цикла): раньше слот строился spread'ом
+          // session.exercises[0] — новый слот наследовал ЧУЖОЙ executionProfile
+          // (комментарий получал «Паттерн/Технику» лид-упражнения). Профиль
+          // достраивает enrich-проход по собственному имени.
           session.exercises.push({
-            ...template,
             muscle,
             name: candidate.name,
             exerciseName: candidate.name,
@@ -2403,6 +2412,9 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
                   exerciseName: candidate.name,
                   role: 'accessory',
                   character: 'памп',
+                  // Аудит Sep 2026: чужой executionProfile шаблона не переносим —
+                  // enrich достроит инструкции по собственному имени.
+                  executionProfile: undefined,
                   sets: 3,
                   repsRange: [12, 15],
                   rir: 1,
@@ -3590,7 +3602,6 @@ for (const week of next.weeks) {
             } else {
               // Вертикальной тяги нет вообще — добавляем (с учётом оборудования
               // и bodyweight-капабилити), но не более одной на сессию.
-              const template = s.exercises[0];
               const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
   const equipmentOk = (c: any) => {
     if (!options.equipment?.length) return true;
@@ -3607,19 +3618,29 @@ for (const week of next.weeks) {
                 ? pool.find((x: any) => equipmentOk(x) && !/с подхватом|широким хватом|узким/i.test(x.name || '')) || pool.find((x: any) => equipmentOk(x))
                 : null)
                 || pool2.find((x: any) => equipmentOk(x));
-              if (template && pull) {
+              // Аудит Sep 2026 (качество цикла): и заменённый слот, и добавленный
+              // строятся с весом ОТ workMax спины (раньше spread шаблона тащил
+              // вес чужого упражнения и чужой executionProfile).
+              const pullWeight = Math.max(5, Math.round((options.workMax?.back || 60) * 0.5 * 10) / 10);
+              const pullSets = (n: number) => Array.from({ length: n }, () => ({ reps: 10, rir: 3, weight: pullWeight, restSeconds: 60 }));
+              if (pull) {
                 let placed = false;
                 if (working.length >= maxEx) {
                   // Лимит упражнений исчерпан: заменяем мелкую изоляцию
                   // (calves/forearms/abs/traps до 3 сетов) на vertical pull.
-                  const repIdx = s.exercises.findIndex((x: any) => !(x as any).warmupActivator && /calves|forearms|abs|traps/.test(x.muscle) && (x.sets || 0) <= 3 && x !== template);
+                  const repIdx = s.exercises.findIndex((x: any) => !(x as any).warmupActivator && /calves|forearms|abs|traps/.test(x.muscle) && (x.sets || 0) <= 3);
                   if (repIdx >= 0) {
                     const old = s.exercises[repIdx];
                     const oldSets = old.sets || 0;
                     const newSets = Math.max(deficit, oldSets);
                     Object.assign(old, {
-                      ...template, name: (pull as any).name, exerciseName: (pull as any).name,
+                      name: (pull as any).name, exerciseName: (pull as any).name,
                       muscle: 'back', role: 'accessory', character: 'памп', sets: newSets,
+                      repsRange: [8, 12], rir: 3, restSeconds: 60,
+                      workSets: pullSets(newSets),
+                      // Чужие хвосты шаблона/старого слота не переносим.
+                      supersetWith: undefined, supersetGroup: undefined, supersetSlot: undefined,
+                      techniqueTag: undefined, optional: false, executionProfile: undefined,
                       comment: 'Баланс ширины спины: замена мелкой изоляции на vertical pull',
                     });
                     sesSets += newSets - oldSets;
@@ -3628,8 +3649,10 @@ for (const week of next.weeks) {
                 }
                 if (!placed && working.length < maxEx && sesSets + deficit <= maxSessionSets) {
                   s.exercises.push({
-                    ...template, name: (pull as any).name || 'Подтягивания', exerciseName: (pull as any).name || 'Подтягивания',
-                    muscle: 'back', role: 'accessory', character: 'памп', sets: deficit,
+                    muscle: 'back', name: (pull as any).name || 'Подтягивания', exerciseName: (pull as any).name || 'Подтягивания',
+                    role: 'accessory', character: 'памп', sets: deficit,
+                    repsRange: [8, 12], rir: 3, restSeconds: 60, warmupSets: [],
+                    workSets: pullSets(deficit),
                     comment: 'Баланс ширины спины: vertical pull (подтягивания/верхний блок)',
                   } as any);
                   sesSets += deficit;
@@ -3729,19 +3752,24 @@ for (const week of next.weeks) {
           return true;
         });
         if (!candidate) continue;
-        const added: any = structuredClone(template);
-        added.muscle = muscle;
-        added.name = candidate.name;
-        added.exerciseName = candidate.name;
-        added.role = 'accessory';
-        added.sets = addSets;
-        const sample = template.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
-        added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
-        if (isOptionalSmall) {
-          added.optional = true;
-          added.comment = 'Опционально — при наличии сил и времени.';
-        }
-        session.exercises.push(added);
+        // Аудит Sep 2026 (качество цикла): раньше — `structuredClone(session.exercises[0])`,
+        // и добор наследовал ВЕС/повторы/профиль лид-упражнения (fill предплечий
+        // получал вес и инструкции приседа — 153% ПМ, «приседательный паттерн»).
+        // Теперь слот строится заново: вес от workMax СВОЕЙ мышцы, профиль
+        // достраивает enrich-проход по собственному имени.
+        const isCompoundCand = String((candidate as any).type || '') === 'compound';
+        const addWeight = Math.max(5, Math.round((options.workMax?.[muscle] || 40) * (isCompoundCand ? 0.5 : 0.3) * 10) / 10);
+        const addReps = isCompoundCand ? 10 : 15;
+        session.exercises.push({
+          muscle, name: candidate.name, exerciseName: candidate.name,
+          role: 'accessory', character: 'памп',
+          sets: addSets, repsRange: isCompoundCand ? [8, 12] : [12, 20],
+          rir: 3, restSeconds: 60, warmupSets: [],
+          workSets: Array.from({ length: addSets }, () => ({ reps: addReps, rir: 3, weight: addWeight, restSeconds: 60 })),
+          ...(isOptionalSmall
+            ? { optional: true, comment: 'Опционально — при наличии сил и времени.' }
+            : { rationale: `Добор малой/выпавшей группы ${muscle}: ${addSets}×${addReps} RIR 3 (MEV-гарантия)` }),
+        } as any);
         present.add(muscle);
       }
       }

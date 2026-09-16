@@ -187,6 +187,38 @@ export function cycleTemplateToFullProgram(cycle: SRCycleTemplate): FullProgram 
   // Базовые недели из week1 (SRDaySpec[])
   const baseWeek1 = week1 || [];
 
+  /**
+   * Аудит Sep 2026 (качество цикла): источники описывают упражнение НЕСКОЛЬКИМИ
+   * сетами-спеками (`sets: [{pct,reps,sets}, …]` — разминочный/лёгкий + рабочие),
+   * а конвертер брал ТОЛЬКО первый спек и терял объём/проценты:
+   *   bench `[{0.4,12,1},{0.6,10,4}]` → sets=1 @40% (в плане 2 сета на 40%).
+   * Теперь: суммарные сеты сохраняются, схема `%×reps` уезжает в `notes`, где её
+   * читает canonical `parseWorkSetSpecs` (та же нотация, что 5/3/1-схемы) →
+   * каждый спек = свои work-сеты с честным % от ПМ (не мышечный fallback по RIR).
+   * RIR недели/делод применяются к каждому спеку (как и было задумано умершим
+   * `finalPct`).
+   */
+  const buildSrExercise = (srEx: SRExerciseSpec, weekRir: number, isDeload: boolean) => {
+    const specs = (srEx.sets && srEx.sets.length ? srEx.sets : [{ pct: 0.6, reps: 10, sets: 3 }]);
+    const totalSets = Math.max(1, specs.reduce((a, sp) => a + (sp.sets || 0), 0) || 3);
+    const mainSpec = specs[specs.length - 1];
+    const rirAdjustment = (3 - weekRir) * 0.025; // RIR 3→0%, 2→+2.5%, 1→+5%, 0→+7.5%
+    const scheme = specs.map(sp => {
+      const adjustedPct = Math.min(0.95, (sp.pct ?? 0.6) + rirAdjustment);
+      const finalPct = isDeload ? adjustedPct * 0.7 : adjustedPct;
+      return `${Math.round(finalPct * 100)}%×${sp.reps ?? 10}`;
+    }).join(', ');
+    return {
+      name: srEx.name,
+      sets: totalSets,
+      reps: String(mainSpec.reps ?? 10),
+      rpe: Math.round(10 - weekRir), // RPE = 10 - RIR
+      rir: weekRir,
+      restSec: srEx.load === 'Тяжелая' ? 180 : srEx.load === 'Средняя' ? 120 : 90,
+      notes: [srEx.load ? `Нагрузка: ${srEx.load}` : '', `${scheme} (от ПМ)`].filter(Boolean).join(' · '),
+    };
+  };
+
   for (let w = 1; w <= totalWeeks; w++) {
     const isDeload = deloadWeeks.has(w);
     // RIR для этой недели: линейно от start к end
@@ -201,31 +233,10 @@ export function cycleTemplateToFullProgram(cycle: SRCycleTemplate): FullProgram 
       const dayNum = dayIdx + 1;
       const dayName = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'][dayIdx] || `День ${dayIdx + 1}`;
 
-      const exercises = srDay.exercises.map(srEx => {
-        // Базовый процент из первого сета
-        const baseSet = srEx.sets?.[0];
-        const basePct = baseSet?.pct ?? 0.6;
-        const baseReps = baseSet?.reps ?? 10;
-        const baseSets = baseSet?.sets ?? 3;
-
-        // Адаптируем процент под RIR недели (чем ниже RIR, тем выше %)
-        const rirAdjustment = (3 - weekRir) * 0.025; // RIR 3→60%, RIR 2→62.5%, RIR 1→65%, RIR 0→67.5%
-        const adjustedPct = Math.min(0.95, basePct + rirAdjustment);
-
-        // На разгрузке снижаем процент
-        const finalPct = isDeload ? adjustedPct * 0.7 : adjustedPct;
-
-        return {
-          name: srEx.name,
-          sets: baseSets,
-          reps: String(baseReps),
-          rpe: Math.round(10 - weekRir), // RPE = 10 - RIR
-          rir: weekRir,
-          restSec: srEx.load === 'Тяжелая' ? 180 : srEx.load === 'Средняя' ? 120 : 90,
-          notes: srEx.load ? `Нагрузка: ${srEx.load}` : '',
-          progression: w < totalWeeks ? `+${Math.round(correctionPct * 100)}% к весу след. неделю` : 'Финальная неделя',
-        };
-      });
+      const exercises = srDay.exercises.map(srEx => ({
+        ...buildSrExercise(srEx, weekRir, isDeload),
+        progression: w < totalWeeks ? `+${Math.round(correctionPct * 100)}% к весу след. неделю` : 'Финальная неделя',
+      }));
 
       return {
         day: dayNum,
@@ -265,25 +276,10 @@ export function cycleTemplateToFullProgram(cycle: SRCycleTemplate): FullProgram 
       const days: ProgramDay[] = srDays.map((srDay, dayIdx) => {
         const dayNum = dayIdx + 1;
         const dayName = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'][dayIdx] || `День ${dayIdx + 1}`;
-        const exercises = srDay.exercises.map(srEx => {
-          const baseSet = srEx.sets?.[0];
-          const basePct = baseSet?.pct ?? 0.6;
-          const baseReps = baseSet?.reps ?? 10;
-          const baseSets = baseSet?.sets ?? 3;
-          const rirAdjustment = (3 - weekRir) * 0.025;
-          const adjustedPct = Math.min(0.95, basePct + rirAdjustment);
-          const finalPct = isDeload ? adjustedPct * 0.7 : adjustedPct;
-          return {
-            name: srEx.name,
-            sets: baseSets,
-            reps: String(baseReps),
-            rpe: Math.round(10 - weekRir),
-            rir: weekRir,
-            restSec: srEx.load === 'Тяжелая' ? 180 : srEx.load === 'Средняя' ? 120 : 90,
-            notes: srEx.load ? `Нагрузка: ${srEx.load}` : '',
-            progression: `Неделя ${weekNumber} (explicit)`,
-          };
-        });
+        const exercises = srDay.exercises.map(srEx => ({
+          ...buildSrExercise(srEx, weekRir, isDeload),
+          progression: `Неделя ${weekNumber} (explicit)`,
+        }));
         return {
           day: dayNum,
           name: `${dayName} (нед ${weekNumber})`,
