@@ -63,6 +63,8 @@ export interface SMWeakCauseInput {
   gripLimitsCarry?: boolean | null;
   /** P7: YBT anterior-асимметрия низа, см. */
   ybtAntAsymCm?: number | null;
+  /** P7-UQ: YBT-UQ асимметрия верха (для лог-фаз), см. */
+  ybtUqAsymCm?: number | null;
 }
 
 export interface SMWeakCauseResult {
@@ -104,6 +106,10 @@ export function diagnoseSMWeakCause(input: SMWeakCauseInput): SMWeakCauseResult 
   // P7: YBT-асимметрия — mobility-сигнал для чувствительных фаз
   const ybtBad = mobSensitive && input.ybtAntAsymCm != null && (input.ybtAntAsymCm as number) > 4;
   if (ybtBad) signals.push(`YBT Δ${input.ybtAntAsymCm}см >4`);
+  // P7-UQ: верхняя асимметрия — mobility-сигнал только лог-фаз (штанга над головой)
+  const isLogZone = zone === 'log_clean' || zone === 'log_dip' || zone === 'log_drive' || zone === 'log_lockout';
+  const ybtUqBad = isLogZone && input.ybtUqAsymCm != null && (input.ybtUqAsymCm as number) > 4;
+  if (ybtUqBad) signals.push(`YBT-UQ Δ${input.ybtUqAsymCm}см >4`);
   const asymBad = input.asymmetryPct != null && input.asymmetryPct >= 7;
   if (asymBad && (isGripZone(zone) || zone === 'stone_off_floor')) signals.push(`асимметрия ${input.asymmetryPct}%`);
 
@@ -120,7 +126,7 @@ export function diagnoseSMWeakCause(input: SMWeakCauseInput): SMWeakCauseResult 
   let cause: SMWeakCause = 'technique';
   let confidence: 'high' | 'med' | 'low' = 'low';
   const gripSignal = (isGripZone(zone) && gripBad) || carryZone;
-  const mobSignal = mobBad || ybtBad;
+  const mobSignal = mobBad || ybtBad || ybtUqBad;
   if (gripSignal && (asymBad || e1rmBad || volBad)) {
     cause = 'grip';
     confidence = 'high';

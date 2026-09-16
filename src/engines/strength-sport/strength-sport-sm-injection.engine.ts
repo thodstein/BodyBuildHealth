@@ -128,7 +128,8 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
       ? opts.weekIdxs.filter((wi) => Number.isInteger(wi) && wi >= 0)
       : [0];
     const multiWeek = weekIdxs.length > 1;
-    // L/R-добивка: +1 сет слабой стороне (хаб шлёт только grip-фазы при асимметрии ≥7%).
+    // L/R-добивка: +1 сет слабой стороне (хаб шлёт grip-фазы при хват-асимметрии ≥7%
+    // + farmers_carry при чемодан-асимметрии ≥7% — односторонний suitcase-топ-ап).
     const uniSide = opts.unilateralBoost?.[wp];
     const uni = uniSide === 'left' || uniSide === 'right' ? uniSide : null;
     const uniMark = uni ? ` +1 слаб. ${uni === 'left' ? 'слева' : 'справа'}` : '';

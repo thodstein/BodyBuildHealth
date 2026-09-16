@@ -164,6 +164,7 @@ type SMState = {
   strideLengthM: string;
   strideRateHz: string;
   stanceS: string;
+  run20mS: string;
   carryTurnS: string;
   turnDrop: boolean;
   gripRunSec: string;
@@ -212,7 +213,7 @@ const DEFAULT_STATE: SMState = {
   herculesSec: '', herculesKg: '', medleyDrops: '',
   yMaxCm: '',
   stoneGripS: '', stonePeakWeek: false, stoneZeroLap: false, stonePull2Style: '', daysToStart: '',
-  strideLengthM: '', strideRateHz: '', stanceS: '', carryTurnS: '', turnDrop: false,
+  strideLengthM: '', strideRateHz: '', stanceS: '', run20mS: '', carryTurnS: '', turnDrop: false,
   gripRunSec: '', gripDrops: '', pickupMs: '',
   stoneRepLatePull1S: '', stoneRepLateLapS: '', stoneRepLatePull2S: '',
   tyrePull2S: '', suitcaseLeftS: '', suitcaseRightS: '',
@@ -674,13 +675,18 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         pickupMs: parseFloat(state.pickupMs) > 0 ? parseFloat(state.pickupMs) : null,
       })?.gripLimitsCarry ?? null;
     } catch { /* noop */ }
+    let ybtUqAsymCm: number | null = null;
     try {
-      ybtAntAsymCm = diagnoseYBT({
+      const ybt = diagnoseYBT({
         antLeftCm: parseFloat(state.ybtAntL) > 0 ? parseFloat(state.ybtAntL) : null,
         antRightCm: parseFloat(state.ybtAntR) > 0 ? parseFloat(state.ybtAntR) : null,
-      })?.antAsymCm ?? null;
+        uqLeftCm: parseFloat(state.ybtUqL) > 0 ? parseFloat(state.ybtUqL) : null,
+        uqRightCm: parseFloat(state.ybtUqR) > 0 ? parseFloat(state.ybtUqR) : null,
+      });
+      ybtAntAsymCm = ybt?.antAsymCm ?? null;
+      ybtUqAsymCm = ybt?.uqAsymCm ?? null;
     } catch { /* noop */ }
-    return { gripLimitsCarry, ybtAntAsymCm };
+    return { gripLimitsCarry, ybtAntAsymCm, ybtUqAsymCm };
   })();
   const smCauses = useMemo(() => smWeakPoints.map((wp) => {
     const liftKey = smLiftKeyForWeakPoint(wp as string);
@@ -697,6 +703,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       asymmetryPct: asymmetry?.diff ?? null,
       gripLimitsCarry: movementCauseSignals.gripLimitsCarry,
       ybtAntAsymCm: movementCauseSignals.ybtAntAsymCm,
+      ybtUqAsymCm: movementCauseSignals.ybtUqAsymCm,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [smWeakPoints, diaryWeaks, acwr, vbtLoss, ohs.failed, gripFails, swayCm, asymmetry, weeklySetsByLift, state.farmersHoldSec, state.gripRunSec, state.gripDrops, state.pickupMs, state.ybtAntL, state.ybtAntR, state.ybtPmL, state.ybtPmR, state.ybtPlL, state.ybtPlR, state.ybtLegLen, state.ybtUqL, state.ybtUqR]);
@@ -740,27 +747,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     try { return smCorrectiveExportLines(smWeakPoints as any, smCauseByPhase as any); } catch { return []; }
   }, [smWeakPoints, smCauseByPhase]);
   // ── SM corrective hints: замер → тег → топ-упражнение (sway/VBT/асимметрия/OHS) ──
-  const smMetricTags = useMemo(() => {
-    try {
-      return smTagsForMetrics({
-        swayCm,
-        vbtLossPct: vbtLoss?.lossPct ?? null,
-        asymmetryPct: asymmetry?.diff ?? null,
-        ohsFailed: ohs.failed,
-      });
-    } catch { return []; }
-  }, [swayCm, vbtLoss, asymmetry, ohs.failed]);
-  const smMetricTops = useMemo(() => {
-    const out: Array<{ tag: string; name: string; dose: string }> = [];
-    for (const tag of smMetricTags.slice(0, 4)) {
-      try {
-        const top = correctivesForSMWeakPoint(tag as any, { cause: (smCauseByPhase as Record<string, any>)[tag] ?? null });
-        const c = top[0];
-        if (c) out.push({ tag, name: c.target, dose: `${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}%` });
-      } catch { /* noop */ }
-    }
-    return out;
-  }, [smMetricTags, smCauseByPhase]);
+  // (smMetricTags/smMetricTops — ниже, после movement-мемов: им нужны диагнозы P1–P8)
   const logDipDiag = useMemo(() => {
     const d = parseFloat(state.logDipCm);
     if (!Number.isFinite(d) || !d) return null;
@@ -888,8 +875,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     stanceS: numOrNull(state.stanceS),
     loadKg: numOrNull(state.yokeKg) ?? numOrNull(state.farmersKg),
     bodyweightKg: bwKg,
-    split20mS: numOrNull(state.progYoke20m),
-  }), [state.yokeKg, state.farmersKg, state.strideLengthM, state.strideRateHz, state.stanceS, state.progYoke20m, bwKg]);
+    // факт текущего заступа; фолбэк — лучший прогресс (совместимость старых сторов)
+    split20mS: numOrNull(state.run20mS) ?? numOrNull(state.progYoke20m),
+  }), [state.yokeKg, state.farmersKg, state.strideLengthM, state.strideRateHz, state.stanceS, state.run20mS, state.progYoke20m, bwKg]);
   const carryTurnDiag = useMemo(() => diagnoseCarryTurn(
     numOrNull(state.carryTurnS), state.turnDrop || null,
   ), [state.carryTurnS, state.turnDrop]);
@@ -933,6 +921,37 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     if (sideHopDiag) out.push(sideHopDiag.text);
     return out.length ? out : null;
   }, [stoneLapDiag, stoneFatigueDiag, carryLocoDiag, carryTurnDiag, gripCarryDiag, logWindowDiag, tyreDiag, suitcaseDiag, ybtDiag, sideHopDiag]);
+  // ── SM corrective hints: movement-метрики → теги → топ-упражнение (мемы выше, TDZ-ок) ──
+  const smMetricTags = useMemo(() => {
+    try {
+      return smTagsForMetrics({
+        swayCm,
+        vbtLossPct: vbtLoss?.lossPct ?? null,
+        asymmetryPct: asymmetry?.diff ?? null,
+        ohsFailed: ohs.failed,
+        stoneLapS: numOrNull(state.stoneLapS),
+        stoneZeroLap: state.stoneZeroLap || null,
+        carryTurnS: numOrNull(state.carryTurnS),
+        turnDrop: state.turnDrop || null,
+        gripLimitsCarry: gripCarryDiag?.gripLimitsCarry ?? null,
+        logDipOutOfWindow: logWindowDiag ? logWindowDiag.verdict !== 'ok' : null,
+        tyreSecondPullS: numOrNull(state.tyrePull2S),
+        suitcaseAsymPct: suitcaseDiag?.asymmetryPct ?? null,
+        ybtAntAsymCm: ybtDiag?.antAsymCm ?? null,
+      });
+    } catch { return []; }
+  }, [swayCm, vbtLoss, asymmetry, ohs.failed, state.stoneLapS, state.stoneZeroLap, state.carryTurnS, state.turnDrop, gripCarryDiag, logWindowDiag, state.tyrePull2S, suitcaseDiag, ybtDiag]);
+  const smMetricTops = useMemo(() => {
+    const out: Array<{ tag: string; name: string; dose: string }> = [];
+    for (const tag of smMetricTags.slice(0, 4)) {
+      try {
+        const top = correctivesForSMWeakPoint(tag as any, { cause: (smCauseByPhase as Record<string, any>)[tag] ?? null });
+        const c = top[0];
+        if (c) out.push({ tag, name: c.target, dose: `${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}%` });
+      } catch { /* noop */ }
+    }
+    return out;
+  }, [smMetricTags, smCauseByPhase]);
   const bicepsRisk = useMemo(() => scoreSMBicepsRisk({
     stonePlanned: (parseFloat(state.stoneKg) || 0) > 0,
     mixedGrip: state.mixGrip === 'mixed',
@@ -1039,11 +1058,19 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       smPreferredCorr: Object.keys(smPrefCorr).length ? smPrefCorr : null,
       smWeakCauses: Object.keys(smCauseByPhase).length ? smCauseByPhase : null,
       smCorrectiveDetail: smCorrSession.length ? smCorrSession.map((c) => `${c.target} — ${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}% · ${c.cues[0]}`.slice(0, 160)).slice(0, 9) : null,
-      // SM-C5: слабая сторона grip-фаз при асимметрии ≥7% (добивка +1 сет в план)
+      // SM-C5 + movement P6: слабая сторона при асимметрии ≥7% — хват (grip L/R)
+      // + фермер-керри (чемодан L/R); добивка +1 сет в план
       smUnilateral: (() => {
-        if (!asymmetry || !asymmetry.isAsym) return null;
-        const grips = (smWeakPoints as string[]).filter((wp) => wp === 'farmers_grip' || wp === 'grip_support');
-        return grips.length ? Object.fromEntries(grips.map((wp) => [wp, asymmetry.weaker])) : null;
+        const out: Record<string, string> = {};
+        if (asymmetry && asymmetry.isAsym) {
+          const grips = (smWeakPoints as string[]).filter((wp) => wp === 'farmers_grip' || wp === 'grip_support');
+          for (const wp of grips) out[wp] = asymmetry.weaker;
+        }
+        if (suitcaseDiag && suitcaseDiag.verdict !== 'ok' && suitcaseDiag.weakSide
+          && (smWeakPoints as string[]).includes('farmers_carry')) {
+          out['farmers_carry'] = suitcaseDiag.weakSide;
+        }
+        return Object.keys(out).length ? out : null;
       })(),
       // SM-C6: понедельные сеты волны коррекции (3-3-4-4-4-4-3-3)
       smWaveSets: smCorrBlock.length ? smCorrBlock.map((w) => w.sets).slice(0, 12) : null,
@@ -1539,6 +1566,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <HubNum label="Длина шага" unit="м" value={state.strideLengthM} onChange={v=>setState(s=>({...s, strideLengthM:v}))} placeholder="1.14" step={0.05} />
               <HubNum label="Темп шагов" unit="Гц" value={state.strideRateHz} onChange={v=>setState(s=>({...s, strideRateHz:v}))} placeholder="1.62" step={0.05} />
               <HubNum label="Контакт" unit="с" value={state.stanceS} onChange={v=>setState(s=>({...s, stanceS:v}))} placeholder="0.42" step={0.01} />
+              <HubNum label="Факт 20м (заступ)" unit="с" value={state.run20mS} onChange={v=>setState(s=>({...s, run20mS:v}))} placeholder="14.5" step={0.5} />
               <HubNum label="Разворот 180°" unit="с" value={state.carryTurnS} onChange={v=>setState(s=>({...s, carryTurnS:v}))} placeholder="2.5" step={0.5} />
             </div>
             <HubToggle checked={state.turnDrop} onChange={v=>setState(s=>({...s, turnDrop:v}))} label="Дроп на развороте (слабое место медли)" style={{ marginTop:6 }} />
@@ -1549,7 +1577,13 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <HubNum label="Дропы/заступ" unit="шт" value={state.gripDrops} onChange={v=>setState(s=>({...s, gripDrops:v}))} placeholder="0" step={1} />
               <HubNum label="Съём" unit="мс" value={state.pickupMs} onChange={v=>setState(s=>({...s, pickupMs:v}))} placeholder="900" step={100} />
             </div>
-            {gripCarryDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>✊ {gripCarryDiag.lines.join(' · ')}</div>}
+            {gripCarryDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>✊ {gripCarryDiag.lines.join(' · ')}{(() => {
+              const d = state.gripDrops !== '' && Number.isFinite(parseFloat(state.gripDrops)) ? parseFloat(state.gripDrops) : 0;
+              const v = carryLocoDiag?.speedModelMS;
+              if (!(d > 0) || !(v != null && v > 0)) return '';
+              const pred = Math.round((20 / v + d * 6) * 10) / 10;
+              return ` · прогноз 20м с дропами: ~${pred}с (модель + ${d}×6с)`;
+            })()}</div>}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
               <HubNum label="Чемодан L" unit="с" value={state.suitcaseLeftS} onChange={v=>setState(s=>({...s, suitcaseLeftS:v}))} placeholder="30" step={1} />
               <HubNum label="Чемодан R" unit="с" value={state.suitcaseRightS} onChange={v=>setState(s=>({...s, suitcaseRightS:v}))} placeholder="30" step={1} />

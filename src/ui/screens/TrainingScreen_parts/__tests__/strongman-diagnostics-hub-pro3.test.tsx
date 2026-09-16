@@ -79,6 +79,31 @@ describe('StrongmanDiagnosticsHub PRO-3', () => {
     expect(document.body.textContent).toContain('YBT postlat R');
     expect(document.body.textContent).toContain('YBT-UQ L');
   });
+  it('movement R2a: чемодан-асимметрия → unilateral farmers_carry в мосте', async () => {
+    render(<StrongmanDiagnosticsHub />);
+    const fillNum = async (tab: string, label: RegExp, value: string) => {
+      fireEvent.click(document.querySelector(`[data-sm="bottom-tab-${tab}"]`) as HTMLElement);
+      fireEvent.click(await screen.findByRole('button', { name: label }));
+      fireEvent.change(await screen.findByRole('textbox', { name: label }), { target: { value } });
+      fireEvent.click(screen.getByText('Готово'));
+    };
+    await fillNum('carry', /Чемодан L/, '25');
+    await fillNum('carry', /Чемодан R/, '30');
+    fireEvent.click(document.querySelector('[data-sm="bottom-tab-carry"]') as HTMLElement);
+    fireEvent.click(await screen.findByText(SM_BIOMECH.farmers_carry.label));
+    fireEvent.click(document.querySelector('[data-sm="bottom-tab-correction"]') as HTMLElement);
+    fireEvent.click(await screen.findByText(/Коррекцию в Стронг/));
+    await waitFor(() => {
+      const raw = localStorage.getItem('he_planner_apply') || '{}';
+      const payload = JSON.parse(raw);
+      expect(payload?.data?.smUnilateral?.farmers_carry).toBe('left');
+    });
+  });
+  it('movement R3a: факт 20м рендерится отдельно от прогресса', async () => {
+    render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(document.querySelector('[data-sm="bottom-tab-carry"]') as HTMLElement);
+    expect(await screen.findByText(/Факт 20м/)).toBeTruthy();
+  });
   it('movement→причина: слабый холд vs заступ даёт причину grip в Коррекции', async () => {
     render(<StrongmanDiagnosticsHub />);
     const fillNum = async (tab: string, label: RegExp, value: string) => {

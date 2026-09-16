@@ -8,6 +8,7 @@ import { diagnoseSuitcase } from '../strength-sport-sm-suitcase.engine';
 import { diagnoseYBT, diagnoseSideHop, SM_SCREENING_DISCLAIMER } from '../strength-sport-sm-ybt.engine';
 import { buildSMDiagnosticsHtml, buildSMCsv } from '../strength-sport-sm-export.engine';
 import { diagnoseSMWeakCause } from '../strength-sport-sm-weak-cause.engine';
+import { smTagsForMetrics } from '../strength-sport-sm-corrective.engine';
 
 describe('SM movement P1: stone lap + fatigue', () => {
   it('zero-lap без lap — ok', () => {
@@ -203,5 +204,46 @@ describe('SM movement→причина: P3/P7-сигналы в weak-cause', () 
   });
   it('YBT ≤4 — не сигнал', () => {
     expect(diagnoseSMWeakCause({ zone: 'yoke_walk', ybtAntAsymCm: 3 }).cause).toBe('technique');
+  });
+  it('YBT-UQ Δ5 → mobility только лог-фаз', () => {
+    const log = diagnoseSMWeakCause({ zone: 'log_lockout', ybtUqAsymCm: 5 });
+    expect(log.cause).toBe('mobility');
+    expect(log.signals.some((s) => s.includes('YBT-UQ'))).toBe(true);
+    expect(diagnoseSMWeakCause({ zone: 'yoke_walk', ybtUqAsymCm: 5 }).cause).toBe('technique');
+    expect(diagnoseSMWeakCause({ zone: 'log_lockout', ybtUqAsymCm: 3 }).cause).toBe('technique');
+  });
+  it('без новых полей weak-cause — байт-в-байт (grip/med/high ветки целы)', () => {
+    expect(diagnoseSMWeakCause({ zone: 'farmers_grip', gripFails: 2 }).cause).toBe('grip');
+    expect(diagnoseSMWeakCause({ zone: 'yoke_walk', ohsFailed: 3 }).cause).toBe('mobility');
+  });
+});
+
+describe('SM movement: замер→тег (R1)', () => {
+  it('пусто — пусто (старые 4 поля целы)', () => {
+    expect(smTagsForMetrics({})).toEqual([]);
+    expect(smTagsForMetrics({ swayCm: 4 })).toContain('yoke_walk');
+  });
+  it('lap 2.5 без zero-lap → stone_lap; zero-lap — тихо', () => {
+    expect(smTagsForMetrics({ stoneLapS: 2.5 })).toContain('stone_lap');
+    expect(smTagsForMetrics({ stoneLapS: 2.5, stoneZeroLap: true })).not.toContain('stone_lap');
+    expect(smTagsForMetrics({ stoneLapS: 1.5 })).not.toContain('stone_lap');
+  });
+  it('разворот >3с или дроп → yoke_turn', () => {
+    expect(smTagsForMetrics({ carryTurnS: 5 })).toContain('yoke_turn');
+    expect(smTagsForMetrics({ turnDrop: true })).toContain('yoke_turn');
+    expect(smTagsForMetrics({ carryTurnS: 2 })).not.toContain('yoke_turn');
+  });
+  it('хват лимитирует → farmers_grip; дип вне окна → log_dip', () => {
+    expect(smTagsForMetrics({ gripLimitsCarry: true })).toContain('farmers_grip');
+    expect(smTagsForMetrics({ logDipOutOfWindow: true })).toContain('log_dip');
+    expect(smTagsForMetrics({ gripLimitsCarry: false })).not.toContain('farmers_grip');
+  });
+  it('тайр >1.0 → conditioning; чемодан ≥7% → farmers_carry; YBT >4 → низ-тройка', () => {
+    expect(smTagsForMetrics({ tyreSecondPullS: 1.2 })).toContain('conditioning');
+    expect(smTagsForMetrics({ suitcaseAsymPct: 9 })).toContain('farmers_carry');
+    const ybt = smTagsForMetrics({ ybtAntAsymCm: 5 });
+    expect(ybt).toContain('yoke_pickup');
+    expect(ybt).toContain('stone_lap');
+    expect(smTagsForMetrics({ tyreSecondPullS: 0.5 })).not.toContain('conditioning');
   });
 });

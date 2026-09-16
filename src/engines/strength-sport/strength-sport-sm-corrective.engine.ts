@@ -511,16 +511,36 @@ export function correctiveBlockForSM(phases: SMWeakPoint[], weeks = 8): Array<{ 
 }
 
 /**
- * Замер → теги → фазы: sway (качание), VBT-просадка, асимметрия L/R, OHS-провалы.
- * Пороги: sway warn 3 / crit 5 (McGill); VBT carry 15 / press 10; асимметрия 7/12 (Bezkorovainyi); OHS ≥2.
+ * Замер → теги → фазы: sway (качание), VBT-просадка, асимметрия L/R, OHS-провалы
+ * + movement P1–P8 (опционально, backward-compat): lap/разворот/хват-заступ/
+ * дип-окно/тайр/чемодан/YBT. Пороги: sway warn 3 / crit 5 (McGill); VBT carry 15 /
+ * press 10; асимметрия 7/12 (Bezkorovainyi); OHS ≥2; lap >2.0 (Hindle); разворот >3с;
+ * тайр 2-я >1.0с (HP/LP); чемодан ≥7%; YBT anterior >4см (Plisky).
  */
-export function smTagsForMetrics(input: { swayCm?: number | null; vbtLossPct?: number | null; asymmetryPct?: number | null; ohsFailed?: number | null }): SMWeakPoint[] {
+export function smTagsForMetrics(input: {
+  swayCm?: number | null; vbtLossPct?: number | null; asymmetryPct?: number | null; ohsFailed?: number | null;
+  stoneLapS?: number | null; stoneZeroLap?: boolean | null;
+  carryTurnS?: number | null; turnDrop?: boolean | null;
+  gripLimitsCarry?: boolean | null;
+  logDipOutOfWindow?: boolean | null;
+  tyreSecondPullS?: number | null;
+  suitcaseAsymPct?: number | null;
+  ybtAntAsymCm?: number | null;
+}): SMWeakPoint[] {
   const tags: SMWeakPoint[] = [];
   if (input.swayCm != null && input.swayCm > 3) tags.push('yoke_walk', 'farmers_carry');
   if (input.vbtLossPct != null && input.vbtLossPct >= 15) tags.push('yoke_walk', 'farmers_carry');
   else if (input.vbtLossPct != null && input.vbtLossPct >= 10) tags.push('log_drive', 'stone_load');
   if (input.asymmetryPct != null && input.asymmetryPct >= 7) tags.push('farmers_grip', 'grip_support');
   if (input.ohsFailed != null && input.ohsFailed >= 2) tags.push('yoke_pickup', 'stone_lap', 'log_clean');
+  // movement P1–P8
+  if (!input.stoneZeroLap && input.stoneLapS != null && input.stoneLapS > 2.0) tags.push('stone_lap');
+  if ((input.carryTurnS != null && input.carryTurnS > 3) || input.turnDrop === true) tags.push('yoke_turn');
+  if (input.gripLimitsCarry === true) tags.push('farmers_grip');
+  if (input.logDipOutOfWindow === true) tags.push('log_dip');
+  if (input.tyreSecondPullS != null && input.tyreSecondPullS > 1.0) tags.push('conditioning');
+  if (input.suitcaseAsymPct != null && input.suitcaseAsymPct >= 7) tags.push('farmers_carry');
+  if (input.ybtAntAsymCm != null && input.ybtAntAsymCm > 4) tags.push('yoke_pickup', 'stone_lap', 'log_clean');
   return Array.from(new Set(tags));
 }
 

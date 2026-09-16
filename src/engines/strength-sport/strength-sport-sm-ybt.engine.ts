@@ -30,6 +30,7 @@ export interface SMYbtResult {
   valid: boolean;
   verdict: 'ok' | 'warn' | 'critical';
   antAsymCm: number | null;
+  uqAsymCm: number | null;
   compositePct: number | null;
   lines: string[];
 }
@@ -60,13 +61,15 @@ export function diagnoseYBT(input: SMYbtInput): SMYbtResult | null {
     lines.push(`YBT композит ${composite}% длины ноги (ориентир LQ ~94%, Plisky)`);
     if (composite < 89.6) { bad++; lines.push('Композит <89.6% — нижняя зона: мобильность голеностопа + баланс'); }
   }
+  let uqAsym: number | null = null;
   if (input.uqLeftCm != null && input.uqRightCm != null && input.uqLeftCm > 0 && input.uqRightCm > 0) {
     const uq = Math.round(Math.abs(input.uqLeftCm - input.uqRightCm) * 10) / 10;
+    uqAsym = uq;
     if (uq > 4) { bad++; lines.push(`YBT-UQ асимметрия ${uq}см >4см — плечо под логом: торакальная + лопатки`); }
     else lines.push(`YBT-UQ асимметрия ${uq}см — норма`);
   }
   const verdict = bad === 0 ? 'ok' : bad >= 2 ? 'critical' : 'warn';
-  return { valid: true, verdict, antAsymCm: antAsym, compositePct: composite, lines };
+  return { valid: true, verdict, antAsymCm: antAsym, uqAsymCm: uqAsym, compositePct: composite, lines };
 }
 
 export interface SMSideHopResult {
