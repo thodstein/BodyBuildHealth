@@ -735,7 +735,15 @@ export const BbAutoConstructor: React.FC = () => {
           : 'intermediate';
     const heightCm = Number(prof?.personal?.height) > 120 ? Number(prof.personal.height) : undefined;
     const cycleDay = (() => { try { const v = Number(localStorage.getItem('he_cycle_day')); return Number.isFinite(v) && v>=1 && v<=35 ? v : undefined; } catch { return undefined; } })();
-    const hasTrial = (() => { try { const raw = localStorage.getItem('he_bb_test_peak_weeks'); if(!raw) return undefined; const arr=JSON.parse(raw); return Array.isArray(arr) && arr.length>0 ? true : undefined; } catch { return undefined; } })();
+    // PRO-3 Э3: high-water разблокирует только УСПЕШНЫЙ trial (verdict tested_ok/conservative);
+    // провальный прогон (adjust — залив/плоскость) — это не «репетиция состоялась», а урок.
+    const hasTrial = (() => {
+      try {
+        const last = latestTestPeakWeek();
+        if (!last) return undefined;
+        return last.verdict === 'tested_ok' || last.verdict === 'conservative' ? true : undefined;
+      } catch { return undefined; }
+    })();
     const base: BBContestPrepConfig = {
       sex,
       category: peakWeekCategory,

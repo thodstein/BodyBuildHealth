@@ -155,6 +155,8 @@ export interface PeakWeekDayPlan {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  /** PRO-3 Э3: сработал безопасный пол ккал дня (макро-левер: жир→угли). */
+  kcalFloorApplied?: boolean;
   fiberMaxG: number;
   waterLiters: number;
   sodiumMg: number;
@@ -1091,7 +1093,23 @@ export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?
     let fatG = Math.max(profile.light ? 25 : 30, Math.round(w * fatGPerKg(phase)));
     // На load — жир кап 45г (не больше), иначе SGLT1 и гликоген страдает
     if (phase.startsWith('load')) fatG = Math.min(fatG, profile.light ? 38 : 45);
-    const kcal = Math.round(proteinG * 4 + carbsG * 4 + fatG * 9);
+    let kcal = Math.round(proteinG * 4 + carbsG * 4 + fatG * 9);
+    // PRO-3 Э3: безопасный пол ккал пик-дня (Ж 1200 / М 1400, масштаб 20 ккал/кг).
+    // У лёгкой женщины деплеция/шоу-день уходили <1000 ккал без предупреждения (риск слабости
+    // на сцене). Формула ккал сохраняется: поднимаем жир до дневного капа, затем угли.
+    // PRO-3 Э3: безопасный пол ккал применяется к СЦЕНЕ (шоу и D-1 peak) — окно риска
+    // слабости/обморока. Деплеция/загрузка остаются в карб-бюджете категории (Escalante
+    // 3.5–12 г/кг total; пол на них ломал бы научные полосы бюджета).
+    const kcalFloor = (phase === 'show' || phase === 'peak')
+      ? Math.max(isFemale ? 1200 : 1400, Math.round(w * 20))
+      : 0;
+    let kcalFloorApplied = false;
+    if (kcalFloor > 0 && kcal < kcalFloor) {
+      kcalFloorApplied = true;
+      // На шоу/пике жир не добавляем (ЖКТ/спилл) — поднимаем угли (быстрый гликоген-топап).
+      carbsG += Math.ceil((kcalFloor - kcal) / 4);
+      kcal = Math.round(proteinG * 4 + carbsG * 4 + fatG * 9);
+    }
     // Вода: база * мульт + гликоген-бонус на load (SGLT1 транспорт требует воды) + luteal guard
     let waterLiters = waterBase * waterMults[idx];
     if (phase.startsWith('load')) waterLiters += glycogenWaterBoost(carbsG);
@@ -1151,6 +1169,9 @@ export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?
       supplementNotes.push('Диуретики — только по назначению врача. Самодеятельность опасна.');
     }
     if (phase === 'show') supplementNotes.push('Соль пакетик за 30–60 мин до выхода (только продвинутые, при постоянном натрии) — васкулярность.');
+    if (kcalFloorApplied) {
+      mealNotes.push(`⚠ Пол ккал: день поднят до безопасного минимума ${kcalFloor} ккал (жир→угли) — не урезайте ниже, риск слабости/обморока на сцене (IOC REDs).`);
+    }
 
     return {
       day,
@@ -1161,6 +1182,7 @@ export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?
       proteinG,
       carbsG,
       fatG,
+      kcalFloorApplied: kcalFloorApplied || undefined,
       fiberMaxG: fiberFor(phase),
       waterLiters,
       sodiumMg,
@@ -1485,6 +1507,9 @@ export function buildBBContestPrep(rawCfg: BBContestPrepConfig, opts?: { carbDos
   const spec = cfg.specialization;
 
   const warnings = [...v.warnings];
+  if (peakWeek.some(d => d.kcalFloorApplied)) {
+    warnings.push('⚠ Пик-день поднят до безопасного минимума ккал (пол Ж 1200 / М 1400, масштаб 20 ккал/кг) — не урезайте ниже (риск слабости/обморока на сцене).');
+  }
   const rationale = [
     `🏁 Тапер ББ: категория ${profile.label} (${cfg.sex}), вес ${cfg.weightKg} кг, шоу ${cfg.showDate}.`,
     `📉 Тренировки: протокол «${getPeakingProtocol(cfg.trainingProtocol).name}», последние ${cfg.weeksOut} нед (${taper.map(t => `${t.label} ${Math.round(t.volumePct * 100)}%`).join(' → ')}).`,
@@ -1655,7 +1680,10 @@ export function applyTrainingTaperToBBPlan(
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) return plan as BBPlanWithPrep;
-  const base = applyForcedModes(rawCfg);
+  const forced = applyForcedModes(rawCfg);
+  // PRO-3 Э3: гейт агрессивной воды и в оверлеях (SRCBB/Macrocycle путь обходил UI-гейт).
+  const gateLocked = manipulationLockedFor(forced);
+  const base = gateLocked ? applyManipulationGate(forced) : forced;
   const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
   const existing = (plan as BBPlanWithPrep).contestPrep;
   const force = opts?.force === true;
@@ -1764,6 +1792,7 @@ export function applyTrainingTaperToBBPlan(
           ...(plan.rationale || []),
           `🏁 Тапер ББ наложен (нед ${appliedWeeks.join(', ')}): «${getPeakingProtocol(cfg.trainingProtocol).name}» (${cfg.weeksOut} нед) + пик-неделя (шоу ${cfg.showDate}).`,
           `🍚 Питание пик-недели: ${cfg.carbLoadStrategy} загрузка, вода ${cfg.waterStrategy}, натрий ${cfg.sodiumStrategy} — см. блок «Питание → Тапер ББ».`,
+          ...(gateLocked ? ['🔒 High water без trial/подтверждения → stable: агрессивная манипуляция заблокирована и в этом пути (сначала trial peak за 21–28 дней).'] : []),
         ]
       : plan.rationale,
   };
@@ -1793,7 +1822,10 @@ export function applyPeakWeekOverlayToBBPlan(
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) return plan as BBPlanWithPrep;
-  const base = applyForcedModes(rawCfg);
+  const forced2 = applyForcedModes(rawCfg);
+  // PRO-3 Э3: тот же гейт high-water и в peak-overlay (Macrocycle/годовой путь).
+  const gateLocked2 = manipulationLockedFor(forced2);
+  const base = gateLocked2 ? applyManipulationGate(forced2) : forced2;
   const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
   const existing = (plan as BBPlanWithPrep).contestPrep;
 
@@ -1824,6 +1856,7 @@ export function applyPeakWeekOverlayToBBPlan(
       ? [
           ...(plan.rationale || []),
           `🎭 Пик-неделя наложена на неделю ${targetIdx + 1} (шоу ${cfg.showDate}): деплеция → загрузка → отдых → памп.`,
+          ...(gateLocked2 ? ['🔒 High water без trial/подтверждения → stable: манипуляция заблокирована (trial peak за 21–28 дней).'] : []),
         ]
       : plan.rationale,
   };
@@ -2450,6 +2483,10 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
   const phases = computePrepPhaseRanges(prepWeeks, taperWeeks, showDate, true);
 
   const conditionLabels = professionalReviewConditions(cfg.contraindications);
+  // PRO-3 Э3: RED-S-риск (женщина, %жира <14) → requiresReview: Triad 2025 update отменил порог EA,
+  // но кости/цикл/щитовидка требуют сопровождения; это предпросмотр, не блокировка сама по себе.
+  const redsRisk = cfg.sex === 'female' && cfg.bodyFatPct != null && cfg.bodyFatPct < 14;
+  if (redsRisk) conditionLabels.push('риск RED-S (женщина, %жира <14)');
   const requiresReview = conditionLabels.length > 0;
   const confirmed = cfg.confirmedManipulation === true;
   // Агрессивные моды (не stable-вода/натрий) при противопоказаниях → протокол блокируется;
@@ -2463,6 +2500,9 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
   const highWithoutTrial = canonWaterReq === 'high' && !cfg.hasTrialPeak;
 
   const warnings = [...v.warnings];
+  if (redsRisk) {
+    warnings.push('⚠ RED-S: %жира <14 у женщины — медицинский контроль (цикл/кости/щитовидка) и EA ≥30 ккал/кг FFM; минимум 1400 ккал/день (IOC REDs / Triad 2025).');
+  }
   if (blockedProtocol) {
     warnings.push('⛔ Автоматический пик-протокол ограничен: при противопоказаниях требуются стабильные вода и натрий и сопровождение врача/тренера.');
   }

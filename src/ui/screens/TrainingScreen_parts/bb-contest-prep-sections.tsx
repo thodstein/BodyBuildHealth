@@ -36,6 +36,8 @@ import {
   postShowComedownNotes,
 } from '../../../engines/bb/bb-prep-post-show-log.engine';
 import { PREP_LAB_PANEL, PREP_PROCEDURES, PREP_HYDRATION_GUIDELINES } from '../../../engines/bb/bb-prep-process.engine';
+import { calcRedsCAT2 } from '../../../engines/metabolic-hub.engine';
+import { computeEA } from '../NutritionScreen_parts/IndividualPlan/planner-ea.engine';
 import type { PeakingProtocol } from '../../../engines/peaking-protocols.engine';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
@@ -762,6 +764,31 @@ export const BbContestPrepTrialSafety: React.FC<{ ctx: BbContestPrepCtx }> = ({ 
                 🩺 Требуется профессиональное сопровождение (противопоказания: {prepPlan.safety.contraindications.join(', ')}). Агрессивные режимы отключены.
               </div>
             )}
+
+            {/* 🩸 RED-S-скрин (PRO-3 Э3): EA из ккал подготовки + CAT2-светофор (IOC REDs) */}
+            {(() => {
+              const ea = computeEA({
+                intakeKcal: prepPlan.preparation.currentCalories,
+                weightKg: prepPlan.preparation.startingWeightKg,
+                lbmKg: 0,
+                isTrainingDay: true, trainDurationMin: 75, trainIntensity: 'medium',
+                sex: prepPlan.sex,
+              });
+              const cat2 = calcRedsCAT2({ ea: ea.ea, sex: prepPlan.sex });
+              return (
+                <div data-bb="reds-screen" style={{ marginBottom:10, padding:10, borderRadius:10, background:'rgba(239,68,68,0.05)', border:"1px solid rgba(239,68,68,0.25)" }}>
+                  <div style={{ fontSize:11, fontWeight:800, color: cat2.color, marginBottom:4 }}>
+                    🩸 RED-S-скрин (IOC CAT2): {ea.zoneLabel} · EA {ea.ea} ккал/кг FFM
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff' }}>{cat2.note}</div>
+                  <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>Выход: {cat2.returnToPlay}</div>
+                  <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>
+                    Оценка по ккал подготовки ({prepPlan.preparation.currentCalories}) и тренировочному дню (~75 мин);
+                    точный EA — по факту рациона/кардио («🧬 Нагрузка» в питании).{(cat2.light === 'red' || cat2.light === 'orange') ? ' ⛔ До старта препа — консультация врача (цикл/кости/щитовидка).' : ''}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 📋 Чек-лист шоу D-10…D-0 + live-adjust (Э5) */}
             {(() => {
