@@ -34,6 +34,8 @@ export interface SMDiagnosticSnapshot {
   // SM corrective: структурированная коррекция (опционально, backward-compat)
   corrections?: string[] | null;
   correctiveDetail?: string[] | null;
+  // SM movement P1–P8: строки диагностики движений (опционально, backward-compat)
+  movement?: string[] | null;
 }
 
 export function buildSMDiagnosticsHtml(snap: SMDiagnosticSnapshot): string {
@@ -62,6 +64,7 @@ ${snap.causes && snap.causes.length ? `<h2>Причины</h2><ul>${snap.causes.
 ${snap.specBlock ? `<h2>Спец-блок</h2><div>${esc(snap.specBlock)}</div>` : ''}
 ${snap.corrections && snap.corrections.length ? `<h2>Коррекция</h2><ul>${snap.corrections.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
 ${snap.correctiveDetail && snap.correctiveDetail.length ? `<h2>Коррекция детально</h2><ul>${snap.correctiveDetail.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
+${snap.movement && snap.movement.length ? `<h2>Движение (P1–P8)</h2><ul>${snap.movement.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
 </body></html>`;
 }
 
@@ -88,6 +91,7 @@ export function buildSMCsv(snap: SMDiagnosticSnapshot): string {
     ['specBlock', snap.specBlock || ''],
     ['corrections', (snap.corrections || []).join('; ')],
     ['correctiveDetail', (snap.correctiveDetail || []).join('; ')],
+    ['movement', (snap.movement || []).join('; ')],
     ['findings', snap.findings.join('; ')],
   ];
   return rows.map(r => r.map(escCsv).join(',')).join('\n');

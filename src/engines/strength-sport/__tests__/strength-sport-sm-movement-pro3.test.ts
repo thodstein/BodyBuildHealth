@@ -6,6 +6,7 @@ import { diagnoseLogWindow, logDipWindowFor, logLoadCorrectionPct } from '../str
 import { diagnoseTyreSecondPull, SM_TYRE_CORRECTIVES } from '../strength-sport-sm-tyre.engine';
 import { diagnoseSuitcase } from '../strength-sport-sm-suitcase.engine';
 import { diagnoseYBT, diagnoseSideHop, SM_SCREENING_DISCLAIMER } from '../strength-sport-sm-ybt.engine';
+import { buildSMDiagnosticsHtml, buildSMCsv } from '../strength-sport-sm-export.engine';
 
 describe('SM movement P1: stone lap + fatigue', () => {
   it('zero-lap без lap — ok', () => {
@@ -144,5 +145,26 @@ describe('SM movement P7/P8: ybt + side-hop + честность', () => {
   });
   it('дисклеймер честный', () => {
     expect(SM_SCREENING_DISCLAIMER).toContain('не диагноз');
+  });
+});
+
+describe('SM movement: экспорт-паритет (без movement — байт-совместимо)', () => {
+  const base: any = { weakPoints: [], score: 80, level: 'ok', verification: 1, findings: [] };
+  it('без movement секция «Движение» отсутствует', () => {
+    expect(buildSMDiagnosticsHtml(base)).not.toContain('Движение (P1');
+    expect(buildSMCsv(base)).not.toContain('Lap 2.5');
+  });
+  it('с movement — секция HTML + строка CSV', () => {
+    const html = buildSMDiagnosticsHtml({ ...base, movement: ['Lap 2.5с >2.0с — перехват слабый', 'Разворот 5с >3с — долгий'] });
+    expect(html).toContain('Движение (P1');
+    expect(html).toContain('Lap 2.5');
+    const csv = buildSMCsv({ ...base, movement: ['Lap 2.5с >2.0с — перехват слабый'] });
+    expect(csv).toContain('movement');
+    expect(csv).toContain('Lap 2.5');
+  });
+  it('XSS в строках движения экранируется', () => {
+    const html = buildSMDiagnosticsHtml({ ...base, movement: ['<script>alert(1)</script>'] });
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
   });
 });

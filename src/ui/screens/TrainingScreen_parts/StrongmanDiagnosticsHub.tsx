@@ -886,6 +886,21 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const sideHopDiag = useMemo(() => diagnoseSideHop(
     numOrNull(state.sideHop), ybtDiag?.antAsymCm ?? null,
   ), [state.sideHop, ybtDiag]);
+  // ── SM movement P1–P8: строки в экспорт (только заполненное, иначе null) ──
+  const movementExportLines = useMemo(() => {
+    const out: string[] = [];
+    if (stoneLapDiag) out.push(stoneLapDiag.text);
+    if (stoneFatigueDiag) out.push(...stoneFatigueDiag.lines);
+    if (carryLocoDiag) out.push(...carryLocoDiag.lines);
+    if (carryTurnDiag) out.push(carryTurnDiag.text);
+    if (gripCarryDiag) out.push(...gripCarryDiag.lines);
+    if (logWindowDiag) out.push(logWindowDiag.text);
+    if (tyreDiag) out.push(`${tyreDiag.text} · ${SM_TYRE_CORRECTIVES[0].target} (${SM_TYRE_CORRECTIVES[0].protocol})`);
+    if (suitcaseDiag) out.push(suitcaseDiag.text);
+    if (ybtDiag) out.push(...ybtDiag.lines);
+    if (sideHopDiag) out.push(sideHopDiag.text);
+    return out.length ? out : null;
+  }, [stoneLapDiag, stoneFatigueDiag, carryLocoDiag, carryTurnDiag, gripCarryDiag, logWindowDiag, tyreDiag, suitcaseDiag, ybtDiag, sideHopDiag]);
   const bicepsRisk = useMemo(() => scoreSMBicepsRisk({
     stonePlanned: (parseFloat(state.stoneKg) || 0) > 0,
     mixedGrip: state.mixGrip === 'mixed',
@@ -1256,6 +1271,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       platformHeightCm: state.platformHeightCm ? parseFloat(state.platformHeightCm) : null,
       tacky: state.tackyUsed,
       findings: scoring.findings.map(f => f.text),
+      movement: movementExportLines,
       ...proSnapExtra(),
     };
     const html = buildSMDiagnosticsHtml(snap);
@@ -1277,6 +1293,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       platformHeightCm: state.platformHeightCm ? parseFloat(state.platformHeightCm) : null,
       tacky: state.tackyUsed,
       findings: scoring.findings.map(f => f.text),
+      movement: movementExportLines,
       ...proSnapExtra(),
     };
     downloadSMCsv(snap, `strongman-diagnostics-${new Date().toISOString().slice(0,10)}.csv`);
