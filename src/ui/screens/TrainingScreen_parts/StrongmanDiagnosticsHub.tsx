@@ -26,6 +26,7 @@ import { correctEnodeByVariable } from '../../../engines/strength-sport/strength
 import { getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { diagnoseSMWeakCause, SM_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-sm-weak-cause.engine';
 import { rankCorrectionsForSM } from '../../../engines/strength-sport/strength-sport-sm-correction-rank.engine';
+import { correctivesForSMWeakPoint, correctiveSessionForSM, correctiveBlockForSM, smCorrectiveExportLines } from '../../../engines/strength-sport/strength-sport-sm-corrective.engine';
 import { buildSMSpecBlock } from '../../../engines/strength-sport/strength-sport-sm-spec-block.engine';
 import { simulateContest } from '../../../engines/strength-sport/strength-sport-contest-simulator.engine';
 import { buildSMAttemptsForContest } from '../../../engines/strength-sport/strength-sport-sm-attempts-bridge.engine';
@@ -59,7 +60,7 @@ import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-l
 
 const STORAGE_KEY = 'he_strongman_diagnostics_hub_v1';
 
-type SMTab = 'press' | 'carry' | 'load' | 'grip' | 'mobility' | 'video';
+type SMTab = 'press' | 'carry' | 'load' | 'grip' | 'mobility' | 'video' | 'correction';
 
 type SMState = {
   pressWeak: string[];
@@ -188,6 +189,7 @@ const TAB_DEFS: Array<{ id: SMTab; label: string; icon: string; desc: string }> 
   { id: 'grip', label: 'Хват/Кор', icon: '✊', desc: 'хват + кор + кондиция' },
   { id: 'mobility', label: 'Мобильность', icon: '🧘', desc: 'ОГС (OHS) 6 + качание' },
   { id: 'video', label: 'Видео', icon: '📹', desc: 'Кинова (Kinovea) + качание' },
+  { id: 'correction', label: 'Коррекция', icon: '🛠️', desc: 'фаза → причина → топ-3 → доза' },
 ];
 
 const PRESS_OPTS = [
@@ -644,6 +646,28 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     if (!smWeakPoints.length) return null;
     try { return buildSMSpecBlock({ weakPoints: smWeakPoints as any, weeks: parseInt(state.specWeeks) || 6 }); } catch { return null; }
   }, [smWeakPoints, state.specWeeks]);
+  // ── SM corrective: структурированная коррекция (фаза → причина → топ-3 + сессия + волна) ──
+  const smCauseByPhase = useMemo(() => {
+    const m: Record<string, string> = {};
+    smWeakPoints.forEach((wp, i) => { const c = (smCauses[i] as any)?.cause; if (c) m[wp] = c; });
+    return m;
+  }, [smWeakPoints, smCauses]);
+  const smCorrTops = useMemo(() => {
+    const out: Record<string, ReturnType<typeof correctivesForSMWeakPoint>> = {};
+    for (const wp of smWeakPoints as string[]) {
+      try { out[wp] = correctivesForSMWeakPoint(wp as any, { cause: (smCauseByPhase[wp] as any) ?? null }); } catch { out[wp] = []; }
+    }
+    return out;
+  }, [smWeakPoints, smCauseByPhase]);
+  const smCorrSession = useMemo(() => {
+    try { return correctiveSessionForSM(smWeakPoints as any, smCauseByPhase as any); } catch { return []; }
+  }, [smWeakPoints, smCauseByPhase]);
+  const smCorrBlock = useMemo(() => {
+    try { return correctiveBlockForSM(smWeakPoints as any, parseInt(state.specWeeks) || 6); } catch { return []; }
+  }, [smWeakPoints, state.specWeeks]);
+  const smCorrExport = useMemo(() => {
+    try { return smCorrectiveExportLines(smWeakPoints as any, smCauseByPhase as any); } catch { return []; }
+  }, [smWeakPoints, smCauseByPhase]);
   const logDipDiag = useMemo(() => {
     const d = parseFloat(state.logDipCm);
     if (!Number.isFinite(d) || !d) return null;
@@ -855,6 +879,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       causes: smCauses,
       rankTop: smRankTop,
       specBlock: smSpec,
+      smCorrections: smCorrExport,
+      correctiveSession: smCorrSession.map((c) => ({ id: c.id, phase: c.phase, kind: c.kind, sets: c.protocolAdj.sets, reps: c.protocolAdj.reps, pct: c.protocolAdj.pct, cue: c.cues[0], source: c.source })),
+      correctiveBlock: smCorrBlock,
       contestSim,
       attempts: attemptsBridge,
       carryPhysics: carryPhys,
@@ -1220,15 +1247,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ ...CARD, padding: 10, position: 'sticky', top: 'calc(env(safe-area-inset-top, 0px))', zIndex: 20, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 8, alignItems: 'center', scrollbarWidth: 'none', paddingBottom: 2 }}>
-          {TAB_DEFS.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} style={{ padding:'11px 16px', minHeight:48, flexShrink:0, borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#ef4444' : 'rgba(140,190,255,0.16)', background: tab===t.id ? 'linear-gradient(135deg, rgba(239,68,68,0.22), rgba(245,158,11,0.12))' : 'rgba(22,30,52,0.88)', color: tab===t.id ? '#fff' : '#fff', cursor:'pointer', fontSize:14, fontWeight:800, boxShadow: tab===t.id ? '0 4px 16px rgba(239,68,68,0.25)' : 'none' }}>
-              {t.icon} {t.label}
-            </button>
-          ))}
-          <button onClick={applyToConstructor} aria-label="Применить в Стронг (верх)" style={{ marginLeft:'auto', flexShrink:0, padding:'13px 20px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:800, fontSize:14, cursor:'pointer', whiteSpace:'nowrap' }}>→ Применить в Стронг</button>
-        </div>
+      <div style={{ ...CARD, padding: 10 }}>
+        <div style={{ fontSize:12, color:'#fff', marginBottom:8, textAlign:'center' }}>Разделы — в закреплённой навигации внизу ↓</div>
 
         {tab==='press' && (
           <div>
@@ -1615,6 +1635,48 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
           </div>
         )}
+
+        {tab==='correction' && (
+          <div data-sm="corr-tab">
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #f59e0b', lineHeight:1.35 }}>Коррекция движений — фаза → причина → топ-3 с дозой</div>
+            {smWeakPoints.length === 0 && (
+              <div data-sm="corr-empty" style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', fontSize:13, color:'#fff' }}>Выбери 1–4 слабые фазы на табах Жим / Переноски / Загрузки / Хват — здесь появится топ-3 с дозой, кью и прогрессией.</div>
+            )}
+            {smWeakPoints.map((wp) => {
+              const cause = (smCauseByPhase as Record<string, string>)[wp as string];
+              const tops = (smCorrTops as Record<string, ReturnType<typeof correctivesForSMWeakPoint>>)[wp as string] || [];
+              return (
+                <div key={wp as string} data-sm="corr-card" style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', borderLeft:'3px solid #f59e0b', marginBottom:8 }}>
+                  <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{wp as string} <span style={{ color:'#f5b04c', fontWeight:600 }}>· {cause ? `причина: ${cause}` : 'причина: техника (данных мало)'}</span></div>
+                  {tops.map((c) => (
+                    <div key={c.id} data-sm="corr-row" style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
+                      <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{c.kind === 'technique' ? '🎯 Техника' : c.kind === 'strength' ? '💪 Сила' : '🧱 Стабильность'} · {c.target}</div>
+                      <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Доза: {c.protocolAdj.sets}×{c.protocolAdj.reps} @{c.protocolAdj.pct}% · RIR {c.protocolAdj.rir} · {c.protocolAdj.tempo} · отдых {c.protocolAdj.restSeconds}с · <span style={{ color:'#f5b04c' }}>{c.doseNote}</span></div>
+                      <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Кью: {c.cues[0]}</div>
+                      <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Прогрессия: {c.progression} · Регресс: {c.regression}</div>
+                      <div style={{ fontSize:11, color:'#fff', marginTop:2 }}>Ошибки: {c.errors.join('; ')} · Источник: {c.source}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+            {smCorrSession.length > 0 && (
+              <div data-sm="corr-session" style={{ padding:'12px 14px', borderRadius:14, background:'rgba(34,197,94,0.07)', border:'1px solid rgba(34,197,94,0.18)', marginBottom:8 }}>
+                <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>📋 Сессия коррекции (техника → сила → стабильность, ≤6)</div>
+                <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{smCorrSession.map((c) => `${c.id} ${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}%`).join(' · ')}</div>
+              </div>
+            )}
+            {smCorrBlock.length > 0 && (
+              <div data-sm="corr-block" style={{ padding:'12px 14px', borderRadius:14, background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.18)', marginBottom:8 }}>
+                <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>🌊 Волна коррекции ({smCorrBlock.length} нед)</div>
+                <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{smCorrBlock.map((w) => `нед${w.week} ${w.name} ${w.sets}×`).join(' · ')}</div>
+              </div>
+            )}
+            {smWeakPoints.length > 0 && (
+              <button data-sm="corr-apply" onClick={applyToConstructor} style={{ width:'100%', padding:'16px 20px', minHeight:56, borderRadius:16, background:'linear-gradient(135deg,#f59e0b,#ef4444)', color:'#fff', border:'none', fontWeight:800, fontSize:16, cursor:'pointer', boxShadow:'0 8px 24px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💉 Коррекцию в Стронг ({smCorrSession.length} упр.)</button>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ ...CARD, padding: 10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.16)' }}>
@@ -1652,10 +1714,19 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Хранилище: {(smStoreBytes.total / 1024).toFixed(1)} КБ · защита от переполнения (истории урезаются, чужие ключи не трогаем)</div>
       </div>
 
-      <div style={{ position:'sticky', bottom:0, zIndex:30, display:'flex', gap:10, alignItems:'center', padding:'10px 12px calc(10px + env(safe-area-inset-bottom, 0px))', margin:'8px -8px -16px', background:'rgba(9,18,34,0.94)', borderTop:'1px solid rgba(140,190,255,0.14)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', paddingBottom:'calc(10px + env(safe-area-inset-bottom, 0px) + var(--tabbar-clear, 0px))' }}>
+      <div data-sm="bottom-nav" style={{ position:'sticky', bottom:0, zIndex:30, display:'flex', flexDirection:'column', gap:8, padding:'10px 12px calc(10px + env(safe-area-inset-bottom, 0px))', margin:'8px -8px -16px', background:'rgba(9,18,34,0.96)', borderTop:'1px solid rgba(140,190,255,0.14)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', paddingBottom:'calc(10px + env(safe-area-inset-bottom, 0px) + var(--tabbar-clear, 0px))' }}>
+        <div style={{ display:'flex', gap:8, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }} role="tablist" aria-label="Навигация диагностики">
+          {TAB_DEFS.map(t=>(
+            <button key={t.id} role="tab" aria-selected={tab===t.id} aria-pressed={tab===t.id} data-sm={`bottom-tab-${t.id}`} onClick={()=>setTab(t.id)} style={{ padding:'10px 14px', minHeight:44, flexShrink:0, borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: tab===t.id ? 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(239,68,68,0.12))' : 'rgba(22,30,52,0.88)', color:'#fff', cursor:'pointer', fontSize:13, fontWeight:800, boxShadow: tab===t.id ? '0 4px 16px rgba(245,158,11,0.25)' : 'none' }}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display:'flex', gap:10, alignItems:'center' }}>
         <span style={{ width:40, height:40, borderRadius:20, background:`conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.08) 0)`, display:'flex', alignItems:'center', justifyContent:'center', border:`2px solid ${sColor}`, fontWeight:900, color:'#fff', fontSize:13, flexShrink:0, fontVariantNumeric:'tabular-nums' }}>{score}</span>
         <span style={{ fontSize:14, fontWeight:800, color: weakPoints.length ? '#fff' : '#fff', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{weakPoints.length ? `${weakPoints.length} слабые: ${weakPoints.join(', ')}` : 'Выбери слабые фазы'}</span>
         <button onClick={applyToConstructor} style={{ padding:'12px 16px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#ef4444,#f59e0b)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap', boxShadow:'0 6px 20px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>→ Применить в Стронг</button>
+        </div>
       </div>
     </div>
   );
