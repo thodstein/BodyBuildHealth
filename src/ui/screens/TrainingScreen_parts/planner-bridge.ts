@@ -48,6 +48,9 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   /** Движения ББ v2 (BBDiagnosticsHub → BbAutoConstructor): драйвер скрининга + односторонний + VBT-флаг (всё опционально). */
   movementDriver?: { driver: string; label: string; fix: string; confidence: number } | null;
   singleLeg?: { weakSide: 'left' | 'right' | null; text: string } | null;
+  /** @deprecated D1 (§9 BB-AUTO-EXHAUSTIVE-PRO): приёмник не читает (хаб всегда шлёт `null`
+   *  by design — VBT живёт в Анализе силы). Оставлено для совместимости сохранённых payload'ов;
+   *  новым кодом не заполнять. */
   vbtLossPct?: number | null;
   weakCauses?: unknown; weakHeads?: string[];
   /** Форма свободная (движок SpecBlock: weeks/lengthWeeks/donors/dayMap/rationale);

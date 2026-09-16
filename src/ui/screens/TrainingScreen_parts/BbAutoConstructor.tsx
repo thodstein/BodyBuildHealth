@@ -42,6 +42,7 @@ import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
 import { bbOrthoMobilityAdd, riskyOpenChainIds, decideBbOrthoIntake, subtractTracked } from '../../../engines/pro/ortho-screen.engine';
+import { resolveBbDiagIntakeExtras } from '../../../engines/bb/bb-diag-intake.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply, applyToPlanner, type WeakpointsPayload } from './planner-bridge';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
@@ -1296,6 +1297,17 @@ export const BbAutoConstructor: React.FC = () => {
           || Array.isArray(d.weakPoints) || Array.isArray(d.groups);
       })()) {
         const bbDiag = payload.data as WeakpointsPayload;
+        // D1 (§9 плана BB-AUTO-EXHAUSTIVE-PRO): движения диагностики (driver/singleLeg) — чистое
+        // решение в движке (unit-тест); сборку НЕ меняет: bits → строка «диагностика», persist →
+        // ключи he_bb_last_movement_driver/single_leg, clean → stale-чистка L/R-канала по маркеру lrVerdicts.
+        const diagExtras = resolveBbDiagIntakeExtras({
+          movementDriver: bbDiag.movementDriver,
+          singleLeg: bbDiag.singleLeg,
+          lrVerdicts: bbDiag.lrVerdicts,
+          lrTopUp: bbDiag.lrTopUp,
+          returnAction: bbDiag.returnAction,
+          returnStage: bbDiag.returnStage,
+        });
         // 3.9: гранулярные зоны приоритетны, но канонические/общие группы — честный fallback.
         const groups = (bbDiag.weakZonesGranular ?? bbDiag.weakMusclesCanonical ?? bbDiag.weakPoints ?? bbDiag.groups) as string[];
         const normalized = normalizeSpecializationTargets(groups.slice(0, 2));
@@ -1458,6 +1470,8 @@ export const BbAutoConstructor: React.FC = () => {
           const ra = bbDiag.readinessAction as { level?: string; volumeMult?: number; rirShift?: number };
           if (ra.level === 'red') pro2parts.push(`готовность red → вставка ×${ra.volumeMult ?? 0.75} RIR+${ra.rirShift ?? 1}`);
         }
+        // LEGACY-канал L/R (старый мост): новые payloads движения этих полей не несут
+        // (их закрывает явная D1-чистка ниже); оставлено для чтения сохранённых payload'ов.
         if (bbDiag.lrTopUp && typeof bbDiag.lrTopUp === 'object' && Object.keys(bbDiag.lrTopUp).length) {
           const clean: Record<string, { side: 'left' | 'right'; sets: number }> = {};
           for (const [k, v] of Object.entries(bbDiag.lrTopUp as Record<string, any>)) {
@@ -1477,6 +1491,7 @@ export const BbAutoConstructor: React.FC = () => {
         if (typeof bbDiag.workingRange === 'string' && bbDiag.workingRange) {
           pro2parts.push('рабочий вес-ориентир');
         }
+        // LEGACY-канал возврата (старый мост): returnAction/returnStage новыми payloads не шлются.
         if (bbDiag.returnAction && typeof bbDiag.returnAction === 'object' && Number.isFinite((bbDiag.returnAction as any).volumeMult)) {
           const ra2 = bbDiag.returnAction as { volumeMult: number; rirShift: number; bannedPatterns: string[] };
           const clean2 = { volumeMult: Math.max(0, Math.min(1, Number(ra2.volumeMult))), rirShift: Math.max(0, Math.min(3, Math.round(Number(ra2.rirShift) || 0))), bannedPatterns: Array.isArray(ra2.bannedPatterns) ? ra2.bannedPatterns.map((x) => String(x)) : [] };
@@ -1489,9 +1504,44 @@ export const BbAutoConstructor: React.FC = () => {
           setReturnAction(null);
           try { localStorage.removeItem('he_bb_return_action'); } catch {}
         }
+        // D1: движения ББ-диагностики — персист (инфо для будущих раундов/экспорта) + честная
+        // строка в rationale УЖЕ собранного плана (паттерн labDelta: дедуп по строке; сеты/веса/
+        // упражнения не трогаются — решение §9.2 «A-инфо / B-сборка»).
+        if (diagExtras.persist.movementDriver) {
+          try { localStorage.setItem('he_bb_last_movement_driver', JSON.stringify(diagExtras.persist.movementDriver)); } catch {}
+        }
+        if (diagExtras.persist.singleLeg) {
+          try { localStorage.setItem('he_bb_last_single_leg', JSON.stringify(diagExtras.persist.singleLeg)); } catch {}
+        }
+        if (diagExtras.bits.length) {
+          const movementLine = `🧭 Скрининг движений: ${diagExtras.bits.join(' · ')}`;
+          try {
+            setBuiltPlan((prev) => {
+              if (!prev || !Array.isArray((prev as { weeks?: unknown }).weeks)) return prev;
+              const rat = Array.isArray((prev as { rationale?: unknown }).rationale)
+                ? (prev as { rationale: string[] }).rationale
+                : [];
+              if (rat.some((r) => r === movementLine)) return prev;
+              return { ...prev, rationale: [...rat, movementLine] };
+            });
+          } catch { /* план обновится при следующей сборке (build-time ветка) */ }
+        }
+        // D1: явная stale-чистка L/R-канала. Маркер канала — ключ lrVerdicts в payload
+        // (BB-хаб шлёт всегда; WL/SM/Arm-хабы не шлют → их мосты ничего не сносят). Новый
+        // мост движения lrTopUp/returnAction НЕ шлёт — без чистки старые значения висели бы на сборках.
+        if (diagExtras.clean.lrTopUp) {
+          setLrTopUp({});
+          try { localStorage.removeItem('he_bb_lr_topup'); } catch {}
+          pro2parts.push('L/R-добивка снята — канал закрыт');
+        }
+        if (diagExtras.clean.returnAction) {
+          setReturnAction(null);
+          try { localStorage.removeItem('he_bb_return_action'); } catch {}
+          pro2parts.push('возврат снят — канал закрыт');
+        }
         // 3.9: ранее неиспользуемые payload-поля диагностики сводим в одну строку моста —
         // ничего не приходит «в никуда» (payload↔потребитель 1:1, без плановых изменений).
-        const diagBits: string[] = [];
+        const diagBits: string[] = [...diagExtras.bits];
         if (typeof bbDiag.bbDiagScore === 'number' && Number.isFinite(bbDiag.bbDiagScore)) diagBits.push(`скор ${Math.round(bbDiag.bbDiagScore)}`);
         if (typeof bbDiag.bbDiagLevel === 'string' && bbDiag.bbDiagLevel) diagBits.push(`уровень ${bbDiag.bbDiagLevel}`);
         if (typeof bbDiag.verification === 'number' && Number.isFinite(bbDiag.verification)) diagBits.push(`вериф ${Math.round(bbDiag.verification <= 1 ? bbDiag.verification * 100 : bbDiag.verification)}%`);
