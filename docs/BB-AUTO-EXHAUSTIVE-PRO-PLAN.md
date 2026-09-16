@@ -707,6 +707,94 @@ M1 (аудит + мёртвые настройки) → M2 (женские сп�
     («volume 0») и к overflow. Дроп/рест-пауз мини-сеты остаются render-only (комментарий-маркер;
     инвариант `sets === workSets.length` — дизайн «цепочка в UI», Aug-2026).
 
+---
+
+## 9. D1-приёмник: движения из ББ-диагностики (hand-off владельца хаба, 2026-09-16)
+
+Владелец `BBDiagnosticsHub` прислал письмо D1: хаб шлёт `movementDriver/singleLeg/vbtLossPct`
+(`BBDiagnosticsHub.tsx:653-680`), приёмник их не читает; stale `he_bb_lr_topup`/`he_bb_return_action`
+чистятся только старым мостом. Аудит по коду (чтение, без правок) + решение ниже.
+
+### 9.1 Аудит по факту (все пункты сверены чтением)
+
+- **Типы/экспорт есть**: `planner-bridge.ts:49-51` (`movementDriver/singleLeg/vbtLossPct`),
+  `bb-diagnostics-export.engine.ts:30-31` (те же поля в export-meta — паритет с хабом нужен).
+- **Intake не читает**: `BbAutoConstructor.tsx:1292-1541` — `movementDriver/singleLeg/vbtLossPct`
+  имеют 0 вхождений (grep); `ohs`/`mmc`/`lrVerdicts`/`lrDirection` идут только в `diagBits`-тост.
+- **Stale реально влияет на сборку**: `lrTopUp`/`returnAction` — состояния (`403-425`) читаются из
+  `he_bb_lr_topup`/`he_bb_return_action` при монтировании и участвуют в сборке (`2170/2260` —
+  `lrEntries`; `2226-2228/2259` — `retMult`). Старый мост персистил их; текущий — не чистит.
+- **Отправителей через bridge больше нет**: grep по `src` — `lrTopUp:`/`returnAction:`/`returnStage:`
+  шлёт только сам хаб **напрямую в план** (`injectBBWeakPoints`, стр.`1310-1320`), а не мостом.
+  Значит intake-ветки `lrTopUp`/`returnAction` — **legacy** (обратная совместимость, живых отправителей нет).
+- **`vbtLossPct` — всегда `null` by design**: комментарии хаба (`613/667/751/824/949`: «VBT живёт
+  в чужом хабе») → потребитель был бы мёртвым кодом.
+- **Дубль-канала подвижности**: хаб УЖЕ пишет ограничения в ПРОФИЛЬ — `applyMobilityToProfile`
+  (`689-711`: `he_profile_v2.health/training.mobilityRestrictions`, кнопка `1995 data-bb="mobility-to-profile"`),
+  а `BbAutoConstructor` сеет `mobilityRestrictions` из профиля (`prof.mobilityRestrictions`, ~483).
+  Т.е. авто-push `ankle` из моста = второй (transient) источник истины для того же.
+
+### 9.2 Решение: гибрид «A-инфо / B-сборка» (сборку не трогаем)
+
+- **Сборку НЕ меняем** (иначе «лишнее» и дубли источников):
+  - `movementDriver` → НЕ в `mobilityRestrictions`: дублировал бы профиль-канал (который уже есть
+    одним кликом «В профиль»), а мост-путь transient — после перезагрузки ограничение исчезнет при
+    ощущении «применено»; single source = профиль.
+  - `singleLeg.weakSide` → НЕ в `lrTopUp`/`unilateralTopUp`: у поля нет мышцы-группы (хаб строит
+    `unilateralTopUp` из `lrVerdicts` с `group`), выдумывать группу нельзя; L/R-добивка уже
+    применяется прямым инжеkтом хаба в план.
+- **Читаем как информацию** (закрываем «в никуда», паритет с экспортом, сборка не меняется):
+  - `diagBits`: `движение: {label}` (+`fix`, если есть), `односторонний: слабее {левая|правая}`.
+  - persist `he_bb_last_movement_driver` / `he_bb_last_single_leg` + строка в `rationale` уже
+    собранного плана (паттерн `labDelta`, дедуп по строке) — сеты/веса/упражнения не трогаются.
+- **`vbtLossPct`**: не читать; в `planner-bridge` пометить `@deprecated` комментарием (не удалять —
+  иначе красный tsc в чужом хабе); владелец хаба может убрать из отправки в своём проходе.
+- **Stale-чистка — явная**, маркер «мост L/R-канала» = в payload ПРИСУТСТВУЕТ ключ `lrVerdicts`
+  (BB-хаб шлёт его всегда; WL/SM/Arm-хабы не шлют → их мосты ничего не сносят):
+  - `lrVerdicts !== undefined && lrTopUp == null` → `setLrTopUp({})` + `removeItem('he_bb_lr_topup')`;
+  - `lrVerdicts !== undefined && returnAction == null && returnStage == null` →
+    `setReturnAction(null)` + `removeItem('he_bb_return_action')`;
+  - оба — с честной строкой в `pro2parts`; старые ветки приёма оставить с LEGACY-комментарием.
+
+### 9.3 Куда вносить (файлы и тесты)
+
+- NEW `src/engines/bb/bb-diag-intake.engine.ts` — чистая `resolveBbDiagIntakeExtras(d)` →
+  `{ bits: string[]; persist: { movementDriver?, singleLeg? }; clean: { lrTopUp: boolean; returnAction: boolean } }`
+  (без сайд-эффектов; `vbtLossPct` не читается).
+- MOD `BbAutoConstructor.tsx` — intake (блок `1461-1541`): применить helper (тост/persist/rationale/чистка).
+- MOD `planner-bridge.ts` — только `@deprecated`-пометка `vbtLossPct` (комментарий).
+- NEW `src/engines/bb/__tests__/bb-diag-intake.test.ts` — unit-lock: bits/persist; clean только при
+  наличии `lrVerdicts`; без `lrVerdicts` — ничего не чистится; `vbtLossPct` игнорируется.
+- NEW `src/ui/screens/TrainingScreen_parts/__tests__/bb-hub-movement-intake.test.ts` — source-guard
+  (BbAutoConstructor вызывает helper; legacy-ветки помечены). **jsdom-mount BB не делаем** — рендер
+  god-component виснет (все BB-тесты — `renderToStaticMarkup`; intake слушает window-событие и
+  pre-render payload не переигрывает — у Arm это работает через `getPlannerApply()`, у BB такого нет).
+- Критерии: `tsc --noEmit` 0 по проекту; bb-UI паки (smoke/annual/prep-cycle/dup/volume-toggle/
+  reproductive/a11y/apk-controls) + `rest-hooks-native`/`apk-top-pack`; `verify:apk-design` OK;
+  инварианты не тронуты (`sets === workSets.length`, MRV×1.15) — сборка не изменяется.
+
+### 9.4 Стартовый промпт новой сессии (скопировать целиком)
+
+> Продолжи ББ-авто по §9 плана `docs/BB-AUTO-EXHAUSTIVE-PRO-PLAN.md` — D1-приёмник движений
+> ББ-диагностики (hand-off владельца хаба). Сначала прочитай AGENTS.md (правила) и §9 плана.
+>
+> Сделать ровно три вещи (решение уже принято в §9.2 — «A-инфо / B-сборка», сборку НЕ менять):
+> 1) NEW `src/engines/bb/bb-diag-intake.engine.ts` — чистая `resolveBbDiagIntakeExtras(d)`:
+>    `bits` (движение+fix, односторонний слабее левая/правая), `persist` (`he_bb_last_movement_driver`/
+>    `he_bb_last_single_leg`), `clean` (`lrTopUp`/`returnAction` — только если в payload есть ключ
+>    `lrVerdicts`; `vbtLossPct` НЕ читать). Без сайд-эффектов.
+> 2) MOD `BbAutoConstructor.tsx` (intake, блок ~1461-1541): применить helper — bits в `diagBits`-тост,
+>    persist + строка в `rationale` уже собранного плана (паттерн `labDelta`, дедуп по строке),
+>    явная stale-чистка `he_bb_lr_topup`/`he_bb_return_action` по маркеру `lrVerdicts`; старые ветки
+>    приёма оставить с LEGACY-комментарием. `mobilityRestrictions`/`lrTopUp` сборку НЕ менять.
+> 3) MOD `planner-bridge.ts`: `vbtLossPct` — `@deprecated`-комментарий (не удалять).
+> Тесты: NEW `bb-diag-intake` (unit-lock) + NEW `bb-hub-movement-intake` (source-guard; jsdom-mount BB
+> не делать — виснет). Прогоны: bb-UI паки + rest-hooks-native/apk-top-pack, `tsc --noEmit` 0 по проекту,
+> `verify:apk-design` OK. Коммит строго pathspec своих файлов (`BbAutoConstructor.tsx`, `planner-bridge.ts`,
+> bb-diag-intake + 2 теста); чужие `BBDiagnosticsHub.tsx`/`bb-movement-screen.engine.ts` НЕ трогать.
+> P.S. После — обнови AGENTS.md (снять старую границу «приёмник не применяет movementDriver/singleLeg/
+> vbtLossPct; stale чистятся только старым мостом») и §9.2 плана отметкой «выполнено».
+
 
 
 
