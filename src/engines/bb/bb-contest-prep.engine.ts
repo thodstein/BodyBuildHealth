@@ -789,10 +789,9 @@ export function recommendBBTaperConfig(input: {
   return { weeksOut: Math.min(4, Math.max(1, weeksOut)), volumeMult, reasons };
 }
 
-/** Применить адаптивную рекомендацию к конфигу тапера (для UI-применения). */
-export function applyAdaptiveTaper(cfg: BBContestPrepConfig, rec: BBTaperRecommendation): BBContestPrepConfig {
-  return { ...cfg, weeksOut: rec.weeksOut };
-}
+/** Применить адаптивную рекомендацию к конфигу тапера — идемпотентный хелпер:
+ *  UI применяет рекомендацию к своим стейтам (weeksOut/volume) напрямую.
+ *  PRO-3 Э12: тонкая обёртка удалена (не давала ничего сверх `rec.weeksOut`). */
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Пик-неделя: 7 дней (день 7 = шоу)
@@ -1434,45 +1433,8 @@ export function planTwoShowSequence(
 }
 
 
-/**
- * Фаза 3.15: плавный pre-taper водно-натриевый каскад (7 дней до пик-недели).
- * Для tapered/back вместо резкого скачка на D-7 (peak-day-1 высокая вода) —
- * постепенная линейная рампа от базовой гидратации к целям дня 1 пик-недели.
- * Возвращает 7 дневных целей воды (л) и натрия (мг).
- */
-export interface PreTaperCascadeDay {
-  day: number;
-  waterLiters: number;
-  sodiumMg: number;
-}
-export function buildPreTaperCascade(
-  cfg: BBContestPrepConfig,
-  opts?: { baselineWaterL?: number; baselineSodiumMg?: number; rampDays?: number },
-): PreTaperCascadeDay[] {
-  const peak = buildPeakWeek(cfg);
-  if (!peak || peak.length < 7) return [];
-  const targetWater = peak[0].waterLiters;
-  const targetNa = peak[0].sodiumMg;
-  const baseWater = opts?.baselineWaterL ?? 3.0;
-  const baseNa = opts?.baselineSodiumMg ?? 2800;
-  const rampDays = Math.min(7, Math.max(1, opts?.rampDays ?? 7));
-  const canonWater = canonicalWaterStrategy(cfg.waterStrategy);
-  const smooth = canonWater === 'tapered' || canonWater === 'high';
-  const out: PreTaperCascadeDay[] = [];
-  for (let i = 0; i < 7; i++) {
-    // t от 0 (день 1) к 1 (последний день пре-тапера).
-    const t = (i + 1) / 7;
-    if (smooth && i < rampDays) {
-      // Плавная рампа к целям дня 1 пик-недели.
-      const w = round1(baseWater + (targetWater - baseWater) * t);
-      const na = Math.round(baseNa + (targetNa - baseNa) * t);
-      out.push({ day: i + 1, waterLiters: w, sodiumMg: na });
-    } else {
-      out.push({ day: i + 1, waterLiters: baseWater, sodiumMg: baseNa });
-    }
-  }
-  return out;
-}
+// (PRO-3 Э12: buildPreTaperCascade/PreTaperCascadeDay удалены — противоречат stable-дефолту
+// (PRO-2) и не имели UI-потребителя; 0 ссылок в src/ui.)
 
 export function computeReadiness(cfg: BBContestPrepConfig): BBContestPrepResult['readiness'] {
   const profile = CATEGORY_PROFILES[cfg.category];
@@ -2454,12 +2416,15 @@ export function computePrepPhaseRanges(
   return phases;
 }
 
-/** Оценка текущих калорий подготовки: поддерживающие − дефицит на цель. */
-export function estimatePrepCalories(weightKg: number, targetRatePctPerWeek: number, referenceKcal?: number): number {
+/** Оценка текущих калорий подготовки: поддерживающие − дефицит на цель.
+ *  PRO-3 Э12: пол по полу (Ж 1400 / М 1200 — RED-S) и кап дефицита ≤30% поддержания
+ *  (защита от сохранённых конфигов с темпом >1%/нед). Без sex — прежнее поведение (1200). */
+export function estimatePrepCalories(weightKg: number, targetRatePctPerWeek: number, referenceKcal?: number, sex?: 'male' | 'female'): number {
   const maintenance = referenceKcal && referenceKcal > 1200 ? referenceKcal : Math.round(weightKg * 31);
   const rate = clamp(Number(targetRatePctPerWeek) || 0.5, 0.1, 1.5);
-  const deficit = Math.round((rate / 100) * weightKg * 7700 / 7);
-  return Math.max(1200, maintenance - deficit);
+  const rawDeficit = Math.round((rate / 100) * weightKg * 7700 / 7);
+  const deficit = Math.min(rawDeficit, Math.round(maintenance * 0.30));
+  return Math.max(sex === 'female' ? 1400 : 1200, maintenance - deficit);
 }
 
 /** Минимально безопасные жиры (г/кг): 0.6–0.8 — жиры не обнуляются в последние дни. */
@@ -2593,7 +2558,7 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
       finalWeeks: prepWeeks >= 4 ? 2 : 0,
       targetRatePctPerWeek: targetRate,
       startingWeightKg: cfg.weightKg,
-      currentCalories: opts.currentCalories ?? estimatePrepCalories(cfg.weightKg, targetRate),
+      currentCalories: opts.currentCalories ?? estimatePrepCalories(cfg.weightKg, targetRate, undefined, cfg.sex),
       stepsPerDay: opts.stepsPerDay ?? 8000,
       cardioMinutesPerWeek: opts.cardioMinutesPerWeek ?? 0,
       volumeMult: opts.prepVolumeMult != null ? Math.min(1, Math.max(0.75, opts.prepVolumeMult)) : undefined,

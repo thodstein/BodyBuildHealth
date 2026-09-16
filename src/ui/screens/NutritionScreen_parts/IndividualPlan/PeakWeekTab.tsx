@@ -24,7 +24,7 @@ import { shareOrCopyText } from './planner-day-print';
 import { usePlanCtx } from './IndividualPlanContext';
 import { getProfile } from '../../../../core/profile-manager';
 import { ContestPrepConfigEditor } from '../../../../ui/components/contest-prep/ContestPrepConfigEditor';
-import { saveContestPrepEverywhere, clearContestPrepEverywhere, loadContestPrepPlan } from '../../../../engines/bb/bb-contest-prep-sync';
+import { saveContestPrepEverywhere, clearContestPrepEverywhere, loadContestPrepPlan, loadContestPrepConfig } from '../../../../engines/bb/bb-contest-prep-sync';
 import { loadShowChecklist, toggleShowChecklistItem } from '../../../../engines/bb/bb-contest-prep.engine';
 
 const ACCENT = '#f59e0b';
@@ -238,7 +238,11 @@ export const PeakWeekTab: React.FC = () => {
   const ctx = usePlanCtx();
   const { bbPrepConfig, setBBPrepConfig, applyBBPeakToPlan, weight, sex, bodyFatPct, bbCategory } = ctx;
 
-  const [draft, setDraft] = useState<BBContestPrepConfig>(() => bbPrepConfig ?? defaultConfig(sex, weight, bbCategory));
+  // PRO-3 Э12: план-первый черновик (единый контур чтения: план → легаси-конфиг → дефолт).
+  const [draft, setDraft] = useState<BBContestPrepConfig>(() => {
+    try { return loadContestPrepConfig() ?? bbPrepConfig ?? defaultConfig(sex, weight, bbCategory); }
+    catch { return bbPrepConfig ?? defaultConfig(sex, weight, bbCategory); }
+  });
   const [savedFlash, setSavedFlash] = useState(false);
   // Э5: тик обновления персистентного чек-листа готовности.
   const [showTick, setShowTick] = useState(0);

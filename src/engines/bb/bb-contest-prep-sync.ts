@@ -229,8 +229,4 @@ export function migrateLegacyContestPrepIfNeeded(opts: BuildPrepPlanOpts = {}): 
   }
 }
 
-/** Подписка на событие обновления (удобный хелпер). */
-export function onContestPrepUpdated(handler: (ev: Event) => void): () => void {
-  window.addEventListener(CONTEST_PREP_UPDATED_EVENT, handler);
-  return () => window.removeEventListener(CONTEST_PREP_UPDATED_EVENT, handler);
-}
+// (PRO-3 Э12: onContestPrepUpdated удалён — слушатели вешают addEventListener напрямую, 0 потребителей.)

@@ -68,7 +68,7 @@ import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBP
 import {
   buildBBContestPrep, applyPeakWeekOverlayToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile,
   isoAddDays, isoToday, CATEGORY_PROFILES,
-  buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, replanBBContestPrep,
+  buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, addPrepWeeks, addPeakPriming,
   shiftBBContestPrepShowDate, serializeBBContestPrepPlan,
   prepPhaseForDate, configFromPlan,
   computeReadiness, spillRiskScore, isShortCycle,
@@ -880,7 +880,8 @@ export const BbAutoConstructor: React.FC = () => {
     const newWeeks = Math.min(52, Math.max(1, prepPlan.preparation.weeks + delta));
     if (newWeeks === prepPlan.preparation.weeks) return;
     setPrepWeeks(newWeeks);
-    const replanned = replanBBContestPrep(prepPlan, prepPlan.showDate, newWeeks);
+    // PRO-3 Э12: расширение/сужение — через единый хелпер движка (addPrepWeeks).
+    const replanned = addPrepWeeks(prepPlan, delta);
     setPrepPlan(replanned);
     // PRO-3 Э1/D2: персист расширения (раньше state/план менялись, профиль — нет, флеш врал).
     const cfg = buildContestPrepConfig();
@@ -3569,7 +3570,7 @@ export const BbAutoConstructor: React.FC = () => {
     void strategySafe;
     // 4.3 остаток-2: снимок внешних привязок шага Contest Prep для под-секций (вместо 80+ props).
     const contestCtx: BbContestPrepCtx = {
-      PREP_CHECKIN_ITEMS, adaptiveTaper, assembleContestPrep, buildContestPrepConfig, builtPlan,
+      PREP_CHECKIN_ITEMS, adaptiveTaper, assembleContestPrep, buildContestPrepConfig, builtPlan, setBuiltPlan, bbWorkMax,
       contestWizard, currentPrepWeek, expYearsForPrep,
       flash, handleApplyAdaptiveTaper, handleApplyWeightAdjustment, handleExportCheckinsCsv, handleExportPrepIcs, handleExportPrepJson,
       handleExportWeeklyReport, handleExtendPrep, handlePrintPrepSummary, handleRunTestPeakWeek, handleSaveWeekCheckin, handleShiftPrepShowDate,

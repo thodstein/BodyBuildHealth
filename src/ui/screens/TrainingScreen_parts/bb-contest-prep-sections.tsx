@@ -23,7 +23,7 @@ import {
   buildPostShowPlan, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson,
   prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv,
   manipulationLockedFor, manipulationLockNote, trialCarbDoseGPerKg,
-  TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks, prepRefeedDates,
+  TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks, prepRefeedDates, addPeakPriming,
   postShowRecoveryDiet, activePostShowCurve, buildPeakWeek, recarbLoadFromVisual,
   type PrepAdjustment,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
@@ -772,7 +772,7 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
 
 /** C — Test Peak Week (шаг 4) + безопасность + чек-лист шоу + мед-процесс + питание на сегодня. */
 export const BbContestPrepTrialSafety: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) => {
-  const { contestWizard, flash, handleRunTestPeakWeek, lastTest, liveFull, liveVisual, liveWater, prepPlan, recarb, setLiveFull, setLiveVisual, setLiveWater, setRecarb, setShowCheck, setTestRatings, setTestWeightDelta, showCheck, step, testRatings, testWeightDelta, today, weeklyLog, savePrepToProfile } = ctx;
+  const { contestWizard, flash, handleRunTestPeakWeek, lastTest, liveFull, liveVisual, liveWater, prepPlan, recarb, setLiveFull, setLiveVisual, setLiveWater, setRecarb, setShowCheck, setTestRatings, setTestWeightDelta, showCheck, step, testRatings, testWeightDelta, today, weeklyLog, savePrepToProfile, prepApplied, builtPlan, setBuiltPlan, bbWorkMax } = ctx;
   return (
     <>
       {/* <<TrialSafety>> */}
@@ -1002,6 +1002,31 @@ export const BbContestPrepTrialSafety: React.FC<{ ctx: BbContestPrepCtx }> = ({ 
                 </div>
               );
             })()}
+
+            {/* 🧠 PRO-3 Э12: прайминг D-2/D-1 — opt-in действие на собранный план (CNS-активация) */}
+            {prepApplied && builtPlan && (
+              <div style={{ marginBottom:10 }}>
+                <button
+                  data-bb="peak-prime"
+                  onClick={() => {
+                    try {
+                      const weeks = (builtPlan as any).weeks || [];
+                      const already = weeks.some((w: any) => w.peakWeek && (w.sessions || []).some((s: any) => (s.exercises || []).some((e: any) => e.priming)));
+                      if (already) { flash('🧠 Прайминг уже добавлен в пик-неделю'); return; }
+                      const { plan: primed, added } = addPeakPriming(builtPlan as any, bbWorkMax || {});
+                      if (added > 0) { setBuiltPlan(primed as any); flash(`🧠 Прайминг 3×3-5 @50-70% добавлен в ${added} сессии D-2/D-1`); }
+                      else flash('Пик-неделя не найдена — сначала соберите/примените prep');
+                    } catch { flash('Не удалось добавить прайминг'); }
+                  }}
+                  style={{ minHeight:44, padding:'6px 12px', borderRadius:8, fontSize:11, fontWeight:800, cursor:'pointer', color:'#fff', border:'1px solid rgba(251,191,36,0.5)', background:'rgba(251,191,36,0.12)' }}
+                >
+                  🧠 Прайминг D-2/D-1 (3×3-5 @50-70%)
+                </button>
+                <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>
+                  Лёгкая CNS-активация на последних сессиях перед сценой (50–70% 1RM, RIR 3, без утомления) — не новые упражнения. Действие не сохраняется автоматически — сохраните план.
+                </div>
+              </div>
+            )}
 
             {/* 🩺 Мед-процесс подготовки (Э6): лаба к шоу + процедуры doctorOnly + гидратация */}
             <CollapsibleCard title="🩺 Мед-процесс подготовки · анализы и мониторинг" badge="не назначения">
