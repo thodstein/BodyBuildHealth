@@ -13,6 +13,26 @@ export interface ArmliftMovementLines {
   painStop: boolean;
 }
 
+/** Ключ персиста движения (пишет приёмник моста, читают печать/сводка/карточка). */
+export const ARMLIFT_MOVEMENT_PACK_KEY = 'he_armlifting_corrections';
+
+/**
+ * Строки движения из персист-пака (единая точка чтения для печати/сводки/карточки —
+ * вместо копий read/filter в каждом потребителе). Пусто/мусор/нет ключа — [].
+ */
+export function readArmliftMovementPack(): string[] {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(ARMLIFT_MOVEMENT_PACK_KEY);
+    const j = raw ? JSON.parse(raw) : null;
+    const mv = j && typeof j === 'object' ? (j as Record<string, unknown>).movement : null;
+    const lines = mv && typeof mv === 'object' && Array.isArray((mv as Record<string, unknown>).lines)
+      ? ((mv as Record<string, unknown>).lines as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '').slice(0, 8)
+      : [];
+    return lines;
+  } catch { return []; }
+}
+
 const str = (v: unknown): string | null => {
   const s = typeof v === 'string' ? v.trim() : '';
   return s ? s : null;

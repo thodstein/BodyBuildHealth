@@ -53,6 +53,18 @@ const TITLES: Record<ArmliftWeakLink, string> = {
   conditioning: 'Стоп: боль — сначала к врачу, не грузить',
 };
 
+/** PRO-6 M12: короткие RU-имена звеньев (для ленты попытки — вместо сырых id). */
+export const ARMLIFT_WEAK_LINK_SHORT_RU: Record<ArmliftWeakLink, string> = {
+  thumb: 'большой палец',
+  fingers: 'сгибатели пальцев',
+  wrist_ext: 'разгибатели запястья',
+  support_endurance: 'выносливость удержания',
+  crush: 'дробление',
+  technique: 'техника',
+  asymmetry: 'асимметрия рук',
+  conditioning: 'боль (стоп)',
+};
+
 function num(v: number | null | undefined): number | null {
   return v != null && Number.isFinite(v) && (v as number) > 0 ? (v as number) : null;
 }

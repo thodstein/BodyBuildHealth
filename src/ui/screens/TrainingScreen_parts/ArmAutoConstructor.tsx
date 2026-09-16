@@ -35,7 +35,7 @@ import { GRIP_IMPLEMENTS, type ArmImplement } from '../../../engines/arm/arm-gri
 import { ARM_MEDLEYS, getMedley } from '../../../engines/arm/arm-medley.engine';
 import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.engine';
 import { resolveArmMovementIntake } from '../../../engines/arm/arm-movement-intake.engine';
-import { armliftMovementFlashLines } from '../../../engines/arm/armlift-movement-lines.engine';
+import { armliftMovementFlashLines, readArmliftMovementPack } from '../../../engines/arm/armlift-movement-lines.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
 import { ARM_EXERCISES } from '../../../core/exercise-catalog-arm';
@@ -1307,15 +1307,24 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </div>
             </AdBanner>
           )}
-          {armliftCorrections.items.length>0 && (discipline as string) === 'armlifting' && (
+          {(armliftCorrections.items.length > 0 || (armliftCorrections.movement?.lines.length ?? 0) > 0) && (discipline as string) === 'armlifting' && (
             <AdBanner tone="info">
               <b>🏋️ Хват-коррекции из армлифтинг-диагностики (волной {armliftCorrections.spec.length || 1} нед в план при сборке)</b>
+              {armliftCorrections.items.length > 0 && (
               <div className="ad-row">
                 {armliftCorrections.items.map(c=> (
                   <span key={c.exId} className="ad-tag">{c.exId} {c.sets}×{c.dayTag || ''}</span>
                 ))}
                 {armliftCorrections.weakArmNote && <span className="ad-tag">{armliftCorrections.weakArmNote}</span>}
               </div>
+              )}
+              {(armliftCorrections.movement?.lines.length ?? 0) > 0 && (
+              <div className="ad-row" data-arm="armlift-movement-card">
+                {(armliftCorrections.movement?.lines ?? []).map((ln, i) => (
+                  <span key={i} className="ad-tag">{ln}</span>
+                ))}
+              </div>
+              )}
               <div className="ad-row">
                 <AdBtn variant="dark" onClick={()=>{ setArmliftCorrections({ items: [], spec: [] }); try{ localStorage.removeItem('he_armlifting_corrections'); } catch{} }}>✕ Сбросить хват-коррекции</AdBtn>
                 <span className="ad-muted">Инъекция: per-day dedup, budget, кап сессии 8, делод-скип</span>
@@ -2006,16 +2015,9 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   } catch {}
                   let proSummary: any = null;
                   try { if (builtPlan?.inputSnapshot) proSummary = buildArmProSummary(builtPlan.inputSnapshot); } catch { proSummary = null; }
-                  /** PRO-6 M11: движение армлифтинга из пака (персист моста, не transient flash). */
-                  let armliftMovement: string[] | null = null;
-                  try {
-                    const praw = localStorage.getItem('he_armlifting_corrections');
-                    const pj = praw ? JSON.parse(praw) : null;
-                    const pl = pj && typeof pj === 'object' && (pj as any).movement && Array.isArray((pj as any).movement.lines)
-                      ? ((pj as any).movement.lines as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '').slice(0, 8)
-                      : [];
-                    if (pl.length) armliftMovement = pl;
-                  } catch { armliftMovement = null; }
+                  /** PRO-6 M12: движение армлифтинга из пака (единый ридер). */
+                  const almPackLines = readArmliftMovementPack();
+                  const armliftMovement = almPackLines.length ? almPackLines : null;
                   const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info, movement: diag?.movement, armliftMovement }, proSummary);
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
@@ -2052,15 +2054,9 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                       if (mv.humerusDangerNote) lines.push(`⛔ ${mv.humerusDangerNote}`);
                       }
                     } catch { /* noop */ }
-                    // PRO-6 M11: движение армлифтинга из пака (тот же источник, что у печати)
-                    try {
-                      const praw = localStorage.getItem('he_armlifting_corrections');
-                      const pj = praw ? JSON.parse(praw) : null;
-                      const pl = pj && typeof pj === 'object' && (pj as any).movement && Array.isArray((pj as any).movement.lines)
-                        ? ((pj as any).movement.lines as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '')
-                        : [];
-                      if (pl.length) lines.push(`🏋️ Движение: ${pl.slice(0, 8).join(' · ')}`);
-                    } catch { /* noop */ }
+                    // PRO-6 M12: движение армлифтинга из пака (тот же ридер, что у печати)
+                    const almSummaryLines = readArmliftMovementPack();
+                    if (almSummaryLines.length) lines.push(`🏋️ Движение: ${almSummaryLines.join(' · ')}`);
                   const txt = lines.join('\n');
                   const done = () => flash('✅ Сводка скопирована');
                   const fallback = () => {

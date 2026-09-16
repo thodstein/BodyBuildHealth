@@ -22,7 +22,7 @@ import { assessArmliftHand, holdCurveFor } from '../../../engines/arm/armlift-ha
 import { assessArmliftPainMap, ARMLIFT_PAIN_ZONES, type ArmliftPainZone } from '../../../engines/arm/armlift-pain-map.engine';
 import { analyzeArmliftVideo } from '../../../engines/arm/armlift-video-flags.engine';
 import { planArmliftAttempts } from '../../../engines/arm/armlift-attempt-plan.engine';
-import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
+import { diagnoseArmlift, ARMLIFT_WEAK_LINK_SHORT_RU } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../../../engines/arm/armlift-cause.engine';
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';
 import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, weeksBetween, loadDiagHistory, clearDiagHistory, historyDeltaFor, completenessTrend } from '../../../engines/arm/armlift-history.engine';
@@ -843,7 +843,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             })}
           </div>
           {failPhase && (
-            <div className="ad-muted">Фаза срыва «{failPhase.label}»: норма — {failPhase.good}. Чинят звенья: {failPhase.weakLinks.join(', ')}.</div>
+            <div className="ad-muted">Фаза срыва «{failPhase.label}»: норма — {failPhase.good}. Чинят звенья: {failPhase.weakLinks.map((w) => ARMLIFT_WEAK_LINK_SHORT_RU[w] || w).join(', ')}.</div>
           )}
           {diag.failurePoint && (
             <div className="ad-muted">

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { ArmAutoConstructor } from '../ArmAutoConstructor';
 import { applyToPlanner, clearPlannerApply } from '../planner-bridge';
 
@@ -83,5 +83,22 @@ describe('M10 приёмник движения в конструкторе', ()
     const raw = localStorage.getItem('he_armlifting_corrections');
     const pack = raw ? JSON.parse(raw) : null;
     expect(pack?.movement).toBeUndefined();
+  });
+
+  it('PRO-6 M12: карточка движения видна и переживает ремаунт (пак, не flash)', () => {
+    seed({
+      diagTimelinePhase: { id: 'mid', label: 'Протяжка', weakLinks: ['fingers'] },
+      armliftExercises: [{ exId: 'plate_pinch_hold', sets: 3 }],
+    });
+    const r1 = render(<ArmAutoConstructor />);
+    expect(document.body.textContent).toContain('фаза срыва: Протяжка');
+    r1.unmount();
+    cleanup();
+    clearPlannerApply();
+    render(<ArmAutoConstructor />);
+    // пак пережил ремаунт, но карточка живёт на шаге «Атлет» и загейчена на дисциплину — идём туда
+    fireEvent.click(screen.getByRole('button', { name: 'Армлифтинг' }));
+    fireEvent.click(screen.getByRole('button', { name: '🎯 Атлет' }));
+    expect(document.body.textContent).toContain('фаза срыва: Протяжка');
   });
 });

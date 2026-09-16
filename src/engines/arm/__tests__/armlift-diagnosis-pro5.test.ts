@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { failuresFor, faultsFor, movementFor } from '../armlift-failure-modes.engine';
-import { diagnoseArmlift } from '../armlift-diagnosis.engine';
+import { diagnoseArmlift, ARMLIFT_WEAK_LINK_SHORT_RU, type ArmliftWeakLink } from '../armlift-diagnosis.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../armlift-correction.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../armlift-cause.engine';
 import { injectArmliftCorrections, correctionsToInjectionItems, applyArmliftSpecWave } from '../armlift-injection.engine';
@@ -692,5 +692,17 @@ describe('PRO-5 D21: completeness в истории и дельта полнот
     ];
     expect(completenessTrend(hist, 'hub')).toEqual([40, 80]);
     expect(completenessTrend([], 'hub')).toEqual([]);
+  });
+});
+
+describe('PRO-6 M12: короткие RU-имена звеньев', () => {
+  it('все 8 звеньев покрыты, без латиницы', () => {
+    const keys = ['thumb', 'fingers', 'wrist_ext', 'support_endurance', 'crush', 'technique', 'asymmetry', 'conditioning'];
+    for (const k of keys) {
+      const v = ARMLIFT_WEAK_LINK_SHORT_RU[k as ArmliftWeakLink];
+      expect(typeof v).toBe('string');
+      expect(v.length).toBeGreaterThan(0);
+      expect(/[a-zA-Z]/.test(v)).toBe(false);
+    }
   });
 });
