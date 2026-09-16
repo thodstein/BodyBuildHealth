@@ -29,6 +29,12 @@ export interface BBDiagnosticsPro2Meta {
   /** Движения v2: драйвер скрининга + односторонний вердикт (хаб шлёт, приёмник/экспорт читают). */
   movementDriver?: { driver: string; label: string; fix: string; confidence: number } | null;
   singleLeg?: { weakSide: 'left' | 'right' | null; text: string } | null;
+  /** D1–D5: плечо/шарнир/YBT/асимметрии/замены (всё опционально, без — байт-в-байт). */
+  shoulder?: { pass: boolean; locus: string; text: string } | null;
+  hinge?: { text: string } | null;
+  ybt?: { text: string } | null;
+  asymPriority?: string | null;
+  driverSubs?: { text: string } | null;
 }
 
 export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakHeads?: string[]; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta): string {
@@ -103,6 +109,11 @@ ${(() => {
     if (m.lr?.length) parts.push(`<h2>Лево/право (дневник)</h2><table><tr><th>Группа</th><th>Л</th><th>П</th><th>Перекос</th><th>Вердикт</th></tr>${m.lr.map((v) => `<tr><td>${esc(v.group)}</td><td>${v.left}</td><td>${v.right}</td><td>${v.asymPct ?? '—'}%</td><td>${esc(v.text)}</td></tr>`).join('')}</table>`);
     if ((m as any).movementDriver && typeof (m as any).movementDriver === 'object' && (m as any).movementDriver.label) parts.push(`<h2>Драйвер движений</h2><div style="font-size:12px">${esc((m as any).movementDriver.label)} — ${esc((m as any).movementDriver.fix || '')}</div>`);
     if ((m as any).singleLeg && typeof (m as any).singleLeg === 'object' && (m as any).singleLeg.text) parts.push(`<h2>Односторонний скрининг</h2><div style="font-size:12px">${esc((m as any).singleLeg.text)}</div>`);
+    if ((m as any).shoulder && typeof (m as any).shoulder === 'object' && (m as any).shoulder.text) parts.push(`<h2>Плечо у стены</h2><div style="font-size:12px">${esc((m as any).shoulder.text)}</div>`);
+    if ((m as any).hinge && typeof (m as any).hinge === 'object' && (m as any).hinge.text) parts.push(`<h2>Шарнир + нагрузка</h2><div style="font-size:12px">${esc((m as any).hinge.text)}</div>`);
+    if ((m as any).ybt && typeof (m as any).ybt === 'object' && (m as any).ybt.text) parts.push(`<h2>YBT-баланс</h2><div style="font-size:12px">${esc((m as any).ybt.text)}</div>`);
+    if (typeof (m as any).asymPriority === 'string' && (m as any).asymPriority) parts.push(`<h2>Асимметрии</h2><div style="font-size:12px">${esc((m as any).asymPriority)}</div>`);
+    if ((m as any).driverSubs && typeof (m as any).driverSubs === 'object' && (m as any).driverSubs.text) parts.push(`<h2>Замены под драйвер</h2><div style="font-size:12px">${esc((m as any).driverSubs.text)}</div>`);
     if (m.readiness?.level) parts.push(`<h2>Готовность — ${esc(m.readiness.level)}</h2><div style="font-size:12px">${esc(m.readiness.advice)}</div><ul>${m.readiness.reasons.map((r) => `<li>${esc(r)}</li>`).join('') || '<li>—</li>'}</ul>`);
     if (m.redFlags?.active) parts.push(`<h2>Флаги — ${m.redFlags.blocked ? 'стоп' : 'осторожно'}</h2><div style="font-size:12px">${esc(m.redFlags.text)} (скрининг, не диагноз)</div>`);
     if (m.bar) parts.push(`<h2>Штанга (видео)</h2><div style="font-size:12px">Петля ${m.bar.xLoop} см · ${esc(m.bar.type)} — ${esc(m.bar.text)} (порог 4/6 см)</div>`);
@@ -196,6 +207,11 @@ export function buildBBDiagnosticsCsv(
   if (meta?.mmc) lines.push(['mmc', meta.mmc].map(escCsv).join(','));
   if ((meta as any)?.movementDriver?.label) lines.push(['movement_driver', `${(meta as any).movementDriver.driver}: ${(meta as any).movementDriver.label}`].map(escCsv).join(','));
   if ((meta as any)?.singleLeg?.text) lines.push(['single_leg', (meta as any).singleLeg.text].map(escCsv).join(','));
+  if ((meta as any)?.shoulder?.text) lines.push(['shoulder', (meta as any).shoulder.text].map(escCsv).join(','));
+  if ((meta as any)?.hinge?.text) lines.push(['hinge_loaded', (meta as any).hinge.text].map(escCsv).join(','));
+  if ((meta as any)?.ybt?.text) lines.push(['ybt', (meta as any).ybt.text].map(escCsv).join(','));
+  if (typeof (meta as any)?.asymPriority === 'string' && (meta as any).asymPriority) lines.push(['asym_priority', (meta as any).asymPriority].map(escCsv).join(','));
+  if ((meta as any)?.driverSubs?.text) lines.push(['driver_subs', (meta as any).driverSubs.text].map(escCsv).join(','));
   if (meta?.returnTo) lines.push(['return_to', meta.returnTo.text].map(escCsv).join(','));
   if (meta?.lrDirection?.length) lines.push(['lr_direction', meta.lrDirection.map((d) => d.text).join(' · ')].map(escCsv).join(','));
   if (meta?.workingRange) lines.push(['working_range', meta.workingRange].map(escCsv).join(','));

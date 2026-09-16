@@ -48,6 +48,14 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   /** Движения ББ v2 (BBDiagnosticsHub → BbAutoConstructor): драйвер скрининга + односторонний + VBT-флаг (всё опционально). */
   movementDriver?: { driver: string; label: string; fix: string; confidence: number } | null;
   singleLeg?: { weakSide: 'left' | 'right' | null; text: string } | null;
+  /** D1–D5 (BBDiagnosticsHub → BbAutoConstructor): плечо/шарнир/YBT/лопатка/видео/замены — всё опционально. */
+  shoulder?: { pass: boolean; locus: string; text: string } | null;
+  hinge?: { pass?: boolean; locus?: string; text: string; loaded?: string } | null;
+  ybt?: { tested: boolean; asymCm: number | null; compositePct: number | null; text: string } | null;
+  scapPain?: { painArc: boolean; winging: boolean; text: string | null } | null;
+  videoStandard?: string | null;
+  driverSubs?: { prefer: string[]; avoid: string[]; note: string } | null;
+  asymPriority?: string | null;
   /** @deprecated D1 (§9 BB-AUTO-EXHAUSTIVE-PRO): приёмник не читает (хаб всегда шлёт `null`
    *  by design — VBT живёт в Анализе силы). Оставлено для совместимости сохранённых payload'ов;
    *  новым кодом не заполнять. */

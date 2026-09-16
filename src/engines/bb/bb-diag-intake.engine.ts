@@ -39,11 +39,19 @@ export interface BbDiagIntakeInput {
   lrTopUp?: unknown;
   returnAction?: unknown;
   returnStage?: unknown;
+  /** D1–D5: плечо/шарнир/YBT/лопатка/видео/замены — всё опционально. */
+  shoulder?: unknown;
+  hinge?: unknown;
+  ybt?: unknown;
+  scapPain?: unknown;
+  videoStandard?: unknown;
+  driverSubs?: unknown;
+  asymPriority?: unknown;
 }
 
 export interface BbDiagIntakeExtras {
   bits: string[];
-  persist: { movementDriver?: BbDiagMovementDriver; singleLeg?: BbDiagSingleLeg };
+  persist: { movementDriver?: BbDiagMovementDriver; singleLeg?: BbDiagSingleLeg; movementExtra?: Record<string, string> };
   clean: { lrTopUp: boolean; returnAction: boolean };
 }
 
@@ -91,6 +99,30 @@ export function resolveBbDiagIntakeExtras(d: BbDiagIntakeInput | null | undefine
   if (singleLeg?.weakSide) {
     bits.push(`односторонний: слабее ${singleLeg.weakSide === 'left' ? 'левая' : 'правая'}`);
   }
+  // D1–D5: только заполненное, мусор — тихо (санитизация через trim, кап 300).
+  const extra: Record<string, string> = {};
+  const take = (key: string, v: unknown, pick: (r: Record<string, unknown>) => string): void => {
+    if (!isRec(v)) return;
+    const t = pick(v).trim().slice(0, 300);
+    if (t) { extra[key] = t; bits.push(t); }
+  };
+  take('shoulder', src.shoulder, (r) => (typeof r.text === 'string' && (r.pass === false || /плечо у стены/i.test(r.text)) ? `плечо: ${r.text}` : ''));
+  take('hinge', src.hinge, (r) => (typeof r.text === 'string' && !/не проверял/i.test(r.text) ? `шарнир: ${r.text}` : ''));
+  take('ybt', src.ybt, (r) => (typeof r.text === 'string' && !/не замерялся/i.test(r.text) ? `${r.text}` : ''));
+  take('scapPain', src.scapPain, (r) => (typeof r.text === 'string' && r.text ? `${r.text}` : ''));
+  take('driverSubs', src.driverSubs, (r) => {
+    const pref = Array.isArray(r.prefer) ? r.prefer.map(String).filter(Boolean).slice(0, 3).join(' · ') : '';
+    return pref ? `замены: ${pref}` : '';
+  });
+  // asymPriority едет строкой (не объектом) — отдельный гейт.
+  if (typeof src.asymPriority === 'string') {
+    const t = src.asymPriority.trim().slice(0, 300);
+    if (t && !/значимых нет/i.test(t)) { extra.asymPriority = t; bits.push(t); }
+  }
+  if (typeof src.videoStandard === 'string') {
+    const t = src.videoStandard.trim().slice(0, 300);
+    if (t) { extra.videoStandard = t; bits.push(`видео: ${t}`); }
+  }
 
   const hasLrMarker = src.lrVerdicts !== undefined;
   const clean = {
@@ -103,6 +135,7 @@ export function resolveBbDiagIntakeExtras(d: BbDiagIntakeInput | null | undefine
   const persist: BbDiagIntakeExtras['persist'] = {};
   if (movementDriver) persist.movementDriver = movementDriver;
   if (singleLeg) persist.singleLeg = singleLeg;
+  if (Object.keys(extra).length) persist.movementExtra = extra;
 
   return { bits, persist, clean };
 }

@@ -43,6 +43,10 @@ import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapsho
 import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
 import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, movementDelta, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
+import { shoulderWallVerdict, thoracicRotationVerdict } from '../../../engines/bb/bb-shoulder-screen.engine';
+import { hingeVerdict, loadedSquatVerdict } from '../../../engines/bb/bb-hinge-screen.engine';
+import { ybtLqVerdict, YBT_DISCLAIMER } from '../../../engines/bb/bb-ybt-lq.engine';
+import { substitutesForDriver, asymPriorityText, SCREENING_DISCLAIMER, VIDEO_GUIDE } from '../../../engines/bb/bb-movement-to-plan.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
 type BBTab = 'weak' | 'screening' | 'exercise' | 'stimulus' | 'symmetry';
@@ -80,6 +84,17 @@ type BBState = {
   jointClickPain: boolean;
   /** PRO-4 S3: подтверждённая ступень возврата ('' — авто: ступень 1). */
   returnStage: '' | '1' | '2' | '3';
+  /** D1 плечо у стены (true = чисто; фолс — провал признака). */
+  shBackOnWall: boolean; shHeadOnWall: boolean; shBicepsAtEars: boolean; shRibsDown: boolean; shNoShrug: boolean;
+  /** D1 ротация грудного, градусы. */
+  rotL: string; rotR: string;
+  /** D2 шарнир (палка) + нагруженный присед. */
+  hingeDowel: '' | 'full' | 'lumbar_loss' | 'neck_loss' | 'both';
+  sqBody: '' | 'pass' | 'fail'; sqBar: '' | 'pass' | 'fail'; sqWork: '' | 'pass' | 'fail';
+  /** D3 YBT-LQ anterior + длина голени. */
+  ybtL: string; ybtR: string; shinCm: string;
+  /** D4 скапула/болевая дуга + видео-стандарт. */
+  painArc: boolean; scapWinging: boolean; videoTwoAngles: boolean;
 };
 
 const DEFAULT_STATE: BBState = {
@@ -107,6 +122,12 @@ const DEFAULT_STATE: BBState = {
   numbness: false,
   jointClickPain: false,
   returnStage: '',
+  shBackOnWall: true, shHeadOnWall: true, shBicepsAtEars: true, shRibsDown: true, shNoShrug: true,
+  rotL: '', rotR: '',
+  hingeDowel: '',
+  sqBody: '', sqBar: '', sqWork: '',
+  ybtL: '', ybtR: '', shinCm: '',
+  painArc: false, scapWinging: false, videoTwoAngles: false,
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
@@ -516,6 +537,53 @@ export const BBDiagnosticsHub: React.FC = () => {
       });
     } catch { return { weakSide: null, text: '' } as any; }
   }, [state.splitL, state.splitR, state.rdlL, state.rdlR, state.fppaL, state.fppaR]);
+  // D1–D5: плечо/шарнир/YBT/асимметрии/замены (чистые мемы, без TDZ — выше экспорта/моста)
+  const shoulderV = useMemo(() => {
+    try {
+      return shoulderWallVerdict({
+        backOnWall: state.shBackOnWall, headOnWall: state.shHeadOnWall, bicepsAtEars: state.shBicepsAtEars,
+        ribsDown: state.shRibsDown, noShrug: state.shNoShrug,
+      });
+    } catch { return { pass: true, fails: [], locus: 'ok', text: '' } as any; }
+  }, [state.shBackOnWall, state.shHeadOnWall, state.shBicepsAtEars, state.shRibsDown, state.shNoShrug]);
+  const rotV = useMemo(() => {
+    try {
+      const n = (v: string): number | null => { const x = parseFloat(v); return Number.isFinite(x) && x >= 0 ? x : null; };
+      return thoracicRotationVerdict({ rotL: n(state.rotL), rotR: n(state.rotR) });
+    } catch { return { text: '', gap: null, low: false } as any; }
+  }, [state.rotL, state.rotR]);
+  const hingeV = useMemo(() => {
+    try { return hingeVerdict((state.hingeDowel || null) as any); } catch { return { pass: true, locus: 'not_tested', text: '' } as any; }
+  }, [state.hingeDowel]);
+  const loadedV = useMemo(() => {
+    try {
+      return loadedSquatVerdict({
+        bodyweight: (state.sqBody || null) as any, bar: (state.sqBar || null) as any, working: (state.sqWork || null) as any,
+      });
+    } catch { return { degraded: false, text: '' } as any; }
+  }, [state.sqBody, state.sqBar, state.sqWork]);
+  const ybtV = useMemo(() => {
+    try {
+      const n = (v: string): number | null => { const x = parseFloat(v); return Number.isFinite(x) && x > 0 ? x : null; };
+      return ybtLqVerdict({ antL: n(state.ybtL), antR: n(state.ybtR), shinCm: n(state.shinCm) });
+    } catch { return { tested: false, asymCm: null, compositePct: null, warn: false, text: '' } as any; }
+  }, [state.ybtL, state.ybtR, state.shinCm]);
+  const asymText = useMemo(() => {
+    try {
+      const n = (v: string): number | null => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; };
+      const kl = n(state.ktwL); const kr = n(state.ktwR);
+      const fl = n(state.fppaL); const fr = n(state.fppaR);
+      return asymPriorityText({
+        ktwGapCm: kl != null && kr != null ? Math.abs(kl - kr) : null,
+        fppaGapDeg: fl != null && fr != null ? Math.abs(fl - fr) : null,
+        ybtAsymCm: (ybtV as any)?.asymCm ?? null,
+        rotGapDeg: (rotV as any)?.gap ?? null,
+      });
+    } catch { return ''; }
+  }, [state.ktwL, state.ktwR, state.fppaL, state.fppaR, ybtV, rotV]);
+  const driverSubs = useMemo(() => {
+    try { return substitutesForDriver((moveDriver as any)?.driver); } catch { return { avoid: [], prefer: [], note: '' } as any; }
+  }, [moveDriver]);
   const ohsCodes = useMemo(() => {
     try {
       return ohsFailCodes({
@@ -675,6 +743,14 @@ export const BBDiagnosticsHub: React.FC = () => {
         // Симметрия L/R — движения, с флип-гейтом (сторона плавает — без добивки); направление — из истории
         lrVerdicts,
         lrDirection,
+        // D1–D5: плечо/шарнир/YBT/лопатка/видео + замены драйвера (всё опционально, приёмник только сохраняет/показывает)
+        shoulder: (() => { try { return { pass: (shoulderV as any).pass, locus: (shoulderV as any).locus, text: (shoulderV as any).text }; } catch { return null; } })(),
+        hinge: (() => { try { return { pass: (hingeV as any).pass, locus: (hingeV as any).locus, text: (hingeV as any).text, loaded: (loadedV as any).text }; } catch { return null; } })(),
+        ybt: (() => { try { return { tested: (ybtV as any).tested, asymCm: (ybtV as any).asymCm, compositePct: (ybtV as any).compositePct, text: (ybtV as any).text }; } catch { return null; } })(),
+        scapPain: (() => { try { return { painArc: state.painArc, winging: state.scapWinging, text: state.painArc || state.scapWinging ? 'Лопатка/дуга: есть замечания (скрининг, не диагноз)' : null }; } catch { return null; } })(),
+        videoStandard: state.videoTwoAngles ? 'снято с 2 ракурсов' : null,
+        driverSubs: (() => { try { return { prefer: (driverSubs as any).prefer, avoid: (driverSubs as any).avoid, note: (driverSubs as any).note }; } catch { return null; } })(),
+        asymPriority: (() => { try { return asymText; } catch { return null; } })(),
       },
       source: 'intellectual',
     });
@@ -694,6 +770,8 @@ export const BBDiagnosticsHub: React.FC = () => {
     if (!state.ohsTrunkUpright) restrictions.push('hip');
     if (!state.ohsArmsOverMidfoot) restrictions.push('shoulder');
     if (!state.ohsLumbarNeutral) restrictions.push('lower_back');
+    // D1: провал плеча у стены — тоже плечо в профиль (тот же канал, без дублей)
+    try { if (!(shoulderV as any)?.pass) restrictions.push('shoulder'); } catch { /* noop */ }
     const ktwEff = ktwOf(state).eff;
     if (ktwEff != null && ktwEff < 12) restrictions.push('ankle');
     const uniq = [...new Set(restrictions)];
@@ -787,6 +865,12 @@ export const BBDiagnosticsHub: React.FC = () => {
         singleLeg: singleLegEx,
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
         mmc: mmcEx,
+        // D1–D5: плечо/шарнир/YBT/асимметрии/замены (только заполненное едет в файл)
+        shoulder: (() => { try { return { pass: (shoulderV as any).pass, locus: (shoulderV as any).locus, text: (shoulderV as any).text }; } catch { return null; } })(),
+        hinge: (() => { try { return { text: `${(hingeV as any).text} · ${(loadedV as any).text}` }; } catch { return null; } })(),
+        ybt: (() => { try { return { text: (ybtV as any).text }; } catch { return null; } })(),
+        asymPriority: (() => { try { return asymText; } catch { return null; } })(),
+        driverSubs: (() => { try { return { text: `${((driverSubs as any).prefer || []).join(' · ')} — ${(driverSubs as any).note}` }; } catch { return null; } })(),
       };
       try { Object.assign(pro2, buildMovementExport()); } catch { /* noop */ }
     } catch { /* noop */ }
@@ -845,6 +929,10 @@ export const BBDiagnosticsHub: React.FC = () => {
         singleLeg,
         ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
         mmc: (() => { try { const a = mmcAdvice; return a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null; } catch { return null; } })(),
+        shoulder: (() => { try { return { pass: (shoulderV as any).pass, locus: (shoulderV as any).locus, text: (shoulderV as any).text }; } catch { return null; } })(),
+        hinge: (() => { try { return { text: `${(hingeV as any).text} · ${(loadedV as any).text}` }; } catch { return null; } })(),
+        ybt: (() => { try { return { text: (ybtV as any).text }; } catch { return null; } })(),
+        asymPriority: (() => { try { return asymText; } catch { return null; } })(),
       };
       try { Object.assign(pro2csv, buildMovementExport()); } catch { /* noop */ }
     } catch { /* noop */ }
@@ -1951,6 +2039,66 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <BbNum label="Угломер FPPA П, ° (необязательно)" value={state.fppaR} onChange={(v) => setState(s => ({ ...s, fppaR: v }))} placeholder="—" step={1} testId="bb-fppa-r" />
               </div>
               <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }}>Угломер — только tiebreak при чистой качественной оценке (разрыв ≥10°). Без угломера вердикт не меняется.</div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="shoulder-screen">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Плечо у стены + ротация грудного (жим/ОHP-зона)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                <BbCheckCard active={state.shBackOnWall} title="Спина на стене" desc="пятки/ягодицы/лопатки плотно" onToggle={() => setState((s) => ({ ...s, shBackOnWall: !s.shBackOnWall }))} />
+                <BbCheckCard active={state.shHeadOnWall} title="Голова на стене" desc="затылок касается, поясница плоская" onToggle={() => setState((s) => ({ ...s, shHeadOnWall: !s.shHeadOnWall }))} />
+                <BbCheckCard active={state.shBicepsAtEars} title="Бицепс у ушей" desc="руки вверх без ухода вперёд" onToggle={() => setState((s) => ({ ...s, shBicepsAtEars: !s.shBicepsAtEars }))} />
+                <BbCheckCard active={state.shRibsDown} title="Рёбра вниз" desc="поясница не прогибается" onToggle={() => setState((s) => ({ ...s, shRibsDown: !s.shRibsDown }))} />
+                <BbCheckCard active={state.shNoShrug} title="Без шрагов" desc="плечи не к ушам" onToggle={() => setState((s) => ({ ...s, shNoShrug: !s.shNoShrug }))} />
+              </div>
+              <div style={{ fontSize: 11, color: shoulderV.pass ? '#22c55e' : '#f59e0b' }} data-bb="shoulder-verdict">{shoulderV.text}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                <BbNum label="Ротация грудного Л, °" value={state.rotL} onChange={(v) => setState(s => ({ ...s, rotL: v }))} placeholder="50" step={1} testId="bb-rot-l" />
+                <BbNum label="Ротация грудного П, °" value={state.rotR} onChange={(v) => setState(s => ({ ...s, rotR: v }))} placeholder="50" step={1} testId="bb-rot-r" />
+              </div>
+              <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="rot-verdict">{rotV.text}</div>
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }}>Норма ротации ≥50°/сторона, разрыв ≥10° — чинить слабую. Тест стоя у стены, руки вверх, 3 повтора.</div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="hinge-screen">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Шарнир (палка) + присед под нагрузкой</div>
+              <BbSheetSelect label="Палка: затылок/лопатки/крестец" value={state.hingeDowel} onChange={(v) => setState((s) => ({ ...s, hingeDowel: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'full', label: 'Держится (3 точки)' }, { id: 'lumbar_loss', label: 'Поясница отрывается' }, { id: 'neck_loss', label: 'Затылок отрывается' }, { id: 'both', label: 'Теряются обе' }]} testId="bb-hinge" />
+              <div style={{ fontSize: 11, color: hingeV.pass ? '#22c55e' : '#f59e0b', marginTop: 4 }} data-bb="hinge-verdict">{hingeV.text}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
+                <BbSheetSelect label="Присед без веса" value={state.sqBody} onChange={(v) => setState((s) => ({ ...s, sqBody: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Плывёт' }]} testId="bb-sq-body" />
+                <BbSheetSelect label="Гриф 20 кг" value={state.sqBar} onChange={(v) => setState((s) => ({ ...s, sqBar: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Плывёт' }]} testId="bb-sq-bar" />
+                <BbSheetSelect label="Рабочий вес" value={state.sqWork} onChange={(v) => setState((s) => ({ ...s, sqWork: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Плывёт' }]} testId="bb-sq-work" />
+              </div>
+              <div style={{ fontSize: 11, color: loadedV.degraded ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="loaded-verdict">{loadedV.text}</div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="ybt-screen">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>YBT-баланс (anterior, босиком)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                <BbNum label="Anterior Л, см" value={state.ybtL} onChange={(v) => setState(s => ({ ...s, ybtL: v }))} placeholder="—" step={0.5} testId="bb-ybt-l" />
+                <BbNum label="Anterior П, см" value={state.ybtR} onChange={(v) => setState(s => ({ ...s, ybtR: v }))} placeholder="—" step={0.5} testId="bb-ybt-r" />
+                <BbNum label="Голень, см" value={state.shinCm} onChange={(v) => setState(s => ({ ...s, shinCm: v }))} placeholder="—" step={0.5} testId="bb-shin" />
+              </div>
+              <div style={{ fontSize: 11, color: ybtV.warn ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="ybt-verdict">{ybtV.text}</div>
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="ybt-disclaimer">{YBT_DISCLAIMER} · пороги: асим &gt;4 см, композит &lt;94%.</div>
+              <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="asym-priority">{asymText}</div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="scap-video">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Лопатка/боль + видео + замены</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                <BbCheckCard active={!state.painArc} title="Без боли 60–120°" desc="дуга подъёма чистая" onToggle={() => setState((s) => ({ ...s, painArc: !s.painArc }))} accent="#ef4444" />
+                <BbCheckCard active={!state.scapWinging} title="Лопатка стабильна" desc="без крыловидности" onToggle={() => setState((s) => ({ ...s, scapWinging: !s.scapWinging }))} accent="#60a5fa" />
+              </div>
+              {(state.painArc || state.scapWinging) && (
+                <div style={{ fontSize: 11, color: '#f59e0b', marginBottom: 6 }} data-bb="scap-note">
+                  {state.painArc ? 'Боль в дуге 60–120°: жимы над головой и тяги за голову — стоп до врача; нейтральный хват + лицо-тяги. ' : ''}
+                  {state.scapWinging ? 'Крыловидность: стена-слайды + серратус (кулак вверх у стены) 2×12, жим — с паузой и сведением.' : ''}
+                  Скрининг, не диагноз.
+                </div>
+              )}
+              <BbCheckCard active={state.videoTwoAngles} title="Видео с 2 ракурсов" desc="5 повторов, босиком, спереди + сбоку" onToggle={() => setState((s) => ({ ...s, videoTwoAngles: !s.videoTwoAngles }))} accent="#a855f7" />
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="video-guide">{VIDEO_GUIDE}</div>
+              <div style={{ fontSize: 11, color: '#fff', marginTop: 6 }} data-bb="driver-subs">
+                Замены под драйвер: {driverSubs.prefer.length ? driverSubs.prefer.join(' · ') : '—'}
+                {driverSubs.avoid.length ? ` (убрать: ${driverSubs.avoid.join(' · ')})` : ''} — {driverSubs.note}
+              </div>
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="screening-disclaimer">{SCREENING_DISCLAIMER}</div>
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="screen-history">
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
