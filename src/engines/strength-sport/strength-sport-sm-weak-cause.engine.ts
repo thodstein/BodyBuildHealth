@@ -59,6 +59,10 @@ export interface SMWeakCauseInput {
   swayCm?: number | null;
   /** Асимметрия L/R % (фармер-hold). */
   asymmetryPct?: number | null;
+  /** P3: хват лимитирует фермер-заступ (холд < времени / дропы). */
+  gripLimitsCarry?: boolean | null;
+  /** P7: YBT anterior-асимметрия низа, см. */
+  ybtAntAsymCm?: number | null;
 }
 
 export interface SMWeakCauseResult {
@@ -93,6 +97,13 @@ export function diagnoseSMWeakCause(input: SMWeakCauseInput): SMWeakCauseResult 
 
   const gripBad = input.gripFails != null && input.gripFails >= 1;
   if (gripBad && isGripZone(zone)) signals.push(`grip fail ${input.gripFails}/3`);
+  // P3-мост: хват лимитирует заступ — структурный grip-сигнал для хвата И фермера-керри
+  const carryGripLimited = input.gripLimitsCarry === true;
+  const carryZone = (isGripZone(zone) || zone === 'farmers_carry') && carryGripLimited;
+  if (carryZone) signals.push('хват лимитирует заступ');
+  // P7: YBT-асимметрия — mobility-сигнал для чувствительных фаз
+  const ybtBad = mobSensitive && input.ybtAntAsymCm != null && (input.ybtAntAsymCm as number) > 4;
+  if (ybtBad) signals.push(`YBT Δ${input.ybtAntAsymCm}см >4`);
   const asymBad = input.asymmetryPct != null && input.asymmetryPct >= 7;
   if (asymBad && (isGripZone(zone) || zone === 'stone_off_floor')) signals.push(`асимметрия ${input.asymmetryPct}%`);
 
@@ -108,19 +119,21 @@ export function diagnoseSMWeakCause(input: SMWeakCauseInput): SMWeakCauseResult 
   // Приоритет: grip (структурный лимитер) → fatigue (острое) → mobility → strength → volume → technique
   let cause: SMWeakCause = 'technique';
   let confidence: 'high' | 'med' | 'low' = 'low';
-  if (isGripZone(zone) && gripBad && (asymBad || e1rmBad || volBad)) {
+  const gripSignal = (isGripZone(zone) && gripBad) || carryZone;
+  const mobSignal = mobBad || ybtBad;
+  if (gripSignal && (asymBad || e1rmBad || volBad)) {
     cause = 'grip';
     confidence = 'high';
-  } else if (isGripZone(zone) && gripBad) {
+  } else if (gripSignal) {
     cause = 'grip';
     confidence = 'med';
   } else if (acwrBad && vbtBad) {
     cause = 'fatigue';
     confidence = 'high';
-  } else if (mobBad && (volBad || e1rmBad || swayHint)) {
+  } else if (mobSignal && (volBad || e1rmBad || swayHint)) {
     cause = 'mobility';
     confidence = 'high';
-  } else if (mobBad) {
+  } else if (mobSignal) {
     cause = 'mobility';
     confidence = 'med';
   } else if (e1rmBad && !isGripZone(zone)) {

@@ -656,6 +656,26 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       }, (state.strategy as any) || 'balanced', contest as any);
     } catch { return null; }
   }, [state.contestId, state.yokeKg, state.farmersKg, state.stoneKg, state.logKg, state.axleKg, state.strategy, contest]);
+  // ── SM movement→причина: P3/P7-сигналы напрямую из стейта (мемы диагнозов ниже — TDZ) ──
+  const movementCauseSignals = (() => {
+    let gripLimitsCarry: boolean | null = null;
+    let ybtAntAsymCm: number | null = null;
+    try {
+      gripLimitsCarry = diagnoseGripCarry({
+        farmersHoldSec: parseFloat(state.farmersHoldSec) > 0 ? parseFloat(state.farmersHoldSec) : null,
+        runTimeSec: parseFloat(state.gripRunSec) > 0 ? parseFloat(state.gripRunSec) : null,
+        dropsPerRun: state.gripDrops !== '' && Number.isFinite(parseFloat(state.gripDrops)) && parseFloat(state.gripDrops) >= 0 ? parseFloat(state.gripDrops) : null,
+        pickupMs: parseFloat(state.pickupMs) > 0 ? parseFloat(state.pickupMs) : null,
+      })?.gripLimitsCarry ?? null;
+    } catch { /* noop */ }
+    try {
+      ybtAntAsymCm = diagnoseYBT({
+        antLeftCm: parseFloat(state.ybtAntL) > 0 ? parseFloat(state.ybtAntL) : null,
+        antRightCm: parseFloat(state.ybtAntR) > 0 ? parseFloat(state.ybtAntR) : null,
+      })?.antAsymCm ?? null;
+    } catch { /* noop */ }
+    return { gripLimitsCarry, ybtAntAsymCm };
+  })();
   const smCauses = useMemo(() => smWeakPoints.map((wp) => {
     const liftKey = smLiftKeyForWeakPoint(wp as string);
     return diagnoseSMWeakCause({
@@ -669,8 +689,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       gripFails,
       swayCm,
       asymmetryPct: asymmetry?.diff ?? null,
+      gripLimitsCarry: movementCauseSignals.gripLimitsCarry,
+      ybtAntAsymCm: movementCauseSignals.ybtAntAsymCm,
     });
-  }), [smWeakPoints, diaryWeaks, acwr, vbtLoss, ohs.failed, gripFails, swayCm, asymmetry, weeklySetsByLift]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [smWeakPoints, diaryWeaks, acwr, vbtLoss, ohs.failed, gripFails, swayCm, asymmetry, weeklySetsByLift, state.farmersHoldSec, state.gripRunSec, state.gripDrops, state.pickupMs, state.ybtAntL, state.ybtAntR]);
   const smRankTop = useMemo(() => {
     const wp = smWeakPoints[0] as any;
     if (!wp) return [];
@@ -867,7 +890,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const gripCarryDiag = useMemo(() => diagnoseGripCarry({
     farmersHoldSec: numOrNull(state.farmersHoldSec),
     runTimeSec: numOrNull(state.gripRunSec),
-    dropsPerRun: state.gripDrops !== '' ? numOrNull(state.gripDrops) : null,
+    dropsPerRun: state.gripDrops !== '' && Number.isFinite(parseFloat(state.gripDrops)) && parseFloat(state.gripDrops) >= 0 ? parseFloat(state.gripDrops) : null,
     pickupMs: numOrNull(state.pickupMs),
   }), [state.farmersHoldSec, state.gripRunSec, state.gripDrops, state.pickupMs]);
   const logWindowDiag = useMemo(() => diagnoseLogWindow(

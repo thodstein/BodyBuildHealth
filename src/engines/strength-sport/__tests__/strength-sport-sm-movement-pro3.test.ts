@@ -7,6 +7,7 @@ import { diagnoseTyreSecondPull, SM_TYRE_CORRECTIVES } from '../strength-sport-s
 import { diagnoseSuitcase } from '../strength-sport-sm-suitcase.engine';
 import { diagnoseYBT, diagnoseSideHop, SM_SCREENING_DISCLAIMER } from '../strength-sport-sm-ybt.engine';
 import { buildSMDiagnosticsHtml, buildSMCsv } from '../strength-sport-sm-export.engine';
+import { diagnoseSMWeakCause } from '../strength-sport-sm-weak-cause.engine';
 
 describe('SM movement P1: stone lap + fatigue', () => {
   it('zero-lap без lap — ok', () => {
@@ -166,5 +167,35 @@ describe('SM movement: экспорт-паритет (без movement — бай
     const html = buildSMDiagnosticsHtml({ ...base, movement: ['<script>alert(1)</script>'] });
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('SM movement→причина: P3/P7-сигналы в weak-cause', () => {
+  it('farmers_carry + gripLimitsCarry → grip', () => {
+    const r = diagnoseSMWeakCause({ zone: 'farmers_carry', gripLimitsCarry: true });
+    expect(r.cause).toBe('grip');
+    expect(r.signals.some((s) => s.includes('заступ'))).toBe(true);
+  });
+  it('farmers_grip + gripLimitsCarry без hold-провала → grip med', () => {
+    const r = diagnoseSMWeakCause({ zone: 'farmers_grip', gripLimitsCarry: true });
+    expect(r.cause).toBe('grip');
+    expect(r.confidence).toBe('med');
+  });
+  it('gripLimitsCarry + объём → grip high', () => {
+    const r = diagnoseSMWeakCause({ zone: 'farmers_carry', gripLimitsCarry: true, factSetsPerWeek: 0 });
+    expect(r.cause).toBe('grip');
+    expect(r.confidence).toBe('high');
+  });
+  it('yoke_walk + YBT Δ5 → mobility', () => {
+    const r = diagnoseSMWeakCause({ zone: 'yoke_walk', ybtAntAsymCm: 5 });
+    expect(r.cause).toBe('mobility');
+    expect(r.signals.some((s) => s.includes('YBT'))).toBe(true);
+  });
+  it('без новых полей — старое поведение (technique)', () => {
+    expect(diagnoseSMWeakCause({ zone: 'log_lockout' }).cause).toBe('technique');
+    expect(diagnoseSMWeakCause({ zone: 'farmers_carry' }).cause).toBe('technique');
+  });
+  it('YBT ≤4 — не сигнал', () => {
+    expect(diagnoseSMWeakCause({ zone: 'yoke_walk', ybtAntAsymCm: 3 }).cause).toBe('technique');
   });
 });

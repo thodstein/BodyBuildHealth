@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { StrongmanDiagnosticsHub } from '../StrongmanDiagnosticsHub';
+import { SM_BIOMECH } from '../../../../engines/strength-sport/strength-sport-sm-biomechanics.engine';
 
 beforeEach(() => {
   localStorage.clear();
@@ -70,5 +71,20 @@ describe('StrongmanDiagnosticsHub PRO-3', () => {
     fireEvent.click(document.querySelector('[data-sm="bottom-tab-mobility"]') as HTMLElement);
     expect(await screen.findByText(/YBT anterior L/)).toBeTruthy();
     expect(document.body.textContent).toContain('Скрининг, не диагноз');
+  });
+  it('movement→причина: слабый холд vs заступ даёт причину grip в Коррекции', async () => {
+    render(<StrongmanDiagnosticsHub />);
+    const fillNum = async (tab: string, label: RegExp, value: string) => {
+      fireEvent.click(document.querySelector(`[data-sm="bottom-tab-${tab}"]`) as HTMLElement);
+      fireEvent.click(await screen.findByRole('button', { name: label }));
+      fireEvent.change(await screen.findByRole('textbox', { name: label }), { target: { value } });
+      fireEvent.click(screen.getByText('Готово'));
+    };
+    await fillNum('grip', /Удержание фермера/, '25');
+    await fillNum('carry', /Время заступа/, '45');
+    fireEvent.click(document.querySelector('[data-sm="bottom-tab-carry"]') as HTMLElement);
+    fireEvent.click(await screen.findByText(SM_BIOMECH.farmers_carry.label));
+    fireEvent.click(document.querySelector('[data-sm="bottom-tab-correction"]') as HTMLElement);
+    expect(await screen.findByText(/причина: grip/)).toBeTruthy();
   });
 });
