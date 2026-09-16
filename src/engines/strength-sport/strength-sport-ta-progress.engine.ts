@@ -169,3 +169,18 @@ export function qPoints(
   const scale = female ? 306.54 : 463.26;
   return Math.round((totalKg * scale / denom) * 100) / 100;
 }
+
+/**
+ * V5-V5: возрастная шкала (USAW с 2025 — Best Lifter по Q-points; юношам —
+ * Q-youth, мастерам — Q-masters, Huebner et al.). Точных публичных коэффициентов
+ * Q-youth/Q-masters в коде нет — честно возвращаем только шкалу + пометку:
+ * число qPoints остаётся базой сравнения внутри своего возраста.
+ * <12 лет / <40кг — неприменимо (как Sinclair/Q флоры).
+ */
+export function qAgeScale(ageYears: number | null | undefined): { scale: 'Q-youth' | 'Q-points' | 'Q-masters'; note: string } | null {
+  if (ageYears == null || !Number.isFinite(ageYears) || ageYears <= 0) return null;
+  if (ageYears < 12) return null;
+  if (ageYears < 18) return { scale: 'Q-youth', note: `Возраст ${ageYears}: юношам — Q-youth по таблицам USAW (здесь база Q-points, сравнивай внутри возраста)` };
+  if (ageYears < 35) return { scale: 'Q-points', note: `Возраст ${ageYears}: основная шкала Q-points (USAW Best Lifter с 2025)` };
+  return { scale: 'Q-masters', note: `Возраст ${ageYears}: мастерам — Q-masters с возрастным коэффициентом (здесь база Q-points, сравнивай внутри возраста)` };
+}

@@ -48,7 +48,7 @@ describe('WLDiagnosticsHub APK UI', () => {
   it('кнопки 44px+: табы, слабые фазы, выдача', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     const tabs = container.querySelectorAll('[data-wl="tab"]');
-    expect(tabs.length).toBe(7);
+    expect(tabs.length).toBe(8); // V5: 7 + 🛠️ Коррекция (C2)
     tabs.forEach(b => {
       const h = (b as HTMLElement).style.minHeight;
       expect(parseInt(h, 10)).toBeGreaterThanOrEqual(44);

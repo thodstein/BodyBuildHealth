@@ -24,7 +24,7 @@ import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend, TA_OHS_HIST_KEY
 import { calibrateLVP, saveLVPProfile } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary, ensurePoseModel } from '../../../engines/strength-sport/strength-sport-pose.engine';
-import { sinclairCoefficient, sinclairTotal, qPoints, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
+import { sinclairCoefficient, sinclairTotal, qPoints, qAgeScale, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 import { auditTAPlan, hubTabForPhase, TA_CORE_PHASES, TA_AUX_PHASES } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
@@ -47,6 +47,9 @@ import { ymaxVerdict, femalePhaseNorm, femaleLevelOf, femalePhaseVerdict } from 
 import { shrinkMVT, mvtPosterior, isVelocityShiftReal, velocityMetricFlag, mvtRetestNote, TA_POPULATION_MVT } from '../../../engines/strength-sport/strength-sport-ta-mvt.engine';
 import { imtpEnduranceDrop } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
 import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor, correctivesByError, tagsForBarMetrics, TA_ERROR_TAG_RU, correctiveById, correctiveExportLines, protocolForPreferred } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
+import { turnoverDiag, jerkDriveDiag, pullPowerBalance, lvpBallisticNote, movementOfWeak, mixedWaveNote, TA_MOVEMENT_RU } from '../../../engines/strength-sport/strength-sport-ta-v5.engine';
+import { appendTAPhaseSnapshot, taPhaseTrend, loadTAPhaseHistory, saveTAPhaseHistory, type TAPhaseSnapshot } from '../../../engines/strength-sport/strength-sport-ta-phase-history.engine';
+import { ymaxNormForBodyweight } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -166,6 +169,14 @@ type WLState = {
   progSex: '' | 'male' | 'female';
   // V8: цикл коэффициентов Sinclair (пусто = текущий)
   progCycle: '' | '2025-2028' | '2021-2024';
+  // V5: turnover/catch + баланс тяг + глубокий толчок + возраст
+  turnoverMs: string;
+  catchKneeDeg: string;
+  pullPowerW: string;
+  jerkCatchBackCm: string;
+  jerkDipFast: boolean;
+  jerkHipFast: boolean;
+  progAge: string;
 };
 
 const DEFAULT_STATE: WLState = {
@@ -220,6 +231,10 @@ const DEFAULT_STATE: WLState = {
   progBw: '', progSnatch: '', progCj: '', progSex: '' as '' | 'male' | 'female',
   // V8: цикл Sinclair (пусто = текущий 2025-2028)
   progCycle: '' as '' | '2025-2028' | '2021-2024',
+  // V5: turnover/catch + баланс тяг + глубокий толчок + возраст
+  turnoverMs: '', catchKneeDeg: '', pullPowerW: '',
+  jerkCatchBackCm: '', jerkDipFast: false, jerkHipFast: false,
+  progAge: '',
   // V6-B1: старые сохранения без поля → []
   lastInjectNotes: [],
   // V10-A: недели годового синка (персистятся; раньше терялись при remount)
@@ -724,6 +739,26 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch { return []; }
   });
   const ohsTrend = useMemo(() => { try { return ohsScoreTrend(ohsHist); } catch { return null; } }, [ohsHist]);
+  // V5-V6: re-screen слабых фаз (снимки + тренд «ушло/висит/новое», как OHS/ножницы)
+  const [phaseHist, setPhaseHist] = useState<TAPhaseSnapshot[]>(() => {
+    try { return loadTAPhaseHistory(); } catch { return []; }
+  });
+  const phaseTrend = useMemo(() => { try { return taPhaseTrend(phaseHist); } catch { return null; } }, [phaseHist]);
+  const takePhaseSnapshot = () => {
+    if (!weakPoints.length) {
+      setToast('Выбери 1-3 слабые фазы — снимать нечего');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    const entry: TAPhaseSnapshot = { date: new Date().toISOString().slice(0, 10), weakPoints: [...weakPoints] };
+    setPhaseHist(prev => {
+      const next = appendTAPhaseSnapshot(prev, entry);
+      try { saveTAPhaseHistory(next); } catch { /* noop */ }
+      return next;
+    });
+    setToast(`✓ Снимок фаз ${entry.date}: ${entry.weakPoints.join(', ')}`);
+    setTimeout(() => setToast(''), 2000);
+  };
   const takeOhsSnapshot = () => {
     const entry: OHSSnapshot = {
       date: new Date().toISOString().slice(0, 10),
@@ -824,18 +859,26 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch { return null; }
   }, [state.imtpImpulse, progSexEff]);
   // V4: консистентность траектории (PCI) + персист из истории трекинга
+  // V5-V8: rough-съёмки вне PCI (Shah 2026 — несравнимая перспектива); старые записи без тега — как ok
   const pciBlock = useMemo(() => {
     try {
       const hist = loadBarTracking();
-      const loops = hist.map((h) => h.xLoop).filter((v) => Number.isFinite(v));
+      const okHist = hist.filter((h) => (h as any).quality !== 'rough');
+      const roughN = hist.length - okHist.length;
+      const loops = okHist.map((h) => h.xLoop).filter((v) => Number.isFinite(v));
       const cur = parseFloat(state.xLoopCm);
-      const all = Number.isFinite(cur) && cur > 0 ? [...loops, cur] : loops;
-      if (all.length < 2) return { pci: null, persist: { persisting: false, n: all.length, text: null } };
+      const curQ = videoQualityForCapture({
+        heightM: state.videoHeightM ? parseFloat(state.videoHeightM) : null,
+        distM: state.videoDistM ? parseFloat(state.videoDistM) : null,
+        side: state.videoSide || null, device: state.videoDevice || null,
+      }).flag;
+      const all = Number.isFinite(cur) && cur > 0 && curQ !== 'rough' ? [...loops, cur] : loops;
+      if (all.length < 2) return { pci: null, persist: { persisting: false, n: all.length, text: null }, roughN };
       // V4-добой: персист по знаковому xBias истории (старые записи без xBias — скип)
-      const biases = hist.map((h) => (typeof h.xBias === 'number' && Number.isFinite(h.xBias) ? h.xBias : null)).filter((v): v is number => v != null);
-      return { pci: pciFromTrackings(all), persist: persistingAsymmetry(biases) };
-    } catch { return { pci: null, persist: { persisting: false, n: 0, text: null } }; }
-  }, [trackNonce, state.xLoopCm]);
+      const biases = okHist.map((h) => (typeof h.xBias === 'number' && Number.isFinite(h.xBias) ? h.xBias : null)).filter((v): v is number => v != null);
+      return { pci: pciFromTrackings(all), persist: persistingAsymmetry(biases), roughN };
+    } catch { return { pci: null, persist: { persisting: false, n: 0, text: null }, roughN: 0 }; }
+  }, [trackNonce, state.xLoopCm, state.videoHeightM, state.videoDistM, state.videoSide, state.videoDevice]);
 
   // V4: ACL-гард dip + выносливость силы + стратегия старта + нормы
   const aclGuard = useMemo(() => {
@@ -860,7 +903,59 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch { return null; }
   }, [state.yMaxCm, state.progBw, profileWeightKg, progSexEff]);
 
-  // W9: пофазная тяга — какой конец проседает первым (Sports Biomech 2025)
+  // V5-V1: уход под штангу + приём (белый лист V3/V4 — тяги покрыты, turnover нет)
+  const turnoverNote = useMemo(() => {
+    try {
+      const t = state.turnoverMs ? parseFloat(state.turnoverMs) : null;
+      const k = state.catchKneeDeg ? parseFloat(state.catchKneeDeg) : null;
+      const y = parseFloat(state.yMaxCm);
+      if ((t == null || !Number.isFinite(t)) && (k == null || !Number.isFinite(k)) && !Number.isFinite(y)) return null;
+      return turnoverDiag({ yMaxCm: Number.isFinite(y) ? y : null, turnoverMs: t, catchKneeDeg: k, lift: state.barLift });
+    } catch { return null; }
+  }, [state.turnoverMs, state.catchKneeDeg, state.yMaxCm, state.barLift]);
+  // V5-V3: баланс тяг (Tunçel 2025 — низкий Hmax + мощность = маркер успеха)
+  const pullBalanceNote = useMemo(() => {
+    try {
+      const y = parseFloat(state.yMaxCm);
+      if (!Number.isFinite(y) || y <= 0) return null;
+      const bw = state.progBw ? parseFloat(state.progBw) : profileWeightKg ?? null;
+      const norm = ymaxNormForBodyweight(bw, progSexEff);
+      if (!norm) return null;
+      const w = state.pullPowerW ? parseFloat(state.pullPowerW) : null;
+      return pullPowerBalance({ yMaxCm: y, normLo: norm.lo, normHi: norm.hi, secondPullW: w, bwKg: bw });
+    } catch { return null; }
+  }, [state.yMaxCm, state.progBw, state.pullPowerW, profileWeightKg, progSexEff]);
+  // V5-V2: глубокий толчок (Nagao 2026 — catch-back + drive + dip-скорость)
+  const jerkDriveNote = useMemo(() => {
+    try {
+      const cb = state.jerkCatchBackCm ? parseFloat(state.jerkCatchBackCm) : null;
+      if ((cb == null || !Number.isFinite(cb)) && !state.jerkDipFast && !state.jerkHipFast) return null;
+      return jerkDriveDiag({ catchBackCm: cb, hipFast: state.jerkHipFast || null, dipFast: state.jerkDipFast || null });
+    } catch { return null; }
+  }, [state.jerkCatchBackCm, state.jerkDipFast, state.jerkHipFast]);
+  // V5-V4: баллистик-оговорка лёгким весам LVP (Thompson 2025)
+  const ballisticNote = useMemo(() => {
+    try {
+      const pts = [50, 65, 80, 90].filter((_, i) => {
+        const v = [state.lvp50, state.lvp65, state.lvp75, state.lvp90][i];
+        return v && Number.isFinite(parseFloat(v)) && parseFloat(v) > 0;
+      });
+      if (!pts.length) return null;
+      return lvpBallisticNote(state.lvpLift, Math.min(...pts));
+    } catch { return null; }
+  }, [state.lvpLift, state.lvp50, state.lvp65, state.lvp75, state.lvp90]);
+  // V5-V5: возрастная шкала (USAW с 2025 — Q-youth / Q-points / Q-masters)
+  const ageScaleNote = useMemo(() => {
+    try {
+      const a = state.progAge ? parseFloat(state.progAge) : null;
+      if (a == null || !Number.isFinite(a)) return null;
+      return qAgeScale(a);
+    } catch { return null; }
+  }, [state.progAge]);
+  // V5-V7: анти-смешивание волны (Torokhtiy 2025 — рывок/взятие по разным дням)
+  const waveMixNote = useMemo(() => {
+    try { return mixedWaveNote(weakPoints); } catch { return null; }
+  }, [weakPoints]);
   const pullPhase = useMemo(() => {
     try {
       const lift = state.barLift.includes('clean') ? 'clean' : 'snatch';
@@ -1178,8 +1273,15 @@ export const WLDiagnosticsHub: React.FC = () => {
       if (p1 && p3) bf = `bfPCA P1 ${p1.score} (r ${p1.correlationWithPerformance}) · P3 ×${p3.score} ${p3.isOptimal ? 'OK' : 'много пересечений'}`;
     } catch { /* noop */ }
     setState(s => ({ ...s, xLoopCm: String(res.xLoop), yMaxCm: String(res.yMax), peakVelMs: String(res.vmax), fvrHAcc: String(res.hAcc), bfPattern: bf }));
-    // V4-A: замер в историю (питает EWMA-тренд)
-    try { saveBarTracking(res); } catch { /* noop */ }
+    // V4-A: замер в историю (питает EWMA-тренд); V5-V8: с тегом качества (rough вне PCI)
+    try {
+      const q = videoQualityForCapture({
+        heightM: state.videoHeightM ? parseFloat(state.videoHeightM) : null,
+        distM: state.videoDistM ? parseFloat(state.videoDistM) : null,
+        side: state.videoSide || null, device: state.videoDevice || null,
+      }).flag;
+      saveBarTracking({ ...res, quality: q });
+    } catch { /* noop */ }
     setTrackNonce(n => n + 1);
     setToast(`✓ Kinovea: xLoop ${res.xLoop}см yMax ${res.yMax}см vmax ${res.vmax} м/с`);
     setTimeout(()=>setToast(''),3000);
@@ -1300,6 +1402,17 @@ export const WLDiagnosticsHub: React.FC = () => {
         if (aclGuard) hubNotes.push(`Dip-ACL: ${aclGuard.text}`);
         if (meetBlock) hubNotes.push(`Старт: рывок ${meetBlock.snatchOpener}, взятие ${meetBlock.cjOpener}`);
         if (ymaxNote) hubNotes.push(ymaxNote);
+        // V5: turnover/catch + баланс тяг + глубокий толчок + LVP-баллистика + возраст + re-screen + PCI-честность + анти-смешивание
+        try {
+          if (turnoverNote) hubNotes.push(`Turnover: ${turnoverNote.text}`);
+          if (pullBalanceNote) hubNotes.push(`Баланс тяг: ${pullBalanceNote}`);
+          if (jerkDriveNote) hubNotes.push(`Толчок-drive: ${jerkDriveNote}`);
+          if (ballisticNote) hubNotes.push(ballisticNote);
+          if (ageScaleNote) hubNotes.push(ageScaleNote.note);
+          if (phaseTrend) hubNotes.push(phaseTrend.text);
+          if (pciBlock.roughN > 0) hubNotes.push(`PCI честный: rough-съёмки вне расчёта (${pciBlock.roughN})`);
+          if (waveMixNote) hubNotes.push(waveMixNote);
+        } catch { /* noop */ }
         if (endurBlock) hubNotes.push(endurBlock.text);
         if (femVerdict) hubNotes.push(femVerdict);
         if (retestNote) hubNotes.push(retestNote);
@@ -1473,6 +1586,13 @@ export const WLDiagnosticsHub: React.FC = () => {
               })()}
               {barMetrics && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Метрика: xLoop {videoQuality.flag === 'rough' ? '≈' : ''}{barMetrics.xLoop}см yMax {barMetrics.yMax}см vmax {barMetrics.vMax} м/с {TA_PEAK_VELOCITY_ZONES.snatch ? `· зона ${taZoneForVelocity(barMetrics.vMax, 'snatch')}` : ''}</div>}
               {ymaxNote && <div data-wl="ymax-norm" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>📏 {ymaxNote}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 6 }}>
+                <label style={{ fontSize: 10, color: '#fff' }}>Уход, мс<br /><input data-wl="turnover" value={state.turnoverMs} onChange={e => setState(s => ({ ...s, turnoverMs: e.target.value }))} placeholder="420" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Сед, колено °<br /><input data-wl="turnover" value={state.catchKneeDeg} onChange={e => setState(s => ({ ...s, catchKneeDeg: e.target.value }))} placeholder="75" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Мощн. 2-й тяги, Вт<br /><input data-wl="turnover" value={state.pullPowerW} onChange={e => setState(s => ({ ...s, pullPowerW: e.target.value }))} placeholder="1800" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+              </div>
+              {turnoverNote && <div data-wl="turnover-note" style={{ fontSize: 10, color: turnoverNote.overpull ? '#f59e0b' : '#22c55e', marginTop: 4 }}>🌀 {turnoverNote.text}</div>}
+              {pullBalanceNote && <div data-wl="pull-balance" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>⚖️ {pullBalanceNote}</div>}
               {profileSex === 'female' && <div style={{ fontSize: 10, color: '#f9a8d4', marginTop: 4 }}>♀ Норма фазы по уровню ({femaleLevelOf(taLevel)}): финал-ускорение {femalePhaseNorm(femaleLevelOf(taLevel)).finalAccS.join('–')}с · таз {femalePhaseNorm(femaleLevelOf(taLevel)).hipAmortDeg.join('–')}° (Slobozhanskyi 2025)</div>}
               {profileSex === 'female' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
@@ -1580,6 +1700,14 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <label style={{ fontSize: 11, color: '#fff' }}>Время dip мс<br /><input value={state.jerkDipMs} onChange={e => setState(s => ({ ...s, jerkDipMs: e.target.value }))} placeholder="200" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
               </div>
               {jerkDip && <div style={{ fontSize: 10, color: jerkDip.isOptimal ? '#22c55e' : '#f59e0b', marginTop: 6 }}>Dip {jerkDip.dipCm}см за {jerkDip.dipTimeMs}мс · скорость {jerkDip.dipVelocityMs} м/с{jerkDip.drivePowerW ? ` · drive ~${jerkDip.drivePowerW}Вт` : ''} — {jerkDip.recommendation}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                <label style={{ fontSize: 11, color: '#fff' }}>Увод назад в catch, см<br /><input data-wl="jerk-drive" value={state.jerkCatchBackCm} onChange={e => setState(s => ({ ...s, jerkCatchBackCm: e.target.value }))} placeholder="5" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'end' }}>
+                  <button data-wl="jerk-drive" onClick={() => setState(s => ({ ...s, jerkDipFast: !s.jerkDipFast }))} aria-pressed={state.jerkDipFast} aria-label="Быстрое сгибание коленей в dip" style={{ minHeight: 44, padding: '10px 12px', borderRadius: 999, border: '1px solid', borderColor: state.jerkDipFast ? '#ef4444' : '#1f3a5f', background: state.jerkDipFast ? 'rgba(239,68,68,0.12)' : '#0a1629', color: state.jerkDipFast ? '#ef4444' : '#fff', fontSize: 10, cursor: 'pointer' }}>{state.jerkDipFast ? '✓ ' : ''}Быстрый dip</button>
+                  <button data-wl="jerk-drive" onClick={() => setState(s => ({ ...s, jerkHipFast: !s.jerkHipFast }))} aria-pressed={state.jerkHipFast} aria-label="Взрывное разгибание таза в drive" style={{ minHeight: 44, padding: '10px 12px', borderRadius: 999, border: '1px solid', borderColor: state.jerkHipFast ? '#22c55e' : '#1f3a5f', background: state.jerkHipFast ? 'rgba(34,197,94,0.12)' : '#0a1629', color: state.jerkHipFast ? '#22c55e' : '#fff', fontSize: 10, cursor: 'pointer' }}>{state.jerkHipFast ? '✓ ' : ''}Взрыв таза</button>
+                </div>
+              </div>
+              {jerkDriveNote && <div data-wl="jerk-drive-note" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>🦵 {jerkDriveNote} (Nagao 2026)</div>}
               <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                 {([['jerkValgus', 'Вальгус колена в dip'], ['jerkRotation', 'Ротация колена внутрь'], ['deepDip', 'Глубокий/проваленный dip']] as const).map(([key, label]) => (
                   <button key={key} data-wl="jerk-acl" onClick={() => setState(s => ({ ...s, [key]: !(s as any)[key] } as any))} aria-pressed={(state as any)[key]} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: (state as any)[key] ? '#ef4444' : '#1f3a5f', background: (state as any)[key] ? 'rgba(239,68,68,0.12)' : '#0a1629', color: (state as any)[key] ? '#ef4444' : '#fff', fontSize: 11, cursor: 'pointer' }}>{(state as any)[key] ? '✓ ' : ''}{label}</button>
@@ -1716,6 +1844,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 ))}
               </div>
               {velFlag && <div data-wl="vel-metric-flag" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚠️ {velFlag}</div>}
+              {ballisticNote && <div data-wl="lvp-ballistic" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🏀 {ballisticNote}</div>}
               <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>Population → individual приоритет: `velocityForSS` сначала ищет `he_lv_profile_ss_v1` (Wood 2026 individual). {velocityTypeForLift(state.lvpLift)==='peak'?'peak':'mpv'} badge.</div>
               {lvpSpark && <div style={{ marginTop: 6 }}><svg width="120" height="36" role="img" aria-label={`LVP ${lvpSpark.n} точки`}><polyline points={lvpSpark.pts} fill="none" stroke="#a78bfa" strokeWidth="2" /></svg></div>}
             </div>
@@ -1731,7 +1860,7 @@ export const WLDiagnosticsHub: React.FC = () => {
               <button data-wl="kinovea" onClick={handleCsvParse} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, cursor: 'pointer' }}>📊 Разобрать Kinovea CSV</button>
               <span style={{ fontSize: 10, color: '#fff', alignSelf: 'center' }}>Или введи метрики вручную ниже</span>
             </div>
-            {pciBlock.pci && <div data-wl="pci" style={{ fontSize: 10, color: pciBlock.pci.level === 'elite' || pciBlock.pci.level === 'intermediate' ? '#22c55e' : '#f59e0b', marginTop: 6 }}>🔁 {pciBlock.pci.text} (история трекинга, PoinT GO 2026)</div>}
+            {pciBlock.pci && <div data-wl="pci" style={{ fontSize: 10, color: pciBlock.pci.level === 'elite' || pciBlock.pci.level === 'intermediate' ? '#22c55e' : '#f59e0b', marginTop: 6 }}>🔁 {pciBlock.pci.text} (история трекинга, PoinT GO 2026){pciBlock.roughN > 0 ? ` · rough-съёмки вне расчёта: ${pciBlock.roughN} (Shah 2026)` : ''}</div>}
             {pciBlock.persist.persisting && <div data-wl="pci-persist" style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>↔️ {pciBlock.persist.text}</div>}
             {/* W4: метаданные съёмки → флаг качества xLoop */}
             <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
@@ -1927,7 +2056,7 @@ export const WLDiagnosticsHub: React.FC = () => {
               const pref = (state.preferredCorr || {})[wp];
               return (
                 <div key={wp} data-wl="corrective-phase" style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{WL_WEAKPOINT_LABELS[wp] || wp}{cause ? <span style={{ color: '#f59e0b' }}> · причина: {(TA_WEAK_CAUSE_LABELS as Record<string, string>)[cause as string] || cause}</span> : null}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>[{TA_MOVEMENT_RU[movementOfWeak(wp)]}] {WL_WEAKPOINT_LABELS[wp] || wp}{cause ? <span style={{ color: '#f59e0b' }}> · причина: {(TA_WEAK_CAUSE_LABELS as Record<string, string>)[cause as string] || cause}</span> : null}</div>
                   {list.map(c => {
                     const d = planData ? simulateTACorrection(planData, { weakPoint: wp, corrId: c.id, sets: c.protocolAdj.sets, reps: c.protocolAdj.reps }) : null;
                     const isPref = pref === c.id;
@@ -1960,6 +2089,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e' }}>📋 Коррекционная сессия 20–30 мин (техника → сила → стабильность)</div>
                   {steps.map(s => <div key={s.order} style={{ fontSize: 10, color: '#fff', marginTop: 3 }}>{s.order}. {s.nameRu} — {s.protocol.sets}×{s.protocol.reps} @{s.protocol.pct}% · {s.cue}</div>)}
                   {block.length > 0 && <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>📅 Волна {block.length} нед: {block.map(w => `Н${w.week} ${w.focus.split(' — ')[0]}`).join(' → ')}</div>}
+                  {waveMixNote && <div data-wl="wave-mix" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔀 {waveMixNote}</div>}
                   <button data-wl="inject" onClick={handleInjectToPlan} style={{ width: '100%', marginTop: 8, minHeight: 48, padding: '10px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>💉 Вставить коррекции в план (⭐ — первыми)</button>
                 </div>
               );
@@ -2031,6 +2161,7 @@ export const WLDiagnosticsHub: React.FC = () => {
             <label style={{ fontSize: 11, color: '#fff' }}>Вес кг<br /><input value={state.progBw} onChange={e => setState(s => ({ ...s, progBw: e.target.value }))} placeholder={profileWeightKg ? String(profileWeightKg) : '80'} style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
             <label style={{ fontSize: 11, color: '#fff' }}>Рывок кг<br /><input value={state.progSnatch} onChange={e => setState(s => ({ ...s, progSnatch: e.target.value }))} placeholder="100" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
             <label style={{ fontSize: 11, color: '#fff' }}>Толчок кг<br /><input value={state.progCj} onChange={e => setState(s => ({ ...s, progCj: e.target.value }))} placeholder="125" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
+            <label style={{ fontSize: 11, color: '#fff' }}>Возраст<br /><input data-wl="prog-age" value={state.progAge} onChange={e => setState(s => ({ ...s, progAge: e.target.value }))} placeholder="25" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
             {(['male', 'female'] as const).map(sx => (
@@ -2043,6 +2174,11 @@ export const WLDiagnosticsHub: React.FC = () => {
           </div>
           {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{progSexEff === 'female' ? '♀' : '♂'} Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair} ({progCalc.cycle}){progCalc.q != null ? ` · Q-points ${progCalc.q}` : ''}</div>}
           {progTrend && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Тренд ({progTrend.n} зам.): сумма {progTrend.totalDelta > 0 ? '+' : ''}{progTrend.totalDelta}кг · вес {progTrend.bwDelta > 0 ? '+' : ''}{progTrend.bwDelta}кг{progTrend.sinclairDelta != null ? ` · Sinclair ${progTrend.sinclairDelta > 0 ? '+' : ''}${progTrend.sinclairDelta}` : ''}{progTrend.bestSinclair != null ? ` · лучший ${progTrend.bestSinclair} (${progTrend.bestDate})` : ''}{progTrend.qDelta != null ? ` · Q ${progTrend.qDelta > 0 ? '+' : ''}${progTrend.qDelta}` : ''}{progTrend.bestQ != null ? ` · лучший Q ${progTrend.bestQ} (${progTrend.bestQDate})` : ''}</div>}
+          {ageScaleNote && <div data-wl="age-scale" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>🎂 {ageScaleNote.note}</div>}
+          <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+            <button data-wl="phase-snap" onClick={takePhaseSnapshot} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>🗂 Фазы: снимок ({weakPoints.length || 0})</button>
+            {phaseTrend ? <span data-wl="phase-trend" style={{ fontSize: 10, color: '#fff' }}>{phaseTrend.text} · пересними через 4–6 нед</span> : <span style={{ fontSize: 10, color: '#fff' }}>Re-screen фаз: 2+ снимка покажут «ушло/висит»</span>}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button data-wl="apply-bottom" onClick={applyToConstructor} style={{ flex: 1, minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>

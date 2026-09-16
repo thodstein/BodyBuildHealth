@@ -21,6 +21,8 @@ export interface BarTrackingResult {
   duration: number;
   /** V4-PROv4: знаковое латеральное смещение (среднее x − старт x, см): + вправо, − влево. Питает персист асимметрии. */
   xBias: number;
+  /** V5-V8: качество съёмки замера (Shah 2026). Старые записи без поля — 'unknown'. */
+  quality?: 'ok' | 'rough' | 'unknown';
 }
 
 export interface TrackingProvider {
