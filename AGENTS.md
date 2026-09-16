@@ -31,6 +31,14 @@
 - Поймано своим тестом: шит `AdSheetSelect` рендерится в портале `document.body` — выбор фазы кликом по триггеру + опции «Середина» (реальный флоу, не хинт).
 - Проверено: NEW `arm-movement-hub` **6/6** + движки **27/27** + hub **49+4** (итого 80) + `verify:apk-design` OK; `tsc` **0 по своим** (1 ошибка — чужой `recipe-db-p39`, не тронут). НЕ ПУШИЛ.
 
+## Арм-движение в конструктор: приёмник movement-моста (P7-хвост, Sep 16 2026, коммит pathspec, без пуша)
+
+Продолжение («продолжай»): аудит приёмника показал — мост слал 6 movement-полей (`armMatchPhase/armStartNote/armVectorNote/armFoulNote/armTableStrengthNote/armHumerusDangerNote`), а `ArmAutoConstructor` читал только `armMatchup/armBouts` (остальное молча ронялось — классический «мост в никуда»). Только свои файлы (`arm-movement-intake.engine` NEW + `ArmAutoConstructor.tsx` 3 ханка + NEW тест); чужие WIP не тронуты, сборка плана не меняется (инфо-слой, прецедент armLifting-моста).
+- NEW `arm-movement-intake.engine` — чистая `resolveArmMovementIntake(data)` → `{ persist, flashes, phaseMode }`: санитизация (trim/кап 300, мусор/левые фазы отбрасываются), persist `he_arm_last_movement`, flash `🥋 Движение схватки: …` + `⛔`-строка danger, мода `failPhase` из журнала (`mid (2/4)`).
+- Конструктор: импорт + thin-try/catch после `armBouts`-ветки (persist + flashes) + movement-блок в `diagSnap` для печати; гейты/сеты/веса не тронуты.
+- Поймано своим тестом: основной `return` резолвера терял `phaseMode` (ранний return его содержал) — чинено до встройки.
+- Проверено: NEW `arm-movement-intake` **6/6** + движки **27/27** + hub-UI **6/6** + arm-круг **991/991 (81 файл)** + hub **59/59** (49+4+6) + `verify:apk-design` OK; `tsc --noEmit` **0 по всему проекту** (чужой `recipe-db-p39` починен владельцем). НЕ ПУШИЛ.
+
 ## Питание: авто-число приёмов (выбор убран) + карб-лоад рецепты п39 + 500Б-сглаживание + mk677→gh (Sep 16 2026, коммит pathspec, без пуша)
 
 По команде «количество приёмов должно выбирать система, выбор пользователя убрать; далее а б в г». Только свои файлы (`UserDietSection.tsx`, `recipe-db-p39.ts`, `recipe-db.ts`, `planner-recipe-mode.ts`, `meal-plan-engine.ts`, `ped-class-matrix.ts`, 3 теста, 2 дока).

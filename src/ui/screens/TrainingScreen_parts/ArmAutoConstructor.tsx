@@ -34,6 +34,7 @@ import { rankArmCycles } from '../../../engines/arm/arm-cycle-selector.engine';
 import { GRIP_IMPLEMENTS, type ArmImplement } from '../../../engines/arm/arm-grip.engine';
 import { ARM_MEDLEYS, getMedley } from '../../../engines/arm/arm-medley.engine';
 import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.engine';
+import { resolveArmMovementIntake } from '../../../engines/arm/arm-movement-intake.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
 import { ARM_EXERCISES } from '../../../core/exercise-catalog-arm';
@@ -804,6 +805,14 @@ export function ArmAutoConstructor() {
           try { localStorage.setItem('he_arm_table_iq', JSON.stringify(bouts.slice(0, 60))); } catch {}
           flash(`↩ Table-IQ: ${bouts.length} схваток из диагностики`);
         }
+        // Движение схватки P1–P6 из хаба — инфо-слой (сборку не меняем)
+        try {
+          const mv = resolveArmMovementIntake(payload.data as any);
+          if (mv.persist) {
+            try { localStorage.setItem(mv.persist.key, JSON.stringify(mv.persist.value)); } catch {}
+          }
+          for (const line of mv.flashes) flash(line);
+        } catch {}
       } catch {}
       // PRO-5 №5: ось/warmup из humerus-чеклиста хаба — только добавляем флаги, снятие вручную.
       try {
@@ -847,6 +856,14 @@ export function ArmAutoConstructor() {
           redFlags: payload.data?.armRedFlags,
           asymmetryPct: payload.data?.armAsymmetry,
           info: payload.data?.armInfo,
+          movement: {
+            matchPhase: payload.data?.armMatchPhase,
+            startNote: payload.data?.armStartNote,
+            vectorNote: payload.data?.armVectorNote,
+            foulNote: payload.data?.armFoulNote,
+            tableStrengthNote: payload.data?.armTableStrengthNote,
+            humerusDangerNote: payload.data?.armHumerusDangerNote,
+          },
         };
         localStorage.setItem('he_arm_last_diagnostics', JSON.stringify(diagSnap));
         if (payload.data?.armWeakPoints) localStorage.setItem('he_arm_last_weakpoints', JSON.stringify(payload.data.armWeakPoints));
