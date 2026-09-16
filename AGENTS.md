@@ -39,6 +39,13 @@
 - Поймано своим тестом: основной `return` резолвера терял `phaseMode` (ранний return его содержал) — чинено до встройки.
 - Проверено: NEW `arm-movement-intake` **6/6** + движки **27/27** + hub-UI **6/6** + arm-круг **991/991 (81 файл)** + hub **59/59** (49+4+6) + `verify:apk-design` OK; `tsc --noEmit` **0 по всему проекту** (чужой `recipe-db-p39` починен владельцем). НЕ ПУШИЛ.
 
+## Арм-движение в печать плана: movement-блок `buildArmPrintHtml` (хвост P7, Sep 16 2026, коммит pathspec, без пуша)
+
+Продолжение («продолжай»): аудит экспорта показал — движение долетало до `he_arm_last_diagnostics` (diagSnap), но `buildArmPrintHtml` его не рендерил (тип diagnostics без `movement`, вызов печати без проброса). Только свои файлы (`arm-export.engine` + 1 строка проброса в `ArmAutoConstructor` + 2 теста в `arm-export.test`); чужие WIP не тронуты.
+- `arm-export`: diagnostics += опциональное `movement` (6 строк, все через `esc`) → блок `🥋 Движение схватки:` внутри diag-карточки; без movement — байт-в-байт (пустого блока нет).
+- Проброс: вызов печати читает `diag?.movement` (тот же `diag` из `he_arm_last_diagnostics`).
+- Проверено: `arm-export` 3→**5/5** (+XSS-lock `<script>` → `&lt;script&gt;`) + смежные print/comprehensive/r6/r7 **43/43** + arm-круг **993/993 (81 файл)** + `tsc --noEmit` **0 по всему проекту** + `verify:apk-design` OK. НЕ ПУШИЛ.
+
 ## Питание: авто-число приёмов (выбор убран) + карб-лоад рецепты п39 + 500Б-сглаживание + mk677→gh (Sep 16 2026, коммит pathspec, без пуша)
 
 По команде «количество приёмов должно выбирать система, выбор пользователя убрать; далее а б в г». Только свои файлы (`UserDietSection.tsx`, `recipe-db-p39.ts`, `recipe-db.ts`, `planner-recipe-mode.ts`, `meal-plan-engine.ts`, `ped-class-matrix.ts`, 3 теста, 2 дока).

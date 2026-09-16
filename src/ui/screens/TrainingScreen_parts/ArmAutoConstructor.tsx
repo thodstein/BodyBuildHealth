@@ -1986,7 +1986,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   } catch {}
                   let proSummary: any = null;
                   try { if (builtPlan?.inputSnapshot) proSummary = buildArmProSummary(builtPlan.inputSnapshot); } catch { proSummary = null; }
-                  const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info }, proSummary);
+                  const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info, movement: diag?.movement }, proSummary);
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
                 }} block style={{ minHeight: 48 }}>🖨 Печать</AdBtn>

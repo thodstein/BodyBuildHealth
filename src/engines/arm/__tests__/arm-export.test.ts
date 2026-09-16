@@ -25,4 +25,24 @@ describe('arm-export', () => {
     const ics = buildArmIcs(plan);
     expect(ics).not.toContain('\n\n');
   });
+  it('print без movement — блока движения нет (байт-в-байт)', () => {
+    const html = buildArmPrintHtml(plan);
+    expect(html).not.toContain('Движение схватки');
+  });
+  it('print с movement — блок + XSS-escape', () => {
+    const html = buildArmPrintHtml(plan, {
+      movement: {
+        matchPhase: 'mid',
+        startNote: 'Реакция 280мс',
+        vectorNote: 'Слабый вектор: бок',
+        foulNote: 'Фол-рейт 0.2',
+        tableStrengthNote: 'Слабое звено: пронация',
+        humerusDangerNote: '<script>alert(1)</script>',
+      },
+    });
+    expect(html).toContain('Движение схватки');
+    expect(html).toContain('Слабое звено: пронация');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
 });
