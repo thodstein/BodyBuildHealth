@@ -4,6 +4,7 @@
  * role=dialog + aria-modal + Escape + возврат фокуса; сообщения — role=status.
  * Этап 1 §4.3: a11y-хук вынесен в `bb-auto-constructor-shared.tsx` (guard читает оба файла).
  * Этап 3 §4.3: модалка замены упражнения вынесена в `bb-step-ex-swap.tsx` — guard читает и её.
+ * Этап 4 §4.3: live-region «Безопасности» вынесен в `bb-quality-sections.tsx` — guard читает и её.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -12,6 +13,7 @@ import { resolve } from 'node:path';
 const SRC = readFileSync(resolve(__dirname, '..', 'BbAutoConstructor.tsx'), 'utf8');
 const SHARED = readFileSync(resolve(__dirname, '..', 'bb-auto-constructor-shared.tsx'), 'utf8');
 const EXSWAP = readFileSync(resolve(__dirname, '..', 'bb-step-ex-swap.tsx'), 'utf8');
+const QUALITY = readFileSync(resolve(__dirname, '..', 'bb-quality-sections.tsx'), 'utf8');
 const ALL = SRC + '\n' + SHARED + '\n' + EXSWAP;
 
 describe('4.4 a11y inline-модалок ББ-авто (source-guard)', () => {
@@ -35,6 +37,7 @@ describe('4.4 a11y inline-модалок ББ-авто (source-guard)', () => {
   });
 
   it('сообщения моста/flash остаются live-region (role=status)', () => {
-    expect((SRC.match(/role="status"/g) || []).length).toBeGreaterThanOrEqual(2);
+    const statuses = (SRC + '\n' + QUALITY).match(/role="status"/g) || [];
+    expect(statuses.length).toBeGreaterThanOrEqual(2);
   });
 });
