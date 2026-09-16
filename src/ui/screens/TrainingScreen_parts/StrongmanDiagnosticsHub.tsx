@@ -178,6 +178,12 @@ type SMState = {
   ybtAntL: string;
   ybtAntR: string;
   ybtLegLen: string;
+  ybtPmL: string;
+  ybtPmR: string;
+  ybtPlL: string;
+  ybtPlR: string;
+  ybtUqL: string;
+  ybtUqR: string;
   sideHop: string;
 };
 
@@ -210,7 +216,7 @@ const DEFAULT_STATE: SMState = {
   gripRunSec: '', gripDrops: '', pickupMs: '',
   stoneRepLatePull1S: '', stoneRepLateLapS: '', stoneRepLatePull2S: '',
   tyrePull2S: '', suitcaseLeftS: '', suitcaseRightS: '',
-  ybtAntL: '', ybtAntR: '', ybtLegLen: '', sideHop: '',
+  ybtAntL: '', ybtAntR: '', ybtLegLen: '', ybtPmL: '', ybtPmR: '', ybtPlL: '', ybtPlR: '', ybtUqL: '', ybtUqR: '', sideHop: '',
 };
 
 const TAB_DEFS: Array<{ id: SMTab; label: string; icon: string; desc: string }> = [
@@ -693,7 +699,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       ybtAntAsymCm: movementCauseSignals.ybtAntAsymCm,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [smWeakPoints, diaryWeaks, acwr, vbtLoss, ohs.failed, gripFails, swayCm, asymmetry, weeklySetsByLift, state.farmersHoldSec, state.gripRunSec, state.gripDrops, state.pickupMs, state.ybtAntL, state.ybtAntR]);
+  }), [smWeakPoints, diaryWeaks, acwr, vbtLoss, ohs.failed, gripFails, swayCm, asymmetry, weeklySetsByLift, state.farmersHoldSec, state.gripRunSec, state.gripDrops, state.pickupMs, state.ybtAntL, state.ybtAntR, state.ybtPmL, state.ybtPmR, state.ybtPlL, state.ybtPlR, state.ybtLegLen, state.ybtUqL, state.ybtUqR]);
   const smRankTop = useMemo(() => {
     const wp = smWeakPoints[0] as any;
     if (!wp) return [];
@@ -905,7 +911,10 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const ybtDiag = useMemo(() => diagnoseYBT({
     antLeftCm: numOrNull(state.ybtAntL), antRightCm: numOrNull(state.ybtAntR),
     legLengthCm: numOrNull(state.ybtLegLen),
-  }), [state.ybtAntL, state.ybtAntR, state.ybtLegLen]);
+    pmLeftCm: numOrNull(state.ybtPmL), pmRightCm: numOrNull(state.ybtPmR),
+    plLeftCm: numOrNull(state.ybtPlL), plRightCm: numOrNull(state.ybtPlR),
+    uqLeftCm: numOrNull(state.ybtUqL), uqRightCm: numOrNull(state.ybtUqR),
+  }), [state.ybtAntL, state.ybtAntR, state.ybtLegLen, state.ybtPmL, state.ybtPmR, state.ybtPlL, state.ybtPlR, state.ybtUqL, state.ybtUqR]);
   const sideHopDiag = useMemo(() => diagnoseSideHop(
     numOrNull(state.sideHop), ybtDiag?.antAsymCm ?? null,
   ), [state.sideHop, ybtDiag]);
@@ -1711,7 +1720,13 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginBottom:6 }}>
               <HubNum label="YBT anterior L" unit="см" value={state.ybtAntL} onChange={v=>setState(s=>({...s, ybtAntL:v}))} placeholder="62" step={1} />
               <HubNum label="YBT anterior R" unit="см" value={state.ybtAntR} onChange={v=>setState(s=>({...s, ybtAntR:v}))} placeholder="60" step={1} />
+              <HubNum label="YBT postmed L" unit="см" value={state.ybtPmL} onChange={v=>setState(s=>({...s, ybtPmL:v}))} placeholder="95" step={1} />
+              <HubNum label="YBT postmed R" unit="см" value={state.ybtPmR} onChange={v=>setState(s=>({...s, ybtPmR:v}))} placeholder="96" step={1} />
+              <HubNum label="YBT postlat L" unit="см" value={state.ybtPlL} onChange={v=>setState(s=>({...s, ybtPlL:v}))} placeholder="90" step={1} />
+              <HubNum label="YBT postlat R" unit="см" value={state.ybtPlR} onChange={v=>setState(s=>({...s, ybtPlR:v}))} placeholder="91" step={1} />
               <HubNum label="Длина ноги (YBT)" unit="см" value={state.ybtLegLen} onChange={v=>setState(s=>({...s, ybtLegLen:v}))} placeholder="90" step={1} />
+              <HubNum label="YBT-UQ L (лог)" unit="см" value={state.ybtUqL} onChange={v=>setState(s=>({...s, ybtUqL:v}))} placeholder="110" step={1} />
+              <HubNum label="YBT-UQ R (лог)" unit="см" value={state.ybtUqR} onChange={v=>setState(s=>({...s, ybtUqR:v}))} placeholder="108" step={1} />
               <HubNum label="Side-hop 30с" unit="шт" value={state.sideHop} onChange={v=>setState(s=>({...s, sideHop:v}))} placeholder="32" step={1} />
             </div>
             {ybtDiag && <div style={{ fontSize:12, color:'#fff', marginBottom:6 }}>⚖️ {ybtDiag.lines.join(' · ')}</div>}

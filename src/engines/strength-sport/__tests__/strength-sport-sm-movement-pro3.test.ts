@@ -144,6 +144,12 @@ describe('SM movement P7/P8: ybt + side-hop + честность', () => {
     expect(diagnoseSideHop(35, 5)?.verdict).toBe('ok');
     expect(diagnoseSideHop(null)).toBeNull();
   });
+  it('UQ для лога: асимметрия >4 — warn-строка', () => {
+    const r = diagnoseYBT({ uqLeftCm: 110, uqRightCm: 104 });
+    expect(r?.verdict).toBe('warn');
+    expect(r?.lines.some((l) => l.includes('YBT-UQ'))).toBe(true);
+    expect(diagnoseYBT({ uqLeftCm: 110, uqRightCm: 109 })?.verdict).toBe('ok');
+  });
   it('дисклеймер честный', () => {
     expect(SM_SCREENING_DISCLAIMER).toContain('не диагноз');
   });

@@ -72,6 +72,13 @@ describe('StrongmanDiagnosticsHub PRO-3', () => {
     expect(await screen.findByText(/YBT anterior L/)).toBeTruthy();
     expect(document.body.textContent).toContain('Скрининг, не диагноз');
   });
+  it('movement P7: полная YBT-поверхность (PM/PL/UQ)', async () => {
+    render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(document.querySelector('[data-sm="bottom-tab-mobility"]') as HTMLElement);
+    expect(await screen.findByText(/YBT postmed L/)).toBeTruthy();
+    expect(document.body.textContent).toContain('YBT postlat R');
+    expect(document.body.textContent).toContain('YBT-UQ L');
+  });
   it('movement→причина: слабый холд vs заступ даёт причину grip в Коррекции', async () => {
     render(<StrongmanDiagnosticsHub />);
     const fillNum = async (tab: string, label: RegExp, value: string) => {
