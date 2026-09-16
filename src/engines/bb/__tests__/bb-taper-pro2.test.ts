@@ -186,15 +186,17 @@ describe('PRO-2 P4 — last-hard по группам', () => {
 
 // ── P5: recovery ──
 describe('PRO-2 P5 — recovery-трек дефолтом', () => {
-  it('recovery нед 1 = maintenance (выше дефицита), монотонна, кап +300', () => {
+  it('recovery нед 1 = maintenance (выше дефицита), монотонна, кривая 12 нед / кап +800', () => {
     const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2 });
     expect(plan.postShowTrack).toBe('recovery');
     const curve = postShowRecoveryDiet(plan);
-    expect(curve).toHaveLength(4);
+    // PRO-3 Э8 (осознанный re-baseline: было 4 нед / кап +300 → 12 нед / кап +800, Buechel 2026)
+    expect(curve).toHaveLength(12);
     expect(curve[0].kcal).toBeGreaterThan(plan.preparation.currentCalories);
     for (let i = 1; i < curve.length; i++) expect(curve[i].kcal).toBeGreaterThanOrEqual(curve[i - 1].kcal);
-    expect(curve[3].kcal - curve[0].kcal).toBeLessThanOrEqual(300);
+    expect(curve[11].kcal - curve[0].kcal).toBeLessThanOrEqual(500); // 300 + 11×75 = 1125 → кап +800 даёт 500
     expect(curve[0].note).toMatch(/Recovery/);
+    expect(curve[0].note).toMatch(/10–15%/);
   });
   it('recovery нед 1 ≥ reverse нед 1 (сразу maintenance), reverse opt-in жив', () => {
     const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2 });
@@ -229,9 +231,10 @@ describe('PRO-2 P6 — лог восстановления', () => {
     expect(list[0].weightKg).toBe(82.5);
     expect(removePostShowEntry('p1', 2)).toEqual([]);
   });
-  it('маркеры: 5/5 при полном восстановлении; вес-гейт +5% stage', () => {
+  it('маркеры: 5/5 при полном восстановлении; вес-гейт +10% stage', () => {
+    // PRO-3 Э8 (re-baseline: было +5% → +10%, консенсус Buechel 2026 «regain 10–15%»)
     const m = postShowRecoveryMarkers(
-      { week: 3, dateIso: '2026-10-20', weightKg: 84, sleepH: 8, hunger1_5: 2, cycle: 'na', strengthReturnPct: 98 },
+      { week: 3, dateIso: '2026-10-20', weightKg: 88.5, sleepH: 8, hunger1_5: 2, cycle: 'na', strengthReturnPct: 98 },
       80,
     );
     expect(m.allRecovered).toBe(true);

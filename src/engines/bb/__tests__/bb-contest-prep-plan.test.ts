@@ -650,11 +650,17 @@ describe('Этап 5 — питание по дням (план vs факт)', (
 
   it('вне окна подготовки: база без изменений', () => {
     const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
-    const far = addDaysIso(plan.showDate, 60);
+    // PRO-3 Э8: окно post_show расширено до 84 дней — «вне окна» теперь show+90
+    const far = addDaysIso(plan.showDate, 90);
     const t = nutritionTargetsForPrepDate(far, plan, base);
     expect(t.kcal).toBe(base.kcal);
     expect(t.carbsG).toBe(base.carbsG);
     expect(t.note).toBe('');
+    // show+60 — уже ВНУТРИ окна восстановления (12 нед), а не «база»
+    const mid = addDaysIso(plan.showDate, 60);
+    const tMid = nutritionTargetsForPrepDate(mid, plan, base);
+    expect(tMid.phaseLabel).toBe('Post-show');
+    expect(tMid.kcal).toBeGreaterThan(plan.preparation.currentCalories);
   });
 
   it('после шоу (post_show): поддержание, не дефицит подготовки', () => {
@@ -771,10 +777,12 @@ describe('Э7 — обратная диета post-show', () => {
   });
 
   it('цели дня идут по кривой (нед 1 → нед 3)', () => {
-    const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2 });
+    // PRO-3 Э8: кривая reverse — только при треке reverse (recovery теперь 12 нед)
+    const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2, postShowTrack: 'reverse' });
     const w1 = nutritionTargetsForPrepDate(addDaysIso(plan.showDate, 2), plan, base);
     const w3 = nutritionTargetsForPrepDate(addDaysIso(plan.showDate, 16), plan, base);
     expect(w1.phaseLabel).toBe('Post-show');
+    expect(w1.note).toMatch(/reverse/);
     expect(w3.kcal).toBeGreaterThan(w1.kcal);
     expect(w3.note).toMatch(/нед 3\/4/);
   });
@@ -1100,7 +1108,8 @@ describe('Post-show — контроль восстановления после
   it('строит поддерживающий план: калории выше дефицита, белок ~2 г/кг, стабильные вода/натрий', () => {
     const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2 });
     const post = buildPostShowPlan(plan);
-    expect(post.durationDays).toBe(7);
+    // PRO-3 Э8 (осознанный re-baseline: окно восстановления 7 → 84 дня — Buechel 2026: 1–6 мес)
+    expect(post.durationDays).toBe(84);
     expect(post.kcal).toBeGreaterThan(plan.preparation.currentCalories);
     expect(post.proteinG).toBeGreaterThanOrEqual(Math.round(80 * 2.0) - 1);
     expect(post.waterLiters).toBeGreaterThanOrEqual(2.5);

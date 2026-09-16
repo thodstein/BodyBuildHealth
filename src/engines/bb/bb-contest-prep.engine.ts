@@ -2423,11 +2423,12 @@ export function computePrepPhaseRanges(
   }
   push('post_show', total + 1, total + 1,
     'Post-show: восстановление — питание на поддерживающем уровне, лёгкие тренировки, контроль веса.');
-  // Э7: reverse-diet окно 4 нед — фаза покрывает 28 дней после шоу (цели — по кривой postShowReverseDiet).
+  // PRO-3 Э8: окно post-show — 12 недель (Buechel 2026: восстановление 1–6 мес;
+  // кривая и живые цели ведут до plateau, а не замирают на 4-й неделе).
   const ps = phases.find(p => p.key === 'post_show');
   if (ps) {
-    ps.dateEnd = isoAddDays(showDate, 28);
-    ps.note = 'Post-show (4 нед): recovery — сразу maintenance (дефолт) либо reverse +100 ккал/нед (opt-in); белок 2 г/кг, вода/натрий стабильны.';
+    ps.dateEnd = isoAddDays(showDate, 84);
+    ps.note = 'Post-show (12 нед): recovery — острый подъём к maintenance+300, далее +75/нед до капа +800 (regain 10–15% за 1–6 мес); reverse +100/нед (opt-in, Silva 2025: не лучше по RCT). Белок 2 г/кг, вода/натрий стабильны.';
   }
 
   return phases;
@@ -2923,32 +2924,16 @@ export function nutritionTargetsForPrepDate(
     };
   }
   if (phase.key === 'post_show') {
-    // PRO-2 P5: трек восстановления — recovery (дефолт, сразу maintenance) vs
-    // reverse (opt-in, медленно). Источник: opts > план > recovery.
+    // PRO-2 P5 + PRO-3 Э8: трек восстановления — recovery (дефолт) vs reverse (opt-in).
+    // Источник: opts > план > recovery. Кривая 12 нед (раньше замирала на 4-й).
     const track = opts?.postShowTrack ?? plan.postShowTrack ?? 'recovery';
     const post = buildPostShowPlan(plan);
     const daysAfter = Math.max(0, isoDiffDays(plan.showDate, dateIso));
-    if (track === 'reverse') {
-      const curve = postShowReverseDiet(plan);
-      const level = curve[Math.min(3, Math.floor(daysAfter / 7))] ?? curve[0];
-      return {
-        kcal: level.kcal,
-        proteinG: level.proteinG,
-        fatG: level.fatG,
-        carbsG: level.carbsG,
-        fiberMaxG: Math.min(70, Math.max(25, Math.round(level.kcal * 0.014))),
-        waterMl: Math.round(post.waterLiters * 1000),
-        sodiumMg: base.sodiumMg,
-        potassiumMg,
-        phase: null,
-        phaseLabel: PREP_PHASE_LABELS.post_show,
-        note: `🔄 Post-show (reverse): ${level.kcal} ккал · Б/У/Ж ${level.proteinG}/${level.carbsG}/${level.fatG} г, вода/натрий стабильны. ${level.note} ${post.weightCheck}`,
-      };
-    }
-    const curve = postShowRecoveryDiet(plan);
-    const level = curve[Math.min(3, Math.floor(daysAfter / 7))] ?? curve[0];
+    const curve = track === 'reverse' ? postShowReverseDiet(plan) : postShowRecoveryDiet(plan);
+    const level = curve[Math.min(curve.length - 1, Math.floor(daysAfter / 7))] ?? curve[0];
+    const floor = plan.sex === 'female' ? 1400 : 1200;
     return {
-      kcal: level.kcal,
+      kcal: Math.max(floor, level.kcal),
       proteinG: level.proteinG,
       fatG: level.fatG,
       carbsG: level.carbsG,
@@ -2958,7 +2943,7 @@ export function nutritionTargetsForPrepDate(
       potassiumMg,
       phase: null,
       phaseLabel: PREP_PHASE_LABELS.post_show,
-      note: `🔄 Post-show (recovery): ${level.kcal} ккал · Б/У/Ж ${level.proteinG}/${level.carbsG}/${level.fatG} г, вода/натрий стабильны. ${level.note} ${post.weightCheck}`,
+      note: `🔄 Post-show (${track}): ${level.kcal} ккал · Б/У/Ж ${level.proteinG}/${level.carbsG}/${level.fatG} г, вода/натрий стабильны. ${level.note} ${post.weightCheck}`,
     };
   }
   const profile = CATEGORY_PROFILES[plan.category];
@@ -3484,7 +3469,8 @@ export function postShowReverseDiet(plan: BBContestPrepPlan): ReverseDietWeek[] 
 // ═══════════════════════════════════════════════════════════════════════════
 
 export interface RecoveryDietWeek {
-  week: 1 | 2 | 3 | 4;
+  /** 1..12 — окно восстановления (Buechel 2026: 1–6 мес; кривая ведёт до plateau). */
+  week: number;
   kcal: number;
   proteinG: number;
   fatG: number;
@@ -3492,20 +3478,28 @@ export interface RecoveryDietWeek {
   note: string;
 }
 
+/**
+ * PRO-3 Э8 (Buechel 2026 Delphi, Silva 2025, AUT 2026): recovery — неделя 1 «острый»
+ * подъём (maintenance+300), далее +75/нед до капа +800 (плавный набор к offseason,
+ * regain 10–15% веса сцены за 1–6 мес). Женский калорийный пол 1400 (RED-S).
+ * Раньше кривая замирала на 4-й неделе и цель была 5–10% — устарело.
+ */
 export function postShowRecoveryDiet(plan: BBContestPrepPlan): RecoveryDietWeek[] {
   const w = plan.preparation.startingWeightKg;
   const post = buildPostShowPlan(plan);
   const fatG = Math.max(plan.sex === 'female' ? 40 : 30, Math.round(w * prepFatFloorGPerKg(plan.sex)));
   const proteinG = post.proteinG;
-  const cap = post.kcal + 300;
-  return ([1, 2, 3, 4] as const).map(week => {
-    const kcal = Math.min(cap, post.kcal + (week - 1) * 75);
+  const cap = post.kcal + 800;
+  const floor = plan.sex === 'female' ? 1400 : 1200;
+  return Array.from({ length: 12 }, (_, i) => {
+    const week = i + 1;
+    const kcal = Math.max(floor, Math.min(cap, post.kcal + 300 + (week - 1) * 75));
     const carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
     return {
       week, kcal, proteinG, fatG, carbsG,
       note: week === 1
-        ? 'Recovery: нед 1/4 — сразу maintenance нового веса (гликоген/вода вернутся, вес +1–3 кг — норма, голод спадёт). Цель regain 5–10% веса сцены.'
-        : `Recovery: нед ${week}/4 — +${(week - 1) * 75} ккал к maintenance (угли +~${(week - 1) * 19} г/нед), вес плавно к offseason.`,
+        ? 'Recovery: нед 1/12 — острый подъём до maintenance+300 (гликоген/вода вернутся, вес +1–3 кг — норма, голод спадёт). Цель regain 10–15% веса сцены за 1–6 мес (Buechel 2026).'
+        : `Recovery: нед ${week}/12 — плавный набор к offseason (кап +800 ккал); восстановление — активная фаза 1–6 мес с мультисистемным контролем (сон/голод/цикл/сила).`,
     };
   });
 }
@@ -3529,15 +3523,18 @@ export function buildPostShowPlan(plan: BBContestPrepPlan, opts?: { referenceCal
   );
   const proteinG = Math.round(w * 2.0);
   return {
-    durationDays: 7,
+    // PRO-3 Э8: окно восстановления 12 нед (Buechel 2026: 1–6 мес; regain 10–15%).
+    durationDays: 84,
     kcal: maintenance,
     proteinG,
     waterLiters: 3,
     notes: [
-      `Калории на поддерживающем уровне (~${maintenance} ккал/день): после длительного дефицита плавно возвращайтесь к поддержанию, не уходите в профицит сразу.`,
+      `Калории на поддерживающем уровне (~${maintenance} ккал/день): неделя 1 — острый подъём к maintenance+300, далее плавный набор (кривая ниже), не уходите в профицит одним скачком.`,
       'Белок 2.0 г/кг сохраняется первые 1–2 недели — восстановление мышц после пик-недели.',
       'Вода и натрий стабильны: никаких резких манипуляций после шоу.',
       'Креатин и привычные добавки можно возвращать без ограничений.',
+      'Цель восстановления: regain 10–15% веса сцены за 1–6 мес, маркеры — сон ≥7 ч, голод ≤3, возврат цикла/либидо, сила ≥95% (Buechel 2026; AUT 2026: восстановление — активная фаза с мультисистемным контролем).',
+      'Не начинайте новый преп раньше, чем восстановление завершено (1–6 мес; некоторые атлеты — раз в 1–2 года).',
     ],
     training: [
       'Неделя 1: лёгкие full-body сессии 2–3×/нед (50–60% веса), ходьба/лёгкое кардио — удовольствие, не результат.',

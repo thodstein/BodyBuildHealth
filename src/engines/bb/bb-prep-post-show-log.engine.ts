@@ -126,7 +126,8 @@ export function removePostShowEntry(planId: string, week: number): PostShowWeekE
 
 /**
  * Маркеры восстановления по последней записи (Buechel/Chappell: вес, сон, голод,
- * цикл/гормоны, сила). stageWeightKg — вес сцены (для +5% regain-гейта).
+ * цикл/гормоны, сила). stageWeightKg — вес сцены (PRO-3 Э8: regain-гейт +10% —
+ * консенсус Buechel 2026 «10–15%»; было +5%).
  */
 export function postShowRecoveryMarkers(
   entry: PostShowWeekEntry | null | undefined,
@@ -139,7 +140,7 @@ export function postShowRecoveryMarkers(
   if (!entry) return empty;
   const weightRegained =
     Number.isFinite(entry.weightKg) && Number.isFinite(stageWeightKg) && (stageWeightKg as number) > 0
-      ? (entry.weightKg as number) >= (stageWeightKg as number) * 1.05
+      ? (entry.weightKg as number) >= (stageWeightKg as number) * 1.10
       : false;
   const sleepOk = Number.isFinite(entry.sleepH) ? (entry.sleepH as number) >= 7 : false;
   const hungerOk = Number.isFinite(entry.hunger1_5) ? (entry.hunger1_5 as number) <= 3 : false;
@@ -161,6 +162,6 @@ export function postShowComedownNotes(): string[] {
     '🦋 T3/тиреоиды (если применялись): только тейпер под контролем врача + контроль TSH/T4 — резкая отмена бьёт по весу.',
     '💉 PED-comedown: конкретику решает врач; еда и сон — главный анаболик этого периода, а не дозы.',
     '👨‍⚕️ Красные флаги к врачу: цикл не вернулся за 3–4 мес, либидо/энергия на нуле >6 нед, отёки/АД, депрессивные эпизоды.',
-    '🧠 Психика: +5–10% веса сцены — план, а не срыв (Buechel 2025). Оставайтесь на связи с тренером — «брошенность» главный риск.',
+    '🧠 Психика: +10–15% веса сцены — план, а не срыв (Buechel 2026). Оставайтесь на связи с тренером — «брошенность» главный риск.',
   ];
 }

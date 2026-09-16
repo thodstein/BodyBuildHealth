@@ -24,7 +24,7 @@ import {
   prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv,
   manipulationLockedFor, manipulationLockNote, trialCarbDoseGPerKg,
   TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks, prepRefeedDates,
-  postShowRecoveryDiet, buildPeakWeek, recarbLoadFromVisual,
+  postShowRecoveryDiet, activePostShowCurve, buildPeakWeek, recarbLoadFromVisual,
   type PrepAdjustment,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
@@ -1118,8 +1118,8 @@ export const BbContestPrepPost: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) 
                     {/* PRO-2 P5: трек восстановления — recovery (дефолт) vs reverse (opt-in) */}
                     <div style={{ display:'flex', gap:6, marginBottom:6 }}>
                       {([
-                        ['recovery', '🔄 Recovery — сразу maintenance', 'гликоген/гормоны/сон быстрее, +5–10% веса'],
-                        ['reverse', '🐢 Reverse — +100/нед', 'медленнее, только осознанно'],
+                        ['recovery', '🔄 Recovery — сразу maintenance', 'гормоны/RMR/сон быстрее, regain 10–15% (дефолт)'],
+                        ['reverse', '🐢 Reverse — +100/нед', 'RCT: не лучше, отсев выше (Silva 2025) — только осознанно'],
                       ] as const).map(([track, label, sub]) => {
                         const active = (prepPlan.postShowTrack ?? 'recovery') === track;
                         return (
@@ -1146,14 +1146,19 @@ export const BbContestPrepPost: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) 
                       })}
                     </div>
                     {(() => {
-                      const curve = postShowRecoveryDiet(prepPlan);
+                      // PRO-3 Э8/D12: рендер кривой по ФАКТИЧЕСКОМУ треку (reverse больше не показывает recovery).
+                      const curve = activePostShowCurve(prepPlan);
                       const w0 = prepPlan.preparation.startingWeightKg;
+                      const track = prepPlan.postShowTrack ?? 'recovery';
                       return (
                         <div style={{ fontSize:9, color:'#fff', marginBottom:4 }}>
-                          Recovery-кривая: {curve.map(wk => `${wk.week}н ${wk.kcal}`).join(' → ')} ккал · regain-цель +5–10% веса сцены (~{Math.round(w0 * 1.05)}–{Math.round(w0 * 1.1)} кг при сцене {w0} кг)
+                          {track === 'reverse' ? 'Reverse' : 'Recovery'}-кривая: {curve.map(wk => `${wk.week}н ${wk.kcal}`).join(' → ')} ккал · regain-цель +10–15% веса сцены (~{Math.round(w0 * 1.1)}–{Math.round(w0 * 1.15)} кг при сцене {w0} кг)
                         </div>
                       );
                     })()}
+                    <div style={{ fontSize:9, color:'#fff', marginBottom:4 }}>
+                      ⏳ Восстановление — активная фаза 1–6 мес: ориентир regain 10–15% и маркеры (сон ≥7 ч, голод ≤3, цикл/либидо, сила ≥95%). Новый преп — только после восстановления (Buechel 2026; AUT 2026).
+                    </div>
                     {post.notes.map((n, i) => <div key={`n${i}`} style={{ color:'#fff', marginTop:2 }}>• {n}</div>)}
                     <div style={{ marginTop:4, fontSize:9, color:'#fff' }}>🏋️ {post.training.join(' ')}</div>
                     <div style={{ marginTop:4, color:'rgba(96,165,250,0.75)' }}>⚖️ {post.weightCheck}</div>
@@ -1169,7 +1174,7 @@ export const BbContestPrepPost: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) 
               const last = entries[entries.length - 1];
               const markers = postShowRecoveryMarkers(last ?? null, prepPlan.preparation.startingWeightKg);
               const markRow: Array<[string, boolean]> = [
-                ['Вес +5%', markers.weightRegained],
+                ['Вес +10%', markers.weightRegained],
                 ['Сон ≥7ч', markers.sleepOk],
                 ['Голод ≤3', markers.hungerOk],
                 ['Цикл/гормоны', markers.cycleOk],
