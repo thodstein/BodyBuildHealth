@@ -35,6 +35,7 @@ import { GRIP_IMPLEMENTS, type ArmImplement } from '../../../engines/arm/arm-gri
 import { ARM_MEDLEYS, getMedley } from '../../../engines/arm/arm-medley.engine';
 import { buildArmProSummary } from '../../../engines/arm/arm-pro-integration.engine';
 import { resolveArmMovementIntake } from '../../../engines/arm/arm-movement-intake.engine';
+import { armliftMovementFlashLines } from '../../../engines/arm/armlift-movement-lines.engine';
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
 import { ARM_EXERCISES } from '../../../core/exercise-catalog-arm';
@@ -797,6 +798,12 @@ export function ArmAutoConstructor() {
               parts.push(`диагноз: ${dw}${top1 ? ` → ${top1}` : ''}`);
               if (dw === 'conditioning') flash('🔴 Диагноз армлифтинга: боль — нагрузку не ставим, сначала врач');
             }
+            // PRO-6 M10: движение из моста (фаза/попытки/рука/кривая/условия/видео/боль) — видимыми строками (сборку не меняем).
+            // Отдельного flash нет осознанно: итоговый flash parts ниже перезатёр бы его (как conditioning выше) — стоп-строка живёт в persistent-линии.
+            try {
+              const mv = armliftMovementFlashLines(al);
+              for (const line of mv.lines) parts.push(line);
+            } catch {}
             if (parts.length) flash(`🏋️ Армлифтинг-мост: ${parts.join(' · ')}`);
           }
         } catch {}
