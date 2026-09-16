@@ -593,7 +593,24 @@
   volume-toggle-e2e/dup/prep-cycle) + `rest-hooks-native`/`apk-top-pack` + `tsc` 0 по проекту +
   `verify:apk-design` OK. **Шторм-инцидент**: параллельный `checkout` снёс незакоммиченные правки
   Prep-цикла — переприменено и закоммичено сразу (урок: коммит в ту же минуту после зелёных тестов).
-- [ ] **4.3 — остаток (новая сессия)**: только `renderQuality` (~1143) и `renderContestPrep` (~1378):
+- [x] **Волна 4 — 4.3 этап 4 (под-секции Quality, начат)**: самые большие `renderQuality`/`renderContestPrep`
+  режутся под-секциями (компонент на секцию, 8-16 props), каждая — отдельный коммит с проверками.
+  Сделано 3 из ~5 под-секций `renderQuality` (NEW `bb-quality-sections.tsx`, перенос 1-в-1, Node-сверка
+  против HEAD «identical modulo indent»):
+  - `BbQualityUnifiedCard` (7 props) — «🛡 Единое качество плана» (VBT/суперсет-время/перегруз/quality issues + V2-карта);
+    единственная замена — readiness-выражение из `linked` вынесено в prop тем же результатом;
+  - `BbQualityPlanLogicCard` (35 props) — «🧠 Логика построения плана» (7 под-карточек: вход/сплит/периодизация/объём/приоритеты/безопасность/методики),
+    по пути пойман и исправлен свой пробой текста («подмышки»→«подмышцы»);
+  - `BbQualitySafetySection` (16 props: safetyScore + 7 тоглов + pedAdapt) — «🛡️ Безопасность плана»
+    (factor-breakdown, суставный анализ 5 блоков, профилактика, распределение, вывод, 321 строка).
+  `BbAutoConstructor.tsx` 8061→5551 строк; 9+3 осиротевших импортов убрано; `bb-a11y-dialogs` теперь
+  читает и `bb-quality-sections.tsx` (live-region «Безопасности» цел). Проверено: 125/125 (9 файлов,
+  вкл. bb-quality-v2-card/volume-toggle/prep-cycle/dup) + `tsc` 0 по проекту + `verify:apk-design` OK.
+  **Остаток этапа 4** (следующая сессия): блок «🏋️ Тренировочная нагрузка плана» внутри `renderQuality`
+  (~600 строк: тогл + «Общая информация»/«Качество плана понедельно»/«Общие сведения»/PHASE-факт/объёмные карточки —
+  резать 2-3 под-секциями) и весь `renderContestPrep` (~1378: prep-форма, таймлайн фаз, peak-week, адаптация по весу,
+  показ-чеклист, экспорты — резать по 8-15 props).
+- [ ] **4.3 — остаток (новая сессия)**: `renderQuality` train-load блок (~600) + `renderContestPrep` (~1378):
   у них ~80-100 state-ссылок, резать **под-секциями** (каждая секция — компонент с 8-15 props)
   или через контекст-объект, а не целиком. Инварианты для каждого этапа: `tsc` 0,
   bb-UI паки (bb-auto-smoke/annual/prep-cycle/dup/volume-toggle/reproductive/a11y/apk-controls) +
