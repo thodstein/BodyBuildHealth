@@ -17,6 +17,8 @@ export interface PrepWeekCheckin {
   sleepAvg?: number;       // средний сон, ч
   sessionsDone?: number;   // выполнено сессий за неделю
   psyche?: number;         // 1..5 самочувствие/психика
+  /** PRO-3 Э9 (Triad 2025 / IOC REDs): менструальный статус недели (только Ж). */
+  cycle?: 'regular' | 'irregular' | 'absent' | 'na';
   note?: string;
   /** Статус совета адаптации на момент записи (для детекта «2 недели подряд»). */
   advice?: 'on_track' | 'too_fast' | 'too_slow' | 'taper' | 'no_data';

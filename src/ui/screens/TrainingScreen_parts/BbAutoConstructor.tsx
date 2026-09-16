@@ -632,6 +632,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [wkSleep, setWkSleep] = useState('');
   const [wkSessions, setWkSessions] = useState('');
   const [wkPsyche, setWkPsyche] = useState('');
+  const [wkCycle, setWkCycle] = useState<'' | 'regular' | 'irregular' | 'absent' | 'na'>('');
   const [wkNote, setWkNote] = useState('');
   const weeklyLog = useMemo(
     () => (prepPlan ? loadPrepWeekCheckins(prepPlan.id) : []),
@@ -667,12 +668,13 @@ export const BbAutoConstructor: React.FC = () => {
       sleepAvg: num(wkSleep),
       sessionsDone: num(wkSessions) != null ? Math.round(num(wkSessions)!) : undefined,
       psyche: num(wkPsyche) != null ? Math.min(5, Math.max(1, Math.round(num(wkPsyche)!))) : undefined,
+      cycle: wkCycle || undefined,
       note: wkNote.trim() || undefined,
       advice: (weightAdvice?.status as PrepWeekCheckin['advice']) ?? 'no_data',
     };
     savePrepWeekCheckin(prepPlan.id, entry);
     setWeeklyTick(t => t + 1);
-    setWkWeight(''); setWkWaist(''); setWkSleep(''); setWkSessions(''); setWkPsyche(''); setWkNote(''); setWkWeek(null);
+    setWkWeight(''); setWkWaist(''); setWkSleep(''); setWkSessions(''); setWkPsyche(''); setWkCycle(''); setWkNote(''); setWkWeek(null);
     flash(`📊 Чек-ин недели ${w} сохранён`);
   };
   const [prepConfirmedManip, setPrepConfirmedManip] = useState(false);
@@ -3585,7 +3587,7 @@ export const BbAutoConstructor: React.FC = () => {
       setWkSessions, setWkSleep, setWkWaist, setWkWeek, setWkWeight, showCheck,
       spillRisk, step, strengthDowns, testRatings, testWeightDelta, today,
       togglePrepCheckin, weekRefs, weeklyLog, weightAdvice, wkNote, wkPsyche,
-      wkSessions, wkSleep, wkWaist, wkWeek, wkWeight,
+      wkSessions, wkSleep, wkWaist, wkWeek, wkWeight, wkCycle, setWkCycle,
     };
     return (
       <div>

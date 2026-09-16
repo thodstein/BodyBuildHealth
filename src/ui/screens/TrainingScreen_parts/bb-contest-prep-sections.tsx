@@ -304,7 +304,7 @@ export const BbContestPrepParams: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }
 
 /** B — шапка результата + фазы + taper + недели подготовки + выполнение + чек-ины недельного лупа. */
 export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) => {
-  const { buildContestPrepConfig, builtPlan, currentPrepWeek, expYearsForPrep, handleSaveWeekCheckin, peds, phaseNow, prepApplied, prepPlan, setWkNote, setWkPsyche, setWkSessions, setWkSleep, setWkWaist, setWkWeek, setWkWeight, step, strengthDowns, weekRefs, weeklyLog, wkNote, wkPsyche, wkSessions, wkSleep, wkWaist, wkWeek, wkWeight } = ctx;
+  const { buildContestPrepConfig, builtPlan, currentPrepWeek, expYearsForPrep, handleSaveWeekCheckin, peds, phaseNow, prepApplied, prepPlan, setWkNote, setWkPsyche, setWkSessions, setWkSleep, setWkWaist, setWkWeek, setWkWeight, setWkCycle, step, strengthDowns, weekRefs, weeklyLog, wkNote, wkPsyche, wkSessions, wkSleep, wkWaist, wkWeek, wkWeight, wkCycle } = ctx;
   return (
     <>
       {/* <<Preview>> */}
@@ -686,6 +686,7 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
                         <th style={{ padding:'3px 5px', textAlign:'right' }}>Сон</th>
                         <th style={{ padding:'3px 5px', textAlign:'right' }}>Сесс</th>
                         <th style={{ padding:'3px 5px', textAlign:'right' }}>Пси</th>
+                        {prepPlan.sex === 'female' && <th style={{ padding:'3px 5px' }}>Цикл</th>}
                         <th style={{ padding:'3px 5px' }}>Статус</th>
                       </tr>
                     </thead>
@@ -706,6 +707,11 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
                             <td style={{ padding:'3px 5px', textAlign:'right' }}>{c?.sleepAvg ?? '—'}</td>
                             <td style={{ padding:'3px 5px', textAlign:'right' }}>{c?.sessionsDone ?? '—'}</td>
                             <td style={{ padding:'3px 5px', textAlign:'right' }}>{c?.psyche ?? '—'}</td>
+                            {prepPlan.sex === 'female' && (
+                              <td style={{ padding:'3px 5px', color: c?.cycle === 'absent' ? '#f87171' : '#fff' }}>
+                                {c?.cycle === 'regular' ? '✓' : c?.cycle === 'irregular' ? '~' : c?.cycle === 'absent' ? '✗' : '—'}
+                              </td>
+                            )}
                             <td style={{ padding:'3px 5px', color:'#fff' }}>{c?.advice && c.advice !== 'no_data' ? c.advice : '—'}</td>
                           </tr>
                         );
@@ -721,9 +727,27 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
                   <input type="number" step={0.5} placeholder="Сон, ч" value={wkSleep} onChange={e => setWkSleep(e.target.value)} style={{ width:70, ...IN }} />
                   <input type="number" step={1} placeholder="Сессии" value={wkSessions} onChange={e => setWkSessions(e.target.value)} style={{ width:70, ...IN }} />
                   <input type="number" step={1} min={1} max={5} placeholder="Пси 1-5" value={wkPsyche} onChange={e => setWkPsyche(e.target.value)} style={{ width:70, ...IN }} />
+                  {prepPlan.sex === 'female' && (
+                    <span style={{ display:'flex', gap:3, alignItems:'center' }}>
+                      <span style={{ fontSize:9, color:'#fff' }}>Цикл:</span>
+                      {([['regular', '✓'], ['irregular', '~'], ['absent', '✗'], ['na', 'н/п']] as const).map(([v, l]) => (
+                        <button key={v} data-bb="wk-cycle" onClick={() => setWkCycle(wkCycle === v ? '' : v)} aria-pressed={wkCycle === v} style={{ minHeight:44, minWidth:36, borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', color: wkCycle === v ? '#f472b6' : '#fff', border: wkCycle === v ? '1px solid #f472b6' : '1px solid rgba(255,255,255,0.15)', background: wkCycle === v ? 'rgba(244,114,182,0.15)' : 'rgba(255,255,255,0.03)' }}>{l}</button>
+                      ))}
+                    </span>
+                  )}
                   <input placeholder="Заметка" value={wkNote} onChange={e => setWkNote(e.target.value)} style={{ flex:'1 1 120px', ...IN }} />
                   <button style={BTN_GHOST} onClick={handleSaveWeekCheckin}>💾 Чек-ин</button>
                 </div>
+                {/* PRO-3 Э9: RED-S-подсказка при отсутствии цикла ≥2 недель (Triad 2025) */}
+                {prepPlan.sex === 'female' && (() => {
+                  const last2 = weeklyLog.slice(-2);
+                  const absent2 = last2.length === 2 && last2.every((c: any) => c.cycle === 'absent');
+                  return absent2 ? (
+                    <div data-bb="reds-cycle-hint" style={{ fontSize:10, color:'#f87171', marginBottom:6 }}>
+                      🩸 Цикл отсутствует ≥2 недель подряд — RED-S-риск (Triad 2025): +300–600 ккал/день, к врачу; дефицит не углублять.
+                    </div>
+                  ) : null;
+                })()}
                 {!prepPlan.testPeakWeekId && (
                   <div style={{ fontSize:10, color:'#fff' }}>🧪 Trial peak ещё не сделан — прогоните репетицию за 21–28 дней до шоу (блок ниже), стратегия пика станет точнее.</div>
                 )}
@@ -737,7 +761,7 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
 
 /** C — Test Peak Week (шаг 4) + безопасность + чек-лист шоу + мед-процесс + питание на сегодня. */
 export const BbContestPrepTrialSafety: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) => {
-  const { contestWizard, flash, handleRunTestPeakWeek, lastTest, liveFull, liveVisual, liveWater, prepPlan, recarb, setLiveFull, setLiveVisual, setLiveWater, setRecarb, setShowCheck, setTestRatings, setTestWeightDelta, showCheck, step, testRatings, testWeightDelta, today } = ctx;
+  const { contestWizard, flash, handleRunTestPeakWeek, lastTest, liveFull, liveVisual, liveWater, prepPlan, recarb, setLiveFull, setLiveVisual, setLiveWater, setRecarb, setShowCheck, setTestRatings, setTestWeightDelta, showCheck, step, testRatings, testWeightDelta, today, weeklyLog } = ctx;
   return (
     <>
       {/* <<TrialSafety>> */}
@@ -826,7 +850,11 @@ export const BbContestPrepTrialSafety: React.FC<{ ctx: BbContestPrepCtx }> = ({ 
                 isTrainingDay: true, trainDurationMin: 75, trainIntensity: 'medium',
                 sex: prepPlan.sex,
               });
-              const cat2 = calcRedsCAT2({ ea: ea.ea, sex: prepPlan.sex });
+              const cat2 = calcRedsCAT2({
+                ea: ea.ea, sex: prepPlan.sex,
+                // PRO-3 Э9: менструальный статус из недельных чек-инов (аменорея >3 мес — primary, IOC CAT2)
+                menstrualFlag: prepPlan.sex === 'female' && weeklyLog[weeklyLog.length - 1]?.cycle === 'absent' ? true : undefined,
+              });
               return (
                 <div data-bb="reds-screen" style={{ marginBottom:10, padding:10, borderRadius:10, background:'rgba(239,68,68,0.05)', border:"1px solid rgba(239,68,68,0.25)" }}>
                   <div style={{ fontSize:11, fontWeight:800, color: cat2.color, marginBottom:4 }}>
