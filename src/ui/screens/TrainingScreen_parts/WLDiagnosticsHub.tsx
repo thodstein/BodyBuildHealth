@@ -46,7 +46,7 @@ import { meetPlan } from '../../../engines/strength-sport/strength-sport-ta-meet
 import { ymaxVerdict, femalePhaseNorm, femaleLevelOf, femalePhaseVerdict } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
 import { shrinkMVT, mvtPosterior, isVelocityShiftReal, velocityMetricFlag, mvtRetestNote, TA_POPULATION_MVT } from '../../../engines/strength-sport/strength-sport-ta-mvt.engine';
 import { imtpEnduranceDrop } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
-import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
+import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor, correctivesByError, tagsForBarMetrics, TA_ERROR_TAG_RU, correctiveById, correctiveExportLines } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -1224,7 +1224,12 @@ export const WLDiagnosticsHub: React.FC = () => {
           return { weakPoint: wp, label: b.label, joint: b.joint, angleRange: `${b.angleRangeDeg[0]}-${b.angleRangeDeg[1]}°`, weakMuscles: b.weakMuscles.join(', '), reason: b.biomechanicalReason };
         } catch { return null; }
       }).filter(Boolean);
-      base.corrections = weakPoints.flatMap(wp => { try { return top3For(wp).map(c => ({ weakPoint: wp, corrId: c.id, name: c.name, protocol: `${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}%` })); } catch { return []; } });
+      base.corrections = weakPoints.flatMap(wp => { try { return top3For(wp).map(c => { const lib = correctiveById(c.id); return { weakPoint: wp, corrId: c.id, name: c.name, protocol: `${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}%`, ...(lib ? { cue: lib.cues[0] || '', source: lib.source } : {}) }; }); } catch { return []; } });
+      try {
+        const causeMap: Record<string, string> = {};
+        for (const wp of weakPoints) { try { causeMap[wp] = causeFor(wp)?.cause ?? ''; } catch { causeMap[wp] = ''; } }
+        base.correctiveDetail = weakPoints.flatMap(wp => { try { return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel); } catch { return []; } });
+      } catch { /* noop */ }
       if (snatchAttempts || cjAttempts) base.attempts = { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) };
       // V4-B/V6-B1: ноты последней инъекции + Sinclair прогресса (ноты персистятся в WLState)
       const injectNotes = Array.isArray(state.lastInjectNotes) ? state.lastInjectNotes : [];
@@ -1722,6 +1727,21 @@ export const WLDiagnosticsHub: React.FC = () => {
             </div>
             {barMetrics && <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: barMetricsDiag?.severity === 'critical' ? 'rgba(239,68,68,0.08)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${barMetricsDiag?.severity === 'ok' ? 'rgba(34,197,94,0.2)' : barMetricsDiag?.severity === 'warn' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize: 11, fontWeight: 700, color: barMetricsDiag?.severity === 'ok' ? '#22c55e' : barMetricsDiag?.severity === 'warn' ? '#f59e0b' : '#ef4444' }}>{barMetricsDiag?.text}</div><div style={{ fontSize: 10, color: '#fff' }}>Enode correction: {correctEnodeHorizontal(barMetrics.xLoop).toFixed(1)}см (bias). SRD: turnover {isRealChange(barMetrics.xLoop, 'turnover') ? 'реально >4см' : '≤4см норма'} · catch {isRealChange(barMetrics.xLoop, 'catch') ? 'реально >6см' : '≤6см норма'}</div></div>}
             {barMetrics?.trajectoryType && barMetrics.trajectoryType !== 'unknown' && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>Тип {barMetrics.trajectoryType} — {classifyTrajectoryType([]).label}</div>}
+            {(() => {
+              try {
+                const t = tagsForBarMetrics(barMetrics?.xLoop ?? null, state.barLift);
+                if (!t.tags.length) return null;
+                const names = t.tags.flatMap(tag => correctivesByError(tag).slice(0, 2).map(e => e.nameRu));
+                const uniq = [...new Set(names)].slice(0, 3);
+                if (!uniq.length) return null;
+                return (
+                  <div data-wl="corrective-video" style={{ fontSize: 10, color: '#fff', marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.16)' }}>
+                    🛠️ Замер → ошибка: {t.tags.map(tag => TA_ERROR_TAG_RU[tag]).join(' · ')} → гасится: {uniq.join(' · ')}
+                    <button onClick={() => setTab('correction')} style={{ display: 'block', marginTop: 6, width: '100%', minHeight: 44, borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Открыть Коррекцию</button>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
             <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
             {/* E8: углы суставов с видео (CSV трекера поз) → автовалидация фаз + OHS-прогноз */}
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>

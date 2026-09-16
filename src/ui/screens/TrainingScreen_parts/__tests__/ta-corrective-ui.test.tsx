@@ -17,6 +17,24 @@ describe('ta corrective tab UI', () => {
     expect(picks.length).toBeGreaterThanOrEqual(3);
     expect(container.querySelector('[data-wl="corrective"]')?.textContent).toMatch(/@/);
   });
+  it('замер петли в Видео даёт хинт с упражнениями и переходом', () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+    fireEvent.change(screen.getByPlaceholderText('xLoop см'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: '📹 Видео' }));
+    const hint = container.querySelector('[data-wl="corrective-video"]');
+    expect(hint).toBeTruthy();
+    expect(hint?.textContent).toMatch(/Рывковая тяга|рывок с дефицита/i);
+    fireEvent.click(screen.getByRole('button', { name: /Открыть Коррекцию/ }));
+    expect(container.querySelector('[data-wl="corrective"]')).toBeTruthy();
+  });
+  it('петля ≤4 — хинта нет (молчим на шум)', () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+    fireEvent.change(screen.getByPlaceholderText('xLoop см'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: '📹 Видео' }));
+    expect(container.querySelector('[data-wl="corrective-video"]')).toBeNull();
+  });
   it('клик ⭐ ставит preferred и показывает сессию + вставку', () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: '🦾 Толчок' }));

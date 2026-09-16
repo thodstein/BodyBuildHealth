@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   TA_CORRECTIVES, CORRECTIVES_BY_PHASE, correctivesForWeakPoint,
   correctiveSessionFor, correctiveBlockFor, correctivesByError,
-  adjustProtocolForCause,
+  adjustProtocolForCause, TA_ERROR_TAG_RU, correctiveById,
+  tagsForBarMetrics, correctiveExportLines,
 } from '../strength-sport-ta-corrective.engine';
+import { estimateCorrBasePm } from '../strength-sport-ta-simulator.engine';
 import { allWLWeakPoints } from '../strength-sport-weakpoint';
 
 describe('ta-corrective library', () => {
@@ -71,5 +73,35 @@ describe('ta-corrective library', () => {
   });
   it('неизвестная фаза — пусто без броска', () => {
     expect(correctivesForWeakPoint('nope' as any)).toEqual([]);
+  });
+});
+
+describe('ta-corrective C3: связка замер→тег→экспорт', () => {
+  const WM = { snatch: 100, cleanJerk: 130, backSquat: 160, deadlift: 180 };
+  it('все id библиотеки инжектабельны (вес > 0, без броска)', () => {
+    for (const e of TA_CORRECTIVES) {
+      const w = estimateCorrBasePm(e.id, WM as any);
+      expect(w, e.id).toBeGreaterThan(0);
+    }
+  });
+  it('RU-подписи покрывают все используемые теги', () => {
+    const used = new Set(TA_CORRECTIVES.flatMap((e) => e.errors));
+    for (const t of used) expect(TA_ERROR_TAG_RU[t], t).toBeTruthy();
+  });
+  it('tagsForBarMetrics: ≤4 молчит, 5 — bar_forward, 8 — +crash, jerk — drive', () => {
+    expect(tagsForBarMetrics(3, 'snatch').tags).toEqual([]);
+    expect(tagsForBarMetrics(null, 'snatch').tags).toEqual([]);
+    expect(tagsForBarMetrics(5, 'snatch').tags).toEqual(['bar_forward']);
+    expect(tagsForBarMetrics(8, 'snatch').tags).toEqual(['bar_forward', 'bar_crash']);
+    expect(tagsForBarMetrics(8, 'jerk').tags).toContain('drive_forward');
+  });
+  it('correctiveById находит запись и null на мусор', () => {
+    expect(correctiveById('tall_snatch')?.nameRu).toMatch(/Высокий/);
+    expect(correctiveById('nope')).toBeNull();
+  });
+  it('exportLines: доза + кью + источник в каждой строке', () => {
+    const lines = correctiveExportLines('jerk_dip', 'technique', 'intermediate');
+    expect(lines.length).toBeGreaterThanOrEqual(3);
+    for (const l of lines) expect(l).toMatch(/@/);
   });
 });

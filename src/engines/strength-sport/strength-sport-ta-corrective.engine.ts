@@ -429,6 +429,71 @@ export interface TACorrectiveWeek {
   items: Array<{ exerciseId: string; sets: number; reps: number; pct: number }>;
 }
 
+/** RU-подписи тегов ошибок (единый словарь хаба: замер → слова). */
+export const TA_ERROR_TAG_RU: Record<TACorrectiveErrorTag, string> = {
+  early_pull: 'Ранняя тяга',
+  hips_rise: 'Таз стреляет вверх',
+  bar_forward: 'Гриф уходит вперёд (дуга)',
+  jump_forward: 'Прыжок вперёд',
+  weak_extension: 'Слабый финал (нет выпрямления)',
+  slow_turnover: 'Медленный уход под штангу',
+  high_catch: 'Высокий приём',
+  soft_catch: 'Мягкий/неуверенный приём',
+  pressout: 'Дожим (press-out)',
+  bar_crash: 'Штанга падает на атлета',
+  unstable_overhead: 'Нестабильный оверхед',
+  early_arm_bend: 'Ранний сгиб рук',
+  dip_forward: 'Подсед вперёд',
+  dip_deep: 'Слишком глубокий dip',
+  slow_dip: 'Медленный dip',
+  drive_forward: 'Драйв вперёд, не вверх',
+  split_short: 'Короткие ножницы',
+  split_asym: 'Асимметричные ножницы',
+  elbows_slow: 'Медленные локти',
+  chest_collapse: 'Грудь складывается',
+  feet_error: 'Ошибка стоп',
+  knee_touch: 'Касание коленей грифом',
+};
+
+/** Поиск записи библиотеки по id (для экспорта/моста; null если нет). */
+export function correctiveById(id: string): TACorrectiveExercise | null {
+  try {
+    const low = String(id || '').toLowerCase();
+    return TA_CORRECTIVES.find((e) => e.id.toLowerCase() === low) || null;
+  } catch { return null; }
+}
+
+export interface BarTagsResult {
+  tags: TACorrectiveErrorTag[];
+  text: string | null;
+}
+
+/**
+ * Замер → теги ошибок (пороги SRD хаба: turnover >4 см, catch >6 см).
+ * Пусто/норма (≤4) — молчит (не диагноз по шуму).
+ */
+export function tagsForBarMetrics(xLoopCm: number | null | undefined, lift: string): BarTagsResult {
+  const x = typeof xLoopCm === 'number' ? xLoopCm : NaN;
+  if (!Number.isFinite(x) || x <= 4) return { tags: [], text: null };
+  const isJerk = String(lift || '').toLowerCase().includes('jerk');
+  if (isJerk) {
+    const tags: TACorrectiveErrorTag[] = x > 6 ? ['drive_forward', 'split_short'] : ['drive_forward'];
+    return { tags, text: `Горизонталь ${x} см — драйв уходит вперёд` };
+  }
+  const tags: TACorrectiveErrorTag[] = x > 6 ? ['bar_forward', 'bar_crash'] : ['bar_forward'];
+  return { tags, text: `Петля ${x} см (>SRD) — гриф уходит вперёд` };
+}
+
+/** Обогащённые строки экспорта фазы: имя + доза + кью + источник. */
+export function correctiveExportLines(
+  wp: WLWeakPoint, cause?: TAWeakCause | null, level?: string | null,
+): string[] {
+  try {
+    return correctivesForWeakPoint(wp, { cause: cause ?? null, level: level ?? null, limit: 3 })
+      .map((c) => `${c.nameRu} — ${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}% · ${c.cues[0] || ''} · ${c.source}`);
+  } catch { return []; }
+}
+
 /** Волна corrective-блока 4–8 нед (паритет ta-spec-block: 3,3,4,4,4,4,3,3). */
 export function correctiveBlockFor(weakPoints: WLWeakPoint[], weeks = 6): TACorrectiveWeek[] {
   const uniq = [...new Set(weakPoints)].slice(0, 3) as WLWeakPoint[];

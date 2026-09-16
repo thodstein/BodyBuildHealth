@@ -64,10 +64,15 @@
   (доза + 2 кью + прогрессия/регрессия + источник + Δ) + ⭐ (в preferredCorr →
   инъекция первой) + сессия + волна + кнопка 💉 (существующий handleInjectToPlan).
   DoD: UI-тесты (таб/пики/⭐→сессия).
-- **C3 Связка (без дублей).** Ранжир/инъекция/экспорт не тронуты (библиотека —
-  контент-слой; скоринг остаётся в ta-correction-rank; инъекция ест ⭐ как раньше).
-  Осознанно не делаем: переписывание ранжира на библиотеку (риск 30+ потребителям),
-  SFR для ТА (данных нет), свой CV-трекинг (железа нет).
+- **C3 Связка «замер → тег → упражнение → экспорт» (без дублей).**
+  Движок: `TA_ERROR_TAG_RU` (22 RU-подписи) + `tagsForBarMetrics` (пороги SRD:
+  ≤4 молчит, 4–6 bar_forward, >6 +bar_crash; jerk — drive_forward) + `correctiveById`
+  + `correctiveExportLines` (имя + доза + кью + источник). Хаб: хинт
+  `data-wl="corrective-video"` в Видео при warn/critical (теги → топ упражнений +
+  «→ Открыть Коррекцию»); экспорт `corrections[]` обогащён cue/source +
+  новый `correctiveDetail[]`. Ранжир/инъекция не тронуты (контент-слой).
+  Lock-тест: все id библиотеки инжектабельны (`estimateCorrBasePm > 0`).
+  Осознанно не делаем: переписывание ранжира на библиотеку, SFR для ТА, CV-трекинг.
 
 ## 4. Выполнение (Sep 15 2026, закрыто кодом)
 
@@ -84,7 +89,15 @@
   `TAB_DEFS += 🛠️ Коррекция`, рендер-блок `data-wl="corrective"` (фаза→причина→
   `data-wl="corrective-pick"` ×5 с дозой/кью/прогрессией/Δ + ⭐ + сессия + волна +
   `data-wl="inject"`). NEW `ta-corrective-ui.test.tsx` 3/3 (таб/пики+дозы/⭐→сессия).
-- **Проверено:** движки 99/99 (corrective 11 + rank 6 + simulator 4 + weak-cause 10 +
-  v4 35 + plan-audit 8 + injection 13 …) + UI corrective 3/3 + v4-ui 5/5 +
-  wl-hub 39/39; `tsc` 0 по своим файлам (1 ошибка — чужой `bb-step-params.tsx`
-  `onUserIntensityTech`, не тронут). НЕ ПУШИЛ (очередь чужих WIP).
+- **C3 (продолжение, тот же день):** движок += `TA_ERROR_TAG_RU` (22) +
+  `correctiveById` + `tagsForBarMetrics` (SRD-пороги 4/6, jerk-ветка) +
+  `correctiveExportLines`; хаб — хинт `data-wl="corrective-video"` в Видео
+  (warn/critical → теги → топ упражнений + переход в Коррекцию) + экспорт
+  `corrections[]` с cue/source + `correctiveDetail[]`. Тесты: `ta-corrective`
+  11→**16/16** (инжектабельность всех 43 id, RU-покрытие тегов, пороги,
+  exportLines) + UI 3→**5/5** (хинт при петле 8, молчание при ≤4).
+- **Проверено (C3):** движки 104/104 (corrective 16 + rank 6 + simulator 4 + weak-cause 10 +
+  v4 35 + pro 27 …) + UI corrective **5/5** + v4-ui 5/5 +
+  wl-hub 39/39 (итого 173/173 в 12 файлах); `tsc` **0 по своим** (1 ошибка — чужой
+  `BbAutoConstructor.tsx:3304 string|null`, активный чужой рефактор 4.3, не тронут);
+  `verify:apk-design` OK. НЕ ПУШИЛ (очередь чужих WIP).
