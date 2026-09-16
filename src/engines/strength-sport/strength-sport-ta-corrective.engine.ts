@@ -504,6 +504,22 @@ export function tagsForBarMetrics(xLoopCm: number | null | undefined, lift: stri
   return { tags, text: `Петля ${x} см (>SRD) — гриф уходит вперёд` };
 }
 
+/**
+ * Доза предпочитаемой коррекции (C8: доза вставки = доза карточки).
+ * Возвращает protocolAdj библиотечного пика или null (тогда — доза ранжира).
+ */
+export function protocolForPreferred(
+  wp: WLWeakPoint, prefId: string | null | undefined,
+  cause?: TAWeakCause | null, level?: string | null,
+): TACorrectiveProtocol | null {
+  try {
+    if (!prefId) return null;
+    const pick = correctivesForWeakPoint(wp, { cause: cause ?? null, level: level ?? null, limit: 5 })
+      .find((c) => c.id === prefId);
+    return pick ? { ...pick.protocolAdj } : null;
+  } catch { return null; }
+}
+
 /** Обогащённые строки экспорта фазы: имя + доза + кью + источник. */
 export function correctiveExportLines(
   wp: WLWeakPoint, cause?: TAWeakCause | null, level?: string | null,

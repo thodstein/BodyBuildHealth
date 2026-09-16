@@ -3,7 +3,7 @@ import {
   TA_CORRECTIVES, CORRECTIVES_BY_PHASE, correctivesForWeakPoint,
   correctiveSessionFor, correctiveBlockFor, correctivesByError,
   adjustProtocolForCause, TA_ERROR_TAG_RU, correctiveById,
-  tagsForBarMetrics, correctiveExportLines,
+  tagsForBarMetrics, correctiveExportLines, protocolForPreferred,
 } from '../strength-sport-ta-corrective.engine';
 import { estimateCorrBasePm } from '../strength-sport-ta-simulator.engine';
 import { rankCorrectionsForTA } from '../strength-sport-ta-correction-rank.engine';
@@ -127,6 +127,16 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
       expect(e.protocol.restSeconds, `${e.id}/rest`).toBeGreaterThanOrEqual(60);
       expect(e.protocol.restSeconds, `${e.id}/rest`).toBeLessThanOrEqual(300);
     }
+  });
+  it('C8: protocolForPreferred — доза карточки (tall 5×3@40 / volume 4×5), мусор — null', () => {
+    expect(protocolForPreferred('snatch_pull_under', 'tall_snatch', 'technique', 'intermediate'))
+      .toMatchObject({ sets: 5, reps: 3, pct: 40 });
+    expect(protocolForPreferred('snatch_pull_under', 'tall_snatch', 'volume', 'intermediate'))
+      .toMatchObject({ sets: 4, reps: 5 });
+    expect(protocolForPreferred('snatch_pull_under', 'nope', 'technique', 'intermediate')).toBeNull();
+    expect(protocolForPreferred('snatch_pull_under', null, 'technique', 'intermediate')).toBeNull();
+    // чужой фазе не принадлежит — null (не тянем чужую дозу)
+    expect(protocolForPreferred('jerk_dip', 'tall_snatch', 'technique', 'intermediate')).toBeNull();
   });
   it('паритет с ранжиром: топ-3 каждой фазы × каждой причины — в библиотеке', () => {
     const causes: Array<TAWeakCause | null> = [null, 'volume', 'technique', 'mobility', 'fatigue', 'strength'];

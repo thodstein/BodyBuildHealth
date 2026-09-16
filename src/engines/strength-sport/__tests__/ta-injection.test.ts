@@ -93,6 +93,21 @@ describe('TA injection v2 E6 — все недели + preferred + spec + отк
     expect(r2.injected).toBe(1); // fallback pause_snatch
     expect(r2.skippedDup).toBe(1);
   });
+  it('C8: preferred из библиотеки (tall_snatch) вставляется с именем библиотеки, а не подменяется legacy', () => {
+    const p = basePlan();
+    const r = injectTAWeakPoints(p, ['snatch_pull_under' as WLWeakPoint], { preferredCorr: { snatch_pull_under: 'tall_snatch' } });
+    expect(r.injected).toBe(1);
+    const ex = r.plan.weeksData[0].sessions.flatMap((s: any) => s.exercises).find((e: any) => e.id === 'tall_snatch');
+    expect(ex).toBeTruthy();
+    expect(ex.name).toMatch(/Высокий/);
+    expect(r.notes.some(n => n.includes('tall_snatch'))).toBe(true);
+  });
+  it('C8: мусорный preferred игнорируется — legacy fallback (high_hang_snatch)', () => {
+    const p = basePlan();
+    const r = injectTAWeakPoints(p, ['snatch_pull_under' as WLWeakPoint], { preferredCorr: { snatch_pull_under: 'nope' } });
+    expect(r.injected).toBe(1);
+    expect(r.plan.weeksData[0].sessions.flatMap((s: any) => s.exercises).some((e: any) => e.id === 'high_hang_snatch')).toBe(true);
+  });
   it('targetSetsByWeek: волна 3→4', () => {
     const p = basePlan();
     const r = injectTAWeakPoints(p, ['jerk_dip' as WLWeakPoint], {

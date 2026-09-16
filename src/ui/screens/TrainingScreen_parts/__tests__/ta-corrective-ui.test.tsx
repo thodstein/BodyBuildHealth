@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { WLDiagnosticsHub } from '../WLDiagnosticsHub';
+import { buildStrengthSportPlan } from '../../../../engines/strength-sport/strength-sport-builder.engine';
 
 describe('ta corrective tab UI', () => {
   it('таб Коррекция есть и просит выбрать фазы', () => {
@@ -66,6 +67,25 @@ describe('ta corrective tab UI', () => {
     fireEvent.change(screen.getByPlaceholderText('95 нож'), { target: { value: '99' } });
     fireEvent.change(screen.getByPlaceholderText('100 нож'), { target: { value: '100' } });
     expect(container.querySelector('[data-wl="corrective-split"]')).toBeNull();
+  });
+  it('C8 E2E: ⭐ tall_snatch → в плане tall_snatch (не подмена legacy)', () => {
+    const plan = buildStrengthSportPlan({ mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 4, daysPerWeek: 3, workMax: { snatch: 100, cleanJerk: 120, backSquat: 150, deadlift: 180 } } as any);
+    localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(plan));
+    localStorage.removeItem('he_strength_sport_plan_prev_v1');
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Рывок: уход под штангу' }));
+    fireEvent.click(screen.getByRole('button', { name: '🛠️ Коррекция' }));
+    fireEvent.click(screen.getByRole('button', { name: /Выбрать Высокий рывок/ }));
+    const injectBtn = container.querySelector('[data-wl="corrective"] [data-wl="inject"]') as HTMLElement;
+    expect(injectBtn).toBeTruthy();
+    fireEvent.click(injectBtn);
+    const saved = JSON.parse(localStorage.getItem('he_strength_sport_plan_v1') || '{}');
+    const holder = saved.weeksData ? saved : saved.plan;
+    const ex = holder.weeksData[0].sessions.flatMap((s: any) => s.exercises).find((e: any) => e.id === 'tall_snatch');
+    expect(ex).toBeTruthy();
+    expect(ex.name).toMatch(/Высокий/);
   });
   it('клик ⭐ ставит preferred и показывает сессию + вставку', () => {
     const { container } = render(<WLDiagnosticsHub />);

@@ -46,7 +46,7 @@ import { meetPlan } from '../../../engines/strength-sport/strength-sport-ta-meet
 import { ymaxVerdict, femalePhaseNorm, femaleLevelOf, femalePhaseVerdict } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
 import { shrinkMVT, mvtPosterior, isVelocityShiftReal, velocityMetricFlag, mvtRetestNote, TA_POPULATION_MVT } from '../../../engines/strength-sport/strength-sport-ta-mvt.engine';
 import { imtpEnduranceDrop } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
-import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor, correctivesByError, tagsForBarMetrics, TA_ERROR_TAG_RU, correctiveById, correctiveExportLines } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
+import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor, correctivesByError, tagsForBarMetrics, TA_ERROR_TAG_RU, correctiveById, correctiveExportLines, protocolForPreferred } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -990,10 +990,20 @@ export const WLDiagnosticsHub: React.FC = () => {
     const protocols: Record<string, { sets?: number; reps?: number; pct?: number }> = {};
     for (const wp of zones) {
       try {
-        const t = top3For(wp);
         const prefId = (state.preferredCorr || {})[wp];
-        const pick = (prefId && t.find(c => c.id === prefId)) || t[0];
-        if (pick) protocols[wp] = { sets: pick.protocol.sets, reps: pick.protocol.reps, pct: pick.protocol.pct };
+        // C8: доза вставки = доза карточки Коррекции (библиотека), fallback — ранжир
+        let libProto: { sets: number; reps: number; pct: number } | null = null;
+        try {
+          const cause = causeFor(wp)?.cause ?? null;
+          libProto = protocolForPreferred(wp, prefId, cause, taLevel);
+        } catch { libProto = null; }
+        if (libProto) {
+          protocols[wp] = { sets: libProto.sets, reps: libProto.reps, pct: libProto.pct };
+        } else {
+          const t = top3For(wp);
+          const pick = (prefId && t.find(c => c.id === prefId)) || t[0];
+          if (pick) protocols[wp] = { sets: pick.protocol.sets, reps: pick.protocol.reps, pct: pick.protocol.pct };
+        }
       } catch { /* noop */ }
     }
     const weekIdxs = (planData.weeksData || []).map((_: any, i: number) => i);

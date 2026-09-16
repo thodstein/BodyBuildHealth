@@ -8,6 +8,7 @@
 import type { StrengthSportPlan, StrengthSportSession, StrengthSportExercise } from './strength-sport.types';
 import { WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from './strength-sport-weakpoint';
 import { TA_BIOMECH } from './strength-sport-biomechanics.engine';
+import { correctiveById } from './strength-sport-ta-corrective.engine';
 import '../../core/exercise-catalog-ta-supplement';
 
 function basePmForTA(id: string, wm: any): number {
@@ -153,8 +154,10 @@ export function injectTAWeakPoints(plan: StrengthSportPlan, weakPoints: WLWeakPo
       const bio = (TA_BIOMECH as any)[wp];
       if (!corrList || !corrList[0]) { notes.push(`⚠ ${wp} — нет коррекции`); continue; }
       // E6 v2: предпочитаемая первой, остальные — fallback (без preferred — legacy: только corr[0])
+      // C8: ⭐ из Коррекции — библиотечный id: принимается, если библиотека чинит эту фазу
       const pref = opts.preferredCorr?.[wp];
-      const candidates = pref && corrList.includes(pref)
+      const prefLibOk = !!pref && (corrList.includes(pref) || (correctiveById(pref)?.targets as string[] || []).includes(wp));
+      const candidates = prefLibOk && pref
         ? [pref, ...corrList.filter(c => c !== pref)]
         : [corrList[0]];
       // E6 v2: сеты/повторы/% из спец-блока и ранжира
@@ -195,7 +198,8 @@ export function injectTAWeakPoints(plan: StrengthSportPlan, weakPoints: WLWeakPo
         const rest = 120;
         const ex: StrengthSportExercise = {
           id: corrId,
-          name: bio?.corrections?.[0] || corrId,
+          // C8: имя — из библиотеки коррекции (точно соответствует id), fallback — legacy-строка биомеханики
+          name: correctiveById(corrId)?.nameRu || bio?.corrections?.[0] || corrId,
           group: 'legs',
           pattern: 'hinge',
           sets: addSets,
