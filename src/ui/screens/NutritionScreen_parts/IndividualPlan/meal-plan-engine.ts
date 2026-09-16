@@ -39,7 +39,8 @@ import {
   isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, countCarbItems,
   isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId,
   familyMealCap, familyMealUses, isCreamId, creamMealCap, citrusFruitCapG, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId,
-  isCannedFoodId, CANNED_SUBSTITUTE, isFlakeId, isMeatProteinId, mealHasMeatProtein,
+  isCannedFoodId, CANNED_SUBSTITUTE, SPECIALTY_POSITION_SUBSTITUTE, isFlakeId, isMeatProteinId, mealHasMeatProtein,
+  CONCENTRATE_FOOD_IDS, isConcentrateFoodId, CONCENTRATE_PORTION_CAP_G,
   isSauceCondimentFood,
   dayTargetScale, quotaMealCap,
 } from "./food-availability";
@@ -430,8 +431,8 @@ const isMeatId = (id: string): boolean => {
 // ─── Р-2.1 (Aug 28): Реалистичность состава приёма («18 г каши и 100 г сухофруктов») ──
 // «Концентраты» — углеводные носители с плотностью ≥55 г углей/100 г (сухофрукты/джем):
 // ДОБАВКА, а не основа — кап 50 г на приём (100 г изюма = 65 г сахаров одним пунктом).
-const CONCENTRATE_IDS = ['dates', 'raisins', 'dried_apricots', 'dried_apple_rings', 'honey', 'fruit_date_medjool', 'pryaniki', 'jam', 'zefir', 'pastila', 'sushki', 'sugar_cookies', 'marmalade', 'prunes', 'dates_dried',
-  'dried_pineapple', 'dried_mango', 'dried_cranberry', 'dried_blueberry', 'dried_kiwi', 'dried_pear', 'dried_peach', 'dried_banana_chips'];
+// P1-realism: единый источник списка — food-availability (корректор/посадка используют тот же).
+const CONCENTRATE_IDS: readonly string[] = CONCENTRATE_FOOD_IDS;
 // Все сухофрукты — сахар (дневной кап 15/20/25%), никогда степл-гарнир.
 const SUGAR_DRIED_IDS: ReadonlySet<string> = new Set(['dates', 'dates_dried', 'raisins', 'dried_apricots', 'dried_apple_rings', 'fruit_date_medjool', 'prunes',
   'dried_pineapple', 'dried_mango', 'dried_cranberry', 'dried_blueberry', 'dried_kiwi', 'dried_pear', 'dried_peach', 'dried_banana_chips']);
@@ -453,8 +454,7 @@ const COMFORT_PORTION_LIMITS: Record<string, number> = {
 };
 
 export function isConcentrateFood(food: FoodItem): boolean {
-  if (CONCENTRATE_IDS.includes(food.id)) return true;
-  return (food.category === 'veg_fruit' || food.category === 'carb') && (food.carbs || 0) >= 55 && (food.fiber || 0) <= 15;
+  return isConcentrateFoodId(food.id, food.carbs, food.fiber, food.category);
 }
 
 /**
@@ -1454,6 +1454,13 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
         const _f = _sub ? FOOD_DB.find(x => x.id === _sub) : undefined;
         if (_f) return _f;
       }
+      // P1-realism: дрейф specialty-фруктов/овощей → нормальный аналог 1-в-1
+      // (позиция/индексы пула целы; «любимый» specialty не подменяем).
+      const _spSub = (SPECIALTY_POSITION_SUBSTITUTE as Record<string, string>)[f.id];
+      if (_spSub && !(preferredIds && preferredIds.has(f.id))) {
+        const _f = FOOD_DB.find(x => x.id === _spSub);
+        if (_f) return _f;
+      }
       return f;
     }).filter(f => {
     if (excludedIds.has(f.id)) return false;
@@ -2442,7 +2449,12 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
       // Этап 5/7: на рефид-дне или пик-дне с низким лимитом клетчатки овощи легче
       // (меньше клетчатки — больше места углеводам загрузки).
       const _lightVeg = refeedDay || (typeof fiberCapG === 'number' && fiberCapG < 35);
-      const grams = _lightVeg ? 60 + Math.floor(seededRandom(seed + 3) * 40) : 150 + Math.floor(seededRandom(seed + 3) * 100);
+      // P5-realism: стеблевые/листовые наполнители (сельдерей/огурец/руккола/салат) —
+      // съедобный кап 150 г (EDIBILITY_CAPS); плотные овощи — прежние 150-250.
+      const grams = Math.min(
+        _lightVeg ? 60 + Math.floor(seededRandom(seed + 3) * 40) : 150 + Math.floor(seededRandom(seed + 3) * 100),
+        edibilityCapFor(vegSource.id, 250),
+      );
       const item = makeItem(vegSource, grams, 'veg');
       items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
     }
@@ -3078,10 +3090,10 @@ function pickRotationsForDay(dayOffset: number, randomSalt: number, count: numbe
 // papaya/green_apple/kiwi — «цитрус как овощ») и specialty-водоросли (nori/wakame/kelp —
 // недоступны без предпочтения). Цветовая ротация = только овощи.
 const VEG_COLOR_GROUPS = [
-  { ids: ['broccoli','spinach','asparagus','green_bean','celery','cabbage','kale','veg_bok_choy','brussels_sprouts','veg_cauliflower','greens_watercress','arugula','veg_endive'], label: 'зелёные' },
+  { ids: ['broccoli','spinach','asparagus','green_bean','celery','cabbage','kale','veg_bok_choy','brussels_sprouts','veg_cauliflower','arugula','veg_endive'], label: 'зелёные' },
   { ids: ['tomato','veg_bell_pepper_red','beetroot','radish','veg_cabbage_red','veg_rhubarb','veg_onion_red'], label: 'красные' },
   { ids: ['carrot','pumpkin','sweet_potato','butternut','squash_kabocha'], label: 'оранжевые' },
-  { ids: ['cucumber','zucchini','eggplant','mushrooms','veg_fennel_bulb','veg_turnip','veg_parsnip'], label: 'белые/фиолетовые' },
+  { ids: ['cucumber','zucchini','eggplant','mushrooms','veg_turnip','veg_parsnip'], label: 'белые/фиолетовые' },
   { ids: ['edamame','peas_green','veg_artichoke','leek'], label: 'зелёно-белые' },
   { ids: ['pepper','veg_bell_pepper_green','veg_bell_pepper_yellow','corn'], label: 'жёлтые' },
 ];
@@ -3096,7 +3108,7 @@ export const HARDCODED_ID_POOLS: Record<string, string[]> = {
   breakfastProtein: BREAKFAST_PROTEIN_IDS,
   vegColorGroups: VEG_COLOR_GROUPS.flatMap(g => g.ids),
   breakfastTemplates: BREAKFAST_TEMPLATES.flatMap(t => t.foods),
-  concentrates: CONCENTRATE_IDS,
+  concentrates: [...CONCENTRATE_IDS],
 };
 
 // ─── P2-3 (план «ведро»): excess-control второго гарнира ─────────────────
@@ -5006,6 +5018,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (!suppMax && best.item.role === 'fruit') maxAmount = Math.min(maxAmount, FRUIT_PORTION_CAP_G);
     // FIX base-2026-09: цитрус — по citrusFruitCapG (иначе «грейпфрут 87 г»).
     if (!suppMax && best.item.role === 'fruit') maxAmount = Math.min(maxAmount, citrusFruitCapG(best.item.id));
+    // Р-2.1: концентраты (сухофрукты) — добавка ≤50 г и точной подгонкой не раздуваются.
+    if (!suppMax && best.item.role === 'fruit' && isConcentrateFood(best.food)) maxAmount = Math.min(maxAmount, CONCENTRATE_PORTION_CAP_G);
     // D-28+ fix: цельный белок не раздувается за 300 г на приём (иначе «лосось 316 г»).
     // Эпик B: кап ровно 300 г (×1.25 допускал 374 г — тест d28 «порция белка ≤300 г»).
     if (!suppMax && best.item.role === 'protein') maxAmount = Math.min(maxAmount, 300);
@@ -5295,8 +5309,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if ((it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein') && na > 300 && it.role !== 'slow_protein') na = 300;
       // Эпик B: фрукт — «добавка», баланс не раздувает за 150 г (жалоба «500 г клюквы»).
       if (it.role === 'fruit' && na > FRUIT_PORTION_CAP_G) na = FRUIT_PORTION_CAP_G;
-      // FIX base-2026-09: цитрус балансом не раздуваем (иначе «грейпфрут 87 г»).
-      if (it.role === 'fruit' && /lemon|lime|citrus|grapefruit/.test(it.id) && na > 30) na = 30;
+      // FIX base-2026-09: цитрус балансом не раздуваем — единый кап citrusFruitCapG
+      // (P1-realism: регексп без 'orange' пропускал кровяной апельсин до 102-115 г).
+      if (it.role === 'fruit') { const _citCap = citrusFruitCapG(it.id); if (na > _citCap) na = _citCap; }
+      // Р-2.1 (единый кап): концентраты (сухофрукты) — добавка ≤50 г, баланс их не раздувает
+      // (P1-realism: «курага/инжир 111-130 г» в приёме ломали GL и реализм тарелки).
+      if (it.role === 'fruit' && _fdB && isConcentrateFoodId(it.id, _fdB.carbs, _fdB.fiber, _fdB.category)) na = Math.min(na, CONCENTRATE_PORTION_CAP_G);
+      // P5-realism: стеблевые овощи-наполнители — баланс тоже не раздувает (≤150 г; плотные 300).
+      if (it.role === 'veg') na = Math.min(na, edibilityCapFor(it.id, 250));
       // D-28: при «загрузке под утреннюю тренировку» ужин — минимум жиров (≤10 г),
       // межприёмный баланс его не поднимает.
       if (morningTrainLoad && m.type === 'dinner' && it.role === 'fat' && na > 10) na = 10;
@@ -6106,6 +6126,66 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
     recalcDayTotals(meals, totals); // B4
 
+    // ─── P3-realism: мясные позиции основных приёмов ≥80 г (при низкой цели белка) ───
+    // Аудит: «индейка 60 г на обед 592 ккал», «креветки 40 г» — дегустационные порции цельного
+    // мяса при недоборе углеводов. Гейт: день ≤2.1 г/кг белка (при высоких целях мясо и так
+    // большое); исключения: вегетарианские дни, peri-окна, pre-sleep. Дельта ккал срезается
+    // с углеводных пунктов ТОГО ЖЕ приёма (полы 50/30 г/кап уважаются); если срезать нельзя —
+    // подъём не делаем (сходимость дня важнее).
+    {
+      const _p3GateKg = Math.max(40, input.weightKg || 80);
+      const _isVegDay = !!(input as any).isVegetarian;
+      // Гейт: день ≤2.1 г/кг И ещё не перебрал ЦЕЛЬ белка (иначе подъём мяса лишь
+      // увеличивает перебор — кейс DFIX: цель 144, план 175 → мясо не растим).
+      if (!_isVegDay && totals.p < (input.goalProteinG || 0) * 1.02 && totals.p <= 2.1 * _p3GateKg) {
+        for (const _pm of meals) {
+          const _pt = String(_pm.type || '');
+          if (!['breakfast', 'lunch', 'dinner'].includes(_pt)) continue; // peri/presleep — не трогаем
+          if (((_pm as any).totals?.kcal || 0) < 450) continue;
+          const _meat = (_pm.items || []).find((x: any) => x.role === 'protein' && (x.amount || 0) > 0 && (x.amount || 0) < 80 && isMeatProteinId(x.id));
+          if (!_meat) continue;
+          const _oldAmt3 = Math.round(_meat.amount || 0);
+          const _oldK = _meat.kcal || 0;
+          const _f3 = 80 / Math.max(1, _meat.amount || 1);
+          const _newK = Math.round(4 * (_meat.p * _f3) + 9 * (_meat.f * _f3) + 4 * (_meat.c * _f3));
+          let _needCut = Math.max(0, _newK - _oldK);
+          if (_needCut <= 0) continue;
+          // Комната резки: углеводные пункты приёма до пола (основной приём 50 г × weightScale).
+          const _floor3 = Math.round(50 * Math.max(1, Math.min(1.6, _p3GateKg / 80)));
+          const _carbCands = (_pm.items || []).filter((x: any) => (x.role === 'carb_slow' || x.role === 'carb_fast') && (x.amount || 0) > _floor3);
+          if (_carbCands.length === 0) continue;
+          // Пробный прогон: сколько ккал можно срезать.
+          const _plan3: Array<{ it: any; to: number }> = [];
+          let _canCut = 0;
+          for (const _ci of [..._carbCands].sort((a: any, b: any) => (b.c || 0) - (a.c || 0))) {
+            if (_canCut >= _needCut) break;
+            const _kpg = (_ci.kcal || 0) / Math.max(1, _ci.amount || 1);
+            const _take = Math.min((_ci.amount || 0) - _floor3, Math.ceil((_needCut - _canCut) / Math.max(0.5, _kpg)));
+            if (_take < 5) continue;
+            _plan3.push({ it: _ci, to: (_ci.amount || 0) - _take });
+            _canCut += Math.round(_take * _kpg);
+          }
+          if (_canCut < _newK - _oldK) continue; // не компенсируется — не поднимаем
+          for (const { it: _ci3, to } of _plan3) {
+            const _r3 = to / Math.max(1, _ci3.amount || 1);
+            _ci3.amount = to;
+            _ci3.p = +(_ci3.p * _r3).toFixed(1); _ci3.f = +(_ci3.f * _r3).toFixed(1); _ci3.c = +(_ci3.c * _r3).toFixed(1);
+            _ci3.kcal = Math.round(4 * _ci3.p + 9 * _ci3.f + 4 * _ci3.c);
+            _ci3.fiber = Math.round((_ci3.fiber || 0) * _r3 * 10) / 10;
+          }
+          _meat.amount = 80;
+          _meat.p = +((_meat.p || 0) * _f3).toFixed(1);
+          _meat.f = +((_meat.f || 0) * _f3).toFixed(1);
+          _meat.c = +((_meat.c || 0) * _f3).toFixed(1);
+          _meat.kcal = Math.round(4 * _meat.p + 9 * _meat.f + 4 * _meat.c);
+          _meat.fiber = Math.round((_meat.fiber || 0) * _f3 * 10) / 10;
+          _pm.totals = mealTotalsOf(_pm.items);
+          recalcDayTotals(meals, totals);
+          notes.push(`🥩 Мясная позиция дотянута до 80 г в «${_pm.label}» (было ${_oldAmt3} г — аудит реализма): дельта ккал срезана с углеводного пункта`);
+        }
+      }
+    }
+
     // ─── ЕДИНЫЙ КОРРЕКТОР ДНЕВНЫХ ЦЕЛЕЙ + ФИНАЛЬНЫЙ ПЕРЕСЧЁТ ПОСЛЕ КАПОВ ───
     // После всех капов/полов/квот/санитарий доводим день до ≤3% по 4 осям.
     // Единый источник для всех путей (simple/minimal/pro → buildDayPlan).
@@ -6841,6 +6921,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           recalcDayTotals(meals, totals);
           if (_log.length > 0) notes.push(`⚖️ «${m.label}» облегчён до съедобных ${MAX_MEAL_SOLID_G} г: ${_log.join(', ')}`);
           if (_solidOf(m) > MAX_MEAL_SOLID_G) notes.push(`⚠ «${m.label}» остался тяжёлым (${_solidOf(m)} г): день недобирает — резать нельзя, добавьте приём`);
+          // P1-realism (тест съедобности 800У): если приём >700 г и переносить некуда, «водяные»
+          // пункты (овощи→фрукты) доводим до 700: это граммы без макросов (углей 2-8 г/100 г),
+          // сходимость не страдает. Гарниры/белки не трогаем (у них честная нота выше).
+          if (_solidOf(m) > MAX_MEAL_SOLID_G) {
+            for (const it of (m.items || []).filter((x: any) => (x.role === 'veg' || x.role === 'fruit') && (x.amount || 0) > 30)) {
+              if (_solidOf(m) <= MAX_MEAL_SOLID_G) break;
+              const _needW = _solidOf(m) - MAX_MEAL_SOLID_G;
+              const _takeW = Math.min(_needW, (it.amount || 0) - 30);
+              if (_takeW < 1) continue;
+              _scaleIt(it, it.amount || 0, (it.amount || 0) - _takeW);
+              _log.push(`${it.name} −${_takeW} г (предел ${MAX_MEAL_SOLID_G})`);
+            }
+            m.totals = mealTotalsOf(m.items);
+            recalcDayTotals(meals, totals);
+          }
           // Жёсткий предел 750 г/приём (тест съедобности): овощи→фрукты режем всегда —
           // это граммы без макросов, сходимость не страдает. Гарниры/белки без комнаты не трогаем.
           if (_solidOf(m) > 750) {
@@ -8111,6 +8206,116 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const _dayDevPctP4 = Math.round(_dayDevP4 * 1000) / 10;
     if (_dayDevPctP4 > 8) {
       notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (>8%) — пулы/капы не закрыли цели, итог честный best-effort, а не подгонка мусором`);
+    }
+
+    // ─── P4-realism: клетчатка HV-дней (≥1000У) ≤ max(50, 14 г/1000 ккал) ───
+    // Аудит: «клетчатка на HV до 77 г (25 г/1000 ккал при ориентире 14)». Режем самые
+    // клетчаточные ИЗОЛИРОВАННЫЕ источники (овощи/фрукты/семена >100 г) — гарниры-носители
+    // углеводов и белковые пункты не трогаем (полы приёмов целы).
+    // Гейт сходимости: срезаем клетчатку только когда день уже сошёлся по ккал
+    // (≥97% цели) — на недобирающем дне резка усугубит недобор (operability 1000У: 797).
+    if ((input.goalCarbsG || 0) >= 1000 && totals.kcal >= (input.goalKcal || 0) * 0.97) {
+      const _p4Cap = Math.max(50, Math.round(((input.goalKcal || 0) / 1000) * 14));
+      let _p4Guard = 10;
+      while (totals.fiber > _p4Cap && _p4Guard-- > 0) {
+        let _p4Best: { m: any; it: any } | null = null;
+        let _p4Den = 0;
+        for (const _m4 of meals) {
+          for (const _it4 of (_m4.items || [])) {
+            if ((_it4 as any)._fixedGrams) continue;
+            if (['carb_slow', 'carb_fast', 'protein', 'fast_protein', 'slow_protein'].includes(_it4.role)) continue;
+            if ((_it4.amount || 0) <= 100) continue;
+            const _fd4 = FOOD_DB.find((f: any) => f.id === _it4.id);
+            if (!_fd4 || (_fd4.category || '') !== 'veg_fruit') continue;
+            const _den4 = (_it4.fiber || 0) / Math.max(1, _it4.amount || 1);
+            if (_den4 > _p4Den) { _p4Den = _den4; _p4Best = { m: _m4, it: _it4 }; }
+          }
+        }
+        if (!_p4Best || (_p4Best.it.fiber || 0) <= 0) break;
+        const _p4Need = totals.fiber - _p4Cap;
+        const _p4Cut = Math.max(5, Math.min((_p4Best.it.amount || 0) - 100, Math.ceil(_p4Need / Math.max(0.0001, _p4Den * 100))));
+        const _p4To = Math.max(100, (_p4Best.it.amount || 0) - _p4Cut);
+        if (_p4To >= (_p4Best.it.amount || 0)) break;
+        const _p4R = _p4To / Math.max(1, _p4Best.it.amount || 1);
+        _p4Best.it.amount = _p4To;
+        _p4Best.it.p = +((_p4Best.it.p || 0) * _p4R).toFixed(1);
+        _p4Best.it.f = +((_p4Best.it.f || 0) * _p4R).toFixed(1);
+        _p4Best.it.c = +((_p4Best.it.c || 0) * _p4R).toFixed(1);
+        _p4Best.it.kcal = Math.round(4 * _p4Best.it.p + 9 * _p4Best.it.f + 4 * _p4Best.it.c);
+        _p4Best.it.fiber = Math.round((_p4Best.it.fiber || 0) * _p4R * 10) / 10;
+        _p4Best.m.totals = mealTotalsOf(_p4Best.m.items);
+        recalcDayTotals(meals, totals);
+        notes.push(`🌾 HV-клетчатка: «${_p4Best.it.name}» до ${_p4To} г (потолок ${_p4Cap} г = 14 г/1000 ккал)`);
+      }
+    }
+
+    // ─── P2-realism: фруктовый кап ≤ maxFruitMeals — финальный инвариант ───
+    // Поздние доборы пробивали лимит («5 приёмов с фруктом при лимите 4» — соль 2, 100 кг/max).
+    // Ставится ПОСЛЕ всех доборов и ПЕРЕД §realism-пересбором mpsSummary (витрина = выдача).
+    {
+      const _fruitCap2 = QUOTA_LIMITS.maxFruitMeals;
+      const _fruitMealsNow = meals.filter((m: any) => (m.items || []).some((it: any) => it.role === 'fruit'));
+      if (_fruitMealsNow.length > _fruitCap2) {
+        const _rankMeal2 = (m: any): number => {
+          const t = String(m.type || '');
+          if (t === 'presleep') return 100; // мелатониновая порция — не трогаем
+          if (t === 'breakfast') return 90;
+          if (t.startsWith('snack')) return 10;
+          if (t === 'lunch' || t === 'dinner') return 30;
+          return 50;
+        };
+        let _over2 = _fruitMealsNow.length - _fruitCap2;
+        for (const _fm of [..._fruitMealsNow].sort((a: any, b: any) => _rankMeal2(a) - _rankMeal2(b))) {
+          if (_over2 <= 0) break;
+          if (_rankMeal2(_fm) >= 100) continue;
+          const _before2 = (_fm.items || []).length;
+          const _fruitGone = (_fm.items || []).filter((it: any) => it.role === 'fruit');
+          _fm.items = (_fm.items || []).filter((it: any) => it.role !== 'fruit');
+          if ((_fm.items || []).length !== _before2) {
+            // P2-fix: угли/ккал убранного фрукта переносим в углеводный носитель ТОГО ЖЕ
+            // приёма (если есть комната) — кап выполняется, сходимость дня не падает
+            // («operability 798.3 < 800» от потери фрукта).
+            // Носитель: сначала в том же приёме, иначе — крупнейший гарнир любого flex-приёма
+            // с комнатой (иначе потеря фрукта уходит «в никуда»: operability 800 → 797).
+            let _carrier = (_fm.items || []).find((it: any) => (it.role === 'carb_slow' || it.role === 'carb_fast') && !(it as any)._fixedGrams);
+            let _fdC2 = _carrier ? FOOD_DB.find((f: any) => f.id === _carrier.id) : undefined;
+            let _cCap2 = _carrier && _fdC2 ? carbPortionCap(_fdC2, mealCapScaleOf(_fm)) : 0;
+            if (!_carrier || !_fdC2 || (_carrier.amount || 0) >= _cCap2) {
+              const _alt = meals
+                .filter((mm: any) => mm !== _fm && _flexMeal(mm) && !(mm as any)._insulinWindow)
+                .flatMap((mm: any) => (mm.items || []).map((it: any) => ({ mm, it })))
+                .filter((x: any) => (x.it.role === 'carb_slow' || x.it.role === 'carb_fast') && !(x.it as any)._fixedGrams)
+                .map((x: any) => {
+                  const _fd = FOOD_DB.find((f: any) => f.id === x.it.id);
+                  const _cap = _fd ? carbPortionCap(_fd, mealCapScaleOf(x.mm)) : 0;
+                  return { ...x, fd: _fd, room: _cap - (x.it.amount || 0), cap: _cap };
+                })
+                .filter((x: any) => x.fd && x.room >= 10)
+                .sort((a: any, b: any) => b.room - a.room)[0];
+              if (_alt) { _carrier = _alt.it; _fdC2 = _alt.fd; _cCap2 = _alt.cap; }
+            }
+            if (_carrier && _fdC2 && (_fdC2.carbs || 0) > 0 && (_carrier.amount || 0) < _cCap2) {
+              const _lostC2 = _fruitGone.reduce((s: number, it: any) => s + (it.c || 0), 0);
+              const _lostK2 = _fruitGone.reduce((s: number, it: any) => s + (it.kcal || 0), 0);
+              let _addG2 = Math.round((_lostC2 / Math.max(1, _fdC2.carbs) * 100) / 5) * 5;
+              _addG2 = Math.min(_addG2, _cCap2 - (_carrier.amount || 0));
+              // ккал-паритет: не перекладывать больше, чем потеряно (ккал носителя)
+              if ((_fdC2.kcal || 0) > 0) _addG2 = Math.min(_addG2, Math.ceil(_lostK2 / Math.max(1, _fdC2.kcal) * 100 / 5) * 5);
+              if (_addG2 >= 10) {
+                const _r2b = ((_carrier.amount || 0) + _addG2) / Math.max(1, _carrier.amount || 1);
+                _carrier.amount = (_carrier.amount || 0) + _addG2;
+                _carrier.p = +((_carrier.p || 0) * _r2b).toFixed(1); _carrier.f = +((_carrier.f || 0) * _r2b).toFixed(1); _carrier.c = +((_carrier.c || 0) * _r2b).toFixed(1);
+                _carrier.kcal = Math.round(4 * _carrier.p + 9 * _carrier.f + 4 * _carrier.c);
+                _carrier.fiber = Math.round(((_carrier.fiber || 0) * _r2b) * 10) / 10;
+              }
+            }
+            _fm.totals = mealTotalsOf(_fm.items);
+            recalcDayTotals(meals, totals);
+            _over2--;
+            notes.push(`🍎 Фруктовый кап (≤${_fruitCap2} приёма): фрукт убран из «${_fm.label}» (поздний добор, угли перенесены в гарнир)`);
+          }
+        }
+      }
     }
 
     // ─── §realism: витрина MPS пересобирается ПОСЛЕ всех проходов ───

@@ -12,7 +12,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
-import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, citrusFruitCapG, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein, dayTargetScale, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS } from './food-availability';
+import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, citrusFruitCapG, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein, dayTargetScale, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS, isConcentrateFoodId, CONCENTRATE_PORTION_CAP_G } from './food-availability';
 // Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
 // Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
 const POWDER_PORTION_CAP_G = 60;
@@ -939,8 +939,15 @@ export function correctDayToTargets(
         else if (isProteinPowderId(cand.it.id)) cap = POWDER_PORTION_CAP_G;
         else if (eff === 'p' && (cand.it.role === 'protein' || cand.it.role === 'fast_protein' || cand.it.role === 'slow_protein')) cap = 300;
         else if (cand.it.role === 'fruit') cap = 150;
+        // P1-realism (в т.ч. салат-наполнитель): овощи ростом не раздуваем — 150 г на приём.
+        // Иначе «клетчаткой» дня закрывался углеводный недобор (endive 475 г, сельдерей 244 г):
+        // вода/стебли в тарелке — гарнир, а не носитель углеводов (углей там 2-8 г/100 г).
+        else if (cand.it.role === 'veg') cap = Math.min(cap, 150);
         // FIX base-2026-09: цитрус ростом не раздуваем — по citrusFruitCapG.
         if (cand.it.role === 'fruit') cap = Math.min(cap, citrusFruitCapG(cand.it.id));
+        // Р-2.1: концентраты (сухофрукты/джем/мёд) — добавка ≤50 г, рост корректора их не раздувает
+        // (P1-realism: инжир 111-130 г в обед ломал GL и реализм тарелки).
+        if (cand.it.role === 'fruit' && isConcentrateFoodId(cand.it.id, candFood?.carbs, candFood?.fiber, candFood?.category)) cap = Math.min(cap, CONCENTRATE_PORTION_CAP_G);
         if (newAmount > cap) continue;
         const beforeTotals = sumTotals(meals);
         const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);

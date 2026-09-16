@@ -59,6 +59,13 @@ export const SPECIALTY_FOOD_IDS: ReadonlySet<string> = new Set([
   'wakame', 'seaweed_nori', 'spirulina', 'chlorella', 'moringa',
   'fruit_papaya', 'fruit_feijoa', 'fruit_pomelo', 'fruit_kumquat',
   'veg_chard', 'veg_radicchio', 'veg_watercress', 'veg_artichoke_globe',
+  // P1-realism (проба 16 дней): реальные id шардов, мимо которых дрейфовал гейт
+  // (канонические двойники уже заблокированы, но генерация видела эти id как 'core'):
+  // тамаринд 3×, локва 2×, жеруха 2×, салак/папайя/маракуйя/драгонфрут ежедневно.
+  'fruit_salak', 'fruit_passion', 'passion_fruit', 'fruit_dragon_fruit',
+  'fruit_papaya_fresh', 'papaya', 'fruit_tamarind', 'fruit_loquat', 'greens_watercress',
+  // Фенхель (проба: 4×/16 дней): нишевый овощ (Азбука/ВкусВилл), не массовая розница РФ.
+  'veg_fennel', 'veg_fennel_bulb',
   'grain_quinoa_puffed', 'quinoa_flakes', 'amaranth_grain', 'teff_grain',
   'spelt_bread', 'khorasan_pasta', 'lentil_pasta', 'chickpea_pasta',
   'bison_ground', 'venison_steak', 'boar_meat',
@@ -324,6 +331,50 @@ export const CANNED_SUBSTITUTE: Record<string, string> = {
   veg_bamboo_shoots_canned: 'celery',
   seafood_tuna_canned_water: 'tuna_steak',
 };
+
+/**
+ * P1-realism: позиционная замена дрейфующих specialty/экзотических id НОРМАЛЬНЫМИ
+ * аналогами 1-в-1 (тот же приём, что CANNED_SUBSTITUTE): длина пула и индексы
+ * seeded-пиков не сдвигаются (выкидывание id валит сходимость несвязанных сценариев),
+ * меняется только идентичность продукта (экзотика → обычная еда: яблоко/киви/груша…).
+ * Применяется ТОЛЬКО если продукт НЕ в предпочтениях пользователя (заявленную
+ * «любимую» specialty-единицу уважаем и не подменяем).
+ */
+export const SPECIALTY_POSITION_SUBSTITUTE: Record<string, string> = {
+  // фрукты (дрейф до P1: ежедневно в пробе 16 дней): замены по макро-профилю
+  // (банан ≈ салак/маракуйя: 89-97 ккал, 21-23 У; груша ≈ драгонфрут; нектарин ≈ папайя;
+  // финики ≈ тамаринд по углеплотности 75/62 У; мандарин ≈ локва)
+  fruit_salak: 'banana',
+  fruit_passion: 'banana',
+  fruit_dragon_fruit: 'pear',
+  fruit_papaya_fresh: 'nectarine',
+  fruit_tamarind: 'dates',
+  fruit_loquat: 'tangerine',
+  // «папайя» стояла цветным «овощем» в vegColor-пуле — заменяем цветным овощем
+  papaya: 'veg_bell_pepper_yellow',
+  // овощи (жеруха 2×, фенхель 4× в пробе): замены подобраны так, чтобы позиция
+  // оставалась в тех же пулах (токены spinach/cucumber/zucchini) — состав не сдвигается
+  greens_watercress: 'spinach',
+  veg_fennel: 'cucumber',
+  veg_fennel_bulb: 'zucchini',
+};
+
+/**
+ * Р-2.1: «концентраты» — углеводные носители плотностью ≥55 г углей/100 г
+ * (сухофрукты/джем/мёд/пряники): ДОБАВКА, а не основа приёма — кап 50 г на приём
+ * (100 г изюма = 65 г сахаров одним пунктом). Единая точка для движка и корректора.
+ */
+export const CONCENTRATE_FOOD_IDS: readonly string[] = [
+  'dates', 'raisins', 'dried_apricots', 'dried_apple_rings', 'honey', 'fruit_date_medjool', 'pryaniki', 'jam', 'zefir', 'pastila', 'sushki', 'sugar_cookies', 'marmalade', 'prunes', 'dates_dried',
+  'dried_pineapple', 'dried_mango', 'dried_cranberry', 'dried_blueberry', 'dried_kiwi', 'dried_pear', 'dried_peach', 'dried_banana_chips',
+];
+export function isConcentrateFoodId(id: string, carbs?: number, fiber?: number, category?: string): boolean {
+  if (!id) return false;
+  if (CONCENTRATE_FOOD_IDS.includes(id)) return true;
+  return (category === 'veg_fruit' || category === 'carb') && (carbs || 0) >= 55 && (fiber || 0) <= 15;
+}
+/** Порционный кап концентрата на приём (движок/корректор/посадка). */
+export const CONCENTRATE_PORTION_CAP_G = 50;
 
 /** Дневные квоты реалистичной тарелки (эпик B). */
 export interface DailyQuotaState {

@@ -67,6 +67,11 @@ export const EDIBILITY_CAPS: Record<string, number> = {
   cottage_cheese_5: 250, egg_whole: 275,
   // Овощи/жиры
   broccoli: 300, cucumber: 300, tomato: 300,
+  // P5-realism: стеблевые/листовые овощи-наполнители (проба: «сельдерей 244 г») —
+  // объём тарелки не набирается водой: ≤150 г на приём. Плотные овощи остаются 300.
+  celery: 150, veg_celery_stalks: 150, veg_celerysticks: 150, veg_celery_root: 150,
+  arugula: 150, veg_arugula: 150, veg_lettuce_romaine: 150, veg_lettuce_iceberg: 150,
+  veg_endive: 150, greens_endive: 150, veg_watercress: 150, greens_watercress: 150, veg_kohlrabi: 250,
   walnuts: 40, almonds: 40, olive_oil: 30,
 };
 
