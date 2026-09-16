@@ -211,6 +211,10 @@ export const EXERCISE_ID_MAP: Record<string, ExerciseIdMapping> = {
   pl_bench_mid_grip: { bio: 'bench_press' },
   pl_block_press: { bio: 'bench_press' },
   pl_speed_bench: { bio: 'bench_press' },
+  // Аудит 5.1 (BB-AUTO-EXHAUSTIVE-PRO): паузы классифицируются как squat/bench (не null),
+  // поэтому входят в ББ-пулы — даём им lab-bio как базовым движениям.
+  pl_squat_stop: { bio: 'back_squat', movement: 'back_squat', synergy: 'back_squat' },
+  pl_bench_stop: { bio: 'bench_press', movement: 'bench_press' },
   // ── Спина ──
   row_seal: { bio: 'barbell_row' },
   kroc_row: { bio: 'barbell_row' },
@@ -282,6 +286,11 @@ export const EXERCISE_ID_MAP: Record<string, ExerciseIdMapping> = {
   cable_hip_adduction: { bio: 'glute_bridge' },
   fire_hydrant: { bio: 'glute_bridge' },
   bridge_walkout: { bio: 'glute_bridge' },
+  // Аудит 5.1: «Ослиный удар» и «Ходьба с резиной» — ягодичная работа (не carry/ham) —
+  // lab-bio как у кикбэка/мостика (без маппинга выпадали из честного source-контура).
+  donkey_kick: { bio: 'glute_bridge' },
+  band_walks: { bio: 'glute_bridge' },
+  cable_pull_through: { bio: 'cable_pull_through', movement: 'cable_pull_through' },
   donkey_calf_raise: { bio: 'calf_raise' },
   donkey_calf_raise_v2: { bio: 'calf_raise' },
   calf_raise_v2: { bio: 'calf_raise' },

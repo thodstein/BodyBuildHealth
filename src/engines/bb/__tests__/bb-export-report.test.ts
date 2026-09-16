@@ -6,11 +6,19 @@
  *    + buildBBPlanReportText (был мёртвый движковый экспорт).
  */
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { generateActionableRecommendations } from '../bb-validator.engine';
 
-const SRC = readFileSync(resolve(__dirname, '..', '..', '..', 'ui', 'screens', 'TrainingScreen_parts', 'BbAutoConstructor.tsx'), 'utf8');
+const DIR = resolve(__dirname, '..', '..', '..', 'ui', 'screens', 'TrainingScreen_parts');
+const SRC = readFileSync(resolve(DIR, 'BbAutoConstructor.tsx'), 'utf8');
+// Этап 3 §4.3: шаги вынесены в `bb-step-*.tsx` (кнопка PDF живёт в bb-step-adjust) —
+// guard считает использование по конструктору И шагам (паттерн bb-auto-apk-controls).
+const STEPS = readdirSync(DIR)
+  .filter((f) => /^bb-step-.*\.tsx$/.test(f))
+  .map((f) => readFileSync(resolve(DIR, f), 'utf8'))
+  .join('\n');
+const ALL = SRC + '\n' + STEPS;
 const plan = { weeks: [], pattern: { id: 'p' } } as never;
 
 describe('4.8 generateActionableRecommendations (движок)', () => {
@@ -51,7 +59,7 @@ describe('4.7/4.8 wiring (source-guard)', () => {
   });
 
   it('handlePrintPlan больше не дублируется на двух кнопках', () => {
-    expect((SRC.match(/onClick=\{handlePrintPlan\}/g) || []).length).toBe(1);
+    expect((ALL.match(/onClick=\{handlePrintPlan\}/g) || []).length).toBe(1);
   });
 
   it('отчёт качества использует рекомендации + движковый текст', () => {

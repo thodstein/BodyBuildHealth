@@ -23,6 +23,9 @@ const CARRY_TERMS = ['прогулк', 'carry', 'walk', 'носил'];
 /** Упражнение-переноска (фермерская прогулка и т.п.). */
 export function isCarryExercise(ex: any): boolean {
   const nm = (ex.name || '').toLowerCase();
+  // Аудит 5.1 (BB-AUTO-EXHAUSTIVE-PRO): «Ходьба с резиной (monster walks)» — активация
+  // ягодиц, НЕ переноска; слово walk в имени не делает упражнение carry.
+  if (/резин|band|monster/.test(nm)) return false;
   return CARRY_TERMS.some(t => nm.includes(t));
 }
 
@@ -43,7 +46,10 @@ export function derivePattern(ex: any): string {
   // Аудит Sep 2026: гакк-присед на бицепс бедра / колодец|колодце — задняя цепь (hinge),
   // а не squat/quads (раньше /присед/ в общей ветке бил 'squat' → мышца quads,
   // и quads-фидеры прикреплялись к хамстринг-упражнению).
-  if (/станов|deadlift|румын|мёртв|гудморнинг|good.?morning|гиперэкстенз|back.?extension|разгибани.*спин|гакк.*бицепс|hack.*ham|hack.*бицепс|колодец|колодце/.test(hay)) return 'hinge';
+  // Аудит 5.1 (BB-AUTO-EXHAUSTIVE-PRO): `станов` без огласовки ловил «постановка» и
+  // «остановками» → «Жим ногами (широкая постановка)»/«Присед с остановками» уходили в hinge.
+  // Теперь только словоформы тяги: становая/становой/становую/становые.
+  if (/станов[аоуы]|deadlift|румын|мёртв|гудморнинг|good.?morning|гиперэкстенз|back.?extension|разгибани.*спин|гакк.*бицепс|hack.*ham|hack.*бицепс|колодец|колодце/.test(hay)) return 'hinge';
   // GLUTE_BRIDGE / HIP_THRUST: до isolation-ветки (g=legs → должен быть glute_squat, не isolation_legs_ham)
   if (/ягодич|мост|thrust|hip.?thrust|glute.?bridge|ягодичн/.test(hay)) return 'glute_squat';
 
@@ -58,6 +64,9 @@ export function derivePattern(ex: any): string {
       // (раньше 'бедр' в имени ловил ветку /бедр|сгибани/ → 'isolation_legs_ham',
       // и аддуктор-машина атрибутировалась hamstrings).
       if (/приведен|adduct/i.test(hay)) return 'adduction';
+      // Аудит 5.1 (BB-AUTO-EXHAUSTIVE-PRO): отведение/ягодичная изоляция («Ходьба с резиной»,
+      // разведения ног, кикбэк) — glutes; раньше по фолбэку падало в isolation_legs_ham.
+      if (/ягодиц|ягодич|отведен|abduct|kickback|кикбэк|разведен.*ног|махи.*ног/.test(hay)) return 'isolation_glutes';
       if (/квад|quad|разгиб|присед|выпрям.*ног| squat/.test(hay)) return 'isolation_legs_quad';
       if (/бедр|сгибани|ham/.test(hay)) return 'isolation_legs_ham';
       return /квад|quad/.test(tgt) ? 'isolation_legs_quad' : 'isolation_legs_ham';
@@ -147,7 +156,9 @@ export function trueMuscleOf(ex: any): string | null {
   // ИСКЛЮЧЕНИЕ: «румынская становая тяга» (= deadlift_romanian) — RDL-вариант с
   // альтернативным названием. Имена с маркером «румын» уходят в ББ-ветку (хамстринги).
   const isRdlAlias = /румын/i.test(nm);
-  if (!isRdlAlias && /станов|рывок|толчок|пендл|подъём на грудь|взятие на грудь|армлифт|конвой|удержание штанг|олимп|швунг|push.?press|push.?jerk|clean.?pull|muscle.?snatch|power.?clean|power.?snatch|hang.?clean/.test(nm)) return null;
+  // Аудит 5.1: `станов[аоуы]` вместо `станов` — иначе «Присед с остановками»/«Жим с остановками»/
+  // «Присед сумо (широкая постановка)» ложно уходили в соревновательный null.
+  if (!isRdlAlias && /станов[аоуы]|рывок|толчок|пендл|подъём на грудь|взятие на грудь|армлифт|конвой|удержание штанг|олимп|швунг|push.?press|push.?jerk|clean.?pull|muscle.?snatch|power.?clean|power.?snatch|hang.?clean/.test(nm)) return null;
   // Hinge-движения — ДВА пути в зависимости от типа лифта:
   // 1) ПЛ/олимпийский путь: классическая/сумо становая, дефицит, ол. тяги, трап-гриф, махи гирей
   //    (силовые/соревновательные лифты). Возвращаем null → выпадают из ББ-пула.
@@ -161,6 +172,11 @@ export function trueMuscleOf(ex: any): string | null {
     // Это core-упражнение → 'abs', не 'hamstrings'.
     if (/мёртв.*жук|dead.?bug/i.test(nm)) {
       return 'abs';
+    }
+    // Аудит 5.1 (BB-AUTO-EXHAUSTIVE-PRO): тяга троса между ног (pull-through) — ББ-упражнение
+    // задней цепи с ведущими ягодицами (EMG), не соревновательный лифт → glutes, не null.
+    if (/pull.?through|между ног/.test(nm)) {
+      return 'glutes';
     }
     // (1) ПЛ/олимпийские лифты — в ББ-плане НЕТ.
     // ИСКЛЮЧЕНИЕ: «румынская становая тяга» (= deadlift_romanian) — это RDL-вариант

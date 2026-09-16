@@ -7,6 +7,8 @@ import {
   buildBBContestPrepPlan,
   planFromStored,
   serializeBBPrepConfig,
+  isoAddDays,
+  isoToday,
   type BBContestPrepConfig,
 } from '../bb-contest-prep.engine';
 import {
@@ -17,6 +19,16 @@ import {
 } from '../bb-contest-prep-sync';
 import { getProfile } from '../../../core/profile-manager';
 
+/** Даты динамические: showDate в прошлом валидатор отклоняет («Дата шоу в прошлом»),
+ *  хардкод-даты — тайм-бомба (тест падал после 15.09.2026). */
+const future = (days: number) => isoAddDays(isoToday(), days);
+const SHOW_DEFAULT = future(21);
+const SHOW_CROSS = future(30);
+const SHOW_PHASES = future(28);
+const SHOW_MIGRATE = future(45);
+const SHOW_EVENT = future(60);
+const SHOW_COMPETITION = future(75);
+
 function cfg(over: Partial<BBContestPrepConfig> = {}): BBContestPrepConfig {
   const base: BBContestPrepConfig = {
     sex: 'male',
@@ -25,7 +37,7 @@ function cfg(over: Partial<BBContestPrepConfig> = {}): BBContestPrepConfig {
     experienceLevel: 'intermediate',
     enhanced: false,
     prepCount: 1,
-    showDate: '2026-09-20',
+    showDate: SHOW_DEFAULT,
     weeksOut: 3,
     trainingProtocol: 'bb',
     carbLoadStrategy: 'moderate',
@@ -50,14 +62,14 @@ describe('Unified taper — версионированный план как и�
     const loaded = planFromStored(s?.goals?.bbContestPrepPlan, s?.goals?.bbPeakConfig, s?.goals, s?.personal);
     expect(loaded).not.toBeNull();
     expect(loaded!.id).toBe(plan!.id);
-    expect(loaded!.showDate).toBe('2026-09-20');
+    expect(loaded!.showDate).toBe(SHOW_DEFAULT);
     // Зеркало конфига тоже лежит
     expect(typeof s?.goals?.bbPeakConfig).toBe('string');
   });
 
   it('питание: сохранение с source=planner делает цели доступными по всем фазам (подготовка/тапер/пик)', async () => {
     const { nutritionTargetsForPrepDate, prepPhaseForDate } = await import('../bb-contest-prep.engine');
-    const plan = saveContestPrepEverywhere(cfg({ showDate: '2026-10-10', weeksOut: 2 }), { source: 'planner', prepWeeks: 8 });
+    const plan = saveContestPrepEverywhere(cfg({ showDate: SHOW_PHASES, weeksOut: 2 }), { source: 'planner', prepWeeks: 8 });
     expect(plan).not.toBeNull();
     const s: any = getProfile().settings as any;
     const loaded = planFromStored(s?.goals?.bbContestPrepPlan, s?.goals?.bbPeakConfig, s?.goals, s?.personal)!;
@@ -91,7 +103,7 @@ describe('Unified taper — версионированный план как и�
   });
 
   it('миграция: голый bbPeakConfig → версионированный план', () => {
-    const c = cfg({ showDate: '2026-11-01', weeksOut: 2 });
+    const c = cfg({ showDate: SHOW_MIGRATE, weeksOut: 2 });
     // Ручная запись только конфига (как делало питание до унификации) — напрямую в localStorage
     try {
       localStorage.setItem(
@@ -120,21 +132,21 @@ describe('Unified taper — версионированный план как и�
     let detail: any = null;
     const h = (e: Event) => { fired = true; detail = (e as CustomEvent).detail; };
     window.addEventListener(CONTEST_PREP_UPDATED_EVENT as any, h);
-    saveContestPrepEverywhere(cfg({ showDate: '2026-12-01' }), { source: 'planner', prepWeeks: 10 });
+    saveContestPrepEverywhere(cfg({ showDate: SHOW_EVENT }), { source: 'planner', prepWeeks: 10 });
     window.removeEventListener(CONTEST_PREP_UPDATED_EVENT as any, h);
     expect(fired).toBe(true);
     expect(detail?.source).toBe('planner');
-    expect(detail?.showDate).toBe('2026-12-01');
+    expect(detail?.showDate).toBe(SHOW_EVENT);
   });
 
   it('кросс-синхронизация: питание сохраняет → ББ-авто читает тот же план', () => {
-    const planA = saveContestPrepEverywhere(cfg({ showDate: '2026-09-15', weeksOut: 3, trainingProtocol: 'bb', carbLoadStrategy: 'front' }), { source: 'planner', prepWeeks: 12 });
+    const planA = saveContestPrepEverywhere(cfg({ showDate: SHOW_CROSS, weeksOut: 3, trainingProtocol: 'bb', carbLoadStrategy: 'front' }), { source: 'planner', prepWeeks: 12 });
     expect(planA).not.toBeNull();
     // Имитация чтения со стороны ББ-авто
     const s: any = getProfile().settings as any;
     const planB = planFromStored(s?.goals?.bbContestPrepPlan, s?.goals?.bbPeakConfig, s?.goals, s?.personal);
     expect(planB).not.toBeNull();
-    expect(planB!.showDate).toBe('2026-09-15');
+    expect(planB!.showDate).toBe(SHOW_CROSS);
     expect(planB!.taper.weeks).toBe(3);
     // Специализация и протокол сохраняются в здании пика
     expect(planB!.peakWeek.carbMode).toBe('high'); // front → high
@@ -149,7 +161,7 @@ describe('Unified taper — версионированный план как и�
       preferLowFiberCarbs: true,
       creatineStrategy: 'stop',
       specialization: 'chest',
-      competitions: [{ id: 'c1', name: 'Кубок', priority: 'A', date: '2026-10-01' }],
+      competitions: [{ id: 'c1', name: 'Кубок', priority: 'A', date: SHOW_COMPETITION }],
       contraindications: ['kidney'],
       confirmedManipulation: true,
     });
