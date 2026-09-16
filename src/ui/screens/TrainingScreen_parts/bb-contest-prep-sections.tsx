@@ -304,7 +304,7 @@ export const BbContestPrepParams: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }
 
 /** B — шапка результата + фазы + taper + недели подготовки + выполнение + чек-ины недельного лупа. */
 export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) => {
-  const { buildContestPrepConfig, builtPlan, currentPrepWeek, expYearsForPrep, handleSaveWeekCheckin, peds, phaseNow, prepApplied, prepPlan, setWkNote, setWkPsyche, setWkSessions, setWkSleep, setWkWaist, setWkWeek, setWkWeight, setWkCycle, step, strengthDowns, weekRefs, weeklyLog, wkNote, wkPsyche, wkSessions, wkSleep, wkWaist, wkWeek, wkWeight, wkCycle } = ctx;
+  const { buildContestPrepConfig, builtPlan, currentPrepWeek, expYearsForPrep, handleSaveWeekCheckin, peds, phaseNow, prepApplied, prepPlan, setWkNote, setWkPsyche, setWkSessions, setWkSleep, setWkWaist, setWkWeek, setWkWeight, setWkCycle, step, strengthDowns, weekRefs, weeklyLog, wkNote, wkPsyche, wkSessions, wkSleep, wkWaist, wkWeek, wkWeight, wkCycle, wkSteps, setWkSteps, flash, savePrepToProfile } = ctx;
   return (
     <>
       {/* <<Preview>> */}
@@ -772,7 +772,7 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
 
 /** C — Test Peak Week (шаг 4) + безопасность + чек-лист шоу + мед-процесс + питание на сегодня. */
 export const BbContestPrepTrialSafety: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) => {
-  const { contestWizard, flash, handleRunTestPeakWeek, lastTest, liveFull, liveVisual, liveWater, prepPlan, recarb, setLiveFull, setLiveVisual, setLiveWater, setRecarb, setShowCheck, setTestRatings, setTestWeightDelta, showCheck, step, testRatings, testWeightDelta, today, weeklyLog } = ctx;
+  const { contestWizard, flash, handleRunTestPeakWeek, lastTest, liveFull, liveVisual, liveWater, prepPlan, recarb, setLiveFull, setLiveVisual, setLiveWater, setRecarb, setShowCheck, setTestRatings, setTestWeightDelta, showCheck, step, testRatings, testWeightDelta, today, weeklyLog, savePrepToProfile } = ctx;
   return (
     <>
       {/* <<TrialSafety>> */}

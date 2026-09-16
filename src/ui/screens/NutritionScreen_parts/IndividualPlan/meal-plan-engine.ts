@@ -8284,7 +8284,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // Носитель: сначала в том же приёме, иначе — крупнейший гарнир любого flex-приёма
             // с комнатой (иначе потеря фрукта уходит «в никуда»: operability 800 → 797).
             let _carrier = (_fm.items || []).find((it: any) => (it.role === 'carb_slow' || it.role === 'carb_fast') && !(it as any)._fixedGrams);
-            let _fdC2 = _carrier ? FOOD_DB.find((f: any) => f.id === _carrier.id) : undefined;
+            let _fdC2 = _carrier ? FOOD_DB.find((f: any) => f.id === _carrier?.id) : undefined;
             let _cCap2 = _carrier && _fdC2 ? carbPortionCap(_fdC2, mealCapScaleOf(_fm)) : 0;
             if (!_carrier || !_fdC2 || (_carrier.amount || 0) >= _cCap2) {
               const _alt = meals

@@ -81,7 +81,7 @@ import {
   prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv,
   manipulationLockedFor, trialCarbDoseGPerKg,
   type PrepAdjustment,
-  type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
+  type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type ContestEventEntry,
   type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy,
@@ -582,9 +582,6 @@ export const BbAutoConstructor: React.FC = () => {
   const resetAskDialogRef = useInlineDialogA11y(!!resetAsk, () => setResetAsk(false));
   // PRO: cross-mesocycle continuity — auto-load последнего сохранённого плана
   const [usePreviousPlan, setUsePreviousPlan] = useState(true);
-  // PRO: peak week — единая система тапера ББ (bb-contest-prep.engine)
-  const [showPeakWeek, setShowPeakWeek] = useState(false);
-  const [peakPrep, setPeakPrep] = useState<BBContestPrepResult | null>(null);
   // 🏁 Contest Prep (Этап 8): опциональный полный цикл подготовки
   const [prepPlan, setPrepPlan] = useState<BBContestPrepPlan | null>(null);
   const [prepApplied, setPrepApplied] = useState(false);
@@ -751,9 +748,11 @@ export const BbAutoConstructor: React.FC = () => {
     // провальный прогон (adjust — залив/плоскость) — это не «репетиция состоялась», а урок.
     const hasTrial = (() => {
       try {
-        const last = latestTestPeakWeek();
-        if (!last) return undefined;
-        return last.verdict === 'tested_ok' || last.verdict === 'conservative' ? true : undefined;
+        const raw = localStorage.getItem('he_bb_test_peak_weeks');
+        const arr = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(arr) || arr.length === 0) return undefined;
+        const last = arr[arr.length - 1];
+        return last?.verdict === 'tested_ok' || last?.verdict === 'conservative' ? true : undefined;
       } catch { return undefined; }
     })();
     const base: BBContestPrepConfig = {
@@ -1057,7 +1056,8 @@ export const BbAutoConstructor: React.FC = () => {
   };
   const handleApplyWeightAdjustment = (caloriesDelta: number, cardioDelta: number) => {
     if (!prepPlan || !weightAdvice || weightAdvice.status === 'no_data') return;
-    const next: BBContestPrepPlan = {
+    // PRO-3 Э12: история корректировок — через единую функцию движка (единый формат/кап 20, было вручную).
+    let next: BBContestPrepPlan = {
       ...prepPlan,
       updatedAt: new Date().toISOString(),
       preparation: {
@@ -1065,18 +1065,16 @@ export const BbAutoConstructor: React.FC = () => {
         currentCalories: Math.max(1200, prepPlan.preparation.currentCalories + caloriesDelta),
         cardioMinutesPerWeek: Math.max(0, prepPlan.preparation.cardioMinutesPerWeek + cardioDelta),
       },
-      adjustments: [
-        ...(prepPlan.adjustments ?? []),
-        {
-          date: isoToday(),
-          reason: weightAdvice.recommendation,
-          caloriesDelta,
-          cardioDelta,
-          weightStatus: weightAdvice.status,
-          source: 'user' as const,
-        },
-      ].slice(-20),
     };
+    try {
+      next = recordPrepAdjustment(next, {
+        reason: weightAdvice.recommendation,
+        caloriesDelta,
+        cardioDelta,
+        weightStatus: weightAdvice.status,
+        source: 'user',
+      });
+    } catch { /* history — не критично для применения */ }
     setPrepPlan(next);
     savePrepToProfile(next, buildContestPrepConfig());
     const parts: string[] = [];
@@ -2495,7 +2493,6 @@ export const BbAutoConstructor: React.FC = () => {
     // План перестроен — применённый ранее contest prep больше не актуален
     // (новый план не содержит taper/пик-неделю). Сброс метки применения.
     setPrepApplied(false);
-    setShowPeakWeek(false);
 
     } catch (e: any) {
       console.error('[BB-auto] Ошибка генерации плана:', e);
@@ -3038,14 +3035,12 @@ export const BbAutoConstructor: React.FC = () => {
     setBuiltPlan(null);
     setPrepApplied(false);
     setPrepPlan(null);
-    setPeakPrep(null);
     setBbWeekSel(1);
     setExerciseEdits({});
     setEditMode(null);
     setSubTarget(null);
     setExSwapModal(null);
     setShowCompare(false);
-    setShowPeakWeek(false);
     try { localStorage.removeItem('he_bb_plan_saved'); } catch { /* ignore */ }
     setStep('params');
     flash('🔄 Сборка сброшена — начинаем заново');
@@ -3538,8 +3533,6 @@ export const BbAutoConstructor: React.FC = () => {
       diffVariantId={diffVariantId}
       setDiffVariantId={setDiffVariantId}
       diffPlan={diffPlan}
-      showPeakWeek={showPeakWeek}
-      peakPrep={peakPrep}
       peakWeekCategory={peakWeekCategory}
       peakSpec={peakSpec}
       weakPoints={weakPoints}

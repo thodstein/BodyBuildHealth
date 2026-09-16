@@ -17,11 +17,9 @@ import { loadSessions } from '../../../engines/workout-logger.engine';
 import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBMesocycleTable, buildBBTaperCurve, buildBBFitnessFatigue, compareBBVariants, type WeekDateRange } from '../../../engines/bb/bb-visual.engine';
 import { buildBBPlanFact, bbPlanFactSummary, bbAdherenceBadge } from '../../../engines/bb/bb-plan-fact.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
-import type { BBContestCategory, ContestSpecialization, BBContestPrepResult } from '../../../engines/bb/bb-contest-prep.engine';
-import { CONTEST_CATEGORY_LABELS, CONTEST_SPECIALIZATION_LABELS } from '../../../engines/bb/bb-contest-prep.engine';
+import type { BBContestCategory, ContestSpecialization } from '../../../engines/bb/bb-contest-prep.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
-import { ContestPeakWeekCard } from '../../components/contest-prep/ContestPeakWeekCard';
 import { PopupSelect, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { BTN, BTN_GHOST, IN, SMALL, H } from './training-ui';
 import { PHASE_COLORS } from './PlanOutput';
@@ -65,8 +63,6 @@ export interface BbAdjustStepProps {
   diffVariantId: string | null;
   setDiffVariantId: React.Dispatch<React.SetStateAction<string | null>>;
   diffPlan: any;
-  showPeakWeek: boolean;
-  peakPrep: BBContestPrepResult | null;
   peakWeekCategory: BBContestCategory;
   peakSpec: ContestSpecialization;
   weakPoints: string[];
@@ -100,7 +96,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
   bulkModal, setBulkModal, bulkField, setBulkField, bulkMode, setBulkMode, bulkValue, setBulkValue,
   bbWeekSel, setBbWeekSel, bbWeeks, startDateInput, setStartDateInput, currentWeek,
   savedPlans, showCompare, setShowCompare, diffVariantId, setDiffVariantId, diffPlan,
-  showPeakWeek, peakPrep, peakWeekCategory, peakSpec,
+  peakWeekCategory, peakSpec,
   weakPoints, dupMode, flash, setStep, setExSwapModal,
   adjustVolume, adjustWeight,
   handleSavePlan, handleSaveToMyPlans, handleSaveAsUserProgram, handleSaveVariant,
@@ -260,33 +256,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
            <button style={BTN_GHOST} onClick={handleExportCSV}>📥 CSV</button>
           </div>
 
-        {/* Пик-неделя: единая система тапера ББ */}
-        {showPeakWeek && peakPrep && (
-          <div style={{ marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)' }}>
-            <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:8 }}>🎭 Пик-неделя (тапер ББ) · шоу {peakPrep.config.showDate}</div>
-            <div style={{ marginBottom:10, fontSize:11 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <PopupSelect
-                  label="🎭 Категория"
-                  value={peakWeekCategory}
-                  onChange={v => applyPeakWeekToCurrentPlan(v as BBContestCategory)}
-                  options={(Object.keys(CONTEST_CATEGORY_LABELS) as BBContestCategory[]).map(c => ({ id: c, label: CONTEST_CATEGORY_LABELS[c] }))}
-                />
-                <PopupSelect
-                  label="⭐ Специализация"
-                  value={peakSpec}
-                  onChange={v => applyPeakWeekToCurrentPlan(peakWeekCategory, v as ContestSpecialization)}
-                  options={(Object.keys(CONTEST_SPECIALIZATION_LABELS) as ContestSpecialization[]).map(s => ({ id: s, label: CONTEST_SPECIALIZATION_LABELS[s] }))}
-                />
-              </div>
-            </div>
-            {/* Единый рендер протокола (Э0.3): ContestPeakWeekCard */}
-            <ContestPeakWeekCard bare result={peakPrep} showPotassiumNote={false} />
-            <div style={{ marginTop:4, fontSize:9, color:'#fff' }}>
-              Наложено на финальную неделю плана: памп-режим (15–20 повт, ~60% веса), сессии 4+ → отдых. K {peakPrep.peakWeek[0]?.potassiumMg} мг — не снижать.
-            </div>
-          </div>
-        )}
+        {/* PRO-3 Э11: мёртвая ветка showPeakWeek/peakPrep удалена — пик-неделя живёт в шаге contest + дедуп ContestPeakWeekCard */}
 
         {/* Мульти-планы: сравнение вариантов */}
         {showCompare && savedPlans.length > 0 && (

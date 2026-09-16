@@ -2135,7 +2135,7 @@ export function deserializeBBPrepConfig(str: string | null | undefined): BBConte
     showDate: String(c.showDate || ''),
     weeksOut: Number.isInteger(Number(c.weeksOut)) ? clamp(Number(c.weeksOut), 1, 4) : 3,
     trainingProtocol: (['bb', 'classic', 'pl'] as const).includes(c.trainingProtocol as PeakingProtocol) ? (c.trainingProtocol as PeakingProtocol) : 'bb',
-    carbLoadStrategy: (['front', 'moderate', 'back', 'undulating', 'linear'] as const).includes(c.carbLoadStrategy as CarbLoadStrategy) ? (c.carbLoadStrategy as CarbLoadStrategy) : 'moderate',
+    carbLoadStrategy: (['front', 'moderate', 'back', 'undulating', 'linear', 'direct'] as const).includes(c.carbLoadStrategy as CarbLoadStrategy) ? (c.carbLoadStrategy as CarbLoadStrategy) : 'moderate',
     waterStrategy: (['classic', 'moderate', 'minimal', 'stable', 'tapered', 'high'] as const).includes(c.waterStrategy as WaterStrategy) ? (c.waterStrategy as WaterStrategy) : 'stable',
     sodiumStrategy: (['constant', 'cut_2d', 'cut_3d', 'stable', 'tapered'] as const).includes(c.sodiumStrategy as SodiumStrategy) ? (c.sodiumStrategy as SodiumStrategy) : 'stable',
     contraindications: Array.isArray(c.contraindications) ? c.contraindications.filter((x): x is string => typeof x === 'string') : undefined,
@@ -2691,10 +2691,7 @@ export function prepPhaseForWeek(plan: BBContestPrepPlan, week1: number): PrepPh
   return plan.phases.find(p => week1 >= p.weekStart && week1 <= p.weekEnd) ?? null;
 }
 
-/** Прошли ли все фазы (шоу позади). */
-export function prepPlanCompleted(plan: BBContestPrepPlan): boolean {
-  return daysBetween(isoToday(), plan.showDate) > 7;
-}
+// (PRO-3 Э12: prepPlanCompleted удалён — 0 потребителей; статус «шоу позади» = daysBetween > 7 в месте вызова)
 
 export function serializeBBContestPrepPlan(plan: BBContestPrepPlan): string {
   return JSON.stringify(plan);
