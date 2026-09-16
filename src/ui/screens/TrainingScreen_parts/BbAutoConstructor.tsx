@@ -111,7 +111,7 @@ import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getWeightLog } from '../../../engines/profile-store';
 import {
-  loadPrepWeekCheckins, savePrepWeekCheckin, prepWeekRefs, prepStrengthTrend, avgWeight7d,
+  loadPrepWeekCheckins, savePrepWeekCheckin, prepWeekRefs, prepStrengthTrend, avgWeight7d, avgSleep7d,
   type PrepWeekCheckin,
 } from '../../../engines/bb/bb-prep-weekly-log';
 import { getPostShowLog } from '../../../engines/bb/bb-prep-post-show-log.engine';
@@ -633,6 +633,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [wkSessions, setWkSessions] = useState('');
   const [wkPsyche, setWkPsyche] = useState('');
   const [wkCycle, setWkCycle] = useState<'' | 'regular' | 'irregular' | 'absent' | 'na'>('');
+  const [wkSteps, setWkSteps] = useState('');
   const [wkNote, setWkNote] = useState('');
   const weeklyLog = useMemo(
     () => (prepPlan ? loadPrepWeekCheckins(prepPlan.id) : []),
@@ -660,12 +661,20 @@ export const BbAutoConstructor: React.FC = () => {
     };
     let weightLog: Array<{ date: string; weight: number }> = [];
     try { weightLog = getWeightLog().map(e => ({ date: e.date, weight: e.weight })); } catch { /* ignore */ }
+    // PRO-3 Э10: сон из дневника сна (Retos 2025: сон ↔ FM/SMM), если поле не заполнено вручную.
+    let sleepFallback: number | undefined;
+    try {
+      const raw = localStorage.getItem('he_sleep_diary');
+      const arr = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(arr)) sleepFallback = avgSleep7d(arr.filter((e: any) => e && typeof e.date === 'string').map((e: any) => ({ date: e.date, hours: Number(e.hours) })), isoToday());
+    } catch { /* ignore */ }
     const entry: PrepWeekCheckin = {
       week: w,
       date: isoToday(),
       weightAvg: num(wkWeight) ?? avgWeight7d(weightLog, isoToday()),
       waistCm: num(wkWaist),
-      sleepAvg: num(wkSleep),
+      sleepAvg: num(wkSleep) ?? sleepFallback,
+      stepsAvg: num(wkSteps) != null ? Math.round(num(wkSteps)!) : undefined,
       sessionsDone: num(wkSessions) != null ? Math.round(num(wkSessions)!) : undefined,
       psyche: num(wkPsyche) != null ? Math.min(5, Math.max(1, Math.round(num(wkPsyche)!))) : undefined,
       cycle: wkCycle || undefined,
@@ -674,7 +683,7 @@ export const BbAutoConstructor: React.FC = () => {
     };
     savePrepWeekCheckin(prepPlan.id, entry);
     setWeeklyTick(t => t + 1);
-    setWkWeight(''); setWkWaist(''); setWkSleep(''); setWkSessions(''); setWkPsyche(''); setWkCycle(''); setWkNote(''); setWkWeek(null);
+    setWkWeight(''); setWkWaist(''); setWkSleep(''); setWkSessions(''); setWkPsyche(''); setWkCycle(''); setWkSteps(''); setWkNote(''); setWkWeek(null);
     flash(`📊 Чек-ин недели ${w} сохранён`);
   };
   const [prepConfirmedManip, setPrepConfirmedManip] = useState(false);
@@ -3587,7 +3596,7 @@ export const BbAutoConstructor: React.FC = () => {
       setWkSessions, setWkSleep, setWkWaist, setWkWeek, setWkWeight, showCheck,
       spillRisk, step, strengthDowns, testRatings, testWeightDelta, today,
       togglePrepCheckin, weekRefs, weeklyLog, weightAdvice, wkNote, wkPsyche,
-      wkSessions, wkSleep, wkWaist, wkWeek, wkWeight, wkCycle, setWkCycle,
+      wkSessions, wkSleep, wkWaist, wkWeek, wkWeight, wkCycle, setWkCycle, wkSteps, setWkSteps,
     };
     return (
       <div>

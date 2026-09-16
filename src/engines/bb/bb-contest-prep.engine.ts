@@ -3831,6 +3831,8 @@ export interface PrepWeeklyReportCheckin {
   weightAvg?: number;
   waistCm?: number;
   sleepAvg?: number;
+  /** PRO-3 Э10: средние шаги/день за неделю. */
+  stepsAvg?: number;
   sessionsDone?: number;
   psyche?: number;
   advice?: string;
@@ -3860,7 +3862,7 @@ export function buildPrepWeeklyReportHtml(plan: BBContestPrepPlan, extra?: PrepW
       `<tr><td>${w}</td><td>${escHtml(dateStart)} – ${escHtml(dateEnd)}</td>` +
       `<td>${escHtml(ph?.label ?? '')}</td>` +
       `<td>${c?.weightAvg ?? '—'}</td><td>${c?.waistCm ?? '—'}</td>` +
-      `<td>${c?.sleepAvg ?? '—'}</td><td>${c?.sessionsDone ?? '—'}</td>` +
+      `<td>${c?.sleepAvg ?? '—'}</td><td>${c?.stepsAvg ?? '—'}</td><td>${c?.sessionsDone ?? '—'}</td>` +
       `<td>${c?.psyche ?? '—'}</td><td>${escHtml(c?.advice ?? '—')}</td></tr>`,
     );
   }
@@ -3876,7 +3878,7 @@ export function buildPrepWeeklyReportHtml(plan: BBContestPrepPlan, extra?: PrepW
     `<h1>🏁 Contest prep — отчёт тренеру (шоу ${escHtml(plan.showDate)}, ${escHtml(CONTEST_CATEGORY_LABELS[plan.category] ?? plan.category)})</h1>` +
     `<p>Подготовка ${plan.preparation.weeks} нед · тапер ${plan.taper.weeks} нед · темп ${plan.preparation.targetRatePctPerWeek}%/нед · ${plan.preparation.currentCalories} ккал</p>` +
     `<h2>📊 Недели и чек-ины</h2>` +
-    `<table border="1" cellpadding="4" cellspacing="0"><thead><tr><th>Нед</th><th>Даты</th><th>Фаза</th><th>Вес ср</th><th>Талия</th><th>Сон</th><th>Сесс</th><th>Пси</th><th>Статус</th></tr></thead><tbody>${rows.join('')}</tbody></table>` +
+    `<table border="1" cellpadding="4" cellspacing="0"><thead><tr><th>Нед</th><th>Даты</th><th>Фаза</th><th>Вес ср</th><th>Талия</th><th>Сон</th><th>Шаги</th><th>Сесс</th><th>Пси</th><th>Статус</th></tr></thead><tbody>${rows.join('')}</tbody></table>` +
     (downs ? `<h2>📉 Сила-тренд (падение на дефиците)</h2><ul>${downs}</ul>` : '') +
     `<h2>🎭 Протокол пика</h2><p>Стратегия: ${escHtml(plan.peakWeek.strategy)} · вода ${escHtml(plan.peakWeek.waterMode)} · натрий ${escHtml(plan.peakWeek.sodiumMode)}</p>` +
     (safety ? `<h2>⚠ Safety</h2><ul>${safety}</ul>` : '') +
@@ -3888,12 +3890,12 @@ function escCsvCell(v: unknown): string {
   return `"${String(v ?? '').replace(/"/g, '""')}"`;
 }
 
-/** CSV чек-инов недель (неделя/дата/вес/талия/сон/сессии/психика/статус). */
+/** CSV чек-инов недель (неделя/дата/вес/талия/сон/шаги/сессии/психика/статус). */
 export function buildPrepCheckinsCsv(checkins: PrepWeeklyReportCheckin[]): string {
-  const head = ['week', 'date', 'weightAvg', 'waistCm', 'sleepAvg', 'sessionsDone', 'psyche', 'advice'];
+  const head = ['week', 'date', 'weightAvg', 'waistCm', 'sleepAvg', 'stepsAvg', 'sessionsDone', 'psyche', 'advice'];
   const lines = [head.join(',')];
   for (const c of [...checkins].sort((a, b) => a.week - b.week)) {
-    lines.push([c.week, c.date ?? '', c.weightAvg ?? '', c.waistCm ?? '', c.sleepAvg ?? '', c.sessionsDone ?? '', c.psyche ?? '', c.advice ?? ''].map(escCsvCell).join(','));
+    lines.push([c.week, c.date ?? '', c.weightAvg ?? '', c.waistCm ?? '', c.sleepAvg ?? '', c.stepsAvg ?? '', c.sessionsDone ?? '', c.psyche ?? '', c.advice ?? ''].map(escCsvCell).join(','));
   }
   return lines.join('\n');
 }

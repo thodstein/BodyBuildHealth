@@ -31,10 +31,10 @@ import {
   type PrepPhaseKey, type ContestEventEntry,
   type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy,
 } from '../../../engines/bb/bb-contest-prep.engine';
-import {
-  getPostShowLog, savePostShowEntry, removePostShowEntry, postShowRecoveryMarkers,
+import { getPostShowLog, savePostShowEntry, removePostShowEntry, postShowRecoveryMarkers,
   postShowComedownNotes,
 } from '../../../engines/bb/bb-prep-post-show-log.engine';
+import { prepStepsTrend } from '../../../engines/bb/bb-prep-weekly-log';
 import { PREP_LAB_PANEL, PREP_PROCEDURES, PREP_HYDRATION_GUIDELINES } from '../../../engines/bb/bb-prep-process.engine';
 import { calcRedsCAT2 } from '../../../engines/metabolic-hub.engine';
 import { computeEA } from '../NutritionScreen_parts/IndividualPlan/planner-ea.engine';
@@ -725,6 +725,7 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
                   <input type="number" step={0.1} placeholder="Вес ср, кг" value={wkWeight} onChange={e => setWkWeight(e.target.value)} style={{ width:86, ...IN }} />
                   <input type="number" step={0.5} placeholder="Талия, см" value={wkWaist} onChange={e => setWkWaist(e.target.value)} style={{ width:86, ...IN }} />
                   <input type="number" step={0.5} placeholder="Сон, ч" value={wkSleep} onChange={e => setWkSleep(e.target.value)} style={{ width:70, ...IN }} />
+                  <input type="number" step={500} placeholder="Шаги/дн" value={wkSteps} onChange={e => setWkSteps(e.target.value)} style={{ width:86, ...IN }} />
                   <input type="number" step={1} placeholder="Сессии" value={wkSessions} onChange={e => setWkSessions(e.target.value)} style={{ width:70, ...IN }} />
                   <input type="number" step={1} min={1} max={5} placeholder="Пси 1-5" value={wkPsyche} onChange={e => setWkPsyche(e.target.value)} style={{ width:70, ...IN }} />
                   {prepPlan.sex === 'female' && (
@@ -739,6 +740,16 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
                   <button style={BTN_GHOST} onClick={handleSaveWeekCheckin}>💾 Чек-ин</button>
                 </div>
                 {/* PRO-3 Э9: RED-S-подсказка при отсутствии цикла ≥2 недель (Triad 2025) */}
+                {/* PRO-3 Э10: NEAT-тренд — при падении активности сначала шаги, не резка калорий */}
+                {(() => {
+                  const t = prepStepsTrend(weeklyLog as any);
+                  if (!t || !t.warning) return null;
+                  return (
+                    <div data-bb="steps-trend" style={{ fontSize:10, color:'#fbbf24', marginBottom:6 }}>
+                      👟 Шаги {t.prev}→{t.last}/дн ({t.deltaPct}% за 2 нед): NEAT падает на дефиците — верните активность (прогулки 7–10 тыс., ~3.5 тыс. быстрым темпом), а не режьте калории первым шагом (Biolayne/PMC5970037).
+                    </div>
+                  );
+                })()}
                 {prepPlan.sex === 'female' && (() => {
                   const last2 = weeklyLog.slice(-2);
                   const absent2 = last2.length === 2 && last2.every((c: any) => c.cycle === 'absent');

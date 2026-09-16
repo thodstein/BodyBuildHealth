@@ -815,7 +815,8 @@ describe('Э8 — отчёт тренеру', () => {
       { week: 1, date: '2026-01-01', weightAvg: 80 },
     ]);
     const lines = csv.split('\n');
-    expect(lines[0]).toBe('week,date,weightAvg,waistCm,sleepAvg,sessionsDone,psyche,advice');
+    // PRO-3 Э10: добавлена колонка stepsAvg (шаги/день)
+    expect(lines[0]).toBe('week,date,weightAvg,waistCm,sleepAvg,stepsAvg,sessionsDone,psyche,advice');
     expect(lines[1]).toContain('"1"');
     expect(lines[2]).toContain('too_fast');
   });

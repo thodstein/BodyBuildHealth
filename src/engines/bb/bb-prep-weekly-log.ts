@@ -19,6 +19,8 @@ export interface PrepWeekCheckin {
   psyche?: number;         // 1..5 самочувствие/психика
   /** PRO-3 Э9 (Triad 2025 / IOC REDs): менструальный статус недели (только Ж). */
   cycle?: 'regular' | 'irregular' | 'absent' | 'na';
+  /** PRO-3 Э10: средние шаги/день за неделю (NEAT-метрика падения активности). */
+  stepsAvg?: number;
   note?: string;
   /** Статус совета адаптации на момент записи (для детекта «2 недели подряд»). */
   advice?: 'on_track' | 'too_fast' | 'too_slow' | 'taper' | 'no_data';
@@ -171,4 +173,38 @@ export function avgWeight7d(log: Array<{ date: string; weight: number }>, before
     if (rows.length === 0) return undefined;
     return Math.round((rows.reduce((a, b) => a + Number(b.weight), 0) / rows.length) * 10) / 10;
   } catch { return undefined; }
+}
+
+/** PRO-3 Э10: средний сон за 7 дней до даты (из дневника сна {date, hours}). */
+export function avgSleep7d(log: Array<{ date: string; hours: number }>, beforeIso: string): number | undefined {
+  try {
+    const rows = (log || [])
+      .filter(e => typeof e?.date === 'string' && e.date <= beforeIso && Number.isFinite(Number(e?.hours)) && Number(e.hours) > 0 && Number(e.hours) <= 16)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-7);
+    if (rows.length === 0) return undefined;
+    return Math.round((rows.reduce((a, b) => a + Number(b.hours), 0) / rows.length) * 10) / 10;
+  } catch { return undefined; }
+}
+
+export interface PrepStepsTrend {
+  last: number;
+  prev: number;
+  deltaPct: number;   // отрицательное = активность падает
+  warning: boolean;   // ≤ −20% за 2 недели (NEAT падает на дефиците — PMC5970037/практика)
+}
+
+/** PRO-3 Э10: тренд шагов между двумя последними чек-инами со stepsAvg. */
+export function prepStepsTrend(checkins: PrepWeekCheckin[] | null | undefined): PrepStepsTrend | null {
+  try {
+    const withSteps = (checkins || [])
+      .filter(c => Number.isFinite(Number(c?.stepsAvg)) && Number(c.stepsAvg) > 1000)
+      .sort((a, b) => a.week - b.week);
+    if (withSteps.length < 2) return null;
+    const last = Number(withSteps[withSteps.length - 1].stepsAvg);
+    const prev = Number(withSteps[withSteps.length - 2].stepsAvg);
+    if (prev <= 0) return null;
+    const deltaPct = Math.round(((last - prev) / prev) * 1000) / 10;
+    return { last, prev, deltaPct, warning: deltaPct <= -20 };
+  } catch { return null; }
 }
