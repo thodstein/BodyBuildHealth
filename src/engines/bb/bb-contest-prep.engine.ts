@@ -2285,6 +2285,11 @@ export interface BBContestPrepPlan {
     sodiumMode: PrepSodiumMode;
     carbMode: PrepCarbMode;
     /**
+     * PRO-3 Э4: lossless карбс-стратегия (undulating/linear больше не теряются в carbMode).
+     * Опционально — старые планы читаются через carbMode-маппинг (back-compat).
+     */
+    carbLoadStrategy?: CarbLoadStrategy;
+    /**
      * PRO-2 P2: персональная доза загрузки (г/кг total, из trialCarbDoseGPerKg).
      * Опционально — без неё buildPeakWeek идёт по среднему коридора (back-compat).
      */
@@ -2467,6 +2472,8 @@ export interface BuildPrepPlanOpts {
   postShowTrack?: 'recovery' | 'reverse';
   /** PRO-2 P2: персональная доза загрузки trial (г/кг total) — в plan.peakWeek. */
   carbDoseGPerKg?: number;
+  /** PRO-3 Э4: lossless карбс-стратегия (undulating/linear) — в plan.peakWeek. */
+  carbLoadStrategy?: CarbLoadStrategy;
 }
 
 export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildPrepPlanOpts = {}): BBContestPrepPlan {
@@ -2578,6 +2585,8 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
       waterMode: allowedManipulation && canonicalWaterStrategy(cfg.waterStrategy) !== 'stable' ? 'moderate' : 'stable',
       sodiumMode: allowedManipulation && canonicalSodiumStrategy(cfg.sodiumStrategy) !== 'stable' ? 'moderate' : 'stable',
       carbMode: cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : cfg.carbLoadStrategy === 'undulating' ? 'moderate' : cfg.carbLoadStrategy === 'linear' ? 'moderate' : 'moderate',
+      // PRO-3 Э4: каноническая стратегия хранится как есть (lossless round-trip).
+      carbLoadStrategy: opts.carbLoadStrategy ?? cfg.carbLoadStrategy,
       // PRO-2 P2: доза trial едет в плане (питание и пик-неделя читают её отсюда).
       carbDoseGPerKg: opts.carbDoseGPerKg != null && Number.isFinite(opts.carbDoseGPerKg)
         ? Math.min(12, Math.max(3, opts.carbDoseGPerKg))
@@ -2756,7 +2765,9 @@ export function configFromPlan(plan: BBContestPrepPlan, trialOverride?: TestPeak
     showDate: plan.showDate,
     weeksOut: plan.taper.weeks,
     trainingProtocol: 'bb',
-    carbLoadStrategy: plan.peakWeek.carbMode === 'high' ? 'front' : plan.peakWeek.carbMode === 'conservative' ? 'back' : 'moderate',
+    // PRO-3 Э4: приоритет — lossless carbLoadStrategy из плана; старые планы — через carbMode.
+    carbLoadStrategy: plan.peakWeek.carbLoadStrategy
+      ?? (plan.peakWeek.carbMode === 'high' ? 'front' : plan.peakWeek.carbMode === 'conservative' ? 'back' : 'moderate'),
     waterStrategy: plan.peakWeek.waterMode === 'moderate' ? 'tapered' : 'stable',
     sodiumStrategy: plan.peakWeek.sodiumMode === 'moderate' ? 'tapered' : 'stable',
     contraindications: plan.safety.contraindications,

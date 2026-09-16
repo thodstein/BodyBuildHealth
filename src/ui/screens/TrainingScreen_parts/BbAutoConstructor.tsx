@@ -3663,7 +3663,11 @@ export const BbAutoConstructor: React.FC = () => {
   const handleBuildPrep = () => {
     setPcBusy(true);
     try {
-      const res = buildPrepCycle(buildPrepCycleCfg());
+      const pcCfg = buildPrepCycleCfg();
+      // PRO-3 Э4: trial едет в Prep-цикл (доза загрузки + ссылка на испытанный протокол),
+      // иначе сохранение из Prep-цикла теряло trial-данные (питание шло по среднему коридору).
+      const pcTrialDose = lastTest ? trialCarbDoseGPerKg(lastTest, pcCfg.category, pcCfg.sex) : undefined;
+      const res = buildPrepCycle(pcCfg, { carbDoseGPerKg: pcTrialDose, testPeakWeekId: lastTest?.id });
       setPrepResult(res);
       // Синхронизируем общий prep-контекст (печать/.ics/JSON/адаптация по весу работают на prepPlan).
       setPrepPlan(res.prepPlan);
@@ -3729,7 +3733,9 @@ export const BbAutoConstructor: React.FC = () => {
     if (prepComps.length < 2) { flash('Добавьте минимум 2 старта в параметрах, чтобы собрать сезон'); return; }
     setPcBusy(true);
     try {
-      const res = buildPrepSeason(buildPrepSeasonCfg());
+      const seasonCfg = buildPrepSeasonCfg();
+      const seasonDose = lastTest ? trialCarbDoseGPerKg(lastTest, seasonCfg.category, seasonCfg.sex) : undefined;
+      const res = buildPrepSeason(seasonCfg, { carbDoseGPerKg: seasonDose, testPeakWeekId: lastTest?.id });
       setPrepSeason(res);
       setPrepResult(res.cycles[res.cycles.length - 1] ?? null);
       setPrepStep('result');

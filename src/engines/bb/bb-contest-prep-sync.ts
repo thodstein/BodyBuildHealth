@@ -71,6 +71,8 @@ export function saveContestPrepEverywhere(
       nutritionPlanId: opts.nutritionPlanId ?? existing?.nutritionPlanId,
       testPeakWeekId: opts.testPeakWeekId ?? existing?.testPeakWeekId,
       carbDoseGPerKg: opts.carbDoseGPerKg ?? existing?.peakWeek.carbDoseGPerKg,
+      // PRO-3 Э4: lossless карбс-стратегия (undulating/linear не вырождаются в moderate)
+      carbLoadStrategy: opts.carbLoadStrategy ?? existing?.peakWeek.carbLoadStrategy,
       postShowTrack: opts.postShowTrack ?? existing?.postShowTrack,
       source: opts.source ?? existing?.source ?? 'bb_auto',
       status: opts.status ?? existing?.status,

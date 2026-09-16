@@ -538,9 +538,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       try { clearContestPrepEverywhere(); } catch {}
       return;
     }
-    // Единая запись: версионированный план + зеркало конфига + событие
+    // Единая запись: версионированный план + зеркало конфига + событие.
+    // PRO-3 Э1/Э4: prepWeeks НЕ передаём (carry-over из плана: не откатываем 16 нед к 12);
+    // недели тапера — из видимого пользователю cfg.weeksOut.
     try {
-      const plan = saveContestPrepEverywhere(cfg, { source: 'planner', prepWeeks: 12, taperWeeks: cfg.weeksOut });
+      const plan = saveContestPrepEverywhere(cfg, { source: 'planner', taperWeeks: cfg.weeksOut });
       if (plan) {
         setBBPrepConfigState(cfg);
         setBBPrepPlan(plan);

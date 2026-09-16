@@ -256,8 +256,14 @@ export function normalizePrepCycle(raw: PrepCycleConfig): PrepCycleConfig {
   return { ...raw, weeks, taperWeeks, accentMuscles: accent, minimalMuscles: minimal, minimalMode: mode };
 }
 
+/** PRO-3 Э4: trial-контекст для сборки Prep-цикла (доза и ссылка на испытанный протокол). */
+export interface PrepCycleBuildOpts {
+  carbDoseGPerKg?: number;
+  testPeakWeekId?: string;
+}
+
 /** Собрать Prep-цикл. */
-export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
+export function buildPrepCycle(raw: PrepCycleConfig, opts: PrepCycleBuildOpts = {}): PrepCycleResult {
   const v = validatePrepCycle(raw);
   if (v.errors.length > 0) throw new Error(`Prep-цикл: ${v.errors.join(' ')}`);
   const cfg = normalizePrepCycle(raw);
@@ -385,6 +391,9 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
     currentCalories: cfg.currentCalories,
     prepVolumeMult: cfg.prepVolumeMult,
     source: 'bb_auto',
+    // PRO-3 Э4: trial едет в план Prep-цикла (доза загрузки + ссылка на испытанный протокол).
+    carbDoseGPerKg: opts.carbDoseGPerKg,
+    testPeakWeekId: opts.testPeakWeekId,
   });
 
   // Тренировочная подготовка: спланированный каскад объёма на ВЕСЬ цикл (не только тапер).
@@ -396,7 +405,7 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
     applyPrepTaperSparing(
       applyPrepDeloads(
         applyPrepVolumeCascade(
-          applyContestPrepToBBPlan(bbPlan, prepCfg, { prepWeeks, taperWeeks, prepVolumeMult: 1.0, force: true }),
+          applyContestPrepToBBPlan(bbPlan, prepCfg, { prepWeeks, taperWeeks, prepVolumeMult: 1.0, force: true, carbDoseGPerKg: opts.carbDoseGPerKg }),
           cfg,
           prepWeeks,
           volumePlan,
@@ -1295,7 +1304,7 @@ export interface PrepSeasonResult {
 }
 
 /** Собрать сезон: для каждого старта отдельный prep-цикл, тапер/пик к его дате. */
-export function buildPrepSeason(cfg: PrepSeasonConfig): PrepSeasonResult {
+export function buildPrepSeason(cfg: PrepSeasonConfig, opts: PrepCycleBuildOpts = {}): PrepSeasonResult {
   const comps = (cfg.competitions || [])
     .filter(c => c && c.date && c.name)
     .sort((a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0));
@@ -1380,7 +1389,7 @@ export function buildPrepSeason(cfg: PrepSeasonConfig): PrepSeasonResult {
       competitions: comps.map(c => ({ id: c.id, name: c.name, date: c.date, priority: c.priority })),
       mainCompetitionId: comp.id,
     };
-    const cycle = buildPrepCycle(cycleCfg);
+    const cycle = buildPrepCycle(cycleCfg, opts);
     cycles.push(cycle);
     summary.push({
       date: comp.date!,

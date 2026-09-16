@@ -24,7 +24,7 @@ import { shareOrCopyText } from './planner-day-print';
 import { usePlanCtx } from './IndividualPlanContext';
 import { getProfile } from '../../../../core/profile-manager';
 import { ContestPrepConfigEditor } from '../../../../ui/components/contest-prep/ContestPrepConfigEditor';
-import { saveContestPrepEverywhere, clearContestPrepEverywhere } from '../../../../engines/bb/bb-contest-prep-sync';
+import { saveContestPrepEverywhere, clearContestPrepEverywhere, loadContestPrepPlan } from '../../../../engines/bb/bb-contest-prep-sync';
 import { loadShowChecklist, toggleShowChecklistItem } from '../../../../engines/bb/bb-contest-prep.engine';
 
 const ACCENT = '#f59e0b';
@@ -252,8 +252,13 @@ export const PeakWeekTab: React.FC = () => {
     return v.ok ? { ...draft, ...v.forced } : draft;
   }, [draft]);
   const result = useMemo(() => {
-    try { return buildBBContestPrep(effDraft); } catch { return null; }
-  }, [effDraft]);
+    // PRO-3 Э4: превью с персональной дозой trial из сохранённого плана (паритет с живыми целями).
+    try {
+      const existing = loadContestPrepPlan();
+      const dose = existing?.peakWeek.carbDoseGPerKg;
+      return buildBBContestPrep(effDraft, dose != null ? { carbDoseGPerKg: dose } : undefined);
+    } catch { return null; }
+  }, [effDraft, showTick]);
 
   const daysToShow = useMemo(() => {
     if (!result) return null;
@@ -282,12 +287,13 @@ export const PeakWeekTab: React.FC = () => {
 
   const applyConfigured = () => {
     if (!validation.ok) return;
-    const plan = saveContestPrepEverywhere(effDraft, { source: 'planner', prepWeeks: 12 });
+    // PRO-3 Э1/Э4: prepWeeks не передаём (carry-over из плана), недели тапера — из черновика.
+    const plan = saveContestPrepEverywhere(effDraft, { source: 'planner', taperWeeks: effDraft.weeksOut });
     if (plan) applyBBPeakToPlan(effDraft);
   };
   const saveToProfile = () => {
     if (!validation.ok) return;
-    const plan = saveContestPrepEverywhere(effDraft, { source: 'planner', prepWeeks: 12 });
+    const plan = saveContestPrepEverywhere(effDraft, { source: 'planner', taperWeeks: effDraft.weeksOut });
     if (plan) {
       setBBPrepConfig(effDraft);
       flash(() => {});
