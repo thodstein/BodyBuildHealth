@@ -4323,7 +4323,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // (12:20-болюс при обеде 12:30 → окна нет). Перекус по-прежнему должен нести
       // ≥80% потребности — иначе честный топ-ап (перекус 35 г не держит 10 ЕД).
       const _isMainNear = _near && ['breakfast', 'lunch', 'dinner'].includes(String(_near.type || ''));
-      if (_near && _nearDt <= 60 && !_isMainNear && _nearC < needC * 0.8) {
+      // §7.2-5: основной приём ВПЛОТНУЮ к болюсу (≤20 мин) покрывает его сам — отдельное
+      // окно-дубль не нужно (12:20-болюс при обеде 12:30). Дальше 20 мин — честный
+      // топ-ап до потребности дозы (перекус 35 г не держит 10 ЕД).
+      const _mainCovers = !!_isMainNear && _nearDt <= 20;
+      if (_near && _nearDt <= 60 && !_mainCovers && _nearC < needC * 0.8) {
         const topC = Math.max(30, Math.min(120, needC - Math.round(_nearC)));
         const label = `⚡ Углеводы под инсулин (${inj.name || 'инсулин'})`;
         _injectMealAt(injMin, label, `${label} — топ-ап ${topC} г к приёму «${_near.label}» (${Math.round(_nearC)} г мало для ${dose} ЕД, нужно ~${needC} г)`, topC, 15, { insulinWindow: true });
@@ -5417,6 +5421,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Роунд-2: стоит ПОСЛЕ межприёмного баланса (баланс сдвигает белок, кламп замыкает).
   {
     const goalP4b = adjustedProteinG || input.goalProteinG;
+    // §7.2-6/7 (hv-adequacy 900 / R-HV 1500): на экстрим-углеводном дне (≥8 г/кг) с
+    // плотной белковой целью (≥2.3 г/кг) полы цельного белка ужимаются до 60/40 — при
+    // 12 приёмах и 1500У «взрослые порции» 80/50 запирают день (p +21% / c −15%),
+    // а своп в углеводы защищён «единственным белком приёма». Мягче (75/40) — на
+    // обычных HV-днях, ещё мягче нельзя (F1-инвариант вне бэнда: c/kг < 8).
+    const _p4bDense = goalP4b / Math.max(40, input.weightKg || 80) >= 2.3;
+    const _p4bExtreme = _p4bDense && (input.goalCarbsG || 0) / Math.max(40, input.weightKg || 80) >= 8;
+    const _p4bOverHv = _pickCtx.highVolumeDay && _p4bDense && (totals.p - goalP4b) / Math.max(1, goalP4b) > 0.05;
+    const _flMain4b = _p4bOverHv ? (_p4bExtreme ? 60 : Math.max(75, _p4bFloorWholeMain)) : _p4bFloorWholeMain;
+    const _flSnack4b = _p4bOverHv ? (_p4bExtreme ? 48 : 50) : _p4bFloorWholeSnack;
     let guard4b = 6;
     let devP4b = (totals.p - goalP4b) / Math.max(1, goalP4b);
     while (devP4b > 0.05 && guard4b-- > 0) {
@@ -5429,14 +5443,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // восстановить peri некому — все доборы его скипают).
       // (Откат scaled-floors: полы ниже realism-минимума 75 г ломают F1-тарелки;
       // сходимость низкобелковых дней держится сборкой в цель, а не резкой.)
-      const all4b = meals.filter(m => !(m as any)._insulinWindow && (m as any).type !== 'presleep' && (m as any).type !== 'preworkout' && (m as any).type !== 'postworkout').flatMap(m => m.items.filter(it => ((it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein') || (it.role === 'veg' && (it.p || 0) >= 10))).map(it => ({ meal: m, item: it })));
+      const all4b = meals.filter(m => !(m as any)._insulinWindow && (m as any).type !== 'presleep' && (m as any).type !== 'preworkout' && ((m as any).type !== 'postworkout' || _p4bOverHv)).flatMap(m => m.items.filter(it => ((it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein') || (it.role === 'veg' && (it.p || 0) >= 10))).map(it => ({ meal: m, item: it })));
       const whole4b = all4b.filter(({ item }) => item.role === 'protein');
       // Эпик B: если все цельные белки уже у реалистичных полов — режем и порошковые
       // (казеин 42→28 г и т.п., пол 20 г), иначе день зависает на +5-6% белка.
       const _canCutWhole = whole4b.some(({ item, meal }) => {
         const _fdW = FOOD_DB.find(f => f.id === item.id); if (!_fdW) return false;
         const _mMain0 = ['breakfast','lunch','dinner','preworkout'].includes(meal.type);
-        const _fl0 = item.role === 'protein' ? (_mMain0 ? (_fdW.category === 'supplement' ? 20 : _p4bFloorWholeMain) : _p4bFloorWholeSnack) : 0;
+        const _fl0 = item.role === 'protein' ? (_mMain0 ? (_fdW.category === 'supplement' ? 20 : _flMain4b) : _flSnack4b) : 0;
         return item.amount > _fl0 + 5;
       });
       const _powder4b = all4b.filter(({ item }) => item.role === 'fast_protein' || item.role === 'slow_protein');
@@ -5457,7 +5471,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // порошок 20 г; иначе посадка резала ночной творог до 70 г / 19 г белка.
             ? (food.category === 'supplement' ? 20 : (meal.type === 'presleep' ? 100 : 60))
             : (item.role === 'veg' ? 30 : 10),
-          item.role === 'protein' ? (_mMain4b ? (food.category === 'supplement' ? 20 : _p4bFloorWholeMain) : _p4bFloorWholeSnack) : 0,
+          item.role === 'protein' ? (_mMain4b ? (food.category === 'supplement' ? 20 : _flMain4b) : _flSnack4b) : 0,
         );
         const newAmount = Math.max(floor4b, Math.round(item.amount - reduceGrams));
         if (newAmount >= item.amount) return;
@@ -7708,6 +7722,72 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_pClamped) recalcDayTotals(meals, totals);
     }
 
+    // ─── §7.2-6b (hv-adequacy 900У): финальный У-добор после чисток ───
+    // P0a-добор доводил HV-день до цели У, но P2-чистка обрезков <30 г снимала ~13 г
+    // (829→816 при цели 900 = 9.3% > 8%, тест). Этот проход — ПОСЛЕ чисток и MPS-коридора
+    // и ДО снекового минимума P3: дотягиваем углеводы ростом существующих гарниров в капах
+    // (новых пунктов не создаём), комната ккал ≤×1.03. Гейт — истинно углеводный день
+    // (_isHighCarbDay), не «HV по ккал»: 4200-ккал дни без гор углеводов не трогаем
+    // (F1-набор: клетчатка/тарелки). Не-углеводные дни — бит-в-бит.
+    if (_isHighCarbDay(input.goalCarbsG || 0, input.weightKg) && !impossibleGoal && (input.goalCarbsG || 0) > 0) {
+      const _goalC7 = input.goalCarbsG || 0;
+      const _goalK7 = input.goalKcal || 0;
+      let _g7 = 8;
+      while (totals.c < _goalC7 - 5 && totals.kcal < _goalK7 * 1.03 && _g7-- > 0) {
+        const _cands7: Array<{ m: any; it: any; fd: any }> = [];
+        for (const m of meals) {
+          const _t7 = String((m as any).type || '');
+          if (!['breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3', 'snack4', 'snack5', 'snack6'].includes(_t7)) continue;
+          if ((m as any)._insulinWindow) continue;
+          const _solid7 = (m.items || []).filter((x: any) => x.role !== 'liquid').reduce((s: number, x: any) => s + (x.amount || 0), 0);
+          if (_solid7 > 650) continue;
+          for (const it of (m.items || [])) {
+            if ((it.role !== 'carb_slow' && it.role !== 'carb_fast') || (it as any)._fixedGrams) continue;
+            if (/glass|funchose|rice_noodles/.test(it.id)) continue;
+            const fd = FOOD_DB.find((f: any) => f.id === it.id);
+            if (!fd || !(fd.carbs || 0)) continue;
+            if ((it.amount || 0) >= carbPortionCap(fd, mealCapScaleOf(m))) continue;
+            _cands7.push({ m, it, fd });
+          }
+        }
+        if (_cands7.length === 0) break;
+        // §7.2-6b: предпочитаем НИЗКОБЕЛКОВЫЕ носители (рис/кукурузные хлопья) — долив
+        // не должен выводить белок дня за честную полосу 8% (900У: рис 2.7Б/100 держит
+        // полосу, крем 7Б/100 выводил на +8.5%).
+        _cands7.sort((a, b) => ((a.fd.protein || 0) - (b.fd.protein || 0)) || ((b.it.c || 0) - (a.it.c || 0)));
+        let _done7 = false;
+        for (const _cand7 of _cands7) {
+          const { m: _m7, it: _it7, fd: _fd7 } = _cand7;
+          const _cap7 = carbPortionCap(_fd7, mealCapScaleOf(_m7));
+          const _kRoom7 = _goalK7 * 1.03 - totals.kcal;
+          let _addG7 = Math.min(60, Math.floor(_kRoom7 / Math.max(1, _fd7.kcal || 1) * 100), _cap7 - (_it7.amount || 0));
+          const _tc7 = (_m7 as any).target?.c;
+          if (_tc7 > 0) {
+            const _mc7 = (_m7.items || []).filter((x: any) => x.role === 'carb_slow' || x.role === 'carb_fast').reduce((s: number, x: any) => s + (x.c || 0), 0);
+            _addG7 = Math.min(_addG7, Math.floor(Math.max(0, (_tc7 + 15) - _mc7) / Math.max(1, _fd7.carbs || 1) * 100));
+          }
+          if ((_fd7.protein || 0) > 0 && (input.goalProteinG || 0) > 0) {
+            const _pRoom7 = (input.goalProteinG || 0) * 1.07 - totals.p;
+            if (_pRoom7 <= 0) continue;
+            _addG7 = Math.min(_addG7, Math.floor(_pRoom7 / Math.max(0.1, _fd7.protein || 1) * 100));
+          }
+          if (_addG7 < 10) continue;
+          const _r7 = ((_it7.amount || 0) + _addG7) / Math.max(1, _it7.amount || 1);
+          _it7.amount = (_it7.amount || 0) + _addG7;
+          _it7.p = Math.round((_it7.p || 0) * _r7 * 10) / 10;
+          _it7.f = Math.round((_it7.f || 0) * _r7 * 10) / 10;
+          _it7.c = Math.round((_it7.c || 0) * _r7 * 10) / 10;
+          _it7.kcal = Math.round(4 * _it7.p + 9 * _it7.f + 4 * _it7.c);
+          _it7.fiber = Math.round(((_it7.fiber || 0) * _r7) * 10) / 10;
+          _m7.totals = mealTotalsOf(_m7.items);
+          recalcDayTotals(meals, totals);
+          _done7 = true;
+          break;
+        }
+        if (!_done7) break;
+      }
+    }
+
     // ─── P3 (план «ведро»): минимум снека — ≥60% углеводной цели приёма ───
     // Стоит ПОСЛЕДНИМ writer-проходом сборки (позже баланса Р-2.3, догона, чисток
     // и клампов): баланс режет снек по ккал-цели, а чистка мелочи добивает ужатый
@@ -7726,8 +7806,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _hvP3 = !!_pickCtx.highVolumeDay;
       // Белковая комната дня: долив снека не должен раздувать перебор белка
       // (кейс «3 болюса»: белок окон + доливы = перебор; критерий §5 — тогда нота).
+      // §7.2-7 (R-HV 1500У): на экстрим-углеводном дне (≥8 г/кг) с плотной белковой
+      // целью (≥2.3 г/кг) долив идёт низкобелковыми носителями (рис 2.7Б/100) и мягче
+      // по кап-фильтрам (uses <4, семейство +2) — иначе снеки висят на 30-40У из 120.
+      // Полоса белка у всех дней одна (3%) — экстрим-добор делает §7.2-7c ниже.
       // Ноль/нет цели — гейт не применяем.
       const _pGoalP3 = input.goalProteinG || 0;
+      const _pDenseFeedP3 = _pGoalP3 / Math.max(40, input.weightKg || 80) >= 2.3
+        && (input.goalCarbsG || 0) / Math.max(40, input.weightKg || 80) >= 8;
       let _pRoomP3 = _pGoalP3 > 0 ? _pGoalP3 * 1.03 - totals.p : Infinity;
       const _fibCapP3 = _hvP3
         ? (() => { const _cc = input.goalCarbsG || 0; const _step = _cc >= 700 ? 115 : _cc >= 500 ? 65 : 50; const _kb = Math.round((input.goalKcal || 0) / 1000 * 14); const _fl = _cc >= 700 ? 105 : _cc >= 500 ? 60 : 0; return Math.max(25, Math.min(_step, Math.max(_kb, _fl))); })()
@@ -7770,10 +7856,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         const _cands = (pool.carbSlow || [])
           .filter((f: any) => f && (f.carbs || 0) > 0 && !_haveIds.has(f.id) && !CONCENTRATE_IDS.includes(f.id))
           .filter((f: any) => !(_hvP3 && (HV_BANNED_CARB_IDS.has(f.id) || isHvStapleBanned(f.id))))
-          .filter((f: any) => ((_pickCtx.dayCarbUses.get(f.id) || 0) < 2))
-          .filter((f: any) => { const _fam = stapleFamilyOf(f.id); return !_fam || ((_pickCtx.dayCarbFamilyUses.get(_fam) || 0) < familyMealCap(_fam, { hv: _hvP3, ts: _pickCtx.dayTargetScale })); })
+          .filter((f: any) => ((_pickCtx.dayCarbUses.get(f.id) || 0) < (_pDenseFeedP3 ? 4 : 2)))
+          .filter((f: any) => { const _fam = stapleFamilyOf(f.id); return !_fam || ((_pickCtx.dayCarbFamilyUses.get(_fam) || 0) < familyMealCap(_fam, { hv: _hvP3, ts: _pickCtx.dayTargetScale }) + (_pDenseFeedP3 ? 2 : 0)); })
           .filter((f: any) => !(isCreamId(f.id) && (((_pickCtx as any).dayCreamMeals || 0) >= creamMealCap(_hvP3, _pickCtx.dayTargetScale))))
           .sort((a: any, b: any) => {
+            // §7.2-7: на плотном белковом дне с перебором — низкобелковые носители
+            // первыми (рис 2.7Б/100, не крем 7Б/100): долив не раздувает белок.
+            if (_pDenseFeedP3 && _pGoalP3 > 0 && totals.p > _pGoalP3) {
+              const _pa = a.protein || 0, _pb = b.protein || 0;
+              if (Math.abs(_pa - _pb) > 0.5) return _pa - _pb;
+            }
             // P4: снековый пул явно по HV — на high-volume дне плотные носители
             // первыми (угли на единицу клетчатки; паритет с ранжированием ребаланса),
             // иначе низкоплотный гарнир раздувает тарелку и ЖКТ. Обычные дни — legacy.
@@ -7833,16 +7925,18 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // вёдра чинят капы, а не сетка. Инвариант ниже: все граммовки — целые.
 
     // ─── E-PLATE (planner-edibility): низкоплотные носители — не горы ───
-    // На HV-днях (инсулин/1500У) «картофель 355» в перекусе — мусор-ведро: картофель/
-    // батат/булгур/запечённый картофель режутся до съедобных 300 г (E-PLATE/planner-carb-
-    // density). Носители углей на таком дне — плотные (крем риса/рис/хлеб/сухофрукты).
-    // Обычные дни не трогаем: там низкоплотные гарниры несут сходимость 5-приёмных.
+    // На HV-днях (инсулин/1500У) «картофель 355» в перекусе — мусор-ведро: ровно четыре
+    // низкоплотных крахмала (картофель/батат/булгур/запечённый) режутся до съедобных 300 г
+    // (E-PLATE/planner-carb-density). Крупы/сухие стейплы НЕ трогаем — они несут сходимость.
+    // Обычные дни не трогаем: там низкоплотные гарниры — несущие.
     if (_pickCtx.highVolumeDay) {
       let _lowDensityCut = false;
+      const _lowDensityIds = new Set(['sweet_potato', 'bulgur', 'potato_boiled', 'potato_baked']);
       for (const m of meals) {
         for (const it of (m.items || [])) {
-          const _capLD = EDIBILITY_CAPS[it.id];
-          if (typeof _capLD !== 'number' || (it.amount || 0) <= _capLD) continue;
+          if (!_lowDensityIds.has(it.id)) continue;
+          const _capLD = EDIBILITY_CAPS[it.id] ?? 300;
+          if ((it.amount || 0) <= _capLD) continue;
           const _rLD = _capLD / (it.amount || 1);
           it.amount = _capLD;
           it.p = Math.round((it.p || 0) * _rLD * 10) / 10;
@@ -7859,6 +7953,67 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         recalcDayTotals(meals, totals);
         notes.push('🥔 Низкоплотные носители ужаты до съедобных порций (≤300 г) — угли дня несут плотные (крем риса/рис/хлеб).');
       }
+    }
+
+    // ─── §7.2-7c (R-HV 1500У): финальный У-добор экстрим-дня ПОСЛЕ всех проходов ───
+    // Последний writer: промежуточные проходы (пери-стража/капы/P3) могли срезать рост
+    // корректора (1323→1174). На экстрим-У дне (≥8 г/кг У и ≥2.3 г/кг Б) добиваем
+    // существующие гарниры плотными низкобелковыми носителями (рис/крем), пока
+    // c < 96% цели и ккал ≤×1.05; полоса белка 35% (иначе белковый гейт душит долив).
+    // Вне экстрим-бэнда — бит-в-бит.
+    if (_isHighCarbDay(input.goalCarbsG || 0, input.weightKg)
+      && (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 2.3
+      && (input.goalCarbsG || 0) / Math.max(40, input.weightKg || 80) >= 8
+      && !impossibleGoal) {
+      const _goalC8 = input.goalCarbsG || 0;
+      const _goalK8 = input.goalKcal || 0;
+      const _pBand8 = (input.goalProteinG || 0) * 1.35;
+      let _g8 = 10;
+      while (totals.c < _goalC8 * 0.96 && totals.kcal < _goalK8 * 1.05 && _g8-- > 0) {
+        const _cands8: Array<{ m: any; it: any; fd: any; solid: number }> = [];
+        for (const m of meals) {
+          const _t8 = String((m as any).type || '');
+          // Только основные приёмы: снеки не трогаем (их ведёт P3, а рецептурный поток
+          // собирает блюда по таргетам приёмов — рост снека уводил рецепт от белка).
+          if (!['breakfast', 'lunch', 'dinner'].includes(_t8)) continue;
+          if ((m as any)._insulinWindow) continue;
+          const _solid8 = (m.items || []).filter((x: any) => x.role !== 'liquid').reduce((s: number, x: any) => s + (x.amount || 0), 0);
+          if (_solid8 > 850) continue;
+          for (const it of (m.items || [])) {
+            if ((it.role !== 'carb_slow' && it.role !== 'carb_fast') || (it as any)._fixedGrams) continue;
+            if (/glass|funchose|rice_noodles/.test(it.id)) continue;
+            const fd = FOOD_DB.find((f: any) => f.id === it.id);
+            if (!fd || !(fd.carbs || 0)) continue;
+            if ((it.amount || 0) >= 600) continue;
+            _cands8.push({ m, it, fd, solid: _solid8 });
+          }
+        }
+        if (_cands8.length === 0) break;
+        // Плотные низкобелковые первыми: не раздувают белок (рис 2.7Б/100 против крема 7Б/100).
+        _cands8.sort((a, b) => ((a.fd.protein || 0) - (b.fd.protein || 0)) || ((b.fd.carbs || 0) - (a.fd.carbs || 0)));
+        let _done8 = false;
+        for (const _c8 of _cands8) {
+          const _pRoom8 = _pBand8 - totals.p;
+          const _maxByP = (_c8.fd.protein || 0) > 0 ? Math.floor(Math.max(0, _pRoom8) / (_c8.fd.protein || 1) * 100) : 999;
+          const _maxByK = Math.floor((_goalK8 * 1.05 - totals.kcal) / Math.max(1, _c8.fd.kcal || 1) * 100);
+          let _add8 = Math.min(80, 600 - (_c8.it.amount || 0), _maxByP, _maxByK, Math.max(0, 730 - _c8.solid));
+          _add8 = Math.floor(_add8 / 5) * 5;
+          if (_add8 < 10) continue;
+          const _r8 = ((_c8.it.amount || 0) + _add8) / Math.max(1, _c8.it.amount || 1);
+          _c8.it.amount = (_c8.it.amount || 0) + _add8;
+          _c8.it.p = Math.round((_c8.it.p || 0) * _r8 * 10) / 10;
+          _c8.it.f = Math.round((_c8.it.f || 0) * _r8 * 10) / 10;
+          _c8.it.c = Math.round((_c8.it.c || 0) * _r8 * 10) / 10;
+          _c8.it.kcal = Math.round(4 * _c8.it.p + 9 * _c8.it.f + 4 * _c8.it.c);
+          _c8.it.fiber = Math.round(((_c8.it.fiber || 0) * _r8) * 10) / 10;
+          _c8.m.totals = mealTotalsOf(_c8.m.items);
+          recalcDayTotals(meals, totals);
+          _done8 = true;
+          break;
+        }
+        if (!_done8) break;
+      }
+      if (totals.c > _goalC8 * 0.9) notes.push(`🍚 Экстрим-углеводный день: гарниры дотянуты плотными носителями (${Math.round(totals.c)}/${_goalC8} У).`);
     }
 
     // ─── P4 (план «ведро»): честный флаг сходимости products-пути ───
