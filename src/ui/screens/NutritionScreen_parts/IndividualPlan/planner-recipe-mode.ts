@@ -1028,6 +1028,112 @@ export function rebalanceDayAfterRecipes(
   return { meals: work, notes, deviationPct: Math.round(devOut * 10) / 10, withinTolerance: devOut <= 3 };
 }
 
+/**
+ * §7.2-Р-финал (D8): экстрим-угли в рецептурном пути — финальный добор углей ПОСЛЕ всех
+ * проходов (ребаланс/корректор). Почему отдельным проходом: перебор белка ядер рецептов
+ * (пол ~+25% структурный) делает день «ккал-перегруженным» ДЛЯ КАЖДОГО приёма внутри
+ * проходов, поэтому любой углеводный топ-ап видится «перебором калорий» и откатывается
+ * (осцилляция add/cut в notes), а день финиширует на −20%+ по углям. Продукт-путь эту
+ * проблему решает тем же приёмом (§7.2-7c). Правила: только экстрим-полоса
+ * (У≥8 г/кг при Б≥2.3 г/кг — как в продукт-пути), только основные приёмы, только
+ * низкобелковые носители (цель дня — угли), сахарные бомбы — нет, объёмные/ЖКТ
+ * (булгур/батат/гречка) — нет, тарелка ≤+250 г, ккал-перебор дня ≤ +maxCalBumpPct%.
+ * Возвращает строки-заметки; мутирует meals на месте (items/totals).
+ */
+export function extremeCarbTopUp(
+  meals: any[],
+  targets: DayMacroTargets,
+  opts?: { weightKg?: number; maxCalBumpPct?: number; honestDevCap?: number },
+): string[] {
+  const notes: string[] = [];
+  const w = opts?.weightKg && opts.weightKg > 0 ? opts.weightKg : 0;
+  const tC = targets?.c || 0;
+  const tP = targets?.p || 0;
+  const tK = targets?.kcal || 0;
+  if (!w || tC <= 0 || !Array.isArray(meals)) return notes;
+  // Та же полоса, что в продукт-пути §7.2-7c: экстрим-угли при экстрим-белке.
+  if (!(tC >= 8 * w && tP >= 2.3 * w)) return notes;
+  const before = sumDayTotals(meals);
+  const devBefore = maxDeviationPct(before, targets);
+  const dC0 = tC - before.c;
+  if (dC0 <= tC * 0.10) return notes; // обычные проходы справились (дефицит ≤10%)
+  const kcalHead = Math.max(0, tK * (1 + (opts?.maxCalBumpPct ?? 5) / 100) - before.kcal);
+  if (kcalHead <= 150) return notes; // комнаты ккал нет — не выдумываем
+  // Честный потолок пути: на рецептурном экстриме белок ядер даёт +20…25% — HONEST_DEV_CAP
+  // (R-1500). Добор не имеет права уводить день ЗА него: угли важны, но не ценой
+  // «раскрутки» отклонения (райс-носитель несёт ~10 г Б на 100 г У).
+  const devCap = Math.max(devBefore, Math.min(opts?.honestDevCap ?? 30, 30));
+  // Носители: только почти-белково-нейтральные (рис/картоф/овёс: Б ≤2.5/100 г) — цель дня У,
+  // не Б. Сахарные бомбы, объём/ЖКТ (булгур/ватат/гречка) и «сливки» — нет.
+  const _sugarIds = new Set(['honey', 'jam', 'marmalade', 'zefir', 'pastila', 'pryaniki', 'sushki', 'sugar_cookies', 'dates', 'dates_dried', 'raisins', 'dried_apricots', 'dried_apple_rings', 'fruit_date_medjool', 'prunes', 'dried_pineapple', 'dried_mango', 'dried_cranberry', 'dried_blueberry', 'dried_kiwi', 'dried_pear', 'dried_peach', 'dried_banana_chips']);
+  const _pool = topupFoods(TOPUP_CARB_IDS, undefined)
+    .filter(f => (f.protein || 0) <= 3) // рис/картофель/овёс — Б-нейтральные (рис 2.7 — оптимален по У/Б)
+    .filter(f => !_sugarIds.has(f.id))
+    .filter(f => f.id !== 'bulgur' && f.id !== 'sweet_potato' && f.id !== 'buckwheat')
+    .sort((a, b) => carbConvenience(b) - carbConvenience(a));
+  if (_pool.length === 0) return notes;
+  let remaining = Math.min(dC0, kcalHead / 4); // ккал→угли: 4 ккал/г (носители почти без жира)
+  if (remaining < 40) return notes;
+  const _dayUses = (id: string): number => meals.reduce((s, m) => s + (m.items || []).filter((it: any) => it.id === id).length, 0);
+  const _solidG = (m: any): number => (m.items || []).reduce((s: number, it: any) => s + (it.amount || 0), 0);
+  const _meals = meals.filter((m: any) => !m?._insulinWindow
+    && !['preworkout', 'postworkout', 'intra'].includes(String(m?.type || '')) // peri-капы неприкосновенны (тест R-1500)
+    && !/Перед сном|Pre-sleep/i.test(m?.label || '') && (m as any).type !== 'presleep');
+  let _rounds = 0;
+  while (remaining >= 40 && _rounds < 4) {
+    _rounds++;
+    let progressed = false;
+    for (const m of _meals) {
+      if (remaining < 40) break;
+      const roomMeal = Math.max(0, (m?.target?.c ?? 0) - (m?.totals?.c || 0));
+      if (roomMeal < 30) continue;
+      const plateRoom = Math.max(0, 730 - _solidG(m));
+      if (plateRoom < 40) continue;
+      const idsInMeal = new Set((m.items || []).map((it: any) => it.id));
+      // Кандидаты: сначала не использованные в дне, затем удобство (угли на клетчатку).
+      // Перебор с откатом: если лучший кандидат не влезает (граммовка/честный потолок) —
+      // пробуем следующего, а не пропускаем приём (иначе oats 12У/100 блокировал все приёмы).
+      const _cands = _pool.filter(f => !idsInMeal.has(f.id))
+        .sort((a, b) => (_dayUses(a.id) - _dayUses(b.id)) || (carbConvenience(b) - carbConvenience(a)));
+      for (const cand of _cands) {
+        if ((cand.carbs || 0) < 15) continue;
+        const cap = Math.min(RECIPE_SIDE_CAP_HV[cand.id] ?? RECIPE_SIDE_CAP[cand.id] ?? 200, 250, plateRoom);
+        const per100 = cand.carbs || 0;
+        const g = Math.floor(Math.min(remaining / per100 * 100, roomMeal / per100 * 100, cap) / 10) * 10;
+        if (g < 40) continue;
+        const item = scaleItem({
+          name: cand.name, id: cand.id, amount: 100,
+          kcal: Math.round(cand.kcal || 0), p: cand.protein || 0, f: cand.fat || 0, c: cand.carbs || 0,
+          fiber: cand.fiber || 0, role: 'carb_slow',
+        }, g);
+        // Честность: пробуем и откатываем, если день уходит за honest-потолок (Б-перебор).
+        const prevItems = m.items;
+        const prevTotals = m.totals;
+        m.items = [...(m.items || []), item];
+        m.totals = sumMealTotals(m.items || []);
+        const after = sumDayTotals(meals);
+        if (maxDeviationPct(after, targets) > devCap + 1e-9) {
+          m.items = prevItems;
+          m.totals = prevTotals;
+          continue; // этот носитель не проходит — пробуем следующий
+        }
+        remaining -= (item.c || 0);
+        progressed = true;
+        notes.push(`🍚 Экстрим-добор углей в «${m.label || 'приём'}» — ${cand.name} ${g} г (тарелка ${Math.round(_solidG(m))} г)`);
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  const after = sumDayTotals(meals);
+  if (notes.length > 0) {
+    notes.push(`🍚 Рецептурный экстрим: угли ${Math.round(before.c)} → ${Math.round(after.c)} г (цель ${Math.round(tC)}), Б ${Math.round(after.p)} г (+${Math.round((after.p / Math.max(1, tP) - 1) * 100)}% — ядра рецептов не трогаем), ккал ${Math.round(after.kcal)} из ${Math.round(tK)}`);
+  } else if (devBefore + 1e-9 >= Math.min(opts?.honestDevCap ?? 30, 30)) {
+    notes.push(`🍚 Экстрим-угли: добор не выполнен — день уже на honest-потолке ${Math.round(devBefore)}% (перебор белка ядер); угли ${Math.round(before.c)} из ${Math.round(tC)} г остаются best-effort.`);
+  }
+  return notes;
+}
+
 // ─── Закупки из фактических планов (в т.ч. из рецептов) ────────────────
 
 const SHOPPING_BATCH_COOKABLE = new Set(['chicken_breast', 'chicken_thigh', 'turkey_breast', 'beef_lean', 'beef_minced', 'rice_white', 'rice_brown', 'buckwheat', 'quinoa', 'oats', 'lentils', 'chickpeas', 'beans', 'pasta_durum', 'bulgur', 'barley', 'millet', 'sweet_potato', 'potato_boiled', 'tofu', 'tempeh', 'whey_protein', 'whey_isolate', 'casein']);
@@ -1915,12 +2021,13 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // Ребаланс дня: недобор закрываем топ-апом в перекус, перебор режем по гибким слотам
   // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%. C5: субротация пулов.
   const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds, seed: args.seed, highCarb: _dayHighCarb, hvStyle: args.hvStyle, weekIndex: args.weekIndex, portableMode: args.portableMode, isWorkDay: args.isWorkDay, workStartMin: args.workStartMin, workEndMin: args.workEndMin });
-  const notes = [...rb.notes];
+  let notes = [...rb.notes];
   // Peri-капы сразу после ребаланса (до корректора): топ-апы/сайды могли залить окна.
   notes.push(...trimPeriCarbs(rb.meals));
 
   // D4: единый корректор — после всех капов/ребелов доводим день до ≤3% по 4 осям.
   // Ядро рецепта трогается только в крайнем случае (±15% кумулятивно), гибкие слоты — свободно.
+  let outMeals: any[] = rb.meals as any;
   const needCorr = !rb.withinTolerance || rb.deviationPct > 3;
   if (needCorr) {
     const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 80, weightKg: args.athleteWeightKg ?? 80, convenientCarbs: _dayHighCarb, highCarb: _dayHighCarb, portableMode: args.portableMode, isWorkDay: args.isWorkDay, workStartMin: args.workStartMin, workEndMin: args.workEndMin, hvStyle: args.hvStyle, weekIndex: args.weekIndex });
@@ -1937,25 +2044,33 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       // (иначе флаг «≤3%» врёт: property seed=32 claims ≤3, факт 3.6%).
       const _postTot = sumDayTotals(corr.meals as any);
       const _postDev = Math.round(maxDeviationPct(_postTot as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any) * 10) / 10;
-      if (_postDev <= 3) {
-        return { meals: corr.meals as any, notes: [...notes, ..._trimNotes1, ..._trimPeri1, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${_postDev}% (≤3%)`], withinTolerance: true, deviationPct: _postDev, appliedCount };
-      }
-      // улучшили, но не до ≤3% — отдаём лучшее с предупреждением (>3%)
-      return { meals: corr.meals as any, notes: [...notes, ..._trimNotes1, ..._trimPeri1, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${_postDev}%`, `⚠ Режим «по рецептам»: дневное отклонение от целей ${_postDev}% (>3%) — попробуйте выбрать другие варианты рецептов.`], withinTolerance: false, deviationPct: _postDev, appliedCount };
+      outMeals = corr.meals as any;
+      notes = [...notes, ..._trimNotes1, ..._trimPeri1,
+        _postDev <= 3
+          ? `✓ Корректор дневных целей: ${rb.deviationPct}% → ${_postDev}% (≤3%)`
+          : `✓ Корректор дневных целей: ${rb.deviationPct}% → ${_postDev}%`];
     }
   }
-
-  if (!rb.withinTolerance) {
-    notes.push(`⚠ Режим «по рецептам»: дневное отклонение от целей ${rb.deviationPct}% (>3%) — попробуйте выбрать другие варианты рецептов.`);
+  if (outMeals === (rb.meals as any)) {
+    const _trimNotes = trimQuotaOverflow(rb.meals);
+    const _trimPeri = trimPeriCarbs(rb.meals);
+    notes = [...notes, ..._trimNotes, ..._trimPeri];
   }
-  const _trimNotes = trimQuotaOverflow(rb.meals);
-  const _trimPeri = trimPeriCarbs(rb.meals);
-  // Тримы меняют тоталы — пересчитываем честную девиацию (иначе врём на ~1 п.п.).
-  const _finTot = sumDayTotals(rb.meals);
+
+  // §7.2-Р-финал (D8): экстрим-угли — добор углей ПОСЛЕ всех проходов (ребаланс/корректор).
+  // Перебор белка ядер запирает ккал-гейты промежуточных проходов (углеводный топ-ап
+  // видится «перебором калорий приёма» и откатывается), поэтому добор здесь — как §7.2-7c
+  // в продукт-пути. Только основные приёмы, только низкобелковые носители, ккал-перебор ≤ +5%.
+  notes = [...notes, ...extremeCarbTopUp(outMeals, targets, { weightKg: args.athleteWeightKg ?? 80 })];
+
+  // Тримы/доборы меняют тоталы — пересчитываем честную девиацию (иначе врём на ~1 п.п.).
+  const _finTot = sumDayTotals(outMeals);
   const _finDev = maxDeviationPct(_finTot as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any);
   const _finDevR = Math.round(_finDev * 10) / 10;
   // P2 (честность флага): квота/peri-тримы могли увести за ±3% ПОСЛЕ tolerance-проверки
   // ребаланса — предупреждение обязательно (иначе property-тест «нет предупреждения» падает).
-  const _finNotes = _finDevR <= 3 ? [...notes, ..._trimNotes, ..._trimPeri] : [...notes, ..._trimNotes, ..._trimPeri, `⚠ Режим «по рецептам»: дневное отклонение от целей ${_finDevR}% (>3%) — попробуйте выбрать другие варианты рецептов.`];
-  return { meals: rb.meals, notes: _finNotes, withinTolerance: _finDevR <= 3, deviationPct: _finDevR, appliedCount };
+  if (_finDevR > 3) {
+    notes = [...notes, `⚠ Режим «по рецептам»: дневное отклонение от целей ${_finDevR}% (>3%) — попробуйте выбрать другие варианты рецептов.`];
+  }
+  return { meals: outMeals, notes, withinTolerance: _finDevR <= 3, deviationPct: _finDevR, appliedCount };
 }

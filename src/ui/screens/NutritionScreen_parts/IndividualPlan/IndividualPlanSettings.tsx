@@ -13,7 +13,7 @@ import { getProfile } from "../../../../core/profile-manager";
 import { categoriesForSex } from "./planner-categories";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 import { plannerWeightAdjustAdvice } from './planner-targets';
-import { recommendMealCount, recommendMealCountDetailed } from './planner-meal-count';
+import { recommendMealCount, planMealStructure } from './planner-meal-count';
 
 /**
  * FIX audit (C1): «Заполнить анализы» дублировалась в двух карточках (~30 строк копии).
@@ -1551,9 +1551,20 @@ export const IndividualPlanSettings: React.FC = () => {
               const wMin = toMin(wakeTime);
               const bMin = toMin(bedTime);
               const awakeH = Math.round((bMin - wMin) / 60);
-              const rec = recommendMealCountDetailed(awakeH, effectiveP, effectiveC, { weightKg: weight, kcal: effectiveKcal });
-              const why = rec.binding === 'protein' ? `белок ${Math.round(effectiveP)} г` : rec.binding === 'carbs' ? `угли ${Math.round(effectiveC)} г` : rec.binding === 'kcal' ? `${Math.round(effectiveKcal)} ккал` : `день ${awakeH} ч`;
-              return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>🍽 Нормальная тарелка: ≤{rec.pCap} г белка · ≤120 г углей · ≤900 ккал → <b>{rec.count} приёмов</b> ({why}; пол по бодрствованию {rec.awakeFloor} ч). Число приёмов подбирается по объёму дня и не настраивается вручную.<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
+              // Единый источник с движком (E1): те же входы — курс (порог белка 0.45→0.55 г/кг),
+              // болюсы (окна инсулина), тренировочные peri. Раньше карточка считала без курса
+              // и без peri/окон — число в UI расходилось с фактической сборкой дня.
+              const _onCourse = phase === 'course' || (injections || []).some((i: any) => /инсулин|аас|тест|трен|нандрол|болд|мастер|станаз|метан|оксандр/i.test(String(i?.type || i?.name || '')));
+              const _boluses = (injections || []).filter((i: any) => /инсулин/i.test(String(i?.type || i?.name || ''))).length;
+              const st = planMealStructure({
+                awakeH, proteinG: effectiveP, carbsG: effectiveC, kcal: effectiveKcal, weightKg: weight,
+                onCourse: _onCourse, insulinBoluses: _boluses,
+                isTrainingDay: plannerMode === 'pro' && !!linkToTraining,
+                allowIntraWorkout: plannerMode === 'pro' && intraWorkoutEnabled && trainIntensity !== 'low',
+              });
+              const why = st.binding === 'protein' ? `белок ${Math.round(effectiveP)} г` : st.binding === 'carbs' ? `угли ${Math.round(effectiveC)} г` : st.binding === 'kcal' ? `${Math.round(effectiveKcal)} ккал` : st.binding === 'insulin' ? `${st.insulinWindows} болюс(а) инсулина` : `день ${awakeH} ч`;
+              const _total = st.regularMeals + st.periMeals + st.insulinWindows;
+              return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>🍽 Нормальная тарелка: ≤{st.pCap} г белка{_onCourse ? ' (на курсе)' : ''} · ≤130 г углей · ≤950 ккал → <b>{st.regularMeals} основных</b>{st.periMeals > 0 ? ` + ${st.periMeals} peri` : ''}{st.insulinWindows > 0 ? ` + ${st.insulinWindows} окон инсулина` : ''} = <b>{_total} приёмов</b> ({why}).<br />Тренировочные peri-окна и окна болюсов идут СВЕРХ основных — в дне они видны отдельными приёмами. Число не настраивается вручную.<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
             })()}
         </div>
       </GlassCard>

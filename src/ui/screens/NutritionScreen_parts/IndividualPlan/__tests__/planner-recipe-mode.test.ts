@@ -18,6 +18,7 @@ import {
   RECIPE_PRESETS,
   recipeMatchesPreset,
   scaleRecipeToTarget,
+  extremeCarbTopUp,
 } from '../planner-recipe-mode';
 import { snapPortionG } from '../meal-plan-engine';
 
@@ -332,5 +333,77 @@ describe('RECIPE_PRESETS (чипы-пресеты: масса = большое �
     expect(recipeMatchesPreset({ carbs: 5 }, null)).toBe(true);
     expect(recipeMatchesPreset(null, 'mass')).toBe(false);
     expect(recipeMatchesPreset({ carbs: 5 }, 'unknown')).toBe(true);
+  });
+});
+
+describe('extremeCarbTopUp (§7.2-Р-финал: добор углей на экстрим-полосе)', () => {
+  const meal = (label: string, targetC: number, items: any[], type?: string): any => ({
+    label, type, target: { c: targetC },
+    items, totals: { kcal: 0, p: 0, f: 0, c: 0 },
+  });
+  const recount = (meals: any[]) => {
+    for (const m of meals) {
+      m.totals = m.items.reduce((a: any, i: any) => ({ kcal: a.kcal + i.kcal, p: a.p + i.p, f: a.f + i.f, c: a.c + i.c }), { kcal: 0, p: 0, f: 0, c: 0 });
+    }
+    return meals;
+  };
+
+  it('вне экстрим-полосы (обычные цели) — байт-в-байт no-op', () => {
+    // 90 кг, 300У (3.3 г/кг) и 160Б — не полоса: ничего не трогаем.
+    const meals = recount([meal('Обед', 100, [{ id: 'rice_white', name: 'рис', amount: 100, kcal: 130, p: 2.7, f: 0.3, c: 28 }])]);
+    const before = JSON.stringify(meals);
+    const notes = extremeCarbTopUp(meals, { kcal: 2600, p: 160, f: 70, c: 300 }, { weightKg: 90 });
+    expect(notes).toEqual([]);
+    expect(JSON.stringify(meals)).toBe(before);
+  });
+
+  it('полоса есть, но углеродный дефицит ≤10% — no-op (проходы справились)', () => {
+    // 100 кг, 850У цель (8.5 г/кг), 240Б (2.4 г/кг) — полоса; день уже на 96% углей.
+    const meals = recount([meal('Обед', 300, [{ id: 'rice_white', name: 'рис', amount: 100, kcal: 130, p: 2.7, f: 0.3, c: 28 * 29 }])]);
+    const before = JSON.stringify(meals);
+    const notes = extremeCarbTopUp(meals, { kcal: 4400, p: 300, f: 90, c: 850 }, { weightKg: 100 });
+    expect(notes).toEqual([]);
+    expect(JSON.stringify(meals)).toBe(before);
+  });
+
+  it('добор: рис/картофель в приём с углеродной комнатой, Б-нейтрально, заметка честная', () => {
+    // 110 кг, 950У (8.6 г/кг), 260Б (2.36 г/кг) — экстрим-полоса при дефиците ~30%.
+    const meals = recount([
+      meal('Завтрак', 250, [{ id: 'oats', name: 'овсянка', amount: 100, kcal: 350, p: 12, f: 6, c: 60 }]),
+      meal('Обед', 250, [{ id: 'rice_white', name: 'рис', amount: 100, kcal: 130, p: 2.7, f: 0.3, c: 28 }]),
+      meal('Ужин', 250, [{ id: 'chicken_breast', name: 'курица', amount: 200, kcal: 220, p: 46, f: 4, c: 0 }]),
+    ]);
+    const notes = extremeCarbTopUp(meals, { kcal: 4800, p: 260, f: 110, c: 950 }, { weightKg: 110 });
+    expect(notes.length).toBeGreaterThan(0);
+    expect(notes[0]).toMatch(/Экстрим-добор/);
+    const added = meals.flatMap(m => (m.items || []).filter((i: any) => i.role === 'carb_slow'));
+    expect(added.length).toBeGreaterThan(0);
+    for (const i of added) expect(i.p).toBeLessThan(i.c * 0.15); // носитель почти без белка
+    // Дубли id внутри приёма не созданы, булгур не появился.
+    for (const m of meals) {
+      const ids = (m.items || []).map((i: any) => i.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids.includes('bulgur')).toBe(false);
+    }
+  });
+
+  it('честный потолок: при переборе белка день не «раскручивается» выше honestDevCap', () => {
+    // День уже на +20% по белку (180/150) при дефиците У; honestDevCap=20 → любой Б-несущий
+    // носитель уводит отклонение за потолок и шаг откатывается (угли остаются best-effort).
+    const meals = recount([
+      meal('Обед', 400, [{ id: 'beef_lean', name: 'говядина', amount: 700, kcal: 900, p: 180, f: 30, c: 0 }]),
+    ]);
+    const notes = extremeCarbTopUp(meals, { kcal: 4800, p: 150, f: 110, c: 950 }, { weightKg: 110, honestDevCap: 20 });
+    expect(notes.every(n => !n.startsWith('🍚 Экстрим-добор'))).toBe(true);
+    expect(meals[0].items.length).toBe(1); // откат: день не тронут
+  });
+
+  it('тарелка: приём с 700 г твёрдого не получает добор (комната < 40 г)', () => {
+    const meals = recount([
+      meal('Обед', 400, [{ id: 'bulk_meal', name: 'блюдо', amount: 700, kcal: 1200, p: 60, f: 20, c: 120 }]),
+    ]);
+    const notes = extremeCarbTopUp(meals, { kcal: 4800, p: 260, f: 110, c: 950 }, { weightKg: 110 });
+    expect(notes.every(n => !n.startsWith('🍚 Экстрим-добор'))).toBe(true);
+    expect(meals[0].items.length).toBe(1);
   });
 });
