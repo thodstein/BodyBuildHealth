@@ -59,4 +59,24 @@ describe('Arm movement hub UI', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Дожим max' }));
     expect(document.body.textContent).toContain('humerus-danger');
   });
+
+  it('сценарии: движение снимается и восстанавливается', () => {
+    goPressure();
+    fireEvent.click(screen.getByRole('button', { name: /Где сыпешься/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Середина/ }));
+    fireEvent.change(screen.getByLabelText('Деталь срыва'), { target: { value: 'открывают пальцы' } });
+    fireEvent.click(screen.getByRole('button', { name: /Снапшот текущего/ }));
+    expect(document.body.textContent).toContain('движение: фаза mid');
+    fireEvent.change(screen.getByLabelText('Деталь срыва'), { target: { value: 'другое' } });
+    fireEvent.click(screen.getByRole('button', { name: /Загрузить/ }));
+    expect((screen.getByLabelText('Деталь срыва') as HTMLInputElement).value).toBe('открывают пальцы');
+  });
+
+  it('коррекция: фаза схватки видна и объясняет бонус', () => {
+    goPressure();
+    fireEvent.click(screen.getByRole('button', { name: /Где сыпешься/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Середина/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Коррекция/ }));
+    expect(document.body.textContent).toContain('Фаза схватки: mid');
+  });
 });

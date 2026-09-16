@@ -5,9 +5,9 @@
  * humerusDanger) + failPhase в схватках — приёмник их молча ронял.
  * Здесь чистая функция без сайд-эффектов: санитизация + строки для flash.
  * Сборку плана НЕ меняем (инфо-слой, прецедент armLifting-моста выше).
+ * Персист — только diagSnap.movement (его читает печать); отдельного
+ * ключа нет осознанно (write-only слепки не храним).
  */
-
-export const ARM_MOVEMENT_KEY = 'he_arm_last_movement';
 
 export interface ArmMovementBridgeData {
   armMatchPhase?: unknown;
@@ -20,11 +20,13 @@ export interface ArmMovementBridgeData {
 }
 
 export interface ArmMovementIntake {
-  /** null — мост пустой, приёмнику нечего делать (байт-в-байт). */
-  persist: { key: string; value: Record<string, string> } | null;
+  /** hasNotes=false — мосту нечего сказать (байт-в-байт, тихо). */
+  hasNotes: boolean;
   flashes: string[];
   /** Мода фазы срыва в журнале (для строки Table-IQ). */
   phaseMode: string | null;
+  /** Санитизированные заметки (приёмник кладёт в diagSnap.movement). */
+  notes: Record<string, string>;
 }
 
 const VALID_PHASES = ['setup', 'readygo', 'start', 'mid', 'pin'] as const;
@@ -66,15 +68,15 @@ export function resolveArmMovementIntake(data: ArmMovementBridgeData | null | un
     }
   } catch { /* noop */ }
   const hasNotes = phase != null || start != null || vector != null || foul != null || strength != null || danger != null || phaseMode != null;
-  if (!hasNotes) return { persist: null, flashes: [], phaseMode };
-  const value: Record<string, string> = {};
-  if (phase) value['matchPhase'] = phase;
-  if (start) value['startNote'] = start;
-  if (vector) value['vectorNote'] = vector;
-  if (foul) value['foulNote'] = foul;
-  if (strength) value['tableStrengthNote'] = strength;
-  if (danger) value['humerusDangerNote'] = danger;
-  if (phaseMode) value['phaseMode'] = phaseMode;
+  const notes: Record<string, string> = {};
+  if (phase) notes['matchPhase'] = phase;
+  if (start) notes['startNote'] = start;
+  if (vector) notes['vectorNote'] = vector;
+  if (foul) notes['foulNote'] = foul;
+  if (strength) notes['tableStrengthNote'] = strength;
+  if (danger) notes['humerusDangerNote'] = danger;
+  if (phaseMode) notes['phaseMode'] = phaseMode;
+  if (!hasNotes) return { hasNotes: false, flashes: [], phaseMode, notes };
   const flashes: string[] = [];
   const bits: string[] = [];
   if (phase) bits.push(`фаза ${phase}`);
@@ -85,5 +87,5 @@ export function resolveArmMovementIntake(data: ArmMovementBridgeData | null | un
   if (phaseMode) bits.push(`мода журнала: ${phaseMode}`);
   if (bits.length) flashes.push(`🥋 Движение схватки: ${bits.join(' · ')}`);
   if (danger) flashes.push(`⛔ ${danger}`);
-  return { persist: { key: ARM_MOVEMENT_KEY, value }, flashes, phaseMode };
+  return { hasNotes: true, flashes, phaseMode, notes };
 }

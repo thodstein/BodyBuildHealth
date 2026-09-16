@@ -34,7 +34,7 @@ export function HubCorrectionTab({ H }: { H: any }) {
   const {
     state, setState, report, diag, armCausesP0, armTop3P0, armSpecP0,
     handleInjectP0, hasInjectPrev, handleRollbackP0, injectMsg,
-    toggleWeakPoint, trackType, autoPoint,
+    toggleWeakPoint, trackType, autoPoint, mvPhase,
   } = H;
   const weakPoints: ArmWeakPoint[] = Array.isArray(state?.weakPoints) && state.weakPoints.length
     ? state.weakPoints
@@ -80,6 +80,7 @@ export function HubCorrectionTab({ H }: { H: any }) {
           здесь соберётся цепочка: угол → причина → топ-3 с дозами → Δ → вставка в план.
         </div>
         {phaseChips}
+        {mvPhase ? <div className="ad-muted" data-arm="correction-matchphase">Фаза схватки: {mvPhase} — топ-3 получит +4 точкам фазы.</div> : null}
         {videoSuggest}
         {angleSuggest}
         <div className="ad-tip">Канон пулов: §3 `docs/ARM-MOVEMENT-CORRECTION-PLAN.md` (все ids — из каталога).</div>
@@ -89,6 +90,7 @@ export function HubCorrectionTab({ H }: { H: any }) {
   return (
     <AdSec title={`🛠 Коррекция движений (${weakPoints.length})`} summary="точка → причина → топ-3 → доза → вставка">
       {phaseChips}
+      {mvPhase ? <div className="ad-muted" data-arm="correction-matchphase">Фаза схватки: {mvPhase} — топ-3 получил +4 точкам фазы (метка «точка слабой фазы» в причинах).</div> : null}
       {videoSuggest}
       {angleSuggest}
       <div className="ad-list" data-arm="correction-list">

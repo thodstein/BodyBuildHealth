@@ -806,11 +806,9 @@ export function ArmAutoConstructor() {
           flash(`↩ Table-IQ: ${bouts.length} схваток из диагностики`);
         }
         // Движение схватки P1–P6 из хаба — инфо-слой (сборку не меняем)
+        // Персист — только diagSnap.movement ниже (его читает печать)
         try {
           const mv = resolveArmMovementIntake(payload.data as any);
-          if (mv.persist) {
-            try { localStorage.setItem(mv.persist.key, JSON.stringify(mv.persist.value)); } catch {}
-          }
           for (const line of mv.flashes) flash(line);
         } catch {}
       } catch {}
@@ -1998,14 +1996,30 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                 }}>📅 .ics</AdBtn>
                 <AdBtn variant="ghost" onClick={() => {
                   const tot = (viewPlan.weeks || []).reduce((a: number, w: any) => a + (w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0), 0);
-                  const lines = [
-                    `🤝 Арм-план — ${viewPlan.pattern.name} (${viewPlan.weeks.length} нед)`,
-                    `${discipline} · ${technique} · ${level} · ${goal}`,
-                    weakPoints.length ? `Слабые: ${weakPoints.join(', ')}` : 'Без специализации',
-                    cycId ? `Цикл: ${cycId}` : 'Обычный план',
-                    `Всего: ${tot} сетов · стол ${planDash ? planDash.tablePct : '—'}%`,
-                    (viewPlan.weeks || []).map((w: any) => `Н${w.week} (${w.phase}): ${(w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0)}`).join(' · '),
-                  ];
+                   const lines = [
+                     `🤝 Арм-план — ${viewPlan.pattern.name} (${viewPlan.weeks.length} нед)`,
+                     `${discipline} · ${technique} · ${level} · ${goal}`,
+                     weakPoints.length ? `Слабые: ${weakPoints.join(', ')}` : 'Без специализации',
+                     cycId ? `Цикл: ${cycId}` : 'Обычный план',
+                     `Всего: ${tot} сетов · стол ${planDash ? planDash.tablePct : '—'}%`,
+                     (viewPlan.weeks || []).map((w: any) => `Н${w.week} (${w.phase}): ${(w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0)}`).join(' · '),
+                   ];
+                   // Движение схватки из диагностики (тот же diag, что у печати)
+                   try {
+                     const raw = localStorage.getItem('he_arm_last_diagnostics');
+                     const dg = raw ? JSON.parse(raw) : null;
+                     const mv = dg?.movement;
+                     if (mv && typeof mv === 'object') {
+                       const bits: string[] = [];
+                       if (mv.matchPhase) bits.push(`фаза ${mv.matchPhase}`);
+                       if (mv.startNote) bits.push('старт');
+                       if (mv.vectorNote) bits.push('векторы');
+                       if (mv.tableStrengthNote) bits.push('сила стола');
+                       if (mv.foulNote) bits.push('фолы');
+                       if (bits.length) lines.push(`🥋 Движение: ${bits.join(' · ')}`);
+                       if (mv.humerusDangerNote) lines.push(`⛔ ${mv.humerusDangerNote}`);
+                     }
+                   } catch { /* noop */ }
                   const txt = lines.join('\n');
                   const done = () => flash('✅ Сводка скопирована');
                   const fallback = () => {

@@ -194,7 +194,7 @@ export function HubPressureTab({ H }: { H: any }) {
             <input value={mvDetail || ''} onChange={e=>setMvDetail(e.target.value)} placeholder="напр. открывают пальцы" aria-label="Деталь срыва" />
           </AdField>
         </AdGrid>
-        {mvPhaseDiag && (mvPhaseDiag as any).phase ? <div className="ad-tip" data-arm="mv-phase-out">{(mvPhaseDiag as any).note}</div> : <div className="ad-muted">Отметь фазу — следующая «＋ Схватка» запишет её в журнал, а топ-3 получит бонус точки своей фазы.</div>}
+        {mvPhaseDiag && (mvPhaseDiag as any).phase ? <div className="ad-tip" data-arm="mv-phase-out">{(mvPhaseDiag as any).note}</div> : <div className="ad-muted">Отметь фазу — новая запись журнала понесёт её с собой, а топ-3 получит бонус точки своей фазы.</div>}
       </AdSec>
       <AdSec title="🥋 Движение схватки P1–P6" collapsible defaultOpen={false} summary="старт · векторы · сила стола · danger · фолы">
         <div className="ad-sec-t">Старт: реакция на Go</div>

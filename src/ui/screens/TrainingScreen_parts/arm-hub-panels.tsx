@@ -286,7 +286,49 @@ type DiagScenario = {
   matchup?: { opp: string; hand: string; wd: string };
   tiq?: Array<Record<string, unknown>>;
   bench?: { level: string };
+  /** Движение схватки P1–P6: только заполненное (строки как есть, флаги '1'). */
+  movement?: Record<string, string>;
 };
+
+// Движение схватки: строковые ключи состояния хаба + флаги (dg* — boolean).
+const MV_STR_KEYS = [
+  'mvPhase', 'mvDetail', 'stReaction', 'stFalse', 'stCenter',
+  'vecSR', 'vecSP', 'vecSB', 'vecSS', 'vecMR', 'vecMP', 'vecMB', 'vecMS',
+  'vecPR', 'vecPP', 'vecPB', 'vecPS',
+  'tsWrist', 'tsPron', 'tsRising', 'tsPin', 'tsR1', 'tsR3',
+  'flElbow', 'flShoulder', 'flPeg', 'flClean', 'flLosing', 'dgElbow',
+];
+const MV_BOOL_KEYS = ['dgLosing', 'dgSideMax', 'dgFatigue', 'dgPress'];
+
+function takeMovement(H: any): Record<string, string> | undefined {
+  const m: Record<string, string> = {};
+  try {
+    for (const k of MV_STR_KEYS) {
+      const v = H?.[k];
+      if (typeof v === 'string' && v.trim()) m[k] = v.trim().slice(0, 120);
+    }
+    for (const b of MV_BOOL_KEYS) {
+      if (H?.[b] === true) m[b] = '1';
+    }
+  } catch { /* noop */ }
+  return Object.keys(m).length ? m : undefined;
+}
+
+function loadMovement(H: any, m: Record<string, string> | undefined): void {
+  if (!m || typeof m !== 'object') return;
+  try {
+    for (const k of MV_STR_KEYS) {
+      if (typeof m[k] === 'string') {
+        const set = H?.['set' + k[0].toUpperCase() + k.slice(1)];
+        if (typeof set === 'function') set(m[k]);
+      }
+    }
+    for (const b of MV_BOOL_KEYS) {
+      const set = H?.['set' + b[0].toUpperCase() + b.slice(1)];
+      if (typeof set === 'function') set(m[b] === '1');
+    }
+  } catch { /* noop */ }
+}
 function loadScenarios(): DiagScenario[] {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(SCEN_KEY) : null;
@@ -325,6 +367,8 @@ export function HubScenarios({ H }: { H: any }) {
       matchup: { opp: muState?.opp || 'unknown', hand: muState?.hand || 'unknown', wd: muState?.wd || '' },
       tiq: Array.isArray(tiq) ? tiq.map((b: any) => ({ ...b })) : [],
       bench: { level: benchRes?.level || '' },
+      // Движение схватки P1–P6 — в тот же снимок (только заполненное)
+      ...(takeMovement(H) ? { movement: takeMovement(H) } : {}),
     };
     setScens((p) => { const n = [s, ...p].slice(0, 6); saveScenarios(n); return n; });
   };
@@ -342,6 +386,7 @@ export function HubScenarios({ H }: { H: any }) {
       }
       if (s.matchup) { setMuState?.(s.matchup); try { saveMu?.(s.matchup); } catch { /* noop */ } }
       if (Array.isArray(s.tiq)) { try { saveTiqAll ? saveTiqAll(s.tiq as any) : setTiq?.(s.tiq); } catch { /* noop */ } }
+      loadMovement(H, (s as DiagScenario).movement);
     } catch { /* noop */ }
   };
   const drop = (id: string) => setScens((p) => { const n = p.filter((s) => s.id !== id); saveScenarios(n); return n; });
@@ -377,8 +422,8 @@ export function HubScenarios({ H }: { H: any }) {
                   <span><b>{s.date}</b></span>
                   <span className="ad-muted">RT {s.fields.rtKg || '—'} · Side {s.fields.sideKg || '—'} · точки {s.weakPoints.join(', ') || '—'}</span>
                 </div>
-                {(s.bench?.level || s.matchup?.opp || (s.tiq && s.tiq.length)) && (
-                  <div className="ad-muted">Подробно: {s.bench?.level ? `бенч ${s.bench.level}` : ''}{s.bench?.level && (s.matchup?.opp || (s.tiq && s.tiq.length)) ? ' · ' : ''}{s.matchup && s.matchup.opp !== 'unknown' ? `матчап ${s.matchup.opp}` : ''}{s.matchup && s.matchup.opp !== 'unknown' && s.tiq && s.tiq.length ? ' · ' : ''}{s.tiq && s.tiq.length ? `TIQ ${s.tiq.length}` : ''}</div>
+                {(s.bench?.level || s.matchup?.opp || (s.tiq && s.tiq.length) || (s as DiagScenario).movement?.mvPhase) && (
+                  <div className="ad-muted">Подробно: {s.bench?.level ? `бенч ${s.bench.level}` : ''}{s.bench?.level && (s.matchup?.opp || (s.tiq && s.tiq.length)) ? ' · ' : ''}{s.matchup && s.matchup.opp !== 'unknown' ? `матчап ${s.matchup.opp}` : ''}{s.matchup && s.matchup.opp !== 'unknown' && s.tiq && s.tiq.length ? ' · ' : ''}{s.tiq && s.tiq.length ? `TIQ ${s.tiq.length}` : ''}{(s.tiq && s.tiq.length || (s.matchup && s.matchup.opp !== 'unknown')) && (s as DiagScenario).movement?.mvPhase ? ' · ' : ''}{(s as DiagScenario).movement?.mvPhase ? `движение: фаза ${(s as DiagScenario).movement?.mvPhase}` : ''}</div>
                 )}
                 <div className="ad-muted">{deltaLine(s)}</div>
                 <div className="ad-row">
