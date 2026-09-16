@@ -203,13 +203,18 @@ export const BbContestPrepParams: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }
             </div>
             <div>
               <div style={{ ...SMALL, marginBottom:4 }}>🍚 Карб-загрузка</div>
-              <div style={{ display:'flex', gap:6 }}>
-                {(['back', 'moderate', 'front'] as CarbLoadStrategy[]).map(m => (
-                  <button key={m} onClick={() => setPrepCarbMode(m)} style={{ ...BTN_GHOST, background: prepCarbMode === m ? 'rgba(34,197,94,0.2)' : 'transparent', borderColor: prepCarbMode === m ? '#22c55e' : undefined, color: prepCarbMode === m ? '#4ade80' : undefined }}>
-                    {m === 'back' ? 'Back-load' : m === 'moderate' ? 'Классика 3/3' : 'Front-load'}
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {(['back', 'moderate', 'front', 'direct'] as CarbLoadStrategy[]).map(m => (
+                  <button key={m} onClick={() => setPrepCarbMode(m)} data-bb={`carb-${m}`} style={{ ...BTN_GHOST, background: prepCarbMode === m ? 'rgba(34,197,94,0.2)' : 'transparent', borderColor: prepCarbMode === m ? '#22c55e' : undefined, color: prepCarbMode === m ? '#4ade80' : undefined }}>
+                    {m === 'back' ? 'Back-load' : m === 'moderate' ? 'Классика 3/3' : m === 'front' ? 'Front-load' : 'Без деплеции'}
                   </button>
                 ))}
               </div>
+              {prepCarbMode === 'direct' && (
+                <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>
+                  Homer 2024: деплеция не обязательна — загрузка с D-6 без деплеции-дней; для опытных с trial (новичкам — moderate).
+                </div>
+              )}
             </div>
             <div>
               <div style={{ ...SMALL, marginBottom:4 }}>🏋️ Протокол (Библиотека)</div>

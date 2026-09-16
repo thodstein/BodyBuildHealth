@@ -36,7 +36,7 @@ export type BBContestCategory =
   | 'mens_physique' | 'classic_physique' | 'mens_bb' | 'bb_212'
   | 'bikini' | 'figure' | 'wellness' | 'womens_physique' | 'womens_bb';
 
-export type CarbLoadStrategy = 'front' | 'moderate' | 'back' | 'undulating' | 'linear';
+export type CarbLoadStrategy = 'front' | 'moderate' | 'back' | 'undulating' | 'linear' | 'direct';
 /** WaterStrategy: legacy 'classic'/'moderate'/'minimal' kept for compat, canonical is 'stable'|'tapered'|'high' */
 export type WaterStrategy = 'classic' | 'moderate' | 'minimal' | 'stable' | 'tapered' | 'high';
 /** SodiumStrategy: legacy 'constant'/'cut_*' kept for compat, canonical is 'stable'|'tapered' */
@@ -143,8 +143,8 @@ export interface TrainingTaperWeek {
 
 export type PeakDayPhase =
   | 'deplete_1' | 'deplete_2' | 'deplete_3'
-  | 'load_1' | 'load_2' | 'load_3'
-  | 'peak' | 'show';
+  | 'load_1' | 'load_2' | 'load_3' | 'load_4'
+  | 'peak' | 'peak_2' | 'show';
 
 export interface PeakWeekDayPlan {
   day: number;              // 1..7 (7 = show day)
@@ -275,6 +275,20 @@ export const CARB_DISTRIBUTION: Record<CarbLoadStrategy, number[]> = {
   back: [0.15, 0.30, 0.55],           // поздняя 15-30-55 (прямо перед сценой, риск spill ниже при хорошей кондиции)
   undulating: [0.30, 0.20, 0.50],     // волна 30-20-50 для непредсказуемых
   linear: [0.33, 0.33, 0.34],         // ровно
+  // PRO-3 Э5 (Homer 2024: деплеция НЕ обязательна для суперкомпенсации): загрузка с дня 1
+  // без деплеции-дней, 36–48 ч нагрузки ранним фронт-лоадом (гликоген держится до 5 дней).
+  direct: [0.30, 0.28, 0.24, 0.18],
+};
+
+/** Фазы пик-недели по стратегии (PRO-3 Э5: 'direct' — без деплеции). */
+export const PHASES_BY_STRATEGY: Record<CarbLoadStrategy, PeakDayPhase[]> = {
+  front: ['deplete_1', 'deplete_2', 'load_1', 'load_2', 'load_3', 'peak', 'show'],
+  moderate: ['deplete_1', 'deplete_2', 'deplete_3', 'load_1', 'load_2', 'load_3', 'show'],
+  back: ['deplete_1', 'deplete_2', 'deplete_3', 'peak', 'load_1', 'load_2', 'show'],
+  undulating: ['deplete_1', 'deplete_2', 'deplete_3', 'load_1', 'load_2', 'load_3', 'show'],
+  linear: ['deplete_1', 'deplete_2', 'deplete_3', 'load_1', 'load_2', 'load_3', 'show'],
+  // 4 дня плавной загрузки (D-6…D-3) + 2 дня пика (D-2, D-1) + шоу — 7 дней без деплеции.
+  direct: ['load_1', 'load_2', 'load_3', 'load_4', 'peak', 'peak_2', 'show'],
 };
 
 export const CONTEST_CATEGORY_LABELS: Record<BBContestCategory, string> = Object.fromEntries(
@@ -326,20 +340,6 @@ export function resolveShowDate(cfg: BBContestPrepConfig): string {
   return cfg.showDate;
 }
 
-/** Фазы по дням (день 1 = D-6, день 7 = шоу). PRO: 5 стратегий, включая undulating. */
-export const PHASES_BY_STRATEGY: Record<CarbLoadStrategy, PeakDayPhase[]> = {
-  // front: деплеция 2 дня (D-6, D-5) → загрузка 3 дня (D-4..D-2) → пик (D-1) → шоу.
-  front: ['deplete_1', 'deplete_2', 'load_1', 'load_2', 'load_3', 'peak', 'show'],
-  // moderate: классика 3/3 — деплеция (D-6..D-4) → загрузка (D-3..D-1) → шоу.
-  moderate: ['deplete_1', 'deplete_2', 'deplete_3', 'load_1', 'load_2', 'load_3', 'show'],
-  // back: деплеция 3 дня → переход (D-3) → загрузка 2 дня (D-2, D-1) → шоу.
-  back: ['deplete_1', 'deplete_2', 'deplete_3', 'peak', 'load_1', 'load_2', 'show'],
-  // undulating: волна 30-20-50 для непредсказуемых (деплеция 3 → волна)
-  undulating: ['deplete_1', 'deplete_2', 'deplete_3', 'load_1', 'load_2', 'load_3', 'show'],
-  // linear: ровная загрузка 33-33-34
-  linear: ['deplete_1', 'deplete_2', 'deplete_3', 'load_1', 'load_2', 'load_3', 'show'],
-};
-
 export const PHASE_LABELS_RU: Record<PeakDayPhase, string> = {
   deplete_1: 'Деплеция 1',
   deplete_2: 'Деплеция 2',
@@ -347,7 +347,9 @@ export const PHASE_LABELS_RU: Record<PeakDayPhase, string> = {
   load_1: 'Загрузка 1',
   load_2: 'Загрузка 2',
   load_3: 'Загрузка 3',
+  load_4: 'Загрузка 4',
   peak: 'Пик',
+  peak_2: 'Пик 2 (D-1)',
   show: 'Шоу',
 };
 
@@ -359,7 +361,9 @@ export const PEAK_PHASE_COLORS: Record<PeakDayPhase, string> = {
   load_1: '#22c55e',
   load_2: '#22c55e',
   load_3: '#22c55e',
+  load_4: '#22c55e',
   peak: '#a855f7',
+  peak_2: '#a855f7',
   show: '#fbbf24',
 };
 
@@ -419,7 +423,7 @@ export function canonicalSodiumStrategy(s: string): SodiumStrategy {
 }
 export function canonicalCarbStrategy(s: string): CarbLoadStrategy {
   const v = String(s || '').toLowerCase();
-  if (['front','moderate','back','undulating','linear'].includes(v)) return v as CarbLoadStrategy;
+  if (['front','moderate','back','undulating','linear','direct'].includes(v)) return v as CarbLoadStrategy;
   return 'moderate';
 }
 
@@ -513,7 +517,7 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
   else if (daysBetween(new Date().toISOString().slice(0, 10), cfg.showDate) < 0) errors.push('Дата шоу в прошлом.');
   if (!Number.isInteger(cfg.weeksOut) || cfg.weeksOut < 1 || cfg.weeksOut > 4) errors.push(`weeksOut ${cfg.weeksOut} вне диапазона 1–4.`);
   if (!['bb', 'classic', 'pl'].includes(cfg.trainingProtocol)) errors.push(`Неизвестный тренировочный протокол: ${cfg.trainingProtocol}`);
-  if (!['front', 'moderate', 'back', 'undulating', 'linear'].includes(cfg.carbLoadStrategy)) errors.push(`Неизвестная карб-стратегия: ${cfg.carbLoadStrategy}`);
+  if (!['front', 'moderate', 'back', 'undulating', 'linear', 'direct'].includes(cfg.carbLoadStrategy)) errors.push(`Неизвестная карб-стратегия: ${cfg.carbLoadStrategy}`);
   if (!['classic', 'moderate', 'minimal', 'stable', 'tapered', 'high'].includes(cfg.waterStrategy)) errors.push(`Неизвестная водная стратегия: ${cfg.waterStrategy}`);
   if (!['constant', 'cut_2d', 'cut_3d', 'stable', 'tapered'].includes(cfg.sodiumStrategy)) errors.push(`Неизвестная натриевая стратегия: ${cfg.sodiumStrategy}`);
   if (!['beginner', 'intermediate', 'advanced'].includes(cfg.experienceLevel)) errors.push(`Неизвестный уровень: ${cfg.experienceLevel}`);
@@ -585,6 +589,10 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
   if (cfg.experienceLevel === 'beginner' || cfg.prepCount === 0) {
     warnings.push('💡 Первый пик (или новичок): минимум манипуляций — вода minimal, натрий constant, карбс moderate. Нарабатывайте опыт, не рискуйте формой.');
   }
+  // PRO-3 Э5 (Homer 2024 RCT: эффект на грани ошибки, ответ индивидуален): direct — для опытных.
+  if (canonicalCarbStrategy(cfg.carbLoadStrategy) === 'direct' && (cfg.experienceLevel === 'beginner' || cfg.prepCount === 0)) {
+    warnings.push('⚠ Загрузка «без деплеции» (direct) — для опытных с trial-прогоном: новичку безопаснее moderate/front после репетиции (Homer 2024 RCT).');
+  }
   if (cfg.sex === 'female') {
     warnings.push('⚠ Женщины: вода не ниже 1.5–2 л/день, натрий не ниже 800 мг — риск гипонатриемии выше при меньшей массе.');
   }
@@ -610,7 +618,7 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
   }
   // SGLT1 guard: натрий срезается во время карб-загрузки — дросселирует SGLT1
   const canonNa = canonicalSodiumStrategy(cfg.sodiumStrategy);
-  const isLoadingStrategy = ['front','moderate','back','undulating','linear'].includes(cfg.carbLoadStrategy);
+  const isLoadingStrategy = ['front','moderate','back','undulating','linear','direct'].includes(cfg.carbLoadStrategy);
   if (isLoadingStrategy && canonNa !== 'stable' && cfg.carbLoadStrategy !== 'moderate') {
     warnings.push('⚠ SGLT1: натрий срезается во время карб-загрузки — глюкоза (SGLT1) требует Na для транспорта. Держите натрий stable до D-1.');
   }
@@ -861,7 +869,9 @@ const TRAINING_BY_PHASE: Record<PeakDayPhase, DayTraining> = {
   load_1: { type: 'Отдых', minutes: 0, details: ['Без тренировки — гликоген наполняется. Лёгкая прогулка 20 мин + позирование 20 мин.'] },
   load_2: { type: 'Отдых', minutes: 0, details: ['Полный покой. Позирование 25 мин, растяжка, сон 8-9ч.'] },
   load_3: { type: 'Отдых', minutes: 0, details: ['Полный покой. Прогон обязательной программы 15 мин, ранний сон.'] },
+  load_4: { type: 'Отдых', minutes: 0, details: ['Полный покой (поздняя загрузка). Позирование 20 мин, вода по плану.'] },
   peak: { type: 'Отдых / лёгкий памп 10 мин', minutes: 10, details: ['Только если «плоско»: 1 круг верх лёгкий 12-15 повт, 50%. Иначе — покой.'] },
+  peak_2: { type: 'Отдых / лёгкий памп 10 мин', minutes: 10, details: ['D-1: покой или 1 круг верх 12-15 повт, 50% (только при «плоско»). Угли малыми порциями, вода по плану.'] },
   show: {
     type: 'Памп-рутина backstage',
     minutes: 20,
@@ -1017,7 +1027,7 @@ export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?
   const carbsForPhase = (phase: PeakDayPhase): number => {
     if (phase.startsWith('deplete')) return depleteCarbs;
     if (loadBudgets[phase] != null) return loadBudgets[phase];
-    if (phase === 'peak') return peakCarbs;
+    if (phase === 'peak' || phase === 'peak_2') return peakCarbs;
     if (phase === 'show') return showCarbs;
     return depleteCarbs;
   };
@@ -1100,7 +1110,7 @@ export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?
     // PRO-3 Э3: безопасный пол ккал применяется к СЦЕНЕ (шоу и D-1 peak) — окно риска
     // слабости/обморока. Деплеция/загрузка остаются в карб-бюджете категории (Escalante
     // 3.5–12 г/кг total; пол на них ломал бы научные полосы бюджета).
-    const kcalFloor = (phase === 'show' || phase === 'peak')
+    const kcalFloor = (phase === 'show' || phase === 'peak' || phase === 'peak_2')
       ? Math.max(isFemale ? 1200 : 1400, Math.round(w * 20))
       : 0;
     let kcalFloorApplied = false;
@@ -1139,20 +1149,26 @@ export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?
       mealNotes.push(`${carbSource}. ${carbsG} г карбс на 6–7 малых приёмов каждые 2–2.5 ч. ${budgetNote}`);
       mealNotes.push(`Жиры минимум (${fatG} г) — <45г, клетчатка ≤${fiberFor(phase)}г. ${lowFodmapNote}`);
       mealNotes.push('Вода стабильна на загрузке — карбы сами тащат воду интра (2.7-3г/г гликогена). Не резать воду во время карб-лоада.');
-    } else if (phase === 'peak') {
+      // PRO-3 Э5 (Homer 2024): фронт-лоад/без деплеции — суперкомпенсация стоит до 5 дней.
+      if (strat === 'front' || strat === 'direct') {
+        mealNotes.push('Гликоген держится до 5 дней после суперкомпенсации — ранняя загрузка ок, суетиться в D-1 не нужно (Homer 2024).');
+      }
+    } else if (phase === 'peak' || phase === 'peak_2') {
       mealNotes.push(`Умеренные карбс ${carbsG}г, вода ${waterLiters}л (не резать до 0.25!). Последняя проверка: фото фронт/тыл. При заливе — не соль, а -150г карб и +0.3л вода.`);
       mealNotes.push(`Клетчатка ≤${fiberFor(phase)}г. ${lowFodmapNote}`);
     } else {
       mealNotes.push(`Завтрак за 2.5 ч до выхода: рисовые хлебцы 40г + мёд 20г + ½ банана + кофе при привычке. Всего ${carbsG}г карбс на шоу-день (≈${Math.round(carbsG/w*10)/10}г/кг).`);
       mealNotes.push(`Далее ${Math.round(carbsG/4)}г карбс каждые 1.5-2 ч (хлебцы/мармелад/рис). Вода ${waterLiters}л глотками, соль щепотка перед пампом (если stable). Клетчатка ≤${fiberFor(phase)}г.`);
       if (day === 7 && canonWater === 'high') mealNotes.push('High water: на сцене глотки, не залпом — риск гипонатриемии.');
+      // PRO-3 Э5 (Homer 2024): Na шоу-дня — спекулятивно, только после триала.
+      if (day === 7) mealNotes.push('Na шоу-дня: концентрированный натрий перед выходом может усилить памп/васкуляризацию (спекулятивно, Homer 2024) — повышайте только если прогоняли с trial; иначе держите привычный уровень.');
     }
     if (cfg.allergens?.length) mealNotes.push(`Исключить аллергены: ${cfg.allergens.join(', ')}.`);
     if (eff.hasTrialPeak === false && eff.experienceLevel === 'beginner') mealNotes.push('Первый пик без trial — держите stable воду/натрий, не экспериментируйте.');
     // Женская грамотность пик-недели (лёгкие категории bikini/wellness/figure):
     if (isFemale) {
       if (phase.startsWith('deplete')) mealNotes.push('Женщины: железо — красное мясо/печень/шпинат (дефицит типичен для сушки).');
-      if (phase.startsWith('load') || phase === 'peak') mealNotes.push('Женщины: кальций 1000–1200 мг/день (молочные/обогащённые) — защита костей при низком % жира.');
+      if (phase.startsWith('load') || phase === 'peak' || phase === 'peak_2') mealNotes.push('Женщины: кальций 1000–1200 мг/день (молочные/обогащённые) — защита костей при низком % жира.');
       if (phase !== 'show' && isLutealPhase(eff.cycleDay)) mealNotes.push('Лютеиновая фаза активна: вода +0.5л и натрий ≥2100мг уже учтены, не усиливайте дефицит.');
       else if (phase !== 'show') mealNotes.push('Женщины: в лютеиновую фазу (15-28 день) возможна задержка воды +0.5–1 кг — это норма, не усиливайте дефицит.');
       if (day === 7) mealNotes.push(`Женщины: вода не ниже 0.9 л на шоу; натрий не ниже ${showNaFloor}мг — гипонатриемия.`);
@@ -1208,7 +1224,7 @@ export function spillRiskScore(cfg: BBContestPrepConfig): { level: 'low'|'medium
   const budgetMax = profile.carbTotalBudgetGPerKg[1];
   const isHighBudget = budgetMax >= 9;
   const isLight = profile.light;
-  if (gap > 3 && isHighBudget && canonWater === 'stable' && (cfg.carbLoadStrategy==='back' || cfg.carbLoadStrategy==='front')) {
+  if (gap > 3 && isHighBudget && canonWater === 'stable' && (cfg.carbLoadStrategy==='back' || cfg.carbLoadStrategy==='front' || cfg.carbLoadStrategy==='direct')) {
     return { level:'high', note:`Залив high: BF +${gap.toFixed(1)}% к цели + бюджет ${budgetMax}г/кг + ${cfg.carbLoadStrategy} → берите moderate/linear и trial.` };
   }
   if (gap > 2 && isLight) return { level:'medium', note:`Залив medium: BF +${gap.toFixed(1)}% + light категория → moderate/linear, stable вода.` };
@@ -2599,7 +2615,7 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
         : 'conservative',
       waterMode: allowedManipulation && canonicalWaterStrategy(cfg.waterStrategy) !== 'stable' ? 'moderate' : 'stable',
       sodiumMode: allowedManipulation && canonicalSodiumStrategy(cfg.sodiumStrategy) !== 'stable' ? 'moderate' : 'stable',
-      carbMode: cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : cfg.carbLoadStrategy === 'undulating' ? 'moderate' : cfg.carbLoadStrategy === 'linear' ? 'moderate' : 'moderate',
+      carbMode: cfg.carbLoadStrategy === 'front' || cfg.carbLoadStrategy === 'direct' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : cfg.carbLoadStrategy === 'undulating' ? 'moderate' : cfg.carbLoadStrategy === 'linear' ? 'moderate' : 'moderate',
       // PRO-3 Э4: каноническая стратегия хранится как есть (lossless round-trip).
       carbLoadStrategy: opts.carbLoadStrategy ?? cfg.carbLoadStrategy,
       // PRO-2 P2: доза trial едет в плане (питание и пик-неделя читают её отсюда).

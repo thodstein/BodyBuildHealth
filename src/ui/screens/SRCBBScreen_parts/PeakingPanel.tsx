@@ -316,7 +316,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
             />
             <PopupSelect label="Тренировочный протокол" value={bbCfg.trainingProtocol} options={[{ id: 'bb', label: 'ББ (4 нед)' }, { id: 'classic', label: 'Classic WF (4 нед)' }, { id: 'pl', label: 'ПЛ (3 нед)' }]} onChange={v => bbPatch({ trainingProtocol: v as any })} />
             <PopupSelect label="Недель тапера" value={String(bbCfg.weeksOut)} options={[1, 2, 3, 4].map(n => ({ id: String(n), label: `${n} нед` }))} onChange={v => bbPatch({ weeksOut: Number(v) })} />
-            <PopupSelect label="🍚 Карб-загрузка" value={bbCfg.carbLoadStrategy} options={[{ id: 'moderate', label: 'Классика 3/3' }, { id: 'front', label: 'Front-load (раньше)' }, { id: 'back', label: 'Back-load (поздно)' }]} onChange={v => bbPatch({ carbLoadStrategy: v as any })} />
+            <PopupSelect label="🍚 Карб-загрузка" value={bbCfg.carbLoadStrategy} options={[{ id: 'moderate', label: 'Классика 3/3' }, { id: 'front', label: 'Front-load (раньше)' }, { id: 'back', label: 'Back-load (поздно)' }, { id: 'direct', label: 'Без деплеции (Homer 2024)' }]} onChange={v => bbPatch({ carbLoadStrategy: v as any })} />
             <PopupSelect label="💧 Вода" value={bbCfg.waterStrategy} options={[{ id: 'stable', label: 'Stable (безопасно, рекомендовано)' }, { id: 'tapered', label: 'Tapered (умеренно, gated)' }, { id: 'high', label: 'High load+cut (только trial+врач)' }]} onChange={v => bbPatch({ waterStrategy: v as any })} />
             <PopupSelect label="🧂 Натрий" value={bbCfg.sodiumStrategy} options={[{ id: 'stable', label: 'Stable (не трогаем)' }, { id: 'tapered', label: 'Tapered −30% за 48ч' }]} onChange={v => bbPatch({ sodiumStrategy: v as any })} />
           </div>
