@@ -55,6 +55,11 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          # Пакета 'tools' больше нет в репозитории Google — дефолт
+          # 'tools platform-tools' роняет шаг (Failed to find package 'tools').
+          # Всё нужное ставит следующий шаг через sdkmanager.
+          packages: ''
 
       - name: Install SDK packages
         run: |
@@ -112,6 +117,9 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          # см. комментарий в build-джобе: дефолтный 'tools' мёртв.
+          packages: ''
 
       - name: Install SDK packages
         run: |
