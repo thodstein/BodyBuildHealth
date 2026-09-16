@@ -89,6 +89,7 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
         <div style={cardBg}>
           <div style={{ fontSize:13, fontWeight:800, color:'#f472b6', marginBottom:2 }}>♀️ Женский цикл и ААС</div>
           <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Абсолютные противопоказания, необратимые риски вирилизации, пороги андрогенов для женщин, беременность и контрацепция на ААС. Расширено: дозы веществ (ААС/пептиды/SARMs), примерные протоколы поддержки с дозировками, женские лабораторные референсы, таймлайн цикла, либидо, взаимодействия, цели/возраст, экстренные ситуации.</p>
+          <p style={{ fontSize:9, color:'#f9a8d4', margin:'4px 0 0', lineHeight:1.3, fontWeight:700 }}>🧮 Калькулятор Virilization Score, примеры и андрогенные индексы — в табе «⚖️ Дозы веществ».</p>
         </div>
 
         <ProtocolDisclaimer />
@@ -182,6 +183,30 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
               <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>🛑 {DECA_125_NOTE}</div>
             </div>
             <VirilizationScoreCalculator />
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>🔬 Андрогенные индексы (используются калькулятором)</div>
+              {FEMALE_VIRILIZATION_CALC.map((x: any) => (
+                <div key={x.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontSize:9, color:'#fff' }}>{x.name}</span>
+                  <span style={{ fontSize:8, color:'var(--text-dim)' }}>{x.unit}</span>
+                  <span style={{ fontSize:9, fontWeight:800, color:'#f9a8d4', minWidth:30, textAlign:'right' }}>{x.androgenIndex}</span>
+                </div>
+              ))}
+              <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:6, lineHeight:1.35 }}>Шкала: тестостерон = 1.0 (эталон) · тренболон 1.5 · нор-группа (нандролон) 0.35 · примоболан 0.2. Чем выше индекс — тем сильнее андрогенный сигнал на той же дозе.</div>
+            </div>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>📐 Примеры расчёта (формула с ×10)</div>
+              {[
+                'Дека 50 мг/нед, 8 нед → 14/100 🟢 безопасно',
+                'Оксандролон 15 мг/день, 6 нед → 8/100 🟢 безопасно',
+                'Дека 100 мг/нед + оксандролон 20 мг/день, 12 нед → 64/100 🟠 риск',
+                'Тестостерон 25 мг/нед, 8 нед → 75/100 🔴 высокий риск',
+                'Тренболон — любая доза → 100/100 🔴 критично (абсолютное противопоказание)',
+              ].map((t: string, i: number) => (
+                <div key={i} style={{ fontSize:8, color:'#fff', lineHeight:1.45, marginBottom:3 }}>• {t}</div>
+              ))}
+              <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4, lineHeight:1.35 }}>Оценка справочная: решение по схеме принимает врач; калькулятор учитывает возраст и чувствительность, но не заменяет осмотр.</div>
+            </div>
             {[
               { title:'💉 Инъекционные ААС', rows:FEMALE_INJECT_DOSES },
               { title:'💊 Пероральные ААС (17α-алкилы)', rows:FEMALE_ORAL_DOSES },

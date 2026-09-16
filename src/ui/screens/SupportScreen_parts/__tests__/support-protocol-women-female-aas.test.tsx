@@ -135,6 +135,8 @@ describe('women-aas: UI — новые табы и калькулятор', () =
     const { container, getByText } = P();
     expect(container.querySelector('.sup-proto-women')).not.toBeNull();
     expect(container.textContent).toContain('virilism-дневник');
+    // шапка явно указывает, где калькулятор
+    expect(container.textContent).toContain('в табе «⚖️ Дозы веществ»');
     fireEvent.click(getByText('⚖️ Дозы веществ'));
     expect(container.querySelector('[data-vircalc="root"]')).not.toBeNull();
     expect(container.textContent).toContain('Калькулятор Virilization Score');
@@ -162,7 +164,7 @@ describe('women-aas: UI — новые табы и калькулятор', () =
   it('таб «Дозы»: DHB, мастерон, GH/IGF-1/MGF, инсулин, SARMs', () => {
     const { container, getByText } = P();
     fireEvent.click(getByText('⚖️ Дозы веществ'));
-    for (const needle of ['Дигидроболденон', 'Дростанолон', 'соматропин', 'IGF-1 LR3', 'MGF', 'Инсулин быстрый', 'Остарин', 'YK-11', '125', 'Множители чувствительности']) {
+    for (const needle of ['Дигидроболденон', 'Дростанолон', 'соматропин', 'IGF-1 LR3', 'MGF', 'Инсулин быстрый', 'Остарин', 'YK-11', '125', 'Множители чувствительности', 'Андрогенные индексы', 'Примеры расчёта', '75/100']) {
       expect(container.textContent, needle).toContain(needle);
     }
   });
