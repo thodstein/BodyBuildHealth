@@ -1,9 +1,13 @@
 # BB Taper PRO-3 — план доработок тапера: стабильность контура, наука 2024–2026, живое питание
 
-Статус: **план, код не начат**. База: `BB-TAPER-PRO-PLAN.md` (Э0–Э9) и `BB-TAPER-PRO-2.md`
-(P1–P7 + добивки) закрыты полностью. Правило PRO-3 прежнее: **объёмная модель ББ
-(MEV/MAV/MRV, `BB_TAPER_CURVE`, капы) не меняется** — только фиксы контура, оверлеи,
-гейты, питание по дате и UI. Движки читают дневники, не пишут в них.
+Статус: **ВЫПОЛНЕН ПОЛНОСТЬЮ кодом** (Sep 16 2026, 11 коммитов pathspec, без пуша). Все эпики
+Э1–Э12 закрыты (см. §10 «Выполнение»); проверка: bb-область **2674 passed / 1 failed** (чужое
+пред-существующее `bb-diagnostics-max-pro` female-symmetry) / 20 skipped, IndividualPlan
+**923 passed / 7 failed** (ровно документированный realism-базлайн), UI TrainingScreen_parts/
+SRCBBScreen_parts **1466/1466**, `tsc --noEmit` **0 по всему проекту**, `verify:apk-design` OK.
+База: `BB-TAPER-PRO-PLAN.md` (Э0–Э9) и `BB-TAPER-PRO-2.md` (P1–P7 + добивки) закрыты полностью.
+Правило PRO-3 прежнее: **объёмная модель ББ (MEV/MAV/MRV, `BB_TAPER_CURVE`, капы) не меняется** —
+только фиксы контура, оверлеи, гейты, питание по дате и UI. Движки читают дневники, не пишут в них.
 Аудит — Sep 16 2026 по HEAD `19d5bb2ad` (два независимых прохода: тренировочный контур
 и питательный контур, все ссылки проверены чтением).
 
@@ -406,3 +410,37 @@ Menstrual health in female bodybuilders 2025 (PMC12413752); Triad 2025 update
 monitoring RCT 2024 (10.1080/15502783.2024.2435542); steps/weight loss (PMC5970037);
 Campbell 2021 refeed RCT (pubmed 33467235); ICECAP (10.1371/journal.pone.0247292);
 carb-cycling review 2025 (10.70315/uloap.ulirs.2025.0204004); Helms 2014 (10.1186/1550-2783-11-20).
+
+## 10. Выполнение (Sep 16 2026, коммиты pathspec, без пуша)
+
+| Эпик | Коммит | Содержание |
+|---|---|---|
+| Э2 | `e372854e` | `lowFiberComposition` (пик true / подготовка false, legacy-порог цел), `PREP_SODIUM_BASE_MG=2800` (3 поверхности), BF-паритет `planner-categories` ← `CATEGORY_PROFILES`, рефид/брейк = `prepMaintenanceKcal` (без planner-утечек), карб-волна тяжёлого дня во всех режимах |
+| Э1 | `93409673` | перенос даты шоу и расширение подготовки персистятся (явный cfg, без stale-state), `saveContestPrepEverywhere` carry-over (prepWeeks/taper/доза/id/`testPeakWeekId`/трек) + `preservePlan` |
+| Э3 | `a409435e` | пол ккал шоу/D-1 (Ж1200/М1400, 20 ккал/кг, угли-левер, формула цела), RED-S (Ж BF<14) → `requiresReview`+warning, гейт high-water встроен в taper/peak-оверлеи, trial-замок только успешный, RED-S-карточка CAT2 |
+| Э4 | `3dadc6c0` | lossless `peakWeek.carbLoadStrategy`, `configFromPlan` читает план, Prep-цикл/сезон несут `carbDose`+`testPeakWeekId`, таб питания/Context не откатывают prepWeeks=12, превью с trial-дозой |
+| Э6 | `5f063b2e` | `visualAdjust` чек-ина → план и живые цели (`recarbDaysForPlan` вместо `he_peak_recarb`), таблица подготовки без фантомного дрейфа, Na-цель во все фазы + K в note, календарь рефидов |
+| Э8 | `096147ea` | recovery-кривая 12 нед (нед 1 +300, кап +800), regain 10–15% / 1–6 мес, окно post_show 84 дня, рендер по факт. треку, маркеры +10%, advisory «новый преп» |
+| Э7 | `f8595d6c` | `refeedPattern '2d'` в финале (Campbell 2021, замена без дублей), `syncPrepDietBreaksWithPlan` (брейки на deload-недели) в BB-auto/Prep-цикле, чип |
+| Э5 | `abbcf30a` | стратегия `direct` (4 загрузки + 2 пика + шоу, фазы `load_4`/`peak_2`), гейт новичка (Homer RCT), заметка «гликоген 5 дней», Na-шоу-дня advisory, чипы ✕2 |
+| Э9 | `3534ef18` | менструальный флаг в чек-ине (персист) + RED-S-подсказка ≥2 нед, `menstrualFlag` в CAT2, колонка цикла, RED-S-панель лабов |
+| Э10 | `59fe42cc` | сон авто из дневника (`avgSleep7d`), шаги/день + `prepStepsTrend` (≤−20% → «активность, не резка калорий»), колонки в HTML/CSV |
+| Э11/Э12 | `9d96dc7f` | мёртвая ветка `showPeakWeek/peakPrep` удалена (единый `ContestPeakWeekCard`), история корректировок через `recordPrepAdjustment`, `prepPlanCompleted` удалён, `direct` в deserialize-whitelist, tsc-фиксы (`_carrier`, аргумент `latestTestPeakWeek`) |
+
+**Осознанные отклонения от плана (честно):**
+1. **Пол ккал** применён к `show`/`peak`/`peak_2` (окно сцены), НЕ к деплеции: пол на деплеции
+   ломал научные полосы карб-бюджета категорий (Escalante 3.5–12 г/кг) и калиброванные
+   бюджет-тесты — доказано прогоном (bikini 55 кг: total 402 против полосы 310).
+2. `direct` реализован 7 фазами с новыми `load_4`/`peak_2` (иначе неделя не покрывалась).
+3. Reverse-кривая оставлена 4 нед (opt-in), 12-нед кривая — только recovery (Silva 2025).
+4. Э9 EA-карточка использует ккал плана + флаг цикла (фактический intake без чтения дневника
+   не берём — не выдумываем).
+5. Э11 ограничен удалением мёртвой ветки: полный снос дублей рендера в SRCBBScreen/Macrocycle
+   не делался (чужие/шаренные зоны, storm-протокол).
+6. `prepToMealPlanInput` не удалён (живой legacy-тест; отложено, кандидат отдельной волны).
+
+**Re-baseline калиброванных тестов (все с комментарием «было→стало»):** `bb-taper-pro2`
+(брейк-день ≥base → `=prepMaintenanceKcal`; recovery-кривая 12 нед/кап +800; маркеры +10%),
+`bb-contest-prep-plan` (окно post_show 90 дней, `durationDays 7→84`, CSV/HTML колонка Шагов,
+reverse-кривая только при треке), `operability`/`planner-*` — 7 питательных падений
+ОСТАВЛЕНЫ как документированный realism-базлайн (не ослаблялись).
