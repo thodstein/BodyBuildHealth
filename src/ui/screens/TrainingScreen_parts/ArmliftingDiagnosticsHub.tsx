@@ -18,6 +18,10 @@ import { loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
 import { failuresFor, faultsFor, movementFor, relevantTestsFor, diagImplementForReportWeakest, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
 import { attemptTimelineFor, phaseForFailurePoint } from '../../../engines/arm/armlift-attempt-timeline.engine';
 import { assessArmliftConditions } from '../../../engines/arm/armlift-conditions.engine';
+import { assessArmliftHand, holdCurveFor } from '../../../engines/arm/armlift-hand.engine';
+import { assessArmliftPainMap, ARMLIFT_PAIN_ZONES, type ArmliftPainZone } from '../../../engines/arm/armlift-pain-map.engine';
+import { analyzeArmliftVideo } from '../../../engines/arm/armlift-video-flags.engine';
+import { planArmliftAttempts } from '../../../engines/arm/armlift-attempt-plan.engine';
 import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../../../engines/arm/armlift-cause.engine';
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';
@@ -76,6 +80,13 @@ type DiagState = {
   /** PRO-6 M5: условия замера (режут ложные слабости). */
   condRtVersion: string; condUncalib: boolean; condLiquid: boolean; condCold: boolean;
   condDiameterMm: string;
+  /** PRO-6 M3/M4: рука + второй холд (опционально, пусто = тихо). */
+  handSpanCm: string; handPalmCm: string; handThumbCm: string;
+  pinchSubSec: string; farmerSubSec: string;
+  /** PRO-6 M8: карта боли (зоны + красные флаги). */
+  painZones: string[]; condNumb: boolean; condSwell: boolean; condNight: boolean;
+  /** PRO-6 M6: видео-лайт (CSV трека + угломер, пусто = тихо). */
+  videoCsv: string; videoWristDeg: string; videoParallelBad: boolean;
 };
 const DEFAULT_DIAG: DiagState = {
   implement: 'rolling_thunder', failurePoint: '', faultIds: [],
@@ -88,6 +99,10 @@ const DEFAULT_DIAG: DiagState = {
   specWeeks: 4,
   condRtVersion: 'unknown', condUncalib: false, condLiquid: false, condCold: false,
   condDiameterMm: '',
+  handSpanCm: '', handPalmCm: '', handThumbCm: '',
+  pinchSubSec: '', farmerSubSec: '',
+  painZones: [], condNumb: false, condSwell: false, condNight: false,
+  videoCsv: '', videoWristDeg: '', videoParallelBad: false,
 };
 function loadDiag(): DiagState {
   try {
@@ -99,6 +114,7 @@ function loadDiag(): DiagState {
       faultIds: Array.isArray((j as any).faultIds) ? (j as any).faultIds.filter((x: any) => typeof x === 'string') : [],
       specWeeks: (j as any).specWeeks === 6 ? 6 : 4,
       condRtVersion: ['v1', 'v2', 'v3'].includes((j as any).condRtVersion) ? (j as any).condRtVersion : 'unknown',
+      painZones: Array.isArray((j as any).painZones) ? (j as any).painZones.filter((x: any) => typeof x === 'string') : [],
     };
   } catch { return DEFAULT_DIAG; }
 }
@@ -190,6 +206,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   const toggleFault = (id: string) => {
     const has = diag.faultIds.includes(id);
     setD({ faultIds: has ? diag.faultIds.filter((x) => x !== id) : [...diag.faultIds, id] });
+  };
+  /** PRO-6 M8: тоггл зоны боли. */
+  const togglePainZone = (id: string) => {
+    const has = diag.painZones.includes(id);
+    setD({ painZones: has ? diag.painZones.filter((x) => x !== id) : [...diag.painZones, id] });
   };
 
   const save = (s: LiftState) => {
@@ -370,6 +391,44 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     coldGym: diag.condCold,
     barDiameterMm: diag.condDiameterMm ? parseFloat(diag.condDiameterMm) : null,
   }), [diag.implement, diag.condRtVersion, diag.condUncalib, diag.condLiquid, diag.condCold, diag.condDiameterMm]);
+  /** PRO-6 M3: рука — только текст, %WR не трогаем. */
+  const hand = useMemo(() => assessArmliftHand({
+    implement: diag.implement,
+    spanCm: diag.handSpanCm ? parseFloat(diag.handSpanCm) : null,
+    palmCm: diag.handPalmCm ? parseFloat(diag.handPalmCm) : null,
+    thumbCm: diag.handThumbCm ? parseFloat(diag.handThumbCm) : null,
+  }), [diag.implement, diag.handSpanCm, diag.handPalmCm, diag.handThumbCm]);
+  /** PRO-6 M4: холд-кривая по релевантному тесту снаряда. */
+  const holdCurve = useMemo(() => {
+    const rel = relevantTestsFor(diag.implement);
+    const num = (s: string): number | null => {
+      const v = parseFloat(s);
+      return Number.isFinite(v) && v > 0 ? v : null;
+    };
+    if (rel.includes('Pinch-hold')) {
+      return holdCurveFor(
+        diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
+        num(diag.pinchSubSec),
+      );
+    }
+    return holdCurveFor(
+      diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
+      num(diag.farmerSubSec),
+    );
+  }, [diag.implement, diag.pinchHoldSec, diag.pinchSubSec, diag.farmerHoldSec, diag.farmerSubSec]);
+  /** PRO-6 M8: карта боли — точечная разгрузка поверх бинарных гейтов. */
+  const painMap = useMemo(() => assessArmliftPainMap({
+    zones: diag.painZones as ArmliftPainZone[],
+    numbness: diag.condNumb,
+    swelling: diag.condSwell,
+    nightPain: diag.condNight,
+  }), [diag.painZones, diag.condNumb, diag.condSwell, diag.condNight]);
+  /** PRO-6 M6: видео-лайт — без CSV тихо. */
+  const videoFlags = useMemo(() => analyzeArmliftVideo({
+    csv: diag.videoCsv,
+    wristDeg: diag.videoWristDeg ? parseFloat(diag.videoWristDeg) : null,
+    parallelOk: diag.videoParallelBad ? false : null,
+  }), [diag.videoCsv, diag.videoWristDeg, diag.videoParallelBad]);
   /** D18: полнота диагностики (что довбить для честного вердикта). */
   const completeness = useMemo(() => diagnosticCompleteness({
     implement: diag.implement,
@@ -385,6 +444,17 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       || mobility.fails.length > 0,
     ),
   }), [diag, mobility.fails, state.cocLevel, state.silverSec]);
+  /** PRO-6 M7: план попыток слабейшего кг-снаряда (read-only от замеров). */
+  const attemptPlan = useMemo(() => {
+    const target = report.weakestWr || report.weakest;
+    if (!target) return null;
+    const row = report.rows.find((r) => r.implement === target);
+    if (!row) return null;
+    const m = /([\d.]+)\s*кг/.exec(row.display || '');
+    const kg = m ? parseFloat(m[1]) : NaN;
+    if (!Number.isFinite(kg) || kg <= 0) return null;
+    return planArmliftAttempts(kg, row.implement, row.label);
+  }, [report]);
 
   const applyToConstructor = () => {
     if (!report.filled) {
@@ -396,6 +466,17 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     const bw = parseFloat(state.bwKg);
     const rtBest = f(state.rtL) ?? f(state.rtR) ?? f(state.rtKg);
     const hubBest = f(state.hubL) ?? f(state.hubR) ?? f(state.hubKg);
+    /** PRO-6 M9: движение в мост — отдельным объектом под spread, чтобы не трогать
+     *  тип shared `planner-bridge` (приёмник лишнее игнорит, старые поля целы). */
+    const movementBridge: Record<string, unknown> = {};
+    if (failPhase) movementBridge.diagTimelinePhase = { id: failPhase.id, label: failPhase.label, weakLinks: failPhase.weakLinks };
+    if (attemptPlan) movementBridge.diagAttemptPlan = { implement: attemptPlan.implement, opener: attemptPlan.opener, second: attemptPlan.second, third: attemptPlan.third };
+    if (diag.handSpanCm.trim() !== '' || diag.handPalmCm.trim() !== '' || diag.handThumbCm.trim() !== '') movementBridge.diagHandNote = hand.handNote;
+    if (holdCurve) movementBridge.diagHoldCurve = { curve: holdCurve.curve, note: holdCurve.note };
+    if (conditions.trainingOnly) movementBridge.diagConditionsNote = conditions.conditionsNote;
+    if (videoFlags) movementBridge.diagVideoNote = videoFlags.note;
+    if (diag.painZones.length > 0) movementBridge.diagPainZones = diag.painZones;
+    if (diag.painZones.length > 0 || diag.condNumb || diag.condSwell || diag.condNight) movementBridge.diagPainNote = painMap.unloadNote;
     applyToPlanner({
       kind: 'weakpoints',
       label: `Армлифтинг-диагностика: ${report.verdict}`,
@@ -426,6 +507,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           armliftCompleteness: completeness,
           armliftSpec: specBlock.map((w) => ({ week: w.week, targetSets: w.targetSets, dayMap: w.dayMap })),
           armliftWeakArmNote: asymForDiag != null && asymForDiag > 15 ? 'слабой рукой первой' : undefined,
+          ...movementBridge,
         },
         armProfile: {
           ...(Number.isFinite(bw) && bw > 0 ? { bwKg: bw } : {}),
@@ -458,6 +540,20 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
   };
 
+  /** PRO-6 M9: строки движения в экспорт (только заполненное). */
+  const diagExtra = useMemo(() => {
+    const out: string[] = [];
+    if (failPhase) out.push(`Фаза срыва: ${failPhase.label}`);
+    if (attemptPlan) out.push(`Попытки (${attemptPlan.label}): ${attemptPlan.opener}/${attemptPlan.second}/${attemptPlan.third}`);
+    const handMeasured = (diag.handSpanCm.trim() !== '' || diag.handPalmCm.trim() !== '' || diag.handThumbCm.trim() !== '');
+    if (handMeasured) out.push(`Рука: ${hand.handNote}`);
+    if (holdCurve) out.push(`Кривая: ${holdCurve.note}`);
+    if (conditions.trainingOnly) out.push(conditions.conditionsNote);
+    if (videoFlags) out.push(`Видео: ${videoFlags.note}`);
+    if (diag.painZones.length > 0 || diag.condNumb || diag.condSwell || diag.condNight) out.push(`Боль: ${painMap.unloadNote}`);
+    return out;
+  }, [failPhase, attemptPlan, hand, holdCurve, conditions, videoFlags, painMap, diag.handSpanCm, diag.handPalmCm, diag.handThumbCm, diag.painZones, diag.condNumb, diag.condSwell, diag.condNight]);
+
   const exportData = () => ({
     date: new Date().toISOString().slice(0, 10),
     sex: state.sex === 'female' ? 'Ж' : 'М',
@@ -466,6 +562,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     diagTitle: `${diagnosis.title} · ${diagnosis.cause}/${diagnosis.confidence}${conditions.trainingOnly ? ' · замер тренировочный' : ''}`,
     diagCorrections: corrections.map((c) => `${c.title} — ${c.protocol}`),
     diagSpec: specBlock.map((w) => `Нед ${w.week}: ${w.focus}`),
+    diagExtra,
   });
 
   const handleExportHtml = () => {
@@ -648,6 +745,11 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <div className="ad-muted">Pinch-асимметрия L/R: {report.pinchAsymPct}%</div>
           )}
           {prescription && <div className="ad-muted" data-arm="lift-recipe">Рецепт: {prescription}</div>}
+          {attemptPlan && (
+            <div className="ad-muted" data-arm="lift-attempt-plan">
+              План попыток ({attemptPlan.label}): {attemptPlan.opener} / {attemptPlan.second} / {attemptPlan.third} кг — {attemptPlan.note}
+            </div>
+          )}
           {(() => {
             const target = diagImplementForReportWeakest(report.weakestWr || report.weakest);
             if (!target) return null;
@@ -771,6 +873,15 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             <AdChip active={diag.wristExtWeak} onClick={() => setD({ wristExtWeak: !diag.wristExtWeak })}>Слабая экстензия запястья</AdChip>
             {asymForDiag != null && <span className="ad-tag">Асимметрия из замеров: {asymForDiag}%</span>}
           </div>
+          <div className="lift-group">Рука + второй холд (по желанию)</div>
+          <AdGrid cols="auto-sm">
+            <LiftNum label="Размах кисти см" value={diag.handSpanCm} onChange={(v) => setD({ handSpanCm: v })} placeholder="21" aria="Размах кисти см" />
+            <LiftNum label="Ладонь см" value={diag.handPalmCm} onChange={(v) => setD({ handPalmCm: v })} placeholder="19" aria="Ладонь см" />
+            <LiftNum label="Большой см" value={diag.handThumbCm} onChange={(v) => setD({ handThumbCm: v })} placeholder="12" aria="Большой палец см" />
+            <LiftNum label="Холд 70% сек" value={relevantTestsFor(diag.implement).includes('Pinch-hold') ? diag.pinchSubSec : diag.farmerSubSec} onChange={(v) => setD(relevantTestsFor(diag.implement).includes('Pinch-hold') ? { pinchSubSec: v } : { farmerSubSec: v })} placeholder="60" aria="Холд 70 процентов сек" />
+          </AdGrid>
+          <div className="ad-muted" data-arm="lift-hand">{hand.handNote}</div>
+          {holdCurve && <div className="ad-muted" data-arm="lift-hold-curve">Кривая: {holdCurve.note}</div>}
           {retests.prev && retests.list.length > 0 && (
             <div className="ad-muted" data-arm="lift-retest">
               Прошлый замер {retests.prev.date}: {retests.list.map((r) => r.text).join(' · ')}
@@ -821,6 +932,36 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             {logStats.sessions28d != null && <span className="ad-tag">Журнал: {logStats.sessions28d} хват-сессий/28д</span>}
             {acwr && <span className="ad-tag">ACWR {acwr.ratio} ({acwr.zone})</span>}
           </div>
+          <div className="lift-group">Карта боли (где — что разгрузить)</div>
+          <div className="ad-row" aria-label="Диагностика: карта боли">
+            {ARMLIFT_PAIN_ZONES.map((z) => (
+              <AdChip key={z.id} active={diag.painZones.includes(z.id)} tone={diag.painZones.includes(z.id) ? 'red' : undefined} onClick={() => togglePainZone(z.id)}>{z.label}</AdChip>
+            ))}
+          </div>
+          <div className="ad-row" aria-label="Диагностика: красные флаги">
+            <AdChip active={diag.condNumb} tone={diag.condNumb ? 'red' : undefined} onClick={() => setD({ condNumb: !diag.condNumb })}>Онемение</AdChip>
+            <AdChip active={diag.condSwell} tone={diag.condSwell ? 'red' : undefined} onClick={() => setD({ condSwell: !diag.condSwell })}>Отёк</AdChip>
+            <AdChip active={diag.condNight} tone={diag.condNight ? 'red' : undefined} onClick={() => setD({ condNight: !diag.condNight })}>Ночная боль</AdChip>
+          </div>
+          {(diag.painZones.length > 0 || diag.condNumb || diag.condSwell || diag.condNight) && (
+            <div className="ad-muted" data-arm="lift-pain-map">{painMap.unloadNote}</div>
+          )}
+          <div className="lift-group">Видео-разбор (Kinovea CSV трека)</div>
+          <AdGrid cols="auto-sm">
+            <LiftNum label="Угол запястья °" value={diag.videoWristDeg} onChange={(v) => setD({ videoWristDeg: v })} placeholder="180" aria="Угол запястья видео градусы" />
+          </AdGrid>
+          <div className="ad-row" aria-label="Диагностика: видео">
+            <AdChip active={diag.videoParallelBad} onClick={() => setD({ videoParallelBad: !diag.videoParallelBad })}>Снаряд не параллелен</AdChip>
+          </div>
+          <textarea
+            value={diag.videoCsv}
+            onChange={(e) => setD({ videoCsv: (e.target as HTMLTextAreaElement).value })}
+            placeholder="Вставь Kinovea CSV трека (t,x,y) — посчитаем гуляние"
+            aria-label="Kinovea CSV трека"
+            rows={3}
+            style={{ width: '100%', minHeight: 64, fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, padding: 8, fontFamily: 'monospace' }}
+          />
+          {videoFlags && <div className="ad-muted" data-arm="lift-video-flags">🎥 {videoFlags.note}</div>}
           <div className="lift-group">Условия замера (режут ложные слабости)</div>
           <div className="ad-row" aria-label="Диагностика: условия">
             {(['v1', 'v2', 'v3'] as const).map((v) => (

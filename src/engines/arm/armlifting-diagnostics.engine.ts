@@ -462,6 +462,8 @@ export interface ArmliftExportData {
   diagTitle?: string;
   diagCorrections?: string[];
   diagSpec?: string[];
+  /** PRO-6 M9: строки движения (фаза/попытки/рука/кривая/условия/видео/боль). */
+  diagExtra?: string[];
 }
 
 export function buildArmliftingHtml(data: ArmliftExportData): string {
@@ -518,6 +520,9 @@ export function buildArmliftingHtml(data: ArmliftExportData): string {
       : '') +
     (data.diagSpec && data.diagSpec.length
       ? '<div class="meta">Спец-блок: ' + esc(data.diagSpec.join(' · ')) + '</div>'
+      : '') +
+    (data.diagExtra && data.diagExtra.length
+      ? '<div class="meta">Движение: ' + esc(data.diagExtra.join(' · ')) + '</div>'
       : '');
   const foot = '<p class="meta">Скрининг, не диагноз. WR-ориентиры: IronMind/Armlifting USA; pinch-сек/CoC/Silver — внутренние ориентиры хаба; несверенные снаряды — факт без %.</p></body></html>';
   return (
@@ -547,5 +552,8 @@ export function buildArmliftingCsv(data: ArmliftExportData): string {
   const spec = data.diagSpec && data.diagSpec.length
     ? '\nspec_block;' + csvCell(data.diagSpec.join(' | '))
     : '';
-  return EXCEL_BOM + head + '\n' + lines.join('\n') + '\n' + verdict + recipe + lms + diag + corr + spec + '\n';
+  const movement = data.diagExtra && data.diagExtra.length
+    ? '\nmovement;' + csvCell(data.diagExtra.join(' | '))
+    : '';
+  return EXCEL_BOM + head + '\n' + lines.join('\n') + '\n' + verdict + recipe + lms + diag + corr + spec + movement + '\n';
 }
