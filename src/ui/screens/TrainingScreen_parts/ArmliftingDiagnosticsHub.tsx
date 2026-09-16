@@ -16,6 +16,8 @@ import { buildArmliftingHtml, buildArmliftingCsv } from '../../../engines/arm/ar
 import { downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
 import { failuresFor, faultsFor, movementFor, relevantTestsFor, diagImplementForReportWeakest, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
+import { attemptTimelineFor, phaseForFailurePoint } from '../../../engines/arm/armlift-attempt-timeline.engine';
+import { assessArmliftConditions } from '../../../engines/arm/armlift-conditions.engine';
 import { diagnoseArmlift } from '../../../engines/arm/armlift-diagnosis.engine';
 import { diagnoseArmliftCause, countGripSessions, flexExtRatio } from '../../../engines/arm/armlift-cause.engine';
 import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';
@@ -71,6 +73,9 @@ type DiagState = {
   hipHingePoor: boolean; pain: boolean; elbowPain: boolean;
   skinTear: boolean; thumbWebPain: boolean;
   specWeeks: 4 | 6;
+  /** PRO-6 M5: условия замера (режут ложные слабости). */
+  condRtVersion: string; condUncalib: boolean; condLiquid: boolean; condCold: boolean;
+  condDiameterMm: string;
 };
 const DEFAULT_DIAG: DiagState = {
   implement: 'rolling_thunder', failurePoint: '', faultIds: [],
@@ -81,6 +86,8 @@ const DEFAULT_DIAG: DiagState = {
   hipHingePoor: false, pain: false, elbowPain: false,
   skinTear: false, thumbWebPain: false,
   specWeeks: 4,
+  condRtVersion: 'unknown', condUncalib: false, condLiquid: false, condCold: false,
+  condDiameterMm: '',
 };
 function loadDiag(): DiagState {
   try {
@@ -91,6 +98,7 @@ function loadDiag(): DiagState {
       ...DEFAULT_DIAG, ...j,
       faultIds: Array.isArray((j as any).faultIds) ? (j as any).faultIds.filter((x: any) => typeof x === 'string') : [],
       specWeeks: (j as any).specWeeks === 6 ? 6 : 4,
+      condRtVersion: ['v1', 'v2', 'v3'].includes((j as any).condRtVersion) ? (j as any).condRtVersion : 'unknown',
     };
   } catch { return DEFAULT_DIAG; }
 }
@@ -350,6 +358,18 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   const diagFaults = useMemo(() => faultsFor(diag.implement), [diag.implement]);
   const diagFailures = useMemo(() => failuresFor(diag.implement), [diag.implement]);
   const moveChain = useMemo(() => movementFor(diag.implement), [diag.implement]);
+  /** PRO-6 M2: фазовая лента попытки (setup → фазы срыва → down). */
+  const timeline = useMemo(() => attemptTimelineFor(diag.implement), [diag.implement]);
+  const failPhase = phaseForFailurePoint(diag.implement, diag.failurePoint);
+  /** PRO-6 M5: условия замера — грязный замер режет слабость. */
+  const conditions = useMemo(() => assessArmliftConditions({
+    implement: diag.implement,
+    rtVersion: (diag.condRtVersion === 'v1' || diag.condRtVersion === 'v2' || diag.condRtVersion === 'v3') ? diag.condRtVersion : 'unknown',
+    uncalibratedPlates: diag.condUncalib,
+    liquidChalk: diag.condLiquid,
+    coldGym: diag.condCold,
+    barDiameterMm: diag.condDiameterMm ? parseFloat(diag.condDiameterMm) : null,
+  }), [diag.implement, diag.condRtVersion, diag.condUncalib, diag.condLiquid, diag.condCold, diag.condDiameterMm]);
   /** D18: полнота диагностики (что довбить для честного вердикта). */
   const completeness = useMemo(() => diagnosticCompleteness({
     implement: diag.implement,
@@ -443,7 +463,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     sex: state.sex === 'female' ? 'Ж' : 'М',
     report,
     /** PRO-5 добивка: диагноз + коррекция в экспорт (аддитивно). */
-    diagTitle: `${diagnosis.title} · ${diagnosis.cause}/${diagnosis.confidence}`,
+    diagTitle: `${diagnosis.title} · ${diagnosis.cause}/${diagnosis.confidence}${conditions.trainingOnly ? ' · замер тренировочный' : ''}`,
     diagCorrections: corrections.map((c) => `${c.title} — ${c.protocol}`),
     diagSpec: specBlock.map((w) => `Нед ${w.week}: ${w.focus}`),
   });
@@ -694,6 +714,25 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               );
             })}
           </div>
+          <div className="lift-group">Лента попытки (по времени)</div>
+          <div className="ad-row" data-arm="lift-timeline" aria-label="Диагностика: лента попытки">
+            {timeline.map((ph) => {
+              const failed = diag.failurePoint === ph.id;
+              if (!ph.isFailurePhase) {
+                return (
+                  <span key={ph.id} className="ad-tag" title={ph.good}>
+                    {ph.order}. {ph.label}
+                  </span>
+                );
+              }
+              return (
+                <AdChip key={ph.id} active={failed} onClick={() => setD({ failurePoint: ph.id })}>{ph.order}. {ph.label}{failed ? ' ✗' : ''}</AdChip>
+              );
+            })}
+          </div>
+          {failPhase && (
+            <div className="ad-muted">Фаза срыва «{failPhase.label}»: норма — {failPhase.good}. Чинят звенья: {failPhase.weakLinks.join(', ')}.</div>
+          )}
           {diag.failurePoint && (
             <div className="ad-muted">
               {(() => {
@@ -782,6 +821,20 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             {logStats.sessions28d != null && <span className="ad-tag">Журнал: {logStats.sessions28d} хват-сессий/28д</span>}
             {acwr && <span className="ad-tag">ACWR {acwr.ratio} ({acwr.zone})</span>}
           </div>
+          <div className="lift-group">Условия замера (режут ложные слабости)</div>
+          <div className="ad-row" aria-label="Диагностика: условия">
+            {(['v1', 'v2', 'v3'] as const).map((v) => (
+              <AdChip key={v} active={diag.condRtVersion === v} onClick={() => setD({ condRtVersion: v })}>RT {v.toUpperCase()}</AdChip>
+            ))}
+            <AdChip active={diag.condRtVersion === 'unknown'} onClick={() => setD({ condRtVersion: 'unknown' })}>RT версия: не знаю</AdChip>
+            <AdChip active={diag.condUncalib} onClick={() => setD({ condUncalib: !diag.condUncalib })}>Диски не калиброваны</AdChip>
+            <AdChip active={diag.condLiquid} onClick={() => setD({ condLiquid: !diag.condLiquid })}>Жидкий мел</AdChip>
+            <AdChip active={diag.condCold} onClick={() => setD({ condCold: !diag.condCold })}>Холодно в зале</AdChip>
+          </div>
+          <AdGrid cols="auto-sm">
+            <LiftNum label="Диаметр грифа мм" value={diag.condDiameterMm} onChange={(v) => setD({ condDiameterMm: v })} placeholder="60.3" aria="Диаметр грифа мм" />
+          </AdGrid>
+          <div className="ad-muted" data-arm="lift-conditions">{conditions.conditionsNote}</div>
           <div data-arm="lift-completeness" aria-label="Диагностика: полнота">
             Полнота диагностики: {completeness.pct}%{completeness.missing.length > 0 ? ` — довбей: ${completeness.missing.join(', ')}` : ' — вердикт честный'}
           </div>
