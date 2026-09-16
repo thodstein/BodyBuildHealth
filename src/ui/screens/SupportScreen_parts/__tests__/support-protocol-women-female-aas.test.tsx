@@ -222,6 +222,12 @@ describe('women-aas: UI — новые табы и калькулятор', () =
     fireEvent.click(getByText('💊 Препараты'));
     expect(container.textContent).toContain('Гестринон');
     expect(container.textContent).toContain('Финастерид / дутастерид');
+    // обновление раздела под работу: движковые пороги/флаги, DHB, SARM-запреты, авто-слой
+    expect(container.textContent).toContain('Дигидроболденон');
+    expect(container.textContent).toContain('SARMs: S23 / YK-11');
+    expect(container.textContent).toContain('флаги вирилизации');
+    expect(container.textContent).toContain('абсолютное противопоказание');
+    expect(container.textContent).toContain('не обнулять');
     fireEvent.click(getByText('💊 Контрацепция'));
     expect(container.textContent).toContain('ВМС');
     expect(container.textContent).toContain('Фертильность');
