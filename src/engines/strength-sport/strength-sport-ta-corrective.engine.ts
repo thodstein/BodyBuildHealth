@@ -173,7 +173,7 @@ export const TA_CORRECTIVES: TACorrectiveExercise[] = [
     { sets: 3, reps: 5, pct: 30, rir: 3, tempo: 'X-0-X-0', restSeconds: 90 },
     ['Из глубокого седа — строго вверх', 'Корпус вертикально'],
     '+вес → snatch push press из седа', 'Палка / пустой гриф', 'Torokhtiy mobility'),
-  P('overhead_hold', 'Удержание оверхеда 5–8 с', ['snatch_overhead'],
+  P('overhead_hold', 'Удержание оверхеда 5–8 с', ['snatch_overhead', 'snatch_catch'],
     ['unstable_overhead'], ['mobility', 'strength'], 'novice', 'stability',
     { sets: 3, reps: 1, pct: 80, rir: 3, tempo: 'X-5-X-0', restSeconds: 90 },
     ['8 секунд — изометрия плеча', 'Лопатки вместе, рёбра вниз'],
@@ -354,6 +354,37 @@ export interface CorrectiveRankOpts {
   cause?: TAWeakCause | null;
   level?: string | null;
   limit?: number;
+  /** Ограничения подвижности (ankle/shoulder/hip/lower_back): спросовые упражнения деприоритизируются. */
+  mobilityRestrictions?: string[];
+}
+
+/**
+ * Спрос упражнений на подвижность (паритет ta-correction-rank ANKLE/OVERHEAD-DEMAND):
+ * при ограничении сустава такие упражнения не запрещаются (доза и так щадится
+ * при mobility-причине), но уходят вниз ранжира — честно, без скрытия выбора.
+ */
+const MOBILITY_ANKLE_DEMAND = new Set([
+  'deficit_snatch', 'deficit_clean', 'deficit_pull',
+  'pause_snatch', 'pause_clean', 'pause_pull', 'pause_jerk', 'pause_squat',
+  'front_squat', 'front_squat_clean_grip', 'overhead_squat_v2', 'tempo_squat',
+  'back_squat', 'hack_squat', 'tall_snatch', 'tall_clean', 'drop_snatch',
+  'snatch_balance', 'jerk_dip', 'double_pause_jerk',
+]);
+const MOBILITY_OVERHEAD_DEMAND = new Set([
+  'overhead_squat_v2', 'snatch_balance', 'behind_neck_jerk', 'push_press', 'push_jerk',
+  'muscle_snatch', 'jerk_recovery', 'tall_snatch', 'tall_jerk', 'drop_snatch',
+  'power_snatch', 'sots_press', 'overhead_hold', 'split_jerk',
+]);
+const MOBILITY_HIP_DEMAND = new Set([
+  'deficit_snatch', 'deficit_clean', 'deficit_pull', 'deadlift',
+]);
+
+function mobilityPenalty(id: string, mob: Set<string>): number {
+  let p = 0;
+  if (mob.has('ankle') && MOBILITY_ANKLE_DEMAND.has(id)) p -= 15;
+  if (mob.has('shoulder') && MOBILITY_OVERHEAD_DEMAND.has(id)) p -= 15;
+  if ((mob.has('hip') || mob.has('lower_back')) && MOBILITY_HIP_DEMAND.has(id)) p -= 10;
+  return p;
 }
 
 /** Доза под причину-лимитер (паритет с ta-correction-rank: volume 4×5, strength 4×4+5%, mobility/fatigue −5%). */
@@ -375,19 +406,22 @@ function levelRank(level: TACorrectiveLevel): number {
 
 /**
  * Коррективы фазы, отранжированные под причину и уровень (дешёвый скоринг, честный):
- *  +20 совпадение причины, +10 техника-фазе при technique, −15 уровень выше атлета.
+ *  +20 совпадение причины, +10 техника-фазе при technique, −15 уровень выше атлета,
+ *  −15/−10 спрос на ограниченный сустав (паритет ta-correction-rank).
  */
 export function correctivesForWeakPoint(wp: WLWeakPoint, opts: CorrectiveRankOpts = {}): TACorrectivePick[] {
   const list = CORRECTIVES_BY_PHASE[wp] || [];
   const cause = opts.cause ?? null;
   const lv = String(opts.level || 'intermediate').toLowerCase();
   const athleteRank = lv.includes('begin') || lv.includes('novice') ? 1 : lv.includes('adv') || lv.includes('enh') || lv.includes('elite') ? 3 : 2;
+  const mob = new Set((opts.mobilityRestrictions || []).map((s) => String(s).toLowerCase()));
   const scored = list.map((ex) => {
     let score = 50;
     if (cause && (ex.causes as string[]).includes(cause)) { score += 20; }
     if (!cause && ex.phase === 'technique') score += 10;
     if (levelRank(ex.level) > athleteRank) score -= 15;
     if (levelRank(ex.level) <= athleteRank) score += 5;
+    score += mobilityPenalty(ex.id, mob);
     const protocolAdj = adjustProtocolForCause(ex.protocol, cause);
     const matchReason = cause && (ex.causes as string[]).includes(cause)
       ? `причина ${cause} — прямое попадание`
@@ -415,12 +449,13 @@ export interface TACorrectiveSessionStep {
  */
 export function correctiveSessionFor(
   weakPoints: WLWeakPoint[], causeByWeak: Record<string, TAWeakCause | null> = {},
+  opts: { level?: string | null; mobilityRestrictions?: string[] } = {},
 ): TACorrectiveSessionStep[] {
   const uniq = [...new Set(weakPoints)].slice(0, 3);
   const picks: Array<{ ex: TACorrectivePick; wp: WLWeakPoint }> = [];
   for (const wp of uniq) {
     const cause = causeByWeak[wp] ?? null;
-    const list = correctivesForWeakPoint(wp, { cause, limit: 3 });
+    const list = correctivesForWeakPoint(wp, { cause, level: opts.level ?? null, mobilityRestrictions: opts.mobilityRestrictions, limit: 3 });
     // 1 техника + 1 сила/стабильность на фазу (не дублируем id внутри сессии)
     const tech = list.find((c) => c.phase === 'technique') || list[0];
     const second = list.find((c) => c.id !== tech?.id && c.phase !== 'technique') || list[1];
@@ -510,11 +545,11 @@ export function tagsForBarMetrics(xLoopCm: number | null | undefined, lift: stri
  */
 export function protocolForPreferred(
   wp: WLWeakPoint, prefId: string | null | undefined,
-  cause?: TAWeakCause | null, level?: string | null,
+  cause?: TAWeakCause | null, level?: string | null, mobilityRestrictions?: string[],
 ): TACorrectiveProtocol | null {
   try {
     if (!prefId) return null;
-    const pick = correctivesForWeakPoint(wp, { cause: cause ?? null, level: level ?? null, limit: 5 })
+    const pick = correctivesForWeakPoint(wp, { cause: cause ?? null, level: level ?? null, mobilityRestrictions, limit: 5 })
       .find((c) => c.id === prefId);
     return pick ? { ...pick.protocolAdj } : null;
   } catch { return null; }
@@ -522,16 +557,19 @@ export function protocolForPreferred(
 
 /** Обогащённые строки экспорта фазы: имя + доза + кью + источник. */
 export function correctiveExportLines(
-  wp: WLWeakPoint, cause?: TAWeakCause | null, level?: string | null,
+  wp: WLWeakPoint, cause?: TAWeakCause | null, level?: string | null, mobilityRestrictions?: string[],
 ): string[] {
   try {
-    return correctivesForWeakPoint(wp, { cause: cause ?? null, level: level ?? null, limit: 3 })
+    return correctivesForWeakPoint(wp, { cause: cause ?? null, level: level ?? null, mobilityRestrictions, limit: 3 })
       .map((c) => `${c.nameRu} — ${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}% · ${c.cues[0] || ''} · ${c.source}`);
   } catch { return []; }
 }
 
 /** Волна corrective-блока 4–8 нед (паритет ta-spec-block: 3,3,4,4,4,4,3,3). */
-export function correctiveBlockFor(weakPoints: WLWeakPoint[], weeks = 6): TACorrectiveWeek[] {
+export function correctiveBlockFor(
+  weakPoints: WLWeakPoint[], weeks = 6,
+  opts: { causeByWeak?: Record<string, TAWeakCause | null>; level?: string | null; mobilityRestrictions?: string[] } = {},
+): TACorrectiveWeek[] {
   const uniq = [...new Set(weakPoints)].slice(0, 3) as WLWeakPoint[];
   const total = Math.max(4, Math.min(8, Math.round(weeks) || 6));
   const setsFor = (wi: number) => (wi <= 1 ? 3 : wi <= 5 ? 4 : 3);
@@ -540,7 +578,12 @@ export function correctiveBlockFor(weakPoints: WLWeakPoint[], weeks = 6): TACorr
   for (let wi = 0; wi < total; wi++) {
     const sets = setsFor(wi);
     const items = uniq.flatMap((wp) => {
-      const list = correctivesForWeakPoint(wp, { limit: 2 });
+      const list = correctivesForWeakPoint(wp, {
+        cause: opts.causeByWeak?.[wp] ?? null,
+        level: opts.level ?? null,
+        mobilityRestrictions: opts.mobilityRestrictions,
+        limit: 2,
+      });
       return list.map((c) => ({ exerciseId: c.id, sets, reps: wi <= 1 ? 5 : wi <= 5 ? (c.phase === 'strength' ? 4 : 5) : 3, pct: c.protocol.pct + (wi >= 2 && wi <= 5 ? 5 : 0) }));
     }).slice(0, 6);
     out.push({ week: wi + 1, focus: focusFor(wi), items });

@@ -138,6 +138,40 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     // чужой фазе не принадлежит — null (не тянем чужую дозу)
     expect(protocolForPreferred('jerk_dip', 'tall_snatch', 'technique', 'intermediate')).toBeNull();
   });
+  it('C11: ограничение сустава топит спросовые упражнения (плечо/голеностоп/таз)', () => {
+    // плечо: high-pull без оверхеда честно остаётся первым, а tall (оверхед-фиксация) тонет
+    const noMob = correctivesForWeakPoint('snatch_pull_under', { cause: 'technique' });
+    expect(noMob[0].id).toBe('snatch_high_pull');
+    const sh = correctivesForWeakPoint('snatch_pull_under', { cause: 'technique', mobilityRestrictions: ['shoulder'] });
+    expect(sh[0].id).toBe('snatch_high_pull');
+    expect(sh.findIndex((c) => c.id === 'tall_snatch')).toBeGreaterThan(
+      noMob.findIndex((c) => c.id === 'tall_snatch'),
+    );
+    // голеностоп: дефицит уступает liftoff/тяге
+    const off = correctivesForWeakPoint('snatch_off_floor', { cause: 'strength' });
+    expect(off[0].id).toBe('deficit_snatch');
+    const ank = correctivesForWeakPoint('snatch_off_floor', { cause: 'strength', mobilityRestrictions: ['ankle'] });
+    expect(ank[0].id).not.toBe('deficit_snatch');
+    // таз: дефициты тонут — deficit_pull последний в топ-5 без ограничения и вылетает с ним
+    const pull = correctivesForWeakPoint('pull_start', { cause: 'strength' });
+    expect(pull[0].id).toBe('deficit_snatch');
+    expect(pull.findIndex((c) => c.id === 'deficit_pull')).toBe(4);
+    const hip = correctivesForWeakPoint('pull_start', { cause: 'strength', mobilityRestrictions: ['hip'] });
+    expect(hip.findIndex((c) => c.id === 'deficit_pull')).toBe(-1);
+  });
+  it('C11: ограничения не меняют дозу (только порядок) + сессия/блок/экспорт их несут', () => {
+    const a = protocolForPreferred('snatch_pull_under', 'tall_snatch', 'technique', 'intermediate');
+    const b = protocolForPreferred('snatch_pull_under', 'tall_snatch', 'technique', 'intermediate', ['shoulder']);
+    expect(a).toEqual(b);
+    const steps = correctiveSessionFor(['snatch_pull_under'], { snatch_pull_under: 'technique' } as any, { mobilityRestrictions: ['shoulder'] });
+    expect(steps[0].exerciseId).toBe('snatch_high_pull');
+    const lines = correctiveExportLines('snatch_pull_under', 'technique', 'intermediate', ['shoulder']);
+    expect(lines[0]).toMatch(/high-pull/);
+    const block = correctiveBlockFor(['snatch_off_floor'], 4, { causeByWeak: { snatch_off_floor: 'strength' } as any, mobilityRestrictions: ['ankle'] });
+    expect(block[0].items[0].exerciseId).toBe('snatch_liftoff');
+    const blockFree = correctiveBlockFor(['snatch_off_floor'], 4, { causeByWeak: { snatch_off_floor: 'strength' } as any });
+    expect(blockFree[0].items[0].exerciseId).toBe('deficit_snatch');
+  });
   it('паритет с ранжиром: топ-3 каждой фазы × каждой причины — в библиотеке', () => {
     const causes: Array<TAWeakCause | null> = [null, 'volume', 'technique', 'mobility', 'fatigue', 'strength'];
     for (const wp of allWLWeakPoints()) {

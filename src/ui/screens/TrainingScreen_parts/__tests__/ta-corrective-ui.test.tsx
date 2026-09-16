@@ -97,6 +97,28 @@ describe('ta corrective tab UI', () => {
     expect(ex).toBeTruthy();
     expect(ex.name).toMatch(/Высокий/);
   });
+  it('C11: ограничение из профиля топит спросовую карточку (ankle: баланс → удержание)', () => {
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    localStorage.setItem('he_profile_v2', JSON.stringify({ training: { mobilityRestrictions: ['ankle'] } }));
+    try {
+      const { container } = render(<WLDiagnosticsHub />);
+      // mobility-причина: 2 OHS-провала + сед (чувствителен к мобильности)
+      fireEvent.click(screen.getByRole('button', { name: '🧘 Мобильность' }));
+      fireEvent.click(screen.getByRole('button', { name: 'OHS: Пятки плоско' }));
+      fireEvent.click(screen.getByRole('button', { name: 'OHS: Колени без вальгуса' }));
+      fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Рывок: фиксация в седе' }));
+      fireEvent.click(screen.getByRole('button', { name: '🛠️ Коррекция' }));
+      const first = container.querySelector('[data-wl="corrective-pick"]');
+      expect(first).toBeTruthy();
+      // без ограничения первым был бы Рывковый баланс (оверхед+присед — спрос на голеностоп)
+      expect(first?.textContent).toMatch(/Удержание оверхеда/);
+      expect(first?.textContent).not.toMatch(/Рывковый баланс/);
+    } finally {
+      localStorage.removeItem('he_profile_v2');
+      localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    }
+  });
   it('клик ⭐ ставит preferred и показывает сессию + вставку', () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: '🦾 Толчок' }));

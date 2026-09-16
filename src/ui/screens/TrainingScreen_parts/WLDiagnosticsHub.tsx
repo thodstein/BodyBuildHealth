@@ -995,7 +995,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         let libProto: { sets: number; reps: number; pct: number } | null = null;
         try {
           const cause = causeFor(wp)?.cause ?? null;
-          libProto = protocolForPreferred(wp, prefId, cause, taLevel);
+          libProto = protocolForPreferred(wp, prefId, cause, taLevel, profileMobility);
         } catch { libProto = null; }
         if (libProto) {
           protocols[wp] = { sets: libProto.sets, reps: libProto.reps, pct: libProto.pct };
@@ -1148,7 +1148,7 @@ export const WLDiagnosticsHub: React.FC = () => {
           try {
             const causeMap: Record<string, string> = {};
             try { causeMap[wp] = causeFor(wp)?.cause ?? ''; } catch { causeMap[wp] = ''; }
-            return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel);
+            return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility);
           } catch { return []; }
         }).slice(0, 9),
         // V5-A: попытки + Sinclair (информационно для конструктора/дневника)
@@ -1246,7 +1246,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       try {
         const causeMap: Record<string, string> = {};
         for (const wp of weakPoints) { try { causeMap[wp] = causeFor(wp)?.cause ?? ''; } catch { causeMap[wp] = ''; } }
-        base.correctiveDetail = weakPoints.flatMap(wp => { try { return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel); } catch { return []; } });
+        base.correctiveDetail = weakPoints.flatMap(wp => { try { return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility); } catch { return []; } });
       } catch { /* noop */ }
       if (snatchAttempts || cjAttempts) base.attempts = { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) };
       // V4-B/V6-B1: ноты последней инъекции + Sinclair прогресса (ноты персистятся в WLState)
@@ -1923,7 +1923,7 @@ export const WLDiagnosticsHub: React.FC = () => {
               let cause: string | null = null;
               try { cause = causeFor(wp)?.cause ?? null; } catch { cause = null; }
               let list: ReturnType<typeof correctivesForWeakPoint> = [];
-              try { list = correctivesForWeakPoint(wp, { cause: cause as any, level: taLevel, limit: 5 }); } catch { list = []; }
+              try { list = correctivesForWeakPoint(wp, { cause: cause as any, level: taLevel, mobilityRestrictions: profileMobility, limit: 5 }); } catch { list = []; }
               const pref = (state.preferredCorr || {})[wp];
               return (
                 <div key={wp} data-wl="corrective-phase" style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
@@ -1952,8 +1952,8 @@ export const WLDiagnosticsHub: React.FC = () => {
               try {
                 const causeMap: Record<string, any> = {};
                 for (const wp of weakPoints) { try { causeMap[wp] = causeFor(wp)?.cause ?? null; } catch { causeMap[wp] = null; } }
-                steps = correctiveSessionFor(weakPoints, causeMap);
-                block = correctiveBlockFor(weakPoints, Math.max(4, Math.min(8, planAudit.workWeeks || 6)));
+                steps = correctiveSessionFor(weakPoints, causeMap, { level: taLevel, mobilityRestrictions: profileMobility });
+                block = correctiveBlockFor(weakPoints, Math.max(4, Math.min(8, planAudit.workWeeks || 6)), { causeByWeak: causeMap as any, level: taLevel, mobilityRestrictions: profileMobility });
               } catch { steps = []; block = []; }
               return (
                 <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.16)', marginBottom: 8 }}>
