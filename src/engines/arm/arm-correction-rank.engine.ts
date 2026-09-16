@@ -16,6 +16,8 @@ export interface ArmRankCtx {
   cause?: ArmWeakCause;
   asymPct?: number | null;
   inPlanIds?: string[];
+  /** P2: фаза срыва схватки setup/start/mid/pin (как armlift failurePoint). */
+  failurePoint?: string | null;
 }
 
 export interface ArmRankedCorrection {
@@ -107,6 +109,13 @@ export function rankCorrectionsForArm(point: ArmWeakPoint, ctx: ArmRankCtx = {})
     if (bio && /cup|pron|sup|back/.test(point) && /belt|strap|table/i.test(id)) {
       score += 3;
       reasons.push('специфика стола');
+    }
+    // P2+P6: фаза срыва — приоритет точке, чинящей фазу (fixesPhase канон §3.1)
+    const fp = String(ctx.failurePoint || '').toLowerCase();
+    const fixes = (corr as any).fixesPhase;
+    if (fp && Array.isArray(fixes) && fixes.map(String).map((s: string) => s.toLowerCase()).includes(fp)) {
+      score += 6;
+      reasons.push('чинит фазу срыва');
     }
     out.push({ id, name, score, reason: reasons.join(', ') || 'топ по точке' });
   }

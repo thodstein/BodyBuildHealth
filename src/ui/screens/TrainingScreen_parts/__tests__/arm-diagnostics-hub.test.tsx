@@ -25,6 +25,33 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('Локоть');
   });
 
+  it('P1: таб Коррекция — пустое состояние + цепочка', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Коррекция/ }));
+    expect(document.body.textContent).toContain('Коррекция движений');
+  });
+
+  it('P4: углы подсказывают точку в табе Коррекции', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    fireEvent.change(screen.getByPlaceholderText('90'), { target: { value: '140' } });
+    fireEvent.click(screen.getByRole('button', { name: /Коррекция/ }));
+    expect(document.body.textContent).toContain('Углы подсказывают');
+    fireEvent.click(screen.getByRole('button', { name: '+ Pron lock' }));
+    expect(document.body.textContent).toContain('Коррекция движений (1)');
+  });
+
+  it('P2: фаза срыва в табе Коррекции двигает ранжир', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Давление/ }));
+    fireEvent.click(screen.getByText(/Side pin/));
+    fireEvent.click(screen.getByRole('button', { name: /Коррекция/ }));
+    expect(document.body.textContent).toContain('Где срыв');
+    expect(document.body.textContent).toContain('Доза базы');
+    fireEvent.click(screen.getByRole('button', { name: 'Дожитие' }));
+    expect(document.body.textContent).toContain('чинит фазу срыва');
+  });
+
   it('применить без слабых зон — тост', () => {
     const { container } = render(<ArmDiagnosticsHub />);
     const btn = screen.getAllByText(/Применить в Арм-конструктор/)[0];
@@ -270,9 +297,9 @@ describe('ArmDiagnosticsHub PRO', () => {
     // ровно одна кнопка с именем таба — навигация Next имеет нейтральный aria-label
     expect(screen.getAllByRole('button', { name: /Давление/ }).length).toBe(1);
     const next = screen.getByRole('button', { name: 'Следующий шаг диагностики' });
-    expect(next.textContent).toContain('Шаг 1 из 5');
+    expect(next.textContent).toContain('Шаг 1 из 6');
     fireEvent.click(next);
-    expect(screen.getByRole('button', { name: 'Следующий шаг диагностики' }).textContent).toContain('Шаг 2 из 5');
+    expect(screen.getByRole('button', { name: 'Следующий шаг диагностики' }).textContent).toContain('Шаг 2 из 6');
     expect(document.body.textContent).toContain('Bezkorovainyi');
   });
 
@@ -293,6 +320,21 @@ describe('ArmDiagnosticsHub PRO', () => {
     const area = document.querySelector('textarea') as HTMLTextAreaElement;
     fireEvent.change(area, { target: { value: 't,x,y\n0,0,0\n0.5,3,1\n1.0,8,2' } });
     expect(document.body.textContent).toContain('Что чинить:');
+  });
+
+  it('P4: видео-подсказка в табе Коррекции добавляет точку', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    const area = document.querySelector('textarea') as HTMLTextAreaElement;
+    fireEvent.change(area, { target: { value: 't,x,y\n0,0,0\n0.5,3,1\n1.0,8,2' } });
+    expect(document.body.textContent).toContain('Что чинить:');
+    fireEvent.click(screen.getByRole('button', { name: /Коррекция/ }));
+    // toproll-трек → подсказка rising/pron (low, кнопками)
+    expect(document.body.textContent).toContain('Видео подсказывает');
+    fireEvent.click(screen.getByRole('button', { name: '+ Rising' }));
+    // точка добавилась — таб перешёл в режим карточек
+    expect(document.body.textContent).toContain('Коррекция движений (1)');
+    expect(document.body.textContent).toContain('Доза базы');
   });
 
   it('P5: red-flags стоп + press-гейт новичка', () => {

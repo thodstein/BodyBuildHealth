@@ -21,6 +21,11 @@ export interface ArmInjectionOpts {
   /** Целевые сеты точки из спец-блока (weakPoint → sets). */
   targetSets?: Record<string, number>;
   /**
+   * П.1: ранжированный порядок кандидатов (weakPoint → exerciseIds по приоритету
+   * ранжира). Без записи — базовый порядок ARM_CORRECTIONS (байт-в-байт).
+   */
+  rankedIds?: Record<string, string[]>;
+  /**
    * E16 P2: критический гейтинг side (score≤49 / humerus-floor) — для side_mid/side_pin
    * разрешены только безопасные кандидаты (ремень/изометрия/внутренняя ротация).
    */
@@ -80,6 +85,11 @@ function findSessionForWeakPoint(week: any, wp: ArmWeakPoint, dayMap?: Record<st
   return week.sessions[0] ?? null;
 }
 
+/** P5: вес коррекции наружу — честный симулятор считает тем же кодом. */
+export function estimateArmCorrectionWeight(exId: string, workMax: Record<string, number>, intensityPct: number, wp?: string): number {
+  return weightForExercise(exId, workMax, intensityPct, wp);
+}
+
 function weightForExercise(exId: string, workMax: Record<string, number>, intensityPct: number, wp?: string): number {
   // PRO-3 P12: вес из workMax мышцы точки напрямую; эвристика по имени — только fallback
   if (wp) {
@@ -136,11 +146,13 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
       const wantSets = opts.targetSets?.[wp] != null && Number.isFinite(Number(opts.targetSets[wp]))
         ? Math.max(1, Math.min(6, Math.round(Number(opts.targetSets[wp]))))
         : corr.sets;
-      // находим первый не-дубликат из списка коррекций
+      // находим первый не-дубликат из списка коррекций (ранжир первым, затем база)
       let exId: string | null = null;
       let catalogEx: any = null;
       let targetSession: any = null;
-      for (const cand of corr.exercises) {
+      const ranked = Array.isArray(opts.rankedIds?.[wp]) ? opts.rankedIds[wp].filter((s) => typeof s === 'string') : [];
+      const order = [...ranked, ...corr.exercises].filter((v, i, a) => a.indexOf(v) === i);
+      for (const cand of order) {
         // E16: gated — side только ремень/изометрия
         if (opts.gatedSideIso && (wp === 'side_mid' || wp === 'side_pin') && !/belt|iso|pushdown|internal_rotation/i.test(cand)) continue;
         const candEx = getArmExercises().find(e => e.id === cand);
@@ -155,8 +167,8 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
         break;
       }
       if (!exId || !catalogEx || !targetSession) {
-        // fallback — первая, но dedup уже учтён выше, считаем dup
-        const first = corr.exercises[0];
+        // fallback — первая из порядка (ранжир/база), но dedup уже учтён выше, считаем dup
+        const first = order[0];
         const sess = findSessionForWeakPoint(week, wp, opts.dayMap);
         if (first && sess && (seenIds.has(`${first}@${sess.sessionTag}`) || sess.exercises.some((e: any)=> e.exerciseId===first))) {
           skippedDup++; notes.push(`⊘ ${wp} → ${first} уже есть в ${sess.sessionTag} (нед ${wi + 1})`); continue;

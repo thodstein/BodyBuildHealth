@@ -5,7 +5,7 @@
  */
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 
-export type HubTab = 'grip' | 'wrist' | 'pressure' | 'strength' | 'recovery';
+export type HubTab = 'grip' | 'wrist' | 'pressure' | 'strength' | 'recovery' | 'correction';
 
 export interface TiqBout {
   fouls?: number;
@@ -30,6 +30,7 @@ export const TAB_DEFS: Array<{ id: HubTab; label: string; icon: string; desc: st
   { id: 'wrist', label: 'Кисть/Ротация', icon: '🤚', desc: '12 мёртвых точек + РУ/РА + VBT' },
   { id: 'pressure', label: 'Давление', icon: '💥', desc: 'Side/Back + humerus + table 3/2/1' },
   { id: 'recovery', label: 'Сухожилие/Восстановление', icon: '🛡️', desc: 'Tendon + ACWR + fatigue' },
+  { id: 'correction', label: 'Коррекция', icon: '🛠️', desc: 'Точка → причина → топ-3 → доза → вставка' },
 ];
 
 export const WEAK_GROUPS: Array<{ title: string; points: ArmWeakPoint[] }> = [

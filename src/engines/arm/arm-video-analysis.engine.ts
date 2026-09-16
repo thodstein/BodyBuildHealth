@@ -73,3 +73,20 @@ export function classifyArmTrajectory(points: TrackPoint[]): ArmTrajectoryType |
 export function isArmRealChange(before: BarPathMetrics, after: BarPathMetrics, srd = 4): boolean {
   return Math.abs(after.xLoop - before.xLoop) > srd;
 }
+
+export type ArmTrackWeakSuggestion = { point: string; confidence: 'low' };
+
+/**
+ * P4: тип траектории → кандидаты мёртвых точек (только подсказка, confidence low,
+ * ручное подтверждение в хабе — weakPoints не выставляем автоматически).
+ */
+export function suggestWeakPointsForTrack(trackType: ArmTrajectoryType | null): ArmTrackWeakSuggestion[] {
+  if (!trackType) return [];
+  if (trackType === 'inside_hook') {
+    return [{ point: 'cup_start', confidence: 'low' }, { point: 'sup_cup', confidence: 'low' }, { point: 'sup_drag', confidence: 'low' }];
+  }
+  if (trackType === 'outside_toproll') {
+    return [{ point: 'rising_top', confidence: 'low' }, { point: 'pron_open', confidence: 'low' }, { point: 'pron_lock', confidence: 'low' }];
+  }
+  return [{ point: 'side_mid', confidence: 'low' }, { point: 'side_pin', confidence: 'low' }, { point: 'back_drag', confidence: 'low' }];
+}

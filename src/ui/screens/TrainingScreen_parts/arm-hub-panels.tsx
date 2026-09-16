@@ -33,7 +33,7 @@ export function HubHead({ H }: { H: any }) {
         </div>
         <div className="ad-head-tx">
           <h2 className="ad-head-title">Арм-диагностика — PRO MAX хаб</h2>
-          <p className="ad-head-sub">5 таба × РУ/РА/РН × VBT × Force + Динамика F/t F100/F500 × Асимметрия × Бенчмарки × Fatigue × Tendon ACWR</p>
+          <p className="ad-head-sub">6 табов × РУ/РА/РН × VBT × Force + Динамика F/t F100/F500 × Асимметрия × Бенчмарки × Fatigue × Tendon ACWR + Коррекция</p>
         </div>
         <div className="ad-head-side">
           <div>{hasWeak ? ((state.weakPoints.length? state.weakPoints.join(', ') : report.weakMuscles.join(', '))) : 'баланс'}</div>

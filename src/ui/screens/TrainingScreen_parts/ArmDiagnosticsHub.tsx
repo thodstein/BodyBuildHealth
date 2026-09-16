@@ -25,6 +25,7 @@ import type { HubTab, TiqBout } from './arm-hub-shared';
 import { HubHead, HubControls, HubOutput, HubP0Panel, HubAction, HubTabNext, HubScenarios } from './arm-hub-panels';
 import { HubGripTab, HubWristTab } from './arm-hub-tabs1';
 import { HubPressureTab, HubStrengthTab, HubRecoveryTab } from './arm-hub-tabs2';
+import { HubCorrectionTab } from './arm-hub-correction-tab';
 import { ARM_BIOMECH, type ArmWeakPoint, isArmWeakPoint, vbtThresholdForWeakPoint, phaseForArmAngle } from '../../../engines/arm/arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections';
 import { auditArmPlan, worstArmPoint } from '../../../engines/arm/arm-plan-audit.engine';
@@ -136,6 +137,8 @@ type ArmDiagState = {
   pronHoldSec: string;
   cupHoldSec: string;
   cocLevel: string;
+  /** P2: фаза срыва схватки setup/start/mid/pin — бонус ранжиру (пусто = без бонуса). */
+  failurePoint?: string;
 };
 
 const DEFAULT_STATE: ArmDiagState = {
@@ -145,7 +148,7 @@ const DEFAULT_STATE: ArmDiagState = {
   elbowDeg: '110', forearmDeg: '90', wristDeg: '10', direction: 'to_middle',
   vbtWeight: '', vbtReps: '', vbtVel: '', vbtVel2: '',
   fingerKg: '', fingerMs: '', hammerKg: '', hammerMs: '', hookKg: '', hookMs: '', cupKg: '', cupMs: '',
-  wristCurlLb: '', pronHoldSec: '', cupHoldSec: '', cocLevel: '',
+  wristCurlLb: '', pronHoldSec: '', cupHoldSec: '', cocLevel: '', failurePoint: '',
 };
 
 export const ArmDiagnosticsHub: React.FC = () => {
@@ -722,11 +725,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
       for (const wp of state.weakPoints) {
         // D3: оборудование и мобильность из профиля + локальный ROM-тест
         const mobMerged = Array.from(new Set([...(profileCtxP0.mobility || []), ...armMobility.fails]));
-        out[wp] = rankCorrectionsForArm(wp, { level: state.level, cause: armCausesP0[wp]?.cause, asymPct: report.asymmetryPct ?? (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null, inPlanIds: inPlan, equipment: profileCtxP0.equipment, mobilityRestrictions: mobMerged });
+        out[wp] = rankCorrectionsForArm(wp, { level: state.level, cause: armCausesP0[wp]?.cause, asymPct: report.asymmetryPct ?? (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null, inPlanIds: inPlan, equipment: profileCtxP0.equipment, mobilityRestrictions: mobMerged, failurePoint: state.failurePoint || null });
       }
     } catch { /* noop */ }
     return out;
-  }, [state.weakPoints, state.level, armCausesP0, armPlan, report.asymmetryPct, dynamicReport, profileCtxP0, armMobility]);
+  }, [state.weakPoints, state.level, armCausesP0, armPlan, report.asymmetryPct, dynamicReport, profileCtxP0, armMobility, state.failurePoint]);
 
   const armSpecP0 = useMemo(() => {
     try {
@@ -765,8 +768,17 @@ export const ArmDiagnosticsHub: React.FC = () => {
       planGate = checkHumerusGuard(working as any).length > 0;
     } catch { /* noop */ }
     const gatedSide = (scoringGate || planGate) && points.some((p) => p === 'side_mid' || p === 'side_pin');
+    // П.1: порядок ранжира едет в план (топ-3 первыми, затем остаток базы)
+    const rankedIds: Record<string, string[]> = {};
     try {
-      const r = injectArmCorrections(working, points as any, { weekIdxs: idx, targetSets, level: state.level, gatedSideIso: gatedSide });
+      for (const p of points) {
+        const top = ((armTop3P0 as any)?.[p] || []).map((t: any) => String(t.id));
+        const rest = ((ARM_CORRECTIONS as any)?.[p]?.exercises || []).map(String);
+        rankedIds[p] = [...top, ...rest].filter((v, i, a) => a.indexOf(v) === i);
+      }
+    } catch { /* noop */ }
+    try {
+      const r = injectArmCorrections(working, points as any, { weekIdxs: idx, targetSets, level: state.level, gatedSideIso: gatedSide, rankedIds });
       working = r.plan;
       injected = r.injected;
       skipped = r.skippedBudget + r.skippedDup + r.skippedHumerus;
@@ -1195,6 +1207,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
           {tab==='pressure' && <HubPressureTab H={H} />}
 
           {tab==='recovery' && <HubRecoveryTab H={H} />}
+
+          {tab==='correction' && <HubCorrectionTab H={H} />}
           {tab==='recovery' && (
             <div style={{ marginTop: 8 }} data-arm="ortho-screen">
               <OrthoScreenCard compact />
