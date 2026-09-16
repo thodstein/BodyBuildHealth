@@ -37,4 +37,12 @@ describe('sm-corrective-bridge (C3)', () => {
     });
     expect(p.smUnilateral).toEqual({ farmers_grip: 'right', grip_support: 'left' });
   });
+  it('C6: smWaveSets санитизируется (1..10, кап 12)', () => {
+    expect(parseSmBridgePayload({}).smWaveSets).toBeNull();
+    expect(parseSmBridgePayload({ smWaveSets: 'мусор' }).smWaveSets).toBeNull();
+    const p = parseSmBridgePayload({ smWaveSets: [3, 3, 4, 0, 99, 'x' as any, 4] });
+    expect(p.smWaveSets).toEqual([3, 3, 4, 4]);
+    const many = Array.from({ length: 15 }, () => 4);
+    expect(parseSmBridgePayload({ smWaveSets: many }).smWaveSets!.length).toBe(12);
+  });
 });

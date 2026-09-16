@@ -925,6 +925,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         const grips = (smWeakPoints as string[]).filter((wp) => wp === 'farmers_grip' || wp === 'grip_support');
         return grips.length ? Object.fromEntries(grips.map((wp) => [wp, asymmetry.weaker])) : null;
       })(),
+      // SM-C6: понедельные сеты волны коррекции (3-3-4-4-4-4-3-3)
+      smWaveSets: smCorrBlock.length ? smCorrBlock.map((w) => w.sets).slice(0, 12) : null,
       contestSim,
       attempts: attemptsBridge,
       carryPhysics: carryPhys,

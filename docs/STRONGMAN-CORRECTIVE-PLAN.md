@@ -187,3 +187,13 @@ NEW 9/9 + UI 4/4 + соседи hub 9/9 + hub-pro3 6/6 + SM-движки pro2/pr
   `⭐ sm_yoke_walk_tech … +1 слаб. слева`) + bridge/wizard + UI 8→**9/9**
   (smUnilateral в payload) + соседи — итого **41/41 (6 файлов) + 126/126
   (9 файлов)**; `tsc` **0 по своим**; `verify:apk-design` OK.
+
+## §10. Добивка C6: понедельные сеты волны (паритет TA targetSetsByWeek)
+
+- Инъекция: NEW `opts.targetSetsByWeek` (weekIdx → фаза → сеты; кламп 1..10,
+  fallback — доза карточки; uni +1 поверх) — без поля поведение 1-в-1.
+- Сквозной тракт: хаб `smWaveSets` (сеты блока 3-3-4-4-4-4-3-3) → мост (числа
+  1..10, кап 12) → wizard → волна маппит позицию среди рабочих недель на сеты.
+- Проверено: injection 10→**13/13** + bridge/wizard/UI + wave (мост со
+  `smWaveSets` end-to-end) + соседи — итого **66/66 (7 файлов) + 109/109
+  (9 файлов)**; `tsc` **0 по своим**; `verify:apk-design` OK.

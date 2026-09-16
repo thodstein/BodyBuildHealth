@@ -94,4 +94,13 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
     expect(raw).toContain('smUnilateral');
     expect(raw).toContain('farmers_grip');
   });
+  it('C6: мост несёт smWaveSets волны', async () => {
+    render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
+    const btns = screen.getAllByText(/Применить в Стронг/);
+    fireEvent.click(btns[btns.length - 1]);
+    await waitFor(() => expect(document.body.textContent).toContain('Применено'), { timeout: 2000 });
+    const raw = localStorage.getItem('he_planner_apply') || '';
+    expect(raw).toContain('smWaveSets');
+  });
 });

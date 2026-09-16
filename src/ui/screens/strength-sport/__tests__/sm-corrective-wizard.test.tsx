@@ -46,4 +46,18 @@ describe('sm-corrective-wizard (C3)', () => {
     });
     expect((result.current.taBridge as any).smUnilateral).toEqual({ farmers_grip: 'right' });
   });
+  it('C6: smWaveSets доходит до taBridge', () => {
+    const { result } = renderHook(() => useStrengthSportWizard());
+    act(() => {
+      applyToPlanner({
+        kind: 'weakpoints',
+        label: 't',
+        data: {
+          smWeakPoints: ['yoke_walk'],
+          smWaveSets: [3, 3, 4],
+        } as any,
+      });
+    });
+    expect((result.current.taBridge as any).smWaveSets).toEqual([3, 3, 4]);
+  });
 });

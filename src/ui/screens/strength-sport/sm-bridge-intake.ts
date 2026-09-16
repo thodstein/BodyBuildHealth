@@ -77,6 +77,8 @@ export interface SmBridgePatch {
   smCorrectiveDetail: string[] | null;
   /** SM-C5: слабая сторона grip-фаз {phase: 'left'|'right'} или null. */
   smUnilateral: Record<string, string> | null;
+  /** SM-C6: понедельные сеты волны коррекции или null. */
+  smWaveSets: number[] | null;
   /** J7 орто-скрининг: заблокированные паттерны (orthopedic.blockedPatterns + orthoGuards.blockedPatterns). */
   orthoBlocked: string[];
   /** J7: mobility-merge (только ключи MOBILITY_RU). */
@@ -196,6 +198,19 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
       if (Object.keys(out).length) smUnilateral = out;
     }
   } catch { /* noop */ }
+  // SM-C6: понедельные сеты волны — числа 1..10, кап 12.
+  let smWaveSets: number[] | null = null;
+  try {
+    const raw = (d as any).smWaveSets;
+    if (Array.isArray(raw)) {
+      const arr = (raw as unknown[])
+        .map((x) => finiteNum(x))
+        .filter((n): n is number => n != null && n >= 1 && n <= 10)
+        .map((n) => Math.round(n))
+        .slice(0, 12);
+      if (arr.length) smWaveSets = arr;
+    }
+  } catch { /* noop */ }
   let smCorrectiveDetail: string[] | null = null;
   try {
     if (Array.isArray((d as any).smCorrectiveDetail)) {
@@ -289,6 +304,7 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     smWeakCauses,
     smCorrectiveDetail,
     smUnilateral,
+    smWaveSets,
     orthoBlocked,
     orthoMobility,
     orthoYokeGate,

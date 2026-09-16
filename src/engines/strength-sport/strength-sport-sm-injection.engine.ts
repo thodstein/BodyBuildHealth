@@ -61,6 +61,8 @@ export interface SMInjectionOpts {
   weekIdxs?: number[];
   /** L/R-добивка слабой стороны: фаза → 'left' | 'right' (+1 сет, честная пометка). */
   unilateralBoost?: Record<string, string>;
+  /** Понедельные сеты волны: weekIdx → фаза → сеты (fallback — доза карточки). */
+  targetSetsByWeek?: Record<number, Record<string, number>>;
 }
 
 export interface SMInjectionResult {
@@ -132,6 +134,10 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
     const uniMark = uni ? ` +1 слаб. ${uni === 'left' ? 'слева' : 'справа'}` : '';
     const weekAddSets = addSets + (uni ? 1 : 0);
     for (const wi of weekIdxs) {
+    // Волна: понедельные сеты перекрывают дозу карточки (fallback — доза карточки).
+    const waveRaw = opts.targetSetsByWeek?.[wi]?.[wp];
+    const waveSets = typeof waveRaw === 'number' && Number.isFinite(waveRaw) ? Math.max(1, Math.min(10, Math.round(waveRaw))) : null;
+    const useSets = (waveSets ?? weekAddSets) + (waveSets != null && uni ? 1 : 0);
     const week = copy.weeksData[wi];
     if (!week || week.deload) { notes.push(`⚠ ${wp} — делод, пропуск${multiWeek ? ` (нед ${wi + 1})` : ''}`); continue; }
     const configuredDays = opts.dayMap?.[wp];
@@ -146,8 +152,8 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
       skippedDup++; notes.push(`⊘ ${wp} → ${corrId} уже есть в ${targetSession.sessionTag}${multiWeek ? ` (нед ${wi + 1})` : ''}`); continue;
     }
     const weeklySets = week.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
-    if (weeklySets + weekAddSets > budget) {
-      skippedBudget++; notes.push(`⊘ ${wp} → ${corrId} превысит Budget ${budget} (сейчас ${weeklySets}+${weekAddSets})${multiWeek ? ` (нед ${wi + 1})` : ''}`); continue;
+    if (weeklySets + useSets > budget) {
+      skippedBudget++; notes.push(`⊘ ${wp} → ${corrId} превысит Budget ${budget} (сейчас ${weeklySets}+${useSets})${multiWeek ? ` (нед ${wi + 1})` : ''}`); continue;
     }
     const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
     const basePm = basePmForSM(corrId, wm);
@@ -165,19 +171,19 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
       name: exName ?? bio?.corrections?.[0] ?? corrId,
       group: corrId.includes('carry') || corrId.includes('walk') ? 'back' : corrId.includes('plank') ? 'core' : 'legs',
       pattern: corrId.includes('carry') || corrId.includes('walk') ? 'carry' : corrId.includes('squat') ? 'squat' : 'hinge',
-      sets: weekAddSets,
+      sets: useSets,
       reps: finalReps,
       rir,
       tempo,
       restSeconds: rest,
       weight,
-      workSets: Array.from({ length: weekAddSets }, () => ({ reps: typeof finalReps === 'number' ? finalReps : (corrId.includes('carry') ? 1 : 5), rir, weight, pct: Math.round(intensityPct * 100), tempo, restSeconds: rest, distanceM: distM } as any)),
+      workSets: Array.from({ length: useSets }, () => ({ reps: typeof finalReps === 'number' ? finalReps : (corrId.includes('carry') ? 1 : 5), rir, weight, pct: Math.round(intensityPct * 100), tempo, restSeconds: rest, distanceM: distM } as any)),
       warmupSets: [],
     } as any;
     targetSession.exercises.push(ex);
-    if (typeof week.totalSets === 'number') week.totalSets += weekAddSets;
+    if (typeof week.totalSets === 'number') week.totalSets += useSets;
     injected++;
-    notes.push(`✓ ${wp} → ${corrId}${starMark} в ${targetSession.sessionTag} ${weekAddSets}×${finalReps} @${Math.round(intensityPct * 100)}%${uniMark}${multiWeek ? ` (нед ${wi + 1})` : ''}`);
+    notes.push(`✓ ${wp} → ${corrId}${starMark} в ${targetSession.sessionTag} ${useSets}×${finalReps} @${Math.round(intensityPct * 100)}%${uniMark}${multiWeek ? ` (нед ${wi + 1})` : ''}`);
     }
   }
   if (injected > 0) {

@@ -436,7 +436,16 @@ export const StrengthSportConstructor: React.FC = () => {
     try {
       const weekIdxs = (plan.weeksData || []).map((_: any, i: number) => i).filter((i: number) => !(plan.weeksData[i] as any)?.deload);
       const protocols = buildSMSpecProtocols(weakPoints, smTb?.smPrefCorr ?? null, smTb?.smWeakCauses ?? null, equipment, mobility);
-      r = injectSMWeakPoints(plan, weakPoints as any, { weekIdxs, preferredCorr: smTb?.smPrefCorr ?? {}, protocols, unilateralBoost: smTb?.smUnilateral ?? {}, workMax } as any);
+      // SM-C6: понедельные сеты волны хаба (позиция среди рабочих недель → сеты 3-3-4-4…).
+      const waveArr: number[] | null = smTb?.smWaveSets ?? null;
+      const targetSetsByWeek: Record<number, Record<string, number>> = {};
+      if (waveArr && waveArr.length) {
+        weekIdxs.forEach((wi: number, k: number) => {
+          const s = waveArr[Math.min(k, waveArr.length - 1)];
+          targetSetsByWeek[wi] = Object.fromEntries(weakPoints.map((wp: string) => [wp, s]));
+        });
+      }
+      r = injectSMWeakPoints(plan, weakPoints as any, { weekIdxs, preferredCorr: smTb?.smPrefCorr ?? {}, protocols, unilateralBoost: smTb?.smUnilateral ?? {}, targetSetsByWeek, workMax } as any);
     } catch {
       setMsg('Ошибка вставки волны — план не тронут');
       setTimeout(()=>setMsg(''), 2500);

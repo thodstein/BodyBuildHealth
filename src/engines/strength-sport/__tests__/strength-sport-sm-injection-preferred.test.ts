@@ -121,4 +121,34 @@ describe('sm-injection-preferred (C3, паритет TA-C8)', () => {
     expect(r2.injected).toBe(0);
     expect(r2.skippedDup).toBe(1);
   });
+  it('C6: targetSetsByWeek перекрывает дозу карточки понедельно', () => {
+    const r = injectSMWeakPoints(fakePlan3(), ['yoke_walk'] as any, {
+      workMax: WM,
+      weekIdxs: [0, 2],
+      targetSetsByWeek: { 0: { yoke_walk: 5 }, 2: { yoke_walk: 2 } },
+    });
+    expect(r.injected).toBe(2);
+    const w0 = r.plan.weeksData[0].sessions[0].exercises.find((e: any) => e.id === 'sandbag_carry');
+    const w2 = r.plan.weeksData[2].sessions[0].exercises.find((e: any) => e.id === 'sandbag_carry');
+    expect(w0.sets).toBe(5);
+    expect(w2.sets).toBe(2);
+    expect(r.notes.some((n) => n.includes('(нед 3)'))).toBe(true);
+  });
+  it('C6: вне волны — доза карточки (fallback)', () => {
+    const r = injectSMWeakPoints(fakePlan3(), ['yoke_walk'] as any, {
+      workMax: WM,
+      weekIdxs: [0, 2],
+      targetSetsByWeek: { 0: { yoke_walk: 5 } },
+    });
+    const w2 = r.plan.weeksData[2].sessions[0].exercises.find((e: any) => e.id === 'sandbag_carry');
+    expect(w2.sets).toBe(3);
+  });
+  it('C6: мусорные сеты клампятся 1..10', () => {
+    const r = injectSMWeakPoints(fakePlan(), ['yoke_walk'] as any, {
+      workMax: WM,
+      targetSetsByWeek: { 0: { yoke_walk: 99 } },
+    });
+    const ex = r.plan.weeksData[0].sessions[0].exercises.find((e: any) => e.id === 'sandbag_carry');
+    expect(ex.sets).toBe(10);
+  });
 });

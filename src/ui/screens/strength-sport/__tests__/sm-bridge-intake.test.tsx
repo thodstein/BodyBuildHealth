@@ -168,7 +168,8 @@ describe('parseSmBridgePayload', () => {
       smPreferredCorr: null,
       smWeakCauses: null,
       smCorrectiveDetail: null,
-      smUnilateral: null, // чужое поле SM-агента (синк пустого патча; правит/коммитит владелец)
+      smUnilateral: null,
+      smWaveSets: null, // чужое поле SM-агента (синк пустого патча; правит/коммитит владелец)
       orthoBlocked: [],
       orthoMobility: [],
       orthoYokeGate: false,

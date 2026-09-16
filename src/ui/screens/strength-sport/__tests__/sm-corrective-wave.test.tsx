@@ -34,6 +34,7 @@ describe('SM corrective wave opt-in', () => {
         smWeakCauses: { yoke_walk: 'technique' },
         smCorrectiveDetail: ['Ходьба — 3×15м @60% · Малые шаги'],
         smUnilateral: { yoke_walk: 'left' },
+        smWaveSets: [3, 3, 4, 4, 4, 4, 3, 3],
       } as any,
     });
     const { container } = render(<StrengthSportConstructor />);
