@@ -8113,6 +8113,28 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (>8%) — пулы/капы не закрыли цели, итог честный best-effort, а не подгонка мусором`);
     }
 
+    // ─── §realism: витрина MPS пересобирается ПОСЛЕ всех проходов ───
+    // mpsSummary собирался в середине функции (до «посадки», MPS-коридора, 500Б-смягчений
+    // и клиники клетчатки) и описывал ПРОМЕЖУТОЧНОЕ состояние: per-meal белок 29 г в витрине
+    // против 15 г в плане, fiberG 69 против 47. Витрина обязана совпадать с выдачей.
+    {
+      const _mbFinal = meals.map(m => {
+        const _p = m.items.reduce((s, i) => s + i.p, 0);
+        const _leu = (m.items.reduce((s, i) => s + (i.leucine_mg || 0), 0)) / 1000;
+        return { label: m.label || m.type, proteinG: Math.round(_p), leucineG: Math.round(_leu * 10) / 10, triggersMps: m.mpsCheck?.triggers_mTOR || (_p >= 25 && _leu >= 2.5) };
+      });
+      (mpsSummary as any).meals = _mbFinal;
+      (mpsSummary as any).avg_protein_per_meal_g = Math.round(totals.p / Math.max(1, meals.length));
+      (mpsSummary as any).avg_leucine_g = Math.round(totals.leucine_mg / Math.max(1, feedings) / 10) / 100;
+      (mpsSummary as any).fiberG = Math.round(totals.fiber);
+      const _pvFinal = meals.filter(m => !['intra', 'presleep'].includes(m.type)).map(m => m.totals.p || 0).filter(v => v > 0);
+      if (_pvFinal.length >= 3) {
+        const _mean = _pvFinal.reduce((a, b) => a + b, 0) / _pvFinal.length;
+        const _sd = Math.sqrt(_pvFinal.reduce((a, b) => a + Math.pow(b - _mean, 2), 0) / _pvFinal.length);
+        (mpsSummary as any).proteinCV = _mean > 0 ? Math.round((_sd / _mean) * 100) / 100 : 0;
+      }
+    }
+
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,

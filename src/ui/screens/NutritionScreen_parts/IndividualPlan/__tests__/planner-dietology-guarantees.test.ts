@@ -138,6 +138,22 @@ describe('F2: диетология бодибилдинга', () => {
     expect(ms.fiberTargetG).toBeGreaterThanOrEqual(25);
   });
 
+  it('C5-fix: витрина mpsSummary совпадает с ФИНАЛЬНЫМ планом (после всех проходов)', () => {
+    // Раньше сводка собиралась в середине функции (до посадки/MPS-коридора/500Б-смягчений)
+    // и врала: per-meal белок 29 г в витрине против 15 г в плане, fiberG 69 против 47.
+    for (const salt of [1, 2, 5]) {
+      const plan = buildDayPlan(train({ randomSalt: salt }));
+      const ms = plan.mpsSummary as any;
+      expect(ms.meals.length, `salt ${salt}: приёмов в витрине`).toBe(plan.meals.length);
+      plan.meals.forEach((m: any, i: number) => {
+        const fact = Math.round(m.totals.p);
+        expect(Math.abs((ms.meals[i].proteinG as number) - fact), `salt ${salt} ${m.label}: витрина ${ms.meals[i].proteinG} vs план ${fact}`).toBeLessThanOrEqual(1);
+      });
+      expect(Math.abs((ms.fiberG as number) - Math.round(plan.totals.fiber)), `salt ${salt}: клетчатка витрины`).toBeLessThanOrEqual(1);
+      expect(Math.abs((ms.avg_protein_per_meal_g as number) - Math.round(plan.totals.p / plan.meals.length))).toBeLessThanOrEqual(1);
+    }
+  });
+
   it('B5: recentStapleFamilies ротирует гарниры между днями (rice вчера → сегодня другой при наличии)', () => {
     const base = { weightKg: 90, lbmKg: 73.8, bodyFatPct: 18, sex: 'male' as const, goalKcal: 3200, goalProteinG: 190, goalFatG: 80, goalCarbsG: 400, mealsCount: 5, isTrainingDay: false, budget: 'medium' as const, cyclePhase: 'course' as const, variety: 'max' as const, eveningLowCarb: false };
     // День 1: рис доминирует в углеводных слотах
