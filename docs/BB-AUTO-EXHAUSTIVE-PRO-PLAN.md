@@ -734,7 +734,14 @@ M1 (аудит + мёртвые настройки) → M2 (женские сп�
   а `BbAutoConstructor` сеет `mobilityRestrictions` из профиля (`prof.mobilityRestrictions`, ~483).
   Т.е. авто-push `ankle` из моста = второй (transient) источник истины для того же.
 
-### 9.2 Решение: гибрид «A-инфо / B-сборка» (сборку не трогаем)
+### 9.2 Решение: гибрид «A-инфо / B-сборка» (сборку не трогаем) — ✅ ВЫПОЛНЕНО (коммит `73977ac8`)
+
+> ✅ Реализовано 2026-09-16: NEW `bb-diag-intake.engine` (`resolveBbDiagIntakeExtras` — bits/persist/clean,
+> без сайд-эффектов) + intake `BbAutoConstructor` (bits в «диагностика»-тост, persist + строка в rationale
+> уже собранного плана дедупом, явная stale-чистка `he_bb_lr_topup`/`he_bb_return_action` по маркеру
+> `lrVerdicts`, legacy-ветки помечены) + `planner-bridge.vbtLossPct` → `@deprecated` (не удалён).
+> Тесты: `bb-diag-intake` 18/18 (unit-lock) + `bb-hub-movement-intake` 9/9 (source-guard); сборка не изменена
+> (`sets === workSets.length`, MRV×1.15 — инварианты целы).
 
 - **Сборку НЕ меняем** (иначе «лишнее» и дубли источников):
   - `movementDriver` → НЕ в `mobilityRestrictions`: дублировал бы профиль-канал (который уже есть

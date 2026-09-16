@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто §9 D1: приёмник движений ББ-диагностики — «A-инфо / B-сборка» (Sep 16 2026, коммит pathspec `73977ac8`, без пуша)
+
+По команде «Продолжи ББ-авто по §9 плана» (hand-off владельца хаба). Только свои файлы: `BbAutoConstructor.tsx`, `planner-bridge.ts` + NEW движок/2 теста; чужие `BBDiagnosticsHub.tsx`/`bb-movement-screen.engine.ts` не тронуты. Сборку НЕ менял (решение §9.2): `movementDriver` не дублирует профиль-канал подвижности, `singleLeg.weakSide` не выдумывает группу для `lrTopUp`.
+- Код: NEW `bb-diag-intake.engine.ts` — чистая `resolveBbDiagIntakeExtras(d)` → `{ bits, persist, clean }` (без сайд-эффектов): bits «движение: label (фикс: …)» + «односторонний: слабее левая/правая»; persist — санитизированные `he_bb_last_movement_driver`/`he_bb_last_single_leg` (трим/клэмпы confidence, мусор отбрасывается); clean — `lrTopUp`/`returnAction` ТОЛЬКО при наличии ключа `lrVerdicts` в payload (маркер BB-хаба; WL/SM/Arm не шлют — их мосты ничего не сносят); `vbtLossPct` не читается.
+- Intake `BbAutoConstructor.tsx` (блок ~1300-1541): helper; bits → «диагностика»-тост; persist + строка `🧭 Скрининг движений: …` в rationale уже собранного плана (паттерн labDelta, дедуп по строке; сеты/веса/упражнения не тронуты); явная stale-чистка `he_bb_lr_topup`/`he_bb_return_action` + честные `pro2parts`-строки; старые ветки — LEGACY-комментарий. `mobilityRestrictions`/`lrTopUp` сборку не меняют.
+- `planner-bridge.ts`: `vbtLossPct` → `@deprecated` (не удалён — иначе красный tsc в хабе; владелец может убрать из отправки).
+- Проверено: NEW `bb-diag-intake` **18/18** (unit-lock: bits/persist/clean/чистота) + NEW `bb-hub-movement-intake` **9/9** (source-guard, jsdom-mount BB не делал — виснет) + bb-UI паки **60/60** (11 файлов) + `rest-hooks-native`/`apk-top-pack` **99/99** (1 пред-существующий unhandled ReportsScreen DB-таймаут) + hub+bridge **77/77**; `tsc` **0 по своим** (3 ошибки — чужой untracked `strength-sport-sm-corrective.engine.ts` WIP, не тронут); `verify:apk-design` OK. НЕ ПУШИЛ (очередь чужих).
+- Старая граница «приёмник не применяет movementDriver/singleLeg/vbtLossPct; stale чистятся только старым мостом» — СНЯТА (записи ниже помечены ✅).
+
 ## ТА-коррекция движений: структурированная библиотека + таб «Коррекция» (Sep 15 2026, коммит pathspec, без пуша — очередь чужих)
 
 По команде «добавить и проработать коррекцию движений + анализ + интернет + план + сразу структуризация». Аудит: конвейер V3–V4 зрел (16 фаз, биомеханика, причина-лимитер, топ-3, симулятор, спец-блок, инъекция+откат), но коррекция — россыпь (3 id-строки/фазу без техники, свободный текст в TA_BIOMECH мимо ранжира, без словаря ошибок/сессии/волны с именами, топ-3 размазаны по 4 табам). Синтез: Everett-лимитеры + segment/halting/slow-pull/high-pull/muscle/tall/balances; QWA-матрица взятия/толчка; PoinT GO пороги (ранняя >1.2 м/с, горизонталь ±10 см, уход >0.45 с); Torokhtiy (не смешивать snatch/clean-технику); Big Bend (dip/no-feet/tall-jerk/behind-neck/double-pause); Burgener (80% ошибок — стопы). Только свои файлы; чужие WIP (BbAutoConstructor 964 строк, meal-plan-engine, bb-step-params) не тронуты.
@@ -22,14 +31,14 @@
 По вопросу «углы/паттерны по мышцам проработаны? эффект сечки?» — аудит: углы были у 9 мышц (грудь/спина/квадры/хамсы/ягодицы/икры/бицепс/трицепс/пресс), плеч/предплечий/трапеций не было (дельты — только головки в stimulus-target); строгие группы — 5 мышц без плеч/рук; сечки как слоя не было (частично: short-профиль, SFR, MMC). Только свои файлы.
 - Код: `ANGLE_CLASSES.shoulders` (жим/махи/задняя/тяга к подбородку) + `STRICT_EXERCISE_GROUPS.shoulders` (press/lateral/rear, кросс-своп запрещён — иначе средняя сползает в жимы, задняя в тяги); аудит-флаг `missingShortened:<мышца>` (≥6 сетов без пиковой, зеркало `missingLengthened`) + резолв `shortened` в симуляторе; хаб — RU-метка «нет пиковой (сечка)» + чинить-строка в стимул-карте.
 - Проверено: NEW `bb-shoulders-detailing` 6/6 + hub 44/44 (сечка-строка) + strict/selection/movement 69/69 + круг 230/231 (**1 — чужое предсуществующее `female норма→тихо`**); `tsc` **0 по своим**; `verify:apk-design` OK. Запушен (в очереди чужих не было — `d83b5558` уже в origin/main).
-- Закрыто по запросу «добить малые тоже» (коммит `ccf1d53f`, без пуша — очередь чужих): `ANGLE_CLASSES.forearms` (сгиб/разгиб/хаммер-валик) + `traps` (шраги верх/блок/тяга к подбородку) + `lower_back` (гипер/гудморнинг); `STRICT_EXERCISE_GROUPS.forearms` (flex/ext) + `traps` (shrug/upright); NEW `bb-small-groups-detailing` 2/2; `tsc` 0; `verify:apk-design` OK. Остаток — только приёмник ББ-авто (D1) — жду «бб-авто».
+- Закрыто по запросу «добить малые тоже» (коммит `ccf1d53f`, без пуша — очередь чужих): `ANGLE_CLASSES.forearms` (сгиб/разгиб/хаммер-валик) + `traps` (шраги верх/блок/тяга к подбородку) + `lower_back` (гипер/гудморнинг); `STRICT_EXERCISE_GROUPS.forearms` (flex/ext) + `traps` (shrug/upright); NEW `bb-small-groups-detailing` 2/2; `tsc` 0; `verify:apk-design` OK. Остаток — только приёмник ББ-авто (D1) — ✅ закрыто 2026-09-16 (`73977ac8`, см. верхнюю запись).
 
 ## ББ-диагностика: доп-анализ сети + L/R голеностоп (Sep 15 2026, коммит pathspec `d36d463a`, запушен)
 
 По команде «продолжай свою зону + доп анализ сети». Синтез: WBLT-нормы McBride-2026 (n=899: середина-50% до 50 лет 8–14 М/8.6–13.8 Ж, типично ~11; разница Л/П ≥1.5–2 см клинически значима) — подтвердили наши 9/12; FPPA>10° = вальгус (Lashien-2024) — валидировал tiebreak-10°; хип: изолированная закачка средней ягодичной часто НЕ двигает кинематику SLS (Palmer-2015/Wilczyński-2021), работает комплекс проксимально+дистально 8 нед (CCEP BMC-2022; Razi-2023 на приземлении); MMC: Schoenfeld-2018 + 2025-уточнения (тренированные/база — эффект гаснет, изоляция ≤65% — держится; выносливость — внешний) — движок уже точен, добавлены цитаты.
 - Код (только свои): движок — `kneeToWallL/R` (худшая решает, legacy-Cm фолбэк; разрыв ≥2 → нота в fix, при чистом паттерне — слабый ankle-драйвер 0.55) + `ankle_asym` в кодах снимков + комплексный хип-фикс; хаб — пара вводов КТС Л/П + гонометр (сетка 3), `ktwOf()`-хелпер во всех 6 местах (OHS/драйвер×3/мост/экспорт×2, профиль), миграция legacy-Cm в обе стороны при загрузке, хинт «разница ≥2 см».
 - Проверено: movement 25/25 + hub 43/43 + круг 137/137 (8 файлов) + max-pro 93/94 (**1 — чужое предсуществующее `female норма→тихо`**); `tsc` **0 по своим** (чужие WIP не тронуты); `verify:apk-design` OK. НЕ ПУШИЛ.
-- Остаток — чужой приёмник ББ-авто (D1) — жду команды «бб-авто».
+- Остаток — чужой приёмник ББ-авто (D1) — ✅ закрыто 2026-09-16 (`73977ac8`, см. верхнюю запись).
 
 ## ББ-авто M3-остаток: полный аудит выдачи по ВСЕМ BB-циклам (UI-путь ПРОФ-цикл) — 5 реальных дефектов (Sep 15 2026, коммит pathspec, без пуша — очередь чужих)
 
@@ -55,7 +64,7 @@
 
 По команде «продолжай пока свои файлы, бб-авто чуть позже». Re-audit своих файлов (мертвых импортов/мемов/стейта — 0; все счётчики >1 использования). По пути пойман шторм: worktree между раундами был откачен — движки/тесты D2–D4 восстанавливал своими же правками, сошлось побайтово с `404757b2` (проверено `git diff HEAD` — пусто, дубли `it(` — 0). Реально нового: переименование `buildPro3Export→buildMovementExport` (имя врало), `testId="bb-ankle-deg"` + UI-тест ankle-драйвера в карточке.
 - Проверено: hub 41/41 + круг 197/197 (10 файлов) + max-pro 93/94 (**1 — чужое предсуществующее `female норма→тихо` в `bb-symmetry`**); `tsc` **0 по своим** (4 ошибки — чужой активный armlift-WIP `ArmliftingDiagnosticsHub diagHistory`, не тронут); `verify:apk-design` OK. Полный `src/engines/bb` круг висит по таймауту (>15 мин под параллельной нагрузкой) — заменён точечным кругом потребителей изменённых движков (17 файлов-импортёров, grep). Запушен (`f59033e6..5f71c9a2`).
-- Своя зона закрыта полностью (v2 + чистка + гейт/профиль + D2–D4 + мелочь). Остаток — только чужой приёмник ББ-авто (D1: `movementDriver/singleLeg/vbtLossPct` в никуда + stale topup/return) — жду команды «бб-авто».
+- Своя зона закрыта полностью (v2 + чистка + гейт/профиль + D2–D4 + мелочь). Остаток — только чужой приёмник ББ-авто (D1: `movementDriver/singleLeg/vbtLossPct` в никуда + stale topup/return) — ✅ закрыто 2026-09-16 (`73977ac8`): движения читаются как инфо (bits/persist/rationale) + явная stale-чистка по маркеру `lrVerdicts`; сборка не тронута.
 
 ## ББ-диагностика движений D2–D4: флип-гейт + драйвер/угломер + экспорт-паритет (Sep 15 2026, коммит pathspec `404757b2`, без пуша — в очереди чужой `dcf87d478` armlift)
 
@@ -64,7 +73,7 @@
 - **D3 драйвер v2**: `ankleDeg<35°` заведен в драйвер (PoinT GO 35–38°; изолированный гонометр без компенсаций — честно не драйвер, тест фиксирует); провод OHS→диагноз уже был (`mobilityFails→jointRisk`) — NEW lock-тест `bb-exercise-mobility-gate` 2/2; `computePerMuscleACWR` замерен — O(сессии×упражнения), дёшев, оставлен + задокументирован; re-screen бейдж (>42 дней от снимка).
 - **D4 разбор v2**: темп уже warning (вес 6, не штраф — по ACSM-2026, покрыт `pro.test.ts`); FPPA-угломер опционально (`fppaL/fppaR`, только tiebreak при чистой качественной оценке, разрыв ≥10° рабочий); `movementDriver/singleLeg` в HTML+CSV (`BBDiagnosticsPro2Meta` + рендер + строки).
 - Проверено: NEW export-movement 3/3 + mobility-gate 2/2 + movement 19/19 + hub 40/40 + bridge/handlers/pro/pro2/pro3/injection — итого **196/196 (10 файлов)** + max-pro 93/94 (**1 — чужое предсуществующее `female норма→тихо` в `bb-symmetry`**); `tsc --noEmit` **0 по всему проекту**; `verify:apk-design` OK. НЕ ПУШИЛ.
-- **Граница для владельца ББ-авто (остаток D1)**: приёмник не применяет `movementDriver/singleLeg/vbtLossPct`; stale `he_bb_lr_topup`/`he_bb_return_action` чистятся только полным старым мостом.
+- **Граница для владельца ББ-авто (остаток D1)**: приёмник не применяет `movementDriver/singleLeg/vbtLossPct`; stale `he_bb_lr_topup`/`he_bb_return_action` чистятся только полным старым мостом. ✅ Снято 2026-09-16 (`73977ac8`).
 
 ## ББ-диагностика движений: живой гейт + профиль-канон (Sep 15 2026, коммит pathspec `0f3064dd`, без пуша — в очереди чужой `2490792e9` armlift)
 
@@ -73,7 +82,7 @@
 - **Профиль — единый источник**: `profileSex` (`settings.personal.sex`) + `profileSleep` (`settings.lifestyle.sleepHours`); `effSex = profileSex || state.sex` (легаси-фолбэк) заменён во всех 8 местах (`buildSpecBlock`×6/top3/corrections + deps); сон в readiness/weakCauses/мост — из профиля; боль сегодня — `null` (в хабе не спрашиваем, честно без штрафа). Удалён замороженный стейт `sleepHours/pain010` (UI-входов больше не было).
 - NEW тесты: стоп-гейт (чип → `Стоп:` → план цел, prev пуст) + профиль-канон (female/7ч → своих селектов нет, мост несёт `sleepHours: 7`).
 - Проверено: hub 35/35 + movement 13/13 + bridge/handlers/pro/pro2/pro3/injection 132/132 + max-pro 93/94 (**1 — чужое предсуществующее `female норма→тихо` в `bb-symmetry`, не мой файл**); `tsc --noEmit` **0 по всему проекту**; `verify:apk-design` OK. НЕ ПУШИЛ.
-- **Граница для владельца ББ-авто (повтор)**: приёмник не читает `movementDriver/singleLeg/vbtLossPct`; stale `he_bb_lr_topup`/`he_bb_return_action` чистятся только полным старым мостом — правит владелец приёмника.
+- **Граница для владельца ББ-авто (повтор)**: приёмник не читает `movementDriver/singleLeg/vbtLossPct`; stale `he_bb_lr_topup`/`he_bb_return_action` чистятся только полным старым мостом — правит владелец приёмника. ✅ Снято 2026-09-16 (`73977ac8`).
 
 ## ББ-диагностика движений: чистка мёртвого кода (Sep 15 2026, коммит pathspec `33bdf8d5`, запушен — очередь была чистая)
 
@@ -81,7 +90,7 @@
 - Удалено ~190 строк мёртвого: мемы `acwr/barLast/poseLive/teenNote/lvpProfile(+save-эффект)/tendonGuard/workingRange/lrTopUpMap/readinessAction/annualBbBlocks/femaleNotes/unifiedSnap`, `handleCsvParse`; импорты srpe/training-load/video/pose/bar-path/vbt/lvp/tendon/bbWorkingRange/volume-landmarks/posingIsoNote/femaleSymmetryNotes/teenTrainingNote; стейт `vbtBest/vbtLast/vbtWeight/csvText/poseCsvText/lvpText/lvpLift/vbtGoal/elbowPain/mmcLoadPct/annualBlockKey/posingIso/age/cyclePhase`. `vbtLossPct` в readiness/weakCauses → `null`; `mmcAdvice` — isolation-only; `handleAnnualApply` — первый ББ-блок (селекта нет). Живое не тронуто: гейт вставки (redFlags/readiness/returnActive/lrVerdicts), weakCauses, мост, экспорт, spec/annual/ICS, OHS→профиль.
 - NEW тест legacy-совместимости (v1-стор с удалёнными ключами грузится, weakManual подхвачен).
 - Проверено: hub 33/33 + movement 13/13 + bridge/handlers/pro/pro2/pro3/injection 132/132 + max-pro 93/94 (**1 — чужое предсуществующее `female норма→тихо` в `bb-symmetry`, не мой файл**); `tsc --noEmit` **0 по всему проекту**; `verify:apk-design` OK. Запушен (`5d5aaf485..33bdf8d51`).
-- **Граница для владельца ББ-авто**: приёмник не читает `movementDriver/singleLeg/vbtLossPct` (мост несёт в никуда — чужой файл, не лезу); раз мост больше не шлёт `lrTopUp:{}`/`returnStage`, stale `he_bb_lr_topup`/`he_bb_return_action` чистятся только полным старым мостом — правит владелец приёмника.
+- **Граница для владельца ББ-авто**: приёмник не читает `movementDriver/singleLeg/vbtLossPct` (мост несёт в никуда — чужой файл, не лезу); раз мост больше не шлёт `lrTopUp:{}`/`returnStage`, stale `he_bb_lr_topup`/`he_bb_return_action` чистятся только полным старым мостом — правит владелец приёмника. ✅ Снято 2026-09-16 (`73977ac8`).
 
 ## ББ-диагностика движений v2: 7 табов → 4, дубли нагрузки вынесены (Sep 15 2026, коммит pathspec `9a4577cb`, без пуша)
 
