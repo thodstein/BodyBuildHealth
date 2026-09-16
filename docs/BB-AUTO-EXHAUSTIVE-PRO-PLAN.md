@@ -623,10 +623,22 @@
   Проверено: bb-UI паки + guard-ы **48/48** (12 файлов), rest-hooks-native/apk-top-pack **99/99**
   (1 пред-существующий unhandled ReportsScreen DB-таймаут), `tsc --noEmit` **0 по проекту**,
   `verify:apk-design` OK.
-- [ ] **4.3 — остаток, часть 2 (новая сессия)**: `renderContestPrep` (`BbAutoConstructor.tsx:3531–4735`,
-  ~1205 строк, ~80-100 state-ссылок после выноса train-load) — резать **под-секциями** (8-15 props)
-  или через контекст-объект, как train-load, а не целиком; мелкие остатки — `renderPrepCycleMode`
-  (~4898–4956) и `renderExSwapModal` (~4958+).
+- [~] **4.3 — остаток, часть 2: Contest Prep ВЫНЕСЕН** (коммит `5495c397`): `renderContestPrep`
+  (было `3531–4735`, ~1205 строк) разрезан на 4 под-секции 1-в-1 + общий `BbContestPrepCtx`
+  (снимок 118 внешних привязок): `BbContestPrepParams` (шапка/визард/«Параметры» 1–3),
+  `BbContestPrepPreview` (фазы/taper/недели подготовки/выполнение/чек-ины),
+  `BbContestPrepTrialSafety` (Test Peak Week/безопасность/чек-лист шоу/мед-процесс/питание),
+  `BbContestPrepPost` (адаптация/show day/контроль/post-show/diff/история/экспорт) — в NEW
+  `bb-contest-prep-sections.tsx` (1279 строк). Условная обёртка `{prepPlan && (…) }`, гейт
+  `contestWizard===5` и низ шага остались в конструкторе; **файл 5600→3941** (diff −1199/+39),
+  осиротевшие импорты убраны (PopupSelect, 20 имён prep-движка, post-show-лог ×4, prep-process-статья,
+  shared ×2). Перенос: Node-сверка «identical с нормализацией тип-онли» **231+367+215+348 строк**
+  (42 авто-аннотации `: any` на инлайн-колбэках + 7 кастов индексов `Record` — тип-онли, рантайм 1-в-1).
+  Проверено: bb-UI паки + guard-ы **48/48** (12 файлов), rest-hooks-native/apk-top-pack **99/99**
+  (1 пред-существующий unhandled ReportsScreen DB-таймаут), `tsc --noEmit` **0 по проекту**,
+  `verify:apk-design` OK.
+- [ ] **4.3 — остаток, часть 3 (мелочь)**: `renderPrepCycleMode` (`BbAutoConstructor.tsx:3738`),
+  `renderExSwapModal` (`:3798`) — те же паттерны (под-секции/ctx), ~60+20 строк; якоря сверять по коду.
   Инварианты для этапа: `tsc` 0,
   bb-UI паки (bb-auto-smoke/annual/prep-cycle/dup/volume-toggle/reproductive/a11y/apk-controls) +
   rest-hooks-native/apk-top-pack, `verify:apk-design`; коммит строго pathspec своих файлов.

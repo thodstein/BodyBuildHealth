@@ -1,5 +1,15 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто 4.3 остаток-2: Contest Prep вынесен в 4 под-секции (Sep 16 2026, коммит pathspec `5495c397`, без пуша)
+
+По команде «продолжай» (после train-load). Только свои файлы (`BbAutoConstructor.tsx` + NEW `bb-contest-prep-sections.tsx`); чужие WIP не тронуты. Конструктор **5600→3941 строк** (было 5101 после train-load; diff −1199/+39).
+- NEW `bb-contest-prep-sections.tsx` (1279 строк) — `renderContestPrep` (было 3531–4735, ~1205 строк) разрезан 1-в-1 на 4 под-секции + общий `BbContestPrepCtx` (снимок 118 внешних привязок; решение §4.3 «через контекст-объект»): `BbContestPrepParams` (шапка/пилюли визарда/«📅 Параметры подготовки» 1–3), `BbContestPrepPreview` (шапка результата/фазы/taper/недели подготовки/выполнение/чек-ины), `BbContestPrepTrialSafety` (Test Peak Week/безопасность/чек-лист шоу/мед-процесс/питание), `BbContestPrepPost` (адаптация по весу/show day/контроль/post-show/diff/история/экспорт). Условная обёртка `{prepPlan && (…)}`, гейт `contestWizard===5` и низ шага остались в конструкторе.
+- **Мех. перенос через скрипт** (`.tmp/gen-contest-sections.mjs`): срезы по ассертам границ, авто-анализ импортов/внешних привязок → ctx-литерал + деструктуризации; выделены `today/phaseNow/strategySafe`. Осиротевшие импорты убраны (PopupSelect, 20 имён prep-движка, post-show-лог ×4, prep-process-статья, shared ×2).
+- **Сверка**: `.tmp/verify-contest-extract.mjs` — «identical с нормализацией тип-онли» **231+367+215+348 строк**; тип-онли дельта (42 авто-`: any` на инлайн-колбэках + 7 кастов индексов `Record` → `as BBContestCategory/PrepPhaseKey`) внесена `.tmp/fix-contest-types.mjs` по ошибкам tsc — рантайм 1-в-1.
+- **Поймано по пути**: генератор захватил JSX-атрибуты/ключи стилей (`checked/cursor/key/label/…`) как «внешние привязки» → чистка `.tmp/fix-contest-ctx.mjs` (родитель + 4 деструктуризации); класс `noImplicitAny` на `any`-ctx закрыт точечными аннотациями.
+- Проверено: bb-UI паки + guard-ы **48/48** (12 файлов), rest-hooks-native/apk-top-pack **99/99** (1 пред-существующий unhandled ReportsScreen DB-таймаут), `tsc --noEmit` **0 по всему проекту**, `verify:apk-design` OK. НЕ ПУШИЛ.
+- **Остаток 4.3**: `renderPrepCycleMode` (`:3738`) + `renderExSwapModal` (`:3798`) — мелочь (~80 строк) тем же паттерном.
+
 ## Питание: §7-остаток — рецептурный экстрим-добор + карточка приёмов + границы VARIETY (Sep 16 2026, коммит pathspec, без пуша)
 
 По команде-аудиту «что осталось» (продолжение сессии §7 `docs/NUTRITION-PLANNER-TUNING-PLAN.md`). Аудит дампами (zz-тесты, удалены до коммита) + 4 закрытых пункта. Только свои файлы (`planner-recipe-mode.ts`, `IndividualPlanSettings.tsx`, 3 теста, 2 дока).
