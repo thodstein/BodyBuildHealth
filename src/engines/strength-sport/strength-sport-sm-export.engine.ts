@@ -31,6 +31,9 @@ export interface SMDiagnosticSnapshot {
   progress?: string | null;
   causes?: string[] | null;
   specBlock?: string | null;
+  // SM corrective: структурированная коррекция (опционально, backward-compat)
+  corrections?: string[] | null;
+  correctiveDetail?: string[] | null;
 }
 
 export function buildSMDiagnosticsHtml(snap: SMDiagnosticSnapshot): string {
@@ -57,6 +60,8 @@ ${snap.attempts && snap.attempts.length ? `<h2>Попытки</h2><ul>${snap.att
 ${snap.progress ? `<h2>Прогресс</h2><div>${esc(snap.progress)}</div>` : ''}
 ${snap.causes && snap.causes.length ? `<h2>Причины</h2><ul>${snap.causes.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
 ${snap.specBlock ? `<h2>Спец-блок</h2><div>${esc(snap.specBlock)}</div>` : ''}
+${snap.corrections && snap.corrections.length ? `<h2>Коррекция</h2><ul>${snap.corrections.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
+${snap.correctiveDetail && snap.correctiveDetail.length ? `<h2>Коррекция детально</h2><ul>${snap.correctiveDetail.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
 </body></html>`;
 }
 
@@ -81,6 +86,8 @@ export function buildSMCsv(snap: SMDiagnosticSnapshot): string {
     ['progress', snap.progress || ''],
     ['causes', (snap.causes || []).join('; ')],
     ['specBlock', snap.specBlock || ''],
+    ['corrections', (snap.corrections || []).join('; ')],
+    ['correctiveDetail', (snap.correctiveDetail || []).join('; ')],
     ['findings', snap.findings.join('; ')],
   ];
   return rows.map(r => r.map(escCsv).join(',')).join('\n');

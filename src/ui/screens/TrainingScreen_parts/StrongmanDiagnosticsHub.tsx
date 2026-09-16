@@ -26,7 +26,7 @@ import { correctEnodeByVariable } from '../../../engines/strength-sport/strength
 import { getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { diagnoseSMWeakCause, SM_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-sm-weak-cause.engine';
 import { rankCorrectionsForSM } from '../../../engines/strength-sport/strength-sport-sm-correction-rank.engine';
-import { correctivesForSMWeakPoint, correctiveSessionForSM, correctiveBlockForSM, smCorrectiveExportLines } from '../../../engines/strength-sport/strength-sport-sm-corrective.engine';
+import { correctivesForSMWeakPoint, correctiveSessionForSM, correctiveBlockForSM, smCorrectiveExportLines, smTagsForMetrics } from '../../../engines/strength-sport/strength-sport-sm-corrective.engine';
 import { buildSMSpecBlock } from '../../../engines/strength-sport/strength-sport-sm-spec-block.engine';
 import { simulateContest } from '../../../engines/strength-sport/strength-sport-contest-simulator.engine';
 import { buildSMAttemptsForContest } from '../../../engines/strength-sport/strength-sport-sm-attempts-bridge.engine';
@@ -668,6 +668,28 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const smCorrExport = useMemo(() => {
     try { return smCorrectiveExportLines(smWeakPoints as any, smCauseByPhase as any); } catch { return []; }
   }, [smWeakPoints, smCauseByPhase]);
+  // ── SM corrective hints: замер → тег → топ-упражнение (sway/VBT/асимметрия/OHS) ──
+  const smMetricTags = useMemo(() => {
+    try {
+      return smTagsForMetrics({
+        swayCm,
+        vbtLossPct: vbtLoss?.lossPct ?? null,
+        asymmetryPct: asymmetry?.diff ?? null,
+        ohsFailed: ohs.failed,
+      });
+    } catch { return []; }
+  }, [swayCm, vbtLoss, asymmetry, ohs.failed]);
+  const smMetricTops = useMemo(() => {
+    const out: Array<{ tag: string; name: string; dose: string }> = [];
+    for (const tag of smMetricTags.slice(0, 4)) {
+      try {
+        const top = correctivesForSMWeakPoint(tag as any, { cause: (smCauseByPhase as Record<string, any>)[tag] ?? null });
+        const c = top[0];
+        if (c) out.push({ tag, name: c.target, dose: `${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}%` });
+      } catch { /* noop */ }
+    }
+    return out;
+  }, [smMetricTags, smCauseByPhase]);
   const logDipDiag = useMemo(() => {
     const d = parseFloat(state.logDipCm);
     if (!Number.isFinite(d) || !d) return null;
@@ -1106,6 +1128,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     progress: smTrend ? `n=${smTrend.n} Δscore ${smTrend.scoreDelta} · лог ${smTrend.logDeltaKg ?? '—'}кг · йок ${smTrend.yokeDeltaS ?? '—'}с` : null,
     causes: smCauses.map((c) => `${c.zone}: ${SM_WEAK_CAUSE_LABELS[c.cause]} (${c.confidence})`),
     specBlock: smSpec ? `${smSpec.weakPoints.join(', ')} × ${smSpec.totalWeeks}нед` : null,
+    corrections: smCorrExport.length ? smCorrExport : null,
+    correctiveDetail: smCorrSession.length ? smCorrSession.map((c) => `${c.phase} → ${c.target} (${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}%): ${c.cues[0]} [${c.source}]`) : null,
     logDiameter: logDiamCls ? `${logDiamCm} см (${logDiamCls})${scaledLogAttempts ? ` → ${scaledLogAttempts.opener}/${scaledLogAttempts.second}/${scaledLogAttempts.third} кг` : ''}` : null,
     athleteSex: athleteSexLabel(athleteSex),
     sexStonePull: sexStonePull ? sexStonePull.lines.join(' · ') : null,
@@ -1502,6 +1526,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <div style={{ fontSize:14, fontWeight:800, color: ohs.level==='ok'?'#22c55e': ohs.level==='warn'?'#f59e0b':'#ef4444' }}>Присед над головой (OHS) {ohs.totalScore}/6 {ohs.level==='ok'?'ОК':ohs.level==='warn'?'ВНИМАНИЕ':'КРИТ'} · провалы {ohs.failed} {ohs.primaryDriver? `· причина ${ohs.primaryDriver}`:''}</div>
               <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{ohs.recommendation} {ohs.needsPhysio?'· нужен врач':''}</div>
               <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Нормы колено-стена (Knee-to-wall) ≥{OHS_NORMS.kneeToWallCm.optimal} см (порог {OHS_NORMS.kneeToWallCm.cutoff}), голеностоп {OHS_NORMS.ankleDeg.range}</div>
+              {ohs.failed >= 2 && (
+                <div data-sm="corr-mobility" style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)' }}>
+                  <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛠️ OHS {ohs.failed}/6 → сначала мобильность (щадящие дозы −5%): yoke_pickup → пауза-присед · stone_lap → фронт-присед с паузой · log_clean → перекат + RDL</div>
+                  <button onClick={() => setTab('correction')} style={{ marginTop:8, padding:'12px 16px', minHeight:48, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>→ Открыть Коррекцию</button>
+                </div>
+              )}
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
                 <button onClick={handleSaveOHSSnap} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#16a34a,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(34,197,94,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 Снапшот приседа (OHS)</button>
                 <span style={{ fontSize:12, color:'#fff' }}>{smOhsTrend && smOhsTrend.n >= 2 ? `тренд ${smOhsTrend.delta >= 0 ? '+' : ''}${smOhsTrend.delta} за ${smOhsTrend.n} зам.` : `история ${smOhsHist.length}/10`}</span>
@@ -1530,6 +1560,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 <div style={{ fontSize:14, fontWeight:800, color: asymmetry.isCrit?'#ef4444': asymmetry.isAsym?'#f59e0b':'#22c55e' }}>Асимметрия {asymmetry.diff}% {asymmetry.isCrit?'КРИТ ≥12%': asymmetry.isAsym?'ВНИМАНИЕ ≥7%':'— норма <7%'} {asymmetry.isAsym? `→ слабее ${asymmetry.weaker === 'left' ? 'слева' : 'справа'}`:''}</div>
                 <div style={{ fontSize:12, color:'#fff' }}>Пороги 7/12% — предиктор distal biceps tear (Heazlewood). {gripAsymDiag ? gripAsymDiag.text : ''}</div>
                 <button onClick={handleSaveGripSnap} style={{ marginTop:8, padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#f59e0b,#ef4444)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 Снапшот хвата (лев/прав)</button>
+                {asymmetry.isAsym && (
+                  <div data-sm="corr-split" style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.22)' }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛠️ Слабее {asymmetry.weaker === 'left' ? 'слева' : 'справа'} → односторонняя добивка +1 сет (15–25%): farmers_grip → вис + молоток · grip_support → pinch block + axle hold</div>
+                    <button onClick={() => setTab('correction')} style={{ marginTop:8, padding:'12px 16px', minHeight:48, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>→ Открыть Коррекцию</button>
+                  </div>
+                )}
               </div>
             )}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
@@ -1561,6 +1597,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             {swayDiag && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: swayDiag.severity==='critical'?'rgba(239,68,68,0.08)': swayDiag.severity==='warn'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${swayDiag.severity==='ok'?'rgba(34,197,94,0.2)': swayDiag.severity==='warn'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.2)'}` }}><div style={{ fontSize:14, fontWeight:800, color: swayDiag.severity==='ok'?'#22c55e': swayDiag.severity==='warn'?'#f59e0b':'#ef4444' }}>{swayDiag.text}</div><div style={{ fontSize:12, color:'#fff' }}>Порог качания 3/5 см — {swayDiag.isReal?'реально выше порога':'в пределах шума'}</div></div>}
             {vbtLoss && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: vbtLoss.exceeded?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${vbtLoss.exceeded?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)'}` }}><div style={{ fontSize:14, fontWeight:800, color: vbtLoss.exceeded?'#ef4444':'#22c55e' }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation}</div><div style={{ fontSize:12, color:'#fff' }}>Порог carry 15% (Hindle stride 1.83м) vs TA 10% — VBT yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div></div>}
+            {smMetricTops.length > 0 && (
+              <div data-sm="corr-video" style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.22)' }}>
+                <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>🛠️ Замер → коррекция: {smMetricTops.map((t) => `${t.tag} → ${t.name} ${t.dose}`).join(' · ')}</div>
+                <button onClick={() => setTab('correction')} style={{ marginTop:8, padding:'12px 16px', minHeight:48, borderRadius:14, background:'linear-gradient(135deg,#f59e0b,#ef4444)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>→ Открыть Коррекцию</button>
+              </div>
+            )}
             <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color:'#fff' }}>VBT зоны: yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}-{VBT_SS_THRESHOLDS.yoke_walk.stopMin} · farmers {VBT_SS_THRESHOLDS.farmers_walk_heavy.optimalMin}/{VBT_SS_THRESHOLDS.farmers_walk_heavy.stopMin} · stone {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} · log {VBT_SS_THRESHOLDS.log_press.optimalMin}/{VBT_SS_THRESHOLDS.log_press.stopMin} м/с</div>
             <div style={{ marginTop:6, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:6 }}>
               <div style={{ padding:'12px 12px', borderRadius:14, background: swayCm!=null ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(59,130,246,0.18)', fontSize:12, color:'#fff' }}>Поправка Энода (Enode): было {swayCm ?? '—'} см → стало {enodeCorrected ?? '—'} см<br/><span style={{ fontSize:10, color:'#fff' }}>{swayCm ?? 0} ×1.08 −0.45 = {enodeCorrected ?? 0}</span></div>

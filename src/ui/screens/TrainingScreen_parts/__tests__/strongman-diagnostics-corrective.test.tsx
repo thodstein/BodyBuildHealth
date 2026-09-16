@@ -46,4 +46,27 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
     await waitFor(() => expect(document.body.textContent).toContain('Применено'), { timeout: 2000 });
     expect(localStorage.getItem('he_planner_apply')).toContain('smCorrections');
   });
+  it('хинт Видео: sway 4см → топ-упражнение + переход в Коррекцию', async () => {
+    localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ swayCm: '4' }));
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(container.querySelector('[data-sm="bottom-tab-video"]')!);
+    await waitFor(() => expect(document.body.querySelector('[data-sm="corr-video"]')).toBeTruthy());
+    expect(document.body.textContent).toContain('yoke_walk →');
+    fireEvent.click(screen.getByText(/Открыть Коррекцию/));
+    await waitFor(() => expect(document.body.querySelector('[data-sm="corr-tab"]')).toBeTruthy());
+  });
+  it('хинт асимметрии: L/R 100/90 → слабее справа + добивка', async () => {
+    localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ leftMax: '100', rightMax: '90' }));
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(container.querySelector('[data-sm="bottom-tab-mobility"]')!);
+    await waitFor(() => expect(document.body.querySelector('[data-sm="corr-split"]')).toBeTruthy());
+    expect(document.body.textContent).toContain('Слабее справа');
+  });
+  it('хинт мобильности: OHS 2 провала → щадящие дозы + переход', async () => {
+    localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ ohsKneeValgus: true, ohsHipBelowParallel: false }));
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(container.querySelector('[data-sm="bottom-tab-mobility"]')!);
+    await waitFor(() => expect(document.body.querySelector('[data-sm="corr-mobility"]')).toBeTruthy());
+    expect(document.body.textContent).toContain('щадящие дозы');
+  });
 });

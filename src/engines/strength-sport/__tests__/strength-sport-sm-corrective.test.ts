@@ -10,6 +10,7 @@ import {
   smCorrectiveExportLines,
   smCorrectiveBasePct,
 } from '../strength-sport-sm-corrective.engine';
+import { buildSMDiagnosticsHtml, buildSMCsv } from '../strength-sport-sm-export.engine';
 
 describe('sm-corrective library', () => {
   it('16 фаз × 3 вида = 48 записей', () => {
@@ -77,5 +78,19 @@ describe('sm-corrective library', () => {
     expect(lines.length).toBe(1);
     expect(lines[0]).toContain('log_lockout →');
     expect(lines[0]).toContain('[');
+  });
+  it('экспорт: коррекции в HTML + CSV, без них — байт-совместимо', () => {
+    const base: any = { weakPoints: [], score: 80, level: 'ok', verification: 1, findings: [] };
+    const htmlBase = buildSMDiagnosticsHtml(base);
+    expect(htmlBase).not.toContain('Коррекция');
+    const html = buildSMDiagnosticsHtml({ ...base, corrections: ['yoke_walk → test 3×20м'], correctiveDetail: ['yoke_walk → detail [src]'] });
+    expect(html).toContain('Коррекция');
+    expect(html).toContain('Коррекция детально');
+    expect(html).toContain('yoke_walk → test');
+    const csv = buildSMCsv({ ...base, corrections: ['a → b'], correctiveDetail: ['d1'] });
+    expect(csv).toContain('corrections');
+    expect(csv).toContain('correctiveDetail');
+    const csvBase = buildSMCsv(base);
+    expect(csvBase).not.toContain('a → b');
   });
 });
