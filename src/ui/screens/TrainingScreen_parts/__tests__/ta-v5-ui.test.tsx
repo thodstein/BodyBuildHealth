@@ -14,14 +14,12 @@ function seed(patch: Record<string, unknown>) {
 }
 
 describe('ta v5 UI', () => {
-  it('turnover: высокий бар + медленный уход → overpull-нота', () => {
+  it('turnover: ввод мс + сед даёт ноту ухода', () => {
     const { container } = render(<WLDiagnosticsHub />);
-    fireEvent.change(screen.getByPlaceholderText('xLoop см'), { target: { value: '3' } });
     fireEvent.change(screen.getByPlaceholderText('420'), { target: { value: '600' } });
     fireEvent.change(screen.getByPlaceholderText('75'), { target: { value: '120' } });
-    fireEvent.change(screen.getByPlaceholderText('1800'), { target: { value: '' } });
-    // yMax задаём через сид, чтобы не зависеть от порядка полей
-    expect(container.querySelector('[data-wl="turnover-note"]') || document.body).toBeTruthy();
+    const note = container.querySelector('[data-wl="turnover-note"]');
+    expect(note?.textContent).toMatch(/медленный/);
   });
   it('turnover через сид: перетягиваешь + баланс тяг', () => {
     seed({ yMaxCm: '135', turnoverMs: '600', catchKneeDeg: '120', pullPowerW: '2000', progBw: '80' });

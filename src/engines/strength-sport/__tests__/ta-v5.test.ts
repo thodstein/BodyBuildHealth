@@ -23,6 +23,11 @@ describe('V5 turnover/catch', () => {
     expect(r.catch).toBe('deep');
     expect(r.text).toMatch(/маркер успеха/);
   });
+  it('префикс движения + молчание без фактов', () => {
+    const r = turnoverDiag({ yMaxCm: 118, turnoverMs: 300, catchKneeDeg: 70, lift: 'clean' })!;
+    expect(r.text.startsWith('Взятие:')).toBe(true);
+    expect(turnoverDiag({ yMaxCm: 125 })).toBeNull();
+  });
 });
 
 describe('V5 jerk drive', () => {

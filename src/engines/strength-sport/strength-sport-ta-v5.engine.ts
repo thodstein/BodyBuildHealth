@@ -35,7 +35,8 @@ export function turnoverDiag(inp: TurnoverInput): TurnoverResult | null {
   const turnover: TurnoverResult['turnover'] = t == null ? null : t < 350 ? 'fast' : t <= 550 ? 'ok' : 'slow';
   const catchV: TurnoverResult['catch'] = k == null ? null : k < 80 ? 'deep' : k <= 110 ? 'power' : 'high';
   const overpull = y != null && y > 130 && turnover === 'slow';
-  const parts: string[] = [];
+  const liftRu = inp.lift != null && String(inp.lift).toLowerCase().includes('clean') ? 'Взятие' : 'Рывок';
+  const parts: string[] = [`${liftRu}:`];
   if (turnover === 'fast') parts.push(`уход ${t}мс — быстрый, отлично`);
   else if (turnover === 'ok') parts.push(`уход ${t}мс — в рабочем коридоре 350–550`);
   else if (turnover === 'slow') parts.push(`уход ${t}мс — медленный, бар успевает упасть`);
@@ -44,7 +45,8 @@ export function turnoverDiag(inp: TurnoverInput): TurnoverResult | null {
   else if (catchV === 'high') parts.push(`приём высокий (колено ${k}°) — не дожимаешь сед`);
   if (overpull) parts.push('перетягиваешь: высокий бар + медленный уход (Tunçel 2025: успех = низкий Hmax + быстрый уход)');
   else if (y != null && y <= 122 && turnover === 'fast') parts.push('связка «низкий бар + быстрый уход» — маркер успеха (Tunçel 2025)');
-  return { turnover, catch: catchV, overpull, text: parts.join(' · ') || 'Данных мало для вердикта' };
+  if (parts.length <= 1) return null; // только префикс движения без фактов — молчим
+  return { turnover, catch: catchV, overpull, text: parts.join(' ') || 'Данных мало для вердикта' };
 }
 
 export interface JerkDriveInput {

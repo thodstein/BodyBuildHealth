@@ -330,3 +330,37 @@ Rochau et al. 2025 (Appl Sci, 17 collegiate, ICC ≥0.86): IMTP + IPST
 - Nature Sci Rep 2024 (ЧМ 2011–2023) + Euro-2024 — стратегия попыток.
 - JOSSI 2026 — биофизический обзор ТА.
 - IWF Sinclair 2025–2028 (канон уточнить по официальному PDF IWF).
+
+## 11. V5 «движение» (Sep 16 2026, закрыто кодом — продолжение «выполняй полностью»)
+
+Интернет-добор к V3/V4 (Wood 2026 PLOS 7 деривативов; Thompson 2025 VBT-гайд;
+Takei 2024 F-V; Nagao 2026 ножницы; Soriano 2024 PP/PJ/SJ; Torokhtiy split-jerk;
+Shah 2026 single-camera; USAW 2025 Q-points; Khuyagbaatar 2024 snatch vs clean).
+Закрыт главный белый лист — turnover/catch (тяги были покрыты, уход — нет).
+
+- **V1** NEW `ta-v5.engine.turnoverDiag` (уход <350/350–550/>550мс + сед по колену +
+  overpull «перетягиваешь», префикс движения; без фактов — null); хаб — 3 инпута
+  в Рывке + `data-wl="turnover-note/pull-balance"`.
+- **V2** `jerkDriveDiag` (увод назад в catch по Nagao 2026 + быстрый dip + взрыв
+  таза; числовых норм catchBack нет — только направление); хаб — инпут + 2 тоггла.
+- **V3** `pullPowerBalance` (Hmax vs норма весовой + Вт/кг фактом, без выдуманных
+  Вт-норм, Tunçel 2025).
+- **V4** `lvpBallisticNote` (лёгкие точки не-баллистики ≤60% + Thompson 2025;
+  математику LVP не трогаем).
+- **V6** NEW `ta-phase-history.engine` (снимки `he_ta_phase_hist_v1` + тренд
+  «ушло/висит/новое»); хаб — `🗂 Фазы: снимок` + `data-wl="phase-trend"`.
+- **V5** `qAgeScale` в `ta-progress.engine` (Q-youth/Q-points/Q-masters без
+  выдуманных коэффициентов — только шкала); хаб — возраст + `data-wl="age-scale"`.
+- **V7** `movementOfWeak`/`mixedWaveNote` (Torokhtiy: рывок+взятие → «разноси по
+  дням») + `[Рывок]/[Взятие]`-метки фаз + `data-wl="wave-mix"`. Движок коррекции
+  не тронут.
+- **V8** `BarTrackingResult += quality`; Kinovea-замеры с тегом съёмки, PCI только
+  по ok (rough — со счётчиком, Shah 2026).
+- Добивка реаудита: пустой UI-тест turnover переписан на реальное поведение;
+  `lift` вшит в текст вердикта; turnover без фактов молчит (раньше — «Данных мало»);
+  apk-тест 7→8 табов (таб Коррекции C2, 44px цел); turnover-сетка на auto-fit
+  (APK-guard).
+- Проверено: NEW `ta-v5` 20/20 + UI `ta-v5-ui` 6/6 + hub 39/39 + apk 14/14 +
+  corrective-ui 11/11 + v4 35/35 + область **63 файла / 910 (+28 изолированно,
+  флейк параллельной нагрузки)**; `tsc --noEmit` 0; `verify:apk-design` OK.
+  Коммит pathspec своих, без пуша.
