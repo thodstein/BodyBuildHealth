@@ -72,6 +72,47 @@ describe('arm П.1 ранжир едет в план', () => {
   });
 });
 
+describe('arm доза по причине применяется в план', () => {
+  const findInjected = (plan: any, ids: string[]) => {
+    for (const w of plan.weeks || []) for (const s of w.sessions || []) for (const e of s.exercises || []) {
+      if (e.exerciseId && ids.includes(String(e.exerciseId)) && String(e.rationale || '').startsWith('Коррекция мёртвой точки')) return e;
+    }
+    return null;
+  };
+  it('без causes — база (3×, RIR базы)', () => {
+    const r = injectArmCorrections(testPlan(), ['cup_hold'] as any, { weekIdxs: [0] });
+    const ex = findInjected(r.plan, ARM_CORRECTIONS.cup_hold.exercises)!;
+    expect(ex).toBeTruthy();
+    expect(ex.sets).toBe(3);
+    expect(ex.rir).toBe(2);
+  });
+  it('fatigue — меньше сетов, выше RIR, легче вес', () => {
+    const base = injectArmCorrections(testPlan(), ['cup_hold'] as any, { weekIdxs: [0] });
+    const tired = injectArmCorrections(testPlan(), ['cup_hold'] as any, { weekIdxs: [0], causes: { cup_hold: 'fatigue' } });
+    const b = findInjected(base.plan, ARM_CORRECTIONS.cup_hold.exercises)!;
+    const t = findInjected(tired.plan, ARM_CORRECTIONS.cup_hold.exercises)!;
+    expect(t.sets).toBe(b.sets - 1);
+    expect(t.rir).toBeGreaterThan(b.rir);
+    expect(t.workSets[0].weight).toBeLessThan(b.workSets[0].weight);
+    expect(String(t.comment)).toContain('доза:');
+  });
+  it('strength — 5×5, вес не ниже базы', () => {
+    const r = injectArmCorrections(testPlan(), ['back_start'] as any, { weekIdxs: [0], causes: { back_start: 'strength' } });
+    const ex = findInjected(r.plan, ARM_CORRECTIONS.back_start.exercises)!;
+    expect(ex.sets).toBe(5);
+    expect(ex.workSets[0].reps).toBe(5);
+    expect(ex.rir).toBe(2);
+  });
+  it('симулятор с causes сходится с инъекцией по сетам', () => {
+    const plan = testPlan();
+    const sim = simulateArmInjection(plan, 'cup_hold', null, { causes: { cup_hold: 'fatigue' } })!;
+    const r = injectArmCorrections(plan, ['cup_hold'] as any, { weekIdxs: [0], causes: { cup_hold: 'fatigue' } });
+    expect(sim.addSets).toBe(2);
+    const ex = findInjected(r.plan, ARM_CORRECTIONS.cup_hold.exercises)!;
+    expect(ex.sets).toBe(sim.addSets);
+  });
+});
+
 describe('arm P5 честный симулятор', () => {
   const basePlan = () => testPlan();
   it('на живом плане: не blocked, вес числом', () => {

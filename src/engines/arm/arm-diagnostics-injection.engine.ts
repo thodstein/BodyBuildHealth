@@ -8,6 +8,8 @@ import type { ArmPlan } from './arm-types';
 import type { ArmWeakPoint } from './arm-biomechanics.engine';
 import { ARM_BIOMECH } from './arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
+import { doseForCause } from './arm-correction-dose.engine';
+import type { ArmWeakCause } from './arm-weak-cause.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
 import { getArmExercises } from '../../core/exercise-catalog-arm';
 
@@ -25,6 +27,12 @@ export interface ArmInjectionOpts {
    * ранжира). Без записи — базовый порядок ARM_CORRECTIONS (байт-в-байт).
    */
   rankedIds?: Record<string, string[]>;
+  /**
+   * Доза по причине (weakPoint → cause из diagnoseArmWeakCause): сеты/повторы/RIR/вес
+   * вставляемого упражнения берутся из doseForCause, а не из базы ARM_CORRECTIONS.
+   * Без записи — база (байт-в-байт). targetSets спец-блока приоритетнее dose.sets.
+   */
+  causes?: Record<string, ArmWeakCause>;
   /**
    * E16 P2: критический гейтинг side (score≤49 / humerus-floor) — для side_mid/side_pin
    * разрешены только безопасные кандидаты (ремень/изометрия/внутренняя ротация).
@@ -143,9 +151,14 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
       const bio = ARM_BIOMECH[wp];
       const corr = ARM_CORRECTIONS[wp];
       if (!bio || !corr) { notes.push(`⚠ ${wp} — нет биомеханики`); continue; }
+      // доза по причине (без causes — база ARM_CORRECTIONS)
+      const dose = doseForCause(wp, opts.causes?.[wp]) ?? {
+        sets: corr.sets, reps: corr.repsRange, rir: corr.rir, intensityPct: corr.intensityPct,
+        holdSeconds: corr.holdSeconds, tempo: corr.tempo, adjusted: false, note: 'база точки',
+      };
       const wantSets = opts.targetSets?.[wp] != null && Number.isFinite(Number(opts.targetSets[wp]))
         ? Math.max(1, Math.min(6, Math.round(Number(opts.targetSets[wp]))))
-        : corr.sets;
+        : dose.sets;
       // находим первый не-дубликат из списка коррекций (ранжир первым, затем база)
       let exId: string | null = null;
       let catalogEx: any = null;
@@ -204,8 +217,8 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
         targetSession = alt;
       }
       const workMax = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
-      const weight = weightForExercise(exId, workMax, corr.intensityPct, wp);
-      const repsAvg = Math.round((corr.repsRange[0] + corr.repsRange[1]) / 2);
+      const weight = weightForExercise(exId, workMax, dose.intensityPct, wp);
+      const repsAvg = Math.round((dose.reps[0] + dose.reps[1]) / 2);
       const finalSession = targetSession;
       if (finalSession.exercises.length >= 8) { skippedBudget++; notes.push(`⊘ ${wp} переполнено (нед ${wi + 1})`); continue; }
 
@@ -215,15 +228,15 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
         role: 'accessory',
         character: 'техника',
         sets: addSets,
-        repsRange: corr.repsRange,
-        rir: corr.rir,
+        repsRange: dose.reps,
+        rir: dose.rir,
         workSets: Array.from({ length: addSets }, () => ({
           reps: repsAvg,
-          rir: corr.rir,
+          rir: dose.rir,
           weight,
           restSeconds: ['side_mid','side_pin'].includes(wp) ? 180 : 90,
-          tempo: corr.tempo || '2-1-1-0',
-          holdSeconds: corr.holdSeconds,
+          tempo: dose.tempo || corr.tempo || '2-1-1-0',
+          holdSeconds: dose.holdSeconds ?? corr.holdSeconds,
         })),
         workingAngle: { elbowDeg: (bio.elbowDeg?.[0] || 110) as any, wrist: 'flexed' as any, forearm: wp.includes('pron') ? 'pronated' as any : wp.includes('sup') ? 'supinated' as any : 'neutral' as any, direction: (bio.workingDirection || 'to_middle') as any },
         isTable: ['cup_start','cup_hold','pron_open','pron_lock','sup_cup','sup_drag','back_start','back_drag'].includes(wp),
@@ -234,13 +247,13 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
         substitutionGroup: corr.substitutionGroup,
         exerciseId: exId,
         equipment: catalogEx.equipment,
-        comment: `${bio.label} → ${corr.exercises.slice(0,2).join('/')} @${Math.round(corr.intensityPct*100)}%`,
+        comment: `${bio.label} → ${corr.exercises.slice(0,2).join('/')} @${Math.round(dose.intensityPct*100)}%${dose.adjusted ? ` · доза: ${dose.note}` : ''}`,
         rationale: `Коррекция мёртвой точки: ${bio.biomechanicalReason.slice(0,90)}…`,
       };
       finalSession.exercises.push(newEx);
       seenIds.add(`${exId}@${finalSession.sessionTag}`);
       injected++;
-      notes.push(`✓ ${wp} → ${exId} в ${finalSession.sessionTag} ${addSets}×${repsAvg} @${Math.round(corr.intensityPct*100)}% (нед ${wi + 1})`);
+      notes.push(`✓ ${wp} → ${exId} в ${finalSession.sessionTag} ${addSets}×${repsAvg} @${Math.round(dose.intensityPct*100)}%${dose.adjusted ? ` (${dose.note})` : ''} (нед ${wi + 1})`);
     }
   }
 

@@ -94,7 +94,10 @@ dayTags — TableCup/TableTech/Hammer/SidePress/BackPress/GripHeavy и др.
 - Добивка «всё полностью» ✅:
   1. `rankedIds` в инъекцию + проводка топ-3 из хаба (ранжир едет в план);
   2. кап сессии (8) в симулятор; 3. `autoPoint` в таб; 4. чипсы фазы в пустом состоянии.
-- Проверено: hub 49/49 + p0 35/35 + injection 7/7 + parity 147/147 + dose 6/6 + phase 15/15;
+- Полное применение дозы ✅: `causes` в `injectArmCorrections` — сеты/повторы/RIR/вес
+  из `doseForCause` (targetSets спец-блока приоритетнее dose.sets; без causes — база);
+  пометка «доза: …» в comment/notes; паритет в симуляторе; проводка causes из хаба
+  и таба; lock-тесты (база/fatigue/strength/сим-инъекция).
+- Проверено: hub 49/49 + p0 35/35 + injection 7/7 + parity 147/147 + dose 6/6 + phase 19/19;
   движки `src/engines/arm` 948/948 (79 файлов); арм-UI 160/160 (22 файла);
-  `verify:apk-design` OK; `tsc` 0 по своим (3 ошибки — чужой untracked
-  `strength-sport-sm-corrective.engine.ts`, не тронут).
+  `verify:apk-design` OK; `tsc --noEmit` 0 по всему проекту.

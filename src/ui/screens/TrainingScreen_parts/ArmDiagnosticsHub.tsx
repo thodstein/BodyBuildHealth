@@ -777,8 +777,16 @@ export const ArmDiagnosticsHub: React.FC = () => {
         rankedIds[p] = [...top, ...rest].filter((v, i, a) => a.indexOf(v) === i);
       }
     } catch { /* noop */ }
+    // доза по причине едет в план (без причины — база ARM_CORRECTIONS)
+    const causes: Record<string, any> = {};
     try {
-      const r = injectArmCorrections(working, points as any, { weekIdxs: idx, targetSets, level: state.level, gatedSideIso: gatedSide, rankedIds });
+      for (const p of points) {
+        const c = (armCausesP0 as any)?.[p]?.cause;
+        if (typeof c === 'string' && c) causes[p] = c;
+      }
+    } catch { /* noop */ }
+    try {
+      const r = injectArmCorrections(working, points as any, { weekIdxs: idx, targetSets, level: state.level, gatedSideIso: gatedSide, rankedIds, causes });
       working = r.plan;
       injected = r.injected;
       skipped = r.skippedBudget + r.skippedDup + r.skippedHumerus;

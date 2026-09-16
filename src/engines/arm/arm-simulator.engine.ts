@@ -7,6 +7,8 @@ import type { ArmWeakPoint } from './arm-biomechanics.engine';
 import { ARM_BIOMECH } from './arm-biomechanics.engine';
 import { auditArmPlan } from './arm-plan-audit.engine';
 import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
+import { doseForCause } from './arm-correction-dose.engine';
+import type { ArmWeakCause } from './arm-weak-cause.engine';
 import { estimateArmCorrectionWeight } from './arm-diagnostics-injection.engine';
 
 export interface ArmSimDelta {
@@ -24,6 +26,8 @@ export interface ArmSimOpts {
   budget?: number;
   workMax?: Record<string, number>;
   targetSets?: Record<string, number>;
+  /** Доза по причине — те же правила, что инъекция (без causes — база). */
+  causes?: Record<string, ArmWeakCause>;
 }
 
 const BUDGET_BY_LEVEL: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
@@ -59,9 +63,13 @@ export function simulateArmInjection(
   const corr = ARM_CORRECTIONS[point];
   const bio = (ARM_BIOMECH as any)[point];
   if (!corr) return null;
+  const dose = doseForCause(point, opts.causes?.[point]) ?? {
+    sets: corr.sets, reps: corr.repsRange, rir: corr.rir, intensityPct: corr.intensityPct,
+    holdSeconds: corr.holdSeconds, tempo: corr.tempo, adjusted: false, note: 'база точки',
+  };
   const wantSets = opts.targetSets?.[point] != null && Number.isFinite(Number(opts.targetSets[point]))
     ? Math.max(1, Math.min(6, Math.round(Number(opts.targetSets[point]))))
-    : corr.sets || 3;
+    : dose.sets || 3;
   const before = audit ? audit.covered.length : 0;
   const alreadyCovered = audit ? (audit.byPoint[point]?.sets ?? 0) > 0 : false;
   const after = audit ? before + (alreadyCovered ? 0 : 1) : 1;
@@ -87,11 +95,12 @@ export function simulateArmInjection(
         else if (sessionsFullForWeakPoint(week, corr.dayTags, bio?.weakMuscles)) blocked = `сессии переполнены (8) — некуда вставить ${ex}`;
       }
       const wm = opts.workMax ?? (plan as any)?.workMax ?? (plan as any)?.inputSnapshot?.workMax ?? {};
-      if (wm && typeof wm === 'object') estWeight = estimateArmCorrectionWeight(ex, wm, corr.intensityPct, point);
+      if (wm && typeof wm === 'object') estWeight = estimateArmCorrectionWeight(ex, wm, dose.intensityPct, point);
     }
   } catch { /* noop — деградация к покрытию */ }
+  const doseTag = dose.adjusted ? ` · ${dose.note}` : '';
   const summary = blocked
     ? `⊘ ${ex}: ${blocked} · покрытие ${before}/12 → ${after}/12`
-    : `+${wantSets} сетов (${ex}${estWeight != null ? ` ≈${estWeight}кг` : ''}) · покрытие ${before}/12 → ${after}/12`;
+    : `+${wantSets} сетов (${ex}${estWeight != null ? ` ≈${estWeight}кг` : ''})${doseTag} · покрытие ${before}/12 → ${after}/12`;
   return { addSets: wantSets, coverageBefore: before, coverageAfter: after, summary, blocked, estWeight };
 }

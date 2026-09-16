@@ -97,7 +97,14 @@ export function HubCorrectionTab({ H }: { H: any }) {
           const corr = (ARM_CORRECTIONS as any)[wp];
           const cause = (armCausesP0 as any)?.[wp];
           const top = (armTop3P0 as any)?.[wp] || [];
-          const sim = (() => { try { return simulateArmInjection(H.armPlan as any, wp); } catch { return null; } })();
+          const sim = (() => {
+            try {
+              const causes: Record<string, any> = {};
+              const c = (armCausesP0 as any)?.[wp]?.cause;
+              if (typeof c === 'string' && c) causes[wp] = c;
+              return simulateArmInjection(H.armPlan as any, wp, null, causes && Object.keys(causes).length ? { causes } : {});
+            } catch { return null; }
+          })();
           const label = (WP_LABEL_SHORT as any)[wp] || wp;
           return (
             <div key={wp} className="ad-sec ad-bio" data-arm="correction-card" data-valid={cause ? 'ok' : 'na'}>
