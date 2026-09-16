@@ -363,27 +363,28 @@ export interface CorrectiveRankOpts {
  * при ограничении сустава такие упражнения не запрещаются (доза и так щадится
  * при mobility-причине), но уходят вниз ранжира — честно, без скрытия выбора.
  */
-const MOBILITY_ANKLE_DEMAND = new Set([
-  'deficit_snatch', 'deficit_clean', 'deficit_pull',
-  'pause_snatch', 'pause_clean', 'pause_pull', 'pause_jerk', 'pause_squat',
-  'front_squat', 'front_squat_clean_grip', 'overhead_squat_v2', 'tempo_squat',
-  'back_squat', 'hack_squat', 'tall_snatch', 'tall_clean', 'drop_snatch',
-  'snatch_balance', 'jerk_dip', 'double_pause_jerk',
-]);
-const MOBILITY_OVERHEAD_DEMAND = new Set([
-  'overhead_squat_v2', 'snatch_balance', 'behind_neck_jerk', 'push_press', 'push_jerk',
-  'muscle_snatch', 'jerk_recovery', 'tall_snatch', 'tall_jerk', 'drop_snatch',
-  'power_snatch', 'sots_press', 'overhead_hold', 'split_jerk',
-]);
-const MOBILITY_HIP_DEMAND = new Set([
-  'deficit_snatch', 'deficit_clean', 'deficit_pull', 'deadlift',
-]);
+/** Спрос на подвижность по суставам (тест-шов для spot-lock; семантика — паритет ранжира). */
+export const MOBILITY_DEMAND: Record<'ankle' | 'overhead' | 'hip', readonly string[]> = {
+  ankle: [
+    'deficit_snatch', 'deficit_clean', 'deficit_pull',
+    'pause_snatch', 'pause_clean', 'pause_pull', 'pause_jerk', 'pause_squat',
+    'front_squat', 'front_squat_clean_grip', 'overhead_squat_v2', 'tempo_squat',
+    'back_squat', 'hack_squat', 'tall_snatch', 'tall_clean', 'drop_snatch',
+    'snatch_balance', 'jerk_dip', 'double_pause_jerk',
+  ],
+  overhead: [
+    'overhead_squat_v2', 'snatch_balance', 'behind_neck_jerk', 'push_press', 'push_jerk',
+    'muscle_snatch', 'jerk_recovery', 'tall_snatch', 'tall_jerk', 'drop_snatch',
+    'power_snatch', 'sots_press', 'overhead_hold', 'split_jerk',
+  ],
+  hip: ['deficit_snatch', 'deficit_clean', 'deficit_pull', 'deadlift'],
+};
 
 function mobilityPenalty(id: string, mob: Set<string>): number {
   let p = 0;
-  if (mob.has('ankle') && MOBILITY_ANKLE_DEMAND.has(id)) p -= 15;
-  if (mob.has('shoulder') && MOBILITY_OVERHEAD_DEMAND.has(id)) p -= 15;
-  if ((mob.has('hip') || mob.has('lower_back')) && MOBILITY_HIP_DEMAND.has(id)) p -= 10;
+  if (mob.has('ankle') && (MOBILITY_DEMAND.ankle as readonly string[]).includes(id)) p -= 15;
+  if (mob.has('shoulder') && (MOBILITY_DEMAND.overhead as readonly string[]).includes(id)) p -= 15;
+  if ((mob.has('hip') || mob.has('lower_back')) && (MOBILITY_DEMAND.hip as readonly string[]).includes(id)) p -= 10;
   return p;
 }
 
@@ -584,7 +585,9 @@ export function correctiveBlockFor(
         mobilityRestrictions: opts.mobilityRestrictions,
         limit: 2,
       });
-      return list.map((c) => ({ exerciseId: c.id, sets, reps: wi <= 1 ? 5 : wi <= 5 ? (c.phase === 'strength' ? 4 : 5) : 3, pct: c.protocol.pct + (wi >= 2 && wi <= 5 ? 5 : 0) }));
+      // C12: pct — от скорректированного протокола (причина уже учтена),
+      // как в карточке/сессии/экспорте/вставке; волна даёт только +5% к пику.
+      return list.map((c) => ({ exerciseId: c.id, sets, reps: wi <= 1 ? 5 : wi <= 5 ? (c.phase === 'strength' ? 4 : 5) : 3, pct: c.protocolAdj.pct + (wi >= 2 && wi <= 5 ? 5 : 0) }));
     }).slice(0, 6);
     out.push({ week: wi + 1, focus: focusFor(wi), items });
   }

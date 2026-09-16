@@ -4,6 +4,7 @@ import {
   correctiveSessionFor, correctiveBlockFor, correctivesByError,
   adjustProtocolForCause, TA_ERROR_TAG_RU, correctiveById,
   tagsForBarMetrics, correctiveExportLines, protocolForPreferred,
+  MOBILITY_DEMAND,
 } from '../strength-sport-ta-corrective.engine';
 import { estimateCorrBasePm } from '../strength-sport-ta-simulator.engine';
 import { rankCorrectionsForTA } from '../strength-sport-ta-correction-rank.engine';
@@ -171,6 +172,32 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     expect(block[0].items[0].exerciseId).toBe('snatch_liftoff');
     const blockFree = correctiveBlockFor(['snatch_off_floor'], 4, { causeByWeak: { snatch_off_floor: 'strength' } as any });
     expect(blockFree[0].items[0].exerciseId).toBe('deficit_snatch');
+  });
+  it('C12: волна блока несёт дозу причины (strength +5 / mobility −5), а не базу', () => {
+    const s = correctiveBlockFor(['snatch_mid'], 6, { causeByWeak: { snatch_mid: 'strength' } as any });
+    const m = correctiveBlockFor(['snatch_mid'], 6, { causeByWeak: { snatch_mid: 'mobility' } as any });
+    const base = correctiveBlockFor(['snatch_mid'], 6);
+    // пик волны (нед 3–6): сила выше базы, мобильность ниже
+    expect(s[2].items[0].pct).toBeGreaterThan(base[2].items[0].pct);
+    expect(m[2].items[0].pct).toBeLessThan(base[2].items[0].pct);
+  });
+  it('C12: demand-сеты — spot-lock ключевых id (паритет ранжира)', () => {
+    // глубокий спрос: дефициты — везде, оверхед-фиксация — в overhead, становая — в hip
+    for (const id of ['deficit_snatch', 'deficit_clean', 'deficit_pull']) {
+      expect(MOBILITY_DEMAND.ankle).toContain(id);
+      expect(MOBILITY_DEMAND.hip).toContain(id);
+    }
+    for (const id of ['overhead_squat_v2', 'snatch_balance', 'tall_snatch', 'split_jerk', 'sots_press']) {
+      expect(MOBILITY_DEMAND.overhead).toContain(id);
+    }
+    expect(MOBILITY_DEMAND.hip).toContain('deadlift');
+    // RDL — контролируемый hinge без глубокого спроса: вне hip-сета (как в ранжире)
+    expect(MOBILITY_DEMAND.hip).not.toContain('rdl');
+    // все id demand-сетов существуют в библиотеке (без висячих ссылок)
+    const ids = new Set(TA_CORRECTIVES.map((e) => e.id));
+    for (const key of Object.keys(MOBILITY_DEMAND) as Array<keyof typeof MOBILITY_DEMAND>) {
+      for (const id of MOBILITY_DEMAND[key]) expect(ids.has(id), `${key}/${id}`).toBe(true);
+    }
   });
   it('паритет с ранжиром: топ-3 каждой фазы × каждой причины — в библиотеке', () => {
     const causes: Array<TAWeakCause | null> = [null, 'volume', 'technique', 'mobility', 'fatigue', 'strength'];
