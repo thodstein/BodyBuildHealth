@@ -14,13 +14,19 @@ const goScreening = () => {
 };
 
 describe('bb-hub R1 жим', () => {
-  it('широкий хват (BAW из ширины плеч) → fix «сузь»', () => {
+  it('широкий хват (BAW из ширины плеч) → fix «сузь» + список правок', () => {
     localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ circ: { shoulderWidth: '40' } }));
     goScreening();
     expect(document.querySelector('[data-bb="bench-screen"]')).not.toBeNull();
     fireEvent.change(screen.getByTestId('bb-bench-grip'), { target: { value: '72' } });
     expect(document.querySelector('[data-bb="bench-verdict"]')?.textContent).toMatch(/сузь/);
     expect(document.querySelector('[data-bb="bench-disclaimer"]')?.textContent).toMatch(/1\.8 BAW|BAW/);
+    // вторая правка (боль) → полный список правок виден
+    fireEvent.click(screen.getByRole('switch', { name: /Без боли в жиме/ }));
+    const list = document.querySelector('[data-bb="bench-fixes"]');
+    expect(list).not.toBeNull();
+    expect(list?.textContent).toMatch(/сузь/);
+    expect(list?.textContent).toMatch(/Боль в жиме/);
   });
   it('касание у шеи через шит → fix-строка', () => {
     goScreening();

@@ -47,7 +47,7 @@ import { shoulderWallVerdict, thoracicRotationVerdict, erIrVerdict, ERIR_DISCLAI
 import { hingeVerdict, loadedSquatVerdict, loadedHingeVerdict, HINGE_LOAD_NOTE } from '../../../engines/bb/bb-hinge-screen.engine';
 import { ybtLqVerdict, YBT_DISCLAIMER } from '../../../engines/bb/bb-ybt-lq.engine';
 import { substitutesForDriver, asymPriorityText, SCREENING_DISCLAIMER, VIDEO_GUIDE } from '../../../engines/bb/bb-movement-to-plan.engine';
-import { benchScreenVerdict, BENCH_DISCLAIMER } from '../../../engines/bb/bb-bench-screen.engine';
+import { benchScreenVerdict, benchCorrections, BENCH_DISCLAIMER } from '../../../engines/bb/bb-bench-screen.engine';
 import { painMonitorVerdict, painMonitorLine, provocationFor, PAIN_LOCATIONS, PAIN_MONITOR_DISCLAIMER, type PainLocation } from '../../../engines/bb/bb-pain-monitor.engine';
 import { nheVerdict, adductorVerdict, NHE_DISCLAIMER, ADDUCTOR_HONESTY, type CphLevel } from '../../../engines/bb/bb-posterior-readiness.engine';
 import { assessBbTendonGuard } from '../../../engines/bb/bb-tendon-guard.engine';
@@ -2280,6 +2280,11 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <BbCheckCard active={!state.benchPain} title="Без боли в жиме" desc="боль → техника + правило боли" accent="#ef4444" onToggle={() => setState(s => ({ ...s, benchPain: !s.benchPain }))} />
               </div>
               <div style={{ fontSize: 11, color: benchV.level === 'fix' ? '#f59e0b' : '#fff' }} data-bb="bench-verdict">{benchV.text}</div>
+              {benchCorrections(benchV).length > 1 && (
+                <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 10, color: '#fff', lineHeight: 1.5 }} data-bb="bench-fixes">
+                  {benchCorrections(benchV).map((f, i) => <li key={i}>{f}</li>)}
+                </ul>
+              )}
               <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="bench-disclaimer">{BENCH_DISCLAIMER}{benchV.gripBaw != null ? ` · хват ${benchV.gripBaw} BAW` : ' · BAW — из ширины плеч в «Пропорциях»'}</div>
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="pain-monitor">
