@@ -18,7 +18,7 @@ describe('D1 intake: helper + bits (source-guard)', () => {
   it('helper импортирован и вызывается с полями движения', () => {
     expect(SRC).toContain("import { resolveBbDiagIntakeExtras } from '../../../engines/bb/bb-diag-intake.engine';");
     expect(SRC).toContain('resolveBbDiagIntakeExtras({');
-    for (const f of ['movementDriver: bbDiag.movementDriver', 'singleLeg: bbDiag.singleLeg', 'lrVerdicts: bbDiag.lrVerdicts', 'lrTopUp: bbDiag.lrTopUp']) {
+    for (const f of ['movementDriver: bbDiag.movementDriver', 'singleLeg: bbDiag.singleLeg', 'lrVerdicts: bbDiag.lrVerdicts', 'lrTopUp: bbDiag.lrTopUp', 'shoulder: bbDiag.shoulder', 'hinge: bbDiag.hinge', 'ybt: bbDiag.ybt', 'scapPain: bbDiag.scapPain', 'videoStandard: bbDiag.videoStandard', 'driverSubs: bbDiag.driverSubs', 'asymPriority: bbDiag.asymPriority']) {
       expect(SRC.includes(f), f).toBe(true);
     }
   });
@@ -33,6 +33,7 @@ describe('D1 intake: persist + rationale (source-guard)', () => {
   it('persist-ключи движения пишутся', () => {
     expect(SRC).toContain("localStorage.setItem('he_bb_last_movement_driver'");
     expect(SRC).toContain("localStorage.setItem('he_bb_last_single_leg'");
+    expect(SRC).toContain("localStorage.setItem('he_bb_last_movement_extra'");
   });
 
   it('строка в rationale уже собранного плана: дедуп по строке (паттерн labDelta)', () => {

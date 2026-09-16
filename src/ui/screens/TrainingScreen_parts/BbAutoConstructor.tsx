@@ -1298,6 +1298,14 @@ export const BbAutoConstructor: React.FC = () => {
           lrTopUp: bbDiag.lrTopUp,
           returnAction: bbDiag.returnAction,
           returnStage: bbDiag.returnStage,
+          // D1–D5: плечо/шарнир/YBT/лопатка/видео/замены (движок санитизирует, мусор — тихо)
+          shoulder: bbDiag.shoulder,
+          hinge: bbDiag.hinge,
+          ybt: bbDiag.ybt,
+          scapPain: bbDiag.scapPain,
+          videoStandard: bbDiag.videoStandard,
+          driverSubs: bbDiag.driverSubs,
+          asymPriority: bbDiag.asymPriority,
         });
         // 3.9: гранулярные зоны приоритетны, но канонические/общие группы — честный fallback.
         const groups = (bbDiag.weakZonesGranular ?? bbDiag.weakMusclesCanonical ?? bbDiag.weakPoints ?? bbDiag.groups) as string[];
@@ -1503,6 +1511,10 @@ export const BbAutoConstructor: React.FC = () => {
         }
         if (diagExtras.persist.singleLeg) {
           try { localStorage.setItem('he_bb_last_single_leg', JSON.stringify(diagExtras.persist.singleLeg)); } catch {}
+        }
+        // D1–D5: экстра движений (плечо/шарнир/YBT/замены) — инфо-персист для экспорта/будущих раундов.
+        if (diagExtras.persist.movementExtra && Object.keys(diagExtras.persist.movementExtra).length) {
+          try { localStorage.setItem('he_bb_last_movement_extra', JSON.stringify(diagExtras.persist.movementExtra)); } catch {}
         }
         if (diagExtras.bits.length) {
           const movementLine = `🧭 Скрининг движений: ${diagExtras.bits.join(' · ')}`;
