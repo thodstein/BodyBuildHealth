@@ -17,6 +17,10 @@ export interface TableBout {
   centerHoldSec?: number; // удержание центра, с
   win?: boolean; // выиграна ли схватка
   finishSec?: number; // время финиша из выигрышной, с
+  /** P1-движения: фаза срыва setup/readygo/start/mid/pin (опционально). */
+  failPhase?: string | null;
+  /** P1-движения: деталь срыва свободной строкой (опционально). */
+  failDetail?: string | null;
 }
 
 export interface TableIqInput {
@@ -68,6 +72,19 @@ export function analyzeTableIq(input: TableIqInput = {}): TableIq {
   if (avgFinishSec != null && avgFinishSec > 12) levers.push(`Финиш ${avgFinishSec}с >12с: side-изометрия 10–20с + пин-холды в слабом углу.`);
   if (!levers.length) levers.push('Стол чистый: держать волну table 3/2/1, специализация по матчапу.');
   if (winPct < 40) levers.push(`Победы ${winPct}% <40%: разведка стиля + матчап-план, спарринг 70% (не красная линия).`);
+  // P1-движения: мода фазы срыва (только заполненные, без угадывания).
+  const phaseCounts = new Map<string, number>();
+  for (const b of bouts) {
+    const ph = String((b as TableBout).failPhase || '').toLowerCase();
+    if (ph === 'setup' || ph === 'readygo' || ph === 'start' || ph === 'mid' || ph === 'pin') {
+      phaseCounts.set(ph, (phaseCounts.get(ph) || 0) + 1);
+    }
+  }
+  if (phaseCounts.size) {
+    const top = Array.from(phaseCounts.entries()).sort((a, b) => b[1] - a[1])[0];
+    const phaseRu = top[0] === 'setup' ? 'постановка' : top[0] === 'readygo' ? 'Ready…Go' : top[0] === 'start' ? 'старт' : top[0] === 'mid' ? 'середина' : 'пин';
+    levers.push(`Слабая фаза: ${phaseRu} (${top[1]}/${n}) — чинить её векторы первым (см. фазовую карту).`);
+  }
   return {
     bouts: n, winPct, foulRate, slipRate, strapRate, avgCenterSec, avgFinishSec,
     levers: levers.slice(0, 3),

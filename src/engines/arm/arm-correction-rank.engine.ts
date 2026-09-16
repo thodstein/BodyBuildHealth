@@ -18,6 +18,8 @@ export interface ArmRankCtx {
   inPlanIds?: string[];
   /** P2: фаза срыва схватки setup/start/mid/pin (как armlift failurePoint). */
   failurePoint?: string | null;
+  /** P1-движения: фаза схватки setup/readygo/start/mid/pin — бонус точке своей фазы. */
+  matchPhase?: string | null;
 }
 
 export interface ArmRankedCorrection {
@@ -116,6 +118,22 @@ export function rankCorrectionsForArm(point: ArmWeakPoint, ctx: ArmRankCtx = {})
     if (fp && Array.isArray(fixes) && fixes.map(String).map((s: string) => s.toLowerCase()).includes(fp)) {
       score += 6;
       reasons.push('чинит фазу срыва');
+    }
+    // P1-движения: точка своей фазы схватки (без fixesPhase — по канону точек).
+    // Локальная карта (без импорта match-phases — ранжир не тянет фазовый движок).
+    const mp = String(ctx.matchPhase || '').toLowerCase();
+    if (mp === 'setup' || mp === 'readygo' || mp === 'start' || mp === 'mid' || mp === 'pin') {
+      const pointPhase: Record<string, string> = {
+        contain_fingers: 'setup',
+        cup_start: 'start', pron_open: 'start', rising_top: 'start', back_start: 'start',
+        cup_hold: 'mid', pron_lock: 'mid', sup_cup: 'mid', sup_drag: 'mid',
+        side_mid: 'mid', back_drag: 'mid',
+        side_pin: 'pin',
+      };
+      if (pointPhase[point] === mp) {
+        score += 4;
+        reasons.push('точка слабой фазы');
+      }
     }
     out.push({ id, name, score, reason: reasons.join(', ') || 'топ по точке' });
   }

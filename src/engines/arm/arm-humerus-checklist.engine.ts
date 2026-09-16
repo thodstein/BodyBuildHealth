@@ -41,3 +41,56 @@ export function checkHumerusChecklist(failedIds: string[]): HumerusCheckResult {
       : null,
   };
 }
+
+// ── P5: humerus-danger v2 — динамика схватки, не только поза ─────────────
+// Источники: Ogawa syst. review (winning 9 / even 17 / losing 20 из 46 —
+// ломаются во всех фазах, не только в проигрыше), Kruczynski 60 MPa,
+// teen medial epicondyle (зона роста), WAF dangerous position.
+
+export interface HumerusDangerInput {
+  losing?: boolean | null; // идёт проигрыш прямо сейчас
+  sideMax?: boolean | null; // дожимание на максимуме
+  elbowDeg?: number | null; // угол локтя (оценка)
+  fatigue?: boolean | null; // усталость/конец турнира
+  teen?: boolean | null; // 14–17 лет (epicondyle, не shaft)
+  pressAttempt?: boolean | null; // идёт пресс
+  axisOk?: boolean | null; // ось кисть–локоть–плечо цела
+}
+
+export interface HumerusDangerResult {
+  stop: boolean;
+  reasons: string[];
+  note: string;
+}
+
+/** Живой guard: losing + side_max + острый локоть + усталость = стоп. */
+export function assessHumerusDanger(input: HumerusDangerInput = {}): HumerusDangerResult {
+  const reasons: string[] = [];
+  if (input.losing && input.sideMax) {
+    reasons.push('дожим на максимуме в проигрыше — торсия пиковая (сдайся/уйди в ремень, не держи на кости)');
+  }
+  const elbow = Number(input.elbowDeg);
+  if (Number.isFinite(elbow) && elbow < 90) {
+    reasons.push(`локоть ~${elbow}° <90° под нагрузкой — острый угол + торсия`);
+  }
+  if (input.fatigue && (input.losing || input.sideMax)) {
+    reasons.push('усталость + борьба до конца — моторика плывёт, риск позы');
+  }
+  if (input.axisOk === false) {
+    reasons.push('ось разбита — момент уходит в кость, а не в мышцы');
+  }
+  if (input.pressAttempt && input.axisOk === false) {
+    reasons.push('пресс на разбитой оси — запрещён (только по оси + tendon≤18)');
+  }
+  const teenNote = input.teen
+    ? ' Teen 14–17: риск не shaft, а medial epicondyle — без отказов и без максимумов в проигрыше.'
+    : '';
+  const stop = reasons.length > 0;
+  return {
+    stop,
+    reasons,
+    note: stop
+      ? `⛔ humerus-danger: ${reasons.join('; ')}.${teenNote}`
+      : `Опасной динамики нет.${teenNote}`,
+  };
+}

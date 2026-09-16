@@ -49,6 +49,13 @@ export interface ArmBridgeInput {
   attempts: Array<{ weightKg: number; success: boolean; wrPct: number }>;
   /** PRO-3 P4: red-flags скрининга (id меток) — конструктор показывает стоп-баннер. */
   redFlags?: string[];
+  /** Движения P1–P6 (опционально, аддитивно): фаза/старт/векторы/фолы/сила стола. */
+  matchPhase?: string | null;
+  startNote?: string | null;
+  vectorNote?: string | null;
+  foulNote?: string | null;
+  tableStrengthNote?: string | null;
+  humerusDangerNote?: string | null;
 }
 
 export function buildArmBridgeData(i: ArmBridgeInput): Record<string, unknown> {
@@ -102,5 +109,12 @@ export function buildArmBridgeData(i: ArmBridgeInput): Record<string, unknown> {
     armAttempts: i.attempts,
     // PRO-3 P4
     armRedFlags: i.redFlags || [],
+    // Движения P1–P6 (конструктор неизвестные поля игнорит)
+    armMatchPhase: i.matchPhase || null,
+    armStartNote: i.startNote || null,
+    armVectorNote: i.vectorNote || null,
+    armFoulNote: i.foulNote || null,
+    armTableStrengthNote: i.tableStrengthNote || null,
+    armHumerusDangerNote: i.humerusDangerNote || null,
   };
 }
