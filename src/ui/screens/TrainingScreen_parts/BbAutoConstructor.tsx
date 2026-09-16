@@ -42,6 +42,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-l
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
 import { bbOrthoMobilityAdd, riskyOpenChainIds, decideBbOrthoIntake, subtractTracked } from '../../../engines/pro/ortho-screen.engine';
 import { resolveBbDiagIntakeExtras } from '../../../engines/bb/bb-diag-intake.engine';
+import { buildBbMovementPrintBlock } from '../../../engines/bb/bb-diagnostics-export.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply, applyToPlanner, type WeakpointsPayload } from './planner-bridge';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
@@ -2813,13 +2814,16 @@ export const BbAutoConstructor: React.FC = () => {
       return `<h2 style="margin:16px 0 6px;color:${phaseColor};border-left:4px solid ${phaseColor};padding-left:8px">Неделя ${wk.week} (${phaseRu}${wk.deload ? ' — DELOAD' : ''})${peakNote}</h2>${prepNote}${sessionsHtml}`;
     }).join('');
     const rationaleHtml = (plan.rationale || []).map(r => `<div style="font-size:10px;color:#666;margin:2px 0">${esc(r)}</div>`).join('');
+    // П3: персист движений в печать (пусто — блока нет, печать байт-в-байт; сборка не тронута).
+    let movementHtml = '';
+    try { movementHtml = buildBbMovementPrintBlock(); } catch { /* тихо */ }
     // Фаза 4.24: heatmap «мышца × неделя» в печати.
     const hm = buildBBMuscleHeatmap(plan);
     const hmWeeks = [...new Set(hm.map(h => h.week))].sort((a, b) => a - b);
     const hmMuscles = [...new Set(hm.map(h => h.muscle))];
     const hmColor: Record<string, string> = { below_mev: '#f87171', mev_mav: '#22c55e', above_mav: '#f59e0b', over_mrv: '#ef4444', none: '#e5e7eb' };
     const hmHtml = hmMuscles.length ? `<h2 style="font-size:14px;margin:16px 0 4px">🧬 Heatmap «мышца × неделя»</h2><table style="border-collapse:collapse;font-size:10px"><tr><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">Мышца</th>${hmWeeks.map(ww => `<th style="border:1px solid #ddd;padding:3px 6px">Нед ${ww}</th>`).join('')}</tr>${hmMuscles.map(m => `<tr><td style="border:1px solid #ddd;padding:3px 6px">${esc(m)}</td>${hmWeeks.map(ww => { const c = hm.find(h => h.muscle === m && h.week === ww); return `<td style="border:1px solid #ddd;text-align:center;background:${c ? hmColor[c.status] : '#fafafa'}">${c ? c.sets : ''}</td>`; }).join('')}</tr>`).join('')}</table>` : '';
-    w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед</h1>${rationaleHtml}${weeksHtml}${hmHtml}<script>window.print()</script></body></html>`);
+    w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед</h1>${rationaleHtml}${movementHtml}${weeksHtml}${hmHtml}<script>window.print()</script></body></html>`);
     w.document.close();
   };
 

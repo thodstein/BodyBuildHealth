@@ -147,8 +147,42 @@ export function singleLegVerdict(s: SingleLegScreen): { weakSide: 'left' | 'righ
 /** Снимок скрининга для дельты «было/стало» (Brookbush/NASM: re-screen 4–6 нед). */
 export interface MovementSnapshot {
   date: string; // YYYY-MM-DD
-  fails: string[]; // коды проваленных сегментов: heels/valgus/depth/trunk/arms/lumbar
+  fails: string[]; // коды проваленных сегментов: heels/valgus/depth/trunk/arms/lumbar + D1–D5 (sh-/rot-/hinge-/sq-/ybt-)
+  /** v:2 — снимок с D1–D5 трекингом; без поля — legacy (только OHS), такие молча мигрируют в дельте. */
+  v?: number;
 }
+
+/** D1–D5 коды снимка (только провалы; пусто — тихо, чистый экран не шумит). */
+export interface D1D5CodesInput {
+  shoulder?: { pass: boolean; locus: string } | null;
+  rotGap?: number | null;
+  rotLow?: boolean;
+  hinge?: { pass: boolean; locus: string } | null;
+  loadedDegraded?: boolean;
+  ybtAsymCm?: number | null;
+  ybtCompositePct?: number | null;
+  ybtTested?: boolean;
+}
+
+export function d1d5FailCodes(s: D1D5CodesInput | null | undefined): string[] {
+  if (!s) return [];
+  const out: string[] = [];
+  if (s.shoulder && !s.shoulder.pass) out.push(`sh-${s.shoulder.locus || 'fail'}`);
+  if (s.rotGap != null && Number.isFinite(s.rotGap) && (s.rotGap as number) >= 10) out.push('rot-gap');
+  else if (s.rotLow) out.push('rot-low');
+  if (s.hinge && !s.hinge.pass && (s.hinge.locus === 'lumbar' || s.hinge.locus === 'neck' || s.hinge.locus === 'both')) {
+    out.push(`hinge-${s.hinge.locus}`);
+  }
+  if (s.loadedDegraded) out.push('sq-degraded');
+  if (s.ybtTested) {
+    if (s.ybtAsymCm != null && Number.isFinite(s.ybtAsymCm) && (s.ybtAsymCm as number) > 4) out.push('ybt-asym');
+    if (s.ybtCompositePct != null && Number.isFinite(s.ybtCompositePct) && (s.ybtCompositePct as number) < 94) out.push('ybt-comp');
+  }
+  return out;
+}
+
+/** Префиксы D1–D5: legacy-снимки (без v:2) их не трекали — это не регресс, а новый трекинг. */
+const D1D5_PREFIX = /^(sh-|rot-|hinge-|sq-|ybt-)/;
 
 export function ohsFailCodes(input: OhsScreenInput): string[] {
   const out: string[] = [];
@@ -167,16 +201,31 @@ export function ohsFailCodes(input: OhsScreenInput): string[] {
   return out;
 }
 
-export function movementDelta(prev: MovementSnapshot | null, cur: string[]): { fixed: string[]; regressed: string[]; text: string } {
-  if (!prev) return { fixed: [], regressed: [], text: 'Первый снимок — дельта появится после перепроверки через 4–6 нед' };
+export function movementDelta(
+  prev: MovementSnapshot | null,
+  cur: string[],
+): { fixed: string[]; regressed: string[]; tracked: string[]; text: string } {
+  if (!prev) return { fixed: [], regressed: [], tracked: [], text: 'Первый снимок — дельта появится после перепроверки через 4–6 нед' };
   const prevSet = new Set(prev.fails || []);
   const curSet = new Set(cur);
   const fixed = Array.from(prevSet).filter((k) => !curSet.has(k));
-  const regressed = Array.from(curSet).filter((k) => !prevSet.has(k));
-  if (!fixed.length && !regressed.length) return { fixed, regressed, text: `vs ${prev.date}: без изменений (${cur.length} замечаний)` };
+  const rawRegressed = Array.from(curSet).filter((k) => !prevSet.has(k));
+  // Миграция legacy-снимков (без v:2): D1–D5 коды в них не трекались — показываем
+  // отдельной строкой «новый трекинг», а не «регрессом» (иначе каждый старый стор покраснеет).
+  let regressed = rawRegressed;
+  let tracked: string[] = [];
+  if ((prev as MovementSnapshot).v !== 2) {
+    tracked = rawRegressed.filter((k) => D1D5_PREFIX.test(k));
+    regressed = rawRegressed.filter((k) => !D1D5_PREFIX.test(k));
+  }
+  if (!fixed.length && !regressed.length && !tracked.length) {
+    return { fixed, regressed, tracked, text: `vs ${prev.date}: без изменений (${cur.length} замечаний)` };
+  }
+  const trackNote = tracked.length ? ` · новый трекинг D1–D5: ${tracked.join(', ')}` : '';
   return {
     fixed,
     regressed,
-    text: `vs ${prev.date}: исправлено ${fixed.length ? fixed.join(', ') : '—'} · новое ${regressed.length ? regressed.join(', ') : '—'}`,
+    tracked,
+    text: `vs ${prev.date}: исправлено ${fixed.length ? fixed.join(', ') : '—'} · новое ${regressed.length ? regressed.join(', ') : '—'}${trackNote}`,
   };
 }

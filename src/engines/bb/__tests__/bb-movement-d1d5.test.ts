@@ -4,6 +4,7 @@ import { hingeVerdict, loadedSquatVerdict } from '../bb-hinge-screen.engine';
 import { ybtLqVerdict, YBT_DISCLAIMER } from '../bb-ybt-lq.engine';
 import { substitutesForDriver, asymPriority, asymPriorityText, SCREENING_DISCLAIMER } from '../bb-movement-to-plan.engine';
 import { resolveBbDiagIntakeExtras } from '../bb-diag-intake.engine';
+import { d1d5FailCodes, movementDelta } from '../bb-movement-screen.engine';
 
 describe('bb-movement D1 плечо у стены', () => {
   it('чисто — pass', () => {
@@ -107,6 +108,50 @@ describe('bb-movement D5 матрица + асимметрии', () => {
   });
   it('дисклеймер честный (AUC, не запрет)', () => {
     expect(SCREENING_DISCLAIMER).toMatch(/не прогноз/);
+  });
+});
+
+describe('bb-movement П1 коды снимка D1–D5', () => {
+  it('чистый экран — пусто', () => {
+    expect(d1d5FailCodes({
+      shoulder: { pass: true, locus: 'ok' }, rotGap: null, rotLow: false,
+      hinge: { pass: true, locus: 'ok' }, loadedDegraded: false,
+      ybtAsymCm: 2, ybtCompositePct: 98, ybtTested: true,
+    })).toEqual([]);
+  });
+  it('провалы кодируются с префиксами', () => {
+    expect(d1d5FailCodes({
+      shoulder: { pass: false, locus: 'thoracic' }, rotGap: 12, rotLow: true,
+      hinge: { pass: false, locus: 'lumbar' }, loadedDegraded: true,
+      ybtAsymCm: 6, ybtCompositePct: 90, ybtTested: true,
+    })).toEqual(['sh-thoracic', 'rot-gap', 'hinge-lumbar', 'sq-degraded', 'ybt-asym', 'ybt-comp']);
+  });
+  it('rot-low только без gap; hinge not_tested и YBT без замера — тихо', () => {
+    expect(d1d5FailCodes({ rotGap: 3, rotLow: true, hinge: { pass: true, locus: 'not_tested' }, ybtTested: false } as any))
+      .toEqual(['rot-low']);
+  });
+  it('null-вход — пусто', () => {
+    expect(d1d5FailCodes(null)).toEqual([]);
+  });
+});
+
+describe('bb-movement П1 миграция дельты (legacy без v:2)', () => {
+  it('legacy: D1–D5 коды — новый трекинг, не регресс', () => {
+    const d = movementDelta({ date: '2026-08-01', fails: ['heels'] }, ['heels', 'sh-thoracic', 'ybt-asym']);
+    expect(d.regressed).toEqual([]);
+    expect(d.tracked).toEqual(['sh-thoracic', 'ybt-asym']);
+    expect(d.text).toMatch(/новый трекинг/);
+  });
+  it('v:2: те же коды — честный регресс', () => {
+    const d = movementDelta({ date: '2026-09-01', fails: ['heels'], v: 2 }, ['heels', 'sh-thoracic']);
+    expect(d.regressed).toEqual(['sh-thoracic']);
+    expect(d.tracked).toEqual([]);
+    expect(d.text).not.toMatch(/новый трекинг/);
+  });
+  it('legacy без новых кодов — классика цела', () => {
+    const d = movementDelta({ date: '2026-08-01', fails: ['heels', 'valgus'] }, ['valgus', 'arms']);
+    expect(d.fixed).toEqual(['heels']);
+    expect(d.regressed).toEqual(['arms']);
   });
 });
 

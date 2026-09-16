@@ -66,6 +66,14 @@ describe('D1 intake: stale-чистка по маркеру lrVerdicts (source-g
   });
 });
 
+describe('П3 print: персист движений в печать плана (source-guard)', () => {
+  it('импорт + вызов + вставка после rationale', () => {
+    expect(SRC).toContain("import { buildBbMovementPrintBlock } from '../../../engines/bb/bb-diagnostics-export.engine';");
+    expect(SRC).toContain('movementHtml = buildBbMovementPrintBlock()');
+    expect(SRC).toContain('${rationaleHtml}${movementHtml}${weeksHtml}');
+  });
+});
+
 describe('D1 planner-bridge: vbtLossPct @deprecated, не удалён (source-guard)', () => {
   it('поле на месте и помечено @deprecated', () => {
     expect(BRIDGE).toContain('vbtLossPct?: number | null;');

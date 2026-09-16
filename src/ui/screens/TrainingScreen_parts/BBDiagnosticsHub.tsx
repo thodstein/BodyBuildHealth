@@ -42,7 +42,7 @@ import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
-import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, movementDelta, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
+import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, d1d5FailCodes, movementDelta, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
 import { shoulderWallVerdict, thoracicRotationVerdict } from '../../../engines/bb/bb-shoulder-screen.engine';
 import { hingeVerdict, loadedSquatVerdict } from '../../../engines/bb/bb-hinge-screen.engine';
 import { ybtLqVerdict, YBT_DISCLAIMER } from '../../../engines/bb/bb-ybt-lq.engine';
@@ -592,6 +592,22 @@ export const BBDiagnosticsHub: React.FC = () => {
       });
     } catch { return []; }
   }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral]);
+  // П1: D1–D5 коды снимка из вердиктов (только провалы; чисто — тихо).
+  const d1d5Codes = useMemo(() => {
+    try {
+      return d1d5FailCodes({
+        shoulder: { pass: !!(shoulderV as any).pass, locus: String((shoulderV as any).locus || '') },
+        rotGap: (rotV as any).gap ?? null,
+        rotLow: !!(rotV as any).low,
+        hinge: { pass: !!(hingeV as any).pass, locus: String((hingeV as any).locus || '') },
+        loadedDegraded: !!(loadedV as any).degraded,
+        ybtAsymCm: (ybtV as any).asymCm ?? null,
+        ybtCompositePct: (ybtV as any).compositePct ?? null,
+        ybtTested: !!(ybtV as any).tested,
+      });
+    } catch { return []; }
+  }, [shoulderV, rotV, hingeV, loadedV, ybtV]);
+  const screenCodes = useMemo(() => [...ohsCodes, ...d1d5Codes], [ohsCodes, d1d5Codes]);
   const [screenHist, setScreenHist] = useState<MovementSnapshot[]>(() => {
     try {
       const raw = localStorage.getItem('he_bb_screen_history');
@@ -602,9 +618,9 @@ export const BBDiagnosticsHub: React.FC = () => {
   const screenDelta = useMemo(() => {
     try {
       const prev = screenHist.length ? screenHist[screenHist.length - 1] : null;
-      return movementDelta(prev, ohsCodes);
-    } catch { return { fixed: [], regressed: [], text: '' } as any; }
-  }, [screenHist, ohsCodes]);
+      return movementDelta(prev, screenCodes);
+    } catch { return { fixed: [], regressed: [], tracked: [], text: '' } as any; }
+  }, [screenHist, screenCodes]);
 
   const score = report.score.score;
   const sLevel = report.score.level;
@@ -2104,7 +2120,8 @@ export const BBDiagnosticsHub: React.FC = () => {
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                 <b style={{ fontSize: 11, color: '#fff' }}>📸 Снимки скрининга ({screenHist.length})</b>
                 <button onClick={() => {
-                  const entry = { date: new Date().toISOString().slice(0, 10), fails: ohsCodes };
+                  // П1: снимок v:2 — OHS + D1–D5 коды (legacy без v мигрируют в дельте, не регрессом)
+                  const entry = { date: new Date().toISOString().slice(0, 10), fails: screenCodes, v: 2 };
                   setScreenHist((prev) => {
                     const next = [...prev, entry].slice(-10);
                     try { localStorage.setItem('he_bb_screen_history', JSON.stringify(next)); } catch { /* noop */ }

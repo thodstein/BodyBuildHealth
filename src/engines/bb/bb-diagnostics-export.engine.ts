@@ -232,6 +232,38 @@ export function buildBBDiagnosticsCsv(
   return lines.join('\n');
 }
 
+/**
+ * П3: блок «Скрининг движений» для печати ББ-плана — читает персист приёмника
+ * (`he_bb_last_movement_driver/_single_leg/_movement_extra`), всё через esc.
+ * Без ключей — пустая строка (печать байт-в-байт, блока нет). Сборку не трогает.
+ */
+export function buildBbMovementPrintBlock(): string {
+  try {
+    const get = (k: string): unknown => {
+      try {
+        if (typeof localStorage === 'undefined') return null;
+        const raw = localStorage.getItem(k);
+        return raw ? JSON.parse(raw) : null;
+      } catch { return null; }
+    };
+    const lines: string[] = [];
+    const d = get('he_bb_last_movement_driver') as { label?: unknown; fix?: unknown } | null;
+    if (d && typeof d.label === 'string' && d.label.trim()) {
+      lines.push(`Драйвер: ${d.label.trim()}${typeof d.fix === 'string' && d.fix.trim() ? ` — ${d.fix.trim()}` : ''}`);
+    }
+    const s = get('he_bb_last_single_leg') as { text?: unknown } | null;
+    if (s && typeof s.text === 'string' && s.text.trim()) lines.push(s.text.trim());
+    const x = get('he_bb_last_movement_extra') as Record<string, unknown> | null;
+    if (x && typeof x === 'object') {
+      for (const v of Object.values(x)) {
+        if (typeof v === 'string' && v.trim()) lines.push(v.trim().slice(0, 300));
+      }
+    }
+    if (!lines.length) return '';
+    return `<h2 style="font-size:14px;margin:16px 0 4px">🧭 Скрининг движений</h2><ul style="font-size:11px;color:#333">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`;
+  } catch { return ''; }
+}
+
 export function downloadHtml(html: string, filename: string): void {
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
