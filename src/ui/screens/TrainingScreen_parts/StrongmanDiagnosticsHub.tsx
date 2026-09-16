@@ -52,6 +52,13 @@ import { diagnoseSMHoldEvent } from '../../../engines/strength-sport/strength-sp
 import { buildSMFormatPlan, SM_EVENT_FORMAT_LABEL, type SMEventFormat } from '../../../engines/strength-sport/strength-sport-sm-format-attempts.engine';
 import { smAutoAnglesFromCsv } from '../../../engines/strength-sport/strength-sport-sm-auto-angles.engine';
 import { smAttemptsFor } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
+import { diagnoseStoneLap, diagnoseStoneRepFatigue } from '../../../engines/strength-sport/strength-sport-sm-stone-fatigue.engine';
+import { diagnoseCarryLocomotion, diagnoseCarryTurn } from '../../../engines/strength-sport/strength-sport-sm-carry-locomotion.engine';
+import { diagnoseGripCarry } from '../../../engines/strength-sport/strength-sport-sm-grip-carry.engine';
+import { diagnoseLogWindow } from '../../../engines/strength-sport/strength-sport-sm-log-window.engine';
+import { diagnoseTyreSecondPull, SM_TYRE_CORRECTIVES } from '../../../engines/strength-sport/strength-sport-sm-tyre.engine';
+import { diagnoseSuitcase } from '../../../engines/strength-sport/strength-sport-sm-suitcase.engine';
+import { diagnoseYBT, diagnoseSideHop, SM_SCREENING_DISCLAIMER } from '../../../engines/strength-sport/strength-sport-sm-ybt.engine';
 import { applyToPlanner } from './planner-bridge';
 import { OrthoScreenCard } from './OrthoScreenCard';
 import { CARD, DIM, ACCENT } from './training-ui';
@@ -153,6 +160,25 @@ type SMState = {
   stoneZeroLap: boolean;
   stonePull2Style: '' | 'pop' | 'grind';
   daysToStart: string;
+  // SM movement P1–P7: локомоция/разворот/хват-заступ/серия камня/тайр/чемодан/YBT
+  strideLengthM: string;
+  strideRateHz: string;
+  stanceS: string;
+  carryTurnS: string;
+  turnDrop: boolean;
+  gripRunSec: string;
+  gripDrops: string;
+  pickupMs: string;
+  stoneRepLatePull1S: string;
+  stoneRepLateLapS: string;
+  stoneRepLatePull2S: string;
+  tyrePull2S: string;
+  suitcaseLeftS: string;
+  suitcaseRightS: string;
+  ybtAntL: string;
+  ybtAntR: string;
+  ybtLegLen: string;
+  sideHop: string;
 };
 
 const DEFAULT_STATE: SMState = {
@@ -180,6 +206,11 @@ const DEFAULT_STATE: SMState = {
   herculesSec: '', herculesKg: '', medleyDrops: '',
   yMaxCm: '',
   stoneGripS: '', stonePeakWeek: false, stoneZeroLap: false, stonePull2Style: '', daysToStart: '',
+  strideLengthM: '', strideRateHz: '', stanceS: '', carryTurnS: '', turnDrop: false,
+  gripRunSec: '', gripDrops: '', pickupMs: '',
+  stoneRepLatePull1S: '', stoneRepLateLapS: '', stoneRepLatePull2S: '',
+  tyrePull2S: '', suitcaseLeftS: '', suitcaseRightS: '',
+  ybtAntL: '', ybtAntR: '', ybtLegLen: '', sideHop: '',
 };
 
 const TAB_DEFS: Array<{ id: SMTab; label: string; icon: string; desc: string }> = [
@@ -813,6 +844,48 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const carrySplitDiag = useMemo(() => diagnoseCarrySplits([
     numOrNull(state.carrySplit1S), numOrNull(state.carrySplit2S), numOrNull(state.carrySplit3S),
   ]), [state.carrySplit1S, state.carrySplit2S, state.carrySplit3S]);
+  // ── SM movement P1–P7: чистые мемы поверх новых движков ──
+  const stoneLapDiag = useMemo(() => diagnoseStoneLap({
+    lapS: numOrNull(state.stoneLapS), zeroLap: state.stoneZeroLap || null,
+  }), [state.stoneLapS, state.stoneZeroLap]);
+  const stoneFatigueDiag = useMemo(() => diagnoseStoneRepFatigue(
+    { pull1S: numOrNull(state.stonePull1S), lapS: numOrNull(state.stoneLapS), pull2S: numOrNull(state.stonePull2S) },
+    { pull1S: numOrNull(state.stoneRepLatePull1S), lapS: numOrNull(state.stoneRepLateLapS), pull2S: numOrNull(state.stoneRepLatePull2S) },
+  ), [state.stonePull1S, state.stoneLapS, state.stonePull2S, state.stoneRepLatePull1S, state.stoneRepLateLapS, state.stoneRepLatePull2S]);
+  const carryLocoDiag = useMemo(() => diagnoseCarryLocomotion({
+    kind: (parseFloat(state.yokeKg) || 0) > 0 ? 'yoke' : 'farmers',
+    strideLengthM: numOrNull(state.strideLengthM),
+    strideRateHz: numOrNull(state.strideRateHz),
+    stanceS: numOrNull(state.stanceS),
+    loadKg: numOrNull(state.yokeKg) ?? numOrNull(state.farmersKg),
+    bodyweightKg: bwKg,
+    split20mS: numOrNull(state.progYoke20m),
+  }), [state.yokeKg, state.farmersKg, state.strideLengthM, state.strideRateHz, state.stanceS, state.progYoke20m, bwKg]);
+  const carryTurnDiag = useMemo(() => diagnoseCarryTurn(
+    numOrNull(state.carryTurnS), state.turnDrop || null,
+  ), [state.carryTurnS, state.turnDrop]);
+  const gripCarryDiag = useMemo(() => diagnoseGripCarry({
+    farmersHoldSec: numOrNull(state.farmersHoldSec),
+    runTimeSec: numOrNull(state.gripRunSec),
+    dropsPerRun: state.gripDrops !== '' ? numOrNull(state.gripDrops) : null,
+    pickupMs: numOrNull(state.pickupMs),
+  }), [state.farmersHoldSec, state.gripRunSec, state.gripDrops, state.pickupMs]);
+  const logWindowDiag = useMemo(() => diagnoseLogWindow(
+    logDiamCm, numOrNull(state.logDipCm),
+  ), [logDiamCm, state.logDipCm]);
+  const tyreDiag = useMemo(() => diagnoseTyreSecondPull({
+    secondPullS: numOrNull(state.tyrePull2S),
+  }), [state.tyrePull2S]);
+  const suitcaseDiag = useMemo(() => diagnoseSuitcase({
+    leftS: numOrNull(state.suitcaseLeftS), rightS: numOrNull(state.suitcaseRightS),
+  }), [state.suitcaseLeftS, state.suitcaseRightS]);
+  const ybtDiag = useMemo(() => diagnoseYBT({
+    antLeftCm: numOrNull(state.ybtAntL), antRightCm: numOrNull(state.ybtAntR),
+    legLengthCm: numOrNull(state.ybtLegLen),
+  }), [state.ybtAntL, state.ybtAntR, state.ybtLegLen]);
+  const sideHopDiag = useMemo(() => diagnoseSideHop(
+    numOrNull(state.sideHop), ybtDiag?.antAsymCm ?? null,
+  ), [state.sideHop, ybtDiag]);
   const bicepsRisk = useMemo(() => scoreSMBicepsRisk({
     stonePlanned: (parseFloat(state.stoneKg) || 0) > 0,
     mixedGrip: state.mixGrip === 'mixed',
@@ -1348,6 +1421,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 <HubNum label="Тяга (аксель)" unit="кг" value={state.deadliftKg} onChange={v=>setState(s=>({...s, deadliftKg:v}))} placeholder="250" step={2.5} />
               </div>
               {logDipDiag && <div style={{ fontSize:12, color: logDipDiag.verdict === 'ok' ? '#22c55e' : '#f59e0b', marginTop:4 }}>{logDipDiag.text} (Renals braking/propulsion, Zhang dip 0.20с)</div>}
+              {logWindowDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>🪵 {logWindowDiag.text}</div>}
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
                 <HubPopupSelect label="Стратегия попыток" value={state.strategy} onChange={v=>setState(s=>({...s, strategy:v}))} options={[{ id:'conservative', label:'Осторожная', desc:'85 / 92 / 98' }, { id:'balanced', label:'Сбалансированная', desc:'88 / 95 / 100' }, { id:'aggressive', label:'Агрессивная', desc:'90 / 97 / 102' }]} />
                 <HubPopupSelect label="Хват тяги" value={state.mixGrip} onChange={v=>setState(s=>({...s, mixGrip:v}))} options={[{ id:'overhand', label:'Верхний / крюк' }, { id:'mixed', label:'Разнохват', desc:'риск бицепса' }, { id:'straps', label:'Лямки' }]} />
@@ -1412,6 +1486,26 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <HubNum label="Отрезок 15–20 м" unit="сек" value={state.carrySplit3S} onChange={v=>setState(s=>({...s, carrySplit3S:v}))} placeholder="4.5" step={0.5} />
             </div>
             {carrySplitDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>⏱ {carrySplitDiag.lines.join(' · ')}</div>}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Длина шага" unit="м" value={state.strideLengthM} onChange={v=>setState(s=>({...s, strideLengthM:v}))} placeholder="1.14" step={0.05} />
+              <HubNum label="Темп шагов" unit="Гц" value={state.strideRateHz} onChange={v=>setState(s=>({...s, strideRateHz:v}))} placeholder="1.62" step={0.05} />
+              <HubNum label="Контакт" unit="с" value={state.stanceS} onChange={v=>setState(s=>({...s, stanceS:v}))} placeholder="0.42" step={0.01} />
+              <HubNum label="Разворот 180°" unit="с" value={state.carryTurnS} onChange={v=>setState(s=>({...s, carryTurnS:v}))} placeholder="2.5" step={0.5} />
+            </div>
+            <HubToggle checked={state.turnDrop} onChange={v=>setState(s=>({...s, turnDrop:v}))} label="Дроп на развороте (слабое место медли)" style={{ marginTop:6 }} />
+            {carryLocoDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>🚜 {carryLocoDiag.lines.join(' · ')}</div>}
+            {carryTurnDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>↩️ {carryTurnDiag.text}</div>}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Время заступа" unit="с" value={state.gripRunSec} onChange={v=>setState(s=>({...s, gripRunSec:v}))} placeholder="40" step={5} />
+              <HubNum label="Дропы/заступ" unit="шт" value={state.gripDrops} onChange={v=>setState(s=>({...s, gripDrops:v}))} placeholder="0" step={1} />
+              <HubNum label="Съём" unit="мс" value={state.pickupMs} onChange={v=>setState(s=>({...s, pickupMs:v}))} placeholder="900" step={100} />
+            </div>
+            {gripCarryDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>✊ {gripCarryDiag.lines.join(' · ')}</div>}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Чемодан L" unit="с" value={state.suitcaseLeftS} onChange={v=>setState(s=>({...s, suitcaseLeftS:v}))} placeholder="30" step={1} />
+              <HubNum label="Чемодан R" unit="с" value={state.suitcaseRightS} onChange={v=>setState(s=>({...s, suitcaseRightS:v}))} placeholder="30" step={1} />
+            </div>
+            {suitcaseDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>🧳 {suitcaseDiag.text}</div>}
             <div style={{ marginTop:6, padding:'10px 12px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px dashed rgba(140,190,255,0.16)', textAlign:'center' }}>
               <div style={{ fontSize:13, color:'#fff' }}>📹 Видео переноски — качание из Кинова (Kinovea)</div>
               <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Сними сбоку 30 кадров/с → таблица Кинова (CSV) → вкладка Видео → качание само</div>
@@ -1465,6 +1559,15 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Руки-канаты: локти прямые, хват вперёд центра, обхват максимум (Hooper) — сгибание = разрыв бицепса</div>
             {stonePhase && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>⏱ {stonePhase.lines.join(' · ')}</div>}
+            {stoneLapDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>🪨 {stoneLapDiag.text}</div>}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubNum label="Поздний 1-я тяга" unit="сек" value={state.stoneRepLatePull1S} onChange={v=>setState(s=>({...s, stoneRepLatePull1S:v}))} placeholder="2.8" step={0.5} />
+              <HubNum label="Поздний колени" unit="сек" value={state.stoneRepLateLapS} onChange={v=>setState(s=>({...s, stoneRepLateLapS:v}))} placeholder="1.8" step={0.5} />
+              <HubNum label="Поздняя 2-я" unit="сек" value={state.stoneRepLatePull2S} onChange={v=>setState(s=>({...s, stoneRepLatePull2S:v}))} placeholder="3.0" step={0.5} />
+              <HubNum label="Тайр 2-я тяга" unit="сек" value={state.tyrePull2S} onChange={v=>setState(s=>({...s, tyrePull2S:v}))} placeholder="0.8" step={0.1} />
+            </div>
+            {stoneFatigueDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>📉 {stoneFatigueDiag.lines.join(' · ')}</div>}
+            {tyreDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>🛞 {tyreDiag.text} · {SM_TYRE_CORRECTIVES[0].target} ({SM_TYRE_CORRECTIVES[0].protocol})</div>}
           </div>
         )}
 
@@ -1565,6 +1668,15 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <HubNum label="Колено-стена (Knee-to-wall)" unit="см" value={state.kneeToWallCm} onChange={v=>setState(s=>({...s, kneeToWallCm:v}))} placeholder="12" step={1} />
               <HubNum label="Голеностоп" unit="°" value={state.ankleDeg} onChange={v=>setState(s=>({...s, ankleDeg:v}))} placeholder="35" step={1} />
             </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginBottom:6 }}>
+              <HubNum label="YBT anterior L" unit="см" value={state.ybtAntL} onChange={v=>setState(s=>({...s, ybtAntL:v}))} placeholder="62" step={1} />
+              <HubNum label="YBT anterior R" unit="см" value={state.ybtAntR} onChange={v=>setState(s=>({...s, ybtAntR:v}))} placeholder="60" step={1} />
+              <HubNum label="Длина ноги (YBT)" unit="см" value={state.ybtLegLen} onChange={v=>setState(s=>({...s, ybtLegLen:v}))} placeholder="90" step={1} />
+              <HubNum label="Side-hop 30с" unit="шт" value={state.sideHop} onChange={v=>setState(s=>({...s, sideHop:v}))} placeholder="32" step={1} />
+            </div>
+            {ybtDiag && <div style={{ fontSize:12, color:'#fff', marginBottom:6 }}>⚖️ {ybtDiag.lines.join(' · ')}</div>}
+            {sideHopDiag && <div style={{ fontSize:12, color:'#fff', marginBottom:6 }}>🦘 {sideHopDiag.text}</div>}
+            <div style={{ fontSize:11, color:'#fff', marginBottom:6 }}>{SM_SCREENING_DISCLAIMER}</div>
             <div style={{ marginTop: 6 }} data-sm="ortho-screen">
               <OrthoScreenCard compact />
             </div>

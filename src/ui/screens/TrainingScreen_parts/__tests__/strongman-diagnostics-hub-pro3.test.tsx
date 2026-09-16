@@ -53,4 +53,22 @@ describe('StrongmanDiagnosticsHub PRO-3', () => {
     expect(await screen.findByText(/Видеоуглы с телефона/)).toBeTruthy();
     expect(document.body.textContent).not.toContain('заглушка BlazePose');
   });
+  it('movement P2: переноски показывают локомоцию и разворот', async () => {
+    render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(screen.getByText(/Переноски/));
+    expect(await screen.findByText(/Длина шага/)).toBeTruthy();
+    expect(document.body.textContent).toContain('Разворот 180');
+  });
+  it('movement P1+P5: загрузки показывают lap-маркер и тайр', async () => {
+    render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(screen.getByText(/Загрузки/));
+    expect(await screen.findByText(/Поздний колени/)).toBeTruthy();
+    expect(document.body.textContent).toContain('Тайр 2-я тяга');
+  });
+  it('movement P7: мобильность показывает YBT и дисклеймер', async () => {
+    render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(document.querySelector('[data-sm="bottom-tab-mobility"]') as HTMLElement);
+    expect(await screen.findByText(/YBT anterior L/)).toBeTruthy();
+    expect(document.body.textContent).toContain('Скрининг, не диагноз');
+  });
 });
