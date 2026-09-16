@@ -35,7 +35,7 @@ import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplac
 import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
 import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, buildTrainSchedule, type TrainScheduleType, type TrainSchedule } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
 import { decomposeRecipe, pickRecipeForMeal, pickRecipesForMeal, cookProfileFromSettings, prepTimeBudgetPerMeal, filterByCookSkill, type CookProfile } from "./recipe-engine";
-import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes, assembleRecipeDay, scaleRecipeToTarget, recipeCompatibility, shrinkFirstForSecond } from "./planner-recipe-mode";
+import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes, assembleRecipeDay, scaleRecipeToTarget, recipeCompatibility, shrinkFirstForSecond, filterRecipePoolForBand } from "./planner-recipe-mode";
 import type { FlatRecipeOption } from "./planner-recipe-mode";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
@@ -2160,7 +2160,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (!m) return;
     const pool = [...getRecipes(), ...(userRecipes || [])];
     const prof = cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking });
-    const filtered = filterByCookSkill(pool, prof.skill);
+    // §7.2-Р (а): «🔄 Другие варианты» тоже не показывает карб-лоад вне экстрим-полосы дня.
+    const filtered = filterRecipePoolForBand(filterByCookSkill(pool, prof.skill), effectiveC, effectiveP, weight);
     const budget = prepTimeBudgetPerMeal(prof, mealsCount);
     const tgt = m.target || { p: m.totals.p, c: m.totals.c, f: m.totals.f };
     const excludeNames = new Set<string>(m.recipeOptionNames || []);
@@ -2219,7 +2220,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       };
     }
     if (!source?.meals) return;
-    const poolAll = filterByCookSkill([...getRecipes(), ...(userRecipes || [])], cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking }).skill);
+    // §7.2-Р (а): 'carb-load' блюда — только для экстрим-полосы дня; вне неё не показываем
+    // (иначе «Загрузка: спагетти…» всплывает в обычных днях и ломает portable-фильтры).
+    const poolAll = filterRecipePoolForBand(filterByCookSkill([...getRecipes(), ...(userRecipes || [])], cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking }).skill), effectiveC, effectiveP, weight);
     const labelMap: Record<string, 'breakfast'|'lunch'|'snack'|'dinner'|'preworkout'|'postworkout'|'presleep'> = {
       'Завтрак': 'breakfast', 'Обед': 'lunch', 'Ужин': 'dinner', 'Перекус': 'snack', 'Второй завтрак': 'snack',
       'Полдник': 'snack', 'Предтрен': 'preworkout', 'Пост-трен': 'postworkout', 'Перед сном': 'presleep',
@@ -3452,7 +3455,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _cookProf: CookProfile | undefined = cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking });
         const _allRecipes = [...getRecipes(), ...(userRecipes||[])];
         const _recipeBudget = _cookProf ? prepTimeBudgetPerMeal(_cookProf, _effMealsCount) : 60;
-        const _filteredRecipes = _cookProf ? filterByCookSkill(_allRecipes, _cookProf.skill) : _allRecipes;
+        // §7.2-Р (а): карб-лоад блюда — только в экстрим-полосе дня (чипы-подсказки включительно).
+        const _filteredRecipes = filterRecipePoolForBand(_cookProf ? filterByCookSkill(_allRecipes, _cookProf.skill) : _allRecipes, input.goalCarbsG, input.goalProteinG, weight);
         if (_filteredRecipes.length > 0) {
           meals.forEach((m: any) => {
             // В режиме «по рецептам» основные приёмы получают recipeOptions ниже — чипы-подсказки им не нужны

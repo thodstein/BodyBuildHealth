@@ -3,6 +3,7 @@ import { usePlanCtx } from "./IndividualPlanContext";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
 import { recipeMacroDistance } from "./recipe-engine";
+import { filterRecipePoolForBand } from "./planner-recipe-mode";
 import { MealQuickControls } from "./MealQuickControls";
 import { MealComposerMode, type ComposerMode } from "./MealComposerMode";
 import type { AdvancedFilter } from "../../../../engines/kbju-food-match.engine";
@@ -83,7 +84,7 @@ export const MealComposer: React.FC = () => {
     renderMealList,
     recipePickerMeal, setRecipePickerMeal, replaceMealWithRecipe, addSecondRecipeToMeal,
     favoriteRecipes, isFavoriteRecipe, toggleFavoriteRecipe,
-    effectiveKcal, effectiveP, effectiveF, effectiveC,
+    effectiveKcal, effectiveP, effectiveF, effectiveC, weight,
     setDayPlan, setThreeDayPlan, setWeekPlan, saveUndo,
      setPlanTab, plannerMode,
   } = usePlanCtx();
@@ -100,7 +101,8 @@ export const MealComposer: React.FC = () => {
     const tgt = m?.target || { p: m?.totals?.p ?? 30, c: m?.totals?.c ?? 40, f: m?.totals?.f ?? 15 };
     const tKcal = m?.totals?.kcal || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9) || 300;
     try {
-      return getRecipesByMeal(mealType as any).map((r: any) => ({
+      // §7.2-Р (а): ручной пикер рецептов тоже уважает полосу дня (карб-лоад — только экстрим-У).
+      return filterRecipePoolForBand(getRecipesByMeal(mealType as any), effectiveC, effectiveP, weight).map((r: any) => ({
         r,
         dist: recipeMacroDistance(r, { targetKcal: tKcal, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15 }),
       })).sort((a: any, b: any) => a.dist - b.dist).map((x: any) => x.r);

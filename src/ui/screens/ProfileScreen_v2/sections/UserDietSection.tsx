@@ -50,14 +50,18 @@ export const UserDietSection: React.FC = React.memo(function UserDietSection() {
           onChange={v => updateNutrition({ dietType: v as any })}
           placeholder="—"
         />
-        <PopupValueEditor
-          label="Приёмов пищи в день"
-          value={nutrition.mealsPerDay}
-          type="number"
-          min={2} max={8}
-          onChange={v => updateNutrition({ mealsPerDay: v ?? 3 })}
-          placeholder="—"
-        />
+        {/* Число приёмов — АВТО (выбор пользователя убран): планировщик подбирает
+            количество по ёмкости нормальной тарелки (белок/угли/ккал на приём),
+            тренировочные peri-окна и окна болюсов идут сверх. Значение в профиле —
+            производное от последнего собранного плана (для отчётов), не настройка. */}
+        <div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Приёмов пищи в день</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>
+            {typeof nutrition.mealsPerDay === 'number' && nutrition.mealsPerDay > 0 ? nutrition.mealsPerDay : '—'}
+            <span style={{ fontWeight: 400, fontSize: 9, marginLeft: 4 }}>· авто</span>
+          </div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>Подбирает планировщик по ёмкости тарелки</div>
+        </div>
         <PopupValueEditor
           label="Навык готовки"
           value={nutrition.cookingSkill}

@@ -134,6 +134,12 @@ describe('E2E калькулятора: SARMs и GLP-1 в фарм-матриц�
     expect(classes).toContain('trenbolone');
     expect(classes).toContain('oral17');
   });
+
+  it('mk677 — GH-секретагог (канон pharma-db), а НЕ SARM (фикс матрицы классов)', () => {
+    const classes = detectActivePedClasses(stateWith(['mk677'])).map(c => c.id);
+    expect(classes).toContain('gh');
+    expect(classes).not.toContain('sarm');
+  });
 });
 
 describe('E2E калькулятора: покрытие резidual с поддержкой из протокола', () => {

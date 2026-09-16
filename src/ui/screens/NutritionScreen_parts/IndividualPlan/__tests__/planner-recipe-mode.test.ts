@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
+import { RECIPE_DB } from '../../../../../data/recipe-db';
 import { getRecipes, type Recipe } from '../../../../../engines/nutrition-periodization.engine';
 import {
   kbjuFormulaDeviationPct,
@@ -19,6 +20,9 @@ import {
   recipeMatchesPreset,
   scaleRecipeToTarget,
   extremeCarbTopUp,
+  assembleRecipeDay,
+  filterRecipePoolForBand,
+  isExtremeCarbBand,
 } from '../planner-recipe-mode';
 import { snapPortionG } from '../meal-plan-engine';
 
@@ -405,5 +409,45 @@ describe('extremeCarbTopUp (§7.2-Р-финал: добор углей на эк
     const notes = extremeCarbTopUp(meals, { kcal: 4800, p: 260, f: 110, c: 950 }, { weightKg: 110 });
     expect(notes.every(n => !n.startsWith('🍚 Экстрим-добор'))).toBe(true);
     expect(meals[0].items.length).toBe(1);
+  });
+});
+
+describe('§7.2-Р: карб-лоад рецепты (p39) — полоса и взвешенный ранкинг', () => {
+  it('контент: 4 карб-лоад блюда, id ⊂ FOOD_DB, У/Б ≥ 5, Б ≤ 30, kcal = формула ≤3%', () => {
+    const loads = RECIPE_DB.filter(r => (r.tags || []).includes('carb-load'));
+    expect(loads.length).toBe(4);
+    for (const r of loads) {
+      for (const id of r.ingredientIds || []) expect(FOOD_DB.find(f => f.id === id), `${r.name}: нет ${id}`).toBeTruthy();
+      expect(r.protein, r.name).toBeLessThanOrEqual(30);
+      expect(r.carbs / Math.max(1, r.protein), r.name).toBeGreaterThanOrEqual(5);
+      expect(kbjuFormulaDeviationPct(r.kcal, r.protein, r.fat, r.carbs), r.name).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('вне экстрим-полосы карб-лоад не выбирается вовсе (обычные дни не тронуты)', () => {
+    const res = assembleRecipeDay({
+      meals: [
+        { label: 'Завтрак', time: '08:00', items: [], totals: { kcal: 0, p: 0, f: 0, c: 0 }, target: { p: 45, c: 120, f: 20 } },
+        { label: 'Обед', time: '13:00', items: [], totals: { kcal: 0, p: 0, f: 0, c: 0 }, target: { p: 55, c: 150, f: 25 } },
+        { label: 'Ужин', time: '19:00', items: [], totals: { kcal: 0, p: 45, f: 20, c: 120 } },
+      ] as any,
+      pool: RECIPE_DB as any, targets: { kcal: 2600, p: 160, f: 80, c: 400 },
+      excludedIds: new Set<string>(), trainDay: false, athleteWeightKg: 90, seed: 1, goal: 'mass',
+    });
+    const names = res.meals.map(m => (m as any).recipeApplied).filter(Boolean) as string[];
+    expect(names.length).toBeGreaterThan(0);
+    expect(names.some(n => n.startsWith('Загрузка:'))).toBe(false);
+  });
+
+  it('filterRecipePoolForBand: чипы/пикер/сборка — единая точка (полоса = У≥8 и Б≥2.3 г/кг)', () => {
+    const bandOut = filterRecipePoolForBand(RECIPE_DB, 400, 160, 90); // 4.4 г/кг У — вне полосы
+    expect(bandOut.some(r => (r.tags || []).includes('carb-load'))).toBe(false);
+    expect(bandOut.length).toBe(RECIPE_DB.length - 4);
+    const bandIn = filterRecipePoolForBand(RECIPE_DB, 1500, 280, 120); // 12.5 г/кг — полоса
+    expect(bandIn.length).toBe(RECIPE_DB.length);
+    expect(bandIn.some(r => (r.tags || []).includes('carb-load'))).toBe(true);
+    expect(isExtremeCarbBand(1500, 280, 120)).toBe(true);
+    expect(isExtremeCarbBand(1500, 200, 120)).toBe(false); // У есть, Б нет → не полоса
+    expect(isExtremeCarbBand(800, 300, 110)).toBe(false); // R-HV: 7.3 г/кг — не полоса
   });
 });

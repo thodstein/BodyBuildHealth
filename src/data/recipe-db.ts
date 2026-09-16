@@ -25,6 +25,7 @@ import { RECIPE_DB_P35 } from './recipe-db-p35';
 import { RECIPE_DB_P36 } from './recipe-db-p36';
 import { RECIPE_DB_P37 } from './recipe-db-p37';
 import { RECIPE_DB_P38 } from './recipe-db-p38';
+import { RECIPE_DB_P39 } from './recipe-db-p39';
 import { enrichRecipes } from './recipe-enrichment';
 
 /**
@@ -155,4 +156,6 @@ export const RECIPE_DB: Recipe[] = enrichRecipes([
   ...RECIPE_DB_P36,
   ...RECIPE_DB_P37,
   ...RECIPE_DB_P38,
+  // p39: 4 «карб-лоад» блюда (Б/У 5.4–11.5) — видны только в экстрим-полосе (tag 'carb-load').
+  ...RECIPE_DB_P39,
 ]).map(sanitizeRecipePortions).map(normalizeRecipeKcal);

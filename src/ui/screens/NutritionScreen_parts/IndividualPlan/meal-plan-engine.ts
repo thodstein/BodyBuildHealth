@@ -5745,6 +5745,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           return true;
         };
         for (const _tm of _orderedTargets) {
+        // §500Б-сглаживание: приём, уже добравший свой белок (≥ цель×1.15), не «докармливаем»
+        // порошком/мясом — топ-ап уходит в следующий приём по загрузке (был «Перекус 2: 89 г
+        // при цели 40»: shrimp 130 + изолят 60). Только ultra-high-P дни (≥350 г или ≥3.5 г/кг).
+        if (_ultraPDay && effWorst === 'p') {
+          const _tpSk = Number((_tm as any)?.target?.p) || 0;
+          if (_tpSk > 0) {
+            const _nowP = (_tm.items || []).reduce((s: number, x: any) => s + (x.p || 0), 0);
+            if (_nowP >= _tpSk * 1.15) continue;
+          }
+        }
         if (_mergeItemFor(_tm)) break;
         {
           // Эпик B: ротация кандидатов — если первый степл в приёме-цели уже у порционного
@@ -5864,7 +5874,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // хлеб ≤110 г), остальное ≤150 г. Иначе догон недобора наливал «Финик Меджул 150 г».
         // Порошок — скуп (60 г) и здесь, а не 150: иначе первый же push — «изолят 150 г».
         const _portionCeiling = isProteinPowderId(best.id) ? (SUPPLEMENT_MAX_G[best.id] ?? 60) : (COMFORT_PORTION_LIMITS[best.id] ?? 150);
-        let grams = Math.max(10, Math.min(_portionCeiling, Math.round(Math.max(0, _needG) / per100 * 100 / 10) * 10));
+        // §500Б-сглаживание: граммовка белка ограничена и комнатой ПРИЁМА (цель×1.15 − факт),
+        // а не только суточным недобором — иначе один приём уходил на 89–95 г при цели 40–68.
+        let _needGUse = _needG;
+        if (_ultraPDay && effWorst === 'p') {
+          const _tpG = Number((targetMeal as any)?.target?.p) || 0;
+          if (_tpG > 0) {
+            const _nowG = (targetMeal.items || []).reduce((s: number, x: any) => s + (x.p || 0), 0);
+            _needGUse = Math.min(_needG, Math.max(0, _tpG * 1.15 - _nowG));
+          }
+        }
+        let grams = Math.max(10, Math.min(_portionCeiling, Math.round(Math.max(0, _needGUse) / per100 * 100 / 10) * 10));
         const r = grams/100;
         const p2=Math.round((best.protein||0)*r), f2=Math.round((best.fat||0)*r), c2=Math.round((best.carbs||0)*r);
         const it:any = { id: best.id, name: best.name, amount: grams, role: effWorst==='p'?'protein':effWorst==='c'?'carb_slow':'fat', kcal: Math.round(4*p2+9*f2+4*c2), p:p2, f:f2, c:c2, fiber: Math.round((best.fiber||0)*r), leucine_mg: 0 };
@@ -7585,6 +7605,69 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
+    // ─── §500Б-сглаживание (ultraP): перераспределение белка по приёмам ───────────
+    // 500 г в ≤8 приёмах требует концентрации, но «Перекус 2: 88 г при цели 40» — следствие
+    // двойного источника в приёме (мясо-ротация + порошок) и грубых порций. Здесь, ПОСЛЕ
+    // всех доборов: у приёма выше цели×1.25 ужимаем крупнейший НЕфиксированный порошок
+    // (fallback — мясо) и отдаём граммы приёму с наибольшим недобором к его цели
+    // (растим его существующий белковый пункт). Суточный итог сохраняется (±округление).
+    {
+      const _ultraPS = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
+      if (_ultraPS) {
+        const _scaleItemG = (it: any, newAmount: number) => {
+          const r = newAmount / Math.max(1, it.amount || 1);
+          it.amount = newAmount;
+          it.p = Math.round((it.p || 0) * r * 10) / 10;
+          it.f = Math.round((it.f || 0) * r * 10) / 10;
+          it.c = Math.round((it.c || 0) * r * 10) / 10;
+          it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+          if (it.fiber != null) it.fiber = Math.round(it.fiber * r * 10) / 10;
+          if (it.leucine_mg != null) it.leucine_mg = Math.round(it.leucine_mg * r);
+        };
+        for (let _g = 0; _g < 12; _g++) {
+          const _over = meals
+            .filter((m: any) => !m._insulinWindow && (Number(m?.target?.p) || 0) > 0)
+            .map((m: any) => ({ m, over: (m.totals?.p || 0) - Number(m.target.p) * 1.25 }))
+            .filter(x => x.over > 5)
+            .sort((a, b) => b.over - a.over)[0];
+          if (!_over) break;
+          const _pows = (_over.m.items || []).filter((it: any) => isProteinPowderId(it.id) && !(it as any)._fixedGrams);
+          const _meats = (_over.m.items || []).filter((it: any) => (it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein') && !(it as any)._fixedGrams);
+          const _donor = [..._pows].sort((a: any, b: any) => (b.p || 0) - (a.p || 0))[0]
+            ?? [..._meats].sort((a: any, b: any) => (b.p || 0) - (a.p || 0))[0];
+          if (!_donor) break;
+          const _dFd = FOOD_DB.find((f: any) => f.id === _donor.id);
+          const _dPer100 = _dFd ? (_dFd.protein || 0) : 0;
+          if (_dPer100 <= 0) break;
+          const _cutG = Math.min(Math.round((_donor.amount || 0) * 0.5), Math.max(0, Math.ceil(_over.over / _dPer100 * 100 / 5) * 5));
+          if (_cutG < 10) break;
+          const _freedP = _dPer100 * _cutG / 100;
+          const _under = meals
+            .filter((m: any) => m !== _over.m && (Number(m?.target?.p) || 0) > 0)
+            .map((m: any) => ({ m, def: Number(m.target.p) - (m.totals?.p || 0) }))
+            .filter(x => x.def > 4)
+            .sort((a, b) => b.def - a.def)[0];
+          if (!_under) break;
+          const _recv = ((_under.m.items || []).find((it: any) => isProteinPowderId(it.id) && !(it as any)._fixedGrams)
+            ?? (_under.m.items || []).find((it: any) => it.role === 'slow_protein' && !(it as any)._fixedGrams)
+            ?? (_under.m.items || []).find((it: any) => it.role === 'protein' && !(it as any)._fixedGrams)
+            ?? (_under.m.items || []).find((it: any) => it.role === 'fast_protein' && !(it as any)._fixedGrams));
+          if (!_recv) break;
+          const _rFd = FOOD_DB.find((f: any) => f.id === _recv.id);
+          const _rPer100 = _rFd ? (_rFd.protein || 0) : 0;
+          if (_rPer100 <= 0) break;
+          const _addG = Math.min(300 - (_recv.amount || 0), Math.max(5, Math.round(_freedP / _rPer100 * 100 / 5) * 5));
+          if (_addG < 5) break;
+          _scaleItemG(_donor, (_donor.amount || 0) - _cutG);
+          _scaleItemG(_recv, (_recv.amount || 0) + _addG);
+          (_over.m as any).totals = mealTotalsOf(_over.m.items);
+          (_under.m as any).totals = mealTotalsOf(_under.m.items);
+          recalcDayTotals(meals, totals);
+          notes.push(`⚖️ 500Б-сбалансировка: «${(_over.m as any).label}» ${_donor.name} −${_cutG} г → «${(_under.m as any).label}» ${_recv.name} +${_addG} г`);
+        }
+      }
+    }
+
     // ─── Коктейльный режим: тайминг жидкого белка (только чтение, макросы не трогаем) ──
     // На ultra-high-P дне (≥350 г или ≥3.5 г/кг) приёмы с порошком ≥20 г и/или яичным
     // белком ≥150 г получают пометку «🥤 Коктейль» со временем отнесения: большой белок

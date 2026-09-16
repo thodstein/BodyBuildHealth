@@ -141,6 +141,20 @@ describe('R-HV: products 500Б — best-effort + бейдж', () => {
     expect(plan.notes.some(n => (n || '').includes('выше потолка'))).toBe(true);
   });
 
+  it('§500Б-сглаживание: основные приёмы ≤ цель×1.35 (было 95 г при цели 68)', () => {
+    // Сглаживание в двух точках: кламп белкового топ-апа комнатой приёма (цель×1.15) +
+    // перераспределение после всех доборов. Остаточный перекос возможен только у
+    // снек-коктейлей (двойной источник мясо+порошок) — там перераспределять некуда
+    // (все приёмы на/выше целей), это структурный дизайн 500Б в ≤8 приёмах.
+    for (const m of plan.meals) {
+      const t = String(m.type || '');
+      if (!['breakfast', 'lunch', 'dinner'].includes(t) || (m as any)._insulinWindow) continue;
+      const tp = Number((m as any).target?.p) || 0;
+      if (tp <= 0) continue;
+      expect(m.totals.p, `${m.label}: ${Math.round(m.totals.p)} г при цели ${tp}`).toBeLessThanOrEqual(tp * 1.35);
+    }
+  });
+
   it('порции ≤350 г, коктейльных приёмов ≤4 (порошок только с яичным белком)', () => {
     for (const m of plan.meals) {
       for (const it of m.items || []) {
@@ -272,5 +286,9 @@ describe('R-1500: assembleRecipeDay на 1500У (реальный поток: pr
     const c = res1500.meals.flatMap(m => m.items || []).reduce((s, i) => s + (i.c || 0), 0);
     expect(c, `угли ${Math.round(c)} г`).toBeGreaterThanOrEqual(1500 * 0.85);
     expect(res1500.notes.some(n => (n || '').includes('Экстрим-добор')), 'нет заметки добора').toBe(true);
+    // §7.2-Р (p39): в экстрим-полосе карб-лоад блюдо реально выбирается (ранжир с весом
+    // углеводов) — иначе день снова перебирает белок ядер на +24…29%.
+    const applied = res1500.meals.map(m => (m as any).recipeApplied).filter(Boolean) as string[];
+    expect(applied.some(n => n.startsWith('Загрузка:')), applied.join(' | ')).toBe(true);
   });
 });

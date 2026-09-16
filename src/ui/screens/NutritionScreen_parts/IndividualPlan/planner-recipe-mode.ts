@@ -1029,6 +1029,25 @@ export function rebalanceDayAfterRecipes(
 }
 
 /**
+ * §7.2-Р (а): экстрим-полоса углеводного дня — У≥8 г/кг И Б≥2.3 г/кг.
+ * Только в этой полосе видны 'carb-load' блюда (рисовые/картофельные загрузочные)
+ * и работает взвешенный в пользу углеводов ранкинг кандидатов.
+ */
+export function isExtremeCarbBand(carbsG: number, proteinG: number, weightKg: number): boolean {
+  const w = weightKg > 0 ? weightKg : 80;
+  return (carbsG || 0) >= 8 * w && (proteinG || 0) >= 2.3 * w;
+}
+
+/**
+ * Вне экстрим-полосы 'carb-load' рецепты вырезаются из пула (обычные дни байт-в-байт
+ * прежние). Единая точка и для сборки дня, и для чипов-подсказок UI.
+ */
+export function filterRecipePoolForBand<T extends { tags?: string[] }>(pool: T[], carbsG: number, proteinG: number, weightKg: number): T[] {
+  if (isExtremeCarbBand(carbsG, proteinG, weightKg)) return pool;
+  return pool.filter(r => !(r.tags || []).includes('carb-load'));
+}
+
+/**
  * §7.2-Р-финал (D8): экстрим-угли в рецептурном пути — финальный добор углей ПОСЛЕ всех
  * проходов (ребаланс/корректор). Почему отдельным проходом: перебор белка ядер рецептов
  * (пол ~+25% структурный) делает день «ккал-перегруженным» ДЛЯ КАЖДОГО приёма внутри
@@ -1052,7 +1071,7 @@ export function extremeCarbTopUp(
   const tK = targets?.kcal || 0;
   if (!w || tC <= 0 || !Array.isArray(meals)) return notes;
   // Та же полоса, что в продукт-пути §7.2-7c: экстрим-угли при экстрим-белке.
-  if (!(tC >= 8 * w && tP >= 2.3 * w)) return notes;
+  if (!isExtremeCarbBand(tC, tP, w)) return notes;
   const before = sumDayTotals(meals);
   const devBefore = maxDeviationPct(before, targets);
   const dC0 = tC - before.c;
@@ -1066,9 +1085,15 @@ export function extremeCarbTopUp(
   // Носители: только почти-белково-нейтральные (рис/картоф/овёс: Б ≤2.5/100 г) — цель дня У,
   // не Б. Сахарные бомбы, объём/ЖКТ (булгур/ватат/гречка) и «сливки» — нет.
   const _sugarIds = new Set(['honey', 'jam', 'marmalade', 'zefir', 'pastila', 'pryaniki', 'sushki', 'sugar_cookies', 'dates', 'dates_dried', 'raisins', 'dried_apricots', 'dried_apple_rings', 'fruit_date_medjool', 'prunes', 'dried_pineapple', 'dried_mango', 'dried_cranberry', 'dried_blueberry', 'dried_kiwi', 'dried_pear', 'dried_peach', 'dried_banana_chips']);
+  // Сахарный потолок дня (скользящий, как в ребалансе): мёд/джем допустимы, ПОКА день
+  // в пределах 15/20/25% сахаров от углеводов — это легальный carb-load носитель
+  // (почти без белка: ~0.4 г Б на 100 г У против рисовых 9.6).
+  const _sugarNow = meals.flatMap(m => (m.items || [])).filter((it: any) => _sugarIds.has(it.id)).reduce((s: number, it: any) => s + (it.c || 0), 0);
+  const _sugarCapShare = tC >= 1300 ? 0.25 : tC >= 1000 ? 0.20 : 0.15;
+  const _allowSugar = _sugarNow < tC * _sugarCapShare;
   const _pool = topupFoods(TOPUP_CARB_IDS, undefined)
     .filter(f => (f.protein || 0) <= 3) // рис/картофель/овёс — Б-нейтральные (рис 2.7 — оптимален по У/Б)
-    .filter(f => !_sugarIds.has(f.id))
+    .filter(f => _allowSugar || !_sugarIds.has(f.id))
     .filter(f => f.id !== 'bulgur' && f.id !== 'sweet_potato' && f.id !== 'buckwheat')
     .sort((a, b) => carbConvenience(b) - carbConvenience(a));
   if (_pool.length === 0) return notes;
@@ -1085,7 +1110,10 @@ export function extremeCarbTopUp(
     let progressed = false;
     for (const m of _meals) {
       if (remaining < 40) break;
-      const roomMeal = Math.max(0, (m?.target?.c ?? 0) - (m?.totals?.c || 0));
+      // Комната приёма: до +15% сверх его углеводной цели — суммы пер-приёмных целей
+      // на экстриме не покрывают день (≈80–190 г углей «без дома»), а перебор дня
+      // контролируется отдельно (тета ккал + honest-потолок ниже).
+      const roomMeal = Math.max(0, (m?.target?.c ?? 0) * 1.15 - (m?.totals?.c || 0));
       if (roomMeal < 30) continue;
       const plateRoom = Math.max(0, 730 - _solidG(m));
       if (plateRoom < 40) continue;
@@ -1348,20 +1376,31 @@ function decomposedFacts(r: Recipe): { items: PlanItemLike[] | null; totals: Ret
   return { items, totals };
 }
 
-function distOf(totals: { kcal: number; p: number; f: number; c: number } | null, tgtKcal: number, tp: number, tf: number, tc: number): number {
+function distOf(totals: { kcal: number; p: number; f: number; c: number } | null, tgtKcal: number, tp: number, tf: number, tc: number, weights?: { kcal: number; p: number; f: number; c: number }): number {
   if (!totals) return 999;
-  const parts: Array<[number, number]> = [
-    [totals.kcal, tgtKcal], [totals.p, tp], [totals.f, tf], [totals.c, tc],
+  const parts: Array<[number, number, number]> = [
+    [totals.kcal, tgtKcal, weights?.kcal ?? 1],
+    [totals.p, tp, weights?.p ?? 1],
+    [totals.f, tf, weights?.f ?? 1],
+    [totals.c, tc, weights?.c ?? 1],
   ];
-  let sum = 0; let n = 0;
-  for (const [val, tgt] of parts) {
-    if (tgt > 0) { sum += Math.abs(val - tgt) / tgt; n++; }
+  let sum = 0; let wsum = 0;
+  for (const [val, tgt, w] of parts) {
+    if (tgt > 0 && w > 0) { sum += w * Math.abs(val - tgt) / tgt; wsum += w; }
   }
-  return n > 0 ? sum / n : 999;
+  return wsum > 0 ? sum / wsum : 999;
 }
 
 export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDayResult {
-  const { meals, pool, targets, excludedIds, cookProfile, usedNamesAcrossDays } = args;
+  const { meals, pool: _poolRaw, targets, excludedIds, cookProfile, usedNamesAcrossDays } = args;
+  // §7.2-Р-финал: экстрим-полоса (У≥8 г/кг и Б≥2.3 г/кг) — это другой режим дня.
+  // (а) карб-лоад блюда ('carb-load') видны ТОЛЬКО здесь: вне полосы обычные дни
+  // байт-в-байт прежние (теги фильтруются до выбора кандидатов);
+  // (б) ранжирование кандидатов взвешивается в пользу углеводов (иначе мясные блюда
+  // выигрывают по дистанции белка и день перебирает Б ядер на +24…29%).
+  const pool = filterRecipePoolForBand(_poolRaw, targets?.c || 0, targets?.p || 0, args.athleteWeightKg ?? 80);
+  const _rankWeights = isExtremeCarbBand(targets?.c || 0, targets?.p || 0, args.athleteWeightKg ?? 80)
+    ? { kcal: 0.25, p: 0.05, f: 0.1, c: 0.6 } : undefined;
   // P0-6 ОТЗВАН (план разнообразия): джиттер ранжирования по args.seed ломал
   // калиброванные гарантии recipe-HV (порции ≤350 г, «булгур 0 г») — масштаб
   // квантуется от выбранного кандидата, перестановка близких меняла посадку.
@@ -1589,7 +1628,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         const t = decomposedFacts(r).totals;
         const s = t && t.kcal > 0 ? scaleOf(t.kcal, t.p, t.f, t.c) : 1;
         const scaled = t ? { kcal: t.kcal * s, p: t.p * s, f: t.f * s, c: t.c * s } : null;
-        return { r, d: distOf(scaled, targetKcal, tgt.p || 30, tgt.f || 15, tgt.c || 40) };
+        return { r, d: distOf(scaled, targetKcal, tgt.p || 30, tgt.f || 15, tgt.c || 40, _rankWeights) };
       })
       .sort((a, b) => a.d - b.d)
       .map(x => x.r);

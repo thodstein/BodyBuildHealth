@@ -192,7 +192,10 @@ export function detectActivePedClasses(state: any): PedClassMatrixEntry[] {
   // полные имена оралов: без голых 'stan'/'meth' (sustanon содержит 'stan')
   if (has(/oxand|anavar|stanozolol|winstrol|methand|methandienone|dianabol|oxymetholone|anadrol|turinabol|trena|superdrol|halotestin|methyltest|cheque_drops/)) out.push(PED_CLASS_MATRIX[4]);
   // SARMs
-  if (has(/ostarine|lgd|rad140|s23|yk11|mk2866|andarine|sr9009|cardarine|mk677|testolone/)) out.push(PED_CLASS_MATRIX[10]);
+  if (has(/ostarine|lgd|rad140|s23|yk11|mk2866|andarine|sr9009|cardarine|testolone/)) out.push(PED_CLASS_MATRIX[10]);
+  // GH-секретагоги по id (mk677 — грелин-миметик, канон pharma-db = class 'gh';
+  // раньше ошибочно падал в SARM-класс и получал чужие дозовые тиры/мониторинг).
+  if (has(/mk677|mk_677|ibutamoren|ghrp|cjc|sermorelin|ipamorelin|hexarelin|tesamorelin/)) out.push(PED_CLASS_MATRIX[5]);
   // DHT-inject (мастерон/DHB/примоболан)
   if (has(/masteron|drostanolone|dhb|primobolan|methenolone|mesterolone/)) out.push(PED_CLASS_MATRIX[11]);
   // GLP-1
