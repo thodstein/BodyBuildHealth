@@ -836,8 +836,12 @@ export const BbAutoConstructor: React.FC = () => {
     setPrepShowDate(d);
     if (changedFrozen) flash(warnings[0] ?? 'Завершённые недели требуют подтверждения');
     else if (warnings.length) flash(warnings[0]);
+    // PRO-3 Э1/D1: персист под НОВУЮ дату: cfg с явной датой (state prepShowDate ещё stale —
+    // setState асинхронен), план сохраняется вместе с ним (раньше перенос терялся до пересборки).
+    const cfgShifted = { ...buildContestPrepConfig(), showDate: d };
+    savePrepToProfile(plan, cfgShifted);
     if (builtPlan && prepApplied) {
-      const updated = applyContestPrepToBBPlan(builtPlan, buildContestPrepConfig(), {
+      const updated = applyContestPrepToBBPlan(builtPlan, cfgShifted, {
         prepWeeks: plan.preparation.weeks,
         taperWeeks: plan.taper.weeks,
         prepVolumeMult: prepVolumeMode,
@@ -855,10 +859,12 @@ export const BbAutoConstructor: React.FC = () => {
     setPrepWeeks(newWeeks);
     const replanned = replanBBContestPrep(prepPlan, prepPlan.showDate, newWeeks);
     setPrepPlan(replanned);
+    // PRO-3 Э1/D2: персист расширения (раньше state/план менялись, профиль — нет, флеш врал).
+    const cfg = buildContestPrepConfig();
     if (builtPlan && prepApplied) {
       let base: BBPlanWithPrep = builtPlan as BBPlanWithPrep;
       if (delta > 0) base = extendBBPlanPreparation(base, delta);
-      const updated = applyContestPrepToBBPlan(base, buildContestPrepConfig(), {
+      const updated = applyContestPrepToBBPlan(base, cfg, {
         prepWeeks: newWeeks,
         taperWeeks: replanned.taper.weeks,
         prepVolumeMult: prepVolumeMode,
@@ -866,6 +872,7 @@ export const BbAutoConstructor: React.FC = () => {
       });
       setBuiltPlan(updated);
     }
+    savePrepToProfile(replanned, cfg);
     flash(delta > 0 ? `Подготовка расширена до ${newWeeks} нед (пик и тапер не тронуты)` : `Подготовка сокращена до ${newWeeks} нед`);
   };
 

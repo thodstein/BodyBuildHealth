@@ -31,12 +31,19 @@ export type ContestPrepSource = BBContestPrepPlan['source'];
 
 export interface SaveContestPrepOpts extends BuildPrepPlanOpts {
   source?: ContestPrepSource;
+  /** PRO-3 Э1/D3: сохранить существующий план «как есть» (без пересборки из конфига) —
+   *  поверхности питания/PeakingPanel не откатывают prepWeeks/дозу trial/id теста/трек. */
+  preservePlan?: boolean;
 }
 
 /**
  * Собрать версионированный план из конфига, сохранить в профиль (оба ключа)
  * и оповестить слушателей. Возвращает план или null при ошибке валидации.
  * Не трогает тренировочный план — его применяет вызывающий (ББ-авто).
+ *
+ * PRO-3 Э1/D3: если план уже есть, недостающие opts переносятся из него (prepWeeks,
+ * taperWeeks, currentCalories, карбс-доза trial, testPeakWeekId, postShowTrack, id) —
+ * иначе сохранение из питания пересобирало план дефолтными 12 нед и теряло trial-данные.
  */
 export function saveContestPrepEverywhere(
   rawCfg: BBContestPrepConfig,
@@ -44,22 +51,29 @@ export function saveContestPrepEverywhere(
 ): BBContestPrepPlan | null {
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) return null;
+  const existing = loadContestPrepPlan();
+  if (existing && opts.preservePlan === true) {
+    storeContestPrepPlan(existing, rawCfg, { source: opts.source ?? existing.source });
+    return existing;
+  }
   let plan: BBContestPrepPlan;
   try {
     plan = buildBBContestPrepPlan(rawCfg, {
-      prepWeeks: opts.prepWeeks,
-      taperWeeks: opts.taperWeeks,
-      currentCalories: opts.currentCalories,
-      stepsPerDay: opts.stepsPerDay,
-      cardioMinutesPerWeek: opts.cardioMinutesPerWeek,
-      targetRatePctPerWeek: opts.targetRatePctPerWeek,
-      prepVolumeMult: opts.prepVolumeMult,
-      trainingPlanId: opts.trainingPlanId,
-      nutritionPlanId: opts.nutritionPlanId,
-      testPeakWeekId: opts.testPeakWeekId,
-      source: opts.source ?? 'bb_auto',
-      status: opts.status,
-      id: opts.id,
+      id: opts.id ?? existing?.id,
+      prepWeeks: opts.prepWeeks ?? existing?.preparation.weeks,
+      taperWeeks: opts.taperWeeks ?? existing?.taper.weeks,
+      currentCalories: opts.currentCalories ?? existing?.preparation.currentCalories,
+      stepsPerDay: opts.stepsPerDay ?? existing?.preparation.stepsPerDay,
+      cardioMinutesPerWeek: opts.cardioMinutesPerWeek ?? existing?.preparation.cardioMinutesPerWeek,
+      targetRatePctPerWeek: opts.targetRatePctPerWeek ?? existing?.preparation.targetRatePctPerWeek,
+      prepVolumeMult: opts.prepVolumeMult ?? existing?.preparation.volumeMult,
+      trainingPlanId: opts.trainingPlanId ?? existing?.trainingPlanId,
+      nutritionPlanId: opts.nutritionPlanId ?? existing?.nutritionPlanId,
+      testPeakWeekId: opts.testPeakWeekId ?? existing?.testPeakWeekId,
+      carbDoseGPerKg: opts.carbDoseGPerKg ?? existing?.peakWeek.carbDoseGPerKg,
+      postShowTrack: opts.postShowTrack ?? existing?.postShowTrack,
+      source: opts.source ?? existing?.source ?? 'bb_auto',
+      status: opts.status ?? existing?.status,
     });
   } catch {
     return null;
