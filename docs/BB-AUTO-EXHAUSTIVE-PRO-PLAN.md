@@ -663,9 +663,46 @@
   `bb-diagnostics-max-pro` female-symmetry), lms pl-weak-groups 18/18, manual 49/49, `tsc` 0,
   `verify:apk-design` OK. Заодно: re-baseline `bb-ped-enhancements` (±16, композиция), тайм-бомба
   `bb-contest-prep-unified` (динамические даты вместо 2026-09-15), guard `bb-export-report` читает `bb-step-*`.
-- [ ] **Волна 5 — остаток**: 5.2 `ANGLE_CLASSES`/`WEAK_PATTERN_REQ` — единый источник паттернов;
-  5.3 хардкод-эвристики комментариев (`/widowmaker/`, `/разгруз/`) → структурные флаги;
+- [x] **5.2 ANGLE_CLASSES/WEAK_PATTERN_REQ — единый источник** (коммит `6b92192c`): `WEAK_PATTERN_REQ`
+  экспортирован из `bb-finalize` (тесты/потребители без локальных копий); мёртвые зоны
+  `chest_mid`/`upper_back`/`rear_delts` получили маппинг в `WEAK_TO_MUSCLE` (фолбэк «зона = сама мышца»
+  искал `muscle='chest_mid'` и гарантия паттерна молчала), `lower_back` → `hamstrings`
+  (паттерн-гиперэкстензия классифицируется hinge→hamstrings, в `back` кандидатов нет);
+  lock-тест «каждая зона → прямой ключ мапы + ≥1 каталог-кандидат под паттерн» + гигиена
+  `ANGLE_CLASSES` (уникальные имена классов, match-функции). Проверено: 7 файлов **131/131**
+  (`--pool=forks`; threads-пул даёт известный флак `buildBBPlan is not a function`), `tsc` 0.
+- [ ] **Волна 5 — остаток**: 5.3 хардкод-эвристики комментариев (`/widowmaker/`, `/разгруз/`) → структурные флаги;
   5.4 женская задняя цепь (Plotkin/Barbalho, приоритет приседа у профи); 5.5 философия интенсив-методик в текстах.
+
+---
+
+## 10. Стартовый промпт следующей сессии (Волна 5.3–5.5)
+
+> Продолжи ББ-авто по плану `docs/BB-AUTO-EXHAUSTIVE-PRO-PLAN.md` — Волна 5, пункты 5.3–5.5
+> (5.1/5.2 уже закрыты коммитами `0e328657`/`6b92192c`, 4.3 закрыт). Сначала прочитай AGENTS.md
+> (правила: только свои файлы, pathspec-коммиты, Edit/Write для контента, чужие WIP не трогать).
+>
+> 1) **5.3 структурные флаги вместо комментариев-эвристик**: в `bb-finalize.engine.ts` делод
+>    определяется через `/разгруз|deload/i.test(exercise.comment)` — 4 сайта (ориентировочно
+>    строки 2788, 3004, 3252, 3424), widowmaker — через `comment.includes('widowmaker')`
+>    (`bb-finalize:2264,4597-4610`, `bb-rep-schemes.engine.ts:360`). Заведи явные поля
+>    (напр. `week.isDeloadLike`/`ex.techniqueTag='widowmaker'`/`ex.deloadMarker`), запись — там же,
+>    где пишутся комментарии; потребители читают флаг (комментарий остаётся для UI/печати);
+>    lock-тест «флаг и комментарий согласованы»; старые комментарии не меняем (парсеры форматов не трогать).
+> 2) **5.4 женская задняя цепь**: сверить с Plotkin 2023 (у тренированных женщин присед ≥ hip thrust
+>    для ягодиц), Barbalho 2020 (присед = thrust), Kassiano 2024 (leg press+SLDL+thrust — комбо);
+>    точки: `bb-demographics` femaleAdjust, хамс/глут-бонусы, приоритет приседа для advanced-женщин
+>    (не выдумывать сверх данных); тесты `bb-female-posterior`/`bb-female-stage`/`bb-female-splits` — стеречь.
+> 3) **5.5 тексты интенсив-методик**: привести формулировки к «тайм-эффективность, не превосходство»
+>    (Sødal 2023: drop ≈ traditional SMD 0.04; rest-pause — небольшой плюс; Havers 2026/Tsartsapakis 2026);
+>    источники текстов: `bb-intensity-techniques.ts` (@deprecated), `bb-rep-schemes.engine.ts`,
+>    `PHASE_TECHNIQUES` в `bb-auto-constructor-shared.tsx`, тексты методик в каталоге/энциклопедии;
+>    lock-тест «нет клеймов превосходства» (regex по ключевым фразам), тексты тестов не ломать.
+>
+> Прогоны: `npx vitest run src/engines/bb` — **лучше `--pool=forks`** (threads-пул даёт флак
+> `buildBBPlan is not a function` в `bb-exercise-levels`), 1 пред-существующее падение
+> `bb-diagnostics-max-pro` female-symmetry — **чужое** (движок симметрии, не BB-зона);
+> `tsc --noEmit` 0 по проекту; `verify:apk-design` OK. Коммит строго pathspec своих файлов.
 
 ---
 

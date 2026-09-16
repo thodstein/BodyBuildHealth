@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто Волна 5.2: единый источник паттернов (Sep 16 2026, коммит pathspec `6b92192c`, без пуша — очередь чужих)
+
+По команде «продолжай» (после 5.1). Только свои файлы: `bb-builder.engine.ts`, `bb-finalize.engine.ts`, 2 теста.
+- `WEAK_PATTERN_REQ` **экспортирован** из `bb-finalize` (был приватным; `bb-ab-strict` держал локальную копию regex — теперь импорт). `ANGLE_CLASSES` уже был каноном (`bb-exercise-selection`, комментарий-канон с этапа §4.3).
+- **Реальные дефекты (мёртвые зоны)**: `chest_mid`/`upper_back`/`rear_delts` отсутствовали в `WEAK_TO_MUSCLE` → фолбэк «каноническая = сама зона» искал `muscle='chest_mid'` и **гарантия паттерна молча не срабатывала** (в `ensureWeakPatternCoverage`); `lower_back` маппился в `back`, но паттерн — гиперэкстензия, а она по классификации hinge→`hamstrings` (кандидатов в `back` нет). Маппинги добавлены/исправлены (`lower_back→hamstrings`).
+- NEW lock в `bb-catalog-consistency`: каждая зона → прямой ключ `WEAK_TO_MUSCLE` (не фолбэк) + ≤ ≥1 каталог-упражнение канонической мышцы под паттерн; `ANGLE_CLASSES` — уникальные имена классов внутри мышцы + match-функции. Итого `bb-catalog-consistency` **14/14**.
+- Проверено: 7 файлов (audit-extended/zero-state/spec-unified/female-posterior/catalog-consistency/ab-strict/exercise-levels) **131/131** — **важно: `--pool=forks`** (threads-пул на этой машине даёт флак `buildBBPlan is not a function` из динамического импорта; лечится форками, кэш не при чём), `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+- **Остаток Волны 5 (новая сессия)**: 5.3 структурные флаги вместо `/разгруз|delalloc/`/`/widowmaker/`-эвристик комментариев, 5.4 женская задняя цепь (Plotkin/Barbalho), 5.5 тексты интенсив-методик (тайм-эффективность). **Готовый стартовый промпт — в плане §10** (`docs/BB-AUTO-EXHAUSTIVE-PRO-PLAN.md`).
+
 ## ББ-авто Волна 5.1: аудит каталога 572 + честная классификация (Sep 16 2026, коммит pathspec `0e328657`, без пуша)
 
 По команде «продолжай» (после 4.3 — Contest Prep). Только свои файлы: `movement-pattern.ts`, `exercise-catalog.ts`, `exercise-id-mapping.ts`, `bb-builder.engine.ts` (junk), 3 теста + NEW lock-тест.
