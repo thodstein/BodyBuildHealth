@@ -642,7 +642,30 @@
   Инварианты для этапа: `tsc` 0,
   bb-UI паки (bb-auto-smoke/annual/prep-cycle/dup/volume-toggle/reproductive/a11y/apk-controls) +
   rest-hooks-native/apk-top-pack, `verify:apk-design`; коммит строго pathspec своих файлов.
-- [ ] Волна 5 — каталог/данные
+- [~] **Волна 5 — 5.1 аудит каталога** (коммит `0e328657`): аудит всех **572** записей дампом
+  (zz-тест удалён до коммита): `movementPattern`/`substitutionGroup` — 0 пропусков, дублей id нет;
+  `trueMuscleOf` NULL 52→**43** (9 восстановлены; остальные 43 — соревновательные лифты/олимпийка/переноски
+  **by design**). Найдены и починены реальные дефекты классификации:
+  - `станов` без огласовки ловил **«постановка»/«остановками»** → `leg_press_wide/high/low` (derived mp=hinge),
+    `sumo_squat`, `pl_squat_stop`, `pl_bench_stop` выпадали из quads/chest (tightening `/станов[аоуы]/`);
+  - `walk` в имени делал **«Ходьба с резиной (monster walks)»** переноской (`isCarryExercise` исключает
+    `резин|band|monster`); «Выпады шагом» (было «…(прогулка фермера)») — lunge/quads;
+  - ягодичная изоляция (ослиный удар/пожарный гидрант/отведения/разведения ног) → `isolation_glutes`
+    (раньше падала в `isolation_legs_ham`); тяга троса между ног (pull-through) → `glutes`;
+  - `exercise-id-mapping` += lab-bio для 5 новых plan-eligible id (`pl_squat_stop`, `pl_bench_stop`,
+    `donkey_kick`, `band_walks`, `cable_pull_through`) — держит инвариант «все план-упражнения с lab-bio»;
+  - дриллы `donkey_kick`/`fire_hydrant` → `BB_JUNK` (активация вне гипертрофийных пулов — эти
+    переклассификации иначе ломали PPL-гарантию «хам-день — квадры памп 3»).
+  NEW `bb-catalog-consistency` **12/12** (гигиена + все починенные кейсы + дизайн-NULL переносок).
+  **Осознанная граница**: `stretchPhase/peakContraction/pauseSeconds` остаются курируемыми (109 записей;
+  undefined = regex-фолбэк у потребителей) — автозаполнение 463 записей эвристикой не делаем (риск вранья
+  physiology). Проверено: полный bb-круг **2472/2473** (1 — чужое предсуществующее
+  `bb-diagnostics-max-pro` female-symmetry), lms pl-weak-groups 18/18, manual 49/49, `tsc` 0,
+  `verify:apk-design` OK. Заодно: re-baseline `bb-ped-enhancements` (±16, композиция), тайм-бомба
+  `bb-contest-prep-unified` (динамические даты вместо 2026-09-15), guard `bb-export-report` читает `bb-step-*`.
+- [ ] **Волна 5 — остаток**: 5.2 `ANGLE_CLASSES`/`WEAK_PATTERN_REQ` — единый источник паттернов;
+  5.3 хардкод-эвристики комментариев (`/widowmaker/`, `/разгруз/`) → структурные флаги;
+  5.4 женская задняя цепь (Plotkin/Barbalho, приоритет приседа у профи); 5.5 философия интенсив-методик в текстах.
 
 ---
 
