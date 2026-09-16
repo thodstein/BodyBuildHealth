@@ -43,4 +43,20 @@ describe('applyBBNutritionToTargets (Ф4.25)', () => {
     const r = applyBBNutritionToTargets({ ...base(), bbNote: { kcal: 4000 }, todayDow: 1 });
     expect(r.kcal).not.toBe(4000);
   });
+
+  describe('locked (ручной режим КБЖУ): цели пользователя неприкосновенны', () => {
+    it('трен-день не сдвигает углеводы/жиры, но заметка честная', () => {
+      const r = applyBBNutritionToTargets({ ...base(), bbNote: { trainDays: [1] }, todayDow: 1, locked: true });
+      expect(r.carbs).toBe(300); // без +30
+      expect(r.fats).toBe(70);   // без сдвига жира
+      expect(r.kcal).toBe(2470);
+      expect(r.breakdown.some(b => b.includes('НЕ применяется (ручной режим КБЖУ)'))).toBe(true);
+    });
+
+    it('ккал ББ-плана НЕ подменяет ручной калораж (даже в пределах 15%)', () => {
+      const r = applyBBNutritionToTargets({ ...base(), bbNote: { kcal: 2600 }, todayDow: 1, locked: true });
+      expect(r.kcal).toBe(2470);
+      expect(r.breakdown.some(b => b.includes('справочно'))).toBe(true);
+    });
+  });
 });

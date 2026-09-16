@@ -2580,7 +2580,7 @@ const doImportPlan = (raw: string): boolean => {
                       </div>
                       {calcDailyReport.overloadWarning && (
                         <div style={{ padding:'3px 6px', borderRadius:4, background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
-                          ⚠ Перегрузка приёма: порция {calcDailyReport.maxSinglePortionG} г — увеличьте число приёмов, чтобы распределить нагрузку
+                          ⚠ Перегрузка приёма: порция {calcDailyReport.maxSinglePortionG} г — число приёмов план подбирает сам; распределите нагрузку по дню или снизьте цель
                         </div>
                       )}
                     </div>

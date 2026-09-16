@@ -19,6 +19,9 @@ export interface BBNutritionTargetsInput {
   carbs: number;
   bbNote: BBNutritionNote | null;
   todayDow?: number; // Пн=1 .. Вс=7; по умолчанию сегодня
+  /** Ручной режим КБЖУ: пользователь задал точные цели — ББ-план НЕ сдвигает
+   *  углеводы/жиры по трен-дням и НЕ подменяет калораж (только заметки). */
+  locked?: boolean;
 }
 
 export interface BBNutritionTargetsResult {
@@ -40,16 +43,23 @@ export function applyBBNutritionToTargets(input: BBNutritionTargetsInput): BBNut
   let fats = input.fats;
   let carbs = input.carbs;
   if (isTrainToday != null) {
-    const shiftG = isTrainToday ? 30 : -25;
-    carbs = Math.max(20, Math.round(input.carbs + shiftG));
-    fats = Math.max(35, Math.round(input.fats - (shiftG * 4) / 9));
-    breakdown.push(`⚡ ББ-план: ${isTrainToday ? 'трен-день' : 'день отдыха'} — углеводы ${isTrainToday ? '+' : ''}${shiftG} г (циклирование по трен-дням плана).`);
+    if (input.locked) {
+      // Ручной КБЖУ: цели пользователя неприкосновенны — циклирование не применяем.
+      breakdown.push(`⚡ ББ-план: ${isTrainToday ? 'трен-день' : 'день отдыха'} — циклирование углеводов НЕ применяется (ручной режим КБЖУ).`);
+    } else {
+      const shiftG = isTrainToday ? 30 : -25;
+      carbs = Math.max(20, Math.round(input.carbs + shiftG));
+      fats = Math.max(35, Math.round(input.fats - (shiftG * 4) / 9));
+      breakdown.push(`⚡ ББ-план: ${isTrainToday ? 'трен-день' : 'день отдыха'} — углеводы ${isTrainToday ? '+' : ''}${shiftG} г (циклирование по трен-дням плана).`);
+    }
   }
   const atwater = Math.round(input.protein * 4 + carbs * 4 + fats * 9);
   const bbKcal = (note && note.kcal != null && Number.isFinite(note.kcal) && (note.kcal as number) > 0) ? Math.round(note.kcal as number) : null;
-  const kcal = (bbKcal && Math.abs(bbKcal - atwater) / Math.max(1, atwater) <= 0.15) ? bbKcal : atwater;
+  const kcal = (!input.locked && bbKcal && Math.abs(bbKcal - atwater) / Math.max(1, atwater) <= 0.15) ? bbKcal : atwater;
   if (bbKcal) {
-    breakdown.push(`🎯 Целевой калораж ББ-плана: ${bbKcal} ккал (применён${kcal === bbKcal ? '' : ' с учётом макросов'}); объём ~${note?.weeklySets ?? '—'} сетов/нед.`);
+    breakdown.push(input.locked
+      ? `🎯 Целевой калораж ББ-плана: ${bbKcal} ккал — справочно (ручной режим КБЖУ, цели не подменяются); объём ~${note?.weeklySets ?? '—'} сетов/нед.`
+      : `🎯 Целевой калораж ББ-плана: ${bbKcal} ккал (применён${kcal === bbKcal ? '' : ' с учётом макросов'}); объём ~${note?.weeklySets ?? '—'} сетов/нед.`);
   }
   return { protein: input.protein, fats, carbs, kcal, isTrainToday, breakdown };
 }

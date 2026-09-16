@@ -986,11 +986,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     fats: dayTargets.fats,
     carbs: dayTargets.carbs,
     bbNote: bbNutritionNote,
+    // Manual: пользователь задал точные цели — ББ-план не сдвигает БЖУ/ккал (только заметки).
+    locked: kbjuMode === 'manual',
   });
   const effectiveP = bbApplied.protein;
   const effectiveF = bbApplied.fats;
   const effectiveC = bbApplied.carbs;
-  const _rawCForCap = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
+  const _rawCForCap = kbjuMode === 'manual' ? dayTargets.carbs : kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
   // P1-9: «Снять потолок» — явный оверрайд (читается из стореджа напрямую: блок
   // вычисляется до useState-объявлений, замыкание перегенерируется на каждый рендер).
   const _capOverride = (() => { try { return localStorage.getItem('he_planner_cap_override') === '1'; } catch { return false; } })();
@@ -1001,7 +1003,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch { return 5; }
   })();
   const carbCapClipped = (() => {
-    try { if (_capOverride) return false; return _rawCForCap > carbCapGPerKg * weight + 1; } catch { return false; }
+    // Ручной режим: цели пользователя — источник правды, потолок не применяем вовсе.
+    try { if (_capOverride || kbjuMode === 'manual') return false; return _rawCForCap > carbCapGPerKg * weight + 1; } catch { return false; }
   })();
   // Kcal из чистой логики (Atwater-консистентно + целевой калораж ББ-плана в пределах 15%).
   const effectiveKcal = bbApplied.kcal;
@@ -3355,8 +3358,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           randomSalt: planRandomSalt,
           variety: plannerModeRef.current === 'minimal' ? 'minimal' : plannerModeRef.current === 'simple' ? 'medium' : variety,
           // P1-9: «Снять потолок» — 0 = явный «без потолка» в движке; без оверрайда
-          // движок использует свой дефолт (байт-в-байт, как раньше).
-          carbCapGPerKg: _capOverride ? 0 : undefined,
+          // движок использует свой дефолт (байт-в-байт, как раньше). Ручной КБЖУ —
+          // цели пользователя: потолок углеводов не применяем (0 = без потолка).
+          carbCapGPerKg: (_capOverride || kbjuMode === 'manual') ? 0 : undefined,
           wakeTime, lunchTime, dinnerTime, bedTime,
           // Хвост-3: floor/MPS-модификаторы стиля питания теперь из ЕДИНОГО источника
           // (planTypeFloorMods в planner-day-targets) — движок сам выводит их из planType.
