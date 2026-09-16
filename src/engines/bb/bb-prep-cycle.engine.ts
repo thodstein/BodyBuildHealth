@@ -687,11 +687,12 @@ export function buildPrepNutritionPlan(
       carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
       note = 'Финал подготовки: лёгкий дефицит (×0.97), белок и жиры не режутся, 1 рефид-день/нед.';
     } else {
-      // Подготовка: ступенчатая прогрессия — каждые 2 недели −120 ккал (поддержание темпа).
-      kcal = Math.max(isFemale ? 1400 : 1200, Math.round(baseKcal - Math.floor((i - 1) / 2) * 120));
+      // PRO-3 Э6/D7: без фантомного дрейфа −120/2нед — таблица = живая математика движка
+      // (ккал подготовки стабильны, темп держится чек-инами/адаптацией по весу, не автодрейфом).
+      kcal = baseKcal;
       refeed = weekLastDay ? isPrepRefeedDay(weekLastDay, prepPlan) : i % 3 === 0; // календарь движка (брейки исключены)
       carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
-      note = `Подготовка (нед ${i}): дефицит ~${Math.round(ratePct * 100 * 10) / 10}%/нед${refeed ? ', 1 рефид-день (карбс до ~поддержания)' : ''}, вода/натрий стабильны.`;
+      note = `Подготовка (нед ${i}): дефицит ~${Math.round(ratePct * 100 * 10) / 10}%/нед, уровень калорий держится по чек-инам (адаптация по весу),${refeed ? ' 1 рефид-день (карбс до ~поддержания),' : ''} вода/натрий стабильны.`;
     }
     weeks.push({ week: i, phase: phaseKey, kcal, proteinG, fatG: fatFloorG, carbsG, refeed, note });
   }

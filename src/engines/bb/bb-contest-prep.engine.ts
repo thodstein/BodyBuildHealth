@@ -1562,8 +1562,10 @@ export function computePeakWeekNutritionTargets(
   base: PeakNutritionBase,
   cfg: BBContestPrepConfig,
   opts?: { carbDoseGPerKg?: number },
+  /** PRO-3 Э6/D16: скорректированный день (recarb visualAdjust) — приоритетнее пересчёта. */
+  dayOverride?: PeakWeekDayPlan | null,
 ): PeakNutritionTargets {
-  const day = peakWeekDayForDate(dateIso, cfg, opts);
+  const day = dayOverride !== undefined ? dayOverride : peakWeekDayForDate(dateIso, cfg, opts);
   if (!day) {
     return {
       kcal: base.kcal, proteinG: base.proteinG, fatG: base.fatG, carbsG: base.carbsG,
@@ -2294,6 +2296,11 @@ export interface BBContestPrepPlan {
      * Опционально — без неё buildPeakWeek идёт по среднему коридора (back-compat).
      */
     carbDoseGPerKg?: number;
+    /**
+     * PRO-3 Э6/D16: визуал утреннего чек-ина D-3…D-1 ('flat'/'spill') — пересчёт оставшихся
+     * load-дней применяется к ЖИВЫМ целям рациона (recarbDaysForPlan), а не в localStorage.
+     */
+    visualAdjust?: { visual: 'flat' | 'full' | 'spill'; at: string };
   };
 
   phases: PrepPhaseRange[];
@@ -2897,6 +2904,13 @@ export function nutritionTargetsForPrepDate(
     : undefined;
   const day = peakWeekDayForDate(dateIso, peakCfg, peakDose);
   if (day) {
+    // PRO-3 Э6/D16: визуал утреннего чек-ина (visualAdjust) применяется к ЖИВЫМ целям дня
+    // (flat → +75 г / spill → −100 г по load-дням), а не только к подписи.
+    const va = plan.peakWeek.visualAdjust;
+    if (va && va.visual !== 'full') {
+      const adjusted = recarbDaysForPlan(plan).find(d => d.day === day.day) ?? day;
+      return computePeakWeekNutritionTargets(dateIso, base, peakCfg, peakDose, adjusted);
+    }
     return computePeakWeekNutritionTargets(dateIso, base, peakCfg, peakDose);
   }
   const phase = prepPhaseForDate(plan, dateIso);
@@ -3011,7 +3025,7 @@ export function nutritionTargetsForPrepDate(
     potassiumMg,
     phase: null,
     phaseLabel: phase.label,
-    note: `🗓 ${phase.label}: ${kcal} ккал · Б/У/Ж ${proteinG}/${carbsG}/${fatG} г · 💧 ${(base.waterMl / 1000).toFixed(1)} л · Na ${base.sodiumMg} мг (стабильно). ${phaseNote}`,
+    note: `🗓 ${phase.label}: ${kcal} ккал · Б/У/Ж ${proteinG}/${carbsG}/${fatG} г · 💧 ${(base.waterMl / 1000).toFixed(1)} л · Na ${base.sodiumMg} мг (стабильно) · K ${potassiumMg} мг. ${phaseNote}`,
   };
 }
 
@@ -3239,6 +3253,25 @@ export function recarbLoadFromVisual(
       mealNotes: [...d.mealNotes, `🔄 Live-пересчёт (${visual}): ${delta >= 0 ? '+' : ''}${delta}г карбс к этому дню.`],
     };
   });
+}
+
+/**
+ * PRO-3 Э6/D16: 7 дней пик-недели с применённым визуалом (plan.peakWeek.visualAdjust).
+ * Единый источник для ЖИВЫХ целей рациона: flat → +75 г / spill → −100 г на оставшиеся
+ * load-дни (не на прошедшие — функция детерминирована и не знает «сегодня»;
+ * UI применяет к текущей дате, дневник/рацион читают день по дате).
+ * Без visualAdjust или при 'full' — базовая неделя (байт-в-байт).
+ */
+export function recarbDaysForPlan(plan: BBContestPrepPlan): PeakWeekDayPlan[] {
+  const cfg = configFromPlan(plan);
+  const dose = plan.peakWeek.carbDoseGPerKg != null ? { carbDoseGPerKg: plan.peakWeek.carbDoseGPerKg } : undefined;
+  const days = buildPeakWeek(cfg, dose);
+  const visual = plan.peakWeek.visualAdjust?.visual;
+  if (!visual || visual === 'full') return days;
+  const loads = days.filter(d => d.phase.startsWith('load'));
+  const adjusted = recarbLoadFromVisual(loads, visual);
+  const byDay = new Map(adjusted.map(d => [d.day, d]));
+  return days.map(d => byDay.get(d.day) ?? d);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

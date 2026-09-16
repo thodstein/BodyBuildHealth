@@ -23,7 +23,7 @@ import {
   buildPostShowPlan, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson,
   prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv,
   manipulationLockedFor, manipulationLockNote, trialCarbDoseGPerKg,
-  TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks,
+  TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks, prepRefeedDates,
   postShowRecoveryDiet, buildPeakWeek, recarbLoadFromVisual,
   type PrepAdjustment,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
@@ -541,6 +541,29 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
                       </div>
                     );
                   })()}
+                  {/* PRO-3 Э6/D19: календарь рефидов (read-only, единый источник с живыми целями) */}
+                  {(() => {
+                    try {
+                      const refeeds = prepRefeedDates(prepPlan);
+                      if (refeeds.length === 0) return null;
+                      const todayIso = isoToday();
+                      const upcoming = refeeds.filter(d => d >= todayIso).slice(0, 3);
+                      const shown = upcoming.length > 0 ? upcoming : refeeds.slice(-3);
+                      const start = prepPlan.preparation.startDate;
+                      const [sy, sm, sd] = start.split('-').map(Number);
+                      const startMs = new Date(sy, sm - 1, sd).getTime();
+                      const weekOf = (d: string): number => {
+                        const [y, m, dd] = d.split('-').map(Number);
+                        return Math.max(1, Math.round((new Date(y, m - 1, dd).getTime() - startMs) / 604800000 + 1));
+                      };
+                      const fmt = (d: string): string => { const [, m, dd] = d.split('-'); return `${dd}.${m}`; };
+                      return (
+                        <div data-bb="refeed-calendar" style={{ fontSize:9, color:'#fff', marginTop:4, background:'rgba(34,197,94,0.05)', border:'1px solid rgba(34,197,94,0.15)', borderRadius:6, padding:6 }}>
+                          🔄 Рефиды: {shown.map(d => `нед ${weekOf(d)} (${fmt(d)})`).join(' · ')}{upcoming.length > 0 ? '' : ' — ближайшие уже прошли'} — ккал до поддержания дня, цели рациона переключатся автоматически.
+                        </div>
+                      );
+                    } catch { return null; }
+                  })()}
                 </div>
               );
             })()}
@@ -841,7 +864,7 @@ export const BbContestPrepTrialSafety: React.FC<{ ctx: BbContestPrepCtx }> = ({ 
                     <div style={{ fontSize:10, color: live.status === 'on_track' ? '#4ade80' : '#fbbf24', marginTop:4 }}>
                       {live.status === 'flat' ? '📉 ' : live.status === 'spill' ? '💧 ' : '✅ '}{live.note}
                     </div>
-                    {/* PRO-2 P2-доводка: пересчёт оставшихся load-дней по визуалу */}
+                    {/* PRO-2 P2-доводка + PRO-3 Э6/D16: пересчёт load-дней по визуалу едет в ПЛАН */}
                     <div style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(251,191,36,0.2)' }}>
                       <div style={{ fontSize:10, fontWeight:800, color:'#fbbf24', marginBottom:4 }}>🔄 Пересчёт load-дней по визуалу (остаток пик-недели)</div>
                       <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', fontSize:10, color:'#fff' }}>
@@ -849,29 +872,63 @@ export const BbContestPrepTrialSafety: React.FC<{ ctx: BbContestPrepCtx }> = ({ 
                           <button key={v} onClick={() => { setLiveVisual(v); setRecarb(null); }} aria-pressed={liveVisual === v} style={{ minHeight:44, padding:'6px 10px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', color: liveVisual === v ? '#fbbf24' : '#fff', border:'1px solid rgba(251,191,36,0.35)', background: liveVisual === v ? 'rgba(251,191,36,0.25)' : 'rgba(255,255,255,0.03)' }}>{label}</button>
                         ))}
                         <button
+                          data-bb="recarb-apply"
                           onClick={() => {
                             try {
                               const base = buildPeakWeek(configFromPlan(prepPlan), prepPlan.peakWeek.carbDoseGPerKg != null ? { carbDoseGPerKg: prepPlan.peakWeek.carbDoseGPerKg } : undefined);
                               const loads = base.filter(d => d.phase.startsWith('load'));
                               const adj = recarbLoadFromVisual(loads, liveVisual);
                               setRecarb(adj.map(d => ({ day: d.day, phase: d.phaseLabel, carbsG: d.carbsG, kcal: d.kcal })));
-                              try { localStorage.setItem(`he_peak_recarb_${prepPlan.showDate}`, JSON.stringify({ visual: liveVisual, at: new Date().toISOString(), days: adj.map(d => ({ day: d.day, carbsG: d.carbsG, kcal: d.kcal })) })); } catch { /* ignore */ }
-                              flash(`🔄 Load-дни пересчитаны (${liveVisual === 'flat' ? '+75г' : liveVisual === 'spill' ? '−100г' : 'без изменений'} на остаток)`);
+                              // PRO-3 Э6/D16: визуал сохраняется в ПЛАН (синк/персист/печать),
+                              // живые цели рациона читают его через recarbDaysForPlan.
+                              const next = { ...prepPlan, updatedAt: new Date().toISOString(), peakWeek: { ...prepPlan.peakWeek, visualAdjust: { visual: liveVisual, at: new Date().toISOString() } } };
+                              savePrepToProfile(next, configFromPlan(next));
+                              flash(`🔄 Load-дни пересчитаны и сохранены в план (${liveVisual === 'flat' ? '+75г' : liveVisual === 'spill' ? '−100г' : 'без изменений'})`);
                             } catch { flash('Не удалось пересчитать load-дни'); }
                           }}
                           style={{ minHeight:44, padding:'6px 12px', borderRadius:8, fontSize:11, fontWeight:800, cursor:'pointer', color:'#fff', border:'1px solid #fbbf24', background:'rgba(251,191,36,0.2)' }}
                         >
                           🔄 Пересчитать load-дни
                         </button>
+                        {prepPlan.peakWeek.visualAdjust && (
+                          <button
+                            data-bb="recarb-reset"
+                            onClick={() => {
+                              try {
+                                const next = { ...prepPlan, updatedAt: new Date().toISOString(), peakWeek: { ...prepPlan.peakWeek, visualAdjust: undefined } };
+                                savePrepToProfile(next, configFromPlan(next));
+                                setRecarb(null);
+                                flash('↺ Пересчёт сброшен — базовый протокол');
+                              } catch { /* ignore */ }
+                            }}
+                            style={{ minHeight:44, padding:'6px 10px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', color:'#fff', border:'1px solid rgba(255,255,255,0.25)', background:'rgba(255,255,255,0.04)' }}
+                          >
+                            ↺ Сбросить пересчёт
+                          </button>
+                        )}
                       </div>
-                      {recarb && recarb.length > 0 && (
-                        <div style={{ fontSize:10, color:'#fff', marginTop:6 }}>
-                          {recarb.map((r: any) => (
-                            <div key={r.day}>Д{r.day} ({r.phase}): <b>{r.carbsG}г</b> · {r.kcal} ккал</div>
-                          ))}
-                          <div style={{ fontSize:9, color:'#fff', marginTop:2 }}>Цифры для приёмов пищи (persist — переживает перезапуск). Дневник/рацион не переписываются.</div>
-                        </div>
-                      )}
+                      {(() => {
+                        const va = prepPlan.peakWeek.visualAdjust;
+                        const rows = (recarb && recarb.length > 0)
+                          ? recarb
+                          : (va && va.visual !== 'full'
+                              ? (() => {
+                                  try {
+                                    const base = buildPeakWeek(configFromPlan(prepPlan), prepPlan.peakWeek.carbDoseGPerKg != null ? { carbDoseGPerKg: prepPlan.peakWeek.carbDoseGPerKg } : undefined);
+                                    return recarbLoadFromVisual(base.filter(d => d.phase.startsWith('load')), va.visual).map(d => ({ day: d.day, phase: d.phaseLabel, carbsG: d.carbsG, kcal: d.kcal }));
+                                  } catch { return null; }
+                                })()
+                              : null);
+                        if (!rows || rows.length === 0) return null;
+                        return (
+                          <div style={{ fontSize:10, color:'#fff', marginTop:6 }} data-bb="recarb-rows">
+                            {rows.map((r: any) => (
+                              <div key={r.day}>Д{r.day} ({r.phase}): <b>{r.carbsG}г</b> · {r.kcal} ккал</div>
+                            ))}
+                            <div style={{ fontSize:9, color:'#fff', marginTop:2 }}>Пересчёт сохранён в план и применяется к живым целям рациона на load-дни; дневник/рацион не переписываются.</div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

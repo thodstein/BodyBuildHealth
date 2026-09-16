@@ -3375,7 +3375,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           breakfastTemplate,
           labValues: Object.keys(labValuesForPlan).length > 0 ? labValuesForPlan : undefined,
           calciumTargetOverride: _caInfo ? _caInfo.target : undefined,
-          sodiumTargetOverride: _peakTargets?.phase ? _peakTargets.sodiumMg : undefined,
+          // PRO-3 Э6: Na-цель — во ВСЕ фазы препа (не только пик), единый источник (PREP_SODIUM_BASE_MG).
+          sodiumTargetOverride: _peakTargets ? _peakTargets.sodiumMg : undefined,
           menstrualPhaseNote: _mp ? _mp.note : undefined,
           carbGiPref: _mp ? _mp.carbGiPref : undefined,
            quality: plannerModeRef.current === 'pro' ? 'full' : 'basic',
