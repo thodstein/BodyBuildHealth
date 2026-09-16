@@ -47,6 +47,8 @@ export interface ArmliftCauseInput {
   /** D21: щипок по рукам (кг) — если обе заполнены и есть асимметрия, evidence указывает слабую руку. */
   pinchL?: number | null;
   pinchR?: number | null;
+  /** PRO-6 M4: холд-кривая «макс vs 70%» — измеренная пара, не одиночный холд. */
+  holdCurve?: { curve: string; ratio: number; note: string } | null;
 }
 
 /** D10 E3: ratio сгибатели/экстензоры. Норма 1.0–1.3, >1.5 — значимый дисбаланс. */
@@ -211,6 +213,15 @@ export function diagnoseArmliftCause(i: ArmliftCauseInput): ArmliftCauseResult {
     ev.push(`ROM-провал: ${fails.join(', ')} — ретест через 2 нед`);
   }
   if (i.wristExtWeak) { scores.max_strength += 0.25; ev.push('Слабая экстензия — теряет позицию под весом'); }
+
+  // PRO-6 M4: холд-кривая — пара «макс vs 70%» различает пик и базу (одиночный холд этого не умеет).
+  const hc = i.holdCurve && typeof i.holdCurve === 'object' ? i.holdCurve as { curve: string; ratio: number; note: string } : null;
+  if (hc && typeof hc.note === 'string' && hc.note) {
+    if (hc.curve === 'peak_gap') { scores.max_strength += 0.3; ev.push(`Холд-кривая: ${hc.note}`); }
+    else if (hc.curve === 'endurance_gap') { scores.endurance += 0.3; ev.push(`Холд-кривая: ${hc.note}`); }
+    else if (hc.curve === 'both_low') { scores.volume += 0.3; ev.push(`Холд-кривая: ${hc.note}`); }
+    else ev.push(`Холд-кривая: ${hc.note}`);
+  }
 
   // D14: системная нагрузка по sRPE (тот же движок, что у арм-хаба, свой вход).
   if (i.acwrZone === 'dangerous') { scores.fatigue += 0.4; ev.push('ACWR dangerous — системный перегруз'); }

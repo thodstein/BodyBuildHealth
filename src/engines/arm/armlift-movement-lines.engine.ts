@@ -51,8 +51,9 @@ export function armliftMovementFlashLines(al: unknown): ArmliftMovementLines {
   if (vid) lines.push(vid);
   const pain = str(a.diagPainNote);
   if (pain) {
-    lines.push(pain);
-    if (pain.startsWith('Стоп:')) painStop = true;
+    // painStop потребляется здесь же: стоп-строка с ⛔ видна в линии моста.
+    if (pain.startsWith('Стоп:')) { painStop = true; lines.push(`⛔ ${pain}`); }
+    else lines.push(pain);
   }
   return { lines, painStop };
 }

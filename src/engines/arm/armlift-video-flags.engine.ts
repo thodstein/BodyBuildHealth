@@ -70,6 +70,13 @@ export function analyzeArmliftVideo(i: ArmliftVideoInput): ArmliftVideoResult | 
   const xs = pts.map((p) => p.x);
   const xLoop = Math.round((Math.max(...xs) - Math.min(...xs)) * 10) / 10;
   const dur = Math.round((pts[pts.length - 1].t - pts[0].t) * 10) / 10;
+  /** Разброс >30 см — не рука (либо вёлся по полу, либо пиксели без калибровки): флага дрейфа нет, честная пометка. */
+  if (xLoop > 30) {
+    if (wrist != null && wrist < 160) flags.push('wrist_break');
+    if (i.parallelOk === false) flags.push('not_parallel');
+    const tail = flags.length ? ` · ${flags.map((f) => FLAG_RU[f]).join(' · ')}` : '';
+    return { parsed: true, xLoopCm: xLoop, durationSec: dur, flags, note: `Трек: гуляние ${xLoop} см — единицы не похожи на см (калибруй Kinovea)${tail}` };
+  }
   if (xLoop > 10) flags.push('drift_big');
   else if (xLoop > 6) flags.push('drift');
   if (dur > 0 && dur < 1) flags.push('quick_pull');

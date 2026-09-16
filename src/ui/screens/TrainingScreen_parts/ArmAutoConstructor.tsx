@@ -438,7 +438,7 @@ export function ArmAutoConstructor() {
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [diagWeakPoints, setDiagWeakPoints] = useState<ArmWeakPoint[]>([]);
   /** PRO-5 real: grip-коррекции из армлифтинг-хаба (только дисциплина armlifting; стол не трогаем). */
-  const [armliftCorrections, setArmliftCorrections] = useState<{ items: ArmliftInjectionItem[]; spec: Array<{ week: number; targetSets: Record<string, number>; dayMap: Record<string, string> }>; weakArmNote?: string; orderNote?: string; completeness?: { pct: number; missing: string[] } }>(() => {
+  const [armliftCorrections, setArmliftCorrections] = useState<{ items: ArmliftInjectionItem[]; spec: Array<{ week: number; targetSets: Record<string, number>; dayMap: Record<string, string> }>; weakArmNote?: string; orderNote?: string; completeness?: { pct: number; missing: string[] }; movement?: { lines: string[] } }>(() => {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_armlifting_corrections') : null;
       const j = raw ? JSON.parse(raw) : null;
@@ -453,6 +453,13 @@ export function ArmAutoConstructor() {
           ...(((j as any).weakArmNote && typeof (j as any).weakArmNote === 'string') ? { weakArmNote: String((j as any).weakArmNote) } : {}),
           ...(((j as any).orderNote && typeof (j as any).orderNote === 'string') ? { orderNote: String((j as any).orderNote) } : {}),
           ...(((j as any).completeness && typeof (j as any).completeness === 'object') ? { completeness: (j as any).completeness as { pct: number; missing: string[] } } : {}),
+          ...((() => {
+            const mv = (j as any).movement;
+            const lines = mv && typeof mv === 'object' && Array.isArray((mv as any).lines)
+              ? (mv as any).lines.filter((x: unknown) => typeof x === 'string' && (x as string).trim() !== '').slice(0, 8)
+              : [];
+            return lines.length ? { movement: { lines } } : {};
+          })()),
         };
       }
       return { items: [], spec: [] };
@@ -659,12 +666,20 @@ export function ArmAutoConstructor() {
           const note = typeof al?.armliftWeakArmNote === 'string' && al.armliftWeakArmNote ? String(al.armliftWeakArmNote) : undefined;
           const ord = typeof al?.armliftOrderNote === 'string' && al.armliftOrderNote ? String(al.armliftOrderNote) : undefined;
           const comp = al?.armliftCompleteness && typeof al.armliftCompleteness === 'object' ? al.armliftCompleteness as { pct: number; missing: string[] } : null;
+          /** PRO-6 M11: движение из моста — персист в пак (печать/сводка читают пак, не transient flash). */
+          let moveLines: string[] = [];
+          try { moveLines = armliftMovementFlashLines(al).lines.slice(0, 8); } catch { moveLines = []; }
+          const movePack = moveLines.length ? { movement: { lines: moveLines } } : {};
           if (clean.length) {
-            const pack = { items: clean, spec: specClean, ...(note ? { weakArmNote: note } : {}), ...(ord ? { orderNote: ord } : {}), ...(comp ? { completeness: comp } : {}) };
+            const pack = { items: clean, spec: specClean, ...(note ? { weakArmNote: note } : {}), ...(ord ? { orderNote: ord } : {}), ...(comp ? { completeness: comp } : {}), ...movePack };
             setArmliftCorrections(pack);
             try { localStorage.setItem('he_armlifting_corrections', JSON.stringify(pack)); } catch {}
             const compNote = comp && typeof comp.pct === 'number' && comp.pct < 60 ? ` · полнота ${comp.pct}% — ${comp.missing?.join(', ') || ''}` : '';
             flash(`↩ Хват-коррекции: ${clean.map((c) => c.exId).join(', ')} → волной ${specClean.length || 1} нед в план при сборке${compNote}`);
+          } else if (moveLines.length) {
+            const pack = { items: [], spec: [], ...movePack };
+            setArmliftCorrections(pack);
+            try { localStorage.setItem('he_armlifting_corrections', JSON.stringify(pack)); } catch {}
           } else {
             setArmliftCorrections({ items: [], spec: [] });
             try { localStorage.removeItem('he_armlifting_corrections'); } catch {}
@@ -1991,7 +2006,17 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   } catch {}
                   let proSummary: any = null;
                   try { if (builtPlan?.inputSnapshot) proSummary = buildArmProSummary(builtPlan.inputSnapshot); } catch { proSummary = null; }
-                  const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info, movement: diag?.movement }, proSummary);
+                  /** PRO-6 M11: движение армлифтинга из пака (персист моста, не transient flash). */
+                  let armliftMovement: string[] | null = null;
+                  try {
+                    const praw = localStorage.getItem('he_armlifting_corrections');
+                    const pj = praw ? JSON.parse(praw) : null;
+                    const pl = pj && typeof pj === 'object' && (pj as any).movement && Array.isArray((pj as any).movement.lines)
+                      ? ((pj as any).movement.lines as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '').slice(0, 8)
+                      : [];
+                    if (pl.length) armliftMovement = pl;
+                  } catch { armliftMovement = null; }
+                  const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info, movement: diag?.movement, armliftMovement }, proSummary);
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
                 }} block style={{ minHeight: 48 }}>🖨 Печать</AdBtn>
@@ -2024,9 +2049,18 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                        if (mv.tableStrengthNote) bits.push('сила стола');
                        if (mv.foulNote) bits.push('фолы');
                        if (bits.length) lines.push(`🥋 Движение: ${bits.join(' · ')}`);
-                       if (mv.humerusDangerNote) lines.push(`⛔ ${mv.humerusDangerNote}`);
-                     }
-                   } catch { /* noop */ }
+                      if (mv.humerusDangerNote) lines.push(`⛔ ${mv.humerusDangerNote}`);
+                      }
+                    } catch { /* noop */ }
+                    // PRO-6 M11: движение армлифтинга из пака (тот же источник, что у печати)
+                    try {
+                      const praw = localStorage.getItem('he_armlifting_corrections');
+                      const pj = praw ? JSON.parse(praw) : null;
+                      const pl = pj && typeof pj === 'object' && (pj as any).movement && Array.isArray((pj as any).movement.lines)
+                        ? ((pj as any).movement.lines as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+                        : [];
+                      if (pl.length) lines.push(`🏋️ Движение: ${pl.slice(0, 8).join(' · ')}`);
+                    } catch { /* noop */ }
                   const txt = lines.join('\n');
                   const done = () => flash('✅ Сводка скопирована');
                   const fallback = () => {

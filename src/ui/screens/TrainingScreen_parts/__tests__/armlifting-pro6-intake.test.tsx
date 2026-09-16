@@ -63,4 +63,25 @@ describe('M10 приёмник движения в конструкторе', ()
     expect(body).not.toContain('фаза срыва:');
     expect(body).not.toContain('попытки:');
   });
+
+  it('PRO-6 M11: движение персистится в пак (печать/сводка переживают перезагрузку)', () => {
+    seed({
+      diagTimelinePhase: { id: 'mid', label: 'Протяжка', weakLinks: ['fingers'] },
+      diagAttemptPlan: { implement: 'rolling_thunder', opener: 92.5, second: 97.5, third: 102.5 },
+    });
+    render(<ArmAutoConstructor />);
+    const raw = localStorage.getItem('he_armlifting_corrections');
+    expect(raw).toBeTruthy();
+    const pack = JSON.parse(raw as string);
+    expect(pack.movement.lines).toContain('фаза срыва: Протяжка');
+    expect(pack.movement.lines).toContain('попытки: 92.5/97.5/102.5');
+  });
+
+  it('PRO-6 M11: без движения в мосте — movement в паке нет', () => {
+    seed({});
+    render(<ArmAutoConstructor />);
+    const raw = localStorage.getItem('he_armlifting_corrections');
+    const pack = raw ? JSON.parse(raw) : null;
+    expect(pack?.movement).toBeUndefined();
+  });
 });

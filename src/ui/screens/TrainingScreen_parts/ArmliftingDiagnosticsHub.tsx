@@ -114,7 +114,9 @@ function loadDiag(): DiagState {
       faultIds: Array.isArray((j as any).faultIds) ? (j as any).faultIds.filter((x: any) => typeof x === 'string') : [],
       specWeeks: (j as any).specWeeks === 6 ? 6 : 4,
       condRtVersion: ['v1', 'v2', 'v3'].includes((j as any).condRtVersion) ? (j as any).condRtVersion : 'unknown',
-      painZones: Array.isArray((j as any).painZones) ? (j as any).painZones.filter((x: any) => typeof x === 'string') : [],
+      painZones: Array.isArray((j as any).painZones)
+        ? (j as any).painZones.filter((x: any) => typeof x === 'string' && ARMLIFT_PAIN_ZONES.some((z) => z.id === x))
+        : [],
     };
   } catch { return DEFAULT_DIAG; }
 }
@@ -294,6 +296,28 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     wristFlexDeg: diag.wristFlexDeg ? parseFloat(diag.wristFlexDeg) : null,
     thumbOppOk: diag.thumbOppOk,
   }), [diag.wristExtDeg, diag.wristFlexDeg, diag.thumbOppOk]);
+  /** PRO-6 M4: холд-кривая по релевантному тесту снаряда (выше cause — порядок TDZ). */
+  const holdCurve = useMemo(() => {
+    const rel = relevantTestsFor(diag.implement);
+    const num = (s: string): number | null => {
+      const v = parseFloat(s);
+      return Number.isFinite(v) && v > 0 ? v : null;
+    };
+    if (rel.includes('Pinch-hold')) {
+      return holdCurveFor(
+        diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
+        num(diag.pinchSubSec),
+      );
+    }
+    if (rel.includes('Farmer-hold')) {
+      return holdCurveFor(
+        diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
+        num(diag.farmerSubSec),
+      );
+    }
+    /** Crush-снаряды (CoC/Silver): кривая по холдам в секундах неприменима — тихо. */
+    return null;
+  }, [diag.implement, diag.pinchHoldSec, diag.pinchSubSec, diag.farmerHoldSec, diag.farmerSubSec]);
   /** PRO-5 real: причина со скорингом и evidence (свой движок, не стол). */
   const cause = useMemo(() => diagnoseArmliftCause({
     implement: diag.implement,
@@ -323,7 +347,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     pain: diag.pain,
     skinTear: diag.skinTear,
     thumbWebPain: diag.thumbWebPain,
-  }), [diag, asymForDiag, logStats, acwr, state.cocLevel, state.silverSec, state.silverGripper]);
+    /** PRO-6 M4: кривая в скоринг причины (без пары — null, как раньше). */
+    holdCurve: holdCurve ? { curve: holdCurve.curve, ratio: holdCurve.ratio, note: holdCurve.note } : null,
+  }), [diag, asymForDiag, logStats, acwr, state.cocLevel, state.silverSec, state.silverGripper, holdCurve]);
   const extRatio = flexExtRatio(
     diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
     diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
@@ -334,7 +360,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     failurePoint: diag.failurePoint || undefined,
     extImbalance: extRatio != null && extRatio > 1.5,
     cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
-  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel]);
+    /** PRO-6 M4: кривая поднимает упражнения под провал. */
+    holdCurve: holdCurve?.curve ?? null,
+  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, holdCurve]);
   const specBlock = useMemo(
     () => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, { fatigueFirst: cause.cause === 'fatigue' || cause.cause === 'pain' }),
     [diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, cause.cause],
@@ -398,24 +426,6 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     palmCm: diag.handPalmCm ? parseFloat(diag.handPalmCm) : null,
     thumbCm: diag.handThumbCm ? parseFloat(diag.handThumbCm) : null,
   }), [diag.implement, diag.handSpanCm, diag.handPalmCm, diag.handThumbCm]);
-  /** PRO-6 M4: холд-кривая по релевантному тесту снаряда. */
-  const holdCurve = useMemo(() => {
-    const rel = relevantTestsFor(diag.implement);
-    const num = (s: string): number | null => {
-      const v = parseFloat(s);
-      return Number.isFinite(v) && v > 0 ? v : null;
-    };
-    if (rel.includes('Pinch-hold')) {
-      return holdCurveFor(
-        diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
-        num(diag.pinchSubSec),
-      );
-    }
-    return holdCurveFor(
-      diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
-      num(diag.farmerSubSec),
-    );
-  }, [diag.implement, diag.pinchHoldSec, diag.pinchSubSec, diag.farmerHoldSec, diag.farmerSubSec]);
   /** PRO-6 M8: карта боли — точечная разгрузка поверх бинарных гейтов. */
   const painMap = useMemo(() => assessArmliftPainMap({
     zones: diag.painZones as ArmliftPainZone[],
@@ -959,6 +969,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             placeholder="Вставь Kinovea CSV трека (t,x,y) — посчитаем гуляние"
             aria-label="Kinovea CSV трека"
             rows={3}
+            maxLength={20000}
             style={{ width: '100%', minHeight: 64, fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, padding: 8, fontFamily: 'monospace' }}
           />
           {videoFlags && <div className="ad-muted" data-arm="lift-video-flags">🎥 {videoFlags.note}</div>}

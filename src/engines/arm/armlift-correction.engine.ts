@@ -41,6 +41,8 @@ export interface ArmliftRankCtx {
   extImbalance?: boolean;
   /** D11 E2: уровень CoC — лесенка рабочий/целевой. */
   cocLevel?: number | null;
+  /** PRO-6 M4: холд-кривая «макс vs 70%» — поднимает упражнения под провал кривой. */
+  holdCurve?: 'peak_gap' | 'endurance_gap' | 'both_low' | 'solid' | null;
 }
 
 interface PoolEntry {
@@ -259,6 +261,10 @@ export function rankArmliftCorrections(
     if (ctx.extImbalance && /wrist_ext_bb|wrist_roller|reverse_ez_curl/.test(p.exId)) {
       score += 10; reasons.push('баланс: экстензия + Expand 2×15');
     }
+    // PRO-6 M4: кривая различает пик и базу — длинные холды vs короткие пиковые vs объём без холдов
+    if (ctx.holdCurve === 'endurance_gap' && p.holdSeconds != null && p.holdSeconds >= 15) { score += 6; reasons.push('под кривую: длинные холды'); }
+    if (ctx.holdCurve === 'peak_gap' && p.holdSeconds != null && p.holdSeconds <= 12 && p.sets >= 3) { score += 6; reasons.push('под кривую: пик'); }
+    if (ctx.holdCurve === 'both_low' && p.holdSeconds == null && p.reps[0] >= 3) { score += 6; reasons.push('под кривую: база объёмом'); }
     return { p, score, reason: reasons.join(', ') };
   });
   scored.sort((a, b) => b.score - a.score);

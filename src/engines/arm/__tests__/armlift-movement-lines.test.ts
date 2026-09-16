@@ -25,10 +25,10 @@ describe('PRO-6 M10: строки движения из моста', () => {
     expect(r.lines[1]).toBe('попытки: 92.5/97.5/102.5');
     expect(r.painStop).toBe(false);
   });
-  it('красные флаги — painStop', () => {
+  it('красные флаги — painStop + ⛔', () => {
     const r = armliftMovementFlashLines({ diagPainNote: 'Стоп: онемение — к врачу' });
     expect(r.painStop).toBe(true);
-    expect(r.lines).toEqual(['Стоп: онемение — к врачу']);
+    expect(r.lines).toEqual(['⛔ Стоп: онемение — к врачу']);
   });
   it('битые попытки (нули/мусор) — тихо', () => {
     expect(armliftMovementFlashLines({ diagAttemptPlan: { opener: 0, second: 'x', third: null } }).lines).toEqual([]);

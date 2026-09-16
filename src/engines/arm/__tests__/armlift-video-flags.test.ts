@@ -32,4 +32,10 @@ describe('PRO-6 M6: видео-флаги', () => {
     const fast = ['t,x,y', '0,0,0', '0.3,1,10', '0.6,2,20'].join('\n');
     expect(analyzeArmliftVideo({ csv: fast })?.flags).toContain('quick_pull');
   });
+  it('пиксельные единицы (разброс в метры) — без drift-флага, с пометкой калибровки', () => {
+    const px = ['t,x,y', '0,0,0', '0.5,600,10', '1.0,100,20', '1.5,500,30'].join('\n');
+    const r = analyzeArmliftVideo({ csv: px });
+    expect(r?.flags).not.toContain('drift_big');
+    expect(r?.note).toContain('калибруй');
+  });
 });

@@ -45,4 +45,12 @@ describe('arm-export', () => {
     expect(html).not.toContain('<script>alert(1)</script>');
     expect(html).toContain('&lt;script&gt;');
   });
+  it('PRO-6 M11: print без armliftMovement — блока нет; с ним — блок + XSS-escape', () => {
+    expect(buildArmPrintHtml(plan)).not.toContain('Движение армлифтинга');
+    const html = buildArmPrintHtml(plan, { armliftMovement: ['фаза срыва: Протяжка', '<script>alert(1)</script>'] });
+    expect(html).toContain('Движение армлифтинга');
+    expect(html).toContain('фаза срыва: Протяжка');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
 });

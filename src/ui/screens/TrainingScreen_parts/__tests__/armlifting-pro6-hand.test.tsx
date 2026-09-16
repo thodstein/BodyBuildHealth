@@ -25,4 +25,21 @@ describe('PRO-6 M3/M4: рука + холд-кривая', () => {
     fireEvent.click(screen.getByText('🔍 Диагностика'));
     expect(document.body.textContent).not.toContain('Кривая:');
   });
+  it('кривая попадает в причину (evidence) и меняет топ коррекции', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    fireEvent.change(screen.getByLabelText(/Farmer-hold сек/), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText(/Холд 70 процентов сек/), { target: { value: '70' } });
+    expect(document.body.textContent).toContain('Холд-кривая');
+  });
+  it('crush-снаряд (CoC): кривая по холдам молчит', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    fireEvent.click(screen.getByText('CoC'));
+    fireEvent.change(screen.getByLabelText(/Farmer-hold сек/), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText(/Холд 70 процентов сек/), { target: { value: '70' } });
+    expect(document.body.textContent).not.toContain('Кривая:');
+  });
 });
