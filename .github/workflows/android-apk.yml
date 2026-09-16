@@ -29,6 +29,15 @@ jobs:
         run: npm ci
 
       - name: Web build + Capacitor sync
+        # Supabase-ключи запекаются в dist на этапе vite build. Локальный .env
+        # в CI недоступен (gitignore), поэтому берём из GitHub Secrets
+        # (Settings → Secrets → Actions: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY,
+        # VITE_CRYPTO_KEY — те же значения, что в локальном .env / на Vercel).
+        # Без них APK собирается, но показывает «Облако не настроено».
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_CRYPTO_KEY: ${{ secrets.VITE_CRYPTO_KEY }}
         run: npm run build:native
 
       # OTA-бандл: zip свежего dist/ (корень = index.html) для подтягивания
@@ -107,6 +116,11 @@ jobs:
         run: npm ci
 
       - name: Web build + Capacitor sync
+        # см. комментарий в build-джобе: ключи только из Secrets.
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_CRYPTO_KEY: ${{ secrets.VITE_CRYPTO_KEY }}
         run: npm run build:native
 
       - name: Setup JDK 21
