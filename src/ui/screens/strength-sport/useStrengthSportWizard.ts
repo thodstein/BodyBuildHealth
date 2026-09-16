@@ -101,7 +101,8 @@ export function useStrengthSportWizard() {
   const [orthoNote, setOrthoNote] = useState<string | null>(null);
   // V4-добой (G8): заявки/Sinclair/спец-блок ТА-хаба — в rationale плана + бейдж.
   // V4-добой-2 (П1): + причины/коррекции/FvR/асимметрия/OHS.
-  const [taBridge, setTaBridge] = useState<{ attempts: { snatch: number[]; cj: number[] } | null; sinclair: { total: number; value: number; cycle?: string | null; q?: number | null } | null; specWeeks: number | null; prefCorr: Record<string, string> | null; causes: Record<string, string> | null; fvr: { snatchTh: number; pmax: number } | null; asymPct: number | null; ohsFailed: number | null; specTargets: number[] | null }>({ attempts: null, sinclair: null, specWeeks: null, prefCorr: null, causes: null, fvr: null, asymPct: null, ohsFailed: null, specTargets: null });
+  // C9: + детальные строки коррекции (имя + доза + кью) — в rationale.
+  const [taBridge, setTaBridge] = useState<{ attempts: { snatch: number[]; cj: number[] } | null; sinclair: { total: number; value: number; cycle?: string | null; q?: number | null } | null; specWeeks: number | null; prefCorr: Record<string, string> | null; causes: Record<string, string> | null; fvr: { snatchTh: number; pmax: number } | null; asymPct: number | null; ohsFailed: number | null; specTargets: number[] | null; correctiveDetail: string[] | null }>({ attempts: null, sinclair: null, specWeeks: null, prefCorr: null, causes: null, fvr: null, asymPct: null, ohsFailed: null, specTargets: null, correctiveDetail: null });
   // Приём из хабов ТА/стронг (planner-bridge weakpoints → weightlifting/strongman)
   // через чистый parseSmBridgePayload (см. sm-bridge-intake.ts + его тест).
   // + мост из Библиотеки (каталог циклов → kind 'ss_cycle': ставит цикл+режим+сроки).
@@ -194,8 +195,8 @@ export function useStrengthSportWizard() {
       }
       // V4-добой (G8): заявки/Sinclair/спец-блок ТА — вне гейта слабых.
       // V4-добой-2 (П1): + причины/коррекции/FvR/асимметрия/OHS.
-      if (p.taAttempts || p.taSinclair || p.taSpecWeeks != null || p.taPreferredCorr || p.taWeakCauses || p.taFvr || p.taAsymPct != null || p.taOhsFailed != null || p.taSpecTargets) {
-        try { setTaBridge({ attempts: p.taAttempts, sinclair: p.taSinclair, specWeeks: p.taSpecWeeks, prefCorr: p.taPreferredCorr, causes: p.taWeakCauses, fvr: p.taFvr, asymPct: p.taAsymPct, ohsFailed: p.taOhsFailed, specTargets: p.taSpecTargets }); } catch {}
+      if (p.taAttempts || p.taSinclair || p.taSpecWeeks != null || p.taPreferredCorr || p.taWeakCauses || p.taFvr || p.taAsymPct != null || p.taOhsFailed != null || p.taSpecTargets || p.taCorrectiveDetail) {
+        try { setTaBridge({ attempts: p.taAttempts, sinclair: p.taSinclair, specWeeks: p.taSpecWeeks, prefCorr: p.taPreferredCorr, causes: p.taWeakCauses, fvr: p.taFvr, asymPct: p.taAsymPct, ohsFailed: p.taOhsFailed, specTargets: p.taSpecTargets, correctiveDetail: p.taCorrectiveDetail }); } catch {}
       }
       if (Array.isArray(p.weakPoints) && p.weakPoints.length > 0) {
         setWeakPoints(p.weakPoints);

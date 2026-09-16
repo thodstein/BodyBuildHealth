@@ -76,6 +76,26 @@ describe('parseSmBridgePayload', () => {
     expect(parseSmBridgePayload({}).taSpecTargets).toBeNull();
   });
 
+  it('C9: taCorrectiveDetail санитизируется (кап 9, trim, мусор — null)', () => {
+    expect(parseSmBridgePayload({}).taCorrectiveDetail).toBeNull();
+    expect(parseSmBridgePayload({ taCorrectiveDetail: 'не массив' }).taCorrectiveDetail).toBeNull();
+    const p = parseSmBridgePayload({ taCorrectiveDetail: ['  Рывок с паузой — 3×3 @65%  ', '', 123 as any, 'x'.repeat(200)] });
+    expect(p.taCorrectiveDetail).toEqual(['Рывок с паузой — 3×3 @65%', '123', 'x'.repeat(160)]);
+    const many = Array.from({ length: 15 }, (_, i) => `строка ${i}`);
+    expect(parseSmBridgePayload({ taCorrectiveDetail: many }).taCorrectiveDetail!.length).toBe(9);
+  });
+
+  it('C9: buildSpecProtocols берёт дозу библиотечного ⭐ (tall_snatch 5×3@40), rank — fallback', () => {
+    const lib = buildSpecProtocols(['snatch_pull_under'], { snatch_pull_under: 'tall_snatch' }, { snatch_pull_under: 'technique' }, [], []);
+    expect(lib.snatch_pull_under).toEqual({ sets: 5, reps: 3, pct: 40 });
+    const rank = buildSpecProtocols(['snatch_mid'], { snatch_mid: 'nope' }, { snatch_mid: 'technique' }, [], []);
+    expect(rank.snatch_mid.sets).toBeGreaterThan(0);
+    // чужой фазе библиотечный pref не тянется
+    const alien = buildSpecProtocols(['jerk_dip'], { jerk_dip: 'tall_snatch' }, {}, [], []);
+    expect(alien.jerk_dip.sets).toBeGreaterThan(0);
+    expect(alien.jerk_dip).not.toEqual({ sets: 5, reps: 3, pct: 40 });
+  });
+
   it('контест без events отклоняется, smContest — фолбэк', () => {
     expect(parseSmBridgePayload({ contest: { name: 'битый' } }).contest).toBeNull();
     const p = parseSmBridgePayload({
@@ -136,6 +156,7 @@ describe('parseSmBridgePayload', () => {
       taAsymPct: null,
       taOhsFailed: null,
       taSpecTargets: null,
+      taCorrectiveDetail: null,
       orthoBlocked: [],
       orthoMobility: [],
       orthoYokeGate: false,

@@ -127,6 +127,22 @@ describe('useStrengthSportWizard', () => {
     expect(result.current.weakPoints).toEqual([]);
   });
 
+  it('C9: мост ТА: correctiveDetail доходит до taBridge', () => {
+    const { result } = renderHook(() => useStrengthSportWizard());
+    act(() => {
+      applyToPlanner({
+        kind: 'weakpoints',
+        label: 't',
+        data: {
+          wlWeakPoints: ['snatch_mid'],
+          taCorrectiveDetail: ['Рывок с паузой — 3×3 @65% · Замри · Everett halting'],
+        } as any,
+      });
+    });
+    expect(result.current.taBridge.correctiveDetail).toEqual(['Рывок с паузой — 3×3 @65% · Замри · Everett halting']);
+    expect(result.current.weakPoints).toEqual(['snatch_mid']);
+  });
+
   it('мост ТА: specTargets доходят до taBridge', () => {
     const { result } = renderHook(() => useStrengthSportWizard());
     act(() => {

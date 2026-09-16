@@ -319,6 +319,11 @@ export const StrengthSportConstructor: React.FC = () => {
         if (tb?.prefCorr && Object.keys(tb.prefCorr).length) {
           p.rationale.push(`Предпочитаемые коррекции ТА-хаба (${Object.keys(tb.prefCorr).length}): в план не вшиты — вставь кнопкой «💉 Вставить коррекции в план» в хабе`);
         }
+        // C9: детальные строки коррекции хаба (имя + доза + кью) — информационно, механики у билдера нет.
+        if (tb?.correctiveDetail && tb.correctiveDetail.length) {
+          const lines = tb.correctiveDetail.slice(0, 3).join(' · ');
+          p.rationale.push(`Коррекция ТА-хаба: ${lines}${tb.correctiveDetail.length > 3 ? ` (+${tb.correctiveDetail.length - 3})` : ''}`);
+        }
         if (tb?.fvr && tb.fvr.snatchTh > 0) {
           p.rationale.push(`FvR-оценка ТА-хаба: рывок ≈${tb.fvr.snatchTh}кг${tb.fvr.pmax > 0 ? ` · Pmax ${tb.fvr.pmax}Вт` : ''} — ориентир заявок`);
         }
@@ -599,7 +604,7 @@ export const StrengthSportConstructor: React.FC = () => {
           <div style={{ ...ROW, gap: 6 }}>
             {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`} icon="📋">План {plan.weeks}нед · {plan.patternId}</Badge>}
             {Object.keys(hubVelocity).length > 0 && <Badge color="#f5b04c" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">📥 Из хаба: {Object.entries(hubVelocity).map(([k, v]) => `${k} ${v.length}т`).join(' · ')}</Badge>}
-            {(taBridge.attempts || taBridge.sinclair || taBridge.specWeeks != null || taBridge.causes || taBridge.fvr) && <Badge color="#7dd3fc" bg="rgba(56,189,248,0.10)" border="rgba(56,189,248,0.18)">📥 ТА-хаб{(taBridge.attempts?.snatch?.length || taBridge.attempts?.cj?.length) ? ' · заявки' : ''}{taBridge.sinclair ? ` · Sinclair ${taBridge.sinclair.value}` : ''}{taBridge.specWeeks != null ? ` · спец ${taBridge.specWeeks}нед` : ''}{taBridge.causes ? ` · причины ${Object.keys(taBridge.causes).length}` : ''}{taBridge.fvr ? ` · FvR ${taBridge.fvr.snatchTh}` : ''}</Badge>}
+            {(taBridge.attempts || taBridge.sinclair || taBridge.specWeeks != null || taBridge.causes || taBridge.fvr || taBridge.correctiveDetail) && <Badge color="#7dd3fc" bg="rgba(56,189,248,0.10)" border="rgba(56,189,248,0.18)">📥 ТА-хаб{(taBridge.attempts?.snatch?.length || taBridge.attempts?.cj?.length) ? ' · заявки' : ''}{taBridge.sinclair ? ` · Sinclair ${taBridge.sinclair.value}` : ''}{taBridge.specWeeks != null ? ` · спец ${taBridge.specWeeks}нед` : ''}{taBridge.causes ? ` · причины ${Object.keys(taBridge.causes).length}` : ''}{taBridge.fvr ? ` · FvR ${taBridge.fvr.snatchTh}` : ''}{taBridge.correctiveDetail?.length ? ` · коррекция ${taBridge.correctiveDetail.length}` : ''}</Badge>}
             {plan && weakPoints.length > 0 && (taBridge.specTargets?.length ?? 0) > 0 && <button data-ss="apply-spec" onClick={handleApplySpecBlock} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(56,189,248,0.35)', background: 'rgba(56,189,248,0.14)', color: '#7dd3fc', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📥 Спец-блок ({taBridge.specTargets!.length} нед)</button>}
             {plan && hasSpecPrev && <button data-ss="rollback-spec" onClick={handleRollbackSpec} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат спец-блока</button>}
             {outsideMetrics && <Badge color="#c4b5fd" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}

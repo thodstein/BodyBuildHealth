@@ -31,6 +31,7 @@ describe('TA spec opt-in', () => {
         taSpecBlock: { totalWeeks: 2, weeks: [{ targetSets: 3 }, { targetSets: 4 }] },
         taPreferredCorr: { snatch_mid: 'pause_snatch' },
         taWeakCauses: { snatch_mid: 'technique' },
+        taCorrectiveDetail: ['Рывок с паузой — 3×3 @65% · Замри · Everett halting'],
       } as any,
     });
     const { container } = render(<StrengthSportConstructor />);
@@ -42,6 +43,9 @@ describe('TA spec opt-in', () => {
     fireEvent.click(screen.getByText(/Далее → 4 🧩 Сплит/));
     fireEvent.click(screen.getByText(/Собрать план/));
     await waitFor(() => expect(container.textContent).toContain('План 8нед'), { timeout: 12000 });
+    // C9: детальная строка коррекции доехала до конструктора (бейдж моста;
+    // rationale пушится в план тем же билдом — путь покрыт intake-тестом)
+    expect(container.textContent).toContain('коррекция 1');
     // Кнопка opt-in со счётчиком недель хаба
     const btn = await screen.findByText(/Спец-блок \(2 нед\)/, {}, { timeout: 5000 });
     expect(btn).toBeTruthy();

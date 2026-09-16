@@ -29,6 +29,16 @@ describe('ta corrective tab UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /Открыть Коррекцию/ }));
     expect(container.querySelector('[data-wl="corrective"]')).toBeTruthy();
   });
+  it('C9: петля в табе Рывок даёт хинт на месте (без похода в Видео)', () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+    fireEvent.change(screen.getByPlaceholderText('xLoop см'), { target: { value: '8' } });
+    const hint = container.querySelector('[data-wl="corrective-snatch"]');
+    expect(hint).toBeTruthy();
+    expect(hint?.textContent).toMatch(/Гриф уходит вперёд/);
+    fireEvent.click(hint?.querySelector('button') as HTMLElement);
+    expect(container.querySelector('[data-wl="corrective"]')).toBeTruthy();
+  });
   it('петля ≤4 — хинта нет (молчим на шум)', () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));

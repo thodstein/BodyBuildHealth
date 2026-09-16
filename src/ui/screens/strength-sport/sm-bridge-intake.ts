@@ -12,6 +12,7 @@
  * sm-bridge-intake), intake конструктора только раскладывает патч по сеттерам.
  */
 import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-sport-ta-correction-rank.engine';
+import { protocolForPreferred } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
 import type { WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
 
 export type SmBridgeMode = 'strongman' | 'weightlifting';
@@ -64,6 +65,8 @@ export interface SmBridgePatch {
   taOhsFailed: number | null;
   /** Spec-блок opt-in: сеты по неделям из taSpecBlock.weeks[].targetSets или null. */
   taSpecTargets: number[] | null;
+  /** C9: детальные строки коррекции хаба (имя + доза + кью) для rationale или null. */
+  taCorrectiveDetail: string[] | null;
   /** J7 орто-скрининг: заблокированные паттерны (orthopedic.blockedPatterns + orthoGuards.blockedPatterns). */
   orthoBlocked: string[];
   /** J7: mobility-merge (только ключи MOBILITY_RU). */
@@ -167,6 +170,19 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
   };
   const taPreferredCorr = strRecord(d.taPreferredCorr);
   const taWeakCauses = strRecord(d.taWeakCauses);
+  // C9: детальные строки коррекции — массив непустых строк ≤160 символов, кап 9, дедуп.
+  let taCorrectiveDetail: string[] | null = null;
+  try {
+    if (Array.isArray(d.taCorrectiveDetail)) {
+      const clean = Array.from(new Set(
+        (d.taCorrectiveDetail as unknown[])
+          .map((x) => String(x ?? '').trim())
+          .filter((s) => s.length > 0)
+          .map((s) => s.slice(0, 160)),
+      )).slice(0, 9);
+      if (clean.length > 0) taCorrectiveDetail = clean;
+    }
+  } catch { /* noop */ }
   const fvrRaw: any = d.fvr != null && typeof d.fvr === 'object' ? d.fvr : null;
   const fvrTh = fvrRaw ? finiteNum(fvrRaw.snatchTh) : null;
   const fvrPmax = fvrRaw ? finiteNum(fvrRaw.Pmax ?? fvrRaw.pmax) : null;
@@ -230,6 +246,7 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     taAsymPct,
     taOhsFailed,
     taSpecTargets,
+    taCorrectiveDetail,
     orthoBlocked,
     orthoMobility,
     orthoYokeGate,
@@ -254,13 +271,21 @@ export function buildSpecProtocols(
   for (const wp of Array.isArray(weakPoints) ? weakPoints : []) {
     if (!wp) continue;
     try {
+      const cause = (causes?.[wp] ?? null) as any;
+      // C9: ⭐ из Коррекции (библиотечный id) — доза карточки; явный выбор
+      // пользователя, поэтому без equipment/mobility-фильтра ранжира.
+      const prefId = prefCorr?.[wp];
+      const libProto = protocolForPreferred(wp as WLWeakPoint, prefId, cause, null);
+      if (libProto) {
+        out[wp] = { sets: libProto.sets, reps: libProto.reps, pct: libProto.pct };
+        continue;
+      }
       const ranked = rankCorrectionsForTA(wp as WLWeakPoint, {
         equipment,
         mobilityRestrictions,
-        cause: (causes?.[wp] ?? null) as any,
+        cause,
       });
       if (!ranked.length) continue;
-      const prefId = prefCorr?.[wp];
       const pick = (prefId && ranked.find((c) => c.id === prefId)) || ranked[0];
       if (pick) out[wp] = { sets: pick.protocol.sets, reps: pick.protocol.reps, pct: pick.protocol.pct };
     } catch { /* noop — фаза без протокола скипается */ }

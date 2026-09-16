@@ -1143,6 +1143,14 @@ export const WLDiagnosticsHub: React.FC = () => {
         taSpecBlock: specPreview,
         taPreferredCorr: state.preferredCorr || {},
         taWeakCauses: Object.fromEntries(weakPoints.map(wp => { try { return [wp, causeFor(wp)?.cause ?? null]; } catch { return [wp, null]; } })),
+        // C9: детальные строки коррекции (имя + доза + кью + источник) — в rationale конструктора
+        taCorrectiveDetail: weakPoints.flatMap(wp => {
+          try {
+            const causeMap: Record<string, string> = {};
+            try { causeMap[wp] = causeFor(wp)?.cause ?? ''; } catch { causeMap[wp] = ''; }
+            return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel);
+          } catch { return []; }
+        }).slice(0, 9),
         // V5-A: попытки + Sinclair (информационно для конструктора/дневника)
         ...(snatchAttempts || cjAttempts ? { taAttempts: { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) } } : {}),
         ...(progCalc && progCalc.sinclair != null ? { taSinclair: { total: progCalc.total, value: progCalc.sinclair, cycle: progCalc.cycle, q: progCalc.q ?? null } } : {}),
@@ -1447,6 +1455,22 @@ export const WLDiagnosticsHub: React.FC = () => {
               </div>
               {barPathDiag?.weak && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 6 }}>→ {WL_WEAKPOINT_LABELS[barPathDiag.weak]} · {barPathDiag.corrections.join(' · ')}</div>}
               {barMetricsDiag && <div style={{ fontSize: 10, color: barMetricsDiag.severity === 'ok' ? '#22c55e' : barMetricsDiag.severity === 'warn' ? '#f59e0b' : '#ef4444', marginTop: 4 }}>{barMetricsDiag.text} {barMetrics?.xLoop ? `(SRD ${isRealChange(barMetrics.xLoop) ? 'реально' : 'в пределах шума'})` : ''}</div>}
+              {(() => {
+                try {
+                  if (!barMetricsDiag || barMetricsDiag.severity === 'ok') return null;
+                  const t = tagsForBarMetrics(barMetrics?.xLoop ?? null, state.barLift);
+                  if (!t.tags.length) return null;
+                  const names = t.tags.flatMap(tag => correctivesByError(tag).slice(0, 2).map(e => e.nameRu));
+                  const uniq = [...new Set(names)].slice(0, 3);
+                  if (!uniq.length) return null;
+                  return (
+                    <div data-wl="corrective-snatch" style={{ fontSize: 10, color: '#fff', marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.16)' }}>
+                      🛠️ Петля → ошибка: {t.tags.map(tag => TA_ERROR_TAG_RU[tag]).join(' · ')} → гасится: {uniq.join(' · ')}
+                      <button onClick={() => setTab('correction')} style={{ display: 'block', marginTop: 6, width: '100%', minHeight: 44, borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Открыть Коррекцию</button>
+                    </div>
+                  );
+                } catch { return null; }
+              })()}
               {barMetrics && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Метрика: xLoop {videoQuality.flag === 'rough' ? '≈' : ''}{barMetrics.xLoop}см yMax {barMetrics.yMax}см vmax {barMetrics.vMax} м/с {TA_PEAK_VELOCITY_ZONES.snatch ? `· зона ${taZoneForVelocity(barMetrics.vMax, 'snatch')}` : ''}</div>}
               {ymaxNote && <div data-wl="ymax-norm" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>📏 {ymaxNote}</div>}
               {profileSex === 'female' && <div style={{ fontSize: 10, color: '#f9a8d4', marginTop: 4 }}>♀ Норма фазы по уровню ({femaleLevelOf(taLevel)}): финал-ускорение {femalePhaseNorm(femaleLevelOf(taLevel)).finalAccS.join('–')}с · таз {femalePhaseNorm(femaleLevelOf(taLevel)).hipAmortDeg.join('–')}° (Slobozhanskyi 2025)</div>}
