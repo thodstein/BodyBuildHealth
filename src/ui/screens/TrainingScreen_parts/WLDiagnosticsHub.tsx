@@ -1272,7 +1272,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         }).slice(0, 9),
         // V5-A: попытки + Sinclair (информационно для конструктора/дневника)
         ...(snatchAttempts || cjAttempts ? { taAttempts: { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) } } : {}),
-        ...(progCalc && progCalc.sinclair != null ? { taSinclair: { total: progCalc.total, value: progCalc.sinclair, cycle: progCalc.cycle, q: progCalc.q ?? null } } : {}),
+        ...(progCalc && progCalc.sinclair != null ? { taSinclair: { total: progCalc.total, value: progCalc.sinclair, cycle: progCalc.cycle, q: progCalc.q ?? null, qm: progCalc.qm ?? null } } : {}),
       } as any,
       source: 'intellectual',
     });

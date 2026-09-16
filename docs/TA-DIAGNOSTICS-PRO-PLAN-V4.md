@@ -369,7 +369,10 @@ Shah 2026 single-camera; USAW 2025 Q-points; Khuyagbaatar 2024 snatch vs clean).
   история мощности 2-й тяги (`he_ta_pullpower_hist_v1` + тренд + экспорт);
   полные Q-masters = Q-points × MF/HMF-таблицы дословно (weighttraining.nz/IMWA,
   66/61 значение; Q-youth числовой HP-матрицы в открытых источниках нет —
-  осталась шкала, выдумывать не стали). Поймано своим прогоном: П3-правка съела
+  осталась шкала, выдумывать не стали).   Поймано своим прогоном: П3-правка съела
   `phaseTrend` (ReferenceError) + округлённый vmax недостижим для сглаженного
   ряда (индекс пика трекается до округления). Проверено: `ta-v5` 30/30 + UI
   10/10 + область **67 файлов / 995**; `tsc` 0; `verify` OK.
+- **Добивка qm end-to-end:** `qm` едет мостом (`taSinclair.qm` в payload хаба) →
+  intake санитизирует (>0, мусор → null) → `taBridge.sinclair.qm` → строка
+  rationale «· Q-masters N» + `· QM N` в бейдже «📦 ТА-хаб». Тесты intake/wizard.

@@ -126,6 +126,20 @@ describe('useStrengthSportWizard', () => {
     expect(result.current.taBridge.specWeeks).toBe(6);
     expect(result.current.weakPoints).toEqual([]);
   });
+  it('V5-П4: qm доходит до taBridge', () => {
+    const { result } = renderHook(() => useStrengthSportWizard());
+    act(() => {
+      applyToPlanner({
+        kind: 'weakpoints',
+        label: 't',
+        data: {
+          wlWeakPoints: [],
+          taSinclair: { total: 229, value: 260.5, cycle: '2025-2028', q: 281.3, qm: 312.7 },
+        } as any,
+      });
+    });
+    expect(result.current.taBridge.sinclair?.qm).toBe(312.7);
+  });
 
   it('C9: мост ТА: correctiveDetail доходит до taBridge', () => {
     const { result } = renderHook(() => useStrengthSportWizard());

@@ -285,4 +285,12 @@ describe('D9 ТА-мост: заявки/Sinclair/FvR не теряются', ()
     expect(p.taAttempts == null || (p.taAttempts.snatch.length === 0 && p.taAttempts.cj.length === 0)).toBe(true);
     expect(p.taSinclair).toBeNull();
   });
+  it('V5-П4: qm парсится позитивно, мусор → null', () => {
+    const p = parseSmBridgePayload({ taSinclair: { total: 212, value: 301.5, qm: 335.2 } });
+    expect(p.taSinclair?.qm).toBe(335.2);
+    const bad = parseSmBridgePayload({ taSinclair: { total: 212, value: 301.5, qm: 'x' } });
+    expect(bad.taSinclair?.qm).toBeNull();
+    const neg = parseSmBridgePayload({ taSinclair: { total: 212, value: 301.5, qm: -3 } });
+    expect(neg.taSinclair?.qm).toBeNull();
+  });
 });

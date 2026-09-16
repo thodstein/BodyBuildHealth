@@ -30,6 +30,8 @@ export interface SmBridgeTaSinclair {
   value: number;
   cycle?: string | null;
   q?: number | null;
+  /** V5-П4: Q-masters числом (Q-points × MF/HMF) или null (моложе 30). */
+  qm?: number | null;
 }
 
 export interface SmBridgePatch {
@@ -164,7 +166,7 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
   const sinVal = sinRaw ? finiteNum(sinRaw.value) : null;
   const sinTot = sinRaw ? finiteNum(sinRaw.total) : null;
   const taSinclair: SmBridgeTaSinclair | null = sinVal != null && sinVal > 0
-    ? { total: sinTot ?? 0, value: sinVal, cycle: typeof sinRaw.cycle === 'string' ? sinRaw.cycle : null, q: finiteNum(sinRaw.q) }
+    ? { total: sinTot ?? 0, value: sinVal, cycle: typeof sinRaw.cycle === 'string' ? sinRaw.cycle : null, q: finiteNum(sinRaw.q), qm: (() => { const v = finiteNum(sinRaw.qm); return v != null && v > 0 ? v : null; })() }
     : null;
   const specRaw: any = d.taSpecBlock != null && typeof d.taSpecBlock === 'object' ? d.taSpecBlock : null;
   const specW = specRaw ? finiteNum(specRaw.totalWeeks) : null;
