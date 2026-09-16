@@ -2401,6 +2401,19 @@ export function prepFatFloorGPerKg(sex: 'male' | 'female'): number {
   return sex === 'female' ? 0.8 : 0.6;
 }
 
+/** PRO-3 Э2: база натрия дня подготовки (мг) — единый источник для живых целей,
+ *  display-таблиц и превью (раньше живой контекст слал 3500, движок/таблицы — 2800). */
+export const PREP_SODIUM_BASE_MG = 2800;
+
+/** PRO-3 Э2/D15: поддержание дня подготовки (рефид / diet-break) — clean-оценка без
+ *  planner-модов: калории дефицита + дефицит по целевому темпу (0.25–0.75%/нед). */
+export function prepMaintenanceKcal(plan: BBContestPrepPlan): number {
+  const w = plan.preparation.startingWeightKg;
+  const rate = clamp(Number(plan.preparation.targetRatePctPerWeek) || 0.5, 0.1, 1.5);
+  const deficit = Math.round((rate / 100) * w * 7700 / 7);
+  return Math.max(plan.sex === 'female' ? 1400 : 1200, Math.round(plan.preparation.currentCalories + deficit));
+}
+
 /** Собрать единый версионированный план contest prep из конфига. */
 export interface BuildPrepPlanOpts {
   id?: string;
@@ -2901,11 +2914,13 @@ export function nutritionTargetsForPrepDate(
   let waveNote = '';
   const isPrepPhase = phase.key === 'preparation' || phase.key === 'final_preparation';
   if (isPrepPhase && isPrepDietBreakDay(dateIso, plan)) {
-    kcal = Math.max(kcal, Math.round(base.kcal));
+    // PRO-3 Э2/D15: чистое поддержание дня (не max с planner-модифицированной базой —
+    // иначе рефид/тяжёлый/-компенсация протекали в брейк-день).
+    kcal = Math.max(kcal, prepMaintenanceKcal(plan));
     carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
     waveNote = ' 🏖 Diet break: неделя на поддержании дня — гормоны/психика восстанавливаются, дефицит продолжится.';
   } else if (isPrepPhase && isPrepRefeedDay(dateIso, plan)) {
-    kcal = Math.max(kcal, Math.round(base.kcal));
+    kcal = Math.max(kcal, prepMaintenanceKcal(plan));
     carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
     waveNote = ' 🔄 Рефид-день: калории до поддержания дня, карбс на гликоген/лептин, жиры на полу.';
   } else if (isPrepPhase && opts?.isHeavyTrainDay === true) {

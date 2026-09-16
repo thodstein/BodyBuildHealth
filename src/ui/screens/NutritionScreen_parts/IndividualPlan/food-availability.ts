@@ -272,6 +272,19 @@ export function familyMealUses(meals: Array<{ items?: Array<{ id?: string }> }>,
 
 export const EXCLUDED_FAMILIES_FROM_PLATE: ReadonlySet<string> = new Set(['oils_mayonnaise']);
 
+// ─── 5b. Режим низкого волокна (PRO-3 Э2) ─────────────────────────────
+/**
+ * Режим «низкое волокно» состава дня (низкоклетчаточные пулы/лёгкие овощи/без семян).
+ * Э2-PRO-3: явный флаг (пик-день препа = true, подготовка/тапер = false) главнее порога;
+ * без явного флага — legacy-порог `fiberCapG < 35` (пик-неделя ББ) — прежнее поведение
+ * байт-в-бит. Раньше порог сам по себе включал «пик-режим» на женских препах (ккал<2500).
+ */
+export function isLowFiberComposition(fiberCapG?: number, explicit?: boolean): boolean {
+  if (explicit === true) return true;
+  if (explicit === false) return false;
+  return typeof fiberCapG === 'number' && fiberCapG < 35;
+}
+
 // ─── 6. Гейт доступности для пулов генератора ─────────────────────────
 /**
  * Может ли продукт попасть в автогенерируемую тарелку.

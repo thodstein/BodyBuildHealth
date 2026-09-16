@@ -27,6 +27,7 @@ import {
   LAST_HARD_DN,
   applyPeakWeekOverlayToBBPlan,
   recarbLoadFromVisual,
+  prepMaintenanceKcal,
   type PeakWeekDayPlan,
   CATEGORY_PROFILES,
   type BBContestPrepConfig,
@@ -266,7 +267,10 @@ describe('PRO-2 P7 — diet-break длинного препа', () => {
     const long = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 20, taperWeeks: 2 });
     const bday = prepDietBreaks(long)[0];
     const t = nutritionTargetsForPrepDate(bday, long, base);
-    expect(t.kcal).toBeGreaterThanOrEqual(base.kcal);
+    // PRO-3 Э2/D15 (осознанный re-baseline, было ≥ base.kcal=2600 из planner-модифицированной
+    // базы → протекание рефид/тяжёлый/-компенсации в брейк-день; стало чистое поддержание плана).
+    expect(t.kcal).toBe(prepMaintenanceKcal(long)); // было 2600 (planner-база), стало 2480 (чистое maintenance плана)
+    expect(t.kcal).toBeGreaterThan(long.preparation.currentCalories);
     expect(t.note).toMatch(/Diet break/);
     expect(isPrepRefeedDay(bday, long)).toBe(false);
     // календарь рефидов не содержит брейк-дней

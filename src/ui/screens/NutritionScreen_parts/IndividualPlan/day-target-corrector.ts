@@ -12,7 +12,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
-import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, citrusFruitCapG, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein, dayTargetScale, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS, isConcentrateFoodId, CONCENTRATE_PORTION_CAP_G } from './food-availability';
+import { foodAvailableForPlan, stapleFamilyOf, familyMealCap, isCreamId, creamMealCap, citrusFruitCapG, countCarbItems, sweetFleshClash, isSweetCarbId, isFleshProteinId, isFishId, isProteinPowderId, isPortableFood, isWorkWindowMeal, isHvStapleBanned, isBreakfastBannedCarb, isBreakfastBannedProtein, isBreakfastBannedFat, isHeavyAnimalFat, isSweetBaseId, isFlakeId, mealHasMeatProtein, dayTargetScale, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS, isConcentrateFoodId, CONCENTRATE_PORTION_CAP_G, isLowFiberComposition } from './food-availability';
 // Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
 // Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
 const POWDER_PORTION_CAP_G = 60;
@@ -157,7 +157,7 @@ function allergenOkCorr(f: { id: string; allergens?: string[] }, allergenTags?: 
   return ![...allergenTags].some(t => tags.includes(t));
 }
 
-function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCarbs?: boolean, highCarb?: boolean, allergenTags?: Set<string>, daySalt?: number, hvStyle?: string, weekIndex?: number, fiberCapG?: number): FoodItem[] {
+function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCarbs?: boolean, highCarb?: boolean, allergenTags?: Set<string>, daySalt?: number, hvStyle?: string, weekIndex?: number, fiberCapG?: number, lowFiberComposition?: boolean): FoodItem[] {
   let ids = macro === 'p' ? TOPUP_PROTEIN_IDS : macro === 'c' ? TOPUP_CARB_IDS : TOPUP_FAT_IDS;
   // P1-7 (план разнообразия): недельная субротация топапов — сдвиг порядка по
   // ledger-неделе (0/7/14…), НЕ по сиду (сид калиброван). Содержимое/квоты инвариантны.
@@ -216,7 +216,7 @@ function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>, convenientCa
   // добивки только низкоклетчаточными носителями (лимит 20 г недостижим на овсянке/
   // цельнозерновых; белый рис/рисовый крем/паста/картофель держат кап). Жиры — без
   // клетчаточных носителей (авокадо/орехи: 7-14 г/100). Без явного капа — бит-в-бит.
-  if (typeof fiberCapG === 'number' && fiberCapG < 35) {
+  if (isLowFiberComposition(fiberCapG, lowFiberComposition)) {
     if (macro === 'c') {
       const lowFib = pool.filter(f => (f.fiber || 0) <= 2.5);
       if (lowFib.length >= 2) pool = lowFib;
@@ -244,7 +244,7 @@ function currentFiber(meals: CorrectorMeal[]): number {
 export function correctDayToTargets(
   mealsIn: CorrectorMeal[],
   targets: DayTargets,
-  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number; convenientCarbs?: boolean; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; anchorCarbIds?: string[]; lbmKg?: number; hvStyle?: string; refeedDay?: boolean; budget?: string; allergenTags?: Set<string>; daySalt?: number; weekIndex?: number; fiberCapG?: number },
+  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number; convenientCarbs?: boolean; highCarb?: boolean; portableMode?: boolean; isWorkDay?: boolean; workStartMin?: number; workEndMin?: number; anchorCarbIds?: string[]; lbmKg?: number; hvStyle?: string; refeedDay?: boolean; budget?: string; allergenTags?: Set<string>; daySalt?: number; weekIndex?: number; fiberCapG?: number; lowFiberComposition?: boolean },
 ): { meals: CorrectorMeal[]; withinTolerance: boolean; deviationPct: number } {
   const maxIter = opts?.maxIter ?? 80;
   const weightKg = opts?.weightKg ?? 80;
@@ -392,7 +392,7 @@ export function correctDayToTargets(
         const over = overs[0];
         const needFor = (f: FoodItem) => under === 'p' ? (f.protein || 0) : under === 'c' ? (f.carbs || 0) : (f.fat || 0);
         const overFor = (f: FoodItem) => over === 'p' ? (f.protein || 0) : over === 'c' ? (f.carbs || 0) : (f.fat || 0);
-        const underPool = poolFor(under, opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex, opts?.fiberCapG).filter(f => needFor(f) > 0);
+        const underPool = poolFor(under, opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex, opts?.fiberCapG, opts?.lowFiberComposition).filter(f => needFor(f) > 0);
         if (underPool.length > 0) {
           // Углеводы в convenient-режиме: удобство первым (низкая клетчатка) — иначе swap тащит батат.
           const _sortU = [...underPool].sort((a, b) => {
@@ -569,7 +569,7 @@ export function correctDayToTargets(
       const _dC = safeTargets.c - totals.c;
       const _hasOver = (safeTargets.p - totals.p) < -5 || (safeTargets.f - totals.f) < -2 || (safeTargets.c - totals.c) < -5;
         if (_dC > 30 && !_hasOver) {
-        const _pool = poolFor('c', opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex, opts?.fiberCapG).filter(f => (f.carbs || 0) >= 45);
+        const _pool = poolFor('c', opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex, opts?.fiberCapG, opts?.lowFiberComposition).filter(f => (f.carbs || 0) >= 45);
         if (_pool.length > 0) {
           let _vMi = -1, _vIi = -1;
           let _vWorst = 0;
@@ -996,7 +996,7 @@ export function correctDayToTargets(
         if (Math.abs(need) < 0.3) continue;
       }
       // 2) не нашли куда нарастить — добавляем новый item из пула
-      let pool = poolFor(eff, opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex, opts?.fiberCapG);
+      let pool = poolFor(eff, opts?.excludedIds, conv, hv, opts?.allergenTags, opts?.daySalt, opts?.hvStyle, opts?.weekIndex, opts?.fiberCapG, opts?.lowFiberComposition);
       // Сахарный потолок дня — скользящий: 15% база, 20% при ≥1000У, 25% при ≥1300У.
       // Интернет-практика высокоуровневых дней (рис/крем + мёд/джем/финики/сок):
       // 1500У из одних круп — 190У/приём сверх сухих капов, без сахара не закрыть.

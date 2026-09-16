@@ -46,7 +46,7 @@ import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, get
 import { autoCyclePhase, CYCLE_PHASE_RU } from "./planner-cycle-calendar";
 import { addDayScore } from "../../../../engines/day-score-trend";
 import { getBBCategory, type BBCategory, getCategoryDeficitMod, getCombinedDeficitMod } from "./planner-categories";
-import { computePeakWeekNutritionTargets, deserializeBBPrepConfig, serializeBBPrepConfig, legacyConfigFromProfile, isoToday, isoAddDays, planFromStored, configFromPlan, nutritionTargetsForPrepDate, prepPhaseForDate, type BBContestPrepConfig, type BBContestPrepPlan } from "../../../../engines/bb/bb-contest-prep.engine";
+import { computePeakWeekNutritionTargets, deserializeBBPrepConfig, serializeBBPrepConfig, legacyConfigFromProfile, isoToday, isoAddDays, planFromStored, configFromPlan, nutritionTargetsForPrepDate, prepPhaseForDate, PREP_SODIUM_BASE_MG, type BBContestPrepConfig, type BBContestPrepPlan } from "../../../../engines/bb/bb-contest-prep.engine";
 import { saveContestPrepEverywhere, clearContestPrepEverywhere, migrateLegacyContestPrepIfNeeded, CONTEST_PREP_UPDATED_EVENT } from "../../../../engines/bb/bb-contest-prep-sync";
 import { annualPlanPhaseForDate } from "../../../../engines/annual-training/block-builders.engine";
 import { loadAnnualTrainingPlan } from "../../../../engines/annual-training/annual-training-storage";
@@ -3295,8 +3295,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
               fatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
               carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
               waterMl: 3000,
-              sodiumMg: 3500,
-            }, { isHeavyTrainDay: plannerModeRef.current === 'pro' ? isTrainDay(offset) : undefined })
+              sodiumMg: PREP_SODIUM_BASE_MG,
+            }, { isHeavyTrainDay: isTrainDay(offset) })
           : bbPrepConfig
             ? computePeakWeekNutritionTargets(_prepDate, {
                 kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
@@ -3304,7 +3304,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
                 fatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
                 carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
                 waterMl: 3000,
-                sodiumMg: 3500,
+                sodiumMg: PREP_SODIUM_BASE_MG,
               }, bbPrepConfig)
             : null;
         if (_peakTargets?.phase) _peakNote = _peakTargets.note;
@@ -3383,6 +3383,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
            refeedDay: isRefeedDay,
             // Этап 7: лимит клетчатки из prep/пик-недели ББ (fiberMaxG) — на пик-дне лёгкие овощи.
             fiberCapG: _peakTargets?.fiberMaxG,
+            // Э2-PRO-3: низкоклетчаточный состав — ТОЛЬКО пик-день (phase != null);
+            // подготовка/тапер держат обычный состав даже при капе <35 (женские препы).
+            lowFiberComposition: _peakTargets ? _peakTargets.phase != null : undefined,
             // D-28: «загрузка под утреннюю тренировку» + «еда на работе» (portable) в pro-движок.
             morningTrainLoad,
             portableMode: workFood === 'portable',
