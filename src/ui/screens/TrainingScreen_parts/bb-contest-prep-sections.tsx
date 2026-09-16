@@ -564,6 +564,30 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
                       );
                     } catch { return null; }
                   })()}
+                  {/* PRO-3 Э7: 2-дневный рефид в финале (Campbell 2021: FFM/RMR против непрерывного дефицита) */}
+                  {(() => {
+                    const on = prepPlan.preparation.refeedPattern === '2d';
+                    return (
+                      <button
+                        data-bb="refeed-2d"
+                        aria-pressed={on}
+                        onClick={() => {
+                          try {
+                            const next = {
+                              ...prepPlan,
+                              updatedAt: new Date().toISOString(),
+                              preparation: { ...prepPlan.preparation, refeedPattern: on ? undefined : ('2d' as const) },
+                            };
+                            savePrepToProfile(next, configFromPlan(next));
+                            flash(on ? 'Рефид: 1 день в финале' : '🔁 Рефид 2 дня в финале (Campbell 2021)');
+                          } catch { /* ignore */ }
+                        }}
+                        style={{ marginTop:4, minHeight:44, padding:'6px 10px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', color: on ? '#4ade80' : '#fff', border: on ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.15)', background: on ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)' }}
+                      >
+                        {on ? '🔁 Рефид 2 дня (финал) — вкл' : '🔁 Рефид 2 дня (финал) — выкл'}
+                      </button>
+                    );
+                  })()}
                 </div>
               );
             })()}

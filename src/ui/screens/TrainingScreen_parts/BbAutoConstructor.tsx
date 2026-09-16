@@ -73,6 +73,7 @@ import {
   prepPhaseForDate, configFromPlan,
   computeReadiness, spillRiskScore, isShortCycle,
   saveTestPeakWeekResult, latestTestPeakWeek, planFromStored, prepWeightAdvice,
+  syncPrepDietBreaksWithPlan,
   recommendBBTaperConfig, sRPEAdjustment,
   loadShowChecklist,
   type BBTaperRecommendation,
@@ -800,6 +801,7 @@ export const BbAutoConstructor: React.FC = () => {
         postShowTrack: keepTrack,
       });
       setPrepPlan(plan);
+      let planFinal = plan;
       if (applyToPlan) {
         // Сохраняем ручные правки пользователя (exerciseEdits) перед пересборкой prep:
         // иначе повторный taper клонирует план БЕЗ правок и они теряются.
@@ -815,12 +817,15 @@ export const BbAutoConstructor: React.FC = () => {
         });
         setBuiltPlan(updated);
         setPrepApplied(true);
+        // PRO-3 Э7: diet-break-окна синхронизируются с deload-неделями собранного плана (ICECAP).
+        planFinal = syncPrepDietBreaksWithPlan(plan, (updated as any).weeks ?? []);
+        if (planFinal !== plan) setPrepPlan(planFinal);
         // Подготовка в плане НЕ переделывается: taper накладывается поверх последних недель.
         const metaWarnings = ((updated as any).contestPrep?.warnings ?? []) as string[];
         const shortPrep = metaWarnings.find(w => w.includes('короче полной подготовки'));
         if (shortPrep) flash(`⚠ ${shortPrep.replace(/^⚠ /, '')}`);
       }
-      savePrepToProfile(plan, cfg);
+      savePrepToProfile(planFinal, cfg);
       flash('🏁 Contest prep собран' + (applyToPlan ? ' и применён к плану' : ''));
     } catch (e) {
       flash(`Не удалось собрать contest prep: ${(e as Error).message}`);

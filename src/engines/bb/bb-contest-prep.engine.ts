@@ -2270,6 +2270,10 @@ export interface BBContestPrepPlan {
     cardioMinutesPerWeek: number;
     /** Множитель объёма недель подготовки (1.0 = сохранение / 0.85 = поддерживающий при дефиците). */
     volumeMult?: number;
+    /** PRO-3 Э7 (Campbell 2021): 2-дневный рефид в финальной подготовке (дефолт '1d'). */
+    refeedPattern?: '1d' | '2d';
+    /** PRO-3 Э7: даты diet-break, синхронизированные с deload-неделями плана (ICECAP). */
+    breakDates?: string[];
   };
 
   taper: {
@@ -2482,6 +2486,8 @@ export interface BuildPrepPlanOpts {
   carbDoseGPerKg?: number;
   /** PRO-3 Э4: lossless карбс-стратегия (undulating/linear) — в plan.peakWeek. */
   carbLoadStrategy?: CarbLoadStrategy;
+  /** PRO-3 Э7: 2-дневный рефид в финальной подготовке (Campbell 2021). */
+  refeedPattern?: '1d' | '2d';
 }
 
 export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildPrepPlanOpts = {}): BBContestPrepPlan {
@@ -2575,6 +2581,7 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
       stepsPerDay: opts.stepsPerDay ?? 8000,
       cardioMinutesPerWeek: opts.cardioMinutesPerWeek ?? 0,
       volumeMult: opts.prepVolumeMult != null ? Math.min(1, Math.max(0.75, opts.prepVolumeMult)) : undefined,
+      refeedPattern: opts.refeedPattern,
     },
     taper: {
       enabled: taperWeeks > 0,
@@ -2826,12 +2833,19 @@ export function prepRefeedDates(plan: BBContestPrepPlan): string[] {
     if (!isValidIsoDate(start)) return out;
     // PRO-2 P7: единый источник — diet-break дни исключаются здесь же.
     const breaks = new Set(prepDietBreaks(plan));
+    // PRO-3 Э7: 2-дневный рефид (Campbell 2021 — сохраняет FFM/RMR) — в ФИНАЛЬНОЙ
+    // подготовке последние ДВА дня недели (замена, не добавка — не двойной бонус).
+    const twoDay = plan.preparation.refeedPattern === '2d';
     for (const p of plan.phases) {
       if (p.key !== 'preparation' && p.key !== 'final_preparation') continue;
       const startIdx = isoDiffDays(start, p.dateStart);
       const endIdx = isoDiffDays(start, p.dateEnd);
       for (let d = Math.max(0, startIdx); d <= endIdx; d++) {
-        if (d % 7 !== 6) continue; // рефид — последний день 7-дневки
+        const dayInWeek = ((d % 7) + 7) % 7;
+        const isRefeedDay = p.key === 'final_preparation' && twoDay
+          ? (dayInWeek === 5 || dayInWeek === 6)
+          : dayInWeek === 6; // рефид — последний день 7-дневки
+        if (!isRefeedDay) continue;
         const weekIdx = Math.floor(d / 7) + 1;
         if (p.key === 'final_preparation' || weekIdx % 3 === 0) {
           const iso = isoAddDays(start, d);
@@ -2860,10 +2874,14 @@ export function isPrepRefeedDay(dateIso: string, plan: BBContestPrepPlan): boole
 // на UI-стороне (бейдж недели), здесь — детерминированный календарь дат.
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** Даты diet-break (7-дневные окна на поддержании, только длинные препы). */
+/** Даты diet-break (7-дневные окна на поддержании, только длинные препы).
+ *  PRO-3 Э7: если `plan.preparation.breakDates` заданы (синк с deload-неделями плана) —
+ *  приоритет у них; иначе детерминированный календарь каждые 8 нед. */
 export function prepDietBreaks(plan: BBContestPrepPlan): string[] {
   const out: string[] = [];
   try {
+    const stored = plan.preparation.breakDates;
+    if (Array.isArray(stored) && stored.length > 0) return stored.filter(isValidIsoDate);
     const prepWeeks = Math.round(plan.preparation.weeks || 0);
     if (prepWeeks < 16) return out;
     const start = plan.preparation.startDate;
@@ -2873,6 +2891,42 @@ export function prepDietBreaks(plan: BBContestPrepPlan): string[] {
     }
   } catch { /* ignore */ }
   return out;
+}
+
+/**
+ * PRO-3 Э7 (ICECAP: брейк синхронизировать с тяжёлыми неделями): сдвигает каждое
+ * брейк-окно на DELOAD-неделю плана в пределах ±1 недели (детерминировано; без
+ * deload рядом — окно остаётся календарным). Сохраняет результат в
+ * `preparation.breakDates` — живые цели/таблица читают его через prepDietBreaks.
+ */
+export function syncPrepDietBreaksWithPlan(
+  plan: BBContestPrepPlan,
+  weeks: Array<{ week?: number; deload?: boolean; phase?: string }>,
+): BBContestPrepPlan {
+  try {
+    const prepWeeks = Math.round(plan.preparation.weeks || 0);
+    if (prepWeeks < 16) return plan;
+    const start = plan.preparation.startDate;
+    if (!isValidIsoDate(start)) return plan;
+    const deloadWeeks = new Set<number>();
+    (weeks || []).forEach((w, i) => {
+      const wk = Number(w?.week) > 0 ? Number(w?.week) : i + 1;
+      if (w?.deload === true || w?.phase === 'deload') deloadWeeks.add(wk);
+    });
+    if (deloadWeeks.size === 0) return plan;
+    const dates: string[] = [];
+    for (let s = 8; s <= prepWeeks; s += 8) {
+      let target = s;
+      for (const cand of [s, s - 1, s + 1]) {
+        if (cand >= 1 && deloadWeeks.has(cand)) { target = cand; break; }
+      }
+      for (let d = (target - 1) * 7; d < target * 7; d++) dates.push(isoAddDays(start, d));
+    }
+    if (dates.length === 0) return plan;
+    return { ...plan, updatedAt: new Date().toISOString(), preparation: { ...plan.preparation, breakDates: dates } };
+  } catch {
+    return plan;
+  }
 }
 
 /** Diet-break день ли эта дата (только preparation/final_preparation). */

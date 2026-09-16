@@ -30,7 +30,7 @@ import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES,
   isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, prepPhaseForDate, buildPeakWeek, configFromPlan,
   prepWeightAdvice, prepTrainingCompliance, isMonotonicTaper,
-  prepDietBreaks, isPrepRefeedDay,
+  prepDietBreaks, isPrepRefeedDay, syncPrepDietBreaksWithPlan,
   type PrepWeightAdvice, type PrepWeightStatus,
   type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan,
   type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry,
@@ -439,6 +439,8 @@ export function buildPrepCycle(raw: PrepCycleConfig, opts: PrepCycleBuildOpts = 
   if (prepWeeks < 4) {
     warnings.push(`⚠ Цикл короткий (${totalWeeks} нед): подготовка всего ${prepWeeks} нед (тапер ${taperWeeks}+пик). Рекомендуем ≥6 нед для осмысленной подготовки.`);
   }
+  // PRO-3 Э7: брейки синхронизируются с deload-неделями собранного плана (ICECAP).
+  const syncedPrepPlan = syncPrepDietBreaksWithPlan(prepPlan, bbPlanPrep.weeks as any[]);
   // PRO mono-check: гарантия монотонного тапера (каждая тапер-неделя ≤ предыдущей)
   if (!isMonotonicTaper(bbPlanPrep.weeks as any)) {
     warnings.push('⚠ Тапер не монотонный: проверьте объём — тапер должен снижаться к пику.');
@@ -447,14 +449,14 @@ export function buildPrepCycle(raw: PrepCycleConfig, opts: PrepCycleBuildOpts = 
   return {
     config: cfg,
     bbPlan: bbPlanPrep,
-    prepPlan,
+    prepPlan: syncedPrepPlan,
     specializationSchedule: schedule,
     accentMuscles: accent,
     minimalMuscles: minimal,
     minimalMode: mode,
     prepWeeks,
     taperWeeks,
-    phases: prepPlan.phases,
+    phases: syncedPrepPlan.phases,
     volumePlan,
     warnings,
     rationale: [
@@ -681,11 +683,14 @@ export function buildPrepNutritionPlan(
       carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
       note = `🏖 Diet break (нед ${i}): неделя на поддержании — гормоны/психика восстанавливаются, дефицит продолжится.`;
     } else if (phaseKey === 'final_preparation') {
-      // Финал подготовки: лёгкий дефицит, рефид раз в неделю.
+      // Финал подготовки: лёгкий дефицит, рефид раз в неделю (PRO-3 Э7: 2 дня при refeedPattern '2d').
+      const refeedText = prepPlan.preparation.refeedPattern === '2d'
+        ? '2 рефид-дня/нед (Campbell 2021: FFM/RMR)'
+        : '1 рефид-день/нед';
       kcal = Math.max(isFemale ? 1400 : 1200, Math.round(baseKcal * 0.97));
       refeed = weekLastDay ? isPrepRefeedDay(weekLastDay, prepPlan) : true;
       carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
-      note = 'Финал подготовки: лёгкий дефицит (×0.97), белок и жиры не режутся, 1 рефид-день/нед.';
+      note = `Финал подготовки: лёгкий дефицит (×0.97), белок и жиры не режутся, ${refeedText}.`;
     } else {
       // PRO-3 Э6/D7: без фантомного дрейфа −120/2нед — таблица = живая математика движка
       // (ккал подготовки стабильны, темп держится чек-инами/адаптацией по весу, не автодрейфом).

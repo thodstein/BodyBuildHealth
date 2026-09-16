@@ -67,6 +67,8 @@ export function saveContestPrepEverywhere(
       cardioMinutesPerWeek: opts.cardioMinutesPerWeek ?? existing?.preparation.cardioMinutesPerWeek,
       targetRatePctPerWeek: opts.targetRatePctPerWeek ?? existing?.preparation.targetRatePctPerWeek,
       prepVolumeMult: opts.prepVolumeMult ?? existing?.preparation.volumeMult,
+      // PRO-3 Э7: паттерн рефидов (1d/2d) не откатывается сохранением из питания
+      refeedPattern: opts.refeedPattern ?? existing?.preparation.refeedPattern,
       trainingPlanId: opts.trainingPlanId ?? existing?.trainingPlanId,
       nutritionPlanId: opts.nutritionPlanId ?? existing?.nutritionPlanId,
       testPeakWeekId: opts.testPeakWeekId ?? existing?.testPeakWeekId,
