@@ -49,6 +49,12 @@ import { readHumerusBridge } from '../../../engines/arm/arm-pro5-safety.engine';
 import { wafClassFor } from '../../../engines/arm/arm-norms-table.engine';
 import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
+import { diagnoseMatchPhase } from '../../../engines/arm/arm-match-phases.engine';
+import { assessStartReaction } from '../../../engines/arm/arm-start-reaction.engine';
+import { analyzeVectorTimeline } from '../../../engines/arm/arm-vector-timeline.engine';
+import { assessTableStrength } from '../../../engines/arm/arm-table-strength.engine';
+import { assessHumerusDanger } from '../../../engines/arm/arm-humerus-checklist.engine';
+import { assessFoulRisk } from '../../../engines/arm/arm-foul-risk.engine';
 import { buildRehabPlan } from '../../../engines/arm/arm-rehab.engine';
 import { loadArmMeasureHistory } from '../../../engines/arm/arm-force-history.store';
 import { scoreArm, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
@@ -223,14 +229,51 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [rhWeeks, setRhWeeks] = useState('');
   const [rhPain, setRhPain] = useState('');
   const [rhSurg, setRhSurg] = useState(false);
+  // Движение схватки P1–P6 (персист в P1_KEY, v4-стейт не трогаем)
+  const [mvPhase, setMvPhase] = useState(String((p1saved as any).mvPhase ?? ''));
+  const [mvDetail, setMvDetail] = useState(String((p1saved as any).mvDetail ?? ''));
+  const [stReaction, setStReaction] = useState(String((p1saved as any).stReaction ?? ''));
+  const [stFalse, setStFalse] = useState(String((p1saved as any).stFalse ?? ''));
+  const [stCenter, setStCenter] = useState(String((p1saved as any).stCenter ?? ''));
+  const [vecSR, setVecSR] = useState(String((p1saved as any).vecSR ?? ''));
+  const [vecSP, setVecSP] = useState(String((p1saved as any).vecSP ?? ''));
+  const [vecSB, setVecSB] = useState(String((p1saved as any).vecSB ?? ''));
+  const [vecSS, setVecSS] = useState(String((p1saved as any).vecSS ?? ''));
+  const [vecMR, setVecMR] = useState(String((p1saved as any).vecMR ?? ''));
+  const [vecMP, setVecMP] = useState(String((p1saved as any).vecMP ?? ''));
+  const [vecMB, setVecMB] = useState(String((p1saved as any).vecMB ?? ''));
+  const [vecMS, setVecMS] = useState(String((p1saved as any).vecMS ?? ''));
+  const [vecPR, setVecPR] = useState(String((p1saved as any).vecPR ?? ''));
+  const [vecPP, setVecPP] = useState(String((p1saved as any).vecPP ?? ''));
+  const [vecPB, setVecPB] = useState(String((p1saved as any).vecPB ?? ''));
+  const [vecPS, setVecPS] = useState(String((p1saved as any).vecPS ?? ''));
+  const [tsWrist, setTsWrist] = useState(String((p1saved as any).tsWrist ?? ''));
+  const [tsPron, setTsPron] = useState(String((p1saved as any).tsPron ?? ''));
+  const [tsRising, setTsRising] = useState(String((p1saved as any).tsRising ?? ''));
+  const [tsPin, setTsPin] = useState(String((p1saved as any).tsPin ?? ''));
+  const [tsR1, setTsR1] = useState(String((p1saved as any).tsR1 ?? ''));
+  const [tsR3, setTsR3] = useState(String((p1saved as any).tsR3 ?? ''));
+  const [flElbow, setFlElbow] = useState(String((p1saved as any).flElbow ?? ''));
+  const [flShoulder, setFlShoulder] = useState(String((p1saved as any).flShoulder ?? ''));
+  const [flPeg, setFlPeg] = useState(String((p1saved as any).flPeg ?? ''));
+  const [flClean, setFlClean] = useState(String((p1saved as any).flClean ?? ''));
+  const [flLosing, setFlLosing] = useState(String((p1saved as any).flLosing ?? ''));
+  const [dgLosing, setDgLosing] = useState((p1saved as any).dgLosing === true);
+  const [dgSideMax, setDgSideMax] = useState((p1saved as any).dgSideMax === true);
+  const [dgFatigue, setDgFatigue] = useState((p1saved as any).dgFatigue === true);
+  const [dgPress, setDgPress] = useState((p1saved as any).dgPress === true);
+  const [dgElbow, setDgElbow] = useState(String((p1saved as any).dgElbow ?? ''));
   const addTiqBout = () => {
     const today = (() => { try { return new Date().toISOString().slice(0, 10); } catch { return ''; } })();
+    const fp = mvPhase === 'setup' || mvPhase === 'readygo' || mvPhase === 'start' || mvPhase === 'mid' || mvPhase === 'pin' ? mvPhase : undefined;
     const b: TiqBout = {
       fouls: Math.max(0, Math.round(Number(tiqFouls) || 0)),
       win: tiqWin, slip: tiqSlip, strap: tiqStrap,
       centerHoldSec: tiqCenter ? Number(tiqCenter) : undefined,
       finishSec: tiqWin && tiqFinish ? Number(tiqFinish) : undefined,
       dateIso: today || undefined,
+      ...(fp ? { failPhase: fp } : {}),
+      ...(mvDetail.trim() ? { failDetail: mvDetail.trim().slice(0, 120) } : {}),
     };
     setTiq((prev) => { const next = [...prev, b].slice(-60); saveTiq(next); return next; });
     setTiqFouls(''); setTiqWin(true); setTiqSlip(false); setTiqStrap(false); setTiqCenter(''); setTiqFinish('');
@@ -250,9 +293,19 @@ export const ArmDiagnosticsHub: React.FC = () => {
         specWeeks, trackCsv, baseXLoop,
         mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest,
         painElbow, painWrist, sleepHours, attKg,
+        mvPhase, mvDetail, stReaction, stFalse, stCenter,
+        vecSR, vecSP, vecSB, vecSS, vecMR, vecMP, vecMB, vecMS, vecPR, vecPP, vecPB, vecPS,
+        tsWrist, tsPron, tsRising, tsPin, tsR1, tsR3,
+        flElbow, flShoulder, flPeg, flClean, flLosing,
+        dgLosing, dgSideMax, dgFatigue, dgPress, dgElbow,
       }));
     } catch {}
-  }, [specWeeks, trackCsv, baseXLoop, mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest, painElbow, painWrist, sleepHours, attKg]);
+  }, [specWeeks, trackCsv, baseXLoop, mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest, painElbow, painWrist, sleepHours, attKg,
+    mvPhase, mvDetail, stReaction, stFalse, stCenter,
+    vecSR, vecSP, vecSB, vecSS, vecMR, vecMP, vecMB, vecMS, vecPR, vecPP, vecPB, vecPS,
+    tsWrist, tsPron, tsRising, tsPin, tsR1, tsR3,
+    flElbow, flShoulder, flPeg, flClean, flLosing,
+    dgLosing, dgSideMax, dgFatigue, dgPress, dgElbow]);
 
   // ACWR from diary — факт без зон
   const acwr = useMemo(() => {
@@ -725,11 +778,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
       for (const wp of state.weakPoints) {
         // D3: оборудование и мобильность из профиля + локальный ROM-тест
         const mobMerged = Array.from(new Set([...(profileCtxP0.mobility || []), ...armMobility.fails]));
-        out[wp] = rankCorrectionsForArm(wp, { level: state.level, cause: armCausesP0[wp]?.cause, asymPct: report.asymmetryPct ?? (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null, inPlanIds: inPlan, equipment: profileCtxP0.equipment, mobilityRestrictions: mobMerged, failurePoint: state.failurePoint || null });
+        out[wp] = rankCorrectionsForArm(wp, { level: state.level, cause: armCausesP0[wp]?.cause, asymPct: report.asymmetryPct ?? (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null, inPlanIds: inPlan, equipment: profileCtxP0.equipment, mobilityRestrictions: mobMerged, failurePoint: state.failurePoint || null, matchPhase: mvPhase || null });
       }
     } catch { /* noop */ }
     return out;
-  }, [state.weakPoints, state.level, armCausesP0, armPlan, report.asymmetryPct, dynamicReport, profileCtxP0, armMobility, state.failurePoint]);
+  }, [state.weakPoints, state.level, armCausesP0, armPlan, report.asymmetryPct, dynamicReport, profileCtxP0, armMobility, state.failurePoint, mvPhase]);
 
   const armSpecP0 = useMemo(() => {
     try {
@@ -878,6 +931,17 @@ export const ArmDiagnosticsHub: React.FC = () => {
       } catch { return null; } })(),
       // PRO-3 P4: red-flags в экспорт
       redFlags: (() => { try { return redFlagLabels(loadRedFlags()); } catch { return []; } })(),
+      // Движение схватки P1–P6 в экспорт (только заполненное)
+      movement: (() => { try {
+        const m: any = {};
+        if (mvPhaseDiag && (mvPhaseDiag as any).phase) m.matchPhase = (mvPhaseDiag as any).note;
+        if (mvStart && (mvStart as any).level !== 'nodata') m.start = (mvStart as any).note;
+        if (mvVector && (mvVector as any).hasData) m.vector = (mvVector as any).note;
+        if (mvStrength && (mvStrength as any).filledCount > 0) m.tableStrength = (mvStrength as any).note;
+        if (mvFoul && ((mvFoul as any).topCause || (mvFoul as any).foulRate != null)) m.foul = (mvFoul as any).note;
+        if (mvDanger && (mvDanger as any).stop) m.danger = (mvDanger as any).note;
+        return Object.keys(m).length ? m : null;
+      } catch { return null; } })(),
     };
   };
 
@@ -935,6 +999,55 @@ export const ArmDiagnosticsHub: React.FC = () => {
       grip: getArmLandmarks(lvl, 'grip_support'),
     };
   }, [state.level]);
+
+  // Движение схватки P1–P6: чистые вычисления из строк ввода (факт, без оценок риска)
+  const numOrNull = (v: string): number | null => {
+    if (v == null || String(v).trim() === '') return null;
+    const n = Number(String(v).replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  };
+  const mvPhaseDiag = useMemo(() => {
+    try { return diagnoseMatchPhase({ failPhase: mvPhase || null, failDetail: mvDetail || null }); } catch { return null; }
+  }, [mvPhase, mvDetail]);
+  const mvStart = useMemo(() => {
+    try { return assessStartReaction({ reactionMs: numOrNull(stReaction), falseStarts: numOrNull(stFalse) ?? 0, centerTakeoverMs: numOrNull(stCenter) }); } catch { return null; }
+  }, [stReaction, stFalse, stCenter]);
+  const mvVector = useMemo(() => {
+    try {
+      return analyzeVectorTimeline({
+        start: { rising: numOrNull(vecSR), pron: numOrNull(vecSP), back: numOrNull(vecSB), side: numOrNull(vecSS) },
+        mid: { rising: numOrNull(vecMR), pron: numOrNull(vecMP), back: numOrNull(vecMB), side: numOrNull(vecMS) },
+        pin: { rising: numOrNull(vecPR), pron: numOrNull(vecPP), back: numOrNull(vecPB), side: numOrNull(vecPS) },
+      });
+    } catch { return null; }
+  }, [vecSR, vecSP, vecSB, vecSS, vecMR, vecMP, vecMB, vecMS, vecPR, vecPP, vecPB, vecPS]);
+  const mvStrength = useMemo(() => {
+    try {
+      return assessTableStrength({
+        wristFlexKg: numOrNull(tsWrist), pronKg: numOrNull(tsPron), risingKg: numOrNull(tsRising),
+        pinHoldSec: numOrNull(tsPin), round1Sec: numOrNull(tsR1), round3Sec: numOrNull(tsR3),
+      });
+    } catch { return null; }
+  }, [tsWrist, tsPron, tsRising, tsPin, tsR1, tsR3]);
+  const mvFoul = useMemo(() => {
+    try {
+      return assessFoulRisk({
+        elbowLift: numOrNull(flElbow), shoulderLine: numOrNull(flShoulder), pegLoss: numOrNull(flPeg),
+        slipClean: numOrNull(flClean) ?? 0, slipLosing: numOrNull(flLosing) ?? 0,
+        foulHistory: tiq.reduce((s, b) => s + (Number((b as any).fouls ?? 0) || 0), 0), bouts: tiq.length || null,
+      });
+    } catch { return null; }
+  }, [flElbow, flShoulder, flPeg, flClean, flLosing, tiq]);
+  const mvDanger = useMemo(() => {
+    try {
+      return assessHumerusDanger({
+        losing: dgLosing || null, sideMax: dgSideMax || null,
+        elbowDeg: numOrNull(dgElbow), fatigue: dgFatigue || null,
+        teen: state.ageBand === 'teen' || null, pressAttempt: dgPress || null,
+        axisOk: null,
+      });
+    } catch { return null; }
+  }, [dgLosing, dgSideMax, dgFatigue, dgPress, dgElbow, state.ageBand]);
 
   const toggleWeakPoint = (wp: ArmWeakPoint) => {
     try { void haptics('light'); } catch { /* no-op */ }
@@ -995,6 +1108,13 @@ export const ArmDiagnosticsHub: React.FC = () => {
       attempts: attHistP0,
       // PRO-3 P4: red-flags скрининга — в конструктор
       redFlags: (() => { try { return loadRedFlags(); } catch { return []; } })(),
+      // Движение схватки P1–P6 — в конструктор (только заполненное)
+      matchPhase: mvPhase || null,
+      startNote: mvStart && (mvStart as any).level !== 'nodata' ? (mvStart as any).note : null,
+      vectorNote: mvVector && (mvVector as any).hasData ? (mvVector as any).note : null,
+      foulNote: mvFoul && ((mvFoul as any).topCause || (mvFoul as any).foulRate != null) ? (mvFoul as any).note : null,
+      tableStrengthNote: mvStrength && (mvStrength as any).filledCount > 0 ? (mvStrength as any).note : null,
+      humerusDangerNote: mvDanger && (mvDanger as any).stop ? (mvDanger as any).note : null,
     });
     // доза в мост: порядок ранжира по точкам (приёмник применит + дозу по armWeakCauses)
     try {
@@ -1209,6 +1329,17 @@ export const ArmDiagnosticsHub: React.FC = () => {
     diaryTrendsP0, diarySuggestP0,
     handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0,
     injectMsg, criticalSideP0,
+    mvPhase, setMvPhase, mvDetail, setMvDetail, mvPhaseDiag,
+    stReaction, setStReaction, stFalse, setStFalse, stCenter, setStCenter, mvStart,
+    vecSR, setVecSR, vecSP, setVecSP, vecSB, setVecSB, vecSS, setVecSS,
+    vecMR, setVecMR, vecMP, setVecMP, vecMB, setVecMB, vecMS, setVecMS,
+    vecPR, setVecPR, vecPP, setVecPP, vecPB, setVecPB, vecPS, setVecPS, mvVector,
+    tsWrist, setTsWrist, tsPron, setTsPron, tsRising, setTsRising, tsPin, setTsPin,
+    tsR1, setTsR1, tsR3, setTsR3, mvStrength,
+    flElbow, setFlElbow, flShoulder, setFlShoulder, flPeg, setFlPeg,
+    flClean, setFlClean, flLosing, setFlLosing, mvFoul,
+    dgLosing, setDgLosing, dgSideMax, setDgSideMax, dgFatigue, setDgFatigue,
+    dgPress, setDgPress, dgElbow, setDgElbow, mvDanger,
   };
 
   return (

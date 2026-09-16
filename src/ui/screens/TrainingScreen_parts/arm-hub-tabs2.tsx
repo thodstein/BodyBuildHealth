@@ -47,7 +47,18 @@ function HumerusChecklist() {
 }
 
 export function HubPressureTab({ H }: { H: any }) {
-  const { state, setState, toggleWeakPoint, toggleLegacy, mockGuard, bwNum, weightClassAuto, tablePreview, muState, setMuState, saveMu, tiq, tiqFouls, setTiqFouls, tiqWin, setTiqWin, tiqSlip, setTiqSlip, tiqStrap, setTiqStrap, tiqCenter, setTiqCenter, tiqFinish, setTiqFinish, addTiqBout, undoTiqBout, clearTiqBouts } = H;
+  const { state, setState, toggleWeakPoint, toggleLegacy, mockGuard, bwNum, weightClassAuto, tablePreview, muState, setMuState, saveMu, tiq, tiqFouls, setTiqFouls, tiqWin, setTiqWin, tiqSlip, setTiqSlip, tiqStrap, setTiqStrap, tiqCenter, setTiqCenter, tiqFinish, setTiqFinish, addTiqBout, undoTiqBout, clearTiqBouts,
+    mvPhase, setMvPhase, mvDetail, setMvDetail, mvPhaseDiag,
+    stReaction, setStReaction, stFalse, setStFalse, stCenter, setStCenter, mvStart,
+    vecSR, setVecSR, vecSP, setVecSP, vecSB, setVecSB, vecSS, setVecSS,
+    vecMR, setVecMR, vecMP, setVecMP, vecMB, setVecMB, vecMS, setVecMS,
+    vecPR, setVecPR, vecPP, setVecPP, vecPB, setVecPB, vecPS, setVecPS, mvVector,
+    tsWrist, setTsWrist, tsPron, setTsPron, tsRising, setTsRising, tsPin, setTsPin,
+    tsR1, setTsR1, tsR3, setTsR3, mvStrength,
+    flElbow, setFlElbow, flShoulder, setFlShoulder, flPeg, setFlPeg,
+    flClean, setFlClean, flLosing, setFlLosing, mvFoul,
+    dgLosing, setDgLosing, dgSideMax, setDgSideMax, dgFatigue, setDgFatigue,
+    dgPress, setDgPress, dgElbow, setDgElbow, mvDanger } = H;
   return (
     <div>
       <AdGrid cols="2">
@@ -169,6 +180,138 @@ export function HubPressureTab({ H }: { H: any }) {
           const trend = tableIqTrend(tiq);
           return <div className="ad-sec ad-bio" data-valid="na" data-arm="tiq-out"><div>{iq.note}</div>{iq.levers.map((l: string,i: number)=><div key={i} className="ad-finding" data-level="warn">• {l}</div>)}<div className="ad-muted">{trend.note}</div></div>;
         } catch { return null; } })()}
+        <div className="ad-sec-t">Фаза срыва (в журнал выше)</div>
+        <AdGrid cols="auto-sm">
+          <AdSheetSelect label="Где сыпешься" value={mvPhase || ''} onChange={(v)=>setMvPhase(v)} options={[
+            { id:'', label:'—' },
+            { id:'setup', label:'Setup', desc:'постановка хвата' },
+            { id:'readygo', label:'Ready…Go', desc:'ожидание команды' },
+            { id:'start', label:'Старт', desc:'0–1 с после Go' },
+            { id:'mid', label:'Середина', desc:'борьба за центр' },
+            { id:'pin', label:'Пин', desc:'дожимание' },
+          ]} />
+          <AdField label="Деталь срыва">
+            <input value={mvDetail || ''} onChange={e=>setMvDetail(e.target.value)} placeholder="напр. открывают пальцы" aria-label="Деталь срыва" />
+          </AdField>
+        </AdGrid>
+        {mvPhaseDiag && (mvPhaseDiag as any).phase ? <div className="ad-tip" data-arm="mv-phase-out">{(mvPhaseDiag as any).note}</div> : <div className="ad-muted">Отметь фазу — следующая «＋ Схватка» запишет её в журнал, а топ-3 получит бонус точки своей фазы.</div>}
+      </AdSec>
+      <AdSec title="🥋 Движение схватки P1–P6" collapsible defaultOpen={false} summary="старт · векторы · сила стола · danger · фолы">
+        <div className="ad-sec-t">Старт: реакция на Go</div>
+        <AdGrid cols="auto-sm">
+          <AdField label="Реакция, мс">
+            <input inputMode="numeric" value={stReaction || ''} onChange={e=>setStReaction(e.target.value)} placeholder="напр. 280" aria-label="Реакция на Go, мс" />
+          </AdField>
+          <AdField label="Фальстарты">
+            <input inputMode="numeric" value={stFalse || ''} onChange={e=>setStFalse(e.target.value)} placeholder="0" aria-label="Фальстарты" />
+          </AdField>
+          <AdField label="Центр, мс">
+            <input inputMode="numeric" value={stCenter || ''} onChange={e=>setStCenter(e.target.value)} placeholder="напр. 1200" aria-label="Захват центра, мс" />
+          </AdField>
+        </AdGrid>
+        {mvStart && (mvStart as any).level !== 'nodata' ? <div className="ad-tip" data-arm="mv-start-out">{(mvStart as any).note}{(mvStart as any).centerNote ? ' ' + (mvStart as any).centerNote : ''}</div> : <div className="ad-muted">Канон хаба: реакция ≤350мс, 0 фальстартов. Центр: ≤1с захват / ≤2.5с середняк / &gt;2.5с старта нет.</div>}
+        <div className="ad-sec-t">Векторы 0–10: старт / середина / пин</div>
+        <AdGrid cols="auto-sm">
+          <AdField label="Старт R/P/B/S">
+            <input inputMode="decimal" value={vecSR || ''} onChange={e=>setVecSR(e.target.value)} placeholder="R" aria-label="Старт райзинг" />
+          </AdField>
+          <AdField label=" ">
+            <input inputMode="decimal" value={vecSP || ''} onChange={e=>setVecSP(e.target.value)} placeholder="P" aria-label="Старт пронация" />
+          </AdField>
+          <AdField label=" ">
+            <input inputMode="decimal" value={vecSB || ''} onChange={e=>setVecSB(e.target.value)} placeholder="B" aria-label="Старт тяга" />
+          </AdField>
+          <AdField label=" ">
+            <input inputMode="decimal" value={vecSS || ''} onChange={e=>setVecSS(e.target.value)} placeholder="S" aria-label="Старт бок" />
+          </AdField>
+        </AdGrid>
+        <AdGrid cols="auto-sm">
+          <AdField label="Серед. R/P/B/S">
+            <input inputMode="decimal" value={vecMR || ''} onChange={e=>setVecMR(e.target.value)} placeholder="R" aria-label="Середина райзинг" />
+          </AdField>
+          <AdField label=" ">
+            <input inputMode="decimal" value={vecMP || ''} onChange={e=>setVecMP(e.target.value)} placeholder="P" aria-label="Середина пронация" />
+          </AdField>
+          <AdField label=" ">
+            <input inputMode="decimal" value={vecMB || ''} onChange={e=>setVecMB(e.target.value)} placeholder="B" aria-label="Середина тяга" />
+          </AdField>
+          <AdField label=" ">
+            <input inputMode="decimal" value={vecMS || ''} onChange={e=>setVecMS(e.target.value)} placeholder="S" aria-label="Середина бок" />
+          </AdField>
+        </AdGrid>
+        <AdGrid cols="auto-sm">
+          <AdField label="Пин R/P/B/S">
+            <input inputMode="decimal" value={vecPR || ''} onChange={e=>setVecPR(e.target.value)} placeholder="R" aria-label="Пин райзинг" />
+          </AdField>
+          <AdField label=" ">
+            <input inputMode="decimal" value={vecPP || ''} onChange={e=>setVecPP(e.target.value)} placeholder="P" aria-label="Пин пронация" />
+          </AdField>
+          <AdField label=" ">
+            <input inputMode="decimal" value={vecPB || ''} onChange={e=>setVecPB(e.target.value)} placeholder="B" aria-label="Пин тяга" />
+          </AdField>
+          <AdField label=" ">
+            <input inputMode="decimal" value={vecPS || ''} onChange={e=>setVecPS(e.target.value)} placeholder="S" aria-label="Пин бок" />
+          </AdField>
+        </AdGrid>
+        {mvVector && (mvVector as any).hasData ? <div className="ad-tip" data-arm="mv-vector-out">{(mvVector as any).note}</div> : <div className="ad-muted">Просадка старт→пин ≥2 — сигнал; rising+pron парой — потеря containment (пальцы/cup первым).</div>}
+        <div className="ad-sec-t">Сила стола: 3с изометрия в ремне</div>
+        <AdGrid cols="auto-sm">
+          <AdField label="Кисть, кг">
+            <input inputMode="decimal" value={tsWrist || ''} onChange={e=>setTsWrist(e.target.value)} placeholder="кг" aria-label="Сила сгибания кисти, кг" />
+          </AdField>
+          <AdField label="Прон., кг">
+            <input inputMode="decimal" value={tsPron || ''} onChange={e=>setTsPron(e.target.value)} placeholder="кг" aria-label="Сила пронации, кг" />
+          </AdField>
+          <AdField label="Райз., кг">
+            <input inputMode="decimal" value={tsRising || ''} onChange={e=>setTsRising(e.target.value)} placeholder="кг" aria-label="Сила райзинга, кг" />
+          </AdField>
+        </AdGrid>
+        <AdGrid cols="auto-sm">
+          <AdField label="Пин-холд, с">
+            <input inputMode="decimal" value={tsPin || ''} onChange={e=>setTsPin(e.target.value)} placeholder="с" aria-label="Удержание в слабом углу, с" />
+          </AdField>
+          <AdField label="Раунд1, с">
+            <input inputMode="decimal" value={tsR1 || ''} onChange={e=>setTsR1(e.target.value)} placeholder="с" aria-label="Удержание раунд 1, с" />
+          </AdField>
+          <AdField label="Раунд3, с">
+            <input inputMode="decimal" value={tsR3 || ''} onChange={e=>setTsR3(e.target.value)} placeholder="с" aria-label="Удержание раунд 3, с" />
+          </AdField>
+        </AdGrid>
+        {mvStrength && (mvStrength as any).filledCount > 0 ? <div className="ad-tip" data-arm="mv-strength-out">{(mvStrength as any).note}</div> : <div className="ad-muted">Норм не выдумываем: слабое звено — минимум из твоих кг; усталость — раунд1→раунд3. Референс: 60°/s сила, 180°/s мощность.</div>}
+        <div className="ad-sec-t">Danger: динамика схватки (humerus)</div>
+        <div className="ad-row">
+          <AdSwitch checked={!!dgLosing} onChange={setDgLosing} label="Проигрыш" />
+          <AdSwitch checked={!!dgSideMax} onChange={setDgSideMax} label="Дожим max" />
+          <AdSwitch checked={!!dgFatigue} onChange={setDgFatigue} label="Усталость" />
+          <AdSwitch checked={!!dgPress} onChange={setDgPress} label="Пресс" />
+        </div>
+        <AdGrid cols="auto-sm">
+          <AdField label="Локоть, °">
+            <input inputMode="numeric" value={dgElbow || ''} onChange={e=>setDgElbow(e.target.value)} placeholder="напр. 100" aria-label="Угол локтя, градусы" />
+          </AdField>
+        </AdGrid>
+        {mvDanger && (mvDanger as any).stop ? <div className="ad-tip" data-arm="mv-danger-out">{(mvDanger as any).note}</div> : <div className="ad-muted">Дожим max в проигрыше / локоть &lt;90° / усталость+борьба / разбитая ось — стоп (сдайся/уйди в ремень).</div>}
+        <div className="ad-sec-t">Фол-профиль 0–3 (самооценка)</div>
+        <AdGrid cols="auto-sm">
+          <AdField label="Локоть 0–3">
+            <input inputMode="numeric" value={flElbow || ''} onChange={e=>setFlElbow(e.target.value)} placeholder="0–3" aria-label="Риск отрыва локтя 0-3" />
+          </AdField>
+          <AdField label="Плечо 0–3">
+            <input inputMode="numeric" value={flShoulder || ''} onChange={e=>setFlShoulder(e.target.value)} placeholder="0–3" aria-label="Риск плеча за центр 0-3" />
+          </AdField>
+          <AdField label="Peg 0–3">
+            <input inputMode="numeric" value={flPeg || ''} onChange={e=>setFlPeg(e.target.value)} placeholder="0–3" aria-label="Риск потери peg 0-3" />
+          </AdField>
+        </AdGrid>
+        <AdGrid cols="auto-sm">
+          <AdField label="Чистых слипов">
+            <input inputMode="numeric" value={flClean || ''} onChange={e=>setFlClean(e.target.value)} placeholder="0" aria-label="Чистых срывов" />
+          </AdField>
+          <AdField label="Сливов в проигр.">
+            <input inputMode="numeric" value={flLosing || ''} onChange={e=>setFlLosing(e.target.value)} placeholder="0" aria-label="Срывов в проигрыше" />
+          </AdField>
+        </AdGrid>
+        {mvFoul && ((mvFoul as any).topCause || (mvFoul as any).foulRate != null) ? <div className="ad-tip" data-arm="mv-foul-out">{(mvFoul as any).note}</div> : <div className="ad-muted">Слипы в проигрыше опаснее чистых (&gt;2/3 = фол+поражение) — не срывайся уходя, вяжись по процедуре.</div>}
       </AdSec>
       <AdSec title="📖 Фолы WAF → что чинить" collapsible defaultOpen={false} summary="5 фолов + 2 дрилла">
         <div className="ad-kv"><span>Отрыв локтя</span><span>пад + back_drag · posting-стойка</span></div>

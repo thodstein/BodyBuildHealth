@@ -15,6 +15,9 @@ export interface TiqBout {
   win?: boolean;
   finishSec?: number;
   dateIso?: string;
+  /** Движение P1: фаза срыва setup/readygo/start/mid/pin + деталь. */
+  failPhase?: string | null;
+  failDetail?: string | null;
 }
 
 export const LEVEL_OPTS = [
