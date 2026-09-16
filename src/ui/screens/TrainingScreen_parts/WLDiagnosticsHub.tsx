@@ -1825,6 +1825,18 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <div style={{ fontSize: 10, color: '#fff' }}>Пороги Bezkorovainyi 7.16% квалиф /12.47% элита.</div>
               </div>
             )}
+            {(() => {
+              try {
+                const mob = weakPoints.filter(wp => { try { return causeFor(wp)?.cause === 'mobility'; } catch { return false; } });
+                if (!mob.length) return null;
+                return (
+                  <div data-wl="corrective-mobility" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.16)', fontSize: 10, color: '#fff' }}>
+                    🛠️ Причина — мобильность: {mob.map(wp => WL_WEAKPOINT_LABELS[wp] || wp).join(' · ')} → в Коррекции подобраны щадящие дозы (−5%)
+                    <button onClick={() => setTab('correction')} style={{ display: 'block', marginTop: 6, width: '100%', minHeight: 44, borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Открыть Коррекцию</button>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
             {/* E9: антропометрия → хват/старт */}
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📏 Антропометрия — хват рывка</div>

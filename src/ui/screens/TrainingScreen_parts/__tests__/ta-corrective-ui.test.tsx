@@ -35,6 +35,20 @@ describe('ta corrective tab UI', () => {
     fireEvent.click(screen.getByRole('button', { name: '📹 Видео' }));
     expect(container.querySelector('[data-wl="corrective-video"]')).toBeNull();
   });
+  it('мобильность-причина даёт хинт в Мобильности с переходом', () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🧘 Мобильность' }));
+    fireEvent.click(screen.getByRole('button', { name: 'OHS: Пятки плоско' }));
+    fireEvent.click(screen.getByRole('button', { name: 'OHS: Колени без вальгуса' }));
+    fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+    fireEvent.click(screen.getByText('Рывок: фиксация в седе'));
+    fireEvent.click(screen.getByRole('button', { name: '🧘 Мобильность' }));
+    const hint = container.querySelector('[data-wl="corrective-mobility"]');
+    expect(hint).toBeTruthy();
+    expect(hint?.textContent).toMatch(/щадящие дозы/);
+    fireEvent.click(screen.getByRole('button', { name: /Открыть Коррекцию/ }));
+    expect(container.querySelector('[data-wl="corrective"]')).toBeTruthy();
+  });
   it('клик ⭐ ставит preferred и показывает сессию + вставку', () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: '🦾 Толчок' }));

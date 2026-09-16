@@ -21,6 +21,9 @@ export interface WLCorrectionRow {
   corrId: string;
   name?: string;
   protocol?: string;
+  /** C3: кью + источник из библиотеки коррекции (опционально, backward compatible). */
+  cue?: string;
+  source?: string;
 }
 
 export interface WLDiagnosticSnapshot {
@@ -39,6 +42,8 @@ export interface WLDiagnosticSnapshot {
   causes?: Record<string, string>;
   biomech?: WLBiomechRow[];
   corrections?: WLCorrectionRow[];
+  /** C3: детальные строки коррекции (имя + доза + кью + источник). */
+  correctiveDetail?: string[];
   injectionNotes?: string[];
   attempts?: { snatch?: [number, number, number]; cj?: [number, number, number] };
   // V4-B: Sinclair прогресса; V8: цикл коэффициентов
@@ -56,7 +61,8 @@ export function buildWLDiagnosticsHtml(snap: WLDiagnosticSnapshot, opts?: { apkH
   const bioRows = (snap.biomech || []).map(b =>
     `<tr><td>${esc(b.weakPoint)}</td><td>${esc(b.label || '')}</td><td>${esc(b.joint || '')} ${esc(b.angleRange || '')}</td><td>${esc(b.weakMuscles || '')}</td><td>${esc(b.reason || '')}</td></tr>`).join('');
   const corrRows = (snap.corrections || []).map(c =>
-    `<tr><td>${esc(c.weakPoint)}</td><td>${esc(c.name || c.corrId)}</td><td>${esc(c.protocol || '')}</td></tr>`).join('');
+    `<tr><td>${esc(c.weakPoint)}</td><td>${esc(c.name || c.corrId)}</td><td>${esc(c.protocol || '')}</td><td>${esc(c.cue || '')}</td><td>${esc(c.source || '')}</td></tr>`).join('');
+  const corrDetail = (snap.correctiveDetail || []).map(l => `<li>${esc(l)}</li>`).join('');
   const injRows = (snap.injectionNotes || []).map(n => `<li>${esc(n)}</li>`).join('');
   const noteRows = (snap.notes || []).map(n => `<li>${esc(n)}</li>`).join('');
   const att = snap.attempts;
@@ -66,7 +72,8 @@ ${opts?.apkHeader ? `<div>Score ${snap.score} · ver ${snap.verification} · ${e
 <div>Score ${snap.score} (${esc(snap.level)}) · verification ${snap.verification}${snap.sex ? ` · ${esc(snap.sex)}` : ''}</div>
 <h2>Слабые фазы + причины</h2><table><tr><th>Фаза</th><th>Причина</th></tr>${rows || '<tr><td>баланс</td><td>—</td></tr>'}</table>
 ${bioRows ? `<h2>Биомеханика фаз</h2><table><tr><th>Фаза</th><th>Метка</th><th>Сустав/угол</th><th>Мышцы</th><th>Причина</th></tr>${bioRows}</table>` : ''}
-${corrRows ? `<h2>Коррекции топ-3</h2><table><tr><th>Фаза</th><th>Упражнение</th><th>Протокол</th></tr>${corrRows}</table>` : ''}
+ ${corrRows ? `<h2>Коррекции топ-3</h2><table><tr><th>Фаза</th><th>Упражнение</th><th>Протокол</th><th>Кью</th><th>Источник</th></tr>${corrRows}</table>` : ''}
+ ${corrDetail ? `<h2>Коррекция детально</h2><ul>${corrDetail}</ul>` : ''}
 ${att && (att.snatch || att.cj) ? `<h2>Попытки</h2><ul>${att.snatch ? `<li>Рывок: ${att.snatch.join(' / ')}</li>` : ''}${att.cj ? `<li>Толчок: ${att.cj.join(' / ')}</li>` : ''}</ul>` : ''}
 ${snap.sinclair ? `<h2>Sinclair${snap.sinclair.cycle ? ` (${esc(snap.sinclair.cycle)})` : ''}</h2><ul><li>Сумма ${esc(String(snap.sinclair.total))}кг · коэфф ${snap.sinclair.coeff != null ? esc(String(snap.sinclair.coeff)) : '—'} · Sinclair ${esc(String(snap.sinclair.value))}</li></ul>` : ''}
  ${injRows ? `<h2>Инъекция в план</h2><ul>${injRows}</ul>` : ''}
@@ -94,7 +101,8 @@ export function buildWLCsv(snap: WLDiagnosticSnapshot): string {
     ['ohs', snap.ohs ? `${snap.ohs.totalScore}/6` : ''],
     ['asymmetry', snap.asymmetryPct != null ? String(snap.asymmetryPct) : ''],
     ['causes', snap.causes ? Object.entries(snap.causes).map(([k, v]) => `${k}=${v}`).join(';') : ''],
-    ['corrections', (snap.corrections || []).map(c => `${c.weakPoint}:${c.corrId}@${c.protocol || ''}`).join(';')],
+    ['corrections', (snap.corrections || []).map(c => `${c.weakPoint}:${c.corrId}@${c.protocol || ''}${c.cue ? `|${c.cue}` : ''}`).join(';')],
+    ['correctiveDetail', (snap.correctiveDetail || []).join('; ')],
     ['attempts', snap.attempts ? [snap.attempts.snatch ? `snatch=${snap.attempts.snatch.join('/')}` : '', snap.attempts.cj ? `cj=${snap.attempts.cj.join('/')}` : ''].filter(Boolean).join(';') : ''],
     ['sinclair', snap.sinclair ? `${snap.sinclair.total}/${snap.sinclair.coeff ?? ''}/${snap.sinclair.value}/${snap.sinclair.cycle ?? ''}` : ''],
     ['notes', (snap.notes || []).join('; ')],

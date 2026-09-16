@@ -50,4 +50,28 @@ describe('TA export v2 E14', () => {
     expect(buildWLDiagnosticsHtml(snap)).toContain('2025-2028');
     expect(buildWLCsv(snap)).toContain('225/1.2864/289.44/2025-2028');
   });
+  it('C3/C5: кью+источник в HTML-таблице коррекций', () => {
+    const html = buildWLDiagnosticsHtml({
+      ...BASE,
+      corrections: [{ weakPoint: 'snatch_mid', corrId: 'pause_snatch', name: 'Рывок с паузой', protocol: '3×3 @65%', cue: 'Замри, не качай', source: 'Everett halting' }],
+    });
+    expect(html).toContain('Замри, не качай');
+    expect(html).toContain('Everett halting');
+    expect(html).toContain('Кью');
+  });
+  it('C3/C5: correctiveDetail секция в HTML + строка в CSV', () => {
+    const line = 'Рывок с паузой — 3×3 @65% · Замри · Everett halting';
+    const html = buildWLDiagnosticsHtml({ ...BASE, correctiveDetail: [line] });
+    expect(html).toContain('Коррекция детально');
+    expect(html).toContain('Рывок с паузой');
+    expect(buildWLCsv({ ...BASE, correctiveDetail: [line] })).toContain('correctiveDetail');
+  });
+  it('C5: cue в CSV-строке коррекций + XSS в cue', () => {
+    const csv = buildWLCsv({ ...BASE, corrections: [{ weakPoint: 'snatch_mid', corrId: 'pause_snatch', protocol: '3×3', cue: 'держи <угол>' }] });
+    expect(csv).toContain('pause_snatch');
+    expect(csv).toContain('держи <угол>');
+    const html = buildWLDiagnosticsHtml({ ...BASE, corrections: [{ weakPoint: 'snatch_mid', corrId: 'x', cue: '<script>alert(1)</script>' }] });
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
 });
