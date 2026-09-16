@@ -13,6 +13,8 @@
  */
 import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-sport-ta-correction-rank.engine';
 import { protocolForPreferred } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
+import { rankCorrectionsForSM } from '../../../engines/strength-sport/strength-sport-sm-correction-rank.engine';
+import { protocolForSMPreferred } from '../../../engines/strength-sport/strength-sport-sm-corrective.engine';
 import type { WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
 
 export type SmBridgeMode = 'strongman' | 'weightlifting';
@@ -67,6 +69,12 @@ export interface SmBridgePatch {
   taSpecTargets: number[] | null;
   /** C9: детальные строки коррекции хаба (имя + доза + кью) для rationale или null. */
   taCorrectiveDetail: string[] | null;
+  /** SM-C3: предпочитаемые коррекции {smWeakPoint: sm_* id} из Коррекции или null. */
+  smPreferredCorr: Record<string, string> | null;
+  /** SM-C3: причины слабых фаз {smWeakPoint: cause} или null. */
+  smWeakCauses: Record<string, string> | null;
+  /** SM-C3: детальные строки коррекции СМ-хаба для rationale или null. */
+  smCorrectiveDetail: string[] | null;
   /** J7 орто-скрининг: заблокированные паттерны (orthopedic.blockedPatterns + orthoGuards.blockedPatterns). */
   orthoBlocked: string[];
   /** J7: mobility-merge (только ключи MOBILITY_RU). */
@@ -170,6 +178,21 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
   };
   const taPreferredCorr = strRecord(d.taPreferredCorr);
   const taWeakCauses = strRecord(d.taWeakCauses);
+  // SM-C3: то же для СМ-хаба (библиотечные sm_* id + причины + детальные строки).
+  const smPreferredCorr = strRecord((d as any).smPreferredCorr);
+  const smWeakCauses = strRecord((d as any).smWeakCauses);
+  let smCorrectiveDetail: string[] | null = null;
+  try {
+    if (Array.isArray((d as any).smCorrectiveDetail)) {
+      const clean = Array.from(new Set(
+        ((d as any).smCorrectiveDetail as unknown[])
+          .map((x) => String(x ?? '').trim())
+          .filter((s) => s.length > 0)
+          .map((s) => s.slice(0, 160)),
+      )).slice(0, 9);
+      if (clean.length > 0) smCorrectiveDetail = clean;
+    }
+  } catch { /* noop */ }
   // C9: детальные строки коррекции — массив непустых строк ≤160 символов, кап 9, дедуп.
   let taCorrectiveDetail: string[] | null = null;
   try {
@@ -247,6 +270,9 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     taOhsFailed,
     taSpecTargets,
     taCorrectiveDetail,
+    smPreferredCorr,
+    smWeakCauses,
+    smCorrectiveDetail,
     orthoBlocked,
     orthoMobility,
     orthoYokeGate,
@@ -289,6 +315,37 @@ export function buildSpecProtocols(
       });
       if (!ranked.length) continue;
       const pick = (prefId && ranked.find((c) => c.id === prefId)) || ranked[0];
+      if (pick) out[wp] = { sets: pick.protocol.sets, reps: pick.protocol.reps, pct: pick.protocol.pct };
+    } catch { /* noop — фаза без протокола скипается */ }
+  }
+  return out;
+}
+/**
+ * Протоколы СМ-коррекций для инъекции: предпочитаемая ⭐ хаба (доза карточки) —
+ * первой, иначе топ-1 ранжира. Чистая функция. Паритет TA buildSpecProtocols.
+ */
+export function buildSMSpecProtocols(
+  weakPoints: string[],
+  prefCorr: Record<string, string> | null | undefined,
+  causes: Record<string, string> | null | undefined,
+  equipment?: string[],
+  mobilityRestrictions?: string[],
+): Record<string, { sets: number; reps: number | string; pct: number }> {
+  const out: Record<string, { sets: number; reps: number | string; pct: number }> = {};
+  for (const wp of Array.isArray(weakPoints) ? weakPoints : []) {
+    if (!wp) continue;
+    try {
+      const cause = (causes?.[wp] ?? null) as any;
+      const prefId = prefCorr?.[wp];
+      const libProto = protocolForSMPreferred(wp as any, prefId, cause);
+      if (libProto) {
+        out[wp] = { sets: libProto.sets, reps: libProto.reps, pct: libProto.pct };
+        continue;
+      }
+      const ranked = rankCorrectionsForSM(wp as any, { equipment, mobilityRestrictions, cause });
+      if (!ranked.length) continue;
+      // prefId — библиотечный sm_* id, у ранжира другие id: чужой ⭐ → честный топ-1 ранжира.
+      const pick = ranked[0];
       if (pick) out[wp] = { sets: pick.protocol.sets, reps: pick.protocol.reps, pct: pick.protocol.pct };
     } catch { /* noop — фаза без протокола скипается */ }
   }

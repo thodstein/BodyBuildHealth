@@ -69,4 +69,19 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-mobility"]')).toBeTruthy());
     expect(document.body.textContent).toContain('щадящие дозы');
   });
+  it('⭐: клик ставит предпочитаемую, персист и мост несут smPreferredCorr', async () => {
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
+    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    const stars = await screen.findAllByText('☆');
+    expect(stars.length).toBeGreaterThan(0);
+    fireEvent.click(stars[0]);
+    await waitFor(() => expect(screen.getAllByText('⭐').length).toBeGreaterThan(0));
+    expect(localStorage.getItem('he_sm_preferred_corr_v1')).toContain('sm_log');
+    const btn = await screen.findByText(/Коррекцию в Стронг/);
+    fireEvent.click(btn);
+    await waitFor(() => expect(document.body.textContent).toContain('Применено'), { timeout: 2000 });
+    expect(localStorage.getItem('he_planner_apply')).toContain('smPreferredCorr');
+    expect(localStorage.getItem('he_planner_apply')).toContain('smCorrectiveDetail');
+  });
 });

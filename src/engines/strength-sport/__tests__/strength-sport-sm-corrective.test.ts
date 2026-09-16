@@ -9,6 +9,10 @@ import {
   smTagsForMetrics,
   smCorrectiveExportLines,
   smCorrectiveBasePct,
+  SM_CORR_EXID,
+  exIdForSMCorrective,
+  libraryEntryForSM,
+  protocolForSMPreferred,
 } from '../strength-sport-sm-corrective.engine';
 import { buildSMDiagnosticsHtml, buildSMCsv } from '../strength-sport-sm-export.engine';
 
@@ -92,5 +96,46 @@ describe('sm-corrective library', () => {
     expect(csv).toContain('correctiveDetail');
     const csvBase = buildSMCsv(base);
     expect(csvBase).not.toContain('a → b');
+  });
+  it('C3-паритет: топ × 16 фаз × 6 причин — везде непусто, доза различается', () => {
+    const causes = ['volume', 'technique', 'mobility', 'fatigue', 'strength', 'grip'] as const;
+    let checked = 0;
+    for (const ph of SM_CORRECTIVE_PHASES) {
+      for (const cause of causes) {
+        const top = correctivesForSMWeakPoint(ph, { cause });
+        expect(top.length).toBeGreaterThan(0);
+        expect(top[0].protocolAdj.sets).toBeGreaterThan(0);
+        checked++;
+      }
+    }
+    expect(checked).toBe(96);
+  });
+  it('exId: все 48 записей — реальное id каталога (без синтетики в план)', () => {
+    const seen = new Set<string>();
+    for (const c of SM_CORRECTIVES) {
+      const exId = exIdForSMCorrective(c);
+      expect(exId).toMatch(/^[a-z0-9_]+$/);
+      expect(exId.startsWith('sm_')).toBe(false);
+      seen.add(exId);
+    }
+    // таблица покрывает все фазы × виды
+    expect(Object.keys(SM_CORR_EXID).length).toBe(16);
+    for (const ph of SM_CORRECTIVE_PHASES) {
+      expect(Object.keys(SM_CORR_EXID[ph]).sort()).toEqual(['stability', 'strength', 'technique']);
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(10);
+  });
+  it('protocolForSMPreferred: библиотечная ⭐ с дозой; чужая/мусор → null', () => {
+    const lib = protocolForSMPreferred('stone_off_floor', 'sm_stone_off_floor_tech', 'technique');
+    expect(lib).not.toBeNull();
+    expect(lib!.exId).toBe('deadlift');
+    expect(lib!.sets).toBeGreaterThan(0);
+    expect(lib!.pct).toBeGreaterThanOrEqual(50);
+    // чужой id (из другой фазы) — null, не подмена
+    expect(protocolForSMPreferred('stone_off_floor', 'sm_yoke_walk_tech', 'technique')).toBeNull();
+    expect(protocolForSMPreferred('stone_off_floor', 'nope', 'technique')).toBeNull();
+    expect(protocolForSMPreferred('stone_off_floor', null, 'technique')).toBeNull();
+    expect(libraryEntryForSM('nope')).toBeNull();
+    expect(libraryEntryForSM('sm_log_dip_tech')!.phase).toBe('log_dip');
   });
 });

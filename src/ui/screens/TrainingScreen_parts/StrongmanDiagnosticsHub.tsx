@@ -380,6 +380,17 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   });
   const [tab, setTab] = useState<SMTab>('press');
   const [toast, setToast] = useState<string>('');
+  // SM-C3: ⭐ предпочитаемые коррекции (фаза → библиотечный sm_* id), персист отдельно от замеров
+  const [smPrefCorr, setSmPrefCorr] = useState<Record<string, string>>(() => {
+    try {
+      const raw = localStorage.getItem('he_sm_preferred_corr_v1');
+      const p = raw ? JSON.parse(raw) : {};
+      return p && typeof p === 'object' ? p : {};
+    } catch { return {}; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('he_sm_preferred_corr_v1', JSON.stringify(smPrefCorr)); } catch {}
+  }, [smPrefCorr]);
   const [csvText, setCsvText] = useState<string>('');
   const [poseResult, setPoseResult] = useState<{ verdict: string; lines: string[]; n: number } | null>(null);
   const [carryPath, setCarryPath] = useState<{ type: string; verdict: string; lines: string[] } | null>(null);
@@ -904,6 +915,10 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       smCorrections: smCorrExport,
       correctiveSession: smCorrSession.map((c) => ({ id: c.id, phase: c.phase, kind: c.kind, sets: c.protocolAdj.sets, reps: c.protocolAdj.reps, pct: c.protocolAdj.pct, cue: c.cues[0], source: c.source })),
       correctiveBlock: smCorrBlock,
+      // SM-C3: ⭐ + причины + детальные строки (мост как TA-C9: trim/дедуп/кап в приёмнике)
+      smPreferredCorr: Object.keys(smPrefCorr).length ? smPrefCorr : null,
+      smWeakCauses: Object.keys(smCauseByPhase).length ? smCauseByPhase : null,
+      smCorrectiveDetail: smCorrSession.length ? smCorrSession.map((c) => `${c.target} — ${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}% · ${c.cues[0]}`.slice(0, 160)).slice(0, 9) : null,
       contestSim,
       attempts: attemptsBridge,
       carryPhysics: carryPhys,
@@ -1692,7 +1707,15 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{wp as string} <span style={{ color:'#f5b04c', fontWeight:600 }}>· {cause ? `причина: ${cause}` : 'причина: техника (данных мало)'}</span></div>
                   {tops.map((c) => (
                     <div key={c.id} data-sm="corr-row" style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
-                      <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{c.kind === 'technique' ? '🎯 Техника' : c.kind === 'strength' ? '💪 Сила' : '🧱 Стабильность'} · {c.target}</div>
+                      <div style={{ fontSize:13, fontWeight:800, color:'#fff', display:'flex', alignItems:'center', gap:8 }}>
+                        <button data-sm="corr-star" data-active={smPrefCorr[wp as string] === c.id ? 'true' : 'false'} onClick={() => setSmPrefCorr((prev) => {
+                          const next = { ...prev };
+                          if (next[wp as string] === c.id) delete next[wp as string];
+                          else next[wp as string] = c.id;
+                          return next;
+                        })} aria-pressed={smPrefCorr[wp as string] === c.id} aria-label={`Предпочитаемая коррекция: ${c.target}`} style={{ minWidth:44, minHeight:44, borderRadius:12, border:'1px solid', borderColor: smPrefCorr[wp as string] === c.id ? '#f5b04c' : 'rgba(255,255,255,0.12)', background: smPrefCorr[wp as string] === c.id ? 'rgba(245,158,11,0.20)' : 'transparent', color: smPrefCorr[wp as string] === c.id ? '#f5b04c' : '#fff', fontSize:18, fontWeight:800, cursor:'pointer', flexShrink:0 }}>{smPrefCorr[wp as string] === c.id ? '⭐' : '☆'}</button>
+                        <span>{c.kind === 'technique' ? '🎯 Техника' : c.kind === 'strength' ? '💪 Сила' : '🧱 Стабильность'} · {c.target}</span>
+                      </div>
                       <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Доза: {c.protocolAdj.sets}×{c.protocolAdj.reps} @{c.protocolAdj.pct}% · RIR {c.protocolAdj.rir} · {c.protocolAdj.tempo} · отдых {c.protocolAdj.restSeconds}с · <span style={{ color:'#f5b04c' }}>{c.doseNote}</span></div>
                       <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Кью: {c.cues[0]}</div>
                       <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Прогрессия: {c.progression} · Регресс: {c.regression}</div>
@@ -1715,7 +1738,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               </div>
             )}
             {smWeakPoints.length > 0 && (
-              <button data-sm="corr-apply" onClick={applyToConstructor} style={{ width:'100%', padding:'16px 20px', minHeight:56, borderRadius:16, background:'linear-gradient(135deg,#f59e0b,#ef4444)', color:'#fff', border:'none', fontWeight:800, fontSize:16, cursor:'pointer', boxShadow:'0 8px 24px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💉 Коррекцию в Стронг ({smCorrSession.length} упр.)</button>
+              <button data-sm="corr-apply" onClick={applyToConstructor} style={{ width:'100%', padding:'16px 20px', minHeight:56, borderRadius:16, background:'linear-gradient(135deg,#f59e0b,#ef4444)', color:'#fff', border:'none', fontWeight:800, fontSize:16, cursor:'pointer', boxShadow:'0 8px 24px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💉 Коррекцию в Стронг ({smCorrSession.length} упр.{Object.keys(smPrefCorr).length ? ` · ⭐ ${Object.keys(smPrefCorr).length}` : ''})</button>
             )}
           </div>
         )}

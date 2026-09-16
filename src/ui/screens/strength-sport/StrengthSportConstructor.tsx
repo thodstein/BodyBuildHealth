@@ -18,7 +18,7 @@ import { estimate1RMFromVelocitySS, velocityTypeForLift } from '../../../engines
 import { calibrateLVP, saveLVPProfile, loadLVPProfiles, velocityForLVP } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
 import { intensityZoneFor } from '../../../engines/strength-sport/strength-sport-progression';
 import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasTAPlanPrev, TA_PLAN_KEY } from '../../../engines/strength-sport/strength-sport-ta-injection.engine';
-import { buildSpecProtocols } from './sm-bridge-intake';
+import { buildSpecProtocols, buildSMSpecProtocols } from './sm-bridge-intake';
 import type { WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
 import { injectSMWeakPoints } from '../../../engines/strength-sport/strength-sport-sm-injection.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans, syncStrengthSportToCloud } from '../../../engines/strength-sport/strength-sport-storage';
@@ -261,7 +261,10 @@ export const StrengthSportConstructor: React.FC = () => {
     if (weakPoints.length) {
       const isSM = weakPoints.some((wp: string) => /^(log_|yoke_|farmers_|stone_|grip_|core_|conditioning)/.test(String(wp)));
       if (isSM || mode === 'strongman') {
-        const inj = injectSMWeakPoints(p, weakPoints as any, { workMax: p.workMax } as any);
+        // SM-C3: ⭐ хаба + дозы карточек — в инъекцию (без ⭐ — legacy-путь 1-в-1)
+        const smTb = taBridge as any;
+        const smProtos = buildSMSpecProtocols(weakPoints, smTb?.smPrefCorr ?? null, smTb?.smWeakCauses ?? null, equipment, mobility);
+        const inj = injectSMWeakPoints(p, weakPoints as any, { workMax: p.workMax, preferredCorr: smTb?.smPrefCorr ?? {}, protocols: smProtos } as any);
         if (inj.injected > 0) p.rationale = inj.plan.rationale;
         p = inj.plan;
         if (inj.notes.length) { try { console.info('[SM injection]', inj.notes.join(' | ')); } catch {} }
@@ -323,6 +326,14 @@ export const StrengthSportConstructor: React.FC = () => {
         if (tb?.correctiveDetail && tb.correctiveDetail.length) {
           const lines = tb.correctiveDetail.slice(0, 3).join(' · ');
           p.rationale.push(`Коррекция ТА-хаба: ${lines}${tb.correctiveDetail.length > 3 ? ` (+${tb.correctiveDetail.length - 3})` : ''}`);
+        }
+        // SM-C3: детальные строки СМ-коррекции + счётчик ⭐ (сама вставка — выше, через injectSMWeakPoints).
+        if (tb?.smCorrectiveDetail && tb.smCorrectiveDetail.length) {
+          const lines = tb.smCorrectiveDetail.slice(0, 3).join(' · ');
+          p.rationale.push(`Коррекция СМ-хаба: ${lines}${tb.smCorrectiveDetail.length > 3 ? ` (+${tb.smCorrectiveDetail.length - 3})` : ''}`);
+        }
+        if (tb?.smPrefCorr && Object.keys(tb.smPrefCorr).length) {
+          p.rationale.push(`⭐ СМ-хаба (${Object.keys(tb.smPrefCorr).length}): вшиты дозой карточки`);
         }
         if (tb?.fvr && tb.fvr.snatchTh > 0) {
           p.rationale.push(`FvR-оценка ТА-хаба: рывок ≈${tb.fvr.snatchTh}кг${tb.fvr.pmax > 0 ? ` · Pmax ${tb.fvr.pmax}Вт` : ''} — ориентир заявок`);
@@ -605,6 +616,7 @@ export const StrengthSportConstructor: React.FC = () => {
             {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`} icon="📋">План {plan.weeks}нед · {plan.patternId}</Badge>}
             {Object.keys(hubVelocity).length > 0 && <Badge color="#f5b04c" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">📥 Из хаба: {Object.entries(hubVelocity).map(([k, v]) => `${k} ${v.length}т`).join(' · ')}</Badge>}
             {(taBridge.attempts || taBridge.sinclair || taBridge.specWeeks != null || taBridge.causes || taBridge.fvr || (taBridge.correctiveDetail?.length ?? 0) > 0) && <Badge color="#7dd3fc" bg="rgba(56,189,248,0.10)" border="rgba(56,189,248,0.18)">📥 ТА-хаб{(taBridge.attempts?.snatch?.length || taBridge.attempts?.cj?.length) ? ' · заявки' : ''}{taBridge.sinclair ? ` · Sinclair ${taBridge.sinclair.value}` : ''}{taBridge.specWeeks != null ? ` · спец ${taBridge.specWeeks}нед` : ''}{taBridge.causes ? ` · причины ${Object.keys(taBridge.causes).length}` : ''}{taBridge.fvr ? ` · FvR ${taBridge.fvr.snatchTh}` : ''}{taBridge.correctiveDetail?.length ? ` · коррекция ${taBridge.correctiveDetail.length}` : ''}</Badge>}
+            {((taBridge as any).smPrefCorr || (taBridge as any).smCorrectiveDetail?.length) && <Badge color="#f5b04c" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">📥 СМ-хаб{(taBridge as any).smPrefCorr ? ` · ⭐ ${Object.keys((taBridge as any).smPrefCorr).length}` : ''}{(taBridge as any).smCorrectiveDetail?.length ? ` · коррекция ${(taBridge as any).smCorrectiveDetail.length}` : ''}</Badge>}
             {plan && weakPoints.length > 0 && (taBridge.specTargets?.length ?? 0) > 0 && <button data-ss="apply-spec" onClick={handleApplySpecBlock} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(56,189,248,0.35)', background: 'rgba(56,189,248,0.14)', color: '#7dd3fc', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📥 Спец-блок ({taBridge.specTargets!.length} нед)</button>}
             {plan && hasSpecPrev && <button data-ss="rollback-spec" onClick={handleRollbackSpec} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>↩ Откат спец-блока</button>}
             {outsideMetrics && <Badge color="#c4b5fd" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}

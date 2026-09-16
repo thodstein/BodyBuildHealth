@@ -8,6 +8,7 @@
 import type { StrengthSportPlan, StrengthSportSession, StrengthSportExercise } from './strength-sport.types';
 import { SM_WEAKPOINT_CORRECTION, type SMWeakPoint } from './strength-sport-sm-biomechanics.engine';
 import { SM_BIOMECH } from './strength-sport-sm-biomechanics.engine';
+import { libraryEntryForSM, protocolForSMPreferred, type SMCorrective } from './strength-sport-sm-corrective.engine';
 import '../../core/exercise-catalog-ta-supplement';
 
 function basePmForSM(id: string, wm: any): number {
@@ -49,6 +50,10 @@ export interface SMInjectionOpts {
   dayMap?: Record<string, number[]>;
   budget?: number;
   workMax?: any;
+  /** ⭐ из Коррекции хаба: фаза → библиотечный id (sm_*). Валидируется по фазе. */
+  preferredCorr?: Record<string, string>;
+  /** Дозы карточек: фаза → {sets, reps, pct} (buildSMSpecProtocols). */
+  protocols?: Record<string, { sets: number; reps: number | string; pct: number }>;
 }
 
 export interface SMInjectionResult {
@@ -81,37 +86,43 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
       const raw = corrList[0];
       const m = raw.match(/\(([^)]+)\)/);
       corrId = m ? m[1].trim() : raw.split(' ')[0].trim();
-      // corrections contain cyrillic labels; map to real ids: if not found in catalog, fallback to known ids
-      const knownMap: Record<string, string> = {
-        'jerk_dip': 'jerk_dip',
-        'pause': 'pause_squat',
-        'Толчковый': 'push_press',
-        'Жим': 'pin_press',
-        'Пауза-присед': 'pause_squat',
-        'Yoke': 'yoke_walk',
-        'Чемоданная': 'sandbag_carry',
-        'Планка': 'plank',
-        'Щипковый': 'plate_pinch',
-        'Вис': 'dead_hang',
-        'Молоток': 'hammer_curl',
+      // fallback на фазу (канон): извлечённый id обязан быть известным,
+      // иначе в план вшивался мусор ('Yoke'/'tacky'/'Prowler' — первое слово строки).
+      const fallbackByWP: Record<string, string> = {
+        log_dip: 'jerk_dip', log_drive: 'push_press', log_lockout: 'pin_press', log_clean: 'rdl',
+        yoke_pickup: 'pause_squat', yoke_walk: 'sandbag_carry', yoke_turn: 'side_plank',
+        farmers_pickup: 'deadlift', farmers_carry: 'farmers_walk_heavy', farmers_grip: 'plate_pinch',
+        stone_off_floor: 'deficit_pull', stone_lap: 'front_squat', stone_load: 'push_press',
+        grip_support: 'plate_pinch', core_brace: 'sandbag_carry', conditioning: 'sled_push_sprint',
       };
-      // try direct, else fallback to bio intensity based generic
-      if (!corrId || corrId.length < 2 || /[А-Яа-я]/.test(corrId)) {
-        // fallback per weakPoint
-        const fallbackByWP: Record<string, string> = {
-          log_dip: 'jerk_dip', log_drive: 'push_press', log_lockout: 'pin_press', log_clean: 'rdl',
-          yoke_pickup: 'pause_squat', yoke_walk: 'sandbag_carry', yoke_turn: 'side_plank',
-          farmers_pickup: 'deadlift', farmers_carry: 'farmers_walk_heavy', farmers_grip: 'plate_pinch',
-          stone_off_floor: 'deficit_pull', stone_lap: 'front_squat', stone_load: 'push_press',
-          grip_support: 'plate_pinch', core_brace: 'sandbag_carry', conditioning: 'sled_push_sprint',
-        };
-        corrId = (fallbackByWP as any)[wp] || corrId;
+      const KNOWN = new Set(Object.values(fallbackByWP));
+      if (!corrId || corrId.length < 2 || /[А-Яа-я]/.test(corrId) || !KNOWN.has(corrId)) {
+        corrId = fallbackByWP[wp] || corrId;
       }
       // if still cyrillic, fallback
       if (!corrId || /[А-Яа-я]/.test(corrId)) corrId = 'farmers_walk_heavy';
     }
     if (!corrId) { notes.push(`⚠ ${wp} — нет коррекции`); continue; }
-    const intensityPct: number = bio?.intensityPct ?? 0.65;
+    // ⭐ из Коррекции (библиотечный id): честная вставка — реальное id + доза карточки
+    // (паритет TA-C8: имя из библиотеки, чужой id → legacy fallback, не молчаливая подмена).
+    const prefRaw: string | undefined = opts.preferredCorr?.[wp];
+    const libEntry: SMCorrective | null = prefRaw ? libraryEntryForSM(prefRaw) : null;
+    const libValid: SMCorrective | null = libEntry && libEntry.phase === wp ? libEntry : null;
+    const libProto = libValid ? protocolForSMPreferred(wp, prefRaw, null) : null;
+    const cardProto = libValid ? opts.protocols?.[wp] ?? null : null;
+    let intensityPct: number = bio?.intensityPct ?? 0.65;
+    let addSets = 3;
+    let exReps: number | string | null = null;
+    let exName: string | null = null;
+    let starMark = '';
+    if (libValid && libProto) {
+      corrId = libProto.exId;
+      intensityPct = (cardProto?.pct ?? libProto.pct) / 100;
+      addSets = cardProto?.sets ?? libProto.sets;
+      exReps = cardProto?.reps ?? libProto.reps;
+      exName = libValid.target;
+      starMark = ` (⭐ ${libValid.id})`;
+    }
     const week = copy.weeksData[0];
     if (!week || week.deload) { notes.push(`⚠ ${wp} — делод, пропуск`); continue; }
     const configuredDays = opts.dayMap?.[wp];
@@ -126,34 +137,38 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
       skippedDup++; notes.push(`⊘ ${wp} → ${corrId} уже есть в ${targetSession.sessionTag}`); continue;
     }
     const weeklySets = copy.weeksData[0].sessions.reduce((a: number, s: any) => a + s.exercises.reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
-    const addSets = 3;
     if (weeklySets + addSets > budget) {
       skippedBudget++; notes.push(`⊘ ${wp} → ${corrId} превысит Budget ${budget} (сейчас ${weeklySets}+${addSets})`); continue;
     }
     const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
     const basePm = basePmForSM(corrId, wm);
     const weight = Math.round(basePm * intensityPct / 2.5) * 2.5;
-    const rir = 2;
-    const tempo = corrId.includes('squat') ? '3-1-1-0' : corrId.includes('walk') || corrId.includes('carry') ? 'brace 2с — walk' : '2-0-1-0';
-    const rest = corrId.includes('carry') || corrId.includes('walk') ? 180 : 120;
+    const libTempo = libValid && libProto ? libValid.protocol.tempo : null;
+    const libRest = libValid && libProto ? libValid.protocol.restSeconds : null;
+    const libDist = libValid && libProto ? libValid.protocol.distanceM : null;
+    const rir = libProto && starMark ? libProto.rir : 2;
+    const tempo = libTempo ?? (corrId.includes('squat') ? '3-1-1-0' : corrId.includes('walk') || corrId.includes('carry') ? 'brace 2с — walk' : '2-0-1-0');
+    const rest = libRest ?? (corrId.includes('carry') || corrId.includes('walk') ? 180 : 120);
+    const distM = libDist ?? (corrId.includes('carry') ? 20 : undefined);
+    const finalReps: number | string = exReps ?? (corrId.includes('carry') || corrId.includes('walk') ? '20м' : '5');
     const ex: StrengthSportExercise = {
       id: corrId,
-      name: bio?.corrections?.[0] || corrId,
+      name: exName ?? bio?.corrections?.[0] ?? corrId,
       group: corrId.includes('carry') || corrId.includes('walk') ? 'back' : corrId.includes('plank') ? 'core' : 'legs',
       pattern: corrId.includes('carry') || corrId.includes('walk') ? 'carry' : corrId.includes('squat') ? 'squat' : 'hinge',
       sets: addSets,
-      reps: corrId.includes('carry') || corrId.includes('walk') ? '20м' : '5',
+      reps: finalReps,
       rir,
       tempo,
       restSeconds: rest,
       weight,
-      workSets: Array.from({ length: addSets }, () => ({ reps: corrId.includes('carry') ? 1 : 5, rir, weight, pct: Math.round(intensityPct * 100), tempo, restSeconds: rest, distanceM: corrId.includes('carry') ? 20 : undefined } as any)),
+      workSets: Array.from({ length: addSets }, () => ({ reps: typeof finalReps === 'number' ? finalReps : (corrId.includes('carry') ? 1 : 5), rir, weight, pct: Math.round(intensityPct * 100), tempo, restSeconds: rest, distanceM: distM } as any)),
       warmupSets: [],
     } as any;
     targetSession.exercises.push(ex);
     if (typeof week.totalSets === 'number') week.totalSets += addSets;
     injected++;
-    notes.push(`✓ ${wp} → ${corrId} в ${targetSession.sessionTag} 3×5 @${Math.round(intensityPct * 100)}%`);
+    notes.push(`✓ ${wp} → ${corrId}${starMark} в ${targetSession.sessionTag} ${addSets}×${finalReps} @${Math.round(intensityPct * 100)}%`);
   }
   if (injected > 0) {
     copy.rationale = [...(copy.rationale || []), `Стронг-диагностика: инъецировано ${injected} коррекций (${uniq.join(', ')})`];
@@ -188,32 +203,14 @@ export function hasSMPlanPrev(): boolean {
 }
 
 /**
- * Инъекция с предпочитаемой коррекцией на фазу (preferredCorr идёт первой — parity с TA E3).
- * preferredCorr: weakPoint → corrId (id каталога, например 'pause_squat').
+ * Инъекция с предпочитаемой коррекцией на фазу (preferredCorr — библиотечные sm_* id
+ * из Коррекции хаба; доза — из opts.protocols или канона записи).
+ * Честная вставка (паритет TA-C8): было — заглушка с пометкой «выбери вручную».
  */
 export function injectSMWeakPointsPreferred(
   plan: StrengthSportPlan,
   weakPoints: SMWeakPoint[],
   opts: SMInjectionOpts & { preferredCorr?: Record<string, string> } = {},
 ): SMInjectionResult {
-  if (opts.preferredCorr && Object.keys(opts.preferredCorr).length > 0) {
-    // Временно подменяем первую коррекцию SM_BIOMECH через dayMap-проход:
-    // проще — вызываем базовую инъекцию, затем переименовываем первую вставленную коррекцию
-    // если preferredCorr задан для зоны. Реализация: делегируем базовой, notes помечают preferred.
-    const res = injectSMWeakPoints(plan, weakPoints, opts);
-    const pref = opts.preferredCorr;
-    for (const s of res.plan.weeksData[0]?.sessions || []) {
-      for (const e of (s as unknown as { exercises: Array<{ id: string; name: string }> }).exercises || []) {
-        void e;
-      }
-    }
-    res.notes = res.notes.map((n) => {
-      for (const [wp, corr] of Object.entries(pref)) {
-        if (n.startsWith(`✓ ${wp} →`) && !n.includes(corr)) return `${n} (preferred ${corr} — выбери вручную в ранжире)`;
-      }
-      return n;
-    });
-    return res;
-  }
   return injectSMWeakPoints(plan, weakPoints, opts);
 }

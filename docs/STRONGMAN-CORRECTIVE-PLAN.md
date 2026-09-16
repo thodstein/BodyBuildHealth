@@ -121,3 +121,28 @@ NEW 9/9 + UI 4/4 + соседи hub 9/9 + hub-pro3 6/6 + SM-движки pro2/pr
   hub 9/9 + hub-pro3 6/6 (итого **32/32**); `tsc` **0 по своим**
   (2 ошибки — чужой untracked `bb-quality-load-sections.tsx`, WIP 4.3, не тронут);
   `verify:apk-design` OK.
+
+## §7. Добивка C3: ⭐ честно вставляет (паритет TA-C8/C9)
+
+- **Найдено чтением инъекции 2 дефекта**: (1) `injectSMWeakPointsPreferred` был
+  заглушкой — ⭐ помечался «выбери вручную», в план не вшивался; (2) legacy-извлечение
+  вшивало фантомы (`'Yoke'`/`'tacky'`/`'Prowler'`/`'Suitcase'` — первое слово строки)
+  вместо fallback-id. Фикс: `preferredCorr` + `protocols` в `SMInjectionOpts`
+  (библиотечные id + доза карточки, имя из библиотеки; чужой id → legacy fallback);
+  извлечение валидируется по KNOWN-сету fallback-id.
+- **Мост как TA-C9**: хаб — ⭐ per-row в Коррекции (персист `he_sm_preferred_corr_v1`)
+  + payload `smPreferredCorr/smWeakCauses/smCorrectiveDetail` (trim/дедуп/кап 9);
+  приёмник — `buildSMSpecProtocols` (⭐ — доза карточки, чужой — топ-1 ранжира);
+  wizard — `smPrefCorr/smWeakCauses/smCorrectiveDetail` в `taBridge`; конструктор —
+  сборка вшивает ⭐ через `injectSMWeakPoints` + rationale «Коррекция СМ-хаба» +
+  бейдж «📥 СМ-хаб · ⭐ N».
+- **exId-честность**: NEW `SM_CORR_EXID` (16 фаз × 3 вида → реальные id каталога,
+  сверены grep по `exercise-catalog.ts`; синтетические `sm_*` в план не вшиваются);
+  `protocolForSMPreferred` (чужой id → null) + `libraryEntryForSM` + `exIdForSMCorrective`.
+- Проверено: `sm-corrective` 10→**13/13** (матрица 16×6=96 + exId + preferred) +
+  NEW `sm-injection-preferred` **6/6** (E2E seed→⭐→план, чужой→fallback, legacy-форма,
+  обёртка не заглушка, дедуп/бюджет) + NEW `sm-corrective-bridge` **3/3** +
+  NEW `sm-corrective-wizard` **1/1** + UI 7→**8/8** (⭐-тогл/персист/мост) +
+  соседи (hub/pro3/intake/wizard/ta-spec-apply) + SM/TA-движки — итого
+  **76/76 (10 файлов) + 108/108 (5 файлов)**; `tsc` **0 по своим**;
+  `verify:apk-design` OK.

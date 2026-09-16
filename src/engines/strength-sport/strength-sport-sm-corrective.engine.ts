@@ -539,3 +539,70 @@ export function smCorrectiveBasePct(id: string): number {
   const c = SM_CORRECTIVES.find((x) => x.id === id);
   return c && c.protocol.sets > 0 && c.protocol.pct > 0 ? c.protocol.pct : 0;
 }
+
+/**
+ * Реальное id упражнения каталога за записью библиотеки (проверено по EXERCISE_CATALOG:
+ * все 48 — существующие id; синтетические sm_* id в план не вшиваются никогда).
+ */
+export const SM_CORR_EXID: Record<SMWeakPoint, Record<SMCorrectiveKind, string>> = {
+  log_dip: { technique: 'jerk_dip', strength: 'front_squat', stability: 'suitcase_carry' },
+  log_drive: { technique: 'push_press', strength: 'axle_press', stability: 'ohp' },
+  log_lockout: { technique: 'ohp', strength: 'push_press', stability: 'axle_press' },
+  log_clean: { technique: 'deadlift', strength: 'rdl', stability: 'dead_hang' },
+  yoke_pickup: { technique: 'yoke_walk', strength: 'squat', stability: 'suitcase_carry' },
+  yoke_walk: { technique: 'yoke_walk', strength: 'front_squat', stability: 'suitcase_carry' },
+  yoke_turn: { technique: 'yoke_walk', strength: 'sled_push_sprint', stability: 'pallof_press' },
+  farmers_pickup: { technique: 'farmers_walk', strength: 'deadlift', stability: 'dead_hang' },
+  farmers_carry: { technique: 'farmers_walk', strength: 'deadlift', stability: 'suitcase_carry' },
+  farmers_grip: { technique: 'plate_pinch', strength: 'hammer_curl', stability: 'tow_hang' },
+  stone_off_floor: { technique: 'deadlift', strength: 'good_morning', stability: 'sandbag_carry' },
+  stone_lap: { technique: 'sandbag_carry', strength: 'front_squat', stability: 'squat' },
+  stone_load: { technique: 'hip_thrust', strength: 'push_press', stability: 'squat' },
+  grip_support: { technique: 'plate_pinch', strength: 'tow_hang', stability: 'hammer_curl' },
+  core_brace: { technique: 'dead_bug', strength: 'suitcase_carry', stability: 'pallof_press' },
+  conditioning: { technique: 'yoke_walk', strength: 'sled_push_sprint', stability: 'farmers_walk' },
+};
+
+/** Реальное id упражнения за записью библиотеки. */
+export function exIdForSMCorrective(c: SMCorrective): string {
+  return SM_CORR_EXID[c.phase]?.[c.kind] ?? 'farmers_walk';
+}
+
+/** Запись библиотеки по id (null — мусор/чужой id). */
+export function libraryEntryForSM(id: string): SMCorrective | null {
+  return SM_CORRECTIVES.find((x) => x.id === id) ?? null;
+}
+
+export interface SMPreferredProtocol {
+  exId: string;
+  sets: number;
+  reps: number | string;
+  pct: number;
+  rir: number;
+  tempo: string;
+  restSeconds: number;
+  distanceM?: number;
+}
+
+/**
+ * Доза библиотечной ⭐ (имя + доза карточки; паритет TA protocolForPreferred).
+ * Чужой id (не из фазы) → null (не подменяем молча — fallback ранжира).
+ */
+export function protocolForSMPreferred(phase: SMWeakPoint, prefId: string | null | undefined, cause: SMWeakCause | null = null): SMPreferredProtocol | null {
+  if (!prefId) return null;
+  const entry = libraryEntryForSM(prefId);
+  if (!entry || entry.phase !== phase) return null;
+  const ranked = correctivesForSMWeakPoint(phase, { cause });
+  const pick = ranked.find((r) => r.id === entry.id) ?? ranked.find((r) => r.kind === entry.kind);
+  const p = pick?.protocolAdj ?? entry.protocol;
+  return {
+    exId: exIdForSMCorrective(entry),
+    sets: p.sets,
+    reps: p.reps,
+    pct: p.pct,
+    rir: p.rir,
+    tempo: p.tempo,
+    restSeconds: p.restSeconds,
+    distanceM: p.distanceM,
+  };
+}
