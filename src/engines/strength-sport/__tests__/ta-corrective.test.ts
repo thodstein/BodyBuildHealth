@@ -6,6 +6,8 @@ import {
   tagsForBarMetrics, correctiveExportLines,
 } from '../strength-sport-ta-corrective.engine';
 import { estimateCorrBasePm } from '../strength-sport-ta-simulator.engine';
+import { rankCorrectionsForTA } from '../strength-sport-ta-correction-rank.engine';
+import type { TAWeakCause } from '../strength-sport-ta-weak-cause.engine';
 import { allWLWeakPoints } from '../strength-sport-weakpoint';
 
 describe('ta-corrective library', () => {
@@ -103,5 +105,15 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     const lines = correctiveExportLines('jerk_dip', 'technique', 'intermediate');
     expect(lines.length).toBeGreaterThanOrEqual(3);
     for (const l of lines) expect(l).toMatch(/@/);
+  });
+  it('паритет с ранжиром: топ-3 каждой фазы × каждой причины — в библиотеке', () => {
+    const causes: Array<TAWeakCause | null> = [null, 'volume', 'technique', 'mobility', 'fatigue', 'strength'];
+    for (const wp of allWLWeakPoints()) {
+      for (const cause of causes) {
+        for (const c of rankCorrectionsForTA(wp, { cause })) {
+          expect(correctiveById(c.id), `${wp}/${cause}/${c.id}`).not.toBeNull();
+        }
+      }
+    }
   });
 });
