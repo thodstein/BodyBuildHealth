@@ -213,7 +213,12 @@ export function HubP0Panel({ H }: { H: any }) {
             {state.weakPoints.map((wp: ArmWeakPoint) => {
               const cause = (armCausesP0 as any)[wp];
               const top = (armTop3P0 as any)[wp] || [];
-              const sim = (() => { try { return simulateArmInjection(armPlan as any, wp); } catch { return null; } })();
+              const sim = (() => {
+                try {
+                  const cs: Record<string, any> = cause && typeof cause.cause === 'string' ? { [wp]: cause.cause } : {};
+                  return simulateArmInjection(armPlan as any, wp, null, Object.keys(cs).length ? { causes: cs } : undefined);
+                } catch { return null; }
+              })();
               return (
                 <div key={wp} className="ad-sec ad-bio" data-valid={cause ? 'ok' : 'na'}>
                   <div><b>{wp} {cause ? `· ${cause.cause} (${Math.round(cause.confidence * 100)}%)` : ''}</b></div>

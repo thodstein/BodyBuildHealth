@@ -103,6 +103,8 @@ dayTags — TableCup/TableTech/Hammer/SidePress/BackPress/GripHeavy и др.
   приёмник `ArmAutoConstructor` — персист `he_arm_last_causes/rankedids` только на свежий
   мост точек + чтение в инъекцию + чистка на «✕ Сбросить»; без ключей — базовый путь.
   Lock-тесты (валидный/мусор/сквозной мост→план).
+- Паритет Δ во всех панелях ✅: P0-панель и экспорт считают симуляцию с causes —
+  одна цифра с табом (было: таб с дозой, остальные с базой).
 - Проверено: hub 49/49 + p0 35/35 + injection 7/7 + parity 147/147 + dose 6/6 + phase 22/22
   + bridge/discipline/ortho/wizard/top 29/29; движки `src/engines/arm` 948/948 (79 файлов);
   арм-UI 160/160 (22 файла); `verify:apk-design` OK; `tsc` 0 по своим

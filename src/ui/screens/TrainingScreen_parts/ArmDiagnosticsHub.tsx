@@ -841,7 +841,10 @@ export const ArmDiagnosticsHub: React.FC = () => {
         const cause = (armCausesP0 as any)[wp];
         const top = ((armTop3P0 as any)[wp] || []).map((t: any) => ({ id: t.id, score: t.score }));
         let sim: string | undefined;
-        try { sim = simulateArmInjection(armPlan as any, wp)?.summary; } catch { /* noop */ }
+        try {
+          const cs: Record<string, any> = cause && typeof cause.cause === 'string' ? { [wp]: cause.cause } : {};
+          sim = simulateArmInjection(armPlan as any, wp, null, Object.keys(cs).length ? { causes: cs } : undefined)?.summary;
+        } catch { /* noop */ }
         let spec1: number | undefined;
         try { spec1 = armSpecP0?.weeks[0]?.targetSets[wp]; } catch { /* noop */ }
         return {
