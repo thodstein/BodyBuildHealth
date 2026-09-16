@@ -3,6 +3,9 @@
  * баллистик-оговорка, анти-смешивание, re-screen фаз, возрастная шкала.
  */
 import { turnoverDiag, jerkDriveDiag, pullPowerBalance, lvpBallisticNote, movementOfWeak, mixedWaveNote } from '../strength-sport-ta-v5.engine';
+import { analyzeBarTracking } from '../strength-sport-video.engine';
+import { appendTAPullPower, taPullPowerTrend } from '../strength-sport-ta-pullpower-history.engine';
+import { qPoints, qMasterFactor, qMasters } from '../strength-sport-ta-progress.engine';
 import { appendTAPhaseSnapshot, taPhaseTrend } from '../strength-sport-ta-phase-history.engine';
 import { qAgeScale } from '../strength-sport-ta-progress.engine';
 
@@ -114,5 +117,80 @@ describe('V5 age scale', () => {
     expect(qAgeScale(15)!.scale).toBe('Q-youth');
     expect(qAgeScale(25)!.scale).toBe('Q-points');
     expect(qAgeScale(45)!.scale).toBe('Q-masters');
+  });
+});
+
+describe('П2 turnover из трекинга', () => {
+  const riseThenFall = () => {
+    const pts: Array<{ x: number; y: number; t: number }> = [];
+    for (let i = 0; i < 10; i++) pts.push({ x: 0, y: i * 10, t: i / 30 });
+    for (let i = 1; i <= 8; i++) pts.push({ x: 0, y: 90 - i * 7, t: (9 + i) / 30 });
+    return pts;
+  };
+  it('подъём→падение даёт turnoverMs в коридоре', () => {
+    const r = analyzeBarTracking(riseThenFall())!;
+    expect(r.turnoverMs).not.toBeNull();
+    expect(r.turnoverMs as number).toBeGreaterThanOrEqual(100);
+    expect(r.turnoverMs as number).toBeLessThanOrEqual(600);
+  });
+  it('монотонный подъём → null (не гадаем)', () => {
+    const pts = Array.from({ length: 12 }, (_, i) => ({ x: 0, y: i * 8, t: i / 30 }));
+    expect(analyzeBarTracking(pts)!.turnoverMs).toBeNull();
+  });
+  it('пусто/мало точек → null', () => {
+    expect(analyzeBarTracking([])).toBeNull();
+    expect(analyzeBarTracking([{ x: 0, y: 0, t: 0 }])).toBeNull();
+  });
+});
+
+describe('П3 история мощности', () => {
+  it('один замер → тренда нет', () => {
+    const h = appendTAPullPower([], { date: '2026-09-01', watts: 1800 });
+    expect(taPullPowerTrend(h)).toBeNull();
+  });
+  it('дельта + лучшая', () => {
+    let h = appendTAPullPower([], { date: '2026-09-01', watts: 1800 });
+    h = appendTAPullPower(h, { date: '2026-09-10', watts: 1950 });
+    const t = taPullPowerTrend(h)!;
+    expect(t.deltaW).toBe(150);
+    expect(t.bestW).toBe(1950);
+    expect(t.text).toMatch(/\+150Вт/);
+  });
+  it('мусор отсеивается, день перезаписывается', () => {
+    let h = appendTAPullPower([{ date: 'x', watts: NaN } as any], { date: '2026-09-01', watts: 1800.6 });
+    expect(h[0].watts).toBe(1801);
+    h = appendTAPullPower(h, { date: '2026-09-01', watts: 1700 });
+    expect(h.length).toBe(1);
+    expect(h[0].watts).toBe(1700);
+  });
+});
+
+describe('П4 Q-masters (MF/HMF дословно)', () => {
+  it('гейты: молодым и без данных — null', () => {
+    expect(qMasterFactor(null, 'male')).toBeNull();
+    expect(qMasterFactor(29, 'male')).toBeNull();
+    expect(qMasters(200, 80, 'male', 25)).toBeNull();
+    expect(qMasters(null, 80, 'male', 40)).toBeNull();
+  });
+  it('точечные значения таблиц (weighttraining.nz / IMWA)', () => {
+    expect(qMasterFactor(30, 'male')).toBe(1);
+    expect(qMasterFactor(30, 'female')).toBe(1);
+    expect(qMasterFactor(40, 'male')).toBe(1.112);
+    expect(qMasterFactor(40, 'female')).toBe(1.108);
+    expect(qMasterFactor(60, 'male')).toBe(1.477);
+    // Huebner 2019: у женщин после ~45 спад круче, чем у мужчин
+    expect(qMasterFactor(60, 'female')).toBe(1.704);
+  });
+  it('Q-masters = Q-points × фактор; кламп края', () => {
+    const q = qPoints(200, 80, 'male')!;
+    expect(qMasters(200, 80, 'male', 40)).toBe(Math.round(q * 1.112 * 100) / 100);
+    expect(qMasterFactor(120, 'male')).toBe(4.863);
+    expect(qMasterFactor(120, 'female')).toBe(3.935);
+  });
+  it('монотонность неубывания 30–90', () => {
+    for (let a = 31; a <= 90; a++) {
+      expect(qMasterFactor(a, 'male') as number).toBeGreaterThanOrEqual(qMasterFactor(a - 1, 'male') as number);
+      expect(qMasterFactor(a, 'female') as number).toBeGreaterThanOrEqual(qMasterFactor(a - 1, 'female') as number);
+    }
   });
 });

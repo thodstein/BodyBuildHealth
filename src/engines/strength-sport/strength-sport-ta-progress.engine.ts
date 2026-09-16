@@ -177,10 +177,62 @@ export function qPoints(
  * число qPoints остаётся базой сравнения внутри своего возраста.
  * <12 лет / <40кг — неприменимо (как Sinclair/Q флоры).
  */
+/**
+ * V5-П4: Q-Masters = Q-points × возрастной коэффициент (IMWA с 2025;
+ * USAW Best Lifter-мастерам с 2025).
+ *
+ * Таблицы дословно: Meltzer–Faber (муж, 66 значений, возраст 30–95) и
+ * Huebner–Meltzer–Faber (жен, 61 значение, 30–90) — путь weighttraining.nz
+ * (IMWA-калькулятор, коэффициенты 2025; те же множители, что SMF/SHMF-эра).
+ * Возраст целый (календарный, как у VGF/USAW — возраст на 31 дек года);
+ * моложе 30 → null (там — чистые Q-points); старше таблицы → кламп к краю.
+ */
+const QMASTER_MEN = [
+  1, 1.01, 1.018, 1.026, 1.038, 1.052, 1.064, 1.076, 1.088, 1.1,
+  1.112, 1.124, 1.136, 1.148, 1.16, 1.173, 1.187, 1.201, 1.215, 1.23,
+  1.247, 1.264, 1.283, 1.304, 1.327, 1.351, 1.376, 1.401, 1.425, 1.451,
+  1.477, 1.504, 1.531, 1.56, 1.589, 1.62, 1.654, 1.693, 1.736, 1.784,
+  1.833, 1.883, 1.932, 1.981, 2.031, 2.083, 2.139, 2.202, 2.271, 2.348,
+  2.43, 2.524, 2.635, 2.755, 2.877, 3.008, 3.168, 3.356, 3.545, 3.709,
+  3.88, 4.059, 4.247, 4.443, 4.648, 4.863,
+];
+const QMASTER_WOMEN = [
+  1, 1.01, 1.021, 1.031, 1.042, 1.052, 1.063, 1.073, 1.084, 1.096,
+  1.108, 1.122, 1.138, 1.155, 1.173, 1.194, 1.216, 1.24, 1.265, 1.292,
+  1.321, 1.352, 1.384, 1.419, 1.456, 1.494, 1.534, 1.575, 1.617, 1.66,
+  1.704, 1.748, 1.794, 1.841, 1.89, 1.942, 1.996, 2.052, 2.109, 2.168,
+  2.226, 2.285, 2.343, 2.402, 2.464, 2.528, 2.597, 2.67, 2.749, 2.831,
+  2.918, 3.009, 3.104, 3.201, 3.301, 3.403, 3.507, 3.613, 3.72, 3.827,
+  3.935,
+];
+
+export function qMasterFactor(ageYears: number | null | undefined, sex?: string | null): number | null {
+  if (ageYears == null || !Number.isFinite(ageYears)) return null;
+  const a = Math.floor(ageYears);
+  if (a < 30) return null;
+  const female = String(sex || '').toLowerCase() === 'female';
+  const table = female ? QMASTER_WOMEN : QMASTER_MEN;
+  const idx = Math.min(a - 30, table.length - 1);
+  return table[idx];
+}
+
+/** Q-Masters числом (округление 0.01). Моложе 30 / без данных → null. */
+export function qMasters(
+  totalKg: number | null | undefined,
+  bwKg: number | null | undefined,
+  sex?: string | null,
+  ageYears?: number | null,
+): number | null {
+  const q = qPoints(totalKg, bwKg, sex);
+  const f = qMasterFactor(ageYears, sex);
+  if (q == null || f == null) return null;
+  return Math.round(q * f * 100) / 100;
+}
+
 export function qAgeScale(ageYears: number | null | undefined): { scale: 'Q-youth' | 'Q-points' | 'Q-masters'; note: string } | null {
   if (ageYears == null || !Number.isFinite(ageYears) || ageYears <= 0) return null;
   if (ageYears < 12) return null;
   if (ageYears < 18) return { scale: 'Q-youth', note: `Возраст ${ageYears}: юношам — Q-youth по таблицам USAW (здесь база Q-points, сравнивай внутри возраста)` };
   if (ageYears < 35) return { scale: 'Q-points', note: `Возраст ${ageYears}: основная шкала Q-points (USAW Best Lifter с 2025)` };
-  return { scale: 'Q-masters', note: `Возраст ${ageYears}: мастерам — Q-masters с возрастным коэффициентом (здесь база Q-points, сравнивай внутри возраста)` };
+  return { scale: 'Q-masters', note: `Возраст ${ageYears}: мастерам — Q-masters = Q-points × возрастной коэффициент (MF/HMF-таблицы, IMWA с 2025; число ниже)` };
 }

@@ -24,7 +24,7 @@ import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend, TA_OHS_HIST_KEY
 import { calibrateLVP, saveLVPProfile } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary, ensurePoseModel } from '../../../engines/strength-sport/strength-sport-pose.engine';
-import { sinclairCoefficient, sinclairTotal, qPoints, qAgeScale, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
+import { sinclairCoefficient, sinclairTotal, qPoints, qMasters, qAgeScale, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 import { auditTAPlan, hubTabForPhase, TA_CORE_PHASES, TA_AUX_PHASES } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
@@ -49,6 +49,7 @@ import { imtpEnduranceDrop } from '../../../engines/strength-sport/strength-spor
 import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor, correctivesByError, tagsForBarMetrics, TA_ERROR_TAG_RU, correctiveById, correctiveExportLines, protocolForPreferred } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
 import { turnoverDiag, jerkDriveDiag, pullPowerBalance, lvpBallisticNote, movementOfWeak, mixedWaveNote, TA_MOVEMENT_RU } from '../../../engines/strength-sport/strength-sport-ta-v5.engine';
 import { appendTAPhaseSnapshot, taPhaseTrend, loadTAPhaseHistory, saveTAPhaseHistory, type TAPhaseSnapshot } from '../../../engines/strength-sport/strength-sport-ta-phase-history.engine';
+import { appendTAPullPower, taPullPowerTrend, loadTAPullPower, saveTAPullPower } from '../../../engines/strength-sport/strength-sport-ta-pullpower-history.engine';
 import { ymaxNormForBodyweight } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
@@ -274,6 +275,8 @@ export const WLDiagnosticsHub: React.FC = () => {
         if (!merged.anthroArmSpan && Number.isFinite(personal.armSpanCm)) merged.anthroArmSpan = String(personal.armSpanCm);
         if (!merged.anthroShoulder && Number.isFinite(personal.shoulderWidthCm)) merged.anthroShoulder = String(personal.shoulderWidthCm);
         if (!merged.anthroHeight && Number.isFinite(personal.height)) merged.anthroHeight = String(personal.height);
+        // V5-П1: возраст — из профиля разово, ручной ввод приоритетнее
+        if (!merged.progAge && Number.isFinite(personal.age) && (personal.age as number) > 0) merged.progAge = String(Math.floor(personal.age as number));
       } catch { /* noop */ }
       return merged;
     } catch {}
@@ -468,9 +471,10 @@ export const WLDiagnosticsHub: React.FC = () => {
       const cj = state.progCj ? parseFloat(state.progCj) : NaN;
       if (!Number.isFinite(bw) || bw <= 0 || !Number.isFinite(sn) || !Number.isFinite(cj) || sn <= 0 || cj <= 0) return null;
       const total = Math.round((sn + cj) * 10) / 10;
-      return { bw, sn, cj, total, cycle: progCycleEff, coeff: sinclairCoefficient(bw, progSexEff, progCycleEff), sinclair: sinclairTotal(total, bw, progSexEff, progCycleEff), q: qPoints(total, bw, progSexEff) };
+      const ageEff = state.progAge ? parseFloat(state.progAge) : null;
+      return { bw, sn, cj, total, cycle: progCycleEff, coeff: sinclairCoefficient(bw, progSexEff, progCycleEff), sinclair: sinclairTotal(total, bw, progSexEff, progCycleEff), q: qPoints(total, bw, progSexEff), qm: qMasters(total, bw, progSexEff, ageEff) };
     } catch { return null; }
-  }, [state.progBw, state.progSnatch, state.progCj, progSexEff, progCycleEff, profileWeightKg]);
+  }, [state.progBw, state.progSnatch, state.progCj, state.progAge, progSexEff, progCycleEff, profileWeightKg]);
   const progTrend = useMemo(() => {
     try { return taProgressTrend(progHist, progSexEff, progCycleEff); } catch { return null; }
   }, [progHist, progSexEff, progCycleEff]);
@@ -744,7 +748,27 @@ export const WLDiagnosticsHub: React.FC = () => {
     try { return loadTAPhaseHistory(); } catch { return []; }
   });
   const phaseTrend = useMemo(() => { try { return taPhaseTrend(phaseHist); } catch { return null; } }, [phaseHist]);
-  const takePhaseSnapshot = () => {
+  // V5-П3: история мощности второй тяги (снимки Вт + тренд «было/стало»)
+  const [powerHist, setPowerHist] = useState<Array<{ date: string; watts: number }>>(() => {
+    try { return loadTAPullPower(); } catch { return []; }
+  });
+  const powerTrend = useMemo(() => { try { return taPullPowerTrend(powerHist); } catch { return null; } }, [powerHist]);
+  const takePowerSnapshot = () => {
+    const w = state.pullPowerW ? parseFloat(state.pullPowerW) : NaN;
+    if (!Number.isFinite(w) || w <= 0) {
+      setToast('Введи мощность 2-й тяги (Вт) — снимать нечего');
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
+    const entry = { date: new Date().toISOString().slice(0, 10), watts: Math.round(w) };
+    setPowerHist(prev => {
+      const next = appendTAPullPower(prev, entry);
+      try { saveTAPullPower(next); } catch { /* noop */ }
+      return next;
+    });
+    setToast(`✓ Снимок мощности ${entry.date}: ${entry.watts}Вт`);
+    setTimeout(() => setToast(''), 2000);
+  };  const takePhaseSnapshot = () => {
     if (!weakPoints.length) {
       setToast('Выбери 1-3 слабые фазы — снимать нечего');
       setTimeout(() => setToast(''), 2000);
@@ -1272,7 +1296,9 @@ export const WLDiagnosticsHub: React.FC = () => {
       const p1 = pats.find(p => p.pattern === 1), p3 = pats.find(p => p.pattern === 3);
       if (p1 && p3) bf = `bfPCA P1 ${p1.score} (r ${p1.correlationWithPerformance}) · P3 ×${p3.score} ${p3.isOptimal ? 'OK' : 'много пересечений'}`;
     } catch { /* noop */ }
-    setState(s => ({ ...s, xLoopCm: String(res.xLoop), yMaxCm: String(res.yMax), peakVelMs: String(res.vmax), fvrHAcc: String(res.hAcc), bfPattern: bf }));
+    setState(s => ({ ...s, xLoopCm: String(res.xLoop), yMaxCm: String(res.yMax), peakVelMs: String(res.vmax), fvrHAcc: String(res.hAcc), bfPattern: bf,
+      // V5-П2: turnover из трекинга — только в пустое поле (ручной ввод приоритетнее)
+      ...(res.turnoverMs != null && !s.turnoverMs ? { turnoverMs: String(res.turnoverMs) } : {}) }));
     // V4-A: замер в историю (питает EWMA-тренд); V5-V8: с тегом качества (rough вне PCI)
     try {
       const q = videoQualityForCapture({
@@ -1283,7 +1309,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       saveBarTracking({ ...res, quality: q });
     } catch { /* noop */ }
     setTrackNonce(n => n + 1);
-    setToast(`✓ Kinovea: xLoop ${res.xLoop}см yMax ${res.yMax}см vmax ${res.vmax} м/с`);
+    setToast(`✓ Kinovea: xLoop ${res.xLoop}см yMax ${res.yMax}см vmax ${res.vmax} м/с${res.turnoverMs != null ? ` turnover ${res.turnoverMs}мс` : ''}`);
     setTimeout(()=>setToast(''),3000);
   };
 
@@ -1410,6 +1436,9 @@ export const WLDiagnosticsHub: React.FC = () => {
           if (ballisticNote) hubNotes.push(ballisticNote);
           if (ageScaleNote) hubNotes.push(ageScaleNote.note);
           if (phaseTrend) hubNotes.push(phaseTrend.text);
+          try {
+            if (powerTrend) hubNotes.push(powerTrend.text);
+          } catch { /* noop */ }
           if (pciBlock.roughN > 0) hubNotes.push(`PCI честный: rough-съёмки вне расчёта (${pciBlock.roughN})`);
           if (waveMixNote) hubNotes.push(waveMixNote);
         } catch { /* noop */ }
@@ -1419,8 +1448,9 @@ export const WLDiagnosticsHub: React.FC = () => {
         if (velFlag) hubNotes.push(`Метрика скорости: ${velFlag}`);
       } catch { /* noop */ }
       base.notes = hubNotes;
-      if (progCalc && progCalc.sinclair != null) base.sinclair = { total: progCalc.total, coeff: progCalc.coeff, value: progCalc.sinclair, cycle: progCalc.cycle };
+      if (progCalc && progCalc.sinclair != null) base.sinclair = { total: progCalc.total, coeff: progCalc.coeff, value: progCalc.sinclair, cycle: progCalc.cycle, qm: progCalc.qm ?? null };
       if (progCalc && progCalc.q != null) hubNotes.push(`Q-points ${progCalc.q} (USAW Best Lifter с 2025)`);
+      if (progCalc && progCalc.qm != null) hubNotes.push(`Q-masters ${progCalc.qm} (Q-points × возрастной коэффициент, IMWA с 2025)`);
     } catch { /* noop — базовый снап */ }
     return base;
   };
@@ -1593,6 +1623,10 @@ export const WLDiagnosticsHub: React.FC = () => {
               </div>
               {turnoverNote && <div data-wl="turnover-note" style={{ fontSize: 10, color: turnoverNote.overpull ? '#f59e0b' : '#22c55e', marginTop: 4 }}>🌀 {turnoverNote.text}</div>}
               {pullBalanceNote && <div data-wl="pull-balance" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>⚖️ {pullBalanceNote}</div>}
+              <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+                <button data-wl="power-snap" onClick={takePowerSnapshot} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.2)', color: '#f59e0b', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>⚡ Снимок мощности</button>
+                {powerTrend ? <span data-wl="power-trend" style={{ fontSize: 10, color: '#fff' }}>{powerTrend.text}</span> : <span style={{ fontSize: 10, color: '#fff' }}>2+ замера покажут динамику Вт</span>}
+              </div>
               {profileSex === 'female' && <div style={{ fontSize: 10, color: '#f9a8d4', marginTop: 4 }}>♀ Норма фазы по уровню ({femaleLevelOf(taLevel)}): финал-ускорение {femalePhaseNorm(femaleLevelOf(taLevel)).finalAccS.join('–')}с · таз {femalePhaseNorm(femaleLevelOf(taLevel)).hipAmortDeg.join('–')}° (Slobozhanskyi 2025)</div>}
               {profileSex === 'female' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
@@ -2172,7 +2206,7 @@ export const WLDiagnosticsHub: React.FC = () => {
             ))}
             <button data-wl="prog-snap" onClick={takeProgSnapshot} style={{ marginLeft: 'auto', minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок</button>
           </div>
-          {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{progSexEff === 'female' ? '♀' : '♂'} Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair} ({progCalc.cycle}){progCalc.q != null ? ` · Q-points ${progCalc.q}` : ''}</div>}
+          {progCalc && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>{progSexEff === 'female' ? '♀' : '♂'} Сумма {progCalc.total}кг · коэфф {progCalc.coeff?.toFixed(4)} · Sinclair {progCalc.sinclair} ({progCalc.cycle}){progCalc.q != null ? ` · Q-points ${progCalc.q}` : ''}{progCalc.qm != null ? ` · Q-masters ${progCalc.qm}` : ''}</div>}
           {progTrend && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Тренд ({progTrend.n} зам.): сумма {progTrend.totalDelta > 0 ? '+' : ''}{progTrend.totalDelta}кг · вес {progTrend.bwDelta > 0 ? '+' : ''}{progTrend.bwDelta}кг{progTrend.sinclairDelta != null ? ` · Sinclair ${progTrend.sinclairDelta > 0 ? '+' : ''}${progTrend.sinclairDelta}` : ''}{progTrend.bestSinclair != null ? ` · лучший ${progTrend.bestSinclair} (${progTrend.bestDate})` : ''}{progTrend.qDelta != null ? ` · Q ${progTrend.qDelta > 0 ? '+' : ''}${progTrend.qDelta}` : ''}{progTrend.bestQ != null ? ` · лучший Q ${progTrend.bestQ} (${progTrend.bestQDate})` : ''}</div>}
           {ageScaleNote && <div data-wl="age-scale" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>🎂 {ageScaleNote.note}</div>}
           <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>

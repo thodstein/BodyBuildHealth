@@ -21,6 +21,8 @@ export interface BarTrackingResult {
   duration: number;
   /** V4-PROv4: знаковое латеральное смещение (среднее x − старт x, см): + вправо, − влево. Питает персист асимметрии. */
   xBias: number;
+  /** V5-П2: длительность turnover, мс (vmax→vmin); null — падения после пика нет. */
+  turnoverMs: number | null;
   /** V5-V8: качество съёмки замера (Shah 2026). Старые записи без поля — 'unknown'. */
   quality?: 'ok' | 'rough' | 'unknown';
 }
@@ -175,13 +177,35 @@ export function analyzeBarTracking(points: BarPoint[]): BarTrackingResult | null
     const v = smooth[i];
     if (v > vmax) { vmax = v; hAcc = filtered[i+1].y / 100; }
   }
+  // индекс пика — до округления (сглаженный ряд может не достать до round(vmax))
+  let iMax = -1;
+  for (let i = 0; i < smooth.length; i++) {
+    if (iMax < 0 || smooth[i] > smooth[iMax]) iMax = i;
+  }
+  if (vmax <= 0) iMax = -1;
   vmax = Math.round(vmax * 100) / 100;
+  // V5-П2: длительность turnover — время от пика скорости до макс. скорости
+  // падения (vmin после vmax). Нет падения после пика → null (не гадаем).
+  let turnoverMs: number | null = null;
+  try {
+    if (iMax >= 0) {
+      let vmin = Infinity;
+      let iMin = -1;
+      for (let i = iMax + 1; i < smooth.length; i++) {
+        if (smooth[i] < vmin) { vmin = smooth[i]; iMin = i; }
+      }
+      if (iMin > iMax && vmin < 0) {
+        const dt = filtered[iMin + 1].t - filtered[iMax + 1].t;
+        if (Number.isFinite(dt) && dt > 0 && dt < 3) turnoverMs = Math.round(dt * 1000);
+      }
+    }
+  } catch { turnoverMs = null; }
   const duration = filtered[filtered.length - 1].t - filtered[0].t;
   hAcc = Math.round(hAcc * 100) / 100;
   if (hAcc <= 0.2) hAcc = 0.8;
   const xMean = xs.reduce((a, b) => a + b, 0) / xs.length;
   const xBias = Math.round((xMean - xs[0]) * 10) / 10;
-  return { points: filtered, fps, yMax: Math.round(yMax), xLoop: Math.round(xLoop * 10) / 10, vmax, hAcc, duration: Math.round(duration * 100) / 100, xBias };
+  return { points: filtered, fps, yMax: Math.round(yMax), xLoop: Math.round(xLoop * 10) / 10, vmax, hAcc, duration: Math.round(duration * 100) / 100, xBias, turnoverMs };
 }
 
 // Force provider abstraction (loadsol insoles, force plate)
