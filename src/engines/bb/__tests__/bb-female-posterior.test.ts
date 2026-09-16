@@ -20,10 +20,13 @@
  *    своп падал в fallback каталога.
  */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { buildBBPlan, type BBBuilderInput, type BBPlan } from '../bb-builder.engine';
 import { convertCycleToBBPlan } from '../cycle-to-plan';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import { ANGLE_CLASSES, strictGroupForExercise, strictGroupMembersOf } from '../bb-exercise-selection.engine';
+import { femaleAdjust, femalePosteriorBoost, FEMALE_POSTERIOR_BOOST } from '../bb-demographics';
 
 const EQ = ['barbell', 'dumbbell', 'cable', 'machine', 'bodyweight'];
 
@@ -112,5 +115,56 @@ describe('строгие группы попы (Kassiano/NSCA: траст + от
   });
   it('кикбэк → glute_abduction', () => {
     expect(strictGroupForExercise({ id: 'cable_kickback' }, 'glutes')?.key).toBe('glute_abduction');
+  });
+});
+
+describe('5.4: женский бонус задней цепи — единый источник (bb-demographics)', () => {
+  it('femalePosteriorBoost: 1.2 только glutes/hamstrings у female', () => {
+    expect(femalePosteriorBoost('glutes', 'female')).toBe(FEMALE_POSTERIOR_BOOST);
+    expect(femalePosteriorBoost('hamstrings', 'female')).toBe(FEMALE_POSTERIOR_BOOST);
+    expect(femalePosteriorBoost('glutes', 'male')).toBe(1);
+    expect(femalePosteriorBoost('hamstrings', undefined)).toBe(1);
+    expect(femalePosteriorBoost('quads', 'female')).toBe(1);
+    expect(FEMALE_POSTERIOR_BOOST).toBe(1.2);
+  });
+
+  it('femaleAdjust: наука задней цепи в notes (Plotkin/Barbalho/Kassiano)', () => {
+    const notes = femaleAdjust().notes.join(' ');
+    expect(notes).toContain('Plotkin 2023');
+    expect(notes).toContain('Barbalho 2020');
+    expect(notes).toContain('Kassiano 2024');
+    expect(notes).toContain('+20%');
+  });
+
+  it('потребители читают единый источник (source-guard)', () => {
+    const builder = readFileSync(resolve(__dirname, '..', 'bb-builder.engine.ts'), 'utf8');
+    const cycle = readFileSync(resolve(__dirname, '..', 'cycle-to-plan.ts'), 'utf8');
+    expect(builder).toContain('FEMALE_POSTERIOR_BOOST');
+    expect(cycle).toContain('femalePosteriorBoost');
+    expect(cycle).not.toContain("(muscle === 'glutes' || muscle === 'hamstrings')) ? 1.2");
+  });
+});
+
+describe('5.4: приоритет приседа у тренированных женщин (Plotkin/Barbalho)', () => {
+  const coverageOf = (plan: BBPlan) => plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises)
+    .filter(e => /Quads-гарантия/.test(String((e as any).comment || '')));
+
+  it('advanced female glute-сплит: quads-гарантия ставит присед (squat-pattern) с Plotkin', () => {
+    const plan = buildBBPlan(makeInput({ patternId: 'female_glute_5', level: 'advanced', trainingYears: 6 }));
+    const cov = coverageOf(plan);
+    expect(cov.length).toBeGreaterThan(0);
+    expect(/приседания/i.test(cov[0].name), cov[0].name).toBe(true);
+    expect(String((cov[0] as any).comment)).toContain('Тренированные');
+    expect(String((cov[0] as any).comment)).toContain('Plotkin 2023');
+  });
+
+  it('intermediate female: машинный носитель (Kassiano) — прежнее поведение', () => {
+    const plan = buildBBPlan(makeInput({ patternId: 'female_glute_5' }));
+    const cov = coverageOf(plan);
+    expect(cov.length).toBeGreaterThan(0);
+    expect(String((cov[0] as any).comment)).toContain('Нетренированные');
+    expect(String((cov[0] as any).comment)).toContain('Kassiano 2024');
+    expect(/гакк|жим ногами|leg.?press/i.test(cov[0].name), cov[0].name).toBe(true);
+    expect(/приседания со штангой|фронтальные приседания/i.test(cov[0].name), cov[0].name).toBe(false);
   });
 });

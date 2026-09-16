@@ -20,7 +20,7 @@ function indirectToMuscle(ex: any, muscle: string): number {
   return v;
 }
 import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine';
-import { REP_SCHEMES } from './bb-rep-schemes.engine';
+import { REP_SCHEMES, isWidowmakerExercise } from './bb-rep-schemes.engine';
 import { analyzeBBRotation } from './bb-rotation.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf, derivePattern } from '../movement-pattern';
@@ -31,7 +31,7 @@ import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.
 import { buildBBPlanReport } from './bb-report.engine';
 import { analyzeBBBalance } from './bb-balance.engine';
 import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
-import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
+import { applyTaperToFinalWeeks, isDeloadLikeWeek } from './bb-autocoach.engine';
 import { analyzePlanStress } from './bb-injury-prevention.engine';
 import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
 import { WEAK_TO_MUSCLE, isBBJunk } from './bb-builder.engine';
@@ -757,17 +757,27 @@ function ensureQuadsCoverageForGluteTags(plan: any, options: BBFinalizeOptions):
     const pumpSess = week.sessions.find((s: any) => /Glutes/i.test(s.sessionTag || '') && String((s as any).character) === 'памп' && s !== heavySess)
       || week.sessions.find((s: any) => /Glutes/i.test(s.sessionTag || '') && s !== heavySess);
     const wm = options.workMax?.quads || 90;
+    // Волна 5.4 (Plotkin 2023 MRI, Barbalho 2020, Kassiano 2024): у ТРЕНИРОВАННЫХ
+    // женщин присед ≥ hip thrust по ягодицам (присед ≈ траст), у нетренированных
+    // носитель — leg press. Поэтому приоритет приседа только для advanced/enhanced;
+    // новички/любители получают машинный носитель (Kassiano: leg press + SLDL + thrust).
+    const trained = options.level === 'advanced' || options.level === 'enhanced';
     // Аудит Sep 2026: машина (leg press/гакк/разгибания) может отсутствовать
     // в инвентаре — фоллбек-цепочка до dumbbell/bodyweight (болгарские/выпады/присед).
-    const heavyCand = pickQuads([/жим.*ног|leg.?press|гакк|hack/i, /болгар|bulgarian|присед|squat|выпад|lunge/i], existing);
+    const heavyCand = trained
+      ? pickQuads([/присед|squat|болгар|bulgarian|жим.*ног|leg.?press|гакк|hack/i, /выпад|lunge/i], existing)
+      : pickQuads([/жим.*ног|leg.?press|гакк|hack/i, /болгар|bulgarian|присед|squat|выпад|lunge/i], existing);
     const pumpCand = pickQuads([/разгиб/i, /выпад|lunge|болгар|bulgarian/i], existing);
     if (heavySess && heavyCand && deficit > 0) {
       const sets = Math.min(3, deficit);
+      const heavyScience = trained
+        ? 'Тренированные: присед ≥ hip thrust по ягодицам (Plotkin 2023 MRI; Barbalho 2020 — присед ≈ траст)'
+        : 'Нетренированные: машинный носитель leg press/гакк (Kassiano 2024: leg press + SLDL + thrust)';
       heavySess.exercises.push({
         muscle: 'quads', name: heavyCand.name, exerciseName: heavyCand.name, role: 'accessory', character: 'памп',
         sets, repsRange: [12, 15], rir: 2, warmupSets: [],
         workSets: Array.from({ length: sets }, () => ({ reps: 12, rir: 2, weight: Math.round(wm * 0.5 * 10) / 10, restSeconds: 90 })),
-        comment: `🦵 Quads-гарантия: ${heavyCand.name} ${sets}×12 RIR 2 — глут-сплит не имеет quads-слота (TAG_MUSCLES.Glutes), недельный прямой объём < 0.7×MEV (${quadsSets}/${floor}). Поддерживающий объём (Kassiano 2024: leg press — главный женский носитель quads+glutes).`,
+        comment: `🦵 Quads-гарантия: ${heavyCand.name} ${sets}×12 RIR 2 — глут-сплит не имеет quads-слота (TAG_MUSCLES.Glutes), недельный прямой объём < 0.7×MEV (${quadsSets}/${floor}). ${heavyScience}.`,
         rationale: 'Quads coverage для glute-сплитов: поддерживающий объём ≥ 0.7×MEV',
       });
       quadsSets += sets;
@@ -2786,8 +2796,9 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
   });
   const muscles = [...new Set(candidates.map(candidate => trueMuscleOf(candidate) || ''))].filter(Boolean);
   for (const week of plan.weeks) {
-    const phase = String((week as any).phase || '').toLowerCase();
-    if (phase === 'deload' || week.sessions.some(session => session.exercises.some(exercise => /разгруз|deload/i.test(exercise.comment || '')))) continue;
+    // Волна 5.3: единый структурный детектор разгрузки (флаг/фаза/deload;
+    // комментарий — только legacy-фолбэк для планов из storage).
+    if (isDeloadLikeWeek(week)) continue;
     const donors = tradeoffDonorsForWeek(options, week.week);
     const weekVolume = aggregateBBVolume(week.sessions);
     // Prioritize muscles by target-volume deficit (target vs effective), not just MEV.
@@ -3002,8 +3013,11 @@ function applyAdaptivePhaseSafety(plan: BBPlan): void {
   for (let index = 1; index < plan.weeks.length; index++) {
     const week = plan.weeks[index];
     const weekPhase = String((week as any).phase || '').toLowerCase();
-    const isDeloadWeek = Boolean((week as any).deload) || weekPhase === 'deload' || weekPhase === 'transition';
-    if (!isDeloadWeek && !week.sessions.some(session => session.exercises.some(exercise => exercise.character === 'лёг' || /разгруз|deload/i.test(exercise.comment || '')))) continue;
+    // Волна 5.3: структурный детектор (флаг/фаза/deload) + transition; комментарий —
+    // legacy-фолбэк внутри isDeloadLikeWeek. `character === 'лёг'` — отдельный признак,
+    // не покрытый флагом (историческое поведение сохранено).
+    const isDeloadWeek = isDeloadLikeWeek(week) || weekPhase === 'transition';
+    if (!isDeloadWeek && !week.sessions.some(session => session.exercises.some(exercise => exercise.character === 'лёг'))) continue;
     const previous = plan.weeks[index - 1];
     for (const session of week.sessions) {
       for (const exercise of session.exercises) {
@@ -3250,8 +3264,9 @@ for (const week of next.weeks) {
     // faithful входы сохраняют исходный объём (контракт финализатора).
     const guardMap: Record<string, number> = {};
     if (options.level && !options.preserveSource && (next as any).pattern?.id) {
-      const w: any = week;
-      if (w.phase !== 'deload' && !week.sessions.some(s => s.exercises.some(e => /разгруз|deload/i.test(e.comment || '')))) {
+      // Волна 5.3: единый структурный детектор разгрузки (флаг/фаза/deload;
+      // комментарий — legacy-фолбэк внутри helper).
+      if (!isDeloadLikeWeek(week)) {
         const sessionsWith = new Map<string, number>();
         for (const s of week.sessions) {
           const seenInSession = new Set<string>();
@@ -3422,8 +3437,8 @@ for (const week of next.weeks) {
     for (const week of next.weeks) {
       // 🏁 Prep guard: MEV-repair/back-баланс не трогает недели contest prep.
       if (isPrepControlled(week)) continue;
-      const w: any = week;
-      if (w.phase === 'deload' || week.sessions.some(s => s.exercises.some(e => /разгруз|deload/i.test(e.comment || '')))) continue;
+      // Волна 5.3: единый структурный детектор разгрузки.
+      if (isDeloadLikeWeek(week)) continue;
       const weekVolume = aggregateBBVolume(week.sessions);
       const freq = new Map<string, number>();
       for (const s of week.sessions) {
@@ -4580,7 +4595,8 @@ for (const week of next.weeks) {
     try { hostCap = perExerciseCap(options.level, 'quads', options.trainingYears, options.onCourse); } catch { hostCap = 5; }
     let widowWeeks = 0;
     for (const week of next.weeks) {
-      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      // Волна 5.3: единый детектор разгрузки (фаза/делод/флаг/legacy-комментарий).
+      if (isDeloadLikeWeek(week)) continue;
       let qDirect = 0;
       for (const s of week.sessions) for (const ex of s.exercises) {
         if ((ex as any).warmupActivator) continue;
@@ -4596,7 +4612,7 @@ for (const week of next.weeks) {
         const wSets = working.reduce((a: number, x: any) => a + (x.sets || 0), 0);
         if (wSets + 1 > maxSets) continue;
         const host = working
-          .filter((x: any) => (x as any).muscle === 'quads' && (x.sets || 0) >= 2 && (x.sets || 0) < hostCap && Array.isArray((x as any).workSets) && !String((x as any).comment || '').includes('widowmaker'))
+          .filter((x: any) => (x as any).muscle === 'quads' && (x.sets || 0) >= 2 && (x.sets || 0) < hostCap && Array.isArray((x as any).workSets) && !isWidowmakerExercise(x))
           .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))[0];
         if (!host) continue;
         const score = (maxSets - wSets) * 10 + ((host as any).sets || 0);
@@ -4606,6 +4622,9 @@ for (const week of next.weeks) {
       const wgt = Math.max(20, Math.round(wmQ * 0.55 * 10) / 10);
       bestHost.sets += 1;
       bestHost.workSets.push({ reps: 20, rir: 2, weight: wgt, tempo: '2-1-1-0', restSeconds: 120 });
+      // Волна 5.3: структурный тег рядом с комментарием (потребители читают тег,
+      // комментарий остаётся для UI/печати).
+      bestHost.techniqueTag = 'widowmaker';
       bestHost.comment = `${(bestHost as any).comment || ''} · 💀 DC widowmaker 1×20 @${wgt}кг (Dante — добивочный 20-повторный сет).`.replace(/^\s*·\s*/, '');
       widowWeeks++;
     }

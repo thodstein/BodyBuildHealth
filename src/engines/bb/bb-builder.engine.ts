@@ -43,6 +43,7 @@ import { findGentleSubstitutions } from '../exercise-substitution.engine';
 import { isPoolAllowed, isSkillEccentric } from './bb-exercise-levels.engine';
 import { packingCapFor, distributePackingSets, planPackingDrops, strictKeysFor, packingPatternOf, PACKING_MUSCLES } from './bb-packing.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
+import { FEMALE_POSTERIOR_BOOST } from './bb-demographics';
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
@@ -361,6 +362,11 @@ export interface BBExercise {
   /** PRO-4 S4: унилатеральная работа слабой стороны первой (структура, не клон комментария). */
   side?: 'left' | 'right';
   unilateral?: boolean;
+  /** Волна 5.3 (BB-AUTO-EXHAUSTIVE-PRO): структурный тег техники, выставленный
+   *  кодом (не парсинг комментария). Сейчас: 'widowmaker' — добивочный DC 1×20
+   *  в финализаторе. Комментарий остаётся для UI/печати; потребители читают тег
+   *  с legacy-фолбэком на комментарий (`isWidowmakerExercise` в bb-rep-schemes). */
+  techniqueTag?: 'widowmaker';
 }
 
 export interface BBSession {
@@ -376,6 +382,10 @@ export interface BBWeek {
   phase?: BBPhase;
   deload?: boolean;
   taper?: boolean;
+  /** Волна 5.3: структурный флаг «неделя-разгрузка» (фаза deload / deload-флаг /
+   *  второй overreaching-делод). Потребители (finalize) читают флаг, а не парсят
+   *  комментарии; комментарий остаётся для UI/печати. */
+  isDeloadLike?: boolean;
   sessions: BBSession[];
 }
 
@@ -1029,8 +1039,9 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
   // Posterior-chain parity (Plotkin 2023: хамсы НЕ растут от приседа/хип-траста; Kassiano 2024 у женщин:
   // leg press + SLDL + hip thrust +9.3% vs +6.0% без него): hamstrings у женщин получают тот же +20%,
   // иначе задняя цепь перекашивается в попу при нулевом бонусе хамсов (femaleAdjust обещает hams-акцент).
+  // Волна 5.4: единый источник бонуса — FEMALE_POSTERIOR_BOOST (bb-demographics).
   const isFemalePosterior = isFemale && (muscle === 'glutes' || muscle === 'hamstrings');
-  const gluteBoost = isFemalePosterior ? 1.2 : 1.0;
+  const gluteBoost = isFemalePosterior ? FEMALE_POSTERIOR_BOOST : 1.0;
   const finalMult = pedArmBoost * gluteBoost;
   // P0-1: arms (biceps/triceps/forearms) — accessory factor повышен с 0.6 до 0.85.
   // Раньше: biceps MAV=8, 2×/нед → 8/2×0.6=2.4 → 2 сета/сессию → 1 сет на упражнение (разминка!).
@@ -3750,7 +3761,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // fix D: капаем недельный объём каждой мышцы по её истинному MRV — единый perExerciseCap.
     // onCourse пробрасываем чтобы per-exercise кап на курсе был BIG (8-10), а не 5.
     normalizeWeekMrv(weekSessions, mrvByMuscle, phase === 'deload', { level: input.level, trainingYears: input.trainingYears, onCourse });
-    weeks.push({ week: w, phase, deload: phase === 'deload', sessions: weekSessions });
+    // Волна 5.3: структурный флаг разгрузки — там же, где фаза/комментарий.
+    weeks.push({ week: w, phase, deload: phase === 'deload', isDeloadLike: phase === 'deload', sessions: weekSessions });
     // Запоминаем упражнения этой недели для мягкого freshness блокировки следующей.
     // В режиме «запрет» (forbid) freshness отключён — строго те же упражнения.
     prevWeekUsedByMuscle.clear();
@@ -4721,6 +4733,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           }
         }
         (target as any).overreachingDeload = true;
+        // Волна 5.3: вторая микро-разгрузка — структурный флаг (комментарий выше
+        // «⚠ Overreaching: вторая разгрузка…» остаётся для UI; потребители читают флаг).
+        (target as any).isDeloadLike = true;
         syncBBPlanSetShape(finalized);
         finalized.rationale.push(`⚠ Вторая разгрузка: нед ${target.week} снижена (объём ×0.8, RIR +2) — readiness не восстановилась (Rogerson/Bell 2024: делод неэффективен → дополнительная разгрузка).`);
       }

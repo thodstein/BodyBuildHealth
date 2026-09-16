@@ -7,6 +7,7 @@
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection, SRLevel, SRPeriod } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
 import type { BBPhase } from './bb-types';
+import { femalePosteriorBoost } from './bb-demographics';
 import { getBBVolumeLandmarks, isWeak, WEAK_TO_MUSCLE, abDominantPattern, normalizeWeekMrv } from './bb-builder.engine';
 import { syncBBPlanSetShape } from './bb-validator.engine';
 import { aggregateBBVolume, perExerciseCap } from './bb-volume.engine';
@@ -1142,8 +1143,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         // focusGroup: +30% (входит в specFactor)
         const focusFactor = 1.0;
         // P0-1: female posterior boost ×1.2 (как в buildBBPlan: glutes + parity hamstrings —
-        // Plotkin 2023: хамсы не растут от приседа/хип-траста, женщинам нужен прямой объём задней цепи)
-        const femaleGluteBoost = (input.sex === 'female' && (muscle === 'glutes' || muscle === 'hamstrings')) ? 1.2 : 1.0;
+        // Plotkin 2023: хамсы не растут от приседа/хип-траста, женщинам нужен прямой объём задней цепи).
+        // Волна 5.4: единый источник — femalePosteriorBoost (bb-demographics).
+        const femaleGluteBoost = femalePosteriorBoost(muscle, input.sex);
         // Goal→объём (паритет с bb-builder: cut 0.72 / recomp 0.92 / maintenance 0.80 / mass 1.05 / strength_mass 1.03)
         const goalMult = mode === 'faithful' ? 1.0 : (() => {
           const g = (input.goal || 'mass').toLowerCase();
@@ -1277,7 +1279,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     // (объём гипертрофийного цикла к финалу растёт, а не падает).
     const weekPhase = isDeload ? 'deload' : w <= Math.ceil(totalWeeks * 0.3) ? 'accumulation' : 'intensification';
 
-    weeks.push({ week: w, phase: weekPhase, deload: isDeload, sessions });
+    weeks.push({ week: w, phase: weekPhase, deload: isDeload, isDeloadLike: isDeload, sessions });
   }
 
   // Compute rotationMuscleVolume
@@ -2122,8 +2124,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           if (isWeakMuscle) adjSets = Math.round(adjSets * 1.15);
           if (isFocus) adjSets = Math.round(adjSets * 1.30);
           if (isWeakMuscle) adjRir = Math.max(0, rir - 1);
-          // P0-1: female posterior boost ×1.2 (паритет с generic-путём: glutes + hamstrings)
-          if (opts.sex === 'female' && (muscle === 'glutes' || muscle === 'hamstrings')) adjSets = Math.round(adjSets * 1.2);
+          // P0-1: female posterior boost ×1.2 (паритет с generic-путём: glutes + hamstrings).
+          // Волна 5.4: единый источник — femalePosteriorBoost (bb-demographics).
+          adjSets = Math.round(adjSets * femalePosteriorBoost(muscle, opts.sex));
           // PED volume boost (как в buildBBPlan): primary × mrvMult, accessory × max(1, mrvMult×0.8)
           if (opts.peds && opts.peds.length > 0) {
             const pedFactor = role === 'primary' ? mrvMult : Math.max(1.0, mrvMult * 0.8);
@@ -2351,7 +2354,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     const normPhase: BBPhase = srcPhase === 'deload' || isDeload ? 'deload'
       : srcPhase === 'peaking' || srcPhase === 'peak' ? 'peaking'
         : srcPhase === 'intensification' ? 'intensification' : 'accumulation';
-    weeks.push({ week: weekNum, phase: normPhase, ...(isDeload ? { deload: true } : {}), sessions });
+    weeks.push({ week: weekNum, phase: normPhase, ...(isDeload ? { deload: true } : {}), ...(normPhase === 'deload' ? { isDeloadLike: true } : {}), sessions });
   }
 
   // Compute rotationMuscleVolume from week 1

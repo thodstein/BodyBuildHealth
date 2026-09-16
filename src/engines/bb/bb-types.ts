@@ -59,6 +59,10 @@ export interface BBExercise {
   /** PRO-4 S4: унилатеральная добивка слабой стороны первой. */
   side?: 'left' | 'right';
   unilateral?: boolean;
+  /** Волна 5.3: структурный тег техники ('widowmaker' — DC 1×20 из финализатора).
+   *  Комментарий остаётся для UI; потребители читают тег (legacy-фолбэк — helper
+   *  `isWidowmakerExercise` в bb-rep-schemes). */
+  techniqueTag?: 'widowmaker';
 }
 
 export interface BBSession {
@@ -74,6 +78,9 @@ export interface BBWeek {
   phase?: BBPhase;
   deload?: boolean;
   taper?: boolean;
+  /** Волна 5.3: структурный флаг недели-разгрузки (фаза/флаг deload, второй
+   *  overreaching-делод). Потребители читают флаг, комментарий — для UI. */
+  isDeloadLike?: boolean;
   sessions: BBSession[];
 }
 

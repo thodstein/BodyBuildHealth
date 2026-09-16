@@ -671,12 +671,50 @@
   lock-тест «каждая зона → прямой ключ мапы + ≥1 каталог-кандидат под паттерн» + гигиена
   `ANGLE_CLASSES` (уникальные имена классов, match-функции). Проверено: 7 файлов **131/131**
   (`--pool=forks`; threads-пул даёт известный флак `buildBBPlan is not a function`), `tsc` 0.
-- [ ] **Волна 5 — остаток**: 5.3 хардкод-эвристики комментариев (`/widowmaker/`, `/разгруз/`) → структурные флаги;
-  5.4 женская задняя цепь (Plotkin/Barbalho, приоритет приседа у профи); 5.5 философия интенсив-методик в текстах.
+- [x] **Волна 5 — 5.3/5.4/5.5 закрыты** (коммит этого раунда):
+  - **5.3 структурные флаги вместо комментариев-эвристик**: `BBWeek.isDeloadLike` +
+    `BBExercise.techniqueTag='widowmaker'` (типы в `bb-builder.engine.ts` и зеркале `bb-types.ts`).
+    Писатели — там же, где комментарии: `bb-builder` weeks.push (`isDeloadLike: phase === 'deload'`),
+    `cycle-to-plan` (оба пути: convert + program), `applyPostPhaseProcessing`
+    (`ph === 'deload'` → флаг), overreaching-проход билдера (вторая микро-разгрузка),
+    widowmaker-пасс финализатора (тег рядом с комментарием). Потребители читают helper-ы:
+    `isDeloadLikeWeek` (флаг/deload/phase + ОДИН legacy-фолбэк на комментарий для планов
+    из storage — вместо 4 разрозненных regex-сайтов) и `isWidowmakerExercise` (тег +
+    legacy-фолбэк; комментарий остаётся для UI/печати). Source-guard: в `bb-finalize`
+    0 вхождений `/разгруз|deload/i` и `includes('widowmaker')`, в `bb-rep-schemes` парсинг
+    комментария ровно в одном месте (helper). Семантика сайтов сохранена (site 2 дополнительно
+    держит `transition`/`character==='лёг'`).
+  - **5.4 женская задняя цепь**: `FEMALE_POSTERIOR_BOOST=1.2` + `femalePosteriorBoost(muscle, sex)`
+    в `bb-demographics` — единый источник, потребители билдер (`sessionShareFor`) и
+    cycle-to-plan (2 сайта, хардкод 1.2 убран); `femaleAdjust` несёт науку (Plotkin 2023
+    MRI: присед ≥ траст у ТРЕНИРОВАННЫХ; Barbalho 2020: присед ≈ траст; Kassiano 2024:
+    leg press + SLDL + thrust). `ensureQuadsCoverageForGluteTags`: advanced/enhanced-женщины
+    получают в quads-гарантию присед (squat-pattern) — раньше всем ставился машинный носитель;
+    новички/любители — прежний leg press/гакк (Kassiano), комментарий честно называет источник.
+  - **5.5 интенсив-методики — «тайм-эффективность, не превосходство»**: переписаны описания
+    `INTENSITY_TECHNIQUES` движка (rest-pause/drop-set/myo-reps — «экономия времени, не
+    превосходство (Sødal 2023 SMD 0.04; Havers/Tsartsapakis 2026)»), UI-каталога
+    (`bb-intensity-techniques`: «Высокая эффективность»/«Максимальная плотность»/«объёмный
+    шок» убраны), `REP_SCHEMES` (myo-reps/GVT), шапки трёх источников + комментарий
+    `PHASE_TECHNIQUES`; lock-тест «нет клеймов превосходства» (8 regex-паттернов по 4 источникам)
+    + маркеры источников. Имена/уровни техник не менялись (UI/парсеры совместимы).
+  - NEW лок-тесты: `bb-structural-flags` **13/13** (helper-семантика, flag⇔комментарий по
+    generic/cycle/program/overreaching, widowmaker-тег, source-guard) + `bb-intensity-honesty`
+    **8/8** + `bb-female-posterior` 10→**15** (boost-источник, science-notes, squat-приоритет
+    advanced vs machine intermediate).
+  - Проверено: полный bb-круг **2500 passed / 1 failed (чужое пред-существующее
+    `bb-diagnostics-max-pro` female-symmetry) / 20 skipped** (`--pool=forks`), `tsc --noEmit`
+    **0 по проекту**, `verify:apk-design` OK.
+
 
 ---
 
-## 10. Стартовый промпт следующей сессии (Волна 5.3–5.5)
+## 10. Стартовый промпт следующей сессии (Волна 5.3–5.5) — ✅ ВЫПОЛНЕНО (см. §7)
+
+> ✅ Закрыто 2026-09-16: 5.3 (структурные флаги `isDeloadLike`/`techniqueTag` + helper-ы
+> `isDeloadLikeWeek`/`isWidowmakerExercise` + source-guard), 5.4 (единый
+> `FEMALE_POSTERIOR_BOOST` + squat-приоритет для trained-женщин), 5.5 (тексты
+> «тайм-эффективность, не превосходство» + lock). Промпт ниже сохранён как история.
 
 > Продолжи ББ-авто по плану `docs/BB-AUTO-EXHAUSTIVE-PRO-PLAN.md` — Волна 5, пункты 5.3–5.5
 > (5.1/5.2 уже закрыты коммитами `0e328657`/`6b92192c`, 4.3 закрыт). Сначала прочитай AGENTS.md

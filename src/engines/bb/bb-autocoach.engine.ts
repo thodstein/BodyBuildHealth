@@ -241,6 +241,27 @@ export function applyDeloadToWeek(week: BBWeek, protocol: DeloadProtocol, opts?:
   return w2;
 }
 
+/* ──────────── Волна 5.3: структурные флаги разгрузки ──────────── */
+/** Legacy-паттерн deload-маркера в комментарии. Единственный сайт парсинга:
+ *  фолбэк для планов из storage (флаг `isDeloadLike` появился в Волне 5.3).
+ *  Свежие планы несут структурный флаг — потребители читают его. */
+export const DELOAD_COMMENT_RE = /разгруз|deload/i;
+
+/**
+ * Волна 5.3 (BB-AUTO-EXHAUSTIVE-PRO): единый детектор недели-разгрузки.
+ * Структурные признаки — `isDeloadLike` (писут билдер/cycle-to-plan/autocoach/
+ * overreaching-проход), `deload`-флаг и `phase==='deload'`. Комментарий —
+ * ТОЛЬКО legacy-фолбэк для планов из storage (раньше 4 сайта финализатора
+ * парсили `/разгруз|deload/` каждый сам).
+ */
+export function isDeloadLikeWeek(week: BBWeek): boolean {
+  const w = week as BBWeek & Record<string, unknown>;
+  if (w.isDeloadLike === true || w.deload === true) return true;
+  if (String(w.phase || '').toLowerCase() === 'deload') return true;
+  return ((w.sessions || []) as BBSession[]).some(session =>
+    (session.exercises || []).some(exercise => DELOAD_COMMENT_RE.test(String((exercise as any).comment || ''))));
+}
+
 /* ──────────── RIR drift within phase ──────────── */
 /**
  * RIR дрейф внутри фазы: RIR снижается на 1 каждые N недель внутри фазы.
@@ -270,6 +291,11 @@ export function rirDrift(baseRir: [number, number], weekInPhase: number, phaseWe
  * myo_reps: 1×12-15+3-5 mini-сетов × 3-5 reps (5с отдых) = 21-30 reps
  * pause_rep: +2-3с пауза в нижней точке (модифицирует tempo)
  * mechanical_drop: смена угла без отдыха
+ *
+ * Волна 5.5 (BB-AUTO-EXHAUSTIVE-PRO): философия — ТАЙМ-ЭФФЕКТИВНОСТЬ, не
+ * превосходство. Sødal 2023 (drop-set ≈ традиционные подходы: SMD 0.04),
+ * Havers 2026 / Tsartsapakis 2026 (rest-pause — небольшой плюс при равном
+ * числе сетов), Enes 2025 (темп/техника минимально влияют при равном усилии).
  */
 export type IntensityTechnique = 'rest_pause' | 'drop_set' | 'myo_reps' | 'pause_rep' | 'mechanical_drop' | 'negative' | 'twenty_ones' | 'none';
 
@@ -288,17 +314,17 @@ export const INTENSITY_TECHNIQUES: Record<IntensityTechnique, IntensityTechnique
   rest_pause: {
     type: 'rest_pause', label: 'Rest-pause', appliesTo: ['compound','isolation'],
     phases: ['intensification','peaking'],
-    description: 'Финальный сет: 1×8 → 15с отдых → 1×3-4 → 15с → 1×3-4. Итого 14-16 reps в 1 «сете».',
+    description: 'Финальный сет: 1×8 → 15с отдых → 1×3-4 → 15с → 1×3-4. Итого 14-16 reps в 1 «сете». Тайм-эффективность: больше объёма за то же время (Sødal 2023 — небольшой плюс, не превосходство).',
   },
   drop_set: {
     type: 'drop_set', label: 'Drop-set', appliesTo: ['isolation','accessory'],
     phases: ['intensification','accumulation'],
-    description: 'Финальный сет: 1×10 → -20% веса → 1×6 → -20% → 1×4. 3 дропа без полного отдыха.',
+    description: 'Финальный сет: 1×10 → -20% веса → 1×6 → -20% → 1×4. 3 дропа без полного отдыха. Гипертрофия ≈ традиционным подходам (Sødal 2023, SMD 0.04) — экономия времени, не превосходство.',
   },
   myo_reps: {
     type: 'myo_reps', label: 'Myo-reps', appliesTo: ['isolation','accessory'],
     phases: ['accumulation','intensification'],
-    description: '1×12-15 (активация) → 5с × 3-5 mini-сетов по 3-5 reps. Итого 21-30 reps.',
+    description: '1×12-15 (активация) → 5с × 3-5 mini-сетов по 3-5 reps. Итого 21-30 reps. Тайм-эффективность: меньше «полных» подходов, стимул сопоставим.',
   },
   pause_rep: {
     type: 'pause_rep', label: 'Pause-rep', appliesTo: ['compound','isolation'],
@@ -746,6 +772,9 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     const ph = phaseMap.get(w.week) || 'accumulation';
     const cfg = PHASE_CONFIGS[ph as keyof typeof PHASE_CONFIGS];
     if (!cfg) continue;
+    // Волна 5.3: структурный флаг ставится там же, где пишется `[Разгрузка]`
+    // в комментарии (rebuildComment ниже) — потребители (finalize) читают флаг.
+    if (ph === 'deload') (w as any).isDeloadLike = true;
 
     if (ph !== lastPhase) { weeksInPhase = 1; lastPhase = ph; }
     else { weeksInPhase++; }

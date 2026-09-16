@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто Волна 5 закрыта: 5.3 структурные флаги + 5.4 женский присед + 5.5 тексты методик (Sep 16 2026, коммит pathspec, без пуша)
+
+По команде «продолжай по плану» (после 5.2 `6b92192c`). Только свои файлы: 8 движков (`bb-builder`/`bb-types`/`bb-autocoach`/`bb-finalize`/`bb-rep-schemes`/`cycle-to-plan`/`bb-demographics`/`bb-intensity-techniques`), shared `bb-auto-constructor-shared.tsx`, 2 NEW + 1 расширенный тест, план+AGENTS.
+- **5.3 комментарии-эвристики → структурные флаги**: `BBWeek.isDeloadLike` + `BBExercise.techniqueTag='widowmaker'` (движок + зеркало `bb-types`). Писатели там же, где комментарии: builder weeks.push (`isDeloadLike: phase==='deload'`), cycle-to-plan (convert+program), `applyPostPhaseProcessing` (ph deload), overreaching-проход (2-я разгрузка), widowmaker-пасс (тег рядом с комментарием). Потребители: helper `isDeloadLikeWeek` (флаг/deload/phase; комментарий — ОДИН legacy-фолбэк для storage-планов вместо 4 разбросанных regex) + `isWidowmakerExercise`; комментарии не менялись (UI/печать/тесты целы). NEW `bb-structural-flags` **13/13** (helper-семантика, flag⇔comment на generic/cycle/program, overreaching, widowmaker-тег, source-guard: 0 эвристик в finalize/rep-schemes).
+- **5.4 женская задняя цепь**: `FEMALE_POSTERIOR_BOOST=1.2`+`femalePosteriorBoost()` в `bb-demographics` — единый источник (builder+cycle хардкод убраны); `femaleAdjust` notes += Plotkin 2023/Barbalho 2020/Kassiano 2024; `ensureQuadsCoverageForGluteTags` — **advanced/enhanced женщинам присед** в quads-гарантию (было машинное всем; Plotkin: у тренированных присед ≥ траст), новички/любители — leg press/гакк (Kassiano). `bb-female-posterior` 10→**15/15**; соседи female 54/54.
+- **5.5 методики — «тайм-эффективность, не превосходство»** (Sødal 2023 SMD 0.04; Havers/Tsartsapakis 2026): переписаны описания движка (rest-pause/drop-set/myo-reps), UI-каталога («Высокая эффективность»/«Максимальная плотность»/«объёмный шок» убраны), `REP_SCHEMES` (myo/GVT), шапки 3 источников + коммент `PHASE_TECHNIQUES`; NEW `bb-intensity-honesty` **8/8** (8 regex клеймов по 4 источникам + маркеры источников). Имена/уровни техник не менялись.
+- Проверено: полный bb-круг **2500 passed / 1 failed (чужое пред-существующее `bb-diagnostics-max-pro` female-symmetry) / 20 skipped** (`--pool=forks`, ~7.5 мин), `tsc --noEmit` **0 по проекту**, `verify:apk-design` OK. НЕ ПУШИЛ.
+- **Волна 5 закрыта полностью** (5.1–5.5). Остаток плана BB-AUTO-EXHAUSTIVE-PRO — только осознанные границы (stretch-флаги каталога курируемые, см. 5.1).
+
 ## Питание: ручной КБЖУ — источник правды (3 латки) + честные тексты вместо «увеличьте приёмы» (Sep 16 2026, коммит pathspec, без пуша)
 
 По команде «поправь [тексты], и проверь чтоб ручной ввод КБЖУ тоже работал и по нему тоже считалось». Только свои файлы (`meal-plan-engine.ts`, `IndividualPlanResults.tsx`, `planner-bb-nutrition.ts`, `IndividualPlanContext.tsx`, 2 теста, 2 дока).

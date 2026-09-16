@@ -162,6 +162,12 @@ export const TAG_LABELS_RU: Record<string, string> = {
   ChestBack: 'Грудь+Спина', ShouldersArms: 'Плечи+Руки', Torso: 'Торс', Limbs: 'Конечности',
   UpperPower: 'Верх(сила)', LowerPower: 'Низ(сила)', UpperHyp: 'Верх(гиперт)', LowerHyp: 'Низ(гиперт)',
   };
+/**
+ * Техники-подсказки по фазам (UI-тексты). Волна 5.5 (BB-AUTO-EXHAUSTIVE-PRO):
+ * формулировки — тайм-эффективность/управление утомлением, не превосходство
+ * (Sødal 2023: drop ≈ традиционные подходы, SMD 0.04; rest-pause — небольшой плюс;
+ * Havers 2026 / Tsartsapakis 2026; Enes 2025 — темп минимально влияет при равном усилии).
+ */
 export const PHASE_TECHNIQUES: Record<BBPhase, string[]> = {
   accumulation: ['Темповые повторы (TUT)', 'Пауза в растянутой позиции', 'Суперсеты антагонистов'],
   intensification: ['Дроп-сеты (последний подход)', 'Рест-пауза (compounds)', 'Форсированные повторы (с партнёром)'],

@@ -12,6 +12,12 @@
  *  - DC Training (DoggCrapp) rest-pause 11-15 RP + extreme stretch
  *  - Fortitude Training (Scott Stevenson) Muscle Rounds, BFR (Loenneke 2012) 30-15-15-15
  *  - Cluster (Haff), Lengthened partials (Wolf 2023), Meadows Mountain Dog (pre-exhaust)
+ *
+ * Волна 5.5 (BB-AUTO-EXHAUSTIVE-PRO): философия схем — ТАЙМ-ЭФФЕКТИВНОСТЬ и
+ * управляемость утомления, не превосходство. Sødal 2023: drop-set ≈ традиционные
+ * подходы (SMD 0.04); Havers 2026 / Tsartsapakis 2026: rest-pause — небольшой плюс;
+ * Enes 2025: темп/схема минимально влияют при равном усилии до отказа. Схема
+ * выбирается по времени, комфорту суставов и профилю атлета, а не как «лучшая».
  */
 import type { BBPhase } from '../periodization';
 import type { BBTrainingFocus } from './bb-goal-types';
@@ -94,7 +100,7 @@ export const REP_SCHEMES: Record<RepSchemeId, RepScheme> = {
     restSec: 15,
     tempo: '2-1-1-0',
     techniques: ['myo_reps'],
-    description: 'Активация 12-20 + мини-сеты 4×4 с 15с паузой. Эффективность.',
+    description: 'Активация 12-20 + мини-сеты 4×4 с 15с паузой. Тайм-эффективность: меньше полных подходов, стимул сопоставим (Sødal 2023).',
     evidence: 'Borge Fagerli Myo-reps',
     pedHint: ['MGF', 'IGF1', 'GH'],
   },
@@ -133,7 +139,7 @@ export const REP_SCHEMES: Record<RepSchemeId, RepScheme> = {
     restSec: 75,
     tempo: '3-1-1-0',
     techniques: ['gvt'],
-    description: 'GVT: 10×10, 75с, 60% 1RM. Объёмный шок.',
+    description: 'GVT: 10×10, 75с, 60% 1RM. Высокообъёмный блок — плотность по времени; превосходства над классикой нет (Schoenfeld 2017: 6-30 повт эквивалентны при равном усилии).',
     evidence: 'Poliquin GVT',
   },
   gironda_8x8: {
@@ -317,6 +323,17 @@ export function applyBfrPattern(ex: any, workMaxValue: number): void {
 }
 
 /**
+ * Волна 5.3 (BB-AUTO-EXHAUSTIVE-PRO): единый widowmaker-детектор.
+ * Структурный тег `techniqueTag='widowmaker'` ставит финализатор; комментарий —
+ * legacy-фолбэк для планов из storage (тег появился в 5.3). Потребители
+ * (rep-схемы не переписывают widowmaker; финализатор не дублирует его) читают
+ * helper, а не парсят комментарий каждый сам.
+ */
+export function isWidowmakerExercise(ex: any): boolean {
+  return ex?.techniqueTag === 'widowmaker' || String(ex?.comment || '').includes('widowmaker');
+}
+
+/**
  * Применяет rep-схему к реальной загрузке упражнений плана.
  * Это закрывает «декоративность» схем: раньше schemeFor давал только строку rationale,
  * теперь repsRange/rir/rest/tempo/workSets перезаписываются выбранной схемой.
@@ -357,7 +374,8 @@ export function applySchemeToPlan(
         if (!ex || ex.warmupActivator) continue;
         // Widowmaker (DC) не трогаем: добивочный 20-повторный сет переживает
         // только если loading его не переписывает (схема дала бы фазовые повторы).
-        if (String((ex as any).comment || '').includes('widowmaker')) continue;
+        // Волна 5.3: структурный тег первичен, комментарий — legacy-фолбэк.
+        if (isWidowmakerExercise(ex)) continue;
         // Целевой фильтр по character самого УПРАЖНЕНИЯ (не сессии) + роли.
         // Памп-primary внутри тяж-сессии (например hams в Legs D1) НЕ должен
         // получать тяж-схему — он остаётся памп-режимом.
