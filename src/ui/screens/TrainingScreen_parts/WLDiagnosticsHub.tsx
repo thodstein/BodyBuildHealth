@@ -1859,6 +1859,19 @@ export const WLDiagnosticsHub: React.FC = () => {
               </div>
               {jerkAsym && <div style={{ fontSize: 10, color: jerkAsym.isCrit ? '#ef4444' : jerkAsym.isAsym ? '#f59e0b' : '#22c55e', marginTop: 6 }}>Ножницы {jerkAsym.diffPct}% {jerkAsym.isCrit ? 'CRITICAL ≥12%' : jerkAsym.isAsym ? 'WARN ≥7%' : '— норма'} — {jerkAsym.text}</div>}
               {jerkTrend && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Тренд разницы ({jerkTrend.n} зам.): {jerkTrend.deltaPp > 0 ? '+' : ''}{jerkTrend.deltaPp} п.п. {jerkTrend.deltaPp <= 0 ? '— выравнивается ✓' : '— растёт ⚠️'}</div>}
+              {(() => {
+                try {
+                  if (!jerkAsym?.isAsym) return null;
+                  const names = [...new Set(correctivesByError('split_asym').slice(0, 2).map(e => e.nameRu))].slice(0, 3);
+                  if (!names.length) return null;
+                  return (
+                    <div data-wl="corrective-split" style={{ fontSize: 10, color: '#fff', marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.16)' }}>
+                      🛠️ Ножницы {jerkAsym.diffPct}% (≥7%) — асимметрия: {names.join(' · ')}
+                      <button onClick={() => setTab('correction')} style={{ display: 'block', marginTop: 6, width: '100%', minHeight: 44, borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Открыть Коррекцию</button>
+                    </div>
+                  );
+                } catch { return null; }
+              })()}
               <button data-wl="jerk-snap" onClick={takeJerkSnapshot} style={{ marginTop: 6, width: '100%', minHeight: 44, padding: '6px 12px', borderRadius: 8, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📸 Снимок ножниц</button>
             </div>
             <button data-wl="ohs-profile" onClick={applyMobilityToProfile} style={{ marginTop: 8, width: '100%', minHeight: 48, padding: '8px 12px', borderRadius: 8, background: ohs.failed > 0 ? 'rgba(59,130,246,0.14)' : 'rgba(34,197,94,0.10)', border: `1px solid ${ohs.failed > 0 ? 'rgba(59,130,246,0.22)' : 'rgba(34,197,94,0.18)'}`, color: ohs.failed > 0 ? '#60a5fa' : '#22c55e', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Применить OHS в профиль {ohs.failed ? `(${ohs.failed}/6 → ${ohs.primaryDriver || 'ограничения'})` : '(OK)'}</button>

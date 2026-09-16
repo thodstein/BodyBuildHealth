@@ -46,8 +46,26 @@ describe('ta corrective tab UI', () => {
     const hint = container.querySelector('[data-wl="corrective-mobility"]');
     expect(hint).toBeTruthy();
     expect(hint?.textContent).toMatch(/щадящие дозы/);
-    fireEvent.click(screen.getByRole('button', { name: /Открыть Коррекцию/ }));
+    fireEvent.click(hint?.querySelector('button') as HTMLElement);
     expect(container.querySelector('[data-wl="corrective"]')).toBeTruthy();
+  });
+  it('асимметрия ножниц ≥7% даёт split-хинт с переходом', () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🧘 Мобильность' }));
+    fireEvent.change(screen.getByPlaceholderText('95 нож'), { target: { value: '90' } });
+    fireEvent.change(screen.getByPlaceholderText('100 нож'), { target: { value: '100' } });
+    const hint = container.querySelector('[data-wl="corrective-split"]');
+    expect(hint).toBeTruthy();
+    expect(hint?.textContent).toMatch(/Толчковый баланс|толчок в ножницы/i);
+    fireEvent.click(hint?.querySelector('button') as HTMLElement);
+    expect(container.querySelector('[data-wl="corrective"]')).toBeTruthy();
+  });
+  it('ножницы в норме — split-хинта нет', () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🧘 Мобильность' }));
+    fireEvent.change(screen.getByPlaceholderText('95 нож'), { target: { value: '99' } });
+    fireEvent.change(screen.getByPlaceholderText('100 нож'), { target: { value: '100' } });
+    expect(container.querySelector('[data-wl="corrective-split"]')).toBeNull();
   });
   it('клик ⭐ ставит preferred и показывает сессию + вставку', () => {
     const { container } = render(<WLDiagnosticsHub />);
