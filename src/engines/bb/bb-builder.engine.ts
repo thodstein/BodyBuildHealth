@@ -634,12 +634,18 @@ function weakExerciseBonus(exName: string, weakPoints: string[]): number {
  *  маппились в канонические мышцы (chest, back, shoulders) при проверках. */
 export const WEAK_TO_MUSCLE: Record<string, string> = {
   chest: 'chest', chest_upper: 'chest', chest_lower: 'chest',
+  // Волна 5.2 (BB-AUTO-EXHAUSTIVE-PRO): зоны WEAK_PATTERN_REQ (chest_mid/upper_back/rear_delts)
+  // раньше падали в фолбэк «каноническая = сама зона» → гарантия паттерна была молча мёртвой.
+  chest_mid: 'chest', upper_back: 'back', rear_delts: 'shoulders',
   back: 'back', back_width: 'back', back_thickness: 'back',
   shoulders: 'shoulders', delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders',
   quads: 'quads', hamstrings: 'hamstrings', glutes: 'glutes', calves: 'calves',
   biceps: 'biceps', triceps: 'triceps', forearms: 'forearms',
   abs: 'abs', traps: 'traps',
-  lower_back: 'back', neck: 'traps',
+  // Нижняя спина (зона WEAK_PATTERN_REQ, паттерн — гиперэкстензия): в ББ-классификации
+  // гиперэкстензия/back-extension = hamstrings (hinge-ветка), поэтому гарантия должна
+  // искаться в ham-сессиях, а не в 'back' (иначе кандидатов нет и паттерн молчит).
+  lower_back: 'hamstrings', neck: 'traps',
 };
 
 /** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */

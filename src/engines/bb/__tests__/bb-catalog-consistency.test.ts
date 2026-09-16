@@ -12,7 +12,9 @@
 import { describe, expect, it } from 'vitest';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { derivePattern, isCarryExercise, trueMuscleOf } from '../../movement-pattern';
-import { isBBJunk } from '../bb-builder.engine';
+import { isBBJunk, WEAK_TO_MUSCLE } from '../bb-builder.engine';
+import { WEAK_PATTERN_REQ } from '../bb-finalize.engine';
+import { ANGLE_CLASSES } from '../bb-exercise-selection.engine';
 
 const cat = EXERCISE_CATALOG as any[];
 const byId = (id: string) => cat.find((e) => e.id === id);
@@ -110,5 +112,30 @@ describe('5.1 каталог: дриллы-активации вне ББ-пла
     expect(isBBJunk(byId('fire_hydrant'))).toBe(true);
     expect(isBBJunk(byId('cable_kickback'))).toBe(false);
     expect(isBBJunk({ id: 'bridge_walkout', name: 'Вышагивания в мост' })).toBe(true);
+  });
+});
+
+describe('5.2 единый источник паттернов: WEAK_PATTERN_REQ × ANGLE_CLASSES', () => {
+  it('каждая зона слабых точек имеет каноническую мышцу и ≥1 каталог-упражнение под паттерн', () => {
+    for (const [zone, re] of Object.entries(WEAK_PATTERN_REQ)) {
+      expect(re instanceof RegExp, zone).toBe(true);
+      // Маппинг — единый (WEAK_TO_MUSCLE); фолбэк «зона сама себе мышца» недопустим:
+      // иначе ensureWeakPatternCoverage ищет упражнение с muscle='chest_mid' и молчит.
+      const canonical = WEAK_TO_MUSCLE[zone];
+      expect(canonical, `зона ${zone} без канонической мышцы в WEAK_TO_MUSCLE`).toBeTruthy();
+      // Прямой ключ в мапе обязателен: фолбэк «зона сама себе мышца» ищет
+      // muscle='chest_mid' и молчит (identity-маппинги traps→traps легальны).
+      expect(Object.prototype.hasOwnProperty.call(WEAK_TO_MUSCLE, zone), `зона ${zone} маппится фолбэком`).toBe(true);
+      const hit = cat.some((c) => trueMuscleOf(c) === canonical && re.test(c.name || ''));
+      expect(hit, `паттерн зоны ${zone} (${canonical}) не находит ни одного каталог-упражнения`).toBe(true);
+    }
+  });
+
+  it('ANGLE_CLASSES: уникальные имена классов внутри мышцы, у каждого класса есть match', () => {
+    for (const [muscle, classes] of Object.entries(ANGLE_CLASSES)) {
+      const names = (classes as any[]).map((c) => c.name);
+      expect(new Set(names).size, `дубли классов ${muscle}`).toBe(names.length);
+      for (const c of classes as any[]) expect(typeof c.match, `${muscle}/${c.name}`).toBe('function');
+    }
   });
 });

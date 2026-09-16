@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
 import { validateBBPlan } from '../bb-validator.engine';
 import { convertCycleToBBPlan, programToBBPlan } from '../cycle-to-plan';
+import { WEAK_PATTERN_REQ } from '../bb-finalize.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import type { FullProgram } from '../../complete-program-library.engine';
 
@@ -16,8 +17,9 @@ import type { FullProgram } from '../../complete-program-library.engine';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 const EQ = ['barbell', 'dumbbell', 'cable', 'machine', 'bodyweight'];
-// Локальная копия WEAK_PATTERN_REQ.chest_upper (константа не экспортирована).
-const INCLINE_RE = /жим.*(наклонн|incline)|(наклонн|incline).*жим/i;
+// Волна 5.2: единый источник — WEAK_PATTERN_REQ экспортирован из финализатора
+// (локальная копия больше не нужна).
+const INCLINE_RE = WEAK_PATTERN_REQ.chest_upper;
 
 function base(over: any = {}): any {
   return { patternId: 'ppl_6', level: 'intermediate', trainingYears: 3, goal: 'mass', weeks: 1, workMax: WM, equipment: EQ, volumeGoal: 'mav', ...over };

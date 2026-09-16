@@ -41,8 +41,10 @@ import { expandDonorMuscles, isSpecializationFocus, isSpecializationWeak, specRe
 import { ANGLE_CLASSES, lengthenedBonus } from './bb-exercise-selection.engine';
 
 /** Слабая подгруппа → обязательный функциональный паттерн (специализация:
- *  не просто больше сетов, а целевое упражнение под слабое место). */
-const WEAK_PATTERN_REQ: Record<string, RegExp> = {
+ *  не просто больше сетов, а целевое упражнение под слабое место).
+ *  Волна 5.2 (BB-AUTO-EXHAUSTIVE-PRO): единый источник — экспортируется,
+ *  потребители/тесты не держат локальных копий (паритет с ANGLE_CLASSES). */
+export const WEAK_PATTERN_REQ: Record<string, RegExp> = {
   chest_upper: /жим.*(наклонн|incline)|(наклонн|incline).*жим/i,
   chest_mid: /жим лёжа|жим.*лёж|bench/i,
   chest_lower: /жим.*(нижн|decline)|decline.*press|брус|dip/i,
