@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто 4.3 остаток-1: train-load блок Quality вынесен в 3 под-секции (Sep 16 2026, коммит pathspec `ac82726d`, без пуша)
+
+По команде «продолжай» (после D1-приёмника). Только свои файлы (`BbAutoConstructor.tsx` + NEW `bb-quality-load-sections.tsx`); чужие WIP (arm-хаб, docs-планы, strength-sport) не тронуты.
+- NEW `bb-quality-load-sections.tsx` (646 строк) — блок «🏋️ Тренировочная нагрузка плана» разрезан 1-в-1: `BbQualityLoadOverview` («Общая информация» + «Качество понедельно» + «Общие сведения» + «Фаза (факт)»; 7 props), `BbQualityLoadVolume` («Объём PRO» + «Прогрессия весов»; 5 props), `BbQualityLoadChecks` («Мусорный объём» + «Рекомендации» + графики Объём/RIR + ACWR + прогноз мезоцикла; 1 prop) + общий `BbQualityLoadCtx` (23 поля plan-basis — решение §4.3 «через контекст-объект», вместо 20+ props каждому) + структурный `BbQualityLoadView` для quality (сохранил контекстную типизацию `recommendations.map` — строка переноса не менялась).
+- `BbAutoConstructor.tsx` **5600→5101** (−499 нетто: −525/+26): 3 вызова под-секций + ctx; toggle-обёртка блока и низ шага (nav + `renderActionRow`) остались; осиротевшие импорты убраны (PlanCharts ×4, MesocycleProgressionCard, getPhaseConfig, MUSCLE_LABEL_RU, aggregateBBVolume, detectGarbageVolume — `DELOAD_PROTOCOLS` оставлен: жив на 2360).
+- **Node-сверка** (`.tmp/verify-load-extract.mjs`): блоки A/B/C из HEAD vs нового файла — «identical modulo indent» **192+218+109 строк**; хирургия родителя — по уникальным маркерам (`.tmp/surgery-load.mjs`), EOL LF сохранён, старые маркеры A-start/nav уникальны (страховки в скрипте).
+- Проверено: bb-UI паки + guard-ы **48/48** (12 файлов, вкл. bb-hub-movement-intake/bb-export-report/bb-hub-payload-consume/bb-quality-v2-card), rest-hooks-native/apk-top-pack **99/99** (1 пред-существующий unhandled ReportsScreen DB-таймаут), `tsc --noEmit` **0 по всему проекту**, `verify:apk-design` OK. НЕ ПУШИЛ.
+- **Остаток 4.3 (следующая сессия)**: `renderContestPrep` (~1378 строк, ~80-100 state) — та же техника (под-секции/ctx).
+
 ## ББ-авто §9 D1: приёмник движений ББ-диагностики — «A-инфо / B-сборка» (Sep 16 2026, коммит pathspec `73977ac8`, без пуша)
 
 По команде «Продолжи ББ-авто по §9 плана» (hand-off владельца хаба). Только свои файлы: `BbAutoConstructor.tsx`, `planner-bridge.ts` + NEW движок/2 теста; чужие `BBDiagnosticsHub.tsx`/`bb-movement-screen.engine.ts` не тронуты. Сборку НЕ менял (решение §9.2): `movementDriver` не дублирует профиль-канал подвижности, `singleLeg.weakSide` не выдумывает группу для `lrTopUp`.

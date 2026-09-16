@@ -610,9 +610,22 @@
   (~600 строк: тогл + «Общая информация»/«Качество плана понедельно»/«Общие сведения»/PHASE-факт/объёмные карточки —
   резать 2-3 под-секциями) и весь `renderContestPrep` (~1378: prep-форма, таймлайн фаз, peak-week, адаптация по весу,
   показ-чеклист, экспорты — резать по 8-15 props).
-- [ ] **4.3 — остаток (новая сессия)**: `renderQuality` train-load блок (~600) + `renderContestPrep` (~1378):
-  у них ~80-100 state-ссылок, резать **под-секциями** (каждая секция — компонент с 8-15 props)
-  или через контекст-объект, а не целиком. Инварианты для каждого этапа: `tsc` 0,
+- [~] **4.3 — остаток, часть 1: train-load блок `renderQuality` ВЫНЕСЕН** (коммит `ac82726d`):
+  NEW `bb-quality-load-sections.tsx` — 3 под-секции 1-в-1: `BbQualityLoadOverview` («Общая информация» +
+  «Качество понедельно» + «Общие сведения» + «Фаза (факт)»; 7 props), `BbQualityLoadVolume` («Объём PRO» +
+  «Прогрессия весов»; 5 props), `BbQualityLoadChecks` («Мусорный объём» + «Рекомендации» + графики Объём/RIR +
+  ACWR + прогноз мезоцикла; 1 prop) + общий `BbQualityLoadCtx` (23 поля plan-basis — решение §4.3
+  «через контекст-объект»); toggle-обёртка блока и низ шага остались в конструкторе.
+  `BbAutoConstructor.tsx` **5600→5101** (−499 нетто: −525/+26), осиротевшие импорты убраны
+  (PlanCharts ×4, MesocycleProgressionCard, getPhaseConfig, MUSCLE_LABEL_RU, aggregateBBVolume,
+  detectGarbageVolume; `DELOAD_PROTOCOLS` оставлен — жив на 2360). Перенос верифицирован Node-сверкой
+  «identical modulo indent»: **192+218+109 строк**.
+  Проверено: bb-UI паки + guard-ы **48/48** (12 файлов), rest-hooks-native/apk-top-pack **99/99**
+  (1 пред-существующий unhandled ReportsScreen DB-таймаут), `tsc --noEmit` **0 по проекту**,
+  `verify:apk-design` OK.
+- [ ] **4.3 — остаток, часть 2 (новая сессия)**: `renderContestPrep` (~1378 строк, ~80-100 state-ссылок) —
+  резать **под-секциями** (8-15 props) или через контекст-объект, как train-load, а не целиком.
+  Инварианты для этапа: `tsc` 0,
   bb-UI паки (bb-auto-smoke/annual/prep-cycle/dup/volume-toggle/reproductive/a11y/apk-controls) +
   rest-hooks-native/apk-top-pack, `verify:apk-design`; коммит строго pathspec своих файлов.
 - [ ] Волна 5 — каталог/данные
