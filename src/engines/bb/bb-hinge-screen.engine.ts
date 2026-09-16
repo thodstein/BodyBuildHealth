@@ -65,3 +65,30 @@ export function loadedSquatVerdict(s: LoadedSquatInput): { degraded: boolean; te
   }
   return { degraded: false, text: 'Нагруженный присед: стабилен под нагрузкой' };
 }
+
+export interface LoadedHingeInput {
+  rdl: LoadGrade; // RDL/наклон под контролем веса
+  floor: LoadGrade; // тяга с пола (или трап-гриф)
+}
+
+export const HINGE_LOAD_NOTE =
+  'Под >90% 3ПМ флексия позвоночника растёт даже у сильных (2025): нейтраль под весом — отдельный навык; трап-гриф снижает наклон торса (Stahl 2024)';
+
+/** Нагруженный шарнир (RDL/тяга): способность держать нейтраль под весом — навык, не «формальность». */
+export function loadedHingeVerdict(s: LoadedHingeInput): { degraded: boolean; text: string } {
+  const vals = [s.rdl, s.floor];
+  if (vals.every((v) => v == null)) return { degraded: false, text: 'Нагруженный наклон: не проверялся' };
+  if (s.rdl !== 'fail' && s.floor !== 'fail') {
+    return { degraded: false, text: 'Нагруженный наклон: нейтраль держится под весом' };
+  }
+  if (s.rdl !== 'fail' && s.floor === 'fail') {
+    return {
+      degraded: false,
+      text: 'Нагруженный наклон: RDL чисто, тяга с пола плывёт → замена трап-гриф / тяга с блоков / RDL выше колен до чистоты',
+    };
+  }
+  return {
+    degraded: true,
+    text: 'Нагруженный наклон: под весом поясница уходит → снизь вес до чистой нейтрали; замена трап-гриф / тяга с блоков / RDL выше колен',
+  };
+}

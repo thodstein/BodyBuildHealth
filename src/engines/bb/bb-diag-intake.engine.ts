@@ -47,6 +47,13 @@ export interface BbDiagIntakeInput {
   videoStandard?: unknown;
   driverSubs?: unknown;
   asymPriority?: unknown;
+  /** R1–R6 (PRO-2): жим/боль-мониторинг/задняя цепь/шарнир под весом/ER:IR/приоритет — всё опционально. */
+  bench?: unknown;
+  painMon?: unknown;
+  posterior?: unknown;
+  loadedHinge?: unknown;
+  erir?: unknown;
+  screenPriority?: unknown;
 }
 
 export interface BbDiagIntakeExtras {
@@ -122,6 +129,33 @@ export function resolveBbDiagIntakeExtras(d: BbDiagIntakeInput | null | undefine
   if (typeof src.videoStandard === 'string') {
     const t = src.videoStandard.trim().slice(0, 300);
     if (t) { extra.videoStandard = t; bits.push(`видео: ${t}`); }
+  }
+  // R1–R6: только заполненное; «не проверялся/не замерялся» — тихо (чистый экран не шумит).
+  take('bench', src.bench, (r) => (
+    typeof r.text === 'string' && typeof r.level === 'string' && r.level !== 'not_tested' && !/не проверялся/i.test(r.text)
+      ? `жим: ${r.text}`
+      : ''
+  ));
+  if (typeof src.painMon === 'string') {
+    const t = src.painMon.trim().slice(0, 300);
+    if (t && !/не заполнен/i.test(t)) { extra.painMonitor = t; bits.push(t); }
+  }
+  take('posterior', src.posterior, (r) => {
+    const nhe = typeof r.nhe === 'string' && !/не замерялась/i.test(r.nhe) ? r.nhe : '';
+    const add = typeof r.adductor === 'string' && !/не замерялись/i.test(r.adductor) ? r.adductor : '';
+    const parts = [nhe, add].filter(Boolean);
+    return parts.length ? `задняя цепь: ${parts.join(' · ')}` : '';
+  });
+  take('loadedHinge', src.loadedHinge, (r) => (
+    typeof r.text === 'string' && !/не проверялся/i.test(r.text) ? `шарнир-нагрузка: ${r.text}` : ''
+  ));
+  take('erir', src.erir, (r) => (
+    typeof r.text === 'string' && !/не замерялся/i.test(r.text) ? `ER/IR: ${r.text.replace(/^ER\/IR:?\s*/i, '')}` : ''
+  ));
+  if (Array.isArray(src.screenPriority)) {
+    const list = (src.screenPriority as unknown[]).map((x) => String(x || '').trim()).filter(Boolean).slice(0, 5);
+    const t = list.join(' · ').slice(0, 300);
+    if (t && !/Приоритетов нет/.test(t)) { extra.screenPriority = t; bits.push(`приоритет: ${t}`); }
   }
 
   const hasLrMarker = src.lrVerdicts !== undefined;

@@ -35,6 +35,13 @@ export interface BBDiagnosticsPro2Meta {
   ybt?: { text: string } | null;
   asymPriority?: string | null;
   driverSubs?: { text: string } | null;
+  /** R1–R8 PRO-2: жим/боль-мониторинг/задняя цепь/шарнир под весом/ER:IR/приоритет (опционально). */
+  bench?: { level: string; text: string } | null;
+  painMon?: string | null;
+  posterior?: { nhe?: string | null; adductor?: string | null } | null;
+  loadedHinge?: { text: string } | null;
+  erir?: { text: string } | null;
+  screenPriority?: string[] | null;
 }
 
 export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakHeads?: string[]; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta): string {
@@ -114,6 +121,17 @@ ${(() => {
     if ((m as any).ybt && typeof (m as any).ybt === 'object' && (m as any).ybt.text) parts.push(`<h2>YBT-баланс</h2><div style="font-size:12px">${esc((m as any).ybt.text)}</div>`);
     if (typeof (m as any).asymPriority === 'string' && (m as any).asymPriority) parts.push(`<h2>Асимметрии</h2><div style="font-size:12px">${esc((m as any).asymPriority)}</div>`);
     if ((m as any).driverSubs && typeof (m as any).driverSubs === 'object' && (m as any).driverSubs.text) parts.push(`<h2>Замены под драйвер</h2><div style="font-size:12px">${esc((m as any).driverSubs.text)}</div>`);
+    // R1–R8 PRO-2: жим/боль/задняя цепь/шарнир-нагрузка/ER:IR/приоритет (только заполненное)
+    if (m.bench && m.bench.text) parts.push(`<h2>Жим лёжа (скрининг)</h2><div style="font-size:12px">${esc(m.bench.text)}</div>`);
+    if (typeof m.painMon === 'string' && m.painMon) parts.push(`<h2>Боль-мониторинг</h2><div style="font-size:12px">${esc(m.painMon)}</div>`);
+    if (m.posterior) {
+      const nhe = typeof m.posterior.nhe === 'string' && m.posterior.nhe ? m.posterior.nhe : '';
+      const add = typeof m.posterior.adductor === 'string' && m.posterior.adductor ? m.posterior.adductor : '';
+      if (nhe || add) parts.push(`<h2>Задняя цепь (NHE/аддукторы)</h2><ul>${[nhe, add].filter(Boolean).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`);
+    }
+    if (m.loadedHinge && typeof m.loadedHinge.text === 'string' && m.loadedHinge.text) parts.push(`<h2>Шарнир под весом</h2><div style="font-size:12px">${esc(m.loadedHinge.text)}</div>`);
+    if (m.erir && typeof m.erir.text === 'string' && m.erir.text) parts.push(`<h2>Плечо ER:IR</h2><div style="font-size:12px">${esc(m.erir.text)}</div>`);
+    if (Array.isArray(m.screenPriority) && m.screenPriority.length) parts.push(`<h2>Скрининг — приоритет</h2><ol>${m.screenPriority.slice(0, 6).map((x) => `<li>${esc(String(x))}</li>`).join('')}</ol>`);
     if (m.readiness?.level) parts.push(`<h2>Готовность — ${esc(m.readiness.level)}</h2><div style="font-size:12px">${esc(m.readiness.advice)}</div><ul>${m.readiness.reasons.map((r) => `<li>${esc(r)}</li>`).join('') || '<li>—</li>'}</ul>`);
     if (m.redFlags?.active) parts.push(`<h2>Флаги — ${m.redFlags.blocked ? 'стоп' : 'осторожно'}</h2><div style="font-size:12px">${esc(m.redFlags.text)} (скрининг, не диагноз)</div>`);
     if (m.bar) parts.push(`<h2>Штанга (видео)</h2><div style="font-size:12px">Петля ${m.bar.xLoop} см · ${esc(m.bar.type)} — ${esc(m.bar.text)} (порог 4/6 см)</div>`);
@@ -212,6 +230,14 @@ export function buildBBDiagnosticsCsv(
   if ((meta as any)?.ybt?.text) lines.push(['ybt', (meta as any).ybt.text].map(escCsv).join(','));
   if (typeof (meta as any)?.asymPriority === 'string' && (meta as any).asymPriority) lines.push(['asym_priority', (meta as any).asymPriority].map(escCsv).join(','));
   if ((meta as any)?.driverSubs?.text) lines.push(['driver_subs', (meta as any).driverSubs.text].map(escCsv).join(','));
+  // R1–R8 PRO-2: жим/боль/задняя цепь/шарнир-нагрузка/ER:IR/приоритет
+  if (meta?.bench && meta.bench.text) lines.push(['bench', `${meta.bench.level}: ${meta.bench.text}`].map(escCsv).join(','));
+  if (typeof meta?.painMon === 'string' && meta.painMon) lines.push(['pain_monitor', meta.painMon].map(escCsv).join(','));
+  if (typeof meta?.posterior?.nhe === 'string' && meta.posterior.nhe) lines.push(['posterior_nhe', meta.posterior.nhe].map(escCsv).join(','));
+  if (typeof meta?.posterior?.adductor === 'string' && meta.posterior.adductor) lines.push(['posterior_addductor', meta.posterior.adductor].map(escCsv).join(','));
+  if (meta?.loadedHinge?.text) lines.push(['loaded_hinge', meta.loadedHinge.text].map(escCsv).join(','));
+  if (meta?.erir?.text) lines.push(['er_ir', meta.erir.text].map(escCsv).join(','));
+  if (Array.isArray(meta?.screenPriority) && meta.screenPriority.length) lines.push(['screen_priority', meta.screenPriority.join(' · ')].map(escCsv).join(','));
   if (meta?.returnTo) lines.push(['return_to', meta.returnTo.text].map(escCsv).join(','));
   if (meta?.lrDirection?.length) lines.push(['lr_direction', meta.lrDirection.map((d) => d.text).join(' · ')].map(escCsv).join(','));
   if (meta?.workingRange) lines.push(['working_range', meta.workingRange].map(escCsv).join(','));

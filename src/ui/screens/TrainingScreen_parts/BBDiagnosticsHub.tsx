@@ -42,11 +42,15 @@ import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
-import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, d1d5FailCodes, movementDelta, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
-import { shoulderWallVerdict, thoracicRotationVerdict } from '../../../engines/bb/bb-shoulder-screen.engine';
-import { hingeVerdict, loadedSquatVerdict } from '../../../engines/bb/bb-hinge-screen.engine';
+import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, d1d5FailCodes, v3FailCodes, movementDelta, screenPriorityList, teenLoadedGate, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
+import { shoulderWallVerdict, thoracicRotationVerdict, erIrVerdict, ERIR_DISCLAIMER } from '../../../engines/bb/bb-shoulder-screen.engine';
+import { hingeVerdict, loadedSquatVerdict, loadedHingeVerdict, HINGE_LOAD_NOTE } from '../../../engines/bb/bb-hinge-screen.engine';
 import { ybtLqVerdict, YBT_DISCLAIMER } from '../../../engines/bb/bb-ybt-lq.engine';
 import { substitutesForDriver, asymPriorityText, SCREENING_DISCLAIMER, VIDEO_GUIDE } from '../../../engines/bb/bb-movement-to-plan.engine';
+import { benchScreenVerdict, BENCH_DISCLAIMER } from '../../../engines/bb/bb-bench-screen.engine';
+import { painMonitorVerdict, painMonitorLine, provocationFor, PAIN_LOCATIONS, PAIN_MONITOR_DISCLAIMER, type PainLocation } from '../../../engines/bb/bb-pain-monitor.engine';
+import { nheVerdict, adductorVerdict, NHE_DISCLAIMER, ADDUCTOR_HONESTY, type CphLevel } from '../../../engines/bb/bb-posterior-readiness.engine';
+import { assessBbTendonGuard } from '../../../engines/bb/bb-tendon-guard.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
 type BBTab = 'weak' | 'screening' | 'exercise' | 'stimulus' | 'symmetry';
@@ -95,6 +99,19 @@ type BBState = {
   ybtL: string; ybtR: string; shinCm: string;
   /** D4 скапула/болевая дуга + видео-стандарт. */
   painArc: boolean; scapWinging: boolean; videoTwoAngles: boolean;
+  /** R4: таз/голеностоп — КТС прямым коленом (гастрокнемиус), сгибание бедра, «подворот» таза. */
+  ktwStraightL: string; ktwStraightR: string; hipFlexDeg: string; ppTilt: boolean;
+  /** R5: шарнир под весом (RDL / тяга с пола). */
+  rdlLoaded: '' | 'pass' | 'fail'; floorLoaded: '' | 'pass' | 'fail';
+  /** R6: ER/IR-ratio (кг, ручной замер). */
+  erKg: string; irKg: string;
+  /** R1: жим — хват/касание/лопатки/отведение/локти/боль. */
+  benchGripCm: string; benchTouch: '' | 'nipple' | 'upper_abs' | 'neck'; benchScapula: '' | 'retracted' | 'neutral' | 'released';
+  benchAbduction: string; benchElbowsBelow: boolean; benchPain: boolean;
+  /** R2: боль-мониторинг (0–10 днём/утром + флаги). */
+  pmLoc: '' | PainLocation; pmDuring: string; pmMorning: string; pmRising: boolean; pmNight: boolean; pmSharp: boolean;
+  /** R3: задняя цепь — NHE (повторы/угол) + аддукторы (сжатие/уровень Copenhagen). */
+  nheL: string; nheR: string; nheAngle: string; addL: string; addR: string; cphLevel: '' | CphLevel;
 };
 
 const DEFAULT_STATE: BBState = {
@@ -128,6 +145,12 @@ const DEFAULT_STATE: BBState = {
   sqBody: '', sqBar: '', sqWork: '',
   ybtL: '', ybtR: '', shinCm: '',
   painArc: false, scapWinging: false, videoTwoAngles: false,
+  ktwStraightL: '', ktwStraightR: '', hipFlexDeg: '', ppTilt: false,
+  rdlLoaded: '', floorLoaded: '',
+  erKg: '', irKg: '',
+  benchGripCm: '', benchTouch: '', benchScapula: '', benchAbduction: '', benchElbowsBelow: false, benchPain: false,
+  pmLoc: '', pmDuring: '', pmMorning: '', pmRising: false, pmNight: false, pmSharp: false,
+  nheL: '', nheR: '', nheAngle: '', addL: '', addR: '', cphLevel: '',
 };
 
 const TAB_DEFS: Array<{ id: BBTab; label: string; icon: string; desc: string }> = [
@@ -365,6 +388,15 @@ export const BBDiagnosticsHub: React.FC = () => {
       return Number.isFinite(n) && n > 0 ? n : null;
     } catch { return null; }
   }, []);
+  // R6: возраст из профиля — гейт нагруженных проб для 14–15 (прецедент teenNotes ББ-авто)
+  const profileAge = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const a = Number(p?.settings?.personal?.age ?? p?.personal?.age);
+      return Number.isFinite(a) && a > 0 ? a : null;
+    } catch { return null; }
+  }, []);
+  const teenGate = useMemo(() => teenLoadedGate(profileAge), [profileAge]);
   // state.sex — замороженный легаси-фолбэк (UI-селекта больше нет); профиль приоритетнее
   const effSex = ((profileSex || state.sex || '') as '' | 'male' | 'female');
 
@@ -515,6 +547,7 @@ export const BBDiagnosticsHub: React.FC = () => {
   // Скрининг v2: драйвер + односторонний + коды/снимок (чистые функции движка)
   const moveDriver = useMemo(() => {
     try {
+      const numStr = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
       return resolveMovementDriver({
         heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
         trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
@@ -524,9 +557,13 @@ export const BBDiagnosticsHub: React.FC = () => {
         ankleDeg: state.ankleDeg ? parseFloat(state.ankleDeg) : null,
         heelRetest: state.heelRetest === 'better' ? 'better' : state.heelRetest === 'same' ? 'same' : null,
         handsOnHipsBetter: state.handsOnHipsBetter || null,
+        // R4: гастрокнемиус (прямое колено) + ROM сгибания бедра + задний наклон таза
+        ktwStraightL: numStr(state.ktwStraightL), ktwStraightR: numStr(state.ktwStraightR),
+        hipFlexionDeg: numStr(state.hipFlexDeg),
+        ppTilt: state.ppTilt,
       });
     } catch { return { driver: 'none', label: '—', fix: '', confidence: 0 } as any; }
-  }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.ktwL, state.ktwR, state.kneeToWallCm, state.ankleDeg, state.heelRetest, state.handsOnHipsBetter]);
+  }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.ktwL, state.ktwR, state.kneeToWallCm, state.ankleDeg, state.heelRetest, state.handsOnHipsBetter, state.ktwStraightL, state.ktwStraightR, state.hipFlexDeg, state.ppTilt]);
   const singleLeg = useMemo(() => {
     try {
       const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n >= 0 ? n : null; };
@@ -584,14 +621,81 @@ export const BBDiagnosticsHub: React.FC = () => {
   const driverSubs = useMemo(() => {
     try { return substitutesForDriver((moveDriver as any)?.driver); } catch { return { avoid: [], prefer: [], note: '' } as any; }
   }, [moveDriver]);
+  // ── R1–R6 PRO-2: жим / боль-мониторинг / задняя цепь / шарнир-нагрузка / ER:IR (чистые мемы) ──
+  const benchV = useMemo(() => {
+    try {
+      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : null; };
+      return benchScreenVerdict({
+        gripCm: num(state.benchGripCm),
+        biacromialCm: num(state.circ.shoulderWidth),
+        touchPoint: (state.benchTouch || null) as any,
+        scapula: (state.benchScapula || null) as any,
+        abductionDeg: num(state.benchAbduction),
+        elbowsBelowBench: state.benchElbowsBelow,
+        pain: state.benchPain,
+      });
+    } catch { return benchScreenVerdict({}); }
+  }, [state.benchGripCm, state.circ.shoulderWidth, state.benchTouch, state.benchScapula, state.benchAbduction, state.benchElbowsBelow, state.benchPain]);
+  const painMon = useMemo(() => {
+    try {
+      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+      const input = {
+        location: (state.pmLoc || null) as any,
+        during010: num(state.pmDuring),
+        nextMorning010: num(state.pmMorning),
+        weeksRising: state.pmRising,
+        nightPain: state.pmNight,
+        sharp: state.pmSharp,
+      };
+      return { verdict: painMonitorVerdict(input), line: painMonitorLine(input) };
+    } catch { return { verdict: painMonitorVerdict({}), line: '' }; }
+  }, [state.pmLoc, state.pmDuring, state.pmMorning, state.pmRising, state.pmNight, state.pmSharp]);
+  const painJointTendon = useMemo(() => {
+    try {
+      const joint = state.pmLoc === 'elbow' ? 'elbow' : state.pmLoc === 'shoulder' ? 'shoulder' : null;
+      if (!joint || !diarySessions.length) return null;
+      const g = assessBbTendonGuard(diarySessions as any, {
+        level,
+        painRedJoint: painMon.verdict.level === 'red' ? joint : null,
+      });
+      return (g as any)[joint] as { text: string; level: string } | null;
+    } catch { return null; }
+  }, [state.pmLoc, diarySessions, level, painMon.verdict.level]);
+  const nheV = useMemo(() => {
+    try {
+      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n >= 0 ? n : null; };
+      const angle = num(state.nheAngle);
+      return nheVerdict({ repsL: num(state.nheL), repsR: num(state.nheR), breakAngleL: angle, breakAngleR: angle });
+    } catch { return nheVerdict({}); }
+  }, [state.nheL, state.nheR, state.nheAngle]);
+  const adductorV = useMemo(() => {
+    try {
+      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : null; };
+      return adductorVerdict({ squeezeL: num(state.addL), squeezeR: num(state.addR), cphLevel: (state.cphLevel || '') as any });
+    } catch { return adductorVerdict({}); }
+  }, [state.addL, state.addR, state.cphLevel]);
+  const loadedHingeV = useMemo(() => {
+    try {
+      if (teenGate.blocked) return { degraded: false, text: teenGate.note };
+      return loadedHingeVerdict({ rdl: (state.rdlLoaded || null) as any, floor: (state.floorLoaded || null) as any });
+    } catch { return { degraded: false, text: '' }; }
+  }, [state.rdlLoaded, state.floorLoaded, teenGate]);
+  const erIrV = useMemo(() => {
+    try {
+      if (teenGate.blocked) return erIrVerdict({});
+      const num = (v: string): number | null => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : null; };
+      return erIrVerdict({ erKg: num(state.erKg), irKg: num(state.irKg) });
+    } catch { return erIrVerdict({}); }
+  }, [state.erKg, state.irKg, teenGate]);
   const ohsCodes = useMemo(() => {
     try {
       return ohsFailCodes({
         heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
         trunkUpright: state.ohsTrunkUpright, armsOverMidfoot: state.ohsArmsOverMidfoot, lumbarNeutral: state.ohsLumbarNeutral,
+        ppTilt: state.ppTilt,
       });
     } catch { return []; }
-  }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral]);
+  }, [state.ohsHeelsFlat, state.ohsKneeValgus, state.ohsHipBelowParallel, state.ohsTrunkUpright, state.ohsArmsOverMidfoot, state.ohsLumbarNeutral, state.ppTilt]);
   // П1: D1–D5 коды снимка из вердиктов (только провалы; чисто — тихо).
   const d1d5Codes = useMemo(() => {
     try {
@@ -607,7 +711,38 @@ export const BBDiagnosticsHub: React.FC = () => {
       });
     } catch { return []; }
   }, [shoulderV, rotV, hingeV, loadedV, ybtV]);
-  const screenCodes = useMemo(() => [...ohsCodes, ...d1d5Codes], [ohsCodes, d1d5Codes]);
+  // R7: R1–R6 коды снимка (жим/боль/NHE/аддукторы/бедро/шарнир-нагрузка/ER:IR)
+  const v3Codes = useMemo(() => {
+    try {
+      const n = (v: string): number | null => { const x = parseFloat(v); return Number.isFinite(x) ? x : null; };
+      return v3FailCodes({
+        benchLevel: benchV.level,
+        nheAsymReps: nheV.asymReps,
+        addAsymPct: adductorV.asymPct,
+        painLevel: painMon.verdict.level,
+        hipFlexionDeg: n(state.hipFlexDeg),
+        ppTilt: state.ppTilt,
+        loadedHingeDegraded: teenGate.blocked ? false : loadedHingeV.degraded,
+        erIrRatio: teenGate.blocked ? null : erIrV.ratio,
+      });
+    } catch { return []; }
+  }, [benchV.level, nheV.asymReps, adductorV.asymPct, painMon.verdict.level, state.hipFlexDeg, state.ppTilt, teenGate.blocked, loadedHingeV.degraded, erIrV.ratio]);
+  const screenCodes = useMemo(() => Array.from(new Set([...ohsCodes, ...d1d5Codes, ...v3Codes])), [ohsCodes, d1d5Codes, v3Codes]);
+  const screenPriority = useMemo(() => {
+    try {
+      return screenPriorityList({
+        painLevel: painMon.verdict.level,
+        painText: painMon.line,
+        driver: moveDriver as any,
+        asymText,
+        tendon: painJointTendon && painJointTendon.level === 'stop' ? { level: 'stop', text: painJointTendon.text } : null,
+        bench: { level: benchV.level, text: benchV.text },
+        posterior: { nhe: nheV.tested ? nheV.text : null, adductor: adductorV.tested ? adductorV.text : null },
+        loadedHinge: { degraded: teenGate.blocked ? false : loadedHingeV.degraded, text: loadedHingeV.text },
+        erIr: erIrV.tested ? erIrV.text : null,
+      });
+    } catch { return []; }
+  }, [painMon, moveDriver, asymText, painJointTendon, benchV, nheV, adductorV, loadedHingeV, erIrV, teenGate.blocked]);
   const [screenHist, setScreenHist] = useState<MovementSnapshot[]>(() => {
     try {
       const raw = localStorage.getItem('he_bb_screen_history');
@@ -767,6 +902,13 @@ export const BBDiagnosticsHub: React.FC = () => {
         videoStandard: state.videoTwoAngles ? 'снято с 2 ракурсов' : null,
         driverSubs: (() => { try { return { prefer: (driverSubs as any).prefer, avoid: (driverSubs as any).avoid, note: (driverSubs as any).note }; } catch { return null; } })(),
         asymPriority: (() => { try { return asymText; } catch { return null; } })(),
+        // R1–R8 PRO-2: жим/боль/задняя цепь/шарнир-нагрузка/ER:IR/приоритет (инфо-слой, сборку не меняет §9.2)
+        bench: benchV.tested ? { level: benchV.level, text: benchV.text } : null,
+        painMon: painMon.line || null,
+        posterior: nheV.tested || adductorV.tested ? { nhe: nheV.tested ? nheV.text : null, adductor: adductorV.tested ? adductorV.text : null } : null,
+        loadedHinge: !teenGate.blocked && !/не проверялся/.test(loadedHingeV.text) ? { text: loadedHingeV.text } : null,
+        erir: !teenGate.blocked && erIrV.tested ? { text: erIrV.text } : null,
+        screenPriority: screenPriority.length ? screenPriority : null,
       },
       source: 'intellectual',
     });
@@ -887,6 +1029,13 @@ export const BBDiagnosticsHub: React.FC = () => {
         ybt: (() => { try { return { text: (ybtV as any).text }; } catch { return null; } })(),
         asymPriority: (() => { try { return asymText; } catch { return null; } })(),
         driverSubs: (() => { try { return { text: `${((driverSubs as any).prefer || []).join(' · ')} — ${(driverSubs as any).note}` }; } catch { return null; } })(),
+        // R1–R8 PRO-2: заполненное едет в файл (не заполнено — секций нет, байт-в-байт)
+        bench: benchV.tested ? { level: benchV.level, text: benchV.text } : null,
+        painMon: painMon.line || null,
+        posterior: nheV.tested || adductorV.tested ? { nhe: nheV.tested ? nheV.text : null, adductor: adductorV.tested ? adductorV.text : null } : null,
+        loadedHinge: !teenGate.blocked && !/не проверялся/.test(loadedHingeV.text) ? { text: loadedHingeV.text } : null,
+        erir: !teenGate.blocked && erIrV.tested ? { text: erIrV.text } : null,
+        screenPriority: screenPriority.length ? screenPriority : null,
       };
       try { Object.assign(pro2, buildMovementExport()); } catch { /* noop */ }
     } catch { /* noop */ }
@@ -949,6 +1098,13 @@ export const BBDiagnosticsHub: React.FC = () => {
         hinge: (() => { try { return { text: `${(hingeV as any).text} · ${(loadedV as any).text}` }; } catch { return null; } })(),
         ybt: (() => { try { return { text: (ybtV as any).text }; } catch { return null; } })(),
         asymPriority: (() => { try { return asymText; } catch { return null; } })(),
+        // R1–R8 PRO-2: заполненное едет в CSV (не заполнено — строк нет, байт-в-байт)
+        bench: benchV.tested ? { level: benchV.level, text: benchV.text } : null,
+        painMon: painMon.line || null,
+        posterior: nheV.tested || adductorV.tested ? { nhe: nheV.tested ? nheV.text : null, adductor: adductorV.tested ? adductorV.text : null } : null,
+        loadedHinge: !teenGate.blocked && !/не проверялся/.test(loadedHingeV.text) ? { text: loadedHingeV.text } : null,
+        erir: !teenGate.blocked && erIrV.tested ? { text: erIrV.text } : null,
+        screenPriority: screenPriority.length ? screenPriority : null,
       };
       try { Object.assign(pro2csv, buildMovementExport()); } catch { /* noop */ }
     } catch { /* noop */ }
@@ -1612,6 +1768,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                   {MUSCLE_LABEL_RU[v.group] || v.group}: Л {v.left} · П {v.right}{v.asymPct != null ? ` · перекос ${v.asymPct}%` : ''} — {v.text}
                 </div>
               ))}
+              <div style={{ color: '#fff', marginTop: 4, fontSize: 10, opacity: 0.9 }} data-bb="lr-disclaimer">Перекос/LSI — ориентир приоритета, не прогноз травмы (BJSM 2025: LSI не различает безопасный возврат)</div>
             </div>
             {report.weakZonesGranular.length > 0 && (
               <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, lineHeight: 1.5 }}>
@@ -2029,6 +2186,7 @@ export const BBDiagnosticsHub: React.FC = () => {
               <BbCheckCard active={state.ohsTrunkUpright} title="Корпус вертикально" desc="грудь вверх" onToggle={() => setState(s => ({ ...s, ohsTrunkUpright: !s.ohsTrunkUpright }))} />
               <BbCheckCard active={state.ohsArmsOverMidfoot} title="Руки над стопой" desc="руки над серединой стопы" onToggle={() => setState(s => ({ ...s, ohsArmsOverMidfoot: !s.ohsArmsOverMidfoot }))} />
               <BbCheckCard active={state.ohsLumbarNeutral} title="Нейтраль поясницы" desc="без округления" onToggle={() => setState(s => ({ ...s, ohsLumbarNeutral: !s.ohsLumbarNeutral }))} />
+              <BbCheckCard active={!state.ppTilt} title="Таз без «подворота»" desc="глубина до нейтрали таза (не ФАИ-паттерн)" onToggle={() => setState(s => ({ ...s, ppTilt: !s.ppTilt }))} />
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 10, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.08)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${ohs.level === 'ok' ? 'rgba(34,197,94,0.18)' : ohs.level === 'warn' ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`, marginBottom: 6 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Присед-тест {ohs.totalScore}/6 · {ohs.level === 'ok' ? 'хорошо' : ohs.level === 'warn' ? 'есть замечания' : 'нужна работа'} · несдано {ohs.failed}{ohs.primaryDriver ? ` · ${ohs.primaryDriver}` : ''}</div>
@@ -2071,6 +2229,12 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <BbNum label="Ротация грудного П, °" value={state.rotR} onChange={(v) => setState(s => ({ ...s, rotR: v }))} placeholder="50" step={1} testId="bb-rot-r" />
               </div>
               <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="rot-verdict">{rotV.text}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                <BbNum label="ER кг (ручной динам.)" value={state.erKg} onChange={(v) => setState(s => ({ ...s, erKg: v }))} placeholder="—" step={0.5} testId="bb-er-kg" />
+                <BbNum label="IR кг (ручной динам.)" value={state.irKg} onChange={(v) => setState(s => ({ ...s, irKg: v }))} placeholder="—" step={0.5} testId="bb-ir-kg" />
+              </div>
+              <div style={{ fontSize: 11, color: erIrV.warn ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="erir-verdict">{erIrV.text}</div>
+              {!teenGate.blocked && <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="erir-disclaimer">{ERIR_DISCLAIMER}</div>}
               <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }}>Норма ротации ≥50°/сторона, разрыв ≥10° — чинить слабую. Тест стоя у стены, руки вверх, 3 повтора.</div>
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="hinge-screen">
@@ -2083,6 +2247,12 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <BbSheetSelect label="Рабочий вес" value={state.sqWork} onChange={(v) => setState((s) => ({ ...s, sqWork: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Чисто' }, { id: 'fail', label: 'Плывёт' }]} testId="bb-sq-work" />
               </div>
               <div style={{ fontSize: 11, color: loadedV.degraded ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="loaded-verdict">{loadedV.text}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                <BbSheetSelect label="RDL под весом" value={state.rdlLoaded} onChange={(v) => setState((s) => ({ ...s, rdlLoaded: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Нейтраль держится' }, { id: 'fail', label: 'Поясница уходит' }]} testId="bb-rdl-loaded" />
+                <BbSheetSelect label="Тяга с пола" value={state.floorLoaded} onChange={(v) => setState((s) => ({ ...s, floorLoaded: v as any }))} options={[{ id: '', label: '—' }, { id: 'pass', label: 'Нейтраль держится' }, { id: 'fail', label: 'Поясница уходит' }]} testId="bb-floor-loaded" />
+              </div>
+              <div style={{ fontSize: 11, color: loadedHingeV.degraded ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="loaded-hinge-verdict">{loadedHingeV.text}</div>
+              {!teenGate.blocked && <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="hinge-load-note">{HINGE_LOAD_NOTE}</div>}
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="ybt-screen">
               <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>YBT-баланс (anterior, босиком)</div>
@@ -2094,6 +2264,58 @@ export const BBDiagnosticsHub: React.FC = () => {
               <div style={{ fontSize: 11, color: ybtV.warn ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="ybt-verdict">{ybtV.text}</div>
               <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="ybt-disclaimer">{YBT_DISCLAIMER} · пороги: асим &gt;4 см, композит &lt;94%.</div>
               <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="asym-priority">{asymText}</div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="bench-screen">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Жим лёжа — хват и техника (главный плечевой риск)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                <BbNum label="Хват, см (между указательными)" value={state.benchGripCm} onChange={(v) => setState(s => ({ ...s, benchGripCm: v }))} placeholder="—" step={1} testId="bb-bench-grip" />
+                <BbNum label="Отведение плеча, °" value={state.benchAbduction} onChange={(v) => setState(s => ({ ...s, benchAbduction: v }))} placeholder="—" step={1} testId="bb-bench-abd" />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                <BbSheetSelect label="Точка касания" value={state.benchTouch} onChange={(v) => setState((s) => ({ ...s, benchTouch: v as any }))} options={[{ id: '', label: 'Не проверял' }, { id: 'nipple', label: 'Линия сосков' }, { id: 'upper_abs', label: 'Живот (арка)' }, { id: 'neck', label: 'У шеи' }]} testId="bb-bench-touch" />
+                <BbSheetSelect label="Лопатки" value={state.benchScapula} onChange={(v) => setState((s) => ({ ...s, benchScapula: v as any }))} options={[{ id: '', label: '—' }, { id: 'retracted', label: 'Сведены' }, { id: 'neutral', label: 'Нейтрально' }, { id: 'released', label: 'Распущены' }]} testId="bb-bench-scapula" />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                <BbCheckCard active={!state.benchElbowsBelow} title="Локти не ниже скамьи" desc="плечо в безопасном коридоре" onToggle={() => setState(s => ({ ...s, benchElbowsBelow: !s.benchElbowsBelow }))} />
+                <BbCheckCard active={!state.benchPain} title="Без боли в жиме" desc="боль → техника + правило боли" accent="#ef4444" onToggle={() => setState(s => ({ ...s, benchPain: !s.benchPain }))} />
+              </div>
+              <div style={{ fontSize: 11, color: benchV.level === 'fix' ? '#f59e0b' : '#fff' }} data-bb="bench-verdict">{benchV.text}</div>
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="bench-disclaimer">{BENCH_DISCLAIMER}{benchV.gripBaw != null ? ` · хват ${benchV.gripBaw} BAW` : ' · BAW — из ширины плеч в «Пропорциях»'}</div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="pain-monitor">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Боль-мониторинг (правило ≤5 днём / &lt;5 утром)</div>
+              <BbSheetSelect label="Локация боли" value={state.pmLoc} onChange={(v) => setState((s) => ({ ...s, pmLoc: v as any }))} options={[{ id: '', label: 'Не заполнено' }, ...PAIN_LOCATIONS.map((p) => ({ id: p.id, label: p.label }))]} testId="bb-pm-loc" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6, marginBottom: 6 }}>
+                <BbNum label="Боль во время, 0–10" value={state.pmDuring} onChange={(v) => setState(s => ({ ...s, pmDuring: v }))} placeholder="—" step={1} testId="bb-pm-during" />
+                <BbNum label="Боль на утро, 0–10" value={state.pmMorning} onChange={(v) => setState(s => ({ ...s, pmMorning: v }))} placeholder="—" step={1} testId="bb-pm-morning" />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+                <BbCheckCard active={!state.pmRising} title="Не растёт по неделям" desc="тренд стабилен/падает" onToggle={() => setState(s => ({ ...s, pmRising: !s.pmRising }))} accent="#f59e0b" />
+                <BbCheckCard active={!state.pmNight} title="Без ночной боли" desc="ночью не беспокоит" accent="#ef4444" onToggle={() => setState(s => ({ ...s, pmNight: !s.pmNight }))} />
+                <BbCheckCard active={!state.pmSharp} title="Без резкой боли" desc="боль тупая, не «прострел»" accent="#ef4444" onToggle={() => setState(s => ({ ...s, pmSharp: !s.pmSharp }))} />
+              </div>
+              <div style={{ fontSize: 11, color: painMon.verdict.level === 'red' ? '#ef4444' : painMon.verdict.level === 'yellow' ? '#f59e0b' : '#fff' }} data-bb="pm-verdict">{painMon.verdict.text}</div>
+              {painMon.verdict.tested && <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="pm-advice">{painMon.verdict.advice}</div>}
+              {state.pmLoc && <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="pm-provocation">Провокация: {provocationFor(state.pmLoc)}</div>}
+              {painJointTendon && <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }} data-bb="pm-tendon">{painJointTendon.text}</div>}
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="pm-disclaimer">{PAIN_MONITOR_DISCLAIMER}</div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="posterior-readiness">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Задняя цепь — NHE (эксцентрик) + аддукторы</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+                <BbNum label="NHE повторов Л" value={state.nheL} onChange={(v) => setState(s => ({ ...s, nheL: v }))} placeholder="—" step={1} testId="bb-nhe-l" />
+                <BbNum label="NHE повторов П" value={state.nheR} onChange={(v) => setState(s => ({ ...s, nheR: v }))} placeholder="—" step={1} testId="bb-nhe-r" />
+                <BbNum label="Контроль до угла, °" value={state.nheAngle} onChange={(v) => setState(s => ({ ...s, nheAngle: v }))} placeholder="—" step={5} testId="bb-nhe-angle" />
+              </div>
+              <div style={{ fontSize: 11, color: nheV.level === 'ok' || nheV.level === 'not_tested' ? '#fff' : '#f59e0b' }} data-bb="nhe-verdict">{nheV.text}</div>
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="nhe-disclaimer">{NHE_DISCLAIMER}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6, marginBottom: 6 }}>
+                <BbNum label="Сжатие аддукторов Л, кг" value={state.addL} onChange={(v) => setState(s => ({ ...s, addL: v }))} placeholder="—" step={1} testId="bb-add-l" />
+                <BbNum label="Сжатие аддукторов П, кг" value={state.addR} onChange={(v) => setState(s => ({ ...s, addR: v }))} placeholder="—" step={1} testId="bb-add-r" />
+              </div>
+              <BbSheetSelect label="Copenhagen, уровень" value={state.cphLevel} onChange={(v) => setState((s) => ({ ...s, cphLevel: v as any }))} options={[{ id: '', label: '—' }, { id: 'L0', label: 'L0 — изометрия' }, { id: 'L1', label: 'L1 — короткий рычаг' }, { id: 'L2', label: 'L2 — полный' }, { id: 'L3', label: 'L3 — динамика' }]} testId="bb-cph-level" />
+              <div style={{ fontSize: 11, color: adductorV.level === 'weak' ? '#f59e0b' : '#fff', marginTop: 4 }} data-bb="adductor-verdict">{adductorV.text}</div>
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="adductor-honesty">{ADDUCTOR_HONESTY}</div>
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="scap-video">
               <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Лопатка/боль + видео + замены</div>
@@ -2116,12 +2338,19 @@ export const BBDiagnosticsHub: React.FC = () => {
               </div>
               <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }} data-bb="screening-disclaimer">{SCREENING_DISCLAIMER}</div>
             </div>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.16)', marginBottom: 6 }} data-bb="screen-priority">
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#00e68a', marginBottom: 4 }}>🧭 Что чинить первым (горизонт 4–6 нед)</div>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: '#fff', lineHeight: 1.5 }}>
+                {screenPriority.map((p, i) => <li key={i}>{p}</li>)}
+              </ol>
+              {teenGate.blocked && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }} data-bb="teen-gate">{teenGate.note}</div>}
+            </div>
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 6 }} data-bb="screen-history">
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                 <b style={{ fontSize: 11, color: '#fff' }}>📸 Снимки скрининга ({screenHist.length})</b>
                 <button onClick={() => {
-                  // П1: снимок v:2 — OHS + D1–D5 коды (legacy без v мигрируют в дельте, не регрессом)
-                  const entry = { date: new Date().toISOString().slice(0, 10), fails: screenCodes, v: 2 };
+                  // П1/R7: снимок v:3 — OHS + D1–D5 + R1–R6 коды (legacy без v / v:2 мигрируют в дельте, не регрессом)
+                  const entry = { date: new Date().toISOString().slice(0, 10), fails: screenCodes, v: 3 };
                   setScreenHist((prev) => {
                     const next = [...prev, entry].slice(-10);
                     try { localStorage.setItem('he_bb_screen_history', JSON.stringify(next)); } catch { /* noop */ }
@@ -2148,6 +2377,11 @@ export const BBDiagnosticsHub: React.FC = () => {
               <BbNum label="КТС левая, см" value={state.ktwL} onChange={(v) => setState(s => ({ ...s, ktwL: v }))} placeholder="12" step={0.5} testId="bb-ktw-l" />
               <BbNum label="КТС правая, см" value={state.ktwR} onChange={(v) => setState(s => ({ ...s, ktwR: v }))} placeholder="12" step={0.5} testId="bb-ktw-r" />
               <BbNum label="Голеностоп, °" value={state.ankleDeg} onChange={(v) => setState(s => ({ ...s, ankleDeg: v }))} placeholder="35" step={1} testId="bb-ankle-deg" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="ankle-straight">
+              <BbNum label="КТС прям. колено Л, см" value={state.ktwStraightL} onChange={(v) => setState(s => ({ ...s, ktwStraightL: v }))} placeholder="12" step={0.5} testId="bb-ktw-straight-l" />
+              <BbNum label="КТС прям. колено П, см" value={state.ktwStraightR} onChange={(v) => setState(s => ({ ...s, ktwStraightR: v }))} placeholder="12" step={0.5} testId="bb-ktw-straight-r" />
+              <BbNum label="Сгибание бедра, °" value={state.hipFlexDeg} onChange={(v) => setState(s => ({ ...s, hipFlexDeg: v }))} placeholder="120" step={1} testId="bb-hip-flex" />
             </div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center', flexWrap: 'wrap' }} data-bb="heel-row">
               <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>Подпятка 2,5 см</span>

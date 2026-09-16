@@ -93,3 +93,42 @@ export function thoracicRotationVerdict(s: ThoracicRotationInput): { text: strin
   }
   return { text: 'Ротация грудного: норма (≥50° обе стороны)', gap, low: false };
 }
+
+// ── R6: ER/IR-ratio (сила наружной / внутренней ротации) ──
+export const ERIR_RATIO_MIN = 0.75;
+
+export const ERIR_DISCLAIMER =
+  'ER/IR <0.75 — самый частый дисбаланс у плечевых атлетов (Intelangelo 2025, n=296); ручной динамометр надёжен (ICC>0.7). Экстраполяция с overhead-атлетов: для жимовиков — эвристика, не диагноз';
+
+export interface ErIrInput {
+  erKg?: number | null;
+  irKg?: number | null;
+}
+
+export function erIrVerdict(s: ErIrInput): { tested: boolean; ratio: number | null; warn: boolean; text: string } {
+  const fin = (v: unknown): number | null => {
+    const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const er = fin(s.erKg);
+  const ir = fin(s.irKg);
+  if (er == null || ir == null) return { tested: false, ratio: null, warn: false, text: 'ER/IR: не замерялся' };
+  const ratio = Math.round((er / ir) * 100) / 100;
+  if (ratio < ERIR_RATIO_MIN) {
+    return {
+      tested: true,
+      ratio,
+      warn: true,
+      text: `ER/IR ${ratio} (<0.75): добавь наружную ротацию 2–3×/нед (лёжа на боку / кабель) — жимы не убирай`,
+    };
+  }
+  if (ratio > 1.15) {
+    return {
+      tested: true,
+      ratio,
+      warn: true,
+      text: `ER/IR ${ratio} (>1.15) — нетипично: проверь технику замера/стороны (манжета не должна быть сильнее внутренних)`,
+    };
+  }
+  return { tested: true, ratio, warn: false, text: `ER/IR ${ratio} — норма (0.75–1.15)` };
+}

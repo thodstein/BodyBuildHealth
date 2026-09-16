@@ -62,14 +62,14 @@ describe('bb-hub D3 YBT + D4/D5', () => {
     expect(delta).toMatch(/новый трекинг/);
     expect(delta).toMatch(/sh-thoracic/);
   });
-  it('П1 новый снимок пишется с v:2 и D1–D5 кодами', () => {
+  it('П1/R7 новый снимок пишется с v:3 и D1–D5 кодами', () => {
     localStorage.setItem('he_bb_screen_history', JSON.stringify([]));
     goScreening();
     fireEvent.click(screen.getByRole('switch', { name: /Рёбра вниз/ }));
     fireEvent.click(screen.getByText('Снимок сегодня'));
     const hist = JSON.parse(localStorage.getItem('he_bb_screen_history') || '[]');
     expect(hist.length).toBe(1);
-    expect(hist[0].v).toBe(2);
+    expect(hist[0].v).toBe(3);
     expect(hist[0].fails).toContain('sh-thoracic');
   });
   it('лопатка/видео/замены/дисклеймер', () => {

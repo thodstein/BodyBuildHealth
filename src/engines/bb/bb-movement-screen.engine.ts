@@ -25,6 +25,13 @@ export interface OhsScreenInput {
   heelRetest?: 'better' | 'same' | null;
   /** руки на бёдрах чистят поясницу (тест на широчайшие): true = стало лучше */
   handsOnHipsBetter?: boolean | null;
+  /** КТС с ПРЯМЫМ коленом (см) — гастрокнемиус (Tourillon 2025: WBLT + подтверждающие пробы). */
+  ktwStraightL?: number | null;
+  ktwStraightR?: number | null;
+  /** ROM сгибания бедра (градусы; <110 — ограничение глубины, Kim 2015: предиктор приседа). */
+  hipFlexionDeg?: number | null;
+  /** Задний наклон таза в глубоком приседе («подворот») — глубина до нейтрали (PMC10987311 2024). */
+  ppTilt?: boolean;
 }
 
 export type MovementDriver = 'ankle' | 'hip' | 'thoracic' | 'shoulder' | 'core' | 'none';
@@ -43,19 +50,40 @@ export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResu
   const ktwR = fin(input.kneeToWallR) ?? fin(input.kneeToWallCm);
   const ktw = ktwL != null && ktwR != null ? Math.min(ktwL, ktwR) : (ktwL ?? ktwR);
   const ktwGap = ktwL != null && ktwR != null ? Math.abs(ktwL - ktwR) : null;
+  // Гастрокнемиус — КТС с ПРЯМЫМ коленом (отдельный канал, Tourillon 2025: WBLT + подтверждающие пробы)
+  const stL = fin(input.ktwStraightL);
+  const stR = fin(input.ktwStraightR);
+  const stWorst = stL != null && stR != null ? Math.min(stL, stR) : (stL ?? stR);
+  const stGap = stL != null && stR != null ? Math.abs(stL - stR) : null;
+  const gastrocBad = stWorst != null && stWorst < 9;
   const deg = input.ankleDeg;
   const goniBad = deg != null && Number.isFinite(deg) && (deg as number) < 35;
-  const ankleBad = !input.heelsFlat || (ktw != null && ktw < 9) || goniBad;
+  const ankleBad = !input.heelsFlat || (ktw != null && ktw < 9) || gastrocBad || goniBad;
+  const asymPart = (kind: string, a: number, b: number): string =>
+    ` + асимметрия ${kind} ${a} vs ${b} см (≥2 см — клинически значимо): мобилизируй отстающую первой, цель — разница <1.5 см`;
   const ankleAsymNote =
     ktwGap != null && ktwGap >= 2 && ktwL != null && ktwR != null
-      ? ` + асимметрия КТС ${ktwL} vs ${ktwR} см (≥2 см — клинически значимо): мобилизируй отстающую первой, цель — разница <1.5 см`
-      : '';
-  // 1. Голеностоп: пятки рвутся ИЛИ худшая КТС <9 ИЛИ гонометр <35° ИЛИ подпятка чинит паттерн
+      ? asymPart('КТС', ktwL, ktwR)
+      : stGap != null && stGap >= 2 && stL != null && stR != null
+        ? asymPart('КТС прям. колена', stL, stR)
+        : '';
+  // 1. Голеностоп: пятки рвутся ИЛИ худшая КТС <9 ИЛИ гастрокнемиус <9 ИЛИ гонометр <35° ИЛИ подпятка чинит паттерн
   if (input.heelRetest === 'better' || (ankleBad && (!input.hipBelowParallel || !input.trunkUpright || input.kneeValgus))) {
+    let label = 'Голеностоп (дорсифлексия)';
+    let fix = 'Мобилизация голеностопа ежедневно (колено к стене, MWM с лентой) + подъём пятки 2.5 см в приседе до нормы ≥12 см, перепроверка через 4–6 нед' + ankleAsymNote;
+    if (gastrocBad && !(ktw != null && ktw < 9) && input.heelsFlat && !goniBad) {
+      label = 'Голеностоп (гастрокнемиус)';
+      fix = 'Гастрокнемиус (КТС прямым коленом <9): растяжка икры у стены 3×30–45 с + пятка-подпорка 2.5 см в приседе до нормы ≥12 см, перепроверка 4–6 нед' + ankleAsymNote;
+    } else if (ktw != null && ktw < 9 && !gastrocBad && input.heelsFlat && !goniBad) {
+      label = 'Голеностоп (камбаловидная/талус)';
+      fix = 'Камбаловидная/талус (КТС согнутым коленом <9): мобилизация талуса + растяжка камбаловидной (колено согнуто) 3×30–45 с + пятка-подпорка, перепроверка 4–6 нед' + ankleAsymNote;
+    } else if (gastrocBad && ktw != null && ktw < 9) {
+      label = 'Голеностоп (гастрокнемиус + камбаловидная)';
+    }
     return {
       driver: 'ankle',
-      label: 'Голеностоп (дорсифлексия)',
-      fix: 'Мобилизация голеностопа ежедневно (колено к стене, MWM с лентой) + подъём пятки 2.5 см в приседе до нормы ≥12 см, перепроверка через 4–6 нед' + ankleAsymNote,
+      label,
+      fix,
       confidence: input.heelRetest === 'better' ? 0.9 : 0.7,
     };
   }
@@ -69,17 +97,37 @@ export function resolveMovementDriver(input: OhsScreenInput): MovementDriverResu
       confidence: 0.55,
     };
   }
-  // 2. ТБС: вальгус без голеностопа / нет глубины при плоских пятках.
+  // 2. ТБС: вальгус без голеностопа / нет глубины при плоских пятках / ROM сгибания бедра <110°.
   // Комплексно, не только ягодица: изолированная закачка средней ягодичной часто НЕ двигает
   // кинематику (Palmer 2015, Wilczyński 2021); работает связка проксимально+дистально 8 нед
   // (CCEP: отведения + наружная ротация бедра + голеностоп/стопа — BMC 2022; Razi 2023: изолированная
   // сила отводящих+ротаторов чинит вальгус на приземлении). Cue «раздвинь пол стопами».
-  if (input.kneeValgus || !input.hipBelowParallel) {
+  const hipFlex = fin(input.hipFlexionDeg);
+  const hipFlexLow = hipFlex != null && hipFlex < 110;
+  const ppNote = input.ppTilt ? ' + задний наклон таза («подворот») — глубина строго до нейтрали, без «добирания» поясницей (ФАИ-паттерн)' : '';
+  if (input.kneeValgus || !input.hipBelowParallel || hipFlexLow) {
+    if (hipFlexLow && !input.kneeValgus) {
+      return {
+        driver: 'hip',
+        label: 'Тазобедренный (сгибание бедра)',
+        fix: `Сгибание бедра ${hipFlex}° (<110) ограничивает глубину: kneeling hip-flexor stretch 2–3×30 с + выпады с темпом + мёртвый жук/гоблет с паузой, cue «глубина до нейтрали таза»; перепроверка SLS` + ppNote + ankleAsymNote,
+        confidence: 0.65,
+      };
+    }
     return {
       driver: 'hip',
       label: 'Тазобедренный (отведение/глубина)',
-      fix: 'Комплекс 3×/нед 8 нед: средняя ягодичная + наружные ротаторы бедра (отведения, кламшеллы, сплит-присед с темпом) + голеностоп/стопа дистально (икры, свод) + cue «раздвинь пол стопами»; перепроверка SLS',
+      fix: 'Комплекс 3×/нед 8 нед: средняя ягодичная + наружные ротаторы бедра (отведения, кламшеллы, сплит-присед с темпом) + голеностоп/стопа дистально (икры, свод) + cue «раздвинь пол стопами»; перепроверка SLS' + ppNote,
       confidence: 0.7,
+    };
+  }
+  // 2b. Только задний наклон таза при чистом паттерне — контроль таза в глубине (слабый драйвер, Kim 2015/PMC10987311)
+  if (input.ppTilt) {
+    return {
+      driver: 'hip',
+      label: 'ТБС (контроль таза в глубине)',
+      fix: 'Паттерн чистый, но таз «подворачивается» внизу — глубина до нейтрали таза + мёртвый жук/гоблет с паузой 3 с; при боли в тазу — к врачу (ФАИ-паттерн, не диагноз)' + ankleAsymNote,
+      confidence: 0.5,
     };
   }
   // 3. Грудной отдел / широчайшие: руки падают; руки на бёдрах чистят поясницу → широчайшие
@@ -147,8 +195,9 @@ export function singleLegVerdict(s: SingleLegScreen): { weakSide: 'left' | 'righ
 /** Снимок скрининга для дельты «было/стало» (Brookbush/NASM: re-screen 4–6 нед). */
 export interface MovementSnapshot {
   date: string; // YYYY-MM-DD
-  fails: string[]; // коды проваленных сегментов: heels/valgus/depth/trunk/arms/lumbar + D1–D5 (sh-/rot-/hinge-/sq-/ybt-)
-  /** v:2 — снимок с D1–D5 трекингом; без поля — legacy (только OHS), такие молча мигрируют в дельте. */
+  fails: string[]; // коды проваленных сегментов: heels/valgus/depth/trunk/arms/lumbar/ppt + D1–D5 (sh-/rot-/hinge-/sq-/ybt-) + R1–R6 (bench-/nhe-/add-/pm-/hip-/hng-/erir-)
+  /** v:2 — D1–D5-трекинг; v:3 — плюс R1–R6 (жим/боль/NHE/аддукторы/бедро/шарнир-нагрузка/ER:IR);
+   *  без поля — legacy (только OHS) — новые коды в дельте показаны «новым трекингом», не регрессом. */
   v?: number;
 }
 
@@ -184,6 +233,45 @@ export function d1d5FailCodes(s: D1D5CodesInput | null | undefined): string[] {
 /** Префиксы D1–D5: legacy-снимки (без v:2) их не трекали — это не регресс, а новый трекинг. */
 const D1D5_PREFIX = /^(sh-|rot-|hinge-|sq-|ybt-)/;
 
+/** R1–R8 коды снимка (только провалы/правки; пусто — тихо). */
+export interface ScreenV3CodesInput {
+  /** Уровень вердикта жима: 'fix' | 'watch' | 'ok' | 'not_tested'. */
+  benchLevel?: string | null;
+  /** Асимметрия NHE в повторах (≥2 — значимо). */
+  nheAsymReps?: number | null;
+  /** Асимметрия аддукторов, % (≥10 — код). */
+  addAsymPct?: number | null;
+  /** Уровень боль-мониторинга: 'red' | 'yellow' | 'green' | 'not_tested'. */
+  painLevel?: string | null;
+  /** ROM сгибания бедра, ° (<110 — код). */
+  hipFlexionDeg?: number | null;
+  /** Задний наклон таза в глубине. */
+  ppTilt?: boolean;
+  /** Деградация шарнира под весом. */
+  loadedHingeDegraded?: boolean;
+  /** ER/IR-ratio (<0.75 — код). */
+  erIrRatio?: number | null;
+}
+
+export function v3FailCodes(s: ScreenV3CodesInput | null | undefined): string[] {
+  if (!s) return [];
+  const out: string[] = [];
+  if (s.benchLevel === 'fix') out.push('bench-fix');
+  else if (s.benchLevel === 'watch') out.push('bench-watch');
+  if (s.nheAsymReps != null && Number.isFinite(s.nheAsymReps) && (s.nheAsymReps as number) >= 2) out.push('nhe-asym');
+  if (s.addAsymPct != null && Number.isFinite(s.addAsymPct) && (s.addAsymPct as number) >= 10) out.push('add-asym');
+  if (s.painLevel === 'red') out.push('pm-red');
+  else if (s.painLevel === 'yellow') out.push('pm-yellow');
+  if (s.hipFlexionDeg != null && Number.isFinite(s.hipFlexionDeg) && (s.hipFlexionDeg as number) < 110) out.push('hip-flex');
+  if (s.ppTilt) out.push('ppt');
+  if (s.loadedHingeDegraded) out.push('hng-degraded');
+  if (s.erIrRatio != null && Number.isFinite(s.erIrRatio) && (s.erIrRatio as number) < 0.75) out.push('erir-low');
+  return out;
+}
+
+/** Префиксы R1–R8: снимки v<3 их не трекали — «новый трекинг», не регресс. */
+const V3_PREFIX = /^(bench-|nhe-|add-|pm-|hip-|ppt$|hng-|erir-)/;
+
 export function ohsFailCodes(input: OhsScreenInput): string[] {
   const out: string[] = [];
   if (!input.heelsFlat) out.push('heels');
@@ -198,6 +286,8 @@ export function ohsFailCodes(input: OhsScreenInput): string[] {
     const r = fin(input.kneeToWallR) ?? fin(input.kneeToWallCm);
     if (l != null && r != null && Math.abs(l - r) >= 2) out.push('ankle_asym');
   } catch { /* noop */ }
+  // Задний наклон таза в глубине (PMC10987311 2024): глубина до нейтрали, ФАИ-паттерн — не диагноз.
+  if (input.ppTilt) out.push('ppt');
   return out;
 }
 
@@ -210,22 +300,67 @@ export function movementDelta(
   const curSet = new Set(cur);
   const fixed = Array.from(prevSet).filter((k) => !curSet.has(k));
   const rawRegressed = Array.from(curSet).filter((k) => !prevSet.has(k));
-  // Миграция legacy-снимков (без v:2): D1–D5 коды в них не трекались — показываем
+  // Миграция снимков: коды, которых в снимке не было (v<2 — D1–D5; v<3 — R1–R8), показываем
   // отдельной строкой «новый трекинг», а не «регрессом» (иначе каждый старый стор покраснеет).
   let regressed = rawRegressed;
   let tracked: string[] = [];
-  if ((prev as MovementSnapshot).v !== 2) {
-    tracked = rawRegressed.filter((k) => D1D5_PREFIX.test(k));
-    regressed = rawRegressed.filter((k) => !D1D5_PREFIX.test(k));
+  const prevV = Number((prev as MovementSnapshot).v || 0);
+  if (prevV !== 3) {
+    tracked = rawRegressed.filter((k) => (prevV >= 2 ? V3_PREFIX.test(k) : D1D5_PREFIX.test(k) || V3_PREFIX.test(k)));
+    regressed = rawRegressed.filter((k) => !tracked.includes(k));
   }
   if (!fixed.length && !regressed.length && !tracked.length) {
     return { fixed, regressed, tracked, text: `vs ${prev.date}: без изменений (${cur.length} замечаний)` };
   }
-  const trackNote = tracked.length ? ` · новый трекинг D1–D5: ${tracked.join(', ')}` : '';
+  const trackNote = tracked.length ? ` · новый трекинг: ${tracked.join(', ')}` : '';
   return {
     fixed,
     regressed,
     tracked,
     text: `vs ${prev.date}: исправлено ${fixed.length ? fixed.join(', ') : '—'} · новое ${regressed.length ? regressed.join(', ') : '—'}${trackNote}`,
   };
+}
+
+/** Гейт нагруженных проб для подростков 14–15 (прецедент teenNotes ББ-авто): техника налегке, без рабочих весов. */
+export function teenLoadedGate(age: number | null | undefined): { blocked: boolean; note: string } {
+  const a = typeof age === 'number' && Number.isFinite(age) ? age : null;
+  if (a != null && a >= 14 && a <= 15) {
+    return {
+      blocked: true,
+      note: '14–15 лет: нагруженные пробы (тяга с пола, рабочий жим) в хабе не проводим — техника налегке и контроль; гейты ББ-авто (teenNote) уже в сборке',
+    };
+  }
+  return { blocked: false, note: '' };
+}
+
+export interface ScreenPriorityInput {
+  painLevel?: 'green' | 'yellow' | 'red' | 'not_tested' | null;
+  painText?: string | null;
+  driver?: { driver: string; label: string; fix: string; confidence: number } | null;
+  asymText?: string | null;
+  tendon?: { level: string; text: string } | null;
+  bench?: { level: string; text: string } | null;
+  posterior?: { nhe?: string | null; adductor?: string | null } | null;
+  loadedHinge?: { degraded: boolean; text: string } | null;
+  erIr?: string | null;
+}
+
+/** Единый список «что чинить первым» (красная боль → драйвер → асимметрии → сухожилия → …). Max 5. */
+export function screenPriorityList(s: ScreenPriorityInput | null | undefined): string[] {
+  if (!s) return [];
+  const out: string[] = [];
+  const push = (txt: string): void => { if (txt && out.length < 5) out.push(`${out.length + 1}. ${txt}`); };
+  if (s.painLevel === 'red') push(`Боль (красный): ${s.painText || 'разгрузка по правилу ≤5/<5'} — снизить объём до ≤3/10`);
+  else if (s.painLevel === 'yellow') push(`Боль (жёлтый): ${s.painText || 'удержать объём 3–7 дней, не повышать вес'}`);
+  const d = s.driver;
+  if (d && d.driver && d.driver !== 'none' && d.confidence >= 0.5) push(`${d.label}: ${d.fix}`);
+  if (s.asymText && !/значимых нет/.test(s.asymText)) push(s.asymText);
+  if (s.tendon && s.tendon.level === 'stop') push(`Сухожилия (стоп): ${s.tendon.text}`);
+  if (s.loadedHinge?.degraded) push(`Шарнир под весом: ${s.loadedHinge.text}`);
+  if (s.bench?.level === 'fix') push(`Жим: ${s.bench.text}`);
+  if (s.posterior?.nhe && !/в порядке/.test(s.posterior.nhe)) push(s.posterior.nhe);
+  if (s.posterior?.adductor && !/не замерялись|симметрично/.test(s.posterior.adductor)) push(s.posterior.adductor);
+  if (s.erIr && /0\.\d+ \(<0\.75\)/.test(s.erIr)) push(`Плечо ER:IR: ${s.erIr}`);
+  if (!out.length) return ['Приоритетов нет: паттерн чистый — поддерживающий объём и перепроверка 6–8 нед'];
+  return out;
 }

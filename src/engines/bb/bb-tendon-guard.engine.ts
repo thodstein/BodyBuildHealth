@@ -106,23 +106,30 @@ const LEVEL_CAPS: Record<string, { warn: number; stop: number }> = {
 
 export function assessBbTendonGuard(
   sessions: any[],
-  opts: { elbowPain?: boolean; shoulderOhsFail?: boolean; level?: string } = {},
+  opts: { elbowPain?: boolean; shoulderOhsFail?: boolean; level?: string; painRedJoint?: 'elbow' | 'shoulder' | null } = {},
 ): BbTendonGuard {
   const caps = LEVEL_CAPS[String(opts.level || 'intermediate').toLowerCase()] || LEVEL_CAPS.intermediate;
   const elbowSets = countFor(sessions, ELBOW_RE);
   const shoulderSets = countFor(sessions, SHOULDER_RE);
-  const elbowLevel = levelFor(elbowSets, !!opts.elbowPain, caps.warn, caps.stop);
-  const shoulderLevel = levelFor(shoulderSets, !!opts.shoulderOhsFail, caps.warn, caps.stop);
-  const elbowText = elbowLevel === 'stop'
-    ? `Локоть: стоп — ${elbowSets} тяж. сетов/нед${opts.elbowPain ? ' + боль' : ''}, только изометрия/ремень-техника`
-    : elbowLevel === 'warn'
-      ? `Локоть: осторожно — ${elbowSets} тяж. сетов/нед (>${caps.warn}), без разнохвата и читинга`
-      : `Локоть: порядок — ${elbowSets} тяж. сетов/нед`;
-  const shoulderText = shoulderLevel === 'stop'
-    ? `Плечо: стоп — ${shoulderSets} жимовых сетов/нед${opts.shoulderOhsFail ? ' + провал плеча в присед-тесте' : ''}, жимы над головой убрать`
-    : shoulderLevel === 'warn'
-      ? `Плечо: осторожно — ${shoulderSets} жимовых сетов/нед (>${caps.warn}), контроль лопатки, без отказа`
-      : `Плечо: порядок — ${shoulderSets} жимовых сетов/нед`;
+  // R2: боль-мониторинг красный по суставу — стоп независимо от объёма (PMM, не диагноз).
+  const elbowForced = opts.painRedJoint === 'elbow';
+  const shoulderForced = opts.painRedJoint === 'shoulder';
+  const elbowLevel = elbowForced ? 'stop' : levelFor(elbowSets, !!opts.elbowPain, caps.warn, caps.stop);
+  const shoulderLevel = shoulderForced ? 'stop' : levelFor(shoulderSets, !!opts.shoulderOhsFail, caps.warn, caps.stop);
+  const elbowText = elbowForced
+    ? `Локоть: стоп — боль-мониторинг красный (PMM: разгрузка до боли ≤3), ${elbowSets} тяж. сетов/нед`
+    : elbowLevel === 'stop'
+      ? `Локоть: стоп — ${elbowSets} тяж. сетов/нед${opts.elbowPain ? ' + боль' : ''}, только изометрия/ремень-техника`
+      : elbowLevel === 'warn'
+        ? `Локоть: осторожно — ${elbowSets} тяж. сетов/нед (>${caps.warn}), без разнохвата и читинга`
+        : `Локоть: порядок — ${elbowSets} тяж. сетов/нед`;
+  const shoulderText = shoulderForced
+    ? `Плечо: стоп — боль-мониторинг красный (PMM: разгрузка до боли ≤3), ${shoulderSets} жимовых сетов/нед`
+    : shoulderLevel === 'stop'
+      ? `Плечо: стоп — ${shoulderSets} жимовых сетов/нед${opts.shoulderOhsFail ? ' + провал плеча в присед-тесте' : ''}, жимы над головой убрать`
+      : shoulderLevel === 'warn'
+        ? `Плечо: осторожно — ${shoulderSets} жимовых сетов/нед (>${caps.warn}), контроль лопатки, без отказа`
+        : `Плечо: порядок — ${shoulderSets} жимовых сетов/нед`;
   return {
     elbow: { joint: 'elbow', heavySets: elbowSets, level: elbowLevel, text: elbowText },
     shoulder: { joint: 'shoulder', heavySets: shoulderSets, level: shoulderLevel, text: shoulderText },

@@ -56,6 +56,14 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   videoStandard?: string | null;
   driverSubs?: { prefer: string[]; avoid: string[]; note: string } | null;
   asymPriority?: string | null;
+  /** R1–R8 PRO-2 (BBDiagnosticsHub → BbAutoConstructor): жим/боль-мониторинг/задняя цепь/
+   *  шарнир под весом/ER:IR/скрининг-приоритет — всё опционально, приёмник только сохраняет/показывает. */
+  bench?: { level: string; text: string } | null;
+  painMon?: string | null;
+  posterior?: { nhe?: string | null; adductor?: string | null } | null;
+  loadedHinge?: { text: string } | null;
+  erir?: { text: string } | null;
+  screenPriority?: string[] | null;
   /** @deprecated D1 (§9 BB-AUTO-EXHAUSTIVE-PRO): приёмник не читает (хаб всегда шлёт `null`
    *  by design — VBT живёт в Анализе силы). Оставлено для совместимости сохранённых payload'ов;
    *  новым кодом не заполнять. */
