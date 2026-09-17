@@ -1,5 +1,21 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-тапер PRO-4: доведение до про-уровня — монитор пик-недели/таймлайн/emergency/мульти-шоу/женский контур/коуч/лабы/post-show (Sep 17 2026, 6 коммитов pathspec, без пуша)
+
+По команде «выполни полностью — довести ББ-тапер до реально про уровня» (план ждался и выдан: `docs/BB-TAPER-PRO-4-PLAN.md`): аудит кода (D1–D10) + интернет-синтез 2024–2026 (Homer 2024 PMC10787737, Escalante 2021 PMC8201693, PMC11251432, PMC9321665, White 2011/Carmichael 2021/Sci Rep 2026/PMC12413752, PMC9364707) → план → полная реализация Э1–Э10. Только свои файлы; чужие WIP (female-support-layer, tz-mapper, meal-plan-engine и др.) не тронуты; коммиты строго pathspec.
+
+- **Э1 `b272ca34` (D1)**: overlay-путь `applyTrainingTaperToBBPlan` теперь ставит `wk.contestPhase` ('taper'/'peak_week') + legacy-нормализация — UI-таблица тапера (sections:429), `plan-quality`, `isMonotonicTaper`, finalize-гарды получили реальный контур фаз в SRCBB/Macrocycle/PeakingPanel-путях. **Бонус-фикс**: пик-конверсия хранит базу в `peakWeekBase` — force-пересборка больше не даёт повторных ×0.6 весов и −20% сетов (поймано своим тестом идемпотентности).
+- **Э2/Э3 `8e81fce3`+`56a37b03`**: NEW `bb-peak-pro.engine` + `PeakWeekProCard` — **📓 монитор пик-недели** (ежедневный чек-ин вес/вода/Na/углеводы/визуал flat-ontrack-full-spill/самочувствие; адгеренс с флагами under_water/over_sodium/under_carbs; вес-трейс с ожиданием гликоген-воды 2.7–3 г/г; тренд-советы по 2–3 дням по правилу «одна переменная»; `he_prep_peak_days_v1` кап 14) + **⏱ часовой таймлайн дня D-6…D-1** (6 малых приёмов, вода по приёмам, Na с едой, тренировка/позы/сон) — встроены в «🏁 Тапер» и шаг contest + в печать (extras).
+- **Э4**: **🚑 экстренная карточка шоу-дня** — 6 harm-reduction сценариев (гипогликемия/гипонатриемия/судороги/обморок/грудь/ЖКТ: признаки → что делать / что НЕ делать / когда врач) + контакт (`he_prep_emergency_v1`) + печать.
+- **Э5**: **🏁 серия шоу** `showSequencePlan` (окна taper+пик по каждому старту с датой, overreach-неделя, предупреждения: 2×A, окно <4 нед → второй пик только по trial) + рабочая кнопка overreach (`planTwoShowSequence` → builtPlan) + `coordinateLastHeavyDay`-строка и `🛌 без тяжёлого` маркер (`peakWeekLastHardRest`) в неделях тапера.
+- **Э6**: **👩 женский пик-контур** `femalePeakGuidance` (фаза цикла на дату шоу из `he_cycle_log`: flow → пик задержки воды/энергии, luteal +0.5–1 кг — не жир, late-luteal сила ↓, BIA-оговорка, ферритин/RED-S).
+- **Э7**: **🧭 коуч-проверка** (`scoreBBShowPrep` + патч `recommendBBShowConfig` — кнопка применить в Тапере).
+- **Э8**: **🔄 post-show фидбэк** `postShowRecoveryProgress` — факт-вес vs regain-цель ~1%/нед (Buechel/PMC9364707), статусы on_track/faster/slower в блоке Post-show.
+- **Э9**: **🧪 лабы-чекпоинт** `prepLabCheckpoint` — дедлайны (база −70дн/середина −35/финал −10/пост +14) + дата последних анализов (`he_prep_labs_v1`) → done/soon/overdue/planned.
+- **Э10 `e07d21ed`**: мёртвый код — удалены `peakTrainingProfile`/`PeakTrainingProfile`, `isKnownPrepCategory`; честно уточнено: `PREP_POST_SHOW`/`POSING_PROFILES` живые (внутренние потребители) — оставлены.
+- **Проверено**: NEW тесты +48 (Э1 7, движок 28, UI 10, гигиена 3) + taper-семья 343/343 + UI-семья 62/62 + prep 67/67 + consumers 57/57; `tsc --noEmit` **0 по всему проекту** (трижды). НЕ ПУШИЛ.
+- **Границы**: фото-чек-ины только метками (без CV); консолидация ~7 рендеров пик-недели и двусторонний коуч-редактор — вне раунда.
+
 ## Женские проблемы на курсе: железо/цикл/кости/RED-S — Э1–Э4 выполнены (Sep 17 2026, коммит кода pathspec + docs, без пуша)
 
 По команде «Выполни план docs/FEMALE-ONCYCLE-PRO-PLAN.md» закрыты все 4 эпика. Только Edit/Write + vitest/tsc; чужие WIP не тронуты (коммиты строго pathspec). Мужской путь байт-в-байт (lock-тест).
