@@ -87,6 +87,7 @@ import {
   type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy,
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { CONTEST_PREP_UPDATED_EVENT, migrateLegacyContestPrepIfNeeded, storeContestPrepPlan } from '../../../engines/bb/bb-contest-prep-sync';
+import { loadPeakWeekLog, peakWeekAdherence, peakWeekTrendAdvice, emergencyLines } from '../../../engines/bb/bb-peak-pro.engine';
 import type { PeakingProtocol } from '../../../engines/peaking-protocols.engine';
 import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, getPosingCheckins, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
@@ -917,7 +918,24 @@ export const BbAutoConstructor: React.FC = () => {
         : undefined;
       const win = window.open('', '_blank', 'width=900,height=700');
       if (!win) { flash('Браузер заблокировал окно печати — разрешите всплывающие окна'); return; }
-      win.document.write(buildContestPrepPrintHtml(prepPlan, { compliance, postShowLog: getPostShowLog(prepPlan.id) }));
+      // PRO-4: монитор пик-недели + экстренная карточка — в печатную сводку (тренеру/на шоу).
+      let monitorLines: string[] | undefined;
+      try {
+        const log = loadPeakWeekLog(prepPlan.id);
+        if (log.length) {
+          const adh = peakWeekAdherence(prepPlan, log);
+          const tr = peakWeekTrendAdvice(log);
+          monitorLines = [
+            `Дней записано: ${adh.loggedDays}/7` +
+              (adh.waterPct != null ? ` · вода ${Math.round(adh.waterPct * 100)}% плана` : '') +
+              (adh.sodiumPct != null ? ` · Na ${Math.round(adh.sodiumPct * 100)}%` : '') +
+              (adh.carbsPct != null ? ` · углеводы ${Math.round(adh.carbsPct * 100)}%` : ''),
+            ...log.map(e => `${e.date}: вес ${e.weightKg ?? '—'} кг · вода ${e.waterLiters ?? '—'} л · Na ${e.sodiumMg ?? '—'} мг · углеводы ${e.carbsG ?? '—'} г · визуал ${e.visual ?? '—'} · самочувствие ${e.wellbeing ?? '—'}`),
+            `Тренд: ${tr.advice.join(' ')}`,
+          ];
+        }
+      } catch { /* нет стора — без секции */ }
+      win.document.write(buildContestPrepPrintHtml(prepPlan, { compliance, postShowLog: getPostShowLog(prepPlan.id), monitor: monitorLines, emergency: emergencyLines() }));
       win.document.close();
       win.focus();
       setTimeout(() => { try { win.print(); } catch { /* ignore */ } }, 300);

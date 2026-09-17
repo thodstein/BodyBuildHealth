@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   buildBBContestPrepPlan,
+  buildContestPrepPrintHtml,
   isoAddDays,
   isoToday,
   type BBContestPrepConfig,
@@ -356,6 +357,24 @@ describe('PRO-4 Э9 — лабы-чекпоинт', () => {
     expect(loadPrepLabsDate('p1')).toBeNull();
     savePrepLabsDate('p1', 'not-a-date');
     expect(loadPrepLabsDate('p1')).toBeNull();
+  });
+});
+
+// ── 🖨 Печать: extras монитора/emergency ──
+describe('PRO-4 — печать prep-сводки с extras', () => {
+  it('без extras — секций PRO-4 нет; с extras — обе секции + XSS-esc', () => {
+    const plan = mkPlan();
+    const base = buildContestPrepPrintHtml(plan);
+    expect(base).not.toMatch(/Монитор пик-недели/);
+    expect(base).not.toMatch(/Экстренная карточка/);
+    const withExtras = buildContestPrepPrintHtml(plan, {
+      monitor: ['2026-06-01: вес 80 кг', '<script>alert(1)</script>'],
+      emergency: ['Контакт: Тренер · 112'],
+    });
+    expect(withExtras).toMatch(/Монитор пик-недели/);
+    expect(withExtras).toMatch(/Экстренная карточка шоу-дня/);
+    expect(withExtras).not.toMatch(/<script>alert\(1\)<\/script>/);
+    expect(withExtras).toMatch(/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   });
 });
 

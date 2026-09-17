@@ -3622,7 +3622,7 @@ export function prepNutritionSignals(plan: BBContestPrepPlan): string[] {
   return signals;
 }
 
-export function buildContestPrepPrintHtml(plan: BBContestPrepPlan, extra?: { compliance?: PrepTrainingCompliance; postShowLog?: PostShowWeekEntry[] }): string {  const profile = CATEGORY_PROFILES[plan.category];
+export function buildContestPrepPrintHtml(plan: BBContestPrepPlan, extra?: { compliance?: PrepTrainingCompliance; postShowLog?: PostShowWeekEntry[]; monitor?: string[]; emergency?: string[] }): string {  const profile = CATEGORY_PROFILES[plan.category];
   const post = buildPostShowPlan(plan);
   const peakWeek = buildPeakWeek(configFromPlan(plan));
   const timeline = buildShowTimeline(configFromPlan(plan));
@@ -3698,6 +3698,8 @@ ${plan.sex === 'female' ? `<h2>♀ Питание и RED-S (женская по�
 ${plan.safety.warnings.length > 0 ? `<h2>⚠️ Предупреждения</h2><ul>${rows(plan.safety.warnings)}</ul>` : ''}
 ${plan.safety.requiresReview ? `<div class="warn">🩺 Требуется профессиональное сопровождение: ${escHtml(plan.safety.contraindications.join(', '))}. Агрессивные режимы отключены.</div>` : ''}
 ${(plan.adjustments?.length ?? 0) > 0 ? `<h2>📝 История корректировок</h2><table><tr><th>Дата</th><th>Причина</th><th>Ккал</th><th>Кардио</th><th>Источник</th></tr>${(plan.adjustments ?? []).map(a => `<tr><td>${escHtml(a.date)}</td><td>${escHtml(a.reason)}</td><td>${a.caloriesDelta > 0 ? '+' : ''}${a.caloriesDelta}</td><td>${a.cardioDelta > 0 ? '+' : ''}${a.cardioDelta}</td><td>${escHtml(a.source)}</td></tr>`).join('')}</table>` : ''}
+${extra?.monitor && extra.monitor.length > 0 ? `<h2>📓 Монитор пик-недели (PRO-4)</h2><ul>${rows(extra.monitor)}</ul>` : ''}
+${extra?.emergency && extra.emergency.length > 0 ? `<h2>🚑 Экстренная карточка шоу-дня (PRO-4)</h2><ul>${rows(extra.emergency)}</ul><div class="warn">При спутанности/судорогах/боли в груди — немедленно медицинская помощь; это не «плохая форма».</div>` : ''}
 <div class="muted" style="margin-top:16px">Расчёт не заменяет работу с врачом и тренером. Диуретики и фармакология не назначаются.</div>
 </body></html>`;
 }
