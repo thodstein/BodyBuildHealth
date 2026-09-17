@@ -160,7 +160,5 @@ export function prepSplitsForCategory(category: BBContestCategory): string[] {
   return prepSplitProfile(category).recommendedSplits;
 }
 
-/** Готов ли профиль (категория известна). */
-export function isKnownPrepCategory(category: BBContestCategory): boolean {
-  return category in PREP_SPLIT_PROFILES;
-}
+// (PRO-4 Э10: isKnownPrepCategory удалён — 0 ссылок в src, вкл. тесты;
+//  валидность категории проверяется через prepSplitProfile/PREP_SPLIT_PROFILES.)
