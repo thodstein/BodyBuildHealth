@@ -4,6 +4,40 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { V7RiskResult } from '../../../engines/risk-engine-v7';
 import { getRiskColor } from '../../../core/utils/risk-colors';
+import { isNativeApp } from '../../../core/app-platform';
+
+/**
+ * Активы резолвим с учётом платформы:
+ * - АПК (native): всегда './x.glb' — абсолютный '/x.glb' ломается в WebView;
+ * - web/TG: как раньше, от BASE_URL (в проде './', в dev/test '/').
+ * Экспортируется для тестов.
+ */
+export function riskAssetUrl(p: string): string {
+  const clean = p.replace(/^\/+/, '');
+  try {
+    if (isNativeApp()) return `./${clean}`;
+  } catch {
+    /* ниже — web-ветка */
+  }
+  try {
+    const base = (import.meta as unknown as { env?: { BASE_URL?: string } })?.env?.BASE_URL || './';
+    return base.endsWith('/') ? `${base}${clean}` : `${base}/${clean}`;
+  } catch {
+    return `./${clean}`;
+  }
+}
+
+/** WebGL-гард: без него `new THREE.WebGLRenderer` бросает и роняет экран в АПК. */
+export function riskHasWebGL(): boolean {
+  try {
+    if (typeof document === 'undefined') return false;
+    const c = document.createElement('canvas');
+    const gl = (c.getContext('webgl2') || c.getContext('webgl')) as unknown;
+    return !!gl;
+  } catch {
+    return false;
+  }
+}
 
 // Mesh name → organ key mapping. Update mesh names to match the GLB model.
 const MESH_TO_ORGAN: Record<string, string> = {
@@ -104,6 +138,10 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    if (!riskHasWebGL()) {
+      setLoading(false);
+      return;
+    }
 
     const w = container.clientWidth;
     const h = container.clientHeight || 500;
@@ -119,7 +157,13 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
     camera.lookAt(0, 0, 0);
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    } catch {
+      setLoading(false);
+      return;
+    }
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -160,7 +204,7 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
 
     // Load GLB
     const loader = new GLTFLoader();
-    loader.load('/hulk.glb', (gltf) => {
+    loader.load(riskAssetUrl('/hulk.glb'), (gltf) => {
       setLoading(false);
       const model = gltf.scene;
       model.position.set(0, -0.15, 0);
@@ -230,7 +274,11 @@ export const Risk3DModel: React.FC<Props> = ({ result, mcEnabled, onToggleMC, or
       window.removeEventListener('resize', onResize);
       controls.dispose();
       renderer.dispose();
-      container.removeChild(renderer.domElement);
+      try {
+        if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
+      } catch {
+        /* уже отмонтировано */
+      }
     };
   }, []);
 

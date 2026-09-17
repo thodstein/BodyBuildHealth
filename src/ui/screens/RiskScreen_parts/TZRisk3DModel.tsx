@@ -13,6 +13,46 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { TzSpecResult, TzSpecOrganResult } from '../../../engines/risk-engine-tz-spec';
 import { buildZoneMapping } from '../../../engines/mesh-zone-mapping';
+import { isNativeApp } from '../../../core/app-platform';
+
+/**
+ * Активы резолвим с учётом платформы:
+ * - АПК (native): всегда './x.glb' — абсолютный '/x.glb' ломается в WebView
+ *   (file://, LiveUpdate-бандлы) и модель не грузится;
+ * - web/TG: как раньше, от BASE_URL (в проде './', в dev/test '/').
+ * Экспортируется для тестов.
+ */
+export function assetUrl(p: string): string {
+  const clean = p.replace(/^\/+/, '');
+  try {
+    if (isNativeApp()) return `./${clean}`;
+  } catch {
+    /* ниже — web-ветка */
+  }
+  try {
+    const base = (import.meta as unknown as { env?: { BASE_URL?: string } })?.env?.BASE_URL || './';
+    return base.endsWith('/') ? `${base}${clean}` : `${base}/${clean}`;
+  } catch {
+    return `./${clean}`;
+  }
+}
+
+/**
+ * Есть ли WebGL в этом окружении (дешёвые телефоны / jsdom — нет).
+ * Проверяем ДО создания WebGLRenderer: иначе three бросает исключение
+ * и без ErrorBoundary роняет весь экран рисков в АПК.
+ * Экспортируется для тестов.
+ */
+export function hasWebGL(): boolean {
+  try {
+    if (typeof document === 'undefined') return false;
+    const c = document.createElement('canvas');
+    const gl = (c.getContext('webgl2') || c.getContext('webgl')) as unknown;
+    return !!gl;
+  } catch {
+    return false;
+  }
+}
 
 const riskColor = (pct: number): string => {
   if (pct < 25) return '#22c55e';
@@ -118,6 +158,16 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [showOrgans, setShowOrgans] = useState(true);
+  // АПК: 3D (тело 2.7МБ + 4 органа ~10МБ + Дейкстра по мешу в главном потоке)
+  // на слабых телефонах убивает WebView — грузим только по явному тапу.
+  // TG/web — как раньше, сразу.
+  const [wants3D, setWants3D] = useState<boolean>(() => {
+    try {
+      return !isNativeApp();
+    } catch {
+      return true;
+    }
+  });
 
   interface OrganEntry {
     system: string;
@@ -162,6 +212,12 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     return o ? o.afterPercent : 0;
   }, [organMap]);
 
+  // Свежие проценты риска без переинициализации сцены: init-эффект висит на []
+  // (раньше зависел от getSystemRiskPct и пересоздавал весь WebGL-контекст
+  // при каждом пересчёте — на АПК это убивало WebView).
+  const riskPctRef = useRef(getSystemRiskPct);
+  riskPctRef.current = getSystemRiskPct;
+
   const systemList = useMemo(() => {
     return tzResult.organs.map(o => ({
       system: o.id,
@@ -173,13 +229,26 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
   }, [tzResult]);
 
   // ── Init scene: lit-материалы + мягкий свет, тело без раскраски ──
+  // Сцена создаётся ОДИН раз (wants3D-гейт); данные обновляются перекраской.
   useEffect(() => {
+    if (!wants3D) return;
+    if (!hasWebGL()) {
+      setFailed(true);
+      return;
+    }
     const container = containerRef.current;
     if (!container) return;
 
+    let native = false;
+    try {
+      native = isNativeApp();
+    } catch {
+      native = false;
+    }
+
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer = new THREE.WebGLRenderer({ antialias: !native, alpha: true, powerPreference: native ? 'low-power' : 'high-performance' });
     } catch {
       setFailed(true);
       return;
@@ -187,7 +256,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     const w = container.clientWidth || 300;
     const h = container.clientHeight || 450;
     renderer.setSize(w, h);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(native ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.85;
     container.appendChild(renderer.domElement);
@@ -230,7 +299,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     const loader = new GLTFLoader();
     loader.setMeshoptDecoder(MeshoptDecoder);
     loader.load(
-      '/bodybuilder.glb',
+      assetUrl('/bodybuilder.glb'),
       (gltf) => {
         const model = gltf.scene;
         model.updateMatrixWorld(true);
@@ -281,13 +350,20 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         // 2) Зоны растут ПО ПОВЕРХНОСТИ меша (геодезика) — не протекают сквозь тело,
         //    границы мягкие (smoothstep-вес у каждой вершины).
         //    Радиус по поверхности > евклидова (путь огибает тело) → ×1.4.
+        //    Дейкстра по большому мешу в главном потоке может убить слабый
+        //    телефон — при ошибке/перегрузе падаем на дешёвый евклидов маппинг
+        //    (клики по зонам продолжают работать, тело остаётся чистым).
         const geoIndex = baseMesh.geometry.index ? (baseMesh.geometry.index.array as Uint32Array) : null;
-        const mapping = buildZoneMapping(
-          worldPos,
-          geoIndex,
-          SYSTEM_ANCHORS.map((a) => ({ id: a.id, pos: a.pos, radius: a.r * 1.4 })),
-        );
-        zoneIdx = mapping.zoneIdx;
+        try {
+          const mapping = buildZoneMapping(
+            worldPos,
+            geoIndex,
+            SYSTEM_ANCHORS.map((a) => ({ id: a.id, pos: a.pos, radius: a.r * 1.4 })),
+          );
+          zoneIdx = mapping.zoneIdx;
+        } catch {
+          zoneIdx = assignVertexSystems(worldPos);
+        }
         anchorToSystem = SYSTEM_ANCHORS.map((a) => a.id);
 
         // 3) Нормализация: высота → 3.0, центровка
@@ -308,7 +384,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           const sel = selectedRef.current;
           const hover = hoverRef.current;
           for (const entry of organEntriesRef.current) {
-            const pct = getSystemRiskPct(entry.system);
+            const pct = riskPctRef.current(entry.system);
             const [r, g, b] = hexToRgb(riskColor(pct));
             for (const m of entry.mats) {
               m.emissive.setRGB(r, g, b);
@@ -422,7 +498,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
             continue;
           }
           organLoader.load(
-            def.url as string,
+            assetUrl(def.url as string),
             (ogltf) => {
               const content = ogltf.scene;
               // Нормализация размера: целевой диаметр def.size
@@ -550,7 +626,11 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       organEntriesRef.current = [];
       organRootRef.current = null;
       hulkMatsRef.current = [];
-      if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
+      try {
+        if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
+      } catch {
+        /* уже отмонтировано */
+      }
       scene.traverse((obj) => {
         if (obj instanceof THREE.Mesh) {
           obj.geometry.dispose();
@@ -559,8 +639,10 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         }
       });
     };
+    // init один раз за монтирование 3D (wants3D-гейт); свежие данные идут
+    // через riskPctRef + эффект перекраски ниже.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getSystemRiskPct]);
+  }, [wants3D]);
 
   // ── Перекраска при смене данных / hover / выборе ──
   useEffect(() => {
@@ -590,6 +672,44 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
 
   return (
     <div>
+      {!wants3D ? (
+        <div
+          style={{
+            width: '100%', minHeight: 220,
+            borderRadius: 16, overflow: 'hidden',
+            background:
+              'radial-gradient(600px 300px at 50% 0%, rgba(139,92,246,0.10), transparent 65%), rgba(28,32,42,0.55)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            padding: 16, textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+            🧊 3D модель рисков
+          </div>
+          <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, marginBottom: 12, opacity: 0.85 }}>
+            Тяжёлая сцена (тело + органы ~13 МБ): на телефоне грузим только по запросу,
+            чтобы приложение не вылетало. Цифры риска — в чипах ниже.
+          </div>
+          <button
+            onClick={() => {
+              if (!hasWebGL()) {
+                setFailed(true);
+                setWants3D(true);
+                return;
+              }
+              setWants3D(true);
+            }}
+            style={{
+              minHeight: 48, padding: '12px 24px', borderRadius: 999,
+              fontSize: 14, fontWeight: 800, cursor: 'pointer',
+              background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+              border: '1px solid #8b5cf6', color: '#fff',
+            }}
+          >
+            🧊 Загрузить 3D
+          </button>
+        </div>
+      ) : (
       <div
         ref={containerRef}
         style={{
@@ -639,6 +759,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           );
         })()}
       </div>
+      )}
 
       {/* Chip buttons — APK PRO: 44px, белый */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
