@@ -52,6 +52,9 @@ export const EXOTIC_FOOD_IDS: ReadonlySet<string> = new Set([
   'meat_ostrich', 'meat_kangaroo', 'meat_alligator', 'meat_bison_ribeye',
   // FIX base-2026-09: реальные id экзотики из FOOD_DB (иначе «кенгуру в предтрен»).
   'exotic_kangaroo_loin', 'exotic_crocodile', 'exotic_ostrich',
+  // CENSUS-2026-09 нашёл ещё 5 дрейф-двойников (sea_urchin/abalone/ostrich_egg/
+  // berry_acai/fruit_durian) — НЕ гейтим в этой волне: их закрытие двигает seeded-пулы
+  // и требует своей компенсации (см. бэклог `planner-id-census` KNOWN_PENDING_LEAKS).
 ]);
 
 // ─── 2. Specialty: только по явному предпочтению пользователя ─────────

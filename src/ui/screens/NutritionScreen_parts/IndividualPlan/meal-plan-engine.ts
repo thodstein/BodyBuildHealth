@@ -3787,7 +3787,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // MealTargets: белок болюс-окон заранее вычтен из дневной цели — окна строятся
   // ПОСЛЕ бюджетов с фиксированными ~20 г белка каждый, и регулярные приёмы их
   // не знали: 3 окна = +60 г поверх цели, мейны добирали их же (перебор +14-23%).
-  const _windowProteinReserved = _insulinPlanned.length * 20;
+  // P5c-realism: окно строится с авторским белком 25 г (см. _injectMealAt default) —
+  // резерв обязан зеркалить факт (было ×20 → окна клали +15 г поверх цели).
+  const _windowProteinReserved = _insulinPlanned.length * 25;
   const _regP = Math.max(0, (adjustedProteinG || input.goalProteinG) - periProteinFixed - _preSleepFixedP - _windowProteinReserved);
   // UltraP (500Б при 110 кг = выше потолка Morton): best-effort — мейн-бюджет растёт
   // до 68 г (0.62 г/кг LBM), иначе targets дня −7% и мердж доливает белок в обед,
@@ -6699,6 +6701,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               const _fl = _f.category === 'supplement' ? 20 : (_isM ? 75 : 50);
               if (Math.max(_fl, Math.round((_c.it.amount || 0) * 0.88)) < (_c.it.amount || 0)) return _c;
             }
+            // P5c (низкая цель белка при мейнах на MPS-полах): кок-якоря окон не входят
+            // в _pItems (peri), но перебор дня режем и в пост-трене — порошок окна до 20 г
+            // (окно не физиологический инвариант ниже 20 г; pre-sleep казеин ≥25 г не трогаем).
+            for (const _m of meals) {
+              if (String((_m as any).type || '') !== 'postworkout' || (_m as any)._insulinWindow) continue;
+              const _pk = ((_m as any).items || []).find((x: any) => isProteinPowderId(x.id) && (x.amount || 0) > 20 && !(x as any)._fixedGrams);
+              if (_pk) return { m: _m, it: _pk };
+            }
             return null;
           })() : null;
           const _cand = (_cutPick || _pItems[0]) as any;
@@ -6834,7 +6844,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           // Резка — только если день ПЕРЕБРАН (ккал или угли сверх цели): иначе срезка
           // усугубит недобор (кейс rest-600: обед тяжёлый, но день −20% — резать нельзя,
           // только переносить). Перенос разрешён всегда (сумму дня не меняет).
-          const _dayOverForCut = totals.kcal > (input.goalKcal || 0) || totals.c > (input.goalCarbsG || 0);
+          // P5b-realism (D-24): допуск к «перебору дня» — 1% ккал / +10 г У. Без него
+          // округление (+0.2 г У) включало жёсткую резку гарниров «комнаты нет нигде»
+          // (обед 470→363 г У, −107 г). Резка — только при РЕАЛЬНОМ переборе.
+          const _dayOverForCut = totals.kcal > (input.goalKcal || 0) * 1.01 || totals.c > (input.goalCarbsG || 0) + 10;
           const _prio = (it: any): number => {
             if (it.role === 'veg') return 0;
             if (it.role === 'fruit') return 1;
@@ -7510,6 +7523,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               if (/glass|funchose|rice_noodles/.test(it.id)) continue;
               const fd = FOOD_DB.find((f: any) => f.id === it.id);
               if (!fd || !(fd.carbs || 0)) continue;
+              // P5c-realism: у самого капа белка — растим ТОЛЬКО низкобелковые носители
+              // (Б/У ≤0.25: рис/картофель/кукурузные хлопья), иначе добор калорий несёт
+              // «внедрённый» белок и упирает день в кап (болюс) или не даёт углеводов (operability).
+              if ((input.goalProteinG || 0) > 0 && totals.p > (input.goalProteinG || 0) * 1.06 && (fd.protein || 0) / Math.max(1, fd.carbs || 0) > 0.25) continue;
               const cap = carbPortionCap(fd, mealCapScaleOf(m));
               if ((it.amount || 0) >= cap) continue;
               cands.push({ m, it, fd, cap });
@@ -7538,6 +7555,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if ((fd.fat || 0) > 0) {
             const fatRoom = Math.max(0, Math.min(fatTotal * 1.08, (input.goalFatG || 0) * 1.08) - totals.f);
             addG = Math.min(addG, Math.floor(fatRoom / (fd.fat || 1) * 100));
+          }
+          // Не раздуваем белок дня за кап (+15% цели): carb-носители несут внедрённый белок
+          // (кейс болюс-дня: финальный добор калорий давал +11 г Б сверх капа при 5 г нужных).
+          // Гард капа — только пока день НИЖЕ капа: если белок уже выше (полы MPS выше
+          // низкой цели дня, кейс operability 190Б на 100 кг), блокировать углеводы нельзя —
+          // действует лишь фильтр плотности ниже (низкобелковые носители).
+          if ((input.goalProteinG || 0) > 0 && (fd.protein || 0) > 0 && totals.p <= (input.goalProteinG || 0) * 1.149) {
+            const _pRoom = Math.floor((((input.goalProteinG || 0) * 1.149) - totals.p) / (fd.protein || 1) * 100);
+            if (_pRoom < 10) break;
+            addG = Math.min(addG, _pRoom);
           }
           if (addG < 10) break;
           _growIt(m, it, addG);
@@ -7580,6 +7607,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           && it.role !== 'supplement' && it.role !== 'liquid'
           && it.role !== 'protein' && it.role !== 'fast_protein' && it.role !== 'slow_protein'
           && !(it.role === 'fat' && (it.amount || 0) <= 20)
+          // P5c-realism: фрукт-остаток — реальная микро-порция (26 г ягод = витамины),
+          // а не «обрезок»: его вычистка ломала фрукт-слот завтрака (typology E1).
+          && it.role !== 'fruit'
           && (it.amount || 0) < 30);
         if (_smallCut.length > 0) {
           for (const _sc of _smallCut) {
@@ -7703,6 +7733,43 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               }
             }
           }
+        }
+      }
+    }
+    // ─── P5c-realism: MPS-минимум основного приёма (0.22 г/кг LBM) ───
+    // «Ужин 15.9 г = 0.215 г/кг LBM» при дне, не перебравшем цель: дотягиваем
+    // существующий белковый пункт мейна (новый не добавляем — «одно мясо»).
+    {
+      const _lbmL = input.lbmKg || 0;
+      const _ultraPL = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
+      if (_lbmL > 0 && !_ultraPL && totals.p < (input.goalProteinG || 0) * 0.99) {
+        for (const m of meals) {
+          const _tL = String((m as any).type || '');
+          if (!['breakfast', 'lunch', 'dinner'].includes(_tL) || (m as any)._insulinWindow) continue;
+          // Целимся в 0.225 г/кг LBM (не 0.22): +0.005 — запас на округления последующих
+          // проходов (пасс видел 16.2 = 0.2195 LBM, финал уезжал на 15.9 = 0.2154).
+          const _needLo = 0.225 * _lbmL - ((m as any).totals?.p || 0);
+          if (_needLo <= 0.2) continue; // 0.2 г — шум округления, ниже не трогаем
+          const _protsL = (m.items || []).filter((it: any) => (it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein') && !(it as any)._fixedGrams);
+          if (_protsL.length === 0) continue;
+          _protsL.sort((a: any, b: any) => (b.p || 0) - (a.p || 0));
+          const _pL = _protsL[0];
+          const _fdL = FOOD_DB.find((f: any) => f.id === _pL.id);
+          const _perL = _fdL ? (_fdL.protein || 0) / 100 : 0;
+          if (!(_perL > 0)) continue;
+          const _capL = isProteinPowderId(_pL.id) ? 60 : 300;
+          const _addL = Math.max(0, Math.min(300 - (_pL.amount || 0), Math.ceil(_needLo / _perL / 5) * 5, _capL - (_pL.amount || 0)));
+          if (_addL < 5) continue;
+          const _rL = ((_pL.amount || 0) + _addL) / Math.max(1, _pL.amount || 1);
+          _pL.amount = (_pL.amount || 0) + _addL;
+          _pL.p = Math.round((_pL.p || 0) * _rL * 10) / 10;
+          _pL.f = Math.round((_pL.f || 0) * _rL * 10) / 10;
+          _pL.c = Math.round((_pL.c || 0) * _rL * 10) / 10;
+          _pL.kcal = Math.round(4 * _pL.p + 9 * _pL.f + 4 * _pL.c);
+          _pL.fiber = Math.round(((_pL.fiber || 0) * _rL) * 10) / 10;
+          m.totals = mealTotalsOf(m.items);
+          recalcDayTotals(meals, totals);
+          notes.push(`🥩 «${m.label}»: ${_pL.name} +${_addL} г — MPS-минимум приёма (0.22 г/кг LBM)`);
         }
       }
     }
@@ -8214,13 +8281,57 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (>8%) — пулы/капы не закрыли цели, итог честный best-effort, а не подгонка мусором`);
     }
 
+    // ─── P5b-realism: финальная дотяжка углеводов до СЪЕДОБНЫХ капов ───
+    // Середины капов (280-315 г варёного крахмала) — бюджетные, а не «съедобные»:
+    // на недобирающих днях (У < 92% цели, ккал не перебран) растим крупнейшие углеводные
+    // носители гибких приёмов до EDIBILITY-капов (рис 450/картофель 300/хлеб 165…).
+    // Иначе день честно не сходится (DFIX 331/450 при пустых комнатах добивок).
+    // Дотяжка бежит по углеводному недобору; от перебора белка защищает пошаговый
+    // кап-гард внутри (проекция Б > цель×1.149 → стоп) — не гейт снаружи: при белочных
+    // полах выше низкой цели (operability 190Б/100кг) углеводы всё равно нужны.
+    if ((input.goalCarbsG || 0) > 0) {
+      let _p5bGuard = 6;
+      while (_p5bGuard-- > 0 && totals.c < (input.goalCarbsG || 0) * 0.92 && totals.kcal < (input.goalKcal || 0) * 1.02) {
+        const _p5bCands = meals
+          .filter((m: any) => _flexMeal(m) && !(m as any)._insulinWindow)
+          .flatMap((m: any) => (m.items || []).map((it: any) => ({ m, it })))
+          .filter((x: any) => (x.it.role === 'carb_slow' || x.it.role === 'carb_fast') && !(x.it as any)._fixedGrams)
+          .map((x: any) => {
+            const _fd5 = FOOD_DB.find((f: any) => f.id === x.it.id);
+            const _cap5 = _fd5 ? Math.min(edibilityCapFor(_fd5.id, 600), 600) : 0;
+            return { ...x, fd: _fd5, cap: _cap5, room: _cap5 - (x.it.amount || 0) };
+          })
+          .filter((x: any) => x.fd && x.room >= 10 && (x.fd.carbs || 0) > 0)
+          .sort((a: any, b: any) => b.room - a.room);
+        const _cand5 = _p5bCands[0];
+        if (!_cand5) break;
+        const _need5 = (input.goalCarbsG || 0) * 0.97 - totals.c;
+        const _add5 = Math.min(_cand5.room, Math.ceil(_need5 / Math.max(1, _cand5.fd.carbs) * 100 / 5) * 5);
+        if (_add5 < 10) break;
+        // Не раздуваем белок дня за кап (+15% цели): шаг дотяжки носителей несёт
+        // внедрённый белок (кейс болюс-дня: 253.1 при капе 253.0).
+        const _pProj5 = totals.p + ((_cand5.fd.protein || 0) * _add5) / 100;
+        if ((input.goalProteinG || 0) > 0 && _pProj5 > (input.goalProteinG || 0) * 1.149) break;
+        const _r5 = ((_cand5.it.amount || 0) + _add5) / Math.max(1, _cand5.it.amount || 1);
+        _cand5.it.amount = (_cand5.it.amount || 0) + _add5;
+        _cand5.it.p = Math.round((_cand5.it.p || 0) * _r5 * 10) / 10;
+        _cand5.it.f = Math.round((_cand5.it.f || 0) * _r5 * 10) / 10;
+        _cand5.it.c = Math.round((_cand5.it.c || 0) * _r5 * 10) / 10;
+        _cand5.it.kcal = Math.round(4 * _cand5.it.p + 9 * _cand5.it.f + 4 * _cand5.it.c);
+        _cand5.it.fiber = Math.round(((_cand5.it.fiber || 0) * _r5) * 10) / 10;
+        _cand5.m.totals = mealTotalsOf(_cand5.m.items);
+        recalcDayTotals(meals, totals);
+        notes.push(`🍚 Финальная дотяжка углеводов: ${_cand5.it.name} +${_add5} г (съедобный кап ${_cand5.cap} г)`);
+      }
+    }
+
     // ─── P4-realism: клетчатка HV-дней (≥1000У) ≤ max(50, 14 г/1000 ккал) ───
     // Аудит: «клетчатка на HV до 77 г (25 г/1000 ккал при ориентире 14)». Режем самые
     // клетчаточные ИЗОЛИРОВАННЫЕ источники (овощи/фрукты/семена >100 г) — гарниры-носители
     // углеводов и белковые пункты не трогаем (полы приёмов целы).
     // Гейт сходимости: срезаем клетчатку только когда день уже сошёлся по ккал
     // (≥97% цели) — на недобирающем дне резка усугубит недобор (operability 1000У: 797).
-    if ((input.goalCarbsG || 0) >= 1000 && totals.kcal >= (input.goalKcal || 0) * 0.97) {
+    if ((input.goalCarbsG || 0) >= 1000 && totals.kcal >= (input.goalKcal || 0) * 0.97 && totals.c >= (input.goalCarbsG || 0) * 0.97) {
       const _p4Cap = Math.max(50, Math.round(((input.goalKcal || 0) / 1000) * 14));
       let _p4Guard = 10;
       while (totals.fiber > _p4Cap && _p4Guard-- > 0) {
@@ -8305,6 +8416,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               const _lostK2 = _fruitGone.reduce((s: number, it: any) => s + (it.kcal || 0), 0);
               let _addG2 = Math.round((_lostC2 / Math.max(1, _fdC2.carbs) * 100) / 5) * 5;
               _addG2 = Math.min(_addG2, _cCap2 - (_carrier.amount || 0));
+              // Не раздуваем белок дня за кап (+15%): носитель несёт внедрённый белок
+              // (болюс-день: перенос фрукта добивал план до 253.1 при капе 253.0).
+              const _pProj2 = totals.p + ((_fdC2.protein || 0) * _addG2) / 100;
+              if ((input.goalProteinG || 0) > 0 && _pProj2 > (input.goalProteinG || 0) * 1.148) _addG2 = 0;
               // ккал-паритет: не перекладывать больше, чем потеряно (ккал носителя)
               if ((_fdC2.kcal || 0) > 0) _addG2 = Math.min(_addG2, Math.ceil(_lostK2 / Math.max(1, _fdC2.kcal) * 100 / 5) * 5);
               if (_addG2 >= 10) {

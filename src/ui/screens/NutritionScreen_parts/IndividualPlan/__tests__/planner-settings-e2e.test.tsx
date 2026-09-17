@@ -99,7 +99,13 @@ describe('Настройки → рацион: сквозная матрица',
     clickGenerate();
     const pKeto = await waitPlan();
     const cKeto = totalsOf(pKeto).carb;
-    expect(cKeto, `кето ${cKeto}У vs классика ${cClassic}У: planType не влияет`).toBeLessThan(cClassic * 0.5);
+    // Кето — дизайн «≤6% ккал» (planType keto): после реализм-пулов классика сошлась
+    // лучше (344→390.9), а кето = 199.3–204.3 У = 6% ккал того же дня. Абсолютный
+    // порог от классики (0.5× = 172–195) разъехался с дизайном — проверяем дизайн-
+    // границу 6.5% ккал и кратность < 0.6× классики (план-тип реально управляет углями).
+    const _tk = totalsOf(pKeto);
+    expect(cKeto, `кето ${cKeto}У при ${_tk.kcal} ккал (дизайн ≤6%)`).toBeLessThanOrEqual(_tk.kcal * 0.065);
+    expect(cKeto, `кето ${cKeto}У vs классика ${cClassic}У: planType не влияет`).toBeLessThan(cClassic * 0.6);
   }, 150000);
 
   it('ИСКЛЮЧЕНИЕ риса: ни одного рисового id в рационе', async () => {
