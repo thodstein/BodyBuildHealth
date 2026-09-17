@@ -44,9 +44,9 @@ describe('women-aas: данные — полнота', () => {
     expect(DECA_125_NOTE).toContain('125');
     expect(DECA_125_NOTE).toContain('красной границе');
   });
-  it('протоколы поддержки: 11 штук, все с дозировками и показаниями', () => {
-    expect(FEMALE_SUPPORT_PROTOCOLS.length).toBe(11);
-    for (const id of ['virilization', 'hepatic', 'lipid', 'hematocrit', 'libidoLow', 'libidoHigh', 'femalePct', 'prolactin', 'glycemic', 'thyroid', 'psyche']) {
+  it('протоколы поддержки: 13 штук (вкл. железо по анализам и кости), все с дозировками и показаниями', () => {
+    expect(FEMALE_SUPPORT_PROTOCOLS.length).toBe(13);
+    for (const id of ['virilization', 'hepatic', 'lipid', 'hematocrit', 'libidoLow', 'libidoHigh', 'femalePct', 'prolactin', 'glycemic', 'thyroid', 'psyche', 'iron', 'bones']) {
       const p = FEMALE_SUPPORT_PROTOCOLS.find((x) => x.id === id);
       expect(p, id).toBeTruthy();
       expect(p!.rows.length, id).toBeGreaterThan(0);
@@ -85,7 +85,7 @@ describe('women-aas: данные — полнота', () => {
     expect(FEMALE_LIBIDO_EFFECTS.length).toBe(13);
     expect(FEMALE_EMERGENCY_CRITICAL.length).toBe(9);
     expect(FEMALE_EMERGENCY_URGENT.length).toBe(6);
-    expect(FEMALE_FERTILITY_PLAN.length).toBe(5);
+    expect(FEMALE_FERTILITY_PLAN.length).toBe(6); // +AMH-строка (оценка резерва до курса, FEMALE-ONCYCLE-PRO)
     expect(FEMALE_PSYCHE_EFFECTS.length).toBe(7);
     expect(FEMALE_VIRILIZATION_CALC.length).toBe(14);
   });

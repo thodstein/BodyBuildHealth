@@ -40,7 +40,9 @@ describe('female-calc-banner (этап C)', () => {
       { timeout: 4000 },
     );
     expect(screen.queryAllByText(/Нандролон/).length).toBeGreaterThan(0);
-    expect(screen.queryAllByText(/vitex/).length).toBeGreaterThan(0);
+    // усиление показывается человекочитаемыми именами (было: сырые id)
+    expect(screen.queryAllByText(/Витекс/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/Кальций/).length).toBeGreaterThan(0);
   });
 
   it('женщина + тренболон → абсолютное противопоказание в баннере', async () => {

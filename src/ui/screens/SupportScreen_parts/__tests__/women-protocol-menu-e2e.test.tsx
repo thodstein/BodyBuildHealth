@@ -36,8 +36,10 @@ describe('women-protocol-menu-e2e (этап D)', () => {
     expect(container.textContent).toContain('Остарин');
     fireEvent.click(getByText('🧪 Поддержка'));
     expect(container.textContent).toContain('Спиронолактон');
-    // Обратная кросс-ссылка из «Препаратов» на «Дозы»
+    // Обратная кросс-ссылка из «Препаратов» на «Дозы» (таб переписан в §6.4:
+    // движковые пороги/флаги; актуальная формулировка кросс-ссылки)
     fireEvent.click(getByText('💊 Препараты'));
-    expect(container.textContent).toContain('Справочные дозовые пороги');
+    expect(container.textContent).toContain('в табе «⚖️ Дозы веществ»');
+    expect(container.textContent).toContain('флаги вирилизации');
   });
 });

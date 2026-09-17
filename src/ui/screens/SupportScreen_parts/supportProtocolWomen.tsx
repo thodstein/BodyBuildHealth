@@ -9,6 +9,9 @@ import {
   FEMALE_FORBIDDEN_COMBOS, FEMALE_LIBIDO_EFFECTS, FEMALE_EMERGENCY_CRITICAL, FEMALE_EMERGENCY_URGENT,
   FEMALE_FERTILITY_PLAN, FEMALE_PSYCHE_EFFECTS,
   FEMALE_VIRILIZATION_CALC, femaleVirilizationScore,
+  FEMALE_IRON_THRESHOLDS, FEMALE_IRON_SCHEME, FEMALE_IRON_DIAGNOSTICS, FEMALE_IRON_GATES,
+  FEMALE_AMENORRHEA_ALGO, FEMALE_BONE_HONESTY, FEMALE_REDS_SIGNS, redsTrafficLight,
+  FEMALE_UROGENITAL_SUPPORT, FERRIMAN_GALLWEY_ZONES, ferrimanGallweyTotal, ferrimanGallweyBand,
 } from './supportProtocolWomenData';
 
 const wInput: React.CSSProperties = {
@@ -81,6 +84,77 @@ const VirilizationScoreCalculator: React.FC = () => {
   );
 };
 
+/** FG-шкала Ферримана–Голлвея: 9 зон по 0–4, живой итог, порог гирсутизма >8. Динамика, не диагноз. */
+const HirsutismScale: React.FC = () => {
+  const [vals, setVals] = useState<number[]>(() => FERRIMAN_GALLWEY_ZONES.map(() => 0));
+  const total = ferrimanGallweyTotal(vals);
+  const band = ferrimanGallweyBand(total);
+  const color = band.level === 'hirsutism' ? '#ef4444' : band.level === 'borderline' ? '#f59e0b' : '#22c55e';
+  const cell = (active: boolean): React.CSSProperties => ({
+    minWidth: 34, minHeight: 34, borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer',
+    background: active ? 'rgba(244,114,182,0.2)' : 'rgba(255,255,255,0.05)',
+    color: active ? '#f9a8d4' : '#fff',
+    border: `1px solid ${active ? 'rgba(244,114,182,0.5)' : 'rgba(255,255,255,0.08)'}`,
+  });
+  return (
+    <div style={cardBg} data-fg="root">
+      <div style={{ fontSize:11, fontWeight:800, color:'#f472b6', marginBottom:4 }}>📏 Шкала Ферримана–Голлвея (гирсутизм, 9 зон)</div>
+      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8, lineHeight:1.35 }}>Каждая зона 0–4 (0 — нет терминальных волос, 4 — выраженный мужской тип). Итог &gt;8 — гирсутизм (у части этнических групп порог ниже). Это динамика для врача и фото-локусов, а не диагноз; отмечайте раз в 2–4 нед на курсе.</div>
+      {FERRIMAN_GALLWEY_ZONES.map((z: any, zi: number) => (
+        <div key={z.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+          <span style={{ fontSize:9, color:'#fff', flex:'1 1 auto' }}>{z.label}</span>
+          {[0, 1, 2, 3, 4].map((n) => (
+            <button key={n} type="button" aria-pressed={vals[zi] === n} aria-label={`${z.label}: ${n}`}
+              onClick={() => setVals((prev) => prev.map((v, i) => (i === zi ? n : v)))}
+              style={cell(vals[zi] === n)}>{n}</button>
+          ))}
+        </div>
+      ))}
+      <div data-fg="result" style={{ marginTop:8, padding:'9px 11px', borderRadius:10, background: color + '12', border: `1px solid ${color}30` }}>
+        <div style={{ fontSize:13, fontWeight:850, color }}>Итог: {total} — {band.label}</div>
+        <div style={{ fontSize:8, color:'#fff', marginTop:3, lineHeight:1.4 }}>→ {band.advice}</div>
+      </div>
+    </div>
+  );
+};
+
+/** RED-S светофор по признакам (Triad-2025: без EA-порогов, primary indicators). */
+const RedsTrafficLight: React.FC = () => {
+  const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const res = redsTrafficLight(flags as any);
+  const color = res.level === 'red' ? '#ef4444' : res.level === 'yellow' ? '#f59e0b' : '#22c55e';
+  const toggle = (on: boolean): React.CSSProperties => ({
+    width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 9, fontSize: 9, fontWeight: 700, cursor: 'pointer',
+    minHeight: 40, lineHeight: 1.3,
+    background: on ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
+    color: on ? '#fca5a5' : '#fff',
+    border: `1px solid ${on ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}`,
+  });
+  return (
+    <div style={cardBg} data-reds="root">
+      <div style={{ fontSize:11, fontWeight:800, color:'#f472b6', marginBottom:4 }}>🚦 RED-S — светофор по признакам</div>
+      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8, lineHeight:1.35 }}>Отметьте, что есть сейчас. Оценка честная: обновление Triad-2025 ушло от порогов энергодоступности — считаются клинические признаки (менструальные нарушения, BSI, РПП). Не диагноз — решение врача.</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+        {FEMALE_REDS_SIGNS.map((sg: any) => (
+          <button key={sg.id} type="button" aria-pressed={!!flags[sg.id]} aria-label={sg.label}
+            onClick={() => setFlags((prev) => ({ ...prev, [sg.id]: !prev[sg.id] }))}
+            style={toggle(!!flags[sg.id])}>
+            {flags[sg.id] ? '☑' : '☐'} {sg.label}
+            <span style={{ display:'block', fontSize:7, color:'var(--text-dim)', fontWeight:400, marginTop:1 }}>{sg.detail}</span>
+          </button>
+        ))}
+      </div>
+      <div data-reds="result" style={{ marginTop:8, padding:'9px 11px', borderRadius:10, background: color + '12', border: `1px solid ${color}30` }}>
+        <div style={{ fontSize:13, fontWeight:850, color }}>{res.label}</div>
+        {res.positive.length > 0 && (
+          <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:3 }}>Признаки: {res.positive.join(' · ')}</div>
+        )}
+        <div style={{ fontSize:8, color:'#fff', marginTop:3, lineHeight:1.4 }}>→ {res.advice}</div>
+      </div>
+    </div>
+  );
+};
+
 export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [womenTab, setWomenTab] = useState('virilization');
   return (
@@ -109,6 +183,8 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
             { id:'doses', label:'⚖️ Дозы веществ' },
             { id:'support', label:'🧪 Поддержка' },
             { id:'labs', label:'🧬 Лабы и СТОП' },
+            { id:'iron', label:'🩸 Железо и ферритин' },
+            { id:'cycle', label:'🦴 Цикл, кости, RED-S' },
             { id:'libido', label:'❤️ Либидо' },
             { id:'timeline', label:'🗓 Таймлайн цикла' },
             { id:'goals', label:'🏆 Цели и возраст' },
@@ -145,6 +221,7 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
                 </div>
               ))}
             </div>
+            <HirsutismScale />
           </div>
         )}
 
@@ -285,6 +362,91 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
               </div>
             ))}
             <StopBanner title="КРИТИЧЕСКИЕ ПОРОГИ — СТОП ДЛЯ ЖЕНЩИН" thresholds={FEMALE_STOP_THRESHOLDS.map((x: any) => `${x.marker} ${x.threshold} — ${x.action}`)} />
+          </div>
+        )}
+
+        {/* Железо и ферритин */}
+        {womenTab === 'iron' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>🩸 Железо и ферритин — атлетические пороги</div>
+              <p style={{ fontSize:8, color:'var(--text-dim)', margin:0, lineHeight:1.35 }}>Женщины-атлетки теряют железо с менструацией + гемолизом нагрузки; на курсе ААС стимулируют эритропоэз — железо можно грузить <b style={{ color:'#fca5a5' }}>только при подтверждённом дефиците и HCT &lt;48%</b>. Ориентиры: AAFP 2025, Stoffel/Moretti (Blood 2015/AJCN 2017), BJSM 2025.</p>
+              <div style={{ fontSize:8, color:'#fca5a5', marginTop:6, lineHeight:1.4, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>⛔ Железо — не «витамин на всякий случай»: при ферритине &gt;100 нг/мл добавление на курсе повышает вязкость крови и окислительный стресс.</div>
+            </div>
+            <StopBanner title="ГЕЙТЫ ЖЕЛЕЗА НА КУРСЕ" thresholds={FEMALE_IRON_GATES.filter((g: any) => g.level === 'stop').map((g: any) => g.text)} />
+            {FEMALE_IRON_GATES.filter((g: any) => g.level === 'doctor').map((g: any, i: number) => (
+              <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.18)' }}>
+                <div style={{ fontSize:8, color:'#fcd34d', lineHeight:1.4 }}>🩺 {g.text}</div>
+              </div>
+            ))}
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>📊 Пороги и трактовка</div>
+              {FEMALE_IRON_THRESHOLDS.map((x: any, i: number) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                    <span style={{ fontSize:9, fontWeight:700, color:'#f9a8d4' }}>{x.band}</span>
+                    <span style={{ fontSize:9, fontWeight:800, color:'#fff' }}>{x.value}</span>
+                  </div>
+                  <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:2, lineHeight:1.3 }}>{x.meaning}</div>
+                  <div style={{ fontSize:8, color:'#fca5a5', marginTop:2, lineHeight:1.35 }}>→ {x.action}</div>
+                </div>
+              ))}
+            </div>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>💊 Схема (при подтверждённом дефиците)</div>
+              {FEMALE_IRON_SCHEME.map((r: any, i: number) => (
+                <ItemRow key={i} name={r.name} dose={r.dose} timing={r.timing} note={r.note} color="#f472b6" />
+              ))}
+            </div>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>🧪 Диагностика и контроль</div>
+              {FEMALE_IRON_DIAGNOSTICS.map((d: any, i: number) => (
+                <div key={i} style={{ padding:'7px 9px', borderRadius:8, marginBottom:4, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{d.what}</div>
+                  <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2, lineHeight:1.35 }}>{d.action}</div>
+                </div>
+              ))}
+              <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4, lineHeight:1.35 }}>Смежные протоколы: «Гематокрит / кровь» (при HCT↑ железо исключить) · «Печёночная защита» · «Женское восстановление». Авто-слой поддержки добавляет железо только по анализам (ферритин &lt;30 и HCT &lt;48).</div>
+            </div>
+          </div>
+        )}
+
+        {/* Цикл, кости, RED-S */}
+        {womenTab === 'cycle' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>🦴 Цикл, кости, RED-S</div>
+              <p style={{ fontSize:8, color:'var(--text-dim)', margin:0, lineHeight:1.35 }}>Дефицит E2 (ААС-супрессия + энергодефицит) бьёт по костям и циклу. Аменорея — не «побочка», а алгоритм: беременности-тест → панель → врач; при длительной — DXA по z-score. Источники: Triad-2025 update (Sports Med 2026), IOC REDs 2023, AFP 2026, ACOG.</p>
+            </div>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>🩺 Аменорея — алгоритм (не одна строка)</div>
+              {FEMALE_AMENORRHEA_ALGO.map((x: any, i: number) => (
+                <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:4, background:'rgba(244,114,182,0.04)', border:'1px solid rgba(244,114,182,0.08)' }}>
+                  <div style={{ fontSize:9, fontWeight:800, color:'#f9a8d4' }}>{x.step}</div>
+                  <div style={{ fontSize:8, color:'#fff', marginTop:2, lineHeight:1.35 }}>{x.action}</div>
+                </div>
+              ))}
+            </div>
+            <RedsTrafficLight />
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>🦴 Костная защита (профилактика)</div>
+              {FEMALE_BONE_HONESTY.map((t: string, i: number) => (
+                <div key={i} style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4, marginBottom:3 }}>⚠ {t}</div>
+              ))}
+              <div style={{ marginTop:6 }}>
+                {(FEMALE_SUPPORT_PROTOCOLS.find((p: any) => p.id === 'bones')?.rows || []).map((r: any, i: number) => (
+                  <ItemRow key={`b${i}`} name={r.name} dose={r.dose} timing={r.timing} note={r.note} color="#f472b6" />
+                ))}
+              </div>
+              <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:4, lineHeight:1.35 }}>Полный протокол — таб «🧪 Поддержка» → «Кости (Ca/D3/K2/Mg)».</div>
+            </div>
+            <div style={cardBg}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>🚺 Урогенитальное на низком E2</div>
+              <p style={{ fontSize:8, color:'var(--text-dim)', margin:'0 0 6px', lineHeight:1.35 }}>Сухость/диспареуния и рецидивирующие ИМП — типичны при подавлении E2. Рецептурные позиции (локальный эстроген) — только гинеколог.</p>
+              {FEMALE_UROGENITAL_SUPPORT.map((r: any, i: number) => (
+                <ItemRow key={`u${i}`} name={r.name} dose={r.dose} timing={r.timing} note={r.note} color="#f472b6" />
+              ))}
+            </div>
           </div>
         )}
 

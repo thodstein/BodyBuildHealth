@@ -164,7 +164,7 @@ export interface SupportRecommendation {
   supportRisks?: SupportRisk[];  // H7: комбинаторные риски самого плана поддержки
   pedRisk?: PedRiskAssessment;   // v6: оценка PED-риска нейро/суставы (для UI-баннеров)
   /** Женский слой (только sex='female'): что добавлено усилением + флаги риска */
-  femaleLayer?: { added: string[]; flags: string[] };
+  femaleLayer?: { added: string[]; labels?: string[]; flags: string[]; removed?: string[] };
 }
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -1398,7 +1398,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             ))}
             {layer?.added?.length ? (
               <div style={{ fontSize:8, color:'#f9a8d4', lineHeight:1.4, marginTop:2 }}>
-                💊 Усиление поверх мужского набора: +{layer.added.join(', ')}
+                💊 Усиление поверх мужского набора: +{(layer.labels?.length ? layer.labels : layer.added).join(', ')}
               </div>
             ) : null}
           </div>
@@ -2687,7 +2687,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         <div data-female-layer="details" style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(244,114,182,0.05)', border:'1px solid rgba(244,114,182,0.14)' }}>
           <div style={{ fontSize:7, color:'#f9a8d4', lineHeight:1.5 }}>
             ♀ Женский слой: индекс {finalRecWithResidual.pedRisk.femaleVirilizationIndex ?? 0}/100 · флагов {(finalRecWithResidual.pedRisk.femaleFlags || []).length}
-            {finalRecWithResidual.femaleLayer?.added?.length ? ` · усиление: +${finalRecWithResidual.femaleLayer.added.join(', ')}` : ''}
+            {finalRecWithResidual.femaleLayer?.added?.length ? ` · усиление: +${(finalRecWithResidual.femaleLayer.labels?.length ? finalRecWithResidual.femaleLayer.labels : finalRecWithResidual.femaleLayer.added).join(', ')}` : ''}
           </div>
           <button
             data-female-layer-link

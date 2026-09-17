@@ -535,6 +535,18 @@ export const SUPPORT_DOSING: Record<string, DosingRecord> = {
     protocolRefs: ['Hematologic_Phase4'],
     riskThresholdKey: 'warfarin',
   },
+  // ── ЖЕЛЕЗО (только по анализам; женский слой — при ферритине <30 и HCT <48) ──
+  iron_bisglycinate: {
+    id: 'iron_bisglycinate', name: 'Iron bisglycinate', nameRu: 'Железо бисглицинат',
+    category: 'mineral',
+    doseRange: { min: 40, max: 100, unit: 'mg', frequency: 'daily_or_every_other_day' },
+    indications: ['iron_deficiency', 'low_ferritin_athlete', 'female_oncycle_confirmed_deficit'],
+    mechanisms: ['HEMOGLOBIN_SYNTHESIS', 'ERYTHROPOIESIS', 'IRON_REPLETION'],
+    warnings: ['only_confirmed_deficiency', 'stop_if_hct_48_plus', 'no_blind_supplementation', 'iv_only_doctor', 'spacing_with_ca_zn_coffee'],
+    evidenceLevel: 'B',
+    lastUpdated: '2026-09-17',
+    protocolRefs: ['Iron_Phase1', 'Women_AAS_Iron'],
+  },
   // ── HEMATO: lifestyle / процедуры (снижение Hct через ↑плазму) ──
   hydration: {
     id: 'hydration', name: 'Hydration', nameRu: 'Гидратация (питьевой режим)',
