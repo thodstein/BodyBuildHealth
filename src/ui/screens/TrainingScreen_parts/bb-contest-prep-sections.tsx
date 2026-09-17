@@ -24,7 +24,7 @@ import {
   prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv,
   manipulationLockedFor, manipulationLockNote, trialCarbDoseGPerKg,
   TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks, prepRefeedDates, addPeakPriming,
-  postShowRecoveryDiet, activePostShowCurve, buildPeakWeek, recarbLoadFromVisual,
+  postShowRecoveryDiet, activePostShowCurve, buildPeakWeek, recarbLoadFromVisual, coordinateLastHeavyDay,
   type PrepAdjustment,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
@@ -51,12 +51,15 @@ import {
   type Step, type BBPhase, type PlanMode,
 } from './bb-auto-constructor-shared';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN } from './training-ui';
+import { PeakWeekMonitorCard, ShowDayEmergencyCard, PrepLabsCard, ShowSeriesCard, ShowCoachCard } from '../../components/contest-prep/PeakWeekProCard';
+import { postShowRecoveryProgress } from '../../../engines/bb/bb-peak-pro.engine';
+import { getWeightLog } from '../../../engines/profile-store';
 
 export interface BbContestPrepCtx { [key: string]: any }
 
 /** A — шапка шага + пилюли визарда + подсказка + карточка «📅 Параметры подготовки» (шаги 1–3). */
 export const BbContestPrepParams: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) => {
-  const { adaptiveTaper, assembleContestPrep, buildContestPrepConfig, builtPlan, contestWizard, expYearsForPrep, handleApplyAdaptiveTaper, handleExtendPrep, handleShiftPrepShowDate, lastTest, peakSpec, peakWeekCategory, peds, prepApplied, prepBusy, prepCarbMode, prepCompetitions, prepConfirmedManip, prepContra, prepContraExtra, prepCreatineStop, prepMainCompetitionId, prepPlan, prepPreferLowFiber, prepShowDate, prepSodiumMode, prepTaperWeeks, prepTrainingProtocol, prepVolumeMode, prepWaterMode, prepWeeks, readiness, setContestWizard, setPeakSpec, setPeakWeekCategory, setPrepCarbMode, setPrepCompetitions, setPrepConfirmedManip, setPrepContraExtra, setPrepCreatineStop, setPrepMainCompetitionId, setPrepPreferLowFiber, setPrepSodiumMode, setPrepTaperWeeks, setPrepTrainingProtocol, setPrepVolumeMode, setPrepWaterMode, setStep, spillRisk } = ctx;
+  const { adaptiveTaper, assembleContestPrep, buildContestPrepConfig, builtPlan, setBuiltPlan, flash, contestWizard, expYearsForPrep, handleApplyAdaptiveTaper, handleExtendPrep, handleShiftPrepShowDate, lastTest, peakSpec, peakWeekCategory, peds, prepApplied, prepBusy, prepCarbMode, prepCompetitions, prepConfirmedManip, prepContra, prepContraExtra, prepCreatineStop, prepMainCompetitionId, prepPlan, prepPreferLowFiber, prepShowDate, prepSodiumMode, prepTaperWeeks, prepTrainingProtocol, prepVolumeMode, prepWaterMode, prepWeeks, readiness, setContestWizard, setPeakSpec, setPeakWeekCategory, setPrepCarbMode, setPrepCompetitions, setPrepConfirmedManip, setPrepContraExtra, setPrepCreatineStop, setPrepMainCompetitionId, setPrepPreferLowFiber, setPrepSodiumMode, setPrepTaperWeeks, setPrepTrainingProtocol, setPrepVolumeMode, setPrepWaterMode, setStep, spillRisk } = ctx;
   return (
     <>
       {/* <<Params>> */}
@@ -147,6 +150,15 @@ export const BbContestPrepParams: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }
               </div>
             ) : <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginBottom:6 }}>Одно шоу — дата выше. Добавьте старты для мульти-пика A/B/C.</div>}
             <button onClick={() => setPrepCompetitions((prev: any) => [...(prev||[]), { id:`comp_${Date.now().toString(36)}`, name:`Старт ${((prev||[]).length)+1}`, priority:'B' }])} style={{ fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.1)', color:'#f87171', border:'1px dashed rgba(239,68,68,0.3)', cursor:'pointer' }}>＋ Добавить соревнование</button>
+          </div>
+          {/* PRO-4: серия шоу — окна taper/пик по всем стартам + overreach (planTwoShowSequence) */}
+          <div style={{ display: contestWizard===3 ? 'block' : 'none', marginBottom: 8 }}>
+            <ShowSeriesCard
+              shows={(prepCompetitions || []).map((c: any) => ({ id: c.id, name: c.name, date: c.date, priority: c.priority }))}
+              builtPlan={builtPlan}
+              onPlanChange={(p: any) => setBuiltPlan(p)}
+              flash={flash}
+            />
           </div>
           <div style={{ display: contestWizard===3 ? 'block' : 'none' }}>
           <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
@@ -459,6 +471,9 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
                             <td style={{ padding:'4px 6px', textAlign:'right' }}>{rirMin}–4</td>
                             <td style={{ padding:'4px 6px', color:'#fff' }}>
                               {firstEx ? `${firstEx.name}${firstEx.workSets?.[0]?.weight ? ` · ${firstEx.workSets[0].weight} кг` : ''}` : 'памп/отдых'}
+                              {w.sessions.some((s: any) => s.peakWeekLastHardRest) && (
+                                <span data-bb="no-heavy" style={{ marginLeft:6, fontSize:8, fontWeight:800, color:'#60a5fa', border:'1px solid rgba(96,165,250,0.4)', borderRadius:999, padding:'0 6px', whiteSpace:'nowrap' }}>🛌 без тяжёлого</span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -479,8 +494,23 @@ export const BbContestPrepPreview: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx 
                       </span>
                     ))}
                   </div>
+                  {/* PRO-4: координата последней тяжёлой сессии плана (coordinateLastHeavyDay) */}
+                  {(() => {
+                    const lh = coordinateLastHeavyDay(builtPlan as any);
+                    return lh ? (
+                      <div data-bb="last-heavy" style={{ fontSize:9, color:'#fff', marginTop:4 }}>
+                        🏋️ Последняя тяжёлая сессия: нед {lh.weekOffset}, сессия {lh.sessionIndex + 1} · {lh.totalWorkingSets} рабочих сетов — дальше только памп/отдых (новые тяжёлые не добавляются).
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               );
+            })()}
+
+            {/* PRO-4: монитор пик-недели — ежедневные чек-ины (вес/вода/Na/углеводы/визуал). */}
+            {prepPlan && (() => {
+              const days = buildPeakWeek(configFromPlan(prepPlan), prepPlan.peakWeek?.carbDoseGPerKg != null ? { carbDoseGPerKg: prepPlan.peakWeek.carbDoseGPerKg } : undefined);
+              return <PeakWeekMonitorCard planId={prepPlan.id} peakDays={days} plan={prepPlan} />;
             })()}
 
             {/* 🏋️ Недели подготовки (режим подготовки) */}
@@ -1084,6 +1114,11 @@ export const BbContestPrepTrialSafety: React.FC<{ ctx: BbContestPrepCtx }> = ({ 
               );
             })()}
 
+            {/* PRO-4: коуч-проверка (scoreBBShowPrep + безопасный патч), лабы-чекпоинт, emergency */}
+            <ShowCoachCard plan={prepPlan ?? null} />
+            <PrepLabsCard planId={prepPlan?.id ?? ''} showDate={prepPlan?.showDate ?? ''} />
+            <ShowDayEmergencyCard />
+
       {/* <</TrialSafety>> */}
     </>
   );
@@ -1248,6 +1283,20 @@ export const BbContestPrepPost: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }) 
                           {track === 'reverse' ? 'Reverse' : 'Recovery'}-кривая: {curve.map(wk => `${wk.week}н ${wk.kcal}`).join(' → ')} ккал · regain-цель +10–15% веса сцены (~{Math.round(w0 * 1.1)}–{Math.round(w0 * 1.15)} кг при сцене {w0} кг)
                         </div>
                       );
+                    })()}
+                    {/* PRO-4: факт-вес vs цель regain (postShowRecoveryProgress) */}
+                    {(() => {
+                      try {
+                        const wlog = getWeightLog().map(e => ({ date: e.date, weight: e.weight }));
+                        const p = postShowRecoveryProgress(prepPlan, wlog);
+                        if (p.status === 'not_started') return null;
+                        const color = p.status === 'on_track' ? '#4ade80' : p.status === 'faster' ? '#60a5fa' : p.status === 'slower' ? '#fbbf24' : '#fff';
+                        return (
+                          <div data-bb="postshow-progress" style={{ fontSize:9, color, marginBottom:4 }}>
+                            📊 Нед {Math.max(0, p.weeksElapsed)} после шоу: факт {p.actualRegainPct != null ? `+${p.actualRegainPct}%` : '—'} / цель {p.targetRegainPct}%{p.stageWeightKg ? ` · сцена ${p.stageWeightKg} кг${p.latestWeightKg ? ` → ${p.latestWeightKg} кг` : ''}` : ''}. {p.advice}
+                          </div>
+                        );
+                      } catch { return null; }
                     })()}
                     <div style={{ fontSize:9, color:'#fff', marginBottom:4 }}>
                       ⏳ Восстановление — активная фаза 1–6 мес: ориентир regain 10–15% и маркеры (сон ≥7 ч, голод ≤3, цикл/либидо, сила ≥95%). Новый преп — только после восстановления (Buechel 2026; AUT 2026).

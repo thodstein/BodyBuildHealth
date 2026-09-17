@@ -19,6 +19,7 @@ import {
   type ContestSpecialization, type ContestEventEntry,
 } from '../../../../engines/bb/bb-contest-prep.engine';
 import { ContestPeakWeekCard } from '../../../../ui/components/contest-prep/ContestPeakWeekCard';
+import { PeakWeekMonitorCard, ShowDayEmergencyCard, PrepLabsCard, ShowSeriesCard, ShowCoachCard } from '../../../../ui/components/contest-prep/PeakWeekProCard';
 import { GlassCard } from './ui';
 import { shareOrCopyText } from './planner-day-print';
 import { usePlanCtx } from './IndividualPlanContext';
@@ -269,6 +270,12 @@ export const PeakWeekTab: React.FC = () => {
     return isoDiffDays(isoToday(), result.config.showDate);
   }, [result]);
 
+  // PRO-4: сохранённый единый план (id для монитора/лабов + полный контур для коуча).
+  const existingPlan = useMemo(() => {
+    try { return loadContestPrepPlan(); } catch { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTick, draft.showDate]);
+
   const autofillFromProfile = () => {
     try {
       const p = getProfile();
@@ -501,6 +508,19 @@ export const PeakWeekTab: React.FC = () => {
             <div style={{ marginTop: 6, fontSize: 9, color: DIM }}>K {result.peakWeek[0]?.potassiumMg} мг — не снижается всю неделю. Белок {result.peakWeek[0]?.proteinG} г — постоянный.</div>
           </div>
 
+          {/* PRO-4: монитор пик-недели (ежедневные чек-ины → тренд-советы) */}
+          <PeakWeekMonitorCard
+            planId={existingPlan?.id ?? ''}
+            peakDays={result.peakWeek}
+            plan={existingPlan ?? null}
+          />
+
+          {/* PRO-4: коуч-проверка (scoreBBShowPrep + безопасный патч конфига) */}
+          <ShowCoachCard
+            plan={existingPlan ?? null}
+            onApply={(p) => { patch(p); flash(() => {}); }}
+          />
+
           <div style={CARD}>
             <div style={CARD_TITLE}>⏰ День шоу по часам <span style={{ fontSize: 9, fontWeight: 700, color: DIM, marginLeft: 'auto' }}>сцена {draft.schedule?.stage || '12:00'}</span></div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -519,6 +539,17 @@ export const PeakWeekTab: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {/* PRO-4: серия шоу (окна taper/пика), лабы-чекпоинт, экстренная карточка */}
+          <ShowSeriesCard
+            shows={(draft.competitions && draft.competitions.length > 0)
+              ? draft.competitions.map(c => ({ id: c.id, name: c.name, date: c.date, priority: c.priority }))
+              : [{ id: 'main', name: 'Основное шоу', date: draft.showDate, priority: 'A' as const }]}
+          />
+          {existingPlan && (
+            <PrepLabsCard planId={existingPlan.id} showDate={result.config.showDate} />
+          )}
+          <ShowDayEmergencyCard />
 
           {result.warnings.length > 0 && (
             <div style={{ ...CARD, background: 'linear-gradient(180deg, rgba(60,20,20,0.6), rgba(24,24,27,0.7))', border: '1px solid rgba(239,68,68,0.25)' }}>

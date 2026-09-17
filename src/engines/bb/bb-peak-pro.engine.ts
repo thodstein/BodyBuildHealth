@@ -178,12 +178,16 @@ export interface PeakAdherenceResult {
 }
 
 /**
- * Адгеренс пик-недели: план (buildPeakWeek) vs факт-чек-ины.
+ * Адгеренс пик-недели: план (buildPeakWeek) vs факт-чек-ины. Принимает план ИЛИ
+ * готовый массив дней (UI часто держит уже построенные дни пик-недели).
  * Флаги: under_water (<70% плана), over_water (>150%), over_sodium (>150%),
  * under_carbs (<70% на load/peak днях).
  */
-export function peakWeekAdherence(plan: BBContestPrepPlan, entries: PeakDayEntry[]): PeakAdherenceResult {
-  const days = peakWeekDaysForPlan(plan);
+export function peakWeekAdherence(
+  planOrDays: BBContestPrepPlan | PeakWeekDayPlan[],
+  entries: PeakDayEntry[],
+): PeakAdherenceResult {
+  const days = Array.isArray(planOrDays) ? planOrDays : peakWeekDaysForPlan(planOrDays);
   const byDate = new Map((entries || []).filter(Boolean).map(e => [e.date, e]));
   const rows: PeakAdherenceRow[] = [];
   const allFlags = new Set<string>();
