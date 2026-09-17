@@ -8206,6 +8206,83 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // ─── P2-realism (волна-3 порядок): фруктовый кап ≤ maxFruitMeals — инвариант состава ───
+    // Поздние доборы пробивали лимит («5 приёмов с фруктом при лимите 4» — соль 2, 100 кг/max).
+    // ВОЛНА-3: перенесён ПЕРЕД экстрим-добором/P5b — удаление фрукта срезало день
+    // (R-HV 1445→1409, dev 3.7→6.1%), а последующие writer'ы теперь дотягивают углеводы
+    // обратно; сам кап от этого не слабеет (ни один проход ниже фруктов не добавляет).
+    {
+      const _fruitCap2 = QUOTA_LIMITS.maxFruitMeals;
+      const _fruitMealsNow = meals.filter((m: any) => (m.items || []).some((it: any) => it.role === 'fruit'));
+      if (_fruitMealsNow.length > _fruitCap2) {
+        const _rankMeal2 = (m: any): number => {
+          const t = String(m.type || '');
+          if (t === 'presleep') return 100; // мелатониновая порция — не трогаем
+          if (t === 'breakfast') return 90;
+          if (t.startsWith('snack')) return 10;
+          if (t === 'lunch' || t === 'dinner') return 30;
+          return 50;
+        };
+        let _over2 = _fruitMealsNow.length - _fruitCap2;
+        for (const _fm of [..._fruitMealsNow].sort((a: any, b: any) => _rankMeal2(a) - _rankMeal2(b))) {
+          if (_over2 <= 0) break;
+          if (_rankMeal2(_fm) >= 100) continue;
+          const _before2 = (_fm.items || []).length;
+          const _fruitGone = (_fm.items || []).filter((it: any) => it.role === 'fruit');
+          _fm.items = (_fm.items || []).filter((it: any) => it.role !== 'fruit');
+          if ((_fm.items || []).length !== _before2) {
+            // P2-fix: угли/ккал убранного фрукта переносим в углеводный носитель ТОГО ЖЕ
+            // приёма (если есть комната) — кап выполняется, сходимость дня не падает
+            // («operability 798.3 < 800» от потери фрукта).
+            // Носитель: сначала в том же приёме, иначе — крупнейший гарнир любого flex-приёма
+            // с комнатой (иначе потеря фрукта уходит «в никуда»: operability 800 → 797).
+            let _carrier = (_fm.items || []).find((it: any) => (it.role === 'carb_slow' || it.role === 'carb_fast') && !(it as any)._fixedGrams);
+            let _fdC2 = _carrier ? FOOD_DB.find((f: any) => f.id === _carrier?.id) : undefined;
+            let _cCap2 = _carrier && _fdC2 ? carbPortionCap(_fdC2, mealCapScaleOf(_fm)) : 0;
+            if (!_carrier || !_fdC2 || (_carrier.amount || 0) >= _cCap2) {
+              const _alt = meals
+                .filter((mm: any) => mm !== _fm && _flexMeal(mm) && !(mm as any)._insulinWindow)
+                .flatMap((mm: any) => (mm.items || []).map((it: any) => ({ mm, it })))
+                .filter((x: any) => (x.it.role === 'carb_slow' || x.it.role === 'carb_fast') && !(x.it as any)._fixedGrams)
+                .map((x: any) => {
+                  const _fd = FOOD_DB.find((f: any) => f.id === x.it.id);
+                  const _cap = _fd ? carbPortionCap(_fd, mealCapScaleOf(x.mm)) : 0;
+                  return { ...x, fd: _fd, room: _cap - (x.it.amount || 0), cap: _cap };
+                })
+                .filter((x: any) => x.fd && x.room >= 10)
+                .sort((a: any, b: any) => b.room - a.room)[0];
+              if (_alt) { _carrier = _alt.it; _fdC2 = _alt.fd; _cCap2 = _alt.cap; }
+            }
+            if (_carrier && _fdC2 && (_fdC2.carbs || 0) > 0 && (_carrier.amount || 0) < _cCap2) {
+              const _lostC2 = _fruitGone.reduce((s: number, it: any) => s + (it.c || 0), 0);
+              const _lostK2 = _fruitGone.reduce((s: number, it: any) => s + (it.kcal || 0), 0);
+              let _addG2 = Math.round((_lostC2 / Math.max(1, _fdC2.carbs) * 100) / 5) * 5;
+              _addG2 = Math.min(_addG2, _cCap2 - (_carrier.amount || 0));
+              // Не раздуваем белок дня за кап (+15%): носитель несёт внедрённый белок
+              // (болюс-день: перенос фрукта добивал план до 253.1 при капе 253.0).
+              const _pProj2 = totals.p + ((_fdC2.protein || 0) * _addG2) / 100;
+              // Волна-3: перенос — приоритет сходимости УГЛЕВОДОВ; белковый гейт только
+              // когда день ещё НЕ выше капа (иначе перенос умирал и день терял ~36 г У).
+              if ((input.goalProteinG || 0) > 0 && totals.p <= (input.goalProteinG || 0) * 1.148 && _pProj2 > (input.goalProteinG || 0) * 1.148) _addG2 = 0;
+              // ккал-паритет: не перекладывать больше, чем потеряно (ккал носителя)
+              if ((_fdC2.kcal || 0) > 0) _addG2 = Math.min(_addG2, Math.ceil(_lostK2 / Math.max(1, _fdC2.kcal) * 100 / 5) * 5);
+              if (_addG2 >= 10) {
+                const _r2b = ((_carrier.amount || 0) + _addG2) / Math.max(1, _carrier.amount || 1);
+                _carrier.amount = (_carrier.amount || 0) + _addG2;
+                _carrier.p = +((_carrier.p || 0) * _r2b).toFixed(1); _carrier.f = +((_carrier.f || 0) * _r2b).toFixed(1); _carrier.c = +((_carrier.c || 0) * _r2b).toFixed(1);
+                _carrier.kcal = Math.round(4 * _carrier.p + 9 * _carrier.f + 4 * _carrier.c);
+                _carrier.fiber = Math.round(((_carrier.fiber || 0) * _r2b) * 10) / 10;
+              }
+            }
+            _fm.totals = mealTotalsOf(_fm.items);
+            recalcDayTotals(meals, totals);
+            _over2--;
+            notes.push(`🍎 Фруктовый кап (≤${_fruitCap2} приёма): фрукт убран из «${_fm.label}» (поздний добор, угли перенесены в гарнир)`);
+          }
+        }
+      }
+    }
+
     // ─── §7.2-7c (R-HV 1500У): финальный У-добор экстрим-дня ПОСЛЕ всех проходов ───
     // Последний writer: промежуточные проходы (пери-стража/капы/P3) могли срезать рост
     // корректора (1323→1174). На экстрим-У дне (≥8 г/кг У и ≥2.3 г/кг Б) добиваем
@@ -8290,6 +8367,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // кап-гард внутри (проекция Б > цель×1.149 → стоп) — не гейт снаружи: при белочных
     // полах выше низкой цели (operability 190Б/100кг) углеводы всё равно нужны.
     if ((input.goalCarbsG || 0) > 0) {
+      // Волна-3 (компенсация census pending-5): база белка на СТАРТЕ дотяжки. Гвард
+      // «+15% цели» ниже раньше жёстко останавливал дотяжку, если день УЖЕ выше капа
+      // (полы цельного белка/якоря на низкой цели — operability 190Б/100кг). Тогда
+      // углеводная дотяжка умирала и экстрим-день терял ~40 г У (797→758). Теперь
+      // запас ограничен +5 г от старта — не раздуваем, но и не блокируем дотяжку.
+      const _p5bBaseP = totals.p;
       let _p5bGuard = 6;
       while (_p5bGuard-- > 0 && totals.c < (input.goalCarbsG || 0) * 0.92 && totals.kcal < (input.goalKcal || 0) * 1.02) {
         const _p5bCands = meals
@@ -8302,16 +8385,28 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             return { ...x, fd: _fd5, cap: _cap5, room: _cap5 - (x.it.amount || 0) };
           })
           .filter((x: any) => x.fd && x.room >= 10 && (x.fd.carbs || 0) > 0)
+          // Волна-3: если день УЖЕ выше белкового капа (+15%), дотяжка идёт только
+          // протеин-следовыми носителями (≤3 г Б/100 г: рис 2.7/картофель 1.7) —
+          // иначе шаг съедает запас +5 г на плотном белке (кукурузные хлопья 6.9)
+          // и углеводы не добираются (operability 790.4 vs порога 795).
+          .filter((x: any) => !((input.goalProteinG || 0) > 0 && _p5bBaseP > (input.goalProteinG || 0) * 1.149) || (x.fd.protein || 0) <= 3)
           .sort((a: any, b: any) => b.room - a.room);
         const _cand5 = _p5bCands[0];
         if (!_cand5) break;
         const _need5 = (input.goalCarbsG || 0) * 0.97 - totals.c;
-        const _add5 = Math.min(_cand5.room, Math.ceil(_need5 / Math.max(1, _cand5.fd.carbs) * 100 / 5) * 5);
-        if (_add5 < 10) break;
+        let _add5 = Math.min(_cand5.room, Math.ceil(_need5 / Math.max(1, _cand5.fd.carbs) * 100 / 5) * 5);
         // Не раздуваем белок дня за кап (+15% цели): шаг дотяжки носителей несёт
-        // внедрённый белок (кейс болюс-дня: 253.1 при капе 253.0).
-        const _pProj5 = totals.p + ((_cand5.fd.protein || 0) * _add5) / 100;
-        if ((input.goalProteinG || 0) > 0 && _pProj5 > (input.goalProteinG || 0) * 1.149) break;
+        // внедрённый белок (кейс болюс-дня: 253.1 при капе 253.0). Если день уже выше
+        // капа — шаг не отменяется, а УЖИМАЕТСЯ под общий запас +5 г от старта дотяжки
+        // (иначе дотяжка полностью умирает на низкой цели белка: operability 758 vs 795).
+        // Болюс-дни исключены: там кап белка уже нарушен резервом окон, и запас +5 г
+        // валил meal-target-scale (269.6 > 253) — им занимается P7-своп ниже.
+        if ((input.goalProteinG || 0) > 0 && (_cand5.fd.protein || 0) > 0 && _insulinPlanned.length === 0) {
+          const _pCap5 = Math.max((input.goalProteinG || 0) * 1.149, _p5bBaseP + 5);
+          const _head5 = Math.max(0, _pCap5 - totals.p);
+          _add5 = Math.min(_add5, Math.floor(_head5 / Math.max(0.01, _cand5.fd.protein) * 100 / 5) * 5);
+        }
+        if (_add5 < 10) break;
         const _r5 = ((_cand5.it.amount || 0) + _add5) / Math.max(1, _cand5.it.amount || 1);
         _cand5.it.amount = (_cand5.it.amount || 0) + _add5;
         _cand5.it.p = Math.round((_cand5.it.p || 0) * _r5 * 10) / 10;
@@ -8322,6 +8417,57 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         _cand5.m.totals = mealTotalsOf(_cand5.m.items);
         recalcDayTotals(meals, totals);
         notes.push(`🍚 Финальная дотяжка углеводов: ${_cand5.it.name} +${_add5} г (съедобный кап ${_cand5.cap} г)`);
+      }
+    }
+
+    // ─── P7 (волна-3): болюс-день — резка протеин-плотных углеводных носителей ───
+    // 3 инсулин-окна резервируют 75 г белка, но регулярные приёмы собираются из пулов,
+    // где носители несут внедрённый белок (кукурузные хлопья 7 г Б/80 г У) → день +19.7%
+    // при капе +15% (meal-target-scale; старые пулы давали 249). На болюс-дне, где И
+    // углеводы уже недобраны (<92% цели), срезаем дефицит белка с носителей с наибольшим
+    // белок/углевод-отношением (овсянка 13/60, картофель 2/17; рис 2.7/28 — не трогаем:
+    // плотность ниже) — до пола 25% веса, не ниже 30 г. Окна/рецепты/_fixedGrams целы;
+    // R-HV (угли ≥92%) и дни без окон не задеваются.
+    if (_insulinPlanned.length > 0 && (input.goalProteinG || 0) > 0
+      && totals.p > (input.goalProteinG || 0) * 1.15
+      && totals.c < (input.goalCarbsG || 0) * 0.92) {
+      const _capP7 = (input.goalProteinG || 0) * 1.15;
+      const _floor7 = Math.max(30, Math.round((input.weightKg || 80) * 0.25));
+      let _guard7 = 12;
+      while (totals.p > _capP7 && _guard7-- > 0) {
+        let _best7: { m: any; it: any; fd: any; dens: number } | null = null;
+        for (const m of meals) {
+          if ((m as any)._insulinWindow) continue;
+          if ((m as any).recipeApplied || (m as any).recipeAppliedData) continue;
+          for (const it of (m.items || [])) {
+            if (it.role !== 'carb_slow' && it.role !== 'carb_fast') continue;
+            if ((it as any)._fixedGrams) continue;
+            const fd = FOOD_DB.find(f => f.id === it.id);
+            if (!fd || (fd.protein || 0) <= 0 || (fd.carbs || 0) <= 0) continue;
+            if ((it.amount || 0) <= _floor7) continue;
+            const dens = (fd.protein || 0) / (fd.carbs || 0);
+            if (dens < 0.08) continue; // рис/крем — низкая плотность, сходимость дороже
+            if (!_best7 || dens > _best7.dens) _best7 = { m, it, fd, dens };
+          }
+        }
+        if (!_best7) break;
+        const _needP7 = totals.p - _capP7;
+        const _cutG7 = Math.min((_best7.it.amount || 0) - _floor7, Math.max(10, Math.ceil((_needP7 / (_best7.fd.protein || 1)) * 100 / 5) * 5));
+        if (_cutG7 < 10) break;
+        const _oldP7 = ((_best7.fd.protein || 0) * (_best7.it.amount || 0)) / 100;
+        const _newA7 = (_best7.it.amount || 0) - _cutG7;
+        const _r7 = _newA7 / Math.max(1, _best7.it.amount || 1);
+        const _newP7 = _oldP7 * _r7;
+        _best7.it.amount = _newA7;
+        _best7.it.p = Math.round((_best7.it.p || 0) * _r7 * 10) / 10;
+        _best7.it.f = Math.round((_best7.it.f || 0) * _r7 * 10) / 10;
+        _best7.it.c = Math.round((_best7.it.c || 0) * _r7 * 10) / 10;
+        _best7.it.kcal = Math.round(4 * _best7.it.p + 9 * _best7.it.f + 4 * _best7.it.c);
+        _best7.it.fiber = Math.round(((_best7.it.fiber || 0) * _r7) * 10) / 10;
+        if (_best7.it.leucine_mg != null) _best7.it.leucine_mg = Math.round(_best7.it.leucine_mg * _r7);
+        _best7.m.totals = mealTotalsOf(_best7.m.items);
+        recalcDayTotals(meals, totals);
+        notes.push(`🍚 Болюс-день: ${_best7.fd.name} ужат до ${_newA7} г (белок −${Math.round((_oldP7 - _newP7) * 10) / 10} г — кап окон +15%)`);
       }
     }
 
@@ -8366,74 +8512,54 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
-    // ─── P2-realism: фруктовый кап ≤ maxFruitMeals — финальный инвариант ───
-    // Поздние доборы пробивали лимит («5 приёмов с фруктом при лимите 4» — соль 2, 100 кг/max).
-    // Ставится ПОСЛЕ всех доборов и ПЕРЕД §realism-пересбором mpsSummary (витрина = выдача).
-    {
-      const _fruitCap2 = QUOTA_LIMITS.maxFruitMeals;
-      const _fruitMealsNow = meals.filter((m: any) => (m.items || []).some((it: any) => it.role === 'fruit'));
-      if (_fruitMealsNow.length > _fruitCap2) {
-        const _rankMeal2 = (m: any): number => {
-          const t = String(m.type || '');
-          if (t === 'presleep') return 100; // мелатониновая порция — не трогаем
-          if (t === 'breakfast') return 90;
-          if (t.startsWith('snack')) return 10;
-          if (t === 'lunch' || t === 'dinner') return 30;
-          return 50;
-        };
-        let _over2 = _fruitMealsNow.length - _fruitCap2;
-        for (const _fm of [..._fruitMealsNow].sort((a: any, b: any) => _rankMeal2(a) - _rankMeal2(b))) {
-          if (_over2 <= 0) break;
-          if (_rankMeal2(_fm) >= 100) continue;
-          const _before2 = (_fm.items || []).length;
-          const _fruitGone = (_fm.items || []).filter((it: any) => it.role === 'fruit');
-          _fm.items = (_fm.items || []).filter((it: any) => it.role !== 'fruit');
-          if ((_fm.items || []).length !== _before2) {
-            // P2-fix: угли/ккал убранного фрукта переносим в углеводный носитель ТОГО ЖЕ
-            // приёма (если есть комната) — кап выполняется, сходимость дня не падает
-            // («operability 798.3 < 800» от потери фрукта).
-            // Носитель: сначала в том же приёме, иначе — крупнейший гарнир любого flex-приёма
-            // с комнатой (иначе потеря фрукта уходит «в никуда»: operability 800 → 797).
-            let _carrier = (_fm.items || []).find((it: any) => (it.role === 'carb_slow' || it.role === 'carb_fast') && !(it as any)._fixedGrams);
-            let _fdC2 = _carrier ? FOOD_DB.find((f: any) => f.id === _carrier?.id) : undefined;
-            let _cCap2 = _carrier && _fdC2 ? carbPortionCap(_fdC2, mealCapScaleOf(_fm)) : 0;
-            if (!_carrier || !_fdC2 || (_carrier.amount || 0) >= _cCap2) {
-              const _alt = meals
-                .filter((mm: any) => mm !== _fm && _flexMeal(mm) && !(mm as any)._insulinWindow)
-                .flatMap((mm: any) => (mm.items || []).map((it: any) => ({ mm, it })))
-                .filter((x: any) => (x.it.role === 'carb_slow' || x.it.role === 'carb_fast') && !(x.it as any)._fixedGrams)
-                .map((x: any) => {
-                  const _fd = FOOD_DB.find((f: any) => f.id === x.it.id);
-                  const _cap = _fd ? carbPortionCap(_fd, mealCapScaleOf(x.mm)) : 0;
-                  return { ...x, fd: _fd, room: _cap - (x.it.amount || 0), cap: _cap };
-                })
-                .filter((x: any) => x.fd && x.room >= 10)
-                .sort((a: any, b: any) => b.room - a.room)[0];
-              if (_alt) { _carrier = _alt.it; _fdC2 = _alt.fd; _cCap2 = _alt.cap; }
-            }
-            if (_carrier && _fdC2 && (_fdC2.carbs || 0) > 0 && (_carrier.amount || 0) < _cCap2) {
-              const _lostC2 = _fruitGone.reduce((s: number, it: any) => s + (it.c || 0), 0);
-              const _lostK2 = _fruitGone.reduce((s: number, it: any) => s + (it.kcal || 0), 0);
-              let _addG2 = Math.round((_lostC2 / Math.max(1, _fdC2.carbs) * 100) / 5) * 5;
-              _addG2 = Math.min(_addG2, _cCap2 - (_carrier.amount || 0));
-              // Не раздуваем белок дня за кап (+15%): носитель несёт внедрённый белок
-              // (болюс-день: перенос фрукта добивал план до 253.1 при капе 253.0).
-              const _pProj2 = totals.p + ((_fdC2.protein || 0) * _addG2) / 100;
-              if ((input.goalProteinG || 0) > 0 && _pProj2 > (input.goalProteinG || 0) * 1.148) _addG2 = 0;
-              // ккал-паритет: не перекладывать больше, чем потеряно (ккал носителя)
-              if ((_fdC2.kcal || 0) > 0) _addG2 = Math.min(_addG2, Math.ceil(_lostK2 / Math.max(1, _fdC2.kcal) * 100 / 5) * 5);
-              if (_addG2 >= 10) {
-                const _r2b = ((_carrier.amount || 0) + _addG2) / Math.max(1, _carrier.amount || 1);
-                _carrier.amount = (_carrier.amount || 0) + _addG2;
-                _carrier.p = +((_carrier.p || 0) * _r2b).toFixed(1); _carrier.f = +((_carrier.f || 0) * _r2b).toFixed(1); _carrier.c = +((_carrier.c || 0) * _r2b).toFixed(1);
-                _carrier.kcal = Math.round(4 * _carrier.p + 9 * _carrier.f + 4 * _carrier.c);
-                _carrier.fiber = Math.round(((_carrier.fiber || 0) * _r2b) * 10) / 10;
-              }
-            }
-            _fm.totals = mealTotalsOf(_fm.items);
+    // ─── P6 (волна-3): MPS-потолок основного приёма 0.62 г/кг LBM — финальный инвариант ───
+    // Верхняя граница MPS-коридора (Schoenfeld & Aragon 2018: 0.4-0.55 г/кг LBM + посадка).
+    // Рост носителей/«посадка» несли внедрённый белок и могли увести мейн за потолок
+    // (dguarantees обед 0.6206 при 0.62). Режем ТОЛЬКО когда день уже на/выше цели белка
+    // (0.99) и это не ultra-P-бюджет 500Б (там мейн ~0.62+ г/кг LBM осознан; Morton-потолок).
+    if ((input.goalProteinG || 0) > 0 && (input.lbmKg || 0) > 0) {
+      const _ultraP6 = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
+      if (!_ultraP6 && totals.p >= (input.goalProteinG || 0) * 0.99) {
+        const _pCeil6 = (input.lbmKg as number) * 0.62;
+        const _floorP6 = (input.lbmKg as number) * 0.22; // нижний MPS-пол приёма — неприкосновенен
+        for (const m of meals) {
+          const _t6 = String((m as any).type || '');
+          if (!['breakfast', 'lunch', 'dinner'].includes(_t6) || (m as any)._insulinWindow) continue;
+          let _mp6 = m.items.reduce((s, i) => s + i.p, 0);
+          if (_mp6 <= _pCeil6) continue;
+          const _items6 = m.items
+            .filter(it => ['protein', 'fast_protein', 'slow_protein'].includes(it.role))
+            .sort((a, b) => ((a.role === 'protein' ? 1 : 0) - (b.role === 'protein' ? 1 : 0)) || ((b.p || 0) - (a.p || 0)));
+          for (const it of _items6) {
+            if (_mp6 <= _pCeil6 || _mp6 <= _floorP6) break;
+            const food = FOOD_DB.find(f => f.id === it.id);
+            if (!food || !food.protein || !(it.amount)) continue;
+            // Жёсткий минимум (не «реалистичный пол» 110*scale=124 г): ужать мейн на 1-2 г —
+            // норма (dguarantees обед 0.6206), а его turkey 100 г «пол» не достигает и блокировал
+            // правку. Ниже 0.5*веса порция мяса не опускается, порошки — 20 г (MPS-порция).
+            const _hard6 = (it.role === 'fast_protein' || it.role === 'slow_protein')
+              ? 20
+              : Math.max(40, Math.round((input.weightKg || 80) * 0.5));
+            const _fl6 = Math.max(10, Math.min(realisticFloorG(food, it.role, false, input.weightKg || 80), _hard6));
+            if (it.amount <= _fl6) continue;
+            const _needG6 = Math.ceil(((_mp6 - _pCeil6) / food.protein) * 100);
+            const _newA6 = Math.max(_fl6, it.amount - _needG6);
+            if (_newA6 >= it.amount) continue;
+            const _r6 = _newA6 / Math.max(1, it.amount);
+            const _lost6 = (it.p || 0) * (1 - _r6);
+            it.amount = _newA6;
+            it.p = Math.round((it.p || 0) * _r6 * 10) / 10;
+            it.f = Math.round((it.f || 0) * _r6 * 10) / 10;
+            it.c = Math.round((it.c || 0) * _r6 * 10) / 10;
+            it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+            it.fiber = Math.round((it.fiber || 0) * _r6 * 10) / 10;
+            if (it.leucine_mg != null) it.leucine_mg = Math.round(it.leucine_mg * _r6);
+            _mp6 -= _lost6;
+          }
+          if (_mp6 <= _pCeil6 + 0.05) {
+            m.totals = mealTotalsOf(m.items);
             recalcDayTotals(meals, totals);
-            _over2--;
-            notes.push(`🍎 Фруктовый кап (≤${_fruitCap2} приёма): фрукт убран из «${_fm.label}» (поздний добор, угли перенесены в гарнир)`);
+            notes.push(`⚖️ «${m.label}»: белок ужат до MPS-потолка ${(_pCeil6).toFixed(1)} г (0.62 г/кг LBM)`);
           }
         }
       }

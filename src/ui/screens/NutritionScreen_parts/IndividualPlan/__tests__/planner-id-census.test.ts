@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
-import { foodAvailableForPlan, EXOTIC_FOOD_IDS, SPECIALTY_FOOD_IDS } from '../food-availability';
+import { foodAvailableForPlan, EXOTIC_FOOD_IDS, SPECIALTY_FOOD_IDS, SPECIALTY_POSITION_SUBSTITUTE } from '../food-availability';
 
 /** Токены экзотики/нишевых продуктов из аудита дрейфа (растут вместе с находками). */
 const EXOTIC_TOKENS = [
@@ -24,11 +24,14 @@ const EXOTIC_TOKENS = [
 ];
 
 /**
- * Документированные дрейф-двойники, ещё НЕ закрытые (найдены этим тестом 2026-09-17):
- * их гейт двигает seeded-пулы и требует компенсационной волны (как P1: гейт + позиционная
- * замена + разбор падений). Пока — явный allowlist: НОВЫЙ дрейф падает, а эти 5 ждут волну.
+ * Документированные дрейф-двойники, ожидающие волну компенсации.
+ * ВОЛНА-3 (2026-09-17): pending-5 закрыт кодом (EXOTIC-гейт + SPECIALTY_POSITION_SUBSTITUTE);
+ * список обязан оставаться пустым — новый дрейф обязан падать здесь, а не расширять allowlist.
  */
-const KNOWN_PENDING_LEAKS = ['sea_urchin', 'abalone', 'ostrich_egg', 'berry_acai', 'fruit_durian'];
+const KNOWN_PENDING_LEAKS: string[] = [];
+
+/** Закрытые волной-3 дрейф-двойники — регресс-лок (обязаны быть непланируемыми). */
+const CLOSED_WAVE3 = ['sea_urchin', 'abalone', 'ostrich_egg', 'berry_acai', 'fruit_durian'];
 
 describe('CENSUS: дрейф id экзотики — гейт держит все реальные id шардов', () => {
   it('каждый FOOD_DB-id с экзотическим токеном непланируем (кроме документированного pending-5)', () => {
@@ -43,10 +46,19 @@ describe('CENSUS: дрейф id экзотики — гейт держит вс�
     expect(leaks, `новый дрейф (не в KNOWN_PENDING_LEAKS): → ${leaks.join(', ')}`).toEqual([]);
   });
 
-  it('pending-список не растёт молча (≤5 документированных)', () => {
+  it('pending-список пуст (pending-5 закрыт волной-3, allowlist не расширяется)', () => {
     // Если волна закрыла часть — обнови KNOWN_PENDING_LEAKS и EXOTIC/SPECIALTY; если
     // появились новые — это падение первого теста, а не расширение списка.
-    expect(KNOWN_PENDING_LEAKS.length, 'pending-дрейф вырос — нужна волна гейта (см. бэклог)').toBeLessThanOrEqual(5);
+    expect(KNOWN_PENDING_LEAKS.length, 'pending-дрейф вырос — нужна волна гейта (см. бэклог)').toBe(0);
+  });
+
+  it('волна-3: закрытые дрейф-двойники непланируемы и имеют позиционную замену', () => {
+    for (const id of CLOSED_WAVE3) {
+      const f = FOOD_DB.find(x => x.id === id);
+      expect(f, `FOOD_DB потерял id ${id}`).toBeTruthy();
+      expect(foodAvailableForPlan(f!), `${id}: обязан быть загейчен`).toBe(false);
+      expect(SPECIALTY_POSITION_SUBSTITUTE[id], `${id}: нет позиционной замены`).toBeTruthy();
+    }
   });
 
   it('загейченные id приходят из реестров (EXOTIC/SPECIALTY), а не из случайной фильтрации', () => {

@@ -52,9 +52,11 @@ export const EXOTIC_FOOD_IDS: ReadonlySet<string> = new Set([
   'meat_ostrich', 'meat_kangaroo', 'meat_alligator', 'meat_bison_ribeye',
   // FIX base-2026-09: реальные id экзотики из FOOD_DB (иначе «кенгуру в предтрен»).
   'exotic_kangaroo_loin', 'exotic_crocodile', 'exotic_ostrich',
-  // CENSUS-2026-09 нашёл ещё 5 дрейф-двойников (sea_urchin/abalone/ostrich_egg/
-  // berry_acai/fruit_durian) — НЕ гейтим в этой волне: их закрытие двигает seeded-пулы
-  // и требует своей компенсации (см. бэклог `planner-id-census` KNOWN_PENDING_LEAKS).
+  // CENSUS-2026-09 (волна-3): закрыты 5 дрейф-двойников, найденных цензом
+  // (изначальный эксперимент: `sea_urchin`, `abalone`, `ostrich_egg`, `berry_acai`,
+  // `fruit_durian` — канонические двойники были гейчены, эти id генерация видела 'core').
+  // Позиционная замена в пулах — SPECIALTY_POSITION_SUBSTITUTE (длина/индексы seeded-пулов целы).
+  'sea_urchin', 'abalone', 'ostrich_egg', 'berry_acai', 'fruit_durian',
 ]);
 
 // ─── 2. Specialty: только по явному предпочтению пользователя ─────────
@@ -373,6 +375,15 @@ export const SPECIALTY_POSITION_SUBSTITUTE: Record<string, string> = {
   greens_watercress: 'spinach',
   veg_fennel: 'cucumber',
   veg_fennel_bulb: 'zucchini',
+  // CENSUS-2026-09 (волна-3): 5 дрейф-двойников закрыты гейтом EXOTIC — позиционная
+  // замена 1-в-1 по макро-профилю позиции (иначе выброс id сдвигает seeded-пики):
+  // морской ёж (12Б/11Ж деликатес) ≈ стейк тунца; абалон (17Б/0.8Ж) ≈ минтай;
+  // страусиное яйцо ≈ куриное; асаи ≈ черника (ягода → ягода); дуриан ≈ банан.
+  sea_urchin: 'tuna_steak',
+  abalone: 'pollock',
+  ostrich_egg: 'egg_whole',
+  berry_acai: 'blueberries',
+  fruit_durian: 'banana',
 };
 
 /**

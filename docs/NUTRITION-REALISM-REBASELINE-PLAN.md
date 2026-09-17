@@ -14,7 +14,26 @@
 > recipe-HV 5.5%, keto — дизайн 6% ккал). **Область 929/929 (88 файлов), полный 14406 passed /
 > 8 failed (все 5 файлов чужие предсуществующие), `tsc` 0.**
 >
-> ## §Волна-3 (бэклог, готовый промпт)
+> **СТАТУС-3 (волна-3, коммит этой сессии)**: §Волна-3 закрыт кодом полностью.
+> 1) **Census pending-5**: `sea_urchin`/`abalone`/`ostrich_egg`/`berry_acai`/`fruit_durian` добавлены
+> в `EXOTIC_FOOD_IDS` + `SPECIALTY_POSITION_SUBSTITUTE` (tuna_steak/pollock/egg_whole/blueberries/banana),
+> `KNOWN_PENDING_LEAKS` пуст + регресс-лок в цензе. Каскад 5/5 вычинен кодом (числа было→стало):
+> operability **757.5→828.6** (>795), dguarantees обед **0.6206→0.6165** (≤0.62), болюс-день
+> **263.3→252.8** (≤253), R-HV **6.09%→0.81%** (≤5.5%), R-1500 перекус **4.75→6.3 г** (≥5).
+> Механизмы: P5b-дотяжка (ужим шага под +5 г от старта при дне выше капа + фильтр носителей ≤3 г Б/100
+> для не-болюс-дней), фруктовый кап ПЕРЕД экстрим-добором/P5b, MPS-потолок мейна 0.62 г/кг LBM
+> (при дне ≥99% цели, кроме ultra-P), P7-ужим протеин-плотных носителей на болюс-дне (<92% У),
+> восстановление белка перекуса в рецептурном пути.
+> 2) **Карточка «🧭 Почему день не сошёлся»**: `planner-day-explain` (чистая классификация notes
+> движка) + блок в выдаче (причины/компенсации/проверки + честный заголовок по отклонению), движок
+> не менялся.
+> 3) **A/B планов**: `planner-ab-compare` (снапшоты A/B в `he_nutrition_ab_v1`, diff КБЖУ/приёмов/
+> состава/заметок) + карточка «⚖️ A/B планов» в выдаче.
+> Тесты: область IndividualPlan **957/957 (91 файл)**, `tsc` 0, полный прогон **14445 passed / 8 failed
+> (5 чужих файлов: course-sync ×4, bb-macrocycle v7, annual-audit-fixes, pl-auto-regressions,
+> bb-diagnostics-max-pro female-symmetry) / 20 skipped**.
+>
+> ## §Волна-3 (ВЫПОЛНЕН — см. СТАТУС-3 выше; ниже исходный бэклог-промпт)
 > 1. **Census pending-5** (`sea_urchin`, `abalone`, `ostrich_egg`, `berry_acai`, `fruit_durian` —
 >    `KNOWN_PENDING_LEAKS` в `planner-id-census.test.ts`): добавить в EXOTIC + позиционная замена
 >    (по образцу `SPECIALTY_POSITION_SUBSTITUTE`: blueberries/banana/tuna_steak/pollock/egg_whole),

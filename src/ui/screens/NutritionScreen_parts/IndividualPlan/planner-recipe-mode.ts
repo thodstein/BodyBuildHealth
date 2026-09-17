@@ -2102,6 +2102,29 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // в продукт-пути. Только основные приёмы, только низкобелковые носители, ккал-перебор ≤ +5%.
   notes = [...notes, ...extremeCarbTopUp(outMeals, targets, { weightKg: args.athleteWeightKg ?? 80 })];
 
+  // Волна-3 (компенсация census pending-5): белковое присутствие перекуса — финальный
+  // инвариант рецептурного пути (R-1500: «перекус ≥100 ккал с белковым пунктом»).
+  // Резка перебора/посадка ужимали единственный белковый пункт ниже 5 г (арахисовая паста
+  // 27→19 г = 4.75 г Б) — перекус оставался «пустым по белку» при живых калориях.
+  // Добавляем лёгкий белковый пункт (творожный тип, не порошок) — MPS-интервал дня цел.
+  {
+    for (const m of outMeals as any[]) {
+      const t = String((m as any).type || '');
+      if (!t.startsWith('snack') || (m as any)._insulinWindow) continue;
+      const items = (m.items || []) as any[];
+      if (items.length === 0 || (m.totals?.kcal || 0) < 100) continue;
+      if (items.some((i: any) => (i.p || 0) >= 5)) continue;
+      const prot = topupFoods(TOPUP_PROTEIN_IDS, excludedIds)
+        .filter(f => !excludedIds?.has(f.id) && (f.protein || 0) > 0 && (f.protein || 0) < 20)
+        .sort((a, b) => (a.kcal || 0) - (b.kcal || 0))[0];
+      if (!prot) continue;
+      const gP = Math.min(60, Math.max(30, Math.round(5.5 / Math.max(1, prot.protein || 1) * 100 / 5) * 5));
+      m.items = [...items, scaleItem({ name: prot.name, id: prot.id, amount: 100, kcal: Math.round(prot.kcal || 0), p: prot.protein || 0, f: prot.fat || 0, c: prot.carbs || 0, fiber: prot.fiber || 0 } as any, gP)];
+      m.totals = sumMealTotals(m.items as any);
+      notes.push(`🍽 «${m.label}»: белковый пункт восстановлен (${prot.name} ${gP} г) — перекус оставался без белка`);
+    }
+  }
+
   // Тримы/доборы меняют тоталы — пересчитываем честную девиацию (иначе врём на ~1 п.п.).
   const _finTot = sumDayTotals(outMeals);
   const _finDev = maxDeviationPct(_finTot as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any);

@@ -18,6 +18,11 @@ import { MealQuickControls } from "./MealQuickControls";
 import { readDiaryV2 } from "../diary-storage-v2";
 import { buildDayReportPrintHtml, buildMealTimelinePrintHtml, buildRecipePlanPrintHtml, buildCoachExportHtml, shareOrCopyText, printPlanHtml, downloadCoachFile } from "./planner-day-print";
 import { buildDayBriefing } from "./planner-briefing";
+import { explainDayPlan } from "./planner-day-explain";
+import {
+  loadAbSnapshots, saveAbSnapshot, removeAbSnapshot, snapshotFromDayPlan, diffAbSnapshots,
+  AB_SLOTS, type AbSlot, type AbPlanSnapshot, type AbDiffResult,
+} from "./planner-ab-compare";
 
 const getDiaryEntriesForDate = (date: string): any[] => {
   try {
@@ -116,6 +121,11 @@ export const IndividualPlanResults: React.FC = () => {
 
   const [showCorrectPopup, setShowCorrectPopup] = useState(false);
   const [correctIssues, setCorrectIssues] = useState<{ mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] | null>(null);
+  // Волна-3: A/B двух планов питания (снапшоты A/B в localStorage + diff) — состояние наверху
+  // (Rules of Hooks: карточка рендерится условно, хуки — всегда).
+  const [abSnaps, setAbSnaps] = useState<Partial<Record<AbSlot, AbPlanSnapshot>>>(() => loadAbSnapshots());
+  const [abDiff, setAbDiff] = useState<AbDiffResult | null>(null);
+  const [abShowDiff, setAbShowDiff] = useState(false);
 
   const analyzePlanIssues = () => {
     // FIX button-audit: активный план по view + клэмп индекса (иначе после недельного вида
@@ -423,6 +433,45 @@ const doImportPlan = (raw: string): boolean => {
             <span style={{ flex: 1, minWidth: 180 }}>Часть приёмов перегружена (каша/крупа упирается в лимит порции) — число приёмов подбирается автоматически; увеличьте объём дня или смените бюджет/разнообразие.</span>
           </div>
         )}
+        {generated && dayPlan && (() => {
+          // Волна-3: «почему день не сошёлся» — чистый разбор notes движка (движок не меняется):
+          // причины (⚠ «Не сошлось»/«Корректор…»/<60%…), компенсации (добор/дотяжка/ужатие) и
+          // точечные проверки (MPS-интервалы, натрий, клетчатка).
+          const ex = explainDayPlan(dayPlan as any, planTargets as any);
+          // Заголовок честный: причины из notes движка («Не сошлось»/«Корректор…»/<60%)
+          // важнее расчётной девиации — день мог не сойтись и без отдельной ноты.
+          const bad = ex.causes.length > 0 || (ex.devPct != null && ex.devPct > ex.tolerance);
+          const hasContent = ex.causes.length > 0 || ex.fixes.length > 0 || ex.checks.length > 0 || bad;
+          if (!hasContent) return null;
+          const accent = bad ? '#f59e0b' : '#22c55e';
+          return (
+            <div data-bitexplain="1" role="status" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: bad ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)', border: `1px solid ${bad ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.25)'}` }}>
+              <div data-bitexplain-head style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 3 }}>{bad ? '🧭 Почему день не сошёлся' : '🧭 Разбор дня (сошёлся)'}</div>
+              {ex.headline && <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>{ex.headline}</div>}
+              {ex.causes.map((r, i) => (
+                <div key={'bc' + i} data-bitexplain-cause={r.id} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginBottom: 3 }}>
+                  <span style={{ color: accent, fontWeight: 700 }}>⚠ {r.title}.</span> {r.hint}
+                </div>
+              ))}
+              {ex.fixes.length > 0 && (
+                <details data-bitexplain-fixes="1" style={{ marginTop: 2 }}>
+                  <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>🔧 Что движок сделал ({ex.fixes.length})</summary>
+                  {ex.fixes.map((r, i) => (
+                    <div key={'bf' + i} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>• {r.title}: {r.hint}</div>
+                  ))}
+                </details>
+              )}
+              {ex.checks.length > 0 && (
+                <details data-bitexplain-checks="1" style={{ marginTop: 2 }}>
+                  <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>☑ Проверить ({ex.checks.length})</summary>
+                  {ex.checks.map((r, i) => (
+                    <div key={'bk' + i} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>• {r.title}: {r.hint}</div>
+                  ))}
+                </details>
+              )}
+            </div>
+          );
+        })()}
         <GlassCard title="Выбор дней" icon="📅" color="#00e68a">
           <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:999, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.14)', color:'rgba(255,255,255,0.68)', fontSize:10, margin:'0 auto 8px', fontWeight:600, textAlign:'center' }}>👆 Нажмите на день — откроется план на 1 день</div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:5, marginBottom:10 }}>
@@ -2253,6 +2302,97 @@ const doImportPlan = (raw: string): boolean => {
               </div>
             );
           })}
+        </GlassCard>
+      )}
+
+      {/* Волна-3: A/B двух планов — снапшоты дня в слоты A/B + diff (КБЖУ/приёмы/состав/заметки) */}
+      {generated && dayPlan && (
+        <GlassCard title="A/B планов" icon="⚖️" color="#22d3ee" style={{ border: '1px solid rgba(34,211,238,0.15)' }}>
+          <div style={{ fontSize: 9, color: '#fff', marginBottom: 6, lineHeight: 1.4 }}>
+            Снимите текущий день в слот A (например, «до»), перегенерируйте/смените настройки и снимите в B — сравните КБЖУ, приёмы и состав.
+          </div>
+          <div data-ab="card" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+            {AB_SLOTS.map(slot => {
+              const snap = abSnaps[slot];
+              return (
+                <div key={slot} style={{ flex: '1 1 140px', minWidth: 130, padding: '8px 10px', borderRadius: 10, background: 'rgba(34,211,238,0.05)', border: '1px solid rgba(34,211,238,0.18)' }}>
+                  <div style={{ fontSize: 9, color: '#fff', fontWeight: 700, marginBottom: 2 }}>Слот {slot}: {snap ? snap.name : 'пусто'}</div>
+                  {snap && (
+                    <div style={{ fontSize: 8, color: '#fff' }}>
+                      {Math.round(snap.totals.kcal)} ккал · {Math.round(snap.totals.p)}Б · {Math.round(snap.totals.f)}Ж · {Math.round(snap.totals.c)}У
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                    <button
+                      data-ab={`save-${slot}`}
+                      aria-label={`Сохранить текущий день в слот ${slot}`}
+                      onClick={() => {
+                        const name = `${planDays === 1 ? DAY_LABELS[selectedDayIndex] : planDays === 3 ? '3 дня' : 'Неделя'} · ${Math.round((dayPlan as any)?.totals?.kcal || 0)} ккал`;
+                        const made = snapshotFromDayPlan(slot, dayPlan as any, { name });
+                        if (made && saveAbSnapshot(made)) { setAbSnaps(loadAbSnapshots()); setAbDiff(null); setAbShowDiff(false); }
+                        else setErrorMsg('Не удалось сохранить снапшот — план пуст.');
+                      }}
+                      style={{ flex: 1, padding: '10px 6px', minHeight: 44, borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 800, background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)', color: '#fff' }}
+                    >📸 В {slot}</button>
+                    {snap && (
+                      <button
+                        data-ab={`clear-${slot}`}
+                        aria-label={`Очистить слот ${slot}`}
+                        onClick={() => { removeAbSnapshot(slot); setAbSnaps(loadAbSnapshots()); setAbDiff(null); setAbShowDiff(false); }}
+                        style={{ padding: '10px', minHeight: 44, minWidth: 44, borderRadius: 8, cursor: 'pointer', fontSize: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}
+                      >✕</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            data-ab="compare"
+            disabled={!abSnaps.A || !abSnaps.B}
+            aria-label="Сравнить слот A и слот B"
+            onClick={() => { if (abSnaps.A && abSnaps.B) { setAbDiff(diffAbSnapshots(abSnaps.A, abSnaps.B)); setAbShowDiff(true); } }}
+            style={{ width: '100%', padding: '12px', minHeight: 44, borderRadius: 10, cursor: (!abSnaps.A || !abSnaps.B) ? 'default' : 'pointer', fontSize: 11, fontWeight: 800, background: (!abSnaps.A || !abSnaps.B) ? 'rgba(34,211,238,0.05)' : 'linear-gradient(135deg,#22d3ee,#0891b2)', border: '1px solid rgba(34,211,238,0.35)', color: (!abSnaps.A || !abSnaps.B) ? 'rgba(255,255,255,0.6)' : '#062a33' }}
+          >⇄ Сравнить A / B</button>
+          {abShowDiff && abDiff && (
+            <div data-ab="diff" style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>{abDiff.summary}</div>
+              {abDiff.rows.map(r => (
+                <div key={r.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 9, color: '#fff' }}>
+                  <span style={{ flex: 1 }}>{r.label}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: 72, textAlign: 'right' }}>A {r.a} · B {r.b}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 800, minWidth: 74, textAlign: 'right', color: r.delta === 0 ? '#fff' : (r.delta > 0 ? '#fbbf24' : '#60a5fa') }}>
+                    {r.delta > 0 ? `+${r.delta}` : `${r.delta}`}{r.deltaPct != null && r.delta !== 0 ? ` (${r.deltaPct > 0 ? '+' : ''}${r.deltaPct}%)` : ''}
+                  </span>
+                </div>
+              ))}
+              {abDiff.meals.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginBottom: 3 }}>Приёмы (Δ ккал · Δ белок)</div>
+                  {abDiff.meals.map((m, i) => (
+                    <div key={i} style={{ fontSize: 9, color: '#fff', padding: '3px 0', lineHeight: 1.4 }}>
+                      {m.label}: {m.aKcal} → {m.bKcal} ккал ({m.deltaKcal > 0 ? `+${m.deltaKcal}` : m.deltaKcal}) · Б {m.aP} → {m.bP} ({m.deltaP > 0 ? `+${m.deltaP}` : m.deltaP})
+                      {m.added.length > 0 && <span style={{ color: '#22c55e' }}> · +{m.added.join(', ')}</span>}
+                      {m.removed.length > 0 && <span style={{ color: '#f87171' }}> · −{m.removed.join(', ')}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(abDiff.foodAdded.length > 0 || abDiff.foodRemoved.length > 0) && (
+                <div style={{ marginTop: 6, fontSize: 9, color: '#fff', lineHeight: 1.45 }}>
+                  {abDiff.foodAdded.length > 0 && <div style={{ color: '#22c55e' }}>Состав +: {abDiff.foodAdded.slice(0, 12).join(', ')}</div>}
+                  {abDiff.foodRemoved.length > 0 && <div style={{ color: '#f87171' }}>Состав −: {abDiff.foodRemoved.slice(0, 12).join(', ')}</div>}
+                </div>
+              )}
+              {(abDiff.notesAdded.length > 0 || abDiff.notesRemoved.length > 0) && (
+                <details style={{ marginTop: 6 }}>
+                  <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>Заметки движка: +{abDiff.notesAdded.length} / −{abDiff.notesRemoved.length}</summary>
+                  {abDiff.notesAdded.map((n, i) => <div key={'na' + i} style={{ fontSize: 8, color: '#fff', marginTop: 2 }}>+ {n}</div>)}
+                  {abDiff.notesRemoved.map((n, i) => <div key={'nr' + i} style={{ fontSize: 8, color: '#fff', marginTop: 2 }}>− {n}</div>)}
+                </details>
+              )}
+            </div>
+          )}
         </GlassCard>
       )}
 
