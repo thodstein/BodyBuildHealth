@@ -38,6 +38,7 @@ import { sfrOf } from '../../../engines/bb/bb-sfr-db';
 import { diagnoseWeakCausesBatch } from '../../../engines/bb/bb-weak-cause.engine';
 import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
+import { rankCorrectives, correctiveDose, correctiveExportLines } from '../../../engines/bb/bb-corrective.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
@@ -886,6 +887,16 @@ export const BBDiagnosticsHub: React.FC = () => {
         vbtLossPct: null,
         weakCauses: weakCausesPayload,
         preferredExerciseIds: topIds,
+        correctiveDetail: (() => { try {
+          const det: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> = [];
+          for (const z of report.weakZonesGranular.slice(0, 2)) {
+            const lib = (correctiveTopByZone[z] || [])[0];
+            if (!lib) continue;
+            const dose = correctiveDose(lib.corr, (weakCauses as any)?.[z]?.cause ?? null, {});
+            det.push({ id: lib.corr.id, zone: z, exerciseId: lib.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: lib.corr.cues.slice(0, 3), source: lib.corr.source });
+          }
+          return det.length ? det : null;
+        } catch { return null; } })(),
         weakHeads,
         specBlock: specPayload,
         // MMC-строка: приёмник ББ-авто её уже читает (typeof string) — шлём тот же текст, что в карточке
@@ -1036,6 +1047,26 @@ export const BBDiagnosticsHub: React.FC = () => {
         loadedHinge: !teenGate.blocked && !/не проверялся/.test(loadedHingeV.text) ? { text: loadedHingeV.text } : null,
         erir: !teenGate.blocked && erIrV.tested ? { text: erIrV.text } : null,
         screenPriority: screenPriority.length ? screenPriority : null,
+        correctiveDetail: (() => { try {
+          const det: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> = [];
+          for (const z of report.weakZonesGranular.slice(0, 2)) {
+            const r = rankCorrectives({
+              zones: [z],
+              driver: (() => { try { const d = String((moveDriver as any)?.driver || ''); return d && d !== 'none' ? d : null; } catch { return null; } })(),
+              benchLevel: (() => { try { return String((benchV as any)?.level || '') || null; } catch { return null; } })(),
+              nheWeak: (() => { try { const l = String((nheV as any)?.level || ''); return l === 'weak' || l === 'very_weak'; } catch { return false; } })(),
+              addWeak: (() => { try { return String((adductorV as any)?.level || '') === 'weak'; } catch { return false; } })(),
+              erirLow: (() => { try { const r2 = Number((erIrV as any)?.ratio); return Number.isFinite(r2) && r2 < 0.75; } catch { return false; } })(),
+              painLevel: (() => { try { const l = String((painMon as any)?.verdict?.level || 'green'); return (l === 'red' || l === 'yellow' ? l : 'green') as any; } catch { return 'green' as any; } })(),
+              cause: (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(),
+              level,
+            })[0];
+            if (!r) continue;
+            const dose = correctiveDose(r.corr, (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(), {});
+            det.push({ id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: r.corr.cues.slice(0, 3), source: r.corr.source });
+          }
+          return det.length ? det : null;
+        } catch { return null; } })(),
       };
       try { Object.assign(pro2, buildMovementExport()); } catch { /* noop */ }
     } catch { /* noop */ }
@@ -1105,6 +1136,26 @@ export const BBDiagnosticsHub: React.FC = () => {
         loadedHinge: !teenGate.blocked && !/не проверялся/.test(loadedHingeV.text) ? { text: loadedHingeV.text } : null,
         erir: !teenGate.blocked && erIrV.tested ? { text: erIrV.text } : null,
         screenPriority: screenPriority.length ? screenPriority : null,
+        correctiveDetail: (() => { try {
+          const det: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> = [];
+          for (const z of report.weakZonesGranular.slice(0, 2)) {
+            const r = rankCorrectives({
+              zones: [z],
+              driver: (() => { try { const d = String((moveDriver as any)?.driver || ''); return d && d !== 'none' ? d : null; } catch { return null; } })(),
+              benchLevel: (() => { try { return String((benchV as any)?.level || '') || null; } catch { return null; } })(),
+              nheWeak: (() => { try { const l = String((nheV as any)?.level || ''); return l === 'weak' || l === 'very_weak'; } catch { return false; } })(),
+              addWeak: (() => { try { return String((adductorV as any)?.level || '') === 'weak'; } catch { return false; } })(),
+              erirLow: (() => { try { const r2 = Number((erIrV as any)?.ratio); return Number.isFinite(r2) && r2 < 0.75; } catch { return false; } })(),
+              painLevel: (() => { try { const l = String((painMon as any)?.verdict?.level || 'green'); return (l === 'red' || l === 'yellow' ? l : 'green') as any; } catch { return 'green' as any; } })(),
+              cause: (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(),
+              level,
+            })[0];
+            if (!r) continue;
+            const dose = correctiveDose(r.corr, (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(), {});
+            det.push({ id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: r.corr.cues.slice(0, 3), source: r.corr.source });
+          }
+          return det.length ? det : null;
+        } catch { return null; } })(),
       };
       try { Object.assign(pro2csv, buildMovementExport()); } catch { /* noop */ }
     } catch { /* noop */ }
@@ -1260,6 +1311,37 @@ export const BBDiagnosticsHub: React.FC = () => {
     }
     return out;
   }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, effSex, planAudit, bbPlan, profileEquipment]);
+
+  // PRO-CORR: библиотека коррекций — зона + причина + сигналы скринингов (жим/NHE/ER:IR/боль/шарнир/YBT).
+  const correctiveTopByZone = useMemo(() => {
+    const out: Record<string, ReturnType<typeof rankCorrectives>> = {};
+    for (const z of report.weakZonesGranular.slice(0, 2)) {
+      try {
+        const asymMax = (() => { try { const vs = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return vs.length ? Math.max(...vs) : null; } catch { return null; } })();
+        const drv = (() => { try { return String((moveDriver as any)?.driver || ''); } catch { return ''; } })();
+        const nheWeak = (() => { try { const l = String((nheV as any)?.level || ''); return l === 'weak' || l === 'very_weak'; } catch { return false; } })();
+        const addWeak = (() => { try { const l = String((adductorV as any)?.level || ''); return l === 'weak'; } catch { return false; } })();
+        const erirLow = (() => { try { const r = Number((erIrV as any)?.ratio); return Number.isFinite(r) && r < 0.75; } catch { return false; } })();
+        const pMae: unknown = painMon;
+        const pLevel = (() => { try { return String((pMae as any)?.verdict?.level || 'green'); } catch { return 'green'; } })();
+        out[z] = rankCorrectives({
+          zones: [z],
+          driver: drv && drv !== 'none' ? drv : null,
+          benchLevel: (() => { try { return String((benchV as any)?.level || ''); } catch { return ''; } })() || null,
+          nheWeak, addWeak, erirLow,
+          painLevel: (pLevel === 'red' || pLevel === 'yellow' ? pLevel : 'green') as any,
+          hingeFail: (() => { try { return !!((hingeV as any)?.pass === false); } catch { return false; } })(),
+          shoulderFail: (() => { try { return !!((shoulderV as any)?.pass === false); } catch { return false; } })(),
+          ybtAsym: (() => { try { const a = Number((ybtV as any)?.asymCm); return Number.isFinite(a) && a > 4; } catch { return false; } })(),
+          ktwAsym: (() => { try { return String(asymText || '').includes('голеностоп'); } catch { return false; } })(),
+          asym: asymMax != null && asymMax >= 7,
+          cause: (() => { try { return (weakCauses as any)?.[z]?.cause ?? null; } catch { return null; } })(),
+          level, equipment: profileEquipment,
+        }).slice(0, 3);
+      } catch { out[z] = []; }
+    }
+    return out;
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {
@@ -1538,8 +1620,21 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { /* noop */ }
     }
     const preferredIds: Record<string, string> = {};
+    const corrective: Record<string, { sets?: number; reps?: number; rir?: number; tempo?: string; label?: string }> = {};
     for (const z of zones) {
       try {
+        // PRO-CORR: библиотека первична (зона+причина+сигналы+доза); каталоговый топ-3 — fallback.
+        const lib = (correctiveTopByZone[z] || [])[0];
+        if (lib) {
+          const dose = correctiveDose(lib.corr, (weakCauses as any)?.[z]?.cause ?? null, {
+            readinessRed: (readiness as any)?.level === 'red',
+            painYellow: (() => { try { return String((painMon as any)?.verdict?.level || '') === 'yellow'; } catch { return false; } })(),
+          });
+          preferredIds[z] = lib.corr.exerciseId;
+          corrective[z] = { sets: dose.sets, reps: dose.repsMin, rir: dose.rir, tempo: dose.tempo, label: `${lib.corr.title} · ${dose.note}` };
+          profTempo[z] = dose.tempo;
+          continue;
+        }
         const top = (top3ByZone[z] || [])[0];
         if (top) preferredIds[z] = top.id;
       } catch { /* noop */ }
@@ -1577,7 +1672,7 @@ export const BBDiagnosticsHub: React.FC = () => {
             }
           }
         } catch { /* noop */ }
-        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, weekIdxs: [wi], rirShift, volumeMult, unilateralTopUp, returnAction: retAct ?? undefined });
+        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, corrective, weekIdxs: [wi], rirShift, volumeMult, unilateralTopUp, returnAction: retAct ?? undefined });
         working = r.plan;
         injected += r.injected;
         skippedBudget += r.skippedBudget;
@@ -1750,6 +1845,22 @@ export const BBDiagnosticsHub: React.FC = () => {
                           {top3ByZone[z].map((r, i) => (
                             <span key={r.id} title={r.reason} style={{ padding: '2px 7px', borderRadius: 20, background: i === 0 ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${i === 0 ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.08)'}`, color: i === 0 ? '#00e68a' : '#fff', fontWeight: 700 }}>#{i + 1} {r.name} · {r.reason}</span>
                           ))}
+                        </div>
+                      )}
+                      {correctiveTopByZone[z] && correctiveTopByZone[z].length > 0 && (
+                        <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.22)' }} data-bb="corrective-card" data-zone={z}>
+                          <b style={{ color: '#00e68a', fontSize: 11 }}>🛠 Коррекция по скринингам (доза + техника)</b>
+                          {correctiveTopByZone[z].slice(0, 2).map((r) => {
+                            const dose = (() => { try { return correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, {}); } catch { return null; } })();
+                            return (
+                              <div key={r.corr.id} style={{ marginTop: 6, fontSize: 10, lineHeight: 1.5, color: '#fff' }} data-bb="corrective-row" data-corr={r.corr.id}>
+                                <b style={{ color: '#fff' }}>{r.corr.title}</b>
+                                <div>Доза: {dose ? `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}` : `${r.corr.protocol.sets}×${r.corr.protocol.repsMin}–${r.corr.protocol.repsMax}`} · {r.why.join(' + ') || 'по зоне'}</div>
+                                <div>Кью: {r.corr.cues.join(' · ')}</div>
+                                <div>Дальше: {r.corr.progression} · Ре-тест: {r.corr.retest} ({r.corr.source})</div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

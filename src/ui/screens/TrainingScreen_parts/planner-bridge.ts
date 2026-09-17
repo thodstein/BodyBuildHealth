@@ -69,6 +69,8 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
    *  новым кодом не заполнять. */
   vbtLossPct?: number | null;
   weakCauses?: unknown; weakHeads?: string[];
+  /** PRO-CORR: детали коррекций библиотеки (хаб шлёт, приёмник/экспорт читают; без — тихо). */
+  correctiveDetail?: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> | null;
   /** Форма свободная (движок SpecBlock: weeks/lengthWeeks/donors/dayMap/rationale);
    *  приёмник валидирует поля перед применением. */
   specBlock?: unknown;

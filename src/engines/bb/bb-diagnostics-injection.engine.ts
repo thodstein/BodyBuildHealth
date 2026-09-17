@@ -58,6 +58,8 @@ export interface BBInjectionOpts {
   weekIdxs?: number[];
   /** MAX PRO: предпочитаемые id упражнений (из correction-rank топ-1) */
   preferredIds?: Record<string, string>;
+  /** PRO-CORR: точная доза/техника коррекций из библиотеки (хаб шлёт, без — legacy 3×10). */
+  corrective?: Record<string, { sets?: number; reps?: number; rir?: number; tempo?: string; label?: string }>;
   /** PRO-3 R2: унилатеральная добивка слабой стороны (из L/R-вердиктов): группа → сторона+сеты. */
   unilateralTopUp?: Record<string, { side: 'left' | 'right'; sets: number }>;
   /** PRO-3 R2: сдвиг RIR вставляемых коррекций (красная готовность → +1). */
@@ -141,16 +143,21 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
         : [0].filter((i) => all[i] && !all[i].deload);
     if (weekIdxs.length === 0) { notes.push(`⚠ ${wp} — делод`); continue; }
     const muscleKey = canonicalMuscle(wp);
+    const corr = opts.corrective?.[wp] || opts.corrective?.[muscleKey];
     const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
     const base = wm[muscleKey] ?? wm[wp] ?? 50;
     const weight = Math.round(base * 0.65 / 2.5) * 2.5; // 65% для изоляции
-    const reps = muscleKey === 'calves' ? 15 : muscleKey === 'forearms' ? 12 : 10;
+    const reps = Number.isFinite(corr?.reps) ? Math.max(3, Math.min(20, Math.round(corr!.reps as number))) : (muscleKey === 'calves' ? 15 : muscleKey === 'forearms' ? 12 : 10);
     // PRO-3 R2: готовность дня двигает вставку (острая, не мезоцикл): RIR+1 / объём −25%
     // PRO-4 S3: ступень возврата добавляется поверх (ступень 2: ×0.5 / RIR+3)
-    const rir = 2 + (Number.isFinite(opts.rirShift as number) ? Math.max(0, Math.min(2, Math.round(opts.rirShift as number))) : 0) + retRir;
-    const tempo = opts.profTempo?.[wp] || opts.profTempo?.[muscleKey] || '3-1-1-0';
+    // PRO-CORR: библиотека задаёт базу дозы; готовность/возврат — поверх неё.
+    const corrRir = Number.isFinite(corr?.rir) ? Math.max(0, Math.min(3, Math.round(corr!.rir as number))) : 2;
+    const rir = Math.min(3, corrRir + (Number.isFinite(opts.rirShift as number) ? Math.max(0, Math.min(2, Math.round(opts.rirShift as number))) : 0) + retRir);
+    const tempo = (corr?.tempo && String(corr.tempo).trim()) || opts.profTempo?.[wp] || opts.profTempo?.[muscleKey] || '3-1-1-0';
     const rest = 90;
-    const wantBase = Math.max(2, Math.min(6, Math.round(opts.targetSets?.[wp] ?? opts.targetSets?.[muscleKey] ?? 3)));
+    const wantBase = Number.isFinite(corr?.sets)
+      ? Math.max(1, Math.min(6, Math.round(corr!.sets as number)))
+      : Math.max(2, Math.min(6, Math.round(opts.targetSets?.[wp] ?? opts.targetSets?.[muscleKey] ?? 3)));
     const volMult = Number.isFinite(opts.volumeMult as number) ? Math.max(0.5, Math.min(1, opts.volumeMult as number)) : 1;
     let wantSets = Math.max(1, Math.round(wantBase * volMult * retVol));
     // PRO-3 R2: добивка слабой стороны — сверху в пределах бюджета (унилатерально, слабая первой)
@@ -195,7 +202,7 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
         exerciseType: catType,
         tempoSpec: tempo,
         restSeconds: rest,
-        comment: `🩺 ББ-диагностика: ${wp} → ${catName} ${addSets}×${reps} @65% ${tempo}${topUpSets > 0 && topUp ? ` · слабая ${topUp.side === 'left' ? 'левая' : 'правая'} первой +${topUpSets}` : ''}${volMult < 1 ? ' · объём срезан готовностью' : ''}${retVol < 1 ? ' · возврат: объём срезан' : ''}${retRir > 0 ? ` · возврат RIR+${retRir}` : ''}`,
+        comment: `🩺 ББ-диагностика: ${wp} → ${catName} ${addSets}×${reps} @65% ${tempo}${corr?.label ? ` · ${corr.label}` : ''}${topUpSets > 0 && topUp ? ` · слабая ${topUp.side === 'left' ? 'левая' : 'правая'} первой +${topUpSets}` : ''}${volMult < 1 ? ' · объём срезан готовностью' : ''}${retVol < 1 ? ' · возврат: объём срезан' : ''}${retRir > 0 ? ` · возврат RIR+${retRir}` : ''}`,
         warmupSets: [],
       } as any;
       targetSession.exercises.push(ex);
