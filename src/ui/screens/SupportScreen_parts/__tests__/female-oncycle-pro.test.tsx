@@ -5,7 +5,7 @@
  * уро-блок, AMH, ферритин/TSAT в лабах.
  * Э2 (данные): протоколы «Железо (по анализам)» и «Кости (Ca/D3/K2/Mg)».
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import React from 'react';
 import { SupportProtocolWomen } from '../supportProtocolWomen';
@@ -14,9 +14,12 @@ import {
   FEMALE_AMENORRHEA_ALGO, FEMALE_BONE_HONESTY, FEMALE_REDS_SIGNS, redsTrafficLight,
   FEMALE_UROGENITAL_SUPPORT, FERRIMAN_GALLWEY_ZONES, ferrimanGallweyTotal, ferrimanGallweyBand,
   FEMALE_LAB_GROUPS, FEMALE_FERTILITY_PLAN, FEMALE_TIMELINE, FEMALE_SUPPORT_PROTOCOLS,
+  FEMALE_DISPENSARY_KEY, FEMALE_DISPENSARY_GROUPS, FEMALE_DISPENSARY_ITEMS,
+  dispensaryMonthKey, parseDispensaryState, toggleDispensaryItem, dispensaryProgress,
 } from '../supportProtocolWomenData';
 
 afterEach(cleanup);
+beforeEach(() => { try { localStorage.clear(); } catch { /* jsdom */ } });
 
 const P = () => render(<SupportProtocolWomen s={{}} />);
 
@@ -183,5 +186,90 @@ describe('Э1: UI — новые табы и FG-шкала', () => {
     const res = container.querySelector('[data-fg="result"]')!.textContent || '';
     expect(res).toContain('Итог: 9');
     expect(res).toContain('Гирсутизм');
+  });
+});
+
+describe('Диспансер женщины на курсе (P3): месячный чек-лист', () => {
+  const NOW = new Date(2026, 8, 17, 12, 0, 0); // Sep 2026 (локально)
+
+  it('данные: 12 пунктов, 6 групп (кровь/цикл/кости/RED-S/настроение/вирилизация)', () => {
+    expect(FEMALE_DISPENSARY_ITEMS.length).toBe(12);
+    expect(new Set(FEMALE_DISPENSARY_ITEMS.map((i) => i.id)).size).toBe(12);
+    expect(FEMALE_DISPENSARY_GROUPS.length).toBe(6);
+    for (const g of FEMALE_DISPENSARY_GROUPS) {
+      const items = FEMALE_DISPENSARY_ITEMS.filter((i) => i.group === g.id);
+      expect(items.length, g.id).toBeGreaterThanOrEqual(2);
+      for (const it of items) {
+        expect(it.label, it.id).toBeTruthy();
+        expect(it.detail, it.id).toBeTruthy();
+      }
+    }
+    const all = FEMALE_DISPENSARY_ITEMS.map((i) => i.label + ' ' + i.detail).join(' ');
+    for (const needle of ['гематокрит', 'Ферритин', 'Менструальный', 'DXA', 'КОК', 'RED-S', 'Либидо', 'Голос']) {
+      expect(all, needle).toContain(needle);
+    }
+  });
+
+  it('ключ месяца — локальный YYYY-MM без UTC-сдвига', () => {
+    expect(dispensaryMonthKey(NOW)).toBe('2026-09');
+    expect(dispensaryMonthKey(new Date(2026, 0, 1))).toBe('2026-01');
+    expect(dispensaryMonthKey(new Date(NaN))).toBe(dispensaryMonthKey(new Date()));
+  });
+
+  it('parse: null/битый JSON/чужой месяц → свежий чек-лист; свой месяц — с фильтром мусора', () => {
+    expect(parseDispensaryState(null, NOW)).toEqual({ month: '2026-09', checked: [] });
+    expect(parseDispensaryState('{broken', NOW)).toEqual({ month: '2026-09', checked: [] });
+    expect(parseDispensaryState('[]', NOW)).toEqual({ month: '2026-09', checked: [] });
+    expect(parseDispensaryState(JSON.stringify({ month: '2026-08', checked: ['cbc_hct'] }), NOW)).toEqual({ month: '2026-09', checked: [] });
+    const ok = parseDispensaryState(JSON.stringify({ month: '2026-09', checked: ['cbc_hct', 'nope', 'cbc_hct'] }), NOW);
+    expect(ok).toEqual({ month: '2026-09', checked: ['cbc_hct'] });
+  });
+
+  it('toggle: включение/выключение; смена месяца начинает новый чек-лист', () => {
+    let s = parseDispensaryState(null, NOW);
+    s = toggleDispensaryItem(s, 'cbc_hct', NOW);
+    expect(s.checked).toEqual(['cbc_hct']);
+    s = toggleDispensaryItem(s, 'voice_record', NOW);
+    expect(s.checked).toEqual(['cbc_hct', 'voice_record']);
+    s = toggleDispensaryItem(s, 'cbc_hct', NOW);
+    expect(s.checked).toEqual(['voice_record']);
+    // новый месяц — прошлые отметки не переносятся
+    const oct = new Date(2026, 9, 2);
+    const fresh = toggleDispensaryItem(s, 'libido', oct);
+    expect(fresh).toEqual({ month: '2026-10', checked: ['libido'] });
+    // неизвестный id не добавляется
+    expect(toggleDispensaryItem(s, 'unknown', NOW).checked).toEqual(['voice_record']);
+  });
+
+  it('прогресс: done/total/pct; чужой месяц — 0', () => {
+    const s = { month: '2026-09', checked: ['cbc_hct', 'mood_scale', 'nope'] };
+    const p = dispensaryProgress(s, NOW);
+    expect(p.done).toBe(2);
+    expect(p.total).toBe(12);
+    expect(p.pct).toBe(17);
+    expect(dispensaryProgress({ month: '2026-08', checked: ['cbc_hct'] }, NOW)).toEqual({ done: 0, total: 12, pct: 0 });
+  });
+
+  it('UI: цикл-таб содержит диспансер, отметка персистится и переживает ремаунт', () => {
+    const first = render(<SupportProtocolWomen s={{}} />);
+    fireEvent.click(first.getByText('🦴 Цикл, кости, RED-S'));
+    expect(first.container.querySelector('[data-dispensary="root"]')).not.toBeNull();
+    expect(first.container.querySelector('[data-dispensary="progress"]')!.textContent).toBe('0 / 12');
+    const btn = first.getByLabelText('ОАК + гематокрит');
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(btn);
+    expect(first.container.querySelector('[data-dispensary="progress"]')!.textContent).toBe('1 / 12');
+    expect(first.getByLabelText('ОАК + гематокрит').getAttribute('aria-pressed')).toBe('true');
+    const persisted = JSON.parse(localStorage.getItem(FEMALE_DISPENSARY_KEY) || '{}');
+    expect(persisted.month).toBe(dispensaryMonthKey());
+    expect(persisted.checked).toContain('cbc_hct');
+    // ремаунт: отметка на месте
+    cleanup();
+    const second = render(<SupportProtocolWomen s={{}} />);
+    fireEvent.click(second.getByText('🦴 Цикл, кости, RED-S'));
+    expect(second.getByLabelText('ОАК + гематокрит').getAttribute('aria-pressed')).toBe('true');
+    // снятие отметки тоже персистится
+    fireEvent.click(second.getByLabelText('ОАК + гематокрит'));
+    expect(second.container.querySelector('[data-dispensary="progress"]')!.textContent).toBe('0 / 12');
   });
 });

@@ -816,3 +816,80 @@ export function ferrimanGallweyBand(total: number, opts: { lessSensitiveCutoff?:
     advice: 'Плановый контроль шкалы раз в 4 нед на курсе.',
   };
 }
+
+// ── 14. Диспансер женщины на курсе: месячный чек-лист (персист) ──
+
+export const FEMALE_DISPENSARY_KEY = 'he_female_dispensary_v1';
+
+export type FemaleDispensaryGroup = 'blood' | 'cycle' | 'bones' | 'reds' | 'mood' | 'virilization';
+
+export const FEMALE_DISPENSARY_GROUPS: Array<{ id: FemaleDispensaryGroup; icon: string; label: string }> = [
+  { id: 'blood', icon: '🩸', label: 'Кровь и железо' },
+  { id: 'cycle', icon: '🌙', label: 'Цикл' },
+  { id: 'bones', icon: '🦴', label: 'Кости' },
+  { id: 'reds', icon: '⚖️', label: 'RED-S / энергия' },
+  { id: 'mood', icon: '🧠', label: 'Настроение и либидо' },
+  { id: 'virilization', icon: '⚠️', label: 'Вирилизация' },
+];
+
+export type FemaleDispensaryItem = { id: string; group: FemaleDispensaryGroup; label: string; detail: string };
+
+export const FEMALE_DISPENSARY_ITEMS: FemaleDispensaryItem[] = [
+  { id: 'cbc_hct', group: 'blood', label: 'ОАК + гематокрит', detail: 'HCT ≥48% — железо не грузить; ≥52% — флеботомия (врач). На инъекциях — каждые 4–8 нед.' },
+  { id: 'ferritin_tsat', group: 'blood', label: 'Ферритин + TSAT (при усталости/дефиците)', detail: 'Атлетки: <30 дефицит · 30–50 функциональный · >100 достаточно; натощак, при CRP↑ — трактовать с TSAT.' },
+  { id: 'cycle_diary', group: 'cycle', label: 'Менструальный дневник (даты/характер)', detail: 'Отмечать каждую менструацию; отсутствие >3 мес — алгоритм: тест беременности → E2/FSH/LH/PRL/ТТГ → гинеколог.' },
+  { id: 'cycle_recovery', group: 'cycle', label: 'Цикл восстановился? (последовательные циклы)', detail: '«Один цикл ≠ норма»; аменорея >6 мес или BSI — DXA по z-score.' },
+  { id: 'bone_intake', group: 'bones', label: 'Ca 1000–1500 + D3 2000–4000 МЕ + K2 + Mg', detail: 'При аменорее — к 1500 мг Ca, ≤500 мг за приём; КОК НЕ улучшают BMD.' },
+  { id: 'bone_stimulus', group: 'bones', label: 'Осевая/силовая нагрузка ≥2 раз/нед', detail: 'Главный не-фармакологический стимул BMD; при BSI — по протоколу возврата.' },
+  { id: 'reds_check', group: 'reds', label: 'RED-S-светофор (перепроверить признаки)', detail: '≥2 первичных признака (цикл/BSI/РПП) — стоп сушке, энергобаланс, врач.' },
+  { id: 'weight_steps', group: 'reds', label: 'Вес (среднее за 7 дней) и темп', detail: 'Женский темп ≤0.4–0.5%/нед; резкое падение + нарушения цикла = энергодефицит.' },
+  { id: 'mood_scale', group: 'mood', label: 'Настроение/тревога/сон (1–10)', detail: 'Трен/стан → панические атаки; низкий E2 → депрессия; затяжное — психиатр.' },
+  { id: 'libido', group: 'mood', label: 'Либидо (в обе стороны)', detail: 'AI/стан/трен ↓, тест/мастерон ↑↑; E2 не обнулять — он критичен для либидо.' },
+  { id: 'voice_record', group: 'virilization', label: 'Голос (запись) + клитор', detail: 'Первая хрипота = немедленная отмена; необратимо.' },
+  { id: 'hair_skin_fg', group: 'virilization', label: 'Волосы/акне + FG-шкала', detail: 'FG-шкала раз в месяц (9 зон, порог >8); фото локусов для динамики.' },
+];
+
+export type FemaleDispensaryState = { month: string; checked: string[] };
+
+/** Локальный ключ месяца 'YYYY-MM' (без UTC-сдвига). */
+export function dispensaryMonthKey(now: Date = new Date()): string {
+  const d = now instanceof Date && Number.isFinite(now.getTime()) ? now : new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Чтение персиста: свой месяц — как есть; чужой/битый — свежий чек-лист. */
+export function parseDispensaryState(raw: string | null, now: Date = new Date()): FemaleDispensaryState {
+  const month = dispensaryMonthKey(now);
+  const fresh: FemaleDispensaryState = { month, checked: [] };
+  if (!raw || typeof raw !== 'string') return fresh;
+  try {
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== 'object' || Array.isArray(p)) return fresh;
+    if (typeof p.month !== 'string' || p.month !== month) return fresh;
+    const valid = new Set(FEMALE_DISPENSARY_ITEMS.map((i) => i.id));
+    const checked = Array.isArray(p.checked)
+      ? p.checked.filter((x: unknown): x is string => typeof x === 'string' && valid.has(x))
+      : [];
+    return { month, checked: Array.from(new Set(checked)) };
+  } catch {
+    return fresh;
+  }
+}
+
+/** Тогл пункта; смена месяца автоматически начинает новый чек-лист. */
+export function toggleDispensaryItem(state: FemaleDispensaryState, id: string, now: Date = new Date()): FemaleDispensaryState {
+  const month = dispensaryMonthKey(now);
+  const base = state && state.month === month && Array.isArray(state.checked) ? state : { month, checked: [] as string[] };
+  if (!FEMALE_DISPENSARY_ITEMS.some((i) => i.id === id)) return { month, checked: [...base.checked] };
+  const checked = base.checked.includes(id) ? base.checked.filter((x) => x !== id) : [...base.checked, id];
+  return { month, checked };
+}
+
+/** Прогресс месяца: неизвестные id не считаются; чужой месяц — 0. */
+export function dispensaryProgress(state: FemaleDispensaryState, now: Date = new Date()): { done: number; total: number; pct: number } {
+  const total = FEMALE_DISPENSARY_ITEMS.length;
+  const inMonth = !!state && state.month === dispensaryMonthKey(now);
+  const valid = new Set(FEMALE_DISPENSARY_ITEMS.map((i) => i.id));
+  const done = inMonth && Array.isArray(state.checked) ? state.checked.filter((x) => valid.has(x)).length : 0;
+  return { done, total, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
+}

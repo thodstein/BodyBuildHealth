@@ -12,6 +12,8 @@ import {
   FEMALE_IRON_THRESHOLDS, FEMALE_IRON_SCHEME, FEMALE_IRON_DIAGNOSTICS, FEMALE_IRON_GATES,
   FEMALE_AMENORRHEA_ALGO, FEMALE_BONE_HONESTY, FEMALE_REDS_SIGNS, redsTrafficLight,
   FEMALE_UROGENITAL_SUPPORT, FERRIMAN_GALLWEY_ZONES, ferrimanGallweyTotal, ferrimanGallweyBand,
+  FEMALE_DISPENSARY_KEY, FEMALE_DISPENSARY_GROUPS, FEMALE_DISPENSARY_ITEMS,
+  parseDispensaryState, toggleDispensaryItem, dispensaryProgress,
 } from './supportProtocolWomenData';
 
 const wInput: React.CSSProperties = {
@@ -151,6 +153,54 @@ const RedsTrafficLight: React.FC = () => {
         )}
         <div style={{ fontSize:8, color:'#fff', marginTop:3, lineHeight:1.4 }}>→ {res.advice}</div>
       </div>
+    </div>
+  );
+};
+
+/** 🗓 Диспансер женщины на курсе — месячный чек-лист с персистом (новый месяц начинается сам). */
+const FemaleDispensary: React.FC = () => {
+  const [state, setState] = useState<any>(() => {
+    try { return parseDispensaryState(localStorage.getItem(FEMALE_DISPENSARY_KEY)); }
+    catch { return parseDispensaryState(null); }
+  });
+  const prog = dispensaryProgress(state);
+  const toggle = (id: string) => {
+    setState((prev: any) => {
+      const next = toggleDispensaryItem(prev, id);
+      try { localStorage.setItem(FEMALE_DISPENSARY_KEY, JSON.stringify(next)); } catch { /* квота/приватный режим */ }
+      return next;
+    });
+  };
+  const barColor = prog.pct >= 100 ? '#22c55e' : prog.pct >= 50 ? '#f59e0b' : '#f472b6';
+  return (
+    <div style={cardBg} data-dispensary="root">
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, marginBottom:4 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#f472b6' }}>🗓 Диспансер женщины на курсе — {state.month}</div>
+        <div data-dispensary="progress" style={{ fontSize:10, fontWeight:800, color: barColor }}>{prog.done} / {prog.total}</div>
+      </div>
+      <div style={{ height:6, borderRadius:4, background:'rgba(255,255,255,0.07)', overflow:'hidden', marginBottom:6 }}>
+        <div style={{ width: `${prog.pct}%`, height:'100%', background: barColor, transition:'width .2s' }} />
+      </div>
+      <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:8, lineHeight:1.35 }}>Месячный чек-лист: при смене календарного месяца начинается новый автоматически (персист в приложении). Отметки — для врача и динамики, не заменяют анализы.</div>
+      {FEMALE_DISPENSARY_GROUPS.map((g: any) => (
+        <div key={g.id} style={{ marginBottom:6 }}>
+          <div style={{ fontSize:9, fontWeight:800, color:'#f9a8d4', marginBottom:3 }}>{g.icon} {g.label}</div>
+          {FEMALE_DISPENSARY_ITEMS.filter((it: any) => it.group === g.id).map((it: any) => {
+            const on = state.checked.includes(it.id);
+            return (
+              <button key={it.id} type="button" aria-pressed={on} aria-label={it.label}
+                onClick={() => toggle(it.id)}
+                style={{ width:'100%', textAlign:'left', padding:'8px 10px', borderRadius:9, marginBottom:4, minHeight:40, cursor:'pointer',
+                  background: on ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)',
+                  color: on ? '#86efac' : '#fff',
+                  border: `1px solid ${on ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
+                <span style={{ fontSize:9, fontWeight:700 }}>{on ? '☑' : '☐'} {it.label}</span>
+                <span style={{ display:'block', fontSize:7, color:'var(--text-dim)', fontWeight:400, marginTop:1, lineHeight:1.3 }}>{it.detail}</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 };
@@ -418,6 +468,7 @@ export const SupportProtocolWomen: React.FC<{ s: Record<string, any> }> = ({ s }
               <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>🦴 Цикл, кости, RED-S</div>
               <p style={{ fontSize:8, color:'var(--text-dim)', margin:0, lineHeight:1.35 }}>Дефицит E2 (ААС-супрессия + энергодефицит) бьёт по костям и циклу. Аменорея — не «побочка», а алгоритм: беременности-тест → панель → врач; при длительной — DXA по z-score. Источники: Triad-2025 update (Sports Med 2026), IOC REDs 2023, AFP 2026, ACOG.</p>
             </div>
+            <FemaleDispensary />
             <div style={cardBg}>
               <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:6 }}>🩺 Аменорея — алгоритм (не одна строка)</div>
               {FEMALE_AMENORRHEA_ALGO.map((x: any, i: number) => (

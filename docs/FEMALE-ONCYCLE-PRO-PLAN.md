@@ -68,7 +68,7 @@
 10. **Статья `lab-guide-course`**: женский блок (железо/цикл/кости) + ссылка на табы.
 
 ### P3 — опционально
-11. «Диспансер женщины на курсе» — месяц-чек-лист (цикл, ферритин/HCT, кости-риски, настроение/либидо) с персистом.
+11. ✅ **«Диспансер женщины на курсе»** — месяц-чек-лист (кровь/железо, цикл, кости, RED-S, настроение/либидо, вирилизация — 12 пунктов, 6 групп) с персистом `he_female_dispensary_v1` и авто-стартом нового месяца; блок `data-dispensary` в табе «🦴 Цикл, кости, RED-S».
 
 ---
 
@@ -120,8 +120,9 @@
 | **Э2** | `female-support-layer`: `FEMALE_BONE_SUBS` (Ca/D3/K2/Mg) + `FEMALE_LAB_GATED_SUBS` (железо — только `FERRITIN<30 && HCT<48`, без анализов тихо) + **жёсткий гейт HCT ≥48%**: добавленное lab-tier'ом железо (по низкому ферритину) вычищается из ЖЕНСКОГО плана + флаг в `protocolWarnings`/rationale; `FEMALE_ALL_LAYER_SUBS` + `labels` для баннера UI; протоколы «Железо (по анализам)» и «Кости (Ca/D3/K2/Mg)»; запись `iron_bisglycinate` в `SUPPORT_DOSING` | `female-support-layer.ts`, `supportProtocolWomenData.ts`, `support-dosing.ts`, `tz-mapper-engine.ts` (тип), `Calc.mapper.tsx` |
 | **Э3** | Статья `lab-guide-course` — женский блок (железо/гейт HCT, аменорея-алгоритм, кости, КОК не улучшают BMD, ссылки на табы) | `articles-manifest.ts` |
 | **Э4** | §17 статус + этот §7 + AGENTS | docs |
+| **P3.11 (добор)** | «🗓 Диспансер женщины на курсе» — месячный чек-лист (12 пунктов/6 групп) в табе «🦴 Цикл, кости, RED-S», персист `he_female_dispensary_v1`, авто-старт месяца (`dispensaryMonthKey/parseDispensaryState/toggleDispensaryItem/dispensaryProgress`) | `supportProtocolWomenData.ts`, `supportProtocolWomen.tsx`, `female-oncycle-pro.test.tsx` |
 
-**Тесты:** NEW `female-oncycle-pro.test.tsx` (18: данные/пороги/гейты/FG/RED-S/UI-табы), `female-support-layer` 12→**25** (гейт железа unit+integration, жёсткий гейт HCT≥48, мужской байт-в-байт lock), обновлены `support-protocol-women-female-aas` (13 протоколов, AMH), `female-calc-banner` (RU-имена баннера). `tsc --noEmit` 0 по проекту.
+**Тесты:** NEW `female-oncycle-pro.test.tsx` (18→**24**: данные/пороги/гейты/FG/RED-S/UI-табы + диспансер 6: данные, ключ месяца, parse, toggle со сменой месяца, прогресс, UI-персист через ремаунт), `female-support-layer` 12→**25** (гейт железа unit+integration, жёсткий гейт HCT≥48, мужской байт-в-байт lock), обновлены `support-protocol-women-female-aas` (13 протоколов, AMH), `female-calc-banner` (RU-имена баннера). `tsc --noEmit` 0 по проекту.
 
 ### Отклонения / честные границы
 - **Жёсткий гейт HCT≥48 действует сильнее принципа «не удалять»**: lab-tier конвейер добавляет `iron_bisglycinate` по ферритину <30 независимо от HCT. Женский слой при подтверждённом HCT≥48 **исключает** железо (safety-правило §1), пишет флаги; мужской путь не тронут (байт-в-байт, lock-тест).
