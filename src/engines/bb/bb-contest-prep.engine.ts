@@ -1619,11 +1619,18 @@ function toPeakWeekSession(
   const training = peakWeek[Math.min(si, 2)]?.training ?? TRAINING_BY_PHASE.deplete_3;
   const exercises = session.exercises.map(e => {
     const isSpec = muscleMatchesSpecialization((e as any).muscle, cfg.specialization);
-    const baseSets = Math.max(2, Math.round((e.sets || 3) * 0.8)) + (isSpec ? 2 : 0); // ⭐ спец-добивка в пик-неделе
+    // PRO-4 Э1b: идемпотентность force-пересборки. База пик-конверсии хранится в
+    // `peakWeekBase` — иначе повторная сборка (force при смене настроек/даты) брала
+    // уже пиковые сеты (−20% каждый раз) и уже урезанный вес (×0.6 каждый раз).
+    const pkBase = (e as any).peakWeekBase as { sets?: number; workSets?: any[] } | undefined;
+    const baseSets0 = pkBase?.sets ?? (e.sets || 3);
+    const baseWorkSets = pkBase?.workSets ?? e.workSets;
+    const baseSets = Math.max(2, Math.round(baseSets0 * 0.8)) + (isSpec ? 2 : 0); // ⭐ спец-добивка в пик-неделе
     const finalSets = Math.min(5, baseSets);
-    const template: any = (e.workSets || [])[0] || { reps: 15, rir: 2, weight: 0 };
+    const template: any = (baseWorkSets || [])[0] || { reps: 15, rir: 2, weight: 0 };
     return {
       ...e,
+      peakWeekBase: { sets: baseSets0, workSets: baseWorkSets },
       sets: finalSets,
       repsRange: [15, 20] as [number, number],
       rir: 2,
@@ -1631,10 +1638,10 @@ function toPeakWeekSession(
       restSeconds: 60,
       warmupSets: [],
       workSets: Array.from({ length: finalSets }, (_, i) => ({
-        ...(e.workSets?.[i % Math.max(1, (e.workSets || []).length)] ?? template),
+        ...(baseWorkSets?.[i % Math.max(1, (baseWorkSets || []).length)] ?? template),
         reps: 15,
         rir: 2,
-        weight: Math.round((e.workSets?.[i % Math.max(1, (e.workSets || []).length)]?.weight ?? template.weight ?? 0) * 0.6 * 10) / 10,
+        weight: Math.round((baseWorkSets?.[i % Math.max(1, (baseWorkSets || []).length)]?.weight ?? template.weight ?? 0) * 0.6 * 10) / 10,
         tempo: '2-1-1-0',
         restSeconds: 60,
       })),
@@ -1689,7 +1696,13 @@ export function applyTrainingTaperToBBPlan(
     const t = usedTaper[i];
     if (!t) break;
     // Без force: идемпотентно пропускаем уже наложенные недели (другое соревнование).
-    if (weekAlreadyPrepped(wk) && !force) continue;
+    if (weekAlreadyPrepped(wk) && !force) {
+      // PRO-4 Э1: legacy-нормализация — недели, размеченные старыми версиями тапера
+      // (prepProtocol без contestPhase), добирают единый маркер фаз (паритет с
+      // applyContestPrepToBBPlan/applyPeakWeekOverlayToBBPlan).
+      if (!wk.contestPhase && wk.taper === true && wk.peakWeek !== true) wk.contestPhase = 'taper';
+      continue;
+    }
     // С force: НЕ пересобираем недели с НАШИМ prepProtocol — у них нет базового объёма
     // (умножение поверх уже порезанного = накопление кривой ×0.85×0.85). Границы фаз
     // пересобираются в applyContestPrepToBBPlan: новые недели окна получают taper,
@@ -1709,6 +1722,7 @@ export function applyTrainingTaperToBBPlan(
     if (isDeload) {
       wk.phase = wk.phase ?? 'deload';
       wk.taper = true;
+      wk.contestPhase = 'taper'; // PRO-4 Э1: контур фаз работает и в overlay-пути (SRCBB/Macrocycle)
       wk.prepProtocol = `Пропущена (разгрузка) — ${t.label}`;
       continue;
     }
@@ -1742,6 +1756,7 @@ export function applyTrainingTaperToBBPlan(
     }
     wk.phase = 'peaking';
     wk.taper = true;
+    wk.contestPhase = 'taper'; // PRO-4 Э1: единый маркер фаз (UI-таблица, plan-quality, isMonotonicTaper)
     wk.prepProtocol = `${getPeakingProtocol(cfg.trainingProtocol).name} — ${t.label}`;
     appliedWeeks.push(idx + 1);
   }
@@ -1749,6 +1764,10 @@ export function applyTrainingTaperToBBPlan(
   // Неделя шоу → пик-неделя (памп/деплеция, отдых).
   if (windowLen > 0) {
     const wk = weeks[endIdx];
+    // PRO-4 Э1: нормализация legacy-пика (peakWeek=true без contestPhase) — единый формат.
+    if (wk.peakWeek === true && !force && wk.contestPhase !== 'peak_week') {
+      wk.contestPhase = 'peak_week';
+    }
     // Guard только против ПРОШЛЫХ применений (peakWeek) при !force; с force —
     // пересобираем пик-неделю по актуальным настройкам (обновление плана).
     if (wk.peakWeek !== true || force) {
@@ -1757,6 +1776,7 @@ export function applyTrainingTaperToBBPlan(
       wk.phase = 'peaking';
       wk.taper = true;
       wk.peakWeek = true;
+      wk.contestPhase = 'peak_week'; // PRO-4 Э1
       wk.sessions = wk.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
       wk.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}`;
       if (!appliedWeeks.includes(endIdx + 1)) appliedWeeks.push(endIdx + 1);
