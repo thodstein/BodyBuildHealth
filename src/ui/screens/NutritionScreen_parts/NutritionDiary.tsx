@@ -467,11 +467,14 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         </div>
       </DiarySection>
       {tab !== 'add' && (
-        <div className="nut-diary-fabbar" style={{ position: 'sticky', bottom: 0, zIndex: 30, padding: '10px 2px 4px', marginTop: 4, background: 'linear-gradient(180deg, rgba(24,24,27,0), #18181b 38%)' }}>
-          <button onClick={() => setTab('add')} aria-label="Быстро добавить" className="nut-diary-fab" style={{ width: '100%', minHeight: 52, borderRadius: 14, background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', boxShadow: '0 6px 20px rgba(0,230,138,0.35)', fontSize: 14, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#000' }}>
+        <>
+        <div aria-hidden style={{ height: 64 }} />
+        <div className="nut-diary-fabbar" style={{ position: 'fixed', left: 12, right: 12, bottom: 'calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px)', zIndex: 40, maxWidth: 560, margin: '0 auto', pointerEvents: 'none' }}>
+          <button onClick={() => setTab('add')} aria-label="Быстро добавить" className="nut-diary-fab" style={{ width: '100%', minHeight: 52, borderRadius: 14, background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', boxShadow: '0 6px 20px rgba(0,230,138,0.35)', fontSize: 14, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#000', pointerEvents: 'auto' }}>
             <span style={{ fontSize: 20, lineHeight: 1 }}>＋</span> Добавить еду
           </button>
         </div>
+        </>
       )}
 
       {/* Modern popups */}

@@ -4948,6 +4948,26 @@ html.app-native .nut-diary-fab {
   bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 16px) !important;
 }
 
+html.app-native .nut-diary-fabbar {
+  position: fixed !important;
+  left: 12px !important;
+  right: 12px !important;
+  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
+  max-width: 560px !important;
+  margin: 0 auto !important;
+  z-index: 40 !important;
+  pointer-events: none !important;
+}
+
+html.app-native .nut-diary-fabbar .nut-diary-fab {
+  pointer-events: auto !important;
+  min-height: 52px !important;
+}
+
+html.app-native .nut-diary-fabbar .nut-diary-fab:active {
+  transform: scale(0.98) !important;
+}
+
 /* ─── 76. LABS PRO-FULL — топ-подача вкладки «Анализы» (hero не тронут) ──
  * Только APK. TSX уже несёт PRO-инлайны (44/48/52px, стекло, белый текст);
  * здесь — липкость, press/focus, каскад, табличные цифры и белый текст-гард.
