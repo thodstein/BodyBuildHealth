@@ -119,7 +119,7 @@ type BBState = {
 
 const DEFAULT_STATE: BBState = {
   weakManual: [],
-  circ: { heightCm: '175', weightKg: '80', bodyFat: '', neck: '', chest: '', waist: '', hips: '', bicepL: '', bicepR: '', thighL: '', thighR: '', calfL: '', calfR: '', shoulderWidth: '', forearmL: '', forearmR: '' },
+  circ: { heightCm: '175', weightKg: '80', neck: '', chest: '', waist: '', hips: '', bicepL: '', bicepR: '', thighL: '', thighR: '', calfL: '', calfR: '', shoulderWidth: '', forearmL: '', forearmR: '' },
   ohsHeelsFlat: true, ohsKneeValgus: false, ohsHipBelowParallel: true, ohsTrunkUpright: true, ohsArmsOverMidfoot: true, ohsLumbarNeutral: true,
   kneeToWallCm: '', ankleDeg: '', heelRetest: '',
   ktwL: '', ktwR: '',

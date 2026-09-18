@@ -162,3 +162,9 @@ describe('PRO-5 Э4 каталог Разбора', () => {
     expect(SRC).not.toContain('EXERCISE_CATALOG.slice(0, 80)');
   });
 });
+
+describe('PRO-5 Э7 гигиена симметрии', () => {
+  it('мёртвое поле circ.bodyFat удалено из дефолта (замеры — сантиметры, % жира живёт в профиле)', () => {
+    expect(SRC).not.toContain("bodyFat: ''");
+  });
+});

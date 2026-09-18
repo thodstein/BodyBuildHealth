@@ -87,8 +87,12 @@ describe('symmetry PRO', () => {
   it('female WHR высокий → подсказка', () => {
     expect(femaleSymmetryNotes({ waist: 85, hips: 95 }).length).toBeGreaterThan(0);
   });
-  it('female норма → тихо', () => {
-    expect(femaleSymmetryNotes({ waist: 65, hips: 95 }).length).toBe(0);
+  it('female коридор 0.65–0.80 → info-нота (контракт с bb-diagnostics-pro2: «коридор нормы»)', () => {
+    // PRO-5 Э7: раньше тест ждал здесь тишину (0), но sibling-тест pro2 ждёт ту же ноту
+    // при r=0.737; семантика зафиксирована одна — коридор = info-нота «держим курс».
+    const notes = femaleSymmetryNotes({ waist: 65, hips: 95 });
+    expect(notes.length).toBe(1);
+    expect(notes[0]).toMatch(/коридор нормы/);
   });
 });
 
