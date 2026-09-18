@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { convertCycleToBBPlan } from '../cycle-to-plan';
 import { validateBBPlan } from '../bb-validator.engine';
-import { effectiveMuscleVolume } from '../bb-weakpoint';
 
 /**
  * P2-13 + P1-11 (план BB-FEMALE-POSTERIOR-QUALITY-PLAN.md):

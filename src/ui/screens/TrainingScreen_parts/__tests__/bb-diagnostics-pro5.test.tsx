@@ -6,7 +6,7 @@
  * Э4 каталог Разбора: план первыми + поиск.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BBDiagnosticsHub } from '../BBDiagnosticsHub';
@@ -166,5 +166,31 @@ describe('PRO-5 Э4 каталог Разбора', () => {
 describe('PRO-5 Э7 гигиена симметрии', () => {
   it('мёртвое поле circ.bodyFat удалено из дефолта (замеры — сантиметры, % жира живёт в профиле)', () => {
     expect(SRC).not.toContain("bodyFat: ''");
+  });
+});
+
+describe('PRO-5 Э6 сироты и LVP', () => {
+  it('LVP-карточка калибрует и сохраняет валидный профиль (движок был без UI)', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Разбор/ }));
+    expect(document.querySelector('[data-bb="lvp-card"]')).not.toBeNull();
+    fireEvent.change(screen.getByTestId('bb-lvp-text'), { target: { value: '100 0.7\n120 0.55\n140 0.4' } });
+    fireEvent.click(document.querySelector('[data-bb="lvp-run"]') as HTMLElement);
+    expect(document.querySelector('[data-bb="lvp-result"]')?.textContent).toMatch(/e1RM/);
+    const store = JSON.parse(localStorage.getItem('he_bb_lvp_profile') || '{}');
+    expect(store.squat?.valid).toBe(true);
+    expect(store.squat?.e1rm).toBeGreaterThan(150);
+  });
+
+  it('шумный профиль (разброс <10 кг) честно не сохраняется', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Разбор/ }));
+    fireEvent.change(screen.getByTestId('bb-lvp-text'), { target: { value: '100 0.5\n102 0.49\n103 0.5' } });
+    fireEvent.click(document.querySelector('[data-bb="lvp-run"]') as HTMLElement);
+    expect(localStorage.getItem('he_bb_lvp_profile')).toBeNull();
+  });
+
+  it('сирота bb-joint-jsi-bridge удалён (ноль импортёров/тестов)', () => {
+    expect(existsSync(resolve(__dirname, '..', '..', '..', '..', 'engines', 'bb', 'bb-joint-jsi-bridge.ts'))).toBe(false);
   });
 });

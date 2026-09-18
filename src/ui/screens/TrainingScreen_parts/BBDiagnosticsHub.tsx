@@ -54,6 +54,7 @@ import { benchScreenVerdict, benchCorrections, BENCH_DISCLAIMER } from '../../..
 import { painMonitorVerdict, painMonitorLine, provocationFor, PAIN_LOCATIONS, PAIN_MONITOR_DISCLAIMER, type PainLocation } from '../../../engines/bb/bb-pain-monitor.engine';
 import { nheVerdict, adductorVerdict, NHE_DISCLAIMER, ADDUCTOR_HONESTY, type CphLevel } from '../../../engines/bb/bb-posterior-readiness.engine';
 import { assessBbTendonGuard } from '../../../engines/bb/bb-tendon-guard.engine';
+import { calibrateBbLvp, parseBbLvpText, loadBbLvpProfiles, saveBbLvpProfile, clearBbLvpProfiles, type BbLvpProfile } from '../../../engines/bb/bb-lvp.engine';
 
 const STORAGE_KEY = 'he_bb_diagnostics_hub_v1';
 type BBTab = 'weak' | 'screening' | 'exercise' | 'stimulus' | 'symmetry';
@@ -387,6 +388,11 @@ export const BBDiagnosticsHub: React.FC = () => {
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }, [state]);
   // Э4 PRO-5: поиск упражнения в «Разборе» (план — первыми, каталог без произвольного среза)
   const [exQuery, setExQuery] = useState('');
+  // Э6 PRO-5: LVP-калибровка (движок был без UI-потребителя) — аккордеон в «Разборе»
+  const [lvpLift, setLvpLift] = useState('squat');
+  const [lvpText, setLvpText] = useState('');
+  const [lvpProfile, setLvpProfile] = useState<BbLvpProfile | null>(null);
+  const [lvpSaved, setLvpSaved] = useState<number>(() => { try { return Object.keys(loadBbLvpProfiles()).length; } catch { return 0; } });
 
   const level = useMemo(() => {
     try { const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}'); return p?.settings?.training?.level || p?.training?.level || 'intermediate'; } catch { return 'intermediate'; }
@@ -991,6 +997,32 @@ export const BBDiagnosticsHub: React.FC = () => {
     painYellow: (() => { try { return String((painMon as any)?.verdict?.level || '') === 'yellow'; } catch { return false; } })(),
     painRed: (() => { try { return String((painMon as any)?.verdict?.level || '') === 'red'; } catch { return false; } })(),
   });
+
+  // Э6 PRO-5: LVP-калибровка — валидный профиль (r²≥0.85) сохраняем, шумный честно не пишем
+  const runLvp = () => {
+    try {
+      const pts = parseBbLvpText(lvpText);
+      const p = calibrateBbLvp(lvpLift, pts);
+      setLvpProfile(p);
+      if (p && p.valid) {
+        const store = saveBbLvpProfile(p);
+        setLvpSaved(Object.keys(store).length);
+        setToast(`✓ LVP ${p.lift}: e1RM ≈ ${p.e1rm} кг (r² ${p.r2}) — профиль сохранён`);
+      } else {
+        setToast(p ? `LVP: r² ${p.r2} — мало/шумно, профиль не сохранён` : 'LVP: нужно 3+ точки с разбросом (формат «вес скорость»)');
+      }
+      setTimeout(() => setToast(''), 3000);
+    } catch { /* noop */ }
+  };
+  const clearLvp = () => {
+    try {
+      clearBbLvpProfiles();
+      setLvpSaved(0);
+      setLvpProfile(null);
+      setToast('LVP-профили очищены');
+      setTimeout(() => setToast(''), 2000);
+    } catch { /* noop */ }
+  };
 
   const handleExport = () => {
     // Э5 PRO-5: причины — мемо weakCauses (с auditFor: «показано = экспортировано»), PRO-мета — общий сборщик
@@ -2182,6 +2214,28 @@ export const BBDiagnosticsHub: React.FC = () => {
                 })}
               </div>
             </div>
+
+            {/* Секция 6: LVP-калибровка (Э6 PRO-5 — движок был без UI) */}
+            <details data-bb="lvp-card" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 700, color: ACCENT }}>6 · ⚡ LVP-калибровка (индивидуальный профиль нагрузка–скорость)</summary>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 6, lineHeight: 1.5 }}>
+                3+ точки «вес скорость лучшего повтора», по одной в строке: «80 0.62» (кг, м/с). Профиль даёт индивидуальный e1RM при MVT движения (канон VBT).
+                В мост/план не уходит — ориентир; сохранено профилей: {lvpSaved}.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, marginTop: 6 }}>
+                <BbSheetSelect label="Движение" value={lvpLift} onChange={setLvpLift} testId="bb-lvp-lift" options={[{ id: 'squat', label: 'Присед' }, { id: 'bench', label: 'Жим лёжа' }, { id: 'deadlift', label: 'Тяга' }, { id: 'ohp', label: 'Жим стоя' }, { id: 'row', label: 'Тяга в наклоне' }]} />
+                <textarea value={lvpText} onChange={(e) => setLvpText(e.target.value)} placeholder={'80 0.62\n100 0.5\n120 0.4'} aria-label="Точки вес скорость" data-bb="lvp-text" data-testid="bb-lvp-text" style={{ minHeight: 72, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 16, resize: 'vertical' }} />
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                <button onClick={runLvp} data-bb="lvp-run" style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.30)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>📈 Калибровать</button>
+                {lvpSaved > 0 && <button onClick={clearLvp} data-bb="lvp-clear" style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Очистить профили</button>}
+              </div>
+              {lvpProfile && (
+                <div data-bb="lvp-result" style={{ marginTop: 6, fontSize: 10, color: lvpProfile.valid ? '#22c55e' : '#f59e0b', lineHeight: 1.5 }}>
+                  {lvpProfile.text}
+                </div>
+              )}
+            </details>
           </div>
         )}
 
