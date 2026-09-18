@@ -124,6 +124,11 @@ MEV-калибровка подключается только при завер
   - bb-ped-семья + `rest-hooks-native` — **7 файлов / 231 тест, 0 падений**
     (unhandled `DB not init` — предсуществующий ReportsScreen-шум).
 - `npm run build` (vite, PWA) — **OK** (51 с); `npm run verify:apk-design` — **OK**.
+- **Полный прогон (14553 теста, 1118 файлов): 14525 passed / 8 failed / 20 skipped** — все
+  5 падающих файлов чужие/предсуществующие: `course-sync` ×4, `bb-macrocycle` v7,
+  `annual-audit-fixes-2026-08`, `bb-diagnostics-max-pro` (female symmetry), `pl-auto-regressions`
+  (catalog aliases); 3 unhandled — чужие предсуществующие (React-teardown `cardio-pro-panels`,
+  `DB not init` rest-hooks, `revokeObjectURL` ExerciseLab). Моих падений 0.
 - **Шторм-инцидент**: параллельный агент дважды откатывал (`checkout`) часть worktree
   (`cycle-to-plan.ts`, хвост `bb-plans-migration.test.ts`) — восстановлено заново
   (перечитано перед edit, сверено `git diff`, повторный tsc 0). Остальные файлы не пострадали.
