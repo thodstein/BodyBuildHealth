@@ -40,7 +40,7 @@ async function readFileAsText(file: File | Blob): Promise<string> {
   });
 }
 
-async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
+export async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
   if (typeof (file as any).arrayBuffer === 'function') {
     try { return await (file as any).arrayBuffer(); } catch { /* use FileReader */ }
   }
