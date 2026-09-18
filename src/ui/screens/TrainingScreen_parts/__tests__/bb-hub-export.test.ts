@@ -92,5 +92,10 @@ describe('bb-hub-export (PRO-5 Э5)', () => {
     expect((SRC.match(/diagnoseWeakCausesBatch\(/g) || []).length).toBe(1);
     // деталь коррекций — одно мемо (карточка = экспорт = мост)
     expect((SRC.match(/correctiveDetailForExport/g) || []).length).toBeGreaterThanOrEqual(3);
+    // Э5-доводка (R3/R5/R6): каждый расчёт сведён к одному мемо
+    expect((SRC.match(/readSavedBbPlan\(\);/g) || []).length).toBe(1); // savedPlan
+    expect((SRC.match(/readPlanHistory\(localStorage/g) || []).length).toBe(1); // planHistory
+    expect((SRC.match(/endsWith\('_asym'\)/g) || []).length).toBe(1); // asymMax
+    expect((SRC.match(/Внутренний' : 'Внешний/g) || []).length).toBe(1); // mmcLine
   });
 });

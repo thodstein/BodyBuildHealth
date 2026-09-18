@@ -59,9 +59,11 @@ describe('PRO-5 Э2 свежесть данных', () => {
     expect((SRC.match(/localIsoDate\(\)/g) || []).length).toBeGreaterThanOrEqual(7);
   });
 
-  it('source-guard: report/balance зависят от planNonce; профиль-мемы от profileNonce', () => {
-    expect(SRC).toMatch(/const balance = useMemo\([\s\S]{0,600}?\}, \[diarySessions, planNonce\]\);/);
-    expect(SRC).toMatch(/state\.weakManual, planNonce\]\);/);
+  it('source-guard: report/balance зависят от planNonce (через мемо savedPlan); профиль-мемы от profileNonce', () => {
+    // Э5-доводка: план читается один раз (savedPlan), report/balance зависят от него
+    expect(SRC).toMatch(/const savedPlan = useMemo\([\s\S]{0,300}?\}, \[planNonce, diarySessions\]\);/);
+    expect(SRC).toMatch(/const balance = useMemo\([\s\S]{0,300}?\}, \[savedPlan\]\);/);
+    expect(SRC).toMatch(/state\.weakManual, savedPlan\]\);/);
     expect((SRC.match(/\[profileNonce\]/g) || []).length).toBeGreaterThanOrEqual(5);
   });
 });

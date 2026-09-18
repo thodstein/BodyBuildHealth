@@ -39,8 +39,9 @@ describe('3.11 dedup (source-guard)', () => {
   it('inline JSON.parse(he_bb_plan_saved) остался только для raw-снапшота (≤1)', () => {
     const inline = (SRC.match(/JSON\.parse\(localStorage\.getItem\('he_bb_plan_saved'\)/g) || []).length;
     expect(inline).toBeLessThanOrEqual(1);
-    // канонический helper присутствует и используется в 3+ местах
+    // канонический helper присутствует; PRO-5 Э5-доводка (было ≥3 → стало 1 вызов):
+    // все поверхности читают мемо savedPlan (единое чтение на рендер), дублей нет.
     expect(SRC).toContain('function readSavedBbPlan(');
-    expect((SRC.match(/readSavedBbPlan\(\)/g) || []).length).toBeGreaterThanOrEqual(3);
+    expect((SRC.match(/readSavedBbPlan\(\);/g) || []).length).toBe(1);
   });
 });

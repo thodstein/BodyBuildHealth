@@ -474,13 +474,17 @@ export const BBDiagnosticsHub: React.FC = () => {
     try { return computePerMuscleACWR(diarySessions as any); } catch { return {}; }
   }, [diarySessions]);
 
+  // Э5-доводка (R6): сохранённый план читается ОДИН раз на рендер (было 3 точки readSavedBbPlan)
+  const savedPlan = useMemo(() => {
+    try { return readSavedBbPlan(); } catch { return null; }
+  }, [planNonce, diarySessions]);
+
   const balance = useMemo(() => {
     try {
-      const plan = readSavedBbPlan();
-      if (plan?.weeks) return analyzeBBBalance(plan);
+      if (savedPlan?.weeks) return analyzeBBBalance(savedPlan);
       return null;
     } catch { return null; }
-  }, [diarySessions, planNonce]);
+  }, [savedPlan]);
 
   const ohs = useMemo(() => assessOHS({
     heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
@@ -569,7 +573,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     sessions: diarySessions as any,
     meas: measNum as any,
     heightCm: measNum.heightCm ?? null,
-    plan: readSavedBbPlan(),
+    plan: savedPlan as any,
     balance,
     // Движения, не нагрузка: ACWR/VBT в скоринг не входят (их хабы — Интеллект/Анализ силы).
     // perMuscleAcwr остаётся тихим входом причин (weakCauses), но не штрафа баллов.
@@ -580,7 +584,15 @@ export const BBDiagnosticsHub: React.FC = () => {
     hasCircumf: Object.keys(measNum).some(k => ['chest','waist','bicepL','bicepR','thighL','thighR'].includes(k)),
     hasVbt: false,
     manualWeak: state.weakManual,
-  }), [level, factVolume, diarySessions, measNum, balance, ohs.failed, state.weakManual, planNonce]);
+  }), [level, factVolume, diarySessions, measNum, balance, ohs.failed, state.weakManual, savedPlan]);
+
+  // Э5-доводка (R3): макс перекос L/R — один мемо (было 5 копий расчёта в карточках/выдаче/мосте)
+  const asymMax = useMemo(() => {
+    try {
+      const vals = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, v]) => Number(v));
+      return vals.length ? Math.max(...vals) : null;
+    } catch { return null; }
+  }, [report.symmetry.ratios]);
 
   // Скрининг v2: драйвер + односторонний + коды/снимок (чистые функции движка)
   const moveDriver = useMemo(() => {
@@ -805,6 +817,13 @@ export const BBDiagnosticsHub: React.FC = () => {
       return mmcAdviceFor({ isolation: iso, loadPct1RM: null, explosive: false });
     } catch { return null; }
   }, [report]);
+  // Э5-доводка (R5): MMC-строка — одна (карточка/мост/экспорт)
+  const mmcLine = useMemo(() => {
+    try {
+      const a = mmcAdvice;
+      return a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null;
+    } catch { return null; }
+  }, [mmcAdvice]);
 
   // ── MAX PRO: причины слабых + McCallum + триада + спец-блок + топ-3 ──
   const wristNum = state.wristCm ? parseFloat(state.wristCm) : NaN;
@@ -898,7 +917,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         weakHeads,
         specBlock: specPayload,
         // MMC-строка: приёмник ББ-авто её уже читает (typeof string) — шлём тот же текст, что в карточке
-        mmc: (() => { try { const a = mmcAdvice; return a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null; } catch { return null; } })(),
+        mmc: mmcLine,
         sleepHours: Number.isFinite(profileSleep as number) ? profileSleep : null,
         // Симметрия L/R — движения, с флип-гейтом (сторона плавает — без добивки); направление — из истории
         lrVerdicts,
@@ -965,7 +984,6 @@ export const BBDiagnosticsHub: React.FC = () => {
   // PRO-CORR-FIX: единый конструктор сигналов библиотеки — карточка, HTML- и CSV-экспорт
   // обязаны считать одним набором входов (иначе топ в файле ≠ показанному/вставленному).
   const corrSignalsFor = (z: string, cause: unknown) => {
-    const asymMax = (() => { try { const vs = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return vs.length ? Math.max(...vs) : null; } catch { return null; } })();
     const drv = (() => { try { return String((moveDriver as any)?.driver || ''); } catch { return ''; } })();
     const pLevel = (() => { try { return String((painMon as any)?.verdict?.level || 'green'); } catch { return 'green'; } })();
     return {
@@ -1117,9 +1135,8 @@ export const BBDiagnosticsHub: React.FC = () => {
 
   // ── Упражнения → эффект (единый инструмент) ──
   const bbPlan = useMemo(() => {
-    const plan = readSavedBbPlan();
-    return plan && plan.weeks ? plan : null;
-  }, [diarySessions, state.exerciseSelectedId, planNonce]);
+    return savedPlan && savedPlan.weeks ? savedPlan : null;
+  }, [savedPlan]);
 
   const planAudit = useMemo(() => {
     try { return bbPlan ? auditPlanExercises(bbPlan) : null; } catch { return null; }
@@ -1172,7 +1189,6 @@ export const BBDiagnosticsHub: React.FC = () => {
     for (const z of report.weakZonesGranular.slice(0, 2)) {
       try {
         const aud = (() => { try { return planAudit?.byMuscle?.[z]; } catch { return null; } })();
-        const asym = (() => { try { const vs = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return vs.length ? Math.max(...vs) : null; } catch { return null; } })();
         const inPlan: string[] = [];
         try {
           if (bbPlan) for (const w of (bbPlan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) inPlan.push(String((ex as any).exerciseName || (ex as any).name || ''));
@@ -1180,7 +1196,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         out[z] = rankCorrectionsForWeak(z, null, {
           cause: weakCauses[z]?.cause,
           weakHead: weakHeadForZone(z),
-          asymPct: asym,
+          asymPct: asymMax,
           level,
           equipment: profileEquipment,
           missingAngles: aud?.angleCoverage.missing || [],
@@ -1233,7 +1249,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     moveDriver,
     singleLeg,
     ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
-    mmcLine: (() => { try { const a = mmcAdvice; return a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null; } catch { return null; } })(),
+    mmcLine,
     shoulder: (() => { try { return { pass: (shoulderV as any).pass, locus: (shoulderV as any).locus, text: (shoulderV as any).text }; } catch { return null; } })(),
     hingeText: (() => { try { return `${(hingeV as any).text} · ${(loadedV as any).text}`; } catch { return ''; } })(),
     ybt: (() => { try { return { text: (ybtV as any).text }; } catch { return null; } })(),
@@ -1247,7 +1263,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     screenPriority: screenPriority.length ? screenPriority : null,
     correctiveDetail: correctiveDetailForExport,
     lrDirection,
-  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcAdvice, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, lrDirection]);
+  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, lrDirection]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {
@@ -1314,10 +1330,6 @@ export const BBDiagnosticsHub: React.FC = () => {
   const selectedDiagnosis = useMemo(() => {
     if (!selectedExRaw) return null;
     try {
-      const asym = (() => {
-        const vals = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, v]) => Number(v));
-        return vals.length ? Math.max(...vals) : null;
-      })();
       const singleAngleMuscle = planAudit ? Object.entries(planAudit.byMuscle).find(([, bm]) => bm.angleCoverage.total > 1 && bm.angleCoverage.covered === 1 && bm.totalSets >= 6)?.[0] || null : null;
       const uncovered = planAudit?.byMuscle[selectedExRaw.muscle || '']?.regionalCoverage.missing || [];
       const strictMissing = planAudit?.byMuscle[selectedExRaw.muscle || '']?.strictCoverage.missing || [];
@@ -1337,19 +1349,18 @@ export const BBDiagnosticsHub: React.FC = () => {
       })();
       return diagnoseExercise(selectedExRaw as any, {
         goal: 'hypertrophy', level, weakZones: report.weakZonesGranular, weakMusclesCanonical: report.weakMusclesCanonical,
-        muscle: selectedExRaw.muscle, mobilityFails: ohs.failed, asymPct: asym, planTempo: selectedExRaw.tempo || null, planPauseSeconds: selectedExRaw.pauseSeconds ?? null, planReps: 10,
+        muscle: selectedExRaw.muscle, mobilityFails: ohs.failed, asymPct: asymMax, planTempo: selectedExRaw.tempo || null, planPauseSeconds: selectedExRaw.pauseSeconds ?? null, planReps: 10,
         singleAngleMuscle, uncoveredSubregions: uncovered, strictMissing, weakHead,
         cheating: state.stimCheating || null,
         rangeFull: state.stimShortRom ? false : null,
         setupIssues: state.stimSetupNote.trim() ? [state.stimSetupNote.trim()] : undefined,
       } as any);
     } catch { return null; }
-  }, [selectedExRaw, report.weakZonesGranular, report.weakMusclesCanonical, report.symmetry.ratios, ohs.failed, level, planAudit, state.stimCheating, state.stimShortRom, state.stimSetupNote]);
+  }, [selectedExRaw, report.weakZonesGranular, report.weakMusclesCanonical, asymMax, ohs.failed, level, planAudit, state.stimCheating, state.stimShortRom, state.stimSetupNote]);
 
   const selectedCorrections = useMemo(() => {
     if (!selectedDiagnosis || !selectedExRaw) return [];
     try {
-      const asym = (() => { try { const vs = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return vs.length ? Math.max(...vs) : null; } catch { return null; } })();
       const aud = (() => { try { return planAudit?.byMuscle?.[selectedExRaw.muscle || '']; } catch { return null; } })();
       // слабая головка под мышцу — замены целятся в неё
       let weakHead: string | null = null;
@@ -1363,9 +1374,9 @@ export const BBDiagnosticsHub: React.FC = () => {
           if (hm === m || (LEGS.has(hm) && LEGS.has(m))) { weakHead = h; break; }
         }
       } catch { /* noop */ }
-      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, weakHead, asymPct: asym, equipment: profileEquipment, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: effSex || undefined });
+      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, weakHead, asymPct: asymMax, equipment: profileEquipment, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: effSex || undefined });
     } catch { return []; }
-  }, [selectedDiagnosis, selectedExRaw, level, report.symmetry.ratios, report.weakZonesGranular, planAudit, effSex, profileEquipment]);
+  }, [selectedDiagnosis, selectedExRaw, level, asymMax, report.weakZonesGranular, planAudit, effSex, profileEquipment]);
 
   const selectedProf = useMemo(() => {
     if (!selectedExRaw) return null;
@@ -1614,8 +1625,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     // Снапшот — только при реальном изменении + журнал последних (для отката на N шагов)
     try {
       localStorage.setItem('he_bb_plan_saved_prev', raw as string);
-      const hist = readPlanHistory(localStorage.getItem('he_bb_plan_history'));
-      const next = pushPlanSnapshot(hist, {
+      const next = pushPlanSnapshot(planHistory, {
         date: localIsoDate(),
         label: `до вставки: ${zones.map(weakRu).join(', ')}`,
         plan,
@@ -1655,16 +1665,13 @@ export const BBDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   };
 
-  const planHistory = (() => {
+  // Э5-доводка (R6): журнал плана — одно чтение на рендер (инъекция/откат бампят planNonce)
+  const planHistory = useMemo(() => {
     try { return readPlanHistory(localStorage.getItem('he_bb_plan_history')); } catch { return []; }
-  })();
+  }, [planNonce]);
 
   const handleRestoreSnapshot = (idx: number) => {
-    let snap: PlanSnapshot | null = null;
-    try {
-      const hist = readPlanHistory(localStorage.getItem('he_bb_plan_history'));
-      snap = hist[idx] || null;
-    } catch { /* noop */ }
+    const snap: PlanSnapshot | null = planHistory[idx] || null;
     if (!snap) return;
     try {
       localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: snap.plan, date: new Date().toISOString() }));
@@ -2005,7 +2012,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                   const tail = String(f).includes(':') ? ` (${String(f).split(':').slice(1).map((m) => MUSCLE_LABEL_RU[m] || m).join(', ')})` : '';
                   return `${ru[base] || f}${tail}`;
                 }).join(' · ')}</div>}
-                <div style={{ color: '#fff', marginTop: 2 }}>План: {bbPlan ? `${bbPlan.weeks?.length || 0} нед` : '— нет плана (собери в ББ-авто)'} · слабые: {weakListRu(report.weakZonesGranular) || '—'} · перекос {(() => { const v = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return v.length ? Math.max(...v).toFixed(1) + '%' : '—'; })()}</div>
+                <div style={{ color: '#fff', marginTop: 2 }}>План: {bbPlan ? `${bbPlan.weeks?.length || 0} нед` : '— нет плана (собери в ББ-авто)'} · слабые: {weakListRu(report.weakZonesGranular) || '—'} · перекос {asymMax != null ? `${asymMax.toFixed(1)}%` : '—'}</div>
               </div>
             ) : (
               <div style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, color: '#fff', marginBottom: 8 }}>Нет плана ББ — собери в ББ-авто, тогда аудит портфеля появится здесь.</div>
