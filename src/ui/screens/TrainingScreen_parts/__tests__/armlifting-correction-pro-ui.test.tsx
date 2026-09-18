@@ -12,6 +12,8 @@ describe('PRO-CORR K6 UI: коррекция показывает почему/�
     expect(screen.getByText(/Запасная:/)).toBeTruthy();
     expect(document.body.textContent).toContain('Нед 4');
     expect(screen.getAllByText(/Прогрессия:/).length).toBeGreaterThan(0);
+    // деталь волны видна в списке и уедет в экспорт той же строкой
+    expect(document.body.textContent).toContain('Тяжёлые тройки');
   });
   it('диагноз с болью — коррекция только щадящая (стоп-нагрузка)', () => {
     try { localStorage.clear(); } catch { /* noop */ }

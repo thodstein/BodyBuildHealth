@@ -592,7 +592,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     /** PRO-5 добивка: диагноз + коррекция в экспорт (аддитивно). */
     diagTitle: `${diagnosis.title} · ${diagnosis.cause}/${diagnosis.confidence}${conditions.trainingOnly ? ' · замер тренировочный' : ''}`,
     diagCorrections: corrections.map((c) => `${c.title} — ${c.protocol} · ${c.dose}${c.cues?.length ? ` · кью: ${c.cues.join(', ')}` : ''}`),
-    diagSpec: specBlock.map((w) => `Нед ${w.week}: ${w.focus}`),
+    diagSpec: specBlock.map((w) => `Нед ${w.week}: ${w.focus}${w.detail ? ` · ${w.detail}` : ''}`),
     diagExtra,
   });
 
