@@ -217,7 +217,18 @@ export function suggestMethodologyForStack(input: { peds: PED[]; pedDoses?: Reco
   return null;
 }
 
-export function applyPEDMethodologyToPlan(plan: import('./bb-builder.engine').BBPlan, meth: PEDMethodology): import('./bb-builder.engine').BBPlan {
+export function applyPEDMethodologyToPlan(
+  plan: import('./bb-builder.engine').BBPlan,
+  meth: PEDMethodology,
+  opts?: {
+    /**
+     * Program/cycle-путь не выполняет axial-замены joint-guard
+     * (`programToBBPlan` не фильтрует пул по GH-гейту) — заметка не должна
+     * обещать замену, которой нет. Строка пропускается (честность).
+     */
+    skipGuardNote?: boolean;
+  },
+): import('./bb-builder.engine').BBPlan {
   if (!meth.insulinPumpWindow && !meth.jointGuard && !meth.mgfTargetMuscles.length) {
     // Даже без окна — добавить periWorkout rationale
     if (meth.periWorkout.intraNote || meth.periWorkout.warning) {
@@ -253,7 +264,7 @@ export function applyPEDMethodologyToPlan(plan: import('./bb-builder.engine').BB
     }
     copy.rationale.push('💉 GH+insulin pump window: памп-дни получили intra-carbs подсказку (тяж дни не тронуты)');
   }
-  if (meth.jointGuard) copy.rationale.push('🛡 Joint guard: тяж-дни сохранены, но axial/high-stress заменены на машины/кабели (см. отбор)');
+  if (meth.jointGuard && !opts?.skipGuardNote) copy.rationale.push('🛡 Joint guard: тяж-дни сохранены, но axial/high-stress заменены на машины/кабели (см. отбор)');
   // MGF/IGF1 локально: целевая мышца в памп-сессиях получает myo-reps/lengthened
   // приоритет (реальная пометка, не только rationale). Тяж-дни не тронуты.
   if (meth.mgfTargetMuscles.length) {

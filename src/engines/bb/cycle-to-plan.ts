@@ -38,6 +38,7 @@ import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { extractMesocycleProgression, applyWeightProgression } from './bb-mesocycle-progression.engine';
 import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationBlock } from './bb-specialization.engine';
 import { applyTradeoffToPlan } from './bb-tradeoff.engine';
+import { isMEVCalibrationComplete, loadMEVCalibration, personalLandmarksFor } from './bb-mev-calibration.engine';
 
 /**
  * Вычислить ACWR из реальных sRPE-сессий пользователя (отдельная функция для cycle/program mode).
@@ -64,6 +65,22 @@ function addDaysISO(from: string, days: number): string {
   if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
   d.setDate(d.getDate() + days);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+/**
+ * Личный MEV (калибровка шага 1) → лендмарки цикла/программы: персональные
+ * значения перекрывают популяционные по мышцам с завершённой калибровкой.
+ * Без калибровки возвращается исходный объект (байт-в-байт).
+ * Ранее «🧪 Личный MEV» работал только в генерик-сплите.
+ */
+function withMEVCalibration<T extends { mev: number; mav: number; mrv: number }>(level: string, base: Record<string, T>): Record<string, T> {
+  try {
+    const cal = loadMEVCalibration();
+    if (!isMEVCalibrationComplete(cal)) return base;
+    return Object.fromEntries(
+      Object.entries(base).map(([m, v]) => [m, (personalLandmarksFor(level, m, 7, cal) ?? v) as T]),
+    );
+  } catch { return base; }
 }
 
 export type CycleSourceCycle = SRCycleTemplate;
@@ -955,8 +972,10 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const gradedInjuries = getGradedInjuries(injuries, today);
 
   // PED adaptation — DOSE-AWARE (передаёт pedDoses + courseIntensity)
-  const allLandmarks = getAllVolumeLandmarks(level);
-  const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]));
+  // Личный MEV (шаг 1) — и в цикловом пути: персональные лендмарки перекрывают
+  // популяционные (без завершённой калибровки — байт-в-байт).
+  const allLandmarks = withMEVCalibration(level, getAllVolumeLandmarks(level));
+  const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, (v as { mrv: number }).mrv]));
   const pedAdapt = adaptForPEDs(peds, landmarks, pedDoses, courseIntensity);
   // Recovery multiplier from body composition + recovery metrics (Helms 2022, Plews 2022, Watson 2022).
   const recoveryMult = computeBBRecoveryMultiplier(input);
@@ -1887,8 +1906,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
 
   // PED adaptation для MRV-кап (добивка слабых групп не превышает MRV)
   const levelForLandmarks = (['beginner', 'intermediate', 'advanced'].includes(level) ? level : 'intermediate') as 'beginner' | 'intermediate' | 'advanced';
-  const allLandmarks = getAllVolumeLandmarks(levelForLandmarks);
-  const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv]));
+  const allLandmarks = withMEVCalibration(levelForLandmarks, getAllVolumeLandmarks(levelForLandmarks));
+  const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, (v as { mrv: number }).mrv]));
   const pedAdapt = adaptForPEDs(opts.peds || [], landmarks, opts.pedDoses, opts.courseIntensity);
   const mrvMult = pedAdapt.combinedMrvMultiplier || 1.0;
   // P0-12 (аудит 2026-09): wearable-данные сливаются в recovery-вход — паритет с generic.

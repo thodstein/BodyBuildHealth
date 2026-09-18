@@ -72,4 +72,50 @@ describe('Saved BB plan legacy migration', () => {
     expect(plans.find(p => p.id === 'pack-off')?.params.packingV2).toBeUndefined();
     expect(plans.find(p => p.id === 'legacy-no-flag')?.params.packingV2).toBeUndefined();
   });
+
+  it('persists шаг 1-2 настройки (пресет/режим объёма/схема/особые режимы), дефолты → undefined', () => {
+    localStorage.setItem('he_bb_plans', JSON.stringify([
+      {
+        id: 'cfg-on', plan: { weeks: [{ week: 1, sessions: [] }] }, params: {
+          proPreset: 'fortitude', trainingVolumeMode: 'high', volumeScheme: 'fst7', supersetMode: 'giant',
+          intensityLevel: 'high', rotationMode: 'forbid', calorieSurplus: 300, eccentricMult: 1.2,
+          bfrMode: true, blastCruiseEnabled: true, blastWeeks: 6, cruiseWeeks: 3,
+          platePreset: 'micro', targetBodyFat: 10, cycleDay: 14,
+        },
+      },
+      {
+        id: 'cfg-defaults', plan: { weeks: [{ week: 1, sessions: [] }] }, params: {
+          proPreset: 'none', trainingVolumeMode: 'standard', volumeScheme: 'standard', supersetMode: 'none',
+          intensityLevel: 'moderate', rotationMode: 'variety', calorieSurplus: 0, eccentricMult: 1,
+          bfrMode: false, blastCruiseEnabled: false, blastWeeks: 8, cruiseWeeks: 4, platePreset: 'standard',
+        },
+      },
+      { id: 'legacy', plan: { weeks: [{ week: 1, sessions: [] }] }, params: {} },
+    ]));
+    const plans = loadSavedBBPlans();
+    const on = plans.find(p => p.id === 'cfg-on')!.params as any;
+    expect(on.proPreset).toBe('fortitude');
+    expect(on.trainingVolumeMode).toBe('high');
+    expect(on.volumeScheme).toBe('fst7');
+    expect(on.supersetMode).toBe('giant');
+    expect(on.intensityLevel).toBe('high');
+    expect(on.rotationMode).toBe('forbid');
+    expect(on.calorieSurplus).toBe(300);
+    expect(on.eccentricMult).toBe(1.2);
+    expect(on.bfrMode).toBe(true);
+    expect(on.blastCruiseEnabled).toBe(true);
+    expect(on.blastWeeks).toBe(6);
+    expect(on.cruiseWeeks).toBe(3);
+    expect(on.platePreset).toBe('micro');
+    expect(on.targetBodyFat).toBe(10);
+    expect(on.cycleDay).toBe(14);
+    const off = plans.find(p => p.id === 'cfg-defaults')!.params as any;
+    for (const k of ['proPreset', 'trainingVolumeMode', 'volumeScheme', 'supersetMode', 'intensityLevel', 'rotationMode', 'calorieSurplus', 'eccentricMult', 'bfrMode', 'blastCruiseEnabled', 'blastWeeks', 'cruiseWeeks', 'platePreset', 'targetBodyFat', 'cycleDay']) {
+      expect(off[k], k).toBeUndefined();
+    }
+    const legacy = plans.find(p => p.id === 'legacy')!.params as any;
+    expect(legacy.proPreset).toBeUndefined();
+    expect(legacy.trainingVolumeMode).toBeUndefined();
+    expect(legacy.volumeScheme).toBeUndefined();
+  });
 });

@@ -54,6 +54,25 @@ export interface SavedBBPlan {
     abPatternRotation?: boolean;
     /** Packing-v2 заливка (opt-in, пилот back). Дефолт выкл; legacy-варианты без поля = выкл. */
     packingV2?: boolean;
+    /** Pro-пресет методик (dc/fortitude/meadows) — макро-команда над DUP/суперсетами/схемой/DC. */
+    proPreset?: string;
+    /** Объёмный режим (high): цель MRV + буст объёма/капов. Дефолт standard. */
+    trainingVolumeMode?: 'standard' | 'high';
+    volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
+    supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
+    intensityLevel?: 'light' | 'moderate' | 'high';
+    rotationMode?: 'forbid' | 'strict' | 'variety';
+    calorieSurplus?: number;
+    eccentricMult?: number;
+    /** Особые режимы шага 2 (BFR/DC/Blast) — восстанавливаются при загрузке варианта. */
+    bfrMode?: boolean;
+    blastCruiseEnabled?: boolean;
+    blastWeeks?: number;
+    cruiseWeeks?: number;
+    /** Набор пластин и уточнения состава тела. */
+    platePreset?: string;
+    targetBodyFat?: number;
+    cycleDay?: number;
   };
   metrics: {
     totalSets: number;
@@ -129,6 +148,23 @@ function migrateSavedPlan(value: any): SavedBBPlan {
       cycleId: typeof rawParams.cycleId === 'string' ? rawParams.cycleId : undefined,
       abPatternRotation: rawParams.abPatternRotation === true ? true : undefined,
       packingV2: rawParams.packingV2 === true ? true : undefined,
+      // Аудит «дубли шаг 1-2»: недостающие настройки вариантов (дефолты → undefined,
+      // legacy-варианты без полей остаются undefined).
+      proPreset: typeof rawParams.proPreset === 'string' && rawParams.proPreset !== 'none' ? rawParams.proPreset : undefined,
+      trainingVolumeMode: rawParams.trainingVolumeMode === 'high' ? 'high' : undefined,
+      volumeScheme: ['gvt', 'fst7', 'gironda'].includes(rawParams.volumeScheme) ? rawParams.volumeScheme : undefined,
+      supersetMode: ['antagonist', 'same_muscle', 'giant'].includes(rawParams.supersetMode) ? rawParams.supersetMode : undefined,
+      intensityLevel: ['light', 'high'].includes(rawParams.intensityLevel) ? rawParams.intensityLevel : undefined,
+      rotationMode: ['forbid', 'strict'].includes(rawParams.rotationMode) ? rawParams.rotationMode : undefined,
+      calorieSurplus: Number.isFinite(rawParams.calorieSurplus) && rawParams.calorieSurplus !== 0 ? Number(rawParams.calorieSurplus) : undefined,
+      eccentricMult: Number.isFinite(rawParams.eccentricMult) && rawParams.eccentricMult !== 1 ? Number(rawParams.eccentricMult) : undefined,
+      bfrMode: rawParams.bfrMode === true ? true : undefined,
+      blastCruiseEnabled: rawParams.blastCruiseEnabled === true ? true : undefined,
+      blastWeeks: Number.isInteger(rawParams.blastWeeks) && rawParams.blastWeeks !== 8 ? rawParams.blastWeeks : undefined,
+      cruiseWeeks: Number.isInteger(rawParams.cruiseWeeks) && rawParams.cruiseWeeks !== 4 ? rawParams.cruiseWeeks : undefined,
+      platePreset: typeof rawParams.platePreset === 'string' && rawParams.platePreset !== 'standard' ? rawParams.platePreset : undefined,
+      targetBodyFat: Number.isFinite(rawParams.targetBodyFat) ? Number(rawParams.targetBodyFat) : undefined,
+      cycleDay: Number.isFinite(rawParams.cycleDay) ? Number(rawParams.cycleDay) : undefined,
     },
     metrics: {
       totalSets: Number(value.metrics?.totalSets) || 0, avgRir: Number(value.metrics?.avgRir) || 0,

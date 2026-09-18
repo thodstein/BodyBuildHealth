@@ -33,7 +33,7 @@ import { averageWeeklyScores, scoreVolumeWeek, scoreProWeek, gradeFor } from '..
 import { computeRegimeMrvMult } from '../../../engines/bb/bb-volume.engine';
 import { buildMEVCalibration, recordMEVCalibrationWeek, resolveMEVAfterCalibration, isMEVCalibrationComplete, mevCalibrationProgress, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, mevSignalDegradation, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
-import { suggestMethodologyForStack } from '../../../engines/bb/bb-ped-methodology.engine';
+import { suggestMethodologyForStack, recommendPEDMethodology, applyPEDMethodologyToPlan } from '../../../engines/bb/bb-ped-methodology.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { canonicalMuscle, expandDonorMuscles, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -124,7 +124,7 @@ import {
   backSubgroupLabel, armHeadLabel, isAbRotationActive,
   annualBlockCtxToPrepPatch, annualActiveBlockLine,
   getPhaseMap, phaseForWeek, DONOR_GROUPS, normalizeDonorTargets,
-  computePhases, chipBtn, useInlineDialogA11y,
+  computePhases, chipBtn, useInlineDialogA11y, BbCard,
   type Step, type BBPhase, type PlanMode,
 } from './bb-auto-constructor-shared';
 import { BbSplitStep } from './bb-step-split';
@@ -2257,6 +2257,25 @@ export const BbAutoConstructor: React.FC = () => {
         }, pedAdapt);
     }
 
+    // Шаг 2 («Фаза MGF/IGF1»): program-путь не звал
+    // recommendPEDMethodology/applyPEDMethodologyToPlan (они жили только в
+    // bb-builder) — оживляем PED-слой для режима источника (adapt): инсулиновое
+    // окно, MGF-акценты, peri-WO. Только пометки/rationale (объём не меняется);
+    // joint-guard-строка пропускается — program-путь axial-замены не делает.
+    if (planMode === 'programs' && bbAdaptMode === 'adapt' && peds.length > 0) {
+      try {
+        const wkPhases = (plan.weeks || []).map((w: any) => w?.phase);
+        const schemePhase: 'peaking' | 'intensification' | 'accumulation' = wkPhases.includes('peaking')
+          ? 'peaking' : wkPhases.includes('intensification') ? 'intensification' : 'accumulation';
+        const meth = recommendPEDMethodology({
+          peds: peds as any, pedDoses, level: bbLevel, goal: bbGoal,
+          focus: bbTrainingFocus, targetMuscles: specTargets,
+          totalWeeks: bbWeeks, phaseOverride: pedPhaseOverride, phase: schemePhase,
+        });
+        plan = applyPEDMethodologyToPlan(plan, meth, { skipGuardNote: true });
+      } catch { /* PED-слой информационный — сборку не роняем */ }
+    }
+
     if (bbAnnualMacrocycle) {
       // BB-1 FIX: use applyMacrocycleToBBPlan for proper volume/RIR adjustments
       // (compound×accessory multipliers, RIR ranges, accessory removal in contest_prep)
@@ -2642,6 +2661,23 @@ export const BbAutoConstructor: React.FC = () => {
             cycleId: planMode === 'programs' ? selectedCycleId : undefined,
             abPatternRotation: abRotation === true ? true : undefined,
             packingV2: packingV2 === true ? true : undefined,
+            // Аудит «дубли шаг 1-2»: сохраняем остальные настройки шага 1-2 (дефолты — undefined,
+            // паттерн как у abPatternRotation/packingV2).
+            proPreset: proPreset !== 'none' ? proPreset : undefined,
+            trainingVolumeMode: trainingVolumeMode === 'high' ? 'high' : undefined,
+            volumeScheme: volumeScheme !== 'standard' ? volumeScheme : undefined,
+            supersetMode: supersetMode !== 'none' ? supersetMode : undefined,
+            intensityLevel: intensityLevel !== 'moderate' ? intensityLevel : undefined,
+            rotationMode: rotationMode !== 'variety' ? rotationMode : undefined,
+            calorieSurplus: calorieSurplus !== 0 ? calorieSurplus : undefined,
+            eccentricMult: eccentricMult !== 1 ? eccentricMult : undefined,
+            bfrMode: bfrMode === true ? true : undefined,
+            blastCruiseEnabled: blastCruiseEnabled === true ? true : undefined,
+            blastWeeks: blastWeeks !== 8 ? blastWeeks : undefined,
+            cruiseWeeks: cruiseWeeks !== 4 ? cruiseWeeks : undefined,
+            platePreset: platePreset !== 'standard' ? platePreset : undefined,
+            targetBodyFat: targetBodyFat != null ? targetBodyFat : undefined,
+            cycleDay: cycleDay != null ? cycleDay : undefined,
           };
         const planMetrics: SavedBBPlan['metrics'] = {
            totalSets: exportMetrics.totalSets,
@@ -2765,6 +2801,24 @@ export const BbAutoConstructor: React.FC = () => {
     if (v.params.cycleId) setSelectedCycleId(v.params.cycleId);
     setAbRotation(v.params.abPatternRotation === true);
     setPackingV2(v.params.packingV2 === true);
+    // Аудит «дубли шаг 1-2»: недостающие настройки варианта (раньше терялись при загрузке).
+    // Legacy-варианты без полей — текущие настройки не трогаем (только явно сохранённое).
+    const vp = v.params as any;
+    if (vp.proPreset) setProPreset(vp.proPreset);
+    if (vp.trainingVolumeMode) setTrainingVolumeMode(vp.trainingVolumeMode);
+    if (vp.volumeScheme) setVolumeScheme(vp.volumeScheme);
+    if (vp.supersetMode) setSupersetMode(vp.supersetMode);
+    if (vp.intensityLevel) setIntensityLevel(vp.intensityLevel);
+    if (vp.rotationMode) setRotationMode(vp.rotationMode);
+    if (Number.isFinite(vp.calorieSurplus)) setCalorieSurplus(Number(vp.calorieSurplus));
+    if (Number.isFinite(vp.eccentricMult)) setEccentricMult(Number(vp.eccentricMult));
+    if (vp.bfrMode != null) setBfrMode(Boolean(vp.bfrMode));
+    if (vp.blastCruiseEnabled != null) setBlastCruiseEnabled(Boolean(vp.blastCruiseEnabled));
+    if (Number.isFinite(vp.blastWeeks)) setBlastWeeks(Number(vp.blastWeeks));
+    if (Number.isFinite(vp.cruiseWeeks)) setCruiseWeeks(Number(vp.cruiseWeeks));
+    if (vp.platePreset) setPlatePreset(vp.platePreset);
+    if (Number.isFinite(vp.targetBodyFat)) setTargetBodyFat(Number(vp.targetBodyFat));
+    if (Number.isFinite(vp.cycleDay)) setCycleDay(Number(vp.cycleDay));
     setBbWeekSel(1);
     setStep('plan');
   };
@@ -3089,8 +3143,11 @@ export const BbAutoConstructor: React.FC = () => {
       return `${start}-${end}`;
     };
     return (
-      <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.05)', border:'1px solid rgba(245,158,11,0.18)' }}>
-        <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>🎯 Отстающие мышцы (специализация, 1-2)</div>
+      <BbCard
+        icon="🎯" accent="#f59e0b"
+        title="Отстающие мышцы (специализация, 1-2)"
+        desc="Блоки по 3–6 недель: цели получают акцент (объём и приоритет), доноры перераспределяются. Пусто — план без акцентов."
+      >
         {specBlocks.map((b, idx) => (
           <div key={b.id} style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:6 }}>
@@ -3165,7 +3222,7 @@ export const BbAutoConstructor: React.FC = () => {
             Базовый ориентир блока 1: {specVolumeSummary}. Фактический план дополнительно учитывает уровень, стаж, цель, PED, восстановление, питание, лабораторную коррекцию и фазу.
           </div>
         )}
-      </div>
+      </BbCard>
     );
   };
 
