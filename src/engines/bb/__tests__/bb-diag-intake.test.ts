@@ -140,3 +140,26 @@ describe('D1 vbtLossPct не читается', () => {
     expect(JSON.stringify(input)).toBe(snapshot);
   });
 });
+
+describe('K5 correctiveDetail (PRO-CORR)', () => {
+  const DET = [
+    { id: 'dm-lateral-pause', zone: 'delt_mid', exerciseId: 'lateral_raise', protocol: '3×12–15 RIR1', cues: ['a', 'b', 'c'], source: 'S' },
+    { id: 'dr-facepull', zone: 'delt_rear', exerciseId: 'face_pull', protocol: '3×12–15 RIR2', cues: ['x'], source: 'T' },
+  ];
+  it('массив → бит «коррекция: зона → протокол» + persist.movementExtra.corrective', () => {
+    const r = resolveBbDiagIntakeExtras({ correctiveDetail: DET });
+    expect(r.bits).toEqual(['коррекция: delt_mid → 3×12–15 RIR1 · delt_rear → 3×12–15 RIR2']);
+    expect(r.persist.movementExtra?.corrective).toBe('коррекция: delt_mid → 3×12–15 RIR1 · delt_rear → 3×12–15 RIR2');
+  });
+  it('пусто/мусор → тихо (без бита и персиста)', () => {
+    for (const d of [undefined, null, [], 'мусор', [{ zone: 'x' }], [{ protocol: 'y' }], [{}]]) {
+      const r = resolveBbDiagIntakeExtras({ correctiveDetail: d } as never);
+      expect(r.bits).toEqual([]);
+      expect(r.persist.movementExtra).toBeUndefined();
+    }
+  });
+  it('без поля — байт-в-байт (старые payloads целы)', () => {
+    const base = { movementDriver: DRIVER };
+    expect(resolveBbDiagIntakeExtras({ ...base, correctiveDetail: undefined } as never)).toEqual(resolveBbDiagIntakeExtras(base));
+  });
+});

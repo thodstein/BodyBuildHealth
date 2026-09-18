@@ -54,6 +54,8 @@ export interface BbDiagIntakeInput {
   loadedHinge?: unknown;
   erir?: unknown;
   screenPriority?: unknown;
+  /** PRO-CORR: детали коррекций библиотеки (хаб шлёт, без — тихо). */
+  correctiveDetail?: unknown;
 }
 
 export interface BbDiagIntakeExtras {
@@ -156,6 +158,22 @@ export function resolveBbDiagIntakeExtras(d: BbDiagIntakeInput | null | undefine
     const list = (src.screenPriority as unknown[]).map((x) => String(x || '').trim()).filter(Boolean).slice(0, 5);
     const t = list.join(' · ').slice(0, 300);
     if (t && !/Приоритетов нет/.test(t)) { extra.screenPriority = t; bits.push(`приоритет: ${t}`); }
+  }
+  // PRO-CORR: детали коррекций библиотеки — только заполненное (массив ≤4: зона → протокол).
+  // Мусор/строки/объекты без zone+protocol — тихо. Персист едет в he_bb_last_movement_extra
+  // (печать buildBbMovementPrintBlock читает его значения generic — отдельный ключ не нужен).
+  if (Array.isArray(src.correctiveDetail)) {
+    const rows = (src.correctiveDetail as unknown[])
+      .filter(isRec)
+      .map((r) => {
+        const zone = str(r.zone).slice(0, 40);
+        const protocol = str(r.protocol).slice(0, 120);
+        return zone && protocol ? `${zone} → ${protocol}` : '';
+      })
+      .filter(Boolean)
+      .slice(0, 2);
+    const t = rows.join(' · ').slice(0, 300);
+    if (t) { extra.corrective = `коррекция: ${t}`; bits.push(`коррекция: ${t}`); }
   }
 
   const hasLrMarker = src.lrVerdicts !== undefined;
