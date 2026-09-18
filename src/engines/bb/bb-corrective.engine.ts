@@ -189,10 +189,10 @@ export const BB_CORRECTIVES: BBCorrective[] = [
     { sets: 3, repsMin: 8, repsMax: 12, rir: 2, tempo: '3-1-1-0', restSec: 90, freqPerWeek: 2 },
     ['Нейтральный хват', 'Локти вниз', 'Пауза в растянутой'], 'Подтягивания нейтральным', 'Тяга блока легко', 'Тяга без боли + амплитуда', 'GRSM 2025', ['pullup_neutral']),
   // ── Шарнир под весом ──
-  c('lh-trap-swap', 'Трап/блоки вместо пола (шарнир плывёт)', 'hack_squat_ham', ['hinge-fail', 'hamstrings', 'driver:hip'], ['technique'], 'technique', 'intermediate',
+  c('lh-trap-swap', 'Трап/блоки вместо пола (шарнир плывёт)', 'hack_squat_ham', ['hinge-fail', 'loaded-fail', 'hamstrings', 'driver:hip'], ['technique'], 'technique', 'intermediate',
     { sets: 3, repsMin: 6, repsMax: 8, rir: 2, tempo: '2-1-1-0', restSec: 120, freqPerWeek: 1 },
     ['Стопы высоко', 'Спина прижата', 'Разгибай тазом'], 'RDL с пола чисто', 'Тяга троса между ног', 'Пол не плывёт на рабочем весе', 'IJSPT-2024 (стабильны под весом)', ['cable_pull_through'], ['pm-red']),
-  c('lh-tempo-split', 'Сплит с темпом 3-1-1 (контроль)', 'bulgarian_split_db', ['hinge-fail', 'quads', 'driver:hip'], ['technique', 'activation'], 'technique', 'any',
+  c('lh-tempo-split', 'Сплит с темпом 3-1-1 (контроль)', 'bulgarian_split_db', ['hinge-fail', 'loaded-fail', 'quads', 'driver:hip'], ['technique', 'activation'], 'technique', 'any',
     { sets: 2, repsMin: 8, repsMax: 10, rir: 2, tempo: '3-1-1-0', restSec: 90, freqPerWeek: 2 },
     ['Темп держишь вслух', 'Переднее колено над стопой', 'Корпус вертикально'], 'Вес +2 кг', 'Сплит без веса', 'Темп не разваливается под весом', 'Pareja-Blanco (контроль)', ['bulgarian_split']),
   // ── YBT / баланс ──
@@ -233,6 +233,8 @@ export interface BBScreenSignals {
   shoulderPain?: boolean;
   /** PRO-CORR-FIX: разрыв ротации грудного ≥10° — тег rot-gap. */
   rotGap?: boolean;
+  /** H2: нагруженный шарнир плывёт (нейтраль не держится под весом) — тег loaded-fail. */
+  loadedFail?: boolean;
   cause?: BBWeakCause | null;
   level?: string | null;
   equipment?: string[];
@@ -256,6 +258,7 @@ export function tagsForMovementScreens(s: BBScreenSignals): string[] {
   if (s.asym) push('asym');
   if (s.painLevel === 'yellow') push('pm-yellow');
   if (s.rotGap) push('rot-gap');
+  if (s.loadedFail) push('loaded-fail');
   return Array.from(out);
 }
 
@@ -325,11 +328,11 @@ export function rankCorrectives(s: BBScreenSignals): Array<{ corr: BBCorrective;
   return out.slice(0, 6);
 }
 
-/** Доза под причину + готовность/боль: recovery и жёлтая боль режут объём, техника — объём не растит. */
+/** Доза под причину + готовность/боль: recovery и любая красная/жёлтая боль режут объём, техника — объём не растит. */
 export function correctiveDose(
   corr: BBCorrective,
   cause: BBWeakCause | null | undefined,
-  opts: { readinessRed?: boolean; painYellow?: boolean } = {},
+  opts: { readinessRed?: boolean; painYellow?: boolean; painRed?: boolean } = {},
 ): { sets: number; repsMin: number; repsMax: number; rir: number; tempo: string; note: string } {
   let sets = corr.protocol.sets;
   let rir = corr.protocol.rir;
@@ -343,7 +346,7 @@ export function correctiveDose(
     notes.push(cause === 'technique' ? 'смена углов/темпа, без +объёма' : 'lengthened первым + MMC');
   }
   if (cause === 'genetics') notes.push('малыми дозами 4–5×, меряем 12 нед');
-  if (opts.readinessRed || opts.painYellow) {
+  if (opts.readinessRed || opts.painYellow || opts.painRed) {
     sets = Math.max(1, Math.round(sets * 0.75));
     rir = Math.min(3, rir + 1);
     notes.push('готовность/боль: −25% объёма, RIR+1');

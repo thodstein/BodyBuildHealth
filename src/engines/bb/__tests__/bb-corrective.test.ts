@@ -111,6 +111,18 @@ describe('bb-corrective K1 library', () => {
     const back = rankCorrectives({ zones: ['back_width'], shoulderPain: true });
     expect(back.map((x) => x.corr.id)).not.toContain('bw-neutral-safe');
   });
+  it('красная боль тоже режет дозу (инверсия жёлтая-режет/красная-нет закрыта)', () => {
+    const c = correctiveById('cu-incline-length')!;
+    const cut = correctiveDose(c, 'volume', { painRed: true });
+    expect(cut.sets).toBeLessThan(c.protocol.sets);
+    expect(cut.rir).toBeGreaterThanOrEqual(c.protocol.rir);
+    expect(cut.note).toMatch(/−25%/);
+  });
+  it('loaded-fail тег ведёт на шарнир-замены (трап первым)', () => {
+    expect(tagsForMovementScreens({ loadedFail: true })).toContain('loaded-fail');
+    const r = rankCorrectives({ zones: ['hamstrings'], cause: 'volume', loadedFail: true });
+    expect(r[0].corr.id).toBe('lh-trap-swap');
+  });
   it('красная боль режет max-нагрузку: копенгаген и штанговый траст (регрессии остаются)', () => {
     const add = rankCorrectives({ zones: ['adductor'], painLevel: 'red' });
     expect(add.map((x) => x.corr.id)).not.toContain('ad-copenhagen');

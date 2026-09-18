@@ -995,6 +995,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       teenBlocked: (() => { try { return !!teenGate.blocked; } catch { return false; } })(),
       shoulderPain: state.pmLoc === 'shoulder' && (pLevel === 'yellow' || pLevel === 'red'),
       rotGap: (() => { try { const g = (rotV as any)?.gap; return typeof g === 'number' && Number.isFinite(g) && g >= 10; } catch { return false; } })(),
+      loadedFail: (() => { try { return teenGate.blocked ? false : !!loadedHingeV.degraded; } catch { return false; } })(),
       cause: (cause ?? null) as 'volume' | 'activation' | 'recovery' | 'technique' | 'genetics' | null,
       level, equipment: profileEquipment,
     };
@@ -1005,6 +1006,7 @@ export const BBDiagnosticsHub: React.FC = () => {
   const corrDoseFlags = () => ({
     readinessRed: (readiness as any)?.level === 'red',
     painYellow: (() => { try { return String((painMon as any)?.verdict?.level || '') === 'yellow'; } catch { return false; } })(),
+    painRed: (() => { try { return String((painMon as any)?.verdict?.level || '') === 'red'; } catch { return false; } })(),
   });
 
   const handleExport = () => {
@@ -1335,7 +1337,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { out[z] = []; }
     }
     return out;
-  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV]);
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV, loadedHingeV]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {

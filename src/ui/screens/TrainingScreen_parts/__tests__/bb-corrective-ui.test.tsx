@@ -45,7 +45,21 @@ describe('bb-corrective-ui', () => {
     expect(uses.length).toBeGreaterThanOrEqual(3); // карточка + HTML + CSV (def без скобки не считается)
     expect(HUB_SRC.includes('rankCorrectives({')).toBe(false);
   });
-  it('жёлтая боль режет дозу на карточке как во вставке (2×12–15 RIR2 вместо 3×12–15 RIR1)', () => {
+  it('красная боль: доза срезана (инверсия закрыта)', () => {
+    localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ weakManual: ['delt_mid'], pmLoc: 'elbow', pmDuring: '7' }));
+    render(<BBDiagnosticsHub />);
+    const card = document.querySelector('[data-bb="corrective-card"]');
+    expect(card).not.toBeNull();
+    expect(card!.textContent).toMatch(/2×12–15 RIR2/);
+  });
+  it('шарнир плывёт под весом: топ — трап/блоки', () => {
+    localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ weakManual: ['hamstrings'], rdlLoaded: 'fail' }));
+    render(<BBDiagnosticsHub />);
+    const rows = document.querySelectorAll('[data-bb="corrective-row"]');
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0].getAttribute('data-corr')).toBe('lh-trap-swap');
+  });
+  it('жёлтая боль режет дозу на карточке как во вставке (2×12–15 RIR1 вместо 3×12–15)', () => {
     localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ weakManual: ['delt_mid'], pmLoc: 'elbow', pmMorning: '5' }));
     render(<BBDiagnosticsHub />);
     const card = document.querySelector('[data-bb="corrective-card"]');
