@@ -186,6 +186,10 @@ type SMState = {
   ybtUqL: string;
   ybtUqR: string;
   sideHop: string;
+  // SM-CORR-D2: фильтры подбора коррекции (уровень/зал/усталость) — пусто = без фильтров
+  corrLevel: string;
+  corrEquipment: string[];
+  corrFatigue: boolean;
 };
 
 const DEFAULT_STATE: SMState = {
@@ -218,6 +222,7 @@ const DEFAULT_STATE: SMState = {
   stoneRepLatePull1S: '', stoneRepLateLapS: '', stoneRepLatePull2S: '',
   tyrePull2S: '', suitcaseLeftS: '', suitcaseRightS: '',
   ybtAntL: '', ybtAntR: '', ybtLegLen: '', ybtPmL: '', ybtPmR: '', ybtPlL: '', ybtPlR: '', ybtUqL: '', ybtUqR: '', sideHop: '',
+  corrLevel: '', corrEquipment: [], corrFatigue: false,
 };
 
 const TAB_DEFS: Array<{ id: SMTab; label: string; icon: string; desc: string }> = [
@@ -253,6 +258,23 @@ const GRIP_OPTS = [
   { id: 'core', label: 'Кор слаб', sm: 'core_brace' as SMWeakPoint },
   { id: 'conditioning', label: 'Кондиция', sm: 'conditioning' as SMWeakPoint },
   { id: 'grip_support', label: SM_BIOMECH.grip_support.label, sm: 'grip_support' as SMWeakPoint },
+];
+
+// D2: фильтры подбора коррекции (локальный словарь = StrengthUI EQUIP_RU/LEVEL_RU)
+const SM_CORR_LEVELS = [
+  { id: 'beginner', label: 'Новичок' },
+  { id: 'intermediate', label: 'Средний' },
+  { id: 'advanced', label: 'Продвинутый' },
+  { id: 'enhanced', label: 'На курсе' },
+];
+const SM_CORR_EQUIP = [
+  { id: 'barbell', label: 'Штанга' },
+  { id: 'dumbbell', label: 'Гантели' },
+  { id: 'machine', label: 'Тренажёр' },
+  { id: 'cable', label: 'Блоки' },
+  { id: 'plate', label: 'Диски' },
+  { id: 'other', label: 'Прочее' },
+  { id: 'bodyweight', label: 'Свой вес' },
 ];
 
 const HUB_SF = '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif';
@@ -714,16 +736,23 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       return (p?.training?.mobilityRestrictions || p?.health?.mobilityRestrictions || []) as string[];
     } catch { return [] as string[]; }
   }, [profileTick]);
+  // D2: фильтры подбора коррекции (уровень/зал/усталость + mobility профиля) — пусто = без фильтров
+  const smCorrFilter = useMemo(() => ({
+    level: state.corrLevel || 'intermediate',
+    equipment: state.corrEquipment,
+    fatigueSensitive: state.corrFatigue,
+    mobilityRestrictions: smProfileMobility,
+  }), [state.corrLevel, state.corrEquipment, state.corrFatigue, smProfileMobility]);
   const smRankTop = useMemo(() => {
     const wp = smWeakPoints[0] as any;
     if (!wp) return [];
     try {
       // P2-паритет: топ-1 строка сводки — из библиотеки (доза = карточке), не legacy-строки.
-      const lib = rankCorrectionsForSMLibrary(wp, { cause: smCauses[0]?.cause ?? null, mobilityRestrictions: smProfileMobility });
+      const lib = rankCorrectionsForSMLibrary(wp, { cause: smCauses[0]?.cause ?? null, level: smCorrFilter.level, equipment: smCorrFilter.equipment, fatigueSensitive: smCorrFilter.fatigueSensitive, mobilityRestrictions: smCorrFilter.mobilityRestrictions });
       if (lib.length) return lib;
-      return rankCorrectionsForSM(wp, { cause: smCauses[0]?.cause ?? null, mobilityRestrictions: smProfileMobility });
+      return rankCorrectionsForSM(wp, { cause: smCauses[0]?.cause ?? null, level: smCorrFilter.level, equipment: smCorrFilter.equipment, fatigueSensitive: smCorrFilter.fatigueSensitive, mobilityRestrictions: smCorrFilter.mobilityRestrictions });
     } catch { return []; }
-  }, [smWeakPoints, smCauses, smProfileMobility]);
+  }, [smWeakPoints, smCauses, smCorrFilter]);
   const smSpec = useMemo(() => {
     if (!smWeakPoints.length) return null;
     try { return buildSMSpecBlock({ weakPoints: smWeakPoints as any, weeks: parseInt(state.specWeeks) || 6 }); } catch { return null; }
@@ -737,19 +766,19 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const smCorrTops = useMemo(() => {
     const out: Record<string, ReturnType<typeof correctivesForSMWeakPoint>> = {};
     for (const wp of smWeakPoints as string[]) {
-      try { out[wp] = correctivesForSMWeakPoint(wp as any, { cause: (smCauseByPhase[wp] as any) ?? null, mobilityRestrictions: smProfileMobility }); } catch { out[wp] = []; }
+      try { out[wp] = correctivesForSMWeakPoint(wp as any, { cause: (smCauseByPhase[wp] as any) ?? null, level: smCorrFilter.level, equipment: smCorrFilter.equipment, fatigueSensitive: smCorrFilter.fatigueSensitive, mobilityRestrictions: smCorrFilter.mobilityRestrictions }); } catch { out[wp] = []; }
     }
     return out;
-  }, [smWeakPoints, smCauseByPhase, smProfileMobility]);
+  }, [smWeakPoints, smCauseByPhase, smCorrFilter]);
   const smCorrSession = useMemo(() => {
-    try { return correctiveSessionForSM(smWeakPoints as any, smCauseByPhase as any, { mobilityRestrictions: smProfileMobility }); } catch { return []; }
-  }, [smWeakPoints, smCauseByPhase, smProfileMobility]);
+    try { return correctiveSessionForSM(smWeakPoints as any, smCauseByPhase as any, { level: smCorrFilter.level, equipment: smCorrFilter.equipment, fatigueSensitive: smCorrFilter.fatigueSensitive, mobilityRestrictions: smCorrFilter.mobilityRestrictions }); } catch { return []; }
+  }, [smWeakPoints, smCauseByPhase, smCorrFilter]);
   const smCorrBlock = useMemo(() => {
-    try { return correctiveBlockForSM(smWeakPoints as any, parseInt(state.specWeeks) || 6, smCauseByPhase as any); } catch { return []; }
-  }, [smWeakPoints, state.specWeeks, smCauseByPhase]);
+    try { return correctiveBlockForSM(smWeakPoints as any, parseInt(state.specWeeks) || 6, smCauseByPhase as any, smCorrFilter.level, { equipment: smCorrFilter.equipment, fatigueSensitive: smCorrFilter.fatigueSensitive, mobilityRestrictions: smCorrFilter.mobilityRestrictions }); } catch { return []; }
+  }, [smWeakPoints, state.specWeeks, smCauseByPhase, smCorrFilter]);
   const smCorrExport = useMemo(() => {
-    try { return smCorrectiveExportLines(smWeakPoints as any, smCauseByPhase as any, { mobilityRestrictions: smProfileMobility }); } catch { return []; }
-  }, [smWeakPoints, smCauseByPhase, smProfileMobility]);
+    try { return smCorrectiveExportLines(smWeakPoints as any, smCauseByPhase as any, { level: smCorrFilter.level, equipment: smCorrFilter.equipment, fatigueSensitive: smCorrFilter.fatigueSensitive, mobilityRestrictions: smCorrFilter.mobilityRestrictions }); } catch { return []; }
+  }, [smWeakPoints, smCauseByPhase, smCorrFilter]);
   // ── SM corrective hints: замер → тег → топ-упражнение (sway/VBT/асимметрия/OHS) ──
   // (smMetricTags/smMetricTops — ниже, после movement-мемов: им нужны диагнозы P1–P8)
   const logDipDiag = useMemo(() => {
@@ -950,13 +979,13 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     const out: Array<{ tag: string; name: string; dose: string }> = [];
     for (const tag of smMetricTags.slice(0, 4)) {
       try {
-        const top = correctivesForSMWeakPoint(tag as any, { cause: (smCauseByPhase as Record<string, any>)[tag] ?? null, mobilityRestrictions: smProfileMobility });
+        const top = correctivesForSMWeakPoint(tag as any, { cause: (smCauseByPhase as Record<string, any>)[tag] ?? null, level: smCorrFilter.level, equipment: smCorrFilter.equipment, fatigueSensitive: smCorrFilter.fatigueSensitive, mobilityRestrictions: smCorrFilter.mobilityRestrictions });
         const c = top[0];
         if (c) out.push({ tag, name: c.target, dose: `${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}%` });
       } catch { /* noop */ }
     }
     return out;
-  }, [smMetricTags, smCauseByPhase, smProfileMobility]);
+  }, [smMetricTags, smCauseByPhase, smCorrFilter]);
   // P1: замер → теги ошибок (RU-словарь) → топ-упражнения (мемы выше — TDZ-ок)
   const smErrTags = useMemo(() => {
     try {
@@ -1923,6 +1952,22 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         {tab==='correction' && (
           <div data-sm="corr-tab">
             <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #f59e0b', lineHeight:1.35 }}>Коррекция движений — фаза → причина → топ-3 с дозой</div>
+            <div data-sm="corr-filters" style={{ padding:'10px 12px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', marginBottom:8 }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:6 }}>🎚️ Подбор: уровень · зал · усталость{(state.corrLevel || state.corrEquipment.length || state.corrFatigue) ? '' : ' · без фильтров'}</div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
+                {SM_CORR_LEVELS.map((l) => (
+                  <button key={l.id} data-sm="corr-filter-level" data-active={state.corrLevel === l.id ? 'true' : 'false'} aria-pressed={state.corrLevel === l.id} onClick={() => setState((s) => ({ ...s, corrLevel: s.corrLevel === l.id ? '' : l.id }))} style={{ padding:'10px 14px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.corrLevel === l.id ? '#f5b04c' : 'rgba(140,190,255,0.16)', background: state.corrLevel === l.id ? 'rgba(245,158,11,0.20)' : 'transparent', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer' }}>{l.label}</button>
+                ))}
+              </div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
+                {SM_CORR_EQUIP.map((e) => (
+                  <button key={e.id} data-sm="corr-filter-equip" data-active={state.corrEquipment.includes(e.id) ? 'true' : 'false'} aria-pressed={state.corrEquipment.includes(e.id)} onClick={() => setState((s) => ({ ...s, corrEquipment: s.corrEquipment.includes(e.id) ? s.corrEquipment.filter((x) => x !== e.id) : [...s.corrEquipment, e.id] }))} style={{ padding:'10px 14px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.corrEquipment.includes(e.id) ? '#f5b04c' : 'rgba(140,190,255,0.16)', background: state.corrEquipment.includes(e.id) ? 'rgba(245,158,11,0.20)' : 'transparent', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer' }}>{e.label}</button>
+                ))}
+              </div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                <button data-sm="corr-filter-fatigue" data-active={state.corrFatigue ? 'true' : 'false'} aria-pressed={state.corrFatigue} onClick={() => setState((s) => ({ ...s, corrFatigue: !s.corrFatigue }))} style={{ padding:'10px 14px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.corrFatigue ? '#f5b04c' : 'rgba(140,190,255,0.16)', background: state.corrFatigue ? 'rgba(245,158,11,0.20)' : 'transparent', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer' }}>😮‍💨 Щадящий при усталости</button>
+              </div>
+            </div>
             {smErrTags.tags.length > 0 && (
               <div data-sm="corr-errtags" style={{ padding:'10px 12px', borderRadius:14, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.22)', marginBottom:8, fontSize:12, color:'#fff' }}>
                 <div style={{ fontWeight:800 }}>🔍 Замер → ошибка: {smErrTags.text}</div>

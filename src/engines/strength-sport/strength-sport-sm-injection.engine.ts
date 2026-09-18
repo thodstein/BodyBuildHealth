@@ -110,7 +110,10 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
     const libEntry: SMCorrective | null = prefRaw ? libraryEntryForSM(prefRaw) : null;
     const libValid: SMCorrective | null = libEntry && libEntry.phase === wp ? libEntry : null;
     const libProto = libValid ? protocolForSMPreferred(wp, prefRaw, null) : null;
-    const cardProto = libValid ? opts.protocols?.[wp] ?? null : null;
+    // Паритет TA (ta-injection: proto всегда): доза protocols (причина уже учтена
+    // мостом через buildSMSpecProtocols) — всегда, не только со ⭐. Без protocols —
+    // канон bio (как раньше, байт-в-байт).
+    const cardProto = opts.protocols?.[wp] ?? null;
     let intensityPct: number = bio?.intensityPct ?? 0.65;
     let addSets = 3;
     let exReps: number | string | null = null;
@@ -123,6 +126,17 @@ export function injectSMWeakPoints(plan: StrengthSportPlan, weakPoints: SMWeakPo
       exReps = cardProto?.reps ?? libProto.reps;
       exName = libValid.target;
       starMark = ` (⭐ ${libValid.id})`;
+    } else if (cardProto) {
+      // D1: без ⭐ — доза ранжира/моста (со ⭐ — доза карточки выше).
+      if (typeof cardProto.pct === 'number' && Number.isFinite(cardProto.pct) && cardProto.pct > 0) {
+        intensityPct = cardProto.pct / 100;
+      }
+      if (typeof cardProto.sets === 'number' && Number.isFinite(cardProto.sets) && cardProto.sets > 0) {
+        addSets = Math.max(1, Math.min(10, Math.round(cardProto.sets)));
+      }
+      if (cardProto.reps != null && (typeof cardProto.reps === 'string' ? cardProto.reps.length > 0 : cardProto.reps > 0)) {
+        exReps = cardProto.reps;
+      }
     }
     const weekIdxs = Array.isArray(opts.weekIdxs) && opts.weekIdxs.length
       ? opts.weekIdxs.filter((wi) => Number.isInteger(wi) && wi >= 0)

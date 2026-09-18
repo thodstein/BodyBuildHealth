@@ -64,6 +64,26 @@ describe('sm-injection-preferred (C3, паритет TA-C8)', () => {
     expect(ex.reps).toBe('20м');
     expect(r.notes[0]).not.toContain('⭐');
   });
+  it('D1: без ⭐ доза protocols чтится (паритет TA) — упражнение legacy-дефолт', () => {
+    const r = injectSMWeakPoints(fakePlan(), ['yoke_walk'] as any, {
+      workMax: WM,
+      protocols: { yoke_walk: { sets: 4, reps: 4, pct: 80 } },
+    });
+    expect(r.injected).toBe(1);
+    const ex = r.plan.weeksData[0].sessions[0].exercises[0];
+    expect(ex.id).toBe('sandbag_carry');
+    expect(ex.sets).toBe(4);
+    expect(r.notes[0]).toContain('4×4 @80%');
+    expect(r.notes[0]).not.toContain('⭐');
+  });
+  it('D1: мусор в protocols — тихо, канон bio (без падений)', () => {
+    const r = injectSMWeakPoints(fakePlan(), ['yoke_walk'] as any, {
+      workMax: WM,
+      protocols: { yoke_walk: { sets: 0, reps: 0, pct: 0 } } as any,
+    });
+    expect(r.injected).toBe(1);
+    expect(r.plan.weeksData[0].sessions[0].exercises[0].sets).toBe(3);
+  });
   it('Preferred-обёртка больше не заглушка: вставляет ⭐', () => {
     const r = injectSMWeakPointsPreferred(fakePlan(), ['farmers_grip'] as any, {
       workMax: WM,

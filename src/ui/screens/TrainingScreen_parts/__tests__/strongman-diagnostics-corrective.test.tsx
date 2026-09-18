@@ -102,6 +102,18 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
     expect(txt).toMatch(/sm_log/);
     expect(txt).toMatch(/@/);
   });
+  it('D2: фильтры подбора — уровень персистится, зал режет топ (3→2)', async () => {
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
+    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    await waitFor(() => expect(document.body.querySelector('[data-sm="corr-filters"]')).toBeTruthy());
+    expect(document.body.querySelectorAll('[data-sm="corr-row"]').length).toBe(3);
+    fireEvent.click(screen.getByText('Штанга'));
+    await waitFor(() => expect(document.body.querySelectorAll('[data-sm="corr-row"]').length).toBe(2));
+    fireEvent.click(screen.getByText('Новичок'));
+    expect(screen.getByText('Новичок').getAttribute('aria-pressed')).toBe('true');
+    expect(localStorage.getItem('he_strongman_diagnostics_hub_v1')).toContain('corrLevel');
+  });
   it('C5: асимметрия + grip-фаза → мост несёт smUnilateral', async () => {
     localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ gripWeak: ['grip'], leftMax: '100', rightMax: '90' }));
     render(<StrongmanDiagnosticsHub />);

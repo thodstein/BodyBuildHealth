@@ -624,6 +624,7 @@ export function correctiveBlockForSM(
   weeks = 8,
   causeByPhase: Record<string, SMWeakCause | null> = {},
   level: string = 'intermediate',
+  extra: SMCorrectiveOpts = {},
 ): Array<{ week: number; name: string; sets: number; focus: SMCorrectiveKind; lines: string[] }> {
   const w = Math.max(1, Math.min(8, Math.round(weeks) || 8));
   const out: Array<{ week: number; name: string; sets: number; focus: SMCorrectiveKind; lines: string[] }> = [];
@@ -631,7 +632,7 @@ export function correctiveBlockForSM(
     const focus: SMCorrectiveKind = i >= w - 2 ? 'technique' : i >= w - 4 ? 'strength' : 'technique';
     const lines = phases.slice(0, 4).map((ph) => {
       const cause = causeByPhase[ph] ?? null;
-      const top = correctivesForSMWeakPoint(ph, { cause, level });
+      const top = correctivesForSMWeakPoint(ph, { ...extra, cause, level });
       const pick = top.find((t) => t.kind === focus) || top[0];
       if (!pick) return `${ph} → техника`;
       const pct = pick.protocolAdj.pct + (i >= 2 && i <= 5 ? 5 : 0);
