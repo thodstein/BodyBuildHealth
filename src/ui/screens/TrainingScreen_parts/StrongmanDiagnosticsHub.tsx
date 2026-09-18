@@ -1431,7 +1431,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       </div>
 
       <div style={{ ...CARD, padding: 10 }}>
-        <div data-sm="top-nav" role="tablist" aria-label="Разделы диагностики" style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', gap: 6, flexWrap: 'wrap', margin: '-10px -10px 8px', padding: '8px 10px', background: 'rgba(9,18,34,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(140,190,255,0.14)', borderRadius: '14px 14px 0 0' }}>
+        <div data-sm="top-nav" role="tablist" aria-label="Разделы диагностики" style={{ position: 'static', display: 'flex', gap: 6, flexWrap: 'wrap', margin: '-10px -10px 8px', padding: '8px 10px', background: 'rgba(9,18,34,0.92)', borderBottom: '1px solid rgba(140,190,255,0.14)', borderRadius: '14px 14px 0 0' }}>
           {TAB_DEFS.map(t => (
             <button key={t.id} role="tab" aria-selected={tab === t.id} aria-pressed={tab === t.id} data-sm={`top-tab-${t.id}`} onClick={() => setTab(t.id)} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: tab === t.id ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: tab === t.id ? 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(239,68,68,0.12))' : 'rgba(22,30,52,0.88)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
               {t.icon} {t.label}
@@ -1981,7 +1981,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Хранилище: {(smStoreBytes.total / 1024).toFixed(1)} КБ · защита от переполнения (истории урезаются, чужие ключи не трогаем)</div>
       </div>
 
-      <div data-sm="bottom-nav" style={{ position:'sticky', bottom:0, zIndex:30, display:'flex', flexDirection:'column', gap:8, padding:'10px 12px calc(10px + env(safe-area-inset-bottom, 0px))', margin:'8px -8px -16px', background:'rgba(9,18,34,0.96)', borderTop:'1px solid rgba(140,190,255,0.14)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', paddingBottom:'calc(10px + env(safe-area-inset-bottom, 0px) + var(--tabbar-clear, 0px))' }}>
+      <div data-sm="bottom-nav" style={{ position:'static', display:'flex', flexDirection:'column', gap:8, padding:'10px 12px', margin:'8px -8px -16px', background:'rgba(9,18,34,0.96)', borderTop:'1px solid rgba(140,190,255,0.14)' }}>
         <div style={{ display:'flex', gap:8, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }} role="tablist" aria-label="Навигация диагностики">
           {TAB_DEFS.map(t=>(
             <button key={t.id} role="tab" aria-selected={tab===t.id} aria-pressed={tab===t.id} data-sm={`bottom-tab-${t.id}`} onClick={()=>setTab(t.id)} style={{ padding:'10px 14px', minHeight:44, flexShrink:0, borderRadius:999, border:'1px solid', borderColor: tab===t.id ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: tab===t.id ? 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(239,68,68,0.12))' : 'rgba(22,30,52,0.88)', color:'#fff', cursor:'pointer', fontSize:13, fontWeight:800, boxShadow: tab===t.id ? '0 4px 16px rgba(245,158,11,0.25)' : 'none' }}>

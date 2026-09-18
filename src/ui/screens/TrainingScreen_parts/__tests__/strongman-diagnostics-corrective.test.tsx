@@ -9,12 +9,14 @@ beforeEach(() => {
 });
 
 describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
-  it('нижний док навигации: 7 табов, закреплён внизу', () => {
+  it('нижний док навигации: 7 табов, без плавающей шапки', () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
     const dock = container.querySelector('[data-sm="bottom-nav"]');
     expect(dock).toBeTruthy();
-    expect((dock as HTMLElement).style.position).toBe('sticky');
-    expect((dock as HTMLElement).style.bottom).toBe('0px');
+    expect((dock as HTMLElement).style.position).not.toBe('sticky');
+    const top = container.querySelector('[data-sm="top-nav"]');
+    expect(top).toBeTruthy();
+    expect((top as HTMLElement).style.position).not.toBe('sticky');
     for (const id of ['press', 'carry', 'load', 'grip', 'mobility', 'video', 'correction']) {
       expect(dock!.querySelector(`[data-sm="bottom-tab-${id}"]`)).toBeTruthy();
     }
