@@ -485,6 +485,8 @@ export const MOBILITY_DEMAND: Record<'ankle' | 'overhead' | 'hip', readonly stri
     'overhead_squat_v2', 'snatch_balance', 'behind_neck_jerk', 'push_press', 'push_jerk',
     'muscle_snatch', 'jerk_recovery', 'tall_snatch', 'tall_jerk', 'drop_snatch',
     'power_snatch', 'sots_press', 'overhead_hold', 'split_jerk',
+    // Д1: новые оверхед-фиксации — тот же спрос, иначе плечо их не топит
+    'oh_lunge', 'heaving_balance', 'snatch_push_press', 'jerk_support',
   ],
   hip: ['deficit_snatch', 'deficit_clean', 'deficit_pull', 'deadlift', 'snatch_deadlift'],
 };
@@ -887,20 +889,31 @@ export interface BarTagsResult {
  * Пусто/норма (≤4) — молчит (не диагноз по шуму).
  * E2: тиры тяжести — 4–6 warn (только bar_forward/drive_forward),
  * >6 critical (+bar_crash/split_short), >10 — ещё и нестабильность приёма.
+ * Д4: extra.vMaxMs < 1.3 м/с (Wood 2026 — все absolute >1.3) → +weak_extension.
  */
-export function tagsForBarMetrics(xLoopCm: number | null | undefined, lift: string): BarTagsResult {
+export function tagsForBarMetrics(xLoopCm: number | null | undefined, lift: string, extra?: { vMaxMs?: number | null }): BarTagsResult {
   const x = typeof xLoopCm === 'number' ? xLoopCm : NaN;
   if (!Number.isFinite(x) || x <= 4) return { tags: [], text: null, severity: null };
   const severity: BarSeverity = x > 6 ? 'critical' : 'warn';
   const isJerk = String(lift || '').toLowerCase().includes('jerk');
+  let text: string;
+  let tags: TACorrectiveErrorTag[];
   if (isJerk) {
-    const tags: TACorrectiveErrorTag[] = x > 6 ? ['drive_forward', 'split_short'] : ['drive_forward'];
-    if (x > 10) tags.push('unstable_overhead');
-    return { tags, text: `Горизонталь ${x} см — драйв уходит вперёд`, severity };
+    tags = x > 6 ? ['drive_forward', 'split_short'] : ['drive_forward'];
+    text = `Горизонталь ${x} см — драйв уходит вперёд`;
+  } else {
+    tags = x > 6 ? ['bar_forward', 'bar_crash'] : ['bar_forward'];
+    text = `Петля ${x} см (>SRD) — гриф уходит вперёд`;
   }
-  const tags: TACorrectiveErrorTag[] = x > 6 ? ['bar_forward', 'bar_crash'] : ['bar_forward'];
   if (x > 10) tags.push('unstable_overhead');
-  return { tags, text: `Петля ${x} см (>SRD) — гриф уходит вперёд`, severity };
+  try {
+    const v = typeof extra?.vMaxMs === 'number' ? extra.vMaxMs : NaN;
+    if (Number.isFinite(v) && (v as number) < 1.3 && !tags.includes('weak_extension')) {
+      tags.push('weak_extension');
+      text += ` · пик ${v} м/с <1.3 — слабый финал`;
+    }
+  } catch { /* noop */ }
+  return { tags, text, severity };
 }
 
 /**

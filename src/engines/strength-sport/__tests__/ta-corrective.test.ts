@@ -258,6 +258,12 @@ describe('ta-corrective E2: тиры замеров + очередь', () => {
     expect(tagsForBarMetrics(12, 'snatch').tags).toContain('unstable_overhead');
     expect(tagsForBarMetrics(12, 'jerk').tags).toContain('unstable_overhead');
   });
+  it('Д4: vMax <1.3 добавляет weak_extension, ≥1.3 — нет', () => {
+    expect(tagsForBarMetrics(5, 'snatch', { vMaxMs: 1.1 }).tags).toEqual(['bar_forward', 'weak_extension']);
+    expect(tagsForBarMetrics(5, 'snatch', { vMaxMs: 1.85 }).tags).toEqual(['bar_forward']);
+    expect(tagsForBarMetrics(5, 'snatch').tags).toEqual(['bar_forward']);
+    expect(tagsForBarMetrics(3, 'snatch', { vMaxMs: 1.1 }).tags).toEqual([]);
+  });
   it('VBT: <10 молчит, 12 — warn turnover, 22 — critical +финал', () => {
     expect(tagsForVelocityLoss(8).tags).toEqual([]);
     expect(tagsForVelocityLoss(12)).toMatchObject({ tags: ['slow_turnover'], severity: 'warn' });
@@ -358,5 +364,19 @@ describe('ta-corrective E4/E5: расширение + доза', () => {
       expect(correctiveMetaOf(c.injectId).nonBarbell, c.id).not.toBe(true);
       expect(correctiveById(c.injectId), c.id).not.toBeNull();
     }
+  });
+  it('Д1: новые оверхед-фиксации в overhead-спросе (плечо их топит)', () => {
+    for (const id of ['oh_lunge', 'heaving_balance', 'snatch_push_press', 'jerk_support']) {
+      expect(MOBILITY_DEMAND.overhead).toContain(id);
+    }
+    const ids = new Set(TA_CORRECTIVES.map((e) => e.id));
+    for (const id of MOBILITY_DEMAND.overhead) expect(ids.has(id), `overhead/${id}`).toBe(true);
+    // плечо топит оверхед-спрос: oh_lunge падает, не-спросовый split_pause обгоняет split_jerk
+    const free = correctivesForWeakPoint('jerk_lockout', { cause: 'technique', limit: 10 });
+    const sore = correctivesForWeakPoint('jerk_lockout', { cause: 'technique', mobilityRestrictions: ['shoulder'], limit: 10 });
+    const fi = (l: ReturnType<typeof correctivesForWeakPoint>, id: string) => l.findIndex((c) => c.id === id);
+    expect(fi(free, 'oh_lunge')).toBeGreaterThanOrEqual(0);
+    expect(fi(sore, 'oh_lunge')).toBeGreaterThan(fi(free, 'oh_lunge'));
+    expect(fi(sore, 'split_pause')).toBeLessThan(fi(sore, 'split_jerk'));
   });
 });

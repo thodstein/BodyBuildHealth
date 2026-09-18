@@ -184,11 +184,12 @@ export function injectTAWeakPoints(plan: StrengthSportPlan, weakPoints: WLWeakPo
       // перебор кандидатов: первый отсутствующий в сессии
       let placed = false;
       for (const corrId of candidates) {
-        // PRO-добивка П6: не-штанга (валик/dead bug/паллоф — праймеры) в штанговый план
-        // не вставляется: доза % от приседа на bodyweight-дрилл врала бы. Честный скип.
+        // Д2: в штанговый план — только штанга/тренажёр. Гантель/свой вес скипаются
+        // с честной нотой (доза % от чужого ПМ врала бы); nonBarbell-флаг — для инфо-слоя.
         try {
-          if (correctiveMetaOf(corrId).nonBarbell) {
-            notes.push(`⊘ ${corrId} — не штанга (праймер), в план не вставляется (нед ${week.week})`);
+          const eq = correctiveMetaOf(corrId).equipment;
+          if (eq !== 'barbell' && eq !== 'machine') {
+            notes.push(`⊘ ${corrId} — не штанга (${eq}), в план не вставляется (нед ${week.week})`);
             continue;
           }
         } catch { /* meta недоступна — вставляем как раньше */ }

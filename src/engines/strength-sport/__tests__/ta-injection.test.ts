@@ -22,6 +22,14 @@ describe('TA injection PRO — MRV + dedup parity', () => {
     // fallback: штанговый кандидат всё равно вставлен
     expect(r.injected).toBe(1);
   });
+  it('Д2: гантель (single_arm_press) тоже скипается — только штанга/тренажёр', () => {
+    const p = basePlan();
+    const r = injectTAWeakPoints(p, ['press_start' as WLWeakPoint], { preferredCorr: { press_start: 'single_arm_press' } });
+    const hasDb = r.plan.weeksData[0].sessions.some(s => s.exercises.some((e: any) => e.id === 'single_arm_press'));
+    expect(hasDb).toBe(false);
+    expect(r.notes.join(' ').toLowerCase()).toMatch(/не штанга \(dumbbell\)/);
+    expect(r.injected).toBe(1);
+  });
   it('dedup: повторный вызов не дублирует', () => {
     const p = basePlan();
     const r1 = injectTAWeakPoints(p, ['snatch_off_floor' as WLWeakPoint]);

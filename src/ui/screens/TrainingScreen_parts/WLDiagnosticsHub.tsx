@@ -1303,6 +1303,13 @@ export const WLDiagnosticsHub: React.FC = () => {
             return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility, { equipment: profileEquipment, seasonPhase });
           } catch { return []; }
         }).slice(0, 9).concat(weakPoints.flatMap(wp => {
+          // Д3: топ-1 комплекс фазы — в выдачу строкой (объём плана не трогает)
+          try {
+            let cause: string | null = null;
+            try { cause = causeFor(wp)?.cause ?? null; } catch { cause = null; }
+            return complexExportLines(wp, cause as any).slice(0, 1);
+          } catch { return []; }
+        })).concat(weakPoints.flatMap(wp => {
           try {
             return primersForWeakPoint(wp).slice(0, 2).map(p => `Разминка ${WL_WEAKPOINT_LABELS[wp] || wp}: ${p.nameRu} ${p.dose} · ${p.cue}`);
           } catch { return []; }
@@ -1412,6 +1419,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         const causeMap: Record<string, string> = {};
         for (const wp of weakPoints) { try { causeMap[wp] = causeFor(wp)?.cause ?? ''; } catch { causeMap[wp] = ''; } }
         base.correctiveDetail = weakPoints.flatMap(wp => { try { return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility, { equipment: profileEquipment, seasonPhase }); } catch { return []; } })
+          .concat(weakPoints.flatMap(wp => { try { return complexExportLines(wp, (causeMap[wp] || null) as any).slice(0, 1); } catch { return []; } }))
           .concat(weakPoints.flatMap(wp => { try { return primersForWeakPoint(wp).slice(0, 2).map(p => `Разминка ${WL_WEAKPOINT_LABELS[wp] || wp}: ${p.nameRu} ${p.dose} · ${p.cue}`); } catch { return []; } }));
       } catch { /* noop */ }
       if (snatchAttempts || cjAttempts) base.attempts = { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) };
@@ -1965,7 +1973,8 @@ export const WLDiagnosticsHub: React.FC = () => {
             {(() => {
               try {
                 // П1: объединённые теги — петля + VBT-просадка + мобильность (а не только xLoop)
-                const t = tagsForBarMetrics(barMetrics?.xLoop ?? null, state.barLift);
+                // Д4: + пик скорости (vMax <1.3 → слабый финал)
+                const t = tagsForBarMetrics(barMetrics?.xLoop ?? null, state.barLift, { vMaxMs: parseFloat(state.peakVelMs) });
                 const vt = tagsForVelocityLoss(vbtLoss?.lossPct ?? null, state.barLift);
                 let ktwMin: number | null = null;
                 try {
@@ -2213,11 +2222,17 @@ export const WLDiagnosticsHub: React.FC = () => {
                       <div style={{ marginTop: 6 }}>
                         {cxs.slice(0, 2).map(cx => {
                           const isCxPref = (state.preferredCorr || {})[wp] === cx.injectId && !!(state.preferredComplexProto || {})[wp];
+                          const cxKg = (() => {
+                            try {
+                              const wm = (planData as any)?.workMax || {};
+                              return estimateCorrectiveKg(cx.injectId, cx.protocol.pct, wm);
+                            } catch { return null; }
+                          })();
                           return (
                             <div key={cx.id} data-wl="corrective-complex" style={{ marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.07)', border: `1px solid ${isCxPref ? 'rgba(168,85,247,0.5)' : 'rgba(168,85,247,0.2)'}`, fontSize: 10, color: '#fff' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <button onClick={() => togglePreferredComplex(wp, cx.id)} aria-pressed={isCxPref} aria-label={`Вставить комплекс ${cx.nameRu}`} style={{ minWidth: 32, minHeight: 32, borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(168,85,247,0.4)', background: isCxPref ? '#a855f7' : 'transparent', color: '#fff', fontSize: 13, fontWeight: 800 }}>{isCxPref ? '⭐' : '☆'}</button>
-                                <div style={{ flex: 1 }}>🔗 Комплекс: {cx.nameRu} ({cx.parts.join(' + ')}) — {cx.protocol.sets}×{cx.protocol.reps} @{cx.protocol.pct}% · {cx.cue}</div>
+                                <div style={{ flex: 1 }}>🔗 Комплекс: {cx.nameRu} ({cx.parts.join(' + ')}) — {cx.protocol.sets}×{cx.protocol.reps} @{cx.protocol.pct}%{cxKg ? ` (≈${cxKg} кг)` : ''} · {cx.cue}</div>
                               </div>
                             </div>
                           );

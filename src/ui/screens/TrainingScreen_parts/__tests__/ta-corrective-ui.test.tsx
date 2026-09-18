@@ -141,6 +141,7 @@ describe('ta corrective tab UI', () => {
     expect(order?.textContent).toMatch(/1\. Рывок: уход под штангу/);
     expect(order?.textContent).toMatch(/Пересним фаз/);
     expect(container.querySelector('[data-wl="corrective-complex"]')?.textContent).toMatch(/Комплекс/);
+    expect(container.querySelector('[data-wl="corrective-complex"]')?.textContent).toMatch(/≈\d+ кг/);
     expect(container.querySelector('[data-wl="corrective-primer"]')?.textContent).toMatch(/праймер/i);
     // howNot у tall_snatch (⛔) — в топ-5 ухода
     expect(container.querySelector('[data-wl="corrective"]')?.textContent).toMatch(/⛔/);
