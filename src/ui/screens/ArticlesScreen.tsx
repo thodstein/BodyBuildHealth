@@ -359,6 +359,137 @@ export function renderMarkdown(md: string, bodyPx = 14): string {
   return `<div className="articles-md" style="line-height:1.8;font-size:${bodyPx}px;color:#fff">${html}</div>`;
 }
 
+/**
+ * PDF-ридер для АПК: Android WebView (Capacitor) не умеет рендерить PDF
+ * в <iframe> — виден пустой белый экран. Поэтому на native страницы
+ * рендерим через pdf.js (уже в бандле: pdfjs-dist + локальный воркер
+ * /pdfjs) в canvas внутри скроллящегося контейнера. На web/Telegram
+ * используется прежний iframe 1-в-1.
+ * Класс articles-pdf-frame сохранён на обоих путях (контракт тестов).
+ */
+function ArticlesPdfReader({ url, title }: { url: string; title: string }) {
+  const hostRef = React.useRef<HTMLDivElement | null>(null);
+  const [status, setStatus] = React.useState<'loading' | 'ready' | 'error'>('loading');
+  const [pages, setPages] = React.useState(0);
+  const [errText, setErrText] = React.useState('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    try {
+      if (hostRef.current) hostRef.current.innerHTML = '';
+    } catch {
+      /* ignore */
+    }
+    setStatus('loading');
+    setPages(0);
+    setErrText('');
+    (async () => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const buf = await res.arrayBuffer();
+        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        try {
+          if (typeof Worker !== 'undefined') {
+            const { resolvePdfjsWorkerSrc } = await import('../../engines/ocr-assets');
+            pdfjsLib.GlobalWorkerOptions.workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
+          }
+        } catch {
+          /* без воркера — рендер в главном потоке */
+        }
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+        if (cancelled) {
+          try {
+            await pdf.cleanup();
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+        setPages(pdf.numPages);
+        const dpr = Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
+        for (let i = 1; i <= pdf.numPages; i++) {
+          if (cancelled) break;
+          const page = await pdf.getPage(i);
+          const hostW = hostRef.current?.clientWidth || 360;
+          const v1 = page.getViewport({ scale: 1 });
+          const cssScale = hostW > 0 ? hostW / v1.width : 1;
+          const viewport = page.getViewport({ scale: cssScale * dpr });
+          const canvas = document.createElement('canvas');
+          canvas.style.width = '100%';
+          canvas.style.height = 'auto';
+          canvas.style.display = 'block';
+          canvas.style.background = '#fff';
+          canvas.setAttribute('aria-label', `Страница ${i} из ${pdf.numPages}`);
+          canvas.width = Math.max(1, Math.floor(viewport.width));
+          canvas.height = Math.max(1, Math.floor(viewport.height));
+          await page.render({ canvas, viewport }).promise;
+          if (cancelled) break;
+          try {
+            const wrap = document.createElement('div');
+            wrap.style.position = 'relative';
+            wrap.style.background = '#fff';
+            wrap.appendChild(canvas);
+            const badge = document.createElement('div');
+            badge.textContent = `Стр. ${i} / ${pdf.numPages}`;
+            badge.setAttribute('style', 'position:absolute;right:8px;bottom:8px;font-size:11px;font-weight:800;color:#fff;background:rgba(0,0,0,0.62);border-radius:999px;padding:3px 9px;');
+            wrap.appendChild(badge);
+            hostRef.current?.appendChild(wrap);
+            if (i < pdf.numPages) {
+              const gap = document.createElement('div');
+              gap.setAttribute('style', 'height:8px;background:#101014;');
+              hostRef.current?.appendChild(gap);
+            }
+          } catch {
+            /* ignore */
+          }
+          if (!cancelled) setStatus('ready');
+        }
+        try {
+          await pdf.cleanup();
+        } catch {
+          /* ignore */
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setStatus('error');
+          setErrText(e instanceof Error ? e.message : String(e));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      try {
+        if (hostRef.current) hostRef.current.innerHTML = '';
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [url]);
+
+  if (status === 'error') {
+    return (
+      <div className="articles-pdf-frame articles-pdf-native" data-status="error" title={title}
+        style={{ flex: 1, overflow: 'auto', background: '#101014', padding: '24px 16px', textAlign: 'center' }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 8 }}>Не удалось открыть PDF внутри приложения</div>
+        <div style={{ fontSize: 12, color: '#fff', opacity: 0.85 }}>{errText || 'Ошибка загрузки документа'}</div>
+        <div style={{ fontSize: 12, color: '#fff', opacity: 0.85, marginTop: 8 }}>Воспользуйтесь кнопками ⤓ или «Открыть снаружи» ниже.</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#101014' }}>
+      {(status === 'loading' || pages === 0) && (
+        <div style={{ padding: '10px 12px', fontSize: 12, fontWeight: 700, color: '#fff', background: 'rgba(10,10,15,0.92)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          ⏳ Открываем PDF… рендерим страницы для чтения внутри приложения
+        </div>
+      )}
+      <div ref={hostRef} className="articles-pdf-frame articles-pdf-native" data-status={status} title={title}
+        style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', background: '#101014', minHeight: 0 }} />
+    </div>
+  );
+}
+
 export const ArticlesScreen: React.FC = () => {
   const [initialUI] = useState<ArticlesUIState>(() => loadArticlesUI());
   const [page, setPage] = useState<'hero' | 'list'>(initialUI.page);
@@ -480,12 +611,43 @@ export const ArticlesScreen: React.FC = () => {
     return list;
   }, [category, search, listSection, saved, sortDir, recent]);
 
-  const openPDFExternal = (url: string) => {
+  const openPDFExternal = async (url: string) => {
+    // АПК: window.open/Telegram-openLink в Capacitor WebView PDF не покажут
+    // (тот же пустой экран). Сохраняем файл в Documents + системный Share —
+    // откроется штатной читалкой устройства.
+    if (isNativeApp()) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const name = decodeURIComponent(url.split('/').pop() || 'article.pdf');
+        const { saveBlobApk } = await import('../../core/apk-share');
+        await saveBlobApk(name, blob);
+        return;
+      } catch {
+        /* fallback ниже */
+      }
+    }
     const tg = (window as any).Telegram?.WebApp;
     if (tg?.openLink) {
       tg.openLink(window.location.origin + url);
     } else {
       window.open(url, '_blank');
+    }
+  };
+
+  /** Скачать PDF: native — Documents + Share, web — классический <a download>. */
+  const downloadPDF = async (url: string) => {
+    if (!isNativeApp()) return;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const name = decodeURIComponent(url.split('/').pop() || 'article.pdf');
+      const { saveBlobApk } = await import('../../core/apk-share');
+      await saveBlobApk(name, blob);
+    } catch {
+      /* тихо: файл и так доступен через «Открыть снаружи» */
     }
   };
 
@@ -720,14 +882,23 @@ export const ArticlesScreen: React.FC = () => {
               <span style={{ fontSize:10, fontWeight:800, padding:'3px 8px', borderRadius:999, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.24)', color:'#fca5a5', flexShrink:0 }}>PDF · внутри</span>
             </span>
             <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-              <a href={pdfViewer} download aria-label="Скачать PDF" className="articles-pdf-download"
-                style={{ minHeight:44, padding:'10px 18px', borderRadius:999, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:800, fontSize:13, cursor:'pointer', textDecoration:'none', display:'inline-flex', alignItems:'center' }}>⤓</a>
-              <button onClick={() => openPDFExternal(pdfViewer)} aria-label="Открыть PDF в браузере" style={{ minHeight:44, padding:'10px 18px', borderRadius:999, background:ART_ACC, color:'#000', border:'none', fontWeight:800, fontSize:13, cursor:'pointer', boxShadow:`0 4px 14px ${artA(0.28)}` }}>↗ Браузер</button>
+              {isNativeApp() ? (
+                <button onClick={() => downloadPDF(pdfViewer)} aria-label="Скачать PDF" className="articles-pdf-download"
+                  style={{ minHeight:44, padding:'10px 18px', borderRadius:999, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:800, fontSize:13, cursor:'pointer', display:'inline-flex', alignItems:'center' }}>⤓</button>
+              ) : (
+                <a href={pdfViewer} download aria-label="Скачать PDF" className="articles-pdf-download"
+                  style={{ minHeight:44, padding:'10px 18px', borderRadius:999, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:800, fontSize:13, cursor:'pointer', textDecoration:'none', display:'inline-flex', alignItems:'center' }}>⤓</a>
+              )}
+              <button onClick={() => openPDFExternal(pdfViewer)} aria-label="Открыть PDF в браузере" style={{ minHeight:44, padding:'10px 18px', borderRadius:999, background:ART_ACC, color:'#000', border:'none', fontWeight:800, fontSize:13, cursor:'pointer', boxShadow:`0 4px 14px ${artA(0.28)}` }}>{isNativeApp() ? '↗ Читалка' : '↗ Браузер'}</button>
               <button onClick={() => setPdfViewer(null)} aria-label="Закрыть PDF" style={{ minWidth:44, minHeight:44, padding:'10px 14px', borderRadius:999, background:'rgba(255,255,255,0.07)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontSize:14, fontWeight:800, cursor:'pointer' }}>✕</button>
             </div>
           </div>
           <div style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', background:'#101014' }}>
-            <iframe className="articles-pdf-frame" src={pdfViewer} title={pdfTitle} style={{ flex:1, width:'100%', minHeight:0, border:'none', background:'#fff' }} allowFullScreen />
+            {isNativeApp() ? (
+              <ArticlesPdfReader url={pdfViewer} title={pdfTitle} />
+            ) : (
+              <iframe className="articles-pdf-frame" src={pdfViewer} title={pdfTitle} style={{ flex:1, width:'100%', minHeight:0, border:'none', background:'#fff' }} allowFullScreen />
+            )}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px 12px calc(10px + env(safe-area-inset-bottom,0px))', background:'rgba(10,10,15,0.92)', borderTop:'1px solid rgba(255,255,255,0.06)', flexShrink:0 }}>
               <span style={{ fontSize:11, color:'#fff', fontWeight:600 }}>Не видно документ?</span>
               <button onClick={() => openPDFExternal(pdfViewer)} style={{ minHeight:44, padding:'10px 18px', borderRadius:999, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)', fontWeight:800, fontSize:12, cursor:'pointer' }}>Открыть снаружи →</button>

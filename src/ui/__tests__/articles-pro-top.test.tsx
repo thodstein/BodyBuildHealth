@@ -580,4 +580,32 @@ describe('ArticlesScreen PRO TOP', () => {
     expect(pdfCard).not.toBeUndefined();
     expect(pdfCard!.textContent).toContain('Читать внутри');
   });
+
+  it('47. native: PDF читается внутри через pdf.js-ридер (без пустого iframe)', () => {
+    (window as unknown as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true };
+    resetAppPlatformCache();
+    // fetch виснет: ридер должен остаться внутри приложения (loading),
+    // а не пустым iframe (Android WebView PDF в iframe не рендерит).
+    // Висящий промис вместо reject — без act-варнингов от поздних setState.
+    vi.stubGlobal('fetch', () => new Promise(() => {}));
+    try {
+      const { container } = render(<ArticlesScreen />);
+      goToList(container);
+      const grid = container.querySelector('.articles-grid') as HTMLElement;
+      const pdfCard = Array.from(grid.children).find(
+        (c) => (c as HTMLElement).textContent?.includes('PDF'),
+      ) as HTMLElement | undefined;
+      expect(pdfCard).not.toBeUndefined();
+      fireEvent.click(pdfCard!);
+      expect(container.querySelector('.articles-pdf')).not.toBeNull();
+      expect(container.querySelector('.articles-pdf-native')).not.toBeNull();
+      expect(container.querySelector('iframe.articles-pdf-frame')).toBeNull();
+      // <a download> в Capacitor не работает — на native кнопка с Filesystem+Share
+      const dl = container.querySelector('.articles-pdf-download') as HTMLElement;
+      expect(dl).not.toBeNull();
+      expect(dl.tagName).toBe('BUTTON');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
