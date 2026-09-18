@@ -4,6 +4,8 @@
 // CDN dependency that was breaking lab recognition when jsdelivr/cdnjs were
 // unreachable. CDN paths are kept only as last-resort fallbacks.
 
+import { isCapacitorNative } from '../core/app-platform';
+
 const TESSERACT_VERSION = '7.0.0';
 const TESSERACT_CORE_VERSION = '7.0.0';
 
@@ -108,6 +110,10 @@ export async function resolveTesseractOptions(): Promise<{
   source: 'local' | 'cdn';
 }> {
   const local = getOcrAssetPaths('local');
+  // Capacitor bundles these files into the APK. Some Android WebViews reject
+  // HEAD/Range probes even though the bundled assets are readable by Tesseract;
+  // probing here would incorrectly switch to an unavailable CDN.
+  if (isCapacitorNative()) return { ...local, source: 'local' };
   const workerOk = await localAssetAvailable(local.workerPath);
   if (workerOk) {
     // Ядро, которое getCore запросит первым на большинстве современных

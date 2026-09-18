@@ -9,8 +9,13 @@ vi.mock('../db', () => ({
 }));
 
 vi.mock('../data-link', () => ({ notifyDataChange: vi.fn() }));
+vi.mock('../app-platform', () => ({
+  isNativeApp: () => true,
+  isCapacitorNative: () => true,
+}));
 
 import { readFileAsArrayBuffer } from '../ocr-engine';
+import { resolveTesseractOptions } from '../../engines/ocr-assets';
 
 describe('АПК: импорт PDF без Blob.arrayBuffer()', () => {
   it('использует FileReader fallback и передаёт буфер в PDF-парсер', async () => {
@@ -22,5 +27,12 @@ describe('АПК: импорт PDF без Blob.arrayBuffer()', () => {
 
     expect(buffer).toBeInstanceOf(ArrayBuffer);
     expect(new TextDecoder().decode(buffer)).toContain('%PDF-1.7');
+  });
+
+  it('не заменяет локальные APK-ассеты CDN-путями', async () => {
+    const options = await resolveTesseractOptions();
+    expect(options.source).toBe('local');
+    expect(options.workerPath).toMatch(/tesseract/);
+    expect(options.langPath).toMatch(/lang/);
   });
 });

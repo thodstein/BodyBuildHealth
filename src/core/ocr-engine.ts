@@ -518,7 +518,9 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
   if (isPDF) {
     source = 'pdf';
     try {
-      const arrayBuffer = await file.arrayBuffer();
+      // Android WebView may expose FileReader but not Blob/File.arrayBuffer().
+      // Keep PDF import on the same compatibility path as scanned-PDF OCR.
+      const arrayBuffer = await readFileAsArrayBuffer(file);
       // АПК: серверных ./api/* в нативном WebView нет — сразу локальный путь
       // (текстовый слой pdfjs + локальный tesseract по страницам). Серверный
       // OCR здесь только для Telegram-mobile, где бэкенд рядом.
