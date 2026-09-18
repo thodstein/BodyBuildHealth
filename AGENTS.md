@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ТА-коррекция: добивка Д1–Д5 — второй остаток закрыт кодом (Sep 18 2026, коммит pathspec `8c8a0bb0`, без пуша)
+
+По команде «что осталось» → 6 пунктов → закрыты все кодом (комплексы в волну/сессию не вшивались осознанно — объём бы вырос против метода Everett; yMax/Vorobyev-тип не маппились — нет сверенных норм, зафиксировано границей). Только Edit/Write + vitest/tsc; чужие WIP (arm-hub-correction-tab пишет параллельный агент прямо сейчас — его дубль-импорт doseForCause роняет tsc, моих ханков там ноль) не тронуты; коммит строго pathspec 6 своих файлов.
+- **Д1 overhead-паритет**: `MOBILITY_DEMAND.overhead += oh_lunge/heaving_balance/snatch_push_press/jerk_support` + lock-тест (плечо: oh_lunge падает, split_pause обгоняет split_jerk; по пути чинил свои неверные ассерты top-1 — чувствителен только индексный lock).
+- **Д2 гвард по equipment**: инъекция скипает всё не-`barbell/machine` (`не штанга (dumbbell/bodyweight)`) с честной нотой + fallback; lock-тест на single_arm_press (прежде гвард ловил только nonBarbell — гантель проскакивала бы со шланг-дозой от приседа).
+- **Д3 комплексы в выдачу**: топ-1 `complexExportLines` в мост и экспорт-снапшот (HTML/CSV подхватили сами, объём не растёт); **Д5** ≈кг на карточках комплексов (`estimateCorrectiveKg(injectId)` + UI-ассерт).
+- **Д4 vMax-тег**: `tagsForBarMetrics += extra.vMaxMs` (<1.3 м/с Wood 2026 → +weak_extension, текст «слабый финал») + проводка `peakVelMs` из видео-хина + lock-тест.
+- **Проверено**: `ta-corrective` 44→**46/46** + `ta-injection` 16→**17/17** + UI 17/17 + круг engines+hub+spec-apply **1030/1030 (66 файлов)** + `tsc` **0 по своим** (4 ошибки — чужой недописанный `arm-hub-correction-tab.tsx`, доказан `git diff -U0`: мои ханки отсутствуют) + `verify:apk-design` OK. НЕ ПУШИЛ.
+
 ## ТА-коррекция: добивка П1–П8 — остатки закрыты кодом (Sep 18 2026, коммит pathspec `28042af5`, без пуша)
 
 По команде «что осталось или выполнено не полностью» → честный список из 8 пунктов → закрыты все 8 кодом. Только Edit/Write + vitest/tsc; чужие WIP (labs/CSS) не тронуты; коммит строго pathspec 6 своих файлов.
