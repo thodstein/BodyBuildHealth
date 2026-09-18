@@ -90,6 +90,9 @@ CSS-дублей (инлайн — единственный источник о�
     `CombatUI` CARD 16/12→12/8, HERO 18/14→12/8, ROW/COL 10→8, титул 15→14;
     корень `padding 14/gap 14` → `0 10px 90px/gap 8`, все `cb-pane` gap 12→8.
     Внутренние 2-колоночные гриды полей (gap 10) оставлены — это не stacked-пустоты.
+  - Добивка reaudit: медли-блок `data-ss="medley"` (StrengthUI:466) нёс рыхлый оверрайд
+    `padding 16/gap 12` + шапку 36/17 поверх ужатого кита → переведён на 12/8 + 30/14
+    (соседи strength UI 75/75 целы).
 - Проверено: NEW `planner-structure` 5/5 + wizard-nav 9/9 + top-ui 16/16 + cycle-picker 7/7
   + switch/quality/grip/pro5/year/variants/correction 43/43 + `tsc --noEmit` 0 по всему
   проекту + `verify:apk-design` OK. НЕ ПУШИЛ.

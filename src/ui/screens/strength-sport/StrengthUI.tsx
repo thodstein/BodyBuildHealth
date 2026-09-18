@@ -463,12 +463,12 @@ export const EventCard: React.FC<{
   const totalCap = events.reduce((a, e) => a + e.timeCapS, 0);
   const medleyCap = Math.max(totalCap - 10, totalDist > 0 ? 60 : 0);
   return (
-    <div data-ss="medley" style={{ ...CARD_STRONG, padding: 16, gap: 12 }}>
+    <div data-ss="medley" style={{ ...CARD_STRONG, padding: 12, gap: 8 }}>
       <div style={ROW}>
-        <span style={{ width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', background: ACCENT_GRAD_STRONG, fontSize: 17, boxShadow: '0 4px 14px rgba(245,158,11,0.30)' }}>⛓️</span>
-        <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15, fontWeight: 700, color: TEXT_1, fontFamily: SF, lineHeight: 1.2 }}>{title}</div><div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 2 }}>{subtitle} · <span style={{ color: ACCENT_STRONG, fontWeight: 700 }}>{totalDist}м / cap {medleyCap}с</span></div></div>
+        <span style={{ width: 30, height: 30, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: ACCENT_GRAD_STRONG, fontSize: 15, boxShadow: '0 4px 14px rgba(245,158,11,0.30)' }}>⛓️</span>
+        <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, fontFamily: SF, lineHeight: 1.2 }}>{title}</div><div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 2 }}>{subtitle} · <span style={{ color: ACCENT_STRONG, fontWeight: 700 }}>{totalDist}м / cap {medleyCap}с</span></div></div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {events.map(ev => (
           <div key={ev.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, fontFamily: SF }}>{ev.label} {ev.weight ? <span style={{ color: TEXT_3, fontWeight: 500 }}>{ev.weight}кг</span> : null}</span><span style={{ fontSize: 12, color: ACCENT_STRONG, fontFamily: SF, fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{ev.distanceM}м · {ev.timeCapS}с</span></div>
