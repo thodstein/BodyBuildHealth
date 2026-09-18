@@ -132,9 +132,8 @@ describe('PRO-5 Э3 паритет выдачи', () => {
 
   it('source-guard: specBlock-мемо — единственный вызов buildSpecBlock, им пользуются выдача/ICS/год/инъекция', () => {
     expect((SRC.match(/buildSpecBlock\(/g) || []).length).toBe(1);
-    expect(SRC).toMatch(/const spec: unknown = specBlock;/);
-    expect(SRC).toMatch(/const spec: any = specBlock;/);
-    expect(SRC).toMatch(/const sb = specBlock;/);
+    // Э5: выдача берёт мемо напрямую (HTML+CSV), ICS/год/инъекция — через const sb
+    expect((SRC.match(/specBlock as any/g) || []).length).toBeGreaterThanOrEqual(2);
     expect(SRC).toMatch(/specPayload = specBlock;/);
     expect((SRC.match(/const sb = specBlock;/g) || []).length).toBe(3);
   });

@@ -7,6 +7,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { CARD, ACCENT } from './training-ui';
 import { applyToPlanner } from './planner-bridge';
+import { buildPro2Meta } from './bb-hub-export';
 import { localIsoDate } from './diary-shared';
 import { scoreColor as bbScoreColor } from '../../../engines/bb/bb-scoring.engine';
 import { buildBBDiagnosticsReport } from '../../../engines/bb/bb-diagnostics-hub.engine';
@@ -839,42 +840,13 @@ export const BBDiagnosticsHub: React.FC = () => {
     let topIds: string[] = [];
     let weakHeads: string[] = [];
     let specPayload: unknown = null;
-    // 28д-история + замеры + e1RM — внутри хендлера (мемы ниже по коду недоступны из-за TDZ)
-    let histLazy: Record<string, number[]> = {};
-    let measLazy: Record<string, number> = {};
-    let trendLazy: Record<string, { deltaPct: number; sessions: number }> = {};
-    try { histLazy = volumeHistory28d(diarySessions as any) || {}; } catch { /* noop */ }
-    try { trendLazy = e1rmTrend28d(diarySessions as any) || {}; } catch { /* noop */ }
-    try {
-      measLazy = {};
-      for (const [k, v] of Object.entries(state.circ)) {
-        const n = parseFloat(v as string);
-        if (Number.isFinite(n) && n > 0) measLazy[k] = n;
-      }
-    } catch { /* noop */ }
-    try {
-      weakCausesPayload = diagnoseWeakCausesBatch(report.weakZonesGranular.slice(0, 2), {
-        level,
-        factVolume: factVolume as any,
-        perMuscleAcwr: perMuscleAcwr as any,
-        sleepHours: Number.isFinite(profileSleep as number) ? (profileSleep as number) : null,
-        vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
-        hist28: histLazy as any,
-        e1rmTrend: trendLazy as any,
-        meas: measLazy as any,
-        heightCm: measLazy.heightCm ?? (parseFloat(state.circ.heightCm || '') || null),
-        wristCm: state.wristCm ? parseFloat(state.wristCm) : null,
-        canonicalOf: canonicalMuscle,
-      });
-    } catch { /* noop */ }
+    // Э5 PRO-5: причины — то же мемо, что в карточке/экспорте (единый набор входов + auditFor)
+    try { weakCausesPayload = weakCauses as Record<string, unknown>; } catch { /* noop */ }
     try {
       specPayload = specBlock;
-      // топ-3 на каждую слабую зону с бонусом слабой головки (макс 6) + сами головки
+      // топ-3 на каждую слабую зону (макс 6) + головки — из общего мемо exportHeads
       const seen = new Set<string>();
-      const heads: string[] = [];
       for (const z of report.weakZonesGranular.slice(0, 2)) {
-        const wh = weakHeadForZone(z);
-        if (wh && !heads.includes(wh)) heads.push(wh);
         try {
           // 3.11: единый источник ранжирования — мемо top3ByZone (без повторного вызова).
           for (const r of (top3ByZone[z] || [])) {
@@ -884,7 +856,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         } catch { /* noop */ }
       }
       topIds = topIds.slice(0, 6);
-      weakHeads = heads;
+      weakHeads = exportHeads;
     } catch { /* noop */ }
     // PRO-3 R6: копим направление перекоса (сырые стороны + дата) для динамики
     try {
@@ -913,16 +885,8 @@ export const BBDiagnosticsHub: React.FC = () => {
         vbtLossPct: null,
         weakCauses: weakCausesPayload,
         preferredExerciseIds: topIds,
-        correctiveDetail: (() => { try {
-          const det: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> = [];
-          for (const z of report.weakZonesGranular.slice(0, 2)) {
-            const lib = (correctiveTopByZone[z] || [])[0];
-            if (!lib) continue;
-            const dose = correctiveDose(lib.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags());
-            det.push({ id: lib.corr.id, zone: z, exerciseId: lib.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: lib.corr.cues.slice(0, 3), source: lib.corr.source });
-          }
-          return det.length ? det : null;
-        } catch { return null; } })(),
+        // Э5 PRO-5: единая деталь коррекций библиотеки (карточка = экспорт = мост)
+        correctiveDetail: correctiveDetailForExport,
         weakHeads,
         specBlock: specPayload,
         // MMC-строка: приёмник ББ-авто её уже читает (typeof string) — шлём тот же текст, что в карточке
@@ -990,22 +954,6 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch {}
   };
 
-  // Экспорт движений: направление перекоса L/R (нагрузка в файл не едет — её хабы свои)
-  const buildMovementExport = (): Record<string, unknown> => {
-    try {
-      const raw = localStorage.getItem('he_bb_lr_history');
-      const hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
-      const dir: Array<{ group: string; text: string }> = [];
-      for (const v of lrVerdictsFromSessions(diarySessions as any).slice(0, 2)) {
-        const d = summarizeLrDirection(hist, v.group);
-        if (d) dir.push({ group: v.group, text: d.text });
-      }
-      return {
-        lrDirection: dir,
-      };
-    } catch { return {}; }
-  };
-
   // PRO-CORR-FIX: единый конструктор сигналов библиотеки — карточка, HTML- и CSV-экспорт
   // обязаны считать одним набором входов (иначе топ в файле ≠ показанному/вставленному).
   const corrSignalsFor = (z: string, cause: unknown) => {
@@ -1043,170 +991,15 @@ export const BBDiagnosticsHub: React.FC = () => {
   });
 
   const handleExport = () => {
-    let causes: Record<string, unknown> = {};
-    // Э3 PRO-5: спец-блок в выдаче = показанному (мемо specBlock с реальным factVolume), не пустой factSets
-    const spec: unknown = specBlock;
-    const heads: string[] = [];
-    try {
-      // те же живые входы, что в меме и CSV (мемы ниже недоступны из-за TDZ)
-      let histLazy: Record<string, number[]> = {};
-      let trendLazy: Record<string, { deltaPct: number; sessions: number }> = {};
-      try { histLazy = volumeHistory28d(diarySessions as any) || {}; } catch { /* noop */ }
-      try { trendLazy = e1rmTrend28d(diarySessions as any) || {}; } catch { /* noop */ }
-      const measLazy: Record<string, number> = {};
-      try {
-        for (const [k, v] of Object.entries(state.circ)) {
-          const n = parseFloat(v as string);
-          if (Number.isFinite(n) && n > 0) measLazy[k] = n;
-        }
-      } catch { /* noop */ }
-      causes = diagnoseWeakCausesBatch(report.weakZonesGranular.slice(0, 2), {
-        level,
-        factVolume: factVolume as any,
-        perMuscleAcwr: perMuscleAcwr as any,
-        sleepHours: Number.isFinite(profileSleep as number) ? (profileSleep as number) : null,
-        vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
-        hist28: histLazy as any,
-        e1rmTrend: trendLazy as any,
-        meas: measLazy as any,
-        heightCm: measLazy.heightCm ?? (parseFloat(state.circ.heightCm || '') || null),
-        wristCm: state.wristCm ? parseFloat(state.wristCm) : null,
-        canonicalOf: canonicalMuscle,
-      });
-      for (const z of report.weakZonesGranular.slice(0, 2)) {
-        const wh = weakHeadForZone(z);
-        if (wh && !heads.includes(wh)) heads.push(wh);
-      }
-    } catch { /* noop */ }
-    // Экспорт движений: L/R + скрининг-драйвер + односторонний (нагрузка — чужие хабы, в файл не едет)
-    let pro2: Record<string, unknown> = {};
-    try {
-      const lr = lrVerdicts.map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
-      let moveDriverEx: unknown = null;
-      try {
-        moveDriverEx = moveDriver;
-      } catch { /* noop */ }
-      let singleLegEx: unknown = null;
-      try {
-        singleLegEx = singleLeg;
-      } catch { /* noop */ }
-      // MMC-строка в экспорт (приёмник ББ-авто её уже читает; в мост добавлена тем же релизом)
-      let mmcEx: string | null = null;
-      try {
-        const a = mmcAdvice;
-        mmcEx = a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null;
-      } catch { /* noop */ }
-      pro2 = {
-        lr,
-        movementDriver: moveDriverEx,
-        singleLeg: singleLegEx,
-        ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
-        mmc: mmcEx,
-        // D1–D5: плечо/шарнир/YBT/асимметрии/замены (только заполненное едет в файл)
-        shoulder: (() => { try { return { pass: (shoulderV as any).pass, locus: (shoulderV as any).locus, text: (shoulderV as any).text }; } catch { return null; } })(),
-        hinge: (() => { try { return { text: `${(hingeV as any).text} · ${(loadedV as any).text}` }; } catch { return null; } })(),
-        ybt: (() => { try { return { text: (ybtV as any).text }; } catch { return null; } })(),
-        asymPriority: (() => { try { return asymText; } catch { return null; } })(),
-        driverSubs: (() => { try { return { text: `${((driverSubs as any).prefer || []).join(' · ')} — ${(driverSubs as any).note}` }; } catch { return null; } })(),
-        // R1–R8 PRO-2: заполненное едет в файл (не заполнено — секций нет, байт-в-байт)
-        bench: benchV.tested ? { level: benchV.level, text: benchV.text } : null,
-        painMon: painMon.line || null,
-        posterior: nheV.tested || adductorV.tested ? { nhe: nheV.tested ? nheV.text : null, adductor: adductorV.tested ? adductorV.text : null } : null,
-        loadedHinge: !teenGate.blocked && !/не проверялся/.test(loadedHingeV.text) ? { text: loadedHingeV.text } : null,
-        erir: !teenGate.blocked && erIrV.tested ? { text: erIrV.text } : null,
-        screenPriority: screenPriority.length ? screenPriority : null,
-        correctiveDetail: (() => { try {
-          const det: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> = [];
-          for (const z of report.weakZonesGranular.slice(0, 2)) {
-            const r = rankCorrectives(corrSignalsFor(z, (causes as any)?.[z]?.cause))[0];
-            if (!r) continue;
-            const dose = correctiveDose(r.corr, (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(), corrDoseFlags());
-            det.push({ id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: r.corr.cues.slice(0, 3), source: r.corr.source });
-          }
-          return det.length ? det : null;
-        } catch { return null; } })(),
-      };
-      try { Object.assign(pro2, buildMovementExport()); } catch { /* noop */ }
-    } catch { /* noop */ }
-    const html = buildBBDiagnosticsHtml(report, { date: localIsoDate(), level, plan: bbPlan, weakHeads: heads, weakCauses: causes as any, specBlock: spec as any, ...pro2 } as any);
+    // Э5 PRO-5: причины — мемо weakCauses (с auditFor: «показано = экспортировано»), PRO-мета — общий сборщик
+    const html = buildBBDiagnosticsHtml(report, { date: localIsoDate(), level, plan: bbPlan, weakHeads: exportHeads, weakCauses: weakCauses as any, specBlock: specBlock as any, ...pro2Meta } as any);
     downloadHtml(html, `bb-diagnostics-${localIsoDate()}.html`);
     setToast('✓ HTML экспорт (движения: причины + спец-блок + разбор + скрининг)');
     setTimeout(() => setToast(''), 2000);
   };
   const handleExportCsv = () => {
-    // лениво, как handleExport (мемы ниже недоступны из-за TDZ)
-    let causes: Record<string, any> = {};
-    // Э3 PRO-5: тот же спец-блок, что в карточке/HTML (без пустых factSets)
-    const spec: any = specBlock;
-    const heads: string[] = [];
-    try {
-      let histLazy: Record<string, number[]> = {};
-      let trendLazy: Record<string, { deltaPct: number; sessions: number }> = {};
-      try { histLazy = volumeHistory28d(diarySessions as any) || {}; } catch { /* noop */ }
-      try { trendLazy = e1rmTrend28d(diarySessions as any) || {}; } catch { /* noop */ }
-      const measLazy: Record<string, number> = {};
-      try {
-        for (const [k, v] of Object.entries(state.circ)) {
-          const n = parseFloat(v as string);
-          if (Number.isFinite(n) && n > 0) measLazy[k] = n;
-        }
-      } catch { /* noop */ }
-      for (const z of report.weakZonesGranular.slice(0, 2)) {
-        const wh = weakHeadForZone(z);
-        if (wh && !heads.includes(wh)) heads.push(wh);
-      }
-      causes = diagnoseWeakCausesBatch(report.weakZonesGranular.slice(0, 2), {
-        level,
-        factVolume: factVolume as any,
-        perMuscleAcwr: perMuscleAcwr as any,
-        sleepHours: Number.isFinite(profileSleep as number) ? (profileSleep as number) : null,
-        vbtLossPct: null, // VBT живёт в Анализе силы — в диагностику движений не входит
-        hist28: histLazy as any,
-        e1rmTrend: trendLazy as any,
-        meas: measLazy as any,
-        heightCm: measLazy.heightCm ?? (parseFloat(state.circ.heightCm || '') || null),
-        wristCm: state.wristCm ? parseFloat(state.wristCm) : null,
-        canonicalOf: canonicalMuscle,
-      });
-    } catch { /* noop */ }
-    let pro2csv: Record<string, unknown> = {};
-    try {
-      const lr = lrVerdicts.map((v) => ({ group: v.group, left: v.left, right: v.right, asymPct: v.asymPct, weakSide: v.weakSide, verdict: v.verdict, topUpSets: v.topUpSets, text: v.text }));
-      let moveDriverCsv: unknown = null;
-      try {
-        moveDriverCsv = moveDriver;
-      } catch { /* noop */ }
-      pro2csv = {
-        lr,
-        movementDriver: moveDriverCsv,
-        singleLeg,
-        ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
-        mmc: (() => { try { const a = mmcAdvice; return a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null; } catch { return null; } })(),
-        shoulder: (() => { try { return { pass: (shoulderV as any).pass, locus: (shoulderV as any).locus, text: (shoulderV as any).text }; } catch { return null; } })(),
-        hinge: (() => { try { return { text: `${(hingeV as any).text} · ${(loadedV as any).text}` }; } catch { return null; } })(),
-        ybt: (() => { try { return { text: (ybtV as any).text }; } catch { return null; } })(),
-        asymPriority: (() => { try { return asymText; } catch { return null; } })(),
-        // R1–R8 PRO-2: заполненное едет в CSV (не заполнено — строк нет, байт-в-байт)
-        bench: benchV.tested ? { level: benchV.level, text: benchV.text } : null,
-        painMon: painMon.line || null,
-        posterior: nheV.tested || adductorV.tested ? { nhe: nheV.tested ? nheV.text : null, adductor: adductorV.tested ? adductorV.text : null } : null,
-        loadedHinge: !teenGate.blocked && !/не проверялся/.test(loadedHingeV.text) ? { text: loadedHingeV.text } : null,
-        erir: !teenGate.blocked && erIrV.tested ? { text: erIrV.text } : null,
-        screenPriority: screenPriority.length ? screenPriority : null,
-        correctiveDetail: (() => { try {
-          const det: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> = [];
-          for (const z of report.weakZonesGranular.slice(0, 2)) {
-            const r = rankCorrectives(corrSignalsFor(z, (causes as any)?.[z]?.cause))[0];
-            if (!r) continue;
-            const dose = correctiveDose(r.corr, (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(), corrDoseFlags());
-            det.push({ id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: r.corr.cues.slice(0, 3), source: r.corr.source });
-          }
-          return det.length ? det : null;
-        } catch { return null; } })(),
-      };
-      try { Object.assign(pro2csv, buildMovementExport()); } catch { /* noop */ }
-    } catch { /* noop */ }
-    const csv = buildBBDiagnosticsCsv(report, bbPlan as any, { weakCauses: causes, weakHeads: heads, specBlock: spec, ...pro2csv });
+    // Э5 PRO-5: тот же объект меты, что HTML (CSV больше не теряет driver_subs)
+    const csv = buildBBDiagnosticsCsv(report, bbPlan as any, { weakCauses: weakCauses as any, weakHeads: exportHeads, specBlock: specBlock as any, ...pro2Meta });
     downloadCsv(csv, `bb-diagnostics-${localIsoDate()}.csv`);
     setToast('✓ CSV экспорт (движения: причины + спец-блок + разбор + скрининг)');
     setTimeout(() => setToast(''), 2000);
@@ -1377,6 +1170,50 @@ export const BBDiagnosticsHub: React.FC = () => {
     }
     return out;
   }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV, loadedHingeV]);
+
+  // Э5 PRO-5: единые входы выдачи — головки, детали коррекций и PRO-мета (HTML/CSV/мост одним объектом)
+  const exportHeads = useMemo(() => {
+    try {
+      const out: string[] = [];
+      for (const z of report.weakZonesGranular.slice(0, 2)) {
+        const wh = weakHeadForZone(z);
+        if (wh && !out.includes(wh)) out.push(wh);
+      }
+      return out;
+    } catch { return []; }
+  }, [report.weakZonesGranular]);
+  const correctiveDetailForExport = useMemo(() => {
+    try {
+      const det: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> = [];
+      for (const z of report.weakZonesGranular.slice(0, 2)) {
+        const r = (correctiveTopByZone[z] || [])[0];
+        if (!r) continue;
+        const dose = correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags());
+        det.push({ id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: r.corr.cues.slice(0, 3), source: r.corr.source });
+      }
+      return det.length ? det : null;
+    } catch { return null; }
+  }, [report.weakZonesGranular, correctiveTopByZone, weakCauses, readiness, painMon]);
+  const pro2Meta = useMemo(() => buildPro2Meta({
+    lrVerdicts: lrVerdicts as any,
+    moveDriver,
+    singleLeg,
+    ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
+    mmcLine: (() => { try { const a = mmcAdvice; return a ? `${a.focus === 'internal' ? 'Внутренний' : 'Внешний'} фокус: ${a.cue} — ${a.text}` : null; } catch { return null; } })(),
+    shoulder: (() => { try { return { pass: (shoulderV as any).pass, locus: (shoulderV as any).locus, text: (shoulderV as any).text }; } catch { return null; } })(),
+    hingeText: (() => { try { return `${(hingeV as any).text} · ${(loadedV as any).text}`; } catch { return ''; } })(),
+    ybt: (() => { try { return { text: (ybtV as any).text }; } catch { return null; } })(),
+    asymText,
+    driverSubsText: (() => { try { const pref = ((driverSubs as any).prefer || []) as string[]; const note = String((driverSubs as any).note || ''); return pref.length || note ? `${pref.join(' · ')} — ${note}` : null; } catch { return null; } })(),
+    bench: benchV.tested ? { level: benchV.level, text: benchV.text } : null,
+    painMonLine: painMon.line || null,
+    posterior: nheV.tested || adductorV.tested ? { nhe: nheV.tested ? nheV.text : null, adductor: adductorV.tested ? adductorV.text : null } : null,
+    loadedHinge: !teenGate.blocked && !/не проверялся/.test(loadedHingeV.text) ? { text: loadedHingeV.text } : null,
+    erir: !teenGate.blocked && erIrV.tested ? { text: erIrV.text } : null,
+    screenPriority: screenPriority.length ? screenPriority : null,
+    correctiveDetail: correctiveDetailForExport,
+    lrDirection,
+  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcAdvice, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, lrDirection]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {

@@ -41,8 +41,10 @@ describe('bb-corrective-ui', () => {
     for (const id of ids) expect(id).toMatch(/^(q-split-unilateral|q-goblet-heel|lh-tempo-split|ybt-split-reach)$/);
   });
   it('паритет путей: карточка и оба экспорта считают через corrSignalsFor (без инлайн-дублей)', () => {
+    // PRO-5 Э5 (было ≥3: карточка+HTML+CSV → стало 1): единственный источник — мемо
+    // correctiveTopByZone; выдача/ICS/год/мост читают его же (инлайн-копии удалены).
     const uses = HUB_SRC.match(/corrSignalsFor\(/g) || [];
-    expect(uses.length).toBeGreaterThanOrEqual(3); // карточка + HTML + CSV (def без скобки не считается)
+    expect(uses.length).toBeGreaterThanOrEqual(1); // def без скобки не считается (пробел), остаётся мемо
     expect(HUB_SRC.includes('rankCorrectives({')).toBe(false);
   });
   it('красная боль: доза срезана (инверсия закрыта)', () => {
@@ -67,8 +69,10 @@ describe('bb-corrective-ui', () => {
     expect(card!.textContent).toMatch(/2×12–15 RIR2/);
   });
   it('доза везде через corrDoseFlags: base-вызовов correctiveDose(..., {}) не осталось', () => {
+    // PRO-5 Э5 (было ≥5: мост+HTML+CSV+карточка+вставка → стало 3): выдача/мост читают один memo
+    // correctiveDetailForExport; флаги остались в нём, карточке и вставке.
     const uses = HUB_SRC.match(/corrDoseFlags\(\)/g) || [];
-    expect(uses.length).toBeGreaterThanOrEqual(5); // мост + HTML + CSV + карточка + вставка
+    expect(uses.length).toBeGreaterThanOrEqual(3); // memo + карточка + вставка
     expect(HUB_SRC.includes('cause ?? null, {})')).toBe(false);
   });
 });
