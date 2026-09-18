@@ -271,6 +271,13 @@ export default function App() {
   }, [initialized]);
 
   const go = useCallback((t: Tab, st: string | null = null) => {
+    // Нижний дашборд: тап по разделу без subTab — всегда возврат на главную
+    // раздела. SupportScreen персистит позицию в he_sup_nav_v1 и при ремаунте
+    // восстанавливает глубокий каталог — чистим ключ, иначе кнопка «БАДы»
+    // никогда не возвращает на hero.
+    if (t === 'support' && st == null) {
+      try { localStorage.removeItem('he_sup_nav_v1'); } catch { /* ignore */ }
+    }
     // Тактильный отклик — ТОЛЬКО APK. В Telegram ветка не выполняется вообще.
     if (isNativeApp() && tab !== t) {
       try {

@@ -166,6 +166,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     } catch { /* non-DOM — нечего скроллить */ }
   }, [section, tab, supportView, calcView, infoView, genTab, protocolTab, protocolView, infoTab]);
   const [searchQuery, setSearchQuery] = useState('');
+  // Отложенный запрос для каталога: ввод остаётся отзывчивым, тяжёлая
+  // перегруппировка ~300 веществ едет на deferred-рендере, а не на каждый кейстрок.
+  const deferredSearchQuery = (React as any).useDeferredValue ? (React as any).useDeferredValue(searchQuery) : searchQuery;
   const [catalogOrgans, setCatalogOrgans] = useState<string[]>([]);
   const [showOrganPopup, setShowOrganPopup] = useState(false);
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
@@ -1288,9 +1291,9 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         return false;
       });
     }
-    // Apply search query
-    if (searchQuery) {
-      const sq = searchQuery.toLowerCase();
+    // Apply search query (deferred — не дёргаем группировку на каждый кейстрок)
+    if (deferredSearchQuery) {
+      const sq = (deferredSearchQuery as string).toLowerCase();
       filtered = filtered.filter(s =>
         (s.name||'').toLowerCase().includes(sq) ||
         (s.id||'').toLowerCase().includes(sq) ||
@@ -1332,7 +1335,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         return { cat, items, count: items.length, classBadges, classItems };
       })
       .sort((a, b) => b.count - a.count);
-  }, [searchQuery, supportTierFilter, categoryFilter, catalogSubstances]);
+  }, [deferredSearchQuery, supportTierFilter, categoryFilter, catalogSubstances]);
 
   // Type-only grouping for "По типам" tab — все распределено, без polyphenols/supplement как отдельных групп
   const TYPE_GROUPS = new Set(['vitamins','minerals','amino_acids','fatty_acids','herbs','mushrooms','peptides','hormones','enzymes','probiotics','electrolytes','nootropics','adaptogens','antioxidants','pharma']);

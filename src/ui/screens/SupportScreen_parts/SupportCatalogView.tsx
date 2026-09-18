@@ -45,6 +45,29 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
   } = s;
   // P3: локальный фильтр грейдов (состояние внутри хаба, SupportScreen не тронут)
   const [gradeFilter, setGradeFilter] = React.useState<GradeFilter>('all');
+  // Перф: избранное читаем из стора ОДИН раз (был JSON.parse на КАЖДУЮ строку
+  // каталога — сотни парсингов на каждый кейстрок поиска). Рефреш по favRefresh.
+  const favSet = React.useMemo(() => {
+    try { return new Set(readSupportStrArr('he_support_favorites')); }
+    catch { return new Set<string>(); }
+  }, [(s as any).favRefresh]);
+  // Перф: грейды доказательности считаем ОДИН раз на каталог, а не 2-3 раза
+  // на строку внутри JSX (там был evidenceGradeExFor в каждом бейдже).
+  const gradeMap = React.useMemo(() => {
+    const m = new Map<string, string>();
+    try {
+      const all: any[] = Array.isArray(catalogSubstances) ? catalogSubstances : [];
+      for (const sub of all) {
+        const id = sub?.id;
+        if (typeof id === 'string' && id && !m.has(id)) m.set(id, evidenceGradeExFor(id));
+      }
+    } catch { /* ignore — fallback 'C' ниже */ }
+    return m;
+  }, [catalogSubstances]);
+  const gradeOf = (id: unknown): string => {
+    if (typeof id !== 'string' || !id) return 'C';
+    return gradeMap.get(id) || 'C';
+  };
   const typeGroupsF = React.useMemo(() => filterCatalogGroups((typeGroupedSubstances || []) as any, gradeFilter), [typeGroupedSubstances, gradeFilter]);
   const organGroupsF = React.useMemo(() => filterCatalogGroups((OrganGroupedSubstances || []) as any, gradeFilter), [OrganGroupedSubstances, gradeFilter]);
   // Стеки: агрегатный грейд = минимум участников (weakest link); фильтр применяется локально
@@ -101,14 +124,14 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                               <div key={sub?.id||'x'}>
                                 <div onClick={() => setSelectedSub(isSelected ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 18px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
                                   <div style={{ flex:1, minWidth:0 }}>
-                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())} <span style={{ fontSize:7, fontWeight:800, padding:'1px 5px', borderRadius:4, background: (() => { const g = evidenceGradeExFor(sub?.id||''); return g === 'A' ? 'rgba(34,197,94,0.15)' : g === 'B' ? 'rgba(245,158,11,0.15)' : g === 'D' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)'; })(), color: (() => { const g = evidenceGradeExFor(sub?.id||''); return g === 'A' ? '#22c55e' : g === 'B' ? '#f59e0b' : g === 'D' ? '#ef4444' : '#fff'; })() }}>{evidenceGradeExFor(sub?.id||'')}</span></div>
+                                    <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())} <span style={{ fontSize:7, fontWeight:800, padding:'1px 5px', borderRadius:4, background: (() => { const g = gradeOf(sub?.id); return g === 'A' ? 'rgba(34,197,94,0.15)' : g === 'B' ? 'rgba(245,158,11,0.15)' : g === 'D' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)'; })(), color: (() => { const g = gradeOf(sub?.id); return g === 'A' ? '#22c55e' : g === 'B' ? '#f59e0b' : g === 'D' ? '#ef4444' : '#fff'; })() }}>{gradeOf(sub?.id)}</span></div>
                                     <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                       {supArr(sub?.categories).slice(0,3).map((c: any) => <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{c||''}</span>)}
                                           {supArr(sub?.mechanisms).slice(0,4).map((m: any) => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || supStr(m).replace(/_/g, ' ')}</span>)}
                                     </div>
                                   </div>
                                   <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
-                                   <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(sub?.id||''); if (idx >= 0) f.splice(idx,1); else f.push(sub?.id||''); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(readSupportStrArr('he_support_favorites').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)') }}>★</button>
+                                   <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(sub?.id||''); if (idx >= 0) f.splice(idx,1); else f.push(sub?.id||''); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(favSet.has(sub?.id||'')?'#fbbf24':'var(--text-dim)') }}>★</button>
                                    <button onClick={e => { e.stopPropagation(); { const arr: any[] = readSupportArr('he_my_substances'); if (!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); writeSupportJSON('he_my_substances', arr); setFavRefresh(p=>p+1); } } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                    <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                  </div>
@@ -165,7 +188,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                          <div style={{ fontSize:8, color:'var(--text-dim)' }}>{supArr(sub.categories).slice(0,2).map((c: any) => CATEGORY_LABELS[c]?.label || c).join(', ')}</div>
                                       </div>
                                       <button onClick={e => { e.stopPropagation(); if (!enhancedSubs.includes(id)) setEnhancedSubs(prev => [...prev, id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(id) ? '✓' : '+ Мой стек'}</button>
-                                       <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(id); if (idx >= 0) f.splice(idx,1); else f.push(id); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(readSupportStrArr('he_support_favorites').includes(id)?'#fbbf24':'var(--text-dim)') }}>★</button>
+                                       <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(id); if (idx >= 0) f.splice(idx,1); else f.push(id); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(favSet.has(id)?'#fbbf24':'var(--text-dim)') }}>★</button>
                                        <button onClick={e => { e.stopPropagation(); { const arr: any[] = readSupportArr('he_my_substances'); if (!arr.find((x:any)=>x.id===id)) { arr.push({id, name:sub?.name||id, source:'Каталог', date:new Date().toISOString()}); writeSupportJSON('he_my_substances', arr); setFavRefresh(p=>p+1); } } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                       <span style={{ fontSize:9, color:'var(--text-dim)', transform:isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
                                     </div>
@@ -306,14 +329,14 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                     <div key={sub?.id||'x'}>
                                       <div onClick={() => setSelectedSub(selectedSub === sub?.id ? null : (sub?.id||null))} style={{ display:'flex', alignItems:'flex-start', gap:4, padding:'6px 10px 6px 22px', cursor:'pointer', borderBottom:'1px solid var(--border)' }}>
                                         <div style={{ flex:1, minWidth:0 }}>
-                                          <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())} <span style={{ fontSize:7, fontWeight:800, padding:'1px 5px', borderRadius:4, background: (() => { const g = evidenceGradeExFor(sub?.id||''); return g === 'A' ? 'rgba(34,197,94,0.15)' : g === 'B' ? 'rgba(245,158,11,0.15)' : g === 'D' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)'; })(), color: (() => { const g = evidenceGradeExFor(sub?.id||''); return g === 'A' ? '#22c55e' : g === 'B' ? '#f59e0b' : g === 'D' ? '#ef4444' : '#fff'; })() }}>{evidenceGradeExFor(sub?.id||'')}</span></div>
+                                          <div style={{ fontSize:10, fontWeight:600, color:'var(--text-light)', lineHeight:1.3 }}>{sub?.name||(sub?.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())} <span style={{ fontSize:7, fontWeight:800, padding:'1px 5px', borderRadius:4, background: (() => { const g = gradeOf(sub?.id); return g === 'A' ? 'rgba(34,197,94,0.15)' : g === 'B' ? 'rgba(245,158,11,0.15)' : g === 'D' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)'; })(), color: (() => { const g = gradeOf(sub?.id); return g === 'A' ? '#22c55e' : g === 'B' ? '#f59e0b' : g === 'D' ? '#ef4444' : '#fff'; })() }}>{gradeOf(sub?.id)}</span></div>
                                           <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginTop:1 }}>
                                       {supArr(sub?.categories).slice(0,3).map((c: any) => { const ci = getCategoryInfo(c); return <span key={c} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.85)' }}>{ci.label||c||''}</span>; })}
                                       {supArr(sub?.mechanisms).slice(0,4).map((m: any) => <span key={m||''} style={{ fontSize:8, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#00e68a' }}>{MECH_TRANSLATIONS_RU[m] || MECH_LABELS[m] || supStr(m).replace(/_/g, ' ')}</span>)}
                                           </div>
                                         </div>
                                         <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
-                                        <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(sub?.id||''); if (idx >= 0) f.splice(idx,1); else f.push(sub?.id||''); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(readSupportStrArr('he_support_favorites').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)') }}>★</button>
+                                        <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(sub?.id||''); if (idx >= 0) f.splice(idx,1); else f.push(sub?.id||''); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(favSet.has(sub?.id||'')?'#fbbf24':'var(--text-dim)') }}>★</button>
                                         <button onClick={e => { e.stopPropagation(); { const arr: any[] = readSupportArr('he_my_substances'); if (!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); writeSupportJSON('he_my_substances', arr); setFavRefresh(p=>p+1); } } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                          <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                        </div>
@@ -376,7 +399,7 @@ export const SupportCatalogView: React.FC<{ s: Record<string, any> }> = ({ s }) 
                                       </div>
                                     </div>
                                     <button onClick={e => { e.stopPropagation(); if (sub?.id && !enhancedSubs.includes(sub.id)) setEnhancedSubs(prev => [...prev, sub.id]); }} style={{ padding:'2px 8px', borderRadius:6, fontSize:9, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', whiteSpace:'nowrap', flexShrink:0 }}>{enhancedSubs.includes(sub?.id||'') ? '✓' : '+ Мой стек'}</button>
-                                    <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(sub?.id||''); if (idx >= 0) f.splice(idx,1); else f.push(sub?.id||''); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(readSupportStrArr('he_support_favorites').includes(sub?.id||'')?'#fbbf24':'var(--text-dim)') }}>★</button>
+                                    <button onClick={e => { e.stopPropagation(); { const f = readSupportStrArr('he_support_favorites'); const idx = f.indexOf(sub?.id||''); if (idx >= 0) f.splice(idx,1); else f.push(sub?.id||''); writeSupportJSON('he_support_favorites', f); setFavRefresh(p=>p+1); } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', background:'transparent', border:'none', color:(favSet.has(sub?.id||'')?'#fbbf24':'var(--text-dim)') }}>★</button>
                                     <button onClick={e => { e.stopPropagation(); { const arr: any[] = readSupportArr('he_my_substances'); if (!arr.find((x:any)=>x.id===sub?.id)) { arr.push({id:sub?.id, name:sub?.name||sub?.id, source:'Каталог', date:new Date().toISOString()}); writeSupportJSON('he_my_substances', arr); setFavRefresh(p=>p+1); } } }} style={{ padding:'2px 6px', borderRadius:6, fontSize:9, cursor:'pointer', background:'transparent', border:'none', color:'var(--text-dim)', whiteSpace:'nowrap', flexShrink:0 }}>💊</button>
                                     <span style={{ fontSize:9, color:'var(--text-dim)', transform:selectedSub === sub?.id ? 'rotate(180deg)' : 'none' }}>▼</span>
                                   </div>
@@ -461,6 +484,22 @@ export const SupportCatalogTab: React.FC<{ s: Record<string, any> }> = ({ s }) =
   } = s;
   // P3: локальный фильтр грейдов (состояние внутри хаба, SupportScreen не тронут)
   const [gradeFilter2, setGradeFilter2] = React.useState<GradeFilter>('all');
+  // Перф: грейды — один раз на каталог (в строке был двойной evidenceGradeExFor).
+  const gradeMap2 = React.useMemo(() => {
+    const m = new Map<string, string>();
+    try {
+      const all: any[] = Array.isArray(catalogSubstances) ? catalogSubstances : [];
+      for (const sub of all) {
+        const id = sub?.id;
+        if (typeof id === 'string' && id && !m.has(id)) m.set(id, evidenceGradeExFor(id));
+      }
+    } catch { /* ignore */ }
+    return m;
+  }, [catalogSubstances]);
+  const gradeOf = (id: unknown): string => {
+    if (typeof id !== 'string' || !id) return 'C';
+    return gradeMap2.get(id) || 'C';
+  };
   const tierGroupsF = React.useMemo(() => filterCatalogGroups((groupedSubstances || []) as any, gradeFilter2), [groupedSubstances, gradeFilter2]);
   return (
     <>
@@ -552,7 +591,7 @@ export const SupportCatalogTab: React.FC<{ s: Record<string, any> }> = ({ s }) =
                         <div key={sub.id}>
                           <div onClick={() => setSelectedSub(selectedSub === sub.id ? null : sub.id)} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '7px 12px 7px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}{' '}<span style={{fontSize:8,padding:'0 3px',borderRadius:3,fontWeight:700,color:TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)',background:(TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)')+'18'}}>{TIER_LABELS[getSubstanceTier(sub.id)]?.label||'Стд'}</span>{' '}<span style={{fontSize:8,padding:'0 3px',borderRadius:3,fontWeight:800,color:(()=>{const g=evidenceGradeExFor(sub.id||'');return g==='A'?'#22c55e':g==='B'?'#f59e0b':g==='D'?'#ef4444':'#fff';})(),background:'rgba(255,255,255,0.06)'}}>{evidenceGradeExFor(sub.id||'')}</span></div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', lineHeight: 1.3 }}>{sub.name||(sub.id||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}{' '}<span style={{fontSize:8,padding:'0 3px',borderRadius:3,fontWeight:700,color:TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)',background:(TIER_LABELS[getSubstanceTier(sub.id)]?.color||'var(--text-dim)')+'18'}}>{TIER_LABELS[getSubstanceTier(sub.id)]?.label||'Стд'}</span>{' '}<span style={{fontSize:8,padding:'0 3px',borderRadius:3,fontWeight:800,color:(()=>{const g=gradeOf(sub.id);return g==='A'?'#22c55e':g==='B'?'#f59e0b':g==='D'?'#ef4444':'#fff';})(),background:'rgba(255,255,255,0.06)'}}>{gradeOf(sub.id)}</span></div>
                               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 2 }}>
                                  {supArr(sub.categories).slice(0, 3).map((c: any) => (
                                    <span key={c} style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{CATEGORY_LABELS[c]?.label || c}</span>
