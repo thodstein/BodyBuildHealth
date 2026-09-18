@@ -336,6 +336,107 @@ export const TA_CORRECTIVES: TACorrectiveExercise[] = [
     { sets: 3, reps: 6, pct: 60, rir: 2, tempo: 'X-0-X-0', restSeconds: 120 },
     ['Рёбра вниз, ягодицы в тонусе', 'Гриф — через лоб, голова под него'],
     'Push press → +вес', 'Жим гантелей сидя', 'Base press'),
+  // ── E4: точечное расширение (split_asym / press / overhead / T-spine) ──
+  P('jerk_split_measure', 'Замер базы ножниц мелом', ['jerk_drive', 'jerk_lockout'],
+    ['split_short', 'split_asym'], ['technique'], 'novice', 'technique',
+    { sets: 3, reps: 3, pct: 50, rir: 3, tempo: 'X-0-X-0', restSeconds: 90 },
+    ['Мелом отметь базу — поровну вперёд/назад', 'Таз и плечи строго под грифом'],
+    'Ножницы с паузой → классика', 'Выпады со штангой над головой', 'QWA split'),
+  P('oh_lunge', 'Выпады со штангой над головой', ['jerk_lockout', 'snatch_overhead'],
+    ['split_asym', 'unstable_overhead'], ['technique', 'mobility'], 'intermediate', 'stability',
+    { sets: 3, reps: 5, pct: 40, rir: 3, tempo: 'X-0-X-0', restSeconds: 120 },
+    ['Шаг поровну — гриф неподвижен', 'Передняя нога назад первой'],
+    'Ножницы с паузой → +вес', 'Выпады с палкой над головой', 'QWA split'),
+  P('split_pause', 'Ножницы с паузой 2 с', ['jerk_lockout'],
+    ['split_short', 'split_asym'], ['technique'], 'intermediate', 'technique',
+    { sets: 3, reps: 3, pct: 60, rir: 2, tempo: 'X-2-X-0', restSeconds: 120 },
+    ['Пауза внизу — проверь базу мелом', 'Фиксация сразу, без дожима'],
+    'Классика с замером базы', 'Push jerk / tall jerk', 'QWA split; Big Bend'),
+  P('pin_press_high', 'Жим с высоких упоров', ['press_start', 'jerk_lockout'],
+    ['pressout', 'weak_extension'], ['strength'], 'advanced', 'strength',
+    { sets: 4, reps: 3, pct: 80, rir: 2, tempo: 'X-1-X-0', restSeconds: 150 },
+    ['С упоров — без инерции, локти под грифом', 'Дожим до жёсткого локаута'],
+    '+вес → перегруз уверенности', 'Жим гантелей', 'QWA press'),
+  P('z_press', 'Z-жим сидя с пола', ['press_start'],
+    ['pressout'], ['strength', 'mobility'], 'intermediate', 'strength',
+    { sets: 3, reps: 6, pct: 50, rir: 2, tempo: 'X-0-X-0', restSeconds: 120 },
+    ['Ноги прямые — только корпус и руки', 'Рёбра вниз, без переразгибания'],
+    'Строгий жим стоя → +вес', 'Жим гантелей сидя', 'Base press'),
+  P('single_arm_press', 'Жим гантели одной рукой стоя', ['press_start', 'jerk_lockout'],
+    ['pressout', 'drive_forward'], ['technique', 'strength'], 'intermediate', 'strength',
+    { sets: 3, reps: 6, pct: 50, rir: 2, tempo: 'X-0-X-0', restSeconds: 90 },
+    ['Корпус квадрат — вторая рука в сторону', 'Дожим строго вверх, без крена'],
+    'Швунг одной → двусторонний жим', 'Жим гантелей сидя', 'Unilateral press'),
+  P('klokov_press', 'Жим Клокова широким хватом', ['press_start', 'snatch_overhead'],
+    ['pressout', 'unstable_overhead'], ['strength'], 'advanced', 'strength',
+    { sets: 3, reps: 5, pct: 55, rir: 2, tempo: 'X-0-X-0', restSeconds: 120 },
+    ['Широкий хват — за головой, не перед', 'Лопатки вместе всю дорогу'],
+    'Швунг-жим рывковым → +вес', 'Жим стоя строгий', 'Overhead strength'),
+  P('heaving_balance', 'Баланс с дожиманием (heaving)', ['snatch_catch', 'snatch_overhead'],
+    ['soft_catch', 'unstable_overhead'], ['technique', 'mobility'], 'intermediate', 'stability',
+    { sets: 3, reps: 3, pct: 55, rir: 2, tempo: 'X-0-X-0', restSeconds: 120 },
+    ['Ноги дожимают из седа — руки пробивают вверх', 'Приём активный, не падение'],
+    'Snatch balance → классика', 'Drop-рывок лёгкий', 'Burgener skill transfer'),
+  P('snatch_push_press', 'Швунг-жим рывковым хватом', ['snatch_overhead', 'jerk_drive'],
+    ['pressout', 'weak_extension'], ['strength'], 'intermediate', 'strength',
+    { sets: 4, reps: 5, pct: 65, rir: 2, tempo: 'X-0-X-0', restSeconds: 120 },
+    ['Dip мелкий — драйв резкий, дожим без ножниц', 'Гриф над шеей'],
+    'Push press → behind-neck jerk', 'Строгий жим рывковым', 'QWA drive'),
+  P('jerk_support', 'Удержание толчка в ножницах 5 с', ['jerk_lockout'],
+    ['unstable_overhead', 'pressout'], ['strength', 'mobility'], 'intermediate', 'stability',
+    { sets: 3, reps: 1, pct: 85, rir: 3, tempo: 'X-5-X-0', restSeconds: 150 },
+    ['5 секунд — изометрия, гриф неподвижен', 'Шаги короткие при сходе'],
+    'Jerk recovery с шагами → +вес', 'Ножницы с палкой', 'Overload stability'),
+  P('tspine_ext', 'Разгибание грудного на валике + палка', ['snatch_overhead', 'clean_catch'],
+    ['unstable_overhead', 'chest_collapse'], ['mobility'], 'all', 'stability',
+    { sets: 3, reps: 8, pct: 20, rir: 3, tempo: 'X-2-X-0', restSeconds: 60 },
+    ['Валик под лопатками — руки над головой', 'Рёбра вниз, поясница не участвует'],
+    'Оверхед-присед с палкой → со штангой', 'Кошка-верблюд', 'T-spine mobility'),
+  P('dead_bug_oh', 'Dead bug с палкой над головой', ['snatch_overhead', 'jerk_lockout'],
+    ['unstable_overhead'], ['mobility'], 'all', 'stability',
+    { sets: 3, reps: 8, pct: 20, rir: 3, tempo: 'X-2-X-0', restSeconds: 60 },
+    ['Поясница прижата — палка неподвижна', 'Выдох на опускании ноги'],
+    'Паллоф-удержание → оверхед-присед', 'Дыхание 90/90', 'Core stability'),
+  P('pallof_hold', 'Паллоф-удержание 20 с/сторона', ['jerk_lockout', 'snatch_mid'],
+    ['drive_forward', 'bar_forward'], ['mobility'], 'all', 'stability',
+    { sets: 3, reps: 2, pct: 20, rir: 3, tempo: 'X-5-X-0', restSeconds: 60 },
+    ['Трос тянет вбок — корпус квадрат', 'Таз под грифом, не уведён'],
+    'Антиротация в сплите → классика', 'Dead bug', 'Core anti-rotation'),
+  P('clean_shrug', 'Шраги толчковые 110%', ['clean_mid', 'pull_lockout'],
+    ['weak_extension'], ['strength'], 'intermediate', 'strength',
+    { sets: 4, reps: 4, pct: 105, rir: 2, tempo: 'X-0-X-0', restSeconds: 150 },
+    ['После полного выпрямления — плечи к ушам', 'Руки прямые, не сгибать'],
+    'Толчковая тяга → +5%', 'Шраги со штангой', 'QWA pulls'),
+  P('hang_clean_knee', 'Взятие с виса от колена', ['clean_mid'],
+    ['slow_turnover', 'knee_touch', 'bar_forward'], ['technique'], 'novice', 'technique',
+    { sets: 5, reps: 3, pct: 60, rir: 3, tempo: 'X-0-X-0', restSeconds: 90 },
+    ['Скучный тазом — гриф скользит по бёдрам', 'Локти — выстрел вверх и вокруг'],
+    'Hang с бедра → классика', 'Tall clean', 'QWA scoop ±5 см'),
+  P('snatch_deadlift', 'Рывковая становая до колен 105%', ['snatch_off_floor'],
+    ['hips_rise', 'early_pull'], ['strength'], 'advanced', 'strength',
+    { sets: 4, reps: 4, pct: 100, rir: 2, tempo: 'X-0-X-0', restSeconds: 150 },
+    ['Спина — один угол до колен, ноги жмут', 'Гриф на голенях, не вокруг'],
+    'Дефицит → классика легче', 'RDL рывковым хватом', 'QWA start'),
+  P('hip_snatch', 'Рывок от бедра (без замаха)', ['snatch_mid'],
+    ['bar_forward', 'weak_extension'], ['technique'], 'intermediate', 'technique',
+    { sets: 4, reps: 3, pct: 65, rir: 2, tempo: 'X-0-X-0', restSeconds: 120 },
+    ['Старт с бедра — только вертикальный финиш', 'Локти вверх сразу'],
+    'High-hang → классика', 'Dip-рывок', 'Torokhtiy contact'),
+  P('clean_segment', 'Сегментное взятие (пол–колено–взрыв)', ['clean_off_floor'],
+    ['early_pull', 'bar_forward'], ['technique'], 'intermediate', 'technique',
+    { sets: 3, reps: 3, pct: 65, rir: 2, tempo: 'X-1-X-0', restSeconds: 120 },
+    ['Каждый сегмент — стоп 1 с', 'Колени под грифом после срыва'],
+    'Тяга с паузой → классика', 'Lift-off взятия', 'Everett segment'),
+  P('push_jerk_pause', 'Швунг толчковый с паузой в полуседе', ['jerk_drive'],
+    ['pressout', 'split_short'], ['technique'], 'intermediate', 'technique',
+    { sets: 3, reps: 3, pct: 65, rir: 2, tempo: 'X-2-X-0', restSeconds: 120 },
+    ['Пауза в полуседе — затем резкий панч вниз', 'Голова под гриф'],
+    'Split jerk → классика', 'Tall jerk', 'QWA; Big Bend'),
+  P('front_rack_hold', 'Удержание фронта 8 с 110%', ['clean_catch'],
+    ['chest_collapse', 'soft_catch'], ['strength', 'mobility'], 'intermediate', 'strength',
+    { sets: 3, reps: 1, pct: 90, rir: 3, tempo: 'X-5-X-0', restSeconds: 120 },
+    ['Локти выше — грудь вверх 8 секунд', 'Гриф на плечах, не на запястьях'],
+    'Фронт-присед с паузой → +5%', 'Гоблет-присед', 'Torokhtiy rack'),
 ];
 
 /** Индекс фаза → упражнения (производный, стабильный порядок каталога). */
@@ -356,6 +457,13 @@ export interface CorrectiveRankOpts {
   limit?: number;
   /** Ограничения подвижности (ankle/shoulder/hip/lower_back): спросовые упражнения деприоритизируются. */
   mobilityRestrictions?: string[];
+  /** E1: оборудование зала (barbell/dumbbell/machine/cable/bodyweight/blocks/band/grip_tool);
+   *  пусто = весь каталог (байт-в-байт со старым поведением). */
+  equipment?: string[];
+  /** E1: чувствительность к усталости (причина fatigue или ACWR danger) — дорогие топятся. */
+  fatigueSensitive?: boolean;
+  /** E5: фаза сезона (prep/comp); comp — силовые пики топятся, доза −5%. */
+  seasonPhase?: 'prep' | 'comp' | null;
 }
 
 /**
@@ -371,13 +479,14 @@ export const MOBILITY_DEMAND: Record<'ankle' | 'overhead' | 'hip', readonly stri
     'front_squat', 'front_squat_clean_grip', 'overhead_squat_v2', 'tempo_squat',
     'back_squat', 'hack_squat', 'tall_snatch', 'tall_clean', 'drop_snatch',
     'snatch_balance', 'jerk_dip', 'double_pause_jerk',
+    'snatch_deadlift', 'push_jerk_pause',
   ],
   overhead: [
     'overhead_squat_v2', 'snatch_balance', 'behind_neck_jerk', 'push_press', 'push_jerk',
     'muscle_snatch', 'jerk_recovery', 'tall_snatch', 'tall_jerk', 'drop_snatch',
     'power_snatch', 'sots_press', 'overhead_hold', 'split_jerk',
   ],
-  hip: ['deficit_snatch', 'deficit_clean', 'deficit_pull', 'deadlift'],
+  hip: ['deficit_snatch', 'deficit_clean', 'deficit_pull', 'deadlift', 'snatch_deadlift'],
 };
 
 function mobilityPenalty(id: string, mob: Set<string>): number {
@@ -388,14 +497,174 @@ function mobilityPenalty(id: string, mob: Set<string>): number {
   return p;
 }
 
+/**
+ * E1: мета оборудования/цены усталости (паритет ta-correction-rank: fatigueCost + equipment).
+ * Отдельная таблица (не поля записей) — 47 существующих P()-строк не тронуты.
+ * needsBlocks: нужны стойки/плинты (штраф −12 без 'blocks', не исключение — честно);
+ * nonBarbell: не штанга (гантель/свой вес — не лезет в штанговую инъекцию как штанга).
+ */
+export interface CorrectiveMeta {
+  equipment: string;
+  fatigueCost: number;
+  needsBlocks?: boolean;
+  nonBarbell?: boolean;
+}
+
+const CORRECTIVE_META: Record<string, CorrectiveMeta> = {
+  deficit_snatch: { equipment: 'barbell', fatigueCost: 7 },
+  pause_snatch: { equipment: 'barbell', fatigueCost: 7 },
+  segment_snatch: { equipment: 'barbell', fatigueCost: 6 },
+  slow_pull_snatch: { equipment: 'barbell', fatigueCost: 5 },
+  snatch_liftoff: { equipment: 'barbell', fatigueCost: 5 },
+  snatch_pull: { equipment: 'barbell', fatigueCost: 8 },
+  snatch_high_pull: { equipment: 'barbell', fatigueCost: 6 },
+  block_snatch: { equipment: 'barbell', fatigueCost: 6, needsBlocks: true },
+  high_hang_snatch: { equipment: 'barbell', fatigueCost: 5 },
+  tall_snatch: { equipment: 'barbell', fatigueCost: 4 },
+  muscle_snatch: { equipment: 'barbell', fatigueCost: 5 },
+  power_snatch: { equipment: 'barbell', fatigueCost: 6 },
+  drop_snatch: { equipment: 'barbell', fatigueCost: 4 },
+  snatch_balance: { equipment: 'barbell', fatigueCost: 6 },
+  overhead_squat_v2: { equipment: 'barbell', fatigueCost: 6 },
+  sots_press: { equipment: 'barbell', fatigueCost: 5 },
+  overhead_hold: { equipment: 'barbell', fatigueCost: 3 },
+  nofeet_snatch: { equipment: 'barbell', fatigueCost: 5 },
+  dip_snatch: { equipment: 'barbell', fatigueCost: 5 },
+  deficit_clean: { equipment: 'barbell', fatigueCost: 7 },
+  pause_clean: { equipment: 'barbell', fatigueCost: 7 },
+  block_clean: { equipment: 'barbell', fatigueCost: 6, needsBlocks: true },
+  high_hang_clean: { equipment: 'barbell', fatigueCost: 5 },
+  tall_clean: { equipment: 'barbell', fatigueCost: 4 },
+  muscle_clean: { equipment: 'barbell', fatigueCost: 5 },
+  clean_pull: { equipment: 'barbell', fatigueCost: 8 },
+  front_squat: { equipment: 'barbell', fatigueCost: 7 },
+  front_squat_clean_grip: { equipment: 'barbell', fatigueCost: 6 },
+  jerk_dip: { equipment: 'barbell', fatigueCost: 5 },
+  double_pause_jerk: { equipment: 'barbell', fatigueCost: 6 },
+  pause_jerk: { equipment: 'barbell', fatigueCost: 6 },
+  jerk_balance: { equipment: 'barbell', fatigueCost: 5 },
+  behind_neck_jerk: { equipment: 'barbell', fatigueCost: 7 },
+  tall_jerk: { equipment: 'barbell', fatigueCost: 4 },
+  push_press: { equipment: 'barbell', fatigueCost: 6 },
+  push_jerk: { equipment: 'barbell', fatigueCost: 6 },
+  split_jerk: { equipment: 'barbell', fatigueCost: 6 },
+  jerk_recovery: { equipment: 'barbell', fatigueCost: 5 },
+  pause_squat: { equipment: 'barbell', fatigueCost: 7 },
+  back_squat: { equipment: 'barbell', fatigueCost: 8 },
+  hack_squat: { equipment: 'machine', fatigueCost: 6 },
+  tempo_squat: { equipment: 'barbell', fatigueCost: 6 },
+  deficit_pull: { equipment: 'barbell', fatigueCost: 8 },
+  deadlift: { equipment: 'barbell', fatigueCost: 8 },
+  pause_pull: { equipment: 'barbell', fatigueCost: 7 },
+  rdl: { equipment: 'barbell', fatigueCost: 5 },
+  pin_press: { equipment: 'barbell', fatigueCost: 6 },
+  ohp: { equipment: 'barbell', fatigueCost: 5 },
+  // E4: новые (гантель/свой вес помечены честно для E1-фильтра)
+  jerk_split_measure: { equipment: 'bodyweight', fatigueCost: 2 },
+  oh_lunge: { equipment: 'barbell', fatigueCost: 5 },
+  split_pause: { equipment: 'barbell', fatigueCost: 5 },
+  pin_press_high: { equipment: 'barbell', fatigueCost: 6 },
+  z_press: { equipment: 'barbell', fatigueCost: 5 },
+  single_arm_press: { equipment: 'dumbbell', fatigueCost: 4, nonBarbell: true },
+  klokov_press: { equipment: 'barbell', fatigueCost: 6 },
+  heaving_balance: { equipment: 'barbell', fatigueCost: 5 },
+  snatch_push_press: { equipment: 'barbell', fatigueCost: 6 },
+  jerk_support: { equipment: 'barbell', fatigueCost: 4 },
+  tspine_ext: { equipment: 'bodyweight', fatigueCost: 2, nonBarbell: true },
+  dead_bug_oh: { equipment: 'bodyweight', fatigueCost: 2, nonBarbell: true },
+  pallof_hold: { equipment: 'bodyweight', fatigueCost: 2, nonBarbell: true },
+  clean_shrug: { equipment: 'barbell', fatigueCost: 6 },
+  hang_clean_knee: { equipment: 'barbell', fatigueCost: 5 },
+  snatch_deadlift: { equipment: 'barbell', fatigueCost: 7 },
+  hip_snatch: { equipment: 'barbell', fatigueCost: 5 },
+  clean_segment: { equipment: 'barbell', fatigueCost: 6 },
+  push_jerk_pause: { equipment: 'barbell', fatigueCost: 5 },
+  front_rack_hold: { equipment: 'barbell', fatigueCost: 4 },
+};
+
+/** Мета упражнения (дефолт barbell/6 — как у ранжира при отсутствии каталога). */
+export function correctiveMetaOf(id: string): CorrectiveMeta {
+  try {
+    return CORRECTIVE_META[String(id || '').toLowerCase()] || { equipment: 'barbell', fatigueCost: 6 };
+  } catch { return { equipment: 'barbell', fatigueCost: 6 }; }
+}
+
+/**
+ * E5: «как НЕ делать» (Everett: плохо выполненное упражнение закрепляет ошибку).
+ * 1 строка на ключевое упражнение; отсутствие = общий принцип «легче, но правильно».
+ */
+const CORRECTIVE_HOW_NOT: Record<string, string> = {
+  tall_snatch: 'Не сгибать колени на старте — иначе это dip-рывок, а не tall',
+  muscle_snatch: 'Не ронять локти вниз в финале — иначе жим широким, а не протяж',
+  nofeet_snatch: 'Не отрывать стопы — иначе теряется смысл вертикального драйва',
+  segment_snatch: 'Не проскакивать сегменты без стопа — иначе обычная тяга',
+  slow_pull_snatch: 'Не взрывать до колена — иначе чинишь не то',
+  snatch_balance: 'Не ловить мягко — приём активный, руки пробивают',
+  drop_snatch: 'Не дожимать ногами вверх — только скорость вниз',
+  jerk_dip: 'Не на носках и не глубоко — вся стопа, 8–12 см, резкий стоп',
+  split_jerk: 'Не короткие ножницы — таз под грифом, база мелом',
+  tall_jerk: 'Не толкать ногами слабо — панч сильнее драйва',
+  pause_snatch: 'Не качать на паузе — замри, затем взрыв',
+  snatch_pull: 'Не опрокидываться назад — финиш вертикально',
+  deficit_snatch: 'Не круглить спину на дефиците — угол держит всё',
+  overhead_squat_v2: 'Не вставать раньше стабилизации — сначала уверенность внизу',
+  front_squat: 'Не ронять локти — иначе штанга на запястьях',
+  power_snatch: 'Не ловить жёстко сверху — встречай напряжением в полуседе',
+  clean_segment: 'Не тянуть руками на сегментах — ноги и паузы',
+  hip_snatch: 'Не замахиваться с пола — старт строго с бедра',
+  jerk_split_measure: 'Не шагать наугад — сначала мел, потом вес',
+};
+
+/** Строка «как НЕ делать» (null — нет специфики, действует общий принцип). */
+export function correctiveHowNot(id: string): string | null {
+  try {
+    return CORRECTIVE_HOW_NOT[String(id || '').toLowerCase()] || null;
+  } catch { return null; }
+}
+
+/**
+ * E5: якорь дозы в кг (оценка рабочего веса через токен движения × pct;
+ * токен-карта — паритет estimateCorrBasePm симулятора, без импорта — без цикла).
+ */
+export function estimateCorrectiveKg(
+  corrId: string, pct: number, wm: { snatch?: number; cleanJerk?: number; clean?: number; backSquat?: number; deadlift?: number } | null | undefined,
+): number | null {
+  try {
+    if (!wm) return null;
+    const low = String(corrId || '').toLowerCase();
+    let base = 0;
+    if (low.includes('snatch')) base = wm.snatch || 60;
+    else if (low.includes('clean') || low.includes('jerk') || low.includes('press')) base = (wm as any).cleanJerk || wm.clean || 80;
+    else if (low.includes('squat') || low.includes('overhead')) base = wm.backSquat || 100;
+    else if (low.includes('pull') || low.includes('deficit') || low.includes('deadlift') || low.includes('rdl')) base = wm.deadlift || 120;
+    else base = wm.backSquat || 80;
+    const p = Number(pct);
+    if (!Number.isFinite(p) || p <= 0) return null;
+    return Math.round(((base * p) / 100) / 2.5) * 2.5;
+  } catch { return null; }
+}
+
+/** E5: лесенка регрессии шагами (разбивка строки по '→'; всегда ≥1 шаг). */
+export function regressionSteps(id: string): string[] {
+  try {
+    const ex = TA_CORRECTIVES.find((e) => e.id.toLowerCase() === String(id || '').toLowerCase());
+    const raw = ex?.regression || '';
+    return raw.split('→').map((s) => s.trim()).filter(Boolean);
+  } catch { return []; }
+}
+
 /** Доза под причину-лимитер (паритет с ta-correction-rank: volume 4×5, strength 4×4+5%, mobility/fatigue −5%). */
 export function adjustProtocolForCause(
-  base: TACorrectiveProtocol, cause?: TAWeakCause | null,
+  base: TACorrectiveProtocol, cause?: TAWeakCause | null, seasonPhase?: 'prep' | 'comp' | null,
 ): TACorrectiveProtocol {
-  if (cause === 'volume') return { ...base, sets: 4, reps: 5 };
-  if (cause === 'strength') return { ...base, sets: 4, reps: 4, pct: Math.min(110, base.pct + 5) };
-  if (cause === 'mobility' || cause === 'fatigue') return { ...base, pct: Math.max(40, base.pct - 5), rir: Math.max(base.rir, 2) };
-  return { ...base };
+  let out: TACorrectiveProtocol;
+  if (cause === 'volume') out = { ...base, sets: 4, reps: 5 };
+  else if (cause === 'strength') out = { ...base, sets: 4, reps: 4, pct: Math.min(110, base.pct + 5) };
+  else if (cause === 'mobility' || cause === 'fatigue') out = { ...base, pct: Math.max(40, base.pct - 5), rir: Math.max(base.rir, 2) };
+  else out = { ...base };
+  // E5: comp-фаза — силовые пики щадятся (−5% поверх причины, пол 40%).
+  if (seasonPhase === 'comp') out = { ...out, pct: Math.max(40, out.pct - 5) };
+  return out;
 }
 
 function levelRank(level: TACorrectiveLevel): number {
@@ -416,6 +685,9 @@ export function correctivesForWeakPoint(wp: WLWeakPoint, opts: CorrectiveRankOpt
   const lv = String(opts.level || 'intermediate').toLowerCase();
   const athleteRank = lv.includes('begin') || lv.includes('novice') ? 1 : lv.includes('adv') || lv.includes('enh') || lv.includes('elite') ? 3 : 2;
   const mob = new Set((opts.mobilityRestrictions || []).map((s) => String(s).toLowerCase()));
+  const eqFilter = (opts.equipment || []).map((s) => String(s).toLowerCase()).filter(Boolean);
+  const fatigueOn = opts.fatigueSensitive || cause === 'fatigue';
+  const season = opts.seasonPhase ?? null;
   const scored = list.map((ex) => {
     let score = 50;
     if (cause && (ex.causes as string[]).includes(cause)) { score += 20; }
@@ -423,12 +695,28 @@ export function correctivesForWeakPoint(wp: WLWeakPoint, opts: CorrectiveRankOpt
     if (levelRank(ex.level) > athleteRank) score -= 15;
     if (levelRank(ex.level) <= athleteRank) score += 5;
     score += mobilityPenalty(ex.id, mob);
-    const protocolAdj = adjustProtocolForCause(ex.protocol, cause);
+    // E1: оборудование (паритет ta-correction-rank: mismatch → исключение, bodyweight/universal — всегда).
+    const meta = correctiveMetaOf(ex.id);
+    if (eqFilter.length > 0) {
+      const need = String(meta.equipment || 'barbell').toLowerCase();
+      if (need !== 'bodyweight' && need !== 'universal' && !eqFilter.includes(need)) {
+        return null;
+      }
+      if (meta.needsBlocks && !eqFilter.includes('blocks')) score -= 12;
+    }
+    // E1: цена усталости (fatigue-причина или явная чувствительность).
+    if (fatigueOn) {
+      if (meta.fatigueCost >= 7) score -= 10;
+      else if (meta.fatigueCost <= 5) score += 5;
+    }
+    // E5: comp-фаза — силовые пики топятся (техника/праймеры первыми).
+    if (season === 'comp' && ex.phase === 'strength') score -= 10;
+    const protocolAdj = adjustProtocolForCause(ex.protocol, cause, season);
     const matchReason = cause && (ex.causes as string[]).includes(cause)
       ? `причина ${cause} — прямое попадание`
       : ex.phase === 'technique' ? 'база техники фазы' : ex.phase === 'strength' ? 'сила фазы' : 'стабильность приёма';
     return { ...ex, protocolAdj, matchReason, __s: score } as TACorrectivePick & { __s: number };
-  });
+  }).filter((s): s is TACorrectivePick & { __s: number } => s !== null);
   scored.sort((a, b) => (b as any).__s - (a as any).__s);
   const limit = opts.limit && opts.limit > 0 ? Math.min(opts.limit, scored.length) : Math.min(5, scored.length);
   return scored.slice(0, limit).map((s) => { const { __s: _drop, ...rest } = s as any; return rest as TACorrectivePick; });
@@ -450,13 +738,13 @@ export interface TACorrectiveSessionStep {
  */
 export function correctiveSessionFor(
   weakPoints: WLWeakPoint[], causeByWeak: Record<string, TAWeakCause | null> = {},
-  opts: { level?: string | null; mobilityRestrictions?: string[] } = {},
+  opts: { level?: string | null; mobilityRestrictions?: string[]; equipment?: string[]; fatigueSensitive?: boolean; seasonPhase?: 'prep' | 'comp' | null } = {},
 ): TACorrectiveSessionStep[] {
   const uniq = [...new Set(weakPoints)].slice(0, 3);
   const picks: Array<{ ex: TACorrectivePick; wp: WLWeakPoint }> = [];
   for (const wp of uniq) {
     const cause = causeByWeak[wp] ?? null;
-    const list = correctivesForWeakPoint(wp, { cause, level: opts.level ?? null, mobilityRestrictions: opts.mobilityRestrictions, limit: 3 });
+    const list = correctivesForWeakPoint(wp, { cause, level: opts.level ?? null, mobilityRestrictions: opts.mobilityRestrictions, equipment: opts.equipment, fatigueSensitive: opts.fatigueSensitive, seasonPhase: opts.seasonPhase ?? null, limit: 3 });
     // 1 техника + 1 сила/стабильность на фазу (не дублируем id внутри сессии)
     const tech = list.find((c) => c.phase === 'technique') || list[0];
     const second = list.find((c) => c.id !== tech?.id && c.phase !== 'technique') || list[1];
@@ -519,25 +807,100 @@ export function correctiveById(id: string): TACorrectiveExercise | null {
   } catch { return null; }
 }
 
+export type BarSeverity = 'warn' | 'critical';
+
 export interface BarTagsResult {
   tags: TACorrectiveErrorTag[];
   text: string | null;
+  /** E2: тяжесть отклонения (warn 4–6 см / critical >6 см). */
+  severity?: BarSeverity | null;
 }
 
 /**
  * Замер → теги ошибок (пороги SRD хаба: turnover >4 см, catch >6 см).
  * Пусто/норма (≤4) — молчит (не диагноз по шуму).
+ * E2: тиры тяжести — 4–6 warn (только bar_forward/drive_forward),
+ * >6 critical (+bar_crash/split_short), >10 — ещё и нестабильность приёма.
  */
 export function tagsForBarMetrics(xLoopCm: number | null | undefined, lift: string): BarTagsResult {
   const x = typeof xLoopCm === 'number' ? xLoopCm : NaN;
-  if (!Number.isFinite(x) || x <= 4) return { tags: [], text: null };
+  if (!Number.isFinite(x) || x <= 4) return { tags: [], text: null, severity: null };
+  const severity: BarSeverity = x > 6 ? 'critical' : 'warn';
   const isJerk = String(lift || '').toLowerCase().includes('jerk');
   if (isJerk) {
     const tags: TACorrectiveErrorTag[] = x > 6 ? ['drive_forward', 'split_short'] : ['drive_forward'];
-    return { tags, text: `Горизонталь ${x} см — драйв уходит вперёд` };
+    if (x > 10) tags.push('unstable_overhead');
+    return { tags, text: `Горизонталь ${x} см — драйв уходит вперёд`, severity };
   }
   const tags: TACorrectiveErrorTag[] = x > 6 ? ['bar_forward', 'bar_crash'] : ['bar_forward'];
-  return { tags, text: `Петля ${x} см (>SRD) — гриф уходит вперёд` };
+  if (x > 10) tags.push('unstable_overhead');
+  return { tags, text: `Петля ${x} см (>SRD) — гриф уходит вперёд`, severity };
+}
+
+/**
+ * E2: VBT-просадка → теги (пороги ТА 10/20 из ta-weak-cause):
+ * ≥20% critical (медленный уход + слабый финал), 10–20% warn (медленный уход).
+ */
+export function tagsForVelocityLoss(lossPct: number | null | undefined, lift?: string): BarTagsResult {
+  const x = typeof lossPct === 'number' ? lossPct : NaN;
+  if (!Number.isFinite(x) || x < 10) return { tags: [], text: null, severity: null };
+  const isJerk = String(lift || '').toLowerCase().includes('jerk');
+  if (x >= 20) {
+    const tags: TACorrectiveErrorTag[] = isJerk ? ['slow_turnover', 'drive_forward'] : ['slow_turnover', 'weak_extension'];
+    return { tags, text: `VBT −${x}% — скорость упала критично`, severity: 'critical' };
+  }
+  return { tags: ['slow_turnover'], text: `VBT −${x}% — уход замедляется`, severity: 'warn' };
+}
+
+/**
+ * E2: мобильность → теги. OHS-провалы ≥2 на чувствительной фазе или
+ * knee-to-wall <9 см (отрыв/тяга) дают точечные теги вместо общего «мобильность».
+ */
+export function tagsForMobility(
+  ohsFailed: number | null | undefined, kneeToWallCm: number | null | undefined, lift: string,
+): BarTagsResult {
+  const l = String(lift || '').toLowerCase();
+  const ohs = typeof ohsFailed === 'number' ? ohsFailed : 0;
+  const ktw = typeof kneeToWallCm === 'number' ? kneeToWallCm : NaN;
+  const isOverhead = /snatch|clean.*catch|overhead|catch/.test(l);
+  const isDip = /jerk|dip/.test(l);
+  const isPull = /pull|floor|deadlift|start|snatch|clean/.test(l);
+  if (ohs >= 2 && (isOverhead || isDip)) {
+    const tags: TACorrectiveErrorTag[] = isDip ? ['dip_forward', 'soft_catch'] : ['soft_catch', 'unstable_overhead'];
+    return { tags, text: `OHS ${ohs}/6 — приём/подсед нестабильны`, severity: ohs >= 4 ? 'critical' : 'warn' };
+  }
+  if (Number.isFinite(ktw) && ktw < 9 && isPull) {
+    return { tags: ['hips_rise', 'early_pull'], text: `Knee-to-wall ${ktw} см — голеностоп тянет таз вверх`, severity: 'warn' };
+  }
+  return { tags: [], text: null, severity: null };
+}
+
+/**
+ * E2: порядок коррекции (Everett first-and-worst: самое раннее и грубое — первым).
+ * Ранг фазы: отрыв 0 → середина 1 → уход 2 → приём 3 → оверхед/замок 4 → база 5.
+ * severityByWeak: 0–3 (0 — нет данных; critical/bar_crash/VBT≥20 — 3).
+ */
+export const WEAK_PHASE_ORDER: Record<string, number> = {
+  snatch_off_floor: 0, clean_off_floor: 0, pull_start: 0,
+  snatch_mid: 1, clean_mid: 1,
+  snatch_pull_under: 2,
+  snatch_catch: 3, clean_catch: 3, jerk_dip: 3, squat_bottom: 3,
+  snatch_overhead: 4, jerk_drive: 4, jerk_lockout: 4,
+  squat_mid: 5, pull_lockout: 5, press_start: 5,
+};
+
+export function correctionOrderFor(
+  weakPoints: WLWeakPoint[], severityByWeak: Record<string, number> = {},
+): WLWeakPoint[] {
+  const uniq = [...new Set(weakPoints)];
+  return uniq.sort((a, b) => {
+    const oa = WEAK_PHASE_ORDER[a] ?? 9;
+    const ob = WEAK_PHASE_ORDER[b] ?? 9;
+    if (oa !== ob) return oa - ob;
+    const sa = severityByWeak[a] ?? 0;
+    const sb = severityByWeak[b] ?? 0;
+    return sb - sa;
+  });
 }
 
 /**
@@ -547,10 +910,11 @@ export function tagsForBarMetrics(xLoopCm: number | null | undefined, lift: stri
 export function protocolForPreferred(
   wp: WLWeakPoint, prefId: string | null | undefined,
   cause?: TAWeakCause | null, level?: string | null, mobilityRestrictions?: string[],
+  extra?: { equipment?: string[]; fatigueSensitive?: boolean; seasonPhase?: 'prep' | 'comp' | null },
 ): TACorrectiveProtocol | null {
   try {
     if (!prefId) return null;
-    const pick = correctivesForWeakPoint(wp, { cause: cause ?? null, level: level ?? null, mobilityRestrictions, limit: 5 })
+    const pick = correctivesForWeakPoint(wp, { cause: cause ?? null, level: level ?? null, mobilityRestrictions, equipment: extra?.equipment, fatigueSensitive: extra?.fatigueSensitive, seasonPhase: extra?.seasonPhase ?? null, limit: 5 })
       .find((c) => c.id === prefId);
     return pick ? { ...pick.protocolAdj } : null;
   } catch { return null; }
@@ -559,9 +923,10 @@ export function protocolForPreferred(
 /** Обогащённые строки экспорта фазы: имя + доза + кью + источник. */
 export function correctiveExportLines(
   wp: WLWeakPoint, cause?: TAWeakCause | null, level?: string | null, mobilityRestrictions?: string[],
+  extra?: { equipment?: string[]; fatigueSensitive?: boolean; seasonPhase?: 'prep' | 'comp' | null },
 ): string[] {
   try {
-    return correctivesForWeakPoint(wp, { cause: cause ?? null, level: level ?? null, mobilityRestrictions, limit: 3 })
+    return correctivesForWeakPoint(wp, { cause: cause ?? null, level: level ?? null, mobilityRestrictions, equipment: extra?.equipment, fatigueSensitive: extra?.fatigueSensitive, seasonPhase: extra?.seasonPhase ?? null, limit: 3 })
       .map((c) => `${c.nameRu} — ${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}% · ${c.cues[0] || ''} · ${c.source}`);
   } catch { return []; }
 }
@@ -569,7 +934,7 @@ export function correctiveExportLines(
 /** Волна corrective-блока 4–8 нед (паритет ta-spec-block: 3,3,4,4,4,4,3,3). */
 export function correctiveBlockFor(
   weakPoints: WLWeakPoint[], weeks = 6,
-  opts: { causeByWeak?: Record<string, TAWeakCause | null>; level?: string | null; mobilityRestrictions?: string[] } = {},
+  opts: { causeByWeak?: Record<string, TAWeakCause | null>; level?: string | null; mobilityRestrictions?: string[]; equipment?: string[]; fatigueSensitive?: boolean; seasonPhase?: 'prep' | 'comp' | null } = {},
 ): TACorrectiveWeek[] {
   const uniq = [...new Set(weakPoints)].slice(0, 3) as WLWeakPoint[];
   const total = Math.max(4, Math.min(8, Math.round(weeks) || 6));
@@ -583,6 +948,9 @@ export function correctiveBlockFor(
         cause: opts.causeByWeak?.[wp] ?? null,
         level: opts.level ?? null,
         mobilityRestrictions: opts.mobilityRestrictions,
+        equipment: opts.equipment,
+        fatigueSensitive: opts.fatigueSensitive,
+        seasonPhase: opts.seasonPhase ?? null,
         limit: 2,
       });
       // C12: pct — от скорректированного протокола (причина уже учтена),
@@ -592,4 +960,139 @@ export function correctiveBlockFor(
     out.push({ week: wi + 1, focus: focusFor(wi), items });
   }
   return out;
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * E3: КОМПЛЕКСЫ + ПРАЙМЕРЫ (метод Everett: чинить комплексами и разминкой,
+ * а не раздуванием объёма; Burgener warm-up + skill transfer).
+ * Комплекс = связка «упражнение-носитель + классика» одной строкой плана:
+ * в инъекцию идёт injectId (реальный id библиотеки), объём не растёт.
+ * ════════════════════════════════════════════════════════════════ */
+
+export interface TACorrectiveComplex {
+  id: string;
+  nameRu: string;
+  /** Связка (читается слева направо: носитель + классика). */
+  parts: string[];
+  /** Реальный id библиотеки для инъекции/веса. */
+  injectId: string;
+  targets: WLWeakPoint[];
+  errors: TACorrectiveErrorTag[];
+  causes: TAWeakCause[];
+  level: TACorrectiveLevel;
+  protocol: TACorrectiveProtocol;
+  cue: string;
+  source: string;
+}
+
+const CX = (
+  id: string, nameRu: string, parts: string[], injectId: string,
+  targets: WLWeakPoint[], errors: TACorrectiveErrorTag[], causes: TAWeakCause[],
+  level: TACorrectiveLevel, protocol: TACorrectiveProtocol, cue: string, source: string,
+): TACorrectiveComplex => ({ id, nameRu, parts, injectId, targets, errors, causes, level, protocol, cue, source });
+
+/** 12 комплексов: носитель чинит кусок, классика переносит (Everett complexes). */
+export const TA_CORRECTIVE_COMPLEXES: TACorrectiveComplex[] = [
+  CX('cx_snatch_pull_plus_snatch', 'Рывковая тяга + рывок', ['Рывковая тяга 110%', 'Рывок 85%'], 'snatch_pull',
+    ['snatch_off_floor', 'snatch_mid'], ['early_pull', 'hips_rise'], ['technique', 'strength'], 'intermediate',
+    { sets: 3, reps: 3, pct: 80, rir: 2, tempo: 'X-0-X-0', restSeconds: 150 },
+    'Тяга задаёт позицию — рывок её повторяет', 'Everett complexes'),
+  CX('cx_halting_deadlift_plus_snatch', 'Halting-тяга + рывок', ['Halting deadlift до колена', 'Рывок'], 'snatch_liftoff',
+    ['snatch_off_floor'], ['early_pull', 'bar_forward'], ['technique'], 'intermediate',
+    { sets: 3, reps: 3, pct: 75, rir: 2, tempo: 'X-1-X-0', restSeconds: 150 },
+    'Пауза у колена — затем тот же старт в рывке', 'Everett halting + lift'),
+  CX('cx_segment_snatch_top_down', 'Сегментный рывок сверху вниз', ['С колена', 'С пола + колено', 'Классика'], 'segment_snatch',
+    ['snatch_mid'], ['early_pull', 'bar_forward'], ['technique'], 'intermediate',
+    { sets: 3, reps: 3, pct: 70, rir: 2, tempo: 'X-1-X-0', restSeconds: 150 },
+    'Сверху вниз: позиция чище с каждым шагом', 'Everett segment'),
+  CX('cx_highpull_plus_snatch', 'High-pull + рывок', ['Рывковый high-pull', 'Рывок'], 'snatch_high_pull',
+    ['snatch_mid', 'snatch_pull_under'], ['bar_forward', 'slow_turnover'], ['technique'], 'intermediate',
+    { sets: 3, reps: 3, pct: 70, rir: 2, tempo: 'X-0-X-0', restSeconds: 120 },
+    'High-pull учит близости — рывок её держит', 'Everett high-pull'),
+  CX('cx_power_snatch_plus_ohs', 'Power-рывок + оверхед-присед', ['Power-рывок', 'Оверхед-присед 3 с'], 'power_snatch',
+    ['snatch_pull_under', 'snatch_catch'], ['high_catch', 'soft_catch'], ['technique'], 'intermediate',
+    { sets: 3, reps: 3, pct: 65, rir: 2, tempo: 'X-0-X-0', restSeconds: 120 },
+    'Встретил высоко — сел и встретил низко', 'Torokhtiy turnover'),
+  CX('cx_snatch_balance_plus_ohs', 'Баланс + оверхед-присед', ['Рывковый баланс', 'Оверхед-присед с паузой'], 'snatch_balance',
+    ['snatch_catch', 'snatch_overhead'], ['soft_catch', 'unstable_overhead'], ['technique', 'mobility'], 'intermediate',
+    { sets: 3, reps: 3, pct: 60, rir: 2, tempo: 'X-0-X-0', restSeconds: 120 },
+    'Резко вниз — затем уверенно внизу', 'Everett; QWA приём'),
+  CX('cx_clean_pull_plus_clean', 'Толчковая тяга + взятие', ['Толчковая тяга 105%', 'Взятие'], 'clean_pull',
+    ['clean_off_floor', 'clean_mid'], ['early_pull', 'weak_extension'], ['technique', 'strength'], 'intermediate',
+    { sets: 3, reps: 3, pct: 80, rir: 2, tempo: 'X-0-X-0', restSeconds: 150 },
+    'Тяга строит финиш — взятие его использует', 'QWA pulls'),
+  CX('cx_power_clean_plus_front_squat', 'Power-взятие + фронт-присед', ['Power-взятие', 'Фронт-присед'], 'front_squat',
+    ['clean_mid', 'clean_catch'], ['slow_turnover', 'soft_catch'], ['technique'], 'intermediate',
+    { sets: 3, reps: 4, pct: 70, rir: 2, tempo: 'X-0-X-0', restSeconds: 150 },
+    'Быстрые локти — затем глубокий сед', 'Everett complexes'),
+  CX('cx_push_press_plus_jerk', 'Швунг-жим + толчок', ['Швунг жимовой', 'Толчок в ножницы'], 'push_press',
+    ['jerk_dip', 'jerk_drive'], ['dip_forward', 'pressout'], ['technique'], 'intermediate',
+    { sets: 3, reps: 4, pct: 70, rir: 2, tempo: 'X-0-X-0', restSeconds: 150 },
+    'Вертикальный драйв — затем те же ноги в ножницы', 'Big Bend; QWA'),
+  CX('cx_pause_jerk_plus_split', 'Толчок с паузой + ножницы', ['Dip с паузой 2 с', 'Ножницы с паузой'], 'double_pause_jerk',
+    ['jerk_dip', 'jerk_lockout'], ['dip_forward', 'split_short'], ['technique'], 'intermediate',
+    { sets: 3, reps: 2, pct: 65, rir: 2, tempo: 'X-2-X-0', restSeconds: 150 },
+    'Пауза лечит крен — ножницы его проверяют', 'Big Bend primer'),
+  CX('cx_front_squat_plus_jerk', 'Фронт-присед + толчок', ['Фронт-присед 3 с паузой', 'Толчок'], 'front_squat',
+    ['clean_catch', 'jerk_dip'], ['chest_collapse', 'dip_forward'], ['strength', 'technique'], 'intermediate',
+    { sets: 3, reps: 3, pct: 75, rir: 2, tempo: 'X-0-X-0', restSeconds: 150 },
+    'Жёсткий фронт держит dip вертикально', 'QWA drive'),
+  CX('cx_rdl_plus_snatch_pull', 'RDL + рывковая тяга', ['Румынская 3 с вниз', 'Рывковая тяга'], 'rdl',
+    ['pull_start', 'pull_lockout'], ['hips_rise', 'weak_extension'], ['strength'], 'intermediate',
+    { sets: 3, reps: 5, pct: 70, rir: 2, tempo: '3-1-1-0', restSeconds: 150 },
+    'Хиндж держит спину — тяга держит финиш', 'PoinT GO hinge'),
+];
+
+/** Комплексы фазы (фильтр по причине опционален; без причины — все). */
+export function complexesForWeakPoint(wp: WLWeakPoint, opts: { cause?: TAWeakCause | null; level?: string | null } = {}): TACorrectiveComplex[] {
+  try {
+    const cause = opts.cause ?? null;
+    return TA_CORRECTIVE_COMPLEXES.filter((c) => (c.targets as string[]).includes(wp) && (!cause || (c.causes as string[]).includes(cause)));
+  } catch { return []; }
+}
+
+export function complexById(id: string): TACorrectiveComplex | null {
+  try {
+    const low = String(id || '').toLowerCase();
+    return TA_CORRECTIVE_COMPLEXES.find((c) => c.id.toLowerCase() === low) || null;
+  } catch { return null; }
+}
+
+export function complexExportLines(wp: WLWeakPoint, cause?: TAWeakCause | null): string[] {
+  try {
+    return complexesForWeakPoint(wp, { cause: cause ?? null })
+      .map((c) => `${c.nameRu} (${c.parts.join(' + ')}) — ${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}% · ${c.cue} [${c.source}]`);
+  } catch { return []; }
+}
+
+export interface TAPrimer {
+  id: string;
+  nameRu: string;
+  dose: string;
+  targets: WLWeakPoint[];
+  cue: string;
+  source: string;
+}
+
+/** 12 праймеров разминки: палка/гриф, 3×3, до основной работы (Burgener + skill transfer). */
+export const TA_WARMUP_PRIMERS: TAPrimer[] = [
+  { id: 'wp_down_up', nameRu: 'Down-up (тройное разгибание)', dose: 'палка · 3×5', targets: ['snatch_mid', 'clean_mid', 'jerk_drive'], cue: 'Пятки в пол как можно дольше — шраги в конце', source: 'Burgener warm-up' },
+  { id: 'wp_elbows_high_out', nameRu: 'Локти вверх-наружу', dose: 'палка · 3×5', targets: ['snatch_pull_under', 'clean_mid'], cue: 'Пугало: локти высоко — гриф близко', source: 'Burgener warm-up' },
+  { id: 'wp_muscle_snatch_stick', nameRu: 'Масл-рывок с палкой', dose: 'палка · 3×5', targets: ['snatch_pull_under'], cue: 'Агрессивный протяж вниз, не жим', source: 'Burgener warm-up' },
+  { id: 'wp_snatch_land', nameRu: 'Уход в полусед (land)', dose: 'палка · 3×3', targets: ['snatch_pull_under', 'snatch_catch'], cue: 'Подрыв вверх — тело резко вниз в четверть', source: 'Burgener warm-up' },
+  { id: 'wp_snatch_drop', nameRu: 'Бросок вниз (drop)', dose: 'палка · 3×3', targets: ['snatch_pull_under', 'snatch_catch'], cue: 'Без подрыва — только скорость вниз, стопы в сед', source: 'Burgener warm-up' },
+  { id: 'wp_hang_power_snatch', nameRu: 'Hang power-рывок с палкой', dose: 'палка · 3×3', targets: ['snatch_mid', 'snatch_pull_under'], cue: 'Собрать всё вместе: прыжок + посадка', source: 'Burgener warm-up' },
+  { id: 'wp_snatch_push_press', nameRu: 'Швунг-жим рывковым хватом', dose: 'гриф · 3×5', targets: ['snatch_overhead', 'jerk_drive'], cue: 'Лопатки вместе — гриф над шеей, не перед', source: 'Burgener skill transfer' },
+  { id: 'wp_overhead_squat_stick', nameRu: 'Оверхед-присед с палкой 3 с', dose: 'палка · 3×5', targets: ['snatch_catch', 'snatch_overhead'], cue: 'Пауза внизу — уверенность позиции', source: 'Burgener skill transfer' },
+  { id: 'wp_heaving_balance', nameRu: 'Heaving-баланс', dose: 'гриф · 3×3', targets: ['snatch_catch'], cue: 'Дожим ногами из седа — руки пробивают', source: 'Burgener skill transfer' },
+  { id: 'wp_drop_snatch_stick', nameRu: 'Drop-рывок с палкой', dose: 'палка · 3×3', targets: ['snatch_pull_under'], cue: 'Из-за головы — вниз без тяги', source: 'Burgener skill transfer' },
+  { id: 'wp_snatch_balance_stick', nameRu: 'Рывковый баланс с палкой', dose: 'палка · 3×3', targets: ['snatch_catch', 'snatch_overhead'], cue: 'Резко вниз под гриф — активный приём', source: 'Burgener skill transfer' },
+  { id: 'wp_tall_clean_stick', nameRu: 'Tall-взятие с палкой', dose: 'палка · 3×3', targets: ['clean_mid', 'clean_catch'], cue: 'Без тяги — только локти и вниз', source: 'Burgener clean warm-up' },
+];
+
+/** Праймеры фазы (разминка перед сессией; не идут в инъекцию штанги). */
+export function primersForWeakPoint(wp: WLWeakPoint): TAPrimer[] {
+  try {
+    return TA_WARMUP_PRIMERS.filter((p) => (p.targets as string[]).includes(wp));
+  } catch { return []; }
 }

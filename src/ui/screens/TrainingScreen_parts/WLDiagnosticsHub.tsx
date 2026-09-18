@@ -46,7 +46,7 @@ import { meetPlan } from '../../../engines/strength-sport/strength-sport-ta-meet
 import { ymaxVerdict, femalePhaseNorm, femaleLevelOf, femalePhaseVerdict } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
 import { shrinkMVT, mvtPosterior, isVelocityShiftReal, velocityMetricFlag, mvtRetestNote, TA_POPULATION_MVT } from '../../../engines/strength-sport/strength-sport-ta-mvt.engine';
 import { imtpEnduranceDrop } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
-import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor, correctivesByError, tagsForBarMetrics, TA_ERROR_TAG_RU, correctiveById, correctiveExportLines, protocolForPreferred } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
+import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor, correctivesByError, tagsForBarMetrics, TA_ERROR_TAG_RU, correctiveById, correctiveExportLines, protocolForPreferred, correctionOrderFor, complexesForWeakPoint, complexExportLines, primersForWeakPoint, correctiveHowNot, estimateCorrectiveKg } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
 import { turnoverDiag, jerkDriveDiag, pullPowerBalance, lvpBallisticNote, movementOfWeak, mixedWaveNote, TA_MOVEMENT_RU } from '../../../engines/strength-sport/strength-sport-ta-v5.engine';
 import { appendTAPhaseSnapshot, taPhaseTrend, loadTAPhaseHistory, saveTAPhaseHistory, type TAPhaseSnapshot } from '../../../engines/strength-sport/strength-sport-ta-phase-history.engine';
 import { appendTAPullPower, taPullPowerTrend, loadTAPullPower, saveTAPullPower } from '../../../engines/strength-sport/strength-sport-ta-pullpower-history.engine';
@@ -1114,7 +1114,7 @@ export const WLDiagnosticsHub: React.FC = () => {
         let libProto: { sets: number; reps: number; pct: number } | null = null;
         try {
           const cause = causeFor(wp)?.cause ?? null;
-          libProto = protocolForPreferred(wp, prefId, cause, taLevel, profileMobility);
+          libProto = protocolForPreferred(wp, prefId, cause, taLevel, profileMobility, { equipment: profileEquipment });
         } catch { libProto = null; }
         if (libProto) {
           protocols[wp] = { sets: libProto.sets, reps: libProto.reps, pct: libProto.pct };
@@ -1267,7 +1267,7 @@ export const WLDiagnosticsHub: React.FC = () => {
           try {
             const causeMap: Record<string, string> = {};
             try { causeMap[wp] = causeFor(wp)?.cause ?? ''; } catch { causeMap[wp] = ''; }
-            return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility);
+            return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility, { equipment: profileEquipment });
           } catch { return []; }
         }).slice(0, 9),
         // V5-A: попытки + Sinclair (информационно для конструктора/дневника)
@@ -1374,7 +1374,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       try {
         const causeMap: Record<string, string> = {};
         for (const wp of weakPoints) { try { causeMap[wp] = causeFor(wp)?.cause ?? ''; } catch { causeMap[wp] = ''; } }
-        base.correctiveDetail = weakPoints.flatMap(wp => { try { return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility); } catch { return []; } });
+        base.correctiveDetail = weakPoints.flatMap(wp => { try { return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility, { equipment: profileEquipment }); } catch { return []; } });
       } catch { /* noop */ }
       if (snatchAttempts || cjAttempts) base.attempts = { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) };
       // V4-B/V6-B1: ноты последней инъекции + Sinclair прогресса (ноты персистятся в WLState)
@@ -2082,11 +2082,30 @@ export const WLDiagnosticsHub: React.FC = () => {
           <div data-wl="corrective">
             <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🛠️ Коррекция движений — структурировано: фаза → причина → упражнения с дозами</div>
             {!weakPoints.length && <div style={{ fontSize: 11, color: '#fff', padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>Выбери 1–3 слабые фазы в табах Рывок/Взятие/Толчок/База — здесь соберётся коррекционный план с техникой и дозами.</div>}
+            {weakPoints.length > 0 && (() => {
+              let ordered: WLWeakPoint[] = weakPoints;
+              try {
+                const sev: Record<string, number> = {};
+                for (const wp of weakPoints) {
+                  try {
+                    const c = causeFor(wp);
+                    sev[wp] = c?.confidence === 'high' ? 3 : c?.confidence === 'med' ? 2 : 1;
+                  } catch { sev[wp] = 0; }
+                }
+                ordered = correctionOrderFor(weakPoints, sev);
+              } catch { ordered = weakPoints; }
+              return (
+                <div data-wl="corrective-order" style={{ fontSize: 10, color: '#fff', marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.16)' }}>
+                  🎯 Порядок коррекции (сначала раннее и грубое): {ordered.map((w, i) => `${i + 1}. ${WL_WEAKPOINT_LABELS[w] || w}`).join(' → ')}
+                  <div style={{ marginTop: 2, opacity: 0.85 }}>Пересним фаз через 4–6 нед (кнопка «🗂 Фазы: снимок» ниже) — «ушло/висит» покажет что сработало</div>
+                </div>
+              );
+            })()}
             {weakPoints.map(wp => {
               let cause: string | null = null;
               try { cause = causeFor(wp)?.cause ?? null; } catch { cause = null; }
               let list: ReturnType<typeof correctivesForWeakPoint> = [];
-              try { list = correctivesForWeakPoint(wp, { cause: cause as any, level: taLevel, mobilityRestrictions: profileMobility, limit: 5 }); } catch { list = []; }
+              try { list = correctivesForWeakPoint(wp, { cause: cause as any, level: taLevel, mobilityRestrictions: profileMobility, equipment: profileEquipment, fatigueSensitive: cause === 'fatigue', limit: 5 }); } catch { list = []; }
               const pref = (state.preferredCorr || {})[wp];
               return (
                 <div key={wp} data-wl="corrective-phase" style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
@@ -2094,18 +2113,47 @@ export const WLDiagnosticsHub: React.FC = () => {
                   {list.map(c => {
                     const d = planData ? simulateTACorrection(planData, { weakPoint: wp, corrId: c.id, sets: c.protocolAdj.sets, reps: c.protocolAdj.reps }) : null;
                     const isPref = pref === c.id;
+                    const howNot = (() => { try { return correctiveHowNot(c.id); } catch { return null; } })();
+                    const kg = (() => {
+                      try {
+                        const wm = (planData as any)?.workMax || {};
+                        return estimateCorrectiveKg(c.id, c.protocolAdj.pct, wm);
+                      } catch { return null; }
+                    })();
                     return (
                       <div key={c.id} data-wl="corrective-pick" style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: `1px solid ${isPref ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.14)'}` }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <button onClick={() => togglePreferredCorr(wp, c.id)} aria-pressed={isPref} aria-label={`Выбрать ${c.nameRu}`} style={{ minWidth: 32, minHeight: 32, borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(59,130,246,0.3)', background: isPref ? '#3b82f6' : 'transparent', color: isPref ? '#fff' : '#60a5fa', fontSize: 13, fontWeight: 800 }}>{isPref ? '⭐' : '☆'}</button>
-                          <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: '#fff' }}>{c.nameRu} <span style={{ color: '#60a5fa' }}>{c.protocolAdj.sets}×{c.protocolAdj.reps} @{c.protocolAdj.pct}% · RIR{c.protocolAdj.rir} · отдых {c.protocolAdj.restSeconds}с</span></div>
+                          <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: '#fff' }}>{c.nameRu} <span style={{ color: '#60a5fa' }}>{c.protocolAdj.sets}×{c.protocolAdj.reps} @{c.protocolAdj.pct}%{kg ? ` (≈${kg} кг)` : ''} · RIR{c.protocolAdj.rir} · отдых {c.protocolAdj.restSeconds}с</span></div>
                         </div>
                         <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>🎯 {c.cues[0] || ''}{c.cues[1] ? ` · ${c.cues[1]}` : ''}</div>
+                        {howNot && <div style={{ fontSize: 10, color: '#fca5a5', marginTop: 2 }}>⛔ {howNot}</div>}
                         <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>📈 {c.progression} · 📉 {c.regression}</div>
                         <div style={{ fontSize: 9, color: '#fff', marginTop: 2, opacity: 0.85 }}>{c.matchReason} · {c.source}{d ? ` · Δ ${d.summary}` : ''}</div>
                       </div>
                     );
                   })}
+                  {(() => {
+                    let cxs: ReturnType<typeof complexesForWeakPoint> = [];
+                    let prims: ReturnType<typeof primersForWeakPoint> = [];
+                    try { cxs = complexesForWeakPoint(wp, { cause: cause as any }); } catch { cxs = []; }
+                    try { prims = primersForWeakPoint(wp); } catch { prims = []; }
+                    if (!cxs.length && !prims.length) return null;
+                    return (
+                      <div style={{ marginTop: 6 }}>
+                        {cxs.slice(0, 2).map(cx => (
+                          <div key={cx.id} data-wl="corrective-complex" style={{ marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', fontSize: 10, color: '#fff' }}>
+                            🔗 Комплекс: {cx.nameRu} ({cx.parts.join(' + ')}) — {cx.protocol.sets}×{cx.protocol.reps} @{cx.protocol.pct}% · {cx.cue}
+                          </div>
+                        ))}
+                        {prims.slice(0, 3).length > 0 && (
+                          <div data-wl="corrective-primer" style={{ marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)', fontSize: 10, color: '#fff' }}>
+                            🟢 Разминка-праймер (до работы): {prims.slice(0, 3).map(p => `${p.nameRu} ${p.dose}`).join(' · ')}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -2115,8 +2163,8 @@ export const WLDiagnosticsHub: React.FC = () => {
               try {
                 const causeMap: Record<string, any> = {};
                 for (const wp of weakPoints) { try { causeMap[wp] = causeFor(wp)?.cause ?? null; } catch { causeMap[wp] = null; } }
-                steps = correctiveSessionFor(weakPoints, causeMap, { level: taLevel, mobilityRestrictions: profileMobility });
-                block = correctiveBlockFor(weakPoints, Math.max(4, Math.min(8, planAudit.workWeeks || 6)), { causeByWeak: causeMap as any, level: taLevel, mobilityRestrictions: profileMobility });
+                steps = correctiveSessionFor(weakPoints, causeMap, { level: taLevel, mobilityRestrictions: profileMobility, equipment: profileEquipment });
+                block = correctiveBlockFor(weakPoints, Math.max(4, Math.min(8, planAudit.workWeeks || 6)), { causeByWeak: causeMap as any, level: taLevel, mobilityRestrictions: profileMobility, equipment: profileEquipment });
               } catch { steps = []; block = []; }
               return (
                 <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.16)', marginBottom: 8 }}>

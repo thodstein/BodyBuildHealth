@@ -130,4 +130,45 @@ describe('ta corrective tab UI', () => {
     expect(container.querySelector('[data-wl="corrective"]')?.textContent).toMatch(/Коррекционная сессия/);
     expect(container.querySelector('[data-wl="inject"]')).toBeTruthy();
   });
+  it('E6: порядок коррекции + комплекс + праймер на фазе ухода', () => {
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+    fireEvent.click(screen.getByText('Рывок: уход под штангу'));
+    fireEvent.click(screen.getByRole('button', { name: '🛠️ Коррекция' }));
+    const order = container.querySelector('[data-wl="corrective-order"]');
+    expect(order).toBeTruthy();
+    expect(order?.textContent).toMatch(/1\. Рывок: уход под штангу/);
+    expect(order?.textContent).toMatch(/Пересним фаз/);
+    expect(container.querySelector('[data-wl="corrective-complex"]')?.textContent).toMatch(/Комплекс/);
+    expect(container.querySelector('[data-wl="corrective-primer"]')?.textContent).toMatch(/праймер/i);
+    // howNot у tall_snatch (⛔) — в топ-5 ухода
+    expect(container.querySelector('[data-wl="corrective"]')?.textContent).toMatch(/⛔/);
+  });
+  it('E6: две фазы — отрыв раньше ухода в очереди', () => {
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+    fireEvent.click(screen.getByText('Рывок: уход под штангу'));
+    fireEvent.click(screen.getByText('Рывок: отрыв (0-20°)'));
+    fireEvent.click(screen.getByRole('button', { name: '🛠️ Коррекция' }));
+    const order = container.querySelector('[data-wl="corrective-order"]');
+    expect(order?.textContent).toMatch(/1\. Рывок: отрыв/);
+  });
+  it('E6: профиль без штанги — только свой вес в оверхеде', () => {
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    localStorage.setItem('he_profile_v2', JSON.stringify({ training: { equipment: ['bodyweight'] } }));
+    try {
+      const { container } = render(<WLDiagnosticsHub />);
+      fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+      fireEvent.click(screen.getByText('Рывок: оверхед стабильность'));
+      fireEvent.click(screen.getByRole('button', { name: '🛠️ Коррекция' }));
+      const picks = container.querySelectorAll('[data-wl="corrective-pick"]');
+      expect(picks.length).toBeGreaterThan(0);
+      expect(container.querySelector('[data-wl="corrective"]')?.textContent).toMatch(/валике|Dead bug/);
+    } finally {
+      localStorage.removeItem('he_profile_v2');
+      localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    }
+  });
 });

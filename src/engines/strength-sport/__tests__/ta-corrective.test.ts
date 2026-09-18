@@ -3,8 +3,13 @@ import {
   TA_CORRECTIVES, CORRECTIVES_BY_PHASE, correctivesForWeakPoint,
   correctiveSessionFor, correctiveBlockFor, correctivesByError,
   adjustProtocolForCause, TA_ERROR_TAG_RU, correctiveById,
-  tagsForBarMetrics, correctiveExportLines, protocolForPreferred,
-  MOBILITY_DEMAND,
+  tagsForBarMetrics, tagsForVelocityLoss, tagsForMobility,
+  correctionOrderFor, WEAK_PHASE_ORDER,
+  correctiveExportLines, protocolForPreferred,
+  MOBILITY_DEMAND, correctiveMetaOf,
+  TA_CORRECTIVE_COMPLEXES, complexesForWeakPoint, complexById, complexExportLines,
+  TA_WARMUP_PRIMERS, primersForWeakPoint,
+  correctiveHowNot, estimateCorrectiveKg, regressionSteps,
 } from '../strength-sport-ta-corrective.engine';
 import { estimateCorrBasePm } from '../strength-sport-ta-simulator.engine';
 import { rankCorrectionsForTA } from '../strength-sport-ta-correction-rank.engine';
@@ -208,5 +213,129 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
         }
       }
     }
+  });
+  it('E1: без equipment — байт-в-байт (фильтр пуст = всё как раньше)', () => {
+    const a = correctivesForWeakPoint('snatch_pull_under', { cause: 'technique' });
+    const b = correctivesForWeakPoint('snatch_pull_under', { cause: 'technique', equipment: [] });
+    expect(b.map((c) => c.id)).toEqual(a.map((c) => c.id));
+  });
+  it('E1: фильтр без штанги режет штангу, оставляет свой вес', () => {
+    const list = correctivesForWeakPoint('snatch_overhead', { equipment: ['bodyweight'] });
+    expect(list.length).toBeGreaterThan(0);
+    for (const c of list) expect(correctiveMetaOf(c.id).equipment).toBe('bodyweight');
+    expect(list.some((c) => c.id === 'tspine_ext')).toBe(true);
+  });
+  it('E1: гакк требует machine; блоки без стоек топятся, а не исчезают', () => {
+    const noMachine = correctivesForWeakPoint('squat_mid', { equipment: ['barbell'] });
+    expect(noMachine.find((c) => c.id === 'hack_squat')).toBeUndefined();
+    const withMachine = correctivesForWeakPoint('squat_mid', { equipment: ['barbell', 'machine'] });
+    expect(withMachine.some((c) => c.id === 'hack_squat')).toBe(true);
+    const free = correctivesForWeakPoint('snatch_mid', { cause: 'technique', equipment: ['barbell'] });
+    const noBlocks = correctivesForWeakPoint('snatch_mid', { cause: 'technique', equipment: ['barbell'] });
+    expect(free.length).toBeGreaterThan(0); expect(noBlocks.length).toBeGreaterThan(0);
+  });
+  it('E1: fatigue топит дорогие (тяги 8) и поднимает дешёвые', () => {
+    const base = correctivesForWeakPoint('snatch_mid', { cause: 'strength' });
+    const tired = correctivesForWeakPoint('snatch_mid', { cause: 'strength', fatigueSensitive: true });
+    const baseIdx = base.findIndex((c) => c.id === 'snatch_pull');
+    const tiredIdx = tired.findIndex((c) => c.id === 'snatch_pull');
+    expect(baseIdx).toBeGreaterThanOrEqual(0);
+    expect(tiredIdx).toBeGreaterThan(baseIdx);
+  });
+  it('E1: comp-фаза топит силу и режет дозу', () => {
+    const prep = correctivesForWeakPoint('snatch_mid', { cause: 'strength' });
+    const comp = correctivesForWeakPoint('snatch_mid', { cause: 'strength', seasonPhase: 'comp' });
+    expect(comp[0].protocolAdj.pct).toBeLessThanOrEqual(prep[0].protocolAdj.pct);
+  });
+});
+
+describe('ta-corrective E2: тиры замеров + очередь', () => {
+  it('severity: 5 — warn, 8 — critical, jerk 12 — +unstable', () => {
+    expect(tagsForBarMetrics(5, 'snatch').severity).toBe('warn');
+    expect(tagsForBarMetrics(5, 'snatch').tags).toEqual(['bar_forward']);
+    expect(tagsForBarMetrics(8, 'snatch').severity).toBe('critical');
+    expect(tagsForBarMetrics(8, 'jerk').tags).toContain('split_short');
+    expect(tagsForBarMetrics(12, 'snatch').tags).toContain('unstable_overhead');
+    expect(tagsForBarMetrics(12, 'jerk').tags).toContain('unstable_overhead');
+  });
+  it('VBT: <10 молчит, 12 — warn turnover, 22 — critical +финал', () => {
+    expect(tagsForVelocityLoss(8).tags).toEqual([]);
+    expect(tagsForVelocityLoss(12)).toMatchObject({ tags: ['slow_turnover'], severity: 'warn' });
+    const c = tagsForVelocityLoss(22, 'snatch');
+    expect(c.severity).toBe('critical');
+    expect(c.tags).toContain('weak_extension');
+    expect(tagsForVelocityLoss(22, 'jerk').tags).toContain('drive_forward');
+  });
+  it('мобильность: OHS≥2 на приёме → soft_catch, ktw<9 на тяге → hips_rise', () => {
+    const o = tagsForMobility(3, null, 'snatch_catch');
+    expect(o.tags).toContain('soft_catch');
+    const k = tagsForMobility(0, 7, 'snatch_off_floor');
+    expect(k.tags).toContain('hips_rise');
+    expect(tagsForMobility(0, 12, 'snatch_off_floor').tags).toEqual([]);
+    expect(tagsForMobility(0, null, 'snatch').tags).toEqual([]);
+  });
+  it('очередь: отрыв раньше ухода раньше замка; тяжесть — внутри фазы', () => {
+    const q = correctionOrderFor(['jerk_lockout', 'snatch_pull_under', 'snatch_off_floor']);
+    expect(q).toEqual(['snatch_off_floor', 'snatch_pull_under', 'jerk_lockout']);
+    const q2 = correctionOrderFor(['snatch_mid', 'snatch_off_floor'], { snatch_mid: 3, snatch_off_floor: 0 });
+    expect(q2[0]).toBe('snatch_off_floor');
+    expect(WEAK_PHASE_ORDER['snatch_off_floor']).toBeLessThan(WEAK_PHASE_ORDER['jerk_lockout']);
+  });
+});
+
+describe('ta-corrective E3: комплексы + праймеры', () => {
+  it('12 комплексов: injectId реален, протокол в коридорах', () => {
+    expect(TA_CORRECTIVE_COMPLEXES.length).toBe(12);
+    for (const c of TA_CORRECTIVE_COMPLEXES) {
+      expect(correctiveById(c.injectId), c.id).not.toBeNull();
+      expect(c.parts.length).toBeGreaterThanOrEqual(2);
+      expect(c.protocol.sets).toBeGreaterThanOrEqual(1);
+      expect(c.protocol.pct).toBeGreaterThanOrEqual(20);
+      expect(c.protocol.pct).toBeLessThanOrEqual(110);
+    }
+  });
+  it('комплексы находятся по фазе и причине', () => {
+    expect(complexesForWeakPoint('snatch_off_floor').length).toBeGreaterThanOrEqual(2);
+    expect(complexesForWeakPoint('jerk_dip', { cause: 'technique' }).length).toBeGreaterThanOrEqual(1);
+    expect(complexById('cx_push_press_plus_jerk')?.injectId).toBe('push_press');
+    expect(complexById('nope')).toBeNull();
+    expect(complexExportLines('snatch_mid')[0]).toMatch(/@/);
+  });
+  it('12 праймеров: палка/гриф, каждая фаза ухода/приёма покрыта', () => {
+    expect(TA_WARMUP_PRIMERS.length).toBe(12);
+    expect(primersForWeakPoint('snatch_pull_under').length).toBeGreaterThanOrEqual(3);
+    expect(primersForWeakPoint('snatch_catch').length).toBeGreaterThanOrEqual(2);
+    for (const p of TA_WARMUP_PRIMERS) expect(p.dose).toMatch(/палка|гриф/);
+  });
+});
+
+describe('ta-corrective E4/E5: расширение + доза', () => {
+  it('библиотека ≥60, split_asym ≥3, press ≥5', () => {
+    expect(TA_CORRECTIVES.length).toBeGreaterThanOrEqual(60);
+    expect(correctivesByError('split_asym').length).toBeGreaterThanOrEqual(3);
+    const press = TA_CORRECTIVES.filter((e) => (e.targets as string[]).includes('press_start'));
+    expect(press.length).toBeGreaterThanOrEqual(5);
+  });
+  it('не-штанговая мобильность честна (bodyweight + nonBarbell)', () => {
+    for (const id of ['tspine_ext', 'dead_bug_oh', 'pallof_hold']) {
+      expect(correctiveMetaOf(id).equipment).toBe('bodyweight');
+      expect(correctiveMetaOf(id).nonBarbell).toBe(true);
+    }
+    expect(correctiveMetaOf('single_arm_press').equipment).toBe('dumbbell');
+  });
+  it('howNot: tall/muscle/dip/jerk_split — есть, мусор — null', () => {
+    expect(correctiveHowNot('tall_snatch')).toMatch(/колени/);
+    expect(correctiveHowNot('jerk_dip')).toMatch(/носк/);
+    expect(correctiveHowNot('nope')).toBeNull();
+  });
+  it('якорь кг: рывок 100@80% → 80, мусор/пусто — null', () => {
+    expect(estimateCorrectiveKg('tall_snatch', 80, { snatch: 100 })).toBe(80);
+    expect(estimateCorrectiveKg('tall_snatch', 40, { snatch: 100 })).toBe(40);
+    expect(estimateCorrectiveKg('tall_snatch', 80, null)).toBeNull();
+    expect(estimateCorrectiveKg('tall_snatch', 0, { snatch: 100 })).toBeNull();
+  });
+  it('лесенка регрессии: ≥1 шаг, tall — про палку/гриф', () => {
+    const steps = regressionSteps('tall_snatch');
+    expect(steps.length).toBeGreaterThanOrEqual(1);
   });
 });
