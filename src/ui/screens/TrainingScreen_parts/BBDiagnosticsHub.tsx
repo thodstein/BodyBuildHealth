@@ -892,7 +892,7 @@ export const BBDiagnosticsHub: React.FC = () => {
           for (const z of report.weakZonesGranular.slice(0, 2)) {
             const lib = (correctiveTopByZone[z] || [])[0];
             if (!lib) continue;
-            const dose = correctiveDose(lib.corr, (weakCauses as any)?.[z]?.cause ?? null, {});
+            const dose = correctiveDose(lib.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags());
             det.push({ id: lib.corr.id, zone: z, exerciseId: lib.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: lib.corr.cues.slice(0, 3), source: lib.corr.source });
           }
           return det.length ? det : null;
@@ -1000,6 +1000,13 @@ export const BBDiagnosticsHub: React.FC = () => {
     };
   };
 
+  // PRO-CORR-FIX П2-финал: единые флаги дозы — карточка, мост, оба экспорта и вставка
+  // обязаны показывать/класть одно и то же («показано = вставится = экспортировано»).
+  const corrDoseFlags = () => ({
+    readinessRed: (readiness as any)?.level === 'red',
+    painYellow: (() => { try { return String((painMon as any)?.verdict?.level || '') === 'yellow'; } catch { return false; } })(),
+  });
+
   const handleExport = () => {
     let causes: Record<string, unknown> = {};
     let spec: unknown = null;
@@ -1079,7 +1086,7 @@ export const BBDiagnosticsHub: React.FC = () => {
           for (const z of report.weakZonesGranular.slice(0, 2)) {
             const r = rankCorrectives(corrSignalsFor(z, (causes as any)?.[z]?.cause))[0];
             if (!r) continue;
-            const dose = correctiveDose(r.corr, (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(), {});
+            const dose = correctiveDose(r.corr, (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(), corrDoseFlags());
             det.push({ id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: r.corr.cues.slice(0, 3), source: r.corr.source });
           }
           return det.length ? det : null;
@@ -1158,7 +1165,7 @@ export const BBDiagnosticsHub: React.FC = () => {
           for (const z of report.weakZonesGranular.slice(0, 2)) {
             const r = rankCorrectives(corrSignalsFor(z, (causes as any)?.[z]?.cause))[0];
             if (!r) continue;
-            const dose = correctiveDose(r.corr, (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(), {});
+            const dose = correctiveDose(r.corr, (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(), corrDoseFlags());
             det.push({ id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: r.corr.cues.slice(0, 3), source: r.corr.source });
           }
           return det.length ? det : null;
@@ -1613,10 +1620,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         // PRO-CORR: библиотека первична (зона+причина+сигналы+доза); каталоговый топ-3 — fallback.
         const lib = (correctiveTopByZone[z] || [])[0];
         if (lib) {
-          const dose = correctiveDose(lib.corr, (weakCauses as any)?.[z]?.cause ?? null, {
-            readinessRed: (readiness as any)?.level === 'red',
-            painYellow: (() => { try { return String((painMon as any)?.verdict?.level || '') === 'yellow'; } catch { return false; } })(),
-          });
+          const dose = correctiveDose(lib.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags());
           preferredIds[z] = lib.corr.exerciseId;
           corrective[z] = { sets: dose.sets, reps: dose.repsMin, rir: dose.rir, tempo: dose.tempo, label: `${lib.corr.title} · ${dose.note}` };
           profTempo[z] = dose.tempo;
@@ -1839,10 +1843,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                           <b style={{ color: '#00e68a', fontSize: 11 }}>🛠 Коррекция по скринингам (доза + техника)</b>
                           {correctiveTopByZone[z].slice(0, 2).map((r) => {
                             // П2: те же флаги, что вставка (readiness-red/жёлтая боль) — «показано = вставится».
-                            const dose = (() => { try { return correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, {
-                              readinessRed: (readiness as any)?.level === 'red',
-                              painYellow: (() => { try { return String((painMon as any)?.verdict?.level || '') === 'yellow'; } catch { return false; } })(),
-                            }); } catch { return null; } })();
+                            const dose = (() => { try { return correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags()); } catch { return null; } })();
                             return (
                               <div key={r.corr.id} style={{ marginTop: 6, fontSize: 10, lineHeight: 1.5, color: '#fff' }} data-bb="corrective-row" data-corr={r.corr.id}>
                                 <b style={{ color: '#fff' }}>{r.corr.title}</b>

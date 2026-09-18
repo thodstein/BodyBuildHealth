@@ -45,4 +45,16 @@ describe('bb-corrective-ui', () => {
     expect(uses.length).toBeGreaterThanOrEqual(3); // карточка + HTML + CSV (def без скобки не считается)
     expect(HUB_SRC.includes('rankCorrectives({')).toBe(false);
   });
+  it('жёлтая боль режет дозу на карточке как во вставке (2×12–15 RIR2 вместо 3×12–15 RIR1)', () => {
+    localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ weakManual: ['delt_mid'], pmLoc: 'elbow', pmMorning: '5' }));
+    render(<BBDiagnosticsHub />);
+    const card = document.querySelector('[data-bb="corrective-card"]');
+    expect(card).not.toBeNull();
+    expect(card!.textContent).toMatch(/2×12–15 RIR2/);
+  });
+  it('доза везде через corrDoseFlags: base-вызовов correctiveDose(..., {}) не осталось', () => {
+    const uses = HUB_SRC.match(/corrDoseFlags\(\)/g) || [];
+    expect(uses.length).toBeGreaterThanOrEqual(5); // мост + HTML + CSV + карточка + вставка
+    expect(HUB_SRC.includes('cause ?? null, {})')).toBe(false);
+  });
 });
