@@ -385,6 +385,8 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, []);
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }, [state]);
+  // Э4 PRO-5: поиск упражнения в «Разборе» (план — первыми, каталог без произвольного среза)
+  const [exQuery, setExQuery] = useState('');
 
   const level = useMemo(() => {
     try { const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}'); return p?.settings?.training?.level || p?.training?.level || 'intermediate'; } catch { return 'intermediate'; }
@@ -1257,6 +1259,26 @@ export const BBDiagnosticsHub: React.FC = () => {
     return { id, name: id, muscle: 'chest' };
   }, [state.exerciseSelectedId, bbPlan]);
 
+  // Э4 PRO-5: «Разбор» больше не режет каталог с начала — упражнения плана первыми + живой поиск
+  const plannedCatalogIds = useMemo(() => {
+    const set = new Set<string>();
+    try {
+      if (bbPlan) for (const w of (bbPlan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) {
+        const id = String((ex as any).exerciseName || (ex as any).id || '');
+        if (id) set.add(id);
+      }
+    } catch { /* noop */ }
+    return set;
+  }, [bbPlan]);
+  const exPickerOptions = useMemo(() => {
+    const q = exQuery.trim().toLowerCase();
+    let list = EXERCISE_CATALOG;
+    if (q) list = list.filter((c) => String(c.name).toLowerCase().includes(q) || String(c.id).toLowerCase().includes(q));
+    const planFirst = list.filter((c) => plannedCatalogIds.has(c.id));
+    const rest = list.filter((c) => !plannedCatalogIds.has(c.id));
+    return [{ id: '', label: 'Не выбрано' }, ...[...planFirst, ...rest].slice(0, 80).map((c) => ({ id: c.id, label: `${c.name}`, hint: `${MUSCLE_LABEL_RU[(c as any).group] || (c as any).group} · СФР ${sfrOf(c as any) ?? '—'}` }))];
+  }, [exQuery, plannedCatalogIds]);
+
   const selectedDiagnosis = useMemo(() => {
     if (!selectedExRaw) return null;
     try {
@@ -1996,8 +2018,20 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>2 · Диагноз упражнения (выбери из портфеля выше или из каталога)</div>
                 <button onClick={selectWorstExercise} data-bb="worst" style={{ marginLeft: 'auto', minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🎯 Худшее в плане</button>
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, marginBottom: 6 }} data-bb="ex-search-row">
+                <input
+                  value={exQuery}
+                  onChange={(e) => setExQuery(e.target.value)}
+                  placeholder="Поиск упражнения (план — первыми)"
+                  aria-label="Поиск упражнения"
+                  data-bb="ex-search"
+                  data-testid="bb-ex-search"
+                  style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 16 }}
+                />
+                <button onClick={() => setExQuery('')} data-bb="ex-search-clear" aria-label="Очистить поиск" style={{ minHeight: 44, minWidth: 48, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>✕</button>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, marginBottom: 6 }} data-bb="ex-picker">
-                <BbSheetSelect label="Упражнение" value={state.exerciseSelectedId || ''} onChange={(v) => setState(s => ({ ...s, exerciseSelectedId: v || null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} testId="bb-exercise" options={[{ id: '', label: 'Не выбрано' }, ...EXERCISE_CATALOG.slice(0, 80).map((c) => ({ id: c.id, label: `${c.name}`, hint: `${MUSCLE_LABEL_RU[(c as any).group] || (c as any).group} · СФР ${sfrOf(c as any) ?? '—'}` }))]} />
+                <BbSheetSelect label="Упражнение" value={state.exerciseSelectedId || ''} onChange={(v) => setState(s => ({ ...s, exerciseSelectedId: v || null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} testId="bb-exercise" options={exPickerOptions} />
                 <button onClick={() => setState(s => ({ ...s, exerciseSelectedId: null, stimCheating: false, stimShortRom: false, stimSetupNote: '' }))} data-bb="ex-reset" style={{ minHeight: 44, minWidth: 64, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Сброс</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }} data-bb="exec-cards">

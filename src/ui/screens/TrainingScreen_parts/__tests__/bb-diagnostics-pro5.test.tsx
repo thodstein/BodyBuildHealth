@@ -12,6 +12,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { BBDiagnosticsHub } from '../BBDiagnosticsHub';
 import { aggregateBBVolume } from '../../../../engines/bb/bb-volume.engine';
 import { buildSpecBlock } from '../../../../engines/bb/bb-spec-block.engine';
+import { EXERCISE_CATALOG } from '../../../../core/exercise-catalog';
 
 const SRC = readFileSync(resolve(__dirname, '..', 'BBDiagnosticsHub.tsx'), 'utf8');
 
@@ -136,5 +137,28 @@ describe('PRO-5 Э3 паритет выдачи', () => {
     expect((SRC.match(/specBlock as any/g) || []).length).toBeGreaterThanOrEqual(2);
     expect(SRC).toMatch(/specPayload = specBlock;/);
     expect((SRC.match(/const sb = specBlock;/g) || []).length).toBe(3);
+  });
+});
+
+describe('PRO-5 Э4 каталог Разбора', () => {
+  it('упражнение из плана за пределами первых 80 — доступно, первым в списке, ищется', () => {
+    const beyond = EXERCISE_CATALOG.find((c, i) => i >= 100 && (c as any).id && (c as any).name) as any;
+    expect(beyond).toBeTruthy();
+    localStorage.setItem('he_bb_plan_saved', JSON.stringify(planWith([
+      { exerciseName: beyond.id, name: beyond.name, muscle: beyond.group || 'chest', sets: 3, rir: 2 },
+    ])));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Разбор/ }));
+    fireEvent.click(screen.getByTestId('bb-exercise'));
+    const opts = Array.from(document.querySelectorAll('[data-bb="sheet-option"]'));
+    expect(opts.length).toBeGreaterThan(1);
+    const short = String(beyond.name).slice(0, 8);
+    expect(opts[1].textContent).toContain(short);
+    // поиск сужает/находит это упражнение
+    fireEvent.change(screen.getByTestId('bb-ex-search'), { target: { value: short } });
+    const opts2 = Array.from(document.querySelectorAll('[data-bb="sheet-option"]'));
+    expect(opts2.some((o) => (o.textContent || '').includes(short))).toBe(true);
+    // срез каталога с начала в пикере больше не применяется
+    expect(SRC).not.toContain('EXERCISE_CATALOG.slice(0, 80)');
   });
 });
