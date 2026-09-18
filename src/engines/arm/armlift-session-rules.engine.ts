@@ -12,13 +12,13 @@ function orderRank(c: ArmliftCorrection): number {
   // Макс-сила первой: тяжёлые тройки/единички без холда.
   if (c.sets >= 4 && c.reps[1] <= 5 && c.holdSeconds == null) return 0;
   // Щипок: широкий → узкий (plate перед hub по ширине).
-  if (/plate_pinch_hold|saxon_bar|country_crush/.test(id)) return 1;
-  if (/hub_pinch|pinch_block_80|anvil_hub/.test(id)) return 2;
+  if (/plate_pinch_hold|saxon_bar|country_crush|euro_pinch_2h|blockbuster_pinch/.test(id)) return 1;
+  if (/hub_pinch|pinch_block_80|anvil_hub|little_big_horn/.test(id)) return 2;
   // Crush-работа.
   if (/coc_|silver/.test(id)) return 3;
   // Холды и керри.
-  if (c.holdSeconds != null || /farmer|towel|fat_gripz|inch_dumbbell|wrist_wrench|rolling_thunder|apollon|raptor|grandfather|excalibur|flask|napalm/.test(id)) return 4;
-  // Экстензоры и рычаги — в конце.
+  if (c.holdSeconds != null || /farmer|towel|fat_gripz|inch_dumbbell|wrist_wrench|rolling_thunder|apollon|raptor|grandfather|excalibur|flask|napalm|wrist_curl/.test(id)) return 4;
+  // Экстензоры, рычаги и активация — в конце.
   return 5;
 }
 
@@ -35,8 +35,10 @@ export function sessionOrderNote(corrections: ArmliftCorrection[]): string {
   const ids = (corrections || []).map((c) => c.exId);
   const bits: string[] = ['Хват — в конце тренировки, после тяг'];
   if (ids.includes('saxon_bar') && ids.includes('hub_pinch')) bits.push('Saxon до Hub');
-  if (ids.includes('plate_pinch_hold')) bits.push('Щипок: широкий → узкий по мере отказа');
-  if (ids.some((id) => /wrist_ext_bb|wrist_roller|reverse_ez_curl|lever_top/.test(id))) {
+  if (ids.some((id) => /plate_pinch_hold|country_crush_3|euro_pinch_2h|blockbuster_pinch/.test(id))) {
+    bits.push('Щипок: широкий → узкий по мере отказа');
+  }
+  if (ids.some((id) => /wrist_ext_bb|wrist_roller|reverse_ez_curl|lever_top|finger_containment|indian_clubs|sledge_choke|ulnar_dev|radial_dev/.test(id))) {
     bits.push('Экстензоры/рычаг — последними');
   }
   return bits.join(' · ');

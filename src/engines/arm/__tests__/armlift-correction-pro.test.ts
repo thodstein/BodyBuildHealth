@@ -1,0 +1,148 @@
+import { describe, it, expect } from 'vitest';
+import { rankArmliftCorrections, buildArmliftSpecBlock, armliftCorrectionPoolIds } from '../armlift-correction.engine';
+import {
+  injectArmliftCorrections,
+  correctionsToInjectionItems,
+  rirForCause,
+} from '../armlift-injection.engine';
+import { getArmExerciseById } from '../../../core/exercise-catalog-arm';
+import type { ArmliftWeakLink } from '../armlift-diagnosis.engine';
+
+const LINKS: ArmliftWeakLink[] = [
+  'thumb', 'fingers', 'wrist_ext', 'support_endurance', 'crush', 'technique', 'asymmetry', 'conditioning',
+];
+
+describe('PRO-CORR K1: библиотека PRO на реальных id', () => {
+  it('все коррекции всех звеньев — реальные id каталога', () => {
+    for (const wl of LINKS) {
+      for (const c of rankArmliftCorrections(wl)) {
+        expect(getArmExerciseById(c.exId)).toBeTruthy();
+      }
+    }
+  });
+  it('пул вырос: определено >= 35 уникальных (было ~22), все — реальные id', () => {
+    const ids = armliftCorrectionPoolIds();
+    expect(ids.length).toBeGreaterThanOrEqual(35);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) expect(getArmExerciseById(id)).toBeTruthy();
+  });
+  it('топ несёт кью и прогрессию (показ в табе)', () => {
+    const top = rankArmliftCorrections('thumb', 'saxon_bar', {});
+    expect(top.some((c) => (c.cues || []).length > 0)).toBe(true);
+    expect(top.some((c) => (c.progression || '').length > 0)).toBe(true);
+  });
+  it('lock: thumb топ-1 plate_pinch_hold цел', () => {
+    expect(rankArmliftCorrections('thumb')[0].id).toBe('plate_pinch_hold');
+  });
+  it('lock: support_endurance дефолт [farmer, towel, fat_gripz] цел', () => {
+    expect(rankArmliftCorrections('support_endurance', 'rolling_thunder', {}).map((c) => c.id))
+      .toEqual(['farmer_walk_fat', 'towel_pullup', 'fat_gripz_curl']);
+  });
+  it('lock: crush generic топ coc_trainer цел', () => {
+    expect(rankArmliftCorrections('crush')[0].exId).toMatch(/coc_|silver/);
+    expect(rankArmliftCorrections('crush', 'coc_gripper', {})[0].exId).toBe('coc_trainer');
+  });
+});
+
+describe('PRO-CORR K2: матрица причина × уровень × оборудование × боль', () => {
+  it('cause-матрица: mobility держит экстензоры в топе запястья', () => {
+    const top = rankArmliftCorrections('wrist_ext', 'rolling_thunder', { cause: 'mobility' });
+    expect(top[0].exId).toBe('wrist_ext_bb');
+    expect(top[0].source).toContain('под причину');
+  });
+  it('cause-матрица: max_strength держит rolling в топе пальцев', () => {
+    const top = rankArmliftCorrections('fingers', 'rolling_thunder', { cause: 'max_strength' });
+    expect(top[0].exId).toBe('rolling_thunder');
+  });
+  it('level-гейт: новичку не едут Inch и Rolling в топ-3 пальцев', () => {
+    const top = rankArmliftCorrections('fingers', 'rolling_thunder', { level: 'beginner' });
+    const ids = top.map((c) => c.exId);
+    expect(ids).not.toContain('inch_dumbbell');
+    expect(ids).not.toContain('rolling_thunder');
+    expect(top.some((c) => c.source.includes('сложно для уровня'))).toBe(true);
+  });
+  it('equipment-фолбэк: без grip_tool подменяется, а не умирает', () => {
+    const top = rankArmliftCorrections('wrist_ext', 'rolling_thunder', { equipment: ['band'] });
+    expect(top.some((c) => c.exId === 'finger_containment_band')).toBe(true);
+    expect(top.some((c) => c.source.includes('замена оборудованием'))).toBe(true);
+  });
+  it('боль (gentleOnly): только щадящие, без тяжёлых троек', () => {
+    const top = rankArmliftCorrections('fingers', 'rolling_thunder', { gentleOnly: true });
+    expect(top.length).toBe(3);
+    expect(top.every((c) => ['wrist_ext_bb', 'wrist_roller', 'plate_pinch_hold'].includes(c.exId))).toBe(true);
+  });
+  it('усталость щадит: ext_bb первый при fatigue', () => {
+    const top = rankArmliftCorrections('wrist_ext', 'rolling_thunder', { cause: 'fatigue' });
+    expect(top[0].exId).toBe('wrist_ext_bb');
+  });
+  it('limit: 4-й ранг — запасная для UI', () => {
+    const four = rankArmliftCorrections('thumb', 'saxon_bar', {}, 4);
+    expect(four.length).toBe(4);
+    expect(new Set(four.map((c) => c.id)).size).toBe(4);
+  });
+});
+
+describe('PRO-CORR K3: покрытие фаз срыва', () => {
+  it('каждая фаза чинится минимум 2 упражнениями', () => {
+    for (const fp of ['off_floor', 'hold_short', 'hold_long', 'mid', 'lockout', 'close_fail']) {
+      const ids = new Set<string>();
+      for (const wl of LINKS) {
+        for (const c of rankArmliftCorrections(wl, undefined, { failurePoint: fp }, 6)) {
+          if (c.source.includes('чинит срыв')) ids.add(c.exId);
+        }
+      }
+      expect(ids.size).toBeGreaterThanOrEqual(2);
+    }
+  });
+});
+
+describe('PRO-CORR K4: спец-волна с подсказкой', () => {
+  it('detail: CoC — лесенка, щипок — широкий→узкий, support — тройки', () => {
+    const coc = buildArmliftSpecBlock('crush', 'coc_gripper');
+    expect(coc[0].detail).toContain('CoC');
+    const pinch = buildArmliftSpecBlock('thumb', 'saxon_bar');
+    expect(pinch[0].detail).toContain('Щипок');
+    const sup = buildArmliftSpecBlock('fingers', 'rolling_thunder');
+    expect(sup[0].detail).toContain('тройки');
+  });
+  it('форма блока цела: 4/6 нед, делод последний, fatigueFirst первый', () => {
+    expect(buildArmliftSpecBlock('thumb', 'saxon_bar').length).toBe(4);
+    expect(buildArmliftSpecBlock('thumb', 'saxon_bar', undefined, 6).length).toBe(6);
+    expect(buildArmliftSpecBlock('thumb', 'saxon_bar')[3].focus).toContain('Делод');
+    expect(buildArmliftSpecBlock('fingers', 'rolling_thunder', undefined, 4, { fatigueFirst: true })[0].focus).toContain('Делод');
+  });
+});
+
+describe('PRO-CORR K5: инъекция держит дозу коррекции', () => {
+  const plan = () => ({
+    level: 'intermediate', rationale: [] as string[],
+    weeks: [{ week: 1, sessions: [{ sessionTag: 'PinchGrip', exercises: [] }] }],
+  });
+  it('rirForCause: боль/усталость/мобильность 3, сила 1, остальное 2', () => {
+    expect(rirForCause('pain')).toBe(3);
+    expect(rirForCause('fatigue')).toBe(3);
+    expect(rirForCause('mobility')).toBe(3);
+    expect(rirForCause('max_strength')).toBe(1);
+    expect(rirForCause('technique')).toBe(2);
+    expect(rirForCause(null)).toBe(2);
+  });
+  it('items несут holdSeconds коррекции и заданный rir', () => {
+    const top = rankArmliftCorrections('thumb', 'saxon_bar', {});
+    const items = correctionsToInjectionItems(top, 3, 0.5, rirForCause('mobility'));
+    expect(items.every((t) => t.intensityPct === 0.5 && t.rir === 3)).toBe(true);
+    const plate = items.find((t) => t.exId === 'plate_pinch_hold');
+    expect(plate?.holdSeconds).toBe(25);
+  });
+  it('инъекция ставит холд 25с из коррекции, а не фикс 20с', () => {
+    const r = injectArmliftCorrections(plan(), [{ exId: 'plate_pinch_hold', sets: 3, dayTag: 'PinchGrip', holdSeconds: 25, rir: 3 }], { workMax: { grip_pinch: 40 } });
+    expect(r.injected).toBe(1);
+    const ex = r.plan.weeks[0].sessions[0].exercises[0];
+    expect(ex.workSets[0].holdSeconds).toBe(25);
+    expect(ex.holdSeconds).toBe(25);
+    expect(ex.workSets[0].rir).toBe(3);
+  });
+  it('без holdSeconds — дефолт 20с как раньше', () => {
+    const r = injectArmliftCorrections(plan(), [{ exId: 'plate_pinch_hold', sets: 3, dayTag: 'PinchGrip' }], { workMax: { grip_pinch: 40 } });
+    expect(r.plan.weeks[0].sessions[0].exercises[0].workSets[0].holdSeconds).toBe(20);
+  });
+});

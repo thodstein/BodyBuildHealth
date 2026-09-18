@@ -30,7 +30,7 @@ import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.eng
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
-import { correctionsToInjectionItems, intensityForCause } from '../../../engines/arm/armlift-injection.engine';
+import { correctionsToInjectionItems, intensityForCause, rirForCause } from '../../../engines/arm/armlift-injection.engine';
 import { orderCorrectionsForDay, sessionOrderNote } from '../../../engines/arm/armlift-session-rules.engine';
 import { diagnosticCompleteness } from '../../../engines/arm/armlift-completeness.engine';
 import { applyToPlanner } from './planner-bridge';
@@ -362,7 +362,31 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
     /** PRO-6 M4: кривая поднимает упражнения под провал. */
     holdCurve: holdCurve?.curve ?? null,
-  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, holdCurve]);
+    /** PRO-CORR K2: уровень из тест-батареи — advanced-снаряды новичку не едут; боль — только щадящие. */
+    level: overallGripLevel([
+      benchmarkPinchHold(diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null),
+      benchmarkFarmerHold(diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null),
+      benchmarkCoc(state.cocLevel ? parseFloat(state.cocLevel) : null),
+      benchmarkSilverHold(state.silverSec ? parseFloat(state.silverSec) : null),
+    ]) ?? undefined,
+    gentleOnly: cause.cause === 'pain',
+  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, state.silverSec, diag.pinchHoldSec, diag.farmerHoldSec, holdCurve]);
+  /** PRO-CORR K6: запасная 4-я — «🔁 Запасная» строкой (топ-3 в мост не меняется). */
+  const spareCorrection = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
+    cause: cause.cause === 'pain' ? undefined : cause.cause,
+    asymPct: asymForDiag,
+    failurePoint: diag.failurePoint || undefined,
+    extImbalance: extRatio != null && extRatio > 1.5,
+    cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
+    holdCurve: holdCurve?.curve ?? null,
+    level: overallGripLevel([
+      benchmarkPinchHold(diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null),
+      benchmarkFarmerHold(diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null),
+      benchmarkCoc(state.cocLevel ? parseFloat(state.cocLevel) : null),
+      benchmarkSilverHold(state.silverSec ? parseFloat(state.silverSec) : null),
+    ]) ?? undefined,
+    gentleOnly: cause.cause === 'pain',
+  }, 4)[3] ?? null, [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, state.silverSec, diag.pinchHoldSec, diag.farmerHoldSec, holdCurve]);
   const specBlock = useMemo(
     () => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, { fatigueFirst: cause.cause === 'fatigue' || cause.cause === 'pain' }),
     [diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, cause.cause],
@@ -512,7 +536,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           diagSpecBlock: specBlock,
           /** PRO-5 real: упражнения в план — только armlifting-ветка конструктора читает. */
           diagCauseDetail: { cause: cause.cause, confidence: cause.confidence, evidence: cause.evidence, fix: cause.fix },
-          armliftExercises: correctionsToInjectionItems(orderCorrectionsForDay(corrections), 3, intensityForCause(cause.cause)),
+          armliftExercises: correctionsToInjectionItems(orderCorrectionsForDay(corrections), 3, intensityForCause(cause.cause), rirForCause(cause.cause)),
           armliftOrderNote: sessionOrderNote(corrections),
           armliftCompleteness: completeness,
           armliftSpec: specBlock.map((w) => ({ week: w.week, targetSets: w.targetSets, dayMap: w.dayMap })),
@@ -570,7 +594,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     report,
     /** PRO-5 добивка: диагноз + коррекция в экспорт (аддитивно). */
     diagTitle: `${diagnosis.title} · ${diagnosis.cause}/${diagnosis.confidence}${conditions.trainingOnly ? ' · замер тренировочный' : ''}`,
-    diagCorrections: corrections.map((c) => `${c.title} — ${c.protocol}`),
+    diagCorrections: corrections.map((c) => `${c.title} — ${c.protocol} · ${c.dose}${c.cues?.length ? ` · кью: ${c.cues.join(', ')}` : ''}`),
     diagSpec: specBlock.map((w) => `Нед ${w.week}: ${w.focus}`),
     diagExtra,
   });
@@ -1005,14 +1029,24 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         <AdSec title="🔧 Коррекция" defaultOpen summary={`${diagnosis.weakLink} · топ-3`}>
           <div data-arm="lift-corr-result"><b>{diagnosis.title}</b> · причина {cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
           <div className="ad-muted">Чинить: {cause.fix}</div>
+          <div className="ad-muted" data-arm="lift-corr-why">Почему: {cause.evidence.join(' · ')}</div>
           <div className="ad-list" data-arm="lift-corr-top">
             {corrections.map((c, idx) => (
               <div key={c.id} className="ad-row">
                 <span><b>{idx + 1}. {c.title}</b> — {c.protocol}</span>
                 <span className="ad-muted">{c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq} · {c.source} · день {c.dayTag} · чинит: {c.fixesPhase.map((fid) => diagFailures.find((fp) => fp.id === fid)?.label || fid).join(', ')}</span>
+                {c.cues && c.cues.length > 0 && (
+                  <span className="ad-muted" data-arm="lift-corr-cues">Кью: {c.cues.join(' · ')}</span>
+                )}
+                {c.progression && (
+                  <span className="ad-muted">Прогрессия: {c.progression}</span>
+                )}
               </div>
             ))}
           </div>
+          {spareCorrection && (
+            <div className="ad-muted" data-arm="lift-corr-spare">🔁 Запасная: {spareCorrection.title} — {spareCorrection.protocol} (та же группа, замена без смены дозы)</div>
+          )}
           {corrections.some((c) => c.warmup) && (
             <div className="ad-muted" data-arm="lift-corr-warmup">
               Разминка: {corrections.filter((c) => c.warmup).map((c) => c.warmup).join(' · ')}
@@ -1029,6 +1063,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               <div key={w.week} className="ad-row">
                 <span><b>Нед {w.week}</b> — {w.focus}</span>
                 <span className="ad-muted">{w.volume}</span>
+                {w.detail && (
+                  <span className="ad-muted" data-arm="lift-corr-wave">{w.detail}</span>
+                )}
               </div>
             ))}
           </div>

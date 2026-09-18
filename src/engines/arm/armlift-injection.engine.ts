@@ -17,6 +17,8 @@ export interface ArmliftInjectionItem {
   dayTag?: string;
   intensityPct?: number;
   rir?: number;
+  /** PRO-CORR K5: длительность холда из коррекции (пусто = 20с дефолт для статики). */
+  holdSeconds?: number;
 }
 
 export interface ArmliftInjectionOpts {
@@ -48,6 +50,14 @@ const DAY_BY_SG: Record<string, string[]> = {
   wrist_ext: ['SupportGrip', 'GripHeavy', 'Support'],
   reverse_curl: ['SupportGrip', 'GripHeavy', 'Support'],
   cup_iso: ['SupportGrip', 'Support'],
+  // PRO-CORR K5: новые группы пула — в support-сессии (фолбэк раньше был первым не-столовым днём).
+  rising: ['SupportGrip', 'GripHeavy', 'Support'],
+  pron_sup: ['SupportGrip', 'GripHeavy', 'Support'],
+  hammer: ['SupportGrip', 'GripHeavy', 'Support'],
+  pronation: ['SupportGrip', 'GripHeavy', 'Support'],
+  supination: ['SupportGrip', 'GripHeavy', 'Support'],
+  ulnar_iso: ['SupportGrip', 'GripHeavy', 'Support'],
+  radial_iso: ['SupportGrip', 'GripHeavy', 'Support'],
 };
 
 const MUSCLE_BY_SG: Record<string, string> = {
@@ -57,6 +67,14 @@ const MUSCLE_BY_SG: Record<string, string> = {
   wrist_ext: 'wrist_extensors',
   reverse_curl: 'brachioradialis',
   cup_iso: 'wrist_flexors',
+  // PRO-CORR K5: новые группы — в grip_support (как прежний фолбэк), объёмы инвариантны.
+  rising: 'grip_support',
+  pron_sup: 'grip_support',
+  hammer: 'grip_support',
+  pronation: 'grip_support',
+  supination: 'grip_support',
+  ulnar_iso: 'grip_support',
+  radial_iso: 'grip_support',
 };
 
 function catalogById(exId: string): any {
@@ -140,6 +158,10 @@ export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[
       const weight = weightFor(cat, workMax, intensityPct);
       const isHold = /hold|pinch|hub|silver/i.test(t.exId) || cat?.movementPattern === 'grip_pinch';
       const rir = Number.isFinite(Number(t.rir)) ? Number(t.rir) : 2;
+      // PRO-CORR K5: холд из коррекции (короче/длиннее 20с), кламп 3–60с.
+      const holdLen = isHold
+        ? Math.max(3, Math.min(60, Math.round(Number((t as any).holdSeconds) || 20)))
+        : 0;
       const sg = String(cat.substitutionGroup || '');
       const muscle = MUSCLE_BY_SG[sg] || 'grip_support';
       const repsAvg = isHold ? 1 : 5;
@@ -155,11 +177,11 @@ export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[
         workSets: Array.from({ length: sets }, () => ({
           reps: repsAvg, rir, weight,
           restSeconds: 120, tempo: '2-1-1-0',
-          ...(isHold ? { holdSeconds: 20 } : {}),
+          ...(isHold ? { holdSeconds: holdLen } : {}),
         })),
         isTable: false,
         isStatic: isHold,
-        ...(isHold ? { holdSeconds: 20 } : {}),
+        ...(isHold ? { holdSeconds: holdLen } : {}),
         movementPattern: cat.movementPattern,
         substitutionGroup: cat.substitutionGroup,
         exerciseId: t.exId,
@@ -193,15 +215,29 @@ export function intensityForCause(cause: string | null | undefined): number {
   return 0.65;
 }
 
+/**
+ * PRO-CORR K5: RIR инъекции от причины (тяжесть дозы).
+ * Боль/усталость/мобильность — щадяще 3; сила — 1; остальное — 2.
+ */
+export function rirForCause(cause: string | null | undefined): number {
+  const c = String(cause || '');
+  if (c === 'pain' || c === 'fatigue' || c === 'mobility') return 3;
+  if (c === 'max_strength') return 1;
+  return 2;
+}
+
 /** Мост-обёртка: ranked-коррекции → injection items (топ-N). */
 export function correctionsToInjectionItems(
   corrections: ArmliftCorrection[],
   n = 3,
   intensityPct = 0.65,
+  rir = 2,
 ): ArmliftInjectionItem[] {
   const pct = Number.isFinite(Number(intensityPct)) ? Number(intensityPct) : 0.65;
+  const r = Number.isFinite(Number(rir)) ? Number(rir) : 2;
   return (corrections || []).slice(0, n).map((c) => ({
-    exId: c.exId, sets: c.sets, dayTag: c.dayTag, intensityPct: pct, rir: 2,
+    exId: c.exId, sets: c.sets, dayTag: c.dayTag, intensityPct: pct, rir: r,
+    ...(Number.isFinite(Number(c.holdSeconds)) ? { holdSeconds: Number(c.holdSeconds) } : {}),
   }));
 }
 
