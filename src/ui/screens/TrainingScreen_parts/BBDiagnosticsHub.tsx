@@ -7,6 +7,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { CARD, ACCENT } from './training-ui';
 import { applyToPlanner } from './planner-bridge';
+import { localIsoDate } from './diary-shared';
 import { scoreColor as bbScoreColor } from '../../../engines/bb/bb-scoring.engine';
 import { buildBBDiagnosticsReport } from '../../../engines/bb/bb-diagnostics-hub.engine';
 import { buildBBDiagnosticsHtml, buildBBDiagnosticsCsv, downloadHtml, downloadCsv } from '../../../engines/bb/bb-diagnostics-export.engine';
@@ -354,12 +355,27 @@ export const BBDiagnosticsHub: React.FC = () => {
   });
   // Нонс перечитывания плана из хранилища (инъекция/откат меняют его мимо мемов)
   const [planNonce, setPlanNonce] = useState(0);
+  // PRO-5 Э2: профиль читают мемы — бампим тик по profile-updated/storage (правка профиля без ремаунта)
+  const [profileNonce, setProfileNonce] = useState(0);
+  useEffect(() => {
+    const bump = () => setProfileNonce((t) => t + 1);
+    try {
+      window.addEventListener('profile-updated', bump as EventListener);
+      window.addEventListener('storage', bump as EventListener);
+    } catch { /* noop */ }
+    return () => {
+      try {
+        window.removeEventListener('profile-updated', bump as EventListener);
+        window.removeEventListener('storage', bump as EventListener);
+      } catch { /* noop */ }
+    };
+  }, []);
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }, [state]);
 
   const level = useMemo(() => {
     try { const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}'); return p?.settings?.training?.level || p?.training?.level || 'intermediate'; } catch { return 'intermediate'; }
-  }, []);
+  }, [profileNonce]);
 
   // Оборудование зала из профиля — фильтр кандидатов (без него — весь каталог)
   const profileEquipment = useMemo(() => {
@@ -372,7 +388,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       }
       return undefined;
     } catch { return undefined; }
-  }, []);
+  }, [profileNonce]);
 
   // Пол и сон — из профиля (единый источник; в хабе своих селектов нет, без дублей)
   const profileSex = useMemo(() => {
@@ -381,14 +397,14 @@ export const BBDiagnosticsHub: React.FC = () => {
       const s = p?.settings?.personal?.sex ?? p?.personal?.sex;
       return s === 'female' || s === 'male' ? (s as 'male' | 'female') : '';
     } catch { return ''; }
-  }, []);
+  }, [profileNonce]);
   const profileSleep = useMemo(() => {
     try {
       const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
       const n = Number(p?.settings?.lifestyle?.sleepHours ?? p?.lifestyle?.sleepHours);
       return Number.isFinite(n) && n > 0 ? n : null;
     } catch { return null; }
-  }, []);
+  }, [profileNonce]);
   // R6: возраст из профиля — гейт нагруженных проб для 14–15 (прецедент teenNotes ББ-авто)
   const profileAge = useMemo(() => {
     try {
@@ -396,7 +412,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       const a = Number(p?.settings?.personal?.age ?? p?.personal?.age);
       return Number.isFinite(a) && a > 0 ? a : null;
     } catch { return null; }
-  }, []);
+  }, [profileNonce]);
   const teenGate = useMemo(() => teenLoadedGate(profileAge), [profileAge]);
   // state.sex — замороженный легаси-фолбэк (UI-селекта больше нет); профиль приоритетнее
   const effSex = ((profileSex || state.sex || '') as '' | 'male' | 'female');
@@ -443,7 +459,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       if (plan?.weeks) return analyzeBBBalance(plan);
       return null;
     } catch { return null; }
-  }, [diarySessions]);
+  }, [diarySessions, planNonce]);
 
   const ohs = useMemo(() => assessOHS({
     heelsFlat: state.ohsHeelsFlat, kneeValgus: state.ohsKneeValgus, hipBelowParallel: state.ohsHipBelowParallel,
@@ -543,7 +559,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     hasCircumf: Object.keys(measNum).some(k => ['chest','waist','bicepL','bicepR','thighL','thighR'].includes(k)),
     hasVbt: false,
     manualWeak: state.weakManual,
-  }), [level, factVolume, diarySessions, measNum, balance, ohs.failed, state.weakManual]);
+  }), [level, factVolume, diarySessions, measNum, balance, ohs.failed, state.weakManual, planNonce]);
 
   // Скрининг v2: драйвер + односторонний + коды/снимок (чистые функции движка)
   const moveDriver = useMemo(() => {
@@ -864,7 +880,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     try {
       const raw = localStorage.getItem('he_bb_lr_history');
       let hist = raw ? (JSON.parse(raw) as BbLrSnapshot[]) : [];
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localIsoDate();
       for (const v of lrVerdictsFromSessions(diarySessions as any).slice(0, 4)) {
         hist = pushLrSnapshot(hist, { date: today, group: v.group, weakSide: v.weakSide, asymPct: v.asymPct, verdict: v.verdict });
       }
@@ -1096,8 +1112,8 @@ export const BBDiagnosticsHub: React.FC = () => {
       };
       try { Object.assign(pro2, buildMovementExport()); } catch { /* noop */ }
     } catch { /* noop */ }
-    const html = buildBBDiagnosticsHtml(report, { date: new Date().toISOString().slice(0, 10), level, plan: bbPlan, weakHeads: heads, weakCauses: causes as any, specBlock: spec as any, ...pro2 } as any);
-    downloadHtml(html, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
+    const html = buildBBDiagnosticsHtml(report, { date: localIsoDate(), level, plan: bbPlan, weakHeads: heads, weakCauses: causes as any, specBlock: spec as any, ...pro2 } as any);
+    downloadHtml(html, `bb-diagnostics-${localIsoDate()}.html`);
     setToast('✓ HTML экспорт (движения: причины + спец-блок + разбор + скрининг)');
     setTimeout(() => setToast(''), 2000);
   };
@@ -1176,7 +1192,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       try { Object.assign(pro2csv, buildMovementExport()); } catch { /* noop */ }
     } catch { /* noop */ }
     const csv = buildBBDiagnosticsCsv(report, bbPlan as any, { weakCauses: causes, weakHeads: heads, specBlock: spec, ...pro2csv });
-    downloadCsv(csv, `bb-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadCsv(csv, `bb-diagnostics-${localIsoDate()}.csv`);
     setToast('✓ CSV экспорт (движения: причины + спец-блок + разбор + скрининг)');
     setTimeout(() => setToast(''), 2000);
   };
@@ -1240,7 +1256,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         setTimeout(() => setToast(''), 2000);
         return;
       }
-      downloadBBSpecIcs(ics, `bb-spec-${new Date().toISOString().slice(0, 10)}.ics`);
+      downloadBBSpecIcs(ics, `bb-spec-${localIsoDate()}.ics`);
       setToast('📅 Календарь спец-блока скачан');
       setTimeout(() => setToast(''), 2000);
     } catch {
@@ -1549,7 +1565,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2000);
       return;
     }
-    const entry = { date: new Date().toISOString().slice(0, 10), meas };
+    const entry = { date: localIsoDate(), meas };
     setMeasureHist((prev) => {
       const next = appendMeasureSnapshot(prev, entry);
       try { localStorage.setItem('he_bb_measure_history', JSON.stringify(next)); } catch { /* noop */ }
@@ -1681,7 +1697,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       localStorage.setItem('he_bb_plan_saved_prev', raw as string);
       const hist = readPlanHistory(localStorage.getItem('he_bb_plan_history'));
       const next = pushPlanSnapshot(hist, {
-        date: new Date().toISOString().slice(0, 10),
+        date: localIsoDate(),
         label: `до вставки: ${zones.map(weakRu).join(', ')}`,
         plan,
       });
@@ -1755,7 +1771,7 @@ export const BBDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>Скрининг + разбор упражнения + стимул-карта + пропорции. Нагрузка — ⚡ Интеллект, объём — 📐 Объём-хаб, суставы — 🦴 Ортопедия (здесь только ссылки).</div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
+            <div data-bb="score" style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
             <div style={{ fontSize: 9, color: sColor, fontWeight: 700, marginTop: 2 }}>{sLevel === 'ok' ? 'ОК' : sLevel === 'warn' ? 'ВНИМАНИЕ' : 'КРИТИЧНО'} · пров. {report.score.verification}</div>
           </div>
         </div>
@@ -2460,7 +2476,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <b style={{ fontSize: 11, color: '#fff' }}>📸 Снимки скрининга ({screenHist.length})</b>
                 <button onClick={() => {
                   // П1/R7: снимок v:3 — OHS + D1–D5 + R1–R6 коды (legacy без v / v:2 мигрируют в дельте, не регрессом)
-                  const entry = { date: new Date().toISOString().slice(0, 10), fails: screenCodes, v: 3 };
+                  const entry = { date: localIsoDate(), fails: screenCodes, v: 3 };
                   setScreenHist((prev) => {
                     const next = [...prev, entry].slice(-10);
                     try { localStorage.setItem('he_bb_screen_history', JSON.stringify(next)); } catch { /* noop */ }
