@@ -733,9 +733,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-      {/* ─── TOP NAV BAR — FIX: sticky с учётом safe-area, не перекрывает сабтабы ─── */}
+      {/* ─── TOP NAV BAR — sticky от верха скролла, шторка телефона — в padding с fallback 24px (env=0 в APK WebView) ─── */}
       {mainTab !== 'hero' && (
-        <div className="labs-topnav" style={{ position:'sticky', top:'env(safe-area-inset-top, 0px)', zIndex:30, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', background:'linear-gradient(180deg, rgba(21,38,66,0.92), rgba(12,23,40,0.92))', borderBottom:'1px solid rgba(140,190,255,0.14)', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', paddingTop:'calc(10px + env(safe-area-inset-top, 0px))', flexShrink:0, boxShadow:'0 8px 24px rgba(0,0,0,0.35)', minHeight:56 }}>
+        <div className="labs-topnav" style={{ position:'sticky', top:0, zIndex:30, backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', background:'linear-gradient(180deg, rgba(21,38,66,0.92), rgba(12,23,40,0.92))', borderBottom:'1px solid rgba(140,190,255,0.14)', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', paddingTop:'calc(10px + max(env(safe-area-inset-top, 0px), 24px))', flexShrink:0, boxShadow:'0 8px 24px rgba(0,0,0,0.35)', minHeight:56 }}>
           <button onClick={() => setMainTab('hero')} aria-label="Назад в Лабораторию" style={{
             minHeight:44, minWidth:44, padding:'10px 14px', cursor:'pointer', fontSize:13, fontWeight:800, color:'#fff', border:'1px solid rgba(140,190,255,0.16)', background:'rgba(21,38,66,0.70)', borderRadius:999, display:'flex', alignItems:'center', justifyContent:'center', gap:6, flexShrink:0,
           }}>←</button>
@@ -753,9 +753,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-      {/* ─── SCROLLABLE CONTENT — один скролл-контейнер (outer), без вложенного */}
+      {/* ─── SCROLLABLE CONTENT — один скролл-контейнер (outer), низ с двойным клиренсом: док дашборда + labs-bottomtabs ─── */}
       {mainTab !== 'hero' && (
-      <div className="labs-body" style={{ flex: 1, minHeight: 0, overflowY: 'visible', padding: '0 12px calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom,0px))' }}>
+      <div className="labs-body" style={{ flex: 1, minHeight: 0, overflowY: 'visible', padding: '0 12px calc(var(--nav-height, 76px)*2 + max(env(safe-area-inset-bottom, 0px), 28px) + 40px)' }}>
 
       {/* ≡≡≡ LAB CONTENT (only when mainTab === 'lab') — верхняя плавающая панель subtabs убрана, навигация только нижней labs-bottomtabs ≡≡≡ */}
       {mainTab === 'lab' && (
@@ -2188,9 +2188,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       </div>
        )}
-      {/* ─── BOTTOM TABS — док вплотную к дашборду (без floating-зазора), навигация разделов ─── */}
+      {/* ─── BOTTOM TABS — плавающий бар с зазором 8px над дашбордом (var(--tabbar-lift), как остальные разделы) ─── */}
       {mainTab === 'lab' && (
-        <div className="labs-bottomtabs" style={{ position:'fixed', bottom:'calc(var(--tabbar-h, var(--nav-height,76px)) + var(--tabbar-safe, max(env(safe-area-inset-bottom,0px), 28px)))', left:0, right:0, zIndex:25, display:'flex', gap:10, overflowX:'auto', padding:'10px 12px calc(10px + env(safe-area-inset-bottom,0px))', background:'linear-gradient(180deg, rgba(21,38,66,0.90), rgba(12,23,40,0.92))', backdropFilter:'blur(22px)', WebkitBackdropFilter:'blur(22px)', borderTop:'1px solid rgba(140,190,255,0.16)', scrollbarWidth:'none', boxShadow:'0 -12px 32px rgba(0,0,0,0.40)' }}>
+        <div className="labs-bottomtabs" style={{ position:'fixed', bottom:'var(--tabbar-lift, calc(var(--nav-height, 76px) + max(env(safe-area-inset-bottom, 0px), 28px) + 18px))', left:0, right:0, zIndex:25, display:'flex', gap:10, overflowX:'auto', padding:'10px 12px calc(10px + env(safe-area-inset-bottom,0px))', background:'linear-gradient(180deg, rgba(21,38,66,0.90), rgba(12,23,40,0.92))', backdropFilter:'blur(22px)', WebkitBackdropFilter:'blur(22px)', borderTop:'1px solid rgba(140,190,255,0.16)', scrollbarWidth:'none', boxShadow:'0 -12px 32px rgba(0,0,0,0.40)' }}>
           {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => {
             const active = subTab===t.id;
             return (
@@ -2207,7 +2207,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
         {/* OCR Import — floating bottom-sheet above nav + labs-bottomtabs */}
       {showImport && (
-         <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'12px 12px calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom, 0px))' }} onClick={backdropClick}>
+         <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'12px 12px calc(var(--nav-height, 76px)*2 + max(env(safe-area-inset-bottom, 0px), 28px) + 40px)' }} onClick={backdropClick}>
           <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px', maxHeight:'80vh', overflow:'hidden', display:'flex', flexDirection:'column', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }} onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:999, background:'rgba(255,255,255,0.20)', margin:'10px auto 2px', flexShrink:0 }} />
             <div style={{ padding:'12px 16px', borderBottom:'1px solid rgba(140,190,255,0.12)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, flexShrink:0 }}>
@@ -2336,7 +2336,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* Lab Input Modal — floating sheet above nav + labs-bottomtabs */}
       {showLabInput && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'12px 12px calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom, 0px))' }} onClick={() => setShowLabInput(false)}>
+        <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'12px 12px calc(var(--nav-height, 76px)*2 + max(env(safe-area-inset-bottom, 0px), 28px) + 40px)' }} onClick={() => setShowLabInput(false)}>
           <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', maxHeight:'80dvh', overflow:'hidden', display:'flex', flexDirection:'column' }} onClick={e => e.stopPropagation()}>
             <div style={{ width:40, height:4, borderRadius:999, background:'rgba(255,255,255,0.20)', margin:'10px auto 4px', flexShrink:0 }} />
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'0 18px 12px', flexShrink:0 }}>

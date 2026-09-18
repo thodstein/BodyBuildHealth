@@ -5,8 +5,12 @@
  * спиннеры number-инпутов, overscroll шитов, страховка нижних отступов. */
 
 html.app-native .labs-body {
-  padding-bottom: calc(var(--nav-height, 76px) + 84px + env(safe-area-inset-bottom, 0px)) !important;
+  /* Низ с двойным клиренсом: док дашборда (nav 76 + safe 28) + labs-bottomtabs (~68) + зазор.
+   * Было nav+84+env(0)=160 — контент уходил под нижние табы и док. */
+  padding-bottom: calc(var(--nav-height, 76px) * 2 + max(env(safe-area-inset-bottom, 0px), 28px) + 40px) !important;
   overscroll-behavior-y: contain !important;
+  /* Якоря/скролл к секциям не прячутся под липкий топнав (56 + шторка 24). */
+  scroll-padding-top: calc(max(env(safe-area-inset-top, 0px), 24px) + 76px) !important;
 }
 
 html.app-native .labs-subtabs,

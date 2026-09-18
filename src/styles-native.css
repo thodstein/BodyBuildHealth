@@ -4976,6 +4976,9 @@ html.app-native .labs-topnav {
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  /* Верх под шторку телефона: sticky от 0, шторка — в padding с fallback 24px (env=0 в APK WebView). */
+  top: 0 !important;
+  padding-top: calc(10px + max(env(safe-area-inset-top, 0px), 24px)) !important;
 }
 
 html.app-native .labs-topnav button {
@@ -5027,8 +5030,8 @@ html.app-native .labs-bottomtabs {
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35) !important;
-  /* Док вплотную к дашборду (без floating-зазора +10px) — по ТЗ. */
-  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + var(--tabbar-offset, 0px)) !important;
+  /* Плавающий бар с зазором 8px над доком дашборда (как остальные разделы). */
+  bottom: var(--tabbar-lift, calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 18px)) !important;
 }
 
 html.app-native .labs-bottomtabs button {
@@ -5045,6 +5048,11 @@ html.app-native .labs-body {
   flex-direction: column !important;
   gap: 12px !important;
   animation: nativeScreenIn 0.38s cubic-bezier(0.22, 0.68, 0, 1) !important;
+}
+
+/* Якоря секций не уходят под липкий топнав (шапка 56 + шторка 24 + зазор). */
+html.app-native .labs-body > * {
+  scroll-margin-top: calc(max(env(safe-area-inset-top, 0px), 24px) + 76px) !important;
 }
 
 html.app-native .labs-overview,

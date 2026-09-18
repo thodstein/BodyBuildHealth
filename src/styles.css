@@ -3788,9 +3788,9 @@ html.app-native {
 .support-subbar {
   bottom: var(--tabbar-lift) !important;
 }
-/* Анализы: нижняя панель доком вплотную к дашборду (без floating-зазора 8px) — по ТЗ. */
+/* Анализы: нижняя панель — плавающий бар с зазором 8px над дашбордом (как остальные разделы). */
 .labs-bottomtabs {
-  bottom: calc(var(--tabbar-h) + var(--tabbar-offset) + var(--tabbar-safe)) !important;
+  bottom: var(--tabbar-lift) !important;
 }
 .manual-constructor--editor .editor-bottomnav {
   bottom: var(--tabbar-lift) !important;
