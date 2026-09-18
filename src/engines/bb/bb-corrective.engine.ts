@@ -140,7 +140,7 @@ export const BB_CORRECTIVES: BBCorrective[] = [
   // ── Ягодицы / ТБС ──
   c('g-hip-thrust', 'Хип-траст с паузой 2с', 'hip_thrust_barbell', ['glutes', 'driver:hip'], ['activation', 'volume'], 'strength', 'any',
     { sets: 3, repsMin: 8, repsMax: 10, rir: 1, tempo: '2-2-1-0', restSec: 120, freqPerWeek: 2 },
-    ['Лопатки на скамье', 'Сжатие ягодиц 2с вверху', 'Без гиперэкстензии'], 'Вес +2.5 кг', 'Ягодичный мост на полу', 'Пауза держится на рабочем весе', 'Plotkin 2023 (траст у тренированных)', ['glute_bridge_v2', 'cable_pull_through']),
+    ['Лопатки на скамье', 'Сжатие ягодиц 2с вверху', 'Без гиперэкстензии'], 'Вес +2.5 кг', 'Ягодичный мост на полу', 'Пауза держится на рабочем весе', 'Plotkin 2023 (траст у тренированных)', ['glute_bridge_v2', 'cable_pull_through'], ['pm-red']),
   c('g-clam-complex', 'Комплекс ТБС 8 нед (кламшелл+)', 'clamshell', ['glutes', 'driver:hip', 'ybt-asym'], ['technique', 'activation'], 'stability', 'any',
     { sets: 2, repsMin: 15, repsMax: 20, rir: 3, tempo: '2-1-2-0', restSec: 45, freqPerWeek: 3 },
     ['Резина на бёдрах', '«Раздвинь пол стопами»', 'Таз стабилен'], 'Резина жёстче / боковая планка с ногой', 'Ходьба с резиной', 'FPPA −5° / колени не валятся', 'CCEP BMC-2022 (комплекс, не изоляция)', ['band_walks', 'plank_side_leg_lift']),
@@ -153,7 +153,7 @@ export const BB_CORRECTIVES: BBCorrective[] = [
   // ── Приводящие ──
   c('ad-copenhagen', 'Копенгаген L0–L3 (прогрессия)', 'copenhagen_plank', ['adductor', 'add-weak', 'driver:hip'], ['technique', 'volume', 'activation'], 'strength', 'intermediate',
     { sets: 3, repsMin: 5, repsMax: 8, rir: 2, tempo: '3-0-1-0', restSec: 90, freqPerWeek: 2 },
-    ['Верхняя нога на скамье', 'Тело линией', 'Без провисания'], 'L0→L3 по готовности', 'Боковая планка', 'Уровень + время без просадки', 'Quintana-Cepedal 2025 (сила↑)', ['plank_side']),
+    ['Верхняя нога на скамье', 'Тело линией', 'Без провисания'], 'L0→L3 по готовности', 'Боковая планка', 'Уровень + время без просадки', 'Quintana-Cepedal 2025 (сила↑)', ['plank_side'], ['pm-red']),
   // ── Икры / голеностоп ──
   c('c-stand-full', 'Подъёмы стоя: полная амплитуда', 'calf_raise_standing', ['calves', 'driver:ankle', 'ktw-asym'], ['volume', 'activation'], 'strength', 'any',
     { sets: 3, repsMin: 12, repsMax: 15, rir: 1, tempo: '2-2-1-0', restSec: 60, freqPerWeek: 3 },

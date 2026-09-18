@@ -111,6 +111,13 @@ describe('bb-corrective K1 library', () => {
     const back = rankCorrectives({ zones: ['back_width'], shoulderPain: true });
     expect(back.map((x) => x.corr.id)).not.toContain('bw-neutral-safe');
   });
+  it('красная боль режет max-нагрузку: копенгаген и штанговый траст (регрессии остаются)', () => {
+    const add = rankCorrectives({ zones: ['adductor'], painLevel: 'red' });
+    expect(add.map((x) => x.corr.id)).not.toContain('ad-copenhagen');
+    const gl = rankCorrectives({ zones: ['glutes'], painLevel: 'red' });
+    expect(gl.map((x) => x.corr.id)).not.toContain('g-hip-thrust');
+    expect(gl.length).toBeGreaterThan(0);
+  });
   it('rot-gap тег ведёт на wall-slide', () => {
     expect(tagsForMovementScreens({ rotGap: true })).toContain('rot-gap');
     expect(tagsForMovementScreens({})).not.toContain('rot-gap');
