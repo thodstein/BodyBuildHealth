@@ -12,7 +12,7 @@ beforeEach(() => {
 describe('StrongmanDiagnosticsHub PRO-3', () => {
   it('yMax пишется в yMaxCm и не трогает stoneKg', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(screen.getByText(/Видео/));
+    fireEvent.click(document.querySelector('[data-sm="top-tab-video"]') as HTMLElement);
     const card = await screen.findByRole('button', { name: /Высота подъёма/ });
     fireEvent.click(card);
     const input = await screen.findByRole('textbox', { name: /Высота подъёма/ });
@@ -27,42 +27,42 @@ describe('StrongmanDiagnosticsHub PRO-3', () => {
   });
   it('переименованный Мешок: bag_press без дубля press_start', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(screen.getByText(/Загрузки/));
+    fireEvent.click(document.querySelector('[data-sm="top-tab-load"]') as HTMLElement);
     fireEvent.click(await screen.findByText(/Мешок: жим/));
     expect(document.body.textContent).toContain('bag_press');
   });
   it('таб Загрузки показывает 5-фазные поля', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(screen.getByText(/Загрузки/));
+    fireEvent.click(document.querySelector('[data-sm="top-tab-load"]') as HTMLElement);
     expect(document.body.textContent).toContain('Камень хват');
     expect(document.body.textContent).toContain('Zero-lap');
     expect(document.body.textContent).toContain('Дней до старта');
   });
   it('таб Переноски показывает класс фермера после ввода', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(screen.getByText(/Переноски/));
+    fireEvent.click(document.querySelector('[data-sm="top-tab-carry"]') as HTMLElement);
     expect(screen.getByText(/Фермер \(на руку\)/)).toBeTruthy();
   });
   it('таб Хват показывает бюджет McGill', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(screen.getByText(/Хват\/Кор/));
+    fireEvent.click(document.querySelector('[data-sm="top-tab-grip"]') as HTMLElement);
     expect(document.body.textContent).toContain('Бюджет McGill');
   });
   it('таб Видео показывает гониометр вместо заглушки', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(screen.getByText(/Видео/));
+    fireEvent.click(document.querySelector('[data-sm="top-tab-video"]') as HTMLElement);
     expect(await screen.findByText(/Видеоуглы с телефона/)).toBeTruthy();
     expect(document.body.textContent).not.toContain('заглушка BlazePose');
   });
   it('movement P2: переноски показывают локомоцию и разворот', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(screen.getByText(/Переноски/));
+    fireEvent.click(document.querySelector('[data-sm="top-tab-carry"]') as HTMLElement);
     expect(await screen.findByText(/Длина шага/)).toBeTruthy();
     expect(document.body.textContent).toContain('Разворот 180');
   });
   it('movement P1+P5: загрузки показывают lap-маркер и тайр', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(screen.getByText(/Загрузки/));
+    fireEvent.click(document.querySelector('[data-sm="top-tab-load"]') as HTMLElement);
     expect(await screen.findByText(/Поздний колени/)).toBeTruthy();
     expect(document.body.textContent).toContain('Тайр 2-я тяга');
   });

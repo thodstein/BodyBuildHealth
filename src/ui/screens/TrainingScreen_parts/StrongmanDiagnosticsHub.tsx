@@ -1370,49 +1370,36 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   return (
     <div className="train-strongdiag" style={{ padding: '10px 8px 16px', color: '#fff', maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <style>{`.train-strongdiag input:focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(245,158,11,0.65) !important; box-shadow:0 0 0 3px rgba(245,158,11,0.18) !important; outline:none !important; }.train-strongdiag input::placeholder, .train-strongdiag textarea::placeholder{ color:rgba(255,255,255,0.75); opacity:1; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; min-height:44px; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:#fff; font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }.train-strongdiag button:focus-visible, .train-strongdiag summary:focus-visible, .train-strongdiag input:focus-visible, .train-strongdiag select:focus-visible, .train-strongdiag textarea:focus-visible{ outline:2px solid rgba(245,158,11,0.70); outline-offset:2px; }@media (prefers-reduced-motion: reduce){ .train-strongdiag button:active{ transform:none; } }@keyframes hubFade{from{opacity:0}to{opacity:1}}@keyframes hubSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
-      <div style={{ ...CARD, padding: '12px 12px 10px', background: 'linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.12))', border: '1px solid rgba(239,68,68,0.22)', borderTop: '3px solid rgba(239,68,68,0.55)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#ef4444,#f59e0b)', color: '#fff', fontWeight: 900, fontSize: 20, flexShrink: 0, boxShadow: '0 6px 20px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>🏋️‍♂️</div>
-          <div style={{ flex: '1 1 180px', minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', lineHeight: 1.15, letterSpacing: -0.3 }}>Стронгмен-диагностика — хаб PRO</div>
-            <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>16 фаз × углы + биомеханика + скорость (VBT) + присед над головой (OHS) + хват + качание (sway) + симулятор.</div>
+      <div style={{ ...CARD, padding: '10px 12px', margin: '6px 0', background: 'linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.08))', border: '1px solid rgba(239,68,68,0.22)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -18, right: -18, width: 110, height: 110, borderRadius: 110, background: 'radial-gradient(circle,rgba(239,68,68,0.14),transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#ef4444,#f59e0b)', color: '#fff', fontWeight: 900, fontSize: 16 }}>🏋️</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Стронгмен-диагностика — хаб PRO</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>16 фаз × углы + биомеханика + скорость (VBT) + присед над головой (OHS) + хват + качание (sway) + симулятор.</div>
           </div>
-          <div style={{ textAlign: 'center', flexShrink: 0, marginLeft: 'auto' }}>
-            <div style={{ width: 60, height: 60, borderRadius: 30, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 16, boxShadow: `0 0 20px ${sColor}44` }}>{score}</div>
-            <div style={{ fontSize: 11, color: sColor, fontWeight: 800, marginTop: 4 }}>{level==='ok'?'ОК':level==='warn'?'ВНИМАНИЕ':'КРИТ'} · v{scoring.verification}</div>
-          </div>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:6, marginBottom:6 }}>
-          <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${ohs.level==='ok'?'#22c55e':'#ef4444'}`, display:'flex', flexDirection:'column', gap:2 }}>
-            <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>OHS · МОБИЛЬНОСТЬ</span>
-            <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: ohs.level==='ok'?'#22c55e':'#ef4444' }}>{ohs.totalScore}/6</span>
-          </div>
-          <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${gripFails>0?'#f59e0b':'#22c55e'}`, display:'flex', flexDirection:'column', gap:2 }}>
-            <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>GRIP · ПРОВАЛЫ</span>
-            <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: gripFails>0?'#f59e0b':'#22c55e' }}>grip {gripFails? `${gripFails}/3` : 'OK'}</span>
-          </div>
-          <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${swayDiag ? (swayDiag.severity==='ok'?'#22c55e':'#ef4444') : 'rgba(255,255,255,0.15)'}`, display:'flex', flexDirection:'column', gap:2 }}>
-            <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>SWAY · CARRY</span>
-            <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: swayDiag ? (swayDiag.severity==='ok'?'#22c55e':'#ef4444') : '#fff' }}>{swayDiag ? `качание ${swayDiag.swayCm} см` : '—'}</span>
-          </div>
-          <div style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.035)', border:'1px solid rgba(255,255,255,0.07)', borderTop:`2px solid ${vbtLoss ? (vbtLoss.exceeded?'#ef4444':'#22c55e') : 'rgba(255,255,255,0.15)'}`, display:'flex', flexDirection:'column', gap:2 }}>
-            <span style={{ fontSize:10, fontWeight:800, letterSpacing:1.2, color:'#fff' }}>VBT · ПОТЕРЯ</span>
-            <span style={{ fontSize:20, fontWeight:800, fontVariantNumeric:'tabular-nums', color: vbtLoss ? (vbtLoss.exceeded?'#ef4444':'#22c55e') : '#fff' }}>{vbtLoss ? `VBT ${vbtLoss.lossPct}%` : '—'}</span>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 26, background: `conic-gradient(${sColor} ${score}%, rgba(255,255,255,0.06) 0)`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${sColor}`, fontWeight: 900, color: '#fff', fontSize: 14 }}>{score}</div>
+            <div style={{ fontSize: 9, color: sColor, fontWeight: 700, marginTop: 2 }}>{level==='ok'?'ОК':level==='warn'?'WARN':'CRITICAL'} · v{scoring.verification}</div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 12, marginBottom: 6 }}>
-          <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
-          <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{weakPoints.length? `${weakPoints.length} слабые` : 'баланс'}</span>
-          {scoring.floors.length>0 && <span style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#fff' }}>порог: {scoring.floors[0]}</span>}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{weakPoints.length ? `${weakPoints.length} слабые` : 'баланс'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: ohs.level === 'ok' ? '#22c55e' : '#ef4444' }}>OHS {ohs.totalScore}/6</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: gripFails > 0 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: gripFails > 0 ? '#f59e0b' : '#22c55e' }}>{gripFails > 0 ? `grip ${gripFails}/3` : 'grip OK'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: swayDiag ? (swayDiag.severity === 'ok' ? '#22c55e' : '#ef4444') : '#fff' }}>{swayDiag ? `sway ${swayDiag.swayCm} см` : 'sway —'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: vbtLoss ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: vbtLoss ? (vbtLoss.exceeded ? '#ef4444' : '#22c55e') : '#fff' }}>{vbtLoss ? `VBT ${vbtLoss.lossPct}%` : 'VBT —'}</span>
+          {scoring.floors.length > 0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>порог: {scoring.floors[0]}</span>}
         </div>
         {(diaryWeaks.length>0 || diaryPhases.length>0) && (
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
-            {diaryWeaks.length>0 && <span style={{ padding:'6px 12px', borderRadius:20, background:'rgba(94,234,212,0.10)', border:'1px solid rgba(94,234,212,0.22)', color:'#5ee', fontSize:12, fontWeight:700 }}>📓 Дневник: {diaryWeaks.map(w=> `${w.label}`).join(', ')}</span>}
-            {diaryPhases.length>0 && <span style={{ padding:'6px 12px', borderRadius:20, background:'rgba(167,139,250,0.10)', border:'1px solid rgba(167,139,250,0.22)', color:'#a78bfa', fontSize:12, fontWeight:700 }}>📓 Фаза по дневнику: {diaryPhases.join(' · ')}</span>}
+            {diaryWeaks.length>0 && <span style={{ padding:'2px 8px', borderRadius:20, background:'rgba(94,234,212,0.10)', border:'1px solid rgba(94,234,212,0.22)', color:'#5ee', fontSize:10, fontWeight:700 }}>📓 Дневник: {diaryWeaks.map(w=> `${w.label}`).join(', ')}</span>}
+            {diaryPhases.length>0 && <span style={{ padding:'2px 8px', borderRadius:20, background:'rgba(167,139,250,0.10)', border:'1px solid rgba(167,139,250,0.22)', color:'#a78bfa', fontSize:10, fontWeight:700 }}>📓 Фаза по дневнику: {diaryPhases.join(' · ')}</span>}
           </div>
         )}
-        <div style={{ fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '10px 12px', lineHeight: 1.4 }}>
-          Выбери слабые фазы (углы + биомеханика) + качание 3/5 см + скорость 15% + хват из 3 тестов → общий балл. Кнопка <b style={{ color: '#fff' }}>«Применить в Стронг-конструктор»</b> отправит данные с биомеханикой и контестом.
+        <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
+          Выбери слабые фазы (углы + биомеханика) + качание 3/5 см + скорость 15% + хват из 3 тестов → общий балл. Кнопка <b style={{ color: '#60a5fa' }}>«Применить в Стронг-конструктор»</b> отправит данные с биомеханикой и контестом.
         </div>
         <details style={{ marginTop: 6, borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <summary style={{ padding: '12px 14px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', minHeight: 48, display: 'flex', alignItems: 'center', gap: 8 }}>📊 Детали расчёта — лимитеры, физика, симулятор, причины</summary>
@@ -1444,7 +1431,13 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       </div>
 
       <div style={{ ...CARD, padding: 10 }}>
-        <div style={{ fontSize:12, color:'#fff', marginBottom:8, textAlign:'center' }}>Разделы — в закреплённой навигации внизу ↓</div>
+        <div data-sm="top-nav" role="tablist" aria-label="Разделы диагностики" style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', gap: 6, flexWrap: 'wrap', margin: '-10px -10px 8px', padding: '8px 10px', background: 'rgba(9,18,34,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(140,190,255,0.14)', borderRadius: '14px 14px 0 0' }}>
+          {TAB_DEFS.map(t => (
+            <button key={t.id} role="tab" aria-selected={tab === t.id} aria-pressed={tab === t.id} data-sm={`top-tab-${t.id}`} onClick={() => setTab(t.id)} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: tab === t.id ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: tab === t.id ? 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(239,68,68,0.12))' : 'rgba(22,30,52,0.88)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
 
         {tab==='press' && (
           <div>
