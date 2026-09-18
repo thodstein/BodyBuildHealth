@@ -62,3 +62,30 @@ describe('PRO-5 Э2 свежесть данных', () => {
     expect((SRC.match(/\[profileNonce\]/g) || []).length).toBeGreaterThanOrEqual(5);
   });
 });
+
+describe('PRO-5 Э1 возврат в работу', () => {
+  it('стоп-флаг → карточка ступеней; выбор ступени 2 активен + персист', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    expect(document.querySelector('[data-bb="return-card"]')).toBeNull();
+    fireEvent.click(screen.getByRole('switch', { name: /Острая боль/ }));
+    const card = document.querySelector('[data-bb="return-card"]');
+    expect(card).not.toBeNull();
+    expect(card?.textContent).toMatch(/Возврат в работу/);
+    const stage2 = Array.from(document.querySelectorAll('[data-bb="return-stage"]')).find((el) => /2 ·/.test(el.textContent || ''));
+    expect(stage2).toBeTruthy();
+    fireEvent.click(stage2!);
+    expect(stage2!.getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelector('[data-bb="return-active"]')?.textContent).toMatch(/Активная/);
+    // ступень персистится в стор хаба (в мост уедет при «→ В ББ-авто»)
+    const saved = JSON.parse(localStorage.getItem('he_bb_diagnostics_hub_v1') || '{}');
+    expect(saved.returnStage).toBe('2');
+  });
+
+  it('source-guard: returnTo/returnStage/returnAction уезжают в мост только при активных флагах', () => {
+    expect(SRC).toMatch(/\.\.\.\(returnToPlan \? \{/);
+    expect(SRC).toMatch(/returnTo: returnToPlan,/);
+    expect(SRC).toMatch(/returnStage: state\.returnStage \|\| null,/);
+    expect(SRC).toMatch(/returnAction: state\.returnStage \? \(returnActive\?\.action \?\? null\) : null,/);
+  });
+});

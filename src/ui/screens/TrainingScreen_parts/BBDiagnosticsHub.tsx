@@ -929,6 +929,13 @@ export const BBDiagnosticsHub: React.FC = () => {
         videoStandard: state.videoTwoAngles ? 'снято с 2 ракурсов' : null,
         driverSubs: (() => { try { return { prefer: (driverSubs as any).prefer, avoid: (driverSubs as any).avoid, note: (driverSubs as any).note }; } catch { return null; } })(),
         asymPriority: (() => { try { return asymText; } catch { return null; } })(),
+        // Э1 PRO-5: возврат в работу — план ступеней (инфо) + ручная ступень + её исполняемое
+        // действие для автосборки (BbAutoConstructor применяет через he_bb_return_action).
+        ...(returnToPlan ? {
+          returnTo: returnToPlan,
+          returnStage: state.returnStage || null,
+          returnAction: state.returnStage ? (returnActive?.action ?? null) : null,
+        } : {}),
         // R1–R8 PRO-2: жим/боль/задняя цепь/шарнир-нагрузка/ER:IR/приоритет (инфо-слой, сборку не меняет §9.2)
         bench: benchV.tested ? { level: benchV.level, text: benchV.text } : null,
         painMon: painMon.line || null,
@@ -1651,6 +1658,7 @@ export const BBDiagnosticsHub: React.FC = () => {
     let working: any = plan;
     let injected = 0;
     let skippedBudget = 0;
+    let onlyTechSkip = false;
     const nWeeks = Array.isArray(working.weeks) ? working.weeks.length : 0;
     for (let wi = 0; wi < nWeeks; wi++) {
       if (!working.weeks[wi] || working.weeks[wi].deload) continue;
@@ -1668,6 +1676,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         const rirShift = baseRir + (retAct ? retAct.rirShift : 0);
         const volumeMult = baseVol * (retAct ? retAct.volumeMult : 1);
         if (retAct && retAct.volumeMult <= 0) {
+          onlyTechSkip = true;
           skippedBudget++;
           continue;
         }
@@ -1688,7 +1697,9 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { /* noop */ }
     }
     if (!injected) {
-      setToast(`⊘ Не вставлено (бюджет переполнен: ${skippedBudget} · или уже есть в днях)`);
+      setToast(onlyTechSkip
+        ? '↩ Ступень 1 — вставка без силового объёма (только техника). Выбери ступень 2–3, когда боли нет'
+        : `⊘ Не вставлено (бюджет переполнен: ${skippedBudget} · или уже есть в днях)`);
       setTimeout(() => setToast(''), 3000);
       return;
     }
@@ -1961,6 +1972,35 @@ export const BBDiagnosticsHub: React.FC = () => {
                   </div>
                 )}
                 <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 4 }}>Полный суставной скрининг — <b>🦴 Суставы и ортопедия</b> (здесь только гейт вставки).</div>
+              </div>
+            )}
+            {returnToPlan && (
+              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.20)', fontSize: 11, lineHeight: 1.5 }} data-bb="return-card">
+                <b style={{ color: '#fff' }}>🔄 Возврат в работу после стоп-флагов (ступени — только ручные)</b>
+                <div style={{ color: '#fff', marginTop: 4, fontSize: 10 }}>{returnToPlan.text}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  {([['', 'Авто · ступень 1'], ['1', '1 · техника'], ['2', '2 · ×0.5 RIR+3'], ['3', '3 · полный']] as Array<[BBState['returnStage'], string]>).map(([v, label]) => (
+                    <button
+                      key={v || 'auto'}
+                      type="button"
+                      aria-pressed={(state.returnStage || '') === v}
+                      aria-label={`Ступень возврата: ${label}`}
+                      data-bb="return-stage"
+                      data-active={(state.returnStage || '') === v ? '1' : '0'}
+                      onClick={() => setState((s) => ({ ...s, returnStage: v }))}
+                      style={{ minHeight: 44, padding: '8px 12px', borderRadius: 999, border: '1px solid', borderColor: (state.returnStage || '') === v ? '#f59e0b' : 'rgba(255,255,255,0.12)', background: (state.returnStage || '') === v ? 'rgba(245,158,11,0.14)' : 'rgba(255,255,255,0.04)', color: (state.returnStage || '') === v ? '#f59e0b' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                    >{label}</button>
+                  ))}
+                </div>
+                {returnActive && (
+                  <div style={{ color: '#fff', marginTop: 6, fontSize: 10 }} data-bb="return-active">
+                    Активная: <b style={{ color: '#f59e0b' }}>{returnActive.title}</b> · {returnActive.volume} · {returnActive.rir}
+                    {returnActive.action.volumeMult <= 0 ? ' — силовые коррекции не вставляются (только техника)' : ''}
+                  </div>
+                )}
+                <div style={{ color: '#fff', marginTop: 4, fontSize: 10, opacity: 0.9 }}>
+                  Правило боли (ПММ): во время ≤5/10 и к утру — как до нагрузки. Боль вернулась — назад на ступень. Ступень уехает в ББ-авто кнопкой «→ В ББ-авто» и учитывается при 💉.
+                </div>
               </div>
             )}
             {report.weakZonesGranular.length > 0 && (
