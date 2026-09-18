@@ -38,7 +38,7 @@ import { sfrOf } from '../../../engines/bb/bb-sfr-db';
 import { diagnoseWeakCausesBatch } from '../../../engines/bb/bb-weak-cause.engine';
 import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
-import { rankCorrectives, correctiveDose, correctiveExportLines } from '../../../engines/bb/bb-corrective.engine';
+import { rankCorrectives, correctiveDose } from '../../../engines/bb/bb-corrective.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
@@ -1056,8 +1056,11 @@ export const BBDiagnosticsHub: React.FC = () => {
               benchLevel: (() => { try { return String((benchV as any)?.level || '') || null; } catch { return null; } })(),
               nheWeak: (() => { try { const l = String((nheV as any)?.level || ''); return l === 'weak' || l === 'very_weak'; } catch { return false; } })(),
               addWeak: (() => { try { return String((adductorV as any)?.level || '') === 'weak'; } catch { return false; } })(),
-              erirLow: (() => { try { const r2 = Number((erIrV as any)?.ratio); return Number.isFinite(r2) && r2 < 0.75; } catch { return false; } })(),
+              erirLow: (() => { try { const r2 = (erIrV as any)?.ratio; return typeof r2 === 'number' && Number.isFinite(r2) && r2 < 0.75; } catch { return false; } })(),
               painLevel: (() => { try { const l = String((painMon as any)?.verdict?.level || 'green'); return (l === 'red' || l === 'yellow' ? l : 'green') as any; } catch { return 'green' as any; } })(),
+              teenBlocked: (() => { try { return !!teenGate.blocked; } catch { return false; } })(),
+              shoulderPain: (() => { try { return state.pmLoc === 'shoulder' && ((painMon as any)?.verdict?.level === 'yellow' || (painMon as any)?.verdict?.level === 'red'); } catch { return false; } })(),
+              rotGap: (() => { try { const g = (rotV as any)?.gap; return typeof g === 'number' && Number.isFinite(g) && g >= 10; } catch { return false; } })(),
               cause: (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(),
               level,
             })[0];
@@ -1145,8 +1148,11 @@ export const BBDiagnosticsHub: React.FC = () => {
               benchLevel: (() => { try { return String((benchV as any)?.level || '') || null; } catch { return null; } })(),
               nheWeak: (() => { try { const l = String((nheV as any)?.level || ''); return l === 'weak' || l === 'very_weak'; } catch { return false; } })(),
               addWeak: (() => { try { return String((adductorV as any)?.level || '') === 'weak'; } catch { return false; } })(),
-              erirLow: (() => { try { const r2 = Number((erIrV as any)?.ratio); return Number.isFinite(r2) && r2 < 0.75; } catch { return false; } })(),
+              erirLow: (() => { try { const r2 = (erIrV as any)?.ratio; return typeof r2 === 'number' && Number.isFinite(r2) && r2 < 0.75; } catch { return false; } })(),
               painLevel: (() => { try { const l = String((painMon as any)?.verdict?.level || 'green'); return (l === 'red' || l === 'yellow' ? l : 'green') as any; } catch { return 'green' as any; } })(),
+              teenBlocked: (() => { try { return !!teenGate.blocked; } catch { return false; } })(),
+              shoulderPain: (() => { try { return state.pmLoc === 'shoulder' && ((painMon as any)?.verdict?.level === 'yellow' || (painMon as any)?.verdict?.level === 'red'); } catch { return false; } })(),
+              rotGap: (() => { try { const g = (rotV as any)?.gap; return typeof g === 'number' && Number.isFinite(g) && g >= 10; } catch { return false; } })(),
               cause: (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(),
               level,
             })[0];
@@ -1321,7 +1327,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         const drv = (() => { try { return String((moveDriver as any)?.driver || ''); } catch { return ''; } })();
         const nheWeak = (() => { try { const l = String((nheV as any)?.level || ''); return l === 'weak' || l === 'very_weak'; } catch { return false; } })();
         const addWeak = (() => { try { const l = String((adductorV as any)?.level || ''); return l === 'weak'; } catch { return false; } })();
-        const erirLow = (() => { try { const r = Number((erIrV as any)?.ratio); return Number.isFinite(r) && r < 0.75; } catch { return false; } })();
+        const erirLow = (() => { try { const r = (erIrV as any)?.ratio; return typeof r === 'number' && Number.isFinite(r) && r < 0.75; } catch { return false; } })();
         const pMae: unknown = painMon;
         const pLevel = (() => { try { return String((pMae as any)?.verdict?.level || 'green'); } catch { return 'green'; } })();
         out[z] = rankCorrectives({
@@ -1335,13 +1341,16 @@ export const BBDiagnosticsHub: React.FC = () => {
           ybtAsym: (() => { try { const a = Number((ybtV as any)?.asymCm); return Number.isFinite(a) && a > 4; } catch { return false; } })(),
           ktwAsym: (() => { try { return String(asymText || '').includes('голеностоп'); } catch { return false; } })(),
           asym: asymMax != null && asymMax >= 7,
+          teenBlocked: (() => { try { return !!teenGate.blocked; } catch { return false; } })(),
+          shoulderPain: state.pmLoc === 'shoulder' && (pLevel === 'yellow' || pLevel === 'red'),
+          rotGap: (() => { try { const g = (rotV as any)?.gap; return typeof g === 'number' && Number.isFinite(g) && g >= 10; } catch { return false; } })(),
           cause: (() => { try { return (weakCauses as any)?.[z]?.cause ?? null; } catch { return null; } })(),
           level, equipment: profileEquipment,
         }).slice(0, 3);
       } catch { out[z] = []; }
     }
     return out;
-  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText]);
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {

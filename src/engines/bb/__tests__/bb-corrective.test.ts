@@ -4,6 +4,11 @@ import {
   BB_CORRECTIVES, BB_CORRECTIVE_COUNT, correctiveById, rankCorrectives,
   tagsForMovementScreens, correctiveDose, correctiveExportLines,
 } from '../bb-corrective.engine';
+// Статика вместо dynamic import: dynamic-import под нагрузкой машины упирается
+// в дефолтный testTimeout 5с (доказано: с --testTimeout=60000 тот же файл — 3.7с).
+// Циклов нет (инъекция/экспорт bb-corrective не импортируют).
+import { injectBBWeakPoints } from '../bb-diagnostics-injection.engine';
+import { buildBBDiagnosticsHtml, buildBBDiagnosticsCsv } from '../bb-diagnostics-export.engine';
 
 const IDS = new Set((EXERCISE_CATALOG as any[]).map((c) => String(c.id).toLowerCase()));
 
@@ -68,10 +73,9 @@ describe('bb-corrective K1 library', () => {
     expect(lines.length).toBe(3);
     expect(lines.join(' ')).toMatch(/RIR|Кью|Ре-тест/);
   });
-  it('инъекция берёт дозу библиотеки (sets/tempo/label), legacy без неё цел', async () => {
-    const mod = await import('../bb-diagnostics-injection.engine');
+  it('инъекция берёт дозу библиотеки (sets/tempo/label), legacy без неё цел', () => {
     const plan = { pattern: { id: 't' }, weeks: [{ week: 1, sessions: [{ day: 1, exercises: [] }] }], rationale: [] } as any;
-    const withCorr = mod.injectBBWeakPoints(plan, ['delt_mid'], {
+    const withCorr = injectBBWeakPoints(plan, ['delt_mid'], {
       budget: 500,
       preferredIds: { delt_mid: 'lateral_raise' },
       corrective: { delt_mid: { sets: 2, reps: 15, rir: 3, tempo: '2-1-2-0', label: 'Тест-доза' } },
@@ -82,17 +86,56 @@ describe('bb-corrective K1 library', () => {
     expect(ex.workSets[0].reps).toBe(15);
     expect(ex.workSets[0].rir).toBe(3);
     expect(String(ex.comment)).toMatch(/Тест-доза/);
-    const legacy = mod.injectBBWeakPoints(plan, ['delt_mid'], { budget: 500 });
+    const legacy = injectBBWeakPoints(plan, ['delt_mid'], { budget: 500 });
     const exL = legacy.plan.weeks[0].sessions[0].exercises[0] as any;
     expect(exL.sets).toBe(3);
     expect(exL.workSets[0].rir).toBe(2);
   });
-  it('экспорт несёт correctiveDetail в HTML+CSV без дублей', async () => {
-    const { buildBBDiagnosticsHtml, buildBBDiagnosticsCsv } = await import('../bb-diagnostics-export.engine');
+  it('экспорт несёт correctiveDetail в HTML+CSV без дублей', () => {
     const report = { weakCandidates: [], weakMusclesCanonical: [], weakZonesGranular: [], symmetry: { ratios: {}, issues: [] }, stimulus: { issues: [], global: { lengthened: 0, midRange: 0, shortened: 0, compound: 0, isolation: 0 } }, score: { score: 80, level: 'ok', verification: 'high', floors: [] }, findings: [], priorities: [] } as any;
     const meta = { correctiveDetail: [{ id: 'dm-lateral-pause', zone: 'delt_mid', exerciseId: 'lateral_raise', protocol: '3×12–15 RIR1', cues: ['a', 'b', 'c'], source: 'S' }] } as any;
     expect(buildBBDiagnosticsHtml(report, meta)).toMatch(/Коррекции/);
     expect(buildBBDiagnosticsCsv(report, null, meta)).toMatch(/corr_id/);
     expect(buildBBDiagnosticsHtml(report, {})).not.toMatch(/Коррекции/);
+  });
+  it('teenBlocked режет teen-loaded (нордик), остальное NHE цело', () => {
+    const base = rankCorrectives({ zones: ['hamstrings'], nheWeak: true });
+    expect(base.map((x) => x.corr.id)).toContain('h-nordic-ecc');
+    const teen = rankCorrectives({ zones: ['hamstrings'], nheWeak: true, teenBlocked: true });
+    expect(teen.map((x) => x.corr.id)).not.toContain('h-nordic-ecc');
+    expect(teen.length).toBeGreaterThan(0);
+  });
+  it('shoulderPain режет брусья и нейтральные подтягивания', () => {
+    const pain = rankCorrectives({ zones: ['chest'], shoulderPain: true });
+    expect(pain.map((x) => x.corr.exerciseId)).not.toContain('dips_chest');
+    const back = rankCorrectives({ zones: ['back_width'], shoulderPain: true });
+    expect(back.map((x) => x.corr.id)).not.toContain('bw-neutral-safe');
+  });
+  it('rot-gap тег ведёт на wall-slide', () => {
+    expect(tagsForMovementScreens({ rotGap: true })).toContain('rot-gap');
+    expect(tagsForMovementScreens({})).not.toContain('rot-gap');
+    const r = rankCorrectives({ zones: ['back'], rotGap: true });
+    expect(r.map((x) => x.corr.id)).toContain('sh-wall-slide');
+  });
+  it('оборудование: гантели+вес — гоблет есть, жима ногами нет; без списка — всё', () => {
+    const home = rankCorrectives({ zones: ['quads'], equipment: ['dumbbell', 'bodyweight'] });
+    const ids = home.map((x) => x.corr.exerciseId);
+    expect(ids).toContain('goblet_squat');
+    expect(ids).not.toContain('leg_press');
+    const full = rankCorrectives({ zones: ['quads'] });
+    expect(full.map((x) => x.corr.exerciseId)).toContain('leg_press');
+  });
+  it('bodyweight-атлет: брусья есть, кроссовер — нет', () => {
+    const bw = rankCorrectives({ zones: ['chest'], equipment: ['bodyweight'] });
+    const ids = bw.map((x) => x.corr.exerciseId);
+    expect(ids).toContain('dips_chest');
+    expect(ids).not.toContain('cable_fly_low');
+  });
+  it('зона бьёт сигнал: зона +5 — свой топ даже при чужом erir-low', () => {
+    const r = rankCorrectives({ zones: ['chest_upper'] });
+    expect(r[0].score).toBeGreaterThanOrEqual(5);
+    expect(r[0].why).toContain('в зону');
+    const sig = rankCorrectives({ zones: ['chest_upper'], cause: 'volume', erirLow: true });
+    expect(sig[0].corr.id).toMatch(/^(cu-|ch-)/);
   });
 });

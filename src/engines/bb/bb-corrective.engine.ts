@@ -10,6 +10,8 @@
  * Silbernagel PMM ≤5/<5 (боль), Wolf/Strey/Maeo/Kassiano (момент в длине).
  */
 
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+
 export type BBCorrPhase = 'technique' | 'strength' | 'stability';
 export type BBWeakCause = 'volume' | 'activation' | 'recovery' | 'technique' | 'genetics';
 
@@ -180,7 +182,7 @@ export const BB_CORRECTIVES: BBCorrective[] = [
     { sets: 3, repsMin: 8, repsMax: 10, rir: 3, tempo: '3-1-1-0', restSec: 90, freqPerWeek: 2 },
     ['Палка: 3 точки касания', 'Таз назад, колени мягкие', 'Выше колен — стоп'], 'Полная RDL с палкой чисто', 'Тяга троса между ног', 'Палка не отрывается весь сет', 'NASM (hinge-паттерн)', ['cable_pull_through']),
   // ── Плечо у стены / грудной ──
-  c('sh-wall-slide', 'Скольжение по стене (лопатки)', 'wall_slide', ['shoulder-fail', 'driver:shoulder', 'thoracic', 'driver:thoracic'], ['technique', 'activation'], 'stability', 'any',
+  c('sh-wall-slide', 'Скольжение по стене (лопатки)', 'wall_slide', ['shoulder-fail', 'driver:shoulder', 'thoracic', 'driver:thoracic', 'rot-gap'], ['technique', 'activation'], 'stability', 'any',
     { sets: 2, repsMin: 10, repsMax: 12, rir: 3, tempo: '2-1-2-0', restSec: 45, freqPerWeek: 3 },
     ['Спина к стене', 'Руки скользят вверх', 'Поясница не отрывается'], 'Жим гантелей нейтральным без боли', 'Scaption без веса', 'Стена-тест: чисто + ротация ≥50°', 'NASM (scap-контроль)', ['scaption']),
   c('sh-neutral-press', 'Жим нейтральным хватом (длина широчайших)', 'pulldown_rev', ['shoulder-fail', 'driver:shoulder', 'back_width'], ['technique', 'activation'], 'technique', 'any',
@@ -225,6 +227,12 @@ export interface BBScreenSignals {
   ktwAsym?: boolean;
   asym?: boolean;
   benchWatch?: boolean;
+  /** PRO-CORR-FIX: подросток 14–15 (нагруженные пробы запрещены) — режет teen-loaded. */
+  teenBlocked?: boolean;
+  /** PRO-CORR-FIX: боль плеча (жёлтая/красная) — режет shoulder-pain. */
+  shoulderPain?: boolean;
+  /** PRO-CORR-FIX: разрыв ротации грудного ≥10° — тег rot-gap. */
+  rotGap?: boolean;
   cause?: BBWeakCause | null;
   level?: string | null;
   equipment?: string[];
@@ -247,6 +255,7 @@ export function tagsForMovementScreens(s: BBScreenSignals): string[] {
   if (s.ktwAsym) push('ktw-asym');
   if (s.asym) push('asym');
   if (s.painLevel === 'yellow') push('pm-yellow');
+  if (s.rotGap) push('rot-gap');
   return Array.from(out);
 }
 
@@ -258,28 +267,50 @@ function levelOk(c: BBCorrective, level: string | null | undefined): boolean {
   return true;
 }
 
-function equipOk(c: BBCorrective, _exerciseEquipment: unknown, wanted: string[] | undefined): boolean {
-  void _exerciseEquipment;
-  if (!wanted || !wanted.length) return true;
-  // корпус/bodyweight-стабильность доступна всегда; остальное — по совпадению или альтернативе
-  return true;
+let catEquipCache: Map<string, string[]> | null = null;
+/** Оборудование упражнения по каталогу (словарь профиля: barbell/dumbbell/machine/cable/bodyweight/band/kettlebell). */
+function catalogEquipmentOf(exerciseId: string): string[] | null {
+  try {
+    if (!catEquipCache) {
+      catEquipCache = new Map();
+      for (const c of EXERCISE_CATALOG as any[]) {
+        const id = String(c?.id || '').toLowerCase().trim();
+        if (!id || catEquipCache.has(id)) continue;
+        const raw: unknown[] = Array.isArray((c as any).equipment) ? (c as any).equipment : [(c as any).equipment];
+        catEquipCache.set(id, raw.map((e: unknown) => String(e || '').toLowerCase().trim()).filter(Boolean));
+      }
+    }
+    return catEquipCache.get(String(exerciseId || '').toLowerCase().trim()) ?? null;
+  } catch { return null; }
 }
 
-/** Ранг библиотеки: зона +5, драйвер/сигнал +4, причина +3, unilateral-при-асимметрии +2. Красная боль — только без противопоказаний. */
+/** Честный фильтр зала: bodyweight — всегда; неизвестное в каталоге — не блочим; иначе пересечение со списком профиля. */
+function equipOk(c: BBCorrective, wanted: string[] | undefined): boolean {
+  if (!wanted || !wanted.length) return true;
+  const list = catalogEquipmentOf(c.exerciseId);
+  if (!list || !list.length) return true;
+  if (list.includes('bodyweight')) return true;
+  const want = wanted.map((w) => String(w || '').toLowerCase().trim()).filter(Boolean);
+  return list.some((e) => want.includes(e));
+}
+
+/** Ранг библиотеки: зона +5, драйвер/сигнал +4, причина +3, unilateral-при-асимметрии +2. Противопоказания: красная боль (pm-red), подросток (teen-loaded), боль плеча (shoulder-pain). */
 export function rankCorrectives(s: BBScreenSignals): Array<{ corr: BBCorrective; score: number; why: string[] }> {
   const tags = new Set(tagsForMovementScreens(s));
   const out: Array<{ corr: BBCorrective; score: number; why: string[] }> = [];
   for (const c of BB_CORRECTIVES) {
     if (!levelOk(c, s.level)) continue;
     if (s.painLevel === 'red' && c.contraindicated.includes('pm-red')) continue;
-    if (!equipOk(c, null, s.equipment)) continue;
+    if (s.teenBlocked && c.contraindicated.includes('teen-loaded')) continue;
+    if (s.shoulderPain && c.contraindicated.includes('shoulder-pain')) continue;
+    if (!equipOk(c, s.equipment)) continue;
     let score = 0;
     const why: string[] = [];
     const zoneHit = (s.zones || []).some((z) => c.targets.includes(String(z || '').toLowerCase()));
     if (zoneHit) { score += 5; why.push('в зону'); }
     let sigHit = 0;
     for (const t of c.targets) {
-      if (t.includes(':') || t.startsWith('bench') || t.endsWith('-weak') || t.endsWith('-low') || t.endsWith('-fail') || t.endsWith('-asym') || t === 'asym' || t === 'pm-yellow') {
+      if (t.includes(':') || t.startsWith('bench') || t.endsWith('-weak') || t.endsWith('-low') || t.endsWith('-fail') || t.endsWith('-asym') || t.endsWith('-gap') || t === 'asym' || t === 'pm-yellow') {
         if (tags.has(t)) sigHit++;
       }
     }
