@@ -10,23 +10,33 @@ import {
   smCorrectiveExportLines,
   smCorrectiveBasePct,
   SM_CORR_EXID,
+  SM_CORR_EXID_BY_ID,
   exIdForSMCorrective,
   libraryEntryForSM,
   protocolForSMPreferred,
+  SM_ERROR_TAG_RU,
+  SM_TAG_PHASES,
+  smCorrectivesByError,
+  smErrorTagsForMetrics,
+  SM_MOBILITY_DEMAND,
 } from '../strength-sport-sm-corrective.engine';
 import { buildSMDiagnosticsHtml, buildSMCsv } from '../strength-sport-sm-export.engine';
-import { rankCorrectionsForSM } from '../strength-sport-sm-correction-rank.engine';
+import { rankCorrectionsForSM, rankCorrectionsForSMLibrary } from '../strength-sport-sm-correction-rank.engine';
 import { SM_FALLBACK_BY_WP } from '../strength-sport-sm-correction-rank.engine';
+import { buildSMSpecProtocols } from '../../../ui/screens/strength-sport/sm-bridge-intake';
 
 describe('sm-corrective library', () => {
-  it('16 фаз × 3 вида = 48 записей', () => {
+  it('16 фаз × 3 вида = 56 записей (48 канон + 8 P5-добор)', () => {
     expect(SM_CORRECTIVE_PHASES.length).toBe(16);
-    expect(SM_CORRECTIVES.length).toBe(48);
+    expect(SM_CORRECTIVES.length).toBe(56);
   });
-  it('каждая фаза имеет technique+strength+stability', () => {
+  it('каждая фаза имеет technique+strength+stability (P5-добор — сверх канона)', () => {
     for (const ph of SM_CORRECTIVE_PHASES) {
       const kinds = correctivesForPhase(ph).map((c) => c.kind).sort();
-      expect(kinds).toEqual(['stability', 'strength', 'technique']);
+      expect(kinds).toContain('stability');
+      expect(kinds).toContain('strength');
+      expect(kinds).toContain('technique');
+      expect(kinds.length).toBeGreaterThanOrEqual(3);
     }
   });
   it('гигиена: id уникальны, дозы в коридорах, ≥1 причина', () => {
@@ -149,5 +159,77 @@ describe('sm-corrective library', () => {
         expect(c.name.length).toBeGreaterThan(0);
       }
     }
+  });
+  it('P1: словарь ошибок — 18 RU-тегов, каждый гасится ≥1 записью, замеры → теги', () => {
+    expect(Object.keys(SM_ERROR_TAG_RU).length).toBe(18);
+    for (const [tag, phases] of Object.entries(SM_TAG_PHASES)) {
+      expect(phases.length).toBeGreaterThan(0);
+      expect(smCorrectivesByError(tag as never).length).toBeGreaterThan(0);
+    }
+    expect(smErrorTagsForMetrics({ swayCm: 4 }).tags).toContain('sway');
+    expect(smErrorTagsForMetrics({}).tags).toEqual([]);
+    expect(smErrorTagsForMetrics({}).text).toBeNull();
+    expect(smErrorTagsForMetrics({ logDipOutOfWindow: true }).tags).toContain('dip_forward');
+    expect(smErrorTagsForMetrics({ gripLimitsCarry: true }).tags).toContain('grip_slip');
+    expect(smErrorTagsForMetrics({ carryTurnS: 4 }).tags).toContain('turn_wide');
+    expect(smErrorTagsForMetrics({ turnDrop: true }).tags).toContain('turn_drop');
+    expect(smErrorTagsForMetrics({ stoneLapS: 3 }).tags).toContain('lap_slow');
+    expect(smErrorTagsForMetrics({ tyreSecondPullS: 1.5 }).tags).toContain('pop_fail');
+    expect(smErrorTagsForMetrics({ suitcaseAsymPct: 8 }).tags).toContain('asym_carry');
+    expect(smErrorTagsForMetrics({ ohsFailed: 3 }).tags).toContain('brace_soft');
+  });
+  it('P2: ранжир из библиотеки — id sm_* с дозой карточки; топ × 16 фаз × 6 причин', () => {
+    const causes = ['volume', 'technique', 'mobility', 'fatigue', 'strength', 'grip'] as const;
+    let checked = 0;
+    for (const ph of SM_CORRECTIVE_PHASES) {
+      for (const cause of causes) {
+        const top = rankCorrectionsForSMLibrary(ph, { cause });
+        expect(top.length).toBeGreaterThan(0);
+        expect(top[0].id.startsWith('sm_')).toBe(true);
+        expect(top[0].protocol.sets).toBeGreaterThan(0);
+        checked++;
+      }
+    }
+    expect(checked).toBe(96);
+    const lib = rankCorrectionsForSMLibrary('stone_off_floor', { cause: 'strength' });
+    const base = correctivesForSMWeakPoint('stone_off_floor', { cause: 'strength' })[0];
+    expect(lib[0].protocol.pct).toBe(base.protocolAdj.pct);
+  });
+  it('P3: mobility-demand spot-lock + equipment-гейт + fatigueSensitive', () => {
+    for (const ids of Object.values(SM_MOBILITY_DEMAND)) {
+      for (const id of ids) expect(SM_CORRECTIVES.some((c) => c.id === id)).toBe(true);
+    }
+    const full = correctivesForSMWeakPoint('log_dip', {});
+    expect(full.length).toBeGreaterThan(0);
+    const none = correctivesForSMWeakPoint('log_dip', { equipment: ['___no_such_equip___'] });
+    expect(none.length).toBeLessThanOrEqual(full.length);
+    // shoulder-ограничение топит оверхед-дозы, но не скрывает фазу
+    const sh = correctivesForSMWeakPoint('log_lockout', { mobilityRestrictions: ['shoulder'] });
+    expect(sh.length).toBeGreaterThan(0);
+    const ses = correctiveSessionForSM(['log_dip', 'yoke_walk'], { log_dip: 'technique', yoke_walk: null }, { mobilityRestrictions: ['shoulder'] });
+    expect(ses.length).toBeLessThanOrEqual(6);
+    // C10-гейт моста: при фильтрах ⭐ не вшивается (строгий путь ранжира)
+    const withStar = buildSMSpecProtocols(['log_dip'], { log_dip: 'sm_log_dip_tech' }, { log_dip: 'technique' }, ['barbell'], []);
+    const noFilter = buildSMSpecProtocols(['log_dip'], { log_dip: 'sm_log_dip_tech' }, { log_dip: 'technique' });
+    expect(noFilter['log_dip']).toBeTruthy();
+    expect(withStar['log_dip']).toBeTruthy();
+  });
+  it('P4: волна несёт дозу причины (protocolAdj), а не канон', () => {
+    const block = correctiveBlockForSM(['stone_off_floor'], 8, { stone_off_floor: 'strength' });
+    expect(block.length).toBe(8);
+    // нед4 (i=4) — фокус strength: доза причины +5% пика
+    const str = correctivesForSMWeakPoint('stone_off_floor', { cause: 'strength' }).find((t) => t.kind === 'strength')!;
+    expect(block[4].lines[0]).toContain('sm_stone_off_floor_strength');
+    expect(block[4].lines[0]).toContain(`@${Math.min(90, str.protocolAdj.pct + 5)}%`);
+    const tech = correctiveBlockForSM(['log_dip'], 8, {});
+    expect(tech[0].lines[0]).toContain('sm_log_dip_tech');
+  });
+  it('P5: добор инжектабелен — tyre/frame/sandbag/husafell/zercher/axle без sm_* в плане', () => {
+    for (const id of ['sm_conditioning_tyre_tech', 'sm_log_lockout_circus', 'sm_stone_load_sandbag', 'sm_farmers_carry_frame', 'sm_stone_lap_husafell', 'sm_yoke_walk_zercher', 'sm_grip_support_axle']) {
+      expect(smCorrectiveBasePct(id)).toBeGreaterThan(0);
+      expect(SM_CORR_EXID_BY_ID[id]).toMatch(/^[a-z0-9_]+$/);
+      expect(SM_CORR_EXID_BY_ID[id].startsWith('sm_')).toBe(false);
+    }
+    expect(exIdForSMCorrective(libraryEntryForSM('sm_conditioning_tyre_tech')!)).toBe('tire_flip');
   });
 });

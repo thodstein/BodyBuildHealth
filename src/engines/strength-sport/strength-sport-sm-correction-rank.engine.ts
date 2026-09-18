@@ -14,6 +14,7 @@
 
 import { SM_WEAKPOINT_CORRECTION, SM_BIOMECH, type SMWeakPoint } from './strength-sport-sm-biomechanics.engine';
 import type { SMWeakCause } from './strength-sport-sm-weak-cause.engine';
+import { correctivesForSMWeakPoint } from './strength-sport-sm-corrective.engine';
 import { TA_CATALOG_SUPPLEMENT } from '../../core/exercise-catalog-ta-supplement';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 
@@ -121,9 +122,14 @@ export interface SMRankOpts {
   equipment?: string[];
   mobilityRestrictions?: string[];
   cause?: SMWeakCause | null;
+  fatigueSensitive?: boolean;
+  /** Режим библиотеки: топ-3 из SM_CORRECTIVES (иначе — legacy строки SM_BIOMECH). */
+  useLibrary?: boolean;
 }
 
 export function rankCorrectionsForSM(wp: SMWeakPoint, opts: SMRankOpts = {}): SMCorrectionCandidate[] {
+  // P2-паритет: режим библиотеки — топ-3 из SM_CORRECTIVES (доза/имя = карточке).
+  if (opts.useLibrary) return rankCorrectionsForSMLibrary(wp, opts);
   const rawList = (SM_WEAKPOINT_CORRECTION as Record<string, string[]>)[wp] || [];
   const extracted = rawList.map(smCorrIdFromLabel).filter((s) => s && !/[А-Яа-я]/.test(s));
   if (extracted.length === 0 && SM_FALLBACK_BY_WP[wp]) extracted.push(SM_FALLBACK_BY_WP[wp]);
@@ -182,6 +188,46 @@ export function rankCorrectionsForSM(wp: SMWeakPoint, opts: SMRankOpts = {}): SM
     const rationale = `${bio?.label || wp}: ${cat.name || prettyName(id)} ${sets}×${reps} @${pct}% — ${cause ? `причина ${cause}` : 'техника фазы'}`;
     out.push({ id, name: cat.name || prettyName(id), protocol, rationale, score, cause });
   }
-  out.sort((a, b) => b.score - a.score);
+  if (opts.fatigueSensitive) {
+    for (const c of out) {
+      const cost = catalogLookup(c.id).fatigueCost ?? 7;
+      c.score += cost <= 6 ? 5 : cost >= 8 ? -10 : 0;
+    }
+    out.sort((a, b) => b.score - a.score);
+  } else {
+    out.sort((a, b) => b.score - a.score);
+  }
   return out.slice(0, 3);
+}
+
+/**
+ * P2: топ-3 фазы из библиотеки SM_CORRECTIVES (паритет TA-C4: топ ранжира — в библиотеке).
+ * id — библиотечные sm_* (имя — target записи, доза — protocolAdj причины).
+ */
+export function rankCorrectionsForSMLibrary(wp: SMWeakPoint, opts: SMRankOpts = {}): SMCorrectionCandidate[] {
+  try {
+    const tops = correctivesForSMWeakPoint(wp, {
+      cause: opts.cause ?? null,
+      level: opts.level,
+      equipment: opts.equipment,
+      mobilityRestrictions: opts.mobilityRestrictions,
+      fatigueSensitive: opts.fatigueSensitive,
+    }).slice(0, 3);
+    return tops.map((t) => ({
+      id: t.id,
+      name: t.target,
+      protocol: {
+        sets: t.protocolAdj.sets,
+        reps: t.protocolAdj.reps,
+        pct: t.protocolAdj.pct,
+        rir: t.protocolAdj.rir,
+        tempo: t.protocolAdj.tempo,
+        restSeconds: t.protocolAdj.restSeconds,
+        distanceM: (t.protocolAdj as { distanceM?: number }).distanceM,
+      },
+      rationale: `${wp}: ${t.target} ${t.protocolAdj.sets}×${t.protocolAdj.reps} @${t.protocolAdj.pct}% — ${t.doseNote}`,
+      score: t.score,
+      cause: opts.cause ?? null,
+    }));
+  } catch { return []; }
 }

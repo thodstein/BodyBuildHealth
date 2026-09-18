@@ -86,6 +86,22 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
     expect(localStorage.getItem('he_planner_apply')).toContain('smPreferredCorr');
     expect(localStorage.getItem('he_planner_apply')).toContain('smCorrectiveDetail');
   });
+  it('P1: замер sway 6см → RU-теги ошибок в Коррекции', async () => {
+    localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ swayCm: '6' }));
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    await waitFor(() => expect(document.body.querySelector('[data-sm="corr-errtags"]')).toBeTruthy());
+    expect(document.body.textContent).toContain('Качание');
+  });
+  it('P4/P6: волна с дозой причины — строки с sm_ id и @%', async () => {
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
+    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    await waitFor(() => expect(document.body.querySelector('[data-sm="corr-block-lines"]')).toBeTruthy());
+    const txt = document.body.querySelector('[data-sm="corr-block-lines"]')?.textContent || '';
+    expect(txt).toMatch(/sm_log/);
+    expect(txt).toMatch(/@/);
+  });
   it('C5: асимметрия + grip-фаза → мост несёт smUnilateral', async () => {
     localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ gripWeak: ['grip'], leftMax: '100', rightMax: '90' }));
     render(<StrongmanDiagnosticsHub />);

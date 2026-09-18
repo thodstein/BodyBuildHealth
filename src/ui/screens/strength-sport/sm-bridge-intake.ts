@@ -371,7 +371,10 @@ export function buildSMSpecProtocols(
     try {
       const cause = (causes?.[wp] ?? null) as any;
       const prefId = prefCorr?.[wp];
-      const libProto = protocolForSMPreferred(wp as any, prefId, cause);
+      // C10-паритет TA: при активных equipment/mobility-фильтрах — только строгий
+      // путь ранжира (иначе вставили бы штангу в зал без штанги).
+      const hasFilters = (equipment && equipment.length > 0) || (mobilityRestrictions && mobilityRestrictions.length > 0);
+      const libProto = !hasFilters ? protocolForSMPreferred(wp as any, prefId, cause) : null;
       if (libProto) {
         out[wp] = { sets: libProto.sets, reps: libProto.reps, pct: libProto.pct };
         continue;

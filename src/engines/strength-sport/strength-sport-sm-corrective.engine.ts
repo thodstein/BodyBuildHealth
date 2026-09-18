@@ -24,6 +24,8 @@
 
 import type { SMWeakPoint } from './strength-sport-sm-biomechanics.engine';
 import type { SMWeakCause } from './strength-sport-sm-weak-cause.engine';
+import { TA_CATALOG_SUPPLEMENT } from '../../core/exercise-catalog-ta-supplement';
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 
 export type SMCorrectiveKind = 'technique' | 'strength' | 'stability';
 export type SMCorrectiveLevel = 'beginner' | 'intermediate' | 'advanced';
@@ -74,7 +76,7 @@ const C = (
   source: string,
 ): SMCorrective => ({ id, phase, kind, target, errors, causes, level, protocol, cues, progression, regression, source });
 
-/** 48 записей: 16 фаз × (technique/strength/stability). Дозы в коридорах: sets 1–6, pct 50–90, rir 0–4, отдых 60–300. */
+/** 56 записей: 16 фаз × (technique/strength/stability) + 8 P5 (покрышка/бревно/мешок/рама). Дозы в коридорах: sets 1–6, pct 50–90, rir 0–4, отдых 60–300. */
 export const SM_CORRECTIVES: SMCorrective[] = [
   // ── 1. log_dip: дип 8–12 см ──
   C('sm_log_dip_tech', 'log_dip', 'technique', 'Вертикальный дип 8–12 см без завала вперёд',
@@ -397,6 +399,48 @@ export const SM_CORRECTIVES: SMCorrective[] = [
     ['Sled push sprint 25м — скорость', 'Zone 2 — 2×30мин/нед базой'],
     'Sled sprint → Zone 2 база → медли на фоне',
     'Ходьба в горку 20мин', 'EliteFTS prowler; Zone 2'),
+
+  // ── P5-добор: покрышка/бревно одной рукой/мешок/рама (фазы существующие, +8) ──
+  C('sm_conditioning_tyre_tech', 'conditioning', 'technique', 'Переворот покрышки: таз низко + колено + взрыв',
+    ['тяга спиной вместо ног', 'вторая тяга >1.0с (застревает)'], ['technique', 'strength'], 'intermediate',
+    { sets: 4, reps: 3, pct: 65, rir: 2, tempo: '1-0-1-0', restSeconds: 150 },
+    ['Таз под покрышку, грудь к ней', 'Колено под борт на второй тяге'],
+    'Шина лёгкая 4×3 → зачётная → медли', 'Становая с паузой <колена', 'Heezza tyre 2nd pull; HP 0.38 vs LP 1.49'),
+  C('sm_conditioning_tyre_strength', 'conditioning', 'strength', 'Ноги второй тяги покрышки',
+    ['не дотягивает вторую тягу'], ['strength', 'volume'], 'intermediate',
+    { sets: 4, reps: 4, pct: 75, rir: 2, tempo: '2-0-1-0', restSeconds: 150 },
+    ['Фронт-присед — поза второй тяги', 'Взрыв бедрами, не спиной'],
+    'Фронт 4×4 → шина тяжелее → медли', 'Гоблет-присед 3×8', 'Cerberus tyre accessories'),
+  C('sm_log_lockout_circus', 'log_lockout', 'strength', 'Бревно одной рукой (circus DB): дожимающая рука',
+    ['одна рука не дожимает', 'корпус валит вбок'], ['strength', 'technique'], 'advanced',
+    { sets: 4, reps: 3, pct: 70, rir: 2, tempo: '2-0-1-0', restSeconds: 150 },
+    ['Ноги дали пик — панч одной', 'Свободная рука — противовес'],
+    'Гантель сидя 4×5 → circus DB → лог тяжелее', 'Жим гантели стоя 3×8', 'WSM circus DB coaching'),
+  C('sm_stone_load_sandbag', 'stone_load', 'technique', 'Мешок через планку: обхват + triple extension',
+    ['мешок далеко от тела', 'тяга руками'], ['technique', 'strength'], 'intermediate',
+    { sets: 4, reps: 3, pct: 65, rir: 2, tempo: '1-0-1-0', restSeconds: 150 },
+    ['Обхват снизу, грудь к мешку', 'Бёдра → носки → руки вверх'],
+    'Низкая планка → зачётная → камень', 'Медбол через планку 3×5', 'Cerberus sandbag → stone'),
+  C('sm_farmers_carry_frame', 'farmers_carry', 'stability', 'Рама (frame): высота ручек + вертикаль',
+    ['наклон вперёд на раме', 'ручки низко — кругление'], ['technique', 'mobility'], 'intermediate',
+    { sets: 3, reps: '20м', pct: 65, rir: 2, tempo: 'walk 20м', restSeconds: 180, distanceM: 20 },
+    ['Ручки на середине голени — натяг', 'Грудь вверх, шаг короткий'],
+    'Фермер 40м → рама 20м → зачёт', 'Переноска гантелей 3×20м', 'EliteFTS frame carry'),
+  C('sm_stone_lap_husafell', 'stone_lap', 'stability', 'Хусафелл на груди: обхват + brace 2с',
+    ['камень сползает вниз', 'поясница гнётся'], ['technique', 'fatigue'], 'intermediate',
+    { sets: 3, reps: '20м', pct: 60, rir: 3, tempo: 'walk 20м', restSeconds: 180, distanceM: 20 },
+    ['Камень высоко на грудь, руки снизу', 'Brace до шага, не на ходу'],
+    'Сэндбэг 20м → х-walk → зачёт', 'Фронт-hold 3×20с', 'Husafell carry coaching'),
+  C('sm_yoke_walk_zercher', 'yoke_walk', 'strength', 'Зерчер-керри: передняя нагрузка без осевой',
+    ['sway при слабом прессе', 'локти падают'], ['strength', 'mobility'], 'intermediate',
+    { sets: 3, reps: '20м', pct: 60, rir: 2, tempo: 'walk 20м', restSeconds: 180, distanceM: 20 },
+    ['Штанга в локтях, грудь вверх', 'Шаг короткий, таз ровно'],
+    'Suitcase → zercher → йок', 'Гоблет-керри 3×20м', 'IUSCA 2026 ZC vs FC'),
+  C('sm_grip_support_axle', 'grip_support', 'strength', 'Аксель (толстый гриф): опора без лямок',
+    ['axle выскальзывает', 'кисть ломается'], ['grip', 'strength'], 'intermediate',
+    { sets: 4, reps: 15, pct: 55, rir: 2, tempo: 'hold 15с', restSeconds: 120 },
+    ['Кисть — продолжение предплечья', 'Мел только на зачёте'],
+    'Фермер-hold → axle hold → зачёт', 'Вис 3×15с', 'IronMind axle; SBS grip'),
 ];
 
 /** Все фазы библиотеки (16). */
@@ -404,7 +448,7 @@ export const SM_CORRECTIVE_PHASES: SMWeakPoint[] = Array.from(
   new Set(SM_CORRECTIVES.map((c) => c.phase)),
 );
 
-/** Записи фазы (ровно 3: technique/strength/stability). */
+/** Записи фазы (≥3: technique+strength+stability + точечный P5-добор). */
 export function correctivesForPhase(phase: SMWeakPoint): SMCorrective[] {
   return SM_CORRECTIVES.filter((c) => c.phase === phase);
 }
@@ -414,6 +458,50 @@ export interface SMCorrectiveOpts {
   level?: string;
   equipment?: string[];
   mobilityRestrictions?: string[];
+  /** Щадящий режим усталости: дорогие по fatigueCost записи уходят вниз (без скрытия). */
+  fatigueSensitive?: boolean;
+}
+
+/** Спрос библиотеки на подвижность (паритет TA MOBILITY_DEMAND; spot-lock ниже). */
+export const SM_MOBILITY_DEMAND: Record<'ankle' | 'overhead' | 'hip', readonly string[]> = {
+  ankle: [
+    'sm_yoke_pickup_strength', 'sm_yoke_pickup_stab', 'sm_stone_lap_strength', 'sm_stone_off_floor_stab',
+    'sm_log_clean_tech', 'sm_log_dip_tech', 'sm_yoke_walk_stab', 'sm_stone_lap_stab',
+  ],
+  overhead: [
+    'sm_log_drive_strength', 'sm_log_drive_stab', 'sm_log_lockout_tech', 'sm_log_lockout_strength',
+    'sm_log_lockout_stab', 'sm_log_clean_stab',
+  ],
+  hip: [
+    'sm_stone_off_floor_tech', 'sm_stone_off_floor_strength', 'sm_log_clean_strength',
+    'sm_farmers_pickup_tech', 'sm_farmers_pickup_strength',
+  ],
+};
+
+function smMobilityPenalty(id: string, mob: Set<string>): number {
+  let p = 0;
+  if (mob.has('ankle') && (SM_MOBILITY_DEMAND.ankle as readonly string[]).includes(id)) p -= 15;
+  if (mob.has('shoulder') && (SM_MOBILITY_DEMAND.overhead as readonly string[]).includes(id)) p -= 15;
+  if ((mob.has('hip') || mob.has('lower_back')) && (SM_MOBILITY_DEMAND.hip as readonly string[]).includes(id)) p -= 10;
+  return p;
+}
+
+interface SMCatInfo {
+  equipment?: string;
+  fatigueCost?: number;
+  name?: string;
+}
+
+function smCatalogLookup(id: string): SMCatInfo {
+  try {
+    const hit = (TA_CATALOG_SUPPLEMENT as unknown as Array<{ id?: string; equipment?: string; fatigueCost?: number; name?: string }> || []).find((e) => e?.id === id);
+    if (hit) return { equipment: hit.equipment, fatigueCost: hit.fatigueCost, name: hit.name };
+  } catch { /* noop */ }
+  try {
+    const hit = (EXERCISE_CATALOG as unknown as Array<{ id?: string; equipment?: string; fatigueCost?: number; name?: string }> || []).find((e) => e?.id === id);
+    if (hit) return { equipment: hit.equipment, fatigueCost: hit.fatigueCost, name: hit.name };
+  } catch { /* noop */ }
+  return {};
 }
 
 const KIND_BY_CAUSE: Record<SMWeakCause, SMCorrectiveKind> = {
@@ -439,12 +527,26 @@ function levelOf(s?: string): number {
  * Без причины — канонический порядок technique → strength → stability.
  */
 export function correctivesForSMWeakPoint(phase: SMWeakPoint, opts: SMCorrectiveOpts = {}): SMCorrectiveRanked[] {
-  const list = correctivesForPhase(phase);
-  if (!list.length) return [];
+  const all = correctivesForPhase(phase);
+  if (!all.length) return [];
   const cause = opts.cause ?? null;
   const wantKind = cause ? KIND_BY_CAUSE[cause] : null;
   const athLevel = levelOf(opts.level);
   const mob = new Set((opts.mobilityRestrictions || []).map((s) => String(s).toLowerCase()));
+  const eqFilter = (opts.equipment || []).map((s) => String(s).toLowerCase()).filter(Boolean);
+  // Честный подбор по оборудованию: чужое железо исключается (bodyweight/universal — всегда);
+  // без фильтра — байт-в-байт как раньше.
+  const list = eqFilter.length
+    ? all.filter((c) => {
+        try {
+          const exId = SM_CORR_EXID[c.phase]?.[c.kind] ?? '';
+          const need = String(smCatalogLookup(exId).equipment || '').toLowerCase();
+          if (!need || need === 'bodyweight' || need === 'universal') return true;
+          return eqFilter.includes(need);
+        } catch { return true; }
+      })
+    : all;
+  if (!list.length) return [];
   const ranked = list.map((c) => {
     let score = 50;
     if (wantKind && c.kind === wantKind) score += 15;
@@ -453,9 +555,18 @@ export function correctivesForSMWeakPoint(phase: SMWeakPoint, opts: SMCorrective
     const lr = LEVEL_RANK[c.level] ?? 1;
     score -= Math.abs(lr - athLevel) * 5;
     if (lr <= athLevel) score += 5;
-    // Мобильность: stability без осевой/оверхеда — плюс; чужая зона — честно без штрафа (доза −5% ниже)
+    // Мобильность: спросовая таблица (паритет TA); stability при mobility/fatigue — плюс
+    score += smMobilityPenalty(c.id, mob);
     if ((cause === 'mobility' || cause === 'fatigue') && c.kind === 'stability') score += 5;
     if (mob.has('shoulder') && /overhead|press|lockout|z-press/i.test(c.target)) score -= 5;
+    // Усталость: дорогие (fatigueCost>7) уходят вниз, дешёвые — вверх (без скрытия)
+    if (opts.fatigueSensitive) {
+      try {
+        const exId = SM_CORR_EXID[c.phase]?.[c.kind] ?? '';
+        const cost = smCatalogLookup(exId).fatigueCost ?? 7;
+        score += cost <= 6 ? 5 : cost >= 8 ? -10 : 0;
+      } catch { /* noop */ }
+    }
     const p = { ...c.protocol };
     let doseNote = `канон ${p.sets}×${p.reps} @${p.pct}%`;
     if (cause === 'volume') {
@@ -478,10 +589,23 @@ export function correctivesForSMWeakPoint(phase: SMWeakPoint, opts: SMCorrective
 }
 
 /** Сессия коррекции: техника → сила → стабильность, ≤6 (по 1–2 на фазу, слабейшая первая). */
-export function correctiveSessionForSM(phases: SMWeakPoint[], causeByPhase: Record<string, SMWeakCause | null> = {}, level = 'intermediate'): SMCorrectiveRanked[] {
+export function correctiveSessionForSM(
+  phases: SMWeakPoint[],
+  causeByPhase: Record<string, SMWeakCause | null> = {},
+  levelOrOpts: string | SMCorrectiveOpts = 'intermediate',
+): SMCorrectiveRanked[] {
+  const opts: SMCorrectiveOpts = typeof levelOrOpts === 'string'
+    ? { level: levelOrOpts }
+    : (levelOrOpts || {});
   const out: SMCorrectiveRanked[] = [];
   for (const ph of phases.slice(0, 4)) {
-    const top = correctivesForSMWeakPoint(ph, { cause: causeByPhase[ph] ?? null, level });
+    const top = correctivesForSMWeakPoint(ph, {
+      cause: causeByPhase[ph] ?? null,
+      level: opts.level ?? 'intermediate',
+      equipment: opts.equipment,
+      mobilityRestrictions: opts.mobilityRestrictions,
+      fatigueSensitive: opts.fatigueSensitive,
+    });
     const first = top[0];
     if (first) out.push(first);
     if (out.length < 6 && phases.length <= 2 && top[1]) out.push(top[1]);
@@ -494,16 +618,24 @@ export function correctiveSessionForSM(phases: SMWeakPoint[], causeByPhase: Reco
 const SM_WAVE_NAMES = ['Втягивание', 'База', 'Объём', 'Интенсив', 'Пик', 'Реализация', 'Тейпер', 'Старт'];
 const SM_WAVE_SETS = [3, 3, 4, 4, 4, 4, 3, 3];
 
-/** Волна коррекции 8 нед с именами (сеты 3-3-4-4-4-4-3-3; пик — сила, тейпер — техника). */
-export function correctiveBlockForSM(phases: SMWeakPoint[], weeks = 8): Array<{ week: number; name: string; sets: number; focus: SMCorrectiveKind; lines: string[] }> {
+/** Волна коррекции 8 нед с именами (сеты 3-3-4-4-4-4-3-3; пик — сила, тейпер — техника). Доза — protocolAdj причины (паритет TA-C12). */
+export function correctiveBlockForSM(
+  phases: SMWeakPoint[],
+  weeks = 8,
+  causeByPhase: Record<string, SMWeakCause | null> = {},
+  level: string = 'intermediate',
+): Array<{ week: number; name: string; sets: number; focus: SMCorrectiveKind; lines: string[] }> {
   const w = Math.max(1, Math.min(8, Math.round(weeks) || 8));
   const out: Array<{ week: number; name: string; sets: number; focus: SMCorrectiveKind; lines: string[] }> = [];
   for (let i = 0; i < w; i++) {
     const focus: SMCorrectiveKind = i >= w - 2 ? 'technique' : i >= w - 4 ? 'strength' : 'technique';
     const lines = phases.slice(0, 4).map((ph) => {
-      const top = correctivesForSMWeakPoint(ph, { cause: null });
+      const cause = causeByPhase[ph] ?? null;
+      const top = correctivesForSMWeakPoint(ph, { cause, level });
       const pick = top.find((t) => t.kind === focus) || top[0];
-      return pick ? `${ph} → ${pick.id} ${SM_WAVE_SETS[i]}×${pick.protocol.reps}` : `${ph} → техника`;
+      if (!pick) return `${ph} → техника`;
+      const pct = pick.protocolAdj.pct + (i >= 2 && i <= 5 ? 5 : 0);
+      return `${ph} → ${pick.id} ${SM_WAVE_SETS[i]}×${pick.protocolAdj.reps} @${Math.min(90, pct)}%`;
     });
     out.push({ week: i + 1, name: SM_WAVE_NAMES[i] || `Нед ${i + 1}`, sets: SM_WAVE_SETS[i], focus, lines });
   }
@@ -544,6 +676,100 @@ export function smTagsForMetrics(input: {
   return Array.from(new Set(tags));
 }
 
+/** Теги ошибок движения (единый словарь: замер → слова → упражнение; паритет TA TA_ERROR_TAG_RU). */
+export type SMErrorTag =
+  | 'dip_forward' | 'dip_deep' | 'slow_dip' | 'rack_collapse'
+  | 'drive_legs_off' | 'lockout_forward' | 'clean_curl' | 'pickup_round'
+  | 'sway' | 'turn_wide' | 'turn_drop' | 'grip_slip'
+  | 'lap_skip' | 'lap_slow' | 'stone_arms' | 'pop_fail'
+  | 'asym_carry' | 'brace_soft';
+
+export const SM_ERROR_TAG_RU: Record<SMErrorTag, string> = {
+  dip_forward: 'Подсед вперёд',
+  dip_deep: 'Слишком глубокий дип',
+  slow_dip: 'Медленный дип',
+  rack_collapse: 'Стойка плывёт (лог сползает)',
+  drive_legs_off: 'Жим руками без ног',
+  lockout_forward: 'Локаут перед головой',
+  clean_curl: 'Тяга бицепсом на забросе',
+  pickup_round: 'Кругление на съёме',
+  sway: 'Качание корпуса (sway)',
+  turn_wide: 'Широкий разворот',
+  turn_drop: 'Дроп на развороте',
+  grip_slip: 'Хват плывёт',
+  lap_skip: 'Пропуск lap (рывок вверх)',
+  lap_slow: 'Медленный lap >2с',
+  stone_arms: 'Тяга камня руками',
+  pop_fail: 'Камень не долетает (слабый pop)',
+  asym_carry: 'Асимметрия переноски L/R',
+  brace_soft: 'Мягкий brace',
+};
+
+/** Тег → фазы (каждая запись библиотеки находится через свою фазу; lock-тест ниже). */
+export const SM_TAG_PHASES: Record<SMErrorTag, SMWeakPoint[]> = {
+  dip_forward: ['log_dip'],
+  dip_deep: ['log_dip'],
+  slow_dip: ['log_dip'],
+  rack_collapse: ['log_drive', 'log_lockout'],
+  drive_legs_off: ['log_drive'],
+  lockout_forward: ['log_lockout'],
+  clean_curl: ['log_clean'],
+  pickup_round: ['yoke_pickup', 'farmers_pickup', 'stone_off_floor'],
+  sway: ['yoke_walk', 'farmers_carry'],
+  turn_wide: ['yoke_turn'],
+  turn_drop: ['yoke_turn'],
+  grip_slip: ['farmers_grip', 'grip_support'],
+  lap_skip: ['stone_lap'],
+  lap_slow: ['stone_lap'],
+  stone_arms: ['stone_off_floor', 'stone_load'],
+  pop_fail: ['stone_load'],
+  asym_carry: ['farmers_carry', 'farmers_grip'],
+  brace_soft: ['core_brace', 'yoke_pickup'],
+};
+
+/** Записи библиотеки по тегу ошибки (фаза тега → топ записи фазы). */
+export function smCorrectivesByError(tag: SMErrorTag): SMCorrective[] {
+  const phases = SM_TAG_PHASES[tag] || [];
+  const out: SMCorrective[] = [];
+  for (const ph of phases) out.push(...correctivesForPhase(ph));
+  return out;
+}
+
+export interface SMErrorTagsResult {
+  tags: SMErrorTag[];
+  text: string | null;
+}
+
+/**
+ * Замер → теги ошибок (пороги — те же что smTagsForMetrics; пусто/норма — молчит).
+ */
+export function smErrorTagsForMetrics(input: {
+  swayCm?: number | null; vbtLossPct?: number | null; asymmetryPct?: number | null; ohsFailed?: number | null;
+  stoneLapS?: number | null; stoneZeroLap?: boolean | null;
+  carryTurnS?: number | null; turnDrop?: boolean | null;
+  gripLimitsCarry?: boolean | null;
+  logDipOutOfWindow?: boolean | null;
+  tyreSecondPullS?: number | null;
+  suitcaseAsymPct?: number | null;
+  ybtAntAsymCm?: number | null;
+}): SMErrorTagsResult {
+  const tags: SMErrorTag[] = [];
+  if (input.swayCm != null && input.swayCm > 5) tags.push('sway');
+  else if (input.swayCm != null && input.swayCm > 3) tags.push('sway');
+  if (input.logDipOutOfWindow === true) tags.push('dip_forward', 'slow_dip');
+  if (input.gripLimitsCarry === true || (input.asymmetryPct != null && input.asymmetryPct >= 7)) tags.push('grip_slip');
+  if ((input.carryTurnS != null && input.carryTurnS > 3) || input.turnDrop === true) tags.push('turn_wide');
+  if (input.turnDrop === true) tags.push('turn_drop');
+  if (!input.stoneZeroLap && input.stoneLapS != null && input.stoneLapS > 2.0) tags.push('lap_slow');
+  if (input.stoneZeroLap === false && input.stoneLapS != null && input.stoneLapS > 2.0) tags.push('lap_skip');
+  if (input.tyreSecondPullS != null && input.tyreSecondPullS > 1.0) tags.push('pop_fail');
+  if (input.suitcaseAsymPct != null && input.suitcaseAsymPct >= 7) tags.push('asym_carry');
+  if (input.ohsFailed != null && input.ohsFailed >= 2) tags.push('brace_soft', 'pickup_round');
+  if (input.vbtLossPct != null && input.vbtLossPct >= 15) tags.push('sway');
+  const uniq = Array.from(new Set(tags));
+  return { tags: uniq, text: uniq.length ? uniq.map((t) => SM_ERROR_TAG_RU[t]).join(' · ') : null };
+}
+
 /** Строки экспорта коррекции (HTML/CSV/мост): фаза → топ-1 + cue + source. */
 export function smCorrectiveExportLines(phases: SMWeakPoint[], causeByPhase: Record<string, SMWeakCause | null> = {}): string[] {
   return phases.slice(0, 4).map((ph) => {
@@ -562,7 +788,7 @@ export function smCorrectiveBasePct(id: string): number {
 
 /**
  * Реальное id упражнения каталога за записью библиотеки (проверено по EXERCISE_CATALOG:
- * все 48 — существующие id; синтетические sm_* id в план не вшиваются никогда).
+ * все 56 — существующие id; синтетические sm_* id в план не вшиваются никогда).
  */
 export const SM_CORR_EXID: Record<SMWeakPoint, Record<SMCorrectiveKind, string>> = {
   log_dip: { technique: 'jerk_dip', strength: 'front_squat', stability: 'suitcase_carry' },
@@ -583,9 +809,21 @@ export const SM_CORR_EXID: Record<SMWeakPoint, Record<SMCorrectiveKind, string>>
   conditioning: { technique: 'yoke_walk', strength: 'sled_push_sprint', stability: 'farmers_walk' },
 };
 
+/** Точечные exId P5-добора (иначе — фазовый канон SM_CORR_EXID). */
+export const SM_CORR_EXID_BY_ID: Record<string, string> = {
+  sm_conditioning_tyre_tech: 'tire_flip',
+  sm_conditioning_tyre_strength: 'sled_push_sprint',
+  sm_log_lockout_circus: 'push_press',
+  sm_stone_load_sandbag: 'sandbag_carry',
+  sm_farmers_carry_frame: 'frame_carry',
+  sm_stone_lap_husafell: 'husafell_carry',
+  sm_yoke_walk_zercher: 'zercher_carry',
+  sm_grip_support_axle: 'axle_press',
+};
+
 /** Реальное id упражнения за записью библиотеки. */
 export function exIdForSMCorrective(c: SMCorrective): string {
-  return SM_CORR_EXID[c.phase]?.[c.kind] ?? 'farmers_walk';
+  return SM_CORR_EXID_BY_ID[c.id] ?? SM_CORR_EXID[c.phase]?.[c.kind] ?? 'farmers_walk';
 }
 
 /** Запись библиотеки по id (null — мусор/чужой id). */

@@ -25,8 +25,8 @@ import { validatePassport, validateContestPassports } from '../../../engines/str
 import { correctEnodeByVariable } from '../../../engines/strength-sport/strength-sport-barpath.engine';
 import { getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 import { diagnoseSMWeakCause, SM_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-sm-weak-cause.engine';
-import { rankCorrectionsForSM } from '../../../engines/strength-sport/strength-sport-sm-correction-rank.engine';
-import { correctivesForSMWeakPoint, correctiveSessionForSM, correctiveBlockForSM, smCorrectiveExportLines, smTagsForMetrics } from '../../../engines/strength-sport/strength-sport-sm-corrective.engine';
+import { rankCorrectionsForSM, rankCorrectionsForSMLibrary } from '../../../engines/strength-sport/strength-sport-sm-correction-rank.engine';
+import { correctivesForSMWeakPoint, correctiveSessionForSM, correctiveBlockForSM, smCorrectiveExportLines, smTagsForMetrics, smErrorTagsForMetrics, SM_ERROR_TAG_RU, smCorrectivesByError } from '../../../engines/strength-sport/strength-sport-sm-corrective.engine';
 import { buildSMSpecBlock } from '../../../engines/strength-sport/strength-sport-sm-spec-block.engine';
 import { simulateContest } from '../../../engines/strength-sport/strength-sport-contest-simulator.engine';
 import { buildSMAttemptsForContest } from '../../../engines/strength-sport/strength-sport-sm-attempts-bridge.engine';
@@ -707,19 +707,23 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [smWeakPoints, diaryWeaks, acwr, vbtLoss, ohs.failed, gripFails, swayCm, asymmetry, weeklySetsByLift, state.farmersHoldSec, state.gripRunSec, state.gripDrops, state.pickupMs, state.ybtAntL, state.ybtAntR, state.ybtPmL, state.ybtPmR, state.ybtPlL, state.ybtPlR, state.ybtLegLen, state.ybtUqL, state.ybtUqR]);
+  const smProfileMobility = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_profile_v2');
+      const p = raw ? JSON.parse(raw) : null;
+      return (p?.training?.mobilityRestrictions || p?.health?.mobilityRestrictions || []) as string[];
+    } catch { return [] as string[]; }
+  }, [profileTick]);
   const smRankTop = useMemo(() => {
     const wp = smWeakPoints[0] as any;
     if (!wp) return [];
     try {
-      let profile: string[] = [];
-      try {
-        const raw = localStorage.getItem('he_profile_v2');
-        const p = raw ? JSON.parse(raw) : null;
-        profile = p?.training?.mobilityRestrictions || p?.health?.mobilityRestrictions || [];
-      } catch { /* noop */ }
-      return rankCorrectionsForSM(wp, { cause: smCauses[0]?.cause ?? null, mobilityRestrictions: profile });
+      // P2-паритет: топ-1 строка сводки — из библиотеки (доза = карточке), не legacy-строки.
+      const lib = rankCorrectionsForSMLibrary(wp, { cause: smCauses[0]?.cause ?? null, mobilityRestrictions: smProfileMobility });
+      if (lib.length) return lib;
+      return rankCorrectionsForSM(wp, { cause: smCauses[0]?.cause ?? null, mobilityRestrictions: smProfileMobility });
     } catch { return []; }
-  }, [smWeakPoints, smCauses]);
+  }, [smWeakPoints, smCauses, smProfileMobility]);
   const smSpec = useMemo(() => {
     if (!smWeakPoints.length) return null;
     try { return buildSMSpecBlock({ weakPoints: smWeakPoints as any, weeks: parseInt(state.specWeeks) || 6 }); } catch { return null; }
@@ -733,16 +737,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const smCorrTops = useMemo(() => {
     const out: Record<string, ReturnType<typeof correctivesForSMWeakPoint>> = {};
     for (const wp of smWeakPoints as string[]) {
-      try { out[wp] = correctivesForSMWeakPoint(wp as any, { cause: (smCauseByPhase[wp] as any) ?? null }); } catch { out[wp] = []; }
+      try { out[wp] = correctivesForSMWeakPoint(wp as any, { cause: (smCauseByPhase[wp] as any) ?? null, mobilityRestrictions: smProfileMobility }); } catch { out[wp] = []; }
     }
     return out;
-  }, [smWeakPoints, smCauseByPhase]);
+  }, [smWeakPoints, smCauseByPhase, smProfileMobility]);
   const smCorrSession = useMemo(() => {
-    try { return correctiveSessionForSM(smWeakPoints as any, smCauseByPhase as any); } catch { return []; }
-  }, [smWeakPoints, smCauseByPhase]);
+    try { return correctiveSessionForSM(smWeakPoints as any, smCauseByPhase as any, { mobilityRestrictions: smProfileMobility }); } catch { return []; }
+  }, [smWeakPoints, smCauseByPhase, smProfileMobility]);
   const smCorrBlock = useMemo(() => {
-    try { return correctiveBlockForSM(smWeakPoints as any, parseInt(state.specWeeks) || 6); } catch { return []; }
-  }, [smWeakPoints, state.specWeeks]);
+    try { return correctiveBlockForSM(smWeakPoints as any, parseInt(state.specWeeks) || 6, smCauseByPhase as any); } catch { return []; }
+  }, [smWeakPoints, state.specWeeks, smCauseByPhase]);
   const smCorrExport = useMemo(() => {
     try { return smCorrectiveExportLines(smWeakPoints as any, smCauseByPhase as any); } catch { return []; }
   }, [smWeakPoints, smCauseByPhase]);
@@ -945,13 +949,33 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     const out: Array<{ tag: string; name: string; dose: string }> = [];
     for (const tag of smMetricTags.slice(0, 4)) {
       try {
-        const top = correctivesForSMWeakPoint(tag as any, { cause: (smCauseByPhase as Record<string, any>)[tag] ?? null });
+        const top = correctivesForSMWeakPoint(tag as any, { cause: (smCauseByPhase as Record<string, any>)[tag] ?? null, mobilityRestrictions: smProfileMobility });
         const c = top[0];
         if (c) out.push({ tag, name: c.target, dose: `${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}%` });
       } catch { /* noop */ }
     }
     return out;
-  }, [smMetricTags, smCauseByPhase]);
+  }, [smMetricTags, smCauseByPhase, smProfileMobility]);
+  // P1: замер → теги ошибок (RU-словарь) → топ-упражнения (мемы выше — TDZ-ок)
+  const smErrTags = useMemo(() => {
+    try {
+      return smErrorTagsForMetrics({
+        swayCm,
+        vbtLossPct: vbtLoss?.lossPct ?? null,
+        asymmetryPct: asymmetry?.diff ?? null,
+        ohsFailed: ohs.failed,
+        stoneLapS: numOrNull(state.stoneLapS),
+        stoneZeroLap: state.stoneZeroLap || null,
+        carryTurnS: numOrNull(state.carryTurnS),
+        turnDrop: state.turnDrop || null,
+        gripLimitsCarry: gripCarryDiag?.gripLimitsCarry ?? null,
+        logDipOutOfWindow: logWindowDiag ? logWindowDiag.verdict !== 'ok' : null,
+        tyreSecondPullS: numOrNull(state.tyrePull2S),
+        suitcaseAsymPct: suitcaseDiag?.asymmetryPct ?? null,
+        ybtAntAsymCm: ybtDiag?.antAsymCm ?? null,
+      });
+    } catch { return { tags: [], text: null } as { tags: never[]; text: null }; }
+  }, [swayCm, vbtLoss, asymmetry, ohs.failed, state.stoneLapS, state.stoneZeroLap, state.carryTurnS, state.turnDrop, gripCarryDiag, logWindowDiag, state.tyrePull2S, suitcaseDiag, ybtDiag]);
   const bicepsRisk = useMemo(() => scoreSMBicepsRisk({
     stonePlanned: (parseFloat(state.stoneKg) || 0) > 0,
     mixedGrip: state.mixGrip === 'mixed',
@@ -1898,6 +1922,15 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         {tab==='correction' && (
           <div data-sm="corr-tab">
             <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #f59e0b', lineHeight:1.35 }}>Коррекция движений — фаза → причина → топ-3 с дозой</div>
+            {smErrTags.tags.length > 0 && (
+              <div data-sm="corr-errtags" style={{ padding:'10px 12px', borderRadius:14, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.22)', marginBottom:8, fontSize:12, color:'#fff' }}>
+                <div style={{ fontWeight:800 }}>🔍 Замер → ошибка: {smErrTags.text}</div>
+                <div style={{ marginTop:4 }}>{smErrTags.tags.slice(0, 4).map((t) => {
+                  const names = smCorrectivesByError(t as never).slice(0, 2).map((e) => e.target).join(' / ');
+                  return `${SM_ERROR_TAG_RU[t as never] || t} → ${names}`;
+                }).join(' · ')}</div>
+              </div>
+            )}
             {smWeakPoints.length === 0 && (
               <div data-sm="corr-empty" style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', fontSize:13, color:'#fff' }}>Выбери 1–4 слабые фазы на табах Жим / Переноски / Загрузки / Хват — здесь появится топ-3 с дозой, кью и прогрессией.</div>
             )}
@@ -1935,8 +1968,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             )}
             {smCorrBlock.length > 0 && (
               <div data-sm="corr-block" style={{ padding:'12px 14px', borderRadius:14, background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.18)', marginBottom:8 }}>
-                <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>🌊 Волна коррекции ({smCorrBlock.length} нед)</div>
+                <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>🌊 Волна коррекции ({smCorrBlock.length} нед, доза причины)</div>
                 <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{smCorrBlock.map((w) => `нед${w.week} ${w.name} ${w.sets}×`).join(' · ')}</div>
+                <div data-sm="corr-block-lines" style={{ fontSize:11, color:'#fff', marginTop:4 }}>{smCorrBlock.slice(0, 2).map((w) => `нед${w.week}: ${w.lines.slice(0, 2).join(' · ')}`).join(' | ')}</div>
               </div>
             )}
             {smWeakPoints.length > 0 && (
