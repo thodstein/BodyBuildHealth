@@ -171,4 +171,47 @@ describe('ta corrective tab UI', () => {
       localStorage.removeItem('he_wl_diagnostics_hub_v1');
     }
   });
+  it('П1: VBT-просадка даёт хинт в Видео без петли', () => {
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '⚡ VBT/FvR' }));
+    fireEvent.change(screen.getAllByPlaceholderText('1.90')[0], { target: { value: '1.90' } });
+    fireEvent.change(screen.getAllByPlaceholderText('1.55')[0], { target: { value: '1.55' } });
+    fireEvent.click(screen.getByRole('button', { name: '📹 Видео' }));
+    const hint = container.querySelector('[data-wl="corrective-video"]');
+    expect(hint).toBeTruthy();
+    expect(hint?.textContent).toMatch(/VBT/);
+    expect(hint?.textContent).toMatch(/high-pull|уход/i);
+  });
+  it('П1: OHS-провалы дают мобильность-теги в Видео без петли', () => {
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🧘 Мобильность' }));
+    fireEvent.click(screen.getByRole('button', { name: 'OHS: Пятки плоско' }));
+    fireEvent.click(screen.getByRole('button', { name: 'OHS: Колени без вальгуса' }));
+    fireEvent.click(screen.getByRole('button', { name: '📹 Видео' }));
+    const hint = container.querySelector('[data-wl="corrective-video"]');
+    expect(hint).toBeTruthy();
+    expect(hint?.textContent).toMatch(/мобильность/i);
+  });
+  it('П3: ⭐ комплекса вставляет injectId с дозой комплекса', () => {
+    const plan = buildStrengthSportPlan({ mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 4, daysPerWeek: 3, workMax: { snatch: 100, cleanJerk: 120, backSquat: 150, deadlift: 180 } } as any);
+    localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(plan));
+    localStorage.removeItem('he_strength_sport_plan_prev_v1');
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Рывок: уход под штангу' }));
+    fireEvent.click(screen.getByRole('button', { name: '🛠️ Коррекция' }));
+    fireEvent.click(screen.getByRole('button', { name: /Вставить комплекс High-pull/ }));
+    const injectBtn = container.querySelector('[data-wl="corrective"] [data-wl="inject"]') as HTMLElement;
+    expect(injectBtn).toBeTruthy();
+    fireEvent.click(injectBtn);
+    const saved = JSON.parse(localStorage.getItem('he_strength_sport_plan_v1') || '{}');
+    const holder = saved.weeksData ? saved : saved.plan;
+    const ex = holder.weeksData[0].sessions.flatMap((s: any) => s.exercises).find((e: any) => e.id === 'snatch_high_pull');
+    expect(ex).toBeTruthy();
+    // доза комплекса 3×3@70, а не библиотечные 3×4@75
+    expect(ex.sets).toBe(3);
+  });
 });

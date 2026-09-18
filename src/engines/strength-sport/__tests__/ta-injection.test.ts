@@ -13,6 +13,15 @@ describe('TA injection PRO — MRV + dedup parity', () => {
     expect(r.injected).toBe(1);
     expect(r.plan.weeksData[0].sessions.some(s => s.exercises.some(e => e.id === 'deficit_snatch'))).toBe(true);
   });
+  it('П6: не-штанга (tspine_ext) не вставляется — честный скип с fallback на штангу', () => {
+    const p = basePlan();
+    const r = injectTAWeakPoints(p, ['snatch_overhead' as WLWeakPoint], { preferredCorr: { snatch_overhead: 'tspine_ext' } });
+    const hasTspine = r.plan.weeksData[0].sessions.some(s => s.exercises.some((e: any) => e.id === 'tspine_ext'));
+    expect(hasTspine).toBe(false);
+    expect(r.notes.join(' ').toLowerCase()).toMatch(/не штанга/);
+    // fallback: штанговый кандидат всё равно вставлен
+    expect(r.injected).toBe(1);
+  });
   it('dedup: повторный вызов не дублирует', () => {
     const p = basePlan();
     const r1 = injectTAWeakPoints(p, ['snatch_off_floor' as WLWeakPoint]);

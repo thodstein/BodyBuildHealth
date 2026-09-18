@@ -46,7 +46,7 @@ import { meetPlan } from '../../../engines/strength-sport/strength-sport-ta-meet
 import { ymaxVerdict, femalePhaseNorm, femaleLevelOf, femalePhaseVerdict } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
 import { shrinkMVT, mvtPosterior, isVelocityShiftReal, velocityMetricFlag, mvtRetestNote, TA_POPULATION_MVT } from '../../../engines/strength-sport/strength-sport-ta-mvt.engine';
 import { imtpEnduranceDrop } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
-import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor, correctivesByError, tagsForBarMetrics, TA_ERROR_TAG_RU, correctiveById, correctiveExportLines, protocolForPreferred, correctionOrderFor, complexesForWeakPoint, complexExportLines, primersForWeakPoint, correctiveHowNot, estimateCorrectiveKg } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
+import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor, correctivesByError, tagsForBarMetrics, tagsForVelocityLoss, tagsForMobility, TA_ERROR_TAG_RU, correctiveById, correctiveExportLines, protocolForPreferred, correctionOrderFor, complexesForWeakPoint, complexExportLines, primersForWeakPoint, correctiveHowNot, estimateCorrectiveKg, seasonPhaseForCompetition } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
 import { turnoverDiag, jerkDriveDiag, pullPowerBalance, lvpBallisticNote, movementOfWeak, mixedWaveNote, TA_MOVEMENT_RU } from '../../../engines/strength-sport/strength-sport-ta-v5.engine';
 import { appendTAPhaseSnapshot, taPhaseTrend, loadTAPhaseHistory, saveTAPhaseHistory, type TAPhaseSnapshot } from '../../../engines/strength-sport/strength-sport-ta-phase-history.engine';
 import { appendTAPullPower, taPullPowerTrend, loadTAPullPower, saveTAPullPower } from '../../../engines/strength-sport/strength-sport-ta-pullpower-history.engine';
@@ -107,6 +107,8 @@ type WLState = {
   peakVelMs: string;
   // E3: предпочитаемая коррекция на фазу (идёт первой в инъекцию E6)
   preferredCorr: Record<string, string>;
+  // PRO-добивка П3: доза выбранного комплекса на фазу (перебивает дозу библиотеки при вставке)
+  preferredComplexProto: Record<string, { sets: number; reps: number; pct: number }>;
   // E7: jerk dip метрики + bfPCA сводка
   jerkDipCm: string;
   jerkDipMs: string;
@@ -197,6 +199,7 @@ const DEFAULT_STATE: WLState = {
   imtpKg: '', isppKg: '',
   xLoopCm: '', yMaxCm: '', peakVelMs: '',
   preferredCorr: {},
+  preferredComplexProto: {},
   jerkDipCm: '', jerkDipMs: '', bfPattern: '',
   // E8: углы суставов с видео (CSV трекера поз)
   poseCsv: '',
@@ -1040,10 +1043,25 @@ export const WLDiagnosticsHub: React.FC = () => {
   const togglePreferredCorr = (wp: WLWeakPoint, id: string) => {
     setState(s => {
       const cur = { ...(s.preferredCorr || {}) };
-      if (cur[wp] === id) delete cur[wp];
-      else cur[wp] = id;
-      return { ...s, preferredCorr: cur };
+      const cxp = { ...(s.preferredComplexProto || {}) };
+      if (cur[wp] === id) { delete cur[wp]; delete cxp[wp]; }
+      else { cur[wp] = id; delete cxp[wp]; }
+      return { ...s, preferredCorr: cur, preferredComplexProto: cxp };
     });
+  };
+  // PRO-добивка П3: выбор комплекса — injectId идёт первым + доза комплекса
+  const togglePreferredComplex = (wp: WLWeakPoint, complexId: string) => {
+    try {
+      const cx = complexesForWeakPoint(wp).find(c => c.id === complexId);
+      if (!cx) return;
+      setState(s => {
+        const cur = { ...(s.preferredCorr || {}) };
+        const cxp = { ...(s.preferredComplexProto || {}) };
+        if (cur[wp] === cx.injectId && cxp[wp]) { delete cur[wp]; delete cxp[wp]; }
+        else { cur[wp] = cx.injectId; cxp[wp] = { sets: cx.protocol.sets, reps: cx.protocol.reps, pct: cx.protocol.pct }; }
+        return { ...s, preferredCorr: cur, preferredComplexProto: cxp };
+      });
+    } catch { /* noop */ }
   };
   const top3Block = (wp: WLWeakPoint) => {
     const top = top3For(wp);
@@ -1071,6 +1089,14 @@ export const WLDiagnosticsHub: React.FC = () => {
       const p: any = planData;
       return p?.inputSnapshot?.level ?? p?.level ?? 'intermediate';
     } catch { return 'intermediate'; }
+  }, [planData]);
+  // PRO-добивка П2: фаза сезона из даты старта плана (0–21 день → comp)
+  const seasonPhase = useMemo(() => {
+    try {
+      const p: any = planData;
+      const cd = p?.inputSnapshot?.competitionDate ?? p?.competitionDate ?? null;
+      return seasonPhaseForCompetition(cd || null);
+    } catch { return null; }
   }, [planData]);
   const specPreview = useMemo(() => {
     try {
@@ -1109,12 +1135,18 @@ export const WLDiagnosticsHub: React.FC = () => {
     const protocols: Record<string, { sets?: number; reps?: number; pct?: number }> = {};
     for (const wp of zones) {
       try {
+        // PRO-добивка П3: доза выбранного комплекса бьёт дозу библиотеки
+        const cxp = (state.preferredComplexProto || {})[wp];
+        if (cxp && cxp.sets > 0) {
+          protocols[wp] = { sets: cxp.sets, reps: cxp.reps, pct: cxp.pct };
+          continue;
+        }
         const prefId = (state.preferredCorr || {})[wp];
         // C8: доза вставки = доза карточки Коррекции (библиотека), fallback — ранжир
         let libProto: { sets: number; reps: number; pct: number } | null = null;
         try {
           const cause = causeFor(wp)?.cause ?? null;
-          libProto = protocolForPreferred(wp, prefId, cause, taLevel, profileMobility, { equipment: profileEquipment });
+          libProto = protocolForPreferred(wp, prefId, cause, taLevel, profileMobility, { equipment: profileEquipment, seasonPhase });
         } catch { libProto = null; }
         if (libProto) {
           protocols[wp] = { sets: libProto.sets, reps: libProto.reps, pct: libProto.pct };
@@ -1263,13 +1295,18 @@ export const WLDiagnosticsHub: React.FC = () => {
         taPreferredCorr: state.preferredCorr || {},
         taWeakCauses: Object.fromEntries(weakPoints.map(wp => { try { return [wp, causeFor(wp)?.cause ?? null]; } catch { return [wp, null]; } })),
         // C9: детальные строки коррекции (имя + доза + кью + источник) — в rationale конструктора
+        // PRO-добивка П4: + строки праймеров разминки (в инъекцию штанги не идут — только текст)
         taCorrectiveDetail: weakPoints.flatMap(wp => {
           try {
             const causeMap: Record<string, string> = {};
             try { causeMap[wp] = causeFor(wp)?.cause ?? ''; } catch { causeMap[wp] = ''; }
-            return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility, { equipment: profileEquipment });
+            return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility, { equipment: profileEquipment, seasonPhase });
           } catch { return []; }
-        }).slice(0, 9),
+        }).slice(0, 9).concat(weakPoints.flatMap(wp => {
+          try {
+            return primersForWeakPoint(wp).slice(0, 2).map(p => `Разминка ${WL_WEAKPOINT_LABELS[wp] || wp}: ${p.nameRu} ${p.dose} · ${p.cue}`);
+          } catch { return []; }
+        }).slice(0, 6)),
         // V5-A: попытки + Sinclair (информационно для конструктора/дневника)
         ...(snatchAttempts || cjAttempts ? { taAttempts: { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) } } : {}),
         ...(progCalc && progCalc.sinclair != null ? { taSinclair: { total: progCalc.total, value: progCalc.sinclair, cycle: progCalc.cycle, q: progCalc.q ?? null, qm: progCalc.qm ?? null } } : {}),
@@ -1374,7 +1411,8 @@ export const WLDiagnosticsHub: React.FC = () => {
       try {
         const causeMap: Record<string, string> = {};
         for (const wp of weakPoints) { try { causeMap[wp] = causeFor(wp)?.cause ?? ''; } catch { causeMap[wp] = ''; } }
-        base.correctiveDetail = weakPoints.flatMap(wp => { try { return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility, { equipment: profileEquipment }); } catch { return []; } });
+        base.correctiveDetail = weakPoints.flatMap(wp => { try { return correctiveExportLines(wp, (causeMap[wp] || null) as any, taLevel, profileMobility, { equipment: profileEquipment, seasonPhase }); } catch { return []; } })
+          .concat(weakPoints.flatMap(wp => { try { return primersForWeakPoint(wp).slice(0, 2).map(p => `Разминка ${WL_WEAKPOINT_LABELS[wp] || wp}: ${p.nameRu} ${p.dose} · ${p.cue}`); } catch { return []; } }));
       } catch { /* noop */ }
       if (snatchAttempts || cjAttempts) base.attempts = { ...(snatchAttempts ? { snatch: snatchAttempts.attempts } : {}), ...(cjAttempts ? { cj: cjAttempts.attempts } : {}) };
       // V4-B/V6-B1: ноты последней инъекции + Sinclair прогресса (ноты персистятся в WLState)
@@ -1926,14 +1964,31 @@ export const WLDiagnosticsHub: React.FC = () => {
             {barMetrics?.trajectoryType && barMetrics.trajectoryType !== 'unknown' && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 4 }}>Тип {barMetrics.trajectoryType} — {classifyTrajectoryType([]).label}</div>}
             {(() => {
               try {
+                // П1: объединённые теги — петля + VBT-просадка + мобильность (а не только xLoop)
                 const t = tagsForBarMetrics(barMetrics?.xLoop ?? null, state.barLift);
-                if (!t.tags.length) return null;
-                const names = t.tags.flatMap(tag => correctivesByError(tag).slice(0, 2).map(e => e.nameRu));
+                const vt = tagsForVelocityLoss(vbtLoss?.lossPct ?? null, state.barLift);
+                let ktwMin: number | null = null;
+                try {
+                  const l = parseFloat(state.kneeToWallL);
+                  const r = parseFloat(state.kneeToWallR);
+                  const vals = [l, r].filter((v) => Number.isFinite(v));
+                  ktwMin = vals.length ? Math.min(...vals) : null;
+                } catch { ktwMin = null; }
+                const mt = tagsForMobility(ohs.failed, ktwMin, state.barLift);
+                const allTags = [...new Set([...t.tags, ...vt.tags, ...mt.tags])];
+                if (!allTags.length) return null;
+                const names = allTags.flatMap(tag => correctivesByError(tag).slice(0, 2).map(e => e.nameRu));
                 const uniq = [...new Set(names)].slice(0, 3);
                 if (!uniq.length) return null;
+                const sev = [t.severity, vt.severity, mt.severity].includes('critical') ? '🔴' : '🟡';
+                const src: string[] = [];
+                if (t.tags.length) src.push(`петля ${t.text || ''}`.trim());
+                if (vt.tags.length) src.push(`VBT ${vt.text || ''}`.trim());
+                if (mt.tags.length) src.push(`мобильность: ${mt.text || ''}`.trim());
                 return (
                   <div data-wl="corrective-video" style={{ fontSize: 10, color: '#fff', marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.16)' }}>
-                    🛠️ Замер → ошибка: {t.tags.map(tag => TA_ERROR_TAG_RU[tag]).join(' · ')} → гасится: {uniq.join(' · ')}
+                    {sev} Замер → ошибка: {allTags.map(tag => TA_ERROR_TAG_RU[tag]).join(' · ')} → гасится: {uniq.join(' · ')}
+                    <div style={{ marginTop: 2, opacity: 0.85 }}>{src.join(' · ')}</div>
                     <button onClick={() => setTab('correction')} style={{ display: 'block', marginTop: 6, width: '100%', minHeight: 44, borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Открыть Коррекцию</button>
                   </div>
                 );
@@ -2025,10 +2080,24 @@ export const WLDiagnosticsHub: React.FC = () => {
             {(() => {
               try {
                 const mob = weakPoints.filter(wp => { try { return causeFor(wp)?.cause === 'mobility'; } catch { return false; } });
-                if (!mob.length) return null;
+                // П1: точечные теги мобильности (OHS/KTW → упражнения), даже без выбранных фаз
+                let ktwMin: number | null = null;
+                try {
+                  const l = parseFloat(state.kneeToWallL);
+                  const r = parseFloat(state.kneeToWallR);
+                  const vals = [l, r].filter((v) => Number.isFinite(v));
+                  ktwMin = vals.length ? Math.min(...vals) : null;
+                } catch { ktwMin = null; }
+                const liftForMob = weakPoints[0] ? String(weakPoints[0]) : 'snatch_catch';
+                const mt = tagsForMobility(ohs.failed, ktwMin, liftForMob);
+                const mtNames = mt.tags.length
+                  ? [...new Set(mt.tags.flatMap(tag => correctivesByError(tag).slice(0, 2).map(e => e.nameRu)))].slice(0, 3)
+                  : [];
+                if (!mob.length && !mtNames.length) return null;
                 return (
                   <div data-wl="corrective-mobility" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.16)', fontSize: 10, color: '#fff' }}>
-                    🛠️ Причина — мобильность: {mob.map(wp => WL_WEAKPOINT_LABELS[wp] || wp).join(' · ')} → в Коррекции подобраны щадящие дозы (−5%)
+                    {mob.length > 0 && <div>🛠️ Причина — мобильность: {mob.map(wp => WL_WEAKPOINT_LABELS[wp] || wp).join(' · ')} → в Коррекции подобраны щадящие дозы (−5%)</div>}
+                    {mtNames.length > 0 && <div style={{ marginTop: mob.length ? 4 : 0 }}>🦶 {mt.text} → гасится: {mtNames.join(' · ')}</div>}
                     <button onClick={() => setTab('correction')} style={{ display: 'block', marginTop: 6, width: '100%', minHeight: 44, borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>→ Открыть Коррекцию</button>
                   </div>
                 );
@@ -2097,6 +2166,7 @@ export const WLDiagnosticsHub: React.FC = () => {
               return (
                 <div data-wl="corrective-order" style={{ fontSize: 10, color: '#fff', marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.16)' }}>
                   🎯 Порядок коррекции (сначала раннее и грубое): {ordered.map((w, i) => `${i + 1}. ${WL_WEAKPOINT_LABELS[w] || w}`).join(' → ')}
+                  {seasonPhase === 'comp' && <div style={{ marginTop: 2, color: '#f59e0b' }}>🏁 Старт ≤21 дня: дозы −5%, силовые пики притоплены — только техника и праймеры</div>}
                   <div style={{ marginTop: 2, opacity: 0.85 }}>Пересним фаз через 4–6 нед (кнопка «🗂 Фазы: снимок» ниже) — «ушло/висит» покажет что сработало</div>
                 </div>
               );
@@ -2105,7 +2175,7 @@ export const WLDiagnosticsHub: React.FC = () => {
               let cause: string | null = null;
               try { cause = causeFor(wp)?.cause ?? null; } catch { cause = null; }
               let list: ReturnType<typeof correctivesForWeakPoint> = [];
-              try { list = correctivesForWeakPoint(wp, { cause: cause as any, level: taLevel, mobilityRestrictions: profileMobility, equipment: profileEquipment, fatigueSensitive: cause === 'fatigue', limit: 5 }); } catch { list = []; }
+              try { list = correctivesForWeakPoint(wp, { cause: cause as any, level: taLevel, mobilityRestrictions: profileMobility, equipment: profileEquipment, fatigueSensitive: cause === 'fatigue', seasonPhase, limit: 5 }); } catch { list = []; }
               const pref = (state.preferredCorr || {})[wp];
               return (
                 <div key={wp} data-wl="corrective-phase" style={{ padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', marginBottom: 8 }}>
@@ -2141,11 +2211,17 @@ export const WLDiagnosticsHub: React.FC = () => {
                     if (!cxs.length && !prims.length) return null;
                     return (
                       <div style={{ marginTop: 6 }}>
-                        {cxs.slice(0, 2).map(cx => (
-                          <div key={cx.id} data-wl="corrective-complex" style={{ marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', fontSize: 10, color: '#fff' }}>
-                            🔗 Комплекс: {cx.nameRu} ({cx.parts.join(' + ')}) — {cx.protocol.sets}×{cx.protocol.reps} @{cx.protocol.pct}% · {cx.cue}
-                          </div>
-                        ))}
+                        {cxs.slice(0, 2).map(cx => {
+                          const isCxPref = (state.preferredCorr || {})[wp] === cx.injectId && !!(state.preferredComplexProto || {})[wp];
+                          return (
+                            <div key={cx.id} data-wl="corrective-complex" style={{ marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.07)', border: `1px solid ${isCxPref ? 'rgba(168,85,247,0.5)' : 'rgba(168,85,247,0.2)'}`, fontSize: 10, color: '#fff' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <button onClick={() => togglePreferredComplex(wp, cx.id)} aria-pressed={isCxPref} aria-label={`Вставить комплекс ${cx.nameRu}`} style={{ minWidth: 32, minHeight: 32, borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(168,85,247,0.4)', background: isCxPref ? '#a855f7' : 'transparent', color: '#fff', fontSize: 13, fontWeight: 800 }}>{isCxPref ? '⭐' : '☆'}</button>
+                                <div style={{ flex: 1 }}>🔗 Комплекс: {cx.nameRu} ({cx.parts.join(' + ')}) — {cx.protocol.sets}×{cx.protocol.reps} @{cx.protocol.pct}% · {cx.cue}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
                         {prims.slice(0, 3).length > 0 && (
                           <div data-wl="corrective-primer" style={{ marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)', fontSize: 10, color: '#fff' }}>
                             🟢 Разминка-праймер (до работы): {prims.slice(0, 3).map(p => `${p.nameRu} ${p.dose}`).join(' · ')}
@@ -2163,8 +2239,8 @@ export const WLDiagnosticsHub: React.FC = () => {
               try {
                 const causeMap: Record<string, any> = {};
                 for (const wp of weakPoints) { try { causeMap[wp] = causeFor(wp)?.cause ?? null; } catch { causeMap[wp] = null; } }
-                steps = correctiveSessionFor(weakPoints, causeMap, { level: taLevel, mobilityRestrictions: profileMobility, equipment: profileEquipment });
-                block = correctiveBlockFor(weakPoints, Math.max(4, Math.min(8, planAudit.workWeeks || 6)), { causeByWeak: causeMap as any, level: taLevel, mobilityRestrictions: profileMobility, equipment: profileEquipment });
+                steps = correctiveSessionFor(weakPoints, causeMap, { level: taLevel, mobilityRestrictions: profileMobility, equipment: profileEquipment, fatigueSensitive: Object.values(causeMap).some((c) => c === 'fatigue'), seasonPhase });
+                block = correctiveBlockFor(weakPoints, Math.max(4, Math.min(8, planAudit.workWeeks || 6)), { causeByWeak: causeMap as any, level: taLevel, mobilityRestrictions: profileMobility, equipment: profileEquipment, fatigueSensitive: Object.values(causeMap).some((c) => c === 'fatigue'), seasonPhase });
               } catch { steps = []; block = []; }
               return (
                 <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.16)', marginBottom: 8 }}>

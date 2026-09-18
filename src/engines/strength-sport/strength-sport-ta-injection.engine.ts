@@ -8,7 +8,7 @@
 import type { StrengthSportPlan, StrengthSportSession, StrengthSportExercise } from './strength-sport.types';
 import { WL_WEAKPOINT_CORRECTION, type WLWeakPoint } from './strength-sport-weakpoint';
 import { TA_BIOMECH } from './strength-sport-biomechanics.engine';
-import { correctiveById } from './strength-sport-ta-corrective.engine';
+import { correctiveById, correctiveMetaOf } from './strength-sport-ta-corrective.engine';
 import '../../core/exercise-catalog-ta-supplement';
 
 function basePmForTA(id: string, wm: any): number {
@@ -184,6 +184,14 @@ export function injectTAWeakPoints(plan: StrengthSportPlan, weakPoints: WLWeakPo
       // перебор кандидатов: первый отсутствующий в сессии
       let placed = false;
       for (const corrId of candidates) {
+        // PRO-добивка П6: не-штанга (валик/dead bug/паллоф — праймеры) в штанговый план
+        // не вставляется: доза % от приседа на bodyweight-дрилл врала бы. Честный скип.
+        try {
+          if (correctiveMetaOf(corrId).nonBarbell) {
+            notes.push(`⊘ ${corrId} — не штанга (праймер), в план не вставляется (нед ${week.week})`);
+            continue;
+          }
+        } catch { /* meta недоступна — вставляем как раньше */ }
         // dedup по id в ЭТОЙ сессии
         if (targetSession.exercises.some(e => e.id === corrId || e.id.toLowerCase() === corrId.toLowerCase())) {
           skippedDup++;

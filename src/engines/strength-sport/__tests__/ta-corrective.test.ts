@@ -9,7 +9,7 @@ import {
   MOBILITY_DEMAND, correctiveMetaOf,
   TA_CORRECTIVE_COMPLEXES, complexesForWeakPoint, complexById, complexExportLines,
   TA_WARMUP_PRIMERS, primersForWeakPoint,
-  correctiveHowNot, estimateCorrectiveKg, regressionSteps,
+  correctiveHowNot, estimateCorrectiveKg, regressionSteps, seasonPhaseForCompetition,
 } from '../strength-sport-ta-corrective.engine';
 import { estimateCorrBasePm } from '../strength-sport-ta-simulator.engine';
 import { rankCorrectionsForTA } from '../strength-sport-ta-correction-rank.engine';
@@ -337,5 +337,26 @@ describe('ta-corrective E4/E5: расширение + доза', () => {
   it('лесенка регрессии: ≥1 шаг, tall — про палку/гриф', () => {
     const steps = regressionSteps('tall_snatch');
     expect(steps.length).toBeGreaterThanOrEqual(1);
+  });
+  it('П5: howNot покрывает все 67 записей (непустые строки)', () => {
+    for (const e of TA_CORRECTIVES) {
+      const h = correctiveHowNot(e.id);
+      expect(h && h.length > 5, e.id).toBe(true);
+    }
+  });
+  it('П2: фаза сезона — старт 0–21 день → comp, иначе null', () => {
+    const now = '2026-09-01';
+    expect(seasonPhaseForCompetition('2026-09-01', now)).toBe('comp');
+    expect(seasonPhaseForCompetition('2026-09-22', now)).toBe('comp');
+    expect(seasonPhaseForCompetition('2026-10-15', now)).toBeNull();
+    expect(seasonPhaseForCompetition('2026-08-01', now)).toBeNull();
+    expect(seasonPhaseForCompetition(null)).toBeNull();
+    expect(seasonPhaseForCompetition('мусор', now)).toBeNull();
+  });
+  it('П3: injectId всех комплексов — штанга (гвард инъекции их не зарежет)', () => {
+    for (const c of TA_CORRECTIVE_COMPLEXES) {
+      expect(correctiveMetaOf(c.injectId).nonBarbell, c.id).not.toBe(true);
+      expect(correctiveById(c.injectId), c.id).not.toBeNull();
+    }
   });
 });
