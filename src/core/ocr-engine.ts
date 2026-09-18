@@ -463,9 +463,26 @@ export async function recognizeImageTextOffline(file: File, timeoutMs = 90_000):
     langPath: opts.langPath,
   });
   try {
-    const run: Promise<string> = worker
-      .recognize(upload)
-      .then((r: any) => String(r?.data?.text || ''));
+    const recognizePass = async (pageSegMode: '6' | '11'): Promise<string> => {
+      if (typeof worker.setParameters === 'function') {
+        await worker.setParameters({
+          tessedit_pageseg_mode: pageSegMode,
+          preserve_interword_spaces: '1',
+          user_defined_dpi: '220',
+        });
+      }
+      const result = await worker.recognize(upload);
+      return String(result?.data?.text || '');
+    };
+    const run: Promise<string> = recognizePass('6').then(async blockText => {
+      // FatSecret Android uses right-aligned macro columns. A sparse-text pass
+      // recovers rows that PSM 6 commonly drops, especially on narrow screens.
+      const sparseText = await recognizePass('11');
+      const lines = [...blockText.split(/\r?\n/), ...sparseText.split(/\r?\n/)]
+        .map(line => line.trim())
+        .filter(Boolean);
+      return [...new Set(lines)].join('\n');
+    });
     return await Promise.race([
       run,
       new Promise<string>((_, reject) =>
