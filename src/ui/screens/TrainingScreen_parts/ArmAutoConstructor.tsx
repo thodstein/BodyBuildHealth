@@ -49,54 +49,53 @@ import { useDataLink } from '../../../core/data-link';
 import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
 import './arm-design.css';
 import { CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN } from './training-ui';
+import { PlannerHead, buzzPlanner } from './planner-ui';
 import { AdSwitch, AdSheetSelect } from './arm-design-system';
 import { isNativeApp } from '../../../core/app-platform';
 import { ensureArmApkStyles } from './arm-apk-loader';
 
-/* ── BB-modern presentation primitives (Ad* DOM contracts kept 1-в-1:
- * classes .ad-* + data-arm hooks + aria, только инлайн-стиль в токенах
- * training-ui как в BbAutoConstructor) ── */
+/* ── Единый плотный каркас (план PLANNERS-STRUCTURE-PRO P2): Ad* — тонкие обёртки
+ * над planner-ui (BB-эталон). DOM-контракты 1-в-1: классы .ad-* + data-arm хуки +
+ * строки + aria. Отступы — один слой (инлайн planner-ui); CSS-дубли гасятся
+ * добивкой в arm-design.css. Скрытое = collapsed-тело нулевой высоты
+ * (grid 0fr / opacity 0, без display:none): пустот нет, контент остаётся
+ * в DOM для скринридеров и тестовых запросов. ── */
 type AdStepDef = { id: string; label: string };
 function AdRoot({ rootClass, maxWidth, children }: { rootClass: string; maxWidth?: number; children: React.ReactNode }) {
   React.useEffect(() => { ensureArmApkStyles(); }, []);
-  return <div className={isNativeApp() ? `${rootClass} arm-apk ad-wrap` : `${rootClass} ad-wrap`} style={maxWidth ? { maxWidth, margin: '0 auto', padding: '0 10px 90px' } : undefined}>{children}</div>;
+  return <div className={isNativeApp() ? `${rootClass} arm-apk ad-wrap planner-root` : `${rootClass} ad-wrap planner-root`} style={maxWidth ? { maxWidth, margin: '0 auto', padding: '0 10px 90px', display: 'flex', flexDirection: 'column', gap: 8 } : { display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</div>;
 }
 function AdHead({ icon, title, sub, side }: { icon: string; title: string; sub?: string; side?: React.ReactNode }) {
-  return (
-    <div className="ad-head" style={{ ...CARD, display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', flexWrap: 'wrap' }}>
-      <div className="ad-head-ic" aria-hidden style={{ fontSize: 26, lineHeight: 1, width: 44, height: 44, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(0,230,138,0.22), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.35)', flexShrink: 0 }}>{icon}</div>
-      <div className="ad-head-tx" style={{ flex: 1, minWidth: 0 }}>
-        <h2 className="ad-head-title" style={{ ...H, margin: 0 }}>{title}</h2>
-        {sub ? <p className="ad-head-sub" style={{ ...SMALL, margin: '4px 0 0', color: '#fff' }}>{sub}</p> : null}
-      </div>
-      {side ? <div className="ad-head-side" style={{ flexShrink: 0 }}>{side}</div> : null}
-    </div>
-  );
+  return <PlannerHead icon={icon} title={title} sub={sub} side={side} className="ad-head" />;
 }
 function AdCard({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={className ? `ad-card ${className}` : 'ad-card'} style={{ ...CARD, padding: '10px 12px' }} {...rest}>{children}</div>;
+  return <div className={className ? `ad-card ${className}` : 'ad-card'} style={{ ...CARD, padding: '10px 12px', margin: '0 0 8px', display: 'flex', flexDirection: 'column', gap: 8 }} {...rest}>{children}</div>;
 }
 function AdSec({ title, hint, children, hook, collapsible, defaultOpen, summary, status }: { title: React.ReactNode; hint?: React.ReactNode; children: React.ReactNode; hook?: string; collapsible?: boolean; defaultOpen?: boolean; summary?: React.ReactNode; status?: 'ok' | 'warn' }) {
-  const [open, setOpen] = React.useState(defaultOpen ?? true);
+  // Вторичное по умолчанию закрыто (BB-эталон PlannerFold); первичное — открыто.
+  const [open, setOpen] = React.useState(defaultOpen ?? !collapsible);
   const dot = status ? <span className="ad-dot" data-s={status} aria-hidden style={{ width: 8, height: 8, borderRadius: 99, background: status === 'ok' ? '#00e68a' : '#f59e0b', display: 'inline-block', marginRight: 6 }} /> : null;
   if (!collapsible) {
     return (
-      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '8px 10px', marginTop: 6 }}>
-        <div className="ad-sec-t" style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 4 }}>{dot}{title}</div>
-        {hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 4 }}>{hint}</div> : null}
+      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '10px 12px', margin: 0 }}>
+        <div className="ad-sec-t" style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', marginBottom: 6 }}>{dot}{title}</div>
+        {hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 6, fontSize: 10.5 }}>{hint}</div> : null}
         {children}
       </div>
     );
   }
   return (
-    <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: open ? '8px 10px' : '0 10px', marginTop: 6 }}>
-      <button type="button" className="ad-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', cursor: 'pointer', background: 'transparent', border: 'none', color: '#fff', fontSize: 13, fontWeight: 800, textAlign: 'left' }}>
-        <span className="ad-sec-chev" aria-hidden style={{ color: '#00e68a', fontSize: 12 }}>{open ? '▾' : '▸'}</span>
+    <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '10px 12px', margin: 0 }}>
+      <button type="button" className="ad-sec-head" aria-expanded={open} onClick={() => { buzzPlanner(); setOpen((o) => !o); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: 0, cursor: 'pointer', background: 'transparent', border: 'none', color: '#fff', fontSize: 12.5, fontWeight: 800, textAlign: 'left', minHeight: 28 }}>
+        <span className="ad-sec-chev" aria-hidden style={{ color: '#00e68a', fontSize: 11 }}>{open ? '▾' : '▸'}</span>
         {dot}
-        <span className="ad-sec-t" style={{ flex: 1 }}>{title}</span>
+        <span className="ad-sec-t" style={{ flex: 1, margin: 0 }}>{title}</span>
         {!open && summary ? <span className="ad-sec-sum" style={{ ...SMALL, color: '#fff' }}>{summary}</span> : null}
       </button>
-      {open ? <div className="ad-sec-body" data-collapsed={!open} style={{ paddingBottom: 8 }}>{hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 4 }}>{hint}</div> : null}{children}</div> : <div className="ad-sec-body" data-collapsed={!open} style={{ display: 'none' }}>{children}</div>}
+      {hint && open ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 6, marginTop: 6, fontSize: 10.5 }}>{hint}</div> : null}
+      {open
+        ? <div className="ad-sec-body" data-collapsed={false} style={{ marginTop: hint ? 0 : 6 }}>{children}</div>
+        : <div className="ad-sec-body" data-collapsed={true}>{children}</div>}
     </div>
   );
 }
@@ -126,7 +125,8 @@ function AdEmpty({ icon, title, sub, children }: { icon: string; title: string; 
   return <div className="ad-empty" style={{ textAlign: 'center', padding: '18px 12px' }}><div className="ad-empty-ic" aria-hidden style={{ fontSize: 32 }}>{icon}</div><div className="ad-empty-t" style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginTop: 6 }}>{title}</div>{sub ? <p className="ad-empty-s" style={{ ...SMALL, marginTop: 4 }}>{sub}</p> : null}{children ? <div style={{ marginTop: 10 }}>{children}</div> : null}</div>;
 }
 function AdCta({ children }: { children: React.ReactNode }) {
-  return <div className="ad-cta" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, position: 'sticky', bottom: 8, zIndex: 5 }}>{children}</div>;
+  // Плотная навигация без липкой пустоты: обычный поток, gap 6.
+  return <div className="ad-cta" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2 }}>{children}</div>;
 }
 
 type Step = 'params'|'athlete'|'grip'|'split'|'plan'|'quality'|'export'|'year';
@@ -664,6 +664,8 @@ export function ArmAutoConstructor() {
               ...(typeof t.dayTag === 'string' && t.dayTag ? { dayTag: String(t.dayTag) } : {}),
               ...(Number.isFinite(Number(t.intensityPct)) ? { intensityPct: Number(t.intensityPct) } : {}),
               ...(Number.isFinite(Number(t.rir)) ? { rir: Number(t.rir) } : {}),
+              // PRO-CORR K5: холд из коррекции (кламп 3–60с, мусор отбрасывается).
+              ...(Number.isFinite(Number((t as any).holdSeconds)) ? { holdSeconds: Math.max(3, Math.min(60, Math.round(Number((t as any).holdSeconds)))) } : {}),
             }));
           const specRaw = Array.isArray(al?.armliftSpec) ? al.armliftSpec : [];
           const specClean = specRaw.slice(0, 6).filter((w: any) => w && typeof w === 'object').map((w: any) => ({
@@ -1281,7 +1283,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           </AdSec>
 
           {discipline !== 'armwrestling' && (
-            <AdSec title="Хват-фокус" collapsible summary={summFocus}>
+            <AdSec title="Хват-фокус" collapsible defaultOpen={false} summary={summFocus}>
               <div className="ad-chips">
                 {GRIP_FOCI.map(g=> (
                   <AdChip key={g.id} active={gripFocus===g.id} onClick={()=>setGripFocus(g.id)}>{g.label}</AdChip>
@@ -1299,7 +1301,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
 
       {step === 'athlete' && (
         <AdCard className="ad-stepview">
-          <AdSec title="🎯 Слабые зоны (1–2)" hint="Специализация ×1.3 — мышцы" collapsible summary={summWeak} status={weakPoints.length ? 'ok' : undefined}>
+          <AdSec title="🎯 Слабые зоны (1–2)" hint="Специализация ×1.3 — мышцы" collapsible defaultOpen summary={summWeak} status={weakPoints.length ? 'ok' : undefined}>
             <div className="ad-chips">
               {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m=> (
                 <AdChip key={m} active={weakPoints.includes(m)} onClick={()=>toggleWeak(m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
