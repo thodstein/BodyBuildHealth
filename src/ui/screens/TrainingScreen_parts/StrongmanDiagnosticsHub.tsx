@@ -748,8 +748,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     try { return correctiveBlockForSM(smWeakPoints as any, parseInt(state.specWeeks) || 6, smCauseByPhase as any); } catch { return []; }
   }, [smWeakPoints, state.specWeeks, smCauseByPhase]);
   const smCorrExport = useMemo(() => {
-    try { return smCorrectiveExportLines(smWeakPoints as any, smCauseByPhase as any); } catch { return []; }
-  }, [smWeakPoints, smCauseByPhase]);
+    try { return smCorrectiveExportLines(smWeakPoints as any, smCauseByPhase as any, { mobilityRestrictions: smProfileMobility }); } catch { return []; }
+  }, [smWeakPoints, smCauseByPhase, smProfileMobility]);
   // ── SM corrective hints: замер → тег → топ-упражнение (sway/VBT/асимметрия/OHS) ──
   // (smMetricTags/smMetricTops — ниже, после movement-мемов: им нужны диагнозы P1–P8)
   const logDipDiag = useMemo(() => {
@@ -942,6 +942,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         tyreSecondPullS: numOrNull(state.tyrePull2S),
         suitcaseAsymPct: suitcaseDiag?.asymmetryPct ?? null,
         ybtAntAsymCm: ybtDiag?.antAsymCm ?? null,
+        ybtUqAsymCm: ybtDiag?.uqAsymCm ?? null,
       });
     } catch { return []; }
   }, [swayCm, vbtLoss, asymmetry, ohs.failed, state.stoneLapS, state.stoneZeroLap, state.carryTurnS, state.turnDrop, gripCarryDiag, logWindowDiag, state.tyrePull2S, suitcaseDiag, ybtDiag]);

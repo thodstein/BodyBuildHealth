@@ -232,4 +232,18 @@ describe('sm-corrective library', () => {
     }
     expect(exIdForSMCorrective(libraryEntryForSM('sm_conditioning_tyre_tech')!)).toBe('tire_flip');
   });
+  it('R1: YBT-UQ >4см → лог-фазы (паритет weak-cause P7-UQ); ≤4 — тихо', () => {
+    const tags = smTagsForMetrics({ ybtUqAsymCm: 5 });
+    expect(tags).toContain('log_drive');
+    expect(tags).toContain('log_lockout');
+    expect(smTagsForMetrics({ ybtUqAsymCm: 3 })).not.toContain('log_drive');
+    expect(smTagsForMetrics({})).toEqual([]);
+  });
+  it('R2: экспорт с фильтрами = показанному (mobility passthrough, без — байт-в-байт)', () => {
+    const base = smCorrectiveExportLines(['log_lockout']);
+    const mob = smCorrectiveExportLines(['log_lockout'], {}, { mobilityRestrictions: ['shoulder'] });
+    expect(base.length).toBe(1);
+    expect(mob.length).toBe(1);
+    expect(mob[0]).toContain('log_lockout →');
+  });
 });

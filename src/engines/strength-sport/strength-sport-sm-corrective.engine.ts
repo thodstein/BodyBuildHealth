@@ -647,7 +647,7 @@ export function correctiveBlockForSM(
  * + movement P1–P8 (опционально, backward-compat): lap/разворот/хват-заступ/
  * дип-окно/тайр/чемодан/YBT. Пороги: sway warn 3 / crit 5 (McGill); VBT carry 15 /
  * press 10; асимметрия 7/12 (Bezkorovainyi); OHS ≥2; lap >2.0 (Hindle); разворот >3с;
- * тайр 2-я >1.0с (HP/LP); чемодан ≥7%; YBT anterior >4см (Plisky).
+ * тайр 2-я >1.0с (HP/LP); чемодан ≥7%; YBT anterior >4см (Plisky); YBT-UQ >4см → лог-фазы.
  */
 export function smTagsForMetrics(input: {
   swayCm?: number | null; vbtLossPct?: number | null; asymmetryPct?: number | null; ohsFailed?: number | null;
@@ -658,6 +658,8 @@ export function smTagsForMetrics(input: {
   tyreSecondPullS?: number | null;
   suitcaseAsymPct?: number | null;
   ybtAntAsymCm?: number | null;
+  /** P7-UQ: верхняя асимметрия (лог над головой) — паритет diagnoseSMWeakCause. */
+  ybtUqAsymCm?: number | null;
 }): SMWeakPoint[] {
   const tags: SMWeakPoint[] = [];
   if (input.swayCm != null && input.swayCm > 3) tags.push('yoke_walk', 'farmers_carry');
@@ -673,6 +675,7 @@ export function smTagsForMetrics(input: {
   if (input.tyreSecondPullS != null && input.tyreSecondPullS > 1.0) tags.push('conditioning');
   if (input.suitcaseAsymPct != null && input.suitcaseAsymPct >= 7) tags.push('farmers_carry');
   if (input.ybtAntAsymCm != null && input.ybtAntAsymCm > 4) tags.push('yoke_pickup', 'stone_lap', 'log_clean');
+  if (input.ybtUqAsymCm != null && input.ybtUqAsymCm > 4) tags.push('log_clean', 'log_dip', 'log_drive', 'log_lockout');
   return Array.from(new Set(tags));
 }
 
@@ -754,8 +757,7 @@ export function smErrorTagsForMetrics(input: {
   ybtAntAsymCm?: number | null;
 }): SMErrorTagsResult {
   const tags: SMErrorTag[] = [];
-  if (input.swayCm != null && input.swayCm > 5) tags.push('sway');
-  else if (input.swayCm != null && input.swayCm > 3) tags.push('sway');
+  if (input.swayCm != null && input.swayCm > 3) tags.push('sway');
   if (input.logDipOutOfWindow === true) tags.push('dip_forward', 'slow_dip');
   if (input.gripLimitsCarry === true || (input.asymmetryPct != null && input.asymmetryPct >= 7)) tags.push('grip_slip');
   if ((input.carryTurnS != null && input.carryTurnS > 3) || input.turnDrop === true) tags.push('turn_wide');
@@ -770,10 +772,10 @@ export function smErrorTagsForMetrics(input: {
   return { tags: uniq, text: uniq.length ? uniq.map((t) => SM_ERROR_TAG_RU[t]).join(' · ') : null };
 }
 
-/** Строки экспорта коррекции (HTML/CSV/мост): фаза → топ-1 + cue + source. */
-export function smCorrectiveExportLines(phases: SMWeakPoint[], causeByPhase: Record<string, SMWeakCause | null> = {}): string[] {
+/** Строки экспорта коррекции (HTML/CSV/мост): фаза → топ-1 + cue + source. opts — те же фильтры показа (уровень/оборудование/мобильность): показано = экспортируется. */
+export function smCorrectiveExportLines(phases: SMWeakPoint[], causeByPhase: Record<string, SMWeakCause | null> = {}, opts: SMCorrectiveOpts = {}): string[] {
   return phases.slice(0, 4).map((ph) => {
-    const top = correctivesForSMWeakPoint(ph, { cause: causeByPhase[ph] ?? null });
+    const top = correctivesForSMWeakPoint(ph, { ...opts, cause: causeByPhase[ph] ?? null });
     const c = top[0];
     if (!c) return `${ph}: —`;
     return `${ph} → ${c.target} (${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}%): ${c.cues[0]} [${c.source}]`;
