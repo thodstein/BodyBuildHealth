@@ -1037,7 +1037,7 @@ export const WLDiagnosticsHub: React.FC = () => {
   const top3For = (wp: WLWeakPoint) => {
     try {
       const c = causeFor(wp);
-      return rankCorrectionsForTA(wp, { equipment: profileEquipment, mobilityRestrictions: profileMobility, cause: c?.cause ?? null });
+      return rankCorrectionsForTA(wp, { equipment: profileEquipment, mobilityRestrictions: profileMobility, cause: c?.cause ?? null, seasonPhase });
     } catch { return []; }
   };
   const togglePreferredCorr = (wp: WLWeakPoint, id: string) => {

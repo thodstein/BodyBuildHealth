@@ -71,6 +71,8 @@ export interface TARankOpts {
   equipment?: string[]; // фильтр зала; пусто = весь каталог
   mobilityRestrictions?: string[]; // ankle/hip/shoulder/lower_back
   cause?: TAWeakCause | null;
+  /** Сезон: comp (старт ≤21 дня) — силовые пики топятся, доза −5% (паритет библиотеки). */
+  seasonPhase?: 'prep' | 'comp' | null;
 }
 
 export function rankCorrectionsForTA(wp: WLWeakPoint, opts: TARankOpts = {}): TACorrectionCandidate[] {
@@ -102,12 +104,16 @@ export function rankCorrectionsForTA(wp: WLWeakPoint, opts: TARankOpts = {}): TA
     if (cause === 'mobility' && !ANKLE_DEMAND.has(id) && !OVERHEAD_DEMAND.has(id)) score += 10;
     if (cause === 'strength' && /pull|squat|deadlift|press/.test(id)) score += 10;
     if (cause === 'fatigue' && (cat.fatigueCost ?? 7) <= 6) score += 10;
+    // Сезон comp: силовые пики (тяги/приседы) топятся — только техника и праймеры первыми
+    const season = opts.seasonPhase ?? null;
+    if (season === 'comp' && /pull|squat|deadlift|press/.test(id)) score -= 10;
 
     // Протокол по причине (база 3×5 @intensityPct — протокол инъекции)
     let sets = 3, reps = 5, pct = basePct;
     if (cause === 'volume') { sets = 4; }
     else if (cause === 'strength') { sets = 4; reps = 4; pct = Math.min(90, basePct + 5); }
     else if (cause === 'mobility' || cause === 'fatigue') { pct = Math.max(50, basePct - 5); }
+    if (season === 'comp') { pct = Math.max(50, pct - 5); }
     const protocol: TACorrectionProtocol = { sets, reps, pct, rir: 2, tempo: 'X-0-X-0', restSeconds: 120 };
     const rationale = `${bio?.label || wp}: ${cat.name || prettyName(id)} ${sets}×${reps} @${pct}% — ${cause ? `причина ${cause}` : 'техника фазы'}`;
     out.push({ id, name: cat.name || bio?.corrections?.find(c => String(c).toLowerCase().includes(id.split('_')[0])) || prettyName(id), protocol, rationale, score, cause });

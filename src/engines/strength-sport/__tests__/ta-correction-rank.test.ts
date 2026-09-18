@@ -38,4 +38,14 @@ describe('TA correction rank E3', () => {
   it('неизвестная фаза → []', () => {
     expect(rankCorrectionsForTA('nope' as any)).toEqual([]);
   });
+  it('comp: доза −5% и силовые пики тонут (паритет библиотеки)', () => {
+    const plain = rankCorrectionsForTA('snatch_off_floor');
+    const comp = rankCorrectionsForTA('snatch_off_floor', { seasonPhase: 'comp' });
+    expect(comp[0].protocol.pct).toBe(plain[0].protocol.pct - 5);
+    const pullPlain = plain.find(c => c.id === 'snatch_pull')!;
+    const pullComp = comp.find(c => c.id === 'snatch_pull')!;
+    expect(pullComp.score).toBe(pullPlain.score - 10);
+    // без флага — байт-в-байт
+    expect(JSON.stringify(rankCorrectionsForTA('snatch_off_floor', {}))).toBe(JSON.stringify(plain));
+  });
 });

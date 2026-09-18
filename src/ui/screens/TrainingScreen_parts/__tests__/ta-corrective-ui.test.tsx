@@ -215,4 +215,21 @@ describe('ta corrective tab UI', () => {
     // доза комплекса 3×3@70, а не библиотечные 3×4@75
     expect(ex.sets).toBe(3);
   });
+  it('П2: старт через 7 дней — 🏁-бейдж и comp-дозы в Коррекции', () => {
+    const in7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const plan = buildStrengthSportPlan({ mode: 'weightlifting', goal: 'strength', level: 'intermediate', weeks: 4, daysPerWeek: 3, workMax: { snatch: 100, cleanJerk: 120, backSquat: 150, deadlift: 180 }, competitionDate: in7 } as any);
+    localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(plan));
+    localStorage.removeItem('he_strength_sport_plan_prev_v1');
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    try {
+      const { container } = render(<WLDiagnosticsHub />);
+      fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+      fireEvent.click(screen.getByText('Рывок: уход под штангу'));
+      fireEvent.click(screen.getByRole('button', { name: '🛠️ Коррекция' }));
+      const order = container.querySelector('[data-wl="corrective-order"]');
+      expect(order?.textContent).toMatch(/🏁 Старт/);
+    } finally {
+      localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    }
+  });
 });
