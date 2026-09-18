@@ -183,6 +183,18 @@ const GRANULAR_OPTS: Array<{ id: string; label: string }> = [
 
 /** Русские подписи профилей/мышц для вывода (движковые id не меняются). */
 const PROFILE_RU: Record<string, string> = { lengthened: 'растянутая', mid: 'средняя', short: 'пиковая', all: 'все' };
+
+/** PRO-5 Э3: RU-расшифровка кодов трекинга снимков (D1–D5/R1–R8; неизвестный код — как есть). */
+const TRACKED_CODE_RU: Record<string, string> = {
+  heels: 'пятки', valgus: 'вальгус', depth: 'глубина', trunk: 'корпус', arms: 'руки', lumbar: 'поясница', ppt: 'наклон таза',
+  'sh-flexion': 'плечо: сгибание', 'sh-thoracic': 'плечо: грудной', 'sh-lats': 'плечо: широчайшие', 'sh-control': 'плечо: контроль', 'sh-position': 'плечо: позиция', 'sh-fail': 'плечо: провал',
+  'rot-gap': 'ротация: разрыв', 'rot-low': 'ротация: мало',
+  'hinge-lumbar': 'шарнир: поясница', 'hinge-neck': 'шарнир: шея', 'hinge-both': 'шарнир: поясница+шея',
+  'sq-degraded': 'присед под весом', 'ybt-asym': 'YBT: асимметрия', 'ybt-comp': 'YBT: композит',
+  'bench-fix': 'жим: правка', 'bench-watch': 'жим: наблюдать', 'nhe-asym': 'NHE: асимметрия', 'add-asym': 'аддукторы: асимметрия',
+  'pm-red': 'боль: красная', 'pm-yellow': 'боль: жёлтая', 'hip-flex': 'сгибание бедра', 'hng-degraded': 'шарнир под весом', 'erir-low': 'ER/IR низко',
+};
+const trackedRu = (codes: string[]): string => codes.map((c) => TRACKED_CODE_RU[c] || c).join(' · ');
 const profileRu = (p: string | null | undefined): string => (p && PROFILE_RU[p]) || String(p || '—');
 const FLAG_RU: Record<string, string> = {
   synergistTakeover: 'нагрузку забирают соседи', stabilityGap: 'не хватает стабильности', wrongHead: 'бьёт мимо слабой головки',
@@ -856,9 +868,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       });
     } catch { /* noop */ }
     try {
-      const f: Record<string, number> = {};
-      for (const [k, v] of Object.entries((factVolume as any) || {})) f[k] = (v as any)?.effectiveSets ?? (v as any)?.directSets ?? 0;
-      specPayload = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
+      specPayload = specBlock;
       // топ-3 на каждую слабую зону с бонусом слабой головки (макс 6) + сами головки
       const seen = new Set<string>();
       const heads: string[] = [];
@@ -1034,7 +1044,8 @@ export const BBDiagnosticsHub: React.FC = () => {
 
   const handleExport = () => {
     let causes: Record<string, unknown> = {};
-    let spec: unknown = null;
+    // Э3 PRO-5: спец-блок в выдаче = показанному (мемо specBlock с реальным factVolume), не пустой factSets
+    const spec: unknown = specBlock;
     const heads: string[] = [];
     try {
       // те же живые входы, что в меме и CSV (мемы ниже недоступны из-за TDZ)
@@ -1066,8 +1077,6 @@ export const BBDiagnosticsHub: React.FC = () => {
         const wh = weakHeadForZone(z);
         if (wh && !heads.includes(wh)) heads.push(wh);
       }
-      const f: Record<string, number> = {};
-      spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
     } catch { /* noop */ }
     // Экспорт движений: L/R + скрининг-драйвер + односторонний (нагрузка — чужие хабы, в файл не едет)
     let pro2: Record<string, unknown> = {};
@@ -1127,7 +1136,8 @@ export const BBDiagnosticsHub: React.FC = () => {
   const handleExportCsv = () => {
     // лениво, как handleExport (мемы ниже недоступны из-за TDZ)
     let causes: Record<string, any> = {};
-    let spec: any = null;
+    // Э3 PRO-5: тот же спец-блок, что в карточке/HTML (без пустых factSets)
+    const spec: any = specBlock;
     const heads: string[] = [];
     try {
       let histLazy: Record<string, number[]> = {};
@@ -1158,8 +1168,6 @@ export const BBDiagnosticsHub: React.FC = () => {
         wristCm: state.wristCm ? parseFloat(state.wristCm) : null,
         canonicalOf: canonicalMuscle,
       });
-      const f: Record<string, number> = {};
-      spec = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
     } catch { /* noop */ }
     let pro2csv: Record<string, unknown> = {};
     try {
@@ -1226,8 +1234,12 @@ export const BBDiagnosticsHub: React.FC = () => {
       }
       // Блок года выбирает годовой план сам (первый ББ-блок) — селекта в диагностике нет, без дублей
       const key = bbBlocks[0].ref.blockKey;
-      const f: Record<string, number> = {};
-      const sb = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
+      const sb = specBlock;
+      if (!sb) {
+        setToast('Не удалось собрать спец-блок');
+        setTimeout(() => setToast(''), 2000);
+        return;
+      }
       const patch = bbSpecToAnnualPatch(sb, report.weakZonesGranular);
       if (!patch) {
         setToast('Не удалось собрать патч спец-блока');
@@ -1252,8 +1264,12 @@ export const BBDiagnosticsHub: React.FC = () => {
         setTimeout(() => setToast(''), 2000);
         return;
       }
-      const f: Record<string, number> = {};
-      const sb = buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
+      const sb = specBlock;
+      if (!sb) {
+        setToast('Не удалось собрать календарь');
+        setTimeout(() => setToast(''), 2000);
+        return;
+      }
       const ics = buildBBSpecIcs(
         { weeks: (sb.weeks || []).map((w) => ({ week: w.week, targetSets: w.targetSets, note: w.note })), weakZones: report.weakZonesGranular },
         { title: 'ББ спец-блок' },
@@ -1626,10 +1642,11 @@ export const BBDiagnosticsHub: React.FC = () => {
     let dayMap: Record<string, number[]> | undefined;
     let specWeeks: Array<{ targetSets: Record<string, number> }> = [];
     try {
-      const f: Record<string, number> = {};
-      const sb = buildSpecBlock({ weakZones: zones, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
-      dayMap = sb.dayMap;
-      specWeeks = sb.weeks || [];
+      const sb = specBlock;
+      if (sb) {
+        dayMap = sb.dayMap;
+        specWeeks = sb.weeks || [];
+      }
     } catch { /* noop */ }
     const profTempo: Record<string, string> = {};
     for (const z of zones) {
@@ -2527,6 +2544,11 @@ export const BBDiagnosticsHub: React.FC = () => {
                 }} data-bb="screen-snapshot" style={{ minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Снимок сегодня</button>
               </div>
               <div style={{ fontSize: 11, color: '#fff' }} data-bb="screen-delta">{screenDelta.text}</div>
+              {(screenDelta.tracked?.length ?? 0) > 0 && (
+                <div style={{ fontSize: 10, color: '#fff', marginTop: 2, opacity: 0.9 }} data-bb="screen-tracked" title={screenDelta.tracked.join(', ')}>
+                  Новый трекинг: {trackedRu(screenDelta.tracked)}
+                </div>
+              )}
               {(() => {
                 try {
                   const last = screenHist.length ? screenHist[screenHist.length - 1] : null;

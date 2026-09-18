@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BBDiagnosticsHub } from '../BBDiagnosticsHub';
+import { aggregateBBVolume } from '../../../../engines/bb/bb-volume.engine';
+import { buildSpecBlock } from '../../../../engines/bb/bb-spec-block.engine';
 
 const SRC = readFileSync(resolve(__dirname, '..', 'BBDiagnosticsHub.tsx'), 'utf8');
 
@@ -87,5 +89,53 @@ describe('PRO-5 Э1 возврат в работу', () => {
     expect(SRC).toMatch(/returnTo: returnToPlan,/);
     expect(SRC).toMatch(/returnStage: state\.returnStage \|\| null,/);
     expect(SRC).toMatch(/returnAction: state\.returnStage \? \(returnActive\?\.action \?\? null\) : null,/);
+  });
+});
+
+describe('PRO-5 Э3 паритет выдачи', () => {
+  it('трекинг снимка: новый код pm-red показан RU-строкой', () => {
+    localStorage.setItem('he_bb_screen_history', JSON.stringify([{ date: '2026-01-01', fails: ['heels'] }]));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Скрининг/ }));
+    fireEvent.change(screen.getByTestId('bb-pm-during'), { target: { value: '8' } });
+    const tr = document.querySelector('[data-bb="screen-tracked"]');
+    expect(tr).not.toBeNull();
+    expect(tr?.textContent).toMatch(/боль: красная/);
+  });
+
+  it('спец-блок в HTML-экспорте = показанному (реальный факт-объём, а не пустые factSets)', async () => {
+    // факт-объём: 12 сетов груди за последние 7 дней (тогда factSets в выдаче не пустые)
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    localStorage.setItem('he_workout_log_v1', JSON.stringify([{
+      date: iso,
+      exercises: [{ muscleGroup: 'chest', sets: Array.from({ length: 12 }, () => ({ weightKg: 100, reps: 8 })) }],
+    }]));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    // ожидаемый старт блока — тем же движком, что карточка (факт+4, кап MAV/MRV)
+    const fv: any = aggregateBBVolume([{ exercises: [{ name: 'bench_bar', muscle: 'chest', sets: 12, rir: 2, role: 'accessory' }] }] as any);
+    const factSets: Record<string, number> = {};
+    for (const [k, v] of Object.entries(fv as any)) factSets[k] = (v as any)?.effectiveSets ?? (v as any)?.directSets ?? 0;
+    const expected = buildSpecBlock({ weakZones: ['chest_upper'], factSets, level: 'intermediate', weeks: 8 }).weeks[0].targetSets.chest_upper;
+    expect(expected).toBeGreaterThan(12);
+    let captured: Blob | null = null;
+    (URL as any).createObjectURL = (b: Blob) => { captured = b; return 'blob:mock'; };
+    fireEvent.click(document.querySelector('[data-bb="export-html"]') as HTMLElement);
+    expect(captured).not.toBeNull();
+    const html = typeof (captured as any)?.text === 'function'
+      ? await (captured as any).text()
+      : await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.readAsText(captured as Blob); });
+    expect(html).toContain(`chest_upper ${expected}`);
+    expect(html).not.toContain('chest_upper 12');
+  });
+
+  it('source-guard: specBlock-мемо — единственный вызов buildSpecBlock, им пользуются выдача/ICS/год/инъекция', () => {
+    expect((SRC.match(/buildSpecBlock\(/g) || []).length).toBe(1);
+    expect(SRC).toMatch(/const spec: unknown = specBlock;/);
+    expect(SRC).toMatch(/const spec: any = specBlock;/);
+    expect(SRC).toMatch(/const sb = specBlock;/);
+    expect(SRC).toMatch(/specPayload = specBlock;/);
+    expect((SRC.match(/const sb = specBlock;/g) || []).length).toBe(3);
   });
 });
