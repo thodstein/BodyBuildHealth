@@ -30,8 +30,8 @@
 > 3) **A/B планов**: `planner-ab-compare` (снапшоты A/B в `he_nutrition_ab_v1`, diff КБЖУ/приёмов/
 > состава/заметок) + карточка «⚖️ A/B планов» в выдаче.
 > 4) **Гигиена**: условный `usePlanCtx()` в JSX Results заменён на деструктуризацию (React-warning
-> порядка хуков устранён). **Остаток (только с согласия)**: VARIETY P2-1 affinity, P2-3
-> deviation-бюджет, P2-4 template-rotate.
+> порядка хуков устранён). **VARIETY P2-1/2-3/2-4 РЕШЕНО (Sep 17 2026): оставлены границами** (пользователь
+> подтвердил «не делать»; `docs/NUTRITION-VARIETY-PLAN.md` §5).
 > Тесты: область IndividualPlan **957/957 (91 файл)**, `tsc` 0, полный прогон **14445 passed / 8 failed
 > (5 чужих файлов: course-sync ×4, bb-macrocycle v7, annual-audit-fixes, pl-auto-regressions,
 > bb-diagnostics-max-pro female-symmetry) / 20 skipped**.
