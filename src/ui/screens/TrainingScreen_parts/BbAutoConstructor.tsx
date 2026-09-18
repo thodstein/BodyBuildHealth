@@ -1355,6 +1355,8 @@ export const BbAutoConstructor: React.FC = () => {
           videoStandard: bbDiag.videoStandard,
           driverSubs: bbDiag.driverSubs,
           asymPriority: bbDiag.asymPriority,
+          // PRO-CORR: детали коррекций библиотеки → бит «коррекция:» + персист movementExtra
+          correctiveDetail: bbDiag.correctiveDetail,
         });
         // 3.9: гранулярные зоны приоритетны, но канонические/общие группы — честный fallback.
         const groups = (bbDiag.weakZonesGranular ?? bbDiag.weakMusclesCanonical ?? bbDiag.weakPoints ?? bbDiag.groups) as string[];
