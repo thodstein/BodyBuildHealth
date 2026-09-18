@@ -2169,9 +2169,14 @@ export const BbAutoConstructor: React.FC = () => {
             calorieSurplus,
             eccentricMult,
             mobilityRestrictions,
-            labMrvMultiplier: labAdjust.mrvMultiplier,
+            labMrvMultiplier: labMultOverride ?? labAdjust.mrvMultiplier,
             labWarnings: labAdjust.warnings,
             labIntensityNote: labAdjust.intensityNote,
+            // Паритет с generic: целевой % жира / женский цикл / ручной оверрайд восстановления
+            // (множители объёма adapt-пути; без данных = 1.0 байт-в-байт).
+            targetBodyFat,
+            cycleDay,
+            recoveryMultOverride: recoveryOverride ?? undefined,
             planStartWeek: new Date().toISOString().slice(0, 10),
             supersetMode,
             volumeScheme: effectiveVolumeScheme,

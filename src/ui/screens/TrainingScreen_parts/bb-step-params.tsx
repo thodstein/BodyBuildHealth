@@ -315,7 +315,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
 
             {/* Честный гейт: что в режиме источника не действует */}
             <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', ...NOTE }}>
-              ⚠ В режиме источника не действуют (только «Генерик-сплит»): женский цикл, целевой % жира, packing-заливка, ручные оверрайды лаб/восстановления. Контролы скрыты или помечены ниже.
+              ⚠ В режиме источника не действует только packing-заливка (заливка до капов переписывала бы авторскую структуру программы) — контрол ниже заблокирован. Целевой % жира, женский цикл и оверрайды работают в обоих режимах.
             </div>
           </>
         )}
@@ -567,36 +567,34 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
         )}
       </BbCard>
 
-      {/* 7. Оверрайды — только генерик (в program-пути движок их не читает) */}
-      {isGeneric && (
-        <BbCard icon="⚙️" accent="#60a5fa" title="Оверрайды (ручные)"
-          desc="Ручные поправки к авто-множителям: лабораторная коррекция MRV и множитель восстановления. PED-буст считается отдельно — из доз на шаге 2 (не дублируется здесь)."
-        >
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, ...NOTE }}>
-              Лаб-множитель MRV (авто {labAdjust.mrvMultiplier.toFixed(2)}):
-              <input type="number" step="0.05" min={0.5} max={1.5} value={labMultOverride ?? ''} placeholder="авто" onChange={e2 => { const v = e2.target.value === '' ? null : parseFloat(e2.target.value); setLabMultOverride(v != null && Number.isFinite(v) ? Math.max(0.5, Math.min(1.5, v)) : null); }} style={{ width: 55, ...IN }} />
-            </label>
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, ...NOTE }}>
-              Множитель восстановления (0.6–1.5, авто 1.0):
-              <input type="number" step="0.05" min={0.6} max={1.5} value={recoveryOverride ?? ''} placeholder="1.0" onChange={e2 => { const v = e2.target.value === '' ? null : parseFloat(e2.target.value); setRecoveryOverride(v != null && Number.isFinite(v) ? Math.max(0.6, Math.min(1.5, v)) : null); }} style={{ width: 55, ...IN }} />
-            </label>
-            <button onClick={() => { setLabMultOverride(null); setRecoveryOverride(null); flash('Оверрайды сброшены — авто'); }} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#fff' }}>Сбросить</button>
-          </div>
-          <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 10, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)', ...NOTE, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            {(() => {
-              try {
-                const srpe: any = (loadSRPESessions as any)();
-                if (!srpe || srpe.length < 2) return <><span>📊 ACWR: нет данных sRPE (нужно ≥2 сессии)</span><span>дефицит/восстановление — кнопкой Авто-делод</span></>;
-                const acwr = (acuteChronicRatio as any)((toDailyLoads as any)(srpe));
-                const ratio = acwr?.ratio ?? 1;
-                const zone = ratio > 1.5 ? '🔴 опасно' : ratio > 1.3 ? '🟡 осторожность' : ratio < 0.8 ? '🔵 недогруз' : '🟢 норма';
-                return <><span>📊 ACWR {ratio.toFixed(2)} — {zone}</span><span style={{ fontSize: 9 }}>дефицит/восстановление — Авто-делод</span></>;
-              } catch { return <span>📊 ACWR: —</span>; }
-            })()}
-          </div>
-        </BbCard>
-      )}
+      {/* 7. Оверрайды — работают в обоих режимах (generic + program/adapt) */}
+      <BbCard icon="⚙️" accent="#60a5fa" title="Оверрайды (ручные)"
+        desc="Ручные поправки к авто-множителям: лабораторная коррекция MRV и множитель восстановления (в режиме источника применяются в adapt-конвертации). PED-буст считается отдельно — из доз на шаге 2."
+      >
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, ...NOTE }}>
+            Лаб-множитель MRV (авто {labAdjust.mrvMultiplier.toFixed(2)}):
+            <input type="number" step="0.05" min={0.5} max={1.5} value={labMultOverride ?? ''} placeholder="авто" onChange={e2 => { const v = e2.target.value === '' ? null : parseFloat(e2.target.value); setLabMultOverride(v != null && Number.isFinite(v) ? Math.max(0.5, Math.min(1.5, v)) : null); }} style={{ width: 55, ...IN }} />
+          </label>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, ...NOTE }}>
+            Множитель восстановления (0.6–1.5, авто 1.0):
+            <input type="number" step="0.05" min={0.6} max={1.5} value={recoveryOverride ?? ''} placeholder="1.0" onChange={e2 => { const v = e2.target.value === '' ? null : parseFloat(e2.target.value); setRecoveryOverride(v != null && Number.isFinite(v) ? Math.max(0.6, Math.min(1.5, v)) : null); }} style={{ width: 55, ...IN }} />
+          </label>
+          <button onClick={() => { setLabMultOverride(null); setRecoveryOverride(null); flash('Оверрайды сброшены — авто'); }} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#fff' }}>Сбросить</button>
+        </div>
+        <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 10, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)', ...NOTE, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          {(() => {
+            try {
+              const srpe: any = (loadSRPESessions as any)();
+              if (!srpe || srpe.length < 2) return <><span>📊 ACWR: нет данных sRPE (нужно ≥2 сессии)</span><span>дефицит/восстановление — кнопкой Авто-делод</span></>;
+              const acwr = (acuteChronicRatio as any)((toDailyLoads as any)(srpe));
+              const ratio = acwr?.ratio ?? 1;
+              const zone = ratio > 1.5 ? '🔴 опасно' : ratio > 1.3 ? '🟡 осторожность' : ratio < 0.8 ? '🔵 недогруз' : '🟢 норма';
+              return <><span>📊 ACWR {ratio.toFixed(2)} — {zone}</span><span style={{ fontSize: 9 }}>дефицит/восстановление — Авто-делод</span></>;
+            } catch { return <span>📊 ACWR: —</span>; }
+          })()}
+        </div>
+      </BbCard>
 
       {/* 8. Подбор упражнений — единый список в обоих режимах */}
       <BbCard icon="🏋️" accent="#22d3ee" title="Подбор упражнений"
@@ -655,7 +653,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
 
       {/* 10. Здоровье и восстановление */}
       <BbCard icon="🩺" accent="#f472b6" title="Здоровье и восстановление"
-        desc="Травмы защищают мышцу, мобильность — конкретные движения; сон/HRV перекрывают профиль. Женский цикл и целевой % жира применяются в генерик-режиме."
+        desc="Травмы защищают мышцу, мобильность — конкретные движения; сон/HRV перекрывают профиль. Женский цикл и целевой % жира применяются в обоих режимах (adapt-конвертация источника)."
       >
         <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.14)', marginBottom: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd', marginBottom: 4 }}>📱 Восстановление (носимое / ручной)</div>
@@ -668,7 +666,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
           </div>
         </div>
 
-        {isGeneric && (isFemaleProfile || bbGoal === 'cut' || bbGoal === 'recomp') && (
+        {(isFemaleProfile || bbGoal === 'cut' || bbGoal === 'recomp') && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
             {isFemaleProfile && (
               <div style={{ flex: '1 1 220px', padding: 10, borderRadius: 10, background: 'rgba(244,114,182,0.04)', border: '1px solid rgba(244,114,182,0.14)' }}>

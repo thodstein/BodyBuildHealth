@@ -111,16 +111,19 @@ describe('Шаг 1: один контрол на настройку (нет ду
     }
   });
 
-  it('режимные гейты честные: женский цикл/% жира — только generic; packing в источнике заблокирован', () => {
+  it('мягкие настройки работают в обоих режимах; packing в источнике заблокирован', () => {
     // generic с женским профилем и целью cut — карточки видны и применимы
     const gFemale = renderToStaticMarkup(React.createElement(BbParamsStep, baseParams({ planMode: 'generic_split', isFemaleProfile: true, bbGoal: 'cut' })));
     expect(count(gFemale, '🌸 Женский цикл')).toBe(1);
     expect(count(gFemale, '🎯 Целевой % жира')).toBe(1);
-    // programs — карточки скрыты (движок их не применяет в этом пути)
-    expect(count(programs, '🌸 Женский цикл')).toBe(0);
-    expect(count(programs, '🎯 Целевой % жира')).toBe(0);
+    // programs — те же карточки видны: применяются в adapt-конвертации источника
+    expect(count(programs, '🌸 Женский цикл')).toBe(1);
+    expect(count(programs, '🎯 Целевой % жира')).toBe(1);
+    expect(count(programs, 'Оверрайды (ручные)')).toBe(1);
     // packing в источнике — disabled с пояснением (виден, но не действует)
     expect(programs).toContain('Только генерик-сплит — в режиме источника не действует');
+    // честная пометка: в источнике остался только packing-гейт
+    expect(programs).toContain('не действует только packing-заливка');
   });
 
   it('объёмный режим честно перечисляет эффекты и не подменяет селект схемы', () => {

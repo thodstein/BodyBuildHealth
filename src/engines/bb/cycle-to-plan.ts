@@ -39,6 +39,8 @@ import { extractMesocycleProgression, applyWeightProgression } from './bb-mesocy
 import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationBlock } from './bb-specialization.engine';
 import { applyTradeoffToPlan } from './bb-tradeoff.engine';
 import { isMEVCalibrationComplete, loadMEVCalibration, personalLandmarksFor } from './bb-mev-calibration.engine';
+import { bodyCompVolumeFactor, bodyCompStrategyNote } from './bb-bodycomp.engine';
+import { cycleVolumeFactor } from './bb-cycle.engine';
 
 /**
  * Вычислить ACWR из реальных sRPE-сессий пользователя (отдельная функция для cycle/program mode).
@@ -1675,6 +1677,14 @@ export interface ProgramToBBPlanOpts {
   /** PRO: ограничения мобильности — фильтр упражнений по биомеханике. */
   mobilityRestrictions?: string[];
   labMrvMultiplier?: number;
+  /** P1: целевой % жира — уточняет агрессивность объёма на cut/recomp (паритет с generic). */
+  targetBodyFat?: number;
+  /** Женский цикл: день цикла (1-35) — лютеиновая фаза снижает объём (паритет с generic). */
+  cycleDay?: number;
+  /** Длина менструального цикла (дней), дефолт 28. */
+  cycleLength?: number;
+  /** Ручной оверрайд множителя восстановления (0.6-1.5) — паритет с generic-оверрайдами. */
+  recoveryMultOverride?: number;
   /** P0-5: текстовые предупреждения лаборатории (пробрасываются в rationale плана). */
   labWarnings?: string[];
   /** P0-5: рекомендация по интенсивности из лаборатории (пробрасывается в rationale). */
@@ -1696,9 +1706,11 @@ export interface ProgramToBBPlanOpts {
   // ── P0-12 (аудит 2026-09): паритет program↔generic. ─────────────────────────
   // Реально исполняются в program-пути: wearable (сливается в recovery-вход),
   // availablePlates (пост-округление), rehabMuscles (пост-рампа), dcMode
-  // (widowmaker в finalize). packingV2/pedPhaseOverride/cycleDay/targetBodyFat
-  // остаются buildSession-механиками generic-пути — UI не показывает их в
-  // режиме программ (честная недоступность вместо тихого no-op).
+  // (widowmaker в finalize), targetBodyFat/cycleDay (множители объёма adapt),
+  // recoveryMultOverride (ручной множитель). packingV2 остаётся
+  // buildSession-механикой generic-пути (заливка до капов переписывала бы
+  // авторскую структуру программы) — UI не показывает его в режиме программ
+  // (честная недоступность вместо тихого no-op).
   wearable?: WearableDaily | null;
   /** Гимназический набор пластин — пост-округление весов плана. */
   availablePlates?: number[];
@@ -1915,12 +1927,14 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     { hrvMs: opts.hrvMs, sleepHours: opts.sleepHours, stressLevel: opts.stressLevel },
     opts.wearable ?? null,
   );
+  const _recoveryOverrideProgram = Number.isFinite(opts.recoveryMultOverride)
+    ? Math.max(0.6, Math.min(1.5, opts.recoveryMultOverride as number)) : 1;
   const recoveryMult = computeBBRecoveryMultiplier({
     ...opts,
     hrvMs: wearableRecoveryProgram.hrvMs,
     sleepHours: wearableRecoveryProgram.sleepHours,
     stressLevel: wearableRecoveryProgram.stressLevel,
-  });
+  }) * _recoveryOverrideProgram;
   // P0-12: DC-лайт в program-пути — тот же гейт, что в builder
   // (уровень advanced/enhanced + AAS-эквивалент ≥750 мг/нед).
   const dcDoseProgram = computeAASEquivDose(opts.pedDoses);
@@ -1945,6 +1959,16 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   if (focusGroup) rationale.push(`⭐ Фокус-группа (+30% объём): ${focusGroup}`);
   if (excludedMuscles.size > 0) rationale.push(`⚠ Исключены мышцы (травма): ${[...excludedMuscles].join(', ')}`);
   if (opts.peds && opts.peds.length > 0) rationale.push(`💉 PED: MRV ×${mrvMult.toFixed(2)}`);
+  if (mode === 'adapt' && _recoveryOverrideProgram !== 1) {
+    rationale.push(`⚙️ Ручной множитель восстановления: ×${_recoveryOverrideProgram.toFixed(2)} (объём/капы скорректированы).`);
+  }
+  if (mode === 'adapt') {
+    const _bcNote = bodyCompStrategyNote(opts.bodyFat, opts.targetBodyFat, opts.goal || 'mass');
+    if (_bcNote) rationale.push(`🧬 ${_bcNote}`);
+    if (cycleVolumeFactor(opts.cycleDay, opts.cycleLength ?? 28, opts.sex ?? 'male') !== 1.0) {
+      rationale.push('🌸 Женский цикл: лютеиновая фаза — объём скорректирован (−5%).');
+    }
+  }
   if ((opts as any).bfrMode) rationale.push(`🩸 BFR включен (памп-добивка 30-15-15-15)`);
   if (dcGateProgram) rationale.push(`🎯 DC-лайт: widowmaker 20 повторов (гейт: ${level} + AAS-экв ${dcDoseProgram} мг/нед ≥ 750)`);
   else if (opts.dcMode) rationale.push(`⚠ DC-лайт пропущен: гейт не пройден (нужен уровень advanced/enhanced и AAS-эквивалент ≥750 мг/нед).`);
@@ -2133,6 +2157,12 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           const g = ((opts as any).goal || 'mass').toLowerCase();
           const goalMultProgram = g === 'cut' ? 0.72 : g === 'recomp' ? 0.92 : g === 'maintenance' ? 0.80 : g === 'mass' ? 1.05 : g === 'strength_mass' ? 1.03 : 1.0;
           if (goalMultProgram !== 1.0) adjSets = Math.round(adjSets * goalMultProgram);
+          // P1: состав тела (далеко от целевого % жира → объём к MEV) + женский цикл
+          // (лютеиновая −5%) — паритет с generic-путём; дефолты (нет данных) = 1.0.
+          const bodyCompFProgram = bodyCompVolumeFactor(opts.bodyFat, opts.targetBodyFat, g);
+          if (bodyCompFProgram !== 1.0) adjSets = Math.round(adjSets * bodyCompFProgram);
+          const cycleFProgram = cycleVolumeFactor(opts.cycleDay, opts.cycleLength ?? 28, opts.sex ?? 'male');
+          if (cycleFProgram !== 1.0) adjSets = Math.round(adjSets * cycleFProgram);
           // Единый резолвер акцентов НЕДЕЛИ: focus ×1.3 / weak ×1.15 — без стэкинга.
           const isWeakMuscle = isSpecializationWeak(muscle, weekSpec);
           const isFocus = isSpecializationFocus(muscle, weekSpec);

@@ -34,12 +34,12 @@ MEV-калибровка подключается только при завер
 | Настройка | Что было | Причина |
 |---|---|---|
 | `proPreset` | не доходил до движка | только подсказка `rankBBSplits` (`preset: 'dc'/'fortitude'/'meadows'`); `meadows` вообще ничего не делал; не сохранялся в вариантах |
-| «🌸 Женский цикл» (`cycleDay`) | UI в режиме источника, движок — только генерик | `programToBBPlan` не поддерживает; в генерике UI не было вовсе |
+| «🌸 Женский цикл» (`cycleDay`) | UI в режиме источника, движок — только генерик | `programToBBPlan` не поддерживал; в генерике UI не было вовсе |
 | «🎯 Целевой % жира» (`targetBodyFat`) | то же | то же |
-| `packingV2` в режиме источника | кликабельный тогл, движок игнорирует | `programToBBPlan` не поддерживает (был только текстовый warning) |
+| `packingV2` в режиме источника | кликабельный тогл, движок игнорирует | `programToBBPlan` не поддерживает (осознанный гейт: заливка до капов переписывает авторскую структуру) |
 | `pedPhaseOverride` (шаг 2) | UI при MGF+IGF1, в режиме источника — no-op | `recommendPEDMethodology`/`applyPEDMethodologyToPlan` вызывались только в `bb-builder` |
 | `autoRegOn` | тогл только в генерике | в режиме источника включить нельзя (хотя `autoRegResult` движок принимает в обоих путях) |
-| `labMultOverride` / `recoveryOverride` | UI только в генерике, движок — только генерик | согласовано, но `recoveryMultOverride` не поддержан program-путём (оставлено генерик-only честно) |
+| `labMultOverride` / `recoveryMultOverride` | UI только в генерике, движок — только генерик | `programToBBPlan` не принимал |
 | «🧪 Личный MEV» (`mevCal`) | UI на шаге 1, движок читал калибровку только в `bb-builder` | `cycle-to-plan` (цикл и программа) не звал `calibratedLandmarksFor` — настройка молчала в режиме источника |
 
 ## 3. Решения
@@ -48,9 +48,12 @@ MEV-калибровка подключается только при завер
 2. **Секции вместо веток-копий.** Шаг 1 перестроен в 10 секций; режимные различия —
    явные гейты (`planMode === 'generic_split'` / `programs`), а не копипаста.
 3. **Честные гейты:**
-   - «Женский цикл» и «Целевой % жира» — перенесены в генерик-гейт (где реально работают);
-     в режиме источника не показываются (осознанно: `programToBBPlan` их не применяет).
-   - `packingV2` в режиме источника — disabled-строка с пометкой «только генерик-сплит».
+   - «Женский цикл», «Целевой % жира», `labMultOverride`/`recoveryMultOverride` — **работают в обоих режимах**:
+     для program-пути добавлены `targetBodyFat`/`cycleDay`/`recoveryMultOverride` в `ProgramToBBPlanOpts`
+     (множители adapt-конвертации, паритет с generic; faithful и дефолты — байт-в-байт) + lab-оверрайд
+     пробрасывается в `labMrvMultiplier`.
+   - `packingV2` в режиме источника — disabled-строка: заливка до капов переписывала бы авторскую
+     структуру программы (осознанный гейт, не тихий no-op).
    - `autoRegOn` — в общей секции «Подбор упражнений» (доступен в обоих режимах; движок
      принимает `autoRegResult` в обоих путях).
    - `pedPhaseOverride` — **оживлён для режима источника**: после `programToBBPlan`
@@ -79,10 +82,10 @@ MEV-калибровка подключается только при завер
 
 - Объёмную математику движка (`bb-builder`/`bb-finalize`): капы, MEV/MRV (популяционные),
   PED-множители, специализация — байт-в-байт; `cycle-to-plan` изменён только аддитивно
-  (MEV-калибровка как opt-in override поверх тех же лендмарков).
-- `recoveryMultOverride` в program-пути — генерик-only (честный гейт UI, не дублируем).
+  (MEV-калибровка + мягкие множители adapt-пути как opt-in поверх тех же формул).
+- `packingV2` в program-пути — осознанный гейт (см. §3).
 - Формы `PedInputPanel`/`PedAdaptationCard` — свои карточки (зона `PedCoursePanel`).
-- `specializationSelection` — как было (одна точка, шаг 1).
+- `specializationSelection` — одна точка (шаг 1), переведена на единый `BbCard`.
 
 ## 5. План работ (выполнено по пунктам)
 
@@ -97,29 +100,33 @@ MEV-калибровка подключается только при завер
       женский цикл, целевой % жира и др.) — восстановление после загрузки варианта.
 - [x] Тесты: single-source SSR (каждая настройка ровно 1 раз) + сохранение существующих
       guard-ов (`bb-auto-smoke`, `bb-auto-apk-controls`, `bb-volume-toggle-e2e`).
+- [x] **Добивка (продолжение 2): program-путь применяет мягкие настройки** —
+      `ProgramToBBPlanOpts += targetBodyFat/cycleDay/cycleLength/recoveryMultOverride`:
+      `bodyCompVolumeFactor` + `cycleVolumeFactor` в adapt-множителях сетов, recovery-оверрайд
+      в `recoveryMult`, lab-оверрайд в `labMrvMultiplier`; UI-карточки «Женский цикл»/«% жира»/
+      «Оверрайды» открыты в обоих режимах; packing остался осознанным гейтом.
 
 ## 6. Проверки (выполнено)
 
-- `tsc --noEmit` — **0 ошибок по всему проекту** (NODE_OPTIONS=12288).
+- `tsc --noEmit` — **0 по моим файлам** (1 чужая ошибка WIP `bb-corrective.engine.ts`).
 - Тесты:
   - NEW `bb-params-single-source.test.tsx` — **8/8** (SSR обоих режимов: каждая
-    настройка ровно 1 раз; честные гейты женского цикла/% жира/packing;
-    «Объёмный» перечисляет эффекты; шаг 2 — одна кнопка методики, честные подписи);
+    настройка ровно 1 раз; мягкие настройки видны в обоих режимах; packing-гейт);
   - NEW `bb-ped-methodology-program-overlay.test.ts` — **3/3** (skipGuardNote:
     нет обещания axial-замены в program-пути; инсулиновое окно/MGF-пометки живы);
+  - NEW `bb-cycle-program-factors.test.ts` — **5/5** (targetBodyFat/cycleDay/
+    recoveryMultOverride: adapt применяет, faithful/дефолты — байт-в-байт);
   - `bb-plans-migration` — **7/7** (+1: persist/нормализация новых настроек шага 1-2);
-  - весь `TrainingScreen_parts/__tests__` — **145 файлов / 1330 тестов, 0 падений**
+  - весь `TrainingScreen_parts/__tests__` — **147 файлов / 1338 тестов, 0 падений**
     (1 unhandled `revokeObjectURL` — чужой предсуществующий);
+  - движковый круг (bb-cycle*/bb-ped*/selection/strict/spec/audit + миграция) —
+    **17 файлов / 314 тестов, 0 падений**;
   - bb-ped-семья + `rest-hooks-native` — **7 файлов / 231 тест, 0 падений**
-    (unhandled `DB not init` — предсуществующий ReportsScreen-шум);
-  - `bb-cycle*` (цикл/программа после MEV-обвязки) + миграция — **8 файлов / 47 тестов, 0 падений**;
-  - `bb-selection-layer`/`bb-cycle-audit-library`/`bb-strict-groups`/
-    `bb-specialization-unified`/`bb-audit-2026-08-extended` — **5 файлов / 113 тестов, 0 падений**.
-- `npm run verify:apk-design` — **OK**.
-- **Шторм-инцидент**: параллельный агент во время работы откатил (`checkout`) часть
-  worktree — `cycle-to-plan.ts` и хвост `bb-plans-migration.test.ts` были потеряны и
-  восстановлены заново (перечитано перед edit, сверено `git diff`, повторный `tsc` 0).
-  Остальные файлы не пострадали.
+    (unhandled `DB not init` — предсуществующий ReportsScreen-шум).
+- `npm run build` (vite, PWA) — **OK** (51 с); `npm run verify:apk-design` — **OK**.
+- **Шторм-инцидент**: параллельный агент дважды откатывал (`checkout`) часть worktree
+  (`cycle-to-plan.ts`, хвост `bb-plans-migration.test.ts`) — восстановлено заново
+  (перечитано перед edit, сверено `git diff`, повторный tsc 0). Остальные файлы не пострадали.
 
 ### «Было → стало» (дедуп и честность)
 
@@ -132,7 +139,8 @@ MEV-калибровка подключается только при завер
 | «Объёмный» | непонятно, что даёт | перечисляет 5 эффектов цифрами |
 | Кнопки PED-методики | 2 одинаковых | 1 |
 | `proPreset` | тихо переписывал шаг 1 (meadows — ничего) | явный: применяет + flash «что изменил» + сохраняется |
-| «Женский цикл» / «% жира» | UI в источнике, движок — генерик | честный генерик-гейт (там, где применяется) |
+| «Женский цикл» / «% жира» | UI в источнике, движок — генерик | **применяются в обоих режимах** (adapt-множители program-пути), UI открыт везде |
+| Оверрайды lab/recovery | только генерик | общий блок; program-путь читает `labMrvMultiplier`/`recoveryMultOverride` |
 | `packingV2` в источнике | кликабельный no-op | disabled + пометка |
 | `autoRegOn` | только генерик | общий (движок принимает в обоих) |
 | `pedPhaseOverride` | в источнике молчал | оверлей после program-сборки (adapt) |
