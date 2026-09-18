@@ -8,7 +8,7 @@ import React from 'react';
 import { ARM_BIOMECH, type ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ARM_CORRECTIONS, correctionForWeakPoint } from '../../../engines/arm/arm-weakpoint-corrections';
 import { doseForCause, doseLabel } from '../../../engines/arm/arm-correction-dose.engine';
-import { doseForCauseV2, roleLabel, preventiveFor, drillsForPhase, correctiveWaveForWeek } from '../../../engines/arm/arm-correction-pro2.engine';
+import { roleLabel, preventiveFor, drillsForPhase, correctiveWaveForWeek } from '../../../engines/arm/arm-correction-pro2.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
 import { suggestWeakPointsForTrack } from '../../../engines/arm/arm-video-analysis.engine';
 import { AdSec, AdBtn, AdBanner } from './arm-design-system';
@@ -73,6 +73,27 @@ export function HubCorrectionTab({ H }: { H: any }) {
       <AdBtn variant="dark" onClick={() => toggleWeakPoint(autoPoint as ArmWeakPoint)}>+ {(WP_LABEL_SHORT as any)[autoPoint] || autoPoint}</AdBtn>
     </div>
   ) : null;
+  // D2: селект недели микро-волны (пусто = без волны, как инъекция без флага)
+  const waveChips = (
+    <div className="ad-row" data-arm="correction-wave-select">
+      <span className="ad-muted">Волна:</span>
+      {[
+        { id: '', label: '— без волны' },
+        { id: '1', label: 'Н1 база' },
+        { id: '2', label: 'Н2 +1' },
+        { id: '3', label: 'Н3 делод' },
+      ].map((w) => (
+        <AdBtn
+          key={w.id}
+          variant={String((state as any)?.corrWave || '') === w.id ? 'amber' : 'dark'}
+          aria-pressed={String((state as any)?.corrWave || '') === w.id}
+          onClick={() => setState((s: any) => ({ ...s, corrWave: w.id }))}
+        >
+          {w.label}
+        </AdBtn>
+      ))}
+    </div>
+  );
   if (!weakPoints.length) {
     return (
       <AdSec title="🛠 Коррекция движений" summary="выбери 1–3 мёртвые точки">
@@ -81,6 +102,7 @@ export function HubCorrectionTab({ H }: { H: any }) {
           здесь соберётся цепочка: угол → причина → топ-3 с дозами → Δ → вставка в план.
         </div>
         {phaseChips}
+        {waveChips}
         {mvPhase ? <div className="ad-muted" data-arm="correction-matchphase">Фаза схватки: {mvPhase} — топ-3 получит +4 точкам фазы.</div> : null}
         {videoSuggest}
         {angleSuggest}
@@ -91,6 +113,7 @@ export function HubCorrectionTab({ H }: { H: any }) {
   return (
     <AdSec title={`🛠 Коррекция движений (${weakPoints.length})`} summary="точка → причина → топ-3 → доза → вставка">
       {phaseChips}
+      {waveChips}
       {mvPhase ? <div className="ad-muted" data-arm="correction-matchphase">Фаза схватки: {mvPhase} — топ-3 получил +4 точкам фазы (метка «точка слабой фазы» в причинах).</div> : null}
       {videoSuggest}
       {angleSuggest}
@@ -105,7 +128,13 @@ export function HubCorrectionTab({ H }: { H: any }) {
               const causes: Record<string, any> = {};
               const c = (armCausesP0 as any)?.[wp]?.cause;
               if (typeof c === 'string' && c) causes[wp] = c;
-              return simulateArmInjection(H.armPlan as any, wp, null, causes && Object.keys(causes).length ? { causes } : {});
+              // D3: сим считает теми же флагами, что инъекция (паритет Δ = факт)
+              const flags = (H as any).corrV2 || {};
+              const simOpts: Record<string, any> = { level: (state as any)?.level };
+              if (Object.keys(causes).length) simOpts.causes = causes;
+              if (flags.tendonOverload) simOpts.tendonOverload = true;
+              if (flags.waveWeek != null) simOpts.waveWeek = flags.waveWeek;
+              return simulateArmInjection(H.armPlan as any, wp, null, simOpts);
             } catch { return null; }
           })();
           const label = (WP_LABEL_SHORT as any)[wp] || wp;
@@ -144,7 +173,8 @@ export function HubCorrectionTab({ H }: { H: any }) {
               })()}
               {(() => {
                 try {
-                  const w = correctiveWaveForWeek(1);
+                  const sel = parseInt(String((state as any)?.corrWave || ''), 10);
+                  const w = correctiveWaveForWeek(Number.isFinite(sel) && sel >= 1 && sel <= 3 ? sel : 1);
                   return <div className="ad-muted" data-arm="correction-wave">🌊 Волна: {w.note} · Н2 объём +1 · Н3 делод −1</div>;
                 } catch { return null; }
               })()}

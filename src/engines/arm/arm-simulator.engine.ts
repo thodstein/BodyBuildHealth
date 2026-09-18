@@ -8,6 +8,7 @@ import { ARM_BIOMECH } from './arm-biomechanics.engine';
 import { auditArmPlan } from './arm-plan-audit.engine';
 import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
 import { doseForCause } from './arm-correction-dose.engine';
+import { doseForCauseV2, waveSetsFor, shouldUseDoseV2 } from './arm-correction-pro2.engine';
 import type { ArmWeakCause } from './arm-weak-cause.engine';
 import { estimateArmCorrectionWeight } from './arm-diagnostics-injection.engine';
 
@@ -28,6 +29,10 @@ export interface ArmSimOpts {
   targetSets?: Record<string, number>;
   /** Доза по причине — те же правила, что инъекция (без causes — база). */
   causes?: Record<string, ArmWeakCause>;
+  /** D3 PRO-2: те же v2-флаги/волна, что инъекция (без — базовый путь 1-в-1). */
+  tendonOverload?: boolean;
+  age50plus?: boolean;
+  waveWeek?: number;
 }
 
 const BUDGET_BY_LEVEL: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
@@ -63,13 +68,19 @@ export function simulateArmInjection(
   const corr = ARM_CORRECTIONS[point];
   const bio = (ARM_BIOMECH as any)[point];
   if (!corr) return null;
-  const dose = doseForCause(point, opts.causes?.[point]) ?? {
+  // D3: доза/волна 1-в-1 как инъекция (shouldUseDoseV2 общий; targetSets приоритетнее волны)
+  const level = String(opts.level || (plan as any)?.level || 'intermediate');
+  const v2 = shouldUseDoseV2(opts.causes?.[point], level, { tendonOverload: opts.tendonOverload, age50plus: opts.age50plus })
+    ? doseForCauseV2(point, opts.causes?.[point], { level, tendonOverload: opts.tendonOverload, age50plus: opts.age50plus })
+    : null;
+  const dose = v2 ?? doseForCause(point, opts.causes?.[point]) ?? {
     sets: corr.sets, reps: corr.repsRange, rir: corr.rir, intensityPct: corr.intensityPct,
     holdSeconds: corr.holdSeconds, tempo: corr.tempo, adjusted: false, note: 'база точки',
   };
+  const waveSets = opts.waveWeek != null ? waveSetsFor(dose.sets, opts.waveWeek) : dose.sets;
   const wantSets = opts.targetSets?.[point] != null && Number.isFinite(Number(opts.targetSets[point]))
     ? Math.max(1, Math.min(6, Math.round(Number(opts.targetSets[point]))))
-    : dose.sets || 3;
+    : waveSets || 3;
   const before = audit ? audit.covered.length : 0;
   const alreadyCovered = audit ? (audit.byPoint[point]?.sets ?? 0) > 0 : false;
   const after = audit ? before + (alreadyCovered ? 0 : 1) : 1;

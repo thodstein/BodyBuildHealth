@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { ARM_CORRECTIONS } from '../arm-weakpoint-corrections';
 import { ARM_WEAK_POINTS, type ArmWeakPoint } from '../arm-biomechanics.engine';
 import { rankCorrectionsForArm } from '../arm-correction-rank.engine';
-import { doseForCause } from '../arm-correction-dose.engine';
+import { doseForCause, bridgeDoseFromPayload } from '../arm-correction-dose.engine';
+import { buildArmBridgeData } from '../arm-bridge-payload.engine';
+import { simulateArmInjection } from '../arm-simulator.engine';
 import {
   CORRECTION_ROLE,
   POOL_TOPUP,
@@ -16,6 +18,7 @@ import {
   waveSetsFor,
   doseForCauseV2,
   correctiveDetailLine,
+  shouldUseDoseV2,
 } from '../arm-correction-pro2.engine';
 import { getArmExercises } from '../../../core/exercise-catalog-arm';
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv } from '../arm-diagnostics-export.engine';
@@ -205,5 +208,98 @@ describe('arm-corrective-pro2 C8: экспорт', () => {
     const h = buildArmDiagnosticsHtml(data);
     expect(h).not.toContain('<script>');
     expect(h).toContain('&lt;script&gt;');
+  });
+});
+
+describe('arm-corrective-pro2 D1: ранжир с живых входов', () => {
+  it('VBT warn точки двигает удержание в топ', () => {
+    const plain = rankCorrectionsForArm('pron_lock', {});
+    const withVbt = rankCorrectionsForArm('pron_lock', { vbtLossPct: 16 });
+    expect(withVbt[0].score).toBeGreaterThan(plain[0].score);
+  });
+  it('без VBT — те же скоры, что база (паритет)', () => {
+    const a = rankCorrectionsForArm('back_drag', {});
+    const b = rankCorrectionsForArm('back_drag', { vbtLossPct: null, angleOutOfRange: false });
+    expect(b.map((t) => t.id)).toEqual(a.map((t) => t.id));
+  });
+});
+
+describe('arm-corrective-pro2 D3: паритет сим = инъекция', () => {
+  it('shouldUseDoseV2: флаги и гарды', () => {
+    expect(shouldUseDoseV2(null, 'intermediate', {})).toBe(false);
+    expect(shouldUseDoseV2('volume', 'intermediate', {})).toBe(false);
+    expect(shouldUseDoseV2('strength', 'intermediate', {})).toBe(true);
+    expect(shouldUseDoseV2('volume', 'intermediate', { tendonOverload: true })).toBe(true);
+    expect(shouldUseDoseV2(null, 'beginner', {})).toBe(false);
+    expect(shouldUseDoseV2('volume', 'beginner', {})).toBe(true);
+  });
+  it('сим с tendon-флагом = инъекция с флагом (сеты и доза)', () => {
+    const plan = basePlan();
+    const sim = simulateArmInjection(plan, 'back_start' as ArmWeakPoint, null, { tendonOverload: true })!;
+    expect(sim.addSets).toBe(2);
+    const res = injectArmCorrections(plan, ['back_start' as ArmWeakPoint], { tendonOverload: true });
+    const inserted = res.plan.weeks[0].sessions.flatMap((s) => s.exercises)
+      .filter((e: any) => String(e.rationale || '').startsWith('Коррекция мёртвой точки'));
+    expect(inserted.length).toBe(1);
+    expect((inserted[0] as any).sets).toBe(sim.addSets);
+  });
+  it('сим с волной Н2 = инъекция с волной (back_start, без капов)', () => {
+    const plan = basePlan();
+    const sim = simulateArmInjection(plan, 'back_start' as ArmWeakPoint, null, { waveWeek: 2 })!;
+    expect(sim.addSets).toBe(4);
+    const res = injectArmCorrections(plan, ['back_start' as ArmWeakPoint], { waveWeek: 2 });
+    const inserted = res.plan.weeks[0].sessions.flatMap((s) => s.exercises)
+      .filter((e: any) => String(e.rationale || '').startsWith('Коррекция мёртвой точки'));
+    expect((inserted[0] as any).sets).toBe(sim.addSets);
+  });
+  it('без флагов сим как раньше (3 сета pron_open)', () => {
+    const plan = basePlan();
+    const sim = simulateArmInjection(plan, 'pron_open' as ArmWeakPoint, null, {})!;
+    expect(sim.addSets).toBe(3);
+  });
+});
+
+describe('arm-corrective-pro2 D4: targetSets приоритетнее волны', () => {
+  it('waveWeek=2 + targetSets=2 → 2 сета', () => {
+    const plan = basePlan();
+    const res = injectArmCorrections(plan, ['back_start' as ArmWeakPoint], { waveWeek: 2, targetSets: { back_start: 2 } });
+    const inserted = res.plan.weeks[0].sessions.flatMap((s) => s.exercises)
+      .filter((e: any) => String(e.rationale || '').startsWith('Коррекция мёртвой точки'));
+    expect((inserted[0] as any).sets).toBe(2);
+  });
+});
+
+describe('arm-corrective-pro2 D5: мост v2-флагов', () => {
+  it('билдер кладёт флаги только при заполненности', () => {
+    const input: any = {
+      groups: [], technique: 'toproll', weakPoints: [], biomechCards: [], corrections: [],
+      scoring: null, diag: null, angles: null, force: null, vbt: null, dynamic: null,
+      bench: null, tendon: 0, findings: [], humerus: [], balance: [], asymmetry: null,
+      info: [], weakCauses: {}, topByPoint: {}, spec: null, mobilityFails: [],
+      acwrDanger: [], bilateral: null, attempts: [],
+    };
+    const empty = buildArmBridgeData({ ...input });
+    expect('armTendonOverload' in empty).toBe(false);
+    expect('armWaveWeek' in empty).toBe(false);
+    const full = buildArmBridgeData({ ...input, tendonOverload: true, waveWeek: 2 });
+    expect(full.armTendonOverload).toBe(true);
+    expect(full.armWaveWeek).toBe(2);
+  });
+  it('валидация моста: мусор → без флагов, флаги одни → не null', () => {
+    expect(bridgeDoseFromPayload({ armTendonOverload: true, armWaveWeek: 9 })).toEqual(
+      expect.objectContaining({ tendonOverload: true }),
+    );
+    const only = bridgeDoseFromPayload({ armWaveWeek: 2 })!;
+    expect(only.waveWeek).toBe(2);
+    expect(bridgeDoseFromPayload({ armWaveWeek: 'oops' })).toBeNull();
+    expect(bridgeDoseFromPayload({})).toBeNull();
+  });
+  it('флаги моста доезжают до инъекции (tendon 2 сета)', () => {
+    const bd = bridgeDoseFromPayload({ armTendonOverload: true })!;
+    const plan = basePlan();
+    const res = injectArmCorrections(plan, ['back_start' as ArmWeakPoint], { ...bd });
+    const inserted = res.plan.weeks[0].sessions.flatMap((s) => s.exercises)
+      .filter((e: any) => String(e.rationale || '').startsWith('Коррекция мёртвой точки'));
+    expect((inserted[0] as any).sets).toBe(2);
   });
 });

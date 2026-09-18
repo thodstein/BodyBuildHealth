@@ -56,6 +56,9 @@ export interface ArmBridgeInput {
   foulNote?: string | null;
   tableStrengthNote?: string | null;
   humerusDangerNote?: string | null;
+  /** D5 PRO-2: v2-флаги дозы/волны (опционально; конструктор без них — базовый путь). */
+  tendonOverload?: boolean;
+  waveWeek?: number | null;
 }
 
 export function buildArmBridgeData(i: ArmBridgeInput): Record<string, unknown> {
@@ -116,5 +119,8 @@ export function buildArmBridgeData(i: ArmBridgeInput): Record<string, unknown> {
     armFoulNote: i.foulNote || null,
     armTableStrengthNote: i.tableStrengthNote || null,
     armHumerusDangerNote: i.humerusDangerNote || null,
+    // D5 PRO-2: v2-флаги (только заполненные; пусто — ключей нет, приёмник базовым путём)
+    ...(i.tendonOverload ? { armTendonOverload: true } : {}),
+    ...(i.waveWeek != null ? { armWaveWeek: i.waveWeek } : {}),
   };
 }

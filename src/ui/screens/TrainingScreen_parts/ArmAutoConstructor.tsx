@@ -615,9 +615,17 @@ export function ArmAutoConstructor() {
           if (bd) {
             localStorage.setItem('he_arm_last_causes', JSON.stringify(bd.causes));
             localStorage.setItem('he_arm_last_rankedids', JSON.stringify(bd.rankedIds));
+            // D5 PRO-2: v2-флаги моста (только валидные; без — ключи чистятся)
+            try {
+              if (bd.tendonOverload) localStorage.setItem('he_arm_last_tendon', '1');
+              else localStorage.removeItem('he_arm_last_tendon');
+              if (bd.waveWeek != null) localStorage.setItem('he_arm_last_wave', String(bd.waveWeek));
+              else localStorage.removeItem('he_arm_last_wave');
+            } catch {}
           } else {
             localStorage.removeItem('he_arm_last_causes');
             localStorage.removeItem('he_arm_last_rankedids');
+            try { localStorage.removeItem('he_arm_last_tendon'); localStorage.removeItem('he_arm_last_wave'); } catch {}
           }
         } catch {}
       } else if (Array.isArray(payload.data?.armBiomechCards) && payload.data.armBiomechCards.length) {
@@ -1049,12 +1057,19 @@ export function ArmAutoConstructor() {
         const toInject: ArmWeakPoint[] = diagWeakPoints.length ? diagWeakPoints : (()=>{ try{ const raw=localStorage.getItem('he_arm_last_weakpoints'); if(raw){ const arr=JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr as ArmWeakPoint[]; } } catch{} return []; })();
         if (toInject.length) {
           // доза из диагностики (нет ключей — базовый путь)
-          const doseOpts: { causes?: Record<string, any>; rankedIds?: Record<string, string[]> } = {};
+          const doseOpts: { causes?: Record<string, any>; rankedIds?: Record<string, string[]>; tendonOverload?: boolean; waveWeek?: number } = {};
           try {
             const cRaw = localStorage.getItem('he_arm_last_causes');
             const rRaw = localStorage.getItem('he_arm_last_rankedids');
             if (cRaw) { const c = JSON.parse(cRaw); if (c && typeof c === 'object') doseOpts.causes = c; }
             if (rRaw) { const r = JSON.parse(rRaw); if (r && typeof r === 'object') doseOpts.rankedIds = r; }
+            // D5 PRO-2: v2-флаги моста (валидация; мусор — тихо без флага)
+            try {
+              if (localStorage.getItem('he_arm_last_tendon') === '1') doseOpts.tendonOverload = true;
+              const wRaw = localStorage.getItem('he_arm_last_wave');
+              const w = wRaw != null ? Math.round(Number(wRaw)) : NaN;
+              if (Number.isFinite(w) && w >= 1 && w <= 3) doseOpts.waveWeek = w;
+            } catch {}
           } catch {}
           const inj = injectArmCorrections(plan, toInject as ArmWeakPoint[], { level, workMax, ...doseOpts });
           plan = inj.plan;

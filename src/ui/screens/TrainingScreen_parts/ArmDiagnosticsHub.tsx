@@ -26,7 +26,7 @@ import { HubHead, HubControls, HubOutput, HubP0Panel, HubAction, HubTabNext, Hub
 import { HubGripTab, HubWristTab } from './arm-hub-tabs1';
 import { HubPressureTab, HubStrengthTab, HubRecoveryTab } from './arm-hub-tabs2';
 import { HubCorrectionTab } from './arm-hub-correction-tab';
-import { ARM_BIOMECH, type ArmWeakPoint, isArmWeakPoint, vbtThresholdForWeakPoint, phaseForArmAngle } from '../../../engines/arm/arm-biomechanics.engine';
+import { ARM_BIOMECH, type ArmWeakPoint, isArmWeakPoint, vbtThresholdForWeakPoint, phaseForArmAngle, autoValidateArmAngles } from '../../../engines/arm/arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections';
 import { auditArmPlan, worstArmPoint } from '../../../engines/arm/arm-plan-audit.engine';
 import { diagnoseArmWeakCause } from '../../../engines/arm/arm-weak-cause.engine';
@@ -145,6 +145,8 @@ type ArmDiagState = {
   cocLevel: string;
   /** P2: фаза срыва схватки setup/start/mid/pin — бонус ранжиру (пусто = без бонуса). */
   failurePoint?: string;
+  /** D2 PRO-2: неделя микро-волны коррекции 1/2/3 (пусто = без волны, байт-в-байт). */
+  corrWave?: string;
 };
 
 const DEFAULT_STATE: ArmDiagState = {
@@ -154,7 +156,7 @@ const DEFAULT_STATE: ArmDiagState = {
   elbowDeg: '110', forearmDeg: '90', wristDeg: '10', direction: 'to_middle',
   vbtWeight: '', vbtReps: '', vbtVel: '', vbtVel2: '',
   fingerKg: '', fingerMs: '', hammerKg: '', hammerMs: '', hookKg: '', hookMs: '', cupKg: '', cupMs: '',
-  wristCurlLb: '', pronHoldSec: '', cupHoldSec: '', cocLevel: '', failurePoint: '',
+  wristCurlLb: '', pronHoldSec: '', cupHoldSec: '', cocLevel: '', failurePoint: '', corrWave: '',
 };
 
 export const ArmDiagnosticsHub: React.FC = () => {
@@ -775,14 +777,25 @@ export const ArmDiagnosticsHub: React.FC = () => {
     try {
       const inPlan: string[] = [];
       if (armPlan) for (const w of (armPlan as any).weeks || []) for (const s of (w as any).sessions || []) for (const ex of (s as any).exercises || []) if ((ex as any).exerciseId) inPlan.push(String((ex as any).exerciseId));
+      // D1: углы вне диапазона per-point (ручные замеры; тихо при мусоре)
+      let invalidAngles: Set<string> = new Set();
+      try {
+        const elbow = parseFloat(state.elbowDeg);
+        const fore = parseFloat(state.forearmDeg);
+        const wrist = parseFloat(state.wristDeg);
+        if ([elbow, fore, wrist].some((n) => Number.isFinite(n))) {
+          const rows = autoValidateArmAngles({ elbow, wrist, forearm: fore } as any, state.weakPoints as any);
+          for (const r of rows) if (!r.valid) invalidAngles.add(String(r.weakPoint));
+        }
+      } catch { /* noop — ранжир без углового бонуса */ }
       for (const wp of state.weakPoints) {
         // D3: оборудование и мобильность из профиля + локальный ROM-тест
         const mobMerged = Array.from(new Set([...(profileCtxP0.mobility || []), ...armMobility.fails]));
-        out[wp] = rankCorrectionsForArm(wp, { level: state.level, cause: armCausesP0[wp]?.cause, asymPct: report.asymmetryPct ?? (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null, inPlanIds: inPlan, equipment: profileCtxP0.equipment, mobilityRestrictions: mobMerged, failurePoint: state.failurePoint || null, matchPhase: mvPhase || null });
+        out[wp] = rankCorrectionsForArm(wp, { level: state.level, cause: armCausesP0[wp]?.cause, asymPct: report.asymmetryPct ?? (dynamicReport as any)?.asymmetry?.asymmetryPct ?? null, inPlanIds: inPlan, equipment: profileCtxP0.equipment, mobilityRestrictions: mobMerged, failurePoint: state.failurePoint || null, matchPhase: mvPhase || null, angleOutOfRange: invalidAngles.has(wp), vbtLossPct: Number.isFinite(Number((vbt as any)?.velocityLossPct)) ? Number((vbt as any).velocityLossPct) : null });
       }
     } catch { /* noop */ }
     return out;
-  }, [state.weakPoints, state.level, armCausesP0, armPlan, report.asymmetryPct, dynamicReport, profileCtxP0, armMobility, state.failurePoint, mvPhase]);
+  }, [state.weakPoints, state.level, armCausesP0, armPlan, report.asymmetryPct, dynamicReport, profileCtxP0, armMobility, state.failurePoint, mvPhase, state.elbowDeg, state.forearmDeg, state.wristDeg, vbt]);
 
   const armSpecP0 = useMemo(() => {
     try {
@@ -838,8 +851,12 @@ export const ArmDiagnosticsHub: React.FC = () => {
         if (typeof c === 'string' && c) causes[p] = c;
       }
     } catch { /* noop */ }
+    // D2 PRO-2: tendon-флаг авто из tendon-ACWR (≥1.3 caution), волна из corrWave-селекта
+    const tendonOverload = (() => { try { return Number((tendonAcwr as any)?.ratio) >= 1.3; } catch { return false; } })();
+    const waveW = parseInt(String((state as any).corrWave || ''), 10);
+    const waveWeek = Number.isFinite(waveW) && waveW >= 1 && waveW <= 3 ? waveW : null;
     try {
-      const r = injectArmCorrections(working, points as any, { weekIdxs: idx, targetSets, level: state.level, gatedSideIso: gatedSide, rankedIds, causes });
+      const r = injectArmCorrections(working, points as any, { weekIdxs: idx, targetSets, level: state.level, gatedSideIso: gatedSide, rankedIds, causes, tendonOverload, ...(waveWeek != null ? { waveWeek } : {}) });
       working = r.plan;
       injected = r.injected;
       skipped = r.skippedBudget + r.skippedDup + r.skippedHumerus;
@@ -1104,6 +1121,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
       spec: armSpecP0 as any,
       mobilityFails: armMobility.fails,
       acwrDanger: perMuscleAcwrSumP0.danger,
+      // D5 PRO-2: v2-флаги дозы/волны в мост (приёмник применит к инъекции)
+      tendonOverload: (() => { try { return Number((tendonAcwr as any)?.ratio) >= 1.3; } catch { return false; } })(),
+      waveWeek: (() => { const w = parseInt(String((state as any).corrWave || ''), 10); return Number.isFinite(w) && w >= 1 && w <= 3 ? w : null; })(),
       bilateral: bilatP0 ? { weakArm: bilatP0.weakArm, weakSets: bilatP0.weakSets, strongSets: bilatP0.strongSets } : null,
       attempts: attHistP0,
       // PRO-3 P4: red-flags скрининга — в конструктор
@@ -1326,6 +1346,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     autoregP0, cnsHeavyP0, guardsP0, armPlan,
     rh, setRh, buildRehabPlanFn: buildRehabPlan, scoreLabel,
     specWeeks, setSpecWeeks, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0,
+    corrV2: (() => { try { return { tendonOverload: Number((tendonAcwr as any)?.ratio) >= 1.3, waveWeek: (() => { const w = parseInt(String((state as any).corrWave || ''), 10); return Number.isFinite(w) && w >= 1 && w <= 3 ? w : null; })() }; } catch { return { tendonOverload: false, waveWeek: null }; } })(),
     diaryTrendsP0, diarySuggestP0,
     handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0,
     injectMsg, criticalSideP0,

@@ -196,6 +196,23 @@ export interface DoseV2Opts {
 }
 
 /**
+ * D3: единое условие «доза v2 vs база» для инъекции и симулятора.
+ * v2 включается только когда меняет результат: флаги tendon/50+,
+ * side-guard при strength-причине, beginner-гард при известной причине.
+ * Иначе база 1-в-1 (паритет Δ = факт инъекции).
+ */
+export function shouldUseDoseV2(
+  cause: ArmWeakCause | null | undefined,
+  level: string | null | undefined,
+  opts: { tendonOverload?: boolean; age50plus?: boolean },
+): boolean {
+  if (opts.tendonOverload || opts.age50plus) return true;
+  if (cause === 'strength') return true;
+  if (String(level || '').toLowerCase() === 'beginner' && cause) return true;
+  return false;
+}
+
+/**
  * C3: доза v2 = база doseForCause + гарды уровня/tendon/side/возраста.
  * Без opts — байт-в-байт с doseForCause (старые тесты целы).
  * - side_* + cause strength → НЕ 5×5 (humerus): 3×6 статика ремнём.

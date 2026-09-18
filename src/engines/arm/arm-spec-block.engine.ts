@@ -35,6 +35,10 @@ export function buildArmSpecBlock(input: {
     if (corr?.dayTags?.[0]) dayMap[wp] = corr.dayTags[0];
   }
   const weeks: ArmSpecWeek[] = [];
+  // Волна спец-блока — мезоцикл 4–8 нед (техника → объём → стресс-контроль).
+  // D4 PRO-2: микро-волна correctiveWaveForWeek (Н1/Н2+1/Н3−1) живёт отдельно и
+  // применяется в инъекции/симе; targetSets спец-блока ПРИОРИТЕТНЕЕ волны
+  // (инъекция: targetSets > waveWeek > доза — lock-тест arm-corrective-pro2).
   for (let w = 1; w <= n; w++) {
     const kind = tableWeekKind(w, n);
     const targetSets: Record<string, number> = {};

@@ -9,7 +9,7 @@ import type { ArmWeakPoint } from './arm-biomechanics.engine';
 import { ARM_BIOMECH } from './arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
 import { doseForCause } from './arm-correction-dose.engine';
-import { doseForCauseV2, waveSetsFor, preventiveFor, roleLabel } from './arm-correction-pro2.engine';
+import { doseForCauseV2, waveSetsFor, preventiveFor, roleLabel, shouldUseDoseV2 } from './arm-correction-pro2.engine';
 import type { ArmWeakCause } from './arm-weak-cause.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
 import { getArmExercises } from '../../core/exercise-catalog-arm';
@@ -165,7 +165,8 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
       const corr = ARM_CORRECTIONS[wp];
       if (!bio || !corr) { notes.push(`⚠ ${wp} — нет биомеханики`); continue; }
       // доза по причине: PRO-2 v2 при флагах (tendon/50+/side-guard), иначе база 1-в-1
-      const v2 = (opts.tendonOverload || opts.age50plus || opts.causes?.[wp] === 'strength' || (level === 'beginner' && opts.causes?.[wp]))
+      // Условие — общий shouldUseDoseV2 (паритет с симулятором, D3)
+      const v2 = shouldUseDoseV2(opts.causes?.[wp], level, { tendonOverload: opts.tendonOverload, age50plus: opts.age50plus })
         ? doseForCauseV2(wp, opts.causes?.[wp], { level, tendonOverload: opts.tendonOverload, age50plus: opts.age50plus })
         : null;
       const dose = v2 ?? doseForCause(wp, opts.causes?.[wp]) ?? {

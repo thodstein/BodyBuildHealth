@@ -75,6 +75,9 @@ const CAUSE_IDS = ['volume', 'technique', 'mobility', 'fatigue', 'strength'] as 
 export interface BridgeDose {
   causes: Record<string, ArmWeakCause>;
   rankedIds: Record<string, string[]>;
+  /** D5 PRO-2: v2-флаги моста (опционально; без — базовый путь приёмника). */
+  tendonOverload?: boolean;
+  waveWeek?: number;
 }
 
 /**
@@ -102,6 +105,14 @@ export function bridgeDoseFromPayload(data: unknown): BridgeDose | null {
       if (ids.length) rankedIds[String(wp)] = ids;
     }
   }
-  if (!Object.keys(causes).length && !Object.keys(rankedIds).length) return null;
-  return { causes, rankedIds };
+  // D5: v2-флаги (валидация; мусор — тихо, без флага)
+  const out: BridgeDose = { causes, rankedIds };
+  try {
+    const t = (d as Record<string, unknown>).armTendonOverload;
+    if (t === true) out.tendonOverload = true;
+    const w = Number((d as Record<string, unknown>).armWaveWeek);
+    if (Number.isFinite(w) && w >= 1 && w <= 3) out.waveWeek = Math.round(w);
+  } catch { /* noop */ }
+  if (!Object.keys(causes).length && !Object.keys(rankedIds).length && !out.tendonOverload && out.waveWeek == null) return null;
+  return out;
 }
