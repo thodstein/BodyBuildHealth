@@ -82,6 +82,34 @@ describe('PRO-CORR K2: матрица причина × уровень × обо
   });
 });
 
+describe('PRO-CORR добивка: лесенка и малые пулы', () => {
+  it('лесенка CoC несёт кью и прогрессию (порядок цел)', () => {
+    const ladder = rankArmliftCorrections('crush', 'coc_gripper', { cocLevel: 1 });
+    expect(ladder[0].exId).toBe('coc_no1');
+    expect(ladder.every((c) => (c.cues || []).length > 0 && (c.progression || '').length > 0)).toBe(true);
+  });
+  it('инжектированный экстензор несёт кью (дисбаланс)', () => {
+    const imb = rankArmliftCorrections('support_endurance', 'rolling_thunder', { extImbalance: true });
+    const ext = imb.find((c) => c.exId === 'wrist_ext_bb');
+    expect(ext).toBeTruthy();
+    expect((ext?.cues || []).length).toBeGreaterThan(0);
+  });
+  it('level-гейт малых пулов: technique/asymmetry без rolling у новичка', () => {
+    const tech = rankArmliftCorrections('technique', 'rolling_thunder', { level: 'beginner' });
+    expect(tech.map((c) => c.exId)).not.toContain('rolling_thunder');
+    const asym = rankArmliftCorrections('asymmetry', 'rolling_thunder', { level: 'beginner' });
+    const ids = asym.map((c) => c.exId);
+    expect(ids).not.toContain('rolling_thunder');
+    expect(ids).toContain('wrist_curl_db');
+  });
+  it('дефолт малых пулов цел: technique [rolling, plate, farmer]', () => {
+    expect(rankArmliftCorrections('technique', 'rolling_thunder', {}).map((c) => c.exId))
+      .toEqual(['rolling_thunder', 'plate_pinch_hold', 'farmer_walk_fat']);
+    expect(rankArmliftCorrections('asymmetry', 'rolling_thunder', {}).map((c) => c.exId))
+      .toEqual(['plate_pinch_hold', 'rolling_thunder', 'wrist_ext_bb']);
+  });
+});
+
 describe('PRO-CORR K3: покрытие фаз срыва', () => {
   it('каждая фаза чинится минимум 2 упражнениями', () => {
     for (const fp of ['off_floor', 'hold_short', 'hold_long', 'mid', 'lockout', 'close_fail']) {

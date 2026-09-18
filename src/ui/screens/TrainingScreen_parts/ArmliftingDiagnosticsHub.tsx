@@ -354,6 +354,13 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
     diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
   );
+  /** PRO-CORR K2: уровень из тест-батареи — advanced-снаряды новичку не едут (единый мемо для топ-3 и запасной). */
+  const corrLevel = useMemo(() => overallGripLevel([
+    benchmarkPinchHold(diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null),
+    benchmarkFarmerHold(diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null),
+    benchmarkCoc(state.cocLevel ? parseFloat(state.cocLevel) : null),
+    benchmarkSilverHold(state.silverSec ? parseFloat(state.silverSec) : null),
+  ]) ?? undefined, [diag.pinchHoldSec, diag.farmerHoldSec, state.cocLevel, state.silverSec]);
   const corrections = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
     cause: cause.cause === 'pain' ? undefined : cause.cause,
     asymPct: asymForDiag,
@@ -362,15 +369,10 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
     /** PRO-6 M4: кривая поднимает упражнения под провал. */
     holdCurve: holdCurve?.curve ?? null,
-    /** PRO-CORR K2: уровень из тест-батареи — advanced-снаряды новичку не едут; боль — только щадящие. */
-    level: overallGripLevel([
-      benchmarkPinchHold(diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null),
-      benchmarkFarmerHold(diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null),
-      benchmarkCoc(state.cocLevel ? parseFloat(state.cocLevel) : null),
-      benchmarkSilverHold(state.silverSec ? parseFloat(state.silverSec) : null),
-    ]) ?? undefined,
+    /** PRO-CORR K2: боль — только щадящие. */
+    level: corrLevel,
     gentleOnly: cause.cause === 'pain',
-  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, state.silverSec, diag.pinchHoldSec, diag.farmerHoldSec, holdCurve]);
+  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, corrLevel, holdCurve]);
   /** PRO-CORR K6: запасная 4-я — «🔁 Запасная» строкой (топ-3 в мост не меняется). */
   const spareCorrection = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
     cause: cause.cause === 'pain' ? undefined : cause.cause,
@@ -379,14 +381,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     extImbalance: extRatio != null && extRatio > 1.5,
     cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
     holdCurve: holdCurve?.curve ?? null,
-    level: overallGripLevel([
-      benchmarkPinchHold(diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null),
-      benchmarkFarmerHold(diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null),
-      benchmarkCoc(state.cocLevel ? parseFloat(state.cocLevel) : null),
-      benchmarkSilverHold(state.silverSec ? parseFloat(state.silverSec) : null),
-    ]) ?? undefined,
+    level: corrLevel,
     gentleOnly: cause.cause === 'pain',
-  }, 4)[3] ?? null, [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, state.silverSec, diag.pinchHoldSec, diag.farmerHoldSec, holdCurve]);
+  }, 4)[3] ?? null, [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, corrLevel, holdCurve]);
   const specBlock = useMemo(
     () => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, { fatigueFirst: cause.cause === 'fatigue' || cause.cause === 'pain' }),
     [diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, cause.cause],

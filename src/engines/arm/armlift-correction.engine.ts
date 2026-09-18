@@ -172,14 +172,25 @@ export const IMPLEMENT_TO_EX: Record<string, string> = {
   fat_gripz: 'fat_gripz_curl',
 };
 
+/** PRO-CORR K3: добрать запись пула по id (расширение малых пулов без смены дефолтного топ-3). */
+function poolById(pool: PoolEntry[], exId: string): PoolEntry {
+  const found = pool.find((p) => p.exId === exId);
+  if (!found) throw new Error(`armlift-correction: pool miss ${exId}`);
+  return found;
+}
+
 const BASE_POOL: Record<ArmliftWeakLink, PoolEntry[]> = {
   thumb: withFixes(PINCH, ['off_floor', 'hold_short', 'hold_long']),
   fingers: withFixes(SUPPORT_MAX, ['off_floor', 'mid', 'lockout', 'close_fail']),
   wrist_ext: withFixes(WRIST_EXT, ['mid', 'lockout', 'hold_short']),
   support_endurance: withFixes(ENDURANCE, ['hold_long', 'hold_short', 'mid']),
   crush: withFixes(CRUSH, ['close_fail', 'hold_short', 'hold_long']),
-  technique: [...SUPPORT_MAX.slice(0, 1), ...PINCH.slice(0, 1), ...ENDURANCE.slice(0, 1)],
-  asymmetry: [...PINCH.slice(0, 1), ...SUPPORT_MAX.slice(0, 1), ...WRIST_EXT.slice(0, 1)],
+  // PRO-CORR K3: technique/asymmetry добиты до 6 записей дешёвым стартом (дефолтный топ-3 цел —
+  // новички идут первыми тремя базовыми, advanced-первые вытесняются гейтом уровня).
+  technique: [...SUPPORT_MAX.slice(0, 1), ...PINCH.slice(0, 1), ...ENDURANCE.slice(0, 1),
+    poolById(ENDURANCE, 'fat_gripz_curl'), poolById(SUPPORT_MAX, 'napalm_handle_60'), poolById(PINCH, 'finger_containment_band')],
+  asymmetry: [...PINCH.slice(0, 1), ...SUPPORT_MAX.slice(0, 1), ...WRIST_EXT.slice(0, 1),
+    poolById(WRIST_EXT, 'wrist_curl_db'), poolById(PINCH, 'finger_containment_band'), poolById(ENDURANCE, 'indian_clubs')],
   conditioning: [
     { exId: 'wrist_ext_bb', protocol: 'Минимальная нагрузка, без провокации боли', dose: '2×15', freq: 'ежедневно', source: 'Rehab-практика', sets: 2, reps: [15, 15], restSec: 60, dayTag: 'SupportGrip' },
     { exId: 'wrist_roller', protocol: 'Пустой валик, только кровоток', dose: '2 подъёма', freq: 'ежедневно', source: 'Rehab-практика', sets: 2, reps: [1, 2], restSec: 60, dayTag: 'SupportGrip' },
@@ -265,6 +276,8 @@ function cocLadderPool(level: number | null | undefined): PoolEntry[] {
     freq: '2–3×/нед', source: 'CoC-канон work', sets: 3, reps: [5, 7], restSec: 120,
     dayTag: 'CrushGrip', fixes: ['close_fail'],
     warmup: 'Разминка: гриппером легче 1×10–12 до жжения, не в отказ',
+    causes: ['max_strength'], phase: 'strength',
+    cues: ['5–7 до отказа', 'Полная пауза между сетами'], progression: '10–12 повторов → следующий уровень',
   }];
   if (goalId) {
     pool.push({
@@ -272,6 +285,8 @@ function cocLadderPool(level: number | null | undefined): PoolEntry[] {
       freq: '2×/нед', source: 'CoC-канон challenge (Kinney)', sets: 3, reps: [3, 3], restSec: 150,
       dayTag: 'CrushGrip', fixes: ['close_fail'],
       warmup: 'Только после рабочих сетов, свежим — не в конце убитой сессии',
+      causes: ['max_strength'], phase: 'strength',
+      cues: ['Только свежим', 'После рабочих сетов'], progression: 'Частички → негативы → холд 3–5с',
     });
   } else {
     pool.push({
@@ -279,12 +294,16 @@ function cocLadderPool(level: number | null | undefined): PoolEntry[] {
       freq: '1×/нед', source: 'CoC overcrush', sets: 4, reps: [1, 1], holdSeconds: 8, restSec: 120,
       dayTag: 'CrushGrip', fixes: ['close_fail', 'hold_short'],
       warmup: 'Разминка: гриппером легче 1×10–12',
+      causes: ['max_strength'], minLevel: 'advanced', phase: 'strength',
+      cues: ['Дожим 6–10с', 'Раз в неделю'], progression: 'Дольше холд → следующий гриппер',
     });
   }
   pool.push({
     exId: 'silver_bullet_hold', protocol: 'Патрон в закрытом на время (финиш crush)', dose: '3×макс',
     freq: '2×/нед', source: 'IronMind Silver', sets: 3, reps: [1, 1], holdSeconds: 20, restSec: 120,
     dayTag: 'CrushGrip', fixes: ['hold_short', 'hold_long'],
+    causes: ['endurance'], phase: 'stability',
+    cues: ['Вертикаль', 'Патрон не ронять'], progression: '+5с/нед',
   });
   return pool;
 }
@@ -309,6 +328,9 @@ export function rankArmliftCorrections(
       exId: 'wrist_ext_bb', protocol: 'Ладони вниз на жжение + Expand 2×15', dose: '3×15–25',
       freq: '3–4×/нед', source: 'Баланс flex/ext', sets: 3, reps: [15, 25], restSec: 60,
       dayTag: 'SupportGrip', fixes: ['mid'],
+      causes: ['mobility', 'fatigue'], minLevel: 'beginner', phase: 'stability',
+      cues: ['Ладони вниз', 'На жжение, не в отказ'], progression: '+2–3 повтора/нед',
+      equipmentAlt: ['dumbbell', 'band'], gentle: true,
     }];
   }
   // Практика своим снарядом — первой, если звено/причина про технику (специфичность).
