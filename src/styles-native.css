@@ -4949,13 +4949,13 @@ html.app-native .nut-diary-fab {
 }
 
 html.app-native .nut-diary-fabbar {
-  position: fixed !important;
-  left: 12px !important;
-  right: 12px !important;
-  bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom, 0px), 28px) + 12px) !important;
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
   max-width: 560px !important;
-  margin: 0 auto !important;
-  z-index: 40 !important;
+  margin: 4px auto 0 !important;
+  z-index: auto !important;
   pointer-events: none !important;
 }
 
