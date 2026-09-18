@@ -1,5 +1,15 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Арм-коррекция D1–D5: проводка v2 замкнута (хаб/сим/мост/приёмник) (Sep 18 2026, коммит pathspec `aa738d04`, без пуша)
+
+По команде «что осталось или выполнено не полностью» → честный реаудит нашёл 5 разрывов проводки (движки PRO-2 были готовы, хаб их не кормил) → закрыты кодом D1–D5. Только Edit/Write + vitest/tsc; чужие WIP (bb/ta/styles/labs/WL-хаб) не тронуты; коммит строго pathspec 10 своих файлов.
+- **D1 ранжир живьём**: `armTop3P0` прокидывает `vbtLossPct` (из `vbt.velocityLossPct`) + `angleOutOfRange` per-point через `autoValidateArmAngles` (ручные замеры, мусор — тихо без бонуса); `tableTimeMin` — осознанная граница (у хаба только счётчик table-сессий плана, минут спаррингов нет — выдумывать минуты запрещено; бонус достижим через API/тесты).
+- **D2 инъекция живьём**: `tendonOverload` авто из tendon-ACWR ≥1.3 + NEW `corrWave`-селект в табе (Н1/Н2/Н3/без волны; персист в сторе v4 merge-safe) → `handleInjectP0` и мост.
+- **D3 паритет сима**: NEW `shouldUseDoseV2` (общий для инъекции и симулятора — условие 1-в-1) + сим opts `tendonOverload/age50plus/waveWeek`; таб считает Δ теми же флагами (`H.corrV2`) — «показано = вставится».
+- **D4 волны разведены**: spec-волна = мезоцикл, PRO-2 = микро-волна; приоритет `targetSets > waveWeek > доза` зафиксирован lock-тестом + коммент в `arm-spec-block`.
+- **D5 мост**: payload += `armTendonOverload/armWaveWeek` (только заполненные) → `BridgeDose += tendonOverload/waveWeek` (валидация: волна 1–3, флаги-одиночки не роняются) → приёмник персистит `he_arm_last_tendon/he_arm_last_wave` (чистятся при пустом мосте) → инъекция конструктора их читает. По пути: чуть не снёс `startNote` широкой заменой в bridge-интерфейсе — восстановлено сразу, проверено чтением.
+- **Проверено**: `arm-corrective-pro2` 27→**37/37** (+10 D) + соседи phase/dose/injection/p0/parity/export/d/p1/p2 267/267 + hub 49/49 + bridge r/pro3-w2/movement 44/44 + `tsc --noEmit` **0 по всему проекту** + `verify:apk-design` OK. НЕ ПУШИЛ.
+
 ## ТА-коррекция PRO: подбор по оборудованию/усталости + тиры замеров/очередь + комплексы/праймеры + 47→67 + доза-якорь/howNot + хаб E6 (Sep 18 2026, коммит pathspec `5039b8f4`, без пуша)
 
 По команде «хаб та диагностики — очень слабая корректировка и подбор корректирующих упражнений, проанализируй, составь план и изучи интернет источники» → аудит + интернет-синтез (Everett/Catalyst: exercise selection + error correction order + complexes/warm-ups + press-out 8 причин; QWA fault→cause→correction матрицы рывка/толчка; Torokhtiy 8+7 ошибок + turnover-лесенка tall/drop/balance + локти вверх-наружу; Burgener warm-up 6 + skill transfer + tall 20–40%) → план E1–E6 → выполнен полностью кодом. Только Edit/Write + vitest/tsc; чужие WIP (bb-*/zz-*) не тронуты; коммит строго pathspec 4 своих файлов.
