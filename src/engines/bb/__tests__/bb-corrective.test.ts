@@ -138,4 +138,17 @@ describe('bb-corrective K1 library', () => {
     const sig = rankCorrectives({ zones: ['chest_upper'], cause: 'volume', erirLow: true });
     expect(sig[0].corr.id).toMatch(/^(cu-|ch-)/);
   });
+  it('теги скринингов: hinge/shoulder/ybt/ktw/asym маппятся', () => {
+    const t = tagsForMovementScreens({ hingeFail: true, shoulderFail: true, ybtAsym: true, ktwAsym: true, asym: true });
+    expect(t).toEqual(expect.arrayContaining(['hinge-fail', 'shoulder-fail', 'ybt-asym', 'ktw-asym', 'asym']));
+    const r = rankCorrectives({ zones: ['glutes'], ybtAsym: true, ktwAsym: true });
+    expect(r.map((x) => x.corr.id)).toContain('g-clam-complex');
+  });
+  it('unilateral-бонус: при asym односторонние выше', () => {
+    const plain = rankCorrectives({ zones: ['glutes'] });
+    const asym = rankCorrectives({ zones: ['glutes'], asym: true });
+    const scoreOf = (list: Array<{ corr: { id: string }; score: number }>, id: string) =>
+      list.find((x) => x.corr.id === id)?.score ?? -1;
+    expect(scoreOf(asym, 'g-single-bridge')).toBeGreaterThan(scoreOf(plain, 'g-single-bridge'));
+  });
 });

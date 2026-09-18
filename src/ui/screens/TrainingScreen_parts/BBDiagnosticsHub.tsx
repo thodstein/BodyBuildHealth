@@ -973,6 +973,33 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { return {}; }
   };
 
+  // PRO-CORR-FIX: единый конструктор сигналов библиотеки — карточка, HTML- и CSV-экспорт
+  // обязаны считать одним набором входов (иначе топ в файле ≠ показанному/вставленному).
+  const corrSignalsFor = (z: string, cause: unknown) => {
+    const asymMax = (() => { try { const vs = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return vs.length ? Math.max(...vs) : null; } catch { return null; } })();
+    const drv = (() => { try { return String((moveDriver as any)?.driver || ''); } catch { return ''; } })();
+    const pLevel = (() => { try { return String((painMon as any)?.verdict?.level || 'green'); } catch { return 'green'; } })();
+    return {
+      zones: [z],
+      driver: drv && drv !== 'none' ? drv : null,
+      benchLevel: (() => { try { return String((benchV as any)?.level || '') || null; } catch { return null; } })(),
+      nheWeak: (() => { try { const l = String((nheV as any)?.level || ''); return l === 'weak' || l === 'very_weak'; } catch { return false; } })(),
+      addWeak: (() => { try { return String((adductorV as any)?.level || '') === 'weak'; } catch { return false; } })(),
+      erirLow: (() => { try { const r = (erIrV as any)?.ratio; return typeof r === 'number' && Number.isFinite(r) && r < 0.75; } catch { return false; } })(),
+      painLevel: (pLevel === 'red' || pLevel === 'yellow' ? pLevel : 'green') as 'green' | 'yellow' | 'red',
+      hingeFail: (() => { try { return !!((hingeV as any)?.pass === false); } catch { return false; } })(),
+      shoulderFail: (() => { try { return !!((shoulderV as any)?.pass === false); } catch { return false; } })(),
+      ybtAsym: (() => { try { const a = (ybtV as any)?.asymCm; return typeof a === 'number' && Number.isFinite(a) && a > 4; } catch { return false; } })(),
+      ktwAsym: (() => { try { return String(asymText || '').includes('голеностоп'); } catch { return false; } })(),
+      asym: asymMax != null && asymMax >= 7,
+      teenBlocked: (() => { try { return !!teenGate.blocked; } catch { return false; } })(),
+      shoulderPain: state.pmLoc === 'shoulder' && (pLevel === 'yellow' || pLevel === 'red'),
+      rotGap: (() => { try { const g = (rotV as any)?.gap; return typeof g === 'number' && Number.isFinite(g) && g >= 10; } catch { return false; } })(),
+      cause: (cause ?? null) as 'volume' | 'activation' | 'recovery' | 'technique' | 'genetics' | null,
+      level, equipment: profileEquipment,
+    };
+  };
+
   const handleExport = () => {
     let causes: Record<string, unknown> = {};
     let spec: unknown = null;
@@ -1050,20 +1077,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         correctiveDetail: (() => { try {
           const det: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> = [];
           for (const z of report.weakZonesGranular.slice(0, 2)) {
-            const r = rankCorrectives({
-              zones: [z],
-              driver: (() => { try { const d = String((moveDriver as any)?.driver || ''); return d && d !== 'none' ? d : null; } catch { return null; } })(),
-              benchLevel: (() => { try { return String((benchV as any)?.level || '') || null; } catch { return null; } })(),
-              nheWeak: (() => { try { const l = String((nheV as any)?.level || ''); return l === 'weak' || l === 'very_weak'; } catch { return false; } })(),
-              addWeak: (() => { try { return String((adductorV as any)?.level || '') === 'weak'; } catch { return false; } })(),
-              erirLow: (() => { try { const r2 = (erIrV as any)?.ratio; return typeof r2 === 'number' && Number.isFinite(r2) && r2 < 0.75; } catch { return false; } })(),
-              painLevel: (() => { try { const l = String((painMon as any)?.verdict?.level || 'green'); return (l === 'red' || l === 'yellow' ? l : 'green') as any; } catch { return 'green' as any; } })(),
-              teenBlocked: (() => { try { return !!teenGate.blocked; } catch { return false; } })(),
-              shoulderPain: (() => { try { return state.pmLoc === 'shoulder' && ((painMon as any)?.verdict?.level === 'yellow' || (painMon as any)?.verdict?.level === 'red'); } catch { return false; } })(),
-              rotGap: (() => { try { const g = (rotV as any)?.gap; return typeof g === 'number' && Number.isFinite(g) && g >= 10; } catch { return false; } })(),
-              cause: (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(),
-              level,
-            })[0];
+            const r = rankCorrectives(corrSignalsFor(z, (causes as any)?.[z]?.cause))[0];
             if (!r) continue;
             const dose = correctiveDose(r.corr, (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(), {});
             det.push({ id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: r.corr.cues.slice(0, 3), source: r.corr.source });
@@ -1142,20 +1156,7 @@ export const BBDiagnosticsHub: React.FC = () => {
         correctiveDetail: (() => { try {
           const det: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> = [];
           for (const z of report.weakZonesGranular.slice(0, 2)) {
-            const r = rankCorrectives({
-              zones: [z],
-              driver: (() => { try { const d = String((moveDriver as any)?.driver || ''); return d && d !== 'none' ? d : null; } catch { return null; } })(),
-              benchLevel: (() => { try { return String((benchV as any)?.level || '') || null; } catch { return null; } })(),
-              nheWeak: (() => { try { const l = String((nheV as any)?.level || ''); return l === 'weak' || l === 'very_weak'; } catch { return false; } })(),
-              addWeak: (() => { try { return String((adductorV as any)?.level || '') === 'weak'; } catch { return false; } })(),
-              erirLow: (() => { try { const r2 = (erIrV as any)?.ratio; return typeof r2 === 'number' && Number.isFinite(r2) && r2 < 0.75; } catch { return false; } })(),
-              painLevel: (() => { try { const l = String((painMon as any)?.verdict?.level || 'green'); return (l === 'red' || l === 'yellow' ? l : 'green') as any; } catch { return 'green' as any; } })(),
-              teenBlocked: (() => { try { return !!teenGate.blocked; } catch { return false; } })(),
-              shoulderPain: (() => { try { return state.pmLoc === 'shoulder' && ((painMon as any)?.verdict?.level === 'yellow' || (painMon as any)?.verdict?.level === 'red'); } catch { return false; } })(),
-              rotGap: (() => { try { const g = (rotV as any)?.gap; return typeof g === 'number' && Number.isFinite(g) && g >= 10; } catch { return false; } })(),
-              cause: (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(),
-              level,
-            })[0];
+            const r = rankCorrectives(corrSignalsFor(z, (causes as any)?.[z]?.cause))[0];
             if (!r) continue;
             const dose = correctiveDose(r.corr, (() => { try { return (causes as any)?.[z]?.cause ?? null; } catch { return null; } })(), {});
             det.push({ id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: r.corr.cues.slice(0, 3), source: r.corr.source });
@@ -1318,35 +1319,12 @@ export const BBDiagnosticsHub: React.FC = () => {
     return out;
   }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, effSex, planAudit, bbPlan, profileEquipment]);
 
-  // PRO-CORR: библиотека коррекций — зона + причина + сигналы скринингов (жим/NHE/ER:IR/боль/шарнир/YBT).
+  // PRO-CORR: библиотека коррекций — зона + причина + сигналы скринингов (единый corrSignalsFor: паритет с экспортом/вставкой).
   const correctiveTopByZone = useMemo(() => {
     const out: Record<string, ReturnType<typeof rankCorrectives>> = {};
     for (const z of report.weakZonesGranular.slice(0, 2)) {
       try {
-        const asymMax = (() => { try { const vs = Object.entries(report.symmetry.ratios).filter(([k]) => k.endsWith('_asym')).map(([, vv]) => Number(vv)); return vs.length ? Math.max(...vs) : null; } catch { return null; } })();
-        const drv = (() => { try { return String((moveDriver as any)?.driver || ''); } catch { return ''; } })();
-        const nheWeak = (() => { try { const l = String((nheV as any)?.level || ''); return l === 'weak' || l === 'very_weak'; } catch { return false; } })();
-        const addWeak = (() => { try { const l = String((adductorV as any)?.level || ''); return l === 'weak'; } catch { return false; } })();
-        const erirLow = (() => { try { const r = (erIrV as any)?.ratio; return typeof r === 'number' && Number.isFinite(r) && r < 0.75; } catch { return false; } })();
-        const pMae: unknown = painMon;
-        const pLevel = (() => { try { return String((pMae as any)?.verdict?.level || 'green'); } catch { return 'green'; } })();
-        out[z] = rankCorrectives({
-          zones: [z],
-          driver: drv && drv !== 'none' ? drv : null,
-          benchLevel: (() => { try { return String((benchV as any)?.level || ''); } catch { return ''; } })() || null,
-          nheWeak, addWeak, erirLow,
-          painLevel: (pLevel === 'red' || pLevel === 'yellow' ? pLevel : 'green') as any,
-          hingeFail: (() => { try { return !!((hingeV as any)?.pass === false); } catch { return false; } })(),
-          shoulderFail: (() => { try { return !!((shoulderV as any)?.pass === false); } catch { return false; } })(),
-          ybtAsym: (() => { try { const a = Number((ybtV as any)?.asymCm); return Number.isFinite(a) && a > 4; } catch { return false; } })(),
-          ktwAsym: (() => { try { return String(asymText || '').includes('голеностоп'); } catch { return false; } })(),
-          asym: asymMax != null && asymMax >= 7,
-          teenBlocked: (() => { try { return !!teenGate.blocked; } catch { return false; } })(),
-          shoulderPain: state.pmLoc === 'shoulder' && (pLevel === 'yellow' || pLevel === 'red'),
-          rotGap: (() => { try { const g = (rotV as any)?.gap; return typeof g === 'number' && Number.isFinite(g) && g >= 10; } catch { return false; } })(),
-          cause: (() => { try { return (weakCauses as any)?.[z]?.cause ?? null; } catch { return null; } })(),
-          level, equipment: profileEquipment,
-        }).slice(0, 3);
+        out[z] = rankCorrectives(corrSignalsFor(z, (weakCauses as any)?.[z]?.cause)).slice(0, 3);
       } catch { out[z] = []; }
     }
     return out;
@@ -1860,7 +1838,11 @@ export const BBDiagnosticsHub: React.FC = () => {
                         <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.22)' }} data-bb="corrective-card" data-zone={z}>
                           <b style={{ color: '#00e68a', fontSize: 11 }}>🛠 Коррекция по скринингам (доза + техника)</b>
                           {correctiveTopByZone[z].slice(0, 2).map((r) => {
-                            const dose = (() => { try { return correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, {}); } catch { return null; } })();
+                            // П2: те же флаги, что вставка (readiness-red/жёлтая боль) — «показано = вставится».
+                            const dose = (() => { try { return correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, {
+                              readinessRed: (readiness as any)?.level === 'red',
+                              painYellow: (() => { try { return String((painMon as any)?.verdict?.level || '') === 'yellow'; } catch { return false; } })(),
+                            }); } catch { return null; } })();
                             return (
                               <div key={r.corr.id} style={{ marginTop: 6, fontSize: 10, lineHeight: 1.5, color: '#fff' }} data-bb="corrective-row" data-corr={r.corr.id}>
                                 <b style={{ color: '#fff' }}>{r.corr.title}</b>
