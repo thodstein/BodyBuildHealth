@@ -14,7 +14,7 @@
 > recipe-HV 5.5%, keto — дизайн 6% ккал). **Область 929/929 (88 файлов), полный 14406 passed /
 > 8 failed (все 5 файлов чужие предсуществующие), `tsc` 0.**
 >
-> **СТАТУС-3 (волна-3, коммит этой сессии)**: §Волна-3 закрыт кодом полностью.
+> **СТАТУС-3 (волна-3, коммиты `410235b9c` + гигиена)**: §Волна-3 закрыт кодом полностью.
 > 1) **Census pending-5**: `sea_urchin`/`abalone`/`ostrich_egg`/`berry_acai`/`fruit_durian` добавлены
 > в `EXOTIC_FOOD_IDS` + `SPECIALTY_POSITION_SUBSTITUTE` (tuna_steak/pollock/egg_whole/blueberries/banana),
 > `KNOWN_PENDING_LEAKS` пуст + регресс-лок в цензе. Каскад 5/5 вычинен кодом (числа было→стало):
@@ -29,6 +29,9 @@
 > не менялся.
 > 3) **A/B планов**: `planner-ab-compare` (снапшоты A/B в `he_nutrition_ab_v1`, diff КБЖУ/приёмов/
 > состава/заметок) + карточка «⚖️ A/B планов» в выдаче.
+> 4) **Гигиена**: условный `usePlanCtx()` в JSX Results заменён на деструктуризацию (React-warning
+> порядка хуков устранён). **Остаток (только с согласия)**: VARIETY P2-1 affinity, P2-3
+> deviation-бюджет, P2-4 template-rotate.
 > Тесты: область IndividualPlan **957/957 (91 файл)**, `tsc` 0, полный прогон **14445 passed / 8 failed
 > (5 чужих файлов: course-sync ×4, bb-macrocycle v7, annual-audit-fixes, pl-auto-regressions,
 > bb-diagnostics-max-pro female-symmetry) / 20 skipped**.

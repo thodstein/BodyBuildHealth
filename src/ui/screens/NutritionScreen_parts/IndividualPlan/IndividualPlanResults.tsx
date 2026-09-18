@@ -89,6 +89,7 @@ export const IndividualPlanResults: React.FC = () => {
     weightMode,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
+    combatNutrition, applyCombatNutrition,
     plannerMode,
     annualPhase,
     setErrorMsg,
@@ -756,14 +757,16 @@ const doImportPlan = (raw: string): boolean => {
           </div>
         );
       })()}
-      {generated && ((usePlanCtx() as any).combatNutrition) && (() => {
-        const ctx:any = usePlanCtx() as any;
-        const cn = ctx.combatNutrition as any;
+      {generated && combatNutrition && (() => {
+        // Гигиена (волна-3): условный `usePlanCtx()` внутри JSX ломал порядок хуков
+        // (React-warning «change in the order of Hooks»). combatNutrition/applyCombatNutrition
+        // берутся из безусловной деструктуризации наверху компонента.
+        const cn = combatNutrition as any;
         return (
           <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)', fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, display:'flex', flexWrap:'wrap', gap:6, alignItems:'center' }}
             title={cn.note || ''}>
             <span>🥊 План единоборств: {cn.kcal ? `${cn.kcal} ккал` : ''} {cn.proteinG ? `· P${cn.proteinG}` : ''} {cn.carbsG ? `· C${cn.carbsG}` : ''} {cn.fatG ? `· F${cn.fatG}` : ''} {cn.fiberG ? `· клетч ${cn.fiberG}г` : ''} {cn.waterMl ? `· 💧${cn.waterMl}мл` : ''} {cn.sodiumMg ? `· Na${cn.sodiumMg}мг` : ''} {cn.orsMmol ? `· ORS ${cn.orsMmol}` : ''} {cn.weighInType ? `· ${cn.weighInType==='same_day_2h'?'same-day':'24ч'}` : ''} {cn.planId ? `· #${String(cn.planId).slice(0,6)}` : ''}</span>
-            <button onClick={() => ctx.applyCombatNutrition?.()} style={{ marginLeft:'auto', padding:'4px 8px', borderRadius:6, background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.28)', color:'#d8b4fe', fontSize:9, fontWeight:700, cursor:'pointer' }}>⚡ Применить к плану</button>
+            <button onClick={() => applyCombatNutrition?.()} style={{ marginLeft:'auto', padding:'4px 8px', borderRadius:6, background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.28)', color:'#d8b4fe', fontSize:9, fontWeight:700, cursor:'pointer' }}>⚡ Применить к плану</button>
             <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }} title={cn.note || ''}>{cn.note ? String(cn.note).slice(0,80) : ''}</span>
           </div>
         );

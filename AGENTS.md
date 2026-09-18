@@ -1,6 +1,6 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Питание волна-3: census pending-5 закрыт кодом + карточка «почему день не сошёлся» + A/B планов (Sep 17 2026, коммит pathspec, без пуша)
+## Питание волна-3: census pending-5 закрыт кодом + карточка «почему день не сошёлся» + A/B планов + гигиена хуков (Sep 17 2026, коммиты pathspec `410235b9c` + этот, без пуша)
 
 По команде «Продолжаем питание волной-3 по docs/NUTRITION-REALISM-REBASELINE-PLAN.md (§Волна-3)» закрыты все три пункта. Правила соблюдены: только Edit/Write (без PowerShell-перезаписи), после скриптов перечитывание, чужие файлы не тронуты, коммит строго `git commit -m … -- <свои файлы>`, НЕ пушил, zz-пробы удалены до коммита.
 
@@ -15,10 +15,11 @@
   - Числа пробы каскада сходятся с планом §Волна-3 1-в-1 (757.5/0.6206/263.3) — источник деградации подтверждён (egg_whole-квота/снап и сдвиг seeded-пулов; `duck_egg`-проба давала байт-в-байт legacy).
 - **2) UI «🧭 Почему день не сошёлся»** (без правок движка): NEW `planner-day-explain.ts` — чистая классификация `notes` (14 правил: причины «Не сошлось»/«Корректор…»/<60%/перегрузка/перекос, компенсации добор/дотяжка/болюс-ужим/фрукт-кап/перекус-белок, проверки MPS-gap/натрий/клетчатка) + `dayDeviationPct` (макс по 4 осям, приоритет `plan.deviationPct`); карточка в `IndividualPlanResults` (заголовок честный: причины важнее расчётной девиации; `data-bitexplain`/`-cause`/`-fixes`/`-checks`, 44px-строки, без серого).
 - **3) A/B планов**: NEW `planner-ab-compare.ts` — `snapshotFromDayPlan`/`saveAbSnapshot`/`loadAbSnapshots`/`removeAbSnapshot` (ключ `he_nutrition_ab_v1`, слоты A/B, битый сторедж → пусто) + `diffAbSnapshots` (дельты КБЖУ+клетчатки с % , приёмы по подписи с Δ и +/− позиций, состав added/removed, заметки +/−, честная сводка «макросы совпали»); карточка «⚖️ A/B планов» в выдаче (📸 В A/B, ⇄ Сравнить, ✕ слот, diff-таблица `data-ab`).
+- **4) Гигиена (этот раунд)**: React-warning «change in the order of Hooks called by IndividualPlanResults» (предсуществующий; ловился и на нетронутых тестах) — условный `usePlanCtx()` внутри JSX блока «🥊 План единоборств» заменён на `combatNutrition`/`applyCombatNutrition` из безусловной деструктуризации наверху; warning больше не воспроизводится (`planner-recipe-mode-e2e` + `planner-wave3-ui` чистые).
 - **Проверено**: область IndividualPlan **957/957 (91 файл)** (база 929 + новые: ценз 5, day-explain 13, ab-compare 9, wave3-ui 2, прочие); `tsc --noEmit` с `NODE_OPTIONS=--max-old-space-size=12288` — **0 по всему проекту**; `verify:apk-design` OK.
 - **Полный прогон (14473 теста, 1111 файлов): 14445 passed / 8 failed / 20 skipped** — карта падений: `course-sync` ×4, `bb-macrocycle` v7 (`null для v != 7`), `annual-audit-fixes-2026-08` (размер года 52 нед), `pl-auto-regressions` (catalog aliases), `bb-diagnostics-max-pro` female-symmetry — **все 5 файлов чужие/предсуществующие** (изоляция: те же 2 файла падают и вне моего диффа; `bb-auto-smoke` — флейк параллельного прогона, изолированно 8/8); моих падений 0.
-- **Замечено (чужое, не чинил)**: React-warning «change in the order of Hooks called by IndividualPlanResults» — предсуществующий (воспроизводится на нетронутом `planner-recipe-mode-e2e`) из-за условного `usePlanCtx()` в JSX Results; мои новые хуки A/B — безусловные на верхнем уровне.
-- Файлы: MOD `food-availability.ts`, `meal-plan-engine.ts` (P5b/P6/P7 + перенос фрукт-капа), `planner-recipe-mode.ts` (перекус-белок), `IndividualPlanResults.tsx`, `planner-id-census.test.ts`, доки; NEW `planner-day-explain.ts`, `planner-ab-compare.ts`, 3 теста. НЕ ПУШИЛ.
+- **Остаток волны**: §Волна-3 п.4 — VARIETY P2-1 (affinity-матрица), P2-3 (deviation-бюджет), P2-4 (template-rotate) — **«только с согласия»** (нужно решение пользователя, не дефекты).
+- Файлы: MOD `food-availability.ts`, `meal-plan-engine.ts` (P5b/P6/P7 + перенос фрукт-капа), `planner-recipe-mode.ts` (перекус-белок), `IndividualPlanResults.tsx` (карточки + гигиена хуков), `planner-id-census.test.ts`, доки; NEW `planner-day-explain.ts`, `planner-ab-compare.ts`, 3 теста. НЕ ПУШИЛ.
 
 ## Женские проблемы на курсе: P3-«диспансер женщины на курсе» — добор (Sep 17 2026, коммит pathspec, без пуша)
 
