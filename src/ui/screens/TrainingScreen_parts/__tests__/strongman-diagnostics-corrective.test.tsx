@@ -113,6 +113,19 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
     fireEvent.click(screen.getByText('Новичок'));
     expect(screen.getByText('Новичок').getAttribute('aria-pressed')).toBe('true');
     expect(localStorage.getItem('he_strongman_diagnostics_hub_v1')).toContain('corrLevel');
+    const applyBtn = await screen.findByText(/Коррекцию в Стронг/);
+    fireEvent.click(applyBtn);
+    await waitFor(() => expect(document.body.textContent).toContain('Применено'), { timeout: 2000 });
+    expect(localStorage.getItem('he_planner_apply')).toContain('smCorrEquipment');
+  });
+  it('O1: фильтр без совпадений — честная нота вместо пустой карточки', async () => {
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
+    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    await waitFor(() => expect(document.body.querySelector('[data-sm="corr-row"]')).toBeTruthy());
+    fireEvent.click(screen.getByText('Свой вес'));
+    await waitFor(() => expect(document.body.querySelector('[data-sm="corr-empty-phase"]')).toBeTruthy());
+    expect(document.body.textContent).toContain('ослабь фильтры');
   });
   it('C5: асимметрия + grip-фаза → мост несёт smUnilateral', async () => {
     localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ gripWeak: ['grip'], leftMax: '100', rightMax: '90' }));

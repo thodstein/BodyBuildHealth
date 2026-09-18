@@ -1110,6 +1110,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       correctiveBlock: smCorrBlock,
       // SM-C3: ⭐ + причины + детальные строки (мост как TA-C9: trim/дедуп/кап в приёмнике)
       smPreferredCorr: Object.keys(smPrefCorr).length ? smPrefCorr : null,
+      // O2: фильтры зала хаба — приёмник отдаёт им приоритет над своими (показано = вставится)
+      smCorrEquipment: state.corrEquipment.length ? state.corrEquipment : null,
       smWeakCauses: Object.keys(smCauseByPhase).length ? smCauseByPhase : null,
       smCorrectiveDetail: smCorrSession.length ? smCorrSession.map((c) => `${c.target} — ${c.protocolAdj.sets}×${c.protocolAdj.reps} @${c.protocolAdj.pct}% · ${c.cues[0]}`.slice(0, 160)).slice(0, 9) : null,
       // SM-C5 + movement P6: слабая сторона при асимметрии ≥7% — хват (grip L/R)
@@ -1986,6 +1988,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               return (
                 <div key={wp as string} data-sm="corr-card" style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', borderLeft:'3px solid #f59e0b', marginBottom:8 }}>
                   <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{wp as string} <span style={{ color:'#f5b04c', fontWeight:600 }}>· {cause ? `причина: ${cause}` : 'причина: техника (данных мало)'}</span></div>
+                  {tops.length === 0 && (
+                    <div data-sm="corr-empty-phase" style={{ fontSize:12, color:'#fff', marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.20)' }}>Под фильтры (зал/уровень) ничего не подошло — ослабь фильтры выше.</div>
+                  )}
                   {tops.map((c) => (
                     <div key={c.id} data-sm="corr-row" style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
                       <div style={{ fontSize:13, fontWeight:800, color:'#fff', display:'flex', alignItems:'center', gap:8 }}>

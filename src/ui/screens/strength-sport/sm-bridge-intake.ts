@@ -81,6 +81,8 @@ export interface SmBridgePatch {
   smUnilateral: Record<string, string> | null;
   /** SM-C6: понедельные сеты волны коррекции или null. */
   smWaveSets: number[] | null;
+  /** O2: фильтры зала хаба (таб Коррекция) — приёмник отдаёт им приоритет. */
+  smCorrEquipment: string[] | null;
   /** J7 орто-скрининг: заблокированные паттерны (orthopedic.blockedPatterns + orthoGuards.blockedPatterns). */
   orthoBlocked: string[];
   /** J7: mobility-merge (только ключи MOBILITY_RU). */
@@ -187,6 +189,20 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
   // SM-C3: то же для СМ-хаба (библиотечные sm_* id + причины + детальные строки).
   const smPreferredCorr = strRecord((d as any).smPreferredCorr);
   const smWeakCauses = strRecord((d as any).smWeakCauses);
+  // O2: фильтры зала хаба — строки ≤20, lower, кап 7, дедуп; мусор — null.
+  let smCorrEquipment: string[] | null = null;
+  try {
+    const raw = (d as any).smCorrEquipment;
+    if (Array.isArray(raw)) {
+      const clean = Array.from(new Set(
+        (raw as unknown[])
+          .map((x) => String(x ?? '').trim().toLowerCase())
+          .filter((s) => s.length > 0 && s.length <= 20)
+          .map((s) => s.slice(0, 20)),
+      )).slice(0, 7);
+      if (clean.length > 0) smCorrEquipment = clean;
+    }
+  } catch { /* noop */ }
   // SM-C5: слабая сторона — только 'left'/'right', кап 4.
   let smUnilateral: Record<string, string> | null = null;
   try {
@@ -307,6 +323,7 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     smCorrectiveDetail,
     smUnilateral,
     smWaveSets,
+    smCorrEquipment,
     orthoBlocked,
     orthoMobility,
     orthoYokeGate,

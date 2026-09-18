@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import React from 'react';
-import { parseSmBridgePayload, collectSsVelocityHistory, buildSpecProtocols } from '../sm-bridge-intake';
+import { parseSmBridgePayload, collectSsVelocityHistory, buildSpecProtocols, buildSMSpecProtocols } from '../sm-bridge-intake';
 import { buildStrengthSportPlan } from '../../../../engines/strength-sport/strength-sport-builder.engine';
 import { StrengthSportConstructor } from '../StrengthSportConstructor';
 
@@ -74,6 +74,20 @@ describe('parseSmBridgePayload', () => {
     // Без слабых — пусто, без паники
     expect(buildSpecProtocols([], null, null)).toEqual({});
     expect(parseSmBridgePayload({}).taSpecTargets).toBeNull();
+  });
+
+  it('O2: smCorrEquipment санитизируется (lower/trim/кап 7, мусор — null)', () => {
+    expect(parseSmBridgePayload({}).smCorrEquipment).toBeNull();
+    expect(parseSmBridgePayload({ smCorrEquipment: ['Barbell ', 'DUMBBELL', '', 42, 'barbell'] }).smCorrEquipment).toEqual(['barbell', 'dumbbell', '42']);
+    expect(parseSmBridgePayload({ smCorrEquipment: 'barbell' }).smCorrEquipment).toBeNull();
+  });
+
+  it('O2: фильтры хаба переключают protocols с библиотечной дозы на ранжир (C10-гейт)', () => {
+    const noF = buildSMSpecProtocols(['log_dip'], { log_dip: 'sm_log_dip_tech' }, { log_dip: 'technique' });
+    expect(noF.log_dip).toEqual({ sets: 4, reps: 3, pct: 60 });
+    const hubF = buildSMSpecProtocols(['log_dip'], { log_dip: 'sm_log_dip_tech' }, { log_dip: 'technique' }, ['barbell'], []);
+    expect(hubF.log_dip).toEqual({ sets: 3, reps: 5, pct: 70 });
+    expect(hubF.log_dip).not.toEqual(noF.log_dip);
   });
 
   it('C9: taCorrectiveDetail санитизируется (кап 9, trim, мусор — null)', () => {
@@ -170,6 +184,7 @@ describe('parseSmBridgePayload', () => {
       smCorrectiveDetail: null,
       smUnilateral: null,
       smWaveSets: null, // чужое поле SM-агента (синк пустого патча; правит/коммитит владелец)
+      smCorrEquipment: null,
       orthoBlocked: [],
       orthoMobility: [],
       orthoYokeGate: false,

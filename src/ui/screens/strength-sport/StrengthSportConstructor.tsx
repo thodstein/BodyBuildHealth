@@ -267,8 +267,10 @@ export const StrengthSportConstructor: React.FC = () => {
       if (isSM || mode === 'strongman') {
         // SM-C3: ⭐ хаба + дозы карточек — в инъекцию (без ⭐ — legacy-путь 1-в-1)
         // SM-C5: + слабая сторона grip-фаз.
+        // O2: фильтры зала хаба (smCorrEquipment) приоритетнее своих — показано = вставится.
         const smTb = taBridge as any;
-        const smProtos = buildSMSpecProtocols(weakPoints, smTb?.smPrefCorr ?? null, smTb?.smWeakCauses ?? null, equipment, mobility);
+        const smHubEquip = Array.isArray(smTb?.smCorrEquipment) && smTb.smCorrEquipment.length ? smTb.smCorrEquipment : null;
+        const smProtos = buildSMSpecProtocols(weakPoints, smTb?.smPrefCorr ?? null, smTb?.smWeakCauses ?? null, smHubEquip ?? equipment, mobility);
         const inj = injectSMWeakPoints(p, weakPoints as any, { workMax: p.workMax, preferredCorr: smTb?.smPrefCorr ?? {}, protocols: smProtos, unilateralBoost: smTb?.smUnilateral ?? {} } as any);
         if (inj.injected > 0) p.rationale = inj.plan.rationale;
         p = inj.plan;
@@ -435,7 +437,9 @@ export const StrengthSportConstructor: React.FC = () => {
     let r;
     try {
       const weekIdxs = (plan.weeksData || []).map((_: any, i: number) => i).filter((i: number) => !(plan.weeksData[i] as any)?.deload);
-      const protocols = buildSMSpecProtocols(weakPoints, smTb?.smPrefCorr ?? null, smTb?.smWeakCauses ?? null, equipment, mobility);
+      // O2: фильтры зала хаба приоритетнее своих (см. авто-путь выше).
+      const hubEquip = Array.isArray(smTb?.smCorrEquipment) && smTb.smCorrEquipment.length ? smTb.smCorrEquipment : null;
+      const protocols = buildSMSpecProtocols(weakPoints, smTb?.smPrefCorr ?? null, smTb?.smWeakCauses ?? null, hubEquip ?? equipment, mobility);
       // SM-C6: понедельные сеты волны хаба (позиция среди рабочих недель → сеты 3-3-4-4…).
       const waveArr: number[] | null = smTb?.smWaveSets ?? null;
       const targetSetsByWeek: Record<number, Record<string, number>> = {};
