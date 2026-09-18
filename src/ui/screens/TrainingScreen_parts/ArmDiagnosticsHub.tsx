@@ -31,6 +31,8 @@ import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections'
 import { auditArmPlan, worstArmPoint } from '../../../engines/arm/arm-plan-audit.engine';
 import { diagnoseArmWeakCause } from '../../../engines/arm/arm-weak-cause.engine';
 import { rankCorrectionsForArm } from '../../../engines/arm/arm-correction-rank.engine';
+import { doseLabel } from '../../../engines/arm/arm-correction-dose.engine';
+import { doseForCauseV2, roleLabel, preventiveFor, shouldUseDoseV2 } from '../../../engines/arm/arm-correction-pro2.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
 import { buildArmSpecBlock } from '../../../engines/arm/arm-spec-block.engine';
 import { injectArmCorrections, saveArmPlanPrev, loadArmPlanPrev, clearArmPlanPrev } from '../../../engines/arm/arm-diagnostics-injection.engine';
@@ -910,10 +912,29 @@ export const ArmDiagnosticsHub: React.FC = () => {
         const card = ((diag as any).biomechCards || []).find((c: any) => c.weakPoint === wp);
         const cause = (armCausesP0 as any)[wp];
         const top = ((armTop3P0 as any)[wp] || []).map((t: any) => ({ id: t.id, score: t.score }));
+        const topId = top.length ? String(top[0].id) : null;
+        // E1: доза v2 теми же флагами, что инъекция (tendon авто + волна из corrWave)
+        const tendonOv = (() => { try { return Number((tendonAcwr as any)?.ratio) >= 1.3; } catch { return false; } })();
+        const wSel = parseInt(String((state as any).corrWave || ''), 10);
+        const waveW = Number.isFinite(wSel) && wSel >= 1 && wSel <= 3 ? wSel : null;
+        let doseStr: string | undefined;
+        try {
+          const c = cause && typeof cause.cause === 'string' ? cause.cause : null;
+          const d = shouldUseDoseV2(c, state.level, { tendonOverload: tendonOv })
+            ? doseForCauseV2(wp, c, { level: state.level, tendonOverload: tendonOv })
+            : null;
+          if (d) doseStr = doseLabel(d);
+        } catch { /* noop */ }
+        let prevStr: string | undefined;
+        try { const p = preventiveFor(wp); if (p) prevStr = `${p.id} (${p.label})`; } catch { /* noop */ }
         let sim: string | undefined;
         try {
           const cs: Record<string, any> = cause && typeof cause.cause === 'string' ? { [wp]: cause.cause } : {};
-          sim = simulateArmInjection(armPlan as any, wp, null, Object.keys(cs).length ? { causes: cs } : undefined)?.summary;
+          const simOpts: Record<string, any> = { level: state.level };
+          if (Object.keys(cs).length) simOpts.causes = cs;
+          if (tendonOv) simOpts.tendonOverload = true;
+          if (waveW != null) simOpts.waveWeek = waveW;
+          sim = simulateArmInjection(armPlan as any, wp, null, simOpts)?.summary;
         } catch { /* noop */ }
         let spec1: number | undefined;
         try { spec1 = armSpecP0?.weeks[0]?.targetSets[wp]; } catch { /* noop */ }
@@ -925,6 +946,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
           cause: cause ? `${cause.cause} (${Math.round(cause.confidence * 100)}%)` : undefined,
           causeFix: cause?.fix,
           topCorrections: top,
+          doseLabel: doseStr,
+          topRole: topId ? roleLabel(topId) : undefined,
+          preventive: prevStr,
           simDelta: sim,
           specSetsWeek1: spec1,
         };

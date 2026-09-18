@@ -8,7 +8,7 @@ import React from 'react';
 import { ARM_BIOMECH, type ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ARM_CORRECTIONS, correctionForWeakPoint } from '../../../engines/arm/arm-weakpoint-corrections';
 import { doseForCause, doseLabel } from '../../../engines/arm/arm-correction-dose.engine';
-import { roleLabel, preventiveFor, drillsForPhase, correctiveWaveForWeek } from '../../../engines/arm/arm-correction-pro2.engine';
+import { roleLabel, preventiveFor, drillsForPhase, correctiveWaveForWeek, doseForCauseV2, shouldUseDoseV2 } from '../../../engines/arm/arm-correction-pro2.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
 import { suggestWeakPointsForTrack } from '../../../engines/arm/arm-video-analysis.engine';
 import { AdSec, AdBtn, AdBanner } from './arm-design-system';
@@ -35,7 +35,7 @@ export function HubCorrectionTab({ H }: { H: any }) {
   const {
     state, setState, report, diag, armCausesP0, armTop3P0, armSpecP0,
     handleInjectP0, hasInjectPrev, handleRollbackP0, injectMsg,
-    toggleWeakPoint, trackType, autoPoint, mvPhase,
+    toggleWeakPoint, trackType, autoPoint, mvPhase, corrV2,
   } = H;
   const weakPoints: ArmWeakPoint[] = Array.isArray(state?.weakPoints) && state.weakPoints.length
     ? state.weakPoints
@@ -152,7 +152,12 @@ export function HubCorrectionTab({ H }: { H: any }) {
                 💊 Доза базы: {baseDoseLabel(wp)} · группа {corr?.substitutionGroup || '—'} → {corr?.dayTags?.[0] || '—'}
               </div>
               {(() => {
-                const adj = cause ? doseForCause(wp, cause.cause) : null;
+                // E3: показанная доза = вставляемая (v2 с флагами инъекции; без — v1 как раньше)
+                const c = cause ? cause.cause : null;
+                const useV2 = shouldUseDoseV2(c, (state as any)?.level, { tendonOverload: !!(corrV2 as any)?.tendonOverload });
+                const adj = useV2
+                  ? doseForCauseV2(wp, c, { level: (state as any)?.level, tendonOverload: !!(corrV2 as any)?.tendonOverload })
+                  : (cause ? doseForCause(wp, cause.cause) : null);
                 return adj && adj.adjusted ? (
                   <div className="ad-tip" data-arm="correction-dose-cause">📐 Доза по причине ({cause.cause}): {doseLabel(adj)}</div>
                 ) : null;

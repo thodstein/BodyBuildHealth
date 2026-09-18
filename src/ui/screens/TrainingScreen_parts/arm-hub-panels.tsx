@@ -177,7 +177,7 @@ const RED_FLAGS: Array<{ id: string; label: string }> = [
 ];
 
 export function HubP0Panel({ H }: { H: any }) {
-  const { state, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0, diaryTrendsP0, diarySuggestP0, toggleWeakPoint, handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0, injectMsg, criticalSideP0, specWeeks, setSpecWeeks, armPlan, setTab } = H;
+  const { state, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0, diaryTrendsP0, diarySuggestP0, toggleWeakPoint, handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0, injectMsg, criticalSideP0, specWeeks, setSpecWeeks, armPlan, setTab, corrV2 } = H;
   // PRO-3 P4: red-flags в персисте (he_arm_diag_redflags), а не только в useState
   const [redFlags, setRedFlags] = React.useState<string[]>(() => { try { return loadRedFlags(); } catch { return []; } });
   const toggleRed = (id: string) => setRedFlags((p) => {
@@ -216,7 +216,12 @@ export function HubP0Panel({ H }: { H: any }) {
               const sim = (() => {
                 try {
                   const cs: Record<string, any> = cause && typeof cause.cause === 'string' ? { [wp]: cause.cause } : {};
-                  return simulateArmInjection(armPlan as any, wp, null, Object.keys(cs).length ? { causes: cs } : undefined);
+                  // E2: те же флаги, что инъекция и таб (паритет Δ везде)
+                  const simOpts: Record<string, any> = { level: (state as any)?.level };
+                  if (Object.keys(cs).length) simOpts.causes = cs;
+                  if ((corrV2 as any)?.tendonOverload) simOpts.tendonOverload = true;
+                  if ((corrV2 as any)?.waveWeek != null) simOpts.waveWeek = (corrV2 as any).waveWeek;
+                  return simulateArmInjection(armPlan as any, wp, null, simOpts);
                 } catch { return null; }
               })();
               return (
