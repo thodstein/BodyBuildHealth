@@ -37,10 +37,10 @@ export const CARD: React.CSSProperties = {
   background: GLASS_BG,
   border: `0.5px solid ${GLASS_BORDER}`,
   borderRadius: RADIUS_LG,
-  padding: 16,
+  padding: 12,
   display: 'flex',
   flexDirection: 'column',
-  gap: 12,
+  gap: 8,
   boxShadow: GLASS_SHADOW,
   backdropFilter: VIBRANCY,
   WebkitBackdropFilter: VIBRANCY,
@@ -61,12 +61,12 @@ export const CARD_HERO: React.CSSProperties = {
   background: 'rgba(44,44,46,0.84)',
   borderColor: 'rgba(84,84,88,0.32)',
   boxShadow: '0 4px 24px rgba(0,0,0,0.32), 0 1px 3px rgba(0,0,0,0.24)',
-  padding: 18,
-  gap: 14,
+  padding: 12,
+  gap: 8,
 };
 
-export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontFamily: SF };
-export const COL: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 10, fontFamily: SF };
+export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontFamily: SF };
+export const COL: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8, fontFamily: SF };
 
 export const LABEL: React.CSSProperties = {
   fontSize: 11, color: TEXT_2, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.06 * 11, lineHeight: 1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6,
@@ -207,7 +207,7 @@ export const SectionCard: React.FC<{
           }}>{icon}</span>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_1, letterSpacing: -0.02 * 15, fontFamily: SF }}>{title}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: TEXT_1, letterSpacing: -0.02 * 14, fontFamily: SF }}>{title}</div>
           {subtitle && <div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 1, lineHeight: 1.35 }}>{subtitle}</div>}
         </div>
         {right}

@@ -2185,3 +2185,31 @@
 :is(.train-armdiag) .ad-volbar {
   margin: 6px 0;
 }
+
+/* ── PLANNERS-STRUCTURE-PRO P2: плотный каркас арм-конструктора ──
+ * Гасим второй слой отступов: инлайн planner-ui — единственный источник.
+ * Корень — gap 8 вместо stacked marginTop; скрытое = null (пустот нет). */
+:is(.train-arm) .ad-wrap.planner-root {
+  gap: 8px;
+}
+:is(.train-arm) .ad-card {
+  padding: 10px 12px;
+  margin: 0 0 8px;
+}
+:is(.train-arm) .ad-sec {
+  padding: 10px 12px;
+  margin-top: 0;
+}
+:is(.train-arm) .ad-sec-t {
+  margin: 0 0 6px;
+}
+:is(.train-arm) .ad-stepview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+:is(.train-arm) .ad-cta {
+  position: static;
+  padding: 0;
+  margin: 2px 0 0;
+}

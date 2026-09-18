@@ -681,7 +681,7 @@ export const StrengthSportConstructor: React.FC = () => {
   const qualitySummary = weakPoints.length ? `Слабые: ${weakPoints.length}` : injuries.length ? `Травмы: ${injuries.length}` : equipment.length ? `Инвентарь: ${equipment.length}` : 'проверки по плану';
 
   return (
-    <div className={isNativeApp() ? 'train-strong ss-apk' : 'train-strong'} data-ss="root" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 880, margin: '0 auto' }}>
+    <div className={isNativeApp() ? 'train-strong ss-apk' : 'train-strong'} data-ss="root" style={{ padding: '0 10px 90px', display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 880, margin: '0 auto' }}>
       <style>{`input[type="range"]{ -webkit-appearance:none; appearance:none; height:8px; border-radius:999px; background:rgba(255,255,255,0.10); border:0.5px solid rgba(255,255,255,0.06); }
         input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background:${mode === 'strongman' ? '#f59e0b' : mode === 'hybrid' ? '#0ea5e9' : '#00e68a'}; border:3px solid #fff; box-shadow:0 2px 12px rgba(0,0,0,0.30), 0 0 0 5px ${mode === 'strongman' ? 'rgba(245,158,11,0.15)' : mode === 'hybrid' ? 'rgba(14,165,233,0.15)' : 'rgba(0,230,138,0.15)'}; cursor:pointer; }
         input[type="range"]::-moz-range-thumb{ width:22px; height:22px; border-radius:50%; background:${mode === 'strongman' ? '#f59e0b' : mode === 'hybrid' ? '#0ea5e9' : '#00e68a'}; border:3px solid #fff; box-shadow:0 2px 12px rgba(0,0,0,0.30); cursor:pointer; }
@@ -719,7 +719,7 @@ export const StrengthSportConstructor: React.FC = () => {
 
       {/* Mobile lazy: только активный шаг монтируется (step==='params' &&) — 1/4 DOM, 60% меньше памяти на мобильном, как CardioUI */}
       {step === 'params' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <SectionCard icon="🎯" title="Режим и цель" subtitle="Подбирает сплит, тоннаж и % зоны" summary={`${ruLabel(MODE_RU, mode)} · ${ruLabel(GOAL_RU, goal)} · ${ruLabel(LEVEL_RU, level)} · ${weeks}н × ${days}дн`}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
               <StrengthPopupSelect label="Режим" value={mode} onChange={v=> setMode(v as any)} strong={mode==='strongman'} options={[
@@ -773,7 +773,7 @@ export const StrengthSportConstructor: React.FC = () => {
       )}
 
       {step === 'athlete' && (
-        <div className="ss-pane" data-pane="athlete" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="ss-pane" data-pane="athlete" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <SectionCard icon="👤" title="Атлет" subtitle="Вес и возраст — % от ПМ и SINCLAIR" summary={athleteSummary}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
               <StrengthPopupSelect label="Пол" value={sex} onChange={v=> setSex(v as any)} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} />
@@ -890,7 +890,7 @@ export const StrengthSportConstructor: React.FC = () => {
       )}
 
       {step === 'outside' && (
-        <div style={{ display:'flex', flexDirection:'column', gap: 10 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap: 8 }}>
           <SectionCard icon="🏃" title="Вне зала — поле / кроссфит" subtitle="ACWR и объём зала ×" accent={outsideEnabled}>
             <GroupHeading icon="📊" text="Нагрузка вне зала" desc="Поле, кроссфит, GPP — декремент объёма зала" />
             <label style={{ display:'flex', gap:8, alignItems:'center', fontSize:13, color:'#fff', fontWeight:700, background: outsideEnabled ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.03)', padding:'11px 12px', borderRadius:12, border:`1px solid ${outsideEnabled?'rgba(48,209,88,0.22)':'rgba(255,255,255,0.06)'}`, cursor:'pointer', fontFamily: '-apple-system, system-ui, sans-serif' }}>
@@ -915,7 +915,7 @@ export const StrengthSportConstructor: React.FC = () => {
       )}
 
       {step === 'split' && (
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap: 8 }}>
           <SectionCard icon="✨" title="Рекомендация" subtitle="Подбор сплита по режиму · дням · уровню" accent collapsible defaultOpen={false} summary={patternId ? `Выбран: ${STRENGTH_SPORT_PATTERNS.find(p=>p.id===patternId)?.name}` : recommendStrengthSportPattern(mode, days, level).name} status="ok">
             <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
               <span style={{ fontSize:12, color: '#fff' }}>Рекомендуем:</span><Highlight color={modeColor}>{recommendStrengthSportPattern(mode, days, level).name}</Highlight>
@@ -1083,7 +1083,7 @@ export const StrengthSportConstructor: React.FC = () => {
       )}
 
       {step === 'quality' && (
-        <div className="ss-pane" data-pane="quality" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="ss-pane" data-pane="quality" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <SectionCard icon="🎯" title="Слабые точки" subtitle="Объём ×1.15 на выбранные зоны" summary={weakPoints.length ? `Выбрано: ${weakPoints.length}/2` : 'не выбраны — план сбалансирован'} status={weakPoints.length ? 'ok' : undefined}>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {Object.entries(WL_WEAKPOINT_LABELS).slice(0,8).map(([k,label])=> (
@@ -1141,7 +1141,7 @@ export const StrengthSportConstructor: React.FC = () => {
       )}
 
       {step === 'export' && (
-        <div className="ss-pane" data-pane="export" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="ss-pane" data-pane="export" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {!plan && !annual && (
             <SectionCard icon="📤" title="Пока пусто" subtitle="Соберите план — откроются файлы, печать и год">
               <div style={{ fontSize:14, color:'#fff', textAlign:'center', lineHeight:1.55 }}>Выдача строится после сборки плана на шаге «5 План».</div>

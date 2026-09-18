@@ -37,10 +37,10 @@ export const CARD: React.CSSProperties = {
   background: GLASS_BG,
   border: `0.5px solid ${GLASS_BORDER}`,
   borderRadius: RADIUS_LG,
-  padding: 14,
+  padding: 12,
   display: 'flex',
   flexDirection: 'column',
-  gap: 10,
+  gap: 8,
   boxShadow: GLASS_SHADOW,
   backdropFilter: VIBRANCY,
   WebkitBackdropFilter: VIBRANCY,
@@ -59,11 +59,11 @@ export const CARD_HERO: React.CSSProperties = {
   background: 'rgba(44,44,46,0.84)',
   borderColor: 'rgba(84,84,88,0.32)',
   boxShadow: '0 4px 24px rgba(0,0,0,0.32), 0 1px 3px rgba(0,0,0,0.24)',
-  padding: 14,
-  gap: 10,
+  padding: 12,
+  gap: 8,
 };
-export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontFamily: SF };
-export const COL: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 10, fontFamily: SF };
+export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontFamily: SF };
+export const COL: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8, fontFamily: SF };
 export const LABEL: React.CSSProperties = {
   fontSize: 11, color: TEXT_2, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.06 * 11, lineHeight: 1, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6,
 };
@@ -183,15 +183,15 @@ export const SectionCard: React.FC<{
     <div style={{ ...ROW, marginBottom: collapsible ? 0 : 4 }}>
       {icon && (
         <span style={{
-          width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 30, height: 30, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: strong ? ACCENT_GRAD_STRONG : accent ? ACCENT_GRAD : 'rgba(58,58,60,0.72)', border: `0.5px solid ${strong ? STRONG_BORDER : accent ? ACCENT_BORDER : SEPARATOR}`,
-          fontSize: 17, flexShrink: 0, fontFamily: SF, color: strong || accent ? '#fff' : TEXT_1,
+          fontSize: 15, flexShrink: 0, fontFamily: SF, color: strong || accent ? '#fff' : TEXT_1,
           boxShadow: strong ? '0 4px 14px rgba(245,158,11,0.30)' : accent ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
         }}>{icon}</span>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 17, fontWeight: 700, color: TEXT_1, letterSpacing: -0.02 * 17, fontFamily: SF, lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 8 }}>{dot}{title}</div>
-        {(!collapsible || open) && subtitle && <div style={{ fontSize: 13, color: TEXT_2, fontFamily: SF, marginTop: 2, lineHeight: 1.4 }}>{subtitle}</div>}
+        <div style={{ fontSize: 14, fontWeight: 700, color: TEXT_1, letterSpacing: -0.02 * 14, fontFamily: SF, lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 8 }}>{dot}{title}</div>
+        {(!collapsible || open) && subtitle && <div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 2, lineHeight: 1.4 }}>{subtitle}</div>}
         {collapsible && !open && summary != null && <div className="ss-sec-sum" style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 2, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>{summary}</div>}
       </div>
       {collapsible && (
@@ -207,7 +207,7 @@ export const SectionCard: React.FC<{
   return (
     <div className="kit-section" data-ss={strong ? 'section-strong' : 'section'} style={strong ? CARD_STRONG : accent ? CARD_ACCENT : CARD} id={id}>
       {collapsible ? (
-        <button type="button" className="ss-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer', textAlign: 'left', minHeight: 52, display: 'block', fontFamily: SF, WebkitTapHighlightColor: 'transparent' }}>{head}</button>
+        <button type="button" className="ss-sec-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer', textAlign: 'left', minHeight: 44, display: 'block', fontFamily: SF, WebkitTapHighlightColor: 'transparent' }}>{head}</button>
       ) : head}
       <div className="ss-sec-body" data-open={open} style={collapsible ? { display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', opacity: open ? 1 : 0, transition: 'grid-template-rows 0.28s ease, opacity 0.2s ease' } : undefined}>
         <div style={collapsible ? { minHeight: 0, overflow: 'hidden' } : undefined}>

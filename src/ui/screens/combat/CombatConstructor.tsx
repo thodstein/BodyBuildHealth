@@ -92,7 +92,7 @@ const CbSec: React.FC<{
         className="cb-sec-head"
         style={{
           width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '11px 12px', minHeight: 48, cursor: 'pointer', background: 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(236,72,153,0.03))',
+          padding: '10px 12px', minHeight: 44, cursor: 'pointer', background: 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(236,72,153,0.03))',
           border: 'none', borderBottom: open ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign: 'left',
         }}
       >
@@ -102,7 +102,11 @@ const CbSec: React.FC<{
           <span style={{ fontSize: 11, color: '#fff', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
         </span>
       </button>
-      <div style={{ display: open ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>{children}</div>
+      <div data-collapsed={!open} style={open
+        ? { display: 'flex', flexDirection: 'column', gap: 8 }
+        : { display: 'grid', gridTemplateRows: '0fr', opacity: 0, transition: 'grid-template-rows 0.28s ease, opacity 0.2s ease', pointerEvents: 'none' }}>
+        <div style={open ? undefined : { minHeight: 0, overflow: 'hidden' }}>{children}</div>
+      </div>
     </div>
   );
 };
@@ -621,7 +625,7 @@ export const CombatConstructor: React.FC = () => {
   const paramsSummary = `${ruLabel(PERIODIZATION_RU, periodizationModel ?? 'atr_10')} · ${weeks}нед · ${days}×`;
 
   return (
-    <div className="combat-constructor" data-step={step} style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 860, margin: '0 auto' }}>
+    <div className="combat-constructor" data-step={step} style={{ padding: '0 10px 90px', display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 860, margin: '0 auto' }}>
       <style>{`input[type="range"]{ -webkit-appearance:none; appearance:none; height:6px; border-radius:999px; background:rgba(255,255,255,0.08); }
         input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:linear-gradient(135deg,#a855f7,#ec4899); border:2px solid #fff; box-shadow:0 2px 10px rgba(168,85,247,0.42); cursor:pointer; }
         input[type="range"]::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:linear-gradient(135deg,#a855f7,#ec4899); border:2px solid #fff; box-shadow:0 2px 10px rgba(168,85,247,0.42); cursor:pointer; }
@@ -673,7 +677,7 @@ export const CombatConstructor: React.FC = () => {
       </div>
 
       {step === 'params' && (
-        <div className="cb-pane" data-pane="params" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="cb-pane" data-pane="params" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <CbSec title="🎯 Дисциплина и цель" defaultOpen summary={`${DISC_RU[discipline] || discipline} · ${GOAL_RU[goal] || goal} · ${weeks}нед`}>
             <SectionCard icon="🎯" title="Дисциплина и цель" subtitle="Подбирает акценты: шея/хват/ротация">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -766,7 +770,7 @@ export const CombatConstructor: React.FC = () => {
       )}
 
       {step === 'athlete' && (
-        <div className="cb-pane" data-pane="athlete" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="cb-pane" data-pane="athlete" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <CbSec title="👤 Антропометрия" defaultOpen summary={athleteSummary}>
             <SectionCard icon="👤" title="Антропометрия" subtitle="Вес и возраст — % от ПМ и тонус">
               <div style={{ display: 'flex', gap:6, flexWrap:'wrap', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', fontSize:11, color:'#fff' }}>Профиль: <Highlight color="#a855f7">{sex==='male'?'Мужской':'Женский'}</Highlight> · <Highlight>{bodyweight}кг</Highlight> · <Highlight>{age} лет</Highlight></div>
@@ -965,7 +969,7 @@ export const CombatConstructor: React.FC = () => {
       )}
 
       {step === 'outside' && (
-        <div className="cb-pane" data-pane="outside" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="cb-pane" data-pane="outside" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <CbSec title="🏁 Дата боя и тапер" defaultOpen summary={fightDate || 'без даты'}>
             <SectionCard icon="🏁" title="Дата боя и тапер" subtitle="Дата боя включает авто-тапер + сауну">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
@@ -1143,8 +1147,8 @@ export const CombatConstructor: React.FC = () => {
       )}
 
       {step === 'split' && (
-        <div className="cb-pane" data-pane="split" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ ...CARD, padding: 14, gap: 10 }}>
+        <div className="cb-pane" data-pane="split" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ ...CARD, padding: 12, gap: 8 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ width: 32, height: 32, borderRadius: 10, background: ACCENT_GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>✨</span>
               <div style={{ flex: 1 }}>
@@ -1295,7 +1299,7 @@ export const CombatConstructor: React.FC = () => {
       {step === 'plan' && plan && renderNavRow('split', 'quality')}
 
       {step === 'quality' && plan && (
-        <div className="cb-pane" data-pane="quality" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="cb-pane" data-pane="quality" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <SectionCard icon="📋" title="Сводка плана" subtitle={`${plan.discipline} · ${plan.goal} · ${plan.level} · ${plan.weeks} нед`} accent>
             <div className="cb-plan-stats" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(110px,1fr))', gap:8 }}>
               <StatTile label="Недель" value={String(plan.weeks)} color="#a855f7" sub={plan.patternId} icon="📅" />
@@ -1353,7 +1357,7 @@ export const CombatConstructor: React.FC = () => {
       )}
 
       {step === 'export' && (
-        <div className="cb-pane" data-pane="export" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="cb-pane" data-pane="export" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {annual ? (
             <SectionCard icon="🗓️" title={`Годовой ATR · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · синхронизация`} accent>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems:'center' }}>
