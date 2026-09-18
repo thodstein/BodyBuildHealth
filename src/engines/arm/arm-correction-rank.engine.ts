@@ -4,8 +4,9 @@
  * без SFR — вместо него intensityPct + table/static соответствие + причина.
  */
 import type { ArmWeakPoint } from './arm-biomechanics.engine';
-import { ARM_BIOMECH } from './arm-biomechanics.engine';
+import { ARM_BIOMECH, vbtThresholdForWeakPoint } from './arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
+import { POOL_TOPUP, roleOf } from './arm-correction-pro2.engine';
 import { getArmExerciseById } from '../../core/exercise-catalog-arm';
 import type { ArmWeakCause } from './arm-weak-cause.engine';
 
@@ -20,6 +21,12 @@ export interface ArmRankCtx {
   failurePoint?: string | null;
   /** P1-движения: фаза схватки setup/readygo/start/mid/pin — бонус точке своей фазы. */
   matchPhase?: string | null;
+  /** PRO-2: угол вне диапазона точки (авто-валидация хаба) — приоритет углу-специфике. */
+  angleOutOfRange?: boolean;
+  /** PRO-2: VBT-просадка скорости точки (%, null = нет замера). */
+  vbtLossPct?: number | null;
+  /** PRO-2: table-time мин/нед (факт спаррингов) — мало стола → бонус table-роли. */
+  tableTimeMin?: number | null;
 }
 
 export interface ArmRankedCorrection {
@@ -66,14 +73,16 @@ export function rankCorrectionsForArm(point: ArmWeakPoint, ctx: ArmRankCtx = {})
   if (!corr) return [];
   const inPlan = new Set((ctx.inPlanIds || []).map((s) => String(s).toLowerCase()));
   const out: ArmRankedCorrection[] = [];
-  for (const id of corr.exercises) {
+  // PRO-2: пул базы + топап-хвост (порядок базы цел — топап только расширяет выбор)
+  const pool = [...corr.exercises, ...(POOL_TOPUP[point] || []).filter((id) => !corr.exercises.includes(id))];
+  for (const id of pool) {
     const cat = getArmExerciseById(id);
     const name = cat?.name || id;
     let score = 100;
     const reasons: string[] = [];
-    // база: порядок в ARM_CORRECTIONS (топ-1 приоритет)
+    // база: порядок в ARM_CORRECTIONS (топ-1 приоритет); топап-хвост — позади базы
     const orderIdx = corr.exercises.indexOf(id);
-    score -= orderIdx * 4;
+    score -= (orderIdx >= 0 ? orderIdx : corr.exercises.length) * 4;
     // оборудование
     if (!equipmentOk((cat as any)?.equipment, ctx.equipment)) {
       score -= 40;
@@ -118,6 +127,51 @@ export function rankCorrectionsForArm(point: ArmWeakPoint, ctx: ArmRankCtx = {})
     if (fp && Array.isArray(fixes) && fixes.map(String).map((s: string) => s.toLowerCase()).includes(fp)) {
       score += 6;
       reasons.push('чинит фазу срыва');
+    }
+    // PRO-2: угол вне диапазона — приоритет table/static ролям (специфика угла, не зала)
+    if (ctx.angleOutOfRange) {
+      const r = roleOf(id);
+      if (r === 'table' || r === 'static') {
+        score += 8;
+        reasons.push('угол вне диапазона — специфика');
+      }
+    }
+    // PRO-2: VBT-просадка точки — приоритет статике/пульсам (удержание позиции, не разгон)
+    if (ctx.vbtLossPct != null && Number.isFinite(Number(ctx.vbtLossPct))) {
+      try {
+        const th = vbtThresholdForWeakPoint(point);
+        const loss = Number(ctx.vbtLossPct);
+        const r = roleOf(id);
+        if (loss >= th.stopPct && (r === 'static' || r === 'pulse')) {
+          score += 10;
+          reasons.push('VBT-стоп — статика');
+        } else if (loss >= th.warnPct && (r === 'static' || r === 'pulse' || r === 'table')) {
+          score += 6;
+          reasons.push('VBT-предупреждение — удержание');
+        }
+      } catch { /* noop — без VBT ранжир как раньше */ }
+    }
+    // PRO-2: мало стола — бонус table-роли (StrengthLog/GripStrength: table-time решает)
+    if (ctx.tableTimeMin != null && Number.isFinite(Number(ctx.tableTimeMin)) && Number(ctx.tableTimeMin) < 20) {
+      if (roleOf(id) === 'table') {
+        score += 6;
+        reasons.push('мало стола — к столу');
+      }
+    }
+    // PRO-2: уровень — новичкам iso/pump, продвинутым heavy/static
+    const lvl = String((ctx as any).level || '').toLowerCase();
+    if (lvl === 'beginner') {
+      const r = roleOf(id);
+      if (r === 'iso' || r === 'pump') {
+        score += 6;
+        reasons.push('новичку — мягкая');
+      }
+    } else if (lvl === 'advanced' || lvl === 'enhanced') {
+      const r = roleOf(id);
+      if (r === 'heavy' || r === 'static') {
+        score += 4;
+        reasons.push('уровень — тяжёлая');
+      }
     }
     // P1-движения: точка своей фазы схватки (без fixesPhase — по канону точек).
     // Локальная карта (без импорта match-phases — ранжир не тянет фазовый движок).

@@ -9,6 +9,7 @@ import type { ArmWeakPoint } from './arm-biomechanics.engine';
 import { ARM_BIOMECH } from './arm-biomechanics.engine';
 import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
 import { doseForCause } from './arm-correction-dose.engine';
+import { doseForCauseV2, waveSetsFor, preventiveFor, roleLabel } from './arm-correction-pro2.engine';
 import type { ArmWeakCause } from './arm-weak-cause.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
 import { getArmExercises } from '../../core/exercise-catalog-arm';
@@ -38,6 +39,18 @@ export interface ArmInjectionOpts {
    * разрешены только безопасные кандидаты (ремень/изометрия/внутренняя ротация).
    */
   gatedSideIso?: boolean;
+  /**
+   * PRO-2: перегруз сухожилий (tendon ACWR danger или боль ≥4) — доза v2 режет
+   * до пульсов/high-rep 2 сетов. Без флага — базовый путь (байт-в-байт).
+   */
+  tendonOverload?: boolean;
+  /** PRO-2: возраст 50+ — доза v2 снимает 1 сет, RIR+1. Без флага — базовый путь. */
+  age50plus?: boolean;
+  /**
+   * PRO-2: неделя волны коррекции (1-based: 1 база, 2 объём +1, 3 делод −1).
+   * Без записи — без волны (байт-в-байт). targetSets приоритетнее волны.
+   */
+  waveWeek?: number;
 }
 
 export const ARM_PLAN_PREV_KEY = 'he_arm_plan_saved_prev';
@@ -151,14 +164,19 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
       const bio = ARM_BIOMECH[wp];
       const corr = ARM_CORRECTIONS[wp];
       if (!bio || !corr) { notes.push(`⚠ ${wp} — нет биомеханики`); continue; }
-      // доза по причине (без causes — база ARM_CORRECTIONS)
-      const dose = doseForCause(wp, opts.causes?.[wp]) ?? {
+      // доза по причине: PRO-2 v2 при флагах (tendon/50+/side-guard), иначе база 1-в-1
+      const v2 = (opts.tendonOverload || opts.age50plus || opts.causes?.[wp] === 'strength' || (level === 'beginner' && opts.causes?.[wp]))
+        ? doseForCauseV2(wp, opts.causes?.[wp], { level, tendonOverload: opts.tendonOverload, age50plus: opts.age50plus })
+        : null;
+      const dose = v2 ?? doseForCause(wp, opts.causes?.[wp]) ?? {
         sets: corr.sets, reps: corr.repsRange, rir: corr.rir, intensityPct: corr.intensityPct,
         holdSeconds: corr.holdSeconds, tempo: corr.tempo, adjusted: false, note: 'база точки',
       };
+      // PRO-2 волна: targetSets приоритетнее, затем волна, затем доза
+      const waveSets = opts.waveWeek != null ? waveSetsFor(dose.sets, opts.waveWeek) : dose.sets;
       const wantSets = opts.targetSets?.[wp] != null && Number.isFinite(Number(opts.targetSets[wp]))
         ? Math.max(1, Math.min(6, Math.round(Number(opts.targetSets[wp]))))
-        : dose.sets;
+        : waveSets;
       // находим первый не-дубликат из списка коррекций (ранжир первым, затем база)
       let exId: string | null = null;
       let catalogEx: any = null;
@@ -247,7 +265,7 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
         substitutionGroup: corr.substitutionGroup,
         exerciseId: exId,
         equipment: catalogEx.equipment,
-        comment: `${bio.label} → ${corr.exercises.slice(0,2).join('/')} @${Math.round(dose.intensityPct*100)}%${dose.adjusted ? ` · доза: ${dose.note}` : ''}`,
+        comment: `${bio.label} → ${corr.exercises.slice(0,2).join('/')} @${Math.round(dose.intensityPct*100)}%${dose.adjusted ? ` · доза: ${dose.note}` : ''}${(() => { try { const p = preventiveFor(wp); return p ? ` · ${p.label}` : ''; } catch { return ''; } })()}${exId ? ` · роль ${roleLabel(exId)}` : ''}`,
         rationale: `Коррекция мёртвой точки: ${bio.biomechanicalReason.slice(0,90)}…`,
       };
       finalSession.exercises.push(newEx);

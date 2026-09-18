@@ -15,6 +15,10 @@ export interface ArmExportPoint {
   topCorrections?: Array<{ id: string; score: number }>;
   simDelta?: string;
   specSetsWeek1?: number;
+  /** PRO-2: доза/роль/профилактика топ-1 (опционально, без — строки как раньше). */
+  doseLabel?: string;
+  topRole?: string;
+  preventive?: string;
 }
 
 export interface ArmExportData {
@@ -72,7 +76,9 @@ function pointRow(p: ArmExportPoint): string {
   const tops = (p.topCorrections || [])
     .map(function (t) { return t.id + ' (' + t.score + ')'; })
     .join(', ');
-  return '<tr>' + td(p.weakPoint) + td(p.label) + td(angle) + td(p.cause) + td(p.causeFix) + td(tops) + td(p.simDelta) + '</tr>';
+  const dose = [p.doseLabel, p.topRole, p.preventive].filter(Boolean).join(' · ');
+  const topsCell = dose ? tops + ' · ' + dose : tops;
+  return '<tr>' + td(p.weakPoint) + td(p.label) + td(angle) + td(p.cause) + td(p.causeFix) + td(topsCell) + td(p.simDelta) + '</tr>';
 }
 
 export function buildArmDiagnosticsHtml(data: ArmExportData): string {
@@ -133,7 +139,9 @@ export function buildArmDiagnosticsCsv(data: ArmExportData): string {
     const tops = (p.topCorrections || [])
       .map(function (t) { return t.id + '(' + t.score + ')'; })
       .join(', ');
-    return [p.weakPoint, p.label, angle, p.cause || '', p.causeFix || '', tops, p.simDelta || '']
+    const dose = [p.doseLabel, p.topRole, p.preventive].filter(Boolean).join(' · ');
+    const topsCell = dose ? tops + ' · ' + dose : tops;
+    return [p.weakPoint, p.label, angle, p.cause || '', p.causeFix || '', topsCell, p.simDelta || '']
       .map(csvCell)
       .join(';');
   });

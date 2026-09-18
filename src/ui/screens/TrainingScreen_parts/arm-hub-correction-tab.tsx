@@ -8,6 +8,7 @@ import React from 'react';
 import { ARM_BIOMECH, type ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ARM_CORRECTIONS, correctionForWeakPoint } from '../../../engines/arm/arm-weakpoint-corrections';
 import { doseForCause, doseLabel } from '../../../engines/arm/arm-correction-dose.engine';
+import { doseForCauseV2, roleLabel, preventiveFor, drillsForPhase, correctiveWaveForWeek } from '../../../engines/arm/arm-correction-pro2.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
 import { suggestWeakPointsForTrack } from '../../../engines/arm/arm-video-analysis.engine';
 import { AdSec, AdBtn, AdBanner } from './arm-design-system';
@@ -129,12 +130,24 @@ export function HubCorrectionTab({ H }: { H: any }) {
               })()}
               {top.length > 0 ? (
                 <div className="ad-tip" data-arm="correction-top3">
-                  Топ-3: {top.map((t: any) => `${t.id} (${t.score}${t.reason ? `, ${t.reason}` : ''})`).join(' · ')}
+                  Топ-3: {top.map((t: any) => `${t.id} (${roleLabel(t.id)} · ${t.score}${t.reason ? `, ${t.reason}` : ''})`).join(' · ')}
                   {sim ? ` · Δ ${sim.summary}` : ''}
                 </div>
               ) : (
                 <div className="ad-muted">Топ-3: {(corr?.exercises || []).slice(0, 3).join(' · ')}</div>
               )}
+              {(() => {
+                try {
+                  const p = preventiveFor(wp);
+                  return p ? <div className="ad-tip" data-arm="correction-prevent">🛡 {p.label} ({p.id})</div> : null;
+                } catch { return null; }
+              })()}
+              {(() => {
+                try {
+                  const w = correctiveWaveForWeek(1);
+                  return <div className="ad-muted" data-arm="correction-wave">🌊 Волна: {w.note} · Н2 объём +1 · Н3 делод −1</div>;
+                } catch { return null; }
+              })()}
               <div className="ad-row">
                 <AdBtn variant="dark" onClick={() => toggleWeakPoint(wp)}>✕ Убрать {label}</AdBtn>
               </div>
@@ -142,6 +155,13 @@ export function HubCorrectionTab({ H }: { H: any }) {
           );
         })}
       </div>
+      {(() => {
+        try {
+          const ds = drillsForPhase((state as any)?.failurePoint || mvPhase);
+          if (!ds.length) return null;
+          return <div className="ad-tip" data-arm="correction-drills">🥋 Table-time: {ds.map((d) => `${d.label} — ${d.dose}`).join(' · ')}</div>;
+        } catch { return null; }
+      })()}
       {armSpecP0?.summary && <div className="ad-muted">📦 {armSpecP0.summary}</div>}
       <div className="ad-row">
         <AdBtn variant="primary" block hero onClick={handleInjectP0}>💉 Вставить коррекции в план ({weakPoints.length})</AdBtn>
