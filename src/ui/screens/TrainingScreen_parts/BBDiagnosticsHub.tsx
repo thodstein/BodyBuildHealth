@@ -426,6 +426,19 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { return undefined; }
   }, [profileNonce]);
 
+  // K4: ограничения мобильности профиля — гейт кандидатов инъекции (те же каноны, что у билдера).
+  const profileMobility = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const m = p?.settings?.training?.mobilityRestrictions ?? p?.training?.mobilityRestrictions;
+      if (Array.isArray(m)) {
+        const clean = m.map((s) => String(s)).filter(Boolean);
+        return clean.length ? clean : undefined;
+      }
+      return undefined;
+    } catch { return undefined; }
+  }, [profileNonce]);
+
   // Пол и сон — из профиля (единый источник; в хабе своих селектов нет, без дублей)
   const profileSex = useMemo(() => {
     try {
@@ -1574,10 +1587,24 @@ export const BBDiagnosticsHub: React.FC = () => {
     }
     const preferredIds: Record<string, string> = {};
     const corrective: Record<string, { sets?: number; reps?: number; repsMax?: number; rir?: number; tempo?: string; restSec?: number; loadFactor?: number; label?: string }> = {};
+    // K4: кандидаты на зону — библиотека top-2/3 (осознанные дриллы) → каталожный fallback;
+    // движок перебирает их канонами билдера и берёт первого прошедшего (замена с note).
+    const candidates: Record<string, Array<{ exerciseId: string; sets?: number; reps?: number; repsMax?: number; rir?: number; tempo?: string; restSec?: number; loadFactor?: number; label?: string; allowJunk?: boolean }>> = {};
     for (const z of zones) {
       try {
         // PRO-CORR: библиотека первична (зона+причина+сигналы+доза); каталоговый топ-3 — fallback.
         const lib = (correctiveTopByZone[z] || [])[0];
+        const list: Array<{ exerciseId: string; sets?: number; reps?: number; repsMax?: number; rir?: number; tempo?: string; restSec?: number; loadFactor?: number; label?: string; allowJunk?: boolean }> = [];
+        for (const r of (correctiveTopByZone[z] || [])) {
+          const dose = correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags());
+          list.push({
+            exerciseId: r.corr.exerciseId, sets: dose.sets, reps: dose.repsMin, repsMax: dose.repsMax, rir: dose.rir, tempo: dose.tempo,
+            restSec: r.corr.protocol.restSec, loadFactor: correctiveLoadFactor(r.corr.phase),
+            label: `${r.corr.title} · ${dose.note}`, allowJunk: true,
+          });
+        }
+        for (const r of (top3ByZone[z] || [])) list.push({ exerciseId: r.id, allowJunk: false });
+        if (list.length) candidates[z] = list;
         if (lib) {
           const dose = correctiveDose(lib.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags());
           preferredIds[z] = lib.corr.exerciseId;
@@ -1629,7 +1656,7 @@ export const BBDiagnosticsHub: React.FC = () => {
             }
           }
         } catch { /* noop */ }
-        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, corrective, workMax: profileWorkMax, weekIdxs: [wi], rirShift, volumeMult, unilateralTopUp, returnAction: retAct ?? undefined });
+        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, corrective, correctiveCandidates: candidates, equipment: profileEquipment, mobilityRestrictions: profileMobility, workMax: profileWorkMax, weekIdxs: [wi], rirShift, volumeMult, unilateralTopUp, returnAction: retAct ?? undefined });
         working = r.plan;
         injected += r.injected;
         skippedBudget += r.skippedBudget;

@@ -52,15 +52,18 @@ function levelAllows(level: string | undefined, exName: string): boolean {
 /**
  * Фильтр оборудования зала. Дедуп каталога (P0.3) сливает одноимённые записи,
  * превращая equipment в массив — проверяем пересечение, а не равенство строк.
- * bodyweight/machine доступны всегда.
+ * bodyweight доступен всегда; machine — по умолчанию тоже (каталожная политика,
+ * calibrated-лок max-pro), но инъекция коррекций зовёт со `{ machineAlways: false }`:
+ * домашнему залу без тренажёров тренажёрная коррекция бесполезна (K4/K5 CORR-HUB).
  */
-export function equipmentAllows(catalogEquipment: unknown, wanted: string[] | undefined): boolean {
+export function equipmentAllows(catalogEquipment: unknown, wanted: string[] | undefined, opts?: { machineAlways?: boolean }): boolean {
   if (!wanted || wanted.length === 0) return true;
   const list = (Array.isArray(catalogEquipment) ? catalogEquipment : [catalogEquipment])
     .map((e) => String(e || '').toLowerCase().trim())
     .filter(Boolean);
   if (!list.length) return true;
-  if (list.every((e) => e === 'bodyweight' || e === 'machine')) return true;
+  const machineAlways = opts?.machineAlways !== false;
+  if (list.every((e) => e === 'bodyweight' || (machineAlways && e === 'machine'))) return true;
   const want = wanted.map((w) => String(w || '').toLowerCase().trim()).filter(Boolean);
   return list.some((e) => want.includes(e));
 }

@@ -7,6 +7,11 @@ import type { BBPlan, BBSession, BBExercise } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { canonicalMuscle } from './bb-specialization.engine';
 import { sessionLimitsFor, computeBBWeeklyBudget, computeBBRecoveryScore } from './bb-volume.engine';
+import { isBBJunk } from './bb-builder.engine';
+import { isPoolAllowed } from './bb-exercise-levels.engine';
+import { isMobilityRestricted } from './bb-mobility.engine';
+import { isAxialLoadExercise } from '../exercise-selector.engine';
+import { equipmentAllows } from './bb-correction-rank.engine';
 
 const BB_WEAK_CORRECTION: Record<string, string[]> = {
   delt_mid: ['lateral_raise', 'cable_lateral', 'lateral_raise_machine'],
@@ -70,6 +75,19 @@ export function correctiveWeightHint(
   return { kg: Math.round((base * f) / 2.5) * 2.5, bodyweight: false, base, pct };
 }
 
+/** K4: гейты вставки коррекции — те же каноны, что у билдера (уровень/осевая/junk/оборудование/мобильность).
+ *  При отказе инъекция берёт следующего кандидата (library top-2/3 → каталожный fallback). */
+function gateAttemptCandidate(id: string, allowJunk: boolean, opts: BBInjectionOpts): { ok: boolean; why?: string } {
+  const cat = findCatalog(id);
+  if (!cat) return { ok: false, why: 'нет в каталоге' };
+  if (!isPoolAllowed(opts.level, cat)) return { ok: false, why: 'уровень' };
+  if (opts.avoidAxialLoad && isAxialLoadExercise(cat)) return { ok: false, why: 'осевая' };
+  if (!allowJunk && isBBJunk(cat)) return { ok: false, why: 'junk-дрилл' };
+  if (!equipmentAllows((cat as any).equipment, opts.equipment, { machineAlways: false })) return { ok: false, why: 'оборудование' };
+  if (isMobilityRestricted(cat, opts.mobilityRestrictions)) return { ok: false, why: 'мобильность' };
+  return { ok: true };
+}
+
 function sessionForInjection(week: any, muscle: string): BBSession | null {
   const can = canonicalMuscle(muscle);
   for (const s of week.sessions as BBSession[]) {
@@ -105,6 +123,28 @@ export interface BBInjectionOpts {
   volumeMult?: number;
   /** PRO-4 S3: активная ступень возврата (ступень 1 = только техника, объём 0). */
   returnAction?: { volumeMult: number; rirShift: number; bannedPatterns: string[] };
+  /** K4: кандидаты на зону (библиотека top-2/3 → каталожный fallback) с дозой и allowlist дриллов. */
+  correctiveCandidates?: Record<string, BBAttemptCandidate[]>;
+  /** K4: каноны билдера — оборудование зала (machine строго), мобильность, осевая. */
+  equipment?: string[];
+  mobilityRestrictions?: string[];
+  avoidAxialLoad?: boolean;
+}
+
+/** K4: кандидат вставки коррекции (доза — своя у каждого кандидата: замена не врёт дозой). */
+export interface BBAttemptCandidate {
+  exerciseId: string;
+  sets?: number;
+  reps?: number;
+  repsMax?: number;
+  rir?: number;
+  tempo?: string;
+  restSec?: number;
+  loadFactor?: number;
+  bodyweight?: boolean;
+  label?: string;
+  /** Библиотечные дриллы (кламшелл, паллоф, wall-slide…) — осознанный allowlist от isBBJunk. */
+  allowJunk?: boolean;
 }
 
 export interface BBInjectionResult {
@@ -153,9 +193,29 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
   const uniq = [...new Set(weakZones.map(s => String(s).toLowerCase().trim()).filter(Boolean))].slice(0, 2);
 
   for (const wp of uniq) {
-    const preferred = opts.preferredIds?.[wp] || opts.preferredIds?.[canonicalMuscle(wp)];
-    const corrList = BB_WEAK_CORRECTION[wp] || BB_WEAK_CORRECTION[canonicalMuscle(wp)] || [];
-    const corrId = preferred || corrList[0];
+    const muscleKey = canonicalMuscle(wp);
+    const preferred = opts.preferredIds?.[wp] || opts.preferredIds?.[muscleKey];
+    const corrList = BB_WEAK_CORRECTION[wp] || BB_WEAK_CORRECTION[muscleKey] || [];
+    // K4: сначала кандидаты (библиотека top-2/3 → каталожный fallback) с гейтами билдера;
+    // legacy-путь (preferred/дэфолт-пул) — без кандидатов, как раньше.
+    const cands = opts.correctiveCandidates?.[wp] || opts.correctiveCandidates?.[muscleKey];
+    let corrId: string;
+    let picked: BBAttemptCandidate | null = null;
+    if (cands && cands.length) {
+      const rejected: string[] = [];
+      for (const cnd of cands) {
+        if (!cnd || !cnd.exerciseId) continue;
+        const g = gateAttemptCandidate(cnd.exerciseId, cnd.allowJunk === true, opts);
+        if (!g.ok) { rejected.push(`${cnd.exerciseId} (${g.why})`); continue; }
+        picked = cnd;
+        break;
+      }
+      corrId = picked?.exerciseId || '';
+      if (!corrId) { notes.push(`⊘ ${wp} — все кандидаты отсеяны гейтами: ${rejected.slice(0, 3).join(', ')}`); continue; }
+      if (rejected.length) notes.push(`↩ ${wp}: заменено гейтами (${rejected.join(', ')}) → ${corrId}`);
+    } else {
+      corrId = preferred || corrList[0] || '';
+    }
     if (!corrId) { notes.push(`⚠ ${wp} — нет коррекции`); continue; }
     const cat = findCatalog(corrId);
     const catName = cat ? cat.name : corrId;
@@ -180,8 +240,10 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
         ? all.map((w, i) => ({ w, i })).filter(({ w }) => w && !w.deload).map(({ i }) => i)
         : [0].filter((i) => all[i] && !all[i].deload);
     if (weekIdxs.length === 0) { notes.push(`⚠ ${wp} — делод`); continue; }
-    const muscleKey = canonicalMuscle(wp);
-    const corr = opts.corrective?.[wp] || opts.corrective?.[muscleKey];
+    // K4: доза — у выбранного кандидата (замена не врёт дозой первого); legacy — из opts.corrective.
+    const corr = picked
+      ? { sets: picked.sets, reps: picked.reps, repsMax: picked.repsMax, rir: picked.rir, tempo: picked.tempo, restSec: picked.restSec, loadFactor: picked.loadFactor, bodyweight: picked.bodyweight, label: picked.label }
+      : (opts.corrective?.[wp] || opts.corrective?.[muscleKey]);
     const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
     // K3: вес от workMax профиля (точный id упражнения → мышца), bodyweight/band — без кг;
     // нет базы — без выдуманных кг + честная пометка (раньше всегда 32.5 кг).
