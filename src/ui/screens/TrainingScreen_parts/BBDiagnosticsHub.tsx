@@ -40,7 +40,7 @@ import { sfrOf } from '../../../engines/bb/bb-sfr-db';
 import { diagnoseWeakCausesBatch } from '../../../engines/bb/bb-weak-cause.engine';
 import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
-import { rankCorrectives, correctiveDose } from '../../../engines/bb/bb-corrective.engine';
+import { rankCorrectives, correctiveDose, correctiveLoadFactor } from '../../../engines/bb/bb-corrective.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
@@ -408,6 +408,21 @@ export const BBDiagnosticsHub: React.FC = () => {
         return clean.length ? clean : undefined;
       }
       return undefined;
+    } catch { return undefined; }
+  }, [profileNonce]);
+
+  // K3: рабочие максимумы профиля для веса коррекций (точный id упражнения → мышца).
+  // Единый вход карточки и вставки («показано = вставится»); нет данных — движок честно без кг.
+  const profileWorkMax = useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      const t = p?.settings?.training ?? p?.training;
+      const byMuscle = (t?.workMax || {}) as Record<string, number>;
+      const byEx = (t?.workMaxByExercise || {}) as Record<string, number>;
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(byEx)) { const n = Number(v); if (Number.isFinite(n) && n > 0) out[k] = n; }
+      for (const [k, v] of Object.entries(byMuscle)) { const n = Number(v); if (Number.isFinite(n) && n > 0) out[k] = n; }
+      return Object.keys(out).length ? out : undefined;
     } catch { return undefined; }
   }, [profileNonce]);
 
@@ -1558,7 +1573,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { /* noop */ }
     }
     const preferredIds: Record<string, string> = {};
-    const corrective: Record<string, { sets?: number; reps?: number; rir?: number; tempo?: string; label?: string }> = {};
+    const corrective: Record<string, { sets?: number; reps?: number; repsMax?: number; rir?: number; tempo?: string; restSec?: number; loadFactor?: number; label?: string }> = {};
     for (const z of zones) {
       try {
         // PRO-CORR: библиотека первична (зона+причина+сигналы+доза); каталоговый топ-3 — fallback.
@@ -1566,7 +1581,12 @@ export const BBDiagnosticsHub: React.FC = () => {
         if (lib) {
           const dose = correctiveDose(lib.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags());
           preferredIds[z] = lib.corr.exerciseId;
-          corrective[z] = { sets: dose.sets, reps: dose.repsMin, rir: dose.rir, tempo: dose.tempo, label: `${lib.corr.title} · ${dose.note}` };
+          // K3: реальная доза — rest/repsMax/loadFactor записи (вес считается в движке от workMax профиля).
+          corrective[z] = {
+            sets: dose.sets, reps: dose.repsMin, repsMax: dose.repsMax, rir: dose.rir, tempo: dose.tempo,
+            restSec: lib.corr.protocol.restSec, loadFactor: correctiveLoadFactor(lib.corr.phase),
+            label: `${lib.corr.title} · ${dose.note}`,
+          };
           profTempo[z] = dose.tempo;
           continue;
         }
@@ -1609,7 +1629,7 @@ export const BBDiagnosticsHub: React.FC = () => {
             }
           }
         } catch { /* noop */ }
-        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, corrective, weekIdxs: [wi], rirShift, volumeMult, unilateralTopUp, returnAction: retAct ?? undefined });
+        const r = injectBBWeakPoints(working, zones, { dayMap, targetSets, profTempo, preferredIds, corrective, workMax: profileWorkMax, weekIdxs: [wi], rirShift, volumeMult, unilateralTopUp, returnAction: retAct ?? undefined });
         working = r.plan;
         injected += r.injected;
         skippedBudget += r.skippedBudget;

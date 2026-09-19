@@ -35,6 +35,41 @@ function findCatalog(idOrName: string) {
   return (EXERCISE_CATALOG as any[]).find(e => e.id === idOrName || e.id.toLowerCase() === low || e.name.toLowerCase() === low) || null;
 }
 
+/**
+ * K3: вес коррекции по workMax профиля — единый источник для карточки хаба и инъекции
+ * («показано = вставится»). Приоритет базы: точный максимум упражнения (workMaxByExercise)
+ * → максимум мышцы/зоны. Нет базы → null (без выдуманных 32.5 кг — честная пометка в комментарии).
+ * bodyweight/band-упражнения — всегда без кг.
+ */
+export function correctiveWeightHint(
+  exerciseId: string,
+  workMax: Record<string, number> | undefined | null,
+  muscleKeyOrZone: string | null | undefined,
+  opts: { loadFactor?: number; bodyweight?: boolean } = {},
+): { kg: number | null; bodyweight: boolean; base: number | null; pct: number } {
+  const cat = findCatalog(exerciseId);
+  const eqRaw = cat ? (cat as any).equipment : null;
+  const eq = (Array.isArray(eqRaw) ? eqRaw : [eqRaw]).map((e: unknown) => String(e || '').toLowerCase().trim()).filter(Boolean);
+  const bw = opts.bodyweight === true || eq.some((e) => e === 'bodyweight' || e === 'band');
+  const f = Number.isFinite(opts.loadFactor) ? Math.max(0.3, Math.min(0.85, opts.loadFactor as number)) : 0.65;
+  const pct = Math.round(f * 100);
+  if (bw) return { kg: null, bodyweight: true, base: null, pct };
+  const wm = workMax || {};
+  const idLow = String(exerciseId || '').toLowerCase().trim();
+  let base: number | null = null;
+  if (idLow) {
+    const direct = wm[idLow] ?? wm[exerciseId];
+    const v = Number(direct);
+    if (Number.isFinite(v) && v > 0) base = v;
+  }
+  if (base == null && muscleKeyOrZone) {
+    const v = Number(wm[muscleKeyOrZone]);
+    if (Number.isFinite(v) && v > 0) base = v;
+  }
+  if (base == null) return { kg: null, bodyweight: false, base: null, pct };
+  return { kg: Math.round((base * f) / 2.5) * 2.5, bodyweight: false, base, pct };
+}
+
 function sessionForInjection(week: any, muscle: string): BBSession | null {
   const can = canonicalMuscle(muscle);
   for (const s of week.sessions as BBSession[]) {
@@ -58,8 +93,10 @@ export interface BBInjectionOpts {
   weekIdxs?: number[];
   /** MAX PRO: предпочитаемые id упражнений (из correction-rank топ-1) */
   preferredIds?: Record<string, string>;
-  /** PRO-CORR: точная доза/техника коррекций из библиотеки (хаб шлёт, без — legacy 3×10). */
-  corrective?: Record<string, { sets?: number; reps?: number; rir?: number; tempo?: string; label?: string }>;
+  /** PRO-CORR: точная доза/техника коррекций из библиотеки (хаб шлёт, без — legacy 3×10).
+   *  K3: + реальная доза — restSec (45–150 из записи), repsMax (окно), loadFactor (вес = фактор × workMax),
+   *  bodyweight (без кг, пометка в комментарии). */
+  corrective?: Record<string, { sets?: number; reps?: number; repsMax?: number; rir?: number; tempo?: string; restSec?: number; bodyweight?: boolean; loadFactor?: number; label?: string }>;
   /** PRO-3 R2: унилатеральная добивка слабой стороны (из L/R-вердиктов): группа → сторона+сеты. */
   unilateralTopUp?: Record<string, { side: 'left' | 'right'; sets: number }>;
   /** PRO-3 R2: сдвиг RIR вставляемых коррекций (красная готовность → +1). */
@@ -112,6 +149,7 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
   const budget = opts.budget ?? computeBudgetBB(plan as any, opts.level);
   let injected = 0, skippedBudget = 0, skippedDup = 0;
   const notes: string[] = [];
+  const doseLines: string[] = [];
   const uniq = [...new Set(weakZones.map(s => String(s).toLowerCase().trim()).filter(Boolean))].slice(0, 2);
 
   for (const wp of uniq) {
@@ -145,16 +183,22 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
     const muscleKey = canonicalMuscle(wp);
     const corr = opts.corrective?.[wp] || opts.corrective?.[muscleKey];
     const wm = opts.workMax ?? (copy as any).workMax ?? (copy as any).inputSnapshot?.workMax ?? {};
-    const base = wm[muscleKey] ?? wm[wp] ?? 50;
-    const weight = Math.round(base * 0.65 / 2.5) * 2.5; // 65% для изоляции
+    // K3: вес от workMax профиля (точный id упражнения → мышца), bodyweight/band — без кг;
+    // нет базы — без выдуманных кг + честная пометка (раньше всегда 32.5 кг).
+    const hint = correctiveWeightHint(corrId, wm, muscleKey, { loadFactor: corr?.loadFactor, bodyweight: corr?.bodyweight });
+    const weight = hint.kg ?? 0;
     const reps = Number.isFinite(corr?.reps) ? Math.max(3, Math.min(20, Math.round(corr!.reps as number))) : (muscleKey === 'calves' ? 15 : muscleKey === 'forearms' ? 12 : 10);
+    const repsMax = Number.isFinite(corr?.repsMax) ? Math.max(reps, Math.min(25, Math.round(corr!.repsMax as number))) : reps + 2;
     // PRO-3 R2: готовность дня двигает вставку (острая, не мезоцикл): RIR+1 / объём −25%
     // PRO-4 S3: ступень возврата добавляется поверх (ступень 2: ×0.5 / RIR+3)
     // PRO-CORR: библиотека задаёт базу дозы; готовность/возврат — поверх неё.
-    const corrRir = Number.isFinite(corr?.rir) ? Math.max(0, Math.min(3, Math.round(corr!.rir as number))) : 2;
-    const rir = Math.min(3, corrRir + (Number.isFinite(opts.rirShift as number) ? Math.max(0, Math.min(2, Math.round(opts.rirShift as number))) : 0) + retRir);
+    // K3: база записи 0–4 (RIR3-записи реагируют на сдвиг), общий кламп 0–4.
+    const corrRir = Number.isFinite(corr?.rir) ? Math.max(0, Math.min(4, Math.round(corr!.rir as number))) : 2;
+    const shiftRir = Number.isFinite(opts.rirShift as number) ? Math.max(0, Math.min(2, Math.round(opts.rirShift as number))) : 0;
+    const rir = Math.max(0, Math.min(4, corrRir + shiftRir + retRir));
     const tempo = (corr?.tempo && String(corr.tempo).trim()) || opts.profTempo?.[wp] || opts.profTempo?.[muscleKey] || '3-1-1-0';
-    const rest = 90;
+    const rest = Number.isFinite(corr?.restSec) ? Math.max(30, Math.min(300, Math.round(corr!.restSec as number))) : 90;
+    const loadText = hint.kg != null ? `@${hint.pct}% ≈${hint.kg}кг` : hint.bodyweight ? 'без кг (вес тела)' : 'вес по факту (workMax не задан)';
     const wantBase = Number.isFinite(corr?.sets)
       ? Math.max(1, Math.min(6, Math.round(corr!.sets as number)))
       : Math.max(2, Math.min(6, Math.round(opts.targetSets?.[wp] ?? opts.targetSets?.[muscleKey] ?? 3)));
@@ -195,26 +239,32 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
         role: 'accessory' as const,
         character: 'pump' as any,
         sets: addSets,
-        repsRange: [reps, reps + 2] as [number, number],
+        repsRange: [reps, repsMax] as [number, number],
         rir,
         workSets: Array.from({ length: addSets }, () => ({ reps, rir, weight, tempo, restSeconds: rest } as any)),
         exerciseName: catId,
         exerciseType: catType,
         tempoSpec: tempo,
         restSeconds: rest,
-        comment: `🩺 ББ-диагностика: ${wp} → ${catName} ${addSets}×${reps} @65% ${tempo}${corr?.label ? ` · ${corr.label}` : ''}${topUpSets > 0 && topUp ? ` · слабая ${topUp.side === 'left' ? 'левая' : 'правая'} первой +${topUpSets}` : ''}${volMult < 1 ? ' · объём срезан готовностью' : ''}${retVol < 1 ? ' · возврат: объём срезан' : ''}${retRir > 0 ? ` · возврат RIR+${retRir}` : ''}`,
+        comment: `🩺 ББ-диагностика: ${wp} → ${catName} ${addSets}×${reps}${repsMax > reps ? `–${repsMax}` : ''} ${loadText} RIR${rir} ${tempo} · отдых ${rest}с${corr?.label ? ` · ${corr.label}` : ''}${topUpSets > 0 && topUp ? ` · слабая ${topUp.side === 'left' ? 'левая' : 'правая'} первой +${topUpSets}` : ''}${volMult < 1 ? ' · объём срезан готовностью' : ''}${retVol < 1 ? ' · возврат: объём срезан' : ''}${retRir > 0 ? ` · возврат RIR+${retRir}` : ''}`,
         warmupSets: [],
       } as any;
       targetSession.exercises.push(ex);
       if (typeof week.totalSets === 'number') week.totalSets += addSets;
       injected++;
-      if (!opts.allWeeks) notes.push(`✓ ${wp} → ${catName} в день ${targetSession.day} ${addSets}×${reps} @65%`);
+      doseLines.push(`${wp}: ${catName} ${addSets}×${reps}${repsMax > reps ? `–${repsMax}` : ''} ${loadText} RIR${rir} · отдых ${rest}с`);
+      if (!opts.allWeeks) notes.push(`✓ ${wp} → ${catName} в день ${targetSession.day} ${addSets}×${reps} ${loadText} RIR${rir} · отдых ${rest}с`);
     }
     if (opts.allWeeks) notes.push(`✓ ${wp} → ${catName} в ${weekIdxs.length} нед по ${wantSets} сетов (${tempo})`);
   }
 
   if (injected > 0) {
-    copy.rationale = [...(copy.rationale || []), `ББ-диагностика: инъецировано ${injected} коррекций (${uniq.join(', ')})`];
+    // K3: в rationale — фактическая доза (вес/отдых/повторы/RIR), а не только факт вставки.
+    copy.rationale = [
+      ...(copy.rationale || []),
+      `ББ-диагностика: инъецировано ${injected} коррекций (${uniq.join(', ')})`,
+      ...doseLines.slice(0, 4).map((l) => `🩺 ${l}`),
+    ];
   }
   return { plan: copy, injected, skippedBudget, skippedDup, notes };
 }

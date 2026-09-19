@@ -398,6 +398,12 @@ export function correctiveExportLines(
   ];
 }
 
+/** K3: множитель веса коррекции по фазе записи (техника/стабильность — ниже, сила — выше).
+ *  Единый источник: карточка хаба и инъекция обязаны считать одно и то же («показано = вставится»). */
+export function correctiveLoadFactor(phase: BBCorrPhase): number {
+  return phase === 'strength' ? 0.7 : 0.6;
+}
+
 /** RU-имя причины для UI. */
 export const BB_CAUSE_RU: Record<BBWeakCause, string> = {
   volume: 'объём',
