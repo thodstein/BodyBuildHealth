@@ -1,6 +1,10 @@
 # ББ-коррекции в контексте хаба — PRO-уровень: аудит реальности упражнений + план K1–K7
 
-Статус: **ПЛАН** (кода нет). Дата: Sep 18 2026.
+Статус: **ВЫПОЛНЕН ПОЛНОСТЬЮ** (K1–K7, 7 коммитов pathspec: `617f994b` K1 · `41a3508a` K2 ·
+`e3bc0fce` K3 · `b410f593` K4 · `c74d4f19` K5 · `28b34fef` K6 · `77babb5e` K7; без пуша).
+Проверено: corrective/diagnostics/injection/rank 32 файла **530/530**, все bb-UI 23 файла/189,
+`tsc --noEmit` 0 по всему проекту, `verify:apk-design` OK. Осознанный re-baseline не потребовался
+(PRO-5-локи не менялись по контракту). См. §7 (факт) ниже. Дата плана: Sep 18 2026.
 Запрос: «проверь все упражнения коррекции и их реальность именно в контексте хаба — должно быть всё
 чётко и профессионально; хаб должен стать уровнем про».
 Основание: аудит кода `bb-corrective.engine.ts` (43 записи) + `bb-correction-rank.engine.ts` +
@@ -199,3 +203,23 @@ re-baseline с «было→стало». Тесты по эпику + сосе�
 bb-correction-rank, bb-corrective-ui, bb-hub-export, bb-hub-dedup, pro/pro2/pro3/max-pro) + tsc 0
 + verify:apk-design. Веб-поиск при недоступности не выдумывать — синтез в §2 уже верифицирован.
 ```
+
+## §7. Факт выполнения (Sep 19 2026)
+
+Все K1–K7 выполнены, техника и приёмка §4 соблюдены:
+
+| Эпик | Коммит | Содержание | Тесты эпика |
+|---|---|---|---|
+| K1 | `617f994b` | семантика 10 пунктов §1.2 (id/title/targets/кью), lock title↔упражнение | `bb-corrective-semantics` 11 |
+| K2 | `41a3508a` | +8 записей (traps×2/forearms×2/abs×2/biceps/adductor), lock покрытия зон | `bb-corrective-coverage` 4 |
+| K3 | `e3bc0fce` | workMax/вес/rest/repsMax/bodyweight/RIR0–4, `correctiveWeightHint`, rationale-доза | `bb-corrective-dose` 9 |
+| K4 | `b410f593` | кандидаты+гейты (уровень/оборудование/мобильность/осевая/junk-allowlist), note замены | `bb-corrective-gates` 7 |
+| K5 | `c74d4f19` | `inPlanIds` (альтернатива вместо skippedDup), единый `equipmentAllows` strict-machine | `bb-corrective-rank-inplan` 5 |
+| K6 | `28b34fef` | битые id, equipmentAlt/regression в карточке и инъекции, benchWatch-дубль, реальные фильтры | `bb-corrective-hygiene` 7 |
+| K7 | `77babb5e` | карточка ≈кг/отдых/бейджи/покрытие, HTML «Доза»+CSV `corr_*`, мост опционально | `bb-corrective-export-dose` 4 + UI 2 |
+
+Инвентарь после: `BB_CORRECTIVES` = 52 записи (43 + ch-decline-lower + 8 K2), все id — реальные
+(Lock-тесты), fallback-пул — все id реальные. Найденный при K2 дефект каталога: `hanging_knee_raise` —
+keep-first дубль по имени с `knee_raise` (удаляется из `EXERCISE_CATALOG`) — учтено в fallback.
+Осознанно не сломано: PRO-5-локи (`bb-corrective-ui` ≥3/≥1 счётчики, `bb-hub-export`, `bb-hub-dedup`)
+и calibrated-лок `equipmentAllows('machine', [])` (default-политика сохранена; строгая — параметром).
