@@ -52,9 +52,10 @@ function levelAllows(level: string | undefined, exName: string): boolean {
 /**
  * Фильтр оборудования зала. Дедуп каталога (P0.3) сливает одноимённые записи,
  * превращая equipment в массив — проверяем пересечение, а не равенство строк.
- * bodyweight доступен всегда; machine — по умолчанию тоже (каталожная политика,
- * calibrated-лок max-pro), но инъекция коррекций зовёт со `{ machineAlways: false }`:
- * домашнему залу без тренажёров тренажёрная коррекция бесполезна (K4/K5 CORR-HUB).
+ * bodyweight доступен всегда. machine: по умолчанию «доступно» (сохранено для ручных
+ * вызывающих/calibrated-локов max-pro), но все продуктовые пути (ранжир/библиотека/инъекция)
+ * зовут со `{ machineAlways: false }` — домашнему залу без тренажёров тренажёрная коррекция
+ * бесполезна (K4/K5/K6 CORR-HUB).
  */
 export function equipmentAllows(catalogEquipment: unknown, wanted: string[] | undefined, opts?: { machineAlways?: boolean }): boolean {
   if (!wanted || wanted.length === 0) return true;
@@ -99,7 +100,9 @@ export function rankCorrectionsForWeak(weakZone: string, plan: unknown, ctx: Ran
     if (muscle && !same && !aliasOk) return false;
     if (inPlan.has(norm(c.id)) || inPlan.has(norm(c.name))) return false;
     if (!levelAllows(ctx.level, String(c.name))) return false;
-    if (!equipmentAllows((c as any).equipment, ctx.equipment)) return false;
+    // K5/K6: строгая equipment-политика (machine — только при явном тренажёре) — единая
+    // с библиотекой/инъекцией/подбором; дефолт helper (machineAlways) сохранён для ручных вызывающих.
+    if (!equipmentAllows((c as any).equipment, ctx.equipment, { machineAlways: false })) return false;
     try {
       if (isMobilityRestricted(muscle) && String(c.jointStress || '').toLowerCase() === 'high' && /присед|squat|жим.*стоя|overhead/i.test(String(c.name))) return false;
     } catch { /* noop */ }

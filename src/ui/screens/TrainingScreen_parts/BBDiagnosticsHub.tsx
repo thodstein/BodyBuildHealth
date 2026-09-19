@@ -1407,9 +1407,9 @@ export const BBDiagnosticsHub: React.FC = () => {
           if (hm === m || (LEGS.has(hm) && LEGS.has(m))) { weakHead = h; break; }
         }
       } catch { /* noop */ }
-      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, weakHead, asymPct: asymMax, equipment: profileEquipment, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: effSex || undefined });
+      return prescribeCorrections(selectedDiagnosis, selectedExRaw as any, { goal: 'hypertrophy', level, muscle: selectedExRaw.muscle, weakHead, asymPct: asymMax, equipment: profileEquipment, mobilityRestrictions: profileMobility, missingAngles: aud?.angleCoverage.missing || [], missingStrict: aud?.strictCoverage.missing || [], sex: effSex || undefined });
     } catch { return []; }
-  }, [selectedDiagnosis, selectedExRaw, level, asymMax, report.weakZonesGranular, planAudit, effSex, profileEquipment]);
+  }, [selectedDiagnosis, selectedExRaw, level, asymMax, report.weakZonesGranular, planAudit, effSex, profileEquipment, profileMobility]);
 
   const selectedProf = useMemo(() => {
     if (!selectedExRaw) return null;
@@ -1594,18 +1594,20 @@ export const BBDiagnosticsHub: React.FC = () => {
     const corrective: Record<string, { sets?: number; reps?: number; repsMax?: number; rir?: number; tempo?: string; restSec?: number; loadFactor?: number; label?: string }> = {};
     // K4: кандидаты на зону — библиотека top-2/3 (осознанные дриллы) → каталожный fallback;
     // движок перебирает их канонами билдера и берёт первого прошедшего (замена с note).
-    const candidates: Record<string, Array<{ exerciseId: string; sets?: number; reps?: number; repsMax?: number; rir?: number; tempo?: string; restSec?: number; loadFactor?: number; label?: string; allowJunk?: boolean }>> = {};
+    const candidates: Record<string, Array<{ exerciseId: string; sets?: number; reps?: number; repsMax?: number; rir?: number; tempo?: string; restSec?: number; loadFactor?: number; label?: string; allowJunk?: boolean; equipmentAlt?: string[] }>> = {};
     for (const z of zones) {
       try {
         // PRO-CORR: библиотека первична (зона+причина+сигналы+доза); каталоговый топ-3 — fallback.
         const lib = (correctiveTopByZone[z] || [])[0];
-        const list: Array<{ exerciseId: string; sets?: number; reps?: number; repsMax?: number; rir?: number; tempo?: string; restSec?: number; loadFactor?: number; label?: string; allowJunk?: boolean }> = [];
+        const list: Array<{ exerciseId: string; sets?: number; reps?: number; repsMax?: number; rir?: number; tempo?: string; restSec?: number; loadFactor?: number; label?: string; allowJunk?: boolean; equipmentAlt?: string[] }> = [];
         for (const r of (correctiveTopByZone[z] || [])) {
           const dose = correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags());
           list.push({
             exerciseId: r.corr.exerciseId, sets: dose.sets, reps: dose.repsMin, repsMax: dose.repsMax, rir: dose.rir, tempo: dose.tempo,
             restSec: r.corr.protocol.restSec, loadFactor: correctiveLoadFactor(r.corr.phase),
             label: `${r.corr.title} · ${dose.note}`, allowJunk: true,
+            // K6: «чем заменить» при отказе оборудования — до перехода к следующему кандидату.
+            equipmentAlt: r.corr.equipmentAlt.slice(),
           });
         }
         for (const r of (top3ByZone[z] || [])) list.push({ exerciseId: r.id, allowJunk: false });
@@ -1846,6 +1848,9 @@ export const BBDiagnosticsHub: React.FC = () => {
                                 <div>Доза: {dose ? `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}` : `${r.corr.protocol.sets}×${r.corr.protocol.repsMin}–${r.corr.protocol.repsMax}`} · {r.why.join(' + ') || 'по зоне'}</div>
                                 <div>Кью: {r.corr.cues.join(' · ')}</div>
                                 <div>Дальше: {r.corr.progression} · Ре-тест: {r.corr.retest} ({r.corr.source})</div>
+                                {/* K6: мёртвые поля оживлены — «чем заменить» (equipmentAlt) и регрессия (спад) */}
+                                {r.corr.regression ? <div>Регрессия: {r.corr.regression}</div> : null}
+                                {r.corr.equipmentAlt.length > 0 ? <div data-bb="corrective-alt">Если нет снаряда: {r.corr.equipmentAlt.map((id) => { try { const c = (EXERCISE_CATALOG as any[]).find((e) => String(e.id).toLowerCase() === String(id).toLowerCase()); return c ? String(c.name) : id; } catch { return id; } }).join(', ')}</div> : null}
                               </div>
                             );
                           })}

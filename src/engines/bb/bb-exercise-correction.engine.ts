@@ -9,7 +9,7 @@ import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
 import type { ExerciseDiagnosis } from './bb-exercise-diagnosis.engine';
 import { sfrOf } from './bb-sfr-db';
 import { isMobilityRestricted } from './bb-mobility.engine';
-import { rankCorrectionsForWeak } from './bb-correction-rank.engine';
+import { rankCorrectionsForWeak, equipmentAllows } from './bb-correction-rank.engine';
 
 export type CorrectionType =
   | 'substitute'
@@ -42,7 +42,7 @@ function findCatalog(idOrName: string) {
 function rankSubstituteCandidates(
   ex: { id?: string | null; name: string; muscle?: string | null },
   diagnosis: ExerciseDiagnosis,
-  ctx: { goal?: string; level?: string; equipment?: string[]; muscle?: string | null; weakHead?: string | null; asymPct?: number | null; missingAngles?: string[]; missingStrict?: string[]; inPlanIds?: string[]; sex?: string },
+  ctx: { goal?: string; level?: string; equipment?: string[]; muscle?: string | null; weakHead?: string | null; asymPct?: number | null; missingAngles?: string[]; missingStrict?: string[]; inPlanIds?: string[]; sex?: string; mobilityRestrictions?: string[] },
 ): Array<{ id: string; name: string; score: number; reason: string }> {
   const muscle = String(ctx.muscle || ex.muscle || '').toLowerCase();
   const curId = ex.id || '';
@@ -60,15 +60,13 @@ function rankSubstituteCandidates(
     });
     if (ranked.length > 0) return ranked.map((r) => ({ id: r.id, name: r.name, score: r.score, reason: r.reason }));
   } catch { /* fallback ниже */ }
+  // K6: fallback-пул с РЕАЛЬНЫМИ фильтрами (раньше пустые if-блоки только обещали фильтры):
+  // оборудование (machine строго — как библиотека) + мобильность.
   const pool = EXERCISE_CATALOG.filter(c => {
     if (muscle && c.group !== muscle) return false;
     if (c.id === curId) return false;
-    if (ctx.equipment && ctx.equipment.length && !ctx.equipment.includes(c.equipment) && c.equipment !== 'bodyweight' && c.equipment !== 'machine') {
-      // фильтр оборудования мягкий — не отсекаем bodyweight
-    }
-    if (isMobilityRestricted(muscle || c.group)) {
-      // если мышца ограничена, отсекаем compound с высокой нагрузкой — упростим не отсекаем
-    }
+    if (!equipmentAllows((c as any).equipment, ctx.equipment, { machineAlways: false })) return false;
+    if (isMobilityRestricted(c, ctx.mobilityRestrictions)) return false;
     return true;
   });
   const scored = pool.map(c => {
@@ -94,7 +92,7 @@ function rankSubstituteCandidates(
 export function prescribeCorrections(
   diagnosis: ExerciseDiagnosis,
   ex: { id?: string | null; name: string; muscle?: string | null; tempo?: string; pauseSeconds?: number },
-  ctx: { goal?: string; level?: string; muscle?: string | null; equipment?: string[]; weakHead?: string | null; asymPct?: number | null; missingAngles?: string[]; missingStrict?: string[]; inPlanIds?: string[]; sex?: string } = {},
+  ctx: { goal?: string; level?: string; muscle?: string | null; equipment?: string[]; weakHead?: string | null; asymPct?: number | null; missingAngles?: string[]; missingStrict?: string[]; inPlanIds?: string[]; sex?: string; mobilityRestrictions?: string[] } = {},
 ): CorrectionAction[] {
   const out: CorrectionAction[] = [];
   const muscle = String(ctx.muscle || ex.muscle || diagnosis.effect.muscle || '').toLowerCase();
@@ -169,8 +167,10 @@ export function prescribeCorrections(
 
   // 5 unilateral — если unilateralGap
   if (flags.has('unilateralGap')) {
-    // найдём unilateral кандидата в той же мышце
-    const pool = EXERCISE_CATALOG.filter(c => c.group === muscle && /одно|single|болгар|выпад|lunge|одной/i.test(c.name));
+    // найдём unilateral кандидата в той же мышце (K6: с теми же фильтрами оборудования/мобильности)
+    const pool = EXERCISE_CATALOG.filter(c => c.group === muscle && /одно|single|болгар|выпад|lunge|одной/i.test(c.name)
+      && equipmentAllows((c as any).equipment, ctx.equipment, { machineAlways: false })
+      && !isMobilityRestricted(c, ctx.mobilityRestrictions));
     const cand = pool[0];
     if (cand) out.push({
       type: 'unilateral', targetId: cand.id, targetName: cand.name,

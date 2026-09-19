@@ -56,7 +56,7 @@ function c(
 }
 
 /** Библиотека: каждая зона × причина/фаза + каждый скрининг-сигнал. Число записей — источник истины
- *  BB_CORRECTIVE_COUNT (комментарий цифру не дублирует — раньше дрейфовала «~50» при 43).
+ *  BB_CORRECTIVE_COUNT (шапка цифру не дублирует — раньше дрейфовала при росте библиотеки).
  *  Упражнения — только реальные id EXERCISE_CATALOG (lock-тест). */
 export const BB_CORRECTIVES: BBCorrective[] = [
   // ── Грудь верх (chest_upper) ──
@@ -258,8 +258,8 @@ export interface BBScreenSignals {
   ybtAsym?: boolean;
   ktwAsym?: boolean;
   asym?: boolean;
-  benchWatch?: boolean;
-  /** PRO-CORR-FIX: подросток 14–15 (нагруженные пробы запрещены) — режет teen-loaded. */
+  /** K6: легаси-дубль benchWatch удалён — тег ставится из `benchLevel === 'watch'` (хаб).
+   *  PRO-CORR-FIX: подросток 14–15 (нагруженные пробы запрещены) — режет teen-loaded. */
   teenBlocked?: boolean;
   /** PRO-CORR-FIX: боль плеча (жёлтая/красная) — режет shoulder-pain. */
   shoulderPain?: boolean;
@@ -282,7 +282,7 @@ export function tagsForMovementScreens(s: BBScreenSignals): string[] {
   for (const z of s.zones || []) push(z);
   if (s.driver && s.driver !== 'none') push(`driver:${s.driver}`);
   if (s.benchLevel === 'fix') push('bench-fix');
-  else if (s.benchLevel === 'watch' || s.benchWatch) push('bench-watch');
+  else if (s.benchLevel === 'watch') push('bench-watch');
   if (s.nheWeak) push('nhe-weak');
   if (s.addWeak) push('add-weak');
   if (s.erirLow) push('erir-low');

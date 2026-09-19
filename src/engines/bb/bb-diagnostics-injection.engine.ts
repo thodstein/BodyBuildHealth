@@ -13,7 +13,8 @@ import { isMobilityRestricted } from './bb-mobility.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { equipmentAllows } from './bb-correction-rank.engine';
 
-const BB_WEAK_CORRECTION: Record<string, string[]> = {
+/** K6: fallback-пул базовых коррекций по зоне (все id проверены каталогом; lock-тест). */
+export const BB_WEAK_CORRECTION: Record<string, string[]> = {
   delt_mid: ['lateral_raise', 'cable_lateral', 'lateral_raise_machine'],
   delt_rear: ['rear_delt_fly', 'rear_delt_machine', 'face_pull_sh'],
   delt_front: ['ohp', 'db_press', 'ohp_seated'],
@@ -27,12 +28,12 @@ const BB_WEAK_CORRECTION: Record<string, string[]> = {
   hamstrings: ['rdl', 'leg_curl', 'leg_curl_seated'],
   glutes: ['hip_thrust', 'cable_kickback', 'hip_abduction_machine'],
   biceps: ['curl_bar', 'curl_db', 'hammer_curl'],
-  triceps: ['tricep_pushdown_rope', 'lying_tricep_extension', 'tricep_pushdown_bar'],
+  triceps: ['tricep_pushdown_rope', 'bb_triceps_long', 'tricep_pushdown_bar'],
   calves: ['calf_raise', 'calf_raise_seated', 'donkey_calf_raise'],
-  traps: ['face_pull', 'upright_row'],
-  forearms: ['hammer_curl', 'curl_bar'],
+  traps: ['shrug_bar', 'upright_row', 'shrug_db'],
+  forearms: ['wrist_curl_db', 'reverse_curl_cable'],
   shoulders: ['lateral_raise', 'ohp', 'rear_delt_fly'],
-  abs: ['crunch', 'hanging_leg_raise', 'plank'],
+  abs: ['crunch', 'knee_raise', 'plank'],
 };
 
 function findCatalog(idOrName: string) {
@@ -145,6 +146,8 @@ export interface BBAttemptCandidate {
   label?: string;
   /** Библиотечные дриллы (кламшелл, паллоф, wall-slide…) — осознанный allowlist от isBBJunk. */
   allowJunk?: boolean;
+  /** K6: «чем заменить» при отказе оборудования (equipmentAlt записи) — альтернатива до перехода к след. кандидату. */
+  equipmentAlt?: string[];
 }
 
 export interface BBInjectionResult {
@@ -206,9 +209,23 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
       for (const cnd of cands) {
         if (!cnd || !cnd.exerciseId) continue;
         const g = gateAttemptCandidate(cnd.exerciseId, cnd.allowJunk === true, opts);
-        if (!g.ok) { rejected.push(`${cnd.exerciseId} (${g.why})`); continue; }
-        picked = cnd;
-        break;
+        if (g.ok) { picked = cnd; break; }
+        // K6: отказ по оборудованию — сначала «чем заменить» самой записи (equipmentAlt),
+        // и только потом следующий кандидат.
+        if (g.why === 'оборудование' && Array.isArray(cnd.equipmentAlt) && cnd.equipmentAlt.length) {
+          let altPick: BBAttemptCandidate | null = null;
+          for (const altId of cnd.equipmentAlt) {
+            if (!altId) continue;
+            const ga = gateAttemptCandidate(String(altId), true, opts);
+            if (ga.ok) { altPick = { ...cnd, exerciseId: String(altId) }; break; }
+          }
+          if (altPick) {
+            rejected.push(`${cnd.exerciseId} (оборудование → ${altPick.exerciseId})`);
+            picked = altPick;
+            break;
+          }
+        }
+        rejected.push(`${cnd.exerciseId} (${g.why})`);
       }
       corrId = picked?.exerciseId || '';
       if (!corrId) { notes.push(`⊘ ${wp} — все кандидаты отсеяны гейтами: ${rejected.slice(0, 3).join(', ')}`); continue; }
