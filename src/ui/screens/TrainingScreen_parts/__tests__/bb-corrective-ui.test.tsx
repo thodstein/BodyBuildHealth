@@ -75,4 +75,19 @@ describe('bb-corrective-ui', () => {
     expect(uses.length).toBeGreaterThanOrEqual(3); // memo + карточка + вставка
     expect(HUB_SRC.includes('cause ?? null, {})')).toBe(false);
   });
+  it('K7: карточка несёт дозу ≈кг/отдых из workMax профиля (показано = вставится)', () => {
+    localStorage.setItem('he_profile_v2', JSON.stringify({ settings: { training: { workMax: { shoulders: 100 } } } }));
+    localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ weakManual: ['delt_mid'] }));
+    render(<BBDiagnosticsHub />);
+    const card = document.querySelector('[data-bb="corrective-card"]');
+    expect(card).not.toBeNull();
+    expect(card!.textContent).toMatch(/≈60 кг/); // 0.6 × 100 (техника)
+    expect(card!.textContent).toMatch(/отдых 60с/);
+    expect(card!.textContent).toMatch(/техника/); // бейдж фазы
+    expect(document.querySelector('[data-bb="corrective-coverage"]')!.textContent).toMatch(/вариантов/);
+  });
+  it('K7: паритет карточка=экспорт — обе точки считают вес одним helper', () => {
+    expect((HUB_SRC.match(/correctiveWeightHint\(/g) || []).length).toBeGreaterThanOrEqual(2); // карточка + correctiveDetailForExport
+    expect((HUB_SRC.match(/loadFactor: correctiveLoadFactor\(/g) || []).length).toBeGreaterThanOrEqual(2);
+  });
 });

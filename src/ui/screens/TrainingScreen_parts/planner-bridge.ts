@@ -70,7 +70,12 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   vbtLossPct?: number | null;
   weakCauses?: unknown; weakHeads?: string[];
   /** PRO-CORR: детали коррекций библиотеки (хаб шлёт, приёмник/экспорт читают; без — тихо). */
-  correctiveDetail?: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> | null;
+  /** K7: детали коррекций — + опциональная реальная доза (вес/отдых/повторы/альтернатива); старый формат без них цел. */
+  correctiveDetail?: Array<{
+    id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string;
+    weightHint?: number | null; bodyweight?: boolean; restSec?: number; reps?: number; repsMax?: number; rir?: number;
+    phase?: string; level?: string; alt?: string[];
+  }> | null;
   /** Форма свободная (движок SpecBlock: weeks/lengthWeeks/donors/dayMap/rationale);
    *  приёмник валидирует поля перед применением. */
   specBlock?: unknown;

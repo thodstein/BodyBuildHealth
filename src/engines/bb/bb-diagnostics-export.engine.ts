@@ -42,8 +42,13 @@ export interface BBDiagnosticsPro2Meta {
   loadedHinge?: { text: string } | null;
   erir?: { text: string } | null;
   screenPriority?: string[] | null;
-  /** PRO-CORR: детали коррекций библиотеки (опционально, без — байт-в-байт). */
-  correctiveDetail?: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> | null;
+  /** PRO-CORR: детали коррекций библиотеки (опционально, без — байт-в-байт).
+   *  K7: + реальная доза (weightHint/restSec/reps/rir/phase/level/alt) — опционально, старые потребители не трогаются. */
+  correctiveDetail?: Array<{
+    id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string;
+    weightHint?: number | null; bodyweight?: boolean; restSec?: number; reps?: number; repsMax?: number; rir?: number;
+    phase?: string; level?: string; alt?: string[];
+  }> | null;
 }
 
 export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakHeads?: string[]; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta): string {
@@ -134,7 +139,20 @@ ${(() => {
     if (m.loadedHinge && typeof m.loadedHinge.text === 'string' && m.loadedHinge.text) parts.push(`<h2>Шарнир под весом</h2><div style="font-size:12px">${esc(m.loadedHinge.text)}</div>`);
     if (m.erir && typeof m.erir.text === 'string' && m.erir.text) parts.push(`<h2>Плечо ER:IR</h2><div style="font-size:12px">${esc(m.erir.text)}</div>`);
     if (Array.isArray(m.screenPriority) && m.screenPriority.length) parts.push(`<h2>Скрининг — приоритет</h2><ol>${m.screenPriority.slice(0, 6).map((x) => `<li>${esc(String(x))}</li>`).join('')}</ol>`);
-    if (Array.isArray((m as any).correctiveDetail) && (m as any).correctiveDetail.length) parts.push(`<h2>Коррекции (библиотека)</h2><table><tr><th>Зона</th><th>Протокол</th><th>Кью</th><th>Источник</th></tr>${(m as any).correctiveDetail.slice(0, 4).map((d: any) => `<tr><td>${esc(d.zone)}</td><td>${esc(d.protocol)}</td><td>${esc((d.cues || []).join(' · '))}</td><td>${esc(d.source || '')}</td></tr>`).join('')}</table>`);
+    if (Array.isArray((m as any).correctiveDetail) && (m as any).correctiveDetail.length) {
+      // K7: доза (вес/отдых) — та же, что в карточке хаба и вставке («показано = вставится = выгружено»).
+      const doseText = (d: any): string => {
+        const bits: string[] = [];
+        if (typeof d.weightHint === 'number' && d.weightHint > 0) bits.push(`≈${d.weightHint} кг`);
+        else if (d.bodyweight) bits.push('без кг');
+        if (typeof d.restSec === 'number' && d.restSec > 0) bits.push(`отдых ${d.restSec}с`);
+        if (typeof d.reps === 'number' && d.reps > 0) bits.push(`${d.reps}${typeof d.repsMax === 'number' && d.repsMax > d.reps ? `–${d.repsMax}` : ''} повт`);
+        if (typeof d.rir === 'number') bits.push(`RIR${d.rir}`);
+        if (typeof d.level === 'string' && d.level && d.level !== 'any') bits.push(d.level);
+        return bits.join(' · ');
+      };
+      parts.push(`<h2>Коррекции (библиотека)</h2><table><tr><th>Зона</th><th>Протокол</th><th>Доза</th><th>Кью</th><th>Источник</th></tr>${(m as any).correctiveDetail.slice(0, 4).map((d: any) => `<tr><td>${esc(d.zone)}</td><td>${esc(d.protocol)}</td><td>${esc(doseText(d))}</td><td>${esc((d.cues || []).join(' · '))}</td><td>${esc(d.source || '')}</td></tr>`).join('')}</table>`);
+    }
     if (m.readiness?.level) parts.push(`<h2>Готовность — ${esc(m.readiness.level)}</h2><div style="font-size:12px">${esc(m.readiness.advice)}</div><ul>${m.readiness.reasons.map((r) => `<li>${esc(r)}</li>`).join('') || '<li>—</li>'}</ul>`);
     if (m.redFlags?.active) parts.push(`<h2>Флаги — ${m.redFlags.blocked ? 'стоп' : 'осторожно'}</h2><div style="font-size:12px">${esc(m.redFlags.text)} (скрининг, не диагноз)</div>`);
     if (m.bar) parts.push(`<h2>Штанга (видео)</h2><div style="font-size:12px">Петля ${m.bar.xLoop} см · ${esc(m.bar.type)} — ${esc(m.bar.text)} (порог 4/6 см)</div>`);
@@ -242,8 +260,13 @@ export function buildBBDiagnosticsCsv(
   if (meta?.erir?.text) lines.push(['er_ir', meta.erir.text].map(escCsv).join(','));
   if (Array.isArray(meta?.screenPriority) && meta.screenPriority.length) lines.push(['screen_priority', meta.screenPriority.join(' · ')].map(escCsv).join(','));
   if (Array.isArray((meta as any)?.correctiveDetail) && (meta as any).correctiveDetail.length) {
-    lines.push(['corr_id', 'corr_zone', 'corr_exercise', 'corr_protocol', 'corr_source'].map(escCsv).join(','));
-    for (const d of (meta as any).correctiveDetail.slice(0, 4)) lines.push([d.id, d.zone, d.exerciseId, d.protocol, d.source].map(escCsv).join(','));
+    // K7: хвостовые колонки дозы (старые колонки 1-в-1 — потребители формата не ломаются).
+    lines.push(['corr_id', 'corr_zone', 'corr_exercise', 'corr_protocol', 'corr_source', 'corr_weight', 'corr_rest', 'corr_reps'].map(escCsv).join(','));
+    for (const d of (meta as any).correctiveDetail.slice(0, 4)) {
+      const w = typeof d.weightHint === 'number' && d.weightHint > 0 ? String(d.weightHint) : (d.bodyweight ? 'bodyweight' : '');
+      const reps = typeof d.reps === 'number' && d.reps > 0 ? `${d.reps}${typeof d.repsMax === 'number' && d.repsMax > d.reps ? `-${d.repsMax}` : ''}` : '';
+      lines.push([d.id, d.zone, d.exerciseId, d.protocol, d.source, w, d.restSec != null ? String(d.restSec) : '', reps].map(escCsv).join(','));
+    }
   }
   if (meta?.returnTo) lines.push(['return_to', meta.returnTo.text].map(escCsv).join(','));
   if (meta?.lrDirection?.length) lines.push(['lr_direction', meta.lrDirection.map((d) => d.text).join(' · ')].map(escCsv).join(','));

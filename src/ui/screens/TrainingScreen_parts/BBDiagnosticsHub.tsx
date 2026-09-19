@@ -42,7 +42,7 @@ import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-dete
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { rankCorrectives, correctiveDose, correctiveLoadFactor } from '../../../engines/bb/bb-corrective.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
-import { injectBBWeakPoints, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
+import { injectBBWeakPoints, correctiveWeightHint, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
 import { weakHeadForZone, HEAD_FUNCTIONS, auditHeadCoverage, headsHitOf } from '../../../engines/bb/bb-stimulus-target.engine';
 import { resolveMovementDriver, singleLegVerdict, ohsFailCodes, d1d5FailCodes, v3FailCodes, movementDelta, screenPriorityList, teenLoadedGate, type MovementSnapshot } from '../../../engines/bb/bb-movement-screen.engine';
@@ -1267,16 +1267,29 @@ export const BBDiagnosticsHub: React.FC = () => {
   }, [report.weakZonesGranular]);
   const correctiveDetailForExport = useMemo(() => {
     try {
-      const det: Array<{ id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string }> = [];
+      const det: Array<{
+        id: string; zone: string; exerciseId: string; protocol: string; cues: string[]; source: string;
+        weightHint?: number | null; bodyweight?: boolean; restSec?: number; reps?: number; repsMax?: number; rir?: number;
+        phase?: string; level?: string; alt?: string[];
+      }> = [];
       for (const z of report.weakZonesGranular.slice(0, 2)) {
         const r = (correctiveTopByZone[z] || [])[0];
         if (!r) continue;
         const dose = correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags());
-        det.push({ id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId, protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`, cues: r.corr.cues.slice(0, 3), source: r.corr.source });
+        // K7: доза 1-в-1 с карточкой и вставкой (тот же workMax/loadFactor) — «выгружено = вставится».
+        const hint = (() => { try { return correctiveWeightHint(r.corr.exerciseId, profileWorkMax, canonicalMuscle(z), { loadFactor: correctiveLoadFactor(r.corr.phase) }); } catch { return null; } })();
+        det.push({
+          id: r.corr.id, zone: z, exerciseId: r.corr.exerciseId,
+          protocol: `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}`,
+          cues: r.corr.cues.slice(0, 3), source: r.corr.source,
+          weightHint: hint ? hint.kg : null, bodyweight: hint ? hint.bodyweight : undefined,
+          restSec: r.corr.protocol.restSec, reps: dose.repsMin, repsMax: dose.repsMax, rir: dose.rir,
+          phase: r.corr.phase, level: r.corr.level, alt: r.corr.equipmentAlt.slice(),
+        });
       }
       return det.length ? det : null;
     } catch { return null; }
-  }, [report.weakZonesGranular, correctiveTopByZone, weakCauses, readiness, painMon]);
+  }, [report.weakZonesGranular, correctiveTopByZone, weakCauses, readiness, painMon, profileWorkMax]);
   const pro2Meta = useMemo(() => buildPro2Meta({
     lrVerdicts: lrVerdicts as any,
     moveDriver,
@@ -1839,13 +1852,18 @@ export const BBDiagnosticsHub: React.FC = () => {
                       {correctiveTopByZone[z] && correctiveTopByZone[z].length > 0 && (
                         <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.22)' }} data-bb="corrective-card" data-zone={z}>
                           <b style={{ color: '#00e68a', fontSize: 11 }}>🛠 Коррекция по скринингам (доза + техника)</b>
+                          <span style={{ color: '#fff', fontSize: 10 }} data-bb="corrective-coverage"> · зона: {correctiveTopByZone[z].length} вариантов</span>
                           {correctiveTopByZone[z].slice(0, 2).map((r) => {
                             // П2: те же флаги, что вставка (readiness-red/жёлтая боль) — «показано = вставится».
                             const dose = (() => { try { return correctiveDose(r.corr, (weakCauses as any)?.[z]?.cause ?? null, corrDoseFlags()); } catch { return null; } })();
+                            // K7: вес/отдых — из тех же входов, что вставка (workMax профиля + loadFactor записи).
+                            const hint = (() => { try { return correctiveWeightHint(r.corr.exerciseId, profileWorkMax, canonicalMuscle(z), { loadFactor: correctiveLoadFactor(r.corr.phase) }); } catch { return null; } })();
+                            const phaseRu = r.corr.phase === 'strength' ? 'сила' : r.corr.phase === 'stability' ? 'стабильность' : 'техника';
                             return (
                               <div key={r.corr.id} style={{ marginTop: 6, fontSize: 10, lineHeight: 1.5, color: '#fff' }} data-bb="corrective-row" data-corr={r.corr.id}>
                                 <b style={{ color: '#fff' }}>{r.corr.title}</b>
-                                <div>Доза: {dose ? `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}` : `${r.corr.protocol.sets}×${r.corr.protocol.repsMin}–${r.corr.protocol.repsMax}`} · {r.why.join(' + ') || 'по зоне'}</div>
+                                <span style={{ color: '#fff' }} data-bb="corrective-badge"> · {phaseRu}{r.corr.level !== 'any' ? ` · ${r.corr.level === 'intermediate' ? 'любитель+' : 'профи'}` : ''}</span>
+                                <div>Доза: {dose ? `${dose.sets}×${dose.repsMin}–${dose.repsMax} RIR${dose.rir} ${dose.tempo}` : `${r.corr.protocol.sets}×${r.corr.protocol.repsMin}–${r.corr.protocol.repsMax}`}{hint ? ` · ${hint.kg != null ? `≈${hint.kg} кг` : hint.bodyweight ? 'без кг' : 'вес по факту'}` : ''} · отдых {r.corr.protocol.restSec}с · {r.why.join(' + ') || 'по зоне'}</div>
                                 <div>Кью: {r.corr.cues.join(' · ')}</div>
                                 <div>Дальше: {r.corr.progression} · Ре-тест: {r.corr.retest} ({r.corr.source})</div>
                                 {/* K6: мёртвые поля оживлены — «чем заменить» (equipmentAlt) и регрессия (спад) */}
