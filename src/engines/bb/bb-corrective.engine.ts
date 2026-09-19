@@ -11,6 +11,7 @@
  */
 
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { equipmentAllows } from './bb-correction-rank.engine';
 
 export type BBCorrPhase = 'technique' | 'strength' | 'stability';
 export type BBWeakCause = 'volume' | 'activation' | 'recovery' | 'technique' | 'genetics';
@@ -269,6 +270,9 @@ export interface BBScreenSignals {
   cause?: BBWeakCause | null;
   level?: string | null;
   equipment?: string[];
+  /** K5: id упражнений, уже стоящих в плане — дубль-кандидат уступает альтернативе
+   *  (раньше топ-1 «уже в плане» давал skippedDup и зона оставалась без коррекции). */
+  inPlanIds?: string[];
 }
 
 /** Маппинг сырых скринингов → сигнальные теги (честно: неизвестное — тихо). */
@@ -318,21 +322,21 @@ function catalogEquipmentOf(exerciseId: string): string[] | null {
   } catch { return null; }
 }
 
-/** Честный фильтр зала: bodyweight — всегда; неизвестное в каталоге — не блочим; иначе пересечение со списком профиля. */
+/** Честный фильтр зала: единый helper с ранжиром (K5), но со строгой machine-политикой —
+ *  домашнему залу без тренажёров тренажёрная коррекция бесполезна (каталожный rank
+ *  сохраняет machine-доступность — calibrated-лок max-pro). */
 function equipOk(c: BBCorrective, wanted: string[] | undefined): boolean {
   if (!wanted || !wanted.length) return true;
-  const list = catalogEquipmentOf(c.exerciseId);
-  if (!list || !list.length) return true;
-  if (list.includes('bodyweight')) return true;
-  const want = wanted.map((w) => String(w || '').toLowerCase().trim()).filter(Boolean);
-  return list.some((e) => want.includes(e));
+  return equipmentAllows(catalogEquipmentOf(c.exerciseId), wanted, { machineAlways: false });
 }
 
-/** Ранг библиотеки: зона +5, драйвер/сигнал +4, причина +3, unilateral-при-асимметрии +2. Противопоказания: красная боль (pm-red), подросток (teen-loaded), боль плеча (shoulder-pain). */
+/** Ранг библиотеки: зона +5, драйвер/сигнал +4, причина +3, unilateral-при-асимметрии +2. Противопоказания: красная боль (pm-red), подросток (teen-loaded), боль плеча (shoulder-pain). K5: упражнение из плана — исключается (альтернатива важнее дубля). Возвращает запас 6: хаб спрашивает до 3, K4-кандидаты — больше. */
 export function rankCorrectives(s: BBScreenSignals): Array<{ corr: BBCorrective; score: number; why: string[] }> {
   const tags = new Set(tagsForMovementScreens(s));
+  const inPlan = new Set((s.inPlanIds || []).map((x) => String(x || '').toLowerCase().trim()).filter(Boolean));
   const out: Array<{ corr: BBCorrective; score: number; why: string[] }> = [];
   for (const c of BB_CORRECTIVES) {
+    if (inPlan.has(String(c.exerciseId || '').toLowerCase())) continue;
     if (!levelOk(c, s.level)) continue;
     if (s.painLevel === 'red' && c.contraindicated.includes('pm-red')) continue;
     if (s.teenBlocked && c.contraindicated.includes('teen-loaded')) continue;

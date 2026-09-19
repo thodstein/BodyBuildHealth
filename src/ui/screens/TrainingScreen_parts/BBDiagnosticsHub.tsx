@@ -1033,6 +1033,8 @@ export const BBDiagnosticsHub: React.FC = () => {
       loadedFail: (() => { try { return teenGate.blocked ? false : !!loadedHingeV.degraded; } catch { return false; } })(),
       cause: (cause ?? null) as 'volume' | 'activation' | 'recovery' | 'technique' | 'genetics' | null,
       level, equipment: profileEquipment,
+      // K5: топ библиотеки не должен быть занят планом (иначе зона остаётся без коррекции).
+      inPlanIds: inPlanExerciseIds,
     };
   };
 
@@ -1212,15 +1214,18 @@ export const BBDiagnosticsHub: React.FC = () => {
       return buildSpecBlock({ weakZones: report.weakZonesGranular, factSets: f, level, weeks: parseInt(state.specWeeks) || 8, sex: effSex || undefined });
     } catch { return null; }
   }, [report.weakZonesGranular, factVolume, level, state.specWeeks, effSex]);
+  const inPlanExerciseIds = useMemo(() => {
+    const out: string[] = [];
+    try {
+      if (bbPlan) for (const w of (bbPlan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) out.push(String((ex as any).exerciseName || (ex as any).name || ''));
+    } catch { /* noop */ }
+    return out;
+  }, [bbPlan]);
   const top3ByZone = useMemo(() => {
     const out: Record<string, ReturnType<typeof rankCorrectionsForWeak>> = {};
     for (const z of report.weakZonesGranular.slice(0, 2)) {
       try {
         const aud = (() => { try { return planAudit?.byMuscle?.[z]; } catch { return null; } })();
-        const inPlan: string[] = [];
-        try {
-          if (bbPlan) for (const w of (bbPlan.weeks || [])) for (const s of (w.sessions || [])) for (const ex of (s.exercises || [])) inPlan.push(String((ex as any).exerciseName || (ex as any).name || ''));
-        } catch { /* noop */ }
         out[z] = rankCorrectionsForWeak(z, null, {
           cause: weakCauses[z]?.cause,
           weakHead: weakHeadForZone(z),
@@ -1230,13 +1235,13 @@ export const BBDiagnosticsHub: React.FC = () => {
           missingAngles: aud?.angleCoverage.missing || [],
           missingStrict: aud?.strictCoverage.missing || [],
           missingShort: (aud?.totalSets ?? 0) >= 6 && (aud?.shortened ?? 0) === 0,
-          inPlanIds: inPlan,
+          inPlanIds: inPlanExerciseIds,
           sex: effSex || undefined,
         }).slice(0, 3);
       } catch { out[z] = []; }
     }
     return out;
-  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, effSex, planAudit, bbPlan, profileEquipment]);
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, effSex, planAudit, inPlanExerciseIds, profileEquipment]);
 
   // PRO-CORR: библиотека коррекций — зона + причина + сигналы скринингов (единый corrSignalsFor: паритет с экспортом/вставкой).
   const correctiveTopByZone = useMemo(() => {
@@ -1247,7 +1252,7 @@ export const BBDiagnosticsHub: React.FC = () => {
       } catch { out[z] = []; }
     }
     return out;
-  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV, loadedHingeV]);
+  }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, inPlanExerciseIds, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV, loadedHingeV]);
 
   // Э5 PRO-5: единые входы выдачи — головки, детали коррекций и PRO-мета (HTML/CSV/мост одним объектом)
   const exportHeads = useMemo(() => {

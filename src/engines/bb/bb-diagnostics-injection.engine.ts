@@ -214,7 +214,16 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
       if (!corrId) { notes.push(`⊘ ${wp} — все кандидаты отсеяны гейтами: ${rejected.slice(0, 3).join(', ')}`); continue; }
       if (rejected.length) notes.push(`↩ ${wp}: заменено гейтами (${rejected.join(', ')}) → ${corrId}`);
     } else {
-      corrId = preferred || corrList[0] || '';
+      // Legacy-путь (внешний API/preferred): гейты билдера применяются, junk — allowlist
+      // (default-пул и preferred не дриллы; новые кандидаты хаба несут allowJunk явно).
+      const legacyId = preferred || corrList[0] || '';
+      if (legacyId) {
+        const g = gateAttemptCandidate(legacyId, true, opts);
+        if (g.ok) corrId = legacyId;
+        else { notes.push(`⊘ ${wp}: ${legacyId} отсеян (${g.why}) — альтернатив нет`); continue; }
+      } else {
+        corrId = '';
+      }
     }
     if (!corrId) { notes.push(`⚠ ${wp} — нет коррекции`); continue; }
     const cat = findCatalog(corrId);
