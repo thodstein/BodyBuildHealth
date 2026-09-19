@@ -656,6 +656,9 @@ export const WEAK_TO_MUSCLE: Record<string, string> = {
   // гиперэкстензия/back-extension = hamstrings (hinge-ветка), поэтому гарантия должна
   // искаться в ham-сессиях, а не в 'back' (иначе кандидатов нет и паттерн молчит).
   lower_back: 'hamstrings', neck: 'traps',
+  // Аддукторы (K1 CORR-HUB): отдельной мышцы в BB-модели нет — тазовая зона,
+  // ведём через glutes (учёт объёма/сессия/вес инъекции); сила-тест — сигнал add-weak.
+  adductor: 'glutes',
 };
 
 /** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */

@@ -54,7 +54,9 @@ function c(
   return { id, title, exerciseId, targets, causes, phase, level, protocol, cues, progression, regression, retest, source, equipmentAlt, contraindicated };
 }
 
-/** ~50 записей: каждая зона × причина/фаза + каждый скрининг-сигнал. Упражнения — только id EXERCISE_CATALOG. */
+/** Библиотека: каждая зона × причина/фаза + каждый скрининг-сигнал. Число записей — источник истины
+ *  BB_CORRECTIVE_COUNT (комментарий цифру не дублирует — раньше дрейфовала «~50» при 43).
+ *  Упражнения — только реальные id EXERCISE_CATALOG (lock-тест). */
 export const BB_CORRECTIVES: BBCorrective[] = [
   // ── Грудь верх (chest_upper) ──
   c('cu-incline-length', 'Жим гантелей 30° с паузой (длина)', 'incline_db', ['chest_upper', 'chest', 'bench-fix'], ['activation', 'technique', 'volume'], 'technique', 'any',
@@ -63,13 +65,16 @@ export const BB_CORRECTIVES: BBCorrective[] = [
   c('cu-cable-low', 'Сведение снизу вверх (пик)', 'cable_fly_low', ['chest_upper', 'chest'], ['activation', 'genetics'], 'technique', 'any',
     { sets: 2, repsMin: 12, repsMax: 15, rir: 1, tempo: '3-2-1-0', restSec: 60, freqPerWeek: 2 },
     ['Руки внизу — тяни вверх', 'Задержка 1–2с в сведении', 'Рёбра вниз, без моста'], 'Вес +1 шаг при 15 повт чисто', 'Отжимания с колен в узкой постановке', 'Пиковое удержание 2с × 12 без потери формы', 'Schoenfeld MMC (изоляция ≤65%)', ['pec_deck']),
-  c('cu-bench-neutral', 'Жим: сузь хват + сведи лопатки', 'incline_db', ['bench-fix', 'bench-watch', 'chest'], ['technique'], 'technique', 'any',
+  c('cu-bench-neutral', 'Жим: сузь хват + сведи лопатки', 'bench_bar', ['bench-fix', 'bench-watch', 'chest'], ['technique'], 'technique', 'any',
     { sets: 3, repsMin: 6, repsMax: 10, rir: 2, tempo: '3-1-1-0', restSec: 120, freqPerWeek: 2 },
     ['Хват 1.2–1.5 ширины плеч', 'Лопатки сведены и опущены', 'Касание — линия сосков'], 'Та же техника +5% веса', 'Жим гантелей сидя с опорой', 'Хват ≤1.5 BAW + лопатки держат весь сет', 'Noteboom 2024 (BAW/ретракция)', ['incline_bar']),
   // ── Грудь общая ──
-  c('ch-fly-stretch', 'Разводка с растяжением 2с', 'fly_db', ['chest', 'chest_mid', 'chest_lower'], ['activation', 'volume'], 'strength', 'any',
+  c('ch-fly-stretch', 'Разводка с растяжением 2с', 'fly_db', ['chest', 'chest_mid'], ['activation', 'volume'], 'strength', 'any',
     { sets: 2, repsMin: 10, repsMax: 14, rir: 2, tempo: '3-2-1-0', restSec: 75, freqPerWeek: 2 },
     ['Полукруг до растяжения', 'Пауза 2с внизу', 'Сведение как объятие'], 'Вес +1 кг при верхней границе', 'Сведение в тренажёре', 'Амплитуда + RIR стабилен', 'Maeo lengthened (растянутая)', ['pec_deck', 'cable_fly_mid'], ['pm-red']),
+  c('ch-decline-lower', 'Жим на наклонной вниз (низ груди)', 'decline_db', ['chest_lower', 'chest'], ['volume', 'technique'], 'strength', 'any',
+    { sets: 3, repsMin: 8, repsMax: 12, rir: 2, tempo: '3-1-1-0', restSec: 90, freqPerWeek: 1 },
+    ['Локти в стороны, без разведения в стороны', 'Касание — низ груди', 'Разгибание без замка локтей'], 'Вес +2 кг при форме', 'Отжимания от пола с широкой постановкой', 'Низ груди: +повторы/вес за 3 нед', 'NSCA (регионарная нагрузка)', ['decline_bar', 'machine_decline_press'], ['pm-red']),
   c('ch-dips-tech', 'Брусья грудным стилем (контро́ль)', 'dips_chest', ['chest_lower', 'chest'], ['volume', 'technique'], 'strength', 'intermediate',
     { sets: 3, repsMin: 6, repsMax: 10, rir: 2, tempo: '3-0-1-0', restSec: 120, freqPerWeek: 1 },
     ['Наклон 30–40° вперёд', 'Локти в стороны', 'Вниз — растяжение, вверх — сведение'], 'Доп. вес +2.5 кг', 'Отжимания от пола с широкой постановкой', 'Глубина без боли плеча 3 нед', 'Calatayud (наклон=грудь)', [], ['pm-red', 'shoulder-pain', 'teen-loaded']),
@@ -104,7 +109,7 @@ export const BB_CORRECTIVES: BBCorrective[] = [
   c('dr-rear-fly', 'Махи в наклоне (локти вверх)', 'rear_delt_fly', ['delt_rear', 'shoulders'], ['volume', 'activation'], 'strength', 'any',
     { sets: 3, repsMin: 12, repsMax: 15, rir: 1, tempo: '2-1-1-0', restSec: 60, freqPerWeek: 2 },
     ['Наклон 60–70°', 'Локти вверх, не назад', 'Спина прямая'], 'Вес +1 кг', 'Обратные сведения в тренажёре', 'Локти держат высоту все повторы', 'NSCA (задняя)', ['rear_delt_machine_v2']),
-  c('dr-erir-rotation', 'Наружная ротация легко ×15', 'cable_facepull_rope', ['erir-low', 'delt_rear', 'shoulders'], ['technique', 'activation'], 'stability', 'any',
+  c('dr-erir-rotation', 'Наружная ротация легко ×15', 'cable_external_rotation', ['erir-low', 'delt_rear', 'shoulders'], ['technique', 'activation'], 'stability', 'any',
     { sets: 2, repsMin: 12, repsMax: 15, rir: 3, tempo: '2-1-2-0', restSec: 45, freqPerWeek: 3 },
     ['Локоть прижат к корпусу', 'Только ротация, без рывка', 'Боль 0'], 'ER:IR ≥0.75 на перетесте', 'Scaption без веса', 'ER:IR вырос + боль 0', 'Intelangelo 2025 (<0.75)', ['scaption']),
   // ── Дельты передняя ──
@@ -141,7 +146,7 @@ export const BB_CORRECTIVES: BBCorrective[] = [
   c('g-hip-thrust', 'Хип-траст с паузой 2с', 'hip_thrust_barbell', ['glutes', 'driver:hip'], ['activation', 'volume'], 'strength', 'any',
     { sets: 3, repsMin: 8, repsMax: 10, rir: 1, tempo: '2-2-1-0', restSec: 120, freqPerWeek: 2 },
     ['Лопатки на скамье', 'Сжатие ягодиц 2с вверху', 'Без гиперэкстензии'], 'Вес +2.5 кг', 'Ягодичный мост на полу', 'Пауза держится на рабочем весе', 'Plotkin 2023 (траст у тренированных)', ['glute_bridge_v2', 'cable_pull_through'], ['pm-red']),
-  c('g-clam-complex', 'Комплекс ТБС 8 нед (кламшелл+)', 'clamshell', ['glutes', 'driver:hip', 'ybt-asym'], ['technique', 'activation'], 'stability', 'any',
+  c('g-clam-complex', 'Комплекс ТБС: кламшелл + боковая планка', 'clamshell', ['glutes', 'driver:hip', 'ybt-asym'], ['technique', 'activation'], 'stability', 'any',
     { sets: 2, repsMin: 15, repsMax: 20, rir: 3, tempo: '2-1-2-0', restSec: 45, freqPerWeek: 3 },
     ['Резина на бёдрах', '«Раздвинь пол стопами»', 'Таз стабилен'], 'Резина жёстче / боковая планка с ногой', 'Ходьба с резиной', 'FPPA −5° / колени не валятся', 'CCEP BMC-2022 (комплекс, не изоляция)', ['band_walks', 'plank_side_leg_lift']),
   c('g-single-bridge', 'Мост на одной ноге (асимметрия)', 'hip_thrust_single', ['glutes', 'asym', 'ybt-asym'], ['genetics', 'technique'], 'stability', 'any',
@@ -165,12 +170,12 @@ export const BB_CORRECTIVES: BBCorrective[] = [
   c('bi-incline-length', 'Сгибания на наклонной (длина)', 'incline_db_curl', ['biceps'], ['activation', 'volume'], 'strength', 'any',
     { sets: 3, repsMin: 10, repsMax: 12, rir: 1, tempo: '3-0-1-0', restSec: 75, freqPerWeek: 2 },
     ['Скамья 30–45° назад', 'Руки висят = растяжение', 'Супинация наверху'], 'Вес +1 кг', 'Сгибания со штангой', 'Растяжение без читинга', 'Wolf (длина)', ['curl_bar_v2']),
-  c('tri-overhead-length', 'Французский из-за головы (длина)', 'kickback_v2', ['triceps'], ['activation', 'volume'], 'technique', 'any',
+  c('tri-overhead-length', 'Французский из-за головы (длина)', 'bb_triceps_long', ['triceps'], ['activation', 'volume'], 'technique', 'any',
     { sets: 2, repsMin: 10, repsMax: 12, rir: 1, tempo: '3-1-1-0', restSec: 60, freqPerWeek: 2 },
     ['Локоть фиксирован', 'Полное разгибание', 'Удержание 1с'], 'Вес +1 кг при форме', 'Разгибания на блоке', 'Локоть не гуляет', 'Maeo (overhead)', ['dips_tricep_v2'], ['pm-red']),
-  c('tri-pushdown-peak', 'Разгибания на блоке (пик)', 'dips_tricep_v2', ['triceps'], ['volume', 'technique'], 'technique', 'any',
+  c('tri-pushdown-peak', 'Разгибания на блоке (пик)', 'tricep_pushdown_rope', ['triceps'], ['volume', 'technique'], 'technique', 'any',
     { sets: 2, repsMin: 10, repsMax: 12, rir: 2, tempo: '2-1-1-0', restSec: 60, freqPerWeek: 2 },
-    ['Корпус вертикально', 'Локти назад', 'Без наклона вперёд'], 'Вес +1 шаг', 'Кикбэк лёгкий', 'Локти держат линию', 'Schoenfeld (пик)', ['kickback_cable'], ['pm-red']),
+    ['Корпус вертикально', 'Локти назад', 'Без наклона вперёд'], 'Вес +1 шаг', 'Кикбэк лёгкий', 'Локти держат линию', 'Schoenfeld (пик)', ['tricep_pushdown_bar'], ['pm-red']),
   // ── Кор / шарнир ──
   c('core-deadbug', 'Мёртвый жук с дыханием', 'dead_bug', ['core', 'driver:core', 'hinge-fail'], ['technique', 'activation'], 'stability', 'any',
     { sets: 2, repsMin: 8, repsMax: 10, rir: 3, tempo: '3-1-3-0', restSec: 45, freqPerWeek: 3 },
@@ -178,20 +183,20 @@ export const BB_CORRECTIVES: BBCorrective[] = [
   c('core-pallof', 'Паллоф-пресс 3–5с', 'pallof_press', ['core', 'driver:core'], ['technique', 'activation'], 'stability', 'any',
     { sets: 2, repsMin: 8, repsMax: 10, rir: 3, tempo: '3-3-1-0', restSec: 45, freqPerWeek: 3 },
     ['Трос сбоку', 'Выжал — держи 3–5с', 'Таз стабилен'], 'Трос тяжелее / дальше от опоры', 'Боковая планка', 'Удержание без ротации', 'McGill (антиротация)', ['plank_side']),
-  c('core-hinge-rdl', 'Румынская выше колен (шарнир-учеба)', 'rdl_db', ['core', 'hinge-fail', 'driver:core', 'driver:hip'], ['technique'], 'technique', 'any',
+  c('core-hinge-rdl', 'Румынская выше колен (шарнир-учеба)', 'rdl_db', ['hinge-fail', 'hamstrings', 'driver:hip'], ['technique'], 'technique', 'any',
     { sets: 3, repsMin: 8, repsMax: 10, rir: 3, tempo: '3-1-1-0', restSec: 90, freqPerWeek: 2 },
     ['Палка: 3 точки касания', 'Таз назад, колени мягкие', 'Выше колен — стоп'], 'Полная RDL с палкой чисто', 'Тяга троса между ног', 'Палка не отрывается весь сет', 'NASM (hinge-паттерн)', ['cable_pull_through']),
   // ── Плечо у стены / грудной ──
   c('sh-wall-slide', 'Скольжение по стене (лопатки)', 'wall_slide', ['shoulder-fail', 'driver:shoulder', 'thoracic', 'driver:thoracic', 'rot-gap'], ['technique', 'activation'], 'stability', 'any',
     { sets: 2, repsMin: 10, repsMax: 12, rir: 3, tempo: '2-1-2-0', restSec: 45, freqPerWeek: 3 },
     ['Спина к стене', 'Руки скользят вверх', 'Поясница не отрывается'], 'Жим гантелей нейтральным без боли', 'Scaption без веса', 'Стена-тест: чисто + ротация ≥50°', 'NASM (scap-контроль)', ['scaption']),
-  c('sh-neutral-press', 'Жим нейтральным хватом (длина широчайших)', 'pulldown_rev', ['shoulder-fail', 'driver:shoulder', 'back_width'], ['technique', 'activation'], 'technique', 'any',
+  c('sh-neutral-press', 'Тяга нейтральным хватом (плечо-сейф)', 'pulldown_rev', ['shoulder-fail', 'driver:shoulder', 'back_width'], ['technique', 'activation'], 'technique', 'any',
     { sets: 3, repsMin: 8, repsMax: 12, rir: 2, tempo: '3-1-1-0', restSec: 90, freqPerWeek: 2 },
     ['Нейтральный хват', 'Локти вниз', 'Пауза в растянутой'], 'Подтягивания нейтральным', 'Тяга блока легко', 'Тяга без боли + амплитуда', 'GRSM 2025', ['pullup_neutral']),
   // ── Шарнир под весом ──
-  c('lh-trap-swap', 'Трап/блоки вместо пола (шарнир плывёт)', 'hack_squat_ham', ['hinge-fail', 'loaded-fail', 'hamstrings', 'driver:hip'], ['technique'], 'technique', 'intermediate',
+  c('lh-trap-swap', 'Трап-гриф вместо штанги (шарнир плывёт)', 'deadlift_trapbar', ['hinge-fail', 'loaded-fail', 'hamstrings', 'driver:hip'], ['technique'], 'technique', 'intermediate',
     { sets: 3, repsMin: 6, repsMax: 8, rir: 2, tempo: '2-1-1-0', restSec: 120, freqPerWeek: 1 },
-    ['Стопы высоко', 'Спина прижата', 'Разгибай тазом'], 'RDL с пола чисто', 'Тяга троса между ног', 'Пол не плывёт на рабочем весе', 'IJSPT-2024 (стабильны под весом)', ['cable_pull_through'], ['pm-red']),
+    ['Стопы в центр трапа', 'Грудь вверх, спина нейтральна', 'Тяга ногами и тазом, без рывка'], 'RDL с пола чисто', 'Гакк на бицепс бедра (стопы высоко)', 'Пол не плывёт на рабочем весе', 'IJSPT-2024 (стабильны под весом)', ['hack_squat_ham', 'cable_pull_through'], ['pm-red']),
   c('lh-tempo-split', 'Сплит с темпом 3-1-1 (контроль)', 'bulgarian_split_db', ['hinge-fail', 'loaded-fail', 'quads', 'driver:hip'], ['technique', 'activation'], 'technique', 'any',
     { sets: 2, repsMin: 8, repsMax: 10, rir: 2, tempo: '3-1-1-0', restSec: 90, freqPerWeek: 2 },
     ['Темп держишь вслух', 'Переднее колено над стопой', 'Корпус вертикально'], 'Вес +2 кг', 'Сплит без веса', 'Темп не разваливается под весом', 'Pareja-Blanco (контроль)', ['bulgarian_split']),
