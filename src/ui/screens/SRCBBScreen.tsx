@@ -15,20 +15,20 @@ import { SPLIT_PATTERNS } from '../../engines/bb/bb-split-patterns';
 import { rankBBSplits, selectBestBBSplit, explainBBSelection, type BBSelectorInput } from '../../engines/bb/bb-selector.engine';
 import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
 import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, buildBBContestPrep, isoAddDays, isoToday, PEAK_PHASE_COLORS, PHASE_LABELS_RU, type BBContestPrepConfig } from '../../engines/bb/bb-contest-prep.engine';
-import { calcBBPlanMetrics, explainBBMetrics } from '../../engines/bb/bb-metrics.engine';
+import { calcBBPlanMetrics } from '../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
 import { DayCard, type PlanDayView, type PlanExerciseView, type PhaseKey } from './TrainingScreen_parts/PlanOutput';
 import { PedInputPanel, PedAdaptationCard } from './TrainingScreen_parts/PedCoursePanel';
 
-import { PeakingPanel } from './SRCBBScreen_parts/PeakingPanel';
+
 import { TaperCoachCard } from './SRCBBScreen_parts/TaperCoachCard';
 import { PLCompetitionTab } from './SRCBBScreen_parts/PLCompetitionTab';
 import { PLPlanView } from './SRCBBScreen_parts/PLPlanView';
 import { PLTaperProvider, usePLTaper } from './SRCBBScreen_parts/taper-state';
 import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
-import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
+
 import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { TRAINING_SPLITS } from '../../engines/training.engine';
@@ -36,14 +36,11 @@ import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, setPlannerSource, type PlannerApply } from './TrainingScreen_parts/planner-bridge';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
-import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
-import { VisualTab } from './TrainingScreen_parts/VisualTab';
-import { ProMetricsPanel } from './SRCBBScreen_parts/ProMetricsPanel';
+
 import { PopupNumber, PopupSelect, PopupMultiSelect, ExpandableCard, MetricCard, SaveButton } from './SRCBBScreen_parts/TrainingPopups';
 import { lmsPlanToSessions, bbPlanToSessions, autoregPlan as autoregPlanBridge, progressFromSessions, planVsFact } from '../../engines/training-integration.engine';
 import type { BridgeSession, ReadinessInput, ProgressSnapshot } from '../../engines/training-integration.engine';
 import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
-import { MesocycleProgressionCard, SOURCE_PHASE_LABEL, SOURCE_PHASE_ORIGIN_LABEL, sourceWeekColor, summarizeSourceCycleWeeks } from './TrainingScreen_parts/MesocycleProgressionCard';
 import { parseProgressionRationale, progressionTiles, splitDescriptionPoints } from './TrainingScreen_parts/plan-card-helpers';
 import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
@@ -97,6 +94,18 @@ const IN: React.CSSProperties = { ...SEL, padding: '10px' };
 const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '6px 0 3px' };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
 
+/** 6 групп Frequency Planner ← канонические мышцы volume-landmarks (без выдуманных цифр). */
+function plToolGroupOf(group: string): 'chest' | 'back' | 'legs' | 'shoulders' | 'arms' | 'core' | null {
+  const g = (group || '').toLowerCase();
+  if (g === 'chest') return 'chest';
+  if (g === 'back' || g === 'lats' || g === 'traps' || g === 'lower_back') return 'back';
+  if (g.startsWith('delt') || g === 'shoulders' || g === 'rotator_cuff') return 'shoulders';
+  if (g === 'biceps' || g === 'triceps' || g === 'forearms' || g === 'arms') return 'arms';
+  if (g === 'abs' || g === 'core' || g === 'obliques') return 'core';
+  if (g === 'quads' || g === 'hamstrings' || g === 'glutes' || g === 'calves' || g === 'legs') return 'legs';
+  return null;
+}
+
 function getRecoveryMetrics(linked: any): Pick<LMSBuildInput, 'bodyFat' | 'leanMass' | 'hrvMs' | 'sleepHours' | 'stressLevel'> {
   const settings = linked.profile?.settings as Record<string, any> | undefined;
   const weight = settings?.personal?.weight;
@@ -126,7 +135,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
     pl: [['settings', '1 ⚙️ Настройки'], ['diagnostics', '2 🔧 Корректор движений'], ['plan', '3 📋 План'], ['charts', '4 📊 Графики'], ['reference', '5 📚 Справка и отчёты'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты']].map(([k, l]) => ({ key: k, label: l })),
-    bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
+    // Фаза 2: BB/manual/bridge/peak_bb/methods/analytics/prometrics-ветки удалены —
+    // SRCBBScreen монтируется только как track='pl' (PlannerPlAuto); ББ живёт в BbAutoConstructor.
+    bb: [],
     manual: [],
   };
   const [subView, setSubView] = useState<string>('plan');
@@ -344,15 +355,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
 
   // U7: связь композиции методик с планом (оверлей, безопасно — движок не трогаем)
   const [methodHints, setMethodHints] = useState<{ volumeMult: number; technique: string | null; label: string }>({ volumeMult: 1, technique: null, label: '' });
-  const deriveHints = (am: Record<string,string>) => {
-    const vol = (am['volume']||'').toLowerCase();
-    const volumeMult = vol.includes('gvt')||vol.includes('german') ? 1.3 : vol.includes('mev') ? 0.8 : 1;
-    const techName = am['intensity'] || am['technique'] || '';
-    const t = techName.toLowerCase();
-    const technique = t.includes('cluster') ? 'cluster' : t.includes('rest')||t.includes('pause') ? 'rest_pause' : t.includes('tempo')||t.includes('eccentric') ? 'slow_eccentric' : t.includes('myo') ? 'myo_rep' : t.includes('drop') ? 'dropset' : null;
-    const label = Object.values(am).join(' · ');
-    return { volumeMult, technique, label };
-  };
 
   // ПЛ-авто работает ТОЛЬКО с силовыми циклами (бодибилдинг-циклы имеют свой экран track='bb')
   const plCycles = useMemo(() => LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding'), []);
@@ -395,7 +397,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   }, [plCycles, filterAuthors, filterTypes, filterLevels]);
   const hasActiveFilters = filterAuthors.length > 0 || filterTypes.length > 0 || filterLevels.length > 0;
   const resetAllFilters = () => { setFilterAuthors([]); setFilterTypes([]); setFilterLevels([]); };
-  const buildSrc = (cycleId = selectedCycleId, weeks = cycleWeeks) => {
+  // Календарь задаёт ОРИГИНАЛ цикла (originalCycleWeeks), а не UI-длительность:
+  // аргумент weeks отсюда убран (был тихим no-op, вводил в заблуждение).
+  // Авто-тапер в faithful-сборке не применяется — он навешивается отдельно
+  // кнопками вкладки «🏁 Соревнования» (appendPLTaperWeeks).
+  const buildSrc = (cycleId = selectedCycleId) => {
     const tpl = getCycleById(cycleId);
     if (!tpl) {
       // Раньше — тихий return: кнопка «Применить как активный цикл» молча
@@ -438,9 +444,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       // and apply the cycle's own PM correction between weeks.
       progressionEnabled: true,
       faithful: true,
-      peakCycleId: peakCycleId ?? undefined,
-      taperWeeks: taperWeeksToAdd,
-      peakMode: peakMode,
       ...rec,
     });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setPickerDay(null);
@@ -500,11 +503,15 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       .filter((item): item is { block: Macrocycle['blocks'][number]; output: LMSBuildOutput } => item !== null);
     if (outputs.length === 0) throw new Error('В макроцикле нет доступных СРЦ-циклов');
     const outputByBlock = new Map(outputs.map(item => [item.block, item.output]));
+    // Честность: недели блоков без собственного цикла (соревновательные)
+    // заполняются ближайшей тренировочной раскладкой — сообщаем в rationale.
+    let reusedWeeks = 0;
     const weeks = Array.from({ length: macro.totalWeeks }, (_, index) => {
       const weekNumber = index + 1;
       const block = macro.blocks.find(candidate => weekNumber >= candidate.weekOffset && weekNumber < candidate.weekOffset + candidate.weeks);
       if (!block) throw new Error(`Неделя ${weekNumber} не покрыта макроциклом`);
       const output = outputByBlock.get(block);
+      if (!output) reusedWeeks += 1;
       // Competition blocks intentionally have no cycleId. Reuse the nearest
       // training week so the annual result still contains a runnable week.
       const sourceOutput = output ?? outputs.reduce((best, item) =>
@@ -538,7 +545,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       template: first.template,
       weeks: finalWeeks,
       cycleMetrics: calcCycleMetrics(sessions),
-      progressionRationale: `Макроцикл: ${outputs.length} СРЦ-блок(ов), ${weeks.length} недель. ` + outputs.map(({ block, output }) => `${block.phase} ${block.weekOffset}-${block.weekOffset + block.weeks - 1}: ${output.template.meta.title}`).join('; ') + (taperRes.notes.length > 0 ? ' 🏁 ' + taperRes.notes.join(' ') : ''),
+      progressionRationale: `Макроцикл: ${outputs.length} СРЦ-блок(ов), ${weeks.length} недель. ` + outputs.map(({ block, output }) => `${block.phase} ${block.weekOffset}-${block.weekOffset + block.weeks - 1}: ${output.template.meta.title}`).join('; ') + (reusedWeeks > 0 ? ` ⚠ ${reusedWeeks} нед без собственного цикла (соревновательные блоки) — использована ближайшая тренировочная раскладка.` : '') + (taperRes.notes.length > 0 ? ' 🏁 ' + taperRes.notes.join(' ') : ''),
     };
     setBuiltSrc(combined);
     setCycleWeeks(macro.totalWeeks);
@@ -611,10 +618,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5, minWidth: 0 }}>
           ✏️ Правка блока годового плана: {ctx.weeks} нед · фаза «{ctx.phase}»{!ctx.isBB && ctx.cycleId ? ` · цикл «${getCycleById(ctx.cycleId)?.meta.title ?? ctx.cycleId}»` : ''}
-          <div style={{ fontSize: 10, color: '#fff' }}>Соберите план с нужным числом недель и нажмите «💾 Сохранить в годовой план».</div>
+          <div style={{ fontSize: 10, color: '#fff' }}>
+            {ctx.isBB
+              ? 'Соберите план с нужным числом недель и нажмите «💾 Сохранить в годовой план».'
+              : 'ПЛ-цикл неизменен (длина исходная). Длину блока меняйте в «⚙️ Фазы» годового плана; при применении макроцикла раскладка адаптируется только по согласию.'}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          <button type="button" onClick={saveMacroEdit} style={{ ...BTN, minHeight: 36, fontSize: 10, padding: '6px 12px' }}>💾 Сохранить в годовой план</button>
+          {ctx.isBB && <button type="button" onClick={saveMacroEdit} style={{ ...BTN, minHeight: 36, fontSize: 10, padding: '6px 12px' }}>💾 Сохранить в годовой план</button>}
           <button type="button" onClick={() => { try { localStorage.removeItem('he_macro_edit_ctx'); } catch { /* ignore */ } setSubView('macro'); }} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, padding: '6px 12px' }}>✕ Отменить</button>
         </div>
       </div>
@@ -756,13 +767,22 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [mrvOverride, setMrvOverride] = useState<number | null>(null);
   const [deloadAdjust, setDeloadAdjust] = useState<{ volumeMult: number; rirShift: number; weeks: number[] } | null>(null);
   const [peakAdjust, setPeakAdjust] = useState<{ volumeMult: number; rirTarget: number } | null>(null);
-  const [volumeTarget, setVolumeTarget] = useState<Record<string, number> | null>(null);
   const pendingApplyRef = useRef<PlannerApply | null>(null);
   useEffect(() => subscribePlannerApply(p => setApplyPayload(p)), []);
   // Авто-применение bridge: только НОВЫЕ события (не stale данные при монтировании)
   const mountedRef = useRef(false);
   useEffect(() => {
-    if (!mountedRef.current) { mountedRef.current = true; clearPlannerApply(); setApplyPayload(null); return; }
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      // Свежий мост из «Периодизации» (kind 'cycle', ≤5 мин) применяем сразу —
+      // остальные прошлые payload'ы считаются stale (старая защита сохранена).
+      const pending = getPlannerApply();
+      if (pending && pending.kind === 'cycle' && Date.now() - (pending.ts ?? 0) < 5 * 60_000) {
+        applyExternal(pending);
+        return;
+      }
+      clearPlannerApply(); setApplyPayload(null); return;
+    }
     if (applyPayload) applyExternal();
   }, [applyPayload]);
   // производные от bridge-корректировок (видны в таблице плана ПЛ/ББ и в runtime)
@@ -1007,8 +1027,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setSubView('plan');
   };
   // 🔗 применение корректировок из калькуляторов к активному плану (ПЛ/ББ) — с маршрутизацией по источнику
-  const applyExternal = () => {
-    const p = getPlannerApply();
+  const applyExternal = (explicit?: PlannerApply | null) => {
+    const p = explicit ?? getPlannerApply();
     if (!p) return;
     const src = (p as any).source as string | undefined;
     const targetId = (p as any).targetCycleId as string | undefined;
@@ -1088,7 +1108,25 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       setPeakAdjust({ volumeMult: (p.data?.volumeMult ?? 0.5) as number, rirTarget: (p.data?.rirTarget ?? 0) as number });
       if (p.data?.peakCycleId) setPeakCycleId(p.data.peakCycleId as string);
     } else if (p.kind === 'volume') {
-      setVolumeTarget((p.data?.sets || null) as Record<string, number> | null);
+      // Честность (Фаза 1): собранный PL-план не пересобирается под посетовый
+      // объём из моста (faithful сохраняет раскладку источника) — сообщаем прямо,
+      // а не храним мёртвый state.
+      setMethodNote('📊 Объём-мост: посетовый объём не применяется к дословному PL-плану — раскладку меняйте в конструкторе/цикле.');
+    } else if (p.kind === 'cycle') {
+      // Мост «Периодизация → ПЛ-авто»: применить выбранный СРЦ-цикл (оригинал)
+      // и пересобрать план. Раньше kind не был зарегистрирован — кнопка молча
+      // заканчивалась общим тостом «не применима».
+      const cid = (p.data as { cycleId?: string } | undefined)?.cycleId ?? '';
+      const tpl = cid ? getCycleById(cid) : null;
+      if (tpl) {
+        const origWeeks = originalCycleWeeks(tpl);
+        setSelectedCycleId(cid);
+        setCycleWeeks(origWeeks);
+        buildSrc(cid);
+        setMethodNote(`✅ Цикл «${tpl.meta.title}» применён из «Периодизации» — план пересобран по оригиналу (${origWeeks} нед).`);
+      } else {
+        setMethodNote('⚠ Цикл из моста не найден в каталоге — выберите вручную.');
+      }
     }
     clearPlannerApply(); setApplyPayload(null);
     setSubView('plan'); // показать обновлённый план
@@ -1400,6 +1438,18 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     recovery: getRecoveryMetrics(linked),
   }), [exercisePMs, pmSquat, pmBench, pmDead, pedAuto, peds, courseIntensity, pedDoses, plCalorieSurplus, plProteinPerKg, acwrData, autoRegMode, autoRegResult, pmAutoRegMode, pmDiary, linked, weakPoints, plWeakPoints, weakGroupDayMap, plWeakPointDayMap, weakGroupExerciseMap, plWeakPointExerciseMap, orthopedicBlockedPatterns, diagnosticExerciseMap, diagnosticDayMap, limiterExerciseMap, limiterProtocolMap, limiterDayMap]);
 
+  // 📊 Frequency Planner: недельные объёмы по группам — из volume-landmarks
+  // собранного плана (раньше передавался вымышленный хардкод 12/10/14/8/6/4).
+  const plToolTotalSets = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const lm of builtSrc?.plVolumeLandmarks ?? []) {
+      const key = plToolGroupOf(lm.group);
+      if (!key) continue;
+      acc[key] = (acc[key] || 0) + (lm.sets || 0);
+    }
+    return acc;
+  }, [builtSrc]);
+
   // Сводка для печати/экспорта: базовые метрики + циклы сезона (с «ужатиями»).
   const plPrintSummary = (): { label: string; value: string }[] => {
     const rows: { label: string; value: string }[] = [
@@ -1444,9 +1494,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {/* sub-view pill nav for PL/BB — компактно, современно */}
       {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (() => {
         const list = subViewList[mainTab];
-        const groups: Record<string, string[]> = mainTab === 'pl'
-          ? { 'СБОРКА': ['settings','diagnostics','plan'], 'АНАЛИЗ': ['charts','reference'], 'СИСТЕМА': ['competition','macro','tools'] }
-          : { 'ПЛАН': ['plan','macro','tools'], 'РАБОТА': ['bridge','peak_bb'], 'АНАЛИЗ': ['methods','analytics','prometrics','charts'] };
+        const groups: Record<string, string[]> = { 'СБОРКА': ['settings','diagnostics','plan'], 'АНАЛИЗ': ['charts','reference'], 'СИСТЕМА': ['competition','macro','tools'] };
         const groupEndKeys = new Set(Object.values(groups).map(arr => (arr as string[])[(arr as string[]).length - 1]).filter(Boolean) as string[]);
         return (
           <div style={{ background: 'linear-gradient(135deg, rgba(24,24,27,0.65), rgba(18,18,22,0.85))', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '8px', marginBottom: 12, display: 'flex', gap: 6, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
@@ -1683,7 +1731,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             tempoStr, getTempo, methodHints,
           }} />
           <BlockView plan={builtSrc} />
-          <PLToolsCard level={level} days={days} totalSets={{ chest: 12, back: 10, legs: 14, shoulders: 8, arms: 6, core: 4 }} e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }} hrvRatio={linked.profile?.settings?.baselineHrvRatio} acwr={acwrData.ratio} rpeDelta={autoRegResult.rirShift} plan={builtSrc} onApplyFrequency={(plans)=>{ const m: Record<string, number[]> = {}; plans.forEach(p=>{ m[p.muscle]=Array.from({length:p.frequency},(_,i)=>i+1); }); setWeakGroupDayMap(m); setMethodNote(`📊 Частота применена: ${plans.map(p=>`${p.muscle} ${p.frequency}×`).join(', ')}`); }} />
+          <PLToolsCard level={level} days={days} totalSets={plToolTotalSets} bodyWeight={linked.profile?.settings?.personal?.weight ?? bw} sex={linked.profile?.settings?.personal?.sex} e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }} hrvRatio={linked.profile?.settings?.baselineHrvRatio} acwr={acwrData.ratio} rpeDelta={autoRegResult.rirShift} plan={builtSrc} onApplyFrequency={(plans)=>{ const m: Record<string, number[]> = {}; plans.forEach(p=>{ m[p.muscle]=Array.from({length:p.frequency},(_,i)=>i+1); }); setWeakGroupDayMap(m); setMethodNote(`📊 Частота применена: ${plans.map(p=>`${p.muscle} ${p.frequency}×`).join(', ')}`); }} />
           {plSeasonMode === 'season' && (
             <div role="status" style={{ marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', fontSize: 11, color: '#c4b5fd', lineHeight: 1.5 }}>
               {seasonNotes.length > 0 ? (
@@ -1874,347 +1922,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         </div>
       )}
 
-      {mainTab === 'bb' && subView === 'plan' && (
-        <div>
-          {renderMacroEditBanner()}
-          <div style={H}>💪 Авто-подбор бодибилдинг-сплита</div>
-           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-             <PopupSelect label="Уровень спортсмена" value={bbLevel} onChange={setBbLevel} options={[['beginner','Новичок'],['intermediate','Средний'],['advanced','Опытный'],['enhanced','Enhanced (на курсе)']].map(([id,label]) => ({ id, label }))} />
-             <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass','Мышечная масса'],['cut','Сушка'],['recomp','Рекомпозиция'],['maintenance','Поддержание'],['strength_mass','Сила + Масса']].map(([id,label]) => ({ id, label }))} />
-             <PopupNumber label="Дней в неделю" value={bbDays} min={3} max={6} onChange={v => setBbDays(v)} />
-             <PopupNumber label="Недель мезоцикла" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
-             <PopupSelect label="Цель по объёму" value={bbVolGoal} onChange={setBbVolGoal} options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
-              <PopupSelect label="Группа фокуса" value={bbFocus} onChange={setBbFocus} options={[{ id: '', label: 'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
-              <PopupSelect label="Training focus (RIR)" value={bbTrainingFocus} onChange={(v) => setBbTrainingFocus(v as 'strength' | 'hypertrophy' | 'endurance')} options={[['strength','Сила (RIR 1-2)'],['hypertrophy','Гипертрофия (RIR 2-3)'],['endurance','Выносливость (RIR 3-4)']].map(([id,label]) => ({ id, label }))} />
-           </div>
-
-          {bbBest && <ExpandableCard title={'🏆 Рекомендован: ' + bbBest.pattern.name} icon='🏆' short={bbBest.pattern.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот сплит:</b> {explainBBSelection(bbBest)}</div><button onClick={buildBb} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>✅ Применить сплит и собрать план</button></>} />}
-           <div style={H}>💉 Фармакология (PED-адаптация объёмов)</div>
-           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-             {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => <button key={p} style={peds.includes(p) ? BTN : BTN_GHOST} onClick={() => togglePed(p)}>{p}{peds.includes(p) ? ' ✓' : ''}</button>)}
-             <button onClick={() => setPedAuto(a => !a)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)', color: pedAuto ? '#000' : '#fff', marginLeft: 'auto' }}>АВТО {pedAuto ? 'ON' : 'OFF'}</button>
-           </div>
-           {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>⚡ Авто-прогрессия ПМ: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
-           {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
-           <PedAdaptationCard adaptation={pedAdapt} />
-          <div style={{ ...H, marginTop: 10 }}>💪 Рабочие максимумы (кг) — для расчёта весов</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6, boxSizing: 'border-box' }}>
-            {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={400} suffix=' кг' onChange={v => setBbWm(k, v)} />)}
-          </div>
-          <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы мышц (ББ-акцент, сохраняются в профиль)</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2, marginBottom: 4 }}>
-            💪 ББ: pump-finisher (3×15 @ RIR 4) для каждой слабой группы; +accessoryCompound-первым.
-          </div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : '#fff', minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}{on ? " ✓" : ""}</button>; })}</div>
-          <button style={{ ...BTN, width: '100%', marginTop: 10 }} onClick={buildBb}>Сгенерировать BB-план ({bbWeeks} нед)</button>
-          {builtBb && Array.isArray(builtBb.weeks) && builtBb.weeks.length > 0 && (() => {
-            const W = builtBb.weeks;
-            const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
-            const m = calcBBPlanMetrics(builtBb, pedAdapt.combinedMrvMultiplier);
-            return <div style={{ ...CARD, borderLeft: `3px solid ${ACCENT}`, boxShadow: '0 0 0 1px var(--accent-dim)' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
-                <div style={{ ...H, margin:0 }}>📋 План: {builtBb.pattern.name}</div>
-                <span style={{ fontSize:10, fontWeight:700, color: ACCENT, background:'rgba(0,230,138,0.12)', padding:'3px 8px', borderRadius:8 }}>{W.length} нед</span>
-              </div>
-              {/* P12 auto-reg toggle + shouldTrainToday для BB — 3 режима */}
-              {(() => {
-                 const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0, combinedRirShift: autoRegMode === 'auto' ? autoRegResult.rirShift + bridgeRir : bridgeRir });
-                const modeColor = autoRegMode === 'auto' ? '#60a5fa' : autoRegMode === 'diary' ? '#22c55e' : '#71717a';
-                const segBtn = (m: AutoRegMode, label: string) => (
-                  <button onClick={() => setAutoRegMode(m)} style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === m ? modeColor : 'rgba(255,255,255,0.08)', color: autoRegMode === m ? '#000' : '#fff' }}>{label}</button>
-                );
-                return (
-                  <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: autoRegMode === 'off' ? 'rgba(255,255,255,0.02)' : autoRegResult.deload ? 'rgba(239,68,68,0.08)' : autoRegMode === 'diary' ? 'rgba(34,197,94,0.06)' : 'rgba(96,165,250,0.06)', border: '1px solid ' + (autoRegMode === 'off' ? 'rgba(255,255,255,0.06)' : autoRegResult.deload ? 'rgba(239,68,68,0.25)' : autoRegMode === 'diary' ? 'rgba(34,197,94,0.2)' : 'rgba(96,165,250,0.2)') }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                      <div>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: stt.train ? (autoRegResult.deload && autoRegMode !== 'off' ? '#ef4444' : modeColor) : '#ef4444' }}>
-                          {stt.train ? '✅' : '⚠️'} {stt.reason}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 3 }}>{segBtn('off', 'ВЫКЛ')}{segBtn('auto', 'АВТО')}{segBtn('diary', 'ДНЕВНИК')}</div>
-                    </div>
-                    {autoRegMode === 'auto' && (
-                      <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
-                        <div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload ? ' · 🔴 DELOAD' : ''}</div>
-                        {autoRegResult.decisions.slice(0, 3).map((d, i) => <div key={i} style={{ marginTop: 2, color: '#fff' }}>• {d}</div>)}
-                      </div>
-                    )}
-                    {autoRegMode === 'diary' && diaryAutoreg && (
-                      <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
-                        <div style={{ fontWeight: 700, color: '#22c55e' }}>✓ {diaryAutoreg.summary.adjusted} скорректировано · {diaryAutoreg.summary.unchanged} в норме · {diaryAutoreg.summary.noData} без данных</div>
-                        {diaryAutoreg.summary.noData > 0 && <div style={{ marginTop: 2, color: '#f59e0b' }}>⚠ {diaryAutoreg.summary.noData} упражнений без данных — плановые веса</div>}
-                        {diaryAutoreg.plateauWarnings.slice(0, 2).map((w, i) => <div key={'pw'+i} style={{ marginTop: 2, color: '#ef4444' }}>🔴 {w}</div>)}
-                      </div>
-                    )}
-                    {autoRegMode === 'diary' && !diaryAutoreg && <div style={{ marginTop: 6, fontSize: 10, color: '#f59e0b' }}>⚠ Постройте план — дневниковая авторегуляция применится к весам.</div>}
-                  </div>
-                );
-              })()}
-              {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); if (acwr.ratio <= 1.5) return null; const srpeList = loadSRPESessions(); const loads = toDailyLoads(srpeList); const ratio = acuteChronicRatio(loads); return <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}><div style={{ color: '#ef4444', fontSize: 10, fontWeight: 600, marginBottom: 6 }}>🚨 ACWR {ratio.ratio.toFixed(2)} — опасная зона. Рекомендуется разгрузка.</div><DeloadProtocolCard ctx={{ acwr: ratio.ratio, weeksSinceDeload: 0, fatigue: 6, recovery: 50, hasCompetitionSoon: false, jointPain: false, cnsFatigue: false, goal: 'hypertrophy' }} /></div>; })()}
-              {builtBb.rationale.map((r, i) => <div key={i} style={{ ...SMALL, marginTop: 4 }}>{r}</div>)}
-              {/* Выбор недели */}
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize:11, color:'#fff', marginBottom:6, fontWeight:700 }}>Неделя {wk.week} из {W.length}{(wk as any).peakWeek ? ' · 🎭 пик-неделя' : ''}</div>
-                {(wk as any).peakWeek && (
-                  <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.3)', fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                      <span>🎭 <b style={{ color: '#ec4899' }}>Пик-неделя (тапер ББ)</b>{(builtBb as any)?.contestPrep?.showDate ? ` · шоу ${(builtBb as any).contestPrep.showDate}` : ''}</span>
-                      {(() => {
-                        try {
-                          const goals = (linked.profile?.settings as any)?.goals;
-                          const rawCfg = goals?.bbPeakConfig;
-                          const prepCfg = rawCfg ? deserializeBBPrepConfig(rawCfg) : legacyConfigFromProfile(goals, linked.profile?.settings?.personal);
-                          if (!prepCfg) return null;
-                          const days = buildBBContestPrep(prepCfg).peakWeek;
-                          return (
-                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }} title="Фазы пик-недели: деплеция → загрузка → пик → шоу">
-                              {days.map(d => (
-                                <span key={d.day} title={`D-${7 - d.day}: ${PHASE_LABELS_RU[d.phase]}`} style={{
-                                  width: 12, height: 12, borderRadius: 4,
-                                  background: PEAK_PHASE_COLORS[d.phase],
-                                  boxShadow: d.day === 7 ? `0 0 8px ${PEAK_PHASE_COLORS[d.phase]}` : 'none',
-                                  opacity: 0.9,
-                                }} />
-                              ))}
-                            </div>
-                          );
-                        } catch { return null; }
-                      })()}
-                    </div>
-                    {(wk as any).prepProtocol ? <div style={{ color: '#fff' }}>{(wk as any).prepProtocol}</div> : null}
-                    <div style={{ color: '#fff' }}>День 1–2: памп-деплеция (верх/низ) · день 3: лёгкий full-body · далее отдых и позы. Питание по дням (карбс/вода/натрий) — блок «Питание → 🏁 Тапер ББ».</div>
-                  </div>
-                )}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
-                  {W.map(w => { const active = w.week === wk.week; const isPeak = (w as any).peakWeek === true; return <button key={w.week} onClick={() => setBbWeekSel(w.week)} title={isPeak ? ((w as any).prepProtocol || 'Пик-неделя') : `Неделя ${w.week}`} style={{ padding:'7px 0', borderRadius:7, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? 'linear-gradient(135deg,var(--accent),#00c853)' : isPeak ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.02)', color: active ? '#000' : '#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{isPeak ? '🎭' : ''}{w.week}</button>; })}
-                </div>
-              </div>
-              {/* Визуальный календарь ББ: недели × дни (объём по сетам) */}
-              <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, объём сетов)</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {W.map(w => { const active = w.week === wk.week; const daySets = w.sessions.map(s => s.exercises.reduce((ss, e) => ss + e.sets, 0)); const maxD = Math.max(1, ...W.flatMap(ww => ww.sessions.map(s => s.exercises.reduce((ss, e) => ss + e.sets, 0)))); return (
-                    <div key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'var(--accent-dim)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? 'var(--accent)' : '#fff', minWidth: 26 }}>Н{w.week}</span>
-                      <div style={{ flex: 1, display: 'flex', gap: 2 }}>
-                        {daySets.map((ds, di) => <div key={di} title={'Д' + (di+1) + ': ' + ds + ' сетов'} style={{ flex: 1, height: 14, borderRadius: 3, background: ds > 0 ? 'linear-gradient(180deg,var(--accent),#00c853)' : 'rgba(255,255,255,0.04)', opacity: 0.35 + 0.65 * (ds / maxD) }} />)}
-                      </div>
-                      <span style={{ fontSize: 11, color: '#fff', minWidth: 30, textAlign: 'right' }}>{daySets.reduce((a, b) => a + b, 0)}</span>
-                    </div>
-                  ); })}
-                </div>
-              </div>
-              {/* Дни выбранной недели — таблицы-карточки */}
-              <div style={{ marginTop: 10, display:'flex', flexDirection:'column', gap: 8 }}>
-                {wk.sessions.map((s, si) => (
-                  <div key={si} style={{ background:'rgba(255,255,255,0.02)', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', background:'var(--accent-dim)', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
-                      <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>🏋️ День {si + 1} · {s.character}{(s as any).peakWeekTraining ? ' · 🎭 памп' : ''}{(s as any).peakWeekRest ? ' · 😴 отдых' : ''}</span>
-                      <span style={{ fontSize:10, color:ACCENT, fontWeight:700 }}>{s.sessionTag}</span>
-                    </div>
-                    {s.exercises.length === 0 ? (
-                      <div style={{ padding: '10px 12px', fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
-                        😴 Полный отдых — позирование {(s as any).peakWeekRest ? '60 мин' : '—'}, растяжка, сон 8–9 ч.{(s as any).comment ? ` ${(s as any).comment}` : ''}
-                      </div>
-                    ) : (
-                    <div style={{ padding: '4px 0', overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
-                      <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.7fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr)', gap:2, padding:'4px 10px', fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>
-                        <span>Мышца</span><span>Характер</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span><span>Темп</span>
-                      </div>
-                      {s.exercises.map((e, ei) => {
-                        const rawW = e.workSets[0].weight;
-                        let adjW = rawW; let adjSets0 = e.sets; let diaryRirAdd = 0;
-                        if (autoRegMode === 'auto' && autoRegResult) { adjW = Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10; adjSets0 = Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)); }
-                        else if (autoRegMode === 'diary' && diaryAutoreg) { const adj = diaryAutoreg.perExercise.get(e.name || e.exerciseName || e.muscle); if (adj) { adjW = adj.adjustedWeight; adjSets0 = adj.adjustedSets; diaryRirAdd = adj.adjustedRir - e.rir; } }
-                        const adjSets = Math.max(1, Math.round(adjSets0 * bridgeMult));
-                        const tmpo = getTempo(e.muscle, bbGoal, e.character === 'тяж');
-                        return (
-                        <div key={ei} style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.7fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr)', gap:2, padding:'5px 10px', fontSize:10, color:'#fff', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
-                          <span style={{ fontWeight:600, whiteSpace:'normal', overflowWrap:'anywhere' }}>{e.muscle}</span>
-                          <span style={{ color:'#fff' }}>{e.character}</span>
-                          <span>{adjSets}×{e.workSets[0].reps}</span>
-                          <span style={{ color:'#f59e0b' }}>{peakRirTarget != null ? peakRirTarget : Math.max(0, e.rir + bridgeRir + diaryRirAdd)}{autoRegMode === 'auto' && autoRegResult?.rirShift ? `+${autoRegResult.rirShift}` : ''}</span>
-                          <span style={{ color: adjW !== rawW ? '#f59e0b' : ACCENT, fontWeight:700 }}>{adjW} кг{adjW !== rawW ? (autoRegMode === 'diary' ? ' 📒' : ' ⚡') : ''}</span>
-                          <span style={{ fontSize:10, color:'#a855f7', fontWeight:700, background:'rgba(168,85,247,0.1)', padding:'2px 6px', borderRadius:4, textAlign:'center' }}>{tempoStr || tmpo.tempo.toString}</span>
-                        </div>
-                        );
-                      })}
-                    </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {/* Итоги мезоцикла */}
-              <MetricCard title={`Итоги мезоцикла (${W.length} нед)`} icon="📊">
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Всего сетов/ротация: <b style={{ color:'#fff' }}>{m.totalSets}</b></div>
-                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Тяжёлых: <b style={{ color:'#fff' }}>{(m.тяжPct * 100).toFixed(0)}%</b></div>
-                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Памп: <b style={{ color:'#fff' }}>{(m.пампPct * 100).toFixed(0)}%</b></div>
-                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Средний RIR: <b style={{ color:'#fff' }}>{m.avgRir.toFixed(1)}</b></div>
-                </div>
-              </MetricCard>
-              {/* Объём по мышцам */}
-              <MetricCard title="Объём по мышцам (сетов/нед)" icon="🏋️" accent="#a855f7">
-              <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr)', gap:2, fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', padding:'2px 0' }}>
-                  <span>Мышца</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
-                </div>
-                {m.perMuscle.map(mm => { const over = mm.totalSets > (mm.mrv || 999); return (
-                  <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr)', gap:2, fontSize:10, color:'#fff', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
-                    <span style={{ fontWeight:600 }}>{mm.muscle}{over ? ' ⚠' : ''}</span>
-                    <span style={{ color: over ? '#ef4444' : ACCENT, fontWeight:700 }}>{mm.totalSets}</span>
-                    <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>
-                    <span style={{ color:'#60a5fa' }}>{mm.пампSets}</span>
-                    <span style={{ color:'#fff' }}>{mm.mrv}</span>
-                  </div>
-                ); })}
-              </div>
-              </MetricCard>
-              {(() => { const wkStats = W.map(w => { const exs = w.sessions.flatMap(s => s.exercises); const sets = exs.reduce((s, e) => s + e.sets, 0); const rir = sets > 0 ? exs.reduce((s, e) => s + e.rir * e.sets, 0) / sets : 0; return { week: w.week, sets, rir }; }); const maxS = Math.max(1, ...wkStats.map(x => x.sets)); const px = (i: number) => 24 + (i / Math.max(1, W.length - 1)) * 280; const py = (v: number) => 60 - (v / 5) * 44; return <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.15)' }}><div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>📈 Прогрессия объёма и RIR по неделям</div><svg width='100%' viewBox='0 0 320 70' style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>{wkStats.map(x => <rect key={'b'+x.week} x={px(x.week-1)-8} y={60 - (x.sets / maxS) * 44} width={16} height={(x.sets / maxS) * 44} rx={3} fill='rgba(0,230,138,0.4)' />)}<polyline points={wkStats.map(x => px(x.week-1) + ',' + py(x.rir)).join(' ')} fill='none' stroke='#a855f7' strokeWidth={1.6} />{wkStats.map(x => <circle key={'r'+x.week} cx={px(x.week-1)} cy={py(x.rir)} r={2} fill='#a855f7' />)}</svg><div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 4 }}><span style={{ fontSize: 11, color: 'rgba(0,230,138,0.8)' }}>▮ Сеты/нед</span><span style={{ fontSize: 11, color: '#a855f7' }}>● RIR</span></div></div>; })()}
-              <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s, w) => s + w.sessions.reduce((ss, sess) => ss + sess.exercises.reduce((sss, e) => sss + e.sets, 0), 0), 0) / W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
-              <div style={{ ...SMALL, marginTop: 8, padding: 8, background:'rgba(96,165,250,0.06)', borderRadius:8, border:'1px solid rgba(96,165,250,0.15)' }}>{explainBBMetrics(m)}</div>
-            </div>;
-          })()}
-        </div>
-      )}
-
-      {/* ── Ручной сбор (перенаправлен в полный конструктор) ── */}
-      {mainTab === 'manual' && (
-        <div style={{ ...CARD, padding: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🛠️</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)', marginBottom: 8 }}>Ручной конструктор переехал</div>
-          <div style={{ fontSize: 11, color: '#fff', marginBottom: 16, lineHeight: 1.6 }}>
-            Полный ручной конструктор теперь доступен в разделе <b style={{ color: 'var(--accent)' }}>📐 Планирование → 🛠️ Ручной конструктор</b>.<br />
-            Там вас ждёт: авто-подбор сплита, генерация плана, оценка качества, MRV-guardrails,<br />
-            применение методик, экспорт в PDF, выполнение через SessionPlayer и многое другое.
-          </div>
-          <button onClick={() => {
-            try { localStorage.setItem('he_training_planning_track', 'manual'); } catch {}
-            if (typeof (window as any).__navigateToTrainingTab === 'function') {
-              (window as any).__navigateToTrainingTab('programcalc');
-            }
-          }} style={{
-            padding: '12px 24px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: 'linear-gradient(135deg,var(--accent),#00c853)', color: '#000',
-            fontWeight: 800, fontSize: 13,
-          }}>
-            🚀 Открыть полный конструктор
-          </button>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 12 }}>
-            Также доступен на вкладке «Ручной конструктор» в разделе Планирование
-          </div>
-        </div>
-      )}
-
-      {subView === 'bridge' && (
-        <div style={CARD}>
-          <div style={H}>🔗 Мост план→сессия (training-integration)</div>
-          {bridgeSessions.length === 0 ? (
-            <div style={{ ...SMALL, padding: 12, textAlign: 'center' }}>Постройте план (ПЛ или ББ) — сессии появятся здесь.</div>
-          ) : (
-            <>
-              <div style={{ ...SMALL, marginBottom: 8 }}>Сгенерировано {bridgeSessions.length} сессий · {bridgeWeeks.length} недель</div>
-              {/* селектор недель */}
-              {bridgeWeeks.length > 1 && (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Выберите неделю:</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(36px, 1fr))', gap: 4 }}>
-                    {bridgeWeeks.map(w => {
-                      const totalW = bridgeWeeks.length;
-                      const ph = mesocyclePhaseForWeek(w, Math.max(totalW, w));
-                      const active = w === bridgeWeek;
-                      const weekSessions = bridgeSessions.filter(s => s.weekNumber === w);
-                      const hasMeet = weekSessions.some(s => s.meetWeek);
-                      const hasMock = weekSessions.some(s => s.mockMeet);
-                      const hasPost = weekSessions.some(s => s.postMeet);
-                      const hasTaper = weekSessions.some(s => s.taperWeek && !s.mockMeet && !s.meetWeek && !s.postMeet);
-                      const PH_COLOR_B: Record<string,string> = { base: '#22c55e', build: '#eab308', peak: '#ef4444', deload: '#60a5fa' };
-                      const PH_RU_B: Record<string,string> = { base: 'База', build: 'Накопление', peak: 'Пик', deload: 'Разгрузка' };
-                      const wkColor = hasMeet ? '#eab308' : hasMock ? '#a78bfa' : hasPost ? '#34d399' : hasTaper ? '#f59e0b' : PH_COLOR_B[ph];
-                      const wkLabel = hasMeet ? '🏁 Соревнования (прикиды)' : hasMock ? '🎯 Имитация соревнований (mock meet)' : hasPost ? '🔄 Пост-старт (восстановление)' : hasTaper ? '📉 Тапер' : PH_RU_B[ph];
-                      return (
-                        <button key={w} onClick={() => setBridgeWeek(w)}
-                          title={`Неделя ${w}: ${wkLabel}`}
-                          style={{
-                            padding: '7px 0', borderRadius: 7,
-                            border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                            background: active ? wkColor : (wkColor || '#22c55e') + '1a',
-                            color: active ? '#000' : '#fff',
-                            fontSize: 10, fontWeight: 700, cursor: 'pointer'
-                          }}
-                        >{hasMeet ? '🏁' : hasMock ? '🎯' : hasPost ? '🔄' : hasTaper ? '📉' : w}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {/* сессии выбранной недели */}
-              <div style={{ ...SMALL, marginBottom: 6 }}>
-                Неделя {bridgeWeek} · {bridgeWeekSessions.length} {bridgeWeekSessions.length === 1 ? 'тренировка' : 'тренировок'}
-              </div>
-              {bridgeWeekSessions.map((s, i) => (
-                <ExpandableCard key={i}
-                  title={`${s.focus} · ${s.exercises.length} упр.${s.meetWeek ? ' · 🏁 Соревнования' : s.mockMeet ? ' · 🎯 Mock meet' : s.postMeet ? ' · 🔄 Пост-старт' : s.taperWeek ? ' · 📉 Тапер' : ''}`}
-                  icon={s.source === 'SRC' ? '🏋️' : '💪'}
-                  short={`${s.totalSets} сетов · ${Math.round(s.totalVolume)} кг·пов${s.planned ? ' · запланировано' : ''}${s.meetWeek ? ' · 🏁 прикиды' : s.mockMeet ? ' · 🎯 прикиды-синглы' : s.postMeet ? ' · 🔄 восстановление' : s.taperWeek ? ' · 📉 разгрузка' : ''}`}
-                  full={
-                    <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.8 }}>
-                      {s.exercises.map((e, ei) => (
-                        <div key={ei} style={{
-                          marginBottom: 6, padding: '6px 8px', borderRadius: 6,
-                          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)'
-                        }}>
-                          <div style={{ fontWeight: 700, color: '#fff', marginBottom: 2 }}>
-                            {e.exerciseName}
-                            <span style={{ fontWeight: 400, color: '#fff', marginLeft: 6 }}>
-                              ({e.muscleGroup}) · ПМ {e.best1RM}кг
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                            {e.sets.map((set, si) => (
-                              <span key={si} style={{
-                                display: 'inline-block', padding: '2px 6px', borderRadius: 4, fontSize: 11,
-                                background: 'var(--accent-dim)', border: '1px solid rgba(0,230,138,0.12)',
-                                color: '#fff'
-                              }}>
-                                {set.reps}×{set.weightKg}кг
-                                {set.rir > 0 ? ` · RIR ${set.rir}` : ''}
-                              </span>
-                            ))}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
-                            Объём: {e.totalVolume.toFixed(0)} кг·пов · {e.sets.length} подходов
-                            {e.avgRPE > 0 ? ` · ср.RPE ${e.avgRPE.toFixed(1)}` : ''}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  }
-                />
-              ))}
-              {bridgeAutoreg && (
-                <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🧠 Авторегуляция (мост)</div>
-                  <div style={{ fontSize: 10, color: '#fff' }}>
-                    {bridgeAutoreg.summary}
-                    {bridgeAutoreg.sessionDowngraded && ' · ⬇ понижение нагрузки'}
-                    {bridgeAutoreg.sessionCancelled && ' · ⛔ отмена сессии'}
-                  </div>
-                </div>
-              )}
-              {progressSnap.length > 0 && (
-                <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.2)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>📈 Прогресс (лучшие подходы)</div>
-                  {progressSnap.slice(0, 5).map((p, i) => (
-                    <div key={i} style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>{p.exercise}: {p.lastWeight}кг×{p.lastReps} → e1RM {p.estimated1RM.toFixed(1)}кг</div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
       {subView === 'macro' && mainTab === 'pl' && (
         <div style={{ margin: '0 0 10px', padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', marginBottom: 8 }}>🏁 Тапер/пик в макроцикле (ПЛ)</div>
@@ -2262,11 +1969,18 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               setSubView('plan');
             }
         } else {
-          // ПЛ-авто: загрузить выбранный СРЦ-цикл
+          // ПЛ-авто: загрузить выбранный СРЦ-цикл.
+          // Длина плана = оригинал цикла; если блок года длиннее/короче —
+          // честно сообщаем, что адаптация выполняется лишь через «Применить весь макроцикл».
           try {
+            const tplApply = getCycleById(cycleId);
+            const originalWeeks = tplApply ? originalCycleWeeks(tplApply) : weeks;
             setSelectedCycleId(cycleId);
-            setCycleWeeks(weeks);
-            buildSrc(cycleId, weeks);
+            setCycleWeeks(originalWeeks);
+            buildSrc(cycleId);
+            if (tplApply && originalWeeks !== weeks) {
+              setMethodNote(`ℹ️ Цикл «${tplApply.meta.title}» (${originalWeeks} нед) применён как есть — блок ${weeks} нед. Для адаптации раскладки используйте «🗓 Применить весь макроцикл» (по согласию).`);
+            }
           } catch (error) {
             setMethodNote(`⚠ Цикл не применён: ${(error as Error).message}`);
           }
@@ -2281,9 +1995,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           // ББ-авто: недели блока уже в параметрах плана.
           setBbWeeks(Math.min(24, Math.max(4, weeks)));
         } else if (cycleId) {
-          // ПЛ-авто: предзагружаем цикл блока.
+          // ПЛ-авто: предзагружаем цикл блока. Длина цикла неизменна (оригинал) —
+          // показываем реальную длину, а не длину блока.
+          const tplEdit = getCycleById(cycleId);
           setSelectedCycleId(cycleId);
-          setCycleWeeks(weeks);
+          setCycleWeeks(tplEdit ? originalCycleWeeks(tplEdit) : weeks);
         }
         setSubView('plan');
       }} />}
@@ -2295,16 +2011,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('macro')}>← 🗓 Годовой план</button>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('competition')}>🏁 Соревнования →</button>
-          </div>
-        </div>
-      )}
-      {mainTab === 'bb' && subView === 'tools' && (
-        <div style={{ minWidth: 0, maxWidth: '100%' }}>
-          <div style={H}>🔧 Инструменты ББ</div>
-          <PlannerToolsPanel mode="bb" />
-          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('macro')}>← 🗓 Годовой план</button>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('bridge')}>🔗 Мост →</button>
           </div>
         </div>
       )}
@@ -2324,13 +2030,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         autoRegMode,
         setAutoRegMode: (mode: AutoRegMode) => setAutoRegMode(mode),
       }} />}
-      {subView === 'peak_bb' && <PeakingPanel defaultKind="bb" />}
-      {subView === 'methods' && (<>
-        <MethodsTab linked={linked} trainingOutput={null} diaryStats={[] as any} historyWorkouts={[] as any} goal={mainTab === 'pl' ? goal : bbGoal} level={mainTab === 'pl' ? level : bbLevel} daysPerWeek={mainTab === 'pl' ? days : bbDays} recovery={linked.readiness?.recovery ?? 80} fatigue={linked.readiness?.fatigue ?? 30} appliedMethods={appliedMethods} onToggleMethod={(name, cat) => setAppliedMethods(prev => { const n = { ...prev }; if (n[cat] === name) delete n[cat]; else n[cat] = name; return n; })} onApplyComposition={() => { const keys = Object.keys(appliedMethods); if (keys.length > 0) { const h = deriveHints(appliedMethods); setMethodHints(h); setMethodNote(`✓ Применена методология: ${h.label}${h.volumeMult !== 1 ? ' · объём×' + h.volumeMult : ''}${h.technique ? ' · техн: ' + h.technique : ''}`); } else { setMethodHints({ volumeMult: 1, technique: null, label: '' }); setMethodNote('Выберите методики (по одной из категории)'); } }} />
-      </>)}
-      {subView === 'analytics' && (<><AnalyticsTab sessions={historyWorkouts} /><VisualTab sessions={historyWorkouts} /></>)}
-      {subView === 'prometrics' && <ProMetricsPanel />}
-      {mainTab === 'bb' && subView === 'charts' && <TrainingMetricsChart lms={lmsChart} bb={bbChart} />}
       {/* Модалка подтверждения «Начать заново» */}
       {resetAsk && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', padding: 16 }}

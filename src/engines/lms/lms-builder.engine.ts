@@ -25,6 +25,7 @@ import { derivePattern, trueMuscleOf } from '../movement-pattern';
 import { norm } from '../norm';
 import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
+import { cloneCycleTemplate } from '../../data/lms-cycles/lms-cycle-clone';
 import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
 import { buildPLTaperCurve, summarizeTaperCurve, type PeakWeekLayout, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
 import { buildPLPeakBlockLayout, dateWeeksBackward, type PLPeakBlockLayout } from './lms-peak-block.engine';
@@ -93,15 +94,14 @@ export interface LMSBuildInput {
   /** Exact source mode: preserve source sets, reps, order and frequency. */
   faithful?: boolean;
   /** Режим авто-тапера при сборке (канон lms-taper.engine). По умолчанию 'classic'.
-   *  Раньше авто-тапер был захардкожен classic/2 — не подстраивался под выбранную
-   *  модель из таба соревнований. Теперь сборка уважает выбранный peakMode. */
+   *  ВАЖНО: действует только для auto-прогрессирующих циклов. При `faithful` или
+   *  явной раскладке всех недель параметр — тихий no-op (раскладка источника
+   *  сохраняется дословно); тапер навешивается отдельно через `appendPLTaperWeeks`. */
   peakMode?: TaperMode;
-  /** Число авто-тапер-недель при сборке (по умолчанию 2). */
+  /** Число авто-тапер-недель при сборке (по умолчанию 2). См. peakMode (no-op при faithful). */
   taperWeeks?: number;
-  /** Пиковый цикл ПЛ для тапера (если задан — кривая из цикла, интеграция пиковых циклов). */
+  /** Пиковый цикл ПЛ для тапера (если задан — кривая из цикла). См. peakMode (no-op при faithful). */
   peakCycleId?: string;
-  /** DUP-волна внутри микроцикла: heavy/light/medium дни (если задан — переопределяет % из шаблона). */
-  dupWave?: 'heavy' | 'light' | 'medium';
 }
 
 
@@ -1569,9 +1569,17 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     rationale,
     levelPmNote,
     nutritionNote,
-    input.volumeGoal ? `Объём аксессуаров: ${input.volumeGoal === 'mev' ? 'минимальный (MEV)' : input.volumeGoal === 'mrv' ? 'максимальный (MRV)' : 'оптимальный (MAV)'}.` : '',
-    input.focusLift ? `Приоритет: акцент на ${input.focusLift === 'squat' ? 'присед' : input.focusLift === 'bench' ? 'жим' : 'тягу'} (+20% объёма).` : '',
-    input.weakPoints?.length ? `Слабые группы: ${input.weakPoints.join(', ')} (+20% объёма для упражнений на эти группы).` : '',
+    // Честность текста (Фаза 1): в faithful множители объёма аксессуаров НЕ применяются —
+    // не обещаем «+20%», если раскладка источника сохраняется дословно.
+    input.volumeGoal
+      ? `Объём аксессуаров: ${input.volumeGoal === 'mev' ? 'минимальный (MEV)' : input.volumeGoal === 'mrv' ? 'максимальный (MRV)' : 'оптимальный (MAV)'}${faithful ? ' — в дословном режиме не применяется (объём источника сохранён).' : '.'}`
+      : '',
+    input.focusLift
+      ? `Приоритет: акцент на ${input.focusLift === 'squat' ? 'присед' : input.focusLift === 'bench' ? 'жим' : 'тягу'}${faithful ? ' — в дословном режиме не применяется.' : ' (+20% объёма).'}`
+      : '',
+    input.weakPoints?.length
+      ? `Слабые группы: ${input.weakPoints.join(', ')}${faithful ? ' — ассистенты добавлены сверху, объём источника не изменён.' : ' (+20% объёма для упражнений на эти группы).'}`
+      : '',
     `S-MRV: объём сессий автоматически ограничен бюджетом утомления (Ready: ${input.currentReadiness ?? 80}%).`,
     input.peds?.length ? `💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}.` : '',
     (input.bodyFat != null || input.hrvMs != null || input.sleepHours != null) ? `🔄 Recovery multiplier: ×${recoveryMult.toFixed(2)} (bodyFat/HRV/sleep/stress). Итог MRV ×${combinedMrvMult.toFixed(2)}.` : '',
@@ -1596,7 +1604,10 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const taperNote = taperedWeeks !== weeks ? ' 📉 Taper: финальные недели — объём ↓, интенсивность сохранена (Bosquet 2005).' : '';
 
   return {
-    template,
+    // Выход не должен давать потребителю ссылку на замороженный реестр:
+    // клон сохраняет оригинал неприкосновенным (и позволяет легальную
+    // локальную правку плана без TypeError).
+    template: cloneCycleTemplate(template),
     progressionRationale: proRationale + taperNote,
     weeks: taperedWeeks,
     cycleMetrics,

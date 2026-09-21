@@ -32,7 +32,7 @@ import {
   type CompGapBuildOptions,
 } from '../../../engines/lms/lms-comp-gap.engine';
 import type { LMSRankedCycle, LMSSelectorInput } from '../../../engines/lms/lms-selector.engine';
-import type { LMSBuildOutput, LMSPlanWeek } from '../../../engines/lms/lms-builder.engine';
+import { originalCycleWeeks, type LMSBuildOutput, type LMSPlanWeek } from '../../../engines/lms/lms-builder.engine';
 import type { PLSeasonMeet, MacroTaperOpts } from '../../../engines/lms/lms-macro-taper.engine';
 import { LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
@@ -374,7 +374,9 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
     const raw = fitCycleToWeeks(chosen.cycle, slot.weeks);
     if (!raw.needsConsent) return null;
     const consented = consents[idx] === true;
-    const orig = raw.cycle.meta.weeks;
+    // Реальная длина оригинала — из реестра (raw.cycle.meta.weeks у производной
+    // уже равен целевому окну, из-за чего диалог показывал «сжать N→N»).
+    const orig = originalCycleWeeks(chosen.cycle);
     // raw уже содержит предложение; показываем диалог только если needsConsent
     // seasonPlan уже применил consents, поэтому проверяем raw, а не seasonPlan
     return (
@@ -403,7 +405,8 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
                   saveSeasonStateValue(seasonMode, undefined, undefined, undefined, next);
                 }}
                 style={consentBtnNo}
-              >✕ Оставить как есть 1:1</button>
+                title="Оригинал цикла не изменяется: слот пропускается, раскладка сезона остаётся прежней"
+              >✕ Пропустить слот (цикл не меняем)</button>
               <button
                 onClick={() => {
                   setPickMode('manual');

@@ -3,6 +3,7 @@
  * Единый реестр шаблонов (унификация с cycle.engine.CYCLE_TEMPLATES — Этап R).
  */
 import type { SRCycleTemplate, SRDirection } from './lms-types';
+import { deepFreezeCycleTemplates } from './lms-cycle-clone';
 
 import { CYCLE_01 } from './cycle-01';
 import { CYCLE_02 } from './cycle-02';
@@ -281,9 +282,14 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     BASE_BUILDING,
     TSA_9,
     BRIDGE,
-    PHUL,
-    PHAT,
+ PHUL,
+ PHAT,
 ];
+
+// ОРИГИНАЛ ЦИКЛА неприкосновенен: реестр глубоко заморожен, любая попытка
+// мутировать шаблон бросает TypeError. Изменяемые версии — только через
+// cloneCycleTemplate() и только с согласием пользователя (см. lms-season).
+deepFreezeCycleTemplates(LMS_CYCLES);
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {
  return LMS_CYCLES.find(c => c.meta.id === id);

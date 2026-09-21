@@ -16,6 +16,7 @@ import {
 import type { BBTrainingFocus } from '../../../engines/bb/bb-goal-types';
 import { buildPLTaperCurve, TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type TaperMode, type TaperWeightGoal } from '../../../engines/lms/lms-taper.engine';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
+import { originalCycleWeeks } from '../../../engines/lms/lms-builder.engine';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 import { CARD, SMALL, H, IN, BTN, BTN_GHOST } from '../TrainingScreen_parts/training-ui';
 import { PL_PHASE_VISUAL, BB_PHASE_VISUAL, COMPETITION_PRIORITY_VISUAL } from '../TrainingScreen_parts/phase-visual-tokens';
@@ -542,6 +543,30 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const levelLabel = effLevel || 'Не выбран';
   const goalLabel = effGoal === 'powerlifting' ? 'Пауэрлифтинг' : effGoal === 'bodybuilding' ? 'Бодибилдинг' : 'Общее';
   const focusLabel = trainingFocus === 'strength' ? 'Сила' : trainingFocus === 'endurance' ? 'Выносливость' : 'Гипертрофия';
+  // 🔒 ОРИГИНАЛ ЦИКЛА: применение макроцикла с подгонкой недель под блоки
+  // (растяжение/сжатие/повтор) допускается только по явному согласию пользователя.
+  // Сам шаблон при этом не изменяется — строится производная раскладка.
+  const macroFitChanges = useMemo(() => {
+    if (isBB || !macro) return [] as Array<{ blockIdx: number; cycleId: string; title: string; cycleWeeks: number; blockWeeks: number; weekFrom: number; weekTo: number }>;
+    return macro.blocks.flatMap((block, blockIdx) => {
+      if (block.kind !== 'SRC' || !block.cycleId) return [];
+      const cycle = getCycleById(block.cycleId);
+      if (!cycle) return [];
+      const cycleWeeks = originalCycleWeeks(cycle);
+      if (cycleWeeks === block.weeks) return [];
+      return [{
+        blockIdx, cycleId: block.cycleId, title: cycle.meta.title,
+        cycleWeeks, blockWeeks: block.weeks,
+        weekFrom: block.weekOffset, weekTo: block.weekOffset + block.weeks - 1,
+      }];
+    });
+  }, [isBB, macro]);
+  const [macroFitConsent, setMacroFitConsent] = useState(false);
+  const macroFitSignature = macroFitChanges.map(ch => `${ch.blockIdx}:${ch.cycleId}:${ch.blockWeeks}`).join('|');
+  useEffect(() => {
+    setMacroFitConsent(false);
+  }, [macroFitSignature]);
+  const macroFitLocked = !isBB && macroFitChanges.length > 0 && !macroFitConsent;
   useEffect(() => {
     // The panel can stay mounted while the user switches PL/BB. Reload the
     // matching persisted plan instead of keeping the previous direction's state.
@@ -2998,8 +3023,35 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
 
           {/* 🎯 Действия: применение макроцикла, сохранение, экспорт, год → конструкторы */}
           <SectionHead icon="🎯" title="Действия" />
+          {!isBB && macroFitChanges.length > 0 && (
+            <div data-pl="macro-fit-consent" role="alert" style={{ marginTop: 6, padding: 10, borderRadius: 10, background: macroFitConsent ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${macroFitConsent ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.35)'}` }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: macroFitConsent ? '#22c55e' : '#f59e0b', marginBottom: 4 }}>
+                {macroFitConsent
+                  ? `✓ Согласие дано: ${macroFitChanges.length} цикл(ов) будут адаптированы под длину блоков`
+                  : `⚠️ Требуется согласие: ${macroFitChanges.length} цикл(ов) будут растянуты/сжаты/повторены под блоки`}
+              </div>
+              <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 4 }}>
+                {macroFitChanges.map(ch => (
+                  <div key={`${ch.blockIdx}-${ch.cycleId}`}>• «{ch.title}» — {ch.cycleWeeks} нед цикла → {ch.blockWeeks} нед блока (нед {ch.weekFrom}–{ch.weekTo})</div>
+                ))}
+              </div>
+              <div style={{ fontSize: 9.5, color: '#fff', lineHeight: 1.45, marginBottom: 6 }}>
+                Оригинал цикла не изменяется — строится производная раскладка. Либо отредактируйте длину блока (⚙️ Фазы), чтобы совпала с длиной цикла.
+              </div>
+              {!macroFitConsent ? (
+                <button data-pl="macro-fit-consent-ok" onClick={() => setMacroFitConsent(true)} style={{ ...BTN, fontSize: 11, padding: '8px 12px', minHeight: 44 }}>✓ Согласен, применить адаптацию</button>
+              ) : (
+                <button data-pl="macro-fit-consent-revoke" onClick={() => setMacroFitConsent(false)} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44 }}>↩ Отозвать согласие</button>
+              )}
+            </div>
+          )}
           {onApplyMacrocycle && (isBB ? bbMacro : macro) && (
-            <button onClick={() => { const source = isBB ? bbMacro : macro; if (source) onApplyMacrocycle(source); }} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%' }}>
+            <button
+              data-pl="apply-macro"
+              disabled={macroFitLocked}
+              title={macroFitLocked ? 'Сначала подтвердите адаптацию циклов под блоки (оригинал не изменяется)' : undefined}
+              onClick={() => { if (macroFitLocked) return; const source = isBB ? bbMacro : macro; if (source) onApplyMacrocycle(source); }}
+              style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%', opacity: macroFitLocked ? 0.5 : 1, cursor: macroFitLocked ? 'not-allowed' : 'pointer' }}>
               🗓 Применить весь макроцикл
             </button>
           )}
@@ -3029,7 +3081,11 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 {copyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
               </button>
               <button
+                data-pl="start-macro"
+                disabled={macroFitLocked}
+                title={macroFitLocked ? 'Сначала подтвердите адаптацию циклов под блоки (оригинал не изменяется)' : undefined}
                 onClick={() => {
+                  if (macroFitLocked) return;
                   const source = isBB ? bbMacro : macro;
                   if (!source) return;
                   if (onApplyMacrocycle) onApplyMacrocycle(source);

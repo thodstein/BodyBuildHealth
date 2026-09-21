@@ -45,7 +45,7 @@ import { rankBBSplits } from '../../../engines/bb/bb-selector.engine';
 import { loadUserPrograms, saveUserProgram } from '../../../engines/user-program/program-store';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
 import { generatePeriodization } from '../../../engines/cycle-periodization.engine';
-import { PHASE_LABELS, PHASE_HINTS } from './shared';
+import { PHASE_LABELS, PHASE_HINTS, setPlanningTrack } from './shared';
 import { autoSchedule, detectOvertraining } from '../../../engines/overtraining-scheduler.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
@@ -740,7 +740,20 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                             <div style={{ fontSize: 11, fontWeight: 800, color: idx===0 ? accent : '#fff' }}>{idx===0 ? '★ ' : ''}{r.cycle.meta.title}</div>
                             <div style={{ fontSize: 10, color: DIM }}>{r.cycle.meta.period} · {r.cycle.meta.level} · {r.cycle.meta.sessionsPerWeek} дн/нед · {r.cycle.meta.weeks} нед · скор {r.score}</div>
                           </div>
-                          <button onClick={() => applyToPlanner({ kind: 'cycle', label: 'Цикл ПЛ: '+r.cycle.meta.title, data: { cycleId: r.cycle.meta.id } } as any)} style={{ ...btn, minHeight: 36, background: accent+'18', borderColor: accent+'33', color: accent }}>Применить</button>
+                          <button onClick={() => {
+                            // Мост «Периодизация → ПЛ-авто»: payload kind 'cycle' + переключение
+                            // трека (как CycleCatalog для арм/SS). SRCBBScreen применит свежий
+                            // payload при монтировании (ts ≤ 5 мин) и пересоберёт план.
+                            applyToPlanner({
+                              kind: 'cycle',
+                              label: 'Цикл ПЛ: ' + r.cycle.meta.title,
+                              data: { cycleId: r.cycle.meta.id },
+                              source: 'intellectual',
+                              targetCycleId: r.cycle.meta.id,
+                            });
+                            try { setPlanningTrack('pl'); } catch { /* ignore */ }
+                            try { window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'pl' })); } catch { /* ignore */ }
+                          }} style={{ ...btn, minHeight: 36, background: accent+'18', borderColor: accent+'33', color: accent }}>Применить</button>
                         </div>
                       ))}
                     </div>

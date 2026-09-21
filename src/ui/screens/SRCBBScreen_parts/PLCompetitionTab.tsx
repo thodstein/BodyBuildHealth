@@ -22,6 +22,7 @@ import type { PeakWeekLayout, TaperMode, TaperWeightGoal } from '../../../engine
 import type { TaperCoachCtx, TaperConfigRecommendation } from '../../../engines/lms/lms-taper-coach.engine';
 import { buildPLTaperPrintHtml, buildPLPeakWeekCutProtocol } from '../../../engines/lms/lms-taper-coach.engine';
 import { PopupNumber, PopupSelect, ExpandableCard } from './TrainingPopups';
+import { AutoRegModeSwitch } from './AutoRegModeSwitch';
 import { TaperCoachCard } from './TaperCoachCard';
 import { usePLTaper } from './taper-state';
 import { getPeakCycles } from '../../../engines/lms/pl-peak-cycle-taper.engine';
@@ -393,22 +394,8 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: builtSrc && taperNote ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc && taperNote ? '#a78bfa' : 'rgba(255,255,255,0.3)', background: builtSrc && taperNote ? 'rgba(139,92,246,0.1)' : 'transparent' }}
           title="Пересчитать прикиды на финальной тапер-неделе (и mock meet) под выбранную стратегию"
         >🔄 Обновить прикиды</button>
-        <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setAutoRegMode('diary')}
-            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'diary' ? '#60a5fa' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'diary' ? '#000' : '#fff' }}>
-            📓 Авто-дневник
-          </button>
-          <button
-            onClick={() => setAutoRegMode('auto')}
-            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'auto' ? '#60a5fa' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'auto' ? '#000' : '#fff' }}>
-            🤖 Авто
-          </button>
-          <button
-            onClick={() => setAutoRegMode('off')}
-            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'off' ? '#71717a' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'off' ? '#000' : '#fff' }}>
-            ВЫКЛ
-          </button>
+        <div style={{ marginTop: 6 }}>
+          <AutoRegModeSwitch value={autoRegMode} onChange={setAutoRegMode} dataHook="comp-autoreg" />
         </div>
       </div>
       {/* Рекомендации по сбросу ИЛИ набору (текущий вес ниже целевого — переход в более тяжёлую категорию) */}

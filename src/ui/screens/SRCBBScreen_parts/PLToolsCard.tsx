@@ -6,9 +6,10 @@ import { fetchOPLHistory } from '../../../engines/openpowerlifting-import.engine
 import { dailyReadinessCheck, mvtForLift, velocityForPct, calibrateLVP, trainingMax } from '../../../engines/pro/vbt.engine';
 import { avgIntensity, checkTonnageGate } from '../../../engines/lms/pl-tonnage-gate.engine';
 import { dotsScore } from '../../../engines/pro/relative-strength.engine';
+import { calibrateLVP as calibrateLVPCanonical, saveLVPProfile } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
 import type { VBTLift } from '../../../engines/pro/vbt.engine';
 
-export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Record<string, number>; e1RM: Record<string, number>; hrvRatio?: number; acwr?: number; rpeDelta?: number; onApplyFrequency?: (plans: ReturnType<typeof planFrequency>[]) => void; plan?: { weeks: Array<{ week: number; days: Array<{ exercises: Array<{ workSets: Array<{ weight: number; reps: number; sets: number; pct: number }> }> }> }> } | null }> = ({ level, days, totalSets, e1RM, hrvRatio, acwr, rpeDelta, onApplyFrequency, plan }) => {
+export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Record<string, number>; e1RM: Record<string, number>; hrvRatio?: number; acwr?: number; rpeDelta?: number; bodyWeight?: number; sex?: string; onApplyFrequency?: (plans: ReturnType<typeof planFrequency>[]) => void; plan?: { weeks: Array<{ week: number; days: Array<{ exercises: Array<{ workSets: Array<{ weight: number; reps: number; sets: number; pct: number }> }> }> }> } | null }> = ({ level, days, totalSets, e1RM, hrvRatio, acwr, rpeDelta, bodyWeight, sex, onApplyFrequency, plan }) => {
   const freqs = useMemo(() => Object.keys(totalSets).map(m => planFrequency(m, totalSets[m], days, level)), [totalSets, days, level]);
   const [lift, setLift] = useState<VBTLift>('squat');
   const attempts = useMemo(() => {
@@ -25,6 +26,7 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
   const [lvp70, setLvp70] = useState(0.75);
   const [lvp80, setLvp80] = useState(0.60);
   const lvpCal = useMemo(() => calibrateLVP([{pct:0.6, velocity:lvp60},{pct:0.7, velocity:lvp70},{pct:0.8, velocity:lvp80}]), [lvp60, lvp70, lvp80]);
+  const [lvpSaveMsg, setLvpSaveMsg] = useState('');
   const [compMax, setCompMax] = useState(200);
 
   return (
@@ -32,7 +34,7 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa' }}>🏋️ OpenPowerlifting импорт</span>
         <input value={oplName} onChange={e=>setOplName(e.target.value)} placeholder="Имя атлета" style={{ flex: 1, minWidth: 120, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', padding: '4px 8px', fontSize: 10 }} />
-        <button onClick={async()=>{ const r=await fetchOPLHistory(oplName); if(r.length){ try{ localStorage.setItem('he_opl_history', JSON.stringify(r)); localStorage.setItem('he_opl_name', oplName); }catch{} setOplRes(`Найдено ${r.length} стартов → сохранено в профиль, график DOTS обновится`); } else setOplRes(`Нет данных / не найдено`); }} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#a78bfa', color: '#000', border: 'none', cursor: 'pointer' }}>Найти</button>
+        <button onClick={async()=>{ const r=await fetchOPLHistory(oplName); if(r.length){ try{ localStorage.setItem('he_opl_history', JSON.stringify(r)); localStorage.setItem('he_opl_name', oplName); }catch{} setOplRes(`Найдено ${r.length} стартов — история сохранена локально (график DOTS её пока не читает)`); } else setOplRes(`Нет данных / не найдено`); }} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#a78bfa', color: '#000', border: 'none', cursor: 'pointer' }}>Найти</button>
         {oplRes && <span style={{ fontSize: 10, color: '#fff' }}>{oplRes}</span>}
       </div>
       <div style={{ padding: 10, borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
@@ -40,6 +42,9 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
           <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>📊 Frequency Planner (MEV/MRV)</div>
           <button onClick={() => onApplyFrequency?.(freqs)} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#60a5fa', color: '#000', border: 'none', cursor: 'pointer' }}>Применить в план</button>
         </div>
+        {freqs.length === 0 && (
+          <div style={{ fontSize: 10, color: '#fff' }}>Объёмы берутся из собранного плана — постройте план, чтобы увидеть частоту.</div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 6 }}>
           {freqs.map(f => (
             <div key={f.muscle} style={{ padding: 6, background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 10 }}>
@@ -82,7 +87,20 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
           <span>70%:</span><input type="number" step={0.05} value={lvp70} onChange={e=>setLvp70(Number(e.target.value))} style={{ width: 60, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', padding: '2px 4px', fontSize: 9 }} />
           <span>80%:</span><input type="number" step={0.05} value={lvp80} onChange={e=>setLvp80(Number(e.target.value))} style={{ width: 60, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', padding: '2px 4px', fontSize: 9 }} />
           <span style={{ color: lvpCal ? '#22c55e' : '#ef4444' }}>{lvpCal ? `R² ${lvpCal.r2.toFixed(2)} slope ${lvpCal.slope.toFixed(2)}` : 'нужно 3 точки'}</span>
-          <button onClick={()=>{ if(lvpCal) localStorage.setItem('he_lv_profile_ss_v1', JSON.stringify({60:lvp60,70:lvp70,80:lvp80, slope:lvpCal.slope, intercept:lvpCal.intercept})); }} style={{ padding: '2px 6px', borderRadius: 6, fontSize: 9, background: '#a78bfa', color: '#000', border: 'none', cursor: 'pointer' }}>Сохранить LVP</button>
+          <button onClick={()=>{
+            if (!lvpCal) { setLvpSaveMsg('⚠ не сохранено: нужно 3 точки'); return; }
+            // Канонический профиль (he_lv_profile_ss_v1 = { [lift]: LVPProfile }) —
+            // прежний плоский формат не читался VBT/WL-хабом.
+            const profile = calibrateLVPCanonical('squat', [
+              { pct: 0.6, velocity: lvp60 },
+              { pct: 0.7, velocity: lvp70 },
+              { pct: 0.8, velocity: lvp80 },
+            ]);
+            if (!profile) { setLvpSaveMsg('⚠ не сохранено: наклон/разброс вне нормы'); return; }
+            saveLVPProfile(profile);
+            setLvpSaveMsg(`✓ сохранено (squat, R² ${profile.r2.toFixed(2)})`);
+          }} style={{ padding: '2px 6px', borderRadius: 6, fontSize: 9, background: '#a78bfa', color: '#000', border: 'none', cursor: 'pointer' }}>Сохранить LVP</button>
+          {lvpSaveMsg && <span style={{ color: lvpSaveMsg.startsWith('✓') ? '#22c55e' : '#f59e0b' }}>{lvpSaveMsg}</span>}
         </div>
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 4, display: 'flex', gap: 4, alignItems: 'center' }}>
           <span>Соревн. макс</span><input type="number" value={compMax} onChange={e=>setCompMax(Number(e.target.value))} style={{ width: 70, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', padding: '2px 4px', fontSize: 9 }} />
@@ -95,12 +113,15 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
         const danger = gates.filter(g=>g.flag==='danger').length;
         const warn = gates.filter(g=>g.flag==='warn').length;
         const total = Object.values(e1RM).reduce((a,b)=>a+(b||0),0);
-        const dots = total>0 ? dotsScore(total, 83, 'male') : 0;
+        // Честный DOTS: реальный вес из профиля (83 кг — только явный фолбэк) и пол.
+        const bwForDots = bodyWeight && bodyWeight > 0 ? bodyWeight : 83;
+        const sexForDots = sex === 'female' ? 'female' : 'male';
+        const dots = total>0 ? dotsScore(total, bwForDots, sexForDots) : 0;
         return (
           <div style={{ padding: 10, borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 6 }}>📈 Sheiko Gate + DOTS</div>
             <div style={{ fontSize: 10, color: '#fff' }}>Средняя интенсивность: <b>{avg}%</b> {avg>=73 && avg<=77 ? <span style={{color:'#22c55e'}}>✓ Шейко-норма 75%</span> : <span style={{color:'#ef4444'}}>⚠ вне 75%±2%</span>} | Тоннаж гейт: {danger? <span style={{color:'#ef4444'}}>{danger}× danger</span> : warn? <span style={{color:'#f59e0b'}}>{warn}× warn</span> : <span style={{color:'#22c55e'}}>ок</span>}</div>
-            <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Тотал e1RM {total}кг → DOTS <b>{dots}</b> (83кг male) {dots>=400 ? '— МС' : dots>=350 ? '— КМС' : ''}</div>
+            <div data-pl="dots-line" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Тотал e1RM {total}кг → DOTS <b>{dots}</b> ({bwForDots}кг {sexForDots}{!bodyWeight || bodyWeight <= 0 ? ' — профиль не заполнен' : ''}) {dots>=400 ? '— МС' : dots>=350 ? '— КМС' : ''}</div>
             {gates.filter(g=>g.flag!=='ok').slice(0,3).map(g=>(
               <div key={g.week} style={{ fontSize: 9, color: g.flag==='danger'?'#ef4444':'#f59e0b' }}>Нед {g.week}: {g.changePct}% {g.note}</div>
             ))}

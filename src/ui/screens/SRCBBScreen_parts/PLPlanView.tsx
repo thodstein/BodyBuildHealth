@@ -26,6 +26,7 @@ import {
   sourceWeekColor, summarizeSourceCycleWeeks,
 } from '../TrainingScreen_parts/MesocycleProgressionCard';
 import { MetricCard, PopupNumber, PopupSelect, ExpandableCard, SaveButton } from './TrainingPopups';
+import { AutoRegModeSwitch } from './AutoRegModeSwitch';
 import { SessionPlayer, type PlayerDay } from './SessionPlayer';
 import { DayCard, type PhaseKey } from '../TrainingScreen_parts/PlanOutput';
 import { usePLTaper } from './taper-state';
@@ -355,9 +356,6 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               {(() => {
                 const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0, combinedRirShift: autoRegMode === 'auto' ? autoRegResult.rirShift + bridgeRir : bridgeRir });
                 const modeColor = autoRegMode === 'auto' ? '#60a5fa' : autoRegMode === 'diary' ? '#22c55e' : '#71717a';
-                const segBtn = (m: AutoRegMode, label: string) => (
-                  <button onClick={() => setAutoRegMode(m)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === m ? modeColor : 'rgba(255,255,255,0.08)', color: autoRegMode === m ? '#000' : '#fff' }}>{label}</button>
-                );
                 return (
                   <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: autoRegMode === 'off' ? 'rgba(255,255,255,0.02)' : autoRegResult.deload ? 'rgba(239,68,68,0.08)' : autoRegMode === 'diary' ? 'rgba(34,197,94,0.06)' : 'rgba(96,165,250,0.06)', border: '1px solid ' + (autoRegMode === 'off' ? 'rgba(255,255,255,0.06)' : autoRegResult.deload ? 'rgba(239,68,68,0.25)' : autoRegMode === 'diary' ? 'rgba(34,197,94,0.2)' : 'rgba(96,165,250,0.2)') }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
@@ -367,12 +365,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                         </span>
                         {autoRegMode !== 'off' && autoRegResult.intensityNote && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: autoRegResult.intensityNote === 'силовая' ? 'rgba(239,68,68,0.15)' : autoRegResult.intensityNote === 'восстановительная' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)', color: autoRegResult.intensityNote === 'силовая' ? '#ef4444' : autoRegResult.intensityNote === 'восстановительная' ? '#22c55e' : '#f59e0b' }}>{autoRegResult.intensityNote === 'силовая' ? 'СИЛОВАЯ' : autoRegResult.intensityNote === 'восстановительная' ? 'ВОССТАНОВИТ.' : autoRegResult.intensityNote === 'лёгкая' ? 'ЛЁГКАЯ' : ''}</span>}
                       </div>
-                      <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                        <span style={{ fontSize:10, fontWeight:700, color: modeColor, marginRight: 4 }}>Авторегуляция:</span>
-                        {segBtn('off', 'ВЫКЛ')}
-                        {segBtn('auto', 'АВТО')}
-                        {segBtn('diary', 'ДНЕВНИК')}
-                      </div>
+                      <AutoRegModeSwitch value={autoRegMode} onChange={setAutoRegMode} size="md" showTitleLabel />
                     </div>
                     {autoRegMode === 'auto' && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
                       <div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload ? ' · 🔴 DELOAD' : ''}</div>
@@ -555,23 +548,10 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   deadlift: cycleVal('dead') || pmDead,
                 };
                 const cyclePmApplied = !!cycleKeyFor('squat') || !!cycleKeyFor('bench') || !!cycleKeyFor('dead');
-                const arBtn = (m: AutoRegMode, label: string) => {
-                  const active = autoRegMode === m;
-                  return (
-                    <button
-                      onClick={() => setAutoRegMode(m)}
-                      title={m === 'auto' ? 'Формульная авторегуляция: вес × топ-сет множитель, объём, RIR' : m === 'diary' ? 'Корректировка весов из последней сессии дневника' : 'Плановые веса без корректировок'}
-                      style={{ padding: '4px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: active ? (m === 'off' ? '#71717a' : '#60a5fa') : 'rgba(255,255,255,0.08)', color: active ? '#000' : '#fff' }}>
-                      {label}
-                    </button>
-                  );
-                };
                 return (
                 <MetricCard title={`🏁 Попытки на соревнования${W.some(isTaperWeek) ? ` · ${MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : ''}${autoRegMode === 'auto' ? ` · 🤖 режим авторегуляции${arMult !== 1 ? `: веса ×${arMult.toFixed(2)}` : ' (множитель 1.00)'}` : ''}`} icon="🏁" accent="#f59e0b">
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
-                    {arBtn('diary', '📓 Авто-дневник')}
-                    {arBtn('auto', '🤖 Авто')}
-                    {arBtn('off', 'ВЫКЛ')}
+                    <AutoRegModeSwitch value={autoRegMode} onChange={setAutoRegMode} />
                     <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : '#fff' }}>
                       {autoRegMode === 'auto'
                         ? (arMult !== 1 ? `попытки ×${arMult.toFixed(2)}` : 'множитель 1.00')
@@ -617,23 +597,10 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 // (паритет с движком appendPLTaperWeeks.autoReg).
                 const base = computeMeetAttemptsFromPmRow(wk.pmRow, wk.meetAttempts.strategy) ?? wk.meetAttempts;
                 const scale = (w: number) => Math.round(w * arMult * 10) / 10;
-                const arBtn = (m: AutoRegMode, label: string) => {
-                  const active = autoRegMode === m;
-                  return (
-                    <button
-                      onClick={() => setAutoRegMode(m)}
-                      title={m === 'auto' ? 'Формульная авторегуляция: вес × топ-сет множитель, объём, RIR' : m === 'diary' ? 'Корректировка весов из последней сессии дневника' : 'Плановые веса без корректировок'}
-                      style={{ padding: '4px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: active ? (m === 'off' ? '#71717a' : '#60a5fa') : 'rgba(255,255,255,0.08)', color: active ? '#000' : '#fff' }}>
-                      {label}
-                    </button>
-                  );
-                };
                 return (
                 <MetricCard title={`${wk.meetWeek ? '🏁 Неделя соревнований' : wk.mockMeet ? '🎯 Имитация соревнований (mock meet)' : '🏁 Соревновательный день'} · прикиды ${MEET_STRATEGY_PCT_LABEL[base.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (неделя ${wk.week})${autoRegMode === 'auto' ? ` · 🤖 режим авторегуляции${arMult !== 1 ? `: веса ×${arMult.toFixed(2)}` : ' (множитель 1.00)'}` : ''}`} icon={wk.meetWeek ? '🏁' : wk.mockMeet ? '🎯' : '🏁'} accent={wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b'}>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
-                    {arBtn('diary', '📓 Авто-дневник')}
-                    {arBtn('auto', '🤖 Авто')}
-                    {arBtn('off', 'ВЫКЛ')}
+                    <AutoRegModeSwitch value={autoRegMode} onChange={setAutoRegMode} />
                     <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : '#fff' }}>
                       {autoRegMode === 'auto'
                         ? (arMult !== 1 ? `прикиды ×${arMult.toFixed(2)}` : 'множитель 1.00')

@@ -28,7 +28,7 @@
 const KEY = 'he_planner_apply';
 type Listener = (payload: PlannerApply | null) => void;
 
-export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'tempo_rollback' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter' | 'bb_nutrition' | 'arm_cycle' | 'ss_cycle' | 'combat_cycle';
+export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'tempo_rollback' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter' | 'bb_nutrition' | 'arm_cycle' | 'ss_cycle' | 'combat_cycle' | 'cycle';
 
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
@@ -145,6 +145,8 @@ export interface ArmCyclePayload { cycleId: string }
 export interface SSCyclePayload { cycleId: string }
 /** Именной цикл единоборств из библиотеки → CombatConstructor (дисциплина/цель/уровень/недели/дни/паттерн). */
 export interface CombatCyclePayload { cycleId: string }
+/** СРЦ-цикл из «Периодизации» (rankCycles) → ПЛ-авто (выбор цикла + пересборка). */
+export interface CyclePayload { cycleId: string }
 
 /** Калькулятор «Лимитирующие факторы движения»: выбранные упражнения + категорийные протоколы.
  *  key = `${lift}|${category}|${optionId}`. Протокол — из опции (не из раскладки цикла). */
@@ -155,7 +157,7 @@ export interface LimiterPayload {
   limiterDayMap?: Record<string, number[]>;
 }
 
-export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | TempoRollbackPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload | BBNutritionPayload | ArmCyclePayload | SSCyclePayload | CombatCyclePayload;
+export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | TempoRollbackPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload | BBNutritionPayload | ArmCyclePayload | SSCyclePayload | CombatCyclePayload | CyclePayload;
 
 /** Типобезопасная карта данных для публичного канала. */
 export interface PlannerApplyDataByKind {
@@ -182,6 +184,7 @@ export interface PlannerApplyDataByKind {
   arm_cycle: ArmCyclePayload;
   ss_cycle: SSCyclePayload;
   combat_cycle: CombatCyclePayload;
+  cycle: CyclePayload;
 }
 
 export type PlannerSource = 'pl-auto' | 'bb-auto' | 'intellectual' | 'manual' | string;

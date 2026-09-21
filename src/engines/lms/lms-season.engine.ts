@@ -14,6 +14,7 @@
  * Источник LMS_CYCLES — immutable канон, fit всегда возвращает производную копию.
  */
 import { LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
+import { cloneCycleTemplate, cloneCycleDay } from '../../data/lms-cycles/lms-cycle-clone';
 import { rankCycles, type LMSRankedCycle, type LMSSelectorInput } from './lms-selector.engine';
 import type { SRCycleTemplate, SRDaySpec } from '../../data/lms-cycles/lms-types';
 import { originalCycleWeeks, buildLMSPlan, type LMSBuildInput, type LMSBuildOutput, type LMSPlanWeek } from './lms-builder.engine';
@@ -121,12 +122,16 @@ export function fitCycleToWeeks(
     return { cycle, weeks: 0, mode: 'strict_skip', needsConsent: false, notes: [`окно слишком мало (${t} нед < минимальных ${floor} нед)`] };
   }
   if (t === orig) {
-    return { cycle, weeks: t, mode: 'exact', needsConsent: false, notes: ['точное соответствие длине цикла'] };
+    // Даже точное совпадение отдаём копией: производные fit не должны ссылаться
+    // на замороженный реестр (контракт «оригинал неприкосновенен»).
+    return { cycle: cloneCycleTemplate(cycle), weeks: t, mode: 'exact', needsConsent: false, notes: ['точное соответствие длине цикла'] };
   }
   if (t > orig) {
     // Растяжение: убираем явные недели (если были) — buildLMSPlan с weeksOverride
     // использует week1-шаблон + прогрессию correctionPct (логика цикла сохранена).
-    const derived = { ...cycle, weeks: undefined, meta: { ...cycle.meta, weeks: t } };
+    const derived = cloneCycleTemplate(cycle);
+    derived.weeks = undefined;
+    derived.meta.weeks = t;
     return {
       cycle: derived,
       weeks: t,
@@ -137,17 +142,16 @@ export function fitCycleToWeeks(
   }
   // Сжатие (t < orig) — логика цикла сохраняется, но только как предложение.
   const notes: string[] = [`цикл сжат с ${orig} до ${t} нед (предложение, требует согласия)`];
-  const derivedMeta = { ...cycle.meta, weeks: t };
-  let derived: SRCycleTemplate = { ...cycle, meta: derivedMeta };
+  const derived = cloneCycleTemplate(cycle);
+  derived.meta.weeks = t;
   if (Array.isArray(cycle.weeks) && cycle.weeks.length > 0) {
     const idx = sampleIndices(cycle.weeks.length, t);
-    const weeks = idx.map((i) => cycle.weeks![i]);
-    derived = { ...derived, weeks };
+    derived.weeks = idx.map((i) => cycle.weeks![i].map(cloneCycleDay));
     notes.push('явные недели источника: фазовая структура сохранена (первая и последняя недели на месте) — требует согласия');
   } else {
     const base = cycle.meta.correctionPct > 0 ? cycle.meta.correctionPct : 0.005;
     const eff = Math.min(base * (orig / t), base * 2);
-    derived = { ...derived, meta: { ...derivedMeta, correctionPct: eff } };
+    derived.meta.correctionPct = eff;
     notes.push(`темп прогрессии скорректирован ${(base * 100).toFixed(2)}% → ${(eff * 100).toFixed(2)}%/нед — суммарный прирост ПМ за ${t} нед сохранён (требует согласия)`);
   }
   return { cycle: derived, weeks: t, mode: 'proposed_shrink', needsConsent: true, correctionPctEff: derived.meta.correctionPct, notes };

@@ -124,6 +124,18 @@ export function taperWeeksByFatigue(fatigue?: number): number | null {
   return taperWeeksForFatigue(Math.max(0, Math.min(100, fatigue)));
 }
 
+/** Каноническая точка: кривая тапера ИЗ пикового цикла (единый источник —
+ *  pl-peak-cycle-taper ре-экспортирует эту функцию; раньше была дословная копия). */
+export function buildPeakCycleTaperCurve(
+  cycleId: string,
+  taperWeeks = 2,
+  weightGoal: TaperWeightGoal = 'maintain',
+): TaperCurvePoint[] {
+  const cycle = getCycleById(cycleId);
+  if (!cycle) return [];
+  return buildPeakCycleCurveInline(cycle, taperWeeks, weightGoal);
+}
+
 /** Вспомогательное для peakCycle-интеграции: построить кривую ИЗ недель цикла. */
 function buildPeakCycleCurveInline(
   cycle: import('../../data/lms-cycles/lms-types').SRCycleTemplate,
