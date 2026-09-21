@@ -35,7 +35,7 @@ export function HubCorrectionTab({ H }: { H: any }) {
   const {
     state, setState, report, diag, armCausesP0, armTop3P0, armSpecP0,
     handleInjectP0, hasInjectPrev, handleRollbackP0, injectMsg,
-    toggleWeakPoint, trackType, autoPoint, mvPhase, corrV2,
+    toggleWeakPoint, trackType, autoPoint, mvPhase, corrV2, armPrefCorr, setArmPrefCorr,
   } = H;
   const weakPoints: ArmWeakPoint[] = Array.isArray(state?.weakPoints) && state.weakPoints.length
     ? state.weakPoints
@@ -96,7 +96,7 @@ export function HubCorrectionTab({ H }: { H: any }) {
   );
   if (!weakPoints.length) {
     return (
-      <AdSec title="🛠 Коррекция движений" summary="выбери 1–3 мёртвые точки">
+      <AdSec title="🛠 Коррекция движений" summary="выбор точки → причина → методы с выбором упражнения">
         <div className="ad-muted" data-arm="correction-empty">
           Нет выбранных точек. Отметь 1–3 мёртвые точки во вкладках «Кисть/Ротация» или «Давление» —
           здесь соберётся цепочка: угол → причина → топ-3 с дозами → Δ → вставка в план.
@@ -111,7 +111,7 @@ export function HubCorrectionTab({ H }: { H: any }) {
     );
   }
   return (
-    <AdSec title={`🛠 Коррекция движений (${weakPoints.length})`} summary="точка → причина → топ-3 → доза → вставка">
+    <AdSec title={`🛠 Коррекция движений (${weakPoints.length})`} summary="выбор точки → причина → методы с выбором упражнения">
       {phaseChips}
       {waveChips}
       {mvPhase ? <div className="ad-muted" data-arm="correction-matchphase">Фаза схватки: {mvPhase} — топ-3 получил +4 точкам фазы (метка «точка слабой фазы» в причинах).</div> : null}
@@ -164,8 +164,23 @@ export function HubCorrectionTab({ H }: { H: any }) {
               })()}
               {top.length > 0 ? (
                 <div className="ad-tip" data-arm="correction-top3">
-                  Топ-3: {top.map((t: any) => `${t.id} (${roleLabel(t.id)} · ${t.score}${t.reason ? `, ${t.reason}` : ''})`).join(' · ')}
-                  {sim ? ` · Δ ${sim.summary}` : ''}
+                  Топ-3: {top.map((t: any) => {
+                    const pref = (armPrefCorr as any)?.[wp] === t.id;
+                    return (
+                      <span key={t.id} style={{ whiteSpace: 'nowrap' }}>
+                        <button
+                          data-arm="correction-star"
+                          data-active={pref ? 'true' : 'false'}
+                          aria-pressed={pref}
+                          aria-label={`Выбрать ${t.id}`}
+                          onClick={() => setArmPrefCorr(wp, t.id)}
+                          style={{ minWidth: 32, minHeight: 32, borderRadius: 8, marginRight: 4, cursor: 'pointer', border: '1px solid rgba(245,158,11,0.4)', background: pref ? 'rgba(245,158,11,0.25)' : 'transparent', color: '#fff', fontSize: 13, fontWeight: 800 }}
+                        >{pref ? '⭐' : '☆'}</button>
+                        {t.id} ({roleLabel(t.id)} · {t.score}{t.reason ? `, ${t.reason}` : ''})
+                      </span>
+                    );
+                  })}
+                  {sim ? <span> · Δ {sim.summary}</span> : null}
                 </div>
               ) : (
                 <div className="ad-muted">Топ-3: {(corr?.exercises || []).slice(0, 3).join(' · ')}</div>

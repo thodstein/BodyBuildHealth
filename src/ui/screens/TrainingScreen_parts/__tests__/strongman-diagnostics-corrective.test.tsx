@@ -8,28 +8,27 @@ beforeEach(() => {
   (HTMLCanvasElement.prototype as any).getContext = vi.fn(() => null);
 });
 
-describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
-  it('нижний док навигации: 7 табов, без плавающей шапки', () => {
+describe('StrongmanDiagnosticsHub corrective + top nav', () => {
+  it('верхняя навигация: 7 табов + применить, дубль шапки внизу удалён', () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
-    const dock = container.querySelector('[data-sm="bottom-nav"]');
-    expect(dock).toBeTruthy();
-    expect((dock as HTMLElement).style.position).not.toBe('sticky');
+    expect(container.querySelector('[data-sm="bottom-nav"]')).toBeNull();
     const top = container.querySelector('[data-sm="top-nav"]');
     expect(top).toBeTruthy();
     expect((top as HTMLElement).style.position).not.toBe('sticky');
     for (const id of ['press', 'carry', 'load', 'grip', 'mobility', 'video', 'correction']) {
-      expect(dock!.querySelector(`[data-sm="bottom-tab-${id}"]`)).toBeTruthy();
+      expect(top!.querySelector(`[data-sm="top-tab-${id}"]`)).toBeTruthy();
     }
+    expect(top!.querySelector('[data-sm="top-apply"]')).toBeTruthy();
   });
   it('таб Коррекция: пустое состояние без фаз', () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
     expect(document.body.textContent).toContain('Выбери 1–4 слабые фазы');
   });
   it('таб Коррекция: фаза → причина → топ с дозой/кью/прогрессией + сессия + волна', async () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
     fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-card"]')).toBeTruthy());
     const card = document.body.textContent || '';
     expect(card).toContain('Доза:');
@@ -42,7 +41,7 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
   it('кнопка коррекции пишет мост с smCorrections', async () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
     fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
     const btn = await screen.findByText(/Коррекцию в Стронг/);
     fireEvent.click(btn);
     await waitFor(() => expect(document.body.textContent).toContain('Применено'), { timeout: 2000 });
@@ -51,7 +50,7 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
   it('хинт Видео: sway 4см → топ-упражнение + переход в Коррекцию', async () => {
     localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ swayCm: '4' }));
     const { container } = render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-video"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-video"]')!);
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-video"]')).toBeTruthy());
     expect(document.body.textContent).toContain('yoke_walk →');
     fireEvent.click(screen.getByText(/Открыть Коррекцию/));
@@ -60,21 +59,21 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
   it('хинт асимметрии: L/R 100/90 → слабее справа + добивка', async () => {
     localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ leftMax: '100', rightMax: '90' }));
     const { container } = render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-mobility"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-mobility"]')!);
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-split"]')).toBeTruthy());
     expect(document.body.textContent).toContain('Слабее справа');
   });
   it('хинт мобильности: OHS 2 провала → щадящие дозы + переход', async () => {
     localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ ohsKneeValgus: true, ohsHipBelowParallel: false }));
     const { container } = render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-mobility"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-mobility"]')!);
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-mobility"]')).toBeTruthy());
     expect(document.body.textContent).toContain('щадящие дозы');
   });
   it('⭐: клик ставит предпочитаемую, персист и мост несут smPreferredCorr', async () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
     fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
     const stars = await screen.findAllByText('☆');
     expect(stars.length).toBeGreaterThan(0);
     fireEvent.click(stars[0]);
@@ -89,14 +88,14 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
   it('P1: замер sway 6см → RU-теги ошибок в Коррекции', async () => {
     localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ swayCm: '6' }));
     const { container } = render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-errtags"]')).toBeTruthy());
     expect(document.body.textContent).toContain('Качание');
   });
   it('P4/P6: волна с дозой причины — строки с sm_ id и @%', async () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
     fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-block-lines"]')).toBeTruthy());
     const txt = document.body.querySelector('[data-sm="corr-block-lines"]')?.textContent || '';
     expect(txt).toMatch(/sm_log/);
@@ -105,7 +104,7 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
   it('D2: фильтры подбора — уровень персистится, зал режет топ (3→2)', async () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
     fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-filters"]')).toBeTruthy());
     expect(document.body.querySelectorAll('[data-sm="corr-row"]').length).toBe(3);
     fireEvent.click(screen.getByText('Штанга'));
@@ -121,7 +120,7 @@ describe('StrongmanDiagnosticsHub corrective + bottom nav', () => {
   it('O1: фильтр без совпадений — честная нота вместо пустой карточки', async () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
     fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
-    fireEvent.click(container.querySelector('[data-sm="bottom-tab-correction"]')!);
+    fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-row"]')).toBeTruthy());
     fireEvent.click(screen.getByText('Свой вес'));
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-empty-phase"]')).toBeTruthy());

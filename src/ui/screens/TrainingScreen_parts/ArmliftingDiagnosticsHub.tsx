@@ -196,6 +196,15 @@ const f = (s: string): number | undefined => {
 export const ArmliftingDiagnosticsHub: React.FC = () => {
   const [state, setState] = useState<LiftState>(loadState);
   const [toast, setToast] = useState('');
+  // Паритет с ТА/стронгом: ⭐ предпочитаемое упражнение коррекции (первым в мост/план).
+  const [armliftPrefCorr, setArmliftPrefCorrState] = useState<string>(() => {
+    try { return localStorage.getItem('he_armlift_preferred_corr_v1') || ''; } catch { return ''; }
+  });
+  const setArmliftPrefCorr = (id: string) => setArmliftPrefCorrState((prev) => {
+    const next = prev === id ? '' : id;
+    try { if (next) localStorage.setItem('he_armlift_preferred_corr_v1', next); else localStorage.removeItem('he_armlift_preferred_corr_v1'); } catch { /* noop */ }
+    return next;
+  });
   const [histTick, setHistTick] = useState(0);
   /** PRO-5 D7: 3 таба — Замеры + Диагностика движений + Коррекция. Соревы удалены из хаба. */
   const [tab, setTab] = useState<DiagTab>('pomost');
@@ -373,6 +382,13 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     level: corrLevel,
     gentleOnly: cause.cause === 'pain',
   }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, corrLevel, holdCurve]);
+  /** ⭐-предпочтение: если выбранное входит в топ-3 — ставим первым (показ = мост = план). */
+  const correctionsOrdered = useMemo(() => {
+    if (!armliftPrefCorr) return corrections;
+    const hit = corrections.filter((c) => c.id === armliftPrefCorr);
+    if (!hit.length) return corrections;
+    return [...hit, ...corrections.filter((c) => c.id !== armliftPrefCorr)];
+  }, [corrections, armliftPrefCorr]);
   /** PRO-CORR K6: запасная 4-я — «🔁 Запасная» строкой (топ-3 в мост не меняется). */
   const spareCorrection = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
     cause: cause.cause === 'pain' ? undefined : cause.cause,
@@ -529,12 +545,12 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           diagFailurePoint: diag.failurePoint || undefined,
           diagFaultIds: diag.faultIds,
           diagCues: diagnosis.cues,
-          diagCorrections: corrections.map((c) => ({ id: c.id, title: c.title, protocol: c.protocol })),
+          diagCorrections: correctionsOrdered.map((c) => ({ id: c.id, title: c.title, protocol: c.protocol })),
           diagSpecBlock: specBlock,
           /** PRO-5 real: упражнения в план — только armlifting-ветка конструктора читает. */
           diagCauseDetail: { cause: cause.cause, confidence: cause.confidence, evidence: cause.evidence, fix: cause.fix },
-          armliftExercises: correctionsToInjectionItems(orderCorrectionsForDay(corrections), 3, intensityForCause(cause.cause), rirForCause(cause.cause)),
-          armliftOrderNote: sessionOrderNote(corrections),
+          armliftExercises: correctionsToInjectionItems(orderCorrectionsForDay(correctionsOrdered), 3, intensityForCause(cause.cause), rirForCause(cause.cause)),
+          armliftOrderNote: sessionOrderNote(correctionsOrdered),
           armliftCompleteness: completeness,
           armliftSpec: specBlock.map((w) => ({ week: w.week, targetSets: w.targetSets, dayMap: w.dayMap })),
           armliftWeakArmNote: asymForDiag != null && asymForDiag > 15 ? 'слабой рукой первой' : undefined,
@@ -591,7 +607,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     report,
     /** PRO-5 добивка: диагноз + коррекция в экспорт (аддитивно). */
     diagTitle: `${diagnosis.title} · ${diagnosis.cause}/${diagnosis.confidence}${conditions.trainingOnly ? ' · замер тренировочный' : ''}`,
-    diagCorrections: corrections.map((c) => `${c.title} — ${c.protocol} · ${c.dose}${c.cues?.length ? ` · кью: ${c.cues.join(', ')}` : ''}`),
+    diagCorrections: correctionsOrdered.map((c) => `${c.title} — ${c.protocol} · ${c.dose}${c.cues?.length ? ` · кью: ${c.cues.join(', ')}` : ''}`),
     diagSpec: specBlock.map((w) => `Нед ${w.week}: ${w.focus}${w.detail ? ` · ${w.detail}` : ''}`),
     diagExtra,
   });
@@ -696,6 +712,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         {([['pomost', '📏 Замеры'], ['diag', '🔍 Диагностика'], ['corr', '🔧 Коррекция']] as Array<[DiagTab, string]>).map(([id, label]) => (
           <AdChip key={id} active={tab === id} onClick={() => setTab(id)}>{label}</AdChip>
         ))}
+        <AdBtn variant="amber" data-arm="lift-apply-top" aria-label="Применить в Арм-конструктор" onClick={applyToConstructor}>→ Применить</AdBtn>
       </div>
       <div className="ad-muted">📏 Замеры — вход диагностики (%WR, слабейший). 🔍 Диагностика — точка срыва + фолы + тесты + причина. 🔧 Коррекция — упражнения + спец-блок волной.</div>
       {tab === 'pomost' && (<>
@@ -1023,14 +1040,24 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       </>)}
       {tab === 'corr' && (<>
       <AdCard>
-        <AdSec title="🔧 Коррекция" defaultOpen summary={`${diagnosis.weakLink} · топ-3`}>
+        <AdSec title="🔧 Коррекция" defaultOpen summary={`выбор снаряда → причина → методы с выбором упражнения`}>
           <div data-arm="lift-corr-result"><b>{diagnosis.title}</b> · причина {cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
           <div className="ad-muted">Чинить: {cause.fix}</div>
           <div className="ad-muted" data-arm="lift-corr-why">Почему: {cause.evidence.join(' · ')}</div>
           <div className="ad-list" data-arm="lift-corr-top">
-            {corrections.map((c, idx) => (
+            {correctionsOrdered.map((c, idx) => (
               <div key={c.id} className="ad-row">
-                <span><b>{idx + 1}. {c.title}</b> — {c.protocol}</span>
+                <span>
+                  <button
+                    data-arm="lift-corr-star"
+                    data-active={armliftPrefCorr === c.id ? 'true' : 'false'}
+                    aria-pressed={armliftPrefCorr === c.id}
+                    aria-label={`Выбрать ${c.title}`}
+                    onClick={() => setArmliftPrefCorr(c.id)}
+                    style={{ minWidth: 32, minHeight: 32, borderRadius: 8, marginRight: 6, cursor: 'pointer', border: '1px solid rgba(245,158,11,0.4)', background: armliftPrefCorr === c.id ? 'rgba(245,158,11,0.25)' : 'transparent', color: '#fff', fontSize: 13, fontWeight: 800 }}
+                  >{armliftPrefCorr === c.id ? '⭐' : '☆'}</button>
+                  <b>{idx + 1}. {c.title}</b> — {c.protocol}
+                </span>
                 <span className="ad-muted">{c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq} · {c.source} · день {c.dayTag} · чинит: {c.fixesPhase.map((fid) => diagFailures.find((fp) => fp.id === fid)?.label || fid).join(', ')}</span>
                 {c.cues && c.cues.length > 0 && (
                   <span className="ad-muted" data-arm="lift-corr-cues">Кью: {c.cues.join(' · ')}</span>
@@ -1049,7 +1076,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               Разминка: {corrections.filter((c) => c.warmup).map((c) => c.warmup).join(' · ')}
             </div>
           )}
-          <div className="ad-muted" data-arm="lift-corr-order">{sessionOrderNote(corrections)}</div>
+          <div className="ad-muted" data-arm="lift-corr-order">{sessionOrderNote(correctionsOrdered)}</div>
           <div className="lift-group">Спец-блок волной</div>
           <div className="ad-row" aria-label="Длина спец-блока">
             <AdChip active={diag.specWeeks !== 6} onClick={() => setD({ specWeeks: 4 })}>4 нед</AdChip>
@@ -1076,7 +1103,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       <AdCard>
         <div id="lift-bridge" />
         <AdSec title="📦 Что уедет в конструктор" collapsible defaultOpen={false} summary={report.filled ? 'армлифтинг' : 'пока пусто'}>
-          <div className="ad-muted">Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину «Армлифтинг». Слабейший снаряд, класс, рецепт, last-man-standing — в payload. Упражнения коррекции ({corrections.map((c) => c.exId).join(', ') || '—'}) встанут в недели плана при сборке в дисциплине «Армлифтинг».</div>
+          <div className="ad-muted">Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину «Армлифтинг». Слабейший снаряд, класс, рецепт, last-man-standing — в payload. Упражнения коррекции ({correctionsOrdered.map((c) => c.exId).join(', ') || '—'}) встанут в недели плана при сборке в дисциплине «Армлифтинг».</div>
         </AdSec>
         <AdCta>
           <AdBtn variant="amber" block hero onClick={applyToConstructor}>→ В Арм-конструктор (армлифтинг)</AdBtn>
@@ -1086,7 +1113,6 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <AdBtn variant="ghost" onClick={handleExportCsv}>📥 CSV</AdBtn>
           <AdBtn variant="ghost" onClick={handlePrint}>🖨 Печать</AdBtn>
         </div>
-        {toast && <AdBanner tone="ok">{toast}</AdBanner>}
       </AdCard>
     </AdRoot>
   );

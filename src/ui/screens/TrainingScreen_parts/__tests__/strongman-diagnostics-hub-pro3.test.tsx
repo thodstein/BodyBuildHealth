@@ -68,13 +68,13 @@ describe('StrongmanDiagnosticsHub PRO-3', () => {
   });
   it('movement P7: мобильность показывает YBT и дисклеймер', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(document.querySelector('[data-sm="bottom-tab-mobility"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-sm="top-tab-mobility"]') as HTMLElement);
     expect(await screen.findByText(/YBT anterior L/)).toBeTruthy();
     expect(document.body.textContent).toContain('Скрининг, не диагноз');
   });
   it('movement P7: полная YBT-поверхность (PM/PL/UQ)', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(document.querySelector('[data-sm="bottom-tab-mobility"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-sm="top-tab-mobility"]') as HTMLElement);
     expect(await screen.findByText(/YBT postmed L/)).toBeTruthy();
     expect(document.body.textContent).toContain('YBT postlat R');
     expect(document.body.textContent).toContain('YBT-UQ L');
@@ -82,16 +82,16 @@ describe('StrongmanDiagnosticsHub PRO-3', () => {
   it('movement R2a: чемодан-асимметрия → unilateral farmers_carry в мосте', async () => {
     render(<StrongmanDiagnosticsHub />);
     const fillNum = async (tab: string, label: RegExp, value: string) => {
-      fireEvent.click(document.querySelector(`[data-sm="bottom-tab-${tab}"]`) as HTMLElement);
+      fireEvent.click(document.querySelector(`[data-sm="top-tab-${tab}"]`) as HTMLElement);
       fireEvent.click(await screen.findByRole('button', { name: label }));
       fireEvent.change(await screen.findByRole('textbox', { name: label }), { target: { value } });
       fireEvent.click(screen.getByText('Готово'));
     };
     await fillNum('carry', /Чемодан L/, '25');
     await fillNum('carry', /Чемодан R/, '30');
-    fireEvent.click(document.querySelector('[data-sm="bottom-tab-carry"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-sm="top-tab-carry"]') as HTMLElement);
     fireEvent.click(await screen.findByText(SM_BIOMECH.farmers_carry.label));
-    fireEvent.click(document.querySelector('[data-sm="bottom-tab-correction"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-sm="top-tab-correction"]') as HTMLElement);
     fireEvent.click(await screen.findByText(/Коррекцию в Стронг/));
     await waitFor(() => {
       const raw = localStorage.getItem('he_planner_apply') || '{}';
@@ -101,22 +101,22 @@ describe('StrongmanDiagnosticsHub PRO-3', () => {
   });
   it('movement R3a: факт 20м рендерится отдельно от прогресса', async () => {
     render(<StrongmanDiagnosticsHub />);
-    fireEvent.click(document.querySelector('[data-sm="bottom-tab-carry"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-sm="top-tab-carry"]') as HTMLElement);
     expect(await screen.findByText(/Факт 20м/)).toBeTruthy();
   });
   it('movement→причина: слабый холд vs заступ даёт причину grip в Коррекции', async () => {
     render(<StrongmanDiagnosticsHub />);
     const fillNum = async (tab: string, label: RegExp, value: string) => {
-      fireEvent.click(document.querySelector(`[data-sm="bottom-tab-${tab}"]`) as HTMLElement);
+      fireEvent.click(document.querySelector(`[data-sm="top-tab-${tab}"]`) as HTMLElement);
       fireEvent.click(await screen.findByRole('button', { name: label }));
       fireEvent.change(await screen.findByRole('textbox', { name: label }), { target: { value } });
       fireEvent.click(screen.getByText('Готово'));
     };
     await fillNum('grip', /Удержание фермера/, '25');
     await fillNum('carry', /Время заступа/, '45');
-    fireEvent.click(document.querySelector('[data-sm="bottom-tab-carry"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-sm="top-tab-carry"]') as HTMLElement);
     fireEvent.click(await screen.findByText(SM_BIOMECH.farmers_carry.label));
-    fireEvent.click(document.querySelector('[data-sm="bottom-tab-correction"]') as HTMLElement);
+    fireEvent.click(document.querySelector('[data-sm="top-tab-correction"]') as HTMLElement);
     expect(await screen.findByText(/причина: grip/)).toBeTruthy();
   });
 });

@@ -197,6 +197,21 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [specWeeks, setSpecWeeks] = useState(String((p1saved as any).specWeeks ?? '6'));
   const [injectMsg, setInjectMsg] = useState('');
   const [planNonce, setPlanNonce] = useState(0);
+  // Паритет с ТА/стронгом: ⭐ предпочитаемое упражнение коррекции на мёртвую точку.
+  // Реально влияет: идёт первым в rankedIds инъекции и в preferredExerciseIds моста.
+  const [armPrefCorr, setArmPrefCorrState] = useState<Record<string, string>>(() => {
+    try {
+      const raw = localStorage.getItem('he_arm_preferred_corr_v1');
+      const p = raw ? JSON.parse(raw) : {};
+      return p && typeof p === 'object' ? p : {};
+    } catch { return {}; }
+  });
+  const setArmPrefCorr = (wp: string, id: string) => setArmPrefCorrState((prev) => {
+    const next = { ...prev };
+    if (next[wp] === id) delete next[wp]; else next[wp] = id;
+    try { localStorage.setItem('he_arm_preferred_corr_v1', JSON.stringify(next)); } catch { /* noop */ }
+    return next;
+  });
   const [hasInjectPrev, setHasInjectPrev] = useState<boolean>(() => {
     try { return !!localStorage.getItem('he_arm_plan_saved_prev'); } catch { return false; }
   });
@@ -799,6 +814,20 @@ export const ArmDiagnosticsHub: React.FC = () => {
     return out;
   }, [state.weakPoints, state.level, armCausesP0, armPlan, report.asymmetryPct, dynamicReport, profileCtxP0, armMobility, state.failurePoint, mvPhase, state.elbowDeg, state.forearmDeg, state.wristDeg, vbt]);
 
+  // ⭐-предпочтение первым в порядке точки (идёт в rankedIds инъекции и preferredExerciseIds моста)
+  const orderedTopFor = (wp: string): any[] => {
+    const top = ((armTop3P0 as any)?.[wp] || []) as any[];
+    const pref = armPrefCorr[wp];
+    if (!pref) return top;
+    const hit = top.filter((t) => String(t.id) === pref);
+    return hit.length ? [...hit, ...top.filter((t) => String(t.id) !== pref)] : top;
+  };
+  const orderedTopByPointFor = (points: string[]): Record<string, any[]> => {
+    const out: Record<string, any[]> = {};
+    for (const p of points) out[p] = orderedTopFor(p);
+    return out;
+  };
+
   const armSpecP0 = useMemo(() => {
     try {
       return buildArmSpecBlock({ weakPoints: state.weakPoints as any, level: state.level, weeks: parseInt(specWeeks) || 6, technique: state.technique });
@@ -840,7 +869,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     const rankedIds: Record<string, string[]> = {};
     try {
       for (const p of points) {
-        const top = ((armTop3P0 as any)?.[p] || []).map((t: any) => String(t.id));
+        const top = orderedTopFor(p).map((t: any) => String(t.id));
         const rest = ((ARM_CORRECTIONS as any)?.[p]?.exercises || []).map(String);
         rankedIds[p] = [...top, ...rest].filter((v, i, a) => a.indexOf(v) === i);
       }
@@ -1141,7 +1170,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
       asymmetry: report.asymmetryPct,
       info: report.info,
       weakCauses: armCausesP0 as any,
-      topByPoint: armTop3P0 as any,
+      // ⭐ первым — мост ставит предпочитаемое упражнение первым (preferredExerciseIds)
+      topByPoint: (weakPoints && weakPoints.length ? orderedTopByPointFor(weakPoints) : armTop3P0) as any,
       spec: armSpecP0 as any,
       mobilityFails: armMobility.fails,
       acwrDanger: perMuscleAcwrSumP0.danger,
@@ -1164,7 +1194,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     try {
       const ranked: Record<string, string[]> = {};
       for (const wp of weakPoints || []) {
-        const top = ((armTop3P0 as any)?.[wp] || []).map((t: any) => String(t.id));
+        const top = orderedTopFor(wp).map((t: any) => String(t.id));
         const rest = ((ARM_CORRECTIONS as any)?.[wp]?.exercises || []).map(String);
         const order = [...top, ...rest].filter((v, i, a) => a.indexOf(v) === i);
         if (order.length) ranked[wp] = order;
@@ -1370,6 +1400,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     autoregP0, cnsHeavyP0, guardsP0, armPlan,
     rh, setRh, buildRehabPlanFn: buildRehabPlan, scoreLabel,
     specWeeks, setSpecWeeks, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0,
+    armPrefCorr, setArmPrefCorr,
     corrV2: (() => { try { return { tendonOverload: Number((tendonAcwr as any)?.ratio) >= 1.3, waveWeek: (() => { const w = parseInt(String((state as any).corrWave || ''), 10); return Number.isFinite(w) && w >= 1 && w <= 3 ? w : null; })() }; } catch { return { tendonOverload: false, waveWeek: null }; } })(),
     diaryTrendsP0, diarySuggestP0,
     handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0,

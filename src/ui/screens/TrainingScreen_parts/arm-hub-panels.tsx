@@ -75,7 +75,7 @@ export function HubHead({ H }: { H: any }) {
 }
 
 export function HubControls({ H }: { H: any }) {
-  const { state, setState, weightClassAuto, tab, setTab } = H;
+  const { state, setState, weightClassAuto, tab, setTab, applyToConstructor } = H;
   return (
     <div style={HUB_SECTION_GAP}>
       <div>
@@ -124,6 +124,9 @@ export function HubControls({ H }: { H: any }) {
         </AdBanner>
       )}
       <AdSteps steps={TAB_DEFS.map(t=>({ id: t.id, label: `${t.icon} ${t.label}` }))} active={tab} onSelect={(id)=>setTab(id)} hook="hub-tabs" numbered={false} />
+      <div className="ad-row" style={{ marginTop: 6 }}>
+        <AdBtn variant="amber" block hero data-arm="hub-apply-top" aria-label="Применить в Арм-конструктор" onClick={applyToConstructor}>→ Применить в Арм-конструктор</AdBtn>
+      </div>
     </div>
   );
 }
