@@ -1524,6 +1524,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       </div>
 
       <div style={{ ...CARD, padding: 10 }}>
+        <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>🧭 Выбор движения и слабые фазы</div>
         <div data-sm="top-nav" role="tablist" aria-label="Разделы диагностики" style={{ position: 'static', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
           {TAB_DEFS.map(t => (
             <button key={t.id} role="tab" aria-selected={tab === t.id} aria-pressed={tab === t.id} data-sm={`top-tab-${t.id}`} onClick={() => setTab(t.id)} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: tab === t.id ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: tab === t.id ? 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(239,68,68,0.12))' : 'rgba(22,30,52,0.88)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>

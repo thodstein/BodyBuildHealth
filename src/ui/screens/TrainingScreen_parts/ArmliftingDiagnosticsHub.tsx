@@ -708,13 +708,16 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         {toast && <AdBanner tone="ok">{toast}</AdBanner>}
       </AdCard>
 
-      <div className="ad-row" data-arm="lift-tabs" aria-label="Режим хаба">
-        {([['pomost', '📏 Замеры'], ['diag', '🔍 Диагностика'], ['corr', '🔧 Коррекция']] as Array<[DiagTab, string]>).map(([id, label]) => (
-          <AdChip key={id} active={tab === id} onClick={() => setTab(id)}>{label}</AdChip>
-        ))}
-        <AdBtn variant="amber" data-arm="lift-apply-top" aria-label="Применить в Арм-конструктор" onClick={applyToConstructor}>→ Применить</AdBtn>
-      </div>
-      <div className="ad-muted">📏 Замеры — вход диагностики (%WR, слабейший). 🔍 Диагностика — точка срыва + фолы + тесты + причина. 🔧 Коррекция — упражнения + спец-блок волной.</div>
+      <AdCard>
+        <div className="ad-sec-t" data-arm="lift-movement-head">🧭 Режим и снаряд</div>
+        <div className="ad-row" data-arm="lift-tabs" aria-label="Режим хаба">
+          {([['pomost', '📏 Замеры'], ['diag', '🔍 Диагностика'], ['corr', '🔧 Коррекция']] as Array<[DiagTab, string]>).map(([id, label]) => (
+            <AdChip key={id} active={tab === id} onClick={() => setTab(id)}>{label}</AdChip>
+          ))}
+          <AdBtn variant="amber" data-arm="lift-apply-top" aria-label="Применить в Арм-конструктор" onClick={applyToConstructor}>→ Применить</AdBtn>
+        </div>
+        <div className="ad-muted">📏 Замеры — вход диагностики (%WR, слабейший). 🔍 Диагностика — точка срыва + фолы + тесты + причина. 🔧 Коррекция — упражнения + спец-блок волной.</div>
+      </AdCard>
       {tab === 'pomost' && (<>
       <AdCard>
         <div id="lift-measures" />

@@ -1423,6 +1423,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
       <HubHead H={H} />
 
       <AdCard>
+        <div className="ad-sec-t" data-arm="hub-params-head">🧭 Параметры и выбор движения</div>
         <HubControls H={H} />
 
         {/* Tab content — key remount даёт enter-переход панели */}
@@ -1447,13 +1448,13 @@ export const ArmDiagnosticsHub: React.FC = () => {
         <HubTabNext H={H} />
       </AdCard>
 
-      <HubOutput H={H} />
-
-      <HubP0Panel H={H} />
-
-      <HubScenarios H={H} />
-
-      <HubAction H={H} />
+      <AdCard>
+        <div className="ad-sec-t" data-arm="hub-result-head">📋 Итог и применение</div>
+        <HubOutput H={H} />
+        <HubP0Panel H={H} />
+        <HubScenarios H={H} />
+        <HubAction H={H} />
+      </AdCard>
     </AdRoot>
   );
 };

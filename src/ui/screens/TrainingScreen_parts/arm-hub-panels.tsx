@@ -10,7 +10,7 @@ import { getArmLandmarks } from '../../../engines/arm/arm-volume-landmarks.engin
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
-import { AdCard, AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdCta, AdSteps } from './arm-design-system';
+import { AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdCta, AdSteps } from './arm-design-system';
 import { CARD } from './training-ui';
 
 /* BB-shell: hero/controls/action поверх тех же .ad-* классов и data-arm
@@ -134,7 +134,7 @@ export function HubControls({ H }: { H: any }) {
 export function HubOutput({ H }: { H: any }) {
   const { report, diag, state } = H;
   return (
-    <AdCard>
+    <>
       <AdSec title="🔬 Диагностика — мёртвые точки (12) + сустав/сухожилие">
         <div className="ad-muted">{report.findings.slice(0,3).map((f:any)=>f.text).join(' · ')} {report.asymmetryPct!=null ? `· Асим ${report.asymmetryPct}%` : ''} {(report as any).weakPoints?.length? `· точек ${(report as any).weakPoints.join(', ')}` : ''}</div>
         {report.findings.length>3 && <div className="ad-sec">{report.findings.map((f:any,i:number)=><div key={i} className="ad-finding" data-level={f.level} style={{ color: f.level==='critical'?'#ef4444': f.level==='warn'?'#f59e0b':'#22c55e' }}>• {f.text} {f.level!=='ok'?'('+f.level+')':''}</div>)}</div>}
@@ -167,7 +167,7 @@ export function HubOutput({ H }: { H: any }) {
           </AdBanner>
         )}
       </AdSec>
-    </AdCard>
+    </>
   );
 }
 
@@ -189,7 +189,7 @@ export function HubP0Panel({ H }: { H: any }) {
     return next;
   });
   return (
-    <AdCard>
+    <>
       <AdSec title="🚨 Red-flags — скрининг перед тестами" collapsible defaultOpen={false} summary={redFlags.length ? `🔴 ${redFlags.length}` : 'проверь себя'}>
         <div className="ad-chips" data-arm="red-flags">
           {RED_FLAGS.map((f) => (
@@ -264,7 +264,7 @@ export function HubP0Panel({ H }: { H: any }) {
         </div>
         {injectMsg && <AdBanner tone={injectMsg.startsWith('✓') || injectMsg.startsWith('↩') ? 'ok' : 'warn'}>{injectMsg}</AdBanner>}
       </AdSec>
-    </AdCard>
+    </>
   );
 }
 
@@ -416,7 +416,7 @@ export function HubScenarios({ H }: { H: any }) {
     return parts.length ? `Δ vs сейчас: ${parts.join(' · ')}` : 'Δ vs сейчас: без изменений';
   };
   return (
-    <AdCard>
+    <>
       <AdSec title={`📸 Сценарии замеров (${scens.length}/6)`} collapsible defaultOpen={false} summary={scens.length ? 'было/стало' : 'сними сейчас'}>
         <div className="ad-row">
           <AdBtn variant="dark" onClick={take}>📸 Снапшот текущего</AdBtn>
@@ -443,7 +443,7 @@ export function HubScenarios({ H }: { H: any }) {
           </div>
         )}
       </AdSec>
-    </AdCard>
+    </>
   );
 }
 
@@ -459,7 +459,7 @@ export function HubAction({ H }: { H: any }) {
   const label = (pts.join(', ') || muscles.join(', ')) || (dynKeys.length ? 'динамика' : 'баланс');
   const count = pts.length ? `${pts.length} точек` : `${muscles.length} мышц`;
   return (
-    <AdCard>
+    <>
       <AdSec title="📦 Что уедет в конструктор" collapsible defaultOpen={false} summary={hasPayload ? label : 'пока пусто'}>
         {hasPayload ? (
           <div className="ad-muted">
@@ -476,6 +476,6 @@ export function HubAction({ H }: { H: any }) {
       </AdCta>
       <div className="ad-muted">Bridge: <code>weakpoints</code> → <code>ArmAutoConstructor</code> via <code>planner-bridge</code> · <code>armWeakPoints(12)</code>+<code>biomechCards</code>+<code>corrections</code>+<code>armDynamic</code>+<code>scoring</code> в payload · dedup/budget/humerus gated</div>
       {(diag as any).biomechCards?.length ? <div className="ad-muted">Инъекция: {(diag as any).biomechCards.map((c:any)=> `${c.weakPoint}→${c.corrections[0]}`).join(' · ')} · per-day ≤8, budget {(report as any).scoring?.score ?? ''}</div> : null}
-    </AdCard>
+    </>
   );
 }
