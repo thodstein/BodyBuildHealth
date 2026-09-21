@@ -507,7 +507,21 @@ export function scoreVolumeWeek(plan: PlanLike, weekNo: number): BBVolumeWeekSco
   // Баланс недели — движковым калькулятором (effective).
   const effMap: Record<string, { effectiveSets: number }> = {};
   for (const [k, v] of Object.entries(vol)) effMap[k] = { effectiveSets: v.effectiveSets };
-  const balance = computeMuscleBalance(effMap);
+  const balance = computeMuscleBalance(effMap, {
+    // Аудит 2026-09: цели акцента (слабая группа/специализация) не считаются
+    // «дисбалансом к исправлению» — иначе качество недели штрафовало за
+    // сознательный акцент пользователя («выбрал слабую спину — пишет +жимы»).
+    specTargets: (() => {
+      try {
+        const snapTargets = [...((plan as any).priorityMuscles || [])];
+        const weekSpec = (plan as any).specializationSchedule
+          ? specResForWeekSchedule((plan as any).specializationSchedule, (week as any).week || 1)
+          : null;
+        if (weekSpec?.active) snapTargets.push(...weekSpec.targets, ...weekSpec.weak);
+        return snapTargets;
+      } catch { return []; }
+    })(),
+  });
   for (const b of balance.issues.slice(0, 2)) {
     penalize('warning', 3, { code: 'muscle_balance', message: b, source: 'баланс недели (факт)' });
   }

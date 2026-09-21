@@ -6,6 +6,7 @@
  * локальной MRV-модели, а единый слой агрегации для генератора и метрик.
  */
 import { trueMuscleOf } from '../movement-pattern';
+import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 
 export type BBVolumeKind = 'direct' | 'effective';
 
@@ -209,18 +210,14 @@ export function sessionLimitsFor(
   // Сохранённые по-сессионные капы (исходный тернарник 24/40/60 и 10/14/18) + high-объём +15-20%
   let maxWorkingSets: number; let maxExercises: number;
   if (level === 'enhanced' && years >= 3 || (onCourse && years >= 3)) {
-    // Политика бюджета (zero-sum закрыт здесь, а не в фите): предписание BIG
-    // (спина 22 + грудь 18 + руки с гарантией) даёт ~63-65 сетов на плотный
-    // Upper. Фиксированные 60 заставляли fit резать по живому (памп-спина
-    // 17 вместо 18) при любом раскладе проходов. Tier 6+ лет несёт 65 сетов
-    // и 20 движений; 3-5 лет остаются на 60/18. Время (165 мин = 65×~150с)
-    // масштабируется парой в финализаторе; валидатор читает этот же источник.
-    maxWorkingSets = years >= 6 ? 65 : 60;
-    // BIG-сессии опытных несут ~20 движений: лимит 18 срезал бы аксессуарные
-    // тяги/махи целиком (enforce режет упражнениями, а не сетами).
-    maxExercises = years >= 6 ? 20 : 18;
+    // Реализм сессии (аудит 2026-09): 65/20 и 60/18 давали Upper-дни по 18-20
+    // упражнений («18 упражнений нереально даже для топ-уровня»). Потолок
+    // пересобран под практику про-тренировок: 40-45 сетов / 15-16 упражнений —
+    // при этом недельный объём держится частотой сплита (sessionMuscleRealismCap).
+    maxWorkingSets = years >= 6 ? 44 : 40;
+    maxExercises = years >= 6 ? 16 : 15;
   }
-  else if (level === 'enhanced' || (onCourse && years >= 1)) { maxWorkingSets = 40; maxExercises = 14; }
+  else if (level === 'enhanced' || (onCourse && years >= 1)) { maxWorkingSets = 34; maxExercises = 13; }
   else { maxWorkingSets = 24; maxExercises = 10; }
   // PPL: сессия качает 4–5 групп (Pull: спина/задняя/трапы/бицепс/предплечья) —
   // в 24/10 не влезает даже на минимумах пользовательских требований
@@ -254,7 +251,10 @@ export function sessionLimitsFor(
   if (input.trainingVolumeMode === 'high') {
     const isMaxExp = input.level === 'enhanced' && (input.trainingYears ?? 0) >= 6;
     maxWorkingSets = Math.round(maxWorkingSets * (isMaxExp ? 1.3 : 1.2));
-    maxExercises = Math.min(24, maxExercises + (isMaxExp ? 3 : 2));
+    // Абсолютный кап реализма: даже объёмный режим не выходит за 18 упражнений
+    // и 50 сетов (практический потолок тренажёрного дня ~2 часа).
+    maxExercises = Math.min(18, maxExercises + (isMaxExp ? 3 : 2));
+    maxWorkingSets = Math.min(50, maxWorkingSets);
   }
   return { weeklyWorkingSets, maxWorkingSets, maxExercises };
 }
@@ -662,6 +662,95 @@ export function resolveMrvCap(input: {
 export const PUOS_SESSION_FRACTIONAL = 11;
 
 /**
+ * РЕАЛИЗМ СЕССИИ (аудит 2026-09): сколько прямых сетов мышцы физически
+ * продуктивно в одной тренировке.
+ *
+ * Источники: Henselmans 2022 «maximum productive training volume per session»
+ * (9–13 сетов на группу), Remmert 2025 (PUOS ≈ 11 fractional — сверх этого
+ * отдача падает), Schoenfeld 2016 (1×/нед >12-16 — уже избыток),
+ * практика про-тренировок (Upper/Pull-день: 4–6 сетов на мышцу).
+ *
+ * Классы мышц: big — спина/ноги/грудь (могут больше), mid — плечи/трапы/икры/
+ * пресс, small — руки/предплечья.
+ *
+ * ВАЖНО: это ПОТОЛОК ПРЯМЫХ сетов за сессию, не недельный. Недельный — MRV.
+ * Смысл: большая цель (enhanced MAV×режим) распределяется по частоте сплита,
+ * а не сваливается в одну сессию (жалоба: Upper-день 18-20 упражнений).
+ */
+export const SESSION_MUSCLE_REALISM: Record<'beginner' | 'intermediate' | 'advanced' | 'course_1' | 'course_3' | 'course_6', { big: number; mid: number; small: number }> = {
+  beginner:     { big: 8, mid: 7, small: 7 },
+  intermediate: { big: 12, mid: 9, small: 8 },
+  advanced:     { big: 13, mid: 9, small: 8 },
+  course_1:     { big: 14, mid: 10, small: 9 },
+  course_3:     { big: 15, mid: 11, small: 9 },
+  course_6:     { big: 16, mid: 12, small: 10 },
+};
+
+/** Мышцы-классы для реализм-капа сессии. */
+export function sessionMuscleClass(muscle: string): 'big' | 'mid' | 'small' {
+  const m = String(muscle || '').toLowerCase();
+  if (['back', 'chest', 'quads', 'hamstrings', 'glutes', 'legs'].includes(m)) return 'big';
+  if (['shoulders', 'delt_front', 'delt_mid', 'delt_rear', 'traps', 'calves', 'abs', 'lower_back', 'arms'].includes(m)) return 'mid';
+  return 'small';
+}
+
+/**
+ * Потолок ПРЯМЫХ сетов мышцы за одну сессию (реализм, аудит 2026-09).
+ * Плотность: в сессии на 5+ групп каждая мышца получает меньше сетов
+ * (та же недельная цель распределяется по большему числу групп дня).
+ * Возвращает 0, если вход невалиден (кап не применяется).
+ */
+export function sessionMuscleRealismCap(input: {
+  muscle: string;
+  level?: string;
+  trainingYears?: number;
+  onCourse?: boolean;
+  /** Сколько групп мышц в сессии (musclePlans.length) — плотность. */
+  groupsInSession?: number;
+}): number {
+  const level = (input.level || 'intermediate').toLowerCase();
+  const years = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
+  const course = !!input.onCourse || level === 'enhanced';
+  let tier: keyof typeof SESSION_MUSCLE_REALISM;
+  if (course && years >= 6) tier = 'course_6';
+  else if (course && years >= 3) tier = 'course_3';
+  else if (course) tier = 'course_1';
+  else if (level === 'advanced') tier = 'advanced';
+  else if (level === 'beginner') tier = 'beginner';
+  else tier = 'intermediate';
+  const row = SESSION_MUSCLE_REALISM[tier];
+  let cap = row[sessionMuscleClass(input.muscle)];
+  const groups = Number(input.groupsInSession) || 0;
+  // Плотность: ≥5 групп — −15%, ≥6 — −25%, ≥8 (фулбоди) — −35% — только для
+  // крупных мышц (у них недельный объём распределяется по частоте сплита).
+  // Средние/малые НЕ ужимаются: их объём не «съедает» бюджет сессии, а
+  // PPL-минимумы (руки 8, икры 9) — контракт модели.
+  if (sessionMuscleClass(input.muscle) === 'big') {
+    const densityFactor = groups >= 8 ? 0.65 : groups >= 6 ? 0.75 : groups >= 5 ? 0.85 : 1;
+    cap = Math.max(3, Math.round(cap * densityFactor));
+  }
+  return cap;
+}
+
+/** Потолок числа упражнений на мышцу в сессии: ≥2 сета на упражнение (Schoenfeld). */
+export function sessionMuscleExerciseCap(setsForMuscle: number): number {
+  return Math.max(1, Math.ceil((Number(setsForMuscle) || 0) / 2));
+}
+
+/**
+ * Потолок упражнений мышцы по плотности сессии: в дне на 5+ групп каждая
+ * мышца получает 2-4 упражнения, а не 6-8 (жалоба: Upper 18 упражнений).
+ */
+export function sessionDensityExerciseCap(groupsInSession: number): number {
+  const g = Number(groupsInSession) || 0;
+  if (g >= 8) return 2;
+  if (g >= 6) return 3;
+  if (g >= 5) return 4;
+  if (g >= 4) return 5;
+  return 8;
+}
+
+/**
  * Волна-2.7: сессионный потолок мышцы по ЕЁ challenge-MRV и частоте.
  * Формула `ceil(challengeMrv/частота × BB_MRV_TOLERANCE)` ограничивает только
  * «малые» мышцы — те, у кого честная доля ниже старого флора 12 (задняя дельта,
@@ -683,20 +772,48 @@ export function sessionMrvRotCap(input: {
   return formula < 12 ? Math.min(cap, formula) : cap;
 }
 
+/**
+ * Баланс мышц недели (грудь/спина, квадр/хам, push/pull, перед/зад дельта).
+ *
+ * Аудит 2026-09 (жалоба «выбрал слабую спину — а везде пишет увеличить жимы»):
+ * функция принимает цели специализации/слабые группы. Если перекос создан
+ * сознательным акцентом блока (спина растёт как цель), предупреждение не
+ * выдаётся как проблема — вместо «добавьте жимов» идёт честная пометка
+ * «дисбаланс ожидаем: цель специализации». Без opts поведение 1-в-1 прежнее.
+ */
 export function computeMuscleBalance(
   weekly: Record<string, { effectiveSets: number }>,
+  opts?: { specTargets?: string[]; weakPoints?: string[] },
 ): { issues: string[]; ratios: Record<string, number> } {
   const get = (m: string) => weekly[m]?.effectiveSets || 0;
   const issues: string[] = [];
   const ratios: Record<string, number> = {};
+  const targets = new Set<string>();
+  for (const t of [...(opts?.specTargets || []), ...(opts?.weakPoints || [])]) {
+    const key = normalizeBBMuscle(t);
+    targets.add(key);
+    // Гранулярные зоны (delt_mid, back_width) → канонические мышцы.
+    if (key === 'delt_mid' || key === 'delt_rear' || key === 'delt_front') targets.add('shoulders');
+    if (key === 'back_width' || key === 'back_thickness' || key === 'lats') targets.add('back');
+    if (key === 'chest_upper' || key === 'chest_lower') targets.add('chest');
+  }
+  const isTarget = (...muscles: string[]) => muscles.some(m => targets.has(normalizeBBMuscle(m)));
+  /** Перекос создан целью акцента: вместо «исправь» — пометка об ожидаемости. */
+  const accentNote = (accentMuscle: string) => `«${MUSCLE_LABEL_RU[accentMuscle] || accentMuscle}» — цель акцента блока: дисбаланс ожидаем и не требует правки (остальные группы держат MEV).`;
+
   // chest/back
   const chest = get('chest');
   const back = get('back');
   if (chest > 0 && back > 0) {
     const r = chest / back;
     ratios['chest/back'] = Math.round(r * 100) / 100;
-    if (r > 1.3) issues.push(`Дисбаланс грудь/спина ${Math.round(r * 100) / 100} — грудь перегружена, добавьте тяг`);
-    if (r < 0.7) issues.push(`Дисбаланс грудь/спина ${Math.round(r * 100) / 100} — спина перегружена, добавьте жимов`);
+    if (r > 1.3) {
+      if (isTarget('chest', 'chest_upper', 'chest_lower')) issues.push(accentNote('chest'));
+      else issues.push(`Дисбаланс грудь/спина ${Math.round(r * 100) / 100} — грудь перегружена, добавьте тяг`);
+    } else if (r < 0.7) {
+      if (isTarget('back', 'back_width', 'back_thickness')) issues.push(accentNote('back'));
+      else issues.push(`Дисбаланс грудь/спина ${Math.round(r * 100) / 100} — спина перегружена, добавьте жимов`);
+    }
   }
   // quad/ham
   const quad = get('quads');
@@ -704,7 +821,10 @@ export function computeMuscleBalance(
   if (quad > 0 && ham > 0) {
     const r = quad / ham;
     ratios['quad/ham'] = Math.round(r * 100) / 100;
-    if (r > 1.5 || r < 0.66) issues.push(`Квадр/бицепс бедра ${Math.round(r * 100) / 100} — риск дисбаланса колена`);
+    if (r > 1.5 || r < 0.66) {
+      if (isTarget('quads', 'legs', 'hamstrings')) issues.push(accentNote(r > 1.5 ? 'quads' : 'hamstrings'));
+      else issues.push(`Квадр/бицепс бедра ${Math.round(r * 100) / 100} — риск дисбаланса колена`);
+    }
   }
   // push/pull per-week
   const push = chest + get('triceps') + get('shoulders') + get('delt_front') + get('delt_mid');
@@ -712,8 +832,13 @@ export function computeMuscleBalance(
   if (push > 0 && pull > 0) {
     const r = push / pull;
     ratios['push/pull'] = Math.round(r * 100) / 100;
-    if (r > 1.3) issues.push(`Push/pull ${Math.round(r * 100) / 100} — тяг мало`);
-    if (r < 0.77) issues.push(`Push/pull ${Math.round(r * 100) / 100} — жимов мало`);
+    if (r > 1.3) {
+      if (isTarget('chest', 'shoulders', 'delt_mid', 'delt_front')) issues.push(accentNote('chest'));
+      else issues.push(`Push/pull ${Math.round(r * 100) / 100} — тяг мало`);
+    } else if (r < 0.77) {
+      if (isTarget('back', 'back_width', 'back_thickness', 'hamstrings', 'glutes')) issues.push(accentNote('back'));
+      else issues.push(`Push/pull ${Math.round(r * 100) / 100} — жимов мало`);
+    }
   }
   // front/rear delt
   const front = get('delt_front') + get('shoulders') * 0.3;
@@ -721,7 +846,10 @@ export function computeMuscleBalance(
   if (front > 0 && rear > 0) {
     const r = front / rear;
     ratios['front/rear'] = Math.round(r * 100) / 100;
-    if (r > 1.5) issues.push(`Передняя/задняя дельта ${Math.round(r * 100) / 100} — добавьте тяг на заднюю дельту`);
+    if (r > 1.5) {
+      if (isTarget('delt_front', 'shoulders', 'delt_mid')) issues.push(accentNote('shoulders'));
+      else issues.push(`Передняя/задняя дельта ${Math.round(r * 100) / 100} — добавьте тяг на заднюю дельту`);
+    }
   }
   return { issues, ratios };
 }

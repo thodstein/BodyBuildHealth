@@ -6,6 +6,7 @@ import { SPLIT_PATTERNS, type SplitPattern } from './bb-split-patterns';
 import { normLevel } from '../volume-landmarks.engine';
 import { TAG_MUSCLES } from './bb-day-types';
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
+import { sessionLimitsFor } from './bb-volume.engine';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBLevel = 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
@@ -43,6 +44,13 @@ export interface BBRankedPattern {
   score: number;
   rationale: string[];
   warnings: string[];
+  /**
+   * Ориентир размера сессии (аудит 2026-09): капы сессии уровня + число групп
+   * в самом плотном дне. Нужен UI, чтобы показать пользователю, сколько
+   * упражнений/сетов реально ждать от сплита ДО сборки (жалоба: «верх/низ на
+   * 6 днях с 18 упражнениями» — раньше размер сессии нигде не показывался).
+   */
+  sessionBudget?: { maxExercises: number; maxWorkingSets: number; maxGroups: number };
 }
 
 // FIX-8: TAG_MUSCLES — единый источник в bb-day-types.ts (было дублировано без LegsBiceps)
@@ -225,17 +233,25 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     // качеству разделённым Push/Pull (те же объёмы вдвое короче). Мягкий
     // бонус сплитам, где в каждом дне ≤4 групп — рекомендация, не запрет:
     // явный выбор пользователя в UI приоритетнее (selectedSplitId).
+    // Аудит 2026-09: усилено — фулбоди-дни (≥8 групп) при высоком объёме
+    // физически не влезают в реалистичную сессию (≤16 движений), штраф −10.
     const highVolumeDemand = lvl === 'enhanced' || hasAAS || hasGH || hasIns;
+    let maxTagSize = 0;
+    for (const d of p.schedule) {
+      if (d.kind !== 'тренировка' || !d.sessionTag) continue;
+      const muscles = TAG_MUSCLES[d.sessionTag] || [d.sessionTag];
+      if (muscles.length > maxTagSize) maxTagSize = muscles.length;
+    }
     if (highVolumeDemand) {
-      let maxTagSize = 0;
-      for (const d of p.schedule) {
-        if (d.kind !== 'тренировка' || !d.sessionTag) continue;
-        const muscles = TAG_MUSCLES[d.sessionTag] || [d.sessionTag];
-        if (muscles.length > maxTagSize) maxTagSize = muscles.length;
-      }
       if (maxTagSize > 0 && maxTagSize <= 4) {
         score += 6;
         rationale.push('high-объём: короткие дни (≤4 групп) — Push/Pull короче Upper при том же объёме');
+      } else if (maxTagSize >= 8) {
+        score -= 10;
+        warnings.push('плотные дни на 8+ групп не влезают в реалистичную сессию при высоком объёме (≤16 движений)');
+      } else if (maxTagSize >= 6) {
+        score -= 4;
+        warnings.push('дни на 6+ групп: при высоком объёме сессия длиннее 100 мин — рассмотрите Push/Pull');
       }
     }
 
@@ -279,7 +295,7 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       }
     }
 
-    out.push({ pattern: p, score, rationale, warnings });
+    out.push({ pattern: p, score, rationale, warnings, sessionBudget: splitSessionBudget(p, input) });
   }
   // Сортировка: скор, затем близость к запрошенным дням, затем больше сессий.
   // (при равном скоре 6-дневный bro_6 должен бить 4-дневный rolling_4_1 на «6 дн.»)
@@ -297,6 +313,52 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
 
 export function selectBestBBSplit(input: BBSelectorInput): BBRankedPattern | null {
   return rankBBSplits(input)[0] ?? null;
+}
+
+/** Капы сессии сплита для уровня/режима + число групп в самом плотном дне. */
+export function splitSessionBudget(p: SplitPattern, input: Pick<BBSelectorInput, 'level' | 'peds' | 'pedDoses' | 'mode'>): { maxExercises: number; maxWorkingSets: number; maxGroups: number } {
+  const years = 0; // без стажа капы консервативнее — это честный ориентир
+  let lim = { maxExercises: 10, maxWorkingSets: 24 };
+  try {
+    lim = sessionLimitsFor({ level: input.level, trainingYears: years, peds: input.peds, onCourse: (input.peds || []).length > 0 } as any, { id: p.id });
+  } catch { /* дефолт */ }
+  let maxGroups = 0;
+  for (const d of (p.schedule || [])) {
+    if (d.kind !== 'тренировка' || !d.sessionTag) continue;
+    const muscles = TAG_MUSCLES[d.sessionTag] || [d.sessionTag];
+    if (muscles.length > maxGroups) maxGroups = muscles.length;
+  }
+  // Реалистичность: сессия на 8+ групп при высоком объёме ограничена
+  // плотностью (sessionDensityExerciseCap) — показываем фактический ориентир.
+  const densityCap = maxGroups >= 8 ? 2 : maxGroups >= 6 ? 3 : maxGroups >= 5 ? 4 : lim.maxExercises;
+  const estExercises = Math.min(lim.maxExercises, Math.max(4, maxGroups * densityCap));
+  return { maxExercises: estExercises, maxWorkingSets: lim.maxWorkingSets, maxGroups };
+}
+
+/**
+ * Диагностика выбранного пользователем сплита против его параметров:
+ * возвращает пустой массив, если сплит подходит. Используется UI, чтобы
+ * честно сказать «почему не рекомендован», а не молча собирать не то.
+ */
+export function splitFitWarnings(input: BBSelectorInput, patternId: string): string[] {
+  const p = SPLIT_PATTERNS.find(x => x.id === patternId);
+  if (!p) return ['сплит не найден'];
+  const lvl = normLevel(input.level);
+  const out: string[] = [];
+  if (!p.level.includes(lvl)) out.push(`уровень «${lvl}» не в списке этого сплита (${p.level.join('/')})`);
+  if (input.daysPerWeek != null) {
+    const eff = p.sessionsPerRotation * 7 / p.rotationDays;
+    const diff = eff - input.daysPerWeek;
+    if (diff > 1.5) out.push(`${eff.toFixed(1)} сессий/нед при ${input.daysPerWeek} доступных днях — план нереализуем`);
+    else if (diff < -2.5) out.push(`только ${eff.toFixed(1)} сессий/нед при ${input.daysPerWeek} днях — недоиспользуете неделю`);
+  }
+  if (input.sex === 'male' && patternId.startsWith('female_')) out.push('сплит для женского профиля');
+  const highVolumeDemand = lvl === 'enhanced' || (input.peds || []).length > 0;
+  if (highVolumeDemand) {
+    const budget = splitSessionBudget(p, input);
+    if (budget.maxGroups >= 8) out.push(`день на ${budget.maxGroups} групп при высоком объёме — сессия не влезет в реалистичный лимит`);
+  }
+  return out;
 }
 
 export function explainBBSelection(r: BBRankedPattern): string {

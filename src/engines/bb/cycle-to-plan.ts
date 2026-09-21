@@ -20,6 +20,7 @@ import { sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine
 import { adaptForPEDs, computeAASEquivDose, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
 import { applyRehabToPlan, rehabNotes } from './bb-recovery.engine';
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
+import { applyBfrPattern } from './bb-rep-schemes.engine';
 import { mergeWearableIntoRecovery, type WearableDaily } from './bb-wearable.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 import { applyPostPhaseProcessing, applyDeloadToWeek, resolveDeloadProtocol, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
@@ -2529,7 +2530,29 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
 
   const programSessionLimits = centralizedSessionLimits({
     level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears, peds: opts.peds, courseIntensity: opts.courseIntensity,
+    // Аудит 2026-09 (методики должны применяться): объёмный режим и курс влияют
+    // на лимиты сессии и в program-пути (раньше — NO-OP поле).
+    trainingVolumeMode: opts.trainingVolumeMode,
+    onCourse: (opts.peds?.length || 0) > 0,
   });
+  // Единый passthrough методик program-пути (аудит 2026-09):
+  //  • volumeScheme: FST-7 7-in-1 только enhanced без joint-guard (паритет с generic);
+  //  • rotationMode / intensityLevel / onCourse / trainingVolumeMode — в finalize.
+  const programVolumeScheme: 'standard' | 'gvt' | 'fst7' | 'gironda' = (() => {
+    const scheme = (opts as any).volumeScheme as 'standard' | 'gvt' | 'fst7' | 'gironda' | undefined;
+    if (scheme !== 'fst7') return scheme || 'standard';
+    const lvl = String(opts.level ?? levelForLandmarks);
+    // Паритет с generic: joint-guard = GH ≥4 / GH≥2+AAS≥500 / lab MRV <0.65
+    // (bb-joint-guard.engine) — при нём 7-in-1 не назначается.
+    const doses = (opts.pedDoses || {}) as Record<string, number>;
+    const gh = Number(doses.GH || doses.gh || 0);
+    const aas = Number(doses.AAS || doses.aas || 0);
+    const jointGuard = (gh >= 4) || (gh >= 2 && aas >= 500) || (opts.labMrvMultiplier ?? 1) < 0.65;
+    if (lvl !== 'enhanced' || jointGuard || mode === 'faithful') return 'standard';
+    return 'fst7';
+  })();
+  const programFst7Seven = programVolumeScheme === 'fst7' && mode === 'adapt';
+  const programOnCourse = (opts.peds?.length || 0) > 0;
   const finalized = finalizeBBPlan({
     ...finalPlan,
     volumeLandmarks,
@@ -2540,6 +2563,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     mrvMultiplier: pedMrvMult,
     maxWorkingSets: programSessionLimits.maxWorkingSets,
     maxExercises: programSessionLimits.maxExercises,
+    volumeScheme: programVolumeScheme,
+    trainingVolumeMode: opts.trainingVolumeMode,
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
     mobilityRestrictions: opts.mobilityRestrictions,
   }, {
@@ -2569,7 +2594,10 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     trainingYears: opts.trainingYears,
     bodyweightCapability: opts.bodyweightCapability,
     supersetMode: (opts as any).supersetMode,
-    volumeScheme: (opts as any).volumeScheme,
+    volumeScheme: programVolumeScheme,
+    fst7Seven: programFst7Seven,
+    rotationMode: (opts as any).rotationMode,
+    onCourse: programOnCourse,
     dcWidowmaker: dcGateProgram,
   });
   // M3 (аудит BB-AUTO-EXHAUSTIVE §8.3): недельный MRV-кап program-пути —
@@ -2584,6 +2612,13 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       const mrv = lmRaw?.mrv;
       if (!mrv) continue;
       let capMrv = Math.round(mrv * pedMrvMult);
+      // Аудит 2026-09: объёмный режим в program-adapt — паритет с generic
+      // (+25/30/35% к потолкам; сам состав программы при этом не переписывается).
+      if (opts.trainingVolumeMode === 'high') {
+        const lvl = String(opts.level ?? levelForLandmarks);
+        const boost = lvl === 'enhanced' && (opts.trainingYears ?? 0) >= 6 ? 1.35 : lvl === 'enhanced' ? 1.30 : 1.25;
+        capMrv = Math.round(capMrv * boost);
+      }
       // Female posterior boost: кап поднимается в такт объёмному ×1.2 (glutes/hams),
       // иначе кап стирает женский акцент (паритет convert/generic).
       if (opts.sex === 'female' && (m === 'glutes' || m === 'hamstrings')) capMrv = Math.round(capMrv * 1.2);
@@ -2686,7 +2721,45 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       for (const m of opts.rehabMuscles) finalized.rationale.push(rehabNotes(m, opts.rehabWeekStart ?? 1));
     }
   }
+  // Аудит 2026-09 (методики должны применяться): program-adapt получает те же
+  // эффекты, что generic-путь — отдых по интенсивности и BFR-протокол.
+  if (mode === 'adapt') {
+    const intensityLevel = (opts as any).intensityLevel as 'light' | 'moderate' | 'high' | undefined;
+    if (intensityLevel && intensityLevel !== 'moderate') {
+      const restMult = intensityLevel === 'light' ? 1.2 : 0.8;
+      let changed = 0;
+      for (const w of finalized.weeks) {
+        if ((w as any).phase === 'deload' || (w as any).deload) continue;
+        for (const s of w.sessions) for (const e of s.exercises) {
+          if ((e as any).warmupActivator) continue;
+          if (e.restSeconds) { e.restSeconds = Math.round(e.restSeconds * restMult); changed++; }
+          for (const ws of (e.workSets || [])) if ((ws as any).restSeconds) (ws as any).restSeconds = Math.round((ws as any).restSeconds * restMult);
+        }
+      }
+      if (changed > 0) finalized.rationale.push(`⏱ Интенсивность «${intensityLevel === 'light' ? 'лёгкая' : 'высокая'}»: отдых ×${restMult} применён (${changed} упр.).`);
+    }
+    if ((opts as any).bfrMode) {
+      let bfrApplied = 0;
+      for (const w of finalized.weeks) {
+        if ((w as any).phase === 'deload' || (w as any).deload) continue;
+        for (const sess of w.sessions) {
+          for (const e of sess.exercises) {
+            if ((e as any).warmupActivator || e.role !== 'accessory') continue;
+            const isIso = (e as any).exerciseType === 'isolation' || (e as any).type === 'isolation' || /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|подъем|отведен|сведен|face.?pull|тяга.*лиц/i.test(e.name || '');
+            if (!isIso) continue;
+            applyBfrPattern(e, (opts.workMax as any)?.[e.muscle] || 50);
+            bfrApplied++;
+          }
+        }
+      }
+      if (bfrApplied > 0) finalized.rationale.push(`🩸 BFR-режим: ${bfrApplied} изоляций переведены в 30-15-15-15 @25% (объём и восстановление).`);
+    }
+  }
   (finalized as any).trainingVolumeMode = (opts as any).trainingVolumeMode || 'standard';
+  // Честность методик (аудит 2026-09): в режиме «точно по программе» порядок/
+  // техники/схемы НЕ применяются (дословный источник). Флаг читает UI, чтобы
+  // не показывать «выбрано = применено» там, где это не так.
+  (finalized as any).methodologyApplied = mode !== 'faithful';
   (finalized as any).mrvMultiplier = pedMrvMult;
   (finalized as any).volumeGoal = opts.volumeGoal;
   (finalized as any).goal = (opts as any).goal;

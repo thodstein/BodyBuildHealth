@@ -29,7 +29,9 @@ describe('BB validator volume contract', () => {
       // хотя landmarks.mrv (32) был бы ниже.
       mrvByMuscle: { back: 70 },
     }, { level: 'enhanced' });
-    expect(result.issues.some(issue => issue.code === 'effective_mrv_overflow' && issue.message.includes('back'))).toBe(false);
+    // Аудит 2026-09: сообщения валидатора локализованы (RU-подписи мышц) —
+    // ищем «Спина» вместо сырого ключа back; контракт (cap из плана) тот же.
+    expect(result.issues.some(issue => issue.code === 'effective_mrv_overflow' && issue.message.includes('Спина'))).toBe(false);
   });
 
   it('falls back to landmarks.mrv when mrvByMuscle missing', () => {
@@ -44,6 +46,6 @@ describe('BB validator volume contract', () => {
       weeks: [{ week: 1, sessions: [{ day: 1, weekOffset: 1, character: 'тяж', exercises: [ex] }] }],
       rotationMuscleVolume: {}, rationale: [],
     }, { level: 'enhanced' });
-    expect(result.issues.some(issue => issue.code === 'effective_mrv_overflow' && issue.message.includes('back'))).toBe(true);
+    expect(result.issues.some(issue => issue.code === 'effective_mrv_overflow' && issue.message.includes('Спина'))).toBe(true);
   });
 });

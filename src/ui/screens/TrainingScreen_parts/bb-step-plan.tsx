@@ -12,9 +12,10 @@ import { buildWarmup } from '../../../engines/bb/bb-builder.engine';
 import type { BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { isCompoundEx } from '../../../engines/bb/bb-session-order.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
-import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
+import { sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
+import { buildPlanValidationView, planValidationBadge, planSessionStats } from './bb-plan-validation-view';
 import { PATTERN_RU as SUMMARY_PATTERN_RU } from '../../../engines/bb/bb-summary.engine';
 import { tempoExplain, buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
 import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechnique } from './bb-technique-display';
@@ -88,30 +89,71 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
         </div>
       </div>
 
-      {/* Топ-волна: сводка валидатора в выдаче (CYCLE-SYSTEM-FULL-AUDIT Ф5) */}
+      {/* 🧪 Валидация плана — адаптирована под выбор пользователя (аудит 2026-09):
+          технические коды скрыты, повторы сгруппированы, мышцы по-русски, у
+          каждой проблемы — действие; акцент специализации объяснён. */}
       {(() => {
         try {
-          const v = validateBBPlan(builtPlan, builtPlan.safetyConstraints);
-          const errs = v.issues.filter((i: any) => i.level === 'error');
-          const warns = v.issues.filter((i: any) => i.level === 'warning');
-          const ok = errs.length === 0;
+          const view = buildPlanValidationView(builtPlan);
+          const badge = planValidationBadge(view);
+          const stats = planSessionStats(builtPlan);
           return (
             <CollapsibleCard
-              title="🧪 Валидация плана"
-              defaultOpen={false}
-              headerStyle={{ background: ok ? 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))' : 'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(239,68,68,0.04))', color: ok ? '#22c55e' : '#ef4444' }}
-              badge={ok ? `✓ 0 ошибок · ${warns.length} замечаний` : `✗ ${errs.length} ошибок · ${warns.length} замечаний`}
+              title="🧪 Проверка плана под ваши настройки"
+              defaultOpen={!view.ok || view.warnings.length > 0}
+              headerStyle={{ background: badge.ok ? 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))' : 'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(239,68,68,0.04))', color: badge.ok ? '#22c55e' : '#ef4444' }}
+              badge={badge.label}
             >
-              {v.issues.length === 0 ? (
-                <div style={{ fontSize: 11, color: '#22c55e' }}>Проблем не найдено: объём в коридорах, делоды снижены, фазы размечены.</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {[...errs, ...warns].slice(0, 12).map((i: any, k: number) => (
-                    <div key={k} style={{ fontSize: 11, color: i.level === 'error' ? '#ef4444' : '#e5e7eb', padding: '4px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)' }}>
-                      {i.level === 'error' ? '⛔' : '⚠'} {i.message}
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginBottom: 6, lineHeight: 1.45 }}>
+                Учтены: уровень «{bbLevel}», {bbWeeks} нед, {bbTrainingFocus === 'strength' ? 'силовой' : bbTrainingFocus === 'endurance' ? 'выносливостный' : 'гипертрофийный'} фокус, лимиты сессии {(() => { try { const l = sessionLimitsFor({ level: bbLevel } as any, { id: builtPlan.pattern?.id } as any); return `${l.maxExercises} упр / ${l.maxWorkingSets} сетов`; } catch { return '—'; } })()}.
+                Максимум в плане: {stats.maxExercises} упр / {stats.maxSets} сетов за сессию.
+              </div>
+              {view.accentNote && (
+                <div style={{ fontSize: 10, color: '#facc15', padding: '5px 8px', borderRadius: 8, background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.2)', marginBottom: 6, lineHeight: 1.45 }}>
+                  🎯 {view.accentNote}
+                </div>
+              )}
+              {view.errors.length === 0 && view.warnings.length === 0 && (
+                <div style={{ fontSize: 11, color: '#22c55e' }}>Проблем по вашим параметрам нет: объём в коридорах, делоды снижены, фазы размечены.</div>
+              )}
+              {view.errors.length > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  {view.errors.map((e, k) => (
+                    <div key={k} style={{ fontSize: 11, color: '#fca5a5', padding: '5px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', marginBottom: 3 }}>
+                      ⛔ {e.text}{e.count > 1 ? ` (×${e.count})` : ''}
+                      {e.hint && <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>→ {e.hint}</div>}
                     </div>
                   ))}
-                  {v.issues.length > 12 && <div style={{ fontSize: 10, color: '#fff' }}>… и ещё {v.issues.length - 12} замечаний</div>}
+                </div>
+              )}
+              {view.warnings.length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  {view.warnings.slice(0, 8).map((w, k) => (
+                    <div key={k} style={{ fontSize: 11, color: '#fcd34d', padding: '5px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.07)', marginBottom: 3 }}>
+                      ⚠ {w.text}{w.count > 1 ? ` (×${w.count})` : ''}
+                      {w.hint && <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>→ {w.hint}</div>}
+                    </div>
+                  ))}
+                  {view.warnings.length > 8 && <div style={{ fontSize: 10, color: '#fff' }}>… и ещё {view.warnings.length - 8} предупреждений</div>}
+                </div>
+              )}
+              {view.infos.length > 0 && (
+                <details style={{ marginTop: 2 }}>
+                  <summary style={{ fontSize: 10, color: '#fff', cursor: 'pointer' }}>
+                    ℹ️ Информационные заметки ({view.infos.length}) — не требуют правок
+                  </summary>
+                  <div style={{ marginTop: 3 }}>
+                    {view.infos.map((i, k) => (
+                      <div key={k} style={{ fontSize: 10, color: '#fff', opacity: 0.9, padding: '3px 6px' }}>
+                        · {i.text}{i.count > 1 ? ` (×${i.count})` : ''}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+              {view.hiddenCount > 0 && (
+                <div style={{ fontSize: 9, color: '#fff', opacity: 0.6, marginTop: 4 }}>
+                  Скрыто {view.hiddenCount} технических строк (классификация каталога, добивки малых мышц, движковые пороги) — они не влияют на выполнение.
                 </div>
               )}
             </CollapsibleCard>
@@ -178,20 +220,9 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
           {builtPlan.validation.issues.filter((i: { level?: string }) => i.level === 'error').slice(0, 5).map((issue: { message: string }, i: number) => (
             <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>{issue.message}</div>
           ))}
+          <div style={{ marginTop:5, fontSize:10, color:'#fff' }}>Подробности и действия — в карточке «🧪 Проверка плана под ваши настройки» выше.</div>
         </div>
       )}
-
-      {builtPlan.validation && (() => {
-        const warnings = builtPlan.validation.issues.filter((issue: { level?: string; code: string }) => issue.level === 'warning' && ['target_volume_deficit', 'session_working_set_cap', 'effective_mrv_overflow', 'low_training_frequency', 'goal_focus_mismatch'].includes(issue.code));
-        if (warnings.length === 0) return null;
-        return (
-          <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)' }}>
-            <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:5 }}>⚠️ Объём и бюджет требуют внимания</div>
-            {warnings.slice(0, 8).map((issue: { message: string }, i: number) => <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>{issue.message}</div>)}
-            <div style={{ marginTop:5, fontSize:10, color:'#fff' }}>Это предупреждения, а не блокировка. Ограничения оборудования, времени и восстановления могут объяснять недобор.</div>
-          </div>
-        );
-      })()}
 
       {/* Week selector with phase colors */}
       <div style={{ marginTop:10 }}>

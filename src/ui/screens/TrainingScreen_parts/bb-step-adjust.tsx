@@ -110,7 +110,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
   const currentPhase = ((wk as any).phase || ((wk as any).deload ? 'deload' : 'accumulation')) as BBPhase;
   return (
     <div>
-      <div style={H}>🛠 Шаг 6: Ручная коррекция</div>
+      <div style={H}>🛠 Шаг 7: Ручная коррекция</div>
       {(() => {
         const fb = getPlanFeedback();
         return fb.reasons.length > 0 && fb.avgRpe > 0 ? (

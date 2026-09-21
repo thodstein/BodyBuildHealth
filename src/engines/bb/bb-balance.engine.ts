@@ -43,7 +43,20 @@ function position(name: string, catalog?: typeof EXERCISE_CATALOG[number]): 'len
   return 'midRange';
 }
 
-export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
+export function analyzeBBBalance(plan: BBPlan, opts?: { specTargets?: string[]; weakPoints?: string[] }): BBBalanceReport {
+  // Аудит 2026-09 (жалоба «выбрал слабую спину — а пишет добавьте жимов»):
+  // перекос тяги/жимы, созданный целью акцента (спина-цель → доминируют тяги),
+  // не считается дефектом — вместо «исправь» честная пометка об акценте.
+  const accent = new Set<string>();
+  for (const t of [...(opts?.specTargets || []), ...(opts?.weakPoints || [])]) {
+    const k = String(t || '').toLowerCase();
+    accent.add(k);
+    if (/^(back_width|back_thickness|lats)$/.test(k)) accent.add('back');
+    if (/^chest_(upper|lower)$/.test(k)) accent.add('chest');
+    if (/^delt_/.test(k)) accent.add('shoulders');
+  }
+  const pullAccent = accent.has('back') || accent.has('delt_rear') || accent.has('traps');
+  const pressAccent = accent.has('chest') || accent.has('shoulders') || accent.has('delt_front');
   const report: BBBalanceReport = { press: 0, pull: 0, raise: 0, upperPress: 0, upperPull: 0, pullPressRatio: 0, compound: 0, isolation: 0, compoundIsolationRatio: 0, lengthened: 0, midRange: 0, shortened: 0, patterns: {}, byMuscle: {}, issues: [] };
   const workWeeks = plan.weeks.filter(week => String((week as any).phase || '').toLowerCase() !== 'deload' && !(week as any).taper);
   const sessions = (workWeeks.length > 0 ? workWeeks : plan.weeks).flatMap(week => week.sessions);
@@ -75,8 +88,12 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
   report.pullPressRatio = report.upperPress > 0 ? Math.round((report.upperPull / report.upperPress) * 100) / 100 : 0;
   report.compoundIsolationRatio = report.isolation > 0 ? Math.round((report.compound / report.isolation) * 100) / 100 : 0;
   report.peakWork = { press: report.upperPress, pull: report.upperPull, pullPressRatio: report.pullPressRatio };
-  if (report.upperPress > 0 && report.upperPull < report.upperPress * 0.75) report.issues.push(`Перекос верхней части: тяги ${report.upperPull} против жимов ${report.upperPress} сетов (ratio ${report.pullPressRatio}).`);
-  if (report.upperPull > 0 && report.upperPress < report.upperPull * 0.4) report.issues.push(`Перекос верхней части: жимы ${report.upperPress} против тяг ${report.upperPull} сетов.`);
+  if (report.upperPress > 0 && report.upperPull < report.upperPress * 0.75) {
+    if (!pressAccent) report.issues.push(`Перекос верхней части: тяги ${report.upperPull} против жимов ${report.upperPress} сетов (ratio ${report.pullPressRatio}).`);
+  }
+  if (report.upperPull > 0 && report.upperPress < report.upperPull * 0.4) {
+    if (!pullAccent) report.issues.push(`Перекос верхней части: жимы ${report.upperPress} против тяг ${report.upperPull} сетов.`);
+  }
   if (report.press > 0 && report.pull === 0) report.issues.push('Нет тягового объёма при наличии жимов.');
   if (report.pull > 0 && report.press === 0) report.issues.push('Нет жимового объёма при наличии тяг.');
   if (report.lengthened === 0 && report.midRange > 0) report.issues.push('Нет упражнений в растянутой позиции — добавьте наклонные движения, RDL, разведения с паузой.');

@@ -21,12 +21,13 @@ describe('experienced enhanced back prescription', () => {
     const uppers = plan.weeks[0].sessions.filter(s => s.sessionTag === 'Upper');
     expect(uppers).toHaveLength(2);
     for (const session of uppers) {
-      const back = session.exercises.filter(e => e.muscle === 'back');
-      // Re-baseline 2026-09 (аудит, P0-3): дозо-зависимый MRV — AAS 500 даёт
-      // режим ×1.30 (было плоское ×1.9/×2.0). Оба Upper несут реальный
-      // back-блок (факт 24/15, недельный direct 43). Распределение 24/15 —
-      // перекос недельного MRV-трима на последнюю сессию: задача Волны 2.7.
-      expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(14);
+      const back = session.exercises.filter(e => e.muscle === 'back' && !(e as any).warmupActivator);
+      // Re-baseline 2 (аудит 2026-09, РЕАЛИЗМ СЕССИИ): было ≥14. Сессия
+      // ограничена общим бюджетом 44 сета и per-muscle потолком (big 16 ×0.85
+      // при 5 группах дня = 14), поэтому Upper на enhanced 6 несёт back 12-14
+      // прямых сетов — это верх практического диапазона (Henselmans 9-13) при
+      // том же недельном объёме (2×Upper + 2×Lower).
+      expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(12);
       expect(new Set(back.map(e => classifyBackExercise(e.name).pattern)).size).toBeGreaterThanOrEqual(3);
       const verticalProfiles = back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull').map(e => verticalPullProfile(e.name)).filter((p): p is string => p !== null);
       expect(new Set(verticalProfiles).size).toBe(verticalProfiles.length);
@@ -43,7 +44,11 @@ describe('experienced enhanced back prescription', () => {
     expect(pulls.length).toBeGreaterThanOrEqual(2);
     for (const session of pulls) {
       const back = session.exercises.filter(e => e.muscle === 'back' && !(e as any).warmupActivator);
-      expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(15);
+      // Re-baseline 2 (аудит 2026-09, реализм сессии): было ≥15. Pull-сессия
+      // теперь ограничена per-muscle потолком (big 16 при 4-5 группах) и общим
+      // бюджетом 44 сета; back 12-14 прямых сетов за сессию при 2×Pull/нед =
+      // 24-28 сетов/нед — верх практического диапазона.
+      expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(12);
       expect(back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull').length).toBeLessThanOrEqual(1);
     }
   }, 30000);

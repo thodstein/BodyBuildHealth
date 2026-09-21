@@ -18,7 +18,7 @@ import { useDataLink } from '../../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../../core/exercise-catalog';
 import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
-import { rankBBSplits, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
+import { rankBBSplits, splitFitWarnings, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
 import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
 import { collectPlanExercises, autoCalibrateFromStored, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
@@ -1734,7 +1734,27 @@ export const BbAutoConstructor: React.FC = () => {
     preset: proPreset,
   }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, peds, pedDoses, bbEquipment, injuries, mobilityRestrictions, proPreset]);
   const bestSplit = ranked[0];
-  useEffect(() => { if (bestSplit && !selectedSplitId && !splitTouched.current) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit, selectedSplitId]);
+  // Авто-синхронизация сплита (аудит 2026-09): раньше once-set `selectedSplitId`
+  // навсегда «прилипал» — смена числа дней/уровня/фармы оставляла неподходящий
+  // сплит (жалоба: «на 6 днях рекомендует Верх/Низ с 18 упражнениями»).
+  // Логика: пока пользователь не выбрал сплит вручную — следуем рекомендации;
+  // после ручного выбора автоматически переключаем ТОЛЬКО при жёстком
+  // несоответствии (дни/уровень/пол), иначе оставляем (осознанный выбор).
+  const splitFitKeyRef = useRef<string>('');
+  useEffect(() => {
+    if (!bestSplit) return;
+    const key = `${bbDays}|${bbLevel}|${bbGoal}|${peds.join(',')}`;
+    const keyChanged = splitFitKeyRef.current !== '' && splitFitKeyRef.current !== key;
+    splitFitKeyRef.current = key;
+    const hard = selectedSplitId
+      ? splitFitWarnings({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays, peds, sex: linked.profile?.settings?.personal?.sex }, selectedSplitId)
+      : [];
+    const shouldSync = !selectedSplitId || (!splitTouched.current ? keyChanged : hard.length > 0);
+    if (shouldSync && selectedSplitId !== bestSplit.pattern.id) {
+      setSelectedSplitId(bestSplit.pattern.id);
+      if (selectedSplitId) flash(`🔄 Сплит обновлён под параметры: «${bestSplit.pattern.name}»`);
+    }
+  }, [bestSplit, selectedSplitId, bbDays, bbLevel, bbGoal, peds, linked.profile?.settings?.personal?.sex]);
 
   const allLandmarks = useMemo(() => getAllVolumeLandmarks(bbLevel), [bbLevel]);
   // Расчётный объём целей специализации для подсказки: цель = MAV × (1.0 + 0.1×зон)
@@ -1808,13 +1828,15 @@ export const BbAutoConstructor: React.FC = () => {
     try {
       return bbPlanQualityV2(builtPlan as any, {
         level: bbLevel,
-        specTargets,
+        // Акцент = цели специализации ИЛИ слабые группы (аудит 2026-09):
+        // не-целевые мышцы на MV-поддержании не штрафуются за «недогруз».
+        specTargets: specTargets.length ? specTargets : (weakPoints.length ? weakPoints : undefined),
         acwrRatio: acwrData?.ratio ?? null,
         monotony: srpeMonotony?.monotony ?? null,
         hasDiary: acwrData != null,
       });
     } catch { return null; }
-  }, [builtPlan, bbLevel, specTargets, acwrData, srpeMonotony]);
+  }, [builtPlan, bbLevel, specTargets, weakPoints, acwrData, srpeMonotony]);
   const todayBadge = useMemo(() => {
     if (acwrData == null) return null;
     const acwr = acwrData.ratio;
@@ -3071,20 +3093,42 @@ export const BbAutoConstructor: React.FC = () => {
   };
 
   const stepList: Step[] = planMode === 'programs' ? ['params','ped','plan','weights','quality','adjust','contest','annual','tools'] : ['params','ped','split','plan','weights','quality','adjust','contest','annual','tools'];
-  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'programs' ? '3 План' : '4 План', weights: planMode === 'programs' ? '4 Реальные веса' : '5 Реальные веса', quality: planMode === 'programs' ? '5 Тренировочная нагрузка плана' : '6 Тренировочная нагрузка плана', adjust: planMode === 'programs' ? '6 Коррекция' : '7 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
+  // Единая нумерация шагов во всех режимах (аудит 2026-09: в «Программах» номера
+  // прыгали 1-2-3-4-5-6, в «Сплите» 1-2-3-4-5-6-7 — пользователь терял ориентацию).
+  // Сплит в режиме программ пропускается, поэтому его номер остаётся пропущенным.
+  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan:'4 План', weights:'5 Реальные веса', quality:'6 Нагрузка и качество', adjust:'7 Коррекция', contest:'🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
+  // Причина блокировки шага — вместо молчаливого «не нажимается».
+  const stepLockReason = (s: Step): string | null => {
+    if (['plan','weights','quality','adjust'].includes(s) && !builtPlan) return 'Сначала соберите план (шаг «4 План» станет доступен после сборки)';
+    if (s === 'contest' && !builtPlan) return 'Contest prep доступен после сборки плана';
+    return null;
+  };
   const renderStepNav = () => {
     const groups: Record<string, string[]> = planMode === 'programs'
       ? { 'ПАРАМЕТРЫ': ['params','ped'], 'ПЛАН': ['plan','weights','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] }
       : { 'ПАРАМЕТРЫ': ['params','ped','split'], 'ПЛАН': ['plan','weights','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] };
     const groupEndKeys = new Set(Object.values(groups).map(arr => (arr as string[])[(arr as string[]).length - 1]).filter(Boolean) as string[]);
     return (
-      <div style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 4, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center' }}>
+      // Без backdrop-filter: blur(12px) — он давал заметные лаги при переключении
+      // шагов на телефоне (жалоба «выбор шагов подтупливает»). Плотный фон вместо стекла.
+      <div data-bb="step-nav" style={{ background: 'rgba(24,24,27,0.92)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 4, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center' }}>
         {stepList.map(s => {
           const active = step === s;
-          const disabled = (s === 'plan' || s === 'weights' || s === 'quality' || s === 'adjust' || s === 'contest') && !builtPlan;
+          const lockReason = stepLockReason(s);
+          const disabled = lockReason != null;
           return (
             <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
-              <button disabled={disabled} onClick={() => { if (disabled) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: disabled ? 0.45 : 1 }}>{stepLabels[s]}</button>
+              <button
+                disabled={disabled}
+                aria-current={active ? 'step' : undefined}
+                title={disabled ? lockReason! : undefined}
+                onClick={() => {
+                  if (disabled) { flash(`🔒 ${lockReason}`); return; }
+                  if (s === 'annual') { goAnnual(); return; }
+                  setStep(s);
+                }}
+                style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: disabled ? 0.45 : 1 }}
+              >{stepLabels[s]}</button>
               {groupEndKeys.has(s) && s !== stepList[stepList.length - 1] && <span style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', flexShrink: 0 as const, margin: '0 2px', alignSelf: 'center' }} />}
             </span>
           );
@@ -3092,6 +3136,21 @@ export const BbAutoConstructor: React.FC = () => {
       </div>
     );
   };
+
+  // Смена шага — наверх и активная пилюля в видимую зону (аудит 2026-09:
+  // «выбор шагов подтупливает» — после перехода экран оставался в середине
+  // предыдущего шага, а активная пилюля уезжала за край ленты).
+  useEffect(() => {
+    try {
+      const scroller = document.querySelector('.screen.training-screen') as HTMLElement | null;
+      if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'smooth' });
+      const nav = document.querySelector('[data-bb="step-nav"]') as HTMLElement | null;
+      const activeBtn = nav?.querySelector('button[aria-current="step"]') as HTMLElement | null;
+      if (activeBtn && typeof activeBtn.scrollIntoView === 'function') {
+        activeBtn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
+    } catch { /* среда без DOM (SSR/jsdom) — не критично */ }
+  }, [step, planMode]);
 
   // Переход на «Годовой план»: построенный цикл сохраняется автоматически
   // (возврат — через шаг «Коррекция»/«План»), чтобы не потерять работу.
@@ -3391,6 +3450,7 @@ export const BbAutoConstructor: React.FC = () => {
       goal={bbGoal}
       level={bbLevel}
       weeks={bbWeeks}
+      daysPerWeek={bbDays}
       isBuilding={isBuilding}
       onBuild={buildBb}
       onBack={() => setStep('ped')}
@@ -3467,6 +3527,7 @@ export const BbAutoConstructor: React.FC = () => {
           readiness={(linked?.readiness?.recovery ?? linked?.profile?.settings?.lifestyle?.morningHRV) ? 65 : null}
           bbQualityV2={bbQualityV2}
           todayBadge={todayBadge}
+          v2Context={{ level: bbLevel, goal: bbGoal, focus: bbTrainingFocus, accent: specTargets.length ? specTargets : weakPoints, peds }}
         />
         {/* 🧠 Логика построения плана — вынесена первой в Шаге 5 */}
         <BbQualityPlanLogicCard

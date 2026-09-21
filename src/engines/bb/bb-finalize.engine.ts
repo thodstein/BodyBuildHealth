@@ -1,7 +1,7 @@
 import type { BBPlan } from './bb-builder.engine';
 import { syncBBPlanSetShape, validateBBPlan, resolveExerciseCatalogEntry, BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { tidySessionExercises, orderSessionExercises, isCompoundEx, type SessionMethodology } from './bb-session-order.engine';
-import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, normalizeBBMuscle, sessionLimitsFor as centralizedSessionLimits, perExerciseCap } from './bb-volume.engine';
+import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, normalizeBBMuscle, sessionLimitsFor as centralizedSessionLimits, perExerciseCap, sessionMuscleRealismCap, sessionMuscleClass } from './bb-volume.engine';
 
 /**
  * Indirect-вклад упражнения в мышцу с паритетом aggregateBBVolume
@@ -2538,6 +2538,137 @@ function enforceSessionExerciseLimit(plan: BBPlan, options: BBFinalizeOptions): 
   }
 }
 
+/**
+ * Финальный реализм-проход (аудит 2026-09, жалоба «Upper на 18 упражнений»):
+ * после ВСЕХ аддитивных проходов (фидеры, гарантии головок/частоты, добивки)
+ * приводим сессии к практическому виду:
+ *  1) число рабочих упражнений ≤ sessionLimitsFor.maxExercises (строго: убираем
+ *     дубли-изоляции → самые дешёвые accessory → дубли любых accessory);
+ *  2) прямых сетов мышцы за сессию ≤ sessionMuscleRealismCap (Henselmans 9-13 /
+ *     Remmert PUOS ≈ 11): режем сеты самых маленьких упражнений мышцы до пола 2,
+ *     затем убираем лишние упражнения мышцы (если их >1).
+ * Только уменьшение объёма; цели недели специализации неприкосновенны,
+ * последнее упражнение мышцы не удаляется.
+ */
+export function enforceSessionRealism(plan: BBPlan, options: BBFinalizeOptions = {}): void {
+  const isIso = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц|подъём.*бицепс|подъем.*бицепс|подъём гантел|подъем гантел|наклонн.*скам|incline.*curl|молот|hammer|француз|french|из.?за.*голов|overhead/i.test(n);
+  let maxEx: number;
+  if (options.maxExercises != null) maxEx = options.maxExercises;
+  else {
+    try {
+      maxEx = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears } as any, (plan as any).pattern ? { id: (plan as any).pattern.id } as any : undefined).maxExercises;
+    } catch {
+      maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 15 : options.level === 'enhanced' ? 13 : 10;
+    }
+  }
+  let maxSets: number;
+  if (options.maxWorkingSets != null) maxSets = options.maxWorkingSets;
+  else {
+    try {
+      maxSets = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears } as any, (plan as any).pattern ? { id: (plan as any).pattern.id } as any : undefined).maxWorkingSets;
+    } catch {
+      maxSets = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 40 : options.level === 'enhanced' ? 34 : 24;
+    }
+  }
+  for (const week of plan.weeks) {
+    const weekNum = (week as any).week ?? (plan.weeks.indexOf(week) + 1);
+    const weekSpec = options.specializationSchedule ? specResForWeekSchedule(options.specializationSchedule, weekNum) : null;
+    const isSpecTarget = (muscle: string) => {
+      if (!weekSpec || !weekSpec.active) return false;
+      const am = WEAK_TO_MUSCLE[muscle] || muscle;
+      return weekSpec.weak.includes(muscle) || weekSpec.weak.includes(am) || weekSpec.targets.includes(muscle) || weekSpec.targets.includes(am);
+    };
+    for (const session of week.sessions) {
+      const working = () => session.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
+      const uniqueMuscles = new Set(working().map((e: any) => e.muscle));
+      // (0) Общий бюджет сетов сессии (maxWorkingSets): режем сеты самых
+      // крупных «съедобных» упражнений, не трогая цели специализации и
+      // последнее упражнение мышцы. Это прямой ответ на «59 сетов за сессию».
+      const totalWorkingSets = () => working().reduce((a: number, e: any) => a + (e.sets || 0), 0);
+      const packingSession = !!(session as any).packingApplied;
+      let setGuard = 0;
+      while (!packingSession && totalWorkingSets() > maxSets && setGuard++ < 120) {
+        // Приоритет резки (жалоба «Upper 18 упражнений / 59 сетов»): сначала
+        // средние/малые мышцы (плечи/икры/пресс/руки) до 4 сетов — у них есть
+        // косвенная нагрузка от базы; только затем крупные (по убыванию объёма).
+        // Цели специализации неприкосновенны, PPL-минимумы рук сохраняются
+        // (в Pull/Push бюджет не переполнен и проход не срабатывает).
+        const soft = working()
+          .filter((e: any) => sessionMuscleClass((e as any).muscle) !== 'big' && !isSpecTarget((e as any).muscle) && (e.sets || 0) > 4)
+          .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0));
+        let victim: any = soft.find((e: any) => e.role === 'accessory' || isIso(e.name || '')) || soft[0] || null;
+        if (!victim) {
+          const hard = working()
+            .filter((e: any) => !isSpecTarget((e as any).muscle) && (e.sets || 0) > 2)
+            .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0));
+          victim = hard.find((e: any) => e.role === 'accessory' || isIso(e.name || '')) || hard[0] || null;
+        }
+        if (!victim) break;
+        victim.sets = (victim.sets || 0) - 1;
+        if (Array.isArray(victim.workSets) && victim.workSets.length > victim.sets) victim.workSets = victim.workSets.slice(0, victim.sets);
+      }
+      // (1) Кап сетов мышцы за сессию.
+      const byMuscle = new Map<string, any[]>();
+      for (const ex of working()) {
+        const list = byMuscle.get((ex as any).muscle) || [];
+        list.push(ex);
+        byMuscle.set((ex as any).muscle, list);
+      }
+      for (const [muscle, list] of byMuscle) {
+        if (isSpecTarget(muscle)) continue;
+        let cap = 0;
+        try {
+          cap = sessionMuscleRealismCap({ muscle, level: options.level, trainingYears: options.trainingYears, onCourse: options.onCourse, groupsInSession: uniqueMuscles.size });
+        } catch { cap = 0; }
+        if (cap <= 0) continue;
+        let total = list.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+        // 1a: срезаем сеты самых маленьких упражнений до пола 2.
+        const sorted = [...list].sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+        for (const ex of sorted) {
+          if (total <= cap) break;
+          const cut = Math.min((ex.sets || 0) - 2, total - cap);
+          if (cut > 0) {
+            ex.sets = (ex.sets || 0) - cut;
+            if (Array.isArray(ex.workSets) && ex.workSets.length > ex.sets) ex.workSets = ex.workSets.slice(0, ex.sets);
+            total -= cut;
+          }
+        }
+        // 1b: всё ещё выше капа и упражнений >1 — убираем самое дешёвое
+        // (accessory в первую очередь; primary — только если остаётся ≥2).
+        while (total > cap && list.length > 1) {
+          const sortedList = [...list].sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+          const victim = sortedList.find((e: any) => e.role !== 'primary')
+            || (list.length > 2 ? sortedList[0] : null);
+          if (!victim) break;
+          session.exercises = session.exercises.filter((x: any) => x !== victim);
+          list.splice(list.indexOf(victim), 1);
+          total -= (victim.sets || 0);
+        }
+      }
+      // (2) Строгий кап числа упражнений (после аддитивных проходов).
+      const removeCandidate = (): any | null => {
+        const pool = working().filter((e: any) => !isSpecTarget((e as any).muscle));
+        const countOf = (m: string) => working().filter((x: any) => (x as any).muscle === m).length;
+        const alive = pool.filter((e: any) => countOf((e as any).muscle) > 1);
+        if (alive.length === 0) return null;
+        const bySets = (a: any, b: any) => (a.sets || 0) - (b.sets || 0);
+        return (
+          alive.filter((e: any) => isIso(e.name || '') && /calves|abs|forearms|traps/.test((e as any).muscle) === false).sort(bySets)[0]
+          || alive.filter((e: any) => e.role === 'accessory' && isIso(e.name || '')).sort(bySets)[0]
+          || alive.filter((e: any) => e.role === 'accessory').sort(bySets)[0]
+          || null
+        );
+      };
+      let guard = 0;
+      while (working().length > maxEx && guard++ < 40) {
+        const victim = removeCandidate();
+        if (!victim) break;
+        session.exercises = session.exercises.filter((x: any) => x !== victim);
+      }
+    }
+  }
+}
+
 /** Суперсеты-антагонисты: пары грудь↔спина, бицепс↔трицепс, квадры↔хамсы.
  *  Помечаем supersetWith + comment (лимиты не меняются), максимум 3 пары/сессию. */
 const ANTAGONIST_PAIRS: Array<[string, string]> = [
@@ -4415,7 +4546,12 @@ for (const week of next.weeks) {
           const rep = EXERCISE_CATALOG.find((x: any) => {
             if (trueMuscleOf(x) !== 'back') return false;
             if (used.has(x.name)) return false;
-            if (classifyBackExercise(x.name).pattern === 'vertical_pull') return false;
+            // Замена дублирующей вертикали — только ТЯГОВЫЙ паттерн (горизонт/
+            // одноручная/с опорой/изоляция широчайших). Иначе дубль вертикали
+            // заменялся гиперэкстензией/становой («erector») — терялась тяга дня.
+            const rp = classifyBackExercise(x.name).pattern;
+            if (rp === 'vertical_pull') return false;
+            if (!['heavy_row', 'supported_row', 'unilateral_row', 'lat_isolation'].includes(rp)) return false;
             if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
             if (options.equipment?.length) {
               const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
@@ -4793,6 +4929,7 @@ for (const week of next.weeks) {
     avoidAxialLoad: options.avoidAxialLoad,
     checkOrder: options.checkOrder,
     methodology: options.methodology,
+    specializationTargets: (options as any).priorityMuscles,
   });
   next.validation = validation;
   next.fatigueReport = next.weeks.map(week => ({
@@ -4958,6 +5095,24 @@ for (const week of next.weeks) {
       session.exercises = filtered;
     }
   }
+  // Финальный реализм сессий (аудит 2026-09): после всех аддитивных проходов
+  // (гарантии головок рук/частоты, фидеры) приводим сессии к практическим
+  // лимитам — упражнения и прямые сеты мышц. Только уменьшение объёма.
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    enforceSessionRealism(next, options);
+    // Чистим dangling supersetWith после удалений реализм-прохода (партнёр
+    // мог быть удалён как дубль/лишний объём).
+    for (const w of next.weeks) for (const s of w.sessions) {
+      const remaining = new Set(s.exercises.map(e => (e as any).exerciseName || (e as any).name));
+      for (const e of s.exercises as any[]) {
+        if (e.supersetWith && !remaining.has(e.supersetWith)) {
+          delete e.supersetWith;
+          if (e.comment) e.comment = e.comment.replace(/\s*\[Суперсет с:[^\]]*\]/, '').replace(/Суперсет с\s*“[^”]*”\s*·?/g, '').trim();
+          if (e.comment) e.comment = e.comment.replace(/🔗 Суперсет с[^·]*·?/g, '').trim();
+        }
+      }
+    }
+  }
   // Enrich: каждое упражнение — executionProfile/comment/tempo не пустые (качество подбора, вкладки)
   // FIX: авто-MEV, GVT и другие добивки получали минимальный comment — дополняем до полной инструкции
   for (const week of next.weeks) for (const session of week.sessions) for (const ex of session.exercises) {
@@ -5002,7 +5157,7 @@ for (const week of next.weeks) {
     }
   }
   syncBBPlanSetShape(next);
-  next.balanceReport = analyzeBBBalance(next);
+  next.balanceReport = analyzeBBBalance(next, { specTargets: (options as any).priorityMuscles });
   next.report = buildBBPlanReport(next);
   return next;
 }

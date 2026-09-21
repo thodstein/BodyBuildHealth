@@ -19,7 +19,7 @@ export function analyzeBBStimulus(plan: BBPlan | null | undefined): BBStimulusRe
   }
   let balance: BBBalanceReport;
   try {
-    balance = analyzeBBBalance(plan as any);
+    balance = analyzeBBBalance(plan as any, { specTargets: (plan as any).priorityMuscles });
   } catch {
     return { byMuscle: {}, global: { lengthened: 0, midRange: 0, shortened: 0, compound: 0, isolation: 0, patterns: {} }, issues: [], bfrEligible: [], scorePenalty: 0 };
   }

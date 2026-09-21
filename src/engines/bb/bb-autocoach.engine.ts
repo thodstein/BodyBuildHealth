@@ -726,7 +726,14 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
   // P0-7 (audit 2026-07): enforce deload только при ACWR>1.5 (danger zone).
   // 1.3-1.5 = caution (display only, handled in buildBBPlan rationale).
   const needsDeload = !!autoDeload && acwrRatio != null && acwrRatio > 1.5;
-  const deloadProtocol = needsDeload && deloadType ? DELOAD_PROTOCOLS[deloadType] : null;
+  // Аудит 2026-09: выбранный тип разгрузки применяется НЕ только при ACWR-делоаде,
+  // но и к ПЛАНОВЫМ deload-неделям фазы — раньше выбор pump/neural/full_rest/mini
+  // не влиял ни на что, если авто-делод не сработал (жалоба «методика не применяется»).
+  // Дефолт 'pump' совпадает с профилем фазы deload (×0.5/×0.55/RIR4) — no-op.
+  const explicitDeloadType = !!deloadType && String(deloadType) !== 'pump' && String(deloadType) !== 'разгрузка';
+  const deloadProtocol = (needsDeload && deloadType)
+    ? resolveDeloadProtocol(deloadType)
+    : (explicitDeloadType ? resolveDeloadProtocol(deloadType) : null);
 
   // FIX-5: источник фаз владеет разметкой — берём phase/deload из плана как есть.
   const phaseMap = new Map<number, BBPhase>();
@@ -781,7 +788,7 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
 
     const phaseWeeksTotal = phaseWeekTotals[ph] || 1;
 
-    if (needsDeload && ph === 'deload' && deloadProtocol) {
+    if ((needsDeload || explicitDeloadType) && ph === 'deload' && deloadProtocol) {
       // Структурированный делод-протокол (если ACWR>1.3). Поверх делода фазы.
       // P1: НЕ перезаписывать reps/rir/tempo (buildSession уже выставил по фазе).
       // Только дополнительное снижение веса/сетов по протоколу.
@@ -804,8 +811,11 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
             if (ws.restSeconds != null && deloadProtocol.restSeconds < ws.restSeconds) {
               ws.restSeconds = deloadProtocol.restSeconds;
             }
+            // RIR протокола как минимум (разгрузка не уходит в отказ)
+            if (Number.isFinite(deloadProtocol.rirTarget) && ws.rir < deloadProtocol.rirTarget) ws.rir = deloadProtocol.rirTarget;
           }
-          rebuildComment(e, cfg.label);
+          if (Number.isFinite(deloadProtocol.rirTarget) && e.rir < deloadProtocol.rirTarget) e.rir = deloadProtocol.rirTarget;
+          rebuildComment(e, deloadProtocol.type !== 'pump' ? `${cfg.label} · ${deloadProtocol.description}` : cfg.label);
         }
       }
     } else if (loadStrategy && ph !== 'deload') {

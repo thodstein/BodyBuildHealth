@@ -7,11 +7,29 @@
  */
 import React, { useMemo } from 'react';
 import type { QualityScoreV2 } from '../../../engines/quality-score-v2.engine';
-import { v2OnlyIssues } from '../../../engines/bb/bb-quality-v2.engine';
+import { v2OnlyIssues, localizeV2Issue } from '../../../engines/bb/bb-quality-v2.engine';
 
 const NUM: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 
-export const BbQualityV2Card: React.FC<{ v2: QualityScoreV2 | null; todayBadge?: string | null }> = ({ v2, todayBadge }) => {
+export interface BbQualityV2Context {
+  level?: string;
+  goal?: string;
+  focus?: string;
+  /** Цели акцента (специализация/слабые группы) — по ним не штрафуем «недогруз». */
+  accent?: string[];
+  peds?: string[];
+}
+
+const LEVEL_RU: Record<string, string> = { beginner: 'новичок', intermediate: 'средний', advanced: 'опытный', enhanced: 'на курсе' };
+const GOAL_RU: Record<string, string> = { mass: 'масса', cut: 'сушка', recomp: 'рекомпозиция', maintenance: 'поддержание', strength_mass: 'сила+масса' };
+const FOCUS_RU: Record<string, string> = { strength: 'сила', hypertrophy: 'гипертрофия', endurance: 'выносливость' };
+const MUSCLE_RU: Record<string, string> = {
+  chest: 'Грудь', back: 'Спина', quads: 'Квадрицепсы', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы',
+  shoulders: 'Плечи', delt_front: 'Передняя дельта', delt_mid: 'Средняя дельта', delt_rear: 'Задняя дельта',
+  biceps: 'Бицепс', triceps: 'Трицепс', calves: 'Икры', abs: 'Пресс', traps: 'Трапеции', forearms: 'Предплечья',
+};
+
+export const BbQualityV2Card: React.FC<{ v2: QualityScoreV2 | null; todayBadge?: string | null; context?: BbQualityV2Context }> = ({ v2, todayBadge, context }) => {
   const only = useMemo(() => v2OnlyIssues(v2), [v2]);
   if (!v2) return null;
   const color = v2.score >= 85 ? '#00e68a' : v2.score >= 65 ? '#fbbf24' : v2.score >= 45 ? '#fb923c' : '#f87171';
@@ -24,12 +42,21 @@ export const BbQualityV2Card: React.FC<{ v2: QualityScoreV2 | null; todayBadge?:
     ['Длина', v2.breakdown.length, 10],
     ['Нагрузка', v2.breakdown.load, 5],
   ];
+  const accentText = (context?.accent || []).map(m => MUSCLE_RU[m] || m).join(', ');
   return (
     <div data-bb="quality-v2" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: `1px solid ${color}30` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, fontWeight: 800, color }}>⭐ V2-качество {v2.grade}</span>
         <span style={{ fontSize: 18, fontWeight: 900, color, ...NUM }}>{v2.score}<span style={{ fontSize: 10, opacity: 0.6 }}>/100</span></span>
       </div>
+      {/* Контекст пользователя: оценка читается «под него», а не абстрактно. */}
+      {context && (context.level || context.goal || context.focus || accentText || context.peds?.length) && (
+        <div style={{ fontSize: 9, color: '#fff', opacity: 0.85, marginBottom: 6, lineHeight: 1.45 }}>
+          Учтено: уровень {LEVEL_RU[context.level || ''] || context.level} · цель {GOAL_RU[context.goal || ''] || context.goal} · фокус {FOCUS_RU[context.focus || ''] || context.focus}
+          {context.peds && context.peds.length > 0 ? ` · PED: ${context.peds.join(', ')}` : ''}
+          {accentText ? ` · акцент: ${accentText} (не-целевые на поддержании — их «недогруз» не штрафуется)` : ''}
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 6 }}>
         {bars.map(([label, got, max]) => {
           const pct = Math.round((got / max) * 100);
@@ -58,13 +85,13 @@ export const BbQualityV2Card: React.FC<{ v2: QualityScoreV2 | null; todayBadge?:
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {only.slice(0, 6).map(i => (
             <div key={i.id} style={{ fontSize: 9, padding: '4px 6px', borderRadius: 6, background: i.severity === 'critical' ? 'rgba(248,113,113,0.10)' : 'rgba(251,191,36,0.08)', color: i.severity === 'critical' ? '#fca5a5' : '#fcd34d', border: '1px solid rgba(255,255,255,0.08)' }}>
-              • {i.message}
+              • {localizeV2Issue(i.message)}
             </div>
           ))}
           {only.length > 6 && <div style={{ fontSize: 9, color: '#fff', opacity: 0.7 }}>…и ещё {only.length - 6} (полный список — в хабе «Качество»)</div>}
         </div>
       ) : (
-        <div style={{ fontSize: 9, color: '#6ee7b7' }}>✓ Новых V2-замечаний нет — частота/RIR/делод/плечо/длина в норме.</div>
+        <div style={{ fontSize: 9, color: '#6ee7b7' }}>✓ Новых V2-замечаний нет — частота/RIR/делод/плечо/длина в норме для ваших настроек.</div>
       )}
     </div>
   );

@@ -16,7 +16,7 @@ import { bbVbtRecommendation, bbVbtZoneLabel } from '../../../engines/bb/bb-vbt.
 import { overreachingCheck } from '../../../engines/bb/bb-recovery.engine';
 import { CollapsibleCard, isAbRotationActive, type BBPhase } from './bb-auto-constructor-shared';
 import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
-import BbQualityV2Card from './BbQualityV2Card';
+import BbQualityV2Card, { type BbQualityV2Context } from './BbQualityV2Card';
 import { getPhaseConfig } from '../../../engines/periodization';
 import { PHASE_COLORS } from './PlanOutput';
 import { DELOAD_PROTOCOLS, type LoadStrategy, type DeloadType, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
@@ -40,10 +40,12 @@ export interface BbQualityUnifiedCardProps {
   readiness: number | null;
   bbQualityV2: ReturnType<typeof bbPlanQualityV2> | null;
   todayBadge: string | null;
+  /** Контекст пользователя для V2-карточки (уровень/цель/фокус/акцент/PED). */
+  v2Context?: BbQualityV2Context;
 }
 
 export const BbQualityUnifiedCard: React.FC<BbQualityUnifiedCardProps> = ({
-  qualityReport, builtPlan, vbtInput, setVbtInput, readiness, bbQualityV2, todayBadge,
+  qualityReport, builtPlan, vbtInput, setVbtInput, readiness, bbQualityV2, todayBadge, v2Context,
 }) => {
   if (!qualityReport) return null;
   return (
@@ -127,7 +129,7 @@ export const BbQualityUnifiedCard: React.FC<BbQualityUnifiedCardProps> = ({
           ))}
         </div>
       )}
-      {bbQualityV2 && <BbQualityV2Card v2={bbQualityV2} todayBadge={todayBadge} />}
+      {bbQualityV2 && <BbQualityV2Card v2={bbQualityV2} todayBadge={todayBadge} context={v2Context} />}
     </CollapsibleCard>
   );
 };
@@ -309,6 +311,12 @@ export const BbQualityPlanLogicCard: React.FC<BbQualityPlanLogicProps> = ({
               return (
                 <div style={{ display:'grid', gap:8 }}>
                   <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35 }}>Показано что выбрал пользователь и что реально используется в плане. Если отличается — применена автокоррекция (уровень, травмы, оборудование).</div>
+                  {/* Честность режима источника: faithful не переписывает программу. */}
+                  {p.methodologyApplied === false && (
+                    <div role="alert" style={{ fontSize:10, color:'#fbbf24', padding:'6px 8px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', lineHeight:1.45 }}>
+                      ⚠ Режим «🎯 Точно по программе»: порядок, интенсив-техники, схемы объёма и суперсеты НЕ применяются — программа воспроизводится дословно. Чтобы выбранные методики реально работали, переключите режим на «⚙️ Адаптировать» на шаге «Параметры».
+                    </div>
+                  )}
                   <div style={{ display:'grid', gap:6 }}>
                     {selItems.map((it,i)=> (
                       <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'6px 8px', borderRadius:8, background: it.changed? 'rgba(245,158,11,0.08)':'rgba(255,255,255,0.03)', border: it.changed? '1px solid rgba(245,158,11,0.18)':'1px solid rgba(255,255,255,0.05)' }}>

@@ -41,6 +41,12 @@ export interface BBPlanValidationOptions {
   trainingYears?: number;
   patternId?: string;
   splitId?: string;
+  /**
+   * Цели специализации/слабые группы (аудит 2026-09): позволяют не выдавать
+   * «исправь дисбаланс» там, где перекос создан сознательным акцентом блока,
+   * и не считать overflow цели дефектом.
+   */
+  specializationTargets?: string[];
 }
 
 /** Лимиты сессии зависят от уровня: natural 24/10, enhanced 60/18 (3+ лет)
@@ -284,21 +290,26 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     }
   }
   if (options.level && plan.weeks.length > 0) {
+    const specTargets = new Set((options.specializationTargets || []).map(t => String(t || '').toLowerCase()));
     for (const week of plan.weeks) {
       const volume = aggregateBBVolume(week.sessions);
       for (const [muscle, values] of Object.entries(volume)) {
         // Фактический per-muscle MRV-кап после всех множителей (PED/recovery/
         // lab/стаж) имеет приоритет над landmarks.mrv — иначе enhanced-планы
         // получают ложные overflow (landmarks.mrv не учитывает стажевые бусты).
-        // Допуск ×1.1: MRV — мягкий ориентир, пограничные ±10% не флагаются
-        // (ложные «на грани» предупреждения у natural-планов).
         // Допуск ×1.15 (паритет с plan-validator error-порогом): MRV — мягкий
         // ориентир, пограничные ±15% не флагаются (ложные «на грани» у natural).
+        const isSpecTarget = specTargets.has(muscle) || /^delt_/.test(muscle) && specTargets.has('shoulders');
         const actualCap = plan.mrvByMuscle?.[muscle];
         const lm = getVolumeLandmarks(options.level, muscle);
         const cap = actualCap ?? (lm ? Math.round(lm.mrv * (options.mrvMultiplier ?? 1)) : 0);
-        if (cap > 0 && values.effectiveSets > cap * BB_MRV_TOLERANCE) {
-          issues.push({ level: 'warning', code: 'effective_mrv_overflow', message: `Неделя ${week.week}: ${muscle}: effective ${Math.round(values.effectiveSets * 10) / 10} > MRV ${cap}.`, week: week.week });
+        // Цель специализации: перебор к ней — не дефект (акцент блока), но
+        // при >1.2× от капа всё равно предупреждаем честно.
+        const tol = isSpecTarget ? 1.2 : BB_MRV_TOLERANCE;
+        if (cap > 0 && values.effectiveSets > cap * tol) {
+          const label = MUSCLE_LABEL_RU[muscle] || muscle;
+          const suffix = isSpecTarget ? ' (цель акцента — проверьте восстановление)' : '';
+          issues.push({ level: 'warning', code: 'effective_mrv_overflow', message: `Неделя ${week.week}: ${label}: эффективных ${Math.round(values.effectiveSets * 10) / 10} > MRV ${cap}${suffix}.`, week: week.week });
         }
       }
     }
@@ -329,9 +340,9 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       if (isExcluded(muscle)) continue;
       if (isLegMuscle(muscle) && !hasLegDay) continue;
       if (MAJOR_FOR_FREQ.has(muscle) && target.frequency === 0) {
-        issues.push({ level: 'error', code: 'low_training_frequency', message: `${muscle}: частота 0×/нед — мышца не тренируется вовсе. Проверьте пул/оборудование/травмы.`, exercise: muscle });
+        issues.push({ level: 'error', code: 'low_training_frequency', message: `${MUSCLE_LABEL_RU[muscle] || muscle}: частота 0×/нед — мышца не тренируется вовсе. Проверьте пул/оборудование/травмы.`, exercise: muscle });
       } else if (MAJOR_FOR_FREQ.has(muscle) && target.frequency === 1) {
-        issues.push({ level: 'warning', code: 'low_training_frequency', message: `${muscle}: частота 1×/нед — неоптимально для гипертрофии. Рекомендовано ≥2×/нед (Schoenfeld 2016: 2× ES 0.49 vs 1× 0.30). Рассмотрите сплит с 2× частотой.`, exercise: muscle });
+        issues.push({ level: 'warning', code: 'low_training_frequency', message: `${MUSCLE_LABEL_RU[muscle] || muscle}: частота 1×/нед — неоптимально для гипертрофии. Рекомендовано ≥2×/нед (Schoenfeld 2016: 2× ES 0.49 vs 1× 0.30). Рассмотрите сплит с 2× частотой.`, exercise: muscle });
       }
     }
   } else if (plan.muscleFrequency) {
@@ -367,9 +378,9 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       // forearms, traps) легитимно живут с нулевым объёмом в минимальных
       // планах — факт 0 у них остаётся warning'ом.
       if (peakVolume <= 0 && target.mev > 0 && MAJOR_FOR_FREQ.has(muscle) && !isExcluded(muscle) && !(isLegMuscle(muscle) && !hasLegDay)) {
-        issues.push({ level: 'error', code: 'target_volume_deficit', message: `${muscle}: effective volume 0 при target MEV ${target.mev} — мышца не получает прямой/косвенной работы.`, exercise: muscle });
+        issues.push({ level: 'error', code: 'target_volume_deficit', message: `${MUSCLE_LABEL_RU[muscle] || muscle}: эффективного объёма 0 при целевой MEV ${target.mev} — мышца не получает прямой/косвенной работы.`, exercise: muscle });
       } else if (peakVolume < target.mev * 0.7) {
-        issues.push({ level: 'warning', code: 'target_volume_deficit', message: `${muscle}: effective volume ${Math.round(peakVolume * 10) / 10} ниже MEV ${target.mev} (${Math.round((peakVolume / target.mev) * 100)}%); проверьте feeder/session cap или ограничения оборудования.`, exercise: muscle });
+        issues.push({ level: 'warning', code: 'target_volume_deficit', message: `${MUSCLE_LABEL_RU[muscle] || muscle}: эффективных сетов ${Math.round(peakVolume * 10) / 10} ниже минимума MEV ${target.mev} (${Math.round((peakVolume / target.mev) * 100)}%); проверьте feeder/session cap или ограничения оборудования.`, exercise: muscle });
       }
     }
   }

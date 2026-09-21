@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { sessionLimitsFor } from '../bb-volume.engine';
 import { buildBBPlan } from '../bb-builder.engine';
 
-describe('F0: sessionLimitsFor капы от уровня (freeze 24/40/60)', () => {
+describe('F0: sessionLimitsFor капы от уровня (реализм сессии 2026-09)', () => {
   it('beginner без фармы 24/10 — 60 недоступно', () => {
     const l = sessionLimitsFor({ level: 'beginner', trainingYears: 2 });
     expect(l.maxWorkingSets).toBe(24);
@@ -12,24 +12,29 @@ describe('F0: sessionLimitsFor капы от уровня (freeze 24/40/60)', ()
     const l = sessionLimitsFor({ level: 'intermediate', trainingYears: 1 });
     expect(l.maxWorkingSets).toBe(24);
   });
-  it('enhanced 0 лет + без onCourse -> 40/14 (а не 60)', () => {
+  it('enhanced 0 лет + без onCourse -> 34/13 (было 40/14)', () => {
     const l = sessionLimitsFor({ level: 'enhanced', trainingYears: 0 });
-    // after fix: enhanced 0 лет должен быть 40, не 60
-    expect(l.maxWorkingSets).toBe(40);
-    expect(l.maxExercises).toBe(14);
+    // Re-baseline (аудит 2026-09, реализм сессии): 40/14 → 34/13.
+    // Причина: 40-сетовые сессии на плотных сплитах давали 16-18 упражнений;
+    // практический потолок тренажёрного дня — ~34 сета / 13 движений
+    // (Henselmans 9-13 сетов на группу, Remmert 2025 PUOS ≈ 11).
+    expect(l.maxWorkingSets).toBe(34);
+    expect(l.maxExercises).toBe(13);
   });
-  it('enhanced 1 год -> 40/14', () => {
+  it('enhanced 1 год -> 34/13', () => {
     const l = sessionLimitsFor({ level: 'enhanced', trainingYears: 1 });
-    expect(l.maxWorkingSets).toBe(40);
+    expect(l.maxWorkingSets).toBe(34);
   });
-  it('enhanced 3 года -> 60/18', () => {
+  it('enhanced 3 года -> 40/15 (было 60/18)', () => {
     const l = sessionLimitsFor({ level: 'enhanced', trainingYears: 3 });
-    expect(l.maxWorkingSets).toBe(60);
-    expect(l.maxExercises).toBe(18);
+    // Re-baseline (аудит 2026-09): 60/18 → 40/15. Недельный объём держится
+    // частотой сплита (per-muscle session realism cap), а не одной сессией.
+    expect(l.maxWorkingSets).toBe(40);
+    expect(l.maxExercises).toBe(15);
   });
-  it('natural 3 года + onCourse -> 60/18', () => {
+  it('natural 3 года + onCourse -> 40/15', () => {
     const l = sessionLimitsFor({ level: 'intermediate', trainingYears: 3, onCourse: true, peds: ['AAS'] });
-    expect(l.maxWorkingSets).toBe(60);
+    expect(l.maxWorkingSets).toBe(40);
   });
 });
 

@@ -175,7 +175,7 @@ describe('generic buildBBPlan: единая модель', () => {
     expect(twoZones.rotationMuscleVolume['chest']).toBe(oneZone.rotationMuscleVolume['chest']);
   }, 30000);
 
-  it('уровень/стаж/PED-множители не сломаны: enhanced 6 лет получает back ≥18 в Upper', () => {
+  it('уровень/стаж/PED-множители не сломаны: enhanced 6 лет получает back ≥12 в Upper (реализм сессии)', () => {
     const plan = buildBBPlan({
       patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6,
       goal: 'mass', weeks: 1, workMax: WM,
@@ -185,7 +185,11 @@ describe('generic buildBBPlan: единая модель', () => {
     const uppers = plan.weeks[0].sessions.filter(s => s.sessionTag === 'Upper');
     for (const session of uppers) {
       const back = session.exercises.filter(e => e.muscle === 'back');
-      expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(18);
+      // Re-baseline (аудит 2026-09, РЕАЛИЗМ СЕССИИ): было ≥18. Non-target back
+      // держит MEV+ (12 прямых сетов за Upper при 2×Upper/нед = 24/нед), потолок
+      // задан per-muscle session realism (big 16 ×0.85 плотности): цель
+      // специализации получает приоритет по частоте/RIR, а не раздуванием сессии.
+      expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(12);
     }
   }, 30000);
 

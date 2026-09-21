@@ -82,13 +82,35 @@ export function bbPlanQualityV2(
         ? { acwr: opts.acwrRatio ?? null, monotony: opts.monotony ?? null, hasDiary: !!opts.hasDiary }
         : null,
       specTargets: opts.specTargets,
-      maintenanceMuscles: opts.maintenanceMuscles,
+      // Аудит 2026-09: при активной специализации все НЕ-целевые мышцы плана —
+      // сознательное поддержание (MV-режим). Без этого V2 штрафовал за
+      // «недогруз» групп, объём которых уменьшен намеренно (жалоба: заметки не
+      // под настройки пользователя).
+      maintenanceMuscles: opts.maintenanceMuscles ?? (opts.specTargets && opts.specTargets.length > 0
+        ? s1.muscles.map(m => m.muscle).filter(m => m !== 'shouldersΣ' && !opts.specTargets!.includes(m))
+        : undefined),
       exerciseNames: qInput.exerciseNames,
     };
     return composeQualityScoreV2(v2input);
   } catch {
     return null;
   }
+}
+
+/** RU-подписи мышц для сообщений V2 (движок отдаёт EN-ключи). */
+const V2_MUSCLE_RU: Record<string, string> = {
+  chest: 'Грудь', back: 'Спина', quads: 'Квадрицепсы', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы',
+  shoulders: 'Плечи', 'shouldersΣ': 'Плечи Σ', delt_front: 'Передняя дельта', delt_mid: 'Средняя дельта',
+  delt_rear: 'Задняя дельта', biceps: 'Бицепс', triceps: 'Трицепс', calves: 'Икры', abs: 'Пресс',
+  traps: 'Трапеции', forearms: 'Предплечья', legs: 'Ноги', lower_back: 'Поясница',
+};
+
+/** Заменяет EN-ключи мышц в сообщении V2 на русские подписи (для UI-карточки). */
+export function localizeV2Issue(message: string): string {
+  return String(message || '').replace(
+    /\b(chest|back|quads|hamstrings|glutes|shouldersΣ|shoulders|delt_front|delt_mid|delt_rear|biceps|triceps|calves|abs|traps|forearms|legs|lower_back)\b/g,
+    m => V2_MUSCLE_RU[m] || m,
+  );
 }
 
 /** Префиксы, уже покрытые S1/S5 (объём/наличие делода/ноль-частота) — не дублируем в V2-панели. */

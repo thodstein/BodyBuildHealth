@@ -254,7 +254,7 @@ export function calculatePlanSafetyScore(
   let balanceScore = SCORE_WEIGHTS.balance;
   let balanceDetails: BBBalanceReport | null = null;
   try {
-    const balance = options.balanceReport !== undefined ? options.balanceReport : analyzeBBBalance(plan);
+    const balance = options.balanceReport !== undefined ? options.balanceReport : analyzeBBBalance(plan, { specTargets: (plan as any).priorityMuscles });
     balanceDetails = balance as any;
     if (balance && balance.issues.length > 0) {
       balanceScore = Math.max(0, SCORE_WEIGHTS.balance - balance.issues.length * 2);

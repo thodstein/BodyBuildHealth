@@ -59,7 +59,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan } from './bb-finalize.engine';
-import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, resolveMrvCap, BB_MRV_TOLERANCE } from './bb-volume.engine';
+import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
 import { insulinWindowActive } from './bb-insulin-window.engine';
@@ -2093,6 +2093,16 @@ function buildSession(
     if (muscle === 'back' && trainingYears !== undefined && trainingYears >= 3 && level === 'enhanced' && role === 'accessory') {
       exerciseCount = Math.max(exerciseCount, trainingYears >= 6 ? 6 : 5);
     }
+    // Аудит 2026-09 (реализм сессии): три ограничителя поверх level-базы.
+    // (1) Плотность дня: при 5+ группах мышца получает ≤4 упражнения, при 6+ ≤3,
+    //     при 8+ (фулбоди) ≤2 — жалоба «Upper на 18 упражнений».
+    // (2) Бюджет сетов мышцы: ≥2 сета на упражнение (Schoenfeld 2016) — мышца
+    //     с 8-10 сетами не держит 5-6 упражнений.
+    // (3) Абсолютный предел сессии держат финализатор/валидатор (sessionLimitsFor).
+    if (musclePlans.length >= 5) {
+      exerciseCount = Math.min(exerciseCount, sessionDensityExerciseCap(musclePlans.length));
+    }
+    exerciseCount = Math.min(exerciseCount, sessionMuscleExerciseCap(sets));
     // ★ B: focusGroup/weakPoint — больше СЕТОВ (не упражнений).
     // Объём уже усилен через sessionShareFor (×1.2 weak, ×1.3 focus).
     // exerciseCount НЕ повышаем — качество > количество.
@@ -2647,7 +2657,12 @@ function buildSession(
       && !pl.exDatas.some(d => (d as any).warmupActivator);
     let packedSets: number[] | null = null;
     if (packingEligible && pl.exDatas.length > 0) {
-      const exMinPack = level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 3 : 2;
+      // Аудит 2026-09 (реализм сессии): бюджет мышцы уменьшился (per-muscle
+      // session cap), поэтому минимум 3 сета/упражнение у enhanced мог делать
+      // заливку невозможной (3×N > объём). Минимум адаптивный: не выше, чем
+      // реально доступно на упражнение (пол 2 сета).
+      const exMinPackBase = level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 3 : 2;
+      const exMinPack = Math.min(exMinPackBase, Math.max(2, Math.floor(pl.sets / pl.exDatas.length)));
       const evenShare = Math.round(pl.sets / pl.exDatas.length);
       const packCaps = pl.exDatas.map(d => packingCapFor(d as any, pl.muscle));
       packedSets = distributePackingSets(
@@ -3501,7 +3516,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const mrvRotByMuscle: Record<string, number> = {};
       for (const m of sessMuscles) {
         const sessCapM = perSessionMuscleCap({ level, trainingYears: input.trainingYears, onCourse: onCourse || (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3, muscle: m });
-        mrvRotByMuscle[m] = sessionMrvRotCap({ perSessionMuscleCap: sessCapM, challengeMrv: mrvByMuscle[m] ?? mrvByMuscle[collapseKey(m)], frequency: freqOfMuscle(m) });
+        // Аудит 2026-09 (реализм сессии): per-muscle потолок применяется ко ВСЕМ
+        // мышцам, а не только к «малым» (формула <12). Раньше крупная мышца
+        // забирала в одну сессию 20+ сетов → Upper-день на 18-20 упражнений.
+        mrvRotByMuscle[m] = Math.min(
+          sessCapM,
+          sessionMrvRotCap({ perSessionMuscleCap: sessCapM, challengeMrv: mrvByMuscle[m] ?? mrvByMuscle[collapseKey(m)], frequency: freqOfMuscle(m) }),
+          sessionMuscleRealismCap({ muscle: m, level, trainingYears: input.trainingYears, onCourse, groupsInSession: sessMuscles.length }),
+        );
       }
       // fix F: per-week оценка травм относительно даты недели (а не только «сегодня»).
       // Травма с from > даты недели ещё неактивна; травма с to < даты недели уже зажила.
@@ -3871,14 +3893,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const weeklyAgg = aggregateBBVolume(weeks[0]?.sessions || []);
     const effMap: Record<string, { effectiveSets: number }> = {};
     for (const [k, v] of Object.entries(weeklyAgg)) effMap[k] = { effectiveSets: (v as any).effectiveSets };
-    const bal = computeMuscleBalance(effMap);
+    const bal = computeMuscleBalance(effMap, { specTargets: [...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])] });
     if (bal.issues.length) {
       rationale.push(...bal.issues.map(s => `⚖️ Баланс: ${s} (ratio ${Object.entries(bal.ratios).map(([kk, vv]) => `${kk}=${vv}`).join(', ')})`));
-      // Автоправка: chest/back >1.3 → +2 сета спине, quad/ham → +2 отстающей
-      if (bal.ratios['chest/back'] > 1.3 && mrvByMuscle['back']) mrvByMuscle['back'] = Math.round(mrvByMuscle['back'] * 1.15);
-      if (bal.ratios['chest/back'] < 0.7 && mrvByMuscle['chest']) mrvByMuscle['chest'] = Math.round(mrvByMuscle['chest'] * 1.15);
-      if (bal.ratios['quad/ham'] > 1.5 && mrvByMuscle['hamstrings']) mrvByMuscle['hamstrings'] = Math.round(mrvByMuscle['hamstrings'] * 1.2);
-      if (bal.ratios['quad/ham'] < 0.66 && mrvByMuscle['quads']) mrvByMuscle['quads'] = Math.round(mrvByMuscle['quads'] * 1.2);
+      // Автоправка: chest/back >1.3 → +2 сета спине, quad/ham → +2 отстающей.
+      // Аудит 2026-09: если перекос создан ЦЕЛЬЮ акцента (специализация/слабая
+      // группа), автоправка не применяется — иначе движок воевал с выбором
+      // пользователя (спина-цель → «добавьте жимов» → +MRV груди).
+      const balTargets = new Set<string>([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])].map(x => collapseKey(x)));
+      const balTargeted = (m: string) => balTargets.has(collapseKey(m)) || [...balTargets].some(t => t === m);
+      if (bal.ratios['chest/back'] > 1.3 && mrvByMuscle['back'] && !balTargeted('chest')) mrvByMuscle['back'] = Math.round(mrvByMuscle['back'] * 1.15);
+      if (bal.ratios['chest/back'] < 0.7 && mrvByMuscle['chest'] && !balTargeted('back')) mrvByMuscle['chest'] = Math.round(mrvByMuscle['chest'] * 1.15);
+      if (bal.ratios['quad/ham'] > 1.5 && mrvByMuscle['hamstrings'] && !balTargeted('quads')) mrvByMuscle['hamstrings'] = Math.round(mrvByMuscle['hamstrings'] * 1.2);
+      if (bal.ratios['quad/ham'] < 0.66 && mrvByMuscle['quads'] && !balTargeted('hamstrings')) mrvByMuscle['quads'] = Math.round(mrvByMuscle['quads'] * 1.2);
     }
   } catch {}
   if (pedAdapt) {
@@ -3961,7 +3988,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // чтобы оба вызывающих пути (BbAutoConstructor и TrainingConstructor) получали результат.
   // Условие покрывает ВСЕ признаки, а не только technique/weakPoints — иначе loadStrategy
   // и autoDeload теряются (баг: dfa8842fb убрал дубль-вызов из BbAutoConstructor, но не расширил guard).
-  if ((effIntensityTechnique && effIntensityTechnique !== 'none') || weakPoints.length > 0 || input.loadStrategy || input.autoDeload || effAutoReg) {
+  if ((effIntensityTechnique && effIntensityTechnique !== 'none') || weakPoints.length > 0 || input.loadStrategy || input.autoDeload || effAutoReg
+    // Аудит 2026-09: выбранный тип разгрузки должен работать и без остальных
+    // опций (иначе neural/mini/full_rest на плановых deload-неделях не применялись).
+    || (input.deloadType && String(input.deloadType) !== 'pump' && String(input.deloadType) !== 'разгрузка')) {
     finalPlan = applyPostPhaseProcessing({
       plan: basePlan,
       totalWeeks: input.weeks,
@@ -4617,7 +4647,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     },
   };
   syncBBPlanSetShape(output);
-  const validation =   validateBBPlan(output, { level, trainingYears: input.trainingYears });
+  const validation =   validateBBPlan(output, { level, trainingYears: input.trainingYears, specializationTargets: [...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])] });
   const validationWarnings = validation.issues
     .filter(issue => issue.level === 'warning')
     // Ложные warning на этой стадии: weeklyVolume пересчитывается в finalize

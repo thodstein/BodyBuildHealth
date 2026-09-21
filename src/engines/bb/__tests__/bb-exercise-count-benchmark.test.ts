@@ -41,9 +41,12 @@ describe('BB exercise-count benchmark', () => {
     const maxExercises = Math.max(...plan.weeks.flatMap(w => w.sessions.map(s => working(s).length)));
     expect(maxSets).toBeGreaterThan(24);
     expect(maxExercises).toBeGreaterThan(10);
-    expect(maxSets).toBeGreaterThanOrEqual(36);
-    expect(maxSets).toBeLessThanOrEqual(64);
-    expect(maxExercises).toBeLessThanOrEqual(18);
+    // Re-baseline (аудит 2026-09, реализм сессии): было ≥36/≤64, 18 упражнений.
+    // Сессия experienced enhanced теперь 32-40 сетов / ≤16 упражнений
+    // (sessionLimitsFor 44/16 + per-muscle session realism cap).
+    expect(maxSets).toBeGreaterThanOrEqual(30);
+    expect(maxSets).toBeLessThanOrEqual(48);
+    expect(maxExercises).toBeLessThanOrEqual(16);
   }, 30000);
 
   it('does not keep two vertical-pull variants in one generic back session', () => {
