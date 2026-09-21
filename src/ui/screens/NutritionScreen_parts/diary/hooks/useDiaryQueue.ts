@@ -54,8 +54,16 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
   const handleBarcodeProduct = useCallback((product: OFFProduct) => {
     setShowBarcode(false);
     const item = productToFoodItem(product);
-    setParsedItems(prev => [...prev, { name: item.name, kcal: item.kcal, p: item.protein, f: item.fat, c: item.carbs, qty: 100 }]);
-  }, [setShowBarcode]);
+    // Сканер уже кладёт в shared-базу, но очередь — вторая точка входа
+    // (страховка: продукт из кэша/поиска тоже должен расходиться по устройствам).
+    try {
+      import('../../../../../engines/food-barcode-catalog.engine').then(m => {
+        try { void m.saveSharedBarcode(product); } catch { /* ignore */ }
+      }).catch(() => {});
+    } catch { /* ignore */ }
+    setParsedItems(prev => [...prev, { name: item.name, kcal: item.kcal, p: item.protein, f: item.fat, c: item.carbs, qty: 100, category: (item as any).category || 'other', foodId: (item as any).id }]);
+    showToast(`📷 ${item.name} → очередь (100 г, правьте вес)`);
+  }, [setShowBarcode, showToast]);
 
   const convertOCRItems = useCallback((meals: { mealType: string; items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; category?: string; foodId?: string; micros?: Record<string, number>; confidence?: number }> }[], usdaFallback?: FoodItemLike[]) => {
     return meals.flatMap(m => m.items.map(item => {

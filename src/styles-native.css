@@ -14033,6 +14033,46 @@ html.app-native [data-cal="monthheat"] [data-date] {
   }
 }
 
+/* --- §118.3 BARCODE NATIVE: нативный MLKit-сканер + недавние --- */
+/* Хуки nd-scannative/nd-scansettings/nd-scanrecent (сканер питания, АПК).
+   TG/web — инлайн-стили 1-в-1; здесь только native-дожим. */
+html.app-native .nd-scannative,
+html.app-native .nd-scansettings,
+html.app-native .nd-scanrecent {
+  -webkit-tap-highlight-color: transparent !important;
+}
+html.app-native .nd-scannative {
+  min-height: 52px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .nd-scannative:active,
+html.app-native .nd-scansettings:active,
+html.app-native .nd-scanrecent:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .nd-scannative:focus-visible,
+html.app-native .nd-scansettings:focus-visible,
+html.app-native .nd-scanrecent:focus-visible {
+  outline: 2px solid var(--accent-2) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .nd-scansettings,
+html.app-native .nd-scanrecent {
+  min-height: 44px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .nd-scannative {
+    font-size: 13px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .nd-scannative:active,
+  html.app-native .nd-scansettings:active,
+  html.app-native .nd-scanrecent:active {
+    transform: none !important;
+  }
+}
+
 /* === §118.2 SESSION-DOCK: липкий низ телефона над пилюлей === */
 html.app-native [data-widget="session-dock"] [data-dock] {
   min-height: 48px !important;

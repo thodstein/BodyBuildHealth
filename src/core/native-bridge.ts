@@ -345,6 +345,124 @@ export async function pickPhoto(): Promise<PickedPhoto | null> {
 }
 
 /* ------------------------------------------------------------------ */
+/* Barcode (MLKit, только APK)                                         */
+/* ------------------------------------------------------------------ */
+
+export type NativeBarcodeOutcome =
+  | { status: 'scanned'; code: string }
+  | { status: 'denied' }
+  | { status: 'cancelled' }
+  | { status: 'unavailable'; hint?: string };
+
+function cleanBarcodeDigits(raw: string): string {
+  return (raw || '').replace(/\D/g, '');
+}
+
+/**
+ * Нативный сканер штрихкодов для АПК (Google MLKit, системный UI).
+ * Вне native — всегда {status:'unavailable'}. Ничего не бросает наружу.
+ * Форматы ограничены товарными (EAN-13/8, UPC-A/E + CODE_128/39/ITF) —
+ * так сканер цепляется быстрее и не хватает QR со стен.
+ */
+export async function scanNativeBarcode(): Promise<NativeBarcodeOutcome> {
+  if (!isCapacitorNative()) return { status: 'unavailable' };
+  try {
+    const mod = await import('@capacitor-mlkit/barcode-scanning');
+    const scanner = (mod as unknown as { BarcodeScanner?: any }).BarcodeScanner;
+    if (!scanner) return { status: 'unavailable', hint: 'no-plugin' };
+    try {
+      const sup = await scanner.isSupported();
+      if (sup && sup.supported === false) return { status: 'unavailable', hint: 'no-camera' };
+    } catch {
+      /* isSupported опционален — пробуем дальше */
+    }
+    try {
+      const perm = await scanner.checkPermissions();
+      let camera = (perm as { camera?: string })?.camera;
+      if (camera !== 'granted') {
+        try {
+          const req = await scanner.requestPermissions();
+          camera = (req as { camera?: string })?.camera;
+        } catch {
+          return { status: 'denied' };
+        }
+      }
+      if (camera === 'denied' || camera === 'prompt-with-rationale') {
+        // «prompt-with-rationale» на части прошивок означает «спросить ещё раз
+        // бессмысленно — только настройки». Отдаём denied, UI ведёт в настройки.
+        if (camera === 'denied') return { status: 'denied' };
+      }
+      if (camera !== 'granted' && camera !== 'limited') return { status: 'denied' };
+    } catch {
+      return { status: 'denied' };
+    }
+    // Android: системному сканеру нужен модуль Google Barcode Scanner.
+    // Если его нет — запускаем установку и просим повторить (модуль ставится асинхронно).
+    try {
+      if (typeof scanner.isGoogleBarcodeScannerModuleAvailable === 'function') {
+        const avail = await scanner.isGoogleBarcodeScannerModuleAvailable();
+        if (avail && avail.available === false) {
+          try {
+            await scanner.installGoogleBarcodeScannerModule();
+          } catch {
+            /* ignore — ниже scan сам вернёт ошибку */
+          }
+          return { status: 'unavailable', hint: 'installing-module' };
+        }
+      }
+    } catch {
+      /* iOS / старые версии — пропускаем */
+    }
+    const { BarcodeFormat } = await import('@capacitor-mlkit/barcode-scanning');
+    let result: { barcodes?: Array<{ displayValue?: string; rawValue?: string }> };
+    try {
+      result = await scanner.scan({
+        formats: [
+          BarcodeFormat.Ean13,
+          BarcodeFormat.Ean8,
+          BarcodeFormat.UpcA,
+          BarcodeFormat.UpcE,
+          BarcodeFormat.Code128,
+          BarcodeFormat.Code39,
+          BarcodeFormat.Itf,
+        ],
+        autoZoom: true,
+      });
+    } catch (e) {
+      const msg = String((e as { message?: unknown })?.message ?? e ?? '');
+      // Пользователь закрыл системный сканер крестом — это отмена, не ошибка.
+      if (/cancel|cancell|dismiss|closed|abort/i.test(msg)) return { status: 'cancelled' };
+      return { status: 'unavailable', hint: msg.slice(0, 120) };
+    }
+    const first = result?.barcodes?.[0];
+    const code = cleanBarcodeDigits(first?.displayValue || first?.rawValue || '');
+    if (!code) return { status: 'cancelled' };
+    try {
+      await haptics('medium');
+    } catch {
+      /* ignore */
+    }
+    return { status: 'scanned', code };
+  } catch {
+    return { status: 'unavailable', hint: 'import-failed' };
+  }
+}
+
+/** Открыть настройки приложения (выдать доступ к камере после отказа). Вне native — false. */
+export async function openNativeAppSettings(): Promise<boolean> {
+  if (!isCapacitorNative()) return false;
+  try {
+    const mod = await import('@capacitor-mlkit/barcode-scanning');
+    const scanner = (mod as unknown as { BarcodeScanner?: any }).BarcodeScanner;
+    if (!scanner?.openSettings) return false;
+    await scanner.openSettings();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Device / network                                                    */
 /* ------------------------------------------------------------------ */
 
