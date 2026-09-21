@@ -1423,6 +1423,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     return sm ? diagnoseSMWeakPoint(sm) : null;
   };
 
+  // Единый заголовок секции внутри вкладки (каркас «Замеры → Фазы → Методы → Вспомогательное»).
+  const smSectionHeader = (title: string, accent: string) => (
+    <div style={{ fontSize:14, fontWeight:800, color:'#fff', marginTop:10, marginBottom:6, paddingLeft:10, borderLeft:`3px solid ${accent}`, lineHeight:1.3 }}>{title}</div>
+  );
+
   // Инлайн-блок «методы с выбором упражнения» прямо на табе движения (паритет с ТА top3Block):
   // выбираешь упражнение → оно идёт первым в инъекцию и в мост.
   const smTop3Block = (sm: SMWeakPoint) => {
@@ -1536,7 +1541,14 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='press' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Жим — лог/аксель (4 фазы, дип 8-12 см)</div>
+            {smSectionHeader('📥 Замеры', '#60a5fa')}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
+              <HubNum label="Лог" unit="кг" value={state.logKg} onChange={v=>setState(s=>({...s, logKg:v}))} placeholder="100" step={2.5} />
+              <HubNum label="Аксель" unit="кг" value={state.axleKg} onChange={v=>setState(s=>({...s, axleKg:v}))} placeholder="120" step={2.5} />
+              <HubNum label="VBT лог — лучшая" unit="м/с" value={state.vbtLogBest} onChange={v=>setState(s=>({...s, vbtLogBest:v}))} placeholder="0.85" step={0.05} />
+              <HubNum label="VBT лог — последняя" unit="м/с" value={state.vbtLogLast} onChange={v=>setState(s=>({...s, vbtLogLast:v}))} placeholder="0.65" step={0.05} />
+            </div>
+            {smSectionHeader('🎯 Слабые фазы (4)', '#ef4444')}
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {PRESS_OPTS.map(o=>{ const on = state.pressWeak.includes(o.id); return (
                 <button key={o.id} onClick={()=>toggle('pressWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#ef4444' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(239,68,68,0.20), rgba(245,158,11,0.10))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(239,68,68,0.35)' : 'none' }}>
@@ -1553,18 +1565,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize:12, color:'#fff' }}>{bio.weakMuscles.join(', ')} · {bio.references.join(', ')}</div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:4, lineHeight:1.4 }}>{bio.biomechanicalReason}</div>
                   <div style={{ fontSize:13, color:'#5ee', marginTop:4 }}>{bio.corrections.join(' · ')} · {bio.loadCues}</div>
-                  {smTop3Block(bio.weakPoint)}
                 </div>
               );
             })}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
-              <HubNum label="Лог" unit="кг" value={state.logKg} onChange={v=>setState(s=>({...s, logKg:v}))} placeholder="100" step={2.5} />
-              <HubNum label="Аксель" unit="кг" value={state.axleKg} onChange={v=>setState(s=>({...s, axleKg:v}))} placeholder="120" step={2.5} />
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
-              <HubNum label="VBT лог — лучшая" unit="м/с" value={state.vbtLogBest} onChange={v=>setState(s=>({...s, vbtLogBest:v}))} placeholder="0.85" step={0.05} />
-              <HubNum label="VBT лог — последняя" unit="м/с" value={state.vbtLogLast} onChange={v=>setState(s=>({...s, vbtLogLast:v}))} placeholder="0.65" step={0.05} />
-            </div>
+            {state.pressWeak.length > 0 && smSectionHeader('🏋️ Методы с выбором упражнения', '#f59e0b')}
+            {state.pressWeak.map(id=>{ const bio = smBiomechForWeak(id); if (!bio) return null; return <div key={`pick-${id}`}>{smTop3Block(bio.weakPoint)}</div>; })}
+            {smSectionHeader('⚙️ Вспомогательное и контест', '#a78bfa')}
             <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Ивенты: {Object.keys(EVENT_META).slice(0,4).join(', ')} — {VBT_SS_THRESHOLDS.log_press ? `VBT log ${VBT_SS_THRESHOLDS.log_press.optimalMin}/${VBT_SS_THRESHOLDS.log_press.stopMin} м/с` : ''}</div>
             <details open style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
               <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>🏆 Контест пакет</summary>
@@ -1613,7 +1619,17 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='carry' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Переноски — йок/фермер/рама (5 фаз, качание 3/5 см)</div>
+            {smSectionHeader('📥 Замеры', '#60a5fa')}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
+              <HubNum label="Йок" unit="кг" value={state.yokeKg} onChange={v=>setState(s=>({...s, yokeKg:v}))} placeholder="300" step={5} />
+              <HubNum label="Фермер (на руку)" unit="кг" value={state.farmersKg} onChange={v=>setState(s=>({...s, farmersKg:v}))} placeholder="120" step={2.5} />
+              <HubNum label="Качание (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="2.5" step={0.5} />
+              <HubNum label="VBT йок — лучшая" unit="м/с" value={state.vbtYokeBest} onChange={v=>setState(s=>({...s, vbtYokeBest:v}))} placeholder="1.45" step={0.05} />
+              <HubNum label="VBT йок — последняя" unit="м/с" value={state.vbtYokeLast} onChange={v=>setState(s=>({...s, vbtYokeLast:v}))} placeholder="1.20" step={0.05} />
+            </div>
+            {swayDiag && <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{swayDiag.text} · порог 3/5 см · скорость йок {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div>}
+            {vbtLoss && <div style={{ fontSize:12, color: vbtLoss.exceeded?'#ef4444':'#22c55e', marginTop:4 }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} · порог 15% carry (MHV-декремент &gt;15% = стоп, PoinT GO)</div>}
+            {smSectionHeader('🎯 Слабые фазы (5)', '#f59e0b')}
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {CARRY_OPTS.map(o=>{ const on = state.carryWeak.includes(o.id); return (
                 <button key={o.id} onClick={()=>toggle('carryWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(245,158,11,0.20), rgba(239,68,68,0.08))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(245,158,11,0.35)' : 'none' }}>
@@ -1629,21 +1645,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label} <span style={{ color:'#fff', fontWeight:500 }}>· {bio.angleRangeDeg.join('-')}°</span></div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{bio.biomechanicalReason}</div>
                   <div style={{ fontSize:13, color:'#5ee' }}>{bio.corrections.join(' · ')}</div>
-                  {smTop3Block(bio.weakPoint)}
                 </div>
               );
             })}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
-              <HubNum label="Йок" unit="кг" value={state.yokeKg} onChange={v=>setState(s=>({...s, yokeKg:v}))} placeholder="300" step={5} />
-              <HubNum label="Фермер (на руку)" unit="кг" value={state.farmersKg} onChange={v=>setState(s=>({...s, farmersKg:v}))} placeholder="120" step={2.5} />
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
-              <HubNum label="Качание (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="2.5" step={0.5} />
-              <HubNum label="VBT йок — лучшая" unit="м/с" value={state.vbtYokeBest} onChange={v=>setState(s=>({...s, vbtYokeBest:v}))} placeholder="1.45" step={0.05} />
-              <HubNum label="VBT йок — последняя" unit="м/с" value={state.vbtYokeLast} onChange={v=>setState(s=>({...s, vbtYokeLast:v}))} placeholder="1.20" step={0.05} />
-            </div>
-            {swayDiag && <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{swayDiag.text} · порог 3/5 см · скорость йок {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div>}
-            {vbtLoss && <div style={{ fontSize:12, color: vbtLoss.exceeded?'#ef4444':'#22c55e', marginTop:4 }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} · порог 15% carry (MHV-декремент &gt;15% = стоп, PoinT GO)</div>}
+            {state.carryWeak.length > 0 && smSectionHeader('🏋️ Методы с выбором упражнения', '#f59e0b')}
+            {state.carryWeak.map(id=>{ const bio = smBiomechForWeak(id); if (!bio) return null; return <div key={`pick-${id}`}>{smTop3Block(bio.weakPoint)}</div>; })}
+            {smSectionHeader('⚙️ Вспомогательное — локомоция, хват, разворот', '#a78bfa')}
             {carryPhys ? <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика: {carryPhys.note}{carryPhys.rateLimited ? ' · разгон 0–5м частотой, дальше крейсер коротким шагом' : ''}</div> : <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика йока: введи вес тела (вкладка Жим) + йок, кг → скорость/шаг/темп/оценка</div>}
             {farmersClass && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Фермер-класс: {farmersClass} (на руку, {athleteSex === 'female' ? 'Ж' : 'М'} нормы FitnessVolt)</div>}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
@@ -1688,7 +1695,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='load' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Загрузки — камни/мешок/кега (передняя нагрузка, высокие бёдра)</div>
+            {smSectionHeader('📥 Замеры', '#60a5fa')}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
+              <HubNum label="Камень" unit="кг" value={state.stoneKg} onChange={v=>setState(s=>({...s, stoneKg:v}))} placeholder="140" step={2.5} />
+              <HubNum label="Качание камня (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="2.0" step={0.5} />
+              <HubNum label="VBT камень — лучшая" unit="м/с" value={state.vbtStoneBest} onChange={v=>setState(s=>({...s, vbtStoneBest:v}))} placeholder="0.75" step={0.05} />
+              <HubNum label="VBT камень — последняя" unit="м/с" value={state.vbtStoneLast} onChange={v=>setState(s=>({...s, vbtStoneLast:v}))} placeholder="0.55" step={0.05} />
+            </div>
+            <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Контест пресеты: {Object.values(CONTEST_PRESETS as any).slice(0,3).map((c:any)=>c.name).join(', ')} · stone VBT {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} м/с · платформа {state.platformHeightCm || '—'}см</div>
+            <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{state.tackyUsed ? '✓ Смола (tacky) учтена — руки не сгибать' : '⚠ Без смолы — риск сгибания рук + разрыв бицепса'}</div>
+            {smSectionHeader('🎯 Слабые фазы (3)', '#22c55e')}
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {LOAD_OPTS.map(o=>{ const on = state.loadWeak.includes(o.id); return (
                 <button key={o.id} onClick={()=>toggle('loadWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#22c55e' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(34,197,94,0.20), rgba(34,197,94,0.06))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(34,197,94,0.35)' : 'none' }}>
@@ -1704,20 +1720,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label}</div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{bio.biomechanicalReason}</div>
                   <div style={{ fontSize:13, color:'#5ee' }}>{bio.corrections.join(' · ')} · {bio.loadCues}</div>
-                  {smTop3Block(bio.weakPoint)}
                 </div>
               );
             })}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
-              <HubNum label="Камень" unit="кг" value={state.stoneKg} onChange={v=>setState(s=>({...s, stoneKg:v}))} placeholder="140" step={2.5} />
-              <HubNum label="Качание камня (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="2.0" step={0.5} />
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
-              <HubNum label="VBT камень — лучшая" unit="м/с" value={state.vbtStoneBest} onChange={v=>setState(s=>({...s, vbtStoneBest:v}))} placeholder="0.75" step={0.05} />
-              <HubNum label="VBT камень — последняя" unit="м/с" value={state.vbtStoneLast} onChange={v=>setState(s=>({...s, vbtStoneLast:v}))} placeholder="0.55" step={0.05} />
-            </div>
-            <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Контест пресеты: {Object.values(CONTEST_PRESETS as any).slice(0,3).map((c:any)=>c.name).join(', ')} · stone VBT {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} м/с · платформа {state.platformHeightCm || '—'}см</div>
-            <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{state.tackyUsed ? '✓ Смола (tacky) учтена — руки не сгибать' : '⚠ Без смолы — риск сгибания рук + разрыв бицепса'}</div>
+            {state.loadWeak.length > 0 && smSectionHeader('🏋️ Методы с выбором упражнения', '#22c55e')}
+            {state.loadWeak.map(id=>{ const bio = smBiomechForWeak(id); if (!bio) return null; return <div key={`pick-${id}`}>{smTop3Block(bio.weakPoint)}</div>; })}
+            {smSectionHeader('⚙️ Вспомогательное — фазы камня и тайр', '#a78bfa')}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
               <HubNum label="Рабочий % от макса" unit="%" value={state.workPct} onChange={v=>setState(s=>({...s, workPct:v}))} placeholder="90" step={1} />
               <HubNum label="Камень хват" unit="сек" value={state.stoneGripS} onChange={v=>setState(s=>({...s, stoneGripS:v}))} placeholder="1.2" step={0.1} />
@@ -1747,7 +1755,28 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='grip' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Хват / Кор / Кондиция (3 теста + осевая нагрузка)</div>
+            {smSectionHeader('📥 Замеры', '#60a5fa')}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6 }}>
+              <HubNum label="Опора · Support (фермер)" unit="сек" value={state.gripHoldSec} onChange={v=>setState(s=>({...s, gripHoldSec:v}))} placeholder="60" step={5} />
+              <HubNum label="Щипок · Pinch" unit="сек" value={state.pinchHoldSec} onChange={v=>setState(s=>({...s, pinchHoldSec:v}))} placeholder="20" step={1} />
+              <HubNum label="Сдавливание · Crush (аксель)" unit="сек" value={state.axleHoldSec} onChange={v=>setState(s=>({...s, axleHoldSec:v}))} placeholder="30" step={1} />
+              <HubNum label="Планка" unit="сек" value={state.corePlankSec} onChange={v=>setState(s=>({...s, corePlankSec:v}))} placeholder="120" step={5} />
+              <HubNum label="Удержание лога" unit="сек" value={state.logHoldSec} onChange={v=>setState(s=>({...s, logHoldSec:v}))} placeholder="10" step={1} />
+              <HubNum label="Удержание фермера" unit="сек" value={state.farmersHoldSec} onChange={v=>setState(s=>({...s, farmersHoldSec:v}))} placeholder="60" step={5} />
+              <HubNum label="Аксель верхним хватом" unit="кг" value={state.axleDohKg} onChange={v=>setState(s=>({...s, axleDohKg:v}))} placeholder="140" step={2.5} />
+            </div>
+            <HubToggle checked={state.conditioningFail} onChange={v=>setState(s=>({...s, conditioningFail:v}))} label="Кондиция провалена (медли дольше 60 сек)" style={{ marginTop:6 }} />
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
+              <HubPopupSelect label="Щипковый блок · Pinch" value={state.pinchWidth} onChange={v=>setState(s=>({...s, pinchWidth:v}))} options={[{ id:'2in', label:'2″', desc:'норма 30 сек' }, { id:'3in', label:'3″', desc:'норма 20 сек' }, { id:'4in', label:'4″', desc:'норма 15 сек' }]} />
+              <HubPopupSelect label="Кистевой эспандер · CoC" value={state.cocLevel} onChange={v=>setState(s=>({...s, cocLevel:v}))} options={[{ id:'coc1', label:'CoC 1', desc:'норма 20 сек' }, { id:'coc1_5', label:'CoC 1.5', desc:'норма 30 сек' }, { id:'coc2', label:'CoC 2', desc:'норма 40 сек' }]} />
+              <HubPopupSelect label="Толстый гриф · FatGrip, мм" value={state.fatGripMm} onChange={v=>setState(s=>({...s, fatGripMm:v}))} options={[{ id:'38', label:'38', desc:'стандарт' }, { id:'50', label:'50', desc:'аксель' }, { id:'60', label:'60', desc:'толстый' }]} />
+            </div>
+            <div style={{ display:'flex', gap:6, marginTop:6 }}>
+              <button onClick={handleSaveGripProfile} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#a855f7,#6366f1)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(168,85,247,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Профиль хвата</button>
+              <span style={{ fontSize:12, color:'#fff', alignSelf:'center' }}>Опора/щипок/сдавливание — раздельно</span>
+            </div>
+            {holdDiag && <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{holdDiag.verdict} · {holdDiag.details.join(' · ')}</div>}
+            {smSectionHeader('🎯 Слабые фазы (4)', '#a855f7')}
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {GRIP_OPTS.map(o=>{ const on = state.gripWeak.includes(o.id); return (
                 <button key={o.id} onClick={()=>toggle('gripWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#a855f7' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(168,85,247,0.20), rgba(168,85,247,0.06))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(168,85,247,0.35)' : 'none' }}>
@@ -1755,15 +1784,14 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                   <span>{o.label}</span>
                 </button> );})}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6 }}>
-              <HubNum label="Опора · Support (фермер)" unit="сек" value={state.gripHoldSec} onChange={v=>setState(s=>({...s, gripHoldSec:v}))} placeholder="60" step={5} />
-              <HubNum label="Щипок · Pinch" unit="сек" value={state.pinchHoldSec} onChange={v=>setState(s=>({...s, pinchHoldSec:v}))} placeholder="20" step={1} />
-              <HubNum label="Сдавливание · Crush (аксель)" unit="сек" value={state.axleHoldSec} onChange={v=>setState(s=>({...s, axleHoldSec:v}))} placeholder="30" step={1} />
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:6 }}>
-              <HubNum label="Планка" unit="сек" value={state.corePlankSec} onChange={v=>setState(s=>({...s, corePlankSec:v}))} placeholder="120" step={5} />
-              <HubToggle checked={state.conditioningFail} onChange={v=>setState(s=>({...s, conditioningFail:v}))} label="Кондиция провалена (медли дольше 60 сек)" />
-            </div>
+            {weakPoints.filter(id=>{ const b = smBiomechForWeak(id); return b && ['grip_support','core_brace','conditioning','farmers_grip'].includes(b.weakPoint); }).map(id=>{
+              const bio = smBiomechForWeak(id);
+              if (!bio) return null;
+              return <div key={id} style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', borderLeft:'3px solid #a855f7', marginBottom:8 }}><div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label}</div><div style={{ fontSize:12, color:'#fff' }}>{bio.biomechanicalReason}</div><div style={{ fontSize:13, color:'#5ee' }}>{bio.corrections.join(' · ')}</div></div>;
+            })}
+            {weakPoints.some(id=>{ const b = smBiomechForWeak(id); return b && ['grip_support','core_brace','conditioning','farmers_grip'].includes(b.weakPoint); }) && smSectionHeader('🏋️ Методы с выбором упражнения', '#a855f7')}
+            {weakPoints.map(id=>{ const bio = smBiomechForWeak(id); if (!bio || !['grip_support','core_brace','conditioning','farmers_grip'].includes(bio.weakPoint)) return null; return <div key={`pick-${id}`}>{smTop3Block(bio.weakPoint)}</div>; })}
+            {smSectionHeader('⚙️ Вспомогательное — диагностика хвата, бицепс, геркулес', '#a78bfa')}
             <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>Хват: провалы {gripFails}/3 (калибровка {gripFailsCal}/3) {gripFails>=2?'— профилактика: молот 3×12 + щипок 2×15': '— норма'} · осевая {axialOverload?'перегруз — чемодан 2×20 м': 'в норме'} · {axialQuant.text}</div>
             <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Бюджет McGill: {axialQuant.breakdown.join(' · ')}</div>
             <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Нагрузка (ACWR) {acwr? `${acwr.ratio.toFixed(2)}` : '—'} · кондиция: рывки 8×10 сек/50 сек</div>
@@ -1777,21 +1805,6 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 </div>
               );
             })()}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
-              <HubPopupSelect label="Щипковый блок · Pinch" value={state.pinchWidth} onChange={v=>setState(s=>({...s, pinchWidth:v}))} options={[{ id:'2in', label:'2″', desc:'норма 30 сек' }, { id:'3in', label:'3″', desc:'норма 20 сек' }, { id:'4in', label:'4″', desc:'норма 15 сек' }]} />
-              <HubPopupSelect label="Кистевой эспандер · CoC" value={state.cocLevel} onChange={v=>setState(s=>({...s, cocLevel:v}))} options={[{ id:'coc1', label:'CoC 1', desc:'норма 20 сек' }, { id:'coc1_5', label:'CoC 1.5', desc:'норма 30 сек' }, { id:'coc2', label:'CoC 2', desc:'норма 40 сек' }]} />
-              <HubPopupSelect label="Толстый гриф · FatGrip, мм" value={state.fatGripMm} onChange={v=>setState(s=>({...s, fatGripMm:v}))} options={[{ id:'38', label:'38', desc:'стандарт' }, { id:'50', label:'50', desc:'аксель' }, { id:'60', label:'60', desc:'толстый' }]} />
-            </div>
-            <div style={{ display:'flex', gap:6, marginTop:6 }}>
-              <button onClick={handleSaveGripProfile} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#a855f7,#6366f1)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(168,85,247,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Профиль хвата</button>
-              <span style={{ fontSize:12, color:'#fff', alignSelf:'center' }}>Опора/щипок/сдавливание — раздельно</span>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
-              <HubNum label="Удержание лога" unit="сек" value={state.logHoldSec} onChange={v=>setState(s=>({...s, logHoldSec:v}))} placeholder="10" step={1} />
-              <HubNum label="Удержание фермера" unit="сек" value={state.farmersHoldSec} onChange={v=>setState(s=>({...s, farmersHoldSec:v}))} placeholder="60" step={5} />
-              <HubNum label="Аксель верхним хватом" unit="кг" value={state.axleDohKg} onChange={v=>setState(s=>({...s, axleDohKg:v}))} placeholder="140" step={2.5} />
-            </div>
-            {holdDiag && <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{holdDiag.verdict} · {holdDiag.details.join(' · ')}</div>}
             <HubToggle checked={state.bicepsHistory} onChange={v=>setState(s=>({...s, bicepsHistory:v}))} label="Травма бицепса в прошлом" style={{ marginTop:6 }} />
             <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>
               🦾 Риск бицепса {bicepsRisk.score}/100 ({bicepsRisk.level === 'high' ? 'высокий' : bicepsRisk.level === 'moderate' ? 'умеренный' : 'низкий'})
@@ -1803,11 +1816,6 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <HubNum label="Падения в медли" unit="шт" value={state.medleyDrops} onChange={v=>setState(s=>({...s, medleyDrops:v}))} placeholder="0" step={1} />
             </div>
             {holdEventDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>🏛 {holdEventDiag.lines.join(' · ')}</div>}
-            {weakPoints.map(id=>{
-              const bio = smBiomechForWeak(id);
-              if (!bio || !['grip_support','core_brace','conditioning','farmers_grip'].includes(bio.weakPoint)) return null;
-              return <div key={id} style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', borderLeft:'3px solid #a855f7', marginTop:8 }}><div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label}</div><div style={{ fontSize:12, color:'#fff' }}>{bio.biomechanicalReason}</div><div style={{ fontSize:13, color:'#5ee' }}>{bio.corrections.join(' · ')}</div></div>;
-            })}
           </div>
         )}
 

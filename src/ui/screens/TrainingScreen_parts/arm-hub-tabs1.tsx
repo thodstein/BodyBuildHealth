@@ -181,6 +181,7 @@ export function HubWristTab({ H }: { H: any }) {
   const { state, setState, angles, angleValid, anglesVerified, recAngles, autoPoint, toggleWeakPoint, showCam, setShowCam, handleVideoFile, trackCsv, setTrackCsv, trackMetrics, trackType, trackSrd, setBaseXLoop, setTrackCsvClear, diag, clearWeakPoints, toggleLegacy, videoRef } = H;
   return (
     <div>
+      <div className="ad-sec-t" data-arm="wrist-params-head">📥 Замеры — углы и видео</div>
       <AdGrid cols="auto">
         <AdField label="Локоть°">
           <input inputMode="decimal" value={state.elbowDeg} onChange={e=>setState((s: any)=>({...s, elbowDeg:e.target.value}))} placeholder="110" />
