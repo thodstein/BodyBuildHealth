@@ -21,6 +21,7 @@ import { isWorkDayForIndex } from "./planner-work";
 import { applyCarbPeriodizationMods, carbPeriodizationLabel, isHeavyDayForOffset } from "./planner-carb-periodization";
 import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, repairDiaasWeakLinks } from "./planner-micro-pools";
 import { applyMealTargetOverrides } from "./planner-meal-targets";
+import { publishPlanTargets } from "./plan-targets-bridge";
 import { correctDayToTargets } from "./day-target-corrector";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { loadVarietyLedger, saveVarietyLedger, LEDGER_WEEK_FAMILIES_CAP } from "./planner-variety-ledger";
@@ -1521,6 +1522,19 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { if (manualF !== null) localStorage.setItem('he_manual_f', String(manualF)); else localStorage.removeItem('he_manual_f'); } catch {} }, [manualF]);
   useEffect(() => { try { if (manualC !== null) localStorage.setItem('he_manual_c', String(manualC)); else localStorage.removeItem('he_manual_c'); } catch {} }, [manualC]);
   useEffect(() => { try { localStorage.setItem('he_kbju_mode', kbjuMode); } catch {} }, [kbjuMode]);
+
+  // FIX (hero/дневник ≠ цели плана): публикуем ФАКТИЧЕСКИЕ цели дня (effective*)
+  // единым мостом — hero Питания и дневник читают их как источник правды вместо
+  // отдельного профильного расчёта (calcNutrition), из-за которого цифры расходились
+  // с целями, заданными в Плане (ручное КБЖУ / цель / фаза / профицит / ББ-заметка).
+  useEffect(() => {
+    publishPlanTargets({
+      kcal: Math.round(effectiveKcal),
+      protein: Math.round(effectiveP),
+      fats: Math.round(effectiveF),
+      carbs: Math.round(effectiveC),
+    });
+  }, [effectiveKcal, effectiveP, effectiveF, effectiveC]);
 
   // B1: Persist generated plan data so it survives tab switching / remounts
   useEffect(() => { try { localStorage.setItem("he_plan_days", String(planDays)); } catch {} }, [planDays]);

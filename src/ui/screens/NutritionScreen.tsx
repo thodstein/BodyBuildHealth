@@ -11,6 +11,7 @@ import { RETAIL_CHAINS, retailToFoodItem, searchRetailProducts, type RetailProdu
 import { IndividualPlan, NutritionPlanScope, PlanReportTab } from './NutritionScreen_parts/IndividualPlan';
 import { OrganLoadCalculator } from './NutritionScreen_parts/IndividualPlan/OrganLoadCalculator';
 import { PeakWeekTab } from './NutritionScreen_parts/IndividualPlan/PeakWeekTab';
+import { readPlanTargets, PLAN_TARGETS_EVENT, type PlanKbjuTargets } from './NutritionScreen_parts/IndividualPlan/plan-targets-bridge';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
 import { addToCart, getCarts, saveCarts, getActiveStoreId, setActiveStoreId, CART_CAT_LABELS, CartStore, CartItemEnhanced } from '../../core/nutrition-utils';
 import { NutritionCustomFood } from './NutritionScreen_parts/NutritionCustomFood';
@@ -1439,7 +1440,23 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
 
   const cartCount = useMemo(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_carts') || '[]').reduce((s:number,st:any) => s + (st.items?.length || 0), 0); } catch { return 0; } }, [tab]);
 
+  const [planTargetsSnapshot, setPlanTargetsSnapshot] = useState<PlanKbjuTargets | null>(() => readPlanTargets());
+  useEffect(() => {
+    const read = () => setPlanTargetsSnapshot(readPlanTargets());
+    window.addEventListener(PLAN_TARGETS_EVENT, read as EventListener);
+    window.addEventListener('storage', read);
+    window.addEventListener('focus', read);
+    return () => {
+      window.removeEventListener(PLAN_TARGETS_EVENT, read as EventListener);
+      window.removeEventListener('storage', read);
+      window.removeEventListener('focus', read);
+    };
+  }, []);
+
+  // Единый источник целей: сначала ФАКТИЧЕСКИЕ цели Плана (ручное КБЖУ / цель /
+  // фаза / профицит / ББ-заметка), иначе — профильный расчёт (План не настраивался).
   const macroTargets = useMemo(() => {
+    if (planTargetsSnapshot) return planTargetsSnapshot;
     const s: any = linked.profile?.settings;
     const p = s?.personal;
     const tr = s?.training;
@@ -1450,7 +1467,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
       const t = calcNutrition({ weightKg: p.weight, heightCm: p.height || 175, age: p.age || 30, sex: p.sex || 'male', pal, goal });
       return { kcal: t.kcal, protein: t.protein, fats: t.fats, carbs: t.carbs };
     } catch { return { kcal: 2500, protein: 160, fats: 70, carbs: 300 }; }
-  }, [linked.profile]);
+  }, [linked.profile, planTargetsSnapshot]);
 
   // B2: Build meal visualizer items from saved day plan or today's diary
   const visualizerItems = useMemo(() => {
