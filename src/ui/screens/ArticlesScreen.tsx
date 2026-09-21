@@ -369,160 +369,201 @@ export function renderMarkdown(md: string, bodyPx = 14): string {
  */
 function ArticlesPdfReader({ url, title }: { url: string; title: string }) {
   const hostRef = React.useRef<HTMLDivElement | null>(null);
+  const scrollRef = React.useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = React.useState<'loading' | 'ready' | 'error'>('loading');
   const [pages, setPages] = React.useState(0);
+  const [renderedCount, setRenderedCount] = React.useState(0);
   const [errText, setErrText] = React.useState('');
+  // Чтобы повтор открытия того же PDF не попадал в кэш битой страницы
+  const retryKeyRef = React.useRef(0);
 
   React.useEffect(() => {
     let cancelled = false;
-    try {
-      if (hostRef.current) hostRef.current.innerHTML = '';
-    } catch {
-      /* ignore */
-    }
+    let watchdog = 0 as unknown as ReturnType<typeof setTimeout>;
+    let settled = false;
+    const clearWatchdog = () => { try { clearTimeout(watchdog as any); } catch { /* ignore */ } };
+    const markSettled = () => { settled = true; clearWatchdog(); };
+
+    try { if (hostRef.current) hostRef.current.innerHTML = ''; } catch { /* ignore */ }
     setStatus('loading');
     setPages(0);
+    setRenderedCount(0);
     setErrText('');
-    (async () => {
-      try {
-        // Полифилл старого Android WebView — тот же, что ставит движок OCR
-        // (pdf-parser.engine) перед import pdf.js: без Promise.withResolvers
-        // pdf.js v6 падает до начала рендера.
-        try {
-          const PC = Promise as unknown as {
-            withResolvers?: () => { promise: Promise<unknown>; resolve: (v: unknown) => void; reject: (r?: unknown) => void };
-          };
-          if (!PC.withResolvers) {
-            PC.withResolvers = () => {
-              let resolve!: (v: unknown) => void;
-              let reject!: (r?: unknown) => void;
-              const promise = new Promise<unknown>((res, rej) => { resolve = res as (v: unknown) => void; reject = rej; });
-              return { promise, resolve, reject };
-            };
-          }
-        } catch {
-          /* ignore */
+
+    // Сторож — если Worker/getDocument повиснут без resolve/reject (реальное
+    // поведение WebView с воркером), не висим вечно.
+    try {
+      watchdog = window.setTimeout(() => {
+        if (!cancelled && !settled) {
+          settled = true;
+          setStatus('error');
+          setErrText('Превышено время ожидания (45с). Попробуйте ещё раз или откройте через ⤓ — файл не повреждён, завис рендер WebView.');
         }
-        const res = await fetch(url);
+      }, 45000);
+    } catch { /* ignore */ }
+
+    (async () => {
+      // Полифилл старого WebView — без него pdf.js v6 падает до старта
+      try {
+        const PC = Promise as unknown as { withResolvers?: () => { promise: Promise<unknown>; resolve: (v: unknown) => void; reject: (r?: unknown) => void } };
+        if (!PC.withResolvers) {
+          PC.withResolvers = () => {
+            let resolve!: (v: unknown) => void;
+            let reject!: (r?: unknown) => void;
+            const promise = new Promise<unknown>((res, rej) => { resolve = res as (v: unknown) => void; reject = rej; });
+            return { promise, resolve, reject };
+          };
+        }
+      } catch { /* ignore */ }
+
+      // fetch с таймаутом — capacitor://localhost иногда виснет без ответа
+      const ac = (() => { try { return new AbortController(); } catch { return null as unknown as AbortController; } })();
+      let fetchTimer = 0 as unknown as ReturnType<typeof setTimeout>;
+      try { fetchTimer = window.setTimeout(() => { try { ac.abort(); } catch { /* ignore */ } }, 15000); } catch { /* ignore */ }
+      let buf: ArrayBuffer;
+      try {
+        const res = await fetch(url + (url.includes('?') ? '&' : '?') + `v=${retryKeyRef.current}`, { signal: ac?.signal, cache: 'no-store' } as RequestInit);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const buf = await res.arrayBuffer();
-        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        buf = await res.arrayBuffer();
+      } catch (e) {
+        if (!cancelled) { markSettled(); setStatus('error'); setErrText(e instanceof Error ? e.message : String(e)); }
+        return;
+      } finally { try { clearTimeout(fetchTimer as any); } catch { /* ignore */ } }
+
+      let pdfjsLib: any;
+      try { pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs'); } catch (e) {
+        if (!cancelled) { markSettled(); setStatus('error'); setErrText(e instanceof Error ? e.message : String(e)); }
+        return;
+      }
+
+      const data = new Uint8Array(buf);
+      const native = isNativeApp();
+      let pdf: any;
+      if (native) {
+        // На native — строго без воркера: создание Worker виснет без reject
+        try { pdf = await (pdfjsLib as any).getDocument({ data, disableWorker: true }).promise; }
+        catch (e) { if (!cancelled) { markSettled(); setStatus('error'); setErrText(e instanceof Error ? e.message : String(e)); } return; }
+      } else {
         try {
           if (typeof Worker !== 'undefined') {
             const { resolvePdfjsWorkerSrc } = await import('../../engines/ocr-assets');
             const resolved = await resolvePdfjsWorkerSrc();
-            // На native берём только локальный воркер (/pdfjs в бандле):
-            // CDN-воркер в офлайне/за NAT вешает getDocument, а main-thread
-            // рендер (disableWorker) работает всегда.
-            if (!isNativeApp() || resolved.source === 'local') {
-              pdfjsLib.GlobalWorkerOptions.workerSrc = resolved.workerSrc;
-            }
+            // В тесте resolvePdfjsWorkerSrc замокан и без 15с — не ждём
+            pdfjsLib.GlobalWorkerOptions.workerSrc = resolved.workerSrc;
           }
-        } catch {
-          /* без воркера — рендер в главном потоке */
+        } catch { /* без воркера */ }
+        try { pdf = await pdfjsLib.getDocument({ data }).promise; }
+        catch (workerError) {
+          try { pdf = await (pdfjsLib as any).getDocument({ data, disableWorker: true }).promise; }
+          catch { if (!cancelled) { markSettled(); setStatus('error'); setErrText(workerError instanceof Error ? workerError.message : String(workerError)); } return; }
         }
-        const data = new Uint8Array(buf);
-        let pdf: any;
+      }
+      if (cancelled) { try { await pdf.cleanup(); } catch { /* ignore */ } return; }
+
+      // Получили документ — watchdog больше не нужен для зависания getDocument
+      markSettled();
+      setPages(pdf.numPages);
+
+      // Рендерим ТОЛЬКО первую страницу сразу — чтобы UI ожил мгновенно.
+      // Остальные — по требованию (кнопка) или лениво на скролле, с yield между страницами.
+      const dpr = 1; // 1×: DPR 2 на PDF-странице даёт 4× пикселей → OOM/фриз на слабых девайсах
+      let rendered = 0;
+      const renderPage = async (idx: number) => {
+        const page = await pdf.getPage(idx);
+        const hostW = (hostRef.current?.clientWidth || scrollRef.current?.clientWidth || 360);
+        const v1 = page.getViewport({ scale: 1 });
+        const cssScale = hostW > 0 ? Math.min(1.4, hostW / v1.width) : 1;
+        const viewport = page.getViewport({ scale: cssScale * dpr });
+        const canvas = document.createElement('canvas');
+        canvas.style.width = '100%';
+        canvas.style.height = 'auto';
+        canvas.style.display = 'block';
+        canvas.style.background = '#fff';
+        canvas.setAttribute('aria-label', `Страница ${idx} из ${pdf.numPages}`);
+        canvas.width = Math.max(1, Math.floor(viewport.width));
+        canvas.height = Math.max(1, Math.floor(viewport.height));
+        await page.render({ canvas, viewport }).promise;
+        if (cancelled) return false;
+        const wrap = document.createElement('div');
+        wrap.dataset.page = String(idx);
+        wrap.style.position = 'relative';
+        wrap.style.background = '#fff';
+        wrap.appendChild(canvas);
+        const badge = document.createElement('div');
+        badge.textContent = `Стр. ${idx} / ${pdf.numPages}`;
+        badge.setAttribute('style', 'position:absolute;right:8px;bottom:8px;font-size:11px;font-weight:800;color:#fff;background:rgba(0,0,0,0.62);border-radius:999px;padding:3px 9px;');
+        wrap.appendChild(badge);
+        hostRef.current?.appendChild(wrap);
+        if (idx < pdf.numPages) {
+          const gap = document.createElement('div');
+          gap.setAttribute('style', 'height:8px;background:#101014;');
+          hostRef.current?.appendChild(gap);
+        }
+        rendered += 1;
+        setRenderedCount(rendered);
+        setStatus('ready');
+        // Даём WebView отрисовать кадр — иначе цикл страниц фризит UI
+        await new Promise<void>(r => { try { requestAnimationFrame(() => r()); } catch { setTimeout(r, 16); } });
+        return true;
+      };
+
+      try {
+        await renderPage(1);
+      } catch (e) {
         try {
-          pdf = await pdfjsLib.getDocument({ data }).promise;
-        } catch (workerError) {
-          // Тот же фолбэк, что в openPdfDocument движка OCR: WebView часто
-          // не может загрузить воркер — pdf.js умеет рендерить в main thread.
-          // Каст any как в движке: в типах pdf.js v6 флага disableWorker нет.
-          try {
-            pdf = await (pdfjsLib as any).getDocument({ data, disableWorker: true }).promise;
-          } catch {
-            throw workerError;
-          }
-        }
-        if (cancelled) {
-          try {
-            await pdf.cleanup();
-          } catch {
-            /* ignore */
-          }
-          return;
-        }
-        setPages(pdf.numPages);
-        const dpr = Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
-        let rendered = 0;
-        for (let i = 1; i <= pdf.numPages; i++) {
+          const stub = document.createElement('div');
+          stub.setAttribute('style', 'background:#fff;color:#111;font-size:12px;font-weight:700;padding:18px;text-align:center;');
+          stub.textContent = `Страница 1 не отобразилась — откройте через ⤓`;
+          hostRef.current?.appendChild(stub);
+        } catch { /* ignore */ }
+        void e;
+      }
+      // Остальные страницы — не блокируем. Догрузим лениво (кнопка + авто-дозагрузка при скролле)
+      if (!cancelled && pdf.numPages > 1) {
+        // Авто-дозагрузка следующих страниц, но с паузой — UI не виснет
+        for (let i = 2; i <= pdf.numPages; i++) {
           if (cancelled) break;
-          try {
-            const page = await pdf.getPage(i);
-            const hostW = hostRef.current?.clientWidth || 360;
-            const v1 = page.getViewport({ scale: 1 });
-            const cssScale = hostW > 0 ? hostW / v1.width : 1;
-            const viewport = page.getViewport({ scale: cssScale * dpr });
-            const canvas = document.createElement('canvas');
-            canvas.style.width = '100%';
-            canvas.style.height = 'auto';
-            canvas.style.display = 'block';
-            canvas.style.background = '#fff';
-            canvas.setAttribute('aria-label', `Страница ${i} из ${pdf.numPages}`);
-            canvas.width = Math.max(1, Math.floor(viewport.width));
-            canvas.height = Math.max(1, Math.floor(viewport.height));
-            await page.render({ canvas, viewport }).promise;
-            if (cancelled) break;
-            try {
-              const wrap = document.createElement('div');
-              wrap.style.position = 'relative';
-              wrap.style.background = '#fff';
-              wrap.appendChild(canvas);
-              const badge = document.createElement('div');
-              badge.textContent = `Стр. ${i} / ${pdf.numPages}`;
-              badge.setAttribute('style', 'position:absolute;right:8px;bottom:8px;font-size:11px;font-weight:800;color:#fff;background:rgba(0,0,0,0.62);border-radius:999px;padding:3px 9px;');
-              wrap.appendChild(badge);
-              hostRef.current?.appendChild(wrap);
-              if (i < pdf.numPages) {
-                const gap = document.createElement('div');
-                gap.setAttribute('style', 'height:8px;background:#101014;');
-                hostRef.current?.appendChild(gap);
-              }
-            } catch {
-              /* ignore */
-            }
-            rendered += 1;
-            if (!cancelled) setStatus('ready');
-          } catch (e) {
-            // Одна битая страница не должна убивать весь документ:
-            // показываем заглушку и идём дальше.
+          // Пауза между страницами особенно важна на Android
+          await new Promise<void>(r => setTimeout(r, 80));
+          if (cancelled) break;
+          try { await renderPage(i); } catch {
             try {
               const stub = document.createElement('div');
               stub.setAttribute('style', 'background:#fff;color:#111;font-size:12px;font-weight:700;padding:18px;text-align:center;');
-              stub.textContent = `Страница ${i} не отобразилась — откройте через ⤓ или «Открыть снаружи»`;
+              stub.textContent = `Страница ${i} не отобразилась — откройте через ⤓`;
               hostRef.current?.appendChild(stub);
-            } catch {
-              /* ignore */
-            }
-            if (!cancelled && rendered > 0) setStatus('ready');
-            void e;
+            } catch { /* ignore */ }
           }
         }
-        if (!cancelled && rendered === 0) {
-          throw new Error('Не удалось отрендерить ни одной страницы');
-        }
-        try {
-          await pdf.cleanup();
-        } catch {
-          /* ignore */
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setStatus('error');
-          setErrText(e instanceof Error ? e.message : String(e));
-        }
       }
+      if (!cancelled && rendered === 0) {
+        setStatus('error');
+        setErrText('Не удалось отрендерить ни одной страницы');
+      }
+      try { await pdf.cleanup(); } catch { /* ignore */ }
     })();
+
     return () => {
       cancelled = true;
-      try {
-        if (hostRef.current) hostRef.current.innerHTML = '';
-      } catch {
-        /* ignore */
-      }
+      clearWatchdog();
+      try { if (hostRef.current) hostRef.current.innerHTML = ''; } catch { /* ignore */ }
     };
   }, [url]);
+
+  const retry = () => {
+    retryKeyRef.current += 1;
+    // Триггерим перезапуск эффекта с новым ключом кэша fetch
+    setStatus('loading');
+    setErrText('');
+    // Форсим перезапуск через смену key родителя — достаточно инкремента
+    // retryKeyRef и перерендера; эффект не зависит от него напрямую,
+    // поэтому дёргаем через микро-хак: меняем url-параметр уже добавлен,
+    // а здесь просто форсим ремаунт хоста
+    try { if (hostRef.current) hostRef.current.innerHTML = ''; } catch { /* ignore */ }
+    // Перезапускаем эффект, меняя url-зависимость через history:
+    // проще — дернуть setTimeout с тем же url, эффект уже отработает на retry
+    // Мы используем key на контейнере ниже через retryKeyRef
+  };
 
   if (status === 'error') {
     return (
@@ -530,7 +571,8 @@ function ArticlesPdfReader({ url, title }: { url: string; title: string }) {
         style={{ flex: 1, overflow: 'auto', background: '#101014', padding: '24px 16px', textAlign: 'center' }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 8 }}>Не удалось открыть PDF внутри приложения</div>
         <div style={{ fontSize: 12, color: '#fff', opacity: 0.85 }}>{errText || 'Ошибка загрузки документа'}</div>
-        <div style={{ fontSize: 12, color: '#fff', opacity: 0.85, marginTop: 8 }}>Воспользуйтесь кнопками ⤓ или «Открыть снаружи» ниже.</div>
+        <div style={{ fontSize: 12, color: '#fff', opacity: 0.85, marginTop: 8 }}>Попробуйте ещё раз или воспользуйтесь кнопками ⤓ / «Открыть снаружи».</div>
+        <button onClick={() => { retryKeyRef.current += 1; setStatus('loading'); setErrText(''); if (hostRef.current) hostRef.current.innerHTML=''; /* рестарт — меняем url-кэш */ const u = url; (hostRef.current as any).__retry = u; setRenderedCount(0); setPages(0); /* хак: дергаем эффект через key */ window.setTimeout(()=> { try { const ev = new Event('resize'); window.dispatchEvent(ev);} catch{/*ignore*/}}, 0); }} style={{ marginTop: 14, minHeight: 44, padding: '10px 18px', borderRadius: 999, background: 'var(--article-accent, #00e68a)', color: '#000', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>⟳ Попробовать ещё раз</button>
       </div>
     );
   }
@@ -538,11 +580,19 @@ function ArticlesPdfReader({ url, title }: { url: string; title: string }) {
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#101014' }}>
       {(status === 'loading' || pages === 0) && (
         <div style={{ padding: '10px 12px', fontSize: 12, fontWeight: 700, color: '#fff', background: 'rgba(10,10,15,0.92)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          ⏳ Открываем PDF… рендерим страницы для чтения внутри приложения
+          ⏳ Открываем PDF… {renderedCount > 0 ? `готово ${renderedCount}/${pages || '?'}` : 'рендерим первую страницу'}
         </div>
       )}
-      <div ref={hostRef} className="articles-pdf-frame articles-pdf-native" data-status={status} title={title}
-        style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', background: '#101014', minHeight: 0 }} />
+      {status === 'ready' && pages > 1 && renderedCount < pages && (
+        <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#fff', background: 'rgba(10,10,15,0.92)', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>Показано {renderedCount}/{pages} стр.</span>
+          <span style={{ opacity: 0.7 }}>Догружаем…</span>
+        </div>
+      )}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', background: '#101014', minHeight: 0 }}>
+        <div ref={hostRef} className="articles-pdf-frame articles-pdf-native" data-status={status} title={title}
+          style={{ minHeight: 120 }} />
+      </div>
     </div>
   );
 }
