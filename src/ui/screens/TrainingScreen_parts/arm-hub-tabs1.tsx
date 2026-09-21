@@ -16,6 +16,7 @@ import { hasVideoSupport } from '../../../engines/arm/arm-motion-capture.engine'
 import { isOnline } from '../../../core/native-bridge';
 import { AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner } from './arm-design-system';
 import { WEAK_GROUPS, WP_LABEL_SHORT } from './arm-hub-shared';
+import { ArmPickBlock } from './arm-hub-pick';
 
 export function HubGripTab({ H }: { H: any }) {
   const { state, setState, forceVecPro, weightClassAuto, bwNum, platformP0, measureHistP0, setMeasureTick, attKg, setAttKg, attOk, setAttOk, attHistP0, setAttTick, vbt, vbtThP0, benchRes, toggleWeakPoint } = H;
@@ -292,6 +293,7 @@ export function HubWristTab({ H }: { H: any }) {
                   <div className="ad-muted">{c.reason}</div>
                   <div className="ad-tip"><b>Коррекции:</b> {c.corrections.join(' · ')} @ {Math.round(c.intensityPct*100)}% · <i>{c.loadCues}</i> · VBT {vbtThresholdForWeakPoint(c.weakPoint).warnPct}/{vbtThresholdForWeakPoint(c.weakPoint).stopPct}%</div>
                   {corr && <div className="ad-muted">Сеты {corr.sets}×{corr.repsRange[0]}-{corr.repsRange[1]} RIR{corr.rir}{corr.holdSeconds?` hold ${corr.holdSeconds}с`:''} → день {corr.dayTags[0]} · группа {corr.substitutionGroup}</div>}
+                  <ArmPickBlock wp={c.weakPoint as ArmWeakPoint} top={(H.armTop3P0?.[c.weakPoint] || []) as any} pref={(H.armPrefCorr || {})[c.weakPoint]} onPick={H.setArmPrefCorr} />
                 </div>
               );
             })}

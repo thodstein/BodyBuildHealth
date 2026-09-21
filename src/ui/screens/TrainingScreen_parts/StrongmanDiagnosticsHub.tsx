@@ -1423,6 +1423,45 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     return sm ? diagnoseSMWeakPoint(sm) : null;
   };
 
+  // Инлайн-блок «методы с выбором упражнения» прямо на табе движения (паритет с ТА top3Block):
+  // выбираешь упражнение → оно идёт первым в инъекцию и в мост.
+  const smTop3Block = (sm: SMWeakPoint) => {
+    const tops = (smCorrTops as Record<string, ReturnType<typeof correctivesForSMWeakPoint>>)[sm as string] || [];
+    if (!tops.length) return null;
+    const pref = smPrefCorr[sm as string];
+    return (
+      <div data-sm="phase-top3" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 12, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#f5b04c', marginBottom: 2 }}>🏋️ Методы с выбором упражнения {pref ? '· ⭐ выбрано' : '· нажми — пойдёт первым в план'}</div>
+        {tops.map((c) => {
+          const sel = pref === c.id;
+          const pick = () => setSmPrefCorr((prev) => {
+            const next = { ...prev };
+            if (next[sm as string] === c.id) delete next[sm as string];
+            else next[sm as string] = c.id;
+            return next;
+          });
+          return (
+            <button
+              key={c.id}
+              type="button"
+              data-sm="phase-pick"
+              data-selected={sel ? 'true' : 'false'}
+              aria-pressed={sel}
+              aria-label={`${sel ? 'Выбрано' : 'Выбрать'}: ${c.target}`}
+              onClick={pick}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44, marginTop: 4, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', color: '#fff', background: sel ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.06))' : 'rgba(255,255,255,0.03)', border: sel ? '2px solid rgba(245,158,11,0.65)' : '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <span aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: sel ? 'rgba(245,158,11,0.25)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
+              <b style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{c.target}</b>
+              <span style={{ fontSize: 11, color: '#f5b04c', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.protocolAdj.sets}×{c.protocolAdj.reps} @{c.protocolAdj.pct}%</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#f5b04c' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓' : 'Выбрать'}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="train-strongdiag" style={{ padding: '10px 8px 16px', color: '#fff', maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <style>{`.train-strongdiag input:focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(245,158,11,0.65) !important; box-shadow:0 0 0 3px rgba(245,158,11,0.18) !important; outline:none !important; }.train-strongdiag input::placeholder, .train-strongdiag textarea::placeholder{ color:rgba(255,255,255,0.75); opacity:1; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; min-height:44px; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:#fff; font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }.train-strongdiag button:focus-visible, .train-strongdiag summary:focus-visible, .train-strongdiag input:focus-visible, .train-strongdiag select:focus-visible, .train-strongdiag textarea:focus-visible{ outline:2px solid rgba(245,158,11,0.70); outline-offset:2px; }@media (prefers-reduced-motion: reduce){ .train-strongdiag button:active{ transform:none; } }@keyframes hubFade{from{opacity:0}to{opacity:1}}@keyframes hubSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
@@ -1480,8 +1519,6 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         </details>
         {toast && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', fontSize: 13 }}>{toast}</div>}
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-          <button onClick={handleExport} style={{ padding: '12px 16px', minHeight:48, borderRadius: 14, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(140,190,255,0.16)', color: '#60a5fa', fontSize: 13, fontWeight:700, cursor: 'pointer' }}>🖨 HTML</button>
-          <button onClick={handleExportCsv} style={{ padding: '12px 16px', minHeight:48, borderRadius: 14, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(140,190,255,0.16)', color: '#60a5fa', fontSize: 13, fontWeight:700, cursor: 'pointer' }}>📥 CSV</button>
           <button onClick={applyMobilityToProfile} style={{ padding: '12px 16px', minHeight:48, borderRadius: 14, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.22)', color: '#22c55e', fontSize: 13, fontWeight:700, cursor: 'pointer' }}>→ Мобильность в профиль</button>
         </div>
       </div>
@@ -1515,6 +1552,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize:12, color:'#fff' }}>{bio.weakMuscles.join(', ')} · {bio.references.join(', ')}</div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:4, lineHeight:1.4 }}>{bio.biomechanicalReason}</div>
                   <div style={{ fontSize:13, color:'#5ee', marginTop:4 }}>{bio.corrections.join(' · ')} · {bio.loadCues}</div>
+                  {smTop3Block(bio.weakPoint)}
                 </div>
               );
             })}
@@ -1590,6 +1628,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label} <span style={{ color:'#fff', fontWeight:500 }}>· {bio.angleRangeDeg.join('-')}°</span></div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{bio.biomechanicalReason}</div>
                   <div style={{ fontSize:13, color:'#5ee' }}>{bio.corrections.join(' · ')}</div>
+                  {smTop3Block(bio.weakPoint)}
                 </div>
               );
             })}
@@ -1664,6 +1703,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                   <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label}</div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{bio.biomechanicalReason}</div>
                   <div style={{ fontSize:13, color:'#5ee' }}>{bio.corrections.join(' · ')} · {bio.loadCues}</div>
+                  {smTop3Block(bio.weakPoint)}
                 </div>
               );
             })}

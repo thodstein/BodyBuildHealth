@@ -1032,6 +1032,31 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <div className="ad-muted">Факты: {cause.evidence.join(' · ')}</div>
           <div className="ad-muted">Чинить: {cause.fix} · {diagnosis.cues.join(' · ')}</div>
           <div className="ad-muted">{diagnosis.ruleNote}</div>
+          {correctionsOrdered.length > 0 && (
+            <div data-arm="lift-diag-top3" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 12, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#f5b04c', marginBottom: 2 }}>🏋️ Методы с выбором упражнения {armliftPrefCorr ? '· ⭐ выбрано' : '· нажми — пойдёт первым в план'}</div>
+              {correctionsOrdered.map((c) => {
+                const sel = armliftPrefCorr === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    data-arm="lift-diag-pick"
+                    data-selected={sel ? 'true' : 'false'}
+                    aria-pressed={sel}
+                    aria-label={`${sel ? 'Выбрано' : 'Выбрать'}: ${c.title}`}
+                    onClick={() => setArmliftPrefCorr(c.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44, marginTop: 4, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', color: '#fff', background: sel ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.06))' : 'rgba(255,255,255,0.03)', border: sel ? '2px solid rgba(245,158,11,0.65)' : '1px solid rgba(255,255,255,0.08)' }}
+                  >
+                    <span aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: sel ? 'rgba(245,158,11,0.25)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
+                    <b style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{c.title}</b>
+                    <span style={{ fontSize: 11, color: '#f5b04c', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.protocol}</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#f5b04c' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓' : 'Выбрать'}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <AdCta>
             <AdBtn variant="amber" block hero onClick={() => setTab('corr')}>→ К коррекции ({corrections[0]?.title})</AdBtn>
           </AdCta>
@@ -1045,19 +1070,22 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <div className="ad-muted">Чинить: {cause.fix}</div>
           <div className="ad-muted" data-arm="lift-corr-why">Почему: {cause.evidence.join(' · ')}</div>
           <div className="ad-list" data-arm="lift-corr-top">
-            {correctionsOrdered.map((c, idx) => (
-              <div key={c.id} className="ad-row">
-                <span>
-                  <button
-                    data-arm="lift-corr-star"
-                    data-active={armliftPrefCorr === c.id ? 'true' : 'false'}
-                    aria-pressed={armliftPrefCorr === c.id}
-                    aria-label={`Выбрать ${c.title}`}
-                    onClick={() => setArmliftPrefCorr(c.id)}
-                    style={{ minWidth: 32, minHeight: 32, borderRadius: 8, marginRight: 6, cursor: 'pointer', border: '1px solid rgba(245,158,11,0.4)', background: armliftPrefCorr === c.id ? 'rgba(245,158,11,0.25)' : 'transparent', color: '#fff', fontSize: 13, fontWeight: 800 }}
-                  >{armliftPrefCorr === c.id ? '⭐' : '☆'}</button>
-                  <b>{idx + 1}. {c.title}</b> — {c.protocol}
-                </span>
+            {correctionsOrdered.map((c, idx) => {
+              const sel = armliftPrefCorr === c.id;
+              return (
+              <div key={c.id} className="ad-row" data-arm="lift-corr-row" data-selected={sel ? 'true' : 'false'} style={{ alignItems: 'center', borderRadius: 10, padding: '6px 8px', background: sel ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.06))' : 'transparent', border: sel ? '2px solid rgba(245,158,11,0.65)' : '1px solid transparent' }}>
+                <button
+                  data-arm="lift-corr-star"
+                  data-active={sel ? 'true' : 'false'}
+                  aria-pressed={sel}
+                  aria-label={`${sel ? 'Выбрано' : 'Выбрать'}: ${c.title}`}
+                  onClick={() => setArmliftPrefCorr(c.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, minHeight: 44, padding: 0, cursor: 'pointer', border: 'none', background: 'transparent', color: '#fff', textAlign: 'left' }}
+                >
+                  <span aria-hidden style={{ minWidth: 36, minHeight: 36, borderRadius: 9, border: '1px solid rgba(245,158,11,0.4)', background: sel ? 'rgba(245,158,11,0.25)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
+                  <b style={{ flex: 1, minWidth: 0 }}>{idx + 1}. {c.title}</b> — {c.protocol}
+                  <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#f5b04c' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓ Выбрано' : 'Выбрать'}</span>
+                </button>
                 <span className="ad-muted">{c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq} · {c.source} · день {c.dayTag} · чинит: {c.fixesPhase.map((fid) => diagFailures.find((fp) => fp.id === fid)?.label || fid).join(', ')}</span>
                 {c.cues && c.cues.length > 0 && (
                   <span className="ad-muted" data-arm="lift-corr-cues">Кью: {c.cues.join(' · ')}</span>
@@ -1066,7 +1094,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
                   <span className="ad-muted">Прогрессия: {c.progression}</span>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
           {spareCorrection && (
             <div className="ad-muted" data-arm="lift-corr-spare">🔁 Запасная: {spareCorrection.title} — {spareCorrection.protocol} (та же группа, замена без смены дозы)</div>

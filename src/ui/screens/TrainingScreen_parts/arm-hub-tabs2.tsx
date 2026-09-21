@@ -11,6 +11,7 @@ import { ARM_BIOMECH } from '../../../engines/arm/arm-biomechanics.engine';
 import { HUMERUS_CHECKS, checkHumerusChecklist } from '../../../engines/arm/arm-humerus-checklist.engine';
 import { AdSec, AdGrid, AdField, AdChip, AdSwitch, AdSheetSelect, AdBtn, AdBanner } from './arm-design-system';
 import { WP_LABEL_SHORT } from './arm-hub-shared';
+import { ArmPickBlock } from './arm-hub-pick';
 
 /** PRO-3 P8: позиционный чек-лист — локальный стейт ритуала (не персистится: проверка «сегодня»).
  * PRO-5 №5: провалы дублируются в he_arm_humerus_checks — мост в конструктор (ось/warmup). */
@@ -95,7 +96,9 @@ export function HubPressureTab({ H }: { H: any }) {
             <span> ⚠ Side — прогрессия ≤10%/нед, RIR≥2, ≤3 сета первые 4н</span>
             {state.weakPoints.filter((wp: string)=>['side_mid','side_pin','back_start','back_drag'].includes(wp)).map((wp: string)=>{
               const bio = ARM_BIOMECH[wp as keyof typeof ARM_BIOMECH];
-              return <div key={wp}>{bio.label}: {bio.angleRangeDeg[0]}-{bio.angleRangeDeg[1]}° {bio.keyJoint} · угол н/п — контроль по технике{wp === 'side_pin' ? ' · дожимание — только вручную по видео (авто-хинт даёт side_mid: side_pin humerus-рискован)' : ''}</div>;
+              return <div key={wp}>{bio.label}: {bio.angleRangeDeg[0]}-{bio.angleRangeDeg[1]}° {bio.keyJoint} · угол н/п — контроль по технике{wp === 'side_pin' ? ' · дожимание — только вручную по видео (авто-хинт даёт side_mid: side_pin humerus-рискован)' : ''}
+                <ArmPickBlock wp={wp as any} top={(H.armTop3P0?.[wp] || []) as any} pref={(H.armPrefCorr || {})[wp]} onPick={H.setArmPrefCorr} />
+              </div>;
             })}
           </div>
         )}

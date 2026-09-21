@@ -163,24 +163,31 @@ export function HubCorrectionTab({ H }: { H: any }) {
                 ) : null;
               })()}
               {top.length > 0 ? (
-                <div className="ad-tip" data-arm="correction-top3">
-                  Топ-3: {top.map((t: any) => {
+                <div data-arm="correction-top3" style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="ad-muted">Методы с выбором упражнения — выбери, что пойдёт первым в план:</div>
+                  {top.map((t: any) => {
                     const pref = (armPrefCorr as any)?.[wp] === t.id;
                     return (
-                      <span key={t.id} style={{ whiteSpace: 'nowrap' }}>
-                        <button
-                          data-arm="correction-star"
-                          data-active={pref ? 'true' : 'false'}
-                          aria-pressed={pref}
-                          aria-label={`Выбрать ${t.id}`}
-                          onClick={() => setArmPrefCorr(wp, t.id)}
-                          style={{ minWidth: 32, minHeight: 32, borderRadius: 8, marginRight: 4, cursor: 'pointer', border: '1px solid rgba(245,158,11,0.4)', background: pref ? 'rgba(245,158,11,0.25)' : 'transparent', color: '#fff', fontSize: 13, fontWeight: 800 }}
-                        >{pref ? '⭐' : '☆'}</button>
-                        {t.id} ({roleLabel(t.id)} · {t.score}{t.reason ? `, ${t.reason}` : ''})
-                      </span>
+                      <button
+                        key={t.id}
+                        type="button"
+                        data-arm="correction-pick"
+                        data-selected={pref ? 'true' : 'false'}
+                        aria-pressed={pref}
+                        aria-label={`${pref ? 'Выбрано' : 'Выбрать'}: ${t.id}`}
+                        onClick={() => setArmPrefCorr(wp, t.id)}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', minHeight: 52, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', color: '#fff', background: pref ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.06))' : 'rgba(59,130,246,0.06)', border: pref ? '2px solid rgba(245,158,11,0.65)' : '1px solid rgba(59,130,246,0.14)' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span data-arm="correction-star" aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: pref ? 'rgba(245,158,11,0.25)' : 'transparent', color: '#fff', fontSize: 14, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{pref ? '⭐' : '☆'}</span>
+                          <b style={{ flex: 1, minWidth: 0 }}>{t.id}</b>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: pref ? '#f5b04c' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{pref ? '✓ Выбрано' : 'Выбрать'}</span>
+                        </div>
+                        <div className="ad-muted">{roleLabel(t.id)} · score {t.score}{t.reason ? ` · ${t.reason}` : ''}</div>
+                      </button>
                     );
                   })}
-                  {sim ? <span> · Δ {sim.summary}</span> : null}
+                  {sim ? <div className="ad-muted">Δ {sim.summary}</div> : null}
                 </div>
               ) : (
                 <div className="ad-muted">Топ-3: {(corr?.exercises || []).slice(0, 3).join(' · ')}</div>
