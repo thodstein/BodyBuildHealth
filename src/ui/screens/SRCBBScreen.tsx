@@ -15,7 +15,6 @@ import { SPLIT_PATTERNS } from '../../engines/bb/bb-split-patterns';
 import { rankBBSplits, selectBestBBSplit, explainBBSelection, type BBSelectorInput } from '../../engines/bb/bb-selector.engine';
 import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
 import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, buildBBContestPrep, isoAddDays, isoToday, PEAK_PHASE_COLORS, PHASE_LABELS_RU, type BBContestPrepConfig } from '../../engines/bb/bb-contest-prep.engine';
-import { calcBBPlanMetrics } from '../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
@@ -30,7 +29,7 @@ import { TaperCoachCard } from './SRCBBScreen_parts/TaperCoachCard';
 import { PLCompetitionTab } from './SRCBBScreen_parts/PLCompetitionTab';
 import { PLPlanView } from './SRCBBScreen_parts/PLPlanView';
 import { PLTaperProvider, usePLTaper } from './SRCBBScreen_parts/taper-state';
-import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
+import { TrainingMetricsChart, type LMSWeekMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
 
 import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
@@ -357,8 +356,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     });
   };
 
-  // U7: связь композиции методик с планом (оверлей, безопасно — движок не трогаем)
-  const [methodHints, setMethodHints] = useState<{ volumeMult: number; technique: string | null; label: string }>({ volumeMult: 1, technique: null, label: '' });
+
 
   // ПЛ-авто работает ТОЛЬКО с силовыми циклами (бодибилдинг-циклы имеют свой экран track='bb')
   const plCycles = useMemo(() => LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding'), []);
@@ -1290,11 +1288,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     }
     return base;
   }, [builtSrc, autoRegMode, autoRegResult, historyWorkouts]);
-  const bbChart: BBMuscleMetric[] = useMemo(() => {
-    if (!builtBb || !Array.isArray(builtBb.weeks) || !builtBb.weeks.length) return [];
-    const mult = methodHints.volumeMult;
-    return calcBBPlanMetrics(builtBb, pedAdapt.combinedMrvMultiplier).perMuscle.map(p => ({ muscle: p.muscle, sets: Math.round(p.totalSets * mult), тяж: Math.round(p.тяжSets * mult), памп: Math.round(p.пампSets * mult), mrv: p.mrv }));
-  }, [builtBb]);
 
   // Сохраняем построенный план (дни + фокус + неделя) в localStorage, чтобы
   // вкладка «Тренировки» (runtime) могла запустить его выполнение.
@@ -1732,7 +1725,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             plWeakPoints,
             linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
             e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
-            tempoStr, getTempo, methodHints,
+            tempoStr, getTempo,
           }} />
           <BlockView plan={builtSrc} />
           <PLToolsCard level={level} days={days} totalSets={plToolTotalSets} bodyWeight={linked.profile?.settings?.personal?.weight ?? bw} sex={linked.profile?.settings?.personal?.sex} e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }} hrvRatio={linked.profile?.settings?.baselineHrvRatio} acwr={acwrData.ratio} rpeDelta={autoRegResult.rirShift} plan={builtSrc} onApplyFrequency={(plans)=>{ const m: Record<string, number[]> = {}; plans.forEach(p=>{ m[p.muscle]=Array.from({length:p.frequency},(_,i)=>i+1); }); setWeakGroupDayMap(m); setMethodNote(`📊 Частота применена: ${plans.map(p=>`${p.muscle} ${p.frequency}×`).join(', ')}`); }} />

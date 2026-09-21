@@ -23,17 +23,21 @@ export const EXERCISE_ALIAS_MAP: Record<string, string> = {
   'становая тяга из ямы': 'deadlift',
   'становая тяга с остановками': 'deadlift',
   'становая тяга с плинтов': 'deadlift',
-  'армейский жим': 'ohp_bar',
+  // ВАЖНО: значения обязаны существовать в ИТОГОВОМ EXERCISE_CATALOG
+  // (после keep-first дедупа). Прежние ohp_bar/ohp_seated_db/lateral_raise_v2
+  // были вытеснены каноническими ohp/db_press/lateral_raise — см. тест
+  // pl-auto-regressions «points aliases only to existing catalog entries».
+  'армейский жим': 'ohp',
 
   // ─── Жимы ───
-  'жим стоя': 'ohp_bar',
+  'жим стоя': 'ohp',
   'жим гантелей': 'bench_db',
   'жим гантелей на наклонной': 'incline_db',
   'жим на наклонной': 'incline_bar',
   'жим на наклонной скамье': 'incline_bar',
   'жим гантелей лежа на накл скамье': 'incline_db',
   'жим гантелей лежа на гор скамье': 'bench_db',
-  'жим гантелей вниз головой': 'ohp_seated_db',
+  'жим гантелей вниз головой': 'bench_db',
   'жим ногами': 'leg_press',
   'жим без ног': 'bench_bar',
   'скоростной жим': 'bench_bar',
@@ -82,9 +86,9 @@ export const EXERCISE_ALIAS_MAP: Record<string, string> = {
   'подъем обратным хватом стоя': 'curl_bar',
 
   // ─── Плечи ───
-  'махи гантелями в стороны': 'lateral_raise_v2',
-  'подъем гантелей в стороны': 'lateral_raise_v2',
-  'подъем гантели перед собой': 'lateral_raise_v2',
+  'махи гантелями в стороны': 'lateral_raise',
+  'подъем гантелей в стороны': 'lateral_raise',
+  'подъем гантели перед собой': 'front_raise_db',
   'наклоны': 'good_morning',
   'наклоны стоя': 'good_morning',
   'наклоны со штангой': 'good_morning',

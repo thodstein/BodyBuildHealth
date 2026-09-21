@@ -121,7 +121,7 @@ export interface PLPlanViewApi {
   setSelectedTrendEx: React.Dispatch<React.SetStateAction<string | null>>;
   tempoStr: string;
   getTempo: (exerciseName: string, goal: string, isMainLift: boolean) => RepTempoOutput;
-  methodHints: { volumeMult: number; technique: string | null; label: string };
+
 }
 
 export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
@@ -136,7 +136,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
     pmAutoRegMode, setPmAutoRegMode, pmDiary,
     plWeakPoints, linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
     e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
-    tempoStr, getTempo, methodHints,
+    tempoStr, getTempo,
   } = api;
   // 🏁 Тапер-поля — из контекста (taper-state.tsx).
   const { attemptStrategy, peakMode, taperWeeksToAdd, mockMeetOn, meetWeekOn, postMeetOn, taperNote, taperAttemptOverride } = usePLTaper();
@@ -330,7 +330,6 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   </div>
                 );
               })()}
-              {methodHints.label && <div style={{ marginTop:4, fontSize:11, color:'var(--accent)', background:'var(--accent-dim)', border:'1px solid rgba(0,230,138,0.2)', padding:'3px 8px', borderRadius:8, display:'inline-block' }}>🧩 {methodHints.label}{methodHints.volumeMult !== 1 ? ' · объём×' + methodHints.volumeMult : ''}{methodHints.technique ? ' · ' + methodHints.technique : ''}</div>}
               {plWeakPoints.length > 0 && (
                 <div style={{ marginTop:8, fontSize:11, color:'#c4b5fd', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.25)', padding:'6px 8px', borderRadius:8 }}>
                   <div style={{ fontWeight:700, marginBottom:4 }}>🎯 Слабые точки СРЦ (добавлены ассистенты в план):</div>
