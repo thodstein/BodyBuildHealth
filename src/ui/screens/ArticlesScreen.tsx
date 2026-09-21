@@ -379,7 +379,7 @@ function ArticlesPdfReader({ url, title }: { url: string; title: string }) {
 
   React.useEffect(() => {
     let cancelled = false;
-    let watchdog = 0 as unknown as ReturnType<typeof setTimeout>;
+    let watchdog: any = 0;
     let settled = false;
     const clearWatchdog = () => { try { clearTimeout(watchdog as any); } catch { /* ignore */ } };
     const markSettled = () => { settled = true; clearWatchdog(); };
@@ -418,7 +418,7 @@ function ArticlesPdfReader({ url, title }: { url: string; title: string }) {
 
       // fetch с таймаутом — capacitor://localhost иногда виснет без ответа
       const ac = (() => { try { return new AbortController(); } catch { return null as unknown as AbortController; } })();
-      let fetchTimer = 0 as unknown as ReturnType<typeof setTimeout>;
+      let fetchTimer: any = 0;
       try { fetchTimer = window.setTimeout(() => { try { ac.abort(); } catch { /* ignore */ } }, 15000); } catch { /* ignore */ }
       let buf: ArrayBuffer;
       try {
