@@ -2273,6 +2273,19 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       {ocrResult.warnings.map((warning, index) => <div key={`${index}-${warning}`}>⚠ {warning}</div>)}
                     </div>
                   )}
+                  {ocrResult.labs.length === 0 && ocrResult.text.trim().length > 0 && (
+                    <details style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(21,38,66,0.60)', border: '1px solid rgba(140,190,255,0.14)' }}>
+                      <summary style={{ fontSize: 12, color: '#fff', fontWeight: 700, cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center' }}>
+                        📄 Показать распознанный текст ({ocrResult.text.trim().length} символов)
+                      </summary>
+                      <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11, color: '#fff', maxHeight: 220, overflowY: 'auto', margin: '8px 0 0' }}>
+                        {ocrResult.text.trim().slice(0, 2000)}{ocrResult.text.trim().length > 2000 ? '… (обрезано)' : ''}
+                      </pre>
+                      <div style={{ fontSize: 11, color: '#fff', marginTop: 8, lineHeight: 1.5 }}>
+                        Если здесь мусор или пусто — фото нечитаемо. Если текст есть, но маркеры не нашлись — скопируйте его в поле «Вставьте текст анализов» (кнопка «🔄 Попробовать другой файл» ниже).
+                      </div>
+                    </details>
+                  )}
                   {ocrResult.labs.map(lab => {
                     const isSelected = selectedLabs.has(lab.code);
                     const confidence = typeof lab.confidence === 'number' ? lab.confidence : 0.8;

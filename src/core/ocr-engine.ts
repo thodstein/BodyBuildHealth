@@ -514,6 +514,9 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
   if (!file) {
     return { text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Файл изображения не выбран или недоступен.'] };
   }
+  if (/\.(heic|heif)$/i.test(fileName)) {
+    warnings.push('Формат HEIC/HEIF может не распознаться на этом устройстве — лучше JPG/PNG или скриншот экрана.');
+  }
 
   if (isPDF) {
     source = 'pdf';
@@ -590,8 +593,9 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
     source = 'image';
     try {
       let serverResult: { text: string; meals?: ParsedMeal[] };
-      // АПК: серверные ./api/* недоступны/долгие в нативном WebView —
-      // сначала локальный tesseract из бандла, сервер только запасным.
+      // АПК: серверного OCR здесь нет в принципе — ./api/* резолвятся
+      // в https://localhost/api/* и всегда падают. Поэтому только честный
+      // локальный результат сразу, без 70 секунд ожидания двух таймаутов.
       if (isNativeApp()) {
         try {
           const offlineText = await recognizeImageTextOffline(file);
@@ -600,16 +604,10 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
             serverResult = { text: offlineText };
             rawText = offlineText;
           } else {
-            warnings.push('Оффлайн-распознавание вернуло пустой текст — пробую сервер.');
-            serverResult = await serverOcrImage(file);
-            rawText = serverResult.text;
-            warnings.push('Фото обработано на сервере OCR.');
+            return { text: '', labs: [], meals: [], source, confidence: 0, warnings: [...warnings, 'Оффлайн-распознавание вернуло пустой текст. Попробуйте более чёткое фото при хорошем освещении или вставьте текст вручную.'] };
           }
         } catch (offlineError: any) {
-          warnings.push(`Оффлайн-распознавание не удалось: ${offlineError?.message || String(offlineError)} — пробую сервер.`);
-          serverResult = await serverOcrImage(file);
-          rawText = serverResult.text;
-          warnings.push('Фото обработано на сервере OCR.');
+          return { text: '', labs: [], meals: [], source, confidence: 0, warnings: [...warnings, `Оффлайн-распознавание не удалось: ${offlineError?.message || String(offlineError)}`] };
         }
       } else {
       try {
