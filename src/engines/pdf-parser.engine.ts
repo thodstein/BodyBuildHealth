@@ -1,3 +1,5 @@
+import { isNativeApp as isCapacitorNativeRuntime } from '../core/app-platform';
+
 export interface ParsedLabValue {
   code: string;
   name: string;
@@ -904,14 +906,14 @@ export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<Parsed
     // The legacy bundle keeps the same browser API and is compatible with
     // environments where those DOM globals are not exposed eagerly.
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    if (typeof Worker !== 'undefined') {
+    if (typeof Worker !== 'undefined' && !isCapacitorNativeRuntime()) {
       const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
       pdfjsLib.GlobalWorkerOptions.workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
     }
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
     // Scanned PDFs need page rendering. Telegram WebView often cannot load
     // the PDF.js worker URL, while the main-thread renderer works reliably.
-    const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
+    const pdf = await openPdfDocument(pdfjsLib, arrayBuffer, isCapacitorNativeRuntime());
     let fullText = '';
     let allItems: TextItem[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {

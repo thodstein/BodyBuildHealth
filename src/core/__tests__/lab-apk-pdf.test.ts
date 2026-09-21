@@ -16,6 +16,7 @@ vi.mock('../app-platform', () => ({
 
 import { readFileAsArrayBuffer } from '../ocr-engine';
 import { resolveTesseractOptions } from '../../engines/ocr-assets';
+import { resolvePdfjsWorkerSrc } from '../../engines/ocr-assets';
 
 describe('АПК: импорт PDF без Blob.arrayBuffer()', () => {
   it('использует FileReader fallback и передаёт буфер в PDF-парсер', async () => {
@@ -34,5 +35,11 @@ describe('АПК: импорт PDF без Blob.arrayBuffer()', () => {
     expect(options.source).toBe('local');
     expect(options.workerPath).toMatch(/tesseract/);
     expect(options.langPath).toMatch(/lang/);
+  });
+
+  it('оставляет PDF.js на локальном APK-пути', async () => {
+    const options = await resolvePdfjsWorkerSrc();
+    expect(options.source).toBe('local');
+    expect(options.workerSrc).toMatch(/pdfjs\/pdf\.worker\.min\.mjs$/);
   });
 });

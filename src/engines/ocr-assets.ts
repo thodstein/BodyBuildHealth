@@ -141,6 +141,9 @@ export async function resolveTesseractOptions(): Promise<{
  */
 export async function resolvePdfjsWorkerSrc(): Promise<{ workerSrc: string; source: 'local' | 'cdn' }> {
   const local = getOcrAssetPaths('local');
+  // PDF parsing in the APK uses the main thread because Capacitor WebViews
+  // frequently reject module workers and external CDN URLs.
+  if (isCapacitorNative()) return { workerSrc: local.pdfjsWorkerSrc, source: 'local' };
   const localOk = await localAssetAvailable(local.pdfjsWorkerSrc);
   if (localOk) {
     return { workerSrc: local.pdfjsWorkerSrc, source: 'local' };
