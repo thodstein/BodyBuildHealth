@@ -393,7 +393,7 @@ export const PopupExerciseList: React.FC<{
               {results.map(e => (
                 <button key={e.id} onClick={() => add(e.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>
                   <span>{e.name}</span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>+ добавить</span>
+                  <span style={{ fontSize: 10, color: '#fff' }}>+ добавить</span>
                 </button>
               ))}
               {results.length === 0 && q.trim() && <div style={{ fontSize: 10, color: '#fff', textAlign: 'center' }}>Ничего не найдено</div>}
@@ -465,7 +465,7 @@ export const PopupMultiSelect: React.FC<{
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>{o.label}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {o.count != null && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>{o.count}</span>}
+                          {o.count != null && <span style={{ fontSize: 9, color: '#fff' }}>{o.count}</span>}
                           {isSel && <span style={{ width: 16, height: 16, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: ACCENT, color: '#000', fontSize: 9, fontWeight: 800 }}>✓</span>}
                         </span>
                       </div>

@@ -640,7 +640,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
             <button onClick={() => addSlot('strength')} style={btnMini}>💪 Сила</button>
             <button onClick={() => addSlot('speed')} style={btnMini}>⚡ Скорость</button>
             <button onClick={() => addSlot('peak')} style={btnMini}>🎯 Пик</button>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', alignSelf: 'center' }}>(дубль — напр. сила→скорость→сила)</span>
+            <span style={{ fontSize: 9, color: '#fff', alignSelf: 'center' }}>(дубль — напр. сила→скорость→сила)</span>
           </div>
           <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
             <button onClick={() => { setPickMode('auto'); saveSeasonStateValue(seasonMode, undefined, 'auto'); }} style={segBtn(pickMode === 'auto')}>🤖 Авто-подбор циклов</button>

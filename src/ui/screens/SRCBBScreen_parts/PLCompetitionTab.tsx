@@ -21,14 +21,16 @@ import { saveCompetitionPlan } from '../TrainingScreen_parts/CompetitionPlansVie
 import type { PeakWeekLayout, TaperMode, TaperWeightGoal } from '../../../engines/lms/lms-taper.engine';
 import type { TaperCoachCtx, TaperConfigRecommendation } from '../../../engines/lms/lms-taper-coach.engine';
 import { buildPLTaperPrintHtml, buildPLPeakWeekCutProtocol } from '../../../engines/lms/lms-taper-coach.engine';
+import { BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST } from '../TrainingScreen_parts/training-ui';
 import { PopupNumber, PopupSelect, ExpandableCard } from './TrainingPopups';
 import { AutoRegModeSwitch } from './AutoRegModeSwitch';
 import { TaperCoachCard } from './TaperCoachCard';
 import { usePLTaper } from './taper-state';
 import { getPeakCycles } from '../../../engines/lms/pl-peak-cycle-taper.engine';
 
-const BTN: React.CSSProperties = { background: '#00e68a', color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
-const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: '#00e68a', border: '1px solid var(--accent-dim)' };
+// Фаза 3: кнопки — из единого кита training-ui.
+const BTN = TRAIN_BTN;
+const BTN_GHOST = TRAIN_BTN_GHOST;
 
 export interface PLMeetListItem {
   id: string;

@@ -234,7 +234,7 @@ export const ProMetricsPanel: React.FC = () => {
             <option value="__auto">Авто: {autoCat.label} (по {bw} кг)</option>
             {normTable.categories.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
           </select>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 3, lineHeight: 1.3 }}>Авто — по вашему весу ({bw} кг → {autoCat.label}). Выберите любую для просмотра «что если» без смены веса. Подробный просмотр всех категорий — в «Анализ силы → Единый».</div>
+          <div style={{ fontSize: 9, color: '#fff', marginTop: 3, lineHeight: 1.3 }}>Авто — по вашему весу ({bw} кг → {autoCat.label}). Выберите любую для просмотра «что если» без смены веса. Подробный просмотр всех категорий — в «Анализ силы → Единый».</div>
           {manualCat && manualCat !== autoCat.label && (
             <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#f59e0b' }}>Просмотр «{manualCat}» ≠ авто «{autoCat.label}». На помосте зачёт по фактической категории взвешивания.</div>
           )}

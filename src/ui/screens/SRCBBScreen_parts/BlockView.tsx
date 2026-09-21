@@ -2,7 +2,7 @@ import React from 'react';
 import type { LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 
 export const BlockView: React.FC<{ plan: LMSBuildOutput | null }> = ({ plan }) => {
-  if (!plan || !plan.weeks.length) return <div className="pl-blockview" style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', padding: 8 }}>Нет плана — соберите цикл или сезон</div>;
+  if (!plan || !plan.weeks.length) return <div className="pl-blockview" style={{ fontSize: 11, color: '#fff', padding: 8 }}>Нет плана — соберите цикл или сезон</div>;
   const weeks = plan.weeks;
   const maxDays = Math.max(...weeks.map(w => w.days.length));
   // e1RM тренд по неделям (средний по всем lifts, для velocity cap)
@@ -32,15 +32,15 @@ export const BlockView: React.FC<{ plan: LMSBuildOutput | null }> = ({ plan }) =
                       <b>{e.name}</b> {e.workSets.map(ws => `${ws.sets}×${ws.reps}@${Math.round(ws.pct*100)}%`).join(' ')} RIR{e.rir}
                     </div>
                   ))}
-                  {d.exercises.length > 3 && <div style={{ color: 'rgba(255,255,255,0.5)' }}>+{d.exercises.length - 3} упр</div>}
+                  {d.exercises.length > 3 && <div style={{ color: '#fff' }}>+{d.exercises.length - 3} упр</div>}
                 </div>
               );
             })}
           </React.Fragment>
         ))}
       </div>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>PowerSheets-стиль: недели side-by-side, RPE/RIR/%/вес в одной строке. e1RM тренд: {e1rmTrend.join(' → ')} кг. Прокрутите горизонтально.</div>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>First-rep velocity cap: падение &gt;8% от нед 1 → volume -20% (VBT). MVT squat 0.25 м/с.</div>
+      <div style={{ fontSize: 9, color: '#fff', marginTop: 6 }}>PowerSheets-стиль: недели side-by-side, RPE/RIR/%/вес в одной строке. e1RM тренд: {e1rmTrend.join(' → ')} кг. Прокрутите горизонтально.</div>
+      <div style={{ fontSize: 9, color: '#fff', marginTop: 4 }}>First-rep velocity cap: падение &gt;8% от нед 1 → volume -20% (VBT). MVT squat 0.25 м/с.</div>
     </div>
   );
 };

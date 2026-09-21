@@ -28,9 +28,13 @@ import { MobilitySessionPanel, MobilityPostPanel } from './MobilitySessionPanel'
 import { PlateCalcTab } from '../TrainingScreen_parts/PlateCalcTab';
 import { techniqueLabel, techniqueChainParts } from '../TrainingScreen_parts/bb-technique-display';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+import {
+  CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
+} from '../TrainingScreen_parts/training-ui';
 
-  const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
-  const ACCENT = '#00e68a';
+// Фаза 3: карточки/кнопки/поля — из единого кита training-ui.
+const CARD = TRAIN_CARD;
+const ACCENT = '#00e68a';
   
   // CSS анимация для таймера
   const timerAnimationStyle = `
@@ -73,8 +77,8 @@ function formatPlates(targetW: number, exerciseName?: string): string {
   }
   return `гриф ${r.barWeight} кг`;
 }
-const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 14, minHeight: 44 };
-const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT}` };
+const BTN = TRAIN_BTN;
+const BTN_GHOST = TRAIN_BTN_GHOST;
 
 /** ⏭ Пропустить разминку/заминку с указанием причины (пишется в дневник). */
 const SkipBar: React.FC<{ reasons: string[]; onSkip: (reason: string) => void; label: string }> = ({ reasons, onSkip, label }) => {
@@ -99,10 +103,10 @@ const SkipBar: React.FC<{ reasons: string[]; onSkip: (reason: string) => void; l
     </div>
   );
 };
-const IN: React.CSSProperties = { background: 'var(--input-bg)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
+const IN = TRAIN_IN;
 const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '4px 0 2px' };
 const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
-const SMALL: React.CSSProperties = { color: '#fff', fontSize: 12, lineHeight: 1.4 };
+const SMALL = TRAIN_SMALL;
 const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' };
 
 export interface PlayerSet { weight: number; reps: number; rir: number; technique?: string }
@@ -844,7 +848,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontSize: 13, fontWeight: 800 }}>#{weekNumber}</span>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', lineHeight: 1 }}>Неделя {weekNumber} · {days.length} тренировки {focus ? `· ${focus}` : ''}</div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.60)', lineHeight: 1.2 }}>{totalWeeklySets} сетов · {totalWeeklyVol.toLocaleString()} кг недельный объём · {days[dayIdx]?.label || ''}</div>
+                  <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.2 }}>{totalWeeklySets} сетов · {totalWeeklyVol.toLocaleString()} кг недельный объём · {days[dayIdx]?.label || ''}</div>
                 </div>
               </div>
               <span style={{ fontSize: 9, fontWeight: 700, padding: '4px 8px', borderRadius: 20, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.22)', whiteSpace: 'nowrap' }}>{phase === 'ready' || phase === 'done' ? 'выбор дня' : phase === 'warmup' ? 'разминка' : phase === 'main' ? 'тренировка' : 'заминка'}</span>
@@ -901,7 +905,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
               <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.label}</div>
               <div style={{ display: 'flex', gap: 5, marginTop: 7, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: active ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)', color: active ? '#00e68a' : '#fff', border: `1px solid ${active ? 'rgba(0,230,138,0.22)' : 'rgba(255,255,255,0.08)'}` }}>{exCnt} упр.</span>
-                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.06)' }}>{totalSets} сетов</span>
+                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.06)' }}>{totalSets} сетов</span>
               </div>
               {active && <span style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 18, background: '#00e68a', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, boxShadow: '0 2px 8px rgba(0,230,138,0.35)' }}>✓</span>}
             </button>
@@ -1095,7 +1099,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                       }}>{isDone ? '✓' : '🔥'}</span>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1 }}>Разминка · {day.label}</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.72)', marginTop: 1, lineHeight: 1.2 }}>
+                        <div style={{ fontSize: 10, color: '#fff', marginTop: 1, lineHeight: 1.2 }}>
                           {warmupBlocks.length} блока · {total} пунктов · {mins} мин · группы дня учтены
                         </div>
                       </div>
@@ -1107,7 +1111,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                       <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: isDone ? '#22c55e' : 'linear-gradient(135deg,#f97316,#ea580c)', color: isDone ? '#000' : '#fff' }}>
                         {pct}%
                       </span>
-                      <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.78)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>
                         ⏱ ~{mins} мин
                       </span>
                       {warmupBlocks.some(b => b.notes?.includes('грудь') || b.notes?.includes('спина') || b.notes?.includes('ягодиц')) && (
@@ -1179,7 +1183,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     );
                   })}
                 </div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 6, lineHeight: 1.3 }}>
+                <div style={{ fontSize: 9, color: '#fff', marginTop: 6, lineHeight: 1.3 }}>
                   Отмечайте пункты по ходу · разминка пишется в дневник при переходе к основной части · {isDone ? 'отлично — все пункты отмечены!' : 'минимум: 50% для хорошей готовности'}
                 </div>
               </div>
@@ -1218,7 +1222,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     }}>{allDone ? '✓' : meta.icon}</span>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 800, color: allDone ? '#22c55e' : meta.color, lineHeight: 1 }}>{meta.title}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.58)', lineHeight: 1.2 }}>{meta.desc} · {b.durationSec}с</div>
+                      <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.2 }}>{meta.desc} · {b.durationSec}с</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -1232,7 +1236,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 </div>
                 {b.notes && (
                   <div style={{
-                    fontSize: 9, color: 'rgba(255,255,255,0.72)', lineHeight: 1.35, marginBottom: 7, padding: '5px 8px', borderRadius: 8,
+                    fontSize: 9, color: '#fff', lineHeight: 1.35, marginBottom: 7, padding: '5px 8px', borderRadius: 8,
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
                   }}>
                     <span style={{ color: meta.color, fontWeight: 700 }}>ℹ </span>{b.notes}
@@ -1296,7 +1300,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                             if (isActive) {
                               return <span style={{ minWidth: 48, alignSelf: 'center', padding: '6px 8px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(6,182,214,0.16), rgba(14,165,233,0.10))', color: '#22d3ee', border: '1px solid rgba(6,182,214,0.28)', fontSize: 11, fontWeight: 800, textAlign: 'center', flexShrink: 0, boxShadow: '0 2px 10px rgba(6,182,214,0.18)' }}>{warmupTimer!.remaining}с</span>;
                             }
-                            return <button type="button" onClick={(e) => { e.stopPropagation(); hapticImpact('light'); setWarmupTimer({ i, j, remaining: 30, total: 30 }); }} style={{ alignSelf: 'center', padding: '7px 9px', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.78)', flexShrink: 0, backdropFilter: 'blur(8px)' }} aria-label={`Таймер 30с для ${label}`}>⏱ 30с</button>;
+                            return <button type="button" onClick={(e) => { e.stopPropagation(); hapticImpact('light'); setWarmupTimer({ i, j, remaining: 30, total: 30 }); }} style={{ alignSelf: 'center', padding: '7px 9px', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)', color: '#fff', flexShrink: 0, backdropFilter: 'blur(8px)' }} aria-label={`Таймер 30с для ${label}`}>⏱ 30с</button>;
                           })()}
                         </div>
                       </li>
@@ -1337,7 +1341,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             </button>
           </div>
           <SkipBar reasons={WARMUP_SKIP_REASONS} label="разминку" onSkip={reason => { skipWarmupReasonRef.current = reason; startMain(); }} />
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.38)', textAlign: 'center', lineHeight: 1.3, marginTop: 2 }}>
+          <div style={{ fontSize: 9, color: '#fff', textAlign: 'center', lineHeight: 1.3, marginTop: 2 }}>
             Активация подбирается под группы дня — каждая рабочая мышца получает мобильность и «включение» · без ленты — bodyweight-замены уже включены · подводящие — с весом в подсказке (~кг)
           </div>
         </div>
@@ -1422,7 +1426,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             })()}
             {/* режимы суперсета и круга — современные карточки-кнопки */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, textTransform: 'uppercase' }}>Режим</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' }}>Режим</span>
               <button type="button" aria-pressed={supersetMode} onClick={() => { hapticImpact('light'); toggleSupersetMode(); }} style={{
                 display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 20, cursor: 'pointer', fontSize: 11, fontWeight: 700,
                 border: supersetMode ? '1px solid rgba(245,158,11,0.32)' : '1px solid rgba(255,255,255,0.09)',
@@ -1472,10 +1476,10 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
            <div style={{ ...SMALL, marginBottom: 6 }}>План: {planned.sets} сетов / {planned.volume} кг·пов · Факт: {factVol.sets} сетов / {factVol.volume} кг·пов</div>
           {/* P12: sRPE для мониторинга нагрузки (сохранится при завершении) */}
            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, textTransform: 'uppercase' }}>sRPE</span>
+            <span style={{ fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' }}>sRPE</span>
             {[6,7,8,9,10].map(r => <button key={r} type="button" aria-pressed={sessionRPE===r} onClick={() => { hapticImpact('light'); setSessionRPE(r); }} style={{ minWidth: 30, padding: '5px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: sessionRPE===r?'1px solid rgba(0,230,138,0.32)':'1px solid rgba(255,255,255,0.09)', background: sessionRPE===r?'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))':'rgba(255,255,255,0.04)', color: sessionRPE===r?'#00e68a':'#fff', boxShadow: sessionRPE===r?'0 2px 10px rgba(0,230,138,0.16)':'none', transition: 'all 0.2s' }}>{r}</button>)}
-            <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginLeft: 2 }}>·</span>
-            <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>мин</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginLeft: 2 }}>·</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>мин</span>
             <input style={{ ...IN, width: 58, padding: '4px 6px', borderRadius: 8, fontSize: 11, textAlign: 'center' }} type="number" value={sessionDur} onChange={e => setSessionDur(+e.target.value)} aria-label="длительность мин" />
           </div>
           {/* 🧮 Калькулятор блинов: подкладка с выбором упражнения текущей сессии */}
@@ -1516,7 +1520,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                         color: supersetExercises.includes(ei) ? '#fff' : 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: 800,
                       }}>{supersetExercises.includes(ei) ? '✓' : (ei + 1)}</span>
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1.2, display: 'block' }}>{ex.name} <span style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 400, fontSize: 11 }}>({ex.muscleGroup})</span></span>
+                        <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1.2, display: 'block' }}>{ex.name} <span style={{ color: '#fff', fontWeight: 400, fontSize: 11 }}>({ex.muscleGroup})</span></span>
                         <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
                           {(() => { const t = ex.targetSets[ex.targetSets.length - 1]?.technique; const lbl = techniqueLabel(t); return lbl ? (<span style={{ fontSize: 9, color: '#f87171', fontWeight: 700 }}>💥 {lbl}</span>) : null; })()}
                           <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 20, background: supersetExercises.includes(ei) ? (supersetMode ? 'rgba(245,158,11,0.16)' : 'rgba(139,92,246,0.16)') : 'rgba(255,255,255,0.06)', color: supersetExercises.includes(ei) ? (supersetMode ? '#f59e0b' : '#a78bfa') : 'rgba(255,255,255,0.5)', border: `1px solid ${supersetExercises.includes(ei) ? (supersetMode ? 'rgba(245,158,11,0.22)' : 'rgba(139,92,246,0.22)') : 'rgba(255,255,255,0.06)'}` }}>{supersetExercises.includes(ei) ? (supersetMode ? '🔄 в суперсете' : '⭕ в круге') : (supersetMode ? 'нажать чтобы добавить в суперсет' : 'нажать чтобы добавить в круг')}</span>
@@ -1710,7 +1714,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                           </div>
 )}
                             {/* MMC-трекинг */}
-                           <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', cursor: 'pointer', userSelect:'none', borderBottom:'1px dashed rgba(255,255,255,0.15)' }} onClick={() => setMMCOpen(mmco === k ? '' : k)}>
+                           <span style={{ fontSize: 8, color: '#fff', cursor: 'pointer', userSelect:'none', borderBottom:'1px dashed rgba(255,255,255,0.15)' }} onClick={() => setMMCOpen(mmco === k ? '' : k)}>
                              {mmco === k ? '🔼 скрыть MMC' : '🔽 MMC/Пампинг/Суставы'}
                            </span>
                            {mmco === k && <div style={{ width: '100%', display: 'flex', gap: 8, padding: '4px 0' }}>
@@ -1742,7 +1746,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 </div>;
               })()}
               <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap', alignItems: 'center', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <span style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.50)', letterSpacing: 0.3, textTransform: 'uppercase' }}>VBT</span>
+                <span style={{ fontSize: 8, fontWeight: 800, color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' }}>VBT</span>
                 {(['strength','hypertrophy','power_heavy','speed'] as VBTIntent[]).map(it => {
                   const active = vbtIntent===it;
                   const label = it === 'strength' ? '💪 Сила' : it === 'hypertrophy' ? '🏋️ Гипер' : it === 'power_heavy' ? '⚡ Мощь' : '🚀 Скорость';
@@ -1776,7 +1780,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 
                  {/* пресеты таймера отдыха — современные пилюли */}
                 <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap', alignItems: 'center', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.50)', letterSpacing: 0.3, textTransform: 'uppercase' }}>Таймер</span>
+                  <span style={{ fontSize: 8, fontWeight: 800, color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' }}>Таймер</span>
                   {(['compound','isolation','pump'] as const).map(p => {
                     const active = timerPreset===p;
                     return (
@@ -1910,12 +1914,12 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     }}>{cAllDone ? '✓' : cMeta.icon}</span>
                     <div>
                       <div style={{ fontSize: 11, fontWeight: 800, color: cAllDone ? '#22c55e' : cMeta.color, lineHeight: 1 }}>{cMeta.title}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.58)', lineHeight: 1.2 }}>⏱ {b.durationSec}с · {cDone}/{cTotal}</div>
+                      <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.2 }}>⏱ {b.durationSec}с · {cDone}/{cTotal}</div>
                     </div>
                   </div>
                   <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: cAllDone ? '#22c55e' : cMeta.bg, color: cAllDone ? '#000' : cMeta.color, border: `1px solid ${cAllDone ? 'rgba(34,197,94,0.28)' : cMeta.border}` }}>{cPct}%</span>
                 </div>
-                {b.notes && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.72)', lineHeight: 1.35, marginBottom: 7, padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}><span style={{ color: cMeta.color, fontWeight: 700 }}>ℹ </span>{b.notes}</div>}
+                {b.notes && <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.35, marginBottom: 7, padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}><span style={{ color: cMeta.color, fontWeight: 700 }}>ℹ </span>{b.notes}</div>}
                 <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 7 }}>
                   <div style={{ height: '100%', width: `${cPct}%`, borderRadius: 2, background: cAllDone ? '#22c55e' : cMeta.color, transition: 'width 0.3s ease' }} />
                 </div>

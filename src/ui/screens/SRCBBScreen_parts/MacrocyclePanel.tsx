@@ -2960,7 +2960,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 {(() => {
                   const d = diaryMacroStats();
                   if (!d.acwr && d.sessions7 === 0) {
-                    return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>🗺 Фазы по неделям (ACWR появится, когда в дневнике будут sRPE-сессии).</div>;
+                    return <div style={{ fontSize: 9, color: '#fff', marginTop: 4 }}>🗺 Фазы по неделям (ACWR появится, когда в дневнике будут sRPE-сессии).</div>;
                   }
                   const zoneColor = d.acwr?.zone === 'dangerous' ? '#ef4444' : d.acwr?.zone === 'caution' ? '#f59e0b' : d.acwr?.zone === 'undertrained' ? '#fff' : '#00e68a';
                   return (

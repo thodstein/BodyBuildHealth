@@ -25,6 +25,9 @@ import {
   MesocycleProgressionCard, SOURCE_PHASE_LABEL, SOURCE_PHASE_ORIGIN_LABEL,
   sourceWeekColor, summarizeSourceCycleWeeks,
 } from '../TrainingScreen_parts/MesocycleProgressionCard';
+import {
+  ACCENT as TRAIN_ACCENT, CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
+} from '../TrainingScreen_parts/training-ui';
 import { MetricCard, PopupNumber, PopupSelect, ExpandableCard, SaveButton } from './TrainingPopups';
 import { AutoRegModeSwitch } from './AutoRegModeSwitch';
 import { SessionPlayer, type PlayerDay } from './SessionPlayer';
@@ -37,13 +40,14 @@ import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
 import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareLink, plShareDigest, plTelegramAppUrl, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
 import type { RepTempoOutput } from '../../../engines/rep-tempo-engine';
 
-const ACCENT = '#00e68a';
-const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
-const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.4 };
-const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
-const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: '1px solid var(--accent-dim)' };
+// Фаза 3: карточки/кнопки/поля — из единого кита training-ui (без локальных копий токенов).
+const ACCENT = TRAIN_ACCENT;
+const CARD = TRAIN_CARD;
+const SMALL = TRAIN_SMALL;
+const BTN = TRAIN_BTN;
+const BTN_GHOST = TRAIN_BTN_GHOST;
 const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '8px', minHeight: 38 };
-const IN: React.CSSProperties = { ...SEL, padding: '10px' };
+const IN = TRAIN_IN;
 const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '6px 0 3px' };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
 const CAT_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];

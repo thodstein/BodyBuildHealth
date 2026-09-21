@@ -11,8 +11,10 @@ import {
   type TaperCoachCtx, type TaperConfigRecommendation,
 } from '../../../engines/lms/lms-taper-coach.engine';
 import { MEET_STRATEGY_PCT_LABEL, type MeetStrategy } from '../../../engines/lms/competition-attempts';
+import { BTN_GHOST as TRAIN_BTN_GHOST } from '../TrainingScreen_parts/training-ui';
 
-const BTN_GHOST: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', minHeight: 36 };
+// Фаза 3: кнопка — из единого кита training-ui.
+const BTN_GHOST = TRAIN_BTN_GHOST;
 
 export interface TaperCoachCardProps {
   /** Текущий план ПЛ (с тапером или без). */

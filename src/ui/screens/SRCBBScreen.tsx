@@ -19,6 +19,9 @@ import { calcBBPlanMetrics } from '../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
+import {
+  CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
+} from './TrainingScreen_parts/training-ui';
 import { DayCard, type PlanDayView, type PlanExerciseView, type PhaseKey } from './TrainingScreen_parts/PlanOutput';
 import { PedInputPanel, PedAdaptationCard } from './TrainingScreen_parts/PedCoursePanel';
 
@@ -82,15 +85,16 @@ const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepT
 
 type Mode = 'pl' | 'bb' | 'manual';
 
-const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
-const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.4 };
+// Фаза 3: карточки/кнопки — из единого кита training-ui (без локальных копий токенов).
+const CARD = TRAIN_CARD;
+const SMALL = TRAIN_SMALL;
 const cardBg = CARD;
 const ACCENT = 'var(--accent)';
-const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
-const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: '1px solid var(--accent-dim)' };
+const BTN = TRAIN_BTN;
+const BTN_GHOST = TRAIN_BTN_GHOST;
 const PILL = (active: boolean) => ({ padding:'8px 14px', borderRadius:20, fontSize:11, fontWeight: active ? 800 : 500, cursor:'pointer', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? 'linear-gradient(135deg,var(--accent) 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)', color: active ? '#000' : '#fff', flexShrink:0, boxShadow: active ? '0 2px 10px rgba(0,230,138,0.25), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none', backdropFilter: 'blur(8px)', transition: 'all 0.2s ease', transform: active ? 'translateY(-1px)' : 'none' } as React.CSSProperties);
 const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%', outline: 'none', boxSizing: 'border-box' };
-const IN: React.CSSProperties = { ...SEL, padding: '10px' };
+const IN = TRAIN_IN;
 const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '6px 0 3px' };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
 
@@ -1794,7 +1798,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                     );
                   })}
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>Цвет = относительный тонаж недели (зелёный → красный). Наведите на ячейку для сетов/кг. Светло-зелёные — разгрузки/тапер.</div>
+                <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>Цвет = относительный тонаж недели (зелёный → красный). Наведите на ячейку для сетов/кг. Светло-зелёные — разгрузки/тапер.</div>
               </div>
             );
           })()}
@@ -1843,7 +1847,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                 </div>
                 {selectedTrendEx && (() => {
                   if (exTrendSeries.length < 2) {
-                    return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нужно ≥2 тренировок с «{selectedTrendEx}» для графика (найдено {exTrendSeries.length})</div>;
+                    return <div style={{ fontSize: 10, color: '#fff' }}>нужно ≥2 тренировок с «{selectedTrendEx}» для графика (найдено {exTrendSeries.length})</div>;
                   }
                   const vals = exTrendSeries.map(p => p.e1);
                   const W = 100, H = 40;
@@ -1937,7 +1941,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
             <button onClick={() => setMacroPostMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, flex: 1, minWidth: 180, border: macroPostMeet ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: macroPostMeet ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: macroPostMeet ? '#34d399' : '#fff' }}>🔄 Пост-старт восстановление{macroPostMeet ? ' ✓' : ''}</button>
-            <span style={{ alignSelf: 'center', fontSize: 10, color: 'rgba(255,255,255,0.45)', flex: 2, minWidth: 200 }}>Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и пост-разгрузка — для КАЖДОГО старта.</span>
+            <span style={{ alignSelf: 'center', fontSize: 10, color: '#fff', flex: 2, minWidth: 200 }}>Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и пост-разгрузка — для КАЖДОГО старта.</span>
           </div>
         </div>
       )}
