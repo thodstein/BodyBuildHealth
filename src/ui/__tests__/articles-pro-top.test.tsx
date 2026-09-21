@@ -608,4 +608,27 @@ describe('ArticlesScreen PRO TOP', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('48. native: битый PDF показывает ошибку внутри (без краша)', async () => {
+    (window as unknown as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true };
+    resetAppPlatformCache();
+    // 404 от fetch → ридер уходит в error-состояние с текстом внутри приложения.
+    // findBy* ждёт асинхронное обновление в act — без act-варнингов.
+    vi.stubGlobal('fetch', () => Promise.resolve({ ok: false, status: 404 } as Response));
+    try {
+      const { container } = render(<ArticlesScreen />);
+      goToList(container);
+      const grid = container.querySelector('.articles-grid') as HTMLElement;
+      const pdfCard = Array.from(grid.children).find(
+        (c) => (c as HTMLElement).textContent?.includes('PDF'),
+      ) as HTMLElement | undefined;
+      expect(pdfCard).not.toBeUndefined();
+      fireEvent.click(pdfCard!);
+      const err = await screen.findByText('Не удалось открыть PDF внутри приложения');
+      expect(err).not.toBeNull();
+      expect(container.querySelector('.articles-pdf-native')?.getAttribute('data-status')).toBe('error');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
