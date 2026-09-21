@@ -113,9 +113,17 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
       setOcrFileLoading(false);
       setOcrError(prev => (prev as any) || (nativeOcr ? 'Зависло на телефоне. Попробуйте фото при хорошем свете или вставьте текст вручную через «Текст».' : 'Зависло на телефоне. Попробуйте кнопку «Фото/файл» → выберите скриншот из галереи (не «Камера»).'));
     }, hardMs) as any;
+    let lastPct = -1;
+    const onOcrProgress = (fraction: number) => {
+      const pct = Math.round(fraction * 100);
+      if (pct >= lastPct + 10 || pct >= 100) {
+        lastPct = pct;
+        setOcrHint(`⏳ Распознаём скриншот… ${pct}% (текст+цифры КБЖУ)`);
+      }
+    };
     try {
       const result: any = await Promise.race([
-        processUploadedFile(file),
+        processUploadedFile(file, { onProgress: onOcrProgress }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error(nativeOcr ? 'Оффлайн-распознавание не ответило за 120 секунд.' : 'Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), raceMs)),
         backupPromise,
       ]);

@@ -81,7 +81,13 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       const { pickPhoto } = await import('../../../../core/native-bridge');
       const photo = await pickPhoto();
       if (!photo) return;
-      const blob = await (await fetch(photo.uri)).blob();
+      // data: URL напрямую в Blob: fetch(data:) в части WebView режется CSP.
+      let blob: Blob | null = null;
+      try {
+        const { dataUrlToBlob } = await import('../../../../engines/ocr-preprocess');
+        blob = dataUrlToBlob(photo.uri);
+      } catch { /* fallback ниже */ }
+      if (!blob) blob = await (await fetch(photo.uri)).blob();
       const file = new File([blob], `food.${photo.format || 'jpg'}`, { type: blob.type || 'image/jpeg' });
       onOcrFile(file);
     } catch {

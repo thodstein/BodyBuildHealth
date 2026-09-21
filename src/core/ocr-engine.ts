@@ -71,15 +71,12 @@ async function prepareImageForServer(file: File): Promise<Blob> {
   );
 
   try {
-    // Decode with a resize hint first. Mobile WebViews may otherwise decode a
-    // 12-48 MP camera photo at full size and get killed before the OCR request
-    // is sent. The pixel cap below protects browsers that ignore the hint.
+    // Декодируем БЕЗ resize-хинтов: createImageBitmap с парой
+    // resizeWidth+resizeHeight сплющивает высокий скриншот (1080×2400)
+    // в квадрат 1280×1280 — текст сжимается по вертикали вдвое и OCR
+    // не видит вообще ничего. Точный размер + canvas-кап ниже.
     const bitmap = typeof createImageBitmap === 'function'
-      ? await withTimeout(createImageBitmap(file, {
-        resizeWidth: maxSide,
-        resizeHeight: maxSide,
-        resizeQuality: 'high',
-      }), 15_000, 'image decode timeout')
+      ? await withTimeout(createImageBitmap(file), 15_000, 'image decode timeout')
       : null;
     if (!bitmap) throw new Error('createImageBitmap unavailable');
     const scale = Math.min(
@@ -447,42 +444,109 @@ async function serverOcrImage(file: File): Promise<{ text: string; meals?: Parse
 }
 
 /**
- * Оффлайн-распознавание фото еды (АПК и нет сети): локальный tesseract.js
- * rus+eng, ассеты из бандла (/tesseract, sync-ocr-assets) — серверные ./api/*
- * в WebView-АПК недоступны. Возвращает сырой текст для parseNutritionText.
+ * Оффлайн-распознавание фото/скриншота еды (АПК и нет сети): локальный
+ * tesseract.js rus+eng, ассеты из бандла (/tesseract, sync-ocr-assets) —
+ * серверные ./api/* в WebView-АПК недоступны. Возвращает сырой текст
+ * для parseNutritionText.
+ *
+ * Скриншоты идут через предобработку (ocr-preprocess): grayscale,
+ * инверсия тёмной темы, контраст — варианты ранжируются по «текстовости»,
+ * берётся лучший. Первый удачный вариант закрывает задачу досрочно
+ * (ранний выход вместо двух всегда полных проходов), разреженный PSM-11
+ * добирает строки FatSecret только когда PSM-6 дал мало.
  */
-export async function recognizeImageTextOffline(file: File, timeoutMs = 90_000): Promise<string> {
-  const { resolveTesseractOptions } = await import('../engines/ocr-assets');
-  const opts = await resolveTesseractOptions();
-  const Tesseract = await import('tesseract.js') as any;
+export async function recognizeImageTextOffline(
+  file: File,
+  timeoutMs = 90_000,
+  onProgress?: (fraction: number) => void,
+): Promise<string> {
+  const report = (fraction: number) => {
+    try {
+      onProgress?.(Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0)));
+    } catch { /* ignore */ }
+  };
+  let opts: { workerPath: string; corePath: string; langPath: string };
+  try {
+    const { resolveTesseractOptions } = await import('../engines/ocr-assets');
+    opts = await resolveTesseractOptions();
+  } catch (e) {
+    throw new Error(`движок OCR не настроился: ${(e as Error)?.message || String(e)}`);
+  }
+  let Tesseract: any;
+  try {
+    Tesseract = await import('tesseract.js') as any;
+  } catch {
+    throw new Error('движок OCR не загрузился (tesseract.js). Пересоберите АПК: npm run build:native.');
+  }
   let upload: Blob = file;
   try { upload = await prepareImageForServer(file); } catch { /* исходник как есть */ }
-  const worker = await Tesseract.createWorker('rus+eng', 1, {
-    workerPath: opts.workerPath,
-    corePath: opts.corePath,
-    langPath: opts.langPath,
-  });
+  // Варианты кадра: предобработка (тёмная тема и т.д.) или сырой вход,
+  // если canvas недоступен (jsdom/старый WebView).
+  let inputs: Array<{ kind: string; blob: Blob }> = [{ kind: 'raw', blob: upload }];
   try {
-    const recognizePass = async (pageSegMode: '6' | '11'): Promise<string> => {
+    const { preprocessVariantsForOcr } = await import('../engines/ocr-preprocess');
+    const variants = await preprocessVariantsForOcr(upload);
+    if (variants.length > 0) inputs = variants.map((v) => ({ kind: v.kind, blob: v.blob }));
+  } catch { /* сырой вход */ }
+  const progressWindow = { base: 0, span: 1 };
+  let worker: any;
+  try {
+    worker = await Tesseract.createWorker('rus+eng', 1, {
+      workerPath: opts.workerPath,
+      corePath: opts.corePath,
+      langPath: opts.langPath,
+      logger: (m: any) => {
+        if (m?.status === 'recognizing text' && typeof m?.progress === 'number') {
+          report(progressWindow.base + progressWindow.span * m.progress);
+        }
+      },
+    });
+  } catch (e) {
+    throw new Error(`движок OCR не запустился (worker/core/lang): ${(e as Error)?.message || String(e)}`);
+  }
+  try {
+    const { scoreOcrText, isGoodOcrText, isCompleteOcrText, pickBestOcrText } = await import('../engines/ocr-preprocess');
+    const setPsm = async (mode: '6' | '11') => {
       if (typeof worker.setParameters === 'function') {
         await worker.setParameters({
-          tessedit_pageseg_mode: pageSegMode,
+          tessedit_pageseg_mode: mode,
           preserve_interword_spaces: '1',
           user_defined_dpi: '220',
         });
       }
-      const result = await worker.recognize(upload);
-      return String(result?.data?.text || '');
     };
-    const run: Promise<string> = recognizePass('6').then(async blockText => {
+    // PSM-6 ставим ДО первого прохода (иначе первый recognize уйдёт с дефолтным).
+    await setPsm('6');
+    const run: Promise<string> = (async () => {
+      const blockTexts: string[] = [];
+      const perPass = 0.85 / Math.max(1, inputs.length);
+      for (let i = 0; i < inputs.length; i++) {
+        progressWindow.base = i * perPass;
+        progressWindow.span = perPass;
+        const text = String((await worker.recognize(inputs[i].blob))?.data?.text || '');
+        blockTexts.push(text);
+        report((i + 1) * perPass);
+        // Ранний выход: полный текст (цифры + макросы) с первого варианта —
+        // второй проход на телефоне экономит десятки секунд. Без макросов
+        // разреженный проход обязателен: FatSecret роняет колонки Б/Ж/У.
+        if (isCompleteOcrText(text)) break;
+      }
+      const best = pickBestOcrText(blockTexts);
+      if (isCompleteOcrText(best)) return best;
       // FatSecret Android uses right-aligned macro columns. A sparse-text pass
       // recovers rows that PSM 6 commonly drops, especially on narrow screens.
-      const sparseText = await recognizePass('11');
-      const lines = [...blockText.split(/\r?\n/), ...sparseText.split(/\r?\n/)]
-        .map(line => line.trim())
+      // Только когда блочный проход дал мало — иначе это лишний полный проход.
+      await setPsm('11');
+      progressWindow.base = 0.85;
+      progressWindow.span = 0.15;
+      const sparseText = String((await worker.recognize(inputs[0].blob))?.data?.text || '');
+      report(1);
+      const lines = [...best.split(/\r?\n/), ...sparseText.split(/\r?\n/)]
+        .map((line) => line.trim())
         .filter(Boolean);
-      return [...new Set(lines)].join('\n');
-    });
+      const merged = [...new Set(lines)].join('\n');
+      return scoreOcrText(merged) >= scoreOcrText(best) ? merged : best;
+    })();
     return await Promise.race([
       run,
       new Promise<string>((_, reject) =>
@@ -496,8 +560,12 @@ export async function recognizeImageTextOffline(file: File, timeoutMs = 90_000):
 /**
  * Process an uploaded file (PDF, image, or text) for lab analysis or nutrition data.
  * Returns parsed labs and meals ready for auto-input.
+ * opts.onProgress (0..1) — прогресс оффлайн-OCR скриншотов (АПК).
  */
-export async function processUploadedFile(file: File): Promise<OCRResult> {
+export async function processUploadedFile(
+  file: File,
+  opts?: { onProgress?: (fraction: number) => void },
+): Promise<OCRResult> {
   const warnings: string[] = [];
   let labs: ParsedLabValue[] = [];
   let meals: ParsedMeal[] = [];
@@ -598,7 +666,7 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
       // локальный результат сразу, без 70 секунд ожидания двух таймаутов.
       if (isNativeApp()) {
         try {
-          const offlineText = await recognizeImageTextOffline(file);
+          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress);
           if (offlineText.trim().length > 2) {
             warnings.push('Фото распознано оффлайн на устройстве (АПК-режим).');
             serverResult = { text: offlineText };
@@ -619,7 +687,7 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
         // АПК/оффлайн: серверные ./api/* в WebView недоступны — пробуем
         // локальный tesseract, дальше общий парсинг rawText как обычно.
         try {
-          const offlineText = await recognizeImageTextOffline(file);
+          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress);
           if (offlineText.trim().length <= 2) {
             return { text: '', labs: [], meals: [], source, confidence: 0, warnings };
           }

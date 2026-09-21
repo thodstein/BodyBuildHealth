@@ -256,7 +256,12 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
       const { pickPhoto } = await import('../../core/native-bridge');
       const photo = await pickPhoto();
       if (!photo) return;
-      const blob = await (await fetch(photo.uri)).blob();
+      let blob: Blob | null = null;
+      try {
+        const { dataUrlToBlob } = await import('../../engines/ocr-preprocess');
+        blob = dataUrlToBlob(photo.uri);
+      } catch { /* fallback ниже */ }
+      if (!blob) blob = await (await fetch(photo.uri)).blob();
       const file = new File([blob], `barcode.${photo.format || 'jpg'}`, { type: blob.type || 'image/jpeg' });
       const holder = document.createElement('div');
       const holderId = `barcode-photo-decode-${Date.now()}`;
