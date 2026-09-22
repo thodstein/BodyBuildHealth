@@ -1,5 +1,13 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Коррекция-контент round-10 · АРМ: топ-ап снова даёт выбор (Sep 22 2026, коммит pathspec, без пуша)
+
+Реаудит после round-9: база выросла до ≥6, и **7 из 12 `POOL_TOPUP` стали чистыми дублями** (добавляли 0 уникальных id — топ-ап был мёртвым). Исправлено:
+- В `POOL_TOPUP` добавлен по одному **уникальному** id на точку из arm-каталога: cup_start +`fat_gripz_curl`, cup_hold +`wrist_wrench_60`, rising_top +`euro_pinch_2h`, pron_open +`hammer_rope_cable`, pron_lock +`zottman_curl`, sup_cup +`reverse_curl_cable`, sup_drag +`incline_hammer`, side_mid +`ulnar_dev`, side_pin +`wrist_ext_bb`, back_start +`coc_trainer`, back_drag +`silver_bullet_hold`, contain_fingers +`coc_no1_5`.
+- `CORRECTION_ROLE` — роли для всех 10 новых id (иначе падал lock «у каждого пула есть роль»).
+- NEW lock: «топ-ап реально добавляет ≥1 уникальный id на каждую точку» (было молчаливое дублирование). Итог: пул каждой точки 7–10 id (было 6–7).
+- **Проверено**: `src/engines/arm` **92 файла / 1123** + арм-UI/apk-arm-pack **88/88** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · ТА-ядро ≥6 (цель плана) + 2 записи (Sep 22 2026, коммит pathspec, без пуша)
 
 По команде «продолжай» закрыта последняя невыполненная цель плана §3.3: **ТА `TA_CORRECTIVES` 80→82** и **ядро `WL_WEAKPOINT_CORRECTION` 5→6 кандидатов на каждую из 16 фаз** (было 5 после round-9; документ требовал ≥6).

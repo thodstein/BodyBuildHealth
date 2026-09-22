@@ -87,7 +87,18 @@ export const CORRECTION_ROLE: Record<string, CorrectionRole> = {
   coc_no1: 'iso',
   little_big_horn: 'static',
   pinch_block_80: 'static',
-  // профилактика (не пулы точек)
+  // ROUND-10: роли для уникальных id топ-апа (иначе lock «у каждого пула есть роль» падает)
+  fat_gripz_curl: 'pump',
+  wrist_wrench_60: 'iso',
+  euro_pinch_2h: 'heavy',
+  zottman_curl: 'pump',
+  reverse_curl_cable: 'pump',
+  incline_hammer: 'pump',
+  ulnar_dev: 'iso',
+  coc_trainer: 'pump',
+  silver_bullet_hold: 'static',
+  coc_no1_5: 'iso',
+  // профилистика (по 12 точек)
   wrist_ext_bb: 'pump',
   external_rotation_band: 'iso',
 };
@@ -106,18 +117,20 @@ export function roleLabel(exId: string): string {
  * Не мутируют ARM_CORRECTIONS: порядок базы цел, добавки идут хвостом.
  */
 export const POOL_TOPUP: Partial<Record<ArmWeakPoint, string[]>> = {
-  cup_start: ['wrist_curl_db'],
-  cup_hold: ['wrist_curl_db'],
-  rising_top: ['pinch_block_80'],
-  pron_open: ['pronation_pulses', 'lever_top'],
-  pron_lock: ['pronation_pulses', 'pronation_sledge'],
-  sup_cup: ['reverse_ez_curl', 'indian_clubs'],
-  sup_drag: ['reverse_ez_curl'],
-  side_mid: ['anti_rotation_hold'],
-  side_pin: ['anti_rotation_hold'],
-  back_start: ['towel_pullup', 'hammer_rope_cable'],
-  back_drag: ['towel_pullup'],
-  contain_fingers: ['pinch_block_80'],
+  // ROUND-10: после расширения базы (≥6) часть топапов стала дублями — добавлен по одному
+  // уникальному id на точку (дедуп в poolWithTopup), чтобы топ-ап реально давал выбор.
+  cup_start: ['wrist_curl_db', 'fat_gripz_curl'],
+  cup_hold: ['wrist_curl_db', 'wrist_wrench_60'],
+  rising_top: ['pinch_block_80', 'euro_pinch_2h'],
+  pron_open: ['pronation_pulses', 'lever_top', 'hammer_rope_cable'],
+  pron_lock: ['pronation_pulses', 'pronation_sledge', 'zottman_curl'],
+  sup_cup: ['reverse_ez_curl', 'indian_clubs', 'reverse_curl_cable'],
+  sup_drag: ['reverse_ez_curl', 'incline_hammer'],
+  side_mid: ['anti_rotation_hold', 'ulnar_dev'],
+  side_pin: ['anti_rotation_hold', 'wrist_ext_bb'],
+  back_start: ['towel_pullup', 'hammer_rope_cable', 'coc_trainer'],
+  back_drag: ['towel_pullup', 'silver_bullet_hold'],
+  contain_fingers: ['pinch_block_80', 'coc_no1_5'],
 };
 
 export function poolWithTopup(wp: ArmWeakPoint): string[] {

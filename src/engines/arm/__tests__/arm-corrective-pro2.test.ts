@@ -55,6 +55,15 @@ describe('arm-corrective-pro2 C1: роли и пулы', () => {
     const pool = poolWithTopup('cup_start');
     expect(new Set(pool).size).toBe(pool.length);
   });
+  it('ROUND-10: топ-ап реально добавляет уникальный id на каждую точку (не дубль базы)', () => {
+    const thin: string[] = [];
+    for (const wp of ARM_WEAK_POINTS) {
+      const base = new Set((ARM_CORRECTIONS as Record<string, { exercises: string[] }>)[wp].exercises);
+      const added = poolWithTopup(wp).filter((id) => !base.has(id)).length;
+      if (added < 1) thin.push(`${wp}:${added}`);
+    }
+    expect(thin).toEqual([]);
+  });
   it('ROUND-9: пул каждой точки ≥6 (больше выбора), все id — из каталога', () => {
     const short: string[] = [];
     for (const wp of ARM_WEAK_POINTS) {
