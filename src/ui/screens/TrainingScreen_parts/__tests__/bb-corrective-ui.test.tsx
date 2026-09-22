@@ -21,6 +21,24 @@ describe('bb-corrective-ui', () => {
     render(<BBDiagnosticsHub />);
     expect(document.querySelector('[data-bb="corrective-card"]')).toBeNull();
   });
+  it('ROUND-10: превью моста — что уедет в конструктор (зоны/упражнения/коррекции/блок)', () => {
+    localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ weakManual: ['chest_upper', 'quads'] }));
+    render(<BBDiagnosticsHub />);
+    const prev = document.querySelector('[data-bb="bridge-preview"]');
+    expect(prev).not.toBeNull();
+    expect(prev!.textContent).toContain('Что уедет в конструктор');
+    expect(prev!.textContent).toMatch(/Зоны: /);
+    expect(prev!.textContent).toMatch(/Коррекции: /);
+    expect(prev!.textContent).toMatch(/Блок: /);
+    // паритет: упражнения превью — из того же источника, что уходит в мост (top3ByZone → preferredExerciseIds)
+    expect(HUB_SRC).toContain('const first = (top3ByZone[z] || [])[0];');
+  });
+  it('ROUND-10: без слабых зон превью честно говорит «нечего отправлять»', () => {
+    render(<BBDiagnosticsHub />);
+    const prev = document.querySelector('[data-bb="bridge-preview"]');
+    expect(prev).not.toBeNull();
+    expect(document.querySelector('[data-bb="bridge-empty"]')).not.toBeNull();
+  });
   it('ROUND-10: блок коррекции (волна) рендерится из тех же пиков, честно пуст без зон', () => {
     localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ weakManual: ['chest_upper', 'quads'] }));
     render(<BBDiagnosticsHub />);

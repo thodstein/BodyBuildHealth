@@ -2638,6 +2638,34 @@ export const BBDiagnosticsHub: React.FC = () => {
             {state.showSpecBlock && <div style={{ marginTop: 4, color: '#fff' }}>{specBlock.weeks.slice(0, 8).map((w) => `Н${w.week}: ${Object.entries(w.targetSets).map(([k, v]) => `${MUSCLE_LABEL_RU[k] || k} ${v}`).join(', ')} ×${Object.entries(w.frequency).map(([, f]) => `${f}`).join('/')}/нед`).join(' · ')}</div>}
           </div>
         )}
+        {/* ROUND-10: превью моста — что реально уедет в конструктор (паритет с ТА/стронг/арм) */}
+        <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.18)', fontSize: 11, lineHeight: 1.5 }} data-bb="bridge-preview">
+          <b style={{ color: '#60a5fa' }}>📦 Что уедет в конструктор</b>
+          {(() => {
+            try {
+              const lines: string[] = [];
+              const zones = report.weakZonesGranular.map(weakRu);
+              if (zones.length) lines.push(`Зоны: ${zones.join(', ')}`);
+              // упражнения — из ТОГО ЖЕ источника, что уходит в мост (top3ByZone → preferredExerciseIds)
+              const names = report.weakZonesGranular.map((z) => {
+                const first = (top3ByZone[z] || [])[0];
+                if (!first) return null;
+                try {
+                  const c = (EXERCISE_CATALOG as Array<{ id?: string; name?: string }>).find((e) => String(e.id).toLowerCase() === String(first.id).toLowerCase());
+                  return c?.name ? String(c.name) : first.id;
+                } catch { return first.id; }
+              }).filter((x): x is string => !!x);
+              if (names.length) lines.push(`Упражнения (⭐ первым): ${names.slice(0, 6).join(', ')}`);
+              const det = Array.isArray(correctiveDetailForExport) ? correctiveDetailForExport.slice(0, 3) : [];
+              if (det.length) lines.push(`Коррекции: ${det.map((d) => `${String((d as { zone?: unknown }).zone ?? '')}: ${String((d as { protocol?: unknown }).protocol ?? '')}`).join(' · ')}`);
+              if (corrBlockLines) lines.push(`Блок: ${corrBlockLines.block.summary}`);
+              if (specBlock) lines.push(`Спец-блок: ${specBlock.lengthWeeks} нед, доноры ${specBlock.donors.join(', ') || '—'}`);
+              if (lrDirection?.length) lines.push(`Перекос: ${lrDirection.map((d) => String(d.text)).join(' · ')}`);
+              if (!lines.length) return <div style={{ color: '#fff' }} data-bb="bridge-empty">Нечего отправлять — нет слабых зон/причин (баланс).</div>;
+              return <div style={{ color: '#fff' }}>{lines.map((l, i) => <div key={i}>{l}</div>)}</div>;
+            } catch { return null; }
+          })()}
+        </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} data-bb="export-row">
           <button onClick={applyToConstructor} data-bb="apply-bottom" style={{ flex: '2 1 200px', minHeight: 52, padding: '12px 14px', borderRadius: 12, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', border: 'none', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>→ Применить в ББ-авто ({report.weakZonesGranular.map(weakRu).join(', ') || 'баланс'})</button>
           <button onClick={handleExport} data-bb="export-html" style={{ flex: '1 1 120px', minHeight: 52, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>🖨 Печать</button>
