@@ -127,6 +127,18 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     const missing = TA_CORRECTIVES.filter((e) => !cat.has(e.id)).map((e) => e.id);
     expect(missing).toEqual([]);
   });
+  it('ROUND-10: каждая причина-лимитер имеет ≥2 записи в каждой фазе (volume/fatigue были 0)', () => {
+    const causes: TAWeakCause[] = ['volume', 'technique', 'mobility', 'fatigue', 'strength'];
+    const phases: Array<'technique' | 'strength' | 'stability'> = ['technique', 'strength', 'stability'];
+    const thin: string[] = [];
+    for (const cause of causes) {
+      for (const ph of phases) {
+        const n = TA_CORRECTIVES.filter((e) => (e.causes as TAWeakCause[]).includes(cause) && e.phase === ph).length;
+        if (n < 2) thin.push(`${cause}/${ph}:${n}`);
+      }
+    }
+    expect(thin).toEqual([]);
+  });
   it('ROUND-10: ядро коррекции — ≥6 кандидатов на каждую из 16 фаз, все из библиотеки', () => {
     const lib = new Set(TA_CORRECTIVES.map((e) => e.id));
     const problems: string[] = [];

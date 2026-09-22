@@ -19,6 +19,15 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · ТА: причины volume/fatigue объявлены + SM: причина × вид (Sep 22 2026, коммит pathspec, без пуша)
+
+По команде «продолжай работу над хабами» — аудит покрытия по **причинам** (у ТА такого лока не было).
+- **ТА (главная находка)**: `TAWeakCause` объявляет 5 лимитеров, но `volume` и `fatigue` **не были объявлены ни в одной записи** (0 из 82) → причинный бонус `correctivesForWeakPoint(wp, {cause})` и метки «причина-лимитер» для них молча не работали. Проставлены на существующие записи (по 2 на каждую фазу): volume — `slow_pull_snatch`, `pause_pull`, `back_squat`, `rack_pull`, `overhead_hold`, `pallof_hold`; fatigue — `tall_snatch`, `tall_jerk`, `push_press_v2`, `snatch_push_press`, `tspine_ext`, `dead_bug_oh`. Итог: volume 2/2/2, fatigue 2/2/2 (technique/strength/stability).
+- NEW lock ТА: «каждая причина-лимитер имеет ≥2 записи в каждой фазе» (mirror SM/BB).
+- **Стронг**: у SM был лок «причина × фаза ≥2», но по оси **вида** (`kind`) оставались 4 ячейки по 1: volume/stability, technique/strength, mobility/strength, strength/stability. +4 записи (`sm_core_brace_vol_stab`, `sm_log_lockout_tech_str`, `sm_yoke_pickup_mob_str`, `sm_farmers_grip_str_stab`) со своими реальными exId (`cable_pull_through`, `deadlift_romanian`, `back_extension`, `shrug_db`) → SM 84→88, все ячейки ≥2.
+- NEW lock SM: «каждая причина × вид (technique/strength/stability) ≥2».
+- **Проверено**: `src/engines/strength-sport` **64 файла / 1005** + ТА/стронг-UI (10 файлов) **132/132** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · АРМ: топ-ап снова даёт выбор (Sep 22 2026, коммит pathspec, без пуша)
 
 Реаудит после round-9: база выросла до ≥6, и **7 из 12 `POOL_TOPUP` стали чистыми дублями** (добавляли 0 уникальных id — топ-ап был мёртвым). Исправлено:

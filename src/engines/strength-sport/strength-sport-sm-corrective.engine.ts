@@ -582,6 +582,27 @@ export const SM_CORRECTIVES: SMCorrective[] = [
     { sets: 3, reps: '30с', pct: 50, rir: 4, tempo: 'hold', restSeconds: 90 },
     ['Ребра вниз', 'Ягодицы в тонусе'],
     '+5с/нед', 'Планк на коленях', 'McGill core; Rehab'),
+  // ── ROUND-10: добивка «причина × вид» (было по 1 в 4 ячейках) ──
+  C('sm_core_brace_vol_stab', 'core_brace', 'stability', 'Объём корсета: тяга блока на брассе 6×10',
+    ['кор не держит объём серии'], ['volume'], 'intermediate',
+    { sets: 6, reps: 10, pct: 55, rir: 3, tempo: '2-0-1-0', restSeconds: 75 },
+    ['Одна линия корпуса', 'Без рывка на тяге'],
+    '+1 подход/нед', 'Паллоф без веса', 'McGill core volume'),
+  C('sm_log_lockout_tech_str', 'log_lockout', 'strength', 'Замыкание с паузой: техника под нагрузкой 4×3',
+    ['лог клюёт вперёд на замыкании', 'потеря вертикали'], ['technique'], 'intermediate',
+    { sets: 4, reps: 3, pct: 75, rir: 2, tempo: '2-2-1-0', restSeconds: 180 },
+    ['Пауза 2с в замке', 'Лопатки назад', 'Без кивка корпусом'],
+    '+2.5%/нед при чистом замке', 'Замыкание с упоров', 'NSCA lockout technique'),
+  C('sm_yoke_pickup_mob_str', 'yoke_pickup', 'strength', 'Подхват с мобильностью: глубокий старт 4×2',
+    ['не садится под раму', 'спина округляется на отрыве'], ['mobility'], 'intermediate',
+    { sets: 4, reps: 2, pct: 70, rir: 3, tempo: '1-2-1-0', restSeconds: 180 },
+    ['Сесть под раму до отрыва', 'Спина одной линией'],
+    'Мобильность ТБС → подхват +5%/нед', 'Подхват с плинтов', 'Zercher 2026 yoke prep'),
+  C('sm_farmers_grip_str_stab', 'farmers_grip', 'stability', 'Силовой хват: шраги-холд 4×3 на выносливость',
+    ['хват не дожимает на 3-м подходе'], ['strength'], 'intermediate',
+    { sets: 4, reps: 3, pct: 85, rir: 2, tempo: 'hold 5с', restSeconds: 150 },
+    ['Плечи к ушам, без вращения', 'Холд 5с на верхней точке'],
+    '+2.5%/нед', 'Шраги без веса', 'SBS grip strength'),
 ];
 
 /** Все фазы библиотеки (16). */
@@ -992,6 +1013,10 @@ export const SM_CORR_EXID_BY_ID: Record<string, string> = {
   sm_grip_support_techfat: 'sledgehammer_lever',
   sm_core_brace_volstr: 'russian_twist_v2',
   sm_core_brace_mobfat: 'plank_walkout',
+  sm_core_brace_vol_stab: 'cable_pull_through',
+  sm_log_lockout_tech_str: 'deadlift_romanian',
+  sm_yoke_pickup_mob_str: 'back_extension',
+  sm_farmers_grip_str_stab: 'shrug_db',
 };
 
 /** Реальное id упражнения за записью библиотеки. */
