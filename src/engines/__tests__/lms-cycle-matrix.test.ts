@@ -44,8 +44,10 @@ function weekVolume(plan: ReturnType<typeof buildLMSPlan>, weekIdx: number): num
 }
 
 describe('Ф1.2: PL-матрица циклов', () => {
-  it('все PL-циклы (89, вкл. женскую ПЛ-базу Ф4) собираются: форма/математика без NaN в обоих режимах', () => {
-    expect(plCycles.length).toBe(89);
+  // Re-baseline (Фаза 4, решение пользователя): 89 → 84 — удалены 5 дефектных
+  // PL-циклов («1 сессия/нед» при spw 3–4; корректная пересборка невозможна).
+  it('все PL-циклы (84, вкл. женскую ПЛ-базу Ф4) собираются: форма/математика без NaN в обоих режимах', () => {
+    expect(plCycles.length).toBe(84);
     for (const c of plCycles) {
       const plan = buildLMSPlan({ template: c, pmMap: {}, fallbackPm: 100 });
       assertPlanShape(plan, c.meta.id);
@@ -69,7 +71,7 @@ describe('Ф1.2: PL-матрица циклов', () => {
       expect(dangerVol, `${c.meta.id}`).toBeLessThanOrEqual(baseVol);
       checked++;
     }
-    expect(checked).toBe(89);
+    expect(checked).toBe(84);
   });
 
   it('циклы с meta.deloadWeeks (17 носителей): делод-недели легче соседей', () => {

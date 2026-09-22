@@ -30,8 +30,6 @@ export const SPEED_CYCLE_IDS: Record<string, SpeedOrientation[]> = {
   'src2-gusenitsa': ['tempo'],
   // Системы 1 и 2 (Суровецкий): дожимы с бруска, объёмные дубли — техника/скорость срыва.
   'src2-sistemy-1i2': ['technique'],
-  // Соловьёв жим 28 дней: двойная волновая периодизация, синглы 85-100%.
-  'src2-solovyov-bench-28': ['technique', 'tempo'],
   // Шейко 13 нед (жим): волновая периодизация по трём планам, специализация.
   'src2-sheiko-13': ['tempo', 'technique'],
   // Перспектива (Суровецкий): восходящие пирамиды, соревновательная проходка.
@@ -46,9 +44,7 @@ export const SPEED_CYCLE_IDS: Record<string, SpeedOrientation[]> = {
   'cycle-09s': ['tempo', 'speed_strength'],
   // Западные + новые: Westside — динамические усилия 50-60% с цепями
   'westside': ['explosive', 'speed_strength', 'coordination'],
-  'korte-3x3': ['tempo', 'coordination'],
   'gzclp': ['tempo', 'technique'],
-  'juggernaut-2': ['tempo'],
   'texas-method': ['tempo'],
 };
 

@@ -82,7 +82,6 @@ import { CYCLE_BB_F_WELLNESS_12 } from './cycle-bb-f-wellness-12';
 
 // СРЦ2 (авторские программы) — начато Jul 12
 import { SRC2_MURAVYOV_16 } from './src2/src2-muravyov-16';
-import { SRC2_SOLOVYOV_BENCH_28 } from './src2/src2-solovyov-bench-28';
 import { SRC2_PTBAZ_8 } from './src2/src2-ptbaz-8';
 import { SRC2_PT12TA } from './src2/src2-pt12ta';
 import { SRC2_PERSPEKTIVA } from './src2/src2-perspektiva';
@@ -117,11 +116,9 @@ import { SHEIKO_30 } from './sheiko-30';
 import { SHEIKO_31 } from './sheiko-31';
 import { SHEIKO_32 } from './sheiko-32';
 import { GZCLP } from './gzclp';
-import { JUGGERNAUT_2 } from './juggernaut-2';
 import { TEXAS_METHOD } from './texas-method';
 import { MADCOW } from './madcow';
 import { WESTSIDE } from './westside';
-import { KORTE_3X3 } from './korte';
 import { GOLOVINSKY_8 } from './golovinsky-8';
 import { SHEIKO_AML_20 } from './sheiko-aml-20';
 import { CALGARY_16 } from './calgary-16';
@@ -129,14 +126,12 @@ import { RTS_9 } from './rts-9';
 import { SHEIKO_CMS_MS } from './sheiko-cms-ms';
 import { WENDLER_531 } from './wendler-531';
 import { NSUNS } from './nsuns';
-import { CUBE } from './cube';
 import { SHEIKO_37 } from './sheiko-37';
 import { CALGARY_8 } from './calgary-8';
 import { HATCH } from './hatch';
 import { WENDLER_BBB } from './wendler-bbb';
 import { BULGARIAN } from './bulgarian';
 import { LILLIEBRIDGE } from './lilliebridge';
-import { RUSSIAN_SQUAT } from './russian-squat';
 import { GZCL_UHF } from './gzcl-uhf';
 import { COAN_DEADLIFT } from './coan-deadlift';
 import { KIZEN_SHEIKO } from './kizen-sheiko';
@@ -221,7 +216,6 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
   CYCLE_BB_F_WELLNESS_12,
    // СРЦ2
    SRC2_MURAVYOV_16,
-   SRC2_SOLOVYOV_BENCH_28,
    SRC2_PTBAZ_8,
    SRC2_PT12TA,
    SRC2_PERSPEKTIVA,
@@ -255,11 +249,9 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     SHEIKO_31,
     SHEIKO_32,
     GZCLP,
-    JUGGERNAUT_2,
     TEXAS_METHOD,
     MADCOW,
     WESTSIDE,
-    KORTE_3X3,
     GOLOVINSKY_8,
     SHEIKO_AML_20,
     CALGARY_16,
@@ -267,14 +259,12 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
     SHEIKO_CMS_MS,
     WENDLER_531,
     NSUNS,
-    CUBE,
     SHEIKO_37,
     CALGARY_8,
     HATCH,
     WENDLER_BBB,
     BULGARIAN,
     LILLIEBRIDGE,
-    RUSSIAN_SQUAT,
     GZCL_UHF,
     COAN_DEADLIFT,
     KIZEN_SHEIKO,

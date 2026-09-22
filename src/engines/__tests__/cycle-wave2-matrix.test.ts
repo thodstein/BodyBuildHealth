@@ -30,7 +30,10 @@ describe('Ф4: вторая волна циклов (5 женских + 6 муж
     for (const id of FEMALE_IDS) {
       expect(LMS_CYCLES.find(x => x.meta.id === id)!.meta.tags.includes('female'), `${id}: tags female`).toBe(true);
     }
-    expect(LMS_CYCLES.length).toBe(132);
+    // Re-baseline (Фаза 4, решение пользователя): удалены 5 дефектных циклов
+    // (juggernaut-2/korte-3x3/cube/russian-squat/src2-solovyov-bench-28 — «1 сессия/нед»
+    // при spw 3–4, корректно пересобрать нельзя). Было 132 → стало 127.
+    expect(LMS_CYCLES.length).toBe(127);
   });
 
   it('все 22 собираются через конвертер: 0 ошибок валидатора, делоды присутствуют', () => {

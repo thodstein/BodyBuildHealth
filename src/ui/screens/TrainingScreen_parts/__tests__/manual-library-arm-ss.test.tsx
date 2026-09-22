@@ -115,7 +115,9 @@ describe('Ручная библиотека: маппинг фильтров (в
     expect(beg.length).toBe(12);
     // 66 = 59 базовых + Ф4 (pec-8/back-10/glute-adv-12) + топ-волна (arms-8/shoulders-8/legs-10)
     // + сцена (bodyfitness-12, KMS-MS)
-    expect(adv.length).toBe(66);
+    // Re-baseline (Фаза 4, решение пользователя): 66 → 65 — удалён дефектный advanced-цикл
+    // («1 сессия/нед» при spw 3–4, корректная пересборка невозможна).
+    expect(adv.length).toBe(65);
     expect(beg.length + adv.length + LMS_CYCLES.filter(c => plCycleMatchesLevel(c.meta.level, 'intermediate') && !beg.includes(c) && !adv.includes(c)).length).toBeGreaterThanOrEqual(LMS_CYCLES.length - 3);
   });
 
