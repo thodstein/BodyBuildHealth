@@ -621,6 +621,15 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     if (mainCount > 1) return 'Можно назначить только одно главное соревнование (приоритет A).';
     return null;
   }, [competitions, totalWeeks]);
+  // Персист правок соревнований года: раньше competitions менялись только в state
+  // и попадали в macro лишь при «Построить макроцикл» — терялись при перезагрузке.
+  useEffect(() => {
+    if (!macro || isBB) return;
+    const cur = JSON.stringify(macro.competitions ?? []);
+    const next = JSON.stringify(competitions ?? []);
+    if (cur === next) return;
+    setMacro({ ...macro, competitions: competitions.length > 0 ? competitions : undefined });
+  }, [competitions, macro, isBB]);
 
   useEffect(() => {
     if (macro && !isBB) {

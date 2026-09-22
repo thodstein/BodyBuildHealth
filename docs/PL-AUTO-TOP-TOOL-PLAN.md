@@ -126,7 +126,7 @@
 - 2.5 ✅ Мёртвые ветки `SRCBBScreen` удалены: BB-план, manual-заглушка, bridge, BB-tools, peak_bb/methods/analytics/prometrics/bb-charts (358 строк) + осиротевшие импорты/`deriveHints`/группы табов; `subViewList.bb/manual` = []; файл 2424→2067 строк (скрипт-хирургия `.tmp/pl-deadcode-surgery.mjs` с маркер-ассертами, проверено чтением).
 - 2.6 ✅ Мост `kind cycle` зарегистрирован: тип `CyclePayload` в `planner-bridge.ts` (без `as any`), дизайнер шлёт payload + `planning-track-open('pl')`, `SRCBBScreen` применяет свежий payload (ts ≤ 5 мин) при монтировании и пересобирает план. NEW тест `bridge-cycle` 4/4.
 - 2.3 ✅ Один набор % прикидов: `pro/pl-attempts.engine` (StrengthAnalysisHub) переведён на канон `MEET_STRATEGY_PCT` (`competition-attempts`): safe→conservative 90/95.5/100, standard→balanced 92/96/102, record→aggressive 93/97/105; второй набор 92.5/97.5/102.5 удалён. Осознанный re-baseline `strength-hub-p5` (180 кг: 167.5/175/185 → 165/172.5/182.5) с комментарием «было→стало».
-- 2.4 ⏸ Слияние реестров соревнований (`plMeetList` ↔ `he_pl_macro.competitions`) — отложено: требует миграции данных (риск потери стартов).
+- 2.4 ✅ **Единый реестр стартов** (решение пользователя «да — делай»): NEW `pl-meet-registry.engine.ts` — канон `he_pl_macro.competitions` (id/неделя года/дата/приоритет), `plMeetList` остаётся надстройкой (федерация/заявленные ПМ/стратегия); `mergeMeetRegistry` делает lossless-миграцию обоих направлений (легаси-старт → событие года; событие без старта → старт с дефолтами; склейка по id/имени; неделя года главнее при конфликте), `syncCompetitionsFromMeets` — обратная запись upsert/удаление с сохранением `notes/cycleId/cycleIds`. Вшито: `SRCBBScreen` гидратирует слияние при монтировании и по `he-pl-macrocycle-updated`, обратно пишет старты; **фикс**: правки `competitions` в `MacrocyclePanel` теперь персистятся в `he_pl_macro` (раньше терялись при перезагрузке, если не жать «Построить макроцикл»). Если год не построен — поведение прежнее (локальный список, без выдумывания событий). Тесты: `pl-meet-registry` 8/8 + wiring-гард 2/2; круги 1212/1212.
 - 2.7 ✅ Единый контур печати/переключателя: NEW `CalendarViewSwitch` — один компонент в обоих местах `PLPlanView` (дубль разметки убран, aria-pressed, guard-тест); печать тапера в `PLCompetitionTab` сведена к одному `handlePrintTaperPlan` (inline-копия `window.open` удалена, канон `buildPLTaperPrintHtml` получил опциональную строку данных `metaLine` — федерация/стратегия/ПМ); экспорт из «Справки» и `PLPlanView` уже используют один `pl-export.ts` — подтверждено, дублей реализации нет.
 - Проверено: `tsc --noEmit` — по моим файлам 0 (2 ошибки в `ArticlesScreen.tsx` — чужой коммит `2a907558a` параллельного агента, не тронут); круги lms+SRCBBScreen_parts 1193/1194 и расширенный (TrainingScreen_parts 1392/1392 + мосты) 1241/1242 — единственный красный предсуществующий `pl-auto-regressions`; unhandled `URL.revokeObjectURL` (ExerciseLabMerged) — чужой предсуществующий.
 
@@ -157,3 +157,33 @@
 - Пересборка архитектуры сезона/годового плана «с нуля» — только точечные consent-гейты.
 - Изменение математики ПМ/тапера/объёмов — Фаза 1+.
 - Дизайн-миграция карточек — Фаза 3 (после честности).
+
+## §9. Промпт следующей сессии — Фаза 3-остаток: структурная миграция карточек PL на BbCard/BbFoldCard
+
+> **Задача**: довести структурную подачу карточек ПЛ-авто до эталона `BbCard`/`BbFoldCard`
+> (`src/ui/screens/TrainingScreen_parts/bb-auto-constructor-shared.tsx`) — не только токены/цвета
+> (это уже сделано), а структуру: иконка-тайл + заголовок 12.5/800 + верхняя кромка акцента,
+> сворачиваемые секции (`BbFoldCard`) для длинных блоков. Только Edit/Write + vitest/tsc;
+> чужие WIP не трогать; коммиты строго pathspec.
+>
+> **Область (живые PL-файлы)**: `SRCBBScreen.tsx`, `SRCBBScreen_parts/PLPlanView.tsx`,
+> `PLCompetitionTab.tsx`, `PLSeasonBuilder.tsx`, `PLToolsCard.tsx`, `MacrocyclePanel.tsx`
+> (SectionCard → BbCard), `SessionPlayer.tsx` (только шапки карточек, не логика), `BlockView.tsx`,
+> `TrainingPopups.tsx` (ExpandableCard/MetricCard → единый fold-стиль).
+>
+> **Обязательные условия**:
+> 1. DOM-контракты сохранить: тексты/роли/aria/`data-*`-хуки не переименовывать (159 UI-тестов
+>    SRCBBScreen_parts должны пройти без правок; при неизбежном изменении — re-baseline с
+>    комментарием «было→стало»).
+> 2. `BbCard` импортировать из `bb-auto-constructor-shared.tsx` (или вынести общий кит в
+>    `training-ui.tsx`, если импорт из BB-файла создаёт цикл) — без третьего набора токенов.
+> 3. Сворачивать только длинные вторичные блоки (детали цикла, отчёты, справка), критичные
+>    статусы (план/вердикт/требуется согласие) оставлять развёрнутыми.
+> 4. Прогон: `tsc --noEmit` 0; `SRCBBScreen_parts` + `TrainingScreen_parts` + `src/engines/lms`
+>    зелёные; `verify:apk-design` OK; скриншот-проверка структуры через DOM-дамп (заголовок+иконка+крем).
+> 5. Обновить AGENTS.md (запись раунда) и §6 Фазы 3 этого плана.
+>
+> **Критерий готовности**: карточки ПЛ визуально и структурно неотличимы от ББ-авто (один кит,
+> одинаковые шапки/кромки/фолды), все круги зелёные, новых токенов/копий разметки ноль
+> (guard-тест `pl-card-design` расширить на структуру: `BbCard`/`BbFoldCard` используются,
+> локальных `SectionCard`-дублей нет).

@@ -3,6 +3,7 @@ import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lm
 import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, getPLWeakGroupExerciseCandidates, originalCycleWeeks, appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { applyMacroTaperToPLWeeks, type MacroTaperOpts } from '../../engines/lms/lms-macro-taper.engine';
+import { mergeMeetRegistry, syncCompetitionsFromMeets } from '../../engines/lms/pl-meet-registry.engine';
 import { recommendTaperConfig, coachPLPeakPlan, pmFeasibility, projectPmToMeet, compareTaperScenarios, evaluateMeetAttemptsFromDiary, type TaperCoachCtx } from '../../engines/lms/lms-taper-coach.engine';
 import { TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type PeakWeekLayout, type TaperMode, type TaperWeightGoal } from '../../engines/lms/lms-taper.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
@@ -282,6 +283,75 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
   useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plPeakCycleId: peakCycleId })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId]);
+  // 🏁 Единый реестр стартов (слияние Фазы 2): канон — he_pl_macro.competitions,
+  // plMeetList — надстройка ПЛ (федерация/ПМ/стратегия). Гидрация при монтировании
+  // и по событию годового плана; обратная запись — при правках стартов в ПЛ.
+  const meetsHydratedRef = useRef(false);
+  const macroMeetsJsonRef = useRef('');
+  const registryEmptyRef = useRef(false);
+  useEffect(() => {
+    const applyMacroMeets = () => {
+      try {
+        const raw = localStorage.getItem('he_pl_macro');
+        if (!raw) { meetsHydratedRef.current = true; return; }
+        const macro = deserializeMacro(raw);
+        if (!macro) { meetsHydratedRef.current = true; return; }
+        const sess = (() => { try { return JSON.parse(localStorage.getItem('he_pl_session') || 'null'); } catch { return null; } })();
+        const persistedMeets = Array.isArray(sess?.plMeetList) && sess.plMeetList.length > 0 ? sess.plMeetList : [];
+        const legacyMain = typeof sess?.plMainMeetId === 'string' ? sess.plMainMeetId : '';
+        if ((macro.competitions ?? []).length === 0 && persistedMeets.length === 0) {
+          // Год построен без стартов и ПЛ-список ещё не заводился: оставляем
+          // локальный дефолт, в события года его не переносим.
+          meetsHydratedRef.current = true;
+          registryEmptyRef.current = true;
+          return;
+        }
+        const res = mergeMeetRegistry({
+          competitions: macro.competitions ?? [],
+          legacyMeets: persistedMeets,
+          mainMeetId: legacyMain || mainMeetId,
+          todayIso: isoToday(),
+        });
+        setMeetList(res.meets);
+        setMainMeetId(res.mainMeetId);
+        macroMeetsJsonRef.current = JSON.stringify(res.competitions);
+        meetsHydratedRef.current = true;
+        registryEmptyRef.current = false;
+        if (res.changed) {
+          const next = serializeMacro({ ...macro, competitions: res.competitions });
+          localStorage.setItem('he_pl_macro', next);
+          if (res.notes.length) setMethodNote('🏁 ' + res.notes.join(' · '));
+          window.dispatchEvent(new CustomEvent('he-pl-macrocycle-updated', { detail: next }));
+        }
+      } catch { meetsHydratedRef.current = true; }
+    };
+    applyMacroMeets();
+    const handler = () => applyMacroMeets();
+    window.addEventListener('he-pl-macrocycle-updated', handler);
+    return () => window.removeEventListener('he-pl-macrocycle-updated', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!meetsHydratedRef.current) return;
+    if (registryEmptyRef.current) {
+      const isDefaultMeet = meetList.length === 1 && meetList[0].id === 'm1' && meetList[0].name === 'Соревнование 1';
+      if (isDefaultMeet) return;
+      registryEmptyRef.current = false;
+    }
+    try {
+      const raw = localStorage.getItem('he_pl_macro');
+      if (!raw) return;
+      const macro = deserializeMacro(raw);
+      if (!macro) return;
+      const synced = syncCompetitionsFromMeets(macro.competitions ?? [], meetList, { mainMeetId, todayIso: isoToday() });
+      const sig = JSON.stringify(synced);
+      if (sig === JSON.stringify(macro.competitions ?? []) || sig === macroMeetsJsonRef.current) return;
+      macroMeetsJsonRef.current = sig;
+      const next = serializeMacro({ ...macro, competitions: synced });
+      localStorage.setItem('he_pl_macro', next);
+      window.dispatchEvent(new CustomEvent('he-pl-macrocycle-updated', { detail: next }));
+    } catch { /* ignore */ }
+  }, [meetList, mainMeetId]);
   useEffect(() => {
     const cycle = getCycleById(selectedCycleId);
     if (cycle) setCycleWeeks(originalCycleWeeks(cycle));
