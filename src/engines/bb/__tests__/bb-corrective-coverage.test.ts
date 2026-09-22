@@ -14,12 +14,35 @@ const BUILDER_ZONES = ['chest', 'chest_upper', 'chest_lower', 'back', 'back_widt
 const count = (zone: string) => BB_CORRECTIVES.filter((c) => c.targets.includes(zone)).length;
 
 describe('bb-corrective K2: покрытие зон ≥2', () => {
-  it('каждая зона чипов хаба имеет ≥2 записи', () => {
-    const thin = HUB_ZONES.filter((z) => count(z) < 2).map((z) => `${z}:${count(z)}`);
+  it('каждая зона чипов хаба имеет ≥3 записи (ROUND-10: было ≥2)', () => {
+    const thin = HUB_ZONES.filter((z) => count(z) < 3).map((z) => `${z}:${count(z)}`);
     expect(thin).toEqual([]);
   });
-  it('каждая зона слабых групп ББ-авто имеет ≥2 записи', () => {
-    const thin = BUILDER_ZONES.filter((z) => count(z) < 2).map((z) => `${z}:${count(z)}`);
+  it('каждая зона слабых групп ББ-авто имеет ≥3 записи (ROUND-10: было ≥2)', () => {
+    const thin = BUILDER_ZONES.filter((z) => count(z) < 3).map((z) => `${z}:${count(z)}`);
+    expect(thin).toEqual([]);
+  });
+  it('ROUND-10: каждый скрининг-сигнал даёт ≥3 варианта (не вырождается в 1)', () => {
+    const SIG = ['bench-fix', 'bench-watch', 'nhe-weak', 'add-weak', 'erir-low', 'ybt-asym', 'ktw-asym', 'hinge-fail', 'shoulder-fail', 'rot-gap', 'loaded-fail', 'pm-yellow'];
+    const thin = SIG.filter((s) => count(s) < 3).map((s) => `${s}:${count(s)}`);
+    expect(thin).toEqual([]);
+  });
+  it('ROUND-10: каждый драйвер движения (резолвер хаба) даёт ≥3 варианта', () => {
+    // MovementDriver = ankle|hip|thoracic|shoulder|core|none ('flexibility' в типе нет — не выдумываем)
+    const DRV = ['driver:ankle', 'driver:hip', 'driver:thoracic', 'driver:shoulder', 'driver:core'];
+    const thin = DRV.filter((d) => count(d) < 3).map((d) => `${d}:${count(d)}`);
+    expect(thin).toEqual([]);
+  });
+  it('ROUND-10: каждая объявленная причина в каждой фазе имеет ≥2 варианта', () => {
+    const CAUSES = ['volume', 'activation', 'recovery', 'technique', 'genetics'];
+    const PHASES = ['technique', 'strength', 'stability'];
+    const thin: string[] = [];
+    for (const cause of CAUSES) {
+      for (const ph of PHASES) {
+        const n = BB_CORRECTIVES.filter((c) => c.causes.includes(cause as never) && c.phase === ph).length;
+        if (n > 0 && n < 2) thin.push(`${cause}/${ph}:${n}`);
+      }
+    }
     expect(thin).toEqual([]);
   });
   it('ранее пустые/тонкие зоны закрыты: traps/forearms/abs/biceps/adductor', () => {

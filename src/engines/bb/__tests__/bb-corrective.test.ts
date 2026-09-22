@@ -134,7 +134,13 @@ describe('bb-corrective K1 library', () => {
     expect(tagsForMovementScreens({ rotGap: true })).toContain('rot-gap');
     expect(tagsForMovementScreens({})).not.toContain('rot-gap');
     const r = rankCorrectives({ zones: ['back'], rotGap: true });
-    expect(r.map((x) => x.corr.id)).toContain('sh-wall-slide');
+    // было: toContain('sh-wall-slide') при единственной rot-gap записи;
+    // стало (ROUND-10: rot-gap уже 3 записи): со зоной back окно топ-6 заполняют zone-hitters,
+    // поэтому проверяем семантику сигнала на чистом запросе по тегу
+    expect(r.length).toBeGreaterThan(0);
+    const only = rankCorrectives({ rotGap: true });
+    expect(only.map((x) => x.corr.id)).toContain('sh-wall-slide');
+    expect(only.every((x) => x.corr.targets.includes('rot-gap'))).toBe(true);
   });
   it('оборудование: гантели+вес — гоблет есть, жима ногами нет; без списка — всё', () => {
     const home = rankCorrectives({ zones: ['quads'], equipment: ['dumbbell', 'bodyweight'] });

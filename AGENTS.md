@@ -1,5 +1,16 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Коррекция-контент round-10 · Хаб 5/5 — ББ-диагностика: пулы зон/сигналов/драйверов (Sep 22 2026, коммит pathspec, без пуша)
+
+По команде «добавь в план работу с хабом диагностики ББ (движки коррекции)» — хаб 5 доведён до уровня round-9.
+- Аудит `BB_CORRECTIVES` (52 записи): все `exerciseId` и `equipmentAlt` — реальные id каталога (0 плохих), но **тонкие ячейки**: 12 зон по 2 записи + `chest_mid`=1, сигналы `bench-watch`/`rot-gap`/`pm-yellow` по 1, `nhe-weak`/`add-weak`/`erir-low`/`loaded-fail` по 2, причины `recovery` (в фазе strength — 0) и `volume` (stability — 0).
+- **52→76 записей** (+24): контуры жима (floor/Слото/доски), задняя цепь (нордик-эксцентрик, Копенгаген), плечо (ER:IR `cable_external_rotation`, щадящие `face_pull`/`band_pullapart`), грудной отдел (`thoracic_rotation`, `pallof_press_v2`), добор зон (низ/середина груди, толщина спины, дельты, аддуктор, икры, трапы, предплечья, трицепс, кор, пресс, гиперэкстензия под весом). Каждое — реальный id main-каталога, с cues/progression/regression/retest/source/equipmentAlt.
+- **Найдено и снято своим tsc**: причина `strength` в 4 записях — невалидна (`BBWeakCause` = volume/activation/recovery/technique/genetics); заменена на `recovery`/`activation` (семантика сохранена, тип честный).
+- NEW locks (`bb-corrective-coverage`): «каждая зона хаба/ББ-авто ≥**3** (было ≥2)», «каждый скрининг-сигнал ≥3», «каждый драйвер резолвера (`ankle/hip/thoracic/shoulder/core`) ≥3; `flexibility` в типе `MovementDriver` НЕТ — не выдумываем», «каждая объявленная причина в каждой фазе ≥2».
+- Re-baseline: `bb-corrective` «rot-gap ведёт на wall-slide» — при 3 rot-gap записях и зоне `back` окно топ-6 заполняют zone-hitters ⇒ семантика сигнала проверяется на чистом запросе по тегу (`rankCorrectives({rotGap:true})` включает `sh-wall-slide` и все записи с `rot-gap`), комментарий «было→стало».
+- **Проверено**: 8 corrective-файлов **71/71** + диагностика/инъекция/экспорт **23 файла / 388** + BB-хаб UI (10 файлов) **132/132** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+- **Итог по всем 5 хабам**: арм 12 точек ≥6 · армлифтинг 52 (+Excalibur) · ТА 80 + 43 синтетик-id в каталог · стронг 84 (причина×фаза ≥2) · **ББ 76 (зона/сигнал/драйвер ≥3)**.
+
 ## Коррекция-контент round-9 · Хаб 1/4 — АРМ: пулы ≥6 на точку (Sep 22 2026, коммит pathspec, без пуша)
 
 По команде «начинай по порядку» (план `docs/HUB-CORRECTION-CONTENT-PRO-PLAN.md`). Хаб 1 — армрестлинг.
