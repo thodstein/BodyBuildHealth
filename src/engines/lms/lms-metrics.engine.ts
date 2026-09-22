@@ -161,10 +161,23 @@ export interface SRSessionMetrics {
   exerciseCount: number;
 }
 
+/**
+ * Служебные «упражнения»-маркеры источника («Отдых», «Тест: проходка (до макс)») —
+ * это разметка, а не упражнения: не входят в КПШ/тоннаж/интенсивность и не
+ * считаются в exerciseCount (иначе метрики цикла врут). В плане/UI строки остаются.
+ */
+export function isPseudoExercise(name: string): boolean {
+  // Без \b: в JS \b не считает кириллицу word-символами («Отдых» не матчился).
+  return /^(отдых|тест\s*:)/i.test((name || '').trim());
+}
+
 /** Метрики тренировочного дня (сессии). */
 export function calcSessionMetrics(exercises: SRExercise[]): SRSessionMetrics {
   let tonnage = 0, kpsh = 0, relIntWeighted = 0, intFB = 0, uoiNum = 0;
+  let realCount = 0;
   for (const ex of exercises) {
+    if (isPseudoExercise(ex.name)) continue;
+    realCount += 1;
     const m = calcExerciseMetrics(ex);
     tonnage += m.tonnage;
     kpsh += m.kpsh;
@@ -179,7 +192,7 @@ export function calcSessionMetrics(exercises: SRExercise[]): SRSessionMetrics {
     relIntensity: kpsh > 0 ? relIntWeighted / kpsh : 0,
     intFB,
     uoi: kpsh > 0 ? uoiNum / kpsh : 0,
-    exerciseCount: exercises.length,
+    exerciseCount: realCount,
   };
 }
 
