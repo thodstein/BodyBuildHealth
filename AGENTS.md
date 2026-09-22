@@ -7,6 +7,7 @@
 - **Прямая инъекция**: `sm-inject` «💉 Вставить коррекции в план» → `injectSMWeakPoints` по не-делод неделям, с ⭐ `preferredCorr` (`he_sm_preferred_corr_v1`), дозами карточек (`smCorrProtocols` из top-1 `protocolAdj`), L/R-добивкой (`unilateralBoost` из `gripAsymDiag`/`suitcaseDiag`); снапшот `snapshotSMPlanForInject` → `sessionStorage[SM_INJECT_PREV_KEY]`; запись обратно + событие `he-strength-sport-plan-saved`; сообщение `sm-inject-msg`. **`sm-rollback`** «↩ Откат» возвращает план из снапшота.
 - **Причина в Коррекции** теперь RU: `SM_WEAK_CAUSE_LABELS[cause]` («Хват» вместо «grip»); тест `strongman-diagnostics-hub-pro3` обновлён осознанно.
 - **Живой аудит**: стронг слушает `he-strength-sport-plan-saved` (+`storage`) и перечитывает план/аудит после сохранения конструктором; арм — `he-arm-plan-saved` (+`storage`) → `planNonce`/`hasInjectPrev`.
+- **Арм — чипы покрытия**: в `HubP0Panel` добавлен блок `arm-coverage` — 12 чипов точек (сеты, зелёный окрыт / красный худшая / янтарная выбрана), клик = выбрать/снять точку (`toggleWeakPoint`); паритет визуала с ТА/стронгом.
 - **Тесты**: NEW `strongman-diagnostics-inject` **3/3** (без плана → плашка+предупреждение; покрытие+чипы; инъекция пишет в план `инъецировано` + откат убирает). Прогон стронг 42 + арм 49 + армлифтинг 7 + rest-hooks 68 = **163/163** зелёные, `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
 
 ## ПЛ-диагностика движений: видео — полноэкранным окном + камера телефона в АПК (Sep 22 2026, коммит pathspec, без пуша)

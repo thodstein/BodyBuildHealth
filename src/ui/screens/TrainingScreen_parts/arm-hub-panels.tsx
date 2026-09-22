@@ -6,6 +6,7 @@
 import React from 'react';
 import { loadRedFlags, saveRedFlags } from '../../../engines/arm/arm-redflags.store';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
+import { ARM_WEAK_POINTS } from '../../../engines/arm/arm-biomechanics.engine';
 import { getArmLandmarks } from '../../../engines/arm/arm-volume-landmarks.engine';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { scoreLabel } from '../../../engines/arm/arm-scoring.engine';
@@ -21,7 +22,7 @@ const HUB_HERO: React.CSSProperties = {
   padding: '10px 12px',
 };
 const HUB_SECTION_GAP: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 };
-import { LEVEL_OPTS, TAB_DEFS } from './arm-hub-shared';
+import { LEVEL_OPTS, TAB_DEFS, WP_LABEL_SHORT } from './arm-hub-shared';
 
 export function HubHead({ H }: { H: any }) {
   const { state, report, scoring, showScoring, weightClassAuto, benchRes, forceVecPro, toast, hasWeak } = H;
@@ -211,6 +212,30 @@ export function HubP0Panel({ H }: { H: any }) {
           {armAudit ? `Аудит плана: покрытие ${armAudit.covered.length}/12 (${armAudit.coveragePct}%) · стол ${(armAudit.tableRatio * 100).toFixed(0)}% · статика ${armAudit.staticSets}/динамика ${armAudit.dynamicSets}${armAudit.duplicates.length ? ` · дубли: ${armAudit.duplicates.slice(0, 3).join(', ')}` : ''}` : 'Нет плана арм (he_arm_plan_saved / he_arm_last_plan) — собери в Арм-конструкторе; причины и топ-3 работают и без плана'}
           {armWorst ? ` · 🎯 худшая из выбранных: ${armWorst}` : ''}
         </div>
+        {armAudit && (
+          <div data-arm="arm-coverage" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+            {ARM_WEAK_POINTS.map((wp: ArmWeakPoint) => {
+              const sets = armAudit.byPoint[wp]?.sets ?? 0;
+              const worst = armWorst === wp;
+              const isSel = state.weakPoints.includes(wp);
+              return (
+                <span
+                  key={wp}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${(WP_LABEL_SHORT as any)[wp] || wp}: ${sets} сетов`}
+                  title={`${(WP_LABEL_SHORT as any)[wp] || wp} — ${sets} сетов${isSel ? ' · выбрана' : ''}`}
+                  onClick={() => toggleWeakPoint(wp)}
+                  data-covered={sets > 0 ? 'true' : 'false'}
+                  data-worst={worst ? 'true' : 'false'}
+                  style={{ cursor: 'pointer', fontSize: 10, padding: '4px 8px', borderRadius: 12, background: worst ? 'rgba(239,68,68,0.12)' : sets > 0 ? 'rgba(34,197,94,0.10)' : isSel ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${worst ? 'rgba(239,68,68,0.35)' : sets > 0 ? 'rgba(34,197,94,0.25)' : isSel ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}`, color: worst ? '#ef4444' : sets > 0 ? '#22c55e' : '#fff' }}
+                >
+                  {(WP_LABEL_SHORT as any)[wp] || wp} {sets}
+                </span>
+              );
+            })}
+          </div>
+        )}
         {state.weakPoints.length > 0 && (
           <div className="ad-list">
             {state.weakPoints.map((wp: ArmWeakPoint) => {
