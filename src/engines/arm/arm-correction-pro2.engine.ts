@@ -47,6 +47,7 @@ export const CORRECTION_ROLE: Record<string, CorrectionRole> = {
   plate_pinch_hold: 'static',
   radial_dev_heavy: 'heavy',
   ulnar_dev_heavy: 'heavy',
+  radial_dev: 'iso',
   // pronation
   pronation_cable: 'heavy',
   pronation_sledge: 'heavy',
@@ -64,6 +65,7 @@ export const CORRECTION_ROLE: Record<string, CorrectionRole> = {
   hook_drag_cable: 'table',
   hammer_belt: 'table',
   reverse_ez_curl: 'pump',
+  preacher_hammer: 'iso',
   // side (только безопасные роли: статика/ремень/манжета)
   side_press_cable: 'heavy',
   side_belt_table: 'table',
@@ -82,6 +84,9 @@ export const CORRECTION_ROLE: Record<string, CorrectionRole> = {
   rolling_thunder: 'heavy',
   apollon_axle: 'heavy',
   coc_gripper: 'iso',
+  coc_no1: 'iso',
+  little_big_horn: 'static',
+  pinch_block_80: 'static',
   // профилактика (не пулы точек)
   wrist_ext_bb: 'pump',
   external_rotation_band: 'iso',
@@ -103,12 +108,16 @@ export function roleLabel(exId: string): string {
 export const POOL_TOPUP: Partial<Record<ArmWeakPoint, string[]>> = {
   cup_start: ['wrist_curl_db'],
   cup_hold: ['wrist_curl_db'],
+  rising_top: ['pinch_block_80'],
   pron_open: ['pronation_pulses', 'lever_top'],
   pron_lock: ['pronation_pulses', 'pronation_sledge'],
   sup_cup: ['reverse_ez_curl', 'indian_clubs'],
   sup_drag: ['reverse_ez_curl'],
+  side_mid: ['anti_rotation_hold'],
+  side_pin: ['anti_rotation_hold'],
   back_start: ['towel_pullup', 'hammer_rope_cable'],
   back_drag: ['towel_pullup'],
+  contain_fingers: ['pinch_block_80'],
 };
 
 export function poolWithTopup(wp: ArmWeakPoint): string[] {

@@ -52,7 +52,17 @@ describe('arm-corrective-pro2 C1: роли и пулы', () => {
     const before = ARM_CORRECTIONS.cup_start.exercises.join(',');
     poolWithTopup('cup_start');
     expect(ARM_CORRECTIONS.cup_start.exercises.join(',')).toBe(before);
-    expect(ARM_CORRECTIONS.cup_start.exercises).not.toContain('wrist_curl_db');
+    const pool = poolWithTopup('cup_start');
+    expect(new Set(pool).size).toBe(pool.length);
+  });
+  it('ROUND-9: пул каждой точки ≥6 (больше выбора), все id — из каталога', () => {
+    const short: string[] = [];
+    for (const wp of ARM_WEAK_POINTS) {
+      const pool = poolWithTopup(wp);
+      if (pool.length < 6) short.push(`${wp}: ${pool.length}`);
+      for (const id of pool) if (!CAT.has(id)) short.push(`${wp}: нет id ${id}`);
+    }
+    expect(short).toEqual([]);
   });
   it('CORRECTION_ROLE покрывает все ключи без мусора', () => {
     for (const id of Object.keys(CORRECTION_ROLE)) expect(CAT.has(id)).toBe(true);
