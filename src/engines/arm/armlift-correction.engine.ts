@@ -98,6 +98,9 @@ const SUPPORT_MAX: PoolEntry[] = [
   { exId: 'grandfather_clock', protocol: 'Вертикальная труба DOH, тяга без вращения', dose: '4×3', freq: '1×/нед', source: 'ArmliftingUSA Clock', sets: 4, reps: [3, 3], restSec: 180, dayTag: 'SupportGrip', fixes: ['mid', 'lockout'], warmup: 'Разминка: круги + лёгкие сжимания 1×12', causes: ['max_strength', 'endurance'], minLevel: 'advanced', phase: 'strength', cues: ['Вертикаль', 'Без вращения'], progression: '+2.5%/нед', equipmentAlt: ['barbell', 'dumbbell'] },
   { exId: 'flask_1h', protocol: 'Одной рукой вращающаяся, синглы к топу', dose: '5×1', freq: '1×/нед', source: 'ArmliftingUSA Flask', sets: 5, reps: [1, 1], restSec: 180, dayTag: 'GripHeavy', fixes: ['off_floor', 'mid'], warmup: 'Разминка: сжимания + раскрытия 2×10', causes: ['max_strength'], minLevel: 'advanced', phase: 'strength', cues: ['Одна рука', 'Вращающаяся'], progression: 'Синглы, шаг +1кг' },
   { exId: 'napalm_handle_60', protocol: '60мм rolling, техника + холды 10с', dose: '3×5 + холд', freq: '1–2×/нед', source: 'Napalm-практика', sets: 3, reps: [5, 5], holdSeconds: 10, restSec: 150, dayTag: 'SupportGrip', fixes: ['mid', 'hold_short'], warmup: 'Разминка: круги + лёгкий гриппер 1×10', causes: ['technique', 'endurance'], minLevel: 'intermediate', phase: 'technique', cues: ['60мм', 'Техника прежде веса'], progression: 'Сначала чисто 3×5, потом вес', equipmentAlt: ['dumbbell'] },
+  { exId: 'excalibur_handle', protocol: '50мм Excalibur DOH, тяжёлые тройки без лямок', dose: '4×3', freq: '1–2×/нед', source: 'AUSA Excalibur', sets: 4, reps: [3, 3], restSec: 180, dayTag: 'SupportGrip', fixes: ['off_floor', 'mid', 'lockout'], warmup: 'Разминка: круги + лёгкие сжимания 1×12', causes: ['max_strength'], minLevel: 'intermediate', phase: 'strength', cues: ['DOH 50мм', 'Без лямок', 'Параллель'], progression: '+2.5%/нед к топ-тройке', equipmentAlt: ['barbell', 'dumbbell'] },
+  { exId: 'excalibur_handle', protocol: 'Лёгкий Excalibur на технику: центр ручки, без вращения', dose: '3×5', freq: '1–2×/нед', source: 'SAR Excalibur', sets: 3, reps: [5, 5], restSec: 120, dayTag: 'SupportGrip', warmup: 'Разминка: круги + лёгкий гриппер 1×10', causes: ['technique', 'volume'], minLevel: 'beginner', phase: 'technique', cues: ['Центр ручки', 'Без вращения'], progression: 'Сначала чисто 3×5, потом вес', equipmentAlt: ['dumbbell'] },
+  { exId: 'excalibur_handle', protocol: 'Холды 15с на Excalibur — выносливость хвата', dose: '3×15с', freq: '2×/нед', source: 'Excalibur-практика', sets: 3, reps: [1, 1], holdSeconds: 15, restSec: 120, dayTag: 'GripHeavy', fixes: ['hold_short', 'hold_long'], warmup: 'Разминка: сжимания + раскрытия 2×10', causes: ['endurance', 'fatigue'], minLevel: 'intermediate', phase: 'stability', cues: ['50мм', 'Холд до отказа формы'], progression: '+5с холда/нед', equipmentAlt: ['dumbbell'] },
 ];
 
 const PINCH: PoolEntry[] = [
@@ -112,6 +115,8 @@ const PINCH: PoolEntry[] = [
   { exId: 'country_crush_3', protocol: '3″ блок широким щипком, тяжёлые тройки', dose: '4×3', freq: '1×/нед', source: 'ArmliftingUSA Monster', sets: 4, reps: [3, 3], restSec: 150, dayTag: 'PinchGrip', fixes: ['off_floor', 'hold_short'], warmup: 'Разминка: тщательный прогрев пальцев 1×10–12', causes: ['max_strength'], minLevel: 'advanced', phase: 'strength', cues: ['3″ блок', 'Широкий щипок'], progression: '+1–2.5кг/нед' },
   { exId: 'little_big_horn', protocol: 'Конус 76→50мм щипком, удержание', dose: '3×холд 10с', freq: '1–2×/нед', source: 'Horn-практика', sets: 3, reps: [1, 1], holdSeconds: 10, restSec: 120, dayTag: 'PinchGrip', fixes: ['hold_short', 'hold_long'], warmup: 'Разминка: круги + лёгкий щипок 1×10', causes: ['technique', 'endurance'], minLevel: 'advanced', phase: 'technique', cues: ['Конус', 'Удержание без сползания'], progression: '+5с холда/нед' },
   { exId: 'finger_containment_band', protocol: 'Резина вокруг пальцев — не распахивать, держать свод', dose: '3×15', freq: '2–3×/нед', source: 'Containment-практика', sets: 3, reps: [12, 15], restSec: 60, dayTag: 'PinchGrip', fixes: ['hold_short', 'mid'], warmup: 'Без разминки — активация', causes: ['technique', 'mobility'], minLevel: 'beginner', phase: 'technique', cues: ['Не распахивать пальцы', 'Держать свод'], progression: 'Туже резина → дольше', equipmentAlt: ['band'], gentle: true },
+  { exId: 'country_crush_2', protocol: '2″ блок лёгким весом — техника щипка и постановки пальцев', dose: '3×5', freq: '2×/нед', source: 'AUSA Crush техника', sets: 3, reps: [5, 5], restSec: 120, dayTag: 'PinchGrip', warmup: 'Разминка: круги + 1×10 лёгким блоком', causes: ['technique', 'volume'], minLevel: 'beginner', phase: 'technique', cues: ['Пальцы прямо', 'Без рывка'], progression: 'Сначала чисто, потом вес', equipmentAlt: ['dumbbell'] },
+  { exId: 'euro_pinch_2h', protocol: 'Евро-пластины холдами 15с — выносливость щипка', dose: '3×15с', freq: '2×/нед', source: 'Euro Pinch холды', sets: 3, reps: [1, 1], holdSeconds: 15, restSec: 120, dayTag: 'PinchGrip', fixes: ['hold_short', 'hold_long'], warmup: 'Разминка: мел + 1×10–12 лёгким щипком', causes: ['endurance'], minLevel: 'intermediate', phase: 'stability', cues: ['Две руки', 'Холд до отказа формы'], progression: '+5с холда/нед', equipmentAlt: ['dumbbell'] },
 ];
 
 const CRUSH: PoolEntry[] = [
@@ -121,6 +126,8 @@ const CRUSH: PoolEntry[] = [
   { exId: 'silver_bullet_hold', protocol: 'Удержание патрона в закрытом гриппере на время', dose: '3×макс', freq: '2×/нед', source: 'IronMind Silver', sets: 3, reps: [1, 1], holdSeconds: 20, restSec: 120, dayTag: 'CrushGrip', fixes: ['hold_short', 'hold_long'], causes: ['endurance'], minLevel: 'intermediate', phase: 'stability', cues: ['Вертикаль', 'Патрон не ронять'], progression: '+5с/нед' },
   { exId: 'coc_no1_5', protocol: 'Work: 5–7 до отказа — мостик к №2', dose: '3×5–7', freq: '2–3×/нед', source: 'CoC-канон work (1.5)', sets: 3, reps: [5, 7], restSec: 120, dayTag: 'CrushGrip', fixes: ['close_fail'], warmup: 'Разминка: гриппером легче 1×10–12', causes: ['max_strength'], minLevel: 'advanced', phase: 'strength', cues: ['Мостик к №2', 'До отказа'], progression: '10–12 → пробовать №2' },
   { exId: 'coc_no2', protocol: 'Work: 3–5 до отказа — соревновательный уровень', dose: '3×3–5', freq: '2×/нед', source: 'CoC-канон work (№2)', sets: 3, reps: [3, 5], restSec: 150, dayTag: 'CrushGrip', fixes: ['close_fail'], warmup: 'Разминка: лесенка 2–3 гриппера вверх', causes: ['max_strength'], minLevel: 'advanced', phase: 'strength', cues: ['Низкие повторы', 'Высокое усилие'], progression: 'Тройки → пятёрки → №2.5' },
+  { exId: 'coc_no1', protocol: 'Объёмные сеты 8–10 на №1 — работа на выносливость хвата', dose: '3×8–10', freq: '2×/нед', source: 'CoC FAQ volume', sets: 3, reps: [8, 10], restSec: 90, dayTag: 'CrushGrip', warmup: 'Разминка: гриппером легче 1×12', causes: ['volume', 'endurance'], minLevel: 'intermediate', phase: 'stability', cues: ['Без отказа', 'Ровный темп'], progression: '+1–2 повтора/нед' },
+  { exId: 'silver_bullet_hold', protocol: 'Патрон в лёгком гриппере — техника вертикали и постановки', dose: '3×10с', freq: '2×/нед', source: 'IronMind Silver техника', sets: 3, reps: [1, 1], holdSeconds: 10, restSec: 90, dayTag: 'CrushGrip', warmup: 'Разминка: лёгкий гриппер 1×10', causes: ['technique'], minLevel: 'beginner', phase: 'technique', cues: ['Вертикаль', 'Лёгкий гриппер'], progression: '+5с/нед' },
 ];
 
 const ENDURANCE: PoolEntry[] = [
@@ -128,6 +135,9 @@ const ENDURANCE: PoolEntry[] = [
   { exId: 'towel_pullup', protocol: 'Полотенце через перекладину, DOH, без лямок', dose: '3×8', freq: '1–2×/нед', source: 'NSCA towel', sets: 3, reps: [6, 8], restSec: 120, dayTag: 'SupportGrip', fixes: ['mid', 'hold_long'], warmup: 'Разминка: вис лёгкий + круги 1 мин', causes: ['endurance', 'volume'], minLevel: 'intermediate', phase: 'stability', cues: ['DOH', 'Без лямок'], progression: '+1–2 повтора/нед', equipmentAlt: ['bodyweight'] },
   { exId: 'fat_gripz_curl', protocol: 'Любые сгибания с накладками 50мм', dose: '3×10', freq: '1–2×/нед', source: 'AUSA Fat Gripz', sets: 3, reps: [8, 12], restSec: 90, dayTag: 'SupportGrip', fixes: ['mid', 'hold_short'], warmup: 'Разминка: лёгкие сжимания 1×15', causes: ['volume', 'technique'], minLevel: 'beginner', phase: 'technique', cues: ['Накладки 50мм', 'Строго'], progression: '+1–2 повтора/нед', equipmentAlt: ['dumbbell'] },
   { exId: 'indian_clubs', protocol: 'Лёгкие булавы 5 lbs, high-rep на кровоток', dose: '2×20', freq: '2–3×/нед', source: 'Indian clubs balance', sets: 2, reps: [15, 20], restSec: 60, dayTag: 'SupportGrip', fixes: ['hold_long'], warmup: 'Без разминки — восстановление', causes: ['mobility', 'fatigue'], minLevel: 'beginner', phase: 'stability', cues: ['Легко', 'Кровоток, не отказ'], progression: 'Дольше без усталости', equipmentAlt: ['dumbbell'], gentle: true },
+  { exId: 'towel_pullup', protocol: 'Вис на полотенце 3×макс — мобильность и хват', dose: '3×макс', freq: '1–2×/нед', source: 'NSCA towel холд', sets: 3, reps: [1, 1], holdSeconds: 25, restSec: 120, dayTag: 'SupportGrip', fixes: ['hold_long'], warmup: 'Разминка: вис лёгкий 1 мин', causes: ['mobility', 'fatigue'], minLevel: 'intermediate', phase: 'stability', cues: ['DOH', 'До отказа формы'], progression: '+5с/нед' },
+  { exId: 'farmer_walk_fat', protocol: 'Лёгкие накладки 50–60% — техника походки и корпуса', dose: '3×20м', freq: '1–2×/нед', source: 'NSCA carries техника', sets: 3, reps: [20, 30], restSec: 90, dayTag: 'SupportGrip', warmup: 'Разминка: сжимания 1×15@30–40%', causes: ['technique', 'mobility'], minLevel: 'beginner', phase: 'technique', cues: ['Корпус прямо', 'Ровный шаг'], progression: '+5м/нед', equipmentAlt: ['dumbbell'] },
+  { exId: 'fat_bar_deadlift', protocol: '50мм гриф на холдах 20с — выносливость DOH', dose: '3×20с', freq: '2×/нед', source: 'NSCA thick bar холд', sets: 3, reps: [1, 1], holdSeconds: 20, restSec: 120, dayTag: 'GripHeavy', fixes: ['hold_long', 'mid'], warmup: 'Разминка: DOH лёгкий 1×10', causes: ['endurance', 'volume'], minLevel: 'intermediate', phase: 'stability', cues: ['DOH 50мм', 'Без лямок'], progression: '+5с/нед', equipmentAlt: ['barbell'] },
 ];
 
 const WRIST_EXT: PoolEntry[] = [
@@ -322,16 +332,16 @@ export function rankArmliftCorrections(
     pool = cocLadderPool(Number(ctx.cocLevel));
   } else if (impl === 'coc_gripper' || impl === 'silver_bullet') pool = CRUSH;
   else pool = [...(BASE_POOL[weakLink] || BASE_POOL.fingers)];
-  // D10 E3: дисбаланс — экстензор втягивается в любой пул (CTD: extensors во всех программах).
+  // D10 E3: дисбаланс — экстензор втягивается в любой пул ПЕРВЫМ (CTD: extensors-first во всех программах).
   if (ctx.extImbalance && !pool.some((p) => p.exId === 'wrist_ext_bb')) {
-    pool = [...pool, {
+    pool = [{
       exId: 'wrist_ext_bb', protocol: 'Ладони вниз на жжение + Expand 2×15', dose: '3×15–25',
       freq: '3–4×/нед', source: 'Баланс flex/ext', sets: 3, reps: [15, 25], restSec: 60,
       dayTag: 'SupportGrip', fixes: ['mid'],
       causes: ['mobility', 'fatigue'], minLevel: 'beginner', phase: 'stability',
       cues: ['Ладони вниз', 'На жжение, не в отказ'], progression: '+2–3 повтора/нед',
       equipmentAlt: ['dumbbell', 'band'], gentle: true,
-    }];
+    }, ...pool];
   }
   // Практика своим снарядом — первой, если звено/причина про технику (специфичность).
   const implEx = IMPLEMENT_TO_EX[impl];

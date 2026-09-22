@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { rankArmliftCorrections, buildArmliftSpecBlock, armliftCorrectionPoolIds } from '../armlift-correction.engine';
 import {
   injectArmliftCorrections,
@@ -25,6 +27,19 @@ describe('PRO-CORR K1: библиотека PRO на реальных id', () =>
     expect(ids.length).toBeGreaterThanOrEqual(35);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(getArmExerciseById(id)).toBeTruthy();
+  });
+  it('ROUND-9: библиотека 42→≥50 записей; Excalibur покрыт коррекциями', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/arm/armlift-correction.engine.ts'), 'utf8');
+    expect((src.match(/\{ exId:/g) || []).length).toBeGreaterThanOrEqual(50);
+    for (const phase of ['technique', 'strength', 'stability']) {
+      expect((src.match(new RegExp(`phase: '${phase}'`, 'g')) || []).length).toBeGreaterThanOrEqual(10);
+    }
+    const ids = armliftCorrectionPoolIds();
+    expect(ids).toContain('excalibur_handle');
+    // Excalibur покрыт в самой библиотеке (снаряд был в каталоге без практики).
+    expect((src.match(/\{ exId: 'excalibur_handle'/g) || []).length).toBeGreaterThanOrEqual(2);
+    const exLines = src.split('\n').filter((l) => l.includes("exId: 'excalibur_handle'"));
+    expect(exLines.every((l) => l.includes('cues:') && l.includes('progression:'))).toBe(true);
   });
   it('топ несёт кью и прогрессию (показ в табе)', () => {
     const top = rankArmliftCorrections('thumb', 'saxon_bar', {});
