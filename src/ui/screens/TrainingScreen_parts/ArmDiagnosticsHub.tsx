@@ -5,13 +5,13 @@
  * - Видео BlazePose (estimateAnglesFromLandmarks) + canvas preview
  * - Вывод в Арм-конструктор via planner-bridge (weakpoints)
  */
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { diagnoseArmWeakDetailed, expandLegacyWeakPoints, LEGACY_TO_DETAILED } from '../../../engines/arm/arm-weakpoint.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from '../../../engines/arm/arm-volume-landmarks.engine';
 import { checkHumerusGuard, checkWristBalance } from '../../../engines/arm/arm-injury-guard.engine';
 import { tableWeekKind } from '../../../engines/arm/arm-table.engine';
 import { buildArmDiagnosticsReport } from '../../../engines/arm/arm-diagnostics-hub.engine';
-import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, estimateAnglesFromLandmarks, hasVideoSupport, ensureHandsModel, createHandsProcessor, isAnglesVerified } from '../../../engines/arm/arm-motion-capture.engine';
+import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, estimateAnglesFromLandmarks, isAnglesVerified } from '../../../engines/arm/arm-motion-capture.engine';
 import { estimateForceVector } from '../../../engines/arm/arm-force-capture.engine';
 import { diagnoseVbt } from '../../../engines/arm/arm-vbt-capture.engine';
 import { buildDynamicReport } from '../../../engines/arm/arm-dynamic-force.engine';
@@ -192,7 +192,6 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [tab, setTab] = useState<HubTab>('grip');
   const [toast, setToast] = useState<string>('');
   const [forceHistoryTick, setForceHistoryTick] = useState(0);
-  const [showCam, setShowCam] = useState(false);
   const p1saved = useMemo(loadP1State, []);
   const [specWeeks, setSpecWeeks] = useState(String((p1saved as any).specWeeks ?? '6'));
   const [injectMsg, setInjectMsg] = useState('');
@@ -297,10 +296,6 @@ export const ArmDiagnosticsHub: React.FC = () => {
     setTiq((prev) => { const next = [...prev, b].slice(-60); saveTiq(next); return next; });
     setTiqFouls(''); setTiqWin(true); setTiqSlip(false); setTiqStrap(false); setTiqCenter(''); setTiqFinish('');
   };
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const handsRef = useRef<{ stop: () => void } | null>(null);
-
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
   }, [state]);
@@ -431,7 +426,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     try { return vbtThresholdForWeakPoint(wp0); } catch { return null; }
   }, [state.weakPoints]);
 
-  const anglesVerified = hasVideoSupport() && isAnglesVerified(angles);
+  const anglesVerified = isAnglesVerified(angles);
 
   // Dynamic trials (Bezkorovainyi 4 теста)
   const dynamicTrials = useMemo(() => {
@@ -531,7 +526,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     },
     weakPoints: state.weakPoints as any,
     angles: { elbowDeg: parseFloat(state.elbowDeg) || 110, wristDeg: parseFloat(state.wristDeg) || 10, forearmDeg: parseFloat(state.forearmDeg) || 90 },
-    hasVideo: hasVideoSupport(),
+    hasVideo: false,
     hasVbt: !!(state.vbtWeight && state.vbtVel),
     hasGripHistory: (()=>{ try{ return loadForceTrials().length>0; } catch{ return false; } })(),
     grip: { rtKg: state.rtKg ? parseFloat(state.rtKg) : undefined, axleKg: state.axleKg ? parseFloat(state.axleKg) : undefined, pinchSec: state.pinchSec ? parseFloat(state.pinchSec) : undefined, sideKg: state.sideKg ? parseFloat(state.sideKg) : undefined, backKg: state.backKg ? parseFloat(state.backKg) : undefined, leftKg: state.leftKg ? parseFloat(state.leftKg) : undefined, rightKg: state.rightKg ? parseFloat(state.rightKg) : undefined } as any,
@@ -1299,14 +1294,10 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const scoring = (report as any).scoring as ReturnType<typeof scoreArm> | undefined;
   const showScoring = !!scoring && (scoring.verification>0 || scoring.floors.length>0);
 
-  // Video handler stub — при загрузке файла парсим как landmarks
+  // Углы из файла landmarks (JSON) — локально, без CDN/камеры.
   const handleVideoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setToast('📹 Видео загружено — парсим углы (BlazePose stub: используем ручные ползунки, модель — отдельный эпик)');
-    setTimeout(()=>setToast(''), 3000);
-    // реальная модель требует @mediapipe/hands + canvas — оставляем ручной fallback, но помечаем verified
-    // симуляция: считываем как текст json с landmarks если есть
     try {
       const text = await file.text();
       if (text.includes('shoulder')) {
@@ -1314,49 +1305,16 @@ export const ArmDiagnosticsHub: React.FC = () => {
         const frame = estimateAnglesFromLandmarks(lm);
         if (frame.elbowDeg) setState(s=> ({ ...s, elbowDeg: String(frame.elbowDeg), forearmDeg: String(frame.forearmDeg), wristDeg: String(frame.wristDeg), direction: (frame.direction as any) || s.direction }));
         setToast('✓ Углы из landmarks применены');
+        setTimeout(()=>setToast(''), 2500);
+      } else {
+        setToast('Файл без landmarks — нужен JSON с точками (shoulder/elbow/wrist)');
+        setTimeout(()=>setToast(''), 2500);
       }
-    } catch {}
-  };
-
-  // Camera: getUserMedia + Hands pipeline (механизм-ориентированная)
-  useEffect(() => {
-    if (!showCam) {
-      if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; }
-      if (handsRef.current) { try { handsRef.current.stop(); } catch {} handsRef.current=null; }
-      return;
+    } catch {
+      setToast('Файл не распознан — нужен JSON-экспорт landmarks');
+      setTimeout(()=>setToast(''), 2500);
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const stream = await (navigator.mediaDevices as any)?.getUserMedia?.({ video: { facingMode: 'user' } });
-        if (!stream || cancelled) return;
-        streamRef.current = stream;
-        if (videoRef.current) { (videoRef.current as any).srcObject = stream; try { await videoRef.current.play(); } catch {} }
-        const hasHands = await ensureHandsModel().catch(()=>false);
-        if (!cancelled && hasHands && videoRef.current) {
-          // запуск Hands loop — углы обновляются live
-          const proc = createHandsProcessor(videoRef.current, (frame) => {
-            if (cancelled) return;
-            // обновляем ползунки live (факт, без риска)
-            setState(s => ({ ...s,
-              elbowDeg: String(frame.elbowDeg ?? s.elbowDeg),
-              forearmDeg: String(frame.forearmDeg ?? s.forearmDeg),
-              wristDeg: String(frame.wristDeg ?? s.wristDeg),
-              direction: (frame.direction as any) ?? s.direction,
-            }));
-          });
-          if (proc) handsRef.current = proc;
-        }
-        setToast(hasHands ? '📹 Камера + Hands модель загружена — углы live' : '📹 Камера включена — Hands CDN не загружен, fallback ползунки');
-        setTimeout(()=>setToast(''),2500);
-      } catch (e:any) {
-        setToast(`⚠ Камера недоступна: ${e?.message || e}`);
-        setTimeout(()=>setToast(''),3000);
-        setShowCam(false);
-      }
-    })();
-    return () => { cancelled = true; if (streamRef.current) { streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; } if (handsRef.current) { try { handsRef.current.stop(); } catch {} handsRef.current=null; } };
-  }, [showCam]);
+  };
 
   // Презентационный контекст для arm-hub-tabs/panels (вычислено выше, тела 1-в-1).
   const setMob = (key: string, v: boolean) => {
@@ -1383,7 +1341,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     state, setState, report, diag, angles, angleValid, anglesVerified, recAngles, autoPoint,
     hasWeak, scoring, showScoring, weightClassAuto, benchRes, forceVecPro, toast, bwNum,
     applyToConstructor, tab, setTab, toggleWeakPoint, clearWeakPoints, toggleLegacy,
-    handleVideoFile, showCam, setShowCam, videoRef,
+    handleVideoFile,
     trackCsv, setTrackCsv, setTrackCsvClear, trackMetrics, trackType, trackSrd, setBaseXLoop,
     platformP0, measureHistP0, setMeasureTick,
     attKg, setAttKg, attOk, setAttOk, setAttTick, attHistP0,

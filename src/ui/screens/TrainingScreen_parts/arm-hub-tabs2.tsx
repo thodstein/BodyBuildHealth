@@ -6,7 +6,6 @@
 import React from 'react';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
-import { hasVideoSupport } from '../../../engines/arm/arm-motion-capture.engine';
 import { ARM_BIOMECH } from '../../../engines/arm/arm-biomechanics.engine';
 import { HUMERUS_CHECKS, checkHumerusChecklist } from '../../../engines/arm/arm-humerus-checklist.engine';
 import { AdSec, AdGrid, AdField, AdChip, AdSwitch, AdSheetSelect, AdBtn, AdBanner } from './arm-design-system';
@@ -484,7 +483,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
         </AdSec>
         <AdSec title="Дополнительно">
           <div className="ad-muted">Техника: {state.technique} · Уровень: {state.level} · Направление: {state.direction} · Углы: {angles.elbowDeg}°/{angles.forearmDeg}°/{angles.wristDeg}°</div>
-          <div className="ad-muted">Видео: {hasVideoSupport()?'поддерживается':'—'} · Ввод: {anglesVerified?'углы в допуске':'ручной'}</div>
+          <div className="ad-muted">Ввод углов: {anglesVerified?'в допуске':'ручной (или JSON landmarks)'}</div>
         </AdSec>
       </AdGrid>
       <AdBanner tone="info">

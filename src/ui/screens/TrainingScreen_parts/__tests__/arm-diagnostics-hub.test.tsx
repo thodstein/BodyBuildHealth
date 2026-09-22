@@ -82,17 +82,12 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(screen.getByPlaceholderText('15').getAttribute('inputmode')).toBe('decimal');
   });
 
-  it('APK: офлайн-хинт про Hands-модель', () => {
-    const nav = window.navigator as any;
-    const prev = nav.onLine;
-    Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
-    try {
-      render(<ArmDiagnosticsHub />);
-      fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
-      expect(document.body.textContent).toContain('Офлайн (APK)');
-    } finally {
-      Object.defineProperty(window.navigator, 'onLine', { value: prev, configurable: true });
-    }
+  it('видео убрано: нет камеры, есть загрузка landmarks JSON', () => {
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
+    expect(document.body.textContent).toContain('Углы из файла landmarks');
+    expect(document.body.textContent).not.toContain('Включить камеру');
+    expect(document.body.textContent).not.toContain('Офлайн (APK)');
   });
 
   it('legacy cup зеркалится в чипы 12 точек', () => {

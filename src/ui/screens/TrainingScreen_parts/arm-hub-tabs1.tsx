@@ -12,8 +12,6 @@ import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine'
 import { ARM_CORRECTIONS } from '../../../engines/arm/arm-weakpoint-corrections';
 import { saveArmMeasureSnapshot } from '../../../engines/arm/arm-force-history.store';
 import { savePlatformLogEntry } from '../../../engines/arm/arm-platform.engine';
-import { hasVideoSupport } from '../../../engines/arm/arm-motion-capture.engine';
-import { isOnline } from '../../../core/native-bridge';
 import { AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner } from './arm-design-system';
 import { WEAK_GROUPS, WP_LABEL_SHORT } from './arm-hub-shared';
 import { ArmPickBlock } from './arm-hub-pick';
@@ -178,7 +176,7 @@ export function HubGripTab({ H }: { H: any }) {
 }
 
 export function HubWristTab({ H }: { H: any }) {
-  const { state, setState, angles, angleValid, anglesVerified, recAngles, autoPoint, toggleWeakPoint, showCam, setShowCam, handleVideoFile, trackCsv, setTrackCsv, trackMetrics, trackType, trackSrd, setBaseXLoop, setTrackCsvClear, diag, clearWeakPoints, toggleLegacy, videoRef } = H;
+  const { state, setState, angles, angleValid, anglesVerified, recAngles, autoPoint, toggleWeakPoint, handleVideoFile, trackCsv, setTrackCsv, trackMetrics, trackType, trackSrd, setBaseXLoop, setTrackCsvClear, diag, clearWeakPoints, toggleLegacy } = H;
   return (
     <div>
       <div className="ad-sec-t" data-arm="wrist-params-head">📥 Замеры — углы и видео</div>
@@ -202,7 +200,7 @@ export function HubWristTab({ H }: { H: any }) {
       <AdBanner tone={angleValid.valid ? 'ok' : 'bad'}>
         <b>РУ: {angles.elbowDeg}° · {angles.direction} · pron {angles.pronDeg}° sup {angles.supDeg}° · {anglesVerified?'✓ верифицировано':'○ ручной ввод'}</b>
         <div>{angleValid.valid? '✓ В допуске' : angleValid.warnings.join(' · ')}</div>
-        <div>Рекомендация для {state.technique}: {recAngles.elbowDeg}° {recAngles.direction} (hasVideoSupport: {hasVideoSupport()?'да':'нет — подключи Hands/BlazePose'})</div>
+        <div>Рекомендация для {state.technique}: {recAngles.elbowDeg}° {recAngles.direction}</div>
       </AdBanner>
       {autoPoint && !state.weakPoints.includes(autoPoint) && (
         <AdBanner tone="warn">
@@ -210,11 +208,10 @@ export function HubWristTab({ H }: { H: any }) {
           <AdChip active={false} onClick={()=>toggleWeakPoint(autoPoint)}>+ Добавить {autoPoint}</AdChip>
         </AdBanner>
       )}
-      <AdSec title="📹 Видео (BlazePose/HANDS) — опционально" hint="Камера или landmarks JSON → углы автоматически (estimateAnglesFromLandmarks + angleBetween). Fallback — ручные ползунки." collapsible defaultOpen={false} summary={showCam ? 'камера вкл' : 'ручной ввод'}>
-        {!isOnline() && <AdBanner tone="warn">📴 Офлайн (APK): Hands-модель грузится из CDN и недоступна — камера покажет картинку без live-углов, вводи углы вручную или JSON.</AdBanner>}
+      <AdSec title="🎥 Углы из файла landmarks (JSON)" hint="Экспорт точек (shoulder/elbow/wrist) из любого трекера поз → углы подставятся в ползунки. Работает офлайн, без камеры и CDN." collapsible defaultOpen={false} summary="JSON">
         <div className="ad-row">
-          <AdChip active={showCam} tone="green" onClick={()=> setShowCam((v: boolean)=>!v)}>{showCam?'⏹ Выкл камеру':'📹 Включить камеру'}</AdChip>
-          <label className="ad-chip">📁 JSON<input type="file" accept=".json" onChange={handleVideoFile} style={{ display:'none' }} /></label>
+          <label className="ad-chip">📁 Загрузить JSON<input type="file" accept=".json" onChange={handleVideoFile} style={{ display:'none' }} /></label>
+          <span className="ad-muted">Элбоу {angles.elbowDeg}° · forearm {angles.forearmDeg}° · wrist {angles.wristDeg}° · {anglesVerified ? '✓ в допуске' : 'проверь углы'}</span>
         </div>
         <AdSec title="📊 Kinovea CSV трекинга кисти (t,x,y)" collapsible defaultOpen={false} summary={trackMetrics ? `xLoop ${trackMetrics.xLoop} · ${trackMetrics.points} точек` : 'CSV не загружен'}>
           <textarea value={trackCsv} onChange={(e) => setTrackCsv(e.target.value)} placeholder={'t,x,y\n0,0,0\n0.1,1.2,0.5'} rows={3} className="ad-mono" />
@@ -234,23 +231,6 @@ export function HubWristTab({ H }: { H: any }) {
             </div>
           )}
         </AdSec>
-        <div className="ad-sec">
-          {showCam ? (
-            <>
-              <video ref={videoRef} className="ad-video" autoPlay muted playsInline />
-              <div className="ad-row">
-                <span className="ad-tag">Элбоу {angles.elbowDeg}°</span>
-                <span className="ad-tag">{angles.direction}</span>
-                <span className="ad-tag">{angleValid.valid?'✓':'⚠'}</span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="ad-video-ph" data-arm="video-ph">video preview — PRO: BlazePose + angleBetween()</div>
-              <div className="ad-muted">Элбоу {angles.elbowDeg}° · forearm {angles.forearmDeg}° · wrist {angles.wristDeg}° · {hasVideoSupport()?'Hands ready':'нужен Hands'}</div>
-            </>
-          )}
-        </div>
       </AdSec>
       <AdSec title="🎯 12 мёртвых точек (1–3)" hint={`Группы Кисть/Ротация/Давление · техника ${state.technique} · до 3`} status={state.weakPoints.length ? 'ok' : undefined}>
         <div className="ad-row" data-arm="wp-groups">
