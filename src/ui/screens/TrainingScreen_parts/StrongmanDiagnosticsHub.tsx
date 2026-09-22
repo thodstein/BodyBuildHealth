@@ -28,6 +28,8 @@ import { diagnoseSMWeakCause, SM_WEAK_CAUSE_LABELS } from '../../../engines/stre
 import { rankCorrectionsForSM, rankCorrectionsForSMLibrary } from '../../../engines/strength-sport/strength-sport-sm-correction-rank.engine';
 import { correctivesForSMWeakPoint, correctiveSessionForSM, correctiveBlockForSM, smCorrectiveExportLines, smTagsForMetrics, smErrorTagsForMetrics, SM_ERROR_TAG_RU, smCorrectivesByError } from '../../../engines/strength-sport/strength-sport-sm-corrective.engine';
 import { buildSMSpecBlock } from '../../../engines/strength-sport/strength-sport-sm-spec-block.engine';
+import { auditSMPlan, SM_ALL_PHASES, hubTabForSMPhase } from '../../../engines/strength-sport/strength-sport-sm-plan-audit.engine';
+import { injectSMWeakPoints, snapshotSMPlanForInject, rollbackSMPlanInject, hasSMPlanPrev, SM_INJECT_PREV_KEY } from '../../../engines/strength-sport/strength-sport-sm-injection.engine';
 import { simulateContest } from '../../../engines/strength-sport/strength-sport-contest-simulator.engine';
 import { buildSMAttemptsForContest } from '../../../engines/strength-sport/strength-sport-sm-attempts-bridge.engine';
 import { diagnoseSMAnthro } from '../../../engines/strength-sport/strength-sport-sm-anthro.engine';
@@ -277,6 +279,14 @@ const SM_CORR_EQUIP = [
   { id: 'bodyweight', label: 'Свой вес' },
 ];
 
+/** Короткие подписи 16 SM-фаз для чипов аудита покрытия. */
+const SM_PHASE_SHORT: Record<string, string> = {
+  log_dip: 'лог-дип', log_drive: 'лог-драйв', log_lockout: 'лог-финиш', log_clean: 'лог-зачистка',
+  yoke_pickup: 'йок-подъём', yoke_walk: 'йок-ход', farmers_pickup: 'фрм-старт', farmers_carry: 'фрм-ход',
+  stone_off_floor: 'кам-отрыв', stone_lap: 'кам-lap', stone_load: 'кам-загрузка',
+  yoke_turn: 'йок-разворот', farmers_grip: 'хват', grip_support: 'опора', core_brace: 'кор', conditioning: 'кондиция',
+};
+
 const HUB_SF = '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif';
 
 /** Свитч-тогл топ-уровня: трек 52×32, слайд-кноб, янтарный glow во вкл. */
@@ -455,6 +465,10 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const [poseResult, setPoseResult] = useState<{ verdict: string; lines: string[]; n: number } | null>(null);
   const [carryPath, setCarryPath] = useState<{ type: string; verdict: string; lines: string[] } | null>(null);
   const [autoAngles, setAutoAngles] = useState<{ verdict: string; lines: string[] } | null>(null);
+  // Инъекция коррекций в текущий SM-план (he_strength_sport_plan_v1) + откат
+  const [planNonce, setPlanNonce] = useState(0);
+  const [smInjectMsg, setSmInjectMsg] = useState('');
+  const [hasInjectPrev, setHasInjectPrev] = useState<boolean>(() => { try { return hasSMPlanPrev(); } catch { return false; } });
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -779,6 +793,35 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const smCorrExport = useMemo(() => {
     try { return smCorrectiveExportLines(smWeakPoints as any, smCauseByPhase as any, { level: smCorrFilter.level, equipment: smCorrFilter.equipment, fatigueSensitive: smCorrFilter.fatigueSensitive, mobilityRestrictions: smCorrFilter.mobilityRestrictions }); } catch { return []; }
   }, [smWeakPoints, smCauseByPhase, smCorrFilter]);
+  // ── Аудит текущего SM-плана (he_strength_sport_plan_v1) + инъекция/откат ──
+  const smPlan = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_strength_sport_plan_v1');
+      if (!raw) return null;
+      const j = JSON.parse(raw);
+      return (j?.weeksData ? j : j?.plan?.weeksData ? j.plan : null) as any;
+    } catch { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planNonce]);
+  const smAudit = useMemo(() => { try { return auditSMPlan(smPlan); } catch { return null; } }, [smPlan]);
+  // доза карточек (top-1 каждой фазы) → протоколы инъекции
+  const smCorrProtocols = useMemo(() => {
+    const out: Record<string, { sets: number; reps: number; pct: number }> = {};
+    for (const wp of smWeakPoints as string[]) {
+      const p = ((smCorrTops as any)[wp] || [])[0]?.protocolAdj;
+      if (p) out[wp] = { sets: p.sets, reps: p.reps, pct: p.pct };
+    }
+    return out;
+  }, [smWeakPoints, smCorrTops]);
+  // Фаза → чип-пара (группа/opt id) для «разобрать» из аудита
+  const smOptByPhase = useMemo(() => {
+    const m: Record<string, { group: 'pressWeak' | 'carryWeak' | 'loadWeak' | 'gripWeak'; id: string }> = {};
+    for (const o of PRESS_OPTS) m[o.sm] = { group: 'pressWeak', id: o.id };
+    for (const o of CARRY_OPTS) m[o.sm] = { group: 'carryWeak', id: o.id };
+    for (const o of LOAD_OPTS) m[o.sm] = { group: 'loadWeak', id: o.id };
+    for (const o of GRIP_OPTS) m[o.sm] = { group: 'gripWeak', id: o.id };
+    return m;
+  }, []);
   // ── SM corrective hints: замер → тег → топ-упражнение (sway/VBT/асимметрия/OHS) ──
   // (smMetricTags/smMetricTops — ниже, после movement-мемов: им нужны диагнозы P1–P8)
   const logDipDiag = useMemo(() => {
@@ -1275,6 +1318,67 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     if (!weeks) return;
     saveSMAnnualOverlay(weeks, parseInt(state.annualStartWeek) || 1);
     setToast(`✓ Годовая подложка: ${weeks.length} нед → годовой план`);
+    setTimeout(() => setToast(''), 2500);
+  };
+
+  // Инъекция коррекций в текущий SM-план + откат (паритет с ТА/арм)
+  const handleInjectSM = () => {
+    if (!smWeakPoints.length) { setSmInjectMsg('Выбери 1–4 слабые фазы — нечего вставлять'); setTimeout(() => setSmInjectMsg(''), 2500); return; }
+    let raw: string | null = null;
+    try { raw = localStorage.getItem('he_strength_sport_plan_v1'); } catch { /* noop */ }
+    if (!raw) { setSmInjectMsg('Нет плана стронга — собери в Стронг-конструкторе, потом вставляй'); setTimeout(() => setSmInjectMsg(''), 3000); return; }
+    let parsed: any = null;
+    try { parsed = JSON.parse(raw); } catch { setSmInjectMsg('План в хранилище битый — пересобери'); setTimeout(() => setSmInjectMsg(''), 2500); return; }
+    const plan = parsed?.weeksData ? parsed : parsed?.plan?.weeksData ? parsed.plan : null;
+    if (!plan) { setSmInjectMsg('План не распознан — пересобери'); setTimeout(() => setSmInjectMsg(''), 2500); return; }
+    try { sessionStorage.setItem(SM_INJECT_PREV_KEY, JSON.stringify(snapshotSMPlanForInject(plan))); } catch { /* noop */ }
+    const weekIdxs = (plan.weeksData || []).map((_: any, i: number) => i).filter((i: number) => !(plan.weeksData[i] as any)?.deload);
+    const unilateralBoost: Record<string, string> = {};
+    try {
+      const gripWeakSide = gripAsymDiag?.weaker ?? null;
+      if (gripAsymDiag && gripAsymDiag.isAsym && gripWeakSide) { for (const wp of ['farmers_grip', 'grip_support']) if ((smWeakPoints as string[]).includes(wp)) unilateralBoost[wp] = gripWeakSide; }
+      const weakSide = suitcaseDiag?.weakSide ?? null;
+      if (suitcaseDiag && suitcaseDiag.verdict !== 'ok' && weakSide && (smWeakPoints as string[]).includes('farmers_carry')) unilateralBoost['farmers_carry'] = weakSide;
+    } catch { /* noop */ }
+    let res: ReturnType<typeof injectSMWeakPoints>;
+    try {
+      res = injectSMWeakPoints(plan, smWeakPoints as any, { weekIdxs, preferredCorr: smPrefCorr, protocols: smCorrProtocols, ...(Object.keys(unilateralBoost).length ? { unilateralBoost } : {}) });
+    } catch { setSmInjectMsg('Инъекция упала — проверь план'); setTimeout(() => setSmInjectMsg(''), 2500); return; }
+    try {
+      const out = parsed?.plan?.weeksData ? { ...parsed, plan: res.plan } : res.plan;
+      localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(out));
+    } catch { setSmInjectMsg('Не влезло в хранилище — очисти старые планы'); setTimeout(() => setSmInjectMsg(''), 2500); return; }
+    setHasInjectPrev(true);
+    setPlanNonce((n) => n + 1);
+    try { window.dispatchEvent(new Event('he-strength-sport-plan-saved')); } catch { /* noop */ }
+    setSmInjectMsg(`✓ Вставлено коррекций: ${res.injected}${res.skippedBudget ? ` · бюджет ${res.skippedBudget}` : ''}${res.skippedDup ? ` · дубли ${res.skippedDup}` : ''} (нед: ${weekIdxs.length})`);
+    setTimeout(() => setSmInjectMsg(''), 3500);
+  };
+
+  const handleRollbackSM = () => {
+    try {
+      const raw = sessionStorage.getItem(SM_INJECT_PREV_KEY);
+      if (!raw) { setSmInjectMsg('Нет снапшота для отката'); setTimeout(() => setSmInjectMsg(''), 2000); return; }
+      const snap = rollbackSMPlanInject(JSON.parse(raw));
+      const cur = JSON.parse(localStorage.getItem('he_strength_sport_plan_v1') || 'null');
+      const out = cur?.plan?.weeksData ? { ...cur, plan: snap } : snap;
+      localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(out));
+      sessionStorage.removeItem(SM_INJECT_PREV_KEY);
+      setHasInjectPrev(false);
+      setPlanNonce((n) => n + 1);
+      try { window.dispatchEvent(new Event('he-strength-sport-plan-saved')); } catch { /* noop */ }
+      setSmInjectMsg('↩ Откат выполнен — план восстановлен');
+      setTimeout(() => setSmInjectMsg(''), 2500);
+    } catch { setSmInjectMsg('Откат не удался'); setTimeout(() => setSmInjectMsg(''), 2000); }
+  };
+
+  const selectSmWorstPhase = () => {
+    const wp = smAudit?.worstPhase;
+    if (!wp) return;
+    const opt = smOptByPhase[wp as string];
+    if (opt) toggle(opt.group, opt.id);
+    setTab(hubTabForSMPhase(wp as any) as any);
+    setToast(`🎯 Открыта слабая фаза: ${SM_WEAKPOINT_LABELS[wp as SMWeakPoint] || wp}`);
     setTimeout(() => setToast(''), 2500);
   };
 
@@ -2037,7 +2141,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               const tops = (smCorrTops as Record<string, ReturnType<typeof correctivesForSMWeakPoint>>)[wp as string] || [];
               return (
                 <div key={wp as string} data-sm="corr-card" style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', borderLeft:'3px solid #f59e0b', marginBottom:8 }}>
-                  <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{SM_WEAKPOINT_LABELS[wp as SMWeakPoint] || String(wp)} <span style={{ color:'#f5b04c', fontWeight:600 }}>· {cause ? `причина: ${cause}` : 'причина: техника (данных мало)'}</span></div>
+                  <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{SM_WEAKPOINT_LABELS[wp as SMWeakPoint] || String(wp)} <span style={{ color:'#f5b04c', fontWeight:600 }}>· {cause ? `причина: ${SM_WEAK_CAUSE_LABELS[cause as keyof typeof SM_WEAK_CAUSE_LABELS] || cause}` : 'причина: техника (данных мало)'}</span></div>
                   {tops.length === 0 && (
                     <div data-sm="corr-empty-phase" style={{ fontSize:12, color:'#fff', marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.20)' }}>Под фильтры (зал/уровень) ничего не подошло — ослабь фильтры выше.</div>
                   )}
@@ -2083,6 +2187,28 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
       <div style={{ ...CARD, padding: 10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.16)' }}>
         <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6 }}>📋 Итог и применение</div>
+        {smAudit && (
+          <div data-sm="sm-plan-audit" style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', marginBottom:6 }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>
+              📋 Аудит плана: {smAudit.hasPlan ? `покрытие фаз ${smAudit.coveredCount}/${SM_ALL_PHASES.length} · сетов ${smAudit.totalSets} · раб. недель ${smAudit.workWeeks}` : 'план стронга не собран — собери в Стронг-конструкторе'}
+            </div>
+            {smAudit.hasPlan && (
+              <div data-sm="sm-coverage" style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
+                {SM_ALL_PHASES.map(ph => { const c = smAudit.byPhase[ph]; const worst = smAudit.worstPhase === ph; return (
+                  <span key={ph} title={`${SM_WEAKPOINT_LABELS[ph]} — ${c.sets} сетов`} data-covered={c.covered?'true':'false'} data-worst={worst?'true':'false'} style={{ fontSize:10, padding:'4px 8px', borderRadius:12, background: worst?'rgba(239,68,68,0.12)': c.covered?'rgba(34,197,94,0.10)':'rgba(255,255,255,0.04)', border:`1px solid ${worst?'rgba(239,68,68,0.35)': c.covered?'rgba(34,197,94,0.25)':'rgba(255,255,255,0.08)'}`, color: worst?'#ef4444': c.covered?'#22c55e':'#fff' }}>{SM_PHASE_SHORT[ph] || ph} {c.sets}</span>
+                ); })}
+              </div>
+            )}
+            {smAudit.hasPlan && smAudit.worstPhase && (
+              <button data-sm="sm-worst" onClick={selectSmWorstPhase} style={{ marginTop:6, minHeight:44, padding:'8px 12px', borderRadius:10, background:'rgba(59,130,246,0.14)', border:'1px solid rgba(140,190,255,0.2)', color:'#60a5fa', fontSize:12, fontWeight:800, cursor:'pointer' }}>🎯 Худшая фаза: {SM_WEAKPOINT_LABELS[smAudit.worstPhase]} ({smAudit.byPhase[smAudit.worstPhase].sets} сетов) → разобрать</button>
+            )}
+            <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
+              <button data-sm="sm-inject" onClick={handleInjectSM} style={{ flex:'1 1 180px', minHeight:48, padding:'10px 14px', borderRadius:12, background:'linear-gradient(135deg,#3b82f6,#a855f7)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer' }}>💉 Вставить коррекции в план ({smWeakPoints.length})</button>
+              {hasInjectPrev && <button data-sm="sm-rollback" onClick={handleRollbackSM} style={{ minHeight:48, padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer' }}>↩ Откат</button>}
+            </div>
+            {smInjectMsg && <div data-sm="sm-inject-msg" style={{ marginTop:6, fontSize:12, color: smInjectMsg.startsWith('✓') || smInjectMsg.startsWith('↩') ? '#22c55e' : '#f59e0b' }}>{smInjectMsg}</div>}
+          </div>
+        )}
         <details style={{ marginBottom:6, borderRadius:14, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
           <summary style={{ padding:'12px 14px', fontSize:13, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>Сводка расчёта — находки, ранжир, спец-блок</summary>
           <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column', gap:6 }}>

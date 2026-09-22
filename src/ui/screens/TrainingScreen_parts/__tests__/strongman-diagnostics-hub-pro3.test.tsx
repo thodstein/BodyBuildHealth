@@ -117,6 +117,6 @@ describe('StrongmanDiagnosticsHub PRO-3', () => {
     fireEvent.click(document.querySelector('[data-sm="top-tab-carry"]') as HTMLElement);
     fireEvent.click(await screen.findByText(SM_BIOMECH.farmers_carry.label));
     fireEvent.click(document.querySelector('[data-sm="top-tab-correction"]') as HTMLElement);
-    expect(await screen.findByText(/причина: grip/)).toBeTruthy();
+    expect(await screen.findByText(/причина: Хват/)).toBeTruthy();
   });
 });
