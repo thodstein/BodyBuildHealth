@@ -1,5 +1,24 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ПЛ-авто: аудит-раунд P0/P1 + делод по кнопке пользователя + P2-часть (Sep 22 2026, локально, без пуша)
+
+По команде «что осталось по ПЛ-авто, полный анализ» проведён аудит 4 направлений (движки, UI, данные циклов, статус док-плана) с перепроверкой чтением; затем «выполняем полностью; делод по кнопке должен автодобавляться НО ПРАВИЛЬНО». Только Edit/Write + vitest/tsc; чужие WIP не тронуты.
+- **Делод по кнопке (ключевое)**: NEW `src/engines/lms/lms-deload.engine.ts` — `pickDeloadWeeks`/`applyPLDeload`/`planHasDeload`. Делод применяется к **самому плану** (не runtime-оверлею): объём ×volumeMult (флор 1), RIR +shift (кламп 6), флаг `deload`, пересчёт метрик дня/цикла и `plVolumeLandmarks`; соревновательные недели (meet/mock/post/taper) и повторные клики — пропуск с честной причиной; пустой список недель → ближайшая подходящая от текущей; план не мутируется. Проводка `SRCBBScreen`: buildSrc/buildSrcMacrocycle/мост kind `deload`/реальный «↩ Убрать делод» (пересборка по раскладке цикла), конфиг `plDeloadCfg` персистится и переприменяется при каждой сборке, runtime-`deloadAdjust` чистится (не режем дважды). `PLPlanView`: маркер `🔋` в календаре/шапке/баннере `data-pl="deload-banner"` + кнопка `data-pl="deload-remove"`. Тесты `pl-deload` 7/7 + `pl-deload-wiring` 6/6.
+- **P0-1**: `selectedCycleId` удалённого/неизвестного цикла больше не роняет «3 План» — валидация при загрузке сессии + guard `originalCycleWeeks(getCycleById(...))` в PLPlanView (был TypeError на `originalCycleWeeks(undefined)`).
+- **P0-2**: `he_pl_session` пишется **merge-записью** (base из текущего объекта) — больше не теряет `season` (PLSeasonBuilder), `peds/pedDoses/courseIntensity` и `plDeloadCfg/plDiagnosticWeakSide`.
+- **P1-1**: mrv-мост в ПЛ — честная заметка (был тихий no-op: `mrvOverride` читается только BB-веткой).
+- **P1-2**: «ℹ️ в плане» → честный контур: при встраивании тапера снимок недель `he_pl_prev_weeks_v1`, кнопка «↩ Убрать тапер из плана» реально возвращает раскладку; статус «тапер: встроен / готов (не встроен)» вместо врущего «да/нет».
+- **P1-3**: `progressionRationale` уважает `pmCap` (кап-пометка в строке; было обещание ×1.74 там, где факт ×1.5) + тесты.
+- **P1-4**: слабая сторона `diagnosticWeakSide` из мастера движений доезжает до ПЛ-плана/сезона/пролётов (была потеряна); `redBlocked` → честная заметка.
+- **P1-5**: сезон — `consents/selections` больше не съезжают при выключении/перемещении слота (`segments.slotIndex`, карта `enabledIdxOf`, swap ключей, персист вкл/выкл).
+- **P1-6**: нулевое окно между стартами больше не даёт ПУСТУЮ неделю старта (1 неделя цикла + прикиды сверху) + тест.
+- **P1-7**: `detectLift('Приседания из ямы')` → squat (было dead с весом от становой) + тесты.
+- **P1-8**: `pl-tonnage-gate` флагает только РОСТ (снижение — заметка `ok`, было «Скачок −50%») + тест.
+- **P1-9**: тихие `catch` авто-пересборки после моста → заметки пользователю.
+- **P2-часть**: `rpeAttempts` приведён к канону `MEET_STRATEGY_PCT`; удалён мёртвый `TAPER_MODE_DESCS` (док ошибочно числил залоченным); CJK `日均/疲劳` в `training-load`; неиспользуемый `tw` в `pro/taper`; мёртвый JSX в `PLCompetitionTab`; честные тексты (PED-белок, федерация, «правка недели 1»); полный `PL_WEAKPOINT_LABELS` (27 ключей фаз: ohp/row/pd/inc/sumo/головки); чистка импортов `PLPlanView`.
+- **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
+- **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
+
 ## Коррекция-контент round-10 · АРМ: топ-ап снова даёт выбор (Sep 22 2026, коммит pathspec, без пуша)
 
 Реаудит после round-9: база выросла до ≥6, и **7 из 12 `POOL_TOPUP` стали чистыми дублями** (добавляли 0 уникальных id — топ-ап был мёртвым). Исправлено:

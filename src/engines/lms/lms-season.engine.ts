@@ -288,6 +288,9 @@ export interface PLSeasonSegment {
   fit: FitResult;
   candidates?: LMSRankedCycle[];
   rationale: string[];
+  /** Индекс слота среди ВКЛЮЧЁННЫХ слотов (для матчинга UI-слотов с сегментами,
+   *  в т.ч. когда слот без кандидатов пропущен и индексы сегментов сдвигаются). */
+  slotIndex?: number;
 }
 
 export interface PLSeasonPlan {
@@ -340,6 +343,7 @@ export function planSeason(input: PLSeasonInput): PLSeasonPlan {
       fit,
       candidates: input.mode === 'manual' ? candidates : undefined,
       rationale,
+      slotIndex: i,
     });
     if (weeks > 0) cycleIds.push(chosen.cycle.meta.id);
   });
@@ -392,6 +396,7 @@ export interface AssembleSeasonOptions {
   orthopedicBlockedPatterns?: string[];
   diagnosticExerciseMap?: LMSBuildInput['diagnosticExerciseMap'];
   diagnosticDayMap?: LMSBuildInput['diagnosticDayMap'];
+  diagnosticWeakSide?: LMSBuildInput['diagnosticWeakSide'];
   limiterExerciseMap?: LMSBuildInput['limiterExerciseMap'];
   limiterProtocolMap?: LMSBuildInput['limiterProtocolMap'];
   limiterDayMap?: LMSBuildInput['limiterDayMap'];
@@ -428,6 +433,7 @@ export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptio
       orthopedicBlockedPatterns: opts.orthopedicBlockedPatterns,
       diagnosticExerciseMap: opts.diagnosticExerciseMap,
       diagnosticDayMap: opts.diagnosticDayMap,
+      diagnosticWeakSide: opts.diagnosticWeakSide,
       limiterExerciseMap: opts.limiterExerciseMap,
       limiterProtocolMap: opts.limiterProtocolMap,
       limiterDayMap: opts.limiterDayMap,

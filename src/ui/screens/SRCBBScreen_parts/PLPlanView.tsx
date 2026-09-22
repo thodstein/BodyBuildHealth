@@ -26,24 +26,23 @@ import {
   sourceWeekColor, summarizeSourceCycleWeeks,
 } from '../TrainingScreen_parts/MesocycleProgressionCard';
 import {
-  ACCENT as TRAIN_ACCENT, CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
+  CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
   BbCard, BbFoldCard,
 } from '../TrainingScreen_parts/training-ui';
-import { MetricCard, PopupNumber, PopupSelect, ExpandableCard, SaveButton } from './TrainingPopups';
+import { MetricCard, SaveButton } from './TrainingPopups';
 import { AutoRegModeSwitch } from './AutoRegModeSwitch';
 import { CalendarViewSwitch } from './CalendarViewSwitch';
-import { SessionPlayer, type PlayerDay } from './SessionPlayer';
+import type { PlayerDay } from './SessionPlayer';
 import { DayCard, type PhaseKey } from '../TrainingScreen_parts/PlanOutput';
 import { usePLTaper } from './taper-state';
 import type { BridgeSession } from '../../../engines/training-integration.engine';
 import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { AutoRegMode, DiaryAutoregResult } from '../../../engines/pro/diary-autoreg.engine';
 import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
-import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareLink, plShareDigest, plTelegramAppUrl, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
+import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareDigest, plTelegramAppUrl, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
 import type { RepTempoOutput } from '../../../engines/rep-tempo-engine';
 
 // Фаза 3: карточки/кнопки/поля — из единого кита training-ui (без локальных копий токенов).
-const ACCENT = TRAIN_ACCENT;
 const CARD = TRAIN_CARD;
 const SMALL = TRAIN_SMALL;
 const BTN = TRAIN_BTN;
@@ -56,6 +55,17 @@ const CAT_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
 const GRP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор' };
 const PL_WEAKPOINT_LABELS: Record<string, string> = {
   lockout: 'Замок (дожим)', off_chest: 'Срыв с груди', mid: 'Середина', off_floor: 'Срыв с пола', sticking: 'Мёртвая точка', weak_quads: 'Слабые квадрицепсы', weak_hams: 'Слабые бицепсы бедра', weak_glutes: 'Слабые ягодицы', weak_back: 'Слабая спина', weak_grip: 'Слабый хват', weak_pause: 'Слабый пауза-присед', weak_lockout: 'Слабый замок', weak_upper_back: 'Слабый верх спины',
+  // Полный словарь фаз WEAK_POINTS_BY_LIFT (7 движений × старт/середина/замок + сумо/головки):
+  start: 'Старт/отрыв', bottom: 'Низ (дно)',
+  sumo_start: 'Сумо: срыв с пола', sumo_mid: 'Сумо: середина', sumo_lockout: 'Сумо: замыкание (бёдра)',
+  ohp_start: 'Жим стоя: срыв с груди', ohp_mid: 'Жим стоя: середина', ohp_lockout: 'Жим стоя: дожим',
+  row_start: 'Тяга в наклоне: срыв', row_mid: 'Тяга в наклоне: середина', row_squeeze: 'Тяга в наклоне: сжатие лопаток',
+  pd_top: 'Верхний блок: верх (старт)', pd_mid: 'Верхний блок: середина', pd_squeeze: 'Верхний блок: сжатие лопаток',
+  inc_off: 'Наклонный жим: срыв с груди', inc_mid: 'Наклонный жим: середина', inc_lockout: 'Наклонный жим: дожим',
+  biceps_start: 'Бицепс: старт (низ)', biceps_mid: 'Бицепс: середина', biceps_top: 'Бицепс: пиковое сокращение',
+  triceps_start: 'Трицепс: старт (разгибание)', triceps_mid: 'Трицепс: середина', triceps_lockout: 'Трицепс: замок',
+  calf_bottom: 'Икры: низ (растяжка)', calf_mid: 'Икры: середина', calf_top: 'Икры: пик',
+  shrug_start: 'Трапеции: старт', shrug_mid: 'Трапеции: середина', shrug_top: 'Трапеции: пик',
 };
 
 export interface PLPlanViewApi {
@@ -123,7 +133,10 @@ export interface PLPlanViewApi {
   setSelectedTrendEx: React.Dispatch<React.SetStateAction<string | null>>;
   tempoStr: string;
   getTempo: (exerciseName: string, goal: string, isMainLift: boolean) => RepTempoOutput;
-
+  /** 🔋 Есть ли в плане делод-неделя (мост kind 'deload', кнопка «Применить делод»). */
+  hasDeload?: boolean;
+  /** ↩ Убрать делод и пересобрать план по раскладке цикла. */
+  onRemoveDeload?: () => void;
 }
 
 export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
@@ -138,7 +151,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
     pmAutoRegMode, setPmAutoRegMode, pmDiary,
     plWeakPoints, linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
     e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
-    tempoStr, getTempo,
+    tempoStr, getTempo, hasDeload, onRemoveDeload,
   } = api;
   // 🏁 Тапер-поля — из контекста (taper-state.tsx).
   const { attemptStrategy, peakMode, taperWeeksToAdd, mockMeetOn, meetWeekOn, postMeetOn, taperNote, taperAttemptOverride } = usePLTaper();
@@ -185,6 +198,8 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
              const isMockWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.mockMeet === true;
              const isMeetWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.meetWeek === true;
              const isPostMeetWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.postMeet === true;
+             /** 🔋 Делод-неделя по действию пользователя (мост kind 'deload'). */
+             const isDeloadWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.deload === true;
              const sourceCalendar = sourceCycle && !W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).some(w => w.macroPhase)
                  ? summarizeSourceCycleWeeks(sourceCycle.weeks && sourceCycle.weeks.length > 0
                  ? sourceCycle.weeks
@@ -194,12 +209,15 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
              const MOCK_COLOR = '#a78bfa';
              const MEET_COLOR = '#eab308';
              const POST_COLOR = '#34d399';
+             const DELOAD_COLOR = '#60a5fa';
              const sourceWeek = sourceCalendar?.[wk.week - 1];
              const mockPctLabel = wk.meetAttempts ? (MEET_STRATEGY_PCT_LABEL[wk.meetAttempts.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced) : 'прикиды-синглы';
-             const calendarColor = sourceWeek && sourceCalendar ? sourceWeekColor(sourceWeek, sourceCalendar) : isMeetWeek(wk) ? MEET_COLOR : isMockWeek(wk) ? MOCK_COLOR : isPostMeetWeek(wk) ? POST_COLOR : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase];
-             const calendarTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 14%, transparent)` : (isMeetWeek(wk) ? MEET_COLOR : isMockWeek(wk) ? MOCK_COLOR : isPostMeetWeek(wk) ? POST_COLOR : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '14';
-             const calendarBorderTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 30%, transparent)` : (isMeetWeek(wk) ? MEET_COLOR : isMockWeek(wk) ? MOCK_COLOR : isPostMeetWeek(wk) ? POST_COLOR : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '30';
-             const calendarBadgeTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 13%, transparent)` : (isMeetWeek(wk) ? MEET_COLOR : isMockWeek(wk) ? MOCK_COLOR : isPostMeetWeek(wk) ? POST_COLOR : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '22';
+             // Спец-недели (соревнование/mock/пост/тапер/делод) перекрывают цвет исходной фазы.
+             const specialColor = isMeetWeek(wk) ? MEET_COLOR : isMockWeek(wk) ? MOCK_COLOR : isPostMeetWeek(wk) ? POST_COLOR : isTaperWeek(wk) ? TAPER_COLOR : isDeloadWeek(wk) ? DELOAD_COLOR : null;
+             const calendarColor = specialColor ?? (sourceWeek && sourceCalendar ? sourceWeekColor(sourceWeek, sourceCalendar) : PH_COLOR[phase]);
+             const calendarTint = sourceWeek && !specialColor ? `color-mix(in srgb, ${calendarColor} 14%, transparent)` : (specialColor ?? PH_COLOR[phase]) + '14';
+             const calendarBorderTint = sourceWeek && !specialColor ? `color-mix(in srgb, ${calendarColor} 30%, transparent)` : (specialColor ?? PH_COLOR[phase]) + '30';
+             const calendarBadgeTint = sourceWeek && !specialColor ? `color-mix(in srgb, ${calendarColor} 13%, transparent)` : (specialColor ?? PH_COLOR[phase]) + '22';
              const calendarLabel = isMeetWeek(wk)
                ? `🏁 Соревнования · прикиды ${mockPctLabel}`
                : isMockWeek(wk)
@@ -210,6 +228,8 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                ? (peakMode === 'pl' && wk.taperNote
                  ? `🏁 ${wk.taperNote.split(':')[0].trim()} · ${Math.round(weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма${wk.meetAttempts ? ' · прикиды' : ''}`
                  : `📉 Тапер · ${Math.round(weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма`)
+               : isDeloadWeek(wk)
+               ? `🔋 Делод · объём снижен, интенсивность сохранена`
                : sourceWeek
                ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]} · ${SOURCE_PHASE_LABEL[sourceWeek.phase]} · ${Math.round(sourceWeek.intensityPct * 100)}% · ${sourceWeek.volumeSets} сетов`
                : PH_RU[phase];
@@ -221,6 +241,8 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                ? `Пост-соревновательное восстановление: объём ×0.5, RIR +3 — полная разгрузка после старта, возврат к базовому объёму со следующей недели.`
                : isTaperWeek(wk)
                ? `Тапер-неделя: объём снижен (×0.65/×0.45), RIR +1/+2, интенсивность сохранена (Bosquet 2005). Разгрузка перед соревнованием.`
+               : isDeloadWeek(wk)
+               ? `Делод-неделя (добавлена по вашему действию): объём снижен, веса/проценты сохранены — восстановление без потери интенсивности. Отменить — кнопкой «↩ Убрать делод» в шапке плана.`
                : sourceWeek
                ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]}: ${SOURCE_PHASE_LABEL[sourceWeek.phase]}. ${sourceWeek.volumeSets} рабочих сетов, средняя интенсивность ${Math.round(sourceWeek.intensityPct * 100)}% 1ПМ, средний RIR ${sourceWeek.rir.toFixed(1)}.`
                : PH_DESC[phase];
@@ -338,8 +360,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               )}
               <div style={{ display:'flex', gap:6, marginTop:8, alignItems:'center', flexWrap:'wrap' }}>
                 <button onClick={() => setEditMode(m => !m)} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border: editMode ? '1px solid #f59e0b' : '1px solid rgba(245,158,11,0.55)', background: editMode ? 'rgba(245,158,11,0.28)' : 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>{editMode ? '✓ Готово' : '✏️ Правка плана'}</button>
+                {hasDeload && onRemoveDeload && (
+                  <button data-pl="deload-remove" onClick={onRemoveDeload} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(96,165,250,0.55)', background:'rgba(96,165,250,0.12)', color:'#60a5fa' }} title="Снять делод и пересобрать план по раскладке цикла">↩ Убрать делод</button>
+                )}
                 {editMode && <button onClick={() => setSrcEdits({})} disabled={Object.keys(srcEdits).length===0} style={{ ...BTN_GHOST, padding:'6px 10px', minHeight:34, fontSize:11, opacity: Object.keys(srcEdits).length===0?0.4:1 }}>↺ Сбросить</button>}
-                {editMode && <span style={{ ...SMALL }}>правка недели 1 применяется к «Выполнение»</span>}
+                {editMode && <span style={{ ...SMALL }}>правки применяются к «Выполнение» (выбранная неделя)</span>}
                 <button onClick={() => { setExpOpen(true); setExpFormat(null); setExpScope(null); setExpBlock(null); setExpWeek(null); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(96,165,250,0.55)', background:'rgba(96,165,250,0.12)', color:'#60a5fa' }}>📤 Экспорт</button>
                  <button onClick={async () => {
                    const title = builtSrc.template.meta.title;
@@ -445,7 +470,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   <span style={{ fontSize:11, fontWeight:700, color:calendarColor, background:calendarBadgeTint, padding:'2px 10px', borderRadius:8 }}>{calendarLabel}</span>
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
-                   {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const meet = isMeetWeek(w); const post = isPostMeetWeek(w); const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : meet ? MEET_COLOR : mock ? MOCK_COLOR : post ? POST_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const tint = original ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a'; const label = original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]} ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : meet ? `🏁 Соревнования · прикиды ${MEET_STRATEGY_PCT_LABEL[w.meetAttempts?.strategy ?? attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : mock ? `🎯 Имитация соревнований (mock meet) · прикиды-синглы` : post ? `🔄 Пост-старт восстановление (объём ×0.5, RIR +3)` : taper ? `📉 Тапер · ${Math.round(weekVolumeOf(w) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма` : PH_RU[ph]; const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+label} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? color : tint, color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : w.week}</button>; })}
+                   {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const meet = isMeetWeek(w); const post = isPostMeetWeek(w); const deload = isDeloadWeek(w); const color = deload ? DELOAD_COLOR : original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : meet ? MEET_COLOR : mock ? MOCK_COLOR : post ? POST_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const tint = original && !deload ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a'; const label = deload ? '🔋 Делод · объём снижен, интенсивность сохранена' : original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]} ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : meet ? `🏁 Соревнования · прикиды ${MEET_STRATEGY_PCT_LABEL[w.meetAttempts?.strategy ?? attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : mock ? `🎯 Имитация соревнований (mock meet) · прикиды-синглы` : post ? `🔄 Пост-старт восстановление (объём ×0.5, RIR +3)` : taper ? `📉 Тапер · ${Math.round(weekVolumeOf(w) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма` : PH_RU[ph]; const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+label} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? color : tint, color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{deload ? '🔋' : meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : w.week}</button>; })}
                 </div>
               </div>
               {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
@@ -469,10 +494,10 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   </div>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {(calendarView === 'original' ? W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w) && !isPostMeetWeek(w)) : W).map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const meet = isMeetWeek(w); const post = isPostMeetWeek(w); const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : meet ? MEET_COLOR : mock ? MOCK_COLOR : post ? POST_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const colorFade = original ? `color-mix(in srgb, ${color} 55%, transparent)` : color + '88'; const active = w.week === wk.week; const calWeeks = calendarView === 'original' ? W.filter(ww => !isTaperWeek(ww) && !isMockWeek(ww) && !isMeetWeek(ww) && !isPostMeetWeek(ww)) : W; const maxT = Math.max(1, ...calWeeks.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
-                    <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? (meet ? 'rgba(234,179,8,0.12)' : mock ? 'rgba(167,139,250,0.12)' : post ? 'rgba(52,211,153,0.1)' : taper ? 'rgba(245,158,11,0.1)' : 'var(--accent-dim)') : 'transparent', border: active ? (meet ? '1px solid rgba(234,179,8,0.45)' : mock ? '1px solid rgba(167,139,250,0.45)' : post ? '1px solid rgba(52,211,153,0.4)' : taper ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(0,230,138,0.3)') : '1px solid transparent' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? (meet ? '#eab308' : mock ? '#a78bfa' : post ? '#34d399' : taper ? '#f59e0b' : 'var(--accent)') : '#fff', minWidth: 26 }}>{meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : 'Н' + w.week}</span>
-                       <span style={{ width: 4, height: 14, borderRadius: 2, background: color, flexShrink: 0 }} title={original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]}: ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : meet ? '🏁 Соревнования: прикиды как подходы' : mock ? '🎯 Имитация соревнований: прикиды-синглы' : post ? '🔄 Пост-старт: объём ×0.5, RIR +3' : taper ? '📉 Тапер: объём снижен, RIR +1/+2, интенсивность сохранена' : PH_RU[ph]} />
+                    {(calendarView === 'original' ? W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w) && !isPostMeetWeek(w)) : W).map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const meet = isMeetWeek(w); const post = isPostMeetWeek(w); const deload = isDeloadWeek(w); const color = deload ? DELOAD_COLOR : original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : meet ? MEET_COLOR : mock ? MOCK_COLOR : post ? POST_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const colorFade = original && !deload ? `color-mix(in srgb, ${color} 55%, transparent)` : color + '88'; const active = w.week === wk.week; const calWeeks = calendarView === 'original' ? W.filter(ww => !isTaperWeek(ww) && !isMockWeek(ww) && !isMeetWeek(ww) && !isPostMeetWeek(ww)) : W; const maxT = Math.max(1, ...calWeeks.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
+                    <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? (meet ? 'rgba(234,179,8,0.12)' : mock ? 'rgba(167,139,250,0.12)' : post ? 'rgba(52,211,153,0.1)' : taper ? 'rgba(245,158,11,0.1)' : deload ? 'rgba(96,165,250,0.12)' : 'var(--accent-dim)') : 'transparent', border: active ? (meet ? '1px solid rgba(234,179,8,0.45)' : mock ? '1px solid rgba(167,139,250,0.45)' : post ? '1px solid rgba(52,211,153,0.4)' : taper ? '1px solid rgba(245,158,11,0.4)' : deload ? '1px solid rgba(96,165,250,0.45)' : '1px solid rgba(0,230,138,0.3)') : '1px solid transparent' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? (meet ? '#eab308' : mock ? '#a78bfa' : post ? '#34d399' : taper ? '#f59e0b' : deload ? '#60a5fa' : 'var(--accent)') : '#fff', minWidth: 26 }}>{deload ? '🔋' : meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : 'Н' + w.week}</span>
+                       <span style={{ width: 4, height: 14, borderRadius: 2, background: color, flexShrink: 0 }} title={deload ? '🔋 Делод: объём снижен, интенсивность сохранена' : original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]}: ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : meet ? '🏁 Соревнования: прикиды как подходы' : mock ? '🎯 Имитация соревнований: прикиды-синглы' : post ? '🔄 Пост-старт: объём ×0.5, RIR +3' : taper ? '📉 Тапер: объём снижен, RIR +1/+2, интенсивность сохранена' : PH_RU[ph]} />
                       <div style={{ flex: 1, display: 'flex', gap: 2 }}>
                           {w.days.map((d, di) => { const t = d.metrics.tonnage; return <div key={di} title={'Д' + (di+1) + ': ' + t.toFixed(0) + ' кг·пов'} style={{ flex: 1, height: 14, borderRadius: 3, background: t > 0 ? `linear-gradient(180deg, ${color}, ${colorFade})` : 'rgba(255,255,255,0.04)', opacity: 0.4 + 0.6 * (t / maxT) }} />; })}
                       </div>
@@ -777,6 +802,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   📉 <b>Тапер-неделя</b> — разгрузка: объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена (Bosquet 2005). Восстановление перед соревнованиями.
                 </div>
               )}
+              {isDeloadWeek(wk) && !isMockWeek(wk) && !isMeetWeek(wk) && !isTaperWeek(wk) && (
+                <div data-pl="deload-banner" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.35)', fontSize: 11, color: '#60a5fa', lineHeight: 1.45 }}>
+                  🔋 <b>Делод-неделя</b> — объём снижен, веса/проценты сохранены (разгрузка без потери интенсивности).{onRemoveDeload ? ' Убрать — кнопкой «↩ Убрать делод» выше.' : ''}
+                </div>
+              )}
               {wk.days.map((d, di) => {
                 const sourcePhase = sourceWeek?.phase || phase;
                 const dayPhase: PhaseKey = ({ base: 'accumulation', build: 'intensification', peak: 'peaking', deload: 'deload' } as Record<string, PhaseKey>)[sourcePhase] || 'accumulation';
@@ -976,7 +1006,9 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 <CalendarViewSwitch
                   value={calendarView}
                   onChange={setCalendarView}
-                  originalLabel={`🔵 Оригинальный (${originalCycleWeeks(getCycleById(selectedCycleId)!) ?? totalW} нед)`}
+                  // P0-1 guard: id цикла может быть удалён из каталога (сессия старше каталога) —
+                  // без проверки originalCycleWeeks(undefined) ронял рендер.
+                  originalLabel={`🔵 Оригинальный (${(() => { const c = getCycleById(selectedCycleId); return c ? originalCycleWeeks(c) : totalW; })()} нед)`}
                   taperedLabel={`📉 С тапером (${totalW} нед)`}
                 />
               </div>

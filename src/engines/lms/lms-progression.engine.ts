@@ -126,6 +126,11 @@ export function progressionRationale(input: PMProgressionInput): string {
   };
   const dir = k >= 0 ? 'восходящая прогрессия' : 'нисходящая прогрессия (минимум потерь)';
   const verb = k >= 0 ? 'растёт' : 'снижается';
+  // Честность (аудит P1-3): прогноз в строке обязан уважать pmCap, иначе на длинных
+  // курсовых циклах текст врёт (напр. 29 нед k=2%: без капа ×1.74 против факта ×1.5).
+  const rawEnd = input.pm0 * Math.pow(1 + k, input.weeks - 1);
+  const end = pmCap(input.pm0, k, rawEnd);
+  const capped = end < rawEnd - 1e-9;
   return `${modeLabel[input.mode]}: PM ${verb} на ${sign}${pct}%/нед (${dir}). ` +
-    `PM0=${input.pm0} кг → за ${input.weeks} нед: ${(input.pm0 * Math.pow(1 + k, input.weeks - 1)).toFixed(1)} кг.`;
+    `PM0=${input.pm0} кг → за ${input.weeks} нед: ${end.toFixed(1)} кг${capped ? ` (кап роста ×${(end / input.pm0).toFixed(2)} — без капа было бы ${rawEnd.toFixed(1)} кг)` : ''}.`;
 }

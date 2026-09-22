@@ -4,6 +4,7 @@
  */
 import { mvtForLift, pctForVelocity, velocityForPct } from '../pro/vbt.engine';
 import type { VBTLift } from '../pro/vbt.engine';
+import { MEET_STRATEGY_PCT } from './competition-attempts';
 
 export type AttemptSet = { weight: number; velocity: number; pct: number; note: string };
 
@@ -24,9 +25,14 @@ export function velocityAttempts(e1RM: number, lift: VBTLift, strategy: 'conserv
   return { opener, second, third };
 }
 
+/**
+ * Попытки по стратегии — КАНОН `MEET_STRATEGY_PCT` (competition-attempts):
+ * conservative 90/95.5/100, balanced 92/96/102, aggressive 93/97/105.
+ * Раньше здесь жил третий набор 90/95/100 · 90/97/102 · 92/98/103 — расхождение
+ * с планом/прикидами устранено (аудит P2).
+ */
 export function rpeAttempts(e1RM: number, strategy: 'conservative'|'balanced'|'aggressive' = 'balanced'): { opener: number; second: number; third: number } {
-  const opener = Math.round(e1RM * (strategy === 'aggressive' ? 0.92 : 0.90) * 10)/10;
-  const second = Math.round(e1RM * (strategy === 'aggressive' ? 0.98 : strategy === 'conservative' ? 0.95 : 0.97) *10)/10;
-  const third = Math.round(e1RM * (strategy === 'aggressive' ? 1.03 : strategy === 'conservative' ? 1.00 : 1.02) *10)/10;
-  return { opener, second, third };
+  const pct = MEET_STRATEGY_PCT[strategy];
+  const r = (x: number) => Math.round(e1RM * x * 10) / 10;
+  return { opener: r(pct.opener), second: r(pct.second), third: r(pct.third) };
 }

@@ -6,7 +6,7 @@
  * P1-11 (ACWR zone 'dangerous'), P2-4 (plateau %threshold).
  */
 import { describe, it, expect } from 'vitest';
-import { pmForWeek, pmProgression, type PMProgressionInput } from '../lms-progression.engine';
+import { pmForWeek, pmProgression, progressionRationale, type PMProgressionInput } from '../lms-progression.engine';
 import { detectLift, expandCycleWeeks } from '../lms-to-pl';
 import { computePLPlanFeedback, summarizePLFeedback } from '../lms-progression-feedback.engine';
 import { buildDiaryAutoreg, type DiaryAutoregInput } from '../../pro/diary-autoreg.engine';
@@ -69,6 +69,22 @@ describe('P1-1: PM growth cap', () => {
     const input = baseInput();
     expect(pmForWeek(input, 1)).toBe(200);
   });
+
+  // Аудит Sep 22 (P1-3): строка rationale обязана уважать кап — раньше обещала ×1.74 там,
+  // где недели упирались в ×1.5 (длинные курсовые циклы).
+  it('rationale respects pmCap: cap-строка вместо «сырой» прогрессии', () => {
+    const input = baseInput(); // on_course heavy, 52 нед
+    const text = progressionRationale(input);
+    expect(text).toContain('300.0 кг');
+    expect(text).toContain('кап роста ×1.50');
+    expect(text).not.toContain('712.3 кг');
+  });
+
+  it('rationale без капа (натурал, короткий цикл) не печатает кап-пометку', () => {
+    const text = progressionRationale({ pm0: 100, weeks: 6, mode: 'natural' });
+    expect(text).toContain('за 6 нед:');
+    expect(text).not.toContain('кап роста');
+  });
 });
 
 // ── P1-2: detectLift OHP exclusion ──
@@ -101,8 +117,18 @@ describe('P1-2: detectLift excludes OHP from bench', () => {
   });
 
   it('classifies squat correctly', () => {
-    expect(detectLift('Присед со штангой', 'ПР')).toBe('squat');
-    expect(detectLift('Приседания', 'Ноги')).toBe('squat');
+    expect(detectLift('Присед со штангой', '')).toBe('squat');
+  });
+
+  // Аудит P1-7: «из ямы» без тягового контекста — это присед, не становая.
+  it('«Приседания из ямы» — squat, а не dead (вес от ПМ приседа)', () => {
+    expect(detectLift('Приседания из ямы', '')).toBe('squat');
+    expect(detectLift('Присед из ямы со штангой', '')).toBe('squat');
+  });
+
+  it('«Тяга из ямы» остаётся deadlift', () => {
+    expect(detectLift('Тяга из ямы', '')).toBe('dead');
+    expect(detectLift('Тяга штанги из ямы', '')).toBe('dead');
   });
 
   it('returns null for accessories', () => {

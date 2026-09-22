@@ -203,3 +203,67 @@
 > одинаковые шапки/кромки/фолды), все круги зелёные, новых токенов/копий разметки ноль
 > (guard-тест `pl-card-design` расширить на структуру: `BbCard`/`BbFoldCard` используются,
 > локальных `SectionCard`-дублей нет).
+
+## §10. Аудит-раунд Sep 22 2026 (P0/P1) + делод по кнопке — ✅ ВЫПОЛНЕНО, остаток P2
+
+Полный аудит 4 направлений (движки/UI/данные/статус плана) с перепроверкой чтением; закрыто:
+
+- **Делод по кнопке (запрос пользователя)**: NEW `src/engines/lms/lms-deload.engine.ts`
+  (`pickDeloadWeeks`/`applyPLDeload`/`planHasDeload`): делод применяется к САМОМУ плану
+  (объём ×volumeMult, RIR+shift, флаг `deload`, пересчёт метрик дня/цикла/landmarks),
+  защищённые недели (meet/mock/post/taper) и повторные клики пропускаются с причиной,
+  пустой список недель → ближайшая подходящая от текущей; вход не мутируется.
+  Проводка: `SRCBBScreen` (buildSrc/buildSrcMacrocycle/мост kind `deload`/реальный
+  «↩ Убрать делод»), конфиг персистится (`plDeloadCfg`) и переприменяется при сборке;
+  `PLPlanView` — маркер `🔋`, баннер `data-pl="deload-banner"`, кнопка `data-pl="deload-remove"`.
+  Тесты: `pl-deload` 7/7, `pl-deload-wiring` 6/6.
+- **P0**: `selectedCycleId` удалённого цикла больше не роняет план (`PLPlanView:979` guard +
+  валидация при загрузке сессии); `he_pl_session` пишется merge-записью — больше не теряет
+  `season`, `peds/pedDoses/courseIntensity` и deload-конфиг.
+- **P1**: mrv-мост в ПЛ — честная заметка (а не тихий no-op); «ℹ️ в плане» → реальный
+  «↩ Убрать тапер из плана» (снимок недель `he_pl_prev_weeks_v1`); `progressionRationale`
+  уважает `pmCap` (+тесты); `detectLift('Приседания из ямы')` → squat (+тесты); `pl-tonnage-gate`
+  флагает только РОСТ, снижение — заметка `ok` (+тесты); тихие catch моста → заметки;
+  слабая сторона диагностики (`diagnosticWeakSide`) доезжает до плана/сезона/пролётов;
+  сезон: индексы `consents/selections` больше не съезжают (`slotIndex`, `enabledIdxOf`,
+  swap при перемещении, персист вкл/выкл); нулевое окно между стартами даёт НЕ пустую
+  стартовую неделю (+тест).
+- **P2 (часть)**: `rpeAttempts` → канон `MEET_STRATEGY_PCT`; удалён мёртвый `TAPER_MODE_DESCS`;
+  CJK в `training-load`; неиспользуемый `tw` в `pro/taper`; мёртвый JSX в `PLCompetitionTab`;
+  честные тексты (PED-белок, федерация, правка недели); полный словарь `PL_WEAKPOINT_LABELS`;
+  чистка импортов `PLPlanView`.
+- **Проверено**: `tsc --noEmit` 0; `src/engines/lms`+`SRCBBScreen_parts` **1241/1241 (74 файла)**;
+  `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`);
+  `verify:apk-design` OK.
+
+### §10.1 Промт следующей сессии (остаток P2) — копировать целиком
+
+> Задача: закрыть остаток P2 аудит-раунда ПЛ-авто (Sep 22 2026). Репо `D:\BodyBuildHealth`.
+> Никаких изменений математики планов без явного согласия; только Edit/Write + vitest/tsc;
+> чужие WIP не трогать; коммиты строго `git commit -m ... -- <свои файлы>`; НЕ пушить.
+>
+> 1. Персист черновиков тапера: `taper-state.tsx` — `taperPlan` и `taperAttemptOverride`
+>    не сохраняются в `he_pl_session` (после F5 карточка «📋 Тапер-план» пустая, кнопки
+>    печати/сохранения disabled, хотя статус «тапер: встроен/готов» — главный писатель в
+>    `SRCBBScreen` merge-запись уже есть, добавь `plTaperPlan`/`plTaperAttemptOverride`
+>    (кап по размеру, `validateSavedSrc`-подобная проверка формы) + восстановление.
+>    Тест: ремаунт провайдера видит план; битый стор → пусто.
+> 2. Мёртвый код UI: `SRCBBScreen.tsx` — неиспользуемые импорты/state (bridgeSessions/
+>    bridgeWeek/bridgeAutoreg/progressSnap/peakRirTarget/appliedMethods/PL_WP_OPTIONS/
+>    toggleWeak/WEAK_GROUPS и список из аудита), если удаление не ломает tsc — убрать;
+>    `PeakingPanel.tsx` (41КБ) и `ProMetricsPanel.tsx` (29КБ) не смонтированы нигде —
+>    принять решение: подключить или помечены `@deprecated` с причиной.
+> 3. `PLToolsCard` OPL-импорт: пишет `he_opl_history`/`he_opl_name` без читателя — либо
+>    отрисовать историю (DOTS-график), либо убрать запись и оставить честную подсказку.
+> 4. Данные циклов (аккуратно, lock-тесты обязательны): нормализация RPE/T-суффиксов имён
+>    («Присед @RPE8», «Жим лежа T2») в резолвере `lms-builder` (`findCatalogExerciseByLabel`),
+>    мёртвые ключи `exercise-id-mapping.ts` (42 шт — стираются keep-first дедупом),
+>    гард `pct > 1.1` (15 проходок) в валидации/движке; `LMS_EXERCISES` (xlsm-шум) — merge
+>    с каталогом по плану §3.0 (реальные id/имена), без выдуманных упражнений.
+> 5. `assembleSeasonPlan` при полной блокировке согласием подставляет `LMS_CYCLES[0]` как
+>    template с пустыми метриками — заменить на честный `null`-шаблон/флаг или первый
+>    сегмент плана, покрыть тестом.
+> 6. Памятка: полный прогон `npx vitest run src/engines/lms src/ui/screens/SRCBBScreen_parts
+>    src/ui/screens/TrainingScreen_parts` + `tsc --noEmit` (NODE_OPTIONS=12GB) + `verify:apk-design`;
+>    обновить AGENTS.md и §10 этого плана.
+

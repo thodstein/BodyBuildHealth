@@ -82,7 +82,7 @@ export function acuteChronicRatio(dailyLoads: DayLoad[], referenceDate?: string,
     for (const d of sorted) {
       if (d.date >= start && d.date <= ref) { sum += d.load; n++; }
     }
-    return n > 0 ? sum / days : 0; //日均 (делим на длину окна, не на число записей → учитывает нулевые дни)
+    return n > 0 ? sum / days : 0; // среднесуточная (делим на длину окна, не на число записей → учитывает нулевые дни)
   };
   // EWMA-вариант: alpha = 2/(N+1)
   const acute = avgOver(acuteDays);
@@ -243,7 +243,7 @@ export function trainingLoadReport(sessions: TrainingSession[], referenceDate?: 
   else recommendations.push(`ACWR ${acwr.ratio} в оптимальной зоне (0.8-1.3).`);
   if (monotony.monotony > 2) recommendations.push(`Monotony ${monotony.monotony} > 2 — однообразная нагрузка, добавьте вариативность/восстановление.`);
   if (banister.current) {
-    if (banister.current.performance < 0) recommendations.push(`Fitness-Fatigue performance отрицательный (${banister.current.performance}) —疲劳 накапливается, плановый deload.`);
+    if (banister.current.performance < 0) recommendations.push(`Fitness-Fatigue performance отрицательный (${banister.current.performance}) — усталость накапливается, плановый deload.`);
     else recommendations.push(`Fitness-Fatigue performance ${banister.current.performance} (fitness ${banister.current.fitness} − fatigue ${banister.current.fatigue}).`);
   }
   return { dailyLoads, acwr, monotony, banister, recommendations, disclaimer: ACWR_DISCLAIMER };

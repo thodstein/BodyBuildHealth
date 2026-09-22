@@ -46,8 +46,11 @@ export function detectLift(name: string, group: string): 'squat' | 'bench' | 'de
   const haystack = (name || '') + ' ' + (group || '');
   // Bench: "жим" but NOT overhead/leg-press/arnold/push-press variants.
   if (/жим/i.test(haystack) && !/стоя|сидя|армейск|над голов|ногами|гантел|швунг|push.?press|армолд|арнолд/i.test(haystack)) return 'bench';
-  // Deadlift: explicit deadlift keywords (становая/румынская/сумо/с плинтов/из ямы/на прямых ногах)
-  if (/станов|румын|сумо|прямых ног|плинт|из ямы/i.test(haystack)) return 'dead';
+  // Deadlift: explicit deadlift keywords (становая/румынская/сумо/с плинтов/на прямых ногах).
+  // Аудит P1-7: «из ямы» само по себе НЕ специфично («Приседания из ямы» уезжали в тягу
+  // с весом от ПМ становой) — требуем тяговый контекст рядом.
+  if (/станов|румын|сумо|прямых ног|плинт/i.test(haystack)) return 'dead';
+  if (/из ямы|с ямы/i.test(haystack) && /тяг|станов|deadlift/i.test(haystack)) return 'dead';
   // Deadlift: "тяг" but NOT row/pulldown variants.
   if (/тяг/i.test(haystack) && !/верхнего|нижнего|горизонтального|блока|в наклон|к поясу|гантел|штанг|к груди/i.test(haystack)) return 'dead';
   if (/прис|скв/i.test(haystack)) return 'squat';

@@ -91,6 +91,24 @@ describe('planBetweenCompetitions', () => {
     expect(res.weeks.length).toBe(10);
   });
 
+  // Аудит P1-6: при нулевом окне неделя старта раньше была ПУСТОЙ (days: [] без упражнений),
+  // хотя заметка обещала прикиды. Теперь это собранная неделя цикла (pmRow есть → прикиды сверху).
+  it('P1-6: нулевое окно — стартовая неделя не пустая (дни с упражнениями и pmRow)', () => {
+    const res = planBetweenCompetitions(
+      [
+        { id: 'm1', name: 'Старт 1', weeksToStart: 4 },
+        { id: 'm2', name: 'Старт 2', weeksToStart: 8 },
+      ],
+      { ...opts, cycleForGap: () => CYCLE_01, mode: 'auto', consents: { 0: true, 1: true } } as never,
+    );
+    const meetWeekNo = res.segments[1].meetWeek;
+    const meetWeek = res.weeks.find(w => w.week === meetWeekNo);
+    expect(meetWeek).toBeTruthy();
+    expect(meetWeek!.days.length).toBeGreaterThan(0);
+    expect(meetWeek!.days.some(d => d.exercises.length > 0)).toBe(true);
+    expect(Object.keys(meetWeek!.pmRow).length).toBeGreaterThan(0);
+  });
+
   it('несколько стартов подряд: окна не накладываются, у каждого старта пик-блок (с согласием)', () => {
     const res = planBetweenCompetitions(
       [

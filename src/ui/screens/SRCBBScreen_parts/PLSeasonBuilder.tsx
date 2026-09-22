@@ -26,6 +26,7 @@ import {
   type PLSeasonSlot,
   type PLSeasonPeriod,
   type PLSeasonPlan,
+  type PLSeasonSegment,
 } from '../../../engines/lms/lms-season.engine';
 import {
   planBetweenCompetitions,
@@ -175,7 +176,34 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
 
   const enabledSlots = useMemo(() => slots.filter(s => s.enabled), [slots]);
 
-  const slotCandidates = useMemo(() => enabledSlots.map(s => candidateCyclesForSlot(s, selector)), [enabledSlots, selector]);
+  // P1-5: кандидаты — по СЫРОМУ индексу слота (рендер идёт по slots.map), а не по
+  // индексу среди включённых: иначе после выключения слота выбор/согласие съезжали.
+  const slotCandidates = useMemo(() => slots.map(s => (s.enabled ? candidateCyclesForSlot(s, selector) : [])), [slots, selector]);
+
+  /** Сырой индекс слота → индекс среди включённых (движок planSeason индексирует по enabled). */
+  const enabledIdxOf = useMemo(() => {
+    const m: Record<number, number> = {};
+    let e = 0;
+    slots.forEach((s, i) => { if (s.enabled) m[i] = e++; });
+    return m;
+  }, [slots]);
+
+  /** Пере-ключить selections/consents (сырые индексы UI) в ключи enabled-индексов движка. */
+  const toEnabledKeyed = <T,>(src: Record<number, T>): Record<number, T> => {
+    const out: Record<number, T> = {};
+    for (const k of Object.keys(src)) {
+      const e = enabledIdxOf[Number(k)];
+      if (e != null) out[e] = src[Number(k)] as T;
+    }
+    return out;
+  };
+
+  /** Сегмент плана для СЫРОГО индекса слота (по slotIndex, а не по позиции массива). */
+  const segFor = (rawIdx: number): PLSeasonSegment | undefined => {
+    const e = enabledIdxOf[rawIdx];
+    if (e == null) return undefined;
+    return seasonPlan.segments.find(seg => seg.slotIndex === e);
+  };
 
   // Единая сборка taper-опций для buildPLSeasonPeaks (и пролёты, и одиночный старт).
   const taperOpts = useMemo<MacroTaperOpts>(() => ({
@@ -191,8 +219,9 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
     if (seasonMode !== 'season' || enabledSlots.length === 0) {
       return { segments: [], totalWeeks: 0, notes: [], cycleIds: [] };
     }
-    return planSeason({ slots: enabledSlots, selector, mode: pickMode, selections, consents });
-  }, [seasonMode, enabledSlots, selector, pickMode, selections, consents]);
+    return planSeason({ slots: enabledSlots, selector, mode: pickMode, selections: toEnabledKeyed(selections), consents: toEnabledKeyed(consents) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seasonMode, enabledSlots, selector, pickMode, selections, consents, enabledIdxOf]);
 
   const compGap = useMemo(() => {
     if (seasonMode !== 'season' || meets.length < 2) return null;
@@ -213,17 +242,32 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
   };
 
   const toggleSlot = (idx: number) => {
-    setSlots(prev => prev.map((s, i) => (i === idx ? { ...s, enabled: !s.enabled } : s)));
+    const next = slots.map((s, i) => (i === idx ? { ...s, enabled: !s.enabled } : s));
+    setSlots(next);
+    // Persist: раньше вкл/выкл слота не сохранялся до следующей правки.
+    saveSeasonStateValue(seasonMode, next);
   };
 
   const moveSlot = (idx: number, dir: -1 | 1) => {
-    setSlots(prev => {
-      const next = [...prev];
-      const j = idx + dir;
-      if (j < 0 || j >= next.length) return prev;
-      const tmp = next[idx]; next[idx] = next[j]; next[j] = tmp;
-      return next;
-    });
+    const j = idx + dir;
+    if (j < 0 || j >= slots.length) return;
+    const next = [...slots];
+    const tmp = next[idx]; next[idx] = next[j]; next[j] = tmp;
+    setSlots(next);
+    // Выбор/согласие привязаны к слоту (сырой индекс) — при перемещении меняем ключи местами,
+    // иначе выбор «съезжал» на соседний период.
+    const swapKey = <T,>(m: Record<number, T>): Record<number, T> => {
+      const out = { ...m };
+      const va = out[idx]; const vb = out[j];
+      if (vb === undefined) delete out[idx]; else out[idx] = vb;
+      if (va === undefined) delete out[j]; else out[j] = va;
+      return out;
+    };
+    const nextSel = swapKey(selections);
+    const nextCons = swapKey(consents);
+    setSelections(nextSel);
+    setConsents(nextCons);
+    saveSeasonStateValue(seasonMode, next, undefined, nextSel, nextCons);
   };
 
   const addSlot = (period: PLSeasonPeriod) => {
@@ -369,7 +413,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
 
   const renderConsentForSlot = (slot: PLSeasonSlot, idx: number) => {
     const candidates = slotCandidates[idx] ?? [];
-    const chosenId = pickMode === 'manual' ? (selections[idx] ?? '') : (seasonPlan.segments[idx]?.cycleId ?? '');
+    const chosenId = pickMode === 'manual' ? (selections[idx] ?? '') : (segFor(idx)?.cycleId ?? '');
     const chosen = candidates.find(c => c.cycle.meta.id === chosenId) ?? candidates[0];
     if (!chosen || !slot.enabled) return null;
     const raw = fitCycleToWeeks(chosen.cycle, slot.weeks);
@@ -433,9 +477,9 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
 
   const renderSlot = (slot: PLSeasonSlot, idx: number) => {
     const candidates = slotCandidates[idx] ?? [];
-    const chosenId = pickMode === 'manual' ? (selections[idx] ?? '') : (seasonPlan.segments[idx]?.cycleId ?? '');
+    const chosenId = pickMode === 'manual' ? (selections[idx] ?? '') : (segFor(idx)?.cycleId ?? '');
     const chosen = candidates.find(c => c.cycle.meta.id === chosenId) ?? candidates[0];
-    const seg = seasonPlan.segments[idx];
+    const seg = segFor(idx);
     const isBlocked = seg?.fit.mode === 'strict_skip';
     return (
       <div key={idx} style={{ padding: 8, borderRadius: 10, background: isBlocked ? 'rgba(239,68,68,0.04)' : slot.enabled ? 'rgba(0,230,138,0.04)' : 'rgba(255,255,255,0.02)', border: isBlocked ? '1px solid rgba(239,68,68,0.3)' : slot.enabled ? '1px solid rgba(0,230,138,0.18)' : '1px solid rgba(255,255,255,0.06)' }}>

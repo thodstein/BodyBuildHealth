@@ -85,6 +85,12 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
     peakCycleId, setPeakCycleId,
   } = t;
   const { peds, pedDoses, courseIntensity, pedAuto, autoRegMode, autoRegResult, plCalorieSurplus, plProteinPerKg, selectedCycleId, pmSquat, pmBench, pmDead } = cyc;
+  // P1-2: честный контур «встроен ↔ не встроен»: снимок недель до встраивания
+  // тапера позволяет реально вернуть план (а не только сбросить подпись).
+  const TAPER_PREV_KEY = 'he_pl_prev_weeks_v1';
+  const [taperEmbedded, setTaperEmbedded] = React.useState<boolean>(() => {
+    try { return !!sessionStorage.getItem(TAPER_PREV_KEY); } catch { return false; }
+  });
   const setAutoRegMode = (mode: AutoRegMode) => {
     // Реальный переключатель режима авторегуляции — state живёт в родительском SRCBBScreen.
     api.setAutoRegMode(mode);
@@ -178,7 +184,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
       style={{ marginTop: 10, background: 'rgba(245,158,11,0.05)' }}
       right={
         <>
-          {builtSrc && <span style={{ fontSize: 10, color: '#fff' }}>план: {builtSrc.weeks.length} нед · тапер добавлен: {taperNote ? 'да' : 'нет'}</span>}
+          {builtSrc && <span style={{ fontSize: 10, color: '#fff' }}>план: {builtSrc.weeks.length} нед · тапер: {taperNote ? (taperEmbedded ? 'встроен' : 'готов (не встроен)') : 'нет'}</span>}
           {builtSrc && (
             <span style={{ fontSize: 10, color: '#fff', marginLeft: 8 }}>
               {autoRegMode === 'auto' && '🤖 auto'}{autoRegMode === 'diary' && '📓 diary'}{autoRegMode === 'off' && '⚠ off'}
@@ -241,7 +247,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                   label="Федерация"
                   value={m.fed}
                   options={[{ id: 'ipf', label: 'IPF' }, { id: 'fpr', label: 'FPR' }, { id: 'wpc', label: 'WPC' }, { id: 'other', label: 'Другая' }]}
-                  hint="Федерация определяет нормативы/категории — используется в прикидах сезона"
+                  hint="Федерация отображается в сводке/печати прикидов; в расчёт весов попыток не входит (веса — от ПМ по стратегии)"
                   onChange={v => { setMeetList(cur => cur.map(x => x.id === m.id ? { ...x, fed: v } : x)); if (isMain) setTaperFed(v); }}
                 />
               </div>
@@ -521,17 +527,33 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         >📅 Тапер по сезону ({meetList.length} старт)</button>
         <button
           disabled={!builtSrc}
+          data-taper="state"
           onClick={() => {
             if (!builtSrc) return;
             if (taperNote) {
-              setBuiltSrc(builtSrc);
-              setTaperNote('');
-              onNote('↺ Тапер уже в плане — сгенерируйте план заново, чтобы убрать.');
+              // Честный откат: если тапер реально встроен — возвращаем снимок недель.
+              let restored = false;
+              try {
+                const raw = sessionStorage.getItem(TAPER_PREV_KEY);
+                const prev = raw ? JSON.parse(raw) : null;
+                if (Array.isArray(prev) && prev.length > 0) {
+                  setBuiltSrc({ ...builtSrc, weeks: prev });
+                  restored = true;
+                }
+              } catch { /* снимок битый — честно сообщаем ниже */ }
+              if (restored) {
+                try { sessionStorage.removeItem(TAPER_PREV_KEY); } catch { /* ignore */ }
+                setTaperEmbedded(false);
+                setTaperNote('');
+                onNote('↩ Тапер убран из плана — восстановлена раскладка до встраивания.');
+              } else {
+                onNote('ℹ️ Тапер сгенерирован отдельной карточкой и НЕ встроен в недели плана — встройте кнопкой «📌 Встроить в план», чтобы он попал в таблицу/печать.');
+              }
             }
           }}
           style={{ ...BTN_GHOST, minHeight: 44, fontSize: 11, border: '1px solid rgba(255,255,255,0.08)', color: '#fff', display: taperNote ? 'inline-flex' : 'none' }}
-          title="Тапер уже добавлен — пересоберите план, чтобы начать заново"
-        >ℹ️ в плане</button>
+          title={taperEmbedded ? 'Вернуть раскладку плана до встраивания тапера' : 'Тапер готов отдельной карточкой и не встроен в план'}
+        >{taperEmbedded ? '↩ Убрать тапер из плана' : 'ℹ️ в плане'}</button>
         <button
           disabled={!builtSrc || !taperNote}
           onClick={() => {
@@ -608,7 +630,6 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                   const bd = isFinal ? 'rgba(245,158,11,0.4)' : protoLabel ? 'rgba(96,165,250,0.3)' : 'rgba(245,158,11,0.25)';
                   return <span key={w.week} style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: bg, color, border: `1px solid ${bd}` }}>{protoLabel ? `🏁 ${protoLabel} — нед ${w.week}` : `📉 Тапер — нед ${w.week}`}{isFinal ? ' · прикиды' : ''}</span>;
                 })}
-                {peakWk && taperWeeks.includes(peakWk) && null}
                 {meetWk && <span style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(234,179,8,0.14)', color: '#eab308', border: '1px solid rgba(234,179,8,0.4)' }}>🏁 Соревнования — нед {meetWk.week}</span>}
               </div>
               {/* P2-7: гент-таймлайн пик-блока (недели по типам + даты) */}
@@ -824,7 +845,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               </div>
               {/* Действия */}
               <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                <button onClick={() => { setBuiltSrc(taperPlan); setTaperNote(`Встроено в weeks цикла: +${taperPlan.weeks.length - (builtSrc?.weeks.length ?? taperPlan.weeks.length)} нед тапера`); }} style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', background: 'rgba(245,158,11,0.08)' }} title="Встроить тапер-недели в weeks активного плана (календарь покажет с тапером)">📌 Встроить в план (weeks)</button>
+                <button onClick={() => { try { sessionStorage.setItem(TAPER_PREV_KEY, JSON.stringify(builtSrc?.weeks ?? [])); } catch { /* ignore */ } setTaperEmbedded(true); setBuiltSrc(taperPlan); setTaperNote(`Встроено в weeks цикла: +${taperPlan.weeks.length - (builtSrc?.weeks.length ?? taperPlan.weeks.length)} нед тапера`); }} style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', background: 'rgba(245,158,11,0.08)' }} title="Встроить тапер-недели в weeks активного плана (календарь покажет с тапером)">📌 Встроить в план (weeks)</button>
                 <button onClick={() => { if (taperPlan) setTaperPlan(refreshMeetAttempts(taperPlan, attemptStrategy)); }} style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(139,92,246,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.08)' }} title="Пересчитать прикиды под выбранную стратегию">🔄 Обновить прикиды</button>
                 <button
                   onClick={() => {

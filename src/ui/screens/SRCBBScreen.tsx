@@ -52,6 +52,7 @@ import { CardioLinkCard } from './TrainingScreen_parts/CardioLinkCard';
 import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, serializeMacro, serializeBbMacro, rebalanceMacrocycle, rebalanceBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
 import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase } from '../../engines/periodization/phase-bridge';
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
+import { applyPLDeload, planHasDeload, type PLDeloadRequest } from '../../engines/lms/lms-deload.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
 import { pmDiaryMultiplier, type PMAutoRegMode } from '../../engines/lms/pm-autoreg.engine';
 import { competitionAttempts, MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, type MeetStrategy } from '../../engines/lms/competition-attempts';
@@ -262,8 +263,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [selectedCycleId, setSelectedCycleId] = useState<string>(() => {
     const saved = _plSaved?.selectedCycleId;
     const c = saved ? getCycleById(saved) : null;
-    if (c && normalizeCycleDirection(c.meta.direction) === 'bodybuilding') return 'cycle-01';
-    return saved || 'cycle-01';
+    // P0-1: id удалённого/неизвестного цикла больше не тащим в план —
+    // иначе PLPlanView падал на originalCycleWeeks(undefined) (календарь/подпись).
+    if (!c) return 'cycle-01';
+    if (normalizeCycleDirection(c.meta.direction) === 'bodybuilding') return 'cycle-01';
+    return c.meta.id;
   });
   const [cycleWeeks, setCycleWeeks] = useState<number>(_plSaved?.cycleWeeks ?? 12);
   // 📋 Тапер-план: ОТДЕЛЬНАЯ свёрнутая карточка (не встраивается в weeks цикла).
@@ -279,11 +283,40 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(() => validateSavedSrc(_plSaved?.builtSrc));
   const [srcWeek, setSrcWeek] = useState<number>(_plSaved?.srcWeek ?? 1);
   const [srcAdditions, setSrcAdditions] = useState<Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>>(_plSaved?.srcAdditions ?? {});
+  // 🔋 Делод по кнопке пользователя (мост kind 'deload'): конфиг персистится и
+  // переприменяется при каждой сборке плана — показано = вставлено = уехало в печать.
+  type PLDeloadCfg = Required<Pick<PLDeloadRequest, 'volumeMult' | 'rirShift' | 'weeks'>>;
+  const [plDeloadCfg, setPlDeloadCfg] = useState<PLDeloadCfg | null>(() => {
+    const raw = (_plSaved as Record<string, unknown> | null)?.plDeloadCfg as Partial<PLDeloadCfg> | undefined;
+    if (!raw || typeof raw !== 'object') return null;
+    const vol = Number(raw.volumeMult);
+    const rir = Number(raw.rirShift);
+    const weeks = Array.isArray(raw.weeks) ? raw.weeks.map(Number).filter(n => Number.isFinite(n) && n > 0) : [];
+    if (!Number.isFinite(vol) || !Number.isFinite(rir)) return null;
+    return { volumeMult: Math.min(1, Math.max(0.2, vol)), rirShift: Math.min(6, Math.max(0, Math.round(rir))), weeks };
+  });
+  // P1-4: слабая сторона из мастера движений — buildLMSPlan умеет унилатерально
+  // добивать слабую сторону (diagnosticWeakSide), но мост её терял.
+  const [diagnosticWeakSide, setDiagnosticWeakSide] = useState<'left' | 'right' | null>(() => {
+    const v = (_plSaved as Record<string, unknown> | null)?.plDiagnosticWeakSide;
+    return v === 'left' || v === 'right' ? v : null;
+  });
   useEffect(() => {
     if (!builtSrc) return;
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
-  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plPeakCycleId: peakCycleId })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId]);
+  // P0-2: merge-запись сессии — не теряем независимые ключи (season из PLSeasonBuilder,
+  // peds/pedDoses/courseIntensity, taper-черновики, deload-конфиг).
+  useEffect(() => { try {
+    const raw = localStorage.getItem('he_pl_session');
+    const prev = raw ? JSON.parse(raw) : null;
+    const base = prev && typeof prev === 'object' && !Array.isArray(prev) ? prev as Record<string, unknown> : {};
+    localStorage.setItem('he_pl_session', JSON.stringify({
+      ...base,
+      selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plPeakCycleId: peakCycleId,
+      plDeloadCfg, plDiagnosticWeakSide: diagnosticWeakSide,
+    }));
+  } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId, plDeloadCfg, diagnosticWeakSide]);
   // 🏁 Единый реестр стартов (слияние Фазы 2): канон — he_pl_macro.competitions,
   // plMeetList — надстройка ПЛ (федерация/ПМ/стратегия). Гидрация при монтировании
   // и по событию годового плана; обратная запись — при правках стартов в ПЛ.
@@ -474,7 +507,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   // аргумент weeks отсюда убран (был тихим no-op, вводил в заблуждение).
   // Авто-тапер в faithful-сборке не применяется — он навешивается отдельно
   // кнопками вкладки «🏁 Соревнования» (appendPLTaperWeeks).
-  const buildSrc = (cycleId = selectedCycleId) => {
+  const buildSrc = (cycleId = selectedCycleId, deloadOverride?: PLDeloadCfg | null) => {
     const tpl = getCycleById(cycleId);
     if (!tpl) {
       // Раньше — тихий return: кнопка «Применить как активный цикл» молча
@@ -504,6 +537,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             orthopedicBlockedPatterns,
        diagnosticExerciseMap,
        diagnosticDayMap,
+       diagnosticWeakSide,
        limiterExerciseMap,
        limiterProtocolMap,
        limiterDayMap,
@@ -519,9 +553,13 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       faithful: true,
       ...rec,
     });
-    setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setPickerDay(null);
+    // 🔋 Делод по кнопке пользователя: применяется к САМОМУ плану (таблица/печать/
+    // графики видят одно), не только к runtime-показу SessionPlayer.
+    const effDeload = deloadOverride === undefined ? plDeloadCfg : deloadOverride;
+    const planOut = effDeload ? applyPLDeload(plan, { ...effDeload, currentWeek: srcWeek, level }).plan : plan;
+    setBuiltSrc(planOut); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setPickerDay(null);
     // TRAINING INTEGRATION: конвертировать PL план в сессии
-    try { const sessions = lmsPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
+    try { const sessions = lmsPlanToSessions(planOut); saveBridgeSessions(sessions); } catch { /* ignore */ }
   };
 
   const buildSrcMacrocycle = (macro: Macrocycle) => {
@@ -555,6 +593,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             orthopedicBlockedPatterns,
             diagnosticExerciseMap,
             diagnosticDayMap,
+            diagnosticWeakSide,
             limiterExerciseMap,
             limiterProtocolMap,
             limiterDayMap,
@@ -620,7 +659,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       cycleMetrics: calcCycleMetrics(sessions),
       progressionRationale: `Макроцикл: ${outputs.length} СРЦ-блок(ов), ${weeks.length} недель. ` + outputs.map(({ block, output }) => `${block.phase} ${block.weekOffset}-${block.weekOffset + block.weeks - 1}: ${output.template.meta.title}`).join('; ') + (reusedWeeks > 0 ? ` ⚠ ${reusedWeeks} нед без собственного цикла (соревновательные блоки) — использована ближайшая тренировочная раскладка.` : '') + (taperRes.notes.length > 0 ? ' 🏁 ' + taperRes.notes.join(' ') : ''),
     };
-    setBuiltSrc(combined);
+    // 🔋 Делод по кнопке — и на макроцикловом пути (недели могут не совпасть:
+    // pickDeloadWeeks сам честно пропустит отсутствующие/защищённые).
+    const combinedWithDeload = plDeloadCfg
+      ? applyPLDeload(combined, { ...plDeloadCfg, currentWeek: srcWeek, level }).plan
+      : combined;
+    setBuiltSrc(combinedWithDeload);
     setCycleWeeks(macro.totalWeeks);
     setSrcWeek(1);
     setSrcEdits({});
@@ -783,8 +827,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [weakGroupExerciseMap, setWeakGroupExerciseMap] = useState<Record<string, string[]>>({});
    const [plWeakPointExerciseMap, setPlWeakPointExerciseMap] = useState<Record<string, string[]>>({});
    const [orthopedicBlockedPatterns, setOrthopedicBlockedPatterns] = useState<string[]>([]);
-   const [diagnosticExerciseMap, setDiagnosticExerciseMap] = useState<Record<string, string[]>>({});
-   const [diagnosticDayMap, setDiagnosticDayMap] = useState<Record<string, number[]>>({});
+  const [diagnosticExerciseMap, setDiagnosticExerciseMap] = useState<Record<string, string[]>>({});
+  const [diagnosticDayMap, setDiagnosticDayMap] = useState<Record<string, number[]>>({});
    // 🧩 Калькулятор «Лимитирующие факторы движения» (limiter-событие): выбранные упражнения + категорийные протоколы.
    const [limiterExerciseMap, setLimiterExerciseMap] = useState<Record<string, string[]>>({});
    const [limiterProtocolMap, setLimiterProtocolMap] = useState<Record<string, { protocol: { sets: number; reps: number; pct: number; rir: number; tempo?: string; rest?: string; holdSec?: number; note?: string }; category: string }>>({});
@@ -1146,6 +1190,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         if (Array.isArray(p.data?.orthopedic?.blockedPatterns)) setOrthopedicBlockedPatterns(p.data.orthopedic.blockedPatterns);
         if (p.data?.diagnosticExerciseMap) setDiagnosticExerciseMap(p.data.diagnosticExerciseMap);
         if (p.data?.diagnosticDayMap) setDiagnosticDayMap(p.data.diagnosticDayMap);
+        // P1-4: слабая сторона из мастера движений — в план (унилатеральная добивка).
+        setDiagnosticWeakSide(p.data?.diagnosticWeakSide === 'left' ? 'left' : p.data?.diagnosticWeakSide === 'right' ? 'right' : null);
+        if (p.data?.redBlocked) setMethodNote('⛔ Красный флаг движений: коррекции не добавляем автоматически — сначала разгрузка/обследование; план собран по раскладке цикла.');
         if (Array.isArray(p.data?.plWeakPoints)) {
           setPlWeakPoints(p.data.plWeakPoints.map((x: any) => ({ lift: x.lift, weakPoint: x.weakPoint })));
           const dm: Record<string, number[]> = {};
@@ -1174,9 +1221,35 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       setRirShiftAdjust((p.data?.rirShift ?? 0) as number);
     } else if (p.kind === 'mrv') {
       if (tabForApply === 'bb') { setMrvOverride((p.data?.mrv ?? null) as number | null); pendingApplyRef.current = p; }
-      else { pendingApplyRef.current = p; }
+      else {
+        // Честность (аудит P1-1): MRV-оверрайд — настройка ББ-авто (сетов/мышца/нед);
+        // в ПЛ объём задаёт раскладка цикла, «применить» тут нечего — не молчим.
+        setMethodNote(`🛠 MRV ${p.data?.mrv ?? '—'} сет/мышца/нед — настройка ББ-авто. В ПЛ объём задаёт цикл: смените цикл/ассистентов, а для разгрузки используйте «Применить делод».`);
+      }
     } else if (p.kind === 'deload') {
-      setDeloadAdjust({ volumeMult: (p.data?.volumeMult ?? 0.5) as number, rirShift: (p.data?.rirShift ?? 3) as number, weeks: (p.data?.weeks || []) as number[] });
+      const vol = Math.min(1, Math.max(0.2, (p.data?.volumeMult ?? 0.5) as number));
+      const rir = Math.min(6, Math.max(0, Math.round((p.data?.rirShift ?? 3) as number)));
+      const weeksRaw = Array.isArray(p.data?.weeks)
+        ? (p.data!.weeks as unknown[]).map(n => Number(n)).filter(n => Number.isFinite(n) && n > 0) as number[]
+        : [];
+      if (tabForApply === 'bb') {
+        setDeloadAdjust({ volumeMult: vol, rirShift: rir, weeks: weeksRaw });
+      } else {
+        // ПЛ: делод применяется к САМОМУ плану (не runtime-оверлей) — объём/RIR
+        // видны в таблице, метриках, heatmap и печати; конфиг персистится и
+        // переприменяется при пересборке. Runtime-оверлей чистим, чтобы не резать дважды.
+        const cfg: PLDeloadCfg = { volumeMult: vol, rirShift: rir, weeks: weeksRaw };
+        if (builtSrc) {
+          const res = applyPLDeload(builtSrc, { ...cfg, currentWeek: srcWeek, level });
+          setBuiltSrc(res.plan);
+          setPlDeloadCfg({ ...cfg, weeks: res.applied.length ? res.applied : weeksRaw });
+          setDeloadAdjust(null);
+          setMethodNote(res.notes[0]);
+        } else {
+          setPlDeloadCfg(cfg);
+          setMethodNote(`🔋 Делод запомнен: объём ×${vol}, RIR +${rir} — добавится в план при сборке (недели: ${weeksRaw.length ? weeksRaw.join(', ') : 'ближайшая подходящая'}).`);
+        }
+      }
     } else if (p.kind === 'peak') {
       setPeakAdjust({ volumeMult: (p.data?.volumeMult ?? 0.5) as number, rirTarget: (p.data?.rirTarget ?? 0) as number });
       if (p.data?.peakCycleId) setPeakCycleId(p.data.peakCycleId as string);
@@ -1204,6 +1277,18 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     clearPlannerApply(); setApplyPayload(null);
     setSubView('plan'); // показать обновлённый план
   };
+  /** ↩ Убрать делод: снять конфиг и пересобрать план по раскладке цикла (честный откат). */
+  const handleRemoveDeload = () => {
+    if (!plDeloadCfg) return;
+    setPlDeloadCfg(null);
+    setDeloadAdjust(null);
+    try {
+      buildSrc(selectedCycleId, null);
+      setMethodNote('↩ Делод убран — план пересобран по раскладке цикла.');
+    } catch (e) {
+      setMethodNote(`⚠ Делод снят, но план не пересобрался: ${(e as Error).message}`);
+    }
+  };
   useEffect(() => {
     const p = pendingApplyRef.current;
     if (!p) return;
@@ -1217,8 +1302,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       const c = getCycleById(targetId);
       if (c) eff = normalizeCycleDirection(c.meta.direction) === 'bodybuilding' ? 'bb' : 'pl';
     }
-    if (eff === 'pl') { try { buildSrc(); } catch { /* ignore */ } }
-    else if (eff === 'bb') { try { buildBb(); } catch { /* ignore */ } }
+    if (eff === 'pl') { try { buildSrc(); } catch (e) { setMethodNote(`⚠ Не удалось пересобрать ПЛ-план после моста: ${(e as Error).message}`); } }
+    else if (eff === 'bb') { try { buildBb(); } catch (e) { setMethodNote(`⚠ Не удалось пересобрать ББ-план после моста: ${(e as Error).message}`); } }
     setSubView('plan'); // показать пересобранный план
   }, [pmSquat, pmBench, pmDead, weakPoints, bbDays, bbWorkMax, mrvOverride, mainTab]);
   const baseMrv = useMemo(() => Object.fromEntries(Object.entries(getAllVolumeLandmarks(bbLevel)).map(([k, v]) => [k, mrvOverride != null ? mrvOverride : v.mrv])), [bbLevel, mrvOverride]);
@@ -1500,11 +1585,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     orthopedicBlockedPatterns,
     diagnosticExerciseMap,
     diagnosticDayMap,
+    diagnosticWeakSide,
     limiterExerciseMap,
     limiterProtocolMap,
     limiterDayMap,
     recovery: getRecoveryMetrics(linked),
-  }), [exercisePMs, pmSquat, pmBench, pmDead, pedAuto, peds, courseIntensity, pedDoses, plCalorieSurplus, plProteinPerKg, acwrData, autoRegMode, autoRegResult, pmAutoRegMode, pmDiary, linked, weakPoints, plWeakPoints, weakGroupDayMap, plWeakPointDayMap, weakGroupExerciseMap, plWeakPointExerciseMap, orthopedicBlockedPatterns, diagnosticExerciseMap, diagnosticDayMap, limiterExerciseMap, limiterProtocolMap, limiterDayMap]);
+  }), [exercisePMs, pmSquat, pmBench, pmDead, pedAuto, peds, courseIntensity, pedDoses, plCalorieSurplus, plProteinPerKg, acwrData, autoRegMode, autoRegResult, pmAutoRegMode, pmDiary, linked, weakPoints, plWeakPoints, weakGroupDayMap, plWeakPointDayMap, weakGroupExerciseMap, plWeakPointExerciseMap, orthopedicBlockedPatterns, diagnosticExerciseMap, diagnosticDayMap, diagnosticWeakSide, limiterExerciseMap, limiterProtocolMap, limiterDayMap]);
 
   // 📊 Frequency Planner: недельные объёмы по группам — из volume-landmarks
   // собранного плана (раньше передавался вымышленный хардкод 12/10/14/8/6/4).
@@ -1686,7 +1772,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                     <div style={{ gridColumn: '1/-1' }}><span style={{ color: '#fff' }}>💡 </span><span style={{ color: '#fff' }}>{n.tip}</span></div>
                     {pedAdapt.combinedMrvMultiplier > 1 && (
                       <div style={{ gridColumn: '1/-1', marginTop: 4, fontSize: 10, color: '#f59e0b' }}>
-                        💉 PED увеличивают потребность в калориях и белке — значения скорректированы.
+                        💉 PED увеличивают потребность в калориях — рекомендация по калориям скорректирована; белок при необходимости задайте полем «Белок (г/кг)» выше.
                       </div>
                     )}
                   </div>
@@ -1796,6 +1882,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
             e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
             tempoStr, getTempo,
+            hasDeload: planHasDeload(builtSrc),
+            onRemoveDeload: handleRemoveDeload,
           }} />
           <BlockView plan={builtSrc} />
           <PLToolsCard level={level} days={days} totalSets={plToolTotalSets} bodyWeight={linked.profile?.settings?.personal?.weight ?? bw} sex={linked.profile?.settings?.personal?.sex} e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }} hrvRatio={linked.profile?.settings?.baselineHrvRatio} acwr={acwrData.ratio} rpeDelta={autoRegResult.rirShift} plan={builtSrc} onApplyFrequency={(plans)=>{ const m: Record<string, number[]> = {}; plans.forEach(p=>{ m[p.muscle]=Array.from({length:p.frequency},(_,i)=>i+1); }); setWeakGroupDayMap(m); setMethodNote(`📊 Частота применена: ${plans.map(p=>`${p.muscle} ${p.frequency}×`).join(', ')}`); }} />

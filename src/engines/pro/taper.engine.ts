@@ -59,7 +59,9 @@ export function warmupSequence(opener: number): { percent: number; weight: numbe
   return MEET_WARMUP_STEPS.map(p => ({ percent: p, weight: r05(opener * p), reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
 }
 
-/** Полный taper-план: объём/интенсивность из P7 taperCurve + сессии прайминга + прикиды. */
+/** Полный taper-план: сессии по собственному протоколу (удержание интенсивности +
+ *  прайминг), кривая P7 `taperCurve` — витрина/график (возвращается в результате),
+ *  прикиды — канон MEET_STRATEGY_PCT (в `peakWeekAttempts`). */
 export function taperPlan(
   meetDate: string,
   current1RM: Record<Lift, number>,
@@ -71,7 +73,6 @@ export function taperPlan(
   const weeks: { week: number; sessions: TaperSession[] }[] = [];
 
   for (let w = 1; w <= taperWeeks; w++) {
-    const tw = tc[w - 1];
     const isLast = w === taperWeeks;
     const sessions: TaperSession[] = [];
     // Сессия 1: интенсивность-удержание (squat/bench тяжёлые синглы early, lighter к концу)

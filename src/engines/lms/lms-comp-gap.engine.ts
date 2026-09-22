@@ -89,6 +89,7 @@ export interface CompGapBuildOptions extends CompGapOptions {
   orthopedicBlockedPatterns?: string[];
   diagnosticExerciseMap?: LMSBuildInput['diagnosticExerciseMap'];
   diagnosticDayMap?: LMSBuildInput['diagnosticDayMap'];
+  diagnosticWeakSide?: LMSBuildInput['diagnosticWeakSide'];
   limiterExerciseMap?: LMSBuildInput['limiterExerciseMap'];
   limiterProtocolMap?: LMSBuildInput['limiterProtocolMap'];
   limiterDayMap?: LMSBuildInput['limiterDayMap'];
@@ -183,8 +184,11 @@ export function planBetweenCompetitions(
       fitWeeks = 1;
       fitMode = 'skip';
       needsConsent = false;
-      fittedCycle = null;
-      fitNotes = ['окно между стартами слишком мало — только стартовая неделя с прикидами (время не простаивает)'];
+      // P1-6: раньше fittedCycle=null давал ПУСТУЮ неделю (дни без упражнений) на старте.
+      // Теперь берём одну базовую неделю цикла как стартовую (pmRow есть → прикиды
+      // сверху считаются), заметка честно это говорит.
+      fittedCycle = rawFit.cycle;
+      fitNotes = ['окно между стартами слишком мало — стартовая неделя собрана из 1 недели цикла «' + chosen.cycle.meta.title + '» (прикиды сверху), время не простаивает'];
     } else if (rawFit.needsConsent) {
       needsConsent = true;
       const consent = opts.consents?.[j] === true;
@@ -257,6 +261,7 @@ export function planBetweenCompetitions(
       orthopedicBlockedPatterns: opts.orthopedicBlockedPatterns,
       diagnosticExerciseMap: opts.diagnosticExerciseMap,
       diagnosticDayMap: opts.diagnosticDayMap,
+      diagnosticWeakSide: opts.diagnosticWeakSide,
       limiterExerciseMap: opts.limiterExerciseMap,
       limiterProtocolMap: opts.limiterProtocolMap,
       limiterDayMap: opts.limiterDayMap,
