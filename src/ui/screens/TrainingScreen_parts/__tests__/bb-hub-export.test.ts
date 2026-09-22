@@ -29,6 +29,7 @@ const baseInput = (over?: Partial<BbHubPro2Input>): BbHubPro2Input => ({
   erir: { text: '0.63 — добавь наружную' },
   screenPriority: ['1. Голеностоп — подпятка'],
   correctiveDetail: [{ id: 'c1', zone: 'chest_upper', exerciseId: 'incline_db', protocol: '3×8 RIR2 3-1-1-0', cues: ['n'], source: 'x' }],
+  correctionBlock: ['📅 Блок коррекции: 6 нед · 2 упр. · волна 3-3-4-4-3-3 · зоны: chest_upper'],
   lrDirection: [{ group: 'chest', text: 'Перекос держится: левая' }],
   ...over,
 });
@@ -48,7 +49,23 @@ describe('bb-hub-export (PRO-5 Э5)', () => {
     expect(m.posterior).toEqual({ nhe: 'NHE 3 повтора', adductor: null });
     expect(m.screenPriority).toEqual(['1. Голеностоп — подпятка']);
     expect(m.correctiveDetail).toHaveLength(1);
+    expect(m.correctionBlock).toHaveLength(1);
     expect(m.lrDirection).toHaveLength(1);
+  });
+
+  it('ROUND-10: блок коррекции едет в HTML и CSV; без него — секций нет (байт-в-байт)', () => {
+    const report = { weakCandidates: [], weakMusclesCanonical: [], weakZonesGranular: [], symmetry: { ratios: {}, score: 0, issues: [] }, stimulus: { issues: [], scorePenalty: 0, global: {} }, score: { score: 100, level: 'ok', verification: 0, floors: [] }, findings: [], priorities: [] } as any;
+    const withBlock = buildPro2Meta(baseInput());
+    const html = buildBBDiagnosticsHtml(report, { date: '2026-09-22', ...withBlock } as any);
+    expect(html).toContain('Блок коррекции (волна)');
+    expect(html).toContain('волна 3-3-4-4-3-3');
+    const csv = buildBBDiagnosticsCsv(report, null, { ...withBlock, weakCauses: {}, weakHeads: [], specBlock: null } as any);
+    expect(csv).toContain('correction_block');
+    const empty = buildPro2Meta(baseInput({ correctionBlock: null }));
+    const htmlEmpty = buildBBDiagnosticsHtml(report, { date: '2026-09-22', ...empty } as any);
+    expect(htmlEmpty).not.toContain('Блок коррекции (волна)');
+    const csvEmpty = buildBBDiagnosticsCsv(report, null, { ...empty, weakCauses: {}, weakHeads: [], specBlock: null } as any);
+    expect(csvEmpty).not.toContain('correction_block');
   });
 
   it('пустое — тихо: driverSubs null, bench/painMon/posterior/erir пустые', () => {

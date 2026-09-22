@@ -30,6 +30,8 @@ export interface BbHubPro2Input {
   erir: { text: string } | null;
   screenPriority: string[] | null;
   correctiveDetail: unknown;
+  /** ROUND-10: строки блока коррекции (волна) — тот же источник, что карточка хаба. */
+  correctionBlock: string[] | null;
   lrDirection: Array<{ group: string; text: string }>;
 }
 
@@ -56,6 +58,7 @@ export function buildPro2Meta(i: BbHubPro2Input): Record<string, unknown> {
     erir: i.erir,
     screenPriority: i.screenPriority,
     correctiveDetail: i.correctiveDetail,
+    correctionBlock: i.correctionBlock,
     lrDirection: i.lrDirection,
   };
 }

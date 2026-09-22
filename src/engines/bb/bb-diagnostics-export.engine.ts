@@ -49,6 +49,8 @@ export interface BBDiagnosticsPro2Meta {
     weightHint?: number | null; bodyweight?: boolean; restSec?: number; reps?: number; repsMax?: number; rir?: number;
     phase?: string; level?: string; alt?: string[];
   }> | null;
+  /** ROUND-10: строки блока коррекции (волна 4–8 нед) — опционально, без — байт-в-байт. */
+  correctionBlock?: string[] | null;
 }
 
 export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakHeads?: string[]; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta): string {
@@ -152,6 +154,10 @@ ${(() => {
         return bits.join(' · ');
       };
       parts.push(`<h2>Коррекции (библиотека)</h2><table><tr><th>Зона</th><th>Протокол</th><th>Доза</th><th>Кью</th><th>Источник</th></tr>${(m as any).correctiveDetail.slice(0, 4).map((d: any) => `<tr><td>${esc(d.zone)}</td><td>${esc(d.protocol)}</td><td>${esc(doseText(d))}</td><td>${esc((d.cues || []).join(' · '))}</td><td>${esc(d.source || '')}</td></tr>`).join('')}</table>`);
+    }
+    if (Array.isArray((m as any).correctionBlock) && (m as any).correctionBlock.length) {
+      // ROUND-10: блок коррекции — те же строки, что карточка хаба («показано = выгружено»).
+      parts.push(`<h2>Блок коррекции (волна)</h2><ul>${(m as any).correctionBlock.map((l: unknown) => `<li>${esc(String(l))}</li>`).join('')}</ul>`);
     }
     if (m.readiness?.level) parts.push(`<h2>Готовность — ${esc(m.readiness.level)}</h2><div style="font-size:12px">${esc(m.readiness.advice)}</div><ul>${m.readiness.reasons.map((r) => `<li>${esc(r)}</li>`).join('') || '<li>—</li>'}</ul>`);
     if (m.redFlags?.active) parts.push(`<h2>Флаги — ${m.redFlags.blocked ? 'стоп' : 'осторожно'}</h2><div style="font-size:12px">${esc(m.redFlags.text)} (скрининг, не диагноз)</div>`);
@@ -267,6 +273,9 @@ export function buildBBDiagnosticsCsv(
       const reps = typeof d.reps === 'number' && d.reps > 0 ? `${d.reps}${typeof d.repsMax === 'number' && d.repsMax > d.reps ? `-${d.repsMax}` : ''}` : '';
       lines.push([d.id, d.zone, d.exerciseId, d.protocol, d.source, w, d.restSec != null ? String(d.restSec) : '', reps].map(escCsv).join(','));
     }
+  }
+  if (Array.isArray((meta as any)?.correctionBlock) && (meta as any).correctionBlock.length) {
+    lines.push(['correction_block', (meta as any).correctionBlock.join(' | ')].map(escCsv).join(','));
   }
   if (meta?.returnTo) lines.push(['return_to', meta.returnTo.text].map(escCsv).join(','));
   if (meta?.lrDirection?.length) lines.push(['lr_direction', meta.lrDirection.map((d) => d.text).join(' · ')].map(escCsv).join(','));

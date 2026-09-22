@@ -1255,6 +1255,16 @@ export const BBDiagnosticsHub: React.FC = () => {
     return out;
   }, [report.weakZonesGranular, report.symmetry.ratios, weakCauses, level, profileEquipment, inPlanExerciseIds, moveDriver, benchV, nheV, adductorV, erIrV, painMon, hingeV, shoulderV, ybtV, asymText, teenGate, state.pmLoc, rotV, loadedHingeV]);
 
+  // ROUND-10: блок коррекции (волна) — единый источник для карточки и экспорта (HTML/CSV/печать)
+  const corrBlockLines = useMemo(() => {
+    try {
+      const picks = Object.values(correctiveTopByZone).flat().map((r) => ({ corr: r.corr, why: r.why }));
+      const block = correctiveBlockForBB(picks, 6);
+      const lines = correctiveBlockExportLines(block);
+      return lines.length ? { lines, block } : null;
+    } catch { return null; }
+  }, [correctiveTopByZone]);
+
   // Э5 PRO-5: единые входы выдачи — головки, детали коррекций и PRO-мета (HTML/CSV/мост одним объектом)
   const exportHeads = useMemo(() => {
     try {
@@ -1309,8 +1319,9 @@ export const BBDiagnosticsHub: React.FC = () => {
     erir: !teenGate.blocked && erIrV.tested ? { text: erIrV.text } : null,
     screenPriority: screenPriority.length ? screenPriority : null,
     correctiveDetail: correctiveDetailForExport,
+    correctionBlock: corrBlockLines?.lines ?? null,
     lrDirection,
-  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, lrDirection]);
+  }), [lrVerdicts, moveDriver, singleLeg, ohs, mmcLine, shoulderV, hingeV, loadedV, ybtV, asymText, driverSubs, benchV, painMon, nheV, adductorV, loadedHingeV, erIrV, teenGate, screenPriority, correctiveDetailForExport, corrBlockLines, lrDirection]);
 
   // Покрытие слабых головок текущим планом (есть ли хоть одно упражнение в головку)
   const headCoverage = useMemo(() => {
@@ -1886,10 +1897,8 @@ export const BBDiagnosticsHub: React.FC = () => {
             {/* ROUND-10: блок коррекции (волна) — тот же источник, что карточка/вставка (без нового ранжира) */}
             {(() => {
               try {
-                const picks = Object.values(correctiveTopByZone).flat().map((r) => ({ corr: r.corr, why: r.why }));
-                const block = correctiveBlockForBB(picks, 6);
-                const lines = correctiveBlockExportLines(block);
-                if (!lines.length) return null;
+                if (!corrBlockLines) return null;
+                const block = corrBlockLines.block;
                 return (
                   <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.22)', fontSize: 11, lineHeight: 1.5 }} data-bb="corr-block">
                     <b style={{ color: '#00e68a' }}>📅 Блок коррекции (волна 4–8 нед)</b>
