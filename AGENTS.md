@@ -1,5 +1,13 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Хабы диагностики round-7: сессия/волна арма + превью плана армлифтинга + уплотнение свёрнутых (Sep 22 2026, коммит pathspec, без пуша)
+
+По команде «выполняй три пункта: армлифтинг-превью, арм-сессия/волна, полный vitest+build; проверь оформление (без пустых мест у свёрнутых), реальность подбора и фактическое внесение в план». Только Edit/Write + vitest/tsc; чужие WIP не тронуты.
+- **Арм — сессия/волна коррекции** (`arm-hub-correction-tab`): блок `data-arm="correction-session"` — по **1 упражнению на точку** (⭐-выбранное первым через `orderedTopFor`), порядок роль-heavy→table→static→iso→pulse→pump (кап 6), доза `sets×reps@%` из `ARM_CORRECTIONS`; строка `correction-wave-note` — `correctiveWaveForWeek` (Н1/Н2/Н3). Показанное = вставляемое (инъекция `handleInjectP0` берёт `rankedIds` в том же ⭐-порядке).
+- **Армлифтинг — превью плана** (`ArmliftingDiagnosticsHub`): в «📦 Что уедет в конструктор» блок `data-arm="lift-bridge-preview"` — топ-3 упражнения (доза/холд/отдых/freq/id, ⭐ первым), «слабой рукой первой» при асимметрии >15%, волна спец-блока (`specBlock` Н1…). Паритет с мостом: `diagCorrections`/`armliftExercises` идут из того же `correctionsOrdered`.
+- **Оформление свёрнутых**: CSS-уплотнение `:is(.train-armdiag) .ad-sec:has(> .ad-sec-head[aria-expanded='false'])` — нижний паддинг 6px + нулевой margin шапки (тело и так `grid 0fr`); старые WebView без `:has` деградируют без вреда.
+- **Проверено**: NEW тесты (+2) — `arm-corrective-ui` сессия+волна, `armlifting-hub` превью; движки `src/engines/arm`+`strength-sport` **156 файлов / 2119**; UI `TrainingScreen_parts` **154 файла / 1399** (1 unhandled — чужой `revokeObjectURL` ExerciseLab, предсуществующий); `vite build` **OK** (32.6с, PWA сгенерён); `tsc` 0. НЕ ПУШИЛ.
+
 ## ПЛ-Фаза 3: структурная миграция карточек ПЛ на единый кит BbCard/BbFoldCard (Sep 22 2026, локально, без пуша)
 
 По команде «довести структурную подачу карточек ПЛ-авто до эталона BbCard/BbFoldCard — не только токены/цвета, а структуру: иконка-тайл + заголовок 12.5/800 + верхняя кромка, фолды для длинных блоков». Выполнено полностью; чужие WIP не тронуты; круги зелёные.

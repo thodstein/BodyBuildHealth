@@ -1136,6 +1136,20 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         <div id="lift-bridge" />
         <AdSec title="📦 Что уедет в конструктор" collapsible defaultOpen={false} summary={report.filled ? 'армлифтинг' : 'пока пусто'}>
           <div className="ad-muted">Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину «Армлифтинг». Слабейший снаряд, класс, рецепт, last-man-standing — в payload. Упражнения коррекции ({correctionsOrdered.map((c) => c.exId).join(', ') || '—'}) встанут в недели плана при сборке в дисциплине «Армлифтинг».</div>
+          {correctionsOrdered.length > 0 && (
+            <div data-arm="lift-bridge-preview" style={{ marginTop: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)' }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#22c55e' }}>📋 Что встанет в план ({Math.min(3, correctionsOrdered.length)} упр. · {specBlock.length || 1} нед)</div>
+              {correctionsOrdered.slice(0, 3).map((c, i) => (
+                <div key={c.id} style={{ fontSize: 11, color: '#fff', marginTop: 3 }}>{i + 1}. {c.title} — {c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq}{c.exId ? ` · id ${c.exId}` : ''}{armliftPrefCorr === c.id ? ' · ⭐ первым' : ''}</div>
+              ))}
+              {asymForDiag != null && asymForDiag > 15 && (
+                <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>↔ Слабой рукой первой (асимметрия {asymForDiag}%)</div>
+              )}
+              {specBlock.length > 0 && (
+                <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>🌊 Волна {specBlock.length} нед: {specBlock.map((w) => `Н${w.week} ${String(w.focus).split(' — ')[0]}`).join(' → ')}</div>
+              )}
+            </div>
+          )}
         </AdSec>
         <AdCta>
           <AdBtn variant="amber" block hero onClick={applyToConstructor}>→ В Арм-конструктор (армлифтинг)</AdBtn>

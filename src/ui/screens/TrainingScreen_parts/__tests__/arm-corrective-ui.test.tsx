@@ -87,6 +87,14 @@ describe('arm-corrective-ui E3', () => {
     expect(q(container, 'correction-prevent')!.textContent).toContain('wrist_ext_bb');
     expect(q(container, 'correction-wave')!.textContent).toContain('Н1');
   });
+  it('сессия коррекции: по 1 упражнению на точку + волна (предпросмотр)', () => {
+    const { container } = render(<HubCorrectionTab H={fakeH()} />);
+    const s = q(container, 'correction-session');
+    expect(s).toBeTruthy();
+    expect(s!.textContent).toContain('Коррекционная сессия');
+    expect(s!.textContent).toContain('side_belt_table');
+    expect(q(container, 'correction-wave-note')!.textContent).toContain('Волна');
+  });
   it('клик волны Н2 пишет corrWave в стейт', () => {
     const setState = vi.fn();
     render(<HubCorrectionTab H={fakeH({ setState })} />);

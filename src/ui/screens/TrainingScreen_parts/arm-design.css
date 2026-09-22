@@ -2213,3 +2213,13 @@
   padding: 0;
   margin: 2px 0 0;
 }
+
+/* ── Свёрнутая секция хаба: без нижнего «пустого» паддинга (каркас без пустот) ──
+ * Тело и так 0fr (нулевая высота), убираем только лишний воздух под шапкой.
+ * :has — в старых WebView правило просто игнорируется (деградация без вреда). */
+:is(.train-armdiag) .ad-sec:has(> .ad-sec-head[aria-expanded='false']) {
+  padding-bottom: 6px;
+}
+:is(.train-armdiag) .ad-sec:has(> .ad-sec-head[aria-expanded='false']) .ad-sec-head {
+  margin-bottom: 0;
+}

@@ -48,6 +48,17 @@ describe('W-AL UI: хаб армлифтинга', () => {
     render(<ArmliftingDiagnosticsHub />);
     expect((screen.getByLabelText(/RT кг/) as HTMLInputElement).value).toBe('60');
   });
+  it('превью плана: что встанет (упражнения + волна) после диагноза', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.change(screen.getByLabelText(/RT кг/), { target: { value: '100' } });
+    fireEvent.click(screen.getByText('🔍 Диагностика'));
+    fireEvent.click(screen.getByText('Срыв с пола'));
+    const prev = document.querySelector('[data-arm="lift-bridge-preview"]');
+    expect(prev).toBeTruthy();
+    expect(prev!.textContent).toContain('Что встанет в план');
+    expect(prev!.textContent).toContain('Волна');
+  });
   it('мост с RT — тост про армлифтинг + трек arm', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

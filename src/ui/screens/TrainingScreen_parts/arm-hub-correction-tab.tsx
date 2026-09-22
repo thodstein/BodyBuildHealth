@@ -8,7 +8,7 @@ import React from 'react';
 import { ARM_BIOMECH, type ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ARM_CORRECTIONS, correctionForWeakPoint } from '../../../engines/arm/arm-weakpoint-corrections';
 import { doseForCause, doseLabel } from '../../../engines/arm/arm-correction-dose.engine';
-import { roleLabel, preventiveFor, drillsForPhase, correctiveWaveForWeek, doseForCauseV2, shouldUseDoseV2 } from '../../../engines/arm/arm-correction-pro2.engine';
+import { roleLabel, roleOf, preventiveFor, drillsForPhase, correctiveWaveForWeek, doseForCauseV2, shouldUseDoseV2 } from '../../../engines/arm/arm-correction-pro2.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
 import { suggestWeakPointsForTrack } from '../../../engines/arm/arm-video-analysis.engine';
 import { AdSec, AdBtn, AdBanner } from './arm-design-system';
@@ -220,6 +220,32 @@ export function HubCorrectionTab({ H }: { H: any }) {
         } catch { return null; }
       })()}
       {armSpecP0?.summary && <div className="ad-muted">📦 {armSpecP0.summary}</div>}
+      {(() => {
+        const roleOrder: Record<string, number> = { heavy: 0, table: 1, static: 2, iso: 3, pulse: 4, pump: 5 };
+        const picks = (weakPoints as ArmWeakPoint[]).map((wp) => {
+          const pref = (armPrefCorr || {})[wp];
+          const top = ((H.armTop3P0?.[wp] || []) as any[]);
+          const ordered = pref ? [...top.filter((t) => t.id === pref), ...top.filter((t) => t.id !== pref)] : top;
+          const id = ordered[0]?.id;
+          if (!id) return null;
+          const corr = (ARM_CORRECTIONS as any)?.[wp];
+          return { wp, id, role: roleOf(id) || 'heavy', sets: corr?.sets ?? 3, reps: (corr?.repsRange ?? [6, 8]) as number[], pct: Math.round((corr?.intensityPct ?? 0.65) * 100), hold: corr?.holdSeconds };
+        }).filter(Boolean) as Array<{ wp: string; id: string; role: string; sets: number; reps: number[]; pct: number; hold?: number }>;
+        picks.sort((a, b) => (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9));
+        const session = picks.slice(0, 6);
+        if (!session.length) return null;
+        const w = correctiveWaveForWeek(1);
+        return (
+          <div data-arm="correction-session" style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)' }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#22c55e' }}>📋 Коррекционная сессия ({session.length}) — сила → стол → стабильность → объём</div>
+            {session.map((s, i) => (
+              <div key={`${s.wp}-${s.id}-${i}`} style={{ fontSize: 11, color: '#fff', marginTop: 3 }}>{i + 1}. {s.id} — {s.sets}×{s.reps[0]}–{s.reps[1]}{s.hold ? ` · холд ${s.hold}с` : ''} @{s.pct}% · {roleLabel(s.id)}</div>
+            ))}
+            <div data-arm="correction-wave-note" style={{ fontSize: 11, color: '#fff', marginTop: 6 }}>🌊 Волна: {w.note} · Н2 объём +1 · Н3 делод −1</div>
+            <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>⭐-выбранное идёт первым в план; сессия — предпросмотр по 1 упражнению на точку.</div>
+          </div>
+        );
+      })()}
       <div className="ad-row">
         <AdBtn variant="primary" block hero onClick={handleInjectP0}>💉 Вставить коррекции в план ({weakPoints.length})</AdBtn>
         {hasInjectPrev && <AdBtn variant="dark" onClick={handleRollbackP0}>↩ Откат</AdBtn>}
