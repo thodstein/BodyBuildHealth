@@ -28,6 +28,22 @@ describe('PRO-CORR K1: библиотека PRO на реальных id', () =>
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(getArmExerciseById(id)).toBeTruthy();
   });
+  it('ROUND-10: у каждой записи есть equipmentAlt (фолбэк домашнему залу) + токены канонические', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/arm/armlift-correction.engine.ts'), 'utf8');
+    const entries = src.split('\n').filter((l) => l.trim().startsWith('{ exId:'));
+    const VALID = new Set(['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight', 'band', 'kettlebell', 'grip_tool']);
+    const noAlt = entries.filter((l) => !l.includes('equipmentAlt:')).length;
+    expect(noAlt).toBe(0);
+    const bad: string[] = [];
+    for (const l of entries) {
+      const m = l.match(/equipmentAlt: \[([^\]]*)\]/);
+      if (!m) continue;
+      for (const t of m[1].replace(/[^a-z_,]/g, '').split(',')) {
+        if (t && !VALID.has(t)) bad.push(t);
+      }
+    }
+    expect(Array.from(new Set(bad))).toEqual([]);
+  });
   it('ROUND-10: каждая причина × фаза ≥2 (6 ячеек были по 1) + причины только канонические', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/engines/arm/armlift-correction.engine.ts'), 'utf8');
     const VALID = new Set(['technique', 'max_strength', 'endurance', 'volume', 'mobility', 'fatigue', 'pain']);

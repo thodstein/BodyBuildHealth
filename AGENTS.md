@@ -29,6 +29,13 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · АРМЛИФТИНГ: equipmentAlt у всех 58 записей (Sep 22 2026, коммит pathspec, без пуша)
+
+Реаудит по цели плана P1 («`equipmentAlt` и `gentle` на всех, где осмысленно»): **20 из 58 записей были без фолбэка снаряда** → в домашнем зале (без CoC/акселя/Saxon/Inch) такая коррекция получала −40 «нет оборудования» и выпадала из выдачи без альтернативы.
+- Проставлен `equipmentAlt` на все 20 (реальные токены словаря профиля): силовые снаряды → `barbell`/`dumbbell` (`fat_bar_deadlift`, `inch_dumbbell`, `flask_1h`, `saxon_bar` ×2, `country_crush_3`, `little_big_horn`, `lever_top`, `plate_pinch_hold`); грипперы CoC/Silver (7 записей) → `band` (band-crush/hold — признанная замена гриппера); `towel_pullup` → `bodyweight`; conditioning-записи → `dumbbell`/`band`/`cable`.
+- NEW lock: «у каждой записи есть `equipmentAlt` (фолбэк домашнему залу) + токены только канонические (`barbell/dumbbell/machine/cable/bodyweight/band/kettlebell/grip_tool`)». Итог: 58/58 с фолбэком (было 38/58).
+- **Проверено**: `src/engines/arm` **92 файла / 1126** + армлифтинг-UI/apk-arm-pack **31/31** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · АРМ: фазы схватки — ≥2 чинящих точки (Sep 22 2026, коммит pathspec, без пуша)
 
 Реаудит движения арма: `weakPointsForPhase` возвращал канонический маппинг 1-в-1 → для **setup** и **pin** была ровно **одна** рекомендация (contain_fingers / side_pin), хотя библиотека чинит эти фазы 4 точками (`fixesPhase`).
