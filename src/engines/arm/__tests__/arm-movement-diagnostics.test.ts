@@ -13,6 +13,7 @@ import { assessHumerusDanger, checkHumerusChecklist } from '../arm-humerus-check
 import { assessFoulRisk } from '../arm-foul-risk.engine';
 import { analyzeTableIq } from '../arm-table-iq.engine';
 import { rankCorrectionsForArm } from '../arm-correction-rank.engine';
+import { ARM_CORRECTIONS } from '../arm-weakpoint-corrections';
 import { buildArmBridgeData } from '../arm-bridge-payload.engine';
 import { buildArmDiagnosticsCsv, buildArmDiagnosticsHtml } from '../arm-diagnostics-export.engine';
 
@@ -215,5 +216,24 @@ describe('P7 встройка', () => {
       expect(d.phase).toBe(ph);
       expect(d.weakPoints.length).toBeGreaterThan(0);
     }
+  });
+  it('ROUND-10: каждая фаза схватки имеет ≥2 точки, способных её чинить (канон ∪ fixesPhase)', () => {
+    const CANON: Record<string, string> = {
+      contain_fingers: 'setup', cup_start: 'start', pron_open: 'start', rising_top: 'start', back_start: 'start',
+      cup_hold: 'mid', pron_lock: 'mid', sup_cup: 'mid', sup_drag: 'mid', side_mid: 'mid', back_drag: 'mid', side_pin: 'pin',
+    };
+    const points = Object.keys(CANON);
+    const thin: string[] = [];
+    for (const ph of ['setup', 'start', 'mid', 'pin']) {
+      const pts = weakPointsForPhase(ph);
+      // каждая заявленная точка реально чинит фазу: канон ИЛИ fixesPhase библиотеки
+      for (const p of pts) {
+        const fixes = ((ARM_CORRECTIONS as Record<string, { fixesPhase?: string[] }>)[p]?.fixesPhase || []).map((s) => String(s).toLowerCase());
+        expect(CANON[p] === ph || fixes.includes(ph), `${p} не чинит ${ph}`).toBe(true);
+      }
+      if (pts.length < 2) thin.push(`${ph}:${pts.length}`);
+      for (const p of pts) expect(points).toContain(p);
+    }
+    expect(thin).toEqual([]);
   });
 });

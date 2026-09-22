@@ -10,6 +10,7 @@
 
 import type { ArmWeakPoint } from './arm-biomechanics.engine';
 import { isArmWeakPoint } from './arm-biomechanics.engine';
+import { ARM_CORRECTIONS } from './arm-weakpoint-corrections';
 
 export type ArmMatchPhase = 'setup' | 'readygo' | 'start' | 'mid' | 'pin';
 
@@ -96,10 +97,16 @@ export function phaseForWeakPoint(point: string): ArmMatchPhase | null {
 
 export function weakPointsForPhase(phase: string): ArmWeakPoint[] {
   if (!isArmMatchPhase(phase)) return [];
-  const direct = (Object.keys(ARM_POINT_TO_PHASE) as ArmWeakPoint[]).filter(
-    (p) => ARM_POINT_TO_PHASE[p] === phase,
+  const all = Object.keys(ARM_POINT_TO_PHASE) as ArmWeakPoint[];
+  const canonical = all.filter((p) => ARM_POINT_TO_PHASE[p] === phase);
+  // ROUND-10: + точки, которые ЧИНЯТ фазу (fixesPhase библиотеки коррекции): канонический
+  // маппинг 1-в-1 давал для setup/pin ровно одну рекомендацию при 4 доступных.
+  const fixing = all.filter((p) =>
+    ((ARM_CORRECTIONS[p]?.fixesPhase || []) as string[]).map((s) => String(s).toLowerCase()).includes(phase),
   );
-  if (direct.length) return direct;
+  const out: ArmWeakPoint[] = [];
+  for (const p of [...canonical, ...fixing]) if (!out.includes(p)) out.push(p);
+  if (out.length) return out;
   // readygo: своих точек нет — делит precursors старта (фальстарт/Cup/pron).
   const info = ARM_PHASE_INFO[phase];
   return (info.typicalFails || []).filter((x): x is ArmWeakPoint => isArmWeakPoint(x));
