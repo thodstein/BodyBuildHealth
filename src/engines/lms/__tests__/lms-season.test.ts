@@ -15,6 +15,7 @@ import {
   seasonSegmentSummary,
   type PLSeasonSlot,
   type PLSeasonPlan,
+  type PLSeasonSegment,
 } from '../lms-season.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import { CYCLE_03 } from '../../../data/lms-cycles/cycle-03';
@@ -300,5 +301,44 @@ describe('assembleSeasonPlan', () => {
   it('без согласия — сборка блокируется, weeks пустой или урезан', () => {
     const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto' });
     expect(plan.segments.some(s => s.fit.mode === 'strict_skip')).toBe(true);
+  });
+
+  // Аудит P2 (Sep 22 2026): при полной блокировке согласием НЕ подставляем чужой
+  // LMS_CYCLES[0] как template с пустыми метриками — честный blocked-флаг + либо
+  // цикл первого сегмента, либо пустой шаблон-заглушка.
+  it('полная блокировка: blocked-флаг, template = цикл первого сегмента (не чужой)', () => {
+    const cycle = CYCLE_01 as unknown as SRCycleTemplate;
+    const seg: PLSeasonSegment = {
+      slot: { period: 'strength', label: 'Сила', weeks: 8, weeksMin: 6, weeksMax: 12, defaultWeeks: 8, enabled: true },
+      cycleId: cycle.meta.id,
+      cycleTitle: cycle.meta.title,
+      weeks: 0,
+      fit: { cycle, weeks: 0, mode: 'strict_skip', needsConsent: false, notes: ['⛔ Без согласия — раскладка не изменена'] },
+      rationale: [],
+      slotIndex: 0,
+    };
+    const plan: PLSeasonPlan = { segments: [seg], totalWeeks: 0, notes: [], cycleIds: [] };
+    const out = assembleSeasonPlan(plan, { pmMap: { 'Присед': 180, 'Жим лежа': 120, 'Становая тяга': 220 }, fallbackPm: 80 });
+    expect(out.blocked).toBe(true);
+    expect(out.weeks).toEqual([]);
+    expect(out.template.meta.id).toBe(cycle.meta.id);
+    expect(out.progressionRationale).toContain('заблокирована');
+  });
+
+  it('пустой сезон: blocked-флаг и пустой шаблон (не чужой цикл реестра)', () => {
+    const empty: PLSeasonPlan = { segments: [], totalWeeks: 0, notes: [], cycleIds: [] };
+    const out = assembleSeasonPlan(empty, { pmMap: {}, fallbackPm: 80 });
+    expect(out.blocked).toBe(true);
+    expect(out.weeks).toEqual([]);
+    expect(out.template.meta.id).toBe('');
+    expect(out.template.meta.weeks).toBe(0);
+  });
+
+  it('собранный сезон blocked-флага не несёт (обратная совместимость)', () => {
+    const consents: Record<number, boolean> = { 0: true, 1: true, 2: true, 3: true };
+    const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto', consents });
+    const out = assembleSeasonPlan(plan, { pmMap: { 'Присед': 180, 'Жим лежа': 120, 'Становая тяга': 220 }, fallbackPm: 80 });
+    expect(out.blocked).toBeUndefined();
+    expect(out.weeks.length).toBeGreaterThan(0);
   });
 });

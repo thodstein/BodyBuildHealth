@@ -14,6 +14,7 @@ export const EXERCISE_ALIAS_MAP: Record<string, string> = {
   // ─── Основные лифты (СРЦ-движения) ───
   'присед': 'squat',
   'присед на груди': 'front_squat',
+  'приседания со штангой на груди': 'front_squat',
   'приседание': 'squat',
   'присед в широкой постановке': 'hack_squat',
   'жим лежа': 'bench_bar',
@@ -43,6 +44,7 @@ export const EXERCISE_ALIAS_MAP: Record<string, string> = {
   'скоростной жим': 'bench_bar',
   'жим с остановками': 'bench_bar',
   'жим с паузой 2 секунды': 'bench_bar',
+  'жим лежа с паузой': 'pl_bench_pause',
   'жим в раме (дожим)': 'bench_bar',
   'жим в раме (старт)': 'bench_bar',
   'дожим с 3 см': 'bench_bar',
@@ -54,6 +56,7 @@ export const EXERCISE_ALIAS_MAP: Record<string, string> = {
   'тяга верхнего блока': 'pulldown',
   'тяга гантели в наклоне': 'row_db',
   'тяга штанги в наклоне': 'row_bar',
+  'тяга в наклоне': 'row_bar',
   'тяга на прямых ногах': 'rdl',
   'тяга на прямых ногах (класс.)': 'rdl',
   'тяга с подчеркнутым стартом': 'row_bar',
@@ -74,10 +77,12 @@ export const EXERCISE_ALIAS_MAP: Record<string, string> = {
   // ─── Руки ───
   'бицепс стоя': 'curl_bar',
   'бицепс с гантелями': 'curl_db',
+  'бицепс стоя со штангой': 'curl_bar',
   'молотковые сгибания': 'hammer_curl',
   'французский жим': 'tricep_push',
   'французский жим лежа': 'tricep_push',
   'разгибания с гантелью из-за головы': 'db_skullcrusher',
+  'разгиб. с гантелью из-за головы': 'db_skullcrusher',
   'разгибания из-за головы': 'tricep_cable',
   'трицепс на блоке': 'tricep_cable',
   'кисть стоя': 'wrist_curl',
@@ -105,4 +110,21 @@ export const EXERCISE_ALIAS_MAP: Record<string, string> = {
 export function resolveCatalogId(templateName: string): string | null {
   const n = (templateName || '').toLowerCase().replace(/ё/g, 'е').trim();
   return EXERCISE_ALIAS_MAP[n] ?? null;
+}
+
+/**
+ * Срезает нотацию источника с имени упражнения цикла (аудит P2, Sep 22 2026):
+ *  - RPE-метка в конце: «Присед @RPE8», «Жим лежа с паузой @RPE8», «@RPE 8»;
+ *  - тир JTS/Sheiko: «Жим лежа T2», «Тяга в наклоне T3» (Т1…Т4);
+ *  - скобочные формы: «Жим лежа (RPE 8)», «Присед (T2)».
+ * Без срезания 19 имён циклов не резолвились в каталог → терялись снаряд/мышца/
+ * паттерн и MRV-учёт. Функция идемпотентна: повторное применение ничего не меняет.
+ */
+export function stripCycleNotation(label: string): string {
+  let s = (label || '').trim();
+  s = s.replace(/\s*@\s*rpe?\s*\d+(?:[.,]\d+)?\s*$/i, '');
+  s = s.replace(/\s*\brpe\s*\d+(?:[.,]\d+)?\s*$/i, '');
+  s = s.replace(/\s*\bT[1-4]\b\s*$/i, '');
+  s = s.replace(/\s*\(\s*(?:rpe\s*\d+(?:[.,]\d+)?|T[1-4])\s*\)\s*$/i, '');
+  return s.trim();
 }

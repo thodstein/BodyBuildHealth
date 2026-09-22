@@ -372,6 +372,20 @@ function weekRangeOf(segments: PLSeasonSegment[], idx: number): string {
 
 // ─── Сборка недель сезона ───────────────────────────────────────────────────────
 
+/**
+ * Пустой шаблон для честного blocked-результата: сезон не собран (нет ни одного
+ * сегмента/все заблокированы). Это НЕ чужой цикл из реестра — UI читает только
+ * meta (title/weeks), week1 пуст, сборка такого шаблона невозможна by design.
+ */
+const EMPTY_BLOCKED_TEMPLATE: SRCycleTemplate = {
+  meta: {
+    id: '', title: '—', direction: 'powerlifting', level: 'II-KMS', period: 'strength',
+    sessionsPerWeek: 0, weeks: 0, correctionPct: 0,
+    description: 'сборка не выполнялась', howItWorks: '—', conditions: [],
+  },
+  week1: [],
+};
+
 export interface AssembleSeasonOptions {
   pmMap: Record<string, number>;
   fallbackPm?: number;
@@ -459,9 +473,13 @@ export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptio
   }
   // Если все сегменты заблокированы согласием — возвращаем пустой план с предупреждением
   if (activeSegments.length === 0) {
-    const template = plan.segments[0]?.fit.cycle as SRCycleTemplate | undefined ?? (LMS_CYCLES[0] as unknown as SRCycleTemplate);
+    // Честно (аудит P2): НЕ подставляем чужой LMS_CYCLES[0] как template с пустыми
+    // метриками. Если сегменты есть — это цикл первого сегмента (реальная выбранная
+    // раскладка), иначе пустой шаблон-заглушка; флаг blocked говорит, что плана нет.
+    const firstSeg = plan.segments[0];
     return {
-      template,
+      template: cloneCycleTemplate(firstSeg ? firstSeg.fit.cycle : EMPTY_BLOCKED_TEMPLATE),
+      blocked: true,
       progressionRationale: notes.join('\n') || '⛔ Сборка заблокирована — требуется согласие на изменение раскладки',
       weeks: [],
       cycleMetrics: {} as LMSBuildOutput['cycleMetrics'],

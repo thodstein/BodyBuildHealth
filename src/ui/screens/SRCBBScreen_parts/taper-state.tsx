@@ -14,6 +14,39 @@ import type { PeakWeekLayout, TaperMode, TaperWeightGoal } from '../../../engine
 import type { LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import type { PLMeetListItem } from './PLCompetitionTab';
 
+/** Кап сохранения taperPlan в he_pl_session (localStorage ~5 МБ на всё; план ~100 КБ). */
+export const TAPER_PLAN_PERSIST_MAX_CHARS = 1_500_000;
+
+/**
+ * Проверка формы сохранённого тапер-плана (аудит P2-1): после F5 карточка
+ * «📋 Тапер-план» пустела, хотя merge-запись сессии уже была. Стор может быть
+ * повреждён (старая версия/ручная правка) — восстанавливаем ТОЛЬКО валидную
+ * структуру (weeks/days/exercises + template.meta, которые читает PLCompetitionTab),
+ * иначе честно пусто.
+ */
+export function validateSavedTaperPlan(plan: unknown): LMSBuildOutput | null {
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan)) return null;
+  const p = plan as Partial<LMSBuildOutput>;
+  if (!p.template || typeof p.template !== 'object') return null;
+  if (!(p.template as { meta?: unknown }).meta || typeof (p.template as { meta?: unknown }).meta !== 'object') return null;
+  if (!Array.isArray(p.weeks) || p.weeks.length === 0) return null;
+  if (!p.weeks.every((week) => week && Number.isFinite((week as { week?: unknown }).week) && Array.isArray((week as { days?: unknown }).days))) return null;
+  if (!p.weeks.every((week) => (week as { days: unknown[] }).days.every((day) => day && Array.isArray((day as { exercises?: unknown }).exercises)))) return null;
+  return plan as LMSBuildOutput;
+}
+
+/** Проверка формы taperAttemptOverride: { имя лифта: [опенер, вторая, третья] }. */
+export function validateSavedTaperAttemptOverride(value: unknown): Record<string, number[]> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out: Record<string, number[]> = {};
+  for (const [lift, attempts] of Object.entries(value as Record<string, unknown>)) {
+    if (!lift || !Array.isArray(attempts) || attempts.length === 0 || attempts.length > 3) continue;
+    if (!attempts.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0)) continue;
+    out[lift] = attempts.map((n) => Math.round(n));
+  }
+  return out;
+}
+
 export interface PLTaperState {
   bw: number; setBw: React.Dispatch<React.SetStateAction<number>>;
   targetBw: number; setTargetBw: React.Dispatch<React.SetStateAction<number>>;
@@ -60,7 +93,7 @@ export function usePLTaperState(saved: any, profBodyWeight?: number): PLTaperSta
   const [taperActualPm, setTaperActualPm] = useState<Record<string, number>>(saved?.plTaperActualPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
   const [taperPlannedPm, setTaperPlannedPm] = useState<Record<string, number>>(saved?.plTaperPlannedPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
   const [taperFed, setTaperFed] = useState<string>(saved?.plTaperFed ?? 'fpr');
-  const [taperAttemptOverride, setTaperAttemptOverride] = useState<Record<string, number[]>>({});
+  const [taperAttemptOverride, setTaperAttemptOverride] = useState<Record<string, number[]>>(() => validateSavedTaperAttemptOverride(saved?.plTaperAttemptOverride));
   const [meetList, setMeetList] = useState<PLMeetListItem[]>(() => {
     const savedList = saved?.plMeetList as PLMeetListItem[] | undefined;
     if (Array.isArray(savedList) && savedList.length > 0) return savedList;
@@ -71,7 +104,8 @@ export function usePLTaperState(saved: any, profBodyWeight?: number): PLTaperSta
   const [taperWeightGoal, setTaperWeightGoal] = useState<TaperWeightGoal>(saved?.plTaperWeightGoal ?? 'auto');
   const [peakLayout, setPeakLayout] = useState<PeakWeekLayout>(saved?.plPeakLayout ?? 'attempts');
   const [postMeetOn, setPostMeetOn] = useState<boolean>(saved?.plPostMeetOn ?? true);
-  const [taperPlan, setTaperPlan] = useState<LMSBuildOutput | null>(null);
+  // P2-1: план тапера — черновик сессии (валидация формы; битый стор → пусто).
+  const [taperPlan, setTaperPlan] = useState<LMSBuildOutput | null>(() => validateSavedTaperPlan(saved?.plTaperPlan));
   const [peakCycleId, setPeakCycleId] = useState<string | null>(saved?.plPeakCycleId ?? null);
 
   const applyMainMeet = (m: PLMeetListItem) => {

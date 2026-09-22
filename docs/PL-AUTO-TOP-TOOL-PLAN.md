@@ -204,7 +204,7 @@
 > (guard-тест `pl-card-design` расширить на структуру: `BbCard`/`BbFoldCard` используются,
 > локальных `SectionCard`-дублей нет).
 
-## §10. Аудит-раунд Sep 22 2026 (P0/P1) + делод по кнопке — ✅ ВЫПОЛНЕНО, остаток P2
+## §10. Аудит-раунд Sep 22 2026 (P0/P1 + P2) + делод по кнопке — ✅ ВЫПОЛНЕНО ПОЛНОСТЬЮ
 
 Полный аудит 4 направлений (движки/UI/данные/статус плана) с перепроверкой чтением; закрыто:
 
@@ -236,7 +236,7 @@
   `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`);
   `verify:apk-design` OK.
 
-### §10.1 Промт следующей сессии (остаток P2) — копировать целиком
+### §10.1 Промт сессии P2 — ✅ ВЫПОЛНЕН ЦЕЛИКОМ (Sep 22 2026, см. §10.2)
 
 > Задача: закрыть остаток P2 аудит-раунда ПЛ-авто (Sep 22 2026). Репо `D:\BodyBuildHealth`.
 > Никаких изменений математики планов без явного согласия; только Edit/Write + vitest/tsc;
@@ -266,4 +266,38 @@
 > 6. Памятка: полный прогон `npx vitest run src/engines/lms src/ui/screens/SRCBBScreen_parts
 >    src/ui/screens/TrainingScreen_parts` + `tsc --noEmit` (NODE_OPTIONS=12GB) + `verify:apk-design`;
 >    обновить AGENTS.md и §10 этого плана.
+
+### §10.2 Результат P2-остатка (Sep 22 2026) — ✅ выполнено кодом, без изменения математики планов
+
+1. **Персист тапера** — `taper-state.tsx`: `validateSavedTaperPlan` (weeks/days/exercises +
+   `template.meta`) и `validateSavedTaperAttemptOverride` (числа 0..3); восстановление в
+   `usePLTaperState`; merge-запись `he_pl_session` в `SRCBBScreen` пишет `plTaperPlan`
+   (кап `TAPER_PLAN_PERSIST_MAX_CHARS = 1_500_000` символов; `null` = честная очистка) и
+   `plTaperAttemptOverride`. Тесты: ремаунт провайдера видит план/прикиды; битый стор → пусто;
+   отсутствие ключей — обратная совместимость (`taper-state` 3→6).
+2. **Мёртвый код UI** — `SRCBBScreen`: удалён write-only мост план→сессия
+   (`he_bridge_sessions`/`he_bridge_progress`, `bridgeSessions/bridgeAutoreg/progressSnap/
+   bridgeWeek` + мемо), `WEAK_GROUPS/toggleWeak/PL_WP_OPTIONS/PL_WEAKPOINT_LABELS/peakRirTarget/
+   appliedMethods/BB_WM_KEYS/BB_WM_RU/setBbWm/displayPhaseForWeek/weekVolumeOf`, неиспользуемые
+   деструктуризации тапер-контекста и 44 импорта; `PLPlanView` — api без `bridgeSessions/
+   setBridgeWeek/bridgeWeek` (и без типа `BridgeSession`). Решение по панелям без маунта:
+   `PeakingPanel`/`ProMetricsPanel` → `@deprecated` с причиной (тапер/пик — `PLCompetitionTab`+
+   `TaperPlannerTab`, ББ-преп — `BbAutoConstructor`; `FFChart` из ProMetrics живой).
+   Source-guard — в новом `pl-p2-data-hygiene`.
+3. **OPL** — `PLToolsCard` читает `he_opl_history` при монтировании и рисует
+   `data-pl="opl-history"` (SVG DOTS + лучший старт + диапазон дат); запись `he_opl_name`
+   удалена; битый стор → пусто. Тесты `pl-tools-card` 5→8.
+4. **Данные циклов** — `stripCycleNotation` + экспорт `findCatalogExerciseByLabel`;
+   +5 alias (`бицепс стоя со штангой`, `разгиб. с гантелью из-за головы`, `приседания со
+   штангой на груди`, `жим лежа с паузой`, `тяга в наклоне`); 57 мёртвых ключей
+   `exercise-id-mapping.ts` удалены; `LMS_EXERCISES` 78→73 с реальным `catalogId` у каждой
+   записи (шум xlsm удалён); `MAX_SOURCE_SET_PCT = 1.3` — единый гард для 15 проходок
+   (>110%, макс 129.25%) в 7 циклах, UI-редактор `% ПМ` до 130%. Lock-тесты:
+   `pl-p2-data-hygiene` 14/14.
+5. **Сезон** — `assembleSeasonPlan` при полной блокировке: `blocked: true`, `template` =
+   цикл первого сегмента или пустой шаблон-заглушка (никакого чужого `LMS_CYCLES[0]`);
+   `lms-season` 26→29.
+6. **Проверено** — `tsc --noEmit` 0 по всему проекту (12GB); `src/engines/lms` 52/1082;
+   `SRCBBScreen_parts` 23/182; `TrainingScreen_parts` 154/1402 (+чужой unhandled
+   `revokeObjectURL`); `verify:apk-design` OK. Коммит pathspec своих файлов, без пуша.
 

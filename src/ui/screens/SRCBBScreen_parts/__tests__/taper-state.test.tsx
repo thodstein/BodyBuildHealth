@@ -66,3 +66,57 @@ describe('usePLTaper / PLTaperProvider', () => {
     expect(screen.getByTestId('strategyAfter').textContent).toBe('aggressive');
   });
 });
+
+// P2-1: черновики тапера переживают F5 — taperPlan/taperAttemptOverride восстанавливаются
+// из he_pl_session (валидная форма); битый/чужой стор → честно пусто.
+const TAPER_PLAN = {
+  template: { meta: { id: 'taper-test', title: 'Тапер-тест' } },
+  progressionRationale: '',
+  cycleMetrics: {},
+  weeks: [{ week: 1, pmRow: {}, days: [{ exercises: [] }] }],
+};
+
+/** Потребитель: показывает наличие тапер-плана и прикидов. */
+const PlanConsumer: React.FC = () => {
+  const tp = usePLTaper();
+  return (
+    <div>
+      <span data-testid="plan">{tp.taperPlan ? `${tp.taperPlan.weeks.length} нед` : 'нет'}</span>
+      <span data-testid="ov">{JSON.stringify(tp.taperAttemptOverride)}</span>
+    </div>
+  );
+};
+
+describe('P2-1: персист черновиков тапера (taperPlan/attemptOverride)', () => {
+  it('ремаунт провайдера видит план и прикиды из сохранённой сессии', () => {
+    const saved = {
+      plTaperPlan: TAPER_PLAN,
+      plTaperAttemptOverride: { 'Присед': [180, 190, 200] },
+    };
+    const { unmount } = render(<PLTaperProvider saved={saved}><PlanConsumer /></PLTaperProvider>);
+    expect(screen.getByTestId('plan').textContent).toBe('1 нед');
+    expect(screen.getByTestId('ov').textContent).toContain('Присед');
+    unmount();
+    // Ремаунт (условный F5): те же данные сессии → та же карточка «📋 Тапер-план».
+    render(<PLTaperProvider saved={saved}><PlanConsumer /></PLTaperProvider>);
+    expect(screen.getByTestId('plan').textContent).toBe('1 нед');
+    expect(screen.getByTestId('ov').textContent).toBe('{"Присед":[180,190,200]}');
+  });
+
+  it('битый стор → честно пусто (план без weeks, прикиды не-числа)', () => {
+    const saved = {
+      plTaperPlan: { weeks: 'oops', template: null },
+      plTaperAttemptOverride: { 'Присед': ['a', 'b'], 'Жим лежа': [100, 105, 'x'], 'Становая тяга': [0, 200] },
+    };
+    render(<PLTaperProvider saved={saved}><PlanConsumer /></PLTaperProvider>);
+    expect(screen.getByTestId('plan').textContent).toBe('нет');
+    // Нечисловые массивы отброшены, валидный сохранён (округлён).
+    expect(screen.getByTestId('ov').textContent).toBe('{"Становая тяга":[0,200]}');
+  });
+
+  it('отсутствие черновиков — пусто (обратная совместимость)', () => {
+    render(<PLTaperProvider saved={{ plBw: 90 }}><PlanConsumer /></PLTaperProvider>);
+    expect(screen.getByTestId('plan').textContent).toBe('нет');
+    expect(screen.getByTestId('ov').textContent).toBe('{}');
+  });
+});

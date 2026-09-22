@@ -1,21 +1,20 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
-import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
-import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, getPLWeakGroupExerciseCandidates, originalCycleWeeks, appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
-import { applyMacroTaperToPLWeeks, type MacroTaperOpts } from '../../engines/lms/lms-macro-taper.engine';
+import { rankCycles, explainSelection } from '../../engines/lms/lms-selector.engine';
+import { buildLMSPlan, extractExercises, originalCycleWeeks, appendPLTaperWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
+import { applyMacroTaperToPLWeeks } from '../../engines/lms/lms-macro-taper.engine';
 import { mergeMeetRegistry, syncCompetitionsFromMeets } from '../../engines/lms/pl-meet-registry.engine';
-import { recommendTaperConfig, coachPLPeakPlan, pmFeasibility, projectPmToMeet, compareTaperScenarios, evaluateMeetAttemptsFromDiary, type TaperCoachCtx } from '../../engines/lms/lms-taper-coach.engine';
-import { TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type PeakWeekLayout, type TaperMode, type TaperWeightGoal } from '../../engines/lms/lms-taper.engine';
-import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
+import { recommendTaperConfig, type TaperCoachCtx } from '../../engines/lms/lms-taper-coach.engine';
+import { TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type TaperMode, type TaperWeightGoal } from '../../engines/lms/lms-taper.engine';
+import { type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { detectLift } from '../../engines/lms/lms-to-pl';
-import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../engines/rir-matrix.engine';
-import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
+import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
+import { autoRegulate, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
-import { SPLIT_PATTERNS } from '../../engines/bb/bb-split-patterns';
-import { rankBBSplits, selectBestBBSplit, explainBBSelection, type BBSelectorInput } from '../../engines/bb/bb-selector.engine';
+import { rankBBSplits } from '../../engines/bb/bb-selector.engine';
 import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
-import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, buildBBContestPrep, isoAddDays, isoToday, PEAK_PHASE_COLORS, PHASE_LABELS_RU, type BBContestPrepConfig } from '../../engines/bb/bb-contest-prep.engine';
+import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, isoAddDays, isoToday, type BBContestPrepConfig } from '../../engines/bb/bb-contest-prep.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
@@ -23,44 +22,33 @@ import {
   CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
   BbCard,
 } from './TrainingScreen_parts/training-ui';
-import { DayCard, type PlanDayView, type PlanExerciseView, type PhaseKey } from './TrainingScreen_parts/PlanOutput';
 import { PedInputPanel, PedAdaptationCard } from './TrainingScreen_parts/PedCoursePanel';
 
 
 import { TaperCoachCard } from './SRCBBScreen_parts/TaperCoachCard';
 import { PLCompetitionTab } from './SRCBBScreen_parts/PLCompetitionTab';
 import { PLPlanView } from './SRCBBScreen_parts/PLPlanView';
-import { PLTaperProvider, usePLTaper } from './SRCBBScreen_parts/taper-state';
+import { PLTaperProvider, usePLTaper, TAPER_PLAN_PERSIST_MAX_CHARS } from './SRCBBScreen_parts/taper-state';
 import { TrainingMetricsChart, type LMSWeekMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
 
 import { useDataLink } from '../../core/data-link';
-import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
-import { TRAINING_SPLITS } from '../../engines/training.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, setPlannerSource, type PlannerApply } from './TrainingScreen_parts/planner-bridge';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
 
-import { PopupNumber, PopupSelect, PopupMultiSelect, ExpandableCard, MetricCard, SaveButton } from './SRCBBScreen_parts/TrainingPopups';
-import { lmsPlanToSessions, bbPlanToSessions, autoregPlan as autoregPlanBridge, progressFromSessions, planVsFact } from '../../engines/training-integration.engine';
-import type { BridgeSession, ReadinessInput, ProgressSnapshot } from '../../engines/training-integration.engine';
+import { PopupNumber, PopupSelect, PopupMultiSelect, ExpandableCard } from './SRCBBScreen_parts/TrainingPopups';
 import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
-import { parseProgressionRationale, progressionTiles, splitDescriptionPoints } from './TrainingScreen_parts/plan-card-helpers';
 import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './TrainingScreen_parts/CardioLinkCard';
-import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, serializeMacro, serializeBbMacro, rebalanceMacrocycle, rebalanceBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
-import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase } from '../../engines/periodization/phase-bridge';
+import { deserializeMacro, deserializeBbMacro, serializeMacro, serializeBbMacro, rebalanceMacrocycle, rebalanceBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { applyPLDeload, planHasDeload, type PLDeloadRequest } from '../../engines/lms/lms-deload.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
 import { pmDiaryMultiplier, type PMAutoRegMode } from '../../engines/lms/pm-autoreg.engine';
-import { competitionAttempts, MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, type MeetStrategy } from '../../engines/lms/competition-attempts';
-import { recommendWeightCut } from '../../engines/gym-competition.engine';
 import { getProfile } from '../../core/profile-manager';
-import { LAST_HEAVY_DAYS, warmupSequence } from '../../engines/pro/taper.engine';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
-import { saveCompetitionPlan, type CompetitionPlanRecord } from './TrainingScreen_parts/CompetitionPlansView';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
 import { LiftMasterCard } from './TrainingScreen_parts/LiftMasterCard';
 import { LimiterCalculatorCard } from './TrainingScreen_parts/LimiterCalculatorCard';
@@ -185,15 +173,15 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [pmDead, setPmDead] = useState<number>(_plSaved?.pmDead ?? _profPL.pmDead ?? 140);
   // 🏁 Тапер-state (сезон/параметры/прикиды/mock/meet/пост/тапер-план) — из хука+контекста.
   const {
-    bw, setBw, targetBw, setTargetBw, weeksToMeet, setWeeksToMeet,
+    bw, setBw, targetBw, weeksToMeet,
     taperWeeksToAdd, setTaperWeeksToAdd, attemptStrategy, setAttemptStrategy,
-    peakMode, setPeakMode, peakLayout, setPeakLayout, taperWeightGoal, setTaperWeightGoal,
-    taperFed, setTaperFed, taperActualPm, setTaperActualPm, taperPlannedPm, setTaperPlannedPm,
-    taperAttemptOverride, setTaperAttemptOverride,
-    mockMeetOn, setMockMeetOn, meetWeekOn, setMeetWeekOn, postMeetOn, setPostMeetOn,
-    taperNote, setTaperNote, taperPlan, setTaperPlan,
+    peakMode, setPeakMode, peakLayout, taperWeightGoal, setTaperWeightGoal,
+    taperFed, taperActualPm, taperPlannedPm,
+    taperAttemptOverride,
+    mockMeetOn, setMockMeetOn, meetWeekOn, postMeetOn, setPostMeetOn,
+    taperNote, taperPlan, setTaperPlan,
     meetList, setMeetList, mainMeetId, setMainMeetId,
-    peakCycleId, setPeakCycleId, applyMainMeet, addMeet, removeMeet,
+    peakCycleId, setPeakCycleId,
   } = usePLTaper();
   const [exercisePMs, setExercisePMs] = useState<Record<string, number>>(_plSaved?.exercisePMs ?? {});
   const initExercisePMs = (cycleId: string) => {
@@ -311,12 +299,19 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const raw = localStorage.getItem('he_pl_session');
     const prev = raw ? JSON.parse(raw) : null;
     const base = prev && typeof prev === 'object' && !Array.isArray(prev) ? prev as Record<string, unknown> : {};
+    // P2-1: черновики тапера — plan (карточка/печать/встройка после F5) и
+    // attemptOverride. Размер плана капнут: слишком большой не перезаписываем
+    // (в base остаётся прежний), null — честная очистка (сброс сборки).
+    const taperDraft: Record<string, unknown> = { plTaperAttemptOverride: taperAttemptOverride };
+    if (taperPlan === null) taperDraft.plTaperPlan = null;
+    else if (JSON.stringify(taperPlan).length <= TAPER_PLAN_PERSIST_MAX_CHARS) taperDraft.plTaperPlan = taperPlan;
     localStorage.setItem('he_pl_session', JSON.stringify({
       ...base,
+      ...taperDraft,
       selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plPeakCycleId: peakCycleId,
       plDeloadCfg, plDiagnosticWeakSide: diagnosticWeakSide,
     }));
-  } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId, plDeloadCfg, diagnosticWeakSide]);
+  } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId, plDeloadCfg, diagnosticWeakSide, taperPlan, taperAttemptOverride]);
   // 🏁 Единый реестр стартов (слияние Фазы 2): канон — he_pl_macro.competitions,
   // plMeetList — надстройка ПЛ (федерация/ПМ/стратегия). Гидрация при монтировании
   // и по событию годового плана; обратная запись — при правках стартов в ПЛ.
@@ -558,8 +553,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const effDeload = deloadOverride === undefined ? plDeloadCfg : deloadOverride;
     const planOut = effDeload ? applyPLDeload(plan, { ...effDeload, currentWeek: srcWeek, level }).plan : plan;
     setBuiltSrc(planOut); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setPickerDay(null);
-    // TRAINING INTEGRATION: конвертировать PL план в сессии
-    try { const sessions = lmsPlanToSessions(planOut); saveBridgeSessions(sessions); } catch { /* ignore */ }
   };
 
   const buildSrcMacrocycle = (macro: Macrocycle) => {
@@ -670,8 +663,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setSrcEdits({});
     setEditMode(false);
     setSubView('plan');
-    try { saveBridgeSessions(lmsPlanToSessions(combined)); }
-    catch (error) { setMethodNote(`Мост план→сессия: ${(error as Error).message}`); }
   };
 
   // ── 🧠 Тренерский слой (lms-taper-coach.engine): контекст спортсмена + подбор ──
@@ -815,9 +806,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   };
   const [builtBb, setBuiltBb] = useState<BBPlan | null>(_validateBBPlan(_bbSaved?.builtBb));
   const [bbWeekSel, setBbWeekSel] = useState<number>(_bbSaved?.bbWeekSel ?? 1);
-  const WEAK_GROUPS = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']] as const;
   const [weakPoints, setWeakPoints] = useState<string[]>(_profPL.weakPoints || []);
-  const toggleWeak = (g: string) => setWeakPoints(p => p.includes(g) ? p.filter(x => x !== g) : [...p, g]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), weakPoints }); } catch {} }, [weakPoints]);
   // 🎯 Слабые точки СРЦ-движений (профи-диагностика weakpoint-pl) — заполняются из единого калькулятора движения (PlDeadpointsBarPathCard, weakpoints-событие)
   const [plWeakPoints, setPlWeakPoints] = useState<{ lift: Lift; weakPoint: WeakPoint }[]>([]);
@@ -860,22 +849,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   };
   // V7 расширение: тренд 1ПМ по выбранному упражнению
   const [selectedTrendEx, setSelectedTrendEx] = useState<string | null>(null);
-  const PL_WEAKPOINT_LABELS: Record<WeakPoint, string> = {
-    off_chest: 'Сход с груди', mid: 'Середина', lockout: 'Дожим', start: 'Старт', bottom: 'Низ',
-    sumo_start: 'Сумо: старт', sumo_lockout: 'Сумо: дожим',
-    ohp_start: 'Старт с плеч', ohp_mid: 'Середина', ohp_lockout: 'Дожим',
-    row_start: 'Старт (съём)', row_mid: 'Середина', row_squeeze: 'Сведение лопаток',
-    pd_top: 'Верх (старт)', pd_mid: 'Середина', pd_squeeze: 'Сведение к груди',
-    inc_off: 'Сход с груди (верх)', inc_mid: 'Середина', inc_lockout: 'Дожим',
-    sumo_mid: 'Сумо: середина',
-    biceps_start: 'Сгибание: старт', biceps_mid: 'Сгибание: середина', biceps_top: 'Сгибание: пик',
-    triceps_start: 'Разгибание: старт', triceps_mid: 'Разгибание: середина', triceps_lockout: 'Разгибание: дожим',
-    calf_bottom: 'Икры: низ', calf_mid: 'Икры: середина', calf_top: 'Икры: верх',
-    shrug_start: 'Шраги: старт', shrug_mid: 'Шраги: середина', shrug_top: 'Шраги: пик',
-  };
-  const PL_WP_OPTIONS = (Object.keys(WEAK_POINTS_BY_LIFT) as Lift[]).map(lift => ({
-    lift, weakPoints: WEAK_POINTS_BY_LIFT[lift].map(wp => ({ id: wp, label: PL_WEAKPOINT_LABELS[wp] || wp })),
-  }));
   // 🔗 planner-bridge: приём корректировок от калькуляторов (ПМ/слабые точки/PRI/сплит)
   const [applyPayload, setApplyPayload] = useState<PlannerApply | null>(() => getPlannerApply());
   const [priAdjust, setPriAdjust] = useState<{ volumeMult: number; rirShift: number } | null>(null);
@@ -906,15 +879,10 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const tempoStr = tempoAdjust ? `${tempoAdjust.eccentric}-${tempoAdjust.bottomPause}-${tempoAdjust.concentric}-${tempoAdjust.topPause}` : '';
   const bridgeMult = (priAdjust ? priAdjust.volumeMult : 1) * (deloadAdjust ? deloadAdjust.volumeMult : 1) * (peakAdjust ? peakAdjust.volumeMult : 1);
   const bridgeRir = (priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0);
-  const peakRirTarget = peakAdjust ? peakAdjust.rirTarget : null;
-  const BB_WM_KEYS = ['chest','back','quads','hamstrings','shoulders','biceps','triceps','glutes','calves','abs'] as const;
-  const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
   const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>({ chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60, ...(_profPL?.workMax || {}), ...(_bbSaved?.bbWorkMax || {}) });
-  const setBbWm = (k: string, v: number) => setBbWorkMax(p => ({ ...p, [k]: v }));
   useEffect(() => { try { localStorage.setItem('he_bb_session', JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbWorkMax, bbTrainingFocus })); } catch { /* ignore */ } }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbTrainingFocus]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax }); } catch { /* ignore */ } }, [bbWorkMax]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), onCourse: peds.length > 0 }); } catch {} }, [peds]);
-  const [appliedMethods, setAppliedMethods] = useState<Record<string, string>>({});
   const [methodNote, setMethodNote] = useState<string | null>(null);
   const linked = useDataLink();
   const diarySessions = useMemo(() => loadSessions(), []);
@@ -970,74 +938,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     return pmDiaryMultiplier({ historyWorkouts, pm0Map });
   }, [pmAutoRegMode, exercisePMs, pmSquat, pmBench, pmDead, historyWorkouts]);
 
-  // ── TRAINING INTEGRATION: мост план→сессия ──
-  const [bridgeSessions, setBridgeSessions] = useState<BridgeSession[]>([]);
-  const [progressSnap, setProgressSnap] = useState<ProgressSnapshot[]>([]);
-  const [bridgeWeek, setBridgeWeek] = useState<number>(1);
-  // сохраняем bridge-сессии при построении плана
-  const saveBridgeSessions = (sessions: BridgeSession[]) => {
-    setBridgeSessions(sessions);
-    try { localStorage.setItem('he_bridge_sessions', JSON.stringify(sessions)); } catch { /* ignore */ }
-    // рассчитываем прогресс
-    const snap = progressFromSessions(sessions);
-    setProgressSnap(snap);
-    try { localStorage.setItem('he_bridge_progress', JSON.stringify(snap)); } catch { /* ignore */ }
-  };
-  // восстанавливаем при монтировании
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('he_bridge_sessions');
-      if (saved) { const s = JSON.parse(saved); setBridgeSessions(s); setBridgeWeek(1); }
-      const savedProgress = localStorage.getItem('he_bridge_progress');
-      if (savedProgress) setProgressSnap(JSON.parse(savedProgress));
-    } catch { /* ignore */ }
-  }, []);
-
-  // autoregPlan через training-integration (параллельно существующему autoreg)
-  const bridgeAutoreg = useMemo(() => {
-    if (!builtSrc && !builtBb) return null;
-    const rec = linked.readiness?.recovery ?? 80;
-    const fat = linked.readiness?.fatigue ?? 30;
-    const r: ReadinessInput = {
-      priScore: rec / 100,
-      fatigueScore: fat / 100,
-      recoveryScore: rec / 100,
-      riskLevel: level === 'novice' ? 'high' : level === 'intermediate' ? 'medium' : 'low',
-      goal: mainTab === 'pl' ? goal : bbGoal,
-      plannedIntensity: mainTab === 'pl' ? 85 : 75,
-      plannedSets: mainTab === 'pl' ? 15 : 20,
-      plannedReps: mainTab === 'pl' ? 5 : 10,
-      plannedFrequency: mainTab === 'pl' ? days : bbDays,
-    };
-    return autoregPlanBridge(r);
-  }, [builtSrc, builtBb, linked.readiness, mainTab, goal, bbGoal, level, days, bbDays]);
-
-  // группировка bridge-сессий по неделям
-  const bridgeWeeks = useMemo(() => {
-    const uniq = [...new Set(bridgeSessions.map(s => s.weekNumber))].sort((a, b) => a - b);
-    return uniq;
-  }, [bridgeSessions]);
-  const bridgeWeekSessions = useMemo(() => {
-    return bridgeSessions.filter(s => s.weekNumber === bridgeWeek);
-  }, [bridgeSessions, bridgeWeek]);
-  const bridgeWeekPhase = useMemo(() => {
-    const explicit = bridgeWeekSessions.find(session => session.macroPhase)?.macroPhase;
-    if (explicit) return explicit;
-    const totalW = bridgeWeeks.length || 12;
-    return mesocyclePhaseForWeek(bridgeWeek, Math.max(totalW, bridgeWeek));
-  }, [bridgeWeek, bridgeWeeks, bridgeWeekSessions]);
-  const displayPhaseForWeek = (week: LMSBuildOutput['weeks'][number], totalWeeks: number): string => {
-    return week.macroPhase
-      ? macroPhaseToLmsPhase(week.macroPhase as Macrocycle['blocks'][number]['phase'])
-      : (week.sourcePhase || mesocyclePhaseForWeek(week.week, totalWeeks));
-  };
-  /** Суммарный объём (сеты) недели плана — для отображения taper-процентов. */
-  const weekVolumeOf = (week: LMSBuildOutput['weeks'][number]): number => {
-    let v = 0;
-    for (const d of week.days) for (const e of d.exercises) for (const ws of e.workSets) v += ws.sets;
-    return v;
-  };
-
   const bbRanked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays }), [bbLevel, bbGoal, bbDays]);
   const bbBest = bbRanked[0];
 
@@ -1070,8 +970,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       if (prepCfg) plan = applyTrainingTaperToBBPlan(plan, prepCfg);
     } catch { /* оверлей не блокирует сборку */ }
     setBuiltBb(plan); setBbWeekSel(1);
-    // TRAINING INTEGRATION: конвертировать BB план в сессии
-    try { const sessions = bbPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
   };
 
   const applyBBMacrocycle = (macro: Macrocycle | BBMacrocycle) => {
@@ -1140,7 +1038,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setBbWeeks(macro.totalWeeks);
     setBuiltBb(finalPlan);
     setBbWeekSel(1);
-    try { saveBridgeSessions(bbPlanToSessions(finalPlan)); } catch { /* ignore */ }
     setSubView('plan');
   };
   // 🔗 применение корректировок из калькуляторов к активному плану (ПЛ/ББ) — с маршрутизацией по источнику
@@ -1871,7 +1768,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             editMode, setEditMode, setKey, effSet, dayKey, addExToDay,
             pickerDay, setPickerDay, pickerGroup, setPickerGroup, pickerExName, setPickerExName,
             pickerScheme, setPickerScheme, days, calendarView, setCalendarView,
-            bridgeSessions, setBridgeWeek, bridgeWeek,
             onNote: setMethodNote,
             buildSrc: () => buildSrc(),
             selectedCycleId, cycleWeeks, goal, level, peds, pedDoses, pedAuto, courseIntensity,

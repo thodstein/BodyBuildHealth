@@ -1,6 +1,12 @@
 /** PeakingPanel.tsx — ПОЛНЫЙ переписан: taper + соревнование + пик в едином красивом калькуляторе.
  *  Все вводы — PopupNumber/PopupSelect/PopupToggle, никаких raw <input>.
- *  Связан с planner-bridge для применения к планировщику. */
+ *  Связан с planner-bridge для применения к планировщику.
+ *
+ *  @deprecated Не смонтирован ни в одном экране (аудит P2, Sep 22 2026):
+ *  ПЛ-тапер/пик живут в «🏁 Соревнования» (`PLCompetitionTab`) и `TaperPlannerTab`,
+ *  ББ-подготовка — в шаге «🏁 Contest prep» `BbAutoConstructor`. Панель сохранена
+ *  как референс ПМ (`applyPms` — эталонные 1RM) и покрыта смоук-тестами;
+ *  удаление — отдельным решением (завязаны profile-e2e/rest-hooks-native). */
 import React, { useState, useMemo } from 'react';
 import { PopupNumber, PopupSelect, PopupToggle, ExpandableCard, MetricCard, CalcSection, CalcResult } from './TrainingPopups';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';

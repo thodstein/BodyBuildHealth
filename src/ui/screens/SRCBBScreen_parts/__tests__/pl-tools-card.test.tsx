@@ -59,3 +59,39 @@ describe('PLToolsCard — честные данные', () => {
     expect(screen.getByText(/✓ сохранено \(squat/)).toBeTruthy();
   });
 });
+
+// P2-3 (аудит): he_opl_history больше не write-only — сохранённые старты читаются
+// при монтировании и рисуются графиком DOTS; битый стор → честно пусто.
+describe('PLToolsCard — история OpenPowerlifting (DOTS)', () => {
+  const OPL_MEETS = [
+    { date: '2024-03-10', federation: 'FPR', totalKg: 500, bwKg: 83, dots: 320, squatKg: 180, benchKg: 120, deadliftKg: 200 },
+    { date: '2025-05-18', federation: 'FPR', totalKg: 530, bwKg: 83, dots: 355.5, squatKg: 190, benchKg: 130, deadliftKg: 210 },
+  ];
+
+  it('сохранённая история рисуется графиком DOTS (лучший результат + диапазон дат)', () => {
+    localStorage.setItem('he_opl_history', JSON.stringify(OPL_MEETS));
+    render(<PLToolsCard level="II-KMS" days={4} totalSets={{ chest: 12 }} e1RM={e1RM} />);
+    // Секция OPL свёрнута по умолчанию — раскрываем (контент монтируется только открытым).
+    fireEvent.click(screen.getByText('OpenPowerlifting импорт'));
+    const hist = document.querySelector('[data-pl="opl-history"]');
+    expect(hist).toBeTruthy();
+    expect(hist!.textContent).toContain('2 стартов');
+    expect(hist!.textContent).toContain('лучший 356');
+    expect(hist!.textContent).toContain('2025-05-18');
+    expect(hist!.querySelectorAll('circle').length).toBe(2);
+  });
+
+  it('битый/чужой he_opl_history → блок не рисуется (честно, без краха)', () => {
+    localStorage.setItem('he_opl_history', '{not-json');
+    render(<PLToolsCard level="II-KMS" days={4} totalSets={{ chest: 12 }} e1RM={e1RM} />);
+    fireEvent.click(screen.getByText('OpenPowerlifting импорт'));
+    expect(document.querySelector('[data-pl="opl-history"]')).toBeNull();
+  });
+
+  it('пустая история — подсказки нет, ввод доступен', () => {
+    render(<PLToolsCard level="II-KMS" days={4} totalSets={{ chest: 12 }} e1RM={e1RM} />);
+    fireEvent.click(screen.getByText('OpenPowerlifting импорт'));
+    expect(document.querySelector('[data-pl="opl-history"]')).toBeNull();
+    expect(screen.getByPlaceholderText('Имя атлета')).toBeTruthy();
+  });
+});

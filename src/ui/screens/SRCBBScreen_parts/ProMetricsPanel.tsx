@@ -2,6 +2,10 @@
  * ProMetricsPanel.tsx — P12: UI-интеграция проф-движков.
  * REUSE P1/P3/P4/P6/P9. Калькулятор относительной силы + монитор тренировочной нагрузки (sRPE/ACWR/fitness-fatigue)
  * + панель проф-авторегуляции (readiness/ACWR/velocity-loss → корректировка плана).
+ *
+ * @deprecated Сам `ProMetricsPanel` не смонтирован ни в одном экране (аудит P2, Sep 22 2026):
+ * относительная сила/DOTS живут в `PLToolsCard` (Sheiko Gate + DOTS), нагрузка — в «Интеллекте».
+ * Файл НЕ удаляем: `FFChart` из него — живой (импортируется `bb-step-adjust`).
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { relativeStrengthReport } from '../../../engines/pro/relative-strength.engine';

@@ -35,7 +35,6 @@ import { CalendarViewSwitch } from './CalendarViewSwitch';
 import type { PlayerDay } from './SessionPlayer';
 import { DayCard, type PhaseKey } from '../TrainingScreen_parts/PlanOutput';
 import { usePLTaper } from './taper-state';
-import type { BridgeSession } from '../../../engines/training-integration.engine';
 import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { AutoRegMode, DiaryAutoregResult } from '../../../engines/pro/diary-autoreg.engine';
 import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
@@ -94,9 +93,6 @@ export interface PLPlanViewApi {
   days: number;
   calendarView: 'original' | 'tapered';
   setCalendarView: (v: 'original' | 'tapered') => void;
-  bridgeSessions: BridgeSession[];
-  setBridgeWeek: (n: number) => void;
-  bridgeWeek: number;
   onNote: (m: string) => void;
   buildSrc: () => void;
   // Параметры спортсмена/курса
@@ -145,7 +141,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
     editMode, setEditMode, setKey, effSet, dayKey, addExToDay,
     pickerDay, setPickerDay, pickerGroup, setPickerGroup, pickerExName, setPickerExName,
     pickerScheme, setPickerScheme, days, calendarView, setCalendarView,
-    bridgeSessions, setBridgeWeek, bridgeWeek, onNote, buildSrc,
+    onNote, buildSrc,
     selectedCycleId, cycleWeeks, goal, level, peds, pedDoses, pedAuto, courseIntensity,
     autoRegMode, setAutoRegMode, autoRegResult, bridgeRir, pmSquat, pmBench, pmDead, best,
     pmAutoRegMode, setPmAutoRegMode, pmDiary,
@@ -846,7 +842,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
                                           <div><div style={IN_LBL}>Вес, кг</div><input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => { const next = { ...prev, [k]: { ...(prev[k] ?? {}), weight: +ev.target.value } }; delete next[k].pct; return next; })} style={{ ...INM, width:'100%' }} /></div>
                                           <div><div style={IN_LBL}>Повторы</div><input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:'100%' }} /></div>
-                                          <div><div style={IN_LBL}>% ПМ</div><input type='number' value={Math.round(es.pct*100)} min={0} max={110} onChange={ev => setSrcEdits(prev => { const next = { ...prev, [k]: { ...(prev[k] ?? {}), pct: (+ev.target.value) / 100 } }; delete next[k].weight; return next; })} style={{ ...INM, width:'100%' }} title='% от ПМ недели — вес пересчитается автоматически' /></div>
+                                          <div><div style={IN_LBL}>% ПМ</div><input type='number' value={Math.round(es.pct*100)} min={0} max={130} onChange={ev => setSrcEdits(prev => { const next = { ...prev, [k]: { ...(prev[k] ?? {}), pct: (+ev.target.value) / 100 } }; delete next[k].weight; return next; })} style={{ ...INM, width:'100%' }} title='% от ПМ недели — вес пересчитается автоматически (до 130% — проходки источника)' /></div>
                                         </div>
                                       </div>
                                     );

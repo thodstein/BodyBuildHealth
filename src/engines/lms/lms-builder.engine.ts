@@ -23,7 +23,7 @@ import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks } fro
 import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
 import { derivePattern, trueMuscleOf } from '../movement-pattern';
 import { norm } from '../norm';
-import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
+import { resolveCatalogId, stripCycleNotation } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
 import { cloneCycleTemplate } from '../../data/lms-cycles/lms-cycle-clone';
 import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
@@ -168,6 +168,11 @@ export interface LMSBuildOutput {
   cycleMetrics: SRCycleMetrics;
   /** Валидация объёма по группам мышц против MEV/MAV/MRV (volume-landmarks). */
   plVolumeLandmarks?: PLVolumeLandmark[];
+  /**
+   * Честный флаг «план НЕ собран» (аудит P2): сборка сезона заблокирована
+   * согласием/пустым сезоном — weeks пуст, template НЕ подставной чужой цикл.
+   */
+  blocked?: boolean;
 }
 
 /**
@@ -313,12 +318,14 @@ function rirLevelKey(level: string): keyof typeof RIR_MATRIX['strength'] {
   }
 }
 
-/** Найти упражнение в каталоге по метке коррекции (метка может быть более специфичной, чем имя в каталоге).
+/** Найти упражнение в каталоге по метке коррекции/имени цикла (метка может быть
+ *  более специфичной, чем имя в каталоге).
  *  P0-fix: сначала проверяем EXERCISE_ALIAS_MAP для точного маппинга шаблонных имён → catalog ID.
+ *  P2-fix (Sep 22 2026): нотация источника (@RPE8 / T1-T4) срезается до резолва.
  *  P2: memoized — same label returns same result without repeated linear scans.
- */
+ *  Экспорт — для lock-тестов данных циклов (pl-p2-data-hygiene). */
 const _catalogLabelCache = new Map<string, Exercise | null>();
-function findCatalogExerciseByLabel(label: string): Exercise | null {
+export function findCatalogExerciseByLabel(label: string): Exercise | null {
   const cached = _catalogLabelCache.get(label);
   if (cached !== undefined) return cached;
   const result = _findCatalogExerciseByLabelUncached(label);
@@ -326,6 +333,14 @@ function findCatalogExerciseByLabel(label: string): Exercise | null {
   return result;
 }
 function _findCatalogExerciseByLabelUncached(label: string): Exercise | null {
+  // Аудит P2 (Sep 22 2026): имена циклов несут нотацию источника («Присед @RPE8»,
+  // «Жим лежа T2», «Тяга в наклоне T3») — до этого резолва ничего не находилось.
+  // Срезаем нотуцию ДО поиска (идемпотентно, глубина рекурсии 1) и пробуем снова.
+  const stripped = stripCycleNotation(label);
+  if (stripped && stripped !== label) {
+    const viaStripped = _findCatalogExerciseByLabelUncached(stripped);
+    if (viaStripped) return viaStripped;
+  }
   // P0-1: точный маппинг из alias map (шаблонные имена → catalog ID)
   const aliasId = resolveCatalogId(label);
   if (aliasId) {
@@ -1073,6 +1088,14 @@ function injectLimiterExercises(
   }
 }
 
+/**
+ * Гард % от ПМ в источниках (аудит P2, Sep 22 2026): 100%+ — это проходки
+ * (15 наборов в 7 циклах, макс 129.25% в src2-sistemy-1i2). Их НЕЛЬЗЯ молча
+ * клампить — это тестовые максимумы, ради которых цикл и написан; но и мусор
+ * (pct > 1.3) не пропускаем. Один контракт на оба валидатора ниже.
+ */
+const MAX_SOURCE_SET_PCT = 1.3;
+
 export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const { template, pmMap, fallbackPm = 80 } = input;
   if (fallbackPm <= 0) throw new Error('buildLMSPlan: fallbackPm must be > 0');
@@ -1087,7 +1110,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       if (!ex || typeof ex.name !== 'string' || !ex.name.trim()) throw new Error('buildLMSPlan: exercise name must be non-empty');
       if (!ex.sets || !Array.isArray(ex.sets)) throw new Error(`buildLMSPlan: exercise "${ex.name}" has missing or invalid sets`);
       for (const s of ex.sets) {
-        if (typeof s.pct !== 'number' || s.pct <= 0 || s.pct > 1.3) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid pct (${s.pct}), expected 0..1.3`);
+        if (typeof s.pct !== 'number' || s.pct <= 0 || s.pct > MAX_SOURCE_SET_PCT) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid pct (${s.pct}), expected 0..${MAX_SOURCE_SET_PCT}`);
         if (typeof s.sets !== 'number' || s.sets <= 0) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid sets count (${s.sets})`);
         if (typeof s.reps !== 'number' || s.reps <= 0) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid reps (${s.reps})`);
       }
@@ -1104,7 +1127,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           if (!ex || typeof ex.name !== 'string' || !ex.name.trim()) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise name must be non-empty`);
           if (!ex.sets || !Array.isArray(ex.sets)) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets`);
           for (const s of ex.sets) {
-            if (typeof s.pct !== 'number' || !Number.isFinite(s.pct) || s.pct <= 0 || s.pct > 1.3) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid pct (${s.pct})`);
+            if (typeof s.pct !== 'number' || !Number.isFinite(s.pct) || s.pct <= 0 || s.pct > MAX_SOURCE_SET_PCT) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid pct (${s.pct})`);
             if (typeof s.sets !== 'number' || !Number.isFinite(s.sets) || s.sets <= 0) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets count (${s.sets})`);
             if (typeof s.reps !== 'number' || !Number.isFinite(s.reps) || s.reps <= 0) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid reps (${s.reps})`);
           }
