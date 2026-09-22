@@ -698,7 +698,7 @@ const PREFERRED_BB_EXERCISES = new Set([
   'leg_curl_seated', 'hack_squat_ham', 'nordic_curl', 'b_stance_rdl',
   // Плечи — классические жимы перед собой приоритет (не армейский жим стоя):
   // Smith press перед собой, широкий хват в Smith, жимы гантелей.
-  'ohp_seated_bar', 'ohp_seated_db', 'db_press', 'smith_shoulder_press',
+  'ohp_seated_bar', 'db_press', 'smith_shoulder_press',
   'lateral_raise', 'lateral_raise_cable', 'lateral_raise_machine',
   // Руки
   'tricep_pushdown_rope', 'tricep_pushdown_bar', 'curl_bar', 'curl_db', 'hammer_curl',

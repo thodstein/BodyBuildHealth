@@ -82,7 +82,7 @@ export const SFR_EXERCISE_DB: Record<string, SFRRecord> = {
   lateral_raise_machine:{ sfr: 5, resistanceProfile: 'mid' },
   rear_delt_fly:        { sfr: 4, resistanceProfile: 'short' },
   ohp_seated_bar:       { sfr: 3, resistanceProfile: 'mid' },
-  ohp_seated_db:        { sfr: 3, resistanceProfile: 'mid' },
+  db_press:             { sfr: 3, resistanceProfile: 'mid' },
   smith_shoulder_press: { sfr: 4, resistanceProfile: 'mid' },
   // ── Руки ───────────────────────────────────────────────────────────────
   curl_bar:             { sfr: 4, resistanceProfile: 'mid' },
@@ -121,7 +121,7 @@ const RU_NAME_LOOKUP: Array<[RegExp, string]> = [
   [/сгибание ног|сгибан.*ног/, 'leg_curl'],
   [/махи гантел.*сторон|развед.*гантел|махи в стороны/, 'lateral_raise'],
   [/развед.*блок/, 'lateral_raise_cable'],
-  [/жим гантел.*сидя|жим.*сидя/, 'ohp_seated_db'],
+  [/жим гантел.*сидя|жим.*сидя/, 'db_press'],
   [/сгибание рук|подъём штанги на бицепс/, 'curl_bar'],
   [/сгибание рук.*гантел/, 'curl_db'],
   [/молоток|молот/, 'hammer_curl'],

@@ -98,7 +98,6 @@ export const LEVEL_REGRESSIONS: Record<string, string[]> = {
   dips_chest: ['bench_dips', 'pushup_incline', 'pushup'],
   dips_tricep: ['tricep_bench_dip', 'pushup_incline', 'pushup'],
   ohp: ['ohp_smith', 'landmine_press_shoulder', 'machine_chest_press'],
-  ohp_bar: ['ohp_smith', 'landmine_press_shoulder', 'machine_chest_press'],
   bench_bar: ['machine_chest_press', 'pushup_incline', 'pushup'],
   row_bar: ['row_db', 'seated_row', 'row_inverted'],
   pistol_squat: ['squat_split', 'curtsy_lunge', 'lunge_reverse'],

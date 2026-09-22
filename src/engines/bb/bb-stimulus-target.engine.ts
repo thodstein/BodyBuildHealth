@@ -326,7 +326,7 @@ export const EXERCISE_STIMULUS_DB: ExerciseStimulus[] = [
   },
   {
     key: 'lateral_raise',
-    ids: ['lateral_raise', 'lateral_raise_cable', 'lateral_raise_machine', 'lateral_raise_single', 'lateral_raise_v2'],
+    ids: ['lateral_raise', 'lateral_raise_cable', 'lateral_raise_machine', 'lateral_raise_single'],
     nameRe: [/махи.*сторон/i, /развед.*сторон/i, /lateral.*raise/i, /дельт.*махи/i],
     headsHit: ['delt_mid'],
     alternativesForMissed: { delt_rear: ['Махи в наклоне', 'Face pull'], delt_front: ['Армейский жим'] },
@@ -363,7 +363,7 @@ export const EXERCISE_STIMULUS_DB: ExerciseStimulus[] = [
   },
   {
     key: 'ohp',
-    ids: ['ohp', 'ohp_seated', 'ohp_seated_bar', 'ohp_seated_db', 'ohp_db', 'db_press', 'smith_shoulder_press'],
+    ids: ['ohp', 'ohp_seated', 'ohp_seated_bar', 'ohp_db', 'db_press', 'smith_shoulder_press'],
     nameRe: [/армейский/i, /жим.*сидя/i, /жим.*стоя/i, /overhead.*press/i, /ohp/i],
     headsHit: ['delt_front'],
     headsPartial: ['delt_mid'],
