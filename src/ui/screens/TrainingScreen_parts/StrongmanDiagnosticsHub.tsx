@@ -2213,6 +2213,33 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             {smInjectMsg && <div data-sm="sm-inject-msg" style={{ marginTop:6, fontSize:12, color: smInjectMsg.startsWith('✓') || smInjectMsg.startsWith('↩') ? '#22c55e' : '#f59e0b' }}>{smInjectMsg}</div>}
           </div>
         )}
+        {/* ROUND-10: превью моста — что уедет в конструктор (паритет с ТА/арм/армлифтингом) */}
+        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.18)', fontSize:11, lineHeight:1.5 }} data-sm="bridge-preview">
+          <b style={{ color:'#60a5fa' }}>📦 Что уедет в конструктор</b>
+          {(() => {
+            try {
+              const lines: string[] = [];
+              const phases = (smWeakPoints as string[]) || [];
+              if (phases.length) {
+                lines.push(`Фазы: ${phases.map((p) => SM_WEAKPOINT_LABELS[p as keyof typeof SM_WEAKPOINT_LABELS] || p).join(', ')}`);
+                const pref = phases.map((p) => `${SM_PHASE_SHORT[p] || p}→${(smPrefCorr as Record<string, string>)[p] || 'авто'}`);
+                lines.push(`Предпочтения (⭐): ${pref.join(' · ')}`);
+              }
+              if (smCorrSession.length) {
+                lines.push(`Сессия: ${smCorrSession.map((c) => `${c.id} ${c.protocolAdj.sets}×${c.protocolAdj.reps}`).join('; ')}`);
+              }
+              if (smCorrBlock.length) {
+                lines.push(`Блок: ${smCorrBlock.length} нед · сеты ${smCorrBlock.map((w) => w.sets).join('-')} · первая «${smCorrBlock[0].name}»`);
+              }
+              const causes = Object.entries(smCauseByPhase as Record<string, string>).filter(([, v]) => !!v);
+              if (causes.length) lines.push(`Причины: ${causes.map(([k, v]) => `${SM_PHASE_SHORT[k] || k}: ${v}`).join(', ')}`);
+              if (state.corrEquipment.length) lines.push(`Зал (приоритет приёмника): ${state.corrEquipment.join(', ')} · уровень ${smCorrFilter.level}`);
+              if (asymmetry?.isAsym) lines.push(`Асимметрия ${asymmetry.diff}% — слабая сторона: ${asymmetry.weaker} (унилатеральная добивка)`);
+              if (!lines.length) return <div style={{ color:'#fff' }} data-sm="bridge-empty">Нечего отправлять — нет слабых фаз/причин (баланс).</div>;
+              return <div style={{ color:'#fff' }}>{lines.map((l, i) => <div key={i}>{l}</div>)}</div>;
+            } catch { return null; }
+          })()}
+        </div>
         <details style={{ marginBottom:6, borderRadius:14, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
           <summary style={{ padding:'12px 14px', fontSize:13, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>Сводка расчёта — находки, ранжир, спец-блок</summary>
           <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column', gap:6 }}>

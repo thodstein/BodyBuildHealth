@@ -351,13 +351,15 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('RT +2');
   });
 
-  it('P7: превью моста — пусто честно, с точками по делу', () => {
+  it('P7: превью моста — пусто честно, с точками по делу (ROUND-10: + data-arm-хук)', () => {
     render(<ArmDiagnosticsHub />);
+    expect(document.body.querySelector('[data-arm="hub-bridge-preview"]')).not.toBeNull();
     expect(document.body.textContent).toContain('Пока нечего отправлять');
     fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
     fireEvent.click(screen.getByText(/Pron откр/));
     expect(document.body.textContent).toContain('Что уедет в конструктор');
     expect(document.body.textContent).toContain('Точки: pron_open');
+    expect(document.body.querySelector('[data-arm="hub-bridge-preview"]')!.textContent).toMatch(/Точки: pron_open/);
   });
 
   it('F1: селект снаряда Axle меняет норму 133 ↔ 237.5', () => {

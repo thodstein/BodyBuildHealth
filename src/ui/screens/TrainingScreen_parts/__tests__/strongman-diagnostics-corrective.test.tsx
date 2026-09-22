@@ -119,6 +119,18 @@ describe('StrongmanDiagnosticsHub corrective + top nav', () => {
     await waitFor(() => expect(document.body.textContent).toContain('Применено'), { timeout: 2000 });
     expect(localStorage.getItem('he_planner_apply')).toContain('smCorrEquipment');
   });
+  it('ROUND-10: превью моста — что уедет в конструктор (фазы/⭐/сессия/блок)', async () => {
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
+    fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
+    await waitFor(() => expect(document.body.querySelector('[data-sm="bridge-preview"]')).not.toBeNull());
+    expect(document.body.querySelector('[data-sm="bridge-preview"]')!.textContent).toContain('Что уедет в конструктор');
+    await waitFor(() => expect(document.body.querySelector('[data-sm="bridge-preview"]')!.textContent).toMatch(/Фазы: /));
+    const t = document.body.querySelector('[data-sm="bridge-preview"]')!.textContent || '';
+    expect(t).toMatch(/Предпочтения \(⭐\): /);
+    expect(t).toMatch(/Сессия: /);
+    expect(t).toMatch(/Блок: \d+ нед/);
+  });
   it('O1: фильтр без совпадений — честная нота вместо пустой карточки', async () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
     fireEvent.click(await screen.findByText(/Жим\/лог: старт/));

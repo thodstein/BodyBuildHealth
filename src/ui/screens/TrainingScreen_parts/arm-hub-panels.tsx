@@ -485,7 +485,7 @@ export function HubAction({ H }: { H: any }) {
   const count = pts.length ? `${pts.length} точек` : `${muscles.length} мышц`;
   return (
     <>
-      <AdSec title="📦 Что уедет в конструктор" collapsible defaultOpen={false} summary={hasPayload ? label : 'пока пусто'}>
+      <AdSec title="📦 Что уедет в конструктор" hook="hub-bridge-preview" collapsible defaultOpen={false} summary={hasPayload ? label : 'пока пусто'}>
         {hasPayload ? (
           <div className="ad-muted">
             <div>Точки: {pts.join(', ') || '—'} · Мышцы: {muscles.join(', ') || '—'} · Динамика: {dynKeys.join(', ') || '—'}</div>
