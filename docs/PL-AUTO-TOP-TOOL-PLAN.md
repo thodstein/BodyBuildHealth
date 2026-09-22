@@ -142,10 +142,10 @@
   - `MacrocyclePanel.tsx`: локальный `SectionCard` удалён → `BbCard` («Фазы», «Макроцикл (вертикально)», «Сборка года по конструкторам»); `SectionHead` остаётся заголовком под-секций.
   - `SRCBBScreen.tsx`: «Питание», heatmap объёма, «Тренды e1RM», «Тапер/пик в макроцикле» → `BbCard`.
   - `BlockView.tsx`: PowerSheets → `BbFoldCard` (свёрнут по умолчанию, класс `.pl-blockview` сохранён).
-  - `TrainingPopups.tsx`: `ExpandableCard`/`MetricCard` → кит-стиль (иконка-тайл + 12.5/800 + верхняя кромка; `.pl-expandcard`/`.pl-metriccard` и тексты «▼ подробнее/▲ свернуть» сохранены, у fold — `aria-expanded`).
+  - `TrainingPopups.tsx`: `ExpandableCard`/`MetricCard` → кит-стиль (иконка-тайл + 12.5/800 + верхняя кромка; `.pl-expandcard`/`.pl-metriccard` и тексты «▼ подробнее/▲ свернуть» сохранены, у fold — `aria-expanded`). Обвязка/тайл/заголовок/бейдж вынесены в кит-хелперы `bbCardChrome/bbIconTile/bbCardTitle/bbCardBadge` (training-ui) — попапы берут значения оттуда, локальных копий нет (DOM не менялся: APK-слой `styles-native` селекторы `.pl-expandcard > …` целы).
   - `SessionPlayer.tsx`: только шапки — верхняя кромка акцента + заголовок недели 12.5/800.
   - DOM-контракты: re-baseline только 3 ассертов `🧩 Сборка года по конструкторам` → `Сборка года по конструкторам` (иконка вынесена в тайл), комментарии «было→стало».
-  - Guard расширен: живые PL-файлы обязаны использовать `BbCard`/`BbFoldCard` из кита, локальных `SectionCard`-дублей нет, добавлены DOM-дампы кита и живой карточки (`BlockView`) с проверкой кромки/тайла/12.5/aria-expanded.
+  - Guard расширен: живые PL-файлы обязаны использовать `BbCard`/`BbFoldCard` из кита, локальных `SectionCard`-дублей нет, `TrainingPopups` берёт обвязку из кит-хелперов (`bbCardChrome`/`bbIconTile`, без локальных литералов кромки/тайла), добавлены DOM-дампы кита и живой карточки (`BlockView`) с проверкой кромки/тайла/12.5/aria-expanded.
 - Проверено: `tsc --noEmit` 0 по всему проекту; `SRCBBScreen_parts` 168/168; `TrainingScreen_parts` 1397/1397 (+чужой unhandled `revokeObjectURL`); `src/engines/lms` 1049/1049; `verify:apk-design` OK.
 
 ### Фаза 4 — гигиена данных и кода (P2) — ◐ ВЫПОЛНЕНА ЧАСТЬ (21.09.2026)

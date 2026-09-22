@@ -137,6 +137,36 @@ export function mrvBadge(status: 'below_mev' | 'optimal' | 'approaching_mrv' | '
       заголовок 12.5/800, верхняя кромка акцента. Один визуальный язык для
       ББ-авто, ПЛ-авто, попапов и общих панелей — вместо локальных копий. ── */
 
+/** Общая обвязка карточки кита (фон/рамка/радиус/верхняя кромка) — единый
+ *  источник для BbCard/BbFoldCard и выносных fold-карточек (TrainingPopups). */
+export function bbCardChrome(accent: string): React.CSSProperties {
+  return {
+    marginBottom: 10, padding: '10px 12px', borderRadius: 14, boxSizing: 'border-box',
+    background: 'rgba(255,255,255,0.025)',
+    border: `1px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
+  };
+}
+
+/** Иконка-тайл карточки кита (26×26, акцентная подложка). */
+export function bbIconTile(accent: string): React.CSSProperties {
+  return {
+    width: 26, height: 26, borderRadius: 9, flexShrink: 0, fontSize: 14,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    background: `${accent}1f`, border: `1px solid ${accent}44`,
+  };
+}
+
+/** Заголовок карточки кита (12.5/800). */
+export const bbCardTitle: React.CSSProperties = { fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: 0.2 };
+
+/** Бейдж карточки кита (справа, акцентный). */
+export function bbCardBadge(accent: string): React.CSSProperties {
+  return {
+    marginLeft: 'auto', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 999,
+    background: `${accent}1a`, color: accent, border: `1px solid ${accent}44`,
+  };
+}
+
 /** Базовая карточка секции: иконка-тайл + заголовок + подпись + контент. */
 export const BbCard: React.FC<{
   icon?: string;
@@ -151,27 +181,11 @@ export const BbCard: React.FC<{
   style?: React.CSSProperties;
   children?: React.ReactNode;
 }> = ({ icon, title, desc, accent = '#a855f7', badge, right, id, className, style, children }) => (
-  <section id={id} className={className} style={{
-    marginBottom: 10, padding: '10px 12px', borderRadius: 14, boxSizing: 'border-box',
-    background: 'rgba(255,255,255,0.025)',
-    border: `1px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
-    ...style,
-  }}>
+  <section id={id} className={className} style={{ ...bbCardChrome(accent), ...style }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: desc || children ? 8 : 0 }}>
-      {icon && (
-        <span aria-hidden style={{
-          width: 26, height: 26, borderRadius: 9, flexShrink: 0, fontSize: 14,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: `${accent}1f`, border: `1px solid ${accent}44`,
-        }}>{icon}</span>
-      )}
-      <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: 0.2 }}>{title}</span>
-      {badge && (
-        <span style={{
-          marginLeft: 'auto', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 999,
-          background: `${accent}1a`, color: accent, border: `1px solid ${accent}44`,
-        }}>{badge}</span>
-      )}
+      {icon && <span aria-hidden style={bbIconTile(accent)}>{icon}</span>}
+      <span style={bbCardTitle}>{title}</span>
+      {badge && <span style={bbCardBadge(accent)}>{badge}</span>}
       {right && (
         <span style={{ marginLeft: badge ? 0 : 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
           {right}
@@ -200,12 +214,7 @@ export const BbFoldCard: React.FC<{
 }> = ({ icon, title, desc, accent = '#60a5fa', badge, right, defaultOpen = false, id, className, style, children }) => {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
-    <section id={id} className={className} style={{
-      marginBottom: 10, padding: '10px 12px', borderRadius: 14, boxSizing: 'border-box',
-      background: 'rgba(255,255,255,0.025)',
-      border: `1px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
-      ...style,
-    }}>
+    <section id={id} className={className} style={{ ...bbCardChrome(accent), ...style }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       <button
         type="button"
@@ -218,20 +227,9 @@ export const BbFoldCard: React.FC<{
           fontFamily: 'inherit', minHeight: 28,
         }}
       >
-        {icon && (
-          <span aria-hidden style={{
-            width: 26, height: 26, borderRadius: 9, flexShrink: 0, fontSize: 14,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            background: `${accent}1f`, border: `1px solid ${accent}44`,
-          }}>{icon}</span>
-        )}
-        <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: 0.2 }}>{title}</span>
-        {badge && (
-          <span style={{
-            marginLeft: 'auto', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 999,
-            background: `${accent}1a`, color: accent, border: `1px solid ${accent}44`,
-          }}>{badge}</span>
-        )}
+        {icon && <span aria-hidden style={bbIconTile(accent)}>{icon}</span>}
+        <span style={bbCardTitle}>{title}</span>
+        {badge && <span style={bbCardBadge(accent)}>{badge}</span>}
         <span aria-hidden style={{
           marginLeft: badge ? 6 : 'auto', fontSize: 11, color: '#fff',
           transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s', display: 'inline-block',

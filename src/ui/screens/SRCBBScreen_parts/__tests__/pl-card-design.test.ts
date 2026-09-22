@@ -98,6 +98,18 @@ describe('ПЛ-авто: единый дизайн карточек', () => {
     const kit = read('src/ui/screens/TrainingScreen_parts/training-ui.tsx');
     expect(kit).toContain('export const BbCard');
     expect(kit).toContain('export const BbFoldCard');
+    expect(kit).toContain('export function bbCardChrome');
+    expect(kit).toContain('export function bbIconTile');
+  });
+
+  it('fold-карточки попапов берут обвязку/тайл из кита (копий значений нет)', () => {
+    const popups = read(`${PARTS}/TrainingPopups.tsx`);
+    expect(popups).toContain('bbCardChrome');
+    expect(popups).toContain('bbIconTile');
+    expect(popups).toContain("from '../TrainingScreen_parts/training-ui'");
+    // Кромка/тайл — только из кита, не локальные литералы.
+    expect(popups).not.toMatch(/borderTop:\s*`2px solid \$\{accent\}55`/);
+    expect(popups).not.toMatch(/width:\s*26,\s*height:\s*26/);
   });
 
   it('DOM-дамп кита: иконка-тайл + заголовок 12.5/800 + верхняя кромка (BbCard)', () => {

@@ -5,6 +5,7 @@
  */
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
+import { bbCardChrome, bbCardTitle, bbIconTile } from '../TrainingScreen_parts/training-ui';
 
 const ACCENT = '#00e68a';
 
@@ -230,8 +231,8 @@ export const ExpandableCard: React.FC<{
   children?: React.ReactNode;
 }> = ({ title, short, full, accent = ACCENT, icon, children }) => {
   const [open, setOpen] = useState(false);
-  // Единый fold-стиль кита (BbFoldCard): иконка-тайл + заголовок 12.5/800 +
-  // верхняя кромка акцента. DOM-тексты/класс сохранены (▼ подробнее / ▲ свернуть).
+  // Единый fold-стиль кита: обвязка/тайл/заголовок — из training-ui (без копий
+  // значений); DOM-структура и тексты раскрытия сохранены.
   const headStyle: React.CSSProperties = {
     width: '100%', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
     padding: 0, background: 'none', border: 'none', fontFamily: 'inherit', textAlign: 'left',
@@ -239,20 +240,13 @@ export const ExpandableCard: React.FC<{
   };
   const inner = (
     <>
-      {icon && (
-        <span aria-hidden style={{
-          width: 26, height: 26, borderRadius: 9, flexShrink: 0, fontSize: 14,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: `${accent}1f`, border: `1px solid ${accent}44`,
-        }}>{icon}</span>
-      )}
-      <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: 0.2, minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+      {icon && <span aria-hidden style={bbIconTile(accent)}>{icon}</span>}
+      <span style={{ ...bbCardTitle, minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
       {full && <span style={{ fontSize: 10, fontWeight: 700, color: accent, flexShrink: 0 }}>{open ? '▲ свернуть' : '▼ подробнее'}</span>}
     </>
   );
   return <div className="pl-expandcard" style={{
-    background: 'rgba(255,255,255,0.025)', borderRadius: 14, border: `1px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
-    padding: 12, margin: '6px 0', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box',
+    ...bbCardChrome(accent), padding: 12, margin: '6px 0', minWidth: 0, maxWidth: '100%',
   }}>
     {full
       ? <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} style={headStyle}>{inner}</button>
@@ -266,19 +260,10 @@ export const ExpandableCard: React.FC<{
 export const MetricCard: React.FC<{
   title: string; accent?: string; icon?: string; children: React.ReactNode;
 }> = ({ title, accent = ACCENT, icon, children }) => (
-  <div className="pl-metriccard" style={{ marginTop: 10, padding: 12, borderRadius: 14,
-    background: 'rgba(255,255,255,0.025)',
-    border: `1px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
-    boxSizing: 'border-box' }}>
+  <div className="pl-metriccard" style={{ ...bbCardChrome(accent), padding: 12, margin: '10px 0 0' }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 8px' }}>
-      {icon && (
-        <span aria-hidden style={{
-          width: 26, height: 26, borderRadius: 9, flexShrink: 0, fontSize: 14,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: `${accent}1f`, border: `1px solid ${accent}44`,
-        }}>{icon}</span>
-      )}
-      <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: 0.2, minWidth: 0 }}>{title}</span>
+      {icon && <span aria-hidden style={bbIconTile(accent)}>{icon}</span>}
+      <span style={bbCardTitle}>{title}</span>
     </div>
     {children}
   </div>
