@@ -101,14 +101,16 @@ describe('StrongmanDiagnosticsHub corrective + top nav', () => {
     expect(txt).toMatch(/sm_log/);
     expect(txt).toMatch(/@/);
   });
-  it('D2: фильтры подбора — уровень персистится, зал режет топ (3→2)', async () => {
+  it('D2: фильтры подбора — уровень персистится, зал режет топ (ROUND-9: 5→3)', async () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
     fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
     fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-filters"]')).toBeTruthy());
-    expect(document.body.querySelectorAll('[data-sm="corr-row"]').length).toBe(3);
+    // было: 3 (в фазе было ровно 3 записи) → стало 5: ROUND-9 добил пул фазы до 5 вариантов
+    expect(document.body.querySelectorAll('[data-sm="corr-row"]').length).toBe(5);
     fireEvent.click(screen.getByText('Штанга'));
-    await waitFor(() => expect(document.body.querySelectorAll('[data-sm="corr-row"]').length).toBe(2));
+    // было: 2 → стало 3: из 5 кандидатов под штангу проходят 3 (выбор шире)
+    await waitFor(() => expect(document.body.querySelectorAll('[data-sm="corr-row"]').length).toBe(3));
     fireEvent.click(screen.getByText('Новичок'));
     expect(screen.getByText('Новичок').getAttribute('aria-pressed')).toBe('true');
     expect(localStorage.getItem('he_strongman_diagnostics_hub_v1')).toContain('corrLevel');

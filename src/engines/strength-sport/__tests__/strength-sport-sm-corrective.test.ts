@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   SM_CORRECTIVES,
   SM_CORRECTIVE_PHASES,
@@ -26,9 +28,29 @@ import { SM_FALLBACK_BY_WP } from '../strength-sport-sm-correction-rank.engine';
 import { buildSMSpecProtocols } from '../../../ui/screens/strength-sport/sm-bridge-intake';
 
 describe('sm-corrective library', () => {
-  it('16 фаз × 3 вида = 56 записей (48 канон + 8 P5-добор)', () => {
+  it('16 фаз × 3 вида: канон + P5-добор (ROUND-9: 56 → ≥80)', () => {
     expect(SM_CORRECTIVE_PHASES.length).toBe(16);
-    expect(SM_CORRECTIVES.length).toBe(56);
+    // было: toBe(56) — ROUND-9 добил тонкие ячейки (причина × фаза) до ≥2 вариантов
+    expect(SM_CORRECTIVES.length).toBeGreaterThanOrEqual(80);
+  });
+  it('ROUND-9: библиотека ≥80; каждый exId — реальная запись каталога (source-guard)', () => {
+    expect(SM_CORRECTIVES.length).toBeGreaterThanOrEqual(80);
+    const src = readFileSync(resolve(process.cwd(), 'src/core/exercise-catalog.ts'), 'utf8');
+    for (const c of SM_CORRECTIVES) {
+      const ex = exIdForSMCorrective(c);
+      const ok = src.includes(`id:'${ex}'`) || src.includes(`id: '${ex}'`);
+      expect(ok, `${c.id} → ${ex}`).toBe(true);
+    }
+  });
+  it('ROUND-9: в каждой фазе объявленная причина имеет ≥2 варианта (не вырождается в 1)', () => {
+    const causes = ['volume', 'technique', 'mobility', 'fatigue', 'strength', 'grip'];
+    for (const ph of SM_CORRECTIVE_PHASES) {
+      const list = correctivesForPhase(ph);
+      for (const cause of causes) {
+        const n = list.filter((c) => (c.causes as string[]).includes(cause)).length;
+        expect(n === 0 || n >= 2, `${ph}/${cause}=${n}`).toBe(true);
+      }
+    }
   });
   it('каждая фаза имеет technique+strength+stability (P5-добор — сверх канона)', () => {
     for (const ph of SM_CORRECTIVE_PHASES) {
