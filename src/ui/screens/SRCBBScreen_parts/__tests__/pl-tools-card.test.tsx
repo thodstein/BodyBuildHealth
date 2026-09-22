@@ -8,9 +8,17 @@
  *     формат прежней версии не читался VBT/WL-хабом).
  */
 import React from 'react';
-import { describe, expect, it, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PLToolsCard } from '../PLToolsCard';
+import { fetchOPLHistory } from '../../../../engines/openpowerlifting-import.engine';
+
+// §10.3: сетевой путь OPL-импорта тестируется моком движка (реальная сеть в тестах — нет);
+// oplToDotsHistory остаётся настоящим (график строится реальной функцией).
+vi.mock('../../../../engines/openpowerlifting-import.engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../engines/openpowerlifting-import.engine')>();
+  return { ...actual, fetchOPLHistory: vi.fn() };
+});
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* ignore */ }
@@ -93,5 +101,24 @@ describe('PLToolsCard — история OpenPowerlifting (DOTS)', () => {
     fireEvent.click(screen.getByText('OpenPowerlifting импорт'));
     expect(document.querySelector('[data-pl="opl-history"]')).toBeNull();
     expect(screen.getByPlaceholderText('Имя атлета')).toBeTruthy();
+  });
+
+  it('«Найти» (мок сети): история сохраняется (he_opl_history/name) и рисуется DOTS', async () => {
+    (fetchOPLHistory as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(OPL_MEETS);
+    render(<PLToolsCard level="II-KMS" days={4} totalSets={{ chest: 12 }} e1RM={e1RM} />);
+    fireEvent.click(screen.getByText('OpenPowerlifting импорт'));
+    fireEvent.change(screen.getByPlaceholderText('Имя атлета'), { target: { value: 'Иванов' } });
+    fireEvent.click(screen.getByText('Найти'));
+    await waitFor(() => expect(document.querySelector('[data-pl="opl-history"]')).toBeTruthy());
+    expect(localStorage.getItem('he_opl_name')).toBe('Иванов');
+    expect(JSON.parse(localStorage.getItem('he_opl_history') || '[]')).toHaveLength(2);
+    expect(document.querySelector('[data-pl="opl-history"]')!.textContent).toContain('2 стартов');
+  });
+
+  it('имя атлета восстанавливается из he_opl_name при монтировании (не write-only)', () => {
+    localStorage.setItem('he_opl_name', 'Петров');
+    render(<PLToolsCard level="II-KMS" days={4} totalSets={{ chest: 12 }} e1RM={e1RM} />);
+    fireEvent.click(screen.getByText('OpenPowerlifting импорт'));
+    expect((screen.getByPlaceholderText('Имя атлета') as HTMLInputElement).value).toBe('Петров');
   });
 });

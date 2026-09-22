@@ -838,7 +838,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                     const es = effSet(wk.week, di, ei, setIdx, ws);
                                     return (
                                       <div key={setIdx} style={{ background:'rgba(255,255,255,0.025)', borderRadius:6, padding:'4px 6px' }}>
-                                        <div style={{ fontSize:10, color:'#fff', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {setIdx+1}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%</span></div>
+                                        <div style={{ fontSize:10, color:'#fff', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {setIdx+1}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%{es.pct > 1.1 && <span data-pl="test-attempt" title="Проходка источника: тестовый максимум выше 110% ПМ (не клампится)" style={{ marginLeft:4, fontSize:9, fontWeight:800, color:'#f59e0b' }}>⚡ проходка</span>}</span></div>
                                         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
                                           <div><div style={IN_LBL}>Вес, кг</div><input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => { const next = { ...prev, [k]: { ...(prev[k] ?? {}), weight: +ev.target.value } }; delete next[k].pct; return next; })} style={{ ...INM, width:'100%' }} /></div>
                                           <div><div style={IN_LBL}>Повторы</div><input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:'100%' }} /></div>
@@ -937,7 +937,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                       <div key={si} style={{ fontSize:11, color:'#fff', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                                         <span style={{ fontSize:9, fontWeight:700, color:'rgba(0,230,138,0.7)', minWidth:40 }}>Сет {si+1}</span>
                                         <span style={{ fontWeight:700, color:'#fff' }}>{es.reps} повт</span>
-                                        <span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%</span>
+                                        <span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%{es.pct > 1.1 && <span data-pl="test-attempt" title="Проходка источника: тестовый максимум выше 110% ПМ (не клампится)" style={{ marginLeft:4, fontSize:9, fontWeight:800, color:'#f59e0b' }}>⚡ проходка</span>}</span>
                                         <span style={{ color:'#fff' }}>{es.weight}кг</span>
                                         {typeof es.rir === 'number' && <span style={{ color:'#f59e0b' }}>RIR {es.rir}</span>}
                                         {adjustedMark && <span style={{ fontSize:9 }}>{adjustedMark}</span>}

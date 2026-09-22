@@ -363,6 +363,11 @@ function _findCatalogExerciseByLabelUncached(label: string): Exercise | null {
   // Fallback: извлечь ядро имени (до скобок, слэша, тире), убрать обёртки типа «(акцент ...)»
   const core = label.split(/[\(\/—–\:\;]/)[0]?.trim();
   if (core && core.length > 2 && core !== label) {
+    const coreAliasId = resolveCatalogId(core);
+    if (coreAliasId) {
+      const byId = EXERCISE_CATALOG.find(e => e.id === coreAliasId);
+      if (byId) return byId;
+    }
     const cn = norm(core);
     ex = EXERCISE_CATALOG.find(e => {
       const en = norm(e.name);

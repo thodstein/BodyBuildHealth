@@ -129,6 +129,54 @@ function LCM_CYCLE_01(): SRCycleTemplate {
   return JSON.parse(JSON.stringify(c)) as SRCycleTemplate;
 }
 
+describe('P2-данные: wave-2 имён циклов (§10.3)', () => {
+  /**
+   * Остаток после wave-2 — имена ДРУГОГО контура (arm/WL-каталоги), псевдо-строки
+   * источника и честно неоднозначные варианты. Резолвер main-каталога их не должен
+   * «угадывать»; список заморожен: и рост, и падение этого множества = сигнал.
+   */
+  const EXPECTED_UNRESOLVED = [
+    // arm-циклы (целевой каталог — exercise-catalog-arm, не main):
+    'Иммитация верха', 'Боковой нажим', 'Отведение СБ', 'Приведение к плечу', 'Кисть РР', 'Пронация СБ',
+    // WL-цикл (ТА):
+    'Присед ТА',
+    // псевдо-строки источника (не упражнения):
+    'Опциональная тяга (см. инстр)', 'Опциональная тяга', 'Тест: проходка до макс', 'Отдых', 'Тест: проходка',
+    // неоднозначные без каталожного эквивалента:
+    'Сгибания обратным хватом', 'Сгибание обратным хватом', 'Жим-разводка',
+    // плиометрика без записи в каталоге:
+    'Прыжки на box', 'Выпрыгивания',
+  ];
+
+  it('падежи/DE/BBB/разговорные имена резолвятся (было — null)', () => {
+    expect(findCatalogExerciseByLabel('Фронт-присед')?.id).toBe('front_squat');
+    expect(findCatalogExerciseByLabel('Тяга становая')?.id).toBe('deadlift');
+    expect(findCatalogExerciseByLabel('Разводка лёжа')?.id).toBe('fly_db');
+    expect(findCatalogExerciseByLabel('Разгибания ног сидя')?.id).toBe('leg_ext_v2');
+    expect(findCatalogExerciseByLabel('Присед DE 50% + цепи')?.id).toBe('squat');
+    expect(findCatalogExerciseByLabel('Присед до макс')?.id).toBe('squat');
+    expect(findCatalogExerciseByLabel('Жим лежа BBB')?.id).toBe('bench_bar');
+    expect(findCatalogExerciseByLabel('Становая тяга скоростная')?.id).toBe('deadlift');
+    expect(findCatalogExerciseByLabel('Дожим с бруска 10см')?.id).toBe('bench_bar');
+  });
+
+  it('parenthetical-нотация: alias-фолбэк ядра (ME/примечания)', () => {
+    expect(findCatalogExerciseByLabel('Жим лежа с паузой (ME Upper)')?.id).toBe('pl_bench_pause');
+    expect(findCatalogExerciseByLabel('Дотяга (с плинтов)')?.id).toBe('rack_pull');
+    expect(findCatalogExerciseByLabel('ЖЛШХ (жим широким хватом)')?.id).toBe('bench_bar');
+  });
+
+  it('полный остаток имён циклов = allowlist (ни больше, ни меньше)', () => {
+    const names = new Set<string>();
+    for (const c of LMS_CYCLES) {
+      const layouts = c.weeks && c.weeks.length > 0 ? c.weeks : [c.week1];
+      for (const days of layouts) for (const d of days) for (const ex of d.exercises) names.add(ex.name);
+    }
+    const unresolved = [...names].filter(n => !findCatalogExerciseByLabel(n)).sort();
+    expect(unresolved).toEqual([...EXPECTED_UNRESOLVED].sort());
+  });
+});
+
 describe('P2-UI: мёртвый код SRCBBScreen + решение по панелям', () => {
   const screen = readFileSync(resolve(process.cwd(), 'src/ui/screens/SRCBBScreen.tsx'), 'utf8');
 

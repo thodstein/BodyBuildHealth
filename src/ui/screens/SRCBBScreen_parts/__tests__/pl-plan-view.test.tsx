@@ -47,7 +47,6 @@ const api = (): PLPlanViewApi => ({
   pickerDay: null, setPickerDay: () => {}, pickerGroup: 'chest', setPickerGroup: () => {},
   pickerExName: '', setPickerExName: () => {}, pickerScheme: { sets: 3, reps: 8, weight: 40 }, setPickerScheme: () => {},
   days: 3, calendarView: 'tapered', setCalendarView: () => {},
-  bridgeSessions: [], setBridgeWeek: () => {}, bridgeWeek: 1,
   onNote: () => {}, buildSrc: () => {},
   selectedCycleId: 'cycle-01', cycleWeeks: 8, goal: 'strength', level: 'II-KMS',
   peds: [], pedDoses: {}, pedAuto: false, courseIntensity: 'moderate',
@@ -81,6 +80,15 @@ describe('PLPlanView', () => {
     const a = api();
     render(<PLPlanView api={a} />);
     expect(screen.getAllByText(/Присед/).length).toBeGreaterThan(0);
+  });
+
+  it('проходки источника (>110%) помечаются «⚡ проходка» (display-only, числа не меняются)', () => {
+    const a = api();
+    const custom = plan() as unknown as { weeks: Array<{ days: Array<{ exercises: Array<{ workSets: Array<{ pct: number }> }> }> }> };
+    custom.weeks[0].days[0].exercises[0].workSets[0].pct = 1.12;
+    a.builtSrc = custom as never;
+    render(<PLPlanView api={a} />);
+    expect(document.querySelectorAll('[data-pl="test-attempt"]').length).toBeGreaterThan(0);
   });
 
   it('карточка прикидов: переключение «🤖 Авто» меняет веса на лету (база из pmRow, множитель в отображении)', () => {

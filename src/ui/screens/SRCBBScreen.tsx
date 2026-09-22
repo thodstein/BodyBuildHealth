@@ -301,10 +301,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const base = prev && typeof prev === 'object' && !Array.isArray(prev) ? prev as Record<string, unknown> : {};
     // P2-1: черновики тапера — plan (карточка/печать/встройка после F5) и
     // attemptOverride. Размер плана капнут: слишком большой не перезаписываем
-    // (в base остаётся прежний), null — честная очистка (сброс сборки).
+    // (в base остаётся прежний) — с честной заметкой, null — очистка (сброс сборки).
     const taperDraft: Record<string, unknown> = { plTaperAttemptOverride: taperAttemptOverride };
+    const taperPlanJson = taperPlan ? JSON.stringify(taperPlan) : '';
     if (taperPlan === null) taperDraft.plTaperPlan = null;
-    else if (JSON.stringify(taperPlan).length <= TAPER_PLAN_PERSIST_MAX_CHARS) taperDraft.plTaperPlan = taperPlan;
+    else if (taperPlanJson.length <= TAPER_PLAN_PERSIST_MAX_CHARS) taperDraft.plTaperPlan = taperPlan;
+    else setMethodNote(`⚠ Тапер-план слишком большой (${Math.round(taperPlanJson.length / 1024)} КБ > ${Math.round(TAPER_PLAN_PERSIST_MAX_CHARS / 1024)} КБ) — не сохранён; при перезагрузке останется прошлый.`);
     localStorage.setItem('he_pl_session', JSON.stringify({
       ...base,
       ...taperDraft,

@@ -18,10 +18,12 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
     return velocityAttempts(e, lift, 'balanced');
   }, [e1RM, lift]);
   const light = useMemo(() => trafficLight(hrvRatio ?? null, acwr ?? 1.0, rpeDelta ?? 0), [hrvRatio, acwr, rpeDelta]);
-  const [oplName, setOplName] = useState('');
+  // P2-3/§10.3: имя атлета персистится (he_opl_name читается при монтировании);
+  // история — больше не write-only: сохранённые старты читаются и рисуются DOTS.
+  const [oplName, setOplName] = useState<string>(() => {
+    try { return localStorage.getItem('he_opl_name') ?? ''; } catch { return ''; }
+  });
   const [oplRes, setOplRes] = useState<string>('');
-  // P2-3: история OPL больше не write-only — сохранённые старты читаются при
-  // монтировании и рисуются графиком DOTS (битый/чужой стор → честно пусто).
   const [oplMeets, setOplMeets] = useState<OPLMeet[]>(() => {
     try {
       const raw = localStorage.getItem('he_opl_history');
@@ -46,7 +48,7 @@ export const PLToolsCard: React.FC<{ level: string; days: number; totalSets: Rec
       <BbFoldCard icon="🏋️" accent="#a78bfa" title="OpenPowerlifting импорт" className="pl-tools-opl">
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <input value={oplName} onChange={e=>setOplName(e.target.value)} placeholder="Имя атлета" style={{ flex: 1, minWidth: 120, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: '#fff', padding: '4px 8px', fontSize: 10 }} />
-          <button onClick={async()=>{ const r=await fetchOPLHistory(oplName); if(r.length){ setOplMeets(r); try{ localStorage.setItem('he_opl_history', JSON.stringify(r)); }catch{} setOplRes(`Найдено ${r.length} стартов — история DOTS ниже (локально в этом браузере)`); } else setOplRes(`Нет данных / не найдено`); }} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#a78bfa', color: '#000', border: 'none', cursor: 'pointer' }}>Найти</button>
+          <button onClick={async()=>{ const r=await fetchOPLHistory(oplName); if(r.length){ setOplMeets(r); try{ localStorage.setItem('he_opl_history', JSON.stringify(r)); localStorage.setItem('he_opl_name', oplName); }catch{} setOplRes(`Найдено ${r.length} стартов — история DOTS ниже (локально в этом браузере)`); } else setOplRes(`Нет данных / не найдено`); }} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#a78bfa', color: '#000', border: 'none', cursor: 'pointer' }}>Найти</button>
           {oplRes && <span style={{ fontSize: 10, color: '#fff' }}>{oplRes}</span>}
         </div>
         {oplMeets.length > 0 && (() => {
