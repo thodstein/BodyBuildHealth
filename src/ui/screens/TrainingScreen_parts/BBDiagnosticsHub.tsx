@@ -41,6 +41,7 @@ import { diagnoseWeakCausesBatch } from '../../../engines/bb/bb-weak-cause.engin
 import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
 import { rankCorrectives, correctiveDose, correctiveLoadFactor } from '../../../engines/bb/bb-corrective.engine';
+import { correctiveBlockForBB, correctiveBlockExportLines } from '../../../engines/bb/bb-corrective-block.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
 import { injectBBWeakPoints, correctiveWeightHint, pushPlanSnapshot, readPlanHistory, type PlanSnapshot } from '../../../engines/bb/bb-diagnostics-injection.engine';
 import { idealMcCallumMap, symmetryTriadDeviation, appendMeasureSnapshot, measureDeltas, type MeasureSnapshot } from '../../../engines/bb/bb-symmetry.engine';
@@ -1882,6 +1883,26 @@ export const BBDiagnosticsHub: React.FC = () => {
             <div style={{ fontSize: 10, color: '#fff', marginTop: 6, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', borderRadius: 8, padding: '8px 10px' }}>
               Подсказка: две зоны одной мышцы (средняя + задняя дельты) — можно, плечи + зона — конфликт.
             </div>
+            {/* ROUND-10: блок коррекции (волна) — тот же источник, что карточка/вставка (без нового ранжира) */}
+            {(() => {
+              try {
+                const picks = Object.values(correctiveTopByZone).flat().map((r) => ({ corr: r.corr, why: r.why }));
+                const block = correctiveBlockForBB(picks, 6);
+                const lines = correctiveBlockExportLines(block);
+                if (!lines.length) return null;
+                return (
+                  <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.22)', fontSize: 11, lineHeight: 1.5 }} data-bb="corr-block">
+                    <b style={{ color: '#00e68a' }}>📅 Блок коррекции (волна 4–8 нед)</b>
+                    <div style={{ color: '#fff' }} data-bb="corr-block-summary">{block.summary}</div>
+                    {block.weeks.map((wk) => (
+                      <div key={wk.week} style={{ color: '#fff', fontSize: 10 }} data-bb="corr-block-week">
+                        Нед {wk.week} ({wk.focus}): {wk.items.map((i) => `${i.name} ${i.sets}×${i.repsMin}–${i.repsMax} RIR${i.rir}`).join('; ')}
+                      </div>
+                    ))}
+                  </div>
+                );
+              } catch { return null; }
+            })()}
             <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, lineHeight: 1.5 }} data-bb="lr-card">
               <b style={{ color: '#fff' }}>↔ Лево/право по дневнику (унилатеральные — своей стороне, штанга — поровну)</b>
               {lrVerdicts.length === 0 && <div style={{ color: '#fff', marginTop: 4 }}>Пока пусто — нужны унилатеральные сеты в дневнике (гантели, по одной стороне).</div>}

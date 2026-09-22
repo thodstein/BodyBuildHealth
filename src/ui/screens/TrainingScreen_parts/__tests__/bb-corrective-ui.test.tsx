@@ -21,6 +21,17 @@ describe('bb-corrective-ui', () => {
     render(<BBDiagnosticsHub />);
     expect(document.querySelector('[data-bb="corrective-card"]')).toBeNull();
   });
+  it('ROUND-10: блок коррекции (волна) рендерится из тех же пиков, честно пуст без зон', () => {
+    localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ weakManual: ['chest_upper', 'quads'] }));
+    render(<BBDiagnosticsHub />);
+    const block = document.querySelector('[data-bb="corr-block"]');
+    expect(block).not.toBeNull();
+    expect(document.querySelector('[data-bb="corr-block-summary"]')!.textContent).toMatch(/волна \d/);
+    const weeks = document.querySelectorAll('[data-bb="corr-block-week"]');
+    expect(weeks.length).toBe(6);
+    expect(weeks[0].textContent).toMatch(/Нед 1 \(Втягивание\):/);
+    expect(weeks[5].textContent).toMatch(/Разгрузка/);
+  });
   it('строки коррекции несут data-corr id библиотеки', () => {
     localStorage.setItem('he_bb_diagnostics_hub_v1', JSON.stringify({ weakManual: ['chest_upper'] }));
     render(<BBDiagnosticsHub />);

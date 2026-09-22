@@ -19,6 +19,18 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · ББ: НОВЫЙ движок сессии/блока коррекции (Sep 22 2026, коммит pathspec, без пуша)
+
+Продолжение «работы над хабами»: у ББ-хаба (в отличие от ТА/стронга/арма) **не было** движка сессии/блока коррекции — только карточка, доза и вставка. Закрыто паритетом:
+- NEW `src/engines/bb/bb-corrective-block.engine.ts` (чистые функции, без UI/storage, ранжир НЕ дублируется — на вход идут уже выбранные библиотечные пики):
+  - `correctiveSessionForBB(picks, {max})` — сессия ≤6, порядок техника → сила → стабильность, без дублей, доза через `correctiveDose` (фолбэк — protocol записи);
+  - `correctiveWaveForWeeks(w)` / `correctiveFocusForWeek(i,w)` — волна сетов (8 нед = канон **3-3-4-4-4-4-3-3**; 6 = 3-3-4-4-3-3; 4 = 3-4-4-3; 2 = 3-4 без разгрузки) и фокус «Втягивание → Прогрессия → Пик → Разгрузка (RIR+1)»;
+  - `correctiveBlockForBB(picks, weeks)` — блок 2–12 нед с разгрузкой в хвосте (RIR+1, кламп 4) и честной сводкой;
+  - `correctiveBlockExportLines(block)` — строки для экспорта/печати; блок без упражнений **не выгружается** (не плодим строки с «—»).
+- Хаб `BBDiagnosticsHub.tsx`: компактная карточка `data-bb="corr-block"` (`corr-block-summary` + `corr-block-week` × нед) сразу после подсказки зон; источник — тот же `correctiveTopByZone` (паритет «показано = вставится», нового ранжира нет).
+- **Тесты**: NEW `bb-corrective-block` **6/6** (порядок/лимит сессии, волна 8/6/4/2, фокус, RIR+1 в разгрузке, все id — каталог, пустой вход, экспорт) + UI-лок в `bb-corrective-ui` (блок рендерится, 6 недель, первая «Втягивание», последняя «Разгрузка»).
+- **Проверено**: `src/engines/bb` corrective/diagnostic/hub-подмножество **16 файлов / 283** + BB-хаб UI (3 файла) **69** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · АРМЛИФТИНГ: причина × фаза ≥2 (Sep 22 2026, коммит pathspec, без пуша)
 
 Продолжение «работы над хабами»: у армлифтинга лок «причина × фаза» отсутствовал, и матрица имела **6 ячеек по 1**: endurance/strength, fatigue/technique, max_strength/stability, max_strength/technique, technique/stability, volume/strength.
