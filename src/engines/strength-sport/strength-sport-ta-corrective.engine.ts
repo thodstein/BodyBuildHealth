@@ -437,6 +437,37 @@ export const TA_CORRECTIVES: TACorrectiveExercise[] = [
     { sets: 3, reps: 1, pct: 90, rir: 3, tempo: 'X-5-X-0', restSeconds: 120 },
     ['Локти выше — грудь вверх 8 секунд', 'Гриф на плечах, не на запястьях'],
     'Фронт-присед с паузой → +5%', 'Гоблет-присед', 'Torokhtiy rack'),
+  // ── ROUND-9: добивка тонких фаз (подъём/провал/замок/разножка) ──
+  P('power_clean', 'Взятие в стойку без подседа (power clean)', ['clean_off_floor', 'clean_mid'],
+    ['early_pull', 'bar_forward', 'weak_extension'], ['technique', 'strength'], 'intermediate', 'strength',
+    { sets: 4, reps: 3, pct: 70, rir: 2, tempo: 'X-0-X-0', restSeconds: 150 },
+    ['Разгон до колена — терпи', 'Взрыв выше колена, лови в стойке', 'Локти не раньше разгона'],
+    'С дефицита 3 см → power с виса', 'Взятие с паузой у пола', 'Everett; QWA'),
+  P('hang_clean', 'Взятие с виса (выше колена)', ['clean_off_floor', 'clean_mid'],
+    ['early_pull', 'slow_turnover'], ['technique'], 'novice', 'technique',
+    { sets: 3, reps: 3, pct: 65, rir: 3, tempo: 'X-1-X-0', restSeconds: 120 },
+    ['Вис — старт без отрыва от пола', 'Колени под гриф, спина угол держит'],
+    'Вис выше колена → классика', 'Тяга взятийная медленно', 'Everett hang'),
+  P('push_press_v2', 'Швунг жировой (push press) на дожим', ['jerk_dip', 'jerk_drive'],
+    ['dip_forward', 'slow_dip', 'pressout'], ['strength', 'technique'], 'novice', 'strength',
+    { sets: 4, reps: 5, pct: 70, rir: 2, tempo: 'X-0-X-0', restSeconds: 150 },
+    ['Дип строго вертикальный', 'Дожим ногами, не плечами', 'Голова сквозь руки'],
+    'Швунг толчком → толчок в разножку', 'Жим стоя без ног', 'Big Bend; QWA'),
+  P('squat_split', 'Сплит-присед (опора-разножка)', ['squat_bottom', 'squat_mid'],
+    ['split_short', 'chest_collapse'], ['technique', 'mobility'], 'novice', 'technique',
+    { sets: 3, reps: 6, pct: 60, rir: 3, tempo: '2-1-X-0', restSeconds: 120 },
+    ['Разножка ровная, таз между стоп', 'Грудь вверх, колено над стопой'],
+    'Присед с паузой → сплит с паузой', 'Выпады в разножке без веса', 'Everett squat split'),
+  P('good_morning_v2', 'Наклоны со штангой (good morning)', ['squat_mid'],
+    ['chest_collapse', 'hips_rise'], ['strength'], 'intermediate', 'strength',
+    { sets: 3, reps: 6, pct: 55, rir: 2, tempo: '3-1-X-0', restSeconds: 150 },
+    ['Спина — один угол', 'Таз назад, колени мягкие', 'Без округления поясницы'],
+    '+2.5%/нед → RDL с паузой', 'Гиперэкстензия без веса', 'NSCA posterior chain'),
+  P('rack_pull', 'Тяга со стоек (rack pull, выше колена)', ['pull_lockout'],
+    ['chest_collapse', 'weak_extension'], ['strength'], 'intermediate', 'strength',
+    { sets: 4, reps: 4, pct: 90, rir: 2, tempo: 'X-1-X-0', restSeconds: 180 },
+    ['Старт со стоек выше колена', 'Довести до полного выпрямления', 'Плечи над грифом'],
+    '+5% → становая с пола', 'Тяга с дефицита 3 см', 'NSCA rack pull'),
 ];
 
 /** Индекс фаза → упражнения (производный, стабильный порядок каталога). */
@@ -582,6 +613,12 @@ const CORRECTIVE_META: Record<string, CorrectiveMeta> = {
   clean_segment: { equipment: 'barbell', fatigueCost: 6 },
   push_jerk_pause: { equipment: 'barbell', fatigueCost: 5 },
   front_rack_hold: { equipment: 'barbell', fatigueCost: 4 },
+  power_clean: { equipment: 'barbell', fatigueCost: 7 },
+  hang_clean: { equipment: 'barbell', fatigueCost: 6 },
+  push_press_v2: { equipment: 'barbell', fatigueCost: 5 },
+  squat_split: { equipment: 'barbell', fatigueCost: 4 },
+  good_morning_v2: { equipment: 'barbell', fatigueCost: 5 },
+  rack_pull: { equipment: 'barbell', fatigueCost: 7 },
 };
 
 /** Мета упражнения (дефолт barbell/6 — как у ранжира при отсутствии каталога). */
@@ -665,6 +702,13 @@ const CORRECTIVE_HOW_NOT: Record<string, string> = {
   overhead_hold: 'Не гулять грифом — лопатки вместе, рёбра вниз, 8 секунд камень',
   sots_press: 'Не заваливаться вперёд из седа — корпус вертикально, строго вверх',
   dip_snatch: 'Не бить бёдрами — плечи над грифом, толкай ногами вертикально',
+  // ROUND-9: новые записи библиотеки
+  power_clean: 'Не ловить глубоко — это power: финал выше параллели',
+  hang_clean: 'Не расслаблять спину в виса — тот же угол, что с пола',
+  push_press_v2: 'Не проваливать дип вперёд — вертикально, дожим ногами',
+  squat_split: 'Не ставить стопы в одну линию — база шире плеч',
+  good_morning_v2: 'Не округлять поясницу — таз назад, спина одним углом',
+  rack_pull: 'Не рвать со стоек — мёртвый старт, полное выпрямление',
 };
 
 /** Строка «как НЕ делать» (null — нет специфики, действует общий принцип). */

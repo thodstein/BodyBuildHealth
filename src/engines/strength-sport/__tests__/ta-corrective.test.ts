@@ -14,7 +14,9 @@ import {
 import { estimateCorrBasePm } from '../strength-sport-ta-simulator.engine';
 import { rankCorrectionsForTA } from '../strength-sport-ta-correction-rank.engine';
 import type { TAWeakCause } from '../strength-sport-ta-weak-cause.engine';
-import { allWLWeakPoints } from '../strength-sport-weakpoint';
+import { allWLWeakPoints, getCorrectionForWeakPoint } from '../strength-sport-weakpoint';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+import { TA_CATALOG_SUPPLEMENT } from '../../../core/exercise-catalog-ta-supplement';
 
 describe('ta-corrective library', () => {
   it('покрывает все 16 фаз минимум 3 упражнениями', () => {
@@ -116,6 +118,25 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     for (const tag of Object.keys(TA_ERROR_TAG_RU) as Array<keyof typeof TA_ERROR_TAG_RU>) {
       expect(correctivesByError(tag).length, tag).toBeGreaterThanOrEqual(1);
     }
+  });
+  it('ROUND-9: все id библиотеки — реальные записи каталога (синтетики нет)', () => {
+    const cat = new Set([
+      ...EXERCISE_CATALOG.map((e) => e.id),
+      ...TA_CATALOG_SUPPLEMENT.map((e) => e.id),
+    ]);
+    const missing = TA_CORRECTIVES.filter((e) => !cat.has(e.id)).map((e) => e.id);
+    expect(missing).toEqual([]);
+  });
+  it('ROUND-9: ядро коррекции — ≥5 кандидатов на каждую из 16 фаз, все из библиотеки', () => {
+    const lib = new Set(TA_CORRECTIVES.map((e) => e.id));
+    const problems: string[] = [];
+    for (const wp of allWLWeakPoints()) {
+      const list = getCorrectionForWeakPoint(wp);
+      if (list.length < 5) problems.push(`${wp}: ${list.length}`);
+      if (new Set(list).size !== list.length) problems.push(`${wp}: дубли`);
+      for (const id of list) if (!lib.has(id)) problems.push(`${wp}: нет в библиотеке ${id}`);
+    }
+    expect(problems).toEqual([]);
   });
   it('C6: гигиена библиотеки — имена уникальны, протоколы в коридорах', () => {
     const names = TA_CORRECTIVES.map((e) => e.nameRu);
