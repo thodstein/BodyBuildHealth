@@ -702,6 +702,34 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           {report.hubAsymPct != null && <span className="ad-tag">Hub-асимметрия {report.hubAsymPct}%</span>}
           {report.pinchAsymPct != null && <span className="ad-tag">Pinch-асимметрия {report.pinchAsymPct}%</span>}
         </div>
+        {/* ROUND-10: покрытие снарядов (паритет с Та-чипами/стронгом/армом) — что уже замерено */}
+        {(() => {
+          try {
+            const FAMILIES: Array<{ id: string; label: string; ids: string[] }> = [
+              { id: 'rt', label: 'RT', ids: ['rolling_thunder'] },
+              { id: 'axle', label: 'Axle', ids: ['apollon_axle', 'saxon_bar'] },
+              { id: 'pinch', label: 'Pinch', ids: ['pinch_hold', 'pinch_block'] },
+              { id: 'hub', label: 'Hub', ids: ['hub'] },
+              { id: 'coc', label: 'CoC', ids: ['coc_gripper'] },
+              { id: 'silver', label: 'Silver', ids: ['silver_bullet'] },
+              { id: 'excalibur', label: 'Excalibur', ids: ['excalibur'] },
+            ];
+            const rows = (report.rows || []) as Array<{ implement?: string }>;
+            const isOn = (f: { ids: string[] }) => rows.some((r) => f.ids.some((id) => String(r.implement || '').startsWith(id)));
+            const on = FAMILIES.filter(isOn);
+            return (
+              <div className="ad-row" data-arm="lift-coverage" aria-label="Покрытие снарядов" style={{ flexWrap: 'wrap', gap: 6 }}>
+                <span className="ad-muted">Покрытие снарядов: {on.length}/{FAMILIES.length}</span>
+                {FAMILIES.map((f) => {
+                  const hit = isOn(f);
+                  return (
+                    <span key={f.id} className="ad-tag" data-covered={hit ? 'true' : 'false'} style={{ background: hit ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${hit ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: hit ? '#22c55e' : '#fff' }}>{hit ? '✓ ' : '— '}{f.label}</span>
+                  );
+                })}
+              </div>
+            );
+          } catch { return null; }
+        })()}
         <AdSec title="ℹ️ Как пользоваться" collapsible defaultOpen={false} summary="3 шага до коррекции">
           <div className="ad-muted"><b>1 Замеры</b> — вбей снаряды ниже · <b>2 Диагностика</b> — точка срыва, фолы, тесты, причина · <b>3 Коррекция</b> — упражнения волной в план через мост внизу.</div>
         </AdSec>

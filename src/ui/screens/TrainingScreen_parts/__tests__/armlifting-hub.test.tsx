@@ -11,6 +11,20 @@ describe('W-AL UI: хаб армлифтинга', () => {
     expect(screen.getByLabelText(/Excalibur кг/)).toBeTruthy();
     expect(document.body.textContent).toContain('Введи замеры');
   });
+  it('ROUND-10: чипы покрытия снарядов — 0/7 без замеров, RT отмечается после ввода', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    const cov = document.querySelector('[data-arm="lift-coverage"]');
+    expect(cov).not.toBeNull();
+    expect(cov!.textContent).toContain('Покрытие снарядов: 0/7');
+    const chips = cov!.querySelectorAll('[data-covered]');
+    expect(chips.length).toBe(7);
+    fireEvent.change(screen.getByLabelText(/RT кг/), { target: { value: '100' } });
+    const cov2 = document.querySelector('[data-arm="lift-coverage"]')!;
+    expect(cov2.textContent).toContain('Покрытие снарядов: 1/7');
+    const rt = Array.from(cov2.querySelectorAll('[data-covered]')).find((c) => (c.textContent || '').includes('RT'));
+    expect(rt!.getAttribute('data-covered')).toBe('true');
+  });
   it('RT 65.25 → 50% и вердикт многоборья', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);
