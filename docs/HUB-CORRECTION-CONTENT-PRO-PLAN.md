@@ -1,8 +1,27 @@
-# HUB-CORRECTION-CONTENT-PRO-PLAN — углубление контента коррекции 4 хабов
+# HUB-CORRECTION-CONTENT-PRO-PLAN — углубление контента коррекции 5 хабов
 
-> Статус: **ПЛАН + промт новой сессии** (Sep 22 2026). Код контента НЕ менялся.
-> Цель: «ещё глубже» — больше упражнений в пулах и новые движки коррекции для
-> армрестлинга, армлифтинга, ТА и стронга. Математику объёма/капов не трогаем.
+> Статус: **ВЫПОЛНЕНО (round-9 + round-10, Sep 22 2026)**. План выполнен по всем хабам,
+> включая добавленный по ходу 5-й хаб (ББ-диагностика, движки коррекции). Итоги — §7.
+> Цель была: «ещё глубже» — больше упражнений в пулах и новые движки коррекции для
+> армрестлинга, армлифтинга, ТА, стронга и ББ. Математику объёма/капов не трогали.
+
+## 0. Статус выполнения (round-9/10, коммиты pathspec, не пушилось)
+
+| Хаб | Было → Стало | Локи | Коммит |
+|---|---|---|---|
+| Армрестлинг | 12 точек `exercises[]` 4–5 → **≥6** (contain_fingers 8); `POOL_TOPUP` 8 → **все 12** и каждая точка реально добавляет ≥1 уникальный id (пул 7–10) | пул ≥6; топ-ап не дубль; все id из каталога | `9833c2b0`, `9c6a3489` |
+| Армлифтинг | **42 → 52** записи; закрыт пробел снаряда **Excalibur** (был в каталоге без практики); фазы 10/20/14 → 14/21/19 | ≥50 записей, ≥10 на фазу, Excalibur покрыт, cues+progression | `f1769bce` |
+| ТА | **74 → 82** записи; **43 синтетических id добавлены в каталог** (`exercise-catalog-ta-supplement.ts` 14 → 57); ядро фаз **3 → 6** кандидатов | все id библиотеки — реальные записи каталога; ≥6 кандидатов на фазу | `644f45c9`, `a6e5d820` |
+| Стронг | **56 → 84** записи; тонкие ячейки «причина × фаза» добиты (объявленная причина ≥2); +28 своих реальных exId | ≥80; каждый exId — каталог (source-guard); причина×фаза ≥2 | `3c8f2416` |
+| **ББ (hub 5)** | **52 → 76** записи; зоны/сигналы/драйверы доведены до **≥3**; закрыты `recovery` (strength 0) и `volume` (stability 0) | зона/сигнал/драйвер ≥3; причина×фаза ≥2 | `c3edbb09` |
+
+Ключевая находка round-9: в ТА **43 из 74 id библиотеки были синтетическими** (нет записи
+в каталоге) — `catalogLookup` их не находил, из-за чего фильтры оборудования/мобильности
+молча обходились. Закрыто по правилу §3.0 (достройка каталога, а не выбрасывание).
+
+Проверено после каждого шага: `tsc --noEmit` 0 по всему проекту; круги движков
+(`arm` 1123, `strength-sport` 1003) и UI-хабов — зелёные (кроме известного чужого
+unhandled `revokeObjectURL` в `lab-exercise-ui`).
 
 ## 1. Аудит (факт по коду, Sep 2026)
 
@@ -12,6 +31,10 @@
 | **Армлифтинг** | `engines/arm/armlift-correction.engine.ts` (пул ~50 записей: `id/exId/causes/level/phase/cues/progression/equipmentAlt/gentle`) + `armlift-session-rules.engine.ts` | ~50; каталог arm — 73 id | `rankArmliftCorrections` | там же (`protocol`) + `rirForCause` | `armlift-injection.engine.ts` | `armlift-correction-pro` 24, `armlifting-correction-pro-ui` 2 |
 | **ТА** | `engines/strength-sport/strength-sport-ta-corrective.engine.ts` (`TA_CORRECTIVES`, конструктор `P(...)`) | **68** записей; 22 тега ошибок; каталог main 590 + `exercise-catalog-ta-supplement.ts` 14 | `ta-correction-rank.engine.ts` | `protocolForPreferred`, `adjustProtocolForCause` | `ta-injection.engine.ts` | `ta-corrective` 24, `ta-corrective-ui` 14, `ta-injection` 15 |
 | **Стронг** | `engines/strength-sport/strength-sport-sm-corrective.engine.ts` (`SM_CORRECTIVES`, конструктор `C(...)`) | **56** записей; 18 тегов ошибок; каталог main 590 | `sm-correction-rank.engine.ts` | `buildSMSpecProtocols`, `protocolForSMPreferred` | `sm-injection.engine.ts` | `sm-corrective` ~21, `strongman-diagnostics-corrective` 14, `strongman-diagnostics-inject` 3 |
+
+> Таблица выше — **снимок ДО работ** (аудит Sep 2026). Актуальные числа — в §0.
+> ББ-диагностика (hub 5, добавлена по ходу): `engines/bb/bb-corrective.engine.ts`
+> (`BB_CORRECTIVES`, 52 записи; зоны/сигналы/драйверы; `rankCorrectives` запас 6).
 
 ## 2. Что значит «глубже» (цели)
 
