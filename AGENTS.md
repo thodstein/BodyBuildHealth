@@ -19,6 +19,14 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · АРМЛИФТИНГ: причина × фаза ≥2 (Sep 22 2026, коммит pathspec, без пуша)
+
+Продолжение «работы над хабами»: у армлифтинга лок «причина × фаза» отсутствовал, и матрица имела **6 ячеек по 1**: endurance/strength, fatigue/technique, max_strength/stability, max_strength/technique, technique/stability, volume/strength.
+- **52→58 записей** (+6, каждая в свой пул, в ХВОСТ — топ-3 целы): `rolling_thunder` (endurance, тяжёлые пятёрки с холдом 8с), `apollon_axle` (volume, объёмные тройки DOH), `hub_pinch` (max_strength, синглы с паузой 3с), `saxon_bar` (max_strength+technique, техника старта), `plate_pinch_hold` (technique, постановка пальцев под нагрузкой), `finger_containment_band` (fatigue+technique, щадящая containment).
+- NEW lock (source-guard, пулы не экспортируются): «каждая причина × фаза ≥2» + «объявленные причины — только канонические `ArmliftCause` (technique/max_strength/endurance/volume/mobility/fatigue/pain)».
+- **Поймано своим tsc/локом**: в 3 новых записях причиной был указан `strength`/`stability` (это фазы, не причины) — исправлено; лок теперь ловит такой дрейф даже при кастах.
+- **Проверено**: `src/engines/arm` **92 файла / 1124** + армлифтинг/арм-UI+apk-arm-pack **80/80** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · ТА: причины volume/fatigue объявлены + SM: причина × вид (Sep 22 2026, коммит pathspec, без пуша)
 
 По команде «продолжай работу над хабами» — аудит покрытия по **причинам** (у ТА такого лока не было).

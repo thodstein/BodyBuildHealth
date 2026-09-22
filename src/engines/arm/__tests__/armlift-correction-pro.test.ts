@@ -28,6 +28,25 @@ describe('PRO-CORR K1: библиотека PRO на реальных id', () =>
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(getArmExerciseById(id)).toBeTruthy();
   });
+  it('ROUND-10: каждая причина × фаза ≥2 (6 ячеек были по 1) + причины только канонические', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/arm/armlift-correction.engine.ts'), 'utf8');
+    const VALID = new Set(['technique', 'max_strength', 'endurance', 'volume', 'mobility', 'fatigue', 'pain']);
+    const counts: Record<string, number> = {};
+    const bad: string[] = [];
+    for (const line of src.split('\n')) {
+      const m = line.match(/causes: \[([^\]]*)\].*?phase: '([a-z]+)'/);
+      if (!m) continue;
+      for (const c of m[1].replace(/[^a-z_,]/g, '').split(',')) {
+        if (!c) continue;
+        if (!VALID.has(c)) bad.push(c);
+        const k = `${c}/${m[2]}`;
+        counts[k] = (counts[k] || 0) + 1;
+      }
+    }
+    expect(Array.from(new Set(bad))).toEqual([]);
+    const thin = Object.entries(counts).filter(([, n]) => n < 2).map(([k, n]) => `${k}:${n}`);
+    expect(thin).toEqual([]);
+  });
   it('ROUND-9: библиотека 42→≥50 записей; Excalibur покрыт коррекциями', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/engines/arm/armlift-correction.engine.ts'), 'utf8');
     expect((src.match(/\{ exId:/g) || []).length).toBeGreaterThanOrEqual(50);
