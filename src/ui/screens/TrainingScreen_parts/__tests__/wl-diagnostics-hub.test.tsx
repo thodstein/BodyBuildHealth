@@ -343,11 +343,20 @@ describe('WLDiagnosticsHub PRO', () => {
     expect(JSON.parse(localStorage.getItem('he_ta_progress_hist_v1') || '[]').length).toBe(1);
     expect(JSON.parse(localStorage.getItem('he_ta_progress_hist_v1') || '[]')[0].cycle).toBe('2025-2028');
   });
-  it('V3 MediaPipe: кнопка проверки', async () => {
+  it('видео: live-MediaPipe/стабы убраны, остаётся CSV-трекинг углов', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByRole('button', { name: /Видео/ }));
-    fireEvent.click(screen.getByText(/Проверить MediaPipe/));
-    await waitFor(() => expect(container.textContent).toMatch(/проверяем|модель доступна|нет сети/), { timeout: 5000 });
+    expect(screen.queryByText(/Проверить MediaPipe/)).toBeNull();
+    expect(container.textContent).not.toContain('Pose stub');
+    expect(container.textContent).not.toContain('BlazePose stub');
+    expect(container.textContent).toContain('Углы с видео');
+  });
+  it('превью моста: что уедет (фаза → упражнение)', async () => {
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /База/ }));
+    fireEvent.click(screen.getAllByText(/Присед: внизу/)[0]);
+    await waitFor(() => expect(container.querySelector('[data-wl="bridge-preview"]')).toBeTruthy(), { timeout: 2000 });
+    expect(container.querySelector('[data-wl="bridge-preview"]')!.textContent).toContain('Что уедет в конструктор');
   });
   it('V9-B aux-таб: присед → биомеханика + топ-3 + причина', async () => {
     const { container } = render(<WLDiagnosticsHub />);

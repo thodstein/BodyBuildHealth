@@ -23,7 +23,7 @@ import { scoreTA, scoreColor } from '../../../engines/strength-sport/strength-sp
 import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend, TA_OHS_HIST_KEY, diagnoseKneeToWallBilateral, type OHSSnapshot } from '../../../engines/strength-sport/strength-sport-ohs.engine';
 import { calibrateLVP, saveLVPProfile } from '../../../engines/strength-sport/strength-sport-lvp-calibration.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
-import { estimateAnglesFromLandmarks, livePoseStatus, createMockPoseStream, parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary, ensurePoseModel } from '../../../engines/strength-sport/strength-sport-pose.engine';
+import { parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { sinclairCoefficient, sinclairTotal, qPoints, qMasters, qAgeScale, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
@@ -159,8 +159,6 @@ type WLState = {
   // V10-A: недели годового синка (персистятся)
   annualStartWeek: string;
   annualEndWeek: string;
-  // V3: MediaPipe live-статус + прогресс двоеборья
-  poseLive: '' | 'loading' | 'ok' | 'fail';
   // W4: метаданные съёмки для флага качества xLoop (Shah 2026)
   videoHeightM: string;
   videoDistM: string;
@@ -225,8 +223,6 @@ const DEFAULT_STATE: WLState = {
   femFinalAcc: '', femHipDeg: '',
   // V6-B3: ручной вес IMTP
   imtpBw: '',
-  // V3: live-статус + прогресс
-  poseLive: '' as '' | 'loading' | 'ok' | 'fail',
   // W4: метаданные съёмки (персистятся)
   videoHeightM: '',
   videoDistM: '',
@@ -500,18 +496,6 @@ export const WLDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   };
 
-  // V3: MediaPipe live-проверка (честно: только наличие модели, углы — после загрузки)
-  const checkPoseLive = async () => {
-    setState(s => ({ ...s, poseLive: 'loading' }));
-    try {
-      const ok = await ensurePoseModel();
-      setState(s => ({ ...s, poseLive: ok ? 'ok' : 'fail' }));
-      setToast(ok ? '✓ MediaPipe доступен — live-углы следующим шагом' : '✕ MediaPipe недоступен (нет сети/CDN)');
-      setTimeout(() => setToast(''), 2500);
-    } catch {
-      setState(s => ({ ...s, poseLive: 'fail' }));
-    }
-  };
   const jerkDip = useMemo(() => {
     const cm = parseFloat(state.jerkDipCm), ms = parseFloat(state.jerkDipMs);
     if (!Number.isFinite(cm) || !Number.isFinite(ms)) return null;
@@ -1544,12 +1528,6 @@ export const WLDiagnosticsHub: React.FC = () => {
     } catch { return { flag: 'unknown' as const, reason: '' }; }
   }, [state.videoHeightM, state.videoDistM, state.videoSide, state.videoDevice]);
 
-  const mockPose = useMemo(() => {
-    const frames = createMockPoseStream();
-    const ang = estimateAnglesFromLandmarks(frames[0]);
-    return { angles: ang, status: livePoseStatus(ang) };
-  }, []);
-
   // Lifter limiter suggestions for selected phase (top 2)
   const limiterForPhase = useMemo(() => {
     const wp = weakPoints[0];
@@ -2003,7 +1981,6 @@ export const WLDiagnosticsHub: React.FC = () => {
                 );
               } catch { return null; }
             })()}
-            <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 10, color: '#a78bfa' }}>BlazePose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° ankle {mockPose.angles.ankle}° shoulder {mockPose.angles.shoulder}° — {mockPose.status.faults.join(' · ') || 'OK (mock)'}</div>
             {/* E8: углы суставов с видео (CSV трекера поз) → автовалидация фаз + OHS-прогноз */}
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📐 Углы с видео — вставь CSV трекера (t,hip,knee,ankle,shoulder)</div>
@@ -2016,15 +1993,6 @@ export const WLDiagnosticsHub: React.FC = () => {
                 </div>
               )}
               {state.poseCsv.trim() && !poseSummary && <div style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>CSV не распознан — нужно ≥2 строк t,hip,knee,ankle,shoulder</div>}
-            </div>
-            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px dashed #1f3a5f', textAlign: 'center' }}>
-              <div style={{ fontSize: 11, color: '#fff' }}>📹 BlazePose (MediaPipe) — live-проверка</div>
-              <div style={{ marginTop: 6, display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
-                <button data-wl="pose-live" onClick={checkPoseLive} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#a78bfa', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>📡 Проверить MediaPipe</button>
-                {state.poseLive === 'loading' && <span style={{ fontSize: 10, color: '#fff' }}>проверяем CDN…</span>}
-                {state.poseLive === 'ok' && <span style={{ fontSize: 10, color: '#22c55e' }}>✓ модель доступна — live-углы следующим шагом</span>}
-                {state.poseLive === 'fail' && <span style={{ fontSize: 10, color: '#f59e0b' }}>✕ нет сети/CDN — работай через CSV выше</span>}
-              </div>
             </div>
           </div>
         )}
@@ -2353,13 +2321,25 @@ export const WLDiagnosticsHub: React.FC = () => {
             {phaseTrend ? <span data-wl="phase-trend" style={{ fontSize: 10, color: '#fff' }}>{phaseTrend.text} · пересними через 4–6 нед</span> : <span style={{ fontSize: 10, color: '#fff' }}>Re-screen фаз: 2+ снимка покажут «ушло/висит»</span>}
           </div>
         </div>
+        {weakPoints.length > 0 && (
+          <div data-wl="bridge-preview" style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e' }}>📦 Что уедет в конструктор ({weakPoints.length} фазы · {specPreview?.totalWeeks ?? 0} нед спец-блока)</div>
+            {weakPoints.map((wp) => {
+              const pref = (state.preferredCorr || {})[wp];
+              const top = top3For(wp);
+              const ordered = pref ? [...top.filter((c) => c.id === pref), ...top.filter((c) => c.id !== pref)] : top;
+              const c = ordered[0];
+              return c ? <div key={wp} style={{ fontSize: 10, color: '#fff', marginTop: 3 }}>{WL_WEAKPOINT_LABELS[wp] || wp} → {c.name} {c.protocol.sets}×{c.protocol.reps} @{c.protocol.pct}%{pref === c.id ? ' ⭐' : ''}</div> : null;
+            })}
+            <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Инъекция в план — кнопкой ниже (⭐ первыми); мост — «Применить».</div>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button data-wl="apply-bottom" onClick={applyToConstructor} style={{ flex: 1, minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>→ Применить в ТА-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
           <button data-wl="export-html" onClick={handleExport} style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 HTML</button>
           <button data-wl="print" onClick={handlePrint} style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 Печать</button>
           <button data-wl="export-csv" onClick={handleExportCsv} style={{ minHeight: 48, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>📊 CSV</button>
         </div>
-        <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>Pose stub: hip {mockPose.angles.hip}° knee {mockPose.angles.knee}° {mockPose.status.ok ? '✓' : `⚠ ${mockPose.status.faults.join(', ')}`}</div>
       </div>
     </div>
   );
