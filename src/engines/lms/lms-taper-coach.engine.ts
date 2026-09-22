@@ -617,7 +617,7 @@ export function buildTaperCoachPrintHtml(verdict: TaperCoachVerdict, ctx?: Taper
  * Показывает только хвост блока (вход в пик / mock / тапер / соревнования / пост):
  * неделя, даты, объём (сетов), средняя интенсивность (% ПМ), прикиды.
  */
-export function buildPLTaperPrintHtml(plan: LMSBuildOutput): string {
+export function buildPLTaperPrintHtml(plan: LMSBuildOutput, opts?: { metaLine?: string }): string {
   const esc = escHtml;
   const tail = (plan?.weeks ?? []).filter(w => w.taperWeek || w.mockMeet || w.meetWeek || w.postMeet);
   const lines: string[] = [];
@@ -648,6 +648,7 @@ export function buildPLTaperPrintHtml(plan: LMSBuildOutput): string {
     }
     lines.push('</table>');
   }
+  if (opts?.metaLine) lines.push(`<p><b>Данные:</b> ${esc(opts.metaLine)}</p>`);
   lines.push('</body></html>');
   return lines.join('\n');
 }

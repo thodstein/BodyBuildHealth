@@ -114,11 +114,17 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
   // P2-5: протокол сгонки к категории на пик-неделю (вода/натрий/карбы).
   const peakCut = React.useMemo(() => buildPLPeakWeekCutProtocol(bw, targetBw), [bw, targetBw]);
   const fedRu: Record<string, string> = { ipf: 'IPF', fpr: 'FPR', wpc: 'WPC', other: 'Другая' };
-  // C4: печать тапер-плана (PDF через window.print).
+  // C4: печать тапер-плана (PDF через window.print) — единый контур печати
+  // (карточка тапер-плана и кнопка у прикидов используют этот же обработчик).
   const handlePrintTaperPlan = () => {
     if (!taperPlan) return;
     try {
-      const html = buildPLTaperPrintHtml(taperPlan);
+      const pmLine = 'Федерация: ' + (fedRu[taperFed] || taperFed)
+        + ' · прикиды: ' + (MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? '')
+        + ' · факт. ПМ: ' + ['Присед', 'Жим лежа', 'Становая тяга']
+          .map(n => n.split(' ')[0] + ' ' + (taperActualPm[n] || '—') + ' / план ' + (taperPlannedPm[n] || '—'))
+          .join(' · ');
+      const html = buildPLTaperPrintHtml(taperPlan, { metaLine: pmLine });
       const w = window.open('', '_blank', 'width=900,height=700');
       if (!w) { onNote('⚠ Всплывающее окно заблокировано — разрешите попапы для печати тапер-плана.'); return; }
       w.document.write(html);
@@ -842,28 +848,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                   title="Сохранить тапер-план как соревновательный — появится в дневнике (подвкладка «🏁 Соревнования») с прикидами"
                 >🏆 Сохранить как соревновательный</button>
                 <button
-                  onClick={() => {
-                    if (!taperPlan) return;
-                    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const lines: string[] = [];
-                    lines.push('<h2>📋 Тапер-план: ' + esc(taperPlan.template.meta.title) + (peakMode === 'pl' ? ' (ПЛ-пик-протокол)' : ' (классика)') + '</h2>');
-                    lines.push('<p>Федерация: ' + esc(fedRu[taperFed] || taperFed) + ' · стратегия прикидов: ' + esc(MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? '') + ' · всего ' + taperPlan.weeks.length + ' нед</p>');
-                    lines.push('<table border="1" cellpadding="6" style="border-collapse:collapse;font-size:13px">');
-                    lines.push('<tr><th>Нед</th><th>Тип</th><th>Движение</th><th>1-я</th><th>2-я</th><th>3-я</th></tr>');
-                    for (const wk of taperPlan.weeks) {
-                      const attempts = wk.meetAttempts?.lifts;
-                      if (!attempts) continue;
-                      for (const l of attempts) {
-                        lines.push(`<tr><td>${wk.week}</td><td>${wk.meetWeek ? '🏁 Соревнования' : wk.mockMeet ? '🎯 Mock' : '🏁 Пик'}</td><td>${esc(l.name)}</td><td><b>${scale(l.opener)}</b></td><td><b>${scale(l.second)}</b></td><td><b>${scale(l.third)}</b></td></tr>`);
-                      }
-                    }
-                    lines.push('</table>');
-                    lines.push('<p><b>Данные:</b> факт. ПМ: ' + ['Присед', 'Жим лежа', 'Становая тяга'].map(n => n.split(' ')[0] + ' ' + (taperActualPm[n] || '—')).join(' · ') + ' | план федерации: ' + ['Присед', 'Жим лежа', 'Становая тяга'].map(n => n.split(' ')[0] + ' ' + (taperPlannedPm[n] || '—')).join(' · ') + '</p>');
-                    const w = window.open('', '_blank', 'width=900,height=700');
-                    if (w) { w.document.write('<html><head><title>Тапер-план</title></head><body style="font-family:sans-serif">' + lines.join('') + '</body></html>'); w.document.close(); w.print(); }
-                  }}
+                  onClick={handlePrintTaperPlan}
                   style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(96,165,250,0.4)', color: '#93c5fd', background: 'rgba(96,165,250,0.08)' }}
-                  title="Печать тапер-плана: прикиды по неделям + данные к соревнованиям"
+                  title="Печать тапер-плана: прикиды по неделям, объём/интенсивность, даты и данные к соревнованиям"
                 >🖨 Печать тапер-плана</button>
               </div>
             </div>

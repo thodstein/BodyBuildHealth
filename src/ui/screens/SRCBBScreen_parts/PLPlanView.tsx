@@ -30,6 +30,7 @@ import {
 } from '../TrainingScreen_parts/training-ui';
 import { MetricCard, PopupNumber, PopupSelect, ExpandableCard, SaveButton } from './TrainingPopups';
 import { AutoRegModeSwitch } from './AutoRegModeSwitch';
+import { CalendarViewSwitch } from './CalendarViewSwitch';
 import { SessionPlayer, type PlayerDay } from './SessionPlayer';
 import { DayCard, type PhaseKey } from '../TrainingScreen_parts/PlanOutput';
 import { usePLTaper } from './taper-state';
@@ -458,15 +459,13 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📅 Календарь мезоцикла (нед × дни, тоннаж)</div>
-                  {/* Переключатель: оригинальный цикл / с учётом тапера */}
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button onClick={() => setCalendarView('original')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'original' ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'original' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'original' ? '#60a5fa' : '#fff' }}>
-                      🔵 Оригинальный ({W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).length} нед)
-                    </button>
-                    <button onClick={() => setCalendarView('tapered')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'tapered' ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'tapered' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'tapered' ? '#f59e0b' : '#fff' }}>
-                      📉 С тапером ({W.length} нед)
-                    </button>
-                  </div>
+                  {/* Переключатель: оригинальный цикл / с учётом тапера (единый компонент) */}
+                  <CalendarViewSwitch
+                    value={calendarView}
+                    onChange={setCalendarView}
+                    originalLabel={`🔵 Оригинальный (${W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).length} нед)`}
+                    taperedLabel={`📉 С тапером (${W.length} нед)`}
+                  />
                 </div>
                 {(W.some(isTaperWeek) || W.some(isMockWeek) || W.some(isMeetWeek)) && (
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6, fontSize: 9, color: '#fff' }}>
@@ -981,13 +980,13 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 </MetricCard>
               )}
               {/* Календарь цикла: оригинальный / с учётом тапера */}
-              <div style={{ marginTop: 4, display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-                <button onClick={() => setCalendarView('original')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'original' ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'original' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'original' ? '#60a5fa' : '#fff' }}>
-                  🔵 Оригинальный ({originalCycleWeeks(getCycleById(selectedCycleId)!) ?? totalW} нед)
-                </button>
-                <button onClick={() => setCalendarView('tapered')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'tapered' ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'tapered' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'tapered' ? '#f59e0b' : '#fff' }}>
-                  📉 С тапером ({totalW} нед)
-                </button>
+              <div style={{ marginTop: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                <CalendarViewSwitch
+                  value={calendarView}
+                  onChange={setCalendarView}
+                  originalLabel={`🔵 Оригинальный (${originalCycleWeeks(getCycleById(selectedCycleId)!) ?? totalW} нед)`}
+                  taperedLabel={`📉 С тапером (${totalW} нед)`}
+                />
               </div>
               <MesocycleProgressionCard
                 weeks={totalW}

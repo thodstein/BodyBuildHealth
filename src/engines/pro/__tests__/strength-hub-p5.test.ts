@@ -9,11 +9,13 @@ import {
 } from '../strength-export.engine';
 
 describe('P5 раскладка попыток', () => {
-  it('180 кг стандарт: 167.5 / 175 / 185 (шаг 2.5)', () => {
+  // Re-baseline (Фаза 2, канон прикидов): было 92.5/97.5/102.5% (второй набор),
+  // стало каноническое balanced 92/96/102% из competition-attempts (единый источник).
+  it('180 кг стандарт: 165 / 172.5 / 182.5 (канон 92/96/102, шаг 2.5)', () => {
     const a = planPLAttempts(180, 'standard');
-    expect(a.opener).toBe(167.5);
-    expect(a.second).toBe(175);
-    expect(a.third).toBe(185);
+    expect(a.opener).toBe(165);
+    expect(a.second).toBe(172.5);
+    expect(a.third).toBe(182.5);
   });
   it('цели: safe ≤ standard ≤ record; third ≥ second', () => {
     const s = planPLAttempts(200, 'safe');
