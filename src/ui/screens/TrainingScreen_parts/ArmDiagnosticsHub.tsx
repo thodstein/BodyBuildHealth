@@ -214,6 +214,20 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [hasInjectPrev, setHasInjectPrev] = useState<boolean>(() => {
     try { return !!localStorage.getItem('he_arm_plan_saved_prev'); } catch { return false; }
   });
+  // Живой аудит плана: конструктор сохранил план (или инъекция/откат) → перечитать
+  useEffect(() => {
+    const bump = () => { setPlanNonce((n) => n + 1); setHasInjectPrev((() => { try { return !!localStorage.getItem('he_arm_plan_saved_prev'); } catch { return false; } })()); };
+    try {
+      window.addEventListener('he-arm-plan-saved', bump as EventListener);
+      window.addEventListener('storage', bump as EventListener);
+    } catch { /* noop */ }
+    return () => {
+      try {
+        window.removeEventListener('he-arm-plan-saved', bump as EventListener);
+        window.removeEventListener('storage', bump as EventListener);
+      } catch { /* noop */ }
+    };
+  }, []);
   const [bilatTick, setBilatTick] = useState(0);
   const [trackCsv, setTrackCsv] = useState(String((p1saved as any).trackCsv ?? ''));
   const [baseXLoop, setBaseXLoop] = useState<string>(() => {

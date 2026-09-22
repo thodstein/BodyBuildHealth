@@ -478,14 +478,18 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const [profileTick, setProfileTick] = useState(0);
   useEffect(() => {
     const bump = () => setProfileTick(t => t + 1);
+    // Живой аудит: план сохранил конструктор (или инъекция/откат) → перечитать план
+    const bumpPlan = () => setPlanNonce(n => n + 1);
     try {
       window.addEventListener('profile-updated', bump as EventListener);
       window.addEventListener('storage', bump as EventListener);
+      window.addEventListener('he-strength-sport-plan-saved', bumpPlan as EventListener);
     } catch {}
     return () => {
       try {
         window.removeEventListener('profile-updated', bump as EventListener);
         window.removeEventListener('storage', bump as EventListener);
+        window.removeEventListener('he-strength-sport-plan-saved', bumpPlan as EventListener);
       } catch {}
     };
   }, []);
