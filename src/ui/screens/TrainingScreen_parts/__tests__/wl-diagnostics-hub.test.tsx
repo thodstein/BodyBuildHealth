@@ -184,9 +184,10 @@ describe('WLDiagnosticsHub PRO', () => {
     };
     localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(miniPlan));
     const { container } = render(<WLDiagnosticsHub />);
-    // back_squat по каталогу WL_WEAKPOINT_CORRECTION закрывает только squat_mid (corr-приоритет)
+    // было: back_squat закрывал только squat_mid (corr-приоритет) → squat_bottom 0.
+    // стало (ROUND-9/10: back_squat в ядре squat_bottom — паритет с targets библиотеки): покрыты оба
     await waitFor(() => expect(container.textContent).toContain('прис.серед 4'), { timeout: 2000 });
-    expect(container.textContent).toContain('прис.низ 0');
+    expect(container.textContent).toContain('прис.низ 4');
     expect(container.textContent).toContain('тяга.старт 0');
   });
   it('V4-C LVP-sparkline рисуется из ramp-ввода', async () => {

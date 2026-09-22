@@ -20,7 +20,9 @@ describe('TA plan audit E1', () => {
     expect(b.deloadWeeks).toBe(1);
   });
   it('маппинг: deficit → off_floor, pause → mid, полный рывок → все 5', () => {
-    expect(phasesForExercise({ id: 'deficit_snatch' })).toEqual(['snatch_off_floor']);
+    // было: ['snatch_off_floor'] — ROUND-10 добавил deficit_snatch и в ядро pull_start
+    // (паритет с targets библиотеки: сегментный отрыв чинит и старт тяги)
+    expect(phasesForExercise({ id: 'deficit_snatch' })).toEqual(['snatch_off_floor', 'pull_start']);
     expect(phasesForExercise({ id: 'pause_clean' })).toEqual(['clean_off_floor', 'clean_mid']);
     expect(phasesForExercise({ id: 'snatch', name: 'Рывок классический' }).length).toBe(5);
     expect(phasesForExercise({ id: 'jerk_dip' })).toEqual(['jerk_dip']);
@@ -70,9 +72,11 @@ describe('TA plan audit E1', () => {
     const a = auditTAPlan(plan);
     expect(a.hasPlan).toBe(true);
     expect(a.missing.length).toBe(0);
+    // было: worst 'squat_mid' (0). стало (ROUND-10: front_squat добавлен в ядро squat_mid →
+    // front_squat покрывает squat_mid) — худший по всем 16 фазам теперь pull_lockout (0).
+    // coveredCount считает CORE (11) и не меняется (front_squat в CORE не входит).
     expect(a.coveredCount).toBe(11);
-    // front_squat/overhead_squat закрывают и squat_bottom по каталогу → худший AUX: squat_mid (0)
-    expect(a.worstPhase).toBe('squat_mid');
+    expect(a.worstPhase).toBe('pull_lockout');
     expect(TA_AUX_PHASES.includes(a.worstPhase as any)).toBe(true);
   });
 });

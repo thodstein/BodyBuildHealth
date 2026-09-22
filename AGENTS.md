@@ -1,5 +1,14 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Коррекция-контент round-10 · ТА-ядро ≥6 (цель плана) + 2 записи (Sep 22 2026, коммит pathspec, без пуша)
+
+По команде «продолжай» закрыта последняя невыполненная цель плана §3.3: **ТА `TA_CORRECTIVES` 80→82** и **ядро `WL_WEAKPOINT_CORRECTION` 5→6 кандидатов на каждую из 16 фаз** (было 5 после round-9; документ требовал ≥6).
+- +2 записи: `push_press_jerk` (дип→выталкивание, targets jerk_dip/jerk_drive), `front_squat_v2` (фронтальный присед, targets squat_bottom/clean_catch) — реальные id main-каталога, + `CORRECTIVE_META`/`CORRECTIVE_HOW_NOT`.
+- 6-й кандидат на фазу подобран из уже существующих записей библиотеки (паритет с их `targets`): snatch_off_floor +`snatch_deadlift`, snatch_mid +`nofeet_snatch`, snatch_pull_under +`drop_snatch`, snatch_catch +`overhead_hold`, snatch_overhead +`dead_bug_oh`, clean_off_floor +`deficit_pull`, clean_mid +`muscle_clean`, clean_catch +`tspine_ext`, jerk_drive +`tall_jerk`, jerk_lockout +`single_arm_press`, squat_mid +`front_squat`, pull_start +`deficit_snatch`, pull_lockout +`deadlift`, press_start +`single_arm_press`; jerk_dip/squat_bottom — новые записи.
+- NEW lock обновлён: «≥**6** кандидатов на фазу, без дублей, все из библиотеки» (было ≥5).
+- Re-baseline (осознанно, комментарии «было→стало»): `ta-plan-audit` — `phasesForExercise('deficit_snatch')` теперь `['snatch_off_floor','pull_start']` (паритет с targets библиотеки); «V10-B» `worstPhase` `squat_mid`→`pull_lockout` (front_squat в ядре squat_mid покрыл squat_mid; coveredCount CORE остался 11); `wl-diagnostics-hub` V7-B — `прис.низ 0`→`прис.низ 4` (back_squat в ядре squat_bottom, паритет с targets).
+- **Проверено**: `src/engines/strength-sport` **64 файла / 1003** + ТА-UI (`wl-diagnostics-hub`, `wl-diagnostics-apk`, `ta-corrective-ui`, `ta-diagnostics-v4-ui`, `ta-v5-ui`) **87/87** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · Хаб 5/5 — ББ-диагностика: пулы зон/сигналов/драйверов (Sep 22 2026, коммит pathspec, без пуша)
 
 По команде «добавь в план работу с хабом диагностики ББ (движки коррекции)» — хаб 5 доведён до уровня round-9.

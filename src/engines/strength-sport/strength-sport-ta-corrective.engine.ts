@@ -468,6 +468,16 @@ export const TA_CORRECTIVES: TACorrectiveExercise[] = [
     { sets: 4, reps: 4, pct: 90, rir: 2, tempo: 'X-1-X-0', restSeconds: 180 },
     ['Старт со стоек выше колена', 'Довести до полного выпрямления', 'Плечи над грифом'],
     '+5% → становая с пола', 'Тяга с дефицита 3 см', 'NSCA rack pull'),
+  P('push_press_jerk', 'Швунг толчковый (дип → выталкивание)', ['jerk_dip', 'jerk_drive'],
+    ['dip_forward', 'slow_dip', 'drive_forward'], ['technique', 'strength'], 'intermediate', 'strength',
+    { sets: 4, reps: 4, pct: 70, rir: 2, tempo: 'X-0-X-0', restSeconds: 150 },
+    ['Дип вертикальный, 8–12 см', 'Выталкивание — ноги, не плечи', 'Локти выстрелом вверх'],
+    '+5% → толчок в разножку', 'Швунг жировой 4×5', 'QWA; Big Bend (dip/drive)'),
+  P('front_squat_v2', 'Фронтальный присед (вертикальный торс)', ['squat_bottom', 'clean_catch'],
+    ['chest_collapse', 'elbows_slow'], ['strength', 'technique'], 'intermediate', 'strength',
+    { sets: 4, reps: 4, pct: 75, rir: 2, tempo: '3-1-1-0', restSeconds: 180 },
+    ['Локти высоко, гриф на плечах', 'Спина вертикально весь сет', 'Пауза 1с внизу'],
+    '+5% при чистом фронте', 'Фронт-присед с паузой 3с', 'NSCA front squat'),
 ];
 
 /** Индекс фаза → упражнения (производный, стабильный порядок каталога). */
@@ -619,6 +629,8 @@ const CORRECTIVE_META: Record<string, CorrectiveMeta> = {
   squat_split: { equipment: 'barbell', fatigueCost: 4 },
   good_morning_v2: { equipment: 'barbell', fatigueCost: 5 },
   rack_pull: { equipment: 'barbell', fatigueCost: 7 },
+  push_press_jerk: { equipment: 'barbell', fatigueCost: 6 },
+  front_squat_v2: { equipment: 'barbell', fatigueCost: 8 },
 };
 
 /** Мета упражнения (дефолт barbell/6 — как у ранжира при отсутствии каталога). */
@@ -709,6 +721,8 @@ const CORRECTIVE_HOW_NOT: Record<string, string> = {
   squat_split: 'Не ставить стопы в одну линию — база шире плеч',
   good_morning_v2: 'Не округлять поясницу — таз назад, спина одним углом',
   rack_pull: 'Не рвать со стоек — мёртвый старт, полное выпрямление',
+  push_press_jerk: 'Не заваливать дип вперёд — вертикально, выталкивание ногами',
+  front_squat_v2: 'Не ронять локти — гриф скатится на запястья',
 };
 
 /** Строка «как НЕ делать» (null — нет специфики, действует общий принцип). */

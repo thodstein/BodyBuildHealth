@@ -51,22 +51,22 @@ export const WL_WEAKPOINT_ANGLE: Record<WLWeakPoint, { joint: string; angle: str
 // ROUND-9: ядро 3 → 5 кандидатов на фазу (реальная альтернатива после фильтров
 // оборудование/мобильность/comp; «3» часто вырождалось в 1-2 варианта).
 export const WL_WEAKPOINT_CORRECTION: Record<WLWeakPoint, string[]> = {
-  snatch_off_floor: ['deficit_snatch', 'pause_snatch', 'snatch_pull', 'segment_snatch', 'slow_pull_snatch'],
-  snatch_mid: ['pause_snatch', 'snatch_pull', 'rdl', 'segment_snatch', 'snatch_high_pull'],
-  snatch_pull_under: ['high_hang_snatch', 'muscle_snatch', 'snatch_balance', 'tall_snatch', 'block_snatch'],
-  snatch_catch: ['overhead_squat_v2', 'snatch_balance', 'pause_squat', 'sots_press', 'power_snatch'],
-  snatch_overhead: ['overhead_squat_v2', 'snatch_balance', 'jerk_recovery', 'oh_lunge', 'snatch_push_press'],
-  clean_off_floor: ['deficit_clean', 'pause_clean', 'clean_pull', 'clean_segment', 'hang_clean'],
-  clean_mid: ['pause_clean', 'clean_pull', 'rdl', 'block_clean', 'hang_clean_knee'],
-  clean_catch: ['front_squat', 'front_squat_clean_grip', 'pause_squat', 'front_rack_hold', 'tall_clean'],
-  jerk_dip: ['jerk_dip', 'pause_jerk', 'front_squat', 'double_pause_jerk', 'push_press_v2'],
-  jerk_drive: ['push_press', 'push_jerk', 'behind_neck_jerk', 'pause_jerk', 'push_jerk_pause'],
-  jerk_lockout: ['split_jerk', 'jerk_recovery', 'pin_press', 'jerk_support', 'pin_press_high'],
-  squat_bottom: ['pause_squat', 'tempo_squat', 'front_squat', 'back_squat', 'squat_split'],
-  squat_mid: ['pause_squat', 'back_squat', 'hack_squat', 'tempo_squat', 'good_morning_v2'],
-  pull_start: ['deficit_pull', 'pause_pull', 'deadlift', 'snatch_liftoff', 'deficit_clean'],
-  pull_lockout: ['clean_pull', 'snatch_pull', 'rdl', 'clean_shrug', 'rack_pull'],
-  press_start: ['pin_press', 'push_press', 'ohp', 'z_press', 'klokov_press'],
+  snatch_off_floor: ['deficit_snatch', 'pause_snatch', 'snatch_pull', 'segment_snatch', 'slow_pull_snatch', 'snatch_deadlift'],
+  snatch_mid: ['pause_snatch', 'snatch_pull', 'rdl', 'segment_snatch', 'snatch_high_pull', 'nofeet_snatch'],
+  snatch_pull_under: ['high_hang_snatch', 'muscle_snatch', 'snatch_balance', 'tall_snatch', 'block_snatch', 'drop_snatch'],
+  snatch_catch: ['overhead_squat_v2', 'snatch_balance', 'pause_squat', 'sots_press', 'power_snatch', 'overhead_hold'],
+  snatch_overhead: ['overhead_squat_v2', 'snatch_balance', 'jerk_recovery', 'oh_lunge', 'snatch_push_press', 'dead_bug_oh'],
+  clean_off_floor: ['deficit_clean', 'pause_clean', 'clean_pull', 'clean_segment', 'hang_clean', 'deficit_pull'],
+  clean_mid: ['pause_clean', 'clean_pull', 'rdl', 'block_clean', 'hang_clean_knee', 'muscle_clean'],
+  clean_catch: ['front_squat', 'front_squat_clean_grip', 'pause_squat', 'front_rack_hold', 'tall_clean', 'tspine_ext'],
+  jerk_dip: ['jerk_dip', 'pause_jerk', 'front_squat', 'double_pause_jerk', 'push_press_v2', 'push_press_jerk'],
+  jerk_drive: ['push_press', 'push_jerk', 'behind_neck_jerk', 'pause_jerk', 'push_jerk_pause', 'tall_jerk'],
+  jerk_lockout: ['split_jerk', 'jerk_recovery', 'pin_press', 'jerk_support', 'pin_press_high', 'single_arm_press'],
+  squat_bottom: ['pause_squat', 'tempo_squat', 'front_squat', 'back_squat', 'squat_split', 'front_squat_v2'],
+  squat_mid: ['pause_squat', 'back_squat', 'hack_squat', 'tempo_squat', 'good_morning_v2', 'front_squat'],
+  pull_start: ['deficit_pull', 'pause_pull', 'deadlift', 'snatch_liftoff', 'deficit_clean', 'deficit_snatch'],
+  pull_lockout: ['clean_pull', 'snatch_pull', 'rdl', 'clean_shrug', 'rack_pull', 'deadlift'],
+  press_start: ['pin_press', 'push_press', 'ohp', 'z_press', 'klokov_press', 'single_arm_press'],
 };
 
 export const WL_WEAKPOINT_BY_LIFT: Record<string, WLWeakPoint[]> = {

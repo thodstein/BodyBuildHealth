@@ -127,12 +127,12 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     const missing = TA_CORRECTIVES.filter((e) => !cat.has(e.id)).map((e) => e.id);
     expect(missing).toEqual([]);
   });
-  it('ROUND-9: ядро коррекции — ≥5 кандидатов на каждую из 16 фаз, все из библиотеки', () => {
+  it('ROUND-10: ядро коррекции — ≥6 кандидатов на каждую из 16 фаз, все из библиотеки', () => {
     const lib = new Set(TA_CORRECTIVES.map((e) => e.id));
     const problems: string[] = [];
     for (const wp of allWLWeakPoints()) {
       const list = getCorrectionForWeakPoint(wp);
-      if (list.length < 5) problems.push(`${wp}: ${list.length}`);
+      if (list.length < 6) problems.push(`${wp}: ${list.length}`);
       if (new Set(list).size !== list.length) problems.push(`${wp}: дубли`);
       for (const id of list) if (!lib.has(id)) problems.push(`${wp}: нет в библиотеке ${id}`);
     }
