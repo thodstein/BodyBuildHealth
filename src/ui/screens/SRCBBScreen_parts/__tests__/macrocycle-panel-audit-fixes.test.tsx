@@ -86,7 +86,8 @@ describe('P0-1: «🚀 В ББ-авто» после перезагрузки (b
     expect(bb.result!.bbPlan).toBeNull(); // компактная форма: bbPlan не хранится
 
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
-    await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+    // было: '🧩 Сборка года по конструкторам' — BbCard-кит (ПЛ-Фаза 3) вынес иконку в тайл.
+    await waitFor(() => expect(screen.getByText('Сборка года по конструкторам')).toBeTruthy());
     fireEvent.click(screen.getByLabelText(/^Блок .*недели 7-12/));
     await waitFor(() => expect(screen.getByText('🚀 В ББ-авто')).toBeTruthy());
     fireEvent.click(screen.getByText('🚀 В ББ-авто'));

@@ -105,96 +105,11 @@ export const BbToggleChip: React.FC<{
 );
 
 
-/* ── Единый стиль карточек шагов 1–2 (аудит «дубли шаг 1-2»): иконка-тайл,
-      заголовок, подпись, бейдж, акцентная верхняя кромка. Один визуальный
-      язык для всех секций параметров/PED — вместо разнородных карточек. ── */
-
-/** Базовая карточка секции: иконка + заголовок + подпись + контент. */
-export const BbCard: React.FC<{
-  icon?: string;
-  title: React.ReactNode;
-  desc?: React.ReactNode;
-  accent?: string;
-  badge?: React.ReactNode;
-  children?: React.ReactNode;
-}> = ({ icon, title, desc, accent = '#a855f7', badge, children }) => (
-  <section style={{
-    marginBottom: 10, padding: '10px 12px', borderRadius: 14, boxSizing: 'border-box',
-    background: 'rgba(255,255,255,0.025)',
-    border: `1px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
-  }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: desc || children ? 8 : 0 }}>
-      {icon && (
-        <span aria-hidden style={{
-          width: 26, height: 26, borderRadius: 9, flexShrink: 0, fontSize: 14,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          background: `${accent}1f`, border: `1px solid ${accent}44`,
-        }}>{icon}</span>
-      )}
-      <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: 0.2 }}>{title}</span>
-      {badge && (
-        <span style={{
-          marginLeft: 'auto', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 999,
-          background: `${accent}1a`, color: accent, border: `1px solid ${accent}44`,
-        }}>{badge}</span>
-      )}
-    </div>
-    {desc && <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginBottom: children ? 8 : 0 }}>{desc}</div>}
-    {children}
-  </section>
-);
-
-/** Карточка-аккордеон (необязательные/второстепенные секции): тот же стиль, шапка-кнопка. */
-export const BbFoldCard: React.FC<{
-  icon?: string;
-  title: React.ReactNode;
-  desc?: React.ReactNode;
-  accent?: string;
-  badge?: React.ReactNode;
-  defaultOpen?: boolean;
-  children?: React.ReactNode;
-}> = ({ icon, title, desc, accent = '#60a5fa', badge, defaultOpen = false, children }) => {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <section style={{
-      marginBottom: 10, padding: '10px 12px', borderRadius: 14, boxSizing: 'border-box',
-      background: 'rgba(255,255,255,0.025)',
-      border: `1px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
-    }}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(v => !v)}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-          padding: 0, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
-          fontFamily: 'inherit', minHeight: 28,
-        }}
-      >
-        {icon && (
-          <span aria-hidden style={{
-            width: 26, height: 26, borderRadius: 9, flexShrink: 0, fontSize: 14,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            background: `${accent}1f`, border: `1px solid ${accent}44`,
-          }}>{icon}</span>
-        )}
-        <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: 0.2 }}>{title}</span>
-        {badge && (
-          <span style={{
-            marginLeft: 'auto', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 999,
-            background: `${accent}1a`, color: accent, border: `1px solid ${accent}44`,
-          }}>{badge}</span>
-        )}
-        <span aria-hidden style={{
-          marginLeft: badge ? 6 : 'auto', fontSize: 11, color: '#fff',
-          transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s', display: 'inline-block',
-        }}>▾</span>
-      </button>
-      {desc && <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginTop: 6 }}>{desc}</div>}
-      {open && <div style={{ marginTop: 8 }}>{children}</div>}
-    </section>
-  );
-};
+/* ── Единый кит карточек (иконка-тайл, заголовок 12.5/800, верхняя кромка
+      акцента) теперь живёт в `training-ui.tsx` — один набор для ББ-авто,
+      ПЛ-авто и общих панелей. Здесь — ре-экспорт для существующих
+      потребителей (`bb-step-*`, тесты, guard'ы). ── */
+export { BbCard, BbFoldCard } from './training-ui';
 
 /* ── CollapsibleCard helper для шага 5 (заголовок-кнопка карточки) ── */
 export const CollapsibleCard: React.FC<{

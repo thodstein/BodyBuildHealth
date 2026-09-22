@@ -1,5 +1,6 @@
 import React from 'react';
 import type { LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
+import { BbFoldCard } from '../TrainingScreen_parts/training-ui';
 
 export const BlockView: React.FC<{ plan: LMSBuildOutput | null }> = ({ plan }) => {
   if (!plan || !plan.weeks.length) return <div className="pl-blockview" style={{ fontSize: 11, color: '#fff', padding: 8 }}>Нет плана — соберите цикл или сезон</div>;
@@ -10,8 +11,11 @@ export const BlockView: React.FC<{ plan: LMSBuildOutput | null }> = ({ plan }) =
     const avg = w.days.reduce((a,d)=>a+d.exercises.reduce((aa,e)=>aa+e.workSets.reduce((aaa,ws)=>aaa+ws.weight/(ws.pct||0.7),0)/e.workSets.length,0)/d.exercises.length,0)/w.days.length;
     return Math.round(avg);
   });
+  // Единый кит (BbFoldCard): длинная вторичная деталь блока — свёрнута по умолчанию.
   return (
-    <div className="pl-blockview" style={{ overflowX: 'auto', marginTop: 8 }}>
+    <BbFoldCard className="pl-blockview" icon="📦" accent="#a78bfa"
+      title={`PowerSheets: ${weeks.length} нед × ${maxDays} дн (недели side-by-side)`} style={{ marginTop: 8 }}>
+      <div style={{ overflowX: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: `80px repeat(${weeks.length}, 1fr)`, gap: 4, minWidth: 600 }}>
         <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', padding: 6 }}>День / Нед</div>
         {weeks.map(w => (
@@ -41,6 +45,7 @@ export const BlockView: React.FC<{ plan: LMSBuildOutput | null }> = ({ plan }) =
       </div>
       <div style={{ fontSize: 9, color: '#fff', marginTop: 6 }}>PowerSheets-стиль: недели side-by-side, RPE/RIR/%/вес в одной строке. e1RM тренд: {e1rmTrend.join(' → ')} кг. Прокрутите горизонтально.</div>
       <div style={{ fontSize: 9, color: '#fff', marginTop: 4 }}>First-rep velocity cap: падение &gt;8% от нед 1 → volume -20% (VBT). MVT squat 0.25 м/с.</div>
-    </div>
+      </div>
+    </BbFoldCard>
   );
 };

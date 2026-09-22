@@ -21,6 +21,7 @@ import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
 import {
   CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
+  BbCard,
 } from './TrainingScreen_parts/training-ui';
 import { DayCard, type PlanDayView, type PlanExerciseView, type PhaseKey } from './TrainingScreen_parts/PlanOutput';
 import { PedInputPanel, PedAdaptationCard } from './TrainingScreen_parts/PedCoursePanel';
@@ -1662,8 +1663,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
             <PedAdaptationCard adaptation={pedAdapt} />
             {/* 🥗 Питание (как в ББ-авто): профицит калорий + белок → MRV soft-cap (Helms 2022) */}
-            <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.15)' }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#22c55e', marginBottom: 6 }}>🥗 Питание</div>
+            <BbCard icon="🥗" accent="#22c55e" title="Питание" style={{ marginTop: 8 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 <PopupNumber label="Профицит калорий (ккал/день)" value={plCalorieSurplus} onChange={v => setPlCalorieSurplus(Math.round(v))} step={50} min={-500} max={1000} hint="Профицит >100 → +5% MRV, >300 → +10%. Дефицит <-200 → -20% MRV (Helms 2022)" />
                 <PopupNumber label="Белок (г/кг)" value={plProteinPerKg} onChange={v => setPlProteinPerKg(v)} step={0.1} min={0.5} max={3} hint="≥2.0 → +10% MRV, ≥1.6 → +5%, <1.0 → -15% MRV" />
@@ -1712,7 +1712,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                   </div>
                 );
               })()}
-            </div>
+            </BbCard>
           </div>
           {/* 🧩 Сезон — встроен в Настройки (выбор одиночный / сезон) */}
           <PLSeasonBuilder
@@ -1850,8 +1850,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             }));
             const maxT = Math.max(1, ...weekData.map(w => w.tonnage));
             return (
-              <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#fb7185', marginBottom: 6 }}>🔥 Объём по неделям (heatmap)</div>
+              <BbCard icon="🔥" accent="#fb7185" title="Объём по неделям (heatmap)" style={{ marginTop: 8 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(34px, 1fr))', gap: 4 }}>
                   {weekData.map(w => {
                     const intensity = w.tonnage / maxT;
@@ -1862,13 +1861,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                   })}
                 </div>
                 <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>Цвет = относительный тонаж недели (зелёный → красный). Наведите на ячейку для сетов/кг. Светло-зелёные — разгрузки/тапер.</div>
-              </div>
+              </BbCard>
             );
           })()}
           <TrainingMetricsChart lms={lmsChart} bb={undefined} />
           {/* 📈 Тренды e1RM из дневника (план: шаг 4 — графики) */}
-          <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📈 Тренды e1RM (из дневника тренировок)</div>
+          <BbCard icon="📈" accent="#60a5fa" title="Тренды e1RM (из дневника тренировок)" style={{ marginTop: 8 }}>
             {e1rmSeries.length === 0 ? (
               <div style={{ fontSize: 11, color: '#fff' }}>Нет данных дневника — выполняйте тренировки, и здесь появятся графики приседа/жима/тяги.</div>
             ) : (
@@ -1930,7 +1928,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                 })()}
               </>
             )}
-          </div>
+          </BbCard>
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>← 3 План</button>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('reference')}>5 Справка и отчёты →</button>
@@ -1990,8 +1988,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       )}
 
       {subView === 'macro' && mainTab === 'pl' && (
-        <div style={{ margin: '0 0 10px', padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', marginBottom: 8 }}>🏁 Тапер/пик в макроцикле (ПЛ)</div>
+        <BbCard icon="🏁" accent="#f59e0b" title="Тапер/пик в макроцикле (ПЛ)" style={{ margin: '0 0 10px', background: 'rgba(245,158,11,0.05)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             <PopupSelect label="Раскладка тапера" value={macroTaperMode} onChange={v => setMacroTaperMode(v as TaperMode)} hint="Как снижается объём к старту: классика (Bosquet, разгрузка), ПЛ-пик-протокол (интенсификация к 100%), про-кривая по усталости или Classic WF (перегрузка → суперкомпенсация)" options={(['classic', 'pl', 'pro', 'wf'] as TaperMode[]).map(m => ({ id: m, label: TAPER_MODE_LABELS[m], desc: '' }))} />
             <PopupSelect label="Весовая цель тапера" value={macroWeightGoal} onChange={v => setMacroWeightGoal(v as TaperWeightGoal)} hint="Сгонка к категории режет объём тапера ×0.9 (дефицит → MRV ниже); набор/стабильный — полный объём" options={(['auto', 'lose', 'gain', 'maintain'] as TaperWeightGoal[]).map(g => ({ id: g, label: TAPER_WEIGHT_GOAL_LABELS[g], desc: '' }))} />
@@ -2006,7 +2003,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             <button onClick={() => setMacroPostMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, flex: 1, minWidth: 180, border: macroPostMeet ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: macroPostMeet ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: macroPostMeet ? '#34d399' : '#fff' }}>🔄 Пост-старт восстановление{macroPostMeet ? ' ✓' : ''}</button>
             <span style={{ alignSelf: 'center', fontSize: 10, color: '#fff', flex: 2, minWidth: 200 }}>Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и пост-разгрузка — для КАЖДОГО старта.</span>
           </div>
-        </div>
+        </BbCard>
       )}
       {subView === 'macro' && <MacrocyclePanel taperMode={macroTaperMode} level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={(macro) => {
         try {

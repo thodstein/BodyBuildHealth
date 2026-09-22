@@ -21,7 +21,7 @@ import { saveCompetitionPlan } from '../TrainingScreen_parts/CompetitionPlansVie
 import type { PeakWeekLayout, TaperMode, TaperWeightGoal } from '../../../engines/lms/lms-taper.engine';
 import type { TaperCoachCtx, TaperConfigRecommendation } from '../../../engines/lms/lms-taper-coach.engine';
 import { buildPLTaperPrintHtml, buildPLPeakWeekCutProtocol } from '../../../engines/lms/lms-taper-coach.engine';
-import { BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST } from '../TrainingScreen_parts/training-ui';
+import { BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, BbCard } from '../TrainingScreen_parts/training-ui';
 import { PopupNumber, PopupSelect, ExpandableCard } from './TrainingPopups';
 import { AutoRegModeSwitch } from './AutoRegModeSwitch';
 import { TaperCoachCard } from './TaperCoachCard';
@@ -170,16 +170,23 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
   };
 
   return (
-    <div className="pl-comp" style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>🏁 Соревнования сезона + тапер</div>
-        {builtSrc && <span style={{ fontSize: 10, color: '#fff' }}>план: {builtSrc.weeks.length} нед · тапер добавлен: {taperNote ? 'да' : 'нет'}</span>}
-        {builtSrc && (
-          <span style={{ fontSize: 10, color: '#fff', marginLeft: 8 }}>
-            {autoRegMode === 'auto' && '🤖 auto'}{autoRegMode === 'diary' && '📓 diary'}{autoRegMode === 'off' && '⚠ off'}
-          </span>
-        )}
-      </div>
+    <BbCard
+      className="pl-comp"
+      icon="🏁"
+      accent="#f59e0b"
+      title="Соревнования сезона + тапер"
+      style={{ marginTop: 10, background: 'rgba(245,158,11,0.05)' }}
+      right={
+        <>
+          {builtSrc && <span style={{ fontSize: 10, color: '#fff' }}>план: {builtSrc.weeks.length} нед · тапер добавлен: {taperNote ? 'да' : 'нет'}</span>}
+          {builtSrc && (
+            <span style={{ fontSize: 10, color: '#fff', marginLeft: 8 }}>
+              {autoRegMode === 'auto' && '🤖 auto'}{autoRegMode === 'diary' && '📓 diary'}{autoRegMode === 'off' && '⚠ off'}
+            </span>
+          )}
+        </>
+      }
+    >
       {/* 🏁 Несколько соревнований: список + выбор главного */}
       <div style={{ marginBottom: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
@@ -857,7 +864,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           );
         })()}
       />
-    </div>
+    </BbCard>
   );
 };
 

@@ -2,6 +2,10 @@
  * macrocycle-panel-annual-build.test.tsx — карточка «🧩 Сборка года по
  * конструкторам» в годовой панели: сборка всех блоков, сборка выбранного
  * блока, экспорт в ручной режим, статусы и stale-флаги.
+ *
+ * Re-baseline (ПЛ-Фаза 3, кит BbCard): заголовок карточки — иконка-тайл +
+ * текст без эмодзи; было: getByText('🧩 Сборка года по конструкторам') →
+ * стало: getByText('Сборка года по конструкторам').
  */
 import React from 'react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
@@ -20,7 +24,7 @@ beforeEach(() => { try { localStorage.clear(); } catch { /* ignore */ } });
 async function buildPlMacroAndOpen(): Promise<void> {
   render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
   fireEvent.click(screen.getByText('Построить макроцикл'));
-  await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+  await waitFor(() => expect(screen.getByText('Сборка года по конструкторам')).toBeTruthy());
 }
 
 describe('MacrocyclePanel — сборка года по конструкторам', () => {
@@ -111,7 +115,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     const macro = buildPlMacroFixture();
     localStorage.setItem('he_pl_macro', serializeMacro(macro));
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
-    await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Сборка года по конструкторам')).toBeTruthy());
     fireEvent.click(screen.getByText('📦 Собрать весь год'));
     await waitFor(() => expect(loadAnnualTrainingPlan()?.status).toBe('built'), { timeout: 30000 });
     const plan = loadAnnualTrainingPlan();
@@ -168,7 +172,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     const macro = buildPlMacroFixture();
     localStorage.setItem('he_pl_macro', serializeMacro(macro));
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
-    await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Сборка года по конструкторам')).toBeTruthy());
     // Выбрать BB-блок (strength, индекс 1) в списке сборки.
     fireEvent.click(screen.getByLabelText(/^Блок .*недели 7-12/));
     await waitFor(() => expect(screen.getByLabelText(/Пик-неделя/)).toBeTruthy());
@@ -188,7 +192,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     const macro = buildPlMacroFixture();
     localStorage.setItem('he_pl_macro', serializeMacro(macro));
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
-    await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Сборка года по конструкторам')).toBeTruthy());
     fireEvent.click(screen.getByLabelText(/^Блок .*недели 7-12/));
     await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
     fireEvent.click(screen.getByText('⚙️ Собрать блок'));
@@ -237,7 +241,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     const onApplyCycle = vi.fn();
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={onApplyCycle} />);
     fireEvent.click(screen.getByText('Построить макроцикл'));
-    await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Сборка года по конструкторам')).toBeTruthy());
     fireEvent.click(screen.getByLabelText(/^Блок .*недели 1-/));
     await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
     fireEvent.click(screen.getByText('⚙️ Собрать блок'));
@@ -288,7 +292,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     const macro = buildPlMacroFixture();
     localStorage.setItem('he_pl_macro', serializeMacro(macro));
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
-    await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Сборка года по конструкторам')).toBeTruthy());
     fireEvent.click(screen.getByLabelText(/^Блок .*недели 7-12/));
     await waitFor(() => expect(screen.getByText('📥 Из ББ-авто')).toBeTruthy());
     // Без сохранённого плана — предупреждение.

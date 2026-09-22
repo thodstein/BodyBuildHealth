@@ -1,5 +1,23 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ПЛ-Фаза 3: структурная миграция карточек ПЛ на единый кит BbCard/BbFoldCard (Sep 22 2026, локально, без пуша)
+
+По команде «довести структурную подачу карточек ПЛ-авто до эталона BbCard/BbFoldCard — не только токены/цвета, а структуру: иконка-тайл + заголовок 12.5/800 + верхняя кромка, фолды для длинных блоков». Выполнено полностью; чужие WIP не тронуты; круги зелёные.
+- **Один кит без третьего набора**: `BbCard`/`BbFoldCard` перенесены в `TrainingScreen_parts/training-ui.tsx` (аддитивные `right/className/id/style`; у `BbFoldCard` правый слот вне кнопки), `bb-auto-constructor-shared.tsx` — тонкий ре-экспорт (`export { BbCard, BbFoldCard } from './training-ui'`), все BB-потребители не менялись.
+- **PLPlanView**: шапка плана → `BbCard` (📋 + бейдж календаря в `badge`), «⚙️ Как собран план» / «📊 Расчёты цикла» / «📈 Прогрессия ПМ» → `BbFoldCard` (детали свёрнуты), «🎯 Слабые точки СРЦ» → `BbCard` (критичный статус развёрнут).
+- **PLSeasonBuilder**: корень → `BbCard` (🧩, селектор режима в `right`); «🏁 Циклы между соревнованиями» → `BbFoldCard defaultOpen` (консенты/статусы не прячутся).
+- **PLToolsCard**: все 6 блоков — кит: OPL-импорт → fold, Frequency → fold (`right`=«Применить в план»), Attempt/Traffic Light/VBT/Sheiko → `BbCard`.
+- **PLCompetitionTab**: корень → `BbCard` (🏁, статус-строка в `right`).
+- **MacrocyclePanel**: локальный `const SectionCard` **удалён** → `BbCard` («⚙️ Фазы», «📈 Макроцикл (вертикально)», «🧩 Сборка года по конструкторам» с `desc`).
+- **SRCBBScreen**: «🥗 Питание», heatmap объёма, «📈 Тренды e1RM», «🏁 Тапер/пик в макроцикле (ПЛ)» → `BbCard`.
+- **BlockView**: PowerSheets → `BbFoldCard` (свёрнут по умолчанию, класс `.pl-blockview` и пустое состояние сохранены).
+- **TrainingPopups**: `ExpandableCard`/`MetricCard` → кит-стиль (иконка-тайл + 12.5/800 + верхняя кромка; классы `.pl-expandcard`/`.pl-metriccard`, тексты «▼ подробнее/▲ свернуть» и поведение клика сохранены; у fold `aria-expanded`). `PopupXxx`-структура не менялась (guard `wl-diagnostics-apk` на `.pl-popupselect` цел).
+- **SessionPlayer**: только шапки — верхняя кромка акцента на сводке недели, заголовок недели 12.5/800 (логика/тесты целы).
+- **DOM-контракты**: re-baseline только 3 ассертов `🧩 Сборка года по конструкторам` → `Сборка года по конструкторам` (эмодзи ушло в иконка-тайл), с комментариями «было→стало» в 3 тест-файлах; остальные 165 тестов SRCBBScreen_parts без правок.
+- **Guard `pl-card-design` расширен**: 9 тестов — живые PL-файлы обязаны использовать `BbCard`/`BbFoldCard` (импорт из `training-ui`), локальных `SectionCard`-дублей нет, ББ-авто ре-экспортирует кит (третьего набора нет), **DOM-дампы**: кит (кромка `border-top:2px solid …55`, тайл 26px, заголовок 12.5/800) и живая карточка `BlockView` (`.pl-blockview`, кромка, `aria-expanded=false`, контент под fold).
+- **Проверено**: `tsc --noEmit` **0 по всему проекту**; `SRCBBScreen_parts` **168/168 (22 файла)**; `TrainingScreen_parts` **1397/1397 (154 файла)** + чужой unhandled `revokeObjectURL` (ExerciseLabMerged, предсуществующий); `src/engines/lms` **1049/1049 (49 файлов)**; `rest-hooks-native`+apk-паки+guard-ы **102/102** (+ чужой DB-таймаут ReportsScreen); `verify:apk-design` OK. НЕ ПУШИЛ.
+- **Инцидент (честно)**: одна правка теста была сделана PowerShell `Set-Content` → файл получил BOM; обнаружено `git diff` сразу, файл восстановлен `git checkout HEAD -- <файл>` и переделан Edit-инструментом (правило «контент только Edit/Write» подтверждено снова).
+
 ## Хабы диагностики round-6: стронг — аудит SM-плана + инъекция коррекций + откат (паритет с ТА/арм) (Sep 22 2026, коммит pathspec, без пуша)
 
 По команде «дорабатывай — сделал мало». Аудит: у арм/ТА есть аудит плана (покрытие фаз) и **прямая инъекция коррекций в план + откат**, а у стронга — только мост в конструктор (движки `auditSMPlan`/`injectSMWeakPoints` существовали, но НЕ были подключены). Довёл стронг до паритета. Только Edit/Write + vitest/tsc; чужие WIP не тронуты.

@@ -18,7 +18,7 @@ import { buildPLTaperCurve, TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type Ta
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { originalCycleWeeks } from '../../../engines/lms/lms-builder.engine';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
-import { CARD, SMALL, H, IN, BTN, BTN_GHOST } from '../TrainingScreen_parts/training-ui';
+import { CARD, SMALL, H, IN, BTN, BTN_GHOST, BbCard } from '../TrainingScreen_parts/training-ui';
 import { PL_PHASE_VISUAL, BB_PHASE_VISUAL, COMPETITION_PRIORITY_VISUAL } from '../TrainingScreen_parts/phase-visual-tokens';
 import { PopupNumber, PopupSelect } from './TrainingPopups';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
@@ -255,10 +255,8 @@ const SectionHead: React.FC<{ icon: string; title: string; right?: React.ReactNo
   </div>
 );
 
-/** Карточка-секция годового планировщика. */
-const SectionCard: React.FC<{ children: React.ReactNode; tone?: string }> = ({ children, tone }) => (
-  <div style={{ marginTop: 12, padding: 10, borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: `1px solid ${tone ? tone + '33' : 'rgba(255,255,255,0.08)'}` }}>{children}</div>
-);
+/* SectionCard-дубль удалён (ПЛ-Фаза 3): карточки годового планировщика —
+   единый кит `BbCard` (иконка-тайл + заголовок 12.5/800 + верхняя кромка). */
 
 const PL_PHASES: MacroPhase[] = ['endurance', 'strength', 'peak', 'competition', 'transition'];
 const BB_PHASES: BBMacroPhase[] = ['hypertrophy', 'strength', 'contest_prep', 'transition'];
@@ -2106,8 +2104,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           })()}
 
           {/* ⚙️ Фазы: правка длительности фаз (перенесено после активного блока) */}
-          <SectionCard>
-            <SectionHead icon="⚙️" title="Фазы" />
+          <BbCard icon="⚙️" accent="#60a5fa" title="Фазы" style={{ marginTop: 12 }}>
             <div className="macrocycle-phase-editor">
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Правка длительности фаз</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(82px, 1fr))', gap: isCompact ? 4 : 6 }}>
@@ -2137,17 +2134,13 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               </div>
               <button onClick={applyEdit} style={{ ...BTN_GHOST, fontSize: 11, padding: '6px 12px', minHeight: 44, marginTop: 6 }}>Пересчитать</button>
             </div>
-          </SectionCard>
+          </BbCard>
 
           {/* 🧩 Сборка года по конструкторам: каждый блок — своим конструктором (ПЛ/ББ/ручной) */}
           {(isBB ? bbMacro : macro) && (
-            <div style={{ marginTop: 12, padding: 10, borderRadius: 12, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.22)' }} className="macrocycle-annual-build">
-              <div style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>
-                🧩 Сборка года по конструкторам
-              </div>
-              <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 6 }}>
-                Каждый блок года собирается СВОИМ конструктором: ПЛ-блоки — СРЦ-циклами, ББ-блоки — ББ-авто, ручные — в редакторе. Собранные блоки не пересобираются без изменений; правка макро помечает блок «устарел».
-              </div>
+            <BbCard icon="🧩" accent="#a855f7" title="Сборка года по конструкторам" className="macrocycle-annual-build"
+              desc="Каждый блок года собирается СВОИМ конструктором: ПЛ-блоки — СРЦ-циклами, ББ-блоки — ББ-авто, ручные — в редакторе. Собранные блоки не пересобираются без изменений; правка макро помечает блок «устарел»."
+              style={{ marginTop: 12, background: 'rgba(139,92,246,0.04)' }}>
               <div className="macrocycle-build-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
                 <button type="button" onClick={() => runAnnualBuild('all')} style={{ ...BTN_GHOST, width: '100%', fontSize: 11, padding: '9px 10px', minHeight: 44, border: '1px solid rgba(139,92,246,0.4)', color: '#a78bfa' }}
                   title="Собрать все несобранные/устаревшие блоки их конструкторами">
@@ -2678,7 +2671,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   {annualStatusNote}
                 </div>
               )}
-            </div>
+            </BbCard>
           )}
 
           {/* 📖 Обоснование (rationale) — тренерская карточка на русском */}
@@ -2996,8 +2989,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             const src = isBB ? bbMacro! : macro!;
             const total = Math.max(1, src.totalWeeks);
             return (
-              <SectionCard tone="rgba(96,165,250,0.25)">
-                <SectionHead icon="📈" title={`Макроцикл (вертикально) — ${total} нед`} />
+              <BbCard icon="📈" accent="#60a5fa" title={`Макроцикл (вертикально) — ${total} нед`} style={{ marginTop: 12 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {src.blocks.map((b, i) => {
                     const pct = (b.weeks / total) * 100;
@@ -3026,7 +3018,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   })}
                 </div>
                 <div style={{ fontSize: 9, color: '#fff', marginTop: 6 }}>Клик по блоку — выбрать его. Маркер «📍 нед N» показывает текущую неделю.</div>
-              </SectionCard>
+              </BbCard>
             );
           })()}
 

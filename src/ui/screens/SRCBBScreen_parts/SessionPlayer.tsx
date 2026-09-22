@@ -841,13 +841,14 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
           <div style={{
             display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10, padding: '10px 12px', borderRadius: 14,
             background: 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(16,185,129,0.05), rgba(59,130,246,0.06))',
-            border: '1px solid rgba(0,230,138,0.16)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+            border: '1px solid rgba(0,230,138,0.16)', borderTop: '2px solid rgba(0,230,138,0.4)',
+            backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontSize: 13, fontWeight: 800 }}>#{weekNumber}</span>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', lineHeight: 1 }}>Неделя {weekNumber} · {days.length} тренировки {focus ? `· ${focus}` : ''}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#00e68a', lineHeight: 1 }}>Неделя {weekNumber} · {days.length} тренировки {focus ? `· ${focus}` : ''}</div>
                   <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.2 }}>{totalWeeklySets} сетов · {totalWeeklyVol.toLocaleString()} кг недельный объём · {days[dayIdx]?.label || ''}</div>
                 </div>
               </div>

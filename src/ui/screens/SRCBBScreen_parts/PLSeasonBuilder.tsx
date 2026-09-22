@@ -37,6 +37,7 @@ import type { PLSeasonMeet, MacroTaperOpts } from '../../../engines/lms/lms-macr
 import { LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { calcCycleMetrics, type SRExercise } from '../../../engines/lms/lms-metrics.engine';
+import { BbCard, BbFoldCard } from '../TrainingScreen_parts/training-ui';
 
 const ALL_PL_CYCLES = LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding');
 
@@ -500,8 +501,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
   const renderCompGap = () => {
     if (seasonMode !== 'season' || meets.length < 2 || !compGap) return null;
     return (
-      <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.2)' }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 6 }}>🏁 Циклы между соревнованиями</div>
+      <BbFoldCard icon="🏁" accent="#f59e0b" title="Циклы между соревнованиями" defaultOpen style={{ marginTop: 10 }}>
         <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
           <button onClick={() => { setCompPickMode('auto'); saveSeasonStateValue(seasonMode, undefined, undefined, undefined, undefined, 'auto'); }} style={segBtn(compPickMode === 'auto')}>🤖 Авто-подбор</button>
           <button onClick={() => { setCompPickMode('manual'); saveSeasonStateValue(seasonMode, undefined, undefined, undefined, undefined, 'manual'); }} style={segBtn(compPickMode === 'manual')}>👆 Выбрать вручную</button>
@@ -611,19 +611,24 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           </div>
         );})}
         <div style={{ fontSize: 10, color: '#fff' }}>Итого: {compGap.totalPlanWeeks} нед плана, у каждого старта пик-блок (вход в пик + mock + тапер + старт{taper.postMeet ? ' + пост' : ''}).</div>
-      </div>
+      </BbFoldCard>
     );
   };
 
   return (
-    <div className="pl-season" style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.2)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>🧩 Сезон по микроциклам</div>
-        <div style={{ display: 'flex', gap: 4 }}>
+    <BbCard
+      className="pl-season"
+      icon="🧩"
+      accent="#a855f7"
+      title="Сезон по микроциклам"
+      style={{ marginTop: 10 }}
+      right={
+        <>
           <button onClick={() => { setSeasonMode('single'); saveSeasonStateValue('single'); }} style={segBtn(seasonMode === 'single')}>🎯 Одиночный цикл</button>
           <button onClick={() => { setSeasonMode('season'); saveSeasonStateValue('season'); }} style={segBtn(seasonMode === 'season')}>🧩 Сезон</button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       {seasonMode === 'season' && (
         <>
@@ -663,7 +668,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           >{hasBlockedSegments ? '⛔ Требуется согласие — подтвердите изменения' : '🧩 Собрать сезон и перейти к плану →'}</button>
         </>
       )}
-    </div>
+    </BbCard>
   );
 };
 

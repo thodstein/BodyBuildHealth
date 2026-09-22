@@ -27,6 +27,7 @@ import {
 } from '../TrainingScreen_parts/MesocycleProgressionCard';
 import {
   ACCENT as TRAIN_ACCENT, CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
+  BbCard, BbFoldCard,
 } from '../TrainingScreen_parts/training-ui';
 import { MetricCard, PopupNumber, PopupSelect, ExpandableCard, SaveButton } from './TrainingPopups';
 import { AutoRegModeSwitch } from './AutoRegModeSwitch';
@@ -223,11 +224,9 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                : sourceWeek
                ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]}: ${SOURCE_PHASE_LABEL[sourceWeek.phase]}. ${sourceWeek.volumeSets} рабочих сетов, средняя интенсивность ${Math.round(sourceWeek.intensityPct * 100)}% 1ПМ, средний RIR ${sourceWeek.rir.toFixed(1)}.`
                : PH_DESC[phase];
-            return <div style={{ ...CARD, overflow:'hidden', boxSizing:'border-box', maxWidth:'100%' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
-                   <div style={{ ...H, margin:0, minWidth:0, overflowWrap:'break-word' }}>План: {builtSrc.template.meta.title}</div>
-                 <span style={{ fontSize:11, fontWeight:700, color: calendarColor, background: calendarBadgeTint, padding:'3px 8px', borderRadius:10, flexShrink:0 }}>{calendarLabel}</span>
-              </div>
+            return <BbCard icon="📋" accent="#00e68a" title={`План: ${builtSrc.template.meta.title}`}
+              badge={<span style={{ fontSize:11, fontWeight:700, color: calendarColor }}>{calendarLabel}</span>}
+              style={{ overflow:'hidden', boxSizing:'border-box', maxWidth:'100%' }}>
                 {/* ⚙️ Как собран план — структурированная карточка (PED-стиль) */}
                 {(() => {
                   const info = parseProgressionRationale(builtSrc.progressionRationale || '');
@@ -243,11 +242,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     !/Объём аксессуаров/.test(n);
                   const notes = info.notes.filter(RELEVANT);
                   return (
-                    <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(56,189,248,0.05)', border:'1px solid rgba(56,189,248,0.16)' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                        <span style={{ fontSize:13 }}>⚙️</span>
-                        <span style={{ fontSize:11, fontWeight:800, color:'#38bdf8' }}>Как собран план</span>
-                      </div>
+                    <BbFoldCard icon="⚙️" accent="#38bdf8" title="Как собран план">
                       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
                         {tiles.map((t, i) => (
                           <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
@@ -265,7 +260,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                           ))}
                         </div>
                       )}
-                    </div>
+                    </BbFoldCard>
                   );
                 })()}
                {autoRegMode === 'off' && best && modeMismatchWarning({ goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' }, best.cycle) && (
@@ -318,22 +313,20 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   { l: 'Сессий', v: String(cm.sessions) },
                 ];
                 return (
-                  <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.15)' }}>
-                    <div style={{ fontSize:11, fontWeight:800, color:'var(--accent)', marginBottom:6 }}>📊 Расчёты цикла</div>
+                  <BbFoldCard icon="📊" accent="#00e68a" title="Расчёты цикла">
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
                       {tiles.map((t, i) => (
                         <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
                           <div style={{ fontSize:9, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
-                          <div style={{ fontSize:12, fontWeight:800, color:'var(--accent)', marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
+                          <div style={{ fontSize:12, fontWeight:800, color:'#00e68a', marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </BbFoldCard>
                 );
               })()}
               {plWeakPoints.length > 0 && (
-                <div style={{ marginTop:8, fontSize:11, color:'#c4b5fd', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.25)', padding:'6px 8px', borderRadius:8 }}>
-                  <div style={{ fontWeight:700, marginBottom:4 }}>🎯 Слабые точки СРЦ (добавлены ассистенты в план):</div>
+                <BbCard icon="🎯" accent="#a855f7" title="Слабые точки СРЦ (добавлены ассистенты в план)" style={{ marginTop: 8 }}>
                   {plWeakPoints.map((wp, i) => {
                     const rec = getPLWeakPointRecommendations(wp.lift, wp.weakPoint);
                     const liftLabelMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной' };
@@ -341,7 +334,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     const assists = rec.corrections.length ? rec.corrections : ['—'];
                     return <div key={i} style={{ marginBottom:2, overflowWrap:'break-word' }}>• <b>{PL_WEAKPOINT_LABELS[wp.weakPoint]}</b> ({liftLabel}): + {assists.join(', ')} — {rec.rationale}</div>;
                   })}
-                </div>
+                </BbCard>
               )}
               <div style={{ display:'flex', gap:6, marginTop:8, alignItems:'center', flexWrap:'wrap' }}>
                 <button onClick={() => setEditMode(m => !m)} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border: editMode ? '1px solid #f59e0b' : '1px solid rgba(245,158,11,0.55)', background: editMode ? 'rgba(245,158,11,0.28)' : 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>{editMode ? '✓ Готово' : '✏️ Правка плана'}</button>
@@ -508,15 +501,14 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 const colors = ['var(--accent)', '#60a5fa', '#a855f7'];
                 const px = (i: number) => 24 + (i / Math.max(1, W2 - 1)) * 280;
                 const py = (v: number) => 70 - ((v - minV) / Math.max(1, maxV - minV)) * 56;
-                return <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📈 Прогрессия ПМ по неделям</div>
+                return <BbFoldCard icon="📈" accent="#60a5fa" title="Прогрессия ПМ по неделям" style={{ marginTop: 8 }}>
                   <svg width="100%" viewBox="0 0 320 80" style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>
                     {[0,1,2,3].map(g => <line key={g} x1={24} x2={304} y1={14 + g * 18} y2={14 + g * 18} stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />)}
                     {exNames.map((n, ei) => { const pts = builtSrc.weeks.map((w, i) => `${px(i)},${py(w.pmRow[n] || 0)}`).join(' '); return <polyline key={n} points={pts} fill="none" stroke={colors[ei]} strokeWidth={1.6} />; })}
                     {exNames.map((n, ei) => builtSrc.weeks.map((w, i) => <circle key={n + i} cx={px(i)} cy={py(w.pmRow[n] || 0)} r={2} fill={colors[ei]} />))}
                   </svg>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 4 }}>{exNames.map((n, ei) => <span key={n} style={{ fontSize: 10, color: colors[ei] }}>● {n}</span>)}</div>
-                </div>;
+                </BbFoldCard>;
               })()}
               {(goal === 'peak' || W.some(isTaperWeek) || W.some(isMeetWeek) || W.some(isMockWeek)) && (() => {
                 const hasDiary = e1rmSeries.length > 0;
@@ -1153,7 +1145,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   </div>
                 );
               })()}
-            </div>;
+            </BbCard>;
           })()}
     </div>
   );

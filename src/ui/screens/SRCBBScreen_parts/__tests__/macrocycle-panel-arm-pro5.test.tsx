@@ -16,7 +16,8 @@ beforeEach(() => { try { localStorage.clear(); } catch { /* ignore */ } });
 async function openArmBlock(): Promise<void> {
   render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
   fireEvent.click(screen.getByText('Построить макроцикл'));
-  await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+  // было: '🧩 Сборка года по конструкторам' — BbCard-кит (ПЛ-Фаза 3) вынес иконку в тайл.
+  await waitFor(() => expect(screen.getByText('Сборка года по конструкторам')).toBeTruthy());
   fireEvent.click(screen.getByLabelText(/^Блок .*недели 1-/));
   await waitFor(() => expect(screen.getByText('💪 Арм (арм-авто)')).toBeTruthy());
   fireEvent.click(screen.getByText('💪 Арм (арм-авто)'));

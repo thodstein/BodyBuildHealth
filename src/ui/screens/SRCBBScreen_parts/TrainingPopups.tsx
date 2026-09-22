@@ -230,11 +230,33 @@ export const ExpandableCard: React.FC<{
   children?: React.ReactNode;
 }> = ({ title, short, full, accent = ACCENT, icon, children }) => {
   const [open, setOpen] = useState(false);
-  return <div className="pl-expandcard" style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: `1px solid ${accent}22`, padding: 12, margin: '6px 0', minWidth: 0, maxWidth: '100%' }}>
-    <div onClick={() => full && setOpen(o => !o)} style={{ cursor: full ? 'pointer' : 'default', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: accent, minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{icon ? icon + ' ' : ''}{title}</div>
-      {full && <span style={{ fontSize: 10, color: accent, flexShrink: 0 }}>{open ? '▲ свернуть' : '▼ подробнее'}</span>}
-    </div>
+  // Единый fold-стиль кита (BbFoldCard): иконка-тайл + заголовок 12.5/800 +
+  // верхняя кромка акцента. DOM-тексты/класс сохранены (▼ подробнее / ▲ свернуть).
+  const headStyle: React.CSSProperties = {
+    width: '100%', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+    padding: 0, background: 'none', border: 'none', fontFamily: 'inherit', textAlign: 'left',
+    cursor: full ? 'pointer' : 'default', minHeight: 28, minWidth: 0,
+  };
+  const inner = (
+    <>
+      {icon && (
+        <span aria-hidden style={{
+          width: 26, height: 26, borderRadius: 9, flexShrink: 0, fontSize: 14,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          background: `${accent}1f`, border: `1px solid ${accent}44`,
+        }}>{icon}</span>
+      )}
+      <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: 0.2, minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+      {full && <span style={{ fontSize: 10, fontWeight: 700, color: accent, flexShrink: 0 }}>{open ? '▲ свернуть' : '▼ подробнее'}</span>}
+    </>
+  );
+  return <div className="pl-expandcard" style={{
+    background: 'rgba(255,255,255,0.025)', borderRadius: 14, border: `1px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
+    padding: 12, margin: '6px 0', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box',
+  }}>
+    {full
+      ? <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} style={headStyle}>{inner}</button>
+      : <div style={headStyle}>{inner}</div>}
     <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5, marginTop: 6, overflow: 'hidden', wordBreak: 'break-word' }}>{short}</div>
     {open && full && <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.55, marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', wordBreak: 'break-word' }}>{full}</div>}
     {children}
@@ -244,10 +266,20 @@ export const ExpandableCard: React.FC<{
 export const MetricCard: React.FC<{
   title: string; accent?: string; icon?: string; children: React.ReactNode;
 }> = ({ title, accent = ACCENT, icon, children }) => (
-  <div className="pl-metriccard" style={{ marginTop: 10, padding: 12, borderRadius: 12,
-    background: `${accent}0f`, border: `1px solid ${accent}33`,
-    boxShadow: `0 0 0 1px ${accent}11` }}>
-    <div style={{ fontSize: 11, fontWeight: 800, color: accent, margin: '0 0 8px', letterSpacing: 0.3, textTransform: 'uppercase' }}>{icon ? icon + ' ' : ''}{title}</div>
+  <div className="pl-metriccard" style={{ marginTop: 10, padding: 12, borderRadius: 14,
+    background: 'rgba(255,255,255,0.025)',
+    border: `1px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
+    boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 8px' }}>
+      {icon && (
+        <span aria-hidden style={{
+          width: 26, height: 26, borderRadius: 9, flexShrink: 0, fontSize: 14,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          background: `${accent}1f`, border: `1px solid ${accent}44`,
+        }}>{icon}</span>
+      )}
+      <span style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: 0.2, minWidth: 0 }}>{title}</span>
+    </div>
     {children}
   </div>
 );
