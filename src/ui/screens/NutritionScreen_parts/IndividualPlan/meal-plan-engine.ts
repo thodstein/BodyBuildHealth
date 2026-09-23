@@ -1060,15 +1060,40 @@ function gapFillTimes(fixedMin: number[], count: number): number[] {
       const g = pts[j] - pts[j - 1];
       if (g > bestGap) { bestGap = g; bestIdx = j; }
     }
-    // Не заполняем разрыв меньше 2.5 ч — иначе приёмы слишком близко.
-    if (bestGap < 150) break;
-    const mid = Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2);
-    result.push(mid);
-    pts.push(mid);
+    // §3B: предпочтительный разрыв 2.5 ч; если день плотный (много приёмов/окон) —
+    // допускаем вынужденный разрыв 90 мин, а при полном отсутствии — ставим приём в
+    // точку, максимально удалённую от всех существующих (никаких дублей времени).
+    if (bestGap >= 150) {
+      const mid = Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2);
+      result.push(mid);
+      pts.push(mid);
+      pts.sort((a, b) => a - b);
+      continue;
+    }
+    if (bestGap >= 90) {
+      const mid = Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2);
+      result.push(mid);
+      pts.push(mid);
+      pts.sort((a, b) => a - b);
+      continue;
+    }
+    // Вынужденная точка: максимум расстояния до ближайшего приёма в окне 05:00–23:30.
+    let bestM = -1, bestDist = -1;
+    const lo = Math.max(300, Math.min(...pts) - 150);
+    const hi = Math.min(1410, Math.max(...pts) + 150);
+    for (let m = lo; m <= hi; m += 10) {
+      let d = Infinity;
+      for (const p of pts) { const dd = Math.abs(p - m); if (dd < d) d = dd; }
+      if (d > bestDist) { bestDist = d; bestM = m; }
+    }
+    if (bestDist < 20) break; // день реально переполнен — остаток получит сдвинутый fallback
+    result.push(bestM);
+    pts.push(bestM);
     pts.sort((a, b) => a - b);
   }
   return result;
 }
+export { gapFillTimes as _gapFillTimesForTest };
 function fmtMin(min: number): string {
   return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
 }
@@ -3602,7 +3627,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _snackTimes = gapFillTimes(_fixedPts, _keptSnacks.length);
   const _snackTimeOf = (role: string): string => {
     const i = _keptSnacks.indexOf(role);
-    return i >= 0 && i < _snackTimes.length ? fmtMin(_snackTimes[i]) : tSnack;
+    if (i >= 0 && i < _snackTimes.length) return fmtMin(_snackTimes[i]);
+    // §3B: неразмещённый перекус (день переполнен) получает сдвиг от tSnack,
+    // а не тот же самый час — иначе два приёма сливаются в один момент.
+    const base = _toMin2(tSnack);
+    const off = Math.max(0, i) * 30;
+    const m = Number.isFinite(base) ? Math.min(1400, base + off) : 930;
+    return fmtMin(m);
   };
   // FIX 2.2 (БАГ-10): preSleep резервировал углеводную долю 0.3 в _wSum, но никогда её не отдавал
   // (buildPreSleep целенаправленно 0-углеводный — казеин). Доля «терялась», сжимая остальные приёмы.
