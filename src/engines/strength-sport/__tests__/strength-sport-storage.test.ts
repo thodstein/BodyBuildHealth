@@ -37,6 +37,27 @@ describe('storage v1→v3 migration', () => {
     expect(loaded[0].weeksData[0].totalSets).toBeDefined();
   });
 
+  it('ROUND-10: save пишет ключ плана, который читают хабы ТА/стронга', () => {
+    const p:any = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{} } as any);
+    saveStrengthSportPlan(p);
+    const raw = store['he_strength_sport_plan_v1'];
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw).id).toBe(p.id);
+  });
+
+  it('ROUND-10: save будит слушателей событием he-strength-sport-plan-saved', () => {
+    const p:any = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{} } as any);
+    let fired = 0;
+    const h = () => { fired++; };
+    (global as any).window?.addEventListener?.('he-strength-sport-plan-saved', h);
+    try {
+      saveStrengthSportPlan(p);
+      expect(fired).toBe(1);
+    } finally {
+      (global as any).window?.removeEventListener?.('he-strength-sport-plan-saved', h);
+    }
+  });
+
   it('migrate idempotent v3', () => {
     const p:any = buildStrengthSportPlan({ mode:'weightlifting', goal:'strength', level:'beginner', weeks:2, daysPerWeek:3, workMax:{} } as any);
     saveStrengthSportPlan(p);

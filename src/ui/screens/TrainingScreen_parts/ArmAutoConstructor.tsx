@@ -426,6 +426,17 @@ const CyclePickerList = React.memo(function CyclePickerList({ items, cycId, onPi
   );
 });
 
+// ROUND-10: единая запись плана арма — хабы (арм-аудит, армлифтинг-аудит) читают `he_arm_plan_saved`
+// и слушают `he-arm-plan-saved`; конструктор раньше писал только `he_arm_last_plan` → план молча не доходил.
+export function persistArmPlan(plan: unknown): void {
+  try {
+    const raw = JSON.stringify(plan);
+    localStorage.setItem('he_arm_last_plan', raw);
+    localStorage.setItem('he_arm_plan_saved', raw);
+  } catch { /* noop */ }
+  try { window.dispatchEvent(new Event('he-arm-plan-saved')); } catch { /* noop */ }
+}
+
 export function ArmAutoConstructor() {
   const [step, setStep] = useState<Step>('params');
   const [discipline, setDiscipline] = useState<string>('armwrestling');
@@ -1100,7 +1111,7 @@ export function ArmAutoConstructor() {
       plan.report = buildArmReport(plan);
       plan.metrics = calcArmMetrics(plan);
       setBuiltPlan(plan);
-      try { localStorage.setItem('he_arm_last_plan', JSON.stringify(plan)); } catch {}
+      persistArmPlan(plan);
       setWeekSel(1);
       setArmEdits({});
       setEditOpen(null);
@@ -2123,7 +2134,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                           }} aria-label={`Сравнить ${v.name}`}>⇄</AdChip>
                           <AdBtn variant="ghost" aria-label={`Загрузить ${v.name}`} style={{ minWidth: 48, minHeight: 48 }} onClick={()=>{
                             setBuiltPlan(v.plan);
-                            try { localStorage.setItem('he_arm_last_plan', JSON.stringify(v.plan)); } catch {}
+                            persistArmPlan(v.plan);
                             setArmEdits({});
                             setEditOpen(null);
                             setWeekSel(1);

@@ -74,6 +74,9 @@ export function saveStrengthSportPlan(plan: StrengthSportPlan): void {
     else list.unshift(plan);
     localStorage.setItem(LIST_KEY, JSON.stringify(list.slice(0, 20)));
   } catch {}
+  // ROUND-10: аудит/покрытие хабов ТА и стронга читают этот ключ живьём — будим слушателей
+  // (иначе смонтированный хаб с аудитом не обновлялся после пересборки плана в конструкторе).
+  try { if (typeof window !== 'undefined') window.dispatchEvent(new Event('he-strength-sport-plan-saved')); } catch { /* noop */ }
 }
 
 export function loadStrengthSportPlan(): StrengthSportPlan | null {
