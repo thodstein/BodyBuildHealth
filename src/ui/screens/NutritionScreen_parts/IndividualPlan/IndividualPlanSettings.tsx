@@ -2191,18 +2191,18 @@ export const IndividualPlanSettings: React.FC = () => {
                 {!weightAdaptMode && <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>Автокоррекция КБЖУ по динамике веса</div>}
               </div>
             </div>
-            <label style={{ position:'relative', display:'inline-block', width:40, height:22, cursor:'pointer' }}>
-              <input type="checkbox" checked={weightAdaptMode} onChange={e => { setWeightAdaptMode(e.target.checked); if (e.target.checked) setShowWeightAdaptModal(true); }} style={{ opacity:0, width:0, height:0 }} />
+            {/* P1-UX: нативный чекбокс 40×22 → свитч role=switch (тач-таргет 44px+) */}
+            <button role="switch" aria-checked={weightAdaptMode} aria-label="Адаптация веса" onClick={() => { const next = !weightAdaptMode; setWeightAdaptMode(next); if (next) setShowWeightAdaptModal(true); }} style={{ width:52, minHeight:44, padding:0, border:'none', background:'transparent', cursor:'pointer', display:'inline-flex', alignItems:'center', flexShrink:0 }}>
               <span style={{
-                position:'absolute', inset:0, borderRadius:11, transition:'0.2s',
+                position:'relative', width:52, height:32, borderRadius:16, transition:'0.2s',
                 background: weightAdaptMode ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.15)',
               }}>
                 <span style={{
-                  position:'absolute', top:2, left: weightAdaptMode ? 20 : 2, width:18, height:18, borderRadius:'50%',
+                  position:'absolute', top:2, left: weightAdaptMode ? 22 : 2, width:28, height:28, borderRadius:'50%',
                   background:'#fff', transition:'0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.2)',
                 }} />
               </span>
-            </label>
+            </button>
           </div>
           {weightAdaptMode && (
             <>

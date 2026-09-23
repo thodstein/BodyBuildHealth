@@ -3903,3 +3903,15 @@ html:not([data-theme="light"]):not([data-apk-theme="light"]) textarea::placehold
 .plan-root [style*="font-size: 6px"] { font-size: 9px !important; }
 .plan-root [style*="font-size: 7px"] { font-size: 10px !important; }
 .plan-root [style*="font-size: 8px"] { font-size: 10px !important; }
+
+/* Планировщик питания: тач-минимум мелких контролов (жалоба «микрокнопки очень
+ * неудобно»). Центрально: кнопки ≥44px, интерактивные span-чипы ≥40px. Инлайновые
+ * размеры не переписываются — задаются только минимальные габариты, поэтому
+ * крупные контролы (44–58px) не меняются. */
+.plan-root button { min-height: 44px; }
+.plan-root span[style*="cursor: pointer"], .plan-root span[style*="cursor:pointer"] {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  min-width: 40px;
+}

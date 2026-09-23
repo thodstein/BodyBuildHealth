@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
+import { readFileSync, readdirSync } from 'fs';
 import { IndividualPlan } from '../index';
 
 const bodyHas = (re: RegExp) => !!(document.body.textContent || '').match(re);
@@ -25,6 +26,24 @@ const generateAndOpenPlan = async () => {
   clickBtn(/✨ Сгенерировать план питания/);
   await waitFor(() => { expect(bodyHas(/Завтрак/)).toBe(true); }, { timeout: 25000 });
 };
+
+describe('планировщик: нативных контролов нет (P1-UX source-guard)', () => {
+  it('в исходниках планировщика нет <select> и input[type=checkbox]', () => {
+    // vitest запускается из корня репозитория (import.meta.url под jsdom не file:)
+    const dir = `${process.cwd()}/src/ui/screens/NutritionScreen_parts/IndividualPlan`;
+    const files = readdirSync(dir).filter(f => /\.tsx$/.test(f));
+    const offenders: string[] = [];
+    for (const f of files) {
+      const src = readFileSync(`${dir}/${f}`, 'utf8')
+        .split('\n')
+        .filter(l => !/^\s*(\*|\/\/)/.test(l)) // комментарии не считаем
+        .join('\n');
+      if (/<select[\s>]/.test(src)) offenders.push(`${f}: <select`);
+      if (/type="checkbox"/.test(src)) offenders.push(`${f}: checkbox`);
+    }
+    expect(offenders).toEqual([]);
+  });
+});
 
 describe('планировщик: лист порции продукта (P1-UX)', () => {
   beforeEach(() => { try { localStorage.clear(); } catch {} });

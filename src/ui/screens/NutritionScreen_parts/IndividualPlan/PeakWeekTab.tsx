@@ -447,14 +447,12 @@ export const PeakWeekTab: React.FC = () => {
             ] as Array<[string, string]>).map(([id, label]) => {
               const key = `${draft.showDate}_${id}`;
               const checked = !!showCheckState[key];
+              // P1-UX: нативный чекбокс → строка-тап 44px (role=checkbox)
               return (
-                <label key={id} style={{ display:'flex', gap:6, alignItems:'center', opacity: checked ? 0.6 : 1 }}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => { try { toggleShowChecklistItem(draft.showDate, id); setShowTick(t => t + 1); } catch { /* ignore */ } }}
-                  /> {label}
-                </label>
+                <button key={id} role="checkbox" aria-checked={checked} onClick={() => { try { toggleShowChecklistItem(draft.showDate, id); setShowTick(t => t + 1); } catch { /* ignore */ } }} style={{ display:'flex', gap:8, alignItems:'center', width:'100%', minHeight:44, padding:'6px 8px', borderRadius:10, cursor:'pointer', textAlign:'left', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', opacity: checked ? 0.65 : 1, fontSize:10, fontWeight:500 }}>
+                  <span style={{ width:22, height:22, borderRadius:6, flexShrink:0, display:'inline-flex', alignItems:'center', justifyContent:'center', background: checked ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)', border: checked ? '1px solid rgba(34,197,94,0.5)' : '1px solid rgba(255,255,255,0.15)', color:'#22c55e', fontWeight:800, fontSize:12 }}>{checked ? '✓' : ''}</span>
+                  <span>{label}</span>
+                </button>
               );
             })}
           </div>

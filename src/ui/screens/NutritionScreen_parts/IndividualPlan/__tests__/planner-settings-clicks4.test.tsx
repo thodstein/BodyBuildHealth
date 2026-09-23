@@ -114,12 +114,12 @@ describe('Кнопки настроек: клик → состояние (бат
     expect(btns(/БУЧ/)[0].getAttribute('data-active')).toBe('true');
   });
 
-  it('адаптация веса: чекбокс открывает модалку', () => {
+  it('адаптация веса: свитч (role=switch) открывает модалку', () => {
     boot();
-    const row = deepestDivWith(/Адаптация веса/, 'input[type="checkbox"]');
+    const row = deepestDivWith(/Адаптация веса/, '[role="switch"]');
     expect(row).toBeTruthy();
-    const cb = row!.querySelector('input[type="checkbox"]') as HTMLInputElement;
-    fireEvent.click(cb);
+    const sw = row!.querySelector('[role="switch"]') as HTMLElement;
+    fireEvent.click(sw);
     expect(document.body.textContent || '').toMatch(/⚖️ Адаптация веса/);
   });
 
