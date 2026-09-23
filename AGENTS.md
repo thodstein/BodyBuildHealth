@@ -40,6 +40,14 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · ТА: порог «причина × фаза» ≥3 (Sep 22 2026, коммит pathspec, без пуша)
+
+Углубление на ступень: `TA_CORRECTIVES` → **83 записи** (+7), все 15 ячеек «причина × фаза» доведены до **≥3** (было ≥2; реально тонкими были volume/technique, volume/stability, fatigue/strength, fatigue/stability, затем volume/strength, mobility/technique, fatigue/technique).
+- +7 записей на реальных id main-каталога: `clean_pull_v2` (volume/technique), `overhead_squat` (volume/stability), `smith_split_squat` (fatigue/strength, machine), `squat_overhead` (fatigue/stability, bodyweight-по-сути), `snatch` (volume/strength), `kb_snatch` (mobility/technique, kettlebell), `deadlift_snatch_grip` (fatigue/technique) — с `CORRECTIVE_META` и `CORRECTIVE_HOW_NOT`.
+- NEW-порог лока: «каждая причина-лимитер ≥3 в каждой фазе» (было ≥2).
+- Re-baseline (осознанно, «было→стало»): `ta-corrective` C11 — под ограничением плеча `tall_snatch` теперь вытесняется из окна топ-5 (плотнее список) → `protocolForPreferred(...)` возвращает `null` честно, а паритет дозы проверяется на `snatch_high_pull` (не спросовый по оверхeду); индексный ассерт заменён на «-1 ИЛИ больше».
+- **Проверено**: `src/engines/strength-sport` **65 файлов / 1007** + ТА-UI **5 файлов / 87** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · ББ: порог зон/сигналов/драйверов ≥4 (Sep 22 2026, коммит pathspec, без пуша)
 
 Углубление контента на ступень (цели плана были ≥3): `BB_CORRECTIVES` **76→87** (+11 записей, каждая с реальным id каталога, cues/progression/regression/retest/source/equipmentAlt).

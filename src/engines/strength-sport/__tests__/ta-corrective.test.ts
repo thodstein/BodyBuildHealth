@@ -127,14 +127,14 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     const missing = TA_CORRECTIVES.filter((e) => !cat.has(e.id)).map((e) => e.id);
     expect(missing).toEqual([]);
   });
-  it('ROUND-10: каждая причина-лимитер имеет ≥2 записи в каждой фазе (volume/fatigue были 0)', () => {
+  it('ROUND-10: каждая причина-лимитер имеет ≥3 записи в каждой фазе (было ≥2)', () => {
     const causes: TAWeakCause[] = ['volume', 'technique', 'mobility', 'fatigue', 'strength'];
     const phases: Array<'technique' | 'strength' | 'stability'> = ['technique', 'strength', 'stability'];
     const thin: string[] = [];
     for (const cause of causes) {
       for (const ph of phases) {
         const n = TA_CORRECTIVES.filter((e) => (e.causes as TAWeakCause[]).includes(cause) && e.phase === ph).length;
-        if (n < 2) thin.push(`${cause}/${ph}:${n}`);
+        if (n < 3) thin.push(`${cause}/${ph}:${n}`);
       }
     }
     expect(thin).toEqual([]);
@@ -183,9 +183,12 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     expect(noMob[0].id).toBe('snatch_high_pull');
     const sh = correctivesForWeakPoint('snatch_pull_under', { cause: 'technique', mobilityRestrictions: ['shoulder'] });
     expect(sh[0].id).toBe('snatch_high_pull');
-    expect(sh.findIndex((c) => c.id === 'tall_snatch')).toBeGreaterThan(
-      noMob.findIndex((c) => c.id === 'tall_snatch'),
-    );
+    // было: toBeGreaterThan(noMob-индекс) при коротком окне; стало (ROUND-10: библиотека плотнее) —
+    // ограничение плеча вытесняет tall_snatch из окна топ-5 вовсе
+    const shIdx = sh.findIndex((c) => c.id === 'tall_snatch');
+    const noIdx = noMob.findIndex((c) => c.id === 'tall_snatch');
+    expect(noIdx).toBeGreaterThanOrEqual(0);
+    expect(shIdx === -1 || shIdx > noIdx).toBe(true);
     // голеностоп: дефицит уступает liftoff/тяге
     const off = correctivesForWeakPoint('snatch_off_floor', { cause: 'strength' });
     expect(off[0].id).toBe('deficit_snatch');
@@ -199,8 +202,11 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     expect(hip.findIndex((c) => c.id === 'deficit_pull')).toBe(-1);
   });
   it('C11: ограничения не меняют дозу (только порядок) + сессия/блок/экспорт их несут', () => {
-    const a = protocolForPreferred('snatch_pull_under', 'tall_snatch', 'technique', 'intermediate');
-    const b = protocolForPreferred('snatch_pull_under', 'tall_snatch', 'technique', 'intermediate', ['shoulder']);
+    // было: tall_snatch выживал под ограничением плеча; стало (ROUND-10: плотнее список) — вытесняется → null честно
+    expect(protocolForPreferred('snatch_pull_under', 'tall_snatch', 'technique', 'intermediate', ['shoulder'])).toBeNull();
+    const a = protocolForPreferred('snatch_pull_under', 'snatch_high_pull', 'technique', 'intermediate');
+    const b = protocolForPreferred('snatch_pull_under', 'snatch_high_pull', 'technique', 'intermediate', ['shoulder']);
+    expect(a).not.toBeNull();
     expect(a).toEqual(b);
     const steps = correctiveSessionFor(['snatch_pull_under'], { snatch_pull_under: 'technique' } as any, { mobilityRestrictions: ['shoulder'] });
     expect(steps[0].exerciseId).toBe('snatch_high_pull');
