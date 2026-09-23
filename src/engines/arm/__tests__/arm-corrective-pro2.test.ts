@@ -64,11 +64,11 @@ describe('arm-corrective-pro2 C1: роли и пулы', () => {
     }
     expect(thin).toEqual([]);
   });
-  it('ROUND-9: пул каждой точки ≥6 (больше выбора), все id — из каталога', () => {
+  it('ROUND-10 (третья ступень): пул каждой точки ≥7 (было ≥6), все id — из каталога', () => {
     const short: string[] = [];
     for (const wp of ARM_WEAK_POINTS) {
       const pool = poolWithTopup(wp);
-      if (pool.length < 6) short.push(`${wp}: ${pool.length}`);
+      if (pool.length < 7) short.push(`${wp}: ${pool.length}`);
       for (const id of pool) if (!CAT.has(id)) short.push(`${wp}: нет id ${id}`);
     }
     expect(short).toEqual([]);

@@ -60,8 +60,8 @@ describe('PRO-CORR K1: библиотека PRO на реальных id', () =>
       }
     }
     expect(Array.from(new Set(bad))).toEqual([]);
-    // ROUND-10: порог поднят ≥2 → ≥3 (объявленная причина обязана давать выбор в каждой фазе)
-    const thin = Object.entries(counts).filter(([, n]) => n < 3).map(([k, n]) => `${k}:${n}`);
+    // ROUND-10 третья ступень: порог поднят ≥2 → ≥3 → ≥4 (объявленная причина обязана давать выбор в каждой фазе)
+    const thin = Object.entries(counts).filter(([, n]) => n < 4).map(([k, n]) => `${k}:${n}`);
     expect(thin).toEqual([]);
   });
   it('ROUND-9: библиотека 42→≥50 записей; Excalibur покрыт коррекциями', () => {

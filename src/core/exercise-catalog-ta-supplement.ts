@@ -68,6 +68,11 @@ export const TA_CATALOG_SUPPLEMENT: Exercise[] = [
   { id: 'tspine_ext', name: 'Разгибание грудного отдела', group: 'core', type: 'isolation', equipment: 'bodyweight', difficulty: 'beginner', jointStress: 'low', fatigueCost: 2, targetMuscle: 'Грудной отдел', movementPattern: 'core', canReplace: [], cannotReplace: [] },
   { id: 'dead_bug_oh', name: 'Dead bug с палкой над головой', group: 'core', type: 'isolation', equipment: 'bodyweight', difficulty: 'beginner', jointStress: 'low', fatigueCost: 2, targetMuscle: 'Кор (антиэкстензия)', movementPattern: 'core', canReplace: [], cannotReplace: [] },
   { id: 'pallof_hold', name: 'Паллоф-холд', group: 'core', type: 'isolation', equipment: 'bodyweight', difficulty: 'beginner', jointStress: 'low', fatigueCost: 2, targetMuscle: 'Кор (антиротация)', movementPattern: 'anti_rotation', canReplace: [], cannotReplace: [] },
+  // ROUND-10 (третья ступень коррекции ТА): реальные записи под 3 новые коррекции (id больше не синтетика)
+  { id: 'pause_below_knee_pull', name: 'Тяга с паузой у колена (поза старта)', group: 'back', type: 'compound', equipment: 'barbell', difficulty: 'beginner', jointStress: 'low', fatigueCost: 4, targetMuscle: 'Разгибатели спины/ягодицы', movementPattern: 'hinge', canReplace: ['pause_pull'], cannotReplace: [] },
+  { id: 'snatch_pause_knee', name: 'Рывок с паузой у колена', group: 'legs', type: 'compound', equipment: 'barbell', difficulty: 'intermediate', jointStress: 'med', fatigueCost: 6, targetMuscle: 'Задняя цепь/трапеции', movementPattern: 'hinge', canReplace: ['pause_snatch'], cannotReplace: [] },
+  { id: 'clean_volume_pull', name: 'Взятие на грудь объёмом (переносимость)', group: 'legs', type: 'compound', equipment: 'barbell', difficulty: 'intermediate', jointStress: 'med', fatigueCost: 7, targetMuscle: 'Квадрицепс/трапеции', movementPattern: 'squat', canReplace: ['clean_pull_v2'], cannotReplace: [] },
+  { id: 'catch_series_ta', name: 'Серии приёма (рывок/взятие) в усталости', group: 'legs', type: 'compound', equipment: 'barbell', difficulty: 'intermediate', jointStress: 'med', fatigueCost: 6, targetMuscle: 'Стабилизаторы плеча/ноги', movementPattern: 'squat', canReplace: ['snatch_catch'], cannotReplace: [] },
 ];
 
 // side-effect регистрация (опционально, если EXERCISE_CATALOG импортирует)

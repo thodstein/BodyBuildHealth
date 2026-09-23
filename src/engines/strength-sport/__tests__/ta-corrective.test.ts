@@ -127,14 +127,14 @@ describe('ta-corrective C3: связка замер→тег→экспорт', 
     const missing = TA_CORRECTIVES.filter((e) => !cat.has(e.id)).map((e) => e.id);
     expect(missing).toEqual([]);
   });
-  it('ROUND-10: каждая причина-лимитер имеет ≥3 записи в каждой фазе (было ≥2)', () => {
+  it('ROUND-10 третья ступень: каждая причина-лимитер × фаза ≥4 (было ≥3)', () => {
     const causes: TAWeakCause[] = ['volume', 'technique', 'mobility', 'fatigue', 'strength'];
     const phases: Array<'technique' | 'strength' | 'stability'> = ['technique', 'strength', 'stability'];
     const thin: string[] = [];
     for (const cause of causes) {
       for (const ph of phases) {
         const n = TA_CORRECTIVES.filter((e) => (e.causes as TAWeakCause[]).includes(cause) && e.phase === ph).length;
-        if (n < 3) thin.push(`${cause}/${ph}:${n}`);
+        if (n < 4) thin.push(`${cause}/${ph}:${n}`);
       }
     }
     expect(thin).toEqual([]);
