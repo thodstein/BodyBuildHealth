@@ -40,6 +40,14 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · ББ: порог зон/сигналов/драйверов ≥4 (Sep 22 2026, коммит pathspec, без пуша)
+
+Углубление контента на ступень (цели плана были ≥3): `BB_CORRECTIVES` **76→87** (+11 записей, каждая с реальным id каталога, cues/progression/regression/retest/source/equipmentAlt).
+- Добиты все 16 дефицитов: зоны (delt_mid, delt_front, chest_upper, chest_lower, biceps, triceps, calves, traps, forearms) 3→4, сигналы (bench-watch, nhe-weak, add-weak, erir-low, ktw-asym, pm-yellow) 3→4, драйвер `driver:ankle` 3→4; часть записей закрывает по 2-3 токена сразу (`cv-ktw-ankle-calf` = calves + ktw-asym + driver:ankle, `dm-erir-side-lying` = delt_mid + erir-low, `df-pm-front-light` = delt_front + pm-yellow).
+- NEW-порог локов: зона/сигнал/драйвер **≥4** (было ≥3), причина × фаза ≥2 без изменений.
+- **Поймано своими локами/tsc**: `tibialis_raise` и `incline_hammer` — id **arm-каталога**, не main → невалидны как BB `equipmentAlt` (заменены на `calf_press_leg` / `curl_db`+`curl_bar`); причина `mobility` — не входит в `BBWeakCause` (volume/activation/recovery/technique/genetics) → заменена на `activation`; заголовок с «(длина …)» при профиле `short` у `overhead_tricep_ext` → переименован (K1-лок «title не врёт»).
+- **Проверено**: 9 corrective-файлов **77/77** + диагностика/инъекция/экспорт **16 файлов / 283** + BB-хаб UI **24 файла / 199** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · Армлифтинг: аудит собранного плана по 5 звеньям (Sep 22 2026, коммит pathspec, без пуша)
 
 Матрица паритета: аудит плана есть у ТА (`auditTAPlan`), стронга (`auditSMPlan`), арма (`auditArmPlan`), ББ — у армлифтинга не было.

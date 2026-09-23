@@ -14,23 +14,23 @@ const BUILDER_ZONES = ['chest', 'chest_upper', 'chest_lower', 'back', 'back_widt
 const count = (zone: string) => BB_CORRECTIVES.filter((c) => c.targets.includes(zone)).length;
 
 describe('bb-corrective K2: покрытие зон ≥2', () => {
-  it('каждая зона чипов хаба имеет ≥3 записи (ROUND-10: было ≥2)', () => {
-    const thin = HUB_ZONES.filter((z) => count(z) < 3).map((z) => `${z}:${count(z)}`);
+  it('каждая зона чипов хаба имеет ≥4 записи (ROUND-10: было ≥3)', () => {
+    const thin = HUB_ZONES.filter((z) => count(z) < 4).map((z) => `${z}:${count(z)}`);
     expect(thin).toEqual([]);
   });
-  it('каждая зона слабых групп ББ-авто имеет ≥3 записи (ROUND-10: было ≥2)', () => {
-    const thin = BUILDER_ZONES.filter((z) => count(z) < 3).map((z) => `${z}:${count(z)}`);
+  it('каждая зона слабых групп ББ-авто имеет ≥4 записи (ROUND-10: было ≥3)', () => {
+    const thin = BUILDER_ZONES.filter((z) => count(z) < 4).map((z) => `${z}:${count(z)}`);
     expect(thin).toEqual([]);
   });
-  it('ROUND-10: каждый скрининг-сигнал даёт ≥3 варианта (не вырождается в 1)', () => {
+  it('ROUND-10: каждый скрининг-сигнал даёт ≥4 варианта', () => {
     const SIG = ['bench-fix', 'bench-watch', 'nhe-weak', 'add-weak', 'erir-low', 'ybt-asym', 'ktw-asym', 'hinge-fail', 'shoulder-fail', 'rot-gap', 'loaded-fail', 'pm-yellow'];
-    const thin = SIG.filter((s) => count(s) < 3).map((s) => `${s}:${count(s)}`);
+    const thin = SIG.filter((s) => count(s) < 4).map((s) => `${s}:${count(s)}`);
     expect(thin).toEqual([]);
   });
-  it('ROUND-10: каждый драйвер движения (резолвер хаба) даёт ≥3 варианта', () => {
+  it('ROUND-10: каждый драйвер движения (резолвер хаба) даёт ≥4 варианта', () => {
     // MovementDriver = ankle|hip|thoracic|shoulder|core|none ('flexibility' в типе нет — не выдумываем)
     const DRV = ['driver:ankle', 'driver:hip', 'driver:thoracic', 'driver:shoulder', 'driver:core'];
-    const thin = DRV.filter((d) => count(d) < 3).map((d) => `${d}:${count(d)}`);
+    const thin = DRV.filter((d) => count(d) < 4).map((d) => `${d}:${count(d)}`);
     expect(thin).toEqual([]);
   });
   it('ROUND-10: каждая объявленная причина в каждой фазе имеет ≥2 варианта', () => {
