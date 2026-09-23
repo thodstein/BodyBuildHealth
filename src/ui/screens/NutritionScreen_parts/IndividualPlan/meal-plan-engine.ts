@@ -8682,6 +8682,132 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
 
+    // ─── §3D EXTREME-SCALE: ФИНАЛЬНЫЙ инвариант порций/тарелки ───
+    // Поздние проходы (P5b/P7/P4/P6, корректор, доборы) шли ПОСЛЕ проверки тарелки и могли
+    // перерасти капы (проба: джем 215 г при капе 35, рис 522 при EDIBILITY 450, ужин 845 г).
+    // Политика: сначала ПЕРЕНОС излишка в приём с комнатой (сумма дня сохраняется), и только
+    // если день РЕАЛЬНО перебран — срез до капа. Обычные дни не трогаются (profile.active).
+    if (_pickCtx.capacity.active) {
+      const _profD = _pickCtx.capacity;
+      const _plateMaxD = Math.min(900, Math.round(700 * _profD.plateMult));
+      const _solidD = (m: any): number => (m.items || []).filter((it: any) => it.role !== 'liquid').reduce((s: number, it: any) => s + (it.amount || 0), 0);
+      const _scaleD = (it: any, to: number): void => {
+        const r = to / Math.max(1, it.amount || 1);
+        it.amount = Math.round(to);
+        it.p = Math.round((it.p || 0) * r * 10) / 10; it.f = Math.round((it.f || 0) * r * 10) / 10;
+        it.c = Math.round((it.c || 0) * r * 10) / 10; it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+        it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
+        if (it.leucine_mg != null) it.leucine_mg = Math.round(it.leucine_mg * r);
+      };
+      const _capForItemD = (it: any): number => {
+        const _vals: number[] = [];
+        const _comfort = COMFORT_PORTION_LIMITS[it.id];
+        if (_comfort !== undefined) _vals.push(_comfort);
+        if (CONCENTRATE_IDS.includes(it.id)) _vals.push(CONCENTRATE_CAP_G);
+        const _edBase = EDIBILITY_CAPS[it.id];
+        if (typeof _edBase === 'number' && _edBase > 0) {
+          const _mult = (it.c || 0) >= 20 ? _profD.edibilityMult : 1;
+          _vals.push(Math.round(_edBase * _mult));
+        }
+        if (it.role === 'fruit') _vals.push(FRUIT_PORTION_CAP_G);
+        return _vals.length > 0 ? Math.min(..._vals) : 600;
+      };
+      const _dayOverD = (): boolean => totals.kcal > (input.goalKcal || 0) * 1.01
+        || totals.c > (input.goalCarbsG || 0) + 10 || totals.p > (input.goalProteinG || 0) * 1.02;
+      const _transferD = (from: any, it: any, grams: number): number => {
+        let moved = 0;
+        const _isCarbD = it.role === 'carb_slow' || it.role === 'carb_fast';
+        const recips = meals
+          .filter((x: any) => x !== from && !(x as any)._insulinWindow && _flexMeal(x) && _solidD(x) < _plateMaxD
+            // §3D-гигиена переноса: не плодим дубли/вторые гарниры/моно-носитель —
+            // реципиент без того же id, без своего гарнира (для карбов), без фрукта (для фрукта),
+            // и не завтрак для «запрещённых» круп (типология E1).
+            && !(x.items || []).some((y: any) => y.id === it.id)
+            && !(_isCarbD && (x.items || []).some((y: any) => y.role === 'carb_slow' || y.role === 'carb_fast'))
+            && !(_isCarbD && x.type === 'breakfast' && isBreakfastBannedCarb(it.id))
+            && !(it.role === 'fruit' && (x.items || []).some((y: any) => y.role === 'fruit')))
+          .sort((a: any, b: any) => _solidD(a) - _solidD(b));
+        for (const x of recips) {
+          if (moved >= grams) break;
+          const room = _plateMaxD - _solidD(x);
+          if (room < 10) continue;
+          const take = Math.round(Math.min(grams - moved, room));
+          if (take < 10) continue;
+          const r = take / Math.max(1, it.amount || 1);
+          const ex = (x.items || []).find((y: any) => y.id === it.id);
+          if (ex) {
+            ex.amount = (ex.amount || 0) + take;
+            ex.p = Math.round(((ex.p || 0) + (it.p || 0) * r) * 10) / 10;
+            ex.f = Math.round(((ex.f || 0) + (it.f || 0) * r) * 10) / 10;
+            ex.c = Math.round(((ex.c || 0) + (it.c || 0) * r) * 10) / 10;
+            ex.kcal = Math.round(4 * ex.p + 9 * ex.f + 4 * ex.c);
+            ex.fiber = Math.round(((ex.fiber || 0) + (it.fiber || 0) * r) * 10) / 10;
+          } else {
+            (x.items || []).push({
+              ...it, amount: take,
+              p: Math.round((it.p || 0) * r * 10) / 10, f: Math.round((it.f || 0) * r * 10) / 10,
+              c: Math.round((it.c || 0) * r * 10) / 10, kcal: Math.round(4 * ((it.p || 0) * r) + 9 * ((it.f || 0) * r) + 4 * ((it.c || 0) * r)),
+              fiber: Math.round((it.fiber || 0) * r * 10) / 10,
+            });
+          }
+          x.totals = mealTotalsOf(x.items);
+          moved += take;
+        }
+        return moved;
+      };
+      let _capNotes = 0;
+      for (const m of meals) {
+        if ((m as any)._insulinWindow) continue;
+        for (const it of (m.items || []) as any[]) {
+          const cap = _capForItemD(it);
+          if (!Number.isFinite(cap) || (it.amount || 0) <= cap + 0.5) continue;
+          const excess = (it.amount || 0) - cap;
+          const moved = _transferD(m, it, excess);
+          const after = (it.amount || 0) - moved;
+          if (after > cap && _dayOverD()) {
+            _scaleD(it, cap);
+            _capNotes++;
+          } else if (after > cap) {
+            // День недобирает — резать нельзя (усугубим недобор), честная нота.
+            if (moved > 0) _scaleD(it, after);
+            notes.push(`⚠ «${m.label}»: ${it.name} ${Math.round(after)} г > съедобного капа ${cap} г — день недобирает, переносить некуда`);
+            continue;
+          } else if (moved > 0) {
+            _scaleD(it, after);
+          }
+          if (moved > 0) _capNotes++;
+        }
+        // Тарелка: остаток сверх профиля — перенос не-белковых пунктов, иначе честная нота.
+        let _overD = _solidD(m) - _plateMaxD;
+        if (_overD > 0) {
+          const _candsD = (m.items || []).filter((it: any) => it.role !== 'liquid'
+            && !['protein', 'fast_protein', 'slow_protein'].includes(it.role))
+            .sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
+          for (const it of _candsD) {
+            if (_overD <= 0) break;
+            const take = Math.round(Math.min(_overD, (it.amount || 0) - 20));
+            if (take < 10) continue;
+            const moved = _transferD(m, it, take);
+            if (moved > 0) { _scaleD(it, (it.amount || 0) - moved); _overD = _solidD(m) - _plateMaxD; }
+          }
+          if (_solidD(m) > _plateMaxD && _dayOverD()) {
+            for (const it of _candsD) {
+              if (_solidD(m) <= _plateMaxD) break;
+              const take = Math.round(Math.min(_solidD(m) - _plateMaxD, (it.amount || 0) - 20));
+              if (take < 10) continue;
+              _scaleD(it, (it.amount || 0) - take);
+            }
+          }
+          if (_solidD(m) > _plateMaxD) {
+            notes.push(`⚠ «${m.label}» остался тяжёлым (${Math.round(_solidD(m))} г) — переносить некуда, день недобирает`);
+          }
+        }
+        m.totals = mealTotalsOf(m.items);
+      }
+      recalcDayTotals(meals, totals);
+      if (_capNotes > 0) notes.push(`⚖️ Финальные капы §3D: порции/тарелки приведены к съедобным (перенос/срез ${_capNotes}×)`);
+    }
+
     // ─── §realism: витрина MPS пересобирается ПОСЛЕ всех проходов ───
     // mpsSummary собирался в середине функции (до «посадки», MPS-коридора, 500Б-смягчений
     // и клиники клетчатки) и описывал ПРОМЕЖУТОЧНОЕ состояние: per-meal белок 29 г в витрине
