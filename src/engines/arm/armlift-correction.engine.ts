@@ -144,6 +144,8 @@ const ENDURANCE: PoolEntry[] = [
   { exId: 'towel_pullup', protocol: 'Вис на полотенце 3×макс — мобильность и хват', dose: '3×макс', freq: '1–2×/нед', source: 'NSCA towel холд', sets: 3, reps: [1, 1], holdSeconds: 25, restSec: 120, dayTag: 'SupportGrip', fixes: ['hold_long'], warmup: 'Разминка: вис лёгкий 1 мин', causes: ['mobility', 'fatigue'], minLevel: 'intermediate', phase: 'stability', cues: ['DOH', 'До отказа формы'], progression: '+5с/нед', equipmentAlt: ['bodyweight'] },
   { exId: 'farmer_walk_fat', protocol: 'Лёгкие накладки 50–60% — техника походки и корпуса', dose: '3×20м', freq: '1–2×/нед', source: 'NSCA carries техника', sets: 3, reps: [20, 30], restSec: 90, dayTag: 'SupportGrip', warmup: 'Разминка: сжимания 1×15@30–40%', causes: ['technique', 'mobility'], minLevel: 'beginner', phase: 'technique', cues: ['Корпус прямо', 'Ровный шаг'], progression: '+5м/нед', equipmentAlt: ['dumbbell'] },
   { exId: 'fat_bar_deadlift', protocol: '50мм гриф на холдах 20с — выносливость DOH', dose: '3×20с', freq: '2×/нед', source: 'NSCA thick bar холд', sets: 3, reps: [1, 1], holdSeconds: 20, restSec: 120, dayTag: 'GripHeavy', fixes: ['hold_long', 'mid'], warmup: 'Разминка: DOH лёгкий 1×10', causes: ['endurance', 'volume'], minLevel: 'intermediate', phase: 'stability', cues: ['DOH 50мм', 'Без лямок'], progression: '+5с/нед', equipmentAlt: ['barbell'] },
+  // ROUND-10: пул выносливости был 5 уникальных id → 6-й (RT-холды, тот же отчёт аудита)
+  { exId: 'rolling_thunder', protocol: 'RT-холды 30с на 60–70% — выносливость хвата во времени', dose: '3×30с', freq: '2×/нед', source: 'IronMind RT холды', sets: 3, reps: [1, 1], holdSeconds: 30, restSec: 120, dayTag: 'SupportGrip', fixes: ['hold_long'], warmup: 'Разминка: круги + лёгкий гриппер 1×10', causes: ['endurance'], minLevel: 'intermediate', phase: 'stability', cues: ['Центр ручки', 'Холд 30с без разжимания'], progression: '+5с/нед', equipmentAlt: ['barbell', 'dumbbell'] },
 ];
 
 const WRIST_EXT: PoolEntry[] = [
@@ -168,6 +170,13 @@ export function armliftCorrectionPoolIds(): string[] {
     for (const p of pool) ids.add(p.exId);
   }
   return [...ids];
+}
+
+/** ROUND-10: id упражнений пула конкретного звена (для аудита плана: чем закрыто звено). */
+export function armliftLinkPoolIds(link: ArmliftWeakLink): string[] {
+  const pool = BASE_POOL[link];
+  if (!pool) return [];
+  return [...new Set(pool.map((p) => String(p.exId).toLowerCase()))];
 }
 
 /** Снаряд → его же упражнение в каталоге (практика по правилам). */

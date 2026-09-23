@@ -6,12 +6,13 @@
  * PRO-4: pinch кг+сек, Silver Bullet, L/R, новые снаряды, классы, чек-лист правил,
  * last-man-standing, тренд, рецепт.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   buildArmliftingReport,
   liftTrendFromLog,
   prescriptionForWeakest,
 } from '../../../engines/arm/armlifting-diagnostics.engine';
+import { auditArmliftPlan, worstArmliftLink, ARMLIFT_AUDIT_LINKS } from '../../../engines/arm/armlift-plan-audit.engine';
 import { buildArmliftingHtml, buildArmliftingCsv } from '../../../engines/arm/armlifting-diagnostics.engine';
 import { downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
@@ -206,6 +207,19 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     return next;
   });
   const [histTick, setHistTick] = useState(0);
+  // ROUND-10: аудит собранного плана (план строит Арм-конструктор в дисциплине «Армлифтинг»)
+  const [planNonce, setPlanNonce] = useState(0);
+  useEffect(() => {
+    const bump = () => setPlanNonce((n) => n + 1);
+    try {
+      window.addEventListener('he-arm-plan-saved', bump as EventListener);
+      window.addEventListener('storage', bump as EventListener);
+      return () => {
+        window.removeEventListener('he-arm-plan-saved', bump as EventListener);
+        window.removeEventListener('storage', bump as EventListener);
+      };
+    } catch { return; }
+  }, []);
   /** PRO-5 D7: 3 таба — Замеры + Диагностика движений + Коррекция. Соревы удалены из хаба. */
   const [tab, setTab] = useState<DiagTab>('pomost');
   const [diag, setDiag] = useState<DiagState>(loadDiag);
@@ -252,6 +266,28 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   const trend = useMemo(() => {
     try { return liftTrendFromLog(loadPlatformLog()); } catch { return []; }
   }, []);
+
+  // ROUND-10: план армлифтинга → аудит покрытия 5 звеньев (тот же план, что строит Арм-конструктор)
+  const liftPlan = useMemo(() => {
+    try {
+      if (typeof localStorage === 'undefined') return null;
+      const raw = localStorage.getItem('he_arm_plan_saved') || localStorage.getItem('he_arm_last_plan');
+      if (!raw) return null;
+      const j = JSON.parse(raw);
+      if (j?.plan?.weeks) return j.plan;
+      if (j?.weeks) return j;
+      return null;
+    } catch { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planNonce, histTick]);
+
+  const liftAudit = useMemo(() => {
+    try { return auditArmliftPlan(liftPlan); } catch { return null; }
+  }, [liftPlan]);
+
+  const liftWorst = useMemo(() => {
+    try { return worstArmliftLink(liftPlan); } catch { return null; }
+  }, [liftPlan]);
 
   const prescription = report.prescription || prescriptionForWeakest(report.weakestWr || report.weakest);
 
@@ -730,6 +766,33 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             );
           } catch { return null; }
         })()}
+        {/* ROUND-10: аудит собранного плана — покрытие 5 звеньев (паритет с ТА/стронг/арм/ББ) */}
+        <div data-arm="lift-plan-audit" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, lineHeight: 1.5 }}>
+          {liftAudit ? (
+            <>
+              <b style={{ color: '#fff' }}>📋 Аудит плана: покрытие звеньев {liftAudit.covered.length}/{ARMLIFT_AUDIT_LINKS.length} ({liftAudit.coveragePct}%) · сетов {liftAudit.totalSets} · стол {Math.round(liftAudit.tableRatio * 100)}%</b>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                {ARMLIFT_AUDIT_LINKS.map((link) => {
+                  const sets = liftAudit.byLink[link]?.sets ?? 0;
+                  const worst = liftWorst === link;
+                  return (
+                    <span key={link} data-covered={sets > 0 ? 'true' : 'false'} data-worst={worst ? 'true' : 'false'} className="ad-tag" style={{ background: worst ? 'rgba(239,68,68,0.12)' : sets > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${worst ? 'rgba(239,68,68,0.35)' : sets > 0 ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`, color: worst ? '#ef4444' : sets > 0 ? '#22c55e' : '#fff' }}>
+                      {ARMLIFT_WEAK_LINK_SHORT_RU[link]} {sets}
+                    </span>
+                  );
+                })}
+              </div>
+              {liftAudit.duplicates.length > 0 && <div className="ad-muted" style={{ marginTop: 4 }}>⚠ Дубли (3+ сессии): {liftAudit.duplicates.slice(0, 4).join(', ')}</div>}
+              {liftWorst && (liftAudit.byLink[liftWorst]?.sets ?? 0) === 0 && (
+                <button data-arm="lift-audit-go" onClick={() => setTab('corr')} style={{ marginTop: 6, minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(245,158,11,0.14)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+                  🎯 Дыра: {ARMLIFT_WEAK_LINK_SHORT_RU[liftWorst]} — не закрыта планом → Коррекция
+                </button>
+              )}
+            </>
+          ) : (
+            <span className="ad-muted" data-arm="lift-plan-empty">📋 Аудит плана: план армлифтинга не собран — построй в Арм-конструкторе (дисциплина «Армлифтинг»), и здесь появится покрытие 5 звеньев.</span>
+          )}
+        </div>
         <AdSec title="ℹ️ Как пользоваться" collapsible defaultOpen={false} summary="3 шага до коррекции">
           <div className="ad-muted"><b>1 Замеры</b> — вбей снаряды ниже · <b>2 Диагностика</b> — точка срыва, фолы, тесты, причина · <b>3 Коррекция</b> — упражнения волной в план через мост внизу.</div>
         </AdSec>

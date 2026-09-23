@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ArmliftingDiagnosticsHub } from '../ArmliftingDiagnosticsHub';
 
 describe('W-AL UI: хаб армлифтинга', () => {
@@ -24,6 +24,21 @@ describe('W-AL UI: хаб армлифтинга', () => {
     expect(cov2.textContent).toContain('Покрытие снарядов: 1/7');
     const rt = Array.from(cov2.querySelectorAll('[data-covered]')).find((c) => (c.textContent || '').includes('RT'));
     expect(rt!.getAttribute('data-covered')).toBe('true');
+  });
+  it('ROUND-10: аудит плана — пусто без плана, покрытие звена с планом + метка дыры', async () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    expect(document.querySelector('[data-arm="lift-plan-empty"]')).not.toBeNull();
+    // apollon_axle — только пул «пальцы» (rolling_thunder закрыл бы и выносливость)
+    window.localStorage.setItem('he_arm_plan_saved', JSON.stringify({ plan: { weeks: [{ week: 1, sessions: [{ day: 1, sessionTag: 'GripHeavy', exercises: [{ exerciseId: 'apollon_axle', sets: 4 }] }] }] } }));
+    fireEvent(window, new Event('he-arm-plan-saved'));
+    await waitFor(() => expect(document.querySelector('[data-arm="lift-plan-empty"]')).toBeNull());
+    const card = document.querySelector('[data-arm="lift-plan-audit"]')!;
+    expect(card.textContent).toMatch(/покрытие звеньев 1\/5 \(20%\)/);
+    const chips = Array.from(card.querySelectorAll('[data-covered]'));
+    expect(chips.length).toBe(5);
+    expect(chips.filter((c) => c.getAttribute('data-covered') === 'true').length).toBe(1);
+    expect(card.querySelectorAll('[data-worst="true"]').length).toBe(1);
   });
   it('RT 65.25 → 50% и вердикт многоборья', () => {
     try { localStorage.clear(); } catch { /* noop */ }

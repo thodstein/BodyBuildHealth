@@ -40,6 +40,16 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · Армлифтинг: аудит собранного плана по 5 звеньям (Sep 22 2026, коммит pathspec, без пуша)
+
+Матрица паритета: аудит плана есть у ТА (`auditTAPlan`), стронга (`auditSMPlan`), арма (`auditArmPlan`), ББ — у армлифтинга не было.
+- NEW `src/engines/arm/armlift-plan-audit.engine.ts`: `auditArmliftPlan(plan)` — покрытие 5 звеньев (thumb/fingers/wrist_ext/support_endurance/crush) по пулам библиотеки (`armliftLinkPoolIds`), table/gym по `isTable`, дубли (3+ сессии), `worstArmliftLink` (дыра 0 сетов приоритетна; без плана — первый); честный `null` на пустой/битый план.
+- `armlift-correction.engine.ts` += `armliftLinkPoolIds(link)` (per-link пул для аудита) и **6-й уникальный id в ENDURANCE** (RT-холды 30с) — пул выносливости был 5 id против ≥6 у остальных звеньев.
+- Хаб: `data-arm="lift-plan-audit"` (счётчик «покрытие звеньев N/5 · сетов · стол %», 5 чипов с `data-covered`/`data-worst`, строка дублей, кнопка `lift-audit-go` «🎯 Дыра: … → Коррекция» при незакрытом звене) + слушатель `he-arm-plan-saved`/`storage` (план строит Арм-конструктор в дисциплине «Армлифтинг»); без плана — честная плашка `lift-plan-empty`.
+- NEW тесты: `armlift-plan-audit` **6/6** (пулы реальны и ≥6, пустой/битый план → null, покрытие/проценты/сессии, table/gym, worst-дыра, 100%) + UI-лок (пусто без плана → покрытие 1/5 (20%) с планом + метка дыры).
+- **Поймано своим тестом**: `rolling_thunder` живёт и в fingers, и в support_endurance пулах → один замер закрывает 2 звена (в тестах для «1/5» взят `apollon_axle`).
+- **Проверено**: `src/engines/arm` **93 файла / 1132** + армлифтинг-UI **3 файла / 21** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · Армлифтинг: чипы покрытия снарядов (Sep 22 2026, коммит pathspec, без пуша)
 
 Матрица паритета: у ТА/стронга/арма/ББ есть полоса покрытия (чипы), у армлифтинга её не было (0 совпадений по `coverage|Покрыт`).
