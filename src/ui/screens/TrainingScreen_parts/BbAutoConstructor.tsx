@@ -15,43 +15,42 @@
  */
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useDataLink } from '../../../core/data-link';
-import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../../core/exercise-catalog';
+import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
 import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
-import { rankBBSplits, splitFitWarnings, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
-import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
-import { collectPlanExercises, autoCalibrateFromStored, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
+import { rankBBSplits, splitFitWarnings } from '../../../engines/bb/bb-selector.engine';
+import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
+import { autoCalibrateFromStored, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyDUPOverlay, recommendDUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyExecutionCorrections, type ExecutionCorrection } from '../../../engines/bb/bb-execution-corrections.engine';
 import { validateBBPlan, generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
 import { exerciseFeatureBadges, techniqueChainParts, canonTechniqueId } from './bb-technique-display';
-import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
+import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { buildBBPlanReportText } from '../../../engines/bb/bb-report.engine';
 import { averageWeeklyScores, scoreVolumeWeek, scoreProWeek, gradeFor } from '../../../engines/bb/bb-quality-weekly.engine';
 import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
 import { bbExerciseExplanation } from '../../../engines/bb/bb-summary.engine';
-import { buildMEVCalibration, recordMEVCalibrationWeek, resolveMEVAfterCalibration, isMEVCalibrationComplete, mevCalibrationProgress, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, mevSignalDegradation, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
-import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { buildMEVCalibration, recordMEVCalibrationWeek, isMEVCalibrationComplete, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
+import { adaptForPEDs, type PED } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { suggestMethodologyForStack, recommendPEDMethodology, applyPEDMethodologyToPlan } from '../../../engines/bb/bb-ped-methodology.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { canonicalMuscle, expandDonorMuscles, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
-import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
-import { bbOrthoMobilityAdd, riskyOpenChainIds, decideBbOrthoIntake, subtractTracked } from '../../../engines/pro/ortho-screen.engine';
+import { autoRegulate } from '../../../engines/pro/autoregulation-pro.engine';
+import { riskyOpenChainIds, decideBbOrthoIntake, subtractTracked } from '../../../engines/pro/ortho-screen.engine';
 import { resolveBbDiagIntakeExtras } from '../../../engines/bb/bb-diag-intake.engine';
 import { buildBbMovementPrintBlock } from '../../../engines/bb/bb-diagnostics-export.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply, applyToPlanner, getPlannerApply, clearPlannerApply, type PlannerApply, type WeakpointsPayload } from './planner-bridge';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
-import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
-import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN } from './training-ui';
+import { CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL } from './training-ui';
 import { PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
 import type { InjurySelectEntry } from './InjurySelectCard';
-import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, type LoadStrategy, type DeloadType, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
+import { DELOAD_PROTOCOLS, type LoadStrategy, type DeloadType, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { labTrainingAdjust } from './lab-training-adjust';
@@ -64,40 +63,16 @@ import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { useOriginalPrograms } from './useOriginalPrograms';
 
 import { PlanExportCard } from './PlanExportCard';
-import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
-import {
-  buildBBContestPrep, applyPeakWeekOverlayToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile,
-  isoAddDays, isoToday, CATEGORY_PROFILES,
-  buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, addPrepWeeks, addPeakPriming,
-  shiftBBContestPrepShowDate, serializeBBContestPrepPlan,
-  prepPhaseForDate, configFromPlan,
-  computeReadiness, spillRiskScore, isShortCycle,
-  saveTestPeakWeekResult, latestTestPeakWeek, planFromStored, prepWeightAdvice,
-  syncPrepDietBreaksWithPlan,
-  recommendBBTaperConfig, sRPEAdjustment,
-  loadShowChecklist,
-  type BBTaperRecommendation,
-  buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson,
-  prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv,
-  manipulationLockedFor, trialCarbDoseGPerKg,
-  type PrepAdjustment,
-  type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization,
-  type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
-  type ContestEventEntry,
-  type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy,
-} from '../../../engines/bb/bb-contest-prep.engine';
+import { deserializeBBPrepConfig, legacyConfigFromProfile, isoAddDays, isoToday, CATEGORY_PROFILES, buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, addPrepWeeks, shiftBBContestPrepShowDate, prepPhaseForDate, configFromPlan, computeReadiness, spillRiskScore, isShortCycle, saveTestPeakWeekResult, latestTestPeakWeek, planFromStored, prepWeightAdvice, syncPrepDietBreaksWithPlan, recommendBBTaperConfig, sRPEAdjustment, loadShowChecklist, type BBTaperRecommendation, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson, prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv, trialCarbDoseGPerKg, type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization, type BBContestPrepPlan, type BBPlanWithPrep, type ContestEventEntry, type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy } from '../../../engines/bb/bb-contest-prep.engine';
 import { CONTEST_PREP_UPDATED_EVENT, migrateLegacyContestPrepIfNeeded, storeContestPrepPlan } from '../../../engines/bb/bb-contest-prep-sync';
 import { loadPeakWeekLog, peakWeekAdherence, peakWeekTrendAdvice, emergencyLines } from '../../../engines/bb/bb-peak-pro.engine';
 import type { PeakingProtocol } from '../../../engines/peaking-protocols.engine';
 import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, getPosingCheckins, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
-import {
-  PREP_SPLIT_PROFILES, type PrepMinimalMode,
-} from '../../../engines/bb/bb-prep-splits';
+import { PREP_SPLIT_PROFILES, type PrepMinimalMode } from '../../../engines/bb/bb-prep-splits';
 import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../../../engines/bb/bb-frequency-optimizer.engine';
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
-import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
 import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBPlanPrintHtml } from '../../../engines/bb/bb-visual.engine';
 import { buildBBQualityReport } from '../../../engines/bb/bb-quality-report.engine';
 import { bbPlanQualityV2 } from '../../../engines/bb/bb-quality-v2.engine';
@@ -110,24 +85,14 @@ import { CardioLinkCard } from './CardioLinkCard';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
-import { getProfile, updateProfile } from '../../../core/profile-manager';
+import { getProfile } from '../../../core/profile-manager';
 import { getWeightLog } from '../../../engines/profile-store';
-import {
-  loadPrepWeekCheckins, savePrepWeekCheckin, prepWeekRefs, prepStrengthTrend, avgWeight7d, avgSleep7d,
-  type PrepWeekCheckin,
-} from '../../../engines/bb/bb-prep-weekly-log';
+import { loadPrepWeekCheckins, savePrepWeekCheckin, prepWeekRefs, prepStrengthTrend, avgWeight7d, avgSleep7d, type PrepWeekCheckin } from '../../../engines/bb/bb-prep-weekly-log';
 import { getPostShowLog } from '../../../engines/bb/bb-prep-post-show-log.engine';
 
 /* ── Вынесенный служебный слой (этап 1 §4.3): CollapsibleCard, типы шагов/фаз,
    константы групп и чистые хелперы — в `bb-auto-constructor-shared.tsx`. ── */
-import {
-  CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES,
-  backSubgroupLabel, armHeadLabel, isAbRotationActive,
-  annualBlockCtxToPrepPatch, annualActiveBlockLine,
-  getPhaseMap, phaseForWeek, DONOR_GROUPS, normalizeDonorTargets,
-  computePhases, chipBtn, useInlineDialogA11y, BbCard,
-  type Step, type BBPhase, type PlanMode,
-} from './bb-auto-constructor-shared';
+import { CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive, annualBlockCtxToPrepPatch, annualActiveBlockLine, DONOR_GROUPS, normalizeDonorTargets, computePhases, useInlineDialogA11y, BbCard, type Step, type PlanMode } from './bb-auto-constructor-shared';
 import { BbSplitStep } from './bb-step-split';
 import { BbPedWorkMaxStep } from './bb-step-ped';
 import { BbWeightsStep } from './bb-step-weights';

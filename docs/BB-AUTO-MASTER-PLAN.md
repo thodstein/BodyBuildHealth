@@ -161,9 +161,12 @@
   `strategySafe`-заглушка, `catEx`/`distText`/`past` локали, `disabled=false`-заготовка
   пилюль Contest Wizard.
 - Осознанно НЕ трогали: `bbProgramPath` (roundtrip-маркер вариантов, читается в снимке
-  параметров), `zoneSpec`/`donorsForZone` (самосогласованный реестр, API-запас),
-  широкий дедуп импортов в `bb-contest-prep-sections` (риск без выгоды);
+  параметров), `zoneSpec`/`donorsForZone` (самосогласованный реестр, API-запас);
   `applyTaperToFinalWeeks(totalWeeks)` — параметр не читается (задокументировано в §4.4).
+- **Дедуп импортов (продолжение)**: read-only анализ + безопасный фиксер
+  (`.tmp/find-dead-imports.mjs` / `.tmp/remove-dead-imports.mjs`, удаление только при 0
+  вхождений в теле) — снято **95 мёртвых именованных импортов**: `BbAutoConstructor` 37,
+  `bb-contest-prep-sections` 57, `bb-step-adjust` 1; повторная проверка — 0; tsc 0, bb-UI 213/213.
 
 ### 4.2. Своп внутри жёсткой группы — ✅
 - `BbExSwapModal` (`bb-step-ex-swap.tsx`) использует `strictGroupMembersOf`: для упражнения
@@ -306,3 +309,5 @@ Re-baseline тестов — только с комментарием «было
 - §4.3-добивка: 11 тихих `return`-пропусков → precondition-throw; найдена и починена
   вакуумная проверка `programToBBPlan × eccentricMult` (теперь реально тестирует фичу);
   `pre_exhaust` — не-вакуумный минимум. Тесты 3 файлов 76/76.
+- Дедуп импортов: 95 мёртвых именованных импортов снято (37+57+1) через read-only
+  анализ + фиксер с проверкой 0 вхождений; tsc 0, bb-UI 213/213.

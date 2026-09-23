@@ -6,7 +6,7 @@
  * план vs факт по дневнику, инструменты коррекции + инлайн-редактор упражнений.
  */
 import React from 'react';
-import { EXERCISE_CATALOG, getExercisesByGroup } from '../../../core/exercise-catalog';
+import { getExercisesByGroup } from '../../../core/exercise-catalog';
 import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 import type { BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { isCompoundEx } from '../../../engines/bb/bb-session-order.engine';

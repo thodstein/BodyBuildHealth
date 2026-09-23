@@ -9,48 +9,17 @@
  * форма состояния god-component не типизируется снаружи (осознанный trade-off мех. переноса).
  */
 import React from 'react';
-import {
-  buildBBContestPrep, applyPeakWeekOverlayToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile,
-  isoAddDays, isoToday, CATEGORY_PROFILES, CONTEST_CATEGORY_LABELS, CONTEST_SPECIALIZATION_LABELS,
-  buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, replanBBContestPrep,
-  shiftBBContestPrepShowDate, serializeBBContestPrepPlan, nutritionTargetsForPrepDate,
-  prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,   buildShowTimeline, configFromPlan,
-  computeReadiness, spillRiskScore, isShortCycle,
-  saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice, recommendCarbStrategyFromTrial, liveAdjustForPeakDay,
-  recommendBBTaperConfig, sRPEAdjustment,
-  buildShowChecklist, loadShowChecklist, toggleShowChecklistItem,
-  type BBTaperRecommendation,
-  buildPostShowPlan, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson,
-  prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv,
-  manipulationLockedFor, manipulationLockNote, trialCarbDoseGPerKg,
-  TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks, prepRefeedDates, addPeakPriming,
-  postShowRecoveryDiet, activePostShowCurve, buildPeakWeek, recarbLoadFromVisual, coordinateLastHeavyDay,
-  type PrepAdjustment,
-  type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
-  type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
-  type PrepPhaseKey, type ContestEventEntry,
-  type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy,
-} from '../../../engines/bb/bb-contest-prep.engine';
-import { getPostShowLog, savePostShowEntry, removePostShowEntry, postShowRecoveryMarkers,
-  postShowComedownNotes,
-} from '../../../engines/bb/bb-prep-post-show-log.engine';
+import { isoToday, CATEGORY_PROFILES, CONTEST_CATEGORY_LABELS, CONTEST_SPECIALIZATION_LABELS, nutritionTargetsForPrepDate, prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS, buildShowTimeline, configFromPlan, isShortCycle, resolvePeakStrategy, recommendCarbStrategyFromTrial, liveAdjustForPeakDay, buildShowChecklist, toggleShowChecklistItem, buildPostShowPlan, prepTrainingCompliance, manipulationLockNote, trialCarbDoseGPerKg, TAPER_VS_DELOAD_NOTE, lastHardDayForMuscle, prepDietBreaks, prepRefeedDates, addPeakPriming, activePostShowCurve, buildPeakWeek, recarbLoadFromVisual, coordinateLastHeavyDay, type BBContestCategory, type ContestSpecialization, type PrepPhaseKey, type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy } from '../../../engines/bb/bb-contest-prep.engine';
+import { getPostShowLog, savePostShowEntry, removePostShowEntry, postShowRecoveryMarkers, postShowComedownNotes } from '../../../engines/bb/bb-prep-post-show-log.engine';
 import { prepStepsTrend } from '../../../engines/bb/bb-prep-weekly-log';
 import { PREP_LAB_PANEL, PREP_PROCEDURES, PREP_HYDRATION_GUIDELINES } from '../../../engines/bb/bb-prep-process.engine';
 import { calcRedsCAT2 } from '../../../engines/metabolic-hub.engine';
 import { computeEA } from '../NutritionScreen_parts/IndividualPlan/planner-ea.engine';
 import type { PeakingProtocol } from '../../../engines/peaking-protocols.engine';
 import { loadSessions } from '../../../engines/workout-logger.engine';
-import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
-import {
-  CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES,
-  backSubgroupLabel, armHeadLabel, isAbRotationActive,
-  annualBlockCtxToPrepPatch, annualActiveBlockLine,
-  getPhaseMap, phaseForWeek, DONOR_GROUPS, normalizeDonorTargets,
-  computePhases, chipBtn, useInlineDialogA11y,
-  BbRowSwitch, BbToggleChip,
-  type Step, type BBPhase, type PlanMode,
-} from './bb-auto-constructor-shared';
-import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN } from './training-ui';
+import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
+import { CollapsibleCard, BbRowSwitch, BbToggleChip, type Step } from './bb-auto-constructor-shared';
+import { CARD, SMALL, BTN, BTN_GHOST, H, IN } from './training-ui';
 import { PeakWeekMonitorCard, ShowDayEmergencyCard, PrepLabsCard, ShowSeriesCard, ShowCoachCard } from '../../components/contest-prep/PeakWeekProCard';
 import { postShowRecoveryProgress } from '../../../engines/bb/bb-peak-pro.engine';
 import { getWeightLog } from '../../../engines/profile-store';
