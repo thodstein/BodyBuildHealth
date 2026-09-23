@@ -40,6 +40,13 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · Армлифтинг: порог «причина × фаза» ≥3 (Sep 22 2026, коммит pathspec, без пуша)
+
+Углубление на ступень: `armlift-correction.engine` **59→66** записей (+7, в хвосты своих пулов — топ-3 целы), все объявленные ячейки «причина × фаза» доведены до **≥3** (было ≥2: technique/strength, technique/stability, max_strength/technique, max_strength/stability, endurance/strength, volume/strength, fatigue/technique).
+- +7 записей на реальных id arm-каталога: `napalm_handle_60` (endurance/strength), `raptor_3` (volume/strength), `saxon_bar` (technique/strength), `blockbuster_pinch` (technique/stability), `euro_pinch_2h` (max_strength/technique), `hub_pinch` (max_strength/stability), `fat_gripz_curl` (fatigue/technique, gentle).
+- NEW-порог лока: «каждая объявленная причина × фаза ≥3» (было ≥2) + лок «у каждой записи есть equipmentAlt» поймал мою новую `saxon_bar` без фолбэка (добавлен `dumbbell`).
+- **Проверено**: `src/engines/arm` **93 файла / 1132** + армлифтинг-UI/apk-arm-pack **3 файла / 33** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · Стронг: порог «причина × вид» ≥3 (Sep 22 2026, коммит pathspec, без пуша)
 
 Углубление на ступень: `SM_CORRECTIVES` → **92 записи** (+4), все 18 ячеек «причина × вид» доведены до **≥3** (было ≥2; тонкими были volume/stability, technique/strength, mobility/strength, strength/stability).
