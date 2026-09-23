@@ -17,6 +17,25 @@ import { buildRecommendations } from "./planner-recommendations";
 import { resolveAllExcludedFoodIds } from "./planner-restrictions";
 import type { DrugInjection } from "./types";
 
+/**
+ * P1-fix («показано = применяется»): «Время приёма» спецприёма раньше жило только
+ * подписью в карточке — движок о нём не знал. Теперь это ЕДИНЫЙ словарь
+ * «время → метка приёма» для замены (движок матчит targetLabel по метке), и
+ * `effectiveSpecialMealTarget` даёт фактическую цель: явный выбор «Заменить приём»
+ * приоритетнее, иначе — выбранное время.
+ */
+export const SPECIAL_MEAL_TIMING_TARGETS: Record<string, string> = {
+  breakfast: 'Завтрак',
+  lunch: 'Обед',
+  dinner: 'Ужин',
+  snack: 'Перекус',
+  before_bed: 'Перед сном',
+};
+
+export function effectiveSpecialMealTarget(replaceTarget: string, timing: string): string {
+  return replaceTarget || SPECIAL_MEAL_TIMING_TARGETS[timing] || '';
+}
+
 export interface PlannerSpecialMealStateDeps {
   isTrainDay: (offset: number) => boolean;
   allergens: string[];

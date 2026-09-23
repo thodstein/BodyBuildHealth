@@ -2319,14 +2319,15 @@ export const IndividualPlanSettings: React.FC = () => {
           {cravingMode && (
             <>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, marginBottom:6, lineHeight:1.4 }}>
-                Разрешает один приём пищи с десертом/сладким в выбранные дни. Помогает соблюдать диету без срывов.
+                Формирует отдельный десерт-план на выбранное число дней (кнопка «🍬 Хочу сладкое» в выдаче).
+                Основной рацион не меняется — сладкое вписывайте в КБЖУ.
               </div>
               {/* FIX button-audit (B7): круги дней выглядели как выбор конкретных дней,
                   а движок получает только ЧИСЛО дней — честный счётчик вместо кругов */}
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
-                <button onClick={() => setCravingDays(Math.max(1, cravingDays - 1))} style={{ width:36, height:36, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#ef4444', fontSize:14, fontWeight:800 }}>−</button>
+                <button onClick={() => setCravingDays(Math.max(1, cravingDays - 1))} style={{ width:44, height:44, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#ef4444', fontSize:14, fontWeight:800 }}>−</button>
                 <div style={{ fontSize:14, fontWeight:800, color:'#ef4444', minWidth:22, textAlign:'center' }}>{cravingDays}</div>
-                <button onClick={() => setCravingDays(Math.min(7, cravingDays + 1))} style={{ width:36, height:36, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#ef4444', fontSize:14, fontWeight:800 }}>＋</button>
+                <button onClick={() => setCravingDays(Math.min(7, cravingDays + 1))} style={{ width:44, height:44, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#ef4444', fontSize:14, fontWeight:800 }}>＋</button>
               </div>
               <div style={{ textAlign:'center', marginTop:4, fontSize:9, color:'rgba(255,255,255,0.8)' }}>
                 {cravingDays} {cravingDays === 1 ? 'день' : 'дней'} с десертом в неделю
@@ -2355,13 +2356,14 @@ export const IndividualPlanSettings: React.FC = () => {
           {lazyDayMode && (
             <>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, marginBottom:6, lineHeight:1.4 }}>
-                День с минимальной готовкой — протеиновый коктейль, творог, хлопья. Снижает нагрузку, когда нет сил или времени.
+                Отдельный план готовки на выбранное число дней — протеиновый коктейль, творог, хлопья.
+                Основной рацион не меняется; снижает нагрузку, когда нет сил или времени.
               </div>
               {/* FIX button-audit (B7): счётчик вместо кругов (движок получает число дней) */}
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
-                <button onClick={() => setLazyDayDays(Math.max(1, lazyDayDays - 1))} style={{ width:36, height:36, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#f59e0b', fontSize:14, fontWeight:800 }}>−</button>
+                <button onClick={() => setLazyDayDays(Math.max(1, lazyDayDays - 1))} style={{ width:44, height:44, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#f59e0b', fontSize:14, fontWeight:800 }}>−</button>
                 <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b', minWidth:22, textAlign:'center' }}>{lazyDayDays}</div>
-                <button onClick={() => setLazyDayDays(Math.min(7, lazyDayDays + 1))} style={{ width:36, height:36, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#f59e0b', fontSize:14, fontWeight:800 }}>＋</button>
+                <button onClick={() => setLazyDayDays(Math.min(7, lazyDayDays + 1))} style={{ width:44, height:44, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#f59e0b', fontSize:14, fontWeight:800 }}>＋</button>
               </div>
               <div style={{ textAlign:'center', marginTop:4, fontSize:9, color:'rgba(255,255,255,0.8)' }}>
                 {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'} без готовки в неделю
@@ -2750,7 +2752,7 @@ export const IndividualPlanSettings: React.FC = () => {
                   const sel = specialMealDate === dateStr;
                   return (
                     <button key={idx} onClick={() => setSpecialMealDate(dateStr)} style={{
-                      width:36, height:36, borderRadius:'50%', cursor:'pointer', fontSize:9, fontWeight:sel?800:500,
+                      width:44, height:44, borderRadius:'50%', cursor:'pointer', fontSize:9, fontWeight:sel?800:500,
                       background: sel ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.03)',
                       border: sel ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.08)',
                       color: sel ? '#f97316' : 'rgba(255,255,255,0.7)',

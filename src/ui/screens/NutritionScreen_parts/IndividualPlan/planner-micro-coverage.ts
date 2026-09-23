@@ -177,23 +177,6 @@ export function analyzeMicroCoverage(
   return { totals: microTotals, coverage, deficits, surpluses, topDeficitNutrient };
 }
 
-/**
- * Карта нутриент → id-продуктов-источников (для prefer-логики следующего дня).
- * Используется движком чтобы при дефиците Ca/Mg/Zn/Fe... prefer-ить источники.
- */
-export const NUTRIENT_SOURCES: Record<string, string[]> = {
-  Ca: ['milk','yogurt_greek','cottage_cheese_5','cheese_hard','sardines','almonds','broccoli','kale','chia_seeds','sesame','tofu','fig','spinach'],
-  Fe: ['beef_liver','beef_lean','red_meat','lentils','spinach','pumpkin_seeds','dark_chocolate','quinoa','turkey_leg','rabbit'],
-  Mg: ['pumpkin_seeds','almonds','spinach','dark_chocolate','avocado','black_beans','quinoa','oats','buckwheat','nuts_mix','cashew'],
-  Zn: ['beef_lean','beef_liver','oysters','pumpkin_seeds','cashew','chickpeas','yogurt_greek','cheese_hard','shellfish','dark_chocolate'],
-  Se: ['brazil_nut','salmon','tuna','sardines','turkey_breast','beef_lean','eggs','mushrooms','cod'],
-  K:  ['avocado','spinach','potato_boiled','salmon','banana','yogurt_greek','coconut','dried_apricots','beetroot','tomato'],
-  VitC:['pepper','citrus','kiwi','strawberry','broccoli','kale','papaya','pineapple','berries','cranberry'],
-  VitD:['salmon','mackerel','sardines','egg_whole','tuna','red_fish','mushrooms_uv','cod_liver'],
-  Omega3:['salmon','mackerel','sardines','flaxseed','chia_seeds','walnuts','red_fish','herring','tuna_steak'],
-  VitB12:['beef_liver','salmon','tuna','sardines','beef_lean','egg_whole','milk','cheese_hard','mackerel'],
-  VitB9:['lentils','spinach','asparagus','chickpeas','broccoli','avocado','beetroot','kale','edamame'],
-  VitA:['beef_liver','carrot','sweet_potato','spinach','kale','egg_whole','pumpkin','apricot'],
-  VitE:['almonds','sunflower_seeds','spinach','avocado','olive_oil','hazelnut','dark_chocolate'],
-  VitK:['kale','spinach','broccoli','brussels','green_bean','asparagus','cabbage','cucumber'],
-};
+// P2-fix: NUTRIENT_SOURCES удалён как мёртвый — prefer-пулы живут в planner-micro-pools
+// (MICRO_SOURCE_POOLS + microDeficitToPreferIds), а эта карта никем не читалась
+// (комментарий «используется движком» был неверным).

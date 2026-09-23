@@ -3893,3 +3893,13 @@ html:not([data-theme="light"]):not([data-apk-theme="light"]) textarea::placehold
   color: #fff !important;
   opacity: 1 !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * Планировщик питания: микро-типографика 6-8px нечитаема на телефоне —
+ * центральный подъём (атрибут-селекторы по сериализованным инлайнам,
+ * прецедент дневников/фармы). Макет не меняется: только размер текста:
+ * 6px → 9px, 7-8px → 10px. Печать (отдельный HTML) не затрагивается.
+ * ═══════════════════════════════════════════════════════════════════ */
+.plan-root [style*="font-size: 6px"] { font-size: 9px !important; }
+.plan-root [style*="font-size: 7px"] { font-size: 10px !important; }
+.plan-root [style*="font-size: 8px"] { font-size: 10px !important; }

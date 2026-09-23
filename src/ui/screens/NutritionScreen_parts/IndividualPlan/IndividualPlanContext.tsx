@@ -18,19 +18,22 @@ import { computePlannerTargets, contextualCarbCapGPerKg, plannerGoalCategory } f
 import { buildDayTargets } from "./planner-day-targets";
 import { awakeHoursFromTimes, planMealStructure } from "./planner-meal-count";
 import { isWorkDayForIndex } from "./planner-work";
+import { readWeightMode, writeWeightMode } from "./planner-weight-mode";
 import { applyCarbPeriodizationMods, carbPeriodizationLabel, isHeavyDayForOffset } from "./planner-carb-periodization";
 import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, repairDiaasWeakLinks } from "./planner-micro-pools";
 import { applyMealTargetOverrides } from "./planner-meal-targets";
 import { publishPlanTargets } from "./plan-targets-bridge";
 import { correctDayToTargets } from "./day-target-corrector";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
+import { readPlannerPrefs, writePlannerPrefsPatch } from "./planner-prefs";
+import { localIsoDate } from "./planner-date-utils";
 import { loadVarietyLedger, saveVarietyLedger, LEDGER_WEEK_FAMILIES_CAP } from "./planner-variety-ledger";
 // P1-7: чистые функции отчётов вынесены в planner-report-state.ts (Хвост-1)
 import { buildMealPrep } from "./planner-mealprep"; // P1-7: generateMealPrep вынесен
 import { useRenderMealList } from "./MealListRender"; // P1-7: renderMealList вынесен
 import { usePlannerReportState } from "./planner-report-state"; // Хвост-1: состояние отчётов вынесено в под-хук
 import { usePlannerDerivedSync } from "./planner-derived-sync"; // G2: единый конвергер закупок/готовки/рекомендаций
-import { usePlannerSpecialMealState } from "./planner-special-meal-state"; // Хвост-1: спец-режимы/рекомендации в под-хук
+import { usePlannerSpecialMealState, effectiveSpecialMealTarget } from "./planner-special-meal-state"; // Хвост-1: спец-режимы/рекомендации в под-хук
 import { getAutoExcludedFoodIds } from "./OrganLoadBadges"; // P2-12: organ-load auto restrictions
 import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
 import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
@@ -200,7 +203,6 @@ intolerances: Intolerances; setIntolerances: (v: any) => void;
   editAmount: number; setEditAmount: (v: number) => void;
   replacingItem: any; setReplacingItem: (v: any) => void;
   recipePickerMeal: any; setRecipePickerMeal: (v: any) => void;
-  mealPrep: any; setMealPrep: (v: any) => void;
   dayPlanNotes: string; setDayPlanNotes: (v: string) => void;
   draggedItem: any; setDraggedItem: (v: any) => void;
   dropTarget: number | null; setDropTarget: (v: any) => void;
@@ -423,12 +425,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // Раньше ~24 настройки (бюджет, режим, время приёмов, цикл фазы и т.д.) сбрасывались при
   // перезагрузке — выбора пользователя не было ни в localStorage, ни в профиле.
   const _plannerPrefsRef = useRef<Record<string, any>>({});
-  if (Object.keys(_plannerPrefsRef.current).length === 0) {
-    try {
-      const v = JSON.parse(localStorage.getItem('he_planner_prefs') || 'null');
-      if (v && typeof v === 'object' && !Array.isArray(v)) _plannerPrefsRef.current = v;
-    } catch {}
-  }
+  if (Object.keys(_plannerPrefsRef.current).length === 0) _plannerPrefsRef.current = readPlannerPrefs();
   const _pf = _plannerPrefsRef.current;
   const [cookTimeMin, setCookTimeMin] = useState<number>(typeof _pf.cookTimeMin === 'number' ? _pf.cookTimeMin : 60);
   const [cookingSkill, setCookingSkill] = useState<'basic' | 'medium' | 'advanced'>((_pf as any).cookingSkill === 'advanced' ? 'advanced' : (_pf as any).cookingSkill === 'medium' ? 'medium' : 'basic');
@@ -580,7 +577,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (!base) return;
       const d = new Date();
       d.setDate(d.getDate() + (n - d.getDay() + 7) % 7);
-      const iso = d.toISOString().slice(0, 10);
+      const iso = localIsoDate(d);
       setBBPrepConfig({ ...base, showDate: iso });
     } catch {}
   };
@@ -713,7 +710,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (merged.length > 0) return merged;
     } catch {}
     const e: { date: string; weight: number }[] = [];
-    for (let i = 0; i < 3; i++) { const d = new Date(); d.setDate(d.getDate() - (2 - i)); e.push({ date: d.toISOString().split('T')[0], weight: 80 }); }
+    for (let i = 0; i < 3; i++) { const d = new Date(); d.setDate(d.getDate() - (2 - i)); e.push({ date: localIsoDate(d), weight: 80 }); }
     return e;
   });
   const [weightLogPeriod, setWeightLogPeriod] = useState<string>(typeof _pf.weightLogPeriod === 'string' ? _pf.weightLogPeriod : 'every3');
@@ -1123,17 +1120,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   });
   // FIX persist-settings: пишем все локальные предпочтения в he_planner_prefs (debounce не нужен —
   // пишем на каждое изменение, объём крошечный). Раньше эти настройки не сохранялись вообще.
+  // P1-fix: запись — merge-patch (writePlannerPrefsPatch), а не полная перезапись: полный объект
+  // стирал ключи чужих писателей (график работы workSchedule*), и он сбрасывался после перезагрузок.
   useEffect(() => {
-    try {
-      safeWriteJSON('he_planner_prefs', {
-        cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays,
-        trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase,
-        weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct,
-        weightLogPeriod, phase, proteinPreset, budget, variety,
-        lunchTime, dinnerTime, workFood, planType, morningTrainLoad, heavyTrainDay,
-        cookingSkill, cookingFrequency, batchCooking,
-      });
-    } catch {}
+    writePlannerPrefsPatch({
+      cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays,
+      trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase,
+      weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct,
+      weightLogPeriod, phase, proteinPreset, budget, variety,
+      lunchTime, dinnerTime, workFood, planType, morningTrainLoad, heavyTrainDay,
+      cookingSkill, cookingFrequency, batchCooking,
+    });
   }, [cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase, weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, weightLogPeriod, phase, proteinPreset, budget, variety, lunchTime, dinnerTime, workFood, planType, morningTrainLoad, heavyTrainDay, cookingSkill, cookingFrequency, batchCooking]);
 
   // P1-fix: preferredFoods из Profile (UnifiedSettings.nutrition.preferredFoods) + legacy
@@ -1330,10 +1327,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     return 'none';
   });
   useEffect(() => {
-    try {
-      const cur = JSON.parse(localStorage.getItem('he_planner_prefs') || '{}');
-      safeWriteJSON('he_planner_prefs', { ...cur, varietyLevel, carbPeriodization });
-    } catch {}
+    writePlannerPrefsPatch({ varietyLevel, carbPeriodization });
   }, [varietyLevel, carbPeriodization]);
   const [workScheduleEnabledRaw, setWorkScheduleEnabledRaw] = useState<boolean>(typeof _pf.workScheduleEnabled === 'boolean' ? _pf.workScheduleEnabled : false);
   const [workStartTimeRaw, setWorkStartTimeRaw] = useState<string>(typeof _pf.workStartTime === 'string' && /^\d{2}:\d{2}$/.test(_pf.workStartTime) ? _pf.workStartTime : '09:00');
@@ -1347,10 +1341,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const workDays = workDaysRaw;
   const workScheduleType = workScheduleTypeRaw;
   const persistWorkPrefs = useCallback((patch: Record<string, any>) => {
-    try {
-      const cur = (() => { try { return JSON.parse(localStorage.getItem('he_planner_prefs') || '{}'); } catch { return {}; } })();
-      safeWriteJSON('he_planner_prefs', { ...cur, ...patch });
-    } catch {}
+    writePlannerPrefsPatch(patch);
   }, []);
   const setWorkScheduleEnabled = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
     setWorkScheduleEnabledRaw(prev => {
@@ -1430,7 +1421,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // P4a-диалог: второй рецепт не влез в закрытый приём — явный выбор пользователя
   // (shrink ×0.65 / комната из перекусов / мини / отмена) вместо тихого отказа.
   const [secondRecipeConflict, setSecondRecipeConflict] = useState<{ dayIdx: number; mealIdx: number; recipe: Recipe; targetKcal: number; firstKcal: number; roomKcal: number; miniKcal: number } | null>(null);
-  const [mealPrep, setMealPrep] = useState<any[] | null>(null);
   const [dayPlanNotes, setDayPlanNotes] = useState(() => { try { return localStorage.getItem('he_day_notes') || ''; } catch { return ''; } });
   const [draggedItem, setDraggedItem] = useState<any>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
@@ -1482,10 +1472,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { generationModeRef.current = generationMode; }, [generationMode]);
    useEffect(() => { try { localStorage.setItem('he_planner_gen_mode', generationMode); } catch {} }, [generationMode]);
   // G1 (сырое/готовое): режим отображения веса — 'cooked' (как на тарелке, дефолт) / 'raw' (как взвешивать сухим)
-  const [weightMode, setWeightMode] = useState<'cooked' | 'raw'>(() => {
-    try { return localStorage.getItem('he_planner_weight_mode') === 'raw' ? 'raw' : 'cooked'; } catch { return 'cooked'; }
-  });
-   useEffect(() => { try { localStorage.setItem('he_planner_weight_mode', weightMode); } catch {} }, [weightMode]);
+  const [weightMode, setWeightMode] = useState<'cooked' | 'raw'>(() => readWeightMode());
+  useEffect(() => { writeWeightMode(weightMode); }, [weightMode]);
   // ⭐ Избранные рецепты (B5): имена рецептов, бейдж в чипах/вариантах + бонус к скорингу
   const [favoriteRecipes, setFavoriteRecipes] = useState<Set<string>>(() => {
     try { const v = JSON.parse(localStorage.getItem('he_recipe_fav') || '[]'); return new Set<string>(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set(); }
@@ -1761,8 +1749,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const wi = selectedWeek ?? 0;
     if (!monthPlan[wi] || monthPlan[wi] === weekPlan) return;
     setMonthPlan(prev => { const next = [...prev]; next[wi] = weekPlan; return next; });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekPlan, monthPlanMode, weekEditDay, selectedWeek]);
+    // monthPlan в deps: после setMonthPlan гард `monthPlan[wi] === weekPlan` останавливает повтор —
+    // без депа синк мог не увидеть внешнее изменение monthPlan (stale-замыкание).
+  }, [weekPlan, monthPlan, monthPlanMode, weekEditDay, selectedWeek]);
   const openWeekDayForEdit = (di: number) => {
     if (!weekPlan?.days?.[di]) return;
     try { setDayPlan(JSON.parse(JSON.stringify(weekPlan.days[di]))); } catch { setDayPlan(weekPlan.days[di]); }
@@ -3296,8 +3285,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           }
         } catch {}
         // E6: активная конфигурация спецприёма (модалка) с включённой заменой — явные макросы.
-        if (specialMealMode && specialMealReplaceMode && specialMealReplaceTarget) {
-          _specialMealOverrides.push({ targetLabel: specialMealReplaceTarget, kind: 'custom', p: specialMealProteinG, c: specialMealCarbsG, f: specialMealFatG });
+        if (specialMealMode && specialMealReplaceMode) {
+          // P1-fix: явный «Заменить приём» приоритетнее, иначе цель берётся из «Времени приёма»
+          // (раньше без явной цели выбор времени не влиял ни на что — «показано ≠ применяется»).
+          const _smTarget = effectiveSpecialMealTarget(specialMealReplaceTarget, specialMealTiming);
+          if (_smTarget) _specialMealOverrides.push({ targetLabel: _smTarget, kind: 'custom', p: specialMealProteinG, c: specialMealCarbsG, f: specialMealFatG });
         }
         const _effMealsRaw = _fastingDay ? Math.max(3, (opts?.overrides?.mealsCount ?? mealsCount) - 1) : (opts?.overrides?.mealsCount ?? mealsCount);
         const _effMealsCount = _effMealsRaw;
@@ -3718,9 +3710,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   };
 
 const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // P0-2: Pro Engine — единственный движок (был всегда true, переключатель в UI отсутствовал).
-  // Сохраняем fallback на классический путь внутри generatePlan через try/catch для живучести.
-  const useProEngine: true = true;
   const [planTab, setPlanTab] = useState<string>(() => { try { return localStorage.getItem('he_plan_active_tab') || 'settings'; } catch { return 'settings'; } });
   useEffect(() => { try { localStorage.setItem('he_plan_active_tab', planTab); } catch {} }, [planTab]);
 
@@ -3758,7 +3747,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const confirmSavePlan = () => {
     const name = (savePlanPrompt?.value || '').trim() || `План ${new Date().toLocaleDateString('ru-RU')}`;
     setSavePlanPrompt(null);
-    const plan: SavedPlan = { id: Date.now(), date: new Date().toISOString().split('T')[0], name, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc };
+    const plan: SavedPlan = { id: Date.now(), date: localIsoDate(new Date()), name, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc };
     const updated = [plan, ...savedPlans.filter(p => p.id !== plan.id)].slice(0, 10);
     setSavedPlans(updated);
     // P1-fix: показываем ошибку пользователю при неудаче сохранения (раньше только console.warn)
@@ -3899,14 +3888,14 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
         const base = new Date(baseDate);
         weekPlan.days.forEach((d: any, i: number) => {
           const dt = new Date(base); dt.setDate(base.getDate() + i);
-          const iso = dt.toISOString().slice(0, 10);
+          const iso = localIsoDate(dt);
           totalAdded += addDay(d, iso);
         });
       } else if (planDays === 3 && threeDayPlan?.days) {
         const base = new Date(baseDate);
         threeDayPlan.days.forEach((d: any, i: number) => {
           const dt = new Date(base); dt.setDate(base.getDate() + i);
-          const iso = dt.toISOString().slice(0, 10);
+          const iso = localIsoDate(dt);
           totalAdded += addDay(d, iso);
         });
       } else {
@@ -4000,7 +3989,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     savedPlans, setSavedPlans, expandedSavedId, setExpandedSavedId,
     lockedFoodIds, toggleLockFood,
     editItem, setEditItem, editAmount, setEditAmount, replacingItem, setReplacingItem,
-    recipePickerMeal, setRecipePickerMeal, mealPrep, setMealPrep,
+    recipePickerMeal, setRecipePickerMeal,
     dayPlanNotes, setDayPlanNotes, draggedItem, setDraggedItem, dropTarget, setDropTarget,
     undoStack, setUndoStack, userRecipes, setUserRecipes,
     showRecipeCreator, setShowRecipeCreator,
@@ -4050,10 +4039,9 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
      plannerMode, setPlannerMode,
     labAnalysis,
     errorMsg, setErrorMsg,
-    useProEngine,
     planTab, setPlanTab,
     labs,
-  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, combatNutrition, _rawCForCap, applyCombatNutrition, cookingSkill, cookingFrequency, batchCooking, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, nightCarbs, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, combatNutrition, _rawCForCap, applyCombatNutrition, cookingSkill, cookingFrequency, batchCooking, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, nightCarbs, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
   const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, weightMode, setWeightMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, weightMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase]);

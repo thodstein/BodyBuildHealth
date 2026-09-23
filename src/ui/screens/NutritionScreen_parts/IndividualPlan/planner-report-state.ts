@@ -112,7 +112,11 @@ export function usePlannerReportState(d: PlannerReportStateDeps): PlannerReportS
           } catch {}
         }
       }
-    } catch (e) { try { console.error('Report failed:', e); } catch {} }
+    } catch (e) {
+      try { console.error('Report failed:', e); } catch {}
+      // P2-fix: ручной запрос отчёта больше не «молчит» — авто-прогон тоста не шумит (archive=false).
+      try { if (archive) (window as any).showToast?.('⚠ Отчёт не сформирован — попробуйте ещё раз', 'warning'); } catch {}
+    }
   };
 
   // D-26: auto-run drug-compat check when the plan changes (live food-drug warnings).

@@ -64,12 +64,3 @@ export function computeEA(input: EAInput): EAResult {
   }
   return { ea, ffm: Math.round(ffm), eee, status, note, zoneLabel };
 }
-
-export function eaZoneColor(status: EAStatus): string {
-  switch (status) {
-    case 'optimal': return '#22c55e';
-    case 'reduced': return '#f59e0b';
-    case 'risk': return '#ef4444';
-    case 'severe': return '#7f1d1d';
-  }
-}

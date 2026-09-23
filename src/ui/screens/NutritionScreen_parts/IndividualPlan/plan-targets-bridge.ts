@@ -64,11 +64,4 @@ export function readPlanTargets(): PlanKbjuTargets | null {
   }
 }
 
-/** Снимает публикацию (напр. полный сброс плана). */
-export function clearPlanTargets(): void {
-  try {
-    localStorage.removeItem(PLAN_TARGETS_KEY);
-  } catch {
-    /* молча */
-  }
-}
+

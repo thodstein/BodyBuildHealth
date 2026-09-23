@@ -10,6 +10,7 @@
 
 import type { FoodItem } from "../../../../core/nutrition-database";
 import { sumMicros, analyzeMicroCoverage, getMicroTargets, type Sex, type CyclePhase, type FoodDbLike } from "./planner-micro-coverage";
+import { matchesSelectedAllergen } from "./planner-restrictions";
 
 export interface AllergenReport { conflicts: { food: string; allergens: string[] }[]; riskLevel: 'low' | 'medium' | 'high'; summary: string; }
 export interface NutrientReport { micros: Record<string, any>; gaps: string[]; }
@@ -17,11 +18,12 @@ export interface QualityReport { avgScore: number; bbsAvg: number; budget: strin
 export interface RiskReport { systems: Record<string, any>; totalRisk: string; summary: string; }
 export interface DrugCompatReport { interactions: any[]; warnings: string[]; positions?: any[]; }
 
-function matchesSelectedAllergen(food: any, allergen: string): boolean {
-  if (!food?.allergens) return false;
-  const fa = food.allergens as string[];
-  return fa.some(a => a.toLowerCase().includes(allergen.toLowerCase()) || allergen.toLowerCase().includes(a.toLowerCase()));
-}
+// P1-fix: локальный наивный substring-матчер удалён. Он сравнивал русские id аллергенов
+// пользователя ('рыба', 'глютен' — ALLERGEN_LIST) с латинскими тегами FOOD_DB ('fish',
+// 'gluten') — совпадений нет → отчёт «⚠ Аллергены» всегда показывал «всех аллергенов нет»
+// (ложно-отрицательный safety-контур; рядом UI честно писал «🚫 Исключено N продуктов»).
+// Теперь — канонический матчер planner-restrictions (теги FOOD_ALLERGEN_DIET + текстовый
+// фолбэк), тот же, что у генерации/резолвера исключений.
 
 function planItems(dayPlan: any): any[] {
   const meals = Array.isArray(dayPlan?.meals) ? dayPlan.meals : [];
@@ -35,10 +37,9 @@ export function generateAllergenReportPure(dayPlan: any, allergens: string[], fo
   const conflicts: { food: string; allergens: string[] }[] = [];
   planItems(dayPlan).forEach((it: any) => {
     const food = foodDb.find(f => f.id === it.id || f.name === it.name);
-    if (food?.allergens) {
-      const matched = [...allergenIds].filter(a => matchesSelectedAllergen(food, a));
-      if (matched.length > 0) conflicts.push({ food: it.name, allergens: matched });
-    }
+    if (!food) return;
+    const matched = [...allergenIds].filter(a => matchesSelectedAllergen(food, a, foodDb));
+    if (matched.length > 0) conflicts.push({ food: it.name, allergens: matched });
   });
   const riskLevel = conflicts.length === 0 ? 'low' : conflicts.length <= 3 ? 'medium' : 'high';
   return {

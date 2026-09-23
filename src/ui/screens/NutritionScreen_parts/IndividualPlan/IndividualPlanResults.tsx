@@ -5,6 +5,8 @@ import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.en
 import { generateNutritionReport } from "../../../../engines/nutrition-report.engine";
 import { ALLERGEN_LIST, HEALTH_ISSUES } from "./types";
 import { resolveAllergenFoodIds } from "./planner-restrictions";
+import { effectiveSpecialMealTarget } from "./planner-special-meal-state";
+import { localIsoDate } from "./planner-date-utils";
 import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
@@ -838,7 +840,7 @@ const doImportPlan = (raw: string): boolean => {
               // Факт из дневника питания за сегодня (что реально съедено)
               let fact: { kcal: number; p: number } | null = null;
               try {
-                const dateIso = now.toISOString().slice(0, 10);
+                const dateIso = localIsoDate(now);
                 const data = readDiaryV2();
                 const dayEntries = data?.[dateIso]?.meals || {};
                 let fk = 0, fp = 0;
@@ -892,7 +894,7 @@ const doImportPlan = (raw: string): boolean => {
 
         {(() => {
           try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = localIsoDate(new Date());
             const todayEntries = getDiaryEntriesForDate(today);
             if (todayEntries.length === 0) return null;
             const factKcal = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.kcal || 0), 0));
@@ -1896,16 +1898,16 @@ const doImportPlan = (raw: string): boolean => {
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Белково-углеводное чередование</div>
           </div>
           <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
-            <button onClick={() => generateCravingPlan()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: cravingMode ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)', border: cravingMode ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.06)', color: cravingMode ? '#ef4444' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+            <button onClick={() => { if (!cravingMode) setCravingMode(true); generateCravingPlan(); }} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: cravingMode ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)', border: cravingMode ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.06)', color: cravingMode ? '#ef4444' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
               🍬 Хочу сладкое
             </button>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Сладкий перекус на {cravingDays} {cravingDays === 1 ? 'день' : 'дня'}</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Отдельный план: {cravingDays} {cravingDays === 1 ? 'день' : 'дня'} с десертом (основной рацион не меняется)</div>
           </div>
           <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
-            <button onClick={() => generateLazyDayPlan()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: lazyDayMode ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)', border: lazyDayMode ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(255,255,255,0.06)', color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+            <button onClick={() => { if (!lazyDayMode) setLazyDayMode(true); generateLazyDayPlan(); }} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: lazyDayMode ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)', border: lazyDayMode ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(255,255,255,0.06)', color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
               🛋 Ленивый день
             </button>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Минимум готовки, {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'}</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Отдельный план готовки: {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'} (основной рацион не меняется)</div>
           </div>
           <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
             <button onClick={() => setSpecialMealMode(!specialMealMode)} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: specialMealMode ? 'rgba(249,115,22,0.08)' : 'rgba(255,255,255,0.02)', border: specialMealMode ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(255,255,255,0.06)', color: specialMealMode ? '#f97316' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
@@ -2067,7 +2069,7 @@ const doImportPlan = (raw: string): boolean => {
         return (
         <div style={{ borderRadius: 12, padding: 12, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.15)', marginTop: 4 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316' }}>🍽️ Спецприём{specialMealReplaceMode ? ` (замена: ${specialMealReplaceTarget})` : ' (дополнительно)'}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316' }}>🍽️ Спецприём{specialMealReplaceMode ? ` (замена: ${effectiveSpecialMealTarget(specialMealReplaceTarget, specialMealTiming)})` : ' (дополнительно)'}</span>
             <span onClick={() => setSpecialMealMode(false)} style={{ cursor: 'pointer', fontSize: 10, color: 'rgba(255,255,255,0.9)' }}>✕</span>
           </div>
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
@@ -2183,7 +2185,7 @@ const doImportPlan = (raw: string): boolean => {
                 <button onClick={() => {
                   try {
                     const html = buildCoachExportHtml({
-                      dateIso: new Date().toISOString().slice(0, 10),
+                      dateIso: localIsoDate(new Date()),
                       totals: dayPlan.totals || { kcal: 0, p: 0, f: 0, c: 0 },
                       goals: { kcal: effectiveKcal || 0, p: effectiveP || 0, f: effectiveF || 0, c: effectiveC || 0 },
                       isTrainingDay: !!dayPlan.isTrainingDay,
@@ -2192,7 +2194,7 @@ const doImportPlan = (raw: string): boolean => {
                       notes: [...(dayPlan.proNotes || []), ...(dayPlanNotes ? [`💬 ${dayPlanNotes}`] : [])],
                       weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any,
                     });
-                    void downloadCoachFile(html, `plan-coach-${new Date().toISOString().slice(0, 10)}.html`).then(ok => {
+                    void downloadCoachFile(html, `plan-coach-${localIsoDate(new Date())}.html`).then(ok => {
                       if (typeof (window as any).showToast === 'function') (window as any).showToast(ok ? '📤 Файл для тренера готов' : 'Не удалось создать файл', ok ? 'success' : 'warning');
                     });
                   } catch {}

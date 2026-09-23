@@ -3885,6 +3885,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       : _smo.targetLabel === 'Обед' ? 'lunch'
       : _smo.targetLabel === 'Ужин' ? 'dinner'
       : _smo.targetLabel === 'Полдник' ? 'snack'
+      // P1-fix: «Перед сном» из «Времени приёма» спецприёма — раньше падал в snack-fallback
+      // (заменял перекус вместо вечернего слота); preSleep может отсутствовать — skip ниже.
+      : _smo.targetLabel === 'Перед сном' ? 'preSleep'
       : ((mealBudget as any).snack2 ? 'snack2' : 'snack');
     const _b = (mealBudget as any)[key];
     if (!_b) continue;
@@ -4600,7 +4603,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       (mpsSummary as any).eaStatus = eaRes.status;
       (mpsSummary as any).eaEee = eaRes.eee;
       if (eaRes.note) notes.push(eaRes.note);
-    } catch {}
+    } catch (e) { try { console.warn('[Planner] EA (энергодоступность) не рассчитана:', e); } catch {} }
   }
   // Peak week: fiber cap ≤20 → habitual water/sodium ±10%, trial mandatory (Helms, Escalante)
   if (typeof input.fiberCapG === 'number' && input.fiberCapG <= 20) {

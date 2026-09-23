@@ -541,10 +541,6 @@ export function flavorCompatibilityScore(recipeA: Recipe, recipeB: Recipe): numb
 
 // ─── Навык готовки и частота ───────────────────────────────────────────
 
-export function defaultCookProfile(): CookProfile {
-  return { skill: 'basic', timePerDayMin: 30, frequency: 'daily', batchCooking: false };
-}
-
 export function cookProfileFromSettings(s: any): CookProfile {
   const skill: CookSkill = s?.cookingSkill === 'advanced' ? 'advanced' : s?.cookingSkill === 'medium' ? 'medium' : 'basic';
   const freq: CookFrequency = s?.cookingFrequency === 'weekly' ? 'weekly' : s?.cookingFrequency === 'every_3_days' ? 'every_3_days' : 'daily';

@@ -10,7 +10,6 @@ import {
   publishPlanTargets,
   readPlanTargets,
   parsePlanTargets,
-  clearPlanTargets,
   PLAN_TARGETS_KEY,
   PLAN_TARGETS_EVENT,
 } from '../plan-targets-bridge';
@@ -62,11 +61,11 @@ describe('plan-targets-bridge — публикация и чтение целе�
     expect(parsePlanTargets({ kcal: 2200, protein: -1, fats: 60, carbs: 280 })).toBeNull();
   });
 
-  it('5. clearPlanTargets убирает публикацию', () => {
+  it('5. невалидная публикация не затирает валидную (clearPlanTargets удалён — reset-пути нет)', () => {
     publishPlanTargets({ kcal: 2300, protein: 170, fats: 75, carbs: 270 });
     expect(readPlanTargets()).not.toBeNull();
-    clearPlanTargets();
-    expect(readPlanTargets()).toBeNull();
+    publishPlanTargets({ kcal: 0, protein: 0, fats: 0, carbs: 0 } as any);
+    expect(readPlanTargets()).toEqual({ kcal: 2300, protein: 170, fats: 75, carbs: 270 });
   });
 });
 

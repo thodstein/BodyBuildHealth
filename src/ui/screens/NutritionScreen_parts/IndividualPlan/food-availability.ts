@@ -214,12 +214,6 @@ export function isFishId(id: string): boolean {
   return FISH_RE.test(id);
 }
 
-/** Крем + рыба в том же приёме (кроме самого проверяемого пункта). */
-export function creamFishClash(sweetId: string, meal: { items?: Array<{ id?: string }> }): boolean {
-  if (!isCreamId(sweetId)) return false;
-  return ((meal as any)?.items || []).some((x: any) => x.id !== sweetId && isFishId(x.id));
-}
-
 /**
  * Хлопья/мюсли/гранола — снековая еда (с молоком/протеином), не гарнир к мясу.
  * Жалоба: «хлопья и мясо — кто-то ест вообще вместе? нет?» — в приёме с мясом
@@ -274,8 +268,6 @@ export function familyMealUses(meals: Array<{ items?: Array<{ id?: string }> }>,
   }
   return n;
 }
-
-export const EXCLUDED_FAMILIES_FROM_PLATE: ReadonlySet<string> = new Set(['oils_mayonnaise']);
 
 // ─── 5b. Режим низкого волокна (PRO-3 Э2) ─────────────────────────────
 /**
@@ -560,19 +552,6 @@ export function registerMealInQuota(q: DailyQuotaState, items: { id?: string; am
     q.familyUses.set(fam, (q.familyUses.get(fam) || 0) + 1);
   }
   return { usedPowder, usedFruit };
-}
-
-/**
- * Итоговый гейт «продукт может войти в автотарелку»:
- * доступность (эпик A) + квоты дня (эпик B).
- */
-export function foodPlannable(
-  f: { id: string; category?: string; carbs?: number; fiber?: number },
-  opts: { preferredIds?: Set<string>; blocked?: Set<string>; allowIds?: Set<string> } = {},
-): boolean {
-  if (!foodAvailableForPlan(f, opts.preferredIds)) return false;
-  if (opts.blocked && !foodAvailableWithQuota(f, opts.blocked, opts.allowIds)) return false;
-  return true;
 }
 
 // ─── B3/B8 (Эпик B): единые катчелл-потолки ──────────────────────────────

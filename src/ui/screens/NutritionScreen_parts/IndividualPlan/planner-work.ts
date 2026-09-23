@@ -41,8 +41,3 @@ export function isWorkDayForIndex(
   const i = ((Math.trunc(index) % 7) + 7) % 7;
   return !!opts.workDays[(dowBase + i) % 7];
 }
-
-/** Портативное окно: работа включена, день рабочий и включён режим «Только портативное». */
-export function isPortableWorkDay(workFood: string, isWorkDay: boolean): boolean {
-  return workFood === 'portable' && isWorkDay;
-}

@@ -317,6 +317,10 @@ export interface RebalanceResult {
 const SHRINK_LADDER = [10, 15, 20, 25, 30, 40, 50, 60, 75, 90, 100, 120, 125, 150, 175, 200, 250, 300, 350, 400, 450, 500, 600, 750, 900, 1000];
 
 function scaleItem(it: PlanItemLike, newAmount: number): PlanItemLike {
+  // P2-fix (паритет с day-target-corrector.scaleItem): пункты с `_fixedGrams`
+  // (креатин и будущие фикс-граммовки) не масштабируются. В рецептурном пути таких
+  // пунктов сейчас нет — гард на будущее, поведение не меняет.
+  if ((it as any)._fixedGrams) return it;
   const r = newAmount / (it.amount || 1);
   const p = Math.round((it.p || 0) * r * 10) / 10;
   const f = Math.round((it.f || 0) * r * 10) / 10;
@@ -1416,7 +1420,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   const quota = createDailyQuota(args.athleteWeightKg);
   meals.forEach(m => {
     if (m.recipeApplied || !m.items?.length) return;
-    try { registerMealInQuota(quota, m.items as any); } catch {}
+    try { registerMealInQuota(quota, m.items as any); } catch (e) { try { console.warn('[Planner] квоты приёма не зарегистрированы:', e); } catch {} }
   });
   // Финальный грамм-трим орехов/масел/яиц после корректора (он идёт мимо квот).
   const trimQuotaOverflow = (ms: PlanMealLike[]): string[] => {
@@ -1989,7 +1993,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     if (_recipeHasPowder(chosenFlat as unknown as Recipe)) _powderMealsUsed.add(mi);
     // C1: выбранный рецепт (с сайдами) регистрируется в дневных квотах —
     // следующий приём видит актуальный блок-лист семейств/грамм-лимитов.
-    try { registerMealInQuota(quota, finalItems as any); } catch {}
+    try { registerMealInQuota(quota, finalItems as any); } catch (e) { try { console.warn('[Planner] квоты рецепта не зарегистрированы:', e); } catch {} }
     appliedCount++;
   });
 
@@ -2055,7 +2059,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         });
       }
     }
-  } catch {}
+  } catch (e) { try { console.warn('[Planner] E4-подбор порций рецептов пропущен:', e); } catch {} }
 
   // Ребаланс дня: недобор закрываем топ-апом в перекус, перебор режем по гибким слотам
   // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%. C5: субротация пулов.

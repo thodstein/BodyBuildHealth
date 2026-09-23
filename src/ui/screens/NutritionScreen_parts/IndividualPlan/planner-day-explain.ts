@@ -133,9 +133,13 @@ export function dayDeviationPct(
   let maxDev = 0;
   let hasAny = false;
   for (const k of MAX_DEVIATIONS) {
-    const goal = Number((targets as any)[k] || 0);
+    // P2-fix: isFinite-гарды — строковое/битое значение из any-данных (старые сохранённые
+    // планы/импорт) давало NaN, который уезжал в текст объяснения и отклонение.
+    const rawGoal = Number((targets as any)[k]);
+    const goal = Number.isFinite(rawGoal) && rawGoal > 0 ? rawGoal : 0;
     if (!(goal > 0)) continue;
-    const fact = Number((totals as any)[k] || 0);
+    const rawFact = Number((totals as any)[k]);
+    const fact = Number.isFinite(rawFact) ? rawFact : 0;
     hasAny = true;
     maxDev = Math.max(maxDev, Math.abs(fact - goal) / goal);
   }

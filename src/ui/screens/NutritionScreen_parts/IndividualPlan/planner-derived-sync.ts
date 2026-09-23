@@ -101,7 +101,11 @@ export function usePlannerDerivedSync(plans: DerivedSyncPlans, actions: DerivedS
           }
           a.generateRecommendations();
         }
-      } catch {}
+      } catch (e) {
+        // P2-fix: сбой конвертера (закупки/готовка/рекомендации) раньше глотался молча —
+        // пользователь видел устаревшие карточки без следа в консоли.
+        try { console.warn('[Planner] derived-sync (закупки/готовка/рекомендации) не обновлён:', e); } catch {}
+      }
     }, DERIVED_SYNC_DEBOUNCE_MS);
     return () => {
       if (timer.current) clearTimeout(timer.current);
