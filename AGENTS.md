@@ -54,6 +54,14 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · Армлифтинг: годовой overlay спец-блока (Sep 22 2026, коммит pathspec, без пуша)
+
+Последний пункт матрицы паритета: годовой синк есть у ТА/стронга/арма/ББ — у армлифтинга не было.
+- NEW `src/engines/arm/armlift-annual-bridge.engine.ts`: `buildArmliftAnnualOverlay(spec, {startWeek, totalYearWeeks, focus})` (недели спец-блока → фокусы недель года, дальше «поддержание»; окно ≤52), `saveArmliftAnnualOverlay`/`loadArmliftAnnualOverlay` (ключ `he_armlift_annual_sync_v1`, битый стор → null), честный `null` на пустой блок.
+- Хаб: `LiftState += annualStartWeek` (дефолт '1'), поле «Год: старт-неделя» + кнопка `data-arm="lift-annual"` («🗓 В годовой план») рядом с экспортом; тост «✓ Годовой overlay: N нед → недели года» или честное «⚠ Спец-блок пуст — нечего класть в год».
+- NEW тесты: `armlift-annual-bridge` **3/3** (null на пустой, раскладка с окном года/поддержанием, save/load roundtrip + битый стор) + UI-лок в `armlifting-hub`.
+- **Проверено**: `src/engines/arm` **95 файлов / 1139** + армлифтинг-UI **12/12** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · ICS-паритет: арм (мёртвый движок подключён) + армлифтинг (новый) (Sep 22 2026, коммит pathspec, без пуша)
 
 Реаудит поверхностей: у ТА (`data-wl="ics"`), стронга («📅 Календарь (ICS)») и ББ (шаг коррекции) календарь есть, а у **арма** `buildArmIcs` был **мёртвым** (движок есть, в UI не подключён), у **армлифтинга** ICS-движка не было вовсе.

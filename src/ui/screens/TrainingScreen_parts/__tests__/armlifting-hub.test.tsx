@@ -11,6 +11,15 @@ describe('W-AL UI: хаб армлифтинга', () => {
     expect(screen.getByLabelText(/Excalibur кг/)).toBeTruthy();
     expect(document.body.textContent).toContain('Введи замеры');
   });
+  it('ROUND-10: годовой overlay спец-блока — кнопка есть, клик кладёт недели года или честно пусто', async () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    const annual = document.body.querySelector('[data-arm="lift-annual"]');
+    expect(annual).not.toBeNull();
+    const btn = Array.from(annual!.querySelectorAll('button')).find((b) => /В годовой план/.test(b.textContent || ''))!;
+    fireEvent.click(btn);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Годовой overlay|Спец-блок пуст/));
+  });
   it('ROUND-10: ICS спец-блока — кнопка есть, клик даёт честный ответ (календарь/пусто)', async () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

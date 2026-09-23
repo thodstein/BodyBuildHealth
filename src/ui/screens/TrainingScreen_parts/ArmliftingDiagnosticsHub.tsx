@@ -32,6 +32,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
 import { buildArmliftIcs, downloadArmliftIcs } from '../../../engines/arm/armlift-ics.engine';
+import { buildArmliftAnnualOverlay, saveArmliftAnnualOverlay } from '../../../engines/arm/armlift-annual-bridge.engine';
 import { correctionsToInjectionItems, intensityForCause, rirForCause } from '../../../engines/arm/armlift-injection.engine';
 import { orderCorrectionsForDay, sessionOrderNote } from '../../../engines/arm/armlift-session-rules.engine';
 import { diagnosticCompleteness } from '../../../engines/arm/armlift-completeness.engine';
@@ -131,6 +132,8 @@ type LiftState = {
   excalKg: string; hubKg: string; hubL: string; hubR: string;
   raptorKg: string; crushKg: string; clockKg: string; anvilKg: string; medleyKg: string;
   sex: string; bwKg: string;
+  /** ROUND-10: старт-неделя года для overlay спец-блока (паритет со стронгом/ТА). */
+  annualStartWeek: string;
 };
 
 const DEFAULT_STATE: LiftState = {
@@ -138,7 +141,7 @@ const DEFAULT_STATE: LiftState = {
   pinchSec: '', pinchKg: '', pinchL: '', pinchR: '', cocLevel: '', silverSec: '', silverGripper: '3',
   excalKg: '', hubKg: '', hubL: '', hubR: '',
   raptorKg: '', crushKg: '', clockKg: '', anvilKg: '', medleyKg: '',
-  sex: 'male', bwKg: '80',
+  sex: 'male', bwKg: '80', annualStartWeek: '1',
 };
 
 /** PRO-3 W6: сид из арм-хаба — замеры не дублируются вручную.
@@ -660,6 +663,23 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       }
       downloadArmliftIcs(ics, `armlift-spec-block-${new Date().toISOString().slice(0, 10)}.ics`);
       setToast('✓ Календарь .ics (недели спец-блока)');
+      setTimeout(() => setToast(''), 2500);
+    } catch { /* noop */ }
+  };
+
+  // ROUND-10: годовой overlay спец-блока (паритет со стронгом/ТА — односторонний ключ)
+  const handleSaveAnnual = () => {
+    try {
+      const weeks = buildArmliftAnnualOverlay(specBlock, {
+        startWeek: parseInt(state.annualStartWeek) || 1,
+        focus: [diagnosis.weakLink],
+      });
+      if (!weeks || !saveArmliftAnnualOverlay(weeks, parseInt(state.annualStartWeek) || 1)) {
+        setToast('⚠ Спец-блок пуст — нечего класть в год');
+        setTimeout(() => setToast(''), 2500);
+        return;
+      }
+      setToast(`✓ Годовой overlay: ${weeks.length} нед → недели года`);
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
   };
@@ -1265,6 +1285,10 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <AdBtn variant="ghost" onClick={handleExportHtml}>🖨 HTML</AdBtn>
           <AdBtn variant="ghost" onClick={handleExportCsv}>📥 CSV</AdBtn>
           <AdBtn variant="ghost" data-arm="lift-export-ics" onClick={handleExportIcs}>📅 Календарь (.ics)</AdBtn>
+          <span data-arm="lift-annual" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <input aria-label="Год: старт-неделя" inputMode="numeric" value={state.annualStartWeek} onChange={(e) => set({ annualStartWeek: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) })} placeholder="1" style={{ width: 56, minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14, fontWeight: 700, textAlign: 'center' }} />
+            <AdBtn variant="ghost" onClick={handleSaveAnnual}>🗓 В годовой план</AdBtn>
+          </span>
           <AdBtn variant="ghost" onClick={handlePrint}>🖨 Печать</AdBtn>
         </div>
       </AdCard>
