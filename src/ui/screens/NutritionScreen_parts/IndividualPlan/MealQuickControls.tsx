@@ -12,7 +12,7 @@ import type { NutrientGapResult } from "../../../../engines/nutrient-gap-filler.
 import type { ComposerMode } from "./MealComposerMode";
 
 const btnCard: React.CSSProperties = {
-  flex: 1, minWidth: 0,
+  flex: 1, minWidth: 0, minHeight: 44,
   padding: '12px 8px', borderRadius: 14, cursor: 'pointer', textAlign: 'center',
   background: 'linear-gradient(180deg, rgba(32,32,38,0.92), rgba(24,24,27,0.88))', border: '1px solid rgba(255,255,255,0.07)',
   color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing:'-0.15px',
