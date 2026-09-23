@@ -305,7 +305,7 @@
 
 Записаны честные «не полностью» из отчёта P2-остатка; порядок = безопасность/ценность.
 
-1. **⏳ BB-ветка `SRCBBScreen`** (решение требуется). Экран монтируется только
+1. **⏸ BB-ветка `SRCBBScreen`** — оставлено неактивным резервом (решение Sep 23 2026, код не менялся). Экран монтируется только
    `track="pl"` (`PlannerPlAuto`), `setMainTab` зовётся только с `'pl'` → недостижимы
    `buildBb`, `applyBBMacrocycle`, `bbDaysArr`, `builtBb/bbWeekSel/bbWorkMax/bbGoal/...`,
    ветка `'bb'` pending-apply и роутинг `applyExternal` по bb-циклам. Удаление ветки —
