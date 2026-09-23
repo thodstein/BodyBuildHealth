@@ -14,23 +14,23 @@ const BUILDER_ZONES = ['chest', 'chest_upper', 'chest_lower', 'back', 'back_widt
 const count = (zone: string) => BB_CORRECTIVES.filter((c) => c.targets.includes(zone)).length;
 
 describe('bb-corrective K2: покрытие зон ≥2', () => {
-  it('каждая зона чипов хаба имеет ≥4 записи (ROUND-10: было ≥3)', () => {
-    const thin = HUB_ZONES.filter((z) => count(z) < 4).map((z) => `${z}:${count(z)}`);
+  it('каждая зона чипов хаба имеет ≥5 записей (ROUND-10 третья ступень: было ≥4)', () => {
+    const thin = HUB_ZONES.filter((z) => count(z) < 5).map((z) => `${z}:${count(z)}`);
     expect(thin).toEqual([]);
   });
-  it('каждая зона слабых групп ББ-авто имеет ≥4 записи (ROUND-10: было ≥3)', () => {
-    const thin = BUILDER_ZONES.filter((z) => count(z) < 4).map((z) => `${z}:${count(z)}`);
+  it('каждая зона слабых групп ББ-авто имеет ≥5 записей (ROUND-10 третья ступень: было ≥4)', () => {
+    const thin = BUILDER_ZONES.filter((z) => count(z) < 5).map((z) => `${z}:${count(z)}`);
     expect(thin).toEqual([]);
   });
-  it('ROUND-10: каждый скрининг-сигнал даёт ≥4 варианта', () => {
+  it('ROUND-10: каждый скрининг-сигнал даёт ≥5 вариантов (третья ступень: было ≥4)', () => {
     const SIG = ['bench-fix', 'bench-watch', 'nhe-weak', 'add-weak', 'erir-low', 'ybt-asym', 'ktw-asym', 'hinge-fail', 'shoulder-fail', 'rot-gap', 'loaded-fail', 'pm-yellow'];
-    const thin = SIG.filter((s) => count(s) < 4).map((s) => `${s}:${count(s)}`);
+    const thin = SIG.filter((s) => count(s) < 5).map((s) => `${s}:${count(s)}`);
     expect(thin).toEqual([]);
   });
-  it('ROUND-10: каждый драйвер движения (резолвер хаба) даёт ≥4 варианта', () => {
+  it('ROUND-10: каждый драйвер движения (резолвер хаба) даёт ≥5 варианта (третья ступень: было ≥4)', () => {
     // MovementDriver = ankle|hip|thoracic|shoulder|core|none ('flexibility' в типе нет — не выдумываем)
     const DRV = ['driver:ankle', 'driver:hip', 'driver:thoracic', 'driver:shoulder', 'driver:core'];
-    const thin = DRV.filter((d) => count(d) < 4).map((d) => `${d}:${count(d)}`);
+    const thin = DRV.filter((d) => count(d) < 5).map((d) => `${d}:${count(d)}`);
     expect(thin).toEqual([]);
   });
   it('ROUND-10: домашний зал (dumbbell+bodyweight) — каждая зона хаба даёт ≥2 варианта', () => {

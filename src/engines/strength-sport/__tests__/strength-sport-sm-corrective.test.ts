@@ -42,6 +42,18 @@ describe('sm-corrective library', () => {
       expect(ok, `${c.id} → ${ex}`).toBe(true);
     }
   });
+  it('ROUND-10 (третья ступень): каждая причина × вид имеет ≥4 варианта', () => {
+    const causes = ['volume', 'technique', 'mobility', 'fatigue', 'strength', 'grip'];
+    const kinds = ['technique', 'strength', 'stability'];
+    const thin: string[] = [];
+    for (const cause of causes) {
+      for (const kind of kinds) {
+        const n = SM_CORRECTIVES.filter((c) => (c.causes as string[]).includes(cause) && c.kind === kind).length;
+        if (n < 4) thin.push(`${cause}/${kind}:${n}`);
+      }
+    }
+    expect(thin).toEqual([]);
+  });
   it('ROUND-10: каждая причина × вид (technique/strength/stability) имеет ≥3 варианта (было ≥2)', () => {
     const causes = ['volume', 'technique', 'mobility', 'fatigue', 'strength', 'grip'];
     const kinds = ['technique', 'strength', 'stability'];

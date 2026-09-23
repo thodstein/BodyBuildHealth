@@ -376,6 +376,43 @@ export const BB_CORRECTIVES: BBCorrective[] = [
     { sets: 3, repsMin: 15, repsMax: 20, rir: 1, tempo: '2-1-2-0', restSec: 45, freqPerWeek: 3 },
     ['Предплечье на колене/опоре', 'Полная амплитуда', 'Без раскачки корпусом'],
     'Вес +1 шаг при 20', 'Сгибание с резиной', 'Предплечья: +повторы за 3 нед', 'CTD flexors', ['wrist_curl_db']),
+  // ── ROUND-10 (третья ступень): зона/сигнал/драйвер ≥5 ──
+  c('cl-decline-pause', 'Жим гантелей на наклонной вниз + пауза (низ груди, контроль траектории)', 'decline_db', ['chest_lower', 'chest', 'bench-watch', 'bench-fix'], ['technique', 'activation'], 'technique', 'any',
+    { sets: 4, repsMin: 8, repsMax: 10, rir: 1, tempo: '3-2-1-0', restSec: 90, freqPerWeek: 2 },
+    ['Пауза 2с на точке касания — единая точка каждый раз', 'Локти ~45°, гриф к низу груди', 'Лопатки сведены, без отбива'],
+    'Вес +1 шаг при 10 чистых', 'Жим с пола / отжимания с наклоном', 'Низ груди + точка касания: +повторы/стабильность 3 нед', 'Noteboom 2024 (точка касания/BAW)', ['dumbbell_press_floor']),
+  c('bt-cs-row-tspine', 'Тяга с упором грудью + разгибание грудного отдела (толщина спины)', 'row_chest_supported', ['back_thickness', 'back', 'driver:thoracic'], ['activation', 'technique'], 'strength', 'any',
+    { sets: 4, repsMin: 8, repsMax: 12, rir: 1, tempo: '3-1-2-0', restSec: 90, freqPerWeek: 2 },
+    ['Сначала разгибание грудного отдела, затем тяга', 'Локти вдоль корпуса', 'Пауза 1с в сокращении'],
+    'Вес +1 шаг / разгибание с меньшим весом', 'Тяга с роликом для т-спайн / бодивейт', 'Толщина спины: +сеты/вес за 3 нед', 'PoinT GO thoracic; NSCA row', ['seated_row']),
+  c('df-front-raise-er', 'Подъём гантелей перед собой + наружная ротация (передняя дельта + ротация)', 'front_raise_db', ['delt_front', 'shoulders', 'rot-gap', 'erir-low'], ['activation', 'technique'], 'technique', 'any',
+    { sets: 3, repsMin: 12, repsMax: 15, rir: 1, tempo: '3-1-2-0', restSec: 60, freqPerWeek: 2 },
+    ['Подъём до уровня глаз, без рывка', 'Наружная ротация 2×12–15 после', 'Лопатки собраны, ребра вниз'],
+    'Вес +1 шаг при 15', 'Подъём с резиной / махи лёгкие', 'Передняя дельта + ER: +повторы за 3 нед', 'Intelangelo 2025 ER:IR; NASM', ['front_raise_cable']),
+  c('tr-suitcase-brace', 'Удержание чемодана с жёстким кором (трапы + стабильность кора)', 'suitcase_carry', ['traps', 'driver:core'], ['activation', 'technique'], 'stability', 'any',
+    { sets: 3, repsMin: 20, repsMax: 30, rir: 2, tempo: 'hold', restSec: 60, freqPerWeek: 2 },
+    ['Рёбра вниз, таз нейтрально — без наклона в сторону', 'Плечо вниз, лопатка «в карман»', 'Дыхание через нос, не зажимать'],
+    'Время +5с/нед', 'Удержание у стены / меньший вес', 'Трапы + кор: +время холда за 3 нед', 'McGill core brace; farmer carry', ['shrug_db']),
+  c('bi-incline-curl-len', 'Сгибание на наклонной скамье (бицепс, растянутая позиция)', 'incline_db_curl', ['biceps'], ['volume', 'activation'], 'technique', 'any',
+    { sets: 3, repsMin: 10, repsMax: 12, rir: 1, tempo: '3-1-2-0', restSec: 75, freqPerWeek: 2 },
+    ['Плечо отведено назад — рука висит', 'Без раскачки корпусом', 'Пауза 1с в растянутой позиции'],
+    'Вес +1 шаг при 12', 'Сгибание с резиной', 'Бицепс: +вес/повторы за 3 нед', 'Maeo 2023 lengthened', ['hammer_curl']),
+  c('hm-nhe-ecc', 'Нордик-эксцентрик + контроль (задняя цепь, эксцентрическая сила)', 'nordic_curl', ['hamstrings', 'nhe-weak'], ['technique', 'volume'], 'strength', 'intermediate',
+    { sets: 3, repsMin: 4, repsMax: 6, rir: 2, tempo: '5-1-1-0', restSec: 150, freqPerWeek: 2 },
+    ['Опускание 5с, помогаем себе руками только при необходимости', 'Таз не проваливается', 'Контроль до конца амплитуды'],
+    'Меньше помощи руками / +повтор', 'Нордик с лентой / сгибания ног', 'NHE: +1 повтор за 2 нед', 'Franke 2025 NHE; van Dyk 2019'),
+  c('ad-copenhagen-lg', 'Копенгагенская планка (аддукторы, длинная рычаг)', 'copenhagen_plank', ['add-weak', 'adductor'], ['volume', 'activation'], 'stability', 'intermediate',
+    { sets: 3, repsMin: 15, repsMax: 25, rir: 3, tempo: 'hold', restSec: 60, freqPerWeek: 2 },
+    ['Корпус в линию, таз не провисает', 'Опора на предплечье и внутреннюю часть стопы', 'Начинать с короткого рычага (колено)'],
+    'Перейти на длинный рычаг/время +5с', 'Копенгаген с колена', 'Аддукторы: +время холда за 3 нед', 'Quintana-Cepedal 2025 Copenhagen', ['cable_hip_adduction']),
+  c('ank-calf-knw', 'Подъём на носки одной ногой + knee-to-wall (голеностоп, асимметрия)', 'calf_raise_single', ['ktw-asym', 'calves', 'driver:ankle'], ['volume', 'activation'], 'stability', 'any',
+    { sets: 3, repsMin: 12, repsMax: 15, rir: 1, tempo: '2-2-1-0', restSec: 60, freqPerWeek: 3 },
+    ['Полная амплитуда, пауза 2с внизу', 'Каждой стороной отдельно, слабая первой', 'Knee-to-wall до 10–12 см перед'],
+    'Рюкзак / время холда +5с', 'Носки двумя ногами', 'Асимметрия голеностопа: Δ ≤1 см за 3 нед', 'Tourillon 2025 WBLT; Kim 2015', ['standing_calf']),
+  c('pm-throughput-tempo', 'Контроль боли: медленный темп в доступной амплитуде (мониторинг жёлтой зоны)', 'db_press', ['pm-yellow'], ['recovery', 'technique'], 'technique', 'any',
+    { sets: 3, repsMin: 12, repsMax: 15, rir: 3, tempo: '4-1-2-0', restSec: 60, freqPerWeek: 2 },
+    ['Боль ≤3/10 во время и ≤5 утром — иначе откат', 'Амплитуда до появления дискомфорта, не через боль', 'Прогресс — по объёму, затем по нагрузке'],
+    'Амплитуда/повторы +, вес в последнюю очередь', 'Изометрия у стены', 'Жёлтая зона: симптом ≤2/10 через 7 и 14 дней', 'Silbernagel PMM; BJSM 2021', ['db_press']),
   c('add-cable-adduction', 'Приведение бедра в кроссовере (аддукторы)', 'cable_hip_adduction', ['add-weak', 'adductor'], ['volume', 'activation'], 'stability', 'any',
     { sets: 3, repsMin: 12, repsMax: 15, rir: 2, tempo: '2-1-1-0', restSec: 60, freqPerWeek: 2 },
     ['Корпус стабилен, тянет бедро', 'Без разворота таза', 'Пауза 1с в конце'], 'Вес +1 шаг при 15', 'Копенгаген короткой ногой', 'Асимметрия ≤15%', 'CCEP (аддукторы)', ['copenhagen_plank'], ['pm-red']),
@@ -383,11 +420,15 @@ export const BB_CORRECTIVES: BBCorrective[] = [
 
 // ROUND-10: домашние аналоги помечаем запасными — в равном скоре они не вытесняют основную запись
 // (порядок/приоритет калиброванного топа сохранён), но выбираются, когда основную отсекли фильтры.
-const HOME_SPARE_IDS = [
+const SPARE_IDS = [
+  // домашние аналоги (dumbbell/bodyweight)
   'dm-home-single-raise', 'dr-home-rear-db', 'cu-home-incline-pushup', 'bw-home-pullup',
   'tri-home-overhead-db-both', 'cv-home-standing-calf', 'fa-home-wrist-db',
+  // третья ступень покрытия (зона/сигнал/драйвер ≥5) — дополняют, а не вытесняют калиброванный топ
+  'cl-decline-pause', 'bt-cs-row-tspine', 'df-front-raise-er', 'tr-suitcase-brace', 'bi-incline-curl-len',
+  'hm-nhe-ecc', 'ad-copenhagen-lg', 'ank-calf-knw', 'pm-throughput-tempo',
 ];
-for (const rec of BB_CORRECTIVES) if (HOME_SPARE_IDS.includes(rec.id)) rec.spare = true;
+for (const rec of BB_CORRECTIVES) if (SPARE_IDS.includes(rec.id)) rec.spare = true;
 
 export const BB_CORRECTIVE_COUNT = BB_CORRECTIVES.length;
 

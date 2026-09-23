@@ -624,6 +624,27 @@ export const SM_CORRECTIVES: SMCorrective[] = [
     { sets: 4, reps: '15с', pct: 85, rir: 2, tempo: 'hold', restSeconds: 150 },
     ['Хват до отказа формы', 'Плечи над грифом'],
     '+5с/нед', 'Холд 60% 3×15с', 'IronMind axle strength'),
+  // ── ROUND-10 (третья ступень): каждая причина × вид ≥4 ──
+  C('sm_stone_load_vol_stab', 'stone_load', 'stability', 'Загрузка камня объёмно: техника-стабилизатор 5×3',
+    ['камень уходит вбок на груди', 'нет стабильности на плече при загрузке'], ['volume'], 'intermediate',
+    { sets: 5, reps: 3, pct: 70, rir: 3, tempo: '2-1-1-0', restSeconds: 150 },
+    ['Камень к центру груди', 'Плечи над камнем, без наклона', 'Сброс через бёдра, не спину'],
+    '+2.5%/нед при чистом накрытии', 'Загрузка мешка 5×3 на платформу', 'Heezza stone accessory'),
+  C('sm_stone_floor_tech_str', 'stone_off_floor', 'strength', 'Срыв камня с пола: сила ног 5×3',
+    ['тянут спиной, ноги стоят', 'срыв на прямых ногах'], ['technique', 'strength'], 'intermediate',
+    { sets: 5, reps: 3, pct: 78, rir: 2, tempo: '1-0-1-0', restSeconds: 180 },
+    ['Подсесть к камню, руки длиннее', 'Срыв ногами, спина нейтральна'],
+    '+2.5%/нед', 'Срыв с плинтов 4×3', 'Heezza stone: legs first'),
+  C('sm_farmers_pickup_mob_str2', 'farmers_carry', 'strength', 'Проходка фермеров: силовая база + мобильность голеностопа 4×3',
+    ['подъём/шаг спиной', 'нет глубины из-за голеностопа', 'шаг короткий на носках'], ['mobility', 'strength'], 'intermediate',
+    { sets: 4, reps: 3, pct: 80, rir: 2, tempo: '1-0-1-0', restSeconds: 180 },
+    ['Подсед до ручек, грудь над', 'Колени вперёд — добор глубины'],
+    '+2.5%/нед', 'Подъём с подставок 4×3', 'Keogh 2014 farmers pickup'),
+  C('sm_log_drive_str_stab', 'log_drive', 'stability', 'Выталкивание лога: сила + стабильность кора 5×3',
+    ['прогиб в пояснице на выталкивании', 'лог уходит вперёд-в сторону'], ['strength'], 'advanced',
+    { sets: 5, reps: 3, pct: 72, rir: 2, tempo: '1-1-1-0', restSeconds: 150 },
+    ['Ребра вниз, таз под лог', 'Выталкивание ногами, не спиной'],
+    '+2.5%/нед', 'Швунг с груди 4×3', 'Heezza log press; core brace'),
 ];
 
 /** Все фазы библиотеки (16). */
@@ -1042,6 +1063,11 @@ export const SM_CORR_EXID_BY_ID: Record<string, string> = {
   sm_log_clean_tech_str: 'hang_clean',
   sm_yoke_turn_mob_str: 'squat_zercher',
   sm_grip_support_str_stab: 'plate_pinch',
+  // ROUND-10 (третья ступень)
+  sm_stone_load_vol_stab: 'sandbag_carry',
+  sm_stone_floor_tech_str: 'deadlift',
+  sm_farmers_pickup_mob_str2: 'deadlift_trapbar',
+  sm_log_drive_str_stab: 'front_squat',
 };
 
 /** Реальное id упражнения за записью библиотеки. */
