@@ -7,6 +7,7 @@
  * Формулы: Epley, Brzycki, Lander, Lombardi, Mayhew, O'Conner, Wathen.
  + Консенсус (медиана применимых) + load-velocity e1RM (через LVP-таблицу, расширится в P2).
  */
+import { LOAD_VELOCITY_PROFILE } from './vbt.engine';
 
 export type RMFormula = 'epley' | 'brzycki' | 'lander' | 'lombardi' | 'mayhew' | 'oconner' | 'wathen';
 
@@ -144,16 +145,26 @@ export function rmAccuracyNote(lift: string | null | undefined, reps: number): s
 
 // ── Load-velocity profile (P2 расширит; здесь минимальная таблица для e1RM-по-скорости) ──
 // Средняя скорость (м/с) на %1RM для соревновательных движений (Jovanovic / Gonzalez-Badillo).
-const LVP: Record<string, readonly [number, number][]> = {
-  squat: [[1.00, 0.30], [0.90, 0.47], [0.80, 0.60], [0.70, 0.75], [0.60, 0.87], [0.50, 1.00]],
-  bench: [[1.00, 0.16], [0.90, 0.33], [0.80, 0.47], [0.70, 0.60], [0.60, 0.75], [0.50, 0.90]],
-  deadlift: [[1.00, 0.20], [0.90, 0.37], [0.80, 0.50], [0.70, 0.62], [0.60, 0.77], [0.50, 0.92]],
+// P1-§3: ЕДИНЫЙ источник — канон `LOAD_VELOCITY_PROFILE` (vbt.engine). Раньше здесь
+// лежала вторая таблица (6-точечное подмножество канона с теми же числами) — теперь
+// подмножество ВЫВОДИТСЯ из канона: опорные %1RM берём ровно те же (1.00…0.50), поэтому
+// интерполяция 1-в-1 не меняется (новые точки канона 0.95/0.85/… сюда намеренно не входят —
+// иначе сдвинулись бы показания VBT/estimate1RM).
+const LVP_SUBSET_PCTS: readonly number[] = [1.00, 0.90, 0.80, 0.70, 0.60, 0.50];
+/** Лифты с LVP в этом движке (исторический контракт): прочие → фолбэк squat, как было. */
+const LVP_LIFTS: readonly string[] = ['squat', 'bench', 'deadlift'];
+const lvpTable = (lift: string): readonly [number, number][] => {
+  const key = LVP_LIFTS.includes(lift) ? lift : 'squat';
+  const full = (LOAD_VELOCITY_PROFILE as Record<string, readonly [number, number][]>)[key]
+    ?? LOAD_VELOCITY_PROFILE.squat;
+  const sub = full.filter(([p]) => LVP_SUBSET_PCTS.includes(p));
+  return sub.length >= 2 ? sub : full;
 };
 const DEFAULT_LIFT = 'squat';
 
 function interpPctForVelocity(lift: string, v: number): number {
   // LVP отсортирован по %1RM по убыванию (tbl[0] = тяжелейший/медленнейший).
-  const tbl = LVP[lift] || LVP[DEFAULT_LIFT];
+  const tbl = lvpTable(lift);
   if (v <= tbl[0][1]) return tbl[0][0];                         // медленнее медленнейшего → тяжелейший %
   if (v >= tbl[tbl.length - 1][1]) return tbl[tbl.length - 1][0]; // быстрее быстрейшего → легчайший %
   for (let i = 0; i < tbl.length - 1; i++) {
@@ -173,7 +184,7 @@ export function estimate1RMFromVelocity(lift: string, velocityMps: number, weigh
 
 /** Обратная функция: целевая скорость для %1RM (для VBT-таргетов, расширится в P2). */
 export function velocityForPct(lift: string, pct1RM: number): number {
-  const tbl = LVP[lift] || LVP[DEFAULT_LIFT];
+  const tbl = lvpTable(lift);
   if (pct1RM >= tbl[0][0]) return tbl[0][1];
   if (pct1RM <= tbl[tbl.length - 1][0]) return tbl[tbl.length - 1][1];
   for (let i = 0; i < tbl.length - 1; i++) {
@@ -183,4 +194,5 @@ export function velocityForPct(lift: string, pct1RM: number): number {
   return 0.5;
 }
 
-export const SUPPORTED_LIFTS = Object.keys(LVP);
+/** Движения с LVP-подмножеством в этом движке (канон — `LOAD_VELOCITY_PROFILE`). */
+export const SUPPORTED_LIFTS = LVP_LIFTS;

@@ -3,7 +3,8 @@
  * Объём ↓40-60% за 1-3 нед (по усталости), удержание интенсивности, нейромышечный прайминг,
  * peak-week протокол: прикиды (opener/2nd/3rd), тайминг последних тяжёлых, план соревновательного дня.
  */
-import { taperCurve, type TaperWeek } from "./mesocycle-progression.engine";
+import type { TaperWeek } from "./mesocycle-progression.engine";
+import { buildPLTaperCurve } from "../lms/lms-taper.engine";
 import { MEET_STRATEGY_PCT, MEET_WARMUP_STEPS } from "../lms/competition-attempts";
 
 export type AttemptStrategy = "conservative" | "balanced" | "aggressive";
@@ -60,8 +61,9 @@ export function warmupSequence(opener: number): { percent: number; weight: numbe
 }
 
 /** Полный taper-план: сессии по собственному протоколу (удержание интенсивности +
- *  прайминг), кривая P7 `taperCurve` — витрина/график (возвращается в результате),
- *  прикиды — канон MEET_STRATEGY_PCT (в `peakWeekAttempts`). */
+ *  прайминг), кривая — через КАНОН `buildPLTaperCurve` (mode 'pro'; P7-кривая
+ *  `taperCurve` внутри канона — числа 1-в-1, §3 ПЛ-плана), прикиды — канон
+ *  MEET_STRATEGY_PCT (в `peakWeekAttempts`). */
 export function taperPlan(
   meetDate: string,
   current1RM: Record<Lift, number>,
@@ -69,7 +71,15 @@ export function taperPlan(
   strategy: AttemptStrategy = "balanced"
 ): TaperPlan {
   const taperWeeks = taperWeeksForFatigue(fatigue);
-  const tc = taperCurve(taperWeeks, 0.90);
+  // Витрина/график — из канона; адаптер возвращает прежний TaperWeek-шейп
+  // (volumePctOfPeak/intensityPct/rir/rationale), потребители TaperPlannerTab не меняются.
+  const tc: TaperWeek[] = buildPLTaperCurve({ taperWeeks, mode: 'pro', peakIntensityPct: 0.90 }).map(p => ({
+    week: p.week,
+    volumePctOfPeak: p.volumePct,
+    intensityPct: p.intensityPct,
+    rir: p.rirShift,
+    rationale: p.focus ?? '',
+  }));
   const weeks: { week: number; sessions: TaperSession[] }[] = [];
 
   for (let w = 1; w <= taperWeeks; w++) {

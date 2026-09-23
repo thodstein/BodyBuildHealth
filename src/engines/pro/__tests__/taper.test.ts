@@ -6,6 +6,7 @@ import {
   taperPlan,
   LAST_HEAVY_DAYS,
 } from '../taper.engine';
+import { taperCurve } from '../mesocycle-progression.engine';
 
 const default1RM = { squat: 200, bench: 140, deadlift: 240 };
 
@@ -83,5 +84,31 @@ describe('taperPlan', () => {
     const lastWeek = plan.weeks[plan.weeks.length - 1];
     const lastSession = lastWeek.sessions[lastWeek.sessions.length - 1];
     expect(lastSession.exercises.every(e => e.reps <= 2)).toBe(true);
+  });
+
+  // §3 ПЛ-плана: кривая тапера идёт через канон buildPLTaperCurve (mode 'pro');
+  // числа 1-в-1 с P7 taperCurve (сведение не сдвинуло отображение TaperPlannerTab).
+  it('taperCurve — паритет с каноном (mode pro = P7-кривая, числа 1-в-1)', () => {
+    for (const fatigue of [30, 60, 80]) {
+      const plan = taperPlan('2026-08-15', default1RM, fatigue, 'balanced');
+      const direct = taperCurve(plan.taperWeeks, 0.90);
+      expect(plan.taperCurve).toHaveLength(direct.length);
+      plan.taperCurve.forEach((tw, i) => {
+        expect(tw.week, `w${i}`).toBe(direct[i].week);
+        expect(tw.volumePctOfPeak, `w${i} vol`).toBeCloseTo(direct[i].volumePctOfPeak, 10);
+        expect(tw.intensityPct, `w${i} int`).toBeCloseTo(direct[i].intensityPct, 10);
+        expect(tw.rir, `w${i} rir`).toBe(direct[i].rir);
+      });
+    }
+  });
+
+  it('якоря 2-недельной кривой: 0.65/0.89/RIR2 → 0.45/0.90/RIR1 (r2-округление)', () => {
+    const plan = taperPlan('2026-08-15', default1RM, 60, 'balanced');
+    expect(plan.taperCurve[0].volumePctOfPeak).toBeCloseTo(0.65, 10);
+    expect(plan.taperCurve[0].intensityPct).toBeCloseTo(0.89, 10);
+    expect(plan.taperCurve[0].rir).toBe(2);
+    expect(plan.taperCurve[1].volumePctOfPeak).toBeCloseTo(0.45, 10);
+    expect(plan.taperCurve[1].intensityPct).toBeCloseTo(0.90, 10);
+    expect(plan.taperCurve[1].rir).toBe(1);
   });
 });

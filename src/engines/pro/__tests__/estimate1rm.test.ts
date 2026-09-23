@@ -8,6 +8,7 @@ import {
   SUPPORTED_LIFTS,
   type RMFormula,
 } from '../estimate1rm.engine';
+import { LOAD_VELOCITY_PROFILE } from '../vbt.engine';
 
 describe('estimate1RMFormula', () => {
   it('epley: 100×10 → 133.3', () => {
@@ -90,5 +91,30 @@ describe('SUPPORTED_LIFTS', () => {
     expect(SUPPORTED_LIFTS).toContain('squat');
     expect(SUPPORTED_LIFTS).toContain('bench');
     expect(SUPPORTED_LIFTS).toContain('deadlift');
+  });
+});
+
+// P1-§3: единый источник LVP — канон vbt.engine.LOAD_VELOCITY_PROFILE;
+// здешние 6 опорных точек ВЫВОДЯТСЯ из канона, числа 1-в-1 (интерполяция не сдвинулась).
+describe('P1-§3: LVP-паритет с каноном vbt.engine (без смены чисел)', () => {
+  it('опорные точки совпадают с каноном ровно', () => {
+    for (const [lift, rows] of Object.entries(LOAD_VELOCITY_PROFILE)) {
+      if (!SUPPORTED_LIFTS.includes(lift as (typeof SUPPORTED_LIFTS)[number])) continue;
+      for (const [pct, vel] of rows) {
+        if (![1.00, 0.90, 0.80, 0.70, 0.60, 0.50].includes(pct)) continue;
+        expect(velocityForPct(lift, pct), `${lift} @${pct}`).toBeCloseTo(vel, 10);
+      }
+    }
+  });
+
+  it('интерполяция — по 6-точечному подмножеству (0.95 squat = 0.385, а не 0.40 из полного канона)', () => {
+    expect(velocityForPct('squat', 0.75)).toBeCloseTo(0.675, 10); // (0.80,0.60)→(0.70,0.75)
+    expect(velocityForPct('squat', 0.95)).toBeCloseTo(0.385, 10); // старое поведение (не 0.40)
+    expect(estimate1RMFromVelocity('squat', 0.675, 150).e1RM).toBeCloseTo(200, 6);
+    expect(estimate1RMFromVelocity('bench', 0.90, 100).pct1RM).toBeCloseTo(0.5, 10);
+  });
+
+  it('неизвестный лифт → fallback squat (как было)', () => {
+    expect(velocityForPct('ohp', 0.6)).toBeCloseTo(velocityForPct('squat', 0.6), 10);
   });
 });

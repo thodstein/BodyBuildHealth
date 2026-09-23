@@ -15,13 +15,27 @@ function getNamesAvailable(): Set<string> {
 }
 
 function findExerciseByLabel(label: string): Exercise | undefined {
-  const n = label.toLowerCase().replace(/ё/g, 'е');
-  const ex = EXERCISE_CATALOG.find((e: Exercise) => e.name.toLowerCase().replace(/ё/g, 'е') === n);
+  const normName = (s: string) => s.toLowerCase().replace(/ё/g, 'е');
+  const n = normName(label);
+  const ex = EXERCISE_CATALOG.find((e: Exercise) => normName(e.name) === n);
   if (ex) return ex;
-  // contains-match для длинных названий
-  return EXERCISE_CATALOG.find((e: Exercise) => {
-    const en = e.name.toLowerCase().replace(/ё/g, 'е');
+  // contains-match по подстроке: «дожим»/«дожимы»
+  const contains = EXERCISE_CATALOG.find((e: Exercise) => {
+    const en = normName(e.name);
     return en.length > 2 && (en.includes(n) || n.includes(en));
+  });
+  if (contains) return contains;
+  // P0-8 (§2): core-fallback — сравниваем имена БЕЗ скобочных уточнений, иначе
+  // «Паучий подъём (на наклонной скамье лицом вниз)» не находил каталог
+  // «Паучий подъём (лёжа на скамье лицом вниз)» (8 ассистентов терялось).
+  // Консервативно: равенство ядер либо подстрока при ядре ≥10 символов.
+  const core = (s: string) => normName(s.replace(/\(.*?\)/g, ' ')).replace(/\s+/g, ' ').trim();
+  const nc = core(label);
+  if (nc.length <= 3) return undefined;
+  return EXERCISE_CATALOG.find((e: Exercise) => {
+    const ec = core(e.name);
+    if (ec.length <= 3) return false;
+    return ec === nc || (nc.length >= 10 && (ec.includes(nc) || nc.includes(ec)));
   });
 }
 
@@ -92,24 +106,24 @@ const DIAGNOSIS: Record<Lift, Partial<Record<WeakPoint, Omit<WeakPointDiagnosis,
     sumo_lockout: { weakPoint: 'sumo_lockout', label: 'Сумо: замыкание бёдер (дожим)', description: 'Не замыкает бёдра вверху — слабые ягодицы/разгибатели спины.', assistanceFromCatalog: ['Тяга с плинтов (rack pull)', 'Присед в широкой постановке', 'Румынская тяга'], intensityPct: 0.75, rationale: 'Тяга с плинтов выше колен + широкая постановка — изоляция финальной фазы сумо.' },
   },
   biceps: {
-    biceps_start: { weakPoint: 'biceps_start', label: 'Сгибание: старт (с полного разгибания)', description: 'Слабый срыв из полного разгибания локтя — недостаточная сила бицепса/брахиалиса в нижней точке.', assistanceFromCatalog: ['Подъём штанги на бицепс', 'Подъём на скамье Скотта', 'Сгибание на бицепс в блоках'], intensityPct: 0.6, rationale: 'Контролируемый старт без раскачки + изоляция Скотта — стартовая сила бицепса.' },
+    biceps_start: { weakPoint: 'biceps_start', label: 'Сгибание: старт (с полного разгибания)', description: 'Слабый срыв из полного разгибания локтя — недостаточная сила бицепса/брахиалиса в нижней точке.', assistanceFromCatalog: ['Подъём штанги на бицепс', 'Подъём на скамье Скотта', 'Сгибания на бицепс в блоке'], intensityPct: 0.6, rationale: 'Контролируемый старт без раскачки + изоляция Скотта — стартовая сила бицепса.' },
     biceps_mid: { weakPoint: 'biceps_mid', label: 'Сгибание: середина (переход)', description: 'Зависание в середине — слабый переход и недостаток объёма бицепса/брахиалиса.', assistanceFromCatalog: ['Подъём штанги на бицепс', 'Молотки (нейтральный хват)', 'Подъём гантелей на бицепс'], intensityPct: 0.65, rationale: 'Молотки включают брахиалис (толщина руки); штанга/гантели — контролируемая середина.' },
     biceps_top: { weakPoint: 'biceps_top', label: 'Сгибание: верхнее сокращение (пик)', description: 'Слабая пиковая контракция вверху — бицепс не «выкручивается» в верхней точке.', assistanceFromCatalog: ['Подъём гантелей на наклонной скамье', 'Паучий подъём (на наклонной скамье лицом вниз)', 'Молотки (нейтральный хват)'], intensityPct: 0.6, rationale: 'Наклонная скамья (растянутая позиция) и паучий подъём — пиковое сокращение и контроль верха.' },
   },
   triceps: {
-    triceps_start: { weakPoint: 'triceps_start', label: 'Разгибание: старт (с согнутых рук)', description: 'Слабый старт из полного сгибания — недостаточная сила трицепса в растянутой позиции.', assistanceFromCatalog: ['Французский жим', 'Разгибание на трицепс в верхнем блоке', 'Жим узким хватом'], intensityPct: 0.6, rationale: 'Растянутая позиция (французский/overhead) — стартовая сила длинной головки.' },
-    triceps_mid: { weakPoint: 'triceps_mid', label: 'Разгибание: середина', description: 'Зависание в середине — слабый переход трицепса.', assistanceFromCatalog: ['Жим узким хватом', 'Разгибание на трицепс в верхнем блоке', 'Отжимания на брусьях'], intensityPct: 0.65, rationale: 'Базовые жимы узким хватом + блок — объём середины амплитуды.' },
-    triceps_lockout: { weakPoint: 'triceps_lockout', label: 'Разгибание: дожим (пик)', description: 'Слабый дожим вверху — трицепс не замыкает локоть.', assistanceFromCatalog: ['Разгибание на трицепс в верхнем блоке', 'Французский жим', 'Жим узким хватом'], intensityPct: 0.65, rationale: 'Блок и дожимы — изоляция пикового сокращения трицепса.' },
+    triceps_start: { weakPoint: 'triceps_start', label: 'Разгибание: старт (с согнутых рук)', description: 'Слабый старт из полного сгибания — недостаточная сила трицепса в растянутой позиции.', assistanceFromCatalog: ['Французский жим', 'Разгибания на трицепс в верхнем блоке', 'Жим узким хватом'], intensityPct: 0.6, rationale: 'Растянутая позиция (французский/overhead) — стартовая сила длинной головки.' },
+    triceps_mid: { weakPoint: 'triceps_mid', label: 'Разгибание: середина', description: 'Зависание в середине — слабый переход трицепса.', assistanceFromCatalog: ['Жим узким хватом', 'Разгибания на трицепс в верхнем блоке', 'Отжимания на брусьях'], intensityPct: 0.65, rationale: 'Базовые жимы узким хватом + блок — объём середины амплитуды.' },
+    triceps_lockout: { weakPoint: 'triceps_lockout', label: 'Разгибание: дожим (пик)', description: 'Слабый дожим вверху — трицепс не замыкает локоть.', assistanceFromCatalog: ['Разгибания на трицепс в верхнем блоке', 'Французский жим', 'Жим узким хватом'], intensityPct: 0.65, rationale: 'Блок и дожимы — изоляция пикового сокращения трицепса.' },
   },
   calf: {
-    calf_bottom: { weakPoint: 'calf_bottom', label: 'Икры: низ (растяжение)', description: 'Слабая стартовая фаза из полного растяжения — недостаточная сила камбаловидной/икроножной.', assistanceFromCatalog: ['Подъём на носки стоя', 'Подъём на носки сидя', 'Жим носками в тренажёре'], intensityPct: 0.6, rationale: 'Полная амплитуда с паузой внизу — растянутая позиция икроножной.' },
-    calf_mid: { weakPoint: 'calf_mid', label: 'Икры: середина', description: 'Зависание в середине подъёма — общий объём икр.', assistanceFromCatalog: ['Подъём на носки стоя', 'Подъём на носки в Смите', 'Подъём на носки сидя'], intensityPct: 0.65, rationale: 'Базовый объём икр + разные углы стопы.' },
-    calf_top: { weakPoint: 'calf_top', label: 'Икры: верх (пик)', description: 'Слабое пиковое сокращение вверху — икры не удерживают пик.', assistanceFromCatalog: ['Подъём на носки стоя с паузой вверху', 'Подъём на носки сидя', 'Подъём на носки на одной ноге'], intensityPct: 0.6, rationale: 'Пауза 2с в пике — удержание сокращения.' },
+    calf_bottom: { weakPoint: 'calf_bottom', label: 'Икры: низ (растяжение)', description: 'Слабая стартовая фаза из полного растяжения — недостаточная сила камбаловидной/икроножной.', assistanceFromCatalog: ['Подъём на носки стоя', 'Подъём на носки сидя', 'Жим носками в жиме ногами'], intensityPct: 0.6, rationale: 'Полная амплитуда с паузой внизу — растянутая позиция икроножной.' },
+    calf_mid: { weakPoint: 'calf_mid', label: 'Икры: середина', description: 'Зависание в середине подъёма — общий объём икр.', assistanceFromCatalog: ['Подъём на носки стоя', 'Жим носками в жиме ногами', 'Подъём на носки сидя'], intensityPct: 0.65, rationale: 'Базовый объём икр + разные углы стопы.' },
+    calf_top: { weakPoint: 'calf_top', label: 'Икры: верх (пик)', description: 'Слабое пиковое сокращение вверху — икры не удерживают пик.', assistanceFromCatalog: ['Подъём на носки стоя с паузой вверху', 'Подъём на носки сидя', 'Подъём на носок одной ногой'], intensityPct: 0.6, rationale: 'Пауза 2с в пике — удержание сокращения.' },
   },
   shrug: {
     shrug_start: { weakPoint: 'shrug_start', label: 'Шраги: старт (съём)', description: 'Слабый съём штанги/гантелей — трапеции не стартуют движение.', assistanceFromCatalog: ['Шраги со штангой', 'Шраги с гантелями', 'Тяга штанги к подбородку'], intensityPct: 0.65, rationale: 'Тяжёлые шраги со штангой — стартовая сила трапеций.' },
-    shrug_mid: { weakPoint: 'shrug_mid', label: 'Шраги: середина', description: 'Зависание по ходу — недостаточный объём трапеций.', assistanceFromCatalog: ['Шраги со штангой', 'Шраги в Смите', 'Тяга штанги к подбородку'], intensityPct: 0.65, rationale: 'Объёмные шраги + тяга к подбородку — середина траектории.' },
-    shrug_top: { weakPoint: 'shrug_top', label: 'Шраги: пик (удержание)', description: 'Слабое пиковое удержание вверху — трапеции не фиксируют пик.', assistanceFromCatalog: ['Шраги со штангой с паузой вверху', 'Шраги с гантелями', 'Шраги в тренажёре'], intensityPct: 0.65, rationale: 'Пауза 2с в пике + изометрия — фиксация верха.' },
+    shrug_mid: { weakPoint: 'shrug_mid', label: 'Шраги: середина', description: 'Зависание по ходу — недостаточный объём трапеций.', assistanceFromCatalog: ['Шраги со штангой', 'Шраги с гантелями', 'Тяга штанги к подбородку'], intensityPct: 0.65, rationale: 'Объёмные шраги + тяга к подбородку — середина траектории.' },
+    shrug_top: { weakPoint: 'shrug_top', label: 'Шраги: пик (удержание)', description: 'Слабое пиковое удержание вверху — трапеции не фиксируют пик.', assistanceFromCatalog: ['Шраги со штангой с паузой вверху', 'Шраги с гантелями', 'Шраги на блоке'], intensityPct: 0.65, rationale: 'Пауза 2с в пике + изометрия — фиксация верха.' },
   },
 };
 

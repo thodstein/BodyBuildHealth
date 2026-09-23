@@ -54,6 +54,30 @@ describe('diagnoseWeakPoint', () => {
       }
     }
   });
+
+  // P0-8 (§2): 8/63 ассистентов терялись (нет core-fallback/алиасов). Теперь все
+  // имена резолвятся в каталог — «рекомендуется добавить в каталог» не должно
+  // встречаться НИГДЕ (иначе builders молча создают неисполнимые назначения).
+  it('все ассистенты всех фаз резолвятся в каталог (0 потерь)', () => {
+    const unresolved: string[] = [];
+    for (const lift of Object.keys(WEAK_POINTS_BY_LIFT) as Lift[]) {
+      for (const wp of WEAK_POINTS_BY_LIFT[lift]) {
+        const d = diagnoseWeakPoint(lift, wp);
+        if (d.rationale.includes('рекомендуется добавить в каталог')) {
+          unresolved.push(`${lift}/${wp}: ${d.rationale}`);
+        }
+        expect(d.assistance.length, `${lift}/${wp}`).toBeGreaterThan(0);
+      }
+    }
+    expect(unresolved).toEqual([]);
+  });
+
+  // core-fallback: скобочные уточнения больше не ломают резолв (канон-имя в выдаче).
+  it('parenthetical-имя резолвится через ядро (Паучий подъём → каталог)', () => {
+    const d = diagnoseWeakPoint('biceps', 'biceps_top');
+    expect(d.assistance.some(a => /Паучий подъём/.test(a))).toBe(true);
+    expect(d.rationale).not.toContain('рекомендуется добавить в каталог');
+  });
 });
 
 describe('WEAK_POINTS_BY_LIFT', () => {
