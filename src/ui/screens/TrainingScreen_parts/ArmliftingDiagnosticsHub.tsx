@@ -31,6 +31,7 @@ import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.eng
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
+import { buildArmliftIcs, downloadArmliftIcs } from '../../../engines/arm/armlift-ics.engine';
 import { correctionsToInjectionItems, intensityForCause, rirForCause } from '../../../engines/arm/armlift-injection.engine';
 import { orderCorrectionsForDay, sessionOrderNote } from '../../../engines/arm/armlift-session-rules.engine';
 import { diagnosticCompleteness } from '../../../engines/arm/armlift-completeness.engine';
@@ -648,6 +649,21 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     diagExtra,
   });
 
+  // ROUND-10: ICS спец-блока (паритет с ТА/стронгом — у армлифтинга календаря не было)
+  const handleExportIcs = () => {
+    try {
+      const ics = buildArmliftIcs(specBlock, { implement: diag.implement, title: 'Армлифтинг спец-блок' });
+      if (!ics) {
+        setToast('⚠ Спец-блок пуст — нечего выгружать');
+        setTimeout(() => setToast(''), 2500);
+        return;
+      }
+      downloadArmliftIcs(ics, `armlift-spec-block-${new Date().toISOString().slice(0, 10)}.ics`);
+      setToast('✓ Календарь .ics (недели спец-блока)');
+      setTimeout(() => setToast(''), 2500);
+    } catch { /* noop */ }
+  };
+
   const handleExportHtml = () => {
     try {
       downloadArmFile(`armlifting-${new Date().toISOString().slice(0, 10)}.html`, buildArmliftingHtml(exportData()), 'text/html');
@@ -1248,6 +1264,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         <div className="ad-row" data-arm="lift-export">
           <AdBtn variant="ghost" onClick={handleExportHtml}>🖨 HTML</AdBtn>
           <AdBtn variant="ghost" onClick={handleExportCsv}>📥 CSV</AdBtn>
+          <AdBtn variant="ghost" data-arm="lift-export-ics" onClick={handleExportIcs}>📅 Календарь (.ics)</AdBtn>
           <AdBtn variant="ghost" onClick={handlePrint}>🖨 Печать</AdBtn>
         </div>
       </AdCard>

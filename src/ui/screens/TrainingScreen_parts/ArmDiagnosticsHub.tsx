@@ -45,6 +45,7 @@ import { planBilateralVolume, loadBilateralHist, saveBilateralEntry, bilateralTr
 import { scorePlatform, planAttempts, loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
 import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary } from '../../../engines/arm/arm-acwr.engine';
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
+import { buildArmIcs } from '../../../engines/arm/arm-export.engine';
 import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
 import { loadRedFlags, redFlagLabels } from '../../../engines/arm/arm-redflags.store';
 import { readHumerusBridge } from '../../../engines/arm/arm-pro5-safety.engine';
@@ -1040,6 +1041,21 @@ export const ArmDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
   };
 
+  // ROUND-10: ICS-календарь арм-плана (движок `buildArmIcs` был мёртвым — не подключён в UI)
+  const handleExportIcsP0 = () => {
+    try {
+      if (!armPlan) {
+        setInjectMsg('⚠ Нет арм-плана — сначала собери в Арм-конструкторе');
+        setTimeout(() => setInjectMsg(''), 2500);
+        return;
+      }
+      const ics = buildArmIcs(armPlan as any);
+      downloadArmFile(`arm-plan-${new Date().toISOString().slice(0, 10)}.ics`, ics, 'text/calendar');
+      setInjectMsg('✓ Календарь .ics (недели/сессии плана)');
+      setTimeout(() => setInjectMsg(''), 2500);
+    } catch { /* noop */ }
+  };
+
   const handlePrintP0 = () => {
     try {
       const html = buildArmDiagnosticsHtml(exportDataP0() as any);
@@ -1375,7 +1391,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     armPrefCorr, setArmPrefCorr,
     corrV2: (() => { try { return { tendonOverload: Number((tendonAcwr as any)?.ratio) >= 1.3, waveWeek: (() => { const w = parseInt(String((state as any).corrWave || ''), 10); return Number.isFinite(w) && w >= 1 && w <= 3 ? w : null; })() }; } catch { return { tendonOverload: false, waveWeek: null }; } })(),
     diaryTrendsP0, diarySuggestP0,
-    handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0,
+    handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0, handleExportIcsP0,
     injectMsg, criticalSideP0,
     mvPhase, setMvPhase, mvDetail, setMvDetail, mvPhaseDiag,
     stReaction, setStReaction, stFalse, setStFalse, stCenter, setStCenter, mvStart,

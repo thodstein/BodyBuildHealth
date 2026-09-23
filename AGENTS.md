@@ -54,6 +54,14 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · ICS-паритет: арм (мёртвый движок подключён) + армлифтинг (новый) (Sep 22 2026, коммит pathspec, без пуша)
+
+Реаудит поверхностей: у ТА (`data-wl="ics"`), стронга («📅 Календарь (ICS)») и ББ (шаг коррекции) календарь есть, а у **арма** `buildArmIcs` был **мёртвым** (движок есть, в UI не подключён), у **армлифтинга** ICS-движка не было вовсе.
+- **Арм**: `ArmDiagnosticsHub` += `handleExportIcsP0` (`buildArmIcs(armPlan)` + `downloadArmFile(..., 'text/calendar')`), кнопка `data-arm="export-ics"` в ряду экспорта (`arm-hub-panels`), честный ответ без плана («Нет арм-плана — сначала собери в Арм-конструкторе»); план читается из `he_arm_plan_saved` (слушатель `he-arm-plan-saved` уже был).
+- **Армлифтинг**: NEW `src/engines/arm/armlift-ics.engine.ts` — `buildArmliftIcs(spec, {startDate, implement, title})` (недели спец-блока → VEVENT, понедельник недели, DATE-формат, ICS-экранирование `\\ ; , \\n`) + `downloadArmliftIcs`; кнопка `data-arm="lift-export-ics"`; пустой блок → честный тост «Спец-блок пуст — нечего выгружать».
+- NEW тесты: `armlift-ics` **4/4** (null на пустой/битый, VEVENT на каждую неделю + `DTSTART;VALUE=DATE`, экранирование, недели подряд) + UI-локи в `arm-diagnostics-hub` (без плана → честный тост; с планом → «✓ Календарь .ics») и `armlifting-hub` (кнопка + честный ответ).
+- **Проверено**: `src/engines/arm` **95 файлов / 1147** + арм/армлифтинг-UI + apk-arm-pack **зелёные** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · Армлифтинг: порог «причина × фаза» ≥3 (Sep 22 2026, коммит pathspec, без пуша)
 
 Углубление на ступень: `armlift-correction.engine` **59→66** записей (+7, в хвосты своих пулов — топ-3 целы), все объявленные ячейки «причина × фаза» доведены до **≥3** (было ≥2: technique/strength, technique/stability, max_strength/technique, max_strength/stability, endurance/strength, volume/strength, fatigue/technique).

@@ -11,6 +11,14 @@ describe('W-AL UI: хаб армлифтинга', () => {
     expect(screen.getByLabelText(/Excalibur кг/)).toBeTruthy();
     expect(document.body.textContent).toContain('Введи замеры');
   });
+  it('ROUND-10: ICS спец-блока — кнопка есть, клик даёт честный ответ (календарь/пусто)', async () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    const btn = document.body.querySelector('[data-arm="lift-export-ics"]');
+    expect(btn).not.toBeNull();
+    fireEvent.click(btn!);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Календарь \.ics|Спец-блок пуст/));
+  });
   it('ROUND-10: чипы покрытия снарядов — 0/7 без замеров, RT отмечается после ввода', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

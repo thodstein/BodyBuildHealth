@@ -181,7 +181,7 @@ const RED_FLAGS: Array<{ id: string; label: string }> = [
 ];
 
 export function HubP0Panel({ H }: { H: any }) {
-  const { state, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0, diaryTrendsP0, diarySuggestP0, toggleWeakPoint, handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0, injectMsg, criticalSideP0, specWeeks, setSpecWeeks, armPlan, setTab, corrV2 } = H;
+  const { state, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0, diaryTrendsP0, diarySuggestP0, toggleWeakPoint, handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0, handleExportIcsP0, injectMsg, criticalSideP0, specWeeks, setSpecWeeks, armPlan, setTab, corrV2 } = H;
   // PRO-3 P4: red-flags в персисте (he_arm_diag_redflags), а не только в useState
   const [redFlags, setRedFlags] = React.useState<string[]>(() => { try { return loadRedFlags(); } catch { return []; } });
   const toggleRed = (id: string) => setRedFlags((p) => {
@@ -285,6 +285,7 @@ export function HubP0Panel({ H }: { H: any }) {
           <AdBtn variant="ghost" onClick={handleExportHtmlP0}>🖨 HTML</AdBtn>
           <AdBtn variant="ghost" onClick={handlePrintP0}>🖨 Печать</AdBtn>
           <AdBtn variant="ghost" onClick={handleExportCsvP0}>📥 CSV</AdBtn>
+          <AdBtn variant="ghost" data-arm="export-ics" onClick={handleExportIcsP0}>📅 Календарь (.ics)</AdBtn>
           {criticalSideP0 && <span className="ad-tip">🔴 критично — side только ремень/изометрия</span>}
         </div>
         {injectMsg && <AdBanner tone={injectMsg.startsWith('✓') || injectMsg.startsWith('↩') ? 'ok' : 'warn'}>{injectMsg}</AdBanner>}
