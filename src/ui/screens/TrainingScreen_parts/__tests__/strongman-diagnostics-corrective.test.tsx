@@ -140,6 +140,16 @@ describe('StrongmanDiagnosticsHub corrective + top nav', () => {
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-empty-phase"]')).toBeTruthy());
     expect(document.body.textContent).toContain('ослабь фильтры');
   });
+  it('ROUND-10: слабые по дневнику читаются из ЖИВОГО ключа he_workout_log_v2', () => {
+    const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    const sess = (date: string, sessionId: string, w: number) => ({
+      sessionId, date, focus: 'strongman',
+      exercises: [{ exerciseId: 'yoke_walk', exerciseName: 'Yoke Walk', sets: [{ weightKg: w, reps: 5, rpe: 9 }] }],
+    });
+    localStorage.setItem('he_workout_log_v2', JSON.stringify([sess(ago(40), 'a', 200), sess(ago(3), 'b', 150)]));
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    expect(container.textContent).toContain('📓 Дневник:');
+  });
   it('ROUND-10: превью моста честно помечает фазу без вариантов под фильтр зала', async () => {
     const { container } = render(<StrongmanDiagnosticsHub />);
     fireEvent.click(await screen.findByText(/Жим\/лог: старт/));

@@ -242,6 +242,16 @@ describe('BBDiagnosticsHub', () => {
     fireEvent.click(screen.getAllByText('Верх груди')[0]);
     expect(screen.getAllByText(/мало данных/)[0]).toBeInTheDocument();
   });
+  it('ROUND-10: e1RM-тренд читается из ЖИВОГО дневника he_workout_log_v2', () => {
+    const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    localStorage.setItem('he_workout_log_v2', JSON.stringify([
+      { sessionId: 'a', date: ago(40), exercises: [{ exerciseId: 'bench_bar', exerciseName: 'Жим штанги лёжа', muscleGroup: 'chest_upper', sets: [{ weightKg: 100, reps: 8 }] }] },
+      { sessionId: 'b', date: ago(5), exercises: [{ exerciseId: 'bench_bar', exerciseName: 'Жим штанги лёжа', muscleGroup: 'chest_upper', sets: [{ weightKg: 80, reps: 8 }] }] },
+    ]));
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    expect(screen.getAllByText(/Дневник e1RM \(28д\)/)[0]).toBeInTheDocument();
+  });
   it('HTML export runs unified batch without throwing', () => {
     const now = new Date().toISOString().slice(0, 10);
     localStorage.setItem('he_workout_log_v1', JSON.stringify([

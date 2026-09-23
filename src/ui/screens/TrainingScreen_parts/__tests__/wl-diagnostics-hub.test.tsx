@@ -421,4 +421,15 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getAllByText(/🖨 HTML/)[0]);
     await waitFor(() => expect(second.container.textContent).toContain('биомеханика + коррекции'), { timeout: 2000 });
   });
+
+  it('ROUND-10: фазы по дневнику читаются из ЖИВОГО ключа he_workout_log_v2', () => {
+    const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    const sess = (date: string, sessionId: string) => ({
+      sessionId, date, focus: 'snatch',
+      exercises: [{ exerciseId: 'snatch', exerciseName: 'Рывок', sets: [{ weightKg: 90, reps: 2, rpe: 9 }, { weightKg: 92, reps: 2, rpe: 9 }] }],
+    });
+    localStorage.setItem('he_workout_log_v2', JSON.stringify([sess(ago(2), 'a')]));
+    const { container } = render(<WLDiagnosticsHub />);
+    expect(container.textContent).toContain('Дневник фазы');
+  });
 });

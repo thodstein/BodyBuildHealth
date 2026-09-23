@@ -457,4 +457,16 @@ describe('ArmDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getByRole('button', { name: /Сухожилие/ }));
     expect(document.body.textContent).toContain('pronators');
   });
+
+  it('ROUND-10: dневник читается из ЖИВОГО ключа he_workout_log_v2 (v2-форма)', () => {
+    const ago = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    const sess = (date: string, n: number, sessionId: string) => ({
+      sessionId, date, focus: 'grip',
+      exercises: [{ exerciseId: 'wrist_curl_db', exerciseName: 'Сгибание кисти', muscle: 'pronators', sets: Array.from({ length: n }, () => ({ weightKg: 30, reps: 8, rpe: 8 })) }],
+    });
+    localStorage.setItem('he_workout_log_v2', JSON.stringify([sess(ago(1), 10, 'a'), sess(ago(20), 2, 'b')]));
+    render(<ArmDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /Сухожилие/ }));
+    expect(document.body.textContent).toContain('pronators');
+  });
 });
