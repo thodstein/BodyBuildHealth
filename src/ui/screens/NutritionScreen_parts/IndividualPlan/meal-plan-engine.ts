@@ -3582,6 +3582,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       carbsTotal = Math.max(carbFloorG, Math.min(_baseCarbsTotal, _restCarbs));
     }
   }
+  // §3A/§3C EXTREME-SCALE: профиль ёмкости вычисляем ЗДЕСЬ (до резерва инсулин-окон и
+  // распределения углеводов) и переиспользуем в _pickCtx — единая точка, без дрейфа.
+  const _capProfEarly = extremeCapacityProfile({
+    insulinUnits: _bolusUnits, carbsG: carbsTotal, weightKg: input.weightKg, goalKcal: input.goalKcal,
+  });
   // Д-2: Peri-workout carbs must SCALE with the daily carb budget (not hardcoded 40/60g),
   // D-24: mealsCount-aware carb distribution (weight-based, lunch = main meal).
   // Веса нормируются к 100% по приёмам, которые РЕАЛЬНО будут построены → нет
@@ -3680,17 +3685,23 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Итерация C: пред-резерв углеводов под болюс-окна — окна входят в дневную сумму
   // (distribute получает остаток), а не падают сверху (иначе посадка/корректор съедают
   // дозу как «перебор»: 800У + окно 100У → резка максимального углеводного пункта = окна).
+  // §3C: резерв = то, что РЕАЛЬНО понесут под-кормления цепочки (до 3 слотов ×120 г на болюс),
+  // а не одно окно: 40 ЕД больше не «стоят» 120 г в бюджете при фактических 360.
+  const _insulinSlotCap = 120; // физиологический болюсный слот (≤120 г быстрых У)
+  const _insulinSlotsFor = (need: number): number => Math.min(3, Math.max(1, Math.ceil(need / _insulinSlotCap)));
   const _plannedMealMins: number[] = [tBreakfast, tLunch, tDinner, ..._snackTimes, ...((_keep.has('preSleep') && wantPreSleep) ? [tPreSleep] : [])]
     .map((t: any) => _toMin2(t)).filter((v: number) => Number.isFinite(v));
   if (trainWindow && _keep.has('prew')) _plannedMealMins.push(prewMin);
   if (trainWindow && _keep.has('postw')) _plannedMealMins.push(postwMin);
   if (intraEligible && _keep.has('intra') && input.trainStartMin) _plannedMealMins.push(input.trainStartMin + 30);
-  const _insulinPlanned: { min: number; carbG: number }[] = (input.injections || [])
+  const _insulinPlanned: { min: number; carbG: number; dose: number; slots: number }[] = (input.injections || [])
     .filter(i => (i.type || '').toLowerCase().includes('инсулин') && i.esterType !== 'long')
     .map(inj => {
       const dose = Number(inj.dose) || 8;
+      const need = Math.max(30, Math.round(dose * 10));
+      const slots = _insulinSlotsFor(need);
       const t = inj.time ? _toMin2(inj.time) : NaN;
-      return { min: Number.isFinite(t) ? t : 8 * 60, carbG: Math.max(30, Math.min(120, Math.round(dose * 10))) };
+      return { min: Number.isFinite(t) ? t : 8 * 60, dose, slots, carbG: Math.min(need, slots * _insulinSlotCap) };
     });
   const _insulinReserved = _insulinPlanned.reduce((s, p) => s + p.carbG, 0);
   // v3: угли ночи резервируются из дневной суммы (presleep — фиксированный бюджет, не доля).
@@ -3707,15 +3718,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _pickCtx.denseDay = _pickCtx.highVolumeDay
     || _carbsForRoles / Math.max(1, _roles.filter(r => r === 'breakfast' || r === 'lunch' || r === 'dinner' || String(r).startsWith('snack')).length) > 130;
   _pickCtx.isTrainingDayCtx = input.isTrainingDay !== false;
-  // §3A EXTREME-SCALE: профиль ёмкости (до распределения углеводов — вместимости приёмов
-  // уже учитывают инсулин/экстрим). Обычные дни: active=false → все капы байт-в-байт.
-  _pickCtx.capacity = extremeCapacityProfile({
-    insulinUnits: _bolusUnits,
-    carbsG: carbsTotal,
-    weightKg: input.weightKg,
-    goalKcal: input.goalKcal,
-    highVolumeDay: _pickCtx.highVolumeDay,
-  });
+  // §3A EXTREME-SCALE: профиль ёмкости (посчитан выше, до резерва окон) — вместимости
+  // приёмов уже учтены; здесь фиксируем его для порционных капов всех проходов.
+  _pickCtx.capacity = _capProfEarly;
   const _capOf = (r: string): number => _keep.has(r)
     ? mealCarbCapacityG(r, { budget: input.budget, weightKg: input.weightKg, trainDurationMin: input.trainDurationMin, nightCarbsG: _nightCarbs })
     : 0;
@@ -4310,7 +4315,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _hasMealNear = (min: number, tol = 30): boolean => meals.some(m => {
     const mt = _toMinOf(m.time); return mt !== null && Math.abs(mt - min) <= tol;
   });
-  const _injectMealAt = (min: number, label: string, note: string, carbG = 40, proteinG = 25, opts?: { insulinWindow?: boolean }): void => {
+  const _injectMealAt = (min: number, label: string, note: string, carbG = 40, proteinG = 25, opts?: { insulinWindow?: boolean; carbId?: string; noProtein?: boolean }): void => {
     const t = fmtTime(min);
     // Малый белково-углеводный приём (лёгкий, без жиров) — для сопровождения укола.
     // D-28+ fix (жалоба «инсулин и на тренировке так мало углеводов»): порция углеводов
@@ -4344,13 +4349,22 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Ищем напрямую в FOOD_DB (пулы урезаны variety-лимитом — доза от него не зависит).
     const _carbCands = [...(pool.carbFast || []), ...(pool.carbSlow || [])]
       .filter(f => (f.carbs || 0) > 0 && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f));
-    const _creamFirst = FOOD_DB.find(f => f.id === 'cream_of_rice'
+    // §3C: ротация носителей окон (цепочка из 3 под-кормлений не должна быть
+    // «cream_of_rice ×3») — carbId задаёт вызывающий, с фолбэком на плотный крем.
+    const _rotFirst = opts?.carbId
+      ? FOOD_DB.find(f => f.id === opts.carbId
+        && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f)
+        && (f.carbs || 0) >= 60)
+      : undefined;
+    const _creamFirst = _rotFirst ?? FOOD_DB.find(f => f.id === 'cream_of_rice'
       && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f));
     const _denseFirst = _creamFirst
       ?? [..._carbCands].sort((a, b) => (b.carbs || 0) - (a.carbs || 0))[0];
     const carb = (_denseFirst && (_denseFirst.carbs || 0) >= 60) ? _denseFirst : (pool.carbFast[0] || pool.carbSlow[0]);
     const items: MealItem[] = [];
-    if (source) items.push(_mkExact(source, proteinG, 'fast_protein'));
+    // §3C: под-кормления цепочки — ЧИСТО углеводные (noProtein): белок дня уже набран
+    // мейнами/первым окном, а 2–3 доп. сыворотки на болюс гнали протеин за цель (+20%).
+    if (source && !opts?.noProtein && proteinG > 0) items.push(_mkExact(source, proteinG, 'fast_protein'));
     if (carb) items.push(_mkExact(carb, Math.max(20, Math.round(carbG / Math.max(1, carb.carbs || 1) * 100)), 'carb_fast'));
     if (items.length === 0) return;
     const totals = items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
@@ -4378,12 +4392,18 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (inj.esterType === 'long') continue;
     const injMin = _toMinOf(inj.time) ?? 8 * 60;
     const dose = Number(inj.dose) || 8;
-    const needC = Math.round(dose * 10); // потребность окна
+    const needC = Math.max(30, Math.round(dose * 10)); // полная потребность болюса (≈10 г/1 ЕД)
+    const slotCap = _insulinSlotCap;                    // ≤120 г на под-кормление (физиологично)
+    // §3C: ротация носителей окна — 3 окна подряд не должны быть одним продуктом
+    // (только плотные не-добавочные: крем/хлопья; декстроза капнута 90 г = 81 г У).
+    const _rotCarbs = ['cream_of_rice', 'corn_flakes', 'grain_rice_flakes'];
+    const _label = `⚡ Углеводы под инсулин (${inj.name || 'инсулин'})`;
+    let covered = 0; // сколько углеводов болюса реально закрыто (окна + близкий основной приём)
     if (!_hasMealNear(injMin)) {
       // ~10 г быстрых углеводов на 1 ЕД болюсного инсулина; кап 120 г на одно окно (безопасность).
-      const carbG = Math.max(30, Math.min(120, needC));
-      const label = `⚡ Углеводы под инсулин (${inj.name || 'инсулин'})`;
-      _injectMealAt(injMin, label, `${label} — быстрые углеводы ${carbG} г при уколе ${dose} ЕД (≈10 г/1 ЕД, без жиров для скорости всасывания)`, carbG, 25, { insulinWindow: true });
+      const carbG = Math.max(30, Math.min(slotCap, needC));
+      _injectMealAt(injMin, _label, `${_label} — быстрые углеводы ${carbG} г при уколе ${dose} ЕД (≈10 г/1 ЕД, без жиров для скорости всасывания)`, carbG, 25, { insulinWindow: true, carbId: _rotCarbs[0] });
+      covered = carbG;
     } else {
       // Близкий приём покрывает болюс, только если несёт ≥80% потребности, —
       // иначе top-up окно на разницу (перекус 35 г не держит 10 ЕД!). Безопасность важнее дубля.
@@ -4405,10 +4425,46 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // окно-дубль не нужно (12:20-болюс при обеде 12:30). Дальше 20 мин — честный
       // топ-ап до потребности дозы (перекус 35 г не держит 10 ЕД).
       const _mainCovers = !!_isMainNear && _nearDt <= 20;
-      if (_near && _nearDt <= 60 && !_mainCovers && _nearC < needC * 0.8) {
-        const topC = Math.max(30, Math.min(120, needC - Math.round(_nearC)));
-        const label = `⚡ Углеводы под инсулин (${inj.name || 'инсулин'})`;
-        _injectMealAt(injMin, label, `${label} — топ-ап ${topC} г к приёму «${_near.label}» (${Math.round(_nearC)} г мало для ${dose} ЕД, нужно ~${needC} г)`, topC, 15, { insulinWindow: true });
+      if (_mainCovers) covered = needC; // приём укола закрывает болюс
+      else if (_near && _nearDt <= 60 && _nearC < needC * 0.8) {
+        const topC = Math.max(30, Math.min(slotCap, needC - Math.round(_nearC)));
+        _injectMealAt(injMin, _label, `${_label} — топ-ап ${topC} г к приёму «${_near.label}» (${Math.round(_nearC)} г мало для ${dose} ЕД, нужно ~${needC} г)`, topC, 15, { insulinWindow: true, carbId: _rotCarbs[0] });
+        covered = Math.round(_nearC) + topC;
+      } else if (_near && _nearDt <= 60) {
+        covered = Math.round(_nearC); // богатый приём рядом несёт ≥80% дозы
+      }
+    }
+    // §3C-цепочка: доза >12 ЕД не влезает в одно окно ≤120 г — добиваем 1–2 под-кормлениями
+    // (интервал 60 мин), каждое ≤120 г; слот пропускается, если рядом приём с ≥80% его дозы.
+    {
+      let remaining = needC - covered;
+      if (remaining >= 30) {
+        const slots = Math.min(2, Math.max(1, Math.ceil(remaining / slotCap)));
+        const per = Math.min(slotCap, Math.ceil(remaining / slots / 10) * 10);
+        let _chainIdx = 0;
+        for (let k = 1; k <= slots && remaining >= 30; k++) {
+          let t = injMin + k * 60;
+          if (t > 22 * 60) break;
+          // §3B/§3C: под-кормление не встаёт В ТУ ЖЕ минуту, что обычный приём:
+          // богатый сосед (≥80% слота) закрывает слот; иначе слот сдвигается ±30 мин.
+          const _nearMeal = meals
+            .filter(m => !(m as any)._insulinWindow && Math.abs((_toMinOf(m.time) ?? -1e9) - t) <= 20)
+            .sort((a, b) => Math.abs((_toMinOf(a.time) ?? 0) - t) - Math.abs((_toMinOf(b.time) ?? 0) - t))[0];
+          if (_nearMeal && (_nearMeal.totals?.c || 0) >= per * 0.8) { remaining -= per; continue; }
+          const _busy = (tt: number) => meals.some(m => Math.abs((_toMinOf(m.time) ?? -1e9) - tt) <= 10);
+          if (_nearMeal || _busy(t)) {
+            const _alt = t + 30;
+            const _alt2 = t - 30;
+            if (_alt <= 22 * 60 && !_busy(_alt)) t = _alt;
+            else if (_alt2 > injMin && !_busy(_alt2)) t = _alt2;
+          }
+          _chainIdx++;
+          _injectMealAt(t, _label, `${_label} — под-кормление ${_chainIdx}/${slots}: ${per} г быстрых У (доза ${dose} ЕД ≈ ${needC} г, одно окно ≤${slotCap} г)`, per, 0, { insulinWindow: true, carbId: _rotCarbs[(_chainIdx) % _rotCarbs.length], noProtein: true });
+          remaining -= per;
+        }
+        if (dose >= 25) {
+          notes.push(`💉 Болюс ${dose} ЕД ≈ ${needC} г быстрых У: покрыто ${Math.max(0, needC - remaining)} г (цепочка окон ≤${slotCap} г). При дозе ≥25 ЕД практика — split-болюс/пролонгированный болюс; держите декстрозу (гипогликемия).`);
+        }
       }
     }
   }

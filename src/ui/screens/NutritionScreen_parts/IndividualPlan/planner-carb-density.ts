@@ -137,8 +137,9 @@ export function extremeCapacityProfile(input: {
   const cPerKg = carbs / w;
   const insulin = Math.max(0, input.insulinUnits || 0);
   // Гейт: инсулин/≥8 г/кг/≥1200 г/≥7000 ккал. Обычные HV-дни (600–1000 г без инсулина)
-  // остаются на прежних капах — их калибровки не трогаем.
-  const hv = !!input.highVolumeDay && (insulin > 0 || cPerKg >= 8 || carbs >= 1200 || (input.goalKcal || 0) >= 7000);
+  // остаются на прежних капах — их калибровки не трогаем. (Все условия гейта ⇒ день
+  // highVolumeDay по определению движка, поэтому отдельный флаг не требуется.)
+  const hv = insulin > 0 || cPerKg >= 8 || carbs >= 1200 || (input.goalKcal || 0) >= 7000;
   if (!hv) return { ...DEFAULT_EXTREME_CAPACITY };
   const extreme = cPerKg >= 8 || insulin >= 20 || carbs >= 1200;
   return {
