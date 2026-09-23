@@ -42,8 +42,11 @@ export interface BBCorrective {
   retest: string;
   source: string;
   equipmentAlt: string[];
-  /** Токены-противопоказания: pm-red (красная боль), shoulder-pain, teen-loaded. */
+  /** Причина-противопоказание: pm-red (красная боль), shoulder-pain, teen-loaded. */
   contraindicated: string[];
+  /** Запасной вариант (домашний аналог): не вытесняет основную запись при равном скоре,
+   *  но виден/выбирается, когда основную отсекли фильтры оборудования/уровня. */
+  spare?: boolean;
 }
 
 function c(
@@ -378,6 +381,14 @@ export const BB_CORRECTIVES: BBCorrective[] = [
     ['Корпус стабилен, тянет бедро', 'Без разворота таза', 'Пауза 1с в конце'], 'Вес +1 шаг при 15', 'Копенгаген короткой ногой', 'Асимметрия ≤15%', 'CCEP (аддукторы)', ['copenhagen_plank'], ['pm-red']),
 ];
 
+// ROUND-10: домашние аналоги помечаем запасными — в равном скоре они не вытесняют основную запись
+// (порядок/приоритет калиброванного топа сохранён), но выбираются, когда основную отсекли фильтры.
+const HOME_SPARE_IDS = [
+  'dm-home-single-raise', 'dr-home-rear-db', 'cu-home-incline-pushup', 'bw-home-pullup',
+  'tri-home-overhead-db-both', 'cv-home-standing-calf', 'fa-home-wrist-db',
+];
+for (const rec of BB_CORRECTIVES) if (HOME_SPARE_IDS.includes(rec.id)) rec.spare = true;
+
 export const BB_CORRECTIVE_COUNT = BB_CORRECTIVES.length;
 
 export function correctiveById(id: string): BBCorrective | null {
@@ -498,6 +509,9 @@ export function rankCorrectives(s: BBScreenSignals): Array<{ corr: BBCorrective;
     if (s.asym && /single|одной|слабая/i.test(`${c.title} ${c.cues.join(' ')}`)) { score += 2; why.push('unilateral'); }
     if (!zoneHit && !sigHit) continue;
     score += c.phase === 'technique' ? 1 : 0;
+    // Запасной (домашний аналог) не вытесняет основную запись при равном скоре, но появляется,
+    // когда основную отсекли фильтры оборудования/уровня/противопоказаний.
+    if (c.spare) score -= 3;
     out.push({ corr: c, score, why });
   }
   out.sort((a, b) => b.score - a.score || a.corr.id.localeCompare(b.corr.id));

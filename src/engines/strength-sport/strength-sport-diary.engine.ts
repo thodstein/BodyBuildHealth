@@ -5,6 +5,7 @@
  */
 
 import { estimate1RMFromVelocitySS } from './strength-sport-vbt.engine';
+import { loadHubDiaryFlatEntries } from '../hub-diary.engine';
 
 export interface DiaryTrendSS {
   lift: string; // snatch | clean | squat | deadlift (канон)
@@ -102,14 +103,16 @@ export function detectPlateau(logs: any[], lift: string): boolean {
 
 /** @deprecated impure — используйте buildDiaryTrendSS(logs) с явным массивом (чистый). Оставлен для обратной совместимости UI. */
 export function loadDiaryLogsSS(): any[] {
+  // ROUND-10: единый адаптер — живой дневник `he_workout_log_v2` (легаси-ключи больше не пишутся),
+  // наружу отдаём ПЛОСКУЮ форму, которую ждут buildDiaryTrendSS/buildLastE1RMIndexSS.
   try {
-    for (const key of ['he_workout_log', 'he_training_log', 'he_workout_history', 'he_srpe_sessions']) {
-      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
-      if (!raw) continue;
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr) && arr.length) return arr;
-    }
-  } catch {}
+    const flat = loadHubDiaryFlatEntries();
+    if (flat.length) return flat as any[];
+  } catch { /* noop */ }
+  try {
+    const srpe = typeof localStorage !== 'undefined' ? localStorage.getItem('he_srpe_sessions') : null;
+    if (srpe) { const arr = JSON.parse(srpe); if (Array.isArray(arr) && arr.length) return arr; }
+  } catch { /* noop */ }
   return [];
 }
 

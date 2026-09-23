@@ -27,6 +27,7 @@ import { parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary } from '../
 import { sinclairCoefficient, sinclairTotal, qPoints, qMasters, qAgeScale, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
 import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
+import { loadHubDiarySessions } from '../../../engines/hub-diary.engine';
 import { auditTAPlan, hubTabForPhase, TA_CORE_PHASES, TA_AUX_PHASES } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
 import { diagnoseTAWeakCause, TA_WEAK_CAUSE_LABELS } from '../../../engines/strength-sport/strength-sport-ta-weak-cause.engine';
 import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-sport-ta-correction-rank.engine';
@@ -308,18 +309,14 @@ export const WLDiagnosticsHub: React.FC = () => {
 
   const diaryWeaks = useMemo(() => {
     try {
-      const raw = localStorage.getItem('he_workout_log_v1') || localStorage.getItem('he_training_log');
-      const logs = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(logs)) return [];
-      return detectTAWeakFromDiary(logs as any);
+      // ROUND-10: единый адаптер (живой he_workout_log_v2; легаси — только фолбэк)
+      return detectTAWeakFromDiary(loadHubDiarySessions() as any);
     } catch { return []; }
   }, []);
 
   const diaryPhases = useMemo(() => {
     try {
-      const raw = localStorage.getItem('he_workout_log_v1') || localStorage.getItem('he_training_log');
-      const logs = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(logs)) return [];
+      const logs = loadHubDiarySessions();
       const sn = candidateTAWeakPointsFromDiary(logs as any, 'snatch');
       const cl = candidateTAWeakPointsFromDiary(logs as any, 'clean');
       const jk = candidateTAWeakPointsFromDiary(logs as any, 'jerk');

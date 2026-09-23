@@ -17,6 +17,7 @@ import { VBT_SS_THRESHOLDS } from '../../../engines/strength-sport/strength-spor
 import { diagnoseVelocityLossSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { parseKinoveaCSV, analyzeBarTracking, diagnoseCarrySway } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { detectSMWeakFromDiary, candidateSMWeakPointsFromDiary, smWeeklySetsByLift, smLiftKeyForWeakPoint } from '../../../engines/strength-sport/strength-sport-sm-diary.engine';
+import { loadHubDiaryFlatEntries } from '../../../engines/hub-diary.engine';
 import { buildSMDiagnosticsHtml, downloadSMHtml, downloadSMCsv } from '../../../engines/strength-sport/strength-sport-sm-export.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { StrongmanVideoGoniometer } from './StrongmanVideoGoniometer';
@@ -504,11 +505,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   }, [profileTick]);
 
   const diaryLogs = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('he_workout_log') || localStorage.getItem('he_training_log') || localStorage.getItem('he_workout_log_v1');
-      const logs = raw ? JSON.parse(raw) : [];
-      return Array.isArray(logs) ? logs : [];
-    } catch { return []; }
+    // ROUND-10: движки SM ждут плоскую форму (exerciseName + sets[].weight) — берём из живого v2
+    // через единый адаптер (легаси-ключи уже никто не пишет, а пустой `[]` глушил чтение).
+    try { return loadHubDiaryFlatEntries(); } catch { return []; }
   }, [profileTick]);
 
   const weeklySetsByLift = useMemo(() => {

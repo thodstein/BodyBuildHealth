@@ -4,6 +4,8 @@
  * Читает логи дневника и считает тренд 28д (recent 0-28 vs prev 28-56)
  */
 
+import { loadHubDiaryFlatEntries } from '../hub-diary.engine';
+
 export interface DiaryTrendSM {
   lift: string; // yoke | farmers | stone | log | carry | stone_load | grip
   changePct: number;
@@ -82,14 +84,15 @@ export function buildDiaryTrendSM(logs: any[]): DiaryTrendSM[] | null {
 }
 
 export function loadDiaryLogsSM(): any[] {
+  // ROUND-10: единый адаптер — живой `he_workout_log_v2` в плоской форме (движки SM ждут exerciseName+weight)
   try {
-    for (const key of ['he_workout_log', 'he_training_log', 'he_workout_history', 'he_srpe_sessions']) {
-      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
-      if (!raw) continue;
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr) && arr.length) return arr;
-    }
-  } catch {}
+    const flat = loadHubDiaryFlatEntries();
+    if (flat.length) return flat as any[];
+  } catch { /* noop */ }
+  try {
+    const srpe = typeof localStorage !== 'undefined' ? localStorage.getItem('he_srpe_sessions') : null;
+    if (srpe) { const arr = JSON.parse(srpe); if (Array.isArray(arr) && arr.length) return arr; }
+  } catch { /* noop */ }
   return [];
 }
 

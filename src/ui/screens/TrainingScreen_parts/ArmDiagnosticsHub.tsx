@@ -37,6 +37,7 @@ import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine'
 import { buildArmSpecBlock } from '../../../engines/arm/arm-spec-block.engine';
 import { injectArmCorrections, saveArmPlanPrev, loadArmPlanPrev, clearArmPlanPrev } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { detectArmWeakByE1rm, armVolumeHistory28d, armPointsForMuscles } from '../../../engines/arm/arm-diary-weak-detection.engine';
+import { loadHubDiarySessions } from '../../../engines/hub-diary.engine';
 import { parseArmTrackCsv, armPathMetrics, classifyArmTrajectory, isArmRealChange } from '../../../engines/arm/arm-video-analysis.engine';
 import { assessArmMobility, mobilityFailForWeakPoint, applyArmMobilityToProfile } from '../../../engines/arm/arm-mobility.engine';
 import { autoregArmFromDiary, type ArmDiaryDay } from '../../../engines/arm/arm-diary-autoreg.engine';
@@ -586,11 +587,9 @@ export const ArmDiagnosticsHub: React.FC = () => {
   }, [armPlan, state.weakPoints]);
 
   const diarySessionsP0 = useMemo(() => {
-    try {
-      const raw = typeof localStorage !== 'undefined' ? (localStorage.getItem('he_workout_log_v1') || localStorage.getItem('he_training_log') || '[]') : '[]';
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : [];
-    } catch { return []; }
+    // ROUND-10: живой дневник — he_workout_log_v2; легаси-ключи больше не пишутся,
+    // а пустой `'[]'` в них раньше глушил чтение (единый адаптер — hub-diary.engine).
+    try { return loadHubDiarySessions(); } catch { return []; }
   }, [forceHistoryTick]);
 
   const diaryTrendsP0 = useMemo(() => {

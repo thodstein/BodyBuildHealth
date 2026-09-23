@@ -40,6 +40,7 @@ import { sfrOf } from '../../../engines/bb/bb-sfr-db';
 import { diagnoseWeakCausesBatch } from '../../../engines/bb/bb-weak-cause.engine';
 import { volumeHistory28d, e1rmTrend28d } from '../../../engines/bb/bb-weak-detection.engine';
 import { rankCorrectionsForWeak } from '../../../engines/bb/bb-correction-rank.engine';
+import { loadHubDiarySessions } from '../../../engines/hub-diary.engine';
 import { rankCorrectives, correctiveDose, correctiveLoadFactor } from '../../../engines/bb/bb-corrective.engine';
 import { correctiveBlockForBB, correctiveBlockExportLines } from '../../../engines/bb/bb-corrective-block.engine';
 import { buildSpecBlock } from '../../../engines/bb/bb-spec-block.engine';
@@ -468,11 +469,8 @@ export const BBDiagnosticsHub: React.FC = () => {
   const effSex = ((profileSex || state.sex || '') as '' | 'male' | 'female');
 
   const diarySessions: any[] = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('he_workout_log_v1') || localStorage.getItem('he_training_log') || localStorage.getItem('he_workout_log_v2') || '[]';
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : [];
-    } catch { return []; }
+    // ROUND-10: единый адаптер (живой he_workout_log_v2; цепочка `||` с `'[]'` глушила v2)
+    try { return loadHubDiarySessions(); } catch { return []; }
   }, []);
 
   const factVolume = useMemo(() => {
