@@ -120,9 +120,9 @@
 - Бонус-честность: `buildSrcMacrocycle` помечает в rationale недели без собственного цикла («использована ближайшая тренировочная раскладка»).
 - Тесты: NEW `pl-rationale-honesty.test.ts` 3/3 + `pl-tools-card.test.tsx` 5/5; `tsc --noEmit` 0; круг lms+SRCBBScreen_parts 1190/1191 (красный — предсуществующий `pl-auto-regressions`).
 
-### Фаза 2 — дубли (P1) — ◐ ВЫПОЛНЕНА БЕЗОПАСНАЯ ЧАСТЬ (21.09.2026)
+### Фаза 2 — дубли (P1) — ✅ ВЫПОЛНЕНА ПОЛНОСТЬЮ (21.09.2026 безопасная часть; 23.09.2026 — остаток 2.2, см. §10.4)
 - 2.1 ✅ Один селектор авторегуляции: NEW `AutoRegModeSwitch.tsx` (канон меток «ВЫКЛ/🤖 Авто/📓 Авто-дневник», aria-pressed, title) — заменены 4 копии (`PLPlanView` ×3, `PLCompetitionTab` ×1); локальные `segBtn/arBtn` удалены, source-guard-тест.
-- 2.2 ◐ Тапер-канон: удалена дословная inline-копия `buildPeakCycleCurveInline` — канон `buildPeakCycleTaperCurve` теперь один в `lms-taper.engine`, `pl-peak-cycle-taper` ре-экспортирует (круговой импорт разорван). `pro/taper.taperPlan` и `mesocycle-progression.taperCurve` пока оставлены (используются TaperPlannerTab/PeriodizationHub — решение об их сведении в Фазе 4).
+- 2.2 ✅ Тапер-канон: удалена дословная inline-копия `buildPeakCycleCurveInline` — канон `buildPeakCycleTaperCurve` теперь один в `lms-taper.engine`, `pl-peak-cycle-taper` ре-экспортирует (круговой импорт разорван). **Остаток закрыт 23.09.2026 (§10.4 п.5)**: `pro/taper.taperPlan` строит витринную кривую через канон `buildPLTaperCurve({mode:'pro'})` (числа 1-в-1, паритет-тест); `mesocycle-progression.taperCurve` остаётся единственной реализацией pro-кривой ВНУТРИ канона — не дубль.
 - 2.5 ✅ Мёртвые ветки `SRCBBScreen` удалены: BB-план, manual-заглушка, bridge, BB-tools, peak_bb/methods/analytics/prometrics/bb-charts (358 строк) + осиротевшие импорты/`deriveHints`/группы табов; `subViewList.bb/manual` = []; файл 2424→2067 строк (скрипт-хирургия `.tmp/pl-deadcode-surgery.mjs` с маркер-ассертами, проверено чтением).
 - 2.6 ✅ Мост `kind cycle` зарегистрирован: тип `CyclePayload` в `planner-bridge.ts` (без `as any`), дизайнер шлёт payload + `planning-track-open('pl')`, `SRCBBScreen` применяет свежий payload (ts ≤ 5 мин) при монтировании и пересобирает план. NEW тест `bridge-cycle` 4/4.
 - 2.3 ✅ Один набор % прикидов: `pro/pl-attempts.engine` (StrengthAnalysisHub) переведён на канон `MEET_STRATEGY_PCT` (`competition-attempts`): safe→conservative 90/95.5/100, standard→balanced 92/96/102, record→aggressive 93/97/105; второй набор 92.5/97.5/102.5 удалён. Осознанный re-baseline `strength-hub-p5` (180 кг: 167.5/175/185 → 165/172.5/182.5) с комментарием «было→стало».
@@ -148,7 +148,7 @@
   - Guard расширен: живые PL-файлы обязаны использовать `BbCard`/`BbFoldCard` из кита, локальных `SectionCard`-дублей нет, `TrainingPopups` берёт обвязку из кит-хелперов (`bbCardChrome`/`bbIconTile`, без локальных литералов кромки/тайла), добавлены DOM-дампы кита и живой карточки (`BlockView`) с проверкой кромки/тайла/12.5/aria-expanded.
 - Проверено: `tsc --noEmit` 0 по всему проекту; `SRCBBScreen_parts` 168/168; `TrainingScreen_parts` 1397/1397 (+чужой unhandled `revokeObjectURL`); `src/engines/lms` 1049/1049; `verify:apk-design` OK.
 
-### Фаза 4 — гигиена данных и кода (P2) — ◐ ВЫПОЛНЕНА ЧАСТЬ (21.09.2026)
+### Фаза 4 — гигиена данных и кода (P2) — ✅ ВЫПОЛНЕНА ПОЛНОСТЬЮ (21.09.2026 часть; 23.09.2026 — остаток §3/§4 и данных, см. §10.4)
 - ✅ Алиасы циклов приведены к существующим id каталога (после keep-first дедупа): `ohp_bar→ohp`, `ohp_seated_db→bench_db` («жим гантелей вниз головой»), `lateral_raise_v2→lateral_raise` / `front_raise_db` («перед собой»); добавлен комментарий-контракт. **Красный `pl-auto-regressions` позеленел** — круг lms+SRCBBScreen_parts **1197/1197, 0 падений**.
 - ✅ Удалён мёртвый файл `src/engines/lms/periodization-methods.ts` (0 импортёров, включая тесты) + осиротевшие `bbChart` и `methodHints` в `SRCBBScreen`/`PLPlanView` (сеттер жил только в удалённой BB-вкладке «Методики» — бейдж был недостижим).
 - ✅ Псевдо-упражнения источника («Отдых», «Тест: проходка (до макс)») больше не портят метрики: NEW `isPseudoExercise` в `lms-metrics.engine`, фильтр в `calcSessionMetrics` (и, через него, в `calcCycleMetrics`/`calcCycleMetricsAggregate`) — не идут в КПШ/тоннаж/интенсивность и не считаются в `exerciseCount`; строки в плане/UI сохранены. NEW `pl-metrics-pseudo.test.ts` 3/3. Круг lms+UI **1200/1200**.
@@ -157,7 +157,7 @@
 - 🔍 Замер `sessionsPerWeek` vs явные недели (probe, удалён): 24 цикла с расхождением, из них **19 — плановые короткие недели делода/тейпера** (cycle-07, block-*, sheiko-*, smolov, candito-6, wendler-*, rts-9, tsa-9 и др. — метаданные = типовая неделя, менять не нужно), **5 — реальный дефект данных**: `juggernaut-2`, `korte-3x3`, `cube`, `russian-squat`, `src2-solovyov-bench-28` хранят **одну сессию в неделе** при заявленных 3–4×/нед (план из них = 1 сессия/нед). Правка размножит сессии по неделям → **меняет планы** (объём ×3–4) — вынесено на решение; альтернатива без смены математики (spw=1 + исключение из 3–4-дневных подборов) делает честными метаданные, но циклы становятся неприменимы на 3–4 днях.
 - ✅ **Решение пользователя по 5 дефектным циклам**: корректно пересобрать нельзя → **удалены** `juggernaut-2`, `korte-3x3`, `cube`, `russian-squat`, `src2-solovyov-bench-28` (файлы + индекс + `SPEED_CYCLE_IDS`); реестр 132→127, PL-циклов 89→84, advanced-фильтр 66→65 (re-baseline с комментариями). Круги lms+UI **1238/1238**.
 - ⏸ Решение пользователя: PL-делод-инференс — **не делаем** (зафиксировано).
-- ⏸ Остаток (по решению/чистке): записи-определения вытесненных id в каталоге (keep-first их не пропускает); dead bio-маппинг для вытесненных id (`exercise-id-mapping.ts`). Полная структура `BbCard/BbFoldCard` — ✅ выполнена в Фазе 3 (22.09.2026).
+- ✅ Остаток закрыт 23.09.2026 (§10.4): dead bio-маппинг вытесненных id — закрыт ещё в P2-раунде (57 ключей, lock «0 мёртвых»); §3/§4-хвосты (alert/prompt, macro-персист, e1RM/LVP, RPE→%, taper-канон, kinds моста, weakpoint-pl 8/63) — все закрыты. Записи-определения вытесненных id в каталоге остаются принятой границей (keep-first их не пропускает; удаление задело бы id-count-ассерты — отдельное решение). Полная структура `BbCard/BbFoldCard` — ✅ выполнена в Фазе 3 (22.09.2026).
 
 ## §7. Критерии готовности
 - Любой UI-путь не меняет `LMS_CYCLES` (snapshot-тест) и не применяет изменённый цикл без явного согласия.
@@ -340,4 +340,45 @@
    `revokeObjectURL` — чужие предсуществующие); `tsc --noEmit` **0 по всему проекту**;
    `verify:apk-design` OK; `vite build` **OK** (32.65с, PWA сгенерён). Полный прогон всего
    проекта — по запросу (тяжёлый, вне обязательного круга).
+
+### §10.4 Закрытие остатка Фаз 2/4 и §3/§4 (Sep 23 2026) — ✅ ВЫПОЛНЕНО
+
+По решению пользователя закрыт максимальный объём остатка (включая taper-дубли). Только
+Edit/Write + vitest/tsc; чужие WIP не тронуты; коммиты строго pathspec; без пуша.
+**Математика планов не менялась** — единственное «сведение» (taper-кривая) числа 1-в-1
+(паритет-тест), остальное — гигиена/честность.
+
+1. **alert/prompt → тосты** (§4): `AutoregPanel`/`RecoveryPanel`/`PeakingPanel` — канонический
+   `useEditorToast` (`window.showToast` живёт только в контуре питания — в тренинге `alert`
+   был реальным путём); `PlDeadpointsBarPathCard` — 6× `prompt()` → `PopupText compact`
+   (шит; новый опциональный проп, существующие потребители `PopupText` не тронуты).
+   Тест `pl-alert-toasts` 4/4 (source-guard без вызовов + поведение тостов/шита).
+2. **macro-настройки тапера** (§3/§4): `plMacroTaperMode/plMacroWeightGoal/plMacroMockMeet/
+   plMacroPostMeet` персистятся в `he_pl_session` и восстанавливаются валидаторами
+   (`validateSavedMacroTaperMode/WeightGoal/Bool` в `taper-state`). Ярлыки макро-контекста
+   отделены («Раскладка тапера макроцикла»), т.к. контекст отдельный от циклового
+   (дефолт 'classic' vs 'pl') — слияние состояний меняло бы числа по умолчанию.
+   Тесты `taper-state` 6→8.
+3. **e1RM/LVP** (§3): приватная LVP-таблица `estimate1rm.engine` выведена из канона
+   `vbt.engine.LOAD_VELOCITY_PROFILE` (подмножество тех же 6 опорных % — интерполяция
+   1-в-1; `ohp`/`row` остаются на фолбэке squat, как было). Паритет-тесты в
+   `estimate1rm.test.ts` (18/18).
+4. **RPE→%** (§3): сверка показала ДВЕ осознанные линейки — Epley (авторегуляция/дневник)
+   и Brzycki (сетка StrengthAnalysisHub/OneRmCalcTab); сведение изменило бы числа одной
+   стороны. Граница заморожена якорным тестом `rpe-formulas-boundary` (4/4): обе линейки
+   монотонны, якоря зафиксированы, намеренное расхождение ≤5 п.п.
+5. **Taper-дубли** (остаток 2.2): `pro/taper.taperPlan` строит витринную кривую через канон
+   `buildPLTaperCurve({taperWeeks, mode:'pro', peakIntensityPct:0.90})` с адаптером к
+   прежнему `TaperWeek`-шейпу — прямого дубля кривой больше нет; числа 1-в-1
+   (паритет-тест `taper.test.ts` 16/16 + `taper-planner-tab` 6/6).
+6. **Мост** (P0-4): неизвестные ПЛ-экрану kinds (`program/design/macrocycle/annual_block/
+   methodology/cardio/bb_nutrition/arm_cycle/ss_cycle/combat_cycle/tempo_rollback`) больше
+   не съедаются молча — честная заметка `setMethodNote`. Source-guard в
+   `pl-p2-data-hygiene` (18/18).
+7. **weakpoint-pl** (P0-8): core-fallback резолвера (сравнение ядер без скобочных
+   уточнений) + 8 имён приведены к каталогу (блок-бицепс, трицепс-блок ×3, жим носками,
+   икры ×2, шраги ×2; Смит/тренажёр-вариантов в каталоге нет — взяты ближайшие
+   каталог-записи). Lock: 0 нерезолвленных на всех 36 фазах (`weakpoint-pl` 14/14).
+8. **Верификация**: обязательный круг + `tsc` + `verify:apk-design` + `vite build` —
+   числа в AGENTS-записи раунда.
 
