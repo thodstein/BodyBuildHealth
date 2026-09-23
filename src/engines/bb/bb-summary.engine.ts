@@ -198,6 +198,27 @@ export function patternRu(pattern: string): string {
   return PATTERN_RU[pattern] || pattern;
 }
 
+/**
+ * §5.2: единая расшифровка упражнения для PDF/CSV — подгруппа (подмышка/головка),
+ * паттерн по-русски и пояснение «чем хорошо / как работает» (display-only).
+ */
+export function bbExerciseExplanation(ex: any): { subgroup: string; pattern: string; why: string; how: string } {
+  const muscle = String(ex?.muscle || '');
+  let pattern = getPatternForExercise(ex);
+  // Display-only уточнение: derivePattern не выделяет наклонный жим (валидатор/атрибуция
+  // не тронуты) — для PDF/CSV показываем «наклонный жим» честно.
+  if (pattern === 'horizontal_push' && /наклон|incline/i.test(ex?.name || '')) pattern = 'incline_push';
+  const known = !!SUBGROUP_MAP[muscle];
+  const subId = resolveSubgroup(muscle, pattern, ex?.name || '', (ex as any)?.backSubgroup, (ex as any)?.armSubgroup);
+  const expl = known ? subgroupExplanation(muscle, subId) : undefined;
+  return {
+    subgroup: known ? (expl?.labelRu || '') : '',
+    pattern: patternRu(pattern),
+    why: expl?.why || '',
+    how: expl?.how || '',
+  };
+}
+
 export function buildBBExpandedSummary(plan: BBPlan): BBExpandedSummary {
   const byMuscle: Record<string, BBMuscleSummary> = {};
   let totalWorkingSets = 0;

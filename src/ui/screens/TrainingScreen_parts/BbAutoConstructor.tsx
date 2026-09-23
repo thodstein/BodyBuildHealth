@@ -31,6 +31,7 @@ import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-me
 import { buildBBPlanReportText } from '../../../engines/bb/bb-report.engine';
 import { averageWeeklyScores, scoreVolumeWeek, scoreProWeek, gradeFor } from '../../../engines/bb/bb-quality-weekly.engine';
 import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
+import { bbExerciseExplanation } from '../../../engines/bb/bb-summary.engine';
 import { buildMEVCalibration, recordMEVCalibrationWeek, resolveMEVAfterCalibration, isMEVCalibrationComplete, mevCalibrationProgress, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, mevSignalDegradation, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { suggestMethodologyForStack, recommendPEDMethodology, applyPEDMethodologyToPlan } from '../../../engines/bb/bb-ped-methodology.engine';
@@ -2958,10 +2959,13 @@ export const BbAutoConstructor: React.FC = () => {
           const chain = techniqueChainParts(e);
           const sets = [...(e.workSets || []).map(ws => `${ws.reps}×${ws.weight}кг @RIR${ws.rir ?? e.rir}`), ...(chain ? [chain.label + ': ' + chain.parts.join(' → ')] : [])].join(', ');
           const sub = e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : '';
-          return `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.exerciseName || e.name || '')}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.muscle)}${sub ? ' · ' + esc(sub) : ''}</td><td style="padding:4px 8px;border:1px solid #ddd">${e.sets}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(sets)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(feat ? '💥 ' + feat : '')}${esc(e.comment || '')}</td></tr>`;
+          // §5.2: подмышка/паттерн/пояснение — колонками (раньше подгруппа склеивалась с мышцей, пояснения не было)
+          const expl = bbExerciseExplanation(e);
+          const subLabel = sub || expl.subgroup || '';
+          return `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.exerciseName || e.name || '')}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.muscle)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(subLabel)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(expl.pattern)}</td><td style="padding:4px 8px;border:1px solid #ddd">${e.sets}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(sets)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc([expl.why, expl.how].filter(Boolean).join(' · '))}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(feat ? '💥 ' + feat : '')}${esc(e.comment || '')}</td></tr>`;
         }).join('');
         const restNote = s.exercises.length === 0 ? `<p style="font-size:11px;color:#888;margin:6px 0">😴 Полный отдых — позирование, растяжка, сон 8–9 ч.${(s as any).comment ? ' ' + esc((s as any).comment) : ''}</p>` : '';
-        return `<h3 style="margin:12px 0 4px">День ${si + 1}${s.sessionTag ? ' — ' + esc(sessionTagLabel(s.sessionTag)) : ''}${(s as any).peakWeekTraining ? ' — 🎭 памп' : ''}${(s as any).peakWeekRest ? ' — 😴 отдых' : ''}</h3>${restNote}<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Упражнение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Мышца</th><th style="padding:4px 8px;border:1px solid #ddd">Сеты</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Вес/Reps</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Коммент</th></tr></thead><tbody>${exsHtml}</tbody></table>`;
+        return `<h3 style="margin:12px 0 4px">День ${si + 1}${s.sessionTag ? ' — ' + esc(sessionTagLabel(s.sessionTag)) : ''}${(s as any).peakWeekTraining ? ' — 🎭 памп' : ''}${(s as any).peakWeekRest ? ' — 😴 отдых' : ''}</h3>${restNote}<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Упражнение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Мышца</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Подмышка</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Паттерн</th><th style="padding:4px 8px;border:1px solid #ddd">Сеты</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Вес/Reps</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Пояснение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Коммент</th></tr></thead><tbody>${exsHtml}</tbody></table>`;
       }).join('');
       const peakNote = (wk as any).peakWeek === true ? ` — 🎭 ПИК-НЕДЕЛЯ (тапер ББ)` : '';
       const prepNote = (wk as any).prepProtocol ? `<p style="font-size:10px;color:#888;margin:2px 0">${esc((wk as any).prepProtocol)}</p>` : '';
@@ -3092,27 +3096,30 @@ export const BbAutoConstructor: React.FC = () => {
   const handleExportCSV = () => {
     if (!builtPlan) return;
     const plan = applyEditsToPlan(builtPlan);
-    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема'].join(',')];    for (const wk of plan.weeks) {
+    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Подмышка', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема', 'Пояснение'].join(',')];    for (const wk of plan.weeks) {
       for (let si = 0; si < wk.sessions.length; si++) {
         const s = wk.sessions[si];
         for (const ex of s.exercises) {
           const ws = ex.workSets || [];
           const chain = techniqueChainParts(ex);
           const feat = [...exerciseFeatureBadges(ex).map(b => b.label), ...(chain ? [chain.label + ': ' + chain.parts.join(' -> ')] : [])].join('; ');
+          // §5.2: подмышка/пояснение — отдельными колонками (паттерн уже был)
+          const expl = bbExerciseExplanation(ex);
           for (let i = 0; i < (ws.length || ex.sets); i++) {
             const set = ws[i] || { reps: ex.repsRange?.[0] || 10, weight: 0, rir: ex.rir };
             const esc = (v: any) => `"${String(v || '').replace(/"/g, '""')}"`;
             rows.push([
-              wk.week, si + 1, esc(ex.exerciseName || ex.name), esc(ex.muscle),
+              wk.week, si + 1, esc(ex.exerciseName || ex.name), esc(ex.muscle), esc(expl.subgroup),
               ex.role, i + 1, set.reps, set.weight, set.rir,
               esc(ex.tempoSpec || ''), ex.restSeconds || '',
-              esc(ex.executionProfile?.pattern || ''),
+              esc(ex.executionProfile?.pattern || expl.pattern),
               esc(ex.executionProfile?.cues.join('; ') || ''),
               esc(ex.executionProfile?.stretch || ''),
               esc(ex.executionProfile?.peak || ''),
               esc(ex.executionProfile?.mistakes.join('; ') || ''),
               esc(ex.comment || ''),
               esc(feat),
+              esc([expl.why, expl.how].filter(Boolean).join(' · ')),
             ].join(','));
           }
         }

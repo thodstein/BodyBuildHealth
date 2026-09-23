@@ -199,8 +199,11 @@
 
 1. **target-volume planner ↔ feeder selection** — глубже объединить в один allocation-pass
    (GEN-MAX §12 / MAX-FINAL §7). Архитектурное, non-blocking.
-2. **PDF/CSV-колонки «Подмышка | Паттерн | Пояснение»** (QUALITY-PLAN §21.2) — в коде нет;
-   `explanation {why/how/patternRu}` живёт display-only в `bb-summary.engine.ts:45,143`.
+2. **PDF/CSV-колонки «Подмышка | Паттерн | Пояснение»** — ✅ закрыто: NEW
+   `bbExerciseExplanation(ex)` в `bb-summary.engine.ts` (display-only: подгруппа/головка,
+   паттерн по-русски с уточнением «наклонный жим» для PDF/CSV, why/how), печать плана и
+   CSV-экспорт ББ-авто получили колонки «Подмышка»/«Паттерн»/«Пояснение»; тесты
+   `bb-summary.test.ts` (+4). `explanation {why/how/patternRu}` больше не display-only-мёртвый.
 3. **«Настройка по результатам реальных тренировок»** (REBUILD) — бессрочный бэклог.
 4. **FULL-AUDIT-2026-08-28 §9** — чекбоксы не отмечены; фактически закрыто поздними
    коммитами (parseDose, bb-dup clone, heavyQuads, prescribeLoad phase, спец-приоритет,
@@ -284,6 +287,11 @@ Re-baseline тестов — только с комментарием «было
 - **3.6**: `legs:140`/`core:80` в DEFAULT_WORKMAX.
 - **4.x** — см. §4.
 
-**Осознанно отложено (не блокирует):** §5 (target-volume↔feeders, PDF/CSV-колонки,
-«реальные тренировки»), §7 (демография/эталонные слои/темп-оверрайд гарда — только по
-согласованию), допуск ±16 blast/cruise.
+**Осознанно отложено (не блокирует):** §5.1 (target-volume↔feeders — allocation-pass),
+§5.3 («реальные тренировки» — бессрочный бэклог), §7 (демография/эталонные слои/темп-оверрайд
+гарда — только по согласованию), допуск ±16 blast/cruise.
+
+**Продолжение после коммита `ce96a4d8` (Sep 23 2026):**
+- §5.2 закрыт: `bbExerciseExplanation` + колонки «Подмышка | Паттерн | Пояснение» в печати
+  и CSV (display-only; `derivePattern`/валидатор не тронуты), +4 теста.
+- Коммит-2 (pathspec своих файлов) — см. AGENTS.
