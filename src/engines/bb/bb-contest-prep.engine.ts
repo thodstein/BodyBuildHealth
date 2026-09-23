@@ -2210,9 +2210,6 @@ export function legacyConfigFromProfile(
   };
 }
 
-// ── Ключ хранения в профиле ──
-export const BB_PREP_CONFIG_KEY = 'bbPeakConfig';
-
 // ═══════════════════════════════════════════════════════════════════════════
 // BBContestPrepPlan — единая версионированная модель contest prep
 // (Этап 2: preparation / taper / peakWeek / showDay разделены, safety, версии)
@@ -2333,8 +2330,6 @@ export interface BBContestPrepPlan {
 
 export const PREP_PLAN_VERSION = 2;
 export const PREP_ALGORITHM_VERSION = 2;
-/** Ключ хранения единого плана в профиле (goals.bbContestPrepPlan). */
-export const BB_PREP_PLAN_KEY = 'bbContestPrepPlan';
 
 export const PREP_PHASE_LABELS: Record<PrepPhaseKey, string> = {
   preparation: 'Подготовка',

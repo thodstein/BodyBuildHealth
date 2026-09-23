@@ -702,7 +702,7 @@ export const BB_NUTRITION_NOTE_KEY = 'he_bb_nutrition_note';
  * Пишет заметку в localStorage (he_bb_nutrition_note) + копирует текст в буфер.
  */
 const bbNutritionHandler: Handler = (payload, { showToast }) => {
-  const d = payload.data as { kcal?: number; proteinG?: number; trainDays?: number[]; weeklySets?: number; splitId?: string };
+  const d = payload.data as { kcal?: number; proteinG?: number; trainDays?: number[]; weeklySets?: number; splitId?: string; weightKg?: number; sex?: 'male' | 'female'; goal?: string };
   const kcal = typeof d?.kcal === 'number' ? d.kcal : undefined;
   const proteinG = typeof d?.proteinG === 'number' ? d.proteinG : undefined;
   const trainDays = Array.isArray(d?.trainDays) ? d.trainDays : [];
@@ -710,13 +710,17 @@ const bbNutritionHandler: Handler = (payload, { showToast }) => {
   const trainDaysLabel = trainDays.length
     ? `Трен-дни: ${trainDays.map(day => ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][day - 1] ?? day).join(', ')} — углеводы выше в трен-дни, ниже в отдых.`
     : '';
+  const basisLabel = (typeof d?.weightKg === 'number' && d.weightKg > 0)
+    ? `Основа расчёта: вес ${d.weightKg} кг · цель ${d.goal || '—'} · ${d.sex === 'female' ? 'жен' : d.sex === 'male' ? 'муж' : 'пол не указан'} (ориентир; уточните в планировщике).`
+    : '';
   const kcalLabel = kcal ? `Целевой калораж: ~${kcal} ккал/день.` : '';
   const proteinLabel = proteinG ? `Белок: ~${proteinG} г/день.` : '';
   const volumeLabel = weeklySets ? `Недельный объём: ${weeklySets} рабочих сетов.` : '';
-  const text = ['🍽 Питание для ББ-плана:', kcalLabel, proteinLabel, volumeLabel, trainDaysLabel].filter(Boolean).join('\n');
+  const text = ['🍽 Питание для ББ-плана:', kcalLabel, proteinLabel, volumeLabel, trainDaysLabel, basisLabel].filter(Boolean).join('\n');
   try {
     localStorage.setItem(BB_NUTRITION_NOTE_KEY, JSON.stringify({
       kcal, proteinG, trainDays, weeklySets, splitId: d?.splitId,
+      weightKg: d?.weightKg, sex: d?.sex, goal: d?.goal,
       text, updatedAt: new Date().toISOString(),
     }));
   } catch { /* ignore */ }

@@ -62,7 +62,7 @@ import { finalizeBBPlan } from './bb-finalize.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
-import { insulinWindowActive } from './bb-insulin-window.engine';
+import { insulinWindowActive, applyInsulinWindowToPlan } from './bb-insulin-window.engine';
 import { recommendPEDMethodology, applyPEDMethodologyToPlan } from './bb-ped-methodology.engine';
 import { REP_SCHEMES, schemeFor, schemeToLoading, applySchemeToPlan, applyBfrPattern } from './bb-rep-schemes.engine';
 import { bbVbtRecommendation } from './bb-vbt.engine';
@@ -1321,6 +1321,10 @@ export const DEFAULT_WORKMAX: Record<string, number> = {
   delt_front: 70, delt_mid: 70, delt_rear: 70, forearms: 45,
   biceps: 45, triceps: 50,
   lower_back: 120, neck: 70,
+  // Легаси-композиты WEAK_GROUPS ('legs'/'core') — алиасы; без них defaultWorkMax('legs'/'core')
+  // падал в fallback 80 кг (ниже реальных дефолтов) и шумел предупреждением.
+  legs: 140,
+  core: 80,
 };
 export const defaultWorkMax = (key: string): number => {
   const collapsed = collapseKey(key);
@@ -3059,7 +3063,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         const baseMrv: Record<string, number> = {};
         for (const [m, lm] of Object.entries(getAllVolumeLandmarks(level))) baseMrv[m] = (lm as MuscleVolumeLandmarks).mrv;
         pedAdapt = adaptForPEDs(active as any, baseMrv, doses as any, input.courseIntensity || 'moderate');
-      } catch { /* без PED-адаптации — натуральный путь */ }
+      } catch (e) { console.warn('[BB] PED-адаптация не применена — натуральный путь:', e); }
     }
   }
   const inputWorkMax = input.workMax || {};
@@ -3907,7 +3911,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (bal.ratios['quad/ham'] > 1.5 && mrvByMuscle['hamstrings'] && !balTargeted('quads')) mrvByMuscle['hamstrings'] = Math.round(mrvByMuscle['hamstrings'] * 1.2);
       if (bal.ratios['quad/ham'] < 0.66 && mrvByMuscle['quads'] && !balTargeted('hamstrings')) mrvByMuscle['quads'] = Math.round(mrvByMuscle['quads'] * 1.2);
     }
-  } catch {}
+  } catch (e) { console.warn('[BB] автоправка баланса (MRV) пропущена:', e); }
   if (pedAdapt) {
     basePlan.pedAdaptation = {
       combinedMrvMultiplier: pedAdapt.combinedMrvMultiplier,
@@ -4834,7 +4838,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     } else {
       finalized.rationale.push(`🔄 Сплит «${pattern.name}» адаптирован: оценка бюджета ${weeklyBudgetEstimate} сетов/нед (натурал) — все сплиты масштабируются под режим`);
     }
-  } catch (e) { /* ped overlay не должен ломать план */ }
+  } catch (e) { console.warn('[BB] PED overlay (схемы/методики/adapt-note) пропущен:', e); }
 
   // BFR-режим: окклюзия 20-30% 1RM, 30-15-15-15, 30с — только памп-изоляции, тяж не трогает.
   if (input.bfrMode) {
@@ -4954,6 +4958,27 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   if (input.packingV2 === true && finalized.weeks.some((w: any) => (w.sessions || []).some((s: any) => (s as any).packingApplied === true))) {
     (finalized as any).packingV2 = true;
   }
+  // GH+инсулин памп-окно (bb-insulin-window): только пометки в памп/лёгких днях + rationale,
+  // тяж-дни и объём не меняются. Ранее движок был мёртв (import-only, ни одного вызова).
+  try {
+    const dosesW: any = input.pedDoses || {};
+    const doseValW = (v: unknown): number => {
+      if (typeof v === 'number') return v;
+      if (v == null) return 0;
+      return parseFloat(String(v).replace(',', '.').replace(/[^0-9.\-eE]/g, '')) || 0;
+    };
+    const pedsW = (pedAdapt?.activePEDs || Object.keys(input.pedDoses || {})).map((p: string) => String(p).toLowerCase());
+    const win = {
+      hasGH: doseValW(dosesW.GH) > 0 || pedsW.some((p: string) => /(^|[_\s-])gh|hgh|somatrop|ghrp|ipamorelin|sermorelin|cjc/.test(p)),
+      ghDose: doseValW(dosesW.GH),
+      hasInsulin: doseValW(dosesW.insulin) > 0 || pedsW.some((p: string) => /insulin|ins_/.test(p)),
+      insulinDose: doseValW(dosesW.insulin),
+      hasAAS: doseValW(dosesW.AAS) > 0 || pedsW.some((p: string) => /test|tren|deca|nandro|bold|prim|drost|stan|oxan|methan|anadrol/.test(p)),
+    };
+    if (insulinWindowActive(win)) {
+      finalized = applyInsulinWindowToPlan(finalized, win);
+    }
+  } catch (e) { console.warn('[BB] insulin window пропущено:', e); }
   return finalized;
 }
 

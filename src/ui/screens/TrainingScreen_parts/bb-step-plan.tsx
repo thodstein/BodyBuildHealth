@@ -50,6 +50,10 @@ export interface BbPlanStepProps {
   setCollapsedExercises: React.Dispatch<React.SetStateAction<Set<string>>>;
   bbTrainingFocus: 'strength' | 'hypertrophy' | 'endurance';
   bbLevel: string;
+  /** Стаж/курс/объёмный режим — для честных лимитов сессии в «Проверке плана» (канон движка). */
+  bbTrainingYears?: number;
+  onCourse?: boolean;
+  trainingVolumeMode?: 'standard' | 'high';
   setSubTarget: React.Dispatch<React.SetStateAction<{ dayIdx: number; exIdx: number; sessionIdx: number } | null>>;
   handleSendToExecution: () => void;
   setWeightEntries: React.Dispatch<React.SetStateAction<PlanWeightEntry[]>>;
@@ -63,7 +67,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
   builtPlan, metrics, bbWeekSel, setBbWeekSel, bbWeeks, autoDeload, weakPoints, dupMode,
   autoRegOn, autoRegResult, exerciseEdits, setExerciseEdits, editMode, setEditMode,
   collapsedDays, setCollapsedDays, collapsedExercises, setCollapsedExercises,
-  bbTrainingFocus, bbLevel, setSubTarget, handleSendToExecution,
+  bbTrainingFocus, bbLevel, bbTrainingYears, onCourse, trainingVolumeMode, setSubTarget, handleSendToExecution,
   setWeightEntries, setWeightsApplied, setStep, actionRow,
 }) => {
   if (!builtPlan || !metrics) return null;
@@ -105,7 +109,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
               badge={badge.label}
             >
               <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginBottom: 6, lineHeight: 1.45 }}>
-                Учтены: уровень «{bbLevel}», {bbWeeks} нед, {bbTrainingFocus === 'strength' ? 'силовой' : bbTrainingFocus === 'endurance' ? 'выносливостный' : 'гипертрофийный'} фокус, лимиты сессии {(() => { try { const l = sessionLimitsFor({ level: bbLevel } as any, { id: builtPlan.pattern?.id } as any); return `${l.maxExercises} упр / ${l.maxWorkingSets} сетов`; } catch { return '—'; } })()}.
+                Учтены: уровень «{bbLevel}», {bbWeeks} нед, {bbTrainingFocus === 'strength' ? 'силовой' : bbTrainingFocus === 'endurance' ? 'выносливостный' : 'гипертрофийный'} фокус, лимиты сессии {(() => { try { const l = sessionLimitsFor({ level: bbLevel, trainingYears: bbTrainingYears, onCourse, trainingVolumeMode } as any, { id: builtPlan.pattern?.id } as any); return `${l.maxExercises} упр / ${l.maxWorkingSets} сетов`; } catch { return '—'; } })()}.
                 Максимум в плане: {stats.maxExercises} упр / {stats.maxSets} сетов за сессию.
               </div>
               {view.accentNote && (

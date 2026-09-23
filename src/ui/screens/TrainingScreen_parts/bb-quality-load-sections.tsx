@@ -208,7 +208,6 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({ ct
             if (!phaseGroups[p]) phaseGroups[p] = [];
             phaseGroups[p].push(w.week);
           }
-          const distText = Object.entries(phaseGroups).map(([p, weeks]) => `${PHASE_LABELS[p as BBPhase] || p}: нед ${weeks.join(',')}`).join(' · ');
           const totalSetsWeek = wkExs.reduce((a,e)=> a+ (e.sets||0),0);
           return <CollapsibleCard title={`📌 Фаза (факт) — ${PHASE_LABELS[curPh] || curPh}`} defaultOpen={true} headerStyle={{ background: `linear-gradient(135deg, ${PHASE_COLORS[curPh]}18, ${PHASE_COLORS[curPh]}08)`, color: PHASE_COLORS[curPh] }}><div style={{ marginBottom:6, padding:'10px 12px', borderRadius:12, background:PHASE_COLORS[curPh] + '18', border:'1px solid ' + PHASE_COLORS[curPh] + '30' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6 }}>

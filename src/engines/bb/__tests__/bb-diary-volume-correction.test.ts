@@ -47,10 +47,12 @@ describe('applyDiaryVolumeCorrection (Фаза 2.10)', () => {
     }));
     const { plan: out, changes } = applyDiaryVolumeCorrection(plan, sessions as any);
     expect(changes.some(c => c.includes('Adherence'))).toBe(true);
-    // сеты не выросли ни у кого
-    for (const w of out.weeks) for (const s of w.sessions) for (const e of s.exercises) {
-      expect(e.sets).toBeLessThanOrEqual(e.sets);
-    }
+    // сеты не выросли ни у кого: сравнение с ИСХОДНЫМ планом (раньше был тавтологичный e.sets <= e.sets)
+    const srcSets = plan.weeks.flatMap((w: any) => w.sessions.flatMap((s: any) => s.exercises.map((e: any) => e.sets)));
+    const outSets = out.weeks.flatMap((w: any) => w.sessions.flatMap((s: any) => s.exercises.map((e: any) => e.sets)));
+    const n = Math.min(srcSets.length, outSets.length);
+    expect(n).toBeGreaterThan(0);
+    for (let i = 0; i < n; i++) expect(outSets[i]).toBeLessThanOrEqual(srcSets[i]);
   });
 
   it('корректный per-muscle ACWR: перегруженная мышца без опасных зон — без изменений', () => {
@@ -59,7 +61,7 @@ describe('applyDiaryVolumeCorrection (Фаза 2.10)', () => {
     const sessions = [{ date: '2026-01-01', exercises: [{ exerciseName: 'Жим лёжа', muscleGroup: 'chest', sets: [{ weightKg: 80, reps: 10, rir: 1 }] }] }];
     const { changes } = applyDiaryVolumeCorrection(plan, sessions as any);
     // adherence>=100% (1 >= planned?) → но planned обычно > 1 → adherence < 1; допускаем либо no-op, либо только adherence-шкалу
-    expect(changes).toBeDefined();
+    expect(Array.isArray(changes)).toBe(true);
   });
 
   it('полный прогон buildBBPlan с дневником не падает', () => {

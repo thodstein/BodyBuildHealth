@@ -125,11 +125,11 @@ export function computeBBDiaryFeedback(plan: BBPlan | null | undefined, sessions
         acwr = { ratio: Math.round(r.ratio * 100) / 100, zone };
       }
     }
-  } catch {}
+  } catch (e) { console.warn('[BB] ACWR (дневник) не рассчитан:', e); }
 
   try {
     perMuscleACWR = computePerMuscleACWR(sessions as any);
-  } catch {}
+  } catch (e) { console.warn('[BB] per-muscle ACWR (дневник) не рассчитан:', e); }
 
   if (!hasPlan) {
     const e1rmAlerts = computeE1RMAlerts(sessions);
@@ -190,7 +190,7 @@ export function computeBBDiaryFeedback(plan: BBPlan | null | undefined, sessions
         warnings.push(iss.message);
       }
     }
-  } catch {}
+  } catch (e) { console.warn('[BB] validator-warnings дневника не собраны:', e); }
 
   if (acwr) {
     if (acwr.zone === 'dangerous') warnings.push(`ACWR ${acwr.ratio} — опасно: объём острой недели >1.5× хроники, риск перетрена`);

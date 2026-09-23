@@ -11,13 +11,6 @@ export interface BbRedFlags {
   jointClickPain: boolean; // щелчки С болью
 }
 
-export const BB_RED_FLAGS_EMPTY: BbRedFlags = {
-  acutePain: false,
-  swelling: false,
-  numbness: false,
-  jointClickPain: false,
-};
-
 export interface BbRedFlagResult {
   active: boolean;
   blocked: boolean; // вставка объёма запрещена

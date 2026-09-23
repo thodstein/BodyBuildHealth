@@ -90,6 +90,9 @@ describe('BB shared finalizer', () => {
     const firstNames = once.weeks.flatMap(week => week.sessions.flatMap(session => session.exercises.map(exercise => exercise.name)));
     const secondNames = twice.weeks.flatMap(week => week.sessions.flatMap(session => session.exercises.map(exercise => exercise.name)));
     expect(secondNames).toEqual(firstNames);
+    // Усиление (мастер-план §4.3): повторная финализация не меняет и числовую нагрузку.
+    const snap = (p: any) => p.weeks.flatMap((w: any) => w.sessions.flatMap((s: any) => s.exercises.map((e: any) => [e.name, e.sets, e.rir, (e.workSets || []).length])));
+    expect(snap(twice)).toEqual(snap(once));
     expect(twice.weeks.flatMap(week => week.sessions).every(session => session.exercises.length <= 10)).toBe(true);
   });
 

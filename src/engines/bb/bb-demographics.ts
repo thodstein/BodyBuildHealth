@@ -28,14 +28,6 @@ export interface DemographicAdjust {
   notes: string[];
 }
 
-const SPLIT_BY_DAYS: Record<number, string> = {
-  2: 'fullbody_3', 3: 'fullbody_3', 4: 'upper_lower_4', 5: 'rolling_4_1', 6: 'ppl_6', 7: 'ppl_6',
-};
-
-export function splitForDays(daysPerWeek: number): string {
-  return SPLIT_BY_DAYS[Math.min(7, Math.max(2, daysPerWeek))] || 'upper_lower_4';
-}
-
 export function femaleAdjust(): DemographicAdjust {
   return {
     emphasisMuscles: ['glutes', 'hamstrings', 'quads', 'calves'],

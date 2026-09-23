@@ -77,6 +77,9 @@ export const BbQualityUnifiedCard: React.FC<BbQualityUnifiedCardProps> = ({
         <input type="number" step="0.01" placeholder="лучший" value={vbtInput.best} onChange={e => setVbtInput({ ...vbtInput, best: e.target.value })} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:10, padding:'2px 6px', width:64 }} />
         <input type="number" step="0.01" placeholder="последний" value={vbtInput.last} onChange={e => setVbtInput({ ...vbtInput, last: e.target.value })} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:10, padding:'2px 6px', width:76 }} />
       </div>
+      <div style={{ fontSize: 9, opacity: 0.75, marginBottom: 6 }}>
+        Применяется при сборке генерик-сплита (объём/RIR по порогу потери скорости, Pareja-Blanco). В режиме источника — справочно.
+      </div>
       {(() => {
         const w0 = (builtPlan as any).weeks?.[0]?.sessions?.[0];
         if (!w0?.exercises?.length) return null;

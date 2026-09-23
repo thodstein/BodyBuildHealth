@@ -214,7 +214,6 @@ export function isSpecializationFocus(
  *  дефолт 5 — классический 5-недельный специализированный блок). */
 export const SPECIALIZATION_BLOCK_WEEKS = 5;
 export const SPECIALIZATION_MIN_BLOCK_WEEKS = 3;
-export const SPECIALIZATION_MAX_BLOCK_WEEKS = 6;
 
 /** Режим перераспределения ресурса: цель специализации за счёт доноров. */
 export type VolumeTradeoffMode =

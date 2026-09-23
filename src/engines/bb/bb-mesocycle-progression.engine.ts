@@ -77,15 +77,21 @@ export function extractMesocycleProgression(
       })
     : previousPlan.weeks[0];
 
-  // Извлечь peak weights и volume per muscle
+  // Извлечь peak weights и volume per muscle.
+  // P0-C2 (мастер-план §3.3): peak weights берём ТОЛЬКО из peak-недели — раньше «самый
+  // тяжёлый сет за все недели» мог прийти из делода/пика (псевдо-пик) и прогрессия
+  // следующего мезо росла от случайной недели.
   for (const w of previousPlan.weeks) {
+    const isPeakWeek = w === peakWeek;
     for (const s of w.sessions) {
       for (const ex of s.exercises) {
-        // Peak weight: самый тяжёлый work set для каждой мышцы
-        const topWeight = Math.max(...(ex.workSets || []).map(ws => ws.weight || 0));
-        if (topWeight > 0) {
-          const current = peakWeights[ex.muscle] || 0;
-          if (topWeight > current) peakWeights[ex.muscle] = topWeight;
+        if (isPeakWeek) {
+          // Peak weight: самый тяжёлый work set для каждой мышцы
+          const topWeight = Math.max(...(ex.workSets || []).map(ws => ws.weight || 0));
+          if (topWeight > 0) {
+            const current = peakWeights[ex.muscle] || 0;
+            if (topWeight > current) peakWeights[ex.muscle] = topWeight;
+          }
         }
         // Volume: суммарные сеты per muscle за весь план
         previousVolume[ex.muscle] = (previousVolume[ex.muscle] || 0) + ex.sets;

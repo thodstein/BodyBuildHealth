@@ -26,11 +26,11 @@ import { applyDUPOverlay, recommendDUPMode } from '../../../engines/bb/bb-dup.en
 import { applyExecutionCorrections, type ExecutionCorrection } from '../../../engines/bb/bb-execution-corrections.engine';
 import { validateBBPlan, generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
-import { exerciseFeatureBadges, techniqueChainParts } from './bb-technique-display';
+import { exerciseFeatureBadges, techniqueChainParts, canonTechniqueId } from './bb-technique-display';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { buildBBPlanReportText } from '../../../engines/bb/bb-report.engine';
 import { averageWeeklyScores, scoreVolumeWeek, scoreProWeek, gradeFor } from '../../../engines/bb/bb-quality-weekly.engine';
-import { computeRegimeMrvMult } from '../../../engines/bb/bb-volume.engine';
+import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
 import { buildMEVCalibration, recordMEVCalibrationWeek, resolveMEVAfterCalibration, isMEVCalibrationComplete, mevCalibrationProgress, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, mevSignalDegradation, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { suggestMethodologyForStack, recommendPEDMethodology, applyPEDMethodologyToPlan } from '../../../engines/bb/bb-ped-methodology.engine';
@@ -44,7 +44,7 @@ import { bbOrthoMobilityAdd, riskyOpenChainIds, decideBbOrthoIntake, subtractTra
 import { resolveBbDiagIntakeExtras } from '../../../engines/bb/bb-diag-intake.engine';
 import { buildBbMovementPrintBlock } from '../../../engines/bb/bb-diagnostics-export.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
-import { subscribePlannerApply, applyToPlanner, type WeakpointsPayload } from './planner-bridge';
+import { subscribePlannerApply, applyToPlanner, getPlannerApply, clearPlannerApply, type PlannerApply, type WeakpointsPayload } from './planner-bridge';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN } from './training-ui';
@@ -477,14 +477,10 @@ export const BbAutoConstructor: React.FC = () => {
   const [qualityWeek, setQualityWeek] = useState<number | 'avg'>('avg');
   const [autoRegOn, setAutoRegOn] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
-  const [expandedMuscles, setExpandedMuscles] = useState<Set<string>>(new Set());
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
   const [collapsedExercises, setCollapsedExercises] = useState<Set<string>>(new Set());
   const [safetyOpen, setSafetyOpen] = useState(true);
   const [qualityOpen, setQualityOpen] = useState(true);
-  const [safetyMainOpen, setSafetyMainOpen] = useState(true);
-  const [safetyJointsOpen, setSafetyJointsOpen] = useState(true);
-  const [safetyOrthoOpen, setSafetyOrthoOpen] = useState(true);
   const [safetyPreventionOpen, setSafetyPreventionOpen] = useState(true);
   const [safetyDistributionOpen, setSafetyDistributionOpen] = useState(true);
   const [safetyConclusionOpen, setSafetyConclusionOpen] = useState(true);
@@ -492,16 +488,6 @@ export const BbAutoConstructor: React.FC = () => {
   const [generalSafetyLoadOpen, setGeneralSafetyLoadOpen] = useState(true);
   const [jointAnalysisOpen, setJointAnalysisOpen] = useState(true);
   const [qualityVolumeOpen, setQualityVolumeOpen] = useState(true);
-  const [qualityLogicOpen, setQualityLogicOpen] = useState(true);
-  const [qualityForecastOpen, setQualityForecastOpen] = useState(true);
-  const [qualityProOpen, setQualityProOpen] = useState(true);
-  const [qualityProgressionOpen, setQualityProgressionOpen] = useState(true);
-  const [qualityGarbageOpen, setQualityGarbageOpen] = useState(true);
-  const [qualityRecsOpen, setQualityRecsOpen] = useState(true);
-  const [qualityVolumeChartOpen, setQualityVolumeChartOpen] = useState(true);
-  const [qualityRirChartOpen, setQualityRirChartOpen] = useState(true);
-  const [qualityLoadOpen, setQualityLoadOpen] = useState(true);
-  const [qualityExtraOpen, setQualityExtraOpen] = useState(true);
   // specializationMode больше не выбирается в UI: специализация включается
   // автоматически при выборе 1-2 отстающих мышц (specTargets).
   const specializationMode = specTargets.length > 0;
@@ -1304,7 +1290,7 @@ export const BbAutoConstructor: React.FC = () => {
 
   // Подписка на planner-bridge: приём программ + слабые группы/ПМ для ББ-авто (маршрутизация по источнику)
   useEffect(() => {
-    const unsub = subscribePlannerApply((payload) => {
+    const routeApply = (payload: PlannerApply | null) => {
       if (!payload || !payload.data) return;
       const src = (payload as any).source as string | undefined;
       const targetId = (payload as any).targetCycleId as string | undefined;
@@ -1314,22 +1300,25 @@ export const BbAutoConstructor: React.FC = () => {
         if (c && normalizeCycleDirection(c.meta.direction) !== 'bodybuilding') return;
       }
       if (payload.kind === 'program' && payload.data) {
-        const cycle = payload.data as SRCycleTemplate;
-        // Legacy SRCycleTemplate из bridge теперь трактуем как программу (только FullProgram путь)
-        // Для совместимости маппим на программу-заглушку через library path (faithful)
-        setCustomProgram(null);
-        setCustomCycle(cycle);
-        setPlanMode('programs');
-        setBbSource('program');
-        setSelectedProgramId(cycle.meta.id.replace('prog_', ''));
-        setSelectedCycleId(cycle.meta.id);
-        setBbDays(cycle.meta.sessionsPerWeek);
-        setBbWeeks(cycle.meta.weeks);
-        setBbLevel(cycle.meta.level === 'novice' ? 'beginner' : cycle.meta.level === 'KMS-MS' || cycle.meta.level === 'MS-MSMK' ? 'advanced' : 'intermediate');
-        setBbGoal(cycle.meta.period === 'strength' ? 'strength_mass' : 'mass');
-        setBridgeMsg(`🔗 Программа загружена: ${cycle.meta.title}`);
-        setTimeout(() => setBridgeMsg(''), 5000);
-        setStep('params');
+        const d = payload.data as any;
+        if (d?.program && !d?.meta) {
+          // Форма { program: FullProgram } (CardioManageStep и др.) — без SRCycleTemplate-обёртки.
+          applyProgramToBb(d.program as FullProgram);
+        } else if (d?.meta?.id) {
+          // SRCycleTemplate (библиотека циклов/программ) — единый путь: SRCycleTemplate →
+          // FullProgram → programToBBPlan. Раньше клали его в customCycle, а сборка
+          // program-ветки читает только customProgram → «Сборка» падала в флеш.
+          try {
+            const prog = cycleTemplateToFullProgram(d as SRCycleTemplate);
+            if (prog) applyProgramToBb(prog);
+            else flash('⚠ Не удалось конвертировать программу в ББ-план');
+          } catch (e) {
+            console.warn('[BB-auto] bridge program:', e);
+            flash('⚠ Ошибка конвертации программы');
+          }
+        } else {
+          flash('⚠ Программа не распознана (пустой payload)');
+        }
       } else if (payload.kind === 'weakpoints' && (() => {
         const d = payload.data as WeakpointsPayload;
         // 3.9: принимаем любой из источников групп (гранулярные → канонические → общие).
@@ -1658,7 +1647,21 @@ export const BbAutoConstructor: React.FC = () => {
           setTimeout(() => setBridgeMsg(''), 4000);
         }
       }
+    };
+    const unsub = subscribePlannerApply((p) => {
+      try { routeApply(p); } catch (e) { console.warn('[BB-auto] planner-bridge:', e); }
     });
+    // Pending: payload, отправленный до монтирования ББ-авто (библиотека/кардио/хаб).
+    // Берём только свежий (≤5 мин) и только ББ-релевантные kinds; после обработки — чистим,
+    // чтобы он не «жил вечно» и не подхватывался другими экранами.
+    try {
+      const pending = getPlannerApply();
+      if (pending && Date.now() - (pending.ts ?? 0) < 5 * 60_000) {
+        const isPl = pending.source === 'pl-auto';
+        const kindOk = pending.kind === 'program' || pending.kind === 'weakpoints' || pending.kind === 'pm';
+        if (!isPl && kindOk) { routeApply(pending); clearPlannerApply(); }
+      }
+    } catch { /* ignore */ }
     return () => { unsub(); };
   }, []);
 
@@ -2241,6 +2244,13 @@ export const BbAutoConstructor: React.FC = () => {
           rotationMode,
           abPatternRotation: abRotation,
           packingV2,
+          // VBT-вход (лучший/последний м/с) — режет объём/RIR по порогу потери (канон bb-vbt).
+          // Ранее поля вводились, но в сборку не попадали (жили только в локальной подсказке).
+          vbt: (() => {
+            const b = Number(vbtInput.best), l = Number(vbtInput.last);
+            if (!Number.isFinite(b) || !Number.isFinite(l) || b <= 0 || l <= 0) return undefined;
+            return { lift: vbtInput.lift, bestVelocity: b, lastVelocity: l };
+          })(),
           intensityLevel,
           intensityTechnique: intensityTech,
          autoDeload,
@@ -2319,6 +2329,13 @@ export const BbAutoConstructor: React.FC = () => {
     // PRO-3 R2: L/R-добивка слабой стороны — поверх плана (унилатерально, слабая первой, ≤3 сетов, делод скип, сессия <10 упр)
     if (exerciseSwaps.length > 0 || preferredExerciseIds.length > 0 || executionCorrections.length > 0 || Object.keys(lrTopUp).length > 0) {
       const swaps = exerciseSwaps.slice();
+      // Лимит упражнений сессии — из движка (уровень/стаж/курс/объёмный режим), не хардкод 10
+      // (движок даёт 15-20 для advanced/enhanced — добивки больше не глохнут).
+      const maxExForInsert = (() => {
+        try {
+          return sessionLimitsFor({ level: bbLevel as any, trainingYears: bbTrainingYears, onCourse: peds.length > 0, trainingVolumeMode: trainingVolumeMode as any } as any).maxExercises;
+        } catch { return 10; }
+      })();
       // preferred как swap если упражнения нет в плане — добавим в первую неделю
       for (const pid of preferredExerciseIds) {
         const low = String(pid).toLowerCase();
@@ -2339,7 +2356,7 @@ export const BbAutoConstructor: React.FC = () => {
             if (!targetSession) targetSession = (plan.weeks?.[0] as any)?.sessions?.[0];
             if (targetSession && Array.isArray(targetSession.exercises)) {
               // заменим последний accessory чтобы не ломать объём, или добавим если ≤ лимита
-              const canAdd = targetSession.exercises.length < 10;
+              const canAdd = targetSession.exercises.length < maxExForInsert;
               if (canAdd) {
                 targetSession.exercises.push({ muscle: targetMuscle, name: cat.name, exerciseName: cat.id, role: 'accessory' as const, sets: 3, repsRange: [10, 12] as any, rir: 2, tempo: '3-1-1-0', comment: `🧬 Лаб: предпочтено ${cat.name} (SFR)` } as any);
               } else {
@@ -2420,7 +2437,7 @@ export const BbAutoConstructor: React.FC = () => {
             for (const s of (w.sessions || []) as any[]) {
               if ((s.exercises || []).some((e: any) => String(e.muscle || '').toLowerCase() === gl)) { target = s; break; }
             }
-            if (!target || !Array.isArray(target.exercises) || target.exercises.length >= 10) continue;
+            if (!target || !Array.isArray(target.exercises) || target.exercises.length >= maxExForInsert) continue;
             const src = (target.exercises as any[]).find((e: any) => String(e.muscle || '').toLowerCase() === gl);
             if (!src) continue;
             target.exercises.push({
@@ -2596,11 +2613,20 @@ export const BbAutoConstructor: React.FC = () => {
           };
           if (edit.rir != null && Number.isFinite(edit.rir)) edited.rir = edit.rir;
           if (edit.tempo) (edited as any).tempoSpec = edit.tempo;
+          // Канон id: UI-легаси (myo_rep/21s) → движковые (myo_reps/twenty_ones).
           if (edit.technique && edit.technique !== 'none') {
-            (edited as any).technique = edit.technique;
-            if (!(edited as any).intensityTechUsed) (edited as any).intensityTechUsed = true;
+            const canonTech = canonTechniqueId(edit.technique) || edit.technique;
+            (edited as any).technique = canonTech;
+            // Потребители читают технику последнего рабочего сета (bb-technique-display,
+            // bb-quality-weekly, bb-report, SessionPlayer targetSets) — пишем и туда.
+            if (Array.isArray(edited.workSets) && edited.workSets.length > 0) {
+              (edited.workSets[edited.workSets.length - 1] as any).technique = canonTech;
+            }
           } else if (edit.technique === 'none') {
             delete (edited as any).technique;
+            if (Array.isArray(edited.workSets) && edited.workSets.length > 0) {
+              delete (edited.workSets[edited.workSets.length - 1] as any).technique;
+            }
           }
           if (edit.supersetWith && edit.supersetWith !== 'none') {
             (edited as any).supersetWith = edit.supersetWith;
@@ -2966,12 +2992,21 @@ export const BbAutoConstructor: React.FC = () => {
       // Трен-дни недели: индексы сессий с упражнениями (не отдых).
       const w0 = plan.weeks[0];
       const trainDays = (w0?.sessions || []).map((s, i) => ((s.exercises || []).some((e: any) => !(e as any).warmupActivator) ? i + 1 : 0)).filter(d => d > 0);
-      const kcal = Math.round((plan as any).mrvMultiplier && (plan as any).mrvMultiplier >= 1.3 ? 2800 : 2500 + trainDays.length * 150);
-      const proteinG = Math.round((plan.weeks[0]?.sessions || []).reduce((a, s) => a + s.exercises.reduce((b, e) => b + (e.sets || 0), 0), 0) > 0 ? 180 : 160);
+      // Калораж/белок — от веса и цели профиля (раньше хардкод 2800/180 без веса/пола/цели);
+      // без веса в профиле — прежний оценочный фолбэк.
+      const pw = Number(linked.profile?.settings?.personal?.weight) || 0;
+      const kcalCoef: Record<string, number> = { mass: 37, strength_mass: 36, cut: 28, recomp: 31, maintenance: 31 };
+      const proteinCoef: Record<string, number> = { mass: 2.0, strength_mass: 2.0, cut: 2.2, recomp: 2.1, maintenance: 1.8 };
+      const kcal = pw > 0
+        ? Math.round(pw * (kcalCoef[bbGoal] || 33))
+        : Math.round((plan as any).mrvMultiplier && (plan as any).mrvMultiplier >= 1.3 ? 2800 : 2500 + trainDays.length * 150);
+      const proteinG = pw > 0
+        ? Math.round(pw * (proteinCoef[bbGoal] || 2.0))
+        : (weeklySets > 0 ? 180 : 160);
       applyToPlanner({
         kind: 'bb_nutrition',
         label: `ББ-план → питание (${trainDays.length} трен-дня, ~${weeklySets} сетов/нед)`,
-        data: { kcal, proteinG, trainDays, weeklySets, splitId: plan.pattern?.id },
+        data: { kcal, proteinG, trainDays, weeklySets, splitId: plan.pattern?.id, weightKg: pw > 0 ? pw : undefined, sex: linked.profile?.settings?.personal?.sex, goal: bbGoal },
       });
     } catch (e) {
       flash('⚠ Ошибка передачи в питание: ' + ((e as Error)?.message || e));
@@ -3458,6 +3493,7 @@ export const BbAutoConstructor: React.FC = () => {
   );
 
   const renderPlanWithComments = () => (
+    <>
     <BbPlanStep
       builtPlan={builtPlan}
       metrics={metrics}
@@ -3479,6 +3515,9 @@ export const BbAutoConstructor: React.FC = () => {
       setCollapsedExercises={setCollapsedExercises}
       bbTrainingFocus={bbTrainingFocus}
       bbLevel={bbLevel}
+      bbTrainingYears={bbTrainingYears}
+      onCourse={peds.length > 0}
+      trainingVolumeMode={trainingVolumeMode === 'high' ? 'high' : 'standard'}
       setSubTarget={setSubTarget}
       handleSendToExecution={handleSendToExecution}
       setWeightEntries={setWeightEntries}
@@ -3486,6 +3525,23 @@ export const BbAutoConstructor: React.FC = () => {
       setStep={setStep}
       actionRow={renderActionRow(false)}
     />
+    {freqOptResult && (
+      <div data-bb="freq-opt" style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>🔧 Оптимизация частоты по мышцам (по дневнику)</div>
+        {freqOptResult.recommendations.length === 0
+          ? <div style={{ fontSize: 11, color: '#fff' }}>✅ Частота по мышцам оптимальна — ACWR в норме, размер и восстановление учтены.</div>
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {freqOptResult.recommendations.slice(0, 6).map(r => (
+                <div key={r.muscle} style={{ fontSize: 11, color: '#fff' }}>
+                  {r.recommendedFrequency > r.currentFrequency ? '↑ повысить' : '↓ снизить'} «{muscleLabel(r.muscle) || r.muscle}»: {r.currentFrequency}→{r.recommendedFrequency}×/нед
+                  {r.acwr != null ? ` · ACWR ${r.acwr.toFixed(2)}` : ''}{r.e1rmTrend != null ? ` · e1RM ${r.e1rmTrend > 0 ? '+' : ''}${r.e1rmTrend}%` : ''}
+                </div>
+              ))}
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.75 }}>Справочно — в сборку не вносится (учтите вручную или через сплит).</div>
+            </div>}
+      </div>
+    )}
+    </>
   );
 
   // ── ⚖️ Реальные веса: фактический ввод весов по упражнениям плана ──
@@ -3524,7 +3580,7 @@ export const BbAutoConstructor: React.FC = () => {
           builtPlan={builtPlan}
           vbtInput={vbtInput}
           setVbtInput={setVbtInput}
-          readiness={(linked?.readiness?.recovery ?? linked?.profile?.settings?.lifestyle?.morningHRV) ? 65 : null}
+          readiness={linked?.readiness?.recovery ?? null}
           bbQualityV2={bbQualityV2}
           todayBadge={todayBadge}
           v2Context={{ level: bbLevel, goal: bbGoal, focus: bbTrainingFocus, accent: specTargets.length ? specTargets : weakPoints, peds }}
@@ -3709,8 +3765,6 @@ export const BbAutoConstructor: React.FC = () => {
   const renderContestPrep = () => {
     const today = isoToday();
     const phaseNow = prepPlan ? prepPhaseForDate(prepPlan, today) : null;
-    const strategySafe = !prepWaterMode || !prepSodiumMode; // всегда true — для читаемости
-    void strategySafe;
     // 4.3 остаток-2: снимок внешних привязок шага Contest Prep для под-секций (вместо 80+ props).
     const contestCtx: BbContestPrepCtx = {
       PREP_CHECKIN_ITEMS, adaptiveTaper, assembleContestPrep, buildContestPrepConfig, builtPlan, setBuiltPlan, bbWorkMax,
@@ -4023,7 +4077,11 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={SMALL}>Постройте макроцикл и начните работу по нему — или стройте план с нуля, как раньше.</div>
             </div>
           </div>
-          <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} storageKey="he_bb_macro" onApplyMacrocycle={source => {
+          <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={(g) => {
+            // Раньше здесь был молчаливый no-op: попап «Направление» выглядел рабочим,
+            // но не менял ничего. Годовой план ББ-авто — всегда bodybuilding; ПЛ-макро — в ПЛ-авто.
+            if (g !== 'bodybuilding') flash('🗓 Годовой план ББ-авто — всегда «Бодибилдинг» (ПЛ-макро строится в ПЛ-авто)');
+          }} storageKey="he_bb_macro" onApplyMacrocycle={source => {
             if (!('trainingFocus' in source)) {
               // Раньше — тихий return: кнопка «Начать работу по циклу» молча
               // ничего не делала, если в he_bb_macro лежал ПЛ-макроцикл.

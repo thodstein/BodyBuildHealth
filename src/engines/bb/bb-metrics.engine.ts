@@ -210,15 +210,3 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
     mrvMultiplier: mult,
   };
 }
-
-/** Человекочитаемая сводка. */
-export function explainBBMetrics(m: BBPlanMetrics): string {
-  const lines = [
-    `Всего direct-сетов/ротация: ${m.totalSets} | тяж ${(m.тяжPct * 100).toFixed(0)}% | памп ${(m.пампPct * 100).toFixed(0)}% | ср.RIR ${m.avgRir.toFixed(1)}`,
-    'Объём на мышцу (vs MEV/MAV/MRV):',
-  ];
-  for (const mm of m.perMuscle) {
-    lines.push(`  ${mm.muscle}: direct ${mm.directSets}, effective ${mm.effectiveSets} сетов (тяж ${mm.тяжSets}/памп ${mm.пампSets}/лёг ${mm.лёгSets}), RIR ${mm.avgRir.toFixed(1)}, частота ${mm.frequencyPerRotation}× — ${mm.status} (MEV${mm.mev}/MAV${mm.mav}/MRV${mm.mrv})`);
-  }
-  return lines.join('\n');
-}

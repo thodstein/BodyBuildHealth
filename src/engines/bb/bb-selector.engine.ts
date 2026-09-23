@@ -361,10 +361,6 @@ export function splitFitWarnings(input: BBSelectorInput, patternId: string): str
   return out;
 }
 
-export function explainBBSelection(r: BBRankedPattern): string {
-  return [`«${r.pattern.name}» — скор ${r.score}`, ...r.rationale.map(x => '✓ ' + x), ...r.warnings.map(x => '⚠ ' + x)].join('\n');
-}
-
 /** Частота мышечных групп (раз/нед) для отображения в карточке сплита. */
 export function getMuscleFrequencies(p: SplitPattern): { tag: string; freq: number }[] {
   const tagCounts: Record<string, number> = {};

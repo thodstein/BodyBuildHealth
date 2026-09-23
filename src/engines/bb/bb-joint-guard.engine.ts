@@ -42,15 +42,3 @@ export function jointGuardScorePenalty(ex: { equipment?: string; jointStress?: s
   if (eq.includes('barbell') && /жим.*штанги/i.test(name)) return -20; // жим лёжа — мягче, но всё равно штраф
   return 0;
 }
-
-export function jointGuardTempoOverride(input: JointGuardInput): string | null {
-  if (!jointGuardActive(input)) return null;
-  return '4-2-1-0'; // эксцентрик 4с, пауза 2с — бережно
-}
-
-export function jointGuardRationale(input: JointGuardInput): string | null {
-  if (!jointGuardActive(input)) return null;
-  if ((input.labMrvMultiplier ?? 1) < 0.65) return '🛡 Joint guard (лаб): axial/high-stress заменены на машины/кабели';
-  if (input.hasGH && (input.ghDose ?? 0) >= 4) return `🛡 Joint guard GH ${input.ghDose}МЕ: связки отстают — машины/кабели приоритет`;
-  return '🛡 Joint guard: тяж-дни сохранены, но с машинными аналогами';
-}

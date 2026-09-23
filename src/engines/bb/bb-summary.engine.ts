@@ -92,10 +92,6 @@ export const SUBGROUP_MAP: Record<string, SubgroupDef[]> = {
   abs: [{ id: 'abs', labelRu: 'пресс', patternNeedles: /crunch|скручиван/i, why: 'Пресс.', how: 'Скручивания.', patternRu: 'скручивания' }],
 };
 
-export const SUBGROUP_LABEL_RU: Record<string, string> = Object.fromEntries(
-  Object.values(SUBGROUP_MAP).flat().map(d => [d.id, d.labelRu])
-);
-
 function resolveSubgroup(muscle: string, pattern: string, name: string, backSubgroup?: string, armSubgroup?: string): string {
   const lowerName = (name || '').toLowerCase();
   const pat = (pattern || '').toLowerCase();

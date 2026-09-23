@@ -137,7 +137,7 @@ export interface ProgramPayload { cycleId?: string; [key: string]: unknown }
 export interface DesignPayload { design: unknown; fillExercises?: boolean; daysPerWeek?: number; level?: string; goal?: string }
 export interface MacrocyclePayload { macro: unknown; level?: string; goal?: string; daysPerWeek?: number }
 export interface CardioPayload { cycleId?: string; cycle?: unknown }
-export interface BBNutritionPayload { kcal?: number; proteinG?: number; trainDays?: number[]; weeklySets?: number; splitId?: string; label?: string }
+export interface BBNutritionPayload { kcal?: number; proteinG?: number; trainDays?: number[]; weeklySets?: number; splitId?: string; label?: string; weightKg?: number; sex?: 'male' | 'female'; goal?: string }
 export interface AnnualBlockPayload { blockKey: string; program?: unknown }
 /** Именной арм-цикл из каталога библиотеки → конструктор армрестлинга/армлифтинга. */
 export interface ArmCyclePayload { cycleId: string }

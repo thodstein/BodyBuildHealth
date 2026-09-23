@@ -86,23 +86,6 @@ export function classifyArmExercise(name: string): { pattern: ArmPattern; subgro
   return { pattern: 'other', subgroup: 'arms' };
 }
 
-/** Косвенный объём рук от compound-упражнений (жимы → трицепс, тяги → бицепс). */
-export function indirectArmVolume(session: BBSession): { biceps: number; triceps: number } {
-  let biceps = 0, triceps = 0;
-  for (const ex of session.exercises) {
-    if (['biceps', 'triceps', 'forearms'].includes(ex.muscle)) continue;
-    const sets = ex.sets || 0;
-    const n = (ex.name || '').toLowerCase();
-    if (/жим|bench|press|dip|отжим.*брус|жим.*узк|close.?grip/i.test(n) && !/ног|leg|сгибан|curl|разгибан.*ног/i.test(n)) {
-      triceps += sets * 0.5;
-    }
-    if (/подтяг|pull.?up|chin|тяга|row|пуллдаун|верхн.*блок|lat.?pull/i.test(n) && !/лиц|face/i.test(n)) {
-      biceps += sets * 0.5;
-    }
-  }
-  return { biceps, triceps };
-}
-
 /** Аннотация упражнения на руки: movementPattern + armSubgroup по головкам. */
 export function annotateArmExercise(exercise: BBExercise): BBExercise {
   if (!['biceps', 'triceps', 'forearms'].includes(exercise.muscle)) return exercise;

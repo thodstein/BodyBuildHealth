@@ -39,6 +39,19 @@ export const TECHNIQUE_LABELS: Record<string, string> = {
   post_exhaust: 'Пост-истощение',
 };
 
+/** Канон id техник: UI-легаси → движковые (myo_rep→myo_reps, 21s→twenty_ones). */
+const TECHNIQUE_ID_CANON: Record<string, string> = {
+  myo_rep: 'myo_reps',
+  '21s': 'twenty_ones',
+  dropset: 'drop_set',
+};
+
+/** Привести id интенсив-техники к канону движка; 'none'/пусто → null. */
+export function canonTechniqueId(id: string | null | undefined): string | null {
+  if (!id || id === 'none') return null;
+  return TECHNIQUE_ID_CANON[id] || id;
+}
+
 /** Схемы объёма памп-дней, детектируемые по comment (applyVolumeScheme). */
 export const VOLUME_SCHEME_LABELS: Array<{ re: RegExp; label: string }> = [
   { re: /GVT\s*10×10|GVT\s*10x10/i, label: 'GVT 10×10' },

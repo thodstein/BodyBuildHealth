@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+import { strictGroupMembersOf } from '../../../engines/bb/bb-exercise-selection.engine';
 import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 
 export interface BbExSwapModalProps {
@@ -24,8 +25,15 @@ export const BbExSwapModal: React.FC<BbExSwapModalProps> = ({
   builtPlan, exSwapModal, exSwapSearch, setExSwapSearch, dialogRef, onReplace, onClose,
 }) => {
   if (!exSwapModal || !builtPlan) return null;
-  const filtered = EXERCISE_CATALOG
-    .filter(e => (e.group || '') === exSwapModal.muscle)
+  // §4.2: жёсткая группа движка (STRICT_EXERCISE_GROUPS) — однотипные движения меняются
+  // только между собой (например, жим под 30° ↔ жим под 30°); вне группы — прежний фолбэк по group.
+  const curCat = EXERCISE_CATALOG.find(e => e.name === exSwapModal.currentName);
+  const strict = strictGroupMembersOf({ id: curCat?.id, name: curCat?.name || exSwapModal.currentName }, exSwapModal.muscle);
+  const strictIds = new Set(strict.map(s => s.id));
+  const basePool = strictIds.size > 0
+    ? strict
+    : EXERCISE_CATALOG.filter(e => (e.group || '') === exSwapModal.muscle);
+  const filtered = basePool
     .filter(e => e.name.toLowerCase().includes(exSwapSearch.toLowerCase()));
   return (
     <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)' }}
@@ -34,6 +42,11 @@ export const BbExSwapModal: React.FC<BbExSwapModalProps> = ({
         <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
         <div style={{ padding:'14px 16px', maxHeight:'calc(78vh - 3px)', overflowY:'auto' }}>
           <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:10 }}>🔄 Замена: {exSwapModal.currentName}</div>
+          {strictIds.size > 0 && (
+            <div style={{ fontSize:10, color:'#fff', opacity:0.8, marginBottom:8 }}>
+              💡 Жёсткая группа: упражнение меняется только внутри однотипных движений ({strict.length} вариантов).
+            </div>
+          )}
           <input type="text" placeholder="Поиск упражнений..." value={exSwapSearch} autoFocus
             onChange={e => setExSwapSearch(e.target.value)}
             style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:13, boxSizing:'border-box', marginBottom:10 }} />

@@ -74,8 +74,7 @@ export const BbContestPrepParams: React.FC<{ ctx: BbContestPrepCtx }> = ({ ctx }
           {[1,2,3,4,5].map(n => {
             const labels=['1 Атлет','2 Кондиция','3 Стратегии','4 Trial','5 Preview'] as const;
             const active=contestWizard===n;
-            const disabled=false;
-            return <button key={n} onClick={()=>setContestWizard(n as any)} disabled={disabled} style={{ flex:1, minWidth:70, padding:'6px 8px', borderRadius:8, fontSize:10, fontWeight: active?800:600, background: active?'rgba(236,72,153,0.2)':'rgba(255,255,255,0.04)', border: active?'1px solid #ec4899':'1px solid rgba(255,255,255,0.08)', color: active?'#ec4899':'#fff', cursor:'pointer' }}>{labels[n-1]}</button>;
+            return <button key={n} onClick={()=>setContestWizard(n as any)} style={{ flex:1, minWidth:70, padding:'6px 8px', borderRadius:8, fontSize:10, fontWeight: active?800:600, background: active?'rgba(236,72,153,0.2)':'rgba(255,255,255,0.04)', border: active?'1px solid #ec4899':'1px solid rgba(255,255,255,0.08)', color: active?'#ec4899':'#fff', cursor:'pointer' }}>{labels[n-1]}</button>;
           })}
         </div>
         <div style={{ fontSize:9, color:'#fff', marginTop:4, textAlign:'center' }}>

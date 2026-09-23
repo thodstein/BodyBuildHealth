@@ -73,16 +73,6 @@ function jointFor(ex: any): 'low' | 'med' | 'high' | null {
   return null;
 }
 
-function cnsFor(ex: any): number | null {
-  const cat = findCatalog(ex);
-  if (!cat) return null;
-  try {
-    const bio = (cat as any).__bio; // not
-  } catch {}
-  // берём из biomechanics db если есть — через getExerciseBio внутри? упростим: fatigueCost прокси
-  return null;
-}
-
 function angleClassFor(ex: { id?: string; name?: string }, muscle?: string | null): string | null {
   const m = (muscle || findCatalog(ex)?.group || '').toLowerCase();
   const classes = (ANGLE_CLASSES as any)[m] as Array<{ name: string; match: (e: any) => boolean }> | undefined;

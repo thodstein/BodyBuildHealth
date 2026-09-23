@@ -44,19 +44,3 @@ export const INTENSITY_TECHNIQUES: TechniqueSpec[] = [
 export function techniquesFor(character: 'тяж' | 'памп' | 'both', level: string): TechniqueSpec[] {
   return INTENSITY_TECHNIQUES.filter(t => (t.appliesTo === character || t.appliesTo === 'both') && t.level.includes(level));
 }
-
-// ── Bridge к каноническому движку (bb-autocoach.engine.ts) ──
-// Движок использует `drop_set`/`myo_reps`/`negative`, UI — `dropset`/`myo_rep`/`slow_eccentric`.
-// Бридж для отображения — `bb-technique-display.ts` (поддерживает обе системы имён).
-export const TECHNIQUE_ALIAS_TO_ENGINE: Record<string, string> = {
-  dropset: 'drop_set',
-  myo_rep: 'myo_reps',
-  slow_eccentric: 'negative',
-  pre_exhaust: 'pre_exhaust', // methodology (порядок), не intensity движка
-  post_exhaust: 'post_exhaust',
-};
-export const ENGINE_ALIAS_TO_UI: Record<string, string> = {
-  drop_set: 'dropset',
-  myo_reps: 'myo_rep',
-  negative: 'slow_eccentric',
-};

@@ -209,10 +209,6 @@ export const REP_SCHEMES: Record<RepSchemeId, RepScheme> = {
   },
 };
 
-export function isRepSchemeId(v: string): v is RepSchemeId {
-  return v in REP_SCHEMES;
-}
-
 export interface SchemeForInput {
   goal?: string;
   focus?: BBTrainingFocus;

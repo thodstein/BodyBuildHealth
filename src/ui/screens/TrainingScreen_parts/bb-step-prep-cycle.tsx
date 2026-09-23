@@ -482,7 +482,6 @@ export const BbPrepCycleStep: React.FC<BbPrepCycleStepProps> = ({
                 })),
                 loadSessions().map(s => ({ date: s.date, totalSets: s.totalSets })),
               );
-              const past = compliance.weeks.filter(w => w.status !== 'upcoming');
               if (compliance.completedWeeks === 0) return null;
               return (
                 <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)' }}>

@@ -153,18 +153,6 @@ export function scoreBBSymmetry(
   return { ratios, issues, score };
 }
 
-export function idealReevesMap(heightCm: number): Record<string, number> {
-  return {
-    chest: idealFor('chest', heightCm),
-    waist: idealFor('waist', heightCm),
-    shoulderWidth: idealFor('shoulderWidth', heightCm),
-    bicep: idealFor('bicep', heightCm),
-    thigh: idealFor('thigh', heightCm),
-    calf: idealFor('calf', heightCm),
-    neck: idealFor('neck', heightCm),
-  };
-}
-
 /**
  * Идеалы McCallum по запястью (канон классики, MAX PRO).
  * chest=wrist×6.5, waist×4.5, thigh×3.0, neck/bicep×2.5, calf×2.0, forearm×1.8.

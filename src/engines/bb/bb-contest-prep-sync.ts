@@ -219,7 +219,7 @@ export function migrateLegacyContestPrepIfNeeded(opts: BuildPrepPlanOpts = {}): 
         next.goals.peakShowDay = cfg.showDate;
       }
       updateProfile({ settings: next });
-    } catch { /* silent */ }
+  } catch (e) { console.warn('[BB] prep-план не сохранён в профиль:', e); }
     try {
       window.dispatchEvent(new CustomEvent(CONTEST_PREP_UPDATED_EVENT, { detail: { prepPlanId: plan.id, showDate: plan.showDate, source: 'migrate' } }));
     } catch { /* ignore */ }

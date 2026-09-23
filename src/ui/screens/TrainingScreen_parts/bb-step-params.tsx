@@ -26,6 +26,7 @@ import type { SessionMethodology } from '../../../engines/bb/bb-session-order.en
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import type { PED } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { computeAASEquivDose } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { jointGuardActive } from '../../../engines/bb/bb-joint-guard.engine';
 import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
@@ -193,10 +194,18 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
     try { const l = sessionLimitsFor({ level: bbLevel, trainingYears: bbTrainingYears, onCourse: peds.length > 0 }); return `${l.maxWorkingSets} сетов / ${l.maxExercises} упр.`; }
     catch { return '24/10'; }
   })();
+  const aasEquiv = computeAASEquivDose(pedDoses);
+  // Joint-guard — из движка (canon bb-joint-guard): GH≥4 · GH≥2+AAS≥500 · lab<0.65.
+  // UI-гейт FST-7 выровнен с движком: иначе выбор молча даунгрейдится до standard.
+  const jgActive = jointGuardActive({
+    hasGH: (pedDoses.GH || 0) > 0, ghDose: pedDoses.GH || 0,
+    hasAAS: aasEquiv > 0, aasDose: aasEquiv,
+    labMrvMultiplier: labMultOverride ?? labAdjust.mrvMultiplier,
+  });
   const fst7Hint = (bbLevel !== 'enhanced' ? ' · FST-7 7-in-1: только enhanced.' : '')
-    + (((pedDoses.insulin || 0) > 0 && !(computeAASEquivDose(pedDoses) > 0) && !((pedDoses.GH || 0) > 0)) ? ' · Соло-инсулин: FST-7 запрещён.' : '')
-    + (((pedDoses.GH || 0) >= 4) ? ' · GH≥4: joint-guard, FST-7 недоступен.' : '');
-  const fst7Allowed = bbLevel === 'enhanced' && !((pedDoses.GH || 0) >= 4) && !((pedDoses.insulin || 0) > 0 && !(computeAASEquivDose(pedDoses) > 0) && !((pedDoses.GH || 0) > 0));
+    + (((pedDoses.insulin || 0) > 0 && !(aasEquiv > 0) && !((pedDoses.GH || 0) > 0)) ? ' · Соло-инсулин: FST-7 запрещён.' : '')
+    + ((bbLevel === 'enhanced' && jgActive) ? ' · Joint-guard активен (движок вернёт standard).' : '');
+  const fst7Allowed = bbLevel === 'enhanced' && !jgActive && !((pedDoses.insulin || 0) > 0 && !(aasEquiv > 0) && !((pedDoses.GH || 0) > 0));
 
   return (
     <div>
@@ -379,9 +388,8 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
             <PopupSelect label="Уровень" value={bbLevel} onChange={setBbLevel} options={[['beginner', 'Новичок'], ['intermediate', 'Средний'], ['advanced', 'Опытный'], ['enhanced', 'Enhanced (PED)']].map(([id, label]) => ({ id, label }))} />
             <PopupNumber label="Стаж" value={bbTrainingYears} min={0} max={50} step={0.5} suffix=" лет" onChange={v => { setBbTrainingYears(v); syncProf({ trainingYears: v }); }} />
             <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass', 'Мышечная масса'], ['cut', 'Сушка'], ['recomp', 'Рекомпозиция'], ['maintenance', 'Поддержание'], ['strength_mass', 'Сила + Масса']].map(([id, label]) => ({ id, label }))} />
-            <PopupNumber label="Дней/нед" value={bbDays} min={3} max={6} onChange={v => setBbDays(v)} />
+            <PopupNumber label="Дней/нед" value={bbDays} min={2} max={7} onChange={v => setBbDays(v)} />
             <PopupNumber label="Недель мезо" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
-            <PopupSelectSmart label="Цель объёма" value={bbVolGoal} onChange={onUserVolGoal} suggestedIds={bbSuggest.volumeGoal} suggestionReason="По цели и уровню" options={[['mev', 'Минимум (MEV)'], ['mav', 'Оптимум (MAV)'], ['mrv', 'Максимум (MRV)']].map(([id, label]) => ({ id, label }))} />
           </div>
           {trainingVolumeMode === 'high' && (
             <div style={{ marginTop: 6, padding: '5px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', ...NOTE }}>
@@ -404,7 +412,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
           <div style={{ marginTop: 6, ...NOTE, lineHeight: 1.5 }}>
             {trainingVolumeMode === 'standard'
               ? <>Обычный: цель MAV, без GVT/FST-7, капы по уровню. Лимит: {limitText} (дефолт 24 с фармой — норма).</>
-              : <>Объёмный разом включает: <b>цель MRV</b> · <b>+25/+30/+35%</b> к целевому объёму мышцы (natural/enhanced/enhanced 6+) · <b>капы сессии ×1.2</b> (×1.3 для enhanced 6+) и +2–3 упражнения · <b>MRV-кап ×1.15</b> (×1.25) · схема «Стандартная» исполняется как <b>GVT 10×10</b> (кап 5 сетов/упр сохраняется). Уровневые капы те же: новичок без фармы — 24/10, enhanced 3г+ — 60/18.</>}
+              : <>Объёмный разом включает: <b>цель MRV</b> · <b>+25/+30/+35%</b> к целевому объёму мышцы (natural/enhanced/enhanced 6+) · <b>капы сессии ×1.2</b> (×1.3 для enhanced 6+) и +2–3 упражнения · <b>MRV-кап ×1.15</b> (×1.25) · схема «Стандартная» исполняется как <b>GVT 10×10</b> (кап 5 сетов/упр сохраняется). Уровневые капы те же: новичок без фармы — 24/10, enhanced 3г+ — 40/15, 6+ лет — 44/16.</>}
           </div>
         </div>
 
@@ -612,6 +620,9 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
           title="Авто-регуляция по готовности" desc="Объём/вес/RIR корректируются по сну, HRV, стрессу и ACWR (работает в обоих режимах)" />
         <BbRowSwitch checked={packingV2} onChange={setPackingV2} icon="📦" accent="#a78bfa" disabled={isPrograms}
           title="Packing заливка" desc={isPrograms ? 'Только генерик-сплит — в режиме источника не действует' : 'Меньше движений: заливка 6/5/4 с пирамидой (спина/грудь)'} />
+        {isPrograms && packingV2 && (
+          <div style={{ ...NOTE, marginTop: 4, color: '#f59e0b' }}>⚠ Тогл включён, но в режиме источника не применяется (программа идёт дословно/адаптированно, без заливки).</div>
+        )}
         <div style={{ ...GRID2, marginTop: 8 }}>
           <PopupExerciseList label="⭐ Любимые упражнения" ids={bbFavEx} onChange={ids => { setBbFavEx(ids); syncProf({ favoriteExercises: ids }); }} accent="#00e68a" />
           <PopupExerciseList label="✕ Не любимые" ids={bbExclEx} onChange={ids => { setBbExclEx(ids); syncProf({ excludedExercises: ids }); }} accent="#ef4444" />

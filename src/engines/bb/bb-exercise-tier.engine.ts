@@ -76,4 +76,3 @@ export function bbExerciseTier(ex: Exercise | any): BBExerciseTier {
 export function isCanonicalBB(ex: Exercise | any): boolean { return bbExerciseTier(ex) === 1; }
 export function isExoticBB(ex: Exercise | any): boolean { const t = bbExerciseTier(ex); return t === 3 || t === 4; }
 export function isInappropriateBB(ex: Exercise | any): boolean { return bbExerciseTier(ex) === 4; }
-export function isAcceptableBB(ex: Exercise | any): boolean { return bbExerciseTier(ex) === 2; }

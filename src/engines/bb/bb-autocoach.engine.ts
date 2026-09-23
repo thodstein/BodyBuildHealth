@@ -364,9 +364,13 @@ export const DEFAULT_TECHNIQUE_BY_PHASE: Record<BBPhase, IntensityTechnique> = {
  * Применить intensity technique к упражнению. Модифицирует workSets + comments.
  * Не меняет sets/rir (они фазо-корректные из buildSession) — только reps/tempo/notes.
  */
+/** Техники, реализуемые applyIntensityTechniqueToExercise, но не входящие в базовый
+ *  авто-каталог IntensityTechnique (выбираются явно: rep-schemes/UI). */
+type ExtendedTechnique = 'lengthened_partials' | 'rest_pause_cluster';
+
 function applyIntensityTechniqueToExercise(
-  e: { workSets: BBSet[]; comment?: string; role: string; muscle: string },
-  technique: IntensityTechnique,
+  e: BBExercise,
+  technique: IntensityTechnique | ExtendedTechnique,
   _phase: BBPhase,
 ): void {
   if (technique === 'none' || e.workSets.length === 0) return;
@@ -451,6 +455,27 @@ function applyIntensityTechniqueToExercise(
       }
       break;
     }
+    case 'lengthened_partials': {
+      // Частичные в растянутой позиции (Wolf 2023/2025) — мини-сет 8 частичных после
+      // последнего сета; объём +1 сет только при явном выборе техники.
+      e.workSets.push({ reps: 8, rir: lastSet.rir, weight: Math.round(baseWeight * 0.85 * 10) / 10, tempo: '2-1-1-0', restSeconds: 15, technique: 'lengthened_partials' } as any);
+      lastSet.technique = 'lengthened_partials';
+      if (!e.comment || !e.comment.includes('Lengthened')) {
+        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🧩 Lengthened partials: мини-сет 8 частичных в растянутой позиции';
+      }
+      break;
+    }
+    case 'rest_pause_cluster': {
+      // Кластерный rest-pause (Haff): 2+2+2 повтора с 15с отдыха — сила + качество техники.
+      for (let i = 0; i < 2; i++) {
+        e.workSets.push({ reps: 2, rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 15, technique: 'rest_pause_cluster' } as any);
+      }
+      lastSet.technique = 'rest_pause_cluster';
+      if (!e.comment || !e.comment.includes('Кластер')) {
+        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Кластерный rest-pause: 2+2+2 с 15с отдыха';
+      }
+      break;
+    }
   }
   // Волна-1.7 (темп-конвейер): техника меняет workSets[].tempo — синхронизируем
   // tempoSpec, иначе карточки/печать показывают старый темп (расхождение каналов).
@@ -469,64 +494,130 @@ export interface FeederSet {
 
 /**
  * Feeder-сеты для слабых групп — ежедневная низкообъёмная высокочастотная работа.
+ *
+ * D1 (мастер-план §3.2): `equipment` больше не игнорируется — вариант фидера выбирается
+ * под доступный инвентарь (гантели/штанга/блок/машина/резинка/свой вес). Без данных об
+ * оборудовании (`[]`) поведение прежнее (первый вариант) — обратная совместимость.
  */
 export function suggestFeeders(weakPoints: string[], equipment: string[]): FeederSet[] {
   const feeders: FeederSet[] = [];
+  const pick = (variants: Array<{ needs: string[]; set: FeederSet }>): FeederSet | null => {
+    if (!equipment || equipment.length === 0) return variants[0].set;
+    const eq = new Set(equipment.map(e => String(e).toLowerCase()));
+    const hit = variants.find(v => v.needs.some(n => n === 'any' || eq.has(n)));
+    return hit ? hit.set : null;
+  };
+  const add = (v: FeederSet | null) => { if (v) feeders.push(v); };
   for (const wp of weakPoints) {
     switch (wp) {
       case 'calves':
-        feeders.push({ muscle: 'calves', exercise: 'Подъём на носки стоя', sets: 3, reps: 15, notes: 'Каждый день по 3×15. Разные углы стоп.' });
+        add(pick([
+          { needs: ['any'], set: { muscle: 'calves', exercise: 'Подъём на носки стоя', sets: 3, reps: 15, notes: 'Каждый день по 3×15. Разные углы стоп.' } },
+        ]));
         break;
       case 'abs':
-        feeders.push({ muscle: 'abs', exercise: 'Скручивания', sets: 3, reps: 15, notes: 'Ежедневно 3×15. Медленно, пиковое сокращение вверху. Прогрессия: +2 повт/нед.' });
+        add(pick([
+          { needs: ['any'], set: { muscle: 'abs', exercise: 'Скручивания', sets: 3, reps: 15, notes: 'Ежедневно 3×15. Медленно, пиковое сокращение вверху. Прогрессия: +2 повт/нед.' } },
+        ]));
         break;
       case 'arms':
       case 'biceps':
-        feeders.push({ muscle: 'biceps', exercise: 'Сгибания рук с гантелью (лёгкий вес)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3, гантель 10-15 кг.' });
+        add(pick([
+          { needs: ['dumbbell'], set: { muscle: 'biceps', exercise: 'Сгибания рук с гантелью (лёгкий вес)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3, гантель 10-15 кг.' } },
+          { needs: ['barbell'], set: { muscle: 'biceps', exercise: 'Сгибания рук со штангой (лёгкий вес)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3, пустой гриф/10-15 кг.' } },
+          { needs: ['cable'], set: { muscle: 'biceps', exercise: 'Сгибания рук на нижнем блоке (лёгкий)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3.' } },
+          { needs: ['band'], set: { muscle: 'biceps', exercise: 'Сгибания рук с резинкой (лёгкая)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
+        ]));
         break;
       case 'triceps':
-        feeders.push({ muscle: 'triceps', exercise: 'Разгибания рук на блоке (лёгкий)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3, смена рукояти.' });
+        add(pick([
+          { needs: ['cable'], set: { muscle: 'triceps', exercise: 'Разгибания рук на блоке (лёгкий)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3, смена рукояти.' } },
+          { needs: ['dumbbell'], set: { muscle: 'triceps', exercise: 'Разгибания рук с гантелью из-за головы (лёгкий)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3.' } },
+          { needs: ['bodyweight'], set: { muscle: 'triceps', exercise: 'Отжимания узким хватом (с колен)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3.' } },
+        ]));
         break;
       case 'side_delts':
       case 'delt_mid':
       case 'shoulders':
-        feeders.push({ muscle: 'shoulders', exercise: 'Махи гантелями в стороны', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Не заваливать корпус.' });
+        add(pick([
+          { needs: ['dumbbell'], set: { muscle: 'shoulders', exercise: 'Махи гантелями в стороны', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Не заваливать корпус.' } },
+          { needs: ['cable'], set: { muscle: 'shoulders', exercise: 'Махи в стороны на блоке', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
+          { needs: ['band'], set: { muscle: 'shoulders', exercise: 'Махи в стороны с резинкой', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
+        ]));
         break;
       case 'delt_front':
-        feeders.push({ muscle: 'shoulders', exercise: 'Подъём гантелей перед собой', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Поочерёдно или одновременно.' });
+        add(pick([
+          { needs: ['dumbbell'], set: { muscle: 'shoulders', exercise: 'Подъём гантелей перед собой', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Поочерёдно или одновременно.' } },
+          { needs: ['barbell'], set: { muscle: 'shoulders', exercise: 'Подъём штанги перед собой (лёгкий)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3.' } },
+          { needs: ['band'], set: { muscle: 'shoulders', exercise: 'Подъём резинки перед собой', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
+        ]));
         break;
       case 'delt_rear':
-        feeders.push({ muscle: 'shoulders', exercise: 'Махи гантелями в наклоне', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Акцент на заднюю дельту, не широчайшие.' });
+        add(pick([
+          { needs: ['dumbbell'], set: { muscle: 'shoulders', exercise: 'Махи гантелями в наклоне', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Акцент на заднюю дельту, не широчайшие.' } },
+          { needs: ['cable'], set: { muscle: 'shoulders', exercise: 'Разведения на блоке в наклоне', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
+          { needs: ['band'], set: { muscle: 'shoulders', exercise: 'Разведения с резинкой в наклоне', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
+        ]));
         break;
       case 'upper_chest':
       case 'chest_upper':
       case 'chest':
-        feeders.push({ muscle: 'chest', exercise: 'Разводка гантелями на наклонной', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3. Акцент на растянутую позицию.' });
+        add(pick([
+          { needs: ['dumbbell'], set: { muscle: 'chest', exercise: 'Разводка гантелями на наклонной', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3. Акцент на растянутую позицию.' } },
+          { needs: ['cable'], set: { muscle: 'chest', exercise: 'Сведения на блоке (снизу-вверх)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
+          { needs: ['band'], set: { muscle: 'chest', exercise: 'Разведения с резинкой на наклонной', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
+          { needs: ['bodyweight'], set: { muscle: 'chest', exercise: 'Отжимания с ногами на возвышении', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3 — верх груди.' } },
+        ]));
         break;
       case 'chest_lower':
-        feeders.push({ muscle: 'chest', exercise: 'Разводка гантелей на скамье с отрицательным наклоном', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3. Акцент на нижнюю часть груди.' });
+        add(pick([
+          { needs: ['dumbbell'], set: { muscle: 'chest', exercise: 'Разводка гантелей на скамье с отрицательным наклоном', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3. Акцент на нижнюю часть груди.' } },
+          { needs: ['bodyweight'], set: { muscle: 'chest', exercise: 'Отжимания на брусьях/от скамьи (корпус вертикальнее)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3 — низ груди.' } },
+        ]));
         break;
       case 'back':
       case 'back_width':
-        feeders.push({ muscle: 'back', exercise: 'Тяга резины/блока к лицу', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Для ширины спины и задней дельты.' });
+        add(pick([
+          { needs: ['band', 'cable'], set: { muscle: 'back', exercise: 'Тяга резины/блока к лицу', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Для ширины спины и задней дельты.' } },
+          { needs: ['bodyweight'], set: { muscle: 'back', exercise: 'Подтягивания/австралийские подтягивания (лёгкие)', sets: 3, reps: 8, notes: 'Ежедневно 3×8, RIR 3 — ширина спины.' } },
+        ]));
         break;
       case 'back_thickness':
-        feeders.push({ muscle: 'back', exercise: 'Тяга резины к поясу сидя', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Для толщины спины (горизонтальная тяга).' });
+        add(pick([
+          { needs: ['band', 'cable'], set: { muscle: 'back', exercise: 'Тяга резины к поясу сидя', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Для толщины спины (горизонтальная тяга).' } },
+          { needs: ['bodyweight'], set: { muscle: 'back', exercise: 'Австралийские подтягивания (низкая перекладина)', sets: 3, reps: 10, notes: 'Ежедневно 3×10, RIR 3 — толщина спины.' } },
+        ]));
         break;
       case 'forearms':
-        feeders.push({ muscle: 'forearms', exercise: 'Сгибания кистей со штангой', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Хват снизу.' });
+        add(pick([
+          { needs: ['barbell'], set: { muscle: 'forearms', exercise: 'Сгибания кистей со штангой', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Хват снизу.' } },
+          { needs: ['dumbbell'], set: { muscle: 'forearms', exercise: 'Сгибания кистей с гантелями', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Хват снизу.' } },
+        ]));
         break;
       case 'traps':
-        feeders.push({ muscle: 'traps', exercise: 'Шраги с гантелями (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Задержка 1 сек вверху.' });
+        add(pick([
+          { needs: ['dumbbell'], set: { muscle: 'traps', exercise: 'Шраги с гантелями (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Задержка 1 сек вверху.' } },
+          { needs: ['barbell'], set: { muscle: 'traps', exercise: 'Шраги со штангой (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
+          { needs: ['machine'], set: { muscle: 'traps', exercise: 'Шраги в тренажёре (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3.' } },
+        ]));
         break;
       case 'glutes':
-        feeders.push({ muscle: 'glutes', exercise: 'Ягодичный мостик (свой вес)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, пиковое сокращение 2 сек вверху.' });
+        add(pick([
+          { needs: ['any'], set: { muscle: 'glutes', exercise: 'Ягодичный мостик (свой вес)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, пиковое сокращение 2 сек вверху.' } },
+        ]));
         break;
       case 'quads':
-        feeders.push({ muscle: 'quads', exercise: 'Разгибания ног на тренажёре (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Медленная негативная фаза.' });
+        add(pick([
+          { needs: ['machine'], set: { muscle: 'quads', exercise: 'Разгибания ног на тренажёре (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Медленная негативная фаза.' } },
+          { needs: ['dumbbell', 'barbell'], set: { muscle: 'quads', exercise: 'Выпады/приседания с лёгким весом', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3.' } },
+          { needs: ['bodyweight'], set: { muscle: 'quads', exercise: 'Приседания с собственным весом', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3, медленный темп.' } },
+        ]));
         break;
       case 'hamstrings':
-        feeders.push({ muscle: 'hamstrings', exercise: 'Сгибания ног на тренажёре (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Контроль негатива.' });
+        add(pick([
+          { needs: ['machine'], set: { muscle: 'hamstrings', exercise: 'Сгибания ног на тренажёре (лёгкий)', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Контроль негатива.' } },
+          { needs: ['dumbbell', 'barbell'], set: { muscle: 'hamstrings', exercise: 'Румынская тяга (лёгкая)', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3. Контроль негатива.' } },
+        ]));
         break;
     }
   }
@@ -646,36 +737,6 @@ export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?
     }
   }
   return garbage;
-}
-
-/* ──────────── Progressive overload target ──────────── */
-export interface OverloadTarget {
-  exerciseName: string;
-  currentSets: number;
-  currentReps: number;
-  currentWeight: number;
-  nextTarget: string;
-}
-
-export function computeOverloadTargets(week: BBWeek, strategy: LoadStrategy, workMax: Record<string, number>, totalWeeks: number, phase: string = ''): OverloadTarget[] {
-  const targets: OverloadTarget[] = [];
-  for (const s of week.sessions) {
-    for (const e of s.exercises) {
-      const currentWeight = e.workSets[0]?.weight || defaultWorkMax(e.muscle);
-      const currentReps = e.workSets[0]?.reps || 10;
-      const currentRIR = e.rir;
-      const maxW = workMax[e.muscle] || defaultWorkMax(e.muscle);
-      const prescr = prescribeLoad(strategy, currentWeight, currentReps, currentRIR, maxW, week.week, totalWeeks, phase);
-      targets.push({
-        exerciseName: e.name,
-        currentSets: e.sets,
-        currentReps,
-        currentWeight,
-        nextTarget: prescr.label,
-      });
-    }
-  }
-  return targets;
 }
 
 /* ──────────── ЕДИНЫЙ ДВИЖОК ФАЗ (P1) ──────────── */

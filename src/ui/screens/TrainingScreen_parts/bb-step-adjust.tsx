@@ -24,7 +24,7 @@ import { PopupSelect, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups
 import { BTN, BTN_GHOST, IN, SMALL, H } from './training-ui';
 import { PHASE_COLORS } from './PlanOutput';
 import { CollapsibleCard, phaseForWeek, exerciseComment, backSubgroupLabel, armHeadLabel, type BBPhase, type Step } from './bb-auto-constructor-shared';
-import { exerciseFeatureBadges, planSetsBreakdown } from './bb-technique-display';
+import { exerciseFeatureBadges, planSetsBreakdown, canonTechniqueId } from './bb-technique-display';
 import { muscleLabel } from './bb-labels';
 import type { SavedBBPlan } from './bb-plans-store';
 
@@ -372,7 +372,6 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
               {s.exercises.map((e, ei) => {
                 const editKey = `${si}-${ei}`;
                 const edit = exerciseEdits[editKey] || { sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight || 80 };
-                const catEx = EXERCISE_CATALOG.find(x => x.name === e.name);
                 const isComp = isCompoundEx(e);
                 const altExercises = getExercisesByGroup(e.muscle).filter(x => x.name !== e.name).slice(0, 5);
                 const editBadges = exerciseFeatureBadges(e, dupMode);
@@ -397,15 +396,15 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                     <span style={{ ...SMALL, fontSize:11, fontWeight:800, color:'#c084fc' }}>⚙️ Фичи и методики</span>
                     <PopupSelect
                       label="Интенсив-техника"
-                      value={edit.technique ?? ((e as any).technique || 'none')}
+                      value={edit.technique ?? (canonTechniqueId(((e as any).workSets || [])[(e as any).workSets?.length - 1]?.technique) || canonTechniqueId((e as any).technique) || 'none')}
                       onChange={v => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, technique: v } }))}
                       options={[
                         { id: 'none', label: '— интенсив-техника —' },
                         { id: 'drop_set', label: '💥 Дроп-сет' },
                         { id: 'rest_pause', label: '⏱ Рест-пауза' },
-                        { id: 'myo_rep', label: '🧬 Мио-репс' },
+                        { id: 'myo_reps', label: '🧬 Мио-репс' },
                         { id: 'negative', label: '⬇️ Негативы' },
-                        { id: '21s', label: '2️⃣1️⃣ 21s' },
+                        { id: 'twenty_ones', label: '2️⃣1️⃣ 21s' },
                       ]}
                     />
                     <PopupSelect

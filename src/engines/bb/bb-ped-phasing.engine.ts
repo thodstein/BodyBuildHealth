@@ -68,12 +68,6 @@ export function resolvePedPhase(input: PedPhasingInput): PedPhase {
   return weekIdx % 2 === 1 ? 'proliferation' : 'differentiation';
 }
 
-/** План-уровень: есть ли обе фазы в цикле (для rationale). */
-export function hasBothPhases(input: Omit<PedPhasingInput, 'weekIdx'>): boolean {
-  const { peds, pedDoses, totalWeeks = 1 } = input;
-  return has(peds, pedDoses, 'MGF') && has(peds, pedDoses, 'IGF1') && totalWeeks >= 1;
-}
-
 /** Человекочитаемое описание фазы для rationale. */
 export function describePedPhase(phase: PedPhase): string {
   switch (phase) {
