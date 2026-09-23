@@ -6,6 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import { autoregulate, type AutoregOutput } from '../../../engines/autoregulation-engine';
 import { getProfile, updateSection } from '../../../core/profile-manager';
+import { useEditorToast } from '../TrainingScreen_parts/EditorToast';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -19,6 +20,9 @@ const dirColor = (d: string) => d === 'increase' ? ACCENT : d === 'decrease' ? '
 const dirLabel = (d: string) => d === 'increase' ? '↑ увеличить' : d === 'decrease' ? '↓ уменьшить' : '→ держать';
 
 export const AutoregPanel: React.FC = () => {
+  // Тосты — канонический хук TrainingScreen_parts (window.showToast живёт только в
+  // контуре питания; здесь alert() был единственным реальным путём в тренинге).
+  const { showToast, ToastNode } = useEditorToast();
   // ── Локальный state ──
   const [readiness, setReadiness] = useState(70);   // 0-100
   const [fatigue, setFatigue] = useState(30);
@@ -56,12 +60,10 @@ export const AutoregPanel: React.FC = () => {
         recovery: Math.min(10, Math.max(1, Math.round(recovery / 10))),
       });
       setLastSavedAt(Date.now());
-      const toast = (window as any).showToast;
-      if (typeof toast === 'function') toast('✓ Сохранено в профиль', 'success');
-      else alert('✓ Сохранено в профиль');
+      showToast('✓ Сохранено в профиль', 'success');
     } catch (e) {
       console.error('[AutoregPanel.saveToProfile]', e);
-      alert('Ошибка сохранения: ' + (e as Error).message);
+      showToast('Ошибка сохранения: ' + (e as Error).message, 'error');
     }
   };
 
@@ -89,6 +91,7 @@ export const AutoregPanel: React.FC = () => {
 
   return (
     <div className="pl-autoreg">
+      {ToastNode}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
         <div><div style={LABEL}>Готовность (PRI), %</div><input style={IN} type="number" min={0} max={100} value={readiness} onChange={e => setReadiness(+e.target.value)} /></div>
         <div><div style={LABEL}>Усталость, %</div><input style={IN} type="number" min={0} max={100} value={fatigue} onChange={e => setFatigue(+e.target.value)} /></div>

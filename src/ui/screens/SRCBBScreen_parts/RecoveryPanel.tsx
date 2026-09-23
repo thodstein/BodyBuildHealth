@@ -7,6 +7,7 @@ import { analyzeRecovery, shouldTrain, type RecoveryOutput } from '../../../engi
 import { getMobilityFlows, getAllCorrectives } from '../../../engines/federation-grip-mobility.engine';
 import { DeloadProtocolCard } from '../TrainingScreen_parts/DeloadProtocolCard';
 import { getProfile, updateSection } from '../../../core/profile-manager';
+import { useEditorToast } from '../TrainingScreen_parts/EditorToast';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -20,6 +21,8 @@ const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-betwe
 const labelColor = (l: string) => l === 'Отлично' ? ACCENT : l === 'Хорошо' ? '#84cc16' : l === 'Средне' ? '#f59e0b' : l === 'Низко' ? '#f97316' : '#ef4444';
 
 export const RecoveryPanel: React.FC = () => {
+  // Тосты — канонический хук TrainingScreen_parts (alert() заменён, см. §4 плана).
+  const { showToast, ToastNode } = useEditorToast();
   // ── Локальный state (поля остаются локальными) ──
   const [sleepHours, setSleepHours] = useState(7.5);
   const [sleepQuality, setSleepQuality] = useState(4);
@@ -74,12 +77,10 @@ export const RecoveryPanel: React.FC = () => {
         updateSection('health', { injuries: merged });
       }
       setLastSavedAt(Date.now());
-      const toast = (window as any).showToast;
-      if (typeof toast === 'function') toast('✓ Сохранено в профиль', 'success');
-      else alert('✓ Сохранено в профиль');
+      showToast('✓ Сохранено в профиль', 'success');
     } catch (e) {
       console.error('[RecoveryPanel.saveToProfile]', e);
-      alert('Ошибка сохранения: ' + (e as Error).message);
+      showToast('Ошибка сохранения: ' + (e as Error).message, 'error');
     }
   };
 
@@ -105,6 +106,7 @@ export const RecoveryPanel: React.FC = () => {
 
   return (
     <div className="pl-recovery">
+      {ToastNode}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
         <div><div style={LABEL}>Сон, часы</div><input style={IN} type="number" min={0} max={12} step={0.5} value={sleepHours} onChange={e => setSleepHours(+e.target.value)} /></div>
         <div><div style={LABEL}>Качество сна 1-5</div><input style={IN} type="number" min={1} max={5} value={sleepQuality} onChange={e => setSleepQuality(+e.target.value)} /></div>

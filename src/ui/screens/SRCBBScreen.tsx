@@ -28,7 +28,7 @@ import { PedInputPanel, PedAdaptationCard } from './TrainingScreen_parts/PedCour
 import { TaperCoachCard } from './SRCBBScreen_parts/TaperCoachCard';
 import { PLCompetitionTab } from './SRCBBScreen_parts/PLCompetitionTab';
 import { PLPlanView } from './SRCBBScreen_parts/PLPlanView';
-import { PLTaperProvider, usePLTaper, TAPER_PLAN_PERSIST_MAX_CHARS } from './SRCBBScreen_parts/taper-state';
+import { PLTaperProvider, usePLTaper, TAPER_PLAN_PERSIST_MAX_CHARS, validateSavedMacroTaperMode, validateSavedMacroWeightGoal, validateSavedMacroBool } from './SRCBBScreen_parts/taper-state';
 import { TrainingMetricsChart, type LMSWeekMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
 
 import { useDataLink } from '../../core/data-link';
@@ -152,11 +152,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [macroGoal, setMacroGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(
     track === 'bb' || dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting'
   );
-  // 🏁 Тапер/пик в макроцикле ПЛ (применяется к peak/competition блокам)
-  const [macroTaperMode, setMacroTaperMode] = useState<TaperMode>('classic');
-  const [macroWeightGoal, setMacroWeightGoal] = useState<TaperWeightGoal>('auto');
-  const [macroMockMeet, setMacroMockMeet] = useState(true);
-  const [macroPostMeet, setMacroPostMeet] = useState(true);
+  // 🏁 Тапер/пик в макроцикле ПЛ (применяется к peak/competition блокам).
+  // P1-§4: настройки персистятся (раньше сбрасывались на дефолт после F5).
+  // Контекст отдельный от циклового тапера (taper-state, дефолт 'pl') — у
+  // макроцикла дефолт 'classic' (Bosquet); слияние меняло бы числа по умолчанию.
+  const [macroTaperMode, setMacroTaperMode] = useState<TaperMode>(() => validateSavedMacroTaperMode(_plSaved?.plMacroTaperMode));
+  const [macroWeightGoal, setMacroWeightGoal] = useState<TaperWeightGoal>(() => validateSavedMacroWeightGoal(_plSaved?.plMacroWeightGoal));
+  const [macroMockMeet, setMacroMockMeet] = useState<boolean>(() => validateSavedMacroBool(_plSaved?.plMacroMockMeet, true));
+  const [macroPostMeet, setMacroPostMeet] = useState<boolean>(() => validateSavedMacroBool(_plSaved?.plMacroPostMeet, true));
   // Keep the annual planner aligned with the active PL level when it changes
   // outside the annual-planning view (profile/session restore).
   useEffect(() => {
@@ -312,8 +315,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       ...taperDraft,
       selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plPeakCycleId: peakCycleId,
       plDeloadCfg, plDiagnosticWeakSide: diagnosticWeakSide,
+      plMacroTaperMode: macroTaperMode, plMacroWeightGoal: macroWeightGoal, plMacroMockMeet: macroMockMeet, plMacroPostMeet: macroPostMeet,
     }));
-  } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId, plDeloadCfg, diagnosticWeakSide, taperPlan, taperAttemptOverride]);
+  } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId, plDeloadCfg, diagnosticWeakSide, taperPlan, taperAttemptOverride, macroTaperMode, macroWeightGoal, macroMockMeet, macroPostMeet]);
   // 🏁 Единый реестр стартов (слияние Фазы 2): канон — he_pl_macro.competitions,
   // plMeetList — надстройка ПЛ (федерация/ПМ/стратегия). Гидрация при монтировании
   // и по событию годового плана; обратная запись — при правках стартов в ПЛ.
@@ -1172,6 +1176,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       } else {
         setMethodNote('⚠ Цикл из моста не найден в каталоге — выберите вручную.');
       }
+    } else {
+      // P0-4 аудита: kinds чужих конструкторов (program/design/macrocycle/annual_block/
+      // methodology/cardio/bb_nutrition/arm_cycle/ss_cycle/combat_cycle/tempo_rollback)
+      // раньше молча съедались — теперь честная заметка вместо тишины.
+      setMethodNote(`⚠ Мост «${p.label || p.kind}» адресован другому конструктору — в ПЛ-авто не применяется.`);
     }
     clearPlannerApply(); setApplyPayload(null);
     setSubView('plan'); // показать обновлённый план
@@ -1976,8 +1985,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {subView === 'macro' && mainTab === 'pl' && (
         <BbCard icon="🏁" accent="#f59e0b" title="Тапер/пик в макроцикле (ПЛ)" style={{ margin: '0 0 10px', background: 'rgba(245,158,11,0.05)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            <PopupSelect label="Раскладка тапера" value={macroTaperMode} onChange={v => setMacroTaperMode(v as TaperMode)} hint="Как снижается объём к старту: классика (Bosquet, разгрузка), ПЛ-пик-протокол (интенсификация к 100%), про-кривая по усталости или Classic WF (перегрузка → суперкомпенсация)" options={(['classic', 'pl', 'pro', 'wf'] as TaperMode[]).map(m => ({ id: m, label: TAPER_MODE_LABELS[m], desc: '' }))} />
-            <PopupSelect label="Весовая цель тапера" value={macroWeightGoal} onChange={v => setMacroWeightGoal(v as TaperWeightGoal)} hint="Сгонка к категории режет объём тапера ×0.9 (дефицит → MRV ниже); набор/стабильный — полный объём" options={(['auto', 'lose', 'gain', 'maintain'] as TaperWeightGoal[]).map(g => ({ id: g, label: TAPER_WEIGHT_GOAL_LABELS[g], desc: '' }))} />
+            <PopupSelect label="Раскладка тапера макроцикла" value={macroTaperMode} onChange={v => setMacroTaperMode(v as TaperMode)} hint="Как снижается объём к старту: классика (Bosquet, разгрузка), ПЛ-пик-протокол (интенсификация к 100%), про-кривая по усталости или Classic WF (перегрузка → суперкомпенсация). Отдельно от циклового тапера («🏁 Соревнования»)" options={(['classic', 'pl', 'pro', 'wf'] as TaperMode[]).map(m => ({ id: m, label: TAPER_MODE_LABELS[m], desc: '' }))} />
+            <PopupSelect label="Весовая цель (макроцикл)" value={macroWeightGoal} onChange={v => setMacroWeightGoal(v as TaperWeightGoal)} hint="Сгонка к категории режет объём тапера ×0.9 (дефицит → MRV ниже); набор/стабильный — полный объём" options={(['auto', 'lose', 'gain', 'maintain'] as TaperWeightGoal[]).map(g => ({ id: g, label: TAPER_WEIGHT_GOAL_LABELS[g], desc: '' }))} />
             <button
               onClick={() => { try { const r = recommendTaperConfig(buildCoachCtx()); setMacroTaperMode(r.mode); setMacroWeightGoal(r.weightGoal); setMacroMockMeet(r.mockMeet); setMacroPostMeet(r.postMeet); setMethodNote(`🤖 Тренер подобрал тапер макроцикла: ${r.rationale.join(' ')}`); } catch (error) { setMethodNote(`⚠ Ошибка подбора: ${(error as Error).message}`); } }}
               style={{ minHeight: 40, borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '8px 12px', border: '1px solid rgba(167,139,250,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.1)' }}

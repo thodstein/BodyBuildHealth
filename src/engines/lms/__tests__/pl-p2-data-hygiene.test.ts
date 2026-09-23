@@ -209,4 +209,10 @@ describe('P2-UI: мёртвый код SRCBBScreen + решение по пан�
     expect(prometrics).toContain('@deprecated');
     expect(prometrics).toContain('FFChart');
   });
+
+  // P0-4 аудита: kinds чужих конструкторов больше не съедаются молча — честная заметка.
+  it('неизвестные kinds моста дают заметку (а не тишину)', () => {
+    expect(screen).toContain('адресован другому конструктору');
+    expect(screen).toMatch(/else \{\s*\/\/ P0-4[\s\S]*?setMethodNote\(/);
+  });
 });

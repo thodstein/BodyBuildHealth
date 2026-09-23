@@ -199,13 +199,19 @@ export const PopupSelectSmart: React.FC<{
 export const PopupText: React.FC<{
   label: string; value: string; placeholder?: string;
   hint?: string; onChange: (v: string) => void;
-}> = ({ label, value, placeholder, hint, onChange }) => {
+  /** Компактный триггер-кнопка (для рядов мелких кнопок вместо prompt(), §4 ПЛ-плана). */
+  compact?: boolean;
+}> = ({ label, value, placeholder, hint, onChange, compact }) => {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(value);
   return <>
-    <button onClick={() => { setEdit(value); setOpen(true); }} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
-      <div style={{ fontSize: 12, color: value ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{value || 'Введите...'}</div>
+    <button onClick={() => { setEdit(value); setOpen(true); }} style={compact
+      ? { padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff' }
+      : cardBtnStyle(!!value)}>
+      {compact ? label : <>
+        <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
+        <div style={{ fontSize: 12, color: value ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{value || 'Введите...'}</div>
+      </>}
     </button>
     {open && <PortalOverlay onClose={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={sheet()}>

@@ -23,6 +23,7 @@ import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { RIRCalibrationCard } from './RIRCalibrationCard';
+import { PopupText } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -604,7 +605,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
                     <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                       <button onClick={() => addToPlan(key, analysis.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
                       <button onClick={() => addToPlan(key, analysis.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
-                      <button onClick={() => { const n=prompt('Название упражнения (рус):','Жим с паузой'); if(n) addToPlan(key,[n]); }} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)' }}>➕ Своё</button>
+                      <PopupText compact label="➕ Своё" placeholder="Жим с паузой" value="" onChange={n => { const t = n.trim(); if (t) addToPlan(key, [t]); }} />
                     </div>
                   </div>
                 );
@@ -656,7 +657,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
                 <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                   <button onClick={() => addToPlan(keyForPhase, phaseAnalysis.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
                   <button onClick={() => addToPlan(keyForPhase, phaseAnalysis.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
-                  <button onClick={() => { const n=prompt('Название упражнения (рус):','Жим с паузой'); if(n) addToPlan(keyForPhase,[n]); }} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)' }}>➕ Своё</button>
+                  <PopupText compact label="➕ Своё" placeholder="Жим с паузой" value="" onChange={n => { const t = n.trim(); if (t) addToPlan(keyForPhase, [t]); }} />
                 </div>
               </div>
             )}
@@ -711,7 +712,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <button onClick={() => addToPlan(stickingKey, stickingAnalysis.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
               <button onClick={() => addToPlan(stickingKey, stickingAnalysis.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
-              <button onClick={() => { const n=prompt('Название упражнения (рус):','Жим с паузой'); if(n) addToPlan(stickingKey,[n]); }} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)' }}>➕ Своё</button>
+              <PopupText compact label="➕ Своё" placeholder="Жим с паузой" value="" onChange={n => { const t = n.trim(); if (t) addToPlan(stickingKey, [t]); }} />
             </div>
           </div>
         )}
@@ -789,7 +790,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
                   <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                     <button onClick={() => addToPlan(vbtKey, vbtSticking.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
                     <button onClick={() => addToPlan(vbtKey, vbtSticking.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(244,114,182,0.12)', color: '#f472b6', border: '1px solid rgba(244,114,182,0.3)' }}>➕ Все</button>
-                    <button onClick={() => { const n=prompt('Название упражнения (рус):','Тяга с паузой'); if(n) addToPlan(vbtKey,[n]); }} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)' }}>➕ Своё</button>
+                    <PopupText compact label="➕ Своё" placeholder="Тяга с паузой" value="" onChange={n => { const t = n.trim(); if (t) addToPlan(vbtKey, [t]); }} />
                   </div>
                 </div>
               )}
@@ -850,7 +851,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
               <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                 <button onClick={() => addToPlan(`${lift}|barpath|${item.issue}`, issueAnalyses[item.issue]?.items.filter(i => i.optimal).map(i => i.exercise.name) ?? [])} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
                 <button onClick={() => addToPlan(`${lift}|barpath|${item.issue}`, issueAnalyses[item.issue]?.items.map(i => i.exercise.name) ?? [])} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
-                <button onClick={() => { const n=prompt('Название упражнения (рус):','Тяга с паузой'); if(n) addToPlan(`${lift}|barpath|${item.issue}`,[n]); }} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)' }}>➕ Своё</button>
+                <PopupText compact label="➕ Своё" placeholder="Тяга с паузой" value="" onChange={n => { const t = n.trim(); if (t) addToPlan(`${lift}|barpath|${item.issue}`, [t]); }} />
               </div>
             </div>
           ))}
@@ -873,12 +874,9 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>Формулы пересчитаны: <b style={{ color:ACCENT }}>actualRIR = 10 − RPE</b>, <b style={{ color:ACCENT }}>bias = plannedRIR − actualRIR</b> (planned из программы/типа упражнения, не константа 2). Среднее по всем подходам + MAD-консистентность, тренд(last ⅓ vs first ⅓). Ручной ввод теперь требует план RIR. Ниже — живые данные из дневника.</div>
         <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', fontSize:10, color:'#fff' }}>
           <div>Проверь: выбери упражнение из списка ниже, добавь своё через «➕ Добавить упражнение» — оно появится в выбранных и учтётся при сборке.</div>
-          <button onClick={() => {
-            const name = prompt('Название упражнения (рус):','Жим гантелей лёжа');
-            if (!name) return;
-            const key = `${lift}|custom|${Date.now()}`;
-            addToPlan(keyForPhase, [name]);
-          }} style={{ marginTop:6, padding:'5px 10px', borderRadius:7, cursor:'pointer', fontSize:10, fontWeight:700, border:'1px solid #00e68a', background:'rgba(0,230,138,0.12)', color:ACCENT }}>➕ Добавить своё упражнение (как в калькуляторе)</button>
+          <div style={{ marginTop:6 }}>
+            <PopupText compact label="➕ Добавить своё упражнение (как в калькуляторе)" placeholder="Жим гантелей лёжа" value="" onChange={n => { const t = n.trim(); if (t) addToPlan(keyForPhase, [t]); }} />
+          </div>
         </div>
         <div style={{ marginTop:8 }}>
           <RIRCalibrationCard />

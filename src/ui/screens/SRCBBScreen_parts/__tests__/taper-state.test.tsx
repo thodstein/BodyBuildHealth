@@ -5,7 +5,12 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { PLTaperProvider, usePLTaper } from '../taper-state';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  PLTaperProvider, usePLTaper,
+  validateSavedMacroTaperMode, validateSavedMacroWeightGoal, validateSavedMacroBool,
+} from '../taper-state';
 
 /** Компонент-потребитель: читает state из контекста и показывает значения. */
 const Consumer: React.FC<{ saved?: any }> = ({ saved }) => {
@@ -118,5 +123,31 @@ describe('P2-1: персист черновиков тапера (taperPlan/atte
     render(<PLTaperProvider saved={{ plBw: 90 }}><PlanConsumer /></PLTaperProvider>);
     expect(screen.getByTestId('plan').textContent).toBe('нет');
     expect(screen.getByTestId('ov').textContent).toBe('{}');
+  });
+});
+
+// P1-§4: macro-настройки тапера (macroTaperMode/WeightGoal/MockMeet/PostMeet)
+// раньше сбрасывались на дефолт после F5 — теперь персистятся и валидируются.
+describe('P1-§4: персист macro-настроек тапера', () => {
+  it('валидаторы: валидные значения проходят, мусор → дефолты', () => {
+    expect(validateSavedMacroTaperMode('wf')).toBe('wf');
+    expect(validateSavedMacroTaperMode('bogus')).toBe('classic');
+    expect(validateSavedMacroTaperMode(undefined)).toBe('classic');
+    expect(validateSavedMacroWeightGoal('lose')).toBe('lose');
+    expect(validateSavedMacroWeightGoal(42)).toBe('auto');
+    expect(validateSavedMacroBool(false, true)).toBe(false);
+    expect(validateSavedMacroBool('yes', true)).toBe(true);
+    expect(validateSavedMacroBool(undefined, true)).toBe(true);
+  });
+
+  it('source-guard: SRCBBScreen пишет и читает 4 ключа макро-тапера', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/ui/screens/SRCBBScreen.tsx'), 'utf8');
+    for (const k of ['plMacroTaperMode', 'plMacroWeightGoal', 'plMacroMockMeet', 'plMacroPostMeet']) {
+      expect(src.includes(k), k).toBe(true);
+    }
+    expect(src).toContain('plMacroTaperMode: macroTaperMode');
+    expect(src).toContain('validateSavedMacroTaperMode');
+    expect(src).toContain('validateSavedMacroWeightGoal');
+    expect(src).toContain('validateSavedMacroBool');
   });
 });

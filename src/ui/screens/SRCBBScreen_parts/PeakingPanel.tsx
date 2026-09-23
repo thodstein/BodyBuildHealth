@@ -10,6 +10,7 @@
 import React, { useState, useMemo } from 'react';
 import { PopupNumber, PopupSelect, PopupToggle, ExpandableCard, MetricCard, CalcSection, CalcResult } from './TrainingPopups';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
+import { useEditorToast } from '../TrainingScreen_parts/EditorToast';
 import { getProfile, updateSection } from '../../../core/profile-manager';
 import {
   buildBBContestPrep, validateBBContestPrepConfig, deserializeBBPrepConfig,
@@ -96,6 +97,8 @@ function weightClass(bw: number, fed: string, sex: 'male' | 'female' = 'male'): 
 
 export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultKind }) => {
   const kind = defaultKind || 'pl';
+  // Тосты — канонический хук TrainingScreen_parts (alert() заменён, см. §4 плана).
+  const { showToast, ToastNode } = useEditorToast();
 
   // ── Локальный state (поля остаются локальными) ──
   const [squat, setSquat] = useState(180);
@@ -217,9 +220,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
         localStorage.setItem('he_training_profile', JSON.stringify(next));
       } catch {}
       setLastSavedAt(Date.now());
-      const toast = (window as any).showToast;
-      if (typeof toast === 'function') toast('✓ ПМ сохранены в профиль', 'success');
-      else alert(`✓ ПМ сохранены в профиль: присед ${squat} / жим ${bench} / тяга ${deadlift} / вес ${bw} кг`);
+      showToast(`✓ ПМ сохранены в профиль: присед ${squat} / жим ${bench} / тяга ${deadlift} / вес ${bw} кг`, 'success');
       applyToPlanner({
         kind: 'pri',
         label: `ПМ: присед ${squat} / жим ${bench} / тяга ${deadlift} кг · вес ${bw} кг`,
@@ -227,7 +228,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
       });
     } catch (e) {
       console.error('[PeakingPanel.applyPms]', e);
-      alert('Ошибка сохранения: ' + (e as Error).message);
+      showToast('Ошибка сохранения: ' + (e as Error).message, 'error');
     }
   };
 
@@ -293,6 +294,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
     };
     return (
       <div className="pl-peak" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+        {ToastNode}
         <CalcSection icon="🏆" title="Шоу-пик (ББ) — единая система тапера" accent="#ec4899" desc={`${bbCountdownText} · Тренировочный тапер (Библиотека методик) + пик-неделя 7 дней: карбс, вода, натрий, позы`}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             <div>
@@ -451,6 +453,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
 
   return (
     <div className="pl-peak" style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+      {ToastNode}
       <CalcSection icon="🏋️" title="Соревнование + Taper (ПЛ)" accent={ACCENT} desc="Полный инструмент: тренировочный пик, стратегия подходов, таймлайн, восстановление">
         <PopupNumber label="Присед (1ПМ)" value={squat} min={20} max={500} suffix=" кг" onChange={setSquat} />
         <PopupNumber label="Жим лёжа (1ПМ)" value={bench} min={20} max={400} suffix=" кг" onChange={setBench} />

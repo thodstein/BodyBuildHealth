@@ -35,6 +35,24 @@ export function validateSavedTaperPlan(plan: unknown): LMSBuildOutput | null {
   return plan as LMSBuildOutput;
 }
 
+/**
+ * P1-§4: валидация персиста macro-настроек тапера (`plMacroTaperMode`/`plMacroWeightGoal`/
+ * `plMacroMockMeet`/`plMacroPostMeet`) — раньше сбрасывались на дефолт после F5.
+ * Контекст отдельный от циклового тапера (peakMode/taperWeightGoal): у макроцикла
+ * дефолт 'classic' (Bosquet), у цикла — 'pl'; слияние меняло бы числа по умолчанию.
+ */
+export function validateSavedMacroTaperMode(v: unknown): TaperMode {
+  return (['classic', 'pl', 'pro', 'wf'] as TaperMode[]).includes(v as TaperMode) ? v as TaperMode : 'classic';
+}
+
+export function validateSavedMacroWeightGoal(v: unknown): TaperWeightGoal {
+  return (['auto', 'lose', 'gain', 'maintain'] as TaperWeightGoal[]).includes(v as TaperWeightGoal) ? v as TaperWeightGoal : 'auto';
+}
+
+export function validateSavedMacroBool(v: unknown, def: boolean): boolean {
+  return typeof v === 'boolean' ? v : def;
+}
+
 /** Проверка формы taperAttemptOverride: { имя лифта: [опенер, вторая, третья] }. */
 export function validateSavedTaperAttemptOverride(value: unknown): Record<string, number[]> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
