@@ -34,7 +34,6 @@ import {
   type LimiterCategory,
   type LimiterExerciseItem,
 } from './limiter-calculator.engine';
-import { analyzePhaseAssistance, analyzeStickingCorrections, analyzeBarPathAssistance } from './lift-assistance.engine';
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 
 // ───────────────────── Типы ─────────────────────
@@ -243,17 +242,4 @@ export function groupsForPhase(lift: Lift, phase: WeakPoint): string[] {
   return [...set];
 }
 
-/** Анализы для UI (ассистенты по каждому слою) — тонкая обёртка над lift-assistance. */
-export function analysesForUnified(input: UnifiedLiftInput) {
-  const eff = effectivePhaseFor(input.lift, input.phase);
-  const tpl = input.template ?? undefined;
-  return {
-    effectivePhase: eff,
-    phaseAnalysis: eff ? analyzePhaseAssistance(input.lift, eff, tpl) : null,
-    stickingAnalysis: eff ? analyzeStickingCorrections(input.lift, eff, tpl) : null,
-    barPathAnalyses: Object.fromEntries((input.barPathIssues ?? []).map(i => [i, analyzeBarPathAssistance(input.lift, i, tpl)])),
-    techniqueGeometry: limiterOptionsFor('technique_geometry', input.lift).map(analyzeLimiterOption),
-  };
-}
 
-export const UNIFIED_LIFT_RU = LIFT_RU;

@@ -152,7 +152,7 @@
 - ✅ Алиасы циклов приведены к существующим id каталога (после keep-first дедупа): `ohp_bar→ohp`, `ohp_seated_db→bench_db` («жим гантелей вниз головой»), `lateral_raise_v2→lateral_raise` / `front_raise_db` («перед собой»); добавлен комментарий-контракт. **Красный `pl-auto-regressions` позеленел** — круг lms+SRCBBScreen_parts **1197/1197, 0 падений**.
 - ✅ Удалён мёртвый файл `src/engines/lms/periodization-methods.ts` (0 импортёров, включая тесты) + осиротевшие `bbChart` и `methodHints` в `SRCBBScreen`/`PLPlanView` (сеттер жил только в удалённой BB-вкладке «Методики» — бейдж был недостижим).
 - ✅ Псевдо-упражнения источника («Отдых», «Тест: проходка (до макс)») больше не портят метрики: NEW `isPseudoExercise` в `lms-metrics.engine`, фильтр в `calcSessionMetrics` (и, через него, в `calcCycleMetrics`/`calcCycleMetricsAggregate`) — не идут в КПШ/тоннаж/интенсивность и не считаются в `exerciseCount`; строки в плане/UI сохранены. NEW `pl-metrics-pseudo.test.ts` 3/3. Круг lms+UI **1200/1200**.
-- ℹ️ Проверка «мёртвых экспортов» (`TAPER_MODE_DESCS`, `hasExplicitWeeks`, `buildSeasonWithCompWindow`, `liftKeyOf`, UI-хелперы `pl-peak-cycle-taper`) показала: они залочены собственными тестами (10 тестов) → удаление отменено, API сохранён (не мёртвое по контракту).
+- ℹ️ Проверка «мёртвых экспортов» (`TAPER_MODE_DESCS`, `hasExplicitWeeks`, `buildSeasonWithCompWindow`, `liftKeyOf`, UI-хелперы `pl-peak-cycle-taper`) показала: они залочены собственными тестами (10 тестов) → удаление отменено, API сохранён (не мёртвое по контракту). **Хвост закрыт 23.09.2026 (§10.4 п.9)**: реально мёртвые (без потребителей и тестов) удалены (`planAllFrequencies`, `analysesForUnified`, `UNIFIED_LIFT_RU`, `DOTS_CLASS_TABLE`, `findPlCorrection`).
 - ✅ Висячие ссылки замен вычищены: в `exercise-catalog.ts` 57 ссылок `'ohp_bar'`/`'ohp_seated_db'` → живые `'ohp'`/`'db_press'` (записи-определения вытесненных id не тронуты, id-count ассертился скриптом); также `bb-builder` (мёртвый id в пуле), `bb-stimulus-target` (2 списка), `bb-sfr-db` (мёртвый ключ → `db_press`), `bb-exercise-levels` (дубль-ключ `ohp_bar`), `pl-correction-exercises` (`canReplace`). Теперь правила замен/SFR/регрессий реально работают. Круги зелёные (lms+UI+bb-target: **1231/1231**).
 - 🔍 Замер `sessionsPerWeek` vs явные недели (probe, удалён): 24 цикла с расхождением, из них **19 — плановые короткие недели делода/тейпера** (cycle-07, block-*, sheiko-*, smolov, candito-6, wendler-*, rts-9, tsa-9 и др. — метаданные = типовая неделя, менять не нужно), **5 — реальный дефект данных**: `juggernaut-2`, `korte-3x3`, `cube`, `russian-squat`, `src2-solovyov-bench-28` хранят **одну сессию в неделе** при заявленных 3–4×/нед (план из них = 1 сессия/нед). Правка размножит сессии по неделям → **меняет планы** (объём ×3–4) — вынесено на решение; альтернатива без смены математики (spw=1 + исключение из 3–4-дневных подборов) делает честными метаданные, но циклы становятся неприменимы на 3–4 днях.
 - ✅ **Решение пользователя по 5 дефектным циклам**: корректно пересобрать нельзя → **удалены** `juggernaut-2`, `korte-3x3`, `cube`, `russian-squat`, `src2-solovyov-bench-28` (файлы + индекс + `SPEED_CYCLE_IDS`); реестр 132→127, PL-циклов 89→84, advanced-фильтр 66→65 (re-baseline с комментариями). Круги lms+UI **1238/1238**.
@@ -381,4 +381,22 @@ Edit/Write + vitest/tsc; чужие WIP не тронуты; коммиты ст
    каталог-записи). Lock: 0 нерезолвленных на всех 36 фазах (`weakpoint-pl` 14/14).
 8. **Верификация**: обязательный круг + `tsc` + `verify:apk-design` + `vite build` —
    числа в AGENTS-записи раунда.
+9. **§4-хвост мёртвых экспортов (найден при финальной перепроверке, закрыт)**: удалены
+   реально мёртвые (без потребителей и без тестов) — `planAllFrequencies` (frequency-planner),
+   `analysesForUnified` + `UNIFIED_LIFT_RU` (unified-lift-diagnosis, + осиротевшие импорты),
+   `DOTS_CLASS_TABLE` (relative-strength; алиас приватного `DOTS_THRESHOLDS`),
+   `findPlCorrection` (pl-correction-exercises). Остальные из §4 — contract-locked
+   собственными тестами (policy «API сохранён»): `rpeAttempts`, `liftKeyOf`,
+   `findBlockByPhase`, `bbTrainingFocusForWeek`, `applicableFormulasForLift`, `adjustedLoad`,
+   `rpeWeightFor`/`e1RMFromRpeSet`, `VL_THRESHOLDS`, `vblLoad`, `rpeVbtDiscrepancy`,
+   `limiter*` ×4, `getScheme`, `lms-metrics` ×6. Проверено: целевые тесты **124/124**
+   (`frequency-planner`/`unified-lift-diagnosis`/`relative-strength`/`limiter-calculator`/
+   `strength-hub-p3/p4`/`progression-pro`/`vbt-mvt`/`pl-auto-audit-2026-08`); `tsc` —
+   по моим файлам 0 (в проекте 1 чужая ошибка WIP arm-хаба `buildArmIcs`).
+10. **Границы (осознанно, без кода)**: сценарии года живут в двух слоях — `he_macro_scenarios`
+    (раскладка макроцикла, `MacrocyclePanel`) и `he_annual_scenarios` (собранные блоки года,
+    `annual-training-storage`); это разные слои данных (раскладка vs сборка), слияние —
+    миграция без пользовательской ценности. ПМ-поля `PLPlanView` — display-only (редактор
+    только в Настройках ПЛ; дублирующий редактор `PeakingPanel` — @deprecated/не смонтирован).
+    `activePopup` MacrocyclePanel — сеттеры есть (строка аудита §4 устарела).
 

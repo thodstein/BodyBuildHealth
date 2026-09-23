@@ -60,7 +60,3 @@ export function planFrequency(muscle: string, totalSets: number, daysPerWeek: nu
 
   return { muscle, totalSets, daysPerWeek, perSession, frequency: freq, status, note };
 }
-
-export function planAllFrequencies(muscles: string[], totalSetsByMuscle: Record<string, number>, daysPerWeek: number, level?: string): FrequencyPlan[] {
-  return muscles.map(m => planFrequency(m, totalSetsByMuscle[m] ?? 0, daysPerWeek, level));
-}

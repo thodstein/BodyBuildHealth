@@ -325,5 +325,3 @@ export function relativeStrengthFullReport(squat: number, bench: number, deadlif
     },
   };
 }
-
-export const DOTS_CLASS_TABLE = DOTS_THRESHOLDS;

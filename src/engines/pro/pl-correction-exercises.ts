@@ -25,9 +25,3 @@ export const PL_CORRECTION_EXERCISES: Exercise[] = [
   { id:'pl_rack_dead', name:'Становая тяга с плинтов', group:'back', type:'compound', equipment:'barbell', difficulty:'advanced', jointStress:'med', fatigueCost:7, targetMuscle:'Разгибатели, трапеции (локаут)', order:2, substitutionGroup:'hip_hinge', movementPattern:'hinge', canReplace:['rack_pull'], cannotReplace:['pulldown','seated_row'], technique:'Тяга с плинтов выше колен — изоляция локаута тяги.', pauseSeconds:1, peakContraction:false, stretchPhase:false, comments:'Коррекция дожима/локаута тяги (Westside rack pull).' },
   { id:'pl_ecc_deadlift', name:'Тяга уступающая', group:'back', type:'compound', equipment:'barbell', difficulty:'advanced', jointStress:'high', fatigueCost:8, targetMuscle:'Задняя цепь (эксцентрика)', order:2, substitutionGroup:'hip_hinge', movementPattern:'hinge', canReplace:['deadlift'], cannotReplace:['pulldown','seated_row'], technique:'Опускание 5-7с — контроль уступающей фазы, взрывной подъём.', pauseSeconds:1, peakContraction:false, stretchPhase:true, comments:'Эксцентрический контроль тяги — позиция и задняя цепь (СРЦ).' },
 ];
-
-/** Поиск по реестру ПЛ-коррекций (для резолвера калькулятора). */
-export function findPlCorrection(name: string): Exercise | undefined {
-  const n = name.toLowerCase().replace(/ё/g, 'е').trim();
-  return PL_CORRECTION_EXERCISES.find(e => e.name.toLowerCase().replace(/ё/g, 'е') === n);
-}
