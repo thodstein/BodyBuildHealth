@@ -823,7 +823,7 @@ export const IndividualPlanSettings: React.FC = () => {
                 )}
                 {canLink && inj.trainLinked && (['before', 'after', 'both'] as const).map(t => (
                   <button key={t} onClick={() => setInjections(injections.map((j2, j) => j === i ? { ...j2, trainTiming: t } : j2))} style={{
-                    fontSize: 6, padding: '1px 4px', borderRadius: 3, cursor: 'pointer', fontWeight: 600,
+                    fontSize: 11, padding: '6px 10px', minHeight: 40, borderRadius: 8, cursor: 'pointer', fontWeight: 600,
                     background: inj.trainTiming === t ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
                     border: inj.trainTiming === t ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
                     color: inj.trainTiming === t ? '#60a5fa' : '#fff',
@@ -866,20 +866,28 @@ export const IndividualPlanSettings: React.FC = () => {
                 width:'100%', padding:'6px', borderRadius:8, cursor:'pointer', fontSize:9, marginBottom:10,
                 background:'rgba(139,92,246,0.08)', border:'1px dashed rgba(139,92,246,0.25)', color:'#a78bfa', fontWeight:600,
               }}>📋 Все типы препаратов ({injectDrugTypes.length})</button>
-              <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+              <div style={{ display:'flex', gap:4, marginBottom:6 }}>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:2 }}>Доза</div>
                   <input type="number" min={0} step="any" value={injDose} onChange={e => setInjDose(Math.max(0, +e.target.value || 0))} style={{ ...inputStyle, width:'100%', fontSize:12, padding:'8px 10px', boxSizing:'border-box' }} />
                 </div>
-                <div style={{ width:60 }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:2 }}>Ед.</div>
-                  <select value={injUnit} onChange={e => setInjUnit(e.target.value)} style={{ ...selectStyle, width:'100%', fontSize:10, padding:'8px 6px' }}>
-                    <option value="mg">mg</option><option value="mcg">mcg</option><option value="IU">IU</option><option value="ml">ml</option>
-                  </select>
-                </div>
                 <div style={{ width:70 }}>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:2 }}>Время</div>
                   <input type="time" value={injTime} onChange={e => setInjTime(e.target.value)} style={{ ...inputStyle, width:'100%', fontSize:10, padding:'8px 6px', boxSizing:'border-box' }} />
+                </div>
+              </div>
+              {/* P1-UX: единицы — чипы 44px вместо нативного select (мелкий тач-таргет в плотной строке) */}
+              <div style={{ marginBottom:8 }}>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:3 }}>Единицы</div>
+                <div style={{ display:'flex', gap:4 }}>
+                  {['mg','mcg','IU','ml'].map(u => (
+                    <button key={u} onClick={() => setInjUnit(u)} aria-pressed={injUnit === u} style={{
+                      flex:1, minHeight:44, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700,
+                      background: injUnit === u ? 'rgba(139,92,246,0.14)' : 'rgba(255,255,255,0.03)',
+                      border: injUnit === u ? '1px solid rgba(139,92,246,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                      color: injUnit === u ? '#a78bfa' : '#fff',
+                    }}>{u}</button>
+                  ))}
                 </div>
               </div>
               <div style={{ marginBottom:10 }}>
@@ -2768,12 +2776,10 @@ export const IndividualPlanSettings: React.FC = () => {
               <textarea value={specialMealNotes} onChange={e => setSpecialMealNotes(e.target.value)} placeholder="Описание..." style={{ ...inputStyle, width:'100%', minHeight:50, resize:'vertical', boxSizing:'border-box', fontSize:9 }} rows={2} />
             </div>
             <div style={{ marginBottom:10 }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Заменить приём</div>
-              <select value={selectedMealToReplace} onChange={e => setSelectedMealToReplace(e.target.value)}
-                style={{ width:'100%', padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'#202023', color:'#fff', fontSize:10 }}>
-                <option value="">— Без замены (добавить) —</option>
-                {['Завтрак','Обед','Ужин','Перекус'].map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
+              {/* P1-UX: попап-выбор вместо нативного select */}
+              <PopupSelect label="Заменить приём" value={selectedMealToReplace}
+                options={[{ id: '', label: '— Без замены (добавить) —' }, ...['Завтрак', 'Обед', 'Ужин', 'Перекус'].map(m => ({ id: m, label: m }))]}
+                onChange={v => setSelectedMealToReplace(v)} />
             </div>
             <div style={{ display:'flex', gap:6 }}>
               <button onClick={() => setShowSpecialMealPopup(false)} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', fontSize:10, fontWeight:600 }}>Отмена</button>

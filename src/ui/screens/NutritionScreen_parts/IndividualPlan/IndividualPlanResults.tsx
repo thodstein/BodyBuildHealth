@@ -7,6 +7,7 @@ import { ALLERGEN_LIST, HEALTH_ISSUES } from "./types";
 import { resolveAllergenFoodIds } from "./planner-restrictions";
 import { effectiveSpecialMealTarget } from "./planner-special-meal-state";
 import { localIsoDate } from "./planner-date-utils";
+import { PopupSelect } from "../../../components/PopupXxx";
 import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
@@ -1370,10 +1371,12 @@ const doImportPlan = (raw: string): boolean => {
               <input value={newRecipe.name} onChange={e => setNewRecipe({...newRecipe, name: e.target.value})} placeholder="Название рецепта" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:15, boxSizing:'border-box', outline:'none', fontWeight:500 }} />
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Приём и время</div>
               <div style={{ display:'flex', gap:6 }}>
-                <select value={newRecipe.meal} onChange={e => setNewRecipe({...newRecipe, meal: e.target.value})} style={{ flex:1, padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:15, boxSizing:'border-box', outline:'none', appearance:'none', fontWeight:500 }}>
-                  <option value="breakfast">Завтрак</option><option value="lunch">Обед</option>
-                  <option value="dinner">Ужин</option><option value="snack">Перекус</option>
-                </select>
+                {/* P1-UX: попап-выбор вместо нативного select */}
+                <div style={{ flex:1 }}>
+                  <PopupSelect label="Приём" value={newRecipe.meal}
+                    options={[{ id:'breakfast', label:'Завтрак' },{ id:'lunch', label:'Обед' },{ id:'dinner', label:'Ужин' },{ id:'snack', label:'Перекус' }]}
+                    onChange={v => setNewRecipe({...newRecipe, meal: v})} />
+                </div>
                 <input type="number" min={0} value={newRecipe.prepTime} onChange={e => setNewRecipe({...newRecipe, prepTime: e.target.value === '' ? 10 : Math.max(0, +e.target.value)})} placeholder="Мин" style={{ width:80, padding:'12px 10px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:15, boxSizing:'border-box', outline:'none', textAlign:'center', fontWeight:500 }} />
               </div>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>КБЖУ (на порцию)</div>
