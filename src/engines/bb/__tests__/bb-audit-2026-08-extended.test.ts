@@ -287,11 +287,11 @@ describe('P0-4: eccentricMult в cycle-to-plan', () => {
     // Найти primary compound в неделе 1 (не deload)
     const weekNormal = planNormal.weeks.find(w => !w.deload && w.phase !== 'deload');
     const weekEcc = planEccentric.weeks.find(w => !w.deload && w.phase !== 'deload');
-    if (!weekNormal || !weekEcc) return;
+    if (!weekNormal || !weekEcc) throw new Error('precondition: план должен иметь рабочую (не deload) неделю');
 
     const primaryNormal = weekNormal.sessions[0].exercises.find(e => e.role === 'primary');
     const primaryEcc = weekEcc.sessions[0].exercises.find(e => e.role === 'primary');
-    if (!primaryNormal || !primaryEcc) return;
+    if (!primaryNormal || !primaryEcc) throw new Error('precondition: рабочая неделя должна иметь primary');
 
     const weightNormal = primaryNormal.workSets?.[0]?.weight ?? 0;
     const weightEcc = primaryEcc.workSets?.[0]?.weight ?? 0;
@@ -602,11 +602,11 @@ describe('E2E: cycle-to-plan — гранулярные слабые групп�
     // Найти primary compound в первой неделе (не deload)
     const weekNormal = planNormal.weeks.find(w => !w.deload && w.phase !== 'deload');
     const weekEcc = planEcc.weeks.find(w => !w.deload && w.phase !== 'deload');
-    if (!weekNormal || !weekEcc) return;
+    if (!weekNormal || !weekEcc) throw new Error('precondition: план должен иметь рабочую (не deload) неделю');
 
     const primaryNormal = weekNormal.sessions[0].exercises.find(e => e.role === 'primary');
     const primaryEcc = weekEcc.sessions[0].exercises.find(e => e.role === 'primary');
-    if (!primaryNormal || !primaryEcc) return;
+    if (!primaryNormal || !primaryEcc) throw new Error('precondition: рабочая неделя должна иметь primary');
 
     const wNormal = primaryNormal.workSets?.[0]?.weight ?? 0;
     const wEcc = primaryEcc.workSets?.[0]?.weight ?? 0;
@@ -631,21 +631,24 @@ describe('E2E: cycle-to-plan — гранулярные слабые групп�
       methodology: 'pre_exhaust',
     } as any);
 
-    // Найти сессию с primary + accessory (изоляция primary мышцы)
+    // Найти сессию, где pre_exhaust поставил изоляцию первой (primary-мышца позже)
+    let found = false;
     for (const w of plan.weeks) {
       for (const s of w.sessions) {
         if (s.exercises.length < 2) continue;
         // Проверить что pre_exhaust применён — хотя бы в одной сессии изоляция primary первой
         const first = s.exercises[0];
         if (first.role === 'accessory') {
-          // Pre-exhaust работает — изоляция первой
-          expect(first.role).toBe('accessory');
-          return;
+          // Pre-exhaust работает — изоляция первой; в сессии обязан быть и primary (иначе порядок нечем мерить)
+          expect(s.exercises.some(e => e.role === 'primary')).toBe(true);
+          found = true;
+          break;
         }
       }
+      if (found) break;
     }
-    // Если ни в одной сессии нет pre_exhaust — это не баг (может не быть primary isolation)
-    // Тест проходит в любом случае — главное что план строится без ошибок
+    // Не вакуумный проход: план построен и не пуст (раньше тест мог «зеленеть» без единой проверки).
+    expect(plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises).length).toBeGreaterThan(0);
   });
 
   it('programToBBPlan с eccentricMult=1.2 — primary веса повышены', async () => {
@@ -653,7 +656,7 @@ describe('E2E: cycle-to-plan — гранулярные слабые групп�
     const { FULL_PROGRAM_LIBRARY } = await import('../../complete-program-library.engine');
 
     const prog = FULL_PROGRAM_LIBRARY.find(p => p.id === '531_bbb');
-    if (!prog) return;
+    if (!prog) throw new Error('precondition: программа 531_bbb должна быть в библиотеке');
 
     const WM = { chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60, traps: 60, hamstrings: 90, glutes: 160, calves: 120, forearms: 50 } as Record<string, number>;
 
@@ -671,14 +674,16 @@ describe('E2E: cycle-to-plan — гранулярные слабые групп�
       eccentricMult: 1.2,
     });
 
-    // Найти primary в неделе 1 (не deload)
+    // Найти primary в неделе 1 (не deload) — по всем сессиям недели (первая сессия может быть без primary)
     const weekNormal = planNormal.weeks.find(w => !w.deload && w.phase !== 'deload');
     const weekEcc = planEcc.weeks.find(w => !w.deload && w.phase !== 'deload');
-    if (!weekNormal || !weekEcc) return;
+    if (!weekNormal || !weekEcc) throw new Error('precondition: план должен иметь рабочую (не deload) неделю');
 
-    const primaryNormal = weekNormal.sessions[0]?.exercises.find(e => e.role === 'primary');
-    const primaryEcc = weekEcc.sessions[0]?.exercises.find(e => e.role === 'primary');
-    if (!primaryNormal || !primaryEcc) return;
+    const primaryNormal = weekNormal.sessions.flatMap(s => s.exercises).find(e => e.role === 'primary');
+    if (!primaryNormal) throw new Error('precondition: рабочая неделя должна иметь primary');
+    const exName = primaryNormal.exerciseName || primaryNormal.name;
+    const primaryEcc = weekEcc.sessions.flatMap(s => s.exercises).find(e => (e.exerciseName || e.name) === exName);
+    if (!primaryEcc) throw new Error('precondition: то же primary-упражнение должно быть и в eccentric-плане');
 
     const wNormal = primaryNormal.workSets?.[0]?.weight ?? 0;
     const wEcc = primaryEcc.workSets?.[0]?.weight ?? 0;
@@ -691,7 +696,7 @@ describe('E2E: cycle-to-plan — гранулярные слабые групп�
     const { FULL_PROGRAM_LIBRARY } = await import('../../complete-program-library.engine');
 
     const prog = FULL_PROGRAM_LIBRARY.find(p => p.id === '531_bbb');
-    if (!prog) return;
+    if (!prog) throw new Error('precondition: программа 531_bbb должна быть в библиотеке');
 
     const WM = { chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60, traps: 60, hamstrings: 90, glutes: 160, calves: 120, forearms: 50 } as Record<string, number>;
 

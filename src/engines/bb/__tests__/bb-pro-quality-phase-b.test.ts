@@ -41,10 +41,10 @@ describe('B1: phaseRepShift — reps снижаются внутри фазы', 
       trainingFocus: 'hypertrophy',
     }));
     const accumWeeks = plan.weeks.filter(w => w.phase === 'accumulation');
-    if (accumWeeks.length < 2) return; // skip if not enough accumulation weeks
+    if (accumWeeks.length < 2) throw new Error('precondition: 8-недельный план должен иметь ≥2 accumulation-недели');
     const w1Ex = accumWeeks[0].sessions.flatMap(s => s.exercises).find(e => e.role === 'primary');
     const w3Ex = accumWeeks[accumWeeks.length - 1].sessions.flatMap(s => s.exercises).find(e => e.role === 'primary');
-    if (!w1Ex || !w3Ex) return;
+    if (!w1Ex || !w3Ex) throw new Error('precondition: accumulation-недели должны иметь primary-упражнения');
     // Reps должны ИЗМЕНИТЬСЯ (phaseRepShift снижает, prescribeLoad может повышать — волна)
     const w1Reps = w1Ex.workSets[0]?.reps ?? w1Ex.repsRange[0];
     const w3Reps = w3Ex.workSets[0]?.reps ?? w3Ex.repsRange[0];
@@ -57,9 +57,9 @@ describe('B1: phaseRepShift — reps снижаются внутри фазы', 
       trainingFocus: 'hypertrophy',
     }));
     const deloadWeeks = plan.weeks.filter(w => w.phase === 'deload');
-    if (deloadWeeks.length === 0) return;
+    if (deloadWeeks.length === 0) throw new Error('precondition: 8-недельный план должен содержать deload-неделю');
     const ex = deloadWeeks[0].sessions.flatMap(s => s.exercises).find(e => e.role === 'primary');
-    if (!ex) return;
+    if (!ex) throw new Error('precondition: deload-неделя должна иметь primary-упражнение');
     // Deload reps должны быть высокими (12-20 из PHASE_CONFIGS)
     const reps = ex.workSets[0]?.reps ?? ex.repsRange[0];
     expect(reps).toBeGreaterThanOrEqual(10);

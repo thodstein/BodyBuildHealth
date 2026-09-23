@@ -143,7 +143,7 @@ describe('experienced enhanced back prescription', () => {
 
   it('adaptive library output uses the shared back quality pass', () => {
     const source = FULL_PROGRAM_LIBRARY.find(program => program.weeks?.some(week => week.days.some(day => day.exercises.some(ex => /подтяг|pull.?up|верхн.*блок|row|тяга/i.test(ex.name)))));
-    if (!source) return;
+    if (!source) throw new Error('precondition: в библиотеке должна быть программа со спиной');
     const plan = programToBBPlan(source, {
       workMax: WM,
       level: 'enhanced', trainingYears: 6,
@@ -158,7 +158,7 @@ describe('experienced enhanced back prescription', () => {
 
   it('faithful library mode does not run adaptive pull-pattern repair', () => {
     const source = FULL_PROGRAM_LIBRARY.find(program => program.weeks?.some(week => week.days.some(day => day.exercises.some(ex => /подтяг|pull.?up|верхн.*блок|row|тяга/i.test(ex.name)))));
-    if (!source) return;
+    if (!source) throw new Error('precondition: в библиотеке должна быть программа со спиной');
     const plan = programToBBPlan(source, { workMax: WM, level: 'enhanced', trainingYears: 6, mode: 'faithful' } as any);
     expect(plan.rationale.some(item => item.includes('Спина по паттернам'))).toBe(true);
     expect(plan.rationale.some(item => item.includes('Адаптация частоты'))).toBe(false);
