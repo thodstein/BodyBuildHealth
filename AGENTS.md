@@ -40,6 +40,13 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · Стронг: порог «причина × вид» ≥3 (Sep 22 2026, коммит pathspec, без пуша)
+
+Углубление на ступень: `SM_CORRECTIVES` → **92 записи** (+4), все 18 ячеек «причина × вид» доведены до **≥3** (было ≥2; тонкими были volume/stability, technique/strength, mobility/strength, strength/stability).
+- +4 записи со своими реальными exId (`SM_CORR_EXID_BY_ID`): `sm_farmers_carry_vol_stab` (volume/stability → `farmer_walk`), `sm_log_clean_tech_str` (technique/strength → `hang_clean`), `sm_yoke_turn_mob_str` (mobility/strength → `squat_zercher`), `sm_grip_support_str_stab` (strength/stability → `plate_pinch`).
+- NEW-порог лока: «каждая причина × вид ≥3» (было ≥2); ранжир не поехал (записи в хвосте, топ-3 целы).
+- **Проверено**: `src/engines/strength-sport` **65 файлов / 1007** + стронг-хаб UI **4 файла / 40** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · ТА: порог «причина × фаза» ≥3 (Sep 22 2026, коммит pathspec, без пуша)
 
 Углубление на ступень: `TA_CORRECTIVES` → **83 записи** (+7), все 15 ячеек «причина × фаза» доведены до **≥3** (было ≥2; реально тонкими были volume/technique, volume/stability, fatigue/strength, fatigue/stability, затем volume/strength, mobility/technique, fatigue/technique).

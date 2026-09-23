@@ -603,6 +603,27 @@ export const SM_CORRECTIVES: SMCorrective[] = [
     { sets: 4, reps: 3, pct: 85, rir: 2, tempo: 'hold 5с', restSeconds: 150 },
     ['Плечи к ушам, без вращения', 'Холд 5с на верхней точке'],
     '+2.5%/нед', 'Шраги без веса', 'SBS grip strength'),
+  // ── ROUND-10 (причина × вид ≥3): добор тонких ячеек ──
+  C('sm_farmers_carry_vol_stab', 'farmers_carry', 'stability', 'Объём переноски в ровном темпе 5×20м',
+    ['темп падает к 4-5 подходу', 'шаг мельчает'], ['volume'], 'intermediate',
+    { sets: 5, reps: '20м', pct: 70, rir: 3, tempo: 'ровный', restSeconds: 150 },
+    ['Одинаковый шаг', 'Корпус прямой, без раскачки'],
+    '+5м/нед при ровном темпе', 'Переноска 3×20м @60%', 'NSCA carries volume'),
+  C('sm_log_clean_tech_str', 'log_clean', 'strength', 'Подъём на грудь под нагрузкой: техника лова 4×3',
+    ['высокий лов лога', 'провал груди под весом'], ['technique'], 'intermediate',
+    { sets: 4, reps: 3, pct: 75, rir: 2, tempo: '2-1-1-0', restSeconds: 150 },
+    ['Локти вверх на лов', 'Лог на груди, не на запястьях', 'Грудь вверх весь лов'],
+    '+2.5%/нед при чистом лове', 'Подъём 3×3 пустым', 'Heezza 2024 clean technique'),
+  C('sm_yoke_turn_mob_str', 'yoke_turn', 'strength', 'Разворот под нагрузкой + мобильность бёдер 4×2',
+    ['широкий разворот', 'завал корпуса на развороте'], ['mobility'], 'advanced',
+    { sets: 4, reps: 2, pct: 80, rir: 2, tempo: 'контроль', restSeconds: 210 },
+    ['Разворот короткий, стопы близко', 'Корпус над йоком'],
+    '+2.5%/нед', 'Разворот с лёгким йоком', 'Hindle turn; hip mobility'),
+  C('sm_grip_support_str_stab', 'grip_support', 'stability', 'Силовая опора: холды на пределе 4×макс',
+    ['хват не держит на 3-м холде'], ['strength'], 'advanced',
+    { sets: 4, reps: '15с', pct: 85, rir: 2, tempo: 'hold', restSeconds: 150 },
+    ['Хват до отказа формы', 'Плечи над грифом'],
+    '+5с/нед', 'Холд 60% 3×15с', 'IronMind axle strength'),
 ];
 
 /** Все фазы библиотеки (16). */
@@ -1017,6 +1038,10 @@ export const SM_CORR_EXID_BY_ID: Record<string, string> = {
   sm_log_lockout_tech_str: 'deadlift_romanian',
   sm_yoke_pickup_mob_str: 'back_extension',
   sm_farmers_grip_str_stab: 'shrug_db',
+  sm_farmers_carry_vol_stab: 'farmer_walk',
+  sm_log_clean_tech_str: 'hang_clean',
+  sm_yoke_turn_mob_str: 'squat_zercher',
+  sm_grip_support_str_stab: 'plate_pinch',
 };
 
 /** Реальное id упражнения за записью библиотеки. */
