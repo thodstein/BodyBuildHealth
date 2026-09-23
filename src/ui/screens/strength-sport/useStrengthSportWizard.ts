@@ -24,7 +24,18 @@ export type StrengthSportStep = 'params' | 'athlete' | 'outside' | 'split' | 'pl
 
 export function useStrengthSportWizard() {
   const [step, setStep] = useState<StrengthSportStep>('params');
-  const [mode, setMode] = useState<StrengthSportInput['mode']>('weightlifting');
+  // ROUND-10: хаб ТА/стронга передаёт режим ключом `he_strength_sport_mode` (раньше ключ был write-only
+  // и конструктор всегда открывался в ТА). Читаем один раз при монтировании и ключ убираем.
+  const [mode, setMode] = useState<StrengthSportInput['mode']>(() => {
+    try {
+      const m = localStorage.getItem('he_strength_sport_mode');
+      if (m === 'weightlifting' || m === 'strongman') {
+        localStorage.removeItem('he_strength_sport_mode');
+        return m;
+      }
+    } catch { /* noop */ }
+    return 'weightlifting';
+  });
   const [goal, setGoal] = useState<StrengthSportInput['goal']>('strength');
   const [level, setLevel] = useState<StrengthSportInput['level']>('intermediate');
   const [weeks, setWeeks] = useState(8);
@@ -38,7 +49,8 @@ export function useStrengthSportWizard() {
   const [mobility, setMobility] = useState<string[]>([]);
   const [injuries, setInjuries] = useState<any[]>([]);
   const [injInput, setInjInput] = useState('');
-  const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('weightlifting'));
+  // Внешняя нагрузка следует за режимом (в т.ч. за режимом, переданным хабом через he_strength_sport_mode).
+  const [outside, setOutside] = useState<OutsideLoad | null>(() => defaultOutsideLoadFor(mode));
   const [outsideEnabled, setOutsideEnabled] = useState(false);
   const [sex, setSex] = useState<'male'|'female'>('male');
   const [bodyweight, setBodyweight] = useState<number>(80);

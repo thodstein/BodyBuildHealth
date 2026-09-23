@@ -99,6 +99,19 @@ describe('SS wizard structure (combat-style, 7 steps)', () => {
     expect(document.body.textContent).toContain('Пресет контеста');
   });
 
+  it('ROUND-10: режим из хаба (he_strength_sport_mode) применяется при открытии конструктора', () => {
+    localStorage.setItem('he_strength_sport_mode', 'strongman');
+    render(<StrengthSportConstructor />);
+    expect(screen.getByLabelText('Режим').textContent).toMatch(/Стронг/);
+    expect(localStorage.getItem('he_strength_sport_mode')).toBeNull();
+  });
+
+  it('ROUND-10: без подсказки хаба режим остаётся ТА (дефолт)', () => {
+    const { unmount } = render(<StrengthSportConstructor />);
+    expect(screen.getByLabelText('Режим').textContent).toMatch(/ТА/);
+    unmount();
+  });
+
   it('пересборка теми же параметрами не накручивает ПМ', async () => {
     render(<StrengthSportConstructor />);
     goToSplit();

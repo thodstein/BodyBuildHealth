@@ -54,6 +54,12 @@
 - **Проверено**: `tsc --noEmit` **0 по всему проекту**; `src/engines/lms` + `SRCBBScreen_parts` **1241/1241 (74 файла)**; `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`); `verify:apk-design` OK.
 - **Остаток (промт новой сессии — `docs/PL-AUTO-TOP-TOOL-PLAN.md` §10.1)**: персист `taperPlan`/`taperAttemptOverride`; мёртвые импорты/state `SRCBBScreen` + решение по `PeakingPanel`/`ProMetricsPanel`; OPL-импорт write-only; нормализация RPE/T-суффиксов имён упражнений + 42 мёртвых ключа `exercise-id-mapping` + гард `pct>1.1`; `assembleSeasonPlan` при полной блокировке подставляет `LMS_CYCLES[0]`.
 
+## Коррекция-контент round-10 · Режим ТА/стронг из хаба: write-only ключ оживлён (Sep 22 2026, коммит pathspec, без пуша)
+
+Скан write-only ключей (симметрия к аудиту «писатель → читатель») нашёл последний разрыв: хабы ТА и стронга помечают режим ключом `he_strength_sport_mode` (`'weightlifting'`/`'strongman'`) при уходе в конструктор, а **никто его не читал** — конструктор всегда открывался в ТА (дефолт), даже если пользователь работал в стронге.
+- `useStrengthSportWizard`: `mode` теперь лениво читает `he_strength_sport_mode` (валидные значения) и **убирает ключ** (одноразовый хинт) → «→ Применить в Стронг-конструктор» реально открывает стронг-режим; `outside` (внешняя нагрузка) следует за режимом.
+- Тесты: `ss-wizard-structure` **11/11** (+2: с хинтом режим = Стронг и ключ удалён; без хинта — дефолт ТА) + SS-UI **12 файлов / 79** + `tsc --noEmit` **0 по всему проекту**. НЕ ПУШИЛ.
+
 ## Коррекция-контент round-10 · Единый адаптер дневника для хабов: живой `he_workout_log_v2` вместо мёртвых легаси-ключей (Sep 22 2026, коммит pathspec, без пуша)
 
 Реаудит «а видит ли хаб РЕАЛЬНЫЙ дневник?»: живой лог пишет `workout-logger.engine` в `he_workout_log_v2` (`WorkoutSession[]`), а хабы читали `he_workout_log_v1`/`he_training_log`/`he_workout_history` — **их в проде никто не пишет**; вдобавок цепочка `getItem(v1) || getItem(v2)` ловила пустой `'[]'` (truthy) и до v2 не доходила. Итог: фичи «слабые по дневнику» (e1RM-тренд 28д, plateau, ACWR, factVolume, L/R из дневника) были слепы к реальным тренировкам.
