@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BB_CORRECTIVES } from '../bb-corrective.engine';
+import { BB_CORRECTIVES, rankCorrectives } from '../bb-corrective.engine';
 import { WEAK_TO_MUSCLE } from '../bb-builder.engine';
 
 /**
@@ -31,6 +31,16 @@ describe('bb-corrective K2: покрытие зон ≥2', () => {
     // MovementDriver = ankle|hip|thoracic|shoulder|core|none ('flexibility' в типе нет — не выдумываем)
     const DRV = ['driver:ankle', 'driver:hip', 'driver:thoracic', 'driver:shoulder', 'driver:core'];
     const thin = DRV.filter((d) => count(d) < 4).map((d) => `${d}:${count(d)}`);
+    expect(thin).toEqual([]);
+  });
+  it('ROUND-10: домашний зал (dumbbell+bodyweight) — каждая зона хаба даёт ≥2 варианта', () => {
+    const HOME = ['dumbbell', 'bodyweight'];
+    const thin: string[] = [];
+    for (const z of HUB_ZONES) {
+      let n = 0;
+      try { n = rankCorrectives({ zones: [z], equipment: HOME }).length; } catch { n = -1; }
+      if (n < 2) thin.push(`${z}:${n}`);
+    }
     expect(thin).toEqual([]);
   });
   it('ROUND-10: каждая объявленная причина в каждой фазе имеет ≥2 варианта', () => {

@@ -2331,6 +2331,18 @@ export const WLDiagnosticsHub: React.FC = () => {
               const c = ordered[0];
               return c ? <div key={wp} style={{ fontSize: 10, color: '#fff', marginTop: 3 }}>{WL_WEAKPOINT_LABELS[wp] || wp} → {c.name} {c.protocol.sets}×{c.protocol.reps} @{c.protocol.pct}%{pref === c.id ? ' ⭐' : ''}</div> : null;
             })}
+            {/* ROUND-10: честный пустой стейт под фильтрами зала/уровня (иначе фаза молча исчезает) */}
+            {(() => {
+              try {
+                const empty = weakPoints.filter((wp) => top3For(wp).length === 0);
+                if (!empty.length) return null;
+                return (
+                  <div data-wl="corrections-empty" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                    ⚠ Нет вариантов под фильтр зала/уровня для фаз: {empty.map((wp) => WL_WEAKPOINT_LABELS[wp] || wp).join(', ')} — ослабь фильтры или добавь снаряд (штангу).
+                  </div>
+                );
+              } catch { return null; }
+            })()}
             <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Инъекция в план — кнопкой ниже (⭐ первыми); мост — «Применить».</div>
           </div>
         )}

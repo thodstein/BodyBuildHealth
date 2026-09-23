@@ -172,6 +172,31 @@ describe('ta corrective tab UI', () => {
       localStorage.removeItem('he_wl_diagnostics_hub_v1');
     }
   });
+  it('ROUND-10: под фильтр зала без штанги фаза без вариантов честно сообщает', () => {
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    localStorage.setItem('he_profile_v2', JSON.stringify({ training: { equipment: ['bodyweight'] } }));
+    try {
+      const { container } = render(<WLDiagnosticsHub />);
+      fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+      fireEvent.click(screen.getByText('Рывок: отрыв (0-20°)'));
+      fireEvent.click(screen.getByRole('button', { name: '🛠️ Коррекция' }));
+      const note = container.querySelector('[data-wl="corrections-empty"]');
+      expect(note).toBeTruthy();
+      expect(note?.textContent).toMatch(/Нет вариантов/);
+      expect(note?.textContent).toMatch(/штангу/);
+    } finally {
+      localStorage.removeItem('he_profile_v2');
+      localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    }
+  });
+  it('ROUND-10: со штангой честной плашки пустых фаз нет', () => {
+    localStorage.removeItem('he_wl_diagnostics_hub_v1');
+    const { container } = render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: '🏋️ Рывок' }));
+    fireEvent.click(screen.getByText('Рывок: отрыв (0-20°)'));
+    fireEvent.click(screen.getByRole('button', { name: '🛠️ Коррекция' }));
+    expect(container.querySelector('[data-wl="corrections-empty"]')).toBeNull();
+  });
   it('П1: VBT-просадка даёт хинт в Видео без петли', () => {
     localStorage.removeItem('he_wl_diagnostics_hub_v1');
     const { container } = render(<WLDiagnosticsHub />);

@@ -2224,6 +2224,26 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 lines.push(`Фазы: ${phases.map((p) => SM_WEAKPOINT_LABELS[p as keyof typeof SM_WEAKPOINT_LABELS] || p).join(', ')}`);
                 const pref = phases.map((p) => `${SM_PHASE_SHORT[p] || p}→${(smPrefCorr as Record<string, string>)[p] || 'авто'}`);
                 lines.push(`Предпочтения (⭐): ${pref.join(' · ')}`);
+                // ROUND-10: честный пустой стейт по фазам — иначе фаза без вариантов молча исчезает из превью
+                const perPhase = phases.map((p) => {
+                  let top: any[] = [];
+                  try {
+                    top = rankCorrectionsForSMLibrary(p as any, {
+                      cause: ((smCauseByPhase as Record<string, string>)[p] || null) as never,
+                      level: smCorrFilter.level,
+                      equipment: smCorrFilter.equipment,
+                      fatigueSensitive: smCorrFilter.fatigueSensitive,
+                      mobilityRestrictions: smCorrFilter.mobilityRestrictions,
+                    });
+                  } catch { top = []; }
+                  const prefId = (smPrefCorr as Record<string, string>)[p];
+                  const pick = (prefId && top.find((c) => c.id === prefId)) || top[0];
+                  const label = SM_PHASE_SHORT[p] || p;
+                  if (!pick) return `${label} → ⊘ нет вариантов под фильтр`;
+                  const pr = pick.protocolAdj || pick.protocol || {};
+                  return `${label} → ${pick.name} ${pr.sets ?? '?'}×${pr.reps ?? '?'}${pr.pct ? ` @${pr.pct}%` : ''}`;
+                });
+                lines.push(`Фаза → упражнение: ${perPhase.join(' · ')}`);
               }
               if (smCorrSession.length) {
                 lines.push(`Сессия: ${smCorrSession.map((c) => `${c.id} ${c.protocolAdj.sets}×${c.protocolAdj.reps}`).join('; ')}`);

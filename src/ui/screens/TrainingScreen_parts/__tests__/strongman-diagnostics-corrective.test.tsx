@@ -140,6 +140,15 @@ describe('StrongmanDiagnosticsHub corrective + top nav', () => {
     await waitFor(() => expect(document.body.querySelector('[data-sm="corr-empty-phase"]')).toBeTruthy());
     expect(document.body.textContent).toContain('ослабь фильтры');
   });
+  it('ROUND-10: превью моста честно помечает фазу без вариантов под фильтр зала', async () => {
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(await screen.findByText(/Жим\/лог: старт/));
+    fireEvent.click(container.querySelector('[data-sm="top-tab-correction"]')!);
+    await waitFor(() => expect(document.body.querySelector('[data-sm="bridge-preview"]')).toBeTruthy());
+    await waitFor(() => expect(document.body.querySelector('[data-sm="bridge-preview"]')!.textContent).toMatch(/Фаза → упражнение: /));
+    fireEvent.click(screen.getByText('Свой вес'));
+    await waitFor(() => expect(document.body.querySelector('[data-sm="bridge-preview"]')!.textContent).toMatch(/⊘ нет вариантов под фильтр/));
+  });
   it('C5: асимметрия + grip-фаза → мост несёт smUnilateral', async () => {
     localStorage.setItem('he_strongman_diagnostics_hub_v1', JSON.stringify({ gripWeak: ['grip'], leftMax: '100', rightMax: '90' }));
     render(<StrongmanDiagnosticsHub />);
