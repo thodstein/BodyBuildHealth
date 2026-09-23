@@ -50,12 +50,15 @@ describe('E-PLATE: products-1500У + инсулин — без гор батат
     }
   });
 
-  it('низкоплотные носители — не горы: каждый пункт ≤300 г, сумма батат+булгур ≤300 г', () => {
+  it('низкоплотные носители — не горы: каждый пункт ≤390 г (300×1.3 §3A), сумма батат+булгур ≤300 г', () => {
+    // §3A EXTREME-SCALE: на инсулин-дне съедобный кап низкоплотных крахмалов ×1.3
+    // (было 300 → стало 390; план NUTRITION-EXTREME-SCALE-PRO §3A). Батат+булгур
+    // остаются «водяными» объёмными носителями — их суммарный кап не расширяем.
     let bulk = 0;
     for (const m of plan.meals) {
       for (const it of m.items || []) {
         if (LOW_DENSITY.has(it.id)) {
-          expect(it.amount || 0, `${m.label}/${it.id}`).toBeLessThanOrEqual(300);
+          expect(it.amount || 0, `${m.label}/${it.id}`).toBeLessThanOrEqual(390);
           if (it.id === 'sweet_potato' || it.id === 'bulgur') bulk += it.amount || 0;
         }
       }

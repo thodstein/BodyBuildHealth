@@ -46,7 +46,7 @@ import {
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets, mealTargetsStale as _mealTargetsStale } from "./day-target-corrector";
 import { getFoodAllergenTags } from "./planner-restrictions";
-import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay, EDIBILITY_CAPS } from "./planner-carb-density";
+import { edibilityCapFor, liveLadderSteps, isHighCarbDay as _isHighCarbDay, EDIBILITY_CAPS, extremeCapacityProfile, DEFAULT_EXTREME_CAPACITY, type ExtremeCapacityProfile } from "./planner-carb-density";
 import { computeEA } from "./planner-ea.engine";
 import { planTypeFloorMods } from "./planner-day-targets";
 import { perMealProteinCapG } from "./planner-meal-count";
@@ -272,8 +272,19 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
 // приёма (scale = clamp(kcal приёма / 900, 1, 2)) — большой обед на массе больше не
 // упирается в кап «нормального» приёма. Фрукт/овощ НЕ масштабируются (объёмные добавки).
 function maxGramPerItem(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 600 : 500) * scale * ws); }
-function maxGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 350 : 280) * scale * ws); }
-function maxDryGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.5, _pickCtx.currentWeightKg / 80)); const base = ((budget === 'max' || budget === 'enhanced') ? 150 : 120); return Math.round(Math.min(170, base * ws * Math.min(scale, 1.15))); }
+function maxGrainPerMeal(budget?: string, scale = 1): number {
+  const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80));
+  const base = ((budget === 'max' || budget === 'enhanced') ? 350 : 280) * scale * ws;
+  const p = _pickCtx.capacity;
+  return Math.round(p.active ? base * p.plateMult : base);
+}
+function maxDryGrainPerMeal(budget?: string, scale = 1): number {
+  const ws = Math.max(1, Math.min(1.5, _pickCtx.currentWeightKg / 80));
+  const base = ((budget === 'max' || budget === 'enhanced') ? 150 : 120);
+  const p = _pickCtx.capacity;
+  const cap = p.active ? p.dryGrainCap : 170;
+  return Math.round(Math.min(cap, base * ws * Math.min(scale, 1.15)));
+}
 // Масштаб порционных капов от макро-цели приёма (p/c/f в граммах).
 function mealCapScale(pG: number, cG: number, fG: number): number {
   const kcal = (pG || 0) * 4 + (cG || 0) * 4 + (fG || 0) * 9;
@@ -409,7 +420,7 @@ function carbPortionCap(food: FoodItem, scale = 1): number {
   // углей больше. Обычные дни — legacy-кап.
   if (carbPer100 > 0 && carbPer100 < 30) {
     const _cap = maxGrainPerMeal(_budget, scale); // cooked starch (potato)
-    return _pickCtx.highVolumeDay ? Math.min(_cap, 250) : _cap;
+    return _pickCtx.highVolumeDay ? Math.min(_cap, Math.round(250 * _pickCtx.capacity.plateMult)) : _cap;
   }
   // medium density 30-55 (oat bran, muesli, bread) — realistic bowl ~300g (max 350 for max budget)
   if (carbPer100 >= 30 && carbPer100 < 55) return Math.round((_budget === 'max' || _budget === 'enhanced' ? 350 : 300) * scale);
@@ -1127,6 +1138,9 @@ const _pickCtx: {
   // familyMealCap скейлятся им; обычные дни (≤3000 ккал) = 1.0 бит-в-бит.
   dayTargetScale: number;
   _locked: boolean;
+  // §3A EXTREME-SCALE: профиль ёмкости (инсулин/≥8 г/кг/1500У) — расширяет порционные
+  // потолки только на экстремальных днях; обычные дни — DEFAULT (active=false).
+  capacity: ExtremeCapacityProfile;
 } = {
   tasteProfile: undefined,
   deprioritizedIds: undefined,
@@ -1148,6 +1162,7 @@ const _pickCtx: {
   denseDay: false,
   dayTargetScale: 1,
   _locked: false,
+  capacity: { ...DEFAULT_EXTREME_CAPACITY },
 };
 
 // Совместимые читающие псевдонимы — исключены: чтение идёт напрямую из _pickCtx (см. хвост-2).
@@ -3661,6 +3676,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _pickCtx.denseDay = _pickCtx.highVolumeDay
     || _carbsForRoles / Math.max(1, _roles.filter(r => r === 'breakfast' || r === 'lunch' || r === 'dinner' || String(r).startsWith('snack')).length) > 130;
   _pickCtx.isTrainingDayCtx = input.isTrainingDay !== false;
+  // §3A EXTREME-SCALE: профиль ёмкости (до распределения углеводов — вместимости приёмов
+  // уже учитывают инсулин/экстрим). Обычные дни: active=false → все капы байт-в-байт.
+  _pickCtx.capacity = extremeCapacityProfile({
+    insulinUnits: _bolusUnits,
+    carbsG: carbsTotal,
+    weightKg: input.weightKg,
+    goalKcal: input.goalKcal,
+    highVolumeDay: _pickCtx.highVolumeDay,
+  });
   const _capOf = (r: string): number => _keep.has(r)
     ? mealCarbCapacityG(r, { budget: input.budget, weightKg: input.weightKg, trainDurationMin: input.trainDurationMin, nightCarbsG: _nightCarbs })
     : 0;
@@ -6831,7 +6855,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // и только если комнаты нет нигде — резка (овощи → фрукты → comfort → гарнир до 90%).
       // Белок/жиры/порошки/peri — не трогаем ни там, ни там.
       {
-        const MAX_MEAL_SOLID_G = 700;
+        // §3A EXTREME-SCALE: на инсулин/HV-днях тарелка шире (700 → 805/910, потолок 900);
+        // обычные дни — ровно 700. Жёсткий предел приёма = тарелка + 50 (как было 750 при 700).
+        const MAX_MEAL_SOLID_G = _pickCtx.capacity.active ? Math.min(900, Math.round(700 * _pickCtx.capacity.plateMult)) : 700;
+        const MAX_MEAL_HARD_G = MAX_MEAL_SOLID_G + 50;
         const _isComfort = (id: string) => (COMFORT_PORTION_LIMITS[id] !== undefined) || isConcentrateFood({ id } as any);
         const _solidOf = (m: any) => (m.items || []).filter((it: any) => it.role !== 'liquid').reduce((s: number, it: any) => s + (it.amount || 0), 0);
         const _roomKcalOf = (m: any): number => {
@@ -6904,7 +6931,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             let _moved = 0;
             for (const { x, room } of _recs.slice(0, 3)) {
               if (_take <= 0) break;
-              const _roomG = 750 - _solidOf(x);
+              const _roomG = MAX_MEAL_HARD_G - _solidOf(x);
               if (_roomG <= 0) continue;
               // Не заливаем реципиента сверх его ккал-комнаты (иначе чиним одно, ломаем другое).
               const _kpg = (it.kcal || 0) / Math.max(1, _cur);
@@ -6958,9 +6985,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             m.totals = mealTotalsOf(m.items);
             recalcDayTotals(meals, totals);
           }
-          // Жёсткий предел 750 г/приём (тест съедобности): овощи→фрукты режем всегда —
+          // Жёсткий предел (тарелка+50)/приём (тест съедобности): овощи→фрукты режем всегда —
           // это граммы без макросов, сходимость не страдает. Гарниры/белки без комнаты не трогаем.
-          if (_solidOf(m) > 750) {
+          if (_solidOf(m) > MAX_MEAL_HARD_G) {
             const _trimOrder = (m.items || [])
               .map((it: any) => ({ it, pri: it.role === 'veg' ? 0 : it.role === 'fruit' ? 1 : 9 }))
               .filter(x => x.pri < 9 && (x.it.amount || 0) > 30)
@@ -8189,7 +8216,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       for (const m of meals) {
         for (const it of (m.items || [])) {
           if (!_lowDensityIds.has(it.id)) continue;
-          const _capLD = EDIBILITY_CAPS[it.id] ?? 300;
+          const _capLD = Math.round((EDIBILITY_CAPS[it.id] ?? 300) * _pickCtx.capacity.edibilityMult);
           if ((it.amount || 0) <= _capLD) continue;
           const _rLD = _capLD / (it.amount || 1);
           it.amount = _capLD;
@@ -8384,7 +8411,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           .filter((x: any) => (x.it.role === 'carb_slow' || x.it.role === 'carb_fast') && !(x.it as any)._fixedGrams)
           .map((x: any) => {
             const _fd5 = FOOD_DB.find((f: any) => f.id === x.it.id);
-            const _cap5 = _fd5 ? Math.min(edibilityCapFor(_fd5.id, 600), 600) : 0;
+            const _cap5 = _fd5 ? Math.min(edibilityCapFor(_fd5.id, 600, _pickCtx.capacity.edibilityMult), 600) : 0;
             return { ...x, fd: _fd5, cap: _cap5, room: _cap5 - (x.it.amount || 0) };
           })
           .filter((x: any) => x.fd && x.room >= 10 && (x.fd.carbs || 0) > 0)
@@ -8622,6 +8649,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _pickCtx.dayProtAnchors = [];
   (_pickCtx as any).denseDay = false;
   _pickCtx.isTrainingDayCtx = true;
+  _pickCtx.capacity = { ...DEFAULT_EXTREME_CAPACITY };
   }
 }
 

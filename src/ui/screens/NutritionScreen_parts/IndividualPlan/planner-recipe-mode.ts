@@ -19,7 +19,7 @@ import type { FoodItem } from '../../../../core/nutrition-database';
 import type { Recipe } from '../../../../engines/nutrition-periodization.engine';
 import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount } from './recipe-engine';
 import { optimizeRecipePortionScales, maxRelativeDeviation } from './planner-recipe-optimizer';
-import { isHighCarbDay } from './planner-carb-density';
+import { isHighCarbDay, extremeCapacityProfile } from './planner-carb-density';
 import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf, isPortableFood, isWorkWindowMeal, isBreakfastBannedCarb, isBreakfastBannedProtein, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS } from './food-availability';
 import { applyRealisticFloors } from './meal-plan-engine';
 import { correctDayToTargets } from './day-target-corrector';
@@ -1074,6 +1074,8 @@ export function extremeCarbTopUp(
   const tP = targets?.p || 0;
   const tK = targets?.kcal || 0;
   if (!w || tC <= 0 || !Array.isArray(meals)) return notes;
+  // §3A EXTREME-SCALE: тарелка рецептурного приёма шире на экстреме (730 → 850/900).
+  const _capProf = extremeCapacityProfile({ carbsG: tC, weightKg: w, goalKcal: tK, highVolumeDay: true });
   // Та же полоса, что в продукт-пути §7.2-7c: экстрим-угли при экстрим-белке.
   if (!isExtremeCarbBand(tC, tP, w)) return notes;
   const before = sumDayTotals(meals);
@@ -1119,7 +1121,7 @@ export function extremeCarbTopUp(
       // контролируется отдельно (тета ккал + honest-потолок ниже).
       const roomMeal = Math.max(0, (m?.target?.c ?? 0) * 1.15 - (m?.totals?.c || 0));
       if (roomMeal < 30) continue;
-      const plateRoom = Math.max(0, 730 - _solidG(m));
+      const plateRoom = Math.max(0, _capProf.recipePlate - _solidG(m));
       if (plateRoom < 40) continue;
       const idsInMeal = new Set((m.items || []).map((it: any) => it.id));
       // Кандидаты: сначала не использованные в дне, затем удобство (угли на клетчатку).
