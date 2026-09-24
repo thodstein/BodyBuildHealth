@@ -113,6 +113,8 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
   const [error, setError] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [nativeLoading, setNativeLoading] = useState(false);
+  const [lookupStep, setLookupStep] = useState('');
+  const [scanNotice, setScanNotice] = useState('');
   const [searchResults, setSearchResults] = useState<OFFProduct[]>([]);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [recent, setRecent] = useState<RecentScan[]>(() => readRecent());
@@ -145,18 +147,21 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
     setError('');
     setShowSettings(false);
     try {
-      // Цепочка: OFF (ru/world/us + кэш 7д) → общая база → каталоги сетей (ВкусВилл).
+      // Показываем пользователю, где ищется товар, пока ждём сетевые каталоги.
+      setLookupStep('Проверяем локальный кэш и Open Food Facts…');
       const product = await searchByBarcode(bc);
       if (product) {
         deliverProduct(product, bc);
         return;
       }
+      setLookupStep('Ищем в общей базе сканирований…');
       const shared = await searchSharedBarcode(bc);
       if (shared) {
         try { await saveToCache(shared); } catch {}
         deliverProduct(shared, bc);
         return;
       }
+      setLookupStep('Проверяем каталог ВкусВилл…');
       const retail = await searchRetailProductByBarcode(bc);
       if (retail) {
         const mapped = {
@@ -176,14 +181,15 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
         deliverProduct(mapped, bc);
         return;
       }
-      const isRu = /^46/.test(bc);
+      const isRu = /^(?:46|48)/.test(bc);
       setError(isRu
-        ? `Продукт 46… (РФ) не найден в ru.openfoodfacts.org, общей базе и каталогах сетей. Попробуйте Поиск по названию или создайте свою еду — сохранится оффлайн и в общую базу.`
+        ? `Продукт ${bc.slice(0, 2)}… (РФ) не найден в ru.openfoodfacts.org, общей базе и каталоге ВкусВилл. Попробуйте поиск по названию или создайте свою еду — она сохранится оффлайн.`
         : 'Продукт не найден (OFF ru/world/us + общая база + каталоги сетей). Проверьте штрихкод или введите название вручную / создайте свою еду.');
     } catch {
       setError('Ошибка сети. OFF недоступен — создайте свою еду оффлайн, она сохранится в кэш и найдётся при след. сканировании.');
     } finally {
       setLoading(false);
+      setLookupStep('');
     }
   }, [deliverProduct]);
 
@@ -211,6 +217,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
     if (!isCapacitorNative()) return;
     setNativeLoading(true);
     setError('');
+    setScanNotice('');
     setShowSettings(false);
     try {
       const { scanNativeBarcode } = await import('../../core/native-bridge');
@@ -226,7 +233,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
         return;
       }
       if (outcome.status === 'unavailable' && (outcome as { hint?: string }).hint === 'installing-module') {
-        setError('Ставится модуль Google-сканера (один раз, ~10–30 сек). Нажмите «Сканировать» ещё раз через полминуты.');
+        setScanNotice('Загружается модуль Google-сканера. После установки нажмите кнопку сканирования ещё раз.');
         return;
       }
       // cancelled — молча, без ошибки (пользователь сам закрыл сканер).
@@ -251,11 +258,29 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
     if (!isCapacitorNative()) return;
     setPhotoLoading(true);
     setError('');
+    setScanNotice('');
     setShowSettings(false);
     try {
-      const { pickPhoto } = await import('../../core/native-bridge');
-      const photo = await pickPhoto();
+      const { pickBarcodePhoto, scanNativeBarcodeImage, persistBarcodePhoto, deleteTemporaryBarcodePhoto } = await import('../../core/native-bridge');
+      const photo = await pickBarcodePhoto();
       if (!photo) return;
+      const pickedNativePath = photo.nativePath || (/^(?:file|content):\/\//i.test(photo.uri) ? photo.uri : null);
+      const nativePath = pickedNativePath || await persistBarcodePhoto(photo.uri, photo.format);
+      const temporaryPath = pickedNativePath ? null : nativePath;
+      if (nativePath) {
+        let nativeCode: string | null = null;
+        try {
+          nativeCode = await scanNativeBarcodeImage(nativePath);
+        } finally {
+          if (temporaryPath) await deleteTemporaryBarcodePhoto(temporaryPath);
+        }
+        if (nativeCode) {
+          setBarcode(nativeCode);
+          setMode('manual');
+          await handleBarcodeLookup(nativeCode);
+          return;
+        }
+      }
       let blob: Blob | null = null;
       try {
         const { dataUrlToBlob } = await import('../../engines/ocr-preprocess');
@@ -394,8 +419,9 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
            <input value={barcode} onChange={e => { barcodeRef.current = e.target.value; setBarcode(e.target.value); }} onKeyDown={e => e.key === 'Enter' && handleBarcodeLookup()} placeholder="4600494400795 (РФ 460…)" aria-label="Штрихкод" style={inputStyle} autoFocus />
           {barcode.replace(/\D/g,'').startsWith('46') && <div style={{ fontSize:10, color:'#00e68a', marginTop:4 }}>🇷🇺 Российский штрихкод 460… — ищем в RU-базе первым</div>}
            <button type="button" onClick={() => void handleBarcodeLookup()} disabled={loading || !barcode.trim()} style={{ ...btnStyle, width: '100%', marginTop: 10, opacity: loading || !barcode.trim() ? 0.5 : 1 }}>
-            {loading ? 'Поиск...' : 'Найти по штрихкоду'}
-          </button>
+             {loading ? 'Поиск...' : 'Найти по штрихкоду'}
+           </button>
+           {loading && <div role="status" className="nd-scanprogress" style={{ marginTop: 8, textAlign: 'center', color: '#fff', fontSize: 12 }}>{lookupStep || 'Ищем продукт…'}</div>}
           {recent.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>🕒 Недавние сканы</div>
@@ -470,6 +496,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
         </div>
       )}
 
+      {scanNotice && <div role="status" className="nd-scannotice" style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(245,158,11,0.08)', color: '#fff', fontSize: 12 }}>{scanNotice}</div>}
       {error && (
         <ModernCreateFood error={error} barcode={barcode} onProductFound={onProductFound} btnStyle={btnStyle} />
       )}

@@ -297,6 +297,10 @@ const FATSECRET_ITEM_REGEX = /^\s*(.+?)\s+(\d+(?:[.,]\d+)?(?:\s+\d+)*)\s*(г|м�
 const FATSECRET_TOTAL_REGEX = /итого|всего|total|daily\s+total|сумма|итог/i;
 const FATSUCCESS_MACRO_LINE = /(\d+(?:[.,]\d+)?(?:\s+\d+)*)\s*(ккал|кал|kcal|белки?|жиры?|углевод|угл|жиры|бел|протеин|б|ж|у|carb|protein|fat|calori|cal|energy)/gi;
 const MFP_LINE_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(?:(?:г|мл|шт|oz|serving|srvg|slice|cup|tbsp|шт|кус|порц|ml|g|pcs)[,.]?\s*)?(\d+(?:[.,]\d+)?)\s*(ккал|кал|kcal|cal)/i;
+const MFP_MEAL_HEADING = /^(?:breakfast|lunch|dinner|snack(?:\s*\d+)?|brunch|завтрак|обед|ужин|перекус(?:\s*\d+)?|полдник|бранч)(?:\s*[:\-].*)?$/i;
+const MFP_UI_NOISE = /^(?:(?:my\s*fitness\s*pal|myfitnesspal)(?:\s+food\s+diary)?|fatsecret|diary|food diary|nutrition|today|yesterday|add food|add exercise|quick add|edit diary|дневник|питание|сегодня|вчера|добавить еду|добавить продукт|упражнения|цели|назад|готово|сохранить|итого|всего|total|daily total|calories remaining|remaining|calories|калории|калорий осталось|осталось|свернуть|копировать|premium|home|more|settings|search)$/i;
+const DATE_ONLY_LINE = /^(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}(?:[-/.]\d{2,4})?)$/;
+const MFP_TOTAL_OR_UI_LINE = /^(?:(?:total|итого|всего)(?:\s+\d+(?:[.,]\d+)?\s*(?:ккал|кал|kcal|cal))?|calories?\s+(?:goal|remaining|consumed|burned)|daily\s+(?:total|goal)|(?:goal|remaining)\s+calories|total\s+(?:calories|protein|fat|carbs?)|калории\s+(?:цель|осталось|употреблено)|калорий\s+осталось|цель\s+калорий|daily\s+summary)(?:\s|$)/i;
 const INLINE_MACRO_REGEX = /(?:total\s+)?(?:белки?|белок|протеин|protein|\bp\b|б)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
 const INLINE_FAT_REGEX = /(?:total\s+)?(?:жиры?|жир|fat|\bf\b|ж)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
 const INLINE_CARB_REGEX = /(?:углеводы?|углевод|угл|у|carbohydrates?|carbs?|carb|\bc\b)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
@@ -477,6 +481,10 @@ export function quantityToGrams(qty: string, food?: FoodItem): number {
   }
   if (/ст\.?\s*л|tbsp/.test(unit)) return value * 15;
   if (/ч\.?\s*л|tsp/.test(unit)) return value * 5;
+  if (/\boz\b/.test(unit)) return value * 28.3495;
+  if (/\bcup\b/.test(unit)) return value * 240;
+  if (/\bslice\b/.test(unit)) return value * 30;
+  if (/\bserving\b|\bsrvg\b/.test(unit)) return value * 100;
   return value;
 }
 
@@ -485,18 +493,20 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
   const food = findFood(name);
   const weight = Math.max(1, quantityToGrams(qty, food));
   const multiplier = weight / 100;
-  const safeKcal = Number.isFinite(kcal) ? Math.max(0, kcal) : 0;
+  const providedKcal = Number.isFinite(kcal) ? Math.max(0, kcal) : 0;
   const safeP = Number.isFinite(p) ? Math.max(0, p) : 0;
   const safeF = Number.isFinite(f) ? Math.max(0, f) : 0;
   const safeC = Number.isFinite(c) ? Math.max(0, c) : 0;
+  const macroKcal = safeP * 4 + safeF * 9 + safeC * 4;
+  const safeKcal = providedKcal || Math.round(macroKcal);
   // OCR can move a column value into another field. Reject impossible macro
   // combinations instead of persisting them as real nutrition data.
-  const macroKcal = safeP * 4 + safeF * 9 + safeC * 4;
   const macrosPlausible = macroKcal === 0 || safeKcal === 0 || macroKcal <= safeKcal * 1.35;
   const hasMacros = safeKcal > 0 || safeP > 0 || safeF > 0 || safeC > 0;
+  const hasAnyMacros = safeP > 0 || safeF > 0 || safeC > 0;
   const confidence = food
-    ? (directId ? (hasMacros ? 0.95 : 0.85) : 0.4)
-    : (hasMacros ? 0.5 : 0.3);
+    ? (directId ? (hasMacros ? 0.95 : 0.85) : hasAnyMacros ? 0.6 : 0.4)
+    : (hasAnyMacros ? 0.5 : 0.3);
   const displayName = name
     .replace(/^(?:завтрак|обед|ужин|перекус|бранч|полдник|breakfast|lunch|dinner|snack)\s*[:\-–—|,]?\s*/i, '')
     .replace(/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\s*/, '')
@@ -513,7 +523,7 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
     name: normalizedDisplayName || food?.name || 'Блюдо',
     qty,
     qtyGrams: Math.round(weight),
-    kcal: hasMacros ? Math.round((safeKcal || (food?.kcal || 0) * multiplier) / multiplier) : food?.kcal || 0,
+    kcal: (providedKcal > 0 || hasAnyMacros) ? Math.round(safeKcal / multiplier) : food?.kcal || 0,
     p: hasMacros && macrosPlausible ? Math.round((safeP || (food?.protein || 0) * multiplier) / multiplier * 10) / 10 : (food?.protein || 0),
     f: hasMacros && macrosPlausible ? Math.round((safeF || (food?.fat || 0) * multiplier) / multiplier * 10) / 10 : (food?.fat || 0),
     c: hasMacros && macrosPlausible ? Math.round((safeC || (food?.carbs || 0) * multiplier) / multiplier * 10) / 10 : (food?.carbs || 0),
@@ -781,6 +791,243 @@ function parseUnlabeledMacroRow(line: string): ParsedMeal['items'][number] | nul
   return normalizeItem(name.trim(), `${numberFrom(qty, 100)} ${unit}`, numberFrom(kcal, 0), numberFrom(p, 0), numberFrom(f, 0), numberFrom(c, 0));
 }
 
+function normalizeScreenshotDate(raw: string | undefined, fallback: string, usDateOrder = false): string {
+  if (!raw) return fallback;
+  const ymd = raw.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (ymd) return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
+  const dmy = raw.match(/^(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{2,4}))?$/);
+  if (dmy) {
+    const first = Number(dmy[1]);
+    const second = Number(dmy[2]);
+    const isMonthFirst = usDateOrder && first <= 12 && (second > 12 || raw.includes('/'));
+    const month = isMonthFirst ? first : second;
+    const day = isMonthFirst ? second : first;
+    const year = dmy[3] ? (dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3]) : fallback.slice(0, 4);
+    const date = new Date(Date.UTC(Number(year), month - 1, day));
+    if (month < 1 || month > 12 || day < 1 || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return fallback;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+  const named = raw.match(/^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,?\s+(\d{4}))?$/i);
+  if (!named) return fallback;
+  const month = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].findIndex(m => named[1].toLowerCase().startsWith(m)) + 1;
+  const year = named[3] || fallback.slice(0, 4);
+  const day = Number(named[2]);
+  const date = new Date(Date.UTC(Number(year), month - 1, day));
+  if (month < 1 || day < 1 || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return fallback;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function parseMfpPortion(raw: string): { qty: string; grams: number } {
+  const clean = raw.trim().replace(/[.,]$/, '');
+  const match = clean.match(/^(\d+(?:[.,]\d+)?)(?:\s+(.*))?$/);
+  if (!match) return { qty: '100 г', grams: 100 };
+  const amount = numberFrom(match[1], 100);
+  const remainder = (match[2] || '').trim();
+  const gramValue = remainder.match(/\((\d+(?:[.,]\d+)?)\s*g\)/i);
+  if (gramValue) {
+    const grams = numberFrom(gramValue[1], amount);
+    return { qty: `${grams} г`, grams };
+  }
+  const unit = remainder.toLowerCase();
+  if (/^oz$/.test(unit)) return { qty: `${amount} oz`, grams: amount * 28.3495 };
+  if (/^(?:cup)$/.test(unit)) return { qty: `${amount} cup`, grams: amount * 240 };
+  if (/^(?:tbsp)$/.test(unit)) return { qty: `${amount} tbsp`, grams: amount * 15 };
+  if (/^(?:tsp)$/.test(unit)) return { qty: `${amount} tsp`, grams: amount * 5 };
+  if (/^(?:slice)$/.test(unit)) return { qty: `${amount} slice`, grams: amount * 30 };
+  if (/^(?:шт|pcs?)$/.test(unit)) return { qty: `${amount} шт`, grams: quantityToGrams(`${amount} шт`, findFood(raw)) };
+  if (/^(?:serving|srvg)$/.test(unit)) return { qty: `${amount} serving`, grams: amount * 100 };
+  return { qty: `${amount} г`, grams: amount };
+}
+
+function mfpMacroRow(line: string, defaultKey?: 'p' | 'f' | 'c'): { p?: number; f?: number; c?: number } | null {
+  const labeled = parseMacroLabel(line);
+  const explicit: { p?: number; f?: number; c?: number } = {};
+  if (INLINE_MACRO_REGEX.test(line)) explicit.p = labeled.p;
+  if (INLINE_FAT_REGEX.test(line)) explicit.f = labeled.f;
+  if (INLINE_CARB_REGEX.test(line)) explicit.c = labeled.c;
+  if (Object.keys(explicit).length) return explicit;
+
+  // MFP OCR/text exports commonly present one nutrient per line:
+  // "Protein 24 g", "Carbs 18 g", "Fat 6 g".
+  const match = line.trim().match(/^(protein|fat|carbs?|carbohydrates?|белки?|белок|жиры?|жир|углеводы?|углевод|угл)\s*[:\-]?\s*(\d+(?:[.,]\d+)?)/i);
+  if (match) {
+    const label = match[1].toLowerCase();
+    const key: 'p' | 'f' | 'c' = /protein|бел/.test(label) ? 'p' : /fat|жир/.test(label) ? 'f' : 'c';
+    return { [key]: numberFrom(match[2], 0) };
+  }
+  const amountFirst = line.trim().match(/^(\d+(?:[.,]\d+)?)\s*(?:г|g)?\s*(protein|fat|carbs?|carbohydrates?|белки?|белок|жиры?|жир|углеводы?|углевод|угл)$/i);
+  if (amountFirst) {
+    const label = amountFirst[2].toLowerCase();
+    const key: 'p' | 'f' | 'c' = /protein|бел/.test(label) ? 'p' : /fat|жир/.test(label) ? 'f' : 'c';
+    return { [key]: numberFrom(amountFirst[1], 0) };
+  }
+  // Some MyFitnessPal screens contain only a macro column header and three
+  // values; header tracking is handled by the caller.
+  if (defaultKey) {
+    const value = line.trim().match(/^(\d+(?:[.,]\d+)?)\s*(?:г|g)?$/i);
+    if (value) return { [defaultKey]: numberFrom(value[1], 0) };
+  }
+  return null;
+}
+
+function mfpCalories(line: string): number | null {
+  const match = line.trim().match(/^(?:(?:calories?|ккал|кал)\s*[:\-]?\s*)?(\d+(?:[.,]\d+)?)\s*(?:ккал|кал|kcal|cal|calories?)?$/i);
+  if (!match) return null;
+  const value = numberFrom(match[1], NaN);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function mfpFoodRow(line: string): { name: string; portion: { qty: string; grams: number }; kcal: number; p?: number; f?: number; c?: number } | null {
+  const macroTail = '(?:\\s+(\\d+(?:[.,]\\d+)?)(?:\\s+(\\d+(?:[.,]\\d+)?))?(?:\\s+(\\d+(?:[.,]\\d+)?))?)?';
+  const compact = line.match(new RegExp(`^(.+?)\\s+(\\d+(?:[.,]\\d+)?)\\s*(г|мл|шт|oz|serving|srvg|slice|cup|tbsp|tsp|g|ml|pcs?)\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:ккал|кал|kcal|cal|calories?)${macroTail}$`, 'i'));
+  const delimited = line.match(new RegExp(`^(.+?)\\s*[|;\\t]\\s*(\\d+(?:[.,]\\d+)?\\s*(?:г|мл|шт|oz|serving|srvg|slice|cup|tbsp|tsp|g|ml|pcs?))\\s*[|;\\t]\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:ккал|кал|kcal|cal|calories?)${macroTail}$`, 'i'));
+  const match = compact || delimited;
+  if (!match) return null;
+  const name = match[1].trim().replace(/[|,;]+$/, '').trim();
+  const qty = compact ? `${compact[2]} ${compact[3]}` : delimited![2];
+  const kcal = numberFrom(compact ? compact[4] : delimited![3], NaN);
+  if (!name || !Number.isFinite(kcal) || kcal <= 0 || MFP_UI_NOISE.test(name) || MFP_MEAL_HEADING.test(name) || MFP_TOTAL_OR_UI_LINE.test(name)) return null;
+  // MFP's compact diary row displays calories, carbs, fat, protein.
+  const tailStart = compact ? 5 : 4;
+  const tail = (compact || delimited)!.slice(tailStart).filter(Boolean).map(value => numberFrom(value, 0));
+  return {
+    name,
+    portion: parseMfpPortion(qty),
+    kcal,
+    ...(tail.length >= 3 ? { c: tail[0], f: tail[1], p: tail[2] } : {}),
+  };
+}
+
+/** Parses compact, exported and OCR-split MyFitnessPal diary layouts. */
+export function parseMyFitnessPalText(text: string): ParsedMeal[] {
+  if (typeof text !== 'string' || !text.trim()) return [];
+  if (!/(?:my\s*fitness\s*pal|myfitnesspal|food\s+diary|calories\s+(?:goal|remaining)|калорий\s+осталось)/i.test(text)) return [];
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const lines = text.split(/\r?\n/).map(normalizeOcrArtifacts).filter(Boolean);
+  const result: ParsedMeal[] = [];
+  let date = today;
+  let meal: ParsedMeal | null = null;
+  let pending: { name: string; qty: string; grams: number; kcal: number; p?: number; f?: number; c?: number } | null = null;
+  let column: 'kcal' | 'p' | 'f' | 'c' | null = null;
+
+  const ensureMeal = (mealType = 'Общее') => {
+    if (!meal) {
+      meal = { date, mealType, items: [] };
+      result.push(meal);
+    }
+  };
+  const flush = () => {
+    if (!pending) return;
+    ensureMeal();
+    meal!.items.push(normalizeItem(
+      pending.name,
+      pending.qty,
+      pending.kcal,
+      pending.p || 0,
+      pending.f || 0,
+      pending.c || 0,
+    ));
+    pending = null;
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    const dateMatch = line.match(/^(\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}(?:[-/.]\d{2,4})?|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s*\d{0,4})$/i);
+    if (dateMatch) { flush(); date = normalizeScreenshotDate(dateMatch[1], today, true); meal = null; column = null; continue; }
+
+    const heading = line.match(/^(breakfast|lunch|dinner|snacks?(?:\s*\d+)?|brunch|завтрак|обед|ужин|перекус(?:\s*\d+)?|полдник|бранч)\b\s*(?:[:\-]\s*)?(.*)$/i);
+    if (heading) {
+      flush();
+      const label = heading[1].toLowerCase();
+      const mealType = /breakfast|завтрак/.test(label) ? 'Завтрак' : /lunch|обед/.test(label) ? 'Обед' : /dinner|ужин/.test(label) ? 'Ужин' : 'Перекус';
+      const inlineDate = heading[2]?.trim().replace(/\s+\d{1,2}:\d{2}(?:\s*[ap]m)?$/i, '');
+      if (inlineDate && /^(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}(?:[-/.]\d{2,4})?|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s*\d{0,4})$/i.test(inlineDate)) {
+        date = normalizeScreenshotDate(inlineDate, today, true);
+      }
+      meal = { date, mealType, items: [] }; result.push(meal); column = null; continue;
+    }
+    const isMacroHeader = /^(?:calories?|protein|fat|carbs?|carbohydrates?|ккал|кал|белки?|белок|жиры?|жир|углеводы?|углевод|угл)$/i.test(line);
+    if ((MFP_UI_NOISE.test(line) && !isMacroHeader) || MFP_TOTAL_OR_UI_LINE.test(line) || DATE_ONLY_LINE.test(line) || /(?:my\s*fitness\s*pal|myfitnesspal|food\s+diary)/i.test(line)) { column = null; continue; }
+    if (/^calories\s+remaining\b/i.test(line)) { column = null; continue; }
+    if (/^calories\s+goal\b/i.test(line)) { column = null; continue; }
+    if (/^(?:calories?|ккал|кал)$/i.test(line)) { column = 'kcal'; continue; }
+    if (/^(?:protein|белки?|белок)$/i.test(line)) { column = 'p'; continue; }
+    if (/^(?:fat|жиры?|жир)$/i.test(line)) { column = 'f'; continue; }
+    if (/^(?:carbs?|carbohydrates?|углеводы?|углевод|угл)$/i.test(line)) { column = 'c'; continue; }
+
+    const row = mfpFoodRow(line);
+    if (row) {
+      flush(); ensureMeal();
+      pending = { name: row.name, qty: row.portion.qty, grams: row.portion.grams, kcal: row.kcal, p: row.p, f: row.f, c: row.c };
+      column = null; continue;
+    }
+
+    if (pending) {
+      if (line === pending.name || line.startsWith(`${pending.name} `)) continue;
+      const macro = mfpMacroRow(line);
+      if (macro) {
+        if (macro.p !== undefined) pending.p = macro.p;
+        if (macro.f !== undefined) pending.f = macro.f;
+        if (macro.c !== undefined) pending.c = macro.c;
+        column = null; continue;
+      }
+      if (column === null) {
+        const directMacros = line.match(/^(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)(?:\s*%?)?$/);
+        if (directMacros) {
+          pending.f = numberFrom(directMacros[1], 0);
+          pending.c = numberFrom(directMacros[2], 0);
+          pending.p = numberFrom(directMacros[3], 0);
+          continue;
+        }
+      }
+      const numeric = mfpCalories(line);
+      if (numeric !== null && column) {
+        if (column === 'kcal') pending.kcal = numeric;
+        else pending[column] = numeric;
+        column = null; continue;
+      }
+      const portionMatch = line.match(/^(\d+(?:[.,]\d+)?)\s*(г|мл|шт|oz|serving|srvg|slice|cup|tbsp|tsp|g|ml|pcs?)(?:\s*\(([^)]+)\))?$/i);
+      if (portionMatch) {
+        const portion = parseMfpPortion(`${portionMatch[1]} ${portionMatch[2]}${portionMatch[3] ? ` (${portionMatch[3]})` : ''}`);
+        pending.qty = portion.qty; pending.grams = portion.grams; column = null; continue;
+      }
+      if (column === 'kcal') {
+        const value = mfpCalories(line);
+        if (value !== null) { pending.kcal = value; column = null; continue; }
+      }
+      if (pending.kcal <= 0) {
+        const calories = mfpCalories(line.replace(/^(?:calories?)\s*/i, ''));
+        if (calories !== null) { pending.kcal = calories; column = null; continue; }
+      }
+      const macroValues = line.match(/^(\d+(?:[.,]\d+)?)(?:\s+(\d+(?:[.,]\d+)?))?(?:\s+(\d+(?:[.,]\d+)?))?(?:\s+(\d+(?:[.,]\d+)?))?$/);
+      if (macroValues && column) {
+        const values = macroValues.slice(1).filter(Boolean).map(v => numberFrom(v, 0));
+        if (values.length >= 2) {
+          if (values.length === 4) { if (pending.kcal <= 0) pending.kcal = values[0]; pending.p = values[1]; pending.c = values[2]; pending.f = values[3]; }
+          else if (values.length === 3) { pending.p = values[0]; pending.c = values[1]; pending.f = values[2]; }
+          else if (column === 'p') pending.p = values[0];
+          else if (column === 'f') pending.f = values[0];
+          else if (column === 'c') pending.c = values[0];
+          column = null; continue;
+        }
+      }
+    }
+
+    const name = line.replace(/\s*[›>‹]+\s*$/, '').trim();
+    if (/[A-Za-zА-Яа-яЁё]/.test(name) && !/^\d/.test(name) && !/^(?:protein|fat|carbs?|calories?|белки?|жиры?|углеводы?|goal|remaining|exercise)\b/i.test(name)) {
+      // A compact MFP food row can be followed by its separate (fat, carbs,
+      // protein) columns; don't create a new food from that numeric row.
+      flush(); ensureMeal();
+      pending = { name, qty: '100 g', grams: 100, kcal: 0 };
+      column = null;
+    }
+  }
+  flush();
+  return dedupeMeals(result);
+}
+
 export function parseFatSecretText(text: string): ParsedMeal[] {
   if (typeof text !== 'string' || !text.trim()) return [];
   const sourceLines = text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 1);
@@ -921,8 +1168,19 @@ function attachVerticalTableIfEmpty(meals: ParsedMeal[], text: string): ParsedMe
 /** Parse OCR/export text through both formats and keep the most complete result. */
 export function parseNutritionText(text: string): ParsedMeal[] {
   if (typeof text !== 'string' || !text.trim()) return [];
+  // Provider layouts are parsed on their own so the generic screenshot/export
+  // fallbacks cannot add a second, shifted interpretation of the same columns.
+  if (/(?:my\s*fitness\s*pal|myfitnesspal|food\s+diary|calories\s+(?:goal|remaining)|калорий\s+осталось)/i.test(text)) {
+    const mfpMeals = parseMyFitnessPalText(text);
+    if (mfpMeals.length > 0) return mfpMeals;
+  }
   const screenshotMeals = parseNutritionScreenshot(text);
   const exportMeals = parseFatSecretText(text);
   const merged = [...screenshotMeals, ...exportMeals];
   return dedupeMeals(merged);
+}
+
+/** Parse MFP-specific diary snapshots without the generic parser alternatives. */
+export function parseMyFitnessPalScreenshot(text: string): ParsedMeal[] {
+  return parseMyFitnessPalText(text);
 }

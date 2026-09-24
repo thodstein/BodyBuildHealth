@@ -542,7 +542,7 @@ export async function recognizeImageTextOffline(
     throw new Error(`движок OCR не запустился (worker/core/lang): ${(e as Error)?.message || String(e)}`);
   }
   try {
-    const { scoreOcrText, isGoodOcrText, isCompleteOcrText, pickBestOcrText } = await import('../engines/ocr-preprocess');
+    const { scoreOcrText, isGoodOcrText, isCompleteOcrText, isNutritionDiaryOcrText, pickBestOcrText } = await import('../engines/ocr-preprocess');
     const setPsm = async (mode: '6' | '11') => {
       if (typeof worker.setParameters === 'function') {
         await worker.setParameters({
@@ -569,13 +569,13 @@ export async function recognizeImageTextOffline(
           if (labOcrCandidateQuality(text).labCount >= 4) break;
         } else {
           // Nutrition screenshots use macro labels for their early-exit gate.
-          if (isCompleteOcrText(text)) break;
+          if (isCompleteOcrText(text) && !isNutritionDiaryOcrText(text)) break;
         }
       }
       let best = purpose === 'labs' ? pickBestLabOcrText(blockTexts) : pickBestOcrText(blockTexts);
       if (purpose === 'labs') {
         if (labOcrCandidateQuality(best).labCount >= 4) return best;
-      } else if (isCompleteOcrText(best)) {
+      } else if (isCompleteOcrText(best) && !isNutritionDiaryOcrText(best)) {
         return best;
       }
       // FatSecret Android uses right-aligned macro columns. A sparse-text pass

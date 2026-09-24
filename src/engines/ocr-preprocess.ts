@@ -101,6 +101,17 @@ export function isCompleteOcrText(text: string): boolean {
   return isGoodOcrText(text) && hasMacroLabels(text);
 }
 
+/** Food diary structure alone is meaningful even before macro columns are recovered. */
+export function isNutritionDiaryOcrText(text: string): boolean {
+  if (!text) return false;
+  const foodRows = (text.match(/(?:\d+(?:[.,]\d+)?\s*(?:г|g|ml|мл|oz|serving|cup|slice)\s+\d+(?:[.,]\d+)?\s*(?:ккал|kcal|cal)|\d+(?:[.,]\d+)?\s*(?:ккал|kcal|cal)\s+[^\n]{2,})/gi) || []).length;
+  const appMarker = /(?:my\s*fitness\s*pal|myfitnesspal|fatsecret|food\s+diary|дневник\s+питания)/i.test(text);
+  const mealHeaders = (text.match(/(?:breakfast|lunch|dinner|snacks?|завтрак|обед|ужин|перекус)/gi) || []).length;
+  const compactDiaryRows = (text.match(/[^\n]{2,}\s+\d+(?:[.,]\d+)?\s*(?:ккал|kcal|cal)\s+\d+(?:[.,]\d+)?(?:\s+\d+(?:[.,]\d+)?){0,3}(?:\s|$)/gi) || []).length;
+  const separateMealRows = (text.match(/(?:breakfast|lunch|dinner|snacks?|завтрак|обед|ужин|перекус)\b/gi) || []).length;
+  return foodRows >= 2 || compactDiaryRows >= 2 || (appMarker && mealHeaders >= 1 && /(?:ккал|kcal|calories?)/i.test(text)) || separateMealRows >= 2;
+}
+
 export interface OcrVariant {
   kind: 'gray' | 'inverted' | 'contrast';
   blob: Blob;

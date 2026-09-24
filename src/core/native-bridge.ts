@@ -290,6 +290,8 @@ export interface PickedPhoto {
   /** dataUrl (web) или file:// URI (native). */
   uri: string;
   format: string;
+  /** Native filesystem path, available for image decoders such as ML Kit. */
+  nativePath?: string;
 }
 
 /**
@@ -339,6 +341,20 @@ export async function pickPhoto(): Promise<PickedPhoto | null> {
       input.oncancel = () => resolve(null);
       input.click();
     });
+  } catch {
+    return null;
+  }
+}
+
+/** Photo-picker variant optimized for native barcode image decoding. */
+export async function pickBarcodePhoto(): Promise<PickedPhoto | null> {
+  if (!isCapacitorNative()) return pickPhoto();
+  try {
+    const { Camera, CameraSource, CameraResultType } = await import('@capacitor/camera');
+    const photo = await Camera.getPhoto({ source: CameraSource.Prompt, resultType: CameraResultType.Uri, quality: 90 });
+    const nativePath = photo.path || (/^(?:file|content):\/\//i.test(photo.webPath || '') ? photo.webPath : undefined);
+    const uri = photo.webPath || photo.dataUrl || nativePath || '';
+    return uri ? { uri, nativePath, format: photo.format ?? 'jpeg' } : null;
   } catch {
     return null;
   }
@@ -403,15 +419,15 @@ export async function scanNativeBarcode(): Promise<NativeBarcodeOutcome> {
         const avail = await scanner.isGoogleBarcodeScannerModuleAvailable();
         if (avail && avail.available === false) {
           try {
+            // Plugin docs: this only starts an asynchronous install. Tell the UI
+            // to expose retry instead of assuming a second probe means ready.
             await scanner.installGoogleBarcodeScannerModule();
-          } catch {
-            /* ignore — ниже scan сам вернёт ошибку */
-          }
+          } catch { /* if install already runs, the user can retry */ }
           return { status: 'unavailable', hint: 'installing-module' };
         }
       }
     } catch {
-      /* iOS / старые версии — пропускаем */
+      /* iOS / older Play Services: attempt scan anyway. */
     }
     const { BarcodeFormat } = await import('@capacitor-mlkit/barcode-scanning');
     let result: { barcodes?: Array<{ displayValue?: string; rawValue?: string }> };
@@ -434,7 +450,9 @@ export async function scanNativeBarcode(): Promise<NativeBarcodeOutcome> {
       if (/cancel|cancell|dismiss|closed|abort/i.test(msg)) return { status: 'cancelled' };
       return { status: 'unavailable', hint: msg.slice(0, 120) };
     }
-    const first = result?.barcodes?.[0];
+    const first = result?.barcodes?.find((entry: { displayValue?: string; rawValue?: string }) =>
+      cleanBarcodeDigits(entry?.displayValue || entry?.rawValue || '').length >= 8,
+    ) || result?.barcodes?.[0];
     const code = cleanBarcodeDigits(first?.displayValue || first?.rawValue || '');
     if (!code) return { status: 'cancelled' };
     try {
@@ -446,6 +464,67 @@ export async function scanNativeBarcode(): Promise<NativeBarcodeOutcome> {
   } catch {
     return { status: 'unavailable', hint: 'import-failed' };
   }
+}
+
+/** Decode an existing image with native ML Kit before using the WebView decoder. */
+export async function scanNativeBarcodeImage(path: string): Promise<string | null> {
+  if (!isCapacitorNative() || !path) return null;
+  try {
+    const mod = await import('@capacitor-mlkit/barcode-scanning');
+    const scanner = (mod as unknown as { BarcodeScanner?: any }).BarcodeScanner;
+    const { BarcodeFormat } = mod;
+    if (!scanner?.readBarcodesFromImage) return null;
+    const result = await scanner.readBarcodesFromImage({
+      path,
+      formats: [BarcodeFormat.Ean13, BarcodeFormat.Ean8, BarcodeFormat.UpcA, BarcodeFormat.UpcE, BarcodeFormat.Code128, BarcodeFormat.Itf],
+    });
+    const found = result?.barcodes?.find((entry: { displayValue?: string; rawValue?: string }) =>
+      cleanBarcodeDigits(entry?.displayValue || entry?.rawValue || '').length >= 8,
+    );
+    const code = cleanBarcodeDigits(found?.displayValue || found?.rawValue || '');
+    return code.length >= 8 ? code : null;
+  } catch {
+    return null;
+  }
+}
+
+/** For image pickers that return a dataUrl, ML Kit needs a native file path. */
+export async function persistBarcodePhoto(uri: string, format = 'jpeg'): Promise<string | null> {
+  if (!isCapacitorNative() || !uri) return null;
+  if (/^(?:file|content):\/\//i.test(uri)) return uri;
+  try {
+    const { dataUrlToBlob } = await import('../engines/ocr-preprocess');
+    const blob = dataUrlToBlob(uri);
+    if (!blob) return null;
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    const mime = blob.type || (format.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg');
+    const ext = mime === 'image/png' ? 'png' : 'jpg';
+    const saved = await Filesystem.writeFile({
+      path: `barcode-scan-${Date.now()}.${ext}`,
+      data: btoa(binary),
+      directory: Directory.Cache,
+    });
+    return saved.uri || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteTemporaryBarcodePhoto(path: string): Promise<void> {
+  if (!isCapacitorNative() || !path || !path.includes('barcode-scan-')) return;
+  try {
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const cacheMarker = '/CACHE/';
+    const normalizedPath = path.replace(/\\/g, '/');
+    const cacheIndex = normalizedPath.toUpperCase().lastIndexOf(cacheMarker);
+    const relativePath = cacheIndex >= 0
+      ? normalizedPath.slice(cacheIndex + cacheMarker.length)
+      : normalizedPath.split('/').pop() || normalizedPath;
+    await Filesystem.deleteFile({ path: relativePath, directory: Directory.Cache });
+  } catch { /* cache cleanup is best-effort */ }
 }
 
 /** Открыть настройки приложения (выдать доступ к камере после отказа). Вне native — false. */

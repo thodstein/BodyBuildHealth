@@ -16,6 +16,7 @@ vi.mock('../../core/db', () => ({ db: { init: vi.fn(), put: vi.fn() } }));
 vi.mock('../../core/data-link', () => ({ notifyDataChange: vi.fn() }));
 
 import { processUploadedFile } from '../../core/ocr-engine';
+import { isNutritionDiaryOcrText } from '../ocr-preprocess';
 
 describe('АПК: FatSecret screenshot OCR', () => {
   it('объединяет блочный и разреженный OCR-проходы в блюда дневника', async () => {
@@ -30,5 +31,10 @@ describe('АПК: FatSecret screenshot OCR', () => {
     expect(result.meals.flatMap(meal => meal.items)).toEqual(expect.arrayContaining([
       expect.objectContaining({ foodId: 'chicken_breast', qtyGrams: 200, p: 20, f: 5, c: 0 }),
     ]));
+  });
+
+  it('распознаёт маркеры строк приложения для продолжения OCR вторым проходом', () => {
+    expect(isNutritionDiaryOcrText('MyFitnessPal\nBreakfast\nChicken 4 oz 190 kcal')).toBe(true);
+    expect(isNutritionDiaryOcrText('FatSecret\nКурица 100 г 165 ккал\nРис 150 г 180 ккал')).toBe(true);
   });
 });

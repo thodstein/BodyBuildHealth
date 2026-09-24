@@ -12,6 +12,7 @@ import {
   isGoodOcrText,
   hasMacroLabels,
   isCompleteOcrText,
+  isNutritionDiaryOcrText,
 } from '../ocr-preprocess';
 
 vi.mock('tesseract.js', () => {
@@ -79,6 +80,14 @@ describe('ocr-preprocess: чистые функции', () => {
     // FatSecret-кейс: ккал есть, макросов нет — раннего выхода нет
     expect(isCompleteOcrText('Завтрак\nКуриная грудка\n200 г\n330 ккал')).toBe(false);
   });
+
+  it('isNutritionDiaryOcrText: MFP/FatSecret food rows требуют sparse pass', () => {
+    expect(isNutritionDiaryOcrText('MyFitnessPal\nBreakfast\nChicken 4 oz 180 kcal')).toBe(true);
+    expect(isNutritionDiaryOcrText('FatSecret\nChicken 100 g 165 kcal\nRice 150 g 180 kcal')).toBe(true);
+    expect(isNutritionDiaryOcrText('Случайный текст с числом 100 и макросами белки 20')).toBe(false);
+    expect(isNutritionDiaryOcrText('Chicken breast 180 kcal 24 3 0\nRice 200 kcal 4 1 44')).toBe(true);
+  });
+
 });
 
 describe('recognizeImageTextOffline: порядок и прогресс', () => {

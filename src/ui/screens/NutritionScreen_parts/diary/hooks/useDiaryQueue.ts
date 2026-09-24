@@ -61,8 +61,8 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
         try { void m.saveSharedBarcode(product); } catch { /* ignore */ }
       }).catch(() => {});
     } catch { /* ignore */ }
-    setParsedItems(prev => [...prev, { name: item.name, kcal: item.kcal, p: item.protein, f: item.fat, c: item.carbs, qty: 100, category: (item as any).category || 'other', foodId: (item as any).id }]);
-    showToast(`📷 ${item.name} → очередь (100 г, правьте вес)`);
+    setParsedItems(prev => [...prev, { name: item.name, kcal: item.kcal, p: item.protein, f: item.fat, c: item.carbs, qty: 100, category: (item as any).category || 'other', foodId: (item as any).id, confidence: 1 }]);
+    showToast(`📷 ${item.name} → очередь (на 100 г)`);
   }, [setShowBarcode, showToast]);
 
   const convertOCRItems = useCallback((meals: { mealType: string; items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; category?: string; foodId?: string; micros?: Record<string, number>; confidence?: number }> }[], usdaFallback?: FoodItemLike[]) => {
@@ -71,21 +71,19 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
       const parsedQty = qtyMatch ? Number.parseFloat(qtyMatch[0].replace(',', '.')) : 100;
       const qty = Math.max(10, Math.round(item.qtyGrams ?? parsedQty));
        let result: DiaryItem = { name: item.name || m.mealType || 'Блюдо', kcal: Math.round(item.kcal) || 0, p: Math.round((item.p || 0) * 10) / 10, f: Math.round((item.f || 0) * 10) / 10, c: Math.round((item.c || 0) * 10) / 10, qty, category: item.category, foodId: item.foodId, micros: item.micros, confidence: item.confidence };
-      // USDA fallback: if food not in FOOD_DB, try external catalog
+      // USDA is only an identity/category fallback. Keep the actual values
+      // captured in the screenshot instead of replacing them with another item.
       if (!result.foodId && usdaFallback?.length) {
         const usdaMatch = findFood(item.name, usdaFallback as any);
         if (usdaMatch) {
           result.foodId = (usdaMatch as any).id || result.foodId;
           result.category = (usdaMatch as any).category || result.category;
-          // Enrich with USDA kcal/macros if parsed data is sparse
-          if (result.kcal === 0 && (usdaMatch as any).kcal) result.kcal = (usdaMatch as any).kcal;
-          if (result.p === 0 && (usdaMatch as any).protein) result.p = (usdaMatch as any).protein;
-          if (result.f === 0 && (usdaMatch as any).fat) result.f = (usdaMatch as any).fat;
-          if (result.c === 0 && (usdaMatch as any).carbs) result.c = (usdaMatch as any).carbs;
         }
       }
       return result;
-    })).filter(item => Boolean(item.foodId) && (item.confidence === undefined || item.confidence >= 0.8));
+      // Unknown catalogue matches remain editable in the queue. Confidence is
+      // a review hint, not a reason to silently discard a recognized food row.
+  })).filter(item => Boolean(item.name.trim()) && (item.kcal > 0 || item.p > 0 || item.f > 0 || item.c > 0));
   }, []);
 
   const fillQueuedMicros = useCallback(() => setParsedItems(prev => prev.map(item => ({ ...item, micros: fillMissingMicros(item.name, Number(item.qty) || 100, item.micros) }))), []);
@@ -135,7 +133,7 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
           setOcrError('');
           setOcrHint(`Распознано позиций: ${converted.length}. Проверьте очередь — тап по названию для правки. Сырой текст ниже.` );
         } else {
-          setOcrError('Распознано 0 позиций — попробуйте более чёткий скриншот или вставьте текст вручную через «Текст».');
+          setOcrError('Строки распознаны, но пищевые позиции не найдены. Попробуйте более чёткий снимок экрана MyFitnessPal/FatSecret или вставьте текст через «Текст».');
         }
       } else if (result.meals.length === 0 && result.labs.length === 0) {
         setOcrError(result.warnings?.[0] || 'Не удалось распознать данные питания. Попробуйте более чёткий скриншот.');

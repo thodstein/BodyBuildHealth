@@ -1,7 +1,100 @@
 import { describe, it, expect } from 'vitest';
-import { fillMissingMicros, parseFatSecretText, parseMicroLine, parseNutritionScreenshot, parseNutritionText, quantityToGrams, parseVerticalNutritionTable } from '../nutrition-ocr-parser';
+import { fillMissingMicros, parseFatSecretText, parseMicroLine, parseMyFitnessPalText, parseNutritionScreenshot, parseNutritionText, quantityToGrams, parseVerticalNutritionTable } from '../nutrition-ocr-parser';
 
 describe('nutrition-ocr-parser', () => {
+  describe('MyFitnessPal APK screenshots', () => {
+    it('parses compact US rows, portion units, localized meals and date', () => {
+      const meals = parseNutritionText([
+        'MyFitnessPal Food Diary',
+        'Calories Goal 2,000',
+        'Calories Remaining 1,850',
+        'September 24, 2026',
+        'Breakfast',
+        'Oatmeal 1 cup 150 kcal',
+        'Protein 5 g',
+        'Fat 3 g',
+        'Carbs 27 g',
+        'Lunch',
+        'Chicken Breast | 4 oz | 187 kcal',
+      ].join('\n'));
+      const items = meals.flatMap(meal => meal.items);
+      expect(items.map(item => [item.name, item.qtyGrams, item.kcal])).toEqual([
+        ['Oatmeal', 240, 63],
+        ['Chicken Breast', 113, 165],
+      ]);
+      expect(meals[0].date).toBe('2026-09-24');
+      expect(meals.map(meal => meal.mealType)).toEqual(['Завтрак', 'Обед']);
+      expect(items[0]).toMatchObject({ name: 'Oatmeal', qtyGrams: 240, kcal: 63, p: 2.1, f: 1.3, c: 11.3 });
+      expect(items[1].qtyGrams).toBe(113);
+    });
+
+    it('parses OCR-separated food, portion and kcal, and keeps unknown foods for review', () => {
+      const meals = parseMyFitnessPalText([
+        'MyFitnessPal',
+        'Calories Goal 2,100',
+        'Lunch',
+        'Seasoned tempeh',
+        '1 serving (85 g)',
+        'Calories',
+        '160',
+        'Protein',
+        '18',
+        'Carbs',
+        '12',
+        'Fat',
+        '6',
+      ].join('\n'));
+      const item = meals.flatMap(meal => meal.items)[0];
+      expect(item).toMatchObject({ name: 'Seasoned tempeh', qtyGrams: 85, kcal: 188, p: 21.2, c: 14.1, f: 7.1 });
+      expect(item.foodId).toBeUndefined();
+      expect(item.confidence).toBe(0.5);
+    });
+
+    it('does not classify ordinary pasted rows as an MFP provider screen', () => {
+      expect(parseMyFitnessPalText('Курица 200 г 330 ккал Б:40 Ж:10 У:0')).toEqual([]);
+    });
+
+    it('normalizes the date when MyFitnessPal shows it inline with the meal header', () => {
+      const meals = parseMyFitnessPalText([
+        'MyFitnessPal',
+        'Breakfast September 24, 2026',
+        'Chicken Breast 100 g 165 kcal',
+      ].join('\n'));
+      expect(meals[0]?.date).toBe('2026-09-24');
+      expect(meals[0]?.items).toHaveLength(1);
+    });
+
+    it('keeps inline meal date and parses compact calories + macro columns', () => {
+      const meals = parseMyFitnessPalText([
+        'MyFitnessPal Food Diary',
+        'Breakfast September 24, 2026',
+        'Oatmeal 1 cup 150 kcal 27 3 5',
+        'Calories Goal 2,000',
+        'Calories Remaining 1,850',
+      ].join('\n'));
+      expect(meals).toHaveLength(1);
+      expect(meals[0]).toMatchObject({ date: '2026-09-24', mealType: 'Завтрак' });
+      expect(meals[0].items).toHaveLength(1);
+      expect(meals[0].items[0]).toMatchObject({ name: 'Oatmeal', qtyGrams: 240, kcal: 63, c: 12, f: 1.4, p: 2.5 });
+    });
+
+    it('ignores calorie totals as food rows and rejects impossible calendar dates', () => {
+      const meals = parseMyFitnessPalText([
+        'MyFitnessPal',
+        '09/24/2026',
+        'Lunch',
+        'Chicken Breast 100 g 165 kcal 0 5 31',
+        'Total 165 kcal',
+        'Calories Remaining 1,835',
+        '02/31/2026',
+      ].join('\n'));
+      expect(meals).toHaveLength(1);
+      expect(meals[0].date).toBe('2026-09-24');
+      expect(meals[0].items).toHaveLength(1);
+      expect(meals[0].items[0]).toMatchObject({ name: 'Chicken Breast', kcal: 165, p: 31, c: 0 });
+    });
+  });
+
   describe('parseFatSecretText', () => {
     it('parses basic item line', () => {
       const text = `Завтрак

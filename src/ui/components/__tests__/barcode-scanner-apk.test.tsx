@@ -16,9 +16,13 @@ vi.mock('html5-qrcode', () => ({
 
 vi.mock('../../../core/native-bridge', () => ({
   scanNativeBarcode: vi.fn(),
+  scanNativeBarcodeImage: vi.fn(async () => null),
   openNativeAppSettings: vi.fn(async () => true),
   haptics: vi.fn(async () => {}),
   pickPhoto: vi.fn(async () => null),
+  pickBarcodePhoto: vi.fn(async () => null),
+  persistBarcodePhoto: vi.fn(async () => null),
+  deleteTemporaryBarcodePhoto: vi.fn(async () => undefined),
 }));
 
 vi.mock('../../../engines/openfoodfacts.engine', async (importOriginal) => {
@@ -38,7 +42,7 @@ vi.mock('../../../engines/retail-search.engine', async (importOriginal) => {
   return { ...orig, searchRetailProductByBarcode: vi.fn(async () => null), guessRetailCategory: (n: string) => 'other' };
 });
 
-import { scanNativeBarcode } from '../../../core/native-bridge';
+import { scanNativeBarcode, scanNativeBarcodeImage } from '../../../core/native-bridge';
 import { saveSharedBarcode } from '../../../engines/food-barcode-catalog.engine';
 import { BarcodeScanner } from '../BarcodeScanner';
 
@@ -91,5 +95,32 @@ describe('Сканер АПК: нативный путь', () => {
     await waitFor(() => expect(vi.mocked(scanNativeBarcode)).toHaveBeenCalled(), { timeout: 8000 });
     expect(container.querySelector('.nd-scancreate')).toBeNull();
     expect(container.querySelector('.nd-scansettings')).toBeNull();
+  });
+
+  it('фильтрует QR и оставляет только продуктовый код', async () => {
+    vi.mocked(scanNativeBarcode).mockResolvedValueOnce({ status: 'scanned', code: '4600000000000' });
+    const { container } = render(<BarcodeScanner onProductFound={() => {}} onClose={() => {}} />);
+    fireEvent.click(container.querySelector('.nd-scannative') as HTMLElement);
+    await waitFor(() => expect(scanNativeBarcode).toHaveBeenCalled());
+    expect(container.querySelector('.nd-scancreate')).toBeNull();
+  });
+
+  it('APK манифест автоматически подтягивает ML Kit barcode UI', async () => {
+    const fs = await import('node:fs');
+    const manifest = fs.readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+    expect(manifest).toContain('com.google.mlkit.vision.DEPENDENCIES');
+    expect(manifest).toContain('barcode_ui');
+  });
+
+  it('повторная попытка сканирования очищает подсказку установки модуля', async () => {
+    vi.mocked(scanNativeBarcode).mockResolvedValueOnce({ status: 'unavailable', hint: 'installing-module' });
+    const { container } = render(<BarcodeScanner onProductFound={() => {}} onClose={() => {}} />);
+    const button = container.querySelector('.nd-scannative') as HTMLElement;
+    fireEvent.click(button);
+    await waitFor(() => expect(container.querySelector('.nd-scannotice')).not.toBeNull());
+    vi.mocked(scanNativeBarcode).mockResolvedValueOnce({ status: 'cancelled' });
+    fireEvent.click(button);
+    await waitFor(() => expect(container.querySelector('.nd-scannotice')).toBeNull());
+    expect(scanNativeBarcode).toHaveBeenCalledTimes(2);
   });
 });

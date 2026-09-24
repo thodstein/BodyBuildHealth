@@ -8,24 +8,22 @@ import { render, fireEvent, waitFor, cleanup } from '@testing-library/react';
 
 vi.mock('../../../core/native-bridge', () => ({
   pickPhoto: vi.fn(async () => ({
-    uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    uri: 'file:///temporary/food-label.jpg',
     format: 'png',
   })),
+  pickBarcodePhoto: vi.fn(async () => ({ uri: 'file:///temporary/food-label.jpg', nativePath: 'file:///temporary/food-label.jpg', format: 'jpg' })),
+  scanNativeBarcodeImage: vi.fn(async () => null),
+  persistBarcodePhoto: vi.fn(async () => 'file:///temporary/food-label.jpg'),
+  deleteTemporaryBarcodePhoto: vi.fn(async () => undefined),
 }));
 
 vi.mock('../../../engines/openfoodfacts.engine', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../../engines/openfoodfacts.engine')>();
   return {
     ...orig,
-    searchByBarcode: vi.fn(async (bc: string) => ({
-      id: bc,
-      barcode: bc,
-      name: 'Тестовый йогурт',
-      kcal: 60,
-      protein: 3,
-      fat: 2,
-      carbs: 5,
-    })),
+    searchByBarcode: vi.fn(async (bc: string) => bc === '4601234567890' ? ({
+      id: bc, barcode: bc, name: 'Тестовый йогурт', kcal: 60, protein: 3, fat: 2, carbs: 5,
+    }) : null),
   };
 });
 
@@ -34,7 +32,7 @@ vi.mock('../../../engines/retail-search.engine', async (importOriginal) => {
   return { ...orig, searchRetailProductByBarcode: vi.fn(async () => null) };
 });
 
-import { Html5Qrcode } from 'html5-qrcode';
+import { pickBarcodePhoto, scanNativeBarcodeImage } from '../../../core/native-bridge';
 import { BarcodeScanner } from '../BarcodeScanner';
 
 afterEach(() => {
@@ -48,9 +46,7 @@ describe('Фото-путь штрихкода (АПК)', () => {
     (window as unknown as { Capacitor?: unknown }).Capacitor = {
       isNativePlatform: () => true,
     };
-    const scanSpy = vi
-      .spyOn(Html5Qrcode.prototype, 'scanFile')
-      .mockResolvedValue('4601234567890' as never);
+    vi.mocked(scanNativeBarcodeImage).mockResolvedValueOnce('4601234567890');
     const found: unknown[] = [];
     const { container } = render(
       <BarcodeScanner onProductFound={(p) => found.push(p)} onClose={() => {}} />,
@@ -64,11 +60,24 @@ describe('Фото-путь штрихкода (АПК)', () => {
     fireEvent.click(photo);
     await waitFor(
       () => {
-        expect(scanSpy).toHaveBeenCalled();
+        expect(scanNativeBarcodeImage).toHaveBeenCalled();
         expect(found.length).toBe(1);
       },
       { timeout: 8000 },
     );
     expect((found[0] as { name: string }).name).toBe('Тестовый йогурт');
+  });
+
+  it('использует native ML Kit для file:// image и не декодирует через WebView', async () => {
+    (window as unknown as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true };
+    vi.mocked(pickBarcodePhoto).mockResolvedValueOnce({ uri: 'content://food/label.jpg', nativePath: 'content://food/label.jpg', format: 'jpeg' });
+    vi.mocked(scanNativeBarcodeImage).mockResolvedValueOnce('4601234567890');
+    const found: unknown[] = [];
+    const { container } = render(<BarcodeScanner onProductFound={p => found.push(p)} onClose={() => {}} />);
+    fireEvent.click(Array.from(container.querySelectorAll('.nd-scanmode')).find(b => b.textContent === 'Камера') as HTMLElement);
+    fireEvent.click(container.querySelector('.nd-scanphoto') as HTMLElement);
+    await waitFor(() => expect(found).toHaveLength(1));
+    expect(scanNativeBarcodeImage).toHaveBeenCalledWith('content://food/label.jpg');
+    expect(scanNativeBarcodeImage).toHaveBeenCalledTimes(1);
   });
 });
