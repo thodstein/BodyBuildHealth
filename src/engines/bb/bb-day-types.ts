@@ -20,14 +20,6 @@ export interface MuscleSlot {
   volumeSets: number;      // целевые сеты на эту мышцу в этот день
 }
 
-export interface BBDay {
-  index: number;           // 1-based в ротации
-  character: DayCharacter; // общий характер сессии (по раскладке)
-  restDay: boolean;
-  slots: MuscleSlot[];     // мышцы, тренируемые в этот день
-  comment?: string;
-}
-
 /** Per-group блокировка: группа всегда только тяж (никогда чистый памп).
  *  forearms/traps — нет метаболического стимула, всегда тяж.
  *  Ноги (quads/hamstrings/glutes) теперь МОГУТ быть памп-днём для метаболического

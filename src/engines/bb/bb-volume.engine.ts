@@ -8,8 +8,6 @@
 import { trueMuscleOf } from '../movement-pattern';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 
-export type BBVolumeKind = 'direct' | 'effective';
-
 /**
  * Волна-2.6 (аудит 2026-09): ЕДИНЫЙ допуск MRV для всех точек конвейера —
  * валидатор (overflow), cap-adjust финализатора, MRV-трим, per-muscle сессионные

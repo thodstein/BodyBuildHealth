@@ -1,8 +1,10 @@
 /**
  * bb-specialization-registry.ts — реестр зон специализации ББ-авто.
  *
- * Единый источник для: выбора паттерна целевой зоны при переносе объёма
- * (donor-transfer), подсказок доноров в UI и валидации выбора зон.
+ * Единый источник паттернов целевых зон: перенос объёма (donor-transfer) через
+ * matchesAnyZonePattern + данные зон для UI-подсказок. Поле donorRecommendations
+ * оставлено как данные-резерв; функции-обёртки zoneSpec/donorsForZone удалены
+ * (мёртвые: 0 потребителей и 0 тестов, 2026-09).
  * Каноническая мышца для объёма/MRV остаётся в bb-specialization.engine
  * (WEAK_TO_MUSCLE): гранулярные зоны НЕ получают отдельный объёмный бюджет,
  * они управляют выбором паттернов и приоритетом упражнений.
@@ -123,30 +125,19 @@ const ZONES: SpecializationZoneSpec[] = [
 
 const ZONE_BY_KEY = new Map(ZONES.map(z => [z.key, z]));
 
-/** Спецификация зоны по ключу (fallback: канонический ключ). */
-export function zoneSpec(key: string): SpecializationZoneSpec | null {
-  return ZONE_BY_KEY.get(key) || null;
-}
-
 /** Все зоны реестра. */
 export function allZoneSpecs(): SpecializationZoneSpec[] {
   return ZONES;
 }
 
 /** Паттерны имён упражнений для зоны (объединение всех выбранных зон). */
-export function patternsForZones(zones: string[]): RegExp[] {
+function patternsForZones(zones: string[]): RegExp[] {
   const out: RegExp[] = [];
   for (const key of zones) {
     const spec = ZONE_BY_KEY.get(key);
     if (spec) out.push(...spec.patterns);
   }
   return out;
-}
-
-/** Рекомендуемые доноры для зоны (первые кандидаты в UI). */
-export function donorsForZone(key: string): string[] {
-  const spec = ZONE_BY_KEY.get(key);
-  return spec ? spec.donorRecommendations : [];
 }
 
 /** Упражнение соответствует паттерну хотя бы одной зоны. */

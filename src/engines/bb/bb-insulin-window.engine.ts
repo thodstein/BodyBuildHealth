@@ -17,11 +17,6 @@ export function insulinWindowActive(input: InsulinWindowInput): boolean {
   return !!input.hasGH && !!input.hasInsulin && (input.ghDose ?? 0) >= 2 && (input.insulinDose ?? 0) >= 5;
 }
 
-export function insulinWindowRationale(input: InsulinWindowInput): string | null {
-  if (!insulinWindowActive(input)) return null;
-  return `💉 GH ${input.ghDose}МЕ + инсулин ${input.insulinDose}МЕ — pump window активно: intra 30-60г + 10г EAA, памп-дни 15-20, BFR опционально`;
-}
-
 export function applyInsulinWindowToPlan(plan: BBPlan, input: InsulinWindowInput): BBPlan {
   if (!insulinWindowActive(input)) return plan;
   const copy: BBPlan = {

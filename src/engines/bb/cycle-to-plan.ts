@@ -86,7 +86,6 @@ function withMEVCalibration<T extends { mev: number; mav: number; mrv: number }>
   } catch { return base; }
 }
 
-export type CycleSourceCycle = SRCycleTemplate;
 export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
 
 /**

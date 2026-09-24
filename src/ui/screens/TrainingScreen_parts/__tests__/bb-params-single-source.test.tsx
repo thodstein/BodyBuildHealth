@@ -27,7 +27,7 @@ const baseParams = (over: Partial<BbParamsStepProps>): BbParamsStepProps => ({
   bbSource: 'cycle', setBbSource: noop as any,
   selectedCycleId: '', setSelectedCycleId: noop as any, bbCyclesList: [],
   setBbDays: noop as any, setBbWeeks: noop as any,
-  selectedProgramId: null, bbLibraryPrograms: [], applyProgramToBb: noop as any, customCycle: null,
+  selectedProgramId: null, bbLibraryPrograms: [], applyProgramToBb: noop as any,
   bbAdaptMode: 'adapt', setBbAdaptMode: noop as any,
   bbLevel: 'intermediate', setBbLevel: noop as any,
   bbGoal: 'mass', setBbGoal: noop as any,

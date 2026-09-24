@@ -487,13 +487,13 @@ export const BbAutoConstructor: React.FC = () => {
   const [exSwapSearch, setExSwapSearch] = useState('');
   // Фаза 7: Фильтр оборудования
   const [bbEquipment, setBbEquipment] = useState<string[]>(() => prof.equipment || []);
-  // Программы: только FullProgram (библиотека) → programToBBPlan (faithful/adapt)
-  const [customCycle, setCustomCycle] = useState<SRCycleTemplate | null>(null);
+  // Программы: только FullProgram (библиотека) → programToBBPlan (faithful/adapt).
+  // (customCycle/bbProgramPath удалены 2026-09: cycle-путь резолвится из selectedCycleId
+  // через getCycleById, а programPath всегда был 'library' — мёртвые состояния.)
   const [customProgram, setCustomProgram] = useState<FullProgram | null>(null);
-  const [bbProgramPath, setBbProgramPath] = useState<'library' | 'cycle'>('library');
   const [bbAdaptMode, setBbAdaptMode] = useState<'faithful' | 'adapt'>('faithful');
   const [bbSource, setBbSource] = useState<'cycle' | 'program'>('program');
-  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(customCycle ? customCycle.meta.id.replace('prog_', '') : null);
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
   const [bridgeMsg, setBridgeMsg] = useState('');
   // C4: flash helper — заменяет alert() для некритичных уведомлений.
   const flash = useCallback((m: string) => { setBridgeMsg(m); setTimeout(() => setBridgeMsg(''), 4000); }, []);
@@ -1636,8 +1636,6 @@ export const BbAutoConstructor: React.FC = () => {
   const applyProgramToBb = useCallback((program: FullProgram) => {
     setBbAdaptMode('faithful');
     setCustomProgram(program);
-    setCustomCycle(null);
-    setBbProgramPath('library');
     setPlanMode('programs');
     setBbSource('program');
     setSelectedProgramId(program.id);
@@ -2021,14 +2019,10 @@ export const BbAutoConstructor: React.FC = () => {
     setBuiltPlan(revalidateEditedPlan({ ...builtPlan, weeks: w2 }));
   };
 
-  const bbCyclesList = useMemo(() => {
-    const base = getCyclesByDirection('bodybuilding').filter(c => !c.meta.id.startsWith('embed-'));
-    // Включить кастомный цикл из библиотеки программ, если есть
-    if (customCycle && !base.some(c => c.meta.id === customCycle.meta.id)) {
-      return [customCycle, ...base];
-    }
-    return base;
-  }, [customCycle]);
+  const bbCyclesList = useMemo(
+    () => getCyclesByDirection('bodybuilding').filter(c => !c.meta.id.startsWith('embed-')),
+    [],
+  );
 
   // BB-циклы как готовые программы (для выбора в "Программе")
   const bbCyclePrograms = useMemo(() => {
@@ -2435,7 +2429,7 @@ export const BbAutoConstructor: React.FC = () => {
 
     const modeLabel = bbAnnualMacrocycle
       ? `Годовой BB-макроцикл (${bbAnnualMacrocycle.totalWeeks} нед)`
-      : planMode === 'programs' ? `Программа: ${customProgram?.name || customCycle?.meta.title || selectedProgramId || selectedCycleId}` : 'Generic-сплит';
+      : planMode === 'programs' ? `Программа: ${customProgram?.name || selectedProgramId || selectedCycleId}` : 'Generic-сплит';
     const srpe = loadSRPESessions();
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
     const deloadNote = autoDeload && acwr && acwr.ratio > 1.5
@@ -2676,8 +2670,7 @@ export const BbAutoConstructor: React.FC = () => {
            specialization: specializationMode,
            specBlocks: buildSpecBlocks,
            daysPerWeek: bbDays,
-           source: bbSource,
-           programPath: bbProgramPath,
+            source: bbSource,
             programId: selectedProgramId || undefined,
             cycleId: planMode === 'programs' ? selectedCycleId : undefined,
             abPatternRotation: abRotation === true ? true : undefined,
@@ -2810,13 +2803,11 @@ export const BbAutoConstructor: React.FC = () => {
     }
     if (v.params.patternId) setSelectedSplitId(v.params.patternId);
     if (v.params.source) setBbSource(v.params.source);
-    if (v.params.programPath) setBbProgramPath(v.params.programPath);
     if (v.params.programId) {
       setSelectedProgramId(v.params.programId);
       const sourceProgram = bbLibraryPrograms.find(program => program.id === v.params.programId);
-      if (sourceProgram && v.params.programPath === 'library') {
+      if (sourceProgram) {
         setCustomProgram(sourceProgram);
-        setCustomCycle(null);
       }
     }
     if (v.params.cycleId) setSelectedCycleId(v.params.cycleId);
@@ -3321,7 +3312,6 @@ export const BbAutoConstructor: React.FC = () => {
       selectedProgramId={selectedProgramId}
       bbLibraryPrograms={bbLibraryPrograms}
       applyProgramToBb={applyProgramToBb}
-      customCycle={customCycle}
       bbAdaptMode={bbAdaptMode}
       setBbAdaptMode={setBbAdaptMode}
       bbLevel={bbLevel}

@@ -46,6 +46,8 @@ export function femaleAdjust(): DemographicAdjust {
   };
 }
 
+/** §7 мастер-плана (зарезервировано под согласование): подключение к сборке
+ *  поменяет объёмы возрастных планов (40+/50+), поэтому вызовов пока нет. */
 export function mastersAdjust(age: number): DemographicAdjust {
   const mrvMult = age >= 60 ? 0.8 : age >= 50 ? 0.88 : 0.95;
   return {
@@ -61,7 +63,8 @@ export function mastersAdjust(age: number): DemographicAdjust {
   };
 }
 
-/** Скорректировать MAV/MRV мышц под демографию. */
+/** §7 мастер-плана (зарезервировано под согласование): скорректировать MAV/MRV
+ *  мышц под демографию. Вызовов нет до отдельного решения по математике. */
 export function adjustVolumeForDemographic(muscle: string, level: string, adj: DemographicAdjust): { mev: number; mav: number; mrv: number } | null {
   const lm = getVolumeLandmarks(normLevel(level), muscle);
   if (!lm) return null;

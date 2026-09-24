@@ -64,7 +64,6 @@ export interface BbParamsStepProps {
   selectedProgramId: string | null;
   bbLibraryPrograms: FullProgram[];
   applyProgramToBb: (program: FullProgram) => void;
-  customCycle: SRCycleTemplate | null;
   bbAdaptMode: 'faithful' | 'adapt';
   setBbAdaptMode: React.Dispatch<React.SetStateAction<'faithful' | 'adapt'>>;
   bbLevel: string;
@@ -169,7 +168,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
   planMode, setPlanMode, specializationSelection,
   mevCal, setMevCal, mevDraft, setMevDraft, startMEVCalibration, commitMEVWeek, resetMEVCalibration,
   bbSource, setBbSource, selectedCycleId, setSelectedCycleId, bbCyclesList, setBbDays, setBbWeeks,
-  selectedProgramId, bbLibraryPrograms, applyProgramToBb, customCycle,
+  selectedProgramId, bbLibraryPrograms, applyProgramToBb,
   bbAdaptMode, setBbAdaptMode, bbLevel, setBbLevel, bbGoal, setBbGoal, bbTrainingYears, setBbTrainingYears,
   bbDays, bbWeeks, bbSuggest, bbTrainingFocus, setBbTrainingFocus, bbMethodology, setBbMethodology,
   intensityTech, setIntensityTech, dupMode, setDupMode, dupRecommendChip, dupMuscles, setDupMuscles,
@@ -273,13 +272,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
             {bbSource === 'program' && (
               <div style={{ marginTop: 8 }}>
                 <BbProgramLibraryPicker label='Программа' value={selectedProgramId} programs={bbLibraryPrograms} onSelect={applyProgramToBb} />
-                {customCycle && (
-                  <div style={{ marginTop: 6, ...NOTE, lineHeight: 1.5 }}>
-                    <div><b>Программа:</b> {customCycle.meta.title} · {customCycle.meta.level} · {customCycle.meta.sessionsPerWeek} дн/нед · {customCycle.meta.weeks} нед</div>
-                    <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 8, background: 'rgba(96,165,250,0.06)' }}>{customCycle.meta.description?.slice(0, 200)}</div>
-                  </div>
-                )}
-                {selectedProgramId && !customCycle && (() => {
+                {selectedProgramId && (() => {
                   const p = bbLibraryPrograms.find(pr => pr.id === selectedProgramId);
                   if (!p) return null;
                   return (

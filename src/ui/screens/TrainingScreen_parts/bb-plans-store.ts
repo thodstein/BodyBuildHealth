@@ -46,7 +46,6 @@ export interface SavedBBPlan {
     }[];
     daysPerWeek?: number;
     source?: 'cycle' | 'program';
-    programPath?: 'library' | 'cycle';
     programId?: string;
     planMode: string;
     cycleId?: string;
@@ -118,7 +117,6 @@ function migrateSavedPlan(value: any): SavedBBPlan {
   const validFocus = ['strength', 'hypertrophy', 'endurance'].includes(rawParams.trainingFocus) ? rawParams.trainingFocus : undefined;
   const validMethodology = ['compound_first', 'pre_exhaust', 'post_exhaust'].includes(rawParams.methodology) ? rawParams.methodology : undefined;
   const validSource = rawParams.source === 'cycle' || rawParams.source === 'program' ? rawParams.source : undefined;
-  const validProgramPath = rawParams.programPath === 'library' || rawParams.programPath === 'cycle' ? rawParams.programPath : undefined;
   const weeks = Number.isInteger(rawParams.weeks) && rawParams.weeks > 0 ? rawParams.weeks : value.plan.weeks.length;
   return {
     id: typeof value.id === 'string' && value.id ? value.id : `bbplan_legacy_${Date.now()}`,
@@ -142,7 +140,7 @@ function migrateSavedPlan(value: any): SavedBBPlan {
       equipment: Array.isArray(rawParams.equipment) ? rawParams.equipment.filter((item: any) => typeof item === 'string') : undefined,
       specialization: rawParams.specialization == null ? undefined : Boolean(rawParams.specialization),
       daysPerWeek: Number.isInteger(rawParams.daysPerWeek) && rawParams.daysPerWeek > 0 ? rawParams.daysPerWeek : undefined,
-      source: validSource, programPath: validProgramPath,
+      source: validSource,
       programId: typeof rawParams.programId === 'string' ? rawParams.programId : undefined,
       planMode: rawParams.planMode === 'programs' || rawParams.planMode === 'bb_cycle' ? 'programs' : 'generic_split',
       cycleId: typeof rawParams.cycleId === 'string' ? rawParams.cycleId : undefined,

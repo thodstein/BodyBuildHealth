@@ -624,7 +624,6 @@ export function suggestFeeders(weakPoints: string[], equipment: string[]): Feede
 }
 
 /* ──────────── Exercise type allocation per phase ──────────── */
-export type ExerciseCategory = 'compound' | 'isolation' | 'machine_compound' | 'cable' | 'feeder';
 
 /**
  * Распределение упражнений по категориям в зависимости от фазы.
@@ -1050,7 +1049,7 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
  * Применяется к последним 2-3 неделям плана ПЕРЕД финальным deload (или вместо
  * deload если план заканчивается peaking без deload).
  */
-export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan {
+export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPlan {
   if (!plan || plan.weeks.length < 4) return plan; // taper только для планов ≥4 нед
 
   // 🏁 Contest prep guard: план уже размечен фазами contest prep (contestPhase /
@@ -1092,8 +1091,9 @@ export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan
   const explicitDeloads = weeks.filter(w => w.deload === true || w.phase === 'deload').length;
   if ((plan as any).sourceDeloads && explicitDeloads >= 1) return plan;
 
-  // Taper-окно: 3 недели перед deload (или концом плана). totalWeeks параметр
-  // используется для документации/логирования (Bosquet 2005, Helms 2022).
+  // Taper-окно: 3 недели перед deload (или концом плана) — длина берётся из
+  // plan.weeks.length. Параметр _totalWeeks оставлен для совместимости API
+  // (вызовы/тесты передают длину плана) и будущего использования (Bosquet 2005, Helms 2022).
   // RIR shift и tempo swap добавлены для проф-уровня (fix A6).
   const taperEnd = lastDeloadIdx >= 0 ? lastDeloadIdx : weeks.length;
   const taperStart = Math.max(0, taperEnd - 3);
