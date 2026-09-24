@@ -1364,6 +1364,10 @@ export interface AssembleRecipeDayResult {
   withinTolerance: boolean;
   deviationPct: number;
   appliedCount: number;
+  /** §3E: экстрим-полоса и перебор Б ядер — эффективная цель Б (что дают ядра рецептов). */
+  effectiveProteinTargetG?: number;
+  /** §3E: отклонение дня к эффективной цели Б (без учёта перебора ядер). */
+  deviationToEffectivePct?: number;
 }
 
 /**
@@ -1400,6 +1404,22 @@ function distOf(totals: { kcal: number; p: number; f: number; c: number } | null
     if (tgt > 0 && w > 0) { sum += w * Math.abs(val - tgt) / tgt; wsum += w; }
   }
   return wsum > 0 ? sum / wsum : 999;
+}
+
+/**
+ * §3E-carb-room (остаток E): скор ранжира рецептов на ЭКСТРИМ-полосе. 65% — прежняя
+ * макро-дистанция, 25% — carb-fill («сколько У рецепт даёт в цель приёма», не выше цели),
+ * 10% — штраф за перебор белка ядра (ядра не режутся — мясное блюдо «точно по ккал»
+ * оставляет день +19% Б / −7% У). Меньше — лучше. Вне полосы не вызывается.
+ */
+export function carbRoomScore(
+  scaled: { p: number; c: number },
+  tgt: { p: number; c: number },
+  dBase: number,
+): number {
+  const fill = (tgt.c || 0) > 0 ? Math.min(scaled.c, tgt.c || 0) / (tgt.c || 1) : 0;
+  const pOver = (tgt.p || 0) > 0 ? Math.max(0, scaled.p - (tgt.p || 0)) / (tgt.p || 1) : 0;
+  return dBase * 0.65 + (1 - fill) * 0.25 + Math.min(1, pOver) * 0.10;
 }
 
 export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDayResult {
@@ -1639,7 +1659,13 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         const t = decomposedFacts(r).totals;
         const s = t && t.kcal > 0 ? scaleOf(t.kcal, t.p, t.f, t.c) : 1;
         const scaled = t ? { kcal: t.kcal * s, p: t.p * s, f: t.f * s, c: t.c * s } : null;
-        return { r, d: distOf(scaled, targetKcal, tgt.p || 30, tgt.f || 15, tgt.c || 40, _rankWeights) };
+        const dBase = distOf(scaled, targetKcal, tgt.p || 30, tgt.f || 15, tgt.c || 40, _rankWeights);
+        // §3E-carb-room (остаток E): на экстрим-полосе 25% ранга — «сколько У рецепт даёт
+        // в цель приёма» (carb-fill), 10% — штраф за перебор белка ядра. Мясной рецепт
+        // «точно по ккал» оставлял день +19% Б / −7% У: ядро резать нельзя, поэтому
+        // углеводно-плотные блюда должны выигрывать у белковых при близкой дистанции.
+        if (!scaled || !_rankWeights) return { r, d: dBase };
+        return { r, d: carbRoomScore(scaled, { p: tgt.p || 30, c: tgt.c || 40 }, dBase) };
       })
       .sort((a, b) => a.d - b.d)
       .map(x => x.r);
@@ -2140,10 +2166,28 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   const _finTot = sumDayTotals(outMeals);
   const _finDev = maxDeviationPct(_finTot as any, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any);
   const _finDevR = Math.round(_finDev * 10) / 10;
+  // §3E-честность (остаток E): ядра рецептов НЕ режутся (авторские пропорции), поэтому
+  // на экстрим-полосе день может перебирать Б (яичница/чечевица/макароны с индейкой):
+  // «dev 18.5%» выглядит как ошибка, хотя это пол ядер. Показываем ЭФФЕКТИВНУЮ цель Б
+  // (факт ядер) и отклонение к ней — иначе честность молчит о причине.
+  let _effTargets: { effP: number; effDevR: number } | null = null;
+  if (isExtremeCarbBand(targets?.c || 0, targets?.p || 0, args.athleteWeightKg ?? 80)) {
+    const _goalP = targets?.p || 0;
+    const _devP = _goalP > 0 ? (_finTot.p - _goalP) / _goalP : 0;
+    if (_devP > 0.05 && _finTot.p > 0) {
+      const _effP = Math.round(_finTot.p);
+      const _effDev = maxDeviationPct(_finTot as any, { kcal: targets.kcal, p: _effP, f: targets.f, c: targets.c } as any);
+      _effTargets = { effP: _effP, effDevR: Math.round(_effDev * 10) / 10 };
+      notes = [...notes, `📐 Режим «по рецептам»: эффективная цель Б = ${_effP} г (ядра рецептов — резать нельзя); к ней отклонение ${_effTargets.effDevR}%, к вашей цели ${_goalP} г — +${Math.round(_devP * 100)}%`];
+    }
+  }
   // P2 (честность флага): квота/peri-тримы могли увести за ±3% ПОСЛЕ tolerance-проверки
   // ребаланса — предупреждение обязательно (иначе property-тест «нет предупреждения» падает).
   if (_finDevR > 3) {
     notes = [...notes, `⚠ Режим «по рецептам»: дневное отклонение от целей ${_finDevR}% (>3%) — попробуйте выбрать другие варианты рецептов.`];
   }
-  return { meals: outMeals, notes, withinTolerance: _finDevR <= 3, deviationPct: _finDevR, appliedCount };
+  return {
+    meals: outMeals, notes, withinTolerance: _finDevR <= 3, deviationPct: _finDevR, appliedCount,
+    ...(_effTargets ? { effectiveProteinTargetG: _effTargets.effP, deviationToEffectivePct: _effTargets.effDevR } : {}),
+  };
 }
