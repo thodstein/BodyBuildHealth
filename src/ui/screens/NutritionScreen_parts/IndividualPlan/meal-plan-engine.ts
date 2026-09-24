@@ -3782,7 +3782,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const _pPerKg = (adjustedProteinG || input.goalProteinG) / _w;
     if (_cPerKg >= 6.5) notes.push(`🔥 Высокоуглеводный день: ${carbsTotal} г = ${_cPerKg.toFixed(1)} г/кг — обед главный приём, перекусы несут угли, напитки/плотная добивка разрешены.`);
     if (_pPerKg >= 3.0) notes.push(`🥩 Белок ${_pPerKg.toFixed(1)} г/кг — выше потолка Morton 2.2 / сушка 3.1: избыток окислится, держим для сытости и MPS-частоты.`);
-    if (_bolusUnits > 0) notes.push(`💉 Инсулин-режим: болюс ${_bolusUnits} ЕД — окна dose×10 г быстрых У закреплены и защищены от коррекций.`);
+    if (_bolusUnits > 0) notes.push(`💉 Инсулин-режим: сумма болюсов ${_bolusUnits} ЕД (${(input.injections || []).filter(i => (i.type || '').toLowerCase().includes('инсулин') && i.esterType !== 'long').length} инжект.) — окна dose×10 г быстрых У закреплены и защищены от коррекций.`);
   }
   // MealTargets (бюджеты = цель дня): на углеводном дне (≥6 г/кг — инсулин/масса)
   // 20%TEI-пол жира превращался из МИНИМУМА в ОVERRADE (8720 ккал → 194 г жира при
@@ -4169,7 +4169,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     meals.push(snack);
     markUsed(snack);
     registerMealInQuota(quota, snack.items);
-    notes.push(`Полдник ${_snackTimeOf('snack')}: MPS gap fill (нетренировочный день) — белок + фрукт`);
+    notes.push(`Полдник ${_snackTimeOf('snack')}: MPS gap fill (${input.isTrainingDay ? 'тренировочный' : 'нетренировочный'} день) — белок + фрукт`);
   }
   // D-24b: второй перекус (для 6-8 приёмов) — между обедом и ужином (или после ужина).
   if (_keep.has('snack2') && mealBudget.snack2) {
@@ -4898,7 +4898,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
   }
-  if (_pickCtx.qualityMode === 'full') notes.push(`Сводка MPS: ${feedings} feedings × ${mpsSummary.avg_protein_per_meal_g} г/meal, ${mpsSummary.avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`);
+  // §3J: «Сводка MPS» пересобирается в финале (после P4b/P6 и витрины MPS) — здесь
+  // промежуточный счётчик feedings врал (16 приёмов → «12 feedings»).
   notes.push(`Диверсификация: ${uniqueFoods} уникальных продуктов (${Object.keys(categories).length} категорий)`);
   if (input.refeedDay) notes.push('🔄 Refeed-день: быстрые/низкоклетчаточные углеводы, овощи легче — приоритет гликогеновому ре-синтезу (лептин/психологическая разгрузка)');
   if (morningTrainLoad) notes.push('🌅 Загрузка под утреннюю тренировку: вечером много углеводов, минимум жиров, умеренный белок — гликоген и энергия к утренней сессии.');
@@ -5176,20 +5177,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (doneP && doneC && doneF) break;
   }
 
-  // Отчёт о точности в notes
-  {
-    const dP = Math.abs(totals.p - gPreciseP) / Math.max(1, gPreciseP);
-    const dC = Math.abs(totals.c - gPreciseC) / Math.max(1, gPreciseC);
-    const dF = Math.abs(totals.f - gPreciseF) / Math.max(1, gPreciseF);
-    const maxDev = Math.max(dP, dC, dF);
-    if (maxDev <= 0.02) {
-      notes.push(`🎯 Точность рациона: Б ${totals.p}/${gPreciseP}г, Ж ${totals.f}/${gPreciseF}г, У ${totals.c}/${gPreciseC}г (отклонение ≤2%)`);
-    } else if (maxDev <= 0.05) {
-      notes.push(`✓ Точность рациона: отклонение ≤5% (Б ${Math.round(dP*100)}%, Ж ${Math.round(dF*100)}%, У ${Math.round(dC*100)}%)`);
-    } else {
-      notes.push(`⚠ Точность рациона: отклонение >5% (Б ${Math.round(dP*100)}%, Ж ${Math.round(dF*100)}%, У ${Math.round(dC*100)}%) — проверьте пулы продуктов`);
-    }
-  }
+  // §3F-честность: отчёт «Точность рациона» перенесён в САМЫЙ КОНЕЦ (после P4b/P5b/P6/P7),
+  // иначе он описывал промежуточное состояние (Б 31% при финальных −3%: середина пайплайна
+  // ещё не дожата финальной белковой коррекцией). См. финальный блок перед витриной MPS.
 
   // P4b (Aug 28): ФИНАЛЬНАЯ белковая коррекция — после FINAL SNAP (см. ниже, перед посадкой).
 
@@ -8507,7 +8497,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           // иначе шаг съедает запас +5 г на плотном белке (кукурузные хлопья 6.9)
           // и углеводы не добираются (operability 790.4 vs порога 795).
           .filter((x: any) => !((input.goalProteinG || 0) > 0 && _p5bBaseP > (input.goalProteinG || 0) * 1.149) || (x.fd.protein || 0) <= 3)
-          .sort((a: any, b: any) => b.room - a.room);
+          // §3G-разнообразие: при равной комнате предпочитаем носитель, который реже
+          // встречается в дне (раньше всегда побеждал один и тот же «самый комнатный» —
+          // проба: рис в 4 приёмах). Моно-инвариант тестов (≤3) от этого только крепче.
+          .sort((a: any, b: any) => {
+            const _usesOf = (id: string) => meals.reduce((s: number, m: any) => s + (m.items || []).filter((y: any) => y.id === id).length, 0);
+            return (_usesOf(a.it.id) - _usesOf(b.it.id)) || (b.room - a.room);
+          });
         const _cand5 = _p5bCands[0];
         if (!_cand5) break;
         const _need5 = (input.goalCarbsG || 0) * 0.97 - totals.c;
@@ -8808,6 +8804,28 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_capNotes > 0) notes.push(`⚖️ Финальные капы §3D: порции/тарелки приведены к съедобным (перенос/срез ${_capNotes}×)`);
     }
 
+    // ─── §3F-честность: «Точность рациона» ПОСЛЕ всех проходов ───
+    // Считаем к ЦЕЛИ ПОЛЬЗОВАТЕЛЯ (введённой), а не к скрытой клинической adjusted-цели
+    // (проба: «Б 31%» при факте −3% от 180 — adjusted ~133 + середина пайплайна).
+    {
+      const _gP = input.goalProteinG || adjustedProteinG;
+      const _dP = Math.abs(totals.p - _gP) / Math.max(1, _gP);
+      const _dC = Math.abs(totals.c - carbsTotal) / Math.max(1, carbsTotal);
+      const _dF = Math.abs(totals.f - fatTotal) / Math.max(1, fatTotal);
+      const _maxDev = Math.max(_dP, _dC, _dF);
+      if (_maxDev <= 0.02) {
+        notes.push(`🎯 Точность рациона: Б ${totals.p}/${_gP}г, Ж ${totals.f}/${fatTotal}г, У ${totals.c}/${carbsTotal}г (отклонение ≤2%)`);
+      } else if (_maxDev <= 0.05) {
+        notes.push(`✓ Точность рациона: отклонение ≤5% (Б ${Math.round(_dP * 100)}%, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%)`);
+      } else {
+        notes.push(`⚠ Точность рациона: отклонение >5% (Б ${Math.round(_dP * 100)}%, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%) — проверьте пулы продуктов`);
+      }
+      if (adjustedProteinG > 0 && Math.abs(adjustedProteinG - _gP) / _gP > 0.05) {
+        const _dAdj = Math.abs(totals.p - adjustedProteinG) / Math.max(1, adjustedProteinG);
+        notes.push(`ℹ️ Белок: ваша цель ${_gP} г — ${Math.round(_dP * 100)}%; клиническая цель уровня/фазы ${adjustedProteinG} г — ${Math.round(_dAdj * 100)}% (полы приёмов)`);
+      }
+    }
+
     // ─── §realism: витрина MPS пересобирается ПОСЛЕ всех проходов ───
     // mpsSummary собирался в середине функции (до «посадки», MPS-коридора, 500Б-смягчений
     // и клиники клетчатки) и описывал ПРОМЕЖУТОЧНОЕ состояние: per-meal белок 29 г в витрине
@@ -8820,7 +8838,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       });
       (mpsSummary as any).meals = _mbFinal;
       (mpsSummary as any).avg_protein_per_meal_g = Math.round(totals.p / Math.max(1, meals.length));
-      (mpsSummary as any).avg_leucine_g = Math.round(totals.leucine_mg / Math.max(1, feedings) / 10) / 100;
+      // §3J: лейцин — на ФАКТИЧЕСКИЕ feedings (≥25 г), а не на промежуточный счётчик.
+      const _feedFinalJ = _mbFinal.filter(x => (x.proteinG || 0) >= 25).length;
+      (mpsSummary as any).avg_leucine_g = Math.round(totals.leucine_mg / Math.max(1, _feedFinalJ)) / 1000;
       (mpsSummary as any).fiberG = Math.round(totals.fiber);
       const _pvFinal = meals.filter(m => !['intra', 'presleep'].includes(m.type)).map(m => m.totals.p || 0).filter(v => v > 0);
       if (_pvFinal.length >= 3) {
@@ -8828,6 +8848,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         const _sd = Math.sqrt(_pvFinal.reduce((a, b) => a + Math.pow(b - _mean, 2), 0) / _pvFinal.length);
         (mpsSummary as any).proteinCV = _mean > 0 ? Math.round((_sd / _mean) * 100) / 100 : 0;
       }
+      // §3J: честная «Сводка MPS» по финальным приёмам (было: промежуточные 12 при 16).
+      if (_pickCtx.qualityMode === 'full') {
+        notes.push(`Сводка MPS: ${_feedFinalJ} feedings × ${(mpsSummary as any).avg_protein_per_meal_g} г/meal, ${(mpsSummary as any).avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`);
+      }
+    }
+
+    // ─── §3H EXTREME-SCALE: вода и электролиты для больших дней ───
+    if ((input.goalKcal || 0) >= 4200 || _pickCtx.capacity.active) {
+      const _w = Math.max(40, input.weightKg || 80);
+      const _waterL = Math.round(((35 * _w + Math.max(0, (input.goalKcal || 0) - 3000) / 1000 * 400) / 1000) * 10) / 10;
+      notes.push(`💧 Вода: ~${_waterL} л/день (35 мл/кг + 400 мл/1000 ккал свыше 3000${input.isTrainingDay ? ' + пот тренировки' : ''}); Na 4–6 г, K:Na ≥3:1${_bolusUnits > 0 ? ' — под инсулином держите быстрые У (декстрозу) на гипо' : ''}.`);
     }
 
     return {
@@ -8962,11 +8993,18 @@ function getMicroFromFood(food: FoodItem, field: string): number {
   if (altKeys) {
     for (const key of altKeys) {
       const val = e?.[key] ?? t?.[key] ?? v?.[key] ?? mg?.[key];
-      if (val !== undefined) return val;
+      if (val !== undefined) {
+        // §3F-честность: дрейф единиц в FOOD_DB — vitamin_d_mcg 87/500 у яйца/лосося
+        // физиологически невозможны в мкг (это IU). Нормализуем IU→мкг (÷40), иначе
+        // «+500 мкг VitD» в ноте и ложные превышения UL 100.
+        if (field === 'VitD' && key === 'vitamin_d_mcg' && val > 50) return Math.round((val / 40) * 10) / 10;
+        return val;
+      }
     }
   }
   return 0;
 }
+export { getMicroFromFood as _getMicroFromFoodForTest };
 // Д-6: veg-aware. In vegetarian mode, deficiency recommendations use plant/dairy sources,
 // never suggesting meat/fish (salmon/oysters/beef_liver) which the user does not eat.
 function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|'female'|'other' = 'male'): string[] {

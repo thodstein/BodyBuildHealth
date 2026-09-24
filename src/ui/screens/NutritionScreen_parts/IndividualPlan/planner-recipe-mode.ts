@@ -499,6 +499,9 @@ export function rebalanceDayAfterRecipes(
   // несколько итераций (иначе «рис 100 → Завтрак / убран рис из Завтрака» пинг-понг
   // с басмати туда-сюда сжигает все 24 итерации на 1500У). Кольцо последних 6 снятий.
   const recentCuts: Array<{ mi: number; id: string }> = [];
+  // §3E-anti-thrash: полная история за вызов (кольцо 6 вытесняло ранние снятия и на 15+
+  // приёмах пинг-понг возвращался) + запрет резать то, что ЭТОТ же ребаланс добавил.
+  const addedByPass = new Set<string>();
   const _inCutCooldown = (mi: number, id: string): boolean => recentCuts.some(x => x.mi === mi && x.id === id);
 
   for (let iter = 0; iter < maxIter; iter++) {
@@ -675,6 +678,7 @@ export function rebalanceDayAfterRecipes(
         notes.push(`➕ Недобор закрыт: ${chosen.name} ${grams} г → «${work[fi].label || 'Приём'}»`);
         lastAddedMeal = fi;
         lastAddedId = chosen.id;
+        addedByPass.add(`${fi}:${chosen.id}`); // §3E: этот ребаланс его не срежет обратно
         continue;
       }
     }
@@ -815,6 +819,7 @@ export function rebalanceDayAfterRecipes(
         if (coreIds && coreIds.has(it.id)) return;
         if (_snackProtCount <= 1 && (it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein')) return;
         if (mi === lastAddedMeal && it.id === lastAddedId) return; // свежий top-ап не режем
+        if (addedByPass.has(`${mi}:${it.id}`)) return; // §3E: добавленное этим же ребалансом не режем
         const a = it.amount || 0;
         if (a < 20) return;
         // Пери-приёмы функциональны (анаболическое окно) — не вырезаем до нуля,
@@ -849,9 +854,9 @@ export function rebalanceDayAfterRecipes(
     {
       const bc = bestCut as any as Cut;
       const it = work[bc.mi].items[bc.ii];
-      // Фиксируем снятие в кулдауне (кольцо 6): топ-ап не вернёт его обратно.
+      // Фиксируем снятие в кулдауне (полная история вызова): топ-ап не вернёт его обратно.
       recentCuts.push({ mi: bc.mi, id: it.id });
-      if (recentCuts.length > 6) recentCuts.shift();
+      if (recentCuts.length > 40) recentCuts.shift();
       if (bc.newAmount < 20) {
         const items = work[bc.mi].items.filter((_, k) => k !== bc.ii);
         work[bc.mi] = { ...work[bc.mi], items, totals: sumMealTotals(items) };

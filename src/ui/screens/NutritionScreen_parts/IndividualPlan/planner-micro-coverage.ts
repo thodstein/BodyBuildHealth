@@ -153,9 +153,12 @@ export function analyzeMicroCoverage(
     const pct = Math.round((actual / Math.max(1, t.target)) * 100);
     const upper = UPPER_LIMIT[t.nutrient];
     let status: MicroCoverageEntry['status'] = 'ok';
+    // §3F-честность: Mg-«предел» 350 мг — UL IOM для ДОБАВОК, не для еды; на еде он
+    // флагался «избытком» на каждом дне (526–1690 мг из рациона) — не применяем.
+    const _supplementOnlyUL = t.nutrient === 'Mg';
     if (pct < DEFICIT_PCT) status = 'deficit';
     else if (pct < LOW_PCT) status = 'low';
-    else if (upper !== undefined && actual > upper) status = 'high';
+    else if (upper !== undefined && !_supplementOnlyUL && actual > upper) status = 'high';
     coverage.push({ nutrient: t.nutrient, actual: Math.round(actual), target: t.target, pct, unit: t.unit, status });
 
     const label = NUTRIENT_LABEL[t.nutrient] || t.nutrient;
