@@ -4386,6 +4386,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Короткий/ультракороткий инсулин в пик (обычно перед едой/тренировкой) требует больше быстрых
   // углеводов, чем базальный фон, — плоский 40 г не обеспечивал гликемическую безопасность.
   const _insulinInjs = _injList.filter(i => (i.type || '').toLowerCase().includes('инсулин'));
+  // §3G: ротация носителей окон — ДЕНЬ-СКОП (раньше счётчик перезапускался на каждом
+  // болюсе: 3 болюса × цепочка давали одинаковый набор крем/хлопья/рис-хлопья ×3).
+  // Пул — плотные быстрые носители ≥60 У/100 без «десертных» капов (крем/хлопья/рис).
+  const _rotCarbs = ['cream_of_rice', 'corn_flakes', 'grain_rice_flakes', 'rice_cream', 'rice_semolina', 'grain_rice_flour', 'rice_cakes', 'grain_cornmeal'];
+  let _winRotSeq = 0;
   for (const inj of _insulinInjs) {
     // Итерация C: базальный (long) — фон без углеводного окна (не болюс); окна только
     // под болюсы, каждое со своей дозой. Несколько болюсов = несколько окон.
@@ -4394,15 +4399,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const dose = Number(inj.dose) || 8;
     const needC = Math.max(30, Math.round(dose * 10)); // полная потребность болюса (≈10 г/1 ЕД)
     const slotCap = _insulinSlotCap;                    // ≤120 г на под-кормление (физиологично)
-    // §3C: ротация носителей окна — 3 окна подряд не должны быть одним продуктом
-    // (только плотные не-добавочные: крем/хлопья; декстроза капнута 90 г = 81 г У).
-    const _rotCarbs = ['cream_of_rice', 'corn_flakes', 'grain_rice_flakes'];
+    // §3C/§3G: ротация носителей окна — см. `_rotCarbs` (день-скоп, последовательный
+    // счётчик: топ-ап и цепочки всех болюсов идут по общему кольцу без повторов подряд).
     const _label = `⚡ Углеводы под инсулин (${inj.name || 'инсулин'})`;
     let covered = 0; // сколько углеводов болюса реально закрыто (окна + близкий основной приём)
     if (!_hasMealNear(injMin)) {
       // ~10 г быстрых углеводов на 1 ЕД болюсного инсулина; кап 120 г на одно окно (безопасность).
       const carbG = Math.max(30, Math.min(slotCap, needC));
-      _injectMealAt(injMin, _label, `${_label} — быстрые углеводы ${carbG} г при уколе ${dose} ЕД (≈10 г/1 ЕД, без жиров для скорости всасывания)`, carbG, 25, { insulinWindow: true, carbId: _rotCarbs[0] });
+      _injectMealAt(injMin, _label, `${_label} — быстрые углеводы ${carbG} г при уколе ${dose} ЕД (≈10 г/1 ЕД, без жиров для скорости всасывания)`, carbG, 25, { insulinWindow: true, carbId: _rotCarbs[_winRotSeq++ % _rotCarbs.length] });
       covered = carbG;
     } else {
       // Близкий приём покрывает болюс, только если несёт ≥80% потребности, —
@@ -4428,7 +4432,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_mainCovers) covered = needC; // приём укола закрывает болюс
       else if (_near && _nearDt <= 60 && _nearC < needC * 0.8) {
         const topC = Math.max(30, Math.min(slotCap, needC - Math.round(_nearC)));
-        _injectMealAt(injMin, _label, `${_label} — топ-ап ${topC} г к приёму «${_near.label}» (${Math.round(_nearC)} г мало для ${dose} ЕД, нужно ~${needC} г)`, topC, 15, { insulinWindow: true, carbId: _rotCarbs[0] });
+        _injectMealAt(injMin, _label, `${_label} — топ-ап ${topC} г к приёму «${_near.label}» (${Math.round(_nearC)} г мало для ${dose} ЕД, нужно ~${needC} г)`, topC, 15, { insulinWindow: true, carbId: _rotCarbs[_winRotSeq++ % _rotCarbs.length] });
         covered = Math.round(_nearC) + topC;
       } else if (_near && _nearDt <= 60) {
         covered = Math.round(_nearC); // богатый приём рядом несёт ≥80% дозы
@@ -4459,7 +4463,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             else if (_alt2 > injMin && !_busy(_alt2)) t = _alt2;
           }
           _chainIdx++;
-          _injectMealAt(t, _label, `${_label} — под-кормление ${_chainIdx}/${slots}: ${per} г быстрых У (доза ${dose} ЕД ≈ ${needC} г, одно окно ≤${slotCap} г)`, per, 0, { insulinWindow: true, carbId: _rotCarbs[(_chainIdx) % _rotCarbs.length], noProtein: true });
+          _injectMealAt(t, _label, `${_label} — под-кормление ${_chainIdx}/${slots}: ${per} г быстрых У (доза ${dose} ЕД ≈ ${needC} г, одно окно ≤${slotCap} г)`, per, 0, { insulinWindow: true, carbId: _rotCarbs[_winRotSeq++ % _rotCarbs.length], noProtein: true });
           remaining -= per;
         }
         if (dose >= 25) {
