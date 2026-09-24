@@ -2,7 +2,7 @@
  * bb-plan-exercise-audit.engine.ts — аудит портфеля упражнений ББ-плана.
  * reuse: bb-exercise-effect, bb-sfr-db, bb-exercise-selection, bb-volume, bb-balance, ExerciseLabShared SUBREGION_DEFS
  */
-import { calcExerciseEffect, exerciseEffectScore, type BBExerciseEffect } from './bb-exercise-effect.engine';
+import { calcExerciseEffect, type BBExerciseEffect } from './bb-exercise-effect.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { ANGLE_CLASSES, STRICT_EXERCISE_GROUPS } from './bb-exercise-selection.engine';
 import { SUBREGION_DEFS } from '../../ui/screens/TrainingScreen_parts/ExerciseLabShared';

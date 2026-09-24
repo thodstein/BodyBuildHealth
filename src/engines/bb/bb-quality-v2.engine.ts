@@ -8,12 +8,7 @@
  * Без дневника нагрузка не штрафуется; без данных — null (карточка не рендерится).
  */
 import { bbPlanToQualityInput, validatePlanQuality } from '../plan-quality.engine';
-import {
-  composeQualityScoreV2,
-  type QualityScoreV2,
-  type QualityV2Issue,
-  type V2ComposerInput,
-} from '../quality-score-v2.engine';
+import { composeQualityScoreV2, type QualityScoreV2, type QualityV2Issue, type V2ComposerInput } from '../quality-score-v2.engine';
 
 export interface BBQualityV2Opts {
   level: string;

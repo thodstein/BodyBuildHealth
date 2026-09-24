@@ -16,7 +16,7 @@
  */
 import type { BBPlan, BBExercise } from './bb-builder.engine';
 import { epley1RM } from '../e1rm';
-import type { WorkoutSession, WorkoutExercise, WorkoutSet } from '../workout-logger.engine';
+import type { WorkoutSession, WorkoutExercise } from '../workout-logger.engine';
 import { prescribeLoad, type LoadStrategy } from './bb-autocoach.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf } from '../movement-pattern';

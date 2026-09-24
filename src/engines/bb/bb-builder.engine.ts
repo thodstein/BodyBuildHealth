@@ -14,7 +14,7 @@
  */
 
 import { SPLIT_PATTERNS, getPattern, sessionsOf, type SplitPattern, type ScheduleDay } from './bb-split-patterns';
-import { FORCE_HEAVY_GROUPS, resolveCharacter, TAG_MUSCLES, type DayCharacter, type MuscleSlot } from './bb-day-types';
+import { resolveCharacter, TAG_MUSCLES, type DayCharacter } from './bb-day-types';
 import { getAllVolumeLandmarks, getVolumeLandmarks, normLevel, type TrainingLevel, type MuscleVolumeLandmarks } from '../volume-landmarks.engine';
 import { calibratedLandmarksFor, loadMEVCalibration, type MEVCalibration } from './bb-mev-calibration.engine';
 import { applyRehabToPlan, rehabNotes, tonnageProgression, overreachingCheck } from './bb-recovery.engine';
@@ -34,11 +34,11 @@ import { adaptForPEDs, computeAASEquivDose } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR, applyDiaryVolumeCorrection } from './bb-progression-feedback.engine';
-import { extractMesocycleProgression, applyWeightProgression, applyVolumeProgression, wasInPreviousMeso, type MesocycleProgression } from './bb-mesocycle-progression.engine';
-import { buildExerciseInstructions, formatExerciseInstructions, cleanInstructionsText, tempoExplain } from './bb-exercise-instructions.engine';
+import { extractMesocycleProgression, applyWeightProgression, applyVolumeProgression } from './bb-mesocycle-progression.engine';
+import { buildExerciseInstructions, cleanInstructionsText, tempoExplain } from './bb-exercise-instructions.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { warmupRampFor } from '../warmup-ramp.engine';
-import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
+import { getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findGentleSubstitutions } from '../exercise-substitution.engine';
 import { isPoolAllowed, isSkillEccentric } from './bb-exercise-levels.engine';
 import { packingCapFor, distributePackingSets, planPackingDrops, strictKeysFor, packingPatternOf, PACKING_MUSCLES } from './bb-packing.engine';
@@ -52,19 +52,19 @@ import { orderSessionExercises, type SessionMethodology } from './bb-session-ord
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
-import { ANGLE_CLASSES, lengthenedBonus, lengthenedBonusForExercise, ensureStrictGroupCoverage, STRICT_EXERCISE_GROUPS, strictGroupMatches } from './bb-exercise-selection.engine';
+import { ANGLE_CLASSES, lengthenedBonus, lengthenedBonusForExercise, ensureStrictGroupCoverage } from './bb-exercise-selection.engine';
 import { sfrSelectionBonus } from './bb-sfr-db';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
-import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
+import type { Macrocycle, MacroPhase, BBMacrocycle } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan } from './bb-finalize.engine';
-import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, BB_MRV_TOLERANCE } from './bb-volume.engine';
+import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
 import { insulinWindowActive, applyInsulinWindowToPlan } from './bb-insulin-window.engine';
 import { recommendPEDMethodology, applyPEDMethodologyToPlan } from './bb-ped-methodology.engine';
-import { REP_SCHEMES, schemeFor, schemeToLoading, applySchemeToPlan, applyBfrPattern } from './bb-rep-schemes.engine';
+import { REP_SCHEMES, schemeFor, applySchemeToPlan, applyBfrPattern } from './bb-rep-schemes.engine';
 import { bbVbtRecommendation } from './bb-vbt.engine';
 import type { BBRotationReport } from './bb-rotation.engine';
 import type { BBSessionCost } from './bb-fatigue.engine';
@@ -72,7 +72,7 @@ import type { BBPlanReport } from './bb-report.engine';
 
 import type { BBPlanValidationResult } from './bb-validator.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
-import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationResolution, type SpecializationBlock } from './bb-specialization.engine';
+import { resolveSpecialization, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationResolution, type SpecializationBlock } from './bb-specialization.engine';
 import { applyTradeoffToPlan } from './bb-tradeoff.engine';
 
 // P7: приоритет equipment по фазе (формирует пропорцию compound/isolation/cable/machine из PHASE_CONFIGS)

@@ -26,15 +26,7 @@
  *  - he_prep_emergency_v1 — контакт { name, phone }
  *  - he_prep_labs_v1 — { [planId]: ISO-дата последних анализов }
  */
-import {
-  type BBContestPrepPlan,
-  type PeakWeekDayPlan,
-  configFromPlan,
-  buildPeakWeek,
-  isoToday,
-  isoAddDays,
-  isoDiffDays,
-} from './bb-contest-prep.engine';
+import { type BBContestPrepPlan, type PeakWeekDayPlan, configFromPlan, buildPeakWeek, isoToday, isoAddDays, isoDiffDays } from './bb-contest-prep.engine';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 📓 Монитор пик-недели

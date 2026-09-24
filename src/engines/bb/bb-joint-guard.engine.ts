@@ -5,7 +5,6 @@
  * отбора упражнений: штрафует axial/high-stress движения, предпочитает
  * машины/кабели с тем же паттерном.
  */
-import { isMobilityRestricted } from './bb-mobility.engine';
 
 export interface JointGuardInput {
   hasGH: boolean;

@@ -13,10 +13,7 @@
  *
  * Возвращает score 0-100 + заметки + конкретные действия (авто-подбор конфига).
  */
-import {
-  type BBContestPrepPlan, type BBContestPrepConfig,
-  professionalReviewConditions, CATEGORY_PROFILES,
-} from './bb-contest-prep.engine';
+import { type BBContestPrepPlan, type BBContestPrepConfig, professionalReviewConditions, CATEGORY_PROFILES } from './bb-contest-prep.engine';
 
 export interface BBShowCoachCtx {
   /** Единый план подготовки (BBContestPrepPlan). */

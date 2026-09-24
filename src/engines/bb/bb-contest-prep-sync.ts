@@ -11,18 +11,7 @@
  * Оба входа — ББ-авто и питание — пользуются ею; legacy-ветки мигрируют сюда же.
  */
 
-import {
-  buildBBContestPrepPlan,
-  serializeBBContestPrepPlan,
-  serializeBBPrepConfig,
-  planFromStored,
-  deserializeBBPrepConfig,
-  validateBBContestPrepConfig,
-  configFromPlan,
-  type BBContestPrepConfig,
-  type BBContestPrepPlan,
-  type BuildPrepPlanOpts,
-} from './bb-contest-prep.engine';
+import { buildBBContestPrepPlan, serializeBBContestPrepPlan, serializeBBPrepConfig, planFromStored, deserializeBBPrepConfig, validateBBContestPrepConfig, configFromPlan, type BBContestPrepConfig, type BBContestPrepPlan, type BuildPrepPlanOpts } from './bb-contest-prep.engine';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 
 export const CONTEST_PREP_UPDATED_EVENT = 'he-bb-contest-prep-updated';

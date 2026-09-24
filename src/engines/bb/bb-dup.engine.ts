@@ -11,7 +11,7 @@
  * каждый тренировочный день получает target character (тяж/памп/лёг),
  * который переопределяет дефолтный character из сплит-паттерна.
  */
-import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
+import type { BBPlan } from './bb-builder.engine';
 import type { DayCharacter } from './bb-day-types';
 
 export type DUPMode = 'none' | 'heavy_light' | 'strength_hypertrophy' | 'full_dup';

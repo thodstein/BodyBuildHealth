@@ -17,29 +17,14 @@
 import type { BBGoal } from './bb-types';
 import { buildBBPlan, type BBBuilderInput, type BBPlan } from './bb-builder.engine';
 import { adaptForPEDs, type PED, type PEDAdaptation, type CourseIntensity } from './bb-ped-adaptation.engine';
-import {
-  buildSpecializationSchedule, normalizeSpecializationTargets, expandDonorMuscles,
-  canonicalMuscle, type SpecializationBlock, type SpecializationSchedule,
-} from './bb-specialization.engine';
+import { buildSpecializationSchedule, normalizeSpecializationTargets, expandDonorMuscles, canonicalMuscle, type SpecializationBlock, type SpecializationSchedule } from './bb-specialization.engine';
 import type { Injury } from '../manual-plan-builder';
 import { computeBBNutritionMultiplier } from './bb-volume.engine';
 import { autoAssignIntensityTechniques } from './bb-finalize.engine';
 import type { BBTrainingFocus } from './bb-goal-types';
 import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
-import {
-  buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES,
-  isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, prepPhaseForDate, buildPeakWeek, configFromPlan,
-  prepWeightAdvice, prepTrainingCompliance, isMonotonicTaper,
-  prepDietBreaks, isPrepRefeedDay, syncPrepDietBreaksWithPlan,
-  type PrepWeightAdvice, type PrepWeightStatus,
-  type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan,
-  type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry,
-  type ContestSpecialization, type ExperienceLevel, type SodiumStrategy, type WaterStrategy,
-} from './bb-contest-prep.engine';
-import {
-  prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
-  type PrepMinimalMode,
-} from './bb-prep-splits';
+import { buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES, isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, buildPeakWeek, configFromPlan, isMonotonicTaper, prepDietBreaks, isPrepRefeedDay, syncPrepDietBreaksWithPlan, type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan, type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry, type ContestSpecialization, type ExperienceLevel, type SodiumStrategy, type WaterStrategy } from './bb-contest-prep.engine';
+import { prepSplitProfile, PREP_MINIMAL_MODE_LABELS, type PrepMinimalMode } from './bb-prep-splits';
 
 /** Конфигурация Prep-цикла (всё пользовательское, валидируется). */
 export interface PrepCycleConfig {

@@ -4,7 +4,7 @@
  * Чистая функция, без мутаций плана.
  */
 import { sfrOf, resistanceProfileOf, isUnilateralExercise, type ResistanceProfile } from './bb-sfr-db';
-import { ANGLE_CLASSES, STRICT_EXERCISE_GROUPS, strictGroupForExercise, type StrictExerciseGroup } from './bb-exercise-selection.engine';
+import { ANGLE_CLASSES, strictGroupForExercise, type StrictExerciseGroup } from './bb-exercise-selection.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getJointStress } from '../movement-engines';
 

@@ -9,7 +9,7 @@
  *  - 24: buildBBPlanPrintHtml — стилизованный HTML (цвета фаз/таблицы/heatmap) для печати
  *  - 27: compareBBVariants — по-недельный дифф двух вариантов плана
  */
-import type { BBPlan, BBExercise, BBSession, BBWeek } from './bb-builder.engine';
+import type { BBPlan, BBExercise } from './bb-builder.engine';
 
 export const BB_PHASE_COLOR: Record<string, string> = {
   accumulation: '#3b82f6',

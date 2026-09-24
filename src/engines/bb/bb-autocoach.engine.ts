@@ -4,11 +4,10 @@
  *
  * Вынесено из BbAutoConstructor.tsx для чистоты UI.
  */
-import type { BBWeek, BBSession, BBExercise, BBSet, BBPlan } from './bb-builder.engine';
+import type { BBWeek, BBSession, BBExercise, BBPlan } from './bb-builder.engine';
 import { defaultWorkMax } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { PHASE_CONFIGS } from '../periodization';
-import { PCT_FOR_RIR } from '../rir-table';
 import { classifyBackExercise } from './bb-back-quality.engine';
 
 /* ──────────── BB phase ──────────── */

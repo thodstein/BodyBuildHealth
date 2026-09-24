@@ -21,12 +21,11 @@
  *  - Bosquet 2005: taper volume -30-50%, intensity preserved
  *  - Helms 2022: RIR +2-3 for deload/taper
  */
-import type { BBExercise, BBSet } from './bb-builder.engine';
-import { weightForRepMax, defaultWorkMax, bbRir } from './bb-builder.engine';
+import type { BBSet } from './bb-builder.engine';
+import { weightForRepMax, bbRir } from './bb-builder.engine';
 import type { DayCharacter } from './bb-day-types';
 import { tempoFor } from './bb-tempo-rest';
 import { PHASE_CONFIGS, type BBPhase } from '../periodization';
-import { PCT_FOR_RIR } from '../rir-table';
 import type { BBTrainingFocus } from './bb-goal-types';
 import { warmupRampFor } from '../warmup-ramp.engine';
 

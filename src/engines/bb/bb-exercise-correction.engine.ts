@@ -2,7 +2,7 @@
  * bb-exercise-correction.engine.ts — коррекция упражнения (что делать).
  * Типы: substitute | add | modifyPattern | modifyExecution | modifyTempo | modifyROM | modifyLoad | mobilitySwap | unilateral
  */
-import { EXERCISE_CATALOG, canReplace, getSubstitutes } from '../../core/exercise-catalog';
+import { EXERCISE_CATALOG, canReplace } from '../../core/exercise-catalog';
 import { getProfExecutionProfile } from './bb-execution-prof.engine';
 import { tempoFor } from './bb-tempo-rest';
 import { buildExerciseInstructions } from './bb-exercise-instructions.engine';

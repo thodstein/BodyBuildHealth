@@ -3,10 +3,9 @@
  * 14 базовых флагов + 7 «стимул в цель» (wrongHead/setupRisk/resistanceLineGap/romShort/stabilityGap/rirMismatch/synergistTakeover).
  */
 import { calcExerciseEffect, type BBExerciseEffect } from './bb-exercise-effect.engine';
-import { getResistanceProfile } from '../../ui/screens/TrainingScreen_parts/ExerciseLabShared';
 import { calcTechniqueScore } from '../../ui/screens/TrainingScreen_parts/ExerciseLabShared';
 import { isMobilityRestricted } from './bb-mobility.engine';
-import { getProfExecutionProfile, diagnoseExecutionProf } from './bb-execution-prof.engine';
+import { diagnoseExecutionProf } from './bb-execution-prof.engine';
 import { derivePattern } from '../movement-pattern';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getExerciseBio } from '../../data/exercise-biomechanics-db';

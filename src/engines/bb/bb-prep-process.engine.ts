@@ -16,7 +16,7 @@
  * медицинские чек-поинты и опции, с предупреждениями и эскалацией при отклонениях.
  */
 
-import type { BBContestCategory, BBContestPrepPlan } from './bb-contest-prep.engine';
+import type { BBContestPrepPlan } from './bb-contest-prep.engine';
 import type { PrepCycleConfig } from './bb-prep-cycle.engine';
 
 export type PrepProcessStage =

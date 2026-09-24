@@ -1,7 +1,7 @@
 /** Builds coach-facing execution notes from the Exercise Lab databases. */
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getExerciseBio, hasExerciseBioEntry, type ExerciseBio } from '../../data/exercise-biomechanics-db';
-import { getMappedBioId, getMappedIds } from '../../data/exercise-id-mapping';
+import { getMappedBioId } from '../../data/exercise-id-mapping';
 import { getTargetMuscleForExercise, TARGET_MUSCLE_DB, type TargetMuscleEntry } from '../../data/target-muscle-db';
 import { derivePattern } from '../movement-pattern';
 

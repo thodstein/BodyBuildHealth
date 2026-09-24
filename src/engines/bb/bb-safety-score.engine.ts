@@ -23,7 +23,7 @@ import { analyzeBBBalance, type BBBalanceReport } from './bb-balance.engine';
 import { aggregateBBVolume } from './bb-volume.engine';
 import { BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { computeOrthopedicConstraints, distributeWeeklyLoad, type OrthopedicConstraints, type LoadDistributionOutput } from '../orthopedic-load-engines';
-import { JOINTS, JOINT_OPTIONS, jointLoadDiagnosis, type JointLoadDiagnosis, type JointId } from '../pro/joint-load-master.engine';
+import { JOINTS, jointLoadDiagnosis, type JointLoadDiagnosis, type JointId } from '../pro/joint-load-master.engine';
 
 export interface PlanSafetyScore {
   score: number;

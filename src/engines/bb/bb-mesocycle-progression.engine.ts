@@ -10,7 +10,7 @@
  * Источники: Helms MAAS (progressive overload), Schoenfeld 2017 (volume landmarks),
  * Israetel RP (mesocycle progression templates).
  */
-import type { BBPlan, BBExercise, BBWeek } from './bb-builder.engine';
+import type { BBPlan } from './bb-builder.engine';
 
 export interface MesocycleProgression {
   /** Per-muscle peak-week веса из предыдущего плана (кг). */

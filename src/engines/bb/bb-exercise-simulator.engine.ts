@@ -2,7 +2,7 @@
  * bb-exercise-simulator.engine.ts — Δ-превью коррекции (pure, без мутации плана).
  * clone plan → применить action → audit до/после → delta
  */
-import { auditPlanExercises, type PlanExerciseAudit } from './bb-plan-exercise-audit.engine';
+import { auditPlanExercises } from './bb-plan-exercise-audit.engine';
 import type { CorrectionAction } from './bb-exercise-correction.engine';
 
 export interface SimulatorDelta {

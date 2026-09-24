@@ -4,7 +4,7 @@
  */
 import type { BBDiagnosticsReport } from './bb-diagnostics-hub.engine';
 import { auditPlanExercises } from './bb-plan-exercise-audit.engine';
-import { calcExerciseEffect, exerciseEffectScore } from './bb-exercise-effect.engine';
+import { exerciseEffectScore } from './bb-exercise-effect.engine';
 import { auditHeadCoverage } from './bb-stimulus-target.engine';
 
 function esc(s: string): string {

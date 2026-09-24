@@ -6,7 +6,6 @@
 import type { BBPlan } from './bb-builder.engine';
 import type { WorkoutSession } from '../workout-logger.engine';
 import { epley1RM } from '../e1rm';
-import { aggregateBBVolume } from './bb-volume.engine';
 import { validateBBPlan } from './bb-validator.engine';
 import { acuteChronicRatio, toDailyLoads } from '../pro/training-load.engine';
 import { loadSRPESessions } from '../pro/srpe-store';

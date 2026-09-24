@@ -5,7 +5,7 @@
  */
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { sfrOf, resistanceProfileOf, isUnilateralExercise } from './bb-sfr-db';
-import { ANGLE_CLASSES, STRICT_EXERCISE_GROUPS, strictGroupForExercise } from './bb-exercise-selection.engine';
+import { ANGLE_CLASSES, strictGroupForExercise } from './bb-exercise-selection.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
 import { headsHitOf } from './bb-stimulus-target.engine';
 import { canonicalMuscle } from './bb-specialization.engine';

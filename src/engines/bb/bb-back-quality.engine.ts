@@ -1,4 +1,4 @@
-import type { BBExercise, BBSession, BBWeek } from './bb-types';
+import type { BBExercise, BBWeek } from './bb-types';
 
 export type BackPattern = 'vertical_pull' | 'heavy_row' | 'supported_row' | 'unilateral_row' | 'lat_isolation' | 'upper_back' | 'rear_delt' | 'shrug' | 'erector' | 'other';
 export type LegPattern = 'compound_squat' | 'lunge' | 'sissy_lengthened' | 'leg_extension' | 'belt_stepup' | 'leg_curl' | 'rdl_hinge' | 'hip_thrust' | 'glute_accessory' | 'calf' | 'other';

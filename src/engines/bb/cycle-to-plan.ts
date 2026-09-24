@@ -8,7 +8,7 @@ import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
 import type { BBPhase } from './bb-types';
 import { femalePosteriorBoost } from './bb-demographics';
-import { getBBVolumeLandmarks, isWeak, WEAK_TO_MUSCLE, abDominantPattern, normalizeWeekMrv } from './bb-builder.engine';
+import { getBBVolumeLandmarks, isWeak, abDominantPattern, normalizeWeekMrv } from './bb-builder.engine';
 import { syncBBPlanSetShape } from './bb-validator.engine';
 import { aggregateBBVolume, perExerciseCap } from './bb-volume.engine';
 import { isRearDeltExercise, isMobilityRestricted } from './bb-builder.engine';
@@ -37,7 +37,7 @@ import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-
 import { applyFeedbackToBuild, autoReplaceOnPlateau, applyDiaryVolumeCorrection } from './bb-progression-feedback.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { extractMesocycleProgression, applyWeightProgression } from './bb-mesocycle-progression.engine';
-import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationBlock } from './bb-specialization.engine';
+import { resolveSpecialization, specializationVolumeFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationBlock } from './bb-specialization.engine';
 import { applyTradeoffToPlan } from './bb-tradeoff.engine';
 import { isMEVCalibrationComplete, loadMEVCalibration, personalLandmarksFor } from './bb-mev-calibration.engine';
 import { bodyCompVolumeFactor, bodyCompStrategyNote } from './bb-bodycomp.engine';

@@ -4,7 +4,7 @@
  * объём на мышцу/ротация, баланс тяж/памп, средний RIR, proximity-to-failure,
  * проверка против MEV/MAV/MRV (volume-landmarks).
  */
-import type { BBPlan, BBSession } from './bb-builder.engine';
+import type { BBPlan } from './bb-builder.engine';
 import { getVolumeLandmarks, normLevel } from '../volume-landmarks.engine';
 import { aggregateBBVolume, normalizeBBMuscle } from './bb-volume.engine';
 

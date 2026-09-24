@@ -22,20 +22,8 @@ import type { BBPlan } from './bb-builder.engine';
 import { BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { QUALITY_GRADE_THRESHOLDS } from '../quality-score-v2.engine';
 import { getVolumeLandmarks, MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
-import {
-  normalizeBBMuscle,
-  aggregateBBVolume,
-  computeMuscleBalance,
-  sessionLimitsFor,
-} from './bb-volume.engine';
-import {
-  canonicalMuscle,
-  specResForWeekSchedule,
-  tradeoffForWeek,
-  expandDonorMuscles,
-  isSpecializationWeak,
-  isSpecializationFocus,
-} from './bb-specialization.engine';
+import { aggregateBBVolume, computeMuscleBalance, sessionLimitsFor } from './bb-volume.engine';
+import { canonicalMuscle, specResForWeekSchedule, tradeoffForWeek, expandDonorMuscles, isSpecializationWeak, isSpecializationFocus } from './bb-specialization.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { derivePattern } from '../movement-pattern';
 import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';

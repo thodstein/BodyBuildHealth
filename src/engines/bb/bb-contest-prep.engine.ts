@@ -22,10 +22,7 @@ import { getPeakingProtocol, type PeakingProtocol } from '../peaking-protocols.e
 import type { BBPlan } from './bb-builder.engine';
 // PRO-2 P6: тип записей восстановления + маркеры/памятка для экспорта (value-импорт
 // безопасен: bb-prep-post-show-log ни от кого не зависит, циклов нет).
-import {
-  postShowRecoveryMarkers, postShowComedownNotes,
-  type PostShowWeekEntry,
-} from './bb-prep-post-show-log.engine';
+import { postShowRecoveryMarkers, postShowComedownNotes, type PostShowWeekEntry } from './bb-prep-post-show-log.engine';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Типы
