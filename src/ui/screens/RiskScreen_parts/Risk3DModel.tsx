@@ -31,6 +31,7 @@ export function riskAssetUrl(p: string): string {
 export function riskHasWebGL(): boolean {
   try {
     if (typeof document === 'undefined') return false;
+    if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)) return false;
     const c = document.createElement('canvas');
     const gl = (c.getContext('webgl2') || c.getContext('webgl')) as unknown;
     return !!gl;

@@ -3,7 +3,7 @@
  * назначение вертексов системам по якорям на модели Халка (без WebGL).
  */
 import { describe, it, expect } from 'vitest';
-import { assignVertexSystems, SYSTEM_ANCHORS } from '../TZRisk3DModel';
+import { assignVertexSystems, ORGAN_MODELS, SYSTEM_ANCHORS } from '../TZRisk3DModel';
 
 describe('SYSTEM_ANCHORS', () => {
   it('все 6 систем ТЗ покрыты якорями', () => {
@@ -12,6 +12,23 @@ describe('SYSTEM_ANCHORS', () => {
     for (const id of ['cardio', 'hepatic', 'renal', 'cns', 'reproductive', 'hematologic']) {
       expect(ids.has(id)).toBe(true);
     }
+  });
+});
+
+describe('ORGAN_MODELS', () => {
+  it('использует GLB для всех шести систем', () => {
+    const systems = new Set(ORGAN_MODELS.map(def => def.system));
+    expect(systems).toEqual(new Set(['cns', 'cardio', 'hepatic', 'hematologic', 'renal', 'reproductive']));
+    expect(ORGAN_MODELS.every(def => def.kind === 'glb' && def.url.endsWith('.glb'))).toBe(true);
+  });
+
+  it('подбирает мужскую и женскую репродуктивную модель', () => {
+    const male = ORGAN_MODELS.filter(def => def.system === 'reproductive' && (!def.sex || def.sex === 'male'));
+    const female = ORGAN_MODELS.filter(def => def.system === 'reproductive' && (!def.sex || def.sex === 'female'));
+    expect(male.some(def => def.url.endsWith('prostate.glb'))).toBe(true);
+    expect(female).toHaveLength(3);
+    expect(female.some(def => def.url.endsWith('uterus.glb'))).toBe(true);
+    expect(female.filter(def => def.url.includes('ovary-'))).toHaveLength(2);
   });
 });
 

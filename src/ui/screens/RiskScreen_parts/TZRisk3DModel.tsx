@@ -46,6 +46,7 @@ export function assetUrl(p: string): string {
 export function hasWebGL(): boolean {
   try {
     if (typeof document === 'undefined') return false;
+    if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)) return false;
     const c = document.createElement('canvas');
     const gl = (c.getContext('webgl2') || c.getContext('webgl')) as unknown;
     return !!gl;
@@ -82,37 +83,29 @@ export const SYSTEM_ANCHORS: SystemAnchor[] = [
   { id: 'reproductive', label: 'Репродуктивная', pos: [0, -0.42, 0.25], r: 0.35 },
 ];
 
-// ── 3D-органы внутри Халка ──
-// Файлы лежат в public/organs (источник моделей: thebuggeddev/anatomy, открытый демо-проект;
-// лицензии отдельных мешей не указаны — при коммерческом релизе заменить на HRA CC-BY 4.0
-// с https://humanatlas.io/3d-reference-library и указать атрибуцию).
-// kind 'glb' — реалистичная модель; kind 'node' — схематичный узел для систем без отдельного
-// органа в наборе (селезёнка при крови, гонады при HPG-оси): обе эти системы по природе
-// системные, а не одноорганные, поэтому узел-маркер здесь честен.
-// pos — точка-наводка в том же пространстве, что и SYSTEM_ANCHORS (до нормализации группы);
-// face — с какой стороны тела пускать луч до поверхности; size — диаметр в финальных
-// единицах сцены (рост тела 3.0); deep — дополнительное заглубление под кожу (мозг — в черепе).
 export interface OrganModelDef {
   system: string;
-  kind: 'glb' | 'spleen' | 'gonads';
-  url?: string;
+  kind: 'glb';
+  url: string;
+  sex?: 'male' | 'female';
   pos: [number, number, number];
   face: 'front' | 'back';
   size: number;
   deep: number;
-  // middle: точка между передней и задней поверхностью (мозг — центр черепа,
-  // почки — к спине); bias — доля от задней поверхности к передней.
   middle?: boolean;
   bias?: number;
 }
 
 export const ORGAN_MODELS: OrganModelDef[] = [
-  { system: 'cns', kind: 'glb', url: '/organs/brain.glb', pos: [0, 0.92, 0], face: 'front', size: 0.3, deep: 0, middle: true, bias: 0.5 },
-  { system: 'cardio', kind: 'glb', url: '/organs/heart.glb', pos: [-0.08, 0.32, 0], face: 'front', size: 0.3, deep: 0.02 },
-  { system: 'hepatic', kind: 'glb', url: '/organs/liver.glb', pos: [0.18, 0.16, 0], face: 'front', size: 0.42, deep: 0.02 },
-  { system: 'hematologic', kind: 'spleen', pos: [-0.25, 0.16, 0], face: 'front', size: 0.22, deep: 0.02 },
-  { system: 'renal', kind: 'glb', url: '/organs/kidneys.glb', pos: [0, 0.02, 0], face: 'back', size: 0.36, deep: 0, middle: true, bias: 0.3 },
-  { system: 'reproductive', kind: 'gonads', pos: [0, -0.42, 0], face: 'front', size: 0.16, deep: 0.02 },
+  { system: 'cns', kind: 'glb', url: '/organs/brain.glb', pos: [0, 0.90, 0], face: 'front', size: 0.30, deep: 0, middle: true, bias: 0.5 },
+  { system: 'cardio', kind: 'glb', url: '/organs/heart.glb', pos: [-0.08, 0.32, 0], face: 'front', size: 0.30, deep: 0.03 },
+  { system: 'hepatic', kind: 'glb', url: '/organs/liver.glb', pos: [0.18, 0.16, 0], face: 'front', size: 0.38, deep: 0.03 },
+  { system: 'hematologic', kind: 'glb', url: '/organs/spleen.glb', pos: [-0.24, 0.16, 0], face: 'back', size: 0.23, deep: 0.04 },
+  { system: 'renal', kind: 'glb', url: '/organs/kidneys.glb', pos: [0, 0.02, 0], face: 'back', size: 0.36, deep: 0.02, middle: true, bias: 0.30 },
+  { system: 'reproductive', kind: 'glb', url: '/organs/prostate.glb', sex: 'male', pos: [0, -0.44, 0], face: 'front', size: 0.16, deep: 0.03 },
+  { system: 'reproductive', kind: 'glb', url: '/organs/uterus.glb', sex: 'female', pos: [0, -0.41, 0], face: 'front', size: 0.18, deep: 0.03 },
+  { system: 'reproductive', kind: 'glb', url: '/organs/ovary-left.glb', sex: 'female', pos: [-0.07, -0.44, 0], face: 'front', size: 0.09, deep: 0.03 },
+  { system: 'reproductive', kind: 'glb', url: '/organs/ovary-right.glb', sex: 'female', pos: [0.07, -0.44, 0], face: 'front', size: 0.09, deep: 0.03 },
 ];
 
 /**
@@ -149,18 +142,16 @@ function hexToRgb(hex: string): [number, number, number] {
 
 interface Props {
   tzResult: TzSpecResult;
+  sex?: 'male' | 'female';
 }
 
-export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
+export const TZRisk3DModel: React.FC<Props> = ({ tzResult, sex = 'male' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedSystem, setSelectedSystem] = useState<string | null>(null);
   const [hoveredSystem, setHoveredSystem] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [showOrgans, setShowOrgans] = useState(true);
-  // АПК: 3D (тело 2.7МБ + 4 органа ~10МБ + Дейкстра по мешу в главном потоке)
-  // на слабых телефонах убивает WebView — грузим только по явному тапу.
-  // TG/web — как раньше, сразу.
   const [wants3D, setWants3D] = useState<boolean>(() => {
     try {
       return !isNativeApp();
@@ -190,6 +181,11 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
   const showOrgansRef = useRef(true);
   const organEntriesRef = useRef<OrganEntry[]>([]);
   const organRootRef = useRef<THREE.Group | null>(null);
+  const loadedOrganSystemsRef = useRef<Set<string>>(new Set());
+  const organLoadInFlightRef = useRef<Set<string>>(new Set());
+  const organErrorsRef = useRef<Set<string>>(new Set());
+  const loadOrganSystemRef = useRef<(system: string) => void>(() => undefined);
+  const organLoadTokenRef = useRef(0);
   const hulkMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
 
   const setXray = useCallback((on: boolean) => {
@@ -228,6 +224,11 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     })).sort((a, b) => b.riskPct - a.riskPct);
   }, [tzResult]);
 
+  const activeOrganModels = useMemo(
+    () => ORGAN_MODELS.filter(def => !def.sex || def.sex === sex),
+    [sex],
+  );
+
   // ── Init scene: lit-материалы + мягкий свет, тело без раскраски ──
   // Сцена создаётся ОДИН раз (wants3D-гейт); данные обновляются перекраской.
   useEffect(() => {
@@ -238,7 +239,11 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     }
     const container = containerRef.current;
     if (!container) return;
+    setLoaded(false);
+    setFailed(false);
+    sceneRef.current = null;
 
+    let disposed = false;
     let native = false;
     try {
       native = isNativeApp();
@@ -248,7 +253,12 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: !native, alpha: true, powerPreference: native ? 'low-power' : 'high-performance' });
+      renderer = new THREE.WebGLRenderer({
+        antialias: !native,
+        alpha: true,
+        powerPreference: native ? 'low-power' : 'high-performance',
+        precision: native ? 'lowp' : 'highp',
+      });
     } catch {
       setFailed(true);
       return;
@@ -256,9 +266,22 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     const w = container.clientWidth || 300;
     const h = container.clientHeight || 450;
     renderer.setSize(w, h);
-    renderer.setPixelRatio(native ? 1 : Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(native ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.85;
+    let animId = 0;
+    let stopped = false;
+    const stopAnimation = () => {
+      if (stopped) return;
+      stopped = true;
+      cancelAnimationFrame(animId);
+    };
+    const handleContextLost = (event: Event) => {
+      event.preventDefault();
+      stopAnimation();
+      setFailed(true);
+    };
+    renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -325,7 +348,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
               side: (src.side ?? THREE.DoubleSide) === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide,
             });
             if (src.color && src.color.getHex() !== 0xffffff) n.color.copy(src.color);
-            // Лёгкое приглушение — если сама JPEG-текстура яркая, модель не «выбелена»
+            if (tex && native) tex.anisotropy = 1;
             n.color.multiplyScalar(0.88);
             hulkMats.push(n);
             return n;
@@ -347,22 +370,20 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           worldPos[i * 3 + 1] = v.y;
           worldPos[i * 3 + 2] = v.z;
         }
-        // 2) Зоны растут ПО ПОВЕРХНОСТИ меша (геодезика) — не протекают сквозь тело,
-        //    границы мягкие (smoothstep-вес у каждой вершины).
-        //    Радиус по поверхности > евклидова (путь огибает тело) → ×1.4.
-        //    Дейкстра по большому мешу в главном потоке может убить слабый
-        //    телефон — при ошибке/перегрузе падаем на дешёвый евклидов маппинг
-        //    (клики по зонам продолжают работать, тело остаётся чистым).
-        const geoIndex = baseMesh.geometry.index ? (baseMesh.geometry.index.array as Uint32Array) : null;
-        try {
-          const mapping = buildZoneMapping(
-            worldPos,
-            geoIndex,
-            SYSTEM_ANCHORS.map((a) => ({ id: a.id, pos: a.pos, radius: a.r * 1.4 })),
-          );
-          zoneIdx = mapping.zoneIdx;
-        } catch {
+        if (native) {
           zoneIdx = assignVertexSystems(worldPos);
+        } else {
+          const geoIndex = baseMesh.geometry.index ? (baseMesh.geometry.index.array as Uint32Array) : null;
+          try {
+            const mapping = buildZoneMapping(
+              worldPos,
+              geoIndex,
+              SYSTEM_ANCHORS.map((a) => ({ id: a.id, pos: a.pos, radius: a.r * 1.4 })),
+            );
+            zoneIdx = mapping.zoneIdx;
+          } catch {
+            zoneIdx = assignVertexSystems(worldPos);
+          }
         }
         anchorToSystem = SYSTEM_ANCHORS.map((a) => a.id);
 
@@ -436,7 +457,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
             surfRay.set(seed.clone().addScaledVector(out, -5), out.clone());
             hits = surfRay.intersectObject(baseMesh, false);
             if (!hits.length) return seed;
-            return hits[0].point.clone().addScaledVector(out.clone(), def.size / 2 + def.deep);
+            return hits[0].point.clone().addScaledVector(dirIn, def.size / 2 + def.deep);
           }
           if (def.middle) {
             // Луч с противоположной стороны: точка гарантированно внутри тела
@@ -451,86 +472,154 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           if (!hits.length) return seed;
           return hits[0].point.clone().addScaledVector(dirIn, def.size / 2 + def.deep);
         };
-        // Общий финиш холдера: системный id для рейкаста, непрозрачные материалы
-        // с корректным depth-тестом (видны только сквозь рентген-кожу).
+        const organRoot = new THREE.Group();
+        organRootRef.current = organRoot;
+        scene.add(organRoot);
+
+        const disposeObject3D = (object: THREE.Object3D) => {
+          object.traverse((o) => {
+            if (!(o instanceof THREE.Mesh)) return;
+            o.geometry.dispose();
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            mats.forEach((m) => {
+              const mat = m as THREE.Material & { map?: THREE.Texture | null };
+              mat.map?.dispose();
+              mat.dispose();
+            });
+          });
+        };
+        const disposeSystem = (system: string) => {
+          for (let i = organEntriesRef.current.length - 1; i >= 0; i--) {
+            const entry = organEntriesRef.current[i];
+            if (entry.system !== system) continue;
+            organRoot.remove(entry.group);
+            disposeObject3D(entry.group);
+            organEntriesRef.current.splice(i, 1);
+          }
+          loadedOrganSystemsRef.current.delete(system);
+        };
         const finishHolder = (def: OrganModelDef, content: THREE.Object3D, mats: THREE.MeshStandardMaterial[]) => {
           const holder = new THREE.Group();
           holder.add(content);
           holder.position.copy(placeInside(def));
           holder.userData.systemId = def.system;
-          // Органы рисуются ПОВЕРХ аддитивной зоны-подсветки (у неё renderOrder 10),
-          // но с честным depth-тестом между собой и кожей.
-          content.traverse((o) => { o.userData.systemId = def.system; if (o instanceof THREE.Mesh) o.renderOrder = 11; });
+          content.traverse((o) => {
+            o.userData.systemId = def.system;
+            if (o instanceof THREE.Mesh) o.renderOrder = 11;
+          });
           holder.visible = showOrgansRef.current;
           organRoot.add(holder);
           organEntriesRef.current.push({ system: def.system, group: holder, mats });
           applyOrganColors();
         };
-        const organRoot = new THREE.Group();
-        organRootRef.current = organRoot;
-        scene.add(organRoot);
-        const organLoader = new GLTFLoader();
-        organLoader.setMeshoptDecoder(MeshoptDecoder);
-        for (const def of ORGAN_MODELS) {
-          if (def.kind === 'spleen') {
-            // Схематичная селезёнка: уплощённый эллипсоид, тёмно-красный
-            const geo = new THREE.SphereGeometry(0.5, 24, 18);
-            const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#7f2430'), roughness: 0.5, metalness: 0.05 });
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.scale.set(1, 0.62, 0.5);
-            const content = new THREE.Group();
-            content.add(mesh);
-            content.scale.setScalar(def.size);
-            finishHolder(def, content, [mat]);
-            continue;
-          }
-          if (def.kind === 'gonads') {
-            // Схематичные гонады: пара сфер в тазу
-            const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#caa183'), roughness: 0.55, metalness: 0.05 });
-            const content = new THREE.Group();
-            for (const sx of [-0.55, 0.55]) {
-              const m = new THREE.Mesh(new THREE.SphereGeometry(0.32, 20, 14), mat);
-              m.position.set(sx * def.size, 0, 0);
-              content.add(m);
+
+        const loadOrganSystem = (system: string) => {
+          if (disposed) return;
+          const defs = activeOrganModels.filter(def => def.system === system);
+          if (!defs.length || !organRoot) return;
+          if (loadedOrganSystemsRef.current.has(system) || organLoadInFlightRef.current.has(system)) return;
+          const token = native ? ++organLoadTokenRef.current : organLoadTokenRef.current;
+          if (native) {
+            for (const entry of organEntriesRef.current.slice()) {
+              if (entry.system !== system) disposeSystem(entry.system);
             }
-            content.scale.setScalar(def.size);
-            finishHolder(def, content, [mat]);
-            continue;
           }
-          organLoader.load(
-            assetUrl(def.url as string),
-            (ogltf) => {
-              const content = ogltf.scene;
-              // Нормализация размера: целевой диаметр def.size
-              const obox = new THREE.Box3().setFromObject(content);
-              const osize = obox.getSize(new THREE.Vector3());
-              const ocenter = obox.getCenter(new THREE.Vector3());
-              const maxDim = Math.max(0.001, osize.x, osize.y, osize.z);
-              const k = def.size / maxDim;
-              content.position.set(-ocenter.x, -ocenter.y, -ocenter.z);
-              content.scale.setScalar(k);
-              const mats: THREE.MeshStandardMaterial[] = [];
-              content.traverse((o) => {
-                if (!(o instanceof THREE.Mesh)) return;
-                const src = (Array.isArray(o.material) ? o.material[0] : o.material) as THREE.MeshStandardMaterial;
-                const nm = new THREE.MeshStandardMaterial({
-                  map: src.map || null,
-                  color: src.color ? src.color.clone() : new THREE.Color('#ffffff'),
-                  roughness: 0.45,
-                  metalness: 0.05,
+          organLoadInFlightRef.current.add(system);
+          let remaining = defs.length;
+          let finished = false;
+          const complete = () => {
+            if (finished) return;
+            finished = true;
+            organLoadInFlightRef.current.delete(system);
+            if (token !== organLoadTokenRef.current) return;
+            if (!organErrorsRef.current.has(system)) loadedOrganSystemsRef.current.add(system);
+            organErrorsRef.current.delete(system);
+            applyOrganColors();
+          };
+          for (const def of defs) {
+            const organLoader = new GLTFLoader();
+            organLoader.setMeshoptDecoder(MeshoptDecoder);
+            organLoader.load(
+              assetUrl(def.url),
+              (ogltf) => {
+                if (token !== organLoadTokenRef.current) {
+                  disposeObject3D(ogltf.scene);
+                  remaining -= 1;
+                  if (remaining === 0) {
+                    organLoadInFlightRef.current.delete(system);
+                    if (native && selectedRef.current === system) window.setTimeout(() => loadOrganSystem(system), 0);
+                  }
+                  return;
+                }
+                const content = ogltf.scene;
+                const obox = new THREE.Box3().setFromObject(content);
+                const osize = obox.getSize(new THREE.Vector3());
+                const ocenter = obox.getCenter(new THREE.Vector3());
+                const maxDim = Math.max(0.001, osize.x, osize.y, osize.z);
+                content.position.set(-ocenter.x, -ocenter.y, -ocenter.z);
+                content.scale.setScalar(def.size / maxDim);
+                const mats: THREE.MeshStandardMaterial[] = [];
+                content.traverse((o) => {
+                  if (!(o instanceof THREE.Mesh)) return;
+                  const sourceMaterials = Array.isArray(o.material) ? o.material : [o.material];
+                  const convertedMaterials = sourceMaterials.map((sourceMaterial) => {
+                    const src = sourceMaterial as THREE.MeshStandardMaterial;
+                    const map = src.map || null;
+                    if (map && native) map.anisotropy = 1;
+                    return new THREE.MeshStandardMaterial({
+                      map,
+                      color: src.color ? src.color.clone() : new THREE.Color('#ffffff'),
+                      roughness: 0.45,
+                      metalness: 0.05,
+                      side: THREE.DoubleSide,
+                    });
+                  });
+                  o.material = Array.isArray(o.material) ? convertedMaterials : convertedMaterials[0];
+                  mats.push(...convertedMaterials);
                 });
-                o.material = nm;
-                mats.push(nm);
-              });
-              finishHolder(def, content, mats);
-            },
-            undefined,
-            (err) => { console.warn('[TZ3D] орган не загрузился:', def.url, err); },
-          );
+                finishHolder(def, content, mats);
+                remaining -= 1;
+                if (remaining === 0) complete();
+              },
+              undefined,
+              (err) => {
+                organLoadInFlightRef.current.delete(system);
+                organErrorsRef.current.add(system);
+                console.warn('[TZ3D] орган не загрузился:', def.url, err);
+                remaining -= 1;
+                if (remaining === 0) complete();
+              },
+            );
+          }
+        };
+        loadOrganSystemRef.current = loadOrganSystem;
+
+        if (native) {
+          if (showOrgansRef.current) loadOrganSystem(selectedRef.current || 'cns');
+        } else if (showOrgansRef.current) {
+          const systems = Array.from(new Set(activeOrganModels.map(def => def.system)));
+          let queueIndex = 0;
+          const loadNext = () => {
+            if (disposed || queueIndex >= systems.length) return;
+            const system = systems[queueIndex++];
+            loadOrganSystem(system);
+            const waitForTurn = () => {
+              if (disposed || !organLoadInFlightRef.current.has(system)) {
+                loadNext();
+                return;
+              }
+              window.setTimeout(waitForTurn, 80);
+            };
+            window.setTimeout(waitForTurn, 80);
+          };
+          loadNext();
         }
       },
       undefined,
-      () => setFailed(true),
+      () => {
+        stopAnimation();
+        setFailed(true);
+      },
     );
 
     // ── Raycast: hover + клик (органы в приоритете, затем зоны тела) ──
@@ -598,8 +687,8 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     container.addEventListener('click', handleClick);
     container.addEventListener('mouseleave', handleLeave);
 
-    let animId = 0;
     const animate = () => {
+      if (stopped) return;
       animId = requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
@@ -616,15 +705,23 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     window.addEventListener('resize', onResize);
 
     return () => {
-      cancelAnimationFrame(animId);
+      disposed = true;
+      stopAnimation();
       window.removeEventListener('resize', onResize);
       container.removeEventListener('mousemove', handleMove);
       container.removeEventListener('click', handleClick);
       container.removeEventListener('mouseleave', handleLeave);
+      organLoadTokenRef.current += 1;
+      loadOrganSystemRef.current = () => undefined;
+      sceneRef.current = null;
+      renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       controls.dispose();
       renderer.dispose();
       organEntriesRef.current = [];
       organRootRef.current = null;
+      loadedOrganSystemsRef.current.clear();
+      organLoadInFlightRef.current.clear();
+      organErrorsRef.current.clear();
       hulkMatsRef.current = [];
       try {
         if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
@@ -635,14 +732,23 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         if (obj instanceof THREE.Mesh) {
           obj.geometry.dispose();
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-          mats.forEach(m => m.dispose());
+          mats.forEach(m => {
+            const mat = m as THREE.Material & { map?: THREE.Texture | null };
+            mat.map?.dispose();
+            mat.dispose();
+          });
         }
       });
     };
     // init один раз за монтирование 3D (wants3D-гейт); свежие данные идут
     // через riskPctRef + эффект перекраски ниже.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wants3D]);
+  }, [wants3D, sex]);
+
+  useEffect(() => {
+    if (!loaded || !showOrgans) return;
+    loadOrganSystemRef.current(selectedSystem || 'cns');
+  }, [loaded, selectedSystem, showOrgans, sex]);
 
   // ── Перекраска при смене данных / hover / выборе ──
   useEffect(() => {
@@ -687,8 +793,8 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
             🧊 3D модель рисков
           </div>
           <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, marginBottom: 12, opacity: 0.85 }}>
-            Тяжёлая сцена (тело + органы ~13 МБ): на телефоне грузим только по запросу,
-            чтобы приложение не вылетало. Цифры риска — в чипах ниже.
+            На телефоне активен один выбранный орган: остальные качественные модели
+            загружаются по чипу, чтобы не перегружать память. Цифры риска — в чипах ниже.
           </div>
           <button
             onClick={() => {
@@ -829,7 +935,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         🖱 Клик по зоне или органу · Вращайте · Колёсико для зума · Клик по чипу для деталей
       </div>
       <div style={{ fontSize: 11, color: '#fff', textAlign: 'center', marginTop: 4, opacity: 0.7 }}>
-        Тело: 3dUVpro (CC-BY) · Цветом подсвечены только органы — цвет = риск системы
+        Тело: 3dUVpro (CC-BY) · Селезёнка/репродуктивная система: HuBMAP CCF (CC-BY 4.0) · Цветом подсвечены только органы — цвет = риск системы
       </div>
     </div>
   );

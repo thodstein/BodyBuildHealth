@@ -1,14 +1,15 @@
 // Механизм-ориентированная модель риска — UI (качественное оформление)
 // Данные курса → из linked.course (Фарма), анализы → из linked.labs, поддержка → из калькулятора
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
 import { buildTzInputCore, normalizeFlatLabs } from '../../../engines/support-plan/engine-helpers';
 import { useDataLink } from '../../../core/data-link';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { DRUG_DB } from '../../../data/support-db';
 import { resolvePedAlias } from '../../../data/ped-alias-map';
-import { TZRisk3DModel } from './TZRisk3DModel';
 import { RiskVerificationList } from './RiskVerificationList';
+
+const TZRisk3DModel = lazy(() => import('./TZRisk3DModel').then(module => ({ default: module.TZRisk3DModel })));
 
 const ACCENT = '#00e68a';
 
@@ -103,6 +104,7 @@ const ArcGauge: React.FC<{ value: number; size?: number; stroke?: number; label?
 
 export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
   const linked = useDataLink();
+  const profileSex: 'male' | 'female' = linked.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
   const course = linked.course || [];
   const labs = linked.labs || [];
   const [forceNoLabs, setForceNoLabs] = useState(false);
@@ -301,7 +303,11 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
             Визуализация риска по 6 системам на анатомической модели · Цвет = уровень риска системы
           </div>
         </div>
-        <div style={{ minHeight: 400 }}><TZRisk3DModel tzResult={result} /></div>
+        <div style={{ minHeight: 400 }}>
+          <Suspense fallback={<div style={{ padding: 20, textAlign: 'center', color: '#fff' }}>Загрузка 3D-модели…</div>}>
+            <TZRisk3DModel tzResult={result} sex={profileSex} />
+          </Suspense>
+        </div>
       </div>
     );
   }
