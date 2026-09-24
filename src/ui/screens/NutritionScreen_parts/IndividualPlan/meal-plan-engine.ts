@@ -5262,7 +5262,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   // Nutrients already covered by closeFoodDeficiencies (avoid duplicate deficit notes).
   const _existingMicroKeys = new Set(['Fe','Mg','Zn','K','Ca','Omega3','Se','VitC','VitD','VitB12','VitB9']);
+  // §3I: на 8000+ VitA/VitE добираются ПОЗДНИМ проходом (после углеводных доборов) —
+  // ранние ноты подавляются и пересчитываются по факту после добавки.
+  const _deferMicroAE = _pickCtx.qualityMode === 'full' && (input.goalKcal || 0) >= 8000;
   for (const c of _pickCtx.qualityMode === 'full' ? _microRes.coverage : []) {
+    if (_deferMicroAE && (c.nutrient === 'VitA' || c.nutrient === 'VitE')) continue;
     if (c.status === 'low') { notes.push(`🟡 ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — близко к дефициту`); }
     else if (c.status === 'deficit' && !_existingMicroKeys.has(c.nutrient)) { notes.push(`⚠ ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — дефицит`); }
   }
@@ -5412,6 +5416,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (Math.abs(1 - ratio) < 0.08) continue; // уже сбалансирован
     const _isMainM = ['breakfast', 'lunch', 'dinner'].includes(m.type);
     m.items.forEach(it => {
+      // §3I: точные граммы (_fixedGrams: микро-плотная добавка) — не масштабируются балансом.
+      if ((it as any)._fixedGrams) return;
       let na = Math.max(5, Math.round((it.amount || 0) * ratio));
       const _fdB = FOOD_DB.find(f => f.id === it.id);
       // Р-2.1: цельный белок основных приёмов ≥80 г (эпик B: не «дегустационные» порции),
@@ -5518,7 +5524,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         if (it.role === 'carb_slow' || it.role === 'carb_fast') return 5 + fDen * 0.2;
         return 4 + fDen;
       };
-      const _candF = meals.flatMap(m => m.items.filter(it => (it.fiber || 0) > 1 && it.role !== 'protein' && it.role !== 'fast_protein' && it.role !== 'slow_protein' && it.role !== 'supplement').map(it => ({ it, m, fd: FOOD_DB.find(f => f.id === it.id) })));
+      const _candF = meals.flatMap(m => m.items.filter(it => (it.fiber || 0) > 1 && it.role !== 'protein' && it.role !== 'fast_protein' && it.role !== 'slow_protein' && it.role !== 'supplement' && !(it as any)._fixedGrams).map(it => ({ it, m, fd: FOOD_DB.find(f => f.id === it.id) })));
       _candF.sort((a, b) => _prio(a.it, a.fd) - _prio(b.it, b.fd));
       for (const { it } of _candF) {
         if (_excessF <= 0) break;
@@ -6974,7 +6980,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             return Math.min(150, Math.max(60, Math.round((it.amount || 0) * 0.7)));
           };
           const _order = (m.items || []).map((it: any) => ({ it, pri: _prio(it) }))
-            .filter(x => x.pri < 9)
+            // §3I: точные граммы (_fixedGrams: микро-плотная добавка) — не «водяной балласт»,
+            // перенос/резка тарелки их не трогают (иначе морковь 100→30 и VitA снова 54%).
+            .filter(x => x.pri < 9 && !(x.it as any)._fixedGrams)
             .map(x => ({
               ...x,
               // P0 (D-24): carb-носители режем по возрастанию углеплотности —
@@ -7055,7 +7063,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           // пункты (овощи→фрукты) доводим до 700: это граммы без макросов (углей 2-8 г/100 г),
           // сходимость не страдает. Гарниры/белки не трогаем (у них честная нота выше).
           if (_solidOf(m) > MAX_MEAL_SOLID_G) {
-            for (const it of (m.items || []).filter((x: any) => (x.role === 'veg' || x.role === 'fruit') && (x.amount || 0) > 30)) {
+            for (const it of (m.items || []).filter((x: any) => (x.role === 'veg' || x.role === 'fruit') && (x.amount || 0) > 30 && !(x as any)._fixedGrams)) {
               if (_solidOf(m) <= MAX_MEAL_SOLID_G) break;
               const _needW = _solidOf(m) - MAX_MEAL_SOLID_G;
               const _takeW = Math.min(_needW, (it.amount || 0) - 30);
@@ -7071,7 +7079,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (_solidOf(m) > MAX_MEAL_HARD_G) {
             const _trimOrder = (m.items || [])
               .map((it: any) => ({ it, pri: it.role === 'veg' ? 0 : it.role === 'fruit' ? 1 : 9 }))
-              .filter(x => x.pri < 9 && (x.it.amount || 0) > 30)
+              .filter(x => x.pri < 9 && (x.it.amount || 0) > 30 && !(x.it as any)._fixedGrams)
               .sort((a, b) => a.pri - b.pri);
             for (const { it } of _trimOrder) {
               if (_solidOf(m) <= 750) break;
@@ -7731,8 +7739,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
         // 2) овощи — 1 пункт (крупнейший). В перекусах овощи — мусор по типологии
         // (E7: перекус = протеин + хлопья/крупа + фрукт) — выносим ВСЕ.
+        // §3I: точные граммы (_fixedGrams: микро-плотная добавка 100 г моркови) — не мусор.
         const _snackTy = String((m as any).type || '').startsWith('snack') || (m as any).type === 'snack';
-        const _veg = _its.filter((it: any) => it.role === 'veg');
+        const _veg = _its.filter((it: any) => it.role === 'veg' && !(it as any)._fixedGrams);
         if (_veg.length > (_snackTy ? 0 : 1)) {
           // FIX base-2026-09: при чистке овощей оставляем любимый (иначе preferred-тесты
           // падают при смене пулов). Без любимых — крупнейший, как было.
@@ -8881,6 +8890,32 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_capNotes > 0) notes.push(`⚖️ Финальные капы §3D: порции/тарелки приведены к съедобным (перенос/срез ${_capNotes}×)`);
     }
 
+    // ─── §3I (остаток I): микро-плотные VitA/VitE на 8000+ — ПОСЛЕ ВСЕХ писателей ───
+    // Ранее (до углеводных доборов) добавка съедала капацитет тарелок и день терял У
+    // (train 1500У 99%→96.4%: мейны уже на капе). Здесь — только +ккал ≤2% цели.
+    // Ранние ноты покрытия VitA/VitE подавлены и пересчитаны ниже (честность по факту).
+    if (_pickCtx.qualityMode === 'full' && (input.goalKcal || 0) >= 8000) {
+      const _emg = closeExtremeMicroGaps(meals, {
+        kcal: input.goalKcal || 0, sex: (input.sex || 'male') as any, excludedIds: input.excludedIds || new Set(),
+        allergenTags: input.allergenTags, intolerances: input.intolerances, categoryPref: input.categoryPref,
+      });
+      if (_emg.notes.length > 0) {
+        notes.push(..._emg.notes);
+        recalcDayTotals(meals, totals);
+        totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
+      }
+      // Честные ноты покрытия VitA/VitE ПОСЛЕ добавки (ранние подавлены выше).
+      const _aeRes = analyzeMicroCoverage(
+        sumMicros(meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount }))), FOOD_DB as any),
+        (input.sex || 'male') as any, input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride,
+      );
+      for (const c of _aeRes.coverage) {
+        if (c.nutrient !== 'VitA' && c.nutrient !== 'VitE') continue;
+        if (c.status === 'low') notes.push(`🟡 ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — близко к дефициту`);
+        else if (c.status === 'deficit') notes.push(`⚠ ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — дефицит`);
+      }
+    }
+
     // ─── §3F-честность: «Точность рациона» ПОСЛЕ всех проходов ───
     // Считаем к ЦЕЛИ ПОЛЬЗОВАТЕЛЯ (введённой), а не к скрытой клинической adjusted-цели
     // (проба: «Б 31%» при факте −3% от 180 — adjusted ~133 + середина пайплайна).
@@ -9165,4 +9200,109 @@ function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: '
   const added = Math.round(getMicroFromFood(food, worstKey) * grams / 100);
   const before = Math.round(microTotals[worstKey] || 0);
   return { note: `${food.name} ${grams}г → закрытие дефицита ${worstKey}: +${added} ${cfg.unit} (${before}→${before + added}/${effRda} ${cfg.unit})` };
+}
+
+// §3I (остаток I, план NUTRITION-EXTREME-SCALE-PRO): на 8000+ ккал RDA не масштабируется,
+// а калорийная пища бедна микро — VitA/VitE системно в дефиците (дампы: VitA 26–32%,
+// VitE 49–61%). Добавляем «микро-плотные» МАЛЫМИ порциями (рост ккал ≤2% цели): морковь
+// 80 г = 668 мкг VitA / ~28 ккал, семечки ≤25 г = 8.75 мг VitE (ужимаются под остаток
+// бюджета). Существующий пункт-источник РАСТИМ, не дублируем. Вне 8000+ — не вызывается
+// (обычные дни байт-в-байт); витамин D не трогаем (IU-дрейф нормализуется в getMicroFromFood,
+// дозу даёт модуль добавок, не тарелка).
+const EXTREME_MICRO_SOURCES: Array<{ nutrient: string; unit: string; rda: (sex: string) => number; ids: string[]; g: number }> = [
+  { nutrient: 'VitA', unit: 'мкг', rda: (sex) => (sex === 'female' ? 700 : 900), ids: ['carrot', 'sweet_potato', 'spinach'], g: 80 },
+  { nutrient: 'VitE', unit: 'мг', rda: () => 15, ids: ['sunflower_seeds', 'almonds', 'olive_oil'], g: 25 },
+];
+
+export function closeExtremeMicroGaps(
+  meals: Meal[],
+  opts: { kcal: number; sex: 'male' | 'female' | 'other'; excludedIds: Set<string>; allergenTags?: Set<string>; intolerances?: Intolerances; categoryPref?: CategoryPref },
+): { notes: string[]; kcalUsed: number } {
+  if ((opts.kcal || 0) < 8000) return { notes: [], kcalUsed: 0 };
+  const _foodAllowed = (f: any): boolean => {
+    if (opts.excludedIds.has(f.id)) return false;
+    const diet = FOOD_ALLERGEN_DIET[f.id];
+    const tags = (diet && Array.isArray(diet.allergens)) ? diet.allergens : (f.allergens || []);
+    if (opts.allergenTags && opts.allergenTags.size > 0 && [...opts.allergenTags].some((t: string) => tags.includes(t))) return false;
+    if (opts.intolerances && !filterByIntolerance(f, opts.intolerances)) return false;
+    if (opts.categoryPref && !matchesCategoryPref(f, opts.categoryPref)) return false;
+    return true;
+  };
+  const microTotals: Record<string, number> = {};
+  meals.flatMap(m => m.items).forEach(it => {
+    const food = FOOD_DB.find(f => f.id === it.id); if (!food) return;
+    const factor = (it.amount || 0) / 100;
+    for (const s of EXTREME_MICRO_SOURCES) microTotals[s.nutrient] = (microTotals[s.nutrient] || 0) + getMicroFromFood(food, s.nutrient) * factor;
+  });
+  const notes: string[] = [];
+  const kcalBudget = Math.round((opts.kcal || 0) * 0.02); // рост ккал ≤2% цели
+  let kcalUsed = 0;
+  const addedParts: string[] = [];
+  const missing: string[] = [];
+  for (const s of EXTREME_MICRO_SOURCES) {
+    const rda = s.rda(opts.sex);
+    const have = microTotals[s.nutrient] || 0;
+    if (have / rda >= 0.7) continue; // дефицита нет
+    const src = s.ids.map(id => FOOD_DB.find(f => f.id === id)).find((f): f is FoodItem => !!f && _foodAllowed(f));
+    if (!src) { missing.push(`${s.nutrient} ${Math.round(have)}/${rda} ${s.unit}`); continue; }
+    const _plateCap = 900; // 8000+ ⇒ профиль ёмкости активен (тарелка 900); добавка чтит кап
+    const _roomOf = (m: any): number => _plateCap - (m.items || []).filter((it: any) => it.role !== 'liquid').reduce((s: number, it: any) => s + (it.amount || 0), 0);
+    // Источник уже в дне (10 г семечек/5 г миндаля) — РАСТИМ его, а не дублируем пункт:
+    // иначе проход пропускал VitE (все источники «заняты») и оставлял дефицит 62%.
+    const _existing = meals.flatMap(m => (m.items || []).map(it => ({ m, it })))
+      .find(x => x.it.id === src.id && !(x.it as any)._fixedGrams);
+    const _candMeal = _existing
+      ? { m: _existing.m, room: _roomOf(_existing.m) }
+      : meals
+        .filter(m => !['presleep', 'preworkout', 'intra', 'postworkout'].includes(m.type) && !(m as any)._insulinWindow)
+        .map(m => ({ m, room: _roomOf(m) }))
+        .sort((a, b) => b.room - a.room)[0];
+    if (!_candMeal || _candMeal.room < 30) { missing.push(`${s.nutrient} ${Math.round(have)}/${rda} ${s.unit}`); continue; }
+    // Граммы — по комнате тарелки (микро-добавка не ломает инвариант ≤900), но не больше нормы источника.
+    const _g = Math.min(s.g, _candMeal.room);
+    const _beforeAmt = _existing?.it.amount || 0;
+    const _macrosOf = (g: number) => {
+      const _r = g / 100;
+      const _p = Math.round((src.protein || 0) * _r * 10) / 10;
+      const _f = Math.round((src.fat || 0) * _r * 10) / 10;
+      const _c = Math.round((src.carbs || 0) * _r * 10) / 10;
+      return { p: _p, f: _f, c: _c, kcal: Math.round(4 * _p + 9 * _f + 4 * _c), fiber: Math.round((src.fiber || 0) * _r * 10) / 10, leucine_mg: Math.round(getLeucine(src) * _r) };
+    };
+    const _before = _macrosOf(_beforeAmt);
+    // Граммы ограничены и комнатой тарелки, и остатком 2% ккал-бюджета (семечки 601 ккал/100:
+    // морковь 37 ккал + 25 г семечек 145 = 182 > 178 — ужимаем до влезающих 20 г).
+    const _per100Kcal = 4 * (src.protein || 0) + 9 * (src.fat || 0) + 4 * (src.carbs || 0);
+    const _maxByBudget = _per100Kcal > 0 ? Math.floor((kcalBudget - kcalUsed) / _per100Kcal * 100 / 5) * 5 : 0;
+    const _gActual = Math.max(0, Math.min(_g, _maxByBudget));
+    if (_gActual < 10) { missing.push(`${s.nutrient} ${Math.round(have)}/${rda} ${s.unit}`); continue; }
+    const _after = _macrosOf(_beforeAmt + _gActual);
+    const _itemKcal = Math.max(0, _after.kcal - _before.kcal);
+    if (kcalUsed + _itemKcal > kcalBudget) { missing.push(`${s.nutrient} ${Math.round(have)}/${rda} ${s.unit}`); continue; }
+    if (_existing) {
+      // Рост существующего пункта (пропорционально).
+      const _it = _existing.it as any;
+      _it.amount = _beforeAmt + _gActual;
+      _it.p = _after.p; _it.f = _after.f; _it.c = _after.c; _it.kcal = _after.kcal;
+      _it.fiber = _after.fiber; if (_it.leucine_mg != null) _it.leucine_mg = _after.leucine_mg;
+      _existing.m.totals = mealTotalsOf(_existing.m.items);
+    } else {
+      const item = {
+        id: src.id, name: src.name, amount: _gActual, role: 'veg' as MealItem['role'],
+        kcal: _after.kcal, p: _after.p, f: _after.f, c: _after.c,
+        fiber: _after.fiber, leucine_mg: _after.leucine_mg,
+        _fixedGrams: _gActual, // микро-добавка не масштабируется коррекциями/тарелкой
+      } as MealItem;
+      _candMeal.m.items.push(item);
+      _candMeal.m.totals = _candMeal.m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+    }
+    kcalUsed += _itemKcal;
+    addedParts.push(`${src.name} +${_gActual} г (+${Math.round(getMicroFromFood(src, s.nutrient) * _gActual / 100)} ${s.unit} ${s.nutrient})`);
+  }
+  if (addedParts.length > 0) {
+    notes.push(`🧬 Микро-плотные (${opts.kcal} ккал): ${addedParts.join(', ')} — калорийная пища бедна микро; рост ккал +${Math.round(kcalUsed / Math.max(1, opts.kcal) * 1000) / 10}%`);
+  }
+  if (missing.length > 0) {
+    notes.push(`⚠ Микро на ${opts.kcal} ккал: ${missing.join(', ')} — калорийная пища бедна микро; добавьте источники вручную (VitA: морковь/тыква/шпинат, VitE: семечки/миндаль/масло)`);
+  }
+  return { notes, kcalUsed };
 }

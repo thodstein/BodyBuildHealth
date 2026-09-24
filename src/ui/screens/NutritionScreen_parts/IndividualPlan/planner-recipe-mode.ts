@@ -21,7 +21,7 @@ import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount } from './rec
 import { optimizeRecipePortionScales, maxRelativeDeviation } from './planner-recipe-optimizer';
 import { isHighCarbDay, extremeCapacityProfile } from './planner-carb-density';
 import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf, isPortableFood, isWorkWindowMeal, isBreakfastBannedCarb, isBreakfastBannedProtein, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS } from './food-availability';
-import { applyRealisticFloors } from './meal-plan-engine';
+import { applyRealisticFloors, closeExtremeMicroGaps } from './meal-plan-engine';
 import { correctDayToTargets } from './day-target-corrector';
 import { toRawPurchaseAmount } from './planner-weight-mode';
 import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
@@ -1356,6 +1356,8 @@ export interface AssembleRecipeDayArgs {
   varietyStrictness?: 'soft' | 'strict';
   hvStyle?: string;
   weekIndex?: number;
+  /** §3I: пол для RDA микро-плотных (VitA 900/700 мкг); без поля — male. */
+  sex?: 'male' | 'female' | 'other';
 }
 
 export interface AssembleRecipeDayResult {
@@ -1430,6 +1432,17 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // (б) ранжирование кандидатов взвешивается в пользу углеводов (иначе мясные блюда
   // выигрывают по дистанции белка и день перебирает Б ядер на +24…29%).
   const pool = filterRecipePoolForBand(_poolRaw, targets?.c || 0, targets?.p || 0, args.athleteWeightKg ?? 80);
+  // §3I: микро-плотная добавка продукт-дня (fixed veg: морковь/семечки) — снимаем её с входа:
+  // рецептурный путь добьёт VitA/VitE САМ в конце, а во входе она сдвигала targetKcal мейнов
+  // (targetKcal = фактические тоталы приёма) и уводила выбор рецептов (проба: жир +19 г, dev 21%).
+  for (const m of meals as any[]) {
+    if (!m?.items?.length) continue;
+    const _stripped = m.items.filter((it: any) => !((it as any)._fixedGrams && it.role === 'veg'));
+    if (_stripped.length !== m.items.length) {
+      m.items = _stripped;
+      m.totals = sumMealTotals(m.items as any);
+    }
+  }
   const _rankWeights = isExtremeCarbBand(targets?.c || 0, targets?.p || 0, args.athleteWeightKg ?? 80)
     ? { kcal: 0.25, p: 0.05, f: 0.1, c: 0.6 } : undefined;
   // P0-6 ОТЗВАН (план разнообразия): джиттер ранжирования по args.seed ломал
@@ -1853,6 +1866,15 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           const _SIDE_CAP: Record<string, number> = _dayHighCarb ? RECIPE_SIDE_CAP_HV : RECIPE_SIDE_CAP;
           const _sideCap = _SIDE_CAP[side.id] ?? 200;
           let g = Math.floor(Math.min(dMacro / macroOf(side) * 100, _sideCap) / 10) * 10;
+          // §3E-хвост (I-связка): жировой сайд не выводит ЖИР ДНЯ за цель ×1.05 —
+          // иначе экстрим-рецепт-день добивал приёмы маслом (оливковое 15 г ×2 = +30 г Ж,
+          // dev 21.3% при белке ядер +18%: честная строка была только про белок).
+          if (role === 'жиры' && targets && (targets.f || 0) > 0) {
+            const _dayF = sumDayTotals(meals as any).f || 0;
+            const _roomF = Math.max(0, (targets.f || 0) * 1.05 - _dayF);
+            g = Math.min(g, Math.floor(_roomF / Math.max(1, macroOf(side)) * 100 / 10) * 10);
+            if (g < 10) break;
+          }
           // Peri-слот: сайд не выводит приём за физиологический кап (предтрен 60/
           // пост-трен 75) — иначе «джем 55 г» в предтрен даёт 84У при капе 63.
           if (role === 'углеводы' && (periType === 'preworkout' || periType === 'postworkout')) {
@@ -2161,6 +2183,50 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       notes.push(`🍽 «${m.label}»: белковый пункт восстановлен (${prot.name} ${gP} г) — перекус оставался без белка`);
     }
   }
+
+  // §3E-хвост (связка с I): на экстрим-полосе жир дня не выводим за цель ×1.05 —
+  // сайды-масла (оливковое 15 г ×2) на белковых ядрах перебирали Ж до +21% (145/120),
+  // а честная строка говорила только о белке. Режем ГИБКИЕ жировые пункты (не ядра
+  // рецептов, не _fixedGrams) до комнаты; ккал дня при этом чуть ниже (−2..3%) — это
+  // меньшая из девиаций (проверено: dev 21.3% → ≤effDev).
+  if (isExtremeCarbBand(targets?.c || 0, targets?.p || 0, args.athleteWeightKg ?? 80) && (targets?.f || 0) > 0) {
+    const _fatRoom = (targets.f || 0) * 1.05;
+    let _fatNow = sumDayTotals(outMeals as any).f || 0;
+    if (_fatNow > _fatRoom) {
+      for (const m of outMeals as any[]) {
+        if (_fatNow <= _fatRoom) break;
+        const _core = new Set<string>([
+          ...((m.recipeAppliedData as any)?.ingredientIds || []),
+          ...((m.recipeAppliedData2 as any)?.ingredientIds || []),
+        ]);
+        for (const it of (m.items || []) as any[]) {
+          if (_fatNow <= _fatRoom) break;
+          if (it.role !== 'fat' || (it as any)._fixedGrams || _core.has(it.id)) continue;
+          const fd = FOOD_DB.find(f => f.id === it.id);
+          if (!fd || (fd.fat || 0) < 30) continue;
+          const _perG = (fd.fat || 0) / 100;
+          const _cut = Math.min(Math.max(0, (it.amount || 0) - 5), Math.ceil((_fatNow - _fatRoom) / _perG / 5) * 5);
+          if (_cut < 5) continue;
+          const _ng = (it.amount || 0) - _cut;
+          const _r = _ng / Math.max(1, it.amount || 1);
+          it.amount = _ng;
+          it.p = Math.round((it.p || 0) * _r * 10) / 10; it.f = Math.round((it.f || 0) * _r * 10) / 10;
+          it.c = Math.round((it.c || 0) * _r * 10) / 10; it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+          it.fiber = Math.round((it.fiber || 0) * _r * 10) / 10;
+          m.totals = sumMealTotals(m.items as any);
+          _fatNow = sumDayTotals(outMeals as any).f || 0;
+        }
+      }
+      if (_fatNow < sumDayTotals(outMeals as any).f) notes = [...notes, `⚖️ Жир дня приведён к цели ×1.05 (сайды-масла на экстрим-полосе)`];
+    }
+  }
+
+  // §3I: микро-плотные на 8000+ ккал в РЕЦЕПТУРНОМ пути — рецепты заменяют мейны, и
+  // добавка продукт-пути (морковь/семечки) уходит вместе с ними; добиваем VitA/VitE
+  // после ВСЕХ проходов (ничто ниже не режет: _fixedGrams).
+  notes = [...notes, ...closeExtremeMicroGaps(outMeals as any, {
+    kcal: targets?.kcal || 0, sex: args.sex || 'male', excludedIds,
+  }).notes];
 
   // Тримы/доборы меняют тоталы — пересчитываем честную девиацию (иначе врём на ~1 п.п.).
   const _finTot = sumDayTotals(outMeals);
