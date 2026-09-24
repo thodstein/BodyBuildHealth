@@ -21,6 +21,7 @@ vi.mock('tesseract.js', () => ({
 import { readFileAsArrayBuffer, processUploadedFile } from '../ocr-engine';
 import { resolveTesseractOptions } from '../../engines/ocr-assets';
 import { resolvePdfjsWorkerSrc } from '../../engines/ocr-assets';
+import { pickBetterLabOcrPass } from '../../engines/pdf-parser.engine';
 
 describe('АПК: импорт PDF без Blob.arrayBuffer()', () => {
   it('использует FileReader fallback и передаёт буфер в PDF-парсер', async () => {
@@ -88,5 +89,14 @@ describe('АПК: импорт PDF без Blob.arrayBuffer()', () => {
     } finally {
       (globalThis as any).fetch = prevFetch;
     }
+  });
+
+  it('склеивает два прохода только если вместе они находят больше показателей', () => {
+    const dense = 'АЛТ 35 Е/л 0-41\nГлюкоза 5,4 ммоль/л 3,9-5,5';
+    const sparse = 'Креатинин 92 мкмоль/л 62-106\nТТГ 2,1 мЕд/л 0,4-4,0';
+    const chosen = pickBetterLabOcrPass(dense, sparse);
+    expect(chosen).toContain('АЛТ');
+    expect(chosen).toContain('Креатинин');
+    expect(chosen.match(/АЛТ/g)).toHaveLength(1);
   });
 });

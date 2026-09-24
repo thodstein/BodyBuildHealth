@@ -201,12 +201,21 @@ function unitKey(unit: string): string {
 
 /** Convert common Russian/foreign lab units to the canonical UCUM_MAP unit. */
 export function normalizeLabMeasurement(code: string, value: number, unit: string): { value: number; unit: string } {
-  const canonical = mapToUcumCode(code).toUpperCase();
-  const info = UCUM_MAP[canonical];
+  const canonicalCode = mapToUcumCode(code);
+  const canonical = canonicalCode.toUpperCase();
+  // UCUM_MAP contains a few intentionally mixed-case keys (e.g. HbA1c).
+  const info = UCUM_MAP[canonicalCode] || UCUM_MAP[canonical]
+    || Object.entries(UCUM_MAP).find(([key]) => key.toUpperCase() === canonical)?.[1];
   if (!info || !Number.isFinite(value)) return { value, unit: unit || info?.prefUnit || '' };
   const from = unitKey(unit);
   const target = unitKey(info.prefUnit);
   let factor = 1;
+
+  // IFCC HbA1c mmol/mol → NGSP % is affine, not a simple ratio. Handle it
+  // before the equal-unit fast path (which otherwise treats mmol/mol as %).
+  if (canonical === 'HBA1C' && from.includes('mmol/mol')) {
+    return { value: round(value * 0.09148 + 2.152), unit: info.prefUnit };
+  }
 
   // Some Russian reports print hematocrit as a fraction (0.45) while the
   // canonical profile stores percent (45%). This conversion is only applied
@@ -229,13 +238,30 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
       else if (from.includes('ng/ml')) factor = 100;
       break;
     case 'FT':
-      if (from.includes('pmol') || from.includes('nmol')) factor = 1 / 10;
+      // Canonical free-testosterone unit is pg/mL. 1 pg/mL = 3.467 pmol/L.
+      if (from.includes('pmol')) factor = 1 / 3.467;
+      else if (from.includes('nmol')) factor = 288.4;
       break;
     case 'VITD': if (from.includes('nmol')) factor = 1 / 2.496; break;
-    case 'HbA1c': if (from.includes('mmol/mol')) factor = 1 / 10.929; break;
+    case 'HbA1c': break;
     case 'HGB': if (from.includes('g/dl')) factor = 10; break;
     case 'CHOL': case 'HDL': case 'LDL': if (from.includes('mg/dl')) factor = 1 / 38.67; break;
     case 'TG': if (from.includes('mg/dl')) factor = 1 / 88.57; break;
+    case 'CRP': if (from.includes('mg/dl')) factor = 10; break;
+    case 'CA': if (from.includes('mg/dl')) factor = 1 / 4.008; break;
+    case 'MG': if (from.includes('mg/dl')) factor = 1 / 2.429; break;
+    case 'P': if (from.includes('mg/dl')) factor = 1 / 3.097; break;
+    case 'B12': if (from.includes('pmol')) factor = 1 / 0.738; break;
+    case 'FOL': if (from.includes('nmol')) factor = 1 / 2.266; break;
+    case 'INS': if (from.includes('pmol')) factor = 1 / 6.0; break;
+    case 'PROG': if (from.includes('nmol')) factor = 1 / 3.18; break;
+    case 'DHEA_S': if (from.includes('umol')) factor = 36.84; break;
+    case 'IRON': if (from.includes('ug/dl')) factor = 0.1791; break;
+    case 'TP': case 'ALB': case 'TRANSFERRIN': case 'FIBRINOGEN':
+      if (from.includes('g/dl')) factor = 10;
+      else if (from.includes('mg/dl')) factor = 0.01;
+      break;
+    case 'D_DIMER': if (from.includes('ng/ml')) factor = 0.001; break;
     default: break;
   }
   return { value: round(value * factor), unit: info.prefUnit };

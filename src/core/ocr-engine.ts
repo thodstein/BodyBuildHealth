@@ -284,6 +284,42 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
   return { labs, provider: provider || 'unknown', warnings: [...merged.warnings, ...regexResults.warnings] };
 }
 
+/**
+ * Rank OCR passes for a lab report by parsed, canonical biomarkers instead of
+ * generic text length. Food-oriented OCR scoring rewards kcal/macros and can
+ * prefer a noisy page over a shorter but useful lab table on Android.
+ */
+function labOcrCandidateQuality(text: string): { score: number; labCount: number } {
+  if (!text.trim()) return { score: 0, labCount: 0 };
+  try {
+    const parsed = parseLabTextAllWays(text, 'tesseract.js');
+    const labs = finalizeLabCandidates(parsed.labs);
+    const withReference = labs.filter(lab => lab.refLow !== undefined || lab.refHigh !== undefined).length;
+    const withUnit = labs.filter(lab => Boolean(lab.unit)).length;
+    // Recognized markers dominate; reference ranges and units break ties.
+    return {
+      score: labs.length * 100 + withReference * 15 + withUnit * 5,
+      labCount: labs.length,
+    };
+  } catch {
+    return { score: 0, labCount: 0 };
+  }
+}
+
+/** Deterministic selector used by the on-device lab OCR pipeline. */
+export function pickBestLabOcrText(texts: string[]): string {
+  let best = '';
+  let bestScore = -1;
+  for (const text of texts) {
+    const score = labOcrCandidateQuality(text || '').score;
+    if (score > bestScore) {
+      best = text || '';
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 function shouldRetryPdfWithOcr(text: string, labs: ParsedLabValue[]): boolean {
   const cleanText = text.replace(/\s+/g, ' ').trim();
   if (!cleanText || cleanText.length < 80 || /�|\uFFFD|invalid pdf|pdf parsing/i.test(cleanText)) return true;
@@ -459,6 +495,7 @@ export async function recognizeImageTextOffline(
   file: File,
   timeoutMs = 90_000,
   onProgress?: (fraction: number) => void,
+  purpose: 'labs' | 'nutrition' = 'nutrition',
 ): Promise<string> {
   const report = (fraction: number) => {
     try {
@@ -526,13 +563,21 @@ export async function recognizeImageTextOffline(
         const text = String((await worker.recognize(inputs[i].blob))?.data?.text || '');
         blockTexts.push(text);
         report((i + 1) * perPass);
-        // Ранний выход: полный текст (цифры + макросы) с первого варианта —
-        // второй проход на телефоне экономит десятки секунд. Без макросов
-        // разреженный проход обязателен: FatSecret роняет колонки Б/Ж/У.
-        if (isCompleteOcrText(text)) break;
+        if (purpose === 'labs') {
+          // A complete lab pass should contain several canonical markers.
+          // Keep trying variants when only a title/footer or one row was read.
+          if (labOcrCandidateQuality(text).labCount >= 4) break;
+        } else {
+          // Nutrition screenshots use macro labels for their early-exit gate.
+          if (isCompleteOcrText(text)) break;
+        }
       }
-      const best = pickBestOcrText(blockTexts);
-      if (isCompleteOcrText(best)) return best;
+      let best = purpose === 'labs' ? pickBestLabOcrText(blockTexts) : pickBestOcrText(blockTexts);
+      if (purpose === 'labs') {
+        if (labOcrCandidateQuality(best).labCount >= 4) return best;
+      } else if (isCompleteOcrText(best)) {
+        return best;
+      }
       // FatSecret Android uses right-aligned macro columns. A sparse-text pass
       // recovers rows that PSM 6 commonly drops, especially on narrow screens.
       // Только когда блочный проход дал мало — иначе это лишний полный проход.
@@ -541,6 +586,10 @@ export async function recognizeImageTextOffline(
       progressWindow.span = 0.15;
       const sparseText = String((await worker.recognize(inputs[0].blob))?.data?.text || '');
       report(1);
+      if (purpose === 'labs') {
+        if (labOcrCandidateQuality(sparseText).score > labOcrCandidateQuality(best).score) return sparseText;
+        return best;
+      }
       const lines = [...best.split(/\r?\n/), ...sparseText.split(/\r?\n/)]
         .map((line) => line.trim())
         .filter(Boolean);
@@ -666,7 +715,7 @@ export async function processUploadedFile(
       // локальный результат сразу, без 70 секунд ожидания двух таймаутов.
       if (isNativeApp()) {
         try {
-          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress);
+          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, 'labs');
           if (offlineText.trim().length > 2) {
             warnings.push('Фото распознано оффлайн на устройстве (АПК-режим).');
             serverResult = { text: offlineText };
@@ -687,7 +736,7 @@ export async function processUploadedFile(
         // АПК/оффлайн: серверные ./api/* в WebView недоступны — пробуем
         // локальный tesseract, дальше общий парсинг rawText как обычно.
         try {
-          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress);
+          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, 'nutrition');
           if (offlineText.trim().length <= 2) {
             return { text: '', labs: [], meals: [], source, confidence: 0, warnings };
           }

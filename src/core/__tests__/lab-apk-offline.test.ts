@@ -11,14 +11,15 @@ vi.mock('tesseract.js', () => ({
   createWorker: vi.fn(async () => ({
     recognize: async () => ({
       data: {
-        text: 'ИНВИТРО\nАЛТ 35 Е/л 0-41\nГлюкоза 5,4 ммоль/л 3,9-5,5\nКреатинин 92 мкмоль/л 62-106',
+        text: 'ИНВИТРО\nАЛТ 35 Е/л 0-41\nГлюкоза 5,4 ммоль/л 3,9-5,5\nКреатинин 92 мкмоль/л 62-106\nТестостерон 18 нмоль/л 8,6-29\nВитамин D 75 нмоль/л 75-250',
       },
     }),
     terminate: async () => {},
   })),
 }));
 
-import { processUploadedFile } from '../ocr-engine';
+import { pickBestLabOcrText, processUploadedFile } from '../ocr-engine';
+import { normalizeLabMeasurement } from '../labs-mapping';
 
 describe('АПК-оффлайн распознавание анализов (фото → labs)', () => {
   it('фото бланка доводится до labs через оффлайн-OCR', async () => {
@@ -34,5 +35,18 @@ describe('АПК-оффлайн распознавание анализов (ф�
     const file = new File(['x'.repeat(64)], 'lab-photo.jpg', { type: 'image/jpeg' });
     const result = await processUploadedFile(file);
     expect(result.warnings.join(' ')).toMatch(/оффлайн|сервер/i);
+  });
+
+  it('для бланка выбирает проход с маркерами, а не длинный текст с макросами еды', () => {
+    const foodNoise = 'Завтрак 450 ккал Б 30 г Ж 12 г У 50 г '.repeat(8);
+    const labTable = 'АЛТ 35 Е/л 0-41\nГлюкоза 5,4 ммоль/л 3,9-5,5\nКреатинин 92 мкмоль/л 62-106\nТТГ 2,1 мЕд/л 0,4-4,0';
+    expect(pickBestLabOcrText([foodNoise, labTable])).toBe(labTable);
+  });
+
+  it('нормализует лабораторные единицы в единицы приложения', () => {
+    expect(normalizeLabMeasurement('FT', 35, 'пмоль/л')).toEqual({ value: 10.095, unit: 'pg/mL' });
+    expect(normalizeLabMeasurement('CA', 10, 'мг/дл')).toEqual({ value: 2.495, unit: 'mmol/L' });
+    expect(normalizeLabMeasurement('CRP', 1.2, 'мг/дл')).toEqual({ value: 12, unit: 'mg/L' });
+    expect(normalizeLabMeasurement('HbA1c', 53, 'ммоль/моль')).toEqual({ value: 7, unit: '%' });
   });
 });

@@ -898,6 +898,18 @@ export function parseLabText(rawText: string): ParsedLabResult {
   return { values, rawText: normalizedText, originalText, source: 'text', date, warnings };
 }
 
+/** Select the scan OCR pass with the strongest useful lab-table coverage. */
+export function pickBetterLabOcrPass(primaryText: string, sparseText: string): string {
+  const primary = primaryText || '';
+  const sparse = sparseText || '';
+  const primaryCount = parseLabText(primary).values.length;
+  const sparseCount = parseLabText(sparse).values.length;
+  const merged = [primary, sparse].filter(Boolean).join('\n');
+  const mergedCount = parseLabText(merged).values.length;
+  if (mergedCount > Math.max(primaryCount, sparseCount)) return merged;
+  return sparseCount > primaryCount ? sparse : primary;
+}
+
 export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<ParsedLabResult> {
   try {
     installWebViewPolyfills();
@@ -1008,16 +1020,23 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
         const enhanced = enhanceOcrCanvasInPlace(canvas);
         try {
           const { data } = await worker.recognize(enhanced);
-          if (data.text?.trim()) texts.push(data.text);
-          // A second sparse-table pass materially improves desktop scans where
-          // values sit in separate columns. Mobile keeps one pass to avoid a
-          // second long-running WASM operation in Telegram WebView.
-          if (!mobile && typeof worker.setParameters === 'function') {
-            await worker.setParameters({ tessedit_pageseg_mode: '6' });
-            const second = await worker.recognize(enhanced);
-            if (second.data.text?.trim()) texts.push(second.data.text);
-            await worker.setParameters({ tessedit_pageseg_mode: '3' });
+          let pageText = data.text || '';
+          // A sparse-table pass recovers right-aligned result/unit columns on
+          // Android too. Choose the pass that actually yields more biomarkers
+          // instead of appending both noisy OCR versions to one text blob.
+          if (typeof worker.setParameters === 'function') {
+            try {
+              await worker.setParameters({ tessedit_pageseg_mode: '11' });
+              const second = await worker.recognize(enhanced);
+              const sparseText = second.data.text || '';
+              pageText = pickBetterLabOcrPass(pageText, sparseText);
+            } catch (sparseOcrError: any) {
+              console.warn(`Sparse lab OCR pass skipped: ${sparseOcrError?.message || String(sparseOcrError)}`);
+            } finally {
+              try { await worker.setParameters({ tessedit_pageseg_mode: mobile ? '6' : '3' }); } catch { /* keep current worker settings */ }
+            }
           }
+          if (pageText.trim()) texts.push(pageText);
         } finally {
           page.cleanup?.();
           canvas.width = 1;
