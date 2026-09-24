@@ -8403,6 +8403,36 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _goalC8 = input.goalCarbsG || 0;
       const _goalK8 = input.goalKcal || 0;
       const _pBand8 = (input.goalProteinG || 0) * 1.35;
+      // §3A-2: проход живёт только на экстрим-полосе (≥8 г/кг У) — тарелка и позиция
+      // обязаны чтить ПРОФИЛЬ ёмкости (900/800), а не хардкод 730/600: иначе белковый
+      // якорь 68 г + плотный носитель физически не набирали цель мейна (rest 1500У:
+      // обед/ужин «остался тяжёлым» при свободной комнате профиля).
+      const _solidCap8 = _pickCtx.capacity.active ? Math.min(900, Math.round(700 * _pickCtx.capacity.plateMult)) : 730;
+      const _itemCap8 = _pickCtx.capacity.active ? _pickCtx.capacity.itemCap : 600;
+      // §3A-2: носитель растёт ТОЛЬКО до собственного капа (comfort/концентрат/EDIBILITY) —
+      // иначе добор заливал «пряники 275 г», а финальный §3D срезал их обратно до 50
+      // (rest 1500У: 1466 → 1222 У, −112 г У на десерте). Тот же расчёт, что в §3D.
+      const _effCap8 = (it: any): number => {
+        const _vals: number[] = [];
+        const _comfort = COMFORT_PORTION_LIMITS[it.id];
+        if (_comfort !== undefined) _vals.push(_comfort);
+        if (CONCENTRATE_IDS.includes(it.id)) _vals.push(CONCENTRATE_CAP_G);
+        const _edBase = EDIBILITY_CAPS[it.id];
+        if (typeof _edBase === 'number' && _edBase > 0) {
+          const _mult = (it.c || 0) >= 20 ? _pickCtx.capacity.edibilityMult : 1;
+          let _capEd = Math.round(_edBase * _mult);
+          // §3A-2: сухая крупа в билдере идёт до `maxDryGrainPerMeal` (профильные 240) —
+          // финальный кап не должен быть НИЖЕ, иначе добор режется сразу после роста
+          // (овсянка 222 → EDIBILITY 130: −55 г У на rest-дне).
+          const _fd8x = FOOD_DB.find((f: any) => f.id === it.id);
+          if (_fd8x && (_fd8x.carbs || 0) >= 55) _capEd = Math.max(_capEd, maxDryGrainPerMeal(_pickCtx.currentBudget, mealCapScale(it.p || 0, it.c || 0, it.f || 0)));
+          _vals.push(_capEd);
+        }
+        if (it.role === 'fruit') _vals.push(FRUIT_PORTION_CAP_G);
+        // Fallback = кап §3D (600): рост и финальный срез обязаны совпадать, иначе
+        // добор заливает позицию, которую финал сразу урежет (класс «пряники 275→50»).
+        return _vals.length > 0 ? Math.min(..._vals) : 600;
+      };
       let _g8 = 10;
       while (totals.c < _goalC8 * 0.96 && totals.kcal < _goalK8 * 1.05 && _g8-- > 0) {
         const _cands8: Array<{ m: any; it: any; fd: any; solid: number }> = [];
@@ -8413,17 +8443,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (!['breakfast', 'lunch', 'dinner'].includes(_t8)) continue;
           if ((m as any)._insulinWindow) continue;
           const _solid8 = (m.items || []).filter((x: any) => x.role !== 'liquid').reduce((s: number, x: any) => s + (x.amount || 0), 0);
-          if (_solid8 > 850) continue;
+          if (_solid8 > _solidCap8 - 50) continue;
           for (const it of (m.items || [])) {
             if ((it.role !== 'carb_slow' && it.role !== 'carb_fast') || (it as any)._fixedGrams) continue;
             if (/glass|funchose|rice_noodles/.test(it.id)) continue;
             const fd = FOOD_DB.find((f: any) => f.id === it.id);
             if (!fd || !(fd.carbs || 0)) continue;
-            if ((it.amount || 0) >= 600) continue;
+            if ((it.amount || 0) >= _effCap8(it)) continue;
             _cands8.push({ m, it, fd, solid: _solid8 });
           }
         }
-        if (_cands8.length === 0) break;
         // Плотные низкобелковые первыми: не раздувают белок (рис 2.7Б/100 против крема 7Б/100).
         _cands8.sort((a, b) => ((a.fd.protein || 0) - (b.fd.protein || 0)) || ((b.fd.carbs || 0) - (a.fd.carbs || 0)));
         let _done8 = false;
@@ -8431,7 +8460,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const _pRoom8 = _pBand8 - totals.p;
           const _maxByP = (_c8.fd.protein || 0) > 0 ? Math.floor(Math.max(0, _pRoom8) / (_c8.fd.protein || 1) * 100) : 999;
           const _maxByK = Math.floor((_goalK8 * 1.05 - totals.kcal) / Math.max(1, _c8.fd.kcal || 1) * 100);
-          let _add8 = Math.min(80, 600 - (_c8.it.amount || 0), _maxByP, _maxByK, Math.max(0, 730 - _c8.solid));
+          let _add8 = Math.min(80, _effCap8(_c8.it) - (_c8.it.amount || 0), _maxByP, _maxByK, Math.max(0, _solidCap8 - _c8.solid));
           _add8 = Math.floor(_add8 / 5) * 5;
           if (_add8 < 10) continue;
           const _r8 = ((_c8.it.amount || 0) + _add8) / Math.max(1, _c8.it.amount || 1);
@@ -8446,7 +8475,41 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           _done8 = true;
           break;
         }
-        if (!_done8) break;
+        if (!_done8) {
+          // §3A-2: растущих носителей нет (картофель/пряники на своих капах, мейны у
+          // тарелки), а комната тарелки есть — цель мейна физически недостижима одним
+          // носителем (rest 1500У: обед 107/276 У при комнате 134 г). Добавляем ВТОРОЙ
+          // плотный стейпл (рис/крем/хлопья, белок ≤8) — только в мейны с комнатой ≥60 г.
+          let _added8 = false;
+          // Плотные стейплы (сухая крупа ≥55 У/100: хлопья/крем/рис) — не лестница
+          // десертов: десерты-концентраты исключены (их кап 50 г — второй носитель из
+          // пряников бессмыслен).
+          const _denseStaples8 = FOOD_DB
+            .filter((f: any) => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 55 && (f.protein || 0) <= 8
+              && !/glass|funchose|rice_noodles/.test(f.id) && !isConcentrateFood(f) && !HV_BANNED_CARB_IDS.has(f.id))
+            .sort((a: any, b: any) => ((a.protein || 0) - (b.protein || 0)) || ((b.carbs || 0) - (a.carbs || 0)));
+          for (const m of meals) {
+            const _t8b = String((m as any).type || '');
+            if (!['breakfast', 'lunch', 'dinner'].includes(_t8b)) continue;
+            const _solid8b = (m.items || []).filter((x: any) => x.role !== 'liquid').reduce((s: number, x: any) => s + (x.amount || 0), 0);
+            const _room8b = _solidCap8 - _solid8b;
+            if (_room8b < 60) continue;
+            const _inMeal8 = new Set((m.items || []).map((x: any) => x.id));
+            const _fd8b = _denseStaples8.find((f: any) => !_inMeal8.has(f.id)
+              && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id))
+              && foodPassesCtxAllergens(f));
+            if (!_fd8b) continue;
+            const _g8b = Math.floor(Math.min(_effCap8({ id: _fd8b.id, c: _fd8b.carbs, role: 'carb_slow' }), _room8b, 200) / 5) * 5;
+            if (_g8b < 20) continue;
+            m.items.push(makeItem(_fd8b, _g8b, 'carb_slow'));
+            m.totals = mealTotalsOf(m.items);
+            recalcDayTotals(meals, totals);
+            _added8 = true;
+            break;
+          }
+          if (!_added8) break;
+          continue;
+        }
       }
       if (totals.c > _goalC8 * 0.9) notes.push(`🍚 Экстрим-углеводный день: гарниры дотянуты плотными носителями (${Math.round(totals.c)}/${_goalC8} У).`);
     }
@@ -8488,7 +8551,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           .filter((x: any) => (x.it.role === 'carb_slow' || x.it.role === 'carb_fast') && !(x.it as any)._fixedGrams)
           .map((x: any) => {
             const _fd5 = FOOD_DB.find((f: any) => f.id === x.it.id);
-            const _cap5 = _fd5 ? Math.min(edibilityCapFor(_fd5.id, 600, _pickCtx.capacity.edibilityMult), 600) : 0;
+            // §3A-2: на экстрим-профиле дотяжка идёт до ТОГО ЖЕ капа, что и билдер
+            // (`carbPortionCap`): сухая крупа 240 г (против «дегустационных» EDIBILITY 150)
+            // — иначе хлопья 168 г упирались в 195 и день честно не сходился, хотя место
+            // в тарелке было. Обычные дни — прежний EDIBILITY-кап (бит-в-бит).
+            let _cap5 = _fd5 ? Math.min(edibilityCapFor(_fd5.id, 600, _pickCtx.capacity.edibilityMult), 600) : 0;
+            if (_fd5 && _pickCtx.capacity.active) _cap5 = Math.max(_cap5, Math.min(600, carbPortionCap(_fd5, mealCapScaleOf(x.m))));
             return { ...x, fd: _fd5, cap: _cap5, room: _cap5 - (x.it.amount || 0) };
           })
           .filter((x: any) => x.fd && x.room >= 10 && (x.fd.carbs || 0) > 0)
@@ -8703,7 +8771,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         const _edBase = EDIBILITY_CAPS[it.id];
         if (typeof _edBase === 'number' && _edBase > 0) {
           const _mult = (it.c || 0) >= 20 ? _profD.edibilityMult : 1;
-          _vals.push(Math.round(_edBase * _mult));
+          let _capEd = Math.round(_edBase * _mult);
+          // §3A-2: сухая крупа — тот же кап, что у билдера/добора (`maxDryGrainPerMeal`,
+          // профильные 240): финальный срез не должен бить ниже положенного (овсянка 222).
+          const _fdD = FOOD_DB.find((f: any) => f.id === it.id);
+          if (_fdD && (_fdD.carbs || 0) >= 55) _capEd = Math.max(_capEd, maxDryGrainPerMeal(_pickCtx.currentBudget, mealCapScale(it.p || 0, it.c || 0, it.f || 0)));
+          _vals.push(_capEd);
         }
         if (it.role === 'fruit') _vals.push(FRUIT_PORTION_CAP_G);
         return _vals.length > 0 ? Math.min(..._vals) : 600;
