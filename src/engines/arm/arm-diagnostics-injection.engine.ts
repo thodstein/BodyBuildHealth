@@ -112,7 +112,6 @@ export function estimateArmCorrectionWeight(exId: string, workMax: Record<string
 }
 
 function weightForExercise(exId: string, workMax: Record<string, number>, intensityPct: number, wp?: string): number {
-  // PRO-3 P12: вес из workMax мышцы точки напрямую; эвристика по имени — только fallback
   if (wp) {
     try {
       const bio = ARM_BIOMECH[wp as keyof typeof ARM_BIOMECH];
@@ -120,19 +119,20 @@ function weightForExercise(exId: string, workMax: Record<string, number>, intens
         const v = Number((workMax as Record<string, number>)[m]);
         if (Number.isFinite(v) && v > 0) return Math.round(v * intensityPct * 2) / 2;
       }
-    } catch { /* noop → fallback ниже */ }
+    } catch {}
   }
   const low = exId.toLowerCase();
-  let base = 40;
-  if (low.includes('wrist') || low.includes('riser') || low.includes('cup')) base = workMax['wrist_flexors'] || workMax['risers'] || workMax['default'] || 30;
-  else if (low.includes('pronation')) base = workMax['pronators'] || workMax['default'] || 30;
-  else if (low.includes('supination')) base = workMax['supinators'] || workMax['default'] || 30;
-  else if (low.includes('hammer') || low.includes('hook_drag')) base = workMax['brachialis'] || workMax['default'] || 40;
-  else if (low.includes('side')) base = workMax['side_pressure'] || workMax['default'] || 30;
-  else if (low.includes('lat_drag') || low.includes('row_strap') || low.includes('landmine')) base = workMax['back_pressure'] || workMax['default'] || 50;
-  else if (low.includes('rolling_thunder') || low.includes('apollon_axle') || low.includes('axle')) base = workMax['grip_support'] || workMax['default'] || 60;
-  else if (low.includes('hub') || low.includes('plate_pinch') || low.includes('saxon') || low.includes('coc')) base = workMax['grip_pinch'] || workMax['grip_support'] || workMax['default'] || 20;
-  else base = workMax['default'] || 30;
+  let base = 0;
+  if (low.includes('wrist') || low.includes('riser') || low.includes('cup')) base = Number(workMax['wrist_flexors'] || workMax['risers'] || workMax['default'] || 0);
+  else if (low.includes('pronation')) base = Number(workMax['pronators'] || workMax['default'] || 0);
+  else if (low.includes('supination')) base = Number(workMax['supinators'] || workMax['default'] || 0);
+  else if (low.includes('hammer') || low.includes('hook_drag')) base = Number(workMax['brachialis'] || workMax['default'] || 0);
+  else if (low.includes('side')) base = Number(workMax['side_pressure'] || workMax['default'] || 0);
+  else if (low.includes('lat_drag') || low.includes('row_strap') || low.includes('landmine')) base = Number(workMax['back_pressure'] || workMax['default'] || 0);
+  else if (low.includes('rolling_thunder') || low.includes('apollon_axle') || low.includes('axle')) base = Number(workMax['grip_support'] || workMax['default'] || 0);
+  else if (low.includes('hub') || low.includes('plate_pinch') || low.includes('saxon') || low.includes('coc')) base = Number(workMax['grip_pinch'] || workMax['grip_support'] || workMax['default'] || 0);
+  else base = Number(workMax['default'] || 0);
+  if (!Number.isFinite(base) || base <= 0) return 0;
   return Math.round(base * intensityPct * 2) / 2;
 }
 
@@ -266,6 +266,9 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
         substitutionGroup: corr.substitutionGroup,
         exerciseId: exId,
         equipment: catalogEx.equipment,
+        loadMode: catalogEx.equipment === 'bodyweight' ? 'bodyweight' : catalogEx.equipment === 'band' ? 'band' : 'tool',
+        provenance: 'diagnostic',
+        provenanceSource: `arm-diagnostics:${exId}`,
         comment: `${bio.label} → ${corr.exercises.slice(0,2).join('/')} @${Math.round(dose.intensityPct*100)}%${dose.adjusted ? ` · доза: ${dose.note}` : ''}${(() => { try { const p = preventiveFor(wp); return p ? ` · ${p.label}` : ''; } catch { return ''; } })()}${exId ? ` · роль ${roleLabel(exId)}` : ''}`,
         rationale: `Коррекция мёртвой точки: ${bio.biomechanicalReason.slice(0,90)}…`,
       };

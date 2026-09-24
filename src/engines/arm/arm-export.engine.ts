@@ -8,6 +8,32 @@ function esc(s: string): string {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+export function armPlanExportBlockReasons(plan: Pick<ArmPlan, 'validation'>): string[] {
+  const reasons = Array.isArray(plan.validation?.blocked)
+    ? plan.validation.blocked.map((line) => String(line || '').trim()).filter(Boolean)
+    : [];
+  if (plan.validation?.status === 'blocked' && reasons.length === 0) reasons.push('validation.status=blocked');
+  return Array.from(new Set(reasons));
+}
+
+export function isArmPlanExportBlocked(plan: Pick<ArmPlan, 'validation'>): boolean {
+  return armPlanExportBlockReasons(plan).length > 0;
+}
+
+export class ArmPlanExportBlockedError extends Error {
+  readonly reasons: string[];
+  constructor(reasons: string[]) {
+    super(`Экспорт арм-плана заблокирован: ${reasons.join('; ')}`);
+    this.name = 'ArmPlanExportBlockedError';
+    this.reasons = reasons;
+  }
+}
+
+export function assertArmPlanExportable(plan: Pick<ArmPlan, 'validation'>): void {
+  const reasons = armPlanExportBlockReasons(plan);
+  if (reasons.length > 0) throw new ArmPlanExportBlockedError(reasons);
+}
+
 /**
  * R6: структурированная PRO-сводка тренера в печати (потребитель
  * buildArmProSummary — раньше сводка жила только в движке/тестах).
@@ -32,13 +58,15 @@ export function buildArmProSummaryHtml(s: ArmProSummary | null | undefined): str
 }
 
 export function buildArmPrintHtml(plan: ArmPlan, diagnostics?: { findings?: Array<{ level: string; text: string }>; humerusWarnings?: string[]; balanceWarnings?: string[]; asymmetryPct?: number; benchLevel?: string; fatigue?: string; trend?: string; info?: string[]; movement?: { matchPhase?: string | null; startNote?: string | null; vectorNote?: string | null; foulNote?: string | null; tableStrengthNote?: string | null; humerusDangerNote?: string | null } | null; armliftMovement?: string[] | null }, proSummary?: ArmProSummary | null): string {
+  assertArmPlanExportable(plan);
   const phaseColor: Record<string, string> = { accumulation:'#22c55e', intensification:'#f59e0b', deload:'#60a5fa', peaking:'#ef4444' };
   const phaseRu: Record<string, string> = { accumulation:'накопление', intensification:'интенсификация', deload:'делод', peaking:'пик' };
   const gantt = `<div class="gantt"><div style="display:flex;gap:3px">${plan.weeks.map(wk=>`<div style="flex:1;height:22px;background:${phaseColor[wk.phase]||'#94a3b8'};border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800">${wk.week}</div>`).join('')}</div><div class="legend"><span><i style="background:#22c55e"></i>накопление</span><span><i style="background:#f59e0b"></i>интенсификация</span><span><i style="background:#ef4444"></i>пик</span><span><i style="background:#60a5fa"></i>делод</span></div></div>`;
   const weekSets = (wk: any) => (wk.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).reduce((x: number, e: any) => x + (e.sets || 0), 0), 0);
   const sessSets = (sess: any) => (sess.exercises || []).reduce((a: number, e: any) => a + (e.sets || 0), 0);
   const exWeight = (ex: any) => {
-    try { const w = ex.workSets?.[0]?.weight; return Number(w) > 0 ? ` ≈${w} кг` : ''; } catch { return ''; }
+    const load = ex.loadMode === 'bodyweight' ? ' · свой вес' : ex.loadMode === 'band' ? ' · резина' : ex.loadMode === 'isometric' ? ' · изометрия' : ex.loadMode === 'tool' ? ' · инструмент' : ex.loadMode === 'external' ? ' · внешняя нагрузка' : '';
+    try { const w = ex.workSets?.[0]?.weight; return Number(w) > 0 ? ` ≈${w} кг${load}` : load || ' · вес не задан'; } catch { return load; }
   };
   const rows = plan.weeks.map(wk => {
     const sessRows = wk.sessions.map(sess => {
@@ -83,6 +111,7 @@ export function buildArmPrintHtml(plan: ArmPlan, diagnostics?: { findings?: Arra
 }
 
 export function buildArmIcs(plan: ArmPlan, startDateIso?: string): string {
+  assertArmPlanExportable(plan);
   const start = startDateIso ? new Date(startDateIso) : new Date();
   const fmt = (d: Date) => d.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
   const escIcs = (s: string) => s.replace(/,/g,'\\,').replace(/;/g,'\\;').replace(/\n/g,'\\n');

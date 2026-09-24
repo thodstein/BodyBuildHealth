@@ -17,9 +17,9 @@ describe('arm-diagnostics-hub PRO (механизм-ориентированна
   });
   it('table <30% → суставной finding warn', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{}, grip:{}, level:'intermediate', technique:'balanced', tableSessions:0, totalSessions:4, tendonSets:8 });
-    expect(r.findings.some(f=>f.text.includes('Table time'))).toBe(true);
+    expect(r.findings.some(f=>f.text.includes('Table sessions'))).toBe(true);
     expect(r.tableRatio).toBe(0);
-    expect(r.findings.find(f=>f.text.includes('Table time'))!.level).toBe('warn');
+    expect(r.findings.find(f=>f.text.includes('Table sessions'))!.level).toBe('warn');
   });
   it('tendon → суставной finding', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{}, grip:{}, level:'intermediate', technique:'balanced', tableSessions:2, totalSessions:4, tendonSets:20 });

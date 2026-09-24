@@ -9,9 +9,10 @@ import { ARM_SPLIT_PATTERNS, getArmPattern } from './arm-split-patterns';
 import { getArmLandmarks, isTendonMuscle, TENDON_CAP, MUSCLE_CAP, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
 import { computeArmRecoveryMult, computeArmBudget, sessionLimitsForArm, perExerciseCap, computeNutritionMult, tendonBudgetForLevel } from './arm-volume.engine';
 import { ARM_EXERCISES } from '../../core/exercise-catalog-arm';
+import { classifyPed } from '../../data/ped-potency-table';
 import { buildArmSchedule, specializationMrvFactor, specForWeek } from './arm-specialization.engine';
 import { adaptForPEDs } from '../bb/bb-ped-adaptation.engine';
-import { tableWeekKind, tableWeekParams } from './arm-table.engine';
+import { tableWeekKind, tableWeekParams, tableTimeSummary } from './arm-table.engine';
 import { applyArmPro } from './arm-pro-integration.engine';
 import { ensureRadialFingers } from './arm-load-quant.engine';
 import { profileOpponent, matchupVolumeFor } from './arm-matchup.engine';
@@ -32,6 +33,7 @@ import { applyPro5Safety, checkHookCap } from './arm-pro5-safety.engine';
 import { checkCocGates } from './arm-pro5-coc-gate.engine';
 import { larrattSinglesFor, strengthLogRir, isSinglesCandidate } from './arm-pro5-singles.engine';
 import { suggestSplitForCycle } from './arm-pro5-ux.engine';
+import { armInjuryRepsCap, armInjuryVolumeFactor, armInjuryWeightFactor, mobilityBlockReason } from './arm-injury-guard.engine';
 
 const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
@@ -87,8 +89,31 @@ function hashString(s: string): number {
   return h >>> 0;
 }
 
-function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equipment: string[], favorite: string[], excluded: string[], usedIds: Set<string>, technique?: string): typeof ARM_EXERCISES[number] | null {
+function equipmentAllows(required: string, available: string[]): boolean {
+  if (available.length === 0) return true;
+  const tokens = available.map((x) => String(x || '').toLowerCase().replace(/[\s-]+/g, '_'));
+  const has = (re: RegExp) => tokens.some((x) => re.test(x));
+  const req = String(required || '').toLowerCase();
+  if (req === 'bodyweight') return has(/bodyweight|body_weight|own|sv[oе]|без_оборудован/);
+  if (req === 'barbell') return has(/barbell|штанга|гриф/);
+  if (req === 'dumbbell') return has(/dumbbell|гантел/);
+  if (req === 'cable') return has(/cable|блок|трос/);
+  if (req === 'band') return has(/band|резин|лент/);
+  if (req === 'machine') return has(/machine|тренаж/);
+  if (req === 'grip_tool') return has(/grip|хват|hub|pinch|coc|axle|saxon|rolling|thumb/);
+  return true;
+}
+
+function loadModeForExercise(e: { equipment?: string; movementPattern?: string; substitutionGroup?: string }): ArmExercise['loadMode'] {
+  if (e.substitutionGroup === 'cup_iso' || String(e.movementPattern || '').toLowerCase().includes('iso')) return 'isometric';
+  if (e.equipment === 'bodyweight') return 'bodyweight';
+  if (e.equipment === 'band') return 'band';
+  return 'tool';
+}
+
+function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equipment: string[], favorite: string[], excluded: string[], usedIds: Set<string>, technique?: string, mobilityRestrictions: string[] = [], injuries?: Array<{ muscle: string; volumePct?: number; exclude?: boolean }>): typeof ARM_EXERCISES[number] | null {
   const mLow = muscle.toLowerCase();
+  if (armInjuryVolumeFactor(injuries, mLow) <= 0) return null;
   // Техника-специфичные приоритеты
   const techniqueBoost = (e: typeof ARM_EXERCISES[number]): number => {
     const sg = (e.substitutionGroup || '').toLowerCase();
@@ -147,19 +172,11 @@ function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equi
     if (!matches) return false;
     if (excluded.includes(e.id)) return false;
     if (usedIds.has(e.id)) return false;
-    if (equipment.length > 0) {
-      const eq = e.equipment.toLowerCase();
-      if (eq === 'grip_tool' && !equipment.some(x => /grip|хват|hub|pinch/i.test(x))) return false;
-      if (eq === 'band' && equipment.length > 0 && !equipment.some(x => /band|резина|лента|cable|блок/i.test(x)) && !equipment.includes('band')) {
-        // band доступен если есть cable/band
-      }
-    }
+    if (mobilityBlockReason(e, mobilityRestrictions)) return false;
+    if (!equipmentAllows(String(e.equipment || ''), equipment)) return false;
     return true;
   });
-  if (pool.length === 0) {
-    const fb = ARM_EXERCISES.filter(e => !excluded.includes(e.id) && !usedIds.has(e.id)).slice(0, 5);
-    return fb[0] || ARM_EXERCISES[0] || null;
-  }
+  if (pool.length === 0) return null;
   for (const fav of favorite) {
     const f = pool.find(p => p.id === fav || p.name === fav);
     if (f) return f;
@@ -262,7 +279,7 @@ function weightForMuscle(muscle: string, workMax: Record<string, number>, pct: n
     else if (workMax['grip'] != null && low.includes('grip')) max = workMax['grip'];
     else if (workMax['pron'] != null && low.includes('pron')) max = workMax['pron'];
     else if (workMax['sup'] != null && low.includes('sup')) max = workMax['sup'];
-    else max = workMax['default'] || 30;
+    else max = Number(workMax['default']) > 0 ? Number(workMax['default']) : 0;
   }
   return Math.round(max * pct * 2) / 2;
 }
@@ -277,6 +294,15 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   const equipment = input.equipment || [];
   const favorite = input.favoriteExercises || [];
   const excluded = input.excludedExercises || [];
+  const injuries = input.injuries || [];
+  const mobilityRestrictions = input.mobilityRestrictions || [];
+  const selectionWarnings: string[] = [];
+  const selectionWarningKeys = new Set<string>();
+  const addSelectionWarning = (key: string, text: string) => {
+    if (selectionWarningKeys.has(key)) return;
+    selectionWarningKeys.add(key);
+    selectionWarnings.push(text);
+  };
   const weakPoints = (input.weakPoints || []).map(s => s.toLowerCase());
   const focusGroup = input.focusGroup ? input.focusGroup.toLowerCase() : undefined;
 
@@ -361,43 +387,42 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     if (Array.isArray(bouts) && bouts.length) iqPlan = analyzeTableIq({ bouts });
   } catch { iqPlan = null; markDegraded('Table-IQ недоступен — рычаги фолов/срывов не применены'); }
 
-  // MRV multipliers — через adaptForPEDs с tendonCap 1.5× + fallback для неизвестных педов (тест 'test_e')
+  // MRV multipliers — через adaptForPEDs с tendonCap 1.5×
   let pedMult = 1;
   let pedAdapt: any = null;
   if (input.pedDoses && Object.keys(input.pedDoses).length > 0) {
-    const pedsKeys = Object.keys(input.pedDoses);
+    const canonicalDoses: Record<string, number> = {};
+    for (const [rawId, rawDose] of Object.entries(input.pedDoses)) {
+      const cls = classifyPed(rawId);
+      const type = cls.startsWith('aas_') ? 'AAS'
+        : cls === 'insulin' ? 'insulin'
+        : cls === 'mgf' ? 'MGF'
+        : cls === 'igf' ? 'IGF1'
+        : cls === 'gh' ? 'GH'
+        : null;
+      const dose = Number(rawDose);
+      if (type && Number.isFinite(dose)) canonicalDoses[type] = (canonicalDoses[type] || 0) + dose;
+    }
     let raw = 1;
-    let usedAdapt = false;
     try {
-      const fakePeds = pedsKeys.map(k => ({ id: k, dose: Number(input.pedDoses![k]) } as any));
-      const adapt = adaptForPEDs(fakePeds as any, { default: 10 } as any, input.pedDoses as any, input.courseIntensity as any);
+      const activePeds = Object.keys(canonicalDoses) as Array<'AAS' | 'insulin' | 'MGF' | 'IGF1' | 'GH'>;
+      const adapt = adaptForPEDs(activePeds, { default: 10 } as any, canonicalDoses, input.courseIntensity as any);
       raw = adapt.combinedMrvMultiplier || 1;
-      // если adapt вернул 1 а дозы >0 и id неизвестный — fallback к doseSum (иначе тест test_e падает)
-      const doseSumChk = pedsKeys.reduce((s,k)=> s + (Number(input.pedDoses![k])||0),0);
-      if (raw === 1 && doseSumChk > 0) {
-        // неизвестный пед — считаем как тест
-        const doseMult = Math.min(0.5, doseSumChk/1000*0.4);
-        const intensityAdj = input.courseIntensity === 'heavy' ? 0.08 : input.courseIntensity === 'mild' ? -0.05 : 0;
-        raw = 1 + doseMult + intensityAdj + (pedsKeys.length>1?0.05:0);
-        usedAdapt = false;
-      } else {
-        usedAdapt = true;
-      }
     } catch {
-      let doseSum = 0;
-      for (const v of Object.values(input.pedDoses)) { const d = Number(v); if (Number.isFinite(d) && d>0) doseSum+=d; }
-      const doseMult = Math.min(0.5, doseSum/1000*0.4);
-      const intensityAdj = input.courseIntensity === 'heavy' ? 0.08 : input.courseIntensity === 'mild' ? -0.05 : 0;
-      raw = 1 + doseMult + intensityAdj + (pedsKeys.length>1?0.05:0);
+      markDegraded('PED-адаптация недоступна — MRV boost отключён');
     }
     const tendonCap = 1.5;
     pedMult = raw <= tendonCap ? raw : tendonCap + (raw - tendonCap) * 0.4;
     pedMult = Math.max(1, Math.min(1.7, pedMult));
     pedAdapt = { combinedMrvMultiplier: pedMult };
   }
-  // PRO-5 G2: честная пометка неизвестных PED-id (формула выше сохранена — тест test_e).
   let pedNote: string | null = null;
   try { pedNote = pedHonestyNote(input.pedDoses as any); } catch { markDegraded('PED-пометка недоступна'); }
+  if (pedNote) {
+    pedMult = 1;
+    pedAdapt = null;
+    markDegraded('неизвестный PED: MRV boost отключён');
+  }
   const recoveryMult = computeArmRecoveryMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
   const labMult = input.labMrvMultiplier ? Math.max(0.6, Math.min(1.4, input.labMrvMultiplier)) : 1;
   const nutritionMult = computeNutritionMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
@@ -441,7 +466,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           }
         }
       }
-    } catch {}
+    } catch { markDegraded('предыдущий план недоступен — кросс-мезо прогрессия пропущена'); }
   }
 
   // Build specialization schedule
@@ -510,7 +535,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   try {
     const track = longevityTrackFor(Number((input as any).ageYears ?? 30));
     mastersDeload = track === 'grandmaster' || track === 'supergrand';
-  } catch { mastersDeload = false; }
+  } catch { mastersDeload = false; markDegraded('masters-профиль недоступен — деload-каденс по умолчанию'); }
   // Именной цикл (P0): фазовая карта библиотеки поверх generic — только при
   // cycleId + (exact либо согласие на extend/shrink). Без cycleId — байт-в-байт.
   let phaseMap = distributeArmPhases(weeks, goal, mastersDeload ? 3 : 4);
@@ -537,7 +562,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         cycleNote = `Цикл ${c.name}: ${fit.note} — без согласия построен generic (фазы по умолчанию).`;
       }
     }
-  } catch { /* цикл опционален */ }
+  } catch { markDegraded('цикл недоступен — фазы generic'); }
   // Хвостовое окно тейпера: непрерывный run делоад/пик-недель с конца плана
   // (PRO-5 G4: явный стейт taperStateFor; поведение 1-в-1 со старым циклом).
   // Только оно идёт под кривую финализатора; срединные делоады (каждая 4-я)
@@ -590,7 +615,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         if (gp.phase === 'deload') gripPhaseMult = 0.6;
         else if (gp.phase === 'peak') { gripPhaseMult = 0.7; gripRirAdd = 1; }
       }
-    } catch { gripPhaseMult = 1; gripRirAdd = 0; gripPhaseName = null; }
+    } catch { gripPhaseMult = 1; gripRirAdd = 0; gripPhaseName = null; markDegraded('Grip-RPE протокол недоступен — базовая нагрузка'); }
     // TOP wave-9: один showcase-протокол хвата в неделю (peak → overcrush, intensification → negatives)
     let gripExecDone = gripPhaseName == null || (gripPhaseName !== 'peak' && gripPhaseName !== 'intensification');
     // PRO-5 P4: один Larratt-блок синглов на intensification-неделю (advanced+).
@@ -622,6 +647,11 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       let rfdDone = !rfdOn || phase !== 'intensification' || ch !== 'тяж';
 
       for (const mus of filteredMuscles) {
+        const injuryFactor = armInjuryVolumeFactor(injuries, mus);
+        if (injuryFactor <= 0) {
+          addSelectionWarning(`exclude:${mus}`, `Н${w} ${mus}: упражнение исключено травмой; безопасная замена не найдена.`);
+          continue;
+        }
         // PRO G: боль ≥4 — side/pron тяжёлая работа переводится в технику (безопасность сухожилий)
         const effCh = (pro.replaceSideWithIso && mus === 'side_pressure' && ch === 'тяж')
           ? 'техника'
@@ -636,11 +666,12 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const gripMult = mus.startsWith('grip_') ? gripPhaseMult : 1;
         const iqSide = iqPlan && (iqPlan.foulRate ?? 0) >= 1 && mus === 'side_pressure' ? 0.8 : 1;
         const iqRise = iqPlan && (iqPlan.slipRate ?? 0) >= 40 && (mus === 'risers' || mus === 'thumb') ? 1.15 : 1;
-        const targetRaw = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult * (pro.volumeMult || 1) * matchupMult * gripMult * iqSide * iqRise) : 6;
+        const targetRaw = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult * (pro.volumeMult || 1) * matchupMult * gripMult * iqSide * iqRise * injuryFactor) : 6;
         const target = volumeTargets[mus] ? Math.min(volumeTargets[mus].mrv, targetRaw) : 6;
         const freq = muscleFreq[mus] || 1;
         const setsBase = setsFor(mus, effCh, w, target, freq);
         const repsBase = repsFor(mus, effCh, phase);
+        const injuryRepsCap = armInjuryRepsCap(injuries, mus);
         // TOP wave-5: RFD — настоящий speed-протокол 5×3 RPE8 вместо метки (первое speed-упражнение тяжёлой intensification)
         const rfdSpeed = rfdOn && phase === 'intensification' && effCh === 'тяж' && !rfdDone &&
           ['pronators','supinators','wrist_flexors','risers','grip_support','grip_pinch','brachioradialis'].includes(mus);
@@ -649,8 +680,12 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const wantSingles = (input as any).heavySingles === true && (level === 'advanced' || level === 'enhanced') && phase === 'intensification' && effCh === 'тяж' && !singlesDone && !rfdSpeed && isSinglesCandidate(mus);
         if (wantSingles) { singlesDone = true; larrattWeeks++; }
         const larratt = wantSingles ? larrattSinglesFor(Number((input as any).larrattStepKg) || 0.57) : null;
-        const sets = wantSingles && larratt ? larratt.sets : rfdSpeed ? Math.min(5, perExerciseCap(mus, level)) : setsBase;
-        const reps: [number, number] = wantSingles ? [1, 1] : rfdSpeed ? [3, 3] : repsBase;
+        const protocolSets = wantSingles && larratt ? larratt.sets : rfdSpeed ? Math.min(5, perExerciseCap(mus, level)) : setsBase;
+        const sets = Math.max(1, Math.min(perExerciseCap(mus, level), Math.max(1, Math.round(protocolSets * injuryFactor))));
+        const protocolReps: [number, number] = wantSingles ? [1, 1] : rfdSpeed ? [3, 3] : repsBase;
+        const reps: [number, number] = injuryRepsCap == null
+          ? protocolReps
+          : [Math.min(protocolReps[0], injuryRepsCap), Math.min(protocolReps[1], injuryRepsCap)];
         const iqRir = (mus === 'side_pressure' && iqSide < 1 ? 1 : 0) + (mus.startsWith('grip_') ? gripRirAdd : 0);
         const hookShift = (mus === 'supinators' || mus === 'wrist_flexors') ? (pro5safety.hookRirShift || 0) : 0;
         // PRO-5 P4: RIR по карте StrengthLog (только явный rpeParity, делоад/пик — как было).
@@ -658,8 +693,11 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           ? strengthLogRir(Math.min(8, Math.max(1, w)), effCh)
           : rirFor(effCh, phase, w, technique);
         const rir = wantSingles && larratt ? larratt.rir : Math.max(0, Math.min(5, rirBase + (pro.rirShift || 0) + iqRir + hookShift));
-        const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique);
-        if (!exTpl) continue;
+        const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique, mobilityRestrictions, injuries);
+        if (!exTpl) {
+          addSelectionWarning(`missing:${mus}:${mobilityRestrictions.join('|')}`, `Н${w} ${mus}: нет безопасного упражнения для equipment/ограничений; произвольная замена не используется.`);
+          continue;
+        }
         usedInSession.add(exTpl.id);
         usedIdsGlobal.add(exTpl.id);
 
@@ -686,7 +724,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
               effectiveWorkMax = { ...effectiveWorkMax, [mus]: baseFromPrev };
             }
           }
-          const wgtBase = weightForMuscle(mus, effectiveWorkMax, pct);
+          const injuryWeightFactor = armInjuryWeightFactor(injuries, mus);
+          const wgtBase = weightForMuscle(mus, effectiveWorkMax, pct) * injuryWeightFactor;
           const wgt = weekLoadMult === 1 ? wgtBase : Math.round(wgtBase * weekLoadMult * 2) / 2;
           workSets.push({
             reps: repVal,
@@ -716,7 +755,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         let wEstimated = false;
         try {
           wEstimated = weightHonestyMark(mus, mergedWorkMax) && !(crossMesoWorkMax && crossMesoWorkMax[mus] != null);
-        } catch { /* опционально */ }
+        } catch { wEstimated = true; markDegraded('проверка workMax недоступна — вес отмечен как ориентир'); }
         exercises.push({
           muscle: mus as any,
           name: exTpl.name,
@@ -735,6 +774,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           substitutionGroup: exTpl.substitutionGroup,
           exerciseId: exTpl.id,
           equipment: exTpl.equipment,
+          loadMode: loadModeForExercise(exTpl),
+          provenance: 'catalog',
+          provenanceSource: `exercise-catalog-arm:${exTpl.id}`,
           holdSeconds: gripShow === 'over' ? 12 : (mus === 'grip_support' || mus === 'grip_pinch' || mus === 'grip_crush' ? (effCh === 'техника' ? 15 : 10) : undefined),
           comment: ((rfdSpeed
             ? `RFD speed 5×3 @RPE8: ускорение через весь диапазон, отдых 90с · ${exTpl.technique || ''}`
@@ -788,7 +830,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const impl = medleyRotationForWeek(mid, w);
         if (impl) weekNote = `🎯 Медли-фокус: ${impl}`;
       }
-    } catch { weekNote = undefined; }
+    } catch { weekNote = undefined; markDegraded('медли-фокус недоступен — ротация не добавлена'); }
     planWeeks.push({
       week: w,
       phase,
@@ -820,7 +862,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       } else if (applied.warning) {
         simRationale = [applied.warning];
       }
-    } catch { /* sim опционален */ }
+    } catch { markDegraded('contest-sim недоступен — финальная неделя без симуляции'); }
   }
 
   // TOP wave-7: Table-IQ инъекция containment при срывах ≥40% (до подсчёта объёма)
@@ -836,7 +878,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       for (let i = 0; i < planWeeks.length; i++) planWeeks[i] = inj.plan.weeks[i];
       tableInjectNotes = inj.notes;
     }
-  } catch { /* опционально */ }
+  } catch { markDegraded('Table-IQ инъекция недоступна — коррекции стола не добавлены'); }
 
   // TOP wave-8: унилатеральные бонусные сеты слабой руки — пост-проход по готовым неделям.
   // Только здесь виден полный недельный объём (мид-билд гард слеп к будущим сессиям + sim/inject уже применены).
@@ -866,7 +908,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           ex.comment = `${ex.comment || ''} + унилатерально слабой (${lrWeak}): +${want} сета сверху`.trim();
         }
       }
-    } catch { /* опционально */ }
+    } catch { markDegraded('L/R добивка недоступна — унилатеральные сеты не добавлены'); }
   }
 
   // Rationale — расширено table 3/2/1 и tendon
@@ -877,12 +919,13 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   if (cycleNote) rationale.push(cycleNote);
   try {
     if (progRates.cyclePctPerWeek > 0) rationale.push(`Прогрессия весов +${progRates.cyclePctPerWeek}%/нед внутри цикла + кросс-мезо ×${progRates.mesoRate.toFixed(3)}${progRates.migrated ? ' (раздельные поля PRO-5)' : ' (legacy correctionPct)'}.`);
-  } catch { /* опционально */ }
+  } catch { markDegraded('пояснение прогрессии недоступно'); }
   if (mastersDeload) rationale.push('Masters 50+: делоад каждая 3-я неделя (longevity Devon-трек).');
   if (specSchedule.active) rationale.push(`Специализация: ${specSchedule.rationale}`);
   const tableKinds = planWeeks.map(wk => `${tableWeekKind(wk.week, weeks)}`).join('/');
   rationale.push(`Table 3/2/1: ${tableKinds} (moderate 50-75% 1-3мин / heavy 75-100% 10с-1мин / stress 100-125% 5-10с)`);
-  rationale.push(`Table time: ${(tableRatio * 100).toFixed(0)}% (цель), факт ~${(planWeeks[0]?.tableRatio || 0 * 100).toFixed(0)}% (Кузнецов VIII ≥50%)`);
+  const tableSummary = tableTimeSummary(planWeeks, tableRatio);
+  rationale.push(`Table sessions: target ${(tableRatio * 100).toFixed(0)}%, fact ${(tableSummary.tableSessionShare * 100).toFixed(0)}%; minutes ${tableSummary.tableMinutesShare == null ? 'нет данных' : `${(tableSummary.tableMinutesShare * 100).toFixed(0)}%`}; target applies to session share.`);
   rationale.push(`Бюджет: recovery×${recoveryMult.toFixed(2)} lab×${labMult.toFixed(2)} nutrition×${nutritionMult.toFixed(2)} ped×${pedMult.toFixed(2)} tendon×${tendonMultGlobal.toFixed(2)} (tendonCap 1.2×)`);
   if (isTendonMuscle('wrist_flexors')) rationale.push(`Tendon лимит ${tendonWeeklyLimit(level)} сетов/нед для wrist/pron/sup`);
   if (crossMesoWorkMax) rationale.push(`Cross-meso: веса +2.5% от предыдущего мезоцикла (${Object.keys(crossMesoWorkMax).length} групп)`);
@@ -898,9 +941,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         rationale.push(`Лестница ${input.ladderFrom}: ${d >= 0 ? '+' : ''}${d}% за мезоцикл — ${nx.ready && nx.next ? `готов к ${nx.next}` : 'держать базу'}.`);
       }
     }
-  } catch { /* опционально */ }
+  } catch { markDegraded('медли/лестница прогрессии недоступна — переход пропущен'); }
   // PRO A–J: строки оркестратора (аддитивно)
   for (const line of pro.rationale) rationale.push(line);
+  for (const line of selectionWarnings) rationale.push(line);
   // TOP T1/T2a/T7a: матчап + RFD + L/R (только при заданных входах)
   if (matchupPlan) rationale.push(`Матчап: ${matchupPlan.note}`);
   if (rfdNote) rationale.push(`RFD: ${rfdNote}`);
@@ -925,7 +969,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         if (sug) rationale.push(`PRO-5: под цикл ${c.name} подходит сплит «${sug.name}» — переключите в 1 клик (сейчас ~${splitPerWeek.toFixed(1)}×/нед vs ${c.daysPerWeek}×/нед).`);
       }
     }
-  } catch { /* опционально */ }
+  } catch { markDegraded('подбор сплита под цикл недоступен'); }
   // TOP wave-13: отдельный peak-протокол хвата (только явная фаза, не авто)
   try {
     const gp = String(input.gripPhase || '').toLowerCase();
@@ -943,8 +987,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       for (let i = 0; i < planWeeks.length; i++) planWeeks[i] = inj.plan.weeks[i];
       for (const line of (inj.plan.rationale || [])) rationale.push(line);
     }
-  } catch { /* опционально */ }
-  const proWarnings = [...pro.warnings];
+  } catch { markDegraded('peak-протокол хвата недоступен — базовая методика'); }
+  const proWarnings = [...pro.warnings, ...selectionWarnings];
   for (const line of pro5safety.warnings) proWarnings.push(line);
   for (const line of pro5safety.blocked) proWarnings.push(`⛔ ${line}`);
   // PRO-5: пост-проход честных гейтов (только warnings/строки, объёмы не трогаем).

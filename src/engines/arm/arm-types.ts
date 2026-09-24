@@ -237,6 +237,9 @@ export interface ArmExercise {
   supersetSlot?: 0 | 1;
   exerciseId?: string;
   equipment?: string;
+  loadMode?: 'bodyweight' | 'tool' | 'band' | 'isometric' | 'external';
+  provenance?: 'catalog' | 'finalizer' | 'diagnostic' | 'manual' | 'annual';
+  provenanceSource?: string;
 }
 
 export interface ArmSession {
@@ -246,6 +249,7 @@ export interface ArmSession {
   sessionTag: string;
   tableTime?: boolean;
   tableRatio?: number;
+  durationMin?: number;
   exercises: ArmExercise[];
   note?: string;
 }
@@ -280,13 +284,15 @@ export interface ArmPlan {
   specializationSchedule?: ArmSpecializationSchedule;
   mrvByMuscle?: Record<string, number>;
   safetyWarnings?: string[];
+  planSnapshotId?: string;
 }
 
 export interface ArmValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
-  blocked?: string[]; // PRO-5: критичные safety-блоки (ось high, humerus-cap) — valid не меняют
+  blocked?: string[];
+  status?: 'ok' | 'warning' | 'blocked';
   mrvOverflow?: Array<{ muscle: string; sets: number; mrv: number }>;
   humerusWarnings?: string[];
   balanceWarnings?: string[];
@@ -306,6 +312,9 @@ export interface ArmMetrics {
   totalSetsPerWeek: Record<number, number>;
   avgIntensity: number;
   tableTimePct: number;
+  tableSessionShare: number;
+  tableMinutesShare: number | null;
+  tableVolumeShare: number;
   tendonLoad: number;
   sidePressureLoad: number;
 }

@@ -124,7 +124,7 @@ function refFromBlock(block: MacroBlock | BBMacroBlock | ArmMacroBlock, idx: num
       blockIndex: idx,
       kind: 'ARM' as AnnualBlockKind,
       phase: (block as ArmMacroBlock).phase,
-      startWeek: (block as ArmMacroBlock).weekOffset,
+      startWeek: (block as ArmMacroBlock).weekOffset + 1,
       weeks: (block as ArmMacroBlock).weeks,
       competitionId: (block as ArmMacroBlock).competitionId,
       description: (block as ArmMacroBlock).description,
@@ -481,7 +481,7 @@ function loopWeeksToLength(weeks: UserWeek[], total: number): UserWeek[] {
 /** Сборка PL-блока: СРЦ-цикл → недели + фазы + taper. */
 function buildPLBlock(
   state: AnnualBlockState,
-  _macro: Macrocycle | BBMacrocycle,
+  _macro: Macrocycle | BBMacrocycle | ArmMacrocycle,
   opts: AnnualBuildOptions,
 ): AnnualBlockBuildResult {
   const warnings: string[] = [];
@@ -663,7 +663,7 @@ function buildBBBlockViaPrep(
 /** Сборка BB-блока: autodraftBBPlan → пик-неделя (опц.) → фаза блока → taper. */
 function buildBBBlock(
   state: AnnualBlockState,
-  _macro: Macrocycle | BBMacrocycle,
+  _macro: Macrocycle | BBMacrocycle | ArmMacrocycle,
   opts: AnnualBuildOptions,
 ): AnnualBlockBuildResult {
   const warnings: string[] = [];
@@ -815,7 +815,7 @@ function configHashOf(config: AnnualBlockConfig, ref: AnnualBlockRef): string {
 export function buildAnnualBlock(
   state: AnnualBlockState,
   plan: AnnualTrainingPlan,
-  macro: Macrocycle | BBMacrocycle,
+  macro: Macrocycle | BBMacrocycle | ArmMacrocycle,
   opts: AnnualBuildOptions = {},
 ): AnnualBlockState {
   try {
@@ -824,21 +824,25 @@ export function buildAnnualBlock(
       case 'PL': result = buildPLBlock(state, macro, opts); break;
       case 'BB': result = buildBBBlock(state, macro, opts); break;
       case 'ARM': {
-        const wc = (state.config as any).weightClass || (state.ref as any).weightClass || (state.ref as any).weightClass;
-        const armRes: any = buildArmBlockInternal({ blockKey: state.ref.blockKey, weeks: state.ref.weeks, phase: state.ref.phase, weightClass: wc } as any, { ...state.config as any, weightClass: wc, level: (state.config.level || opts.level) as any }, { level: opts.level });
-        // configHash должен учитывать weightClass как stale-триггер (как PL cycleId)
+        const wc = (state.config as any).weightClass || (state.ref as any).weightClass;
+        const armRes = buildArmBlockInternal(
+          { blockKey: state.ref.blockKey, weeks: state.ref.weeks, phase: state.ref.phase, weightClass: wc },
+          { ...(state.config as any), weightClass: wc, level: (state.config.level || opts.level) as any },
+          { level: opts.level },
+        );
         const armHash = configHashOf({ ...(state.config as any), weightClass: wc }, { ...state.ref, weightClass: wc } as any);
         result = {
           blockKey: armRes.blockKey,
-          kind: 'ARM' as any,
-          weeks: armRes.weeks as any,
+          kind: 'ARM',
+          weeks: armRes.weeks,
           program: armRes.program,
-          bbPlan: armRes.armPlan,
+          bbPlan: null,
+          armPlan: armRes.armPlan,
           warnings: armRes.warnings,
           taperApplied: armRes.taperApplied,
           peakApplied: armRes.peakApplied,
           configHash: armHash,
-        } as any;
+        };
         break;
       }
       case 'MANUAL': result = buildManualBlock(state, plan, opts); break;
@@ -866,7 +870,7 @@ export function buildAnnualBlock(
  */
 export function buildAnnualPlan(
   plan: AnnualTrainingPlan,
-  macro: Macrocycle | BBMacrocycle,
+  macro: Macrocycle | BBMacrocycle | ArmMacrocycle,
   opts: AnnualBuildOptions = {},
 ): AnnualBuildOutcome {
   // opts.sync=false — собрать блоки «как есть» без синхронизации с макро

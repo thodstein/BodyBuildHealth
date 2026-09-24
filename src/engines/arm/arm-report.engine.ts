@@ -25,12 +25,13 @@ export function buildArmReport(plan: ArmPlan): ArmReport {
     gripRationale.push('Армлифтинг: поддержка (Rolling Thunder/Axle) + щипок (Saxon/Hub) + дробление (CoC) — не смешивать.');
     if (plan.inputSnapshot?.gripImplement) gripRationale.push(`Имплемент: ${plan.inputSnapshot.gripImplement}`);
   }
-  gripRationale.push(`Table time: ${(metrics.tableTimePct*100).toFixed(0)}% — цель ≥50% для армрестлинга (Кузнецов VIII).`);
+  gripRationale.push(`Table sessions: ${(metrics.tableSessionShare * 100).toFixed(0)}% · table minutes: ${metrics.tableMinutesShare == null ? 'нет данных' : `${(metrics.tableMinutesShare * 100).toFixed(0)}%`} · table volume: ${(metrics.tableVolumeShare * 100).toFixed(0)}%.`);
+  gripRationale.push(`Политика стола: target — доля сессий; минуты отображаются только при наличии длительностей.`);
 
   const warnings: string[] = [];
   if (metrics.tendonLoad > 80) warnings.push(`Tendon load ${metrics.tendonLoad} — много сухожильной работы, добавить восстановление`);
   if (metrics.sidePressureLoad > 20) warnings.push(`Side pressure ${metrics.sidePressureLoad} — проверить humerus guard`);
-  if (metrics.tableTimePct < 0.4 && plan.discipline === 'armwrestling') warnings.push('Table time <40% — для армрестлинга мало стола');
+  if (metrics.tableSessionShare < 0.4 && plan.discipline === 'armwrestling') warnings.push('Table sessions <40% — для армрестлинга мало стола');
 
   return { summary, phaseRationale, volumeSummary, techniqueRationale, gripRationale, warnings };
 }

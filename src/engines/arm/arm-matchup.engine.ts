@@ -103,7 +103,7 @@ function baseCounter(opp: MatchupOppStyle): Pick<ArmMatchupPlan, 'threat' | 'pri
         gameplan: [
           'Готовить переходы: pron↔sup и cup в каждой неделе (баланс ≤1.5×).',
           'Слабую линию держать по правилу взаимозависимости Кузнецова (слабые пучки тормозят сильные).',
-          'Table time ≥50%: умеренная/тяжёлая/стресс недели 3/2/1.',
+          'Table sessions ≥50%: умеренная/тяжёлая/стресс недели 3/2/1.',
         ],
       };
     default:

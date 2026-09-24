@@ -64,7 +64,8 @@ export function injectGripProtocol(plan: any, kind: GripProtocolKind, opts: Grip
   const catalogEx = (equipped.length ? equipped : pool)[0] as any;
   if (!catalogEx) return { plan: copy, injected: false, note: `Нет упражнения ${sg} в каталоге.` };
   const wm = opts.workMax || {};
-  const base = Number((wm as any)[muscle] ?? 50) || 50;
+  const baseValue = Number((wm as any)[muscle] ?? (wm as any).default ?? 0);
+  const base = Number.isFinite(baseValue) && baseValue > 0 ? baseValue : 0;
   const addSets = kind === 'over' ? 3 : 4;
   const newSets = Math.min(host.sets, addSets);
   const weight = kind === 'over' ? Math.round(base * 0.9 * 2) / 2 : Math.round(base * 0.75 * 2) / 2;
@@ -88,6 +89,9 @@ export function injectGripProtocol(plan: any, kind: GripProtocolKind, opts: Grip
     substitutionGroup: (catalogEx as any).substitutionGroup,
     exerciseId: (catalogEx as any).id,
     equipment: (catalogEx as any).equipment,
+    loadMode: (catalogEx as any).equipment === 'bodyweight' ? 'bodyweight' : (catalogEx as any).equipment === 'band' ? 'band' : 'tool',
+    provenance: 'diagnostic',
+    provenanceSource: `arm-grip-protocol:${kind}`,
     comment: kind === 'over'
       ? 'Overcrush-протокол пика: 3×3 hold 8–12с, 1 max-попытка главным событием.'
       : 'Negatives-протокол: 4×3, эксцентрик 5с.',

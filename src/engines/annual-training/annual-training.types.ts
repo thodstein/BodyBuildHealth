@@ -127,6 +127,8 @@ export interface AnnualBlockBuildResult {
   program: UserProgram | null;
   /** BBPlan-снапшот (для передачи в ББ-авто); JSON-safe (any — движок BB тяжёлый). */
   bbPlan: unknown | null;
+  /** ArmPlan-снапшот для ARM-блоков; не смешивается с bbPlan. */
+  armPlan?: unknown | null;
   warnings: string[];
   taperApplied: boolean;
   peakApplied: boolean;

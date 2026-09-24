@@ -10,7 +10,7 @@ import { finalizeArmPlan } from '../arm-finalize.engine';
 
 function testPlan() {
   return finalizeArmPlan(
-    buildArmPlan({ discipline: 'armwrestling', patternId: 'arm_3_full', level: 'intermediate', goal: 'strength', technique: 'toproll', weeks: 4, gripFocus: 'support' } as any),
+    buildArmPlan({ discipline: 'armwrestling', patternId: 'arm_3_full', level: 'intermediate', goal: 'strength', technique: 'toproll', weeks: 4, gripFocus: 'support', workMax: { wrist_flexors: 60, risers: 60, default: 60 } } as any),
     { level: 'intermediate' },
   );
 }

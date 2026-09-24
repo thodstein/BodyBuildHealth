@@ -375,6 +375,22 @@ describe('ArmDiagnosticsHub PRO', () => {
     fireEvent.click(btn!);
     await waitFor(() => expect(document.body.textContent).toContain('Календарь .ics'));
   });
+
+  it('ICS blocked-плана показывает safety-причину и не выгружает календарь', async () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    localStorage.setItem('he_arm_plan_saved', JSON.stringify({
+      plan: {
+        validation: { valid: true, errors: [], warnings: [], status: 'blocked', blocked: ['Ось humerus high'] },
+        weeks: [{ week: 1, sessions: [{ day: 1, sessionTag: 'GripHeavy', character: 'тяж', exercises: [{ name: 'RT', sets: 3, repsRange: [3, 3] }] }] }],
+      },
+    }));
+    render(<ArmDiagnosticsHub />);
+    const btn = document.body.querySelector('[data-arm="export-ics"]');
+    fireEvent.click(btn!);
+    await waitFor(() => expect(document.body.textContent).toContain('Экспорт заблокирован'));
+    expect(document.body.textContent).toContain('Ось humerus high');
+    expect(document.body.textContent).not.toContain('Календарь .ics (недели/сессии плана)');
+  });
   it('F1: селект снаряда Axle меняет норму 133 ↔ 237.5', () => {
     render(<ArmDiagnosticsHub />);
     fireEvent.change(screen.getByPlaceholderText('100'), { target: { value: '200' } });

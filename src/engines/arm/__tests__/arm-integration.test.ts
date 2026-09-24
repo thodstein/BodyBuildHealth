@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildArmPlan } from '../arm-builder.engine';
 import { finalizeArmPlan } from '../arm-finalize.engine';
 import { validateArmPlan } from '../arm-validator.engine';
-import { tableWeekKind } from '../arm-table.engine';
+import { tableWeekKind, tableTimeSummary } from '../arm-table.engine';
 import { buildArmTaperCurve } from '../arm-taper.engine';
 
 describe('arm-integration', () => {
@@ -29,6 +29,34 @@ describe('arm-integration', () => {
     expect(tableWeekKind(6,12)).toBe('stress');
     expect(tableWeekKind(7,12)).toBe('moderate');
   });
+  it('table metrics distinguish session share from minutes and honor short cycles', () => {
+    const weeks = [
+      {
+        week: 1,
+        sessions: [
+          { tableTime: true, durationMin: 60, exercises: [] },
+          { tableTime: false, durationMin: 30, exercises: [] },
+        ],
+      },
+      {
+        week: 2,
+        sessions: [
+          { tableTime: true, durationMin: 20, exercises: [] },
+          { tableTime: false, durationMin: 80, exercises: [] },
+        ],
+      },
+    ] as any[];
+    const summary = tableTimeSummary(weeks, 0.5);
+    expect(summary.tableSessionShare).toBe(0.5);
+    expect(summary.tableMinutesShare).toBeCloseTo(80 / 190);
+    expect(summary.targetMet).toBe(true);
+    expect(tableWeekKind(1, 2)).toBe('moderate');
+    expect(tableWeekKind(2, 2)).toBe('heavy');
+    expect(tableWeekKind(1, 3)).toBe('moderate');
+    expect(tableWeekKind(2, 3)).toBe('heavy');
+    expect(tableWeekKind(3, 3)).toBe('stress');
+  });
+
   it('taper 2 нед кривая', () => {
     expect(buildArmTaperCurve({taperWeeks:2}).length).toBe(2);
   });

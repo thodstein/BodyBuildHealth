@@ -26,6 +26,10 @@ describe('arm-diagnostics-injection', () => {
     // вставленный ex есть (pronation_cable или альтернатива pronation_sledge)
     const found = res.plan.weeks[0].sessions.some(s=> s.exercises.some(e=> ['pronation_cable','pronation_sledge','pronation_strap','indian_clubs'].includes(e.exerciseId||'')));
     expect(found).toBe(true);
+    const injected = res.plan.weeks[0].sessions.flatMap(s => s.exercises).find(e => ['pronation_cable','pronation_sledge','pronation_strap','indian_clubs'].includes(e.exerciseId || ''));
+    expect(injected?.provenance).toBe('diagnostic');
+    expect(injected?.loadMode).toBeTruthy();
+    expect(injected?.workSets.every(set => set.weight === 0)).toBe(true);
   });
   it('dedup: второй раз тот же — skip или альтернатива', () => {
     const plan = basePlan();

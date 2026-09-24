@@ -114,8 +114,8 @@ export function buildArmDiagnosticsReport(input: {
 
   // Table — факт
   const tableRatio = input.totalSessions ? input.tableSessions / input.totalSessions : 0;
-  if (tableRatio < 0.3) findings.push({ level: 'warn', text: `Table time ${(tableRatio*100).toFixed(0)}% <30% — для армрестлинга мало стола (Кузнецов VIII ≥50%)`, exercise: 'table_pushdown_iso' });
-  else if (tableRatio >= 0.5) findings.push({ level: 'ok', text: `Table time ${(tableRatio*100).toFixed(0)}% ≥50% — норма`, exercise: 'table_pushdown_iso' });
+  if (tableRatio < 0.3) findings.push({ level: 'warn', text: `Table sessions ${(tableRatio*100).toFixed(0)}% <30% — для армрестлинга мало стола (Кузнецов VIII ≥50%)`, exercise: 'table_pushdown_iso' });
+  else if (tableRatio >= 0.5) findings.push({ level: 'ok', text: `Table sessions ${(tableRatio*100).toFixed(0)}% ≥50% — норма`, exercise: 'table_pushdown_iso' });
 
   // Tendon — сустав/сухожилие риск
   if (input.tendonSets > 22) findings.push({ level: 'critical', text: `Tendon ${input.tendonSets} >22 — CRITICAL (кап 22)`, exercise: 'wrist_ext_bb' });

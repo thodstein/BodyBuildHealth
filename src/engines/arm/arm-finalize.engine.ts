@@ -7,6 +7,7 @@ import { getArmLandmarks } from './arm-volume-landmarks.engine';
 import { perExerciseCap } from './arm-volume.engine';
 import { getArmCycle } from './arm-cycle-library.engine';
 import { buildArmTaperCurve, applyArmTaperToWeeks, type ArmTaperMode } from './arm-taper.engine';
+import { armInjuryRepsCap, armInjuryVolumeFactor, armInjuryWeightFactor, mobilityBlockReason } from './arm-injury-guard.engine';
 
 function ensurePronSupBalance(plan: ArmPlan): void {
   for (const wk of plan.weeks) {
@@ -24,6 +25,7 @@ function ensurePronSupBalance(plan: ArmPlan): void {
           sets: 2, repsRange: [10,15], rir: 2,
           workSets: [{ reps: 12, rir: 2, weight: 0, restSeconds: 90 }, { reps: 12, rir: 2, weight: 0, restSeconds: 90 }],
           movementPattern: 'supination' as any, substitutionGroup: 'supination',
+          loadMode: 'tool', provenance: 'finalizer', provenanceSource: 'arm-finalize:pron-sup-balance',
         });
       }
     } else if (sup > 0 && pron === 0) {
@@ -34,6 +36,7 @@ function ensurePronSupBalance(plan: ArmPlan): void {
           sets: 2, repsRange: [8,12], rir: 2,
           workSets: [{ reps: 10, rir: 2, weight: 0, restSeconds: 90 }, { reps: 10, rir: 2, weight: 0, restSeconds: 90 }],
           movementPattern: 'pronation' as any, substitutionGroup: 'pronation',
+          loadMode: 'tool', provenance: 'finalizer', provenanceSource: 'arm-finalize:pron-sup-balance',
         });
       }
     }
@@ -58,6 +61,7 @@ function ensureFlexExtBalance(plan: ArmPlan): void {
           muscle: 'wrist_extensors' as any, name: 'Разгибание кисти со штангой', role: 'accessory', character: 'памп' as any,
           sets: 2, repsRange: [12,20], rir: 2,
           workSets: [{ reps: 15, rir: 2, weight: 0, restSeconds: 60 }, { reps: 15, rir: 2, weight: 0, restSeconds: 60 }],
+          loadMode: 'bodyweight', provenance: 'finalizer', provenanceSource: 'arm-finalize:flex-ext-balance',
         });
       }
     }
@@ -95,6 +99,7 @@ function tryTableSwap(plan: ArmPlan, wkIdx: number, why: string): boolean {
       sets: 2, repsRange: [8,12], rir: 3,
       workSets: [{ reps: 10, rir: 3, weight: 0, restSeconds: 90 }, { reps: 10, rir: 3, weight: 0, restSeconds: 90 }],
       movementPattern: 'pronation' as any, substitutionGroup: 'pronation', isTable: true,
+      loadMode: 'tool', provenance: 'finalizer', provenanceSource: 'arm-finalize:table-time',
     });
     plan.rationale.push(`Н${wk.week}: ${why} — автозамена Support→TableTech (Кузнецов VIII ≥50%)`);
     return true;
@@ -289,15 +294,17 @@ function ensureGripCoverage(plan: ArmPlan): void {
       const last = wk.sessions[wk.sessions.length-1];
       if (last) last.exercises.push({
         muscle: 'grip_support' as any, name: 'Rolling Thunder (вращающаяся ручка)', role: 'accessory', character: 'памп' as any,
-        sets: 2, repsRange: [5,8], rir: 2, workSets: [{ reps: 5, rir: 2, weight: 0 }, { reps: 5, rir: 2, weight: 0 }],
-      });
+         sets: 2, repsRange: [5,8], rir: 2, workSets: [{ reps: 5, rir: 2, weight: 0 }, { reps: 5, rir: 2, weight: 0 }],
+         loadMode: 'tool', provenance: 'finalizer', provenanceSource: 'arm-finalize:grip-coverage',
+       });
     }
     if (!hasPinch) {
       const last = wk.sessions[wk.sessions.length-1];
       if (last && last.exercises.length < 6) last.exercises.push({
         muscle: 'grip_pinch' as any, name: 'Щипок блинов (удержание)', role: 'accessory', character: 'памп' as any,
-        sets: 2, repsRange: [1,1], rir: 2, workSets: [{ reps: 1, rir: 2, weight: 0, holdSeconds: 10 }, { reps: 1, rir: 2, weight: 0, holdSeconds: 10 }],
-      });
+         sets: 2, repsRange: [1,1], rir: 2, workSets: [{ reps: 1, rir: 2, weight: 0, holdSeconds: 10 }, { reps: 1, rir: 2, weight: 0, holdSeconds: 10 }],
+         loadMode: 'tool', provenance: 'finalizer', provenanceSource: 'arm-finalize:grip-coverage',
+       });
     }
   }
 }
@@ -320,9 +327,41 @@ function ensureCocCoverage(plan: ArmPlan): void {
         sets: 2, repsRange: [5, 7], rir: 2,
         workSets: [{ reps: 6, rir: 2, weight: 0 }, { reps: 6, rir: 2, weight: 0 }],
         movementPattern: 'grip_crush' as any, substitutionGroup: 'grip_crush',
-        comment: 'CoC work 1–3×5–7 в отказ (тройка warm/work/challenge — см. rationale)',
-      });
+         comment: 'CoC work 1–3×5–7 в отказ (тройка warm/work/challenge — см. rationale)',
+         loadMode: 'tool', provenance: 'finalizer', provenanceSource: 'arm-finalize:coc-coverage',
+       });
       plan.rationale.push(`Н${wk.week}: CoC — добавлен work-эспандер 2×5–7 (режим ${coc})`);
+    }
+  }
+}
+
+function enforceInputSafety(plan: ArmPlan): void {
+  const snap = (plan.inputSnapshot as any) || {};
+  const injuries = Array.isArray(snap.injuries) ? snap.injuries : [];
+  const restrictions = Array.isArray(snap.mobilityRestrictions) ? snap.mobilityRestrictions : [];
+  for (const wk of plan.weeks) {
+    for (const sess of wk.sessions) {
+      const before = sess.exercises.length;
+      sess.exercises = sess.exercises.filter((ex) => {
+        if (armInjuryVolumeFactor(injuries, ex.muscle) <= 0) return false;
+        if (mobilityBlockReason(ex, restrictions)) return false;
+        return true;
+      });
+      for (const ex of sess.exercises) {
+        const factor = armInjuryVolumeFactor(injuries, ex.muscle);
+        const weightFactor = armInjuryWeightFactor(injuries, ex.muscle);
+        const repsCap = armInjuryRepsCap(injuries, ex.muscle);
+        ex.sets = Math.max(1, Math.round(ex.sets * factor));
+        ex.workSets = ex.workSets.slice(0, ex.sets).map((ws) => ({
+          ...ws,
+          weight: Math.round(ws.weight * weightFactor * 2) / 2,
+          reps: repsCap == null || ws.reps === 'AMRAP' ? ws.reps : Math.min(Number(ws.reps) || 1, repsCap),
+        }));
+        if (repsCap != null) ex.repsRange = [Math.min(ex.repsRange[0], repsCap), Math.min(ex.repsRange[1], repsCap)];
+      }
+      if (sess.exercises.length !== before) {
+        plan.rationale.push(`Н${wk.week} ${sess.sessionTag}: safety-фильтр снял ${before - sess.exercises.length} упражнений по травме/мобильности.`);
+      }
     }
   }
 }
@@ -367,6 +406,7 @@ export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRat
   assignHoldsAndStatics(plan);
   dedupeAngles(plan);
   injectTendonConditioning(plan, level);
+  enforceInputSafety(plan);
 
   // Итоговый пересчёт weeklyVolume
   const weeklyVolume: Record<number, any> = {};

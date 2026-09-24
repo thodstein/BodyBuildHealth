@@ -92,7 +92,9 @@ export function injectTableCorrections(plan: any, bouts: unknown, opts: TableInj
     return { plan: copy, injected: 0, notes };
   }
   const wm = opts.workMax || {};
-  const weight = Math.round(((wm as any)['risers'] || (wm as any)['default'] || 30) * 0.6 * 2) / 2;
+  const baseValue = Number((wm as any)['risers'] ?? (wm as any)['default'] ?? 0);
+  const base = Number.isFinite(baseValue) && baseValue > 0 ? baseValue : 0;
+  const weight = Math.round(base * 0.6 * 2) / 2;
   target.exercises.push({
     muscle: 'risers',
     name: (catalogEx as any).name,
@@ -109,6 +111,9 @@ export function injectTableCorrections(plan: any, bouts: unknown, opts: TableInj
     substitutionGroup: 'rising',
     exerciseId: CONTAIN_ID,
     equipment: (catalogEx as any).equipment,
+    loadMode: (catalogEx as any).equipment === 'bodyweight' ? 'bodyweight' : (catalogEx as any).equipment === 'band' ? 'band' : 'tool',
+    provenance: 'diagnostic',
+    provenanceSource: 'arm-table-inject:containment',
     comment: `Table-IQ: срывы ${iq.slipRate}% — containment пальцев, не распахивать.`,
   });
   notes.push(`Table-IQ: containment 3×15-20 в ${target.sessionTag} (нед ${week.week}) — срывы ${iq.slipRate}%.`);

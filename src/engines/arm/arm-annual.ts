@@ -2,11 +2,12 @@
  * arm-annual.ts — блок-билдер для годового плана (как strength-sport-annual).
  * Интегрируется в annual-training/block-builders через case 'ARM'.
  */
-import type { ArmBuilderInput } from './arm-types';
+import type { ArmBuilderInput, ArmPlan } from './arm-types';
 import { buildArmPlan } from './arm-builder.engine';
 import { finalizeArmPlan } from './arm-finalize.engine';
 import { applyArmTaperToWeeks, buildArmTaperCurve } from './arm-taper.engine';
 import { getArmCycle, fitCycleToWeeks } from './arm-cycle-library.engine';
+import { refreshArmPlanSnapshot } from './arm-plan-snapshot.engine';
 import { suggestCycleForMacroPhase } from './arm-cycle-selector.engine';
 import { ARM_PHASE_PRESETS, consentPreview } from './arm-pro5-ux.engine';
 import { superSeriesYear } from './arm-calendar.engine';
@@ -16,8 +17,8 @@ export interface ArmAnnualBuildResult {
   blockKey: string;
   kind: 'ARM';
   weeks: UserWeek[];
-  program: any | null;
-  armPlan: any | null;
+  program: null;
+  armPlan: ArmPlan | null;
   warnings: string[];
   taperApplied: boolean;
   peakApplied: boolean;
@@ -31,21 +32,60 @@ function stableHash(obj: any): string {
   return String(h);
 }
 
-function armPlanToUserWeeks(plan: any): UserWeek[] {
-  return plan.weeks.map((wk: any, idx: number) => ({
+function armPlanToUserWeeks(plan: ArmPlan): UserWeek[] {
+  return plan.weeks.map((wk, idx) => ({
     week: idx + 1,
     phase: wk.phase === 'accumulation' ? 'accumulation' : wk.phase === 'intensification' ? 'intensification' : wk.phase === 'peaking' ? 'peaking' : 'deload',
     deload: !!wk.deload,
-    sessions: wk.sessions.map((sess: any, si: number) => ({
-      id: `arm-w${idx+1}-s${si+1}`,
+    armMetadata: {
+      tableRatio: wk.tableRatio ?? null,
+      deload: !!wk.deload,
+      taper: !!wk.taper,
+    },
+    sessions: wk.sessions.map((sess, si) => ({
+      id: `arm-w${idx + 1}-s${si + 1}`,
       name: sess.sessionTag,
+      focus: sess.sessionTag,
       dayOfWeek: (sess.day - 1) % 7,
-      blocks: sess.exercises.map((ex: any, ei: number) => ({
-        id: `arm-w${idx+1}-s${si+1}-b${ei+1}`,
+      character: sess.character === 'техника' ? 'лёг' : sess.character,
+      estimatedMin: sess.durationMin,
+      armMetadata: {
+        sessionTag: sess.sessionTag,
+        tableTime: !!sess.tableTime,
+        tableRatio: sess.tableRatio ?? null,
+        weekOffset: sess.weekOffset,
+      },
+      blocks: sess.exercises.map((ex, ei) => ({
+        id: `arm-w${idx + 1}-s${si + 1}-b${ei + 1}`,
         type: ex.role === 'primary' ? 'compound' : 'accessory',
         exerciseName: ex.name,
         muscle: ex.muscle,
-        sets: ex.workSets.map((ws: any) => ({ reps: ws.reps, rir: ws.rir, restSec: ws.restSeconds, weight: ws.weight })),
+        role: ex.role,
+        sets: ex.workSets.map((ws) => ({
+          reps: ws.reps,
+          rir: ws.rir,
+          restSec: ws.restSeconds,
+          weight: ws.weight,
+          tempo: ws.tempo,
+          holdSeconds: ws.holdSeconds,
+        })),
+        rationale: ex.rationale,
+        note: ex.comment,
+        character: ex.character === 'техника' ? 'лёг' : ex.character,
+        repsRange: ex.repsRange,
+        tempoSpec: ex.tempoSpec,
+        armMetadata: {
+          exerciseId: ex.exerciseId ?? null,
+          equipment: ex.equipment ?? null,
+          movementPattern: ex.movementPattern ?? null,
+          substitutionGroup: ex.substitutionGroup ?? null,
+          isTable: !!ex.isTable,
+          isStatic: !!ex.isStatic,
+          workingAngle: ex.workingAngle ?? null,
+          loadMode: ex.loadMode ?? null,
+          provenance: ex.provenance ?? null,
+          provenanceSource: ex.provenanceSource ?? null,
+        },
       })),
     })),
   }));
@@ -143,8 +183,10 @@ export function buildArmBlock(
     }
   }
 
+  plan = refreshArmPlanSnapshot(plan, input.level);
   const weeksOut = armPlanToUserWeeks(plan);
   const warnings: string[] = [];
+  if (plan.validation?.blocked?.length) warnings.push(...plan.validation.blocked);
   if (plan.validation && !plan.validation.valid) warnings.push(...(plan.validation.warnings || []));
   // PRO-5 P7: consent-превью цикла в warnings блока (было/стало без захода в конструктор).
   try {

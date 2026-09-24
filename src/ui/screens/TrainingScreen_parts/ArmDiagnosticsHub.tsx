@@ -46,7 +46,7 @@ import { planBilateralVolume, loadBilateralHist, saveBilateralEntry, bilateralTr
 import { scorePlatform, planAttempts, loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
 import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary } from '../../../engines/arm/arm-acwr.engine';
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
-import { buildArmIcs } from '../../../engines/arm/arm-export.engine';
+import { armPlanExportBlockReasons, buildArmIcs } from '../../../engines/arm/arm-export.engine';
 import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
 import { loadRedFlags, redFlagLabels } from '../../../engines/arm/arm-redflags.store';
 import { readHumerusBridge } from '../../../engines/arm/arm-pro5-safety.engine';
@@ -1048,11 +1048,20 @@ export const ArmDiagnosticsHub: React.FC = () => {
         setTimeout(() => setInjectMsg(''), 2500);
         return;
       }
+      const reasons = armPlanExportBlockReasons(armPlan as any);
+      if (reasons.length > 0) {
+        setInjectMsg(`⛔ Экспорт заблокирован: ${reasons.join(' · ')}`);
+        setTimeout(() => setInjectMsg(''), 3500);
+        return;
+      }
       const ics = buildArmIcs(armPlan as any);
       downloadArmFile(`arm-plan-${new Date().toISOString().slice(0, 10)}.ics`, ics, 'text/calendar');
       setInjectMsg('✓ Календарь .ics (недели/сессии плана)');
       setTimeout(() => setInjectMsg(''), 2500);
-    } catch { /* noop */ }
+    } catch {
+      setInjectMsg('⚠ Не удалось создать календарь .ics');
+      setTimeout(() => setInjectMsg(''), 2500);
+    }
   };
 
   const handlePrintP0 = () => {

@@ -81,7 +81,7 @@ export function acwrMultFor(input: {
   return { mult: 1, ratio, zone: 'ok', note: null };
 }
 
-/** Честная пометка PED: известные id идут через adaptForPEDs, неизвестные — грубая оценка. */
+/** Честная пометка PED: известные id идут через adaptForPEDs, неизвестные — без boost. */
 const KNOWN_PED_SUBSTR = [
   'test', 'tren', 'deca', 'nand', 'bold', 'eq_', 'primo', 'mast', 'drosta', 'stan', 'oxan',
   'anavar', 'winst', 'dbol', 'methan', 'tbol', 'turin', 'anadrol', 'oxy', 'sust', 'enan', 'cyp',
@@ -96,7 +96,7 @@ export function pedHonestyNote(pedDoses: Record<string, number> | undefined): st
     return !KNOWN_PED_SUBSTR.some((s) => low.includes(s));
   });
   if (unknown.length === 0) return null;
-  return `PED: неизвестные id (${unknown.join(', ')}) — оценка грубая по сумме доз, не фармакология. Проверьте канон pharma-db.`;
+  return `PED: неизвестные id (${unknown.join(', ')}) — MRV boost отключён, фармакологическая оценка не применялась. Проверьте канон pharma-db.`;
 }
 
 /** Честная пометка веса: workMax пуст для мышцы → вес-ориентир, прогрессия по нему не ведётся. */

@@ -81,6 +81,7 @@ export interface UserSet {
   techniques?: IntensityTechnique[];
   tempo?: string;         // нотация темпа "3-1-1-0"
   restSec?: number;
+  holdSeconds?: number;
   note?: string;
   // Динамические поля для техник
   dropWeight?: number;    // вес дропа (кг) для drop_set
@@ -106,6 +107,7 @@ export interface UserBlock {
   /** Обоснование выбора (почему это упражнение) — прозрачность для пользователя. */
   rationale?: string;
   note?: string;
+  armMetadata?: Record<string, unknown>;
   /** Характер упражнения (из BBPlan.character): 'тяж' | 'памп' | 'лёг' — дневник использует для раздела тяжёлых/лёгких подходов. */
   character?: 'тяж' | 'памп' | 'лёг';
   /** Диапазон повторений [min, max] (из BBPlan.repsRange) — для прогрессий 5/3/1 и пр. */
@@ -138,6 +140,7 @@ export interface UserSession {
   estimatedMin?: number;
   /** Заметка к тренировке (для тренера, отображается в редакторе/экспорте/PDF). */
   note?: string;
+  armMetadata?: Record<string, unknown>;
 }
 
 export interface UserWeek {
@@ -148,6 +151,7 @@ export interface UserWeek {
   sessions: UserSession[];
   /** Заметка к неделе (для тренера, отображается в редакторе/экспорте/PDF). */
   note?: string;
+  armMetadata?: Record<string, unknown>;
 }
 
 /* ───────────────────────── Бюджет объёма по мышцам ───────────────────────── */

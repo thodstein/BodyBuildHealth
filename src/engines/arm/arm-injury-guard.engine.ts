@@ -22,12 +22,63 @@ export function isHumerusRiskExercise(ex: { muscle?: string; substitutionGroup?:
   return isSidePressureExercise(ex);
 }
 
-export function armInjuryVolumeFactor(injuries: Array<{ muscle: string; volumePct?: number; exclude?: boolean }>, muscle: string): number {
-  const inj = injuries.find(i => i.muscle.toLowerCase() === muscle.toLowerCase());
+function normalizeArmInjuryKey(value: string): string {
+  const raw = String(value || '').trim().toLowerCase();
+  if (/forearm|pronator|supinator|пронац|супинац|предплеч/.test(raw)) return 'forearm';
+  if (/elbow|локт/.test(raw)) return 'elbow';
+  if (/wrist|кист|запяст/.test(raw)) return 'wrist';
+  return raw;
+}
+
+function armInjuryMatches(injuryMuscle: string, targetMuscle: string): boolean {
+  const injury = normalizeArmInjuryKey(injuryMuscle);
+  const target = normalizeArmInjuryKey(targetMuscle);
+  if (injury === target) return true;
+  if (injury === 'forearm') return ['pronators', 'supinators', 'brachioradialis'].includes(target);
+  if (injury === 'wrist') return ['wrist_flexors', 'wrist_extensors', 'risers', 'thumb', 'grip_support', 'grip_pinch', 'grip_crush'].includes(target);
+  if (injury === 'elbow') return ['side_pressure', 'back_pressure', 'brachialis', 'biceps_long', 'biceps_short'].includes(target);
+  if (injury === 'shoulder' || injury === 'shoulder_stab') return target === 'shoulder_stab';
+  return false;
+}
+
+export function findArmInjury(injuries: Array<{ muscle: string; volumePct?: number; weightPct?: number; repsCap?: number; exclude?: boolean }> | undefined, muscle: string): { muscle: string; volumePct?: number; weightPct?: number; repsCap?: number; exclude?: boolean } | undefined {
+  return (injuries || []).find((i) => armInjuryMatches(i.muscle, muscle));
+}
+
+export function armInjuryVolumeFactor(injuries: Array<{ muscle: string; volumePct?: number; exclude?: boolean }> | undefined, muscle: string): number {
+  const inj = findArmInjury(injuries, muscle);
   if (!inj) return 1;
   if (inj.exclude) return 0;
-  if (inj.volumePct != null) return Math.max(0, Math.min(1, inj.volumePct / 100));
+  if (inj.volumePct != null) return Math.max(0, Math.min(1, Number(inj.volumePct) / 100));
   return 0.5;
+}
+
+export function armInjuryWeightFactor(injuries: Array<{ muscle: string; weightPct?: number; exclude?: boolean }> | undefined, muscle: string): number {
+  const inj = findArmInjury(injuries, muscle);
+  if (!inj || inj.exclude || inj.weightPct == null) return 1;
+  const value = Number(inj.weightPct);
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value / 100)) : 1;
+}
+
+export function armInjuryRepsCap(injuries: Array<{ muscle: string; repsCap?: number; exclude?: boolean }> | undefined, muscle: string): number | null {
+  const inj = findArmInjury(injuries, muscle);
+  if (!inj || inj.exclude || inj.repsCap == null) return null;
+  const value = Number(inj.repsCap);
+  return Number.isFinite(value) && value > 0 ? Math.max(1, Math.round(value)) : null;
+}
+
+export function mobilityBlockReason(ex: { muscle?: string; substitutionGroup?: string; movementPattern?: string; name?: string }, restrictions: string[] | undefined): string | null {
+  const muscle = String(ex.muscle || '').toLowerCase();
+  const group = String(ex.substitutionGroup || '').toLowerCase();
+  const pattern = String(ex.movementPattern || '').toLowerCase();
+  const name = String(ex.name || '').toLowerCase();
+  const text = `${muscle} ${group} ${pattern} ${name}`;
+  const keys = new Set((restrictions || []).map((x) => normalizeArmInjuryKey(String(x))));
+  if (keys.has('wrist') && /wrist|pron|sup|ris|riser|thumb|grip|cup|contain/.test(text)) return 'wrist';
+  if (keys.has('forearm') && /wrist|pron|sup|ris|riser|thumb|grip|hammer|curl|reverse/.test(text)) return 'forearm';
+  if (keys.has('elbow') && /side|back_drag|hammer|biceps|curl/.test(text)) return 'elbow';
+  if (keys.has('shoulder') && /shoulder|плеч/.test(text)) return 'shoulder';
+  return null;
 }
 
 export function checkHumerusGuard(plan: { weeks: Array<{ week: number; sessions: Array<{ exercises: Array<{ muscle: string; sets: number }> }> }> }): string[] {

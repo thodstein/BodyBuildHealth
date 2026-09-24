@@ -41,4 +41,11 @@ describe('ROUND-10: конструктор арма пишет план в кл�
     expect(SRC).not.toMatch(/setItem\('he_arm_last_plan', JSON\.stringify/);
     expect((SRC.match(/persistArmPlan\(/g) || []).length).toBeGreaterThanOrEqual(3);
   });
+
+  it('source-guard: blocked-план отключает все операции с вариантами', () => {
+    expect(SRC).toMatch(/AdBtn variant="primary" disabled=\{exportBlocked\}[\s\S]*?💾 Сохранить вариант/);
+    expect(SRC).toMatch(/AdBtn variant="ghost" disabled=\{exportBlocked\} aria-label=\{`Загрузить \$\{v\.name\}`\}/);
+    expect(SRC).toMatch(/AdBtn variant="ghost" disabled=\{exportBlocked\} aria-label=\{`Скачать \$\{v\.name\} JSON`\}/);
+    expect(SRC).toMatch(/<input type="file" accept="application\/json,\.json" disabled=\{exportBlocked\} aria-label="Импорт варианта JSON"/);
+  });
 });

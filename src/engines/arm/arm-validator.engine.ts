@@ -10,6 +10,7 @@ import { getArmPattern } from './arm-split-patterns';
 // PRO-5: blocked-уровень + каденс делоадов (valid не меняют — старые контракты целы)
 import { axisScoreOf, checkHookCap } from './arm-pro5-safety.engine';
 import { foreignPoolWarnings } from './arm-pro5-core.engine';
+import { armInjuryVolumeFactor, mobilityBlockReason } from './arm-injury-guard.engine';
 import { checkCocGates } from './arm-pro5-coc-gate.engine';
 import { deloadEnforcement } from './arm-pro5-ux.engine';
 
@@ -40,6 +41,9 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
   try {
     for (const line of foreignPoolWarnings(plan.weeks as any)) warnings.push(line);
   } catch { /* опционально */ }
+  for (const line of (plan.safetyWarnings || [])) {
+    if (/нет безопасного упражнения|исключено травмой|ограничен/.test(line) && !warnings.includes(line)) warnings.push(line);
+  }
 
   for (const wk of plan.weeks) {
     // session cap
@@ -124,6 +128,18 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
   // PRO-5: blocked — критичные safety-блоки отдельным каналом (valid не меняют).
   const blocked: string[] = [];
   try {
+    const snap = (plan.inputSnapshot as any) || {};
+    for (const wk of plan.weeks) {
+      for (const sess of wk.sessions) {
+        for (const ex of sess.exercises) {
+          if (armInjuryVolumeFactor(snap.injuries, ex.muscle) <= 0) blocked.push(`Н${wk.week} ${ex.name}: упражнение закрыто травмой.`);
+          const mobility = mobilityBlockReason(ex, snap.mobilityRestrictions);
+          if (mobility) blocked.push(`Н${wk.week} ${ex.name}: ограничение мобильности ${mobility}.`);
+        }
+      }
+    }
+  } catch { /* опционально */ }
+  try {
     const ax = (plan.inputSnapshot as any)?.axisCheck;
     if (ax && axisScoreOf(ax) >= 3) blocked.push(`Ось high (${axisScoreOf(ax)} флага): side_pressure только техника, макс запрещён.`);
   } catch { /* опционально */ }
@@ -141,5 +157,15 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
     const age = Number((plan.inputSnapshot as any)?.ageYears ?? 30);
     for (const line of deloadEnforcement(phases, plan.weeks.length, age >= 50)) warnings.push(line);
   } catch { /* опционально */ }
-  return { valid, errors, warnings, blocked, mrvOverflow, humerusWarnings, balanceWarnings, tendonWarnings: [...tendonWarnings, ...uclWarnings, ...shoulderWarnings] };
+  return {
+    valid,
+    errors,
+    warnings,
+    blocked,
+    status: blocked.length > 0 || errors.length > 0 || mrvOverflow.length > 0 ? 'blocked' : warnings.length > 0 ? 'warning' : 'ok',
+    mrvOverflow,
+    humerusWarnings,
+    balanceWarnings,
+    tendonWarnings: [...tendonWarnings, ...uclWarnings, ...shoulderWarnings],
+  };
 }

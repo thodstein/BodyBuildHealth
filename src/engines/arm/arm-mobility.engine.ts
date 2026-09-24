@@ -4,6 +4,8 @@
  * 5 чеков + нормы + reverse-grip retest + applyArmMobilityToProfile + fail→точка маппинг.
  */
 
+import { getProfile, updateProfile } from '../../core/profile-manager';
+
 export interface ArmMobilityInput {
   wristFlexOk: boolean; // сгибание кисти ≥80°
   wristExtOk: boolean; // разгибание ≥70°
@@ -47,19 +49,83 @@ export function mobilityFailForWeakPoint(fails: ArmMobilityFail[], wp: string): 
   return fails.length > 0;
 }
 
-export function applyArmMobilityToProfile(restrictions: string[]): string {
-  const uniq = Array.from(new Set((restrictions || []).map((s) => String(s)).filter(Boolean)));
+function mergeArmMobility(restrictions: string[], remove = false): string[] {
+  const profile = getProfile();
+  const settings: any = profile.settings || {};
+  const health: any = settings.health || {};
+  const training: any = settings.training || {};
+  let rawHealth: any = {};
+  let rawTraining: any = {};
   try {
-    const raw = localStorage.getItem('he_profile_v2');
-    const p = raw ? JSON.parse(raw) : {};
-    p.health = p.health || {};
-    p.training = p.training || {};
-    const prevH = Array.isArray((p.health as any).mobilityRestrictions) ? (p.health as any).mobilityRestrictions : [];
-    const prevT = Array.isArray((p.training as any).mobilityRestrictions) ? (p.training as any).mobilityRestrictions : [];
-    (p.health as any).mobilityRestrictions = Array.from(new Set([...prevH.filter((x: string) => !['wrist', 'forearm', 'elbow'].includes(x)), ...uniq]));
-    (p.training as any).mobilityRestrictions = Array.from(new Set([...prevT.filter((x: string) => !['wrist', 'forearm', 'elbow'].includes(x)), ...uniq]));
-    localStorage.setItem('he_profile_v2', JSON.stringify(p));
-    try { window.dispatchEvent(new CustomEvent('profile-updated')); } catch { /* noop */ }
-  } catch { /* noop */ }
-  return uniq.join(', ') || 'OK';
+    const raw = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+    rawHealth = raw?.health || {};
+    rawTraining = raw?.training || {};
+  } catch {}
+  const legacyHealth: any = { ...rawHealth, ...((profile as any).health || {}) };
+  const legacyTraining: any = { ...rawTraining, ...((profile as any).training || {}) };
+  const keys = new Set(['wrist', 'forearm', 'elbow']);
+  const next = new Set<string>();
+  const add = (source: unknown) => {
+    if (!Array.isArray(source)) return;
+    for (const item of source) {
+      const value = String(item || '').trim();
+      if (value) next.add(value);
+    }
+  };
+  add(health.mobilityRestrictions);
+  add(training.mobilityRestrictions);
+  add(legacyHealth.mobilityRestrictions);
+  add(legacyTraining.mobilityRestrictions);
+  if (!remove) for (const value of restrictions) {
+    const normalized = String(value || '').trim();
+    if (keys.has(normalized)) next.add(normalized);
+  }
+  const merged = Array.from(next);
+  (updateProfile as any)({
+    health: { ...legacyHealth, mobilityRestrictions: merged },
+    training: { ...legacyTraining, mobilityRestrictions: merged },
+    settings: {
+      ...settings,
+      health: { ...health, mobilityRestrictions: merged },
+      training: { ...training, mobilityRestrictions: merged },
+    },
+  });
+  return merged;
+}
+
+export function applyArmMobilityToProfile(restrictions: string[]): string {
+  try {
+    const uniq = Array.from(new Set((restrictions || []).map((s) => String(s)).filter(Boolean)));
+    mergeArmMobility(uniq);
+    return uniq.join(', ') || 'OK';
+  } catch { return 'OK'; }
+}
+
+export function clearArmMobilityFromProfile(restrictions: string[] = ['wrist', 'forearm', 'elbow']): void {
+  try {
+    const profile = getProfile();
+    const settings: any = profile.settings || {};
+    const health: any = settings.health || {};
+    const training: any = settings.training || {};
+    let rawHealth: any = {};
+    let rawTraining: any = {};
+    try {
+      const raw = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
+      rawHealth = raw?.health || {};
+      rawTraining = raw?.training || {};
+    } catch {}
+    const legacyHealth: any = { ...rawHealth, ...((profile as any).health || {}) };
+    const legacyTraining: any = { ...rawTraining, ...((profile as any).training || {}) };
+    const remove = new Set(restrictions.map((value) => String(value).trim()).filter(Boolean));
+    const clean = (source: unknown): string[] => Array.isArray(source) ? source.map(String).filter((value) => !remove.has(value)) : [];
+    (updateProfile as any)({
+      health: { ...legacyHealth, mobilityRestrictions: clean(legacyHealth.mobilityRestrictions) },
+      training: { ...legacyTraining, mobilityRestrictions: clean(legacyTraining.mobilityRestrictions) },
+      settings: {
+        ...settings,
+        health: { ...health, mobilityRestrictions: clean(health.mobilityRestrictions) },
+        training: { ...training, mobilityRestrictions: clean(training.mobilityRestrictions) },
+      },
+    });
+  } catch {}
 }

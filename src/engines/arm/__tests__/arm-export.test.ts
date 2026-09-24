@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { buildArmPlan } from '../arm-builder.engine';
 import { finalizeArmPlan } from '../arm-finalize.engine';
-import { buildArmPrintHtml, buildArmIcs } from '../arm-export.engine';
+import {
+  armPlanExportBlockReasons,
+  ArmPlanExportBlockedError,
+  buildArmPrintHtml,
+  buildArmIcs,
+  isArmPlanExportBlocked,
+} from '../arm-export.engine';
 
 describe('arm-export', () => {
   const plan: any = (() => {
@@ -52,5 +58,32 @@ describe('arm-export', () => {
     expect(html).toContain('фаза срыва: Протяжка');
     expect(html).not.toContain('<script>alert(1)</script>');
     expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('blocked-план не экспортируется ни в print, ни в ICS', () => {
+    const blocked = {
+      ...plan,
+      validation: {
+        valid: true,
+        errors: [],
+        warnings: [],
+        status: 'blocked' as const,
+        blocked: ['Ось humerus high', 'Ось humerus high'],
+      },
+    };
+    expect(isArmPlanExportBlocked(blocked)).toBe(true);
+    expect(armPlanExportBlockReasons(blocked)).toEqual(['Ось humerus high']);
+    expect(() => buildArmPrintHtml(blocked)).toThrow(ArmPlanExportBlockedError);
+    expect(() => buildArmIcs(blocked)).toThrow(/Экспорт арм-плана заблокирован/);
+  });
+
+  it('warning- и legacy-invalid-планы экспортируются', () => {
+    const warning = {
+      ...plan,
+      validation: { valid: false, errors: [], warnings: ['Проверить баланс'], status: 'warning' as const, blocked: [] },
+    };
+    expect(isArmPlanExportBlocked(warning)).toBe(false);
+    expect(buildArmPrintHtml(warning)).toContain(plan.pattern.name);
+    expect(buildArmIcs(warning)).toContain('BEGIN:VCALENDAR');
   });
 });

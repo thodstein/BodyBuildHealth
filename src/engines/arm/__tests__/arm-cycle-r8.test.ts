@@ -45,7 +45,7 @@ describe('arm-cycle-r8 (weekly pct + table floor)', () => {
     expect(p.rationale.some((l: string) => /Прогрессия весов/.test(l))).toBe(false);
   });
   it('correctionPct 2: вес растёт внутри цикла (~1.02^(w-1))', () => {
-    const p: any = buildArmPlan({ discipline: 'armlifting', patternId: 'grip_3_support', level: 'intermediate', goal: 'strength', technique: 'balanced', weeks: 8, correctionPct: 2 } as any);
+    const p: any = buildArmPlan({ discipline: 'armlifting', patternId: 'grip_3_support', level: 'intermediate', goal: 'strength', technique: 'balanced', weeks: 8, correctionPct: 2, workMax: { grip_support: 60 } } as any);
     const w1 = firstGripSupportWeight(p, 0);
     const w3 = firstGripSupportWeight(p, 2);
     expect(w3).toBeGreaterThan(w1);

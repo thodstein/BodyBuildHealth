@@ -166,7 +166,7 @@ describe('arm PRO MAX v2 — diagnostics hub (механизм)', () => {
   it('tableRatio факт + finding', () => {
     const r = buildArmDiagnosticsReport({ weakTest:{}, grip:{}, level:'intermediate', technique:'balanced', tableSessions:0, totalSessions:4, tendonSets:8 });
     expect(r.tableRatio).toBe(0);
-    expect(r.findings.some(f=>f.text.includes('Table time'))).toBe(true);
+    expect(r.findings.some(f=>f.text.includes('Table sessions'))).toBe(true);
   });
 });
 
