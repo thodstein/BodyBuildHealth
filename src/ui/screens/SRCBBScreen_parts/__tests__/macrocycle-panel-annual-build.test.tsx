@@ -11,7 +11,8 @@ import React from 'react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MacrocyclePanel } from '../MacrocyclePanel';
-import { ANNUAL_PLAN_KEY, loadAnnualTrainingPlan } from '../../../../engines/annual-training/annual-training-storage';
+import { ANNUAL_PLAN_KEY, loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../../engines/annual-training/annual-training-storage';
+import { annualProgramFromBlock, importProgramIntoAnnualBlock } from '../../../../engines/annual-training/block-builders.engine';
 import { serializeMacro, type Macrocycle } from '../../../../engines/lms/macrocycle.engine';
 
 vi.mock('../../../../core/profile-manager', () => ({
@@ -209,6 +210,50 @@ describe('MacrocyclePanel — сборка года по конструктор�
     expect(ctx.blockKey).toBeTruthy();
     expect(ctx.phase).toBe('strength');
     expect(ctx.peakWeek).toBe(false);
+  });
+
+  it('🚀 В ББ-авто после reload: ручная правка блока не теряется (editedFromProgram → bbPlanFromUserWeeks)', async () => {
+    const macro = buildPlMacroFixture();
+    localStorage.setItem('he_pl_macro', serializeMacro(macro));
+    const view = render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Сборка года по конструкторам')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 7-12/));
+    await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
+    fireEvent.click(screen.getByText('⚙️ Собрать блок'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.blocks[1].status).toBe('built'), { timeout: 30000 });
+
+    // Правка в ручном конструкторе: тот же путь, что у commit → completeAnnualBlockImport
+    // (pending/programId проверяется в planner-bridge-handlers.test.ts), здесь — сам блок.
+    const plan = loadAnnualTrainingPlan()!;
+    const bbBlock = plan.blocks[1];
+    const program = annualProgramFromBlock(bbBlock)!;
+    const edited = program.bb!.weeks![0].sessions[0].blocks[0];
+    if (!edited) throw new Error('в BB-блоке нет упражнений для правки');
+    edited.exerciseName = 'ПРАВКА-ГОДА';
+    saveAnnualTrainingPlan(importProgramIntoAnnualBlock(plan, bbBlock.ref.blockKey, program));
+
+    // Компактизация storе: снапшот bbPlan не хранится — его и должен восстановить путь правки.
+    const stored = loadAnnualTrainingPlan()!;
+    expect(stored.blocks[1].result!.editedFromProgram).toBe(true);
+    expect(stored.blocks[1].result!.bbPlan).toBeFalsy();
+    expect(stored.blocks[1].result!.weeks[0].sessions[0].blocks[0].exerciseName).toBe('ПРАВКА-ГОДА');
+
+    // Reload: панель заново читает план из хранилища (состояние инициализируется в useState).
+    view.unmount();
+    localStorage.removeItem('he_bb_plan_saved');
+    render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Сборка года по конструкторам')).toBeTruthy());
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 7-12/));
+    await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('🚀 В ББ-авто')).toBeTruthy());
+    fireEvent.click(screen.getByText('🚀 В ББ-авто'));
+    await waitFor(() => expect(screen.getByText(/🚀 Блок передан в ББ-авто/)).toBeTruthy());
+
+    const saved = JSON.parse(localStorage.getItem('he_bb_plan_saved') || 'null');
+    expect(saved).toBeTruthy();
+    const names: string[] = saved.plan.weeks.flatMap((w: any) => w.sessions.flatMap((s: any) => s.exercises.map((e: any) => e.name)));
+    expect(names).toContain('ПРАВКА-ГОДА');
+    expect(saved.plan.weeks.length).toBe(bbBlock.ref.weeks);
   });
 
   it('живое обновление: событие he-annual-training-plan-updated перечитывает план', async () => {
