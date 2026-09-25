@@ -95,15 +95,28 @@ function buildRampCurve(rampWeeks: number, weightGoal: TaperWeightGoal | undefin
 export function buildPLPeakBlockLayout(opts: PLPeakBlockLayoutOpts): PLPeakBlockLayout {
   const warnings: string[] = [];
   const windowWeeks = Math.max(1, Math.min(52, Math.round(opts.windowWeeks || 1)));
-  const mockWeeks = opts.mockMeet ? 1 : 0;
-  const meetWeeks = opts.meetWeek ? 1 : 0;
+  let mockWeeks = opts.mockMeet ? 1 : 0;
+  let meetWeeks = opts.meetWeek ? 1 : 0;
   const postWeeks = opts.postMeet ? 1 : 0;
   const mode: TaperMode = opts.mode ?? 'classic';
   const weightGoal = opts.weightGoal;
+  if (mockWeeks + meetWeeks > windowWeeks) {
+    if (meetWeeks > 0) {
+      mockWeeks = 0;
+      warnings.push('Окно не вмещает mock meet вместе с соревновательной неделей — mock meet отключён, чтобы не расширять блок.');
+    } else {
+      meetWeeks = 0;
+      warnings.push('Окно не вмещает mock meet вместе с соревнованиями — неделя соревнований отключена, чтобы не расширять блок.');
+    }
+  }
 
   // Сколько недель в окне доступно под кривую (ramp + taper): минус mock и meet.
-  const available = Math.max(1, windowWeeks - mockWeeks - meetWeeks);
-  let taperWeeks = Math.max(1, Math.min(4, Math.round(opts.taperWeeks || 2)));
+  const available = Math.max(0, windowWeeks - mockWeeks - meetWeeks);
+  if (available === 0) {
+    const requestedTaper = Math.max(1, Math.round(opts.taperWeeks || 2));
+    warnings.push(`Тапер (${requestedTaper} нед) длиннее окна (${windowWeeks} нед) с учётом mock/соревнований — глубокий тапер отключён.`);
+  }
+  let taperWeeks = available > 0 ? Math.max(1, Math.min(4, Math.round(opts.taperWeeks || 2))) : 0;
   if (taperWeeks > available) {
     warnings.push(`Тапер (${taperWeeks} нед) длиннее окна до старта (${windowWeeks} нед) с учётом mock/соревнований — глубокий тапер урезан до ${available} нед.`);
     taperWeeks = available;
@@ -122,12 +135,12 @@ export function buildPLPeakBlockLayout(opts: PLPeakBlockLayoutOpts): PLPeakBlock
   }
 
   const rampCurve = buildRampCurve(rampWeeks, weightGoal);
-  const taperCurve = buildPLTaperCurve({ taperWeeks, mode, weightGoal, peakCycleId: opts.peakCycleId });
+  const taperCurve = taperWeeks > 0 ? buildPLTaperCurve({ taperWeeks, mode, weightGoal, peakCycleId: opts.peakCycleId }) : [];
 
   const parts: string[] = [];
   if (rampWeeks > 0) parts.push(`вход ${rampWeeks}`);
   if (mockWeeks > 0) parts.push('mock 1');
-  parts.push(`тапер ${taperWeeks}`);
+  if (taperWeeks > 0) parts.push(`тапер ${taperWeeks}`);
   if (meetWeeks > 0) parts.push('соревнования 1');
   if (postWeeks > 0) parts.push('пост 1');
   const summary = `Пик-блок на ${windowWeeks + postWeeks} нед (окно ${windowWeeks}): ${parts.join(' + ')}`;

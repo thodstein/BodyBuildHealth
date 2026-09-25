@@ -16,9 +16,9 @@
  */
 import {
   type UserWeek, type UserSession, type UserBlock, type UserSet, type Phase,
-  type UserProgram, newId,
+  type UserProgram, type ProgramDirection, newId,
 } from '../user-program/user-program.types';
-import { createBlank, createFromBuild } from '../user-program/program-store';
+import { createBlank, createFromBuild, userWeekToBBPlan } from '../user-program/program-store';
 import type {
   AnnualBlockState, AnnualBlockRef, AnnualTrainingPlan, AnnualBlockKind,
   AnnualBuildOptions, AnnualBuildOutcome, AnnualBlockConfig, AnnualBlockBuildResult,
@@ -42,6 +42,7 @@ import type { ArmMacrocycle, ArmMacroBlock } from '../arm/arm-macrocycle.engine'
 import { buildPrepCycle } from '../bb/bb-prep-cycle.engine';
 import { buildPLTaperCurve, type TaperMode, type TaperWeightGoal } from '../lms/lms-taper.engine';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
+import { originalCycleWeeks } from '../lms/lms-builder.engine';
 import { cycleTemplateToFullProgram } from '../bb/cycle-to-plan';
 import type { FullProgram, ProgramWeek } from '../complete-program-library.engine';
 
@@ -61,8 +62,9 @@ export function stableHash(input: unknown): string {
 /** Стабильный ключ макро-блока: layout-поля + цикл/вес. Изменение любого поля → новый ключ → stale. */
 export function macroBlockKey(block: MacroBlock | BBMacroBlock | ArmMacroBlock, idx: number): string {
   const cycleId = (block as MacroBlock).cycleId;
+  const competitionId = (block as MacroBlock).competitionId;
   const wc = (block as ArmMacroBlock).weightClass || (block as any).weightClass;
-  return `blk${idx}-${block.phase}-${block.weekOffset}-${block.weeks}${cycleId ? '-' + cycleId : ''}${wc ? '-wc' + wc : ''}`;
+  return `blk${idx}-${block.phase}-${block.weekOffset}-${block.weeks}${cycleId ? '-' + cycleId : ''}${competitionId ? '-comp' + competitionId : ''}${wc ? '-wc' + wc : ''}`;
 }
 
 /** Тип конструктора из макро-блока. */
@@ -112,12 +114,15 @@ function nowIso(): string {
 /** Конфиг по умолчанию для нового блока. */
 export function defaultConfigForRef(ref: AnnualBlockRef): AnnualBlockConfig {
   const config: AnnualBlockConfig = {};
-  if (ref.kind === 'PL' && ref.cycleId) config.cycleId = ref.cycleId;
+  if (ref.kind === 'PL' && ref.cycleId) {
+    config.cycleId = ref.cycleId;
+    config.cycleConsent = true;
+  }
   return config;
 }
 
 /** Ref из макро-блока. */
-function refFromBlock(block: MacroBlock | BBMacroBlock | ArmMacroBlock, idx: number, isBbMacro: boolean, isArmMacro: boolean = false): AnnualBlockRef {
+function refFromBlock(block: MacroBlock | BBMacroBlock | ArmMacroBlock, idx: number, isBbMacro: boolean, isArmMacro: boolean = false, competitionDate?: string): AnnualBlockRef {
   if (isArmMacro) {
     return {
       blockKey: macroBlockKey(block as any, idx),
@@ -127,6 +132,7 @@ function refFromBlock(block: MacroBlock | BBMacroBlock | ArmMacroBlock, idx: num
       startWeek: (block as ArmMacroBlock).weekOffset + 1,
       weeks: (block as ArmMacroBlock).weeks,
       competitionId: (block as ArmMacroBlock).competitionId,
+      competitionDate,
       description: (block as ArmMacroBlock).description,
       weightClass: (block as ArmMacroBlock).weightClass || (block as any).weightClass,
     };
@@ -141,9 +147,19 @@ function refFromBlock(block: MacroBlock | BBMacroBlock | ArmMacroBlock, idx: num
     startWeek: block.weekOffset,
     weeks: block.weeks,
     competitionId: block.competitionId,
+    competitionDate,
     cycleId: rawKind !== 'BB' ? (block as MacroBlock).cycleId : undefined,
     description: block.description,
   };
+}
+
+function competitionDateFor(macro: Macrocycle | BBMacrocycle | ArmMacrocycle, block: { competitionId?: string }): string | undefined {
+  const id = block.competitionId;
+  if (!id) return undefined;
+  const competitions = (macro as any).competitions;
+  if (!Array.isArray(competitions)) return undefined;
+  const row = competitions.find((item: any) => item && item.id === id);
+  return typeof row?.date === 'string' ? row.date : undefined;
 }
 
 /** Направление плана из набора типов блоков. */
@@ -174,7 +190,7 @@ export function annualPlanFromMacro(macro: Macrocycle | BBMacrocycle | ArmMacroc
   const isArm = isArmMacroShape(macro as any);
   const isBbMacro = !isArm && isBBMacroShape(macro as any);
   const blocks: AnnualBlockState[] = (macro as any).blocks.map((block: any, idx: number) => {
-    const ref = refFromBlock(block, idx, isBbMacro, isArm);
+    const ref = refFromBlock(block, idx, isBbMacro, isArm, competitionDateFor(macro, block));
     const config = defaultConfigForRef(ref);
     if (!config.daysPerWeek && opts.daysPerWeek) config.daysPerWeek = opts.daysPerWeek;
     return { ref, config, status: 'unbuilt' as const };
@@ -207,12 +223,13 @@ export function syncAnnualPlan(plan: AnnualTrainingPlan, macro: Macrocycle | BBM
   const byKey = new Map(plan.blocks.map(b => [b.ref.blockKey, b]));
   const byIndex = new Map(plan.blocks.map(b => [b.ref.blockIndex, b]));
   const blocks: AnnualBlockState[] = (macro as any).blocks.map((block: any, idx: number) => {
-    const ref = refFromBlock(block, idx, isBbMacro, isArm);
+    const ref = refFromBlock(block, idx, isBbMacro, isArm, competitionDateFor(macro, block));
     const exact = byKey.get(ref.blockKey);
     if (exact) {
       // Layout не изменился. Если пользователь менял конфиг после сборки — stale.
-      const configChanged = exact.result && exact.result.configHash !== configHashOf(exact.config, exact.ref);
-      const status = exact.status === 'built' && configChanged ? 'stale' : exact.status;
+       const configChanged = exact.result && exact.result.configHash !== configHashOf(exact.config, exact.ref);
+       const refChanged = exact.ref.competitionId !== ref.competitionId || exact.ref.competitionDate !== ref.competitionDate || exact.ref.cycleId !== ref.cycleId || exact.ref.weeks !== ref.weeks || exact.ref.phase !== ref.phase;
+       const status = exact.status === 'built' && (configChanged || refChanged) ? 'stale' : exact.status;
       // Свежая разметка побеждает для competitionId/description (иначе после
       // замены соревнования на той же неделе пик-конфиг строился бы с устаревшей датой).
       // НО kind — выбор пользователя (переключатель конструктора в панели, в т.ч. ARM):
@@ -428,6 +445,20 @@ function cloneWeeksWithFreshIds(weeks: UserWeek[]): UserWeek[] {
   }));
 }
 
+/** Собрать переносимый BBPlan-снапшот из отредактированных UserWeek. */
+export function bbPlanFromUserWeeks(weeks: UserWeek[], level: string): BBPlan | null {
+  const source = (weeks ?? []).filter(w => Array.isArray(w?.sessions));
+  if (!source.length) return null;
+  const first = userWeekToBBPlan(source[0], level);
+  const converted = source.map(w => userWeekToBBPlan(w, level).weeks[0]).filter(Boolean);
+  if (!converted.length) return null;
+  return {
+    ...first,
+    weeks: converted,
+    rationale: [...(first.rationale ?? []), 'annual block editor'],
+  };
+}
+
 function fullProgramWeeksToUserWeeks(full: FullProgram): UserWeek[] {
   return (full.weeks ?? []).map((pw: ProgramWeek, wi) => ({
     week: pw.week ?? wi + 1,
@@ -486,7 +517,9 @@ function buildPLBlock(
 ): AnnualBlockBuildResult {
   const warnings: string[] = [];
   const requestedCycleId = state.config.cycleId ?? state.ref.cycleId;
-  const cycleSelection = selectPLCycleForBlock(requestedCycleId, state.ref.phase as MacroBlock['phase'], state.ref.weeks, opts.level, true);
+  const isDefaultCycle = state.config.cycleId == null || state.config.cycleId === state.ref.cycleId;
+  const allowSourceChange = opts.strictCycleConsent !== true || state.config.cycleConsent === true || isDefaultCycle;
+  const cycleSelection = selectPLCycleForBlock(requestedCycleId, state.ref.phase as MacroBlock['phase'], state.ref.weeks, opts.level, allowSourceChange);
   const cycleId = cycleSelection.cycleId;
   if (cycleSelection.warning) warnings.push(cycleSelection.warning);
   const selectedCycle = cycleId ? getCycleById(cycleId) : undefined;
@@ -497,6 +530,10 @@ function buildPLBlock(
       warnings.push(`Цикл «${cycleId}» не найден — блок собран как скелет фаз.`);
       weeks = skeletonWeeks(state.ref.weeks, opts.daysPerWeek ?? 3);
     } else {
+      const originalWeeks = originalCycleWeeks(selectedCycle);
+      if (originalWeeks !== state.ref.weeks && !allowSourceChange) {
+        throw new Error(`Нужно согласие на изменение исходного цикла «${selectedCycle.meta.title}» (${originalWeeks}→${state.ref.weeks} нед). Оригинал не изменён.`);
+      }
       const full = cycleTemplateToFullProgram(selectedCycle);
       weeks = fullProgramWeeksToUserWeeks(full);
       const base = createBlank('pl');
@@ -516,11 +553,11 @@ function buildPLBlock(
     warnings.push('PL-блок без СРЦ-цикла — выберите цикл (config.cycleId) или создайте блок вручную.');
     weeks = skeletonWeeks(state.ref.weeks, opts.daysPerWeek ?? 3);
   }
-  if (selectedCycle && selectedCycle.meta.weeks < state.ref.weeks) {
-    warnings.push(`Цикл «${selectedCycle.meta.title}» короче блока (${selectedCycle.meta.weeks} нед < ${state.ref.weeks}) — шаблон цикла повторён для заполнения фазы.`);
+  if (selectedCycle && originalCycleWeeks(selectedCycle) < state.ref.weeks) {
+    warnings.push(`Цикл «${selectedCycle.meta.title}» короче блока (${originalCycleWeeks(selectedCycle)} нед < ${state.ref.weeks}) — шаблон цикла повторён для заполнения фазы.`);
   }
-  if (selectedCycle && selectedCycle.meta.weeks > state.ref.weeks) {
-    warnings.push(`Цикл «${selectedCycle.meta.title}» длиннее блока (${selectedCycle.meta.weeks} нед > ${state.ref.weeks}) — обрезан до длины блока.`);
+  if (selectedCycle && originalCycleWeeks(selectedCycle) > state.ref.weeks) {
+    warnings.push(`Цикл «${selectedCycle.meta.title}» длиннее блока (${originalCycleWeeks(selectedCycle)} нед > ${state.ref.weeks}) — обрезан до длины блока.`);
   }
   weeks = loopWeeksToLength(weeks, state.ref.weeks);
   weeks = applyBlockPhaseToWeeks(weeks, state.ref.phase, 'PL');
@@ -805,7 +842,7 @@ function buildManualBlock(
 }
 
 function configHashOf(config: AnnualBlockConfig, ref: AnnualBlockRef): string {
-  return stableHash({ config, kind: ref.kind, phase: ref.phase, weeks: ref.weeks, cycleId: ref.cycleId, weightClass: ref.weightClass || (config as any).weightClass });
+  return stableHash({ config, kind: ref.kind, phase: ref.phase, weeks: ref.weeks, cycleId: ref.cycleId, competitionId: ref.competitionId, competitionDate: ref.competitionDate, weightClass: ref.weightClass || (config as any).weightClass });
 }
 
 /**
@@ -826,7 +863,7 @@ export function buildAnnualBlock(
       case 'ARM': {
         const wc = (state.config as any).weightClass || (state.ref as any).weightClass;
         const armRes = buildArmBlockInternal(
-          { blockKey: state.ref.blockKey, weeks: state.ref.weeks, phase: state.ref.phase, weightClass: wc },
+           { blockKey: state.ref.blockKey, weeks: state.ref.weeks, phase: state.ref.phase, description: state.ref.description, weightClass: wc },
           { ...(state.config as any), weightClass: wc, level: (state.config.level || opts.level) as any },
           { level: opts.level },
         );
@@ -980,11 +1017,35 @@ export function activeBlockForWeek(plan: AnnualTrainingPlan, week: number): Annu
  *  Будущее: нед 1 = сегодня; прошлое: нед 2 = 7-13 дней назад и т.д.
  *  Единая каноническая реализация (P2-1, Aug 18 2026) — UI реэкспортирует её
  *  как macroWeekForDate вместо дублирующей копии. */
+function localDayStart(value: Date | string): number | null {
+  if (value instanceof Date) {
+    if (!Number.isFinite(value.getTime())) return null;
+    const d = new Date(value.getTime());
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
+  const raw = String(value ?? '').trim();
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (dateOnly) {
+    const year = Number(dateOnly[1]);
+    const month = Number(dateOnly[2]);
+    const day = Number(dateOnly[3]);
+    const d = new Date(year, month - 1, day);
+    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
+  const parsed = new Date(raw);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed.getTime();
+}
+
 export function weekForDate(isoDate: string, reference?: Date | string): number | null {
-  const d = new Date(isoDate).getTime();
-  const ref = reference == null ? Date.now() : (reference instanceof Date ? reference.getTime() : new Date(reference).getTime());
-  if (!Number.isFinite(d) || !Number.isFinite(ref)) return null;
-  const diffDays = (d - ref) / 86400000;
+  const d = localDayStart(isoDate);
+  const ref = localDayStart(reference == null ? new Date() : reference);
+  if (d == null || ref == null) return null;
+  const diffDays = Math.round((d - ref) / 86400000);
   const week = diffDays >= 0 ? Math.floor(diffDays / 7) + 1 : 1 + Math.floor(-diffDays / 7);
   return Math.max(1, week);
 }
@@ -1118,22 +1179,48 @@ export function setAnnualBlockKind(
   };
 }
 
-/**
- * Ручной roundtrip: принять ОТРЕДАКТИРОВАННЫЕ недели блока (из ручного
- * конструктора). Статус → 'built', configHash синхронизируется с текущим
- * конфигом — блок не считается устаревшим и не пересобирается автоматически.
- */
+export function annualProgramFromBlock(block: AnnualBlockState): UserProgram | null {
+  const result = block.result;
+  if (!result) return null;
+  const expected: ProgramDirection = block.ref.kind === 'PL' ? 'pl' : block.ref.kind === 'ARM' ? 'arm' : 'bb';
+  if (result.program?.meta.direction === expected) return result.program;
+  const program = createBlank(expected);
+  program.meta.title = `Блок: ${block.ref.description ?? block.ref.phase} (${block.ref.weeks} нед)`;
+  program.meta.weeks = block.ref.weeks;
+  program.meta.daysPerWeek = Math.max(1, result.weeks[0]?.sessions.length ?? 3);
+  if (expected === 'pl') {
+    if (program.pl) program.pl.schedule = [];
+    return program;
+  }
+  const weeks = cloneWeeksWithFreshIds(result.weeks);
+  if (expected === 'arm' && program.arm) {
+    program.arm.weeks = weeks;
+    program.arm.microcycleTemplate = {
+      daySlots: (weeks[0]?.sessions ?? []).map((session, index) => ({
+        day: index + 1,
+        label: session.name,
+        muscles: [],
+      })),
+    };
+  } else if (program.bb) {
+    program.bb.weeks = weeks;
+  }
+  return program;
+}
+
 export function updateAnnualBlockWeeks(
   plan: AnnualTrainingPlan,
   blockKey: string,
   weeks: UserWeek[],
   program?: UserProgram | null,
   warnings?: string[],
+  armPlan?: unknown | null,
 ): AnnualTrainingPlan {
   const idx = findBlockIndex(plan, blockKey);
   if (idx < 0) return plan;
   const blocks = [...plan.blocks];
   const block = blocks[idx];
+  if (block.ref.kind === 'ARM' && program && program.meta.direction !== 'arm') return plan;
   // P1-3 (Aug 18 2026): roundtrip с программой ДЛИННЕЕ блока больше не обрезается молча —
   // явное предупреждение (раньше 12 нед → 8 терялись без следов).
   let warning: string | undefined;
@@ -1142,12 +1229,19 @@ export function updateAnnualBlockWeeks(
   } else if (weeks.length < block.ref.weeks) {
     warning = `⚠ Программа короче блока (${weeks.length} нед < ${block.ref.weeks}) — оставшиеся недели заполнены повтором шаблона.`;
   }
+  const nextWeeks = loopWeeksToLength(weeks, block.ref.weeks);
+  const editedFromProgram = !!program;
+  const nextBBPlan = editedFromProgram && block.ref.kind === 'BB'
+    ? bbPlanFromUserWeeks(nextWeeks, program?.meta.level ?? 'intermediate')
+    : block.result?.bbPlan ?? null;
   const result: AnnualBlockBuildResult = {
     blockKey,
     kind: block.ref.kind,
-    weeks: loopWeeksToLength(weeks, block.ref.weeks),
-    program: program ?? block.result?.program ?? null,
-    bbPlan: block.result?.bbPlan ?? null,
+    weeks: nextWeeks,
+    program: program ?? (block.ref.kind === 'ARM' ? annualProgramFromBlock(block) : block.result?.program) ?? null,
+    bbPlan: nextBBPlan,
+    ...(editedFromProgram ? { editedFromProgram: true } : {}),
+    armPlan: armPlan !== undefined ? armPlan : block.result?.armPlan ?? null,
     warnings: [...(warnings ?? block.result?.warnings ?? []), ...(warning ? [warning] : [])],
     taperApplied: block.result?.taperApplied ?? false,
     peakApplied: block.result?.peakApplied ?? false,
@@ -1159,7 +1253,7 @@ export function updateAnnualBlockWeeks(
 
 /**
  * Импортировать UserProgram в блок годового плана (ручной roundtrip).
- * Берёт недели из bb.weeks / hybrid.bbWeeks; для PL-программ — скелет не
+ * Берёт недели из bb.weeks / hybrid.bbWeeks / arm.weeks; для PL-программ — скелет не
  * заменяется, обновляется только program (веса/цикл остаются ссылочными).
  */
 export function importProgramIntoAnnualBlock(
@@ -1170,8 +1264,12 @@ export function importProgramIntoAnnualBlock(
   const idx = findBlockIndex(plan, blockKey);
   if (idx < 0) return plan;
   const block = plan.blocks[idx];
+  if (block.ref.kind === 'ARM') {
+    const weeks = program.arm?.weeks?.length ? program.arm.weeks : block.result?.weeks ?? [];
+    return updateAnnualBlockWeeks(plan, blockKey, weeks, program, ['Импортировано из ручного конструктора.'], block.result?.armPlan ?? null);
+  }
   const weeks = program.bb?.weeks ?? program.hybrid?.bbWeeks ?? block.result?.weeks ?? [];
-  return updateAnnualBlockWeeks(plan, blockKey, weeks, program, ['Импортировано из ручного конструктора.']);
+  return updateAnnualBlockWeeks(plan, blockKey, weeks, program, ['Импортировано из ручного конструктора.'], block.result?.armPlan ?? null);
 }
 
 /* ─────────────────────────── Композиция года ────────────────────────────── */
@@ -1203,6 +1301,7 @@ function composeAnnualWeeks(plan: AnnualTrainingPlan): { weeks: UserWeek[]; miss
 
 /**
  * Собрать единую UserProgram из собранных блоков:
+ *  - только ARM → 'arm';
  *  - только BB/MANUAL → direction 'bb';
  *  - есть PL и не-PL → 'hybrid' (plRef из первого PL-блока + bbWeeks);
  *  - только PL → программа первого PL-блока со сводкой блоков в notes.
@@ -1210,10 +1309,16 @@ function composeAnnualWeeks(plan: AnnualTrainingPlan): { weeks: UserWeek[]; miss
  * пропуски перечисляются в warnings/notes.
  */
 export function composeAnnualProgram(plan: AnnualTrainingPlan, title?: string): UserProgram | null {
+  const allKinds = plan.blocks.map(b => b.ref.kind);
+  const hasARMBlock = allKinds.includes('ARM');
+  if (hasARMBlock && allKinds.some(k => k !== 'ARM')) {
+    throw new Error('ARM-блоки нельзя смешивать с PL/BB/ручными блоками в одном годовом плане.');
+  }
   const builtBlocks = plan.blocks.filter(b => b.status === 'built' && b.result);
   if (builtBlocks.length === 0) return null;
   const kinds = builtBlocks.map(b => b.ref.kind);
   const hasPL = kinds.includes('PL');
+  const hasARM = kinds.includes('ARM');
   const hasNonPL = kinds.some(k => k !== 'PL');
   const nonPLBlocks = plan.blocks.filter(b => b.ref.kind !== 'PL');
   const { weeks: merged, missing } = composeAnnualWeeks(plan);
@@ -1221,6 +1326,25 @@ export function composeAnnualProgram(plan: AnnualTrainingPlan, title?: string): 
   const warnings = missing.map(m => `блок ${m} не собран — недели пустые`);
   const blockSummary = builtBlocks.map(b =>
     `нед ${b.ref.startWeek}-${b.ref.startWeek + b.ref.weeks - 1}: ${b.ref.phase} (${b.ref.kind})`).join('; ');
+
+  if (hasARM) {
+    const prog = annualProgramFromBlock(builtBlocks[0]) ?? createBlank('arm');
+    prog.meta.title = title ?? `Годовой ARM-план (${plan.totalWeeks} нед)`;
+    prog.meta.weeks = plan.totalWeeks;
+    prog.meta.daysPerWeek = Math.max(1, ...builtBlocks.map(b => b.result?.weeks?.[0]?.sessions?.length ?? 3));
+    if (prog.arm) {
+      prog.arm.weeks = merged;
+      prog.arm.microcycleTemplate = {
+        daySlots: (merged[0]?.sessions ?? []).map((session, index) => ({
+          day: index + 1,
+          label: session.name,
+          muscles: [],
+        })),
+      };
+    }
+    prog.meta.notes = [blockSummary, ...(warnings.length ? ['⚠ ' + warnings.join('; ')] : [])].join('\n');
+    return prog;
+  }
 
   if (!hasPL) {
     const prog = createBlank('bb');

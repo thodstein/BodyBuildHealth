@@ -13,7 +13,7 @@ import {
   setAnnualBlockConfig, setAnnualBlockKind, updateAnnualBlockWeeks,
   importProgramIntoAnnualBlock, validateAnnualPlan, activeBlockForWeek,
   recommendKindForPhase, cloneBlockConfigFrom, annualWeekForDate, annualPlanPhaseForDate,
-  selectPLCycleForBlock, applyPLBlockTaperToWeeks, applyBlockPhaseToWeeks,
+  selectPLCycleForBlock, applyPLBlockTaperToWeeks, applyBlockPhaseToWeeks, bbPlanFromUserWeeks,
 } from '../block-builders.engine';
 import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
 import { LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
@@ -169,6 +169,27 @@ describe('сборка блоков', () => {
     expect(built.result!.program?.pl?.sourceCycleId).toBeTruthy();
   });
 
+  it('strictCycleConsent блокирует замену цикла до явного согласия', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const replacement = LMS_CYCLES.find(c => c.meta.id !== CYCLE_ID && c.meta.weeks > 8);
+    expect(replacement).toBeTruthy();
+    const state = {
+      ...plan.blocks[0],
+      config: { ...plan.blocks[0].config, cycleId: replacement!.meta.id, cycleConsent: undefined },
+    };
+    const blocked = buildAnnualBlock(state, plan, macro, { ...DEFAULT_OPTS, strictCycleConsent: true });
+    expect(blocked.status).toBe('error');
+    expect(blocked.error).toContain('Нужно согласие');
+    const allowed = buildAnnualBlock(
+      { ...blocked, config: { ...state.config, cycleConsent: true } },
+      plan,
+      macro,
+      { ...DEFAULT_OPTS, strictCycleConsent: true },
+    );
+    expect(allowed.status).toBe('built');
+  });
+
   it('PL: авто-замена короткого цикла синхронизирует config.cycleId с собранным', () => {
     const macro = makePLMacro();
     const plan = annualPlanFromMacro(macro);
@@ -233,6 +254,23 @@ describe('сборка блоков', () => {
     expect(Array.isArray(bbp.weeks)).toBe(true);
     expect(bbp.weeks.some((w: any) => w.contestPhase === 'peak_week')).toBe(true);
     expect(bbp.weeks.some((w: any) => w.contestPhase === 'taper')).toBe(true);
+  });
+
+  it('syncAnnualPlan: смена даты соревнования помечает собранный блок stale', () => {
+    const macro = {
+      ...makePLMacro([{ competitionId: 'comp-a' }]),
+      competitions: [{ id: 'comp-a', name: 'Старт', week: 3, date: '2026-09-01', priority: 'A' }],
+    } as Macrocycle;
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[0], plan, macro, DEFAULT_OPTS);
+    const withResult = { ...plan, blocks: [{ ...built, status: 'built' as const }, ...plan.blocks.slice(1)] };
+    const changed = {
+      ...macro,
+      competitions: [{ id: 'comp-a', name: 'Старт', week: 3, date: '2026-10-01', priority: 'A' }],
+    } as Macrocycle;
+    const synced = syncAnnualPlan(withResult, changed);
+    expect(synced.blocks[0].ref.competitionDate).toBe('2026-10-01');
+    expect(synced.blocks[0].status).toBe('stale');
   });
 
   it('syncAnnualPlan: свежая разметка побеждает для competitionId (той же блокKey)', () => {
@@ -466,7 +504,19 @@ describe('правки блоков (конфиг/ручной roundtrip)', () =
     const next = importProgramIntoAnnualBlock(withResult, built.ref.blockKey, prog);
     expect(next.blocks[1].status).toBe('built');
     expect(next.blocks[1].result!.program?.meta.title).toBe('Отредактировано вручную');
+    expect(next.blocks[1].result!.editedFromProgram).toBe(true);
+    expect(next.blocks[1].result!.bbPlan).toBeTruthy();
     expect(next.blocks[1].result!.warnings.some(w => w.includes('Импортировано'))).toBe(true);
+  });
+
+  it('bbPlanFromUserWeeks сохраняет все отредактированные недели', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[1], plan, macro, DEFAULT_OPTS);
+    const bbPlan = bbPlanFromUserWeeks(built.result!.weeks, 'intermediate');
+    expect(bbPlan).toBeTruthy();
+    expect(bbPlan!.weeks).toHaveLength(built.result!.weeks.length);
+    expect(bbPlan!.weeks[0].sessions.length).toBe(built.result!.weeks[0].sessions.length);
   });
 });
 
@@ -534,6 +584,7 @@ describe('валидация разметки года', () => {
     expect(annualWeekForDate('2026-01-08', ref)).toBe(2);
     expect(annualWeekForDate('2026-01-02', ref)).toBe(1);
     expect(annualWeekForDate('2025-12-25', ref)).toBe(2);
+    expect(annualWeekForDate('2026-01-08', new Date(2026, 0, 1, 18, 30))).toBe(2);
     expect(annualWeekForDate('не дата', ref)).toBeNull();
     expect(annualWeekForDate('', ref)).toBeNull();
   });

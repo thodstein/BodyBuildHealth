@@ -7,13 +7,14 @@
  * идёт отдельной справочной заметкой с flag 'ok'.
  */
 import type { LMSBuildOutput } from './lms-builder.engine';
+import { isPseudoExercise } from './lms-metrics.engine';
 
 export type TonnageGateResult = { week: number; tonnage: number; prev: number; changePct: number; flag: 'ok' | 'warn' | 'danger'; note: string };
 
 export function checkTonnageGate(plan: LMSBuildOutput, warnPct = 7, dangerPct = 10): TonnageGateResult[] {
   const weeks = plan.weeks.map(w => ({
     week: w.week,
-    tonnage: w.days.reduce((a,d)=>a+d.exercises.reduce((aa,e)=>aa+e.workSets.reduce((aaa,ws)=>aaa+ws.weight*ws.reps*ws.sets,0),0),0),
+    tonnage: w.days.reduce((a, d) => a + d.exercises.reduce((aa, e) => isPseudoExercise(e.name) ? aa : aa + e.workSets.reduce((aaa, ws) => aaa + ws.weight * ws.reps * ws.sets, 0), 0), 0),
   }));
   const out: TonnageGateResult[] = [];
   for (let i=1;i<weeks.length;i++) {
@@ -34,6 +35,9 @@ export function checkTonnageGate(plan: LMSBuildOutput, warnPct = 7, dangerPct = 
 
 export function avgIntensity(plan: LMSBuildOutput): number {
   let sumW=0,sumT=0;
-  for (const w of plan.weeks) for (const d of w.days) for (const e of d.exercises) for (const ws of e.workSets) { sumW += ws.pct * ws.sets; sumT += ws.sets; }
+  for (const w of plan.weeks) for (const d of w.days) for (const e of d.exercises) {
+    if (isPseudoExercise(e.name)) continue;
+    for (const ws of e.workSets) { sumW += ws.pct * ws.sets; sumT += ws.sets; }
+  }
   return sumT? Math.round((sumW/sumT)*1000)/10 : 0;
 }

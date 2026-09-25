@@ -34,12 +34,21 @@ export interface WorkoutSet {
   plannedWeight?: number;
   plannedReps?: number;
   plannedRir?: number;
+  plannedTempo?: string;
+  actualTempo?: string;
   /** Оценка техники выполнения подхода: 3 (слабо) / 4 (норма) / 5 (отлично). */
   techniqueScore?: number;
 }
 
 /** Лимиты валидации подходов (guard от опечаток и повреждённых данных). */
 export const SET_LIMITS = { maxWeightKg: 500, maxReps: 100, maxRpe: 10, maxRir: 20 } as const;
+
+export function localIsoDate(value: Date = new Date()): string {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, '0');
+  const d = String(value.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
 export interface WorkoutExercise {
   exerciseId: string;
@@ -67,7 +76,11 @@ export interface WorkoutSession {
   avgIntensity: number;
   prCount: number;
   notes: string;
-  weekNumber: number;
+  weekNumber?: number;
+  source?: string;
+  provenanceSource?: string;
+  planSnapshotId?: string;
+  plannedSessionId?: string;
   mesocycleWeek: number;
 }
 
@@ -174,10 +187,14 @@ export function saveSessions(sessions: WorkoutSession[]) {
 // Session management
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function startSession(focus: string, weekNumber: number): WorkoutSession {
+export function startSession(
+  focus: string,
+  weekNumber: number,
+  provenance?: Pick<WorkoutSession, 'source' | 'provenanceSource' | 'planSnapshotId' | 'plannedSessionId'>,
+): WorkoutSession {
   return {
     sessionId: 'sess_' + Date.now(),
-    date: new Date().toISOString().slice(0, 10),
+     date: localIsoDate(),
     startTime: new Date().toTimeString().slice(0, 5),
     endTime: '',
     durationMin: 0,
@@ -186,6 +203,7 @@ export function startSession(focus: string, weekNumber: number): WorkoutSession 
     totalVolume: 0, totalSets: 0, totalReps: 0,
     avgIntensity: 0, prCount: 0, notes: '',
     weekNumber, mesocycleWeek: weekNumber % 4 || 4,
+    ...provenance,
   };
 }
 
@@ -229,7 +247,21 @@ export function logSet(
   const sessionBestE1RM = ex.sets.length > 0 ? Math.max(...ex.sets.map(s => epley1RM(s.weightKg, s.reps))) : 0;
   const isPR = estimated1RM > sessionBestE1RM || (previousBestWeight != null && previousBestWeight > 0 && weightKg > previousBestWeight);
 
-  ex.sets = [...ex.sets, { setNumber: set.setNumber, weightKg, reps, rpe, rir, isPR, notes: set.notes || '', techniqueScore: set.techniqueScore }];
+  ex.sets = [...ex.sets, {
+    setNumber: set.setNumber,
+    weightKg,
+    reps,
+    rpe,
+    rir,
+    isPR,
+    notes: set.notes || '',
+    techniqueScore: set.techniqueScore,
+    plannedWeight: set.plannedWeight,
+    plannedReps: set.plannedReps,
+    plannedRir: set.plannedRir,
+    plannedTempo: set.plannedTempo,
+    actualTempo: set.actualTempo,
+  }];
   ex.totalVolume = ex.sets.reduce((s, st) => s + st.weightKg * st.reps, 0);
   ex.best1RM = Math.max(ex.best1RM, estimated1RM);
   ex.avgRPE = Math.round(ex.sets.reduce((s, st) => s + st.rpe, 0) / ex.sets.length * 10) / 10;
@@ -333,6 +365,11 @@ export function workoutLogToSession(log: WorkoutLog): WorkoutSession {
       isPR: false,
       notes: '',
       techniqueScore: st.techniqueScore,
+      plannedWeight: st.plannedWeight,
+      plannedReps: st.plannedReps,
+      plannedRir: st.plannedRir,
+      plannedTempo: st.plannedTempo,
+      actualTempo: st.actualTempo,
     }));
     return {
       exerciseId: ex.exerciseId,
@@ -360,7 +397,11 @@ export function workoutLogToSession(log: WorkoutLog): WorkoutSession {
     avgIntensity: 0,
     prCount: 0,
     notes: log.notes || '',
-    weekNumber: log.weekNumber || 0,
+    weekNumber: log.weekNumber,
+    source: log.source ?? log.provenanceSource,
+    provenanceSource: log.provenanceSource ?? log.source,
+    planSnapshotId: log.planSnapshotId,
+    plannedSessionId: log.plannedSessionId,
     mesocycleWeek: 0,
   };
 }
@@ -412,7 +453,7 @@ export function getWorkoutStats(): WorkoutStats {
   for (let i = 0; i < dates.length; i++) {
     const expected = new Date(today);
     expected.setDate(expected.getDate() - i);
-    if (dates[i] === expected.toISOString().slice(0, 10)) streak++;
+     if (dates[i] === localIsoDate(expected)) streak++;
     else break;
   }
 
@@ -742,7 +783,7 @@ export function getVolumeTrend(days: number = 14): VolumeTrendDay[] {
   // Окно по датам, а не по числу сессий: последние `days` календарных дней.
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffStr = localIsoDate(cutoff);
   const sessions = loadSessions().filter(s => s.date >= cutoffStr);
   const map = new Map<string, { volume: number; sets: number; sessions: number }>();
   for (const sess of sessions) {

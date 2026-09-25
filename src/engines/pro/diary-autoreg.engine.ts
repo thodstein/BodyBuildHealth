@@ -21,6 +21,7 @@ import { rpeFromLoad, loadForRPE } from './autoregulation-pro.engine';
 import { norm } from '../norm';
 import { epley1RM } from '../e1rm';
 import { exerciseMatchScore } from '../exercise-aliases';
+import { toLocalIso } from '../lms/cardio-date-utils.engine';
 
 export type AutoRegMode = 'off' | 'auto' | 'diary';
 
@@ -95,7 +96,7 @@ interface FactEntry {
 export function findLastFact(historyWorkouts: WorkoutLog[], exerciseName: string): FactEntry | null {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 90);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffStr = toLocalIso(cutoff);
   let best: FactEntry | null = null;
   for (const wl of historyWorkouts) {
     for (const ex of wl.exercises) {

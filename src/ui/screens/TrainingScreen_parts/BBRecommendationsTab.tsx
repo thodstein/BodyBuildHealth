@@ -13,6 +13,7 @@ import { generateBBRecommendations, bbRecSummary, type BBRecSection } from '../.
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { loadReadinessHistory } from './readiness-history';
+import { localIsoDate } from './diary-shared';
 import type { DiaryHubCtx } from './diary-hub-context';
 
 const ACCENT = '#00e68a';
@@ -68,7 +69,7 @@ function loadNutritionAvg(): { avgKcal: number; avgProtein: number; avgCarbs: nu
     if (!raw) return result;
     const diary = JSON.parse(raw);
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
-    const cutoffKey = cutoff.toISOString().slice(0, 10);
+    const cutoffKey = localIsoDate(cutoff);
     const dayKeys = Object.keys(diary || {}).filter(k => k >= cutoffKey).slice(0, 7);
     for (const k of dayKeys) {
       const meals = diary[k]?.meals || {};

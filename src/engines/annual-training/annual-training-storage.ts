@@ -6,7 +6,7 @@
  * (конфиг конструктора + результат сборки). Макро-разметка остаётся в старых
  * ключах — план ссылается на неё через macroRef (сериализованный снимок).
  */
-import type { AnnualTrainingPlan, AnnualBlockState, AnnualBlockKind, AnnualBlockConfig } from './annual-training.types';
+import type { AnnualTrainingPlan, AnnualBlockState, AnnualBlockKind, AnnualBlockConfig, AnnualBlockBuildResult } from './annual-training.types';
 import { annualPlanFromMacro, stableHash } from './block-builders.engine';
 import { deserializeMacro, deserializeBbMacro } from '../lms/macrocycle.engine';
 
@@ -49,17 +49,35 @@ export function canonicalJson(value: unknown): string {
  *    (до ~1.1 МБ на 20-нед блок); при «🚀 В ББ-авто» после перезагрузки блок
  *    пересобирается (движок детерминирован);
  *  - `result.program` для BB/MANUAL НЕ хранится (воспроизводится из weeks);
- *    для PL-блоков program маленький и хранится (нужен для «✍ В редактор» и композиции).
- * Полный год 52 нед после компактизации — ~1.5-2 МБ вместо 6.5 МБ (вмещается в localStorage).
+ *    для PL/ARM-блоков program хранится (нужен для «✍ В редактор» и композиции).
+ * Полный год 52 нед после компактизации — ~2–2.2 МБ вместо 6.5 МБ (вмещается в localStorage).
  */
+function compactStoredWeeks(weeks: AnnualBlockBuildResult['weeks']): AnnualBlockBuildResult['weeks'] {
+  return weeks.map(week => ({
+    ...week,
+    sessions: week.sessions.map(session => ({
+      ...session,
+      blocks: session.blocks.map(block => {
+        const compact = { ...block } as Record<string, unknown>;
+        delete compact.rationale;
+        return compact as unknown as typeof block;
+      }),
+    })),
+  }));
+}
+
 export function toStoredPlan(plan: AnnualTrainingPlan): AnnualTrainingPlan {
   return {
     ...plan,
     blocks: plan.blocks.map(b => {
-      if (!b.result || b.ref.kind === 'PL') return b;
+      if (!b.result) return b;
       return {
         ...b,
-        result: { ...b.result, bbPlan: null, program: null },
+        result: {
+          ...b.result,
+          weeks: compactStoredWeeks(b.result.weeks),
+           ...(b.ref.kind === 'PL' || b.ref.kind === 'ARM' ? {} : { bbPlan: null, program: null }),
+        },
       };
     }),
   };

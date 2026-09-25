@@ -18,7 +18,7 @@ import {
   splitCSVRow, importSessionsFromCSV, updateSession, deleteSession, workoutLogToSession,
   logSet, startSession, addExerciseToSession, getVolumeTrend, getISOWeekNumber, getISOWeekYear,
   getStorageTrimWarning, clearStorageTrimWarning, saveSessions, loadSessions, cleanLegacyExerciseName, SET_LIMITS,
-  findDuplicateWorkouts, workoutContentSignature, finishSession, getLastSession, compareWithPrevious,
+  findDuplicateWorkouts, workoutContentSignature, finishSession, getLastSession, compareWithPrevious, localIsoDate,
 } from '../workout-logger.engine';
 import { StrengthDiary, sessionToWorkoutLog } from '../strength-diary.engine';
 import { db } from '../../core/db';
@@ -160,7 +160,7 @@ describe('getVolumeTrend — окно по датам', () => {
   beforeEach(() => { localStorage.clear(); });
   it('фильтрует сессии старше N дней', () => {
     const old = { ...startSession('PPL', 1), date: '2020-01-01', sessionId: 'old' };
-    const recent = { ...startSession('PPL', 1), date: new Date().toISOString().slice(0, 10), sessionId: 'recent', totalVolume: 1000, totalSets: 3, exercises: [] };
+    const recent = { ...startSession('PPL', 1), date: localIsoDate(), sessionId: 'recent', totalVolume: 1000, totalSets: 3, exercises: [] };
     saveSessions([old, recent]);
     const trend = getVolumeTrend(14);
     expect(trend.length).toBe(1);
@@ -327,5 +327,31 @@ describe('StrengthDiary — единый слой и дедуп', () => {
     const diary = new StrengthDiary();
     await diary.getWorkoutLogs();
     expect(mockDb.put).toHaveBeenCalledWith('workout_log', expect.objectContaining({ id: 'ls_only' }));
+  });
+  it('getLastSession: IndexedDB-only workout виден через единый слой', async () => {
+    const mockDb = getMockDb();
+    mockDb.getAll.mockResolvedValueOnce([
+      mkLog('idb_latest', '2026-08-12', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]),
+    ]);
+    const last = await new StrengthDiary().getLastSession();
+    expect(last?.sessionId).toBe('idb_latest');
+    expect(last?.date).toBe('2026-08-12');
+  });
+  it('не удваивает одну тренировку, если она есть в training_log и workout_log', async () => {
+    const mockDb = getMockDb();
+    const date = new Date().toISOString().slice(0, 10);
+    const workout = mkLog('w_daily_dup', date, 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
+    const legacyEntry = { ...workout.exercises[0], id: 'legacy_daily_dup' };
+    mockDb.getAll.mockImplementation((store: string) => Promise.resolve(
+      store === 'training_log' ? [legacyEntry] : store === 'workout_log' ? [workout] : [],
+    ));
+    const diary = new StrengthDiary();
+    const progress = await diary.getWeeklyProgress();
+    expect(progress).toHaveLength(1);
+    expect(progress[0].totalVolume).toBe(400);
+    expect(progress[0].workoutCount).toBe(1);
+    const activity = await diary.getRecentActivity(7);
+    expect(activity).toHaveLength(1);
+    expect(activity[0].volume).toBe(400);
   });
 });

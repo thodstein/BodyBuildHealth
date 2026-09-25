@@ -328,7 +328,7 @@ describe('Additional coverage', () => {
       faithful: true, weeksOverride: 1,
     });
     const ws = plan.weeks[0].days[0].exercises[0].workSets[0];
-    expect(ws.rir).toBe(0);
+    expect(ws.rir).toBe(2);
   });
 });
 

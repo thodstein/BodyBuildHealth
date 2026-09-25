@@ -52,6 +52,23 @@ describe('buildPLPeakBlockLayout', () => {
     expect(l.totalWeeks).toBe(1);
   });
 
+  it('окно 1 с mock и соревнованием не расширяет блок', () => {
+    const l = buildPLPeakBlockLayout({ windowWeeks: 1, taperWeeks: 2, mockMeet: true, meetWeek: true });
+    expect(l.mockWeeks).toBe(0);
+    expect(l.meetWeeks).toBe(1);
+    expect(l.taperWeeks).toBe(0);
+    expect(l.curve).toEqual([]);
+    expect(l.totalWeeks).toBe(1);
+    expect(l.warnings.join(' ')).toContain('не расширять блок');
+  });
+
+  it('окно 2 с mock и соревнованием оставляет окно без неявного тапера', () => {
+    const l = buildPLPeakBlockLayout({ windowWeeks: 2, taperWeeks: 2, mockMeet: true, meetWeek: true });
+    expect(l.mockWeeks + l.meetWeeks + l.taperWeeks + l.rampWeeks).toBe(2);
+    expect(l.taperWeeks).toBe(0);
+    expect(l.totalWeeks).toBe(2);
+  });
+
   it('весовая цель lose снижает объём кривой (×0.9)', () => {
     const a = buildPLPeakBlockLayout({ windowWeeks: 6, taperWeeks: 2, weightGoal: 'maintain' });
     const b = buildPLPeakBlockLayout({ windowWeeks: 6, taperWeeks: 2, weightGoal: 'lose' });

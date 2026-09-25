@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getISOWeekNumber, importSessionsFromCSV, logSet, startSession, finishSession, addExerciseToSession, getWorkoutStats, loadSessions, saveSessions } from '../workout-logger.engine';
+import { getISOWeekNumber, importSessionsFromCSV, logSet, startSession, finishSession, addExerciseToSession, getWorkoutStats, loadSessions, saveSessions, localIsoDate } from '../workout-logger.engine';
+import { sessionToWorkoutLog } from '../strength-diary.engine';
 
 // минимальный mock localStorage (движок использует localStorage для he_workout_log_v2)
 const store: Record<string, string> = {};
@@ -83,6 +84,59 @@ describe('logSet validation', () => {
     expect(modified.exercises[0].sets[0].reps).toBe(6);
   });
 
+  it('preserves planned values and tempo metadata', () => {
+    const session = startSession('fullbody', 1);
+    const withEx = addExerciseToSession(session, { id: 'squat', name: 'Squat', pattern: 'squat', muscleGroup: 'quads' });
+    const modified = logSet(withEx, 0, {
+      setNumber: 1,
+      weightKg: 100,
+      reps: 5,
+      rpe: 8,
+      rir: 1,
+      notes: '',
+      plannedWeight: 95,
+      plannedReps: 6,
+      plannedRir: 2,
+      plannedTempo: '3-1-1-0',
+      actualTempo: '2-0-2-0',
+    }).session;
+    expect(modified.exercises[0].sets[0]).toMatchObject({
+      rir: 1,
+      plannedWeight: 95,
+      plannedReps: 6,
+      plannedRir: 2,
+      plannedTempo: '3-1-1-0',
+      actualTempo: '2-0-2-0',
+    });
+  });
+
+  it('carries planned and tempo metadata into the unified diary', () => {
+    const session = startSession('fullbody', 1);
+    const withEx = addExerciseToSession(session, { id: 'squat', name: 'Squat', pattern: 'squat', muscleGroup: 'quads' });
+    const modified = logSet(withEx, 0, {
+      setNumber: 1,
+      weightKg: 100,
+      reps: 5,
+      rpe: 8,
+      rir: 1,
+      notes: '',
+      plannedWeight: 95,
+      plannedReps: 6,
+      plannedRir: 2,
+      plannedTempo: '3-1-1-0',
+      actualTempo: '2-0-2-0',
+    }).session;
+    const converted = sessionToWorkoutLog(modified);
+    expect(converted.exercises[0].sets[0]).toMatchObject({
+      rir: 1,
+      plannedWeight: 95,
+      plannedReps: 6,
+      plannedRir: 2,
+      plannedTempo: '3-1-1-0',
+      actualTempo: '2-0-2-0',
+    });
+  });
+
   it('uses ISO week boundaries around New Year', () => {
     expect(getISOWeekNumber('2021-01-01')).toBe(53);
     expect(getISOWeekNumber('2021-01-04')).toBe(1);
@@ -93,9 +147,14 @@ describe('finishSession', () => {
   it('returns session with date and notes', () => {
     const session = startSession('fullbody', 1);
     const finished = finishSession(session, 'Test notes');
-    expect(finished.date).toBe(new Date().toISOString().slice(0, 10));
+    expect(finished.date).toBe(localIsoDate());
     expect(finished.notes).toBe('Test notes');
     expect(finished.durationMin).toBeGreaterThanOrEqual(0);
+  });
+
+  it('localIsoDate не перескакивает через полночь', () => {
+    expect(localIsoDate(new Date(2026, 0, 1, 0, 5))).toBe('2026-01-01');
+    expect(localIsoDate(new Date(2026, 0, 1, 23, 55))).toBe('2026-01-01');
   });
 });
 

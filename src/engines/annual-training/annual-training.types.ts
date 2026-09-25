@@ -38,6 +38,8 @@ export interface AnnualBlockRef {
   weeks: number;
   /** id соревнования (если блок привязан к старту). */
   competitionId?: string;
+  /** Дата соревнования, если она привязана к блоку. */
+  competitionDate?: string;
   /** id СРЦ-цикла (для PL-блоков ПЛ-макроцикла). */
   cycleId?: string;
   /** Человекочитаемое описание блока. */
@@ -50,6 +52,7 @@ export interface AnnualBlockRef {
 export interface AnnualBlockConfig {
   /** PL: id СРЦ-цикла (переопределяет ref.cycleId). */
   cycleId?: string;
+  cycleConsent?: boolean;
   /** BB/MANUAL: дней тренировок в неделю. */
   daysPerWeek?: number;
   /** BB: id сплита из SPLIT_PATTERNS. */
@@ -127,6 +130,8 @@ export interface AnnualBlockBuildResult {
   program: UserProgram | null;
   /** BBPlan-снапшот (для передачи в ББ-авто); JSON-safe (any — движок BB тяжёлый). */
   bbPlan: unknown | null;
+  /** Ручной roundtrip: недели результата пришли из редактора, не из автосборки. */
+  editedFromProgram?: boolean;
   /** ArmPlan-снапшот для ARM-блоков; не смешивается с bbPlan. */
   armPlan?: unknown | null;
   warnings: string[];
@@ -189,6 +194,8 @@ export interface AnnualBuildOptions {
   /** false — собрать блоки плана «как есть» без синхронизации с макро-разметкой
    *  (оркестратор уже синхронизировал план). По умолчанию true. */
   sync?: boolean;
+  /** В UI требовать явного consent для изменения длины исходного PL-цикла. */
+  strictCycleConsent?: boolean;
 }
 
 /** Результат сборки всего годового плана. */

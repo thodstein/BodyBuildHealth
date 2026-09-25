@@ -68,6 +68,45 @@ export function meetAttemptsFor(pm: number, strategy: MeetStrategy = 'balanced')
   return { opener, second, third, target: third };
 }
 
+export type CompetitionLift = 'squat' | 'bench' | 'deadlift';
+
+export interface ResolvedCompetitionLift {
+  lift: CompetitionLift;
+  key: string;
+  pm: number;
+}
+
+const COMPETITION_LIFT_PATTERNS: Record<CompetitionLift, RegExp[]> = {
+  squat: [/присед/i, /приседан/i, /squat/i],
+  bench: [/жим\s+(?:штангой\s+)?(?:леж|лёж)/i, /жим\s+на\s+скам/i, /^bench$/i, /bench\s*press/i],
+  deadlift: [/станов/i, /тяга\s+(?:штанги\s+)?(?:становая|классическая)/i, /deadlift/i, /сумо/i],
+};
+
+function normalizedLiftName(value: string): string {
+  return value.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+}
+
+export function resolveCompetitionLifts(pmRow: Record<string, number>): ResolvedCompetitionLift[] {
+  const entries = Object.entries(pmRow)
+    .filter(([, value]) => Number.isFinite(value) && value > 0)
+    .map(([key, pm]) => ({ key, pm, normalized: normalizedLiftName(key) }));
+  const seen = new Set<string>();
+  const resolved: ResolvedCompetitionLift[] = [];
+  for (const lift of ['squat', 'bench', 'deadlift'] as CompetitionLift[]) {
+    const matches = entries
+      .filter(entry => !seen.has(entry.key) && COMPETITION_LIFT_PATTERNS[lift].some(pattern => pattern.test(entry.normalized)))
+      .sort((a, b) => b.pm - a.pm || a.key.localeCompare(b.key))[0];
+    if (!matches) continue;
+    seen.add(matches.key);
+    resolved.push({ lift, key: matches.key, pm: matches.pm });
+  }
+  return resolved;
+}
+
+export function resolveCompetitionLiftPm(pmRow: Record<string, number>, lift: CompetitionLift): number {
+  return resolveCompetitionLifts(pmRow).find(item => item.lift === lift)?.pm ?? 0;
+}
+
 export interface MeetAttemptsInfo {
   strategy: MeetStrategy;
   lifts: {

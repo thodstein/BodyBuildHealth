@@ -189,6 +189,18 @@ describe('planner bridge handlers', () => {
     expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('Собранный цикл'));
   });
 
+  it('program handler принимает готовую ARM-программу', () => {
+    const ctx = context('arm');
+    ctx.program = createBlank('arm');
+    const built = createBlank('arm');
+    built.meta.title = 'Сборка ARM-цикла: тест';
+    built.arm!.weeks[0].armMetadata = { planSnapshotId: 'arm-snapshot' };
+    const ok = applyBridgePayloadDispatch(payload('program', { program: built }), ctx);
+    expect(ok).toBe(true);
+    expect(ctx.onChange).toHaveBeenCalledWith(built);
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('Собранный цикл'));
+  });
+
   it('program handler без готовой программы падает на cycleId', () => {
     const ctx = context('bb');
     const ok = applyBridgePayloadDispatch(payload('program', { id: 'cycle-01' }), ctx);
@@ -315,7 +327,19 @@ describe('annual_block bridge (блок года → редактор → обр
     expect(ok).toBe(true);
     expect(ctx.onChange).toHaveBeenCalledWith(prog);
     expect(getPendingAnnualBlock()?.blockKey).toBe('blk-1');
+    expect(getPendingAnnualBlock()?.programId).toBe(prog.meta.id);
     expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('вернутся в блок'));
+  });
+
+  it('annual_block принимает ARM-программу без преобразования в BB', () => {
+    const ctx = context('arm');
+    const prog = createBlank('arm');
+    prog.meta.title = 'ARM-блок для правки';
+    prog.arm!.weeks[0].armMetadata = { planSnapshotId: 'arm-snapshot' };
+    const ok = applyBridgePayloadDispatch(payload('annual_block', { blockKey: 'arm-blk', program: prog }), ctx);
+    expect(ok).toBe(true);
+    expect(ctx.onChange).toHaveBeenCalledWith(prog);
+    expect(getPendingAnnualBlock()?.blockKey).toBe('arm-blk');
   });
 
   it('annual_block без программы: предупреждение, pending не ставится', () => {
@@ -348,6 +372,24 @@ describe('annual_block bridge (блок года → редактор → обр
     saveAnnualTrainingPlan({ ...plan, blocks: [built] });
     expect(completeAnnualBlockImport(createBlank('bb'))).toBe(false);
     expect(loadAnnualTrainingPlan()!.blocks[0].result!.program?.meta.title).not.toBe('x');
+  });
+
+  it('completeAnnualBlockImport отклоняет pending для другой программы', () => {
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[0], plan, macro, { daysPerWeek: 4 });
+    saveAnnualTrainingPlan({ ...plan, blocks: [built] });
+    localStorage.setItem(ANNUAL_BLOCK_PENDING_KEY, JSON.stringify({ blockKey: built.ref.blockKey, programId: 'other-program', ts: Date.now() }));
+    const prog = createBlank('bb');
+    prog.meta.title = 'Не та программа';
+    expect(completeAnnualBlockImport(prog)).toBe(false);
+    expect(getPendingAnnualBlock()).toBeNull();
+    expect(loadAnnualTrainingPlan()!.blocks[0].result!.program?.meta.title).not.toBe('Не та программа');
+  });
+
+  it('completeAnnualBlockImport без годового плана → false', () => {
+    localStorage.setItem(ANNUAL_BLOCK_PENDING_KEY, JSON.stringify({ blockKey: 'missing-block', ts: Date.now() }));
+    expect(completeAnnualBlockImport(createBlank('bb'))).toBe(false);
+    expect(getPendingAnnualBlock()).toBeNull();
   });
 });
 

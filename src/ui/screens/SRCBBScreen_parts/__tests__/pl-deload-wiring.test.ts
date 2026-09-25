@@ -22,7 +22,7 @@ describe('ПЛ-авто: делод по кнопке — проводка (sour
     const calls = (screen.match(/applyPLDeload\(/g) || []).length;
     // buildSrc + buildSrcMacrocycle + мост kind deload + откат (импорт не считается)
     expect(calls).toBeGreaterThanOrEqual(3);
-    expect(screen).toContain('planHasDeload(builtSrc)');
+    expect(screen).toContain('planHasDeload(effectiveSrc ?? builtSrc)');
     expect(screen).toContain('onRemoveDeload');
   });
 

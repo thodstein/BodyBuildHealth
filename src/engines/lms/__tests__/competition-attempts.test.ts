@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { competitionAttempts, meetAttemptsFor, MEET_STRATEGY_PCT } from '../competition-attempts';
+import { competitionAttempts, meetAttemptsFor, resolveCompetitionLiftPm, resolveCompetitionLifts, MEET_STRATEGY_PCT } from '../competition-attempts';
 
 describe('competitionAttempts', () => {
   it('creates opener, second and third attempts from PM', () => {
@@ -17,6 +17,30 @@ describe('competitionAttempts', () => {
     expect(attempts.secondRange[1]).toBe(170);
     expect(attempts.thirdRange[0]).toBe(170);
     expect(attempts.thirdRange[1]).toBe(190);
+  });
+});
+
+describe('resolveCompetitionLifts', () => {
+  it('выбирает по одному каноническому подъёму из алиасов', () => {
+    const row = {
+      Приседания: 180,
+      Присед: 178,
+      'Жим лёжа': 120,
+      'Жим штангой лёжа': 118,
+      'Становая тяга': 220,
+      Тяга: 215,
+      'Жим ногами': 80,
+    };
+    const resolved = resolveCompetitionLifts(row);
+    expect(resolved.map(item => item.lift)).toEqual(['squat', 'bench', 'deadlift']);
+    expect(resolved.map(item => item.pm)).toEqual([180, 120, 220]);
+    expect(resolveCompetitionLiftPm(row, 'squat')).toBe(180);
+  });
+
+  it('не создаёт повторный подъём для нескольких совпадающих алиасов', () => {
+    const resolved = resolveCompetitionLifts({ Squat: 150, 'Back Squat': 150, Bench: 100, Deadlift: 200 });
+    expect(resolved).toHaveLength(3);
+    expect(new Set(resolved.map(item => item.lift)).size).toBe(3);
   });
 });
 

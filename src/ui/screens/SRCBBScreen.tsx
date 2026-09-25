@@ -2,6 +2,7 @@
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, explainSelection } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, extractExercises, originalCycleWeeks, appendPLTaperWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
+import { applyPLEffectiveOverlay } from '../../engines/lms/lms-effective-plan';
 import { applyMacroTaperToPLWeeks } from '../../engines/lms/lms-macro-taper.engine';
 import { mergeMeetRegistry, syncCompetitionsFromMeets } from '../../engines/lms/pl-meet-registry.engine';
 import { recommendTaperConfig, type TaperCoachCtx } from '../../engines/lms/lms-taper-coach.engine';
@@ -123,6 +124,44 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) =
       <SRCBBScreenInner {...props} />
     </PLTaperProvider>
   );
+};
+
+const finiteAuto = (value: number | undefined, fallback: number): number => typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const normalizeSavedEdits = (raw: unknown): Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }> => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d+_\d+_\d+_\d+$/.test(key) || !value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const item = value as Record<string, unknown>;
+    const next: { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number } = {};
+    for (const field of ['weight', 'reps', 'sets', 'pct', 'rir'] as const) {
+      if (typeof item[field] === 'number' && Number.isFinite(item[field])) next[field] = item[field] as number;
+    }
+    if (typeof item.tempo === 'string' && item.tempo.length <= 32) next.tempo = item.tempo;
+    if (Object.keys(next).length > 0) out[key] = next;
+  }
+  return out;
+};
+
+const normalizeSavedAdditions = (raw: unknown): Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]> => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d+_\d+$/.test(key) || !Array.isArray(value)) continue;
+    out[key] = value.filter(item => item && typeof item === 'object' && !Array.isArray(item)).map(item => {
+      const row = item as Record<string, unknown>;
+      return {
+        uid: typeof row.uid === 'string' ? row.uid.slice(0, 64) : '',
+        name: typeof row.name === 'string' ? row.name.slice(0, 120) : '',
+        group: typeof row.group === 'string' ? row.group.slice(0, 40) : '',
+        sets: Math.max(1, Math.min(20, Number(row.sets) || 1)),
+        reps: Math.max(0, Math.min(100, Number(row.reps) || 0)),
+        weight: Math.max(0, Math.min(2000, Number(row.weight) || 0)),
+      };
+    }).filter(item => item.uid && item.name);
+  }
+  return out;
 };
 
 const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
@@ -267,13 +306,16 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [calendarView, setCalendarView] = useState<'original' | 'tapered'>('tapered');
   const validateSavedSrc = (plan: any): LMSBuildOutput | null => {
     if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return null;
+    if (!plan.template || typeof plan.template !== 'object' || !plan.template.meta || typeof plan.template.meta.id !== 'string') return null;
     if (!plan.weeks.every((week: any) => week && Number.isFinite(week.week) && Array.isArray(week.days))) return null;
-    if (!plan.weeks.every((week: any) => week.days.every((day: any) => day && Array.isArray(day.exercises)))) return null;
+    if (!plan.weeks.every((week: any) => week.days.every((day: any) => day && Array.isArray(day.exercises)
+      && day.exercises.every((exercise: any) => exercise && typeof exercise.name === 'string' && Array.isArray(exercise.workSets)
+        && exercise.workSets.every((set: any) => set && Number.isFinite(set.weight) && Number.isFinite(set.reps) && Number.isFinite(set.sets)))))) return null;
     return plan as LMSBuildOutput;
   };
   const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(() => validateSavedSrc(_plSaved?.builtSrc));
   const [srcWeek, setSrcWeek] = useState<number>(_plSaved?.srcWeek ?? 1);
-  const [srcAdditions, setSrcAdditions] = useState<Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>>(_plSaved?.srcAdditions ?? {});
+  const [srcAdditions, setSrcAdditions] = useState<Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>>(normalizeSavedAdditions(_plSaved?.srcAdditions));
   // 🔋 Делод по кнопке пользователя (мост kind 'deload'): конфиг персистится и
   // переприменяется при каждой сборке плана — показано = вставлено = уехало в печать.
   type PLDeloadCfg = Required<Pick<PLDeloadRequest, 'volumeMult' | 'rirShift' | 'weeks'>>;
@@ -291,6 +333,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [diagnosticWeakSide, setDiagnosticWeakSide] = useState<'left' | 'right' | null>(() => {
     const v = (_plSaved as Record<string, unknown> | null)?.plDiagnosticWeakSide;
     return v === 'left' || v === 'right' ? v : null;
+  });
+  const [srcEdits, setSrcEdits] = useState<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }>>(normalizeSavedEdits(_plSaved?.srcEdits));
+  const [autoRegMode, setAutoRegMode] = useState<AutoRegMode>(() => {
+    const saved = _plSaved?.autoRegMode;
+    return saved === 'auto' || saved === 'diary' ? saved : 'off';
   });
   useEffect(() => {
     if (!builtSrc) return;
@@ -313,11 +360,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     localStorage.setItem('he_pl_session', JSON.stringify({
       ...base,
       ...taperDraft,
-      selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plPeakCycleId: peakCycleId,
+             selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcEdits, srcAdditions, autoRegMode, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plPeakCycleId: peakCycleId,
       plDeloadCfg, plDiagnosticWeakSide: diagnosticWeakSide,
       plMacroTaperMode: macroTaperMode, plMacroWeightGoal: macroWeightGoal, plMacroMockMeet: macroMockMeet, plMacroPostMeet: macroPostMeet,
     }));
-  } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId, plDeloadCfg, diagnosticWeakSide, taperPlan, taperAttemptOverride, macroTaperMode, macroWeightGoal, macroMockMeet, macroPostMeet]);
+  } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcEdits, srcAdditions, autoRegMode, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId, plDeloadCfg, diagnosticWeakSide, taperPlan, taperAttemptOverride, macroTaperMode, macroWeightGoal, macroMockMeet, macroPostMeet]);
   // 🏁 Единый реестр стартов (слияние Фазы 2): канон — he_pl_macro.competitions,
   // plMeetList — надстройка ПЛ (федерация/ПМ/стратегия). Гидрация при монтировании
   // и по событию годового плана; обратная запись — при правках стартов в ПЛ.
@@ -410,15 +457,24 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw }); } catch { /* ignore */ } }, [pmSquat, pmBench, pmDead, bw]);
   // U4: ручная правка поверх сгенерированного плана (оверлей правок по позиции сета)
   const [editMode, setEditMode] = useState<boolean>(false);
-  const [srcEdits, setSrcEdits] = useState<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number }>>({});
   const setKey = (w: number, di: number, ei: number, si: number) => `${w}_${di}_${ei}_${si}`;
-  const effSet = (w: number, di: number, ei: number, si: number, ws: { sets: number; reps: number; weight: number; pct: number }) => {
+  const effSet = (w: number, di: number, ei: number, si: number, ws: { sets: number; reps: number; weight: number; pct: number; rir?: number }, exerciseName?: string) => {
     const ed = srcEdits[setKey(w, di, ei, si)];
-    if (ed?.pct != null && ed.pct > 0 && ws.pct > 0) {
-      // % правка: вес пересчитывается из PM недели (ws.weight / ws.pct = PM_нед).
-      return { sets: ed?.sets ?? ws.sets, reps: ed?.reps ?? ws.reps, weight: Math.round((ws.weight / ws.pct) * ed.pct * 10) / 10, pct: ed.pct };
-    }
-    return { sets: ed?.sets ?? ws.sets, reps: ed?.reps ?? ws.reps, weight: ed?.weight ?? ws.weight, pct: ws.pct };
+    const pct = ed?.pct != null && ed.pct > 0 ? ed.pct : ws.pct;
+    const editedWeight = ed?.pct != null && ed.pct > 0
+      ? Math.round((ws.weight / ws.pct) * ed.pct * 10) / 10
+      : ed?.weight ?? ws.weight;
+    const diaryAdj = exerciseName && autoRegMode === 'diary' ? diaryAutoreg?.perExercise.get(exerciseName) : undefined;
+    const autoVol = autoRegMode === 'auto' ? finiteAuto(autoRegResult.volumeMultiplier, 1) : 1;
+    const autoWeight = autoRegMode === 'auto' ? finiteAuto(autoRegResult.topSetPctMultiplier, 1) : 1;
+    const baseRir = ed?.rir ?? ws.rir ?? 2;
+    const diaryRir = ed?.rir == null && diaryAdj ? diaryAdj.adjustedRir - baseRir : 0;
+    const autoRir = autoRegMode === 'auto' ? finiteAuto(autoRegResult.rirShift, 0) : 0;
+    const sets = Math.max(1, Math.round((ed?.sets ?? diaryAdj?.adjustedSets ?? ws.sets) * bridgeMult * autoVol));
+    const rir = Math.max(0, Math.min(6, peakAdjust ? peakAdjust.rirTarget : baseRir + bridgeRir + autoRir + diaryRir));
+    const hasManualWeight = ed?.pct != null || ed?.weight != null;
+    const outputWeight = hasManualWeight ? editedWeight : diaryAdj?.adjustedWeight ?? editedWeight;
+    return { sets, reps: ed?.reps ?? ws.reps, weight: outputWeight * autoWeight, pct, rir };
   };
 
   // U5: добавление упражнений из каталога (536) в день плана
@@ -524,7 +580,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
     const rec = getRecoveryMetrics(linked);
     const plan = buildLMSPlan({
-       template: tpl, pmMap, fallbackPm: 80, mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural', courseIntensity, weeksOverride: safeWeeks,
+       template: tpl, pmMap, fallbackPm: 80, mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural', courseIntensity, weeksOverride: safeWeeks, sourceChangeConsent: true, requireSourceChangeConsent: true,
       volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
       focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
       currentReadiness: linked.readiness?.recovery,
@@ -545,9 +601,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       peds: peds.length ? peds : undefined,
       pedDoses,
       nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
-      acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
-      autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
-      pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
+       acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
+       pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
       // Original SRC cycles are self-calculating: preserve their source layout
       // and apply the cycle's own PM correction between weeks.
       progressionEnabled: true,
@@ -561,7 +616,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setBuiltSrc(planOut); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setPickerDay(null);
   };
 
-  const buildSrcMacrocycle = (macro: Macrocycle) => {
+  const buildSrcMacrocycle = (macro: Macrocycle, sourceChangeConsent = false) => {
     const unsupported = macro.blocks.find(block => block.kind !== 'SRC');
     if (unsupported) {
       throw new Error(`Фаза «${unsupported.phase}» не содержит доступного СРЦ-цикла для PL-плана`);
@@ -569,9 +624,13 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const rec = getRecoveryMetrics(linked);
     const outputs = macro.blocks
       .map(block => {
-        const cycle = getCycleById(block.cycleId!);
-        if (!cycle) return null;
-        const output = buildLMSPlan({
+         const cycle = getCycleById(block.cycleId!);
+         if (!cycle) return null;
+         const sourceWeeks = originalCycleWeeks(cycle);
+         if (sourceWeeks !== block.weeks && !sourceChangeConsent) {
+           throw new Error(`Нужно согласие на изменение длины исходного цикла «${cycle.meta.title}» (${sourceWeeks}→${block.weeks} нед). Оригинал не изменён.`);
+         }
+         const output = buildLMSPlan({
           template: cycle,
           pmMap: { ...exercisePMs, 'Присед': exercisePMs['Присед'] || pmSquat, 'Жим лежа': exercisePMs['Жим лежа'] || pmBench, 'Становая тяга': exercisePMs['Становая тяга'] || pmDead },
           fallbackPm: 80,
@@ -599,11 +658,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
            peds: peds.length ? peds : undefined,
            pedDoses,
            nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
-           acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
-           autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
-            pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
+            acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
+             pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
             faithful: true,
-            ...rec,
+             sourceChangeConsent: true,
+             requireSourceChangeConsent: true,
+             ...rec,
         });
         const blockWeeks = Array.from({ length: block.weeks }, (_, index) => {
           const source = output.weeks[index % output.weeks.length];
@@ -893,7 +953,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const linked = useDataLink();
   const diarySessions = useMemo(() => loadSessions(), []);
   // P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary)
-  const [autoRegMode, setAutoRegMode] = useState<AutoRegMode>('off');
   const autoRegOn = autoRegMode !== 'off';
   // Авторегуляция ПРОГРЕССИИ ПМ (только ПМ) — независимый переключатель от авторегуляции весов/объёма/RIR.
   const [pmAutoRegMode, setPmAutoRegMode] = useState<PMAutoRegMode>('off');
@@ -933,6 +992,19 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     }));
     return buildDiaryAutoreg({ historyWorkouts, plannedExercises: planned });
   }, [autoRegMode, builtSrc, srcWeek, historyWorkouts]);
+
+  const effectiveSrc = useMemo(() => {
+    if (!builtSrc) return null;
+    return applyPLEffectiveOverlay(builtSrc, {
+      edits: srcEdits,
+      additions: srcAdditions,
+      autoReg: autoRegMode === 'auto' ? autoRegResult : null,
+      diary: autoRegMode === 'diary' ? diaryAutoreg?.perExercise ?? null : null,
+      volumeMultiplier: (priAdjust?.volumeMult ?? 1) * (deloadAdjust?.volumeMult ?? 1) * (peakAdjust?.volumeMult ?? 1),
+      rirShift: bridgeRir,
+      rirTarget: peakAdjust?.rirTarget,
+    });
+  }, [builtSrc, srcEdits, srcAdditions, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, deloadAdjust, peakAdjust, bridgeRir]);
 
   // Авторегуляция ПМ по дневнику: множитель кривой ПМ по e1RM vs плановый ПМ0.
   const pmDiary = useMemo(() => {
@@ -1219,24 +1291,26 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
 
   const togglePed = (p: PED) => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
   const srcDays: PlayerDay[] = useMemo(() => {
-    if (!builtSrc || !Array.isArray(builtSrc.weeks) || !builtSrc.weeks.length) return [];
-     const wk0 = builtSrc.weeks[Math.min(Math.max(srcWeek - 1, 0), builtSrc.weeks.length - 1)]; const w0 = wk0.week;
+    if (!effectiveSrc || !Array.isArray(effectiveSrc.weeks) || !effectiveSrc.weeks.length) return [];
+    const wk0 = effectiveSrc.weeks[Math.min(Math.max(srcWeek - 1, 0), effectiveSrc.weeks.length - 1)];
     return wk0.days.map((d, i) => ({
       label: `Д${i + 1}`,
-      exercises: [
-        ...d.exercises.map((e, ei) => ({
-          name: e.name, muscleGroup: e.group,
-           targetSets: e.workSets.flatMap((ws, si) => { let es = effSet(w0, i, ei, si, ws); if (autoRegMode === 'diary' && diaryAutoreg) { const adj = diaryAutoreg.perExercise.get(e.name); if (adj) { es = { ...es, weight: adj.adjustedWeight, sets: adj.adjustedSets }; } } const priMult = (priAdjust ? priAdjust.volumeMult : 1) * (deloadAdjust ? deloadAdjust.volumeMult : 1) * (peakAdjust ? peakAdjust.volumeMult : 1); const priRir = peakAdjust ? peakAdjust.rirTarget : ((priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0)); let diaryRir = 0; if (autoRegMode === 'diary' && diaryAutoreg) { const adj = diaryAutoreg.perExercise.get(e.name); if (adj) diaryRir = adj.adjustedRir - (ws.rir ?? 2); } es = { ...es, sets: Math.max(1, Math.round(es.sets * priMult)) }; return Array.from({ length: es.sets }, () => ({ weight: es.weight, reps: es.reps, rir: Math.max(0, priRir + diaryRir), tempo: tempoAdjust ? tempoAdjust : undefined })); }),
-          pm: e.pm, coef: e.coef, mnosz: e.mnosz, group: e.group,
-        })),
-        ...(srcAdditions[dayKey(w0, i)] || []).map(a => ({
-          name: a.name, muscleGroup: a.group,
-          targetSets: Array.from({ length: a.sets }, () => ({ weight: a.weight, reps: a.reps, rir: 0 })),
-          pm: Math.max(a.weight * 1.4, 1), coef: 1, mnosz: 1, group: a.group,
-        })),
-      ],
+      exercises: d.exercises.map(e => ({
+        name: e.name,
+        muscleGroup: e.group,
+        targetSets: e.workSets.flatMap(ws => Array.from({ length: Math.max(1, ws.sets) }, () => ({
+          weight: ws.weight,
+          reps: ws.reps,
+          rir: ws.rir,
+          tempo: tempoAdjust ?? undefined,
+        }))),
+        pm: e.pm,
+        coef: e.coef,
+        mnosz: e.mnosz,
+        group: e.group,
+      })),
     }));
-  }, [builtSrc, srcWeek, srcEdits, srcAdditions, autoRegOn, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
+  }, [effectiveSrc, srcWeek, tempoAdjust]);
 
   const bbDaysArr: PlayerDay[] = useMemo(() => {
     if (!builtBb || !Array.isArray(builtBb.weeks) || !builtBb.weeks.length) return [];
@@ -1286,8 +1360,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     ? (plSeasonMode === 'season' ? '🧩 Сезон по микроциклам' : (getCycleById(selectedCycleId)?.meta.title || 'Силовой цикл'))
     : 'BB';
   const lmsChart: LMSWeekMetric[] = useMemo(() => {
-    if (!builtSrc || !Array.isArray(builtSrc.weeks) || !builtSrc.weeks.length) return [];
-    const base = builtSrc.weeks.map(wk => {
+    if (!effectiveSrc || !Array.isArray(effectiveSrc.weeks) || !effectiveSrc.weeks.length) return [];
+    return effectiveSrc.weeks.map(wk => {
       const t = wk.days.reduce((s, d) => s + d.metrics.tonnage, 0);
       const k = wk.days.reduce((s, d) => s + d.metrics.kpsh, 0);
       const uoi = k > 0 ? wk.days.reduce((s, d) => s + d.metrics.uoi * d.metrics.kpsh, 0) / k : 0;
@@ -1295,63 +1369,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       const intFB = k > 0 ? wk.days.reduce((s, d) => s + d.metrics.intFB * d.metrics.kpsh, 0) / k : 0;
       return { week: wk.week, tonnage: Math.round(t), kpsh: k, relInt: Math.round(relInt * 1000) / 1000, uoi: Math.round(uoi * 100) / 100, intFB: Math.round(intFB) };
     });
-    if (autoRegMode === 'off') return base;
-    if (autoRegMode === 'auto' && autoRegResult) {
-      const vol = autoRegResult.volumeMultiplier ?? 1;
-      const wMul = autoRegResult.topSetPctMultiplier ?? 1;
-      if (vol === 1 && wMul === 1) return base;
-      return base.map(b => ({
-        week: b.week,
-        tonnage: Math.round(b.tonnage * vol * wMul),
-        kpsh: Math.round(b.kpsh * vol),
-        relInt: Math.round(b.relInt * wMul * 1000) / 1000,
-        uoi: Math.round(b.uoi * wMul * 100) / 100,
-        intFB: Math.round(b.intFB * vol * wMul),
-      }));
-    }
-    if (autoRegMode === 'diary') {
-      try {
-        const allPlans = builtSrc.weeks.flatMap(wk => wk.days.flatMap(d => d.exercises.map(e => {
-          const mainSet = e.workSets.reduce((best, ws) => (ws.weight ?? 0) > (best.weight ?? 0) ? ws : best, e.workSets[0] ?? ({} as typeof e.workSets[number]));
-          return {
-            name: e.name,
-            plannedWeight: mainSet?.weight ?? 0,
-            plannedReps: mainSet?.reps ?? 8,
-            plannedSets: mainSet?.sets ?? 3,
-            plannedRir: mainSet?.rir ?? 2,
-            isMain: e.load === 'Тяжелая',
-          };
-        })));
-        const uniq = new Map<string, typeof allPlans[number]>();
-        for (const p of allPlans) if (!uniq.has(p.name)) uniq.set(p.name, p);
-        const globalPlanned = [...uniq.values()].filter(p => p.plannedWeight > 0);
-        if (globalPlanned.length === 0) return base;
-        const globalDiary = buildDiaryAutoreg({ historyWorkouts, plannedExercises: globalPlanned });
-        let wSum = 0, sSum = 0, cnt = 0;
-        for (const p of globalPlanned) {
-          const adj = globalDiary.perExercise.get(p.name);
-          if (adj && adj.source === 'diary' && p.plannedWeight > 0 && p.plannedSets > 0) {
-            wSum += adj.adjustedWeight / p.plannedWeight;
-            sSum += adj.adjustedSets / p.plannedSets;
-            cnt++;
-          }
-        }
-        if (cnt === 0) return base;
-        const avgW = wSum / cnt;
-        const avgS = sSum / cnt;
-        if (Math.abs(avgW - 1) < 0.01 && Math.abs(avgS - 1) < 0.01) return base;
-        return base.map(b => ({
-          week: b.week,
-          tonnage: Math.round(b.tonnage * avgW * avgS),
-          kpsh: Math.round(b.kpsh * avgS),
-          relInt: Math.round(b.relInt * avgW * 1000) / 1000,
-          uoi: Math.round(b.uoi * avgW * 100) / 100,
-          intFB: Math.round(b.intFB * avgW * avgS),
-        }));
-      } catch { return base; }
-    }
-    return base;
-  }, [builtSrc, autoRegMode, autoRegResult, historyWorkouts]);
+  }, [effectiveSrc]);
 
   // Сохраняем построенный план (дни + фокус + неделя) в localStorage, чтобы
   // вкладка «Тренировки» (runtime) могла запустить его выполнение.
@@ -1477,9 +1495,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     peds: peds.length ? peds : undefined,
     pedDoses,
     nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
-    acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
-    autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
-    pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
+     acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
+     pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
     volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
     focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
     currentReadiness: linked.readiness?.recovery,
@@ -1504,18 +1521,18 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   // собранного плана (раньше передавался вымышленный хардкод 12/10/14/8/6/4).
   const plToolTotalSets = useMemo(() => {
     const acc: Record<string, number> = {};
-    for (const lm of builtSrc?.plVolumeLandmarks ?? []) {
+    for (const lm of (effectiveSrc ?? builtSrc)?.plVolumeLandmarks ?? []) {
       const key = plToolGroupOf(lm.group);
       if (!key) continue;
       acc[key] = (acc[key] || 0) + (lm.sets || 0);
     }
     return acc;
-  }, [builtSrc]);
+  }, [builtSrc, effectiveSrc]);
 
   // Сводка для печати/экспорта: базовые метрики + циклы сезона (с «ужатиями»).
   const plPrintSummary = (): { label: string; value: string }[] => {
     const rows: { label: string; value: string }[] = [
-      { label: 'Недель', value: `${builtSrc?.weeks.length ?? 0}` },
+      { label: 'Недель', value: `${(effectiveSrc ?? builtSrc)?.weeks.length ?? 0}` },
       { label: 'Дней/нед', value: `${days}` },
       { label: 'Присед ПМ', value: `${pmSquat} кг` },
       { label: 'Жим ПМ', value: `${pmBench} кг` },
@@ -1773,8 +1790,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             >⚙️ Открыть мастерскую тапера →</button>
           </div>
           <PLPlanView api={{
-            builtSrc: builtSrc!,
-            setBuiltSrc: p => setBuiltSrc(p),
+             builtSrc: builtSrc!,
+             effectiveSrc,
+             setBuiltSrc: p => setBuiltSrc(p),
             srcWeek, setSrcWeek, srcEdits, setSrcEdits, srcAdditions, setSrcAdditions,
             editMode, setEditMode, setKey, effSet, dayKey, addExToDay,
             pickerDay, setPickerDay, pickerGroup, setPickerGroup, pickerExName, setPickerExName,
@@ -1789,11 +1807,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
             e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
             tempoStr, getTempo,
-            hasDeload: planHasDeload(builtSrc),
+             hasDeload: planHasDeload(effectiveSrc ?? builtSrc),
             onRemoveDeload: handleRemoveDeload,
           }} />
-          <BlockView plan={builtSrc} />
-          <PLToolsCard level={level} days={days} totalSets={plToolTotalSets} bodyWeight={linked.profile?.settings?.personal?.weight ?? bw} sex={linked.profile?.settings?.personal?.sex} e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }} hrvRatio={linked.profile?.settings?.baselineHrvRatio} acwr={acwrData.ratio} rpeDelta={autoRegResult.rirShift} plan={builtSrc} onApplyFrequency={(plans)=>{ const m: Record<string, number[]> = {}; plans.forEach(p=>{ m[p.muscle]=Array.from({length:p.frequency},(_,i)=>i+1); }); setWeakGroupDayMap(m); setMethodNote(`📊 Частота применена: ${plans.map(p=>`${p.muscle} ${p.frequency}×`).join(', ')}`); }} />
+           <BlockView plan={effectiveSrc ?? builtSrc} />
+           <PLToolsCard level={level} days={days} totalSets={plToolTotalSets} bodyWeight={linked.profile?.settings?.personal?.weight ?? bw} sex={linked.profile?.settings?.personal?.sex} e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }} hrvRatio={linked.profile?.settings?.baselineHrvRatio} acwr={acwrData.ratio} rpeDelta={autoRegResult.rirShift} plan={effectiveSrc ?? builtSrc} onApplyFrequency={(plans)=>{ const m: Record<string, number[]> = {}; plans.forEach(p=>{ m[p.muscle]=Array.from({length:p.frequency},(_,i)=>i+1); }); setWeakGroupDayMap(m); setMethodNote(`📊 Частота применена: ${plans.map(p=>`${p.muscle} ${p.frequency}×`).join(', ')}`); }} />
           {plSeasonMode === 'season' && (
             <div role="status" style={{ marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', fontSize: 11, color: '#c4b5fd', lineHeight: 1.5 }}>
               {seasonNotes.length > 0 ? (
@@ -1836,8 +1854,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {mainTab === 'pl' && subView === 'charts' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <div style={H}>4 📊 Графики</div>
-          {builtSrc && builtSrc.weeks.length > 0 && (() => {
-            const W = builtSrc.weeks;
+           {effectiveSrc && effectiveSrc.weeks.length > 0 && (() => {
+             const W = effectiveSrc.weeks;
             const weekData = W.map(wk => ({
               week: wk.week,
               sets: wk.days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + (e.workSets || []).reduce((s2, ws) => s2 + (ws.sets || 0), 0), 0), 0),
@@ -1934,7 +1952,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {mainTab === 'pl' && subView === 'reference' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <div style={H}>5 📚 Справка и отчёты</div>
-          {builtSrc && (
+           {effectiveSrc && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
               <button
                 onClick={() => {
@@ -1943,7 +1961,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                     const scope = plSeasonMode === 'season'
                       ? `Сезон по микроциклам · ${seasonSegments.map(s => s.cycleTitle).join(' → ')}`
                       : (cycle ? `${cycle.meta.title} · ${cycle.meta.level} · ${cycle.meta.weeks} нед` : 'Силовой цикл ПЛ');
-                    const html = buildPLPrintHtml('Силовой цикл ПЛ', scope, builtSrc!.weeks, {
+                     const html = buildPLPrintHtml('Силовой цикл ПЛ', scope, effectiveSrc!.weeks, {
                       summary: plPrintSummary(),
                     });
                     printPLHtml(html, { title: 'ПЛ-план', text: 'Печать / PDF плана силового цикла' });
@@ -1954,7 +1972,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               <button
                 onClick={() => {
                   try {
-                    const wb = buildPLExcelWorkbook('Силовой цикл ПЛ', plExportRows(builtSrc!.weeks), plPrintSummary());
+                     const wb = buildPLExcelWorkbook('Силовой цикл ПЛ', plExportRows(effectiveSrc!.weeks), plPrintSummary());
                     downloadPLExcel(wb, 'pl-plan.xlsx');
                   } catch (e) { setMethodNote('⚠ Ошибка экспорта: ' + (e as Error).message); }
                 }}
@@ -1963,7 +1981,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             </div>
           )}
            {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
-            {builtSrc && <div style={{ marginTop: 10 }}><div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>📦 Block View — весь блок</div><BlockView plan={builtSrc} /></div>}
+             {effectiveSrc && <div style={{ marginTop: 10 }}><div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>📦 Block View — весь блок</div><BlockView plan={effectiveSrc} /></div>}
             <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('charts')}>← 4 Графики</button>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('competition')}>🏁 Соревнования →</button>
@@ -2000,9 +2018,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           </div>
         </BbCard>
       )}
-      {subView === 'macro' && <MacrocyclePanel taperMode={macroTaperMode} level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={(macro) => {
+      {subView === 'macro' && <MacrocyclePanel taperMode={macroTaperMode} level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={(macro, sourceChangeConsent = false) => {
         try {
-          if (mainTab === 'pl') buildSrcMacrocycle(macro as Macrocycle);
+          if (mainTab === 'pl') buildSrcMacrocycle(macro as Macrocycle, sourceChangeConsent);
           else applyBBMacrocycle(macro as Macrocycle | BBMacrocycle);
         } catch (error) {
           setMethodNote(`⚠ Макроцикл не применён: ${(error as Error).message}`);

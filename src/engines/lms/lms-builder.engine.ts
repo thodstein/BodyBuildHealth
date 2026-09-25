@@ -9,7 +9,7 @@
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec } from '../../data/lms-cycles/lms-types';
 import { pmProgression, pmForWeek, workWeight, progressionRationale, levelPmFloor, type ProgressionMode, type PMProgressionInput } from './lms-progression.engine';
 import { autoWeeklyPercent, type PMAutoRegMode } from './pm-autoreg.engine';
-import { calcSessionMetrics, type SRExercise, type SRSessionMetrics, type SRCycleMetrics } from './lms-metrics.engine';
+import { calcSessionMetrics, calcCycleMetrics, type SRExercise, type SRSessionMetrics, type SRCycleMetrics } from './lms-metrics.engine';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { type Exercise } from '../../core/types';
 import { selectExercisesSmart } from '../exercise-selector.engine';
@@ -26,7 +26,7 @@ import { norm } from '../norm';
 import { resolveCatalogId, stripCycleNotation } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
 import { cloneCycleTemplate } from '../../data/lms-cycles/lms-cycle-clone';
-import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
+import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, resolveCompetitionLifts, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
 import { buildPLTaperCurve, summarizeTaperCurve, type PeakWeekLayout, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
 import { buildPLPeakBlockLayout, dateWeeksBackward, type PLPeakBlockLayout } from './lms-peak-block.engine';
 
@@ -38,6 +38,8 @@ export interface LMSBuildInput {
   weeklyPercent?: number;
   courseIntensity?: 'mild' | 'moderate' | 'heavy';
   weeksOverride?: number;
+  sourceChangeConsent?: boolean;
+  requireSourceChangeConsent?: boolean;
   /** Включить прогрессию ПМ по неделям (как в оригинале циклов). */
   progressionEnabled?: boolean;
   /** ПРОФ-параметры */
@@ -161,6 +163,17 @@ export interface LMSPlanWeek {
   rampWeek?: boolean;
 }
 
+export interface LMSSeasonProvenance {
+  cycleId: string;
+  sourceCycleId: string;
+  title: string;
+  originalWeeks: number;
+  plannedWeeks: number;
+  fitMode: 'exact' | 'proposed_extend' | 'proposed_shrink' | 'strict_skip';
+  consentApplied: boolean;
+  sourceChanged: boolean;
+}
+
 export interface LMSBuildOutput {
   template: SRCycleTemplate;
   progressionRationale: string;
@@ -168,6 +181,8 @@ export interface LMSBuildOutput {
   cycleMetrics: SRCycleMetrics;
   /** Валидация объёма по группам мышц против MEV/MAV/MRV (volume-landmarks). */
   plVolumeLandmarks?: PLVolumeLandmark[];
+  /** Источник и способ подгонки каждого сегмента сезона. */
+  seasonProvenance?: LMSSeasonProvenance[];
   /**
    * Честный флаг «план НЕ собран» (аудит P2): сборка сезона заблокирована
    * согласием/пустым сезоном — weeks пуст, template НЕ подставной чужой цикл.
@@ -1162,6 +1177,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const totalWeeks = hasExplicitWeeks
     ? template.weeks!.length
     : Math.max(1, Math.round(input.weeksOverride ?? template.meta.weeks));
+  if (input.requireSourceChangeConsent && !hasExplicitWeeks && input.weeksOverride != null && input.weeksOverride !== originalCycleWeeks(template) && input.sourceChangeConsent !== true) {
+    throw new Error(`Нужно согласие на изменение длины исходного цикла «${template.meta.title}» (${originalCycleWeeks(template)}→${Math.round(input.weeksOverride)} нед). Оригинал не изменён.`);
+  }
 
   const pm0Map: Record<string, number> = {};
   for (const name of exercises) {
@@ -1340,9 +1358,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           const baseWeight = workWeight(pm, s.pct);
           const adjWeight = Math.round(baseWeight * arTopMult * 10) / 10;
 
-          // RIR с ACWR + авторегуляцией
-          const baseRir = faithful ? (s.rir ?? 0) : rirBase;
-          const adjRir = Math.max(0, Math.min(6, baseRir + acwrRirShift + arRirShift + (metaDeload && !faithful ? 2 : 0)));
+           // RIR с ACWR + авторегуляцией
+           const baseRir = faithful ? (s.rir ?? rirBase) : rirBase;
+           const adjRir = Math.max(0, Math.min(6, baseRir + acwrRirShift + arRirShift + (metaDeload && !faithful ? 2 : 0)));
 
           return {
             pct: s.pct, reps: s.reps, sets: Math.max(1, sets),
@@ -1365,7 +1383,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         }
         dayFatigueBudget -= fatigueCost * totalWorkSets;
 
-      return { name: spec.name, group: spec.group, coef: spec.coef, mnosz: spec.mnosz, load: cleanLoad(spec.load, dayTag), pm, rir: rirBase, workSets };
+      return { name: spec.name, group: spec.group, coef: spec.coef, mnosz: spec.mnosz, load: cleanLoad(spec.load, dayTag), pm, rir: workSets[0]?.rir ?? rirBase, workSets };
        });
  
        const metricsEx: SRExercise[] = planEx.map(pe => ({
@@ -1591,7 +1609,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
     sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
   } as SRExercise))));
-  const cycleMetrics = calcCycleMetricsAggregate(allSessions, totalWeeks);
+  const cycleMetrics = calcCycleMetrics(allSessions);
 
   const proRationale = [
     rationale,
@@ -1649,18 +1667,12 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
  * Если соревновательных движений нет (армрестлинг и т.п.) — возвращает null.
  */
 export function computeMeetAttemptsFromPmRow(pmRow: Record<string, number>, strategy: MeetStrategy = 'balanced'): MeetAttemptsInfo | null {
-  const keys = Object.keys(pmRow).filter(k => Number.isFinite(pmRow[k]) && pmRow[k] > 0);
-  const pick = (re: RegExp): string | undefined => keys.find(k => re.test(norm(k)));
-  const liftKeys = [
-    pick(/присед|сквот/),
-    pick(/жим.*леж|леж.*жим/),
-    pick(/станов/),
-  ].filter((k): k is string => !!k);
+  const liftKeys = resolveCompetitionLifts(pmRow);
   if (liftKeys.length === 0) return null;
   return {
     strategy,
-    lifts: liftKeys.map(name => {
-      const att = meetAttemptsFor(pmRow[name], strategy);
+    lifts: liftKeys.map(({ key: name, pm }) => {
+      const att = meetAttemptsFor(pm, strategy);
       return { name, ...att, warmup: warmupToOpener(att.opener) };
     }),
   };
@@ -2263,7 +2275,7 @@ export function appendPLTaperWeeks(
     name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
     sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
   } as SRExercise))));
-  const cycleMetrics = calcCycleMetricsAggregate(allSessions, weeks.length);
+  const cycleMetrics = calcCycleMetrics(allSessions);
 
   const pedNote = activePeds.length > 0
     ? ` 💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}; прогрессия ПМ ${k >= 0 ? '+' : ''}${(k * 100).toFixed(1)}%/нед продолжена в taper-неделях.`
@@ -2359,24 +2371,6 @@ export function refreshMeetAttempts(plan: LMSBuildOutput, strategy: MeetStrategy
     weeks,
     progressionRationale: plan.progressionRationale +
       ` 🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (${label}).`,
-  };
-}
-
-function calcCycleMetricsAggregate(sessions: SRExercise[][], weeksCount: number): SRCycleMetrics {
-  const perSession = sessions.map(s => calcSessionMetrics(s));
-  let tonnage = 0, kpsh = 0, relIntWeighted = 0, intFB = 0, uoiNum = 0;
-  for (const s of perSession) {
-    tonnage += s.tonnage; kpsh += s.kpsh;
-    relIntWeighted += s.relIntensity * s.kpsh; intFB += s.intFB; uoiNum += s.uoi * s.kpsh;
-  }
-  return {
-    tonnage, kpsh,
-    avgWeight: kpsh > 0 ? tonnage / kpsh : 0,
-    relIntensity: kpsh > 0 ? relIntWeighted / kpsh : 0,
-    intFB,
-    uoi: kpsh > 0 ? uoiNum / kpsh : 0,
-    sessions: perSession.length,
-    perSession,
   };
 }
 

@@ -26,7 +26,7 @@ import { rankBBSplits } from '../../../engines/bb/bb-selector.engine';
 import { applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { applyPeakWeekOverlayToBBPlan, buildBBContestPrep, normalizeContestCategory, isoToday, isoAddDays, PHASE_LABELS_RU, PEAK_PHASE_COLORS, CONTEST_SPECIALIZATION_LABELS, deserializeBBPrepConfig, type BBContestPrepConfig, type BBContestPrepResult } from '../../../engines/bb/bb-contest-prep.engine';
 import { autodraftBBPlan } from '../../../engines/manual-constructor/manual-draft.engine';
-import { createBlank, createFromBuild } from '../../../engines/user-program/program-store';
+import { createFromBuild } from '../../../engines/user-program/program-store';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
 import { getProfile } from '../../../core/profile-manager';
 import { getWeightLog, type WeightEntry } from '../../../engines/profile-store';
@@ -36,8 +36,9 @@ import { loadCardioCycles, cardioCycleSummary, compareCardioCycles, formatCardio
 import {
   annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
   composeAnnualProgram, planStatusFromBlocks, setAnnualBlockConfig, setAnnualBlockKind,
+  annualProgramFromBlock,
   validateAnnualPlan, activeBlockForWeek, recommendKindForPhase, cloneBlockConfigFrom,
-  importProgramIntoAnnualBlock, weekForDate,
+  importProgramIntoAnnualBlock, weekForDate, bbPlanFromUserWeeks,
 } from '../../../engines/annual-training/block-builders.engine';
 import { buildAnnualPrintHtml } from '../../../engines/annual-training/annual-training-print';
 import { annualCardioSpecs, annualCardioText, annualCardioWeekMinutes } from '../../../engines/annual-training/annual-training-cardio.engine';
@@ -449,7 +450,7 @@ interface Props {
   goal: 'powerlifting' | 'bodybuilding' | 'general';
   onApplyCycle?: (cycleId: string, weeks: number) => void;
   /** Применить весь макроцикл; если не задан, доступно только применение блока. */
-  onApplyMacrocycle?: (macro: Macrocycle | BBMacrocycle) => void;
+  onApplyMacrocycle?: (macro: Macrocycle | BBMacrocycle, sourceChangeConsent?: boolean) => void;
   /** Опционально: callback при изменении level (для редактируемого селектора). */
   onLevelChange?: (level: string) => void;
   /** Опционально: callback при изменении goal (для редактируемого селектора). */
@@ -765,7 +766,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
 
   const applyBlock = (idx: number) => {
     if (isBB && bbMacro) {
-      onApplyMacrocycle?.(bbMacro);
+      onApplyMacrocycle?.(bbMacro, true);
       return;
     }
     if (!macro) return;
@@ -1097,16 +1098,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           setAnnualStatusNote('⚠ Блок не собран — сначала «⚙️ Собрать блок»');
           return;
         }
-        // P0-1: после перезагрузки result.program для BB/MANUAL отсутствует (компактное
-        // хранение) — восстанавливаем UserProgram из недель блока.
-        let program = block.result.program;
+        const program = annualProgramFromBlock(block);
         if (!program) {
-          const prog = createBlank(block.ref.kind === 'PL' ? 'pl' : 'bb');
-          prog.meta.title = `Блок: ${block.ref.description ?? block.ref.phase} (${block.ref.weeks} нед)`;
-          prog.meta.weeks = block.ref.weeks;
-          if (block.ref.kind === 'PL' && prog.pl) prog.pl.schedule = [];
-          if (block.ref.kind !== 'PL' && prog.bb) prog.bb.weeks = block.result.weeks;
-          program = prog;
+          setAnnualStatusNote('⚠ В блоке нет сохранённой программы — пересоберите его');
+          return;
         }
         applyToPlanner({
           kind: 'annual_block',
@@ -1141,7 +1136,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           setAnnualStatusNote('⚠ Выберите блок на таймлайне (клик по карточке блока)');
           return;
         }
-        const next = buildAnnualBlock(plan.blocks[selectedBlockIdx], plan, src, { daysPerWeek: 4, level: effLevel });
+        const next = buildAnnualBlock(plan.blocks[selectedBlockIdx], plan, src, { daysPerWeek: 4, level: effLevel, strictCycleConsent: true });
         const blocks = plan.blocks.map((b, i) => (i === selectedBlockIdx ? next : b));
         plan = saveAnnualTrainingPlan({ ...plan, blocks, status: planStatusFromBlocks(blocks), updatedAt: new Date().toISOString() });
         setAnnualPlan(plan);
@@ -1157,7 +1152,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       // готовые built не пересобираются (дефолтное поведение buildAnnualPlan).
       const staleBefore = mode === 'stale' ? plan.blocks.filter(b => b.status === 'stale').length : 0;
       const unbuiltBefore = mode === 'stale' ? plan.blocks.filter(b => b.status === 'unbuilt' || b.status === 'error').length : 0;
-      const outcome = buildAnnualPlan(plan, src, { daysPerWeek: 4, level: effLevel });
+      const outcome = buildAnnualPlan(plan, src, { daysPerWeek: 4, level: effLevel, strictCycleConsent: true });
       plan = saveAnnualTrainingPlan(outcome.plan);
       setAnnualPlan(plan);
       const parts = [`собрано +${outcome.built}`];
@@ -2387,7 +2382,13 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                         <PopupSelect label="СРЦ-цикл блока" value={b.config.cycleId ?? b.ref.cycleId ?? ''}
                           hint="Цикл СРЦ для блока; «— авто-цикл по фазе —» — подбор по фазе при сборке"
                           options={[{ id: '', label: '— авто-цикл по фазе —', desc: '' }, ...LMS_CYCLES.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${c.meta.level} · ${c.meta.sessionsPerWeek} д/нед · ${c.meta.weeks} нед` }))]}
-                          onChange={v => applyAnnualConfig(b.ref.blockKey, { cycleId: v || undefined })} />
+                           onChange={v => applyAnnualConfig(b.ref.blockKey, { cycleId: v || undefined, cycleConsent: undefined })} />
+                        <button type="button" aria-pressed={!!b.config.cycleConsent}
+                          onClick={() => applyAnnualConfig(b.ref.blockKey, { cycleConsent: b.config.cycleConsent ? undefined : true })}
+                          style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: b.config.cycleConsent ? 'rgba(34,197,94,0.45)' : 'rgba(255,255,255,0.12)', color: b.config.cycleConsent ? '#22c55e' : '#fff' }}
+                          title="Разрешить производную подгонку длины цикла; исходный цикл останется неизменным">
+                          {b.config.cycleConsent ? '✓ Изменение длины разрешено' : '⚠ Нужно согласие на длину цикла'}
+                        </button>
                       </div>
                     )}
                     {b.ref.kind === 'ARM' && (() => {
@@ -2408,7 +2409,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                           <PopupSelect label="Арм-цикл блока" value={cur}
                             hint="Именной цикл (StrengthLog/СРЦ №4/CoC/...) для блока; пусто — generic-план"
                             options={[{ id: '', label: '— generic-план —', desc: '' }, ...ARM_CYCLE_LIBRARY.map(c => ({ id: c.id, label: c.name, desc: `${c.weeks} нед · ${c.daysPerWeek}×/нед` }))]}
-                            onChange={v => applyAnnualConfig(b.ref.blockKey, { cycleId: v || undefined })} />
+                          onChange={v => applyAnnualConfig(b.ref.blockKey, { cycleId: v || undefined, cycleConsent: undefined })} />
                           {sugg && !cur && (
                             <span style={{ fontSize: 10, color: '#22c55e' }}>
                               💡 Совет: {sugg.note}{' '}
@@ -2501,11 +2502,14 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                                 // P0-1: после перезагрузки bbPlan не хранится (компактное хранение) —
                                 // пересобираем блок (движок детерминирован) и берём свежий снапшот.
                                 let bbPlan = b.result?.bbPlan ?? null;
+                                if (!bbPlan && b.result?.editedFromProgram && b.result.weeks?.length) {
+                                  bbPlan = bbPlanFromUserWeeks(b.result.weeks, b.config.level ?? effLevel);
+                                }
                                 if (!bbPlan) {
                                   const src = currentMacroSource();
                                   const planForRebuild = loadAnnualTrainingPlan() ?? annualPlanFromMacro(src!);
                                   const rebuilt = src
-                                    ? buildAnnualBlock(planForRebuild.blocks.find(x => x.ref.blockKey === b.ref.blockKey) ?? planForRebuild.blocks[0], planForRebuild, src, { daysPerWeek: 4, level: effLevel })
+                                    ? buildAnnualBlock(planForRebuild.blocks.find(x => x.ref.blockKey === b.ref.blockKey) ?? planForRebuild.blocks[0], planForRebuild, src, { daysPerWeek: 4, level: effLevel, strictCycleConsent: true })
                                     : null;
                                   bbPlan = rebuilt?.result?.bbPlan ?? null;
                                   if (rebuilt?.status !== 'built' || !bbPlan) {
@@ -3051,7 +3055,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               data-pl="apply-macro"
               disabled={macroFitLocked}
               title={macroFitLocked ? 'Сначала подтвердите адаптацию циклов под блоки (оригинал не изменяется)' : undefined}
-              onClick={() => { if (macroFitLocked) return; const source = isBB ? bbMacro : macro; if (source) onApplyMacrocycle(source); }}
+               onClick={() => { if (macroFitLocked) return; const source = isBB ? bbMacro : macro; if (source) onApplyMacrocycle(source, isBB ? true : macroFitConsent); }}
               style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%', opacity: macroFitLocked ? 0.5 : 1, cursor: macroFitLocked ? 'not-allowed' : 'pointer' }}>
               🗓 Применить весь макроцикл
             </button>
@@ -3089,7 +3093,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   if (macroFitLocked) return;
                   const source = isBB ? bbMacro : macro;
                   if (!source) return;
-                  if (onApplyMacrocycle) onApplyMacrocycle(source);
+                   if (onApplyMacrocycle) onApplyMacrocycle(source, isBB ? true : macroFitConsent);
                   else if (onApplyCycle) {
                     const cid = (source as any).blocks?.[0]?.cycleId;
                     if (cid) onApplyCycle(cid, source.totalWeeks);

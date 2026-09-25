@@ -23,6 +23,7 @@ import { CYCLE_15 } from '../../../data/lms-cycles/cycle-15';
 import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { speedOrientationOf } from '../../../data/lms-cycles/lms-speed-index';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
+import type { PED } from '../../bb/bb-ped-adaptation.engine';
 
 // Синтетический week1-цикл (без явных недель) для проверки пересчёта темпа прогрессии.
 const WEEK1_ONLY: SRCycleTemplate = {
@@ -265,6 +266,35 @@ describe('planSeason (авто/ручной)', () => {
 });
 
 describe('assembleSeasonPlan', () => {
+  it('cycleMetrics отражает весь сезон, а не только первый сегмент', () => {
+    const consents: Record<number, boolean> = { 0: true, 1: true, 2: true, 3: true };
+    const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto', consents });
+    const out = assembleSeasonPlan(plan, {
+      pmMap: { 'Присед': 180, 'Жим лежа': 120, 'Становая тяга': 220 },
+      fallbackPm: 80,
+    });
+    const totalSessions = out.weeks.reduce((sum, week) => sum + week.days.length, 0);
+    expect(out.cycleMetrics.sessions).toBe(totalSessions);
+    expect(out.cycleMetrics.tonnage).toBeGreaterThan(0);
+  });
+
+  it('volume landmarks сезона учитывают PED-множитель', () => {
+    const consents: Record<number, boolean> = { 0: true, 1: true, 2: true, 3: true };
+    const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto', consents });
+    const natural = assembleSeasonPlan(plan, { pmMap: { 'Присед': 180, 'Жим лежа': 120 }, fallbackPm: 80 });
+    const course = assembleSeasonPlan(plan, {
+      pmMap: { 'Присед': 180, 'Жим лежа': 120 },
+      fallbackPm: 80,
+      peds: ['AAS'] as PED[],
+      pedDoses: { AAS: 500 },
+    });
+    const naturalChest = natural.plVolumeLandmarks?.find(row => row.group === 'chest');
+    const courseChest = course.plVolumeLandmarks?.find(row => row.group === 'chest');
+    expect(naturalChest).toBeTruthy();
+    expect(courseChest).toBeTruthy();
+    expect(courseChest!.mrv).toBeGreaterThan(naturalChest!.mrv);
+  });
+
   it('склейка недель с перенумерацией и macroPhase по слотам (с согласием)', () => {
     const consents: Record<number, boolean> = { 0: true, 1: true, 2: true, 3: true };
     const plan = planSeason({ slots: buildDefaultSeasonSlots(), selector: selector as never, mode: 'auto', consents });
@@ -279,6 +309,9 @@ describe('assembleSeasonPlan', () => {
     const lastSeg = active[active.length - 1];
     expect(out.weeks[0].macroPhase).toBe(firstSeg.slot.period);
     expect(out.weeks[out.weeks.length - 1].macroPhase).toBe(lastSeg.slot.period);
+    expect(out.seasonProvenance).toHaveLength(active.length);
+    expect(out.seasonProvenance?.every(p => p.plannedWeeks > 0 && p.sourceCycleId.length > 0)).toBe(true);
+    expect(out.plVolumeLandmarks?.length).toBeGreaterThan(0);
   });
 
   it('с meets — поверх применяется buildPLSeasonPeaks (пик-блоки на месте)', () => {

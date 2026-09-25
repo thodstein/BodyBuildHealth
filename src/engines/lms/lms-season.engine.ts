@@ -13,14 +13,16 @@
  * Аддитивный: не меняет сигнатуры существующих экспортов движка; только новые чистые функции.
  * Источник LMS_CYCLES — immutable канон, fit всегда возвращает производную копию.
  */
-import { LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
+import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { cloneCycleTemplate, cloneCycleDay } from '../../data/lms-cycles/lms-cycle-clone';
 import { rankCycles, type LMSRankedCycle, type LMSSelectorInput } from './lms-selector.engine';
 import type { SRCycleTemplate, SRDaySpec } from '../../data/lms-cycles/lms-types';
-import { originalCycleWeeks, buildLMSPlan, type LMSBuildInput, type LMSBuildOutput, type LMSPlanWeek } from './lms-builder.engine';
+import { originalCycleWeeks, buildLMSPlan, getPLVolumeLandmarks, type LMSBuildInput, type LMSBuildOutput, type LMSPlanWeek, type LMSSeasonProvenance } from './lms-builder.engine';
+import { calcCycleMetrics, type SRExercise } from './lms-metrics.engine';
 import { buildPLSeasonPeaks, type MacroTaperOpts, type PLSeasonMeet } from './lms-macro-taper.engine';
 import { speedOrientationOf } from '../../data/lms-cycles/lms-speed-index';
-import type { PED } from '../bb/bb-ped-adaptation.engine';
+import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
+import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 
 // ─── Периоды-слоты ───────────────────────────────────────────────────────────────
 
@@ -419,6 +421,47 @@ export interface AssembleSeasonOptions {
   meets?: PLSeasonMeet[];
 }
 
+function buildSeasonProvenance(segments: PLSeasonSegment[]): LMSSeasonProvenance[] {
+  return segments.filter(s => s.weeks > 0).map(seg => {
+    const source = getCycleById(seg.cycleId);
+    const originalWeeks = source ? originalCycleWeeks(source) : originalCycleWeeks(seg.fit.cycle);
+    const fitMode = seg.fit.mode === 'exact' || seg.fit.mode === 'proposed_extend' || seg.fit.mode === 'proposed_shrink'
+      ? seg.fit.mode
+      : 'strict_skip';
+    return {
+      cycleId: seg.cycleId,
+      sourceCycleId: source?.meta.id ?? seg.fit.cycle.meta.id,
+      title: seg.cycleTitle,
+      originalWeeks,
+      plannedWeeks: seg.weeks,
+      fitMode,
+      consentApplied: fitMode === 'proposed_extend' || fitMode === 'proposed_shrink',
+      sourceChanged: originalWeeks !== seg.weeks,
+    };
+  });
+}
+
+function seasonCycleMetrics(weeks: LMSPlanWeek[]) {
+  const sessions = weeks.flatMap(week => week.days.map(day => day.exercises.map(exercise => ({
+    name: exercise.name,
+    group: exercise.group,
+    coef: exercise.coef,
+    mnosz: exercise.mnosz,
+    pm: exercise.pm,
+    sets: exercise.workSets.map(set => ({ weight: set.weight, reps: set.reps, sets: set.sets })),
+  } as SRExercise))));
+  return calcCycleMetrics(sessions);
+}
+
+function seasonMrvMultiplier(level: string, opts: AssembleSeasonOptions): number {
+  if (opts.peds && opts.peds.length > 0) {
+    const baseMrv = Object.fromEntries(Object.entries(getAllVolumeLandmarks(level)).map(([muscle, value]) => [muscle, value.mrv]));
+    return adaptForPEDs(opts.peds, baseMrv, opts.pedDoses, opts.courseIntensity).combinedMrvMultiplier || 1;
+  }
+  if (opts.mode === 'on_course') return opts.courseIntensity === 'heavy' ? 1.35 : opts.courseIntensity === 'moderate' ? 1.25 : 1.15;
+  return 1;
+}
+
 export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptions): LMSBuildOutput {
   const activeSegments = plan.segments.filter(s => s.weeks > 0 && s.fit.mode !== 'strict_skip');
   const allWeeks: LMSPlanWeek[] = [];
@@ -432,6 +475,8 @@ export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptio
       mode: opts.mode,
       courseIntensity: opts.courseIntensity,
       weeksOverride: seg.weeks,
+      requireSourceChangeConsent: true,
+      sourceChangeConsent: seg.fit.mode !== 'strict_skip',
       progressionEnabled: true,
       faithful: true,
       volumeGoal: opts.volumeGoal,
@@ -480,18 +525,22 @@ export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptio
     return {
       template: cloneCycleTemplate(firstSeg ? firstSeg.fit.cycle : EMPTY_BLOCKED_TEMPLATE),
       blocked: true,
-      progressionRationale: notes.join('\n') || '⛔ Сборка заблокирована — требуется согласие на изменение раскладки',
-      weeks: [],
-      cycleMetrics: {} as LMSBuildOutput['cycleMetrics'],
+       progressionRationale: notes.join('\n') || '⛔ Сборка заблокирована — требуется согласие на изменение раскладки',
+       weeks: [],
+       cycleMetrics: {} as LMSBuildOutput['cycleMetrics'],
+       seasonProvenance: [],
     };
   }
   const first = outputs[0];
   const template = first?.template ?? (activeSegments[0]?.fit.cycle as SRCycleTemplate | undefined) ?? (LMS_CYCLES[0] as unknown as SRCycleTemplate);
+  const level = first?.template.meta.level ?? activeSegments[0]?.fit.cycle.meta.level ?? 'intermediate';
   return {
     template,
     progressionRationale: notes.join('\n'),
     weeks,
-    cycleMetrics: first?.cycleMetrics ?? ({} as LMSBuildOutput['cycleMetrics']),
+    cycleMetrics: seasonCycleMetrics(weeks),
+    plVolumeLandmarks: weeks.length > 0 ? getPLVolumeLandmarks(weeks, level, seasonMrvMultiplier(level, opts)) : [],
+    seasonProvenance: buildSeasonProvenance(plan.segments),
   };
 }
 

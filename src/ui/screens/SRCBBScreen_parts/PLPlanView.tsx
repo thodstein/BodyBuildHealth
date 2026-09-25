@@ -69,17 +69,18 @@ const PL_WEAKPOINT_LABELS: Record<string, string> = {
 
 export interface PLPlanViewApi {
   builtSrc: LMSBuildOutput;
+  effectiveSrc: LMSBuildOutput | null;
   setBuiltSrc: (p: LMSBuildOutput) => void;
   srcWeek: number;
   setSrcWeek: (n: number) => void;
-  srcEdits: Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number }>;
-  setSrcEdits: React.Dispatch<React.SetStateAction<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number }>>>;
+  srcEdits: Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }>;
+  setSrcEdits: React.Dispatch<React.SetStateAction<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }>>>;
   srcAdditions: Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>;
   setSrcAdditions: React.Dispatch<React.SetStateAction<Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>>>;
   editMode: boolean;
   setEditMode: React.Dispatch<React.SetStateAction<boolean>>;
   setKey: (w: number, di: number, ei: number, si: number) => string;
-  effSet: (w: number, di: number, ei: number, si: number, ws: { sets: number; reps: number; weight: number; pct: number }) => { sets: number; reps: number; weight: number; pct: number };
+  effSet: (w: number, di: number, ei: number, si: number, ws: { sets: number; reps: number; weight: number; pct: number; rir?: number }, exerciseName?: string) => { sets: number; reps: number; weight: number; pct: number; rir?: number };
   dayKey: (w: number, di: number) => string;
   addExToDay: (dk: string) => void;
   pickerDay: string | null;
@@ -137,7 +138,7 @@ export interface PLPlanViewApi {
 
 export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
   const {
-    builtSrc, setBuiltSrc, srcWeek, setSrcWeek, srcEdits, setSrcEdits, srcAdditions, setSrcAdditions,
+    builtSrc, effectiveSrc, setBuiltSrc, srcWeek, setSrcWeek, srcEdits, setSrcEdits, srcAdditions, setSrcAdditions,
     editMode, setEditMode, setKey, effSet, dayKey, addExToDay,
     pickerDay, setPickerDay, pickerGroup, setPickerGroup, pickerExName, setPickerExName,
     pickerScheme, setPickerScheme, days, calendarView, setCalendarView,
@@ -173,7 +174,8 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
   return (
     <div className="pl-planview">
           {builtSrc && (() => {
-             const W = builtSrc.weeks;
+             const displaySrc = editMode ? builtSrc : effectiveSrc ?? builtSrc;
+             const W = displaySrc.weeks;
              const wk = W[Math.min(srcWeek, W.length) - 1] || W[0];
              const totalW = W.length;
              const phase = displayPhaseForWeek(wk, totalW);
@@ -242,12 +244,12 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                : sourceWeek
                ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]}: ${SOURCE_PHASE_LABEL[sourceWeek.phase]}. ${sourceWeek.volumeSets} рабочих сетов, средняя интенсивность ${Math.round(sourceWeek.intensityPct * 100)}% 1ПМ, средний RIR ${sourceWeek.rir.toFixed(1)}.`
                : PH_DESC[phase];
-            return <BbCard icon="📋" accent="#00e68a" title={`План: ${builtSrc.template.meta.title}`}
+             return <BbCard icon="📋" accent="#00e68a" title={`План: ${displaySrc.template.meta.title}`}
               badge={<span style={{ fontSize:11, fontWeight:700, color: calendarColor }}>{calendarLabel}</span>}
               style={{ overflow:'hidden', boxSizing:'border-box', maxWidth:'100%' }}>
                 {/* ⚙️ Как собран план — структурированная карточка (PED-стиль) */}
                 {(() => {
-                  const info = parseProgressionRationale(builtSrc.progressionRationale || '');
+                   const info = parseProgressionRationale(displaySrc.progressionRationale || '');
                   const tiles = progressionTiles(info);
                   if (tiles.length === 0) return null;
                   // Только значимые заметки сборки. Отфильтровываем шум, который
@@ -320,8 +322,8 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                  </div>
               </div>
               {/* 📊 Расчёты цикла (метрики микроцикла — Черняк) */}
-              {builtSrc.cycleMetrics && (() => {
-                const cm = builtSrc.cycleMetrics;
+               {displaySrc.cycleMetrics && (() => {
+                 const cm = displaySrc.cycleMetrics;
                 const tiles: Array<{ l: string; v: string }> = [
                   { l: 'Тоннаж', v: Math.round(cm.tonnage).toLocaleString('ru-RU') + ' кг' },
                   { l: 'КПШ', v: String(cm.kpsh) },
@@ -363,7 +365,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 {editMode && <span style={{ ...SMALL }}>правки применяются к «Выполнение» (выбранная неделя)</span>}
                 <button onClick={() => { setExpOpen(true); setExpFormat(null); setExpScope(null); setExpBlock(null); setExpWeek(null); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(96,165,250,0.55)', background:'rgba(96,165,250,0.12)', color:'#60a5fa' }}>📤 Экспорт</button>
                  <button onClick={async () => {
-                   const title = builtSrc.template.meta.title;
+                    const title = displaySrc.template.meta.title;
                    const url = plTelegramAppUrl(selectedCycleId);
                    const digest = plShareDigest({ title, weeks: W, pmSquat, pmBench, pmDead });
                    const result = await openPLShare(url, { title: `ПЛ: ${title}`, text: digest, url });
@@ -513,20 +515,20 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>{Object.entries(wk.pmRow).map(([n, pm]) => <span key={n} style={{ ...SMALL, color:'#fff', background:'rgba(96,165,250,0.08)', padding:'3px 8px', borderRadius:6, border:'1px solid rgba(96,165,250,0.15)' }}><b>{n}:</b> {pm.toFixed(1)} кг</span>)}</div>
               </MetricCard>
               {/* График прогрессии ПМ по неделям */}
-              {builtSrc && Array.isArray(builtSrc.weeks) && builtSrc.weeks.length > 0 && (() => {
-                const exNames = Object.keys(builtSrc.weeks[0]?.pmRow || {}).slice(0, 3);
-                if (exNames.length === 0) return null;
-                const allVals = builtSrc.weeks.flatMap(w => exNames.map(n => w.pmRow[n] || 0));
-                const minV = Math.min(...allVals), maxV = Math.max(...allVals);
-                const W2 = builtSrc.weeks.length;
+               {displaySrc && Array.isArray(displaySrc.weeks) && displaySrc.weeks.length > 0 && (() => {
+                 const exNames = Object.keys(displaySrc.weeks[0]?.pmRow || {}).slice(0, 3);
+                 if (exNames.length === 0) return null;
+                 const allVals = displaySrc.weeks.flatMap(w => exNames.map(n => w.pmRow[n] || 0));
+                 const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+                 const W2 = displaySrc.weeks.length;
                 const colors = ['var(--accent)', '#60a5fa', '#a855f7'];
                 const px = (i: number) => 24 + (i / Math.max(1, W2 - 1)) * 280;
                 const py = (v: number) => 70 - ((v - minV) / Math.max(1, maxV - minV)) * 56;
                 return <BbFoldCard icon="📈" accent="#60a5fa" title="Прогрессия ПМ по неделям" style={{ marginTop: 8 }}>
                   <svg width="100%" viewBox="0 0 320 80" style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>
                     {[0,1,2,3].map(g => <line key={g} x1={24} x2={304} y1={14 + g * 18} y2={14 + g * 18} stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />)}
-                    {exNames.map((n, ei) => { const pts = builtSrc.weeks.map((w, i) => `${px(i)},${py(w.pmRow[n] || 0)}`).join(' '); return <polyline key={n} points={pts} fill="none" stroke={colors[ei]} strokeWidth={1.6} />; })}
-                    {exNames.map((n, ei) => builtSrc.weeks.map((w, i) => <circle key={n + i} cx={px(i)} cy={py(w.pmRow[n] || 0)} r={2} fill={colors[ei]} />))}
+                     {exNames.map((n, ei) => { const pts = displaySrc.weeks.map((w, i) => `${px(i)},${py(w.pmRow[n] || 0)}`).join(' '); return <polyline key={n} points={pts} fill="none" stroke={colors[ei]} strokeWidth={1.6} />; })}
+                     {exNames.map((n, ei) => displaySrc.weeks.map((w, i) => <circle key={n + i} cx={px(i)} cy={py(w.pmRow[n] || 0)} r={2} fill={colors[ei]} />))}
                   </svg>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 4 }}>{exNames.map((n, ei) => <span key={n} style={{ fontSize: 10, color: colors[ei] }}>● {n}</span>)}</div>
                 </BbFoldCard>;
@@ -746,9 +748,10 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap' }}>
                 <SaveButton label="💾 Сохранить программу" savedLabel="✓ Программа сохранена" onSave={() => {
                   try {
-                    const cycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId);
-                    // Полный формат «Моих тренировок»: id + exercises (иначе вкладка «Планы» крашится на plan.exercises.length).
-                    const week1 = builtSrc.weeks[0];
+                     const cycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId);
+                     const saveSrc = effectiveSrc ?? builtSrc;
+                     // Полный формат «Моих тренировок»: id + exercises (иначе вкладка «Планы» крашится на plan.exercises.length).
+                     const week1 = saveSrc.weeks[0];
                     const exercises = week1 ? week1.days.flatMap(d => d.exercises.map(e => ({
                       name: e.name,
                       sets: e.workSets.reduce((s, ws) => s + ws.sets, 0),
@@ -835,7 +838,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                   const IN_LBL: React.CSSProperties = { fontSize:9, color:'#fff', textTransform:'uppercase' as const, letterSpacing:0.5, textAlign:'center' as const };
                                   return allSets.map(({ ws, blockIdx, setIdx }) => {
                                     const k = setKey(wk.week, di, ei, setIdx);
-                                    const es = effSet(wk.week, di, ei, setIdx, ws);
+                                     const es = effSet(wk.week, di, ei, setIdx, ws, e.name);
                                     return (
                                       <div key={setIdx} style={{ background:'rgba(255,255,255,0.025)', borderRadius:6, padding:'4px 6px' }}>
                                         <div style={{ fontSize:10, color:'#fff', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {setIdx+1}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%{es.pct > 1.1 && <span data-pl="test-attempt" title="Проходка источника: тестовый максимум выше 110% ПМ (не клампится)" style={{ marginLeft:4, fontSize:9, fontWeight:800, color:'#f59e0b' }}>⚡ проходка</span>}</span></div>
@@ -851,7 +854,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                               </div>
                             </div>
                           ))}
-                          {(srcAdditions[dk] || []).map(a => (
+                           {editMode && (srcAdditions[dk] || []).map(a => (
                              <div key={a.uid} style={{ display:'flex', flexDirection:'column', gap:4, padding:'5px 0', borderBottom:'1px solid var(--accent-dim)' }}>
                                <div style={{ display:'flex', alignItems:'center', gap:4, minWidth:0 }}>
                                  <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.name}</div>
@@ -886,22 +889,13 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                           const charColor = e.load === 'main' ? '#60a5fa' : e.load === 'additional' ? '#a855f7' : '#fff';
                           const charLabel = e.load === 'main' ? '💪 Тяж' : e.load === 'additional' ? '🩸 Памп' : '🌿 Лёг';
                           const roleLabel = e.load === 'main' ? '🎯 Основное' : e.load === 'additional' ? '📌 Добивка' : '⚙️ Аксессуар';
-                           const rawFirstWs = e.workSets[0] ? effSet(wk.week, di, ei, 0, e.workSets[0]) : null;
-                           const diaryAdj = autoRegMode === 'diary' && diaryAutoreg ? diaryAutoreg.perExercise.get(e.name) : undefined;
-                            const firstWs = rawFirstWs ? {
-                              ...rawFirstWs,
-                              sets: diaryAdj ? diaryAdj.adjustedSets : rawFirstWs.sets,
-                              weight: diaryAdj ? diaryAdj.adjustedWeight : rawFirstWs.weight,
-                              rir: diaryAdj ? diaryAdj.adjustedRir : (e.workSets[0]?.rir ?? e.rir),
-                            } : null;
-                            const adjustedMark = diaryAdj ? ' 📓' : '';
-                            const adjustDisplaySet = (ws: typeof e.workSets[number], si: number) => {
-                               const raw = { ...effSet(wk.week, di, ei, si, ws), rir: ws.rir };
-                              const adjusted = diaryAdj
-                                ? { ...raw, sets: diaryAdj.adjustedSets, weight: diaryAdj.adjustedWeight, rir: diaryAdj.adjustedRir }
-                                : raw;
-                              return adjusted;
-                            };
+                             const rawFirstWs = e.workSets[0] ? (editMode ? effSet(wk.week, di, ei, 0, e.workSets[0], e.name) : e.workSets[0]) : null;
+                             const diaryAdj = editMode && autoRegMode === 'diary' && diaryAutoreg ? diaryAutoreg.perExercise.get(e.name) : undefined;
+                             const firstWs = rawFirstWs;
+                             const adjustedMark = diaryAdj ? ' 📓' : '';
+                             const adjustDisplaySet = (ws: typeof e.workSets[number], si: number) => {
+                                return editMode ? effSet(wk.week, di, ei, si, ws, e.name) : ws;
+                             };
                            const firstRir = firstWs?.rir;
                           const setSummary = firstWs ? (firstWs.sets + '×' + firstWs.reps + ' @ ' + Math.round(firstWs.pct*100) + '%') : '';
                           const tempo = tempoStr || tmpo.tempo.toString;
@@ -965,18 +959,18 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               })}
               <MetricCard title={'Итоги мезоцикла ('+totalW+' нед)'} icon="📊">
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Тоннаж: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.tonnage.toFixed(0)}</b> кг·пов</div>
-                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>КПШ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.kpsh}</b></div>
-                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Инт. отн: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.relIntensity.toFixed(3)}</b></div>
-                  <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>УОИ: <b style={{color:'#fff'}}>{builtSrc.cycleMetrics.uoi.toFixed(3)}</b></div>
+                   <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Тоннаж: <b style={{color:'#fff'}}>{displaySrc.cycleMetrics.tonnage.toFixed(0)}</b> кг·пов</div>
+                   <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>КПШ: <b style={{color:'#fff'}}>{displaySrc.cycleMetrics.kpsh}</b></div>
+                   <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Инт. отн: <b style={{color:'#fff'}}>{displaySrc.cycleMetrics.relIntensity.toFixed(3)}</b></div>
+                   <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>УОИ: <b style={{color:'#fff'}}>{displaySrc.cycleMetrics.uoi.toFixed(3)}</b></div>
                 </div>
               </MetricCard>
-              {builtSrc && builtSrc.plVolumeLandmarks && builtSrc.plVolumeLandmarks.length > 0 && (
+               {displaySrc && displaySrc.plVolumeLandmarks && displaySrc.plVolumeLandmarks.length > 0 && (
                 <MetricCard title={'Объём vs MRV (volume-landmarks)'} icon="📊">
                   <div style={{ color:'#fff', fontSize:11, marginBottom:8 }}>
-                    Пиковая неделя: {builtSrc.plVolumeLandmarks[0].peakWeek}{W.some(w => w.macroPhase === 'competition') ? ` · 📉 +${W.filter(w => w.macroPhase === 'competition').length} тапер-нед` : ''}{pedAuto && peds.length > 0 ? ` · 💉 MRV ×${Math.max(1, (() => { try { const lm = Object.fromEntries(Object.entries(getAllVolumeLandmarks(level)).map(([k, v]) => [k, v.mrv])); return adaptForPEDs(peds, lm, pedDoses, courseIntensity).combinedMrvMultiplier; } catch { return 1; } })()).toFixed(2)} (PED)` : ''}
+                     Пиковая неделя: {displaySrc.plVolumeLandmarks[0].peakWeek}{W.some(w => w.macroPhase === 'competition') ? ` · 📉 +${W.filter(w => w.macroPhase === 'competition').length} тапер-нед` : ''}{pedAuto && peds.length > 0 ? ` · 💉 MRV ×${Math.max(1, (() => { try { const lm = Object.fromEntries(Object.entries(getAllVolumeLandmarks(level)).map(([k, v]) => [k, v.mrv])); return adaptForPEDs(peds, lm, pedDoses, courseIntensity).combinedMrvMultiplier; } catch { return 1; } })()).toFixed(2)} (PED)` : ''}
                   </div>
-                  {builtSrc.plVolumeLandmarks.map((lm) => {
+                   {displaySrc.plVolumeLandmarks.map((lm) => {
                     const c = lm.status === 'over' ? '#ff5252' : lm.status === 'high' ? '#ffb74d' : lm.status === 'optimal' ? '#4caf50' : '#90caf9';
                     const lbl = lm.status === 'over' ? 'ПЕРЕБОР' : lm.status === 'high' ? 'высоко' : lm.status === 'optimal' ? 'оптимум' : 'низко';
                     return (
@@ -992,7 +986,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       </div>
                     );
                   })}
-                  {builtSrc.plVolumeLandmarks.some(l => l.status === 'over') && (
+                   {displaySrc.plVolumeLandmarks.some(l => l.status === 'over') && (
                     <div style={{ color:'#ff5252', fontSize:11, marginTop:4 }}>⚠ Объём выше MRV — риск перетренированности. Снизьте подходы или добавьте разгрузку.</div>
                   )}
                 </MetricCard>
@@ -1067,29 +1061,31 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               </div>
               {/* 📤 Экспорт: цепочка Формат → Объём → (Блок/Неделя) → Экспорт */}
               {expOpen && (() => {
-                const blocks = plBlockGroups(W);
-                const scopeLabel = expScope === 'all' ? `Весь план (${W.length} нед)`
-                  : expScope === 'full' ? `Всё вместе (${W.length} нед + сводка)`
+                const exportSrc = effectiveSrc ?? builtSrc;
+                const exportWeeks = exportSrc.weeks;
+                const blocks = plBlockGroups(exportWeeks);
+                const scopeLabel = expScope === 'all' ? `Весь план (${exportWeeks.length} нед)`
+                  : expScope === 'full' ? `Всё вместе (${exportWeeks.length} нед + сводка)`
                   : expScope === 'block' ? `Блок «${expBlock ? PL_BLOCK_LABEL[expBlock] : ''}»`
                   : expScope === 'week' ? `Неделя ${expWeek}`
                   : '';
                 const ready = !!expFormat && !!expScope && (expScope !== 'block' || !!expBlock) && (expScope !== 'week' || !!expWeek);
-                const summary = expScope === 'full' && builtSrc.cycleMetrics ? [
-                  { label: 'Тоннаж', value: Math.round(builtSrc.cycleMetrics.tonnage).toLocaleString('ru-RU') + ' кг·пов' },
-                  { label: 'КПШ', value: String(builtSrc.cycleMetrics.kpsh) },
-                  { label: 'Средний вес', value: Math.round(builtSrc.cycleMetrics.avgWeight) + ' кг' },
-                  { label: 'Отн. интенсивность', value: Math.round(builtSrc.cycleMetrics.relIntensity * 100) + '%' },
-                  { label: 'УОИ', value: builtSrc.cycleMetrics.uoi.toFixed(2) },
-                  { label: 'Сессий', value: String(builtSrc.cycleMetrics.sessions) },
+                const summary = expScope === 'full' && exportSrc.cycleMetrics ? [
+                  { label: 'Тоннаж', value: Math.round(exportSrc.cycleMetrics.tonnage).toLocaleString('ru-RU') + ' кг·пов' },
+                  { label: 'КПШ', value: String(exportSrc.cycleMetrics.kpsh) },
+                  { label: 'Средний вес', value: Math.round(exportSrc.cycleMetrics.avgWeight) + ' кг' },
+                  { label: 'Отн. интенсивность', value: Math.round(exportSrc.cycleMetrics.relIntensity * 100) + '%' },
+                  { label: 'УОИ', value: exportSrc.cycleMetrics.uoi.toFixed(2) },
+                  { label: 'Сессий', value: String(exportSrc.cycleMetrics.sessions) },
                 ] : undefined;
                 const doExport = async () => {
                   if (!ready) return;
                   const sel: LMSBuildOutput['weeks'] = expScope === 'all' || expScope === 'full'
-                    ? W
+                    ? exportWeeks
                     : expScope === 'block'
-                      ? (blocks.find(b => b.id === expBlock)?.weeks ?? W)
-                      : W.filter(w => w.week === expWeek);
-                  const title = builtSrc.template.meta.title;
+                      ? (blocks.find(b => b.id === expBlock)?.weeks ?? exportWeeks)
+                      : exportWeeks.filter(w => w.week === expWeek);
+                   const title = exportSrc.template.meta.title;
                   setExpOpen(false);
                   if (expFormat === 'xlsx') {
                     const res = await downloadPLExcel(buildPLExcelWorkbook(title, plExportRows(sel), summary), `pl-plan-${selectedCycleId}-${expScope ?? 'all'}.xlsx`);

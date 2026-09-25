@@ -21,6 +21,7 @@ import { epley1RM } from '../e1rm';
 import { mesocyclePhaseForWeek } from '../rir-matrix.engine';
 import { macroPhaseToLmsPhase } from '../periodization/phase-bridge';
 import type { MacroPhase } from './macrocycle.engine';
+import { toLocalIso } from './cardio-date-utils.engine';
 
 export interface PLExerciseLastResult {
   exerciseName: string;
@@ -90,7 +91,7 @@ function buildLastResultIndex(sessions: WorkoutSession[]): Map<string, PLExercis
   const ninetyDaysAgo = (() => {
     const d = new Date();
     d.setDate(d.getDate() - 90);
-    return d.toISOString().slice(0, 10);
+    return toLocalIso(d);
   })();
   for (const s of sorted) {
     // Only consider sessions within the last 90 days for the "best e1RM" selection.

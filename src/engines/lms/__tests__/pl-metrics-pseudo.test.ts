@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   calcSessionMetrics, calcCycleMetrics, isPseudoExercise, type SRExercise,
 } from '../lms-metrics.engine';
+import { avgIntensity, checkTonnageGate } from '../pl-tonnage-gate.engine';
 
 const real: SRExercise = {
   name: 'Присед', group: 'ПР', coef: 1, mnosz: 1, pm: 150,
@@ -43,5 +44,21 @@ describe('метрики сессии/цикла без псевдо-упраж�
     expect(a.tonnage).toBe(b.tonnage);
     expect(a.kpsh).toBe(b.kpsh);
     expect(a.perSession[0].exerciseCount).toBe(1);
+  });
+
+  it('tonnage gate и средняя интенсивность игнорируют маркеры', () => {
+    const week = {
+      days: [{
+        exercises: [
+          { name: 'Присед', workSets: [{ weight: 100, reps: 5, sets: 3, pct: 0.8, rir: 2, restSeconds: 120 }] },
+          { name: 'Отдых', workSets: [{ weight: 999, reps: 99, sets: 99, pct: 999, rir: 0, restSeconds: 0 }] },
+        ],
+      }],
+    };
+    const plan = { weeks: [{ ...week, week: 1 }, { ...week, week: 2 }] } as never;
+    const gate = checkTonnageGate(plan);
+    expect(gate[0].tonnage).toBe(1500);
+    expect(gate[0].changePct).toBe(0);
+    expect(avgIntensity(plan)).toBe(80);
   });
 });

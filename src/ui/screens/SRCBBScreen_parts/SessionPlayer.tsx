@@ -8,7 +8,7 @@ import {
   startSession, addExerciseToSession, logSet, finishSession,
   getLastSession, getRecentPRs, type WorkoutSession, type CachedProgress,
   getExerciseProgress, cacheExerciseProgress, cacheSessionStats, getWorkoutStats,
-  compareWithPrevious, getCachedProgressForExercise,
+  compareWithPrevious, getCachedProgressForExercise, localIsoDate,
 } from '../../../engines/workout-logger.engine';
 import { generateWarmup, upsertWarmupLog, warmupLabel, warmupSpecificLabel, WARMUP_SKIP_REASONS, type WarmupInput, type WarmupMode } from '../../../engines/warmup.engine';
 import { generateCooldown, upsertCooldownLog, cooldownLabel, COOLDOWN_SKIP_REASONS, type CooldownInput } from '../../../engines/cooldown.engine';
@@ -19,8 +19,9 @@ import { useNativeWakeLock } from '../../native/useWakeLock';
 import { velocityLoss, velocityLossZone, thresholdForIntent, type VBTIntent } from '../../../engines/pro/vbt.engine';
 import { calculatePlates } from '../../../engines/gym-competition.engine';
 import { saveSRPESession } from '../../../engines/pro/srpe-store';
+import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
-import { recommendTempo, formatTempo, TEMPO_PRESETS } from '../../../engines/rep-tempo.engine';
+import { recommendTempo, formatTempo, TEMPO_PRESETS, type TempoPhase } from '../../../engines/rep-tempo.engine';
 import { recordSessionRIR, getSessionRIRFeedback } from '../../../engines/rir-calibration.engine';
 import { recordMMC } from '../../../engines/mmc-tracking.engine';
 import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard } from './MindsetSessionPanels';
@@ -109,7 +110,8 @@ const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, m
 const SMALL = TRAIN_SMALL;
 const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' };
 
-export interface PlayerSet { weight: number; reps: number; rir: number; technique?: string }
+export interface PlayerSet { weight: number; reps: number; rir: number; tempo?: string | TempoPhase; technique?: string }
+const tempoText = (tempo: PlayerSet['tempo']): string | undefined => tempo ? (typeof tempo === 'string' ? tempo : formatTempo(tempo)) : undefined;
 export interface PlayerExercise {
   name: string;
   muscleGroup: string;
@@ -182,7 +184,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     return () => window.clearInterval(t);
   }, [warmupTimer ? `${warmupTimer.i}_${warmupTimer.j}` : null]);
   // фактический ввод текущего подхода: [exerciseIndex][setIndex] -> {weight,reps}
-  const [actual, setActual] = useState<Record<string, { weight: number; reps: number; rpe: number }>>({});
+  const [actual, setActual] = useState<Record<string, { weight: number; reps: number; rpe: number; rir?: number; tempo?: string }>>({});
    const [exDone, setExDone] = useState<Record<string, boolean>>({});
    const [interExTimerSec, setInterExTimerSec] = useState<number>(0);
    const [interExTimerRunning, setInterExTimerRunning] = useState<boolean>(false);
@@ -242,8 +244,14 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
    }, [timerPreset, customRestSec, autoStartRest]);
  
    const day = days[dayIdx] || days[0];
-  const last = useMemo(() => getLastSession(), [done]);
+  const [last, setLast] = useState<WorkoutSession | null>(() => getLastSession());
   const prs = useMemo(() => getRecentPRs(3), [done]);
+
+  useEffect(() => {
+    let active = true;
+    new StrengthDiary().getLastSession().then(value => { if (active) setLast(value); }).catch(() => { if (active) setLast(getLastSession()); });
+    return () => { active = false; };
+  }, [done]);
 
   const speakRestComplete = (exIdx: number) => {
      if (!('speechSynthesis' in window)) return;
@@ -492,7 +500,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
        const pct = total > 0 ? doneCnt / total : 0;
        const skipped = skipWarmupReasonRef.current;
        upsertWarmupLog({
-         date: new Date().toISOString().slice(0, 10),
+           date: localIsoDate(),
          done: skipped ? false : doneCnt > 0,
          quality: skipped ? null : doneCnt > 0 ? (pct >= 0.8 ? 4 : pct >= 0.5 ? 3 : 2) : null,
          totalItems: total,
@@ -507,31 +515,44 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
      });
      setSession(s);
      setPhase('main');
-     // авто-подтягивание весов из последней сессии (double progression)
-     const prevSession = getLastSession();
-     if (prevSession && prevSession.exercises.length > 0) {
-       const prevMap: Record<string, { weightKg: number; reps: number }[]> = {};
-       prevSession.exercises.forEach(ex => {
-         if (ex.exerciseName && Array.isArray(ex.sets)) {
-           prevMap[ex.exerciseName.toLowerCase()] = ex.sets.map(st => ({ weightKg: st.weightKg, reps: st.reps }));
-         }
-       });
-       const prefilled: Record<string, { weight: number; reps: number; rpe: number }> = {};
-       day.exercises.forEach((ex, ei) => {
-         const prevSets = prevMap[ex.name.toLowerCase()];
-         if (prevSets && prevSets.length > 0) {
-           ex.targetSets.forEach((t, si) => {
-             const prev = prevSets[si] || prevSets[prevSets.length - 1];
-             if (prev && prev.weightKg > 0) {
-               prefilled[`${ei}_${si}`] = { weight: prev.weightKg, reps: prev.reps, rpe: 0 };
-             }
-           });
-         }
-       });
-       setActual(prefilled);
-     } else {
-       setActual({});
-     }
+      // авто-подтягивание весов из последней сессии (double progression)
+      const hydratePrevious = async () => {
+        let prevSession: WorkoutSession | null = null;
+        try {
+          prevSession = await new StrengthDiary().getLastSession();
+        } catch {
+          prevSession = getLastSession();
+        }
+        if (!prevSession || prevSession.exercises.length === 0) {
+          setActual({});
+          return;
+        }
+        const prevMap: Record<string, { weightKg: number; reps: number; rir: number; tempo?: string }[]> = {};
+        prevSession.exercises.forEach(ex => {
+          if (ex.exerciseName && Array.isArray(ex.sets)) {
+            prevMap[ex.exerciseName.toLowerCase()] = ex.sets.map(st => ({
+              weightKg: st.weightKg,
+              reps: st.reps,
+              rir: st.rir,
+              tempo: st.actualTempo || st.plannedTempo,
+            }));
+          }
+        });
+        const prefilled: Record<string, { weight: number; reps: number; rpe: number; rir?: number; tempo?: string }> = {};
+        day.exercises.forEach((ex, ei) => {
+          const prevSets = prevMap[ex.name.toLowerCase()];
+          if (prevSets && prevSets.length > 0) {
+            ex.targetSets.forEach((t, si) => {
+              const prev = prevSets[si] || prevSets[prevSets.length - 1];
+              if (prev && prev.weightKg > 0) {
+                prefilled[`${ei}_${si}`] = { weight: prev.weightKg, reps: prev.reps, rpe: 0, rir: prev.rir, tempo: prev.tempo };
+              }
+            });
+          }
+        });
+        setActual(prefilled);
+      };
+      void hydratePrevious();
       setExDone({});
       setRestHistory([]);
       savedRef.current = false;
@@ -615,7 +636,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         const pct = total > 0 ? doneCnt / total : 0;
         const skipped = skipCooldownReasonRef.current;
         upsertCooldownLog({
-          date: new Date().toISOString().slice(0, 10),
+            date: localIsoDate(),
           done: skipped ? false : doneCnt > 0,
           quality: skipped ? null : doneCnt > 0 ? (pct >= 0.8 ? 4 : pct >= 0.5 ? 3 : 2) : null,
           totalItems: total,
@@ -675,9 +696,23 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
      const ex = day.exercises[ei];
      if (!ex) return;
      const ts = Array.isArray(ex.targetSets) ? ex.targetSets[si] : null;
-     const t = ts || { weight: weightFor(ex) || 60, reps: repsFor(ex) || 10, rir: rirFor(ex) ?? 2 };
-     const a = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) };
-      let s = logSet(session, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe || Math.max(1, 10 - t.rir), rir: t.rir, notes: '', plannedWeight: t.weight, plannedReps: t.reps, plannedRir: t.rir }).session;
+      const t = ts || { weight: weightFor(ex) || 60, reps: repsFor(ex) || 10, rir: rirFor(ex) ?? 2, tempo: undefined as string | undefined };
+      const plannedTempo = tempoText(t.tempo);
+      const a0 = actual[keyFor(ei, si)] || { weight: t.weight, reps: t.reps, rpe: 0 };
+      const a = { ...a0, rir: a0.rir ?? (a0.rpe > 0 ? Math.max(0, 10 - a0.rpe) : t.rir) };
+      let s = logSet(session, ei, {
+        setNumber: si + 1,
+        weightKg: a.weight,
+        reps: a.reps,
+        rpe: a.rpe || Math.max(1, 10 - t.rir),
+        rir: a.rir,
+        notes: '',
+        plannedWeight: t.weight,
+        plannedReps: t.reps,
+        plannedRir: t.rir,
+         plannedTempo,
+         actualTempo: a.tempo?.trim() || undefined,
+      }).session;
      setSession(s);
      setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
      // обновляем прогресс упражнения
@@ -699,10 +734,23 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     if (!ex || !Array.isArray(ex.targetSets)) return;
     hapticImpact('light');
     let s = session;
-    const newActual: Record<string, { weight: number; reps: number; rpe: number }> = {};
-    ex.targetSets.forEach((t, si) => {
-      const a = { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) };
-      s = logSet(s, ei, { setNumber: si + 1, weightKg: a.weight, reps: a.reps, rpe: a.rpe, rir: t.rir, notes: '', plannedWeight: t.weight, plannedReps: t.reps, plannedRir: t.rir }).session;
+    const newActual: Record<string, { weight: number; reps: number; rpe: number; rir?: number; tempo?: string }> = {};
+     ex.targetSets.forEach((t, si) => {
+       const plannedTempo = tempoText(t.tempo);
+       const a = { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir), rir: t.rir, tempo: plannedTempo };
+      s = logSet(s, ei, {
+        setNumber: si + 1,
+        weightKg: a.weight,
+        reps: a.reps,
+        rpe: a.rpe,
+        rir: t.rir,
+        notes: '',
+        plannedWeight: t.weight,
+        plannedReps: t.reps,
+        plannedRir: t.rir,
+         plannedTempo,
+         actualTempo: plannedTempo,
+      }).session;
       newActual[keyFor(ei, si)] = a;
     });
     setSession(s);
@@ -1596,8 +1644,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     )}
                   {ex.targetSets.map((t, si) => {
                  const k = keyFor(ei, si);
-                 const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0 };
-                 const logged = !!actual[k];
+                   const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0, rir: undefined, tempo: undefined };
+                   const plannedTempo = tempoText(t.tempo);
+                   const logged = !!actual[k];
                  const targetRPE = 10 - t.rir;
                  const dW = a.weight - t.weight;
                  const dR = a.reps - t.reps;
@@ -1644,30 +1693,32 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                          {/* Вес + повторы — крупные степперы для зала */}
                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: Math.max(0, Math.round((a.weight - 2.5) * 10) / 10), reps: a.reps, rpe: a.rpe } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
-                            <input style={{ ...IN, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 700, padding: '6px 2px' }} type="number" inputMode="decimal" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
-                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: Math.round((a.weight + 2.5) * 10) / 10, reps: a.reps, rpe: a.rpe } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, weight: Math.max(0, Math.round((a.weight - 2.5) * 10) / 10) } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
+                            <input style={{ ...IN, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 700, padding: '6px 2px' }} type="number" inputMode="decimal" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { ...a, weight: +e.target.value } }))} aria-label="вес" />
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, weight: Math.round((a.weight + 2.5) * 10) / 10 } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
                           </div>
                           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: a.weight, reps: Math.max(1, a.reps - 1), rpe: a.rpe } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
-                            <input style={{ ...IN, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 700, padding: '6px 2px' }} type="number" inputMode="numeric" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
-                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps + 1, rpe: a.rpe } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, reps: Math.max(1, a.reps - 1) } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
+                            <input style={{ ...IN, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 700, padding: '6px 2px' }} type="number" inputMode="numeric" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { ...a, reps: +e.target.value } }))} aria-label="повт" />
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, reps: a.reps + 1 } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
                           </div>
                         </div>
                         {/* RPE пилюли + VBT + кнопки */}
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
                             {[6, 7, 8, 9, 10].map(v => (
-                              <button key={v} type="button" aria-pressed={a.rpe === v} onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: v } })); }} style={{ minWidth: 32, height: 32, borderRadius: 8, border: a.rpe === v ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', background: a.rpe === v ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : 'rgba(255,255,255,0.04)', color: a.rpe === v ? '#00e68a' : 'rgba(255,255,255,0.70)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{v}</button>
+                              <button key={v} type="button" aria-pressed={a.rpe === v} onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, rpe: v } })); }} style={{ minWidth: 32, height: 32, borderRadius: 8, border: a.rpe === v ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', background: a.rpe === v ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : 'rgba(255,255,255,0.04)', color: a.rpe === v ? '#00e68a' : 'rgba(255,255,255,0.70)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{v}</button>
                             ))}
-                            <input style={{ ...IN, width: 44, textAlign: 'center', padding: '6px 2px', fontSize: 11 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => { const v = +e.target.value; setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : 0 } })) }} aria-label="RPE" />
-                          </div>
-                          <input style={{ ...IN, width: 56, textAlign: 'center', padding: '6px 4px', fontSize: 11 }} type="number" step="0.01" placeholder="v м/с" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
+                             <input style={{ ...IN, width: 44, textAlign: 'center', padding: '6px 2px', fontSize: 11 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => { const v = +e.target.value; setActual(p => ({ ...p, [k]: { ...a, rpe: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : 0 } })) }} aria-label="RPE" />
+                             <input style={{ ...IN, width: 48, textAlign: 'center', padding: '6px 2px', fontSize: 11 }} type="number" min={0} max={20} placeholder="RIR" value={a.rir ?? ""} onChange={e => { const v = +e.target.value; setActual(p => ({ ...p, [k]: { ...a, rir: Number.isFinite(v) ? Math.max(0, Math.min(20, v)) : undefined } })); }} aria-label="RIR факт" />
+                             <input style={{ ...IN, width: 74, textAlign: 'center', padding: '6px 4px', fontSize: 11 }} type="text" placeholder={plannedTempo ? `темп ${plannedTempo}` : 'темп факт'} value={a.tempo ?? ''} onChange={e => setActual(p => ({ ...p, [k]: { ...a, tempo: e.target.value } }))} aria-label="темп факт" />
+                           </div>
+                           <input style={{ ...IN, width: 56, textAlign: 'center', padding: '6px 4px', fontSize: 11 }} type="number" step="0.01" placeholder="v м/с" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
                           <button style={{ ...(logged ? BTN_GHOST : { ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', boxShadow: '0 4px 14px rgba(0,230,138,0.28)', minHeight: 36, padding: '8px 14px', borderRadius: 10, fontSize: 13 }), flexShrink: 0, minWidth: 64 }} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
                           {!logged && (
                             <button style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 10px', borderRadius: 10, minHeight: 36 }} onClick={() => {
                               hapticImpact('light');
-                              setActual(p => ({ ...p, [k]: { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) } }));
+                               setActual(p => ({ ...p, [k]: { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir), rir: t.rir, tempo: plannedTempo } }));
                               setTimeout(() => logOne(ei, si), 30);
                             }}>⚡ Быстро</button>
                           )}

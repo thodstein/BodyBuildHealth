@@ -2,6 +2,7 @@ import { db } from '../core/db';
 import type { StrengthLogEntry, WorkoutLog } from '../core/types';
 import { getISOWeekNumber, getISOWeekYear, loadSessions, saveSessions, deleteSession, workoutLogToSession, cleanLegacyExerciseName, type WorkoutSession } from './workout-logger.engine';
 import { epley1RM } from './e1rm';
+import { toLocalIso } from './lms/cardio-date-utils.engine';
 
 export interface StrengthStats {
   exerciseId: string;
@@ -49,7 +50,18 @@ export function sessionToWorkoutLog(s: WorkoutSession): WorkoutLog {
       date: s.date,
       exerciseId: ex.exerciseId || ex.exerciseName,
       exerciseName: cleanLegacyExerciseName(ex.exerciseName),
-      sets: ex.sets.map(st => ({ weight: st.weightKg, reps: st.reps, rir: st.rir, rpe: st.rpe, techniqueScore: st.techniqueScore })),
+      sets: ex.sets.map(st => ({
+        weight: st.weightKg,
+        reps: st.reps,
+        rir: st.rir,
+        rpe: st.rpe,
+        techniqueScore: st.techniqueScore,
+        plannedWeight: st.plannedWeight,
+        plannedReps: st.plannedReps,
+        plannedRir: st.plannedRir,
+        plannedTempo: st.plannedTempo,
+        actualTempo: st.actualTempo,
+      })),
       totalVolume: ex.totalVolume,
       estimated1RM: ex.best1RM,
       isCompound: COMPOUND_PATTERNS.has(ex.pattern),
@@ -60,10 +72,31 @@ export function sessionToWorkoutLog(s: WorkoutSession): WorkoutLog {
     recoveryBefore: 0,
     split: s.focus,
     weekNumber: s.weekNumber,
+    source: s.source ?? s.provenanceSource,
+    provenanceSource: s.provenanceSource ?? s.source,
+    planSnapshotId: s.planSnapshotId,
+    plannedSessionId: s.plannedSessionId,
     mesocycleId: undefined,
     notes: s.notes,
   };
 }
+
+function strengthEntrySignature(entry: StrengthLogEntry): string {
+  const exercise = (entry.exerciseId || entry.exerciseName || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const sets = (entry.sets || []).map((set, index) => `${index + 1}:${set.weight}:${set.reps}:${set.rir ?? ''}:${set.rpe ?? ''}`).join('|');
+  return `${entry.date}|${exercise}|${sets}`;
+}
+
+function uniqueStrengthEntries(groups: StrengthLogEntry[][]): StrengthLogEntry[] {
+  const seen = new Set<string>();
+  return groups.flat().filter(entry => {
+    const signature = strengthEntrySignature(entry);
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+}
+
 export class StrengthDiary {
   #workoutLogsCache: { data: WorkoutLog[]; ts: number } | null = null;
   #lsSignature = '';
@@ -196,8 +229,13 @@ export class StrengthDiary {
   }
 
   async getWorkoutLogsByDate(start: string, end: string): Promise<WorkoutLog[]> {
-    const logs = await db.getAll<WorkoutLog>('workout_log');
-    return logs.filter(w => w.date >= start && w.date <= end).sort((a, b) => b.date.localeCompare(a.date));
+    const logs = await this.getWorkoutLogs();
+    return logs.filter(w => w.date >= start && w.date <= end);
+  }
+
+  async getLastSession(): Promise<WorkoutSession | null> {
+    const logs = await this.getWorkoutLogs();
+    return logs[0] ? workoutLogToSession(logs[0]) : null;
   }
 
   /**
@@ -245,10 +283,7 @@ export class StrengthDiary {
    */
   async getWeeklyProgress(): Promise<WeeklyProgress[]> {
     const logs = await db.getAll<StrengthLogEntry>('training_log');
-    const workouts = await db.getAll<WorkoutLog>('workout_log');
-    const lsSessions = loadSessions();
-    const lsLogs = lsSessions.map(sessionToWorkoutLog);
-    const allWorkouts = [...workouts, ...lsLogs];
+    const allWorkouts = await this.getWorkoutLogs();
 
     // Группировка по ISO неделе + ISO году (недели разных лет не схлопываются)
     const weekMap = new Map<string, { year: number; week: number; volume: number; compound: number; isolation: number; oneRm: number; sessions: Set<string> }>();
@@ -267,8 +302,8 @@ export class StrengthDiary {
       weekMap.set(key, current);
     };
 
-    logs.forEach(addLog);
-    allWorkouts.forEach(w => (w.exercises || []).forEach(addLog));
+    const workoutEntries = allWorkouts.flatMap(workout => workout.exercises || []);
+    uniqueStrengthEntries([workoutEntries, logs]).forEach(addLog);
 
     return Array.from(weekMap.values()).map(({ year, week, volume, compound, isolation, oneRm, sessions }) => ({
       week,
@@ -297,13 +332,28 @@ export class StrengthDiary {
       date: s.date,
       exerciseId: ex.exerciseId || ex.exerciseName,
       exerciseName: ex.exerciseName,
-      sets: ex.sets.map(st => ({ weight: st.weightKg, reps: st.reps, rir: st.rir, rpe: st.rpe })),
+      sets: ex.sets.map(st => ({
+        weight: st.weightKg,
+        reps: st.reps,
+        rir: st.rir,
+        rpe: st.rpe,
+        techniqueScore: st.techniqueScore,
+        plannedWeight: st.plannedWeight,
+        plannedReps: st.plannedReps,
+        plannedRir: st.plannedRir,
+        plannedTempo: st.plannedTempo,
+        actualTempo: st.actualTempo,
+      })),
       totalVolume: ex.totalVolume,
       estimated1RM: ex.best1RM,
       isCompound: COMPOUND_PATTERNS.has(ex.pattern),
+      weekNumber: s.weekNumber,
+      source: s.source,
+      provenanceSource: s.provenanceSource,
+      planSnapshotId: s.planSnapshotId,
+      plannedSessionId: s.plannedSessionId,
     })));
-    const seenIds = new Set(logs.map(l => l.id));
-    const allLogs = [...logs, ...lsLogs.filter(l => !seenIds.has(l.id))];
+    const allLogs = uniqueStrengthEntries([logs, lsLogs]);
     const compoundLogs = allLogs.filter(l => l.isCompound && l.sets.length > 0);
 
     const exerciseWeekBest = new Map<string, Map<number, { weight: number; e1RM: number }>>();
@@ -378,11 +428,13 @@ export class StrengthDiary {
   async getRecentActivity(days: number = 7): Promise<{ date: string; volume: number; oneRm: number }[]> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
-    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const cutoffStr = toLocalIso(cutoff);
 
     const logs = await db.getAll<StrengthLogEntry>('training_log');
-    
-    const activity = logs
+    const workoutEntries = (await this.getWorkoutLogs()).flatMap(workout => workout.exercises || []);
+    const allEntries = uniqueStrengthEntries([workoutEntries, logs]);
+
+    const activity = allEntries
       .filter((l: StrengthLogEntry) => l.date >= cutoffStr)
       .map((l: StrengthLogEntry) => ({
         date: l.date,

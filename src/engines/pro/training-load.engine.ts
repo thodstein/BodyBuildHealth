@@ -38,12 +38,19 @@ export function sessionLoad(sRPE: number, durationMin: number): number {
 
 /** День → ISO-дата (YYYY-MM-DD). */
 function dayOf(date: string | Date): string {
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return typeof date === 'string' ? date : '';
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function addDays(dateStr: string, n: number): string {
-  const d = new Date(dateStr); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10);
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(part => !Number.isFinite(part))) {
+    const d = new Date(dateStr); d.setDate(d.getDate() + n); return dayOf(d);
+  }
+  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+  d.setDate(d.getDate() + n);
+  return dayOf(d);
 }
 
 /** Сессии → дневная нагрузка (агрегация по датам, отсортировано). */

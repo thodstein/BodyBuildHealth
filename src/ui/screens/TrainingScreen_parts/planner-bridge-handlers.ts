@@ -550,7 +550,7 @@ const programHandler: Handler = (payload, { onChange, showToast }) => {
   try {
     // Готовая UserProgram из «Сборки цикла» Годового планировщика.
     const direct = payload.data.program as UserProgram | undefined;
-    if (direct && direct.meta && (direct.bb || direct.pl)) {
+     if (direct && direct.meta && (direct.bb || direct.pl || direct.hybrid || direct.arm)) {
       onChange(direct);
       showToast('🔗 Собранный цикл загружен: ' + payload.label);
       return;
@@ -641,10 +641,15 @@ const macrocycleHandler: Handler = (payload, { program: p, onChange, showToast, 
 export const ANNUAL_BLOCK_PENDING_KEY = 'he_annual_block_pending';
 
 /** Открытая ссылка «блок годового плана ↔ редактируемая программа». */
-export function getPendingAnnualBlock(): { blockKey: string; ts: number } | null {
+export function getPendingAnnualBlock(): { blockKey: string; ts: number; programId?: string } | null {
   try {
     const v = JSON.parse(localStorage.getItem(ANNUAL_BLOCK_PENDING_KEY) || 'null');
-    return v && typeof v.blockKey === 'string' ? v : null;
+    if (!v || typeof v.blockKey !== 'string' || !Number.isFinite(Number(v.ts))) return null;
+    return {
+      blockKey: v.blockKey,
+      ts: Number(v.ts),
+      ...(typeof v.programId === 'string' ? { programId: v.programId } : {}),
+    };
   } catch { return null; }
 }
 
@@ -662,27 +667,32 @@ export function completeAnnualBlockImport(program: UserProgram): boolean {
   if (!pending) return false;
   try {
     const plan: AnnualTrainingPlan | null = loadAnnualTrainingPlan();
-    if (plan) {
-      const next = importProgramIntoAnnualBlock(plan, pending.blockKey, program);
-      saveAnnualTrainingPlan(next);
-      window.dispatchEvent(new CustomEvent('he-annual-training-plan-updated', {
-        detail: { planId: next.id, blockKey: pending.blockKey, status: next.status },
-      }));
-    }
+    if (!plan) return false;
+    const target = plan.blocks.find(b => b.ref.blockKey === pending.blockKey);
+    if (!target) return false;
+    if (pending.programId && pending.programId !== program.meta.id) return false;
+    const next = importProgramIntoAnnualBlock(plan, pending.blockKey, program);
+    if (next === plan) return false;
+    const saved = saveAnnualTrainingPlan(next);
+    const persisted = loadAnnualTrainingPlan();
+    if (!persisted || persisted.updatedAt !== saved.updatedAt) return false;
+    window.dispatchEvent(new CustomEvent('he-annual-training-plan-updated', {
+      detail: { planId: next.id, blockKey: pending.blockKey, status: next.status },
+    }));
+    return true;
   } finally {
     clearPendingAnnualBlock();
   }
-  return true;
 }
 
 const annualBlockHandler: Handler = (payload, { onChange, showToast }) => {
   if (!payload.data?.blockKey) return;
   try {
     const prog = payload.data.program as UserProgram | undefined;
-    if (prog && (prog.bb || prog.pl || prog.hybrid)) {
+    if (prog && (prog.bb || prog.pl || prog.hybrid || prog.arm)) {
       onChange(prog);
       try {
-        localStorage.setItem(ANNUAL_BLOCK_PENDING_KEY, JSON.stringify({ blockKey: payload.data.blockKey, ts: Date.now() }));
+        localStorage.setItem(ANNUAL_BLOCK_PENDING_KEY, JSON.stringify({ blockKey: payload.data.blockKey, programId: prog.meta.id, ts: Date.now() }));
       } catch { /* ignore */ }
       showToast('🔗 Блок годового плана открыт в редакторе — после правок сохраните программу, изменения вернутся в блок');
       return;
