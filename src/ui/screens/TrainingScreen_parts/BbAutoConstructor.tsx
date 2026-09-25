@@ -3783,6 +3783,9 @@ export const BbAutoConstructor: React.FC = () => {
 
   // ── 🏁 Prep-цикл: отдельный режим подготовки к соревнованиям ──
   const minRec = recommendMinimalMode({ category: prepCat, enhanced: peds.length > 0, trainingYears: bbTrainingYears, level: bbLevel, minimalMuscles: prepMinimal });
+  const prepPedContext = peds.length > 0
+    ? { ghIU: (pedDoses.GH ?? pedDoses.gh ?? 0) || undefined, trenMg: (pedDoses.tren ?? pedDoses.trenbolone ?? 0) || undefined, insulinIU: (pedDoses.insulin ?? 0) || undefined, diuretic: false }
+    : undefined;
 
   const buildPrepCycleCfg = (): PrepCycleConfig => ({
     category: prepCat,
@@ -3814,6 +3817,7 @@ export const BbAutoConstructor: React.FC = () => {
     labIntensityNote: labAdjust?.intensityNote,
     enhanced: peds.length > 0,
     pedDoses,
+    pedContext: prepPedContext,
     courseIntensity,
     trainingFocus: bbTrainingFocus,
     bodyweightCapability: (prof as any)?.bodyweightCapability,
@@ -3834,6 +3838,15 @@ export const BbAutoConstructor: React.FC = () => {
     proteinPerKg: Number((linked.profile?.settings as any)?.nutrition?.proteinPerKg) || undefined,
     calorieSurplus: Number((linked.profile?.settings as any)?.nutrition?.calorieSurplus) || undefined,
     weightKg: profileWeight,
+    heightCm: Number((linked.profile?.settings as any)?.personal?.height) > 120 ? Number((linked.profile?.settings as any).personal.height) : undefined,
+    cycleDay: (() => {
+      const stateDay = Number(cycleDay);
+      if (Number.isFinite(stateDay) && stateDay >= 1 && stateDay <= 35) return Math.round(stateDay);
+      try {
+        const storedDay = Number(localStorage.getItem('he_cycle_day'));
+        return Number.isFinite(storedDay) && storedDay >= 1 && storedDay <= 35 ? Math.round(storedDay) : undefined;
+      } catch { return undefined; }
+    })(),
     bodyFatPct: prepBodyFat,
     experienceLevel: (bbLevel === 'enhanced' || bbLevel === 'advanced' ? 'advanced' : bbLevel === 'beginner' ? 'beginner' : 'intermediate') as 'beginner' | 'intermediate' | 'advanced',
     prepCount: 0,
@@ -3899,8 +3912,8 @@ export const BbAutoConstructor: React.FC = () => {
       mobilityRestrictions: c.mobilityRestrictions, workMax: c.workMax, avoidAxialLoad: c.avoidAxialLoad,
       bodyFat: c.bodyFat, leanMass: c.leanMass, hrvMs: c.hrvMs, sleepHours: c.sleepHours, stressLevel: c.stressLevel,
       labMrvMultiplier: c.labMrvMultiplier,
-      enhanced: c.enhanced, pedDoses: c.pedDoses, courseIntensity: c.courseIntensity,
-      weightKg: c.weightKg, bodyFatPct: c.bodyFatPct, experienceLevel: c.experienceLevel, prepCount: c.prepCount,
+      enhanced: c.enhanced, pedDoses: c.pedDoses, pedContext: c.pedContext, courseIntensity: c.courseIntensity,
+      weightKg: c.weightKg, heightCm: c.heightCm, cycleDay: c.cycleDay, bodyFatPct: c.bodyFatPct, experienceLevel: c.experienceLevel, prepCount: c.prepCount,
       prepVolumeMult: c.prepVolumeMult, currentCalories: c.currentCalories,
       carbLoadStrategy: c.carbLoadStrategy, waterStrategy: c.waterStrategy, sodiumStrategy: c.sodiumStrategy,
       confirmedManipulation: c.confirmedManipulation, contraindications: c.contraindications,

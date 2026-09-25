@@ -94,6 +94,8 @@ export interface PrepCycleConfig {
 
   // ── Prep / питание ──
   weightKg: number;
+  heightCm?: number;
+  cycleDay?: number;
   bodyFatPct?: number;
   experienceLevel: ExperienceLevel;
   prepCount?: number;
@@ -350,6 +352,8 @@ export function buildPrepCycle(raw: PrepCycleConfig, opts: PrepCycleBuildOpts = 
     sex: cfg.sex,
     category: cfg.category,
     weightKg: cfg.weightKg,
+    heightCm: cfg.heightCm,
+    cycleDay: cfg.cycleDay,
     bodyFatPct: cfg.bodyFatPct,
     experienceLevel: cfg.experienceLevel,
     enhanced: cfg.enhanced,
@@ -1239,6 +1243,8 @@ export interface PrepSeasonConfig {
   pedDoses?: Record<string, number>;
   courseIntensity?: CourseIntensity;
   weightKg: number;
+  heightCm?: number;
+  cycleDay?: number;
   bodyFatPct?: number;
   experienceLevel: ExperienceLevel;
   prepCount?: number;
@@ -1345,6 +1351,8 @@ export function buildPrepSeason(cfg: PrepSeasonConfig, opts: PrepCycleBuildOpts 
       pedDoses: cfg.pedDoses,
       courseIntensity: cfg.courseIntensity,
       weightKg: cfg.weightKg,
+      heightCm: cfg.heightCm,
+      cycleDay: cfg.cycleDay,
       bodyFatPct: cfg.bodyFatPct,
       experienceLevel: cfg.experienceLevel,
       prepCount: cfg.prepCount,

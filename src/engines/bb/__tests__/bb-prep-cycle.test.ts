@@ -12,7 +12,7 @@ import {
 import { buildBBPlan, DEFAULT_WORKMAX } from '../bb-builder.engine';
 import { aggregateBBVolume } from '../bb-volume.engine';
 import { buildPrepProcess, PREP_PROCEDURES, PREP_LAB_PANEL } from '../bb-prep-process.engine';
-import { isoToday, isoAddDays } from '../bb-contest-prep.engine';
+import { isoToday, isoAddDays, buildPeakWeek } from '../bb-contest-prep.engine';
 import type { BBContestCategory } from '../bb-contest-prep.engine';
 
 const EQ = ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'];
@@ -136,6 +136,22 @@ describe('bb-prep-cycle: сборка', () => {
       accentMuscles: ['glutes'], minimalMuscles: ['quads'],
     }));
     expect(r.config.accentMuscles).toContain('glutes');
+  });
+
+  it('сохраняет рост, день цикла и PED-контекст для пиковой недели', () => {
+    const r = buildPrepCycle(base({
+      category: 'bikini', sex: 'female', weightKg: 55,
+      heightCm: 200, cycleDay: 21, enhanced: true,
+      pedContext: { ghIU: 6, trenMg: 250 },
+    }));
+    expect(r.prepPlan.config).toMatchObject({
+      heightCm: 200,
+      cycleDay: 21,
+      pedContext: { ghIU: 6, trenMg: 250 },
+    });
+    const peak = buildPeakWeek(r.prepPlan.config!);
+    expect(peak[0].waterLiters).toBeGreaterThan(2.2);
+    expect(peak.some(day => day.sodiumMg >= 2100)).toBe(true);
   });
 
   it('длинный цикл 26 нед строится без ошибок', () => {
@@ -306,6 +322,8 @@ describe('bb-prep-cycle: сезон (несколько стартов)', () => 
     const cfg = {
       ...seasonCfg([{ id: 'c1', date: '2027-03-01', name: 'Главный', priority: 'A' as const }]),
       currentCalories: 2450,
+      heightCm: 200,
+      cycleDay: 21,
       carbLoadStrategy: 'linear' as const,
       waterStrategy: 'high' as const,
       sodiumStrategy: 'cut_2d' as const,
@@ -320,6 +338,8 @@ describe('bb-prep-cycle: сезон (несколько стартов)', () => 
     const r = buildPrepSeason(cfg, { testPeakWeekId: 'trial-season', carbDoseGPerKg: 8 });
     const prep = r.cycles[0].prepPlan;
     expect(prep.config).toMatchObject({
+      heightCm: 200,
+      cycleDay: 21,
       waterStrategy: 'stable',
       sodiumStrategy: 'stable',
       carbLoadStrategy: 'linear',

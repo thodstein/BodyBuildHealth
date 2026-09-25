@@ -298,9 +298,9 @@ Runtime: `added=1`, `count` упражнений вырос, `duplicateBench=2`.
 
 `bb-contest-prep.engine.ts:513-514` использует `new Date().toISOString().slice(0,10)`, хотя рядом уже есть `isoToday()` (`bb-contest-prep.engine.ts:445-449`).
 
-#### CP-19 — Prep-цикл не передаёт peak `pedContext`/trial context
+#### CP-19 — Prep-цикл не передаёт peak `pedContext`/trial context — закрыт 2026-09-25
 
-`bb-prep-cycle.engine.ts:348-371` строит `prepCfg` из `sex/category/weight/bodyFat/...`, но не из `pedDoses`; нет `heightCm/cycleDay/hasTrialPeak/pedContext`.
+`PrepCycleConfig` и `PrepSeasonConfig` теперь сохраняют и передают `heightCm`, `cycleDay` и `pedContext` в `prepCfg`; production wiring Prep-цикла и сезона берёт рост/цикл из профиля и PED-контекст из курса. Trial не дублируется отдельным флагом: `buildBBContestPrepPlan` разрешает `testPeakWeekId` через канонический lookup. Покрыто `bb-prep-cycle.test.ts` и UI SSR smoke.
 
 #### BB-MRV-01 — финальный `normalizeWeekMrv` теряет `onCourse`
 
