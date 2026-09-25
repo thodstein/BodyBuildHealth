@@ -380,6 +380,13 @@ export const StrengthSportConstructor: React.FC = () => {
     setHasSpecPrev(false); // новый id плана — старый снапшот stale, откат его честно отклонит
     setHasSMSpecPrev(false); // то же для волны СМ-коррекции
     try { sessionStorage.removeItem(SM_INJECT_PREV_KEY); } catch {}
+    } catch (e) {
+      // P0: движок вправе отказать (гейт daily-max, неизвестный цикл) — раньше
+      // ошибка уходила в unhandled rejection: пользователь видел лишь «⏳» и тишину.
+      const msg = e instanceof Error ? e.message : String(e);
+      try { console.warn('[SS build]', msg); } catch {}
+      setMsg(`⛔ ${msg}`);
+      setTimeout(()=>setMsg(''), 4600);
     } finally {
       setBuilding(false);
     }
@@ -641,12 +648,12 @@ export const StrengthSportConstructor: React.FC = () => {
       const avail = rankedCycles.filter(r=> !r.blocked);
       const picked = (annualCycleSel && annualCycleSel.length ? annualCycleSel.filter(id=> avail.some(r=> r.cycle.meta.id===id)) : avail.slice(0, 3).map(r=> r.cycle.meta.id));
       if (!picked.length) { setMsg('Нет доступных циклов'); setTimeout(()=>setMsg(''),1800); return; }
-      const base: any = { mode, goal, level, workMax, equipment, injuries, mobilityRestrictions: mobility, sex, bodyweight, age, methodology, dupMode, intensityTech, outsideLoad: outsideEnabled ? outside : null, acwr: acwr as any, weakPoints: weakPoints.length ? weakPoints : undefined, contest: mode==='strongman' ? contest : undefined, contestStrategy: mode==='strongman' ? contestStrategy : undefined, startDate: new Date().toISOString().slice(0,10) };
+      const base: any = { mode, goal, level, workMax, equipment, injuries, mobilityRestrictions: mobility, sex, bodyweight, age, cycleConsent, methodology, dupMode, intensityTech, outsideLoad: outsideEnabled ? outside : null, acwr: acwr as any, weakPoints: weakPoints.length ? weakPoints : undefined, contest: mode==='strongman' ? contest : undefined, contestStrategy: mode==='strongman' ? contestStrategy : undefined, startDate: new Date().toISOString().slice(0,10) };
       const ann3 = buildAnnualFromSSCycles(picked, base, { cycleMode, competitionDate: competitionDate || undefined, taperWeeks });
       saveAnnualSS(ann3); setAnnual(ann3);
       try { syncStrengthAnnualToGeneral(ann3); } catch {}
       setMsg(`✦ Год из циклов: ${picked.length} блока (${ann3.totalWeeks}нед)`); setTimeout(()=>setMsg(''),2200);
-    }catch{ setMsg('Не собралось'); setTimeout(()=>setMsg(''),1800); }
+    }catch(e){ const m = e instanceof Error ? e.message : String(e); try { console.warn('[SS annual-from-cycles]', m); } catch {} setMsg(`⛔ ${m}`); setTimeout(()=>setMsg(''),4600); }
   };
 
   const stepList: Step[] = ['params', 'athlete', 'outside', 'split', 'plan', 'quality', 'export'];
@@ -1040,6 +1047,8 @@ export const StrengthSportConstructor: React.FC = () => {
                     <div style={{ background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.22)', borderRadius:10, padding:'8px 10px', display:'flex', flexDirection:'column', gap:4 }}>
                       <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: {contestSim.totalPoints} pts → {contestSim.predictedPlace} место из 10</div>
                       {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них</div>}
+                      {contestSim.noData.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>⚠ Без честной базы (очки не начислены): {contestSim.noData.join(', ')} — задайте свой ПМ по этим ивентам</div>}
+                      <div style={{ fontSize:10, color:'#f59e0b' }}>Оценено ивентов: {contestSim.events.filter(e=>e.hasData).length} из {contestSim.events.length}</div>
                     </div>
                   )}
                 </div>
@@ -1100,6 +1109,8 @@ export const StrengthSportConstructor: React.FC = () => {
               <div style={{ background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.22)', borderRadius:10, padding:'8px 10px', display:'flex', flexDirection:'column', gap:4 }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: {contestSim.totalPoints} pts → прогноз {contestSim.predictedPlace} место из 10</div>
                 {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них</div>}
+                {contestSim.noData.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>⚠ Без честной базы (очки не начислены): {contestSim.noData.join(', ')} — задайте свой ПМ по этим ивентам</div>}
+                <div style={{ fontSize:10, color:'#f59e0b' }}>Оценено ивентов: {contestSim.events.filter(e=>e.hasData).length} из {contestSim.events.length}</div>
               </div>
             )}
           </SectionCard>

@@ -124,7 +124,11 @@ describe('ss-cycle-to-plan faithful (дословный)', () => {
   });
   it('все циклы реестра строятся без throw', () => {
     for (const c of SS_CYCLES) {
-      const plan = buildSSCyclePlan(c, baseInput({ mode: c.meta.mode === 'hybrid' ? 'hybrid' : c.meta.mode }) as any, { cycleMode: 'faithful' });
+      // Безопасностный контракт: болгарский daily-max требует advanced+ и явного
+      // согласия (buildSSCyclePlan fail-closed). Этот тест — про сборку формы,
+      // сам гейт покрыт ss-bulgarian-gate.test.ts.
+      const gated = c.meta.bulgarian ? { cycleConsent: true, level: 'advanced' } : {};
+      const plan = buildSSCyclePlan(c, baseInput({ ...gated, mode: c.meta.mode === 'hybrid' ? 'hybrid' : c.meta.mode }) as any, { cycleMode: 'faithful' });
       expect(plan.weeksData.length).toBe(c.meta.weeks);
     }
   });

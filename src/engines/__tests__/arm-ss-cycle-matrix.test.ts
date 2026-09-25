@@ -89,7 +89,11 @@ describe('Ф1.4: SS-матрица (15 циклов ТА·Стронг чере�
   it('все 15 циклов собираются: форма/математика без NaN', () => {
     expect(SS_CYCLES.length).toBe(15);
     for (const t of SS_CYCLES) {
-      const plan = buildSSCyclePlan(t, { ...ssInput, mode: t.meta.mode as any, weeks: t.meta.weeks } as StrengthSportInput);
+      // Безопасностный контракт: болгарский daily-max требует advanced+ и явного
+      // согласия — buildSSCyclePlan теперь fail-closed. Эта матрица проверяет
+      // форму/математику, а сам гейт покрыт ss-bulgarian-gate.test.ts.
+      const gated = t.meta.bulgarian ? { cycleConsent: true, level: 'advanced' } : {};
+      const plan = buildSSCyclePlan(t, { ...ssInput, ...gated, mode: t.meta.mode as any, weeks: t.meta.weeks } as StrengthSportInput);
       expect(plan.weeksData.length, `${t.meta.id}: weeks ${plan.weeksData.length} != ${t.meta.weeks}`).toBe(t.meta.weeks);
       for (const w of plan.weeksData) {
         for (const s of w.sessions) {

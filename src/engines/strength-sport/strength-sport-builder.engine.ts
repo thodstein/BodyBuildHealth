@@ -1034,7 +1034,10 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   // Planner PRO P5: blockModel 'wave' включает DUP-wave без явного dupMode (дефолт strong5 → off, байт-в-байт)
   const effDupMode: any = (input.dupMode && input.dupMode !== 'off') ? input.dupMode : ((input as any).blockModel === 'wave' ? 'wave' : 'off');
   if (effDupMode && effDupMode !== 'off') {
-    const tmp: any = { weeksData, level, rationale: [] };
+    // mode ОБЯЗАТЕЛЕН: applyDUP определяет сильменовскую event_day-ротацию по
+    // plan.mode. Без него isStrongman===false и ветка conjugate была мертвой
+    // в проде (тесты были вакуумными — без dupMode во входе).
+    const tmp: any = { weeksData, level, mode, rationale: [] };
     applyDUP(tmp as any, effDupMode as any);
   }
   if (input.intensityTech && input.intensityTech !== 'none') {

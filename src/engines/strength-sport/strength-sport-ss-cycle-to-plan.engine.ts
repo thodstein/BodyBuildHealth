@@ -34,6 +34,7 @@ import { hrvReport } from './strength-sport-hrv.engine';
 import { velocityWeightAdjustFactor, diagnoseVelocityLossEwma, vbtHistoryForLift } from './strength-sport-vbt.engine';
 import { getExerciseById } from '../../core/exercise-catalog';
 import { outsideVolumeMultiplier, type OutsideLoad } from '../outside-load.engine';
+import { bulgarianGate } from './strength-sport-ss-selector.engine';
 import type {
   StrengthSportInput, StrengthSportPlan, StrengthSportWeek,
   StrengthSportSession, StrengthSportExercise, StrengthSportSet,
@@ -263,7 +264,26 @@ export function buildSSCyclePlan(
   const errors: string[] = [];
   rationale.push(`📚 Интернет-цикл: ${t.meta.title} · режим ${mode === 'faithful' ? 'дословный' : 'адаптированный'}`);
   if (tm !== 1) rationale.push(`Training max ×${tm} (проценты от 90% ПМ)`);
-  if (t.meta.bulgarian) rationale.push('⚠ Daily-max протокол: максимумы дня, согласие получено, следите за ACWR/суставами');
+  if (t.meta.bulgarian) {
+    // P0-гейт безопасности: болгарский daily-max — высокорисковый протокол
+    // (6 дней максимумов подряд). Раньше гейт жил ТОЛЬКО в раннере (rankSSCycle)
+    // и обходился прямым buildSSCyclePlan — из годового плана и из сохранённого
+    // cycleId (вариант/мост), где раннер не участвует. Здесь единая точка для
+    // всех трёх путей: заблокированный daily-max НЕ собирается (fail-closed).
+    const block = bulgarianGate({
+      mode: (ssMode as any),
+      level: (input.level as any) || 'intermediate',
+      daysPerWeek: input.daysPerWeek || t.meta.sessionsPerWeek,
+      weeks: t.meta.weeks,
+      acwrZone: (acwr as any)?.zone || null,
+      cycleConsent: !!(input as any).cycleConsent,
+      age: (input as any).age,
+    });
+    if (block) {
+      throw new Error(`Болгарский daily-max недоступен: ${block}. Выберите другой цикл — в подборе он помечен «stretch».`);
+    }
+    rationale.push('⚠ Daily-max протокол: максимумы дня — явное согласие получено, гейт уровня/возраста/ACWR пройден');
+  }
   if (wcProto) {
     try {
       for (const e of validateWeightCutProtocolSS(wcProto, { bodyweightKg: bwForWc, sex: sexForWc })) warnings.push(e);
@@ -621,7 +641,7 @@ export function buildSSCyclePlan(
   const intensityTech = (input as any).intensityTech as string | undefined;
   if (mode === 'adapt') {
     if (dupMode && dupMode !== 'off') {
-      try { applyDUP({ weeksData, level: plan.level, rationale: [] } as any, dupMode as any); rationale.push(`DUP ${dupMode} применён поверх цикла`); } catch { /* DUP недоступен */ }
+      try { applyDUP({ weeksData, level: plan.level, mode: ssMode, rationale: [] } as any, dupMode as any); rationale.push(`DUP ${dupMode} применён поверх цикла`); } catch { /* DUP недоступен */ }
     }
     if (intensityTech && intensityTech !== 'none') {
       try { applyIntensity({ weeksData, level: plan.level, rationale: [] } as any, intensityTech as any); rationale.push(`Интенсив-техника ${intensityTech} применена поверх цикла`); } catch { /* техника недоступна */ }

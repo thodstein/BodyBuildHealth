@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildStrengthSportPlan } from '../strength-sport-builder.engine';
+import { buildSSCyclePlan } from '../strength-sport-ss-cycle-to-plan.engine';
 import { applyDUP } from '../strength-sport-dup';
 import { applyIntensity } from '../strength-sport-intensity';
 import { lengthenedBonus } from '../strength-sport-bonus';
@@ -52,48 +53,96 @@ describe('strength DUP/intensity/bonus/warmup', () => {
       expect(s0.workSets[0].reps).toBeLessThanOrEqual(s2.workSets[0].reps);
     }
   });
-  it('strongman conjugate weekly wave week%3: max/dynamic/rep', () => {
-    // event_day conjugate: week 1 max, week 2 dynamic (X-0-X-0), week 3 rep
-    const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:3, daysPerWeek:3, workMax:{ yokeWalk:200, farmersWalk:140 } } as any);
-    const w1 = p.weeksData[0].sessions.find(s=> s.sessionTag==='event_day');
-    const w2 = p.weeksData[1].sessions.find(s=> s.sessionTag==='event_day');
-    const w3 = p.weeksData[2].sessions.find(s=> s.sessionTag==='event_day');
-    // w2 (week%3==2 → dynamic) should have X-0-X-0 tempo on at least one carry/stone
-    if (w2) {
-      const hasDynamic = w2.exercises.some(e=> e.workSets.some((ws:any)=> ws.tempo==='X-0-X-0'));
-      expect(hasDynamic).toBe(true);
-      const pcts = w2.exercises.map(e=> e.workSets[0]?.pct||0);
-      // dynamic pct lower than max week
-      if (w1) {
-        const pctMax = Math.max(...w1.exercises.map(e=> e.workSets[0]?.pct||0));
-        const pctDyn = Math.min(...pcts);
-        expect(pctDyn).toBeLessThanOrEqual(pctMax);
-      }
-    }
-    if (w3) {
-      // rep week: reps should be higher / pct lower than max
-      const reps3 = w3.exercises[0]?.workSets[0]?.reps || 0;
-      const reps1 = w1?.exercises[0]?.workSets[0]?.reps || 0;
-      expect(reps3).toBeGreaterThanOrEqual(reps1);
-    }
-    if (w1) {
-      const rir1 = w1.exercises[0]?.rir ?? 2;
-      const rir2 = w2?.exercises[0]?.rir ?? 2;
-      // max: RIR-1 vs dynamic RIR+1
-      expect(rir1).toBeLessThanOrEqual(rir2);
-    }
+  /** Синтетический стронгмен-план: три event_day подряд (idx 0/1/2 → wave 0/1/2). */
+  const smEventPlan = () => ({
+    mode: 'strongman', level: 'intermediate', rationale: [],
+    weeksData: [{
+      week: 1, deload: false,
+      sessions: [0, 1, 2].map(i => ({
+        sessionTag: 'event_day',
+        exercises: [
+          { id: 'yoke_walk', rir: 2, sets: 3, workSets: [{ weight: 100, reps: 2, rir: 2, pct: 70 }] },
+          { id: 'atlas_stone', rir: 2, sets: 3, workSets: [{ weight: 80, reps: 3, rir: 2, pct: 70 }] },
+        ].map(e => ({ ...e, _i: i })),
+      })),
+    }],
+  }) as any;
+
+  it('strongman event_day: wave по idx%3 — max(0)/dynamic(1)/rep(2) — детерминированно', () => {
+    const p = smEventPlan();
+    applyDUP(p, 'heavy_light');
+    const [s0, s1, s2] = p.weeksData[0].sessions;
+    const carry = (s: any, id: string) => s.exercises.find((e: any) => e.id === id);
+    // wave 0 (idx 0): carry → RIR−1, pct+5, вес ×1.05 (rounded 2.5)
+    const c0 = carry(s0, 'yoke_walk');
+    expect(c0.rir).toBe(1);
+    expect(c0.workSets[0].pct).toBe(75);
+    expect(c0.workSets[0].weight).toBe(105);
+    // wave 1 (idx 1): stone → динамический темп X-0-X-0; RIR пишется в СЕТ (упражнение не меняется)
+    const st1 = carry(s1, 'atlas_stone');
+    expect(st1.workSets[0].tempo).toBe('X-0-X-0');
+    expect(st1.workSets[0].rir).toBe(3);
+    expect(st1.rir).toBe(2);
+    // wave 2 (idx 2): ВСё → RIR+1, reps+1, pct−5, вес ×0.95
+    const c2 = carry(s2, 'yoke_walk');
+    expect(c2.rir).toBe(3);
+    expect(c2.workSets[0].reps).toBe(3);
+    expect(c2.workSets[0].pct).toBe(65);
+    expect(c2.workSets[0].weight).toBe(95);
   });
-  it('strongman carry wave pct zones max 90 / dynamic 70 / rep volume', () => {
-    const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'advanced', weeks:6, daysPerWeek:3, workMax:{ yokeWalk:240 } } as any);
-    const eventWeeks = p.weeksData.filter(w=> w.sessions.some(s=> s.sessionTag==='event_day'));
-    expect(eventWeeks.length).toBeGreaterThanOrEqual(3);
-    // ensure three consecutive waves have distinct pct levels
-    const pcts = eventWeeks.slice(0,3).map(w=> {
-      const ev = w.sessions.find(s=> s.sessionTag==='event_day')!;
-      return Math.max(...ev.exercises.map(e=> e.workSets[0]?.pct||0));
-    });
-    // max (~90%+) > dynamic (~70% region with -15%) roughly
-    expect(pcts[0]).toBeGreaterThan(pcts[1]);
-    expect(pcts[2]).toBeGreaterThanOrEqual(pcts[1]);
+
+  it('strongman event_day: НЕ dynamic/max без нужной волны (каждая ветка точечна)', () => {
+    const p = smEventPlan();
+    applyDUP(p, 'heavy_light');
+    const [s0, s1, s2] = p.weeksData[0].sessions;
+    const get = (s: any, id: string) => s.exercises.find((e: any) => e.id === id);
+    // wave 0 — только carry: камень не должен получить pct+5
+    expect(get(s0, 'atlas_stone').workSets[0].pct).toBe(70);
+    // wave 1 — только stone: carry не должен получить X-0-X-0
+    expect(get(s1, 'yoke_walk').workSets[0].tempo).toBeUndefined();
+    // wave 2 — общий rep-режим: stone тоже +1 повтор
+    expect(get(s2, 'atlas_stone').workSets[0].reps).toBe(4);
+  });
+
+  it('РЕГРЕСС-ЛОК: сработала ИМЕННО event_day-конъюгат, а не generic heavy/light', () => {
+    // Сигнатура веток на одном и том же event_day (idx=2, heavy_light):
+    //   conjugate wave 2 → вес ×0.95, reps +1, pct −5, RIR +1
+    //   generic heavy_light idx%2===0 → вес ×1.03, reps −1, pct +3
+    // Вес — самый однозначный признак: 0.95 против 1.03. Мутационно падает
+    // при возврате бага (mode не передан → generic-ветка).
+    const IN = { mode: 'strongman', goal: 'strength', level: 'intermediate', weeks: 3, daysPerWeek: 3, workMax: { yokeWalk: 200, farmersWalk: 140, atlasStone: 100 } } as any;
+    const base: any = buildStrengthSportPlan(IN);
+    const dup: any = buildStrengthSportPlan({ ...IN, dupMode: 'heavy_light' });
+    const firstEventEx = (p: any) => {
+      const wk = p.weeksData.find((w: any) => w.sessions.some((s: any) => s.sessionTag === 'event_day'));
+      const s = wk!.sessions.find((x: any) => x.sessionTag === 'event_day');
+      return s!.exercises[0];
+    };
+    const b = firstEventEx(base), d = firstEventEx(dup);
+    expect(d.workSets[0].weight / b.workSets[0].weight).toBeCloseTo(0.95, 1);
+    expect(d.workSets[0].weight).toBeLessThan(b.workSets[0].weight);
+  });
+
+  it('РЕГРЕСС-ЛОК: dupMode в билдере реально меняет event_day (rep-wave)', () => {
+    const IN = { mode: 'strongman', goal: 'strength', level: 'intermediate', weeks: 3, daysPerWeek: 3, workMax: { yokeWalk: 200, farmersWalk: 140, atlasStone: 100 } } as any;
+    const base: any = buildStrengthSportPlan(IN);
+    const dup: any = buildStrengthSportPlan({ ...IN, dupMode: 'heavy_light' });
+    const firstEventEx = (p: any) => {
+      const wk = p.weeksData.find((w: any) => w.sessions.some((s: any) => s.sessionTag === 'event_day'));
+      const s = wk!.sessions.find((x: any) => x.sessionTag === 'event_day');
+      return s!.exercises[0];
+    };
+    const b = firstEventEx(base), d = firstEventEx(dup);
+    // event_day на idx=2 → wave 2 (rep): RIR+1, reps+1, pct−5
+    expect(d.rir).toBe(b.rir + 1);
+    expect(d.workSets[0].reps).toBe(b.workSets[0].reps + 1);
+    expect(d.workSets[0].pct).toBe(b.workSets[0].pct - 5);
+  });
+
+  it('cycle-путь тоже передаёт mode (buildSSCyclePlan + adapt + dupMode)', () => {
+    const cyc: any = buildSSCyclePlan('ss-sm-531-4', { mode: 'strongman', goal: 'strength', level: 'advanced', weeks: 4, daysPerWeek: 4, dupMode: 'heavy_light', workMax: { yokeWalk: 200, farmersWalk: 140 } } as any, { cycleMode: 'adapt' });
+    const noDup: any = buildSSCyclePlan('ss-sm-531-4', { mode: 'strongman', goal: 'strength', level: 'advanced', weeks: 4, daysPerWeek: 4, workMax: { yokeWalk: 200, farmersWalk: 140 } } as any, { cycleMode: 'adapt' });
+    expect(cyc.rationale.join(' ')).toMatch(/DUP heavy_light применён/);
+    expect(JSON.stringify(cyc.weeksData)).not.toBe(JSON.stringify(noDup.weeksData));
   });
 });

@@ -119,9 +119,14 @@ describe('Stone moment', () => {
 describe('Contest simulator', () => {
   it('sim 5 events total 5-50 place 1-10', () => {
     const contest = { name:'test', events:[ {id:'yoke_walk', weight:300, distanceM:20, format:'medley_distance' as const}, {id:'farmers_walk_heavy', weight:120, distanceM:40, format:'medley_distance' as const}, {id:'log_press', weight:110, format:'max' as const}, {id:'atlas_stone_load', ladderWeights:[100,140], format:'ladder' as const, heightCm:140}, {id:'car_deadlift_18', weight:250, format:'reps_60s' as const}] } as any;
-    const wm = { yokeWalk:320, farmersWalk:130, logPress:115, atlasStone:145, deadlift:260 } as any;
+    // carDeadlift — по контракту StrengthSportWorkMax («отдельный ввод, не фолбэк
+    // через deadlift»): без него car_deadlift_18 честно выпадает из оценки.
+    const wm = { yokeWalk:320, farmersWalk:130, logPress:115, atlasStone:145, carDeadlift:260 } as any;
     const s = simulateContest(contest, wm, 'balanced');
     expect(s).not.toBeNull();
+    expect(s!.noData, `ивенты без базы: ${s!.noData.join(',')}`).toEqual([]);
+    expect(s!.events.length).toBe(5);
+    expect(s!.events.every(e => e.hasData)).toBe(true);
     expect(s!.totalPoints).toBeGreaterThanOrEqual(5);
     expect(s!.predictedPlace).toBeGreaterThanOrEqual(1);
     expect(s!.predictedPlace).toBeLessThanOrEqual(10);

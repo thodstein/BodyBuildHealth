@@ -62,7 +62,13 @@ export function migrateStrengthSportStorage(): boolean {
     }
     localStorage.setItem(MIGRATED_KEY, 'v3');
     return migrated;
-  } catch { try{ localStorage.setItem(MIGRATED_KEY,'v3'); }catch{} return false; }
+  } catch (e) {
+    // Миграция не прошла — честно предупреждаем (раньше был беззвучный catch:
+    // битое хранилище выглядело как «плана нет»).
+    try { console.warn('[SS storage] миграция не выполнена:', e); } catch {}
+    try{ localStorage.setItem(MIGRATED_KEY,'v3'); }catch{}
+    return false;
+  }
 }
 
 export function saveStrengthSportPlan(plan: StrengthSportPlan): void {
@@ -73,7 +79,11 @@ export function saveStrengthSportPlan(plan: StrengthSportPlan): void {
     if (idx >= 0) list[idx] = plan;
     else list.unshift(plan);
     localStorage.setItem(LIST_KEY, JSON.stringify(list.slice(0, 20)));
-  } catch {}
+  } catch (e) {
+    // Квота/приватный режим — план НЕ сохранён. Раньше тишина: пользователь
+    // считал, что сохранил, и терял работу при перезагрузке.
+    try { console.warn('[SS storage] план НЕ сохранён (квота или хранилище недоступно):', e); } catch {}
+  }
   // ROUND-10: аудит/покрытие хабов ТА и стронга читают этот ключ живьём — будим слушателей
   // (иначе смонтированный хаб с аудитом не обновлялся после пересборки плана в конструкторе).
   try { if (typeof window !== 'undefined') window.dispatchEvent(new Event('he-strength-sport-plan-saved')); } catch { /* noop */ }
@@ -85,7 +95,10 @@ export function loadStrengthSportPlan(): StrengthSportPlan | null {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     return migratePlan(JSON.parse(raw)) as StrengthSportPlan;
-  } catch { return null; }
+  } catch (e) {
+    try { console.warn('[SS storage] текущий план не прочитан (битые данные?):', e); } catch {}
+    return null;
+  }
 }
 
 export function loadStrengthSportPlans(): StrengthSportPlan[] {
@@ -95,7 +108,10 @@ export function loadStrengthSportPlans(): StrengthSportPlan[] {
     if (!raw) return [];
     const arr = JSON.parse(raw);
     return Array.isArray(arr) ? arr.map(migratePlan) : [];
-  } catch { return []; }
+  } catch (e) {
+    try { console.warn('[SS storage] список планов не прочитан (вернём пустой — это не «плана нет»):', e); } catch {}
+    return [];
+  }
 }
 
 export function removeStrengthSportPlan(id: string): void {
@@ -104,7 +120,9 @@ export function removeStrengthSportPlan(id: string): void {
     localStorage.setItem(LIST_KEY, JSON.stringify(list));
     const cur = loadStrengthSportPlan();
     if (cur?.id === id) localStorage.removeItem(KEY);
-  } catch {}
+  } catch (e) {
+    try { console.warn('[SS storage] удаление плана не выполнено:', e); } catch {}
+  }
 }
 
 // Cloud explicit helper — he_strength_* уже авто-синк через cloud-kv (he_ prefix, не в EXCLUDED), но для явного вызова из UI
@@ -116,6 +134,8 @@ export function syncStrengthSportToCloud(): void {
     // Ленивый импорт: cloud-kv тянет supabase — грузим только по жесту, не в бандл сборки плана.
     import('../../core/cloud-kv').then((m) => {
       try { m.touchKvKeys(keys); } catch { /* no-op */ }
-    }).catch(() => { /* вне TG/mini-app — тихо */ });
-  } catch {}
+    }).catch((e) => { try { console.warn('[SS storage] облачный синк недоступен (вне TG/mini-app):', e); } catch {} });
+  } catch (e) {
+    try { console.warn('[SS storage] облачный синк не запущен:', e); } catch {}
+  }
 }

@@ -3,6 +3,8 @@
  * HTML-экранирование, секции: слабые фазы, bar path, VBT, OHS, план.
  */
 
+import { localIsoDate } from '../workout-logger.engine';
+
 function esc(s: string): string {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -67,8 +69,8 @@ export function buildWLDiagnosticsHtml(snap: WLDiagnosticSnapshot, opts?: { apkH
   const noteRows = (snap.notes || []).map(n => `<li>${esc(n)}</li>`).join('');
   const att = snap.attempts;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ТА-диагностика</title><style>body{font-family:system-ui;padding:24px;color:#111}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:8px}h1{font-size:18px}h2{font-size:15px;margin-top:18px}</style></head><body>
- <h1>ТА-диагностика — отчёт ${esc(new Date().toISOString().slice(0,10))}</h1>
-${opts?.apkHeader ? `<div>Score ${snap.score} · ver ${snap.verification} · ${esc(new Date().toISOString().slice(0,10))} · ТА-хаб PRO (APK)</div>` : ''}
+ <h1>ТА-диагностика — отчёт ${esc(localIsoDate())}</h1>
+${opts?.apkHeader ? `<div>Score ${snap.score} · ver ${snap.verification} · ${esc(localIsoDate())} · ТА-хаб PRO (APK)</div>` : ''}
 <div>Score ${snap.score} (${esc(snap.level)}) · verification ${snap.verification}${snap.sex ? ` · ${esc(snap.sex)}` : ''}</div>
 <h2>Слабые фазы + причины</h2><table><tr><th>Фаза</th><th>Причина</th></tr>${rows || '<tr><td>баланс</td><td>—</td></tr>'}</table>
 ${bioRows ? `<h2>Биомеханика фаз</h2><table><tr><th>Фаза</th><th>Метка</th><th>Сустав/угол</th><th>Мышцы</th><th>Причина</th></tr>${bioRows}</table>` : ''}
@@ -90,7 +92,13 @@ ${noteRows ? `<h2>Заметки</h2><ul>${noteRows}</ul>` : ''}
 }
 
 export function buildWLCsv(snap: WLDiagnosticSnapshot): string {
-  const escCsv = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+  // Защита от CSV-формул: значение, начинающееся с = + - @, Excel/LibreOffice
+  // исполнит его как формулу. Префикс `'` — тот же приём, что в экспорте дневников.
+  const escCsv = (s: string) => {
+    const v = String(s ?? '');
+    const safe = /^[=+\-@]/.test(v) ? `'${v}` : v;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
   const rows = [
     ['weakPoints', snap.weakPoints.join(';') || 'balance'],
     ['score', String(snap.score)],

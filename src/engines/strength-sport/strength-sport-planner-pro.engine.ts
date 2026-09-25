@@ -6,6 +6,8 @@
  * Без localStorage внутри чистых функций; персист — отдельными хелперами с try/catch.
  */
 
+import { localIsoDate } from '../workout-logger.engine';
+
 // ——— P1: весовая категория ———
 export type SmSex = 'male' | 'female';
 export interface SmWeightClass { id: string; label: string; capKg: number | null }
@@ -104,7 +106,9 @@ export function scoreCheckin(c: SsCheckin): { score: number; suggestDeload: bool
 }
 
 export function pushCheckin(list: Array<SsCheckin & { date: string }>, c: SsCheckin, dateISO?: string): Array<SsCheckin & { date: string }> {
-  const next = [...(Array.isArray(list) ? list : []), { ...c, date: dateISO || new Date().toISOString().slice(0, 10) }];
+  // ЛОКАЛЬНАЯ дата: toISOString() — это UTC, в UTC+ вечером чек-ин уезжал
+  // на «вчера» (плюс-минус сутки). Канон — localIsoDate из workout-logger.
+  const next = [...(Array.isArray(list) ? list : []), { ...c, date: dateISO || localIsoDate() }];
   return next.slice(-SS_CHECKIN_CAP);
 }
 
