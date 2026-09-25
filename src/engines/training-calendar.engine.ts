@@ -19,7 +19,7 @@ export interface CalendarDay {
   isTrainingDay: boolean;
   plannedFocus: string;
   plannedExercises: number;
-  plannedDuration: number;
+  plannedDuration?: number;
   plannedVolume: number;
   plannedSets: number;
   actualCompleted: boolean;
@@ -76,7 +76,7 @@ export interface CalendarHeatmapData {
 export interface PlanFactSession {
   date: string;
   dayOfWeek: number;
-  planned: { focus: string; exercises: number; sets: number; volume: number; duration: number } | null;
+  planned: { focus: string; exercises: number; sets: number; volume: number; duration?: number } | null;
   actual: { exercises: number; sets: number; volume: number; duration: number } | null;
   compliance: number;
   status: CalendarDay['status'];
@@ -147,7 +147,7 @@ export interface ExportReport {
 
 export function generateCalendarMonth(
   year: number, month: number,
-  plannedSessions: { date: string; focus: string; exercises: number; duration: number }[],
+  plannedSessions: { date: string; focus: string; exercises: number; duration?: number }[],
   actualSessions: { date: string; completed: boolean; duration: number; volume: number }[],
 ): CalendarMonth {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -181,9 +181,18 @@ export function generateCalendarMonth(
     let status: CalendarDay['status'] = 'none';
     let compliance = 0;
     if (isTraining && actual?.completed) {
-      const pv = planned?.duration || 60;
-      compliance = pv > 0 ? Math.round(Math.min(100, ((actual.duration || 0) / pv) * 100)) : 0;
-      status = compliance >= 80 ? 'done' : compliance >= 30 ? 'partial' : 'missed';
+      const pv = planned?.duration;
+      if (pv != null && pv > 0) {
+        compliance = Math.round(Math.min(100, ((actual.duration || 0) / pv) * 100));
+        status = compliance >= 80 ? 'done' : compliance >= 30 ? 'partial' : 'missed';
+      } else {
+        // Плановая длительность не задана — сравнивать не с чем, и «0%» означал бы
+        // «пропущено» для тренировки, которая по дневнику выполнена. Факт выполнения
+        // известен, поэтому день закрыт как выполненный (как и во втором билдере,
+        // где достаточно наличия факта).
+        compliance = 100;
+        status = 'done';
+      }
     } else if (isTraining && isPast) {
       status = 'missed';
     } else if (isTraining && isFuture) {
@@ -196,7 +205,7 @@ export function generateCalendarMonth(
       date: dateStr, dayOfWeek, isTrainingDay: isTraining,
       plannedFocus: planned?.focus || '',
       plannedExercises: planned?.exercises || 0,
-      plannedDuration: planned?.duration || 0,
+       plannedDuration: planned?.duration,
       plannedVolume: 0,
       plannedSets: 0,
       actualCompleted: actual?.completed || false,
@@ -261,7 +270,7 @@ interface PlannedSession {
   exercises: string[];
   sets: number;
   volume: number;
-  duration: number;
+  duration?: number;
 }
 
 interface ActualSession {
@@ -326,7 +335,7 @@ export function generateTrainingCalendar(
       isTrainingDay: isTraining,
       plannedFocus: planned?.focus || '',
       plannedExercises: planned?.exercises?.length || 0,
-      plannedDuration: planned?.duration || 0,
+       plannedDuration: planned?.duration,
       plannedVolume: planned?.volume || 0,
       plannedSets: planned?.sets || 0,
       actualCompleted: !!actual,
@@ -433,7 +442,7 @@ export function getCalendarHeatmap(
 
 /** Извлечь данные плана из BridgeSession[] и построить plannedMap */
 export function buildPlannedMapFromBridgeSessions(
-  sessions: { date: string; focus: string; exercises: { exerciseName: string }[]; totalSets: number; totalVolume: number; }[],
+  sessions: { date: string; focus: string; exercises: { exerciseName: string }[]; totalSets: number; totalVolume: number; duration?: number; }[],
   startDate: string, endDate: string,
 ): Map<string, PlannedSession> {
   const map = new Map<string, PlannedSession>();
@@ -445,7 +454,7 @@ export function buildPlannedMapFromBridgeSessions(
         exercises: s.exercises.map(e => e.exerciseName),
         sets: s.totalSets,
         volume: s.totalVolume,
-        duration: 60,
+        duration: s.duration,
       });
     }
   }

@@ -53,7 +53,15 @@ export interface SessionLogEntryLite {
     rir: number;
     date: string;
     setIndex: number;
+    plannedWeight?: number;
+    plannedReps?: number;
+    plannedRir?: number;
   }>;
+  source?: string;
+  provenanceSource?: string;
+  planSnapshotId?: string;
+  plannedSessionId?: string;
+  weekNumber?: number;
 }
 
 export function workoutLogToSessionLogEntry(log: WorkoutLog): SessionLogEntryLite {
@@ -62,6 +70,11 @@ export function workoutLogToSessionLogEntry(log: WorkoutLog): SessionLogEntryLit
     date: log.date,
     focus: log.split || 'fullbody',
     durationMin: log.duration || 0,
+    source: log.source ?? log.provenanceSource,
+    provenanceSource: log.provenanceSource ?? log.source,
+    planSnapshotId: log.planSnapshotId,
+    plannedSessionId: log.plannedSessionId,
+    weekNumber: log.weekNumber,
     sets: (log.exercises || []).flatMap((ex, ei) =>
       (ex.sets || []).map((s, si) => ({
         exerciseId: ex.exerciseId,
@@ -72,6 +85,9 @@ export function workoutLogToSessionLogEntry(log: WorkoutLog): SessionLogEntryLit
         rir: s.rir || 3,
         date: log.date,
         setIndex: si,
+        plannedWeight: s.plannedWeight,
+        plannedReps: s.plannedReps,
+        plannedRir: s.plannedRir,
       }))
     ),
   };
@@ -91,10 +107,26 @@ export function workoutLogToStrengthLogEntries(log: WorkoutLog): StrengthLogEntr
     date: log.date,
     exerciseId: ex.exerciseId,
     exerciseName: ex.exerciseName,
-    sets: ex.sets.map(s => ({ weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe, techniqueScore: s.techniqueScore })),
+    sets: ex.sets.map(s => ({
+      weight: s.weight,
+      reps: s.reps,
+      rir: s.rir,
+      rpe: s.rpe,
+      techniqueScore: s.techniqueScore,
+      plannedWeight: s.plannedWeight,
+      plannedReps: s.plannedReps,
+      plannedRir: s.plannedRir,
+      plannedTempo: s.plannedTempo,
+      actualTempo: s.actualTempo,
+    })),
     totalVolume: ex.totalVolume,
     estimated1RM: ex.estimated1RM,
     isCompound: ex.isCompound,
+    weekNumber: log.weekNumber,
+    source: log.source ?? log.provenanceSource,
+    provenanceSource: log.provenanceSource ?? log.source,
+    planSnapshotId: log.planSnapshotId,
+    plannedSessionId: log.plannedSessionId,
     notes: ex.notes || '',
     supersetGroup: ex.supersetGroup,
     note: ex.note,
@@ -127,6 +159,13 @@ export interface UnifiedDiaryEntry {
   estimated1RM: number;
   isCompound: boolean;
   source: 'idb' | 'localStorage';
+  provenanceSource?: string;
+  planSnapshotId?: string;
+  plannedSessionId?: string;
+  weekNumber?: number;
+  plannedWeight?: number;
+  plannedReps?: number;
+  plannedRir?: number;
 }
 
 export function mergeDiaryEntries(idbLogs: WorkoutLog[], lsSessions: WorkoutSession[]): UnifiedDiaryEntry[] {
@@ -150,6 +189,13 @@ export function mergeDiaryEntries(idbLogs: WorkoutLog[], lsSessions: WorkoutSess
           estimated1RM: epley1RM(set.weight, set.reps),
           isCompound: ex.isCompound,
           source,
+          provenanceSource: log.provenanceSource ?? log.source,
+          planSnapshotId: log.planSnapshotId,
+          plannedSessionId: log.plannedSessionId,
+          weekNumber: log.weekNumber,
+          plannedWeight: set.plannedWeight,
+          plannedReps: set.plannedReps,
+          plannedRir: set.plannedRir,
         });
       }
     }

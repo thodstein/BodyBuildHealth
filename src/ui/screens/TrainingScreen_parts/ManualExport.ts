@@ -106,6 +106,10 @@ export function buildProgramIcs(program: UserProgram, startDateIso?: string, opt
       }));
       addWeek(w.week, sess as any, w.phase);
     }
+  } else if (program.arm?.weeks?.length) {
+    for (const w of program.arm.weeks) {
+      addWeek(w.week, w.sessions as any, w.phase);
+    }
   } else if (program.hybrid?.bbWeeks?.length) {
     for (const w of program.hybrid.bbWeeks) {
       addWeek(w.week, w.sessions as any, w.phase);

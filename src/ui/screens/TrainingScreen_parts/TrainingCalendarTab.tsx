@@ -77,9 +77,12 @@ export function runtimeDaysToBridgeSessions(runtime: any, year: number, month: n
         weightKg: Number(set.weight) || 0,
         reps: Number(set.reps) || 0,
         rpe: 10 - (Number(set.rir) || 0),
-        rir: Number(set.rir) || 0,
-        isPR: false,
-        notes: '',
+         rir: Number(set.rir) || 0,
+         isPR: false,
+         notes: '',
+         plannedWeight: set.weight == null || !Number.isFinite(Number(set.weight)) ? undefined : Number(set.weight),
+         plannedReps: set.reps == null || !Number.isFinite(Number(set.reps)) ? undefined : Number(set.reps),
+         plannedRir: set.rir == null || !Number.isFinite(Number(set.rir)) ? undefined : Number(set.rir),
       }));
       return {
         exerciseId: `runtime-${index}-${exerciseIndex}`,
@@ -93,18 +96,24 @@ export function runtimeDaysToBridgeSessions(runtime: any, year: number, month: n
         avgRPE: 0,
       };
     });
-    return {
-      sessionId: `runtime-${index}`,
-      date: `${year}-${String(month + 1).padStart(2, '0')}-${String((index % daysInMonth) + 1).padStart(2, '0')}`,
-      focus: day.label || runtime.focus || 'Тренировка',
-      exercises: bridgeExercises,
-      totalVolume: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.totalVolume, 0),
-      totalSets: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.sets.length, 0),
-      totalReps: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.sets.reduce((inner: number, set: any) => inner + set.reps, 0), 0),
-      weekNumber: startWeek,
-      planned: true,
-      source: runtime.track === 'bb' ? 'BB' : 'SRC',
-    };
+     const track = String(runtime.track || '').toLowerCase();
+     const source = track === 'bb' ? 'BB' : track === 'arm' || track === 'armlifting' ? 'ARM' : 'SRC';
+     const sessionId = `runtime-${index}`;
+     return {
+       sessionId,
+       date: `${year}-${String(month + 1).padStart(2, '0')}-${String((index % daysInMonth) + 1).padStart(2, '0')}`,
+       focus: day.label || runtime.focus || 'Тренировка',
+       exercises: bridgeExercises,
+       totalVolume: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.totalVolume, 0),
+       totalSets: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.sets.length, 0),
+       totalReps: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.sets.reduce((inner: number, set: any) => inner + set.reps, 0), 0),
+       weekNumber: startWeek,
+       planned: true,
+       source,
+       provenanceSource: source,
+       plannedSessionId: sessionId,
+       duration: typeof day.durationMin === 'number' ? day.durationMin : undefined,
+     };
   });
 }
 

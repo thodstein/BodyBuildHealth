@@ -12,9 +12,9 @@ import { calculatePlates, type PlateMathResult } from './gym-competition.engine'
 import { autoregulate, type AutoregInput, type AutoregOutput } from './autoregulation-engine';
 
 // ── workout-logger shape (локальные типы-мосты, чтобы не тащить весь workout-logger) ──
-export interface BridgeSet { setNumber: number; weightKg: number; reps: number; rpe: number; rir: number; isPR: boolean; notes: string; }
+export interface BridgeSet { setNumber: number; weightKg: number; reps: number; rpe: number; rir: number; isPR: boolean; notes: string; plannedWeight?: number; plannedReps?: number; plannedRir?: number; }
 export interface BridgeExercise { exerciseId: string; exerciseName: string; pattern: string; muscleGroup: string; order: number; sets: BridgeSet[]; totalVolume: number; best1RM: number; avgRPE: number; }
-export interface BridgeSession { sessionId: string; date: string; focus: string; exercises: BridgeExercise[]; totalVolume: number; totalSets: number; totalReps: number; weekNumber: number; planned: boolean; source: 'SRC' | 'BB' | 'ARM'; macroPhase?: string; taperWeek?: boolean; mockMeet?: boolean; meetWeek?: boolean; postMeet?: boolean; }
+export interface BridgeSession { sessionId: string; date: string; focus: string; exercises: BridgeExercise[]; totalVolume: number; totalSets: number; totalReps: number; weekNumber?: number; planned: boolean; source?: 'SRC' | 'BB' | 'ARM'; provenanceSource?: string; planSnapshotId?: string; plannedSessionId?: string; duration?: number; macroPhase?: string; taperWeek?: boolean; mockMeet?: boolean; meetWeek?: boolean; postMeet?: boolean; }
 
 // ── INT1: конвертация планов в сессии workout-logger ──
 function uid(prefix: string, i: number): string { return `${prefix}-${i}`; }
@@ -30,7 +30,7 @@ export function lmsPlanToSessions(plan: LMSBuildOutput): BridgeSession[] {
         let sn = 1;
         for (const ws of ex.workSets) {
           for (let s = 0; s < ws.sets; s++) {
-            sets.push({ setNumber: sn++, weightKg: ws.weight, reps: ws.reps, rpe: 10 - (ws.rir ?? 0), rir: ws.rir ?? 0, isPR: false, notes: `${Math.round(ws.pct * 100)}% PM · RIR ${ws.rir ?? 0}` });
+             sets.push({ setNumber: sn++, weightKg: ws.weight, reps: ws.reps, rpe: 10 - (ws.rir ?? 0), rir: ws.rir ?? 0, isPR: false, notes: `${Math.round(ws.pct * 100)}% PM · RIR ${ws.rir ?? 0}`, plannedWeight: ws.weight, plannedReps: ws.reps, plannedRir: ws.rir });
           }
         }
         const totalVolume = sets.reduce((sum, s) => sum + s.weightKg * s.reps, 0);
@@ -38,8 +38,9 @@ export function lmsPlanToSessions(plan: LMSBuildOutput): BridgeSession[] {
       });
       const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
       const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
-      const totalReps = exercises.reduce((sum, e) => sum + e.sets.reduce((ss, s) => ss + s.reps, 0), 0);
-      out.push({ sessionId: uid('src', i), date: '', focus: `Нед${wk.week} День${dayIdx + 1}`, exercises, totalVolume, totalSets, totalReps, weekNumber: wk.week, planned: true, source: 'SRC', macroPhase: wk.macroPhase, taperWeek: wk.taperWeek, mockMeet: wk.mockMeet, meetWeek: wk.meetWeek, postMeet: wk.postMeet });
+       const totalReps = exercises.reduce((sum, e) => sum + e.sets.reduce((ss, s) => ss + s.reps, 0), 0);
+       const sessionId = uid('src', i);
+       out.push({ sessionId, date: '', focus: `Нед${wk.week} День${dayIdx + 1}`, exercises, totalVolume, totalSets, totalReps, weekNumber: wk.week, planned: true, source: 'SRC', provenanceSource: 'SRC', plannedSessionId: sessionId, macroPhase: wk.macroPhase, taperWeek: wk.taperWeek, mockMeet: wk.mockMeet, meetWeek: wk.meetWeek, postMeet: wk.postMeet });
       i++;
     }
   }
@@ -52,13 +53,14 @@ export function bbPlanToSessions(plan: BBPlan): BridgeSession[] {
   for (const wk of plan.weeks) {
     for (const sess of wk.sessions) {
       const exercises: BridgeExercise[] = sess.exercises.map((ex: BBExercise, idx: number) => {
-        const sets: BridgeSet[] = ex.workSets.map((ws, k) => ({ setNumber: k + 1, weightKg: ws.weight, reps: ws.reps, rpe: 0, rir: ws.rir, isPR: false, notes: `${ex.character}/${ex.role}` }));
+         const sets: BridgeSet[] = ex.workSets.map((ws, k) => ({ setNumber: k + 1, weightKg: ws.weight, reps: ws.reps, rpe: 0, rir: ws.rir, isPR: false, notes: `${ex.character}/${ex.role}`, plannedWeight: ws.weight, plannedReps: ws.reps, plannedRir: ws.rir }));
         const totalVolume = sets.reduce((sum, s) => sum + s.weightKg * s.reps, 0);
         return { exerciseId: uid('bbex', i * 100 + idx), exerciseName: ex.exerciseName || ex.muscle, pattern: sess.sessionTag || '', muscleGroup: ex.muscle, order: idx + 1, sets, totalVolume, best1RM: 0, avgRPE: 0 };
       });
       const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
-      const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
-      out.push({ sessionId: uid('bb', i), date: '', focus: `${sess.sessionTag || ''} ${sess.character}`, exercises, totalVolume, totalSets, totalReps: 0, weekNumber: wk.week, planned: true, source: 'BB' });
+       const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
+       const sessionId = uid('bb', i);
+       out.push({ sessionId, date: '', focus: `${sess.sessionTag || ''} ${sess.character}`, exercises, totalVolume, totalSets, totalReps: 0, weekNumber: wk.week, planned: true, source: 'BB', provenanceSource: 'BB', plannedSessionId: sessionId });
       i++;
     }
   }
@@ -71,13 +73,14 @@ export function armPlanToSessions(plan: import('./arm/arm-types').ArmPlan): Brid
   for (const wk of (plan as any).weeks) {
     for (const sess of wk.sessions) {
       const exercises: BridgeExercise[] = sess.exercises.map((ex: any, idx: number) => {
-        const sets: BridgeSet[] = (ex.workSets || []).map((ws: any, k: number) => ({ setNumber: k + 1, weightKg: ws.weight || 0, reps: typeof ws.reps === 'number' ? ws.reps : 5, rpe: ws.rir != null ? 10 - ws.rir : 7, rir: ws.rir ?? 2, isPR: false, notes: `${ex.character}/${ex.muscle}${ex.workingAngle ? ` РУ${ex.workingAngle.elbowDeg}` : ''}${ex.isTable ? ' 🖐️' : ''}` }));
+         const sets: BridgeSet[] = (ex.workSets || []).map((ws: any, k: number) => ({ setNumber: k + 1, weightKg: ws.weight || 0, reps: typeof ws.reps === 'number' ? ws.reps : 5, rpe: ws.rir != null ? 10 - ws.rir : 7, rir: ws.rir ?? 2, isPR: false, notes: `${ex.character}/${ex.muscle}${ex.workingAngle ? ` РУ${ex.workingAngle.elbowDeg}` : ''}${ex.isTable ? ' 🖐️' : ''}`, plannedWeight: ws.weight || 0, plannedReps: typeof ws.reps === 'number' ? ws.reps : 5, plannedRir: ws.rir ?? 2 }));
         const totalVolume = sets.reduce((sum, s) => sum + s.weightKg * s.reps, 0);
         return { exerciseId: uid('armex', i * 100 + idx), exerciseName: ex.name || ex.muscle, pattern: sess.sessionTag || '', muscleGroup: ex.muscle, order: idx + 1, sets, totalVolume, best1RM: 0, avgRPE: 0 };
       });
       const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
-      const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
-      out.push({ sessionId: uid('arm', i), date: '', focus: `${sess.sessionTag || ''} ${sess.character}${sess.tableTime ? ' 🖐️' : ''}`, exercises, totalVolume, totalSets, totalReps: 0, weekNumber: wk.week, planned: true, source: 'ARM', macroPhase: wk.phase, taperWeek: !!wk.taper });
+       const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
+       const sessionId = uid('arm', i);
+       out.push({ sessionId, date: '', focus: `${sess.sessionTag || ''} ${sess.character}${sess.tableTime ? ' 🖐️' : ''}`, exercises, totalVolume, totalSets, totalReps: 0, weekNumber: wk.week, planned: true, source: 'ARM', provenanceSource: 'ARM', planSnapshotId: (plan as any).planSnapshotId, plannedSessionId: sessionId, duration: typeof (sess as any).durationMin === 'number' ? (sess as any).durationMin : undefined, macroPhase: wk.phase, taperWeek: !!wk.taper });
       i++;
     }
   }

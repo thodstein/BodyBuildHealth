@@ -118,7 +118,7 @@ export function analyzeManualVolume(
     patternId?: string;
   },
 ): ManualVolumeAnalysis {
-  const weeksSrc: UserWeek[] = program.bb?.weeks ?? (program.hybrid?.bbWeeks as UserWeek[] | undefined) ?? [];
+  const weeksSrc: UserWeek[] = program.bb?.weeks ?? program.arm?.weeks ?? (program.hybrid?.bbWeeks as UserWeek[] | undefined) ?? [];
   const weeklyBudget = computeBBWeeklyBudget({
     onCourse: opts?.onCourse,
     courseIntensity: opts?.courseIntensity,

@@ -24,6 +24,10 @@ function escCsv(v: unknown): string {
   return safe;
 }
 
+function programWeeks(program: UserProgram): UserWeek[] {
+  return (program.bb?.weeks ?? program.arm?.weeks ?? program.hybrid?.bbWeeks ?? []) as UserWeek[];
+}
+
 function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -32,7 +36,7 @@ function escHtml(s: string): string {
 export function buildProgramCsv(program: UserProgram, opts?: { week?: number }): string {
   const headers = ['Неделя','Фаза','День','Упражнение','Группа','Сеты','Повт','RIR','кг','%1RM','Скорость м/с','Темп','Отдых с','Суперсет','Техника','Комментарий'];
   const lines: string[] = [headers.map(escCsv).join(',')];
-  const weeks: UserWeek[] = (program.bb?.weeks ?? (program.hybrid?.bbWeeks as UserWeek[] | undefined) ?? []) as UserWeek[];
+  const weeks: UserWeek[] = programWeeks(program);
   const filtered = opts?.week ? weeks.filter(w => w.week === opts.week) : weeks;
   // fallback PL customWeeks
   if (filtered.length === 0 && program.pl?.customWeeks?.length) {
@@ -102,7 +106,7 @@ export function downloadCsv(filename: string, csv: string): void {
 export function buildProgramXlsx(program: UserProgram, level?: string): Uint8Array {
   const headers = ['Неделя','Фаза','День','Упражнение','Группа','Сеты','Повт','RIR','кг','%1RM','м/с','Темп','Отдых с','Суперсет','Техника','Комментарий'];
   const rows: (string|number)[][] = [headers];
-  const weeks: UserWeek[] = (program.bb?.weeks ?? (program.hybrid?.bbWeeks as UserWeek[] | undefined) ?? []) as UserWeek[];
+  const weeks: UserWeek[] = programWeeks(program);
   const filtered = weeks;
   if (filtered.length === 0 && program.pl?.customWeeks?.length) {
     for (const w of program.pl.customWeeks) {
@@ -178,8 +182,9 @@ export function buildProgramJsonForCoach(program: UserProgram, level?: string): 
   try { volume = analyzeManualVolume(program, lvl); } catch { /* ignore */ }
   const payload = {
     meta: program.meta,
-    bb: program.bb ? { weeks: program.bb.weeks, progression: program.bb.progression, constraints: program.bb.constraints } : undefined,
-    pl: program.pl,
+     bb: program.bb ? { weeks: program.bb.weeks, progression: program.bb.progression, constraints: program.bb.constraints } : undefined,
+     arm: program.arm ? { weeks: program.arm.weeks, progression: program.arm.progression, constraints: program.arm.constraints } : undefined,
+     pl: program.pl,
     hybrid: program.hybrid,
     analysis: volume ? {
       peakEffective: volume.peakEffective,
@@ -222,7 +227,7 @@ export function buildProgramPrintHtmlFile(program: UserProgram, level?: string):
     }).join('');
   } catch { /* ignore */ }
 
-  const weeks: UserWeek[] = (program.bb?.weeks ?? (program.hybrid?.bbWeeks as UserWeek[] | undefined) ?? []) as UserWeek[];
+  const weeks: UserWeek[] = programWeeks(program);
   const weeksHtml = weeks.map(w => {
     const phaseColor: Record<string,string> = { accumulation:'#3b82f6', intensification:'#f59e0b', deload:'#10b981', peaking:'#ef4444' };
     const bg = phaseColor[w.phase] || '#6b7280';
@@ -291,7 +296,7 @@ export function buildProgramQrPayload(program: UserProgram): string {
     v: 1,
     id: program.meta.id,
     title: program.meta.title,
-    weeks: (program.bb?.weeks?.length ?? program.pl?.customWeeks?.length ?? program.hybrid?.bbWeeks?.length ?? 0),
+     weeks: (program.bb?.weeks?.length ?? program.arm?.weeks?.length ?? program.pl?.customWeeks?.length ?? program.hybrid?.bbWeeks?.length ?? 0),
     direction: program.meta.direction,
     hash: String(JSON.stringify(program).length % 100000) // cheap hash, для проверки целостности
   };

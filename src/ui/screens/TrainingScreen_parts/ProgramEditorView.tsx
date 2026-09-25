@@ -13,7 +13,7 @@ import { HybridPlanPanel } from './HybridPlanPanel';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { MethodologyEncyclopedia } from './MethodologyEncyclopedia';
 import { BbContextPanel } from './program-editor-context-panels';
-import { BBEditor, PLEditor, BBConstraintsPanel, TRAINING_DAY_NAMES } from './ProgramEditorComponents';
+import { BBEditor, ArmEditor, PLEditor, BBConstraintsPanel, TRAINING_DAY_NAMES } from './ProgramEditorComponents';
 import { PlanDiagnosticsPanel, InteractiveVolumePanel, ExerciseInfoPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel, SubstitutionPanel } from './editor-panels';
 import { LoadGuardPanel, RealMRVPanel, RIRCalibrationPanel, TonnageEstimatePanel, StickingPointPanel, PlateAutoPanel, WhatIfGuardPanel, ReadinessForecastPanel, CheckinGuardPanel, BiomechanicsPanel } from './ProGuardPanels';
 import { ProPanelsGroup } from './ProPanelSection';
@@ -461,8 +461,9 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   // с реальными упражнениями и весами, а не пустую заготовку.
    // Читает единый профиль тренированности (equipment, weakPoints, avoidAxialLoad,
    // workMax, onCourse, favoriteExercises, excludedExercises) + лаб. коррекцию.
-    const hasProgramContent = useCallback(() => {
+     const hasProgramContent = useCallback(() => {
       if (program.bb?.weeks?.some(w => w.sessions.some(s => s.blocks.some(b => b.exerciseName && b.exerciseName.trim())))) return true;
+      if (program.arm?.weeks?.some(w => w.sessions.some(s => s.blocks.some(b => b.exerciseName && b.exerciseName.trim())))) return true;
       if (program.pl?.customWeeks?.some(w => w.days.some(d => d.exercises.some(e => e.name && e.name.trim())))) return true;
       if (program.hybrid?.bbWeeks?.some(w => w.sessions?.some(s => (s.blocks ?? []).some(b => b.exerciseName && b.exerciseName.trim())))) return true;
       return false;
@@ -496,14 +497,15 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     }, [program, tprofile, linked.profile, labAdjust.mrvMultiplier, update, showToast, hasProgramContent, confirm]);
 
 
-  // «🚚 К выполнению» — поддерживает BB и PL.
+  // «🚚 К выполнению» — поддерживает BB, ARM и PL.
     const [execWeek, setExecWeek] = useState(1);
     const sendToExecution = useCallback(() => {
      let days: { label: string; exercises: { name: string; muscleGroup: string; targetSets: { weight: number; reps: number; rir: number }[] }[] }[] = [];
 
-    if (dir === 'bb' && program.bb) {
-      const wi = Math.max(0, Math.min(execWeek - 1, program.bb.weeks.length - 1));
-      const week = program.bb.weeks[wi];
+    const executionWeeks = dir === 'bb' ? program.bb?.weeks : dir === 'arm' ? program.arm?.weeks : undefined;
+    if (executionWeeks) {
+      const wi = Math.max(0, Math.min(execWeek - 1, executionWeeks.length - 1));
+      const week = executionWeeks[wi];
        if (!week) { showToast('Сначала добавьте хотя бы одну сессию.', 'warning'); return; }
       for (const s of week.sessions) {
         days.push({
@@ -637,8 +639,9 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     if (program.meta.notes) {
        html.push(`<div style="white-space:pre-wrap;background:#f5f5f5;padding:10px;border-left:3px solid #60a5fa;margin:10px 0;font-size:11px;color:#333;">📝 <b>Заметки тренера:</b><br>${escapeHtml(program.meta.notes)}</div>`);
     }
-    if (program.bb?.weeks) {
-      for (const w of program.bb.weeks) {
+    const weekBodyWeeks = program.bb?.weeks ?? program.arm?.weeks;
+    if (weekBodyWeeks) {
+      for (const w of weekBodyWeeks) {
         html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload?'#f59e0b20':'#00e68a20'};color:${w.deload?'#f59e0b':'#00e68a'}">${w.phase}${w.deload?' · делод':''}</span></h2>`);
         if (w.note) html.push(`<p style="margin:2px 0 8px;padding:6px 10px;background:#f0fdf4;border-left:3px solid #00e68a;font-size:11px;color:#166534;white-space:pre-wrap">🗓 Неделя: ${escapeHtml(w.note)}</p>`);
         for (const s of w.sessions) {
@@ -1027,17 +1030,22 @@ return (
       )}
       {(() => {
         const bbEmpty = !!program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0));
+        const armEmpty = !!program.arm && (program.arm.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0));
         const plEmpty = !!program.pl && !program.pl.schedule.length && !(program.pl.customWeeks ?? []).length;
-        if (!bbEmpty && !plEmpty) return null;
+        if (!bbEmpty && !plEmpty && !armEmpty) return null;
         return (
           <div className="constructor-surface" style={{ ...CARD, padding: 12, borderLeft: '3px solid #f59e0b' }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>🗓 Недели пока пустые</div>
             <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.45, marginBottom: 8 }}>
-              Соберите программу автоматически или загрузите из библиотеки — здесь появятся расписание недели и упражнения.
+              {dir === 'arm'
+                ? 'Заполните упражнения в карточках недель ниже — для Арм-программы автосборка не применяется.'
+                : 'Соберите программу автоматически или загрузите из библиотеки — здесь появятся расписание недели и упражнения.'}
             </div>
-            <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44 }} onClick={() => autoFillDraft()}>
-              {isAutoFilling ? '⏳ Создание...' : '⚡ Создать автоматически'}
-            </button>
+            {dir !== 'arm' && (
+              <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44 }} onClick={() => autoFillDraft()}>
+                {isAutoFilling ? '⏳ Создание...' : '⚡ Создать автоматически'}
+              </button>
+            )}
           </div>
         );
       })()}
@@ -1370,24 +1378,27 @@ return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 850, color: '#00e68a' }}>🧭 Что дальше?</span>
             <span style={{ fontSize: 10, color: DIM, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.14)', borderRadius: 20, padding: '2px 7px' }}>1 клик до качества</span>
-            <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM }}>{program.bb?.weeks.length ?? 0} нед · {program.bb?.weeks[0]?.sessions.length ?? program.meta.daysPerWeek} дн</span>
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM }}>{(program.bb?.weeks ?? program.arm?.weeks ?? []).length} нед · {(program.bb?.weeks ?? program.arm?.weeks)?.[0]?.sessions.length ?? program.meta.daysPerWeek} дн</span>
           </div>
           {(() => {
             const titleOk = !!(program.meta.title && program.meta.title.trim().length >= 3);
-            const hasWeeks = (program.bb?.weeks.length ?? 0) > 0;
-            const hasEmptySession = !!(program.bb?.weeks.some(w => w.sessions.some(s => !(s.blocks??[]).some(b=> b.exerciseName?.trim()))));
-            const daysMismatch = !!(program.bb && program.bb.weeks[0] && program.bb.weeks[0].sessions.length !== program.meta.daysPerWeek);
+            const guideWeeks = program.bb?.weeks ?? program.arm?.weeks ?? [];
+            const hasWeeks = guideWeeks.length > 0;
+            const hasEmptySession = !!guideWeeks.some(w => w.sessions.some(s => !(s.blocks??[]).some(b=> b.exerciseName?.trim())));
+            const daysMismatch = !!(guideWeeks[0] && guideWeeks[0].sessions.length !== program.meta.daysPerWeek);
             let q: any = null;
-            try { q = computePlanQualityFor(program, program.meta.level, { onCourse: tprofile.onCourse ?? false, courseIntensity: tprofile.courseIntensity ?? 'moderate', labMult: labAdjust.mrvMultiplier }); } catch {}
+            if (dir === 'bb') {
+              try { q = computePlanQualityFor(program, program.meta.level, { onCourse: tprofile.onCourse ?? false, courseIntensity: tprofile.courseIntensity ?? 'moderate', labMult: labAdjust.mrvMultiplier }); } catch {}
+            }
             const lows = q?.perMuscle?.filter((m:any)=> m.status==='low') ?? [];
             const overs = q?.perMuscle?.filter((m:any)=> m.status==='over') ?? [];
-            const hasDeload = !!(program.bb?.weeks.some(w=> w.deload));
+            const hasDeload = !!guideWeeks.some(w=> w.deload);
             const needDeload = program.meta.weeks >= 6 && !hasDeload;
             let step: { icon:string; title:string; desc:string; btn:string; action:()=>void; color:string } | null = null;
             if (!titleOk) step = { icon: '✏️', title: 'Добавьте название', desc: 'Без названия Итог не будет качественным — 3+ символов.', color: '#ef4444', btn: 'К параметрам →', action: ()=>{ setEstep('params'); scrollEditorTop(); } };
             else if (!hasWeeks) step = { icon: '🗓', title: 'Создайте недели', desc: 'Добавьте недели и дни — каркас программы.', color: '#3b82f6', btn: 'К параметрам →', action: ()=>{ setEstep('params'); scrollEditorTop(); } };
             else if (hasEmptySession) step = { icon: '⚡', title: 'Заполните пустые тренировки', desc: 'Есть дни без упражнений — 1 клик по «Заполнить пустые» добавит базу под ваш зал.', color: '#f59e0b', btn: 'К упражнениям ↓', action: ()=> window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'}) };
-            else if (daysMismatch) step = { icon: '⚖️', title: 'Выровняйте дни', desc: `meta ${program.meta.daysPerWeek}д ↔ в неделе ${program.bb?.weeks[0]?.sessions.length}д — нажмите Выровнять.`, color: '#f59e0b', btn: 'Выровнять', action: ()=>{ try{ const ndays=program.meta.daysPerWeek; update({ bb: { ...program.bb!, weeks: program.bb!.weeks.map(w=> ({...w, sessions: w.sessions.slice(0, ndays)})) }}); showToast('⚖️ Дни выровнены'); }catch{} } };
+            else if (daysMismatch) step = { icon: '⚖️', title: 'Выровняйте дни', desc: `meta ${program.meta.daysPerWeek}д ↔ в неделе ${guideWeeks[0]?.sessions.length}д — нажмите Выровнять.`, color: '#f59e0b', btn: 'Выровнять', action: ()=>{ try{ const ndays=program.meta.daysPerWeek; if (dir === 'arm' && program.arm) { update({ arm: { ...program.arm, weeks: program.arm.weeks.map(w=> ({...w, sessions: w.sessions.slice(0, ndays)})) } }); } else { update({ bb: { ...program.bb!, weeks: program.bb!.weeks.map(w=> ({...w, sessions: w.sessions.slice(0, ndays)})) }}); } showToast('⚖️ Дни выровнены'); }catch{} } };
             else if (lows.length>0) step = { icon: '⬇️', title: `Недобор: ${lows.slice(0,2).map((l:any)=> GROUP_RU[l.muscle] ?? l.muscle).join(', ')}`, desc: `MEV не достигнут — добавим 1 сет для ${GROUP_RU[lows[0].muscle] ?? lows[0].muscle}. Score ${q?.score??'—'}/100.`, color: '#3b82f6', btn: '+ Добавить сет', action: ()=>{ try{
                   const mus = lows[0].muscle;
                   const prof = (()=>{ try{return loadTrainingProfile();}catch{return {} as any;}})();
@@ -1843,28 +1854,29 @@ return (
       )}
 
       {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression — pro-only, шаг «👤 Профиль» */}
-      {isPro && estep === 'profile' && dir === 'bb' && program.bb && (
+      {isPro && estep === 'profile' && (dir === 'bb' || dir === 'arm') && (program.bb || program.arm) && (
         <>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>⚙️ Ограничения и прогрессия</span>
           <span style={{ fontSize: 10, color: DIM }}>Оборудование, травмы и стратегия нагрузки</span>
         </div>
         <BBConstraintsPanel
-          constraints={program.bb.constraints ?? { equipment: [] }}
-          progression={program.bb.progression ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }}
-          onChangeConstraints={(constraints) => onChange({ ...program, bb: { ...program.bb!, constraints } })}
-          onChangeProgression={(progression) => onChange({ ...program, bb: { ...program.bb!, progression } })}
+           constraints={(dir === 'arm' ? program.arm!.constraints : program.bb!.constraints) ?? { equipment: [] }}
+           progression={(dir === 'arm' ? program.arm!.progression : program.bb!.progression) ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }}
+           onChangeConstraints={(constraints) => dir === 'arm' ? update({ arm: { ...program.arm!, constraints } }) : update({ bb: { ...program.bb!, constraints } })}
+           onChangeProgression={(progression) => dir === 'arm' ? update({ arm: { ...program.arm!, progression } }) : update({ bb: { ...program.bb!, progression } })}
         />
         </>
       )}
 
-      {estep === 'weeks' && !showTableView && (dir === 'bb' || dir === 'pl' || dir === 'hybrid') && (
+      {estep === 'weeks' && !showTableView && (dir === 'bb' || dir === 'pl' || dir === 'hybrid' || dir === 'arm') && (
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>✏️ Редактор недель и дней</span>
           <span style={{ fontSize: 10, color: DIM }}>Добавляйте дни, упражнения и настраивайте подходы</span>
         </div>
       )}
       {estep === 'weeks' && !showTableView && dir === 'bb' && program.bb && <BBEditor body={program.bb} level={program.meta.level} onChange={(bb) => update({ bb })} />}
+      {estep === 'weeks' && !showTableView && dir === 'arm' && program.arm && <ArmEditor body={program.arm} level={program.meta.level} onChange={(arm) => update({ arm })} />}
       {estep === 'weeks' && !showTableView && dir === 'pl' && program.pl && <PLEditor body={program.pl} onChange={(pl) => update({ pl })} />}
       {estep === 'weeks' && !showTableView && dir === 'hybrid' && program.hybrid && (
         <>

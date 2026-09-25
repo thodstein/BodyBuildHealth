@@ -3,7 +3,7 @@
  * F4.2: вынесено из manual-constructor.engine.ts.
  * Фаза 1 PRO: effective объём (direct + indirect 0.45/0.35/0.4), per-head дельты, session caps, недельный бюджет.
  */
-import type { UserProgram } from '../user-program/user-program.types';
+import type { UserProgram, UserWeek } from '../user-program/user-program.types';
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { analyzeManualVolume } from './manual-volume.engine';
 import { checkSessionCap, rirProfileCheck } from '../quality-score-v2.engine';
@@ -32,7 +32,9 @@ export function computePlanQualityFor(
   let sessionLimits = { weeklyWorkingSets: 0, maxWorkingSets: 0, maxExercises: 0 };
   let hasPro = false;
   try {
-    if (program.bb || program.hybrid?.bbWeeks) {
+    // ARM-программы считаем по тем же неделям, что и ББ: структура UserWeek одна,
+    // иначе quality/budget считались бы по пустым данным.
+    if (program.bb || program.arm || program.hybrid?.bbWeeks) {
       const ana = analyzeManualVolume(program, level, {
         onCourse: opts?.onCourse,
         courseIntensity: opts?.courseIntensity,
@@ -53,9 +55,10 @@ export function computePlanQualityFor(
   const weeklySetsByMuscle: Record<string, number[]> = {};
   for (const m of BASE_MUSCLES) weeklySetsByMuscle[m] = [];
 
-  // BB: peak week — fallback direct если PRO не посчитался
-  if (!hasPro && program.bb) {
-    for (const w of program.bb.weeks ?? []) {
+  // BB/ARM: peak week — fallback direct если PRO не посчитался
+  const directWeeks: UserWeek[] | undefined = program.bb?.weeks ?? program.arm?.weeks;
+  if (!hasPro && directWeeks) {
+    for (const w of directWeeks) {
       const weekSets: Record<string, number> = {};
       for (const s of w.sessions ?? []) {
         for (const b of s.blocks ?? []) {
@@ -119,7 +122,7 @@ export function computePlanQualityFor(
   const courseIntensity = opts?.courseIntensity ?? 'moderate';
   const labMult = opts?.labMult ?? 1;
   const division = opts?.division || (program.meta.direction === 'pl' ? 'pl' : program.meta.direction === 'bb' ? 'bb' : undefined);
-  const isPL = division === 'pl' || (!division && !!program.pl?.customWeeks && !program.bb);
+  const isPL = division === 'pl' || (!division && !!program.pl?.customWeeks && !program.bb && !program.arm);
 
   for (const [muscle, peak] of Object.entries(setsByMuscle)) {
     const lm = getVolumeLandmarks(level, muscle);

@@ -7,7 +7,7 @@ import { getAllPrograms } from '../../../../engines/complete-program-library.eng
 import { LMS_CYCLES } from '../../../../data/lms-cycles/lms-cycle-index';
 import type { UserProgram } from '../../../../engines/user-program/user-program.types';
 import { suggestExercisesForGroup } from '../../../../engines/manual-constructor';
-import { saveUserProgram, cloneFromLibrary } from '../../../../engines/user-program/program-store';
+import { saveUserProgram, cloneFromLibrary, createBlank } from '../../../../engines/user-program/program-store';
 import { ManualProgramWizard } from '../ManualProgramWizard';
 import { PLEditor } from '../ProgramEditorComponents';
 import { ConfirmDialogProvider } from '../ConfirmDialog';
@@ -40,6 +40,25 @@ describe('ManualExport ICS', () => {
     expect(ics).toContain('END:VCALENDAR');
     expect(ics.split('BEGIN:VEVENT').length - 1).toBe(2);
   });
+  it('генерирует ICS из ARM-недель', () => {
+    const prog = createBlank('arm');
+    prog.meta.title = 'ARM календарь';
+    prog.arm!.weeks = [{
+      week: 1,
+      phase: 'accumulation',
+      deload: false,
+      armMetadata: { planSnapshotId: 'arm-snapshot' },
+      sessions: [{
+        id: 'arm-s1', name: 'Table Heavy', focus: 'TableHeavy', dayOfWeek: 0,
+        blocks: [{ id: 'arm-b1', type: 'compound', exerciseName: 'Разгибание на бруске', muscle: 'triceps', role: 'primary', sets: [{ reps: 5, rir: 2, weight: 40 }] }],
+      }],
+    }];
+    const ics = buildProgramIcs(prog, '2026-01-05');
+    expect(ics).toContain('Table Heavy');
+    expect(ics).toContain('Разгибание на бруске');
+    expect(ics.split('BEGIN:VEVENT').length - 1).toBe(1);
+  });
+
   it('экранирует спецсимволы ICS', () => {
     const prog: UserProgram = {
       meta: { id: 'test2', title: 'Тест; с запятой, перенос\n', author: '', goal: 'hypertrophy', level: 'beginner', daysPerWeek: 2, weeks: 2, direction: 'bb', createdAt: '', updatedAt: '', source: 'custom' },

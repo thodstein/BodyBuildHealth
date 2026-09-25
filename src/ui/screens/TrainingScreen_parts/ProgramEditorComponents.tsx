@@ -12,7 +12,7 @@ import { ACCENT, ACCENT_LINE, BTN, BTN_GHOST, CARD, DIM, DIM_STRONG, IN, SMALL, 
 import { useConfirmDialog } from './ConfirmDialog';
 import { createBlank, getReferencedCycle, userWeekToBBPlan } from '../../../engines/user-program/program-store';
 import type {
-  UserProgram, BBProgramBody, PLProgramBody, UserWeek, UserSession, UserBlock, UserSet,
+  UserProgram, BBProgramBody, ArmProgramBody, PLProgramBody, UserWeek, UserSession, UserBlock, UserSet,
   ProgramConstraints, ProgramProgression, LoadStrategy, DeloadProtocol,
   PLWeek, PLDay, PLExercise, PLSet,
 } from '../../../engines/user-program/user-program.types';
@@ -1806,6 +1806,14 @@ const PLSetEditor: React.FC<{ sets: PLSet[]; lift: PLExercise['lift']; workMax: 
   );
 };
 
+const ArmEditor: React.FC<{ body: ArmProgramBody; onChange: (b: ArmProgramBody) => void; level: string }> = ({ body, onChange, level }) => (
+  <BBEditor
+    body={body as unknown as BBProgramBody}
+    level={level}
+    onChange={(next) => onChange({ ...next, direction: 'arm' } as ArmProgramBody)}
+  />
+);
+
 const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => void }> = ({ body, onChange }) => {
   const { confirm } = useConfirmDialog();
   const bodyRef = React.useRef(body);
@@ -2380,4 +2388,4 @@ const BBConstraintsPanel: React.FC<{
   );
 };
 
-export { BBEditor, SessionList, BlockList, SetEditor, PLEditor, WeakPointChips, BBConstraintsPanel };
+export { BBEditor, ArmEditor, SessionList, BlockList, SetEditor, PLEditor, WeakPointChips, BBConstraintsPanel };

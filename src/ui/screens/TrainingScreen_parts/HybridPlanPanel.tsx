@@ -39,7 +39,12 @@ export const HybridPlanPanel: React.FC<{
   const [weeks, setWeeks] = useState<number>(initial?.weeksOverride || plCycles[0]?.meta.weeks || 8);
   const [level, setLevel] = useState(initial?.level || program.meta.level || 'intermediate');
   const [built, setBuilt] = useState<HybridPlan | null>(null);
+  const [sourceConsent, setSourceConsent] = useState(false);
+  const [buildError, setBuildError] = useState('');
   const [notes, setNotes] = useState(initial?.notes || '');
+  const sourceCycle = useMemo(() => plCycles.find(c => c.meta.id === cycleId), [plCycles, cycleId]);
+  const sourceWeeks = sourceCycle?.meta.weeks ?? weeks;
+  const sourceLengthChanged = sourceCycle ? weeks !== sourceWeeks : false;
 
   // При изменении props (program) — синхронизируем с локальным state (только если external changed)
   useEffect(() => {
@@ -50,11 +55,22 @@ export const HybridPlanPanel: React.FC<{
       setDead(initial.workMax?.deadlift || 140);
       setWeeks(initial.weeksOverride || plCycles[0]?.meta.weeks || 8);
       setLevel(initial.level || program.meta.level || 'intermediate');
+      setSourceConsent(false);
+      setBuilt(null);
+      setBuildError('');
       setNotes(initial.notes || '');
     }
   }, [program.meta.id]);
 
-  const build = () => setBuilt(buildHybridPlan({ cycleId, pmMap: { squat, bench, dead }, weeks, level, equipment: ['barbell', 'dumbbell', 'cable', 'machine'] }));
+  const build = () => {
+    try {
+      setBuilt(buildHybridPlan({ cycleId, pmMap: { squat, bench, dead }, weeks, sourceChangeConsent: sourceConsent, level, equipment: ['barbell', 'dumbbell', 'cable', 'machine'] }));
+      setBuildError('');
+    } catch (err) {
+      setBuilt(null);
+      setBuildError(err instanceof Error ? err.message : 'Не удалось собрать hybrid-план');
+    }
+  };
 
   // Применить собранный план к program.hybrid
   const apply = () => {
@@ -108,7 +124,14 @@ export const HybridPlanPanel: React.FC<{
           <EditorPopupSelect
             value={cycleId}
             options={plCycles.map(c => ({ id: c.meta.id, label: `${c.meta.title} · ${c.meta.sessionsPerWeek}д/нед · ${c.meta.weeks}нед · ${c.meta.level}` }))}
-            onChange={v => { setCycleId(v); const c = LMS_CYCLES.find(x => x.meta.id === v); if (c) setWeeks(c.meta.weeks); }}
+            onChange={v => {
+              setCycleId(v);
+              setSourceConsent(false);
+              setBuilt(null);
+              setBuildError('');
+              const c = LMS_CYCLES.find(x => x.meta.id === v);
+              if (c) setWeeks(c.meta.weeks);
+            }}
             ariaLabel="ПЛ-цикл (источник силы)"
             title="ПЛ-цикл (источник силы)"
           />
@@ -119,7 +142,7 @@ export const HybridPlanPanel: React.FC<{
           ))}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>Недель<input type="number" style={IN} value={weeks} min={1} max={16} onChange={e => setWeeks(parseInt(e.target.value) || 1)} /></label>
+          <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>Недель<input type="number" style={IN} value={weeks} min={1} max={16} onChange={e => { setWeeks(parseInt(e.target.value) || 1); setSourceConsent(false); setBuilt(null); setBuildError(''); }} /></label>
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>Уровень
           <EditorPopupSelect
             value={level}
@@ -133,6 +156,13 @@ export const HybridPlanPanel: React.FC<{
           />
         </label>
         </div>
+        {sourceLengthChanged && (
+          <div role="status" style={{ ...SMALL, padding: 8, border: '1px solid rgba(245,158,11,0.45)', borderRadius: 8, color: '#fff' }}>
+            Длина исходного цикла изменится: {sourceWeeks} → {weeks} нед. Оригинал останется неизменным.
+            {sourceConsent ? ' ✅ Согласие получено.' : ` <button type="button" style={{ ...BTN, marginTop: 6, width: '100%' }} onClick={() => setSourceConsent(true)}>Разрешить изменение длины</button>`}
+          </div>
+        )}
+        {buildError && <div role="alert" style={{ ...SMALL, color: '#fff', border: '1px solid rgba(239,68,68,0.5)', borderRadius: 8, padding: 8 }}>{buildError}</div>}
         <div style={{ display: 'flex', gap: 6 }}>
           <button style={{ ...BTN, flex: 1 }} onClick={build}>🔧 Собрать powerbuilder-план</button>
           {built && <button style={{ ...BTN, flex: 1, background: '#3b82f6' }} onClick={apply}>💾 Применить к программе</button>}

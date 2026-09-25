@@ -28,7 +28,7 @@ import {
   cloneFromLibrary, cloneFromCycle, createBlank, userWeekToBBPlan, validateProgram, getProgramBlockingIssue, isUserProgramShape,
 } from '../../../engines/user-program/program-store';
 import type {
-  UserProgram, BBProgramBody, PLProgramBody, UserWeek, UserSession, UserBlock, UserSet,
+  UserProgram, BBProgramBody, ArmProgramBody, PLProgramBody, UserWeek, UserSession, UserBlock, UserSet,
   ProgramConstraints, ProgramProgression,
 } from '../../../engines/user-program/user-program.types';
 import { newId } from '../../../engines/user-program/user-program.types';
@@ -281,7 +281,7 @@ export const ProgramManagerPanel: React.FC = () => {
 
   // P2.6: поиск/сортировка/фильтр
   const [search, setSearch] = useState('');
-  const [filterDir, setFilterDir] = useState<'all' | 'bb' | 'pl' | 'hybrid'>('all');
+  const [filterDir, setFilterDir] = useState<'all' | 'bb' | 'pl' | 'hybrid' | 'arm'>('all');
   const [sortBy, setSortBy] = useState<'updated' | 'title' | 'days'>('updated');
   // P2-5: сравнение двух программ
   const [compareIds, setCompareIds] = useState<string[]>([]);
@@ -329,12 +329,28 @@ export const ProgramManagerPanel: React.FC = () => {
       sessions: sessions.map(s => ({ ...s, id: newId('ses') })),
     }));
   };
-  const startCreate = (dir: 'bb' | 'pl' | 'hybrid') => {
+  const buildArmSkeleton = (days: number, weeks: number): UserWeek[] => {
+    const tags = ['TableHeavy', 'GripHeavy', 'Support', 'Technique', 'Strength'];
+    return Array.from({ length: weeks }, (_, wi) => ({
+      week: wi + 1,
+      phase: 'accumulation' as const,
+      deload: false,
+      sessions: Array.from({ length: days }, (_, si) => ({
+        id: newId('ses'),
+        name: `Арм День ${si + 1}`,
+        focus: tags[si % tags.length],
+        dayOfWeek: [0, 2, 4, 1, 3][si % 5],
+        blocks: [],
+      })),
+    }));
+  };
+
+  const startCreate = (dir: 'bb' | 'pl' | 'hybrid' | 'arm') => {
     // Быстрые CTA и визард используют один auto-fill путь. Это не даёт
     // стандартному режиму терять trainingFocus и recovery-метрики профиля.
     const p = createBlank(dir);
-    p.meta.title = dir === 'bb' ? 'Новая ББ-программа' : dir === 'pl' ? 'Новая ПЛ-программа' : 'Новый Powerbuilder-план';
-    p.meta.goal = dir === 'pl' ? 'pl_strength' : dir === 'hybrid' ? 'strength_mass' : 'hypertrophy';
+    p.meta.title = dir === 'bb' ? 'Новая ББ-программа' : dir === 'pl' ? 'Новая ПЛ-программа' : dir === 'arm' ? 'Новая Арм-программа' : 'Новый Powerbuilder-план';
+    p.meta.goal = dir === 'pl' ? 'pl_strength' : dir === 'hybrid' ? 'strength_mass' : dir === 'arm' ? 'strength' : 'hypertrophy';
     p.meta.level = 'intermediate';
     p.meta.daysPerWeek = 4;
     p.meta.weeks = 8;
@@ -344,7 +360,14 @@ export const ProgramManagerPanel: React.FC = () => {
       const focusFromProfile = prof.trainingFocus;
       p.meta.trainingFocus = focusFromProfile || (p.meta.goal === 'strength_mass' ? 'strength' : 'hypertrophy');
     }
-    if (dir === 'bb' && p.bb) {
+    if (dir === 'arm' && p.arm) {
+      p.arm.weeks = buildArmSkeleton(p.meta.daysPerWeek, p.meta.weeks);
+      p.arm.microcycleTemplate = {
+        daySlots: p.arm.weeks[0]?.sessions.map((session, index) => ({ day: index + 1, label: session.name, muscles: [] })) ?? [],
+      };
+      setPendingAutoFill(false);
+      flash('🆕 Новая ARM-программа: недели и дни созданы, заполните упражнения');
+    } else if (dir === 'bb' && p.bb) {
       // P0-2: стартуем со структурой сплита, авто-сборка не перетирает заготовку
       p.bb.weeks = buildBBSkeleton(p.meta.daysPerWeek, p.meta.weeks);
       setPendingAutoFill(false);
@@ -357,12 +380,18 @@ export const ProgramManagerPanel: React.FC = () => {
   };
   const finishWizard = (autoFill = false) => {
     const p = createBlank(wizardDir);
-    p.meta.title = wizardDir === 'bb' ? 'Моя ББ-программа' : wizardDir === 'pl' ? 'Моя ПЛ-программа' : 'Мой Powerbuilder-план';
-    p.meta.goal = wizardDir === 'pl' ? (wizardGoal || 'pl_strength') : wizardGoal;
+    p.meta.title = wizardDir === 'bb' ? 'Моя ББ-программа' : wizardDir === 'pl' ? 'Моя ПЛ-программа' : wizardDir === 'arm' ? 'Моя Арм-программа' : 'Мой Powerbuilder-план';
+    p.meta.goal = wizardDir === 'pl' ? (wizardGoal || 'pl_strength') : wizardDir === 'arm' ? (wizardGoal || 'strength') : wizardGoal;
     p.meta.level = wizardLevel;
     p.meta.daysPerWeek = wizardDays;
     p.meta.weeks = wizardWeeks;
     // Быстрый скелет без авто-сборки: заполняем структуру по выбранным дням/неделям, чтобы не было рассинхрона meta ↔ weeks
+    if (wizardDir === 'arm' && p.arm) {
+      p.arm.weeks = buildArmSkeleton(wizardDays, wizardWeeks);
+      p.arm.microcycleTemplate = {
+        daySlots: p.arm.weeks[0]?.sessions.map((session, index) => ({ day: index + 1, label: session.name, muscles: [] })) ?? [],
+      };
+    }
     if (!autoFill) {
       if (wizardDir === 'bb' && p.bb) {
         p.bb.weeks = buildBBSkeleton(wizardDays, wizardWeeks);
@@ -394,7 +423,7 @@ export const ProgramManagerPanel: React.FC = () => {
       }
     }
     setWizardOpen(false);
-    setPendingAutoFill(autoFill);
+    setPendingAutoFill(autoFill && wizardDir !== 'arm');
     setEditing(p);
   };
   const setWizardDirection = (direction: WizardDirection, defaultGoal: string) => { setWizardDir(direction); setWizardGoal(defaultGoal); };
@@ -427,7 +456,20 @@ export const ProgramManagerPanel: React.FC = () => {
       lines.push(`ПЛ-цикл: ${p.pl.sourceCycleId}`);
       lines.push(`Сессии: ${p.pl.schedule.length}, рабочие ПМ: ${JSON.stringify(p.pl.workMax)}`);
       if (p.pl.notes) lines.push(`\nЗаметки: ${p.pl.notes}`);
-    } else if (p.hybrid) {
+     } else if (p.arm) {
+       lines.push(`ARM: ${p.arm.weeks.length} нед · ${p.arm.weeks[0]?.sessions.length ?? 0} дн/нед`);
+       for (const w of p.arm.weeks) {
+         lines.push(`\n## Неделя ${w.week} (${w.phase}${w.deload ? ', делод' : ''})`);
+         if (w.note) lines.push(`  > Заметка недели: ${w.note}`);
+         for (const s of w.sessions) {
+           lines.push(`\n### ${s.name}${s.focus ? ` (${s.focus})` : ''}`);
+           for (const b of s.blocks) {
+             const setsStr = b.sets.map(set => `${set.reps}×${set.weight ? ` @${set.weight}кг` : ''}`).join(', ');
+             lines.push(`  - ${b.exerciseName} (${GROUP_RU[b.muscle] || b.muscle}) — ${setsStr} RIR${b.sets[0]?.rir ?? '-'}`);
+           }
+         }
+       }
+     } else if (p.hybrid) {
       lines.push('Hybrid: ПЛ + ББ');
       lines.push(`ПЛ-цикл: ${p.hybrid.plRef?.sourceCycleId || 'не выбран'}`);
       lines.push(`ББ-недель: ${p.hybrid.bbWeeks?.length ?? 0}`);
@@ -600,7 +642,9 @@ export const ProgramManagerPanel: React.FC = () => {
       ? p.bb.weeks.reduce((s, w) => s + w.sessions.reduce((ss, sess) => ss + sess.blocks.length, 0), 0)
       : dir === 'pl' && p.pl
         ? p.pl.schedule.length
-        : (p.hybrid?.bbWeeks ?? []).reduce((s, w) => s + (w.sessions ?? []).reduce((ss, sess) => ss + (sess.blocks ?? []).length, 0), 0);
+        : dir === 'arm' && p.arm
+         ? p.arm.weeks.reduce((s, w) => s + w.sessions.reduce((ss, sess) => ss + sess.blocks.length, 0), 0)
+         : (p.hybrid?.bbWeeks ?? []).reduce((s, w) => s + (w.sessions ?? []).reduce((ss, sess) => ss + (sess.blocks ?? []).length, 0), 0);
     const overMrv = (bbMetrics?.perMuscle ?? []).filter(m => m.status === 'exceeding_mrv').length;
     const belowMev = (bbMetrics?.perMuscle ?? []).filter(m => m.status === 'below_mev').length;
     return (
@@ -750,7 +794,7 @@ export const ProgramManagerPanel: React.FC = () => {
               <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>⏰ Час <input type="number" value={icsHour} min={6} max={22} onChange={e=> setIcsHour(Math.max(6,Math.min(22,Number(e.target.value)||9)))} style={{ width: 50, padding: '4px 6px', fontSize: 11, minHeight: 32, borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.25)', color: '#fff' }} /></label>
               <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>⏱ Мин <input type="number" value={icsDur} min={30} max={180} step={15} onChange={e=> setIcsDur(Math.max(30,Math.min(180,Number(e.target.value)||75)))} style={{ width: 60, padding: '4px 6px', fontSize: 11, minHeight: 32, borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.25)', color: '#fff' }} /></label>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
               <button aria-label="📋 В буфер" style={{ ...CARD_BTN, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4 }} onClick={() => copyProgramToClipboard(p)}><span aria-hidden style={{ fontSize: 16 }}>📋</span><span aria-hidden style={{ fontSize: 11, fontWeight: 700 }}>В буфер</span><span aria-hidden style={{ fontSize: 9, color: DIM }}>текст</span><span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)' }}>📋 В буфер</span></button>
               <button style={{ ...CARD_BTN, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4 }} onClick={() => { const json = JSON.stringify(p, null, 2); const blob = new Blob([json], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = (p.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.json'; a.click(); URL.revokeObjectURL(url); flash('📤 Экспортировано'); }}><span style={{ fontSize: 16 }}>📄</span><span style={{ fontSize: 11, fontWeight: 700 }}>JSON</span><span style={{ fontSize: 9, color: DIM }}>файл</span></button>
               <button style={{ ...CARD_BTN, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4 }} onClick={() => { try { const ics = buildProgramIcs(p, undefined, { startHour: icsHour, durationMin: icsDur }); downloadIcs((p.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); flash('📅 ICS скачан'); } catch { flash('⚠ Не удалось собрать ICS'); } }}><span style={{ fontSize: 16 }}>📅</span><span style={{ fontSize: 11, fontWeight: 700 }}>ICS</span><span style={{ fontSize: 9, color: DIM }}>календарь</span></button>
@@ -947,11 +991,16 @@ export const ProgramManagerPanel: React.FC = () => {
               <span style={{ fontSize: 12, fontWeight: 800 }}>ПЛ</span>
               <span style={{ fontSize: 9, color: 'rgba(90,40,160,0.75)', fontWeight: 600 }}>сила · пик</span>
             </button>
-            <button style={{ ...BTN, minHeight: 64, flexDirection: 'column', gap: 3, padding: '10px 6px', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.35)', background: 'linear-gradient(180deg, rgba(59,130,246,0.14), rgba(59,130,246,0.06))' }} onClick={() => startCreate('hybrid')}>
-              <span style={{ fontSize: 18 }}>⚡</span>
-              <span style={{ fontSize: 12, fontWeight: 800 }}>Гибрид</span>
-              <span style={{ fontSize: 9, color: 'rgba(30,60,140,0.75)', fontWeight: 600 }}>сила+масса</span>
-            </button>
+             <button style={{ ...BTN, minHeight: 64, flexDirection: 'column', gap: 3, padding: '10px 6px', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.35)', background: 'linear-gradient(180deg, rgba(59,130,246,0.14), rgba(59,130,246,0.06))' }} onClick={() => startCreate('hybrid')}>
+               <span style={{ fontSize: 18 }}>⚡</span>
+               <span style={{ fontSize: 12, fontWeight: 800 }}>Гибрид</span>
+               <span style={{ fontSize: 9, color: 'rgba(30,60,140,0.75)', fontWeight: 600 }}>сила+масса</span>
+             </button>
+             <button style={{ ...BTN, minHeight: 64, flexDirection: 'column', gap: 3, padding: '10px 6px', color: '#f59e0b', borderColor: 'rgba(245,158,11,0.35)', background: 'linear-gradient(180deg, rgba(245,158,11,0.14), rgba(245,158,11,0.06))' }} onClick={() => startCreate('arm')}>
+               <span style={{ fontSize: 18 }}>💪</span>
+               <span style={{ fontSize: 12, fontWeight: 800 }}>Арм</span>
+               <span style={{ fontSize: 9, color: 'rgba(120,75,10,0.85)', fontWeight: 600 }}>схват · стол</span>
+             </button>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button style={{ flex:1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(167,139,250,0.28)', color: '#a78bfa', fontWeight: 700, fontSize: 11, minHeight: 38 }} onClick={() => { setWizardOpen(true); setWizardStep(1); }}><span style={{ fontSize: 13 }}>🪄</span> Визард — 30 сек <span style={{ fontSize: 10, color: 'rgba(167,139,250,0.60)', fontWeight: 400 }}>по цели/уровню</span></button>
@@ -1091,7 +1140,8 @@ export const ProgramManagerPanel: React.FC = () => {
         <div style={{ display: 'flex', gap: 6 }}>
           <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => startCreate('bb')}>🆕 ББ</button>
           <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => startCreate('pl')}>🆕 ПЛ</button>
-          <button style={{ ...BTN, flex: 1, minHeight: 44, color: '#3b82f6', borderColor: 'rgba(59,130,246,0.3)' }} onClick={() => startCreate('hybrid')}>⚡ Powerbuilder</button>
+           <button style={{ ...BTN, flex: 1, minHeight: 44, color: '#3b82f6', borderColor: 'rgba(59,130,246,0.3)' }} onClick={() => startCreate('hybrid')}>⚡ Powerbuilder</button>
+           <button style={{ ...BTN, flex: 1, minHeight: 44, color: '#f59e0b', borderColor: 'rgba(245,158,11,0.3)' }} onClick={() => startCreate('arm')}>💪 ARM</button>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => setPickerOpen('bb')}>🔍 Библиотека</button>
@@ -1158,10 +1208,11 @@ export const ProgramManagerPanel: React.FC = () => {
           <EditorPopupSelect
             value={filterDir}
             options={[
-              { id: 'all', label: 'Все' }, { id: 'bb', label: 'ББ' },
-              { id: 'pl', label: 'ПЛ' }, { id: 'hybrid', label: '⚡ Powerbuilder' },
+               { id: 'all', label: 'Все' }, { id: 'bb', label: 'ББ' },
+               { id: 'pl', label: 'ПЛ' }, { id: 'hybrid', label: '⚡ Powerbuilder' },
+               { id: 'arm', label: '💪 ARM' },
             ]}
-            onChange={v => setFilterDir(v as 'all' | 'bb' | 'pl' | 'hybrid')}
+            onChange={v => setFilterDir(v as 'all' | 'bb' | 'pl' | 'hybrid' | 'arm')}
             ariaLabel="Фильтр по типу"
             title="Фильтр по типу программы"
             buttonStyle={{ flex: 1, minWidth: 70 }}
@@ -1208,7 +1259,7 @@ export const ProgramManagerPanel: React.FC = () => {
           return (
             <div key={p.meta.id} className="manual-prog-row" data-dir={p.meta.direction} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 8, borderRadius: 14, background: `linear-gradient(135deg, ${dc}14, rgba(24,24,27,0.6))`, border: `1px solid ${dc}30`, boxShadow: '0 2px 10px rgba(0,0,0,0.15)' }}>
               <div className="manual-prog-ico" style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, background: dc + '1a', border: '1px solid ' + dc + '45', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>
-                {p.meta.direction === 'bb' ? '💪' : p.meta.direction === 'pl' ? '🏆' : '⚡'}
+                 {p.meta.direction === 'bb' ? '💪' : p.meta.direction === 'pl' ? '🏆' : p.meta.direction === 'arm' ? '🦾' : '⚡'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{p.meta.title}</div>{(() => { try { const q=computePlanQualityFor(p, p.meta.level); const col=q.score>=75?'#22c55e':q.score>=50?'#f59e0b':'#ef4444'; return <span style={{ fontSize: 10, fontWeight: 800, color: col, background: col+'14', border:`1px solid ${col}30`, borderRadius: 20, padding:'2px 6px', whiteSpace:'nowrap' }}>{q.score} {q.grade}</span>; } catch { return null; }})()}</div>

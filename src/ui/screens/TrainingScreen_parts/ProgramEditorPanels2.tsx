@@ -24,7 +24,8 @@ interface RirWaveChartProps {
 }
 
 export const RirWaveChart: React.FC<RirWaveChartProps> = ({ program }) => {
-  if (program.meta.weeks < 4) return null;
+  const weeks = program.bb?.weeks ?? program.arm?.weeks ?? program.hybrid?.bbWeeks;
+  if (program.meta.weeks < 4 || !weeks?.length) return null;
   const chartW = 280, chartH = 56;
   const N = Math.min(program.meta.weeks, 12);
   const goalMap: Record<string, 'mass' | 'strength' | 'cut' | 'endurance'> = {
@@ -45,12 +46,12 @@ export const RirWaveChart: React.FC<RirWaveChartProps> = ({ program }) => {
     else if (goalKey === 'mass') rir = (w % 8 === 6 || w % 8 === 7) ? 4 : 2;
     else if (goalKey === 'cut') rir = 3;
     else rir = 2;
-    if (program.bb?.weeks?.[w]?.deload) rir = 4;
+    if (weeks?.[w]?.deload) rir = 4;
     expectedWave.push(rir);
   }
   const realWave: number[] = [];
   for (let w = 0; w < N; w++) {
-    const week = program.bb?.weeks?.[w];
+    const week = weeks?.[w];
     if (!week) { realWave.push(-1); continue; }
     const allRirs: number[] = (week.sessions ?? [])
       .flatMap(s => (s.blocks ?? []).flatMap(b => (b.sets ?? []).map(st => typeof st.rir === 'number' ? st.rir : 2)));

@@ -7,7 +7,7 @@ import { loadTrainingProfile } from './training-profile';
 import { computePlanQualityFor } from '../../../engines/manual-constructor';
 import { ProgressBar, InfoBanner } from './ManualUI';
 
-export type WizardDirection = 'bb' | 'pl' | 'hybrid';
+export type WizardDirection = 'bb' | 'pl' | 'hybrid' | 'arm';
 /** Единый конструктор: визард сжат с 5 до 3 шагов без потери контроля
  *  (Тип+Цель → Формат → Превью). Старые значения 4|5 мапятся на 3 для совместимости. */
 export type WizardStep = 1 | 2 | 3 | 4 | 5;
@@ -16,6 +16,7 @@ const DIRECTIONS: Array<[WizardDirection, string, string]> = [
   ['bb', '💪 Бодибилдинг', 'hypertrophy'],
   ['pl', '🏋 Пауэрлифтинг', 'powerlifting'],
   ['hybrid', '⚡ Powerbuilder', 'powerbuilding'],
+  ['arm', '💪 Арм-программа', 'strength'],
 ];
 
 const LEVELS = [
@@ -66,6 +67,9 @@ export const ManualProgramWizard: React.FC<Props> = ({
         const totalEx = prog.bb?.weeks.reduce((s, w) => s + w.sessions.reduce((ss, se) => ss + se.blocks.length, 0), 0) ?? 0;
         const perMuscle = quality?.perMuscle.slice(0, 6) ?? [];
         return { kind: 'bb' as const, prog, quality, w1, totalEx, perMuscle };
+      }
+      if (direction === 'arm') {
+        return { kind: 'arm' as const, info: `${days} дн/нед × ${weeks} нед · уровень ${level}` };
       }
       if (direction === 'pl') {
         // PL preview: show selected cycle info would be here; simplified
@@ -130,7 +134,7 @@ export const ManualProgramWizard: React.FC<Props> = ({
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Недель<input type="number" style={IN} min={4} max={24} value={weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) onWeeks(Math.max(4, Math.min(24, Math.round(v)))); }} aria-label="Недель в программе" inputMode="numeric" /></label>
         </div>
         <div className="constructor-surface constructor-surface--tinted manual-wiz-summary" style={{ ...CARD, padding: 8, background: 'rgba(167,139,250,0.06)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <div style={{ fontSize: 11, color: '#fff' }}>📋 <b>{direction === 'bb' ? 'Бодибилдинг' : direction === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b> · {goal} · {level} · {days}д × {weeks} нед</div>
+           <div style={{ fontSize: 11, color: '#fff' }}>📋 <b>{direction === 'bb' ? 'Бодибилдинг' : direction === 'pl' ? 'Пауэрлифтинг' : direction === 'arm' ? 'Арм' : 'Powerbuilder'}</b> · {goal} · {level} · {days}д × {weeks} нед</div>
           <div style={{ fontSize: 10, color: DIM, lineHeight: 1.45 }}>{pro ? 'Далее — превью качественной программы (неделя-1 + балл качества).' : '💡 Рекомендуем «⚡ Создать и заполнить» — качественная программа в 1 клик.'}</div>
         </div>
       </div>}
@@ -169,7 +173,12 @@ export const ManualProgramWizard: React.FC<Props> = ({
                 <div style={{ fontSize: 10, color: DIM }}>На основе профиля: уровень {level}, оборудование и слабые группы учтены. Веса по workMax.</div>
               </div>
             </>
-          ) : (preview as any).kind === 'pl' ? (
+           ) : (preview as any).kind === 'arm' ? (
+             <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b' }}>
+               <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>💪 Арм · {(preview as any).info}</div>
+               <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Создаётся редактируемый ARM-каркас с неделями, сессиями и armMetadata. После создания можно перенести готовый годовой ARM-блок.</div>
+             </div>
+           ) : (preview as any).kind === 'pl' ? (
             <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>🏆 ПЛ · {(preview as any).info}</div>
               <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>В превью: будет подобран LMS-цикл под уровень/дни + ваш оверлей (ПМ, заметки). Процентки цикла immutable.</div>
