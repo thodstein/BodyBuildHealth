@@ -1265,7 +1265,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       // Faithful: сохраняем оригинальный порядок программы (не переупорядочиваем).
       // Adapt: tidy с sessionTag → orderSessionExercises ставит lead-muscle compound первым.
       if (mode !== 'faithful') {
-        const _tidy = tidySessionExercises(exercises, input.methodology, sessionTag);
+        const _tidy = tidySessionExercises(exercises, undefined, sessionTag, undefined, input.methodology);
         exercises.length = 0; exercises.push(..._tidy);
       }
       const session: BBSession = {
@@ -2317,7 +2317,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       // Sort: primary first, then compound → isolation → pump finisher; faithful: respect original order
       // Adapt: tidy с sessionTag → orderSessionExercises ставит lead-muscle compound первым.
       if (mode !== 'faithful') {
-        const _tidy = tidySessionExercises(exercises, opts.methodology, sessionTag);
+        const _tidy = tidySessionExercises(exercises, undefined, sessionTag, undefined, opts.methodology);
         exercises.length = 0; exercises.push(..._tidy);
       }
 

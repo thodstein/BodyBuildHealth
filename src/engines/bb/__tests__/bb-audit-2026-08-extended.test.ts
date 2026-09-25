@@ -13,6 +13,8 @@
  *  P2-9: post_exhaust = compound_first (нет различия в порядке)
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   tidySessionExercises,
   orderSessionExercises,
@@ -25,6 +27,8 @@ import { rankBBSplits } from '../bb-selector.engine';
 import { finalizeBBPlan } from '../bb-finalize.engine';
 import { makeInput, expectValidPlan } from './bb-test-helpers';
 import type { BBExercise, BBPlan } from '../bb-builder.engine';
+
+const CYCLE_TO_PLAN_SOURCE = readFileSync(resolve(__dirname, '..', 'cycle-to-plan.ts'), 'utf8');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -152,6 +156,11 @@ describe('P0-1: tidySessionExercises — methodology пробрасываетс�
     // Compound_first: жим (compound) должен быть первым
     const isCompoundFirst = /жим|press|bench/i.test(firstEx.name) && !/развод|fly|мах|raise/i.test(firstEx.name);
     expect(isCompoundFirst).toBe(true);
+  });
+
+  it('cycle/program converters передают methodology пятым positional-аргументом', () => {
+    expect(CYCLE_TO_PLAN_SOURCE).toContain('tidySessionExercises(exercises, undefined, sessionTag, undefined, input.methodology)');
+    expect(CYCLE_TO_PLAN_SOURCE).toContain('tidySessionExercises(exercises, undefined, sessionTag, undefined, opts.methodology)');
   });
 });
 
