@@ -20,14 +20,24 @@ export interface DerivedSyncPlans {
   threeDayPlan: any;
   weekPlan: any;
   selectedDayIndex: number;
-  weekEditDay: number | null;
+  weekEditDay?: number | null;
   mealPrepDays: 1 | 3 | 7;
   generated: boolean;
 }
 
 /** Видимые планы — та же логика выбора, что в F-ветках replaceMealWithRecipe. */
-export function selectVisiblePlans(p: Pick<DerivedSyncPlans, 'planDays' | 'dayPlan' | 'threeDayPlan' | 'weekPlan' | 'selectedDayIndex'>): any[] {
-  if (p.planDays >= 7 && (p.weekPlan as any)?.days?.length) return (p.weekPlan as any).days;
+export function selectVisiblePlans(p: Pick<DerivedSyncPlans, 'planDays' | 'dayPlan' | 'threeDayPlan' | 'weekPlan' | 'selectedDayIndex' | 'weekEditDay'>): any[] {
+  if (p.planDays >= 7 && (p.weekPlan as any)?.days?.length) {
+    // P0-синк: в режиме недели пользователь может открыть конкретный день на правку
+    // (weekEditDay) — тогда ВИДИМЫЙ день лежит в dayPlan, а не в weekPlan.days.
+    // Раньше закупки/готовка считались по сырому weekPlan и молча игнорировали
+    // правки открытого дня (устаревшая корзина при верном плане на экране).
+    const wk: number | null = p.weekEditDay ?? null;
+    if (wk !== null && p.dayPlan && wk >= 0 && wk < (p.weekPlan as any).days.length) {
+      return (p.weekPlan as any).days.map((d: any, i: number) => (i === wk ? p.dayPlan : d));
+    }
+    return (p.weekPlan as any).days;
+  }
   if (p.planDays >= 3 && (p.threeDayPlan as any)?.days?.length) {
     return (p.threeDayPlan as any).days.map((d: any, i: number) =>
       i === p.selectedDayIndex && p.dayPlan ? p.dayPlan : d,
@@ -37,12 +47,18 @@ export function selectVisiblePlans(p: Pick<DerivedSyncPlans, 'planDays' | 'dayPl
   return [];
 }
 
-function plansSignature(plans: any[]): string {
+function recipeSignature(data: any): string {
+  if (!data || typeof data !== 'object') return '';
+  return `${data.name || ''}|${data.ingredientIds || ''}|${data.portionScale ?? data.appliedScale ?? 1}`;
+}
+
+export function plansSignature(plans: any[]): string {
   try {
     return plans.map(dp =>
-      (dp?.meals || []).map((m: any) =>
-        `${m.label}:${(m.items || []).map((it: any) => `${it.id}x${it.amount}`).join(',')}`,
-      ).join('|'),
+      (dp?.meals || []).map((m: any) => {
+        const recipeMeta = `${m.recipeApplied || ''}#${recipeSignature(m.recipeAppliedData)}#${m.recipeApplied2 || ''}#${recipeSignature(m.recipeAppliedData2)}`;
+        return `${m.label || ''}@${recipeMeta}:${(m.items || []).map((it: any) => `${it.id}x${it.amount}`).join(',')}`;
+      }).join('|'),
     ).join('~');
   } catch {
     return '';
@@ -75,41 +91,35 @@ export function usePlannerDerivedSync(plans: DerivedSyncPlans, actions: DerivedS
   const sig = plans.generated ? plansSignature(visible) : '';
 
   useEffect(() => {
-    if (!plans.generated || sig === '' || sig === lastSig.current) return;
+    const prepChanged = lastPrepDays.current !== plans.mealPrepDays;
+    if (!plans.generated || (sig === '' && !prepChanged) || (sig === lastSig.current && !prepChanged)) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       try {
+        const a = acts.current;
         if (sig !== lastSig.current) {
           lastSig.current = sig;
-          const a = acts.current;
           const vplans = selectVisiblePlans(plans);
           if (vplans.length > 0) a.setShoppingList(buildShoppingFromPlans(vplans));
           if (a.recipeCookingActive()) {
             a.refreshRecipeCookingCardIfActive(plans.dayPlan, plans.threeDayPlan, plans.weekPlan);
           } else {
-            // Generic-готовка устарела молча — помечаем, не стираем (кнопка пересоберёт).
-            const prev = a.getMealPrepPlan();
-            if (prev && !(prev as any)._stale) {
-              a.setMealPrepPlan({ ...(prev as any), _stale: true });
-            }
-          }
-          // mealPrepDays влияет только на готовку — смена горизонта инвалидирует её тоже.
-          if (lastPrepDays.current !== plans.mealPrepDays) {
-            lastPrepDays.current = plans.mealPrepDays;
             const prev = a.getMealPrepPlan();
             if (prev && !(prev as any)._stale) a.setMealPrepPlan({ ...(prev as any), _stale: true });
           }
           a.generateRecommendations();
         }
+        if (lastPrepDays.current !== plans.mealPrepDays) {
+          lastPrepDays.current = plans.mealPrepDays;
+          const prev = a.getMealPrepPlan();
+          if (prev && !(prev as any)._stale) a.setMealPrepPlan({ ...(prev as any), _stale: true });
+        }
       } catch (e) {
-        // P2-fix: сбой конвертера (закупки/готовка/рекомендации) раньше глотался молча —
-        // пользователь видел устаревшие карточки без следа в консоли.
         try { console.warn('[Planner] derived-sync (закупки/готовка/рекомендации) не обновлён:', e); } catch {}
       }
     }, DERIVED_SYNC_DEBOUNCE_MS);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig, plans.generated, plans.mealPrepDays]);
 }

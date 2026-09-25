@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { FOOD_DB } from "../../../../core/nutrition-database";
-import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
 import {
   scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU, parseServingSizeGrams,
   buildSupplementPortions, getSupplementDose,
   type KbjuMatchResult, type AdvancedFilter,
 } from "../../../../engines/kbju-food-match.engine";
 import { scoreFoodsWithGapPriority, type GapAwareScore } from "../../../../engines/composer-targeting-integration";
+import { sumMealTotals, sumDayTotals } from "./planner-recipe-mode";
 import type { NutrientGapResult } from "../../../../engines/nutrient-gap-filler.engine";
 import type { ComposerMode } from "./MealComposerMode";
 
@@ -85,7 +85,10 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       const days = prev.days.slice();
       const d = JSON.parse(JSON.stringify(days[weekEditDay]));
       mutate(d);
-      if (d.meals) d.totals = d.meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0);
+      if (Array.isArray(d.meals)) {
+        d.meals = d.meals.map((m: any) => ({ ...m, totals: sumMealTotals(m.items || []) }));
+        d.totals = sumDayTotals(d.meals);
+      }
       days[weekEditDay] = d;
       return { ...prev, days };
     });

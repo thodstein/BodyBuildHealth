@@ -32,6 +32,36 @@ export const USER_ALLERGEN_TO_TAGS: Record<string, string[]> = {
 };
 
 /**
+ * Молочные белки (сывороточный/казеин). В БД это `isDairyFree: false` — dairy-продукты,
+ * поэтому при аллергии на белок молока ('молочные') они обязаны исключаться.
+ * При лактозной непереносимости ('лактоза') они допустимы: лактозы в изолятах почти нет.
+ */
+export function isMilkProteinId(foodId: string): boolean {
+  if (foodId === 'whey_protein' || foodId === 'whey_isolate' || foodId === 'casein' || foodId === 'milk_powder') return true;
+  const diet = FOOD_ALLERGEN_DIET[foodId];
+  return !!diet && diet.isDairyFree === false && /whey|casein/.test(foodId);
+}
+
+/**
+ * Канонический маппинг выборов пользователя → теги для tag-гейта движка.
+ * 'лактоза' = непереносимость лактозы и НЕ включает dairy-тег, иначе whey/casein
+ * (переносимые молочные белки) выпали бы из пула. 'молочные'/'no_dairy' → dairy.
+ */
+export function selectedAllergenTags(allergens: string[], dietPrefs: string[] = []): Set<string> {
+  const result = new Set<string>();
+  const list = Array.isArray(allergens) ? allergens : [];
+  const prefs = Array.isArray(dietPrefs) ? dietPrefs : [];
+  const milkAllergy = list.includes('молочные') || prefs.includes('no_dairy');
+  for (const a of list) {
+    if (typeof a !== 'string' || !a) continue;
+    if (a === 'лактоза' && !milkAllergy) continue;
+    for (const v of USER_ALLERGEN_TO_TAGS[a] || [a]) result.add(v);
+  }
+  for (const v of dietRestrictionTags(prefs)) result.add(v);
+  return result;
+}
+
+/**
  * Текстовый фолбэк: продукт без тегов в FOOD_ALLERGEN_DIET определяем по имени.
  * ВАЖНО: 'белок' НЕ входит в паттерн яиц (ложные срабатывания: «Капуста белокочанная»,
  * «Сейтан (пшеничный белок)»). Реальные яичные продукты покрыты тегами eggs.
@@ -39,7 +69,8 @@ export const USER_ALLERGEN_TO_TAGS: Record<string, string[]> = {
 export function allergenTextMatches(allergenId: string, foodName: string): boolean {
   const n = (foodName || '').toLowerCase();
   if (allergenId === 'лактоза' || allergenId === 'молочные') {
-    // whey/casein порошок (сывороточный) — не считается молочным аллергеном per user: "протеин не аллерген"
+    // Фолбэк по имени только для продуктов без тегов. Разрешение молочных белков при
+    // 'лактозе' vs их исключение при 'молочные' решает уровень тегов (isMilkProteinId).
     return /молок|сыр|творог|кефир|сливк|йогурт|сметан|морожен|лактоз/.test(n);
   }
   if (allergenId === 'глютен') {
@@ -105,10 +136,14 @@ export function matchesSelectedAllergen(food: FoodItem, allergenId: string, food
 export function resolveAllergenFoodIds(foods: FoodItem[], allergens: string[]): Set<string> {
   const result = new Set<string>();
   if (!Array.isArray(allergens) || allergens.length === 0) return result;
+  const list = allergens.filter(a => typeof a === 'string' && !!a);
+  if (list.length === 0) return result;
+  const milkAllergy = list.includes('молочные');
+  const lactoseOnly = !milkAllergy && list.includes('лактоза');
   for (const food of foods) {
+    if (lactoseOnly && isMilkProteinId(food.id)) continue;
     const tags = getFoodAllergenTags(food.id, foods);
-    for (const a of allergens) {
-      if (typeof a !== 'string' || !a) continue;
+    for (const a of list) {
       const values = USER_ALLERGEN_TO_TAGS[a] || [a];
       if (values.some(v => tags.includes(v))) { result.add(food.id); break; }
       if (allergenTextMatches(a, food.name)) { result.add(food.id); break; }

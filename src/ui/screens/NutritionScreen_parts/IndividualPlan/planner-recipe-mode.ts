@@ -17,7 +17,7 @@
 import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { Recipe } from '../../../../engines/nutrition-periodization.engine';
-import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount } from './recipe-engine';
+import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount, recipeViolatesHardRestrictions } from './recipe-engine';
 import { optimizeRecipePortionScales, maxRelativeDeviation } from './planner-recipe-optimizer';
 import { isHighCarbDay, extremeCapacityProfile } from './planner-carb-density';
 import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf, isPortableFood, isWorkWindowMeal, isBreakfastBannedCarb, isBreakfastBannedProtein, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS } from './food-availability';
@@ -34,7 +34,7 @@ export interface PlanItemLike {
   fiber?: number; leucine_mg?: number; role?: string;
 }
 
-export interface PlanTotalsLike { kcal: number; p: number; f: number; c: number; fiber?: number }
+export interface PlanTotalsLike { kcal: number; p: number; f: number; c: number; fiber?: number; leucine_mg?: number }
 
 export interface FlatRecipeOption {
   name: string; meal: string;
@@ -256,6 +256,9 @@ export function sumMealTotals(items: PlanItemLike[]): PlanTotalsLike {
     f: Math.round(items.reduce((s, i) => s + (i.f || 0), 0) * 10) / 10,
     c: Math.round(items.reduce((s, i) => s + (i.c || 0), 0) * 10) / 10,
     fiber: Math.round(items.reduce((s, i) => s + (i.fiber || 0), 0) * 10) / 10,
+    // P1-агрегаты: лейцин раньше терялся при пересчёте totals (syncToWeek/импорт),
+    // из-за чего суммы дня расходились с products-значением.
+    leucine_mg: Math.round(items.reduce((s, i) => s + (i.leucine_mg || 0), 0)),
   };
 }
 
@@ -266,6 +269,7 @@ export function sumDayTotals(meals: PlanMealLike[]): PlanTotalsLike {
     f: Math.round(meals.reduce((s, m) => s + (m.totals?.f || 0), 0) * 10) / 10,
     c: Math.round(meals.reduce((s, m) => s + (m.totals?.c || 0), 0) * 10) / 10,
     fiber: Math.round(meals.reduce((s, m) => s + (m.totals?.fiber || 0), 0) * 10) / 10,
+    leucine_mg: Math.round(meals.reduce((s, m) => s + (m.totals?.leucine_mg || 0), 0)),
   };
 }
 
@@ -1191,7 +1195,7 @@ export function buildShoppingFromPlans(allDayPlans: any[]): any[] {
         if (ex) { ex.amount += it.amount || 0; ex.kcal += it.kcal || 0; ex.p += it.p || 0; ex.f += it.f || 0; ex.c += it.c || 0; ex.daySet.add(dayIdx); }
         else {
           const food = FOOD_DB.find(f => f.id === it.id);
-          map.set(it.id, { name: it.name, id: it.id, amount: it.amount || 100, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: food?.category || 'other', daySet: new Set([dayIdx]) });
+          map.set(it.id, { name: it.name, id: it.id, amount: Number.isFinite(it.amount) ? it.amount : 100, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: food?.category || 'other', daySet: new Set([dayIdx]) });
         }
       });
     });
@@ -1329,9 +1333,14 @@ export interface AssembleRecipeDayArgs {
   pool: Recipe[];
   targets: DayMacroTargets;
   excludedIds: Set<string>;
+  /** Теги выбранных аллергенов — рецепт с ними отбраковывается даже если id не попал в excludedIds */
+  allergenTags?: Set<string>;
+  /** Имена исключённых рецептов (маркеры `__recipe__`/`__user_recipe__` в he_excluded_foods) */
+  excludedRecipeNames?: Set<string>;
   cookProfile?: CookProfile;
   maxPrepTimeMin?: number;
   isVegetarian?: boolean;
+  categoryPref?: { preferred: string[]; excluded: string[] };
   /** ⭐ Избранные рецепты — бонус к скорингу подбора */
   preferredRecipeNames?: Set<string>;
   goal?: RecipeMatchOptions['goal'];
@@ -1625,8 +1634,11 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       targetCarbsG: tgt.c || 40,
       targetFatG: tgt.f || 15,
       excludedIds,
+      allergenTags: args.allergenTags,
+      excludedRecipeNames: args.excludedRecipeNames,
       cookProfile,
       isVegetarian: args.isVegetarian,
+      categoryPref: args.categoryPref,
       maxPrepTimeMin: args.maxPrepTimeMin ?? 60,
       preferredRecipeNames: args.preferredRecipeNames,
       goal: args.goal,
@@ -1720,7 +1732,14 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       const _sameFiltered = (periType === 'postworkout' && _dayHighCarb)
         ? sameType.filter(r => !(r.ingredientIds || []).some((id: string) => /bulgur|buckwheat/i.test(id || '')))
         : sameType;
-      cands = rankCands((_sameFiltered.length > 0 ? _sameFiltered : sameType)).slice(0, 6);
+      // P1-01/P1-02/P1-03/P1-04: фолбэк ранжирует по макро-дистанции и РАНЬШЕ обходил
+      // ограничения целиком — при пустом скоринге пользователю с аллергией/исключением
+      // возвращался запрещённый рецепт. Здесь снимаем только МЯГКИЙ отбор по КБЖУ,
+      // а жёсткие ограничения (имя/id/теги аллергенов/вегетарианство) держим.
+      const _hardOk = (r: Recipe) => !recipeViolatesHardRestrictions(r, matchOpts);
+      const _safeFiltered = _sameFiltered.filter(_hardOk);
+      const _safeSame = sameType.filter(_hardOk);
+      cands = rankCands((_safeFiltered.length > 0 ? _safeFiltered : _safeSame)).slice(0, 6);
     }
     if (cands.length === 0) return;
     // D4: порошковый гейт — если 2 приёма дня уже с порошком (продуктом или рецептом),

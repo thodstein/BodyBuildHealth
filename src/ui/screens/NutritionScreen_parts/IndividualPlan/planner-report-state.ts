@@ -13,10 +13,11 @@
 import { useState, useEffect } from "react";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { generateNutritionReport } from "../../../../engines/nutrition-report.engine";
-import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports";
+import { generateAllergenReportPure, generateNutrientReportDetailed, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports";
+import { getMicroTargets, type CyclePhase, type Sex } from "./planner-micro-coverage";
 import { carbPeriodizationLabel } from "./planner-carb-periodization";
-import { getProfileSafe } from "./ui";
 import { safeWriteJSON } from "./planner-storage";
+import { matchesSelectedAllergen } from "./planner-restrictions";
 import type { DrugInjection } from "./types";
 
 export interface PlannerReportStateDeps {
@@ -33,9 +34,12 @@ export interface PlannerReportStateDeps {
   variety: string;
   healthIssues: string[];
   waterCalc: any;
+  userTDEE: number;
+  sex: Sex;
+  goal: string;
+  isTrainingDay: boolean;
   linkToTraining: boolean;
   trainStart: string;
-  trainDaysArr: boolean[];
   carbPeriodization: import("./types").CarbPeriodization;
 }
 
@@ -71,14 +75,14 @@ export function usePlannerReportState(d: PlannerReportStateDeps): PlannerReportS
   const [drugCompatReport, setDrugCompatReport] = useState<any>(null);
   const [nutritionReport, setNutritionReport] = useState<any>(null);
 
-  const { dayPlan, allergens, budget, weight, injections, v2Pharma, phase, takenSupplements, planTargets, planType, variety, healthIssues, waterCalc, linkToTraining, trainStart, trainDaysArr, carbPeriodization } = d;
+  const { dayPlan, allergens, budget, weight, injections, v2Pharma, phase, takenSupplements, planTargets, planType, variety, healthIssues, waterCalc, userTDEE, sex, goal, isTrainingDay, linkToTraining, trainStart, carbPeriodization } = d;
+  const safeInjections = Array.isArray(injections) ? injections : [];
 
   const generateAllergenReport = () => { if (!dayPlan) return; setAllergenReport(generateAllergenReportPure(dayPlan, allergens, FOOD_DB)); setActiveReports(prev => prev.includes('allergen') ? prev : [...prev, 'allergen']); };
-  const generateNutrientReport = () => { if (!dayPlan) return; setNutrientReport(generateNutrientReportPure(dayPlan, FOOD_DB)); setActiveReports(prev => prev.includes('nutrient') ? prev : [...prev, 'nutrient']); };
+  const generateNutrientReport = () => { if (!dayPlan) return; setNutrientReport(generateNutrientReportDetailed(dayPlan, FOOD_DB, sex, weight > 0 ? weight : 80, phase as CyclePhase, isTrainingDay)); setActiveReports(prev => prev.includes('nutrient') ? prev : [...prev, 'nutrient']); };
   const generateQualityReport = () => { if (!dayPlan) return; const _r = generateQualityReportPure(dayPlan, budget, FOOD_DB); setQualityReport({ ..._r, dayScore: (dayPlan as any).healthScore?.score ?? null, dayStatus: (dayPlan as any).healthScore?.status ?? null }); setActiveReports(prev => prev.includes('quality') ? prev : [...prev, 'quality']); };
   const generateRiskReport = () => { if (!dayPlan) return; setRiskReport(generateRiskReportPure(dayPlan, weight)); setActiveReports(prev => prev.includes('risk') ? prev : [...prev, 'risk']); };
   const generateDrugCompatReport = () => {
-    const safeInjections = Array.isArray(injections) ? injections : [];
     if (!dayPlan || safeInjections.length === 0) return;
     setDrugCompatReport(generateDrugCompatReportPure({ dayPlan, injections: safeInjections, weight, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, phase, takenSupplements: Array.isArray(takenSupplements) ? takenSupplements : [] }));
     setActiveReports(prev => prev.includes('drug') ? prev : [...prev, 'drug']);
@@ -86,18 +90,22 @@ export function usePlannerReportState(d: PlannerReportStateDeps): PlannerReportS
   const generateFullNutritionReport = (planArg?: any, archive = true) => {
     const src = planArg || dayPlan; if (!src) return;
     try {
+      const safeMeals = Array.isArray(src.meals) ? src.meals : [];
+      const microTargets = Object.fromEntries(getMicroTargets(sex, weight > 0 ? weight : 80, phase as CyclePhase, isTrainingDay).map(t => [t.nutrient, t.target]));
       const rep = generateNutritionReport({
-        meals: src.meals.map((m: any) => ({ label: m.label, items: m.items.map((i: any) => ({ name: i.name || '', id: i.id || '', amount: i.amount || 100, kcal: i.kcal || 0, p: i.p || 0, f: i.f || 0, c: i.c || 0, fiber: i.fiber || 0 })), totals: m.totals || { kcal: 0, p: 0, f: 0, c: 0 }, time: m.time || '' })),
+        meals: safeMeals.map((m: any) => ({ label: m.label || 'Приём', items: (Array.isArray(m.items) ? m.items : []).map((i: any) => ({ name: i.name || '', id: i.id || '', amount: Number.isFinite(i.amount) ? i.amount : 100, kcal: i.kcal || 0, p: i.p || 0, f: i.f || 0, c: i.c || 0, fiber: i.fiber || 0 })), totals: m.totals || { kcal: 0, p: 0, f: 0, c: 0 }, time: m.time || '' })),
         totals: src.totals || { kcal: 0, p: 0, f: 0, c: 0 },
         targets: planTargets,
-        userWeight: getProfileSafe()?.settings?.weight || 80,
-        userTDEE: planTargets.kcal,
+        userWeight: weight > 0 ? weight : 80,
+        userTDEE: userTDEE > 0 ? userTDEE : planTargets.kcal,
         healthIssues, planType, variety, budget, allergens,
+        microTargets,
+        allergenMatcher: (food: any, allergenId: string) => matchesSelectedAllergen(food, allergenId, FOOD_DB),
         cyclingMode: carbPeriodizationLabel(carbPeriodization),
-        goal: getProfileSafe()?.settings?.primaryGoal || 'maintenance',
-        waterMl: waterCalc?.total ? Math.round(waterCalc.total * 1000) : 0,
-        injections: injections.map((i: any) => ({ type: i.type, dose: i.dose, name: i.name, time: i.time })),
-        workoutTime: linkToTraining && trainDaysArr.some(Boolean) ? trainStart : undefined,
+        goal,
+        waterMl: Number.isFinite(waterCalc?.total) ? Math.max(0, Math.round(waterCalc.total * 1000)) : 0,
+        injections: safeInjections.map((i: any) => ({ type: i.type, dose: i.dose, name: i.name, time: i.time })),
+        workoutTime: linkToTraining && isTrainingDay ? trainStart : undefined,
       });
       if (rep) {
         setNutritionReport(rep);
@@ -120,10 +128,10 @@ export function usePlannerReportState(d: PlannerReportStateDeps): PlannerReportS
   };
 
   // D-26: auto-run drug-compat check when the plan changes (live food-drug warnings).
-  useEffect(() => { try { generateDrugCompatReport(); } catch (e: any) { try { console.warn('[Planner] drug-compat report failed:', e); } catch {} } }, [dayPlan, injections, v2Pharma, phase, takenSupplements]);
+  useEffect(() => { try { generateDrugCompatReport(); } catch (e: any) { try { console.warn('[Planner] drug-compat report failed:', e); } catch {} } }, [dayPlan, injections, v2Pharma, phase, takenSupplements, weight]);
   // D-25: auto-generate the report (without archiving) whenever the day plan changes,
   // so the dietology scorecard in the day card is live without opening the Отчёт tab.
-  useEffect(() => { if (dayPlan) generateFullNutritionReport(dayPlan, false); }, [dayPlan]);
+  useEffect(() => { if (dayPlan) generateFullNutritionReport(dayPlan, false); }, [dayPlan, planTargets, planType, variety, healthIssues, waterCalc, userTDEE, sex, goal, isTrainingDay, linkToTraining, trainStart, carbPeriodization]);
 
   return {
     activeReports, setActiveReports, allergenReport, setAllergenReport, nutrientReport, setNutrientReport,

@@ -66,9 +66,17 @@ export function generateCarbload(deps: SpecialMealDeps): any {
   const fatG = Math.round(deps.weight * 0.5);
   const kcal = totalCarbs * 4 + proteinG * 4 + fatG * 9;
   const bjuBreakdown = `${Math.round(proteinG * 4 / kcal * 100)}% Б / ${Math.round(fatG * 9 / kcal * 100)}% Ж / ${Math.round(totalCarbs * 4 / kcal * 100)}% У`;
+  // P0-сумма: углеводы делятся МЕЖДУ продуктами поровну (n×доля = 100% протокола).
+  // Раньше каждому из 5 продуктов доставалось 30% от общего → 150% углеводов,
+  // а при 2–3 продуктах — 60–90% (цель не закрывалась). Доля = 1/n.
+  const share = carbFoods.length > 0 ? totalCarbs / carbFoods.length : 0;
   return {
     totalCarbs,
-    foods: carbFoods.map(f => ({ name: f.name, carbs: f.carbs, amount: Math.round(totalCarbs * 0.3 / f.carbs * 100) })),
+    foods: carbFoods.map(f => ({
+      name: f.name,
+      carbs: f.carbs,
+      amount: f.carbs > 0 ? Math.max(5, Math.round(share / f.carbs * 100)) : 0,
+    })),
     note: 'За 24-48ч до тренировки. Воды +1-1.5л.',
     principles: ['🍚 Заполнение гликогена', '⏰ За 24-48ч до тяжёлой тренировки', '📏 6-8 г/кг углеводов', '💧 Воды +1-1.5л', '🧂 Натрий 200-500мг', '⬇ Жиры до 0.5г/кг'],
     bju: { c: totalCarbs, p: proteinG, f: fatG, kcal },

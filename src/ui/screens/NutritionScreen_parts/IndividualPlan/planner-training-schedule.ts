@@ -57,6 +57,7 @@ export function normalizeTrainSchedule(raw: any): TrainSchedule {
 
 /** Тренировочный ли день offset (0 = первый день плана). Отрицательные offset корректны. */
 export function isTrainingDayFor(schedule: TrainSchedule, offset: number): boolean {
+  if (!schedule.enabled) return false;
   switch (schedule.scheduleType) {
     case 'eod': {
       const pos = ((offset % 2) + 2) % 2;

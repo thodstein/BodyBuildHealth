@@ -2,10 +2,11 @@ import React, { useState, useRef } from "react";
 import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
-import { generateNutritionReport } from "../../../../engines/nutrition-report.engine";
+import { filterRecipesByHardRestrictions } from "./recipe-engine";
 import { ALLERGEN_LIST, HEALTH_ISSUES } from "./types";
-import { resolveAllergenFoodIds } from "./planner-restrictions";
+import { resolveAllergenFoodIds, resolveAllExcludedFoodIds, selectedAllergenTags } from "./planner-restrictions";
 import { effectiveSpecialMealTarget } from "./planner-special-meal-state";
+import { sumMealTotals, sumDayTotals } from "./planner-recipe-mode";
 import { localIsoDate } from "./planner-date-utils";
 import { PopupSelect } from "../../../components/PopupXxx";
 import type { DrugInjection } from "./types";
@@ -48,10 +49,52 @@ const getDiaryLoggedDayCount = (): number => {
   }
 };
 
+
+// E7: импорт плана — модалка вместо prompt() + ВАЛИДАЦИЯ формы (раньше вставка мусора
+// с полем meals давала кривой план без предупреждения).
+// FIX import-audit (P1-09): старая проверка пропускала amount=undefined/NaN/0 и «доверяла»
+// totals из файла. Теперь форма жёсткая, totals пересчитываются из items по канону,
+// а продукты под ограничениями не молча едут в план — показываем честное предупреждение.
+const _finiteNonNeg = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+export const _validateImportedPlan = (p: any): { ok: boolean; reason?: string; blocked: string[] } => {
+  const blocked: string[] = [];
+  if (!p || typeof p !== 'object' || !Array.isArray(p.meals) || p.meals.length === 0) {
+    return { ok: false, reason: 'ожидается meals[] — массив приёмов', blocked };
+  }
+  for (const m of p.meals) {
+    if (!m || typeof m !== 'object' || !Array.isArray(m.items)) {
+      return { ok: false, reason: 'каждый приём должен иметь items[]', blocked };
+    }
+    for (const it of m.items) {
+      if (!it || typeof it !== 'object' || typeof it.name !== 'string' || it.name.trim().length === 0) {
+        return { ok: false, reason: 'у каждого продукта должно быть имя', blocked };
+      }
+      if (typeof it.amount !== 'number' || !Number.isFinite(it.amount) || it.amount <= 0) {
+        return { ok: false, reason: `у «${it.name}» некорректная граммовка`, blocked };
+      }
+      for (const k of ['kcal', 'p', 'f', 'c']) {
+        if (it[k] !== undefined && !_finiteNonNeg(it[k])) {
+          return { ok: false, reason: `у «${it.name}» некорректный КБЖУ (${k})`, blocked };
+        }
+      }
+      if (typeof it.id === 'string' && it.id) blocked.push(it.id);
+    }
+  }
+  return { ok: true, blocked };
+};
+
+export const _normalizeImportedPlan = (p: any) => {
+  const meals = p.meals.map((m: any) => {
+    const items = m.items.map((it: any) => ({ ...it, fiber: _finiteNonNeg(it.fiber) ? it.fiber : 0 }));
+    return { ...m, items, totals: sumMealTotals(items) };
+  });
+  return { ...p, meals, totals: sumDayTotals(meals) };
+};
+
 export const IndividualPlanResults: React.FC = () => {
   const {
     generatePlan, planDays, setPlanDays, selectedDayIndex, setSelectedDayIndex,
-    weekEditDay, openWeekDayForEdit, switchPlanDays,
+    weekEditDay, openWeekDayForEdit, switchPlanDays, loadMonthWeekIntoPlan,
     DAY_LABELS, trainingDays, planView, setPlanView, weekPlan, setWeekPlan,
     monthPlanMode, setMonthPlanMode, monthPlan, setMonthPlan,
     selectedWeek, setSelectedWeek,
@@ -59,7 +102,8 @@ export const IndividualPlanResults: React.FC = () => {
     mealsCount,
     renderMealList, effectiveKcal, effectiveP, effectiveF, effectiveC,
     dayPlanNotes, setDayPlanNotes,
-    autoCorrectPlan, allergens, allergenExcludedCount, excludedFoods, healthIssues,
+     autoCorrectPlan, allergens, allergenExcludedCount, excludedFoods, excludedCategories, healthIssues, dietPrefs,
+
     carbPeriodization, waterCalc, setWaterCalc, heavyTrainDay,
     showRecipeCreator, setShowRecipeCreator, newRecipe, setNewRecipe,
     userRecipes, setUserRecipes,
@@ -237,7 +281,7 @@ export const IndividualPlanResults: React.FC = () => {
 
   const itemToProduct = (it: any) => {
     const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
-    return { foodId: food?.id || it.name || 'unknown', weightGrams: it.amount || 100 };
+    return { foodId: food?.id || it.name || 'unknown', weightGrams: Number.isFinite(it.amount) ? it.amount : 100 };
   };
 
   const handleCalcUsefulness = () => {
@@ -333,21 +377,32 @@ export const IndividualPlanResults: React.FC = () => {
   setCalcDailyReport(dailyReport);
 };
 
-// E7: импорт плана — модалка вместо prompt() + ВАЛИДАЦИЯ формы (раньше вставка мусора
-// с полем meals давала кривой план без предупреждения).
-const _validateImportedPlan = (p: any): boolean => {
-  if (!p || typeof p !== 'object' || !Array.isArray(p.meals) || p.meals.length === 0) return false;
-  return p.meals.every((m: any) => m && typeof m === 'object' && Array.isArray(m.items) && m.items.every((it: any) => it && typeof it === 'object' && typeof it.name === 'string' && (it.amount === undefined || typeof it.amount === 'number')));
-};
+// E7: импорт плана — doImportPlan использует state-сеттеры компонента, валидатор/нормализатор вынесены на модульный уровень выше.
 const doImportPlan = (raw: string): boolean => {
   try {
     const parsed = JSON.parse(raw);
-    if (!_validateImportedPlan(parsed)) { setErrorMsg('Неверная структура плана: ожидаются meals[] с items[] (name/amount).'); return false; }
-    setDayPlan(parsed);
+    const check = _validateImportedPlan(parsed);
+    if (!check.ok) { setErrorMsg(`Неверная структура плана: ${check.reason}.`); return false; }
+    const normalized = _normalizeImportedPlan(parsed);
+    setDayPlan(normalized);
     setGenerated(true);
     setPlanDays(1); // FIX button-audit: импорт всегда показывает 1-дневный план
     setErrorMsg(null);
-    if (typeof (window as any).showToast === 'function') (window as any).showToast('📥 План импортирован', 'success');
+    // Честная честность: импорт — явное действие пользователя, поэтому план ставим как есть,
+    // но предупреждаем, если в нём есть продукты под текущими ограничениями.
+    const blockedSet = new Set<string>([
+      ...resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []),
+      ...(excludedFoods || []),
+    ]);
+    (healthIssues || []).forEach((hi: string) => {
+      HEALTH_ISSUES.find(h => h.id === hi)?.foodIds?.forEach(fid => blockedSet.add(fid));
+    });
+    const blockedHere = Array.from(new Set(check.blocked.filter(id => blockedSet.has(id))));
+    if (blockedHere.length > 0) {
+      setErrorMsg(`План импортирован, но ${blockedHere.length} продукт(ов) не проходят ваши ограничения: ${blockedHere.slice(0, 5).join(', ')}${blockedHere.length > 5 ? '…' : ''}. Проверьте состав.`);
+    } else if (typeof (window as any).showToast === 'function') {
+      (window as any).showToast('📥 План импортирован', 'success');
+    }
     return true;
   } catch {
     setErrorMsg('Неверный формат. Скопируйте план через кнопку «Копировать».');
@@ -364,6 +419,7 @@ const doImportPlan = (raw: string): boolean => {
     // FIX button-audit: защита от двойного клика (два конкурирующих цикла генерации)
     if (_monthRunningRef.current) return;
     _monthRunningRef.current = true;
+    const failed: number[] = [];
     try {
       // P1-fix: один saveUndo до начала массовой генерации, а не 5 раз внутри
       saveUndo();
@@ -375,18 +431,48 @@ const doImportPlan = (raw: string): boolean => {
         // generatePlan стал async (неблокирующая генерация 3/7 дней) — ОБЯЗАТЕЛЬНО await:
         // иначе недели месяца генерируются конкурентно и расы на общих recentFoodIds/hardWindow
         // портят выбор продуктов и перекрывают weekPlan.
-        try { await generatePlan(7, w, undefined, { skipUndo: true, async: true }); } catch (e: any) { try { console.warn('[Planner] month week', w, 'failed:', e); } catch {} }
+        try { await generatePlan(7, w, undefined, { skipUndo: true, async: true }); } catch (e: any) {
+          failed.push(w);
+          try { console.warn('[Planner] month week', w, 'failed:', e); } catch {}
+        }
       }
       await new Promise<void>(r => setTimeout(() => r(), 100));
       setSelectedWeek(0);
-      // E4-fix: НЕЛЬЗЯ перегенерировать неделю 0 — monthPlan[0] уже сгенерирован в цикле выше
-      // (повторный вызов с новой солью расходил отображаемую неделю и содержимое месяца).
-      // Отображаем неделю 0 прямо из monthPlan.
-      if (monthPlan[0]?.days?.length) setWeekPlan(monthPlan[0]);
+      // P0-fix: не перегенерируем неделю 0 (расхождение с monthPlan[0]), а берём СВЕЖУЮ
+      // неделю из ref-зеркала monthPlan. Раньше читался monthPlan[0] из замыкания — это
+      // массив ДО setMonthPlan([]), т.е. старая/чужая неделя (на экране пусто/не то).
+      const loaded = loadMonthWeekIntoPlan(0);
+      if (failed.length > 0) {
+        setErrorMsg(`Месяц собран частично: не удалось построить неделю ${failed.map(x => x + 1).join(', ')}. Остальные недели готовы.`);
+      } else if (!loaded) {
+        setErrorMsg('Месяц не собрался: нет данных за первую неделю. Попробуйте «Сгенерировать заново».');
+      }
     } finally {
       _monthRunningRef.current = false;
     }
   };
+
+  const _pickerMealType = recipePickerMeal
+    ? recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack'
+    : null;
+  const _pickerExcludedIds = recipePickerMeal ? resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []) : new Set<string>();
+  if (recipePickerMeal) {
+    for (const id of excludedFoods || []) {
+      if (!id.startsWith('__recipe__') && !id.startsWith('__user_recipe__')) _pickerExcludedIds.add(id);
+    }
+  }
+  const _pickerExcludedRecipeNames = new Set<string>((excludedFoods || [])
+    .filter(id => id.startsWith('__recipe__') || id.startsWith('__user_recipe__'))
+    .map(id => id.replace(/^__recipe__/, '').replace(/^__user_recipe__/, '')));
+  const _pickerRecipes = _pickerMealType
+    ? filterRecipesByHardRestrictions(getRecipesByMeal(_pickerMealType), {
+        excludedIds: _pickerExcludedIds,
+        allergenTags: selectedAllergenTags(allergens || [], dietPrefs || []),
+        excludedRecipeNames: _pickerExcludedRecipeNames,
+        categoryPref: { preferred: [], excluded: excludedCategories || [] },
+        isVegetarian: (dietPrefs || []).includes('vegetarian'),
+      })
+    : [];
 
   return (
     <>
@@ -1170,11 +1256,11 @@ const doImportPlan = (raw: string): boolean => {
             <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4, letterSpacing:'-0.3px' }}>{(function(){ const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; return _m?.recipeApplied ? (_m?.recipeApplied2 ? '🍳 Заменить второй рецепт' : '➕ Добавить второй рецепт') : '🍳 Заменить'; })()} «{recipePickerMeal.label}» рецептом</div>
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:12 }}>{(function(){ const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; return _m?.recipeApplied2 ? `Уже: «${_m.recipeApplied}» + «${_m.recipeApplied2}» — выберите на замену второго` : _m?.recipeApplied ? `Уже: «${_m.recipeApplied}» — выберите второй рецепт (совместимый)` : 'Подходящие рецепты'; })()}</div>
             <div style={{ maxHeight:300, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
-              {getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').length === 0 ? (
+              {_pickerRecipes.length === 0 ? (
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
-              ) : getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').map((r, i) => (
+              ) : _pickerRecipes.map((r, i) => (
                 <div key={i} style={{ display:'flex', gap:4, width:'100%' }}>
-                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; if (_m?.recipeApplied && !_m?.recipeApplied2) { addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } else { replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } setRecipePickerMeal(null); }} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, transition:'all 0.15s' }}
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; if (_m?.recipeApplied) { addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } else { replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } setRecipePickerMeal(null); }} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, transition:'all 0.15s' }}
                     onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)'}
                     onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'}>
                     <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>

@@ -17,6 +17,8 @@ import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { MealItem } from './meal-plan-engine';
 import { isSauceCondimentFood, isCannedFoodId, CANNED_SUBSTITUTE } from './food-availability';
+import { getFoodAllergenTags } from './planner-restrictions';
+import { matchesCategoryPref, type CategoryPref } from './planner-preferences';
 
 // C3 (Эпик C): кэш декомпозиции легаси-рецептов (парсинг строк дорогой — гейт аллергенов
 // вызывает его на каждый скоринг; WeakMap кэш делает это O(1) после первого прохода).
@@ -81,16 +83,19 @@ export interface RecipeMatchOptions {
   targetCarbsG: number;
   targetFatG: number;
   excludedIds: Set<string>;
-  currentItemIds?: Set<string>;  // FIX: продукты уже в приёме — бонус за совпадение
+  currentItemIds?: Set<string>;
   allergenTags?: Set<string>;
+  excludedRecipeNames?: Set<string>;
   cookProfile?: CookProfile;
   isVegetarian?: boolean;
-  maxPrepTimeMin?: number;     // лимит времени на готовку (из cookProfile.timePerDayMin / mealsCount)
+  categoryPref?: CategoryPref;
+  maxPrepTimeMin?: number;
   preferredRecipeNames?: Set<string>;
   goal?: 'mass' | 'cut' | 'recomp' | 'maintenance' | 'bulk';
-  /** D5: вес атлета — prefer-матчинг порций (baseWeightKg рецепта ↔ вес). */
   athleteWeightKg?: number;
 }
+
+type RecipeRestrictionOptions = Pick<RecipeMatchOptions, 'excludedIds' | 'allergenTags' | 'excludedRecipeNames' | 'isVegetarian' | 'categoryPref'>;
 
 // ─── Декомпозиция рецепта в MealItem[] ─────────────────────────────────
 
@@ -272,6 +277,11 @@ function makeMealItem(food: FoodItem, grams: number, role: MealItem['role']): Me
   const c = Math.round((food.carbs || 0) * r * 10) / 10;
   // KBЖУ-консистентность ≤3%: kcal из формулы (FOOD_DB-дрейф не наследуем)
   const kcal = Math.round(4 * p + 9 * f + 4 * c);
+  // P1-агрегаты: лейцин больше не константа 0. Тот же канон, что в ручных операциях:
+  // профиль аминокислот из БД, иначе консервативный фолбэк 75 мг/г белка.
+  // Раньше recipe-путь писал 0 → суммы лейцина/дня и MPS-выводы были занижены.
+  const leuPer100 = (food as any).amino_acid_profile_100g?.leucine_mg
+    ?? ((food.micros as any)?.Leucine != null ? (food.micros as any).Leucine : Math.round((food.protein || 0) * 75));
   return {
     id: food.id, name: food.name, amount: cleanGrams, role,
     kcal,
@@ -279,11 +289,66 @@ function makeMealItem(food: FoodItem, grams: number, role: MealItem['role']): Me
     f,
     c,
     fiber: Math.round((food.fiber || 0) * r * 10) / 10,
-    leucine_mg: 0,
+    leucine_mg: Math.round(leuPer100 * r),
   };
 }
 
 // ─── Подбор рецепта под приём ──────────────────────────────────────────
+
+/**
+ * ЖЁСТКИЙ гейт рецепта по ограничениям пользователя (безопасность, не скоринг).
+ *
+ * Вынесен отдельно от `scoreRecipeForMeal`, потому что фолбэк-подбор в
+ * `assembleRecipeDay` ранжирует рецепты по макро-дистанции и раньше обходил
+ * гейт целиком: при пустом скоринге пользователю с аллергией возвращался
+ * запрещённый рецепт. Теперь и скоринг, и фолбэк зовут ОДИН этот предикат.
+ *
+ * Состав: исключение рецепта по имени, исключённые id (в т.ч. ПОСЛЕ подмены
+ * консервов), теги аллергенов по факту БД, вегетарианский гейт.
+ */
+export function recipeViolatesHardRestrictions(recipe: Recipe, opts: RecipeRestrictionOptions): boolean {
+  if (opts.excludedRecipeNames?.has(recipe.name)) return true;
+  const hasIds = !!(recipe.ingredientIds && recipe.ingredientIds.length > 0);
+  const allIds: string[] | null = hasIds ? recipe.ingredientIds! : legacyDecompIds(recipe);
+  if (allIds && allIds.some(fid => opts.excludedIds.has(fid))) return true;
+  // P1-05: подмена консервов идёт ВНУТРИ decomposeRecipe — проверяем фактические id.
+  if (allIds) {
+    const effectiveIds = allIds.map(fid => (isCannedFoodId(fid) ? (CANNED_SUBSTITUTE[fid] ?? fid) : fid));
+    if (effectiveIds.some(fid => opts.excludedIds.has(fid))) return true;
+    // P1-03: allergenTags ловит молочные белки/добавки, не попавшие в excludedIds по id.
+    if (opts.allergenTags && opts.allergenTags.size > 0) {
+      for (const fid of effectiveIds) {
+        if (getFoodAllergenTags(fid, FOOD_DB).some(t => opts.allergenTags!.has(t))) return true;
+      }
+    }
+    if (opts.categoryPref?.excluded?.length) {
+      for (const fid of effectiveIds) {
+        const food = FOOD_DB.find(f => f.id === fid);
+        if (food && !matchesCategoryPref(food, opts.categoryPref)) return true;
+      }
+    }
+    if (opts.isVegetarian && allIds.some(fid => FOOD_ALLERGEN_DIET[fid]?.isVegetarian === false)) return true;
+  }
+  if (!allIds && opts.categoryPref?.excluded?.length) {
+    const items = decomposeRecipe(recipe);
+    if (items.some(item => {
+      const food = FOOD_DB.find(f => f.id === item.id);
+      return !!food && !matchesCategoryPref(food, opts.categoryPref!);
+    })) return true;
+  }
+  // Строковый фолбэк для НЕраспознанных декомпозицией ингредиентов (менее точно).
+  if (!hasIds && opts.isVegetarian) {
+    for (const ing of recipe.ingredients) {
+      const lower = ing.toLowerCase();
+      if (['кури','говядин','свин','баран','индей','утка','гусь','кролик','телятин','печен','сердце','язык','мозг','ножки','крылыш','бедро','фарш','рыб','лосос','форел','тунец','скумбри','сельд','сард','кревет','миди','кальмар','осьмин','устриц','икра','угорь'].some(k => lower.includes(k))) return true;
+    }
+  }
+  return false;
+}
+
+export function filterRecipesByHardRestrictions(recipes: Recipe[], opts: RecipeRestrictionOptions): Recipe[] {
+  return recipes.filter(recipe => !recipeViolatesHardRestrictions(recipe, opts));
+}
 
 /**
  * Оценивает насколько рецепт подходит под приём пищи.
@@ -357,26 +422,9 @@ export function scoreRecipeForMeal(recipe: Recipe, opts: RecipeMatchOptions): nu
   // раньше НЕ проверялись по аллергенам вовсе (строковый вег-фолбэк был единственной
   // защитой): decomposeRecipe парсит строки → FOOD_DB ids → гейт по excludedIds.
   {
-    let allIds: string[] | null = null;
-    if (recipe.ingredientIds && recipe.ingredientIds.length > 0) {
-      allIds = recipe.ingredientIds;
-    } else {
-      allIds = legacyDecompIds(recipe);
-    }
-    if (allIds && allIds.some(fid => opts.excludedIds.has(fid))) hardReject = true;
-    if (!hardReject && opts.isVegetarian && allIds) {
-      // C3: вег-гейт по каноническому FOOD_ALLERGEN_DIET (isVegetarian === false).
-      if (allIds.some(fid => FOOD_ALLERGEN_DIET[fid]?.isVegetarian === false)) hardReject = true;
-    }
-    if (!hardReject && !(recipe.ingredientIds && recipe.ingredientIds.length > 0)) {
-      // Строковый фолбэк для НЕраспознанных декомпозицией ингредиентов (менее точно)
-      for (const ing of recipe.ingredients) {
-        const lower = ing.toLowerCase();
-        if (opts.isVegetarian && ['кури','говядин','свин','баран','индей','утка','гусь','кролик','телятин','печен','сердце','язык','мозг','ножки','крылыш','бедро','фарш','рыб','лосос','форел','тунец','скумбри','сельд','сард','кревет','миди','кальмар','осьмин','устриц','икра','угорь'].some(k => lower.includes(k))) {
-          hardReject = true; break;
-        }
-      }
-    }
+    // P1-03/P1-04/P1-05: единый жёсткий предикат ограничений (имя рецепта, id после
+    // подмены консервов, теги аллергенов, вегетарианство). Его же зовёт фолбэк-подбор.
+    if (recipeViolatesHardRestrictions(recipe, opts)) hardReject = true;
   }
 
   // 7. Предпочтения пользователя

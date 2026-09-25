@@ -21,6 +21,7 @@
  */
 
 import { computeDieteticCarbTarget, plannerGoalCategory } from './planner-targets';
+import { PROTEIN_G_PER_KG_RANGE } from './types';
 import type { PlannerTargets } from './planner-targets';
 
 /**
@@ -50,7 +51,7 @@ export function planTypeFloorMods(planType?: string | null): { pMult: number; cM
 
 export interface DayTargetsInput {
   weightKg: number;
-  presetGPerKg: number;          // пресет белка пользователя (1.6-2.6), v6
+  presetGPerKg: number;          // пресет белка пользователя (авто: жёстко 1.6–2.2, см. PROTEIN_G_PER_KG_RANGE)
   fatFloorGPerKg: number;        // физиологический пол жиров (0.8)
   kbjuMode: 'auto' | 'manual' | 'profile';
   manual?: { kcal?: number | null; p?: number | null; f?: number | null; c?: number | null; gPerKg?: { protein?: number | null; fat?: number | null; carbs?: number | null } | null };
@@ -64,6 +65,11 @@ export interface DayTargetsInput {
   insulinTotalUnits?: number;
   /** Эпик 3: стиль питания (planType): 'keto'/'highcarb' реально меняют макро-профиль дня. */
   dietStyle?: string;
+  /**
+   * P1-9 «Снять потолок углей»: 0 = без диетологического потолка г/кг.
+   * undefined = контекстный потолок по цели/объёму (прежнее поведение).
+   */
+  carbCapGPerKg?: number;
 }
 
 export interface DayTargetsResult {
@@ -79,7 +85,11 @@ const atwater = (p: number, f: number, c: number) => Math.round(p * 4 + f * 9 + 
 
 export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   const weight = Math.max(30, Math.min(300, Number(input.weightKg) || 80));
-  const preset = Math.max(1.2, Math.min(3.5, Number(input.presetGPerKg) || 2.0));
+  // Авто-белок ограничен рабочим диапазоном 1.6–2.2 г/кг (решение пользователя).
+  // Выше 2.2 — только ручной режим КБЖУ ниже: там цели берутся из явных граммов/г-кг пользователя
+  // и этот клэмп не применяется (mode 'manual' возвращается раньше). Legacy 'max' (2.6) из старых
+  // сохранений не может пробить потолок даже при прямом вызове движка.
+  const preset = Math.max(PROTEIN_G_PER_KG_RANGE.min, Math.min(PROTEIN_G_PER_KG_RANGE.max, Number(input.presetGPerKg) || 2.0));
   const fatFloor = Math.max(0.4, Math.min(2.0, Number(input.fatFloorGPerKg) || 0.8));
   const insulinUnits = Math.max(0, Number(input.insulinTotalUnits) || 0);
   const mode = input.kbjuMode || 'auto';
@@ -111,8 +121,12 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
       c = Math.round(Number(manual.c));
     } else if (gCarbs > 0) {
       c = gCarbs;
-    } else if (Number(manual.kcal) > 0 && p > 0 && Number(manual.f) > 0) {
-      c = Math.max(0, Math.round((Number(manual.kcal) - p * 4 - Number(manual.f) * 9) / 4));
+    } else if (Number(manual.kcal) > 0 && p > 0) {
+      // P0-Atwater: остаток углей считаем по ВЫЧИСЛЕННЫМ p/f, а не по сырым
+      // manual.p/manual.f. Раньше ветка требовала «сырой жир > 0»: при вводе
+      // «ккал + белок» без жиров (f поднимался до пола) условие падало → c = 0,
+      // и цель «2000 ккал · Б160 · Ж48 · У0» не сходилась на ~900 ккал.
+      c = Math.max(0, Math.round((Number(manual.kcal) - p * 4 - f * 9) / 4));
     } else {
       c = 0;
     }
@@ -178,6 +192,8 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   const carbs = computeDieteticCarbTarget({
     weightKg: weight, rawCarbsG: carbsFinal, insulinTotalUnits: insulinUnits,
     goalPhase, trainingVolumeMinPerWeek: vol, budget: input.budget,
+    carbGPerKg: input.carbCapGPerKg ?? (input.kbjuMode === 'manual' ? 0 : undefined),
+    minCarbG: input.kbjuMode === 'manual' || dietStyle === 'keto' ? 0 : undefined,
   });
   const kcal = atwater(protein, fatsFinal, carbs);
 
@@ -192,7 +208,15 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
     ? `Жиры: ${fatsFinal} г (инсулин: кап 0.5 г/кг сильнее пола)`
     : `Жиры: ${fatsFinal} г (пол ${fatFloor} г/кг)`);
   breakdown.push(`Углеводы: остаток до ${kcalTarget} ккал → ${carbs} г (диетологический потолок ${goalPhase})`);
-  if (dietStyle === 'keto') breakdown.push(`🥑 Стиль «Кето»: угли ≤6% ккал / ≤60 г, жиры = остаток (кап 3 г/кг)${fatsFinal >= Math.round(weight * 3.0) ? ' — ⚠ цель не закрывается жирами, угли подняты до минимума закрытия' : ''}`);
+  if (dietStyle === 'keto') {
+    const ketoCapG = Math.max(20, Math.min(Math.round(kcalTarget * 0.06 / 4), 60));
+    breakdown.push(`🥑 Стиль «Кето»: угли ≤6% ккал (≤${ketoCapG} г), жиры = остаток (кап 3 г/кг)${fatsFinal >= Math.round(weight * 3.0) ? ' — ⚠ цель не закрывается жирами, угли подняты до минимума закрытия' : ''}`);
+    // Честный конфликт: гликемический пол инсулина может перекрыть кето-цель —
+    // раньше это происходило молча, и пользователь видел «Кето» при 400 г углей.
+    if (carbs > ketoCapG) {
+      breakdown.push(`⚠ Конфликт: гликемический пол инсулина требует ≥${Math.round((insulinUnits || 0) * 10)} г углей — кето-цель (≤${ketoCapG} г) перекрыта. Это безопасность инсулиновых окон, а не стиль рациона.`);
+    }
+  }
   if (dietStyle === 'highcarb') breakdown.push(`🍚 Стиль «Высоко-углеводный»: жиры на полу ${fatFloor} г/кг, угли = максимум до потолка`);
   breakdown.push(`Итог дня: ${kcal} ккал = Б ${protein}×4 + Ж ${fatsFinal}×9 + У ${carbs}×4`);
   if (kcal < kcalTarget * 0.92) breakdown.push(`⚠ Потолок углей срезал ${Math.round(kcalTarget - kcal)} ккал — увеличьте объём тренировок или бюджет («💰»), либо снимите потолок`);

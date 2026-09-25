@@ -35,9 +35,9 @@ import { usePlannerReportState } from "./planner-report-state"; // Хвост-1:
 import { usePlannerDerivedSync } from "./planner-derived-sync"; // G2: единый конвергер закупок/готовки/рекомендаций
 import { usePlannerSpecialMealState, effectiveSpecialMealTarget } from "./planner-special-meal-state"; // Хвост-1: спец-режимы/рекомендации в под-хук
 import { getAutoExcludedFoodIds } from "./OrganLoadBadges"; // P2-12: organ-load auto restrictions
-import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
-import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
-import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, buildTrainSchedule, type TrainScheduleType, type TrainSchedule } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
+import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, matchesCategoryPref, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
+import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, selectedAllergenTags, getFoodAllergenTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
+import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, weeklyTrainingCount, buildTrainSchedule, type TrainScheduleType, type TrainSchedule } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
 import { decomposeRecipe, pickRecipeForMeal, pickRecipesForMeal, cookProfileFromSettings, prepTimeBudgetPerMeal, filterByCookSkill, type CookProfile } from "./recipe-engine";
 import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes, assembleRecipeDay, scaleRecipeToTarget, recipeCompatibility, shrinkFirstForSecond, filterRecipePoolForBand } from "./planner-recipe-mode";
 import type { FlatRecipeOption } from "./planner-recipe-mode";
@@ -102,6 +102,8 @@ export interface PlanCtx {
   manualGPerKg: Record<string, number>; setManualGPerKg: (v: any) => void;
   monthPlanMode: boolean; setMonthPlanMode: (v: boolean) => void;
   monthPlan: any[]; setMonthPlan: (v: any[]) => void;
+  /** P0-месяц: загрузить неделю месяца в weekPlan (без stale-замыкания). */
+  loadMonthWeekIntoPlan: (wi: number) => boolean;
   selectedWeek: number; setSelectedWeek: (v: number) => void;
   goal: GoalId; setGoal: (v: GoalId) => void;
   phase: PhaseId; setPhase: (v: PhaseId) => void;
@@ -140,7 +142,7 @@ export interface PlanCtx {
   manualC: number | null; setManualC: (v: any) => void;
   resultsRef: React.RefObject<HTMLDivElement | null>;
   budget: BudgetLevel; setBudget: (v: BudgetLevel) => void;
-  /** Эпик 3: белок-пресет (1.6-2.6 г/кг) — единственный «уровень белка» (legacy nutrLevel удалён). */
+  /** Эпик 3: белок-пресет (1.6-2.2 г/кг) — единственный «уровень белка» (legacy nutrLevel удалён). */
   proteinPreset: NutritionLevel; setProteinPreset: (v: NutritionLevel) => void;
   variety: string; setVariety: (v: any) => void;
   diaryAdaptation: boolean; setDiaryAdaptation: (v: boolean) => void;
@@ -416,11 +418,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const s = profile?.settings;
   const courseEntries = _course || [];
 
-  const [weight, setWeight] = useState(s?.weight || 80);
-  const [height, setHeight] = useState(s?.height || 180);
-  const [age, setAge] = useState(s?.age || 30);
-  const [sex, setSex] = useState<'male' | 'female'>(s?.sex || 'male');
-  const [dailySteps, setDailySteps] = useState(s?.dailySteps || 8000);
+  const [weight, setWeight] = useState(s?.personal?.weight || 80);
+  const [height, setHeight] = useState(s?.personal?.height || 180);
+  const [age, setAge] = useState(s?.personal?.age || 30);
+  const [sex, setSex] = useState<'male' | 'female'>(s?.personal?.sex || 'male');
+  const [dailySteps, setDailySteps] = useState(s?.lifestyle?.dailySteps || 8000);
   // FIX persist-settings: единый объект локальных предпочтений планировщика (he_planner_prefs).
   // Раньше ~24 настройки (бюджет, режим, время приёмов, цикл фазы и т.д.) сбрасывались при
   // перезагрузке — выбора пользователя не было ни в localStorage, ни в профиле.
@@ -459,14 +461,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [bodyFatPct, setBodyFatPct] = useState<number>(() => {
     // P1-fix: читаем из Profile (UnifiedSettings) через proxy
     try {
-      const v = s?.bodyFat;
+      const v = s?.personal?.bodyFat;
       if (typeof v === 'number' && v > 0) return v;
     } catch {}
     return 15;
   });
   const [sleepHours, setSleepHours] = useState<number>(() => {
     try {
-      const v = s?.sleepHours;
+      const v = s?.lifestyle?.sleepHours;
       if (typeof v === 'number' && v > 0) return v;
     } catch {}
     return 7;
@@ -482,7 +484,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   });
   const [stressLevel, setStressLevel] = useState<number>(() => {
     try {
-      const v = s?.stressLevel;
+      const v = s?.lifestyle?.stressLevel;
       if (typeof v === 'number' && v > 0) return v;
     } catch {}
     return 5;
@@ -760,13 +762,24 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   });
   const [monthPlanMode, setMonthPlanMode] = useState(() => { try { return localStorage.getItem("he_plan_month_mode") === "true"; } catch { return false; } });
   const [monthPlan, setMonthPlan] = useState<any[]>(() => { try { const v = JSON.parse(localStorage.getItem("he_plan_month") || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } });
+  // P0-месяц: зеркало monthPlan в ref. После async-генерации месяца нельзя читать
+  // monthPlan из замыкания (stale — массив ДО setMonthPlan([])), иначе на экране
+  // остаётся старая/чужая неделя 0. Чтение всегда идёт через ref.
+  const monthPlanRef = useRef<any[]>(monthPlan);
+  useEffect(() => { monthPlanRef.current = monthPlan; }, [monthPlan]);
+  /** Загрузить неделю месяца в weekPlan (для вида «неделя» поверх месяца). */
+  const loadMonthWeekIntoPlan = (wi: number) => {
+    const w = monthPlanRef.current[wi];
+    if (w?.days?.length) { setWeekPlan(w); return true; }
+    return false;
+  };
   const [selectedWeek, setSelectedWeek] = useState(0);
   // E4-sync: эффект объявлен НИЖЕ (после weekPlan/weekEditDay — TDZ-guard).
-  const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
+  const [goal, setGoal] = useState<GoalId>(((s?.goals?.primaryGoal || s?.training?.primaryGoal) as GoalId) || 'maintenance');
   const [phase, setPhase] = useState<PhaseId>((_pf.phase && (GOALS.some(g => g.id === _pf.phase) || PHASES.some(p => p.id === _pf.phase))) ? _pf.phase as PhaseId : 'course');
   // Эпик 2: авто-цель НЕ выводится из фазы (фаза — фарма-контекст, не цель).
   // Рекомендация — из профиля (primaryGoal) либо нейтральная.
-  const profilePrimaryGoal = (s?.primaryGoal as GoalId) || 'maintenance';
+  const profilePrimaryGoal = ((s?.goals?.primaryGoal || s?.training?.primaryGoal) as GoalId) || 'maintenance';
   const autoGoal: GoalId = profilePrimaryGoal !== 'maintenance' ? profilePrimaryGoal : 'maintenance';
   const [goalUserSet, setGoalUserSet] = useState(false);
   // FIX 1.2: авто-цель применяется ТОЛЬКО если пользователь явно не выбрал цель
@@ -835,13 +848,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch {}
   }, [linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern]);
   // FIX train-bind: единая функция «тренировочный день?» для всех режимов графика.
-  const isTrainDay = (offset: number): boolean => isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset);
+  const isTrainDay = (offset: number): boolean => linkToTraining && isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset);
   const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const injectDrugTypes = ['инсулин', 'ГР', 'ИФР-1', 'MGF', 'IGF-1 DES', 'IGF-1 LR3', 'HMG', 'HCG', 'GHRP', 'CJC', 'BPC-157', 'TB-500', 'меланотан', 'семаглутид', 'тирзепатид', 'другое'];
 
   const calcTargets = useMemo(() => {
     try {
-      const _localWorkoutsPerWeek = trainingDays.filter(Boolean).length || 3;
+      const _localWorkoutsPerWeek = (() => {
+        if (linkToTraining) return weeklyTrainingCount(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern));
+        const profileDays = Number((s as any)?.training?.daysPerWeek);
+        return Number.isFinite(profileDays) && profileDays > 0 ? Math.round(profileDays) : 3;
+      })();
       const _localAvgMinutes = (() => {
         try {
           const v = (s as any)?.training?.minutesPerSession || (s as any)?.avgWorkoutMinutes;
@@ -857,7 +874,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg: { protein: manualGPerKg.protein || 0, fat: manualGPerKg.fat || 0, carbs: manualGPerKg.carbs || 0 },
       });
     } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; }
-  }, [weight, height, age, sex, goal, trainingDays, s?.avgWorkoutMinutes, injections, phase, bodyFatPct, weightAdaptMode, weightLogWeek, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, dailySteps, householdActivity, trainType, trainIntensity, surplusPct]);
+  }, [weight, height, age, sex, goal, trainingDays, linkToTraining, trainStart, trainEnd, trainScheduleType, trainPattern, s?.training?.daysPerWeek, s?.training?.minutesPerSession, injections, phase, bodyFatPct, weightAdaptMode, weightLogWeek, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, dailySteps, householdActivity, trainType, trainIntensity, surplusPct]);
 
   // FIX: manual KBJU + kbjuMode теперь инициализируются из localStorage и персистятся.
   // Раньше при перезагрузке страницы все ручные цели КБЖУ сбрасывались на null, а режим — на 'auto'.
@@ -911,10 +928,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // the duplicate TDEE calculation that diverged from calcTargets.
     try {
       return computePlannerTargets({
-        weightKg: s?.weight || weight, heightCm: s?.height || height,
-        age: s?.age || age, sex: s?.sex || sex,
+        weightKg: s?.personal?.weight || weight, heightCm: s?.personal?.height || height,
+        age: s?.personal?.age || age, sex: s?.personal?.sex || sex,
         goal: 'maintenance', phase: 'maintenance', bodyFatPct,
-        workoutsPerWeek: s?.workoutsPerWeek || 3, avgWorkoutMinutes: s?.avgWorkoutMinutes || 60,
+        workoutsPerWeek: s?.training?.daysPerWeek || 3, avgWorkoutMinutes: s?.training?.minutesPerSession || 60,
         dailySteps, householdActivity, trainType, trainIntensity, surplusPct: 10,
         injections: [],
         weightAdaptMode: false, weightLogWeek: [], expectedLossKgWeek: 0,
@@ -923,12 +940,31 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       });
     } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s?.weight, s?.height, s?.age, s?.sex, s?.workoutsPerWeek, s?.avgWorkoutMinutes, bodyFatPct, dailySteps, householdActivity, trainType, trainIntensity]);
+  }, [s?.personal?.weight, s?.personal?.height, s?.personal?.age, s?.personal?.sex, s?.training?.daysPerWeek, s?.training?.minutesPerSession, bodyFatPct, dailySteps, householdActivity, trainType, trainIntensity]);
 
   // Эпик 3: белок-пресет (г/кг) — единственный «уровень белка»; legacy nutrLevel
   // (ложный множитель «план на N% больше») удалён полностью.
-  const [proteinPreset, setProteinPreset] = useState<NutritionLevel>((['base', 'medium', 'enhanced', 'max'] as const).includes((_pf as any).proteinPreset as any) ? (_pf as any).proteinPreset : (['base', 'medium', 'enhanced', 'max'] as const).includes(_pf.nutrLevel as any) ? _pf.nutrLevel : 'base');
+  // База 1.6–2.2 г/кг; legacy 'max' (2.6 г/кг, снят из UI) нормализуется в 'enhanced' (2.2),
+  // чтобы старые сохранения не продолжали молча давать 2.6 г/кг. Выше 2.2 — ручной режим КБЖУ.
+  const _PROTEIN_PRESET_IDS = ['base', 'medium', 'enhanced'] as const;
+  const _legacyProteinPreset = (['base', 'medium', 'enhanced', 'max'] as const).includes((_pf as any).proteinPreset as any)
+    ? (_pf as any).proteinPreset
+    : (['base', 'medium', 'enhanced', 'max'] as const).includes(_pf.nutrLevel as any) ? _pf.nutrLevel : 'base';
+  const [proteinPreset, setProteinPreset] = useState<NutritionLevel>(
+    (_PROTEIN_PRESET_IDS as readonly string[]).includes(_legacyProteinPreset as string) ? (_legacyProteinPreset as NutritionLevel) : 'enhanced',
+  );
   const _proteinGPerKg = PROTEIN_PRESETS.find(p => p.id === proteinPreset)?.gPerKg || 2.0;
+  // P1-9: «Снять потолок» — явный оверрайд диетологического потолка углей г/кг
+  // (движок получает carbCapGPerKg: 0 = «без потолка»; UI-warning скрывается).
+  // Объявлен ДО dayTargets: цель дня читает флаг, иначе TDZ на первом рендере.
+  const [carbCapOverride, setCarbCapOverrideState] = useState<boolean>(() => {
+    try { return localStorage.getItem('he_planner_cap_override') === '1'; } catch { return false; }
+  });
+  const setCarbCapOverride = (v: boolean) => {
+    setCarbCapOverrideState(v);
+    try { localStorage.setItem('he_planner_cap_override', v ? '1' : '0'); } catch {}
+  };
+
   // Эпик A (NUTRITION-PLANNER-QUALITY-PLAN): фактические цели дня — единая чистая функция
   // buildDayTargets (planner-day-targets.ts). Наука (TDEE→surplus→фаза→фарма→weight-adapt→
   // metabolic→female gate) задаёт КАЛОРАЖ, пресет белка — оверрайд, угли — остаток до цели.
@@ -938,7 +974,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [planType, setPlanType] = useState<PlanType>((['classic', 'keto', 'highcarb', 'mediterranean', 'vegetarian'] as const).includes(_pf.planType as any) ? _pf.planType : 'classic');
   const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>((['minimal', 'medium', 'max'] as const).includes(_pf.variety as any) ? _pf.variety : 'max');
   const _insulinUnits = (injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0);
-  const _trainVolMin = (() => { try { return trainingDays.filter(Boolean).length * ((s as any)?.training?.minutesPerSession || 60); } catch { return 0; } })();
+  // P1-тренировки: объём недели берём из ФАКТИЧЕСКОГО расписания (weeklyTrainingCount
+  // учитывает eod/pattern/дни недели), а не из `trainingDays.filter(Boolean).length`
+  // (это массив 7 флагов, игнорирующий тип расписания). При выключенной привязке
+  // к тренировкам объём = 0: углеводы не должны расти «за счёт тренировок».
+  const _trainVolMin = (() => {
+    try {
+      if (!linkToTraining) return 0;
+      const sched = buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern);
+      return weeklyTrainingCount(sched) * ((s as any)?.training?.minutesPerSession || 60);
+    } catch { return 0; }
+  })();
   const dayTargets = useMemo(() => buildDayTargets({
     weightKg: weight,
     presetGPerKg: _proteinGPerKg,
@@ -952,7 +998,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     budget,
     insulinTotalUnits: _insulinUnits,
     dietStyle: planType,
-  }), [weight, _proteinGPerKg, kbjuMode, manualKcal, manualP, manualF, manualC, manualGPerKg, calcTargets, profileTargets, goal, _trainVolMin, budget, _insulinUnits, planType]);
+    // P1-9 «Снять потолок»: кнопка в UI меняла только подпись — цель дня считалась
+    // с потолком г/кг. 0 = без потолка (контракт computeDieteticCarbTarget).
+    carbCapGPerKg: carbCapOverride ? 0 : undefined,
+  }), [weight, _proteinGPerKg, kbjuMode, manualKcal, manualP, manualF, manualC, manualGPerKg, calcTargets, profileTargets, goal, _trainVolMin, budget, _insulinUnits, planType, carbCapOverride]);
   const dayTargetsBreakdown: string[] = [...dayTargets.breakdown];
   // Ф4.25: читаем заметку ББ-плана (he_bb_nutrition_note) — калораж + трен-дни для
   // циклирования углеводов. Применяется только если есть данные (no-op иначе).
@@ -998,7 +1047,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const _capOverride = (() => { try { return localStorage.getItem('he_planner_cap_override') === '1'; } catch { return false; } })();
   const carbCapGPerKg = (() => {
     try {
-      const vol = trainingDays.filter(Boolean).length * ((s as any)?.training?.minutesPerSession || 60);
+      const schedule = buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern);
+      const vol = linkToTraining ? weeklyTrainingCount(schedule) * ((s as any)?.training?.minutesPerSession || 60) : 0;
       return contextualCarbCapGPerKg(plannerGoalCategory(goal), vol, budget);
     } catch { return 5; }
   })();
@@ -1242,16 +1292,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     return 'real';
   });
   useEffect(() => { try { localStorage.setItem('he_planner_hv_style', hvStyle); } catch {} }, [hvStyle]);
-  // P1-9: «Снять потолок» — явный оверрайд диетологического потолка углей г/кг
-  // (движок получает carbCapGPerKg: 0 = «без потолка»; UI-warning скрывается).
-  const [carbCapOverride, setCarbCapOverrideState] = useState<boolean>(() => {
-    try { return localStorage.getItem('he_planner_cap_override') === '1'; } catch { return false; }
-  });
-  const setCarbCapOverride = (v: boolean) => {
-    setCarbCapOverrideState(v);
-    try { localStorage.setItem('he_planner_cap_override', v ? '1' : '0'); } catch {}
-  };
-  // v6: единое разнообразие (variety + varietyStrictness → varietyLevel). Храним в _pf.varietyLevel,
+  // P1-9 «Снять потолок»: состояние carbCapOverride объявлено ВЫШЕ dayTargets
+  // (цель дня читает этот флаг — иначе TDZ на первом рендере).
+  // v6: единообразие (variety + varietyStrictness → varietyLevel). Храним в _pf.varietyLevel,
   // мигрируем из старых _pf.variety / _pf.varietyStrictness / he_variety_strictness.
   const [varietyLevel, setVarietyLevelRaw] = useState<VarietyLevel>(() => {
     const v = (_pf as any).varietyLevel as VarietyLevel;
@@ -1566,6 +1609,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setUndoStack(prev => prev.slice(1));
   };
 
+  const withoutSecondRecipe = (meal: any) => {
+    const { recipeApplied2: _recipeApplied2, recipeAppliedData2: _recipeAppliedData2, ...rest } = meal || {};
+    return rest;
+  };
   const calcItemTotals = (items: any[]) => ({ kcal: items.reduce((s: number, i: any) => s + (i.kcal || 0), 0), p: items.reduce((s: number, i: any) => s + (i.p || 0), 0), f: items.reduce((s: number, i: any) => s + (i.f || 0), 0), c: items.reduce((s: number, i: any) => s + (i.c || 0), 0), fiber: items.reduce((s: number, i: any) => s + (i.fiber || 0), 0), leucine_mg: items.reduce((s: number, i: any) => s + (i.leucine_mg || 0), 0) });
   const calcMealTotals = (meals: any[]) => ({ kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0), fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0), leucine_mg: meals.reduce((s: number, m: any) => s + (m.totals?.leucine_mg || 0), 0) });
   const updateMealsInPlan = (prev: any, mealIdx: number, itemsUpdater: (items: any[]) => any[]) => {
@@ -1575,11 +1622,22 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     meals[mealIdx] = { ...meals[mealIdx], items, totals: calcItemTotals(items) };
     return { ...prev, meals, totals: calcMealTotals(meals) };
   };
-  const updateMultiDayPlan = (plan: any, dayIdx: number, mealIdx: number, itemsUpdater: (items: any[]) => any[]) => {
+  const updateMultiDayPlan = (plan: any, dayIdx: number, mealIdx: number, itemsUpdater: (items: any[]) => any[], compositionChange?: boolean) => {
     if (!plan?.days?.[dayIdx]) return;
     const days = [...plan.days];
-    const updated = updateMealsInPlan(days[dayIdx], mealIdx, itemsUpdater);
+    let updated = updateMealsInPlan(days[dayIdx], mealIdx, itemsUpdater);
     if (!updated) return;
+    // P1-правки: смена состава сбрасывает recipeApplied приёма (см. _applyDayPlanMealUpdate).
+    if (compositionChange && updated.meals) {
+      updated = {
+        ...updated,
+        meals: updated.meals.map((m: any, i: number) => {
+          if (i !== mealIdx || (!m.recipeApplied && !m.recipeAppliedData && !m.recipeApplied2 && !m.recipeAppliedData2)) return m;
+          const { recipeApplied, recipeAppliedData, recipeApplied2, recipeAppliedData2, ...rest } = m;
+          return rest;
+        }),
+      };
+    }
     days[dayIdx] = updated;
     const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0), fiber: days.reduce((s: number, d: any) => s + (d.totals?.fiber || 0), 0), leucine_mg: days.reduce((s: number, d: any) => s + (d.totals?.leucine_mg || 0), 0) };
     // P1-fix: используем функциональные updaters вместо сравнения ссылок (===).
@@ -1763,16 +1821,55 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (d !== 1) setWeekEditDay(null);
     setPlanDays(d);
   };
-  const _applyDayPlanMealUpdate = (mealIdx: number, updater: (items: any[]) => any[]) => {
-    setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, updater));
+  const _applyDayPlanMealUpdate = (mealIdx: number, updater: (items: any[]) => any[], opts?: { compositionChange?: boolean }) => {
+    // P1-правки: если СОСТАВ приёма изменён вручную (добавлен/заменён/удалён продукт),
+    // recipeApplied на приёме больше не описывает реальность — карточка готовки показывала
+    // ингредиенты рецепта, которых в приёме уже нет. Сбрасываем provenance.
+    // Правка ТОЛЬКО граммовки состав не меняет — рецепт остаётся источником (не сбрасываем).
+    // Путь применения рецепта (_applyDayPlanMealUpdate не использует) — не затронут.
+    const _applyMeta = (day: any) => {
+      if (!opts?.compositionChange || !day?.meals) return day;
+      return {
+        ...day,
+        meals: day.meals.map((m: any, i: number) => {
+          if (i !== mealIdx || (!m.recipeApplied && !m.recipeAppliedData && !m.recipeApplied2 && !m.recipeAppliedData2)) return m;
+          const { recipeApplied, recipeAppliedData, recipeApplied2, recipeAppliedData2, ...rest } = m;
+          return rest;
+        }),
+      };
+    };
+    setDayPlan((prev: any) => _applyMeta(updateMealsInPlan(prev, mealIdx, updater)));
     if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
-      updateMultiDayPlan(weekPlan, weekEditDay, mealIdx, updater);
+      updateMultiDayPlan(weekPlan, weekEditDay, mealIdx, updater, opts?.compositionChange);
     }
   };
 
   // FIX per100 + dedup: честный per100 расчёт + защита от дубля (две каши)
+  // P1-01/P1-02/P1-06/P1-08: единый гейт ограничений для РУЧНЫХ операций.
+  // Автогенерация ограничения соблюдает, а ручные «добавить/заменить/быстрое комбо»
+  // шли мимо них — продукт с аллергеном молока/исключённый/не-веганский попадал в план.
+  // Канон — planner-restrictions (тот же резолвер, что у движка генерации).
+  const _manualFoodBlockReason = (foodId: string): string | null => {
+    if (!foodId) return null;
+    try {
+      if ((excludedFoods || []).includes(foodId)) return 'продукт в списке исключённых';
+      if (resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []).has(foodId)) return 'продукт не проходит аллергены/рацион';
+      const food = FOOD_DB.find(f => f.id === foodId);
+      if (food && !matchesCategoryPref(food, { preferred: [], excluded: excludedCategories || [] })) return 'категория продукта исключена';
+      if ((dietPrefs || []).includes('vegetarian') && FOOD_ALLERGEN_DIET[foodId]?.isVegetarian === false) return 'продукт не подходит для вегетарианского рациона';
+      return null;
+    } catch { return null; }
+  };
+  const _blockManualFood = (name: string, reason: string): boolean => {
+    try { setErrorMsg(`«${name}» нельзя добавить: ${reason}. Выберите другой продукт.`); setTimeout(() => setErrorMsg(null), 3000); } catch {}
+    if (typeof (window as any).showToast === 'function') (window as any).showToast('⛔ Продукт заблокирован ограничениями', 'warning');
+    return true;
+  };
+
   const addFoodToMeal = (dayIdx: number, mealIdx: number, food: any) => {
     if (!food || !food.name) return;
+    const _block = _manualFoodBlockReason(food.id);
+    if (_block) { _blockManualFood(food.name, _block); return; }
     const resolved = _resolvePlanDay(dayIdx);
     if (!resolved) return;
     const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
@@ -1797,11 +1894,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // KBЖУ-консистентность ≤3%: kcal из формулы
     const item = { name: food.name, id: food.id, amount: grams, kcal: Math.round(4 * _p + 9 * _f + 4 * _c), p: _p, f: _f, c: _c, fiber: Math.round((food.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
     if (resolved.plan === 'day') {
-      _applyDayPlanMealUpdate(mealIdx, items => [...items, item]);
+      _applyDayPlanMealUpdate(mealIdx, items => [...items, item], { compositionChange: true });
     } else if (resolved.plan === 'three') {
-      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => [...items, item]);
+      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => [...items, item], true);
     } else if (resolved.plan === 'week') {
-      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => [...items, item]);
+      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => [...items, item], true);
     }
   };
 
@@ -1818,12 +1915,18 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const usePortable = workFood === 'portable' && isWorkDayForAdd;
     const oats = FOOD_DB.find(f => f.id === (usePortable ? 'oats_dry' : 'oats')) || FOOD_DB.find(f => f.id === 'oats_dry') || FOOD_DB.find(f => f.id === 'oats');
     const additions = [] as any[];
-    if (whey) additions.push(mk(whey, 30));
-    if (oats) additions.push(mk(oats, usePortable ? 70 : 50));
+    if (whey) {
+      const _r = _manualFoodBlockReason(whey.id);
+      if (_r) _blockManualFood(whey.name, _r); else additions.push(mk(whey, 30));
+    }
+    if (oats) {
+      const _r = _manualFoodBlockReason(oats.id);
+      if (_r) _blockManualFood(oats.name, _r); else additions.push(mk(oats, usePortable ? 70 : 50));
+    }
     // полноценная еда на работе — добавляем орехи/фрукт для баланса
     if (usePortable) {
       const alm = FOOD_DB.find(f => f.id === 'almonds');
-      if (alm) additions.push(mk(alm, 15));
+      if (alm && !_manualFoodBlockReason(alm.id)) additions.push(mk(alm, 15));
     }
     if (additions.length === 0) return;
     // P1b: комбо — единый коктейль (порошок + хлопья[/орехи]), а не россыпь строк.
@@ -1832,16 +1935,18 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     saveUndo();
     const apply = (items: any[]) => [...items, ...additions];
     if (resolved.plan === 'day') {
-      _applyDayPlanMealUpdate(mealIdx, apply);
+      _applyDayPlanMealUpdate(mealIdx, apply, { compositionChange: true });
     } else if (resolved.plan === 'three') {
-      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, apply);
+      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, apply, true);
     } else if (resolved.plan === 'week') {
-      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, apply);
+      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, apply, true);
     }
   };
 
   const replaceFoodItem = (dayIdx: number, mealIdx: number, itemIdx: number, newFood: any) => {
     if (!newFood || typeof newFood !== 'object' || !newFood.name) return; // FIX button-audit: guard
+    const _block = _manualFoodBlockReason(newFood.id);
+    if (_block) { _blockManualFood(newFood.name, _block); return; }
     const resolved = _resolvePlanDay(dayIdx);
     if (!resolved) return;
     const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
@@ -1856,11 +1961,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const leuPer100 = (newFood as any).amino_acid_profile_100g?.leucine_mg ?? (newFood.micros?.Leucine != null ? (newFood.micros.Leucine as number) : Math.round((newFood.protein || 0) * 75));
     const replacement = { ...old, name: newFood.name, id: newFood.id, amount: grams, kcal: (() => { const p = Math.round((newFood.protein || 0) * ratio * 10) / 10, f = Math.round((newFood.fat || 0) * ratio * 10) / 10, c = Math.round((newFood.carbs || 0) * ratio * 10) / 10; return Math.round(4 * p + 9 * f + 4 * c); })(), p: Math.round((newFood.protein || 0) * ratio * 10) / 10, f: Math.round((newFood.fat || 0) * ratio * 10) / 10, c: Math.round((newFood.carbs || 0) * ratio * 10) / 10, fiber: Math.round((newFood.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
     if (resolved.plan === 'day') {
-      _applyDayPlanMealUpdate(mealIdx, items => { items[itemIdx] = replacement; return items; });
+      _applyDayPlanMealUpdate(mealIdx, items => { items[itemIdx] = replacement; return items; }, { compositionChange: true });
     } else if (resolved.plan === 'three') {
-      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => { items[itemIdx] = replacement; return items; });
+      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => { items[itemIdx] = replacement; return items; }, true);
     } else if (resolved.plan === 'week') {
-      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => { items[itemIdx] = replacement; return items; });
+      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => { items[itemIdx] = replacement; return items; }, true);
     }
     setReplacingItem(null);
   };
@@ -1871,6 +1976,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
     if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) { setEditItem(null); return; }
     const it = dayData.meals[mealIdx].items[itemIdx];
+    // P1-undo: правка граммовки раньше шла БЕЗ saveUndo — изменение нельзя было отменить
+    // (все соседние операции — добавление/замена/удаление — снимок делали).
+    saveUndo();
     // spice hard cap 10г
     let amt = Math.max(1, newAmount);
     if (String(it.id || '').startsWith('spice_') && amt > 10) amt = 10;
@@ -1893,11 +2001,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) return;
     saveUndo();
     if (resolved.plan === 'day') {
-      _applyDayPlanMealUpdate(mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
+      _applyDayPlanMealUpdate(mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx), { compositionChange: true });
     } else if (resolved.plan === 'three') {
-      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
+      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx), true);
     } else if (resolved.plan === 'week') {
-      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
+      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx), true);
     }
   };
 
@@ -2228,22 +2336,32 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       };
     }
     if (!source?.meals) return;
+    const _excludedRecipeNames = new Set<string>((excludedFoods || [])
+      .filter(id => id.startsWith('__recipe__') || id.startsWith('__user_recipe__'))
+      .map(id => id.replace(/^__(?:user_)?recipe__/, '')));
+    const _excludedIds = new Set<string>([
+      ...resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []),
+      ...(excludedFoods || []).filter(id => !id.startsWith('__recipe__') && !id.startsWith('__user_recipe__')),
+    ]);
+    const _categoryPref = { preferred: [] as string[], excluded: excludedCategories || [] };
     // §7.2-Р (а): 'carb-load' блюда — только для экстрим-полосы дня; вне неё не показываем
     // (иначе «Загрузка: спагетти…» всплывает в обычных днях и ломает portable-фильтры).
-    const poolAll = filterRecipePoolForBand(filterByCookSkill([...getRecipes(), ...(userRecipes || [])], cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking }).skill), effectiveC, effectiveP, weight);
+    const poolAll = filterRecipePoolForBand(filterByCookSkill([...getRecipes(), ...(userRecipes || [])].filter(r => !_excludedRecipeNames.has(r.name)), cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking }).skill), effectiveC, effectiveP, weight);
     const labelMap: Record<string, 'breakfast'|'lunch'|'snack'|'dinner'|'preworkout'|'postworkout'|'presleep'> = {
       'Завтрак': 'breakfast', 'Обед': 'lunch', 'Ужин': 'dinner', 'Перекус': 'snack', 'Второй завтрак': 'snack',
       'Полдник': 'snack', 'Предтрен': 'preworkout', 'Пост-трен': 'postworkout', 'Перед сном': 'presleep',
     };
     const budget = prepTimeBudgetPerMeal(cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking }), mealsCount);
     const nextMeals = source.meals.map((m: any) => {
-      // B7: копим показанные имена между обновлениями — «🔄» не крутит одни и те же рецепты
       const seen = new Set<string>([...((m.recipeSuggestions || []).map((r: any) => r?.name).filter(Boolean)), ...((m as any).suggestionSeenNames || [])]);
       const tgt = m.target || { p: m.totals.p, c: m.totals.c, f: m.totals.f };
       const sugg = pickRecipeOptions(poolAll, {
         mealType: (labelMap[m.label] || 'lunch'),
         targetKcal: m.totals.kcal || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9) || 300, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
-        excludedIds: new Set<string>(excludedFoods || []),
+        excludedIds: _excludedIds,
+        allergenTags: selectedAllergenTags(allergens || [], dietPrefs || []),
+        excludedRecipeNames: _excludedRecipeNames.size > 0 ? _excludedRecipeNames : undefined,
+        categoryPref: _categoryPref,
         isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: budget,
         preferredRecipeNames: favoriteRecipes.size > 0 ? favoriteRecipes : undefined,
       }, 3, seen);
@@ -2270,6 +2388,30 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   };
 
   const replaceMealWithRecipe = (recipe: Recipe, mealIdx: number, dayIdx = 0) => {
+    // P1-01/P1-02: ручная замена рецептом шла мимо ограничений — пользователь мог
+    // поставить рецепт с аллергеном/исключённым продуктом, и он молча попадал в план.
+    // Проверяем ФАКТИЧЕСКУЮ декомпозицию рецепта (после подмены консервов) по канону.
+    try {
+      const _decomp = decomposeRecipe(recipe);
+      const _blocked = new Set<string>([
+        ...resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []),
+        ...(excludedFoods || []),
+      ]);
+      const _tags = selectedAllergenTags(allergens || [], dietPrefs || []);
+      const _isVeg = (dietPrefs || []).includes('vegetarian');
+      const _hits = _decomp.filter(it => {
+        const food = FOOD_DB.find(f => f.id === it.id);
+        return _blocked.has(it.id)
+          || getFoodAllergenTags(it.id, FOOD_DB).some(t => _tags.has(t))
+          || (!!food && !matchesCategoryPref(food, { preferred: [], excluded: excludedCategories || [] }))
+          || (_isVeg && FOOD_ALLERGEN_DIET[it.id]?.isVegetarian === false);
+      });
+      if (_hits.length > 0) {
+        setErrorMsg(`Рецепт «${recipe.name}» не проходит ваши ограничения: ${_hits.slice(0, 3).map(x => x.name).join(', ')}${_hits.length > 3 ? '…' : ''}. Выберите другой.`);
+        if (typeof (window as any).showToast === 'function') (window as any).showToast('⛔ Рецепт заблокирован ограничениями', 'warning');
+        return;
+      }
+    } catch { /* декомпозиция не удалась — не блокируем явное действие пользователя */ }
     saveUndo();
     // P0-fix: пропорциональное распределение КБЖУ по ингредиентам рецепта вместо хардкода 100г.
     // Каждый ингредиент получает долю kcal = recipe.kcal / N, а граммовка выводится из
@@ -2321,7 +2463,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const appliedScale = built.scale;
         const flatOptScaled = flatOpt ? { ...flatOpt, appliedScale } : flatOpt;
         const patched = mealsSrc.map((x, i) => i === mealIdx
-          ? { ...x, items, totals: calcItemTotals(items), recipeApplied: recipe.name, recipeAppliedData: flatOptScaled }
+          ? { ...withoutSecondRecipe(x), items, totals: calcItemTotals(items), recipeApplied: recipe.name, recipeAppliedData: flatOptScaled }
           : x);
         const pre = sumDayTotals(patched as any);
         const rb = rebalanceDayAfterRecipes(patched as any, {
@@ -2374,7 +2516,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const items = built.items;
         const flatOptScaled = flatOpt ? { ...flatOpt, appliedScale: built.scale } : flatOpt;
         const patched = mealsSrc.map((x, i) => i === mealIdx
-          ? { ...x, items, totals: calcItemTotals(items), recipeApplied: recipe.name, recipeAppliedData: flatOptScaled }
+          ? { ...withoutSecondRecipe(x), items, totals: calcItemTotals(items), recipeApplied: recipe.name, recipeAppliedData: flatOptScaled }
           : x);
         const pre = sumDayTotals(patched as any);
         const rb = rebalanceDayAfterRecipes(patched as any, {
@@ -2403,23 +2545,35 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try {
       const allMealsForOptions = _outerResMeals || _outerVisibleMealsForOptions || (dayIdx !== 0 ? ((): any => { const r = _resolvePlanDay(dayIdx); if (!r) return null; const p = r.plan==='three'? threeDayPlan : r.plan==='week'? weekPlan : null; return p?.days?.[r.day]?.meals; })() : null);
       if (allMealsForOptions && Array.isArray(allMealsForOptions)) {
-        const excludedIds = new Set<string>(excludedFoods || []);
-        const poolForOptions = [...getRecipes(), ...(userRecipes||[])].filter(r=> !excludedIds.has(r.name));
-        for (let i=0; i<allMealsForOptions.length; i++) {
+        const excludedRecipeNames = new Set<string>(allMealsForOptions.flatMap((meal: any) => [meal?.recipeApplied, meal?.recipeApplied2].filter(Boolean).map((v: any) => String(v))));
+        const excludedIds = new Set<string>([
+          ...resolveAllExcludedFoodIds(FOOD_DB, allergens, dietPrefs),
+          ...(excludedFoods || []).filter((id: string) => !/^__(recipe|user_recipe)__/.test(id)),
+        ]);
+        const poolForOptions = [...getRecipes(), ...(userRecipes || [])]
+          .filter(r => !excludedRecipeNames.has(r.name));
+        const allergenTags = selectedAllergenTags(allergens, dietPrefs);
+        const categoryPref = { preferred: [], excluded: excludedCategories || [] };
+        for (let i = 0; i < allMealsForOptions.length; i++) {
           const m = allMealsForOptions[i];
-          if (i===mealIdx) continue; // заменённый уже имеет
-          if (!m || m.recipeApplied) continue; // уже выбранный рецепт — не трогаем
+          if (i === mealIdx) continue;
+          if (!m || m.recipeApplied) continue;
           const label = m.label || '';
-          const isMainOpt = ['Завтрак','Обед','Ужин'].includes(label);
+          const isMainOpt = ['Завтрак', 'Обед', 'Ужин'].includes(label);
           if (!isMainOpt && !/Перекус|Полдник/.test(label)) continue;
-          const tgt = (m as any).target || { p: m.totals?.p ?? 30, c: m.totals?.c ?? 40, f: m.totals?.f ?? 15 };
-          const tKcal = m.totals?.kcal || Math.round((tgt.p||0)*4 + (tgt.c||0)*4 + (tgt.f||0)*9) || 300;
-          const opts = { mealType: label==='Завтрак'?'breakfast': label==='Обед'?'lunch': label==='Ужин'?'dinner':'snack' as any, targetKcal:tKcal, targetProteinG:tgt.p||30, targetCarbsG:tgt.c||40, targetFatG:tgt.f||15, excludedIds, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: 60 };
+          const tgt = m.target || { p: m.totals?.p ?? 30, c: m.totals?.c ?? 40, f: m.totals?.f ?? 15 };
+          const tKcal = m.totals?.kcal || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9) || 300;
+          const opts = {
+            mealType: label === 'Завтрак' ? 'breakfast' : label === 'Обед' ? 'lunch' : label === 'Ужин' ? 'dinner' : 'snack' as any,
+            targetKcal: tKcal, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
+            excludedIds, excludedRecipeNames, allergenTags, categoryPref,
+            isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: 60,
+          };
           const picks = pickRecipesForMeal(poolForOptions as any, opts as any, 3);
-          if (picks.length>0) {
-            const flats = picks.map(r=> flattenRecipeOption(r));
-            (m as any).recipeOptions = flats;
-            (m as any).recipeOptionNames = flats.map(f=>f.name);
+          if (picks.length > 0) {
+            const flats = picks.map(r => flattenRecipeOption(r));
+            m.recipeOptions = flats;
+            m.recipeOptionNames = flats.map(f => f.name);
           }
         }
       }
@@ -3038,7 +3192,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const buildWaterTimeline = (w: number, mealTimes: { time: string; label: string }[], isTrainingDay: boolean, trainStart: string) => {
     // #8 Гидратация по поту: base 35 мл/кг + sweat по интенсивности/длительности.
     const _sweatMlPerH = trainIntensity === 'high' ? 1500 : trainIntensity === 'medium' ? 1000 : 600; // пот мл/ч
-    const _trainDurH = (s?.avgWorkoutMinutes || 60) / 60;
+    const _trainDurH = (s?.training?.minutesPerSession || 60) / 60;
     const _sweatMl = isTrainingDay ? Math.round(_sweatMlPerH * _trainDurH) : 0;
     const totalMl = Math.round(w * 35) + _sweatMl;
     const slots = mealTimes.length;
@@ -3329,15 +3483,16 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           goalKcal: _applyPrepTargets ? _peakTargets.kcal : Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
           goalProteinG: _applyPrepTargets ? _peakTargets.proteinG : Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
           goalFatG: _applyPrepTargets ? _peakTargets.fatG : Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
-          goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
-          mealsCount: _effMealsCount, isTrainingDay: plannerModeRef.current === 'pro' ? isTrainDay(offset) : false,
+           goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
+           manualTargetsLocked: kbjuMode === 'manual',
+           mealsCount: _effMealsCount, isTrainingDay: linkToTraining && plannerModeRef.current === 'pro' ? isTrainDay(offset) : false,
           trainStartMin: linkToTraining && isTrainDay(offset) && plannerModeRef.current === 'pro' ? toMin(trainStart) : undefined,
-          allowIntraWorkout: intraWorkoutEnabled && trainIntensity !== 'low' && plannerModeRef.current === 'pro',
-          trainDurationMin: (s?.avgWorkoutMinutes || 60),
+          allowIntraWorkout: linkToTraining && intraWorkoutEnabled && trainIntensity !== 'low' && plannerModeRef.current === 'pro',
+          trainDurationMin: linkToTraining ? (s?.training?.minutesPerSession || 60) : undefined,
           trainIntensity: (trainIntensity as any) || 'medium',
           carbAutoCycle: (carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch' || (carbPeriodization as any) === 'auto'),
           excludedIds: (() => { const s: Set<string> = new Set<string>(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
-          allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
+          allergenTags: selectedAllergenTags(allergens || [], dietPrefs || []),
           preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); _microLedger.preferIds.forEach((id: string) => s.add(id)); if (planType === 'mediterranean') ['salmon','mackerel','olive_oil','tomato','cucumber','yogurt_greek','avocado'].forEach((id: string) => { if (!excludedIds.has(id) && FOOD_DB.some(f => f.id === id)) s.add(id); }); return s; })(),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal || {}).map(([k, v]) => [k, new Set(v as string[] || [])])),
           // Эпик-хвост (8г): specificity удалён из генерации (legacy no-op, UI нет) — движок использует default
@@ -3500,10 +3655,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             pool: _filteredRecipes,
             targets: { kcal: input.goalKcal, p: input.goalProteinG, f: input.goalFatG, c: input.goalCarbsG },
             excludedIds,
+            allergenTags: selectedAllergenTags(allergens || [], dietPrefs || []),
+            // P1-04: исключённые рецепты (маркеры __recipe__/__user_recipe__ в he_excluded_foods).
+            excludedRecipeNames: (() => {
+              const _s = new Set<string>();
+              for (const id of excludedFoods || []) {
+                if (id.startsWith('__recipe__')) _s.add(id.replace(/^__recipe__/, ''));
+                else if (id.startsWith('__user_recipe__')) _s.add(id.replace(/^__user_recipe__/, ''));
+              }
+              return _s.size > 0 ? _s : undefined;
+            })(),
             cookProfile: _cookProf ?? undefined,
             maxPrepTimeMin: _recipeBudget,
-            isVegetarian: dietPrefs.includes('vegetarian'),
-            preferredRecipeNames: favoriteRecipes.size > 0 ? favoriteRecipes : undefined,
+             isVegetarian: dietPrefs.includes('vegetarian'),
+             categoryPref: { preferred: [], excluded: excludedCategories || [] },
+             preferredRecipeNames: favoriteRecipes.size > 0 ? favoriteRecipes : undefined,
             usedNamesAcrossDays: _usedRecipeNames,
             goal: goal === 'cutting' || goal === 'fat_loss' ? 'cut' : goal === 'maintenance' ? 'maintenance' : 'mass',
             athleteWeightKg: weight,
@@ -3726,7 +3892,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     generateCheatMeal, generateCarbload, generateBUTCH, generateCravingPlan, generateLazyDayPlan,
     generateRecommendations,
   } = usePlannerSpecialMealState({
-    isTrainDay, allergens, dietPrefs, plannerModeRef, goal, phase, weight,
+    isTrainDay, allergens, dietPrefs, excludedFoods, excludedCategories, plannerModeRef, goal, phase, weight,
     effectiveKcal, effectiveP, effectiveF, effectiveC, cravingDays, lazyDayDays,
     injections, linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType,
     v2Phase, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {},
@@ -3933,7 +4099,10 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {},
     phase, takenSupplements: Array.isArray(takenSupplements) ? takenSupplements : [],
     planTargets, planType, variety, healthIssues, waterCalc,
-    linkToTraining, trainStart, trainDaysArr: _trainDaysArr, carbPeriodization,
+    userTDEE: calcTargets.tdee > 0 ? calcTargets.tdee : profileTargets.tdee,
+    sex, goal,
+    isTrainingDay: (() => { try { return linkToTraining && isTrainDay(selectedDayIndex); } catch { return false; } })(),
+    linkToTraining, trainStart, carbPeriodization,
   });
 
   // P1-7: renderMealList вынесен в MealListRender.tsx (267 строк → 1 строка)
@@ -3957,7 +4126,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     weightLogPeriod, setWeightLogPeriod,
     metabolicAdaptEnabled, setMetabolicAdaptEnabled, metabolicAdaptPct, setMetabolicAdaptPct,
     manualGPerKg, setManualGPerKg,
-    monthPlanMode, setMonthPlanMode, monthPlan, setMonthPlan, selectedWeek, setSelectedWeek,
+    monthPlanMode, setMonthPlanMode, monthPlan, setMonthPlan, loadMonthWeekIntoPlan, selectedWeek, setSelectedWeek,
     goal, setGoal, phase, setPhase, autoGoal,
     goalUserSet, setGoalUserSet,
     injections, setInjections,

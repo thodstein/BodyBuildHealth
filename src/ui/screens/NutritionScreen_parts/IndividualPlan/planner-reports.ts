@@ -95,7 +95,7 @@ export function generateQualityReportPure(dayPlan: any, budget: string, foodDb: 
   const avg = Math.round(scores.reduce((s, x) => s + x.score, 0) / Math.max(1, scores.length) * 10) / 10;
   const bbsAvg = Math.round(scores.reduce((s, x) => s + x.bbs, 0) / Math.max(1, scores.length) * 10) / 10;
   const sorted = [...scores].sort((a, b) => b.score - a.score);
-  const budgetRange = b === 'low' ? '?1-5' : b === 'medium' ? '?5-8' : b === 'max' ? '?8-10' : '?9-10';
+  const budgetRange = b === 'low' ? '1–5' : b === 'medium' ? '5–8' : b === 'max' ? '8–10' : 'не определён';
   const budgetOk = (b === 'low' && bbsAvg <= 5) || (b === 'medium' && bbsAvg >= 5 && bbsAvg <= 8) || (b === 'max' && bbsAvg >= 8);
   const recommendations: string[] = !budgetOk
     ? [`Ваш бюджет «${b}» (${budgetRange}), но средний bb_quality_score составил ${bbsAvg}. ${b === 'low' ? 'Смените категорию на более дорогие продукты.' : b === 'max' ? 'Попробуйте подобрать более качественные продукты.' : 'Откорректируйте бюджет или продуктовую корзину.'}`]

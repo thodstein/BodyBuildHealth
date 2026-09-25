@@ -114,6 +114,34 @@ describe('buildDayTargets — manual (обратно-совместимо)', () 
     const r = buildDayTargets(IN({ kbjuMode: 'manual', manual: { kcal: 2800, p: 180, f: 30, c: 200 } }));
     expect(r.fats).toBe(64);
   });
+
+  it('manual: ккал и белок без сырого жира дают углы по фактическому полу', () => {
+    const r = buildDayTargets(IN({ kbjuMode: 'manual', manual: { kcal: 2000, p: 160, f: 0, c: null } }));
+    expect(r).toMatchObject({ protein: 160, fats: 64, carbs: 196 });
+    expect(r.kcal).toBe(2000);
+  });
+
+  it('manual: ручные углы ниже 50 г не повышаются скрытым диетологическим полом', () => {
+    const r = buildDayTargets(IN({ kbjuMode: 'manual', manual: { kcal: 1000, p: 100, f: 40, c: 10 } }));
+    expect(r.carbs).toBe(10);
+  });
+
+  it('carbCapOverride снимает контекстный потолок, но не ручные значения', () => {
+    const capped = buildDayTargets(IN({ goal: 'fat_loss', calcTargets: base({ kcal: 3000 }) }));
+    const uncapped = buildDayTargets(IN({ goal: 'fat_loss', calcTargets: base({ kcal: 3000 }), carbCapGPerKg: 0 }));
+    expect(uncapped.carbs).toBeGreaterThan(capped.carbs);
+  });
+
+  it('keto без инсулина сохраняет собственный низкий углеводный cap', () => {
+    const r = buildDayTargets(IN({ dietStyle: 'keto', calcTargets: base({ kcal: 2200, tdee: 2200 }) }));
+    expect(r.carbs).toBeLessThanOrEqual(60);
+    expect(r.breakdown.join(' ')).toContain('Кето');
+  });
+
+  it('keto + инсулин честно сообщает о конфликте гликемического пола', () => {
+    const r = buildDayTargets(IN({ dietStyle: 'keto', insulinTotalUnits: 10, calcTargets: base({ kcal: 2200, tdee: 2200 }) }));
+    expect(r.breakdown.join(' ')).toContain('Конфликт');
+  });
 });
 
 describe('buildDayTargets — profile', () => {

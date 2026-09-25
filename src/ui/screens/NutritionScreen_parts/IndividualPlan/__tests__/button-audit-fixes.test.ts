@@ -102,6 +102,12 @@ describe('P0-3: generateCarbload — bju.p = протокол белка, не e
     const result = generateCarbload(baseDeps);
     expect(result.bju.c).toBe(640);
   });
+
+  it('сумма выбранных продуктов равна заявленной углеводной нагрузке', () => {
+    const result = generateCarbload(baseDeps);
+    const actual = result.foods.reduce((sum: number, food: any) => sum + food.amount / 100 * food.carbs, 0);
+    expect(Math.abs(actual - result.totalCarbs)).toBeLessThanOrEqual(3);
+  });
 });
 
 describe('P0-4: generateAllergenReportPure — null-guard на allergens', () => {

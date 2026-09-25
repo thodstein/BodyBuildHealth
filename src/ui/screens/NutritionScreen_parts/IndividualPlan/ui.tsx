@@ -8,7 +8,7 @@ export const getProfileSafe = () => { try { return getProfile(); } catch { retur
 export const getDefaultKcal = (profile: UserProfile | null) => {
   if (!profile) return 2200;
   const s = profile.settings;
-  return s.weight ? Math.round(s.weight * 30) : 2200;
+  return s.personal?.weight ? Math.round(s.personal.weight * 30) : 2200;
 };
 
 export const GlassCard: React.FC<{ title?: string; icon?: string; color?: string; style?: React.CSSProperties; children: React.ReactNode }> = ({ title, icon, color, style, children }) => (

@@ -109,10 +109,10 @@ describe('buildDayPlan — любимые продукты (все попада�
     expect(allDayIds(plan)).not.toContain('rice_white');
   });
 
-  it('preferred не возвращается при теге аллергена (allergenTags dairy) — кроме порошка (протеин не аллерген)', () => {
+  it('preferred не возвращается при теге аллергена (allergenTags dairy), включая сывороточный порошок', () => {
     const plan = buildDayPlan(baseInput({ preferredIds: new Set(['whey_protein']), allergenTags: new Set(['dairy']) }));
-    // whey порошок не считается молочным аллергеном per user: "протеин не аллерген" — должен остаться
-    expect(allDayIds(plan)).toContain('whey_protein');
+    // whey/casein — молочные белки (isDairyFree:false), поэтому тег dairy их исключает
+    expect(allDayIds(plan)).not.toContain('whey_protein');
     // но обычная молочка — исключается
     const planMilk = buildDayPlan(baseInput({ preferredIds: new Set(['milk']), allergenTags: new Set(['dairy']) }));
     expect(allDayIds(planMilk)).not.toContain('milk');

@@ -4,7 +4,7 @@ import { PHARMA_DB } from "../../../../core/pharma-database";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import {
-  GOALS, PHASES, BUDGET_LEVELS, PROTEIN_PRESETS, CARB_PERIODIZATION_OPTIONS, VARIETY_LEVELS, PLAN_TYPES,
+  GOALS, PHASES, BUDGET_LEVELS, PROTEIN_PRESETS, PROTEIN_G_PER_KG_RANGE, CARB_PERIODIZATION_OPTIONS, VARIETY_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES, type PlanType,
 } from "./types";
 import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from "./ui";
@@ -1508,10 +1508,11 @@ export const IndividualPlanSettings: React.FC = () => {
       {plannerMode === 'pro' && kbjuMode !== 'manual' && (
       <GlassCard title="Белок · пресет" icon="🥩" color="#22c55e">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
-          Пресет белка определяет целевой белок: 1.6–2.6 г/кг. Жиры фиксированы на 0.8 г/кг, угли — остаток в диетпотолке.
+          Базовый диапазон белка: {PROTEIN_G_PER_KG_RANGE.min}–{PROTEIN_G_PER_KG_RANGE.max} г/кг массы. Жиры фиксированы на 0.8 г/кг, угли — остаток в диетпотолке.
+          Нужно больше или меньше — переключи «✏️ Ручное КБЖУ» и введи свои граммы: ручной режим не ограничен диапазоном.
         </div>
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>Сейчас: {effectiveP} г белка · {(weight>0?(effectiveP/weight).toFixed(2):'–')} г/кг · {PROTEIN_PRESETS.find(p=>p.id===proteinPreset)?.gPerKg || 2} г/кг пресет</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PROTEIN_PRESETS.length}, 1fr)`, gap: 5 }}>
           {PROTEIN_PRESETS.map(p => (
             <button key={p.id} onClick={() => setProteinPreset(p.id)} style={{
               padding: '10px 6px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
@@ -1929,9 +1930,9 @@ export const IndividualPlanSettings: React.FC = () => {
         {/* P2.1: 3 categories, 12 presets */}
         {([
           { cat: '🎯 По цели', color: '#00e68a', presets: [
-            { id: 'cut', label: '🔥 Сушка', desc: 'Дефицит, 2.5г белка/кг, низкий GI', fn: () => { const foods = ['chicken_breast','turkey_breast','cod','egg_white','cottage_cheese_5','broccoli','spinach','cucumber']; setGoal('cutting'); setBudget('medium'); setVarietyLevel('high'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+            { id: 'cut', label: '🔥 Сушка', desc: 'Дефицит, высокий белок, низкий GI', fn: () => { const foods = ['chicken_breast','turkey_breast','cod','egg_white','cottage_cheese_5','broccoli','spinach','cucumber']; setGoal('cutting'); setBudget('medium'); setVarietyLevel('high'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
             { id: 'mass', label: '💪 Масса', desc: 'Профицит, 2г/кг, высоко-углеводные', fn: () => { const foods = ['beef_lean','chicken_breast','salmon','egg_whole','rice_white','buckwheat','pasta_durum','banana','nuts_almonds']; setGoal('mass'); setBudget('medium'); setVarietyLevel('high'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-            { id: 'recomp', label: '🔄 Рекомпозиция', desc: 'Maintenance, 2.5г/кг, carb cycling', fn: () => { const foods = ['chicken_breast','salmon','egg_whole','cottage_cheese_5','rice_brown','quinoa','broccoli','avocado','olive_oil']; setGoal('recomposition'); setBudget('medium'); setVarietyLevel('high'); setCarbPeriodization('carb_cycle'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+            { id: 'recomp', label: '🔄 Рекомпозиция', desc: 'Maintenance, carb cycling', fn: () => { const foods = ['chicken_breast','salmon','egg_whole','cottage_cheese_5','rice_brown','quinoa','broccoli','avocado','olive_oil']; setGoal('recomposition'); setBudget('medium'); setVarietyLevel('high'); setCarbPeriodization('carb_cycle'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
             { id: 'maint', label: '⚖️ Поддержание', desc: 'Баланс 30/25/45', fn: () => { const foods = ['chicken_breast','beef_lean','salmon','egg_whole','rice_brown','buckwheat','broccoli','tomato','olive_oil','yogurt_greek']; setGoal('maintenance'); setBudget('medium'); setVarietyLevel('medium'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
           ]},
           { cat: '🥗 По типу питания', color: '#3b82f6', presets: [
@@ -1939,7 +1940,7 @@ export const IndividualPlanSettings: React.FC = () => {
              { id: 'fish', label: '🐟 Рыбный', desc: 'Лосось, тунец, треска', fn: () => { const foods = ['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil']; applyPlanType('mediterranean'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
              { id: 'vegan', label: '🌱 Веган', desc: 'Бобовые, тофу, киноа', fn: () => { const foods = ['tofu','tempeh','lentils','quinoa','broccoli','avocado']; applyPlanType('vegetarian'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
              { id: 'budget', label: '💰 Бюджет', desc: 'Яйца, курица, гречка', fn: () => { const foods = ['egg_whole','chicken_thigh','buckwheat','cabbage','apple']; setBudget('low'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-             { id: 'max', label: '🚀 Максимум', desc: 'Топ-рейтинг + макс. разнообразие', fn: () => { setBudget('max'); setProteinPreset('max'); setVarietyLevel('high'); } },
+             { id: 'max', label: '🚀 Максимум', desc: 'Топ-рейтинг + макс. разнообразие', fn: () => { setBudget('max'); setProteinPreset('enhanced'); setVarietyLevel('high'); } },
           ]},
           { cat: '💉 По фазе', color: '#a78bfa', presets: [
              { id: 'course', label: '💉 Курс', desc: 'Высокий белок, печень-суппорт', fn: () => { const foods = ['chicken_breast','beef_lean','salmon','egg_whole','rice_white','buckwheat','broccoli','spinach','cottage_cheese_5','olive_oil']; setPhase('course'); setGoal('mass'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },

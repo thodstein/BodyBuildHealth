@@ -2,8 +2,9 @@ import React, { useState, useMemo, useRef } from "react";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
-import { recipeMacroDistance } from "./recipe-engine";
+import { recipeMacroDistance, filterRecipesByHardRestrictions } from "./recipe-engine";
 import { filterRecipePoolForBand } from "./planner-recipe-mode";
+import { resolveAllExcludedFoodIds, selectedAllergenTags } from "./planner-restrictions";
 import { MealQuickControls } from "./MealQuickControls";
 import { MealComposerMode, type ComposerMode } from "./MealComposerMode";
 import type { AdvancedFilter } from "../../../../engines/kbju-food-match.engine";
@@ -86,8 +87,19 @@ export const MealComposer: React.FC = () => {
     favoriteRecipes, isFavoriteRecipe, toggleFavoriteRecipe,
     effectiveKcal, effectiveP, effectiveF, effectiveC, weight,
     setDayPlan, setThreeDayPlan, setWeekPlan, saveUndo,
+    allergens, dietPrefs, excludedFoods, excludedCategories, setErrorMsg,
      setPlanTab, plannerMode,
   } = usePlanCtx();
+
+  // P1-08: композер предлагал и применял продукты мимо ограничений пользователя.
+  // Один набор заблокированных id на оба действия (предложение + применение).
+  const _composerBlocked = useMemo(() => {
+    try {
+      const s = new Set<string>(resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []));
+      for (const id of excludedFoods || []) s.add(id);
+      return s;
+    } catch { return new Set<string>(); }
+  }, [allergens, dietPrefs, excludedFoods]);
 
   const [composerMode, setComposerMode] = useState<ComposerMode>('basic');
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilter>({});
@@ -100,14 +112,27 @@ export const MealComposer: React.FC = () => {
     const m = day?.meals?.[recipePickerMeal.mealIdx];
     const tgt = m?.target || { p: m?.totals?.p ?? 30, c: m?.totals?.c ?? 40, f: m?.totals?.f ?? 15 };
     const tKcal = m?.totals?.kcal || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9) || 300;
+    const _excludedRecipeNames = new Set<string>((excludedFoods || [])
+      .filter(id => id.startsWith('__recipe__') || id.startsWith('__user_recipe__'))
+      .map(id => id.replace(/^__recipe__/, '').replace(/^__user_recipe__/, '')));
+    let pool: any[] = [];
     try {
-      // §7.2-Р (а): ручной пикер рецептов тоже уважает полосу дня (карб-лоад — только экстрим-У).
-      return filterRecipePoolForBand(getRecipesByMeal(mealType as any), effectiveC, effectiveP, weight).map((r: any) => ({
-        r,
-        dist: recipeMacroDistance(r, { targetKcal: tKcal, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15 }),
-      })).sort((a: any, b: any) => a.dist - b.dist).map((x: any) => x.r);
-    } catch { return getRecipesByMeal(mealType as any); }
-  }, [recipePickerMeal, dayPlan, threeDayPlan, weekPlan, selectedDayIndex]);
+      pool = filterRecipesByHardRestrictions(getRecipesByMeal(mealType as any), {
+        excludedIds: _composerBlocked,
+        allergenTags: selectedAllergenTags(allergens || [], dietPrefs || []),
+        excludedRecipeNames: _excludedRecipeNames,
+        categoryPref: { preferred: [], excluded: excludedCategories || [] },
+        isVegetarian: (dietPrefs || []).includes('vegetarian'),
+      });
+    } catch {
+      pool = [];
+    }
+    return filterRecipePoolForBand(pool, effectiveC, effectiveP, weight).map((r: any) => ({
+      r,
+      dist: recipeMacroDistance(r, { targetKcal: tKcal, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15 }),
+    })).sort((a: any, b: any) => a.dist - b.dist).map((x: any) => x.r);
+  }, [recipePickerMeal, dayPlan, threeDayPlan, weekPlan, selectedDayIndex, _composerBlocked, allergens, dietPrefs, excludedFoods, excludedCategories, effectiveC, effectiveP, weight]);
+
   const allowAdvancedComposer = plannerMode === 'pro';
   React.useEffect(() => {
     if (!allowAdvancedComposer && composerMode !== 'basic') {
@@ -140,9 +165,14 @@ export const MealComposer: React.FC = () => {
     const key = JSON.stringify(dayProducts);
     if (comboCacheRef.current.key === key) return comboCacheRef.current.result;
     const result = getGapAwareComboResult(dayProducts, 5);
-    comboCacheRef.current = { key, result };
-    return result;
-  }, [composerMode, dayProducts]);
+    // P1-08: не показываем продукты под ограничениями (иначе комбо предлагает запрещённое).
+    const blockedIds = _composerBlocked;
+    const filtered = blockedIds.size > 0
+      ? { ...result, suggestions: result.suggestions.filter(s => !blockedIds.has(s.foodId)) }
+      : result;
+    comboCacheRef.current = { key, result: filtered };
+    return filtered;
+  }, [composerMode, dayProducts, _composerBlocked]);
 
   // Sync dayPlan edits back to multi-day plan.
   // E7-фикс: раньше ключ по totals терял правки без изменения сумм (замена 1:1 по ккал,
@@ -166,6 +196,11 @@ export const MealComposer: React.FC = () => {
 
   const handleApplyCombo = (foodId: string, weightGrams: number) => {
     if (selectedMealForTargeting === null) return;
+    if (_composerBlocked.has(foodId)) {
+      try { setErrorMsg('Этот продукт не проходит ваши ограничения — выберите другой.'); setTimeout(() => setErrorMsg(null), 3000); } catch {}
+      if (typeof (window as any).showToast === 'function') (window as any).showToast('⛔ Продукт заблокирован ограничениями', 'warning');
+      return;
+    }
     saveUndo();
     const newPlan = applyGapComboToPlan(currentDay, selectedMealForTargeting, [{ foodId, weightGrams }]);
     if (newPlan) setDayPlan(newPlan);
@@ -370,7 +405,7 @@ export const MealComposer: React.FC = () => {
                         ) : sortedPickerRecipes.map((r: any, i: number) => (
                           <div key={i} style={{ display:'flex', gap:4, alignItems:'stretch' }}>
                             <span onClick={(e) => { e.stopPropagation(); toggleFavoriteRecipe(r.name); }} title={isFavoriteRecipe(r.name) ? 'Убрать из избранного' : 'В избранное (приоритет в подборе)'} style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, borderRadius:12, cursor:'pointer', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color: isFavoriteRecipe(r.name) ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize:13 }}>{isFavoriteRecipe(r.name) ? '⭐' : '☆'}</span>
-                            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (_hasFirst && !_hasSecond) { addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } else { replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } setRecipePickerMeal(null); }} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:`1px solid ${isFavoriteRecipe(r.name) ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.06)'}`, color:'#fff', fontSize:9 }}>
+                            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (_hasFirst) { addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } else { replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } setRecipePickerMeal(null); }} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:`1px solid ${isFavoriteRecipe(r.name) ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.06)'}`, color:'#fff', fontSize:9 }}>
                               <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{isFavoriteRecipe(r.name) ? '⭐ ' : ''}{r.name}</div>
                               <div style={{ color:'rgba(255,255,255,0.85)' }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
                             </button>

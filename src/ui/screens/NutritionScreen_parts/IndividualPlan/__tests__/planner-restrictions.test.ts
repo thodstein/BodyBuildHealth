@@ -13,13 +13,16 @@ import {
   USER_ALLERGEN_TO_TAGS,
   allergenTextMatches,
   getFoodAllergenTags,
+  isMilkProteinId,
   matchesSelectedAllergen,
   resolveAllergenFoodIds,
   resolveDietRestrictionIds,
   resolveAllExcludedFoodIds,
   countExcludedByAllergens,
   dietRestrictionTags,
+  selectedAllergenTags,
 } from '../planner-restrictions';
+import { FOOD_ALLERGEN_DIET } from '../../../../../core/nutrition-database';
 import { ALLERGEN_LIST } from '../types';
 
 const nameOf = (id: string): string => FOOD_DB.find(f => f.id === id)?.name || id;
@@ -38,6 +41,26 @@ describe('USER_ALLERGEN_TO_TAGS — полный маппинг', () => {
     expect(USER_ALLERGEN_TO_TAGS['лактоза']).toEqual(['dairy']);
     expect(USER_ALLERGEN_TO_TAGS['молочные']).toEqual(['dairy']);
     expect(USER_ALLERGEN_TO_TAGS['глютен']).toEqual(['gluten']);
+  });
+
+  it('selectedAllergenTags: лактоза одна не даёт dairy, молочные/no_dairy — дают', () => {
+    expect([...selectedAllergenTags(['лактоза'])]).toEqual([]);
+    expect([...selectedAllergenTags(['молочные'])]).toEqual(['dairy']);
+    expect([...selectedAllergenTags([], ['no_dairy'])]).toEqual(['dairy']);
+    expect([...selectedAllergenTags(['лактоза'], ['no_dairy'])]).toEqual(['dairy']);
+    expect([...selectedAllergenTags(['глютен', 'лактоза'])]).toEqual(['gluten']);
+  });
+
+  it('БД согласована: isDairyFree:false ⇒ тег dairy (молочные белоки не теряют аллерген)', () => {
+    const mismatched = Object.entries(FOOD_ALLERGEN_DIET)
+      .filter(([, d]) => d.isDairyFree === false && !d.allergens.includes('dairy'))
+      .map(([id]) => id);
+    expect(mismatched).toEqual([]);
+  });
+
+  it('isMilkProteinId ловит сывороточные/казеиновые порошки и не ловит обычную молочку', () => {
+    for (const id of ['whey_protein', 'whey_isolate', 'casein']) expect(isMilkProteinId(id)).toBe(true);
+    for (const id of ['milk', 'cottage_cheese_5', 'yogurt_greek']) expect(isMilkProteinId(id)).toBe(false);
   });
 });
 
@@ -75,18 +98,31 @@ describe('resolveAllergenFoodIds', () => {
     expect(resolveAllergenFoodIds(FOOD_DB, undefined as any).size).toBe(0);
   });
 
-  it('молочные: milk/butter/casein/сырники исключены; olive_oil и курица — нет', () => {
+  it('молочные: milk/butter/молочные белки/сырники исключены; olive_oil и курица — нет', () => {
     const ids = resolveAllergenFoodIds(FOOD_DB, ['молочные']);
-    // whey_protein/casein — протеин-порошок не считается молочным аллергеном (per user: "протеин не аллерген")
-    for (const fid of ['milk', 'butter', 'cottage_cheese_5', 'yogurt_greek']) {
+    for (const fid of ['milk', 'butter', 'cottage_cheese_5', 'yogurt_greek', 'whey_protein', 'whey_isolate', 'casein']) {
       expect(ids.has(fid), `должен быть исключён: ${nameOf(fid)}`).toBe(true);
     }
-    // порошок должен остаться доступен при молочном аллергене
-    expect(ids.has('whey_protein')).toBe(false);
-    expect(ids.has('casein')).toBe(false);
     expect(ids.has('olive_oil')).toBe(false);
     expect(ids.has('chicken_breast')).toBe(false);
     expect(ids.has('rice_white')).toBe(false);
+  });
+
+  it('лактоза без «молочные»: обычная молочка исключена, сывороточные белки разрешены', () => {
+    const ids = resolveAllergenFoodIds(FOOD_DB, ['лактоза']);
+    for (const fid of ['milk', 'cottage_cheese_5', 'yogurt_greek']) {
+      expect(ids.has(fid), `лактоза: должен быть исключён: ${nameOf(fid)}`).toBe(true);
+    }
+    for (const fid of ['whey_protein', 'whey_isolate', 'casein']) {
+      expect(ids.has(fid), `лактоза: молочный белок должен остаться: ${nameOf(fid)}`).toBe(false);
+    }
+  });
+
+  it('«молочные» + «лактоза» вместе: молочные белки исключаются', () => {
+    const ids = resolveAllergenFoodIds(FOOD_DB, ['лактоза', 'молочные']);
+    expect(ids.has('whey_protein')).toBe(true);
+    expect(ids.has('casein')).toBe(true);
+    expect(ids.has('milk')).toBe(true);
   });
 
   it('глютен: pasta/seitan/хлеб исключены; рис и запечённая рыба — нет', () => {
@@ -264,17 +300,13 @@ describe('buildDayPlan — аллергены и ограничения рабо
     expect(allIds).not.toContain('cashew');
   });
 
-  it('MPS-добор и пост-тренировочный приём не используют whey при аллергии на молочные — кроме порошка (протеин не аллерген)', () => {
+  it('MPS-добор и пост-тренировочный приём не используют молочные продукты при аллергии на молочные', () => {
     for (let d = 0; d < 3; d++) {
       const plan = buildDayPlan(baseInput({ dayOffset: d, allergenTags: new Set(['dairy']) }));
       const allIds = plan.meals.flatMap(m => m.items.map(it => it.id));
-      // молочные продукты (молоко, творог, сыр) — исключены, но порошок whey/casein — остаётся (per user)
-      for (const id of ['milk', 'cottage_cheese_5', 'yogurt_greek', 'cheese_hard']) {
+      for (const id of ['milk', 'cottage_cheese_5', 'yogurt_greek', 'cheese_hard', 'whey_protein', 'whey_isolate', 'casein']) {
         expect(allIds, `dairy продукт в плане (${nameOf(id)})`).not.toContain(id);
       }
-      // порошок должен быть доступен
-      const hasPowder = allIds.includes('whey_protein') || allIds.includes('whey_isolate') || allIds.includes('casein');
-      // не требуем обязательного наличия, но не запрещаем — главное что не падает
       expect(plan.meals.length).toBeGreaterThan(0);
     }
   });

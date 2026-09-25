@@ -15,6 +15,7 @@ import { FOOD_DB } from "../../../../core/nutrition-database";
 import { generateCheatMeal as generateCheatMealSm, generateCarbload as generateCarbloadSm, generateBUTCH as generateBUTCHSm, generateCravingPlan as generateCravingPlanSm, generateLazyDayPlan as generateLazyDayPlanSm } from "./planner-special-meals";
 import { buildRecommendations } from "./planner-recommendations";
 import { resolveAllExcludedFoodIds } from "./planner-restrictions";
+import { matchesCategoryPref } from "./planner-preferences";
 import type { DrugInjection } from "./types";
 
 /**
@@ -40,6 +41,10 @@ export interface PlannerSpecialMealStateDeps {
   isTrainDay: (offset: number) => boolean;
   allergens: string[];
   dietPrefs: string[];
+  /** P1-10: явные исключения пользователя (he_excluded_foods) — спецприёмы должны их уважать. */
+  excludedFoods?: string[];
+  /** P1-10: исключённые категории продуктов. */
+  excludedCategories?: string[];
   plannerModeRef: React.MutableRefObject<string>;
   goal: string;
   phase: string;
@@ -92,24 +97,51 @@ export interface PlannerSpecialMealState {
   generateRecommendations: () => void;
 }
 
+const SPECIAL_MEAL_GOALS = ['pre_workout', 'post_workout', 'before_bed', 'high_protein', 'keto', 'low_cal_day', 'custom'];
+
+/**
+ * P1-10: единый набор id, запрещённых для спецприёмов (читмил/БУЧ/углеводная
+ * загрузка/тяга/ленивый день). Раньше учитывались только аллергены + dietPrefs,
+ * поэтому спецприём мог предложить продукт из «Исключения» или запрещённую категорию.
+ */
+export function resolveSpecialMealExcludedIds(
+  allergens: string[],
+  dietPrefs: string[],
+  excludedFoods: string[] = [],
+  excludedCategories: string[] = [],
+): string[] {
+  const s = new Set<string>(resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []));
+  for (const id of excludedFoods || []) s.add(id);
+  const categoryPref = { preferred: [] as string[], excluded: excludedCategories || [] };
+  for (const f of FOOD_DB) if (!matchesCategoryPref(f, categoryPref)) s.add(f.id);
+  return [...s];
+}
+
 export function usePlannerSpecialMealState(d: PlannerSpecialMealStateDeps): PlannerSpecialMealState {
-  // FIX persist-audit (B5): конфиг спец-приёма не сохранялся — после перезагрузки
+  // FIX persist-audit (B5): конфиг спецприёма не сохранялся — после перезагрузки
   // сбрасывался на дефолт (соседний календарь «➕ Спецприём» персистится в he_special_meals).
-  const _loadCfg = <T,>(key: string, fallback: T): T => {
+  const _loadCfg = <T,>(key: string, fallback: T, valid?: (v: unknown) => boolean): T => {
     try {
       const raw = JSON.parse(localStorage.getItem('he_planner_special_cfg') || 'null');
-      if (raw && typeof raw === 'object' && raw[key] !== undefined && raw[key] !== null) return raw[key] as T;
+      if (raw && typeof raw === 'object' && raw[key] !== undefined && raw[key] !== null) {
+        const v = raw[key];
+        if (!valid || valid(v)) return v as T;
+      }
     } catch {}
     return fallback;
   };
-  const [specialMealMode, setSpecialMealMode] = useState(() => _loadCfg<boolean>('mode', false));
-  const [specialMealGoal, setSpecialMealGoal] = useState(() => _loadCfg<string>('goal', 'custom'));
-  const [specialMealProteinG, setSpecialMealProteinG] = useState(() => _loadCfg<number>('proteinG', 40));
-  const [specialMealFatG, setSpecialMealFatG] = useState(() => _loadCfg<number>('fatG', 15));
-  const [specialMealCarbsG, setSpecialMealCarbsG] = useState(() => _loadCfg<number>('carbsG', 50));
-  const [specialMealTiming, setSpecialMealTiming] = useState(() => _loadCfg<string>('timing', 'snack'));
-  const [specialMealReplaceMode, setSpecialMealReplaceMode] = useState(() => _loadCfg<boolean>('replaceMode', false));
-  const [specialMealReplaceTarget, setSpecialMealReplaceTarget] = useState(() => _loadCfg<string>('replaceTarget', 'Ужин'));
+  const _bool = (v: unknown): boolean => typeof v === 'boolean';
+  const _num = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1000;
+  const _enum = (allowed: string[]) => (v: unknown): boolean => typeof v === 'string' && allowed.includes(v);
+  const _str = (v: unknown): boolean => typeof v === 'string' && v.trim().length > 0 && v.length <= 60;
+  const [specialMealMode, setSpecialMealMode] = useState(() => _loadCfg<boolean>('mode', false, _bool));
+  const [specialMealGoal, setSpecialMealGoal] = useState(() => _loadCfg<string>('goal', 'custom', _enum(SPECIAL_MEAL_GOALS)));
+  const [specialMealProteinG, setSpecialMealProteinG] = useState(() => _loadCfg<number>('proteinG', 40, _num));
+  const [specialMealFatG, setSpecialMealFatG] = useState(() => _loadCfg<number>('fatG', 15, _num));
+  const [specialMealCarbsG, setSpecialMealCarbsG] = useState(() => _loadCfg<number>('carbsG', 50, _num));
+  const [specialMealTiming, setSpecialMealTiming] = useState(() => _loadCfg<string>('timing', 'snack', _enum(Object.keys(SPECIAL_MEAL_TIMING_TARGETS))));
+  const [specialMealReplaceMode, setSpecialMealReplaceMode] = useState(() => _loadCfg<boolean>('replaceMode', false, _bool));
+  const [specialMealReplaceTarget, setSpecialMealReplaceTarget] = useState(() => _loadCfg<string>('replaceTarget', 'Ужин', _str));
   useEffect(() => {
     try {
       localStorage.setItem('he_planner_special_cfg', JSON.stringify({
@@ -130,7 +162,9 @@ export function usePlannerSpecialMealState(d: PlannerSpecialMealStateDeps): Plan
   // массив (weekly/eod/pattern → единый формат boolean[7]).
   const _trainDaysArr = Array.from({ length: 7 }, (_, i) => d.isTrainDay(i));
   // FIX allergens-restrictions: спец-режимы уважают исключения пользователя
-  const _smExcludedIds = [...resolveAllExcludedFoodIds(FOOD_DB, d.allergens || [], d.dietPrefs || [])];
+  // P1-10: сюда же — явные excludedFoods (раньше читмил/БУЧ/углеводная загрузка могли
+  // предложить продукт, который пользователь сам исключил) и excludedCategories.
+  const _smExcludedIds = resolveSpecialMealExcludedIds(d.allergens || [], d.dietPrefs || [], d.excludedFoods || [], d.excludedCategories || []);
 
   const generateCheatMeal = () => { const _smDeps = { weight: d.weight, effectiveKcal: d.effectiveKcal, effectiveP: d.effectiveP, effectiveF: d.effectiveF, effectiveC: d.effectiveC, goal: d.goal, cravingDays: d.cravingDays, lazyDayDays: d.lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setCheatMealPlan(generateCheatMealSm(_smDeps)); };
   const generateCarbload = () => { const _smDeps = { weight: d.weight, effectiveKcal: d.effectiveKcal, effectiveP: d.effectiveP, effectiveF: d.effectiveF, effectiveC: d.effectiveC, goal: d.goal, cravingDays: d.cravingDays, lazyDayDays: d.lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setCarbloadPlan(generateCarbloadSm(_smDeps)); };
@@ -140,7 +174,7 @@ export function usePlannerSpecialMealState(d: PlannerSpecialMealStateDeps): Plan
 
   const generateRecommendations = () => {
     if (d.plannerModeRef.current !== 'pro') { setRecommendations([]); return; }
-    setRecommendations(buildRecommendations({ goal: d.goal, phase: d.phase, weight: d.weight, effectiveKcal: d.effectiveKcal, effectiveP: d.effectiveP, effectiveF: d.effectiveF, effectiveC: d.effectiveC, injections: Array.isArray(d.injections) ? d.injections : [], linkToTraining: d.linkToTraining, trainStart: d.trainStart, trainEnd: d.trainEnd, sex: d.sex, bodyFatPct: d.bodyFatPct, trainType: d.trainType, v2Phase: d.v2Phase, v2Pharma: d.v2Pharma && typeof d.v2Pharma === 'object' ? d.v2Pharma : {}, v2Labs: d.v2Labs && typeof d.v2Labs === 'object' ? d.v2Labs : {}, histamineSensitive: d.histamineSensitive, generated: d.generated, planDays: d.planDays, dayPlan: d.dayPlan, threeDayPlan: d.threeDayPlan, weekPlan: d.weekPlan, carbPeriodization: d.carbPeriodization }));
+    setRecommendations(buildRecommendations({ goal: d.goal, phase: d.phase, weight: d.weight, effectiveKcal: d.effectiveKcal, effectiveP: d.effectiveP, effectiveF: d.effectiveF, effectiveC: d.effectiveC, injections: Array.isArray(d.injections) ? d.injections : [], linkToTraining: d.linkToTraining, trainStart: d.trainStart, trainEnd: d.trainEnd, sex: d.sex, bodyFatPct: d.bodyFatPct, trainType: d.trainType, v2Phase: d.v2Phase, v2Pharma: d.v2Pharma && typeof d.v2Pharma === 'object' ? d.v2Pharma : {}, v2Labs: d.v2Labs && typeof d.v2Labs === 'object' ? d.v2Labs : {}, histamineSensitive: d.histamineSensitive, generated: d.generated, planDays: d.planDays, dayPlan: d.dayPlan, threeDayPlan: d.threeDayPlan, weekPlan: d.weekPlan, carbPeriodization: d.carbPeriodization, allergens: d.allergens || [], dietPrefs: d.dietPrefs || [], excludedFoods: d.excludedFoods || [], excludedCategories: d.excludedCategories || [] }));
   };
 
   useEffect(() => { if (d.generated && d.dayPlan) { try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations useEffect failed:', e); } catch {} } } }, [Array.isArray(d.injections) ? d.injections.length : 0]);

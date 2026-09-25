@@ -94,6 +94,7 @@ export interface MealPlanInput {
   goalProteinG: number;
   goalFatG: number;
   goalCarbsG: number;
+  manualTargetsLocked?: boolean;
   mealsCount: number;
   isTrainingDay: boolean;
   trainStartMin?: number;
@@ -8711,7 +8712,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Рост носителей/«посадка» несли внедрённый белок и могли увести мейн за потолок
     // (dguarantees обед 0.6206 при 0.62). Режем ТОЛЬКО когда день уже на/выше цели белка
     // (0.99) и это не ultra-P-бюджет 500Б (там мейн ~0.62+ г/кг LBM осознан; Morton-потолок).
-    if ((input.goalProteinG || 0) > 0 && (input.lbmKg || 0) > 0) {
+    if (!input.manualTargetsLocked && (input.goalProteinG || 0) > 0 && (input.lbmKg || 0) > 0) {
       const _ultraP6 = (input.goalProteinG || 0) >= 350 || (input.goalProteinG || 0) / Math.max(40, input.weightKg || 80) >= 3.5;
       if (!_ultraP6 && totals.p >= (input.goalProteinG || 0) * 0.99) {
         const _pCeil6 = (input.lbmKg as number) * 0.62;

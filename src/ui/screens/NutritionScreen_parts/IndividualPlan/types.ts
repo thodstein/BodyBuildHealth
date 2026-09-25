@@ -43,13 +43,16 @@ export const BUDGET_LEVELS: { id: BudgetLevel; label: string; icon: string; desc
   { id: 'max', label: 'Максимум', icon: '🟠', desc: 'Премиум продукты, органика', color: '#f97316' },
 ];
 
-// ─── Эпик 3: белок-пресет (1.6–2.6 г/кг) — единственный «уровень белка».
+// ─── Эпик 3: белок-пресет — единственный «уровень белка» (решение пользователя).
 // Legacy NUTRITION_LEVELS (ложный множитель «план на N% больше») удалён полностью.
+// Базовый рабочий диапазон 1.6–2.2 г/кг массы (Jäger 2017; Morton 2018; Mountjoy/IOC 2023).
+// ВЫШЕ 2.2 — только ручной режим КБЖУ (индивидуальная цель), авто-пресетов больше нет:
+// прежний 'max' (2.6 г/кг) сохранён в типе как legacy для старых сохранений и нормализуется в 'enhanced'.
+export const PROTEIN_G_PER_KG_RANGE = { min: 1.6, max: 2.2 } as const;
 export const PROTEIN_PRESETS: { id: NutritionLevel; label: string; icon: string; gPerKg: number; desc: string }[] = [
   { id: 'base', label: 'База', icon: '🟢', gPerKg: 1.6, desc: '1.6 г/кг' },
   { id: 'medium', label: 'Стандарт', icon: '🟡', gPerKg: 2.0, desc: '2.0 г/кг' },
   { id: 'enhanced', label: 'Актив', icon: '🟠', gPerKg: 2.2, desc: '2.2 г/кг' },
-  { id: 'max', label: 'Макс белка', icon: '🔴', gPerKg: 2.6, desc: '2.6 г/кг' },
 ];
 
 // ─── v6: Единая периодизация углеводов (cyclingMode+dietPause+periodizationEnabled → одно) ──

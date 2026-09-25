@@ -51,12 +51,16 @@ const CATEGORY_PATTERNS: Record<string, string[]> = {
 };
 
 export function matchesCategoryPref(food: FoodItem, pref: CategoryPref): boolean {
-  const id = food.id.toLowerCase();
-  for (const ex of pref.excluded) {
-    const patterns = CATEGORY_PATTERNS[ex.toLowerCase()];
+  const id = String(food.id || '').toLowerCase();
+  const category = String(food.category || '').toLowerCase();
+  for (const ex of pref.excluded || []) {
+    const excluded = String(ex || '').toLowerCase();
+    if (!excluded) continue;
+    if (category === excluded) return false;
+    const patterns = CATEGORY_PATTERNS[excluded];
     if (patterns) {
       if (patterns.some(p => id.includes(p))) return false;
-    } else if (id.includes(ex.toLowerCase())) {
+    } else if (id.includes(excluded)) {
       return false;
     }
   }

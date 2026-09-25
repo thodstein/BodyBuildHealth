@@ -120,4 +120,10 @@ describe('buildTrainSchedule + describeSchedule', () => {
     expect(weeklyTrainingCount(eod())).toBe(4);
     expect(weeklyTrainingCount(pattern(3, 1))).toBe(6);
   });
+
+  it('выключенная связь с тренировками не создаёт тренировочных дней и не попадает в carb-cap', () => {
+    const disabled = { ...weekly([true, true, true, true, true, true, true]), enabled: false };
+    expect(isTrainingDayFor(disabled, 0)).toBe(false);
+    expect(weeklyTrainingCount(disabled)).toBe(0);
+  });
 });
