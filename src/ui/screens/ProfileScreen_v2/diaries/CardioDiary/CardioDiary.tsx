@@ -99,9 +99,12 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     if (!importPreview || importPreview.entries.length === 0) return;
     const prev = loadCardioLog();
     setUndo(prev);
-    for (const e of importPreview.entries) saveCardioLogEntry(e);
+    // P2-аудит: раньше N записей импорта каждая перечитывала и перезаписывала
+    // ВЕСЬ журнал (O(n²) сериализаций localStorage). Один атомарный вызов.
+    const incoming = importPreview.entries;
+    replaceCardioLog([...incoming, ...prev]);
     reload();
-    flashMsg(`✅ Импортировано ${importPreview.entries.length} тренировок`);
+    flashMsg(`✅ Импортировано ${incoming.length} тренировок`);
     setImportPreview(null);
   };
 

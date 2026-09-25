@@ -60,8 +60,15 @@ export const CardioManageStep: React.FC<{
   lowImpact?: boolean;
   onApplyTemplate?: (templateId: string) => void;
 }> = ({ cycle, library, scenarios, link, macroLink, comparison, annualCardioMap, onBuildAnnualCardio, onClearAnnualCardio, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario, onApplyTaper, goal, level, daysAvailable, lowImpact, onApplyTemplate }) => {
-  const [copyFlash, setCopyFlash] = useState(false);
-const [progFlash, setProgFlash] = useState<string | null>(null);
+  // P1-аудит: 4 разных действия делили ОДИН булев флаг — «✅ Скопировано»
+  // появлялось и на кнопке «Отправлено», а тихие catch оставляли кнопку без
+  // причины. Теперь одно честное сообщение = одна правда + причина сбоя.
+  const [flash, setFlash] = useState<string | null>(null);
+  const say = (msg: string, ms = 3000) => {
+    setFlash(msg);
+    window.setTimeout(() => setFlash(m => (m === msg ? null : m)), ms);
+  };
+  const [progFlash, setProgFlash] = useState<string | null>(null);
   const [nutriFlash, setNutriFlash] = useState(false);
   const [yearFlash, setYearFlash] = useState(false);
 
@@ -95,11 +102,31 @@ const [progFlash, setProgFlash] = useState<string | null>(null);
   const copySummary = () => {
     if (!cycle) return;
     const text = buildCardioSummaryText(cycle);
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(() => say('✅ Сводка скопирована'))
+        .catch(() => copyFallback(text, '⚠️ Буфер не сработал — скопируйте сводку вручную'));
+    } else {
+      copyFallback(text, '⚠️ Буфер обмена недоступен — скопируйте сводку вручную');
+    }
+  };
+
+  const copyFallback = (text: string, failMsg: string): boolean => {
     try {
-      navigator.clipboard.writeText(text).then(() => setCopyFlash(true)).catch(() => fallbackCopy(text));
-    } catch { fallbackCopy(text); }
-    if (!navigator.clipboard) fallbackCopy(text);
-    window.setTimeout(() => setCopyFlash(false), 2500);
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) say('✅ Скопировано');
+      else say(failMsg, 4500);
+      return !!ok;
+    } catch (err) {
+      console.warn('[cardio] clipboard fallback failed', err);
+      say(failMsg, 4500);
+      return false;
+    }
   };
 
   const sendToNutrition = () => {
@@ -107,24 +134,19 @@ const [progFlash, setProgFlash] = useState<string | null>(null);
     const p = cardioToNutritionPayload(cycle, loadCardioLog());
     try {
       localStorage.setItem(CARDIO_KCAL_NOTE_KEY, JSON.stringify({ cycleId: cycle.id, avgKcalPerWeek: p.avgKcalPerWeek, avgMinutesPerWeek: p.avgMinutesPerWeek, updatedAt: new Date().toISOString() }));
-    } catch { /* ignore */ }
-    try {
-      navigator.clipboard.writeText(p.text).then(() => setNutriFlash(true)).catch(() => fallbackCopy(p.text));
-    } catch { fallbackCopy(p.text); }
-    if (!navigator.clipboard) fallbackCopy(p.text);
-    window.setTimeout(() => setNutriFlash(false), 2500);
-  };
-
-  const fallbackCopy = (text: string) => {
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      setCopyFlash(true);
-    } catch { /* ignore */ }
+    } catch (err) {
+      // Раньше here был тихий ignore: расход записывался «в никуда».
+      console.warn('[cardio] kcal note persist failed', err);
+    }
+    const ok = navigator.clipboard?.writeText
+      ? navigator.clipboard.writeText(p.text).then(() => true).catch(() => false)
+      : Promise.resolve(false);
+    ok.then((done) => {
+      if (done) { setNutriFlash(true); window.setTimeout(() => setNutriFlash(false), 2500); }
+      else if (!copyFallback(p.text, '⚠️ Не удалось скопировать расход — вставьте текст в питание вручную')) {
+        say('⚠️ Заметка о расходе сохранена, но текст не скопирован', 4500);
+      }
+    });
   };
 
   const sendToProgram = () => {
@@ -134,9 +156,8 @@ const [progFlash, setProgFlash] = useState<string | null>(null);
     try {
       const prog = cardioCycleToUserProgram(cycle);
       applyToPlanner({ kind: 'program', label: cycle.name, data: { program: prog } });
-      setCopyFlash(true);
       setProgFlash(null);
-      window.setTimeout(() => setCopyFlash(false), 2500);
+      say('✅ Отправлено в конструктор');
     } catch (err) {
       console.warn('[cardio] sendToProgram failed', err);
       setProgFlash(`⚠ Не удалось отправить в конструктор: ${(err as Error)?.message || 'ошибка конвертации цикла'}`);
@@ -144,39 +165,30 @@ const [progFlash, setProgFlash] = useState<string | null>(null);
     }
   };
 
-  const downloadTcx = () => {
+  const downloadFile = (build: () => string, ext: string, label: string) => {
     if (!cycle) return;
+    let url: string | null = null;
     try {
-      const blob = new Blob([buildCardioTcx(cycle)], { type: 'application/xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
+      const blob = new Blob([build()], { type: 'application/xml;charset=utf-8' });
+      url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${cycle.id}.tcx`;
+      a.download = `${cycle.id}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setCopyFlash(true);
-      window.setTimeout(() => setCopyFlash(false), 2500);
-    } catch { /* ignore */ }
+      say(`✅ ${label} сохранён`);
+    } catch (err) {
+      console.warn(`[cardio] download .${ext} failed`, err);
+      say(`⚠️ Не удалось сохранить ${label}`, 4500);
+    } finally {
+      if (url) { try { URL.revokeObjectURL(url); } catch { /* revoke не критичен */ } }
+    }
   };
 
-  const downloadZwo = () => {
-    if (!cycle) return;
-    try {
-      const blob = new Blob([buildCardioZwo(cycle)], { type: 'application/xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${cycle.id}.zwo`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setCopyFlash(true);
-      window.setTimeout(() => setCopyFlash(false), 2500);
-    } catch { /* ignore */ }
-  };
+  const downloadTcx = () => downloadFile(() => buildCardioTcx(cycle!), 'tcx', 'файл .tcx');
+
+  const downloadZwo = () => downloadFile(() => buildCardioZwo(cycle!), 'zwo', 'файл .zwo');
 
   const [libraryFilter, setLibraryFilter] = useState('');
   const [librarySort, setLibrarySort] = useState<'date' | 'weeks' | 'kcal'>('date');
@@ -337,9 +349,9 @@ const [progFlash, setProgFlash] = useState<string | null>(null);
               <SectionCard title="📤 Поделиться">
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 4 }}>Сводки и заметки — в буфер обмена</div>
                 <div style={ROW}>
-                  <button style={BTN} onClick={copySummary}>{copyFlash ? '✅ Сводка скопирована' : '📋 Сводка цикла'}</button>
-                  <button style={{ ...BTN, borderColor: 'rgba(250,204,21,0.32)', color: '#facc15' }} onClick={sendToNutrition}>{nutriFlash ? '✅ Расход передан' : '🍽 В питание'}</button>
-                  <button style={{ ...BTN, borderColor: 'rgba(34,197,94,0.32)', color: '#22c55e' }} onClick={copyYear}>{yearFlash ? '✅ Год в буфере' : '📆 Год кардио'}</button>
+                  <button style={BTN} onClick={copySummary}>📋 Сводка цикла</button>
+                  <button style={{ ...BTN, border: '1px solid rgba(250,204,21,0.32)', color: '#facc15' }} onClick={sendToNutrition}>{nutriFlash ? '✅ Расход передан' : '🍽 В питание'}</button>
+                  <button style={{ ...BTN, border: '1px solid rgba(34,197,94,0.32)', color: '#22c55e' }} onClick={copyYear}>{yearFlash ? '✅ Год в буфере' : '📆 Год кардио'}</button>
                 </div>
               </SectionCard>
               <SectionCard title="📁 Файлы">
@@ -353,9 +365,21 @@ const [progFlash, setProgFlash] = useState<string | null>(null);
               </SectionCard>
               <SectionCard title="📦 В программу">
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>Откройте кардио как отдельную программу в ручном конструкторе</div>
-                <button style={{ ...BTN_CTA, alignSelf: 'flex-start' }} onClick={sendToProgram}>{copyFlash ? '✅ Отправлено' : '📦 Открыть как программу'}</button>
+                <button style={{ ...BTN_CTA, alignSelf: 'flex-start' }} onClick={sendToProgram}>📦 Открыть как программу</button>
                 {progFlash && <div style={{ fontSize: 11.5, fontWeight: 750, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.28)', borderLeft: '3px solid #f59e0b', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="alert" data-cardio="manage-program-error">{progFlash}</div>}
               </SectionCard>
+              {/* P1-аудит: одно сообщение на все действия раздела «Поделиться» —
+                  раньше 4 кнопки делили булев флаг и показывали чужой «✅». */}
+              {flash && (
+                <div data-cardio="manage-flash" role="status"
+                  style={{
+                    fontSize: 11.5, fontWeight: 750, color: flash.startsWith('⚠') ? '#fbbf24' : '#4ade80',
+                    background: flash.startsWith('⚠') ? 'rgba(245,158,11,0.08)' : 'rgba(0,230,138,0.08)',
+                    border: `1px solid ${flash.startsWith('⚠') ? 'rgba(245,158,11,0.28)' : 'rgba(0,230,138,0.28)'}`,
+                    borderLeft: `3px solid ${flash.startsWith('⚠') ? '#f59e0b' : '#00e68a'}`,
+                    borderRadius: 10, padding: '8px 11px', lineHeight: 1.5,
+                  }}>{flash}</div>
+              )}
             </>
           )}
         </div>
