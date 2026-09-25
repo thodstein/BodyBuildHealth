@@ -65,6 +65,21 @@ describe('BB отчёт качества (без мусора/дублей, с �
     expect(sum.some(s => s.includes('Гигант-сет'))).toBe(true);
   });
 
+  it('новые order-методики названы честно и не попадают в applied при faithful', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'advanced', trainingYears: 4, goal: 'mass', weeks: 1, workMax: WM, methodology: 'mountain_dog' });
+    for (const [method, label] of [
+      ['mountain_dog', 'активация → база → памп → растяжка'],
+      ['fst7', 'памп-финишеры в конце (FST-7)'],
+      ['hyperemia', 'памп-изоляции → тяжёлые (гиперемия)'],
+    ] as const) {
+      (plan as any).methodology = method;
+      expect(buildBBMethodologySummary(plan).join(' | ')).toContain(label);
+    }
+    (plan as any).methodologyApplied = false;
+    expect(buildBBMethodologySummary(plan).join(' | ')).not.toContain('Порядок:');
+    expect(buildBBPlanReportText(plan)).toContain('не применяется в faithful');
+  });
+
   it('адекватность флагует decline-жим как низкоценный', () => {
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'advanced', goal: 'mass', weeks: 1, workMax: WM });
     const issues = checkBBExerciseAppropriateness(plan);

@@ -18,6 +18,7 @@ import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { adaptForPEDs, computeAASEquivDose, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
+import { recommendPEDMethodology } from './bb-ped-methodology.engine';
 import { applyRehabToPlan, rehabNotes } from './bb-recovery.engine';
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
 import { applyBfrPattern } from './bb-rep-schemes.engine';
@@ -33,6 +34,7 @@ import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complet
 import type { BBTrainingFocus } from './bb-goal-types';
 import { FOCUS_RIR_TABLE } from './bb-goal-types';
 import { finalizeBBPlan } from './bb-finalize.engine';
+import { buildBBPlanReport } from './bb-report.engine';
 import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-volume.engine';
 import { applyFeedbackToBuild, autoReplaceOnPlateau, applyDiaryVolumeCorrection } from './bb-progression-feedback.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
@@ -1323,7 +1325,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     schedule: week1Days.map((_, i) => ({ kind: 'тренировка' as const, character: null, sessionTag: ['Upper', 'Lower', 'Push', 'Pull', 'Legs', 'FullBody', 'Arms', 'Shoulders', 'ChestBack', 'ShouldersArms'][i % 10] })),
   };
 
-  rationale.push(SESSION_TIDY_RATIONALE);
+  if (mode !== 'faithful') rationale.push(SESSION_TIDY_RATIONALE);
   let finalPlan: BBPlan = { pattern, weeks, rotationMuscleVolume, rationale };
 
   // L8: ACWR из реальных sRPE-сессий пользователя (PED-логика первого режима):
@@ -1427,6 +1429,25 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
 
   // Строгий A/B (adapt-only; faithful дословно — флаг игнится).
   if (mode === 'adapt' && input.abPatternRotation) stashAbAvoidForWeekSessions(finalPlan.weeks);
+  const cyclePedMethod = recommendPEDMethodology({
+    peds: peds as any,
+    pedDoses: pedDoses || {},
+    level,
+    goal: input.goal,
+    focus: input.trainingFocus,
+    totalWeeks: totalWeeks,
+  });
+  const cycleJointGuard = !!cyclePedMethod.jointGuard;
+  const cycleSoloInsulin = !!cyclePedMethod.insulinSafety?.soloWithoutAasGh;
+  const cycleVolumeScheme: 'standard' | 'gvt' | 'fst7' | 'gironda' = (() => {
+    const scheme = input.volumeScheme || 'standard';
+    if (mode === 'faithful') return 'standard';
+    if (scheme !== 'fst7') return scheme;
+    if (level !== 'enhanced' || cycleJointGuard || cycleSoloInsulin) return 'standard';
+    return 'fst7';
+  })();
+  const cycleFst7Seven = cycleVolumeScheme === 'fst7' && mode === 'adapt';
+  if (input.volumeScheme === 'fst7' && cycleVolumeScheme === 'standard') rationale.push('⛔ FST-7 7-in-1: cycle path оставлен в standard (faithful/уровень/joint-guard/соло-инсулин).');
 
   const finalized = finalizeBBPlan({
     ...finalPlan,
@@ -1443,6 +1464,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     maxExercises: centralizedSessionLimits({ level, trainingYears: input.trainingYears, peds, courseIntensity }).maxExercises,
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
     mobilityRestrictions: input.mobilityRestrictions,
+    volumeScheme: cycleVolumeScheme,
   }, {
     reorder: mode !== 'faithful',
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
@@ -1469,13 +1491,17 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     trainingYears: input.trainingYears,
     bodyweightCapability: input.bodyweightCapability,
     supersetMode: (input as any).supersetMode,
-    volumeScheme: (input as any).volumeScheme,
+    volumeScheme: cycleVolumeScheme,
+    fst7Seven: cycleFst7Seven,
   });
   (finalized as any).trainingVolumeMode = (input as any).trainingVolumeMode || 'standard';
+  (finalized as any).level = level;
+  (finalized as any).volumeScheme = cycleVolumeScheme;
   (finalized as any).volumeGoal = input.volumeGoal;
   (finalized as any).goal = input.goal;
   (finalized as any).trainingFocus = input.trainingFocus;
   (finalized as any).methodology = input.methodology;
+  (finalized as any).methodologyApplied = mode !== 'faithful';
   (finalized as any).trainingYears = input.trainingYears;
   (finalized as any).courseIntensity = input.courseIntensity;
   (finalized as any).inputSnapshot = {
@@ -1602,6 +1628,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     // финализатора не накладывается поверх (taper W2-W4 рабочего мезоцикла).
     if (meta.deloadWeeks?.length) (finalized as any).sourceDeloads = true;
   }
+  finalized.report = buildBBPlanReport(finalized);
   return finalized;
 }
 
@@ -2444,7 +2471,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     })),
   };
 
-  rationale.push(SESSION_TIDY_RATIONALE);
+  if (mode !== 'faithful') rationale.push(SESSION_TIDY_RATIONALE);
   let finalPlan: BBPlan = { pattern, weeks, rotationMuscleVolume, rationale };
 
   // L8: ACWR из реальных sRPE-сессий (PED-логика первого режима) — единый расчёт
@@ -2542,15 +2569,17 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   //  • rotationMode / intensityLevel / onCourse / trainingVolumeMode — в finalize.
   const programVolumeScheme: 'standard' | 'gvt' | 'fst7' | 'gironda' = (() => {
     const scheme = (opts as any).volumeScheme as 'standard' | 'gvt' | 'fst7' | 'gironda' | undefined;
+    if (mode === 'faithful') return 'standard';
     if (scheme !== 'fst7') return scheme || 'standard';
     const lvl = String(opts.level ?? levelForLandmarks);
-    // Паритет с generic: joint-guard = GH ≥4 / GH≥2+AAS≥500 / lab MRV <0.65
-    // (bb-joint-guard.engine) — при нём 7-in-1 не назначается.
-    const doses = (opts.pedDoses || {}) as Record<string, number>;
-    const gh = Number(doses.GH || doses.gh || 0);
-    const aas = Number(doses.AAS || doses.aas || 0);
-    const jointGuard = (gh >= 4) || (gh >= 2 && aas >= 500) || (opts.labMrvMultiplier ?? 1) < 0.65;
-    if (lvl !== 'enhanced' || jointGuard || mode === 'faithful') return 'standard';
+    const pedMethod = recommendPEDMethodology({
+      peds: (opts.peds || []) as any,
+      pedDoses: opts.pedDoses || {},
+      level: lvl,
+      goal: opts.goal,
+      focus: opts.trainingFocus,
+    });
+    if (lvl !== 'enhanced' || pedMethod.jointGuard || pedMethod.insulinSafety?.soloWithoutAasGh) return 'standard';
     return 'fst7';
   })();
   const programFst7Seven = programVolumeScheme === 'fst7' && mode === 'adapt';
@@ -2758,6 +2787,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     }
   }
   (finalized as any).trainingVolumeMode = (opts as any).trainingVolumeMode || 'standard';
+  (finalized as any).level = opts.level;
+  (finalized as any).volumeScheme = programVolumeScheme;
   // Честность методик (аудит 2026-09): в режиме «точно по программе» порядок/
   // техники/схемы НЕ применяются (дословный источник). Флаг читает UI, чтобы
   // не показывать «выбрано = применено» там, где это не так.
@@ -2813,6 +2844,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     dcMode: opts.dcMode,
     wearable: opts.wearable ? true : undefined,
   };
+  finalized.report = buildBBPlanReport(finalized);
   return finalized;
 }
 

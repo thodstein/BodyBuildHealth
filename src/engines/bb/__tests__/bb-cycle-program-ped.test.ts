@@ -168,6 +168,33 @@ describe('convertCycleToBBPlan: female glute boost ×1.2', () => {
     // вытеснить 1 сет попы округлением — тот же допуск −2, что в bb-female-default.
     expect(fGlutes).toBeGreaterThanOrEqual(mGlutes - 2);
   });
+
+  it('adapt + FST-7 на enhanced AAS-курсе реально сохраняет 7-in-1', () => {
+    const plan = convertCycleToBBPlan({
+      cycle: CYCLE_01,
+      workMax: WM,
+      peds: ['AAS'],
+      pedDoses: { AAS: 500 },
+      courseIntensity: 'moderate',
+      level: 'enhanced',
+      trainingYears: 4,
+      volumeScheme: 'fst7',
+      mode: 'adapt',
+      equipment: EQ,
+    } as any);
+    expect((plan as any).volumeScheme).toBe('fst7');
+    const fst = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises)
+      .filter(e => /FST-7/.test(String(e.comment || '')));
+    expect(fst.length).toBeGreaterThan(0);
+    expect(fst.some(e => e.sets === 7 || e.workSets?.length === 7)).toBe(true);
+  });
+
+  it('faithful/соло-инсулин не применяют FST-7 7-in-1', () => {
+    const faithful = convertCycleToBBPlan({ cycle: CYCLE_01, workMax: WM, level: 'enhanced', volumeScheme: 'fst7', mode: 'faithful' } as any);
+    const solo = convertCycleToBBPlan({ cycle: CYCLE_01, workMax: WM, level: 'enhanced', peds: ['insulin'], pedDoses: { insulin: 10 }, volumeScheme: 'fst7', mode: 'adapt' } as any);
+    expect((faithful as any).volumeScheme).toBe('standard');
+    expect((solo as any).volumeScheme).toBe('standard');
+  });
 });
 
 /* ═══════════════════════════════════════════════════════════════════

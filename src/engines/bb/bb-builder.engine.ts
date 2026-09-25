@@ -507,6 +507,7 @@ export interface BBPlan {
   goal?: string;
   trainingFocus?: string;
   methodology?: string;
+  methodologyApplied?: boolean;
   supersetMode?: string;
   volumeScheme?: string;
   dupMode?: string;
@@ -4600,6 +4601,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     goal: input.goal,
     trainingFocus: input.trainingFocus,
     methodology: input.methodology,
+    methodologyApplied: true,
     supersetMode: input.supersetMode,
     volumeScheme: effVolumeScheme,
     dupMode: (input as any).dupMode,

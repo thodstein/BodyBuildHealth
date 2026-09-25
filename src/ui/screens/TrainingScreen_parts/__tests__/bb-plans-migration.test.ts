@@ -73,6 +73,19 @@ describe('Saved BB plan legacy migration', () => {
     expect(plans.find(p => p.id === 'legacy-no-flag')?.params.packingV2).toBeUndefined();
   });
 
+  it('preserves all supported order methodologies and sanitizes intensity technique', () => {
+    localStorage.setItem('he_bb_plans', JSON.stringify([
+      ...['mountain_dog', 'fst7', 'hyperemia'].map((methodology, index) => ({
+        id: methodology,
+        plan: { weeks: [{ week: 1, sessions: [] }] },
+        params: { methodology, intensityTechnique: index === 0 ? 'drop_set' : 'invalid' },
+      })),
+    ]));
+    const plans = loadSavedBBPlans();
+    expect(plans.map(plan => plan.params.methodology)).toEqual(['mountain_dog', 'fst7', 'hyperemia']);
+    expect(plans.map(plan => plan.params.intensityTechnique)).toEqual(['drop_set', 'none', 'none']);
+  });
+
   it('persists шаг 1-2 настройки (пресет/режим объёма/схема/особые режимы), дефолты → undefined', () => {
     localStorage.setItem('he_bb_plans', JSON.stringify([
       {

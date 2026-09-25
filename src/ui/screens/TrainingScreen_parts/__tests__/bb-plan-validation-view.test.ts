@@ -67,6 +67,21 @@ describe('buildPlanValidationView: адаптация под пользоват�
     expect(view.accentNote).toContain('Спина');
   });
 
+  it('applied plan проверяет фактический порядок, faithful — нет', () => {
+    const badOrder = {
+      week: 1,
+      phase: 'accumulation',
+      sessions: [{
+        sessionTag: 'Chest',
+        exercises: [ex('chest', 'Разводка гантелей', 3, 'accessory'), ex('chest', 'Жим гантелей', 3, 'primary')],
+      }],
+    };
+    const applied = buildPlanValidationView(plan({ methodologyApplied: true, methodology: 'compound_first', weeks: [badOrder] }));
+    expect(applied.infos.some(issue => issue.code === 'order_primary_after_accessory')).toBe(true);
+    const faithful = buildPlanValidationView(plan({ methodologyApplied: false, methodology: 'compound_first', weeks: [badOrder] }));
+    expect(faithful.infos.some(issue => issue.code === 'order_primary_after_accessory')).toBe(false);
+  });
+
   it('badge честно отражает статус', () => {
     const clean = buildPlanValidationView(plan());
     expect(planValidationBadge(clean).ok).toBe(true);

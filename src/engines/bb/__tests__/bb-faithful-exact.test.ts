@@ -13,4 +13,17 @@ describe('BB faithful exact mode', () => {
     expect(result.weeks[0].sessions[0].exercises).toHaveLength(1);
     expect(result.weeks[0].sessions[0].exercises[0].rationale).toContain('позиция в сессии:');
   });
+
+  it('preserveSource сохраняет исходный порядок даже если warmup расположен позже', () => {
+    const plan: any = {
+      pattern: {}, rationale: [],
+      weeks: [{ week: 1, phase: 'accumulation', sessions: [{ day: 1, sessionTag: 'Chest', exercises: [
+        { muscle: 'chest', name: 'Жим лёжа', role: 'primary', character: 'тяж', sets: 3, repsRange: [6, 8], rir: 2, workSets: Array.from({ length: 3 }, () => ({ reps: 8, rir: 2, weight: 80 })) },
+        { muscle: 'chest', name: 'Активация', role: 'accessory', character: 'лёг', sets: 1, repsRange: [15, 15], rir: 4, warmupActivator: true, workSets: [{ reps: 15, rir: 4, weight: 20 }] },
+      ] }] }],
+      rotationMuscleVolume: {},
+    };
+    const result = finalizeBBPlan(plan, { preserveSource: true, reorder: false, phaseSafety: true, ensureMinimumVolume: false, controlledRotation: false, level: 'intermediate' });
+    expect(result.weeks[0].sessions[0].exercises.map((exercise: any) => exercise.name)).toEqual(['Жим лёжа', 'Активация']);
+  });
 });

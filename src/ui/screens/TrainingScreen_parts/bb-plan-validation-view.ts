@@ -108,6 +108,7 @@ export function buildPlanValidationView(plan: BBPlan | null): PlanValidationView
       excludedExercises: (plan as any).safetyConstraints?.excludedExercises,
       excludedMuscles: (plan as any).safetyConstraints?.excludedMuscles || (plan as any).gradedMuscles,
       avoidAxialLoad: (plan as any).safetyConstraints?.avoidAxialLoad,
+      checkOrder: (plan as any).methodologyApplied !== false,
       methodology: (plan as any).methodology,
       specializationTargets: (plan as any).priorityMuscles,
     });

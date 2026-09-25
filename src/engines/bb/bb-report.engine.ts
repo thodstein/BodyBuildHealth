@@ -176,8 +176,15 @@ export function buildBBMethodologySummary(plan: BBPlan): string[] {
   const out: string[] = [];
   const p: any = plan as any;
   // Порядок упражнений (методика pre/post-exhaust / compound_first).
-  const methodLabel: Record<string, string> = { compound_first: 'базы → изоляция', pre_exhaust: 'изоляция → база (пред-истощение)', post_exhaust: 'база → изоляция' };
-  if (p.methodology && p.methodology !== 'compound_first') out.push(`Порядок: ${methodLabel[p.methodology] || p.methodology}`);
+  const methodLabel: Record<string, string> = {
+    compound_first: 'базы → изоляция',
+    pre_exhaust: 'изоляция → база (пред-истощение)',
+    post_exhaust: 'база → изоляция',
+    mountain_dog: 'активация → база → памп → растяжка',
+    fst7: 'памп-финишеры в конце (FST-7)',
+    hyperemia: 'памп-изоляции → тяжёлые (гиперемия)',
+  };
+  if (p.methodology && p.methodology !== 'compound_first' && p.methodologyApplied !== false) out.push(`Порядок: ${methodLabel[p.methodology] || p.methodology}`);
   // Суперсеты: антагонисты vs одна группа (только 🔗 Суперсет; пре/гигант — отдельно).
   let samePairs = 0, antaPairs = 0;
   for (const w of plan.weeks) for (const s of w.sessions || []) for (const ex of s.exercises || []) {
@@ -229,7 +236,14 @@ export function buildBBPlanReportText(plan: BBPlan): string {
   const LEVEL_RU: Record<string,string> = { beginner:'Новичок', intermediate:'Средний', advanced:'Опытный', enhanced:'Enhanced (фарма)' };
   const GOAL_RU: Record<string,string> = { mass:'Масса', cut:'Сушка', recomp:'Рекомпозиция', maintenance:'Поддержание', strength_mass:'Сила+Масса' };
   const FOCUS_RU: Record<string,string> = { strength:'Сила (RIR 1-2)', hypertrophy:'Гипертрофия (RIR 2-3)', endurance:'Выносливость (RIR 3-4)' };
-  const METH_RU: Record<string,string> = { compound_first:'База → изоляция', pre_exhaust:'Пред-истощение (изоляция первой)', post_exhaust:'Пост-истощение (база → изоляция)' };
+  const METH_RU: Record<string,string> = {
+    compound_first: 'База → изоляция',
+    pre_exhaust: 'Пред-истощение (изоляция первой)',
+    post_exhaust: 'Пост-истощение (база → изоляция)',
+    mountain_dog: 'Mountain Dog (активация → база → памп → растяжка)',
+    fst7: 'FST-7 (памп-финишеры в конце)',
+    hyperemia: 'Гиперемия (памп-изоляции → тяжёлые)',
+  };
   const SUPER_RU: Record<string,string> = { none:'выкл', antagonist:'антагонисты (грудь↔спина, биц↔триц)', same_muscle:'одна группа (пробить мышцу)', giant:'гигант-сет (3 упр.)' };
   const SCHEME_RU: Record<string,string> = { standard:'Стандарт', gvt:'GVT 10×10', fst7:'FST-7', gironda:'8×8 Жиронда' };
   const DUP_RU: Record<string,string> = { none:'выкл', heavy_light:'тяж/лёг', strength_hypertrophy:'сила/гипертрофия', full_dup:'полный DUP (3 дня)' };
@@ -242,7 +256,10 @@ export function buildBBPlanReportText(plan: BBPlan): string {
   if (p.level) settings.push(`Уровень: ${LEVEL_RU[p.level] || p.level}`);
   if (p.goal) settings.push(`Цель: ${GOAL_RU[p.goal] || p.goal}`);
   if (p.trainingFocus) settings.push(`Фокус: ${FOCUS_RU[p.trainingFocus] || p.trainingFocus}`);
-  if (p.methodology) settings.push(`Методика порядка: ${METH_RU[p.methodology] || p.methodology}`);
+  if (p.methodology) {
+    const methodState = p.methodologyApplied === false ? ' (выбрана, но не применяется в faithful)' : '';
+    settings.push(`Методика порядка: ${METH_RU[p.methodology] || p.methodology}${methodState}`);
+  }
   if (p.supersetMode) settings.push(`Суперсеты: ${SUPER_RU[p.supersetMode] || p.supersetMode}`);
   if (p.volumeScheme) settings.push(`Схема объёма: ${SCHEME_RU[p.volumeScheme] || p.volumeScheme}`);
   if (p.dupMode) settings.push(`Периодизация: ${DUP_RU[p.dupMode] || p.dupMode}`);

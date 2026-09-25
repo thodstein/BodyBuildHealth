@@ -8,8 +8,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
-import { programToBBPlan } from '../cycle-to-plan';
+import { convertCycleToBBPlan, programToBBPlan } from '../cycle-to-plan';
 import { FULL_PROGRAM_LIBRARY } from '../../complete-program-library.engine';
+import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 
 const WM = { chest: 120, back: 140, quads: 180, hamstrings: 100, shoulders: 80, biceps: 60, triceps: 70, glutes: 150, calves: 120, abs: 40, traps: 100, forearms: 50 };
 
@@ -53,6 +54,35 @@ describe('тип разгрузки применяется к плановым d
 describe('program-путь: методики не NO-OP', () => {
   const program = FULL_PROGRAM_LIBRARY[0];
   const wm = { chest: 100, back: 120, quads: 140, hamstrings: 100, shoulders: 60, biceps: 40, triceps: 50, glutes: 120, calves: 80, abs: 40 };
+
+  it('faithful: volume schemes не применяются и output показывает standard', () => {
+    const gvt: any = programToBBPlan(program, { workMax: wm, mode: 'faithful', level: 'enhanced', volumeScheme: 'gvt' } as any);
+    expect(gvt.volumeScheme).toBe('standard');
+  });
+
+  it('program FST-7 with solo insulin is downgraded to standard', () => {
+    const plan: any = programToBBPlan(program, { workMax: wm, mode: 'adapt', level: 'enhanced', peds: ['insulin'], pedDoses: { insulin: 10 }, volumeScheme: 'fst7' } as any);
+    expect(plan.volumeScheme).toBe('standard');
+  });
+
+  it('FST-7 gate parity: generic/cycle/program совпадают на AAS-курсе и GH joint-guard', () => {
+    const common = { workMax: wm, level: 'enhanced', trainingYears: 4, goal: 'mass', volumeScheme: 'fst7', mode: 'adapt' } as any;
+    const aas = { ...common, peds: ['AAS'], pedDoses: { AAS: 500 } } as any;
+    const schemes = [
+      buildBBPlan({ patternId: 'upper_lower_4', weeks: 4, ...aas } as any).volumeScheme,
+      convertCycleToBBPlan({ cycle: CYCLE_01, ...aas } as any).volumeScheme,
+      programToBBPlan(program, aas).volumeScheme,
+    ];
+    expect(schemes).toEqual(['fst7', 'fst7', 'fst7']);
+
+    const gh = { ...common, peds: ['GH'], pedDoses: { GH: 4 } } as any;
+    const blocked = [
+      buildBBPlan({ patternId: 'upper_lower_4', weeks: 4, ...gh } as any).volumeScheme,
+      convertCycleToBBPlan({ cycle: CYCLE_01, ...gh } as any).volumeScheme,
+      programToBBPlan(program, gh).volumeScheme,
+    ];
+    expect(blocked).toEqual(['standard', 'standard', 'standard']);
+  });
 
   it('faithful: methodologyApplied=false (программа дословна)', () => {
     const plan: any = programToBBPlan(program, { workMax: wm, mode: 'faithful', level: 'intermediate' } as any);

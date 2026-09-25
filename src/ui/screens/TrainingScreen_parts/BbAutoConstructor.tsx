@@ -2516,11 +2516,11 @@ export const BbAutoConstructor: React.FC = () => {
         plan = { ...calib.plan, rationale: [...calib.plan.rationale, `⚖️ Применены сохранённые реальные веса (${calib.applied} вхождений упражнений).`] };
       }
     } catch { /* ignore */ }
-    setBuiltPlan({
+    setBuiltPlan((prev) => ({
+      ...(prev || {}),
       ...plan,
-      // Слепок всех кнопок — чтобы отчёт соответствовал реальным настройкам, а не «от новичка»
       trainingVolumeMode,
-    });
+    }));
     // Новая сборка с нуля — снапшот отката инъекции протух (план другой)
     try { localStorage.removeItem('he_bb_plan_saved_prev'); localStorage.removeItem('he_bb_plan_history'); } catch { /* ignore */ }
     // PRO: per-muscle frequency optimization

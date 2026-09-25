@@ -5041,7 +5041,7 @@ for (const week of next.weeks) {
   for (const week of next.weeks) for (const session of week.sessions) {
     const warmups: any[] = (session.exercises as any[]).filter((e: any) => (e as any).warmupActivator);
     const rest: any[] = (session.exercises as any[]).filter((e: any) => !(e as any).warmupActivator);
-    if (warmups.length) {
+    if (warmups.length && options.reorder !== false && !options.preserveSource) {
       // Сохраняем порядок остальных через orderSessionExercises, но warmup — вне очереди, первым
       const orderedRest = (() => {
         try { return tidySessionExercises(rest as any, undefined, (session as any).sessionTag, options.priorityMuscles, options.methodology, options.level === 'enhanced' && (options.trainingYears ?? 0) >= 6 ? 6 : 4) as any; } catch { return rest; }

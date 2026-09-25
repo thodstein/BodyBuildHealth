@@ -78,6 +78,10 @@ describe('§2.4/2.5/2.6: UI-разрывы', () => {
     expect(SRC).not.toContain('exercises.length >= 10');
   });
 
+  it('калибровка сохраняет полный metadata-слепок методик', () => {
+    expect(SRC).toContain('setBuiltPlan((prev) => ({\n      ...(prev || {}),\n      ...plan,\n      trainingVolumeMode,');
+  });
+
   it('карточка оптимизации частоты рендерится (была write-only)', () => {
     expect(SRC).toContain('data-bb="freq-opt"');
     expect(SRC).toContain('freqOptResult.recommendations');

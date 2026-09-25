@@ -395,15 +395,19 @@ Runtime:
 | `compound_first` | Да | Да, но через default | Только порядок упражнений | Нет | Работает |
 | `pre_exhaust` | Да | Да, `cycle-to-plan.ts` передаёт `input.methodology` | Один изоляционный стимул ставится перед соответствующим compound | Только порядок; число упражнений/loading не меняются | Работает; контракт покрыт тестом |
 | `post_exhaust` | Да | Да, `cycle-to-plan.ts` передаёт `opts.methodology` | Изоляция ставится сразу после compound | Только порядок | Работает; default/natural output не меняется |
-| `mountain_dog` | Метка сохраняется | Метка сохраняется, loading-эффект теряется | Надёжного отдельного loading-контракта нет | Не определён | Не доказано применение |
-| `fst7` | Отдельный volume-scheme/render path | Метка доходит до плана, отдельный loading-контракт зависит от другого volume pass | Семь подходов применяются не во всех путях одинаково | Может менять число упражнений/сетов | Требует унификации |
-| `hyperemia` | Метка сохраняется | Метка сохраняется, loading-эффект теряется | Надёжного отдельного loading-контракта нет | Не определён | Требует унификации |
+| `mountain_dog` | Да, order-only | Да, order-only | Активация → база → памп → растяжка; отдельного loading-пакета нет | Только порядок | Работает; loading не заявляется |
+| `fst7` | Да, отдельный `volumeScheme` 7-in-1 | Да, `cycle-to-plan.ts`/finalizer с теми же gates | 7 подходов одним финишером только в enhanced adapt без joint-guard и соло-инсулина | Может менять число упражнений/сетов | Паритет generic/cycle/library; faithful = standard |
+| `hyperemia` | Да, order-only | Да, order-only | Памп-изоляции перед тяжёлыми; отдельного loading-пакета нет | Только порядок | Работает; loading не заявляется |
 | DUP | Overlay реально меняет характер дней | Поддержан отдельно в Prep-цикле и production wiring | Вид сессии, reps/RIR и маркеры | Да, методика намеренно меняет план | Работает, но не единый canon |
 | Volume schemes (`pre_exhaust`, `drop_set`, `rest_pause`, `myo_reps`, `negative`, cluster) | Распределяются finalizer/builder по уровню и фазе | Частично наследуются конвертером | Нужна проверка каждого output-поля отдельно | Обычно да | Есть незакрытые parity-гейты |
 
 ### N1 — `methodology` parity между generic и cycle/library path
 
-До remediation `cycle-to-plan.ts` передавал `undefined` в `tidySessionExercises`, поэтому выбор пользователя мог сохраняться в metadata, но не менять порядок в adapt-режиме. Сейчас оба converter path передают typed `methodology` (`input.methodology` для `convertCycleToBBPlan`, `opts.methodology` для `programToBBPlan`). `pre_exhaust` и `post_exhaust` меняют только порядок; loading, число упражнений, reps/load/RIR и default/natural baseline не изменяются. Это покрыто cycle/program regression-тестами.
+До remediation `cycle-to-plan.ts` передавал `undefined` в `tidySessionExercises`, поэтому выбор пользователя мог сохраняться в metadata, но не менять порядок в adapt-режиме. Сейчас оба converter path передают typed `methodology` (`input.methodology` для `convertCycleToBBPlan`, `opts.methodology` для `programToBBPlan`). `pre_exhaust`, `post_exhaust`, `mountain_dog`, `fst7` и `hyperemia` являются order-only контрактами, если не выбран отдельный совместимый `volumeScheme`; loading, число упражнений, reps/load/RIR и default/natural baseline не изменяются. `methodologyApplied` в faithful явно равен `false`, а report не выдаёт выбранный порядок за применённый. Это покрыто cycle/program/report regression-тестами.
+
+### N1.1 — FST-7 loading gate и сохранение фактической схемы
+
+`fst7` как `methodology` меняет только порядок. 7-in-1 loading включается отдельным `volumeScheme='fst7'` и теперь проходит через общий enhanced/joint-guard/соло-инсулин gate в generic, cycle и program paths. В faithful и при не пройденном gate фактический output — `standard`, а пользовательский выбор остаётся в `inputSnapshot`; rationale/report не выдают неприменённую схему за активную. BbAuto сохраняет этот metadata-слепок после калибровки весов.
 
 ### N2 — Prep-cycle/Prep-season authoritative safety projection
 
@@ -448,8 +452,8 @@ Runtime:
 
 1. **Default/natural без методики:** байт-в-байт совпадает с baseline: упражнения, sets/workSets, reps, load, RIR, order, MRV и rationale.
 2. **`pre_exhaust`/`post_exhaust`:** меняется только порядок; число упражнений и loading остаются прежними.
-3. **`fst7`/`mountain_dog`/`hyperemia`:** либо реально изменяют заявленные `workSets`/RIR/tempo с rationale, либо не отмечаются как применённые.
-4. **Cycle/library/generic:** одинаковый `methodology` даёт одинаковый семантический контракт; private `as any` для `onCourse`/`methodology` отсутствует.
+3. **`fst7`/`mountain_dog`/`hyperemia`:** order-only методы отмечаются только как порядок; FST-7 loading включается только через отдельный `volumeScheme` с явным gate и фактическим output.
+4. **Cycle/library/generic:** одинаковый `methodology` даёт одинаковый семантический контракт; faithful не получает order/volume rewrite; private `as any` для `onCourse`/`methodology` отсутствует.
 5. **Taper/peak:** method не назначается в phase/taper/peak; RIR не опускается ниже safety floor.
 6. **Plan safety:** validation/quality/UI используют один snapshot; malformed/consent-red отсутствующие данные не дают fail-open.
 7. **Config round-trip:** PED, RED-S, height, cycle day, experience/prep count, schedule, competition set, trial id/dose, confirmation и contraindications сохраняются без догадок.
@@ -468,4 +472,4 @@ P0/P1/P2 remediation завершена:
 - final MRV normalization получает `onCourse`, RIR имеет safety floor, peaking не получает failure techniques;
 - BB plan validation/quality/UI tests и полный BB circle прошли без новых падений.
 
-Оставшиеся риски — только feature research, не safety-разрывы: `mountain_dog`, `fst7` и `hyperemia` сохраняются как opt-in loading/metadata-контракты и не расширяются автоматически в tapering/peak. Коммиты и push не выполнялись.
+Оставшиеся ограничения — осознанные границы: `mountain_dog` и `hyperemia` не получают отдельный loading-пакет без измеримого контракта; FST-7 loading разрешён только в enhanced adapt без joint-guard/соло-инсулина, а в faithful всегда остаётся `standard`. Предыдущие remediation-коммиты сохранены; текущий follow-up methodology остаётся локальным до отдельной проверки/коммита.

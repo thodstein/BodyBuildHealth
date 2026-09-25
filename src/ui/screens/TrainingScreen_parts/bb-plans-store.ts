@@ -115,7 +115,8 @@ function isSavedPlanShape(value: any): boolean {
 function migrateSavedPlan(value: any): SavedBBPlan {
   const rawParams = value.params && typeof value.params === 'object' ? value.params : {};
   const validFocus = ['strength', 'hypertrophy', 'endurance'].includes(rawParams.trainingFocus) ? rawParams.trainingFocus : undefined;
-  const validMethodology = ['compound_first', 'pre_exhaust', 'post_exhaust'].includes(rawParams.methodology) ? rawParams.methodology : undefined;
+  const validMethodology = ['compound_first', 'pre_exhaust', 'post_exhaust', 'mountain_dog', 'fst7', 'hyperemia'].includes(rawParams.methodology) ? rawParams.methodology : undefined;
+  const validIntensityTechnique = ['rest_pause', 'drop_set', 'myo_reps', 'pause_rep', 'mechanical_drop', 'negative', 'twenty_ones', 'none'].includes(rawParams.intensityTechnique) ? rawParams.intensityTechnique : 'none';
   const validSource = rawParams.source === 'cycle' || rawParams.source === 'program' ? rawParams.source : undefined;
   const weeks = Number.isInteger(rawParams.weeks) && rawParams.weeks > 0 ? rawParams.weeks : value.plan.weeks.length;
   return {
@@ -133,7 +134,7 @@ function migrateSavedPlan(value: any): SavedBBPlan {
       courseIntensity: rawParams.courseIntensity,
       weakPoints: Array.isArray(rawParams.weakPoints) ? rawParams.weakPoints.filter((item: any) => typeof item === 'string') : [],
       focusGroup: typeof rawParams.focusGroup === 'string' ? rawParams.focusGroup : '',
-      intensityTechnique: typeof rawParams.intensityTechnique === 'string' ? rawParams.intensityTechnique : 'none',
+      intensityTechnique: validIntensityTechnique,
       loadStrategy: typeof rawParams.loadStrategy === 'string' ? rawParams.loadStrategy : 'double_progression',
       autoDeload: Boolean(rawParams.autoDeload), deloadType: typeof rawParams.deloadType === 'string' ? rawParams.deloadType : 'pump',
       trainingFocus: validFocus, methodology: validMethodology,
