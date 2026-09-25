@@ -7,7 +7,7 @@
  * FIT — парсинг через fit-file-parser, ZIP — через fflate.
  */
 import type { CardioLogEntry } from './lms/cardio-diary.engine';
-import { estimateCardioEntryKcal } from './lms/cardio-diary.engine';
+import { estimateCardioEntryKcal, sanitizeCardioSport } from './lms/cardio-diary.engine';
 import type { CardioType } from './lms/cardio.engine';
 import { unzipSync, strFromU8 } from 'fflate';
 import FitParser from 'fit-file-parser';
@@ -251,6 +251,8 @@ export function parseCardioCsv(text: string, fileName = 'import.csv'): CardioImp
       rpe: undefined,
       completed: true,
       notes: notes || undefined,
+      sport: sanitizeCardioSport(rawType),
+      source: 'import',
     };
     entries.push(entry);
   }
@@ -319,7 +321,12 @@ export function parseCardioTcx(text: string): CardioImportResult {
       }
       // пульс
       let hr: number | undefined;
-      const hrEl = el.getElementsByTagName('AverageHeartRateBpm')[0] || el.getElementsByTagName('averageHeartRateBpm')[0];
+      // Garmin-экспорт — AverageHeartRateBpm; другие производители идут по
+  // спеке TCX с <HeartRateBpm><Value>. Принимаем оба (как в CSV — по алиасам).
+  const hrEl = el.getElementsByTagName('AverageHeartRateBpm')[0]
+    || el.getElementsByTagName('averageHeartRateBpm')[0]
+    || el.getElementsByTagName('HeartRateBpm')[0]
+    || el.getElementsByTagName('heartRateBpm')[0];
       if (hrEl) {
         const v = hrEl.getElementsByTagName('Value')[0]?.textContent || hrEl.textContent;
         const n = Number(v);
@@ -332,8 +339,17 @@ export function parseCardioTcx(text: string): CardioImportResult {
         const n = Number(calEl.textContent);
         if (Number.isFinite(n) && n > 0) cal = Math.round(n);
       }
-      // тип из Sport
-      const sport = (el.getAttribute('Sport') || (el.parentElement as Element)?.getAttribute?.('Sport') || '').toString();
+      // Дисциплина лежит на <Activity Sport="…">, а <Lap> — на 2 уровня ниже
+      // (Activity > Training > Lap), поэтому одного parentElement мало.
+      const sport = (() => {
+        let n: Element | null = el;
+        for (let i = 0; i < 4 && n; i++) {
+          const v = n.getAttribute?.('Sport');
+          if (v) return v.toString();
+          n = n.parentElement;
+        }
+        return '';
+      })();
       const type = mapActivityToCardioType(sport || el.tagName);
       entries.push({
         id: genId(),
@@ -344,6 +360,10 @@ export function parseCardioTcx(text: string): CardioImportResult {
         avgHr: hr,
         calories: cal ?? estimateCardioEntryKcal(type, clamp(dur, 1, 600)),
         completed: true,
+        // Sprint 5.2/5.3: TCX прямо отдаёт дисциплину (Biking/Other) — сохраняем,
+        // иначе бег и вело слились бы в один TID с разной калибровкой пульса.
+        sport: sanitizeCardioSport(sport),
+        source: 'import',
       });
     } catch {
       // ignore one lap
@@ -435,6 +455,8 @@ export function parseCardioGpx(text: string): CardioImportResult {
         calories: estimateCardioEntryKcal(mapped, dur),
         completed: true,
         notes: name ? name.slice(0, 300) : undefined,
+        sport: sanitizeCardioSport(type || name),
+        source: 'import',
       });
     } catch {
       // ignore
@@ -570,6 +592,8 @@ export function parseCardioJson(text: string): CardioImportResult {
         calories: raw.calories ? Math.round(Number(raw.calories)) : estimateCardioEntryKcal(type, clamp(dur, 1, 600)),
         completed: true,
         notes: String(raw.notes || raw.title || '').slice(0, 300) || undefined,
+        sport: sanitizeCardioSport(raw.sport ?? typeRaw),
+        source: 'import',
       });
     } catch {
       // ignore

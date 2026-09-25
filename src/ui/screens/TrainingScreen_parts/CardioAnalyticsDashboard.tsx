@@ -7,7 +7,7 @@ import { CARD, ROW, LABEL, HINT_SM, Badge, StatTile } from './CardioUI';
 import { cardioLogStats, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
 import {
   cardioMonotonyStrain, cardioFactCtlSeries, cardioHrDrift, interferenceForCycle,
-  timeInZones, polarizationIndex, classifyTid,
+  timeInZones, polarizationIndex, classifyTid, tidPlanVsFact,
   dailyPmcSeries, tssRampRate, interpretTsb,
   aerobicDecoupling, heatAltitudeHrAdd, cardioInterferenceV2,
 } from '../../../engines/lms/cardio.engine';
@@ -114,6 +114,14 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
     } catch { return null; }
   }, [cycle]);
 
+  // P1-аудит: план по типам сессий ≠ факт по HR дневника. Сверяем честно.
+  const tidFact = useMemo(() => {
+    if (!cycle || !log.length) return null;
+    try {
+      const cfg = cycle.config as { lthr?: number; age?: number; sex?: 'male' | 'female' } | undefined;
+      return tidPlanVsFact(cycle, log, { lthr: cfg?.lthr, age: cfg?.age, sex: cfg?.sex });    } catch { return null; }
+  }, [cycle, log]);
+
   // PRO: PMC daily по факту (CTL/ATL/TSB) + рампа TSS
   const pmc = useMemo(() => {
     if (log.length < 7) return null;
@@ -204,6 +212,7 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
       )}
       {hrDriftNote && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>⚠ {hrDriftNote}</div>}
       {tid && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.22)', borderRadius: 8, padding: '6px 8px' }}>🧬 TID {tid.pct.z1}/{tid.pct.z2}/{tid.pct.z3} · PI {tid.pi ?? '—'} — {tid.label}. Новичкам — pyramidal, продвинутым к старту — polarized (PYR→POL).</div>}
+      {tidFact && <div style={{ fontSize: 11, color: '#fff', background: tidFact.comparable ? (tidFact.drift > 12 ? 'rgba(239,68,68,0.08)' : 'rgba(74,222,128,0.07)') : 'rgba(255,255,255,0.02)', border: `1px solid ${tidFact.comparable ? (tidFact.drift > 12 ? 'rgba(239,68,68,0.24)' : 'rgba(74,222,128,0.22)') : 'rgba(255,255,255,0.06)'}`, borderRadius: 8, padding: '6px 8px' }}>📊 TID по факту (HR дневника) {tidFact.fact.pct.z1}/{tidFact.fact.pct.z2}/{tidFact.fact.pct.z3} против плана {tidFact.planned.pct.z1}/{tidFact.planned.pct.z2}/{tidFact.planned.pct.z3} — расхождение {tidFact.drift} п.п. {tidFact.verdict}</div>}
       {pmc && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.22)', borderRadius: 8, padding: '6px 8px' }}>📊 PMC daily: CTL {pmc.ctl} · ATL {pmc.atl} · TSB {pmc.tsb > 0 ? '+' : ''}{pmc.tsb} — {pmc.interp}{pmc.rampPct != null ? ` · Рампа ${pmc.rampPct}%/нед` : ''}{pmc.rampWarn ? ` · ⚠ ${pmc.rampWarn}` : ''}</div>}
       {durability && <div style={{ fontSize: 11, color: durability.level === 'strong' ? '#4ade80' : durability.level === 'moderate' ? '#fbbf24' : '#f87171', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px' }}>🏃 Durability decoupling {durability.decouplingPct}% ({durability.level}) — {durability.advice}</div>}
       {safety && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>🌡 Жара/высота: +{safety.addBpm} уд/мин к зонам — {safety.notes.join(' ')}</div>}

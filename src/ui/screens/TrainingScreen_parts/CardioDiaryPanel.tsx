@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, replaceCardioLog,
   cardioLogStats, computeCardioAdvice, cardioWeekFact, estimateCardioEntryKcal,
+  sanitizeCardioSport, CARDIO_SPORTS, CARDIO_SPORT_RU, type CardioSport,
   cardioPaceMinPerKm, validateCardioLogFields, clampCardioLogNumber,
   saveCardioWellness, loadCardioWellness, wellnessReadiness,
   type CardioLogEntry, type CardioLogFieldWarnings,
@@ -40,6 +41,8 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   }, [onLogChanged]);
   const [date, setDate] = useState(todayIso());
   const [type, setType] = useState<CardioType>('zone2');
+  // Sprint 5.2: дисциплина обязательна для честного TID (бег ≠ вело по пульсу).
+  const [sport, setSport] = useState<CardioSport>('run');
   const [minutes, setMinutes] = useState('30');
   const [rpe, setRpe] = useState('');
   const [hr, setHr] = useState('');
@@ -71,6 +74,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     setHr(e.avgHr != null ? String(e.avgHr) : '');
     setKcal(e.calories != null ? String(e.calories) : '');
     setKm(e.distanceKm != null ? String(e.distanceKm) : '');
+    setSport(sanitizeCardioSport(e.sport));
   };
 
   // Последний вес из журнала для оценки ккал (fallback — 80 кг).
@@ -178,6 +182,10 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
       calories: Number(kcal) > 0 ? Number(kcal) : estimateCardioEntryKcal(type, dur, lastWeight ?? undefined),
       distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
+      // Sprint 5.2/5.3: дисциплина + provenance — иначе TID смешивает
+      // бег и вело (разная калибровка пульса), а правка неотличима от импорта.
+      sport: sanitizeCardioSport(sport),
+      source: editingId ? 'manual' : 'manual',
     };
     const next = saveCardioLogEntry(entry);
     setUndoPrev(log);
@@ -233,6 +241,18 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={INPUT} aria-label="Дата" />
         {TYPES.map(t => (
           <button key={t} style={type === t ? CHIP_ACTIVE : CHIP} onClick={() => setType(t)}>{TYPE_LABEL[t]}</button>
+        ))}
+      </div>
+      <div style={{ ...ROW, gap: 6 }}>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', fontWeight: 700 }}>Дисциплина:</span>
+        {CARDIO_SPORTS.map(s => (
+          <button
+            key={s}
+            data-cardio="diary-sport"
+            style={sport === s ? CHIP_ACTIVE : CHIP}
+            onClick={() => setSport(s)}
+            aria-pressed={sport === s}
+          >{CARDIO_SPORT_RU[s]}</button>
         ))}
       </div>
       {editingId && <div style={{ fontSize: 11, color: '#fbbf24' }}>✏️ Редактирование записи — сохраните или нажмите ✕ на строке, чтобы отменить.</div>}
@@ -339,6 +359,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
             <div key={e.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 7, background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012))', border: '1px solid rgba(255,255,255,0.07)', borderLeft: `3px solid ${TYPE_COLOR[e.type] ?? 'rgba(255,255,255,0.16)'}`, borderRadius: 11, padding: '9px 11px', fontVariantNumeric: 'tabular-nums' }}>
               <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.75)', minWidth: 82, fontWeight: 700 }}>{e.date}</span>
               <span style={{ fontSize: 11, minWidth: 68, fontWeight: 800, color: TYPE_COLOR[e.type] ?? '#fff', background: `${TYPE_COLOR[e.type] ?? '#fff'}14`, border: `1px solid ${TYPE_COLOR[e.type] ?? '#fff'}28`, borderRadius: 20, padding: '3px 9px', textAlign: 'center' }}>{TYPE_LABEL[e.type]}</span>
+              {/* Sprint 5.2/5.3: дисциплина + provenance видны в строке. */}
+              <span data-cardio="diary-sport-chip" style={{ fontSize: 10.5, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 20, padding: '3px 9px' }}>{CARDIO_SPORT_RU[sanitizeCardioSport(e.sport)]}</span>
+              {e.source === 'import' && <span title={`Импорт · ${e.updatedAt ?? 'дата правки не записана'}`} style={{ fontSize: 10.5, fontWeight: 700, color: '#93c5fd', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 20, padding: '3px 9px' }}>импорт</span>}
               <span style={{ display: 'flex', flexWrap: 'wrap', gap: 5, flex: 1, alignItems: 'center' }}>
                 {e.completed === false
                   ? <span style={{ fontSize: 11.5, color: '#f87171', fontWeight: 800 }}>⏭ пропущена</span>

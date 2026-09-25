@@ -12,10 +12,29 @@
  */
 import type { CardioCycle, CardioSession, CardioType } from './cardio.engine';
 import { cardioSessionsForDate, cardioWeekForDate, kcalForCardio } from './cardio.engine';
-import { todayLocalIso, addDaysIso } from './cardio-date-utils.engine';
+import { todayLocalIso, addDaysIso, toLocalIso } from './cardio-date-utils.engine';
 
 export const CARDIO_LOG_KEY = 'he_cardio_sessions';
 export const CARDIO_LOG_CAP = 500;
+
+/** Дисциплина сессии. Sprint 5.2: без неё TID/PI смешивал бег и вело —
+ *  а калибровка пульса у них РАЗНАЯ (одни и те же 150 уд/мин = разная
+ *  интенсивность), поэтому «фактический TID» был бы ложью. */
+export type CardioSport = 'run' | 'bike' | 'row' | 'other';
+export const CARDIO_SPORTS: readonly CardioSport[] = ['run', 'bike', 'row', 'other'];
+export const CARDIO_SPORT_RU: Record<CardioSport, string> = {
+  run: 'бег', bike: 'велосипед', row: 'гребля', other: 'другое',
+};
+
+/** Санация дисциплины: неизвестное/битое → 'other' (не выдумываем «бег»). */
+export function sanitizeCardioSport(v: unknown): CardioSport {
+  const s = typeof v === 'string' ? v.trim().toLowerCase() : '';
+  if ((CARDIO_SPORTS as readonly string[]).includes(s)) return s as CardioSport;
+  if (['running', 'run', 'бег', 'road', 'trail'].includes(s)) return 'run';
+  if (['cycling', 'bike', 'biking', 'велосипед', 'вело'].includes(s)) return 'bike';
+  if (['rowing', 'row', 'гребля'].includes(s)) return 'row';
+  return 'other';
+}
 
 export interface CardioLogEntry {
   id: string;
@@ -28,6 +47,11 @@ export interface CardioLogEntry {
   rpe?: number;
   completed: boolean;
   notes?: string;
+  /** Дисциплина; legacy-записи без поля = 'other' (не угадываем). */
+  sport?: CardioSport;
+  /** Sprint 5.3 provenance: откуда запись и когда обновлена. */
+  source?: 'manual' | 'import' | 'wearable' | 'derived';
+  updatedAt?: string;
 }
 
 export function loadCardioLog(): CardioLogEntry[] {
@@ -36,13 +60,19 @@ export function loadCardioLog(): CardioLogEntry[] {
     if (!Array.isArray(v)) return [];
     return v
       .filter((e): e is CardioLogEntry => !!e && typeof e === 'object' && typeof e.date === 'string' && typeof e.durationMin === 'number')
+      .map(e => ({
+        ...e,
+        sport: sanitizeCardioSport(e.sport),
+        source: (['manual', 'import', 'wearable', 'derived'] as const).includes(e.source as any) ? e.source : 'manual',
+        updatedAt: typeof e.updatedAt === 'string' ? e.updatedAt : undefined,
+      }))
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   } catch { return []; }
 }
 
 export function saveCardioLogEntry(entry: CardioLogEntry): CardioLogEntry[] {
   const all = loadCardioLog().filter(e => e.id !== entry.id);
-  all.unshift(entry);
+  all.unshift({ ...entry, updatedAt: toLocalIso(new Date()) });
   const list = all.slice(0, CARDIO_LOG_CAP);
   try { localStorage.setItem(CARDIO_LOG_KEY, JSON.stringify(list)); } catch { /* ignore */ }
   return list;
@@ -112,10 +142,6 @@ export function clampCardioLogNumber(raw: string | number, min: number, max: num
   const n = typeof raw === 'number' ? raw : Number(String(raw).replace(',', '.'));
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, Math.round(n * 10) / 10));
-}
-
-function toLocalIso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function dateDaysAgo(days: number, referenceIso?: string): string {

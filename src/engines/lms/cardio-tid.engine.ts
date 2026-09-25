@@ -11,6 +11,7 @@
  * - Frontiers 2025: фазовый сдвиг general PYR/POL → specific PYR → pre-comp POL.
  */
 import type { CardioCycle, CardioType } from './cardio.engine';
+import { maxHrClassic } from './cardio-physiology.engine';
 
 export type TidModel = 'polarized' | 'pyramidal' | 'threshold' | 'other';
 
@@ -124,4 +125,152 @@ export function phasedTidTarget(phase: SeasonPhase): { z1: number; z2: number; z
 export function tidDistanceToTarget(tiz: TimeInZones, target: { z1: number; z2: number; z3: number }): number {
   const d = (Math.abs(tiz.pct.z1 - target.z1) + Math.abs(tiz.pct.z2 - target.z2) + Math.abs(tiz.pct.z3 - target.z3)) / 2;
   return Math.round(d * 10) / 10;
+}
+
+// ─── Фактический TID (по дневнику, а не по плану) ────────────────────────────
+// P1-аудит: весь TID-считался из ТИПА сессии в плане (recovery/zone2→Z1,
+// miss→Z2, hiit→Z3). Но дневник хранит ФАКТ: длительность + средний HR.
+// План говорил «зона 2, 30 мин», а человек мог отработать 22 мин в Z1
+// или 35 мин в Z3 — и распределение типов ≠ распределение по факту.
+// Ниже — расчёт по факту (HR → зона через LTHR/ЧССмакс) + честная сверка
+// «план vs факт», чтобы видеть расхождение, а не выдавать план за факт.
+
+export interface FactSession {
+  date: string;
+  type: CardioType;
+  durationMin: number;
+  avgHr?: number;
+  completed?: boolean;
+  /** Дисциплина сессии: калибровка пульса у бега и вела разная (Sprint 5.2). */
+  sport?: 'run' | 'bike' | 'row' | 'other';
+}
+
+/** Границы зон TID в % от референса пульса.
+ *  TID — модель ЗОН, а не абсолютных ЧСС: у бегуна Z2 ≈ LT1, у велосипедиста
+ *  LT2 (Pollock 2017 / Seiler 2006: LT1 у вело заметно выше). Поэтому пороги
+ *  даём по LTHR, а при его отсутствии — по % ЧССмакс с оговоркой в note. */
+export const TID_HR_BOUNDS_PCT_LTHR = { z1: [0, 81], z2: [81, 89], z3: [89, 100] } as const;
+export const TID_HR_BOUNDS_PCT_MAXHR = { z1: [0, 70], z2: [70, 85], z3: [85, 100] } as const;
+
+export type TidHrBasis = 'lthr' | 'maxhr' | 'none';
+
+export interface TidHrReference {
+  lthr?: number;
+  maxHr?: number;
+  age?: number;
+  sex?: 'male' | 'female';
+}
+
+/** Зона TID по среднему HR фактической сессии (null — HR нет или вне зоны). */
+export function tidZoneOfHr(
+  avgHr: number | undefined,
+  ref: TidHrReference,
+): { zone: 1 | 2 | 3 | null; basis: TidHrBasis; pct: number | null } {
+  if (!avgHr || !Number.isFinite(avgHr) || avgHr <= 0) return { zone: null, basis: 'none', pct: null };
+  if (ref.lthr && ref.lthr > 0) {
+    const pct = (avgHr / ref.lthr) * 100;
+    const b = TID_HR_BOUNDS_PCT_LTHR;
+    if (pct < b.z1[0]) return { zone: null, basis: 'lthr', pct: Math.round(pct) };
+    if (pct < b.z2[0]) return { zone: 1, basis: 'lthr', pct: Math.round(pct) };
+    if (pct < b.z3[0]) return { zone: 2, basis: 'lthr', pct: Math.round(pct) };
+    return { zone: 3, basis: 'lthr', pct: Math.round(pct) };
+  }
+  const maxHr = ref.maxHr && ref.maxHr > 0
+    ? ref.maxHr
+    : (ref.age && ref.age > 0 ? maxHrClassic(ref.age, ref.sex) : 0);
+  if (maxHr > 0) {
+    const pct = (avgHr / maxHr) * 100;
+    const b = TID_HR_BOUNDS_PCT_MAXHR;
+    if (pct < b.z1[0]) return { zone: null, basis: 'maxhr', pct: Math.round(pct) };
+    if (pct < b.z2[0]) return { zone: 1, basis: 'maxhr', pct: Math.round(pct) };
+    if (pct < b.z3[0]) return { zone: 2, basis: 'maxhr', pct: Math.round(pct) };
+    return { zone: 3, basis: 'maxhr', pct: Math.round(pct) };
+  }
+  return { zone: null, basis: 'none', pct: null };
+}
+
+/** Фактический TID по дневнику. Сессии без HR идут в `skipped` (честно:
+ *  «не знаем» ≠ «зона 1»). Тип сессии НЕ используется как замена HR:
+ *  Z1 начинается с 0% референса, поэтому любой валидный HR попадает
+ *  в какую-то зону — «фолбэк по типу» был бы мёртвым кодом и ложью. */
+export function factTimeInZones(
+  log: FactSession[],
+  ref: TidHrReference = {},
+): TimeInZones & { byHr: number; skipped: number; basis: TidHrBasis; note: string } {
+  let z1 = 0, z2 = 0, z3 = 0, byHr = 0, skipped = 0;
+  for (const s of log ?? []) {
+    if (s.completed === false) continue;
+    if (!(s.durationMin > 0)) continue;
+    const hr = tidZoneOfHr(s.avgHr, ref);
+    if (hr.zone == null) { skipped++; continue; }
+    byHr++;
+    if (hr.zone === 1) z1 += s.durationMin;
+    else if (hr.zone === 2) z2 += s.durationMin;
+    else z3 += s.durationMin;
+  }
+  const total = z1 + z2 + z3;
+  const basis: TidHrBasis = byHr > 0 ? (ref.lthr && ref.lthr > 0 ? 'lthr' : 'maxhr') : 'none';
+  return {
+    z1Min: Math.round(z1), z2Min: Math.round(z2), z3Min: Math.round(z3), totalMin: Math.round(total),
+    pct: total > 0
+      ? { z1: r1(z1 / total * 100), z2: r1(z2 / total * 100), z3: r1(z3 / total * 100) }
+      : { z1: 0, z2: 0, z3: 0 },
+    byHr, skipped, basis,
+    note: byHr === 0
+      ? 'Нет ни одной сессии со средним HR — фактический TID не считаем (план ≠ факт).'
+      : skipped > 0
+        ? `${byHr} по среднему HR; ${skipped} без HR — вне расчёта.`
+        : `${byHr} сессий по среднему HR${basis === 'lthr' ? ' (пороги по LTHR)' : ' (пороги по % ЧССмакс)'}.`,
+  };
+}
+
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
+export interface TidPlanVsFact {
+  planned: TimeInZones;
+  fact: TimeInZones & { byHr: number; skipped: number; basis: TidHrBasis; note: string };
+  /** |Δ| в п.п. по каждой зоне. */
+  delta: { z1: number; z2: number; z3: number };
+  /** Сумма |Δ|/2 — общая расходимость плана и факта, 0-100. */
+  drift: number;
+  comparable: boolean;
+  verdict: string;
+  /** Спринт 5.2: в дневнике смешаны бег и вело — их зоны несопоставимы. */
+  sportsInLog: string[];
+  mixed: boolean;
+}
+
+/** Честная сверка «план vs факт»: план по типам сессий, факт по HR дневника. */
+export function tidPlanVsFact(
+  cycle: Pick<CardioCycle, 'weeks'>,
+  log: FactSession[],
+  ref: TidHrReference = {},
+): TidPlanVsFact {
+  const planned = timeInZones(cycle);
+  const fact = factTimeInZones(log, ref);
+  const delta = {
+    z1: r1(Math.abs(planned.pct.z1 - fact.pct.z1)),
+    z2: r1(Math.abs(planned.pct.z2 - fact.pct.z2)),
+    z3: r1(Math.abs(planned.pct.z3 - fact.pct.z3)),
+  };
+  const sportsInLog = [...new Set((log ?? []).map(s => s.sport ?? 'other'))];
+  // «other» — это legacy-записи без дисциплины: они не мешают, но и не
+  // дают права утверждать, что калибровка одна.
+  const realSports = sportsInLog.filter(s => s !== 'other');
+  const mixed = realSports.length > 1;
+  const drift = r1((delta.z1 + delta.z2 + delta.z3) / 2);
+  const comparable = fact.byHr > 0 && planned.totalMin > 0;
+  let verdict: string;
+  if (!comparable) {
+    verdict = 'Сверка невозможна: нет фактических сессий с HR (план нельзя выдавать за факт).';
+  } else if (mixed) {
+    verdict = `В дневнике смешаны дисциплины (${realSports.join(' + ')}) — у них разная калибровка пульса, единый TID некорректен. Считайте по одной дисциплине.`;
+  } else if (drift <= 5) {
+    verdict = 'Факт совпадает с планом — распределение по зонам реальное.';
+  } else if (drift <= 12) {
+    verdict = `Факт отличается от плана на ${drift} п.п. — норма для ручных и HR-датчиков, следите за Z3.`;
+  } else {
+    verdict = `Факт расходится с планом на ${drift} п.п. — пересоберите план: ${fact.note}`;
+  }
+  return { planned, fact, delta, drift, comparable, verdict, sportsInLog, mixed };
 }

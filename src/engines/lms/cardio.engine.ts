@@ -40,8 +40,8 @@ export type { FieldTestSource, FieldTestInput, PersonalZones, CpEffort, CpFit, F
 export { ftpFrom20MinTest, criticalPowerFrom3And12, criticalPowerFromEfforts, talkTestZone2Ceiling, zonesFromTalkTest, personalZones, recommendFieldTest, validateFieldTestInput, appendFieldTestLog, responderFromLog, loadFieldTestLog, saveFieldTestLogEntry, removeFieldTestLogEntry, clearFieldTestLog, latestFieldTestMetrics, FIELD_TEST_LOG_KEY } from './cardio-field-tests.engine';
 export type { DailyLoad, PmcPoint, HrDriftContext } from './cardio-pmc.engine';
 export { dailyPmcSeries, hrTss, powerTss, runTss, correctHrForDrift, driftCorrectedTss, tssRampRate, interpretTsb } from './cardio-pmc.engine';
-export type { TidModel, TimeInZones, SeasonPhase } from './cardio-tid.engine';
-export { tidZoneOf, timeInZones, polarizationIndex, classifyTid, tidAdvice, phasedTidTarget, tidDistanceToTarget } from './cardio-tid.engine';
+export type { TidModel, TimeInZones, SeasonPhase, FactSession, TidHrReference, TidHrBasis, TidPlanVsFact } from './cardio-tid.engine';
+export { tidZoneOf, timeInZones, polarizationIndex, classifyTid, tidAdvice, phasedTidTarget, tidDistanceToTarget, tidZoneOfHr, factTimeInZones, tidPlanVsFact, TID_HR_BOUNDS_PCT_LTHR, TID_HR_BOUNDS_PCT_MAXHR } from './cardio-tid.engine';
 export type { DecouplingLevel, DecouplingResult, DurabilityPoint } from './cardio-durability.engine';
 export { aerobicDecoupling, efficiencyPowerHr, efficiencyPaceHr, durabilityTrend, responderClassification, durabilityDurationTarget } from './cardio-durability.engine';
 export type { TaperDecay, FatigueClass, PreTaperState, IndividualTaperPlan } from './cardio-taper-pro.engine';
