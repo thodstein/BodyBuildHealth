@@ -8,7 +8,7 @@ import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
 import { peakBlockHint, type CardioCompPriority } from '../../../engines/lms/cardio-peak-block.engine';
 import { predictRaceTimes, predictorNote, RACE_WEEK_CHECKLIST } from '../../../engines/lms/cardio-race-predictor.engine';
 import { loadCardioRecords, bestCardioRecord, formatCardioTime } from '../../../engines/lms/cardio-records.engine';
-import { SectionCard, GroupHeading, HINT, HINT_SM, BTN_CTA, BTN_DANGER, NumberInput, InfoBanner, Badge, EmptyState } from './CardioUI';
+import { SectionCard, GroupHeading, HINT, HINT_SM, BTN_CTA, BTN_DANGER, NumberInput, InfoBanner, Badge, EmptyState, SelectInput } from './CardioUI';
 import { localMidnight, todayLocalIso } from '../../../engines/lms/cardio-date-utils.engine';
 
 export interface CompDraft { name: string; week: string; date?: string }
@@ -68,14 +68,9 @@ export const CardioCompsStep: React.FC<{
                   <span style={{ cursor: 'grab', color: '#fff', fontSize: 14, userSelect: 'none', padding: '4px 6px', minWidth: 24, textAlign: 'center' }} aria-hidden>⋮⋮</span>
                   <span style={{ fontSize: 13, fontWeight: 800, flex: 1, color: '#fff' }}>{c.name}</span>
                   <Badge bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.22)" color="#60a5fa">нед {c.week}</Badge>
-                  <select value={c.priority ?? 'B'} onChange={e => setPriority(c.id, e.target.value as CardioCompPriority)}
-                    aria-label={`Приоритет старта ${c.name}`}
-                    title={peakBlockHint((c.priority ?? 'B') as CardioCompPriority)}
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: 13, minHeight: 44 }}>
-                    <option value="A">A · главный</option>
-                    <option value="B">B · контрольный</option>
-                    <option value="C">C · тренировочный</option>
-                  </select>
+                  <SelectInput value={c.priority ?? 'B'} onChange={v => setPriority(c.id, v as CardioCompPriority)}
+                    ariaLabel={`Приоритет старта ${c.name}`} width={150}
+                    options={[{ value: 'A', label: 'A · главный' }, { value: 'B', label: 'B · контрольный' }, { value: 'C', label: 'C · тренировочный' }]} />
                   <span style={{ fontSize: 11, color: '#fff' }}>
                     {taperEnabled ? `taper с нед ${Math.max(1, c.week - taperWeeks)}` : peakWeek ? 'пик-неделя' : 'без пика'}
                   </span>

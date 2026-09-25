@@ -16,6 +16,19 @@ import { CardioDayCard } from '../CardioDayCard';
 import { CardioDiaryStep } from '../CardioDiaryStep';
 import { buildCardioCycle, loadCardioCycles } from '../../../../engines/lms/cardio.engine';
 import { saveCardioLogEntry, loadCardioLog } from '../../../../engines/lms/cardio-diary.engine';
+import { within } from '@testing-library/react';
+
+/**
+ * Спринт 5/P2: нативные <select> заменены на попап-шит (CardioSelectSheet),
+ * поэтому выбор значения = открыть триггер → нажать опцию в диалоге.
+ * Хелпер повторяет РЕАЛЬНЫЙ путь пользователя (было: fireEvent.change по
+ * нативному select — этого пути в проде больше нет).
+ */
+const pickInSheet = (triggerName: RegExp, optionName: RegExp) => {
+  fireEvent.click(screen.getByRole('button', { name: triggerName }));
+  const dlg = screen.getByRole('dialog');
+  fireEvent.click(within(dlg).getByRole('button', { name: optionName }));
+};
 import { saveSRPESession } from '../../../../engines/pro/srpe-store';
 
 const CYCLES_KEY = 'he_cardio_cycles';
@@ -142,8 +155,9 @@ describe('CardioWeekEditor', () => {
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'we-2' });
     render(<CardioWeekEditor cycle={c} />);
     fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
-    const select = screen.getByRole('combobox', { name: /Тип новой сессии/ });
-    fireEvent.change(select, { target: { value: 'hiit' } });
+    const select = screen.getByRole('button', { name: /Тип новой сессии/ });
+    expect(select).toBeTruthy();
+    pickInSheet(/Тип новой сессии/, /^HIIT/);
     fireEvent.click(screen.getByRole('button', { name: /Добавить сессию/ }));
     const saved = loadCardioCycles().find(x => x.id === 'we-2');
     expect(saved!.weeks[0].sessions.some(s => s.type === 'hiit')).toBe(true);
@@ -204,8 +218,12 @@ describe('CardioWeekEditor', () => {
     c.weeks[0].sessions = [{ type: 'zone2', durationMin: 30, weeklyFrequency: 1, intensity: 'moderate', kcalPerSession: 210, purpose: 'x', dayOfWeek: 0 }];
     render(<CardioWeekEditor cycle={c} />);
     fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
-    expect(screen.getByRole('option', { name: 'Пн (ноги)' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Вт' })).toBeTruthy();
+    // Попап-шит: опции — кнопки внутри диалога (раньше были <option> нативного select).
+    fireEvent.click(screen.getByRole('button', { name: /День недели сессии 1/ }));
+    const daySheet = screen.getByRole('dialog');
+    // У выбранной опции в шите есть галочка ✓, поэтому имя = «Пн (ноги)✓».
+    expect(within(daySheet).getByRole('button', { name: /Пн \(ноги\)/ })).toBeTruthy();
+    expect(within(daySheet).getByRole('button', { name: 'Вт' })).toBeTruthy();
     expect(screen.getByText(/⚠ ноги/)).toBeTruthy();
   });
 });

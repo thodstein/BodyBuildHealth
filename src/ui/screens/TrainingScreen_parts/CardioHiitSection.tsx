@@ -10,7 +10,7 @@
  */
 import React, { useState } from 'react';
 import { CARDIO_INTERVAL_PRESETS } from '../../../engines/lms/cardio-interval-presets.engine';
-import { CARD, ROW, LABEL, BTN_PRIMARY, HINT_SM, NumberInput } from './CardioUI';
+import { CARD, ROW, LABEL, BTN_PRIMARY, HINT_SM, NumberInput, SelectInput } from './CardioUI';
 
 export const CardioHiitSection: React.FC<{
   onAdd: (presetId: string, opts: { hrMax?: number; sixMinDistanceM?: number }, week: number) => void;
@@ -49,15 +49,8 @@ export const CardioHiitSection: React.FC<{
             <NumberInput label="HRmax" value={hrMax} onChange={setHrMax} min={120} max={220} step={1} placeholder="190" ariaLabel="HRmax для 4×4" width={90} suffix="уд/мин" />
             <NumberInput label="6-мин тест" value={sixMin} onChange={setSixMin} min={500} max={5000} step={10} placeholder="1720" ariaLabel="Дистанция 6-мин теста" width={100} suffix="м" />
             {(totalWeeks ?? 0) >= 1 && (
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={LABEL}>Неделя</span>
-                <select value={String(weekNum)} onChange={e => setWeek(e.target.value)} aria-label="Неделя для HIIT-сессии"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px', color: '#fff', fontSize: 16, minHeight: 48 }}>
-                  {Array.from({ length: totalWeeks! }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>Нед {i + 1}</option>
-                  ))}
-                </select>
-              </label>
+              <SelectInput label="Неделя" value={String(weekNum)} onChange={setWeek} ariaLabel="Неделя для HIIT-сессии" width={120}
+                options={Array.from({ length: totalWeeks! }, (_, i) => ({ value: String(i + 1), label: `Нед ${i + 1}` }))} />
             )}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 8 }}>

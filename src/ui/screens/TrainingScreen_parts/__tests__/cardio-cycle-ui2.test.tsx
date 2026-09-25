@@ -116,7 +116,9 @@ describe('CardioHiitSection', () => {
     expect(container.textContent).toContain('Billat 30-30');
     expect(container.textContent).toContain('Tabata');
     fireEvent.change(container.querySelector('input[aria-label="HRmax для 4×4"]') as HTMLInputElement, { target: { value: '190' } });
-    fireEvent.change(screen.getByLabelText('Неделя для HIIT-сессии'), { target: { value: '5' } });
+    // Неделя HIIT — попап-шит (был нативный select).
+    fireEvent.click(screen.getByRole('button', { name: /Неделя для HIIT-сессии/ }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Нед 5' }));
     fireEvent.click(screen.getByRole('button', { name: /Norwegian 4×4.*в неделю 5/ }));
     expect(onAdd).toHaveBeenCalledWith('norwegian-4x4', expect.objectContaining({ hrMax: 190 }), 5);
   });

@@ -14128,3 +14128,34 @@ html.app-native [data-cardio="durability"] {
     transition: none !important;
   }
 }
+
+/* Спринт 5/P2 — попап-шит вместо нативных <select> (кардио-UI). */
+html.app-native [data-cardio="select-trigger"] {
+  min-height: 48px !important;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+html.app-native [data-cardio="select-trigger"]:active { background: rgba(255,255,255,0.09) !important; }
+html.app-native [data-cardio="select-trigger"]:focus-visible {
+  outline: 2px solid rgba(0,230,138,0.65);
+  outline-offset: 1px;
+}
+html.app-native [data-cardio="select-backdrop"] {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  -webkit-tap-highlight-color: transparent;
+}
+html.app-native [data-cardio="select-option"],
+html.app-native [data-cardio="select-done"] {
+  min-height: 52px !important;
+  transition: background 0.12s ease, transform 0.06s ease;
+}
+html.app-native [data-cardio="select-option"]:active { transform: scale(0.985); }
+html.app-native [data-cardio="select-option"]:focus-visible,
+html.app-native [data-cardio="select-done"]:focus-visible {
+  outline: 2px solid rgba(0,230,138,0.65);
+  outline-offset: 1px;
+}
+html.app-native [data-cardio="select-option"] { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  html.app-native [data-cardio="select-option"],
+  html.app-native [data-cardio="select-done"] { transition: none !important; }
+}

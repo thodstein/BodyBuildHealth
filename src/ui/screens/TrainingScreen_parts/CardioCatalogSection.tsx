@@ -8,7 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { CARDIO_CYCLES } from '../../../data/cardio-cycles/cardio-cycle-index';
 import { rankCardioCycles } from '../../../engines/lms/cardio-cycle-selector.engine';
 import { CARDIO_GOAL_LABELS, type CardioGoal, type CardioLevel } from '../../../engines/lms/cardio.engine';
-import { SectionCard, ROW, BTN_PRIMARY, BTN_SMALL, Badge, HINT } from './CardioUI';
+import { SectionCard, ROW, BTN_PRIMARY, BTN_SMALL, Badge, HINT, SelectInput } from './CardioUI';
 
 const SPORT_LABEL: Record<string, string> = {
   all: 'Все виды', run: '🏃 Бег', row: '🚣 Гребля', bike: '🚴 Вело', mixed: '🔀 Смешанные', hiit: '⚡ HIIT',
@@ -52,14 +52,10 @@ export const CardioCatalogSection: React.FC<{
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 Поиск" aria-label="Поиск по каталогу"
           style={{ flex: '1 1 150px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, outline: 'none' }} />
-        <select value={sport} onChange={e => setSport(e.target.value)} aria-label="Вид спорта"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px', color: '#fff', fontSize: 14, minHeight: 48 }}>
-          {Object.entries(SPORT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select value={lvl} onChange={e => setLvl(e.target.value)} aria-label="Уровень"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px', color: '#fff', fontSize: 14, minHeight: 48 }}>
-          {Object.entries(LEVEL_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
+        <SelectInput value={sport} onChange={setSport} ariaLabel="Вид спорта" width={150}
+          options={Object.entries(SPORT_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
+        <SelectInput value={lvl} onChange={setLvl} ariaLabel="Уровень" width={150}
+          options={Object.entries(LEVEL_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
         <button onClick={() => setOnlyJoints(v => !v)} aria-pressed={onlyJoints} style={onlyJoints ? { ...BTN_SMALL, background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' } : BTN_SMALL}>
           {onlyJoints ? '🦵 Только щадящие ✓' : '🦵 Щадящие'}
         </button>

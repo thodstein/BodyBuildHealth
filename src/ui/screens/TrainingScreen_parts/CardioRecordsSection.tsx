@@ -9,7 +9,7 @@ import {
   predictRunningTime, billatPaceFrom6Min, formatCardioTime,
   CARDIO_RECORD_LABELS, type CardioRecordKind, type CardioRecord,
 } from '../../../engines/lms/cardio-records.engine';
-import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, Badge, HINT_SM, EmptyState, NumberInput } from './CardioUI';
+import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, Badge, HINT_SM, EmptyState, NumberInput, SelectInput } from './CardioUI';
 
 const KINDS = Object.keys(CARDIO_RECORD_LABELS) as CardioRecordKind[];
 
@@ -128,13 +128,8 @@ export const CardioRecordsSection: React.FC = () => {
       <div style={CARD}>
         <div style={LABEL}>＋ Новый рекорд</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>Вид</span>
-            <select value={kind} onChange={e => setKind(e.target.value as CardioRecordKind)} aria-label="Вид рекорда"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px', color: '#fff', fontSize: 14, minHeight: 48 }}>
-              {KINDS.map(k => <option key={k} value={k}>{CARDIO_RECORD_LABELS[k]}</option>)}
-            </select>
-          </label>
+          <SelectInput label="Вид" value={kind} onChange={v => setKind(v as CardioRecordKind)} ariaLabel="Вид рекорда" width={170}
+            options={KINDS.map(k => ({ value: k, label: CARDIO_RECORD_LABELS[k] }))} />
           {isPower ? (
             <NumberInput label="Мощность" value={power} onChange={setPower} min={30} max={800} step={1} placeholder="250" ariaLabel="Мощность рекорда" width={100} suffix="Вт" />
           ) : (
@@ -149,13 +144,8 @@ export const CardioRecordsSection: React.FC = () => {
       <div style={CARD}>
         <div style={LABEL}>🔮 Прогноз Riegel с лучшего рекорда</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>База</span>
-            <select value={predKind} onChange={e => setPredKind(e.target.value as CardioRecordKind)} aria-label="Базовый рекорд"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px', color: '#fff', fontSize: 14, minHeight: 48 }}>
-              {(['run5k', 'run10k', 'runHalf'] as CardioRecordKind[]).map(k => <option key={k} value={k}>{CARDIO_RECORD_LABELS[k]}</option>)}
-            </select>
-          </label>
+          <SelectInput label="База" value={predKind} onChange={v => setPredKind(v as CardioRecordKind)} ariaLabel="Базовый рекорд" width={170}
+            options={(['run5k', 'run10k', 'runHalf'] as CardioRecordKind[]).map(k => ({ value: k, label: CARDIO_RECORD_LABELS[k] }))} />
           <NumberInput label="Цель, м" value={predDist} onChange={setPredDist} min={1000} max={42195} step={500} placeholder="10000" ariaLabel="Целевая дистанция" width={110} suffix="м" />
         </div>
         <div style={{ fontSize: 13, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>

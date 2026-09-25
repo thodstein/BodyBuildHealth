@@ -134,6 +134,20 @@ for (const sel of [
 for (const hook of ['hiit-block', 'week-intense-block', 'manage-program-error']) {
   mustContain('src/styles-native.css', `[data-cardio="${hook}"]`, `cardio alert hook ${hook}`);
 }
+// Спринт 5/P2: нативные <select> заменены попап-шитом — гейдим и хуки,
+// иначе молчаливый возврат к <select> (крошечный в WebView/АПК) проходит.
+for (const hook of ['select-trigger', 'select-backdrop', 'select-option', 'select-done']) {
+  mustContain('src/ui/screens/TrainingScreen_parts/CardioUI.tsx', `data-cardio="${hook}"`, `cardio select sheet ${hook}`);
+  mustContain('src/styles-native.css', `[data-cardio="${hook}"]`, `cardio select sheet css ${hook}`);
+}
+// …и ни одного нативного <select> в кардио-UI (кроме комментария-упоминания).
+for (const f of ['CardioUI', 'CardioWeekEditor', 'CardioCatalogSection', 'CardioCompsStep', 'CardioHiitSection', 'CardioRecordsSection']) {
+  const p = `src/ui/screens/TrainingScreen_parts/${f}.tsx`;
+  const native = readFileSync(p, 'utf8')
+    .split(/\r?\n/)
+    .filter(l => /<select[\s>]/.test(l) && !/^\s*(\*|\/\/)/.test(l));
+  if (native.length) mustContain(p, 'NO_NATIVE_SELECT', `native <select> в ${f}: ${native[0].trim().slice(0, 60)}`);
+}
 
 // 8. Секции native-слоя на месте (молчаливый откат хвоста файла).
 for (const sec of [

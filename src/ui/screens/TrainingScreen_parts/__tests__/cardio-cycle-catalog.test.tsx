@@ -101,9 +101,11 @@ describe('CardioCompsStep — приоритет', () => {
       <CardioCompsStep comps={comps} setComps={setComps} draft={{ name: '', week: '' }} setDraft={noop as never}
         totalWeeks={12} taperWeeks={2} taperEnabled={true} peakWeek={true} />,
     );
-    const sel = screen.getByLabelText('Приоритет старта Старт') as HTMLSelectElement;
-    expect(sel.value).toBe('B');
-    fireEvent.change(sel, { target: { value: 'A' } });
+    // Спринт 5/P2: приоритет — попап-шит (был нативный select).
+    expect(screen.getByRole('button', { name: /Приоритет старта Старт/ }).textContent).toContain('B');
+    fireEvent.click(screen.getByRole('button', { name: /Приоритет старта Старт/ }));
+    const dlg = screen.getByRole('dialog');
+    fireEvent.click(within(dlg).getByRole('button', { name: /A · главный/ }));
     expect(comps[0].priority).toBe('A');
   });
 });

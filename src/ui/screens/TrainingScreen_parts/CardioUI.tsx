@@ -5,6 +5,7 @@
  * чтобы структура и оформление были едиными.
  */
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 // ─── Токены дизайна v4 TOP (уровень флагманов: стекло + кромки + glow) ───
 export const ACCENT = '#00e68a';
@@ -303,37 +304,134 @@ export interface SelectInputProps {
   width?: number;
 }
 
-export const SelectInput: React.FC<SelectInputProps> = ({
-  label,
-  value,
-  onChange,
-  options,
-  ariaLabel,
-  disabled,
-  width,
-}) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-    {label && <span style={LABEL}>{label}</span>}
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      aria-label={ariaLabel}
-      disabled={disabled}
-      style={{
-        ...INPUT,
-        width: width ?? 160,
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(255,255,255,0.12)',
-        color: '#fff',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-      }}
-    >
-      {options.map(opt => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
-  </div>
-);
+/**
+ * Спринт 5/P2: нативный <select> в Telegram/Android WebView неуправляем
+ * (крошечный, 系统ный стиль, ломает дизайн и 44px-тач-норму). Поэтому
+ * ВСЕ 9 мест кардио-UI идут через один попап-шит: триггер 48px + шит
+ * с опциями 52px. Замена точечная: значение/onChange/aria-label — 1-в-1.
+ */
+export const CardioSelectSheet: React.FC<SelectInputProps> = ({
+  label, value, onChange, options, ariaLabel, disabled, width,
+}) => {
+  const [open, setOpen] = React.useState(false);
+  const current = options.find(o => o.value === value);
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+      {label && <span style={LABEL}>{label}</span>}
+      <button
+        type="button"
+        data-cardio="select-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel ?? label ?? current?.label}
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+        style={{
+          ...INPUT,
+          minHeight: 48,
+          width: width ?? 160,
+          textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          color: '#fff',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.55 : 1,
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {current?.label ?? value ?? '—'}
+        </span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>▾</span>
+      </button>
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          data-cardio="select-backdrop"
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={label ?? ariaLabel ?? 'Выбор'}
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 520,
+              background: 'linear-gradient(180deg, #1c1c21, #131317)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderTop: '2px solid rgba(0,230,138,0.55)',
+              borderRadius: '20px 20px 0 0',
+              padding: '10px 12px calc(14px + env(safe-area-inset-bottom, 0px))',
+              maxHeight: '82vh', overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 8 }}>
+              <span style={{ width: 40, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.22)' }} />
+            </div>
+            {label && <div style={{ fontSize: 12.5, fontWeight: 800, padding: '2px 4px 8px' }}>{label}</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {options.map(opt => {
+                const sel = opt.value === value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    data-cardio="select-option"
+                    aria-pressed={sel}
+                    onClick={() => { onChange(opt.value); setOpen(false); }}
+                    style={{
+                      minHeight: 52,
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                      textAlign: 'left', padding: '10px 13px',
+                      fontSize: 12.5, fontWeight: sel ? 800 : 600,
+                      color: '#fff',
+                      background: sel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)',
+                      border: sel ? '1px solid rgba(0,230,138,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{opt.label}</span>
+                    {sel && <span style={{ fontSize: 13, color: '#00e68a' }}>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              data-cardio="select-done"
+              onClick={() => setOpen(false)}
+              style={{
+                marginTop: 10, width: '100%', minHeight: 52,
+                fontSize: 13, fontWeight: 800, color: '#06240f',
+                background: 'linear-gradient(180deg, #00e68a, #00c874)',
+                border: 'none', borderRadius: 14, cursor: 'pointer',
+              }}
+            >Готово</button>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+};
+
+/** Историческое имя (9 мест вызова + тесты) — теперь это попап-шит. */
+export const SelectInput: React.FC<SelectInputProps> = props => <CardioSelectSheet {...props} />;
 
 // Улучшенный Stepper с поддержкой клавиатуры и доступностью
 export const Stepper: React.FC<{

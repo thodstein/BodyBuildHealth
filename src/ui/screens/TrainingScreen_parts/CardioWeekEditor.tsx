@@ -11,7 +11,7 @@ import {
   cardioWeekForDate, cardioSafetyReport, cycleBodyWeight, cardioWeekLegConflicts, cardioHiitInjectGate,
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek,
 } from '../../../engines/lms/cardio.engine';
-import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, SelectInput } from './CardioUI';
 
 const DAY_CELL: React.CSSProperties = {
   flex: '1 1 48px', minWidth: 48, borderRadius: 11, padding: '8px 4px', textAlign: 'center',
@@ -230,13 +230,10 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
           {week.sessions.map((s, idx) => (
             <div key={idx} role="listitem" aria-grabbed={dragIdx === idx} tabIndex={0} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const cur = s.dayOfWeek ?? 0; const next = (cur + (e.key === 'ArrowLeft' ? -1 : 1) + 7) % 7; updateSession(idx, { dayOfWeek: next }); } }} style={{ ...ROW, opacity: dragIdx === idx ? 0.6 : 1, border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid transparent', borderRadius: 8, padding: '4px 0' }} draggable onTouchStart={() => setDragIdx(idx)} onTouchEnd={() => setDragIdx(null)} onDragStart={() => onDragStart(idx)} onDragEnd={() => setDragIdx(null)} title="Перетащите на день недели (мышь/touch) или используйте ←/→ для перемещения">
               <span style={{ cursor: 'grab', fontSize: 12, color: '#fff', padding: '0 4px', userSelect: 'none' }} aria-hidden>⋮⋮</span>
-              <select value={s.type} onChange={e => updateSession(idx, { type: e.target.value as CardioType })} style={SEL} aria-label={`Тип сессии ${idx + 1}`}>
-                {TYPES.filter(t => hiitGate.allowed || s.type === t || (t !== 'hiit' && t !== 'miss')).map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
-              </select>
-              <select value={s.dayOfWeek != null ? String(s.dayOfWeek) : ''} onChange={e => updateSession(idx, { dayOfWeek: e.target.value === '' ? undefined : Number(e.target.value) })} style={SEL} aria-label={`День недели сессии ${idx + 1}`}>
-                <option value="">Авто</option>
-                {DAY_LABELS_RU.map((d, di) => <option key={di} value={di}>{d}{legDays.has(di) ? ' (ноги)' : ''}</option>)}
-              </select>
+                <SelectInput value={s.type} onChange={v => updateSession(idx, { type: v as CardioType })} ariaLabel={`Тип сессии ${idx + 1}`} width={110}
+                  options={TYPES.filter(t => hiitGate.allowed || s.type === t || (t !== 'hiit' && t !== 'miss')).map(t => ({ value: t, label: TYPE_LABEL[t] }))} />
+                <SelectInput value={s.dayOfWeek != null ? String(s.dayOfWeek) : ''} onChange={v => updateSession(idx, { dayOfWeek: v === '' ? undefined : Number(v) })} ariaLabel={`День недели сессии ${idx + 1}`} width={110}
+                  options={[{ value: '', label: 'Авто' }, ...DAY_LABELS_RU.map((d, di) => ({ value: String(di), label: `${d}${legDays.has(di) ? ' (ноги)' : ''}` }))]} />
               {s.dayOfWeek != null && legDays.has(s.dayOfWeek) && s.type !== 'recovery' && (
                 <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }} title="День тяжёлых ног — интенсивное кардио лучше перенести">⚠ ноги</span>
               )}
@@ -250,9 +247,8 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
             </div>
           ))}
           <div style={ROW}>
-            <select value={newType} onChange={e => setNewType(e.target.value as CardioType)} style={SEL} aria-label="Тип новой сессии">
-              {TYPES.filter(t => hiitGate.allowed || (t !== 'hiit' && t !== 'miss')).map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
-            </select>
+            <SelectInput value={newType} onChange={v => setNewType(v as CardioType)} ariaLabel="Тип новой сессии" width={130}
+              options={TYPES.filter(t => hiitGate.allowed || (t !== 'hiit' && t !== 'miss')).map(t => ({ value: t, label: TYPE_LABEL[t] }))} />
             <button style={BTN_PRIMARY} onClick={addSession}>+ Добавить сессию</button>
           </div>
         </div>
