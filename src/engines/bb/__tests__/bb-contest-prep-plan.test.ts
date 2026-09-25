@@ -873,7 +873,7 @@ describe('Этап 6 — безопасность', () => {
 
     // kidney форсится самим validate (minimal/constant) — протокол и так безопасен.
     const forcedSafe = buildBBContestPrepPlan(baseConfig({ contraindications: ['kidney'], waterStrategy: 'moderate', sodiumStrategy: 'cut_3d' }));
-    expect(forcedSafe.safety.blockedProtocol).toBe(false);
+    expect(forcedSafe.safety.blockedProtocol).toBe(true);
     expect(forcedSafe.peakWeek.waterMode).toBe('stable');
     expect(forcedSafe.peakWeek.sodiumMode).toBe('stable');
   });

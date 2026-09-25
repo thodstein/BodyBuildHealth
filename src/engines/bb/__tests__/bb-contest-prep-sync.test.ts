@@ -3,7 +3,7 @@
  * saveContestPrepEverywhere/storeContestPrepPlan пишут оба ключа + событие;
  * loadContestPrepConfig восстанавливает конфиг из версионированного плана.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   saveContestPrepEverywhere,
   storeContestPrepPlan,
@@ -71,6 +71,23 @@ describe('Э0: единая запись prep', () => {
       expect(detail?.prepPlanId).toBe(plan.id);
     } finally {
       window.removeEventListener(CONTEST_PREP_UPDATED_EVENT, h);
+    }
+  });
+
+  it('storeContestPrepPlan: quota failure returns false and suppresses success event', () => {
+    const plan = buildBBContestPrepPlan(cfg());
+    let eventCount = 0;
+    const handler = () => { eventCount++; };
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation((key: string) => {
+      if (key === 'he_profile_v2') throw new DOMException('quota', 'QuotaExceededError');
+    });
+    window.addEventListener(CONTEST_PREP_UPDATED_EVENT, handler);
+    try {
+      expect(storeContestPrepPlan(plan, cfg())).toBe(false);
+      expect(eventCount).toBe(0);
+    } finally {
+      window.removeEventListener(CONTEST_PREP_UPDATED_EVENT, handler);
+      spy.mockRestore();
     }
   });
 

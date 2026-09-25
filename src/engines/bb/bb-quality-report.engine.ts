@@ -14,6 +14,7 @@
 
 import { calculatePlanSafetyScore } from './bb-safety-score.engine';
 import { gradeQualityScore, type QualityV2Grade } from '../quality-score-v2.engine';
+import { canonicalBBIssueText } from './bb-validation-format';
 
 export type BBQualitySource = 'validation' | 'balance' | 'rotation' | 'fatigue' | 'safety';
 export type BBQualityLevel = 'error' | 'warning' | 'info';
@@ -68,7 +69,7 @@ function toIssue(source: BBQualitySource, raw: AnyIssueLike | string): BBQuality
     return { source, level: source === 'safety' ? 'warning' : 'warning', code: `${source}_issue`, message: raw };
   }
   if (!raw) return null;
-  const message = raw.message || raw.text;
+  const message = canonicalBBIssueText(raw);
   if (!message) return null;
   const week = typeof raw.week === 'number' ? raw.week : undefined;
   const muscle = typeof raw.muscle === 'string' ? raw.muscle : (typeof raw.exercise === 'string' ? raw.exercise : undefined);
@@ -162,7 +163,16 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
   const push = (i: BBQualityIssue | null) => {
     if (i) raw.push(i);
   };
+  const validationValid = plan.validation?.valid === true;
 
+  if (!plan.validation) {
+    push({
+      source: 'validation',
+      level: 'error',
+      code: 'validation_missing',
+      message: 'План не прошёл валидацию: результат проверки отсутствует.',
+    });
+  }
   for (const item of plan.validation?.issues ?? []) push(toIssue('validation', item));
   for (const item of plan.balanceReport?.issues ?? []) push(toIssue('balance', item));
   for (const item of plan.rotationReport?.issues ?? []) push(toIssue('rotation', item));
@@ -177,7 +187,7 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
   const errCodes = raw.filter(i => i.source === 'validation' && i.level === 'error').map(i => i.code);
   const warnCodes = raw.filter(i => i.source === 'validation' && i.level === 'warning').map(i => i.code);
   const score = Math.max(0, Math.min(100, Math.round(safety.score - penaltyForUniqueCodes(errCodes, warnCodes))));
-  const riskLevel: BBQualityReport['riskLevel'] = score < 60 ? 'danger' : score < 75 ? 'caution' : 'ok';
+  const riskLevel: BBQualityReport['riskLevel'] = !validationValid || score < 60 ? 'danger' : score < 75 ? 'caution' : 'ok';
 
   const totalWorkingSets = typeof plan.expandedSummary?.totalWorkingSets === 'number'
     ? plan.expandedSummary.totalWorkingSets
@@ -216,7 +226,7 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
     totalWorkingSets,
     peakWeek,
     perWeek,
-    validationValid: plan.validation?.valid !== false,
+    validationValid,
   };
 }
 

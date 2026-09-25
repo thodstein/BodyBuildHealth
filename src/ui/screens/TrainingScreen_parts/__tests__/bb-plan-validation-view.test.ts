@@ -93,10 +93,13 @@ describe('buildPlanValidationView: адаптация под пользоват�
     expect(stats.maxSets).toBe(12);
   });
 
-  it('пустой план — нейтральный результат', () => {
-    const view = buildPlanValidationView(null);
-    expect(view.ok).toBe(true);
-    expect(view.errors).toHaveLength(0);
+  it('пустой или повреждённый план — явная ошибка', () => {
+    const empty = buildPlanValidationView(null);
+    expect(empty.ok).toBe(false);
+    expect(empty.errors[0].code).toBe('invalid_input');
+    const malformed = buildPlanValidationView({ weeks: null } as any);
+    expect(malformed.ok).toBe(false);
+    expect(malformed.errors[0].code).toBe('invalid_input');
     expect(planSessionStats(null).sessions).toBe(0);
   });
 });

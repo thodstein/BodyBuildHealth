@@ -701,11 +701,8 @@ export const BbAutoConstructor: React.FC = () => {
     // провальный прогон (adjust — залив/плоскость) — это не «репетиция состоялась», а урок.
     const hasTrial = (() => {
       try {
-        const raw = localStorage.getItem('he_bb_test_peak_weeks');
-        const arr = raw ? JSON.parse(raw) : [];
-        if (!Array.isArray(arr) || arr.length === 0) return undefined;
-        const last = arr[arr.length - 1];
-        return last?.verdict === 'tested_ok' || last?.verdict === 'conservative' ? true : undefined;
+        const trial = prepPlan ? latestTestPeakWeek(prepPlan.id) : null;
+        return trial?.verdict === 'tested_ok' ? true : undefined;
       } catch { return undefined; }
     })();
     const base: BBContestPrepConfig = {
@@ -749,7 +746,7 @@ export const BbAutoConstructor: React.FC = () => {
       // PRO gates
       const risk = spillRiskScore(cfg);
       if (risk.level==='high' && (cfg.carbLoadStrategy==='back' || cfg.carbLoadStrategy==='front')) { flash(`⛔ ${risk.note}`); setPrepBusy(false); return; }
-      if (cfg.waterStrategy==='high' && !cfg.hasTrialPeak) { flash('⛔ High water требует trial peak за 21-28д + confirm'); setPrepBusy(false); return; }
+      if (cfg.waterStrategy==='high' && (!cfg.hasTrialPeak || !cfg.confirmedManipulation)) { flash('⛔ High water требует успешный trial peak за 21-28д + явное подтверждение'); setPrepBusy(false); return; }
       if (isShortCycle(prepWeeks + prepTaperWeeks + 1) && cfg.carbLoadStrategy==='back') { flash('⛔ ShortCycle 4-6 нед: берите linear/moderate, не back'); setPrepBusy(false); return; }
       // PRO-2 P2: персональная доза загрузки из trial (без trial — коридор по умолчанию).
       const trialDose = lastTest ? trialCarbDoseGPerKg(lastTest, cfg.category, cfg.sex) : undefined;
@@ -761,6 +758,9 @@ export const BbAutoConstructor: React.FC = () => {
         prepVolumeMult: prepVolumeMode,
         source: 'bb_auto',
         carbDoseGPerKg: trialDose,
+        testPeakWeekId: lastTest?.id,
+        trainingPlanId: prepPlan?.trainingPlanId,
+        nutritionPlanId: prepPlan?.nutritionPlanId,
         postShowTrack: keepTrack,
       });
       setPrepPlan(plan);
@@ -799,8 +799,8 @@ export const BbAutoConstructor: React.FC = () => {
 
   // Единая точка записи prep (Э0): готовый план + конфиг — через sync-модуль
   // (оба ключа профиля + событие he-bb-contest-prep-updated). Не пересобирает план.
-  const savePrepToProfile = (plan: BBContestPrepPlan, cfg: BBContestPrepConfig) => {
-    storeContestPrepPlan(plan, cfg, { source: plan.source ?? 'bb_auto' });
+  const savePrepToProfile = (plan: BBContestPrepPlan, cfg: BBContestPrepConfig): boolean => {
+    return storeContestPrepPlan(plan, cfg, { source: plan.source ?? 'bb_auto' });
   };
 
   /** Перенос даты шоу с пересчётом фаз (завершённые недели — с предупреждением). */
@@ -985,10 +985,14 @@ export const BbAutoConstructor: React.FC = () => {
       sleep: testRatings.sleep ?? 3,
     };
     const t = saveTestPeakWeekResult(prepPlan.id, prepPlan.showDate, ratings, testWeightDelta);
+    if (!t) {
+      flash('⚠ Тест пик-недели не сохранён: хранилище недоступно или переполнено.');
+      return;
+    }
     setLastTest(t);
     setPrepPlan(p => p ? { ...p, testPeakWeekId: t.id, updatedAt: new Date().toISOString() } : p);
-    savePrepToProfile({ ...prepPlan, testPeakWeekId: t.id }, buildContestPrepConfig());
-    flash(`✅ Тест пик-недели сохранён: ${t.verdict === 'tested_ok' ? 'протокол можно использовать' : t.verdict === 'adjust' ? 'нужна коррекция' : 'консервативный режим'}`);
+    const saved = savePrepToProfile({ ...prepPlan, testPeakWeekId: t.id }, buildContestPrepConfig());
+    flash(saved ? `✅ Тест пик-недели сохранён: ${t.verdict === 'tested_ok' ? 'протокол можно использовать' : t.verdict === 'adjust' ? 'нужна коррекция' : 'консервативный режим'}` : '⚠ Тест сохранён в журнал, но профиль не обновлён: хранилище переполнено.');
   };
 
   // ⚖️ Ступенчатая адаптация подготовки по весу (одна переменная за раз).
@@ -1064,22 +1068,18 @@ export const BbAutoConstructor: React.FC = () => {
         setPrepWeeks(migrated.preparation.weeks);
         setPrepTaperWeeks(migrated.taper.weeks);
         setPeakWeekCategory(migrated.category);
-        setPrepWaterMode(migrated.peakWeek.waterMode === 'stable' ? 'stable' : 'tapered' as WaterStrategy);
-        setPrepSodiumMode(migrated.peakWeek.sodiumMode === 'stable' ? 'stable' : 'tapered' as SodiumStrategy);
-        setPrepCarbMode(migrated.peakWeek.carbMode === 'conservative' ? 'back' : migrated.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
+        const restoredCfg = configFromPlan(migrated);
+        setPrepWaterMode(restoredCfg.waterStrategy);
+        setPrepSodiumMode(restoredCfg.sodiumStrategy);
+        setPrepCarbMode(restoredCfg.carbLoadStrategy);
+        setPrepTrainingProtocol(restoredCfg.trainingProtocol);
+        setPrepPreferLowFiber(!!restoredCfg.preferLowFiberCarbs);
+        setPrepCreatineStop(restoredCfg.creatineStrategy === 'stop');
+        setPrepConfirmedManip(!!restoredCfg.confirmedManipulation);
+        setPrepCompetitions(restoredCfg.competitions);
+        setPrepMainCompetitionId(restoredCfg.mainCompetitionId);
         if (migrated.preparation.volumeMult != null) setPrepVolumeMode(migrated.preparation.volumeMult);
         setLastTest(migrated.testPeakWeekId ? latestTestPeakWeek(migrated.id) : null);
-        // Доп. поля из конфига
-        try {
-          const cfg = (migrated as any).__cfg as BBContestPrepConfig | undefined;
-          if (cfg) {
-            if (cfg.trainingProtocol) setPrepTrainingProtocol(cfg.trainingProtocol);
-            setPrepPreferLowFiber(!!cfg.preferLowFiberCarbs);
-            setPrepCreatineStop(cfg.creatineStrategy === 'stop');
-            setPrepCompetitions(cfg.competitions);
-            setPrepMainCompetitionId(cfg.mainCompetitionId);
-          }
-        } catch {}
         return;
       }
     } catch {}
@@ -1092,11 +1092,19 @@ export const BbAutoConstructor: React.FC = () => {
       setPrepWeeks(stored.preparation.weeks);
       setPrepTaperWeeks(stored.taper.weeks);
       setPeakWeekCategory(stored.category);
-      setPrepWaterMode(stored.peakWeek.waterMode === 'stable' ? 'stable' : 'tapered' as WaterStrategy);
-      setPrepSodiumMode(stored.peakWeek.sodiumMode === 'stable' ? 'stable' : 'tapered' as SodiumStrategy);
-      setPrepCarbMode(stored.peakWeek.carbMode === 'conservative' ? 'back' : stored.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
+      const restoredCfg = configFromPlan(stored);
+      setPrepWaterMode(restoredCfg.waterStrategy);
+      setPrepSodiumMode(restoredCfg.sodiumStrategy);
+      setPrepCarbMode(restoredCfg.carbLoadStrategy);
+      setPrepTrainingProtocol(restoredCfg.trainingProtocol);
+      setPrepPreferLowFiber(!!restoredCfg.preferLowFiberCarbs);
+      setPrepCreatineStop(restoredCfg.creatineStrategy === 'stop');
+      setPrepConfirmedManip(!!restoredCfg.confirmedManipulation);
+      setPrepCompetitions(restoredCfg.competitions);
+      setPrepMainCompetitionId(restoredCfg.mainCompetitionId);
       if (stored.preparation.volumeMult != null) setPrepVolumeMode(stored.preparation.volumeMult);
       setLastTest(stored.testPeakWeekId ? latestTestPeakWeek(stored.id) : null);
+
       // Доп. поля из сохранённого конфига
       try {
         const raw = prof?.goals?.bbPeakConfig as string | undefined;
@@ -2605,7 +2613,8 @@ export const BbAutoConstructor: React.FC = () => {
       const planToSave = applyEditsToPlan(builtPlan!);
       const saveSafety = calculatePlanSafetyScore(planToSave, {
         acwrRatio: calculateACWR(),
-        injuryCount: injuries.length,
+        injuries,
+        mobilityRestrictions,
       });
       if (saveSafety.riskLevel === 'dangerous') { flash(`⚠ SafetyScore ${saveSafety.score}/100 — план сохранён с предупреждением, проверьте риски.`); }
       if (!planToSave.validation?.valid) { flash('⚠ План сохранён с ошибками валидации — проверьте предупреждения.'); }
@@ -2618,7 +2627,7 @@ export const BbAutoConstructor: React.FC = () => {
   const handleSaveToMyPlans = () => {
     if (!builtPlan) return;
     const exportPlan = applyEditsToPlan(builtPlan);
-    const saveSafety = calculatePlanSafetyScore(exportPlan, { acwrRatio: calculateACWR(), injuryCount: injuries.length });
+    const saveSafety = calculatePlanSafetyScore(exportPlan, { acwrRatio: calculateACWR(), injuries, mobilityRestrictions });
     if (saveSafety.riskLevel === 'dangerous') { flash(`⚠ SafetyScore ${saveSafety.score}/100 — сохраняем с предупреждением.`); }
     if (!exportPlan.validation?.valid) { flash('⚠ Есть ошибки валидации — сохраняем с предупреждением.'); }
     const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед`;
@@ -3017,7 +3026,8 @@ export const BbAutoConstructor: React.FC = () => {
         lines.push('', `КАЧЕСТВО: ${qualityReport.score}/100 (${qualityReport.riskLevel})`);
         for (const i of (qualityReport.issues || []).slice(0, 15)) lines.push(`  • [${i.source}]${i.week ? ` нед ${i.week}` : ''} ${i.message}`);
       }
-      const safety = calculatePlanSafetyScore(plan, { acwrRatio: acwrData?.ratio, injuryCount: injuries.length });
+      const safety = calculatePlanSafetyScore(plan, { acwrRatio: acwrData?.ratio, injuries, mobilityRestrictions });
+
       lines.push('', `БЕЗОПАСНОСТЬ: ${safety.score}/100 (${safety.riskLevel})`);
       for (const r of (safety.recommendations || []).slice(0, 5)) lines.push(`  • ${r}`);
       const errs = issues.filter(i => i.level === 'error');

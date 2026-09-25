@@ -92,9 +92,10 @@ describe('PRO-2 P1 — гейт high water', () => {
     expect(applyManipulationGate(cfg).waterStrategy).toBe('stable');
     expect(manipulationLockNote(cfg)).toMatch(/🔒/);
   });
-  it('high с trial — не locked; high с confirm — не locked', () => {
-    expect(manipulationLockedFor(baseConfig({ waterStrategy: 'high', hasTrialPeak: true }))).toBe(false);
-    expect(manipulationLockedFor(baseConfig({ waterStrategy: 'high', confirmedManipulation: true }))).toBe(false);
+  it('high requires both a successful trial and confirmation', () => {
+    expect(manipulationLockedFor(baseConfig({ waterStrategy: 'high', hasTrialPeak: true }))).toBe(true);
+    expect(manipulationLockedFor(baseConfig({ waterStrategy: 'high', confirmedManipulation: true }))).toBe(true);
+    expect(manipulationLockedFor(baseConfig({ waterStrategy: 'high', hasTrialPeak: true, confirmedManipulation: true }))).toBe(false);
     expect(manipulationLockNote(baseConfig({ waterStrategy: 'stable' }))).toBe(null);
   });
   it('tapered вода/натрий — warning-only, не locked (back-compat движка)', () => {

@@ -370,6 +370,8 @@ export interface CycleToPlanInput {
   pedDoses?: Record<string, number>;
   /** Интенсивность курса — доп. MRV boost (mild/moderate/heavy). */
   courseIntensity?: CourseIntensity;
+  /** Явный флаг курса для course-aware per-exercise cap. */
+  onCourse?: boolean;
   loadStrategy?: LoadStrategy;
   autoRegVolumeMult?: number;
   autoRegRirShift?: number;
@@ -937,6 +939,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     favoriteExercises = [], excludedExercises = [], avoidAxialLoad = false,
     volumeGoal = 'mav', level = 'advanced', equipment = [],
   } = input;
+  const onCourse = input.onCourse ?? peds.length > 0;
   const mode = input.mode || 'adapt';
   const weakPoints = mode === 'faithful' ? [] : (input.weakPoints || []);
   const focusGroup = mode === 'faithful' ? '' : (input.focusGroup || '');
@@ -1262,7 +1265,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       // Faithful: сохраняем оригинальный порядок программы (не переупорядочиваем).
       // Adapt: tidy с sessionTag → orderSessionExercises ставит lead-muscle compound первым.
       if (mode !== 'faithful') {
-        const _tidy = tidySessionExercises(exercises, undefined, sessionTag);
+        const _tidy = tidySessionExercises(exercises, input.methodology, sessionTag);
         exercises.length = 0; exercises.push(..._tidy);
       }
       const session: BBSession = {
@@ -1540,7 +1543,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
       if (lm?.mrv) mrvByMuscle[t] = Math.round(mrvByMuscle[t] * specializationMrvFactor(t, specResForWeekSchedule(specSchedule, 1)) || mrvByMuscle[t]);
     }
     const floorSetsFor = (muscle: string, ex: any): number => {
-      const cap = perExerciseCap(level, muscle, input.trainingYears, (input as any).onCourse);
+      const cap = perExerciseCap(level, muscle, input.trainingYears, onCourse);
       return Math.min(2, cap);
     };
     for (const w of finalized.weeks) {
@@ -1551,7 +1554,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         const lm = (allLandmarks as any)[t];
         if (lm?.mrv) caps[t] = Math.round(caps[t] * specializationMrvFactor(t, weekRes));
       }
-      normalizeWeekMrv(w.sessions, caps, isDeloadWeek, { level, trainingYears: input.trainingYears, onCourse: (input as any).onCourse });
+      normalizeWeekMrv(w.sessions, caps, isDeloadWeek, { level, trainingYears: input.trainingYears, onCourse });
       // Эффективный трим: валидатор меряет direct+indirect против plan.mrvByMuscle.
       // Ключи aggregateBBVolume канонические (core→abs, delt_*→shoulders), а
       // e.muscle может быть сырым — матчим через trueMuscleOf.
@@ -2314,7 +2317,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       // Sort: primary first, then compound → isolation → pump finisher; faithful: respect original order
       // Adapt: tidy с sessionTag → orderSessionExercises ставит lead-muscle compound первым.
       if (mode !== 'faithful') {
-        const _tidy = tidySessionExercises(exercises, undefined, sessionTag);
+        const _tidy = tidySessionExercises(exercises, opts.methodology, sessionTag);
         exercises.length = 0; exercises.push(..._tidy);
       }
 

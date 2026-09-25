@@ -112,6 +112,7 @@ export interface PrepCycleConfig {
   preferLowFiberCarbs?: boolean;
   creatineStrategy?: 'continue' | 'stop';
   schedule?: { wake: string; stage: string };
+  pedContext?: BBContestPrepConfig['pedContext'];
 
   // ── Соревнования ──
   competitions?: ContestEventEntry[];
@@ -353,6 +354,7 @@ export function buildPrepCycle(raw: PrepCycleConfig, opts: PrepCycleBuildOpts = 
     experienceLevel: cfg.experienceLevel,
     enhanced: cfg.enhanced,
     prepCount: cfg.prepCount ?? 0,
+    pedContext: cfg.pedContext,
     showDate: cfg.showDate,
     weeksOut: taperWeeks,
     competitions: cfg.competitions,
@@ -1251,6 +1253,11 @@ export interface PrepSeasonConfig {
   sodiumStrategy?: SodiumStrategy;
   confirmedManipulation?: boolean;
   contraindications?: string[];
+  allergens?: string[];
+  preferLowFiberCarbs?: boolean;
+  creatineStrategy?: 'continue' | 'stop';
+  schedule?: { wake: string; stage: string };
+  pedContext?: BBContestPrepConfig['pedContext'];
   /** Соревнования сезона (сортируются по дате). */
   competitions: ContestEventEntry[];
   /** Длительность одного prep-блока между стартами (4-26; усекается, если не влезает). */
@@ -1349,6 +1356,11 @@ export function buildPrepSeason(cfg: PrepSeasonConfig, opts: PrepCycleBuildOpts 
       sodiumStrategy: cfg.sodiumStrategy,
       confirmedManipulation: cfg.confirmedManipulation,
       contraindications: cfg.contraindications,
+      allergens: cfg.allergens,
+      preferLowFiberCarbs: cfg.preferLowFiberCarbs,
+      creatineStrategy: cfg.creatineStrategy,
+      schedule: cfg.schedule,
+      pedContext: cfg.pedContext,
       competitions: comps.map(c => ({ id: c.id, name: c.name, date: c.date, priority: c.priority })),
       mainCompetitionId: comp.id,
     };

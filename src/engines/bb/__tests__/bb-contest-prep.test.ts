@@ -299,7 +299,7 @@ describe('buildPeakWeek', () => {
   });
 
   it('вода classic/high: load ~8л → ступенчатый cut → глотки (PRO: high 100мл/кг)', () => {
-    const days = buildPeakWeek(baseConfig({ waterStrategy: 'classic', weightKg: 80 }));
+    const days = buildPeakWeek(baseConfig({ waterStrategy: 'classic', weightKg: 80, hasTrialPeak: true, confirmedManipulation: true }));
     expect(days[0].waterLiters).toBeCloseTo(8, 0.5);
     expect(days[4].waterLiters).toBeLessThan(days[3].waterLiters);
     expect(days[5].waterLiters).toBeLessThan(days[4].waterLiters);

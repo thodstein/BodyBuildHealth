@@ -1012,7 +1012,7 @@ export function bbRir(resolved: DayCharacter, phase: BBPhase, phaseWeek: number,
     else if (hasGH && !hasAAS && driftPer2 === -1) driftPer2 = -0.5;
   }
   const drift = Math.floor(phaseWeek / 2);
-  const driftable = Math.max(0, base + driftPer2 * drift);
+  const driftable = Math.max(1, base + driftPer2 * drift);
   let rir = resolved === 'тяж' ? driftable : driftable + 1;
   if (phase === 'deload') rir = Math.max(3, Math.min(4, rir));
   if (resolved === 'памп') rir = Math.max(cfg.pumpRir, rir);
@@ -4197,7 +4197,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // P0-2: финальный MRV-кап ПОСЛЕ всех модификаций (dedup, feeders, re-sort).
     // Раньше normalizeWeekMrv вызывался до compensateCrossDayWeakPoints/dedup,
     // и feeders/dedup могли добавить объём выше MRV.
-    normalizeWeekMrv(w.sessions, mrvByMuscle, w.phase === 'deload' || !!w.deload);
+    normalizeWeekMrv(w.sessions, mrvByMuscle, w.phase === 'deload' || !!w.deload, { level: input.level, trainingYears: input.trainingYears, onCourse });
   }
   // P1-5: auto-MEV-feeder — мышцы с объёмом < MEV получают feeder в ближайший релевантный день.
   // Актуально для bro_5 (calves=2, glutes=4 при MEV=8) и других 1×/нед сплитов.
@@ -4288,7 +4288,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
     }
     // Финальный MRV-кап после auto-feeders
-    for (const w of finalPlan.weeks) normalizeWeekMrv(w.sessions, mrvByMuscle, w.phase === 'deload' || !!w.deload);
+    for (const w of finalPlan.weeks) normalizeWeekMrv(w.sessions, mrvByMuscle, w.phase === 'deload' || !!w.deload, { level: input.level, trainingYears: input.trainingYears, onCourse });
   }
   // MGF/IGF1 локальный слот (P2.9): цель специализации получает РЕАЛЬНЫЙ +1
   // памп-день/нед (частота физически, не комментарием) — 1 изоляция 2 сета

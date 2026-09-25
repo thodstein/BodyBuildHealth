@@ -97,26 +97,23 @@ describe('PRO-3 Э3 — RED-S-гейт', () => {
 });
 
 describe('PRO-3 Э3 — гейт high-water в оверлеях', () => {
-  it('тапер-оверлей: high без trial/confirm → stable + rationale-замок; с trial — без замка', () => {
+  it('тапер-оверлей: high без trial/confirm → stable + rationale-замок; с обоими — без замка', () => {
     const plan = makePlan(8);
     const lockedCfg = baseConfig({ waterStrategy: 'high' });
     expect(manipulationLockedFor(lockedCfg)).toBe(true);
     const out = applyTrainingTaperToBBPlan(plan, lockedCfg) as any;
-    expect(out.rationale.join(' ')).toMatch(/🔒 High water/);
+    expect(out.rationale.join(' ')).toMatch(/🔒|Safety gate/);
     // cfg не мутирован
     expect(lockedCfg.waterStrategy).toBe('high');
-    // успешный trial разблокирует
-    const unlocked = applyTrainingTaperToBBPlan(makePlan(8), baseConfig({ waterStrategy: 'high', hasTrialPeak: true })) as any;
-    expect(unlocked.rationale.join(' ')).not.toMatch(/🔒 High water/);
-    // явное подтверждение тоже
-    const confirmed = applyTrainingTaperToBBPlan(makePlan(8), baseConfig({ waterStrategy: 'high', confirmedManipulation: true })) as any;
-    expect(confirmed.rationale.join(' ')).not.toMatch(/🔒 High water/);
+    // успешный trial и подтверждение вместе разблокируют
+    const unlocked = applyTrainingTaperToBBPlan(makePlan(8), baseConfig({ waterStrategy: 'high', hasTrialPeak: true, confirmedManipulation: true })) as any;
+    expect(unlocked.rationale.join(' ')).not.toMatch(/🔒|Safety gate/);
   });
 
   it('пик-оверлей (Macrocycle/годовой путь): та же блокировка', () => {
     const locked = applyPeakWeekOverlayToBBPlan(makePlan(6), baseConfig({ waterStrategy: 'high' })) as any;
-    expect(locked.rationale.join(' ')).toMatch(/🔒 High water/);
-    const unlocked = applyPeakWeekOverlayToBBPlan(makePlan(6), baseConfig({ waterStrategy: 'high', hasTrialPeak: true })) as any;
-    expect(unlocked.rationale.join(' ')).not.toMatch(/🔒 High water/);
+    expect(locked.rationale.join(' ')).toMatch(/🔒|Safety gate/);
+    const unlocked = applyPeakWeekOverlayToBBPlan(makePlan(6), baseConfig({ waterStrategy: 'high', hasTrialPeak: true, confirmedManipulation: true })) as any;
+    expect(unlocked.rationale.join(' ')).not.toMatch(/🔒|Safety gate/);
   });
 });

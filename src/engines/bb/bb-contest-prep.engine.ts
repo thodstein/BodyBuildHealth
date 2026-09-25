@@ -200,6 +200,8 @@ export interface BBPlanWithPrep extends BBPlan {
     showDate: string;
     protocol: PeakingProtocol;
     weeksOut: number;
+    waterMode?: BBContestPrepConfig['waterStrategy'];
+    sodiumMode?: BBContestPrepConfig['sodiumStrategy'];
     appliedAt: string;
     /** 1-индекс недель плана, к которым уже применён тапер/пик-неделя. */
     appliedWeeks?: number[];
@@ -385,7 +387,9 @@ export const SODIUM_DAY_MG: Record<string, [number, number, number, number, numb
   cut_3d:   [3000, 3000, 3000, 3000, 1500, 500, 500],   // legacy deprecated
 };
 
-export const KNOWN_CONTRAINDICATIONS = ['kidney', 'heart', 'hypertension'];
+export const KNOWN_CONTRAINDICATIONS = [
+  'kidney', 'heart', 'hypertension', 'diabetes', 'pregnancy', 'lactation', 'pylorus', 'eating_disorder', 'bipolar', 'seizures', 'electrolyte',
+];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Утилиты
@@ -448,6 +452,21 @@ export function isoToday(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function stablePlanHash(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
+  return (hash >>> 0).toString(36);
+}
+
+function defaultContestPrepPlanId(cfg: BBContestPrepConfig, prepWeeks: number, taperWeeks: number): string {
+  const identity = [
+    cfg.sex, cfg.category, cfg.showDate, prepWeeks, taperWeeks,
+    cfg.carbLoadStrategy, cfg.waterStrategy, cfg.sodiumStrategy,
+    cfg.specialization ?? '', cfg.schedule?.wake ?? '', cfg.schedule?.stage ?? '',
+  ].join('|');
+  return `bbprep_${stablePlanHash(identity)}`;
+}
+
 /** Таймзона-безопасная арифметика ISO-дат (без toISOString-сдвигов). */
 export function isoAddDays(iso: string, days: number): string {
   const [y, m, d] = iso.split('-').map(Number);
@@ -481,7 +500,10 @@ function hasContraindication(cfg: BBContestPrepConfig, id: string): boolean {
     hypertension: /hypertension|гипертон|давлен|blood.?pressure/,
     diabetes: /diabetes|диабет/,
     pregnancy: /pregnan|беремен/,
+    lactation: /lactat|грудн.*корм|кормлен/,
+    pylorus: /pylorus|пилор/,
     eating_disorder: /eating.?disorder|пищев|анорекс|булим/,
+    bipolar: /bipolar|биполяр/,
     seizures: /seizure|обморок|судорог|syncope|epileps|эпилепс/,
     electrolyte: /electrolyte|электролит|гипонатрием|hyp[o]?natr/,
   };
@@ -511,7 +533,7 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
     errors.push(`% жира ${cfg.bodyFatPct} вне диапазона 3–60.`);
   }
   if (!isValidIsoDate(cfg.showDate)) errors.push(`Дата шоу «${cfg.showDate}» некорректна (нужно ISO yyyy-mm-dd).`);
-  else if (daysBetween(new Date().toISOString().slice(0, 10), cfg.showDate) < 0) errors.push('Дата шоу в прошлом.');
+  else if (daysBetween(isoToday(), cfg.showDate) < 0) errors.push('Дата шоу в прошлом.');
   if (!Number.isInteger(cfg.weeksOut) || cfg.weeksOut < 1 || cfg.weeksOut > 4) errors.push(`weeksOut ${cfg.weeksOut} вне диапазона 1–4.`);
   if (!['bb', 'classic', 'pl'].includes(cfg.trainingProtocol)) errors.push(`Неизвестный тренировочный протокол: ${cfg.trainingProtocol}`);
   if (!['front', 'moderate', 'back', 'undulating', 'linear', 'direct'].includes(cfg.carbLoadStrategy)) errors.push(`Неизвестная карб-стратегия: ${cfg.carbLoadStrategy}`);
@@ -552,7 +574,7 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
   // ── Принудительные безопасные моды по противопоказаниям ──
   for (const id of KNOWN_CONTRAINDICATIONS) {
     if (!hasContraindication(cfg, id)) continue;
-    const labelMap: Record<string,string> = { kidney:'почки', heart:'сердце', hypertension:'гипертония', diabetes:'диабет', pregnancy:'беременность', eating_disorder:'РПП', seizures:'судороги', electrolyte:'электролиты' };
+    const labelMap: Record<string,string> = { kidney:'почки', heart:'сердце', hypertension:'гипертония', diabetes:'диабет', pregnancy:'беременность', lactation:'грудное вскармливание', pylorus:'стритоз', eating_disorder:'РПП', bipolar:'биполярное расстройство', seizures:'судороги', electrolyte:'электролиты' };
     const label = labelMap[id] ?? id;
     warnings.push(`⚠ Противопоказание (${label}): агрессивные водные/натриевые манипуляции опасны.`);
     const canonWater = canonicalWaterStrategy(cfg.waterStrategy);
@@ -644,27 +666,45 @@ export function manipulationRequestedHighWater(cfg: BBContestPrepConfig): boolea
   return canonicalWaterStrategy(cfg.waterStrategy) === 'high';
 }
 
-/** PRO-2 P1: заблокирована ли манипуляция (нет ни trial, ни явного подтверждения). */
+/** PRO-2 P1: заблокирована ли high-манипуляция без обоих обязательных подтверждений. */
 export function manipulationLockedFor(cfg: BBContestPrepConfig): boolean {
   if (!manipulationRequestedHighWater(cfg)) return false;
-  return cfg.hasTrialPeak !== true && cfg.confirmedManipulation !== true;
+  return cfg.hasTrialPeak !== true || cfg.confirmedManipulation !== true;
 }
 
-/**
- * PRO-2 P1: применить гейт к конфигу (не меняет вход): locked → water stable.
- * Натрий/карбс не трогаем (tapered Na — умеренная манипуляция, warning-only;
- * карбс-доза — через trialCarbDoseGPerKg). Back-compat: applyForcedModes НЕ
- * вызывает эту функцию — существующие тесты и сохранённые конфиги целы.
- */
 export function applyManipulationGate(cfg: BBContestPrepConfig): BBContestPrepConfig {
   if (!manipulationLockedFor(cfg)) return cfg;
   return { ...cfg, waterStrategy: 'stable' as WaterStrategy };
 }
 
-/** Подсказка замка для UI (чип 44px в шаге contest). */
+export function contestPrepRequiresReview(cfg: BBContestPrepConfig): boolean {
+  if (professionalReviewConditions(cfg.contraindications).length > 0) return true;
+  return cfg.sex === 'female' && cfg.bodyFatPct != null && cfg.bodyFatPct < 14;
+}
+
+export function contestPrepSafetyBlocked(cfg: BBContestPrepConfig): boolean {
+  const water = canonicalWaterStrategy(cfg.waterStrategy);
+  const sodium = canonicalSodiumStrategy(cfg.sodiumStrategy);
+  const manipulationRequested = water !== 'stable' || sodium !== 'stable';
+  return (contestPrepRequiresReview(cfg) && manipulationRequested) || manipulationLockedFor(cfg);
+}
+
+export function applyContestPrepSafetyGate(cfg: BBContestPrepConfig): BBContestPrepConfig {
+  const forced = applyForcedModes(cfg);
+  if (!contestPrepSafetyBlocked(forced)) return forced;
+  return { ...forced, waterStrategy: 'stable' as WaterStrategy, sodiumStrategy: 'stable' as SodiumStrategy };
+}
+
+
 export function manipulationLockNote(cfg: BBContestPrepConfig): string | null {
-  if (!manipulationLockedFor(cfg)) return null;
-  return '🔒 High water/load+cut закрыт: сначала trial peak за 21–28 дней (блок trial ниже) или явное подтверждение. Без прогона — только stable (Mitchell: манипуляции без репетиции неэффективны).';
+  const gate = applyForcedModes(cfg);
+  if (contestPrepRequiresReview(gate) && (canonicalWaterStrategy(gate.waterStrategy) !== 'stable' || canonicalSodiumStrategy(gate.sodiumStrategy) !== 'stable')) {
+    return '🔒 Водно-натриевые манипуляции закрыты до профессиональной оценки состояния здоровья.';
+  }
+  if (manipulationLockedFor(gate)) {
+    return '🔒 High water/load+cut требует и успешного trial peak, и явного подтверждения.';
+  }
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -714,7 +754,7 @@ export function getPerMuscleTaperMult(muscle: string, weekIdx: number): number {
 export function buildTrainingTaper(cfg: BBContestPrepConfig, opts?: { volumeMult?: number }): TrainingTaperWeek[] {
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return [];
-  const eff = applyForcedModes(cfg);
+  const eff = applyContestPrepSafetyGate(cfg);
   const source = eff.trainingProtocol === 'bb'
     ? BB_TAPER_CURVE
     : getPeakingProtocol(eff.trainingProtocol).weeks;
@@ -976,7 +1016,7 @@ const PEAK_FAMILY_RU: Record<PeakFamily, string> = {
 export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?: number }): PeakWeekDayPlan[] {
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return [];
-  const eff = applyForcedModes(cfg);
+  const eff = applyContestPrepSafetyGate(cfg);
   const profile = CATEGORY_PROFILES[eff.category];
   const isFemale = eff.sex === 'female';
   const w = eff.weightKg;
@@ -1354,6 +1394,7 @@ export function addPeakPriming(plan: BBPlan, workMax: Record<string, number>): {
   const weeks = plan.weeks.map(w => {
     if (!(w as any).peakWeek) return w;
     const sessions = w.sessions.map((s, si) => {
+      if ((s.exercises || []).some((e: any) => e?.priming === true)) return s;
       // Последние 2 сессии пик-недели (D-2/D-1), которые не отдых.
       const restOfWeeks = w.sessions.length;
       if (si < restOfWeeks - 2) return s;
@@ -1463,7 +1504,7 @@ export function buildBBContestPrep(rawCfg: BBContestPrepConfig, opts?: { carbDos
   if (!v.ok) {
     throw new Error(`Некорректный конфиг тапера ББ: ${v.errors.join(' ')}`);
   }
-  const base = applyForcedModes(rawCfg);
+  const base = applyContestPrepSafetyGate(rawCfg);
   const showDate = resolveShowDate(base);
   const cfg: BBContestPrepConfig = { ...base, showDate };
   const profile = CATEGORY_PROFILES[cfg.category];
@@ -1664,10 +1705,9 @@ export function applyTrainingTaperToBBPlan(
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) return plan as BBPlanWithPrep;
-  const forced = applyForcedModes(rawCfg);
-  // PRO-3 Э3: гейт агрессивной воды и в оверлеях (SRCBB/Macrocycle путь обходил UI-гейт).
-  const gateLocked = manipulationLockedFor(forced);
-  const base = gateLocked ? applyManipulationGate(forced) : forced;
+  const gateLocked = contestPrepSafetyBlocked(rawCfg);
+  const highLocked = canonicalWaterStrategy(rawCfg.waterStrategy) === 'high' && (rawCfg.hasTrialPeak !== true || rawCfg.confirmedManipulation !== true);
+  const base = applyContestPrepSafetyGate(rawCfg);
   const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
   const existing = (plan as BBPlanWithPrep).contestPrep;
   const force = opts?.force === true;
@@ -1789,7 +1829,7 @@ export function applyTrainingTaperToBBPlan(
           ...(plan.rationale || []),
           `🏁 Тапер ББ наложен (нед ${appliedWeeks.join(', ')}): «${getPeakingProtocol(cfg.trainingProtocol).name}» (${cfg.weeksOut} нед) + пик-неделя (шоу ${cfg.showDate}).`,
           `🍚 Питание пик-недели: ${cfg.carbLoadStrategy} загрузка, вода ${cfg.waterStrategy}, натрий ${cfg.sodiumStrategy} — см. блок «Питание → Тапер ББ».`,
-          ...(gateLocked ? ['🔒 High water без trial/подтверждения → stable: агрессивная манипуляция заблокирована и в этом пути (сначала trial peak за 21–28 дней).'] : []),
+          ...(gateLocked ? ['🔒 Safety gate: вода и натрий переведены в stable из-за противопоказаний/ограничений.'] : highLocked ? ['🔒 High water без trial/подтверждения → stable: агрессивная манипуляция заблокирована и в этом пути (сначала trial peak за 21–28 дней).'] : []),
         ]
       : plan.rationale,
   };
@@ -1797,6 +1837,8 @@ export function applyTrainingTaperToBBPlan(
     showDate: existing?.showDate ?? cfg.showDate,
     protocol: cfg.trainingProtocol,
     weeksOut: cfg.weeksOut,
+    waterMode: cfg.waterStrategy,
+    sodiumMode: cfg.sodiumStrategy,
     appliedAt: new Date().toISOString(),
     appliedWeeks: [...(existing?.appliedWeeks ?? []), ...appliedWeeks],
   };
@@ -1819,10 +1861,9 @@ export function applyPeakWeekOverlayToBBPlan(
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) return plan as BBPlanWithPrep;
-  const forced2 = applyForcedModes(rawCfg);
-  // PRO-3 Э3: тот же гейт high-water и в peak-overlay (Macrocycle/годовой путь).
-  const gateLocked2 = manipulationLockedFor(forced2);
-  const base = gateLocked2 ? applyManipulationGate(forced2) : forced2;
+  const gateLocked2 = contestPrepSafetyBlocked(rawCfg);
+  const highLocked = canonicalWaterStrategy(rawCfg.waterStrategy) === 'high' && (rawCfg.hasTrialPeak !== true || rawCfg.confirmedManipulation !== true);
+  const base = applyContestPrepSafetyGate(rawCfg);
   const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
   const existing = (plan as BBPlanWithPrep).contestPrep;
 
@@ -1853,7 +1894,7 @@ export function applyPeakWeekOverlayToBBPlan(
       ? [
           ...(plan.rationale || []),
           `🎭 Пик-неделя наложена на неделю ${targetIdx + 1} (шоу ${cfg.showDate}): деплеция → загрузка → отдых → памп.`,
-          ...(gateLocked2 ? ['🔒 High water без trial/подтверждения → stable: манипуляция заблокирована (trial peak за 21–28 дней).'] : []),
+          ...(gateLocked2 ? ['🔒 Safety gate: вода и натрий переведены в stable из-за противопоказаний/ограничений.'] : highLocked ? ['🔒 High water без trial/подтверждения → stable: манипуляция заблокирована (trial peak за 21–28 дней).'] : []),
         ]
       : plan.rationale,
   };
@@ -1861,6 +1902,8 @@ export function applyPeakWeekOverlayToBBPlan(
     showDate: existing?.showDate ?? cfg.showDate,
     protocol: cfg.trainingProtocol,
     weeksOut: cfg.weeksOut,
+    waterMode: cfg.waterStrategy,
+    sodiumMode: cfg.sodiumStrategy,
     appliedAt: new Date().toISOString(),
     appliedWeeks: [...(existing?.appliedWeeks ?? []), ...(applied ? [targetIdx + 1] : [])],
   };
@@ -1908,7 +1951,7 @@ export function applyContestPrepToBBPlan(
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) return plan as BBPlanWithPrep;
-  const base = applyForcedModes(rawCfg);
+  const base = applyContestPrepSafetyGate(rawCfg);
   const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
   const taperWeeks = Math.min(4, Math.max(1, Math.round(opts.taperWeeks ?? cfg.weeksOut)));
   const prepWeeks = Math.max(1, Math.round(opts.prepWeeks ?? 12));
@@ -1916,7 +1959,7 @@ export function applyContestPrepToBBPlan(
 
   // 1) Taper + пик-неделя на последние taperWeeks+1 недель.
   //    force=true: повторное наложение ОБНОВЛЯЕТ уже размеченные недели (изменения настроек).
-  const tapered = applyTrainingTaperToBBPlan(plan, { ...cfg, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber, force: opts.force === true, carbDoseGPerKg: opts.carbDoseGPerKg }) as BBPlanWithPrep;
+  const tapered = applyTrainingTaperToBBPlan(plan, { ...rawCfg, showDate: cfg.showDate, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber, force: opts.force === true, carbDoseGPerKg: opts.carbDoseGPerKg }) as BBPlanWithPrep;
   const weeks = tapered.weeks as any[];
   const total = weeks.length;
   const endIdx = clamp((opts.weekNumber ?? total) - 1, 0, total - 1);
@@ -2051,7 +2094,7 @@ export function extendBBPlanPreparation(plan: BBPlanWithPrep, addWeeks: number):
   const weeks = plan.weeks as any[];
   const total = weeks.length;
   const endIdx = total - 1;
-  const meta = (plan as any).contestPrep as { phases?: PrepPhaseRange[] } | undefined;
+  const meta = (plan as any).contestPrep as { phases?: PrepPhaseRange[]; showDate?: string; weeksOut?: number } | undefined;
   const taperPhases = (meta?.phases ?? []).filter(p => p.key === 'taper' || p.key === 'peak_week');
   const taperWeeks = taperPhases.length > 0
     ? Math.max(1, taperPhases.filter(p => p.key === 'taper').reduce((s, p) => s + (p.weekEnd - p.weekStart + 1), 0) || 1)
@@ -2078,10 +2121,20 @@ export function extendBBPlanPreparation(plan: BBPlanWithPrep, addWeeks: number):
     inserted.push(c);
   }
   const newWeeks = [...weeks.slice(0, prepIdx), ...inserted, ...weeks.slice(prepIdx)];
-  // Перенумеровать week 1-index.
-  newWeeks.forEach((w, i) => { w.week = i + 1; });
+  const newTotal = newWeeks.length;
+  const showDate = meta?.showDate || (plan as any).contestPrep?.showDate;
+  const phases = showDate
+    ? computePrepPhaseRanges(Math.max(1, newTotal - taperWeeks - 1), taperWeeks, showDate, true)
+    : (meta?.phases ?? []);
+  newWeeks.forEach((w, i) => {
+    w.week = i + 1;
+    const phase = phases.find(p => i + 1 >= p.weekStart && i + 1 <= p.weekEnd);
+    if (!phase) return;
+    w.contestPhase = phase.key === 'final_preparation' ? 'final_preparation' : phase.key === 'taper' ? 'taper' : phase.key === 'peak_week' ? 'peak_week' : 'preparation';
+    if (phase.key === 'peak_week') w.peakWeek = true;
+  });
   const result = { ...plan, weeks: newWeeks } as BBPlanWithPrep;
-  (result as any).contestPrep = meta ?? (plan as any).contestPrep;
+  (result as any).contestPrep = { ...(plan as any).contestPrep, phases, showDate };
   return result;
 }
 
@@ -2111,6 +2164,9 @@ export function deserializeBBPrepConfig(str: string | null | undefined): BBConte
     experienceLevel: (c.experienceLevel as ExperienceLevel) || 'intermediate',
     enhanced: !!c.enhanced,
     prepCount: Number.isFinite(Number(c.prepCount)) ? Math.max(0, Math.round(Number(c.prepCount))) : 0,
+    age: c.age != null && Number.isFinite(Number(c.age)) ? clamp(Number(c.age), 14, 90) : undefined,
+    prepWeeks: c.prepWeeks != null && Number.isFinite(Number(c.prepWeeks)) ? clamp(Math.round(Number(c.prepWeeks)), 1, 52) : undefined,
+    pedContext: c.pedContext && typeof c.pedContext === 'object' ? c.pedContext as PEDContext : undefined,
     showDate: String(c.showDate || ''),
     weeksOut: Number.isInteger(Number(c.weeksOut)) ? clamp(Number(c.weeksOut), 1, 4) : 3,
     trainingProtocol: (['bb', 'classic', 'pl'] as const).includes(c.trainingProtocol as PeakingProtocol) ? (c.trainingProtocol as PeakingProtocol) : 'bb',
@@ -2181,7 +2237,7 @@ export function legacyConfigFromProfile(
 ): BBContestPrepConfig | null {
   if (!goals || goals.peakWeek !== true || !goals.peakShowDay) return null;
   if (!isValidIsoDate(goals.peakShowDay)) return null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = isoToday();
   if (daysBetween(today, goals.peakShowDay) < -1) return null; // шоу уже прошло
 
   const sex: 'male' | 'female' = personal?.sex === 'female' ? 'female' : 'male';
@@ -2243,6 +2299,7 @@ export interface BBContestPrepPlan {
   version: number;            // версия СХЕМЫ (миграции)
   algorithmVersion: number;   // версия алгоритма (пересчёт результатов)
   status: PrepPlanStatus;
+  config?: BBContestPrepConfig;
   createdAt: string;          // ISO datetime
   updatedAt: string;          // ISO datetime
   source: 'bb_auto' | 'planner' | 'macrocycle' | 'legacy';
@@ -2325,8 +2382,8 @@ export interface BBContestPrepPlan {
   adjustments?: PrepAdjustment[];
 }
 
-export const PREP_PLAN_VERSION = 2;
-export const PREP_ALGORITHM_VERSION = 2;
+export const PREP_PLAN_VERSION = 3;
+export const PREP_ALGORITHM_VERSION = 3;
 
 export const PREP_PHASE_LABELS: Record<PrepPhaseKey, string> = {
   preparation: 'Подготовка',
@@ -2353,7 +2410,10 @@ const PROFESSIONAL_REVIEW_CONDITIONS: Array<{ id: string; label: string; re: Reg
   { id: 'hypertension', label: 'гипертония', re: /hypertension|гипертон|давлен|blood.?pressure/ },
   { id: 'diabetes', label: 'диабет', re: /diabet|диабет/ },
   { id: 'pregnancy', label: 'беременность', re: /pregnan|беремен/ },
+  { id: 'lactation', label: 'грудное вскармливание', re: /lactat|грудн.*корм|кормлен/ },
+  { id: 'pylorus', label: 'стритоз', re: /pylorus|пилор/ },
   { id: 'eating_disorder', label: 'расстройство пищевого поведения', re: /eating.?disorder|пищев(?:ого|ое).?(?:расстройств|поведен)|анорекс|булим|ортодекс/ },
+  { id: 'bipolar', label: 'биполярное расстройство', re: /bipolar|биполяр/ },
   { id: 'seizures', label: 'обмороки или судороги', re: /seizure|обморок|судорог|syncope|epileps|эпилепс/ },
   { id: 'electrolyte', label: 'нарушения электролитов', re: /electrolyte|электролит|гипонатрием|hyp[o]?natr/ },
 ];
@@ -2486,13 +2546,16 @@ export interface BuildPrepPlanOpts {
 export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildPrepPlanOpts = {}): BBContestPrepPlan {
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) throw new Error(`Некорректный конфиг contest prep: ${v.errors.join(' ')}`);
-  const base = applyForcedModes(rawCfg);
+  const prepWeeks = clamp(Number(opts.prepWeeks) || Number(rawCfg.prepWeeks) || 12, 1, 52);
+  const taperWeeks = clamp(Number(opts.taperWeeks) || rawCfg.weeksOut, 1, 4);
+  const planId = opts.id ?? defaultContestPrepPlanId(rawCfg, prepWeeks, taperWeeks);
+  const trial = opts.testPeakWeekId ? latestTestPeakWeek(planId) : null;
+  const hasSuccessfulTrial = trial?.verdict === 'tested_ok';
+  const base = applyContestPrepSafetyGate({ ...rawCfg, hasTrialPeak: hasSuccessfulTrial });
   const showDate = resolveShowDate(base);
   const cfg: BBContestPrepConfig = { ...base, showDate };
 
   // prepWeeks выносится в профиль (cfg.prepWeeks) — приоритет opts > cfg > 12
-  const prepWeeks = clamp(Number(opts.prepWeeks) || Number(cfg.prepWeeks) || 12, 1, 52);
-  const taperWeeks = clamp(Number(opts.taperWeeks) || cfg.weeksOut, 1, 4);
   const taperCurve = buildTrainingTaper({ ...cfg, weeksOut: taperWeeks });
   const phases = computePrepPhaseRanges(prepWeeks, taperWeeks, showDate, true);
 
@@ -2502,16 +2565,14 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
   const redsRisk = cfg.sex === 'female' && cfg.bodyFatPct != null && cfg.bodyFatPct < 14;
   if (redsRisk) conditionLabels.push('риск RED-S (женщина, %жира <14)');
   const requiresReview = conditionLabels.length > 0;
-  const confirmed = cfg.confirmedManipulation === true;
-  // Агрессивные моды (не stable-вода/натрий) при противопоказаниях → протокол блокируется;
-  // PRO: canonical stable vs any manipulation; high/tapered требуют confirmed + trial
-  const canonWaterReq = canonicalWaterStrategy(cfg.waterStrategy);
-  const canonNaReq = canonicalSodiumStrategy(cfg.sodiumStrategy);
+  const confirmed = rawCfg.confirmedManipulation === true;
+  const canonWaterReq = canonicalWaterStrategy(rawCfg.waterStrategy);
+  const canonNaReq = canonicalSodiumStrategy(rawCfg.sodiumStrategy);
   const manipulationRequested = canonWaterReq !== 'stable' || canonNaReq !== 'stable';
-  const blockedProtocol = requiresReview && manipulationRequested;
+  const requestCfg = { ...rawCfg, hasTrialPeak: hasSuccessfulTrial };
+  const blockedProtocol = contestPrepSafetyBlocked(requestCfg);
   const allowedManipulation = confirmed && !blockedProtocol;
-  // High water без trial — блок
-  const highWithoutTrial = canonWaterReq === 'high' && !cfg.hasTrialPeak;
+  const highWithoutTrial = canonWaterReq === 'high' && (!hasSuccessfulTrial || !confirmed);
 
   const warnings = [...v.warnings];
   if (redsRisk) {
@@ -2526,8 +2587,8 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
   if (highWithoutTrial && manipulationRequested) {
     warnings.push('⛔ High water/tapered без пробного пика (trial peak) заблокирован: сделайте репетицию за 21-28 дней.');
   }
-  if (canonWaterReq === 'high' && confirmed) {
-    warnings.push('⚠ Классический water load/cut подтверждён: контроль электролитов обязателен, диуретики — только по назначению врача.');
+  if (canonWaterReq === 'high' && confirmed && hasSuccessfulTrial && !blockedProtocol) {
+    warnings.push('⚠ Классический water load/cut подтверждён успешным trial peak: контроль электролитов обязателен, диуретики — только по назначению врача.');
   }
   // PED-дозозависимые корректировки
   const ped = cfg.pedContext;
@@ -2554,10 +2615,11 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
   const targetRate = clamp(Number(opts.targetRatePctPerWeek) || (cfg.sex === 'female' ? 0.4 : 0.5), 0.25, 0.75);
 
   const plan: BBContestPrepPlan = {
-    id: opts.id ?? `bbprep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+    id: planId,
     version: PREP_PLAN_VERSION,
     algorithmVersion: PREP_ALGORITHM_VERSION,
     status: opts.status ?? 'active',
+    config: { ...cfg, prepWeeks, weeksOut: taperWeeks, hasTrialPeak: hasSuccessfulTrial },
     createdAt: now,
     updatedAt: now,
     source: opts.source ?? 'bb_auto',
@@ -2587,8 +2649,10 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
       enabled: true,
       // Стратегия по опыту: новичок/первый пик — консервативная, продвинутый — умеренная,
       // тестированный протокол — через resolvePeakStrategy (testPeakWeekId).
-      strategy: cfg.experienceLevel === 'advanced' && cfg.prepCount > 0
-        ? 'moderate'
+      strategy: highWithoutTrial || blockedProtocol ? 'conservative'
+        : trial?.verdict === 'tested_ok' ? 'tested'
+        : trial?.verdict === 'conservative' ? 'moderate'
+        : cfg.experienceLevel === 'advanced' && cfg.prepCount > 0 ? 'moderate'
         : 'conservative',
       waterMode: allowedManipulation && canonicalWaterStrategy(cfg.waterStrategy) !== 'stable' ? 'moderate' : 'stable',
       sodiumMode: allowedManipulation && canonicalSodiumStrategy(cfg.sodiumStrategy) !== 'stable' ? 'moderate' : 'stable',
@@ -2612,6 +2676,7 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
       blockedProtocol,
     },
   };
+  plan.peakWeek.strategy = resolvePeakStrategy(plan, trial);
   return plan;
 }
 
@@ -2621,13 +2686,22 @@ export function replanBBContestPrep(plan: BBContestPrepPlan, showDate: string, p
   const tw = taperWeeks ?? plan.taper.weeks;
   const phases = computePrepPhaseRanges(pw, tw, showDate, plan.peakWeek.enabled);
   const startDate = phases[0]?.dateStart ?? plan.preparation.startDate;
+  const config = plan.config ? { ...plan.config, showDate, prepWeeks: pw, weeksOut: tw } : plan.config;
+  const taper = config ? buildTrainingTaper({ ...config, showDate, weeksOut: tw }) : [];
   return {
     ...plan,
     showDate,
     phases,
+    config,
     updatedAt: new Date().toISOString(),
     preparation: { ...plan.preparation, weeks: pw, finalWeeks: pw >= 4 ? 2 : 0, startDate },
-    taper: { ...plan.taper, weeks: tw },
+    taper: {
+      ...plan.taper,
+      weeks: tw,
+      volumeProfile: taper.map(t => t.volumePct),
+      intensityProfile: taper.map(t => t.intensityPct),
+      rirProfile: taper.map(t => [t.rirMin, t.rirMax]),
+    },
   };
 }
 
@@ -2674,7 +2748,7 @@ export function serializeBBContestPrepPlan(plan: BBContestPrepPlan): string {
   return JSON.stringify(plan);
 }
 
-/** Безопасное чтение: валидация формы + отсев мусора. */
+/** Безопасное чтение: валидация формы + миграция старых схем. */
 export function deserializeBBContestPrepPlan(str: string | null | undefined): BBContestPrepPlan | null {
   if (!str) return null;
   let raw: unknown;
@@ -2683,11 +2757,13 @@ export function deserializeBBContestPrepPlan(str: string | null | undefined): BB
   const p = raw as Record<string, unknown>;
   if (typeof p.id !== 'string' || !Array.isArray(p.phases) || !p.preparation || typeof p.preparation !== 'object') return null;
   if (p.version == null || !Number.isFinite(Number(p.version))) return null;
+  if (!p.taper || typeof p.taper !== 'object' || !p.peakWeek || typeof p.peakWeek !== 'object') return null;
   const prep = p.preparation as Record<string, unknown>;
-  const tp = p.taper as Record<string, unknown> | undefined;
-  const pk = p.peakWeek as Record<string, unknown> | undefined;
-  const sf = p.safety as Record<string, unknown> | undefined;
-  const cfg: BBContestPrepConfig = {
+  const tp = p.taper as Record<string, unknown>;
+  const pk = p.peakWeek as Record<string, unknown>;
+  const sf = p.safety && typeof p.safety === 'object' ? p.safety as Record<string, unknown> : undefined;
+  const plan = p as unknown as BBContestPrepPlan;
+  const legacyConfig: BBContestPrepConfig = {
     sex: p.sex === 'female' ? 'female' : 'male',
     category: (p.category as BBContestCategory) in CATEGORY_PROFILES ? (p.category as BBContestCategory) : 'mens_physique',
     weightKg: Number(prep.startingWeightKg) || 80,
@@ -2695,20 +2771,22 @@ export function deserializeBBContestPrepPlan(str: string | null | undefined): BB
     enhanced: false,
     prepCount: 0,
     showDate: String(p.showDate || ''),
-    weeksOut: Number.isInteger(Number(tp?.weeks)) ? clamp(Number(tp?.weeks), 1, 4) : 3,
+    weeksOut: Number.isInteger(Number(tp.weeks)) ? clamp(Number(tp.weeks), 1, 4) : 3,
     trainingProtocol: 'bb',
-    carbLoadStrategy: 'moderate',
-    waterStrategy: pk?.waterMode === 'moderate' ? 'tapered' : pk?.waterMode === 'stable' ? 'stable' : 'stable',
-    sodiumStrategy: pk?.sodiumMode === 'moderate' ? 'tapered' : pk?.sodiumMode === 'stable' ? 'stable' : 'stable',
+    carbLoadStrategy: canonicalCarbStrategy(String(pk.carbLoadStrategy || pk.carbMode || 'moderate')),
+    waterStrategy: pk.waterMode === 'moderate' ? 'tapered' : 'stable',
+    sodiumStrategy: pk.sodiumMode === 'moderate' ? 'tapered' : 'stable',
     contraindications: Array.isArray(sf?.contraindications) ? sf.contraindications.filter((x): x is string => typeof x === 'string') : undefined,
   };
-  const v = validateBBContestPrepConfig(cfg);
+  const config = plan.config && typeof plan.config === 'object' ? plan.config : legacyConfig;
+  const v = validateBBContestPrepConfig(config);
   if (!v.ok) return null;
-  // v1 -> v2 migration: bump version, keep data, mark migrated
-  const plan = p as unknown as BBContestPrepPlan;
-  if (plan.version === 1) {
-    plan.version = 2;
-    plan.algorithmVersion = 2;
+  const version = Number(p.version);
+  if (version >= 3 && !plan.config) return null;
+  plan.config = config;
+  if (version < 3) {
+    plan.version = PREP_PLAN_VERSION;
+    plan.algorithmVersion = PREP_ALGORITHM_VERSION;
     (plan as any).migratedFromV1 = true;
   }
   return plan;
@@ -2759,7 +2837,7 @@ export interface MealPlanInput {
 
 /** Обратная проекция плана в конфиг (для переиспользования функций пик-недели). */
 export function configFromPlan(plan: BBContestPrepPlan, trialOverride?: TestPeakWeekResult | null): BBContestPrepConfig {
-  const cfg: BBContestPrepConfig = {
+  const cfg: BBContestPrepConfig = plan.config ? { ...plan.config } : {
     sex: plan.sex,
     category: plan.category,
     weightKg: plan.preparation.startingWeightKg,
@@ -2770,21 +2848,26 @@ export function configFromPlan(plan: BBContestPrepPlan, trialOverride?: TestPeak
     showDate: plan.showDate,
     weeksOut: plan.taper.weeks,
     trainingProtocol: 'bb',
-    // PRO-3 Э4: приоритет — lossless carbLoadStrategy из плана; старые планы — через carbMode.
-    carbLoadStrategy: plan.peakWeek.carbLoadStrategy
-      ?? (plan.peakWeek.carbMode === 'high' ? 'front' : plan.peakWeek.carbMode === 'conservative' ? 'back' : 'moderate'),
-    waterStrategy: plan.peakWeek.waterMode === 'moderate' ? 'tapered' : 'stable',
-    sodiumStrategy: plan.peakWeek.sodiumMode === 'moderate' ? 'tapered' : 'stable',
+    carbLoadStrategy: 'moderate' as CarbLoadStrategy,
+    waterStrategy: 'stable' as WaterStrategy,
+    sodiumStrategy: 'stable' as SodiumStrategy,
     contraindications: plan.safety.contraindications,
   };
-  // Фаза 3.16: подставить ИСПЫТАННЫЙ протокол в финальный (resolvePeakStrategy='tested').
-  // Раньше buildPeakWeek брал воду/натрий/карбы только из конфига — trial не влиял.
-  let trial = trialOverride;
-  if (trial === undefined && (plan as any).testPeakWeekId) {
-    try { trial = latestTestPeakWeek((plan as any).testPeakWeekId); } catch { trial = null; }
+  cfg.sex = plan.sex;
+  cfg.category = plan.category;
+  cfg.showDate = plan.showDate;
+  cfg.weeksOut = plan.taper.weeks;
+  cfg.prepWeeks = plan.preparation.weeks;
+  cfg.carbLoadStrategy = plan.peakWeek.carbLoadStrategy
+    ?? (plan.peakWeek.carbMode === 'high' ? 'front' : plan.peakWeek.carbMode === 'conservative' ? 'back' : 'moderate');
+  if (!plan.config) {
+    cfg.waterStrategy = String(plan.peakWeek.waterMode) === 'high' ? 'high' : plan.peakWeek.waterMode === 'moderate' ? 'tapered' : 'stable';
+    cfg.sodiumStrategy = plan.peakWeek.sodiumMode === 'moderate' ? 'tapered' : 'stable';
   }
-  if (trial && trial.verdict === 'tested_ok') return applyTrialToPeakConfig({ ...cfg, hasTrialPeak: true }, trial);
-  if (trial) cfg.hasTrialPeak = true;
+  let trial = trialOverride;
+  if (trial === undefined) trial = plan.testPeakWeekId ? latestTestPeakWeek(plan.id) : null;
+  if (trial?.verdict === 'tested_ok') return applyTrialToPeakConfig({ ...cfg, hasTrialPeak: true }, trial);
+  cfg.hasTrialPeak = false;
   return cfg;
 }
 
@@ -3120,6 +3203,27 @@ export function scoreTestPeakWeek(
   return { verdict: 'conservative', recommendation: 'Результат смешанный: на основной пик-неделе выбирайте умеренные настройки и тестируйте ещё раз за 3-4 недели до шоу.' };
 }
 
+function isTestPeakWeekResult(value: unknown): value is TestPeakWeekResult {
+  if (!value || typeof value !== 'object') return false;
+  const t = value as Partial<TestPeakWeekResult>;
+  if (typeof t.id !== 'string' || typeof t.planId !== 'string' || typeof t.createdAt !== 'string' || typeof t.showDate !== 'string') return false;
+  if (typeof t.weightDeltaKg !== 'number' || !Number.isFinite(t.weightDeltaKg)) return false;
+  if (t.verdict !== 'tested_ok' && t.verdict !== 'conservative' && t.verdict !== 'adjust') return false;
+  if (!t.responses || typeof t.responses !== 'object') return false;
+  return (['carbTolerance', 'digestion', 'fullness', 'waterRetention', 'pump', 'sleep'] as const)
+    .every((key) => typeof t.responses![key] === 'number' && Number.isFinite(t.responses![key]));
+}
+
+function loadTestPeakWeekResults(): TestPeakWeekResult[] {
+  try {
+    const raw = localStorage.getItem(TEST_PEAK_WEEK_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isTestPeakWeekResult).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 10);
+  } catch { return []; }
+}
+
 /** Сохранить результат тестовой пик-недели (не меняет основной план). */
 export function saveTestPeakWeekResult(
   planId: string,
@@ -3127,7 +3231,7 @@ export function saveTestPeakWeekResult(
   responses: TestPeakWeekResult['responses'],
   weightDeltaKg: number,
   notes?: string,
-): TestPeakWeekResult {
+): TestPeakWeekResult | null {
   const scored = scoreTestPeakWeek(responses, weightDeltaKg);
   const result: TestPeakWeekResult = {
     id: `testpw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
@@ -3141,33 +3245,24 @@ export function saveTestPeakWeekResult(
     recommendation: scored.recommendation,
   };
   try {
-    const raw = localStorage.getItem(TEST_PEAK_WEEK_STORAGE_KEY);
-    const list: TestPeakWeekResult[] = raw ? (JSON.parse(raw) as TestPeakWeekResult[]) : [];
-    list.unshift(result);
-    localStorage.setItem(TEST_PEAK_WEEK_STORAGE_KEY, JSON.stringify(list.slice(0, 10)));
-  } catch { /* storage недоступен */ }
-  return result;
+    const list = loadTestPeakWeekResults();
+    localStorage.setItem(TEST_PEAK_WEEK_STORAGE_KEY, JSON.stringify([result, ...list].slice(0, 10)));
+    return result;
+  } catch { return null; }
 }
 
 /** Последний тест для плана (для strategy: 'tested'). */
 export function latestTestPeakWeek(planId: string): TestPeakWeekResult | null {
-  try {
-    const raw = localStorage.getItem(TEST_PEAK_WEEK_STORAGE_KEY);
-    if (!raw) return null;
-    const list = JSON.parse(raw) as TestPeakWeekResult[];
-    return list.find(t => t.planId === planId) ?? null; // первый в списке = самый свежий
-  } catch { return null; }
+  return loadTestPeakWeekResults().find(t => t.planId === planId) ?? null;
 }
 
-/** Стратегия пик-недели с учётом тестового прогона. */
-export function resolvePeakStrategy(plan: BBContestPrepPlan): PrepPeakStrategy {
-  if (plan.testPeakWeekId) {
-    const t = latestTestPeakWeek(plan.id);
-    if (t) {
-      if (t.verdict === 'tested_ok') return 'tested';
-      if (t.verdict === 'adjust') return 'conservative';
-    }
-  }
+/** Стратегия пик-недели с учётом тестового прогона текущего плана. */
+export function resolvePeakStrategy(plan: BBContestPrepPlan, trialOverride?: TestPeakWeekResult | null): PrepPeakStrategy {
+  const trial = trialOverride === undefined ? (plan.testPeakWeekId ? latestTestPeakWeek(plan.id) : null) : trialOverride;
+  if (trial?.verdict === 'tested_ok') return 'tested';
+  if (trial?.verdict === 'adjust') return 'conservative';
+  if (trial?.verdict === 'conservative') return 'moderate';
+  if (plan.safety.blockedProtocol || plan.safety.requiresReview) return 'conservative';
   return plan.peakWeek.strategy === 'tested' ? 'conservative' : plan.peakWeek.strategy;
 }
 
@@ -3614,10 +3709,13 @@ export function prepNutritionSignals(plan: BBContestPrepPlan): string[] {
   return signals;
 }
 
-export function buildContestPrepPrintHtml(plan: BBContestPrepPlan, extra?: { compliance?: PrepTrainingCompliance; postShowLog?: PostShowWeekEntry[]; monitor?: string[]; emergency?: string[] }): string {  const profile = CATEGORY_PROFILES[plan.category];
+export function buildContestPrepPrintHtml(plan: BBContestPrepPlan, extra?: { compliance?: PrepTrainingCompliance; postShowLog?: PostShowWeekEntry[]; monitor?: string[]; emergency?: string[] }): string {
+  const profile = CATEGORY_PROFILES[plan.category];
   const post = buildPostShowPlan(plan);
-  const peakWeek = buildPeakWeek(configFromPlan(plan));
-  const timeline = buildShowTimeline(configFromPlan(plan));
+  const cfg = configFromPlan(plan);
+  const peakWeek = buildPeakWeek(cfg, plan.peakWeek.carbDoseGPerKg != null ? { carbDoseGPerKg: plan.peakWeek.carbDoseGPerKg } : undefined);
+  const strategy = resolvePeakStrategy(plan);
+  const timeline = buildShowTimeline(cfg);
   const rows = (arr: string[]): string => arr.map(n => `<li>${escHtml(n)}</li>`).join('');
 
   return `<!DOCTYPE html>
@@ -3634,6 +3732,7 @@ export function buildContestPrepPrintHtml(plan: BBContestPrepPlan, extra?: { com
 <h1>🏁 Contest Prep — бодибилдинг</h1>
 <div class="muted">Шоу: ${escHtml(plan.showDate)} · ${escHtml(profile?.label ?? plan.category)} · ${plan.sex === 'female' ? 'жен' : 'муж'} · ${plan.preparation.startingWeightKg} кг · темп ${plan.preparation.targetRatePctPerWeek}%/нед</div>
 <div class="muted">Подготовка ${plan.preparation.weeks} нед (финал ${plan.preparation.finalWeeks}) · taper ${plan.taper.weeks} нед · пик-неделя 7 дн · ${plan.preparation.currentCalories} ккал · ${plan.preparation.stepsPerDay} шагов · кардио ${plan.preparation.cardioMinutesPerWeek} мин/нед</div>
+<div class="muted">Стратегия пика: ${escHtml(strategy)}${plan.peakWeek.carbDoseGPerKg != null ? ` · trial-доза ${plan.peakWeek.carbDoseGPerKg} г/кг` : ''}</div>
 
 <h2>🗺 Фазы</h2>
 <table><tr><th>Фаза</th><th>Недели</th><th>Даты</th><th>Задача</th></tr>
@@ -3787,7 +3886,9 @@ export function buildPrepCoachJson(plan: BBContestPrepPlan, opts?: { postShowLog
     status: plan.status,
     preparation: plan.preparation,
     taper: plan.taper,
-    peakWeek: plan.peakWeek,
+    peakWeek: { ...plan.peakWeek, resolvedStrategy: resolvePeakStrategy(plan) },
+    config: plan.config ?? configFromPlan(plan),
+    trial: plan.testPeakWeekId ? latestTestPeakWeek(plan.id) : null,
     phases: plan.phases.map(p => ({ key: p.key, label: p.label, weekStart: p.weekStart, weekEnd: p.weekEnd, dateStart: p.dateStart, dateEnd: p.dateEnd })),
     adjustments: plan.adjustments ?? [],
     safety: plan.safety,
@@ -3827,7 +3928,8 @@ export function buildPrepWeeklyReportHtml(plan: BBContestPrepPlan, extra?: PrepW
   for (const c of checkins) {
     if (Number.isFinite(c.week)) byWeek.set(c.week, c);
   }
-  const total = Math.max(1, Math.min(52, Math.round(plan.preparation.weeks)));
+  const total = Math.max(1, Math.min(52, Math.round(plan.preparation.weeks + plan.taper.weeks + 1)));
+  const strategy = resolvePeakStrategy(plan);
   const rows: string[] = [];
   for (let w = 1; w <= total; w++) {
     const dateStart = isoAddDays(plan.preparation.startDate, (w - 1) * 7);
@@ -3854,9 +3956,9 @@ export function buildPrepWeeklyReportHtml(plan: BBContestPrepPlan, extra?: PrepW
     `<h1>🏁 Contest prep — отчёт тренеру (шоу ${escHtml(plan.showDate)}, ${escHtml(CONTEST_CATEGORY_LABELS[plan.category] ?? plan.category)})</h1>` +
     `<p>Подготовка ${plan.preparation.weeks} нед · тапер ${plan.taper.weeks} нед · темп ${plan.preparation.targetRatePctPerWeek}%/нед · ${plan.preparation.currentCalories} ккал</p>` +
     `<h2>📊 Недели и чек-ины</h2>` +
-    `<table border="1" cellpadding="4" cellspacing="0"><thead><tr><th>Нед</th><th>Даты</th><th>Фаза</th><th>Вес ср</th><th>Талия</th><th>Сон</th><th>Шаги</th><th>Сесс</th><th>Пси</th><th>Статус</th></tr></thead><tbody>${rows.join('')}</tbody></table>` +
+    `<table border="1" cellpadding="4" cellspacing="0"><thead><tr><th>Нед</th><th>Даты</th><th>Фаза</th><th>Вес ср</th><th>Талия</th><th>Сон</th><th>Шаги</th><th>Сесс</th><th>Пси</th><th>Статус</th></tr></thead><tbody>${rows.join('')}<tr><td>Show</td><td>${escHtml(plan.showDate)}</td><td>Show day</td><td colspan="7">Выход на сцену</td></tr></tbody></table>` +
     (downs ? `<h2>📉 Сила-тренд (падение на дефиците)</h2><ul>${downs}</ul>` : '') +
-    `<h2>🎭 Протокол пика</h2><p>Стратегия: ${escHtml(plan.peakWeek.strategy)} · вода ${escHtml(plan.peakWeek.waterMode)} · натрий ${escHtml(plan.peakWeek.sodiumMode)}</p>` +
+    `<h2>🎭 Протокол пика</h2><p>Стратегия: ${escHtml(strategy)} · вода ${escHtml(plan.peakWeek.waterMode)} · натрий ${escHtml(plan.peakWeek.sodiumMode)}</p>` +
     (safety ? `<h2>⚠ Safety</h2><ul>${safety}</ul>` : '') +
     (adjustments ? `<h2>📝 История корректировок</h2><ul>${adjustments}</ul>` : '') +
     `</body></html>`;

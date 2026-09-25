@@ -312,7 +312,7 @@ export const INTENSITY_TECHNIQUES: Record<IntensityTechnique, IntensityTechnique
   none: { type: 'none', label: 'Без техники', appliesTo: ['compound','isolation','accessory'], phases: ['accumulation','intensification','deload','peaking'], description: 'Стандартное выполнение.' },
   rest_pause: {
     type: 'rest_pause', label: 'Rest-pause', appliesTo: ['compound','isolation'],
-    phases: ['intensification','peaking'],
+    phases: ['intensification'],
     description: 'Финальный сет: 1×8 → 15с отдых → 1×3-4 → 15с → 1×3-4. Итого 14-16 reps в 1 «сете». Тайм-эффективность: больше объёма за то же время (Sødal 2023 — небольшой плюс, не превосходство).',
   },
   drop_set: {
@@ -355,7 +355,7 @@ export const INTENSITY_TECHNIQUES: Record<IntensityTechnique, IntensityTechnique
 export const DEFAULT_TECHNIQUE_BY_PHASE: Record<BBPhase, IntensityTechnique> = {
   accumulation: 'none',
   intensification: 'rest_pause',
-  peaking: 'rest_pause',
+  peaking: 'none',
   deload: 'none',
 };
 

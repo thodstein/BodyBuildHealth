@@ -25,6 +25,22 @@ describe('bb-quality-report', () => {
     expect(r.peakWeek).toBe(1); // неделя 1 с 26 сетами — пик
   });
 
+  it('отсутствующая валидация не выдаётся как безопасный план', () => {
+    const r = buildBBQualityReport({ ...basePlan, validation: undefined } as any, {});
+    expect(r.validationValid).toBe(false);
+    expect(r.riskLevel).toBe('danger');
+    expect(r.issues.some(i => i.code === 'validation_missing' && i.level === 'error')).toBe(true);
+  });
+
+  it('quality report локализует сообщения через canonical formatter', () => {
+    const r = buildBBQualityReport({
+      ...basePlan,
+      validation: { valid: true, issues: [{ level: 'warning', code: 'target_volume_deficit', message: 'chest: объём ниже MEV' }] },
+    } as any, {});
+    expect(r.issues[0].message).toContain('Грудь');
+    expect(r.issues[0].message).not.toMatch(/(^|\\W)chest(\\W|$)/);
+  });
+
   it('штраф идёт за уникальные коды (не за инстансы)', () => {
     const plan = {
       ...basePlan,

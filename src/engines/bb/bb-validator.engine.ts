@@ -493,8 +493,7 @@ export function generateActionableRecommendations(
     }
   }
 
-  // Если проблем нет — позитивная рекомендация
-  if (recs.length === 0) {
+  if (recs.length === 0 && !issues.some(issue => issue.level === 'error')) {
     recs.push({
       priority: 'low',
       action: '✅ План сбалансирован: объём в пределах MEV-MRV, делод и taper корректны.',

@@ -43,14 +43,13 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // Re-baseline 5 (аудит 2026-09, РЕАЛИЗМ СЕССИИ): недельный объём enhanced 6+
     // пересобран под практические сессии — потолок прямых сетов мышцы за сессию
     // (sessionMuscleRealismCap: big 16/14 при 5 группах дня) вместо 22, плюс
-    // автобаланс движка (chest/back < 0.7 → chest MRV ×1.15). Было → стало
-    // (directSets, нед 1, upper_lower_4): back 43→40, chest 36→28, quads 21→20,
-    // hamstrings 23→26, abs 16→10, biceps 8→4, triceps 7→4, traps 7→4,
-    // forearms 8→4, delt_mid 7→2, delt_rear 5→2, glutes 10→12.
+    // автобаланс движка и course-aware final cap. Было → стало
+    // (directSets, нед 1, upper_lower_4): back 43→40, chest 36→28, quads 21→19.
+
     // Направление: сессии 10-15 упражнений / 30-40 сетов вместо 18-20/60+;
     // недельный объём держится частотой сплита. Значения — осознанный re-baseline.
     expect(directVolume(plan)).toEqual({
-      abs: 10, back: 40, biceps: 4, calves: 10, chest: 28, delt_mid: 2, delt_rear: 2, forearms: 4, glutes: 12, hamstrings: 26, quads: 20, shoulders: 0, traps: 4, triceps: 4,
+      abs: 10, back: 40, biceps: 4, calves: 10, chest: 28, delt_mid: 2, delt_rear: 2, forearms: 4, glutes: 12, hamstrings: 26, quads: 19, shoulders: 0, traps: 4, triceps: 4,
     });
   });
 

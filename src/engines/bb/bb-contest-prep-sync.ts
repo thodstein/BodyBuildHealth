@@ -11,17 +11,23 @@
  * Оба входа — ББ-авто и питание — пользуются ею; legacy-ветки мигрируют сюда же.
  */
 
-import { buildBBContestPrepPlan, serializeBBContestPrepPlan, serializeBBPrepConfig, planFromStored, deserializeBBPrepConfig, validateBBContestPrepConfig, configFromPlan, type BBContestPrepConfig, type BBContestPrepPlan, type BuildPrepPlanOpts } from './bb-contest-prep.engine';
+import { buildBBContestPrepPlan, serializeBBContestPrepPlan, serializeBBPrepConfig, planFromStored, deserializeBBPrepConfig, deserializeBBContestPrepPlan, validateBBContestPrepConfig, configFromPlan, type BBContestPrepConfig, type BBContestPrepPlan, type BuildPrepPlanOpts } from './bb-contest-prep.engine';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 
 export const CONTEST_PREP_UPDATED_EVENT = 'he-bb-contest-prep-updated';
 
 export type ContestPrepSource = BBContestPrepPlan['source'];
 
+function mergeContestPrepConfig(base: BBContestPrepConfig, patch: Partial<BBContestPrepConfig>): BBContestPrepConfig {
+  const next = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value !== undefined) (next as any)[key] = value;
+  }
+  return next;
+}
+
 export interface SaveContestPrepOpts extends BuildPrepPlanOpts {
   source?: ContestPrepSource;
-  /** PRO-3 Э1/D3: сохранить существующий план «как есть» (без пересборки из конфига) —
-   *  поверхности питания/PeakingPanel не откатывают prepWeeks/дозу trial/id теста/трек. */
   preservePlan?: boolean;
 }
 
@@ -38,16 +44,21 @@ export function saveContestPrepEverywhere(
   rawCfg: BBContestPrepConfig,
   opts: SaveContestPrepOpts = {},
 ): BBContestPrepPlan | null {
-  const v = validateBBContestPrepConfig(rawCfg);
-  if (!v.ok) return null;
   const existing = loadContestPrepPlan();
+  const existingCfg = existing ? configFromPlan(existing) : null;
+  const mergedCfg: BBContestPrepConfig = existingCfg ? mergeContestPrepConfig(existingCfg, rawCfg) : rawCfg;
+  const v = validateBBContestPrepConfig(mergedCfg);
+  if (!v.ok) return null;
   if (existing && opts.preservePlan === true) {
-    storeContestPrepPlan(existing, rawCfg, { source: opts.source ?? existing.source });
-    return existing;
+    const plan: BBContestPrepPlan = {
+      ...existing,
+      config: { ...mergedCfg, showDate: existing.showDate, prepWeeks: existing.preparation.weeks, weeksOut: existing.taper.weeks },
+    };
+    return storeContestPrepPlan(plan, plan.config ?? mergedCfg, { source: opts.source ?? existing.source }) ? plan : null;
   }
   let plan: BBContestPrepPlan;
   try {
-    plan = buildBBContestPrepPlan(rawCfg, {
+    plan = buildBBContestPrepPlan(mergedCfg, {
       id: opts.id ?? existing?.id,
       prepWeeks: opts.prepWeeks ?? existing?.preparation.weeks,
       taperWeeks: opts.taperWeeks ?? existing?.taper.weeks,
@@ -71,28 +82,11 @@ export function saveContestPrepEverywhere(
   } catch {
     return null;
   }
-  try {
-    const cur = getProfile();
-    const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
-    if (!next.goals) next.goals = {};
-    next.goals.bbContestPrepPlan = serializeBBContestPrepPlan(plan);
-    next.goals.bbPeakConfig = serializeBBPrepConfig(rawCfg);
-    next.goals.peakWeek = true;
-    next.goals.peakShowDay = rawCfg.showDate;
-    updateProfile({ settings: next });
-  } catch { /* silent */ }
-  try {
-    window.dispatchEvent(
-      new CustomEvent(CONTEST_PREP_UPDATED_EVENT, {
-        detail: {
-          prepPlanId: plan.id,
-          showDate: rawCfg.showDate,
-          source: opts.source ?? 'bb_auto',
-        },
-      }),
-    );
-  } catch { /* ignore */ }
-  return plan;
+  return storeContestPrepPlan(plan, plan.config ?? mergedCfg, {
+    source: opts.source ?? plan.source,
+    trainingPlanId: plan.trainingPlanId,
+    nutritionPlanId: plan.nutritionPlanId,
+  }) ? plan : null;
 }
 
 /** Прочитать текущий версионированный план из профиля (с bridge legacy→план). */
@@ -109,14 +103,10 @@ export function loadContestPrepPlan(): BBContestPrepPlan | null {
 export function loadContestPrepConfig(): BBContestPrepConfig | null {
   try {
     const s: any = getProfile().settings as any;
-    const raw = s?.goals?.bbPeakConfig;
-    if (raw) {
-      const cfg = deserializeBBPrepConfig(raw);
-      if (cfg) return cfg;
-    }
-    // bridge через план: конфиг восстанавливается из версионированного плана
     const plan = planFromStored(s?.goals?.bbContestPrepPlan, s?.goals?.bbPeakConfig, s?.goals, s?.personal);
     if (plan) return configFromPlan(plan);
+    const raw = s?.goals?.bbPeakConfig;
+    if (raw) return deserializeBBPrepConfig(raw);
     return null;
   } catch {
     return null;
@@ -139,17 +129,19 @@ export function storeContestPrepPlan(
   plan: BBContestPrepPlan,
   rawCfg: BBContestPrepConfig,
   opts: StoreContestPrepOpts = {},
-): void {
+): boolean {
   try {
     const cur = getProfile();
     const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
     if (!next.goals) next.goals = {};
     next.goals.bbContestPrepPlan = serializeBBContestPrepPlan(plan);
-    next.goals.bbPeakConfig = serializeBBPrepConfig(rawCfg);
+    next.goals.bbPeakConfig = serializeBBPrepConfig(plan.config ?? rawCfg);
     next.goals.peakWeek = true;
-    next.goals.peakShowDay = rawCfg.showDate;
-    updateProfile({ settings: next });
-  } catch { /* silent */ }
+    next.goals.peakShowDay = plan.showDate;
+    const saved = updateProfile({ settings: next });
+    const persisted = deserializeBBContestPrepPlan(saved?.settings?.goals?.bbContestPrepPlan);
+    if (!persisted || persisted.id !== plan.id) return false;
+  } catch { return false; }
   try {
     window.dispatchEvent(
       new CustomEvent(CONTEST_PREP_UPDATED_EVENT, {
@@ -157,16 +149,17 @@ export function storeContestPrepPlan(
           prepPlanId: plan.id,
           trainingPlanId: opts.trainingPlanId,
           nutritionPlanId: opts.nutritionPlanId,
-          showDate: rawCfg.showDate,
+          showDate: plan.showDate,
           source: opts.source ?? plan.source ?? 'bb_auto',
         },
       }),
     );
   } catch { /* ignore */ }
+  return true;
 }
 
 /** Полностью отключить тапер ББ (оба ключа + событие). */
-export function clearContestPrepEverywhere(): void {
+export function clearContestPrepEverywhere(): boolean {
   try {
     const cur = getProfile();
     const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
@@ -174,11 +167,13 @@ export function clearContestPrepEverywhere(): void {
     delete next.goals.bbContestPrepPlan;
     delete next.goals.bbPeakConfig;
     next.goals.peakWeek = false;
-    updateProfile({ settings: next });
-  } catch { /* silent */ }
+    const saved = updateProfile({ settings: next });
+    if (saved?.settings?.goals?.bbContestPrepPlan || saved?.settings?.goals?.bbPeakConfig) return false;
+  } catch { return false; }
   try {
     window.dispatchEvent(new CustomEvent(CONTEST_PREP_UPDATED_EVENT, { detail: { source: 'clear' } }));
   } catch { /* ignore */ }
+  return true;
 }
 
 /**
@@ -190,28 +185,12 @@ export function clearContestPrepEverywhere(): void {
 export function migrateLegacyContestPrepIfNeeded(opts: BuildPrepPlanOpts = {}): BBContestPrepPlan | null {
   try {
     const s: any = getProfile().settings as any;
-    const hasPlan = !!s?.goals?.bbContestPrepPlan;
-    if (hasPlan) return null; // уже есть план — миграция не нужна
+    const hasValidPlan = !!deserializeBBContestPrepPlan(s?.goals?.bbContestPrepPlan);
+    if (hasValidPlan) return null;
     const plan = planFromStored(s?.goals?.bbContestPrepPlan, s?.goals?.bbPeakConfig, s?.goals, s?.personal, opts);
     if (!plan) return null;
     // planFromStored уже собрал план из конфига в памяти — теперь сохраним его
-    try {
-      const cur = getProfile();
-      const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
-      if (!next.goals) next.goals = {};
-      next.goals.bbContestPrepPlan = serializeBBContestPrepPlan(plan);
-      // bbPeakConfig уже был — оставляем как есть; если плана не было из-за только legacy-полей — запишем cfg из плана
-      if (!next.goals.bbPeakConfig) {
-        const cfg = configFromPlan(plan);
-        next.goals.bbPeakConfig = serializeBBPrepConfig(cfg);
-        next.goals.peakWeek = true;
-        next.goals.peakShowDay = cfg.showDate;
-      }
-      updateProfile({ settings: next });
-  } catch (e) { console.warn('[BB] prep-план не сохранён в профиль:', e); }
-    try {
-      window.dispatchEvent(new CustomEvent(CONTEST_PREP_UPDATED_EVENT, { detail: { prepPlanId: plan.id, showDate: plan.showDate, source: 'migrate' } }));
-    } catch { /* ignore */ }
+    if (!storeContestPrepPlan(plan, configFromPlan(plan), { source: 'legacy' })) return null;
     return plan;
   } catch {
     return null;

@@ -13,6 +13,7 @@ import type { BBPlan, BBExercise, BBSession } from '../../../engines/bb/bb-build
 import { validateBBPlan, type BBPlanValidationIssue } from '../../../engines/bb/bb-validator.engine';
 import { generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
+import { canonicalBBIssueText } from '../../../engines/bb/bb-validation-format';
 import { sessionTagLabel } from './bb-labels';
 
 export interface PlanValidationView {
@@ -64,6 +65,7 @@ const HINT_BY_CODE: Record<string, string> = {
   invalid_work_set: 'Проверьте вес/повторы/RIR — есть некорректные значения.',
   sets_mismatch: 'Техническая синхронизация подходов — сохраните план заново.',
   empty_plan: 'Соберите план заново.',
+  invalid_input: 'План повреждён или имеет неполную структуру. Пересоберите его перед применением.',
 };
 
 function muscleLabel(m?: string): string {
@@ -73,9 +75,7 @@ function muscleLabel(m?: string): string {
 
 /** Краткая человекочитаемая формулировка из issue (RU-мышцы, сессия, неделя). */
 function formatIssue(plan: BBPlan, i: BBPlanValidationIssue): string {
-  let text = String(i.message || '');
-  // Сырые EN-ключи мышц → RU-подписи (в старых сообщениях движка).
-  text = text.replace(/\b(chest|back|quads|hamstrings|glutes|calves|biceps|triceps|forearms|abs|traps|shoulders|delt_front|delt_mid|delt_rear|lower_back)\b/g, m => muscleLabel(m) || m);
+  const text = canonicalBBIssueText(i);
   const parts: string[] = [];
   if (i.week) parts.push(`нед ${i.week}`);
   if (i.session) {
@@ -86,8 +86,19 @@ function formatIssue(plan: BBPlan, i: BBPlanValidationIssue): string {
   return parts.length ? `${parts.join(' · ')}: ${text}` : text;
 }
 
+function invalidInputView(text: string): PlanValidationView {
+  return {
+    ok: false,
+    errors: [{ code: 'invalid_input', text, hint: HINT_BY_CODE.invalid_input, count: 1 }],
+    warnings: [],
+    infos: [],
+    accentNote: null,
+    hiddenCount: 0,
+  };
+}
+
 export function buildPlanValidationView(plan: BBPlan | null): PlanValidationView {
-  if (!plan) return { ok: true, errors: [], warnings: [], infos: [], accentNote: null, hiddenCount: 0 };
+  if (!plan) return invalidInputView('План отсутствует. Соберите план перед применением.');
   let validation;
   try {
     validation = validateBBPlan(plan, {
@@ -101,7 +112,7 @@ export function buildPlanValidationView(plan: BBPlan | null): PlanValidationView
       specializationTargets: (plan as any).priorityMuscles,
     });
   } catch {
-    return { ok: true, errors: [], warnings: [], infos: [], accentNote: null, hiddenCount: 0 };
+    return invalidInputView('План не прошёл проверку структуры. Пересоберите его перед применением.');
   }
 
   const grouped = new Map<string, { code: string; text: string; count: number }>();

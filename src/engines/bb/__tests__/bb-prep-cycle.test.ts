@@ -302,6 +302,43 @@ describe('bb-prep-cycle: сезон (несколько стартов)', () => 
     expect(r.cycles[0].bbPlan.weeks.length).toBe(8 + 2 + 1);
   });
 
+  it('N2/CP-19: season preserves safety, schedule, PED, and trial context', () => {
+    const cfg = {
+      ...seasonCfg([{ id: 'c1', date: '2027-03-01', name: 'Главный', priority: 'A' as const }]),
+      currentCalories: 2450,
+      carbLoadStrategy: 'linear' as const,
+      waterStrategy: 'high' as const,
+      sodiumStrategy: 'cut_2d' as const,
+      confirmedManipulation: true,
+      contraindications: ['kidney'],
+      allergens: ['gluten'],
+      preferLowFiberCarbs: true,
+      creatineStrategy: 'stop' as const,
+      schedule: { wake: '05:30', stage: '12:00' },
+      pedContext: { trenMg: 250, ghIU: 6 },
+    };
+    const r = buildPrepSeason(cfg, { testPeakWeekId: 'trial-season', carbDoseGPerKg: 8 });
+    const prep = r.cycles[0].prepPlan;
+    expect(prep.config).toMatchObject({
+      waterStrategy: 'stable',
+      sodiumStrategy: 'stable',
+      carbLoadStrategy: 'linear',
+      confirmedManipulation: true,
+      contraindications: ['kidney'],
+      allergens: ['gluten'],
+      preferLowFiberCarbs: true,
+      creatineStrategy: 'stop',
+      schedule: { wake: '05:30', stage: '12:00' },
+      pedContext: { trenMg: 250, ghIU: 6 },
+    });
+    expect(prep.preparation.currentCalories).toBe(2450);
+
+    expect(prep.testPeakWeekId).toBe('trial-season');
+    expect(prep.peakWeek.carbDoseGPerKg).toBe(8);
+    expect(prep.safety.requiresReview).toBe(true);
+    expect(prep.safety.blockedProtocol).toBe(true);
+  });
+
   it('слишком близкие старты — подготовка усекается с предупреждением', () => {
     const r = buildPrepSeason(seasonCfg([
       { id: 'c1', date: '2027-03-01', name: 'A' },

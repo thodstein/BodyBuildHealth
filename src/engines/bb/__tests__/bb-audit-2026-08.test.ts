@@ -80,9 +80,9 @@ describe('B1: peaking RIR drifts (not flat 0 for all weeks)', () => {
     expect(rir).toBeGreaterThanOrEqual(1);
   });
   it('strength peaking W3 has RIR=0 (drift reaches 0)', () => {
-    // W3: drift=1, driftable=max(0, 1+(-1)*1)=0, rir_heavy=0
+    // W3: drift reaches the safety floor at RIR 1
     const rir = bbRir('тяж', 'peaking', 3, 'strength');
-    expect(rir).toBe(0);
+    expect(rir).toBe(1);
   });
   it('hypertrophy peaking W1 has RIR=2 (base preserved)', () => {
     // hypertrophy base=2, peaking should NOT subtract 1 → base stays 2

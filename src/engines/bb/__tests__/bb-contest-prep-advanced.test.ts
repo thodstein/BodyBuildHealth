@@ -266,10 +266,10 @@ describe('deserialize/configFromPlan', () => {
     const plan = buildBBContestPrepPlan(cfg, { prepWeeks: 8 });
     expect(plan.safety.warnings.some(w => /Диуретик|GH|Tren/.test(w))).toBe(false);
   });
-  it('water classic vs minimal', () => {
+  it('classic water is safety-stable like minimal without a verified high-water trial', () => {
     const cClassic = baseCfg({ waterStrategy: 'classic' as const, pedContext: { diuretic: false }, confirmedManipulation: true });
     const cMinimal = baseCfg({ waterStrategy: 'minimal' as const });
-    expect(buildPeakWeek(cClassic)[0].waterLiters).toBeGreaterThan(buildPeakWeek(cMinimal)[0].waterLiters);
+    expect(buildPeakWeek(cClassic)[0].waterLiters).toBe(buildPeakWeek(cMinimal)[0].waterLiters);
   });
   it('configFromPlan preserves prepWeeks via plan.preparation', () => {
     const cfg = baseCfg({ prepWeeks: 20 });
