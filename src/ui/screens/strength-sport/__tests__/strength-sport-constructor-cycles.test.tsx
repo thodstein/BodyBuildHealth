@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { StrengthSportConstructor } from '../StrengthSportConstructor';
+import { loadStrengthSportPlan } from '../../../../engines/strength-sport/strength-sport-storage';
 
 beforeEach(() => { localStorage.clear(); });
 
@@ -86,5 +87,30 @@ describe('StrengthSportConstructor: интернет-циклы', () => {
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Цикл' })).getByText(/общая база/));
     await waitFor(() => expect(container.textContent).toContain('Н1·5д'));
     expect(container.textContent).toContain('Н8·5д');
+  });
+
+  it('startDate плана — локальная дата, не UTC (в UTC+ «вжера»)', async () => {
+    // Детерминированно воспроизводим баг: фиксируем UTC+10 и момент 23:30 UTC.
+    // В этот момент UTC-дата = «вчера» относительно календаря пользователя —
+    // именно это и уезжало в startDate плана.
+    const prevTz = process.env.TZ;
+    process.env.TZ = 'Asia/Vladivostok';
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-09-26T23:30:00Z'));
+    try {
+      const { container } = render(<StrengthSportConstructor />);
+      goToSplit(container);
+      fireEvent.click(screen.getByLabelText('Цикл'));
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'Цикл' })).getByText(/общая база/));
+      await waitFor(() => expect(container.textContent).toContain('Дословно'));
+      fireEvent.click(screen.getByText(/Собрать план/));
+      await waitFor(() => expect(container.textContent).toContain('cycle:ss-ta-general-8'), { timeout: 5000 });
+      const startDate = loadStrengthSportPlan()?.inputSnapshot?.startDate;
+      expect(startDate).toBe('2026-09-27');           // локальный календарь
+      expect(startDate).not.toBe('2026-09-26');       // UTC-вариант был бы «вчера»
+    } finally {
+      vi.useRealTimers();
+      if (prevTz === undefined) delete process.env.TZ; else process.env.TZ = prevTz;
+    }
   });
 });

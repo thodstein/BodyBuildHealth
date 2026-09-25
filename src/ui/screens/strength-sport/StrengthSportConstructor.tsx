@@ -28,6 +28,7 @@ import { saveUserProgram } from '../../../engines/user-program/program-store';
 import { SS_CYCLES, getSSCycleById } from '../../../data/ss-cycles/ss-cycle-index';
 import { recommendSSCycle } from '../../../engines/strength-sport/strength-sport-ss-selector.engine';
 import { buildSSCyclePlan } from '../../../engines/strength-sport/strength-sport-ss-cycle-to-plan.engine';
+import { localIsoDate } from '../../../engines/workout-logger.engine';
 import { buildAnnualFromSSCycles } from '../../../engines/strength-sport/strength-sport-ss-annual.engine';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
@@ -202,7 +203,7 @@ export const StrengthSportConstructor: React.FC = () => {
       equipment, injuries, mobilityRestrictions: mobility as any,
       sex, bodyweight, age,
       competitionDate: competitionDate || undefined,
-      startDate: new Date().toISOString().slice(0,10),
+      startDate: localIsoDate(),
       acwr: acwr as any,
       velocityLossPct: velocityLoss > 0 ? velocityLoss : undefined,
       velocityHistory: velocityHistory || undefined,
@@ -637,8 +638,8 @@ export const StrengthSportConstructor: React.FC = () => {
 
   const handleBuildSeason = () => {
     try{
-      const p2 = buildStrengthSportPlan({ mode:'strongman', goal:'peaking', level, weeks:6, daysPerWeek: days, workMax, competitionDate, startDate: new Date().toISOString().slice(0,10), contest, contestStrategy } as any);
-      const ann2 = buildAnnualMultiPeak([plan!, p2], { competitions: [{date: competitionDate || new Date(Date.now()+ 60*86400000).toISOString().slice(0,10)}, {date: new Date(Date.now()+ 150*86400000).toISOString().slice(0,10)}], gppWeeks:4, transitionWeeks:2 });
+      const p2 = buildStrengthSportPlan({ mode:'strongman', goal:'peaking', level, weeks:6, daysPerWeek: days, workMax, competitionDate, startDate: localIsoDate(), contest, contestStrategy } as any);
+      const ann2 = buildAnnualMultiPeak([plan!, p2], { competitions: [{date: competitionDate || localIsoDate(new Date(Date.now()+ 60*86400000))}, {date: localIsoDate(new Date(Date.now()+ 150*86400000))}], gppWeeks:4, transitionWeeks:2 });
       saveAnnualSS(ann2); setAnnual(ann2); setMsg('✦ Сезон 2 пика собран'); setTimeout(()=>setMsg(''),2200);
     }catch{}
   };
@@ -648,7 +649,7 @@ export const StrengthSportConstructor: React.FC = () => {
       const avail = rankedCycles.filter(r=> !r.blocked);
       const picked = (annualCycleSel && annualCycleSel.length ? annualCycleSel.filter(id=> avail.some(r=> r.cycle.meta.id===id)) : avail.slice(0, 3).map(r=> r.cycle.meta.id));
       if (!picked.length) { setMsg('Нет доступных циклов'); setTimeout(()=>setMsg(''),1800); return; }
-      const base: any = { mode, goal, level, workMax, equipment, injuries, mobilityRestrictions: mobility, sex, bodyweight, age, cycleConsent, methodology, dupMode, intensityTech, outsideLoad: outsideEnabled ? outside : null, acwr: acwr as any, weakPoints: weakPoints.length ? weakPoints : undefined, contest: mode==='strongman' ? contest : undefined, contestStrategy: mode==='strongman' ? contestStrategy : undefined, startDate: new Date().toISOString().slice(0,10) };
+      const base: any = { mode, goal, level, workMax, equipment, injuries, mobilityRestrictions: mobility, sex, bodyweight, age, cycleConsent, methodology, dupMode, intensityTech, outsideLoad: outsideEnabled ? outside : null, acwr: acwr as any, weakPoints: weakPoints.length ? weakPoints : undefined, contest: mode==='strongman' ? contest : undefined, contestStrategy: mode==='strongman' ? contestStrategy : undefined, startDate: localIsoDate() };
       const ann3 = buildAnnualFromSSCycles(picked, base, { cycleMode, competitionDate: competitionDate || undefined, taperWeeks });
       saveAnnualSS(ann3); setAnnual(ann3);
       try { syncStrengthAnnualToGeneral(ann3); } catch {}
