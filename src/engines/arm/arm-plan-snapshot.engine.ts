@@ -2,6 +2,7 @@ import type { ArmPlan } from './arm-types';
 import { validateArmPlan } from './arm-validator.engine';
 import { calcArmMetrics } from './arm-metrics.engine';
 import { buildArmReport } from './arm-report.engine';
+import { armTendonSetForExercises, canonicalizeArmMuscle } from './arm-tendon-sets.engine';
 
 function snapshotKey(plan: any): string {
   const { planSnapshotId: _snapshotId, weeklyVolume: _weeklyVolume, validation: _validation, report: _report, metrics: _metrics, ...rest } = plan || {};
@@ -23,10 +24,16 @@ function recomputeWeeklyVolume(plan: ArmPlan): ArmPlan['weeklyVolume'] {
   for (const wk of plan.weeks) {
     const volume: NonNullable<ArmPlan['weeklyVolume']>[number] = {};
     for (const sess of wk.sessions) for (const ex of sess.exercises) {
-      if (!volume[ex.muscle]) volume[ex.muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0, fatigueWeightedSets: 0 };
-      volume[ex.muscle].directSets += ex.sets;
-      volume[ex.muscle].effectiveSets += ex.sets;
-      volume[ex.muscle].fatigueWeightedSets += ex.sets;
+      const muscle = canonicalizeArmMuscle(ex.muscle) || ex.muscle;
+      if (!volume[muscle]) volume[muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0, fatigueWeightedSets: 0 };
+      volume[muscle].directSets += ex.sets;
+      volume[muscle].effectiveSets += ex.sets;
+      volume[muscle].fatigueWeightedSets += ex.sets;
+    }
+    const tendon = armTendonSetForExercises(wk.sessions.flatMap((sess) => sess.exercises));
+    for (const [muscle, sets] of Object.entries(tendon.byMuscle)) {
+      if (!volume[muscle]) volume[muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0, fatigueWeightedSets: 0 };
+      volume[muscle].tendonSets += sets;
     }
     weeklyVolume[wk.week] = volume;
   }

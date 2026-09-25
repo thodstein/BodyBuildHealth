@@ -8,6 +8,7 @@ import { perExerciseCap } from './arm-volume.engine';
 import { getArmCycle } from './arm-cycle-library.engine';
 import { buildArmTaperCurve, applyArmTaperToWeeks, type ArmTaperMode } from './arm-taper.engine';
 import { armInjuryRepsCap, armInjuryVolumeFactor, armInjuryWeightFactor, mobilityBlockReason } from './arm-injury-guard.engine';
+import { canonicalizeArmMuscle, isArmTendonMuscle } from './arm-tendon-sets.engine';
 
 function ensurePronSupBalance(plan: ArmPlan): void {
   for (const wk of plan.weeks) {
@@ -246,10 +247,10 @@ function injectTendonConditioning(plan: ArmPlan, level: string): void {
   for (const wk of plan.weeks) {
     if (wk.week > limitWeek) continue;
     for (const sess of wk.sessions) {
-      const hasTendon = sess.exercises.some(e => ['wrist_flexors','pronators','supinators','risers'].includes(e.muscle));
+      const hasTendon = sess.exercises.some(e => isArmTendonMuscle(e.muscle));
       if (!hasTendon) continue;
       for (const ex of sess.exercises) {
-        if (['wrist_flexors','pronators','supinators','risers','thumb','wrist_extensors'].includes(ex.muscle)) {
+        if (isArmTendonMuscle(ex.muscle)) {
           // GripStrength F1: 3с negative для tendon, high-rep 15-20, RPE 5-6
           if (ex.sets <= 4) {
             ex.repsRange = [15,20];
@@ -413,10 +414,12 @@ export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRat
   for (const wk of plan.weeks) {
     const vol: Record<string, any> = {};
     for (const sess of wk.sessions) for (const ex of sess.exercises) {
-      if (!vol[ex.muscle]) vol[ex.muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0, fatigueWeightedSets: 0 };
-      vol[ex.muscle].directSets += ex.sets;
-      vol[ex.muscle].effectiveSets += ex.sets;
-      vol[ex.muscle].fatigueWeightedSets += ex.sets;
+      const muscle = canonicalizeArmMuscle(ex.muscle) || ex.muscle;
+      if (!vol[muscle]) vol[muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0, fatigueWeightedSets: 0 };
+      vol[muscle].directSets += ex.sets;
+      vol[muscle].effectiveSets += ex.sets;
+      vol[muscle].fatigueWeightedSets += ex.sets;
+      if (isArmTendonMuscle(ex.muscle)) vol[muscle].tendonSets += ex.sets;
     }
     weeklyVolume[wk.week] = vol;
   }

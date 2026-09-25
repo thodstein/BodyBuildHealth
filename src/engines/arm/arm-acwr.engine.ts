@@ -6,6 +6,7 @@
  */
 import { toDailyLoads, acuteChronicRatio } from '../pro/training-load.engine';
 import type { ArmPlan } from './arm-types';
+import { canonicalizeArmMuscle, isArmTendonMuscle } from './arm-tendon-sets.engine';
 
 export interface ArmAcwrInput {
   sessions: Array<{ dateIso: string; sRpe: number; durationMin: number; isTendon?: boolean; isTable?: boolean }>;
@@ -17,10 +18,8 @@ export interface ArmAcwrResult {
   advice: string[]; // факт, без оценки риска
 }
 
-const TENDON_MUSCLES = new Set(['wrist_flexors','wrist_extensors','pronators','supinators','risers','thumb','ulnar_deviators','radial_deviators']);
-
 export function isTendonSession(exercises: Array<{ muscle: string }>): boolean {
-  return exercises.some(e => TENDON_MUSCLES.has(e.muscle));
+  return exercises.some(e => isArmTendonMuscle(e.muscle));
 }
 
 export function calcTendonAcwr(plan?: ArmPlan, srpeSessions?: Array<{ date: string; sRpe: number; minutes?: number; durationMin?: number; exercises?: any[] }>): { ratio: number } | null {
@@ -106,7 +105,8 @@ export function armDailyLoadsByMuscle(sessions: ArmAcwrDaySession[], referenceIs
       const age = ref - d;
       if (age < 0 || age >= 28) continue;
       for (const ex of (s as any)?.exercises || []) {
-        const m = muscleOf(ex as any);
+        const rawMuscle = muscleOf(ex as any);
+        const m = canonicalizeArmMuscle(rawMuscle);
         if (!m) continue;
         const cnt = Array.isArray((ex as any)?.sets) ? (ex as any).sets.length : 0;
         if (!out[m]) out[m] = new Array(28).fill(0);

@@ -18,7 +18,6 @@ import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injec
 import { bridgeDoseFromPayload } from '../../../engines/arm/arm-correction-dose.engine';
 import { injectArmliftCorrections, applyArmliftSpecWave, type ArmliftInjectionItem } from '../../../engines/arm/armlift-injection.engine';
 import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
-import { PLATFORM_WR, planAttempts, platformWrFor, platformIsInternal } from '../../../engines/arm/arm-platform.engine';
 import { WAF_FOULS, WAF_FOULS_OUT_AFTER } from '../../../engines/arm/arm-start-strap.engine';
 import { buildSupermatchPlan } from '../../../engines/arm/arm-supermatch.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
@@ -37,7 +36,19 @@ import { armliftMovementFlashLines, readArmliftMovementPack } from '../../../eng
 import { planBilateralVolume } from '../../../engines/arm/arm-bilateral.engine';
 import { planWeightCut, weeksUntilStart } from '../../../engines/arm/arm-competition-prep.engine';
 import { ARM_EXERCISES } from '../../../core/exercise-catalog-arm';
-import { buildArmBlock, buildArmYearBlocks } from '../../../engines/arm/arm-annual';
+import { buildArmBlock, buildArmYearBlocks, armYearBlocksToMacro } from '../../../engines/arm/arm-annual';
+import { syncArmExerciseWorkSets } from '../../../engines/arm/arm-sets-integrity.engine';
+import { loadArmAnnotations, armAnnotationLines } from '../../../engines/arm/arm-annotations.engine';
+import { ArmAnnotationsPanel } from './arm-annotations-panel';
+import { ArmRulebookPanel } from './arm-rulebook-panel';
+import { saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
+import { annualPlanFromMacro, setAnnualBlockConfig, buildAnnualPlan } from '../../../engines/annual-training/block-builders.engine';
+import { PLATFORM_WR, planAttempts, platformWrFor, platformIsInternal, loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
+import { parseArmResultJson, parseArmResultCsv, applyArmResultImport } from '../../../engines/arm/arm-result-import.engine';
+import { assessArmReadiness } from '../../../engines/arm/arm-readiness.engine';
+import { resolveArmReturnToLoad } from '../../../engines/arm/arm-return-to-load.engine';
+import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
@@ -229,6 +240,9 @@ export type ArmVariantDiff = {
   setsA: number; setsB: number;
   phasesA: string; phasesB: string;
   rows: Array<{ muscle: string; a: number; b: number; d: number }>;
+  weightRows: Array<{ name: string; a: number; b: number; d: number }>;
+  rirRows: Array<{ name: string; a: number; b: number; d: number }>;
+  exRows: Array<{ name: string; status: 'только A' | 'только B' | 'в обоих' }>;
 };
 function planMuscleSets(plan: any): Record<string, number> {
   const out: Record<string, number> = {};
@@ -245,18 +259,68 @@ function planMuscleSets(plan: any): Record<string, number> {
 function planTotalSets(plan: any): number {
   return Object.values(planMuscleSets(plan)).reduce((a: number, v) => (a as number) + (v as number), 0) as number;
 }
+/** Максимальный вес верхнего сета по названию упражнения (для diff весов). */
+function planTopWeights(plan: any): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const wk of plan?.weeks || []) {
+    for (const s of wk.sessions || []) {
+      for (const e of s.exercises || []) {
+        const name = String(e.name || '—');
+        const ws = Array.isArray(e.workSets) ? e.workSets : [];
+        const top = ws.reduce((m: number, x: any) => Math.max(m, Number(x?.weight) || 0), 0);
+        out[name] = Math.max(out[name] ?? 0, top);
+      }
+    }
+  }
+  return out;
+}
+/** Средний RIR по названию упражнения. */
+function planAvgRir(plan: any): Record<string, number> {
+  const acc: Record<string, { sum: number; n: number }> = {};
+  for (const wk of plan?.weeks || []) {
+    for (const s of wk.sessions || []) {
+      for (const e of s.exercises || []) {
+        const name = String(e.name || '—');
+        const rir = Number(e.rir);
+        if (!Number.isFinite(rir)) continue;
+        const cur = acc[name] ?? { sum: 0, n: 0 };
+        acc[name] = { sum: cur.sum + rir, n: cur.n + 1 };
+      }
+    }
+  }
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(acc)) out[k] = Math.round((v.sum / Math.max(1, v.n)) * 10) / 10;
+  return out;
+}
 export function compareArmVariants(a: any, b: any): ArmVariantDiff | null {
   if (!a || !b || !Array.isArray(a.weeks) || !Array.isArray(b.weeks)) return null;
   const ma = planMuscleSets(a);
   const mb = planMuscleSets(b);
   const keys = Array.from(new Set([...Object.keys(ma), ...Object.keys(mb)])).sort();
   const rows = keys.map((muscle) => ({ muscle, a: ma[muscle] || 0, b: mb[muscle] || 0, d: (mb[muscle] || 0) - (ma[muscle] || 0) }));
+  const wa = planTopWeights(a);
+  const wb = planTopWeights(b);
+  const weightRows = Array.from(new Set([...Object.keys(wa), ...Object.keys(wb)])).sort()
+    .map((name) => ({ name, a: wa[name] ?? 0, b: wb[name] ?? 0, d: (wb[name] ?? 0) - (wa[name] ?? 0) }))
+    .filter(r => r.d !== 0);
+  const ra = planAvgRir(a);
+  const rb = planAvgRir(b);
+  const rirRows = Array.from(new Set([...Object.keys(ra), ...Object.keys(rb)])).sort()
+    .map((name) => ({ name, a: ra[name] ?? 0, b: rb[name] ?? 0, d: (rb[name] ?? 0) - (ra[name] ?? 0) }))
+    .filter(r => r.d !== 0);
+  const ea = new Set(Object.keys(wa));
+  const eb = new Set(Object.keys(wb));
+  const exRows = Array.from(new Set([...ea, ...eb])).sort().map((name) => ({
+    name,
+    status: (ea.has(name) && eb.has(name)) ? 'в обоих' as const : (ea.has(name) ? 'только A' as const : 'только B' as const),
+  }));
   const ph = (p: any) => (p.weeks || []).map((w: any) => String(w.phase || '').slice(0, 3)).join('→');
   return {
     weeksA: (a.weeks || []).length, weeksB: (b.weeks || []).length,
     setsA: planTotalSets(a), setsB: planTotalSets(b),
     phasesA: ph(a), phasesB: ph(b),
     rows,
+    weightRows, rirRows, exRows,
   };
 }
 
@@ -329,6 +393,7 @@ export function applyArmEdits(plan: any, edits: Record<string, ArmExerciseEdit>,
            if (ed.swapId || ed.sets != null || ed.reps != null || ed.weight != null) {
              out.provenance = 'manual';
              out.provenanceSource = 'ui-edit';
+             syncArmExerciseWorkSets(out);
            }
            return out;
         }),
@@ -516,6 +581,48 @@ export function ArmAutoConstructor() {
   const [proSupermatch, setProSupermatch] = useState<boolean>(false);
   const [proStrap, setProStrap] = useState<boolean>(false);
   const [proPlatImpl, setProPlatImpl] = useState<string>('rolling_thunder');
+  const [proPain, setProPain] = useState('');
+  const [proClearDays, setProClearDays] = useState('');
+  const pro7Acwr = useMemo(() => {
+    try {
+      const sessions = loadSRPESessions();
+      if (!Array.isArray(sessions) || sessions.length === 0) return null;
+      const r = acuteChronicRatio(toDailyLoads(sessions));
+      if (!Number.isFinite(r?.ratio) || r.ratio <= 0) return null;
+      return { value: r.ratio, zone: r.zone, method: `ACWR ${r.method === 'ewma_uncoupled' ? 'EWMA' : 'coupled'} · острая ${r.acute} / хроническая ${r.chronic} (${r.acuteDays}/${r.chronicDays} дн)` };
+    } catch { return null; }
+  }, [step, builtPlan]);
+  const pro7Readiness = useMemo(() => {
+    try {
+      const srpe = Number(proSrpe);
+      const pain = Number(proPain);
+      return assessArmReadiness({
+        diary: [{ dateIso: new Date().toISOString().slice(0, 10), srpe: Number.isFinite(srpe) ? srpe : undefined, elbowPain: Number.isFinite(pain) ? pain : undefined }],
+        acwrRatio: pro7Acwr?.value,
+      });
+    } catch { return null; }
+  }, [proSrpe, proPain, pro7Acwr]);
+  const pro7Return = useMemo(() => {
+    try {
+      const days = Number(proClearDays);
+      return resolveArmReturnToLoad({
+        pain: Number(proPain) || 0,
+        painFreeDays: Number.isFinite(days) && days > 0 ? days : undefined,
+        readiness: pro7Readiness?.status as any,
+        acwrRatio: pro7Acwr?.value,
+      });
+    } catch { return null; }
+  }, [proPain, proClearDays, pro7Readiness, pro7Acwr]);
+  const [platformTick, setPlatformTick] = useState(0);
+  const [annotationTick, setAnnotationTick] = useState(0);
+  const annotationLines = useMemo(() => {
+    try { return armAnnotationLines(loadArmAnnotations()); } catch { return [] as string[]; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annotationTick, step, builtPlan]);
+  const platformLog = useMemo(() => {
+    try { return loadPlatformLog(); } catch { return [] as any[]; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platformTick, discipline, step]);
   const [proPlatTarget, setProPlatTarget] = useState<string>('');
   // TOP T1–T8: матчап/скорость/лестница/sim/календарь (всё опционально)
   const [topOpp, setTopOpp] = useState<string>('unknown');
@@ -1959,6 +2066,42 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <div>
                 <ArmHeatmap plan={viewPlan} onToast={flash} />
               </div>
+              <ArmRulebookPanel discipline={discipline} sex={linked?.profile?.personal?.sex} />
+              <div data-arm="pro7-card">
+              <AdSec title="🩺 Готовность к нагрузке (ACWR, боль, возвращение)" hook="pro7">
+                <AdGrid cols="2">
+                  <AdField label="Боль локоть, 0–10">
+                    <input value={proPain} onChange={e=>setProPain(e.target.value)} inputMode="numeric" placeholder="0" aria-label="Боль локоть" />
+                  </AdField>
+                  <AdField label="Безболевых дней">
+                    <input value={proClearDays} onChange={e=>setProClearDays(e.target.value)} inputMode="numeric" placeholder="0" aria-label="Безболевых дней" />
+                  </AdField>
+                </AdGrid>
+                <div className="ad-muted" data-arm="pro7-srpe">sRPE последней сессии берётся из дневника тренировок: {proSrpe || '—'}.</div>
+                <div className="ad-list" data-arm="pro7-signals">
+                  {pro7Acwr && (
+                    <div className="ad-finding" data-level={pro7Acwr.zone === 'dangerous' ? 'bad' : pro7Acwr.zone === 'caution' ? 'warn' : 'ok'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      ACWR {pro7Acwr.value.toFixed(2)} — {pro7Acwr.zone} · {pro7Acwr.method}
+                    </div>
+                  )}
+                  {pro7Readiness && pro7Readiness.status !== 'unknown' && (
+                    <div className="ad-finding" data-level={pro7Readiness.status === 'red' ? 'bad' : pro7Readiness.status === 'yellow' ? 'warn' : 'ok'}>
+                      Готовность: {pro7Readiness.status === 'red' ? 'красная' : pro7Readiness.status === 'yellow' ? 'жёлтая' : 'зелёная'} · действие: {pro7Readiness.action === 'hold' ? 'стоп' : pro7Readiness.action === 'modify' ? 'снизить нагрузку' : 'продолжать'}
+                      {pro7Readiness.reasons.length ? ` · ${pro7Readiness.reasons.slice(0, 2).join('; ')}` : ''}
+                    </div>
+                  )}
+                  {pro7Return && (
+                    <div className="ad-finding" data-level={!pro7Return.allowed ? 'bad' : pro7Return.phase === 'hold' || pro7Return.phase === 'isometric' ? 'warn' : 'ok'}>
+                      Возврат к нагрузке: фаза «{pro7Return.phase}» · {pro7Return.allowed ? `можно до ${pro7Return.maxLoadPct}%` : `стоп — нагрузка не разрешена, до ${pro7Return.maxLoadPct}%`} · RIR ≥ {pro7Return.minRir} · {pro7Return.recommendation}
+                    </div>
+                  )}
+                  {!pro7Acwr && <div className="ad-muted">sRPE-сессий в дневнике нет — ACWR не считается (метод из дневника тренировок, не из замеров помоста).</div>}
+                </div>
+                <AdBanner tone="info">
+                  Сигналы показывают состояние и рекомендацию — <b>не меняются автоматически</b>: объём/веса меняйте на шаге «План» или через правки.
+                </AdBanner>
+              </AdSec>
+              </div>
               {editsCount > 0 && <div className="ad-muted">✏️ Правки: {editsCount} упр. — гейты и отчёт по базовому плану.</div>}
               <AdBanner tone="warn">
                 <b>4 гейта:</b> humerus (side ≤3, ≤10%/нед, RIR≥2) · UCL (hook n00b) · shoulder (≥4, 12-20, RIR≥2) · tendon (12/16/18/22) — все в валидации.
@@ -2017,6 +2160,43 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                         <div key={i} className="ad-stat"><div className="ad-stat-v">{a} кг</div><div className="ad-stat-l">Попытка {i + 1}</div><div className="ad-stat-s">{[90, 96, 102][i]}%</div></div>
                       ))}</div>{`Попытки: ${att.join(' / ')} кг · WR ${wr} кг · цель ${pct}% WR — ${lvl}. Правило помоста: промах = выбыл, только DOH, без лямок.`}</>);
                     })()}</div>
+                    <AdBtn variant="ghost" block onClick={() => {
+                      if (typeof document === 'undefined') return;
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.csv,.txt,.json,application/json,text/csv';
+                      input.onchange = () => {
+                        const f = input.files?.[0];
+                        if (!f) return;
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const text = String(reader.result || '');
+                          const isJson = /\.json$/i.test(f.name) || text.trim().startsWith('{') || text.trim().startsWith('[');
+                          const parsed = isJson ? parseArmResultJson(text) : parseArmResultCsv(text, proPlatImpl);
+                          if (parsed.errors.length > 0) { flash(`⚠ Импорт результатов: ${parsed.errors[0]}`); return; }
+                          if (parsed.entries.length === 0) { flash('⚠ Импорт результатов: распознанных попыток нет.'); return; }
+                          const log = applyArmResultImport(parsed, linked?.profile?.personal?.sex || 'male');
+                          flash(`📥 Импортировано попыток: ${parsed.entries.length} · снаряд ${parsed.implement} · лучший ${parsed.bestKg} кг (${parsed.wrPct}% WR)${parsed.warnings.length ? ` · замечаний: ${parsed.warnings.length}` : ''} · в журнале ${log.length}`);
+                          setPlatformTick(t => t + 1);
+                        };
+                        reader.onerror = () => flash('⚠ Импорт результатов: файл не прочитан.');
+                        reader.readAsText(f);
+                      };
+                      input.click();
+                    }}>📥 Импорт результатов соревнований (CSV/JSON)</AdBtn>
+                    <div className="ad-muted" data-arm="platform-import-note">
+                      Формат: CSV «снаряд,попытка,вес,результат» (1/0, да/нет) либо JSON {`{ date, implement, attempts: [{ weightKg, success }] }`}. Попадёт в журнал помоста с датой соревнования; ничего не угадывается — нераспознанное отбрасывается.
+                    </div>
+                    {platformLog.length > 0 && (
+                      <div className="ad-list" data-arm="platform-log" style={{ marginTop: 6 }}>
+                        <div className="ad-muted">Журнал помоста (последние 3):</div>
+                        {platformLog.slice(-3).map((e: any, i: number) => (
+                          <div key={`${e.date}-${e.implement}-${i}`} className="ad-finding" data-level={e.success ? 'ok' : 'warn'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {e.date} · {e.weightKg} кг · {e.success ? 'взят' : 'промах'} · {e.wrPct ?? 0}% WR
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </AdSec>
                 )}
                 <AdBtn variant="primary" block onClick={handleBuild}>🔄 Пересобрать с весами</AdBtn>
@@ -2051,7 +2231,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   /** PRO-6 M12: движение армлифтинга из пака (единый ридер). */
                   const almPackLines = readArmliftMovementPack();
                   const armliftMovement = almPackLines.length ? almPackLines : null;
-                  const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: diag?.info, movement: diag?.movement, armliftMovement }, proSummary);
+                  const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: [...(diag?.info ?? []), ...annotationLines.map(l => `🎥 ${l}`)], movement: diag?.movement, armliftMovement }, proSummary);
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
                  }} block style={{ minHeight: 48 }}>🖨 Печать</AdBtn>
@@ -2187,6 +2367,34 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                       </div>
                     ))}
                     {cmpDiff.diff.rows.every(r=>r.d===0) && <div className="ad-muted">Объёмы идентичны.</div>}
+                    {cmpDiff.diff.weightRows.length > 0 && (
+                      <div data-arm="variants-diff-weights" className="ad-list" style={{ marginTop: 6 }}>
+                        <div className="ad-muted">Веса верхнего сета (кг):</div>
+                        {cmpDiff.diff.weightRows.slice(0, 10).map(r=>(
+                          <div key={r.name} className="ad-finding" data-level="info" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {r.name}: {r.a} → {r.b} ({r.d >= 0 ? '+' : ''}{r.d})
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {cmpDiff.diff.rirRows.length > 0 && (
+                      <div data-arm="variants-diff-rir" className="ad-list" style={{ marginTop: 6 }}>
+                        <div className="ad-muted">RIR (средний):</div>
+                        {cmpDiff.diff.rirRows.slice(0, 10).map(r=>(
+                          <div key={r.name} className="ad-finding" data-level="info" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {r.name}: {r.a} → {r.b} ({r.d >= 0 ? '+' : ''}{r.d})
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {cmpDiff.diff.exRows.some(r=>r.status !== 'в обоих') && (
+                      <div data-arm="variants-diff-ex" className="ad-list" style={{ marginTop: 6 }}>
+                        <div className="ad-muted">Состав упражнений:</div>
+                        {cmpDiff.diff.exRows.filter(r=>r.status!=='в обоих').map(r=>(
+                          <div key={r.name} className="ad-finding" data-level="warn">{r.name} — {r.status}</div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 <div style={{ marginTop: 8 }}>
@@ -2231,6 +2439,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   </AdField>
                 </div>
               </AdSec>
+              <ArmAnnotationsPanel plan={viewPlan} lines={annotationLines} onChanged={()=>setAnnotationTick(t=>t+1)} />
               <AdSec title="📖 Обоснование" collapsible defaultOpen={false} summary={`${builtPlan.rationale.length} причин`}>
                 <div data-arm="rationale">{builtPlan.rationale.map((r: string, i: number) => <div key={i} className="ad-finding" data-level="info">{r}</div>)}</div>
               </AdSec>
@@ -2251,7 +2460,7 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       )}
       {step === 'year' && (
         <AdCard className="ad-stepview">
-          <AdSec title="🗓 Год по блокам" hint="Серия → блоки base/strength/peaking (+тейпер A/B) → сборка каждым buildArmBlock. Без записи в общий годовой план — превью и сборка внутри конструктора.">
+           <AdSec title="🗓 Год по блокам" hint="Серия → блоки base/strength/peaking (+тейпер A/B) → сборка каждым buildArmBlock. Год собирается в общий годовой план (annual-training, направление «Арм») — плюс остаётся превью здесь.">
             <AdGrid cols="2">
               <div>
                 <div className="ad-fl">Серия</div>
@@ -2295,9 +2504,32 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   };
                   return buildArmBlock({ blockKey: b.blockKey, weeks: b.weeks, phase: b.phase }, cfg, { level });
                 });
-                setYearBuilt(res);
-                const warns = res.reduce((a: number, r: any)=>a + (r.warnings || []).length, 0);
-                flash(`🗓 Год собран: ${res.length} блоков · тейпер ${res.filter((r: any)=>r.taperApplied).length} · предупр. ${warns}`);
+                 setYearBuilt(res);
+                 const warns = res.reduce((a: number, r: any)=>a + (r.warnings || []).length, 0);
+                 // PRO-7 P0: тот же год уходит в ОБЩИЙ годовой план (annual-training),
+                 // а не остаётся превью внутри конструктора. Макро строится из тех же
+                 // блоков через armYearBlocksToMacro — единый источник, без второй копии.
+                 let annualNote = 'общий годовой план не записан';
+                 try {
+                   const totalWeeks = yearBlocks.reduce((a: number, b: any) => a + (b.weeks || 0), 0);
+                   const macro = armYearBlocksToMacro(yearBlocks as any, totalWeeks || undefined);
+                   let plan = annualPlanFromMacro(macro, { level, workMax, weakPoints });
+                   for (const src of yearBlocks as any[]) {
+                     plan = setAnnualBlockConfig(plan, src.blockKey, {
+                       discipline, level, technique, gripFocus, workMax,
+                       weakPoints, focusGroup: focusGroup || undefined, specialization,
+                       patternId: patternId || undefined,
+                       taper: { enabled: src.priority !== 'C', weeks: src.taperWeeks || 2 },
+                       cycleId: yearSuggest ? src.suggestedCycleId : undefined,
+                       cycleConsent: yearSuggest ? true : undefined,
+                     } as any);
+                   }
+                   const outcome = buildAnnualPlan(plan, macro);
+                   saveAnnualTrainingPlan(outcome.plan);
+                   annualNote = `в общий годовой план: собрано ${outcome.built}, пропущено ${outcome.skipped}, ошибок ${outcome.failed}`;
+                   if (outcome.errors.length) annualNote += ` · первая: ${outcome.errors[0].blockKey} — ${outcome.errors[0].message}`;
+                 } catch (ae: any) { annualNote = `в общий годовой план не записан: ${ae?.message || ae}`; }
+                 flash(`🗓 Год собран: ${res.length} блоков · тейпер ${res.filter((r: any)=>r.taperApplied).length} · предупр. ${warns} · ${annualNote}`);
               } catch (e: any) { flash(`❌ Год: ${e?.message || e}`); } finally { setYearBusy(false); }
             }}>{yearBusy ? '⏳ Собираем год…' : '🗓 Собрать год'}</AdBtn>
             <AdBtn variant="ghost" block onClick={()=>setStep('export')}>← Назад</AdBtn>

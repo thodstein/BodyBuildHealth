@@ -87,6 +87,21 @@ describe('Arm plan variants', () => {
     expect(same.rows.every((r) => r.d === 0)).toBe(true);
   });
 
+  it('compareArmVariants: веса, RIR и состав упражнений (PRO-7)', () => {
+    const mk = (opts: { name: string; weight: number; rir: number }) => ({
+      pattern: { id: 'p', name: 'P' },
+      weeks: [{ week: 1, phase: 'accumulation', sessions: [{ exercises: [{ muscle: 'wrist_flexors', sets: 4, name: opts.name, rir: opts.rir, workSets: [{ weight: opts.weight, reps: 5, rir: opts.rir }] }] }] }],
+    });
+    const d = compareArmVariants(mk({ name: 'Жим', weight: 40, rir: 2 }), mk({ name: 'Жим гантели', weight: 30, rir: 3 }))!;
+    expect(d.exRows).toHaveLength(2);
+    expect(d.exRows.some(r => r.name === 'Жим' && r.status === 'только A')).toBe(true);
+    expect(d.exRows.some(r => r.name === 'Жим гантели' && r.status === 'только B')).toBe(true);
+    const same = compareArmVariants(mk({ name: 'Жим', weight: 40, rir: 2 }), mk({ name: 'Жим', weight: 40, rir: 2 }))!;
+    expect(same.weightRows).toEqual([]);
+    expect(same.rirRows).toEqual([]);
+    expect(same.exRows.every(r => r.status === 'в обоих')).toBe(true);
+  });
+
   it('UI: выбор двух вариантов показывает дельты', () => {
     build();
     fireEvent.click(screen.getByRole('button', { name: /Варианты плана/ }));

@@ -11,6 +11,7 @@
  */
 import { getArmExercises } from '../../core/exercise-catalog-arm';
 import { analyzeTableIq } from './arm-table-iq.engine';
+import { armTendonSetForExercises } from './arm-tendon-sets.engine';
 
 export interface TableInjectOpts {
   level?: string;
@@ -29,11 +30,7 @@ const TENDON_HARD_CAP = 26;
 const SESSION_CAP = 8;
 
 function tendonSetsOf(week: any): number {
-  let n = 0;
-  for (const sess of week.sessions || [])
-    for (const ex of sess.exercises || [])
-      if (['wrist_flexors', 'wrist_extensors', 'pronators', 'supinators', 'risers', 'thumb', 'ulnar_deviators', 'radial_deviators'].includes(ex.muscle)) n += ex.sets || 0;
-  return n;
+  return armTendonSetForExercises((week?.sessions || []).flatMap((sess: any) => sess.exercises || [])).totalSets;
 }
 
 function risersSetsOf(week: any): number {

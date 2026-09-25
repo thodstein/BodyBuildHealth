@@ -3,6 +3,7 @@
  */
 import type { ArmPlan, ArmMetrics } from './arm-types';
 import { tableTimeSummary } from './arm-table.engine';
+import { isArmTendonMuscle } from './arm-tendon-sets.engine';
 
 export function calcArmMetrics(plan: ArmPlan): ArmMetrics {
   const totalSetsPerWeek: Record<number, number> = {};
@@ -16,7 +17,7 @@ export function calcArmMetrics(plan: ArmPlan): ArmMetrics {
         totalRir += ex.rir * ex.sets;
         cnt += ex.sets;
         if (ex.isTable) tableSets += ex.sets;
-        if (['wrist_flexors','pronators','supinators','wrist_extensors','risers'].includes(ex.muscle)) tendonSets += ex.sets;
+        if (isArmTendonMuscle(ex.muscle)) tendonSets += ex.sets;
         if (ex.muscle === 'side_pressure') sideSets += ex.sets;
       }
     }

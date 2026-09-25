@@ -7,6 +7,7 @@ import { ARM_MUSCLES } from './arm-types';
 import { TAG_MUSCLES_ARM } from './arm-day-types';
 import { ARM_SPLIT_PATTERNS, getArmPattern } from './arm-split-patterns';
 import { getArmLandmarks, isTendonMuscle, TENDON_CAP, MUSCLE_CAP, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
+import { canonicalizeArmMuscle } from './arm-tendon-sets.engine';
 import { computeArmRecoveryMult, computeArmBudget, sessionLimitsForArm, perExerciseCap, computeNutritionMult, tendonBudgetForLevel } from './arm-volume.engine';
 import { ARM_EXERCISES } from '../../core/exercise-catalog-arm';
 import { classifyPed } from '../../data/ped-potency-table';
@@ -27,6 +28,7 @@ import { longevityTrackFor } from './arm-longevity.engine';
 import { injectGripProtocol } from './arm-grip-protocol.engine';
 import { cyclePhaseMap, fitCycleToWeeks, getArmCycle } from './arm-cycle-library.engine';
 import { getMedley, medleyRotationForWeek } from './arm-medley.engine';
+import { estimateArmSessionDuration } from './arm-duration.engine';
 // PRO-5: ядро-гигиена + safety + синглы + UX (всё gated, дефолт no-op)
 import { taperStateFor, isCycleTaperActive, resolveProgressionRates, acwrMultFor, pedHonestyNote, weightHonestyMark, foreignPoolWarnings } from './arm-pro5-core.engine';
 import { applyPro5Safety, checkHookCap } from './arm-pro5-safety.engine';
@@ -810,14 +812,20 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       }
 
       const isTableSession = tag.toLowerCase().includes('table') || exercises.some(e => e.isTable);
-      sessions.push({
+      const session: ArmSession = {
         day: d + 1,
         weekOffset: w - 1,
         character: ch,
         sessionTag: tag,
         tableTime: isTableSession,
         exercises,
-      });
+      };
+      try {
+        if (!Number.isFinite(Number((session as any).durationMin)) || !(session as any).durationMin) {
+          session.durationMin = estimateArmSessionDuration(session).durationMin;
+        }
+      } catch { /* оценка длительности опциональна */ }
+      sessions.push(session);
       sessionIdx++;
     }
 
@@ -1011,17 +1019,24 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     w1.note = `${w1.note || ''} 🧤 Warmup-блок 10–15 мин обязателен (холод/без разминки).`.trim();
   }
 
+  for (const wk of planWeeks) {
+    for (const sess of wk.sessions) {
+      sess.exercises = sess.exercises.filter((ex) => !mobilityBlockReason(ex, mobilityRestrictions));
+    }
+  }
+
   // Weekly volume
   const weeklyVolume: Record<number, Record<string, any>> = {};
   for (const wk of planWeeks) {
     const vol: Record<string, any> = {};
     for (const sess of wk.sessions) {
       for (const ex of sess.exercises) {
-        if (!vol[ex.muscle]) vol[ex.muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0, fatigueWeightedSets: 0 };
-        vol[ex.muscle].directSets += ex.sets;
-        vol[ex.muscle].effectiveSets += ex.sets;
-        vol[ex.muscle].fatigueWeightedSets += ex.sets * 1;
-        if (['wrist_flexors','pronators','supinators','wrist_extensors','risers','thumb'].includes(ex.muscle)) vol[ex.muscle].tendonSets += ex.sets;
+        const muscle = canonicalizeArmMuscle(ex.muscle) || ex.muscle;
+        if (!vol[muscle]) vol[muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0, fatigueWeightedSets: 0 };
+        vol[muscle].directSets += ex.sets;
+        vol[muscle].effectiveSets += ex.sets;
+        vol[muscle].fatigueWeightedSets += ex.sets * 1;
+        if (isTendonMuscle(muscle)) vol[muscle].tendonSets += ex.sets;
       }
     }
     weeklyVolume[wk.week] = vol;

@@ -1,3 +1,5 @@
+import { canonicalizeArmMuscle, isArmTendonMuscle } from './arm-tendon-sets.engine';
+
 /**
  * arm-volume.engine.ts — бюджеты, indirect, session limits для арм-планировщика.
  * Зеркало bb-volume.engine.ts, но с tendon-учётом и arm-спецификой.
@@ -149,19 +151,17 @@ export function aggregateArmVolume(
   for (const wk of weeks) {
     for (const sess of wk.sessions) {
       for (const ex of sess.exercises) {
-        const m = ex.muscle;
+        const m = canonicalizeArmMuscle(ex.muscle) || ex.muscle;
         if (!out[m]) out[m] = { directSets: 0, effectiveSets: 0, tendonSets: 0 };
         out[m].directSets += ex.sets;
         out[m].effectiveSets += ex.sets;
-        // indirect
         const indirect = indirectForExercise(ex.movementPattern || ex.muscle);
         for (const ind of indirect) {
-          if (!out[ind.muscle]) out[ind.muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0 };
-          out[ind.muscle].effectiveSets += ex.sets * ind.factor;
+          const target = canonicalizeArmMuscle(ind.muscle) || ind.muscle;
+          if (!out[target]) out[target] = { directSets: 0, effectiveSets: 0, tendonSets: 0 };
+          out[target].effectiveSets += ex.sets * ind.factor;
         }
-        // tendon
-        const isTendon = ['wrist_flexors','wrist_extensors','pronators','supinators','risers','thumb','ulnar_deviators','radial_deviators'].includes(m);
-        if (isTendon) out[m].tendonSets += ex.sets;
+        if (isArmTendonMuscle(m)) out[m].tendonSets += ex.sets;
       }
     }
   }

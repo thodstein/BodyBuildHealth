@@ -1,3 +1,6 @@
+import { armBodyRegionsForExercise, armBodyRegionsForValue, normalizeArmBodyRegion, type ArmBodyRegion } from './arm-body-region.engine';
+import { canonicalizeArmMuscle, isArmTendonMuscle } from './arm-tendon-sets.engine';
+
 /**
  * arm-injury-guard.engine.ts — травмо-гейты для арм-плана (как bb-joint-guard).
  * Wrist / humerus / elbow / shoulder.
@@ -24,21 +27,16 @@ export function isHumerusRiskExercise(ex: { muscle?: string; substitutionGroup?:
 
 function normalizeArmInjuryKey(value: string): string {
   const raw = String(value || '').trim().toLowerCase();
-  if (/forearm|pronator|supinator|пронац|супинац|предплеч/.test(raw)) return 'forearm';
-  if (/elbow|локт/.test(raw)) return 'elbow';
-  if (/wrist|кист|запяст/.test(raw)) return 'wrist';
-  return raw;
+  return normalizeArmBodyRegion(value) || canonicalizeArmMuscle(value) || raw;
 }
 
 function armInjuryMatches(injuryMuscle: string, targetMuscle: string): boolean {
   const injury = normalizeArmInjuryKey(injuryMuscle);
   const target = normalizeArmInjuryKey(targetMuscle);
   if (injury === target) return true;
-  if (injury === 'forearm') return ['pronators', 'supinators', 'brachioradialis'].includes(target);
-  if (injury === 'wrist') return ['wrist_flexors', 'wrist_extensors', 'risers', 'thumb', 'grip_support', 'grip_pinch', 'grip_crush'].includes(target);
-  if (injury === 'elbow') return ['side_pressure', 'back_pressure', 'brachialis', 'biceps_long', 'biceps_short'].includes(target);
-  if (injury === 'shoulder' || injury === 'shoulder_stab') return target === 'shoulder_stab';
-  return false;
+  const injuryRegions = new Set(armBodyRegionsForValue(injuryMuscle));
+  const targetRegions = new Set(armBodyRegionsForValue(targetMuscle));
+  return [...injuryRegions].some((region) => targetRegions.has(region));
 }
 
 export function findArmInjury(injuries: Array<{ muscle: string; volumePct?: number; weightPct?: number; repsCap?: number; exclude?: boolean }> | undefined, muscle: string): { muscle: string; volumePct?: number; weightPct?: number; repsCap?: number; exclude?: boolean } | undefined {
@@ -68,16 +66,12 @@ export function armInjuryRepsCap(injuries: Array<{ muscle: string; repsCap?: num
 }
 
 export function mobilityBlockReason(ex: { muscle?: string; substitutionGroup?: string; movementPattern?: string; name?: string }, restrictions: string[] | undefined): string | null {
-  const muscle = String(ex.muscle || '').toLowerCase();
-  const group = String(ex.substitutionGroup || '').toLowerCase();
-  const pattern = String(ex.movementPattern || '').toLowerCase();
-  const name = String(ex.name || '').toLowerCase();
-  const text = `${muscle} ${group} ${pattern} ${name}`;
-  const keys = new Set((restrictions || []).map((x) => normalizeArmInjuryKey(String(x))));
-  if (keys.has('wrist') && /wrist|pron|sup|ris|riser|thumb|grip|cup|contain/.test(text)) return 'wrist';
-  if (keys.has('forearm') && /wrist|pron|sup|ris|riser|thumb|grip|hammer|curl|reverse/.test(text)) return 'forearm';
-  if (keys.has('elbow') && /side|back_drag|hammer|biceps|curl/.test(text)) return 'elbow';
-  if (keys.has('shoulder') && /shoulder|плеч/.test(text)) return 'shoulder';
+  const keys = new Set((restrictions || []).map((x) => normalizeArmInjuryKey(String(x))).filter(Boolean));
+  const regions = new Set(armBodyRegionsForExercise(ex));
+  const priority: ArmBodyRegion[] = ['wrist', 'forearm', 'elbow', 'shoulder', 'hand'];
+  for (const region of priority) {
+    if (keys.has(region) && regions.has(region)) return region;
+  }
   return null;
 }
 
@@ -158,7 +152,7 @@ export function checkTendonGuard(plan: { weeks: Array<{ week: number; sessions: 
   for (const wk of plan.weeks) {
     let tendon = 0;
     for (const sess of wk.sessions) for (const ex of sess.exercises) {
-      if (['wrist_flexors','wrist_extensors','pronators','supinators','risers','thumb','ulnar_deviators','radial_deviators'].includes(ex.muscle)) tendon += ex.sets;
+      if (isArmTendonMuscle(ex.muscle)) tendon += ex.sets;
     }
     if (tendon > 22) warnings.push(`Н${wk.week}: tendon ${tendon} >22 — CRITICAL (кап 22, кап 18 warn)`);
     else if (tendon > 18) warnings.push(`Н${wk.week}: tendon ${tendon} >18 — warn (tendonCap 1.2×, beginner 12)`);

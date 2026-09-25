@@ -76,3 +76,45 @@ describe('Arm quality gates', () => {
     expect(container.textContent).toMatch(/Фазы|Объём/);
   });
 });
+
+describe('Arm PRO-7 readiness / return-to-load', () => {
+  it('карточка готовности и возврата есть в шаге качества', () => {
+    const container = goQuality();
+    expect(container.querySelector("[data-arm='pro7-card']"), 'pro7-card').not.toBeNull();
+    expect(container.querySelector("[data-arm='pro7-signals']"), 'pro7-signals').not.toBeNull();
+    expect(container.textContent).toMatch(/Готовность|Возврат к нагрузке/);
+    expect(container.textContent).toContain('не меняются автоматически');
+  });
+
+  it('высокая боль даёт стоп по готовности и фазе удержания', () => {
+    const container = goQuality();
+    const pain = container.querySelector("[aria-label='Боль локоть']") as HTMLInputElement;
+    expect(pain, 'pain input').not.toBeNull();
+    fireEvent.change(pain, { target: { value: '8' } });
+    const section = container.querySelector("[data-arm='pro7']")!;
+    expect(section.textContent).toMatch(/стоп/);
+    expect(section.textContent).toContain('до 0%');
+  });
+
+  it('безболевые дни + зелёные сигналы дают контролируемый возврат', () => {
+    const container = goQuality();
+    fireEvent.change(container.querySelector("[aria-label='Безболевых дней']") as HTMLInputElement, { target: { value: '30' } });
+    const section = container.querySelector("[data-arm='pro7']")!;
+    // 30 безболевых дней при зелёной готовности = фаза load, 100% плановой нагрузки
+    // (контракт движка arm-return-to-load, а не текст подписи).
+    expect(section.textContent).toContain('фаза «load»');
+    expect(section.textContent).toContain('можно до 100%');
+  });
+
+  it('рост числа безболевых дней двигает фазу назад (контроль → полная)', () => {
+    const container = goQuality();
+    const input = container.querySelector("[aria-label='Безболевых дней']") as HTMLInputElement;
+    const section = container.querySelector("[data-arm='pro7']")!;
+    fireEvent.change(input, { target: { value: '7' } });
+    expect(section.textContent).toContain('фаза «isometric»');
+    fireEvent.change(input, { target: { value: '14' } });
+    expect(section.textContent).toContain('фаза «build»');
+    fireEvent.change(input, { target: { value: '30' } });
+    expect(section.textContent).toContain('фаза «load»');
+  });
+});

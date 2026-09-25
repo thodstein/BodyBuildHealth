@@ -25,6 +25,47 @@ export * from './arm-export.engine';
 export * from './arm-annual';
 export * from './manual-draft-arm.engine';
 export * from './arm-waf.engine';
+export * from './arm-pro7.engine';
+export {
+  ARM_RULEBOOK_REGISTRY,
+  ARMLIFTING_USA_2026_SNAPSHOT,
+  WAF_2025_SNAPSHOT,
+  createRulebookRegistry,
+  getImplementProtocol,
+  getImplementProtocolFor,
+  getRulebookSnapshot,
+  getRulebookSnapshotFor,
+} from './arm-rulebook';
+export type {
+  ArmliftingAttemptMode,
+  ArmliftingAttemptPolicy,
+  ArmliftingMissConsequence,
+  ArmliftingUsaImplement,
+  ArmliftingUsaRuleset,
+  ArmliftingWeightOrder,
+  ArmSex,
+  ArmSide,
+  ImplementProtocol,
+  RulebookAuthority,
+  RulebookRegistry,
+  RulebookRules,
+  RulebookSchemaVersion,
+  RulebookScope,
+  RulebookSnapshot,
+  RulebookSource,
+  WafAgeRule,
+  WafBracketRules,
+  WafCategoryAgeBand,
+  WafCategoryRule,
+  WafParaStyle,
+  WafRuleset,
+  WafWeighInRules,
+  WafWeightClass,
+} from './arm-rulebook';
+export type { WafAgeGroup as RulebookWafAgeGroup, WafParaClass as RulebookWafParaClass } from './arm-rulebook';
+export * from './arm-rulebook-eligibility.engine';
+export * from './arm-rulebook-simulation.engine';
+export * from './arm-rulebook-registry.storage';
 export * from './arm-bilateral.engine';
 export * from './arm-supermatch.engine';
 export * from './arm-start-strap.engine';

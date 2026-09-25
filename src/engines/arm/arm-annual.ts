@@ -11,13 +11,14 @@ import { refreshArmPlanSnapshot } from './arm-plan-snapshot.engine';
 import { suggestCycleForMacroPhase } from './arm-cycle-selector.engine';
 import { ARM_PHASE_PRESETS, consentPreview } from './arm-pro5-ux.engine';
 import { superSeriesYear } from './arm-calendar.engine';
-import type { UserWeek } from '../user-program/user-program.types';
+import type { UserProgram, UserWeek } from '../user-program/user-program.types';
+import { createBlank } from '../user-program/program-store';
 
 export interface ArmAnnualBuildResult {
   blockKey: string;
   kind: 'ARM';
   weeks: UserWeek[];
-  program: null;
+  program: UserProgram;
   armPlan: ArmPlan | null;
   warnings: string[];
   taperApplied: boolean;
@@ -32,7 +33,7 @@ function stableHash(obj: any): string {
   return String(h);
 }
 
-function armPlanToUserWeeks(plan: ArmPlan): UserWeek[] {
+export function armPlanToUserWeeks(plan: ArmPlan): UserWeek[] {
   return plan.weeks.map((wk, idx) => ({
     week: idx + 1,
     phase: wk.phase === 'accumulation' ? 'accumulation' : wk.phase === 'intensification' ? 'intensification' : wk.phase === 'peaking' ? 'peaking' : 'deload',
@@ -91,8 +92,35 @@ function armPlanToUserWeeks(plan: ArmPlan): UserWeek[] {
   }));
 }
 
+export function armPlanToUserProgram(
+  plan: ArmPlan,
+  opts?: { title?: string; goal?: string; level?: string },
+): UserProgram {
+  const weeks = armPlanToUserWeeks(plan);
+  const program = createBlank('arm');
+  program.meta.title = opts?.title ?? 'Арм-план';
+  program.meta.goal = opts?.goal ?? 'strength';
+  program.meta.level = opts?.level ?? 'intermediate';
+  program.meta.weeks = weeks.length;
+  program.meta.daysPerWeek = weeks[0]?.sessions.length ?? program.meta.daysPerWeek;
+  if (program.arm) {
+    program.arm = {
+      ...program.arm,
+      weeks,
+      microcycleTemplate: {
+        daySlots: (weeks[0]?.sessions ?? []).map((session, index) => ({
+          day: index + 1,
+          label: session.name,
+          muscles: [],
+        })),
+      },
+    };
+  }
+  return program;
+}
+
 export function buildArmBlock(
-  block: { blockKey: string; weeks: number; phase: string; competitionId?: string; weightClass?: string },
+  block: { blockKey: string; weeks: number; phase: string; description?: string; competitionId?: string; weightClass?: string },
   config: Partial<ArmBuilderInput> & { taperWeeks?: number; taperEnabled?: boolean; competitionPriority?: 'A'|'B'|'C' },
   opts?: { level?: string },
 ): ArmAnnualBuildResult {
@@ -211,7 +239,11 @@ export function buildArmBlock(
     blockKey: block.blockKey,
     kind: 'ARM',
     weeks: weeksOut,
-    program: null,
+    program: armPlanToUserProgram(plan, {
+      title: `Блок: ${block.description ?? block.phase} (${weeks} нед)`,
+      goal: input.goal,
+      level: input.level,
+    }),
     armPlan: plan,
     warnings,
     taperApplied,
@@ -260,6 +292,38 @@ export function buildArmYearBlocks(
       ...cycleFields,
     };
   }) as ArmYearBlock[];
+}
+
+/**
+ * Превью-блоки серии → ArmMacrocycle для общего годового плана.
+ * Единый источник: тот же список блоков, что идёт в buildArmBlock, поэтому
+ * годовой план (annualPlanFromMacro) и превью не расходятся по фазам/неделям.
+ */
+export function armYearBlocksToMacro(
+  blocks: Array<{ weeks: number; phase: 'base' | 'strength' | 'peaking' | 'transition'; priority: 'A' | 'B' | 'C'; focus: string; blockKey: string }>,
+  totalWeeks?: number,
+): import('./arm-macrocycle.engine').ArmMacrocycle {
+  const phaseMap = { base: 'hypertrophy', strength: 'strength', peaking: 'peaking', transition: 'transition' } as const;
+  let offset = 0;
+  const macroBlocks = blocks.map(b => {
+    const blk = {
+      phase: phaseMap[b.phase] as 'hypertrophy' | 'strength' | 'peaking' | 'transition',
+      weeks: Math.max(1, Math.round(b.weeks || 1)),
+      weekOffset: offset,
+      description: `${b.focus} · приоритет ${b.priority}`,
+      competitionId: b.blockKey,
+      competitionPriority: b.priority,
+    } as any;
+    offset += blk.weeks;
+    return blk;
+  });
+  const total = Math.max(4, Math.min(52, totalWeeks ?? offset));
+  return {
+    type: 'arm',
+    blocks: macroBlocks,
+    totalWeeks: total,
+    rationale: [`Арм-макро ${total} нед: ${macroBlocks.map((b: any) => `${b.phase} ${b.weeks}н`).join(' → ')}`],
+  };
 }
 
 /**

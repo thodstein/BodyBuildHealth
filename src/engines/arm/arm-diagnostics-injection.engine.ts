@@ -13,6 +13,7 @@ import { doseForCauseV2, waveSetsFor, preventiveFor, roleLabel, shouldUseDoseV2 
 import type { ArmWeakCause } from './arm-weak-cause.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
 import { getArmExercises } from '../../core/exercise-catalog-arm';
+import { armTendonSetForExercises, canonicalizeArmMuscle, isArmTendonMuscle } from './arm-tendon-sets.engine';
 
 export interface ArmInjectionOpts {
   dayMap?: Record<string, string>; // weakPoint → sessionTag
@@ -219,9 +220,8 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
         if (sideSets >= 6) { skippedHumerus++; notes.push(`⊘ ${wp} → ${exId} humerus cap (нед ${wi + 1}: side ${sideSets}≥6 первые 4н)`); continue; }
       }
       // tendon budget check — только hard cap 26
-      let tendonSets = 0;
-      for (const sess of week.sessions) for (const ex of sess.exercises) if (['wrist_flexors','wrist_extensors','pronators','supinators','risers','thumb','ulnar_deviators','radial_deviators'].includes(ex.muscle)) tendonSets += ex.sets;
-      const isTendon = ['wrist_flexors','risers','pronators','supinators','thumb','ulnar_deviators','radial_deviators'].some(m => bio.weakMuscles.includes(m));
+      const tendonSets = armTendonSetForExercises(week.sessions.flatMap((sess: any) => sess.exercises || [])).totalSets;
+      const isTendon = Array.isArray(bio.weakMuscles) && bio.weakMuscles.some((m: string) => isArmTendonMuscle(m));
       if (isTendon && tendonSets + addSets > 26) {
         skippedBudget++; notes.push(`⊘ ${wp} → ${exId} tendon hard cap 26 (нед ${wi + 1}: сейчас ${tendonSets}+${addSets})`); continue;
       }
@@ -287,9 +287,11 @@ export function injectArmCorrections(plan: ArmPlan, weakPoints: ArmWeakPoint[], 
       if (!week || (week as any).deload) continue;
       const vol: Record<string, any> = {};
       for (const sess of week.sessions) for (const ex of sess.exercises) {
-        if (!vol[ex.muscle]) vol[ex.muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0, fatigueWeightedSets: 0 };
-        vol[ex.muscle].directSets += ex.sets;
-        vol[ex.muscle].effectiveSets += ex.sets;
+        const muscle = canonicalizeArmMuscle(ex.muscle) || ex.muscle;
+        if (!vol[muscle]) vol[muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0, fatigueWeightedSets: 0 };
+        vol[muscle].directSets += ex.sets;
+        vol[muscle].effectiveSets += ex.sets;
+        if (isArmTendonMuscle(ex.muscle)) vol[muscle].tendonSets += ex.sets;
       }
       if (copy.weeklyVolume) copy.weeklyVolume[week.week] = vol;
     }

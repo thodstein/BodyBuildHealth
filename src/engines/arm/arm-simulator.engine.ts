@@ -11,6 +11,7 @@ import { doseForCause } from './arm-correction-dose.engine';
 import { doseForCauseV2, waveSetsFor, shouldUseDoseV2 } from './arm-correction-pro2.engine';
 import type { ArmWeakCause } from './arm-weak-cause.engine';
 import { estimateArmCorrectionWeight } from './arm-diagnostics-injection.engine';
+import { armTendonSetForExercises, isArmTendonMuscle } from './arm-tendon-sets.engine';
 
 export interface ArmSimDelta {
   addSets: number;
@@ -36,7 +37,6 @@ export interface ArmSimOpts {
 }
 
 const BUDGET_BY_LEVEL: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
-const TENDON_MUSCLES = ['wrist_flexors', 'wrist_extensors', 'pronators', 'supinators', 'risers', 'thumb', 'ulnar_deviators', 'radial_deviators'];
 
 /** П.3: те же кандидаты сессий, что инъекция (dayTags → мышца → первая; alt — остальные dayTags). */
 function sessionsFullForWeakPoint(week: any, dayTags: string[] | undefined, weakMuscles: string[] | undefined): boolean {
@@ -99,8 +99,8 @@ export function simulateArmInjection(
       else {
         // порядок гейтов 1-в-1 как инъекция: humerus → tendon → session
         const sideSets = week.sessions.reduce((a: number, s: any) => a + s.exercises.filter((e: any) => e.muscle === 'side_pressure').reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
-        const tendonSets = week.sessions.reduce((a: number, s: any) => a + s.exercises.filter((e: any) => TENDON_MUSCLES.includes(e.muscle)).reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
-        const isTendon = Array.isArray(bio?.weakMuscles) && bio.weakMuscles.some((m: string) => TENDON_MUSCLES.includes(m));
+        const tendonSets = armTendonSetForExercises(week.sessions.flatMap((s: any) => s.exercises || [])).totalSets;
+        const isTendon = Array.isArray(bio?.weakMuscles) && bio.weakMuscles.some((m: string) => isArmTendonMuscle(m));
         if ((point === 'side_mid' || point === 'side_pin') && week.week <= 4 && sideSets >= 6) blocked = `humerus cap: side ${sideSets}≥6`;
         else if (isTendon && tendonSets + wantSets > 26) blocked = `tendon cap 26: ${tendonSets}+${wantSets}`;
         else if (sessionsFullForWeakPoint(week, corr.dayTags, bio?.weakMuscles)) blocked = `сессии переполнены (8) — некуда вставить ${ex}`;

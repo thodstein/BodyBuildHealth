@@ -6,6 +6,7 @@
  */
 import type { MuscleVolumeLandmarks, TrainingLevel } from '../volume-landmarks.engine';
 import { normLevel } from '../volume-landmarks.engine';
+import { ARM_TENDON_MUSCLES as CANONICAL_TENDON_MUSCLES, isArmTendonMuscle } from './arm-tendon-sets.engine';
 
 export type { MuscleVolumeLandmarks, TrainingLevel };
 
@@ -97,17 +98,12 @@ export const ARM_VOLUME_LANDMARKS_DB: Record<TrainingLevel, Record<string, Muscl
   },
 };
 
-/** Сухожильные группы — tendonCap 1.2× vs muscle 1.7× (Helms 2022, Kemp 2024, Schoenfeld 2016). */
-export const TENDON_MUSCLES: ReadonlySet<string> = new Set([
-  'wrist_flexors','wrist_extensors','pronators','supinators','risers',
-  'ulnar_deviators','radial_deviators','thumb',
-]);
-
+export const TENDON_MUSCLES: ReadonlySet<string> = new Set(CANONICAL_TENDON_MUSCLES);
 export const TENDON_CAP = 1.2;
 export const MUSCLE_CAP = 1.7;
 
 export function isTendonMuscle(muscle: string): boolean {
-  return TENDON_MUSCLES.has(muscle);
+  return isArmTendonMuscle(muscle);
 }
 
 /** MRV с учётом tendonCap для сухожильных групп (PRO: отдельный бюджет). */

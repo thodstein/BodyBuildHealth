@@ -13,6 +13,7 @@ import { foreignPoolWarnings } from './arm-pro5-core.engine';
 import { armInjuryVolumeFactor, mobilityBlockReason } from './arm-injury-guard.engine';
 import { checkCocGates } from './arm-pro5-coc-gate.engine';
 import { deloadEnforcement } from './arm-pro5-ux.engine';
+import { armWorkSetsMismatches } from './arm-sets-integrity.engine';
 
 export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationResult {
   const lvl = level || plan.level || 'intermediate';
@@ -44,6 +45,7 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
   for (const line of (plan.safetyWarnings || [])) {
     if (/нет безопасного упражнения|исключено травмой|ограничен/.test(line) && !warnings.includes(line)) warnings.push(line);
   }
+  for (const line of armWorkSetsMismatches(plan)) errors.push(`workSets mismatch: ${line}`);
 
   for (const wk of plan.weeks) {
     // session cap
