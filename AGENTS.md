@@ -1,5 +1,15 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто: контракт методик замкнут — order-only parity + единый FST-7 гейт (Sep 25 2026, коммит `034fbce8`, без пуша)
+
+Продолжение аудита `docs/BB-AUTO-TAPER-PROFESSIONAL-AUDIT.md` (после `d93dc97d1`/`c370a4f7`): выбранные методики не должны быть NO-OP, а отчёт не должен врать о применении. Только Edit/Write + vitest/tsc; чужие WIP (arm/annual/LMS/manual/SSC) не тронуты; коммит строго pathspec (15 файлов); НЕ пушил.
+- **Order-only контракт**: `mountain_dog`/`fst7`/`hyperemia` — реально применяемый ПОРЯДОК во всех трёх путях (`bb-session-order.engine`); loading у них не выдумывается. Человекочитаемые подписи в `buildBBMethodologySummary`/`buildBBPlanReportText`; `methodologyApplied` в `BBPlan` (generic=true, faithful=false) + честная пометка «выбрана, но не применяется в faithful».
+- **Faithful не переписывает источник**: `SESSION_TIDY_RATIONALE` только в adapt; finalizer не выносит warmup вперёд при `preserveSource`/`reorder:false` (регрессия в `bb-faithful-exact`); order-проверка валидатора отключается при `methodologyApplied === false` (иначе faithful-план ловил ложные info).
+- **FST-7 7-in-1 — один канон во всех путях**: `cycleVolumeScheme`/`programVolumeScheme` считаются через `recommendPEDMethodology` (jointGuard + `insulinSafety.soloWithoutAasGh`) — тот же источник, что generic-гейт (без самодельных regex по peds). Faithful/не-enhanced/joint-guard/соло-инсулин → фактический `standard`; выбор юзера остаётся в `inputSnapshot.volumeScheme`, фактическая схема — в top-level и отчёте; `fst7Seven` проброшен в finalizer. Lock-тест паритета generic/cycle/program (AAS 500 → fst7 во всех; GH 4 → standard во всех).
+- **Metadata-честность**: cycle/program пересобирают `finalized.report` после поздних правок метаданных; `BbAutoConstructor` сохраняет план функциональным merge (калибровка весов больше не затирает `level`/`methodology`/`volumeScheme`/`inputSnapshot`); `bb-plans-store` мигрирует новые методы и санитизирует `intensityTechnique` по белому списку.
+- **Проверено**: полный `src/engines/bb` (`--pool=forks`) **2859 passed / 20 skipped / 0 failed (258 файлов)**; targeted (methodology/ped/faithful/audit/migration/validation/UI guards) зелёные; `npx tsc --noEmit` (12GB) **EXIT=0** — 0 ошибок по всему проекту; `git diff --check` чисто. Чужие WIP (arm/annual/LMS/manual/SSC/bridge) остались в worktree незастейдженными.
+- **Осознанные границы**: `mountain_dog`/`hyperemia` не получают отдельный loading-пакет (нет измеримого effect-контракта); FST-7 7-in-1 — только enhanced adapt без joint-guard/соло-инсулина; DUP остаётся отдельным overlay, не смешивается с order-only `methodology`.
+
 ## Питание: экстремальные КБЖУ — остатки A-2/E/G/I закрыты, план завершён (Sep 24 2026, 4 коммита pathspec, без пуша)
 
 По промту §8 `docs/NUTRITION-EXTREME-SCALE-PRO-PLAN.md` закрыты все остатки (A-2 no-insulin, E-carb-room, G-полный, I микро); план теперь **выполнен целиком** (A–J). Только Edit/Write + vitest/tsc; чужие WIP (OCR/APK/barcode/дневники) не тронуты; коммиты строго pathspec; НЕ пушил.
