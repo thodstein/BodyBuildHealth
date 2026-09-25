@@ -8,7 +8,6 @@ import {
   cardioLogStats, computeCardioAdvice, cardioWeekFact, estimateCardioEntryKcal,
   cardioPaceMinPerKm, validateCardioLogFields, clampCardioLogNumber,
   saveCardioWellness, loadCardioWellness, wellnessReadiness,
-  migrateCardioLogToIdb,
   type CardioLogEntry, type CardioLogFieldWarnings,
 } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
@@ -52,7 +51,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const [warnings, setWarnings] = useState<CardioLogFieldWarnings | null>(null);
   // Undo: снимок журнала до последней операции (добавление/обновление/удаление).
   const [undoPrev, setUndoPrev] = useState<CardioLogEntry[] | null>(null);
-  useEffect(() => { void migrateCardioLogToIdb(); }, []);
+  // P1-аудит: односторонний вызов migrateCardioLogToIdb() удалён вместе с
+  // IDB-зеркалом дневника (write-only зеркало без читателя; канон хранения —
+  // localStorage + синк cloud-kv).
   const [wellness, setWellness] = useState(() => {
     const w = loadCardioWellness().find(x => x.date === todayIso());
     return w ?? { sleep: 3, stress: 3, soreness: 3, mood: 3 };

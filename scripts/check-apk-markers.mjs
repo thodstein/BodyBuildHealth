@@ -115,6 +115,26 @@ mustContain('index.html', 'he_apk_theme_v1', 'boot theme key');
 mustContain('index.html', "html[data-boot-theme='light']", 'boot override');
 mustContain('index.html', 'hero-main.webp', 'webp preload');
 
+// 7b. Кардио-слой АПК на месте (молчаливый откат подсистемы).
+// Кардио-оформление построено на классах `.train-cardio*` (не data-хуков),
+// поэтому без этого гейда откат кардио-слоя проходил молча.
+for (const sel of [
+  '.train-cardioimport',
+  '.train-cardiodiary',
+  '.train-cardioparams',
+  '.train-cardiopreview',
+  '.train-cardiomanage',
+  '.train-cardiostats',  '.train-cardiolink',
+  '.train-cardiovol',
+  '.train-cardiocomps',
+  '.train-cardioday',
+  '.train-cardiotimer',
+]) mustContain('src/styles-native.css', `html.app-native ${sel}`, `cardio apk layer ${sel}`);
+// Блоки-предупреждения кардио (мед-гейт HIIT, заблок. интенсив, ошибка моста).
+for (const hook of ['hiit-block', 'week-intense-block', 'manage-program-error']) {
+  mustContain('src/styles-native.css', `[data-cardio="${hook}"]`, `cardio alert hook ${hook}`);
+}
+
 // 8. Секции native-слоя на месте (молчаливый откат хвоста файла).
 for (const sec of [
   '67. SUPPORT + SECONDARY HEADS',

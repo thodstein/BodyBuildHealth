@@ -114,6 +114,15 @@ export const CardioAutoTunePanel: React.FC<{
     if (res) bleDisconnectRef.current = res;
   };
 
+  // P1-аудит: BLE-подписка жила только до кнопки «отключить» — уход со
+  // шага/размонтирование оставляло датчик подключённым (утечка GATT +
+  // продолжающийся стрим ЧСС). Cleanup гасит подписку при уходе.
+  useEffect(() => () => {
+    const d = bleDisconnectRef.current;
+    bleDisconnectRef.current = null;
+    if (d) { try { d.disconnect(); } catch { /* уже отключён */ } }
+  }, []);
+
   // Факт-ЧСС против целевых зон плана (28 дней).
   const hrCheck = useMemo(() => {
     if (!cycle) return null;

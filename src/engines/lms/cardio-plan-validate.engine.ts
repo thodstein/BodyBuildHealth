@@ -56,6 +56,20 @@ export function validateCardioCycle(
   if (weeks.length === 0) {
     return { issues: [{ level: 'error', code: 'empty', text: 'Цикл без недель.' }], qualityScore: 0, valid: false };
   }
+  // P1-аудит: пустая рабочая неделя = не план. Раньше such week проходила
+  // молча (score 100/100 valid=true) — гейт daysAvailable теперь не даёт
+  // собрать 0, но старые/импортированные циклы ещё могут прийти пустыми.
+  {
+    const emptyWeeks = weeks.filter(w => !Array.isArray(w.sessions) || w.sessions.length === 0);
+    if (emptyWeeks.length > 0) {
+      const list = emptyWeeks.slice(0, 3).map(w => w.week).join(', ');
+      issues.push({
+        level: 'error',
+        code: 'empty_week',
+        text: `Нед ${list}${emptyWeeks.length > 3 ? '…' : ''} — без сессий (${emptyWeeks.length} из ${weeks.length}). Укажите дни/нед (минимум 1) и пересоберите.`,
+      });
+    }
+  }
   // Опубликованный шаблон (штамп config.templateId): острые недели —
   // авторские (план прошли тысячи атлетов), градируем advisory (max warn).
   // Наш синтез и ручные правки — строго (error). strict — строго для всех.

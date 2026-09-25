@@ -1,197 +1,196 @@
 /**
- * CardioImportPanel.tsx — импорт факта из GPX/TCX (B4).
- * Клиентский парсинг без бэка: длительность, дистанция, средний HR.
- * Сохраняет в he_cardio_sessions как zone2/miss/hiit/recovery на выбор.
+ * CardioImportPanel.tsx — импорт факта из файлов часов/приложений.
+ *
+ * P1-аудит: панель знала только GPX/TCX (собственные локальные парсеры),
+ * тогда как движок `parseCardioImport` умеет GPX/TCX/Apple Health XML/CSV/
+ * JSON/FIT/ZIP. Пользователь в конструкторе не мог загрузить export.zip
+ * с Apple Watch, хотя в дневнике профиля мог. Теперь — ОДИН вход
+ * (`parseCardioImport` + async-ветка для ZIP), локальные парсеры удалены.
+ *
+ * ZIP разбирается через `parseCardioZipAsync` (fflate async — не блокирует
+ * main thread на 50-Мегабайтном export.zip).
  */
 import React, { useState } from 'react';
-import { saveCardioLogEntry, estimateCardioEntryKcal } from '../../../engines/lms/cardio-diary.engine';
+import { saveCardioLogEntry, estimateCardioEntryKcal, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { parseCardioImport, parseCardioZipAsync } from '../../../engines/cardio-import.engine';
+import { todayLocalIso } from '../../../engines/lms/cardio-date-utils.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_CTA, BTN_SMALL, CHIP, CHIP_ACTIVE } from './CardioUI';
 import type { CardioType } from '../../../engines/lms/cardio.engine';
 
-function parseGpx(text: string): { durationMin: number; distanceKm: number | null; avgHr: number | null; dateIso: string | null } | null {
+/** Текстовые форматы: 5 МБ (защита от подвисания). ZIP (Apple export) — 60 МБ. */
+const TEXT_MAX = 5 * 1024 * 1024;
+const ZIP_MAX = 60 * 1024 * 1024;
+const ACCEPT = '.gpx,.tcx,.xml,.csv,.json,.fit,.zip';
+
+const FORMAT_LABEL: Record<string, string> = {
+  gpx: 'GPX', tcx: 'TCX', apple_health: 'Apple Health XML',
+  csv: 'CSV', json: 'JSON', fit: 'FIT', zip: 'ZIP', unknown: 'неизвестный',
+};
+
+function currentWeightKg(): number | undefined {
   try {
-    const timeMatches = [...text.matchAll(/<time>([^<]+)<\/time>/gi)].map(m => m[1]);
-    if (timeMatches.length >= 2) {
-      const start = new Date(timeMatches[0]);
-      const end = new Date(timeMatches[timeMatches.length - 1]);
-      const dur = Math.round((end.getTime() - start.getTime()) / 60000);
-      if (dur > 0 && dur < 600) {
-        // dist: sum haversine between trkpt (лимит точек — защита от OOM)
-        const pts = [...text.matchAll(/lat="([^"]+)"\s+lon="([^"]+)"/gi)].map(m => ({ lat: parseFloat(m[1]), lon: parseFloat(m[2]) }));
-        const MAX_PTS = 50000;
-        const usePts = pts.length > MAX_PTS ? pts.filter((_, i) => i % Math.ceil(pts.length / MAX_PTS) === 0) : pts;
-        let distM = 0;
-        for (let i = 1; i < usePts.length; i++) {
-          const R = 6371000;
-          const dLat = (usePts[i].lat - usePts[i - 1].lat) * Math.PI / 180;
-          const dLon = (usePts[i].lon - usePts[i - 1].lon) * Math.PI / 180;
-          const a = Math.sin(dLat / 2) ** 2 + Math.cos(usePts[i - 1].lat * Math.PI / 180) * Math.cos(usePts[i].lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-          distM += 2 * R * Math.asin(Math.sqrt(a));
-        }
-        const hrMatches = [...text.matchAll(/<gpxtpx:hr>(\d+)<\/gpxtpx:hr>/gi)].map(m => parseInt(m[1], 10)).filter(n => n > 30 && n < 220);
-        const avgHr = hrMatches.length > 0 ? Math.round(hrMatches.reduce((s, x) => s + x, 0) / hrMatches.length) : null;
-        const dateIso = timeMatches[0].slice(0, 10);
-        return { durationMin: dur, distanceKm: distM > 100 ? Math.round(distM / 100) / 10 : null, avgHr, dateIso };
-      }
-    }
-  } catch { /* ignore */ }
-  return null;
+    const weights = getWeightLog();
+    const sorted = Array.isArray(weights) ? [...weights].filter(e => Number.isFinite(e.weight)).sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
+    return sorted.length > 0 ? sorted[0].weight : undefined;
+  } catch { return undefined; }
 }
 
-function parseTcx(text: string): { durationMin: number; distanceKm: number | null; avgHr: number | null; dateIso: string | null } | null {
-  try {
-    const laps = [...text.matchAll(/<Lap[^>]*>([\s\S]*?)<\/Lap>/gi)];
-    let totalSec = 0;
-    let totalDist = 0;
-    const hrs: number[] = [];
-    let dateIso: string | null = null;
-    for (const lap of laps) {
-      const secM = lap[1].match(/<TotalTimeSeconds>([^<]+)<\/TotalTimeSeconds>/i);
-      if (secM) totalSec += parseFloat(secM[1]);
-      const distM = lap[1].match(/<DistanceMeters>([^<]+)<\/DistanceMeters>/i);
-      if (distM) totalDist += parseFloat(distM[1]);
-      const hrMs = [...lap[1].matchAll(/<HeartRateBpm>[\s\S]*?<Value>(\d+)<\/Value>/gi)].map(m => parseInt(m[1], 10)).filter(n => n > 30 && n < 220);
-      hrs.push(...hrMs);
-      if (!dateIso) {
-        const t = lap[1].match(/<Time>([^<]+)<\/Time>/i);
-        if (t) dateIso = t[1].slice(0, 10);
-      }
-    }
-    if (totalSec > 0) {
-      return { durationMin: Math.max(1, Math.round(totalSec / 60)), distanceKm: totalDist > 100 ? Math.round(totalDist / 100) / 10 : null, avgHr: hrs.length > 0 ? Math.round(hrs.reduce((s, x) => s + x, 0) / hrs.length) : null, dateIso };
-    }
-  } catch { /* ignore */ }
-  return null;
-}
+const newId = () => `c-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
 export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImported }) => {
   const [type, setType] = useState<CardioType>('zone2');
-  const [preview, setPreview] = useState<{ durationMin: number; distanceKm: number | null; avgHr: number | null; dateIso: string | null; fileName: string } | null>(null);
+  const [preview, setPreview] = useState<{ entries: CardioLogEntry[]; warnings: string[]; format: string; fileName: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
-  const [date, setDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
+  const [busy, setBusy] = useState(false);
+  const [date, setDate] = useState(() => todayLocalIso());
+
+  const say = (m: string, ms = 3500) => { setFlash(m); window.setTimeout(() => setFlash(null), ms); };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    // Лимит 5 МБ — защита от подвисания на битых/огромных файлах
-    if (f.size > 5 * 1024 * 1024) {
-      setFlash('⚠ Файл слишком большой (>5 МБ) — выберите файл до 5 МБ');
-      window.setTimeout(() => setFlash(null), 3500);
-      e.target.value = '';
+    e.target.value = '';
+    const lower = f.name.toLowerCase();
+    const isZip = lower.endsWith('.zip');
+    const isBinary = isZip || lower.endsWith('.fit');
+    if (f.size === 0) { say('⚠ Пустой файл', 3000); return; }
+    if (f.size > (isZip ? ZIP_MAX : TEXT_MAX)) {
+      say(`⚠ Файл слишком большой (>${isZip ? '60 МБ' : '5 МБ'}) — выберите файл поменьше`, 3500);
       return;
     }
-    if (f.size === 0) {
-      setFlash('⚠ Пустой файл');
-      window.setTimeout(() => setFlash(null), 3000);
-      e.target.value = '';
-      return;
-    }
-    let text: string;
+    setBusy(true);
     try {
-      text = await f.text();
-      // Снять BOM
-      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-      if (text.length > 10_000_000) {
-        setFlash('⚠ Файл слишком большой (>10М символов)');
-        window.setTimeout(() => setFlash(null), 3000);
-        e.target.value = '';
+      const result = isZip
+        ? await parseCardioZipAsync(await f.arrayBuffer())
+        : isBinary
+          ? parseCardioImport(f.name, await f.arrayBuffer())
+          : parseCardioImport(f.name, await f.text());
+      if (result.entries.length === 0) {
+        setPreview({ entries: [], warnings: result.warnings, format: result.format, fileName: f.name });
+        say(`⚠ Импорт не удался: ${result.warnings[0] ?? 'нет записей'}`, 4000);
         return;
       }
-    } catch {
-      setFlash('⚠ Не удалось прочитать файл — проверьте кодировку (UTF-8)');
-      window.setTimeout(() => setFlash(null), 3000);
-      e.target.value = '';
-      return;
+      setPreview({ ...result, fileName: f.name });
+      const km = result.entries.reduce((s, x) => s + (x.distanceKm ?? 0), 0);
+      say(`📥 ${f.name}: ${result.entries.length} тренировр${result.entries.length === 1 ? 'а' : 'ок(и)'} · ${FORMAT_LABEL[result.format] ?? result.format}${km > 0 ? ` · ${km.toFixed(1)} км` : ''} — проверьте превью`, 4000);
+    } catch (err) {
+      say(`⚠ Ошибка чтения файла: ${(err as Error).message}`, 4000);
+    } finally {
+      setBusy(false);
     }
-    const lower = f.name.toLowerCase();
-    let parsed = null;
-    if (lower.endsWith('.gpx')) parsed = parseGpx(text);
-    else if (lower.endsWith('.tcx')) parsed = parseTcx(text);
-    else {
-      parsed = parseGpx(text) ?? parseTcx(text);
-    }
-    if (!parsed) {
-      setFlash('⚠ Не удалось распарсить файл — проверьте формат GPX/TCX');
-      window.setTimeout(() => setFlash(null), 3000);
-      e.target.value = '';
-      return;
-    }
-    // Дополнительная валидация распарсенных значений
-    if (!Number.isFinite(parsed.durationMin) || parsed.durationMin <= 0) {
-      setFlash('⚠ Некорректная длительность в файле');
-      window.setTimeout(() => setFlash(null), 3000);
-      e.target.value = '';
-      return;
-    }
-    setPreview({ ...parsed, fileName: f.name });
-    if (parsed.dateIso) setDate(parsed.dateIso);
-    setFlash(`📥 ${f.name}: ${parsed.durationMin} мин${parsed.distanceKm ? ` · ${parsed.distanceKm} км` : ''}${parsed.avgHr ? ` · HR ${parsed.avgHr}` : ''}`);
-    window.setTimeout(() => setFlash(null), 3500);
-    e.target.value = '';
   };
 
-  const save = () => {
-    if (!preview) return;
-    let weight: number | null = null;
-    try {
-      const weights = getWeightLog();
-      const sorted = Array.isArray(weights) ? [...weights].filter(e => Number.isFinite(e.weight)).sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
-      if (sorted.length > 0) weight = sorted[0].weight;
-    } catch { /* ignore */ }
+  /** Одна сессия — с выбором типа и даты (прежний UX сохранён). */
+  const saveSingle = () => {
+    if (!preview || preview.entries.length !== 1) return;
+    const src = preview.entries[0];
     saveCardioLogEntry({
-      id: 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
+      id: newId(),
       date,
       type,
-      durationMin: preview.durationMin,
+      durationMin: src.durationMin,
       completed: true,
-      avgHr: preview.avgHr ?? undefined,
-      calories: estimateCardioEntryKcal(type, preview.durationMin, weight ?? undefined),
-      distanceKm: preview.distanceKm ?? undefined,
+      avgHr: src.avgHr ?? undefined,
+      calories: estimateCardioEntryKcal(type, src.durationMin, currentWeightKg()),
+      distanceKm: src.distanceKm ?? undefined,
+      rpe: src.rpe ?? undefined,
       notes: `импорт ${preview.fileName}`,
     });
-    setFlash('💾 Импортированная сессия сохранена в дневник');
+    setPreview(null);
+    say('💾 Импортированная сессия сохранена в дневник');
     onImported?.();
-    window.setTimeout(() => setFlash(null), 3000);
+  };
+
+  /** Несколько сессий — сохраняем как распознал движок (тип из активности). */
+  const saveAll = () => {
+    if (!preview || preview.entries.length < 2) return;
+    for (const src of preview.entries) {
+      saveCardioLogEntry({
+        id: newId(),
+        date: src.date,
+        type: src.type,
+        durationMin: src.durationMin,
+        completed: src.completed !== false,
+        avgHr: src.avgHr ?? undefined,
+        calories: src.calories ?? estimateCardioEntryKcal(src.type, src.durationMin, currentWeightKg()),
+        distanceKm: src.distanceKm ?? undefined,
+        rpe: src.rpe ?? undefined,
+        notes: `импорт ${preview.fileName}`,
+      });
+    }
+    say(`✅ Импортировано ${preview.entries.length} тренировок`, 3000);
+    setPreview(null);
+    onImported?.();
   };
 
   const stravaSync = () => {
-    setFlash('🔜 Strava/Garmin OAuth — скоро (supabase/functions/strava-sync по паттерну retail-search). Пока — файл GPX/TCX.');
-    window.setTimeout(() => setFlash(null), 4000);
+    say('🔜 Strava/Garmin OAuth — скоро (supabase/functions/strava-sync по паттерну retail-search). Пока — файл GPX/TCX/CSV/ZIP.', 4000);
   };
+
+  const single = preview?.entries.length === 1 ? preview.entries[0] : null;
+
   return (
     <div className="train-cardioimport" style={CARD}>
       <div style={ROW}>
         <span style={{ ...LABEL, fontSize: 12.5 }}>📥 Импорт GPX/TCX</span>
-        <span style={HINT_SM}>часы / Strava → факт в дневник</span>
+        <span style={HINT_SM}>GPX · TCX · Apple export.zip · CSV · JSON · FIT → факт в дневник</span>
         <button style={{ ...BTN_SMALL, marginLeft: 'auto' }} onClick={stravaSync} title="Скоро: OAuth Strava/Garmin">🔗 Strava sync (скоро)</button>
       </div>
       {flash && <div style={{ fontSize: 11.5, fontWeight: 750, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.28)', borderLeft: '3px solid #00e68a', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="status">{flash}</div>}
       <div style={ROW}>
         <label style={{ ...BTN_SMALL, minHeight: 44, padding: '10px 14px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
           📂 Выбрать файл
-          <input type="file" accept=".gpx,.tcx,.xml" onChange={onFile} style={{ display: 'none' }} aria-label="Выбрать GPX/TCX файл" />
+          <input type="file" accept={ACCEPT} onChange={onFile} style={{ display: 'none' }} aria-label="Выбрать файл тренировок" />
         </label>
-        <span style={HINT_SM}>GPX (трэки) или TCX (Garmin). Парсинг локально, без сети.</span>
+        <span style={HINT_SM}>GPX · TCX · Apple export.zip · Apple XML · CSV · JSON · FIT. Парсинг локально, без сети.</span>
       </div>
-      {preview && (
+      {busy && <div style={HINT_SM} role="status">⏳ Разбираем файл…</div>}
+      {preview && preview.entries.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.26)', borderLeft: '3px solid #60a5fa', borderRadius: 11, padding: 12 }}>
           <div style={{ fontSize: 12, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
-            Предпросмотр: <b>{preview.durationMin} мин</b>{preview.distanceKm != null ? ` · ${preview.distanceKm} км` : ''}{preview.avgHr != null ? ` · HR ${preview.avgHr}` : ''} · {preview.fileName}
+            Предпросмотр: <b>{preview.entries.length}</b> · {FORMAT_LABEL[preview.format] ?? preview.format} · {preview.fileName}
           </div>
-          <div style={ROW}>
-            <span style={LABEL}>Тип</span>
-            {(['zone2', 'miss', 'hiit', 'recovery'] as CardioType[]).map(t => (
-              <button key={t} style={type === t ? CHIP_ACTIVE : CHIP} onClick={() => setType(t)} aria-pressed={type === t}>{t.toUpperCase()}</button>
-            ))}
-          </div>
-          <div style={ROW}>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, outline: 'none' }} aria-label="Дата импорта" />
-            <button style={{ ...BTN_CTA, minHeight: 48 }} onClick={save}>💾 Сохранить как {type.toUpperCase()}</button>
-          </div>
+          {preview.warnings.length > 0 && (
+            <div style={{ fontSize: 11, color: '#fbbf24', lineHeight: 1.5 }}>
+              {preview.warnings.slice(0, 3).join(' · ')}
+            </div>
+          )}
+          {single ? (
+            <>
+              <div style={{ fontSize: 12, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
+                <b>{single.durationMin} мин</b>{single.distanceKm != null ? ` · ${single.distanceKm} км` : ''}{single.avgHr != null ? ` · HR ${single.avgHr}` : ''}
+              </div>
+              <div style={ROW}>
+                <span style={LABEL}>Тип</span>
+                {(['zone2', 'miss', 'hiit', 'recovery'] as CardioType[]).map(t => (
+                  <button key={t} style={type === t ? CHIP_ACTIVE : CHIP} onClick={() => setType(t)} aria-pressed={type === t}>{t.toUpperCase()}</button>
+                ))}
+              </div>
+              <div style={ROW}>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 11, padding: '11px 13px', color: '#fff', fontSize: 16, minHeight: 48, outline: 'none' }} aria-label="Дата импорта" />
+                <button style={{ ...BTN_CTA, minHeight: 48 }} onClick={saveSingle}>💾 Сохранить как {type.toUpperCase()}</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {preview.entries.slice(0, 30).map((en, i) => (
+                  <div key={en.id ?? i} style={{ fontSize: 11.5, color: '#fff', display: 'flex', gap: 8, fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ opacity: 0.8, minWidth: 82 }}>{en.date}</span>
+                    <span style={{ minWidth: 52 }}>{en.type.toUpperCase()}</span>
+                    <span>{en.durationMin} мин</span>
+                    {en.distanceKm != null ? <span>{en.distanceKm} км</span> : null}
+                  </div>
+                ))}
+                {preview.entries.length > 30 && <div style={HINT_SM}>…и ещё {preview.entries.length - 30}</div>}
+              </div>
+              <div style={ROW}>
+                <button style={{ ...BTN_CTA, minHeight: 48 }} onClick={saveAll}>💾 Импортировать {preview.entries.length} записей</button>
+                <button style={BTN} onClick={() => setPreview(null)}>✕ Отмена</button>
+              </div>
+            </>
+          )}
         </div>
       )}
       <div style={HINT_SM}>После импорта проверьте дневник — данные появятся и в графике план vs факт, и в профильном дневнике.</div>

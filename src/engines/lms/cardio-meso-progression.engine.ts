@@ -54,12 +54,25 @@ export function cardioProgressionAdvice(prev: CardioCycle | null | undefined): s
  * (мин 10), ккал пересчитаны тем же движком, итоги недель/цикла и
  * rationale обновлены. Возвращает новый цикл (вход не мутируется).
  * No-op при mult ≤ 1 (тот же объект).
+ *
+ * P1-аудит: стартовый множитель НЕ применяется к неделям, чей объём
+ * задан не объёмом, а событием (deload/taper/peak/гонка) — иначе
+ * делод-неделя 48 мин раздувалась до 56, а гоночная неделя — до 23
+ * (×1.15 ПОСЛЕ каскада соревнований). Раньше это ломало смысл
+ * разгрузки. Рабочие недели масштабируются как раньше.
  */
 export function applyMesoMult(cycle: CardioCycle, mult: number): CardioCycle {
   if (!(mult > 1)) return cycle;
   const bw = cycleBodyWeight(cycle);
   const sex = cycle.config?.sex;
+  const raceWeeks = new Set(
+    cycle.weeks
+      .filter(w => w.sessions.some(s => /старт|race|гонка|соревнов|марафон|полумарафон/i.test(s.purpose ?? '')))
+      .map(w => w.week),
+  );
+  const skip = (w: CardioCycle['weeks'][number]) => !!w.deload || !!w.taper || w.phase === 'peak' || w.phase === 'transition' || raceWeeks.has(w.week);
   const weeks = cycle.weeks.map(w => {
+    if (skip(w)) return w;
     const sessions = w.sessions.map(s => {
       const next = { ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)) };
       return recalcSessionKcal(next, bw, sex);
@@ -71,10 +84,14 @@ export function applyMesoMult(cycle: CardioCycle, mult: number): CardioCycle {
       totalKcal: sessions.reduce((sum, x) => sum + x.kcalPerSession * x.weeklyFrequency, 0),
     };
   });
+  const scaled = weeks.filter(w => !skip(w)).length;
   return {
     ...cycle,
     weeks,
     totalKcal: weeks.reduce((sum, w) => sum + w.totalKcal, 0),
-    rationale: [...cycle.rationale, `🔗 Cross-meso: стартовый объём ×${mult} от прошлого цикла.`],
+    rationale: [
+      ...cycle.rationale,
+      `🔗 Cross-meso: стартовый объём ×${mult} от прошлого цикла (${scaled} рабочих нед.; делод/тапер/гонки не тронуты).`,
+    ],
   };
 }

@@ -14103,3 +14103,28 @@ html.app-native [data-widget="session-dock"] {
     font-size: 12px !important;
   }
 }
+/* === §CARDIO-ALERTS: блоки-предупреждения кардио (мед-гейт HIIT, заблок. интенсив, ошибка моста) === */
+html.app-native [data-cardio="hiit-block"],
+html.app-native [data-cardio="week-intense-block"],
+html.app-native [data-cardio="manage-program-error"] {
+  font-size: 12.5px !important;
+  line-height: 1.55 !important;
+  font-weight: 700 !important;
+  padding: 10px 12px !important;
+  border-radius: 12px !important;
+}
+/* Кнопки HIIT-секции: тач-норма 44px (в т.ч. когда секция заблокирована гейтом) */
+html.app-native [data-cardio="hiit-section"] button,
+html.app-native [data-cardio="add-hiit"],
+html.app-native [data-cardio="red-flag"],
+html.app-native [data-cardio="tid-switch"],
+html.app-native [data-cardio="durability"] {
+  min-height: 44px !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native [data-cardio="hiit-block"],
+  html.app-native [data-cardio="week-intense-block"],
+  html.app-native [data-cardio="manage-program-error"] {
+    transition: none !important;
+  }
+}

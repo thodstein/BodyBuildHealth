@@ -33,3 +33,18 @@ export function dayOfWeekIso(week: number, dow: number, referenceIso?: string): 
   const base = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() + (week - 1) * 7 + dow);
   return toLocalIso(base);
 }
+
+/** День недели ISO-даты: понедельник = 0 … воскресенье = 6.
+ *  P1-аудит: `new Date(iso).getDay()` парсит 10-символьную дату как UTC
+ *  и на машинах с отрицательным смещением отдаёт ПРЕДЫДУЩИЙ день недели
+ *  (сетка календаря уезжала на колонку). Канон — только локальный разбор. */
+export function weekdayMon0Iso(iso: string): number {
+  const d = parseLocalIso(iso);
+  return (d.getDay() + 6) % 7;
+}
+
+/** Локальная полночь по ISO-дате (для сортировок/сравнений «начало дня»). */
+export function localMidnight(iso: string): Date {
+  const d = parseLocalIso(iso);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}

@@ -12,7 +12,7 @@ import { btnBase, btnPrimary, chip, chipActive, diaryShell, header as diaryHeade
 import { DiaryHeader } from '../DiaryHeader';
 import { saveCsvApk, printHtmlApk } from '../../../../../core/apk-share';
 import {
-  loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
+  loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, replaceCardioLog,
   cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal, cardioPaceMinPerKm,
   validateCardioLogFields, cardioHrCompliance,
   type CardioLogEntry,
@@ -239,9 +239,11 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   };
 
   // Откат последнего изменения (добавление/обновление/удаление).
+  // P1-аудит: писали напрямую в localStorage, минуя IDB-зеркало дневника →
+  // два представления расходились. Теперь через движок (зеркало обновляется).
   const restoreUndo = () => {
     if (!undo) return;
-    try { localStorage.setItem('he_cardio_sessions', JSON.stringify(undo)); } catch { /* ignore */ }
+    replaceCardioLog(undo);
     setUndo(null);
     reload();
     flashMsg('↩ Изменение отменено');

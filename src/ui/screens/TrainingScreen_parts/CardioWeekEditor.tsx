@@ -8,7 +8,7 @@ import {
   spreadSessionsAcrossDays, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, kcalForCardio,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
-  cardioWeekForDate, cardioSafetyReport, cycleBodyWeight, cardioWeekLegConflicts,
+  cardioWeekForDate, cardioSafetyReport, cycleBodyWeight, cardioWeekLegConflicts, cardioHiitInjectGate,
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek,
 } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL } from './CardioUI';
@@ -102,6 +102,12 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
   const legDays = useMemo(() => new Set((cycle?.config?.legDays ?? []).filter(d => d >= 0 && d <= 6)), [cycle]);
   const legConflicts = useMemo(() => (cycle && week ? cardioWeekLegConflicts(cycle, week.week) : []), [cycle, week]);
 
+  /** P0-аудит: мед-гейт на ЛЮБУЮ ручную интенсив-сессию (добавление и смена типа). */
+  const hiitGate = useMemo(() => cardioHiitInjectGate(cycle), [cycle]);
+  const gateFlash = (type: CardioType) => {
+    flashMsg(`⛔ ${hiitGate.reason ?? 'HIIT запрещён мед-скринингом'} (${TYPE_LABEL[type]} не добавлен)`);
+  };
+
   const bw = cycle ? cycleBodyWeight(cycle) : 80;
 
   const scaleMinutes = (mult: number) => saveWeek(w => ({
@@ -109,22 +115,34 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
     sessions: w.sessions.map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)), kcalPerSession: kcalForCardio(s.type, Math.max(10, Math.round(s.durationMin * mult)), bw, s.equipment) })),
   }));
 
-  const updateSession = (idx: number, patch: Partial<CardioSession>) => saveWeek(w => ({
-    ...w,
-    sessions: w.sessions.map((s, i) => {
-      if (i !== idx) return s;
-      const next = { ...s, ...patch };
-      next.kcalPerSession = kcalForCardio(next.type, next.durationMin, bw, next.equipment);
-      return next;
-    }),
-  }));
+  const updateSession = (idx: number, patch: Partial<CardioSession>) => {
+    // P0-аудит: смена типа на интенсив — тоже под мед-гейтом.
+    const cur = week?.sessions?.[idx];
+    const nextType = patch.type ?? cur?.type;
+    if (cur && nextType && !hiitGate.allowed && (nextType === 'hiit' || nextType === 'miss') && cur.type !== nextType) {
+      gateFlash(nextType);
+      return;
+    }
+    saveWeek(w => ({
+      ...w,
+      sessions: w.sessions.map((s, i) => {
+        if (i !== idx) return s;
+        const next = { ...s, ...patch };
+        next.kcalPerSession = kcalForCardio(next.type, next.durationMin, bw, next.equipment);
+        return next;
+      }),
+    }));
+  };
 
   const removeSession = (idx: number) => saveWeek(w => ({ ...w, sessions: w.sessions.filter((_, i) => i !== idx) }));
 
-  const addSession = () => saveWeek(w => ({
-    ...w,
-    sessions: [...w.sessions, { type: newType, durationMin: 30, weeklyFrequency: 1, intensity: newType === 'hiit' ? 'high' : newType === 'recovery' ? 'low' : 'moderate', kcalPerSession: kcalForCardio(newType, 30, bw, undefined), purpose: 'Ручная сессия' }],
-  }));
+  const addSession = () => {
+    if (!hiitGate.allowed && (newType === 'hiit' || newType === 'miss')) { gateFlash(newType); return; }
+    saveWeek(w => ({
+      ...w,
+      sessions: [...w.sessions, { type: newType, durationMin: 30, weeklyFrequency: 1, intensity: newType === 'hiit' ? 'high' : newType === 'recovery' ? 'low' : 'moderate', kcalPerSession: kcalForCardio(newType, 30, bw, undefined), purpose: 'Ручная сессия' }],
+    }));
+  };
 
   if (!cycle || !week) return null;
 
@@ -203,11 +221,17 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
       {editSessions && (
         <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={HINT_SM}>Перетащите строку на день недели выше, или выберите день в селекте. DnD — быстрый перенос. Клавиатура: ←/→ перемещает день.</div>
+          {!hiitGate.allowed && (
+            <div role="status" data-cardio="week-intense-block"
+              style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.30)', borderLeft: '3px solid #f87171', color: '#fca5a5', fontSize: 12, fontWeight: 700, lineHeight: 1.5 }}>
+              ⛔ {hiitGate.reason} — HIIT/MISS недоступны (только Zone 2 / recovery).
+            </div>
+          )}
           {week.sessions.map((s, idx) => (
             <div key={idx} role="listitem" aria-grabbed={dragIdx === idx} tabIndex={0} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const cur = s.dayOfWeek ?? 0; const next = (cur + (e.key === 'ArrowLeft' ? -1 : 1) + 7) % 7; updateSession(idx, { dayOfWeek: next }); } }} style={{ ...ROW, opacity: dragIdx === idx ? 0.6 : 1, border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid transparent', borderRadius: 8, padding: '4px 0' }} draggable onTouchStart={() => setDragIdx(idx)} onTouchEnd={() => setDragIdx(null)} onDragStart={() => onDragStart(idx)} onDragEnd={() => setDragIdx(null)} title="Перетащите на день недели (мышь/touch) или используйте ←/→ для перемещения">
               <span style={{ cursor: 'grab', fontSize: 12, color: '#fff', padding: '0 4px', userSelect: 'none' }} aria-hidden>⋮⋮</span>
               <select value={s.type} onChange={e => updateSession(idx, { type: e.target.value as CardioType })} style={SEL} aria-label={`Тип сессии ${idx + 1}`}>
-                {TYPES.map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+                {TYPES.filter(t => hiitGate.allowed || s.type === t || (t !== 'hiit' && t !== 'miss')).map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
               </select>
               <select value={s.dayOfWeek != null ? String(s.dayOfWeek) : ''} onChange={e => updateSession(idx, { dayOfWeek: e.target.value === '' ? undefined : Number(e.target.value) })} style={SEL} aria-label={`День недели сессии ${idx + 1}`}>
                 <option value="">Авто</option>
@@ -227,7 +251,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
           ))}
           <div style={ROW}>
             <select value={newType} onChange={e => setNewType(e.target.value as CardioType)} style={SEL} aria-label="Тип новой сессии">
-              {TYPES.map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+              {TYPES.filter(t => hiitGate.allowed || (t !== 'hiit' && t !== 'miss')).map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
             </select>
             <button style={BTN_PRIMARY} onClick={addSession}>+ Добавить сессию</button>
           </div>

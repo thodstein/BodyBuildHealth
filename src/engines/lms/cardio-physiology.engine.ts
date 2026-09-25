@@ -4,6 +4,7 @@
  * cardio.engine.ts реэкспортирует их для обратной совместимости.
  */
 import type { CardioType, CardioCycle } from './cardio.engine';
+import { addDaysIso, toLocalIso } from './cardio-date-utils.engine';
 
 export interface HeartZone {
   zone: number;
@@ -201,11 +202,14 @@ export function sessionTrimpEstimate(type: CardioType, durationMin: number, avgH
   }
   return Math.round(durationMin * (CARDIO_TRIMP_FACTOR[type] ?? 2));
 }
-export function weeklyTrimp(sessions: { type: CardioType; durationMin: number; weeklyFrequency: number; avgHr?: number }[], restHr?: number, maxHr?: number, sex: 'male' | 'female' = 'male'): number {
+export function weeklyTrimp(sessions: { type: CardioType; durationMin: number; weeklyFrequency?: number; avgHr?: number }[], restHr?: number, maxHr?: number, sex: 'male' | 'female' = 'male'): number {
   let sum = 0;
   for (const s of sessions) {
     const per = sessionTrimpEstimate(s.type, s.durationMin, (s as unknown as Record<string, unknown>).avgHr as number | undefined, restHr, maxHr, sex);
-    sum += per * s.weeklyFrequency;
+    // P1-аудит: weeklyFrequency без дефолта давал `per * undefined` = NaN,
+    // и NaN расходился по всей серии CTL/ATL/TSB (панель аналитики «—»).
+    const freq = Number.isFinite(s.weeklyFrequency as number) ? Math.max(0, s.weeklyFrequency as number) : 1;
+    sum += per * freq;
   }
   return Math.round(sum);
 }
@@ -238,12 +242,14 @@ export function cardioAcwrEwma(dailyTrimp: { date: string; load: number }[], ref
   if (dailyTrimp.length === 0) return { ratio: 0, zone: 'undertrained', acute: 0, chronic: 0 };
   const sorted = [...dailyTrimp].sort((a, b) => a.date < b.date ? -1 : 1);
   const ref = referenceDate || sorted[sorted.length - 1].date;
-  const addDays = (d: string, n: number): string => { const dd = new Date(d); dd.setDate(dd.getDate() + n); return `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}-${String(dd.getDate()).padStart(2, '0')}`; };
+  // P1-аудит: был локальный `new Date(d)` → UTC-парс 10-символьной даты,
+  // при UTC+ окно острой/хронической нагрузки смещалось на сутки.
+  // Теперь единый канон cardio-date-utils.
   const ewma = (vals: number[], alpha: number): number => { if (vals.length === 0) return 0; let e = vals[0]; for (let i = 1; i < vals.length; i++) e = alpha * vals[i] + (1 - alpha) * e; return e; };
   const alphaA = 2 / (7 + 1), alphaC = 2 / (28 + 1);
   const acuteVals: number[] = [], chronicVals: number[] = [];
-  for (let i = 0; i < 7; i++) { const d = addDays(ref, -6 + i); const found = sorted.find(x => x.date === d); acuteVals.push(found ? found.load : 0); }
-  for (let i = 0; i < 28; i++) { const d = addDays(ref, -27 + i); const found = sorted.find(x => x.date === d); chronicVals.push(found ? found.load : 0); }
+  for (let i = 0; i < 7; i++) { const d = addDaysIso(ref, -6 + i); const found = sorted.find(x => x.date === d); acuteVals.push(found ? found.load : 0); }
+  for (let i = 0; i < 28; i++) { const d = addDaysIso(ref, -27 + i); const found = sorted.find(x => x.date === d); chronicVals.push(found ? found.load : 0); }
   const acute = ewma(acuteVals, alphaA);
   const chronic = ewma(chronicVals, alphaC);
   const ratio = chronic > 0 ? acute / chronic : (acute > 0 ? 2 : 0);
@@ -255,14 +261,8 @@ export function cardioAcwrEwma(dailyTrimp: { date: string; load: number }[], ref
 
 export interface CardioFactCtlPoint { date: string; ctl: number; atl: number; tsb: number; trimp: number }
 
-function toLocalIsoFromDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function addDaysLocal(iso: string, days: number): string {
-  const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
-  const nd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
-  return toLocalIsoFromDate(nd);
-}
+// P1-аудит: локальные копии toLocalIso/addDays удалены — единый канон
+// cardio-date-utils (три реализации дат в одном файле = источник UTC-регресса).
 
 /** TRIMP одной записи дневника (Banister если есть avgHr+rest/max, иначе фактор). */
 export function dailyTrimpFromLogEntry(
@@ -309,11 +309,11 @@ export function cardioFactCtlSeries(
   const restHr = opts.restHr;
   const maxHr = opts.maxHr;
   const sex = opts.sex ?? 'male';
-  const refIso = opts.referenceIso ?? toLocalIsoFromDate(new Date());
+  const refIso = opts.referenceIso ?? toLocalIso(new Date());
   const map = dailyTrimpMap(log, restHr, maxHr, sex);
   // диапазон: от min(log date, ref- days+1) до ref
   const days = Math.max(7, Math.min(365, Math.round(opts.days ?? 90)));
-  const startIso = addDaysLocal(refIso, -(days - 1));
+  const startIso = addDaysIso(refIso, -(days - 1));
   // находим самую раннюю дату лога не позже ref, но не раньше startIso
   const sortedDates = [...map.keys()].sort();
   const effectiveStart = sortedDates.length > 0 && sortedDates[0] < startIso ? sortedDates[0] : startIso;
@@ -332,7 +332,7 @@ export function cardioFactCtlSeries(
     const tsb = Math.round((ctl - atl) * 10) / 10;
     out.push({ date: cur, ctl: Math.round(ctl * 10) / 10, atl: Math.round(atl * 10) / 10, tsb, trimp });
     if (cur === refIso) break;
-    cur = addDaysLocal(cur, 1);
+    cur = addDaysIso(cur, 1);
     // защита от бесконечности
     if (out.length > 400) break;
   }

@@ -17,7 +17,7 @@ import {
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   bumpCardioZone2Volume,
   cardioProfileFactors, cardioNutritionNotes, CARDIO_VARIANT_LABELS,
-  latestFieldTestMetrics, kcalForCardio,
+  latestFieldTestMetrics, kcalForCardio, cardioHiitInjectGate,
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario, type CardioSession,
 } from '../../../engines/lms/cardio.engine';
 import { getCardioCycleTemplateById } from '../../../data/cardio-cycles/cardio-cycle-index';
@@ -461,9 +461,12 @@ export const CardioConstructor: React.FC = () => {
 
   const refreshActive = () => { setCycle(loadActiveCardioCycle()); reload(); };
 
-  /** HIIT-протокол → сессия в выбранную неделю активного цикла (снапшот для undo). */
+  /** HIIT-протокол → сессия в выбранную неделю активного цикла (снапшот для undo).
+   *  P0-аудит: мед-гейт обязателен — иначе кнопка ломала план при красных флагах. */
   const addHiitToCycle = (presetId: string, opts: { hrMax?: number; sixMinDistanceM?: number }, week = 1) => {
     if (!cycle) { flashMsg('⚠ Сначала соберите цикл'); return; }
+    const gate = cardioHiitInjectGate(cycle);
+    if (!gate.allowed) { flashMsg(`⛔ ${gate.reason ?? 'HIIT запрещён мед-скринингом'}`); return; }
     const preset = getCardioIntervalPreset(presetId);
     if (!preset) { flashMsg('⚠ Протокол не найден'); return; }
     try { saveCardioCycleVersion(cycle, `До HIIT «${preset.title}»`); } catch { /* ignore */ }
@@ -1019,8 +1022,14 @@ export const CardioConstructor: React.FC = () => {
     if (!same(stamped.paceTempoSec, parsePaceText(tempoPace) ?? undefined)) return true;
     if (!same(stamped.paceIntervalSec, parsePaceText(intervalPace) ?? undefined)) return true;
     if ((stamped.mesoOn === true) !== mesoOn) return true;
+    // P1-аудит: модель тапера/периодизации/формулы ЧСС и «суставы» тоже
+    // попадают в config — без них шаг 5 не показывал «параметры изменены».
+    if (cfg.taperModel != null && cfg.taperModel !== taperModel) return true;
+    if (cfg.periodizationModel != null && cfg.periodizationModel !== periodizationModel) return true;
+    if (cfg.maxHrFormula != null && cfg.maxHrFormula !== maxHrFormula) return true;
+    if (previewFactors.jointIssues !== undefined && !cfg.jointIssues) return true;
     return false;
-  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn, redFlags, tidSwitch, durabilityOn]);
+  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoOn, redFlags, tidSwitch, durabilityOn, taperModel, periodizationModel, maxHrFormula]);
 
   const resetParams = () => {
     setGoal('cut');
@@ -1154,6 +1163,9 @@ export const CardioConstructor: React.FC = () => {
     tidSwitchWeek: tidSwitch ? Math.max(2, Math.ceil(totalWeeks / 2)) : undefined,
     durabilitySession: durabilityOn || undefined,
   });
+
+  /** P0-аудит: мед-гейт для ручной HIIT-инъекции (единая точка движка). */
+  const hiitGate = useMemo(() => cardioHiitInjectGate(cycle), [cycle]);
 
   const stepLabels: Record<CardioStep, string> = {
     params: '1 Параметры', athlete: '2 Атлет', load: '3 Нагрузка', comps: '4 Старты',
@@ -1448,9 +1460,9 @@ export const CardioConstructor: React.FC = () => {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button style={BTN_GHOST} onClick={migrateFromPlan}>📦 Мигрировать недельный план</button>
           </div>
-          <CardioValidationCard cycle={cycle} beginner={level === 'beginner'} strict={strictValidate} onToggleStrict={() => setStrictValidate(v => !v)} onAddHiit={() => addHiitToCycle('sit-8x20', {}, 1)} />
+          <CardioValidationCard cycle={cycle} beginner={level === 'beginner'} strict={strictValidate} onToggleStrict={() => setStrictValidate(v => !v)} onAddHiit={hiitGate.allowed ? () => addHiitToCycle('sit-8x20', {}, 1) : undefined} />
           <CardioMesoRow advice={mesoInfo.advice} mult={mesoInfo.mult} on={mesoOn} onToggle={() => setMesoOn(v => !v)} />
-          <CardioHiitSection onAdd={addHiitToCycle} totalWeeks={cycle?.totalWeeks} disabled={!cycle} />
+          <CardioHiitSection onAdd={addHiitToCycle} totalWeeks={cycle?.totalWeeks} disabled={!cycle || !hiitGate.allowed} blockReason={hiitGate.reason} />
         </>
       )}
       {step === 'manage' && (

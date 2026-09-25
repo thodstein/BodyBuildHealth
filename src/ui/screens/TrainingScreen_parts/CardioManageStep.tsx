@@ -61,6 +61,7 @@ export const CardioManageStep: React.FC<{
   onApplyTemplate?: (templateId: string) => void;
 }> = ({ cycle, library, scenarios, link, macroLink, comparison, annualCardioMap, onBuildAnnualCardio, onClearAnnualCardio, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario, onApplyTaper, goal, level, daysAvailable, lowImpact, onApplyTemplate }) => {
   const [copyFlash, setCopyFlash] = useState(false);
+const [progFlash, setProgFlash] = useState<string | null>(null);
   const [nutriFlash, setNutriFlash] = useState(false);
   const [yearFlash, setYearFlash] = useState(false);
 
@@ -128,12 +129,19 @@ export const CardioManageStep: React.FC<{
 
   const sendToProgram = () => {
     if (!cycle) return;
+    // P1-аудит: был тихий `catch { }` — при сбое конвертации/моста кнопка
+    // выглядела как успех. Теперь — честная причина, без «фальшивого» флеша.
     try {
       const prog = cardioCycleToUserProgram(cycle);
       applyToPlanner({ kind: 'program', label: cycle.name, data: { program: prog } });
       setCopyFlash(true);
+      setProgFlash(null);
       window.setTimeout(() => setCopyFlash(false), 2500);
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn('[cardio] sendToProgram failed', err);
+      setProgFlash(`⚠ Не удалось отправить в конструктор: ${(err as Error)?.message || 'ошибка конвертации цикла'}`);
+      window.setTimeout(() => setProgFlash(null), 4000);
+    }
   };
 
   const downloadTcx = () => {
@@ -346,6 +354,7 @@ export const CardioManageStep: React.FC<{
               <SectionCard title="📦 В программу">
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>Откройте кардио как отдельную программу в ручном конструкторе</div>
                 <button style={{ ...BTN_CTA, alignSelf: 'flex-start' }} onClick={sendToProgram}>{copyFlash ? '✅ Отправлено' : '📦 Открыть как программу'}</button>
+                {progFlash && <div style={{ fontSize: 11.5, fontWeight: 750, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.28)', borderLeft: '3px solid #f59e0b', borderRadius: 10, padding: '8px 11px', lineHeight: 1.5 }} role="alert" data-cardio="manage-program-error">{progFlash}</div>}
               </SectionCard>
             </>
           )}

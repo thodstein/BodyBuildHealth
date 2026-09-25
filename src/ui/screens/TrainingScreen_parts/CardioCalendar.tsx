@@ -9,21 +9,12 @@ import {
   type CardioCycle, type CardioType, type CardioPhase,
 } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, BTN, BTN_SMALL, PHASE_COLOR, PHASE_BG, TYPE_COLOR } from './CardioUI';
+import { addDaysIso, toLocalIso, todayLocalIso as todayIso, weekdayMon0Iso } from '../../../engines/lms/cardio-date-utils.engine';
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Z2', hiit: 'HIIT', miss: 'MISS', recovery: 'Rec' };
 
-function toLocalIso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function addDaysIso(iso: string, days: number): string {
-  const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
-  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
-  return toLocalIso(t);
-}
-function todayIso(): string {
-  const d = new Date();
-  return toLocalIso(d);
-}
+// P1-аудит: локальные копии toLocalIso/addDaysIso/todayIso удалены —
+// единый канон cardio-date-utils (6 копий арифметики дат = источник UTC-регресса).
 
 export const CardioCalendar: React.FC<{ cycle: CardioCycle | null; defaultOpen?: boolean }> = ({ cycle, defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
@@ -48,7 +39,7 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null; defaultOpen?:
       const weekStartIso = addDaysIso(cycle.startDate!, (w.week - 1) * 7);
       for (let d = 0; d < 7; d++) {
         const dateIso = addDaysIso(weekStartIso, d);
-        const dayOfWeek = (new Date(dateIso).getDay() + 6) % 7;
+        const dayOfWeek = weekdayMon0Iso(dateIso);
         const sess = laid.filter(s => s.dayOfWeek === dayOfWeek);
         const isLeg = legDays.has(dayOfWeek);
         map.set(dateIso, { phase: w.phase, sessions: sess as never, isLegDay: isLeg, weekNo: w.week });

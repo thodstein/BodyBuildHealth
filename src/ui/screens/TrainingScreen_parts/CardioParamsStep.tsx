@@ -17,7 +17,7 @@ import { parsePaceText } from '../../../engines/lms/cardio-personal-zones.engine
 import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/cardio.engine';
 import {
   ROW, LABEL, HINT_SM, BTN_SMALL, CHIP, CHIP_ACTIVE, PHASE_COLOR, TYPE_COLOR,
-  SectionCard, StatTile, SectionNav, InfoBanner, Accordion, Badge, HeroCard,
+  SectionCard, StatTile, SectionNav, InfoBanner, Accordion, Badge,
   NumberInput, Stepper, CARD_HERO,
 } from './CardioUI';
 

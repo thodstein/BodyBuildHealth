@@ -196,13 +196,16 @@ export interface CardioFinishOpts {
  */
 export function finishCardioCycle(cycle: CardioCycle, opts: CardioFinishOpts = {}): CardioCycle {
   let out = cycle;
+  // P1-аудит: cross-meso ПЕРЕД каскадом соревнований. Обратный порядок
+  // раздувал готовые taper/peak/гоночные недели стартовым множителем
+  // (×1.15 поверх уже срезанного объёма).
+  if (opts.mesoMult != null && opts.mesoMult > 1) {
+    try { out = applyMesoMult(out, opts.mesoMult); } catch { /* ignore */ }
+  }
   if (opts.taperEnabled !== false && opts.competitions && opts.competitions.length > 0) {
     try {
       out = applyCardioCompetitionCascade(out, opts.competitions.map(x => ({ week: x.week, priority: x.priority ?? 'B' })));
     } catch { /* ignore */ }
-  }
-  if (opts.mesoMult != null && opts.mesoMult > 1) {
-    try { out = applyMesoMult(out, opts.mesoMult); } catch { /* ignore */ }
   }
   try {
     out = applyPersonalTargetsToCycle(out, {

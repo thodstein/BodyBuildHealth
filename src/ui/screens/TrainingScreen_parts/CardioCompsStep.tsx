@@ -9,6 +9,7 @@ import { peakBlockHint, type CardioCompPriority } from '../../../engines/lms/car
 import { predictRaceTimes, predictorNote, RACE_WEEK_CHECKLIST } from '../../../engines/lms/cardio-race-predictor.engine';
 import { loadCardioRecords, bestCardioRecord, formatCardioTime } from '../../../engines/lms/cardio-records.engine';
 import { SectionCard, GroupHeading, HINT, HINT_SM, BTN_CTA, BTN_DANGER, NumberInput, InfoBanner, Badge, EmptyState } from './CardioUI';
+import { localMidnight, todayLocalIso } from '../../../engines/lms/cardio-date-utils.engine';
 
 export interface CompDraft { name: string; week: string; date?: string }
 
@@ -26,8 +27,10 @@ export const CardioCompsStep: React.FC<{
   const add = () => {
     let wNum = Number(draft.week);
     if (draft.date) {
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const d = new Date(draft.date); d.setHours(0, 0, 0, 0);
+      // P1-аудит: `new Date(iso)` парсит дату как UTC → на отрицательных
+      // смещениях сетка соревнований считалась от предыдущих суток.
+      const today = localMidnight(todayLocalIso());
+      const d = localMidnight(draft.date);
       const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
       wNum = Math.floor(diff / 7) + 1;
     }
@@ -112,8 +115,8 @@ export const CardioCompsStep: React.FC<{
             onChange={e => {
               const v = e.target.value;
               if (v) {
-                const today = new Date(); today.setHours(0, 0, 0, 0);
-                const d = new Date(v); d.setHours(0, 0, 0, 0);
+                const today = localMidnight(todayLocalIso());
+                const d = localMidnight(v);
                 const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
                 const w = Math.floor(diff / 7) + 1;
                 setDraft({ ...draft, date: v, week: String(Math.min(Math.max(1, w), totalWeeks)) });

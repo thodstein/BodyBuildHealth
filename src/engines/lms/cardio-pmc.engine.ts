@@ -8,6 +8,7 @@
  *   Здесь — lite-версия: поправка HR на длительность >60', жару и дегидратацию перед Banister TRIMP.
  * - TrainingPeaks: hrTSS, powerTSS = dur × (NP/FTP)² × 100/3600, rTSS по VDOT.
  */
+import { parseLocalIso, toLocalIso, addDaysIso } from './cardio-date-utils.engine';
 
 export interface DailyLoad {
   date: string; // YYYY-MM-DD
@@ -41,13 +42,10 @@ export function dailyPmcSeries(
   if (sorted.length === 0) return [];
   const ref = opts.referenceIso ?? sorted[sorted.length - 1];
   const days = Math.max(7, Math.min(365, Math.round(opts.days ?? 90)));
-  const parse = (s: string) => new Date(s.length === 10 ? s + 'T00:00:00' : s);
-  const toIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const addDays = (iso: string, n: number) => {
-    const d = parse(iso);
-    const nd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-    return toIso(nd);
-  };
+  // P1-аудит: локальные копии парсера/форматтера/сдвига дат → канон cardio-date-utils.
+  const parse = parseLocalIso;
+  const toIso = toLocalIso;
+  const addDays = addDaysIso;
   const start = addDays(ref, -(days - 1));
   let ctl = 0;
   let atl = 0;
@@ -141,7 +139,7 @@ export function driftCorrectedTss(
 export function tssRampRate(daily: DailyLoad[], referenceIso?: string): { acute: number; chronic: number; rampPct: number | null; warn: string | null } {
   if (!daily || daily.length === 0) return { acute: 0, chronic: 0, rampPct: null, warn: null };
   const ref = referenceIso ?? [...daily.map(d => d.date)].sort().pop()!;
-  const ms = (s: string) => new Date(s.length === 10 ? s + 'T00:00:00' : s).getTime();
+  const ms = (s: string) => parseLocalIso(s).getTime();
   const refMs = ms(ref);
   const sum = (from: number, to: number) => daily
     .filter(e => { const m = ms(e.date); return m >= refMs - from * 86400000 && (to > 0 ? m < refMs - to * 86400000 : m <= refMs); })

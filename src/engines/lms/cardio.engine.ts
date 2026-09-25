@@ -31,7 +31,7 @@ import {
   cardioFactCtlSeries,
   cardioHrDrift,
 } from './cardio-physiology.engine';
-import { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
+import { addDaysIso, todayLocalIso, toLocalIso, parseLocalIso } from './cardio-date-utils.engine';
 export { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
 export type { HeartZone, VdotResult, CardioCtlPoint, CardioFactCtlPoint } from './cardio-physiology.engine';
 // PRO-уровень: новые движки (эпики A/B/D/E/F/G) — реэкспорт для UI, без циклов (только типы внутрь).
@@ -615,7 +615,9 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   const totalWeeks = clamp(Math.round(input.totalWeeks ?? 12), 1, MAX_CYCLE_WEEKS);
   const bw = clamp(input.bodyWeight ?? 80, 30, 300);
   const ffmKg = typeof input.bodyFatPct === 'number' && input.bodyFatPct >= 3 && input.bodyFatPct <= 70 ? Math.round(bw * (1 - input.bodyFatPct / 100) * 10) / 10 : undefined;
-  const daysAvailable = clamp(Math.round(input.daysAvailable ?? 7), 0, 7);
+  // P1-аудит: floor 1 (было 0). При 0 capSessionsToDays съедал ВСЕ сессии,
+  // и валидатор отдавал score 100/100 valid=true на полностью пустом плане.
+  const daysAvailable = clamp(Math.round(input.daysAvailable ?? 7), 1, 7);
   const competitions = (input.competitions ?? []).filter(c => c.week >= 1 && c.week <= totalWeeks);
   const taperWeeks = clamp(Math.round(input.taperWeeks ?? 2), 1, 4);
   const peakWeek = input.peakWeek !== false;
@@ -782,7 +784,9 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
       totalWeeks: input.totalWeeks,
       bodyWeight: input.bodyWeight,
       bodyFatPct: input.bodyFatPct,
-      daysAvailable: input.daysAvailable,
+      // P1-аудит: в config пишем ФАКТИЧЕСКОЕ значение (после floor 1),
+      // иначе 0 из UI рассинхронизировался с собранным планом.
+      daysAvailable,
       recoveryLow: input.recoveryLow,
       competitions: input.competitions ? input.competitions.map(c => ({ ...c })) : undefined,
       phaseSplit: input.phaseSplit ? { ...input.phaseSplit } : undefined,
@@ -1037,7 +1041,8 @@ export function buildCardioCycleFromPrep(
   const prepVolumeMult = p.volumeMult && p.volumeMult > 0 && p.volumeMult < 1 ? p.volumeMult : 1;
   const bw = clamp(p.startingWeightKg > 0 ? p.startingWeightKg : 80, 30, 300);
   const ffmPrep = typeof (opts as { bodyFatPct?: number }).bodyFatPct === 'number' && (opts as { bodyFatPct?: number }).bodyFatPct! >= 3 && (opts as { bodyFatPct?: number }).bodyFatPct! <= 70 ? Math.round(bw * (1 - (opts as { bodyFatPct?: number }).bodyFatPct! / 100) * 10) / 10 : undefined;
-  const daysAvailable = clamp(Math.round(opts.daysAvailable ?? 7), 0, 7);
+  // P1-аудит: floor 1 — тот же контракт, что в buildCardioCycle (0 = пустой план).
+  const daysAvailable = clamp(Math.round(opts.daysAvailable ?? 7), 1, 7);
   const levelMult = CARDIO_LEVEL_MULT[opts.level ?? 'intermediate'];
   const lowImpact = !!opts.lowImpact || (!!opts.autoLowImpact && !!opts.jointIssues);
   const equipmentPool = (opts.equipment ?? []).filter(e => !lowImpact || CARDIO_EQUIPMENT_OPTIONS.find(o => o.id === e)?.impact === 'low');
@@ -1248,8 +1253,8 @@ export function menstrualPhaseForDate(
     return { cycleDay: 1, phase: 'follicular', note: 'Цикл не задан — без корректировок.' };
   }
   const length = clamp(Math.round(input.cycleLengthDays ?? 28), 21, 35);
-  const start = new Date(input.lastPeriodStartIso.length === 10 ? input.lastPeriodStartIso + 'T00:00:00' : input.lastPeriodStartIso);
-  const d = new Date(dateIso.length === 10 ? dateIso + 'T00:00:00' : dateIso);
+  const start = parseLocalIso(input.lastPeriodStartIso);
+  const d = parseLocalIso(dateIso);
   if (!Number.isFinite(start.getTime()) || !Number.isFinite(d.getTime())) {
     return { cycleDay: 1, phase: 'follicular', note: 'Дата цикла некорректна — без корректировок.' };
   }
@@ -2285,7 +2290,7 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
       const freq = Math.max(1, Math.round(s.weeklyFrequency));
       for (let k = 0; k < freq; k++) {
         const isoDate = s.dayOfWeek != null ? dayOfWeekIso(w.week, (s.dayOfWeek + k) % 7, ref) : (() => {
-          const base = new Date(baseDay.length === 10 ? baseDay + 'T00:00:00' : baseDay);
+          const base = parseLocalIso(baseDay);
           base.setDate(base.getDate() + k);
           return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`;
         })();
@@ -2418,7 +2423,7 @@ export interface CardioNextSession {
 
 /** Ближайшая запланированная сессия от даты (с учётом дня недели сессии). */
 export function cardioNextSession(cycle: CardioCycle, dateIso: string, referenceIso?: string): CardioNextSession | null {
-  const parseLocal = (v: string) => new Date(v.length === 10 ? v + 'T00:00:00' : v);
+  const parseLocal = parseLocalIso;
   const start = parseLocal(dateIso);
   if (!Number.isFinite(start.getTime())) return null;
   const maxDays = Math.min(cycle.totalWeeks * 7, 365);
@@ -2448,7 +2453,7 @@ export interface CardioRescheduleResult {
  * без сессии на дату или без свободного дня — цикл не меняется.
  */
 export function rescheduleCardioSession(cycle: CardioCycle, dateIso: string, opts: { referenceIso?: string } = {}): CardioRescheduleResult {
-  const parseLocal = (v: string) => new Date(v.length === 10 ? v + 'T00:00:00' : v);
+  const parseLocal = parseLocalIso;
   const ref = opts.referenceIso ?? cycle.startDate;
   const week = cardioWeekForDate(cycle, dateIso, ref);
   if (!week) return { cycle, changes: [] };
@@ -2746,7 +2751,7 @@ export function spreadSessionsAcrossDays(week: CardioWeek, referenceIso?: string
 
 /** Активная неделя цикла по локальной дате (неделя 1 = reference). */
 export function cardioWeekForDate(cycle: CardioCycle, dateIso: string, referenceIso?: string): CardioWeek | null {
-  const parseLocal = (v: string) => new Date(v.length === 10 ? v + 'T00:00:00' : v);
+  const parseLocal = parseLocalIso;
   const ref = referenceIso ? parseLocal(referenceIso) : (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); })();
   const target = parseLocal(dateIso);
   if (!Number.isFinite(target.getTime())) return null;
@@ -2763,7 +2768,7 @@ export interface CardioLegDayInfo {
 /** День недели (Пн=0) даты и является ли он днём тяжёлых ног цикла. */
 export function cardioLegDayForDate(cycle: CardioCycle | null, dateIso: string): CardioLegDayInfo | null {
   if (!cycle) return null;
-  const d = new Date(dateIso.length === 10 ? dateIso + 'T00:00:00' : dateIso);
+  const d = parseLocalIso(dateIso);
   if (!Number.isFinite(d.getTime())) return null;
   const dayOfWeek = (d.getDay() + 6) % 7;
   const leg = new Set((cycle.config?.legDays ?? []).filter(x => x >= 0 && x <= 6));
@@ -2774,7 +2779,7 @@ export function cardioLegDayForDate(cycle: CardioCycle | null, dateIso: string):
 export function cardioSessionsForDate(cycle: CardioCycle, dateIso: string, referenceIso?: string): { week: CardioWeek; sessions: CardioSession[] } | null {
   const week = cardioWeekForDate(cycle, dateIso, referenceIso);
   if (!week) return null;
-  const parseLocal = (v: string) => new Date(v.length === 10 ? v + 'T00:00:00' : v);
+  const parseLocal = parseLocalIso;
   const ref = referenceIso ? parseLocal(referenceIso) : (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); })();
   const target = parseLocal(dateIso);
   const dow = (target.getDay() + 6) % 7;
@@ -2821,7 +2826,7 @@ export function autoTuneCardioCycle(
   log: { date: string; durationMin: number; rpe?: number; completed: boolean }[],
   opts: { acwr?: number | null; referenceIso?: string } = {},
 ): CardioTuneResult {
-  const parseLocal = (v: string) => new Date(v.length === 10 ? v + 'T00:00:00' : v);
+  const parseLocal = parseLocalIso;
   const ref = opts.referenceIso ? parseLocal(opts.referenceIso) : new Date();
   const refIso = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}-${String(ref.getDate()).padStart(2, '0')}`;
   const currentWeek = cardioWeekForDate(cycle, refIso, cycle.startDate)?.week ?? cycle.totalWeeks;
@@ -3260,6 +3265,34 @@ export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: n
     ? { action: 'increase', reason: `Улучшение: ${changes.length} изменений (недели: ${[...new Set(changes.map(c => c.week))].join(', ')}).` }
     : { action: 'keep', reason: 'План уже соответствует рекомендациям качества.' };
   return { cycle: cycle2, changes, advice };
+}
+
+// ─── Гейт ручной HIIT-инъекции (аудит: UI обходил мед-блок) ───
+
+export interface CardioHiitInjectGate {
+  /** Можно ли добавлять HIIT в этот цикл. */
+  allowed: boolean;
+  /** Честная причина запрета (для плашки/тоста), null при разрешении. */
+  reason: string | null;
+}
+
+/**
+ * Единая точка мед-гейта для ЛЮБОГО ручного добавления HIIT/MISS
+ * (кнопка «+HIIT», карточка протоколов, импорт, WeekEditor).
+ *
+ * Раньше гейт жил только в `buildCardioCycle` (сборка) и в
+ * `improveCardioCycle` (авто-улучшение), а UI-инъекция
+ * (`CardioConstructor.addHiitToCycle`) его не проверяла — кнопка
+ * ломала план пользователю с красным флагом (`medical_block`).
+ * Теперь любой путь обязан спросить здесь.
+ */
+export function cardioHiitInjectGate(cycle: Pick<CardioCycle, 'config'> | null | undefined): CardioHiitInjectGate {
+  const cfg = cycle?.config as unknown as { redFlags?: string[]; age?: number } | undefined;
+  const screen = screenRedFlagsLocal(cfg?.redFlags, cfg?.age);
+  if (screen.blockHiit) {
+    return { allowed: false, reason: screen.doctorNote ?? 'Мед-скрининг: HIIT/MISS запрещены — только Z2/recovery до врача.' };
+  }
+  return { allowed: true, reason: null };
 }
 
 // ─── Протокол сессии (P1) ───
