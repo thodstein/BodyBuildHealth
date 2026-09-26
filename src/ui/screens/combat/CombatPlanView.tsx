@@ -11,6 +11,7 @@ import { AnnualCard } from './combat-annual-card';
 import { CampStrip } from './cb-camp-strip';
 import { CbCampCharts } from './cb-camp-charts';
 import { CbVariants } from './cb-variants';
+import { CbCampMeasurementsCard } from './cb-camp-measurements';
 import { cbExerciseName } from '../../../engines/combat/combat-builder.engine';
 import { combatMesocycleSummary } from '../../../engines/combat/combat-mesocycle';
 import type { DiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
@@ -252,6 +253,10 @@ export const CombatPlanView: React.FC<Props> = ({
 
       <CbCampCharts plan={shown} />
       <CbVariants plan={plan} onRestore={(p) => { setRestored(p); setExpandedWeek(0); doMsg('↩ Вариант показан'); }} onMsg={doMsg} />
+      <CbCampMeasurementsCard
+        plan={plan}
+        sleepHours={(((plan.inputSnapshot as any)?.sleepHours ?? null) as number | null)}
+      />
 
       {diaryLoad != null && (
         <InfoBanner tone={diaryLoad > 30 ? 'warn' : 'info'}>
