@@ -184,6 +184,25 @@ describe('E8.3 — сила хвата на экране', () => {
     expect(screen.getByText(/не гейт/)).toBeTruthy();
     expect(screen.getByText(/34330493/)).toBeTruthy();
   });
+
+  it('возраст пика на экране свой для каждого пола (26–33 / 25–33)', () => {
+    // Регресс: UI печатал одну константу на оба пола, и женщина видела мужской
+    // пик 26–33. Проверено мутацией — без этого теста регресс был зелёным.
+    const withSex = (sex: string) => {
+      const plan = mkPlan();
+      (plan as any).inputSnapshot = { ...(plan as any).inputSnapshot, sex };
+      return plan;
+    };
+
+    const m = render(<CbCampMeasurementsCard plan={withSex('male')} />);
+    expect(m.container.textContent).toContain('Ориентир P50 43.0 кг (пик 26–33 года)');
+    m.unmount();
+
+    const f = render(<CbCampMeasurementsCard plan={withSex('female')} />);
+    expect(f.container.textContent).toContain('Ориентир P50 26.0 кг (пик 25–33 года)');
+    // и НЕ показывается мужская полоса
+    expect(f.container.textContent).not.toContain('Ориентир P50 26.0 кг (пик 26–33 года)');
+  });
 });
 
 describe('E8.6 — RTP на экране', () => {

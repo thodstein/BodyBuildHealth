@@ -12,7 +12,7 @@ import {
   loadWeighIns, addWeighIn, removeWeighIn, weighTrajectory, cutDeviation,
   loadSparring, addSparring, removeSparring, sparringSummary, sparringJournalToLoad,
   leaScreen, sleepVerdict, heatProtocol,
-  loadGrip, addGrip, gripSummary, gripP50Ref, GRIP_P50_AGE,
+  loadGrip, addGrip, gripSummary, gripP50Ref,
   loadRtp, addRtp, rtpSummary, RTP_STAGES, RTP_STAGE_BY_ID, RTP_EARLY_AEROBIC_NOTE, RTP_SOURCE_IDS,
   loadTests, addTest, testBattery, COMBAT_TEST_BATTERY, COMBAT_TEST_BY_ID,
   readScreenManual, writeScreenManual, resolveScreenInputs, COMBAT_TESTS_KEY,
@@ -283,7 +283,7 @@ export const CbCampMeasurementsCard: React.FC<{
         <span data-cb="grip-source" style={{ fontSize: 11, color: '#fff' }}>Своя база: {gSum.source}</span>
         {gP50 ? (
           <div data-cb="grip-p50" style={{ fontSize: 12, color: '#fff' }}>
-            Ориентир P50 {gP50.kg.toFixed(1)} кг ({GRIP_P50_AGE}) — сравнение с общей популяцией, не гейт.
+            Ориентир P50 {gP50.kg.toFixed(1)} кг ({gP50.age}) — сравнение с общей популяцией, не гейт.
             {gSum.bestL !== null ? ` Ваш пик: ${(((gSum.bestL) / gP50.kg) * 100).toFixed(0)}% от P50.` : ''}
           </div>
         ) : null}

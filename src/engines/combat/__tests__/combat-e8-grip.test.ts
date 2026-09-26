@@ -7,7 +7,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   COMBAT_GRIP_KEY, COMBAT_GRIP_CAP, GRIP_ASYMMETRY_NOTICE_PCT, GRIP_SOURCE,
-  GRIP_P50_REF_MALE, GRIP_P50_REF_FEMALE, GRIP_P50_AGE, GRIP_P50_SOURCE, gripP50Ref,
+  GRIP_P50_REF_MALE, GRIP_P50_REF_FEMALE, GRIP_P50_AGE_MALE, GRIP_P50_AGE_FEMALE,
+  GRIP_P50_SOURCE, gripP50Ref,
   GripEntry, normalizeGrip, loadGrip, addGrip, removeGrip, gripSummary,
 } from '../combat-measurements.engine';
 
@@ -155,6 +156,23 @@ describe('E8.3.5 — ориентир P50 из публикации (не гей
     expect(GRIP_P50_REF_MALE).toBe(43.0);
     expect(GRIP_P50_REF_FEMALE).toBe(26.0);
     expect(GRIP_P50_SOURCE).toContain('34330493');
+  });
+
+  it('возраст пика РАЗНЫЙ у полов — как в самом источнике', () => {
+    // Абстракт: men peaked 26-33, females 25-33. Одна строка на оба пола
+    // показывала женщинам мужской пик (26–33 вместо 25–33).
+    expect(GRIP_P50_AGE_MALE).toBe('пик 26–33 года');
+    expect(GRIP_P50_AGE_FEMALE).toBe('пик 25–33 года');
+    expect(GRIP_P50_AGE_MALE).not.toBe(GRIP_P50_AGE_FEMALE);
+
+    expect(gripP50Ref('male')!.age).toBe(GRIP_P50_AGE_MALE);
+    expect(gripP50Ref('female')!.age).toBe(GRIP_P50_AGE_FEMALE);
+    expect(gripP50Ref('м')!.age).toBe(GRIP_P50_AGE_MALE);
+    expect(gripP50Ref('ж')!.age).toBe(GRIP_P50_AGE_FEMALE);
+
+    // источник не должен приписывать обоим полам мужской пик
+    expect(GRIP_P50_SOURCE).toContain('26–33');
+    expect(GRIP_P50_SOURCE).toContain('25–33');
   });
 
   it('подпись честно называет это ориентиром, а не нормой единоборств', () => {

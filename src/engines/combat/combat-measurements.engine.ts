@@ -329,14 +329,27 @@ function weekdayMon0(iso: string): number {
 
 export const GRIP_P50_REF_MALE = 43.0;
 export const GRIP_P50_REF_FEMALE = 26.0;
-export const GRIP_P50_AGE = 'пик 26–33 года';
+
+/**
+ * Возраст пика — РАЗНЫЙ у полов, и это прямо в абстракте источника:
+ * «In men, HGS peaked at 26-33 years (~43.0 kg in P50) … in females, where
+ * this value peaked at ages 25-33 (~26.0 kg in P50)» (PMID 34330493).
+ * Раньше здесь была одна строка «пик 26–33 года», из-за чего женщинам
+ * показывался мужской пик.
+ */
+export const GRIP_P50_AGE_MALE = 'пик 26–33 года';
+export const GRIP_P50_AGE_FEMALE = 'пик 25–33 года';
+
+/** @deprecated Держит ТОЛЬКО мужской пик — брать по полу, через `gripP50Ref().age`. */
+export const GRIP_P50_AGE = GRIP_P50_AGE_MALE;
+
 export const GRIP_P50_SOURCE =
-  'P50 общей популяции (Колумбия), n=3803, 6–64 года: мужчины ~43.0 кг, женщины ~26.0 кг на пике 26–33 года — PMID 34330493. Ориентир, не норма для единоборств';
+  'P50 общей популяции (Колумбия), n=3803, 6–64 года: мужчины ~43.0 кг (пик 26–33 года), женщины ~26.0 кг (пик 25–33 года) — PMID 34330493. Ориентир, не норма для единоборств';
 
 /** Ориентир P50 по полу. `null` — пол не внесён, сравнивать не с чем. */
-export function gripP50Ref(sex: string | null | undefined): { kg: number; source: string } | null {
-  if (sex === 'female' || sex === 'ж') return { kg: GRIP_P50_REF_FEMALE, source: GRIP_P50_SOURCE };
-  if (sex === 'male' || sex === 'м') return { kg: GRIP_P50_REF_MALE, source: GRIP_P50_SOURCE };
+export function gripP50Ref(sex: string | null | undefined): { kg: number; age: string; source: string } | null {
+  if (sex === 'female' || sex === 'ж') return { kg: GRIP_P50_REF_FEMALE, age: GRIP_P50_AGE_FEMALE, source: GRIP_P50_SOURCE };
+  if (sex === 'male' || sex === 'м') return { kg: GRIP_P50_REF_MALE, age: GRIP_P50_AGE_MALE, source: GRIP_P50_SOURCE };
   return null;
 }
 
