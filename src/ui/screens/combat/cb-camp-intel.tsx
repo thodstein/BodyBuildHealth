@@ -17,6 +17,13 @@ import { conditioningBudgetCost, conditioningNeedsAerobicMaintenance } from '../
 import { combatLoadStatus, combatHrvReportEwma, vbtVelocityForPct } from '../../../engines/combat/combat-monitoring.engine';
 import { vbtRecommendationCombat } from '../../../engines/combat/combat-vbt.engine';
 import { getNeckMeta, ufcNeckMatrixCategory } from '../../../engines/combat/combat-neck.engine';
+import {
+  cutRisk,
+  disciplineProfile,
+  fightEnergyProfile,
+  sessionRpeNote,
+  FIGHT_ENERGY_3X3,
+} from '../../../engines/combat/combat-science';
 
 const CORE_LABELS: Record<string, string> = {
   antiExt: 'антиэкс-тензия',
@@ -30,7 +37,9 @@ export const CbCampIntelCard: React.FC<{
   acwr?: { ratio: number; zone: string } | null;
   velocityLoss?: number | null;
   outsideSessions?: number;
-}> = ({ plan, acwr, velocityLoss, outsideSessions }) => {
+  /** Длительность поединка, мин. Нет в модели — берётся из снимка, если есть. */
+  fightMinutes?: number | null;
+}> = ({ plan, acwr, velocityLoss, outsideSessions, fightMinutes }) => {
   const rows = useMemo(() => {
     const out: { key: string; icon: string; title: string; tone: 'ok' | 'warn' | 'danger'; body: string; badge?: string }[] = [];
 
@@ -40,12 +49,18 @@ export const CbCampIntelCard: React.FC<{
     const wc = snap?.weightCutProtocol || null;
     const banner = weightCutSafetyBanner(wc ?? null, snap?.bodyweightKg, snap?.sex);
     if (wc || banner) {
+      const lossKg = (wc?.targetLossKg ?? snap?.weightCutKg ?? 0) as number;
+      const risk = cutRisk(lossKg, snap?.bodyweightKg ?? snap?.bodyweight, snap?.sex);
       out.push({
         key: 'wc',
         icon: '⚖️',
         title: 'Сгон веса',
-        tone: banner ? (banner.startsWith('⛔') || banner.includes('Same-day') ? 'danger' : 'warn') : 'ok',
-        body: banner || `Протокол собран: цель ${(wc?.targetLossKg ?? 0).toFixed(1)} кг · вода ${(wc?.waterCutL ?? 0).toFixed(1)} л · натрий ${wc?.sodiumCutG ?? 0} г`,
+        tone: banner ? (banner.startsWith('⛔') || banner.includes('Same-day') ? 'danger' : 'warn')
+          : risk.level === 'danger' ? 'danger' : risk.level === 'caution' ? 'warn' : 'ok',
+        body: banner || (wc
+          ? `Протокол собран: цель ${(wc?.targetLossKg ?? 0).toFixed(1)} кг · вода ${(wc?.waterCutL ?? 0).toFixed(1)} л · натрий ${wc?.sodiumCutG ?? 0} г`
+          : risk.note),
+        badge: risk.unsafe ? `${(risk.pct * 100).toFixed(1)}% · ${risk.source}` : undefined,
       });
     }
 
@@ -81,10 +96,34 @@ export const CbCampIntelCard: React.FC<{
       });
     }
 
-    // 4. Нагрузка — ACWR/HRV/VBT одной строкой от движка
+    // 4. Профиль поединка (E7) — энергосистемы по длительности + профиль дисциплины
+    //    Длительность поединка в модели пока нет, поэтому берём из снимка и честно
+    //    говорим, когда её не задали (вместо того, чтобы выдумать 3×3 по умолчанию).
+    {
+      const disc = disciplineProfile(`${snap?.discipline || ''} ${snap?.fightStyle || ''}`);
+      const mins = typeof fightMinutes === 'number' && fightMinutes > 0
+        ? fightMinutes
+        : (typeof snap?.fightMinutes === 'number' && snap.fightMinutes > 0 ? snap.fightMinutes : null);
+      const energy = mins ? fightEnergyProfile(mins) : FIGHT_ENERGY_3X3;
+      const energyText = mins
+        ? `Бой ${mins} мин: аэробная ${Math.round(energy.aerobic * 100)}% · АТФ-ФК ${Math.round(energy.alactic * 100)}% · гликолитическая ${Math.round(energy.glycolytic * 100)}% · ЧСС ${energy.hrPct}%`
+        : 'Длительность поединка не задана — профиль энергосистем посчитать нельзя. Внесите её в настройках боя.';
+      out.push({
+        key: 'fight',
+        icon: '🥊',
+        title: 'Профиль поединка',
+        tone: mins ? 'ok' : 'warn',
+        body: `${energyText} · ${disc.label}: ${disc.note}`,
+        badge: mins ? `${energy.source}` : 'нужна длительность',
+      });
+    }
+
+    // 5. Нагрузка — ACWR/HRV/VBT одной строкой от движка
     const loadNotes = combatLoadStatus(acwr as any, null, typeof velocityLoss === 'number' ? velocityLoss : null);
     const hrv = combatHrvReportEwma();
     if (hrv) loadNotes.push(`HRV (EWMA ${hrv.ewma}): ${hrv.note}`);
+    // RPE: через 10 минут достаточно — позже измерять не нужно (PMID 24570606)
+    loadNotes.push(sessionRpeNote(snap?.discipline));
     if (loadNotes.length) {
       out.push({
         key: 'load',
