@@ -20,7 +20,8 @@ describe('симулятор контеста: честность оценки',
   it('1) нет своего ПМ → 0 очков, noData, а не ratio от чужого максимума', () => {
     // Раньше yoke_walk без yokeWalk считался от farmersWalk/deadlift (или 180).
     const s = simulateContest({ events: [ev({ id: 'yoke_walk', weight: 300 })] } as any, { deadlift: 200 } as any);
-    expect(s).toBeNull(); // ни одного ивента с честной базой → прогноза нет
+    expect(s!.hasEstimate).toBe(false); // ни одного ивента с честной базой → прогноза нет
+    expect(s!.predictedPlace).toBe(0);  // и не «0 место из 10» в выдаче: surfaces ветвятся по hasEstimate
 
     const s2 = simulateContest(
       { events: [ev({ id: 'yoke_walk', weight: 300 }), ev({ id: 'log_press', weight: 100 })] } as any,
@@ -49,7 +50,8 @@ describe('симулятор контеста: честность оценки',
       { events: [ev({ id: 'truck_pull', weight: 5000, distanceM: 20 }), ev({ id: 'arm_over_arm', weight: 200, distanceM: 20 })] } as any,
       { deadlift: 250 } as any,
     );
-    expect(s).toBeNull(); // ни одного оцениваемого ивента
+    expect(s!.hasEstimate).toBe(false); // ни одного оцениваемого ивента
+    expect(s!.noData).toEqual(expect.arrayContaining(['truck_pull', 'arm_over_arm']));
     const s2 = simulateContest(
       { events: [ev({ id: 'truck_pull', weight: 5000, distanceM: 20 }), ev({ id: 'log_press', weight: 100 })] } as any,
       { logPress: 110 } as any,
@@ -103,10 +105,30 @@ describe('симулятор контеста: честность оценки',
     expect(fwd!.predictedPlace).toBe(again!.predictedPlace);
   });
 
-  it('5) неизвестные ивенты без данных → null (UI уже умеет null)', () => {
-    expect(simulateContest({ events: [ev({ id: 'duck_walk', weight: 100 })] } as any, { deadlift: 200 } as any)).toBeNull();
+  it('5a) нет контеста / пустые ивенты → null (тишина оправдана)', () => {
     expect(simulateContest({ events: [] } as any, {} as any)).toBeNull();
     expect(simulateContest(null, {} as any)).toBeNull();
+  });
+
+  it('5b) контест есть, данных нет → результам БЕЗ оценки + причина (не null, не «0 место»)', () => {
+    const s = simulateContest({ events: [ev({ id: 'duck_walk', weight: 100 })] } as any, { deadlift: 200 } as any);
+    expect(s).not.toBeNull();               // иначе блок молча исчезает: «нет данных» = «нет контеста»
+    expect(s!.hasEstimate).toBe(false);
+    expect(s!.predictedPlace).toBe(0);     // НЕ «9 место» и не выдуманное число
+    expect(s!.totalPoints).toBe(0);
+    expect(s!.noData).toEqual(['duck_walk']);
+    expect(s!.noDataNote).toContain('duck_walk');   // причина названа поимённо
+    expect(s!.weakEvents).toEqual([]);              // навязывать объём без базы нельзя
+  });
+
+  it('5c) частичные данные → hasEstimate=true + подсказка по недостающим', () => {
+    const s = simulateContest(
+      { events: [ev({ id: 'log_press', weight: 100 }), ev({ id: 'duck_walk', weight: 100 })] } as any,
+      { logPress: 100 } as any,
+    );
+    expect(s!.hasEstimate).toBe(true);
+    expect(s!.noData).toContain('duck_walk');
+    expect(s!.noDataNote).toContain('duck_walk');
   });
 
   it('6) unknown-ивенты НЕ попадают в «слабые» (иначе навязывается лишний объём)', () => {

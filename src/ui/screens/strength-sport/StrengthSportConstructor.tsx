@@ -1057,8 +1057,11 @@ export const StrengthSportConstructor: React.FC = () => {
                   </div>
                   {contestSim && (
                     <div style={{ background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.22)', borderRadius:10, padding:'8px 10px', display:'flex', flexDirection:'column', gap:4 }}>
-                      <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: {contestSim.totalPoints} pts → {contestSim.predictedPlace} место из 10</div>
+                      {contestSim.hasEstimate
+                        ? <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: {contestSim.totalPoints} pts → {contestSim.predictedPlace} место из 10</div>
+                        : <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: прогноза нет — не хватает данных по ивентам</div>}
                       {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них</div>}
+                      {!contestSim.hasEstimate && contestSim.noDataNote && <div style={{ fontSize:10, color:'#f59e0b' }}>{contestSim.noDataNote}</div>}
                       {contestSim.noData.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>⚠ Без честной базы (очки не начислены): {contestSim.noData.join(', ')} — задайте свой ПМ по этим ивентам</div>}
                       <div style={{ fontSize:10, color:'#f59e0b' }}>Оценено ивентов: {contestSim.events.filter(e=>e.hasData).length} из {contestSim.events.length}</div>
                     </div>
@@ -1119,8 +1122,11 @@ export const StrengthSportConstructor: React.FC = () => {
             {acwr && <InfoBanner tone={acwr.zone==='dangerous'?'warn': acwr.zone==='caution'?'warn':'info'}><Highlight color={acwr.zone==='dangerous'?'#ff3b30':acwr.zone==='caution'?'#ff9f0a':'#30d158'}>ACWR {acwr.ratio}</Highlight> · {ruLabel(ZONE_RU, acwr.zone)}</InfoBanner>}
             {contestSim && mode==='strongman' && (
               <div style={{ background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.22)', borderRadius:10, padding:'8px 10px', display:'flex', flexDirection:'column', gap:4 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: {contestSim.totalPoints} pts → прогноз {contestSim.predictedPlace} место из 10</div>
+                {contestSim.hasEstimate
+                  ? <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: {contestSim.totalPoints} pts → прогноз {contestSim.predictedPlace} место из 10</div>
+                  : <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>🏆 Симулятор: прогноза нет — не хватает данных по ивентам</div>}
                 {contestSim.weakEvents.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>Слабые: {contestSim.weakEvents.join(', ')} — объём ×1.15 на них</div>}
+                {!contestSim.hasEstimate && contestSim.noDataNote && <div style={{ fontSize:10, color:'#f59e0b' }}>{contestSim.noDataNote}</div>}
                 {contestSim.noData.length>0 && <div style={{ fontSize:10, color:'#f59e0b' }}>⚠ Без честной базы (очки не начислены): {contestSim.noData.join(', ')} — задайте свой ПМ по этим ивентам</div>}
                 <div style={{ fontSize:10, color:'#f59e0b' }}>Оценено ивентов: {contestSim.events.filter(e=>e.hasData).length} из {contestSim.events.length}</div>
               </div>

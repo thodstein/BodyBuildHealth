@@ -37,12 +37,17 @@ export interface ContestSimResult {
   events: ContestSimEvent[];
   totalPoints: number;
   avgPoints: number;
-  predictedPlace: number; // 1-10 (по ивентам с данными)
+  predictedPlace: number; // 1-10 (по ивентам с данными); 0 при hasEstimate=false
   weakEvents: string[];
   strongEvents: string[];
   /** Ивенты без честной базы оценки — их точки НЕ придуманы. */
   noData: string[];
   recOrder: string[]; // id в рекомендуемом порядке
+  /** true = прогноз посчитан; false = контест есть, но данных нет (см. noDataNote).
+   *  Поверхности обязаны ветвиться по нему, а не рисовать predictedPlace вслепую. */
+  hasEstimate: boolean;
+  /** Человекочитаемая причина отсутствия данных (по ивентам). */
+  noDataNote: string;
   rationale: string[];
 }
 
@@ -174,8 +179,19 @@ export function simulateContest(contest: StrongmanContest | null | undefined, wo
   });
 
   const scored = simEvents.filter(e => e.hasData);
-  // Нет ни одного ивента с честной базой — прогноз не выдумываем (было бы число из воздуха).
-  if (!scored.length) return null;
+  // Ни одного ивента с честной базой: прогноз НЕ выдумываем, но и не молчим —
+  // возвращаем результат без оценки (hasEstimate=false) с причиной по каждому ивенту.
+  // Иначе поверхности прячут блок целиком, и «нет данных» неотличимо от «нет контеста».
+  if (!scored.length) {
+    const noDataIds = simEvents.filter(e => !e.hasData).map(e => e.id);
+    const noDataNote = simEvents.map(e => e.noDataReason).filter(Boolean).join('; ');
+    return {
+      events: simEvents, totalPoints: 0, avgPoints: 0, predictedPlace: 0,
+      weakEvents: [], strongEvents: [], noData: noDataIds, recOrder: [...noDataIds],
+      hasEstimate: false, noDataNote,
+      rationale: [`⚠ Прогноз не вычислен — нет честной базы ни по одному ивенту. ${noDataNote}`],
+    };
+  }
 
   const totalPoints = scored.reduce((a, e) => a + e.points, 0);
   const avgPoints = Math.round(totalPoints / scored.length * 10) / 10;
@@ -211,7 +227,7 @@ export function simulateContest(contest: StrongmanContest | null | undefined, wo
   if (noData.length) rationale.push(`⚠ Без честной базы (очки не начислены): ${noData.join(', ')} — задайте свой ПМ по этим ивентам`);
   rationale.push(`Порядок fatigue 3%/ивент +2% после carry — recOrder: ${recOrder.join(' → ')}`);
   rationale.push(`Стратегия ${strategy} (×${strategyMult}) — ${totalPoints} pts по ${scored.length} ив. → прогноз ${predictedPlace} место из 10`);
-  return { events: simEvents, totalPoints, avgPoints, predictedPlace, weakEvents, strongEvents, noData, recOrder, rationale };
+  return { events: simEvents, totalPoints, avgPoints, predictedPlace, weakEvents, strongEvents, noData, recOrder, hasEstimate: true, noDataNote: noData.map(id => simEvents.find(e => e.id === id)?.noDataReason).filter(Boolean).join('; '), rationale };
 }
 
 export function recommendOrderForContest(contest: StrongmanContest, workMax: StrengthSportWorkMax): string[] {
