@@ -39,7 +39,6 @@ export interface ExerciseAdjustment {
   adjustedSets: number;
   originalRir: number;
   adjustedRir: number;
-  repRangeMod: number;
   substituted: boolean;
   substituteId?: string;
   rationale: string;
@@ -68,12 +67,20 @@ const PRI_THRESHOLDS = [
   { min: 85, max: 101, label: 'Отличное', volumeMod: 1.00, rirAdd: -0.5, skipTraining: false, desc: 'Полная интенсивность' },
 ];
 
+/** PRI = взвешенная готовность к тренировке. Входы нормализуются (мусор/NaN → нейтраль 0.5),
+ *  чтобы невалидные числа не давали оптимистичный фолбэк. Поля `nutrition`/`support` в формуле
+ *  НЕ участвуют (источника в профиле нет) — раньше хаб подставлял туда константу 80, создавая
+ *  иллюзию входа. Источники: KM 2016 (оригинал), веса — эвристика. */
 export function calculatePRI(readiness: ReadinessScores, doms: number, sleepQuality: number, stress: number): number {
-  const rec = readiness.recovery / 100;
-  const fat = (100 - readiness.fatigue) / 100;
-  const dom = Math.max(0, 1 - doms / 10);
-  const slp = sleepQuality / 10;
-  const str = Math.max(0, 1 - stress / 10);
+  const clamp = (v: unknown, max: number): number => {
+    if (typeof v !== 'number' || !Number.isFinite(v)) return max / 2; // нейтраль 0.5 — не «хорошо» и не «плохо»
+    return Math.max(0, Math.min(max, v));
+  };
+  const rec = clamp(readiness?.recovery, 100) / 100;
+  const fat = (100 - clamp(readiness?.fatigue, 100)) / 100;
+  const dom = Math.max(0, 1 - clamp(doms, 10) / 10);
+  const slp = clamp(sleepQuality, 10) / 10;
+  const str = Math.max(0, 1 - clamp(stress, 10) / 10);
 
   const pri = (rec * 0.30 + fat * 0.25 + dom * 0.20 + slp * 0.15 + str * 0.10) * 100;
   return Math.max(0, Math.min(100, Math.round(pri)));
@@ -137,6 +144,10 @@ export function autoregulate(input: AutoregulationInput): AutoregulationAdjustme
   }
 
   // Injury adjustments
+  // E12: штраф за травмы РЕАЛЬНО применяется к фактору. Раньше строка «Травмы −X%»
+  // попадала в breakdown, но в adjustmentFactor не входила — UI обещал снижение,
+  // которого не было («показывает ≠ применяется»).
+  let injuryMult = 1.0;
   if (input.injuries && input.injuries.length > 0) {
     const sevMap: Record<string, number> = { mild: 0.05, moderate: 0.15, severe: 0.25 };
     let injuryPenalty = 0;
@@ -144,20 +155,20 @@ export function autoregulate(input: AutoregulationInput): AutoregulationAdjustme
       injuryPenalty += sevMap[inj.severity || 'mild'] || 0.05;
     }
     injuryPenalty = Math.min(0.4, injuryPenalty);
+    injuryMult = 1 - injuryPenalty;
     breakdown.push({
       factor: 'Травмы',
       impact: Math.round(-injuryPenalty * 100),
-      rationale: `${input.injuries.length} травм → -${Math.round(injuryPenalty * 100)}%`,
+      rationale: `${input.injuries.length} травм → −${Math.round(injuryPenalty * 100)}% объёма`,
     });
   }
 
-  const adjustmentFactor = Math.max(0.3, Math.min(1.0, recImpact * loadMod * perfMod * techniqueMod));
+  const adjustmentFactor = Math.max(0.3, Math.min(1.0, recImpact * loadMod * perfMod * techniqueMod * injuryMult));
 
   const exerciseAdjustments: ExerciseAdjustment[] = [];
   for (const ex of input.plannedExercises) {
     let adjustedSets = Math.max(1, Math.round(ex.sets * adjustmentFactor));
     let adjustedRir = Math.max(0, Math.round(ex.rir + threshold.rirAdd));
-    let repRangeMod = 0;
 
     // Weak groups get volume priority
     if (ex.isWeakGroup) {
@@ -185,7 +196,6 @@ export function autoregulate(input: AutoregulationInput): AutoregulationAdjustme
       adjustedSets,
       originalRir: ex.rir,
       adjustedRir,
-      repRangeMod,
       substituted,
       substituteId,
       rationale,

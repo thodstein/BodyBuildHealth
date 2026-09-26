@@ -36,7 +36,9 @@ export interface BridgeCtx {
   dir: string;
   update: (patch: Partial<UserProgram>) => void;
   onChange: (p: UserProgram) => void;
-  showToast: (m: string) => void;
+  /** Тип необязательный: провайдеры с `(m: string) => void` остаются совместимы, а отказы
+   *  («ничего не применено») могут уйти с явным уровнем warning, а не только символом в тексте. */
+  showToast: (m: string, kind?: 'info' | 'success' | 'warning') => void;
   tprofile: TrainingProfile;
   recovery?: {
     bodyFat?: number;
@@ -65,10 +67,64 @@ const splitHandler: Handler = (payload, { program: p, dir, update, showToast }) 
   return undefined;
 };
 
+/** Сколько в ветке реальных (безымянных-пустышек не считаем) упражнений.
+ *  createBlank('pl') создаёт скелет с упражнениями без имени — «применять» к нему нечего,
+ *  и честный отказ лучше тоста «применено». */
+function namedPLExercises(weeks: NonNullable<PLProgramBody['customWeeks']> | undefined): number {
+  if (!weeks?.length) return 0;
+  let n = 0;
+  for (const w of weeks) for (const d of w.days ?? []) for (const e of d.exercises ?? []) {
+    if (typeof e?.name === 'string' && e.name.trim().length > 0) n++;
+  }
+  return n;
+}
+function namedBBBlocks(weeks: { sessions?: { blocks?: { exerciseName?: string }[] }[] }[] | undefined): number {
+  if (!weeks?.length) return 0;
+  let n = 0;
+  for (const w of weeks) for (const s of w.sessions ?? []) for (const b of s.blocks ?? []) {
+    if (typeof b?.exerciseName === 'string' && b.exerciseName.trim().length > 0) n++;
+  }
+  return n;
+}
+
+/** ПЛ-неделя: объём ×mult и сдвиг RIR. Вес в PL — это % от 1RM (PLSet.pct), поэтому
+ *  для делода режется именно pct, а не абсолютный вес. Возвращает 0, если менять нечего. */
+function applyPriToPLWeeks(
+  weeks: NonNullable<PLProgramBody['customWeeks']>,
+  mult: number,
+  rirShift: number,
+  opts?: { deload?: boolean },
+): { weeks: NonNullable<PLProgramBody['customWeeks']>; touched: number } {
+  let touched = 0;
+  const out = weeks.map(w => {
+    const days = (w.days ?? []).map(d => ({
+      ...d,
+      exercises: (d.exercises ?? []).map(e => ({
+        ...e,
+        sets: (e.sets ?? []).map(st => {
+          const count = opts?.deload
+            ? Math.max(1, Math.ceil((Number(st.sets) || 1) * 0.6))
+            : Math.max(1, Math.round((Number(st.sets) || 1) * mult));
+          if (count !== st.sets) touched++;
+          return {
+            ...st,
+            sets: count,
+            rir: clampRir(opts?.deload ? Math.max(st.rir ?? 2, 3) : (st.rir ?? 2) + rirShift),
+            pct: opts?.deload ? Math.round((Number(st.pct) || 0.6) * 0.6 * 100) / 100 : st.pct,
+          };
+        }),
+      })),
+    }));
+    return opts?.deload ? { ...w, phase: 'deload' as const, deload: true, days } : { ...w, days };
+  });
+  return { weeks: out, touched };
+}
+
 const priHandler: Handler = (payload, { program: p, update, showToast }) => {
   const mult = Math.max(0.25, Math.min(2, Number(payload.data.volumeMult ?? 1) || 1));
-  const rirShift: number = payload.data.rirShift ?? 0;
-  if (p.bb) {
+  const rirShift: number = Number.isFinite(Number(payload.data.rirShift)) ? Number(payload.data.rirShift) : 0;
+  const scopes: string[] = [];
+  if (p.bb && namedBBBlocks(p.bb.weeks) > 0) {
     const weeks = p.bb.weeks.map(w => ({
       ...w,
       sessions: w.sessions.map(s => ({
@@ -85,8 +141,20 @@ const priHandler: Handler = (payload, { program: p, update, showToast }) => {
       })),
     }));
     update({ bb: { ...p.bb, weeks } });
+    scopes.push('ББ');
   }
-  showToast('🔗 Готовность применена: ' + payload.label);
+  // P0-было: при program.pl обработчик молчал, но показывал успешный тост. Теперь ПЛ-недели
+  // пересчитываются по тому же правилу (в PL вес = % от 1RM, поэтому объём/RIR — по ним).
+  if (namedPLExercises(p.pl?.customWeeks) > 0) {
+    const { weeks } = applyPriToPLWeeks(p.pl!.customWeeks!, mult, rirShift);
+    update({ pl: { ...p.pl!, customWeeks: weeks } });
+    scopes.push('ПЛ');
+  }
+  if (scopes.length === 0) {
+    showToast('⚠ Коррекция не применена: в программе нет изменяемых тренировок (нужна собранная программа ББ или ПЛ с customWeeks).', 'warning');
+    return;
+  }
+  showToast('🔗 Готовность применена (' + scopes.join(' + ') + '): ' + payload.label);
 };
 
 /** ПЛ-упражнение каталога СРЦ → lift ручной программы (custom PL). */
@@ -425,32 +493,71 @@ const mrvHandler: Handler = (payload, { program: p, update, showToast }) => {
 };
 
 const deloadHandler: Handler = (payload, { program: p, update, showToast }) => {
-  if (!p.bb) return;
-  const deloadWeeks: number[] = payload.data.weeks ?? [];
-  const weeks = p.bb.weeks.map(w => {
-    if (!deloadWeeks.includes(w.week)) return w;
-    return {
-      ...w,
-      phase: 'deload' as const,
-      deload: true,
-      sessions: w.sessions.map(s => ({
-        ...s,
-        blocks: s.blocks.map(b => {
-          const sourceSets = b.sets ?? [];
-          const count = Math.max(1, Math.ceil(sourceSets.length * 0.6));
-          return {
-            ...b,
-            sets: Array.from({ length: count }, (_, index) => {
-              const st = sourceSets[index] ?? sourceSets[sourceSets.length - 1] ?? { reps: 8, rir: 2, weight: 0, restSec: 90 };
-              return { ...st, rir: 4, weight: st.weight ? Math.round(st.weight * 0.6) : st.weight };
-            }),
-          };
-        }),
-      })),
-    };
-  });
-  update({ bb: { ...p.bb, weeks } });
-  showToast('🔗 Делод-недели: ' + payload.label);
+  const deloadWeeks: number[] = Array.isArray(payload.data.weeks)
+    ? (payload.data.weeks as unknown[]).filter((n: unknown): n is number => typeof n === 'number')
+    : [];
+  const scopes: string[] = [];
+  const notes: string[] = [];
+  // E1-хвост: пустой `weeks[]` = конкретные недели не выбраны. Для ББ это НЕ «все недели»
+  // (делод всей программы — абсурд) и НЕ «тихий успех» (раньше update() вызывался, weeks
+  // возвращались без изменений, а тост радостно писал «(ББ)»). Теперь — честная пометка.
+  if (p.bb && namedBBBlocks(p.bb.weeks) > 0 && deloadWeeks.length === 0) {
+    notes.push('ББ: недели не выбраны (weeks=[]) — делод к ББ не применён');
+  }
+  if (p.bb && namedBBBlocks(p.bb.weeks) > 0 && deloadWeeks.length > 0) {
+    const weeks = p.bb.weeks.map(w => {
+      if (!deloadWeeks.includes(w.week)) return w;
+      return {
+        ...w,
+        phase: 'deload' as const,
+        deload: true,
+        sessions: w.sessions.map(s => ({
+          ...s,
+          blocks: s.blocks.map(b => {
+            const sourceSets = b.sets ?? [];
+            const count = Math.max(1, Math.ceil(sourceSets.length * 0.6));
+            return {
+              ...b,
+              sets: Array.from({ length: count }, (_, index) => {
+                const st = sourceSets[index] ?? sourceSets[sourceSets.length - 1] ?? { reps: 8, rir: 2, weight: 0, restSec: 90 };
+                return { ...st, rir: 4, weight: st.weight ? Math.round(st.weight * 0.6) : st.weight };
+              }),
+            };
+          }),
+        })),
+      };
+    });
+    const touched = weeks.filter((w, i) => w !== p.bb!.weeks[i]).length;
+    if (touched > 0) {
+      update({ bb: { ...p.bb, weeks } });
+      scopes.push('ББ');
+    } else {
+      notes.push('ББ: указанные недели не найдены в плане — делод к ББ не применён');
+    }
+  }
+  // P0-было: `if (!p.bb) return;` — для ПЛ-моста не было ни применения, ни ответа.
+  // Теперь: недели из weeks[] помечаются deload/срезаются по объёму и % от 1RM.
+  if (namedPLExercises(p.pl?.customWeeks) > 0) {
+    const src = p.pl!.customWeeks!;
+    const isTarget = (wk: number) => !deloadWeeks.length || deloadWeeks.includes(wk);
+    // P0-фикс: правим ровно те недели, которые отдаём в update (раньше deload-флаг терялся).
+    let touched = 0;
+    const weeks = src.map(w => {
+      if (!isTarget(w.week)) return w;
+      const r = applyPriToPLWeeks([w], 1, 0, { deload: true });
+      touched += r.touched;
+      return r.weeks[0];
+    });
+    if (touched > 0) {
+      update({ pl: { ...p.pl!, customWeeks: weeks } });
+      scopes.push('ПЛ');
+    }
+  }
+  if (scopes.length === 0) {
+    showToast('⚠ Делод не применён: ' + (notes.length ? notes.join('; ') : 'нет собранной программы. Соберите программу ББ или ПЛ с customWeeks — иначе менять нечего.'), 'warning');
+    return;
+  }
+  showToast('🔗 Делод-недели (' + scopes.join(' + ') + '): ' + payload.label + (notes.length ? ' · ' + notes.join('; ') : ''));
 };
 
 const volumeHandler: Handler = (payload, { program: p, update, showToast }) => {

@@ -119,3 +119,70 @@ describe('D1 персональная база в analyzeRecovery', () => {
     expect(noBase.hrvScore).toBeLessThan(60); // как раньше, без базы
   });
 });
+
+describe('E2 честное восстановление: суперкомпенсация, сон, санация', () => {
+  const hrvGood = { rmssd: 70, restingHR: 52, readinessScore: 80 };
+  const hrvBad = { rmssd: 28, restingHR: 74, readinessScore: 25 };
+  const sleepGood = { hours: 8, quality: 5 };
+  const sleepBad = { hours: 4.5, quality: 1 };
+
+  // ── P0: направление было инвертировано ──
+  // было: hours = (1.5 − (sleep+hrv)/200) × base → чем ХУЖЕ восстановление, тем ДЛИННЕЕ «окно»,
+  // и UI звал это «планируйте тяжёлую сессию в это окно».
+  it('хорошее восстановление → окно короче и флаг готов (было наоборот)', () => {
+    const good = analyzeRecovery({ sleep: sleepGood, hrv: hrvGood, fatigueScore: 0.3, trainingDaysThisWeek: 3, currentWeek: 2 });
+    const bad = analyzeRecovery({ sleep: sleepBad, hrv: hrvBad, fatigueScore: 0.3, trainingDaysThisWeek: 3, currentWeek: 2 });
+    expect(good.supercompensationHours).toBeLessThan(bad.supercompensationHours);
+    expect(good.supercompensationReady).toBe(true);
+    expect(good.supercompensationReason).toMatch(/достаточн/);
+  });
+
+  it('плохое восстановление → supercompensationReady=false с честной причиной', () => {
+    const bad = analyzeRecovery({ sleep: sleepBad, hrv: hrvBad, fatigueScore: 0.3, trainingDaysThisWeek: 3, currentWeek: 2 });
+    expect(bad.supercompensationReady).toBe(false);
+    expect(bad.supercompensationReason.length).toBeGreaterThan(10);
+  });
+
+  it('усталость растягивает окно, но не создаёт готовность', () => {
+    const calm = analyzeRecovery({ sleep: sleepGood, hrv: hrvGood, fatigueScore: 0.1, trainingDaysThisWeek: 2, currentWeek: 1 });
+    const tired = analyzeRecovery({ sleep: sleepGood, hrv: hrvGood, fatigueScore: 0.95, trainingDaysThisWeek: 6, currentWeek: 1 });
+    expect(tired.supercompensationHours).toBeGreaterThan(calm.supercompensationHours);
+  });
+
+  // ── сон: не выдумывать отсутствующие входы ──
+  it('scoreSleep не начисляет бонусы за несуществующие засыпание/пробуждения/времена', () => {
+    const withFake = analyzeRecovery({ sleep: { ...sleepGood, latencyMin: 5, awakenings: 0, bedtime: '23:00', wakeTime: '07:00' }, hrv: hrvGood, fatigueScore: 0.2, trainingDaysThisWeek: 3, currentWeek: 1 });
+    const without = analyzeRecovery({ sleep: sleepGood, hrv: hrvGood, fatigueScore: 0.2, trainingDaysThisWeek: 3, currentWeek: 1 });
+    // без «фантомных» данных сон не должен быть идеальным на 100
+    expect(without.sleepScore).toBeLessThan(withFake.sleepScore);
+    expect(without.sleepScore).toBeLessThan(100);
+  });
+
+  it('плохое качество сна (введено по шкале 0-10) не читается как «отличное»', () => {
+    const zeroBased = analyzeRecovery({ sleep: { hours: 7, quality: 9 }, hrv: hrvGood, fatigueScore: 0.2, trainingDaysThisWeek: 3, currentWeek: 1 });
+    const five = analyzeRecovery({ sleep: { hours: 7, quality: 5 }, hrv: hrvGood, fatigueScore: 0.2, trainingDaysThisWeek: 3, currentWeek: 1 });
+    // 9 из 10-балльной шкалы приводится к 4.5/5 — не «идеальный сон» и не хуже максимума
+    expect(zeroBased.sleepScore).toBeLessThanOrEqual(five.sleepScore);
+    expect(zeroBased.sleepScore).toBeGreaterThan(five.sleepScore - 5);
+  });
+
+  // ── мусорные входы ──
+  it('NaN/строки во входах нормализуются и помечаются inputsSanitized (было: тихие дефолты)', () => {
+    const out = analyzeRecovery({
+      sleep: { hours: NaN, quality: '4' as unknown as number },
+      hrv: { rmssd: NaN, restingHR: NaN, readinessScore: NaN },
+      fatigueScore: NaN, trainingDaysThisWeek: NaN, currentWeek: 0, periodizationPhase: 'accumulation',
+    });
+    expect(out.inputsSanitized).toBe(true);
+    expect(Number.isFinite(out.overallRecoveryIndex)).toBe(true);
+    expect(out.overallRecoveryIndex).toBeGreaterThanOrEqual(0);
+    expect(out.overallRecoveryIndex).toBeLessThanOrEqual(100);
+    expect(out.recommendations.join(' ')).toMatch(/некорректн/i);
+  });
+
+  it('currentWeek=0 не выдумывает «недельное правило делода» (хаб больше не шлёт week 4)', () => {
+    const noWeek = analyzeRecovery({ sleep: sleepGood, hrv: hrvGood, fatigueScore: 0.2, trainingDaysThisWeek: 4, currentWeek: 0 });
+    const week6 = analyzeRecovery({ sleep: sleepGood, hrv: hrvGood, fatigueScore: 0.2, trainingDaysThisWeek: 4, currentWeek: 6 });
+    expect(noWeek.supercompensationHours).toBe(week6.supercompensationHours);
+  });
+});

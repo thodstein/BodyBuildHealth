@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   acuteChronicRatio,
   toDailyLoads,
+  weeklyMonotony,
   trainingLoadReport,
   banisterForm,
   monotonyStreak,
   ACWR_DISCLAIMER,
   ACWR_ZONE_META,
+  ACWR_WINDOW_NOTE,
   ACWR_CHRONIC_FLOOR_DEFAULT,
   type DayLoad,
 } from '../training-load.engine';
@@ -105,11 +107,26 @@ describe('P1 честный ACWR', () => {
     expect(r.ratio).toBeGreaterThan(1);
   });
 
-  it('канон зон един: метки/цвета совпадают с хабом', () => {
-    expect(ACWR_ZONE_META.undertrained).toEqual({ label: 'Недотрен', color: '#3b82f6' });
-    expect(ACWR_ZONE_META.optimal).toEqual({ label: 'Оптимум', color: '#22c55e' });
-    expect(ACWR_ZONE_META.caution).toEqual({ label: 'Осторожно', color: '#eab308' });
-    expect(ACWR_ZONE_META.dangerous).toEqual({ label: 'Опасно', color: '#ef4444' });
+  it('канон зон един: метки/цвета совпадают с хабом + честный хинт у каждой зоны', () => {
+    // было→стало: у зон появился `hint` (короткое объяснение, что делать), поэтому strict toEqual
+    // на {label,color} заменён на проверку label/color + непустой hint.
+    const expectZone = (zone: keyof typeof ACWR_ZONE_META, label: string, color: string) => {
+      const m = ACWR_ZONE_META[zone] as { label: string; color: string; hint: string };
+      expect(m.label).toBe(label);
+      expect(m.color).toBe(color);
+      expect(typeof m.hint).toBe('string');
+      expect(m.hint.length).toBeGreaterThan(10);
+    };
+    expectZone('undertrained', 'Недотрен', '#3b82f6');
+    expectZone('optimal', 'Оптимум', '#22c55e');
+    expectZone('caution', 'Осторожно', '#eab308');
+    expectZone('dangerous', 'Опасно', '#ef4444');
+  });
+
+  it('ACWR_WINDOW_NOTE — оговорка про окно 0.8–1.3 и его неоднозначность', () => {
+    // тире в тексте типографское (–), поэтому матчим по классу тире
+    expect(ACWR_WINDOW_NOTE).toMatch(/0\.8[–-]1\.3/);
+    expect(ACWR_WINDOW_NOTE).toMatch(/эвристик|неоднозначн|спорн/i);
   });
 });
 
@@ -193,5 +210,74 @@ describe('D2 monotonyStreak — честные 2 недели подряд', () 
     expect(monotonyStreak(even, 3).sustainedHigh).toBe(true);
     const broken = [...flatWeek('2026-07-14'), ...flatWeek('2026-07-21'), ...variedWeek('2026-07-28')];
     expect(monotonyStreak(broken, 3).sustainedHigh).toBe(false);
+  });
+
+  // ── P0: идеально ровная неделя (SD=0) ──
+  // было: monotony = mean/0 → Infinity в UI, потом «починено» делением на 1 → monotony ровно 2,
+  // и monotonyStreak (>2) НЕ считал такую неделю однообразной. Неделя без единого дня отдыха —
+  // самое рискованное однообразие, а хаб показывал её как «норма» (UI-тест ловил именно это).
+  function perfectWeek(end: string, load = 500): DayLoad[] {
+    const out: DayLoad[] = [];
+    const e = new Date(end);
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(e);
+      d.setDate(d.getDate() - i);
+      out.push({ date: d.toISOString().slice(0, 10), load });
+    }
+    return out;
+  }
+
+  it('weeklyMonotony: ровная неделя помечается uniform (SD=0, monotony=2, не «норма»)', () => {
+    const m = weeklyMonotony(perfectWeek('2026-07-28'), '2026-07-28');
+    expect(m.stdev).toBe(0);
+    expect(m.uniform).toBe(true);
+    expect(m.monotony).toBe(2); // ровно 2 — и это провал, а не «норма»
+    expect(m.meanDailyLoad).toBe(500);
+    expect(m.weeklyLoad).toBe(3500);
+  });
+
+  it('рваная неделя uniform=false (признак не ловит вариативность)', () => {
+    expect(weeklyMonotony(variedWeek('2026-07-28'), '2026-07-28').uniform).toBe(false);
+  });
+
+  it('monotonyStreak: ровные недели дают sustainedHigh И uniformWeeks (было: false)', () => {
+    const one = monotonyStreak(perfectWeek('2026-07-28'), 2);
+    expect(one.sustainedHigh).toBe(false); // прошлой недели нет
+    expect(one.uniform).toBe(true);
+    expect(one.uniformWeeks).toBe(1);
+
+    const three = monotonyStreak([...perfectWeek('2026-07-14'), ...perfectWeek('2026-07-21'), ...perfectWeek('2026-07-28')], 3);
+    expect(three.sustainedHigh).toBe(true);
+    expect(three.uniformWeeks).toBe(3);
+  });
+
+  it('uniformWeeks обнуляется, как только появился разброс', () => {
+    const mixed = [...perfectWeek('2026-07-14'), ...perfectWeek('2026-07-21'), ...variedWeek('2026-07-28')];
+    expect(monotonyStreak(mixed, 3).uniformWeeks).toBe(0);
+  });
+
+  it('trainingLoadReport рекомендует действие по uniform, а не молчит (было: ratio вместо зоны)', () => {
+    // trainingLoadReport принимает СЕССИИ ({date, sRPE, durationMin}), а не DayLoad
+    // 28 дней данных, иначе хроника делится на 28 и ratio завышается разреженностью (это отдельный кейс lowBase)
+    const sessions: { date: string; sRPE: number; durationMin: number }[] = [];
+    for (const d of [...perfectWeek('2026-07-07'), ...perfectWeek('2026-07-14'), ...perfectWeek('2026-07-21'), ...perfectWeek('2026-07-28')]) {
+      sessions.push({ date: d.date, sRPE: 8, durationMin: 62.5 }); // 8×62.5 = 500 AU — идентично каждый день
+    }
+    const rep = trainingLoadReport(sessions, '2026-07-28');
+    expect(rep.monotony.uniform).toBe(true);
+    expect(rep.recommendations.join(' ')).toMatch(/SD=0/);
+    // зона ACWR в рекомендации — из канона и совпадает с фактом (500/500 = 1.0)
+    expect(rep.recommendations[0]).toContain('зона «Оптимум»');
+  });
+
+  it('toDailyLoads игнорирует мусорные даты (null/некорректная) — был риск NaN в окнах', () => {
+    const loads = toDailyLoads([
+      { date: '2026-07-26', sRPE: 7, durationMin: 60 },
+      { date: null as unknown as string, sRPE: 9, durationMin: 60 },
+      { date: 'не-дата', sRPE: 9, durationMin: 60 },
+      { date: '2026-07-27', sRPE: 7, durationMin: 60 },
+    ] as any, '2026-07-28');
+    expect(loads).toHaveLength(2);
+    expect(loads.every(d => Number.isFinite(d.load) && d.load > 0)).toBe(true);
   });
 });

@@ -36,7 +36,6 @@ export interface AutoRegOutput {
   volumeMultiplier: number;
   rirShift: number;
   deload: boolean;
-  intensityCap?: number;
   intensityNote?: string;        // рекомендация по интенсивности (силовая/восстановительная)
   adjustedTopSetPct?: number;
   adjustedRIR?: number;

@@ -7,7 +7,6 @@
 
 export interface TrainingSession { date: string; sRPE: number; durationMin: number; }
 export interface DayLoad { date: string; load: number; }        // нагрузка на день (AU)
-export interface WeeklyLoad { weekStart: string; load: number; days: number; }
 
 export type ACWRZone = 'undertrained' | 'optimal' | 'caution' | 'dangerous';
 export interface ACWRResult { acute: number; chronic: number; ratio: number; zone: ACWRZone; acuteDays: number; chronicDays: number; method: ACWRMethod; lowBase: boolean; }
@@ -20,14 +19,17 @@ export interface ACWROptions { method?: ACWRMethod; chronicFloor?: number; }
 export const ACWR_CHRONIC_FLOOR_DEFAULT = 100;
 /** Честный дисклеймер: ACWR — эвристика мониторинга, а не предсказание травмы. */
 export const ACWR_DISCLAIMER = 'ACWR — эвристика мониторинга нагрузки, а не предсказание травмы (Impellizzeri 2020; мета-анализ BMC Sports Sci Med Rehab 2025, c≈0.57). Решение — по совокупности сигналов: сон/HRV/RPE/другая симптоматика.';
-/** Канон зон/цветов/подписей — единый источник для хаба и дашборда (без дублей порогов в UI). */
-export const ACWR_ZONE_META: Record<ACWRZone, { label: string; color: string }> = {
-  undertrained: { label: 'Недотрен', color: '#3b82f6' },
-  optimal: { label: 'Оптимум', color: '#22c55e' },
-  caution: { label: 'Осторожно', color: '#eab308' },
-  dangerous: { label: 'Опасно', color: '#ef4444' },
+/** Честная помета про «окно 0.8–1.3»: в литературе оно ОСПОРЕНО, поэтому подписываем, а не выдаём за канон. */
+export const ACWR_WINDOW_NOTE = 'Окно 0.8–1.3 — старая эвристика, в литературе оспорена (Impellizzeri 2020 IJSPP; методы ACWR систематически расходятся — Cloosterman 2024 J Athl Train). Смотрите также дифф-загрузку иEWMA-метод.';
+/** Канон зон/цветов/подписей — единый источник для хаба и дашборда (без дублей порогов в UI).
+ *  hint — честная расшифровка зоны (без «риска травмы»): решение по совокупности сигналов. */
+export const ACWR_ZONE_META: Record<ACWRZone, { label: string; color: string; hint: string }> = {
+  undertrained: { label: 'Недотрен', color: '#3b82f6', hint: 'нагрузка заметно ниже своей базы — можно плавно поднять объём' },
+  optimal: { label: 'Оптимум', color: '#22c55e', hint: 'нагрузка в привычном диапазоне — плановый объём' },
+  caution: { label: 'Осторожно', color: '#eab308', hint: 'рост выше привычного — смотрите сон/HRV/RPE перед добавлением объёма' },
+  dangerous: { label: 'Опасно', color: '#ef4444', hint: 'заметный скачок нагрузки — снизить объём и дождаться восстановления' },
 };
-export interface MonotonyResult { meanDailyLoad: number; stdev: number; monotony: number; weeklyLoad: number; strain: number; }
+export interface MonotonyResult { meanDailyLoad: number; stdev: number; monotony: number; weeklyLoad: number; strain: number; /** Нагрузка идеально ровная (SD=0) — максимальное однообразие по Фостеру, а не «норма». */ uniform: boolean; }
 export interface BanisterPoint { date: string; fitness: number; fatigue: number; performance: number; }
 export interface FitnessFatigueResult { series: BanisterPoint[]; current: BanisterPoint | null; peakPerformanceIdx: number; }
 
@@ -36,11 +38,19 @@ export function sessionLoad(sRPE: number, durationMin: number): number {
   return Math.max(0, sRPE) * Math.max(0, durationMin);
 }
 
-/** День → ISO-дата (YYYY-MM-DD). */
-function dayOf(date: string | Date): string {
-  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** День → ISO-дата (YYYY-MM-DD). Пустая/мусорная дата → '' (вызывающий пропустит запись).
+ *  Раньше `new Date(null)` давал 1970-01-01 (truthy) → запись попадала в ряд и раздувала
+ *  бесконечный цикл fitnessFatigue от 1970 до текущей даты. */
+function dayOf(date: string | Date | null | undefined): string {
+  if (date == null) return '';
+  if (typeof date === 'string') {
+    if (!date.trim()) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  }
   const d = typeof date === 'string' ? new Date(date) : date;
-  if (isNaN(d.getTime())) return typeof date === 'string' ? date : '';
+  if (!(d instanceof Date) || isNaN(d.getTime())) return typeof date === 'string' ? date : '';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function addDays(dateStr: string, n: number): string {
@@ -58,7 +68,7 @@ export function toDailyLoads(sessions: TrainingSession[]): DayLoad[] {
   const map: Record<string, number> = {};
   for (const s of sessions) {
     const d = dayOf(s.date);
-    if (!d) continue;
+    if (!DATE_RE.test(d)) continue; // мусорная дата не попадает в ряд (иначе ломает окна/свертку)
     map[d] = (map[d] || 0) + sessionLoad(s.sRPE, s.durationMin);
   }
   return Object.keys(map).sort().map(d => ({ date: d, load: map[d] }));
@@ -132,9 +142,12 @@ export function trafficLight(hrvRatio: number | null, acwr: number, rpeDelta: nu
   return 'green';
 }
 
-/** Monotony = среднедневная нагрузка / СТД дневной нагрузки за неделю; strain = monotony × суммарная. */
+/** Monotony = среднедневная нагрузка / СТД дневной нагрузки за неделю; strain = monotony × суммарная.
+ *  Ровная неделя (SD=0) — это максимальное однообразие по Фостеру, а не «норма»:
+ *  число monotony остаётся 2 (обратная совместимость), но флаг uniform=true,
+ *  и потребитель обязан ловить однообразие по флагу, а не по «> 2». */
 export function weeklyMonotony(dailyLoads: DayLoad[], weekEnd?: string): MonotonyResult {
-  if (dailyLoads.length === 0) return { meanDailyLoad: 0, stdev: 0, monotony: 0, weeklyLoad: 0, strain: 0 };
+  if (dailyLoads.length === 0) return { meanDailyLoad: 0, stdev: 0, monotony: 0, weeklyLoad: 0, strain: 0, uniform: false };
   const sorted = [...dailyLoads].sort((a, b) => a.date < b.date ? -1 : 1);
   const end = weekEnd || sorted[sorted.length - 1].date;
   const start = addDays(end, -6);
@@ -148,6 +161,7 @@ export function weeklyMonotony(dailyLoads: DayLoad[], weekEnd?: string): Monoton
   const mean = weeklyLoad / 7;
   const variance = weekLoads.reduce((s, v) => s + (v - mean) ** 2, 0) / 7;
   const stdev = Math.sqrt(variance);
+  const uniform = stdev === 0 && mean > 0;
   const monotony = stdev > 0 ? mean / stdev : (mean > 0 ? 2 : 0);
   return {
     meanDailyLoad: Math.round(mean * 10) / 10,
@@ -155,6 +169,7 @@ export function weeklyMonotony(dailyLoads: DayLoad[], weekEnd?: string): Monoton
     monotony: Math.round(monotony * 100) / 100,
     weeklyLoad: Math.round(weeklyLoad),
     strain: Math.round(monotony * weeklyLoad),
+    uniform,
   };
 }
 
@@ -194,18 +209,36 @@ export function fitnessFatigue(
   return { series, current: series[series.length - 1] || null, peakPerformanceIdx: peakIdx };
 }
 
-export interface MonotonyStreak { current: number; prev: number[]; sustainedHigh: boolean; }
+export interface MonotonyStreak { current: number; prev: number[]; sustainedHigh: boolean; /** Текущая неделя идеально ровная (SD=0) — однообразие максимальное. */ uniform: boolean; /** Сколько однообразных недель подряд (включая текущую). */ uniformWeeks: number; }
 /** Монотонность текущей + предыдущих недель (Фостер: monotony>2 + высокая нагрузка = риск перетрена).
- *  sustainedHigh — текущая И все prev выше 2 (честный «2 недели подряд», а не одна). */
-export function monotonyStreak(dailyLoads: DayLoad[], weeks = 2): MonotonyStreak {
-  if (dailyLoads.length === 0) return { current: 0, prev: [], sustainedHigh: false };
+ *  sustainedHigh — текущая И все prev выше 2 **или** однообразны (SD=0). Флаг uniform — обязательный путь:
+ *  раньше ровная неделя давала ровно 2 и никогда не ловилась гейтом «> 2». */
+export function monotonyStreak(dailyLoads: DayLoad[], weeks = 2, weekEnd?: string): MonotonyStreak {
+  if (dailyLoads.length === 0) return { current: 0, prev: [], sustainedHigh: false, uniform: false, uniformWeeks: 0 };
   const sorted = [...dailyLoads].sort((a, b) => a.date < b.date ? -1 : 1);
-  const ref = sorted[sorted.length - 1].date;
-  const current = weeklyMonotony(dailyLoads, ref).monotony;
+  const ref = weekEnd || sorted[sorted.length - 1].date;
+  const currentWeek = weeklyMonotony(dailyLoads, ref);
+  const current = currentWeek.monotony;
   const prev: number[] = [];
-  for (let w = 1; w < weeks; w++) prev.push(weeklyMonotony(dailyLoads, addDays(ref, -7 * w)).monotony);
-  const sustainedHigh = current > 2 && prev.length === weeks - 1 && prev.every(m => m > 2);
-  return { current: Math.round(current * 100) / 100, prev: prev.map(m => Math.round(m * 100) / 100), sustainedHigh };
+  const prevUniform: boolean[] = [];
+  for (let w = 1; w < weeks; w++) {
+    const m = weeklyMonotony(dailyLoads, addDays(ref, -7 * w));
+    prev.push(m.monotony);
+    prevUniform.push(m.uniform);
+  }
+  const monotonous = (m: number, uniform: boolean) => uniform || m > 2;
+  const sustainedHigh = monotonous(current, currentWeek.uniform)
+    && prev.length === weeks - 1
+    && prev.every((m, i) => monotonous(m, prevUniform[i]));
+  let uniformWeeks = 0;
+  if (currentWeek.uniform) { uniformWeeks = 1; for (let i = 0; i < prevUniform.length && prevUniform[i]; i++) uniformWeeks++; }
+  return {
+    current: Math.round(current * 100) / 100,
+    prev: prev.map(m => Math.round(m * 100) / 100),
+    sustainedHigh,
+    uniform: currentWeek.uniform,
+    uniformWeeks,
+  };
 }
 
 export interface BanisterForm { z: number; trend: 'up' | 'flat' | 'down'; label: string; }
@@ -238,17 +271,28 @@ export interface LoadReport {
   disclaimer: string;
 }
 
-/** Сводный отчёт по нагрузке + рекомендации. opts — тот же метод ACWR, что у вызывающего пульта (иначе цифры и тексты разойдутся). */
+/** Сводный отчёт по нагрузке + рекомендации. opts — тот же метод ACWR, что у вызывающего пульта (иначе цифры и тексты разойдутся).
+ *  Рекомендации строятся по `zone`/`lowBase`/`uniform`, а не по сырому ratio: раньше рядом с зоной
+ *  «Осторожно» печаталось «опасная зона, риск травмы», а фактически применялось ×0.85 без делода. */
 export function trainingLoadReport(sessions: TrainingSession[], referenceDate?: string, opts: ACWROptions = {}): LoadReport {
   const dailyLoads = toDailyLoads(sessions);
   const acwr = acuteChronicRatio(dailyLoads, referenceDate, 7, 28, opts);
   const monotony = weeklyMonotony(dailyLoads, referenceDate);
   const banister = fitnessFatigue(dailyLoads);
+  const streak = monotonyStreak(dailyLoads, 2);
   const recommendations: string[] = [];
-  if (acwr.ratio > 1.5) recommendations.push(`ACWR ${acwr.ratio} > 1.5 — опасная зона: снизить объём на ~20-30%, риск травмы/перетрена.`);
-  else if (acwr.ratio < 0.8) recommendations.push(`ACWR ${acwr.ratio} < 0.8 — недотренированность: можно плавно ↑ объём.`);
-  else recommendations.push(`ACWR ${acwr.ratio} в оптимальной зоне (0.8-1.3).`);
-  if (monotony.monotony > 2) recommendations.push(`Monotony ${monotony.monotony} > 2 — однообразная нагрузка, добавьте вариативность/восстановление.`);
+  const meta = ACWR_ZONE_META[acwr.zone];
+  const methodNote = acwr.method === 'ewma_uncoupled' ? ' (EWMA, хроника без острой недели)' : '';
+  recommendations.push(`ACWR ${acwr.ratio} — зона «${meta.label}»: ${meta.hint}${methodNote}.`);
+  if (acwr.lowBase) recommendations.push(`База нагрузки тонкая (хроника ${acwr.chronic} AU/день) — высокий ratio может отражать недотренированность, а не перегрузку; ориентируйтесь на абсолютные цифры и тренд.`);
+  if (streak.uniform) {
+    recommendations.push(streak.uniformWeeks >= 2
+      ? `Нагрузка ${streak.uniformWeeks} недель подряд абсолютно ровная (SD=0) — это максимальное однообразие по Фостеру: добавьте вариативность/восстановление.`
+      : 'Нагрузка недели абсолютно ровная (SD=0) — максимальное однообразие (самый высокий monotony): добавьте вариативность.');
+  } else if (monotony.monotony > 2) {
+    recommendations.push(`Monotony ${monotony.monotony} > 2 — однообразная нагрузка, добавьте вариативность/восстановление.`);
+  }
+  if (streak.sustainedHigh && !streak.uniform) recommendations.push('Монотонность >2 держится две недели подряд — Фостер: повод обсудить разгрузку.');
   if (banister.current) {
     if (banister.current.performance < 0) recommendations.push(`Fitness-Fatigue performance отрицательный (${banister.current.performance}) — усталость накапливается, плановый deload.`);
     else recommendations.push(`Fitness-Fatigue performance ${banister.current.performance} (fitness ${banister.current.fitness} − fatigue ${banister.current.fatigue}).`);

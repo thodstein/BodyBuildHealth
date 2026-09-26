@@ -14175,3 +14175,53 @@ html.app-native [data-cardio="select-option"] { font-variant-numeric: tabular-nu
   html.app-native [data-cardio="select-option"],
   html.app-native [data-cardio="select-done"] { transition: none !important; }
 }
+/* === §119. UNIFIED-INTELLIGENCE HUB: 44px/шрифты/сетки/focus/tabular === */
+html.app-native .hub-intel button,
+html.app-native .hub-intel input,
+html.app-native .hub-intel select {
+  min-height: 44px !important;
+  font-size: 13px !important;
+}
+html.app-native .hub-intel [role="button"] {
+  min-height: 56px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .hub-intel [role="button"]:active,
+html.app-native .hub-intel button:active {
+  transform: scale(0.97) !important;
+}
+html.app-native .hub-intel [role="button"]:focus-visible,
+html.app-native .hub-intel button:focus-visible,
+html.app-native .hub-intel input:focus-visible,
+html.app-native .hub-intel select:focus-visible,
+html.app-native .hub-intel [tabindex]:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+html.app-native .hub-intel [data-intel-card] {
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .hub-intel [data-intel-grid] {
+  gap: 8px !important;
+}
+@media (max-width: 380px) {
+  html.app-native .hub-intel [data-intel-grid="4"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  html.app-native .hub-intel [data-intel-grid="3"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  html.app-native .hub-intel [data-intel-card="coach-report"] {
+    padding: 8px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.app-native .hub-intel [role="button"]:active,
+  html.app-native .hub-intel button:active {
+    transform: none !important;
+  }
+  html.app-native .hub-intel .pl-metriccard {
+    animation: none !important;
+    transition: none !important;
+  }
+}
