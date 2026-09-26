@@ -238,39 +238,103 @@ export interface TidPlanVsFact {
   /** Спринт 5.2: в дневнике смешаны бег и вело — их зоны несопоставимы. */
   sportsInLog: string[];
   mixed: boolean;
+  /**
+   * Спринт 5.2 (добивка): разбивка факта ПО ДИСЦИПЛИНАМ. Смешанный лог больше
+   * не отбрасывается целиком — видно время по зонам для каждой дисциплины
+   * отдельно (это достоверный факт, даже когда сравнение с планом невозможно).
+   */
+  bySport: TidSportFact[];
+  /** Есть ли свой эталон HR хотя бы у одной реальной дисциплины. */
+  hasPerSportRef: boolean;
 }
 
-/** Честная сверка «план vs факт»: план по типам сессий, факт по HR дневника. */
+/** Факт TID в рамках одной дисциплины. */
+export interface TidSportFact {
+  sport: string;
+  fact: TimeInZones & { byHr: number; skipped: number; basis: TidHrBasis; note: string };
+  /** Эталон задан именно для этой дисциплины (а не взят общий). */
+  ownRef: boolean;
+}
+
+/** Эталоны HR по дисциплинам: у бега и вела РАЗНЫЕ пульсы (свой LTHR). */
+export type TidHrRefsBySport = Partial<Record<string, TidHrReference>>;
+
+/**
+ * Спринт 5.2 (добивка): пер-спортная калибровка.
+ *
+ * Смешанный дневник раньше просто признавался «несравнимым», и время по зонам
+ * терялось совсем. Теперь факт всегда разбирается по дисциплинам, а сравнение
+ * с планом корректно там, где эталон задан для этой дисциплины (`refsBySport`).
+ * Числовых порогов не выдумываем: границы зон те же (LTHR / %ЧССмакс) — меняется
+ * только ЭТАЛОН, который пользователь измерил для своей дисциплины.
+ */
+export function tidFactBySport(
+  log: FactSession[],
+  refsBySport: TidHrRefsBySport = {},
+  fallbackRef: TidHrReference = {},
+): TidSportFact[] {
+  const groups = new Map<string, FactSession[]>();
+  for (const s of log ?? []) {
+    const key = s.sport ?? 'other';
+    const arr = groups.get(key);
+    if (arr) arr.push(s); else groups.set(key, [s]);
+  }
+  const out: TidSportFact[] = [];
+  for (const [sport, sessions] of groups) {
+    const own = refsBySport[sport];
+    const hasOwn = !!own && !!(own.lthr || own.maxHr);
+    out.push({ sport, fact: factTimeInZones(sessions, hasOwn ? (own as TidHrReference) : fallbackRef), ownRef: hasOwn });
+  }
+  // Стабильный порядок: сначала реальные дисциплины, потом legacy «other».
+  return out.sort((a, b) =>
+    (a.sport === 'other' ? 1 : 0) - (b.sport === 'other' ? 1 : 0) || a.sport.localeCompare(b.sport));
+}
+
+/** Честная сверка «план vs факт»: план по типам сессий, факт по HR дневника.
+ *  `refsBySport` — эталон HR по дисциплинам (спринт 5.2): при смешанном логе
+ *  сравнение корректно только для дисциплины со своим эталоном. */
 export function tidPlanVsFact(
   cycle: Pick<CardioCycle, 'weeks'>,
   log: FactSession[],
   ref: TidHrReference = {},
+  refsBySport: TidHrRefsBySport = {},
 ): TidPlanVsFact {
   const planned = timeInZones(cycle);
-  const fact = factTimeInZones(log, ref);
+  const bySport = tidFactBySport(log, refsBySport, ref);
+  const fact0 = bySport;
+  const sportsInLog = [...new Set((log ?? []).map(s => s.sport ?? 'other'))];
+  // «other» — legacy-записи без дисциплины: они не мешают, но и не дают права
+  // утверждать, что калибровка одна.
+  const realSports = sportsInLog.filter(s => s !== 'other');
+  const mixed = realSports.length > 1;
+  // Основная дисциплина для сверки: при смешанном — та, у которой есть СВОЙ
+  // эталон; иначе единственная реальная; иначе первая доступная.
+  const withOwnRef = fact0.filter(s => s.ownRef);
+  const primary = (mixed ? withOwnRef[0] : undefined) ?? fact0.find(s => s.sport !== 'other') ?? fact0[0];
+  const fact = primary ? primary.fact : factTimeInZones([], ref);
   const delta = {
     z1: r1(Math.abs(planned.pct.z1 - fact.pct.z1)),
     z2: r1(Math.abs(planned.pct.z2 - fact.pct.z2)),
     z3: r1(Math.abs(planned.pct.z3 - fact.pct.z3)),
   };
-  const sportsInLog = [...new Set((log ?? []).map(s => s.sport ?? 'other'))];
-  // «other» — это legacy-записи без дисциплины: они не мешают, но и не
-  // дают права утверждать, что калибровка одна.
-  const realSports = sportsInLog.filter(s => s !== 'other');
-  const mixed = realSports.length > 1;
   const drift = r1((delta.z1 + delta.z2 + delta.z3) / 2);
+  const hasPerSportRef = withOwnRef.length > 0;
   const comparable = fact.byHr > 0 && planned.totalMin > 0;
+  // Смешанный лог сравним, только если эталон задан именно для этой дисциплины.
+  const mixedBlocked = mixed && !primary?.ownRef;
   let verdict: string;
   if (!comparable) {
     verdict = 'Сверка невозможна: нет фактических сессий с HR (план нельзя выдавать за факт).';
-  } else if (mixed) {
-    verdict = `В дневнике смешаны дисциплины (${realSports.join(' + ')}) — у них разная калибровка пульса, единый TID некорректен. Считайте по одной дисциплине.`;
+  } else if (mixedBlocked) {
+    verdict = `В дневнике смешаны дисциплины (${realSports.join(' + ')}) — у них разная калибровка пульса, единый TID некорректен. Разбивка по дисциплинам ниже; задайте свой пульс (LTHR) для каждой, чтобы сравнивать.`;
   } else if (drift <= 5) {
-    verdict = 'Факт совпадает с планом — распределение по зонам реальное.';
+    verdict = mixed
+      ? `Факт по «${primary?.sport}» совпадает с планом — распределение по зонам реальное.`
+      : 'Факт совпадает с планом — распределение по зонам реальное.';
   } else if (drift <= 12) {
     verdict = `Факт отличается от плана на ${drift} п.п. — норма для ручных и HR-датчиков, следите за Z3.`;
   } else {
     verdict = `Факт расходится с планом на ${drift} п.п. — пересоберите план: ${fact.note}`;
   }
-  return { planned, fact, delta, drift, comparable, verdict, sportsInLog, mixed };
+  return { planned, fact, delta, drift, comparable, verdict, sportsInLog, mixed, bySport, hasPerSportRef };
 }
