@@ -10,6 +10,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import React from 'react';
 import { StrengthSportConstructor } from '../StrengthSportConstructor';
 
@@ -83,6 +85,57 @@ describe('конструктор: честность сохранения (кв�
     // даём тостам отработать
     await new Promise(r => setTimeout(r, 200));
     expect(container.textContent).not.toMatch(/НЕ сохран/);
+  });
+});
+
+describe('конструктор: правка сета сохраняется (updater-функция должна быть чистой)', () => {
+  const firstSetInput = (container: HTMLElement): HTMLInputElement => {
+    const row = container.querySelector('[data-ss="set-row"]');
+    if (!row) throw new Error('в плане нет строки сета — тест не проверит ничего');
+    return row.querySelector('input') as HTMLInputElement;
+  };
+
+  it('правка веса сета реально попадает в хранилище', async () => {
+    throwOnPlan = false;
+    const container = await buildFirstPlan();
+    const input = firstSetInput(container);
+    fireEvent.change(input, { target: { value: '123' } });
+    await waitFor(() => {
+      expect(backing['he_strength_sport_plan_v1'] || '').toContain('123');
+    });
+  });
+
+  it('при отказе хранилища правка предупреждает честно, а не пропадает молча', async () => {
+    throwOnPlan = true;   // любая запись плана падает
+    const container = await buildFirstPlan();
+    const input = firstSetInput(container);
+    fireEvent.change(input, { target: { value: '77' } });
+    await waitFor(() => expect(container.textContent).toMatch(/Правка не сохранена/));
+  });
+
+  it('валидация диапазона живёт ВНЕ updater (вес 0–500) и не трогает план', async () => {
+    throwOnPlan = false;
+    const container = await buildFirstPlan();
+    const rirInput = container.querySelectorAll('input[placeholder="RIR"]')[0] as HTMLInputElement;
+    expect(rirInput).toBeTruthy();
+    fireEvent.change(rirInput, { target: { value: '9' } });   // вне 0–5
+    await waitFor(() => expect(container.textContent).toMatch(/RIR 0–5/));
+  });
+
+  it('source-guard: внутри setPlan(updater) нет записи в хранилище и сообщений', () => {
+    // Поведенческие тесты выше НЕ ловят возврат side-effect внутрь updater
+    // (проверено мутацией: тесты остаются зелёными). Ловит именно этот гард —
+    // в updater-функциях, которые тут редактируют план, запрещены и запись,
+    // и setMsg: updarter обязан быть чистым (StrictMode зовёт его дважды).
+    const src = readFileSync(resolve(process.cwd(), 'src/ui/screens/strength-sport/StrengthSportConstructor.tsx'), 'utf8');
+    const updaterБлоки = src.split(/setPlan\s*\(\s*(prev|p)\s*=>/).slice(1);
+    expect(updaterБлоки.length, 'не найдено ни одного setPlan(updater) — гард проверяет не то').toBeGreaterThan(0);
+    const виновники: string[] = [];
+    updaterБлоки.forEach((блок, i) => {
+      const тело = блок.slice(0, блок.indexOf('\n  };') + 5 || блок.length);
+      if (/saveStrengthSportPlan\(|setMsg\(/.test(тело)) виновники.push(`#${i + 1}: ${тело.match(/saveStrengthSportPlan\(|setMsg\(/)?.[0]}`);
+    });
+    expect(виновники, `side-effect внутри updater-функции:\n${виновники.join('\n')}`).toEqual([]);
   });
 });
 

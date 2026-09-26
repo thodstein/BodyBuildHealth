@@ -81,6 +81,21 @@ export const StrengthSportConstructor: React.FC = () => {
   const [hasSpecPrev, setHasSpecPrev] = React.useState<boolean>(() => {
     try { return hasTAPlanPrev(); } catch { return false; }
   });
+
+  // Правки сета/упражнения/порядка: сохранение вынесено ИЗ updater-функции setPlan.
+  // Updater обязан быть чистым (React в StrictMode зовёт его дважды) — запись в
+  // localStorage и событие внутри него давали двойное сохранение и двойное
+  // событие, а отказ хранилища (квота) проглатывался молча. Теперь флаг → эффект.
+  const planEditDirty = React.useRef(false);
+  React.useEffect(() => {
+    if (!plan || !planEditDirty.current) return;
+    planEditDirty.current = false;
+    const ok = saveStrengthSportPlan(plan);
+    if (!ok) {
+      setMsg('⚠ Правка не сохранена — в хранилище нет места (пропадёт при перезагрузке)');
+      setTimeout(() => setMsg(''), 3000);
+    }
+  }, [plan]);
   // SM-C5: откат волны СМ-коррекции (свой снапшот SM_INJECT_PREV_KEY).
   const [hasSMSpecPrev, setHasSMSpecPrev] = React.useState<boolean>(() => {
     try { return hasSMPlanPrev(); } catch { return false; }
@@ -552,6 +567,11 @@ export const StrengthSportConstructor: React.FC = () => {
   };
 
   const updateEx = (wkIdx: number, day: number, exId: string, patch: Partial<{ weight: number; reps: string; rir: number }>) => {
+    // Валидация — ДО setPlan: updater-функция должна оставаться чистой
+    // (никаких setState/сообщений внутри неё).
+    if (patch.weight != null && (patch.weight < 0 || patch.weight > 500)) { setMsg('Вес 0–500'); setTimeout(()=>setMsg(''),1800); return; }
+    if (patch.rir != null && (patch.rir < 0 || patch.rir > 5)) { setMsg('RIR 0–5'); setTimeout(()=>setMsg(''),1800); return; }
+    planEditDirty.current = true;
     setPlan(prev => {
       if (!prev) return prev;
       const copy: StrengthSportPlan = JSON.parse(JSON.stringify(prev));
@@ -562,7 +582,6 @@ export const StrengthSportConstructor: React.FC = () => {
       const ex = sess.exercises.find(e => e.id === exId);
       if (!ex) return prev;
       if (patch.weight != null) {
-        if (patch.weight < 0 || patch.weight > 500) { setMsg('Вес 0–500'); setTimeout(()=>setMsg(''),1800); return prev; }
         ex.weight = patch.weight;
         const wmAny: any = (prev as any)?.inputSnapshot?.workMax || workMax || {};
         let base = 100;
@@ -584,16 +603,15 @@ export const StrengthSportConstructor: React.FC = () => {
         ex.workSets = ex.workSets.map(s => ({ ...s, reps: avg }));
       }
       if (patch.rir != null) {
-        if (patch.rir < 0 || patch.rir > 5) { setMsg('RIR 0–5'); setTimeout(()=>setMsg(''),1800); return prev; }
         ex.rir = patch.rir;
         ex.workSets = ex.workSets.map(s => ({ ...s, rir: patch.rir! }));
       }
-      saveStrengthSportPlan(copy);
       return copy;
     });
   };
 
   const updateSet = (wkIdx: number, day: number, exId: string, setIdx: number, patch: Partial<{ weight:number; reps:number; rir:number; distanceM:number; timeCapS:number }>) => {
+    planEditDirty.current = true;
     setPlan(prev=>{
       if(!prev) return prev;
       const copy: StrengthSportPlan = JSON.parse(JSON.stringify(prev));
@@ -608,11 +626,11 @@ export const StrengthSportConstructor: React.FC = () => {
       if(patch.rir!=null) (ex.workSets[setIdx] as any).rir = Math.max(0, Math.min(5, patch.rir));
       if((patch as any).distanceM!=null) (ex.workSets[setIdx] as any).distanceM = Math.max(5, Math.min(100, (patch as any).distanceM));
       if((patch as any).timeCapS!=null) (ex.workSets[setIdx] as any).timeCapS = Math.max(10, Math.min(300, (patch as any).timeCapS));
-      saveStrengthSportPlan(copy);
       return copy;
     });
   };
   const moveEx = (wkIdx: number, day: number, exId: string, dir: -1|1) => {
+    planEditDirty.current = true;
     setPlan(prev => {
       if (!prev) return prev;
       const copy: StrengthSportPlan = JSON.parse(JSON.stringify(prev));
@@ -625,7 +643,6 @@ export const StrengthSportConstructor: React.FC = () => {
       const tmp = sess.exercises[idx];
       sess.exercises[idx]=sess.exercises[nIdx];
       sess.exercises[nIdx]=tmp;
-      saveStrengthSportPlan(copy);
       return copy;
     });
   };
