@@ -6,6 +6,7 @@
  *  - Вывод в конструктор Стронг via planner-bridge (mode:strongman)
  */
 import React, { useMemo, useState, useEffect } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { EVENT_META } from '../../../engines/strength-sport/strength-sport-event-types';
 import { CONTEST_PRESETS } from '../../../engines/strength-sport/strength-sport-contest.types';
 import { WL_WEAKPOINT_LABELS } from '../../../engines/strength-sport/strength-sport-weakpoint';
@@ -1238,7 +1239,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   };
 
   const handleSaveProgress = () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localIsoDate();
     const entry = {
       date: today,
       bodyweightKg: parseFloat(state.progBw || state.bodyweightKg) || 0,
@@ -1274,7 +1275,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
   const handleSaveOHSSnap = () => {
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localIsoDate();
       const raw = localStorage.getItem(SM_OHS_HIST_KEY);
       const hist = raw ? JSON.parse(raw) : [];
       const next = appendOHSSnapshot(hist, { date: today, score: ohs.totalScore, failed: ohs.failed, level: ohs.level });
@@ -1288,7 +1289,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   const handleSMBackup = () => {
     try {
       const b = buildSMBackup();
-      downloadSMBackup(`sm-backup-${new Date().toISOString().slice(0, 10)}.json`);
+      downloadSMBackup(`sm-backup-${localIsoDate()}.json`);
       setToast(`✓ Резервная копия: ${Object.keys(b.data).length}/${SM_STORAGE_KEYS.length} ключей · ${(smStoreBytes.total / 1024).toFixed(1)} КБ`);
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
@@ -1338,7 +1339,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       const key = 'he_sm_grip_hist_v1';
       const raw = localStorage.getItem(key);
       const hist = raw ? JSON.parse(raw) : [];
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localIsoDate();
       const next = appendSMGripSnapshot(hist, { date: today, left: l, right: r, diffPct: d.diffPct, metric: 'kg' });
       localStorage.setItem(key, JSON.stringify(next));
       const tr = smGripTrend(next);
@@ -1351,7 +1352,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     if (!smSpec) { setToast('Нет спец-блока — выбери слабые фазы'); setTimeout(() => setToast(''), 2000); return; }
     const ics = buildSMIcs(smSpec, { title: 'Стронг спец-блок' });
     if (!ics) return;
-    downloadSMIcs(ics, `sm-spec-${new Date().toISOString().slice(0, 10)}.ics`);
+    downloadSMIcs(ics, `sm-spec-${localIsoDate()}.ics`);
     setToast('✓ Календарь спец-блока (ICS)');
     setTimeout(() => setToast(''), 2000);
   };
@@ -1546,7 +1547,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       ...proSnapExtra(),
     };
     const html = buildSMDiagnosticsHtml(snap);
-    downloadSMHtml(html, `strongman-diagnostics-${new Date().toISOString().slice(0,10)}.html`);
+    downloadSMHtml(html, `strongman-diagnostics-${localIsoDate()}.html`);
     setToast('✓ Печать (HTML) готова');
     setTimeout(()=>setToast(''),2000);
   };
@@ -1567,7 +1568,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       movement: movementExportLines,
       ...proSnapExtra(),
     };
-    downloadSMCsv(snap, `strongman-diagnostics-${new Date().toISOString().slice(0,10)}.csv`);
+    downloadSMCsv(snap, `strongman-diagnostics-${localIsoDate()}.csv`);
     setToast('✓ Выгрузка (CSV) готова');
     setTimeout(()=>setToast(''),2000);
   };
