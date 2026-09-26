@@ -629,6 +629,8 @@ export function ArmAutoConstructor() {
   const [topOppHand, setTopOppHand] = useState<string>('unknown');
   const [topWD, setTopWD] = useState<string>('');
   const [topRfd, setTopRfd] = useState<boolean>(false);
+// Wave-0 Э0.5: true = explosivePct посчитан из реконструкции F100, а не из отсечки прибора.
+const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const [topLadder, setTopLadder] = useState<string>('');
   const [topLadderVal, setTopLadderVal] = useState<string>('');
   const [topSim, setTopSim] = useState<boolean>(false);
@@ -897,6 +899,11 @@ export function ArmAutoConstructor() {
           if (ar && Number.isFinite(Number(ar.explosivePct)) && Number(ar.explosivePct) > 0) {
             setTopExpl(String(ar.explosivePct));
             setTopRfd(true);
+            // Wave-0 Э0.5 (честность, не математика): explosivePct — доля РЕКОНСТРУИРОВАННОГО
+            // F100, если прибора-отсечки на 100 мс не было. Такое значение выбирает тип RFD-сессии
+            // и дозу (arm-rfd.engine), поэтому помечаем его прямо в карточке — иначе выглядит как
+            // измерение. Отсечка, если она есть, помечается как измеренная.
+            setRfdEstimated(ar.f100Estimated === true);
           }
         } catch {}
         // PRO-4 добивка: класс/рецепт/LMS/правила из армлифтинг-хаба — видимой строкой (сборку не меняем)
@@ -1713,6 +1720,13 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <AdSwitch checked={topContinuity} onChange={setTopContinuity} label="🔗 С прошлого плана (+2.5% веса)" />
               <AdSwitch checked={topGripAuto} onChange={setTopGripAuto} label="🌊 Grip-RPE авто-волна" />
             </div>
+            {topRfd && rfdEstimated && (
+              <div className="ad-tip">
+                ⚠ F100 здесь — <b>оценка</b> по пробе «сила + время» (реконструкция), а не отсечка прибора на 100 мс.
+                Она выбирает тип RFD-сессии и дозу, поэтому относитесь к ней как к ориентиру: доведите F100
+                до измеренного (FB5k / высокоскоростная камера) — и блок станет точнее.
+              </div>
+            )}
             {(topOpp !== 'unknown' || topWD) && (()=>{
               try {
                 const mp = profileOpponent({ myTechnique: technique, oppStyle: topOpp, oppHand: topOppHand, weightDeltaKg: parseFloat(topWD) || 0, strapExpected: proStrap });

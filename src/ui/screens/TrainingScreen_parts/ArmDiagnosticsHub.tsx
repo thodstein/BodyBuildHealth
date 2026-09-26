@@ -1254,7 +1254,17 @@ export const ArmDiagnosticsHub: React.FC = () => {
       try {
         const mets = Object.values(((dynamicReport as any)?.metrics || {})) as any[];
         const expl = mets.filter((m) => m && Number.isFinite(Number(m.explosivePct))).map((m) => Number(m.explosivePct));
-        if (expl.length) (payload as any).armRfd = { explosivePct: Math.round((expl.reduce((a, b) => a + b, 0) / expl.length) * 10) / 10 };
+        if (expl.length) {
+          // Wave-0 Э0.5: explosivePct = доля F100. Если отсечки прибора на 100 мс не было, движок
+          // РЕКОНСТРУИРУЕТ F100 по пробе «сила+время» (arm-dynamic-force.engine.ts:60-68). Такое
+          // значение выбирает тип RFD-сессии и дозу в конструкторе, поэтому флаг оценки едет
+          // вместе с числом — иначе оценка выглядит как измерение.
+          const estimated = mets.some((m) => m && m.f100Estimated === true);
+          (payload as any).armRfd = {
+            explosivePct: Math.round((expl.reduce((a, b) => a + b, 0) / expl.length) * 10) / 10,
+            f100Estimated: estimated,
+          };
+        }
       } catch {}
       // PRO-5 №5: humerus-чеклист → ось/warmup моста (только затронутый чеклист)
       try {

@@ -816,6 +816,10 @@ export const BBDiagnosticsHub: React.FC = () => {
         bench: { level: benchV.level, text: benchV.text },
         posterior: { nhe: nheV.tested ? nheV.text : null, adductor: adductorV.tested ? adductorV.text : null },
         loadedHinge: { degraded: teenGate.blocked ? false : loadedHingeV.degraded, text: loadedHingeV.text },
+        // Wave-0 Э0.7 (проверено): `erIr` здесь — это локальный параметр движка
+        // screenPriorityList (ScreenPriorityInput.erIr), НЕ поле моста. Контракт бриджа
+        // (`erir`) собирается отдельно на строках выше/ниже и там уже корректен.
+        // Переименовывать здесь нельзя — иначе строка ER:IR молча пропадёт из приоритетов.
         erIr: erIrV.tested ? erIrV.text : null,
       });
     } catch { return []; }

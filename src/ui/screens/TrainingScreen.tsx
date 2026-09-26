@@ -34,7 +34,6 @@ import { ArmAutoConstructor } from './TrainingScreen_parts/ArmAutoConstructor';
 import { ProgramManagerPanelWithProvider as ProgramManagerPanel } from './TrainingScreen_parts/ProgramManagerPanel';
 import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
 import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
-import { TrainingSafetyHub } from './TrainingScreen_parts/TrainingSafetyHub';
 import { QualityHub } from './TrainingScreen_parts/QualityHub';
 import { VolumeHub } from './TrainingScreen_parts/VolumeHub';
 import { JointMasterCard } from './TrainingScreen_parts/JointMasterCard';
@@ -878,10 +877,17 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
-        const CALC_TABS = new Set(['intelligence_hub','strength_analysis','load_safety','joints_ortho','quality_hub','diagnostics_hub','arm_diagnostics_hub','arm_lifting_diagnostics','wl_diagnostics_hub','strongman_diagnostics_hub','bb_diagnostics_hub','periodization_taper_hub','exercise_lab','volume_hub','tempo_hub','rir_forecast_hub','mix_hub','metabolic_hub']);
+        const CALC_TABS = new Set(['intelligence_hub','strength_analysis','joints_ortho','quality_hub','diagnostics_hub','arm_diagnostics_hub','arm_lifting_diagnostics','wl_diagnostics_hub','strongman_diagnostics_hub','bb_diagnostics_hub','periodization_taper_hub','exercise_lab','volume_hub','tempo_hub','mix_hub','metabolic_hub']);
         // Качество и диагностика — РАЗДЕЛЬНО (бывший quality_joint_hub 2-в-1)
-        const effectiveTab = tab === 'load_management' || tab === 'load_safety' ? 'intelligence_hub' as const
-          : tab === 'rir_calibration' || tab === 'readiness_forecast' || tab === 'rir_forecast_hub' ? 'intelligence_hub' as const
+        // ВАЖНО (Wave-0 Э0.3): 'load_safety'/'rir_forecast_hub' — НЕ вкладки этой зоны. Это
+        // легаси-хабы, поглощённые UnifiedIntelligenceHub (его load/recovery/autoreg/forecast
+        // секции считают те же ACWR/readiness/PRI/what-if, но по ЖИВЫМ данным, а не от констант).
+        // Раньше их рендер висел тут мёртвым: effectiveTab нормализовался в intelligence_hub,
+        // поэтому условия ниже никогда не были истинны, а CALC_TABS объявлял их «доступными».
+        // Deep-link алиасы (load_management/rir_calibration/readiness_forecast) → intelligence_hub
+        // остаются: это и есть цель консолидации.
+        const effectiveTab = tab === 'load_management' ? 'intelligence_hub' as const
+          : tab === 'rir_calibration' || tab === 'readiness_forecast' ? 'intelligence_hub' as const
           : tab === 'tempo' ? 'tempo_hub' as const
           : tab === 'tempo_hub' ? 'tempo_hub' as const
           : tab === 'intelligence_hub' ? 'intelligence_hub' as const
@@ -907,7 +913,6 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             <button style={backBtnStyle} onClick={() => { hapticImpact('light'); setTab('runtime'); }}>← К дашборду</button>
             {effectiveTab === 'intelligence_hub' && <InfoErrorBoundary label="Интеллект — единый пульт"><UnifiedIntelligenceHub /></InfoErrorBoundary>}
             {effectiveTab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub initialMode={tab === 'calc_vbt' ? 'vbt' : tab === 'rel_strength' ? 'relstrength' : tab === 'pl_norms' ? 'norms' : tab === 'strength' ? 'analytics' : '1rm'} /></InfoErrorBoundary>}
-            {(effectiveTab as any) === 'load_safety' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}
             {effectiveTab === 'joints_ortho' && <InfoErrorBoundary label="Суставы и ортопедия — единый инструмент"><JointMasterCard /></InfoErrorBoundary>}
             {effectiveTab === 'quality_hub' && <InfoErrorBoundary label="Качество программы"><QualityHub onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
             {effectiveTab === 'diagnostics_hub' && <InfoErrorBoundary label="Диагностика движения"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} /></InfoErrorBoundary>}
@@ -920,7 +925,6 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}
             {effectiveTab === 'volume_hub' && <InfoErrorBoundary label="Объём-хаб"><VolumeHub initialMode={tab === 'tonnage' ? 'tonnage' : tab === 'calc_plates' ? 'plates' : 'volume'} /></InfoErrorBoundary>}
             {effectiveTab === 'tempo_hub' && <InfoErrorBoundary label="Темп повторений"><TempoTab /></InfoErrorBoundary>}
-            {(effectiveTab as any) === 'rir_forecast_hub' && <InfoErrorBoundary label="RIR + Прогноз — единый хаб"><RirForecastHub initialMode={tab === 'readiness_forecast' ? 'forecast' : 'rir'} /></InfoErrorBoundary>}
             {effectiveTab === 'mix_hub' && <InfoErrorBoundary label="Миксы"><MixHub initialMode={tab === 'mix_presets' ? 'health' : 'training'} /></InfoErrorBoundary>}
             {effectiveTab === 'metabolic_hub' && <InfoErrorBoundary label="Метаболика"><MetabolicHub /></InfoErrorBoundary>}
           </>);
@@ -963,17 +967,10 @@ import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { ProgramsTab } from './TrainingScreen_parts/ProgramsTab';
 import { VolumeOptimizerTab } from './TrainingScreen_parts/VolumeOptimizerTab';
 import ExerciseLabMerged from './TrainingScreen_parts/ExerciseLabMerged';
-import { TrainingLoadCalculator } from './TrainingScreen_parts/TrainingLoadCalculator';
-import { WhatIfCard } from './TrainingScreen_parts/WhatIfCard';
-import { ReadinessForecastCard } from './TrainingScreen_parts/ReadinessForecastCard';
-import { labTrainingAdjust } from './TrainingScreen_parts/lab-training-adjust';
-import { appendReadinessToday, loadReadinessHistory } from './TrainingScreen_parts/readiness-history';
+import { appendReadinessToday } from './TrainingScreen_parts/readiness-history';
 import { useTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
-import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../engines/pro/training-load.engine';
-import { PopupSelect, PopupNumber, ExpandableCard } from './SRCBBScreen_parts/TrainingPopups';
-import { LMS_CYCLES } from '../../data/lms-cycles/lms-cycle-index';
-import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './TrainingScreen_parts/programs-data';
+import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
 import { TimersTab } from './TrainingScreen_parts/TimersTab';
 import { ProgressTab } from './TrainingScreen_parts/ProgressTab';
@@ -982,12 +979,7 @@ import { StructuredAnalyticsCard } from './TrainingScreen_parts/StructuredAnalyt
 import { TrainingCalendarTab } from './TrainingScreen_parts/TrainingCalendarTab';
 import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
 import { TonnageCalcTab } from './TrainingScreen_parts/TonnageCalcTab';
-import { RIRCalibrationCard } from './TrainingScreen_parts/RIRCalibrationCard';
-import { RirForecastHub } from './TrainingScreen_parts/RirForecastHub';
-import { QualityJointHub } from './TrainingScreen_parts/QualityJointHub';
-import { ToolsHub } from './TrainingScreen_parts/ToolsHub';
 import { TempoTab } from './TrainingScreen_parts/TempoTab';
 import { MixHub } from './TrainingScreen_parts/MixHub';
 import MesoCorrectionCard from './TrainingScreen_parts/MesoCorrectionCard';
 import MMCTrackingCard from './TrainingScreen_parts/MMCTrackingCard';
-import { loadRirCalibrationStats } from '../../engines/meso-correction.engine';

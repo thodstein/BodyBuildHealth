@@ -29,6 +29,17 @@ export interface ArmDynamicMetrics {
   slowIndex: number; // медленная сила F/t после 500мс
   explosivePct: number; // доля F100 от Fmax %
   fastPct: number; // доля F500 от Fmax %
+  /**
+   * Wave-0 Э0.5 (честность): F100/F500/t0.5F чаще всего НЕ измерены напрямую — атлет снимает
+   * только «макс силы + время» (ARM1 FB5k), а отсечки 100/500 мс реконструируются формулой.
+   * Такие значения — ОЦЕНКА, а не измерение. Флаги позволяют помечать их в хабе, в мосте и в
+   * билдере, где `explosivePct` выбирает тип RFD-сессии и дозу (ArmAutoConstructor:896-899 →
+   * arm-rfd.engine). Математика НЕ меняется — меняется только её маркировка.
+   */
+  f100Estimated: boolean;
+  f500Estimated: boolean;
+  /** Оценка построена из одиночной пробы «сила+время» — надёжность средняя (тренд полезнее абсолюта). */
+  derivedFromSingleTrial: boolean;
 }
 export interface ArmAsymmetry {
   leftMax: number;
@@ -57,8 +68,12 @@ export function calcDynamicMetrics(t: ArmForceTrial): ArmDynamicMetrics {
   const ftIndex = f / (tMs / 1000); // кг/с
   // экстраполяция F100/F500 если не заданы: линейно от 0 до f за tMs, но с нелинейн коррекцией (взрывная первые 200мс быстрее — Coletta)
   // используем кусочно: F100 ~ f * (1 - exp(-3*100/tMs)) аппрокс
+  // ВАЖНО (Wave-0 Э0.5): ниже — ОЦЕНОЧНЫЕ значения. Флаги f100Estimated/f500Estimated
+  // обязаны попадать в хаб/мост, иначе реконструкция выглядит как измерение прибора.
+  const f100Measured = t.f100Kg != null && Number.isFinite(t.f100Kg);
+  const f500Measured = t.f500Kg != null && Number.isFinite(t.f500Kg);
   let f100: number;
-  if (t.f100Kg != null && Number.isFinite(t.f100Kg)) f100 = Math.min(f, t.f100Kg);
+  if (f100Measured) f100 = Math.min(f, t.f100Kg as number);
   else {
     const k = Math.min(0.9, Math.max(0.18, 340 / tMs)); // для быстрого t=800мс k~0.42, для медленного t=2500 k~0.13 — калибр GripStrength
     f100 = Math.min(f, round1(f * k * 0.75));
@@ -67,7 +82,7 @@ export function calcDynamicMetrics(t: ArmForceTrial): ArmDynamicMetrics {
     if (f100 < 11 && f >= 55) f100 = 11; // гарант >10 для средних сил (тест 60кг 1200мс)
   }
   let f500: number;
-  if (t.f500Kg != null && Number.isFinite(t.f500Kg)) f500 = Math.min(f, t.f500Kg);
+  if (f500Measured) f500 = Math.min(f, t.f500Kg as number);
   else {
     // F500 ~ 70-85% от макс для быстрых, 50-65% для медленных (Bezkorovainyi: F500/t500 82 vs 69)
     const ratio = tMs < 1200 ? 0.78 : tMs < 1800 ? 0.65 : 0.52;
@@ -92,6 +107,9 @@ export function calcDynamicMetrics(t: ArmForceTrial): ArmDynamicMetrics {
     slowIndex: round1(slowIndex),
     explosivePct,
     fastPct,
+    f100Estimated: !f100Measured,
+    f500Estimated: !f500Measured,
+    derivedFromSingleTrial: !f100Measured || !f500Measured,
   };
 }
 
@@ -128,9 +146,11 @@ export function buildDynamicReport(trials: ArmForceTrial[]): ArmDynamicReport {
   if (vals.length) {
     const avgExpl = vals.reduce((s, v) => s + v.explosivePct, 0) / vals.length;
     const avgSlow = vals.reduce((s, v) => s + v.slowIndex, 0) / vals.length;
-    if (avgExpl >= 38) tactic = 'Взрывной (F100 ≥38%) — тактика быстрый старт, топролл/рывок, F100 трен (Coletta 100-200мс)';
-    else if (avgSlow >= 20) tactic = 'Силовой выносливый (медленная сила высокая) — суперматч, press/side, статика 1-3мин 40-60%';
-    else tactic = 'Быстрый (F500 высокий, F500/t500 ≥70) — темповая, hook с удержанием, 5-10с стресс 100-125%';
+    // Wave-0 Э0.5: если F100 реконструированы, тактика опирается на ОЦЕНКУ — помечаем прямо в строке.
+    const est = vals.some(v => v.f100Estimated) ? ' ⚠ F100 — оценка по «сила+время», не отсечка прибора' : '';
+    if (avgExpl >= 38) tactic = 'Взрывной (F100 ≥38%) — тактика быстрый старт, топролл/рывок, F100 трен (Coletta 100-200мс)' + est;
+    else if (avgSlow >= 20) tactic = 'Силовой выносливый (медленная сила высокая) — суперматч, press/side, статика 1-3мин 40-60%' + est;
+    else tactic = 'Быстрый (F500 высокий, F500/t500 ≥70) — темповая, hook с удержанием, 5-10с стресс 100-125%' + est;
   }
   return { metrics: map as any, avgFt, totalF, avgF, asymmetry, tactic };
 }

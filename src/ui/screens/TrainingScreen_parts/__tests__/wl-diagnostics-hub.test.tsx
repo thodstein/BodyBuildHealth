@@ -296,7 +296,12 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getAllByText(/Рывок/)[0]);
     fireEvent.click(screen.getAllByText(/Рывок: отрыв/)[0]);
     fireEvent.click(await screen.findByText(/В годовой синк/));
-    await waitFor(() => expect(container.textContent).toContain('Годовой синк ТА'), { timeout: 2000 });
+    // Wave-0 Э0.4 (было→стало): тост был «✓ Годовой синк ТА: нед …» — обещал, что годовой
+    // планировщик подхватит оверлей. Проверено чтением кода: loadTAAnnualOverlay() НЕ имеет
+    // ни одного production-потребителя (только тест), т.е. обещание было ложным.
+    // Теперь тост прямо говорит «сохранён локально / планировщик НЕ читает».
+    await waitFor(() => expect(container.textContent).toContain('Оверлей ТА сохранён локально'), { timeout: 2000 });
+    // ассерты на ключ и на отсутствие чужого ключа — без изменений
     expect(localStorage.getItem('he_ta_annual_sync_v1')).toContain('snatch_off_floor');
     expect(localStorage.getItem('he_strength_annual_sync_v1')).toBeNull();
   });

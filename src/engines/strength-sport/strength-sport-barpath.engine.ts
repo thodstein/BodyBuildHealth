@@ -9,7 +9,12 @@
  * Метрики: xLoop (горизонтальный размах), yMax, vMax, power, xT (у точки transition), xCatch
  * Валидация: Enode/Perch vertical r²=0.99, horizontal bias → correction Intercept+Slope (Chavda 2024)
  *
- * Полевая методика Ang 2023: Kinovea 12Hz Butterworth → дифференцирование → v
+ * Полевая методика Ang 2023: Kinovea, сглаживание 12Гц (однополюсный EMA — см. computeBarPathMetrics) → дифференцирование → v
+ *
+ * Wave-0 Э0.5 (честность имён/чисел):
+ *  - сглаживание — EMA 1-го порядка, НЕ biquad Баттерворта (называть «Баттервортом» было неверно);
+ *  - bfPCA: коэффициенты корреляции — референс из Kipp 2024, а не измерение атлета
+ *    (поле переименовано в `referenceCorrelationFromStudy`, добавлен `isUserMeasurement: false`).
  */
 
 import { barLoopFlag } from '../pro/bar-path-core.engine';
@@ -104,7 +109,10 @@ export function classifyTrajectoryType(xs: number[], ys?: number[], t?: number[]
 
 export function computeBarPathMetrics(points: Array<{ x: number; y: number; t?: number }>): BarPathMetrics | null {
   if (!points || points.length < 2) return null;
-  // Butterworth 12Hz pre-filter если t есть
+  // Низкочастотное сглаживание перед метриками (EMA, fc=12Гц) — если точки с временем `t`.
+  // ИМЯ ЧЕСТНОЕ (Wave-0 Э0.5): реализация ниже — однополюсный экспоненциальный фильтр
+  // (`alpha = dt/(RC+dt)`), а НЕ biquad-фильтр Баттерворта. Раньше в шапке и в UI значилось
+  // «Butterworth 12Hz», что описывает принципиально другой (≥2-полюсный, с заданной АЧХ) фильтр.
   let pts = points;
   try {
     const hasT = points[0].t != null;
@@ -115,6 +123,7 @@ export function computeBarPathMetrics(points: Array<{ x: number; y: number; t?: 
         return med>0? Math.round(1/med):30;
       })();
       const fc = 12; const dt = 1/fps; const RC = 1/(2*Math.PI*fc); const alpha = dt/(RC+dt);
+      // однополюсный EMA (НЕ Biquad Butterworth — см. комментарий выше)
       let prevX = points[0].x, prevY = points[0].y;
       pts = points.map((p,i)=> {
         if (i===0) return p;
@@ -173,17 +182,34 @@ export function correctEnodeByVariable(value: number, variable: keyof typeof ENO
   return Math.round((row.intercept + row.slope * value) * 10) / 10;
 }
 
-// ── bfPCA stub (Kipp 2024) — 3 паттерна траектории ──
-export interface BfPCAPattern { pattern: 1 | 2 | 3; score: number; correlationWithPerformance: number; interpretation: string; isOptimal: boolean; }
+// ── bfPCA (Kipp 2024) — 3 паттерна траектории ──
+//
+// ВАЖНО О ЧЕСТНОСТИ ДАННЫХ (Wave-0 Э0.5): `correlationWithPerformance` — это НЕ корреляция
+// пользователя с его результатом. Это ОПУБЛИКОВАННЫЕ референсные коэффициенты из чужого
+// исследования (Spearman у Kipp 2024), одинаковые для всех атлетов. Раньше UI печатал их рядом
+// с оценкой атлета как «(r 0.42)», и это читалось как «твоя корреляция». Теперь поле
+// переименовано в `referenceCorrelationFromStudy`, а рядом добавлен явный флаг
+// `isUserMeasurement: false` — оценка атлета и коэффициент из статьи больше не смешиваются.
+export interface BfPCAPattern {
+  pattern: 1 | 2 | 3;
+  /** Оценка атлета по этому паттерну (его данные). */
+  score: number;
+  /** Референсный коэффициент ИЗ ИССЛЕДОВАНИЯ (Kipp 2024), одинаков для всех — НЕ измерение атлета. */
+  referenceCorrelationFromStudy: number;
+  /** Всегда false: per-атлета корреляции у нас нет и мы её не выдумываем. */
+  isUserMeasurement: false;
+  interpretation: string;
+  isOptimal: boolean;
+}
 
 export function extractBfPCAPatterns(xs: number[], ys: number[]): BfPCAPattern[] {
   if (!xs || xs.length < 3 || !ys || ys.length < 3) return [];
   const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
   const maxY = Math.max(...ys);
   const crossings = xs.filter((x, i) => i > 0 && ((xs[i - 1] < 0 && x >= 0) || (xs[i - 1] > 0 && x <= 0))).length;
-  // Pattern1: general forward/backward (meanX) → коррелирует положительно с результатом, отрицательно с пик скоростью
+  // Pattern1: general forward/backward (meanX) → в источнике коррелирует положительно с результатом
   const p1Score = Math.round(meanX * 10) / 10;
-  const p1Corr = 0.42; // Spearman из Kipp
+  const p1Corr = 0.42; // Spearman из Kipp 2024 — референс, не измерение атлета
   // Pattern2: peak height (maxY)
   const p2Score = Math.round(maxY * 10) / 10;
   const p2Corr = -0.15;
@@ -191,9 +217,9 @@ export function extractBfPCAPatterns(xs: number[], ys: number[]): BfPCAPattern[]
   const p3Score = crossings;
   const p3Corr = -0.38;
   return [
-    { pattern: 1, score: p1Score, correlationWithPerformance: p1Corr, interpretation: 'Pattern1: общее смещение вперёд/назад (backward → лучше)', isOptimal: meanX > -1 },
-    { pattern: 2, score: p2Score, correlationWithPerformance: p2Corr, interpretation: 'Pattern2: пик высоты', isOptimal: true },
-    { pattern: 3, score: p3Score, correlationWithPerformance: p3Corr, interpretation: 'Pattern3: пересечение вертикали (≥3 → хуже)', isOptimal: crossings < 3 },
+    { pattern: 1, score: p1Score, referenceCorrelationFromStudy: p1Corr, isUserMeasurement: false, interpretation: 'Pattern1: общее смещение вперёд/назад (backward → лучше)', isOptimal: meanX > -1 },
+    { pattern: 2, score: p2Score, referenceCorrelationFromStudy: p2Corr, isUserMeasurement: false, interpretation: 'Pattern2: пик высоты', isOptimal: true },
+    { pattern: 3, score: p3Score, referenceCorrelationFromStudy: p3Corr, isUserMeasurement: false, interpretation: 'Pattern3: пересечение вертикали (≥3 → хуже)', isOptimal: crossings < 3 },
   ];
 }
 

@@ -9,7 +9,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcMaintenanceFinder, calcAdaptiveThermogenesis, calcThyroidImpact, calcHomaIRWrap, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcLeafScore, calcAdaptiveTDEEv3, calcLeamScore, calcRedsCAT2, calcSweatTestV2, calcBeverageRankV2, calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap, calcAlcoholChronic, calcProteinTimingPro, calcNEATPro, calcATRange, calcReverseDietAuto, calcGoalTimelineV2, buildOneAnswerPro, diffMetabolicSnapshots, parseWeeklyScheduleTextPro, buildMetHoursPro, pregnancyAdd, calcPALPro, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
 import { boerLeanBodyMass } from '../../../core/metabolic-constants';
 import { ACTIVITY_CATALOG_60, PROFESSION_PAL } from '../../../core/activity-catalog';
-import { getProfile } from '../../../core/profile-manager';
+import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getNutritionV2Data } from '../../../core/nutrition-v2-data';
 import { readDiaryV2, onDiaryChangeV2 } from '../NutritionScreen_parts/diary-storage-v2';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -721,19 +721,31 @@ export const MetabolicHub: React.FC = () => {
       const tgt = onAAS ? kbju.aas : kbju.nat;
       const payload = { kcal: tgt.kcal, p: tgt.p, f: tgt.f, c: tgt.c, protPerKg: tgt.protPerKg, pal: tgt.pal, bmr: tgt.bmr, ts: Date.now(), source: 'metabolic-hub' };
       localStorage.setItem('he_planner_kbju_suggestion', JSON.stringify(payload));
-      // также в профиль nutrition.manualTargets для автоподхвата (если ручной режим)
+      // РЕАЛЬНЫЙ мост (Wave-0 Э0.4): пишем в профиль `nutrition.manualTargets` — единственный
+      // канал, который Планировщик читает на живую (`IndividualPlanContext.tsx:884-908` + saveToProfile
+      // :3035). Раньше здесь стояло `void curNut` — ключ был write-only, а UI и тост обещали
+      // «планировщик подхватит». Теперь подхватывает. Ручной режим НЕ включаем принудительно:
+      // это решение пользователя; мы только кладём значения, которые он может принять.
+      let profileWritten = false;
       try{
-        const p = getProfile();
-        const curNut:any = p.settings?.nutrition || {};
-        // не перезаписываем без спроса, только подсказка
-        localStorage.setItem('he_metabolic_last_kbju', JSON.stringify(payload));
-        void curNut;
-      }catch{}
+        const cur = getProfile();
+        const next = { ...(cur?.settings || {}) } as any;
+        const nut = { ...(next.nutrition || {}) } as any;
+        nut.manualTargets = { kcal: tgt.kcal, protein: tgt.p, fat: tgt.f, carbs: tgt.c };
+        next.nutrition = nut;
+        updateProfile({ settings: next } as any);
+        profileWritten = true;
+      }catch(e){ console.warn('[metabolic] не записал manualTargets в профиль', e); }
+      localStorage.setItem('he_metabolic_last_kbju', JSON.stringify(payload));
       window.dispatchEvent(new CustomEvent('he-kbju-suggestion', { detail: payload }));
-      const txt = `КБЖУ ${tgt.kcal}ккал Б${tgt.p} Ж${tgt.f} У${tgt.c} → скопировано. Вставь в Планировщике (КБЖУ → Ручной).`;
+      const txt = `КБЖУ ${tgt.kcal}ккал Б${tgt.p} Ж${tgt.f} У${tgt.c} → ${profileWritten
+        ? 'записано в профиль (Планировщик подхватит в режиме «КБЖУ — Ручной»)'
+        : 'скопировано. Вставь в Планировщике (КБЖУ → Ручной)'}.`;
       if(navigator.clipboard) navigator.clipboard.writeText(`${tgt.kcal} ${tgt.p} ${tgt.f} ${tgt.c}`).catch(()=>{});
       showToast(txt);
-    }catch{ showToast('Сохранено в he_planner_kbju_suggestion'); }
+    }catch{
+      showToast('⚠ Не удалось сохранить КБЖУ — скопируй вручную');
+    }
   };
 
   return (
@@ -1364,10 +1376,10 @@ export const MetabolicHub: React.FC = () => {
                 </div>
               )}
               <div style={{ marginTop:6, display:'flex', gap:6 }}>
-                <button onClick={applyKBJU} className="mh-act" style={{ flex:1, padding:'12px 10px', minHeight:48, borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#f59e0b,#d97706)', color:'#000', fontWeight:800, fontSize:12 }}>🍽 Применить к плану питания → буфер</button>
+                 <button onClick={applyKBJU} className="mh-act" style={{ flex:1, padding:'12px 10px', minHeight:48, borderRadius:12, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#f59e0b,#d97706)', color:'#000', fontWeight:800, fontSize:12 }}>🍽 Применить к плану питания</button>
                 <button onClick={()=> { const s = onAAS? kbju.aas:kbju.nat; const t=`КБЖУ ${s.kcal} Б${s.p} Ж${s.f} У${s.c} (P${s.protPerKg})`; void shareOrCopyText('КБЖУ из Метаболики', t).then(ok => showToast(ok ? 'Скопировано: '+t : t)); }} className="mh-act" style={{ padding:'12px', minHeight:48, minWidth:48, borderRadius:12, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' }}>⎘ Копировать</button>
               </div>
-              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.45)', lineHeight:1.35 }}>Буфер: <code style={{ background:'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:5, color:'#fff' }}>he_planner_kbju_suggestion</code> — планировщик подхватит как подсказку. Потолок У — 5г/кг (6 на ААС, ≤8 с инсулином) — из `planner-targets`.</div>
+              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.45)', lineHeight:1.35 }}>«Применить» пишет цели в <code style={{ background:'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:5, color:'#fff' }}>Профиль → Питание → Ручные цели</code> — Планировщик читает их на живую, но включает режим «КБЖУ — Ручной» только вы (иначе это решение за вас). Дубликат-буфер <code style={{ background:'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:5, color:'#fff' }}>he_planner_kbju_suggestion</code> — только для экспорта. Потолок У — 5г/кг (6 на ААС, ≤8 с инсулином) — из `planner-targets`.</div>
             </div>
           )}
           {mode==='fat' && (

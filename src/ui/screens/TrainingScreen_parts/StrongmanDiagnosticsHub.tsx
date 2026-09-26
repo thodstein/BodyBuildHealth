@@ -12,7 +12,7 @@ import { WL_WEAKPOINT_LABELS } from '../../../engines/strength-sport/strength-sp
 import { SM_BIOMECH, diagnoseSMWeakPoint, SM_WEAKPOINT_CORRECTION, SM_WEAKPOINT_LABELS, type SMWeakPoint } from '../../../engines/strength-sport/strength-sport-sm-biomechanics.engine';
 import { scoreSM, smScoreColor } from '../../../engines/strength-sport/strength-sport-sm-scoring.engine';
 import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend } from '../../../engines/strength-sport/strength-sport-ohs.engine';
-import { buildSMBackup, downloadSMBackup, smStorageBytes, SM_STORAGE_KEYS } from '../../../engines/strength-sport/strength-sport-sm-storage.engine';
+import { buildSMBackup, downloadSMBackup, smStorageBytes, restoreSMBackup, isSMBackupShape, SM_STORAGE_KEYS } from '../../../engines/strength-sport/strength-sport-sm-storage.engine';
 import { VBT_SS_THRESHOLDS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { diagnoseVelocityLossSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { parseKinoveaCSV, analyzeBarTracking, diagnoseCarrySway } from '../../../engines/strength-sport/strength-sport-video.engine';
@@ -873,7 +873,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     if (mg) out.push(mg);
     return out.slice(0, 3);
   }, [state.armsBent, state.mixGrip]);
-  const smProgressHist = useMemo(() => { try { return loadSMProgress(); } catch { return []; } }, []);
+  // Wave-0 Э0.4: нонс восстановления из бэкапа — перечитывает мемы, читающие SM-ключи из стора.
+  const [smDataNonce, setSmDataNonce] = useState(0);
+  const smProgressHist = useMemo(() => { try { return loadSMProgress(); } catch { return []; } }, [smDataNonce]);
   const smTrend = useMemo(() => { try { return smProgressTrend(smProgressHist); } catch { return null; } }, [smProgressHist]);
   const SM_OHS_HIST_KEY = 'he_sm_ohs_hist_v1';
   const smOhsHist = useMemo(() => {
@@ -882,12 +884,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       const arr = raw ? JSON.parse(raw) : [];
       return Array.isArray(arr) ? arr : [];
     } catch { return []; }
-  }, [ohs.totalScore, ohs.failed]);
+  }, [ohs.totalScore, ohs.failed, smDataNonce]);
   const smOhsTrend = useMemo(() => { try { return ohsScoreTrend(smOhsHist); } catch { return null; } }, [smOhsHist]);
-  const smStoreBytes = useMemo(() => { try { return smStorageBytes(); } catch { return { total: 0, byKey: {} }; } }, [csvText, state.lvpResult]);
+  const smStoreBytes = useMemo(() => { try { return smStorageBytes(); } catch { return { total: 0, byKey: {} }; } }, [csvText, state.lvpResult, smDataNonce]);
   const smLvpStored = useMemo(() => {
     try { return loadSMLVPProfile(smLvpLiftFor(state.lvpLift) || state.lvpLift); } catch { return null; }
-  }, [state.lvpLift, state.lvpResult]);
+  }, [state.lvpLift, state.lvpResult, smDataNonce]);
 
   // ── SM PRO2: диаметр лога + пол + фазы + бицепс + холд + формат ──
   const logDiamCm = useMemo(() => {
@@ -1224,10 +1226,15 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     const { calibrateSMLVP: fit } = { calibrateSMLVP: calibrateSMLVP };
     const prof = fit(lift, pts.map((p, i) => ({ ...p, loadKg: undefined })));
     if (!prof) { setToast('LVP не сошёлся — скорость должна падать с весом'); setTimeout(() => setToast(''), 2500); return; }
-    try { saveSMLVPProfile(prof); } catch { /* noop */ }
+    // Wave-0 Э0.4: раньше запись была в пустом catch, а тост «✓ LVP …» показывался ВСЕГДА —
+    // то есть калибровка могла потеряться (квота), а пользователь видел успех. Теперь честно.
+    let lvpSaved = false;
+    try { lvpSaved = saveSMLVPProfile(prof); } catch { lvpSaved = false; }
     setState((s) => ({ ...s, lvpResult: `r² ${prof.r2} ${prof.valid ? '✓ valid' : '⚠ проверь'} · slope ${prof.slope}` }));
-    setToast(`✓ LVP ${lift}: r² ${prof.r2}${prof.valid ? '' : ' — проверь измерения'}`);
-    setTimeout(() => setToast(''), 2500);
+    setToast(lvpSaved
+      ? `✓ LVP ${lift}: r² ${prof.r2}${prof.valid ? '' : ' — проверь измерения'}`
+      : `⚠ LVP ${lift} посчитан (r² ${prof.r2}), но НЕ сохранён — хранилище переполнено`);
+    setTimeout(() => setToast(''), 3000);
   };
 
   const handleSaveProgress = () => {
@@ -1243,13 +1250,13 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     try {
       const hist = loadSMProgress();
       saveSMProgress(appendSMProgress(hist, entry as never));
-      try {
-        const raw = localStorage.getItem('he_workout_log');
-        void raw;
-      } catch { /* noop */ }
       setToast('✓ Прогресс сохранён (лимит 60)');
       setTimeout(() => setToast(''), 2000);
-    } catch { /* noop */ }
+    } catch {
+      // Wave-0 Э0.4: раньше здесь был пустой catch — при сбое записи пользователь не видел НИЧЕГО
+      setToast('⚠ Прогресс не сохранён — хранилище переполнено');
+      setTimeout(() => setToast(''), 3000);
+    }
   };
 
   const handleSaveGripProfile = () => {
@@ -1287,6 +1294,40 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
   };
 
+  // Wave-0 Э0.4: бэкап без восстановления — ложное обещание («данные в безопасности», а вернуть
+  // их из приложения нельзя; 116 полей хаба живут только в localStorage). `restoreSMBackup` в движке
+  // был, но в UI не вызывался НОЛЬ раз. Теперь — рабочий импорт файла: форма валидируется
+  // движком (только известные SM-ключи), пишем поштучно quota-safe, результат честно показываем.
+  const handleSMRestore = (file: File) => {
+    const done = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 4000); };
+    const reader = new FileReader();
+    reader.onerror = () => done('⚠ Не удалось прочитать файл');
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || ''));
+        if (!isSMBackupShape(parsed)) { done('⚠ Это не бэкап стронг-хаба (неизвестный формат)'); return; }
+        const res = restoreSMBackup(parsed);
+        if (!res.restored.length) { done('⚠ Восстановить нечего — в файле нет известных ключей'); return; }
+        // перечитываем зеркало хаба (STORAGE_KEY) и инкрементируем нонс мемов истории/LVP/размера
+        try {
+          const rawState = localStorage.getItem(STORAGE_KEY);
+          if (rawState) {
+            const parsedState = JSON.parse(rawState);
+            if (parsedState && typeof parsedState === 'object' && !Array.isArray(parsedState)) {
+              setState({ ...(DEFAULT_STATE as any), ...(parsedState as any) } as any);
+            }
+          }
+        } catch { /* состояние не трогаем — восстановленные ключи истории уже подхвачены */ }
+        setSmDataNonce((n) => n + 1);
+        setPlanNonce((n) => n + 1);
+        done(`✓ Восстановлено ${res.restored.length} ключей${res.failed.length ? ` · не записано ${res.failed.length} (квота)` : ''} — данные хаба обновлены`);
+      } catch {
+        done('⚠ Файл повреждён — не JSON');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleSaveGripSnap = () => {
     try {
       const l = parseFloat(state.leftMax);
@@ -1319,9 +1360,17 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     if (!smSpec) { setToast('Нет спец-блока'); setTimeout(() => setToast(''), 2000); return; }
     const weeks = buildSMAnnualOverlay(smSpec, { startWeek: parseInt(state.annualStartWeek) || 1 });
     if (!weeks) return;
-    saveSMAnnualOverlay(weeks, parseInt(state.annualStartWeek) || 1);
-    setToast(`✓ Годовая подложка: ${weeks.length} нед → годовой план`);
-    setTimeout(() => setToast(''), 2500);
+    const ok = saveSMAnnualOverlay(weeks, parseInt(state.annualStartWeek) || 1);
+    // Wave-0 Э0.4 (честность): loadSMAnnualOverlay() не имеет ни одного production-потребителя —
+    // годовой планировщик оверлей НЕ читает. Раньше тост обещал «→ годовой план». Теперь говорим
+    // правду и отдельно отличаем неудачную запись от успешной.
+    if (!ok) {
+      setToast('⚠ Годовой оверлей не записан (квота/хранилище)');
+      setTimeout(() => setToast(''), 3000);
+      return;
+    }
+    setToast(`📦 Оверлей стронга сохранён локально: ${weeks.length} нед · he_sm_annual_sync_v1. Годовой планировщик его пока НЕ читает.`);
+    setTimeout(() => setToast(''), 4000);
   };
 
   // Инъекция коррекций в текущий SM-план + откат (паритет с ТА/арм)
@@ -2288,6 +2337,17 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           <button onClick={handleExportIcs} aria-label="Календарь спец-блока (ICS)" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📅 Календарь (ICS)</button>
           <button onClick={handleSaveAnnual} aria-label="Отправить в годовой план" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>🗓 В годовой план</button>
           <button onClick={handleSMBackup} aria-label="Скачать резервную копию" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📦 Резервная копия</button>
+          {/* Wave-0 Э0.4: восстановление из файла — без него «бэкап» был односторонним */}
+          <label style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            ♻️ Восстановить
+            <input
+              type="file"
+              accept="application/json,.json"
+              aria-label="Восстановить из файла бэкапа"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleSMRestore(f); e.target.value = ''; }}
+              style={{ display:'none' }}
+            />
+          </label>
         </div>
         <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Хранилище: {(smStoreBytes.total / 1024).toFixed(1)} КБ · защита от переполнения (истории урезаются, чужие ключи не трогаем)</div>
       </div>

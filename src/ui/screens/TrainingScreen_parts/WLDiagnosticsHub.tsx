@@ -44,7 +44,7 @@ import { injectTAWeakPoints, snapshotTAPlanForInject, rollbackTAPlanInject, hasT
 import { pciFromTrackings, persistingAsymmetry } from '../../../engines/strength-sport/strength-sport-ta-bar-consistency.engine';
 import { jerkAclFlags } from '../../../engines/strength-sport/strength-sport-ta-jerk-safety.engine';
 import { meetPlan } from '../../../engines/strength-sport/strength-sport-ta-meet-strategy.engine';
-import { ymaxVerdict, femalePhaseNorm, femaleLevelOf, femalePhaseVerdict } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
+import { ymaxVerdict, ymaxZone as ymaxZoneOf, femalePhaseNorm, femaleLevelOf, femalePhaseVerdict } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
 import { shrinkMVT, mvtPosterior, isVelocityShiftReal, velocityMetricFlag, mvtRetestNote, TA_POPULATION_MVT } from '../../../engines/strength-sport/strength-sport-ta-mvt.engine';
 import { imtpEnduranceDrop } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
 import { correctivesForWeakPoint, correctiveSessionFor, correctiveBlockFor, correctivesByError, tagsForBarMetrics, tagsForVelocityLoss, tagsForMobility, TA_ERROR_TAG_RU, correctiveById, correctiveExportLines, protocolForPreferred, correctionOrderFor, complexesForWeakPoint, complexExportLines, primersForWeakPoint, correctiveHowNot, estimateCorrectiveKg, seasonPhaseForCompetition } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
@@ -910,6 +910,14 @@ export const WLDiagnosticsHub: React.FC = () => {
       return ymaxVerdict(y, bw, progSexEff);
     } catch { return null; }
   }, [state.yMaxCm, state.progBw, profileWeightKg, progSexEff]);
+  // Wave-0 Э0.7: глиф по факту зоны, а не «⚠» перед вердиктом «в норме весовой»
+  const ymaxZone = useMemo(() => {
+    try {
+      const y = parseFloat(state.yMaxCm);
+      const bw = state.progBw ? parseFloat(state.progBw) : profileWeightKg ?? null;
+      return ymaxZoneOf(y, bw, progSexEff);
+    } catch { return 'noData' as const; }
+  }, [state.yMaxCm, state.progBw, profileWeightKg, progSexEff]);
 
   // V5-V1: уход под штангу + приём (белый лист V3/V4 — тяги покрыты, turnover нет)
   const turnoverNote = useMemo(() => {
@@ -1239,7 +1247,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2000);
       return;
     }
-    setToast(`✓ Годовой синк ТА: нед ${startWeek}–${startWeek + weeks.length - 1} (he_ta_annual_sync_v1)`);
+    setToast(`📦 Оверлей ТА сохранён локально: нед ${startWeek}–${startWeek + weeks.length - 1} · he_ta_annual_sync_v1. Годовой планировщик его пока НЕ читает — не жди эффекта в годовом блоке.`);
     setTimeout(() => setToast(''), 2500);
   };
 
@@ -1319,7 +1327,7 @@ export const WLDiagnosticsHub: React.FC = () => {
     try {
       const pats = extractBfPCAPatterns(pts.map(p => p.x), pts.map(p => p.y));
       const p1 = pats.find(p => p.pattern === 1), p3 = pats.find(p => p.pattern === 3);
-      if (p1 && p3) bf = `bfPCA P1 ${p1.score} (r ${p1.correlationWithPerformance}) · P3 ×${p3.score} ${p3.isOptimal ? 'OK' : 'много пересечений'}`;
+      if (p1 && p3) bf = `bfPCA P1 ${p1.score} · P3 ×${p3.score} ${p3.isOptimal ? 'OK' : 'много пересечений'} (коэфф. из Kipp 2024 — референс, не твоё измерение)`;
     } catch { /* noop */ }
     setState(s => ({ ...s, xLoopCm: String(res.xLoop), yMaxCm: String(res.yMax), peakVelMs: String(res.vmax), fvrHAcc: String(res.hAcc), bfPattern: bf,
       // V5-П2: turnover из трекинга — только в пустое поле (ручной ввод приоритетнее)
@@ -1354,7 +1362,11 @@ export const WLDiagnosticsHub: React.FC = () => {
       try { window.dispatchEvent(new CustomEvent('profile-updated')); } catch {}
       setToast('✓ Размах/плечи → профиль');
       setTimeout(() => setToast(''), 2000);
-    } catch { /* noop */ }
+    } catch {
+      // Wave-0 Э0.4: был пустой catch — пользователь не видел, что запись в профиль не вышла
+      setToast('⚠ Не записано в профиль — хранилище переполнено');
+      setTimeout(() => setToast(''), 3000);
+    }
   };
 
   const applyMobilityToProfile = () => {
@@ -1379,7 +1391,11 @@ export const WLDiagnosticsHub: React.FC = () => {
       try { window.dispatchEvent(new CustomEvent('profile-updated')); } catch {}
       setToast(`✓ Мобильность ${uniq.join(', ') || 'OK'} → профиль (учтётся в ТА-плане)`);
       setTimeout(() => setToast(''), 2500);
-    } catch {}
+    } catch {
+      // Wave-0 Э0.4: был пустой catch при обещании «учтётся в ТА-плане»
+      setToast('⚠ Ограничения НЕ записаны в профиль — они не учтутся в плане');
+      setTimeout(() => setToast(''), 3500);
+    }
   };
 
   // E14: обогащённый снапshot (причины + биомеханика + топ-3 + попытки)
@@ -1636,7 +1652,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 } catch { return null; }
               })()}
               {barMetrics && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Метрика: xLoop {videoQuality.flag === 'rough' ? '≈' : ''}{barMetrics.xLoop}см yMax {barMetrics.yMax}см vmax {barMetrics.vMax} м/с {TA_PEAK_VELOCITY_ZONES.snatch ? `· зона ${taZoneForVelocity(barMetrics.vMax, 'snatch')}` : ''}</div>}
-              {ymaxNote && <div data-wl="ymax-norm" style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>📏 {ymaxNote}</div>}
+              {ymaxNote && <div data-wl="ymax-norm" data-wl-zone={ymaxZone} style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>{ymaxZone === 'ok' ? '📏' : '⚠️'} {ymaxNote}</div>}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 6 }}>
                 <label style={{ fontSize: 10, color: '#fff' }}>Уход, мс<br /><input data-wl="turnover" value={state.turnoverMs} onChange={e => setState(s => ({ ...s, turnoverMs: e.target.value }))} placeholder="420" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>
                 <label style={{ fontSize: 10, color: '#fff' }}>Сед, колено °<br /><input data-wl="turnover" value={state.catchKneeDeg} onChange={e => setState(s => ({ ...s, catchKneeDeg: e.target.value }))} placeholder="75" style={{ width: '100%', marginTop: 4, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px', fontSize: 16, minHeight: 44, boxSizing: 'border-box' as const }} /></label>

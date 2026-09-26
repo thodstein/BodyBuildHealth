@@ -82,18 +82,27 @@ export function loadSMLVPProfile(lift: string): LVPProfile | null {
   return null;
 }
 
-export function saveSMLVPProfile(profile: LVPProfile): void {
+/**
+ * Wave-0 Э0.4: возвращает boolean (было void + молчаливый catch).
+ * Причина: UI показывал «✓ LVP …» ВСЕГДА, даже когда запись в localStorage не прошла
+ * (переполнение квоты) — то есть сообщение о результате было невозможно проверить.
+ * Аддитивно и обратно совместимо: вызывающий код, игнорирующий возврат, не меняется.
+ */
+export function saveSMLVPProfile(profile: LVPProfile): boolean {
+  let ok = false;
   try {
-    if (typeof localStorage === 'undefined') return;
+    if (typeof localStorage === 'undefined') return false;
     const raw = localStorage.getItem(SM_LVP_STORAGE_KEY);
     const all: Record<string, LVPProfile> = raw ? (JSON.parse(raw) as Record<string, LVPProfile>) : {};
     all[profile.lift] = profile;
     localStorage.setItem(SM_LVP_STORAGE_KEY, JSON.stringify(all));
-  } catch { /* noop */ }
-  // Дублируем в общий стор для VBT-движка (он читает общий ключ приоритетно)
+    ok = true;
+  } catch { ok = false; }
+  // Мирно: та же калибровка едет в ВБТ-профиль (в т.ч. армлифтинг) — не блокируем основную запись.
   try {
     saveBaseProfile(profile);
   } catch { /* noop */ }
+  return ok;
 }
 
 /** Валидация ramp: ≥3 точек + покрытие ≥20% + наклон <0 + r² warn. */

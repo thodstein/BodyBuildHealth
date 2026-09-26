@@ -30,6 +30,20 @@ export function ymaxVerdict(yMaxCm: number, bwKg: number | null | undefined, sex
   return `yMax ${yMaxCm} см — в норме весовой (${norm.lo}–${norm.hi})`;
 }
 
+/**
+ * Wave-0 Э0.7: зона yMax относительно весовой нормы.
+ * Раньше UI рисовал префикс «⚠» перед ЛЮБЫМ вердиктом, включая «в норме весовой» —
+ * то есть нормальный результат выглядел как проблема. Теперь глиф выбирается по факту.
+ * Additive: ymaxVerdict() не тронут (его текст и поведение 1-в-1).
+ */
+export function ymaxZone(yMaxCm: number, bwKg: number | null | undefined, sex: string | null | undefined): 'low' | 'ok' | 'high' | 'noData' {
+  const norm = ymaxNormForBodyweight(bwKg, sex);
+  if (!norm || !Number.isFinite(yMaxCm) || yMaxCm <= 0) return 'noData';
+  if (yMaxCm < norm.lo) return 'low';
+  if (yMaxCm > norm.hi) return 'high';
+  return 'ok';
+}
+
 export interface FemalePhaseNorm {
   finalAccS: [number, number];
   hipAmortDeg: [number, number];
