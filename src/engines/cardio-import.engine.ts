@@ -153,6 +153,13 @@ const HEADER_ALIASES: Record<string, string[]> = {
   hr: ['hr','pulse','avg_hr','avghr','avg_heart_rate','average_heart_rate','heart_rate','средний_пульс','пульс','avgheartrate','avg_hr_bpm','average_hr','hr_avg','avg_pulse','heartrate'],
   calories: ['calories','kcal','калории','energy','energy_burned','calories_burned','calories_kcal','energyburned','total_calories','totalcalories','ккал','cal','cal_burned'],
   type: ['type','activity','activity_type','exercise_type','тип','sport','workout_type','exercise','activitytype','workouttype','спорт','тип_тренировки','workoutactivitytype'],
+  /**
+   * Спринт 5.2 (аудит): дисциплина — ОТДЕЛЬНАЯ колонка. Раньше единственным
+   * носителем был столбец типа (`sport`), из-за чего «велосипед» попадал и в тип,
+   * и в дисциплину; при этом колонка `Дисциплина` (наш собственный экспорт)
+   * вообще игнорировалась — круговой импорт терял дисциплину.
+   */
+  discipline: ['discipline','дисциплина','вид_активности','activity_kind','sport_kind','sporttype','sport_type'],
   notes: ['notes','note','заметка','заметки','comment','comments','description','title','name','workout_notes'],
 };
 
@@ -225,6 +232,9 @@ export function parseCardioCsv(text: string, fileName = 'import.csv'): CardioImp
   const colCal = findCol(hdr, HEADER_ALIASES.calories);
   const colType = findCol(hdr, HEADER_ALIASES.type);
   const colNotes = findCol(hdr, HEADER_ALIASES.notes);
+  // Спринт 5.2: дисциплина читается из своей колонки; если её нет — из старой
+  // (тип-подобной), чтобы не сломать файлы, где «sport» значил дисциплину.
+  const colDiscipline = findCol(hdr, HEADER_ALIASES.discipline);
 
   if (colDate < 0) warnings.push('Колонка даты не найдена — ищем date/дата/start/begin/time');
   if (colDur < 0) warnings.push('Колонка длительности не найдена — будет 30 мин по умолчанию');
@@ -263,6 +273,7 @@ export function parseCardioCsv(text: string, fileName = 'import.csv'): CardioImp
     }
     const rawType = colType >= 0 ? cols[colType] : '';
     const type = mapActivityToCardioType(rawType);
+    const rawDiscipline = colDiscipline >= 0 ? String(cols[colDiscipline] ?? '') : rawType;
     const notes = colNotes >= 0 ? String(cols[colNotes] || '').trim().slice(0, 300) : undefined;
 
     const entry: CardioLogEntry = {
@@ -276,7 +287,8 @@ export function parseCardioCsv(text: string, fileName = 'import.csv'): CardioImp
       rpe: undefined,
       completed: true,
       notes: notes || undefined,
-      sport: sanitizeCardioSport(rawType),
+      // Дисциплина: своя колонка приоритетнее; иначе старое поведение (тип-столбец).
+      sport: sanitizeCardioSport(rawDiscipline),
       source: 'import',
     };
     entries.push(entry);

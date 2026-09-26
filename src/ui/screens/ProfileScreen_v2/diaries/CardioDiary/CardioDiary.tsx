@@ -270,9 +270,11 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   };
 
   const exportCsv = () => {
-    const head = 'Дата,Тип,Минуты,Км,Темп,Ккал,ЧСС ср.,RPE,День ног,Заметка,Завершено\n';
+    // Спринт 5.2: колонка «Дисциплина» — иначе данные уходят из приложения, а
+    // круговой импорт теряет дисциплину (её больше некуда восстановить).
+    const head = 'Дата,Тип,Дисциплина,Минуты,Км,Темп,Ккал,ЧСС ср.,RPE,День ног,Заметка,Завершено\n';
     const body = log.map(e =>
-      [e.date, TYPES.find(t => t.id === e.type)?.label ?? e.type, e.durationMin,
+      [e.date, TYPES.find(t => t.id === e.type)?.label ?? e.type, CARDIO_SPORT_RU[sanitizeCardioSport(e.sport)], e.durationMin,
         e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '',
         legDayDates.has(e.date) ? 'да' : '', e.notes ?? '', e.completed ? 'да' : 'нет'].map(csvCell).join(','),
     ).join('\n');
@@ -283,7 +285,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const printPdf = () => {
     const typeLabel = (id: CardioType) => TYPES.find(t => t.id === id)?.label ?? id;
     const rows = log.map(e =>
-      `<tr><td>${escapeHtml(e.date)}</td><td>${escapeHtml(typeLabel(e.type))}</td><td>${e.durationMin}</td>` +
+      `<tr><td>${escapeHtml(e.date)}</td><td>${escapeHtml(typeLabel(e.type))}</td><td>${escapeHtml(CARDIO_SPORT_RU[sanitizeCardioSport(e.sport)])}</td><td>${e.durationMin}</td>` +
       `<td>${e.distanceKm != null ? e.distanceKm : ''}</td><td>${cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? ''}</td><td>${e.calories != null ? e.calories : ''}</td>` +
       `<td>${e.avgHr ?? ''}</td><td>${e.rpe ?? ''}</td><td>${legDayDates.has(e.date) ? '🦵' : ''}</td><td>${escapeHtml(e.notes ?? '')}</td></tr>`,
     ).join('');
@@ -307,7 +309,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   <div class="card"><b>Всего</b><br>${doneSessions} сесс · ${totalMinutes} мин</div>
 </div>
 <table>
-  <tr><th>Дата</th><th>Тип</th><th>Минуты</th><th>Км</th><th>Темп</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th><th>День ног</th><th>Заметка</th></tr>
+  <tr><th>Дата</th><th>Тип</th><th>Дисциплина</th><th>Минуты</th><th>Км</th><th>Темп</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th><th>День ног</th><th>Заметка</th></tr>
   ${rows}
 </table>`;
     // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
