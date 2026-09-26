@@ -256,6 +256,9 @@ export const CombatPlanView: React.FC<Props> = ({
             <button
               onClick={() => setExpandedWeek(isOpen ? null : wk.week - 1)}
               className="cb-plan-weekhead"
+              aria-expanded={isOpen}
+              aria-controls={`cb-wk-${wk.week}`}
+              aria-label={`Неделя ${wk.week}${wk.deload ? ' · разгрузка' : (wk as any).taper ? ' · тапер' : ''}`}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 14px', minHeight: 64, background: 'transparent', border: 'none',
                 cursor: 'pointer', textAlign: 'left',
@@ -284,7 +287,7 @@ export const CombatPlanView: React.FC<Props> = ({
             )}
 
             {isOpen && (
-              <div className="cb-plan-weekbody" style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div id={`cb-wk-${wk.week}`} className="cb-plan-weekbody" style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button className="cb-plan-copyweek" onClick={() => {
                     const txt = wk.sessions.map(s => `${s.sessionTag} (${s.character}) д${s.day}:\n` + s.exercises.map(e => `  ${e.name} ${e.sets}x${e.reps} ${e.weight ? e.weight + 'кг' : ''} RIR${e.rir} ${e.tempo} отдых${e.restSeconds}с${e.comment ? ' // ' + e.comment : ''}`).join('\n')).join('\n\n');

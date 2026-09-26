@@ -149,6 +149,35 @@ for (const f of ['CardioUI', 'CardioWeekEditor', 'CardioCatalogSection', 'Cardio
   if (native.length) mustContain(p, 'NO_NATIVE_SELECT', `native <select> в ${f}: ${native[0].trim().slice(0, 60)}`);
 }
 
+// 7b. Единоборства: APK-хуки боёв, 44px на тапах, никаких нативных <select>/checkbox.
+const COMBAT_SRC = 'src/ui/screens/combat/';
+for (const [file, hooks] of [
+  ['CombatUI.tsx', ['cb-chip', 'cb-pop-trig', 'cb-pop-sheet', 'cb-pop-opt', 'cb-pop-done', 'cb-pop-ok', 'cb-switch']],
+  ['CombatConstructor.tsx', ['cb-steps', 'cb-pane', 'cb-split-card', 'cb-build', 'cb-next', 'cb-profile', 'cb-empty', 'cb-msg', 'cb-sec-head', 'cb-cycle-card']],
+  ['CombatPlanView.tsx', ['cb-plan-actions', 'cb-plan-weeks', 'cb-plan-week', 'cb-plan-weekhead', 'cb-plan-sess', 'cb-plan-ex', 'cb-plan-export']],
+  ['combat-annual-card.tsx', ['cb-plan-annual', 'annual-dday']],
+]) {
+  for (const hook of hooks) {
+    mustContain(COMBAT_SRC + file, hook, `combat hook ${hook} in ${file}`);
+  }
+}
+// Шаги конструктора: хук data-cb="step" + APK-правило 44px по нему.
+mustContain(COMBAT_SRC + 'CombatConstructor.tsx', `data-cb="step"`, 'combat step hook');
+mustContain('src/styles-native.css', `[data-cb='step']`, 'combat step css hook');
+// 44px на тап-таргеты (guard на регресс к 40px — было .cb-chip).
+mustContain('src/styles-native.css', '.cb-chip {\n  min-height: 44px !important', 'combat cb-chip 44px');
+// a11y: aria-current на шагах + live-region на тосте.
+mustContain(COMBAT_SRC + 'CombatConstructor.tsx', `aria-current={active ? 'step' : undefined}`, 'combat step aria-current');
+mustContain(COMBAT_SRC + 'CombatConstructor.tsx', 'role="status" aria-live="polite"', 'combat toast live region');
+// …и ни одного нативного <select>/checkbox в боевом UI.
+for (const f of ['CombatConstructor.tsx', 'CombatPlanView.tsx', 'CombatUI.tsx', 'combat-annual-card.tsx']) {
+  const p = COMBAT_SRC + f;
+  const native = readFileSync(p, 'utf8')
+    .split(/\r?\n/)
+    .filter(l => (/<select[\s>]/.test(l) || /type=["']checkbox["']/.test(l)) && !/^\s*(\*|\/\/)/.test(l));
+  if (native.length) mustContain(p, 'NO_NATIVE_SELECT', `нативный контрол в ${f}: ${native[0].trim().slice(0, 60)}`);
+}
+
 // 8. Секции native-слоя на месте (молчаливый откат хвоста файла).
 for (const sec of [
   '67. SUPPORT + SECONDARY HEADS',
@@ -160,6 +189,11 @@ for (const sec of [
   '73. MOBILE FIT',
   '74. BOTTOM FIT',
   '75. ANCHORED BOTTOMS',
+  '92. COMBAT CONSTRUCTOR PRO',
+  '93. COMBAT PLAN PRO',
+  '98. COMBAT POPUPS PRO',
+  '114. COMBAT BB-STYLE',
+  '115. COMBAT CARDS/BUTTONS',
 ]) mustContain('src/styles-native.css', sec, `css section ${sec}`);
 
 // 9. Главная: картинка целиком (contain), без своих надписей поверх верха.

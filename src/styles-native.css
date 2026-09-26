@@ -10929,9 +10929,6 @@ html.app-native .combat-planview .cb-plan-copyweek:active {
 html.app-native .combat-planview .cb-plan-sess {
   border-radius: 16px !important;
 }
-html.app-native .combat-planview .cb-plan-sesshead {
-  font-variant-numeric: tabular-nums !important;
-}
 html.app-native .combat-planview .cb-plan-ex {
   border-radius: 14px !important;
 }
@@ -11525,7 +11522,7 @@ html.app-native .combat-constructor .cb-pop-ok:active {
   transform: scale(0.96) !important;
 }
 html.app-native .combat-constructor .cb-chip {
-  min-height: 40px !important;
+  min-height: 44px !important;
   border-radius: 14px !important;
   font-size: 12px !important;
   font-variant-numeric: tabular-nums !important;
@@ -13350,6 +13347,25 @@ html.app-native .combat-constructor .cb-switch:active {
 html.app-native .combat-constructor .cb-switch:focus-visible {
   outline: 2px solid rgba(168, 85, 247, 0.7) !important;
   outline-offset: 2px !important;
+}
+/* E2/E3: хуки шага (data-cb="step") — активная пилюля, disabled, фокус.
+ * Раньше шаги красились только через `.cb-steps button`, а `.cb-steps` висел
+ * на внешнем враппере, а не на скроллере → scroll-snap не работал. */
+html.app-native .combat-constructor [data-cb='step'] {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+html.app-native .combat-constructor [data-cb='step'][data-active='true'] {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 1), rgba(236, 72, 153, 0.85)) !important;
+  color: #fff !important;
+}
+html.app-native .combat-constructor [data-cb='step']:disabled {
+  opacity: 0.45 !important;
+}
+/* E2: обратный отсчёт до боя в годовом блоке */
+html.app-native .combat-constructor [data-cb='annual-dday'] {
+  min-height: 44px !important;
+  font-variant-numeric: tabular-nums !important;
 }
 @media (max-width: 380px) {
   html.app-native .combat-constructor .cb-pane[data-pane='athlete'] div[style*='grid-template-columns: 1fr 1fr 1fr'] {

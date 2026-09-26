@@ -598,13 +598,21 @@ export const CombatConstructor: React.FC = () => {
   const groupEndKeys = new Set(Object.values(STEP_GROUPS).map(arr => arr[arr.length - 1]).filter(Boolean));
 
   const renderStepNav = () => (
-    <div style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 2, display: 'flex', gap: 4, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center' }}>
+    <div className="cb-steps" aria-label="Шаги конструктора" style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 2, display: 'flex', gap: 4, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center' }}>
       {stepList.map(s => {
         const active = step === s;
         const disabled = s === 'export' ? exportLocked : needsPlan(s);
         return (
           <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
-            <button disabled={disabled} onClick={() => { if (disabled) return; go(s); }} style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: disabled ? 0.45 : 1 }}>{STEP_LABEL_RU[s]}</button>
+            <button
+              disabled={disabled}
+              onClick={() => { if (disabled) return; go(s); }}
+              data-cb="step"
+              data-step={s}
+              data-active={active ? 'true' : 'false'}
+              aria-current={active ? 'step' : undefined}
+              style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: disabled ? 0.45 : 1 }}
+            >{STEP_LABEL_RU[s]}</button>
             {groupEndKeys.has(s) && s !== stepList[stepList.length - 1] && <span style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', flexShrink: 0 as const, margin: '0 2px', alignSelf: 'center' }} />}
           </span>
         );
@@ -658,7 +666,7 @@ export const CombatConstructor: React.FC = () => {
 
         <div className="cb-progress"><ProgressBar value={stepIndex} max={7} color={ACCENT} height={8} /></div>
 
-        <div className="cb-steps">{renderStepNav()}</div>
+        {renderStepNav()}
 
         <div className="cb-status" style={{ ...ROW, justifyContent: 'space-between', gap: 8 }}>
           <div style={ROW}>
@@ -675,7 +683,7 @@ export const CombatConstructor: React.FC = () => {
             )}
           </div>
           {msg && (
-            <span className="cb-msg" style={{
+            <span className="cb-msg" role="status" aria-live="polite" style={{
               fontSize: 11.5, fontWeight: 750, color: '#fff', background: 'linear-gradient(135deg, rgba(168,85,247,0.18), rgba(236,72,153,0.14))',
               border: '1px solid rgba(255,255,255,0.10)', padding: '6px 12px', borderRadius: 20, backdropFilter: 'blur(8px)',
               boxShadow: '0 4px 16px rgba(0,0,0,0.18)', animation: 'fadeInUp 0.22s ease',
