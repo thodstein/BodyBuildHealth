@@ -71,7 +71,11 @@ export function migrateStrengthSportStorage(): boolean {
   }
 }
 
-export function saveStrengthSportPlan(plan: StrengthSportPlan): void {
+/** Возвращает true, если план действительно записан. false = квота/хранилище недоступно
+ *  (раньше был void + безусловное событие «сохранено»: UI и хабы вели себя так,
+ *  будто план записан, а после перезагрузки он исчезал). */
+export function saveStrengthSportPlan(plan: StrengthSportPlan): boolean {
+  let ok = false;
   try {
     localStorage.setItem(KEY, JSON.stringify(plan));
     const list: StrengthSportPlan[] = loadStrengthSportPlans();
@@ -79,6 +83,7 @@ export function saveStrengthSportPlan(plan: StrengthSportPlan): void {
     if (idx >= 0) list[idx] = plan;
     else list.unshift(plan);
     localStorage.setItem(LIST_KEY, JSON.stringify(list.slice(0, 20)));
+    ok = true;
   } catch (e) {
     // Квота/приватный режим — план НЕ сохранён. Раньше тишина: пользователь
     // считал, что сохранил, и терял работу при перезагрузке.
@@ -86,7 +91,9 @@ export function saveStrengthSportPlan(plan: StrengthSportPlan): void {
   }
   // ROUND-10: аудит/покрытие хабов ТА и стронга читают этот ключ живьём — будим слушателей
   // (иначе смонтированный хаб с аудитом не обновлялся после пересборки плана в конструкторе).
-  try { if (typeof window !== 'undefined') window.dispatchEvent(new Event('he-strength-sport-plan-saved')); } catch { /* noop */ }
+  // Событие — только при реальной записи, иначе это ложь подписчикам.
+  if (ok) { try { if (typeof window !== 'undefined') window.dispatchEvent(new Event('he-strength-sport-plan-saved')); } catch { /* noop */ } }
+  return ok;
 }
 
 export function loadStrengthSportPlan(): StrengthSportPlan | null {

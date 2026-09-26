@@ -85,4 +85,38 @@ describe('storage v1→v3 migration', () => {
   it('syncStrengthSportToCloud: no-throw вне TG (ленивый импорт cloud-kv)', () => {
     expect(() => syncStrengthSportToCloud()).not.toThrow();
   });
+
+  it('квота: save возвращает false и НЕ шлёт «сохранено» (была ложь подписчикам)', () => {
+    const p:any = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{} } as any);
+    let fired = 0;
+    const h = () => { fired++; };
+    (global as any).window?.addEventListener?.('he-strength-sport-plan-saved', h);
+    const good = store;
+    (global as any).localStorage = {
+      getItem:(k:string)=> good[k] ?? null,
+      setItem:()=> { const e:any = new Error('QuotaExceededError'); e.name = 'QuotaExceededError'; throw e; },
+      removeItem:(k:string)=> delete good[k],
+    } as any;
+    let ok: boolean | undefined;
+    try { ok = saveStrengthSportPlan(p); }
+    finally {
+      (global as any).localStorage = { getItem:(k:string)=> good[k] ?? null, setItem:(k:string,v:string)=> { good[k]=v; }, removeItem:(k:string)=> delete good[k] } as any;
+      (global as any).window?.removeEventListener?.('he-strength-sport-plan-saved', h);
+    }
+    expect(ok).toBe(false);
+    expect(fired).toBe(0);   // хабы не должны перечитывать «несуществующее» сохранение
+  });
+
+  it('успешная запись возвращает true и событие уходит', () => {
+    const p:any = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{} } as any);
+    let fired = 0;
+    const h = () => { fired++; };
+    (global as any).window?.addEventListener?.('he-strength-sport-plan-saved', h);
+    try {
+      expect(saveStrengthSportPlan(p)).toBe(true);
+      expect(fired).toBe(1);
+    } finally {
+      (global as any).window?.removeEventListener?.('he-strength-sport-plan-saved', h);
+    }
+  });
 });

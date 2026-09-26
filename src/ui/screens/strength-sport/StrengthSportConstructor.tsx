@@ -355,7 +355,11 @@ export const StrengthSportConstructor: React.FC = () => {
       } catch { /* noop */ }
     } catch { /* noop */ }
     setPlan(p);
-    saveStrengthSportPlan(p);
+    const saved = saveStrengthSportPlan(p);
+    if (!saved) {
+      // План в памяти есть, но на диск не лёг — говорим честно, а не «собрано».
+      setMsg('⚠ План собран, но НЕ сохранён (нет места в хранилище) — после перезагрузки пропадёт');
+    }
     try {
       const bw = (input as any).bodyweight || 80;
       const nut = { proteinG: Math.round(bw * ((input as any).weightCutKg ? 2.3 : 2.0)), carbsG: Math.round(bw * ((input as any).weightCutKg ? 3 : 5)), note: `TA/стронг ${input.mode} ${input.weeks}нед`, bodyweight: bw, mode: input.mode };
@@ -419,13 +423,16 @@ export const StrengthSportConstructor: React.FC = () => {
       setTimeout(()=>setMsg(''), 3000);
       return;
     }
+    let ok = false;
     try {
       const p2 = { ...r.plan, rationale: [...(r.plan.rationale || []), ...r.notes] };
       setPlan(p2);
-      saveStrengthSportPlan(p2);
+      ok = saveStrengthSportPlan(p2);
       setHasSpecPrev(true);
     } catch { /* noop */ }
-    setMsg(`✓ Спец-блок встроен: коррекций ${r.injected} (нед: ${r.plan.weeksData.length})`);
+    setMsg(ok
+      ? `✓ Спец-блок встроен: коррекций ${r.injected} (нед: ${r.plan.weeksData.length})`
+      : '⚠ Спец-блок встроен, но НЕ сохранён (нет места в хранилище) — пропадёт при перезагрузке');
     setTimeout(()=>setMsg(''), 3000);
   };
 
@@ -468,13 +475,16 @@ export const StrengthSportConstructor: React.FC = () => {
       setTimeout(()=>setMsg(''), 3000);
       return;
     }
+    let ok = false;
     try {
       const p2 = { ...r.plan, rationale: [...(r.plan.rationale || []), ...r.notes] };
       setPlan(p2);
-      saveStrengthSportPlan(p2);
+      ok = saveStrengthSportPlan(p2);
       setHasSMSpecPrev(true);
     } catch { /* noop */ }
-    setMsg(`✓ Волна коррекции встроена: ${r.injected} (нед: ${r.plan.weeksData.length})`);
+    setMsg(ok
+      ? `✓ Волна коррекции встроена: ${r.injected} (нед: ${r.plan.weeksData.length})`
+      : '⚠ Волна коррекции встроена, но НЕ сохранена (нет места в хранилище) — пропадёт при перезагрузке');
     setTimeout(()=>setMsg(''), 3000);
   };
 
@@ -488,6 +498,7 @@ export const StrengthSportConstructor: React.FC = () => {
       setTimeout(()=>setMsg(''), 2500);
       return;
     }
+    let ok = false;
     try {
       const snap = JSON.parse(raw);
       const curId = (plan as any)?.id ?? null;
@@ -500,7 +511,7 @@ export const StrengthSportConstructor: React.FC = () => {
       }
       const p2 = rollbackSMPlanInject(snap.plan);
       setPlan(p2);
-      saveStrengthSportPlan(p2);
+      ok = saveStrengthSportPlan(p2);
       try { sessionStorage.removeItem(SM_INJECT_PREV_KEY); } catch {}
     } catch {
       setMsg('Ошибка отката — план не тронут');
@@ -508,7 +519,7 @@ export const StrengthSportConstructor: React.FC = () => {
       return;
     }
     setHasSMSpecPrev(false);
-    setMsg('↩ Волна коррекции откачена');
+    setMsg(ok ? '↩ Волна коррекции откачена' : '⚠ Откат применён, но НЕ сохранён (нет места в хранилище)');
     setTimeout(()=>setMsg(''), 2500);
   };
 
