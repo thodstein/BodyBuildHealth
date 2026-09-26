@@ -169,4 +169,19 @@ describe('E8.3 — сила хвата на экране', () => {
     expect(screen.getByText(/Своя база/)).toBeTruthy();
     expect(screen.getByText(/без популяционной нормы/)).toBeTruthy();
   });
+
+  it('ориентир P50 не показывается без пола и честно зовёт внести пол', () => {
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.queryByText(/Ориентир P50 \d/)).toBeNull();
+    expect(screen.getByText(/Ориентир P50: внесите пол/)).toBeTruthy();
+  });
+
+  it('с полом виден ориентир P50 с PMID и пометкой, что это не гейт', () => {
+    const plan = mkPlan();
+    (plan as any).inputSnapshot = { ...(plan as any).inputSnapshot, sex: 'male' };
+    render(<CbCampMeasurementsCard plan={plan} />);
+    expect(screen.getByText(/Ориентир P50 43.0 кг/)).toBeTruthy();
+    expect(screen.getByText(/не гейт/)).toBeTruthy();
+    expect(screen.getByText(/34330493/)).toBeTruthy();
+  });
 });

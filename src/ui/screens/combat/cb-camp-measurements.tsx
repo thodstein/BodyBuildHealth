@@ -11,7 +11,7 @@ import {
   loadWeighIns, addWeighIn, removeWeighIn, weighTrajectory, cutDeviation,
   loadSparring, addSparring, removeSparring, sparringSummary, sparringJournalToLoad,
   leaScreen, sleepVerdict, heatProtocol,
-  loadGrip, addGrip, gripSummary,
+  loadGrip, addGrip, gripSummary, gripP50Ref, GRIP_P50_AGE,
   type SparType, type GripHand,
 } from '../../../engines/combat/combat-measurements.engine';
 
@@ -94,6 +94,7 @@ export const CbCampMeasurementsCard: React.FC<{
   const [gKg, setGKg] = useState('');
   const [gMsg, setGMsg] = useState<string | null>(null);
   const gSum = useMemo(() => gripSummary(grip), [grip]);
+  const gP50 = useMemo(() => gripP50Ref(snap?.sex), [snap?.sex]);
   const onAddGrip = useCallback(() => {
     const wrote = addGrip(gDate, gHand, Number(gKg.replace(',', '.')));
     setGMsg(wrote
@@ -214,6 +215,13 @@ export const CbCampMeasurementsCard: React.FC<{
           {gSum.note}
         </Line>
         <span data-cb="grip-source" style={{ fontSize: 11, color: '#fff' }}>Своя база: {gSum.source}</span>
+        {gP50 ? (
+          <div data-cb="grip-p50" style={{ fontSize: 12, color: '#fff' }}>
+            Ориентир P50 {gP50.kg.toFixed(1)} кг ({GRIP_P50_AGE}) — сравнение с общей популяцией, не гейт.
+            {gSum.bestL !== null ? ` Ваш пик: ${(((gSum.bestL) / gP50.kg) * 100).toFixed(0)}% от P50.` : ''}
+          </div>
+        ) : null}
+        <span data-cb="grip-p50-source" style={{ fontSize: 11, color: '#fff' }}>{gP50 ? gP50.source : 'Ориентир P50: внесите пол в профиле.'}</span>
       </div>
 
       {/* 8.4 — LEA / RED-S */}

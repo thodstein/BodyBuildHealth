@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   COMBAT_GRIP_KEY, COMBAT_GRIP_CAP, GRIP_ASYMMETRY_NOTICE_PCT, GRIP_SOURCE,
+  GRIP_P50_REF_MALE, GRIP_P50_REF_FEMALE, GRIP_P50_AGE, GRIP_P50_SOURCE, gripP50Ref,
   GripEntry, normalizeGrip, loadGrip, addGrip, removeGrip, gripSummary,
 } from '../combat-measurements.engine';
 
@@ -146,5 +147,35 @@ describe('E8.3.4 — честность источника', () => {
     const gripBlock = src.slice(src.indexOf('8.3 Журнал силы хвата'), src.indexOf('8.4 Скрининг'));
     // никаких «минимальных норм»/«нормативов» с числами
     expect(gripBlock).not.toMatch(/МИНИМУМ|МИНИМАЛЬНАЯ НОРМА|normMin|requiredKg/);
+  });
+});
+
+describe('E8.3.5 — ориентир P50 из публикации (не гейт)', () => {
+  it('значения совпадают с PMID 34330493', () => {
+    expect(GRIP_P50_REF_MALE).toBe(43.0);
+    expect(GRIP_P50_REF_FEMALE).toBe(26.0);
+    expect(GRIP_P50_SOURCE).toContain('34330493');
+  });
+
+  it('подпись честно называет это ориентиром, а не нормой единоборств', () => {
+    expect(GRIP_P50_SOURCE).toMatch(/Ориентир, не норма/);
+    expect(GRIP_P50_SOURCE).toMatch(/Колумбия/);
+  });
+
+  it('ориентир выбирается по полу, без пола — не сравниваем', () => {
+    expect(gripP50Ref('male')!.kg).toBe(43.0);
+    expect(gripP50Ref('female')!.kg).toBe(26.0);
+    expect(gripP50Ref('м')!.kg).toBe(43.0);
+    expect(gripP50Ref(undefined)).toBeNull();
+    expect(gripP50Ref(null)).toBeNull();
+    expect(gripP50Ref('что-то')).toBeNull();
+  });
+
+  it('ориентир НЕ меняет вердикт — вердикт только от своей базы', () => {
+    // слабая рука при низком P50 всё равно даёт asym, а не «ниже нормы»
+    const s = gripSummary([g('2026-09-01', 'L', 30), g('2026-09-01', 'R', 22)]);
+    expect(s.level).toBe('asym');
+    // в вердикте нет уровня про «норму»
+    expect(['ok', 'asym', 'dropped', 'no_data', 'one_hand']).toContain(s.level);
   });
 });
