@@ -15,6 +15,7 @@ import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, replaceCardioLog,
   cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal, cardioPaceMinPerKm,
   validateCardioLogFields, cardioHrCompliance,
+  sanitizeCardioSport, CARDIO_SPORTS, CARDIO_SPORT_RU, type CardioSport,
   type CardioLogEntry,
 } from '../../../../../engines/lms/cardio-diary.engine';
 import { loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, cardioLegDayForDate, CARDIO_PHASE_LABELS, type CardioType } from '../../../../../engines/lms/cardio.engine';
@@ -53,6 +54,10 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const [hr, setHr] = useState('');
   const [km, setKm] = useState('');
   const [notes, setNotes] = useState('');
+  // Спринт 5.2: дисциплина записи. Форма профиля — второй вход в дневник, и
+  // без этого поля ручные сессии навсегда оставались <другое> (мимо разбивки TID).
+  // По умолчанию <другое>: не выдумываем — чип в один тап.
+  const [sport, setSport] = useState<CardioSport>('other');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [undo, setUndo] = useState<CardioLogEntry[] | null>(null);
@@ -118,6 +123,8 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     setHr(e.avgHr != null ? String(e.avgHr) : '');
     setKm(e.distanceKm != null ? String(e.distanceKm) : '');
     setNotes(e.notes ?? '');
+    // Спринт 5.2: правка не должна терять дисциплину записи.
+    setSport(sanitizeCardioSport(e.sport));
   };
 
   const stats7 = useMemo(() => cardioLogStats(log, 7), [log]);
@@ -226,6 +233,10 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
       calories: estimateCardioEntryKcal(type, dur, weight ?? undefined),
       distanceKm: Number(String(km).replace(',', '.')) > 0 ? Math.max(0, Math.min(200, Math.round(Number(String(km).replace(',', '.')) * 10) / 10)) : undefined,
       notes: notes.trim() ? notes.trim().slice(0, 300) : undefined,
+      // Спринт 5.2/5.3: дисциплина + provenance. Раньше форма профиля не писала
+      // ни то, ни другое — запись была анонимной для разбивки TID.
+      sport: sanitizeCardioSport(sport),
+      source: 'manual',
     };
     setUndo(log);
     saveCardioLogEntry(entry);
@@ -450,6 +461,21 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 aria-label={`Тип: ${t.label}`}
               >
                 {t.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', paddingBottom: 6 }} data-cardio="diary-sport">
+            <span style={{ fontSize: 10, color: '#fff' }}>Дисциплина:</span>
+            {CARDIO_SPORTS.map(s => (
+              <button
+                key={s}
+                data-sport={s}
+                style={sport === s ? chipActive(ACCENT) : chip(ACCENT)}
+                onClick={() => setSport(s)}
+                aria-pressed={sport === s}
+                aria-label={`Дисциплина: ${CARDIO_SPORT_RU[s]}`}
+              >
+                {CARDIO_SPORT_RU[s]}
               </button>
             ))}
           </div>
