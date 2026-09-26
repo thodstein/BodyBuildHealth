@@ -364,22 +364,32 @@ export const StrengthSportConstructor: React.FC = () => {
       const wc = (p as any).weightCutProtocol;
       if (wc) localStorage.setItem('he_strength_weightcut_payload', JSON.stringify(wc));
     } catch {}
+    let annualFailed = false;
     try {
       setBuildStage('Собираем год…'); await tick();
       const hist = loadStrengthSportPlans().slice(0, 6);
-      const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks }) : buildAnnualFromSS(hist);
-      saveAnnualSS(ann);
-      setAnnual(ann);
-      try { syncStrengthAnnualToGeneral(ann); } catch {}
-      try {
-        localStorage.setItem('he_strength_annual_sync_v1', JSON.stringify({ updatedAt: new Date().toISOString(), totalWeeks: ann.totalWeeks, blocks: ann.blocks.map(b=> ({ startWeek: b.startWeek, weeks: b.weeks, mode: b.mode })) }));
-        window.dispatchEvent(new CustomEvent('he-strength-annual-updated', { detail: ann }));
-      } catch {}
+      // История пуста (или битая и не прочиталась) → год НЕ собираем. Иначе
+      // buildAnnualFromSS([]) даёт «год» из 0 блоков, он сохраняется, рассылается
+      // событием, и UI показывает «Год: 0нед · 0 блоков» как будто год собран.
+      if (!hist.length) {
+        annualFailed = true;
+      } else {
+        const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks }) : buildAnnualFromSS(hist);
+        saveAnnualSS(ann);
+        setAnnual(ann);
+        try { syncStrengthAnnualToGeneral(ann); } catch {}
+        try {
+          localStorage.setItem('he_strength_annual_sync_v1', JSON.stringify({ updatedAt: new Date().toISOString(), totalWeeks: ann.totalWeeks, blocks: ann.blocks.map(b=> ({ startWeek: b.startWeek, weeks: b.weeks, mode: b.mode })) }));
+          window.dispatchEvent(new CustomEvent('he-strength-annual-updated', { detail: ann }));
+        } catch {}
+      }
     } catch {}
     // Итоговое сообщение — по факту записи. Раньше тут стояло безусловное «✦ План собран»,
     // и честное предупреждение (ставилось выше) затиралось этим же кадром.
-    if (saved) { setMsg('✦ План собран'); setTimeout(()=>setMsg(''), 2200); }
-    else { setMsg('⚠ План собран, но НЕ сохранён (нет места в хранилище) — после перезагрузки пропадёт'); setTimeout(()=>setMsg(''), 4500); }
+    // Тот же принцип — с годом: его провал не должен исчезнуть под «собрано».
+    const annualNote = annualFailed ? ' · ⚠ год не собран (пустая история планов)' : '';
+    if (saved) { setMsg(`✦ План собран${annualNote}`); setTimeout(()=>setMsg(''), annualFailed ? 4500 : 2200); }
+    else { setMsg(`⚠ План собран, но НЕ сохранён (нет места в хранилище) — после перезагрузки пропадёт${annualNote}`); setTimeout(()=>setMsg(''), 4500); }
     setStep('plan');
     setHasSpecPrev(false); // новый id плана — старый снапшот stale, откат его честно отклонит
     setHasSMSpecPrev(false); // то же для волны СМ-коррекции

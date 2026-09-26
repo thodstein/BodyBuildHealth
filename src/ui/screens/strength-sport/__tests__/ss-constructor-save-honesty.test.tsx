@@ -14,28 +14,36 @@ import React from 'react';
 import { StrengthSportConstructor } from '../StrengthSportConstructor';
 
 const PLAN_KEYS = ['he_strength_sport_plan_v1', 'he_strength_sport_plans_v1'];
+const ANNUAL_KEY = 'he_strength_annual_v1';
 
 let real: Storage;
 let throwOnPlan: boolean;
+let corruptList: boolean;
+let backing: Record<string, string>;
 
 beforeEach(() => {
   localStorage.clear();
   real = localStorage;
   throwOnPlan = true;
+  corruptList = false;
   // Проксируем localStorage: обычные ключи пишутся как раньше, план — падает (квота).
-  const backing: Record<string, string> = {};
+  const store: Record<string, string> = {};
+  backing = store;
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
     value: {
-      getItem: (k: string) => (k in backing ? backing[k] : null),
+      getItem: (k: string) => {
+        if (k === 'he_strength_sport_plans_v1' && corruptList) return '{битое';
+        return k in store ? store[k] : null;
+      },
       setItem: (k: string, v: string) => {
         if (throwOnPlan && PLAN_KEYS.includes(k)) { const e: any = new Error('QuotaExceededError'); e.name = 'QuotaExceededError'; throw e; }
-        backing[k] = String(v);
+        store[k] = String(v);
       },
-      removeItem: (k: string) => { delete backing[k]; },
-      clear: () => { for (const k of Object.keys(backing)) delete backing[k]; },
-      key: (i: number) => Object.keys(backing)[i] ?? null,
-      get length() { return Object.keys(backing).length; },
+      removeItem: (k: string) => { delete store[k]; },
+      clear: () => { for (const k of Object.keys(store)) delete store[k]; },
+      key: (i: number) => Object.keys(store)[i] ?? null,
+      get length() { return Object.keys(store).length; },
     } as any,
   });
 });
@@ -75,5 +83,44 @@ describe('конструктор: честность сохранения (кв�
     // даём тостам отработать
     await new Promise(r => setTimeout(r, 200));
     expect(container.textContent).not.toMatch(/НЕ сохран/);
+  });
+});
+
+describe('конструктор: год не собирается «из пустоты»', () => {
+  it('битая история планов → год НЕ создаётся и показан честный провал', async () => {
+    throwOnPlan = false;   // запись плана идёт — фокус на истории
+    corruptList = true;    // список не читается → loadStrengthSportPlans() даёт []
+    const container = await buildFirstPlan();
+
+    await waitFor(() => expect(container.textContent).toMatch(/год не собран/));
+    // Ключ года не записан — «Год: 0нед · 0 блоков» показать нечем
+    expect(ANNUAL_KEY in backing).toBe(false);
+    expect(container.textContent).not.toMatch(/Год: 0нед/);
+  });
+
+  it('нечего сохранили → нечего строить год (обе честные ветки сразу)', async () => {
+    // Пустая история САМА ПО СЕБЕ не повод для ошибки: если запись удалась,
+    // в истории появляется план и год строится законно (проверено другим тестом).
+    // Ошибка возникает ровно тогда, когда сохранить не удалось — тогда и года нет.
+    throwOnPlan = true;
+    corruptList = false;
+    backing['he_strength_sport_plans_v1'] = '[]';   // валидный пустой список, не битый
+    const container = await buildFirstPlan();
+
+    await waitFor(() => expect(container.textContent).toMatch(/НЕ сохран/));
+    expect(container.textContent).toMatch(/год не собран/);
+    expect(ANNUAL_KEY in backing).toBe(false);
+    expect(container.textContent).not.toMatch(/Год: 0нед/);
+  });
+
+  it('при успешной записи год строится (страховка: ловушка не ломает обычный путь)', async () => {
+    throwOnPlan = false;
+    await buildFirstPlan();
+    // Проверяем факт, а не видимость: карточка года живёт на другом шаге,
+    // а контракт — «год реально записан и в нём есть блоки».
+    await waitFor(() => expect(ANNUAL_KEY in backing).toBe(true));
+    const ann = JSON.parse(backing[ANNUAL_KEY]);
+    expect(ann.blocks.length).toBe(1);
+    expect(ann.totalWeeks).toBeGreaterThan(0);
   });
 });
