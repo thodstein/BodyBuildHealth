@@ -1,4 +1,5 @@
 import type { WarmupBlock } from '../core/types';
+import { localIsoDate } from '../core/local-date';
 import { collectGroupPrep, prepGroupLabels } from './warmup-day.engine';
 import { collectJointPrep, jointPrepLabels } from './warmup-joints.engine';
 import { getISOWeekNumber } from './workout-logger.engine';
@@ -359,7 +360,7 @@ export function latestWarmupLog(): WarmupLogEntry | null {
 export function warmupAdherence(days = 30): WarmupAdherence {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const floor = since.toISOString().slice(0, 10);
+  const floor = localIsoDate(since);
   const recent = loadWarmupLog().filter(e => e.date >= floor);
   const done = recent.filter(e => e.done).length;
   return {
@@ -448,7 +449,9 @@ export function warmupWeeklyTrendInsight(): string | null {
 
 export const WARMUP_SKIP_REASONS = ['не было времени', 'устал', 'забыл', 'зал был занят', 'другое'];
 
-function isoOf(d: Date): string { return d.toISOString().slice(0, 10); }
+// cursor — момент времени, шагающий по календарю: день берём по локальному
+// канону, иначе серия ломалась на границе суток.
+function isoOf(d: Date): string { return localIsoDate(d); }
 
 /** Серия: сколько дней подряд разминка выполнялась (с сегодня или вчера, если сегодня ещё не отмечено). */
 export function warmupStreak(): number {

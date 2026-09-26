@@ -1,4 +1,5 @@
 import { CourseEntry } from '../core/types';
+import { localIsoDate } from '../core/local-date';
 import { PHARMA_DB } from '../core/constants';
 
 export interface PCTProtocolItem {
@@ -37,7 +38,7 @@ function daysToClear(halfLifeHours: number): number {
 export function generatePCTPlan(course: CourseEntry[], lastCourseWeek: number): PCTSchedule {
   const warnings: string[] = [];
   const activeDrugs = course.filter(c => c.endWeek >= lastCourseWeek);
-  if (activeDrugs.length === 0) return { startDate: new Date().toISOString().slice(0, 10), taperWeeks: [], pctStartWeek: course.length + 4, pctProtocol: [], supportStack: [], warnings: ['Нет активных препаратов для ПКТ'] };
+  if (activeDrugs.length === 0) return { startDate: localIsoDate(), taperWeeks: [], pctStartWeek: course.length + 4, pctProtocol: [], supportStack: [], warnings: ['Нет активных препаратов для ПКТ'] };
   const maxClearanceDays = Math.max(...activeDrugs.map(d => daysToClear(getHalfLifeHours(d.substanceId))));
   const pctStartOffset = Math.ceil(maxClearanceDays / 7);
   const pctStartWeek = lastCourseWeek + pctStartOffset;
@@ -72,7 +73,7 @@ export function generatePCTPlan(course: CourseEntry[], lastCourseWeek: number): 
   if (highE2) warnings.push('⚠️ Высокая ароматизация. Рассмотреть добавление ИА в ПКТ.');
 
   return {
-    startDate: startDate.toISOString().slice(0, 10),
+    startDate: localIsoDate(startDate),
     taperWeeks,
     pctStartWeek,
     pctProtocol,

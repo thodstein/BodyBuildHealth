@@ -1,4 +1,5 @@
 import type { CooldownBlock } from '../core/types';
+import { localIsoDate, shiftIsoDate } from '../core/local-date';
 import { collectGroupCooldown, prepGroupLabelsCooldown } from './cooldown-day.engine';
 import { canonicalizeGroups } from './warmup-day.engine';
 import { getISOWeekNumber } from './workout-logger.engine';
@@ -233,7 +234,7 @@ export function latestCooldownLog(): CooldownLogEntry | null {
 export function cooldownAdherence(days = 30): CooldownAdherence {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const floor = since.toISOString().slice(0, 10);
+  const floor = localIsoDate(since);
   const recent = loadCooldownLog().filter(e => e.date >= floor);
   const done = recent.filter(e => e.done).length;
   return {
@@ -314,12 +315,12 @@ export function cooldownWeeklyTrendInsight(): string | null {
 
 export const COOLDOWN_SKIP_REASONS = ['не было времени', 'устал', 'забыл', 'нужно уходить', 'другое'];
 
-function isoOf(d: Date): string { return d.toISOString().slice(0, 10); }
+// cursor — момент времени, который шагает по календарю, поэтому день берём по
+// локальному канону (UTC здесь отставал на сутки и ломал серию).
+function isoOf(d: Date): string { return localIsoDate(d); }
 
 function isoAddDays(date: string, days: number): string {
-  const [y, m, d] = date.slice(0, 10).split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d + days));
-  return dt.toISOString().slice(0, 10);
+  return shiftIsoDate(date, days);
 }
 
 /** Серия: сколько дней подряд заминка выполнялась (с сегодня или вчера). */

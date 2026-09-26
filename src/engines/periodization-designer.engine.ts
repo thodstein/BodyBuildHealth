@@ -7,6 +7,7 @@
  *
  * @module periodization-designer
  */
+import { localIsoDate } from '../core/local-date';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types — Visual Designer
@@ -723,7 +724,7 @@ export function createGoal(
   return {
     id: 'goal_' + Date.now(),
     title, category, targetValue, currentValue: 0, unit,
-    startDate: new Date().toISOString().slice(0, 10),
+    startDate: localIsoDate(),
     targetDate,
     status: 'not_started',
     progress: 0,
@@ -761,7 +762,7 @@ export function addMilestone(goalId: string, value: number): TrainingGoal[] {
   const goal = goals.find(g => g.id === goalId);
   if (!goal) return goals;
 
-  goal.milestones.push({ value, date: new Date().toISOString().slice(0, 10), achieved: false });
+  goal.milestones.push({ value, date: localIsoDate(), achieved: false });
   saveGoals(goals);
   return goals;
 }
@@ -827,7 +828,7 @@ function saveHabits(habits: DailyHabit[]) {
 
 export function toggleHabit(habitId: string): DailyHabit[] {
   const habits = loadHabits();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const habit = habits.find(h => h.id === habitId);
   if (!habit) return habits;
 
@@ -855,7 +856,7 @@ function recalcStreaks(habits: DailyHabit[]) {
     for (let i = 0; i < completions.length; i++) {
       const expected = new Date(today);
       expected.setDate(expected.getDate() - i);
-      const expectedStr = expected.toISOString().slice(0, 10);
+      const expectedStr = localIsoDate(expected);
 
       if (completions[i]?.date === expectedStr && completions[i].done) {
         streak++;
@@ -892,7 +893,7 @@ export function addCustomHabit(name: string, category: DailyHabit['category'], t
 
 export function getHabitStats(): HabitStats {
   const habits = loadHabits();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
 
   let todayCompleted = 0;
   for (const h of habits) {

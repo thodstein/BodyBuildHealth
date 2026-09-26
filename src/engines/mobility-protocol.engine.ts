@@ -20,6 +20,7 @@
  */
 
 import { getMobilityFlows } from './federation-grip-mobility.engine';
+import { localIsoDate } from '../core/local-date';
 import { latestAssessment, summarizeAssessment, weakestTests } from './mobility-assessment.engine';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -452,7 +453,7 @@ export function mobilityAdherence(days = 30): { done: number; total: number; pct
   const list = loadMobilityCheckins();
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const floor = since.toISOString().slice(0, 10);
+  const floor = localIsoDate(since);
   const recent = list.filter(c => c.date >= floor);
   const done = recent.filter(c => c.done).length;
   return {
@@ -485,7 +486,7 @@ export interface MobilityDayProgress {
 }
 
 export function loadMobilityDayProgress(date?: string): MobilityDayProgress {
-  const key = date || new Date().toISOString().slice(0, 10);
+  const key = date || localIsoDate();
   try {
     const raw = JSON.parse(localStorage.getItem(MOBILITY_DAY_PROGRESS_KEY) || 'null');
     if (raw && raw.date === key && Array.isArray(raw.doneItems)) {

@@ -13,6 +13,7 @@
  *
  * @module body-composition-engine
  */
+import { localIsoDate } from '../core/local-date';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -226,12 +227,12 @@ export function projectWeight(
 
     // Stop if we've reached goal
     if ((weeklyRate > 0 && weight >= goalWeight) || (weeklyRate < 0 && weight <= goalWeight)) {
-      projections.push({ date: d.toISOString().slice(0, 10), weight: goalWeight, isProjected: false });
+      projections.push({ date: localIsoDate(d), weight: goalWeight, isProjected: false });
       break;
     }
 
     projections.push({
-      date: d.toISOString().slice(0, 10),
+      date: localIsoDate(d),
       weight: Math.round(weight * 100) / 100,
       isProjected: w > 0,
     });

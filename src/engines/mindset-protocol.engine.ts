@@ -16,6 +16,7 @@
  */
 
 import { epley1RM } from './e1rm';
+import { localIsoDate } from '../core/local-date';
 import { identifyPhase } from './coaching-psychology.engine';
 import { getProfile } from '../core/profile-manager';
 
@@ -585,7 +586,7 @@ export function protocolAdherence(days = 30): { followed: number; total: number;
   const list = loadCheckins();
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const floor = since.toISOString().slice(0, 10);
+  const floor = localIsoDate(since);
   const marked = list.filter(c => c.date >= floor && typeof c.protocolFollowed === 'boolean');
   const followed = marked.filter(c => c.protocolFollowed === true).length;
   return {
@@ -729,7 +730,7 @@ export interface DayProgress {
 }
 
 export function loadDayProgress(date?: string): DayProgress {
-  const key = date || new Date().toISOString().slice(0, 10);
+  const key = date || localIsoDate();
   try {
     const raw = JSON.parse(localStorage.getItem(MINDSET_DAY_PROGRESS_KEY) || 'null');
     if (raw && raw.date === key && Array.isArray(raw.doneItems)) {
@@ -898,7 +899,7 @@ const PHASE_META: Record<string, { label: string; icon: string }> = {
  */
 export function detectMotivationPhase(workouts: { date: string }[]): MotivationPhaseResult {
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = localIsoDate(today);
   const dates = (Array.isArray(workouts) ? workouts : [])
     .map(w => w && typeof (w as any).date === 'string' ? (w as any).date.slice(0, 10) : '')
     .filter(Boolean)

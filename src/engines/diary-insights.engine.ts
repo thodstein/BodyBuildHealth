@@ -9,6 +9,7 @@
  */
 
 import { epley1RM } from './e1rm';
+import { localIsoDate } from '../core/local-date';
 import { formatDate } from '../core/utils/date-utils';
 import { EXERCISE_CATALOG } from '../core/exercise-catalog';
 
@@ -87,7 +88,7 @@ export function createSession(session: Partial<DiarySession>): DiarySession {
     : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   return {
     sessionId: session.sessionId || uid,
-    date: session.date || new Date().toISOString().slice(0, 10),
+    date: session.date || localIsoDate(),
     focus: session.focus || 'fullbody',
     durationMin: session.durationMin || 0,
     completed: session.completed ?? true,
@@ -168,7 +169,7 @@ export function buildHistoryContext(
   let weeklyVolume = 0;
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const cutoff = oneWeekAgo.toISOString().slice(0, 10);
+  const cutoff = localIsoDate(oneWeekAgo);
 
   for (const set of sortedSets) {
     const sess = sessionMap.get(set.sessionId);

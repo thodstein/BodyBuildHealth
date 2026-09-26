@@ -9,6 +9,7 @@
  *
  * @module coaching-psychology-engine
  */
+import { localIsoDate, parseLocalIsoDate } from '../core/local-date';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -299,13 +300,29 @@ function savePRs(prs: PRRecord[]) {
 export function recordPR(pr: Omit<PRRecord, 'date' | 'estimated1RM'>): PRRecord {
   const record: PRRecord = {
     ...pr,
-    date: new Date().toISOString().slice(0, 10),
+    date: localIsoDate(),
     estimated1RM: pr.reps > 0 ? Math.round(pr.weight * (1 + pr.reps / 30)) : pr.weight,
   };
   const prs = loadPRs();
   prs.push(record);
   savePRs(prs);
   return record;
+}
+
+/**
+ * Разница в календарных днях между датой из журнала и сегодняшним днём.
+ *
+ * Почему нельзя `Date.now() - new Date(iso)`: `new Date('2026-09-27')` — это
+ * ПОЛНОЧЬ UTC, а `Date.now()` — момент. В UTC+10 ПР, сделанный сегодня утром,
+ * давал Math.round(минус_2_часа / сутки) = **-0 дней** (отрицательный ноль),
+ * а вечерний ПР вчерашнего дня давал -1. Обе цифры враньё: «сколько дней назад»
+ * считается по календарю, поэтому обе стороны приводим к местной полуночи.
+ */
+function daysSinceIso(iso: string): number {
+  const было = parseLocalIsoDate(iso);
+  const сегодня = parseLocalIsoDate(localIsoDate());
+  if (!было || !сегодня) return 999;
+  return Math.round((сегодня.getTime() - было.getTime()) / 86400000);
 }
 
 export function getPRStats(): PRStats {
@@ -329,7 +346,7 @@ export function getPRStats(): PRStats {
   for (let i = 0; i < dates.length; i++) {
     const expected = new Date(today);
     expected.setDate(expected.getDate() - i);
-    const expectedStr = expected.toISOString().slice(0, 10);
+    const expectedStr = localIsoDate(expected);
     if (dates[i] === expectedStr) streakCount++;
     else { daysSince = i; break; }
   }
@@ -342,13 +359,15 @@ export function getPRStats(): PRStats {
 
     const first = exercisePRs[0];
     const last = exercisePRs[exercisePRs.length - 1];
-    const daysDiff = (new Date(last.date).getTime() - new Date(first.date).getTime()) / 86400000;
+    // daysSinceIso(x) = «сегодня минус x», поэтому «last минус first» = разность
+    // этих двух величин (обе — целые календарные дни).
+    const daysDiff = daysSinceIso(first.date) - daysSinceIso(last.date);
     const kgPerDay = daysDiff > 0 ? (last.estimated1RM - first.estimated1RM) / daysDiff : 0;
 
     if (kgPerDay > 0) {
       const nextDate = new Date();
       nextDate.setDate(nextDate.getDate() + Math.round(2.5 / kgPerDay));
-      projected[exercise] = { date: nextDate.toISOString().slice(0, 10), weight: Math.round(last.estimated1RM + 2.5) };
+      projected[exercise] = { date: localIsoDate(nextDate), weight: Math.round(last.estimated1RM + 2.5) };
     }
   }
 
@@ -358,7 +377,7 @@ export function getPRStats(): PRStats {
     recentPRs: prs.slice(0, 10),
     bestLifts,
     prStreak: streakCount,
-    daysSinceLastPR: daysSince < 999 ? daysSince : (prs.length > 0 ? Math.round((Date.now() - new Date(prs[0].date).getTime()) / 86400000) : 999),
+    daysSinceLastPR: daysSince < 999 ? daysSince : (prs.length > 0 ? daysSinceIso(prs[0].date) : 999),
     projectedNextPR: projected,
   };
 }

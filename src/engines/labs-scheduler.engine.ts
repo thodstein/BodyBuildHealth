@@ -9,6 +9,12 @@ export function generateCheckpoints(
 ): LabCheckpoint[] {
   const rules = PHASE_SCHEDULE_RULES[phaseType] || PHASE_SCHEDULE_RULES.course;
   const checkpoints: LabCheckpoint[] = [];
+  // ВНИМАНИЕ, это НЕ долг канона дат. startDate — строка 'YYYY-MM-DD', а
+  // new Date('YYYY-MM-DD') разбирается как полуночь UTC; прибавление целых недель
+  // в миллисекундах и извлечение дня в UTC даёт ровно «startDate + N недель»
+  // независимо от смещения машины. Если заменить на localIsoDate, то на машине с
+  // ОТРИЦАТЕЛЬНЫМ смещением (UTC-5 и западнее) dueDate съехал бы на сутки назад.
+  // Здесь календарь — арифметика над датой, а не «момент времени».
   const start = new Date(startDate);
 
   rules.checkpoints.forEach(rule => {
