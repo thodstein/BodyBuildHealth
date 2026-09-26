@@ -62,6 +62,7 @@ export function HubGripTab({ H }: { H: any }) {
             const ci = wafSeniorClassFor(bwNum, state.sex);
             return <div className="ad-muted" data-arm="waf-class">Класс WAF: {ci.label} (ты {bwNum}кг){ci.toNext != null ? ` · до −${ci.cls}: −${ci.toNext}кг` : ' · открытая — без сгонки'}</div>;
           })()}
+          <div className="ad-muted" data-arm="waf-class-senior-note">Класс выше посчитан по сетке Senior. Masters, Junior и Youth имеют другие границы, а возраст в хабе не спрашивается — точный класс по возрасту и Para считает конструктор (чип «Para-класс WAF»).</div>
           {(()=>{
             const rows: Array<{ n: string; v: string }> = [];
             const rt = parseFloat(state.rtKg);

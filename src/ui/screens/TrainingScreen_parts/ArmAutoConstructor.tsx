@@ -17,7 +17,7 @@ import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { injectArmCorrections } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { bridgeDoseFromPayload } from '../../../engines/arm/arm-correction-dose.engine';
 import { injectArmliftCorrections, applyArmliftSpecWave, type ArmliftInjectionItem } from '../../../engines/arm/armlift-injection.engine';
-import { buildWafStartCard } from '../../../engines/arm/arm-waf.engine';
+import { buildWafStartCard, WafParaClass } from '../../../engines/arm/arm-waf.engine';
 import { WAF_FOULS, WAF_FOULS_OUT_AFTER } from '../../../engines/arm/arm-start-strap.engine';
 import { buildSupermatchPlan } from '../../../engines/arm/arm-supermatch.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
@@ -580,6 +580,10 @@ export function ArmAutoConstructor() {
   const [proSparDelta, setProSparDelta] = useState<string>('0');
   const [proSupermatch, setProSupermatch] = useState<boolean>(false);
   const [proStrap, setProStrap] = useState<boolean>(false);
+  // Wave-1 Э1.5 (остаток): WAF-2025 Para. Раньше `paraClass` читался билдером
+  // (arm-pro-integration), но его НИКТО не задавал — система Para показывала допуск
+  // и при этом не влияла на план. Теперь выбор реально доезжает до buildArmPlan.
+  const [proPara, setProPara] = useState<WafParaClass>('none');
   const [proPlatImpl, setProPlatImpl] = useState<string>('rolling_thunder');
   const [proPain, setProPain] = useState('');
   const [proClearDays, setProClearDays] = useState('');
@@ -1088,6 +1092,8 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         targetWeightKg: parseFloat(proTargetW) > 0 ? parseFloat(proTargetW) : undefined,
         supermatch: proSupermatch || undefined,
         strapExpected: proStrap || undefined,
+        // Wave-1 Э1.5: Para реально доезжает до плана (иначе был write-only вход).
+        paraClass: proPara !== 'none' ? proPara : undefined,
         sparring: proSpar === 'off' ? undefined : { intensityPct: Number(proSpar) as any, partnerDeltaKg: parseFloat(proSparDelta) || 0 },
         diary: (parseFloat(proSrpe) > 0 || parseFloat(proElbow) > 0)
           ? [{ dateIso: new Date().toISOString().slice(0, 10), srpe: parseFloat(proSrpe) || undefined, elbowPain: parseFloat(proElbow) || undefined }]
@@ -1543,6 +1549,16 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   {[{id:'both',label:'Обе (2 зачёта)'},{id:'left',label:'Левая'},{id:'right',label:'Правая'}].map(o=> <AdChip key={o.id} active={proArm===o.id} onClick={()=>setProArm(o.id)}>{o.label}</AdChip>)}
                 </div>
               </div>
+              {/* Wave-1 Э1.5: Para доезжает до плана. Подписи классов — официальные
+                  аббревиатуры WAF, поэтому чипы помечены кодом, а не расшифровкой. */}
+              <div>
+                <div className="ad-fl">Para-класс WAF (паралёльные виды спорта)</div>
+                <div className="ad-chips">
+                  {(['none','PID','PIU','PIDH','PIUH','VI','HI','CPD','CPU'] as WafParaClass[]).map(p=> (
+                    <AdChip key={p} active={proPara===p} onClick={()=>setProPara(p)}>{p==='none' ? 'Нет' : p}</AdChip>
+                  ))}
+                </div>
+              </div>
               <AdField label="Дата старта">
                 <input type="date" value={proDate} onChange={e=>setProDate(e.target.value)} />
               </AdField>
@@ -1587,9 +1603,9 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <AdSwitch checked={proSupermatch} onChange={setProSupermatch} label="Суперматч best-of-5/6" />
               <AdSwitch checked={proStrap} onChange={setProStrap} label="Ожидается ремень" />
             </div>
-            {(proBw || proAge) && (()=>{ try {
-              const card = buildWafStartCard({ sex: linked?.profile?.personal?.sex, ageYears: parseFloat(proAge) || 30, bodyWeightKg: parseFloat(proBw) || 80, arm: proArm as any });
-              return <div className="ad-tip">WAF {card.ageGroup} · кат. {card.weightClass.label} кг · {card.weighInNote}</div>;
+            {(proBw || proAge || proPara !== 'none') && (()=>{ try {
+              const card = buildWafStartCard({ sex: linked?.profile?.personal?.sex, ageYears: parseFloat(proAge) || 30, bodyWeightKg: parseFloat(proBw) || 80, arm: proArm as any, para: proPara });
+              return <div className="ad-tip">WAF {card.ageGroup} · кат. {card.weightClass.label}{card.weightClass.label !== 'Open' ? ' кг' : ''} · {card.weighInNote}{proPara !== 'none' ? ` · Para ${proPara}` : ''}</div>;
             } catch { return null; } })()}
             {proSupermatch && (()=>{
               const sm = buildSupermatchPlan({ level });
