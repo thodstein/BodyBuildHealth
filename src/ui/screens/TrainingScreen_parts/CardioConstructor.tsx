@@ -651,11 +651,14 @@ export const CardioConstructor: React.FC = () => {
     setTidSwitch((cfg as { tidSwitchWeek?: unknown }).tidSwitchWeek != null);
     setDurabilityOn((cfg as { durabilitySession?: unknown }).durabilitySession === true);
     // Пост-обработка из config-штампа finish-хелпера (темпы VDOT + мезо-флаг).
-    const stamped = cfg as unknown as { paceEasySec?: number; paceTempoSec?: number; paceIntervalSec?: number; mesoOn?: boolean };
+    const stamped = cfg as unknown as { paceEasySec?: number; paceTempoSec?: number; paceIntervalSec?: number; mesoOn?: boolean; finishNote?: string };
     if (stamped.paceEasySec != null) setEasyPace(formatPace(stamped.paceEasySec));
     if (stamped.paceTempoSec != null) setTempoPace(formatPace(stamped.paceTempoSec));
     if (stamped.paceIntervalSec != null) setIntervalPace(formatPace(stamped.paceIntervalSec));
     if (stamped.mesoOn === true) setMesoOn(true);
+    // Спринт 5.2: если слой при загрузке варианта не применился — говорим прямо,
+    // а не восстанавливаем поля так, будто план их содержит.
+    if (stamped.finishNote) flashMsg(stamped.finishNote);
     setLegDays(cfg.legDays ? [...cfg.legDays] : []);
     setFactorsOn({
       sleep: cfg.sleepHours != null && cfg.sleepHours < 6,

@@ -196,17 +196,26 @@ export interface CardioFinishOpts {
  */
 export function finishCardioCycle(cycle: CardioCycle, opts: CardioFinishOpts = {}): CardioCycle {
   let out = cycle;
+  // Аудит спринта 5.2: слои, которые ПРОСИЛИ, но не применились, раньше терялись
+  // в `catch { /* ignore */ }`, а стамп всё равно писался — план врал («мезо
+  // включено» / темпы заданы), хотя ничего не применилось. Теперь стамп ставится
+  // только под факт, а пропуск попадает в config.finishNote для показа.
+  const skipped: string[] = [];
   // P1-аудит: cross-meso ПЕРЕД каскадом соревнований. Обратный порядок
   // раздувал готовые taper/peak/гоночные недели стартовым множителем
   // (×1.15 поверх уже срезанного объёма).
+  let mesoOk = false;
   if (opts.mesoMult != null && opts.mesoMult > 1) {
-    try { out = applyMesoMult(out, opts.mesoMult); } catch { /* ignore */ }
+    try { out = applyMesoMult(out, opts.mesoMult); mesoOk = true; }
+    catch (e) { skipped.push(`мезо ×${opts.mesoMult}`); console.warn('[cardio] мезо-масштабирование не применено', e); }
   }
   if (opts.taperEnabled !== false && opts.competitions && opts.competitions.length > 0) {
     try {
       out = applyCardioCompetitionCascade(out, opts.competitions.map(x => ({ week: x.week, priority: x.priority ?? 'B' })));
-    } catch { /* ignore */ }
+    } catch (e) { skipped.push('каскад соревнований (taper/peak)'); console.warn('[cardio] каскад соревнований не применён', e); }
   }
+  const personalRequested = [opts.easyPaceSec, opts.tempoPaceSec, opts.intervalPaceSec, opts.ftpWatts].some(v => v != null);
+  let personalOk = false;
   try {
     out = applyPersonalTargetsToCycle(out, {
       easyPaceSec: opts.easyPaceSec,
@@ -214,13 +223,20 @@ export function finishCardioCycle(cycle: CardioCycle, opts: CardioFinishOpts = {
       intervalPaceSec: opts.intervalPaceSec,
       ftpWatts: opts.ftpWatts,
     });
-  } catch { /* ignore */ }
-  const stamp: Record<string, number | boolean> = {};
-  if (opts.easyPaceSec != null) stamp.paceEasySec = opts.easyPaceSec;
-  if (opts.tempoPaceSec != null) stamp.paceTempoSec = opts.tempoPaceSec;
-  if (opts.intervalPaceSec != null) stamp.paceIntervalSec = opts.intervalPaceSec;
-  if (opts.ftpWatts != null) stamp.ftpWattsApplied = opts.ftpWatts;
-  if (opts.mesoMult != null && opts.mesoMult > 1) stamp.mesoOn = true;
+    personalOk = true;
+  } catch (e) {
+    if (personalRequested) { skipped.push('персональные темпы/FTP'); console.warn('[cardio] персональные цели не применены', e); }
+  }
+  const stamp: Record<string, number | boolean | string> = {};
+  // Стампы — только под реально применённые слои.
+  if (personalOk) {
+    if (opts.easyPaceSec != null) stamp.paceEasySec = opts.easyPaceSec;
+    if (opts.tempoPaceSec != null) stamp.paceTempoSec = opts.tempoPaceSec;
+    if (opts.intervalPaceSec != null) stamp.paceIntervalSec = opts.intervalPaceSec;
+    if (opts.ftpWatts != null) stamp.ftpWattsApplied = opts.ftpWatts;
+  }
+  if (mesoOk && opts.mesoMult != null && opts.mesoMult > 1) stamp.mesoOn = true;
+  if (skipped.length > 0) stamp.finishNote = `⚠ Просили, но НЕ применилось: ${skipped.join(' · ')}`;
   if (Object.keys(stamp).length > 0) {
     out = { ...out, config: { ...(out.config as CardioCycleInput | undefined), ...stamp } as CardioCycleInput };
   }

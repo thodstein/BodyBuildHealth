@@ -197,6 +197,10 @@ export function useCardioParamsPreview(m: CardioParamsModel): {
         intervalPaceSec: parsePaceText(intervalPace) ?? undefined,
         ftpWatts: ftpNum,
       });
+      // Честность: если слой запросили, но не применился — говорим об этом
+      // (раньше стамп врал, а пользователь видел «мезо включено»).
+      const note = (finished.config as { finishNote?: string } | undefined)?.finishNote;
+      if (note) warnings.push(note);
       return { cycle: finished, warnings };
     } catch { return { cycle: null, warnings }; }
   }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperModel, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays, periodizationModel, maxHrFormula, lthr, ftpWatts, talkHr, tempC, altitudeM, easyPace, tempoPace, intervalPace, mesoMult, redFlags, tidSwitchWeek, durabilitySession]);
