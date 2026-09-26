@@ -294,3 +294,102 @@ describe('E8 UI — 8.5 журнал тестов', () => {
     expect(screen.getByText(/Планка: 120 с/)).toBeTruthy();
   });
 });
+
+describe('E8 UI — 8.4/8.8 входы скринингов', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('переданные пропсы помечены как авто-источник', () => {
+    const { container } = render(
+      <CbCampMeasurementsCard plan={mkPlan()} kcal={3000} trainingKcal={500} ffmKg={70} />);
+    const h = container.innerHTML;
+    expect(h).toContain('lea-inputs');
+    expect(h).toMatch(/Потребление, ккал · из плана = 3000/);
+    expect(h).toMatch(/Трен\. расход, ккал · из плана = 500/);
+    expect(h).toMatch(/Безжировая масса, кг · из плана = 70/);
+  });
+
+  it('то, что не передали, честно «нет данных» — не выдуманное число', () => {
+    const { container } = render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    const h = container.innerHTML;
+    expect(h).toMatch(/Потребление, ккал · нет данных/);
+    expect(h).toMatch(/Безжировая масса, кг · нет данных/);
+  });
+
+  it('источник каждого поля виден в data-src, а не только в тексте', () => {
+    const { container } = render(
+      <CbCampMeasurementsCard plan={mkPlan()} kcal={3000} trainingKcal={500} ffmKg={70} />);
+    const auto = container.querySelector('[data-cb="lea-in-trainingKcal"]');
+    const none = container.querySelector('[data-cb="lea-in-heatSessions"]');
+    expect(auto?.getAttribute('data-src')).toBe('auto');
+    expect(none?.getAttribute('data-src')).toBe('none');
+  });
+
+  it('LEA оживает, когда пользователь ввёл недостающее', () => {
+    const { container } = render(
+      <CbCampMeasurementsCard plan={mkPlan()} kcal={3000} ffmKg={70} />);
+    // до ввода — просит данных
+    expect(container.innerHTML).toMatch(/Не хватает данных/);
+    // вводим тренировочный расход
+    fireEvent.change(q('[data-cb="lea-in-trainingKcal"]')!, { target: { value: '500' } });
+    const h = container.innerHTML;
+    expect(h).not.toMatch(/Не хватает данных/);
+    expect(h).toMatch(/Трен\. расход, ккал · вручную = 500/);
+  });
+
+  it('ручной ввод перекрывает авто и это видно', () => {
+    const { container } = render(
+      <CbCampMeasurementsCard plan={mkPlan()} kcal={3000} ffmKg={70} trainingKcal={500} />);
+    fireEvent.change(q('[data-cb="lea-in-kcal"]')!, { target: { value: '2400' } });
+    const h = container.innerHTML;
+    expect(h).toMatch(/Потребление, ккал · вручную = 2400/);
+    // расход остался авто — переопределили только потребление
+    expect(h).toMatch(/Трен\. расход, ккал · из плана = 500/);
+  });
+
+  it('признаки CAT2 вводятся вручную и поднимают уровень до cat2', () => {
+    const { container } = render(
+      <CbCampMeasurementsCard plan={mkPlan()} kcal={3000} trainingKcal={500} ffmKg={70} />);
+    fireEvent.change(q('[data-cb="lea-in-cat2Flags"]')!, { target: { value: '2' } });
+    const h = container.innerHTML;
+    expect(h).toMatch(/CAT2-опросник отмечен/);
+  });
+
+  it('ручные значения переживают перемонтирование карточки', () => {
+    const { unmount } = render(
+      <CbCampMeasurementsCard plan={mkPlan()} kcal={3000} trainingKcal={500} ffmKg={70} />);
+    fireEvent.change(q('[data-cb="lea-in-trainingKcal"]')!, { target: { value: '700' } });
+    unmount();
+    const { container } = render(
+      <CbCampMeasurementsCard plan={mkPlan()} kcal={3000} trainingKcal={500} ffmKg={70} />);
+    // вручную поставленное 700 должно перекрыть авто 500
+    expect(container.innerHTML).toMatch(/Трен\. расход, ккал · вручную = 700/);
+  });
+
+  it('обнуление поля возвращает авто-значение, а не ноль', () => {
+    const { container } = render(
+      <CbCampMeasurementsCard plan={mkPlan()} kcal={3000} trainingKcal={500} ffmKg={70} />);
+    fireEvent.change(q('[data-cb="lea-in-trainingKcal"]')!, { target: { value: '700' } });
+    expect(container.innerHTML).toMatch(/вручную = 700/);
+    fireEvent.change(q('[data-cb="lea-in-trainingKcal"]')!, { target: { value: '' } });
+    expect(container.innerHTML).toMatch(/Трен\. расход, ккал · из плана = 500/);
+  });
+
+  it('честная подпись: почему часть полей только вручную', () => {
+    const { container } = render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    const h = container.innerHTML;
+    expect(h).toContain('lea-src-note');
+    expect(h).toMatch(/вводятся только вручную/);
+    expect(h).toMatch(/без выдуманного коэффициента нельзя/);
+  });
+
+  it('подпись «Признаки CAT2» не путается с симптомами сотрясения в RTP', () => {
+    const { container } = render(<CbCampMeasurementsCard plan={mkPlan()} cat2Flags={1} />);
+    const h = container.innerHTML;
+    // в форме скрининга — «Признаки CAT2»
+    expect(h).toMatch(/Признаки CAT2/);
+    // «Симптомы» остались только в RTP («Есть симптомов») — ровно в двух кнопках.
+    // Раньше подпись «Симптомы CAT2» давала третье совпадение и ломала поиск по /Симптомы/.
+    const hits = (h.match(/симптом/gi) || []).length;
+    expect(hits).toBe(2);
+  });
+});

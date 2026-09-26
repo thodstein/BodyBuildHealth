@@ -38,6 +38,29 @@ function readStore<T>(key: string): T[] {
   }
 }
 
+/** Объектный раннер: журналы выше массивы, а переопределения входов — объект. */
+function readJsonObject(key: string): Record<string, unknown> {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    const raw = localStorage.getItem(key);
+    if (!raw) return {};
+    const p = JSON.parse(raw);
+    return p && typeof p === 'object' && !Array.isArray(p) ? (p as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeJsonObject(key: string, obj: Record<string, unknown>): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    localStorage.setItem(key, JSON.stringify(obj));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function writeStore(key: string, rows: unknown[]): boolean {
   try {
     if (typeof localStorage === 'undefined') return false;
@@ -767,6 +790,122 @@ export function testBattery(rows: TestEntry[]): TestBattery {
           ? 'Динамика смешанная — часть тестов выше, часть ниже.'
           : 'Данных пока мало для тренда — нужно минимум два замера на тест.';
   return { lines, direction, testsWithData, note, caveat: TEST_BATTERY_CAVEAT };
+}
+
+// ─── 8.4/8.8 входы скринингов: автоподтягивание + ручная правка ───────────
+//
+// ДО ЛЮБОГО расчёта LEA нужны числа, а они живут в трёх разных местах:
+// потребление — считается из плана (combatToNutritionPayload), Безжировая
+// масса — в профиле, а тренировочный расход и число тепловых сессий НЕ ВЫВОДЯТСЯ
+// ни из чего: считать их из sRPE значило бы выдумать коэффициент.
+//
+// Поэтому: авто — где источник канонический, ручной ввод — где это
+// субъективная величина по определению. Каждое число помечено источником,
+// чтобы пользователь видел, что он измеряет, а что ввёл сам.
+
+export const COMBAT_SCREEN_KEY = 'he_combat_screen_v1';
+
+export type ScreenField = 'kcal' | 'trainingKcal' | 'ffmKg' | 'cat2Flags' | 'heatSessions';
+
+/** Что можно переопределить руками. Отсутствие ключа = «взято авто / нет данных». */
+export type ScreenManual = Partial<Record<ScreenField, number>>;
+
+export type ScreenSource = 'auto' | 'manual' | 'none';
+
+export interface ScreenResolved {
+  kcal: number | null;
+  trainingKcal: number | null;
+  ffmKg: number | null;
+  cat2Flags: number | null;
+  heatSessions: number | null;
+  /** откуда взято каждое число — чтобы UI не выдавал авто за измеренное */
+  source: Record<ScreenField, ScreenSource>;
+}
+
+/** Правдоподобные границы. Вне них число — мусор, а не данные. */
+const SCREEN_RANGES: Record<ScreenField, [number, number]> = {
+  // ограничение снизу — не даём «0 ккал» посчитать EA как «всё отлично»
+  kcal: [800, 12000],
+  trainingKcal: [0, 4000],
+  ffmKg: [20, 200],
+  cat2Flags: [0, 30],
+  heatSessions: [0, 60],
+};
+
+function plausibleScreen(field: ScreenField, v: unknown): number | null {
+  if (typeof v !== 'number' || !isFinite(v)) return null;
+  const [lo, hi] = SCREEN_RANGES[field];
+  return v >= lo && v <= hi ? Math.round(v * 10) / 10 : null;
+}
+
+/**
+ * Безжировая масса из профиля. ВАЖНО: если %жира нет или он мусорный —
+ * возвращаем null, а НЕ подставляем «15% жира = 85% БМ». Выдуманный
+ * знаменатель дал бы правдоподобный, но ничем не подкреплённый EA.
+ */
+export function ffmFromProfile(weightKg: number | null | undefined, bodyFatPct: number | null | undefined): number | null {
+  if (typeof weightKg !== 'number' || !isFinite(weightKg) || weightKg <= 20) return null;
+  if (typeof bodyFatPct !== 'number' || !isFinite(bodyFatPct)) return null;
+  // границы 3–70% — тот же санитарный коридор, что в cardio-движке
+  if (bodyFatPct < 3 || bodyFatPct > 70) return null;
+  return plausibleScreen('ffmKg', weightKg * (1 - bodyFatPct / 100));
+}
+
+export function readScreenManual(): ScreenManual {
+  const raw = readJsonObject(COMBAT_SCREEN_KEY);
+  const out: ScreenManual = {};
+  for (const f of ['kcal', 'trainingKcal', 'ffmKg', 'cat2Flags', 'heatSessions'] as ScreenField[]) {
+    const v = plausibleScreen(f, raw[f]);
+    if (v !== null) out[f] = v;
+  }
+  return out;
+}
+
+export function writeScreenManual(patch: ScreenManual): ScreenManual {
+  const merged = { ...readScreenManual() };
+  for (const f of Object.keys(patch) as ScreenField[]) {
+    const v = (patch as any)[f];
+    if (v === null || v === undefined || v === '') delete merged[f];
+    else {
+      const ok = plausibleScreen(f, Number(v));
+      if (ok === null) delete merged[f];
+      else merged[f] = ok;
+    }
+  }
+  writeJsonObject(COMBAT_SCREEN_KEY, merged as Record<string, unknown>);
+  return merged;
+}
+
+export function clearScreenField(f: ScreenField): ScreenManual {
+  const merged = { ...readScreenManual() };
+  delete merged[f];
+  writeJsonObject(COMBAT_SCREEN_KEY, merged as Record<string, unknown>);
+  return merged;
+}
+
+/**
+ * Итог: ручное значение выигрывает у авто, авто — у «нет данных».
+ * `autoKcal` приходит из плана (combatToNutritionPayload), `autoFfm` — из профиля.
+ */
+export function resolveScreenInputs(
+  auto: Partial<Record<ScreenField, number | null>>,
+  manual: ScreenManual,
+): ScreenResolved {
+  const pick = (f: ScreenField) => {
+    if (typeof manual[f] === 'number') return { v: manual[f], s: 'manual' as ScreenSource };
+    const a = plausibleScreen(f, auto[f] ?? null);
+    if (a !== null) return { v: a, s: 'auto' as ScreenSource };
+    return { v: null, s: 'none' as ScreenSource };
+  };
+  const k = pick('kcal');
+  const t = pick('trainingKcal');
+  const f = pick('ffmKg');
+  const c = pick('cat2Flags');
+  const h = pick('heatSessions');
+  return {
+    kcal: k.v, trainingKcal: t.v, ffmKg: f.v, cat2Flags: c.v, heatSessions: h.v,
+    source: { kcal: k.s, trainingKcal: t.s, ffmKg: f.s, cat2Flags: c.s, heatSessions: h.s },
+  };
 }
 
 // ─── 8.4 Скрининг LEA / RED-S ─────────────────────────────────────────────

@@ -13,6 +13,9 @@ import { CbCampCharts } from './cb-camp-charts';
 import { CbVariants } from './cb-variants';
 import { CbCampMeasurementsCard } from './cb-camp-measurements';
 import { cbExerciseName } from '../../../engines/combat/combat-builder.engine';
+import { combatToNutritionPayload } from '../../../engines/combat/combat-integration.engine';
+import { ffmFromProfile } from '../../../engines/combat/combat-measurements.engine';
+import { useProfileSection } from '../../../core/profile-manager';
 import { combatMesocycleSummary } from '../../../engines/combat/combat-mesocycle';
 import type { DiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
@@ -146,6 +149,19 @@ export const CombatPlanView: React.FC<Props> = ({
   const blockedTitle = blocked ? 'Сначала исправьте ошибки' : undefined;
   const blockedDim = blocked ? { opacity: 0.4 } as const : {};
 
+  // Авто-входы для скринингов (8.4/8.8). Раньше карточка считала их по null и
+  // всегда показывала «нет данных» — блоки LEA и теплового протокола были мертвы.
+  //   kcal  — канон проекта: combatToNutritionPayload (потребление из плана);
+  //   ffmKg — из профиля: вес × (1 − %жира), и только если %жира правдоподобен;
+  //   trainingKcal/cat2Flags/heatSessions — НЕ выводятся ни из чего, вводятся руками.
+  const [personal] = useProfileSection('personal');
+  const autoKcal = React.useMemo(() => {
+    try { return combatToNutritionPayload(plan).kcal ?? null; } catch { return null; }
+  }, [plan]);
+  const autoFfm = React.useMemo(
+    () => ffmFromProfile(personal?.weight ?? null, personal?.bodyFat ?? null),
+    [personal?.weight, personal?.bodyFat]);
+
   return (
     <div className="combat-planview" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Верхняя панель действий */}
@@ -256,6 +272,8 @@ export const CombatPlanView: React.FC<Props> = ({
       <CbCampMeasurementsCard
         plan={plan}
         sleepHours={(((plan.inputSnapshot as any)?.sleepHours ?? null) as number | null)}
+        kcal={autoKcal}
+        ffmKg={autoFfm}
       />
 
       {diaryLoad != null && (

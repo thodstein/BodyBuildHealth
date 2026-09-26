@@ -15,7 +15,8 @@ import {
   loadGrip, addGrip, gripSummary, gripP50Ref, GRIP_P50_AGE,
   loadRtp, addRtp, rtpSummary, RTP_STAGES, RTP_STAGE_BY_ID, RTP_EARLY_AEROBIC_NOTE, RTP_SOURCE_IDS,
   loadTests, addTest, testBattery, COMBAT_TEST_BATTERY, COMBAT_TEST_BY_ID,
-  type RtpStageId, type CombatTestId,
+  readScreenManual, writeScreenManual, resolveScreenInputs, COMBAT_TESTS_KEY,
+  type RtpStageId, type CombatTestId, type ScreenField, type ScreenSource,
   type SparType, type GripHand,
 } from '../../../engines/combat/combat-measurements.engine';
 
@@ -29,6 +30,21 @@ const inp = (v: string | number, ph: string) => ({
 });
 
 const TONE: Record<string, string> = { ok: '#22c55e', warn: '#f59e0b', danger: '#ef4444' };
+
+/** Поля ввода скринингов в порядке важности для LEA. */
+const SCREEN_INPUT_ROWS: { field: ScreenField; label: string; placeholder: string }[] = [
+  { field: 'kcal', label: 'Потребление, ккал', placeholder: 'ккал' },
+  { field: 'trainingKcal', label: 'Трен. расход, ккал', placeholder: 'ккал' },
+  { field: 'ffmKg', label: 'Безжировая масса, кг', placeholder: 'кг' },
+  { field: 'cat2Flags', label: 'Признаки CAT2', placeholder: '0 = нет' },
+  { field: 'heatSessions', label: 'Тепловых сессий', placeholder: 'сессий' },
+];
+
+const SCREEN_SRC_LABEL: Record<ScreenSource, string> = {
+  auto: 'из плана',
+  manual: 'вручную',
+  none: 'нет данных',
+};
 
 function Line({ tone = 'ok', children }: { tone?: string; children: React.ReactNode }) {
   return <div style={{ color: TONE[tone] || TONE.ok, fontSize: 13, lineHeight: 1.45 }}>{children}</div>;
@@ -140,15 +156,30 @@ export const CbCampMeasurementsCard: React.FC<{
   }, [gDate, gHand, gKg]);
 
   // ── скрининги ──
+  // Калории и Безжировая масса, если их передали, считаются АВТО-источником;
+  // всё, что ввёл сам спортсмен, лежит персистом и здесь перекрывает авто.
+  // ВСЕ пять пропсов идут в auto: родитель может передать любой из них, и это
+  // валидный источник. Сейчас CombatPlanView передаёт только kcal и ffmKg —
+  // расход и симптомы приходят исключительно из ручного ввода.
+  const [manual, setManual] = useState(() => readScreenManual());
+  const resolved = useMemo(
+    () => resolveScreenInputs({ kcal, trainingKcal, ffmKg, cat2Flags, heatSessions }, manual),
+    [kcal, trainingKcal, ffmKg, cat2Flags, heatSessions, manual]);
+  const onSetManual = useCallback((f: ScreenField, raw: string) => {
+    const next = writeScreenManual({ ...readScreenManual(), [f]: raw === '' ? null : Number(raw.replace(',', '.')) } as any);
+    setManual(next);
+  }, []);
+
   const lea = useMemo(() => leaScreen({
-    kcal, trainingKcal, ffmKg, cat2Flags, sex: snap?.sex,
-  }), [kcal, trainingKcal, ffmKg, cat2Flags, snap?.sex]);
+    kcal: resolved.kcal, trainingKcal: resolved.trainingKcal, ffmKg: resolved.ffmKg,
+    cat2Flags: resolved.cat2Flags, sex: snap?.sex,
+  }), [resolved, snap?.sex]);
   const sleep = useMemo(() => sleepVerdict(sleepHours), [sleepHours]);
   const heat = useMemo(() => heatProtocol({
-    sessionsDone: heatSessions,
+    sessionsDone: resolved.heatSessions,
     inWeightCut: !!(snap?.weightCutKg || snap?.weightCutProtocol),
     fightWeek: false,
-  }), [heatSessions, snap]);
+  }), [resolved.heatSessions, snap]);
 
   return (
     <SectionCard title="Замеры, журналы и скрининги" accent>
@@ -346,6 +377,30 @@ export const CbCampMeasurementsCard: React.FC<{
           {lea.reason}
         </Line>
         {lea.level !== 'optimal' ? <span style={{ fontSize: 12, color: '#fff' }}>{lea.advice}</span> : null}
+        <div data-cb="lea-inputs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {SCREEN_INPUT_ROWS.map((r) => (
+            <label key={r.field} style={{ fontSize: 11, color: '#fff', display: 'flex', flexDirection: 'column', gap: 2, flex: '0 1 132px' }}>
+              <span data-cb={`lea-src-${r.field}`} data-src={resolved.source[r.field]}>
+                {r.label} · {SCREEN_SRC_LABEL[resolved.source[r.field]]}
+                {resolved[r.field] !== null ? ` = ${resolved[r.field]}` : ''}
+              </span>
+              <input
+                aria-label={r.label}
+                data-cb={`lea-in-${r.field}`}
+                data-src={resolved.source[r.field]}
+                type="number"
+                inputMode="decimal"
+                value={manual[r.field] ?? ''}
+                placeholder={r.placeholder}
+                onChange={(e) => onSetManual(r.field, e.target.value)}
+                style={{ ...inp(String(manual[r.field] ?? ''), r.placeholder), minHeight: 44 }}
+              />
+            </label>
+          ))}
+        </div>
+        <div data-cb="lea-src-note" style={{ fontSize: 11, color: '#fff' }}>
+          «Из плана» и «из профиля» подставляются автоматически, «вручную» — то, что вы ввели сами. Тренировочный расход и признаки CAT2 вводятся только вручную: вывести их из данных без выдуманного коэффициента нельзя.
+        </div>
         <Badge>{lea.source}</Badge>
       </div>
 
