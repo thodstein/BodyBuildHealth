@@ -164,9 +164,12 @@ export function mrvBaseForLevel(level: string, onCourse: boolean): number {
 /**
  * Локальная дата YYYY-MM-DD (без UTC-сдвига: toISOString даёт вчерашний день
  * для UTC+3…+12 около полуночи — «сегодня» и ключи дневников уезжали).
+ * Реализация — общий канон проекта `src/core/local-date.ts`; здесь реэкспорт,
+ * чтобы существующие импорты дневников продолжали работать.
  */
+import { localIsoDate as localIsoDateCanon } from '../../../core/local-date';
 export function localIsoDate(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return localIsoDateCanon(d);
 }
 
 /**

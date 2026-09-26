@@ -6,10 +6,13 @@
  * уезжала на −1 день, брифинг брал вчерашний дневник, дата шоу и имя файла
  * тренеру путались. Единый источник — локальные геттеры даты (прецедент
  * `_toLocalIso` в настройках и diary-helpers).
+ *
+ * Реализация вынесена в `src/core/local-date.ts` (общий канон проекта). Здесь
+ * сохранена исходная сигнатура (аргумент обязателен) — ею пользуются десятки
+ * мест в планировщике, ломать их нельзя.
  */
+import { localIsoDate as localIsoDateCanon } from '../../../../core/local-date';
+
 export function localIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return localIsoDateCanon(d);
 }

@@ -15,6 +15,10 @@
  * @module workout-logger-engine
  */
 
+// Канон календарной даты живёт в core; здесь реэкспорт (исторический путь импорта
+// используют дневники, экспорты и планировщик стронгмена/ТА).
+import { localIsoDate as localIsoDateCanon } from '../core/local-date';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════════════════
@@ -44,10 +48,7 @@ export interface WorkoutSet {
 export const SET_LIMITS = { maxWeightKg: 500, maxReps: 100, maxRpe: 10, maxRir: 20 } as const;
 
 export function localIsoDate(value: Date = new Date()): string {
-  const y = value.getFullYear();
-  const m = String(value.getMonth() + 1).padStart(2, '0');
-  const d = String(value.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return localIsoDateCanon(value);
 }
 
 export interface WorkoutExercise {
