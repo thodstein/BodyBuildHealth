@@ -810,6 +810,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
       periodizationModel: input.periodizationModel,
       taperModel: input.taperModel,
       lthr: input.lthr,
+      lthrBySport: input.lthrBySport,   // спринт 5.2: эталон по дисциплинам
       ftpWatts: input.ftpWatts,
       talkZone2Hr: input.talkZone2Hr,
       tempC: input.tempC,
@@ -915,6 +916,12 @@ export interface CardioPrepBuildOptions {
   startDate?: string;
   /** PRO-калибровка зон (раунд 7): LTHR > talk-test > age — как в buildCardioCycle. */
   lthr?: number;
+  /**
+   * Спринт 5.2 (добивка): эталон пульса ПО ДИСЦИПЛИНАМ. У бега и вела разный
+   * порог (свой LTHR), поэтому смешанный дневник нельзя считать одним TID.
+   * Ключи — значения CardioSport ('run' | 'bike' | 'row').
+   */
+  lthrBySport?: Partial<Record<string, number>>;
   talkZone2Hr?: number;
   /** Среда (раунд 7): жара/высота сдвигают зоны вверх. */
   tempC?: number;

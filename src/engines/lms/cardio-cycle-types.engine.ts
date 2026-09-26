@@ -155,6 +155,12 @@ export interface CardioCycleInput {
   periodizationModel?: CardioPeriodizationModel;
   /** PRO-калибровка (Эпик A): LTHR (Friel 30'), FTP (вело 20'×0.95), talk-test потолок Z2. Приоритет LTHR > FTP > talk > age. */
   lthr?: number;
+  /**
+   * Спринт 5.2 (добивка): эталон пульса ПО ДИСЦИПЛИНАМ — у бега и вела он разный
+   * (свой LTHR). Ключи — значения CardioSport ('run' | 'bike' | 'row').
+   * Смешанный дневник без этих значений нельзя считать одним TID.
+   */
+  lthrBySport?: Partial<Record<string, number>>;
   ftpWatts?: number;
   talkZone2Hr?: number;
   /** PRO-контекст среды (Эпик G): жара/влажность/высота для поправки HR-зон. */

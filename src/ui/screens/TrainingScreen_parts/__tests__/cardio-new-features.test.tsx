@@ -93,6 +93,23 @@ describe('CardioAnalyticsDashboard — SSR', () => {
     const html = renderToStaticMarkup(<CardioAnalyticsDashboard cycle={c} log={log} />);
     expect(html).not.toContain('Разбивка факта по дисциплинам');
   });
+
+  /** Спринт 5.2: эталон по дисциплине из config СНИМАЕТ блокировку смешанного лога. */
+  it('config.lthrBySport: смешанный лог становится сравнимым, чип «свой пульс»', () => {
+    const c = buildCardioCycle({
+      goal: 'cut', totalWeeks: 4,
+      config: { lthr: 170, age: 30, sex: 'male', lthrBySport: { bike: 150 } } as never,
+    });
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const log = [
+      { id: 'r1', date: iso, type: 'zone2' as const, durationMin: 30, completed: true, avgHr: 150, sport: 'run' as const },
+      { id: 'b1', date: iso, type: 'zone2' as const, durationMin: 45, completed: true, avgHr: 130, sport: 'bike' as const },
+    ];
+    const html = renderToStaticMarkup(<CardioAnalyticsDashboard cycle={c} log={log} />);
+    expect(html).toContain('свой пульс');
+    expect(html).not.toContain('несопоставимы');
+  });
 });
 
 describe('CardioVolumeChart — TRIMP', () => {

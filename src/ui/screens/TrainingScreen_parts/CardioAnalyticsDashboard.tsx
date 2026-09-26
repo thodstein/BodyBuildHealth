@@ -115,11 +115,17 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
   }, [cycle]);
 
   // P1-аудит: план по типам сессий ≠ факт по HR дневника. Сверяем честно.
+  // Спринт 5.2: config.lthrBySport — эталон по дисциплинам (у бега и вела он разный).
   const tidFact = useMemo(() => {
     if (!cycle || !log.length) return null;
     try {
-      const cfg = cycle.config as { lthr?: number; age?: number; sex?: 'male' | 'female' } | undefined;
-      return tidPlanVsFact(cycle, log, { lthr: cfg?.lthr, age: cfg?.age, sex: cfg?.sex });    } catch { return null; }
+      const cfg = cycle.config as { lthr?: number; age?: number; sex?: 'male' | 'female'; lthrBySport?: Partial<Record<string, number>> } | undefined;
+      const refsBySport: Record<string, { lthr: number }> = {};
+      for (const [k, v] of Object.entries(cfg?.lthrBySport ?? {})) {
+        if (Number.isFinite(v) && (v as number) > 0) refsBySport[k] = { lthr: Math.round(v as number) };
+      }
+      return tidPlanVsFact(cycle, log, { lthr: cfg?.lthr, age: cfg?.age, sex: cfg?.sex }, refsBySport);
+    } catch { return null; }
   }, [cycle, log]);
 
   // PRO: PMC daily по факту (CTL/ATL/TSB) + рампа TSS
