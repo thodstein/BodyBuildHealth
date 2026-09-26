@@ -9,7 +9,7 @@ import {
   cardioEquipmentLabel,
   type CardioCycle, type CardioType, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
-import { saveCardioLogEntry, loadCardioLog, estimateCardioEntryKcal, cardioExpectedDistanceHint, validateCardioLogFields, type CardioLogFieldWarnings } from '../../../engines/lms/cardio-diary.engine';
+import { saveCardioLogEntry, loadCardioLog, estimateCardioEntryKcal, cardioExpectedDistanceHint, validateCardioLogFields, CARDIO_SPORT_RU, type CardioSport, type CardioLogFieldWarnings } from '../../../engines/lms/cardio-diary.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_CTA, BTN_DANGER, ProgressBar, TYPE_COLOR } from './CardioUI';
 
@@ -75,6 +75,10 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
   const [rpe, setRpe] = useState('');
   const [hr, setHr] = useState('');
   const [km, setKm] = useState('');
+  // Спринт 5.2 (аудит): дисциплина записывается в дневник. Раньше таймер вообще
+  // не писал `sport` — ВСЕ сессии пользователя лежали как <other>, и пер-спортная
+  // разбивка TID видела только импорт. По умолчанию <другое>: не выдумываем.
+  const [sport, setSport] = useState<CardioSport>('other');
   const [flash, setFlash] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<CardioLogFieldWarnings | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -186,6 +190,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
       type: finished.type,
       durationMin: finished.durationMin,
       completed: true,
+      sport,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
       calories: estimateCardioEntryKcal(finished.type, finished.durationMin, weight ?? undefined),
@@ -217,6 +222,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
       type,
       durationMin,
       completed: false,
+      sport,            // спринт 5.2: пропуск тоже принадлежит дисциплине
       notes: 'пропущена',
     });
     if (active) {
@@ -288,6 +294,28 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 10, padding: 10 }}>
           <div style={{ fontSize: 11, color: '#fff' }}>
             ✅ {TYPE_LABEL[finished.type]} {finished.durationMin} мин завершена — оцените сессию:
+          </div>
+          {/* Дисциплина: без неё запись ляжет в <другое> и не попадёт в разбивку TID. */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ ...LABEL, fontSize: 10 }}>дисциплина:</span>
+            {(Object.keys(CARDIO_SPORT_RU) as CardioSport[]).map(s => (
+              <button
+                key={s}
+                data-cardio="sport"
+                data-sport={s}
+                onClick={() => setSport(s)}
+                aria-pressed={sport === s}
+                aria-label={`Дисциплина: ${CARDIO_SPORT_RU[s]}`}
+                style={{
+                  ...BTN, minHeight: 44, padding: '0 12px', fontSize: 12,
+                  border: sport === s ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(255,255,255,0.13)',
+                  background: sport === s ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                  color: '#fff',
+                }}
+              >
+                {sport === s ? '✓ ' : ''}{CARDIO_SPORT_RU[s]}
+              </button>
+            ))}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px,1fr))', gap: 8 }}>
             <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="RPE" />
