@@ -2109,7 +2109,12 @@ export function adaptCardioToStrength(cycle: CardioCycle, ctx: StrengthContext):
     }
     if (legDays >= 4) {
       const hadIntense = sessions.some(s => s.type === 'hiit' || s.type === 'miss');
-      sessions = sessions.map(s => s.type === 'miss' ? { ...s, type: 'zone2' as CardioType, intensity: 'moderate' as const, purpose: s.purpose } : s);
+      // Спринт 5.4: тип сменился (MISS 10 → zone2 7 kcal/мин) — цену сессии
+      // обязаны пересчитать, как это делают ACWR-ветки выше. Раньше здесь
+      // менялся только тип, и план держал калории MISS на «zone2».
+      sessions = sessions.map(s => s.type === 'miss'
+        ? recalcSessionKcal({ ...s, type: 'zone2' as CardioType, intensity: 'moderate' as const, purpose: s.purpose }, bw, sex, ffm)
+        : s);
       if (sessions.some(s => s.type === 'hiit')) {
         sessions = sessions.filter(s => s.type !== 'hiit');
         if (hadIntense) extra.push('Высокая частота ног: интенсивное кардио заменено на zone2.');
