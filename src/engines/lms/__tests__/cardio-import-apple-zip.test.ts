@@ -6,7 +6,7 @@
  * Тесты пишутся по РЕАЛЬНОЙ разметке, которую ждёт парсер, а не по придумке.
  */
 import { describe, expect, it } from 'vitest';
-import { parseCardioImport, detectCardioFormat, parseCardioZip } from '../../cardio-import.engine';
+import { parseCardioImport, detectCardioFormat, parseCardioZip, cardioImportFormatLabel, CARDIO_IMPORT_FORMATS } from '../../cardio-import.engine';
 
 /** Реальная форма Apple Health: Workout + WorkoutStatistics (distance/HR/energy). */
 const APPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -87,6 +87,42 @@ describe('Apple Health (export.xml)', () => {
   it('дата берётся по МЕСТНОМУ календарю (startDate +0300 → 2026-09-10, не 09-09)', () => {
     const r = parseCardioImport('export.xml', APPLE_XML);
     expect(r.entries.map(e => e.date).sort()).toEqual(['2026-09-10', '2026-09-12']);
+  });
+});
+
+describe('Подписи форматов — единый источник (id не должен утекать в UI)', () => {
+  it('каждый известный формат имеет человекочитаемую подпись', () => {
+    for (const f of CARDIO_IMPORT_FORMATS) {
+      const label = cardioImportFormatLabel(f);
+      expect(label).toBeTruthy();
+      expect(label).not.toBe(f);            // не сам id
+      expect(label).not.toContain('undefined');
+    }
+  });
+
+  it('РЕГРЕСС: Apple-парсер отдаёт ключ, который есть в списке форматов', () => {
+    const r = parseCardioImport('export.xml', APPLE_XML);
+    expect(CARDIO_IMPORT_FORMATS as readonly string[]).toContain(r.format);
+    // Раньше было 'apple_health_xml' — ключа не существовало, в UI вылетал id.
+    expect(r.format).toBe('apple_health');
+    expect(cardioImportFormatLabel(r.format)).toBe('Apple Health XML');
+  });
+
+  it('неизвестный формат не показывается «как есть» (честный fallback)', () => {
+    expect(cardioImportFormatLabel('что-то новое')).toBe('неизвестный (что-то новое)');
+  });
+
+  it('все парсеры отдают формат из списка (gpx/tcx/csv/json/fit/zip/apple)', () => {
+    const gpx = `<?xml version="1.0"?><gpx><trk><type>running</type><trkseg><trkpt lat="1" lon="2"><time>2026-09-01T10:00:00Z</time></trkpt></trkseg></trk></gpx>`;
+    const tcx = `<?xml version="1.0"?><TrainingCenterDatabase><Activities><Activity Sport="Running"><Id>2026-09-01T10:00:00Z</Id><Lap><TotalTimeSeconds>1800</TotalTimeSeconds></Lap></Activity></Activities></TrainingCenterDatabase>`;
+    const json = JSON.stringify({ workouts: [{ date: '2026-09-01', type: 'zone2', durationMin: 30 }] });
+    const cases = [
+      parseCardioImport('a.gpx', gpx).format,
+      parseCardioImport('a.tcx', tcx).format,
+      parseCardioImport('a.csv', 'date,duration\n2026-09-01,30').format,
+      parseCardioImport('a.json', json).format,
+    ];
+    for (const f of cases) expect(CARDIO_IMPORT_FORMATS as readonly string[]).toContain(f);
   });
 });
 

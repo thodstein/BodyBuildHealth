@@ -12,7 +12,7 @@
  */
 import React, { useState } from 'react';
 import { saveCardioLogEntry, importCardioEntries, estimateCardioEntryKcal, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
-import { parseCardioImport, parseCardioZipAsync } from '../../../engines/cardio-import.engine';
+import { parseCardioImport, parseCardioZipAsync, cardioImportFormatLabel } from '../../../engines/cardio-import.engine';
 import { todayLocalIso, toLocalIso } from '../../../engines/lms/cardio-date-utils.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_CTA, BTN_SMALL, CHIP, CHIP_ACTIVE } from './CardioUI';
@@ -23,10 +23,9 @@ const TEXT_MAX = 5 * 1024 * 1024;
 const ZIP_MAX = 60 * 1024 * 1024;
 const ACCEPT = '.gpx,.tcx,.xml,.csv,.json,.fit,.zip';
 
-const FORMAT_LABEL: Record<string, string> = {
-  gpx: 'GPX', tcx: 'TCX', apple_health: 'Apple Health XML',
-  csv: 'CSV', json: 'JSON', fit: 'FIT', zip: 'ZIP', unknown: 'неизвестный',
-};
+/** Подписи форматов — единый источник в движке импорта (раньше копия в UI
+ *  разошлась с движком: парсер отдавал 'apple_health_xml', ключа не было —
+ *  пользователю вылетал технический id). */
 
 function currentWeightKg(): number | undefined {
   try {
@@ -73,7 +72,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
       }
       setPreview({ ...result, fileName: f.name });
       const km = result.entries.reduce((s, x) => s + (x.distanceKm ?? 0), 0);
-      say(`📥 ${f.name}: ${result.entries.length} тренировр${result.entries.length === 1 ? 'а' : 'ок(и)'} · ${FORMAT_LABEL[result.format] ?? result.format}${km > 0 ? ` · ${km.toFixed(1)} км` : ''} — проверьте превью`, 4000);
+      say(`📥 ${f.name}: ${result.entries.length} тренировр${result.entries.length === 1 ? 'а' : 'ок(и)'} · ${cardioImportFormatLabel(result.format)}${km > 0 ? ` · ${km.toFixed(1)} км` : ''} — проверьте превью`, 4000);
     } catch (err) {
       say(`⚠ Ошибка чтения файла: ${(err as Error).message}`, 4000);
     } finally {
@@ -157,7 +156,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
       {preview && preview.entries.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.26)', borderLeft: '3px solid #60a5fa', borderRadius: 11, padding: 12 }}>
           <div style={{ fontSize: 12, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.5 }}>
-            Предпросмотр: <b>{preview.entries.length}</b> · {FORMAT_LABEL[preview.format] ?? preview.format} · {preview.fileName}
+            Предпросмотр: <b>{preview.entries.length}</b> · {cardioImportFormatLabel(preview.format)} · {preview.fileName}
           </div>
           {preview.warnings.length > 0 && (
             <div style={{ fontSize: 11, color: '#fbbf24', lineHeight: 1.5 }}>

@@ -175,6 +175,31 @@ export interface CardioImportResult {
   warnings: string[];
   format: string;
 }
+
+/**
+ * Единый источник подписей форматов импорта.
+ * P2-аудит: подписи жили в UI, а движок отдавал `format: 'apple_health_xml'` —
+ * ключа не было, и пользователю в флеше вылетал технический id. Теперь список
+ * форматов и их подписи — рядом, и гард ловит любое новое расхождение.
+ */
+export const CARDIO_IMPORT_FORMATS = ['gpx', 'tcx', 'apple_health', 'csv', 'json', 'fit', 'zip', 'unknown'] as const;
+export type CardioImportFormat = (typeof CARDIO_IMPORT_FORMATS)[number];
+
+export const CARDIO_IMPORT_FORMAT_LABELS: Record<CardioImportFormat, string> = {
+  gpx: 'GPX',
+  tcx: 'TCX',
+  apple_health: 'Apple Health XML',
+  csv: 'CSV',
+  json: 'JSON',
+  fit: 'FIT',
+  zip: 'ZIP',
+  unknown: 'неизвестный',
+};
+
+/** Человекочитаемая подпись формата; неизвестный id — честный fallback. */
+export function cardioImportFormatLabel(format: string): string {
+  return CARDIO_IMPORT_FORMAT_LABELS[format as CardioImportFormat] ?? `неизвестный (${format})`;
+}
 export function parseCardioCsv(text: string, fileName = 'import.csv'): CardioImportResult {
   const warnings: string[] = [];
   const cleaned = String(text || '').replace(/^\uFEFF/, '').trim();
@@ -265,7 +290,11 @@ export function parseCardioCsv(text: string, fileName = 'import.csv'): CardioImp
     if (!seen.has(key)) { seen.add(key); deduped.push(e); }
   }
   if (deduped.length < entries.length) warnings.push(`Удалено дублей: ${entries.length - deduped.length}`);
-  return { entries: deduped, warnings, format: `csv (${header.join(', ')})` };
+  // P2-аудит: было `format: \`csv (${header.join(', ')})\`` — id формата с диагностикой
+  // внутри. В UI это попадало в флеш вместо подписи «CSV». Формат возвращаем
+  // каноническим ключом; «проблемные» случаи (шапка-как-данные, битые строки)
+  // уже сообщаются в warnings выше.
+  return { entries: deduped, warnings, format: 'csv' };
 }
 
 // ── TCX parser ────────────────────────────────────────────────────────────
@@ -556,7 +585,7 @@ export function parseAppleHealthXml(text: string): CardioImportResult {
     }
   }
   if (entries.length === 0) warnings.push('Apple Health: не найдено валидных тренировок');
-  return { entries, warnings, format: 'apple_health_xml' };
+  return { entries, warnings, format: 'apple_health' };
 }
 
 // ── JSON generic ──────────────────────────────────────────────────────────
