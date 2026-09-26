@@ -9,6 +9,10 @@ import { phaseForCombatWeek, rirForCombat, repsForCombat } from './combat-progre
 import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadWeekATR, isTaperWeek } from './combat-periodization.engine';
 import { isTaperByFightDate, taperVolumeMultiplier, buildTaperRationale, taperSplitForWeek, validateTaperConfig, fightWeekIndex, recommendTaperWeeks } from './combat-taper.engine';
 import { weightCutVolumeMultiplier, weightCutNutritionForWeek, weightCutRehydrationNotes, buildWeightCutProtocol, weightCutPhaseForWeek, validateWeightCutProtocol } from './combat-weight-cut.engine';
+import {
+  conditioningSetCost, effectiveWeeklySetBudget,
+  MIN_SETS_PER_EXERCISE, MAX_TRIM_PASSES_PER_EX, MAX_TRIM_ITERATIONS,
+} from './combat-budget-constants';
 import { buildConditioningRationale, conditioningSessionsForWeek } from './combat-conditioning.engine';
 import { filterByTierCB, filterByInjuryCB, selectDiverseCB, tierForCB, gentleFactorForCB, repsCapForCB } from './combat-selection';
 import { accentForDiscipline, accentForFightStyle, styleNarrative } from './combat-specialization';
@@ -717,10 +721,12 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   }
 
   // бюджет enforcement с учётом кондиции: каждый зал-сет ≠ кондиция-мин, 12мин zone2 ≈1 сет
+  // Все числа бюджета — именованные в combat-budget-constants (E1.6), чтобы
+  // их смысл и источник не терялись в инлайне.
   for (const wk of weeksData) {
     const condForWk = (input as any).conditioningMode !== 'off' ? conditioningSessionsForWeek(wk.week, wk.phase as any, goal, outsideSessions) : [];
-    const condCost = Math.round(condForWk.reduce((a:number,c:any)=> a + (c.durationMin||0),0) * 0.08);
-    const effectiveBudget = Math.max(12, weeklyBudget - condCost);
+    const condCost = conditioningSetCost(condForWk as any);
+    const effectiveBudget = effectiveWeeklySetBudget(weeklyBudget, condCost);
     let total = wk.totalSets || 0;
     if (total > effectiveBudget) {
       // собираем все упражнения недели, сортируем: accessory first, затем по убыванию sets
@@ -731,9 +737,9 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         return b.ex.sets - a.ex.sets;
       });
       let idx = 0;
-      while (total > effectiveBudget && idx < allEx.length * 3) {
+      while (total > effectiveBudget && idx < allEx.length * MAX_TRIM_PASSES_PER_EX) {
         const cur = allEx[idx % allEx.length];
-        if (cur.ex.sets > 2) {
+        if (cur.ex.sets > MIN_SETS_PER_EXERCISE) {
           cur.ex.sets -= 1;
           cur.ex.workSets = cur.ex.workSets.slice(0, cur.ex.sets);
           if (cur.ex.workSets.length < cur.ex.sets) {
@@ -744,7 +750,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         }
         idx++;
         // защита от бесконечности
-        if (idx > 100) break;
+        if (idx > MAX_TRIM_ITERATIONS) break;
       }
       // пересчёт тоннажа после обрезки
       wk.totalTonnage = wk.sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.weight * ws.reps, 0), 0), 0);
@@ -817,8 +823,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   // бюджет warning с учётом кондиции
   for (const wk of weeksData) {
     const condForWk = (input as any).conditioningMode !== 'off' ? conditioningSessionsForWeek(wk.week, wk.phase as any, goal, outsideSessions) : [];
-    const condCost = Math.round(condForWk.reduce((a:number,c:any)=> a + (c.durationMin||0),0) * 0.08);
-    const effectiveBudget = Math.max(12, weeklyBudget - condCost);
+    const condCost = conditioningSetCost(condForWk as any);
+    const effectiveBudget = effectiveWeeklySetBudget(weeklyBudget, condCost);
     if ((wk.totalSets || 0) > effectiveBudget) {
       warnings.push(`Нед ${wk.week}: ${wk.totalSets} сетов > бюджета ${effectiveBudget} (зал ${weeklyBudget} - кондиц ${condCost}).`);
       break;
