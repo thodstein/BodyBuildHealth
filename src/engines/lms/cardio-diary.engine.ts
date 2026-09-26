@@ -541,12 +541,30 @@ export function loadCardioWellness(): CardioWellness[] {
   } catch { return []; }
 }
 
-/** Транзакционный импорт: все записи за один localStorage write (атомарно). */
+/** Транзакционный импорт: все записи за один localStorage write (атомарно).
+ *  P2-аудит: это ЕДИНСТВЕННАЯ граница импорта — provenance проставляется здесь,
+ *  чтобы ни один будущий вызов не мог забыть `source`/`sport`/`updatedAt`
+ *  (парсеры уже дают sport, но UI-панель собирала запись руками и теряла его,
+ *  а `saveCardioLogEntry` source не ставит → чипы «Импорт»/дисциплина были мертвы).
+ */
 export function importCardioEntries(entries: CardioLogEntry[]): CardioLogEntry[] {
   const existing = loadCardioLog();
   const seen = new Set(existing.map(e => `${e.date}|${e.type}|${e.durationMin}|${e.distanceKm ?? ''}`));
+  const stamp = toLocalIso(new Date());
   const toAdd: CardioLogEntry[] = [];
-  for (const e of entries) {
+  for (const raw of Array.isArray(entries) ? entries : []) {
+    if (!raw || typeof raw !== 'object') continue;
+    // Уже проставленное происхождение НЕ затираем: 'wearable'/'derived' точнее
+    // общего 'import'. Ставим 'import' только когда источник неизвестен.
+    const src = (['manual', 'import', 'wearable', 'derived'] as const).includes(raw.source as any)
+      ? (raw.source as CardioLogEntry['source'])
+      : 'import';
+    const e: CardioLogEntry = {
+      ...raw,
+      sport: sanitizeCardioSport(raw.sport),
+      source: src,
+      updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : stamp,
+    };
     const k = `${e.date}|${e.type}|${e.durationMin}|${e.distanceKm ?? ''}`;
     if (!seen.has(k)) {
       seen.add(k);

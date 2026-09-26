@@ -11,9 +11,9 @@
  * main thread на 50-Мегабайтном export.zip).
  */
 import React, { useState } from 'react';
-import { saveCardioLogEntry, estimateCardioEntryKcal, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { saveCardioLogEntry, importCardioEntries, estimateCardioEntryKcal, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 import { parseCardioImport, parseCardioZipAsync } from '../../../engines/cardio-import.engine';
-import { todayLocalIso } from '../../../engines/lms/cardio-date-utils.engine';
+import { todayLocalIso, toLocalIso } from '../../../engines/lms/cardio-date-utils.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_CTA, BTN_SMALL, CHIP, CHIP_ACTIVE } from './CardioUI';
 import type { CardioType } from '../../../engines/lms/cardio.engine';
@@ -95,6 +95,8 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
       calories: estimateCardioEntryKcal(type, src.durationMin, currentWeightKg()),
       distanceKm: src.distanceKm ?? undefined,
       rpe: src.rpe ?? undefined,
+      sport: src.sport,               // спринт 5: одиночная сессия тоже помнит дисциплину
+      source: 'import',               // это импорт, даже если тип/дату выбрал пользователь
       notes: `импорт ${preview.fileName}`,
     });
     setPreview(null);
@@ -102,11 +104,14 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
     onImported?.();
   };
 
-  /** Несколько сессий — сохраняем как распознал движок (тип из активности). */
+  /** Несколько сессий — сохраняем как распознал движок (тип + ДИСЦИПЛИНА из активности).
+   *  P2-аудит: был цикл `saveCardioLogEntry` — N полных перезаписей журнала, и
+   *  `sport`/`source` терялись. Теперь один атомарный `importCardioEntries`. */
   const saveAll = () => {
     if (!preview || preview.entries.length < 2) return;
-    for (const src of preview.entries) {
-      saveCardioLogEntry({
+    const n = preview.entries.length;
+    importCardioEntries(
+      preview.entries.map(src => ({
         id: newId(),
         date: src.date,
         type: src.type,
@@ -116,10 +121,13 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
         calories: src.calories ?? estimateCardioEntryKcal(src.type, src.durationMin, currentWeightKg()),
         distanceKm: src.distanceKm ?? undefined,
         rpe: src.rpe ?? undefined,
+        sport: src.sport,               // спринт 5: дисциплина из файла не теряется
+        source: 'import',               // чип «Импорт» в журнале
+        updatedAt: toLocalIso(new Date()),
         notes: `импорт ${preview.fileName}`,
-      });
-    }
-    say(`✅ Импортировано ${preview.entries.length} тренировок`, 3000);
+      })),
+    );
+    say(`✅ Импортировано ${n} тренировок`, 3000);
     setPreview(null);
     onImported?.();
   };
