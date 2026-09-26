@@ -356,10 +356,6 @@ export const StrengthSportConstructor: React.FC = () => {
     } catch { /* noop */ }
     setPlan(p);
     const saved = saveStrengthSportPlan(p);
-    if (!saved) {
-      // План в памяти есть, но на диск не лёг — говорим честно, а не «собрано».
-      setMsg('⚠ План собран, но НЕ сохранён (нет места в хранилище) — после перезагрузки пропадёт');
-    }
     try {
       const bw = (input as any).bodyweight || 80;
       const nut = { proteinG: Math.round(bw * ((input as any).weightCutKg ? 2.3 : 2.0)), carbsG: Math.round(bw * ((input as any).weightCutKg ? 3 : 5)), note: `TA/стронг ${input.mode} ${input.weeks}нед`, bodyweight: bw, mode: input.mode };
@@ -380,7 +376,10 @@ export const StrengthSportConstructor: React.FC = () => {
         window.dispatchEvent(new CustomEvent('he-strength-annual-updated', { detail: ann }));
       } catch {}
     } catch {}
-    setMsg('✦ План собран'); setTimeout(()=>setMsg(''), 2200);
+    // Итоговое сообщение — по факту записи. Раньше тут стояло безусловное «✦ План собран»,
+    // и честное предупреждение (ставилось выше) затиралось этим же кадром.
+    if (saved) { setMsg('✦ План собран'); setTimeout(()=>setMsg(''), 2200); }
+    else { setMsg('⚠ План собран, но НЕ сохранён (нет места в хранилище) — после перезагрузки пропадёт'); setTimeout(()=>setMsg(''), 4500); }
     setStep('plan');
     setHasSpecPrev(false); // новый id плана — старый снапшот stale, откат его честно отклонит
     setHasSMSpecPrev(false); // то же для волны СМ-коррекции
