@@ -1,3 +1,4 @@
+import { localIsoDate } from '../../core/local-date';
 import React, { useState, useMemo, useEffect } from 'react';
 import { HeroImg } from '../HeroImg';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE, UCUM_MAP } from '../../core/constants';
@@ -490,7 +491,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
     const generateRiskReport = () => {
       const report = {
         id: Date.now().toString(),
-        date: new Date().toISOString().slice(0, 10),
+        date: localIsoDate(),
         generatedAt: new Date().toISOString(),
         overallRaw: riskResult?.overallRaw || 0,
         overallNet: riskResult?.overallNet || 0,
@@ -523,7 +524,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
         systems: riskResult?.systemBreakdown ? Object.entries(riskResult.systemBreakdown).map(([k, v]: any) => ({ system: k, raw: v.raw, net: v.net })) : [],
       };
       const lines = [
-        `Отчёт по рискам ${src.date || new Date().toISOString().slice(0, 10)} · net ${Math.round(src.overallNet || 0)}% · raw ${Math.round(src.overallRaw || 0)}%`,
+        `Отчёт по рискам ${src.date || localIsoDate()} · net ${Math.round(src.overallNet || 0)}% · raw ${Math.round(src.overallRaw || 0)}%`,
         ...(Array.isArray(src.systems) ? src.systems.map((s: any) => `• ${s.system}: raw ${Math.round(s.raw || 0)}% → net ${Math.round(s.net || 0)}%`) : []),
       ];
       return lines.join('\n');
@@ -586,7 +587,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
               <button onClick={() => {
                 const cur = (() => { try { return JSON.parse(localStorage.getItem('he_risk_report_current') || 'null'); } catch { return null; } })();
                 const payload = JSON.stringify(cur || { text: riskReportText() }, null, 2);
-                void saveTextFileApk(`risk-report-${new Date().toISOString().slice(0, 10)}.json`, payload, 'application/json;charset=utf-8').then(o => flashReportIo(shareOutcomeLabel(o)));
+                void saveTextFileApk(`risk-report-${localIsoDate()}.json`, payload, 'application/json;charset=utf-8').then(o => flashReportIo(shareOutcomeLabel(o)));
               }} style={{
                 flex:1, minHeight:44, padding:'10px 14px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12,
                 background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff',
@@ -1394,13 +1395,13 @@ export const ComplianceDisplay: React.FC = () => {
 
   const [report, setReport] = useState<ComplianceReport | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
 
   // Auto-computed dates from real data
   const latestLabDate = useMemo(() => {
     if (labs.length === 0) {
       const d = new Date(); d.setMonth(d.getMonth() - 3);
-      return d.toISOString().slice(0, 10);
+      return localIsoDate(d);
     }
     const dates = labs.map(l => l.date || '').filter(Boolean).sort().reverse();
     return dates[0] || today;
@@ -1412,10 +1413,10 @@ export const ComplianceDisplay: React.FC = () => {
       const minStart = Math.min(...starts);
       const d = new Date();
       d.setDate(d.getDate() - 7 * Math.max(1, minStart));
-      return d.toISOString().slice(0, 10);
+      return localIsoDate(d);
     }
     const d = new Date(); d.setDate(d.getDate() - 28);
-    return d.toISOString().slice(0, 10);
+    return localIsoDate(d);
   }, [course]);
 
   const [cycleStart, setCycleStart] = useState(courseStartDate);
