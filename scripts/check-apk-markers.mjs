@@ -158,6 +158,8 @@ for (const [file, hooks] of [
   ['combat-annual-card.tsx', ['cb-plan-annual', 'annual-dday', 'annual-phase']],
   ['cb-camp-intel.tsx', ['cb-camp-intel']],
   ['cb-camp-strip.tsx', ['cb-camp-strip', 'camp-week', 'cb-plan-weeks']],
+  ['cb-camp-charts.tsx', ['cb-camp-charts', 'chart']],
+  ['cb-variants.tsx', ['variants', 'variant-save', 'variant-compare', 'variant-restore', 'variant-remove', 'variant-diff']],
 ]) {
   for (const hook of hooks) {
     mustContain(COMBAT_SRC + file, hook, `combat hook ${hook} in ${file}`);
@@ -172,7 +174,7 @@ mustContain('src/styles-native.css', '.cb-chip {\n  min-height: 44px !important'
 mustContain(COMBAT_SRC + 'CombatConstructor.tsx', `aria-current={active ? 'step' : undefined}`, 'combat step aria-current');
 mustContain(COMBAT_SRC + 'CombatConstructor.tsx', 'role="status" aria-live="polite"', 'combat toast live region');
 // …и ни одного нативного <select>/checkbox в боевом UI.
-for (const f of ['CombatConstructor.tsx', 'CombatPlanView.tsx', 'CombatUI.tsx', 'combat-annual-card.tsx', 'cb-camp-intel.tsx', 'cb-camp-strip.tsx']) {
+for (const f of ['CombatConstructor.tsx', 'CombatPlanView.tsx', 'CombatUI.tsx', 'combat-annual-card.tsx', 'cb-camp-intel.tsx', 'cb-camp-strip.tsx', 'cb-camp-charts.tsx', 'cb-variants.tsx']) {
   const p = COMBAT_SRC + f;
   const native = readFileSync(p, 'utf8')
     .split(/\r?\n/)

@@ -9,6 +9,8 @@ import { buildCombatReport, isCombatPlanBlocked } from '../../../engines/combat/
 import { ruLabel, PHASE_RU, SESSION_TAG_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
 import { AnnualCard } from './combat-annual-card';
 import { CampStrip } from './cb-camp-strip';
+import { CbCampCharts } from './cb-camp-charts';
+import { CbVariants } from './cb-variants';
 import { cbExerciseName } from '../../../engines/combat/combat-builder.engine';
 import { combatMesocycleSummary } from '../../../engines/combat/combat-mesocycle';
 import type { DiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
@@ -134,6 +136,8 @@ export const CombatPlanView: React.FC<Props> = ({
 }) => {
   const [expandedWeek, setExpandedWeek] = React.useState<number | null>(0);
   const [openSess, setOpenSess] = React.useState<Record<string, boolean>>({});
+  const [restored, setRestored] = React.useState<CombatPlan | null>(null);
+  const shown = restored || plan;
   const doMsg = (m: string) => { setMsg?.(m); setTimeout(() => setMsg?.(''), 2200); };
   const sessOpen = (wk: number, day: number, idx: number) => openSess[`${wk}-${day}`] ?? idx === 0;
   // №1: заблокированный план (errors) нельзя выгружать ни в каком виде — канон isCombatPlanBlocked из finalize
@@ -159,30 +163,30 @@ export const CombatPlanView: React.FC<Props> = ({
 
       {/* Отчёт — Apple glass + Highlights + StatTiles */}
       <div className="cb-plan-summary">
-      <SectionCard icon="📋" title="Сводка плана" subtitle={`${plan.discipline} · ${plan.goal} · ${plan.level} · ${plan.weeks} нед`} accent>
+      <SectionCard icon="📋" title="Сводка плана" subtitle={`${shown.discipline} · ${shown.goal} · ${shown.level} · ${shown.weeks} нед`} accent>
         <div className="cb-plan-stats" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(110px,1fr))', gap:8 }}>
-          <StatTile label="Недель" value={String(plan.weeks)} color="#a855f7" sub={plan.patternId} icon="📅" />
-          <StatTile label="Сессий" value={String(plan.weeksData.reduce((a,w)=>a+w.sessions.length,0))} color="#a855f7" sub="за цикл" icon="🗓️" />
-          <StatTile label="Сетов" value={String(plan.weeksData.reduce((a,w)=>a+(w.totalSets||0),0))} color="#a855f7" sub="за цикл" icon="📊" />
-          <StatTile label="Тоннаж" value={`${Math.round(plan.weeksData.reduce((a,w)=>a+((w as any).totalTonnage||0),0)/1000)}т`} color="#a855f7" sub="за цикл" icon="⚖️" />
+          <StatTile label="Недель" value={String(shown.weeks)} color="#a855f7" sub={shown.patternId} icon="📅" />
+          <StatTile label="Сессий" value={String(shown.weeksData.reduce((a,w)=>a+w.sessions.length,0))} color="#a855f7" sub="за цикл" icon="🗓️" />
+          <StatTile label="Сетов" value={String(shown.weeksData.reduce((a,w)=>a+(w.totalSets||0),0))} color="#a855f7" sub="за цикл" icon="📊" />
+          <StatTile label="Тоннаж" value={`${Math.round(shown.weeksData.reduce((a,w)=>a+((w as any).totalTonnage||0),0)/1000)}т`} color="#a855f7" sub="за цикл" icon="⚖️" />
         </div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-          <Badge color="#a855f7" bg="rgba(168,85,247,0.12)" border="rgba(168,85,247,0.22)">{plan.discipline}</Badge>
-          <Badge color="#a855f7" bg="rgba(168,85,247,0.12)" border="rgba(168,85,247,0.22)">{plan.goal}</Badge>
-          <Badge>{plan.patternId}</Badge>
-          {(plan.inputSnapshot as any)?.fightDate && <Badge color="#ef4444" bg="rgba(239,68,68,0.10)" border="rgba(239,68,68,0.18)">🏁 бой {(plan.inputSnapshot as any).fightDate}</Badge>}
+        <Badge color="#a855f7" bg="rgba(168,85,247,0.12)" border="rgba(168,85,247,0.22)">{shown.discipline}</Badge>
+        <Badge color="#a855f7" bg="rgba(168,85,247,0.12)" border="rgba(168,85,247,0.22)">{shown.goal}</Badge>
+        <Badge>{shown.patternId}</Badge>
+        {(shown.inputSnapshot as any)?.fightDate && <Badge color="#ef4444" bg="rgba(239,68,68,0.10)" border="rgba(239,68,68,0.18)">🏁 бой {(shown.inputSnapshot as any).fightDate}</Badge>}
         </div>
         <CampStrip plan={plan} expandedWeek={expandedWeek} onPickWeek={setExpandedWeek} />
-        {plan.outsideMetrics && <InfoBanner tone={plan.outsideMetrics.interference==='high'?'warn':'info'}><Highlight color={plan.outsideMetrics.interference==='high'?'#ff9f0a':'#a855f7'}>{plan.outsideMetrics.weeklyLoad} load</Highlight> → объём <Highlight>×{plan.outsideMetrics.volumeMultiplier}</Highlight> · {plan.outsideMetrics.interference}</InfoBanner>}
-        {(plan.inputSnapshot as any)?.weightCutProtocol && (
+        {shown.outsideMetrics && <InfoBanner tone={shown.outsideMetrics.interference==='high'?'warn':'info'}><Highlight color={shown.outsideMetrics.interference==='high'?'#ff9f0a':'#a855f7'}>{shown.outsideMetrics.weeklyLoad} load</Highlight> → объём <Highlight>×{shown.outsideMetrics.volumeMultiplier}</Highlight> · {shown.outsideMetrics.interference}</InfoBanner>}
+        {(shown.inputSnapshot as any)?.weightCutProtocol && (
           <SectionCard icon="⚖️" title="Весогонка — питание по неделям" subtitle="ISSN 2025 · клик — скопировать в планировщик питания" accent>
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {plan.weeksData.map(wk=>{
-                const proto = (plan.inputSnapshot as any).weightCutProtocol;
-                const bw = (plan.inputSnapshot as any).bodyweight || 80;
-                const sex = (plan.inputSnapshot as any).sex || 'male';
-                const nut = weightCutNutritionForWeek(wk.week, plan.weeks, proto, bw, sex);
-                const meal = combatWeightCutToMealInput(wk.week, plan.weeks, proto, bw, sex);
+              {shown.weeksData.map(wk=>{
+                const proto = (shown.inputSnapshot as any).weightCutProtocol;
+                const bw = (shown.inputSnapshot as any).bodyweight || 80;
+                const sex = (shown.inputSnapshot as any).sex || 'male';
+                const nut = weightCutNutritionForWeek(wk.week, shown.weeks, proto, bw, sex);
+                const meal = combatWeightCutToMealInput(wk.week, shown.weeks, proto, bw, sex);
                 return (
                   <div key={wk.week} style={{ display:'flex', gap:8, alignItems:'center', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', flexWrap:'wrap' }}>
                     <Highlight color={wk.deload?'#f59e0b': (wk as any).taper?'#60a5fa':'#a855f7'}>Нед {wk.week}</Highlight>
@@ -200,7 +204,7 @@ export const CombatPlanView: React.FC<Props> = ({
             <InfoBanner tone="info">Меню генерируется через `combatWeightCutToMealInput` → планировщик питания (кнопка «Копировать» сохраняет в `he_combat_meal_preview`)</InfoBanner>
           </SectionCard>
         )}
-        {plan.rationale?.length ? <div style={{ fontSize:11, color:'#fff', background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.45 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:6 }}><span style={{ color:'#a855f7' }}>•</span><span>{r}</span></div>)}</div> : null}
+        {shown.rationale?.length ? <div style={{ fontSize:11, color:'#fff', background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.45 }}>{shown.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:6 }}><span style={{ color:'#a855f7' }}>•</span><span>{r}</span></div>)}</div> : null}
         <details style={{ background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>
           <summary style={{ fontSize:11, fontWeight:700, color:'#d8b4fe', cursor:'pointer' }}>📄 Подробный отчёт (текст)</summary>
           <div style={{ fontSize:11, color:'#fff', whiteSpace:'pre-wrap', marginTop:8, lineHeight:1.5 }}>{buildCombatReport(plan)}</div>
@@ -208,15 +212,15 @@ export const CombatPlanView: React.FC<Props> = ({
       </SectionCard>
       </div>
 
-      {plan.validation?.errors?.length ? (
+      {shown.validation?.errors?.length ? (
         <div className="cb-plan-errors" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.24)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>⛔ Сборка заблокирована ({plan.validation.errors.length}) — до врача/исправления</div>
-          {plan.validation.errors.map((e, i) => (
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>⛔ Сборка заблокирована ({shown.validation.errors.length}) — до врача/исправления</div>
+          {shown.validation.errors.map((e, i) => (
             <div key={i} style={{ fontSize: 11, color: '#fff' }}>• {e}</div>
           ))}
         </div>
       ) : null}
-      {plan.validation?.warnings.map((w, i) => (
+      {shown.validation?.warnings.map((w, i) => (
         <InfoBanner key={i} tone="warn">{w}</InfoBanner>
       ))}
 
@@ -227,7 +231,7 @@ export const CombatPlanView: React.FC<Props> = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {(plan as any).conditioning.sessions.map((week: any[], wi: number) => (
               <div key={wi} style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.05)', display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
-                <Highlight color="#60a5fa">Нед {wi + 1}</Highlight><span style={{ fontWeight:700, color:'#fff' }}>{ruLabel(PHASE_RU, plan.weeksData[wi]?.phase)}</span><span style={{ color:TEXT_3 }}>·</span>
+                <Highlight color="#60a5fa">Нед {wi + 1}</Highlight><span style={{ fontWeight:700, color:'#fff' }}>{ruLabel(PHASE_RU, shown.weeksData[wi]?.phase)}</span><span style={{ color:TEXT_3 }}>·</span>
                 {week.length ? week.map((s: any, si:number) => <Highlight key={si} color={s.modality==='alactic'?'#a855f7': s.modality==='lactic'?'#ef4444':'#0ea5e9'}>{`${s.modality} ${s.durationMin}′ ${s.intervals || ''}`.trim()}</Highlight>) : <span style={{ color: TEXT_3 }}>внезал покрывает</span>}
               </div>
             ))}
@@ -236,8 +240,18 @@ export const CombatPlanView: React.FC<Props> = ({
         </SectionCard>
       )}
 
+      {restored && (
+        <div data-cb="variant-shown" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <InfoBanner tone="warn">Показан сохранённый вариант — текущая сборка скрыта.</InfoBanner>
+          <button onClick={() => setRestored(null)} style={{ ...BTN_SMALL, minHeight: 44, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '0.5px solid rgba(255,255,255,0.08)' }}>↩ К текущей сборке</button>
+        </div>
+      )}
+
       {/* Карта качества — Apple с Highlights */}
-      <CbQualityMap plan={plan} />
+      <CbQualityMap plan={shown} />
+
+      <CbCampCharts plan={shown} />
+      <CbVariants plan={plan} onRestore={(p) => { setRestored(p); setExpandedWeek(0); doMsg('↩ Вариант показан'); }} onMsg={doMsg} />
 
       {diaryLoad != null && (
         <InfoBanner tone={diaryLoad > 30 ? 'warn' : 'info'}>
@@ -246,7 +260,7 @@ export const CombatPlanView: React.FC<Props> = ({
       )}
 
       {/* Недели */}
-      {plan.weeksData.map(wk => {
+      {shown.weeksData.map(wk => {
         const isOpen = expandedWeek === wk.week - 1;
         const phaseColor = (PHASE_RU as any)[wk.phase] ? (wk.deload ? '#f59e0b' : (wk as any).taper ? '#60a5fa' : '#a855f7') : '#a855f7';
         const border = wk.deload ? 'rgba(245,158,11,0.28)' : (wk as any).taper ? 'rgba(59,130,246,0.22)' : 'rgba(168,85,247,0.16)';
