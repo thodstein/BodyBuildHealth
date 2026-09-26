@@ -146,6 +146,20 @@ describe('E1.4 идентификатор плана детерминирова�
     expect(combatPlanId({ discipline: 'mma', weeks: 8 })).toBe(combatPlanId({ discipline: 'mma', weeks: 8 }));
     expect(combatPlanId({ discipline: 'mma', weeks: 8 })).not.toBe(combatPlanId({ discipline: 'boxing', weeks: 8 }));
   });
+
+  it('РЕГРЕСС: вес тела доезжает до снимка — иначе планы разного веса делят id', () => {
+    // было `bodybodyKg` (поля нет) → вес выпадал из снимка и из id
+    const light = buildCombatPlan({ ...base, bodyweight: 70 } as CombatInput);
+    const heavy = buildCombatPlan({ ...base, bodyweight: 95 } as CombatInput);
+    expect((light.inputSnapshot as any).bodyweightKg).toBe(70);
+    expect((heavy.inputSnapshot as any).bodyweightKg).toBe(95);
+    expect(light.id).not.toBe(heavy.id);
+  });
+
+  it('смена веса тела меняет id плана', () => {
+    expect(combatPlanId({ discipline: 'mma', weeks: 8, bodyweight: 70 } as any))
+      .not.toBe(combatPlanId({ discipline: 'mma', weeks: 8, bodyweight: 95 } as any));
+  });
 });
 
 describe('E1.5 предупреждения не дублируются в rationale', () => {

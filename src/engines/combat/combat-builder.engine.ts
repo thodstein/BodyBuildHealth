@@ -930,7 +930,15 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     errors.push('Отель + same-day взвешивание — не совмещать: нет зала и нет времени на регидратацию');
   }
 
-  const snap: any = { ...input, outsideLoad: effectiveOutsideLoad, weightCutProtocol: wcProtocol || (input as any).weightCutProtocol || null };
+  // `bodyweightKg` — нормализованный алиас: потребители (скрининг LEA, карточка
+  // лагеря, пороги сгона) читают именно это поле, а в CombatInput оно
+  // называется `bodyweight`. Раньше алиаса не было — все падали в фолбэк.
+  const snap: any = {
+    ...input,
+    bodyweightKg: (input as any)?.bodyweightKg ?? input?.bodyweight ?? null,
+    outsideLoad: effectiveOutsideLoad,
+    weightCutProtocol: wcProtocol || (input as any).weightCutProtocol || null,
+  };
   const plan: CombatPlan = {
     id: combatPlanId({ ...snap, discipline, goal, level, weeks, patternId: pattern.id }),
     discipline,
@@ -982,7 +990,10 @@ export function combatPlanId(input: any): string {
     weightClassLimitKg: input?.weightClassLimitKg ?? null,
     weightClassRuleset: input?.weightClassRuleset || null,
     weightCutKg: input?.weightCutKg ?? null,
-    bodyweightKg: input?.bodybodyKg ?? null,
+    // было `bodybodyKg` — поле не существует, поэтому вес тела НЕ попадал в
+    // снимок, а значит и в детерминированный id плана: два плана с разным весом
+    // получали один id. Исправлено (combat-science: 5%/8% пороги сгона).
+    bodyweightKg: input?.bodyweightKg ?? input?.bodyweight ?? null,
     sex: input?.sex,
     age: input?.age,
     fightStyle: input?.fightStyle || null,
