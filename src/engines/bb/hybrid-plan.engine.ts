@@ -88,6 +88,7 @@ export function buildHybridPlan(input: {
   cycleId: string;
   pmMap: { squat?: number; bench?: number; dead?: number };
   weeks?: number;
+  sourceChangeConsent?: boolean;
   level?: string;
   equipment?: string[];
   workMax?: Record<string, number>;
@@ -99,13 +100,20 @@ export function buildHybridPlan(input: {
   if (input.pmMap.squat) { pmMap['Приседания'] = input.pmMap.squat; pmMap['Squat'] = input.pmMap.squat; pmMap['присед'] = input.pmMap.squat; }
   if (input.pmMap.bench) { pmMap['Жим лежа'] = input.pmMap.bench; pmMap['Bench'] = input.pmMap.bench; pmMap['жим'] = input.pmMap.bench; }
   if (input.pmMap.dead) { pmMap['Тяга'] = input.pmMap.dead; pmMap['Deadlift'] = input.pmMap.dead; pmMap['тяга'] = input.pmMap.dead; }
-  const lms = buildLMSPlan({ template: cycle, pmMap, weeksOverride: input.weeks, fallbackPm: 100 });
+  const lms = buildLMSPlan({
+    template: cycle,
+    pmMap,
+    weeksOverride: input.weeks,
+    sourceChangeConsent: input.sourceChangeConsent,
+    requireSourceChangeConsent: true,
+    fallbackPm: 100,
+  });
   const level = input.level || 'intermediate';
   const equipment = input.equipment || [];
   const daysByWeek: HybridDay[][] = lms.weeks.map(w =>
     w.days.map((d, di) => ({ dayIdx: di, mainLift: detectMainLift(d), heavy: d, accessories: buildAccessories(detectMainLift(d), workMax, level, equipment) }))
   );
-  return { cycle, heavyWeeks: lms.weeks, daysByWeek, rationale: `Powerbuilder: ПЛ-цикл «${cycle.meta.title}» (faithful, ${cycle.meta.sessionsPerWeek}д/нед, ${cycle.meta.weeks} нед) + ББ-аксессуары после каждого тяжёлого дня. Силовая прогрессия цикла не меняется.` };
+  return { cycle: lms.template, heavyWeeks: lms.weeks, daysByWeek, rationale: `Powerbuilder: ПЛ-цикл «${cycle.meta.title}» (faithful, ${cycle.meta.sessionsPerWeek}д/нед, ${lms.weeks.length} нед) + ББ-аксессуары после каждого тяжёлого дня. Силовая прогрессия цикла не меняется.` };
 }
 
 export type { LMSBuildOutput, LMSPlanWeek, LMSPlanDay };

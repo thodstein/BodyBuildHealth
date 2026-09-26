@@ -1740,8 +1740,8 @@ export const FOOD_ALLERGEN_DIET: Record<string, { allergens: string[]; isVegetar
   egg_whole: { allergens: ['eggs'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
   egg_white: { allergens: ['eggs'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto'] },
   pork_tenderloin: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
-  whey_protein: { allergens: [], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
-  casein: { allergens: [], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
+  whey_protein: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
+  casein: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
   chicken_thigh: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
   shrimp: { allergens: ['shellfish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
   tuna_steak: { allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },
@@ -2366,7 +2366,7 @@ export { RATION_TIERS };
     // отвергал все растительные молока. Список растительных молок исключает их из dairy.
     const isPlantMilk = /^(milk_|oat_milk|almond_milk|soy_milk|coconut_milk|drink_oat)/.test(f.id)
       && !f.id.startsWith('milk_powder');
-    const hasDairy = (isDairy || f.id.includes('milk') || f.id.includes('cheese') || f.id.includes('cream') || f.id.includes('yogurt') || f.id.includes('kefir')) && !isPlantMilk;
+    const hasDairy = (isDairy || f.id.includes('milk') || f.id.includes('cheese') || f.id.includes('cream') || f.id.includes('yogurt') || f.id.includes('kefir') || f.id.includes('whey') || f.id.includes('casein')) && !isPlantMilk;
     const hasFish = f.id.includes('fish') || f.id.includes('salmon') || f.id.includes('tuna') || f.id.includes('cod') || f.id.includes('herring') || f.id.includes('mackerel') || f.id.includes('sardine') || f.id.includes('trout');
     const hasShellfish = f.id.includes('shrimp') || f.id.includes('crab') || f.id.includes('lobster') || f.id.includes('mussel') || f.id.includes('clam') || f.id.includes('oyster') || f.id.includes('scallop') || f.id.includes('octopus') || f.id.includes('squid');
     const hasEggs = f.id.includes('egg');

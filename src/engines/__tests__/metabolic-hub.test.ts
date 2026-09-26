@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap } from '../metabolic-hub.engine';
+﻿import { describe, it, expect } from 'vitest';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange } from '../metabolic-hub.engine';
 import { bmrCunningham, bmrOwen, bmrTenHaaf, bmrHarrisRevised, bmrHenry, bmrLivingston, calcTEF as calcTEFConst, calcTrendWithConfidence as calcTrendConf2, energyDensityPerKg, hallAdaptationFactor, calcSweatElectrolytes, calcJPBodyFat, calcDurninBodyFat, computeBMR } from '../../core/metabolic-constants';
 
 const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
@@ -948,5 +948,65 @@ describe('metabolic-hub PRO v4-4 — график EMA/intake + приёмы бе
     expect(calcProteinTimingPro(total,80,6,'mixed',30).perMeal).toBe(Math.round(total/6));
     expect(calcProteinTimingPro(total,80,4,'mixed',30).perMeal).toBe(Math.round(total/4));
     expect(calcProteinTimingPro(total,80,6,'mixed',30).leucinePerMeal).toBeLessThan(calcProteinTimingPro(total,80,3,'mixed',30).leucinePerMeal);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E0.5 (26 сен 2026): единый порог лейцина + середина полосы AT
+// ─────────────────────────────────────────────────────────────────────────────
+describe('E0.5 — leucine: один порог для вердикта И для математики', () => {
+  it('вердикт «MPS ок» и расчёт приёмов используют ОДИН порог 2.5 г', () => {
+    // 80 кг × 4 приёма × ~0.4 г/кг ≈ 32 г/приём → ~3.5 г лейцина: «ок».
+    const ok = calcProteinTiming(160, 80, 4, false);
+    expect(ok.note).toContain('MPS ок');
+    expect(ok.note).toContain('≥2.5г');
+  });
+
+  it('приём с лейцином в «серой зоне» 2.2–2.49 г НЕ объявляется «ок» (регресс)', () => {
+    // 30 г белка/приём × 0.11 = 3.3 г — берём дозу, дающую ровно ~2.3 г лейцина.
+    // 2.3 г >= 2.2 (старый порог) → старый код писал «MPS ок»; теперь порог 2.5 → не ок.
+    const perMeal = 21; // 21 × 0.11 = 2.31 г лейцина
+    const r = calcProteinTiming(perMeal * 4, 80, 4, false);
+    expect(r.leucinePerMeal).toBeGreaterThanOrEqual(2.2);
+    expect(r.leucinePerMeal).toBeLessThan(2.5);
+    expect(r.note).toContain('Мало leuc');
+    expect(r.note).not.toContain('MPS ок');
+  });
+
+  it('текст «мало лейцина» называет тот же порог, что и математика', () => {
+    const r = calcProteinTiming(60, 80, 4, false);
+    expect(r.note).toMatch(/<2\.5г/);
+  });
+});
+
+describe('E0.5 — calcATRange: точка внутри своей полосы', () => {
+  it('mid = середина полосы 5–15% (10% TDEE), а не 4%', () => {
+    const r = calcATRange({ tdee: 3000 });
+    expect(r.low).toBe(150);   // 5%
+    expect(r.high).toBe(450);  // 15%
+    expect(r.mid).toBe(300);   // 10% — середина
+    expect(r.mid).toBeGreaterThanOrEqual(r.low);
+    expect(r.mid).toBeLessThanOrEqual(r.high);
+  });
+
+  it('адаптация выше полосы НЕ обрезается молча (регресс Math.min(high, mid))', () => {
+    // `estimateAdaptiveThermogenesis` ограничен 250 ккал, поэтому «выше полосы 15%»
+    // достижимо при TDEE, где 15% < 250 (т.е. TDEE < ~1667). При 2000 ккал
+    // полоса выше адаптации — и aboveBand законно false (проверяется отдельно).
+    const r = calcATRange({ tdee: 1500, deficitKcal: 1200, weeksInDeficit: 40, weightLostKg: 25 });
+    expect(r.high).toBe(225);
+    expect(r.aboveBand).toBe(true);
+    expect(r.note).toContain('ВЫШЕ полосы');
+  });
+
+  it('при нормальном TDEE aboveBand = false (не ложная тревога)', () => {
+    const r = calcATRange({ tdee: 3000, deficitKcal: 800, weeksInDeficit: 20, weightLostKg: 12 });
+    expect(r.aboveBand).toBe(false);
+    expect(r.note).toContain('середина полосы');
+  });
+
+  it('персистентная адаптация появляется только при ≥12 нед', () => {
+    expect(calcATRange({ tdee: 3000, weeksInDeficit: 4 }).persistent).toBe(0);
+    expect(calcATRange({ tdee: 3000, weeksInDeficit: 12 }).persistent).toBeGreaterThan(0);
   });
 });

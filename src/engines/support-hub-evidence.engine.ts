@@ -7,6 +7,9 @@
  * P3: расширенные грейды доказательности в семантике Examine (A/B/C/D + исход).
  */
 
+// 26 сен 2026 (E0.1–E0.3): единый реестр пределов + канонический резолв нутриента.
+import { NUTRIENT_LIMITS_V2, resolveNutrient } from './support-limits';
+
 export type BioSource = 'RCT' | 'meta' | 'review' | 'claim';
 
 export interface BioFormEvidence {
@@ -306,8 +309,18 @@ export function stackEvidenceGrade(substanceIds: string[]): EvidenceGradeEx {
 // ─── P2: единое окно дозы ───
 
 export interface DoseWindow {
-  min: number; opt: number; max: number; ul: number;
+  min: number; opt: number; max: number;
+  /** Числовой предел для обратной совместимости. `null` = предел НЕ УСТАНОВЛЕН (не «9999»). */
+  ul: number | null;
   unit: string; note: string; hasData: boolean;
+  /** Тип предела из реестра — меняет вёрстку: UL ≠ SafeLevel ≠ «не установлен». */
+  ulKind: 'UL' | 'SafeLevel' | 'ClinicalGuidance' | 'NotEstablished' | 'Unknown';
+  /** Есть ли внятный UL для предупреждения. БЫЛО недостижимо: тип не имел поля, а фолбэк писал `ul: 9999`. */
+  ulWarning: boolean;
+  /** Условия, при которых предел не применяется (EFSA 2024, витамин E). */
+  ulExcludes?: Array<{ id: string; label: string }>;
+  /** true, если значение предела не подтверждено первоисточником в раунде 26 сен 2026. */
+  ulUnverified: boolean;
 }
 
 export function doseWindowFor(
@@ -315,41 +328,91 @@ export function doseWindowFor(
   therapeutic: Record<string, { minMg: number; optMg: number; maxMg: number; ul: number; note: string; unit?: string }>,
   ranges: Record<string, { therMin: number; therMax: number; label: string }>,
 ): DoseWindow {
-  const key = id.toLowerCase();
-  // Алиасы нутриентов: therapeutic-ключи короткие (mg/zn/fe/ca/se), id — длинные (magnesium_glycinate)
-  const ALIAS: Record<string, string[]> = {
-    mg: ['magnesium', 'магн'], zn: ['zinc', 'цинк'], fe: ['iron', 'желез', 'феррум'],
-    ca: ['calcium', 'кальц'], se: ['selenium', 'селен'], d3: ['vitamin_d', 'd3', 'холекальц'],
-    b12: ['b12', 'кобаламин', 'cobalamin'], vitc: ['vitamin_c', 'аскорб'], ala: ['alpha_lipo', 'липо'],
-    nac: ['nac', 'ацетилцистеин'], coq10: ['coq10', 'убих'], omega3: ['omega', 'омега'],
-    cr: ['chromium', 'хром'], iodine: ['iodine', 'йод', 'иод'], magnesium: ['magnesium', 'магн'],
-    calcium: ['calcium', 'кальц'], zinc: ['zinc', 'цинк'], iron: ['iron', 'желез'],
-  };
-  const matchKey = (k: string): boolean => {
-    const kl = k.toLowerCase();
-    if (key.includes(kl) || kl.includes(key)) return true;
-    const aliases = ALIAS[kl] || [];
-    if (aliases.some(a => key.includes(a))) return true;
-    const rev = Object.entries(ALIAS).find(([, v]) => v.some(a => kl.includes(a) || key.includes(a)));
-    void rev;
-    // Обратное: therapeutic-ключ длинный, id короткий
-    for (const [short, words] of Object.entries(ALIAS)) {
-      if (kl === short) continue;
-      if (words.some(w => kl.includes(w)) && words.some(w => key.includes(w))) return true;
-    }
-    return false;
-  };
-  const directKey = Object.keys(therapeutic).find(matchKey);
+  // 26 сен 2026 (E0.3): резолв через КАНОНИЧЕСКИЙ нутриент (`support-limits.resolveNutrient`).
+  //
+  // БЫЛО: bidirection-substring матч (`key.includes(kl) || kl.includes(key)`) при
+  // 2–3-буквенных therapeutic-ключах (`ca`, `mg`, `zn`, `fe`, `se`, `cr`) давал ложные
+  // срабатывания: `bcaa` → `'bcaa'.includes('ca')` → ОКНО КАЛЬЦИЯ (min 500 / opt 800 /
+  // max 1200 / UL 2500 мг). Тот же класс для любого id с короткой подстрокой.
+  // Ни один тест не упоминает `bcaa` — дефект был невидим.
+  //
+  // СТАЛО — 3 уровня, ни один не использует подстроку произвольного id:
+  //   1) оба ресолвятся в ОДИН нутриент  → `zinc_gluconate` ↔ `zn` (покрытие форм)
+  //   2) id НЕ нутриент                  → ТОЧНОЕ имя ключа (+нормализация
+  //                                          пробелов/дефисов) → `vitex`↔`vitex`,
+  //                                          `serrapeptase`↔`serrapeptase`.
+  //      Нужно, потому что THERAPEUTIC_WINDOWS содержит ~60 ключей, из которых
+  //      в реестре нутриентов ~35: берберин, TUDCA, сerrapeptase, коллаген,
+  //      мелатонин, пробиотики — не нутриенты, но окна у них есть.
+  //   3) нутриент есть, окна нет          → ranges, затем честное «окна нет»,
+  //                                          но предел из реестра всё равно показываем.
+  const canon = resolveNutrient(id);
+  const normKey = (k: string) => k.toLowerCase().replace(/[\s\-./()]+/g, '_');
+  const keyNorm = normKey(id);
+  const directKey = canon
+    ? Object.keys(therapeutic).find(k => resolveNutrient(k) === canon)
+    : Object.keys(therapeutic).find(k => normKey(k) === keyNorm);
   if (directKey) {
     const t = therapeutic[directKey];
-    return { min: t.minMg, opt: t.optMg, max: t.maxMg, ul: t.ul, unit: t.unit || 'мг', note: t.note, hasData: true };
+    const reg = canon ? NUTRIENT_LIMITS_V2[canon] : undefined;
+    // Сенсант `ul: 9999` в THERAPEUTIC_WINDOWS — это соглашение «UL не установлен»
+    // (его используют 14 ключей: b12, glycine, taurine, l_carnitine, garlic, …).
+    // БЫЛО: 9999 уезжал наружу и в UI, и в сравнение `doseMg > win.ul`.
+    const tableUl = t.ul >= 9999 ? null : t.ul;
+    // Приоритет у реестра: он несёт актуальное (EFSA 2023–2026) значение + тип + исключения.
+    const ulNum = reg ? (reg.value > 0 ? reg.value : null) : tableUl;
+    const ulKind = reg?.kind ?? (tableUl == null ? 'NotEstablished' : 'UL');
+    return {
+      min: t.minMg, opt: t.optMg, max: t.maxMg, ul: ulNum, unit: t.unit || 'мг', note: t.note, hasData: true,
+      ulKind,
+      // ulWarning достижим только для настоящего UL. SafeLevel/NotEstablished/Clinical
+      // не дают права рендерить «нет данных об UL» — у них ДРУГОЙ смысл (см. evaluateLimit).
+      ulWarning: ulKind === 'UL',
+      ulExcludes: reg?.excludes,
+      // Честность: если записи в реестре нет — предел из старой таблицы НЕ перепроверен
+      // первоисточником в этом раунде (правило плана: непроверенное → помечаем).
+      ulUnverified: reg ? !reg.verified : true,
+    };
   }
-  const rangeKey = Object.keys(ranges).find(k => key.includes(k) || k.includes(key));
+  // 26 сен 2026 (E0.3): тот же substring-матч остался в фолбэке по `ranges` — убран.
+  const rangeKey = canon
+    ? Object.keys(ranges).find(k => {
+        const kc = resolveNutrient(k) ?? normKey(k);
+        return kc === canon;
+      })
+    : Object.keys(ranges).find(k => normKey(k) === keyNorm);
+  const reg = canon ? NUTRIENT_LIMITS_V2[canon] : undefined;
   if (rangeKey) {
     const r = ranges[rangeKey];
-    return { min: r.therMin, opt: (r.therMin + r.therMax) / 2, max: r.therMax, ul: 9999, unit: 'мг', note: `Диапазон: ${r.label}. UL для этого вещества в базе не задан — см. NIH UL.`, hasData: true };
+    return {
+      min: r.therMin, opt: (r.therMin + r.therMax) / 2, max: r.therMax,
+      ul: reg && reg.value > 0 ? reg.value : null,
+      unit: 'мг', hasData: true, ulKind: reg?.kind ?? 'Unknown',
+      ulWarning: reg?.kind === 'UL', ulExcludes: reg?.excludes, ulUnverified: reg ? !reg.verified : true,
+      note: `Диапазон: ${r.label}. `
+        + (reg
+          ? `Предел: ${reg.jurisdiction} ${reg.year} ${reg.kind === 'NotEstablished' ? 'НЕ УСТАНОВЛЕН' : reg.value} (${reg.criticalEffect}).`
+          : 'Предел для этого вещества в реестре не задан.'),
+    };
   }
-  return { min: 0, opt: 0, max: 0, ul: 9999, unit: 'мг', note: 'Данных о терапевтическом окне в базе нет — доза не оценивается.', hasData: false };
+  // Окна нет — но если нутриент в реестре, ЕГО предел всё равно известен и полезен.
+  // Не молчим о нём вместе с окном.
+  if (reg) {
+    return {
+      min: 0, opt: 0, max: 0,
+      ul: reg.value > 0 ? reg.value : null,
+      unit: reg.unit === 'mcg' ? 'мкг' : reg.unit === 'iu' ? 'МЕ' : 'мг',
+      hasData: false, ulKind: reg.kind, ulWarning: reg.kind === 'UL', ulExcludes: reg.excludes,
+      ulUnverified: !reg.verified,
+      note: `Терапевтического окна в базе нет. Предел: ${reg.jurisdiction} ${reg.year} `
+        + `${reg.kind === 'NotEstablished' ? 'НЕ УСТАНОВЛЕН' : reg.value} (${reg.criticalEffect}).`,
+    };
+  }
+  return {
+    min: 0, opt: 0, max: 0, ul: null, unit: 'мг',
+    note: 'Данных о терапевтическом окне в базе нет — доза не оценивается.',
+    hasData: false, ulKind: 'Unknown', ulWarning: false, ulUnverified: true,
+  };
 }
 
 export interface PersonCtx { weightKg?: number; sex?: 'male' | 'female'; age?: number }

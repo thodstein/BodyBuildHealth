@@ -226,12 +226,22 @@ export const SupportEffectiveDose: React.FC = () => {
     } else {
       status = 'Окна дозы в базе нет — доза не оценивается';
     }
-    if (win.hasData && win.ul < 9999 && doseMg > win.ul) {
-      ulWarning = `Превышен верхний безопасный уровень (UL ${win.ul} ${win.unit}). Риск побочных эффектов.`;
-    } else if (!win.hasData && (win as any).ulWarning) {
-      ulWarning = (win as any).ulWarning;
+    // 26 сен 2026 (E0.3/E1.8): сенсант различает ТИПЫ предела.
+    //   • UL                  — превышение = риск (EFSA/NIH UL)
+    //   • SafeLevel           — ориентир EFSA «безопасный уровень потребления», НЕ токсичность
+    //   • NotEstablished      — EFSA прямо не установила предел → предупреждать НЕЛЬЗЯ
+    //   • ClinicalGuidance    — предел из клинического руководства, не из UL-досье
+    //   • Unknown             — данных нет
+    // БЫЛО: `win.ul < 9999` (фолбэк писал 9999 = «нет данных») + недостижимая ветка,
+    // присваивавшая boolean в строковую переменную.
+    if (win.ul != null && win.ulWarning && doseMg > win.ul) {
+      ulWarning = `Превышен верхний предел (${win.ul} ${win.unit}). Риск побочных эффектов.`;
+    } else if (win.ul != null && win.ulKind === 'SafeLevel' && doseMg > win.ul) {
+      ulWarning = `Выше ориентира «безопасный уровень потребления» (${win.ul} ${win.unit}) — это НЕ предел токсичности.`;
+    } else if (win.ulKind === 'NotEstablished') {
+      ulWarning = `Предел не установлен (${win.ul ?? '—'}) — дозу оценивает врач, самостоятельно не превышать.`;
     }
-    return { absorbed, rawAbsorbed, range, status, ulWarning, windowNote: win.note, hasWindow: win.hasData };
+    return { absorbed, rawAbsorbed, range, status, ulWarning, windowNote: win.note, hasWindow: win.hasData, ulKind: win.ulKind, ulUnverified: win.ulUnverified };
   };
 
   const eff1 = calcEffDose(f1, dose1, sub1Id);

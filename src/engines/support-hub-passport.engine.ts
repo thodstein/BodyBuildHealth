@@ -3,7 +3,7 @@
  * Собирает в одну структуру то, что уже есть в хабе (био/доза/UL/тайминг/
  * синергия/аналоги/лабы/грейд). Новых чисел не выдумывает: чего нет — hasData:false.
  */
-import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, evidenceOutcomesFor, personDoseHints, type PersonCtx } from './support-hub-evidence.engine';
+import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, evidenceOutcomesFor, personDoseHints, type DoseWindow, type PersonCtx } from './support-hub-evidence.engine';
 import { timingHintsFor } from './support-hub-timing.engine';
 
 export interface SubstancePassport {
@@ -12,7 +12,10 @@ export interface SubstancePassport {
   grade: string;
   gradeLabel: string;
   bio: { max: number; label: string; evidence: string; marketing: boolean } | null;
-  dose: { min: number; opt: number; max: number; ul: number; unit: string; note: string; hasData: boolean };
+  // 26 сен 2026 (E1.8): переиспользуем КАНОН `DoseWindow`, не дублируем контракт.
+  // Раньше здесь стояла узкая копия с `ul: number` — расхождение полей ломалось
+  // при каждом расширении реестра (это и выловил tsc после E0.3).
+  dose: DoseWindow;
   personHints: string[];
   timing: string[];
   synergyTop: string[];

@@ -740,8 +740,20 @@ export function calcAlcohol(alcoholG?:number, weightKg=80): AlcoholResult {
 // ——— Protein Timing (Morton 2018, Schoenfeld/Aragon 2018, Res 2012) ———
 // 0.40г/кг/прием ×4 (≈32г/80кг) + 2-3г leuc, ceiling 0.55г/кг waste, pre-sleep 30-40г казеин +0.22кг LBM, plant DIAAS 0.07 vs 0.11
 export interface ProteinTimingResult { perMeal:number; meals:number; leucinePerMeal:number; perMealGPerKg:number; ceiling:number; preSleepG:number; note:string; plantNote:string }
+/**
+ * Порог лейцина для запуска MPS, г/приём.
+ *
+ * 26 сен 2026 (E0.5): БЫЛО ДВА РАЗНЫХ ЧИСЛА в одной функции —
+ *   `leucineThreshold = 2.5` (используется в расчёте числа приёмов) и
+ *   `leucinePerMeal >= 2.2` (используется в вердикте «MPS ок»).
+ * То есть приём с 2.2–2.49 г лейцина объявлялся «ок», хотя математика требовала 2.5 —
+ * и юзеру не говорилось, что надо добавить приём. В литературе встречается диапазон
+ * 2.2–2.5 г; мы выбрали ВЕРХНЮЮ границу (2.5) как единый канон: оценка должна быть
+ * неoptimistic. Один констант — один вердикт.
+ */
+const LEUCINE_MPS_G = 2.5;
 export function calcProteinTiming(totalProteinG:number, weightKg:number, mealsPerDay=4, isPlantHeavy?: boolean): ProteinTimingResult {
-  const leucineThreshold = 2.5; // г лейцина для MPS (Morton)
+  const leucineThreshold = LEUCINE_MPS_G; // г лейцина для MPS (Morton 2018)
   const leucinePerGProtein = isPlantHeavy ? 0.07 : 0.11; // DIAAS-adjusted: plant 6-8% vs whey 11%
   const protPerMeal = totalProteinG>0 ? Math.round(totalProteinG/mealsPerDay) : 0;
   const perMealGPerKg = weightKg>0 ? Math.round(protPerMeal/weightKg*100)/100 : 0;
@@ -753,9 +765,10 @@ export function calcProteinTiming(totalProteinG:number, weightKg:number, mealsPe
   const overCeiling = perMealGPerKg > ceiling;
   const plantNote = isPlantHeavy ? 'Растительный белок — DIAAS 0.64 (soy) vs 1.09 whey, leuc 0.07' : 'Животный/whey leuc 0.11';
   let note = '';
-  if (leucinePerMeal>=2.2 && !overCeiling) note = `MPS ок (${leucinePerMeal}г leuc, ${perMealGPerKg}г/кг <0.55) — ${mealsPerDay} приема ок. Pre-sleep ${preSleepG}г казеин (Res 2012)`;
+  // Вердикт и расчёт используют ОДИН порог (LEUCINE_MPS_G) — рассинхрон 2.2/2.5 устранён.
+  if (leucinePerMeal>=leucineThreshold && !overCeiling) note = `MPS ок (${leucinePerMeal}г leuc ≥${leucineThreshold}г, ${perMealGPerKg}г/кг <0.55) — ${mealsPerDay} приема ок. Pre-sleep ${preSleepG}г казеин (Res 2012)`;
   else if (overCeiling) note = `Перебор ${perMealGPerKg}г/кг >0.55 waste — увеличь приемы до ${optimalMeals} по ~${Math.round(totalProteinG/optimalMeals)}г. ${plantNote}`;
-  else note = `Мало leuc ${leucinePerMeal}г <2.5г — нужно ${optimalMeals} приемов по ~${Math.round(totalProteinG/optimalMeals)}г. ${plantNote}`;
+  else note = `Мало leuc ${leucinePerMeal}г <${leucineThreshold}г (нужный порог MPS; в литературе 2.2–2.5 г) — нужно ${optimalMeals} приемов по ~${Math.round(totalProteinG/optimalMeals)}г. ${plantNote}`;
   return { perMeal: protPerMeal, meals: mealsPerDay, leucinePerMeal, perMealGPerKg, ceiling, preSleepG, note, plantNote };
 }
 
@@ -1274,14 +1287,35 @@ export function calcNEATPro(input: { weight: number; profession?: ProfessionKind
   const total = Math.max(80, sitting + standing + fidget + walking);
   return { sitting, standing, fidget, walking, profession: prof, total, note: `NEAT PRO Levine+FAO: профессия ${prof} + стоя +${standing} + fidget ${fidget} + ходьба ${walking} = ${total}ккал` };
 }
-/** AT диапазоном 5–15% (MacroBalanceLab), не точкой + Biggest Loser персист */
-export function calcATRange(input: { tdee: number; deficitKcal?: number; weeksInDeficit?: number; weightLostKg?: number }): { low: number; mid: number; high: number; persistent: number; note: string } {
+/**
+ * AT диапазоном 5–15% (MacroBalanceLab), не точкой + Biggest Loser персист.
+ *
+ * 26 сен 2026 (E0.5): БЫЛО
+ *   const mid = Math.max(base, Math.round((low + high) / 2 * 0.4));
+ *   return { ..., mid: Math.min(high, mid) ... }
+ * Два дефекта:
+ *   1) `/2 * 0.4` — середина полосы 5–15% TDEE равна 10% TDEE, а не 4%. При base = 0
+ *      точечная оценка (4%) оказывалась НИЖЕ собственной нижней границы полосы (5%) —
+ *      виз��альный блок показывал «оценка AT» вне диапазона, который сам же объявил.
+ *   2) `Math.min(high, mid)` МОЛЧА обрезал реальную адаптацию, если она выше 15%
+ *      (голодная диета/ACWR выше нормы). Сигнал «AT выше полосы» — самый ценный
+ *      для пользователя, и он исчезал.
+ * СТАЛО: точка = середина полосы (10% TDEE) или база, если она выше; выход за полосу
+ * помечается флагом `aboveBand` и попадает в текст заметки.
+ */
+export function calcATRange(input: { tdee: number; deficitKcal?: number; weeksInDeficit?: number; weightLostKg?: number }): { low: number; mid: number; high: number; persistent: number; aboveBand: boolean; note: string } {
   const base = estimateAdaptiveThermogenesis({ deficitKcal: input.deficitKcal, weeksInDeficit: input.weeksInDeficit, weightLostKg: input.weightLostKg });
   const low = Math.round(Math.max(0, input.tdee * 0.05));
   const high = Math.round(input.tdee * 0.15);
-  const mid = Math.max(base, Math.round((low + high) / 2 * 0.4));
+  const bandMid = Math.round((low + high) / 2);          // 10% TDEE — середина ПОЛОСЫ
+  const est = Math.max(base, bandMid);
+  const aboveBand = base > high;
+  const mid = Math.min(est, high);                        // для отрисовки ВНУТРИ полосы
   const persistent = (input.weeksInDeficit ?? 0) >= 12 ? Math.round(mid * 0.6) : 0; // Fothergill: часть держится годами
-  return { low, mid: Math.min(high, mid), high, persistent, note: `AT диапазон 5–15% TDEE: ${low}–${high}ккал, оценка ${Math.min(high, mid)}${persistent ? ` · персист ~${persistent} (Biggest Loser)` : ''} (Trexler/Fothergill)` };
+  const note = `AT диапазон 5–15% TDEE: ${low}–${high}ккал, оценка ${mid}`
+    + (aboveBand ? ` (адаптация по факту ${base}ккал ВЫШЕ полосы — не обрезаем)` : ` (середина полосы ${bandMid}ккал)`)
+    + `${persistent ? ` · персист ~${persistent} (Biggest Loser)` : ''} (Trexler/Fothergill)`;
+  return { low, mid, high, persistent, aboveBand, note };
 }
 /** Reverse-auto: шаг по trend (а не фикс +100) */
 export function calcReverseDietAuto(currentKcal: number, targetKcal: number, trendKgPerWeek = 0): Array<{ week: number; kcal: number; note: string }> {

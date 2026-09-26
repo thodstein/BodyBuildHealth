@@ -7,7 +7,7 @@ import { buildBBPlan } from '../bb-builder.engine';
 
 describe('hybrid-plan', () => {
   it('buildHybridPlan: cycle + accessories без падения', () => {
-    const plan = buildHybridPlan({ cycleId: 'cycle-01', pmMap: { squat: 150, bench: 100, dead: 180 }, weeks: 4, level: 'intermediate', workMax: { chest: 100, back: 120 } });
+    const plan = buildHybridPlan({ cycleId: 'cycle-01', pmMap: { squat: 150, bench: 100, dead: 180 }, weeks: 4, sourceChangeConsent: true, level: 'intermediate', workMax: { chest: 100, back: 120 } });
     expect(plan).not.toBeNull();
     expect(plan!.heavyWeeks.length).toBeGreaterThan(0);
     expect(plan!.daysByWeek.length).toBeGreaterThan(0);
@@ -22,6 +22,11 @@ describe('hybrid-plan', () => {
         }
       }
     }
+  });
+
+  it('изменение длины hybrid-цикла требует явного согласия', () => {
+    expect(() => buildHybridPlan({ cycleId: 'cycle-01', pmMap: {}, weeks: 4 })).toThrow('согласие');
+    expect(buildHybridPlan({ cycleId: 'cycle-01', pmMap: {}, weeks: 4, sourceChangeConsent: true })).not.toBeNull();
   });
 
   it('hybrid: несуществующий cycle возвращает null', () => {

@@ -12,7 +12,7 @@ import { appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, 
 import { buildPLPeakBlockLayout } from '../../../engines/lms/lms-peak-block.engine';
 import { buildPLSeasonPeaks } from '../../../engines/lms/lms-macro-taper.engine';
 import { calcCycleMetrics, type SRExercise } from '../../../engines/lms/lms-metrics.engine';
-import { MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, type MeetStrategy } from '../../../engines/lms/competition-attempts';
+import { MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, resolveCompetitionLiftPm, type MeetStrategy } from '../../../engines/lms/competition-attempts';
 import { LAST_HEAVY_DAYS } from '../../../engines/pro/taper.engine';
 import type { PED } from '../../../engines/bb/bb-ped-adaptation.engine';
 import type { AutoRegMode } from '../../../engines/pro/diary-autoreg.engine';
@@ -701,8 +701,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                   const actual = taperActualPm[name] || 0;
                   const planned = taperPlannedPm[name] || 0;
                   const diff = actual > 0 && planned > 0 ? planned - actual : 0;
-                  const lastCycleWk = builtSrc?.weeks[builtSrc.weeks.length - 1];
-                  const forecast = lastCycleWk?.pmRow[name] ?? 0;
+                   const lastCycleWk = builtSrc?.weeks[builtSrc.weeks.length - 1];
+                   const forecastLift = name === 'Присед' ? 'squat' : name === 'Жим лежа' ? 'bench' : 'deadlift';
+                   const forecast = resolveCompetitionLiftPm(lastCycleWk?.pmRow ?? {}, forecastLift);
                   const vsForecast = actual > 0 && forecast > 0 ? actual - forecast : 0;
                   return (
                     <div key={name} style={{ padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 10 }}>

@@ -1318,6 +1318,17 @@ export const BbAutoConstructor: React.FC = () => {
           videoStandard: bbDiag.videoStandard,
           driverSubs: bbDiag.driverSubs,
           asymPriority: bbDiag.asymPriority,
+          // R1–R6 (PRO-2): жим-скрин / мониторинг боли / задняя цепь / шарнир под весом / ER:IR /
+          // приоритет скрининга. Движок `bb-diag-intake.engine.ts:136-161` их обрабатывал, но
+          // приёмник НЕ передавал — хаб показывал 6 результатов, которые не доходили ни в тост,
+          // ни в rationale, ни в печать (`he_bb_last_movement_extra` оставался пустым). Замок на
+          // разрыв — source-guard `bb-hub-movement-intake.test.ts` (перечисляет все 17 полей).
+          bench: bbDiag.bench,
+          painMon: bbDiag.painMon,
+          posterior: bbDiag.posterior,
+          loadedHinge: bbDiag.loadedHinge,
+          erir: bbDiag.erir,
+          screenPriority: bbDiag.screenPriority,
           // PRO-CORR: детали коррекций библиотеки → бит «коррекция:» + персист movementExtra
           correctiveDetail: bbDiag.correctiveDetail,
         });

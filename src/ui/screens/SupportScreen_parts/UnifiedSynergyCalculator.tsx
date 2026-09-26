@@ -7,6 +7,8 @@ import type { SubstanceEntry, MasterDB } from '../../../core/types';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
 import { dedupeDepletions, stackOverlap, stackScore as calcHubStackScore } from '../../../engines/support-hub-stack.engine';
 import { evidenceGradeExFor } from '../../../engines/support-hub-evidence.engine';
+import { getMaxDose } from '../../../data/support-dosing';
+import { stackLimitVerdicts, type StackItem } from '../../../engines/support-limits';
 import { isAASHonest } from '../../../engines/support-hub-aas.engine';
 import { LAB_TOP20, resolveLabMonitor } from '../../../engines/support-hub-labs.engine';
 
@@ -50,11 +52,11 @@ const DEPLETION_DB: Array<{ depleter: string; depleted: string; mechanism: strin
   { depleter: 'CHITOSAN', depleted: 'CALCIUM', mechanism: 'Хитозан связывает Ca, Mg, Zn в кишечнике', severity: 'MEDIUM', recommendation: 'Интервал ≥3 ч. Хитозан вечером, минералы утром.' },
   { depleter: 'CHITOSAN', depleted: 'VITAMIN_E', mechanism: 'Хитозан ↓ всасывание жирорастворимых витаминов', severity: 'MEDIUM', recommendation: 'Вит.E в другое время дня.' },
 ];
-const UL_DB: Record<string, number> = {
-  ZINC: 40, SELENIUM: 400, COPPER: 10, IRON: 45, CALCIUM: 2500, MAGNESIUM: 350,
-  VITAMIN_A: 3000, VITAMIN_D: 4000, VITAMIN_E: 1000, VITAMIN_C: 2000, IODINE: 1100,
-  CHROMIUM: 1000, MANGANESE: 11, BORON: 20, POTASSIUM: 3500,
-};
+// 26 сен 2026 (E0.1/E0.4): локальный UL_DB УДАЛЁН.
+// Он был вторым источником правды по пределам (14 нутриентов, все значения — легаси
+// IOM), и его значения расходились с каноническим реестром `support-limits`
+// (B6 100 мг вместо EFSA 12, селен 400 вместо 255, бор 20, железо 45 как UL
+// вместо SafeLevel). Единый источник — `src/engines/support-limits.ts`.
 
 /* ──────────────── LAB MONITOR DB ──────────────── */
 interface LabMon {
@@ -479,33 +481,39 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
     });
   }, [validIds, stackScore, enrichedMatrix, depletionData, overlapData]);
 
-  // ── Cumulative load ──
+  // ── Cumulative load (E0.4) ──
+  //
+  // БЫЛО (декоративный расчёт, который в UI выглядел как настоящий):
+  //   loads[nutr].total += 1;                 // ← СЧИТАЛ КОЛИЧЕСТВО ВЕЩЕСТВ, не дозу
+  //   isOverUL: v.total > v.ul                // ← сравнивал 1..3 с UL в МГ → ВСЕГДА false
+  //   матчинг — substring по свободному тексту описания ('ca' ловил что угодно)
+  // Итог: блок НИКОГДА не мог показать перебор. Это ровно тот класс дефектов, что
+  // и был предметом аудита.
+  //
+  // СТАЛО: сумма считается по РЕАЛЬНЫМ миллиграммам из `support-dosing` (max-доза
+  // каждого вещества) через канонический резолв нутриента, а вердикт — из
+  // `support-limits.evaluateLimit` (UL / SafeLevel / «не установлен» — разные
+  // сообщения, а не одно «перебор»).
+  //
+  // ЧЕСТНАЯ ГРАНИЦА: у хаба НЕТ пользовательских доз стека (в проекте их хранит
+  // только карточка сравнения `he_bio_dose_v1`, максимум 2 вещества). Поэтому сумма
+  // считается по дозам ИЗ БАЗЫ (верхняя граница диапазона), и это подписано явно.
+  // Молча выдавать это за «вашу дозу» было бы тем же враньём, что и `+= 1`.
   const cumulativeLoad = useMemo(() => {
-    const loads: Record<string, { total: number; ul: number; sources: string[] }> = {};
+    const items: StackItem[] = [];
     for (const id of validIds) {
       const entry = SUPPORT_CATALOG_DATA[id]; if (!entry) continue;
-      const ru = entry.nameRu||entry.name||id;
-      // Estimate mineral/vitamin content from dosage forms or description
-      const txt = (entry.description||'').toLowerCase() + ' ' + (entry.nameRu||entry.name||'').toLowerCase();
-      for (const [nutr, ul] of Object.entries(UL_DB)) {
-        const nutrLower = nutr.toLowerCase();
-        const synonyms: Record<string,string[]> = {
-          zinc:['цинк','zinc','zn'], selenium:['селен','selenium','se'], copper:['медь','copper','cu'],
-          iron:['железо','iron','fe'], calcium:['кальций','calcium','ca'], magnesium:['магний','magnesium','mg'],
-          vitamin_a:['витамин а','вит.а','vitamin a','ретинол'], vitamin_d:['витамин d','вит.d','vitamin d','d3','холекальциферол'],
-          vitamin_e:['витамин e','вит.e','vitamin e','токоферол'], vitamin_c:['витамин c','вит.c','vitamin c','аскорб'],
-          iodine:['йод','иод','iodine'], chromium:['хром','chromium'], manganese:['марганец','manganese'], boron:['бор','boron'],
-          potassium:['калий','potassium','k+'],
-        };
-        const keywords = synonyms[nutrLower] || [nutrLower];
-        if (keywords.some(kw=>txt.includes(kw))) {
-          if (!loads[nutrLower]) loads[nutrLower] = { total:0, ul, sources:[] };
-          loads[nutrLower].sources.push(ru);
-          loads[nutrLower].total += 1; // qualitative marker
-        }
-      }
+      const ru = entry.nameRu || entry.name || id;
+      const doseMg = getMaxDose(id);
+      items.push({ id, nameRu: ru, doseMg: doseMg > 0 ? doseMg : undefined, timesPerDay: 1 });
     }
-    return Object.entries(loads).map(([k,v]) => ({ nutrient:k, ...v, isOverUL:v.total>v.ul })).sort((a,b)=>b.total-a.total);
+    return stackLimitVerdicts(items).map(c => ({
+      nutrient: c.nutrient,
+      amountPerDay: c.amountPerDay,
+      sources: c.sources,
+      verdict: c.verdict,
+      isOverUL: c.verdict.over,
+    }));
   }, [validIds]);
 
   // ── Pill burden ──
@@ -977,30 +985,46 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
             )}
           </div>
 
-          {/* ─── Cumulative load ─── */}
+          {/* ─── Cumulative load (E0.4: реальные мг + тип предела) ─── */}
           <div style={{ ...cardStyle, borderColor:'rgba(96,165,250,0.15)' }}>
             <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>Совокупная суточная нагрузка по нутриентам</div>
+            <div style={{ fontSize:7, color:'#fff', marginBottom:6, lineHeight:1.3 }}>
+              Сумма по верхней границе дозы из базы. Твои фактические дозы хаб не знает —
+              сумма честно подписана как «по базе», а не выдана за твою.
+            </div>
             {cumulativeLoad.length>0 ? (
               <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
                 {cumulativeLoad.map((l,i)=>{
-                  const pct = l.ul>0 ? Math.round((l.total/l.ul)*100) : 0;
+                  const lim = l.verdict.limit;
+                  const denom = lim && lim.value>0 ? lim.value : null;
+                  const pct = denom ? Math.round((l.amountPerDay/denom)*100) : 0;
                   const over = l.isOverUL;
+                  const warn = l.verdict.color==='warn';
+                  const na = l.verdict.limitNotApplicable || l.verdict.kind==='NotEstablished';
+                  const accent = over?'#ef4444' : warn?'#f59e0b' : na?'#a1a1aa' : '#60a5fa';
                   return (
                     <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:over?'rgba(239,68,68,0.04)':'rgba(96,165,250,0.02)', border:`1px solid ${over?'rgba(239,68,68,0.1)':'rgba(96,165,250,0.06)'}` }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <span style={{ fontSize:8, fontWeight:600, color:over?'#ef4444':'#60a5fa' }}>{l.nutrient.toUpperCase()}</span>
-                        {over&&<span style={{ fontSize:7, color:'#ef4444', fontWeight:600 }}>⚠ Превышение UL</span>}
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                        <span style={{ fontSize:8, fontWeight:600, color:accent }}>{l.nutrient.toUpperCase()}</span>
+                        <span style={{ fontSize:7, color:accent, fontWeight:600 }}>
+                          {l.amountPerDay} мг{denom ? ` / ${denom} ${lim!.unit==='mcg'?'мкг':lim!.unit==='iu'?'МЕ':'мг'}` : ''}
+                          {over ? ` — превышение UL` : warn ? ' — выше ориентира' : na ? (l.verdict.limitNotApplicable ? ' — предел неприменим' : ' — UL не установлен') : ` (${pct}%)`}
+                        </span>
                       </div>
-                      {l.ul>0&&<div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.04)', marginTop:3 }}>
-                        <div style={{ width:Math.min(pct,100)+'%', height:'100%', borderRadius:2, background:over?'#ef4444':'#60a5fa' }} />
+                      {denom!=null && <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.04)', marginTop:3 }}>
+                        <div style={{ width:Math.min(pct,100)+'%', height:'100%', borderRadius:2, background:accent }} />
                       </div>}
-                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.35)', marginTop:2 }}>Источники: {l.sources.join(', ')}</div>
+                      <div style={{ fontSize:7, color:'#fff', marginTop:2, lineHeight:1.3 }}>{l.verdict.message}</div>
+                      <div style={{ fontSize:7, color:'#fff', marginTop:2 }}>Источники: {l.sources.join(', ')}</div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.3)', lineHeight:1.3 }}>Нутриенты в выбранных веществах не превышают верхних допустимых уровней потребления.</div>
+              <div style={{ fontSize:7, color:'#fff', lineHeight:1.3 }}>
+                Нутриенты с известным пределом в выбранных веществах не найдены. Это НЕ значит «всё в норме» —
+                вещества без идентифицированного нутриента (аминокислоты, ферменты, бот��ники) здесь не оцениваются.
+              </div>
             )}
           </div>
 

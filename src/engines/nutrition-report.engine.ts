@@ -11,6 +11,8 @@ export interface NutritionReportInput {
   allergens: string[];
   cyclingMode: string;
   goal: string;
+  microTargets?: Record<string, number>;
+  allergenMatcher?: (food: any, allergenId: string) => boolean;
   waterMl?: number;
   injections?: { type: string; dose: number; name: string; time?: string }[];
   workoutTime?: string;
@@ -80,7 +82,16 @@ const OMEGA6_PER_100G_FAT: Record<string, number> = {
 };
 
 export function generateNutritionReport(input: NutritionReportInput): NutritionReport {
-  const { meals, totals, targets, userWeight, userTDEE, healthIssues, planType, variety, budget, allergens, cyclingMode, goal, waterMl, injections, workoutTime } = input;
+  const { userWeight, userTDEE, planType, variety, budget, cyclingMode, goal, microTargets, allergenMatcher, waterMl, workoutTime } = input;
+  const meals = Array.isArray(input.meals) ? input.meals : [];
+  const totals = input.totals && typeof input.totals === 'object' ? input.totals : { kcal: 0, p: 0, f: 0, c: 0 };
+  const targets = input.targets && typeof input.targets === 'object' ? input.targets : { kcal: 0, protein: 0, fats: 0, carbs: 0 };
+  const healthIssues = Array.isArray(input.healthIssues) ? input.healthIssues : [];
+  const allergens = Array.isArray(input.allergens) ? input.allergens : [];
+  const injections = Array.isArray(input.injections) ? input.injections : [];
+  const microTargetMap = { ...MICRO_TARGETS, ...(microTargets || {}) };
+  const effectiveWeight = Number.isFinite(userWeight) && userWeight > 0 ? userWeight : 80;
+  const effectiveTDEE = Number.isFinite(userTDEE) && userTDEE > 0 ? userTDEE : totals.kcal;
   const allItems = meals.flatMap(m => m.items);
 
   // ─── 1. KBJU per meal ───
@@ -113,7 +124,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
     const food = FOOD_DB.find(f => f.id === item.id || f.name === item.name);
     if (!food) return;
     const ratio = item.amount / 100;
-    for (const tgtKey of Object.keys(MICRO_TARGETS)) {
+    for (const tgtKey of Object.keys(microTargetMap)) {
       // Fiber/Cholesterol имеют особые источники (food.fiber, micros.Cholesterol) — отдельно
       if (tgtKey === 'Fiber') {
         const v = food.fiber || 0;
@@ -144,7 +155,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
 
   const micros: Record<string, { actual: number; target: number; pct: number; status: 'ok' | 'low' | 'critical'; foods: string[] }> = {};
   const microDeficiencies: string[] = [];
-  Object.entries(MICRO_TARGETS).forEach(([k, target]) => {
+  Object.entries(microTargetMap).forEach(([k, target]) => {
     const actual = Math.round((microTotals[k] || 0) * 10) / 10;
     const pct = Math.round(actual / target * 100);
     const status: 'ok' | 'low' | 'critical' = pct >= 80 ? 'ok' : pct >= 50 ? 'low' : 'critical';
@@ -153,7 +164,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   });
 
   // ─── 4. Weight dynamics ───
-  const kcalDiff = totals.kcal - userTDEE;
+  const kcalDiff = totals.kcal - effectiveTDEE;
   const weeklyKg = Math.round((kcalDiff * 7 / 7700) * 100) / 100;
   const direction: 'loss' | 'gain' | 'maintenance' = weeklyKg < -0.1 ? 'loss' : weeklyKg > 0.1 ? 'gain' : 'maintenance';
   const weightDynamicsBasic = {
@@ -164,11 +175,11 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
       ? `Дефицит ${Math.round(Math.abs(kcalDiff))} ккал/день → ожидаемая потеря ${Math.abs(weeklyKg)} кг/нед (${Math.round(Math.abs(weeklyKg) * 4.33 * 10) / 10} кг/мес).`
       : direction === 'gain'
       ? `Профицит ${Math.round(kcalDiff)} ккал/день → ожидаемый набор ${weeklyKg} кг/нед (${Math.round(weeklyKg * 4.33 * 10) / 10} кг/мес).`
-      : `Энергетический баланс: ${Math.round(totals.kcal)} / ${userTDEE} ккал — вес стабилен.`,
+      : `Энергетический баланс: ${Math.round(totals.kcal)} / ${Math.round(effectiveTDEE)} ккал — вес стабилен.`,
   };
 
   // Enhanced dynamics
-  const proteinGperKg = userWeight > 0 ? totals.p / userWeight : 0;
+  const proteinGperKg = totals.p / effectiveWeight;
   const fatPct = totals.kcal > 0 ? (totals.f * 9 / totals.kcal * 100) : 0;
   const qualityModifier = proteinGperKg >= 2.0 ? 1.15 : proteinGperKg >= 1.6 ? 1.10 : 1.0;
   const fatModifier = fatPct > 40 ? 0.90 : fatPct > 35 ? 0.95 : 1.0;
@@ -204,7 +215,7 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
 
   // ─── 6. Risk analysis ───
   const fatKcalPct = totals.kcal > 0 ? (totals.f * 9 / totals.kcal * 100) : 0;
-  const proteinGperKgVal = userWeight > 0 ? totals.p / userWeight : 0;
+  const proteinGperKgVal = totals.p / effectiveWeight;
   const riskAnalysis = [
     { system: 'Печень', score: fatKcalPct > 40 ? 6 : fatKcalPct > 35 ? 4 : 2, maxScore: 7, impact: fatKcalPct > 40 ? 'Высокое содержание жиров' : 'Умеренное', recommendation: fatKcalPct > 40 ? 'Снизить долю жиров до 25-30%' : 'Норма' },
     { system: 'Почки', score: proteinGperKgVal > 2.5 ? 6 : proteinGperKgVal > 2.0 ? 4 : 2, maxScore: 7, impact: proteinGperKgVal > 2.0 ? 'Повышенная нагрузка' : 'Норма', recommendation: proteinGperKgVal > 2.5 ? 'Снизить белок до 2г/кг' : 'Адекватно' },
@@ -215,12 +226,14 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
 
   // ─── 7. Allergen warnings ───
   const allergenWarnings: { food: string; allergens: string[] }[] = [];
+  const allergenIds = Array.isArray(allergens) ? allergens : [];
   allItems.forEach(item => {
     const food = FOOD_DB.find(f => f.id === item.id || f.name === item.name);
-    if (food?.allergens) {
-      const matched = food.allergens.filter(a => allergens.includes(a));
-      if (matched.length > 0) allergenWarnings.push({ food: item.name, allergens: matched });
-    }
+    if (!food) return;
+    const matched = allergenIds.filter(allergenId => (
+      allergenMatcher ? allergenMatcher(food, allergenId) : (food.allergens || []).includes(allergenId)
+    ));
+    if (matched.length > 0) allergenWarnings.push({ food: item.name, allergens: matched });
   });
 
   // ─── 8. Plan decisions ───
@@ -239,14 +252,17 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   // ════════════════════════════════════════════════
 
   // ─── 9. Water balance ───
-  const hasAAS = (injections || []).some(i => i.type === 'ААС' || i.type.toLowerCase().includes('тест') || i.type.toLowerCase().includes('трен') || i.type.toLowerCase().includes('стан'));
-  const waterBaseTarget = userWeight * 30; // 30 ml/kg
-  const waterPharmaTarget = hasAAS ? userWeight * 40 : userWeight * 35; // 40 on AAS, 35 otherwise
+  const hasAAS = (injections || []).some(i => {
+    const type = String(i?.type || '').toLowerCase();
+    return i?.type === 'ААС' || type.includes('тест') || type.includes('трен') || type.includes('стан');
+  });
+  const waterBaseTarget = effectiveWeight * 30; // 30 ml/kg
+  const waterPharmaTarget = hasAAS ? effectiveWeight * 40 : effectiveWeight * 35; // 40 on AAS, 35 otherwise
   const waterTarget = waterPharmaTarget;
-  const waterActual = waterMl || 0;
+  const waterActual = Number.isFinite(waterMl) ? Math.max(0, waterMl as number) : 0;
   const waterDeficit = Math.max(0, waterTarget - waterActual);
-  const waterIntakePerKg = userWeight > 0 ? Math.round(waterActual / userWeight) : 0;
-  const waterTargetPerKg = Math.round(waterTarget / userWeight);
+  const waterIntakePerKg = Math.round(waterActual / effectiveWeight);
+  const waterTargetPerKg = Math.round(waterTarget / effectiveWeight);
   let waterStatus: 'ok' | 'low' | 'critical' = 'ok';
   if (waterActual < waterTarget * 0.7) waterStatus = 'critical';
   else if (waterActual < waterTarget * 0.9) waterStatus = 'low';

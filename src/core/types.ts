@@ -1251,11 +1251,15 @@ export interface StrengthLogEntry {
   date: string;
   exerciseId: string;
   exerciseName: string;
-  sets: { weight: number; reps: number; rir: number; rpe?: number; techniqueScore?: number }[];
+  sets: { weight: number; reps: number; rir: number; rpe?: number; techniqueScore?: number; plannedWeight?: number; plannedReps?: number; plannedRir?: number; plannedTempo?: string; actualTempo?: string }[];
   totalVolume: number;
   estimated1RM: number;
   isCompound: boolean;
   weekNumber?: number;
+  source?: string;
+  provenanceSource?: string;
+  planSnapshotId?: string;
+  plannedSessionId?: string;
   mesocycleId?: string;
   notes?: string;
   /** Структурный суперсет (не кодируется в имени упражнения). */
@@ -1273,6 +1277,10 @@ export interface WorkoutLog {
   recoveryBefore: number;
   split: string;
   weekNumber?: number;
+  source?: string;
+  provenanceSource?: string;
+  planSnapshotId?: string;
+  plannedSessionId?: string;
   mesocycleId?: string;
   notes?: string;
 }

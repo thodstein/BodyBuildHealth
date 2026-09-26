@@ -310,6 +310,14 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   const [plRuntime, setPlRuntime] = useState<{ days: PlayerDay[]; focus: string; week: number; track: string } | null>(() => safeParsePlRuntime(localStorage.getItem('he_pl_runtime')));
   const [plRunOpen, setPlRunOpen] = useState(false);
   useEffect(() => { if (tab === 'runtime') { setPlRuntime(safeParsePlRuntime(localStorage.getItem('he_pl_runtime'))); } }, [tab]);
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== 'he_pl_runtime' && event.key !== null) return;
+      setPlRuntime(safeParsePlRuntime(localStorage.getItem('he_pl_runtime')));
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
   // Запись готовности — дросселировано, не дёргаем localStorage на каждый микро-ререндер (без урезания данных)
   const lastReadinessRef = React.useRef<{ r: number; f: number } | null>(null);
   useEffect(() => {

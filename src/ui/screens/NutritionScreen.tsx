@@ -36,6 +36,8 @@ import { generateNutritionReport, NutritionReport } from '../../engines/nutritio
 import { isNativeApp } from '../../core/app-platform';
 import { getNutritionV2Data } from '../../core/nutrition-v2-data';
 import { getQualityLabel } from '../../engines/nutrition-quality.engine';
+import { getMicroTargets } from './NutritionScreen_parts/IndividualPlan/planner-micro-coverage';
+import { matchesSelectedAllergen } from './NutritionScreen_parts/IndividualPlan/planner-restrictions';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
@@ -691,6 +693,10 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
   const [reportMode, setReportMode] = React.useState<'day'|'week'|'month'>('day');
   const [reportDate, setReportDate] = React.useState(new Date().toISOString().split('T')[0]);
   const [reportSubTab, setReportSubTab] = React.useState<'overview' | 'full' | 'archive'>('overview');
+  const reportSex = profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
+  const reportWeight = Number(profile?.settings?.personal?.weight) > 0 ? Number(profile.settings.personal.weight) : 80;
+  const reportAllergens = Array.isArray(profile?.settings?.nutrition?.foodAllergies) ? profile.settings.nutrition.foodAllergies : [];
+  const reportMicroTargets = Object.fromEntries(getMicroTargets(reportSex, reportWeight, 'maintenance', false).map(t => [t.nutrient, t.target]));
   const [fullReport, setFullReport] = React.useState<NutritionReport | null>(null);
   const [archiveReports, setArchiveReports] = React.useState<NutritionReport[]>(() => { try { return JSON.parse(localStorage.getItem('he_nutrition_report_archive') || '[]'); } catch { return []; } });
   const [reportEditMode, setReportEditMode] = React.useState(false);
@@ -764,10 +770,11 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
             })) : [{ label: reportMode === 'week' ? 'Неделя' : 'Месяц', items: data.map((i:any) => ({ name: i.name, id: i.id || '', amount: i.amount || 100, kcal: i.kcal||0, p: i.p||0, f: i.f||0, c: i.c||0 })), totals }];
             const rep = generateNutritionReport({ meals, totals,
               targets: targets || { kcal: 2500, protein: 160, fats: 70, carbs: 300 },
-              userWeight: profile?.settings?.weight || 80,
-              userTDEE: targets?.kcal || 2500,
-              healthIssues: [], planType: 'classic', variety: 'max', budget: 'medium',
-              allergens: [], cyclingMode: 'none', goal: 'maintenance',
+               userWeight: reportWeight,
+               userTDEE: targets?.kcal || Math.round(reportWeight * 33),
+               healthIssues: [], planType: profile?.settings?.nutrition?.dietType || 'classic', variety: 'max', budget: 'medium',
+               allergens: reportAllergens, microTargets: reportMicroTargets,
+               allergenMatcher: (food: any, allergenId: string) => matchesSelectedAllergen(food, allergenId, FOOD_DB), cyclingMode: 'none', goal: profile?.settings?.goals?.primaryGoal || 'maintenance',
             });
             setFullReport(rep);
             setReportEditText(JSON.stringify(rep, null, 2));
@@ -1082,10 +1089,11 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
           const meals = [{ label: reportMode === 'day' ? 'День' : reportMode === 'week' ? 'Неделя' : 'Месяц', items: data.map((i:any) => ({ name: i.name, id: i.id || '', amount: i.amount || 100, kcal: i.kcal||0, p: i.p||0, f: i.f||0, c: i.c||0 })), totals }];
           const rep = generateNutritionReport({ meals, totals,
             targets: targets || { kcal: 2500, protein: 160, fats: 70, carbs: 300 },
-            userWeight: profile?.settings?.weight || 80,
-            userTDEE: targets?.kcal || 2500,
-            healthIssues: [], planType: 'classic', variety: 'max', budget: 'medium',
-            allergens: [], cyclingMode: 'none', goal: 'maintenance',
+             userWeight: reportWeight,
+             userTDEE: targets?.kcal || Math.round(reportWeight * 33),
+             healthIssues: [], planType: profile?.settings?.nutrition?.dietType || 'classic', variety: 'max', budget: 'medium',
+             allergens: reportAllergens, microTargets: reportMicroTargets,
+             allergenMatcher: (food: any, allergenId: string) => matchesSelectedAllergen(food, allergenId, FOOD_DB), cyclingMode: 'none', goal: profile?.settings?.goals?.primaryGoal || 'maintenance',
           });
           setFullReport(rep);
           setReportEditText(JSON.stringify(rep, null, 2));
