@@ -1,3 +1,4 @@
+import { localIsoDate, parseLocalIsoDate } from '../core/local-date';
 import { getExerciseById, EXERCISE_CATALOG, canReplace } from '../core/exercise-catalog';
 import { getVolumeByMuscle } from './training-methodology.engine';
 import type { WorkoutLog } from '../core/types';
@@ -35,7 +36,7 @@ export function weeklySetsByGroup(workouts: WorkoutLog[], weeks = 3): Record<str
   const res: Record<string, number[]> = {};
   starts.forEach((s, wi) => {
     const e = new Date(s); e.setDate(e.getDate() + 6);
-    const ss = s.toISOString().slice(0, 10), ee = e.toISOString().slice(0, 10);
+    const ss = localIsoDate(s), ee = localIsoDate(e);
     workouts.forEach(w => {
       if (w.date < ss || w.date > ee) return;
       (w.exercises || []).forEach(ex => {
@@ -95,7 +96,7 @@ export function generateTrainingRecommendations(input: RecommendationInput): Tra
   for (let i = 0; i < 8; i++) weekBuckets[i] = new Set();
   {
     const now = new Date();
-    for (let i = 0; i < 8; i++) { const s = new Date(now); const day = (s.getDay() + 6) % 7; s.setDate(s.getDate() - day - i * 7); const e = new Date(s); e.setDate(e.getDate() + 6); const ss = s.toISOString().slice(0, 10), ee = e.toISOString().slice(0, 10); historyWorkouts.forEach(w => { if (w.date >= ss && w.date <= ee) (w.exercises || []).forEach(ex => weekBuckets[i].add(ex.exerciseId)); }); }
+    for (let i = 0; i < 8; i++) { const s = new Date(now); const day = (s.getDay() + 6) % 7; s.setDate(s.getDate() - day - i * 7); const e = new Date(s); e.setDate(e.getDate() + 6); const ss = localIsoDate(s), ee = localIsoDate(e); historyWorkouts.forEach(w => { if (w.date >= ss && w.date <= ee) (w.exercises || []).forEach(ex => weekBuckets[i].add(ex.exerciseId)); }); }
   }
   Object.values(weekBuckets).forEach(set => set.forEach(id => { exWeeks[id] = (exWeeks[id] || 0) + 1; }));
   Object.entries(exWeeks).forEach(([id, w]) => {
@@ -114,14 +115,18 @@ export function generateTrainingRecommendations(input: RecommendationInput): Tra
       .filter(Boolean)
       .sort()
       .at(-1);
-    const latestWorkout = latestWorkoutDate ? new Date(`${latestWorkoutDate}T00:00:00Z`) : new Date();
-    const day = latestWorkout.getUTCDay();
+    // Неделя последней тренировки. Раньше неделя считалась в UTC
+    // (`T00:00:00Z` + getUTCDay/setUTCDate + toISOString), а ключи `w.date`
+    // пишутся по локальному канону — это раскол writer/reader: в UTC−8
+    // «понедельник недели» уезжал на воскресенье. Теперь обе стороны в каноне.
+    const latestWorkout = latestWorkoutDate ? (parseLocalIsoDate(latestWorkoutDate) ?? new Date()) : new Date();
+    const day = latestWorkout.getDay();
     const start = new Date(latestWorkout);
-    start.setUTCDate(start.getUTCDate() - ((day + 6) % 7));
+    start.setDate(start.getDate() - ((day + 6) % 7));
     const end = new Date(start);
-    end.setUTCDate(end.getUTCDate() + 6);
-    const weekStartKey = start.toISOString().slice(0, 10);
-    const weekEndKey = end.toISOString().slice(0, 10);
+    end.setDate(end.getDate() + 6);
+    const weekStartKey = localIsoDate(start);
+    const weekEndKey = localIsoDate(end);
     historyWorkouts.forEach(w => {
       if (w.date < weekStartKey || w.date > weekEndKey) return;
       (w.exercises || []).forEach(ex => { const cat = getExerciseById(ex.exerciseId); if (!cat) return; const score = cat.jointStress === 'high' ? 3 : cat.jointStress === 'med' ? 2 : 1; jointByGroup[cat.group] = (jointByGroup[cat.group] || 0) + score * (ex.sets?.length || 0); });

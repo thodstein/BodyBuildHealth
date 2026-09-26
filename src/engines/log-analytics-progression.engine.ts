@@ -9,6 +9,7 @@
  *
  * @module log-analytics-progression-engine
  */
+import { localIsoDate, localIsoDateOffset } from '../core/local-date';
 import { saveWeightLogSync } from './profile-store';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -216,13 +217,13 @@ export function analyzeTrainingLog(logs: WorkoutSetLog[], sessionDurations: { da
   const weeklyVolume = new Map<string, { volume: number; sessions: number }>();
   for (const l of logs) {
     const d = new Date(l.date); const weekStart = new Date(d); weekStart.setDate(d.getDate() - d.getDay() + 1);
-    const key = weekStart.toISOString().slice(0, 10);
+    const key = localIsoDate(weekStart);
     if (!weeklyVolume.has(key)) weeklyVolume.set(key, { volume: 0, sessions: 0 });
     const w = weeklyVolume.get(key)!; w.volume += l.weightKg * l.reps;
   }
   for (const d of dates) {
     const dObj = new Date(d); dObj.setDate(dObj.getDate() - dObj.getDay() + 1);
-    const key = dObj.toISOString().slice(0, 10);
+    const key = localIsoDate(dObj);
     if (weeklyVolume.has(key)) weeklyVolume.get(key)!.sessions++;
   }
 
@@ -409,7 +410,7 @@ export function analyzeMeasurements(heightCm: number): MeasurementAnalytics | nu
     shoulderToWaist: last.waistCm > 0 ? Math.round((last.shoulderCm / last.waistCm) * 100) / 100 : 0,
     ffmi, bmi, lbm: Math.round(lbm * 10) / 10, fatMass: Math.round(last.weightKg * last.bodyFatPercent / 100 * 10) / 10,
     weeklyChanges,
-    projectionToGoal: { weeks: weeksToGoal, targetDate: new Date(Date.now() + weeksToGoal * 7 * 86400000).toISOString().slice(0, 10) },
+    projectionToGoal: { weeks: weeksToGoal, targetDate: localIsoDateOffset(weeksToGoal * 7) },
   };
 }
 
@@ -421,8 +422,8 @@ export function generateWeeklyReport(logs: WorkoutSetLog[], sessionData: { date:
   const now = new Date();
   const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() + 1);
   const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
-  const startStr = weekStart.toISOString().slice(0, 10);
-  const endStr = weekEnd.toISOString().slice(0, 10);
+  const startStr = localIsoDate(weekStart);
+  const endStr = localIsoDate(weekEnd);
 
   const weekLogs = logs.filter(l => l.date >= startStr && l.date <= endStr);
   const weekSessions = sessionData.filter(s => s.date >= startStr && s.date <= endStr);

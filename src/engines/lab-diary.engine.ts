@@ -5,6 +5,10 @@
  * хранит историю в localStorage, предоставляет статистику, тренды и данные для графиков.
  */
 
+// Дата записи анализа и окна «за N дней» — по локальному канону (core/local-date):
+// в вечернее время UTC+3…+12 UTC-ключ уезжал на «вчера» и попадал не в ту выборку.
+import { localIsoDate, localIsoDateOffset } from '../core/local-date';
+
 export interface LabDiaryEntry {
   date: string;           // YYYY-MM-DD
   markers: LabDiaryMarker[];
@@ -34,7 +38,7 @@ export interface LabDiaryStats {
 const DIARY_KEY = 'he_lab_diary';
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localIsoDate();
 }
 
 /** Загрузить дневник */
@@ -110,7 +114,7 @@ export function getMarkerChartData(diary: LabDiaryEntry[], code: string): { labe
 
 /** Получить частоту сдачи анализов по дням за период */
 export function getLabFrequency(diary: LabDiaryEntry[], days: number = 30): { date: string; count: number }[] {
-  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const cutoff = localIsoDateOffset(-days);
   return diary
     .filter(d => d.date >= cutoff)
     .map(d => ({ date: d.date, count: d.totalMarkers }))
@@ -138,7 +142,7 @@ export function getTopTestedMarkers(diary: LabDiaryEntry[], limit: number = 15):
 
 /** Получить аномальные маркеры (вне нормы) за последние N дней */
 export function getRecentAbnormalMarkers(diary: LabDiaryEntry[], days: number = 90): { date: string; code: string; name: string; value: number; unit: string; lln?: number; uln?: number }[] {
-  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const cutoff = localIsoDateOffset(-days);
   const result: { date: string; code: string; name: string; value: number; unit: string; lln?: number; uln?: number }[] = [];
   for (const day of diary) {
     if (day.date < cutoff) continue;
@@ -153,7 +157,7 @@ export function getRecentAbnormalMarkers(diary: LabDiaryEntry[], days: number = 
 
 /** Получить сводку по дням за период */
 export function getLabDiarySummary(diary: LabDiaryEntry[], days: number = 30): { date: string; total: number; abnormal: number; pct: number }[] {
-  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const cutoff = localIsoDateOffset(-days);
   return diary
     .filter(d => d.date >= cutoff)
     .map(d => ({

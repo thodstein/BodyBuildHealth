@@ -1,3 +1,4 @@
+import { localIsoDate, localIsoDateOffset } from '../core/local-date';
 import { getWeightLog, getMeasurementsLog } from './profile-store';
 import { loadEntries as loadBodyCompEntries } from './body-composition.engine';
 import { getLabDiary, getMarkerHistory, getLabDiaryStats } from './lab-diary.engine';
@@ -118,7 +119,7 @@ export interface ComprehensiveReport {
 
 /* ─── Утилиты ─── */
 
-function todayIso(): string { return new Date().toISOString().slice(0, 10); }
+function todayIso(): string { return localIsoDate(); }
 
 function daysBetween(a: string, b: string): number {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24));
@@ -765,7 +766,7 @@ function generateRecommendations(sections: ReportSection[], pedRisk: RiskBridgeD
 }
 
 function weekStart(d: Date): Date { const r = new Date(d); r.setDate(r.getDate() - r.getDay() + 1); r.setHours(0, 0, 0, 0); return r; }
-function isoDate(d: Date): string { return d.toISOString().slice(0, 10); }
+function isoDate(d: Date): string { return localIsoDate(d); }
 
 async function gatherMonthlyTrends(dateFrom: string, dateTo: string): Promise<ComprehensiveReport['trends']> {
   const weightLog = getWeightLog();
@@ -826,7 +827,7 @@ export async function generateComprehensiveReport(input: {
 }): Promise<ComprehensiveReport> {
   const now = todayIso();
   const dateTo = input.dateTo || now;
-  const dateFrom = input.dateFrom || (input.type === 'weekly' ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const dateFrom = input.dateFrom || (input.type === 'weekly' ? localIsoDateOffset(-7) : localIsoDateOffset(-30));
 
   const profile = getProfile();
   const settings = (profile?.settings || {}) as UnifiedSettings;

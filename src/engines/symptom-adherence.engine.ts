@@ -4,6 +4,7 @@
  * Отмечает приём назначенных веществ, связывает с динамикой симптома.
  * localStorage: he_symptom_adherence + he_symptom_intake_log
  */
+import { localIsoDate, localIsoDateOffset } from '../core/local-date';
 import { getSymptomHistory, updateSymptomToday, getSymptomDiary } from './symptom-diary.engine';
 
 export interface SubstanceAssignment {
@@ -52,7 +53,7 @@ export function addAssignment(
   const entry: SubstanceAssignment = {
     id: `${substanceId}_${Date.now()}`,
     symptomId, substanceId, substanceName, dose,
-    dateStarted: new Date().toISOString().slice(0, 10),
+    dateStarted: localIsoDate(),
     status: 'active',
   };
   list.push(entry);
@@ -65,7 +66,7 @@ export function stopAssignment(id: string): void {
   const idx = list.findIndex((a) => a.id === id);
   if (idx >= 0) {
     list[idx].status = 'stopped';
-    list[idx].dateEnded = new Date().toISOString().slice(0, 10);
+    list[idx].dateEnded = localIsoDate();
     localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(list));
   }
 }
@@ -87,7 +88,7 @@ export function getIntakeLog(): IntakeLog[] {
 
 export function markIntake(assignmentId: string, taken: boolean, dose?: string): void {
   const log = getIntakeLog();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const existing = log.findIndex((l) => l.assignmentId === assignmentId && l.date === today);
   const entry: IntakeLog = { date: today, assignmentId, taken, dose };
   if (existing >= 0) {
@@ -99,7 +100,7 @@ export function markIntake(assignmentId: string, taken: boolean, dose?: string):
 }
 
 export function getTodayIntakes(): IntakeLog[] {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   return getIntakeLog().filter((l) => l.date === today);
 }
 
@@ -110,13 +111,13 @@ export function getAdherenceStats(): SymptomAdherenceStats {
   const log = getIntakeLog();
 
   // Adherence за 7 дней
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const weekAgo = localIsoDateOffset(-7);
   const weekLogs = log.filter((l) => l.date >= weekAgo && active.some((a) => a.id === l.assignmentId));
   const totalDoses = weekLogs.length;
   const takenDoses = weekLogs.filter((l) => l.taken).length;
   const adherence7d = totalDoses > 0 ? Math.round((takenDoses / totalDoses) * 100) : 100;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const todayIntakeIds = log.filter((l) => l.date === today && l.taken).map((l) => l.assignmentId);
   const missedToday = active.filter((a) => !todayIntakeIds.includes(a.id));
 
