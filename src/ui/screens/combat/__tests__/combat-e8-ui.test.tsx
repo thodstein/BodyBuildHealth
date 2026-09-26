@@ -9,7 +9,7 @@ import React from 'react';
 import { CbCampMeasurementsCard } from '../cb-camp-measurements';
 import { buildCombatPlan } from '../../../../engines/combat/combat-builder.engine';
 import { finalizeCombatPlan } from '../../../../engines/combat/combat-finalize.engine';
-import { COMBAT_SPARRING_KEY, COMBAT_WIGHINS_KEY, COMBAT_GRIP_KEY, COMBAT_RTP_KEY } from '../../../../engines/combat/combat-measurements.engine';
+import { COMBAT_SPARRING_KEY, COMBAT_WIGHINS_KEY, COMBAT_GRIP_KEY, COMBAT_RTP_KEY, COMBAT_TESTS_KEY } from '../../../../engines/combat/combat-measurements.engine';
 
 beforeEach(() => localStorage.clear());
 
@@ -220,5 +220,77 @@ describe('E8.6 — RTP на экране', () => {
     render(<CbCampMeasurementsCard plan={mkPlan()} />);
     expect(screen.getByText(/5–21 сут/)).toBeTruthy();
     expect(screen.getByText(/~14 сут/)).toBeTruthy();
+  });
+});
+
+describe('E8 UI — 8.5 журнал тестов', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('карточка показывает оговорку, что это не норма и не прогноз', () => {
+    const { container } = render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    const h = container.innerHTML;
+    expect(h).toContain('measure-tests');
+    expect(h).toContain('test-caveat');
+    expect(h).toMatch(/не норма/);
+    expect(h).toMatch(/41214825/);
+    expect(h).toMatch(/планировать бой по этим цифрам нельзя/);
+  });
+
+  it('без замеров честно «Замеров нет», а не выдуманный ноль', () => {
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.getByText(/Замеров нет/)).toBeTruthy();
+  });
+
+  it('форма записи на месте: тест, дата, значение, кнопка', () => {
+    const { container } = render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    const h = container.innerHTML;
+    expect(h).toContain('test-form');
+    expect(h).toContain('test-date');
+    expect(h).toContain('test-value');
+    expect(h).toContain('test-add');
+  });
+
+  it('клик по «Записать» без даты честно отвечает, а не молчит', () => {
+    const { container } = render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    fireEvent.click(q('[data-cb="test-add"]')!);
+    expect(container.innerHTML).toContain('test-msg');
+    expect(screen.getByText(/корректные дата/)).toBeTruthy();
+  });
+
+  it('после записи видна своя динамика: последний, лучший, отклонение к пику', () => {
+    localStorage.setItem(COMBAT_TESTS_KEY, JSON.stringify([
+      { date: '2026-09-01', testId: 'pushup', value: 20 },
+      { date: '2026-09-10', testId: 'pushup', value: 25 },
+      { date: '2026-09-01', testId: 'shuttle_4x10', value: 19 },
+      { date: '2026-09-10', testId: 'shuttle_4x10', value: 24 },
+    ]));
+    const { container } = render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    const h = container.innerHTML;
+    expect(h).toContain('test-row');
+    // «лучший» для времени = меньшее число (19), а не большее (24)
+    expect(h).toMatch(/Челночный 4×10 м: 24 с[^]*лучший 19 с/);
+    // одна метрика лучше, другая хуже → «растёт» было бы враньём
+    expect(h).toMatch(/Динамика смешанная/);
+    expect(h).not.toMatch(/Форма растёт/);
+  });
+
+  it('когда всё растёт — сводка прямо говорит, что форма растёт', () => {
+    localStorage.setItem(COMBAT_TESTS_KEY, JSON.stringify([
+      { date: '2026-09-01', testId: 'pushup', value: 20 },
+      { date: '2026-09-10', testId: 'pushup', value: 25 },
+      { date: '2026-09-01', testId: 'plank', value: 60 },
+      { date: '2026-09-10', testId: 'plank', value: 90 },
+    ]));
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.getByText(/Форма растёт/)).toBeTruthy();
+  });
+
+  it('форма растёт вверх — сетка данных не придумывает норм', () => {
+    localStorage.setItem(COMBAT_TESTS_KEY, JSON.stringify([
+      { date: '2026-09-01', testId: 'plank', value: 60 },
+      { date: '2026-09-10', testId: 'plank', value: 120 },
+    ]));
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.getByText(/Планка: 120 с/)).toBeTruthy();
   });
 });

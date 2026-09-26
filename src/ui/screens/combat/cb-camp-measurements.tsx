@@ -14,7 +14,8 @@ import {
   leaScreen, sleepVerdict, heatProtocol,
   loadGrip, addGrip, gripSummary, gripP50Ref, GRIP_P50_AGE,
   loadRtp, addRtp, rtpSummary, RTP_STAGES, RTP_STAGE_BY_ID, RTP_EARLY_AEROBIC_NOTE, RTP_SOURCE_IDS,
-  type RtpStageId,
+  loadTests, addTest, testBattery, COMBAT_TEST_BATTERY, COMBAT_TEST_BY_ID,
+  type RtpStageId, type CombatTestId,
   type SparType, type GripHand,
 } from '../../../engines/combat/combat-measurements.engine';
 
@@ -113,6 +114,22 @@ export const CbCampMeasurementsCard: React.FC<{
       : 'Нужны корректные дата и ступень.');
     setRtp(loadRtp());
   }, [rDate, rStage]);
+
+  // ── 8.5 журнал тестов (своя динамика) ──
+  const [tests, setTests] = useState<ReturnType<typeof loadTests>>(() => loadTests());
+  const [tId, setTId] = useState<CombatTestId>('pushup');
+  const [tDate, setTDate] = useState('');
+  const [tVal, setTVal] = useState('');
+  const [tMsg, setTMsg] = useState<string | null>(null);
+  const battery = useMemo(() => testBattery(tests), [tests]);
+  const onAddTest = useCallback(() => {
+    const wrote = addTest(tDate, tId, Number(tVal.replace(',', '.')));
+    setTMsg(wrote
+      ? `Записано: ${COMBAT_TEST_BY_ID[tId].label}.`
+      : 'Нужны корректные дата и правдоподобное значение.');
+    setTVal('');
+    setTests(loadTests());
+  }, [tDate, tId, tVal]);
   const onAddGrip = useCallback(() => {
     const wrote = addGrip(gDate, gHand, Number(gKg.replace(',', '.')));
     setGMsg(wrote
@@ -275,6 +292,51 @@ export const CbCampMeasurementsCard: React.FC<{
         <span data-cb="rtp-stages-note" style={{ fontSize: 11, color: '#fff' }}>
           Последовательность ступеней — структура приложения: для единоборств одобренных протоколов нет (пробел в источниках выше).
         </span>
+      </div>
+
+      {/* 8.5 — журнал тестов (своя динамика, без норм) */}
+      <div data-cb="measure-tests" style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
+        <Highlight>🧪 Тесты: своя динамика</Highlight>
+        <div data-cb="test-caveat" role="note" style={{ fontSize: 12, color: '#fff' }}>
+          {battery.caveat}
+        </div>
+        <Line tone="ok">{battery.note}</Line>
+        <div data-cb="test-form" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <CombatPopupSelect
+            label="Тест"
+            value={COMBAT_TEST_BY_ID[tId].label}
+            onChange={v => setTId(v as CombatTestId)}
+            options={COMBAT_TEST_BATTERY.map((t) => ({ id: t.id as string, label: t.label }))}
+          />
+          <input
+            aria-label="Дата теста"
+            data-cb="test-date"
+            type="date"
+            value={tDate}
+            onChange={(e) => setTDate(e.target.value)}
+            style={{ ...inp(tDate, ''), flex: '1 1 140px' }}
+          />
+          <input
+            aria-label={`Значение, ${COMBAT_TEST_BY_ID[tId].unit}`}
+            data-cb="test-value"
+            type="number"
+            inputMode="decimal"
+            value={tVal}
+            onChange={(e) => setTVal(e.target.value)}
+            style={{ ...inp(tVal, COMBAT_TEST_BY_ID[tId].unit), flex: '0 1 110px' }}
+          />
+          <button data-cb="test-add" onClick={onAddTest} style={BTN_GHOST}>Записать</button>
+        </div>
+        {tMsg ? <div data-cb="test-msg" role="status" style={{ fontSize: 12, color: '#fff' }}>{tMsg}</div> : null}
+        {battery.lines.filter((l) => l.count > 0).map((l) => (
+          <div key={l.testId} data-cb="test-row" data-trend={l.trend} style={{ fontSize: 12, color: '#fff' }}>
+            {l.label}: {l.latest} {l.unit}
+            <span> · лучший {l.best} {l.unit}</span>
+            {l.vsBestPct !== null && l.vsBestPct !== 0
+              ? <span> · {l.vsBestPct > 0 ? '+' : ''}{l.vsBestPct}% к пику</span>
+              : null}
+          </div>
+        ))}
       </div>
 
       {/* 8.4 — LEA / RED-S */}

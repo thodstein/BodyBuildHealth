@@ -609,6 +609,166 @@ export function rtpSummary(rows: RtpLog[], today: string | null | undefined): Rt
 export const RTP_EARLY_AEROBIC_NOTE =
   `Первые 24–72 ч: постепенная аэробная активность ускоряет восстановление, а не покой (PMID 42379672).`;
 
+// ─── 8.5 Журнал тестов (своя динамика, без норм) ────────────────────────────
+//
+// ЧЕСТНО, ЗАЧЕМ ЭТО. Норм для батареи единоборств не существует, и — важнее —
+// источник прямо говорит, что такие тесты НЕ предсказывают распределение
+// интенсивности схватки: PMID 41214825 (BMC Sports Sci Med Rehabil 2025, n=16,
+// 2988 действий) — специальные тесты коррелируют между собой (анаэробная ↔
+// аэробная, ρ 0.73–0.76), но с time-motion профилем боя значимой связи нет
+// (ρ −0.46…0.40, p > 0.05). Авторы: ритм схватки задаётся технико-тактической
+// динамикой, а не физпоказателями.
+//
+// ПОЭТОМУ здесь нет ни одной нормы и никакого «прогноза по результату».
+// Это дневник собственной формы: спортсмен видит, растёт ли он сам относительно
+// себя. Планировать по нему бой нельзя — и это написано прямо на карточке.
+
+export const COMBAT_TESTS_KEY = 'he_combat_tests_v1';
+/** 200 записей ≈ длинный цикл наблюдения. */
+export const COMBAT_TESTS_CAP = 200;
+
+export type CombatTestId =
+  | 'pushup' | 'pullup' | 'squat_bw' | 'standing_long_jump'
+  | 'med_ball_throw' | 'plank' | 'shuttle_4x10';
+
+export interface CombatTestDef {
+  id: CombatTestId;
+  label: string;
+  unit: string;
+  /** 'up' — больше значит лучше, 'down' — меньше (время). */
+  direction: 'up' | 'down';
+  /** отбраковка мусора: [минимум, максимум] правдоподобного значения. */
+  plausible: [number, number];
+}
+
+export const COMBAT_TEST_BATTERY: CombatTestDef[] = [
+  { id: 'pushup', label: 'Отжимания', unit: 'раз', direction: 'up', plausible: [0, 300] },
+  { id: 'pullup', label: 'Подтягивания', unit: 'раз', direction: 'up', plausible: [0, 80] },
+  { id: 'squat_bw', label: 'Присед с весом тела', unit: 'раз', direction: 'up', plausible: [0, 200] },
+  { id: 'standing_long_jump', label: 'Прыжок в длину', unit: 'см', direction: 'up', plausible: [30, 400] },
+  { id: 'med_ball_throw', label: 'Бросок медицинского мяча', unit: 'м', direction: 'up', plausible: [0.5, 30] },
+  { id: 'plank', label: 'Планка', unit: 'с', direction: 'up', plausible: [5, 900] },
+  { id: 'shuttle_4x10', label: 'Челночный 4×10 м', unit: 'с', direction: 'down', plausible: [10, 90] },
+];
+
+export const COMBAT_TEST_BY_ID: Record<CombatTestId, CombatTestDef> = COMBAT_TEST_BATTERY.reduce((a, t) => {
+  a[t.id] = t; return a;
+}, {} as Record<CombatTestId, CombatTestDef>);
+
+/** Оговорка, которая печатается на карточке. Не украшение, а смысл блока. */
+export const TEST_BATTERY_CAVEAT =
+  'Это ваша собственная динамика, а не норма. По PMID 41214825 специальные тесты не предсказывают распределение интенсивности схватки (p > 0.05) — планировать бой по этим цифрам нельзя.';
+
+export interface TestEntry {
+  date: string;
+  testId: CombatTestId;
+  value: number;
+  note?: string;
+}
+
+function validTest(r: any): TestEntry | null {
+  if (!r || !isIso(r.date)) return null;
+  const id = (r.testId as string) in COMBAT_TEST_BY_ID ? (r.testId as CombatTestId) : null;
+  if (!id) return null;
+  const v = num(r.value);
+  if (v === null) return null;
+  const [lo, hi] = COMBAT_TEST_BY_ID[id].plausible;
+  if (v < lo || v > hi) return null;
+  return { date: r.date, testId: id, value: v, note: typeof r.note === 'string' ? r.note.slice(0, 200) : undefined };
+}
+
+export function normalizeTests(rows: any[]): TestEntry[] {
+  const byKey = new Map<string, TestEntry>();
+  for (const r of rows || []) {
+    const v = validTest(r);
+    if (v) byKey.set(`${v.date}|${v.testId}`, v);
+  }
+  return [...byKey.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-COMBAT_TESTS_CAP);
+}
+
+export function loadTests(): TestEntry[] {
+  return normalizeTests(readStore<any>(COMBAT_TESTS_KEY));
+}
+
+export function addTest(date: string, testId: CombatTestId, value: number, note?: string): boolean {
+  const v = validTest({ date, testId, value, note });
+  if (!v) return false;
+  return writeStore(COMBAT_TESTS_KEY, normalizeTests([...readStore<any>(COMBAT_TESTS_KEY), v]));
+}
+
+export function removeTest(date: string, testId: CombatTestId): boolean {
+  if (!isIso(date)) return false;
+  return writeStore(COMBAT_TESTS_KEY, readStore<any>(COMBAT_TESTS_KEY).filter((r: any) => !(r?.date === date && r?.testId === testId)));
+}
+
+export type TestTrend = 'no_data' | 'up' | 'down' | 'flat';
+
+export interface TestLine {
+  testId: CombatTestId;
+  label: string;
+  unit: string;
+  latest: number | null;
+  best: number | null;
+  /** изменение последнего замера относительно собственного лучшего, % */
+  vsBestPct: number | null;
+  trend: TestTrend;
+  count: number;
+}
+
+export type TestDirection = 'up' | 'down' | 'mixed' | 'no_data';
+
+export interface TestBattery {
+  lines: TestLine[];
+  /** сводное направление формы по всем тестам, у которых есть динамика */
+  direction: TestDirection;
+  testsWithData: number;
+  note: string;
+  caveat: string;
+}
+
+/** Линия по одному тесту: последний, лучший и отклонение от своего пика. */
+export function testLine(rows: TestEntry[], testId: CombatTestId): TestLine {
+  const def = COMBAT_TEST_BY_ID[testId];
+  const mine = rows.filter((r) => r.testId === testId);
+  if (!mine.length) {
+    return { testId, label: def.label, unit: def.unit, latest: null, best: null, vsBestPct: null, trend: 'no_data', count: 0 };
+  }
+  const latest = mine[mine.length - 1].value;
+  const best = def.direction === 'down' ? Math.min(...mine.map((r) => r.value)) : Math.max(...mine.map((r) => r.value));
+  const vsBestPct = best > 0 ? Math.round(((latest - best) / best) * 1000) / 10 : null;
+  let trend: TestTrend = 'flat';
+  if (mine.length >= 2) {
+    const prev = mine[mine.length - 2].value;
+    const better = def.direction === 'down' ? latest < prev : latest > prev;
+    const worse = def.direction === 'down' ? latest > prev : latest < prev;
+    if (better) trend = 'up';
+    else if (worse) trend = 'down';
+  }
+  return { testId, label: def.label, unit: def.unit, latest, best, vsBestPct, trend, count: mine.length };
+}
+
+export function testBattery(rows: TestEntry[]): TestBattery {
+  const lines = COMBAT_TEST_BATTERY.map((t) => testLine(rows, t.id));
+  const withTrend = lines.filter((l) => l.trend === 'up' || l.trend === 'down');
+  const ups = withTrend.filter((l) => l.trend === 'up').length;
+  const downs = withTrend.filter((l) => l.trend === 'down').length;
+  const testsWithData = lines.filter((l) => l.count > 0).length;
+  let direction: TestDirection = 'no_data';
+  if (ups > downs) direction = 'up';
+  else if (downs > ups) direction = 'down';
+  else if (ups > 0) direction = 'mixed';
+  const note = !testsWithData
+    ? 'Замеров нет.'
+    : direction === 'up'
+      ? 'Форма растёт относительно ваших прошлых замеров.'
+      : direction === 'down'
+        ? 'Последние замеры ниже ваших лучших.'
+        : direction === 'mixed'
+          ? 'Динамика смешанная — часть тестов выше, часть ниже.'
+          : 'Данных пока мало для тренда — нужно минимум два замера на тест.';
+  return { lines, direction, testsWithData, note, caveat: TEST_BATTERY_CAVEAT };
+}
+
 // ─── 8.4 Скрининг LEA / RED-S ─────────────────────────────────────────────
 
 /**
