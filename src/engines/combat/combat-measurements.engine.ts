@@ -290,6 +290,130 @@ function weekdayMon0(iso: string): number {
   return (d.getUTCDay() + 6) % 7; // Пн=0
 }
 
+// ─── 8.3 Журнал силы хвата (кистевой динамометр) ────────────────────────────
+//
+// ЧЕСТНО ПРО ИСТОЧНИК. Публикационных нормативов силы хвата именно для
+// единоборств в этой ветке нет: websearch в этой сессии отдавал 403, поэтому
+// новые источники не нашлись, а выдумывать их нельзя. Поэтому здесь НЕТ нормы
+// «сколько должно быть» — только сравнение спортсмена с СОБСТВЕННЫМ пиком.
+// Это честнее, а не слабее: уход формы виден по тренду к своей базе, и при этом
+// спортсмену не подсовывается чужой норматив.
+
+export const COMBAT_GRIP_KEY = 'he_combat_grip_kg_v1';
+/** 240 записей ≈ 4 месяца замеров обеих рук через день. */
+export const COMBAT_GRIP_CAP = 240;
+
+/**
+ * Асимметрия L/R, при которой стоит присмотреться. ИНЖЕНЕРНЫЙ порог
+ * приложения, а не валидированный клинический cut-off: он показывает
+ * «руки заметно разошлись, проверьте хват и цепь слабой руки», но диагноза
+ * не ставит.
+ */
+export const GRIP_ASYMMETRY_NOTICE_PCT = 10;
+
+export type GripHand = 'L' | 'R';
+
+export interface GripEntry {
+  date: string;
+  hand: GripHand;
+  gripKg: number;
+  note?: string;
+}
+
+export const GRIP_SOURCE =
+  'Собственный пик спортсмена, без популяционной нормы: нормативы силы хвата для единоборств не подтверждены (websearch 403, 2026-09)';
+
+function validGrip(r: any): GripEntry | null {
+  if (!r || !isIso(r.date)) return null;
+  const hand: GripHand | null = r.hand === 'R' ? 'R' : r.hand === 'L' ? 'L' : null;
+  if (!hand) return null;
+  const kg = num(r.gripKg);
+  // нижняя граница отсекает мусор и нули, верхняя — шире человеческой руки
+  if (kg === null || kg < 10 || kg > 120) return null;
+  return { date: r.date, hand, gripKg: kg, note: typeof r.note === 'string' ? r.note.slice(0, 200) : undefined };
+}
+
+export function normalizeGrip(rows: any[]): GripEntry[] {
+  const byKey = new Map<string, GripEntry>();
+  for (const r of rows || []) {
+    const v = validGrip(r);
+    if (v) byKey.set(`${v.date}|${v.hand}`, v);
+  }
+  return [...byKey.values()]
+    .sort((a, b) => (a.date === b.date ? a.hand.localeCompare(b.hand) : a.date.localeCompare(b.date)))
+    .slice(-COMBAT_GRIP_CAP);
+}
+
+export function loadGrip(): GripEntry[] {
+  return normalizeGrip(readStore<any>(COMBAT_GRIP_KEY));
+}
+
+export function addGrip(date: string, hand: GripHand, gripKg: number, note?: string): boolean {
+  const v = validGrip({ date, hand, gripKg, note });
+  if (!v) return false;
+  return writeStore(COMBAT_GRIP_KEY, normalizeGrip([...readStore<any>(COMBAT_GRIP_KEY), v]));
+}
+
+export function removeGrip(date: string, hand: GripHand): boolean {
+  if (!isIso(date)) return false;
+  return writeStore(COMBAT_GRIP_KEY, readStore<any>(COMBAT_GRIP_KEY).filter((r: any) => !(r?.date === date && r?.hand === hand)));
+}
+
+export type GripLevel = 'no_data' | 'one_hand' | 'ok' | 'asym' | 'dropped';
+
+export interface GripSummary {
+  bestL: number | null;
+  bestR: number | null;
+  latestL: number | null;
+  latestR: number | null;
+  /** асимметрия пиков, % от большей руки. */
+  asymmetryPct: number | null;
+  /** сколько % от своего пика теряет самая слабая рука на последнем замере. */
+  dropFromPeakPct: number | null;
+  level: GripLevel;
+  /** человеческая строка, без диагнозов. */
+  note: string;
+  source: string;
+}
+
+/**
+ * Сводка по хвату от СОБСТВЕННОГО пика, а не от чужой нормы.
+ * Одна рука — уровень не оцениваем: асимметрию без второй руки не считаем.
+ */
+export function gripSummary(rows: GripEntry[]): GripSummary {
+  const left = rows.filter((r) => r.hand === 'L');
+  const right = rows.filter((r) => r.hand === 'R');
+  const bestL = left.length ? Math.max(...left.map((r) => r.gripKg)) : null;
+  const bestR = right.length ? Math.max(...right.map((r) => r.gripKg)) : null;
+  const latestL = left.length ? left[left.length - 1].gripKg : null;
+  const latestR = right.length ? right[right.length - 1].gripKg : null;
+
+  const base: GripSummary = {
+    bestL, bestR, latestL, latestR, asymmetryPct: null, dropFromPeakPct: null,
+    level: 'no_data', note: 'Нет замеров хвата.', source: GRIP_SOURCE,
+  };
+  if (bestL === null && bestR === null) return base;
+  if (bestL === null || bestR === null) {
+    return { ...base, level: 'one_hand', note: 'Замер только одной руки — асимметрию не считаем.' };
+  }
+
+  const maxPeak = Math.max(bestL, bestR);
+  const asymmetryPct = maxPeak > 0 ? Math.round((Math.abs(bestL - bestR) / maxPeak) * 1000) / 10 : null;
+  const worstLatest = Math.min(latestL as number, latestR as number);
+  const dropFromPeakPct = maxPeak > 0 ? Math.round(((maxPeak - worstLatest) / maxPeak) * 1000) / 10 : null;
+
+  let level: GripLevel = 'ok';
+  let note = 'Хват держится у своего пика.';
+  if (asymmetryPct !== null && asymmetryPct >= GRIP_ASYMMETRY_NOTICE_PCT) {
+    level = 'asym';
+    note = `Пики рук разошлись на ${asymmetryPct}% — проверьте хват и цепь слабой руки.`;
+  } else if (dropFromPeakPct !== null && dropFromPeakPct >= 15) {
+    level = 'dropped';
+    note = `Слабая рука на ${dropFromPeakPct}% ниже своего пика — похоже на уход формы.`;
+  }
+  return { bestL, bestR, latestL, latestR, asymmetryPct, dropFromPeakPct, level, note, source: GRIP_SOURCE };
+}
+
 // ─── 8.4 Скрининг LEA / RED-S ─────────────────────────────────────────────
 
 /**

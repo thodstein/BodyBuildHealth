@@ -9,7 +9,7 @@ import React from 'react';
 import { CbCampMeasurementsCard } from '../cb-camp-measurements';
 import { buildCombatPlan } from '../../../../engines/combat/combat-builder.engine';
 import { finalizeCombatPlan } from '../../../../engines/combat/combat-finalize.engine';
-import { COMBAT_SPARRING_KEY, COMBAT_WIGHINS_KEY } from '../../../../engines/combat/combat-measurements.engine';
+import { COMBAT_SPARRING_KEY, COMBAT_WIGHINS_KEY, COMBAT_GRIP_KEY } from '../../../../engines/combat/combat-measurements.engine';
 
 beforeEach(() => localStorage.clear());
 
@@ -127,5 +127,46 @@ describe('E8.7 / E8.8 — сон и тепло на экране', () => {
     const wc = mkPlan({ weightCutKg: 4 });
     render(<CbCampMeasurementsCard plan={wc} />);
     expect(screen.getByText(/Сгон: акклиматация/)).toBeTruthy();
+  });
+});
+
+describe('E8.3 — сила хвата на экране', () => {
+  it('без замеров честно говорит, что данных нет', () => {
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.getByText(/Нет замеров хвата/)).toBeTruthy();
+  });
+
+  it('замер хвата через UI попадает в хранилище', () => {
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    fireEvent.change(screen.getByLabelText('Дата замера хвата'), { target: { value: '2026-03-01' } });
+    fireEvent.change(screen.getByLabelText('Сила хвата кг'), { target: { value: '58' } });
+    fireEvent.click(screen.getByText('＋ Замерить'));
+    expect(JSON.parse(localStorage.getItem(COMBAT_GRIP_KEY) || '[]').length).toBe(1);
+    expect(screen.getByText(/Записано: левая/)).toBeTruthy();
+  });
+
+  it('мусорный ввод не попадает в журнал', () => {
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    fireEvent.change(screen.getByLabelText('Дата замера хвата'), { target: { value: '2026-03-01' } });
+    fireEvent.change(screen.getByLabelText('Сила хвата кг'), { target: { value: '999' } });
+    fireEvent.click(screen.getByText('＋ Замерить'));
+    expect(localStorage.getItem(COMBAT_GRIP_KEY)).toBeNull();
+    expect(screen.getByText(/10–120 кг/)).toBeTruthy();
+  });
+
+  it('разрыв рук виден на экране, а не прячется в движке', () => {
+    localStorage.setItem(COMBAT_GRIP_KEY, JSON.stringify([
+      { date: '2026-03-01', hand: 'L', gripKg: 60 },
+      { date: '2026-03-01', hand: 'R', gripKg: 45 },
+    ]));
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.getByText(/разрыв 25%/)).toBeTruthy();
+    expect(screen.getByText(/разошлись/)).toBeTruthy();
+  });
+
+  it('под блоком видна честная пометка, что это своя база, а не норма', () => {
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.getByText(/Своя база/)).toBeTruthy();
+    expect(screen.getByText(/без популяционной нормы/)).toBeTruthy();
   });
 });

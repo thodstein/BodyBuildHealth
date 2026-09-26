@@ -11,7 +11,8 @@ import {
   loadWeighIns, addWeighIn, removeWeighIn, weighTrajectory, cutDeviation,
   loadSparring, addSparring, removeSparring, sparringSummary, sparringJournalToLoad,
   leaScreen, sleepVerdict, heatProtocol,
-  type SparType,
+  loadGrip, addGrip, gripSummary,
+  type SparType, type GripHand,
 } from '../../../engines/combat/combat-measurements.engine';
 
 const IN = 16;
@@ -85,6 +86,22 @@ export const CbCampMeasurementsCard: React.FC<{
     setSRpe(''); setSMsg('✅ Сессия записана');
     setSpar(loadSparring());
   }, [sType, sRounds, sRpe]);
+
+  // ── 8.3 сила хвата ──
+  const [grip, setGrip] = useState<ReturnType<typeof loadGrip>>(() => loadGrip());
+  const [gHand, setGHand] = useState<GripHand>('L');
+  const [gDate, setGDate] = useState('');
+  const [gKg, setGKg] = useState('');
+  const [gMsg, setGMsg] = useState<string | null>(null);
+  const gSum = useMemo(() => gripSummary(grip), [grip]);
+  const onAddGrip = useCallback(() => {
+    const wrote = addGrip(gDate, gHand, Number(gKg.replace(',', '.')));
+    setGMsg(wrote
+      ? `Записано: ${gHand === 'L' ? 'левая' : 'правая'}.`
+      : 'Нужны корректные дата и значение (10–120 кг).');
+    setGKg('');
+    setGrip(loadGrip());
+  }, [gDate, gHand, gKg]);
 
   // ── скрининги ──
   const lea = useMemo(() => leaScreen({
@@ -165,6 +182,38 @@ export const CbCampMeasurementsCard: React.FC<{
               setSpar(loadSparring());
             }}>↩ Убрать последнюю</button>
         ) : null}
+      </div>
+
+      {/* 8.3 — сила хвата (кистевой динамометр) */}
+      <div data-cb="measure-grip" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+        <Highlight>✊ Сила хвата ({grip.length} замеров)</Highlight>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <CombatPopupSelect
+            label="Рука"
+            value={gHand}
+            onChange={v => setGHand(v as GripHand)}
+            options={[{ id: 'L', label: 'Левая' }, { id: 'R', label: 'Правая' }]}
+          />
+          <input aria-label="Дата замера хвата" data-cb="grip-date" style={{ ...inp(gDate, 'ГГГГ-ММ-ДД'), flex: '1 1 130px' }}
+            value={gDate} onChange={e => setGDate(e.target.value)} />
+          <input aria-label="Сила хвата кг" data-cb="grip-kg" inputMode="decimal" style={{ ...inp(gKg, 'кг'), flex: '1 1 90px' }}
+            value={gKg} onChange={e => setGKg(e.target.value)} />
+          <button data-cb="grip-add" style={{ ...BTN, background: '#f59e0b', color: '#fff', border: 0, borderRadius: 12 }}
+            onClick={onAddGrip}>＋ Замерить</button>
+        </div>
+        {gMsg ? <div data-cb="grip-msg" style={{ fontSize: 12, color: '#fff' }}>{gMsg}</div> : null}
+        <div data-cb="grip-summary" style={{ fontSize: 12, color: '#fff' }}>
+          {gSum.bestL !== null ? `Л ${gSum.bestL.toFixed(0)}` : 'Л —'}
+          {' · '}
+          {gSum.bestR !== null ? `П ${gSum.bestR.toFixed(0)}` : 'П —'}
+          {gSum.asymmetryPct !== null ? ` · разрыв ${gSum.asymmetryPct}%` : ''}
+          {gSum.dropFromPeakPct !== null && gSum.dropFromPeakPct > 0 ? ` · от пика −${gSum.dropFromPeakPct}%` : ''}
+          {' кг'}
+        </div>
+        <Line tone={gSum.level === 'ok' ? 'ok' : gSum.level === 'no_data' || gSum.level === 'one_hand' ? 'warn' : 'danger'}>
+          {gSum.note}
+        </Line>
+        <span data-cb="grip-source" style={{ fontSize: 11, color: '#fff' }}>Своя база: {gSum.source}</span>
       </div>
 
       {/* 8.4 — LEA / RED-S */}
