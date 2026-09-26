@@ -13,7 +13,7 @@ import { COMBAT_CYCLE_LIBRARY, getCombatCycle } from '../../../engines/combat/co
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveCombatPlan, loadCombatPlans, migrateAllCombatStorage } from '../../../engines/combat/combat-storage';
 import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
-import { buildAnnualATR, saveAnnualCB, loadAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual, removeCompetitionFromAnnual, autoAnnualWithFightTaper } from '../../../engines/combat/combat-annual';
+import { buildAnnualATR, saveAnnualCB, loadAnnualCB, removeAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual, removeCompetitionFromAnnual, autoAnnualWithFightTaper } from '../../../engines/combat/combat-annual';
 import { AnnualCard } from './combat-annual-card';
 import { CbCampIntelCard } from './cb-camp-intel';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
@@ -566,6 +566,11 @@ export const CombatConstructor: React.FC = () => {
     const next = removeCompetitionFromAnnual(annual, id);
     saveAnnualCB(next); setAnnual(next);
     setMsg('✕ Бой удалён — тапер-блок снят, год пересобран'); setTimeout(() => setMsg(''), 1800);
+  };
+  const handleRemoveAnnual = () => {
+    if (!annual) return;
+    removeAnnualCB(); setAnnual(null);
+    setMsg('🗑 Годовой ATR удалён'); setTimeout(() => setMsg(''), 1800);
   };
   const handlePrintAnnual = () => {
     if (!annual) return;
@@ -1283,6 +1288,9 @@ export const CombatConstructor: React.FC = () => {
           onSwapEx={swapEx}
           onBuildATR={handleBuildATR}
           onAddCompetition={handleAddCompetition}
+          onRemoveCompetition={handleRemoveCompetition}
+          onRemoveAnnual={handleRemoveAnnual}
+          annualCyclesHint={annualCycles}
           onPrintAnnual={handlePrintAnnual}
           onDownloadIcs={handleDownloadIcs}
           onExportProgram={exportToUserProgram}
@@ -1403,6 +1411,8 @@ export const CombatConstructor: React.FC = () => {
               setCompetitionPriority={setCompetitionPriority}
               onAddCompetition={handleAddCompetition}
               onRemoveCompetition={handleRemoveCompetition}
+              onRemoveAnnual={handleRemoveAnnual}
+              annualCyclesHint={annualCycles}
               onPrintAnnual={handlePrintAnnual}
               onDownloadIcs={handleDownloadIcs}
             />

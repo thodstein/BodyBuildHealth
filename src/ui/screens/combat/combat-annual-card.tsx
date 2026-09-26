@@ -7,6 +7,7 @@
  */
 import React from 'react';
 import { SectionCard, CardHeader, Badge, BTN_SMALL, INPUT, CombatPopupSelect, Highlight, PHASE_RU, ruLabel, TEXT_3 } from './CombatUI';
+import { annualCBPhaseForWeek, annualResidualNote } from '../../../engines/combat/combat-annual';
 
 export interface AnnualCardProps {
   annual: any;
@@ -26,6 +27,9 @@ export interface AnnualCardProps {
   setCompetitionPriority?: (p: 'main' | 'secondary') => void;
   onAddCompetition?: () => void;
   onRemoveCompetition?: (id: string) => void;
+  onRemoveAnnual?: () => void;
+  /** Сколько циклов в годе — для подписи Issurin-остатка. */
+  annualCyclesHint?: number;
   onPrintAnnual?: () => void;
   onDownloadIcs?: () => void;
 }
@@ -65,6 +69,22 @@ export const AnnualCard: React.FC<AnnualCardProps> = (p) => {
         {dday !== null && (
           <InfoDays dday={dday} firstFight={comps[0]?.name || comps[0]?.date} />
         )}
+
+        {/* Фаза текущей недели + остаток макроцикла по Issurin (движок) */}
+        {(() => {
+          const cycles = p.annualCyclesHint ?? 1;
+          const ref = Math.max(1, Math.round(annual.totalWeeks / cycles));
+          const phaseNow = annualCBPhaseForWeek(annual, ref);
+          if (!phaseNow) return null;
+          return (
+            <div data-cb="annual-phase" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11, color: '#fff' }}>
+              <span>
+                Ориентир недели {ref} (конец 1-го цикла из {cycles}): <Highlight color={PHASE_COLOR(phaseNow)}>{ruLabel(PHASE_RU, phaseNow)}</Highlight>
+              </span>
+              <span>· {annualResidualNote(cycles)}</span>
+            </div>
+          );
+        })()}
 
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {p.onBuildATR && (
@@ -162,6 +182,11 @@ export const AnnualCard: React.FC<AnnualCardProps> = (p) => {
           )}
           {p.onDownloadIcs && (
             <button onClick={p.onDownloadIcs} style={{ ...BTN_SMALL, minHeight: 44, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '0.5px solid rgba(255,255,255,0.08)' }}>📅 .ics</button>
+          )}
+          {p.onRemoveAnnual && (
+            <button onClick={p.onRemoveAnnual} aria-label="Удалить годовой ATR" style={{ ...BTN_SMALL, minHeight: 44, background: 'rgba(239,68,68,0.12)', color: '#fca5a5', border: '0.5px solid rgba(239,68,68,0.24)' }}>
+              🗑 Удалить год
+            </button>
           )}
         </div>
       </SectionCard>

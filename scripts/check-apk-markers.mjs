@@ -154,9 +154,10 @@ const COMBAT_SRC = 'src/ui/screens/combat/';
 for (const [file, hooks] of [
   ['CombatUI.tsx', ['cb-chip', 'cb-pop-trig', 'cb-pop-sheet', 'cb-pop-opt', 'cb-pop-done', 'cb-pop-ok', 'cb-switch']],
   ['CombatConstructor.tsx', ['cb-steps', 'cb-pane', 'cb-split-card', 'cb-build', 'cb-next', 'cb-profile', 'cb-empty', 'cb-msg', 'cb-sec-head', 'cb-cycle-card']],
-  ['CombatPlanView.tsx', ['cb-plan-actions', 'cb-plan-weeks', 'cb-plan-week', 'cb-plan-weekhead', 'cb-plan-sess', 'cb-plan-ex', 'cb-plan-export']],
-  ['combat-annual-card.tsx', ['cb-plan-annual', 'annual-dday']],
+  ['CombatPlanView.tsx', ['cb-plan-actions', 'cb-plan-week', 'cb-plan-weekhead', 'cb-plan-sess', 'cb-plan-ex', 'cb-plan-export']],
+  ['combat-annual-card.tsx', ['cb-plan-annual', 'annual-dday', 'annual-phase']],
   ['cb-camp-intel.tsx', ['cb-camp-intel']],
+  ['cb-camp-strip.tsx', ['cb-camp-strip', 'camp-week', 'cb-plan-weeks']],
 ]) {
   for (const hook of hooks) {
     mustContain(COMBAT_SRC + file, hook, `combat hook ${hook} in ${file}`);
@@ -171,7 +172,7 @@ mustContain('src/styles-native.css', '.cb-chip {\n  min-height: 44px !important'
 mustContain(COMBAT_SRC + 'CombatConstructor.tsx', `aria-current={active ? 'step' : undefined}`, 'combat step aria-current');
 mustContain(COMBAT_SRC + 'CombatConstructor.tsx', 'role="status" aria-live="polite"', 'combat toast live region');
 // …и ни одного нативного <select>/checkbox в боевом UI.
-for (const f of ['CombatConstructor.tsx', 'CombatPlanView.tsx', 'CombatUI.tsx', 'combat-annual-card.tsx', 'cb-camp-intel.tsx']) {
+for (const f of ['CombatConstructor.tsx', 'CombatPlanView.tsx', 'CombatUI.tsx', 'combat-annual-card.tsx', 'cb-camp-intel.tsx', 'cb-camp-strip.tsx']) {
   const p = COMBAT_SRC + f;
   const native = readFileSync(p, 'utf8')
     .split(/\r?\n/)

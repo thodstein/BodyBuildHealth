@@ -8,6 +8,7 @@ import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildCombatReport, isCombatPlanBlocked } from '../../../engines/combat/combat-finalize.engine';
 import { ruLabel, PHASE_RU, SESSION_TAG_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
 import { AnnualCard } from './combat-annual-card';
+import { CampStrip } from './cb-camp-strip';
 import { cbExerciseName } from '../../../engines/combat/combat-builder.engine';
 import { combatMesocycleSummary } from '../../../engines/combat/combat-mesocycle';
 import type { DiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
@@ -47,6 +48,8 @@ type Props = {
   onBuildATR?: () => void;
   onAddCompetition?: () => void;
   onRemoveCompetition?: (id: string) => void;
+  onRemoveAnnual?: () => void;
+  annualCyclesHint?: number;
   onPrintAnnual?: () => void;
   onDownloadIcs?: () => void;
   onExportProgram?: () => void;
@@ -127,7 +130,7 @@ export const CombatPlanView: React.FC<Props> = ({
   plan, historyLen, onUndo, onUpdateEx, onMoveEx, onSwapEx,
   annual, annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight, competitionPriority, setCompetitionPriority,
   startDate, outside, outsideMetrics, diaryLoad, acwr, msg, setMsg,
-  onBuildATR, onAddCompetition, onRemoveCompetition, onPrintAnnual, onDownloadIcs, onExportProgram,
+  onBuildATR, onAddCompetition, onRemoveCompetition, onRemoveAnnual, annualCyclesHint, onPrintAnnual, onDownloadIcs, onExportProgram,
 }) => {
   const [expandedWeek, setExpandedWeek] = React.useState<number | null>(0);
   const [openSess, setOpenSess] = React.useState<Record<string, boolean>>({});
@@ -169,11 +172,7 @@ export const CombatPlanView: React.FC<Props> = ({
           <Badge>{plan.patternId}</Badge>
           {(plan.inputSnapshot as any)?.fightDate && <Badge color="#ef4444" bg="rgba(239,68,68,0.10)" border="rgba(239,68,68,0.18)">🏁 бой {(plan.inputSnapshot as any).fightDate}</Badge>}
         </div>
-        <div className="cb-plan-weeks" style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-          {plan.weeksData.map(w=> (
-            <span key={w.week} style={{ padding:'4px 8px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'0.5px solid rgba(255,255,255,0.06)', fontSize:11, color:'#fff', fontVariantNumeric:'tabular-nums' }}>Н{w.week} · <Highlight color={w.deload?'#f59e0b': (w as any).taper?'#60a5fa':'#a855f7'}>{w.totalSets}</Highlight> сетов</span>
-          ))}
-        </div>
+        <CampStrip plan={plan} expandedWeek={expandedWeek} onPickWeek={setExpandedWeek} />
         {plan.outsideMetrics && <InfoBanner tone={plan.outsideMetrics.interference==='high'?'warn':'info'}><Highlight color={plan.outsideMetrics.interference==='high'?'#ff9f0a':'#a855f7'}>{plan.outsideMetrics.weeklyLoad} load</Highlight> → объём <Highlight>×{plan.outsideMetrics.volumeMultiplier}</Highlight> · {plan.outsideMetrics.interference}</InfoBanner>}
         {(plan.inputSnapshot as any)?.weightCutProtocol && (
           <SectionCard icon="⚖️" title="Весогонка — питание по неделям" subtitle="ISSN 2025 · клик — скопировать в планировщик питания" accent>
@@ -385,6 +384,8 @@ export const CombatPlanView: React.FC<Props> = ({
           setCompetitionPriority={setCompetitionPriority}
           onAddCompetition={onAddCompetition}
           onRemoveCompetition={onRemoveCompetition}
+          onRemoveAnnual={onRemoveAnnual}
+          annualCyclesHint={annualCyclesHint}
           onPrintAnnual={onPrintAnnual}
           onDownloadIcs={onDownloadIcs}
         />
