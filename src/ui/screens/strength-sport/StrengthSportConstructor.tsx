@@ -69,7 +69,7 @@ export const StrengthSportConstructor: React.FC = () => {
     weightClass, setWeightClass, rpeCap, setRpeCap, deadliftGrip, setDeadliftGrip,
     blockModel, setBlockModel, autoDeload, setAutoDeload, conditioningDay, setConditioningDay,
     medleyPreview, setMedleyPreview, weakPoints, setWeakPoints, diagnosticLevel, setDiagnosticLevel,
-    hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge,
+    hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge, verificationNoteBridge,
     orthoNote,
     taBridge, setTaBridge,
     vbtMap, setVbtMap, plan, setPlan, annual, setAnnual,
@@ -316,6 +316,12 @@ export const StrengthSportConstructor: React.FC = () => {
     // J7 орто-скрининг: сводка в rationale (паттерн sway-блока — замер не теряется молча).
     if (orthoNote) {
       p.rationale.push(`🦴 Орто-скрининг: ${orthoNote}`);
+    }
+    // Э0.6: полнота доказательной базы диагноза видна в плане и в печати (печать
+    // печатает весь rationale, а UI плана — только ПЕРВЫЕ 3 строки, поэтому
+    // честную оговорку кладём в начало: иначе она молча не отрисовалась бы).
+    if (verificationNoteBridge && !p.rationale.includes(verificationNoteBridge)) {
+      p.rationale.unshift(verificationNoteBridge);
     }
     // Planner PRO P4-live: чекин включил делоды — фиксируем причину в rationale.
     if (checkinDeload) {

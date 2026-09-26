@@ -56,3 +56,52 @@ export function scoreBase(input: {
 }
 
 export function scoreColor(level: ScoreLevel): string { return level==='ok'?'#22c55e': level==='warn'?'#f59e0b':'#ef4444'; }
+
+/**
+ * Э0.6: честная полнота доказательной базы диагноза.
+ * `verification` (доля 0-1) без списка каналов — это число из воздуха: юзер
+ * видит «35%» и не знает, чего именно не хватает. Поэтому каналы именуются
+ * явно, а доля 0 читается как «гипотеза, а не замер» (не как «диагноз 0%»).
+ */
+export const VERIFICATION_CHANNELS = ['video', 'vbt', 'mobility', 'grip'] as const;
+export type VerificationChannel = typeof VERIFICATION_CHANNELS[number];
+export const VERIFICATION_CHANNEL_RU: Record<VerificationChannel, string> = {
+  video: 'видео', vbt: 'VBT', mobility: 'мобильность', grip: 'хват',
+};
+
+/** Каналы, реально заполненные в хабе (порядок канона — для стабильного текста). */
+export function verificationChannelsPresent(
+  flags: Partial<Record<VerificationChannel, boolean>>,
+): VerificationChannel[] {
+  return VERIFICATION_CHANNELS.filter((c) => flags[c] === true);
+}
+
+/**
+ * Честная строка о полноте доказательной базы.
+ * @param share доля 0-1 (verification скорера)
+ * @param present каналы, которые реально есть. null/undefined = хаб каналы не прислал —
+ *   тогда НЕ выдумываем «не хватает X», а честно говорим только про долю.
+ * @param total сколько каналов заявлено дисциплиной (ТА 3, стронг 4)
+ * @param available признак, что данные вообще пришли (false → пустая строка = тишина)
+ */
+export function verificationCoverageNote(
+  share: number | null | undefined,
+  present: VerificationChannel[] | readonly string[] | null | undefined,
+  total: number,
+  available: boolean = true,
+): string {
+  if (!available) return '';
+  const n = Number(share);
+  const pct = Math.max(0, Math.min(100, Math.round((Number.isFinite(n) ? n : 0) * 100)));
+  if (pct <= 0) return 'Диагноз не подтверждён измерениями (0%) — это гипотеза, а не замер';
+  if (pct >= 100) return 'Диагноз подтверждён на 100% доступных данных — проверка полная';
+  const have = (present ?? []).filter((c): c is VerificationChannel =>
+    (VERIFICATION_CHANNELS as readonly string[]).includes(c));
+  if (!have.length) return `Диагноз подтверждён частично (${pct}%) — проверка неполная, добавьте замеры в хабе`;
+  const haveRu = have.map((c) => VERIFICATION_CHANNEL_RU[c]).join(', ');
+  const missing = VERIFICATION_CHANNELS.filter((c) => !have.includes(c)).slice(0, Math.max(0, total - have.length));
+  const missRu = missing.map((c) => VERIFICATION_CHANNEL_RU[c]).join(', ');
+  if (!missRu) return `Диагноз подтверждён частично (${pct}%): ${haveRu}`;
+  const tail = pct < 40 ? '. Слабые зоны могут оказаться ошибочными' : '';
+  return `Диагноз подтверждён ${pct < 40 ? 'слабо' : 'частично'} (${pct}%) — есть: ${haveRu} · не хватает: ${missRu}${tail}`;
+}

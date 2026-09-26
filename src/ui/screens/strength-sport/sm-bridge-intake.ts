@@ -15,6 +15,10 @@ import { rankCorrectionsForTA } from '../../../engines/strength-sport/strength-s
 import { protocolForPreferred } from '../../../engines/strength-sport/strength-sport-ta-corrective.engine';
 import { rankCorrectionsForSM } from '../../../engines/strength-sport/strength-sport-sm-correction-rank.engine';
 import { protocolForSMPreferred } from '../../../engines/strength-sport/strength-sport-sm-corrective.engine';
+import {
+  VERIFICATION_CHANNELS,
+  verificationCoverageNote,
+} from '../../../engines/strength-sport/strength-sport-scoring-base.engine';
 import type { WLWeakPoint } from '../../../engines/strength-sport/strength-sport-weakpoint';
 
 export type SmBridgeMode = 'strongman' | 'weightlifting';
@@ -94,6 +98,12 @@ export interface SmBridgePatch {
   orthoTeen: boolean;
   /** J7: сводка орто-скрининга для rationale (≤200 символов) или null. */
   orthoSummary: string | null;
+  /**
+   * Э0.6: честная полнота доказательной базы диагноза в plan/print.
+   * null = хаб не прислал verification (старый мост/чужой payload) → тишина,
+   * а не выдуманное «0%».
+   */
+  verificationNote: string | null;
 }
 
 const STRATEGIES: readonly string[] = ['conservative', 'balanced', 'aggressive'];
@@ -299,6 +309,21 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
   const orthoTeen = typeof (d as any).teenNote === 'string' && ((d as any).teenNote as string).length > 0;
   const sumRaw = typeof (d as any).orthoSummary === 'string' ? ((d as any).orthoSummary as string) : '';
   const orthoSummary = sumRaw.length > 0 ? sumRaw.slice(0, 200) : null;
+  // Э0.6: verification (доля 0-1) + опциональный список каналов → одна честная строка.
+  // Каналов может не быть (старый хаб) — тогда говорим только про долю, не выдумывая «не хватает X».
+  const vRaw = finiteNum(d.verification);
+  const vPresent: string[] | null = Array.isArray(d.verificationChannels)
+    ? Array.from(new Set((d.verificationChannels as unknown[])
+        .map((c) => String(c ?? '').trim())
+        .filter((s) => s.length > 0 && (VERIFICATION_CHANNELS as readonly string[]).includes(s))))
+    : null;
+  const verificationNote = vRaw == null
+    ? null
+    : verificationCoverageNote(
+        vRaw >= 0 && vRaw <= 1 ? vRaw : vRaw / 100,
+        vPresent,
+        mode === 'strongman' ? 4 : 3,
+      ) || null;
   return {
     weakPoints,
     diagnosticLevel,
@@ -330,6 +355,7 @@ export function parseSmBridgePayload(data: any): SmBridgePatch {
     orthoClosedChain,
     orthoTeen,
     orthoSummary,
+    verificationNote,
   };
 }
 

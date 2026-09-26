@@ -3,6 +3,7 @@ import { TA_BIOMECH, diagnoseTAWeakPoint, isValidAngleForWeakPoint } from '../st
 import { classifyTrajectoryType, computeBarPathMetrics, diagnoseBarPathFromMetrics, isRealChange, correctEnodeHorizontal } from '../strength-sport-barpath.engine';
 import { TA_PEAK_VELOCITY_ZONES, TA_VTHRES_NORMS, computeFvR2, taZoneForVelocity, thresholdForTALift } from '../strength-sport-vbt.engine';
 import { scoreTA } from '../strength-sport-scoring.engine';
+import { verificationCoverageNote, verificationChannelsPresent } from '../strength-sport-scoring-base.engine';
 import { assessOHS, OHS_NORMS, diagnoseKneeToWallBilateral, kneeToWallDeg } from '../strength-sport-ohs.engine';
 import { parseKinoveaCSV, analyzeBarTracking } from '../strength-sport-video.engine';
 import { estimateAnglesFromLandmarks, hasPoseSupport, livePoseStatus } from '../strength-sport-pose.engine';
@@ -116,6 +117,53 @@ describe('Scoring RSS ТА', () => {
   it('verification: видео+вбт+мобильность → 1.0', () => {
     const s = scoreTA({ weakCount: 0, mobilityFails: 0, hasVideo: true, hasVbt: true, hasMobility: true });
     expect(s.verification).toBe(1);
+  });
+});
+
+// Э0.6: доля «проверенности» без списка каналов — число из воздуха. Канон
+// формулирует это честно: 0% = гипотеза, а не замер; при <40% — «слабые зоны
+// могут оказаться ошибочными»; без данных о каналах НЕ выдумываем «не хватает X».
+describe('Э0.6: verificationCoverageNote — честная формулировка полноты', () => {
+  const note = verificationCoverageNote;
+
+  it('0% читается как гипотеза, а не как «диагноз 0%»', () => {
+    expect(note(0, [], 3)).toContain('гипотеза, а не замер');
+  });
+  it('100% — проверка полная', () => {
+    expect(note(1, ['video', 'vbt', 'mobility'], 3)).toContain('100%');
+  });
+  it('каналы известны — называет, чего именно не хватает (35% = один канал из трёх → слабо)', () => {
+    const n = note(0.35, ['video', 'vbt'], 3);
+    expect(n).toContain('слабо (35%)');
+    expect(n).toContain('есть: видео, VBT');
+    expect(n).toContain('не хватает: мобильность');
+  });
+  it('≥40% — «частично», без страшилки про ошибку', () => {
+    const n = note(0.5, ['video', 'vbt'], 3);
+    expect(n).toContain('частично (50%)');
+    expect(n).not.toContain('ошибочными');
+  });
+  it('<40% — честно предупреждает, что слабые зоны могут быть ошибочными', () => {
+    const n = note(0.3, ['video'], 3);
+    expect(n).toContain('слабо (30%)');
+    expect(n).toContain('могут оказаться ошибочными');
+  });
+  it('без списка каналов говорим только про долю — не выдумываем отсутствующие', () => {
+    const n = note(0.35, null, 3);
+    expect(n).toContain('35%');
+    expect(n).not.toContain('не хватает');
+  });
+  it('available=false → тишина (старый мост не порождает выдуманной строки)', () => {
+    expect(note(0.35, ['video'], 3, false)).toBe('');
+  });
+  it('мусор/NaN/доли вне 0-1 не ломают строку', () => {
+    expect(note(NaN, ['video'], 3)).toContain('гипотеза');
+    expect(note(1.4, ['video'], 3)).toContain('100%');
+    expect(note(-1, ['video'], 3)).toContain('гипотеза');
+  });
+  it('verificationChannelsPresent — только канон-каналы, порядок стабильный', () => {
+    expect(verificationChannelsPresent({ grip: true, video: true, mobility: false, vbt: true })).toEqual(['video', 'vbt', 'grip']);
+    expect(verificationChannelsPresent({})).toEqual([]);
   });
 });
 

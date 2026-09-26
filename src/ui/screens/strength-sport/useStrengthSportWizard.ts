@@ -109,6 +109,9 @@ export function useStrengthSportWizard() {
   // минуя vbtMap (у него другой формат ключей week-day-ex-set).
   const [hubVelocity, setHubVelocity] = useState<Record<string, number[]>>({});
   const [swayCmBridge, setSwayCmBridge] = useState<number | null>(null);
+  // Э0.6: честная полнота доказательной базы диагноза (строка уходит в rationale плана,
+  // а печать SS-плана печатает rationale — т.е. видна и в плане, и на бумаге).
+  const [verificationNoteBridge, setVerificationNoteBridge] = useState<string | null>(null);
   // J7 орто-скрининг: сводка в rationale плана (паттерн swayCmBridge).
   const [orthoNote, setOrthoNote] = useState<string | null>(null);
   // V4-добой (G8): заявки/Sinclair/спец-блок ТА-хаба — в rationale плана + бейдж.
@@ -160,6 +163,8 @@ export function useStrengthSportWizard() {
       if (p.velocityLossPct != null) setVelocityLoss(p.velocityLossPct);
       // Sway carry из хаба — в rationale плана (у билдера нет sway-входа)
       if (p.swayCm != null) setSwayCmBridge(p.swayCm);
+      // Э0.6: verification хаба (доля 0-1 + каналы) → честная строка в rationale.
+      if (p.verificationNote) setVerificationNoteBridge(p.verificationNote);
       // J7 орто-скрининг: гарды ПРИМЕНЯЮТСЯ.
       // mobility-merge — живой фильтр пула; yoke/teen — смягчение стратегии + rationale.
       if (Array.isArray(p.orthoMobility) && p.orthoMobility.length > 0) {
@@ -317,7 +322,7 @@ export function useStrengthSportWizard() {
     weightClass, setWeightClass, rpeCap, setRpeCap, deadliftGrip, setDeadliftGrip,
     blockModel, setBlockModel, autoDeload, setAutoDeload, conditioningDay, setConditioningDay,
     medleyPreview, setMedleyPreview, weakPoints, setWeakPoints, diagnosticLevel, setDiagnosticLevel,
-    hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge,
+    hubVelocity, setHubVelocity, swayCmBridge, setSwayCmBridge, verificationNoteBridge,
     orthoNote, setOrthoNote,
     taBridge, setTaBridge,
     vbtMap, setVbtMap, plan, setPlan, annual, setAnnual,

@@ -43,6 +43,9 @@ export interface WeakpointsPayload { groups?: string[]; lift?: string; orthopedi
   preferredExerciseIds?: string[]; exerciseSwap?: { oldId: string; newId: string };
   labDiagnosis?: unknown; labCorrection?: { type: string; targetId?: string | null; targetName?: string } & Record<string, unknown>; labDelta?: unknown;
   bbDiagScore?: number; bbDiagLevel?: string; verification?: unknown;
+  /** Э0.6: каналы, реально заполненные в хабе (video/vbt/mobility/grip) — чтобы
+   *  в плане называть, чего именно не хватает, а не выводить «35%» из воздуха. */
+  verificationChannels?: string[];
   symmetry?: unknown; stimulus?: unknown; perMuscleAcwr?: Record<string, { ratio: number; zone: string }>;
   ohs?: { totalScore: number; failed: number }; vbt?: { lossPct: number; zone: string } | null;
   /** Движения ББ v2 (BBDiagnosticsHub → BbAutoConstructor): драйвер скрининга + односторонний + VBT-флаг (всё опционально). */

@@ -8,7 +8,7 @@
  *  3. swayCm хаба никуда не сохранялся.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { parseSmBridgePayload, collectSsVelocityHistory, buildSpecProtocols, buildSMSpecProtocols } from '../sm-bridge-intake';
 import { buildStrengthSportPlan } from '../../../../engines/strength-sport/strength-sport-builder.engine';
@@ -191,6 +191,7 @@ describe('parseSmBridgePayload', () => {
       orthoClosedChain: false,
       orthoTeen: false,
       orthoSummary: null,
+      verificationNote: null,
     });
   });
 });
@@ -308,4 +309,59 @@ describe('D9 ТА-мост: заявки/Sinclair/FvR не теряются', ()
     const neg = parseSmBridgePayload({ taSinclair: { total: 212, value: 301.5, qm: -3 } });
     expect(neg.taSinclair?.qm).toBeNull();
   });
+});
+
+// Э0.6: доля проверяемости диагноза жила в хабе, а план/печать выглядели одинаково
+// уверенно при 0% и при 100%. Тест ловит именно «дошло до плана», а не «поле есть».
+describe('Э0.6: verification из хаба доходит до плана', () => {
+  it('парсер: доля + каналы → честная строка (ТА: 3 канала, 35% = слабо)', () => {
+    const p = parseSmBridgePayload({ wlWeakPoints: ['snatch_pull'], verification: 0.35, verificationChannels: ['video', 'vbt'] });
+    expect(p.verificationNote).toContain('слабо (35%)');
+    expect(p.verificationNote).toContain('не хватает: мобильность');
+  });
+  it('парсер: стронг считает 4 канала (grip тоже)', () => {
+    const p = parseSmBridgePayload({ smWeakPoints: ['farmers_grip'], verification: 0.5, verificationChannels: ['video', 'vbt'] });
+    expect(p.verificationNote).toContain('не хватает: мобильность, хват');
+  });
+  it('парсер: доля без каналов — не выдумываем «не хватает»', () => {
+    const p = parseSmBridgePayload({ wlWeakPoints: ['snatch_pull'], verification: 0.35 });
+    expect(p.verificationNote).toContain('35%');
+    expect(p.verificationNote).not.toContain('не хватает');
+  });
+  it('парсер: verification=0 честно читается как гипотеза', () => {
+    expect(parseSmBridgePayload({ wlWeakPoints: ['x'], verification: 0 }).verificationNote).toContain('гипотеза');
+  });
+  it('парсер: старый мост без verification → null, а не выдуманное «0%»', () => {
+    expect(parseSmBridgePayload({ wlWeakPoints: ['snatch_pull'] }).verificationNote).toBeNull();
+    expect(parseSmBridgePayload({}).verificationNote).toBeNull();
+  });
+  it('парсер: мусор в verification/каналах не ломает приём', () => {
+    const p = parseSmBridgePayload({ wlWeakPoints: ['x'], verification: 'мусор', verificationChannels: ['video', 'неКанал', 42] });
+    expect(p.verificationNote).toBeNull();
+  });
+  it('парсер: процентная форма (>1) тоже понимается', () => {
+    expect(parseSmBridgePayload({ wlWeakPoints: ['x'], verification: 35 }).verificationNote).toContain('35%');
+  });
+
+  // Тяжёлый: полная сборка плана в конструкторе под нагрузкой параллельных
+  // прогонов занимает 6-15с (честный таймаут, как в ss-constructor-save-honesty).
+  it('СКВОЗНОЙ: строка видна в собранном плане (а печать печатает rationale)', async () => {
+    localStorage.setItem(
+      'he_planner_apply',
+      JSON.stringify({
+        kind: 'weakpoints',
+        label: 'ТА диагностика: snatch_pull',
+        data: { wlWeakPoints: ['snatch_pull'], verification: 0.35, verificationChannels: ['video', 'vbt'] },
+      }),
+    );
+    const { container } = render(<StrengthSportConstructor />);
+    fireEvent.click(screen.getByText(/Далее → 2 👤 Атлет/));
+    fireEvent.click(screen.getByText(/Далее → 3 🏃 Вне зала/));
+    fireEvent.click(screen.getByText(/Далее → 4 🧩 Сплит/));
+    fireEvent.click(screen.getByLabelText('Цикл'));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Цикл' })).getByText(/общая база/));
+    fireEvent.click(screen.getByText(/Собрать план/));
+    await waitFor(() => expect(container.textContent).toContain('Диагноз подтверждён слабо (35%)'), { timeout: 8000 });
+    expect(container.textContent).toContain('не хватает: мобильность');
+  }, 30000);
 });
