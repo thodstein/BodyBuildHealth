@@ -6,6 +6,7 @@
  * PRO-4: pinch кг+сек, Silver Bullet, L/R, новые снаряды, классы, чек-лист правил,
  * last-man-standing, тренд, рецепт.
  */
+import { localIsoDate } from '../../../core/local-date';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   buildArmliftingReport,
@@ -461,7 +462,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   const retests = useMemo(() => {
     const prev = lastSnapshotFor(diag.implement);
     if (!prev) return { prev: null as null | { date: string }, list: [] as Array<{ test: string; text: string }>, due: null as string | null };
-    const weeks = weeksBetween(prev.date, new Date().toISOString().slice(0, 10));
+    const weeks = weeksBetween(prev.date, localIsoDate());
     const num = (s: string): number | null => {
       const v = parseFloat(s);
       return Number.isFinite(v) && v > 0 ? v : null;
@@ -607,7 +608,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     });
     try {
       saveDiagSnapshot({
-        date: new Date().toISOString().slice(0, 10),
+        date: localIsoDate(),
         implement: diag.implement,
         weakLink: diagnosis.weakLink,
         cause: cause.cause,
@@ -642,7 +643,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   }, [failPhase, attemptPlan, hand, holdCurve, conditions, videoFlags, painMap, diag.handSpanCm, diag.handPalmCm, diag.handThumbCm, diag.painZones, diag.condNumb, diag.condSwell, diag.condNight]);
 
   const exportData = () => ({
-    date: new Date().toISOString().slice(0, 10),
+    date: localIsoDate(),
     sex: state.sex === 'female' ? 'Ж' : 'М',
     report,
     /** PRO-5 добивка: диагноз + коррекция в экспорт (аддитивно). */
@@ -661,7 +662,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         setTimeout(() => setToast(''), 2500);
         return;
       }
-      downloadArmliftIcs(ics, `armlift-spec-block-${new Date().toISOString().slice(0, 10)}.ics`);
+      downloadArmliftIcs(ics, `armlift-spec-block-${localIsoDate()}.ics`);
       setToast('✓ Календарь .ics (недели спец-блока)');
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
@@ -686,7 +687,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
 
   const handleExportHtml = () => {
     try {
-      downloadArmFile(`armlifting-${new Date().toISOString().slice(0, 10)}.html`, buildArmliftingHtml(exportData()), 'text/html');
+      downloadArmFile(`armlifting-${localIsoDate()}.html`, buildArmliftingHtml(exportData()), 'text/html');
       setToast('✓ HTML экспорт вердикта');
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
@@ -694,7 +695,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
 
   const handleExportCsv = () => {
     try {
-      downloadArmFile(`armlifting-${new Date().toISOString().slice(0, 10)}.csv`, buildArmliftingCsv(exportData()), 'text/csv');
+      downloadArmFile(`armlifting-${localIsoDate()}.csv`, buildArmliftingCsv(exportData()), 'text/csv');
       setToast('✓ CSV экспорт вердикта');
       setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }

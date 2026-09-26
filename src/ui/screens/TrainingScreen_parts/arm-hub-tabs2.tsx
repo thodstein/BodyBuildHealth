@@ -20,7 +20,11 @@ function HumerusChecklist() {
   const toggle = (id: string) => setFailed((p) => {
     const next = p.includes(id) ? p.filter((x) => x !== id) : [...p, id];
     try {
-      if (typeof localStorage !== 'undefined') localStorage.setItem(HUMERUS_CHECKS_KEY, JSON.stringify({ failed: next, touchedAt: new Date().toISOString().slice(0, 10) }));
+      // `touchedAt` — МОМЕНТ ВО ВРЕМЕНИ, а не календарный день, поэтому здесь
+      // UTC-таймстемп без среза: контракт канона различает «календарную дату»
+      // (только из core/local-date) и «событие» (updatedAt/touchedAt — UTC).
+      // Ключ write-only (читателей нет), так что смена формы безопасна.
+      if (typeof localStorage !== 'undefined') localStorage.setItem(HUMERUS_CHECKS_KEY, JSON.stringify({ failed: next, touchedAt: new Date().toISOString() }));
     } catch { /* noop */ }
     return next;
   });

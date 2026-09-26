@@ -5,6 +5,7 @@
  * - Видео BlazePose (estimateAnglesFromLandmarks) + canvas preview
  * - Вывод в Арм-конструктор via planner-bridge (weakpoints)
  */
+import { localIsoDate } from '../../../core/local-date';
 import React, { useMemo, useState, useEffect } from 'react';
 import { diagnoseArmWeakDetailed, expandLegacyWeakPoints, LEGACY_TO_DETAILED } from '../../../engines/arm/arm-weakpoint.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from '../../../engines/arm/arm-volume-landmarks.engine';
@@ -298,7 +299,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const [dgPress, setDgPress] = useState((p1saved as any).dgPress === true);
   const [dgElbow, setDgElbow] = useState(String((p1saved as any).dgElbow ?? ''));
   const addTiqBout = () => {
-    const today = (() => { try { return new Date().toISOString().slice(0, 10); } catch { return ''; } })();
+    const today = (() => { try { return localIsoDate(); } catch { return ''; } })();
     const fp = mvPhase === 'setup' || mvPhase === 'readygo' || mvPhase === 'start' || mvPhase === 'mid' || mvPhase === 'pin' ? mvPhase : undefined;
     const b: TiqBout = {
       fouls: Math.max(0, Math.round(Number(tiqFouls) || 0)),
@@ -934,7 +935,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const exportDataP0 = () => {
     const scoring = (report as any).scoring as { score: number; level: string; verification: number; floors: string[] } | undefined;
     return {
-      date: new Date().toISOString().slice(0, 10),
+      date: localIsoDate(),
       level: state.level,
       technique: state.technique,
       score: scoring?.score ?? null,
@@ -1026,7 +1027,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
   const handleExportHtmlP0 = () => {
     try {
-      downloadArmFile(`arm-diagnostics-${new Date().toISOString().slice(0, 10)}.html`, buildArmDiagnosticsHtml(exportDataP0() as any), 'text/html');
+      downloadArmFile(`arm-diagnostics-${localIsoDate()}.html`, buildArmDiagnosticsHtml(exportDataP0() as any), 'text/html');
       setInjectMsg('✓ HTML экспорт (точки + причины + топ-3 + Δ)');
       setTimeout(() => setInjectMsg(''), 2500);
     } catch { /* noop */ }
@@ -1034,7 +1035,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
   const handleExportCsvP0 = () => {
     try {
-      downloadArmFile(`arm-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`, buildArmDiagnosticsCsv(exportDataP0() as any), 'text/csv');
+      downloadArmFile(`arm-diagnostics-${localIsoDate()}.csv`, buildArmDiagnosticsCsv(exportDataP0() as any), 'text/csv');
       setInjectMsg('✓ CSV экспорт');
       setTimeout(() => setInjectMsg(''), 2500);
     } catch { /* noop */ }
@@ -1055,7 +1056,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
         return;
       }
       const ics = buildArmIcs(armPlan as any);
-      downloadArmFile(`arm-plan-${new Date().toISOString().slice(0, 10)}.ics`, ics, 'text/calendar');
+      downloadArmFile(`arm-plan-${localIsoDate()}.ics`, ics, 'text/calendar');
       setInjectMsg('✓ Календарь .ics (недели/сессии плана)');
       setTimeout(() => setInjectMsg(''), 2500);
     } catch {
@@ -1294,7 +1295,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
     if (!dynamicTrials.length) { setToast('Заполни 4 теста: кг и мс'); setTimeout(()=>setToast(''),2000); return; }
     for (const t of dynamicTrials) {
       if ((t as any).hand) continue; // asymmetry duplicates skip
-      addForceTrial({ exercise: t.exercise as any, forceKg: t.forceKg, timeMs: t.timeMs, bwKg: bwNum, dateIso: new Date().toISOString().slice(0,10) });
+      addForceTrial({ exercise: t.exercise as any, forceKg: t.forceKg, timeMs: t.timeMs, bwKg: bwNum, dateIso: localIsoDate() });
     }
     setForceHistoryTick(x=>x+1);
     setToast(`✓ Сохранено ${dynamicTrials.filter((t:any)=>!t.hand).length} trials в историю (avg/max/min график)`);
