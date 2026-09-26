@@ -254,6 +254,8 @@ export interface TidSportFact {
   fact: TimeInZones & { byHr: number; skipped: number; basis: TidHrBasis; note: string };
   /** Эталон задан именно для этой дисциплины (а не взят общий). */
   ownRef: boolean;
+  /** Эталон, которым реально посчитан бакет (свой или общий) — чтобы переиспользовать его для сводки всего лога. */
+  ref: TidHrReference;
 }
 
 /** Эталоны HR по дисциплинам: у бега и вела РАЗНЫЕ пульсы (свой LTHR). */
@@ -283,7 +285,8 @@ export function tidFactBySport(
   for (const [sport, sessions] of groups) {
     const own = refsBySport[sport];
     const hasOwn = !!own && !!(own.lthr || own.maxHr);
-    out.push({ sport, fact: factTimeInZones(sessions, hasOwn ? (own as TidHrReference) : fallbackRef), ownRef: hasOwn });
+    const effRef: TidHrReference = hasOwn ? (own as TidHrReference) : fallbackRef;
+    out.push({ sport, fact: factTimeInZones(sessions, effRef), ownRef: hasOwn, ref: effRef });
   }
   // Стабильный порядок: сначала реальные дисциплины, потом legacy «other».
   return out.sort((a, b) =>
@@ -311,7 +314,21 @@ export function tidPlanVsFact(
   // эталон; иначе единственная реальная; иначе первая доступная.
   const withOwnRef = fact0.filter(s => s.ownRef);
   const primary = (mixed ? withOwnRef[0] : undefined) ?? fact0.find(s => s.sport !== 'other') ?? fact0[0];
-  const fact = primary ? primary.fact : factTimeInZones([], ref);
+  /**
+   * Аудит спринта 5.2. При ОДНОЙ реальной дисциплине заголовок TID обязан
+   * учитывать ВЕСЬ лог, включая legacy-<other>: это реальный объём, и раньше он
+   * молча выпадал (delta показывала «недовыполнено» при фактически выполненном
+   * объёме — тихое занижение факта). Старый 3-аргументный вызов даёт ровно тот же
+   * результат, что и до спринта 5.2 (побайтово).
+   *
+   * При НЕСКОЛЬКИХ дисциплинах — только бакет со своим эталоном: усреднять зоны
+   * разных калибровок (бег 165 vs вело 150) бессмысленно, поэтому такая сводка
+   * помечается несопоставимой. Если свой эталон есть у единственной реальной
+   * дисциплины — им же считаем и legacy-минуты: калибровка одна, конфликта нет.
+   */
+  const fact = mixed
+    ? (primary ? primary.fact : factTimeInZones([], ref))
+    : factTimeInZones(log ?? [], !mixed && primary?.ownRef ? primary.ref : ref);
   const delta = {
     z1: r1(Math.abs(planned.pct.z1 - fact.pct.z1)),
     z2: r1(Math.abs(planned.pct.z2 - fact.pct.z2)),

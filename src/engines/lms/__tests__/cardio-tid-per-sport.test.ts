@@ -63,6 +63,9 @@ describe('Эталон HR по дисциплине снимает блокир�
     expect(r.fact.basis).toBe('lthr');
     expect(r.bySport.find(x => x.sport === 'bike')?.ownRef).toBe(true);
     expect(r.bySport.find(x => x.sport === 'run')?.ownRef).toBe(false);
+    // бакет самодостаточен: хранит эталон, которым реально посчитан
+    expect(r.bySport.find(x => x.sport === 'bike')?.ref.lthr).toBe(150);
+    expect(r.bySport.find(x => x.sport === 'run')?.ref.lthr).toBe(170); // общий фолбэк
   });
 
   it('эталон применяется к СВОЕЙ дисциплине: bike Z2 там, где run дал бы Z3', () => {
@@ -78,6 +81,42 @@ describe('Эталон HR по дисциплине снимает блокир�
     const r = tidPlanVsFact(cycle(), [s({ sport: 'run' }), s({ sport: undefined })], { lthr: 170 });
     expect(r.mixed).toBe(false);
     expect(r.verdict).not.toMatch(/смешаны дисциплины/);
+  });
+
+  /**
+   * Регресс-лок (аудит спринта 5.2): при ОДНОЙ реальной дисциплине legacy-<other>
+   * минуты — это реальный объём, он обязан попасть в заголовок TID. Раньше fact
+   * брался из бакета только этой дисциплины, и «недовыполнено» показывалось
+   * пользователю, хотя объём был (тихое занижение факта).
+   */
+  it('legacy-минуты учтены в заголовке TID, а не выброшены', () => {
+    const r = tidPlanVsFact(
+      cycle(),
+      [s({ sport: 'run', durationMin: 30 }), s({ sport: undefined, durationMin: 20 })],
+      { lthr: 170 },
+    );
+    expect(r.mixed).toBe(false);
+    expect(r.fact.totalMin).toBe(50);   // 30 бег + 20 legacy
+    expect(r.fact.byHr).toBe(2);        // обе сессии с HR посчитаны
+    expect(r.bySport).toHaveLength(2);  // разбивка по-прежнему показывает оба бакета
+    expect(r.comparable).toBe(true);
+  });
+
+  /**
+   * Смешанный лог: усреднять зоны разных калибровок бессмысленно — берём ОДИН бакет.
+   * Какой именно (run или bike) — детерминированный tie-break, поэтому проверяем
+   * инвариант «взят один бакет, НЕ сумма», а не конкретную дисциплину.
+   */
+  it('смешанный лог: в заголовок идёт ТОЛЬКО один бакет, а не сумма', () => {
+    const r = tidPlanVsFact(
+      cycle(),
+      [s({ sport: 'run', durationMin: 30 }), s({ sport: 'bike', durationMin: 45 })],
+      { lthr: 170 },
+    );
+    expect(r.mixed).toBe(true);
+    expect([30, 45]).toContain(r.fact.totalMin); // ровно один бакет
+    expect(r.fact.totalMin).not.toBe(75);          // не сумма разных калибровок
+    expect(r.bySport.reduce((a, b) => a + b.fact.totalMin, 0)).toBe(75); // разбивка полна
   });
 });
 
