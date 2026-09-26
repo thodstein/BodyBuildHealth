@@ -2358,6 +2358,26 @@ export function tcxSportForSession(session: CardioSession, cycle: CardioCycle): 
   return (eq ? TCX_SPORT_BY_EQUIPMENT[eq] : undefined) ?? 'Other';
 }
 
+/**
+ * Текстовые поля «LTHR по видам спорта» → числа для `config.lthrBySport`.
+ *
+ * Один канон на оба места ввода (визард и превью), иначе правило диапазона
+ * разъедется. Ключи — виды дневника ('run'/'bike'/'row'): именно их потом
+ * сопоставляет разбор TID, поэтому 'other' отбрасывается — эталон «другого»
+ * не имеет смысла. Пустое/мусорное значение → ключ просто не попадает в
+ * конфиг (поведение «не задан» = прежнее).
+ */
+export function lthrBySportFromInput(raw: Record<string, string> | undefined): Partial<Record<string, number>> | undefined {
+  if (!raw) return undefined;
+  const out: Record<string, number> = {};
+  for (const [sport, text] of Object.entries(raw)) {
+    if (sport === 'other') continue;
+    const n = Number(text);
+    if (Number.isFinite(n) && n >= 80 && n <= 220) out[sport] = Math.round(n);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Экспорт цикла в .tcx (Garmin Training Center): одна «деятельность» на
  *  сессию дня с длительностью, типом и примечанием. Если session.structured заданы интервалы — пишет Lap на каждый блок. */
 export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): string {

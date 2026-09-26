@@ -13,6 +13,7 @@ import {
   type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment, type CardioPeriodizationModel, type CardioTaperModel,
 } from '../../../engines/lms/cardio.engine';
 import { finishCardioCycle } from '../../../engines/lms/cardio-templates.engine';
+import { CARDIO_SPORTS, CARDIO_SPORT_RU } from '../../../engines/lms/cardio-diary.engine';
 import { parsePaceText } from '../../../engines/lms/cardio-personal-zones.engine';
 import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/cardio.engine';
 import {
@@ -376,6 +377,8 @@ export const CardioAthleteSection: React.FC<{
   level: CardioLevel; setLevel: (l: CardioLevel) => void;
   recoveryLow: boolean; setRecoveryLow: (v: boolean) => void;
   lthr?: string; setLthr?: (v: string) => void;
+  /** Спринт 5.5: эталон LTHR по видам спорта (у бега и велосипеда он разный). */
+  lthrBySport?: Record<string, string>; setLthrBySport?: (v: Record<string, string>) => void;
   ftpWatts?: string; setFtpWatts?: (v: string) => void;
   talkHr?: string; setTalkHr?: (v: string) => void;
   tempC?: string; setTempC?: (v: string) => void;
@@ -389,7 +392,7 @@ export const CardioAthleteSection: React.FC<{
   onFromDiaryHr: () => void;
   onFromLog?: () => void;
   wizardMode?: 'simple' | 'pro';
-}> = ({ age, setAge, bodyWeight, setBodyWeight, restingHr, setRestingHr, sex, setSex, level, setLevel, recoveryLow, setRecoveryLow, lthr = '', setLthr, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, altitudeM = '', setAltitudeM, easyPace = '', setEasyPace, tempoPace = '', setTempoPace, intervalPace = '', setIntervalPace, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, wizardMode = 'pro' }) => (
+}> = ({ age, setAge, bodyWeight, setBodyWeight, restingHr, setRestingHr, sex, setSex, level, setLevel, recoveryLow, setRecoveryLow, lthr = '', setLthr, lthrBySport = {}, setLthrBySport, ftpWatts = '', setFtpWatts, talkHr = '', setTalkHr, tempC = '', setTempC, altitudeM = '', setAltitudeM, easyPace = '', setEasyPace, tempoPace = '', setTempoPace, intervalPace = '', setIntervalPace, onFromProfile, onSaveProfile, onFromDiaryHr, onFromLog, wizardMode = 'pro' }) => (
   <>
     {/* ── 1. Пользователь — открыт ── */}
     <Accordion id="sec-user" title="Параметры пользователя" icon="👤" defaultOpen badge={<span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{age}л · {bodyWeight}кг · {CARDIO_LEVEL_LABELS[level]}</span>}>
@@ -435,6 +438,16 @@ export const CardioAthleteSection: React.FC<{
           {setFtpWatts && <NumberInput label="FTP 20'×0.95 (вело)" value={ftpWatts} onChange={setFtpWatts} min={30} max={800} step={1} placeholder="250" ariaLabel="FTP" width={100} suffix="Вт" />}
           {setTalkHr && <NumberInput label="Talk-test потолок Z2" value={talkHr} onChange={setTalkHr} min={80} max={200} step={1} placeholder="145" ariaLabel="Talk-test" width={100} suffix="уд/мин" />}
         </div>
+        {setLthrBySport && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            {CARDIO_SPORTS.filter(sp => sp !== 'other').map(sp => (
+              <NumberInput key={sp} label={`LTHR · ${CARDIO_SPORT_RU[sp]}`} value={lthrBySport[sp] ?? ''}
+                onChange={v => setLthrBySport({ ...lthrBySport, [sp]: v })}
+                min={80} max={220} step={1} placeholder="—" ariaLabel={`LTHR: ${CARDIO_SPORT_RU[sp]}`} width={100} suffix="уд/мин" />
+            ))}
+          </div>
+        )}
+        {setLthrBySport && <div style={HINT_SM}>Эталон по видам спорта: у бега и велосипеда пульсовая частота разная — интенсивность (TID) считается по каждому виду отдельно. Пусто = взять общий LTHR.</div>}
         {setEasyPace && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
             {[
