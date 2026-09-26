@@ -7,6 +7,7 @@ import type { CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildCombatReport, isCombatPlanBlocked } from '../../../engines/combat/combat-finalize.engine';
 import { ruLabel, PHASE_RU, SESSION_TAG_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider, CombatPopupSelect } from './CombatUI';
+import { AnnualCard } from './combat-annual-card';
 import { cbExerciseName } from '../../../engines/combat/combat-builder.engine';
 import { combatMesocycleSummary } from '../../../engines/combat/combat-mesocycle';
 import type { DiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
@@ -45,6 +46,7 @@ type Props = {
   setMsg?: (s: string) => void;
   onBuildATR?: () => void;
   onAddCompetition?: () => void;
+  onRemoveCompetition?: (id: string) => void;
   onPrintAnnual?: () => void;
   onDownloadIcs?: () => void;
   onExportProgram?: () => void;
@@ -125,7 +127,7 @@ export const CombatPlanView: React.FC<Props> = ({
   plan, historyLen, onUndo, onUpdateEx, onMoveEx, onSwapEx,
   annual, annualWeeks, setAnnualWeeks, annualCycles, setAnnualCycles, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight, competitionPriority, setCompetitionPriority,
   startDate, outside, outsideMetrics, diaryLoad, acwr, msg, setMsg,
-  onBuildATR, onAddCompetition, onPrintAnnual, onDownloadIcs, onExportProgram,
+  onBuildATR, onAddCompetition, onRemoveCompetition, onPrintAnnual, onDownloadIcs, onExportProgram,
 }) => {
   const [expandedWeek, setExpandedWeek] = React.useState<number | null>(0);
   const [openSess, setOpenSess] = React.useState<Record<string, boolean>>({});
@@ -360,74 +362,29 @@ export const CombatPlanView: React.FC<Props> = ({
         );
       })}
 
-      {/* Годовой — Apple premium */}
+      {/* Годовой — единый блок (общий с шагом «Экспорт» конструктора) */}
       {annual && onBuildATR && (
-        <div className="cb-plan-annual">
-        <SectionCard icon="🗓️" title={`Годовой ATR · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · синхронизация`} accent>
-          <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед · ${annual.blocks.length} блоков`} subtitle={`${annual.discipline ? `${annual.discipline} · ` : ''}тапер строится автоматически`} accent />
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems:'center' }}>
-            <button onClick={onBuildATR} style={{ ...BTN_SMALL, background: 'rgba(168,85,247,0.14)', color: '#d8b4fe', border: '0.5px solid rgba(168,85,247,0.24)' }}>↻ Построить {annualWeeks} нед ×{annualCycles ?? 1} ц</button>
-            {setAnnualWeeks && (
-              <div style={{ flex: '1 1 140px', minWidth: 0 }}>
-                <CombatPopupSelect label="Длина года" value={String(annualWeeks)} onChange={v => setAnnualWeeks(Number(v))} options={[
-                  { id:'12', label:'12 нед' }, { id:'24', label:'24 нед' }, { id:'36', label:'36 нед' }, { id:'52', label:'52 нед' },
-                ]} />
-              </div>
-            )}
-            {setAnnualCycles && (
-              <div style={{ flex: '1 1 140px', minWidth: 0 }}>
-                <CombatPopupSelect label="Циклы" value={String(annualCycles ?? 1)} onChange={v => setAnnualCycles(Number(v))} options={[
-                  { id:'1', label:'1 цикл' }, { id:'2', label:'2 цикла' }, { id:'3', label:'3 цикла' }, { id:'4', label:'4 цикла' },
-                ]} />
-              </div>
-            )}
-            <Badge color="#a855f7" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">{annual.totalWeeks} нед{annualCycles && annualCycles>1 ? ` · ${annualCycles}ц` : ''}</Badge>
-            {annual?.blocks?.length>4 && <Badge color="#f59e0b" bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.18)">Issurin 8-13н ×{annualCycles}</Badge>}
-          </div>
-
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {annual.blocks.map((b: any) => {
-              const col = b.phase === 'accumulation' ? '#60a5fa' : b.phase === 'transmutation' ? '#a855f7' : b.phase === 'realization' ? '#ff3b30' : '#f59e0b';
-              return <span key={b.id} style={{ padding:'5px 8px', borderRadius:10, fontSize:10.5, fontWeight:700, background:`${col}12`, border:`0.5px solid ${col}22`, color:col, fontVariantNumeric:'tabular-nums' }}><Highlight color={col}>Нед {b.startWeek}-{b.startWeek + b.weeks - 1}</Highlight> · {ruLabel(PHASE_RU, b.phase)} · <Highlight color={col}>{b.weeks}нед</Highlight>{b.fightDate ? ' 🏁' : ''}</span>;
-            })}
-          </div>
-
-          <div style={{ display: 'flex', height: 16, borderRadius: 10, overflow: 'hidden', border: '0.5px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.18)' }}>
-            {annual.blocks.map((b: any) => {
-              const w = (b.weeks / annual.totalWeeks * 100).toFixed(2);
-              const col = b.phase === 'accumulation' ? '#3b82f6' : b.phase === 'transmutation' ? '#a855f7' : b.phase === 'realization' ? '#ff3b30' : '#f59e0b';
-              return <div key={b.id} title={`${b.phase} ${b.weeks}нед`} style={{ width: `${w}%`, background: col, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700, fontVariantNumeric:'tabular-nums' }}>{b.weeks}</div>;
-            })}
-          </div>
-          <div style={{ fontSize: 10, color: TEXT_3, display: 'flex', justifyContent: 'space-between', fontVariantNumeric:'tabular-nums' }}><span>Нед 1 · {startDate}</span><span>Нед {annual.totalWeeks}</span></div>
-
-          {annual.competitions?.length > 0 && (
-            <div style={{ background: 'rgba(239,68,68,0.06)', border: '0.5px solid rgba(239,68,68,0.14)', borderRadius: 12, padding: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', display:'flex', alignItems:'center', gap:6 }}>🏁 Бои <Highlight color="#ff3b30">{annual.competitions.length}</Highlight></div>
-              {annual.competitions.map((c: any) => <div key={c.id} style={{ fontSize: 11, color: '#fff', marginTop:4 }}><Highlight color="#ff3b30">🏁 {c.name}</Highlight> — {c.date} {c.weightClass ? <Highlight>{c.weightClass}</Highlight> : ''} {c.priority === 'secondary' ? <Highlight color="#f59e0b">мини</Highlight> : <Highlight color="#ef4444">main</Highlight>}</div>)}
-            </div>
-          )}
-
-          {setCompetitionName && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              <input placeholder="Название боя" value={competitionName} onChange={e => setCompetitionName(e.target.value)} style={{ ...INPUT, flex: 1, minWidth: 140, padding: '8px 10px', fontSize: 11 }} />
-              <input type="date" value={competitionDate} onChange={e => setCompetitionDate!(e.target.value)} style={{ ...INPUT, width: 150, padding: '8px 10px', fontSize: 11 }} />
-              <input placeholder="Вес.кат." value={competitionWeight} onChange={e => setCompetitionWeight!(e.target.value)} style={{ ...INPUT, width: 110, padding: '8px 10px', fontSize: 11 }} />
-              {setCompetitionPriority && (
-                <CombatPopupSelect label="Приоритет боя" value={competitionPriority || 'main'} onChange={v => setCompetitionPriority(v as any)} options={[
-                  { id: 'main', label: 'main · тапер 2нед', desc: 'главный бой' },
-                  { id: 'secondary', label: 'secondary · мини 1нед', desc: 'второстепенный' },
-                ]} />
-              )}
-              <button onClick={onAddCompetition} style={{ ...BTN_SMALL, background: '#ef4444', color: '#fff', border: 'none' }}>+ Бой</button>
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button onClick={onPrintAnnual} style={{ ...BTN_SMALL, minHeight: 44, background: 'rgba(255,255,255,0.06)', color: '#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>🖨 Печать года</button>
-            <button onClick={onDownloadIcs} style={{ ...BTN_SMALL, minHeight: 44, background: 'rgba(255,255,255,0.06)', color: '#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>📅 .ics</button>
-          </div>
-        </SectionCard>
-        </div>
+        <AnnualCard
+          annual={annual}
+          onBuildATR={onBuildATR}
+          annualWeeks={annualWeeks}
+          setAnnualWeeks={setAnnualWeeks}
+          annualCycles={annualCycles}
+          setAnnualCycles={setAnnualCycles}
+          startDate={startDate}
+          competitionName={competitionName}
+          setCompetitionName={setCompetitionName}
+          competitionDate={competitionDate}
+          setCompetitionDate={setCompetitionDate}
+          competitionWeight={competitionWeight}
+          setCompetitionWeight={setCompetitionWeight}
+          competitionPriority={competitionPriority}
+          setCompetitionPriority={setCompetitionPriority}
+          onAddCompetition={onAddCompetition}
+          onRemoveCompetition={onRemoveCompetition}
+          onPrintAnnual={onPrintAnnual}
+          onDownloadIcs={onDownloadIcs}
+        />
       )}
 
       {/* Экспорт — Apple glass */}

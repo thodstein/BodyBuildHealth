@@ -167,6 +167,44 @@ export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetiti
 }
 
 /**
+ * Удаление боя. Бой нельзя было удалить вообще: он оставался в annual.competitions
+ * навсегда, а его тапер-блок — тоже. Здесь снимаем и бой, и созданный под него
+ * taper-блок, склеивая `_pre`/`_post` обратно и пересчитывая startWeek (иначе год
+ * «разъезжался» на длину тапера и полоса фаз врала).
+ */
+export function removeCompetitionFromAnnual(annual: AnnualCB, compId: string): AnnualCB {
+  const comp = (annual?.competitions || []).find(c => c.id === compId);
+  if (!comp) return annual;
+  const next: AnnualCB = {
+    ...annual,
+    competitions: annual.competitions.filter(c => c.id !== compId),
+    blocks: annual.blocks.map(b => ({ ...b })),
+    updatedAt: new Date().toISOString(),
+  } as AnnualCB;
+  if (!comp.date) return next;
+  const kept = next.blocks.filter(b => !(b.phase === 'taper' && b.fightDate === comp.date));
+  if (kept.length !== next.blocks.length) {
+    const merged: AnnualCBBlock[] = [];
+    for (const b of kept) {
+      const last = merged[merged.length - 1];
+      if (last && last.phase === b.phase && last.discipline === b.discipline && !last.fightDate && !b.fightDate) {
+        last.weeks += b.weeks;
+        last.id = `${last.id}+${b.id}`;
+      } else {
+        merged.push({ ...b });
+      }
+    }
+    let cur = 1;
+    for (const b of merged) { b.startWeek = cur; cur += b.weeks; }
+    next.blocks = merged;
+    next.totalWeeks = cur - 1;
+  } else {
+    for (const b of next.blocks) if (b.fightDate === comp.date) b.fightDate = null;
+  }
+  return next;
+}
+
+/**
  * №2: авто-год из истории планов + тапер из даты боя свежего плана.
  * Склейка buildAnnualFromCB + addCompetitionToAnnual (main, 2нед); без даты боя — как раньше.
  * Чистая, тестируемая; конструктор — тонкий вызов.

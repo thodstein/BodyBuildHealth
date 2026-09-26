@@ -13,7 +13,8 @@ import { COMBAT_CYCLE_LIBRARY, getCombatCycle } from '../../../engines/combat/co
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveCombatPlan, loadCombatPlans, migrateAllCombatStorage } from '../../../engines/combat/combat-storage';
 import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
-import { buildAnnualATR, saveAnnualCB, loadAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual, autoAnnualWithFightTaper } from '../../../engines/combat/combat-annual';
+import { buildAnnualATR, saveAnnualCB, loadAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual, removeCompetitionFromAnnual, autoAnnualWithFightTaper } from '../../../engines/combat/combat-annual';
+import { AnnualCard } from './combat-annual-card';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
 import { downloadCombatXlsx } from '../../../engines/combat/combat-xlsx.engine';
 import { saveUserProgram } from '../../../engines/user-program/program-store';
@@ -21,7 +22,7 @@ import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.typ
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
 import { weightClassesFor, weightClassLine, weightClassLimitValid, weightClassRulesetNote } from '../../../engines/combat/combat-weight-class.engine';
-import { validateSparringLoad } from '../../../engines/combat/combat-sparring.engine';
+import { validateSparringLoad, sparringWeeklyLoad } from '../../../engines/combat/combat-sparring.engine';
 import { screenCombatRedFlags } from '../../../engines/combat/combat-safety.engine';
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import type { CombatNutritionPayload, CombatCardioPayload } from '../../../engines/combat/combat-integration.engine';
@@ -116,6 +117,7 @@ export const CombatConstructor: React.FC = () => {
     step, setStep,
     discipline, setDiscipline, goal, setGoal, level, setLevel, weeks, setWeeks, days, setDays,
     weightCut, setWeightCut, waterMode, setWaterMode, sodiumMode, setSodiumMode, carbMode, setCarbMode, heatSessions, setHeatSessions, weighInType, setWeighInType, confirmedManipulation, setConfirmedManipulation, orsSodium, setOrsSodium,
+    weightCutFiber, setWeightCutFiber, weightCutSteps, setWeightCutSteps,
     methodology, setMethodology, dupMode, setDupMode, intensityTech, setIntensityTech,
     periodizationModel, setPeriodizationModel, conditioningMode, setConditioningMode,
     outside, setOutside, outsideEnabled, setOutsideEnabled, sparringHard, setSparringHard, sparringTech, setSparringTech, sparringWrest, setSparringWrest, sparringEnabled, setSparringEnabled,
@@ -319,7 +321,7 @@ export const CombatConstructor: React.FC = () => {
         extra.labMrvMultiplier = typeof p.labs?.mrvMultiplier === 'number' ? p.labs.mrvMultiplier : undefined;
       }
     } catch {}
-    const wcProtocol = weightCut > 0 ? buildWeightCutProtocol(weightCut, { startWeightKg: bodyweight, waterMode, sodiumMode, carbMode, heatSessions, weighInType: weighInType as any, confirmedManipulation, orsSodiumMmolPerDl: orsSodium, discipline } as any) : null;
+    const wcProtocol = weightCut > 0 ? buildWeightCutProtocol(weightCut, { startWeightKg: bodyweight, waterMode, sodiumMode, carbMode, heatSessions, weighInType: weighInType as any, confirmedManipulation, orsSodiumMmolPerDl: orsSodium, discipline, fiberGPerDay: weightCutFiber, dailyStepsTarget: weightCutSteps } as any) : null;
     const sparringLoad = sparringEnabled ? { hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest } as any : null;
     let effectiveLoss: number | null = velocityLoss > 0 ? velocityLoss : null;
     if (vbtBest > 0 && vbtLast > 0) {
@@ -558,6 +560,12 @@ export const CombatConstructor: React.FC = () => {
     saveAnnualCB(next); setAnnual(next); setMsg(`✦ Бой добавлен (${competitionPriority === 'secondary' ? 'мини-тапер 1нед' : 'тапер 2нед'})`); setTimeout(() => setMsg(''), 1800);
     setCompetitionName(''); setCompetitionDate(''); setCompetitionWeight('');
   };
+  const handleRemoveCompetition = (id: string) => {
+    if (!annual) return;
+    const next = removeCompetitionFromAnnual(annual, id);
+    saveAnnualCB(next); setAnnual(next);
+    setMsg('✕ Бой удалён — тапер-блок снят, год пересобран'); setTimeout(() => setMsg(''), 1800);
+  };
   const handlePrintAnnual = () => {
     if (!annual) return;
     const html = buildAnnualPrintHtml(annual);
@@ -579,9 +587,9 @@ export const CombatConstructor: React.FC = () => {
   const diaryTrends = React.useMemo(() => {
     try { return getDiaryTrendCB(); } catch { return null; }
   }, [plan]);
-  const sparringErrs = sparringEnabled
-    ? validateSparringLoad({ hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest })
-    : [];
+  const sparringLoad = { hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest };
+  const sparringErrs = sparringEnabled ? validateSparringLoad(sparringLoad) : [];
+  const sparringLoadWeekly = sparringWeeklyLoad(sparringLoad);
 
   const stepList: Step[] = ['params', 'athlete', 'outside', 'split', 'plan', 'quality', 'export'];
   const stepIndex = stepList.indexOf(step) + 1;
@@ -1042,11 +1050,14 @@ export const CombatConstructor: React.FC = () => {
                     <CombatPopupSelect label="Углеводы" value={carbMode} onChange={v=> setCarbMode(v as any)} options={[{id:'stable',label:'Стабильно 4-5г/кг'},{id:'deplete_reload',label:'1г → 8г рефид',desc:'загрузка'}]} />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <Field label={`ORS Na ${orsSodium} mmol/дл`} hint="ISSN 50-90">
+                    <Field label={`ORS Na ${orsSodium} ммоль/дл`} hint="ISSN 50-90">
                       <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={30} max={90} step={5} value={orsSodium} onChange={e => setOrsSodium(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{orsSodium}</Highlight></div>
                     </Field>
-                    <Field label="Клетчатка · нед. боя" hint={'ISSN <10г ×4д =1-2% BM'}>
-                      <div style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>10г/день — низкая клетчатка 4 дн</div>
+                    <Field label={`Клетчатка · ${weightCutFiber} г/день`} hint="ISSN <10 г ×4 дн = 1-2% BM; >15 г при сгоне >4 кг — ошибка">
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={5} max={30} step={1} value={weightCutFiber} onChange={e => setWeightCutFiber(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{weightCutFiber} г</Highlight></div>
+                    </Field>
+                    <Field label={`Шаги · ${(weightCutSteps/1000).toFixed(0)}к/день`} hint=" ISSN: ходьба в неделю боя поднимает окислительный расход">
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={4000} max={20000} step={1000} value={weightCutSteps} onChange={e => setWeightCutSteps(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#64d2ff">{(weightCutSteps/1000).toFixed(0)}к</Highlight></div>
                     </Field>
                   </div>
                   <CbSwitch checked={heatSessions} onChange={setHeatSessions} label="Сауна 15-20′ ×3/нед" desc="heat acclimation (≤4% BM/24ч)" />
@@ -1111,7 +1122,7 @@ export const CombatConstructor: React.FC = () => {
                         <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={4} value={sparringWrest} onChange={e => setSparringWrest(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{sparringWrest}×</Highlight></div>
                       </Field>
                       <div style={{ gridColumn: '1 / -1' }}>
-                        <InfoBanner tone="accent"><Highlight>{sparringHard * 90 * 8.5 + sparringTech * 60 * 5.5 + sparringWrest * 75 * 7.5} load</Highlight> → <Highlight>{sparringHard + sparringTech + sparringWrest}×/нед</Highlight> · декомпозиция</InfoBanner>
+                        <InfoBanner tone="accent"><Highlight>{sparringLoadWeekly} load</Highlight> → <Highlight>{sparringHard + sparringTech + sparringWrest}×/нед</Highlight> · декомпозиция</InfoBanner>
                       </div>
                       {sparringErrs.map((e, i) => (
                         <div key={i} style={{ gridColumn: '1 / -1' }}>
@@ -1359,46 +1370,27 @@ export const CombatConstructor: React.FC = () => {
       {step === 'export' && (
         <div className="cb-pane" data-pane="export" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {annual ? (
-            <SectionCard icon="🗓️" title={`Годовой ATR · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · синхронизация`} accent>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems:'center' }}>
-                <button onClick={handleBuildATR} style={{ ...BTN_SMALL, background: 'rgba(168,85,247,0.14)', color: '#d8b4fe', border: '0.5px solid rgba(168,85,247,0.24)' }}>↻ Построить {annualWeeks} нед ×{annualCycles ?? 1} ц</button>
-                <div style={{ flex: '1 1 140px', minWidth: 0 }}>
-                  <CombatPopupSelect label="Длина года" value={String(annualWeeks)} onChange={v => setAnnualWeeks(Number(v))} options={[
-                    { id:'12', label:'12 нед' }, { id:'24', label:'24 нед' }, { id:'36', label:'36 нед' }, { id:'52', label:'52 нед' },
-                  ]} />
-                </div>
-                {setAnnualCycles && (
-                  <div style={{ flex: '1 1 140px', minWidth: 0 }}>
-                    <CombatPopupSelect label="Циклы" value={String(annualCycles ?? 1)} onChange={v => setAnnualCycles(Number(v))} options={[
-                      { id:'1', label:'1 цикл' }, { id:'2', label:'2 цикла' }, { id:'3', label:'3 цикла' }, { id:'4', label:'4 цикла' },
-                    ]} />
-                  </div>
-                )}
-                <Badge color="#a855f7" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">{annual.totalWeeks} нед{annualCycles && annualCycles>1 ? ` · ${annualCycles}ц` : ''}</Badge>
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {annual.blocks.map((b: any) => {
-                  const col = b.phase === 'accumulation' ? '#60a5fa' : b.phase === 'transmutation' ? '#a855f7' : b.phase === 'realization' ? '#ff3b30' : '#f59e0b';
-                  return <span key={b.id} style={{ padding:'5px 8px', borderRadius:10, fontSize:10.5, fontWeight:700, background:`${col}12`, border:`0.5px solid ${col}22`, color:col, fontVariantNumeric:'tabular-nums' }}><Highlight color={col}>Нед {b.startWeek}-{b.startWeek + b.weeks - 1}</Highlight> · {ruLabel(PHASE_RU, b.phase)} · <Highlight color={col}>{b.weeks}нед</Highlight>{b.fightDate ? ' 🏁' : ''}</span>;
-                })}
-              </div>
-              {annual.competitions?.length > 0 && (
-                <div style={{ background: 'rgba(239,68,68,0.06)', border: '0.5px solid rgba(239,68,68,0.14)', borderRadius: 12, padding: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', display:'flex', alignItems:'center', gap:6 }}>🏁 Бои <Highlight color="#ff3b30">{annual.competitions.length}</Highlight></div>
-                  {annual.competitions.map((c: any) => <div key={c.id} style={{ fontSize: 11, color: '#fff', marginTop:4 }}><Highlight color="#ff3b30">🏁 {c.name}</Highlight> — {c.date} {c.weightClass ? <Highlight>{c.weightClass}</Highlight> : ''}</div>)}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                <input placeholder="Название боя" value={competitionName} onChange={e => setCompetitionName(e.target.value)} style={{ ...INPUT, flex: 1, minWidth: 140, padding: '8px 10px', fontSize: 11 }} />
-                <input type="date" value={competitionDate} onChange={e => setCompetitionDate(e.target.value)} style={{ ...INPUT, width: 150, padding: '8px 10px', fontSize: 11 }} />
-                <input placeholder="Вес.кат." value={competitionWeight} onChange={e => setCompetitionWeight(e.target.value)} style={{ ...INPUT, width: 110, padding: '8px 10px', fontSize: 11 }} />
-                <button onClick={handleAddCompetition} style={{ ...BTN_SMALL, background: '#ef4444', color: '#fff', border: 'none' }}>+ Бой</button>
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <button onClick={handlePrintAnnual} style={{ ...BTN_SMALL, minHeight: 44, background: 'rgba(255,255,255,0.06)', color: '#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>🖨 Печать года</button>
-                <button onClick={handleDownloadIcs} style={{ ...BTN_SMALL, minHeight: 44, background: 'rgba(255,255,255,0.06)', color: '#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>📅 .ics</button>
-              </div>
-            </SectionCard>
+            <AnnualCard
+              annual={annual}
+              onBuildATR={handleBuildATR}
+              annualWeeks={annualWeeks}
+              setAnnualWeeks={setAnnualWeeks}
+              annualCycles={annualCycles}
+              setAnnualCycles={setAnnualCycles}
+              startDate={startDate}
+              competitionName={competitionName}
+              setCompetitionName={setCompetitionName}
+              competitionDate={competitionDate}
+              setCompetitionDate={setCompetitionDate}
+              competitionWeight={competitionWeight}
+              setCompetitionWeight={setCompetitionWeight}
+              competitionPriority={competitionPriority}
+              setCompetitionPriority={setCompetitionPriority}
+              onAddCompetition={handleAddCompetition}
+              onRemoveCompetition={handleRemoveCompetition}
+              onPrintAnnual={handlePrintAnnual}
+              onDownloadIcs={handleDownloadIcs}
+            />
           ) : (
             <div className="cb-empty" style={{ ...CARD, alignItems: 'center', padding: 28, textAlign: 'center' }}>
               <span style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🗓️</span>
