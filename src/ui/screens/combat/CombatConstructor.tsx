@@ -15,6 +15,7 @@ import { saveCombatPlan, loadCombatPlans, migrateAllCombatStorage } from '../../
 import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
 import { buildAnnualATR, saveAnnualCB, loadAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual, removeCompetitionFromAnnual, autoAnnualWithFightTaper } from '../../../engines/combat/combat-annual';
 import { AnnualCard } from './combat-annual-card';
+import { CbCampIntelCard } from './cb-camp-intel';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
 import { downloadCombatXlsx } from '../../../engines/combat/combat-xlsx.engine';
 import { saveUserProgram } from '../../../engines/user-program/program-store';
@@ -22,7 +23,7 @@ import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.typ
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
 import { weightClassesFor, weightClassLine, weightClassLimitValid, weightClassRulesetNote } from '../../../engines/combat/combat-weight-class.engine';
-import { validateSparringLoad, sparringWeeklyLoad } from '../../../engines/combat/combat-sparring.engine';
+import { validateSparringLoad, sparringWeeklyLoad, normalizeSparringLoad } from '../../../engines/combat/combat-sparring.engine';
 import { screenCombatRedFlags } from '../../../engines/combat/combat-safety.engine';
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import type { CombatNutritionPayload, CombatCardioPayload } from '../../../engines/combat/combat-integration.engine';
@@ -587,9 +588,9 @@ export const CombatConstructor: React.FC = () => {
   const diaryTrends = React.useMemo(() => {
     try { return getDiaryTrendCB(); } catch { return null; }
   }, [plan]);
-  const sparringLoad = { hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest };
-  const sparringErrs = sparringEnabled ? validateSparringLoad(sparringLoad) : [];
-  const sparringLoadWeekly = sparringWeeklyLoad(sparringLoad);
+  const sparringLoad = normalizeSparringLoad({ hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest });
+  const sparringErrs = sparringEnabled && sparringLoad ? validateSparringLoad(sparringLoad) : [];
+  const sparringLoadWeekly = sparringLoad ? sparringWeeklyLoad(sparringLoad) : 0;
 
   const stepList: Step[] = ['params', 'athlete', 'outside', 'split', 'plan', 'quality', 'export'];
   const stepIndex = stepList.indexOf(step) + 1;
@@ -1356,6 +1357,12 @@ export const CombatConstructor: React.FC = () => {
             <InfoBanner key={i} tone="warn">{w}</InfoBanner>
           ))}
           <CbMesoCard prev={mesoPrev} nextInput={(plan.inputSnapshot as any) || {}} />
+          <CbCampIntelCard
+            plan={plan}
+            acwr={acwr as any}
+            velocityLoss={velocityLoss > 0 ? velocityLoss : null}
+            outsideSessions={((plan.inputSnapshot as any)?.sessionsPerWeek as number) ?? 0}
+          />
           <CbDiaryCard trends={diaryTrends} />
           <CbQualityMap plan={plan} />
           {plan.rationale?.length ? (

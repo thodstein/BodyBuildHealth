@@ -26,10 +26,12 @@ describe('E2.1 — spar weekly load: один канон', () => {
     expect(CONSTRUCTOR).not.toMatch(/sparringWrest\s*\*\s*75/);
   });
 
-  it('тот же объект нагрузки идёт и в валидатор, и в счётчик', () => {
-    expect(CONSTRUCTOR).toContain('const sparringLoad = {');
-    expect(CONSTRUCTOR).toContain('validateSparringLoad(sparringLoad)');
-    expect(CONSTRUCTOR).toContain('sparringWeeklyLoad(sparringLoad)');
+  it('тот же НОРМАЛИЗОВАННЫЙ объект идёт и в валидатор, и в счётчик', () => {
+    // normalizeSparringLoad клампит и возвращает null на нуле — без него
+    // счётчик показывал «0 load» при выключенном спарринге
+    expect(CONSTRUCTOR).toContain('normalizeSparringLoad({');
+    expect(CONSTRUCTOR).toMatch(/validateSparringLoad\(sparringLoad\)/);
+    expect(CONSTRUCTOR).toMatch(/sparringWeeklyLoad\(sparringLoad\)/);
   });
 });
 
