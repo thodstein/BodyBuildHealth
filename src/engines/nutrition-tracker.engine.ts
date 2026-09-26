@@ -11,8 +11,16 @@
  *
  * Data stored in localStorage under 'he_nutrition_log'.
  *
+ * КАНОН ДАТ: писатель и читатель дневных ключей обязаны считать день ОДИНАКО.
+ * Раньше обе стороны брали UTC (`toISOString().slice(0,10)`), из-за чего в
+ * вечернее время UTC+3…+12 запись и отчёт «сегодня» расходились на сутки.
+ * Пара writer/reader переведена на общий канон `core/local-date` (с ним же
+ * согласован training-calendar.engine — он читает эти ключи).
+ *
  * @module nutrition-tracker-engine
  */
+
+import { localIsoDate, localIsoDateOffset } from '../core/local-date';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -150,7 +158,7 @@ export function addMealTemplate(templateId: string, date?: string): FoodEntry[] 
   const tmpl = MEAL_TEMPLATES.find(t => t.id === templateId);
   if (!tmpl) return loadFoodLog();
 
-  const today = date || new Date().toISOString().slice(0, 10);
+  const today = date || localIsoDate();
   const now = new Date().toTimeString().slice(0, 5);
   const entries = loadFoodLog();
 
@@ -186,7 +194,7 @@ export function loadWaterLog(): WaterEntry[] {
 
 export function addWater(amountMl: number): WaterEntry[] {
   if (!isFinite(amountMl) || amountMl <= 0) return loadWaterLog();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const entries = loadWaterLog();
   const existing = entries.find(e => e.date === today);
   if (existing) existing.amountMl += amountMl;
@@ -224,8 +232,8 @@ export function getDailyMacros(date: string): DailyMacros {
 }
 
 export function getNutritionStats(targets?: MacroTargets): NutritionStats | null {
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = localIsoDate();
+  const yesterday = localIsoDateOffset(-1);
 
   const todayMacros = getDailyMacros(today);
   const yesterdayMacros = getDailyMacros(yesterday);
@@ -254,7 +262,7 @@ export function getNutritionStats(targets?: MacroTargets): NutritionStats | null
   for (let i = 0; i < dates.length; i++) {
     const expected = new Date(todayDate);
     expected.setDate(expected.getDate() - i);
-    if (dates[i] === expected.toISOString().slice(0, 10)) streak++;
+    if (dates[i] === localIsoDate(expected)) streak++;
     else break;
   }
 

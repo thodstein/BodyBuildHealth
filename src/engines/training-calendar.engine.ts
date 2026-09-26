@@ -9,6 +9,11 @@
  * @module training-calendar-engine
  */
 
+// Канон календарной даты: все «дни» здесь — то, что видит человек (подсветка
+// сегодня, ключи ячеек календаря, окна недели/месяца). UTC-версия в вечернее
+// время UTC+3…+12 сдвигала всё на «вчера».
+import { localIsoDate, localIsoDateOffset } from '../core/local-date';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════════════════
@@ -151,7 +156,7 @@ export function generateCalendarMonth(
   actualSessions: { date: string; completed: boolean; duration: number; volume: number }[],
 ): CalendarMonth {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const weeks: CalendarDay[][] = [];
   let currentWeek: CalendarDay[] = [];
 
@@ -289,7 +294,7 @@ export function generateTrainingCalendar(
   mesoPhases?: Map<string, string>,
 ): CalendarMonth {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const weeks: CalendarDay[][] = [];
   let currentWeek: CalendarDay[] = [];
 
@@ -416,11 +421,11 @@ export function getCalendarHeatmap(
   const out: CalendarHeatmapData[] = [];
   const start = new Date(startDate);
   const end = new Date(endDate);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
 
   const cursor = new Date(start);
   while (cursor <= end) {
-    const ds = cursor.toISOString().slice(0, 10);
+    const ds = localIsoDate(cursor);
     const actual = actualMap.get(ds);
     const plannedVol = 0;
     const actualVol = actual?.volume || 0;
@@ -582,7 +587,7 @@ export function generateSyntheticPlan(
 import { loadWaterLog, addWater } from './nutrition-tracker.engine';
 
 export function getTodayWaterLog(goalMl: number = 3000): WaterLog {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   const entries = loadWaterLog();
   const todayEntry = entries.find(e => e.date === today);
   const total = todayEntry?.amountMl || 0;
@@ -607,7 +612,7 @@ export function getTodayWaterLog(goalMl: number = 3000): WaterLog {
 
 export function getWaterStats(): WaterStats {
   const entries = loadWaterLog();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
 
   // Today
   const todayEntry = entries.find(e => e.date === today) || { date: today, amountMl: 0 };
@@ -617,14 +622,14 @@ export function getWaterStats(): WaterStats {
   };
 
   // Week avg
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const weekAgo = localIsoDateOffset(-7);
   const weekEntries = entries.filter(e => e.date >= weekAgo);
   const weekAvg = weekEntries.length > 0
     ? Math.round(weekEntries.reduce((s, e) => s + e.amountMl, 0) / weekEntries.length)
     : 0;
 
   // Month avg
-  const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const monthAgo = localIsoDateOffset(-30);
   const monthEntries = entries.filter(e => e.date >= monthAgo);
   const monthAvg = monthEntries.length > 0
     ? Math.round(monthEntries.reduce((s, e) => s + e.amountMl, 0) / monthEntries.length)
@@ -646,7 +651,7 @@ export function getWaterStats(): WaterStats {
   }
 
   // Trend
-  const prevWeek = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+  const prevWeek = localIsoDateOffset(-14);
   const prevWeekEntries = entries.filter(e => e.date >= prevWeek && e.date < weekAgo);
   const prevAvg = prevWeekEntries.length > 0
     ? prevWeekEntries.reduce((s, e) => s + e.amountMl, 0) / prevWeekEntries.length
