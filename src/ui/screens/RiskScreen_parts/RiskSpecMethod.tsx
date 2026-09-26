@@ -392,7 +392,12 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 10, fontSize: 12, color: '#fff', flexWrap:'wrap', fontWeight:600 }}>
               <span style={{ padding:'4px 10px', borderRadius:999, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>D_cov: {result.d_cov.toFixed(1)}</span>
-              <span style={{ padding:'4px 10px', borderRadius:999, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>U: ×{result.u_i.toFixed(2)}</span>
+              {/* 26 сен 2026 (E0.8): множитель U показываем и в процентах — «×1.22»
+                  без расшифровки читается как «что-то с масштабом», а пользователю
+                  нужно знать, насколько индекс раздут из-за нехватки анализов. */}
+              <span style={{ padding:'4px 10px', borderRadius:999, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                U: ×{result.u_i.toFixed(2)}{result.u_i > 1.001 ? ` (+${Math.round((result.u_i - 1) * 100)}% неопределённости)` : ' (без надбавки)'}
+              </span>
               <span style={{ padding:'4px 10px', borderRadius:999, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>Поддержка: {result.supportCount} веществ</span>
             </div>
 
@@ -452,7 +457,18 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
                       {totalMechs} мех. · защищено {protectedMechs}/{totalMechs}
                       {delta > 0 && <span style={{ color: '#4ade80', marginLeft: 6, fontWeight:800 }}>↓{Math.round(delta)}%</span>}
                       {organ.verification !== undefined && organ.verification < 0.5 && (
-                        <span style={{ color: '#fff', marginLeft: 6, fontWeight:700 }}>⚠ не верифицировано</span>
+                        <span style={{ color: '#fff', marginLeft: 6, fontWeight:700 }}>
+                          {/* 26 сен 2026 (E0.8): рядом с меткой показываем ВЕЛИЧИНУ
+                              неопределённости индекса (+X%), которая реально применяется
+                              в расчёте (U_i = 1 + 0.25·(1−d_cov)).
+                              ВАЖНО: это НЕ то же самое, что `verification` ниже —
+                              verification = доля систем с релевантными маркерами,
+                              U_i = насколько расширен индекс из-за отсутствия анализов.
+                              Раньше число применялось молча, и метка «не верифицировано»
+                              ничего не говорила о том, насколько велик разброс. */}
+                          ⚠ не верифицировано
+                          <span style={{ color:'#f59e0b' }}> · индекс +{Math.round((result.u_i - 1) * 100)}%</span>
+                        </span>
                       )}
                     </div>
                   </div>

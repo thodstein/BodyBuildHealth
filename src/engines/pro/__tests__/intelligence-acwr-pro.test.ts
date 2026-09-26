@@ -25,14 +25,21 @@ function flatLoads(days: number, load: number, end = '2026-07-28'): DayLoad[] {
 }
 
 describe('P1 честный ACWR', () => {
-  it('дефолт — coupled_ra для совместимости (40+ потребителей не меняются)', () => {
+  it('дефолт — ewma_uncoupled; coupled_ra остаётся доступен явно (P0-В, было→стало)', () => {
     const loads = [...flatLoads(21, 300, '2026-07-21'), ...flatLoads(7, 600, '2026-07-28')];
-    const r = acuteChronicRatio(loads, '2026-07-28');
-    expect(r.method).toBe('coupled_ra');
-    expect(r.lowBase).toBe(false);
-    expect(r.acute).toBe(600);
-    expect(r.chronic).toBe((21 * 300 + 7 * 600) / 28); // 375 — острая входит в хроническую
-    expect(r.ratio).toBeCloseTo(1.6, 2);
+    // БЫЛО: дефолт = coupled_ra «для совместимости 40+ потребителей».
+    // СТАЛО: дефолт = EWMA uncoupled (Impellizzeri 2020, PMID 31846477: rolling-average
+    // coupled непригоден на 2-дневной неделе). coupled_ra сохранён как явная опция.
+    const dflt = acuteChronicRatio(loads, '2026-07-28');
+    expect(dflt.method).toBe('ewma_uncoupled');
+    expect(dflt.chronic).toBeCloseTo(300, 1); // хроническая БЕЗ острой недели
+
+    const coupled = acuteChronicRatio(loads, '2026-07-28', 7, 28, { method: 'coupled_ra' });
+    expect(coupled.method).toBe('coupled_ra');
+    expect(coupled.lowBase).toBe(false);
+    expect(coupled.acute).toBe(600);
+    expect(coupled.chronic).toBe((21 * 300 + 7 * 600) / 28); // 375 — острая входит в хроническую
+    expect(coupled.ratio).toBeCloseTo(1.6, 2);
   });
 
   it('ewma_uncoupled исключает острую неделю из хронической', () => {
@@ -52,9 +59,10 @@ describe('P1 честный ACWR', () => {
     const late = acuteChronicRatio(lateSpike, '2026-07-28', 7, 28, { method: 'ewma_uncoupled' });
     const early = acuteChronicRatio(earlySpike, '2026-07-28', 7, 28, { method: 'ewma_uncoupled' });
     expect(late.acute).toBeGreaterThan(early.acute);
-    // coupled RA оба пика считает одинаково (среднее окна)
-    const lateC = acuteChronicRatio(lateSpike, '2026-07-28');
-    const earlyC = acuteChronicRatio(earlySpike, '2026-07-28');
+    // coupled RA оба пика считает одинаково (среднее окна) — метод указываем ЯВНО:
+    // до P0-В этот блок неявно брал дефолт, т.е. тест назывался EWMA, а проверял coupled.
+    const lateC = acuteChronicRatio(lateSpike, '2026-07-28', 7, 28, { method: 'coupled_ra' });
+    const earlyC = acuteChronicRatio(earlySpike, '2026-07-28', 7, 28, { method: 'coupled_ra' });
     expect(lateC.acute).toBeCloseTo(earlyC.acute, 6);
   });
 
@@ -72,6 +80,29 @@ describe('P1 честный ACWR', () => {
     expect(r.zone).toBe('undertrained');
     expect(r.ratio).toBe(0);
     expect(r.lowBase).toBe(false);
+  });
+
+  it('P0-В: coupled тоже не пугает красным на тонкой базе (было ratio 2 → dangerous)', () => {
+    // Регрессия, закрытая P0-В: при chronic=0 и acute>0 coupled-путь ставил ratio=2 → 'dangerous'
+    // при lowBase:false. Две тренировки в дневнике = артефакт данных, а не «опасная зона».
+    const sparse = [{ date: '2026-07-28', load: 200 }];
+    const r = acuteChronicRatio(sparse, '2026-07-28', 7, 28, { method: 'coupled_ra' });
+    expect(r.lowBase).toBe(true);
+    expect(r.zone).not.toBe('dangerous');
+    expect(r.zone).toBe('caution');
+  });
+
+  it('P0-В: дефолт = EWMA даже без opts (2-дневная неделя не читается как скачок)', () => {
+    // coupled на 2-дневной неделе: 28-дневное окно = 20 нулевых дней → chronic занижен → ratio взлетает.
+    const twoPerWeek: DayLoad[] = [];
+    for (let w = 0; w < 4; w++) {
+      twoPerWeek.push({ date: `2026-07-0${(w * 2) + 7}`, load: 600 });
+      twoPerWeek.push({ date: `2026-07-${(w * 2) + 10}`, load: 600 });
+    }
+    const dflt = acuteChronicRatio(twoPerWeek, '2026-07-10');
+    expect(dflt.method).toBe('ewma_uncoupled');
+    const coupled = acuteChronicRatio(twoPerWeek, '2026-07-10', 7, 28, { method: 'coupled_ra' });
+    expect(dflt.ratio).toBeLessThan(coupled.ratio);
   });
 
   it('дисклеймер в отчёте честно ограничивает интерпретацию', () => {

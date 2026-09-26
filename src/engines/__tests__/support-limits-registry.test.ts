@@ -22,6 +22,7 @@ import {
   unverifiedLimits,
 } from '../support-limits';
 import { doseWindowFor } from '../support-hub-evidence.engine';
+import { NUTRIENT_UL, NUTRIENT_LIMIT_INFO } from '../support-plan/types';
 // ВАЖНО: THERAPEUTIC_WINDOWS и DOSE_RANGES живут в РАЗНЫХ файлах (вторая — в TSX
 // компоненте). Импорт DOSE_RANGES из SupportBioavailabilityData даёт `undefined`
 // без ошибки компиляции → тест падал с «Cannot convert undefined or null to object».
@@ -305,6 +306,57 @@ describe('E0.3/E1.8 — doseWindowFor на реальных таблицах', (
     expect(w.hasData).toBe(false);
     expect(w.ulKind).toBe('NotEstablished');
     expect(w.note).toContain('Терапевтического окна в базе нет');
+  });
+});
+
+describe('E0.2 — NUTRIENT_UL выведен из реестра (третья копия закрыта)', () => {
+  it('ключи NUTRIENT_UL — это id ВЕЩЕСТВ (contract checkUpperLimits), не нутриенты', () => {
+    // Регресс: если ключами станут канонические нутриенты (`vitamin_d`),
+    // `checkUpperLimits(['vitamin_d3'])` перестанет находить предел → UL-кап исчезнет.
+    expect(NUTRIENT_UL['vitamin_d3']).toBe(100);
+    expect(NUTRIENT_UL['vitamin_k2']).toBe(1000);
+    expect(NUTRIENT_UL['zinc']).toBe(40);
+  });
+
+  it('витамин D: реестр 4000 МЕ, таблица 100 мкг — один и тот же предел', () => {
+    const reg = NUTRIENT_LIMITS_V2.vitamin_d;
+    expect(reg.value).toBe(4000);
+    expect(reg.unit).toBe('iu');
+    expect(reg.altValue).toBe(100);
+    // Регресс «UL-кап ослаб в 40 раз»: если бы копировалось 4000 — cap не сработал бы.
+    expect(NUTRIENT_UL['vitamin_d3']).toBe(reg.altValue);
+    expect(NUTRIENT_UL['vitamin_d3']).not.toBe(reg.value);
+  });
+
+  it('B6 = 12 мг (EFSA 2023), а не легаси 100 мг', () => {
+    expect(NUTRIENT_UL['vitamin_b6']).toBe(12);
+  });
+
+  it('селен = 255 мкг (EFSA 2023), а не легаси 400', () => {
+    expect(NUTRIENT_UL['selenium']).toBe(255);
+  });
+
+  it('каждое значение NUTRIENT_UL совпадает с реестром (расхождение невозможно)', () => {
+    for (const [k, v] of Object.entries(NUTRIENT_UL)) {
+      const canon = resolveNutrient(k);
+      expect(canon, `ключ ${k} не резолвится в нутриент`).toBeTruthy();
+      const reg = NUTRIENT_LIMITS_V2[canon!];
+      expect(reg, `нет записи предела для ${k}`).toBeDefined();
+      expect(reg.kind, `${k}: NotEstablished не должен попадать в UL`).not.toBe('NotEstablished');
+      // Значение допускается либо как есть, либо как altValue (единицы мкг/МЕ).
+      expect([reg.value, reg.altValue], `${k}: значение ${v} не из реестра`).toContain(v);
+    }
+  });
+
+  it('NUTRIENT_LIMIT_INFO отдаёт тип/юрисдикцию/год/альтернативу для UI', () => {
+    const b6 = NUTRIENT_LIMIT_INFO['vitamin_b6'];
+    expect(b6.jurisdiction).toBe('EFSA');
+    expect(b6.year).toBe(2023);
+    expect(b6.kind).toBe('UL');
+    // Критерий приёмки E0.2: блок «EFSA строже IOM» должен быть выводим.
+    expect(b6.altJurisdiction).toBe('IOM');
+    expect(b6.altValue).toBe(100);
+    expect(NUTRIENT_LIMIT_INFO['iron'].kind).toBe('SafeLevel');
   });
 });
 

@@ -687,13 +687,21 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
               substanceCount: catalogSubstances.length, interactionCount: ALL_INTERACTIONS.length,
               timestamp: Date.now()
             };
-            const archive: any[] = readSupportArr('he_support_reports_archive');
-            archive.unshift(report);
-            writeSupportJSON('he_support_reports_archive', archive);
-            writeSupportJSON('he_support_report_current', report);
-            try { localStorage.setItem('he_support_reports', JSON.stringify(archive.slice(0, 20))); } catch {}
-            try { localStorage.setItem('he_profile_support_reports', JSON.stringify(archive.slice(0, 10))); } catch {}
-            setReportGenerated(true);
+const archive: any[] = readSupportArr('he_support_reports_archive');
+archive.unshift(report);
+writeSupportJSON('he_support_reports_archive', archive);
+writeSupportJSON('he_support_report_current', report);
+// 26 сен 2026 (E0.12): удалены ДВА write-only ключа — дубли срезов одного и того же
+// массива отчётов (имена намеренно не привожу, иначе source-guard по «запрещённым
+// литералам» ловил бы сам себя в комментарии; суть — в тексте ниже).
+// Оба писали срезы массива, который уже сохраняется в `he_support_reports_archive`
+// (этот ключ читается при следующей генерации отчёта) — то есть дублировали данные,
+// которые никто не читает, причём с РАЗНЫМИ кэшами (20 против 10 записей), из-за
+// чего три источника разъезжались.
+// Практический вред: cloud-kv перехватывает setItem, то есть каждая такая запись
+// ещё и улетала в облако целиком, съедая квоту и трафик ради данных, которые
+// невозможно прочитать. Канон хранения: один источник на сущность.
+setReportGenerated(true);
           }} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:700, fontSize:11 }}>📊 Сгенерировать отчёт</button>
 
           {/* Archive */}

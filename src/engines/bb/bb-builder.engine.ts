@@ -188,8 +188,14 @@ export interface BBBuilderInput {
   bodyFat?: number;
   /** Жировая масса тела в кг. Чем выше LBM, тем больше объём способен восстановить (Helms 2022). */
   leanMass?: number;
-  /** HRV (мс). >70 = high readiness, 50-70 = medium, <50 = low (Plews 2022). */
+  /** HRV (мс) — сегодняшний RMSSD. Оценивается ТОЛЬКО против личной базы (Plews 2013,
+   *  PMID 23535808: абсолютные пороги между людьми не переносимы; норма 20–100 мс).
+   *  База — `hrvBaseline`/`hrvBaselineZ` явно, иначе из `he_hrv_log`; без базы объём не трогаем. */
   hrvMs?: number;
+  /** Личная HRV-база (среднее RMSSD, мс). */
+  hrvBaseline?: number;
+  /** Отклонение lnRMSSD от базы в единицах SWC — предпочтительный способ. */
+  hrvBaselineZ?: number;
   /** Часы сна за ночь. >7 = high, 6-7 = medium, <6 = low (Watson 2022). */
   sleepHours?: number;
   /** Субъективный стресс 1-10. Low(1-3)=high readiness, Medium(4-6)=medium, High(7-10)=low (Kreher 2022). */
@@ -4642,6 +4648,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       bodyFat: input.bodyFat,
       leanMass: input.leanMass,
       hrvMs: input.hrvMs,
+      hrvBaseline: input.hrvBaseline,
+      hrvBaselineZ: input.hrvBaselineZ,
       sleepHours: input.sleepHours,
       stressLevel: input.stressLevel,
       weakPoints,

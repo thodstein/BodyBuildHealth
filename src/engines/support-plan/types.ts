@@ -8,6 +8,8 @@ import { SUPPORT_CATALOG_DATA, DEFAULT_DOSAGES } from '../../data/support-databa
 import type { SupportCatalogEntry } from '../../data/support-catalog-data';
 import type { SupportStack } from '../../data/support-stacks-types';
 import type { TzSpecResult } from '../risk-engine-tz-spec';
+// 26 сен 2026 (E0.1/E0.2): лимиты нутриентов — единственный источник `support-limits`.
+import { NUTRIENT_LIMITS_V2, resolveNutrient } from '../support-limits';
 
 // ═══════════════════════════════════════════════════════════════
 //  БАЗОВЫЕ ТИПЫ
@@ -478,37 +480,84 @@ export function defaultDosage(id: string): { mg: number; timing: string } | unde
 //  НУТРИЦИОЛОГИЧЕСКИЕ КОНСТАНТЫ (UL, depletion, t½, meal-context)
 // ═══════════════════════════════════════════════════════════════
 
-/** Верхний допустимый уровень потребления (UL) — суммарно из всех источников, мг/сут.
- *  Источники: EFSA 2024, IOM (NASEM), JECFA. */
-export const NUTRIENT_UL: Record<string, number> = {
-  zinc: 40,          // мг/сут (IOM 2001, EFSA 2006)
-  magnesium: 350,    // мг/сут — только из добавок (не из пищи); диарея при превышении
-  calcium: 2500,     // мг/сут (IOM 2011)
-  iron: 45,          // мг/сут (IOM 2001)
-  selenium: 400,     // мкг/сут (IOM 2000)
-  vitamin_b6: 100,   // мг/сут (IOM 1998)
-  vitamin_c: 2000,   // мг/сут (IOM 2000)
-  vitamin_d3: 100,   // мкг/сут = 4000 МЕ (IOM 2011)
-  vitamin_e: 1000,   // мг/сут альфа-токоферол (IOM 2000)
-  vitamin_k2: 1000,  // мкг/сут (нет установленного UL, ориентир)
-  vitamin_b12: 2000, // мкг/сут (нет UL, ориентир)
-  folate: 1000,      // мкг/сут (IOM 1998)
-  boron: 20,         // мг/сут (IOM 2001)
-  potassium: 3700,   // мг/сут — только из добавок
-  copper: 10,        // мг/сут (IOM 2001)
-  iodine: 1100,      // мкг/сут (IOM 2001)
-  manganese: 11,     // мг/сут (IOM 2001)
-  molybdenum: 2000,  // мкг/сут (IOM 2001)
-  chromium: 1000,    // мкг/сут (IOM 2001)
-  nac: 2400,         // мг/сут (клинический ориентир; тошнота/головная боль)
-  alpha_lipoic: 1800,// мг/сут (клинический ориентир; GI)
-  coq10: 3000,       // мг/сут (клинический ориентир)
-  betaine: 4000,     // мг/сут (клинический ориентир)
-  glycine: 60000,    // мг/сут (~1 г/кг, клинический ориентир)
-  taurine: 10000,    // мг/сут (клинический ориентир)
-  inositol: 18000,   // мг/сут (клинический ориентир)
-  curcumin: 8000,    // мг/сут (гепатотоксичность при >8g)
-};
+/**
+ * Ключи `NUTRIENT_UL` — пространство ИДЕНТИФИКАТОРОВ ВЕЩЕСТВ, а не нутриентов.
+ *
+ * 26 сен 2026 (E0.2): важное различие. Потребитель — `checkUpperLimits`
+ * (`engine-helpers.ts:79`) — ищет предел по `subId`, то есть по id ВЕЩЕСТВА
+ * (`vitamin_d3`, `vitamin_k2`), а реестр оперирует каноническими НУТРИЕНТАМИ
+ * (`vitamin_d`, `vitamin_k`). Первый вариант производной таблицы использовал
+ * ключи реестра → `NUTRIENT_UL['vitamin_d3']` стал `undefined` → UL-кап перестал
+ * работать (поймано тестом `support-calc-audit` «Vitamin D3 dose within UL»).
+ * Поэтому ключи объявлены явно (это КОНТРАКТ поиска), а значения берутся из
+ * реестра через `resolveNutrient` — дубль числа снова невозможен.
+ */
+const NUTRIENT_UL_SUBSTANCE_KEYS = [
+  'zinc', 'magnesium', 'calcium', 'iron', 'selenium',
+  'vitamin_b6', 'vitamin_c', 'vitamin_d3', 'vitamin_e', 'vitamin_k2',
+  'vitamin_b12', 'folate', 'boron', 'potassium', 'copper', 'iodine',
+  'manganese', 'molybdenum', 'chromium',
+  'nac', 'alpha_lipoic', 'coq10', 'betaine', 'glycine', 'taurine',
+  'inositol', 'curcumin',
+] as const;
+
+/**
+ * Верхний допустимый уровень потребления — значение берётся из реестра
+ * `NUTRIENT_LIMITS_V2`, ключ — id вещества (см. список выше).
+ *
+ * 26 сен 2026 (E0.2): БЫЛА третья копия лимитов, набранная вручную, и она была
+ * устаревшей: B6 100 мг (IOM 1998) вместо EFSA 2023 = 12 мг, селен 400 мкг вместо
+ * 255, железо 45 «как UL» вместо SafeLevel, калий 3700 вместо 3500. Плюс тип
+ * `Record<string, number>` прятал единицы: рядом стояли мг (цинк 40) и мкг
+ * (селен 400), и вызывающий код не мог это узнать.
+ *
+ * ⚠️ ЕДИНИЦЫ — САМОЕ ОПАСНОЕ МЕСТО ЗДЕСЬ, поэтому явно, а не молча.
+ * Реестр хранит предел в СВОЕЙ единице (`unit`): витамин D там = 4000 **МЕ**,
+ * тогда как потребитель (`checkUpperLimits` / UL-кап в `applyTitration`) работает
+ * в мг/мкг. Наивное копирование числа дало бы предел 4000 вместо 100 мкг — то есть
+ * UL-кап ослаб бы в 40 раз (поймано тестом «200 кг ограничена UL»: 110 мкг вместо
+ * ≤100). Поэтому для МИКРОграммовых нутриентов берётся `altValue` реестра —
+ * это ТОТ ЖЕ предел, выраженный в мкг (для D: altValue 100 мкг = 4000 МЕ).
+ * Проверено тестом: `NUTRIENT_UL['vitamin_d3'] === 100`.
+ */
+const NUTRIENT_UL_MCG_KEYS = new Set<string>([
+  'selenium', 'vitamin_d3', 'vitamin_k2', 'vitamin_b12', 'folate',
+  'iodine', 'manganese', 'molybdenum', 'chromium',
+]);
+export const NUTRIENT_UL: Record<string, number> = Object.fromEntries(
+  NUTRIENT_UL_SUBSTANCE_KEYS
+    .map(k => {
+      const canon = resolveNutrient(k);
+      const lim = canon ? NUTRIENT_LIMITS_V2[canon] : undefined;
+      if (!lim || lim.kind === 'NotEstablished' || lim.value <= 0) return [k, 0] as const;
+      // Реестр в МЕ, потребитель ждёт мкг → берём микрограммовое выражение.
+      const wantMcg = NUTRIENT_UL_MCG_KEYS.has(k);
+      const value = wantMcg && lim.unit !== 'mcg' ? (lim.altValue ?? lim.value) : lim.value;
+      return [k, value] as const;
+    })
+    .filter(([, v]) => v > 0),
+);
+
+/**
+ * Полная информация о пределе для UI: значение + единица + ТИП + юрисдикция/год +
+ * альтернативное значение (нужно для блока «EFSA строже IOM»: B6 12 против 100).
+ *
+ * 26 сен 2026 (E0.2, критерий приёмки: «блок "EFSA 8× строже IOM" видим»).
+ */
+export const NUTRIENT_LIMIT_INFO: Record<string, {
+  value: number; unit: 'mg' | 'mcg' | 'iu';
+  kind: 'UL' | 'SafeLevel' | 'ClinicalGuidance' | 'NotEstablished';
+  jurisdiction: 'EFSA' | 'IOM' | 'Clinical'; year: number;
+  /** Альтернативное значение другого регулятора (IOM 100 мг для B6 и т.п.). */
+  altValue?: number; altJurisdiction?: 'EFSA' | 'IOM' | 'Clinical'; altYear?: number;
+  criticalEffect: string; verified: boolean;
+}> = Object.fromEntries(
+  Object.values(NUTRIENT_LIMITS_V2).map(l => [l.nutrient, {
+    value: l.value, unit: l.unit, kind: l.kind, jurisdiction: l.jurisdiction, year: l.year,
+    altValue: l.altValue, altJurisdiction: l.altJurisdiction, altYear: l.altYear,
+    criticalEffect: l.criticalEffect, verified: l.verified,
+  }]),
+);
 
 /** Каскады истощения: вещество X в высокой дозе → истощает Y.
  *  Каждая запись: [истощающее, истощаемое, порог мг/сут для истощения, механизм] */

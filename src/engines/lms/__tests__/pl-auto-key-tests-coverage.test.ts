@@ -137,9 +137,20 @@ describe('PL-auto key coverage 4.1-4.15', () => {
     expect(recommendation.corrections.some(n => /дожим|рама/i.test(n))).toBe(true);
   });
 
-  it('4.14 applies caution ACWR ×0.85 to main exercise sets', () => {
+  it('4.14 ACWR caution — advisory without corroboration, applies ×0.85 WITH a recovery marker (P0-А, было→стало)', () => {
+    // БЫЛО→СТАЛО (26.09.2026, P0-А): зона ACWR резала объём сама по себе.
+    // СТАЛО: ACWR — контекстный индикатор (Ding 2026, Front Public Health 14:1896651,
+    // PMID 42662491: g=0.35, I²=95.8 %, «не самостоятельный предиктор»), и меняет план
+    // только при подтверждении другим маркером восстановления.
     const base = plan().weeks[0].days[0].exercises[0].workSets[0];
-    const caution = plan({ acwr: { ratio: 1.4, zone: 'caution' } }).weeks[0].days[0].exercises[0].workSets[0];
+
+    // Без подтверждения — план не тронут (было: ×0.85 и RIR+1 всегда).
+    const advisory = plan({ acwr: { ratio: 1.4, zone: 'caution' } }).weeks[0].days[0].exercises[0].workSets[0];
+    expect(advisory.sets).toBe(base.sets);
+    expect(advisory.rir).toBe(base.rir);
+
+    // С подтверждением (сон) — старая логика включается.
+    const caution = plan({ acwr: { ratio: 1.4, zone: 'caution' }, sleepHours: 8 }).weeks[0].days[0].exercises[0].workSets[0];
     expect(caution.sets).toBe(Math.round(base.sets * 0.85));
     expect(caution.rir).toBe(base.rir + 1);
   });

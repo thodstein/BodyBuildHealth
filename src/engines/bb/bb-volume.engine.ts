@@ -7,6 +7,7 @@
  */
 import { trueMuscleOf } from '../movement-pattern';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
+import { hrvRecoveryMult, hrvSignalFromStore, type HrvRecoverySignal } from '../pro/hrv-baseline.engine';
 
 /**
  * Волна-2.6 (аудит 2026-09): ЕДИНЫЙ допуск MRV для всех точек конвейера —
@@ -257,18 +258,27 @@ export function sessionLimitsFor(
   return { weeklyWorkingSets, maxWorkingSets, maxExercises };
 }
 
-/** Shared recovery soft-cap used by every BB source. */
+/** Shared recovery soft-cap used by every BB source.
+ *  HRV — только от личной базы (P0-Б, hrv-baseline.engine): раньше здесь стоял абсолютный
+ *  порог (>70 / 50–70 / <50 мс), который (1) запрещён шапкой hrv-baseline.engine
+ *  (Plews 2013 PMID 23535808; Buchheit 2014 PMID 24282094) и (2) ПРОТИВОРЕЧИЛ
+ *  `computeBBRecoveryScore` в этом же файле, уже считавшему HRV от базы. */
 export function computeBBRecoveryMultiplier(input: {
   bodyFat?: number;
   leanMass?: number;
   hrvMs?: number;
+  hrvBaseline?: number;
+  hrvBaselineZ?: number;
   sleepHours?: number;
   stressLevel?: number;
 }): number {
   let value = 1;
   if (input.bodyFat != null) value *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1;
   if (input.leanMass != null) value *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1 : 0.9;
-  if (input.hrvMs != null) value *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1 : 0.85;
+  const hrvSig: HrvRecoverySignal = (input.hrvBaseline != null || input.hrvBaselineZ != null)
+    ? { hrvMs: input.hrvMs, hrvBaseline: input.hrvBaseline, hrvBaselineZ: input.hrvBaselineZ }
+    : hrvSignalFromStore(input.hrvMs);
+  value *= hrvRecoveryMult(hrvSig).mult;
   if (input.sleepHours != null) value *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1 : 0.85;
   if (input.stressLevel != null) value *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1 : 0.85;
   return Math.max(0.6, Math.min(1.5, value));

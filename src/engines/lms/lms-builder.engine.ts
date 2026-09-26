@@ -23,6 +23,7 @@ import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks } fro
 import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
 import { derivePattern, trueMuscleOf } from '../movement-pattern';
 import { norm } from '../norm';
+import { hrvRecoveryMult, hrvSignalFromStore, type HrvRecoverySignal } from '../pro/hrv-baseline.engine';
 import { resolveCatalogId, stripCycleNotation } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
 import { cloneCycleTemplate } from '../../data/lms-cycles/lms-cycle-clone';
@@ -88,6 +89,10 @@ export interface LMSBuildInput {
   bodyFat?: number;       // % жира
   leanMass?: number;      // кг сухой массы
   hrvMs?: number;         // RMSSD в мс
+  /** Личная HRV-база (среднее RMSSD, мс). Нет — база читается из `he_hrv_log` (P0-Б). */
+  hrvBaseline?: number;
+  /** Отклонение lnRMSSD от базы в единицах SWC — предпочтительный способ (P0-Б). */
+  hrvBaselineZ?: number;
   sleepHours?: number;    // часов сна/ночь
   stressLevel?: number;   // 1-10
   /** Питание (Helms 2022): профицит калорий и белок г/кг → MRV soft-cap
@@ -436,6 +441,44 @@ const MRV_BUDGET_MUSCLES: Record<string, string[]> = {
   arms: ['biceps', 'triceps', 'forearms'],
   core: ['abs'],
 };
+
+/**
+ * ACWR — КОНТЕКСТНЫЙ ИНДИКАТОР, а не самостоятельный предиктор (P0-А, 26.09.2026).
+ *
+ * Источник: Ding L. et al. *Acute:chronic workload ratio and load management for team sports:
+ * a multilevel meta-analysis.* Front Public Health 2026;14:1896651 · PMID 42662491 ·
+ * DOI 10.3389/fpubh.2026.1896651 (PROSPERO CRD420245127618; 41 исследование в обзоре,
+ * 16 / n=797 в мета-анализе). Факт: повышенный ACWR — связь с риском травмы
+ * Hedges' g = 0.35 (95% CI 0.16–0.54), I² = 95.8%. Вывод авторов дословно:
+ * «current evidence does not support its use as a stand-alone causal or predictive model.
+ * ACWR should be interpreted as a contextual monitoring indicator within individualized,
+ * multi-marker load-management systems».
+ *
+ * Следствие для кода: зона ACWR НЕ режет объём и не ставит делод сама по себе.
+ * Она действует только когда подтверждена независимым маркером восстановления
+ * (autoReg / HRV / сон / стресс / готовность) — то есть ровно «внутри
+ * мультимаркерной системы». Без подтверждения зона остаётся видимой
+ * (и попадает в rationale), но план не трогает.
+ *
+ * Метод НЕ выбрасывается: как мониторинговую полосу его используют, например,
+ * в программе возврата в метание — Reinold M.M. et al., Int J Sports Phys Ther
+ * 2026;21(4):428-439 (PMID 42181776) (коридор 0.7–1.3).
+ */
+export const ACWR_ADVISORY_NOTE =
+  'ACWR — индикатор нагрузки, не предиктор травмы: связь g=0.35 [0.16–0.54] при I²=95.8 % ' +
+  '(мета-анализ Ding 2026, Front Public Health 14:1896651, PMID 42662491). Зона меняет ' +
+  'объём/RIR только при подтверждении другим маркером восстановления.';
+
+/** Есть ли независимый маркер восстановления, подтверждающий зону ACWR (мультимаркерное правило, см. ACWR_ADVISORY_NOTE). */
+export function acwrCorroboratedByRecovery(input: {
+  autoReg?: unknown; hrvMs?: number; sleepHours?: number; stressLevel?: number; currentReadiness?: number;
+}): boolean {
+  return !!(input.autoReg
+    || input.hrvMs != null
+    || input.sleepHours != null
+    || input.stressLevel != null
+    || input.currentReadiness != null);
+}
 
 /** MRV-бюджет группы: сумма MRV входящих мышц × (PED/recovery × ACWR × авторег). */
 function groupMrvBudgetFor(vrLevel: 'beginner' | 'intermediate' | 'advanced', combinedMrvMult: number, acwrVolMod: number, arVolMult: number, group: string): number | null {
@@ -1221,11 +1264,18 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
   // Recovery multiplier из композиции тела + recovery-метрик (Helms 2022, Plews 2022, Watson 2022).
   // Модулирует MRV soft-cap (pedMrvMult × recoveryMult) — выше восстановление → больше объём.
+  // HRV — ТОЛЬКО от личной базы (P0-Б, hrv-baseline.engine): абсолютный порог >70/<50 мс
+  // запрещён шапкой того модуля (Plews 2013 PMID 23535808; Buchheit 2014 PMID 24282094).
+  // Явные hrvBaseline/hrvBaselineZ приоритетнее; иначе база берётся из `he_hrv_log`.
+  const hrvSig: HrvRecoverySignal = (input.hrvBaseline != null || input.hrvBaselineZ != null)
+    ? { hrvMs: input.hrvMs, hrvBaseline: input.hrvBaseline, hrvBaselineZ: input.hrvBaselineZ }
+    : hrvSignalFromStore(input.hrvMs);
+  const hrvVerdict = hrvRecoveryMult(hrvSig);
   const recoveryMult = Math.max(0.6, Math.min(1.5, (() => {
     let r = 1.0;
     if (input.bodyFat != null) r *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1.0;
     if (input.leanMass != null) r *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1.0 : 0.9;
-    if (input.hrvMs != null) r *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1.0 : 0.85;
+    r *= hrvVerdict.mult;
     if (input.sleepHours != null) r *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1.0 : 0.85;
     if (input.stressLevel != null) r *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1.0 : 0.85;
     return r;
@@ -1245,12 +1295,17 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   // Итоговый MRV-множитель: PED × recovery × питание (комбинированный soft-cap)
   const combinedMrvMult = pedMrvMult * recoveryMult * nutritionMult;
 
-  // ACWR-авто-делод: если передана ACWR-зона — корректируем объём/RIR для всех недель.
+  // ACWR-зона: контекстный индикатор (не самостоятельный предиктор — см. ACWR_ADVISORY_NOTE).
+  // Меняет объём/RIR только при подтверждении другим маркером восстановления;
+  // без подтверждения зона остаётся видимой в rationale, но план не трогает.
   const acwrZone = input.acwr?.zone;
+  const acwrCorroborated = acwrCorroboratedByRecovery(input);
   let acwrVolMod = 1, acwrRirShift = 0, acwrDeload = false;
-  if (acwrZone === 'dangerous') { acwrVolMod = 0.65; acwrRirShift = 2; acwrDeload = true; }
-  else if (acwrZone === 'caution') { acwrVolMod = 0.85; acwrRirShift = 1; }
-  else if (acwrZone === 'undertrained') { acwrVolMod = 1.1; } // Растренированность: стимул +10% объёма без RIR-shift (восстановление через объём, не интенсивность).
+  if (acwrZone && acwrCorroborated) {
+    if (acwrZone === 'dangerous') { acwrVolMod = 0.65; acwrRirShift = 2; acwrDeload = true; }
+    else if (acwrZone === 'caution') { acwrVolMod = 0.85; acwrRirShift = 1; }
+    else if (acwrZone === 'undertrained') { acwrVolMod = 1.1; } // Растренированность: стимул +10% объёма без RIR-shift (восстановление через объём, не интенсивность).
+  }
 
   // Авторегуляция: если передана — применяется к весам (topSetPctMultiplier) и объёму/RIR.
   const ar = input.autoReg;
@@ -1629,7 +1684,12 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     `S-MRV: объём сессий автоматически ограничен бюджетом утомления (Ready: ${input.currentReadiness ?? 80}%).`,
     input.peds?.length ? `💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}.` : '',
     (input.bodyFat != null || input.hrvMs != null || input.sleepHours != null) ? `🔄 Recovery multiplier: ×${recoveryMult.toFixed(2)} (bodyFat/HRV/sleep/stress). Итог MRV ×${combinedMrvMult.toFixed(2)}.` : '',
-    input.acwr ? `📊 ACWR ${input.acwr.ratio.toFixed(1)} (${acwrZone}): объём×${acwrVolMod}, RIR+${acwrRirShift}${acwrDeload ? ', deload' : ''}.` : '',
+    input.hrvMs != null ? `💓 HRV: ${hrvVerdict.note}` : '',
+    input.acwr
+      ? (acwrCorroborated
+        ? `📊 ACWR ${input.acwr.ratio.toFixed(1)} (${acwrZone}): объём×${acwrVolMod}, RIR+${acwrRirShift}${acwrDeload ? ', deload' : ''}.`
+        : `📊 ACWR ${input.acwr.ratio.toFixed(1)} (${acwrZone}): индикатор, план не изменён — нет подтверждающего маркера восстановления. ${ACWR_ADVISORY_NOTE}`)
+      : '',
     ...deloadNotes,
     input.autoReg ? `🧠 Авторегуляция: топ-сет×${arTopMult}, объём×${arVolMult}, RIR+${arRirShift}${input.autoReg.deload ? ', deload' : ''}.` : '',
     pmAutoNote,

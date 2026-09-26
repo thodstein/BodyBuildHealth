@@ -84,11 +84,19 @@ export function ewma(values: number[], alpha: number): number {
 
 /** ACWR: острая (7д) / хроническая (28д) нагрузка.
  *  referenceDate — конец окна (по умолчанию последний день из dailyLoads).
- *  Без opts — байт-в-байт классика coupled RA (все 40+ потребителей не меняются).
- *  С opts.method='ewma_uncoupled' — честный метод Вильямса 2017: EWMA (α=2/(N+1)) + хроническая без острой недели. */
+ *  Без opts — EWMA uncoupled (P0-В, 26.09.2026: Impellizzeri 2020 PMID 31846477 / Williams 2017
+ *  PMID 28087502 — coupled RA непригоден для 2-дневной недели).
+ *  С opts.method='coupled_ra' — исторический rolling-average (Gabbett) для сравнения. */
 export function acuteChronicRatio(dailyLoads: DayLoad[], referenceDate?: string, acuteDays = 7, chronicDays = 28, opts: ACWROptions = {}): ACWRResult {
-  if (dailyLoads.length === 0) return { acute: 0, chronic: 0, ratio: 0, zone: 'undertrained', acuteDays, chronicDays, method: opts.method ?? 'coupled_ra', lowBase: false };
-  const method = opts.method ?? 'coupled_ra';
+  // P0-В (26.09.2026): по умолчанию — EWMA uncoupled (Impellizzeri T.M. et al. Acute:chronic workload
+  // ratio: conceptual issues and fundamental pitfalls. Int J Sports Physiol Perform 2020;15(6):907-913,
+  // PMID 31846477). Rolling-average coupled RA нельзя использовать на 2-дневной неделе: 28-дневное окно
+  // содержит 20 нулевых дней, хроническая нагрузка занижена, и обычный тренировочный день читается
+  // как скачок. EWMA с хронической БЕЗ острой недели от этого свободен (Williams N.A. et al.
+  // Eur J Appl Physiol 2017;117(4):651-660, PMID 28087502). `coupled_ra` остаётся доступен явно —
+  // для сравнения и для потребителей, которым нужен исторический ряд.
+  const method = opts.method ?? 'ewma_uncoupled';
+  if (dailyLoads.length === 0) return { acute: 0, chronic: 0, ratio: 0, zone: 'undertrained', acuteDays, chronicDays, method, lowBase: false };
   if (method === 'ewma_uncoupled') return acwrEwmaUncoupled(dailyLoads, referenceDate, acuteDays, chronicDays, opts.chronicFloor ?? ACWR_CHRONIC_FLOOR_DEFAULT);
   const sorted = [...dailyLoads].sort((a, b) => a.date < b.date ? -1 : 1);
   const ref = referenceDate || sorted[sorted.length - 1].date;
@@ -104,9 +112,15 @@ export function acuteChronicRatio(dailyLoads: DayLoad[], referenceDate?: string,
   // EWMA-вариант: alpha = 2/(N+1)
   const acute = avgOver(acuteDays);
   const chronic = avgOver(chronicDays);
+  // P0-В: chronic = 0 при acute > 0 — это ТОНКАЯ БАЗА (мало истории), а не «опасная зона».
+  // Раньше здесь ставилось ratio = 2 → 'dangerous' с lowBase:false, и пользователь с 2 тренировками
+  // в дневнике получал красный вердикт из-за артефакта данных. Теперь падение зоны до 'caution'
+  // и честный lowBase — так же, как в EWMA-пути.
+  const lowBase = chronic < (opts.chronicFloor ?? ACWR_CHRONIC_FLOOR_DEFAULT);
   const ratio = chronic > 0 ? acute / chronic : (acute > 0 ? 2 : 0);
-  const zone: ACWRZone = ratio < 0.8 ? 'undertrained' : ratio <= 1.3 ? 'optimal' : ratio <= 1.5 ? 'caution' : 'dangerous';
-  return { acute, chronic, ratio: Math.round(ratio * 100) / 100, zone, acuteDays, chronicDays, method, lowBase: false };
+  let zone: ACWRZone = ratio < 0.8 ? 'undertrained' : ratio <= 1.3 ? 'optimal' : ratio <= 1.5 ? 'caution' : 'dangerous';
+  if (lowBase && zone === 'dangerous') zone = 'caution';
+  return { acute, chronic, ratio: Math.round(ratio * 100) / 100, zone, acuteDays, chronicDays, method, lowBase };
 }
 
 /** Честный ACWR: EWMA acute (окно acuteDays) + EWMA chronic по дням ВНЕ острого окна (uncoupled).

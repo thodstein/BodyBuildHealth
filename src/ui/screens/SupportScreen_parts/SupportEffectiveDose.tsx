@@ -7,6 +7,9 @@ import {
 import { PopupSelect, PopupNumber, PopupBool } from '../../components/PopupXxx';
 import { S } from './SupportShared';
 import { doseWindowFor, personDoseHints, bioEvidenceLabel, bioEvidenceFor, resolvePersonDefaults, migratedGet, migratedSet } from '../../../engines/support-hub-evidence.engine';
+// 26 сен 2026 (E0.2): предел + юрисдикция + альтернативное мнение регулятора.
+import { NUTRIENT_LIMIT_INFO } from '../../../engines/support-plan/types';
+import { resolveNutrient } from '../../../engines/support-limits';
 import { getProfile } from '../../../core/profile-manager';
 
 // ─── Therapeutic ranges for key supplements ───
@@ -45,7 +48,13 @@ interface DosingCardProps {
   formOpts: { id: string; label: string; desc?: string }[];
   forms: FormWithBio[];
   form?: FormWithBio;
-  eff: { absorbed: number; rawAbsorbed: number; status: string; ulWarning: string };
+  // 26 сен 2026 (E0.2): altNote — юрисдикция предела + расхождение с альтернативным
+  // мнением регулятора (EFSA против IOM). hasWindow/ulKind/ulUnverified/altNote опциональны,
+  // чтобы ранний return в calcEffDose не расходился с типом.
+  eff: {
+    absorbed: number; rawAbsorbed: number; status: string; ulWarning: string;
+    altNote?: string; ulKind?: string; ulUnverified?: boolean; windowNote?: string; hasWindow?: boolean;
+  };
   adjMult: number;
   costEff: number | null;
 }
@@ -104,6 +113,14 @@ const DosingCard: React.FC<DosingCardProps> = ({
         {eff.ulWarning && (
           <div style={{ marginTop: 3, padding: '3px 6px', borderRadius: 5, fontSize: 7, textAlign: 'center', background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontWeight: 700 }}>
             {eff.ulWarning}
+          </div>
+        )}
+        {/* 26 сен 2026 (E0.2): юрисдикция предела + расхождение с альтернативным
+            мнением регулятора (EFSA против IOM). Раньше число показывалось без
+            источника — выглядело как «просто 12 мг». */}
+        {eff.altNote && (
+          <div style={{ marginTop: 3, padding: '3px 6px', borderRadius: 5, fontSize: 7, lineHeight: 1.3, textAlign: 'center', background: 'rgba(96,165,250,0.12)', color: '#60a5fa' }}>
+            {eff.altNote}
           </div>
         )}
         {costEff !== null && (
@@ -241,7 +258,18 @@ export const SupportEffectiveDose: React.FC = () => {
     } else if (win.ulKind === 'NotEstablished') {
       ulWarning = `Предел не установлен (${win.ul ?? '—'}) — дозу оценивает врач, самостоятельно не превышать.`;
     }
-    return { absorbed, rawAbsorbed, range, status, ulWarning, windowNote: win.note, hasWindow: win.hasData, ulKind: win.ulKind, ulUnverified: win.ulUnverified };
+    // 26 сен 2026 (E0.2, критерий приёмки): показываем, ОТКУДА взят предел и
+    // насколько он расходится с альтернативным мнением регулятора. Для B6 это
+    // EFSA 12 мг против IOM 100 мг — разрыв в 8 раз, и без этой строки юзер видит
+    // просто «12 мг» и не понимает, почему цифра такая строгая.
+    const lim = NUTRIENT_LIMIT_INFO[resolveNutrient(id) ?? ''];
+    const altNote = lim && lim.altValue && lim.altValue !== lim.value
+      ? `${lim.jurisdiction} ${lim.year}: ${lim.value} ${lim.unit === 'mcg' ? 'мкг' : lim.unit === 'iu' ? 'МЕ' : 'мг'} · `
+        + `${lim.altJurisdiction} ${lim.altYear}: ${lim.altValue} — `
+        + `разрыв ×${(Math.max(lim.value, lim.altValue) / Math.min(lim.value, lim.altValue)).toFixed(lim.altValue / lim.value >= 10 ? 0 : 1)}. `
+        + `Показан более строгий предел.`
+      : '';
+    return { absorbed, rawAbsorbed, range, status, ulWarning, windowNote: win.note, hasWindow: win.hasData, ulKind: win.ulKind, ulUnverified: win.ulUnverified, altNote };
   };
 
   const eff1 = calcEffDose(f1, dose1, sub1Id);

@@ -5,7 +5,10 @@ import {
   buildHrvBaseline,
   hrvReadiness,
   hrvRatioToBaseline,
+  hrvRecoveryMult,
+  hrvSignalFromStore,
   HRV_PROTOCOL_NOTE,
+  HRV_BASELINE_REQUIRED_NOTE,
 } from '../hrv-baseline.engine';
 import { analyzeRecovery } from '../../recovery-optimization.engine';
 
@@ -184,5 +187,63 @@ describe('E2 честное восстановление: суперкомпен
     const noWeek = analyzeRecovery({ sleep: sleepGood, hrv: hrvGood, fatigueScore: 0.2, trainingDaysThisWeek: 4, currentWeek: 0 });
     const week6 = analyzeRecovery({ sleep: sleepGood, hrv: hrvGood, fatigueScore: 0.2, trainingDaysThisWeek: 4, currentWeek: 6 });
     expect(noWeek.supercompensationHours).toBe(week6.supercompensationHours);
+  });
+});
+
+/* ── P0-Б (26.09.2026): HRV → личная база. Локи контракта, который заменил
+ *    абсолютный порог >70/<50 мс в lms-builder и bb-volume. ── */
+describe('P0-Б hrvRecoveryMult — только от личной базы', () => {
+  it('без базы объём НЕ трогаем, даже при «популярно низком» 40 мс', () => {
+    const v = hrvRecoveryMult({ hrvMs: 40 });
+    expect(v.mult).toBe(1);
+    expect(v.source).toBe('none');
+    expect(v.note).toBe(HRV_BASELINE_REQUIRED_NOTE);
+  });
+
+  it('без базы высокие 80 мс тоже не дают бонуса (Plews 2013 PMID 23535808)', () => {
+    const v = hrvRecoveryMult({ hrvMs: 80 });
+    expect(v.mult).toBe(1);
+    expect(v.source).toBe('none');
+  });
+
+  it('z-путь: ≤−2 SWC → ×0.85, ≤−1 → ×0.925, коридор → 1, ≥+2 → 1 (неоднозначно)', () => {
+    expect(hrvRecoveryMult({ hrvMs: 40, hrvBaselineZ: -2.4 }).mult).toBe(0.85);
+    expect(hrvRecoveryMult({ hrvMs: 50, hrvBaselineZ: -1.2 }).mult).toBe(0.925);
+    expect(hrvRecoveryMult({ hrvMs: 60, hrvBaselineZ: 0.1 }).mult).toBe(1);
+    const up = hrvRecoveryMult({ hrvMs: 80, hrvBaselineZ: 2.5 });
+    expect(up.mult).toBe(1);
+    expect(up.note).toMatch(/неоднозначн/i);
+  });
+
+  it('z приоритетнее ratio, если переданы оба', () => {
+    const v = hrvRecoveryMult({ hrvMs: 40, hrvBaseline: 80, hrvBaselineZ: -0.2 });
+    expect(v.source).toBe('z');
+    expect(v.mult).toBe(1);
+  });
+
+  it('ratio-путь (есть только база в мс): ≤80% → ×0.85, ≤90% → ×0.925, коридор → 1', () => {
+    expect(hrvRecoveryMult({ hrvMs: 60, hrvBaseline: 80 }).mult).toBe(0.85);
+    expect(hrvRecoveryMult({ hrvMs: 70, hrvBaseline: 80 }).mult).toBe(0.925);
+    expect(hrvRecoveryMult({ hrvMs: 80, hrvBaseline: 80 }).mult).toBe(1);
+  });
+
+  it('мусор на входе → нейтрально, без исключения', () => {
+    expect(hrvRecoveryMult({}).mult).toBe(1);
+    expect(hrvRecoveryMult({ hrvMs: Number.NaN }).mult).toBe(1);
+    expect(hrvRecoveryMult({ hrvMs: -5 }).mult).toBe(1);
+    expect(hrvRecoveryMult({ hrvMs: 50, hrvBaseline: 0 }).mult).toBe(1);
+  });
+
+  it('hrvSignalFromStore: база строится из he_hrv_log, без базы n=0 и need_base', () => {
+    const empty = hrvSignalFromStore(50);
+    expect(empty.n).toBe(0);
+    expect(empty.status).toBe('need_base');
+    expect(hrvRecoveryMult(empty).mult).toBe(1);
+
+    seed([60, 62, 58, 61, 59]);
+    const withBase = hrvSignalFromStore(40);
+    expect(withBase.n).toBeGreaterThanOrEqual(3);
+    expect(withBase.hrvBaselineZ).toBeLessThan(0);
+    expect(hrvRecoveryMult(withBase).mult).toBeLessThan(1);
   });
 });
