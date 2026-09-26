@@ -87,9 +87,14 @@ export const CardioDiaryStep: React.FC<{
                 : `🏁 Старт через ${startInfo.left} нед (нед ${startInfo.week}, ${CARDIO_PHASE_LABELS[startInfo.phase]}): taper снижает объём — HIIT уже убран; контролируйте вес (0.5-1%/нед) и сон.${startInfo.lastWeight != null ? ` Последний вес: ${startInfo.lastWeight} кг.` : ''}`}
             </div>
           )}
-          <CardioSessionTimer cycle={localCycle} onSaved={reloadLog} onReschedule={handleReschedule} />
         </div>
       )}
+      {/* P2-аудит: таймер держит идущую сессию в локальном state, поэтому раньше
+          переключение таба РАЗМОНТИРОВАЛО его — сессия и введённые RPE/HR/км
+          терялись. Теперь он всегда смонтирован, а на других табах скрыт. */}
+      <div style={{ display: tab === 'session' ? 'block' : 'none' }} data-cardio="timer-parked">
+        <CardioSessionTimer cycle={localCycle} onSaved={reloadLog} onReschedule={handleReschedule} />
+      </div>
       {tab === 'analytics' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
           <CardioVolumeChart cycle={localCycle} log={log} />
