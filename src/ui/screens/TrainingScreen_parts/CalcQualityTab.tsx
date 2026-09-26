@@ -12,7 +12,7 @@ import { analyzeProQuality } from '../../../engines/manual-constructor/pro-quali
 import TrainingMetricsChart from '../SRCBBScreen_parts/TrainingMetricsChart';
 import { applyToPlanner } from './planner-bridge';
 import { composeQualityScoreV2 } from '../../../engines/quality-score-v2.engine';
-import { deriveV2InputFromProgram, programForDivision } from './quality-hub-helpers';
+import { deriveV2InputFromProgram, programForDivision, plTemplateSynthesis } from './quality-hub-helpers';
 import { PerMuscleBars, QualityScoreCard, useQualityCharts, useQualityProgram } from './quality-hub-parts';
 import { QualityActions } from './QualityActions';
 
@@ -105,6 +105,12 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     if (!progForCalc) return null;
     return computePlanQualityFor(progForCalc as UserProgram, effectiveLevel, { onCourse: false, courseIntensity: 'moderate', labMult: useLab ? labMult : 1, division, enableV2: true });
   }, [selectedProgram, effectiveLevel, usePed, useLab, labMult, division]);
+
+  // Wave-1 Э1.4: тот же источник истины, что и в programForDivision (plTemplateSynthesis).
+  const templateSynth = useMemo(
+    () => (selectedProgram ? plTemplateSynthesis(selectedProgram as any, division, (id: string) => getCycleById(id)) : null),
+    [selectedProgram, division],
+  );
 
   const pro = useMemo(() => {
     if (!selectedProgram || !analysis) return null;
@@ -237,6 +243,21 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 11, color: '#fff', display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <span><b style={{ color: ACCENT }}>{selectedProgram.meta.title}</b> · {selectedProgram.meta.direction.toUpperCase()} {isHybrid ? '· HYBRID' : ''} · {selectedProgram.meta.level} · {selectedProgram.meta.weeks} нед</span>
           <span style={{ color: '#fff' }}>{division === 'bb' ? 'ББ-недель: ' + ((selectedProgram.bb?.weeks.length || 0) || (isHybrid ? (selectedProgram.hybrid?.bbWeeks?.length || 0) : 0)) : 'ПЛ-недель: ' + (selectedProgram.pl?.customWeeks?.length || (selectedProgram.pl?.sourceCycleId ? 1 : 0))}</span>
+        </div>
+      )}
+
+      {/* Wave-1 Э1.4: честная плашка «это ШАБЛОН, а не собранная программа».
+          Раньше хаб молча разбирал week1 шаблона цикла и выдавал это за аудит программы. */}
+      {templateSynth && (
+        <div
+          data-q="template-source"
+          style={{ marginBottom: 8, padding: '9px 11px', borderRadius: 10, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.30)', fontSize: 11, color: '#fff', lineHeight: 1.45 }}
+        >
+          <b style={{ color: '#fbbf24' }}>⚠ Анализ по ШАБЛОНУ цикла, а не по собранной программе.</b>{' '}
+          Цикл <b style={{ color: '#fff' }}>{templateSynth.cycleId}</b> не собран: доступно {templateSynth.weeks[0]?.templateWeeks ?? templateSynth.weeks.length} нед шаблона
+          (обычно только week1). Фазы и делоды в шаблоне отсутствуют — вердикты о периодизации и разгрузке
+          неприменимы. Объём/RIR/плотность посчитаны по реальным подходам шаблона.
+          Собери программу в ПЛ-конструкторе — и аудит станет полным.
         </div>
       )}
 

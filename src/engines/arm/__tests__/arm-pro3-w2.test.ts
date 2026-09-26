@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   saveRedFlags, loadRedFlags, loadRedFlagLog, hasStopFlag, redFlagLabels, ARM_RED_FLAG_DEFS,
 } from '../arm-redflags.store';
-import { wafClassFor, armliftNormsFor, normPct } from '../arm-norms-table.engine';
+import { wafSeniorClassFor, armliftNormsFor, normPct } from '../arm-norms-table.engine';
 import { buildArmBridgeData } from '../arm-bridge-payload.engine';
 import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv } from '../arm-diagnostics-export.engine';
 
@@ -66,22 +66,22 @@ describe('PRO-3 W2 P4: red-flags стор', () => {
 
 describe('PRO-3 W2 P3: WAF-классы и нормы', () => {
   it('муж 82.5 → М-85, до границы 2.5', () => {
-    const c = wafClassFor(82.5, 'male');
+    const c = wafSeniorClassFor(82.5, 'male');
     expect(c.cls).toBe('85');
     expect(c.label).toBe('М-85');
     expect(c.toNext).toBe(2.5);
   });
   it('жен 62 → Ж-65 (женская сетка, не мужская)', () => {
-    const c = wafClassFor(62, 'female');
+    const c = wafSeniorClassFor(62, 'female');
     expect(c.cls).toBe('65');
     expect(c.label).toBe('Ж-65');
     // по мужской сетке было бы 65 тоже — берём различающий кейс:
-    const c2 = wafClassFor(58, 'female');
+    const c2 = wafSeniorClassFor(58, 'female');
     expect(c2.cls).toBe('60');
     expect(c2.label).toBe('Ж-60');
   });
   it('тяж 120 → открытая, без сгонки', () => {
-    const c = wafClassFor(120, 'male');
+    const c = wafSeniorClassFor(120, 'male');
     expect(c.cls).toBe('110+');
     expect(c.limit).toBeNull();
     expect(c.toNext).toBeNull();

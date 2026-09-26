@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildDynamicReport, calcDynamicMetrics, calcAsymmetry } from '../arm-dynamic-force.engine';
-import { resolveArmLevelByTests, wafWeightClassFor, benchLevelFor, ARM_BENCHMARKS } from '../arm-benchmarks.engine';
+import { resolveArmLevelByTests, benchLevelFor, ARM_BENCHMARKS } from '../arm-benchmarks.engine';
+import { wafSeniorClassFor } from '../arm-norms-table.engine';
 import { buildWeeklyStats, fatigueTrend, forceTrend, weeklyForceAdvice } from '../arm-force-history.store';
 import { estimateForceVector, getRtWorldClass, getSideRef } from '../arm-force-capture.engine';
 import { buildArmDiagnosticsReport } from '../arm-diagnostics-hub.engine';
@@ -70,10 +71,17 @@ describe('arm PRO MAX v2 — benchmarks', () => {
     const b = resolveArmLevelByTests({});
     expect(b.level).toBe('beginner');
   });
-  it('WAF class', () => {
-    expect(wafWeightClassFor(55)).toBe('55');
-    expect(wafWeightClassFor(82)).toBe('85');
-    expect(wafWeightClassFor(115)).toBe('110+');
+  it('WAF class — Senior-хелпер таблицы норм, с полом', () => {
+    // Wave-1 Э1.5 (было→стало): тест держал мёртвую `wafWeightClassFor` — третью копию
+    // мужской сетки без пола. Она удалена; здесь `wafSeniorClassFor(bw, sex)`.
+    // Мужские значения совпадают 1-в-1 с прежними.
+    expect(wafSeniorClassFor(55, 'male').cls).toBe('55');
+    expect(wafSeniorClassFor(82, 'male').cls).toBe('85');
+    expect(wafSeniorClassFor(115, 'male').cls).toBe('110+');
+    // Женская сетка другая — ровно то, что не могла дать удалённая функция:
+    // 72 кг → канон '80' (потолок), а удалённая мужская сетка сказала бы '75'.
+    expect(wafSeniorClassFor(72, 'female').cls).toBe('80');
+    expect(wafSeniorClassFor(95, 'female').cls).toBe('90+');
   });
 });
 

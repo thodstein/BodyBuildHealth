@@ -75,11 +75,12 @@ export function resolveArmLevelByTests(input: BenchInput): { level: BenchLevel; 
   return { level: scoreToLevel(avg), avgScore: Math.round(avg * 100) / 100, details };
 }
 
-export function wafWeightClassFor(bwKg: number): string {
-  const classes = [55, 60, 65, 70, 75, 80, 85, 90, 100, 110];
-  for (const c of classes) if (bwKg <= c) return `${c}`;
-  return '110+';
-}
+// Wave-1 Э1.5: `wafWeightClassFor` УДАЛЁН.
+// Причина: это была третья копия мужской сетки WAF ([55…110]) без параметра пола, т.е. для
+// женщины 72 кг она давала «75» вместо канон «70», а 95 кг → «100» вместо «90+».
+ // Живой потребитель (ArmDiagnosticsHub) давно переведён на канон `wafClassFor(bw, sex)`
+// (см. комментарий «PRO-3 P3» рядом с местом вызова), поэтому функция осталась мёртвой:
+// её держал только собственный тест. Канон: `wafClassFor` в arm-norms-table.engine.ts.
 
 export function benchAdviceForLevel(level: BenchLevel): string {
   if (level === 'beginner') return 'Новичок — Phase1 15-20 RPE5-6, 3с негатив, 48ч отдых, без 100% спарринга 3 мес';

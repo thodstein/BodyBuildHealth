@@ -10,6 +10,7 @@
  */
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { deriveLengthShare, deriveShoulderFromNames } from '../../../engines/plan-quality.engine';
+import { detectLift } from '../../../engines/lms/lms-to-pl';
 import type { V2ComposerInput } from '../../../engines/quality-score-v2.engine';
 import { applyToPlanner } from './planner-bridge';
 
@@ -50,25 +51,60 @@ export function resolveWorkMax(
 
 interface TplSet { pct?: number; reps?: number; sets?: number; rir?: number }
 interface TplExercise { name: string; group?: string; sets: TplSet[] }
-interface TplDay { exercises: TplExercise[] }
+interface TplDay { name?: string; exercises: TplExercise[] }
 interface TplTemplate { weeks?: TplDay[][]; week1?: TplDay[] }
 
-export function buildSyntheticPlWeeks(tpl: TplTemplate | null | undefined): Array<{
-  week: number; phase: 'accumulation'; deload: boolean;
-  days: Array<{ name: string; exercises: Array<{ name: string; lift: 'accessory'; muscle: string; sets: TplSet[] }> }>;
-}> {
+/** Wave-1 Э1.4: неделя, СИНТЕЗИРОВАННАЯ из шаблона цикла, а не из собранной программы. */
+export interface SyntheticPlWeek {
+  week: number;
+  /** Подставлено: в шаблоне цикла фаз нет. Реального значения НЕТ — см. phaseKnown. */
+  phase: 'accumulation';
+  /** Подставлено: в шаблоне цикла делодов нет. Реального значения НЕТ — см. deloadKnown. */
+  deload: boolean;
+  /** Всегда true: это данные ШАБЛОНА, не собранной программы. */
+  synthetic: true;
+  phaseKnown: false;
+  deloadKnown: false;
+  /** Сколько недель реально есть в шаблоне (обычно 1 — только week1). */
+  templateWeeks: number;
+  days: Array<{
+    name: string;
+    exercises: Array<{ name: string; lift: 'squat' | 'bench' | 'dead' | 'accessory'; muscle: string; sets: TplSet[] }>;
+  }>;
+}
+
+/**
+ * Синтез недель ПЛ из ШАБЛОНА СРЦ-цикла.
+ *
+ * Wave-1 Э1.4 (честность, не переписывание формул):
+ *  - **было** `lift: 'accessory'` для КАЖДОГО упражнения → присед/тяга/жим лёжа попадали в
+ *    категорию вспомогательных, а V2-скоринг (плечо/длина/нагрузка) считал их по критериям
+ *    изоляции. Теперь лифт определяется каноном `detectLift` (тот же, что у lms-to-pl).
+ *  - **было** `muscle: group || 'chest'` → упражнение без группы приписывалось к груди,
+ *    т.е. к нему применялся MRV/объём груди. Нейтральный фолбэк в проекте — `core`
+ *    (тем же решением чинили lms-to-pl). Теперь `core`.
+ *  - неделя/фаза/делод **помечены** как неизвестные (`phaseKnown/deloadKnown/synthetic`),
+ *    чтобы UI не выдавал аудит шаблона за аудит программы.
+ */
+export function buildSyntheticPlWeeks(tpl: TplTemplate | null | undefined): SyntheticPlWeek[] {
   if (!tpl) return [];
   const rawWeeks: TplDay[][] = (tpl.weeks && tpl.weeks.length ? tpl.weeks : tpl.week1 ? [tpl.week1] : []);
+  const templateWeeks = rawWeeks.length;
   return rawWeeks.map((days, wi) => ({
     week: wi + 1,
     phase: 'accumulation' as const,
     deload: false,
+    synthetic: true as const,
+    phaseKnown: false as const,
+    deloadKnown: false as const,
+    templateWeeks,
     days: days.map((d, di) => ({
-      name: `День ${di + 1}`,
+      // Wave-1 Э1.4: настоящее имя дня, если шаблон его дал; иначе «День N»
+      name: (d && d.name) || `День ${di + 1}`,
       exercises: (d.exercises || []).map(ex => ({
         name: ex.name,
-        lift: 'accessory' as const,
-        muscle: (ex as any).group || 'chest',
+        lift: (detectLift(ex.name, (ex as any).group || '') ?? 'accessory') as 'squat' | 'bench' | 'dead' | 'accessory',
+        muscle: (ex as any).group || 'core',
         sets: (ex.sets || []).map(s => ({ pct: s.pct, reps: s.reps, sets: s.sets, rir: s.rir ?? 2 })),
       })),
     })),
@@ -104,6 +140,8 @@ export function deriveV2InputFromProgram(
   const namesByMuscle: Record<string, string[]> = {};
   const exerciseNames: string[][] = [];
   let weeksTotal = 0;
+  /** Wave-1 Э1.4: true — недели пришли из ШАБЛОНА цикла, а не из собранной программы. */
+  let sourceIsTemplate = false;
   let rirSum = 0; let rirN = 0; let rirLE2 = 0; let rir0 = 0;
   let deloadWeeks = 0;
   const deloadWeekNums: number[] = [];
@@ -163,6 +201,9 @@ export function deriveV2InputFromProgram(
     const weeks = program.pl?.customWeeks || [];
     if (!weeks.length) return null;
     weeksTotal = weeks.length;
+    // Wave-1 Э1.4: недели, синтезированные из ШАБЛОНА цикла (buildSyntheticPlWeeks).
+    // В шаблоне нет ни фаз, ни делодов → их значения подставлены, а не измерены.
+    sourceIsTemplate = weeks.length > 0 && weeks.every((w) => (w as any)?.synthetic === true);
     for (const w of weeks) {
       const isDeloadW = !!(w as any).deload || (w as any).phase === 'deload';
       if (isDeloadW) { deloadWeeks += 1; deloadWeekNums.push((w as any).week || 0); }
@@ -172,7 +213,9 @@ export function deriveV2InputFromProgram(
         const per: Record<string, number> = {};
         const names: string[] = [];
         for (const ex of d.exercises || []) {
-          const mu = ((ex.muscle || ex.lift || 'chest') as string).toLowerCase();
+          // Wave-1 Э1.4: нейтральный фолбэк мышцы — 'core' (не 'chest', который приписывал
+          // упражнение без группы к груди и тянул к ней MRV/объём).
+          const mu = ((ex.muscle || ex.lift || 'core') as string).toLowerCase();
           const n = ex.sets?.reduce((a, s) => a + (s.sets || 1), 0) || 0;
           per[mu] = (per[mu] || 0) + n;
           weeklySets[mu] = (weeklySets[mu] || 0) + n;
@@ -234,7 +277,18 @@ export function deriveV2InputFromProgram(
         : null,
       loadDrop: null,
       phaseTag: 'deload' as const,
-    } : null,
+    } : (sourceIsTemplate ? {
+      // Wave-1 Э1.4: раньше здесь был `null`, и хаб МОЛЧАЛ про делоды — пользователь не мог
+      // отличить «делодов нет» от «мы не знаем». Теперь это честное «неизвестно» (info).
+      hasDeload: false,
+      totalWeeks: weeksTotal,
+      deloadWeeks: [],
+      depthVolume: null,
+      rirShift: null,
+      loadDrop: null,
+      phaseTag: 'none' as const,
+      unknown: true,
+    } : null),
     shoulder: deriveShoulderFromNames(namesByMuscle, weeklySets),
     lengthShare: deriveLengthShare(namesByMuscle, weeklySets),
     load: null,
@@ -466,6 +520,26 @@ interface ProgramForDivision {
 }
 
 /**
+ * Wave-1 Э1.4: единственное место, где решается «а не синтез ли это из ШАБЛОНА?».
+ * Используется и в `programForDivision` (расчёт), и в UI (честная плашка) — чтобы
+ * условие не разъехалось на две копии.
+ */
+export function plTemplateSynthesis(
+  selectedProgram: ProgramForDivision | null | undefined,
+  division: 'bb' | 'pl',
+  getCycleById: (id: string) => unknown,
+): { cycleId: string; weeks: SyntheticPlWeek[] } | null {
+  if (!selectedProgram) return null;
+  const isHybridProg = selectedProgram.meta?.direction === 'hybrid';
+  const cycleId = selectedProgram.pl?.sourceCycleId;
+  if (!(division === 'pl' || isHybridProg) || !cycleId || selectedProgram.pl?.customWeeks) return null;
+  const tpl = getCycleById(cycleId) as TplTemplate | null | undefined;
+  if (!tpl) return null;
+  const weeks = buildSyntheticPlWeeks(tpl);
+  return weeks.length ? { cycleId, weeks } : null;
+}
+
+/**
  * Программа для расчёта под разделение: ПЛ-синтетика из СРЦ-шаблона + hybrid-fallback.
  * Чистая; раньше жила двумя копиями внутри CalcQualityTab (analysis/analysisNatural).
  */
@@ -477,12 +551,9 @@ export function programForDivision<T extends ProgramForDivision>(
   if (!selectedProgram) return null;
   let progForCalc = selectedProgram;
   const isHybridProg = selectedProgram.meta.direction === 'hybrid';
-  if ((division === 'pl' || isHybridProg) && selectedProgram.pl?.sourceCycleId && !selectedProgram.pl.customWeeks) {
-    const tpl = getCycleById(selectedProgram.pl.sourceCycleId) as TplTemplate | null | undefined;
-    if (tpl) {
-      const synthWeeks = buildSyntheticPlWeeks(tpl);
-      progForCalc = { ...selectedProgram, pl: { ...selectedProgram.pl, customWeeks: synthWeeks as any } };
-    }
+  const synth = plTemplateSynthesis(selectedProgram, division, getCycleById);
+  if (synth) {
+    progForCalc = { ...selectedProgram, pl: { ...selectedProgram.pl, customWeeks: synth.weeks as any } };
   }
   if (division === 'bb' && isHybridProg && !(progForCalc as any).bb && (progForCalc as any).hybrid?.bbWeeks) {
     progForCalc = {

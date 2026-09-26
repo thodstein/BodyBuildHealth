@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { getRtWorldClass } from '../../../engines/arm/arm-force-capture.engine';
-import { wafClassFor } from '../../../engines/arm/arm-norms-table.engine';
+import { wafSeniorClassFor } from '../../../engines/arm/arm-norms-table.engine';
 import { benchAdviceForLevel } from '../../../engines/arm/arm-benchmarks.engine';
 import { ARM_BIOMECH, angleJointForWeakPoint, isValidAngleForArmWeakPoint, vbtThresholdForWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
@@ -59,7 +59,7 @@ export function HubGripTab({ H }: { H: any }) {
           </div>
           <div className="ad-muted">WR M {getRtWorldClass('male')}кг / Ж {getRtWorldClass('female')}кг · Axle {state.axleImpl === 'apollon' ? '237.5/137.9' : 133} · Side ref {(bwNum*0.6).toFixed(0)}кг</div>
           {(() => {
-            const ci = wafClassFor(bwNum, state.sex);
+            const ci = wafSeniorClassFor(bwNum, state.sex);
             return <div className="ad-muted" data-arm="waf-class">Класс WAF: {ci.label} (ты {bwNum}кг){ci.toNext != null ? ` · до −${ci.cls}: −${ci.toNext}кг` : ' · открытая — без сгонки'}</div>;
           })()}
           {(()=>{

@@ -131,6 +131,22 @@ describe('quality-score-v2: делод', () => {
   it('короткий мезо без делода — тишина', () => {
     expect(deloadQualityCheck({ hasDeload: false, totalWeeks: 4, deloadWeeks: [] })).toEqual([]);
   });
+  it('Wave-1 Э1.4: unknown → честное «неизвестно» (info), а не выдуманный critical', () => {
+    // Источник — ШАБЛОН цикла: делодов в нём нет, значения подставлены (buildSyntheticPlWeeks).
+    // Раньше хаб либо молчал (deload=null), либо (при >=6 нед) выдавал «нет разгрузочной фазы»
+    // про программу, которую пользователь вообще не собирал.
+    const r = deloadQualityCheck({ hasDeload: false, totalWeeks: 12, deloadWeeks: [], unknown: true });
+    expect(r).toHaveLength(1);
+    expect(r[0].id).toBe('deload_unknown');
+    expect(r[0].severity).toBe('info');
+    expect(r.some(i => i.id === 'no_deload')).toBe(false);
+    // critical не выдумывается даже при длинной «мезоцикле»
+    expect(r.every(i => i.severity !== 'critical')).toBe(true);
+  });
+  it('Wave-1 Э1.4: без флага unknown поведение 1-в-1', () => {
+    const r = deloadQualityCheck({ hasDeload: false, totalWeeks: 12, deloadWeeks: [] });
+    expect(r.some(i => i.id === 'deload_unknown')).toBe(false);
+  });
   it('де lod-призрак ловится', () => {
     const r = deloadQualityCheck({ hasDeload: true, totalWeeks: 8, deloadWeeks: [4], depthVolume: 0.05, rirShift: 0, phaseTag: 'deload' });
     expect(r.some(i => i.id === 'deload_ghost')).toBe(true);

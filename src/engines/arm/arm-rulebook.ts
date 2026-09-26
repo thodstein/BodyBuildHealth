@@ -14,7 +14,14 @@ export type WafAgeGroup =
   | 'super_senior_grand_masters_70'
   | 'para_adult'
   | 'para_junior_23';
-export type WafParaClass = 'none' | 'PID' | 'PIU' | 'PIDH' | 'PIUH' | 'VI' | 'HI' | 'CPD' | 'CPU';
+/**
+ * Wave-1 Э1.5: тип ПЕРЕИСПОЛЬЗУЕТСЯ из канона `arm-waf.engine.ts` (type-only, без рантайм-связи),
+ * раньше был продублирован тут дословно. Причина: два объявления одного union — это два
+ * места, где список Para-классов может разъехаться, а он задаёт и категории 2025, и билдер.
+ * Свой экспорт сохранён: `index.ts` реэкспортит его как `RulebookWafParaClass`.
+ */
+export type { WafParaClass } from './arm-waf.engine';
+import type { WafParaClass } from './arm-waf.engine';
 export type WafCategoryAgeBand = 'standard' | 'para_adult' | 'para_junior_23';
 export type WafParaStyle = 'sit_down' | 'stand_up';
 

@@ -50,7 +50,7 @@ import { armPlanExportBlockReasons, buildArmIcs } from '../../../engines/arm/arm
 import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
 import { loadRedFlags, redFlagLabels } from '../../../engines/arm/arm-redflags.store';
 import { readHumerusBridge } from '../../../engines/arm/arm-pro5-safety.engine';
-import { wafClassFor } from '../../../engines/arm/arm-norms-table.engine';
+import { wafSeniorClassFor } from '../../../engines/arm/arm-norms-table.engine';
 import { analyzeTableIq, tableIqTrend } from '../../../engines/arm/arm-table-iq.engine';
 import { profileOpponent } from '../../../engines/arm/arm-matchup.engine';
 import { diagnoseMatchPhase } from '../../../engines/arm/arm-match-phases.engine';
@@ -382,7 +382,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
   const bwNum = parseFloat(state.bwKg) || 80;
   // PRO-3 P3: класс по полу (раньше wafWeightClassFor — только мужская сетка)
-  const weightClassAuto = state.weightClass || wafClassFor(bwNum, state.sex).cls;
+  const weightClassAuto = state.weightClass || wafSeniorClassFor(bwNum, state.sex).cls;
 
   // локально с bw/sex/weightClass для корректного sideRef
   const forceVecPro = useMemo(() => estimateForceVector({

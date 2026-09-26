@@ -33,7 +33,12 @@ const RT_WORLD_CLASS = RT_WORLD_CLASS_M; // backward compat
 const RT_AVG = 55;
 const AXLE_WORLD_CLASS = 133; // ArmliftingUSA Saxon/Apollon ~133 inspir., оценка (Axle тяжелее RT но без вращения)
 const PINCH_GOOD_SEC = 15; // 15с = хорошо (15с hold = 100%)
-export const WAF_WEIGHT_CLASSES = [-55, -60, -65, -70, -75, -80, -85, -90, -100, -110] as const;
+
+// Wave-1 Э1.5: экспорт `WAF_WEIGHT_CLASSES` УДАЛЁН — это была третья копия весовых классов
+// WAF в проекте (первая — `WAF_CLASSES_FEMALE` в arm-norms-table, вторая — удалённая
+// `wafWeightClassFor` с мужской сеткой). Удаление выбрано, а не вывод из канона, намеренно:
+// arm-norms-table УЖЕ импортирует из этого файла (getRtWorldClass), поэтому импорт обратно
+// создал бы цикл и TDZ на верхнем уровне модуля. Потребителей у константы не было.
 
 export function getRtWorldClass(sex?: string): number {
   return (sex || '').toLowerCase() === 'female' ? RT_WORLD_CLASS_F : RT_WORLD_CLASS_M;

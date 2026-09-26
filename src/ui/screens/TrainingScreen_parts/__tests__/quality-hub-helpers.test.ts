@@ -43,7 +43,7 @@ describe('quality-hub-helpers: buildSyntheticPlWeeks', () => {
     expect(buildSyntheticPlWeeks(null)).toEqual([]);
     expect(buildSyntheticPlWeeks(undefined)).toEqual([]);
   });
-  it('синтез из week1: недели/дни/RIR-дефолт/group-фолбэк', () => {
+  it('синтез из week1: недели/дни/RIR-дефолт/нейтральный фолбэк мышцы', () => {
     const tpl: any = {
       week1: [{ exercises: [{ name: 'Жим', sets: [{ pct: 0.7, reps: 5, sets: 3 }] }] }],
     };
@@ -52,8 +52,43 @@ describe('quality-hub-helpers: buildSyntheticPlWeeks', () => {
     expect(w[0].week).toBe(1);
     expect(w[0].phase).toBe('accumulation');
     expect(w[0].days[0].name).toBe('День 1');
-    expect(w[0].days[0].exercises[0].muscle).toBe('chest');
+    // Wave-1 Э1.4 (было→стало): дефолт мышцы 'chest' → 'core'.
+    // 'chest' приписывал упражнение без группы к груди и тянул к ней MRV/объём;
+    // нейтральный фолбэк в проекте — 'core' (тем же решением чинили lms-to-pl).
+    expect(w[0].days[0].exercises[0].muscle).toBe('core');
     expect(w[0].days[0].exercises[0].sets[0].rir).toBe(2);
+  });
+
+  it('Wave-1 Э1.4: лифт определяется каноном detectLift, а не «accessory» для всего', () => {
+    const tpl: any = {
+      week1: [{
+        exercises: [
+          { name: 'Присед', group: 'quads', sets: [{ pct: 0.8, reps: 3, sets: 5 }] },
+          { name: 'Жим лёжа', group: 'chest', sets: [{ pct: 0.75, reps: 5, sets: 3 }] },
+          { name: 'Становая', group: 'back', sets: [{ pct: 0.85, reps: 3, sets: 3 }] },
+          { name: 'Разводка', group: 'chest', sets: [{ pct: 0.6, reps: 12, sets: 3 }] },
+        ],
+      }],
+    };
+    const ex = buildSyntheticPlWeeks(tpl)[0].days[0].exercises;
+    // БЫЛО: все четыре = 'accessory' → V2 считал присед/тягу/жим по критериям изоляции.
+    expect(ex.map((e) => e.lift)).toEqual(['squat', 'bench', 'dead', 'accessory']);
+  });
+
+  it('Wave-1 Э1.4: недели помечены как синтез из шаблона (фаза/делод НЕ известны)', () => {
+    const tpl: any = { weeks: [[{ exercises: [{ name: 'A', group: 'back', sets: [{ pct: 0.7, reps: 5, sets: 3 }] }] }], [{ exercises: [{ name: 'B', sets: [{ pct: 0.7, reps: 5, sets: 3 }] }] }]] };
+    const w = buildSyntheticPlWeeks(tpl);
+    for (const wk of w) {
+      expect(wk.synthetic).toBe(true);
+      expect(wk.phaseKnown).toBe(false);
+      expect(wk.deloadKnown).toBe(false);
+      expect(wk.templateWeeks).toBe(2);
+    }
+  });
+
+  it('Wave-1 Э1.4: настоящее имя дня из шаблона сохраняется', () => {
+    const tpl: any = { week1: [{ name: 'День силы', exercises: [{ name: 'Жим', group: 'chest', sets: [{ pct: 0.7, reps: 5, sets: 3 }] }] }] };
+    expect(buildSyntheticPlWeeks(tpl)[0].days[0].name).toBe('День силы');
   });
   it('weeks приоритетнее week1', () => {
     const tpl: any = {

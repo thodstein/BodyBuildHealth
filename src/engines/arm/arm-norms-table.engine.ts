@@ -10,7 +10,15 @@ import { getRtWorldClass } from './arm-force-capture.engine';
 export const WAF_CLASSES_MALE = [55, 60, 65, 70, 75, 80, 85, 90, 100, 110] as const;
 export const WAF_CLASSES_FEMALE = [50, 55, 60, 65, 70, 80, 90] as const;
 
-export interface WafClassInfo {
+/**
+ * Wave-1 Э1.5: было `WafClassInfo` / `wafClassFor(bw, sex?)`.
+ * Имя СТОЛКНУЛОСЬ с каноном `wafClassFor` в arm-waf.engine.ts — тремя полями против
+ * этого (`cls/limit/toNext/label` против `label/ceilingKg/deltaKg/fits`), т.е. импортёр
+ * мог взять не тот и получить `undefined`. Здесь оставлен возрастно-слепой Senior-хелпер
+ * для таблицы норм (его док честно пишет: Masters/Junior/Youth здесь НЕ учитываются).
+ * Канон WAF (возраст + Para + сгонка) — `arm-waf.engine.ts`.
+ */
+export interface WafSeniorClassInfo {
   /** '85' или '110+' / '90+'. */
   cls: string;
   /** Верхняя граница класса (кг) или null для открытой. */
@@ -26,7 +34,7 @@ function isFemale(sex?: string): boolean {
 }
 
 /** Класс WAF по весу и полу (Senior; Masters/Junior/Youth — те же границы, свой зачёт). */
-export function wafClassFor(bwKg: number, sex?: string): WafClassInfo {
+export function wafSeniorClassFor(bwKg: number, sex?: string): WafSeniorClassInfo {
   const bw = Number.isFinite(bwKg) && bwKg > 30 ? bwKg : 80;
   const fem = isFemale(sex);
   const classes: readonly number[] = fem ? WAF_CLASSES_FEMALE : WAF_CLASSES_MALE;

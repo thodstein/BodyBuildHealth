@@ -266,11 +266,31 @@ export interface DeloadQualityInput {
   /** Срез нагрузки в делод (0–1). null = нет данных. */
   loadDrop?: number | null;
   phaseTag?: 'deload' | 'taper' | 'peak' | 'none';
+  /**
+   * Wave-1 Э1.4: «делод НЕИЗВЕСТЕН», а не «делода нет».
+   *
+   * Источник этого состояния — программа, собранная не из шаблона, а из ШАБЛОНА цикла
+   * (см. `buildSyntheticPlWeeks`): в шаблоне фаз/делодов нет, поэтому подставленный
+   * `deload:false` — не факт. Без этого флага хаб показывал бы пользователю
+   * «нет разгрузочной фазы при мезо N нед» про программу, которую он вообще не собирал.
+   * При `unknown: true` выдаём честное «неизвестно» вместо выдуманной критики.
+   */
+  unknown?: boolean;
 }
 
 export function deloadQualityCheck(d: DeloadQualityInput): QualityV2Issue[] {
   const out: QualityV2Issue[] = [];
   const tag = d.phaseTag || 'none';
+  // Wave-1 Э1.4: источник — шаблон цикла, а не собранная программа. Делод неизвестен,
+  // поэтому НЕ выдумываем ни «нет делода» (critical), ни «призрак делода».
+  if (d.unknown) {
+    out.push({
+      id: 'deload_unknown', severity: 'info', category: 'deload',
+      message: 'Разгрузочные недели неизвестны: программа разобрана по ШАБЛОНУ цикла, а не собрана',
+      fix: 'Собери программу в ПЛ-конструкторе (шаблон знает только week1 — фаз и делодов в нём нет)',
+    });
+    return out;
+  }
   if (!d.hasDeload && d.totalWeeks >= 6 && tag !== 'taper' && tag !== 'peak') {
     out.push({
       id: 'no_deload', severity: 'critical', category: 'deload',
