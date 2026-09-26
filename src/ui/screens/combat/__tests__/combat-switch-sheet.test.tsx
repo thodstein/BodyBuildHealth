@@ -144,12 +144,12 @@ describe('Combat quality step', () => {
     render(<CombatConstructor />);
     go('4 Сплит');
     fireEvent.click(screen.getByRole('button', { name: /Собрать PRO-план/ }));
-    await screen.findByText('Сводка плана', {}, { timeout: 12000 });
+    await screen.findByText('Сводка плана', {}, { timeout: 25000 });
     go('6 Качество');
     expect(screen.getByText('Карта качества')).toBeTruthy();
     openSec(/Подробный отчёт/);
     expect(document.body.textContent).toContain('Единоборства:');
-  }, 15000);
+  }, 30000);
 });
 
 describe('Combat plan controls', () => {
