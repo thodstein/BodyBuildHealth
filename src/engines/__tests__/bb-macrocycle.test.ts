@@ -5,7 +5,7 @@
  *  - buildBbMacrocycle: 4 BB-фазы, правильные пропорции
  *  - Без соревнований: простое распределение 4 фаз
  *  - С соревнованиями: A/B/C приоритеты
- *  - Сериализация/десериализация v7
+ *  - Сериализация/десериализация формата v8 (v7 принимается как легаси)
  *  - bbMacroToActiveBlock, bbTrainingFocusForWeek
  *  - MACRO_PHASE_TO_BB маппинг (через remapWeeksFromMacrocycle)
  *  - BBMacroPhase → Phase маппинг
@@ -277,10 +277,23 @@ describe('serializeBbMacro / deserializeBbMacro', () => {
     expect(deserializeBbMacro('{"v": 7}')).toBeNull();
   });
 
-  it('null для v != 7', () => {
+  it('null для неизвестной версии формата', () => {
     const json = serializeBbMacro(original);
-    const broken = json.replace('"v":7', '"v":6');
-    expect(deserializeBbMacro(broken)).toBeNull();
+    // Мутация строкой устарела вместе с форматом (v7 → v8) и молча превратила
+    // проверку в «текущая версия валидна». Мутируем версию по факту, а заодно
+    // подтверждаем, что полезная нагрузка сама по себе десериализуется —
+    // иначе отказ мог бы прийти из payload, а не из версии.
+    expect(deserializeBbMacro(json)).not.toBeNull();
+    const parsed = JSON.parse(json) as { v: number };
+    expect(deserializeBbMacro(JSON.stringify({ ...parsed, v: 999 }))).toBeNull();
+  });
+
+  it('отказ по версии отделён от отказа по payload (нагрузка одна, версия разная)', () => {
+    const { b, ...rest } = JSON.parse(serializeBbMacro(original)) as { v: number; b: unknown };
+    // Одна и та же валидная нагрузка: в текущей версии — объект, в неизвестной — null.
+    // Если движок перестанет проверять версию, упадёт именно вторая строка.
+    expect(deserializeBbMacro(JSON.stringify({ ...rest, b }))).not.toBeNull();
+    expect(deserializeBbMacro(JSON.stringify({ ...rest, b, v: 999 }))).toBeNull();
   });
 
   it('отбрасывает повреждённые описания и дубликаты соревнований', () => {
