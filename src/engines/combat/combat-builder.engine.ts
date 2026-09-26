@@ -15,6 +15,7 @@ import { accentForDiscipline, accentForFightStyle, styleNarrative } from './comb
 import { tempoForCB, restForCB } from './combat-loading';
 import { adaptForPEDsCombat } from './combat-ped-adaptation';
 import { filterByMobilityCB, isAxialLoadExerciseCB, isMobilityRestrictedCB } from './combat-mobility';
+import { validateSyncCombat } from './combat-limits';
 import { applyCombatDUP } from './combat-dup';
 import { applyCombatIntensity } from './combat-intensity';
 import { weightForCombatExerciseResolved } from './combat-workmax';
@@ -931,7 +932,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
 
   const snap: any = { ...input, outsideLoad: effectiveOutsideLoad, weightCutProtocol: wcProtocol || (input as any).weightCutProtocol || null };
   const plan: CombatPlan = {
-    id: `cb_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: combatPlanId({ ...snap, discipline, goal, level, weeks, patternId: pattern.id }),
     discipline,
     goal: goal as any,
     level: level as any,
@@ -947,6 +948,77 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   return plan;
 }
 
+/** FNV-1a 32-bit — стабильный между вызовами и между сессиями. */
+function fnv1a(str: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36).padStart(7, '0');
+}
+
+/**
+ * Идентификатор плана = хеш ЗНАЧИМЫХ входов (не Date.now/random).
+ * Одинаковый вход → одинаковый id: планы можно диффать, дедуплицировать
+ * в хранилище и в годовом плане, а rebuild с теми же параметрами идемпотентен.
+ * В `savedAt` отдельно пишется факт времени сохранения.
+ */
+export function combatPlanId(input: any): string {
+  const stable = {
+    discipline: input?.discipline,
+    goal: input?.goal,
+    level: input?.level,
+    weeks: input?.weeks,
+    daysPerWeek: input?.daysPerWeek,
+    patternId: input?.patternId,
+    periodizationModel: input?.periodizationModel,
+    methodology: input?.methodology,
+    dupMode: input?.dupMode,
+    intensityTech: input?.intensityTech,
+    conditioningMode: input?.conditioningMode,
+    fightDate: input?.fightDate || null,
+    startDate: input?.startDate || null,
+    weightClassLimitKg: input?.weightClassLimitKg ?? null,
+    weightClassRuleset: input?.weightClassRuleset || null,
+    weightCutKg: input?.weightCutKg ?? null,
+    bodyweightKg: input?.bodybodyKg ?? null,
+    sex: input?.sex,
+    age: input?.age,
+    fightStyle: input?.fightStyle || null,
+    cycleId: input?.cycleId || null,
+    workMax: input?.workMax || null,
+    equipment: input?.equipment || null,
+  };
+  return `cb_${fnv1a(JSON.stringify(stable))}`;
+}
+
+/** Пересчитывает валидацию по ФАКТУ плана (а не отдаёт сохранённую билдером).
+ *  Нужен после любой мутации плана — иначе `validate*` пропускает испорченный план. */
 export function validateCombatPlan(plan: CombatPlan): { ok: boolean; warnings: string[]; errors: string[] } {
-  return plan.validation || { ok: true, warnings: [], errors: [] };
+  if (!plan) return { ok: true, warnings: [], errors: [] };
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const weeks = plan.weeksData || [];
+  if (weeks.length !== plan.weeks) errors.push(`Число недель ${weeks.length} ≠ заявлено ${plan.weeks}`);
+  for (const wk of weeks) {
+    for (const sess of wk.sessions || []) {
+      for (const ex of sess.exercises || []) {
+        if (ex.workSets && ex.workSets.length !== ex.sets) errors.push(`Нед ${wk.week} ${ex.name}: workSets ${ex.workSets.length} ≠ sets ${ex.sets}`);
+        if (!Number.isFinite(ex.sets) || ex.sets < 1) errors.push(`Нед ${wk.week} ${ex.name}: sets=${ex.sets}`);
+        if (!Number.isFinite(ex.weight) || ex.weight < 0) errors.push(`Нед ${wk.week} ${ex.name}: вес ${ex.weight}`);
+        if (!Number.isFinite(ex.rir) || ex.rir < 0 || ex.rir > 5) errors.push(`Нед ${wk.week} ${ex.name}: RIR ${ex.rir}`);
+      }
+    }
+    if (typeof wk.totalSets === 'number') {
+      const fact = (wk.sessions || []).reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.sets, 0), 0);
+      if (fact !== wk.totalSets) errors.push(`Нед ${wk.week}: totalSets ${wk.totalSets} ≠ факт ${fact}`);
+    }
+  }
+  for (const e of validateSyncCombat(plan)) warnings.push(e);
+  const saved = plan.validation?.warnings || [];
+  for (const w of saved) if (!warnings.includes(w)) warnings.push(w);
+  const savedErr = plan.validation?.errors || [];
+  for (const e of savedErr) if (!errors.includes(e)) errors.push(e);
+  return { ok: errors.length === 0, warnings: [...new Set(warnings)], errors: [...new Set(errors)] };
 }
