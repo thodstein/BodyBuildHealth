@@ -1,4 +1,5 @@
 /** DiaryToolsView.tsx — режим «Инструменты» хаба дневника (вынесен из TrainingDiaryHub). */
+import { localIsoDate } from '../../../core/local-date';
 import React from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { loadMeasurements, saveMeasurement } from '../../../engines/log-analytics-progression.engine';
@@ -69,7 +70,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `diary_export_${new Date().toISOString().slice(0, 10)}.csv`;
+                a.download = `diary_export_${localIsoDate()}.csv`;
                 a.click();
                 URL.revokeObjectURL(url);
               }} style={{ width: '100%', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer' }}>
@@ -87,7 +88,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `mindset_checks_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.download = `mindset_checks_${localIsoDate()}.csv`;
               a.click();
               URL.revokeObjectURL(url);
             }} style={{ width: '100%', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'rgba(167,139,250,0.15)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.3)', cursor: 'pointer' }}>
@@ -104,7 +105,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `mobility_checks_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.download = `mobility_checks_${localIsoDate()}.csv`;
               a.click();
               URL.revokeObjectURL(url);
             }} style={{ width: '100%', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', cursor: 'pointer' }}>
@@ -121,7 +122,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `warmup_checks_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.download = `warmup_checks_${localIsoDate()}.csv`;
               a.click();
               URL.revokeObjectURL(url);
             }} style={{ width: '100%', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'rgba(249,115,22,0.12)', color: '#f97316', border: '1px solid rgba(249,115,22,0.3)', cursor: 'pointer' }}>
@@ -138,7 +139,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `cooldown_checks_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.download = `cooldown_checks_${localIsoDate()}.csv`;
               a.click();
               URL.revokeObjectURL(url);
             }} style={{ width: '100%', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'rgba(56,189,248,0.12)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', cursor: 'pointer' }}>
@@ -197,7 +198,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const sets = month.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + (e.sets?.length || 0), 0), 0);
               const prs = month.flatMap(w => (w.exercises || []).flatMap(e => (e.sets || []).filter((x: any) => x.isPR).map(() => ({ ex: e.exerciseName, w: w.date }))));
               // Психо-чек-ины и мобильность за 30 дней
-              const cutoffStr = cutoff.toISOString().slice(0, 10);
+              const cutoffStr = localIsoDate(cutoff);
               const mind30 = loadCheckins().filter(c => c.date >= cutoffStr);
               const mob30 = loadMobilityCheckins().filter(c => c.date >= cutoffStr);
               const warm30 = loadWarmupLog().filter(e => e.date >= cutoffStr);
@@ -317,7 +318,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `weight_export_${new Date().toISOString().slice(0, 10)}.csv`;
+                a.download = `weight_export_${localIsoDate()}.csv`;
                 a.click();
                 URL.revokeObjectURL(url);
               }} style={{ flex: 1, minWidth: 120, padding: '8px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: 'rgba(0,230,138,0.1)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', cursor: 'pointer' }}>
@@ -394,7 +395,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `diary_backup_${new Date().toISOString().slice(0, 10)}.json`;
+                a.download = `diary_backup_${localIsoDate()}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
               }} style={{ flex: 1, padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer' }}>

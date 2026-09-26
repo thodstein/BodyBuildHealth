@@ -1,4 +1,5 @@
 /** DiaryHistoryView.tsx — режим «История» хаба дневника (вынесен из TrainingDiaryHub). */
+import { localIsoDate } from '../../../core/local-date';
 import React from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { epley1RM } from '../../../engines/e1rm';
@@ -170,7 +171,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             const volDelta = prevVol > 0 ? Math.round(((vol - prevVol) / prevVol) * 100) : 0;
             const best = lastWeek.flatMap(w => w.exercises.map(e => ({ name: e.exerciseName, e1rm: e.estimated1RM || 0 }))).sort((a, b) => b.e1rm - a.e1rm)[0];
             // Психо-чек-ины и мобильность за неделю (для сводки)
-            const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+            const weekAgoStr = localIsoDate(weekAgo);
             const mindWeek = loadCheckins().filter(c => c.date >= weekAgoStr);
             const confAvg = mindWeek.length > 0 ? (mindWeek.reduce((s, c) => s + c.confidence, 0) / mindWeek.length).toFixed(1) : '';
             const mobWeek = loadMobilityCheckins().filter(c => c.date >= weekAgoStr);
@@ -305,7 +306,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const mrvBase = mrvBaseForLevel(level, !!tprofile?.onCourse);
               const ws = (d0: Date) => { const x = new Date(d0); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x; };
               const now = new Date();
-              const wkSets = (weeksAgo: number) => { const s = ws(now); s.setDate(s.getDate() - weeksAgo * 7); const e = new Date(s); e.setDate(e.getDate() + 6); const ss = s.toISOString().slice(0, 10), ee = e.toISOString().slice(0, 10); const m: Record<string, number> = {}; historyWorkouts.forEach((w: any) => { if (w.date >= ss && w.date <= ee) (w.exercises || []).forEach((ex: any) => { const cat = EXERCISE_CATALOG.find((c: any) => c.id === ex.exerciseId); if (cat) m[cat.group] = (m[cat.group] || 0) + (ex.sets?.length || 0); }); }); return m; };
+              const wkSets = (weeksAgo: number) => { const s = ws(now); s.setDate(s.getDate() - weeksAgo * 7); const e = new Date(s); e.setDate(e.getDate() + 6); const ss = localIsoDate(s), ee = localIsoDate(e); const m: Record<string, number> = {}; historyWorkouts.forEach((w: any) => { if (w.date >= ss && w.date <= ee) (w.exercises || []).forEach((ex: any) => { const cat = EXERCISE_CATALOG.find((c: any) => c.id === ex.exerciseId); if (cat) m[cat.group] = (m[cat.group] || 0) + (ex.sets?.length || 0); }); }); return m; };
               const w1 = wkSets(1), w2 = wkSets(0);
               const groups2 = Array.from(new Set([...Object.keys(w1), ...Object.keys(w2)]));
               const over2 = groups2.filter(g => (w1[g] || 0) > mrvBase && (w2[g] || 0) > mrvBase);
@@ -384,7 +385,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 const group = cat?.group;
                 if (group && !lastTrained[group]) lastTrained[group] = w.date;
               }));
-              const today = new Date().toISOString().slice(0, 10);
+              const today = localIsoDate();
               const groups = Object.entries(lastTrained)
                 .map(([g, date]) => {
                   const days = Math.floor((new Date(today).getTime() - new Date(date).getTime()) / (1000 * 60 * 60 * 24));

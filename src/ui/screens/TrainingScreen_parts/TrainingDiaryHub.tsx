@@ -1,3 +1,4 @@
+import { localIsoDate } from '../../../core/local-date';
 import React, { useState, useMemo, useEffect, useDeferredValue, useTransition, useRef } from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { Sparkline } from './Sparkline';
@@ -285,7 +286,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [reminderTime, setReminderTime] = useState<string | null>(() => {
     try {
       const raw = JSON.parse(localStorage.getItem('he_diary_reminder') || 'null');
-      if (raw && raw.date === new Date().toISOString().slice(0, 10)) return raw.time || null;
+      if (raw && raw.date === localIsoDate()) return raw.time || null;
       return null;
     } catch { return null; }
   });
@@ -304,7 +305,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     setTimeout(() => {
       try { new Notification('🏋️ Тренировка по плану', { body: `${plannedName} — ${plannedExercises.length} упр.` }); } catch {}
     }, delay);
-    try { localStorage.setItem('he_diary_reminder', JSON.stringify({ date: new Date().toISOString().slice(0, 10), time })); } catch {}
+    try { localStorage.setItem('he_diary_reminder', JSON.stringify({ date: localIsoDate(), time })); } catch {}
     setReminderTime(time);
   };
   useEffect(() => {
@@ -621,7 +622,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   </div>
                   {(() => {
                     // Прогресс-кольца: тренировка (есть план), психо-протокол, рутина мобильности, разминка
-                    const today = new Date().toISOString().slice(0, 10);
+                    const today = localIsoDate();
                     const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
                     const mindProto = loadActiveProtocol();
                     const mobProto = loadActiveMobility();
@@ -709,7 +710,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 )}
                 {(() => {
                   // Психо-чек-ин: сегодня была тренировка, но чек-ин не заполнен
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = localIsoDate();
                   const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
                   if (!trainedToday) return null;
                   const checkinToday = loadCheckins().some(c => (c.date || '').slice(0, 10) === today);
@@ -725,7 +726,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 })()}
                 {(() => {
                   // Мобильность: ежедневная рутина не выполнена
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = localIsoDate();
                   const mobProtocol = loadActiveMobility();
                   if (!mobProtocol || !hasDailyRoutine(mobProtocol)) return null;
                   const dailyIds = itemsForSlot(mobProtocol, 'daily').map(it => it.id);
@@ -754,7 +755,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 })()}
                 {(() => {
                   // Разминка: сегодня была тренировка, но разминка не отмечена
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = localIsoDate();
                   const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
                   if (!trainedToday) return null;
                   if (warmupLogForDate(today)) return null;
@@ -778,7 +779,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 })()}
                 {(() => {
                   // Заминка: сегодня была тренировка, но заминка не отмечена
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = localIsoDate();
                   const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
                   if (!trainedToday) return null;
                   if (cooldownLogForDate(today)) return null;
@@ -802,7 +803,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 })()}
                 {(() => {
                   // Прогресс протоколов сегодня (чипы-ссылки на вкладки)
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = localIsoDate();
                   const mindProto = loadActiveProtocol();
                   const mobProto = loadActiveMobility();
                   if (!mindProto && !mobProto) return null;
@@ -840,7 +841,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 })()}
                 {(() => {
                   // День отдыха: сессия мобильности (rest_day-блоки)
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = localIsoDate();
                   const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
                   if (trainedToday) return null;
                   const mobProtocol = loadActiveMobility();
@@ -859,7 +860,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           })()}</>
           </InfoErrorBoundary>
           <InfoErrorBoundary label="Привычки недели"><HabitWeekCard historyWorkouts={safeHistoryWorkouts} /></InfoErrorBoundary>
-          <InfoErrorBoundary label="Тренировочные миксы"><MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === new Date().toISOString().slice(0, 10))} /></InfoErrorBoundary>
+          <InfoErrorBoundary label="Тренировочные миксы"><MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === localIsoDate())} /></InfoErrorBoundary>
           <InfoErrorBoundary label="Форма записи"><RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
             sub={recordSub} onSubChange={setRecordSub}
             pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} /></InfoErrorBoundary>
