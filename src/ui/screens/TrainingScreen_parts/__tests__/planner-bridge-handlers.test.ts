@@ -103,6 +103,99 @@ describe('planner bridge handlers', () => {
     expect(week.sessions[0].blocks[0].sets[0].rir).toBe(4);
   });
 
+  // ── E1: pri/deload больше не «успешный тост в никуда» для ПЛ-программы ──
+  function seedPLWeeks(ctx: BridgeCtx, weeks = 2) {
+    ctx.program.pl = {
+      direction: 'pl', sourceCycleId: null, schedule: [], weakPoints: [],
+      customWeeks: Array.from({ length: weeks }, (_, i) => ({
+        week: i + 1, phase: 'accumulation' as const, deload: false,
+        days: [{
+          name: 'День 1',
+          exercises: [{ name: 'Жим лёжа', lift: 'bench' as const, sets: [{ pct: 0.75, reps: 5, sets: 4, rir: 2 }] }],
+        }],
+      })),
+    } as any;
+  }
+
+  it('E1 pri применяется к ПЛ-неделям (было: тишина + тост «применено»)', () => {
+    const update = vi.fn();
+    const ctx = context('pl', update);
+    seedPLWeeks(ctx);
+    applyBridgePayloadDispatch(payload('pri', { volumeMult: 0.5, rirShift: 1 }), ctx);
+    expect(update).toHaveBeenCalled();
+    const sets = update.mock.calls[0][0].pl.customWeeks[0].days[0].exercises[0].sets[0];
+    expect(sets.sets).toBe(2);      // 4 → 2
+    expect(sets.rir).toBe(3);        // 2 + 1
+    expect(sets.pct).toBe(0.75);     // вес не трогаем — в PL это % от 1RM
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('ПЛ'));
+  });
+
+  it('E1 deload режет объём и % от 1RM в ПЛ, помечая неделю deload', () => {
+    const update = vi.fn();
+    const ctx = context('pl', update);
+    seedPLWeeks(ctx);
+    applyBridgePayloadDispatch(payload('deload', { weeks: [1] }), ctx);
+    const patch = update.mock.calls[0][0];
+    expect(patch.pl.customWeeks[0].deload).toBe(true);
+    expect(patch.pl.customWeeks[0].phase).toBe('deload');
+    const st = patch.pl.customWeeks[0].days[0].exercises[0].sets[0];
+    expect(st.sets).toBe(3);         // ceil(4×0.6)
+    expect(st.pct).toBeCloseTo(0.45, 2); // 0.75 × 0.6
+    expect(st.rir).toBeGreaterThanOrEqual(3);
+    // вторая неделя не тронута
+    expect(patch.pl.customWeeks[1].deload).toBe(false);
+  });
+
+  it('E1 без упражнений — честный отказ с warning, а не «успех» (пустая заготовка)', () => {
+    const update = vi.fn();
+    const ctx = context('pl', update);
+    // createBlank('bb') — неделя без упражнений: применять нечего
+    applyBridgePayloadDispatch(payload('pri', { volumeMult: 0.5, rirShift: 0 }), ctx);
+    expect(update).not.toHaveBeenCalled();
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('не применена'), 'warning');
+  });
+
+  it('E1 deload на пустой заготовке — тоже отвечает (было молчание)', () => {
+    const update = vi.fn();
+    const ctx = context('pl', update);
+    applyBridgePayloadDispatch(payload('deload', { weeks: [1] }), ctx);
+    expect(update).not.toHaveBeenCalled();
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('не применён'), 'warning');
+  });
+
+  it('E1 pri в ББ+ПЛ применяется к обоим направлениям и пишет обе области', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    seedPLWeeks(ctx);
+    ctx.program.bb!.weeks[0].sessions[0].blocks[0].sets = [
+      { reps: 8, rir: 2, weight: 100, restSec: 120 },
+      { reps: 8, rir: 2, weight: 100, restSec: 120 },
+    ];
+    applyBridgePayloadDispatch(payload('pri', { volumeMult: 0.5, rirShift: 0 }), ctx);
+    // update вызывается по одному патчу на направление (частичные патчи мержатся приёмником)
+    const merged: any = Object.assign({}, ...update.mock.calls.map(c => c[0]));
+    expect(merged.bb.weeks[0].sessions[0].blocks[0].sets).toHaveLength(1);
+    expect(merged.pl.customWeeks[0].days[0].exercises[0].sets[0].sets).toBe(2);
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('ББ + ПЛ'));
+  });
+
+  it('E1 deload с пустым weeks[] не заявляет «ББ» (было: update + ложный успех без изменений)', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    seedPLWeeks(ctx);
+    // Хаб шлёт weeks: [] — конкретные недели не выбраны. Для ББ это не «все недели» и не «успех».
+    applyBridgePayloadDispatch(payload('deload', { weeks: [], volumeMult: 0.5, rirShift: 1 }), ctx);
+    const merged: any = Object.assign({}, ...update.mock.calls.map(c => c[0]));
+    expect(merged.bb).toBeUndefined();                       // ББ не тронут
+    expect(merged.pl?.customWeeks?.[0]?.deload).toBe(true);  // ПЛ применился
+    const toast = String(ctx.showToast.mock.calls.at(-1)?.[0] ?? '');
+    expect(toast).toContain('ПЛ');
+    expect(toast).not.toContain('(ББ + ПЛ)');
+    expect(toast).toContain('недели не выбраны');
+  });
+
   it('MRV recommendation reduces non-deload weekly muscle volume', () => {
     const update = vi.fn();
     const ctx = context('bb', update);
