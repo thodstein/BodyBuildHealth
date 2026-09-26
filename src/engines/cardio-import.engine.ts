@@ -545,6 +545,11 @@ export function parseAppleHealthXml(text: string): CardioImportResult {
         avgHr: hr,
         calories: cal ?? estimateCardioEntryKcal(mapped, clamp(dur, 1, 600)),
         completed: true,
+        // Спринт 5: дисциплина и provenance — как у CSV/JSON. Раньше Apple
+        // (самый частый формат выгрузки) терял sport, и импорт велосипеда
+        // сохранялся как бег, а чип «Импорт» не появлялся.
+        sport: sanitizeCardioSport(typeRaw),
+        source: 'import',
       });
     } catch {
       // ignore
@@ -772,6 +777,14 @@ export function parseCardioFit(buffer: ArrayBuffer): CardioImportResult {
 }
 
 // ── Auto-detect + unified parse ──────────────────────────────────────────
+/** Сигнатура ZIP (PK\x03\x04) — по расширению файл часто переименован при скачивании. */
+function isZipBuffer(content: unknown): boolean {
+  if (!(content instanceof ArrayBuffer)) return false;
+  const u = new Uint8Array(content as ArrayBuffer);
+  if (u.length < 4) return false;
+  return u[0] === 0x50 && u[1] === 0x4b && (u[2] === 0x03 || u[2] === 0x05 || u[2] === 0x07);
+}
+
 function isFitBuffer(content: unknown): boolean {
   try {
     if (content instanceof ArrayBuffer) {
@@ -792,11 +805,13 @@ export function detectCardioFormat(fileName: string, content: string | ArrayBuff
   const name = String(fileName || '').toLowerCase();
   const isBuf = content instanceof ArrayBuffer;
   const head = isBuf ? '' : String(content || '').slice(0, 4000).toLowerCase();
-  if (name.endsWith('.zip')) return 'zip';
+  if (name.endsWith('.zip') || isZipBuffer(content)) return 'zip';
   if (name.endsWith('.fit') || isFitBuffer(content)) return 'fit';
   if (name.endsWith('.tcx') || head.includes('<trainingcenterdatabase') || head.includes('<activity') && head.includes('<lap')) return 'tcx';
   if (name.endsWith('.gpx') || head.includes('<gpx') || head.includes('<trk>')) return 'gpx';
-  if (name.endsWith('.xml') && head.includes('<healthdata') && head.includes('<workout')) return 'apple_health';
+  // Apple Health: по содержимому, а не только по имени. Пользователи переименовывают
+  // выгрузку («health-2026.xml», «мои данные.xml») — раньше такое уходило в 'unknown'.
+  if (head.includes('<healthdata') || (head.includes('<workout') && head.includes('workoutactivitytype'))) return 'apple_health';
   if (!isBuf && (name.endsWith('.json') || (head.trim().startsWith('{') || head.trim().startsWith('[')))) {
     try { const j = JSON.parse(String(content)); if (Array.isArray(j) || Array.isArray((j as { workouts?: unknown[] }).workouts) || Array.isArray((j as { activities?: unknown[] }).activities) || Array.isArray((j as { data?: unknown[] }).data)) return 'json'; } catch {}
   }

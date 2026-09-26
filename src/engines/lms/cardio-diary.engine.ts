@@ -28,7 +28,10 @@ export const CARDIO_SPORT_RU: Record<CardioSport, string> = {
 
 /** Санация дисциплины: неизвестное/битое → 'other' (не выдумываем «бег»). */
 export function sanitizeCardioSport(v: unknown): CardioSport {
-  const s = typeof v === 'string' ? v.trim().toLowerCase() : '';
+  const raw = typeof v === 'string' ? v.trim().toLowerCase() : '';
+  // Apple Health отдаёт enum-имена вида «HKWorkoutActivityTypeCycling» —
+  // снимаем префикс, иначе дисциплина схлопывается в 'other'.
+  const s = raw.replace(/^hkworkoutactivitytype/, '');
   if ((CARDIO_SPORTS as readonly string[]).includes(s)) return s as CardioSport;
   if (['running', 'run', 'бег', 'road', 'trail'].includes(s)) return 'run';
   if (['cycling', 'bike', 'biking', 'велосипед', 'вело'].includes(s)) return 'bike';
