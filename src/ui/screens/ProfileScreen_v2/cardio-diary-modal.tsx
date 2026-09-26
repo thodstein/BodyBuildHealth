@@ -22,7 +22,7 @@ import {
   findByDate,
   daysSince,
 } from './diary-modals';
-import { validateCardioLogFields } from '../../../engines/lms/cardio-diary.engine';
+import { validateCardioLogFields, sanitizeCardioSport, CARDIO_SPORTS, CARDIO_SPORT_RU } from '../../../engines/lms/cardio-diary.engine';
 
 const CARDIO_TYPES = [
   { id: 'zone2', label: 'Zone 2', color: '#4ade80' },
@@ -41,6 +41,8 @@ type CardioDraft = {
   hr: string;
   km: string;
   notes: string;
+  /** Спринт 5.2: дисциплина — иначе запись из быстрого модала вечно <другое>. */
+  sport: string;
 };
 
 interface AddCardioModalProps {
@@ -50,7 +52,7 @@ interface AddCardioModalProps {
 }
 
 const initialDraft = (): CardioDraft => {
-  const last = lastEntryOf(loadCardioLog() as { date?: string; type?: string; durationMin?: number; rpe?: number; avgHr?: number; distanceKm?: number }[]);
+  const last = lastEntryOf(loadCardioLog() as { date?: string; type?: string; durationMin?: number; rpe?: number; avgHr?: number; distanceKm?: number; sport?: string }[]);
   return {
     date: todayIso(),
     type: last?.type || 'zone2',
@@ -59,6 +61,9 @@ const initialDraft = (): CardioDraft => {
     hr: last && typeof last.avgHr === 'number' ? String(last.avgHr) : '',
     km: last && typeof last.distanceKm === 'number' ? String(last.distanceKm) : '',
     notes: '',
+    // Как и остальные поля — «повторяем последнее». Это дисциплина ПОЛЬЗОВАТЕЛЯ,
+    // а не догадка движка; чип рядом позволяет сменить в один тап.
+    sport: sanitizeCardioSport(last?.sport),
   };
 };
 
@@ -111,6 +116,9 @@ export const AddCardioModal: React.FC<AddCardioModalProps> = ({
       distanceKm: Number(draft.km) > 0 ? Math.round(Number(draft.km) * 10) / 10 : undefined,
       completed: true,
       notes: draft.notes?.trim() || undefined,
+      // Спринт 5.2/5.3: дисциплина + provenance (быстрый модал — тоже вход в дневник).
+      sport: sanitizeCardioSport(draft.sport),
+      source: 'manual',
     };
     onSave(entry);
     resetDraft();
@@ -147,6 +155,28 @@ export const AddCardioModal: React.FC<AddCardioModalProps> = ({
             ))}
           </select>
         </label>
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }} data-cardio="modal-sport">
+        <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600 }}>Дисциплина:</span>
+        {CARDIO_SPORTS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            data-sport={s}
+            onClick={() => setDraft((p) => ({ ...p, sport: s }))}
+            aria-pressed={sanitizeCardioSport(draft.sport) === s}
+            aria-label={`Дисциплина: ${CARDIO_SPORT_RU[s]}`}
+            style={{
+              minHeight: 44, padding: '0 12px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+              color: '#fff', cursor: 'pointer',
+              background: sanitizeCardioSport(draft.sport) === s ? 'rgba(74,222,128,0.16)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${sanitizeCardioSport(draft.sport) === s ? 'rgba(74,222,128,0.45)' : 'rgba(255,255,255,0.14)'}`,
+            }}
+          >
+            {sanitizeCardioSport(draft.sport) === s ? '✓ ' : ''}{CARDIO_SPORT_RU[s]}
+          </button>
+        ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(100px,1fr))', gap: 8, marginBottom: 8 }}>
