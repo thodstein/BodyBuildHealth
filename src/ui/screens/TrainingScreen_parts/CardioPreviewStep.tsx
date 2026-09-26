@@ -301,7 +301,7 @@ export const CardioPreviewStep: React.FC<{
             </div>
           )}
           {interference && interference.level !== 'low' && (
-            <div style={{ ...CARD, borderColor: interference.level === 'high' ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.28)', background: interference.level === 'high' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.06)' }}>
+            <div style={{ ...CARD, border: `1px solid ${interference.level === 'high' ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.28)'}`, background: interference.level === 'high' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.06)' }}>
               <div style={LABEL}>⚡ Совместимость с силовой (Interference)</div>
               <div style={{ fontSize: 12, color: interference.level === 'high' ? '#f87171' : '#fbbf24', fontWeight: 700 }}>{interference.level === 'high' ? 'Высокий риск' : 'Умеренный риск'} · {interference.score}/10</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5 }}>{interference.advice}</div>
@@ -312,7 +312,7 @@ export const CardioPreviewStep: React.FC<{
             const hints = cardioCoachHints(cycle);
             const tests = hints.filter(h => h.kind === 'test');
             return (
-              <div style={{ ...CARD, borderColor: 'rgba(96,165,250,0.24)' }}>
+              <div style={{ ...CARD, border: '1px solid rgba(96,165,250,0.24)' }}>
                 <div style={LABEL}>📈 Адаптация и контроль</div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>
                   Прогноз: <b style={{ color: '#60a5fa' }}>+{forecast.vo2GainPct}% VO2max</b> за {forecast.effectiveWeeks} рабочих нед
@@ -379,7 +379,7 @@ export const CardioPreviewStep: React.FC<{
             </div>
           </div>
           {taperPlan.length > 0 && (
-            <div style={{ ...CARD, borderColor: 'rgba(234,179,8,0.24)' }}>
+            <div style={{ ...CARD, border: '1px solid rgba(234,179,8,0.24)' }}>
               <div style={LABEL}>{cycle.config?.taper === false ? '🏔 Пик-неделя (без taper)' : '📉 Taper-план перед стартом'}</div>
               {taperCut && (
                 <div style={{ fontSize: 11, color: '#eab308', background: 'rgba(234,179,8,0.07)', border: '1px solid rgba(234,179,8,0.22)', borderRadius: 8, padding: '6px 8px' }}>

@@ -43,7 +43,10 @@ export const CARD: React.CSSProperties = {
 };
 export const CARD_ACCENT: React.CSSProperties = {
   ...CARD,
-  borderColor: ACCENT_BORDER,
+  // Полный `border` вместо `borderColor`: базовый CARD уже несёт `1px solid`,
+  // а микс шорткат+лонгхенд заставляет React на каждом рендере «удалять»
+  // borderColor из DOM (warning + лишний стиль-чоунс). Визуал идентичен.
+  border: `1px solid ${ACCENT_BORDER}`,
   background: 'linear-gradient(180deg, rgba(0,230,138,0.13), rgba(0,230,138,0.04))',
   boxShadow: SHADOW_ACCENT,
 };
@@ -283,7 +286,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
           style={{
             ...INPUT,
             width: width ?? 100,
-            borderColor: error ? '#ef4444' : 'rgba(255,255,255,0.12)',
+              border: `1px solid ${error ? '#ef4444' : 'rgba(255,255,255,0.12)'}`,
             background: error ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.05)',
           }}
         />
@@ -547,7 +550,7 @@ export const Tabs: React.FC<{ tabs: { id: string; label: string; icon?: string }
 export const Accordion: React.FC<{ id?: string; title: React.ReactNode; defaultOpen?: boolean; icon?: string; badge?: React.ReactNode; children: React.ReactNode }> = ({ id, title, defaultOpen = false, icon, badge, children }) => {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
-    <div id={id} className="kit-accordion" data-open={open} style={{ ...CARD, padding: 0, overflow: 'hidden', gap: 0, scrollMarginTop: 72, borderColor: open ? 'rgba(0,230,138,0.22)' : GLASS_BORDER }}>
+    <div id={id} className="kit-accordion" data-open={open} style={{ ...CARD, padding: 0, overflow: 'hidden', gap: 0, scrollMarginTop: 72, border: `1px solid ${open ? 'rgba(0,230,138,0.22)' : GLASS_BORDER}` }}>
       <button
         onClick={() => setOpen(v => !v)}
         className="ck-acc-head"

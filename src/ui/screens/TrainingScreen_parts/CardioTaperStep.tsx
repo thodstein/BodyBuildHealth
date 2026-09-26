@@ -61,7 +61,7 @@ export const CardioTaperStep: React.FC<{
               aria-label={`Пред-нагрузка ${v}%`}
               aria-pressed={overloadPct === v}
               style={overloadPct === v
-                ? { ...BTN, minHeight: 44, borderColor: 'rgba(0,230,138,0.55)', color: '#4ade80', background: 'rgba(0,230,138,0.14)', boxShadow: '0 0 10px rgba(0,230,138,0.16)', fontVariantNumeric: 'tabular-nums' }
+                ? { ...BTN, minHeight: 44, border: '1px solid rgba(0,230,138,0.55)', color: '#4ade80', background: 'rgba(0,230,138,0.14)', boxShadow: '0 0 10px rgba(0,230,138,0.16)', fontVariantNumeric: 'tabular-nums' }
                 : { ...BTN, minHeight: 44, fontVariantNumeric: 'tabular-nums' }}
             >
               {v === 0 ? 'Норма' : `+${v}%`}
@@ -78,7 +78,7 @@ export const CardioTaperStep: React.FC<{
               aria-pressed={fatigue === f}
               title={f === 'AF' ? 'Острая усталость (обычная)' : 'Функциональное перенапряжение: нужен длиннее и глубже (Front 2024)'}
               style={fatigue === f
-                ? { ...BTN, minHeight: 44, borderColor: 'rgba(0,230,138,0.55)', color: '#4ade80', background: 'rgba(0,230,138,0.14)', boxShadow: '0 0 10px rgba(0,230,138,0.16)' }
+                ? { ...BTN, minHeight: 44, border: '1px solid rgba(0,230,138,0.55)', color: '#4ade80', background: 'rgba(0,230,138,0.14)', boxShadow: '0 0 10px rgba(0,230,138,0.16)' }
                 : { ...BTN, minHeight: 44 }}
             >
               {f === 'AF' ? 'AF (острая)' : 'F-OR (перегруз)'}

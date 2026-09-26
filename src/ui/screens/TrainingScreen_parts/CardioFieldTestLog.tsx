@@ -109,7 +109,7 @@ export const CardioFieldTestLog: React.FC = () => {
             aria-label={`Замер: ${KIND_META[k].label}`}
             aria-pressed={kind === k}
             style={kind === k
-              ? { ...BTN, minHeight: 44, borderColor: 'rgba(0,230,138,0.55)', color: '#4ade80', background: 'rgba(0,230,138,0.14)', boxShadow: '0 0 10px rgba(0,230,138,0.16)', fontWeight: 800 }
+              ? { ...BTN, minHeight: 44, border: '1px solid rgba(0,230,138,0.55)', color: '#4ade80', background: 'rgba(0,230,138,0.14)', boxShadow: '0 0 10px rgba(0,230,138,0.16)', fontWeight: 800 }
               : { ...BTN, minHeight: 44 }}
           >
             {KIND_META[k].label}

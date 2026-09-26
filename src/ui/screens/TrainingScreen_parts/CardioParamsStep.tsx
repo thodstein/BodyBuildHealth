@@ -392,7 +392,7 @@ export const CardioAthleteSection: React.FC<{
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button style={BTN_SMALL} onClick={onFromProfile} title="Загрузить из профиля">📋 Из профиля</button>
         <button style={BTN_SMALL} onClick={onFromDiaryHr} title="ЧСС покоя из дневника АД">❤️ Из АД</button>
-        <button style={{ ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.45)', color: '#00e68a' }} onClick={onSaveProfile} title="Сохранить в профиль">💾 В профиль</button>
+        <button style={{ ...BTN_SMALL, border: '1px solid rgba(0,230,138,0.45)', color: '#00e68a' }} onClick={onSaveProfile} title="Сохранить в профиль">💾 В профиль</button>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         <NumberInput label="Возраст" value={age} onChange={setAge} min={12} max={90} step={1} placeholder="30" ariaLabel="Возраст" width={90} suffix="лет" />
@@ -763,7 +763,7 @@ export const CardioParamsStep: React.FC<{
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button style={BTN_SMALL} onClick={onFromProfile} title="Загрузить из профиля">📋 Из профиля</button>
           <button style={BTN_SMALL} onClick={onFromDiaryHr} title="ЧСС покоя из дневника АД">❤️ Из АД</button>
-          <button style={{ ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.45)', color: '#00e68a' }} onClick={onSaveProfile} title="Сохранить в профиль">💾 В профиль</button>
+          <button style={{ ...BTN_SMALL, border: '1px solid rgba(0,230,138,0.45)', color: '#00e68a' }} onClick={onSaveProfile} title="Сохранить в профиль">💾 В профиль</button>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           <NumberInput label="Возраст" value={age} onChange={setAge} min={12} max={90} step={1} placeholder="30" ariaLabel="Возраст" width={90} suffix="лет" />
