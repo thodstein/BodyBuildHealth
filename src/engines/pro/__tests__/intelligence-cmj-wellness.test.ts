@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
-  cmjScreen, cmjIsEmpty, jumpHeightCmFromFlight, CMJ_ZONE_THRESHOLDS, CMJ_SCREENING_NOTE, CMJ_NON_BLOCKING_NOTE,
+  cmjScreen, cmjIsEmpty, jumpHeightCmFromFlight, CMJ_ZONE_THRESHOLDS, CMJ_SCREENING_NOTE, CMJ_NON_BLOCKING_NOTE, CMJ_PHONE_TREND_NOTE,
   loadCmj, saveCmj, clearCmj, type CmjEntry,
 } from '../intelligence-cmj.engine';
 import {
@@ -61,9 +61,14 @@ describe('E7 CMJ: нормировка на лучший результат се
   it('метрика НИКОГДА не блокирует и честно называет себя скринингом', () => {
     const r = cmjScreen(series, back(0));
     expect(r.blocking).toBe(false);
-    expect(r.note).toBe(`${CMJ_SCREENING_NOTE} ${CMJ_NON_BLOCKING_NOTE}`);
+    // 26.09.2026 (П1-Д): к двум оговоркам добавилась третья — телефонный CMJ это тренд,
+    // а не лабораторный эталон (force-plate несопоставим, PMID 42666427).
+    expect(r.note).toBe(`${CMJ_SCREENING_NOTE} ${CMJ_NON_BLOCKING_NOTE} ${CMJ_PHONE_TREND_NOTE}`);
     expect(r.note).toContain('НЕ тест готовности');
     expect(r.note).toContain('не автоблокировка');
+    expect(r.note).toContain('ТРЕНД');
+    expect(r.note).toContain('42666427');
+    expect(r.note).toMatch(/решени[ея] о нагрузке по одному замеру не строим/);
   });
   it('мало замеров и отсутствие данных — разные честные состояния', () => {
     const one = cmjScreen([{ date: back(0), heightCm: 40 }], back(0));

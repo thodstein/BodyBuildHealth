@@ -24,6 +24,7 @@ import { aggregateBBVolume } from './bb-volume.engine';
 import { BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { computeOrthopedicConstraints, distributeWeeklyLoad, type OrthopedicConstraints, type LoadDistributionOutput } from '../orthopedic-load-engines';
 import { JOINTS, jointLoadDiagnosis, type JointLoadDiagnosis, type JointId } from '../pro/joint-load-master.engine';
+import { hrvRecoveryMult, hrvSignalFromStore } from '../pro/hrv-baseline.engine';
 
 export interface PlanSafetyScore {
   score: number;
@@ -127,6 +128,9 @@ export function calculatePlanSafetyScore(
     acwrRatio?: number;
     bodyFat?: number;
     hrvMs?: number;
+    /** Личная база RMSSD / отклонение в SWC (26.09.2026). */
+    hrvBaseline?: number;
+    hrvBaselineZ?: number;
     sleepHours?: number;
     stressLevel?: number;
     injuryCount?: number;
@@ -176,13 +180,35 @@ export function calculatePlanSafetyScore(
 
   // 3. Recovery Metrics
   let recoveryScore = SCORE_WEIGHTS.recovery;
+  // Текст вклада HRV для карточки «факторы» — считается вместе с баллами, чтобы Breakdown
+  // не показывал правило, которого в коде уже нет (26.09.2026).
+  let hrvScoreText = '';
   if (options.bodyFat != null && options.bodyFat > 25) {
     recoveryScore -= 4;
     issues.push(`bodyFat=${options.bodyFat}% — высокое (>25%), восстановление снижено.`);
   }
-  if (options.hrvMs != null && options.hrvMs < 50) {
-    recoveryScore -= 4;
-    issues.push(`HRV=${options.hrvMs}мс — низкая вариабельность (<50мс).`);
+  if (options.hrvMs != null) {
+    // 26.09.2026 было→стало: порог был абсолютным (50 мс), а подпись звала его «нормой» — это
+    // неверно вдвойне: норма RMSSD — интервал, а не число (Plews 2013 PMID 23535808).
+    // Теперь штраф только по отклонению от ЛИЧНОЙ базы; без базы — 0 и честный текст.
+    const hrvSig = (options.hrvBaseline != null || options.hrvBaselineZ != null)
+      ? { hrvMs: options.hrvMs, hrvBaseline: options.hrvBaseline, hrvBaselineZ: options.hrvBaselineZ }
+      : hrvSignalFromStore(options.hrvMs);
+    const hrvVerdict = hrvRecoveryMult(hrvSig);
+    if (hrvVerdict.mult <= 0.85) {
+      recoveryScore -= 4;
+      issues.push(`HRV: ${hrvVerdict.note}`);
+      hrvScoreText = '-4(HRV: −2 SWC от базы)';
+    } else if (hrvVerdict.mult < 1) {
+      recoveryScore -= 2;
+      issues.push(`HRV: ${hrvVerdict.note}`);
+      hrvScoreText = '-2(HRV: −1 SWC от базы)';
+    } else if (hrvVerdict.source === 'none') {
+      issues.push('HRV: замер есть, личной базы нет — оценка восстановления по HRV пропущена (абсолютные пороги RMSSD не переносимы между людьми).');
+      hrvScoreText = '(HRV: нет личной базы — пропуск)';
+    } else {
+      hrvScoreText = '(HRV: в коридоре базы)';
+    }
   }
   if (options.sleepHours != null && options.sleepHours < 6) {
     recoveryScore -= 4;
@@ -386,7 +412,7 @@ export function calculatePlanSafetyScore(
     const factorBreakdown: SafetyDetails['factorBreakdown'] = [
       { key:'jointStress', label:'Суставной стресс', weight: SCORE_WEIGHTS.jointStress, score: jointStressScore, max: SCORE_WEIGHTS.jointStress, calculation: `20 - ${stressAnalysis.overallRisk==='high'?'20':stressAnalysis.overallRisk==='moderate'?'10':'0'} (overallRisk=${stressAnalysis.overallRisk}, peakWeek=${(stressAnalysis as any).peakWeek||'—'}, avg=${Math.round((stressAnalysis as any).avgWeeklyStress||0)})`, status: jointStressScore===20?'ok': jointStressScore>=10?'warn':'bad' },
       { key:'acwrCompliance', label:'ACWR', weight: SCORE_WEIGHTS.acwrCompliance, score: acwrScore, max: SCORE_WEIGHTS.acwrCompliance, calculation: hasAcwr ? `ACWR ${acwr.toFixed(2)} → ${acwr>1.5?'0':acwr>1.3?'10':'20'} (зоны: <1.3 ok, 1.3-1.5 warn, >1.5 bad)` : `нет данных → ${acwrScore} (75% от макс, осторожность)`, status: acwrScore===20?'ok': acwrScore>=10?'warn':'bad' },
-      { key:'recovery', label:'Восстановление', weight: SCORE_WEIGHTS.recovery, score: recoveryScore, max: SCORE_WEIGHTS.recovery, calculation: `15 ${options.bodyFat!=null && options.bodyFat>25?'-4(bodyFat)':''} ${options.hrvMs!=null && options.hrvMs<50?'-4(HRV)':''} ${options.sleepHours!=null && options.sleepHours<6?'-4(sleep)':''} ${options.stressLevel!=null && options.stressLevel>6?'-3(stress)':''} = ${recoveryScore}`, status: recoveryScore>=12?'ok': recoveryScore>=8?'warn':'bad' },
+      { key:'recovery', label:'Восстановление', weight: SCORE_WEIGHTS.recovery, score: recoveryScore, max: SCORE_WEIGHTS.recovery, calculation: `15 ${options.bodyFat!=null && options.bodyFat>25?'-4(bodyFat)':''} ${hrvScoreText} ${options.sleepHours!=null && options.sleepHours<6?'-4(sleep)':''} ${options.stressLevel!=null && options.stressLevel>6?'-3(stress)':''} = ${recoveryScore}`, status: recoveryScore>=12?'ok': recoveryScore>=8?'warn':'bad' },
       { key:'injuryRisk', label:'Травмы', weight: SCORE_WEIGHTS.injuryRisk, score: injuryScore, max: SCORE_WEIGHTS.injuryRisk, calculation: injuryCount>0 ? `15 - ${injuryCount}*5 = ${injuryScore}` : `15 (нет активных травм)`, status: injuryScore===15?'ok': injuryScore>=10?'warn':'bad' },
       { key:'volumeCompliance', label:'MRV', weight: SCORE_WEIGHTS.volumeCompliance, score: volumeScore, max: SCORE_WEIGHTS.volumeCompliance, calculation: volumeViolations>0 ? `15 - ${volumeViolations}*3 = ${volumeScore} (${volumeViolations} превышений effective > cap*${BB_MRV_TOLERANCE})` : `15 (нет превышений, допуск ×${BB_MRV_TOLERANCE})`, status: volumeScore===15?'ok': volumeScore>=9?'warn':'bad' },
       { key:'frequencyCompliance', label:'Частота', weight: SCORE_WEIGHTS.frequencyCompliance, score: frequencyScore, max: SCORE_WEIGHTS.frequencyCompliance, calculation: frequencyIssues.length ? `5 - min(5,${frequencyIssues.length}) = ${frequencyScore} (малые мышцы <2×/нед)` : `5 (частота в норме)`, status: frequencyScore===5?'ok':'warn' },

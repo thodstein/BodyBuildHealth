@@ -16,6 +16,7 @@ import type { UserProgram } from '../../../engines/user-program/user-program.typ
 import { loadTrainingProfile } from './training-profile';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony, type ACWRZone } from '../../../engines/pro/training-load.engine';
+import { hrvRecoveryMult, hrvSignalFromStore } from '../../../engines/pro/hrv-baseline.engine';
 import { loadRirCalibrationStats } from '../../../engines/meso-correction.engine';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { GROUP_RU } from './program-types';
@@ -676,7 +677,15 @@ export const CheckinGuardPanel: React.FC<GuardPanelProps> = () => {
   if (checkin.subjectiveSoreness && checkin.subjectiveSoreness >= 4) { recs.push(`🔥 DOMS ${checkin.subjectiveSoreness}/5 → мышцы не восстановлены`); mult *= 0.85; }
   if (checkin.subjectiveStress && checkin.subjectiveStress >= 4) { recs.push(`💔 Стресс ${checkin.subjectiveStress}/5 → ЦНС перегружена`); mult *= 0.9; rirDelta += 1; }
   if (checkin.subjectiveEnergy && checkin.subjectiveEnergy <= 2) { recs.push(`⚡ Энергия ${checkin.subjectiveEnergy}/5 → низкая готовность`); mult *= 0.85; }
-  if (checkin.hrvMs && checkin.hrvMs < 30) { recs.push(`📊 HRV ${checkin.hrvMs}мс < 30 → высокий стресс`); mult *= 0.9; }
+  if (checkin.hrvMs) {
+    // 26.09.2026 было→стало: порог был абсолютным (30 мс) и МЕНЯЛ объём прямо в UI-чек-ине,
+    // хотя 30 мс — нижняя граница коридора нормы, а не «плохое значение». Штрафуем только по
+    // отклонению от личной базы (Plews 2013 PMID 23535808); без базы объём не трогаем.
+    const hrvVerdict = hrvRecoveryMult(hrvSignalFromStore(checkin.hrvMs));
+    if (hrvVerdict.mult <= 0.85) { recs.push(`📊 ${hrvVerdict.note}`); mult *= 0.9; rirDelta += 1; }
+    else if (hrvVerdict.mult < 1) { recs.push(`📊 ${hrvVerdict.note}`); mult *= 0.9; }
+    else if (hrvVerdict.source === 'none') recs.push('ℹ️ HRV: замер есть, личной базы нет — объём не трогаем (абсолютные пороги RMSSD не переносимы между людьми).');
+  }
 
   if (recs.length === 0) {
     recs.push('✅ Чек-ин в норме — корректировка не требуется');

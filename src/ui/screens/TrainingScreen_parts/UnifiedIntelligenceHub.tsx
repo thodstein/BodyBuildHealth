@@ -20,10 +20,10 @@ import { toDailyLoads, acuteChronicRatio, weeklyMonotony, fitnessFatigue, traini
 import { localIsoDate } from './diary-shared';
 import { analyzeRecovery, shouldTrain } from '../../../engines/recovery-optimization.engine';
 import { calculatePRI, getPRIThreshold } from '../../../engines/autoregulation.engine';
-import { autoRegulate, loadForRPE, rpeFromLoad, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
+import { autoRegulate, loadForRPE, rpeFromLoad, shouldTrainToday, AUTOREG_MARKERS_TOTAL, AUTOREG_RELIABILITY_NOTE } from '../../../engines/pro/autoregulation-pro.engine';
 import { generateReadinessForecast, runWhatIf } from '../../../engines/predictive.engine';
 import { loadForecast, performanceTrajectory, TRAJECTORY_NOTE } from '../../../engines/pro/intelligence-load-forecast.engine';
-import { cmjScreen, loadCmj, saveCmj, clearCmj, CMJ_SCREENING_NOTE, CMJ_NON_BLOCKING_NOTE, type CmjEntry } from '../../../engines/pro/intelligence-cmj.engine';
+import { cmjScreen, loadCmj, saveCmj, clearCmj, CMJ_SCREENING_NOTE, CMJ_NON_BLOCKING_NOTE, CMJ_PHONE_TREND_NOTE, type CmjEntry } from '../../../engines/pro/intelligence-cmj.engine';
 import { wellnessReport, loadWellness, saveWellness, clearWellness, WELLNESS_PROTOCOL_NOTE, type WellnessEntry } from '../../../engines/pro/intelligence-wellness.engine';
 import {
   weeklyRollup, loadIntelHistory, saveIntelDecision, clearIntelHistory,
@@ -1132,6 +1132,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                 {cmj.signals.map((sg,i)=> <div key={i} style={{ ...SMALL, marginTop:4 }}>• {sg}</div>)}
                 <div style={{ ...SMALL, marginTop:4, opacity:0.75 }}>ⓘ {CMJ_SCREENING_NOTE}</div>
                 <div style={{ ...SMALL, marginTop:2, opacity:0.75 }}>ⓘ {CMJ_NON_BLOCKING_NOTE}</div>
+                <div style={{ ...SMALL, marginTop:2, opacity:0.75 }} data-intel="cmj-phone-trend">ⓘ {CMJ_PHONE_TREND_NOTE}</div>
               </>
             ) : null}
           </MetricCard>
@@ -1318,6 +1319,33 @@ export const UnifiedIntelligenceHub: React.FC = () => {
             <div style={{ marginTop:6, display:'grid', gap:3 }}>
               {autoReg.decisions.map((d,i)=> <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>• {d}</div>)}
             </div>
+            {/* P1-А: почему такое решение — вклад каждого маркера + честный счёт данных.
+                Пропущенный маркер показывается явно («нет данных»), а не выглядит как идеальный. */}
+            {autoReg.factors && autoReg.factors.length > 0 && (
+              <div data-intel="why" style={{ marginTop:8, paddingTop:8, borderTop:'1px solid rgba(255,255,255,0.10)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:5 }}>
+                  <span style={{ fontSize:11, fontWeight:900, color:'#fff' }}>🧭 Почему такое решение</span>
+                  <span
+                    data-intel="why-markers"
+                    style={{ fontSize:11, padding:'2px 7px', borderRadius:20, fontWeight:800, color:'#fff',
+                      background: autoReg.reliability === 'high' ? 'rgba(34,197,94,0.16)' : autoReg.reliability === 'medium' ? 'rgba(234,179,8,0.16)' : 'rgba(239,68,68,0.16)',
+                      border:'1px solid rgba(255,255,255,0.12)' }}
+                  >
+                    маркеров {autoReg.markersProvided ?? 0}/{autoReg.markersTotal ?? AUTOREG_MARKERS_TOTAL} · надёжность {autoReg.reliability === 'high' ? 'высокая' : autoReg.reliability === 'medium' ? 'средняя' : 'низкая'}
+                  </span>
+                </div>
+                <div style={{ display:'grid', gap:2 }}>
+                  {autoReg.factors.map(fc => (
+                    <div key={fc.key} data-intel="why-factor" data-provided={String(fc.provided)} style={{ display:'flex', gap:6, alignItems:'baseline', fontSize:11, lineHeight:1.4 }}>
+                      <span style={{ color:'#fff', fontWeight:800, minWidth:118 }}>{fc.label}</span>
+                      <span style={{ color:'#fff', fontVariantNumeric:'tabular-nums', minWidth:44 }}>{fc.provided ? fc.value : '—'}</span>
+                      <span style={{ color:'#fff', opacity:0.85, fontSize:11 }}>{fc.provided ? `→ ${fc.effect}` : 'нет данных — не участвует'}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop:5, fontSize:11, color:'#fff', opacity:0.85, lineHeight:1.4 }}>{AUTOREG_RELIABILITY_NOTE}</div>
+              </div>
+            )}
             {autoReg.adjustedTopSetPct!=null && <div style={{ marginTop:6, fontSize:11, color:DIM }}>Топ-сет: {(topPct*100).toFixed(0)}% → <b style={{ color:'#fff' }}>{(autoReg.adjustedTopSetPct*100).toFixed(1)}%</b> · RIR: {planRIR} → <b style={{ color:'#fff' }}>{autoReg.adjustedRIR}</b></div>}
           </div>
 

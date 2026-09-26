@@ -35,7 +35,7 @@ import { simulateTACorrection } from '../../../engines/strength-sport/strength-s
 import { buildTASpecBlock } from '../../../engines/strength-sport/strength-sport-ta-spec-block.engine';
 import { diagnoseTAAnthro } from '../../../engines/strength-sport/strength-sport-ta-anthro.engine';
 import { diagnoseSplitJerkAsymmetry, appendSplitJerkSnapshot, splitJerkTrend, type SplitJerkSnapshot } from '../../../engines/strength-sport/strength-sport-ta-asymmetry.engine';
-import { planTAAttempts } from '../../../engines/strength-sport/strength-sport-ta-attempts.engine';
+import { planTAAttempts, taTotalsJumpNote } from '../../../engines/strength-sport/strength-sport-ta-attempts.engine';
 import { diagnoseTAImtp, IMTP_PROTOCOL_CHECKLIST, IMTP_CLEAN_TRANSFER_NOTE, impulseVerdict } from '../../../engines/strength-sport/strength-sport-ta-imtp.engine';
 import { buildTAIcs, downloadTAIcs } from '../../../engines/strength-sport/strength-sport-ta-ics.engine';
 import { buildTAAnnualOverlay, saveTAAnnualOverlay } from '../../../engines/strength-sport/strength-sport-ta-annual-bridge.engine';
@@ -1863,6 +1863,12 @@ export const WLDiagnosticsHub: React.FC = () => {
               {snatchAttempts && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 6 }}>Рывок: {snatchAttempts.attempts[0]} / {snatchAttempts.attempts[1]} / {snatchAttempts.attempts[2]} (±{snatchAttempts.bandKg}){snatchAttempts.readinessCut ? ' (−2.5 readiness)' : ''}</div>}
               {cjAttempts && <div style={{ fontSize: 11, color: '#22c55e', marginTop: 4 }}>Толчок: {cjAttempts.attempts[0]} / {cjAttempts.attempts[1]} / {cjAttempts.attempts[2]} (±{cjAttempts.bandKg}){cjAttempts.readinessCut ? ' (−2.5 readiness)' : ''}</div>}
               {(snatchAttempts?.readinessNote || cjAttempts?.readinessNote) && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚠️ {snatchAttempts?.readinessNote || cjAttempts?.readinessNote}</div>}
+              {(snatchAttempts || cjAttempts) && (
+                <div data-wl="attempt-jumps" style={{ fontSize: 11, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>
+                  {snatchAttempts && <div>📐 Рывок: {taTotalsJumpNote(snatchAttempts.attempts)}</div>}
+                  {cjAttempts && <div>📐 Толчок: {taTotalsJumpNote(cjAttempts.attempts)}</div>}
+                </div>
+              )}
               {snatchDiv.divergent && <div data-wl="base-div" style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>⚖️ {snatchDiv.text}</div>}
               {meetBlock && <div data-wl="meet-plan" style={{ fontSize: 10, color: '#fff', marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.16)' }}>🏟 Старт: рывок опенер {meetBlock.snatchOpener > 0 ? `${meetBlock.snatchOpener} +${meetBlock.snatchJumps[0]}/+${meetBlock.snatchJumps[1]}` : '—'} · взятие опенер {meetBlock.cjOpener > 0 ? `${meetBlock.cjOpener} +${meetBlock.cjJumps[0]}/+${meetBlock.cjJumps[1]}` : '—'} · {meetBlock.notes[1]}</div>}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 6, marginTop: 6 }}>

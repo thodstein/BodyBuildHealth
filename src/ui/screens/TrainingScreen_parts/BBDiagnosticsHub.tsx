@@ -17,10 +17,10 @@ import { aggregateBBVolume } from '../../../engines/bb/bb-volume.engine';
 import { analyzeBBBalance } from '../../../engines/bb/bb-balance.engine';
 import { computePerMuscleACWR } from '../../../engines/bb/bb-progression-feedback.engine';
 import { assessOHS, OHS_NORMS } from '../../../engines/strength-sport/strength-sport-ohs.engine';
-import { lrVerdictsFromSessions } from '../../../engines/bb/bb-lr-volume.engine';
+import { lrVerdictsFromSessions, LR_PHASE_ASYM_NOTE } from '../../../engines/bb/bb-lr-volume.engine';
 import { assessBbReadiness } from '../../../engines/bb/bb-readiness.engine';
 import { assessBbRedFlags } from '../../../engines/bb/bb-red-flags.engine';
-import { buildReturnToPlan, activeReturnToStage } from '../../../engines/bb/bb-return-to.engine';
+import { buildReturnToPlan, activeReturnToStage, evaluateReturnToCriteria } from '../../../engines/bb/bb-return-to.engine';
 import { mmcAdviceFor } from '../../../engines/bb/bb-mmc-gate.engine';
 import { pushLrSnapshot, summarizeLrDirection, type BbLrSnapshot } from '../../../engines/bb/bb-lr-history.engine';
 import { buildBBSpecIcs, downloadBBSpecIcs } from '../../../engines/bb/bb-spec-ics.engine';
@@ -94,6 +94,12 @@ type BBState = {
   jointClickPain: boolean;
   /** PRO-4 S3: подтверждённая ступень возврата ('' — авто: ступень 1). */
   returnStage: '' | '1' | '2' | '3';
+  /** П2: измеримые критерии выхода из return-to (pain-monitoring, Silbernagel 2007).
+   *  null/undefined = не введено → «нет данных», а не «всё хорошо». */
+  retPainLoad?: number | null;
+  retPainMorning?: number | null;
+  retStiffness?: 'better' | 'same' | 'worse' | null;
+  retPlyo?: boolean | null;
   /** D1 плечо у стены (true = чисто; фолс — провал признака). */
   shBackOnWall: boolean; shHeadOnWall: boolean; shBicepsAtEars: boolean; shRibsDown: boolean; shNoShrug: boolean;
   /** D1 ротация грудного, градусы. */
@@ -145,6 +151,7 @@ const DEFAULT_STATE: BBState = {
   numbness: false,
   jointClickPain: false,
   returnStage: '',
+  retPainLoad: null, retPainMorning: null, retStiffness: null, retPlyo: null,
   shBackOnWall: true, shHeadOnWall: true, shBicepsAtEars: true, shRibsDown: true, shNoShrug: true,
   rotL: '', rotR: '',
   hingeDowel: '',
@@ -571,6 +578,23 @@ export const BBDiagnosticsHub: React.FC = () => {
   const returnActive = useMemo(() => {
     try { return activeReturnToStage(returnToPlan as any, state.returnStage as any); } catch { return null; }
   }, [returnToPlan, state.returnStage]);
+  // П2: измеримые критерии выхода (pain-monitoring). Ничего не двигает автоматически.
+  const chipStyle = (on: boolean) => ({
+    minHeight: 44, padding: '8px 12px', borderRadius: 999,
+    border: '1px solid', borderColor: on ? '#22c55e' : 'rgba(255,255,255,0.12)',
+    background: on ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.04)',
+    color: on ? '#22c55e' : '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+  });
+  const returnCriteria = useMemo(() => {
+    try {
+      return evaluateReturnToCriteria({
+        painDuringLoad: state.retPainLoad,
+        painNextMorning: state.retPainMorning,
+        morningStiffness: state.retStiffness,
+        plyoTolerated: state.retPlyo,
+      });
+    } catch { return null; }
+  }, [state.retPainLoad, state.retPainMorning, state.retStiffness, state.retPlyo]);
   // PRO-3 R6: направление перекоса (история слабых сторон)
   const lrDirection = useMemo(() => {
     try {
@@ -1923,6 +1947,7 @@ export const BBDiagnosticsHub: React.FC = () => {
                 </div>
               ))}
               <div style={{ color: '#fff', marginTop: 4, fontSize: 10, opacity: 0.9 }} data-bb="lr-disclaimer">Перекос/LSI — ориентир приоритета, не прогноз травмы (BJSM 2025: LSI не различает безопасный возврат)</div>
+              <div style={{ color: '#fff', marginTop: 4, fontSize: 10, opacity: 0.9 }} data-bb="lr-phase-note">⚠ {LR_PHASE_ASYM_NOTE}</div>
             </div>
             {report.weakZonesGranular.length > 0 && (
               <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 10, lineHeight: 1.5 }}>
@@ -2023,6 +2048,57 @@ export const BBDiagnosticsHub: React.FC = () => {
                 <div style={{ color: '#fff', marginTop: 4, fontSize: 10, opacity: 0.9 }}>
                   Правило боли (ПММ): во время ≤5/10 и к утру — как до нагрузки. Боль вернулась — назад на ступень. Ступень уехает в ББ-авто кнопкой «→ В ББ-авто» и учитывается при 💉.
                 </div>
+                {returnCriteria && (
+                  <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }} data-bb="return-criteria">
+                    <b style={{ color: '#fff', fontSize: 11 }}>
+                      ✅ Критерии выхода (измеримые) — {returnCriteria.metCount} из {returnCriteria.total}
+                    </b>
+                    {/* вводы: 0–10 для боли, чипы для скованности/плиометрики */}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                      {([['retPainLoad', 'Боль при нагрузке 0–10'], ['retPainMorning', 'Боль утром 0–10']] as Array<['retPainLoad' | 'retPainMorning', string]>).map(([key, label]) => (
+                        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fff', fontSize: 10 }}>
+                          {label}
+                          <input
+                            type="number" inputMode="numeric" min={0} max={10} step={1}
+                            aria-label={label} data-bb="return-criterion-input" data-key={key}
+                            value={state[key] ?? ''}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const n = raw === '' ? null : Math.max(0, Math.min(10, Math.round(Number(raw) || 0)));
+                              setState((s) => ({ ...s, [key]: n }));
+                            }}
+                            style={{ width: 60, minHeight: 44, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 14 }}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                      {([['worse', 'Скованность хуже'], ['same', 'Так же'], ['better', 'Лучше']] as Array<['better' | 'same' | 'worse', string]>).map(([v, label]) => (
+                        <button
+                          key={`stiff-${v}`} type="button" data-bb="return-stiffness" data-value={v}
+                          aria-pressed={state.retStiffness === v}
+                          onClick={() => setState((s) => ({ ...s, retStiffness: s.retStiffness === v ? null : v }))}
+                          style={chipStyle(state.retStiffness === v)}
+                        >{label}</button>
+                      ))}
+                      <button
+                        type="button" data-bb="return-plyo"
+                        aria-pressed={state.retPlyo === true}
+                        onClick={() => setState((s) => ({ ...s, retPlyo: s.retPlyo === true ? null : true }))}
+                        style={chipStyle(state.retPlyo === true)}
+                      >{state.retPlyo === true ? '✓ Плиометрика терпится' : 'Плиометрика терпится'}</button>
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      {returnCriteria.criteria.map((c) => (
+                        <div key={c.id} data-bb="return-criterion" data-state={c.state} style={{ color: c.state === 'not_met' ? '#ef4444' : c.state === 'met' ? '#22c55e' : '#fff', fontSize: 10, marginTop: 2 }}>
+                          {c.state === 'met' ? '✓' : c.state === 'not_met' ? '✗' : '—'} {c.label}: {c.state === 'no_data' ? 'нет данных' : c.rule}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ color: '#fff', marginTop: 6, fontSize: 10 }} data-bb="return-criteria-verdict">{returnCriteria.text}</div>
+                    <div style={{ color: '#fff', marginTop: 2, fontSize: 10, opacity: 0.9 }} data-bb="return-criteria-note">ⓘ {returnCriteria.note}</div>
+                  </div>
+                )}
               </div>
             )}
             {report.weakZonesGranular.length > 0 && (

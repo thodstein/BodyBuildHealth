@@ -54,6 +54,7 @@ import {
   MET_CATALOG,
   palFromMetHours,
   computePalFromMet,
+  bmrMethodSpread,
   type WeightPoint as WeightPointBase,
 } from '../core/metabolic-constants';
 import {
@@ -255,6 +256,31 @@ export function calcWater(input: MetabolicInput) {
   };
 }
 
+// ——— Честная оговорка к TDEE по формуле (E1.1 / A10) ———
+// Pontzer & Trexler 2026 (Curr Biol, PMID 41653928): подогнанный к реальности расход может
+// отличаться от формульного сильнее всего у очень активных; Pontzer — наименьшая адаптация
+// (~100% от формулы), Trexler — заметная адаптация + замедление восстановления.
+//
+// ГЛАВНОЕ: из этого НЕЛЬЗЯ делать «формула +30%». Это враньё в обе стороны — завысит цель
+// на треть у тех, кому повезло с адаптацией. Правильно: показывать формулу как оценку и
+// сверять её с трендом веса (adaptive v3). Когда adaptive v3 доступен, он УЖЕ содержит
+// фактический расход — надбавка не применяется, иначе это двойной счёт.
+export const PONTZER_FORMULA_NOTE =
+  'формула BEE×PAL — оценка: реальный расход может быть выше на ~30% (Pontzer & Trexler 2026)';
+export const TDEE_ALREADY_ADAPTED_NOTE =
+  'TDEE уже адаптирован по тренду веса (adaptive v3) — надбавку Pontzer не применяем, иначе двойной счёт';
+
+/** E1.3 — TyG и HOMA-IR ОБА называют себя маркерами инсулинорезистентности, но делят один
+ *  вход — глюкозу натощак:
+ *    TyG     = ln(TG × глюкоза / 2)      → нужны ТГ + глюкоза
+ *    HOMA-IR = (глюкоза/18.018 × инсулин) / 22.5 → нужны глюкоза + инсулин
+ *  Одна высокая глюкоза натощак поднимает ОБА показателя, поэтому два «⚠» рядом — это не
+ *  два независимых подтверждения, а один и тот же сигнал, посчитанный дважды. Плюс HOMA-IR
+ *  без анализа на инсулин не считается вовсе (возвращает null) — то есть у большинства
+ *  людей из лаборатории его просто нет. */
+export const IR_MARKERS_SHARED_INPUT_NOTE =
+  'TyG и HOMA-IR делят вход «глюкоза натощак» — это один сигнал, посчитанный дважды, а не два независимых подтверждения. HOMA-IR требует анализа на инсулин (без него показателя нет)';
+
 // ——— Шаги ——— (MET-модель + персональный TEF + PRO NEAT — Levine 2002)
 export function calcSteps(input: MetabolicInput) {
   const { bmr } = computeBMR(input);
@@ -307,7 +333,7 @@ export function calcSteps(input: MetabolicInput) {
     sedentKcal,
     tefNat, tefAAS, neat, eat, bmr: Math.round(bmr),
     adaptive, dlwBand,
-    note: input.onAAS ? `ААС EXP +${Math.round((mult-1)*100)}% ${AAS_EXPERIMENTAL_NOTE} → шагов −8%` : `Натурал: PAL ${palEff.toFixed(2)} (бытовая ${palBase}+train ${trainAdd.toFixed(2)}+cardio ${cardioAdd.toFixed(2)}${input.weeklyVolumeTons? ` tons ${input.weeklyVolumeTons}`:''}· DLW ±12% ${dlwBand.low}-${dlwBand.high}) · NEAT Levine 2002`
+    note: input.onAAS ? `ААС EXP +${Math.round((mult-1)*100)}% ${AAS_EXPERIMENTAL_NOTE} → шагов −8%` : `Натурал: PAL ${palEff.toFixed(2)} (бытовая ${palBase}+train ${trainAdd.toFixed(2)}+cardio ${cardioAdd.toFixed(2)}${input.weeklyVolumeTons? ` tons ${input.weeklyVolumeTons}`:''}· DLW ±12% ${dlwBand.low}-${dlwBand.high}) · NEAT Levine 2002 · ${PONTZER_FORMULA_NOTE}`
   };
 }
 
@@ -422,7 +448,8 @@ export function calcKBJU(input: MetabolicInput) {
     delta: { kcal: Math.round(kcalAASFinal - kcalNatFinal), p: pAAS - pNat, c: cAAS - cNat },
     carbTiming, fiber: { nat: fiberNat, aas: fiberAAS }, tefNat, tefAAS, neat, eat, bmr: Math.round(bmr),
     adaptive, periodization, lutealAdd, thyroidMult,
-    note: input.onAAS ? `ААС EXP +${Math.round((mult-1)*100)}% белок ${protAAS}г/кг (+${aasProtAdd.toFixed(1)} EXP)${AAS_EXPERIMENTAL_NOTE}${lutealAdd? `, лютеин +${lutealAdd}`:''}${thyroidNote}${diaasMult > 1 ? ` · DIAAS ×${diaasMult.toFixed(2)} (${diaasSrc.label})` : ''} · TEF ${tefNat}ккал (инфо, в PAL уже)` : `Натурал: белок ${protNat}г/кг (LBM ${Math.round(lbmForProt)}кг)${diaasMult > 1 ? ` · DIAAS ×${diaasMult.toFixed(2)} ${diaasSrc.label}` : ''}, TEF ${tefNat}ккал (инфо), PAL ${palEff.toFixed(2)}${lutealAdd? `, лютеин +${lutealAdd}`:''}${thyroidNote}`
+    bmrSpread: bmrMethodSpread(bmrBase.allMethods),
+    note: input.onAAS ? `ААС EXP +${Math.round((mult-1)*100)}% белок ${protAAS}г/кг (+${aasProtAdd.toFixed(1)} EXP)${AAS_EXPERIMENTAL_NOTE}${lutealAdd? `, лютеин +${lutealAdd}`:''}${thyroidNote}${diaasMult > 1 ? ` · DIAAS ×${diaasMult.toFixed(2)} (${diaasSrc.label})` : ''} · TEF ${tefNat}ккал (инфо, в PAL уже)` : `Натурал: белок ${protNat}г/кг (LBM ${Math.round(lbmForProt)}кг)${diaasMult > 1 ? ` · DIAAS ×${diaasMult.toFixed(2)} ${diaasSrc.label}` : ''}, TEF ${tefNat}ккал (инфо), PAL ${palEff.toFixed(2)}${lutealAdd? `, лютеин +${lutealAdd}`:''}${thyroidNote} · ${PONTZER_FORMULA_NOTE}`
   };
 }
 
@@ -1288,7 +1315,7 @@ export function calcNEATPro(input: { weight: number; profession?: ProfessionKind
   return { sitting, standing, fidget, walking, profession: prof, total, note: `NEAT PRO Levine+FAO: профессия ${prof} + стоя +${standing} + fidget ${fidget} + ходьба ${walking} = ${total}ккал` };
 }
 /**
- * AT диапазоном 5–15% (MacroBalanceLab), не точкой + Biggest Loser персист.
+ * AT диапазоном 5–15% (MacroBalanceLab) с явным выходом за полосу.
  *
  * 26 сен 2026 (E0.5): БЫЛО
  *   const mid = Math.max(base, Math.round((low + high) / 2 * 0.4));
@@ -1296,7 +1323,7 @@ export function calcNEATPro(input: { weight: number; profession?: ProfessionKind
  * Два дефекта:
  *   1) `/2 * 0.4` — середина полосы 5–15% TDEE равна 10% TDEE, а не 4%. При base = 0
  *      точечная оценка (4%) оказывалась НИЖЕ собственной нижней границы полосы (5%) —
- *      виз��альный блок показывал «оценка AT» вне диапазона, который сам же объявил.
+ *      визуальный блок показывал «оценка AT» вне диапазона, который сам же объявил.
  *   2) `Math.min(high, mid)` МОЛЧА обрезал реальную адаптацию, если она выше 15%
  *      (голодная диета/ACWR выше нормы). Сигнал «AT выше полосы» — самый ценный
  *      для пользователя, и он исчезал.
@@ -1314,7 +1341,11 @@ export function calcATRange(input: { tdee: number; deficitKcal?: number; weeksIn
   const persistent = (input.weeksInDeficit ?? 0) >= 12 ? Math.round(mid * 0.6) : 0; // Fothergill: часть держится годами
   const note = `AT диапазон 5–15% TDEE: ${low}–${high}ккал, оценка ${mid}`
     + (aboveBand ? ` (адаптация по факту ${base}ккал ВЫШЕ полосы — не обрезаем)` : ` (середина полосы ${bandMid}ккал)`)
-    + `${persistent ? ` · персист ~${persistent} (Biggest Loser)` : ''} (Trexler/Fothergill)`;
+    // 26 сен 2026 (E0.9): «Biggest Loser» — это прозвище ИССЛЕДОВАНИЯ (Fothergill,
+    // Metabolic Adaptation to Weight Loss, 2016), а не название настройки или ключа
+    // хранилища. Пользователю прозвище ничего не сообщает, поэтому в UI оставляем
+    // фамилию и год; в коде ссылка на конкретную работу сохранена.
+    + `${persistent ? ` · персистентная часть ~${persistent}ккал (Fothergill, 2016)` : ''} (Trexler)`;
   return { low, mid, high, persistent, aboveBand, note };
 }
 /** Reverse-auto: шаг по trend (а не фикс +100) */
@@ -1352,7 +1383,7 @@ export function buildOneAnswerPro(params: { formulaTDEE: number; adaptiveV3?: Ad
   const tdee = tdeeBase + (params.pregnancyAddKcal ?? 0);
   const low = Math.round(tdee * 0.88); const high = Math.round(tdee * 1.12);
   const targets = { maintain: tdee, mildCut: Math.round(tdee - 250), cut: Math.round(tdee - 500), bulk: Math.round(tdee + 300) };
-  return { tdee, low, high, water: params.waterMl, ea: params.ea, tdeeSource: params.adaptiveV3 ? 'adaptive-v3' : 'formula', targets, note: `TDEE ${tdee} [${low}–${high} DLW] via ${params.adaptiveV3 ? `adaptive-v3 R²${params.adaptiveV3.r2} ${params.adaptiveV3.confidence}` : 'формула'} · cut ${targets.cut} / bulk ${targets.bulk}` };
+  return { tdee, low, high, water: params.waterMl, ea: params.ea, tdeeSource: params.adaptiveV3 ? 'adaptive-v3' : 'formula', targets, note: `TDEE ${tdee} [${low}–${high} DLW] via ${params.adaptiveV3 ? `adaptive-v3 R²${params.adaptiveV3.r2} ${params.adaptiveV3.confidence} · ${TDEE_ALREADY_ADAPTED_NOTE}` : `формула · ${PONTZER_FORMULA_NOTE}`} · cut ${targets.cut} / bulk ${targets.bulk}` };
 }
 export function diffMetabolicSnapshots(a: Record<string, any>, b: Record<string, any>): Array<{ key: string; a: any; b: any; delta: number | null }> {
   const keys = Array.from(new Set([...Object.keys(a), ...Object.keys(b)]));

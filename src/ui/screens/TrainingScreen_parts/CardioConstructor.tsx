@@ -24,6 +24,7 @@ import { getCardioCycleTemplateById } from '../../../data/cardio-cycles/cardio-c
 import { buildCardioCycleFromTemplate, finishCardioCycle } from '../../../engines/lms/cardio-templates.engine';
 import { consumeCardioTemplatePending, subscribeCardioTemplatePending } from '../../../engines/lms/cardio-cycle-bridge';
 import { parsePaceText, formatPace } from '../../../engines/lms/cardio-personal-zones.engine';
+import { hrvRecoveryMult, hrvSignalFromStore } from '../../../engines/pro/hrv-baseline.engine';
 import { extractCardioProgression, cardioProgressionAdvice } from '../../../engines/lms/cardio-meso-progression.engine';
 import { getCardioIntervalPreset } from '../../../engines/lms/cardio-interval-presets.engine';
 import { CARDIO_RED_FLAGS } from '../../../engines/lms/cardio-red-flags.engine';
@@ -298,7 +299,10 @@ export const CardioConstructor: React.FC = () => {
     const auto = {
       sleep: !!(pf.sleepHours && pf.sleepHours < 6),
       stress: !!(pf.stressLevel && pf.stressLevel >= 7),
-      hrv: !!(pf.hrvMs && pf.hrvMs > 0 && pf.hrvMs < 25),
+      // 26.09.2026 было→стало: было «HRV ниже 25 мс → фактор включён». Абсолютный порог штрафовал
+      // атлета с высокой базой (Plews 2013 PMID 23535808) — 25 мс это нижняя граница коридора
+      // нормы, а не «плохое значение». Теперь фактор включается по отклонению от ЛИЧНОЙ базы.
+      hrv: hrvRecoveryMult(hrvSignalFromStore(pf.hrvMs)).mult < 1,
       ped: !!pf.enhanced,
       joints: !!pf.jointIssues,
     };
@@ -314,7 +318,10 @@ export const CardioConstructor: React.FC = () => {
     const out: string[] = [];
     if (factorsOn.sleep) out.push(`Сон: ${pf.sleepHours ?? '—'} ч ${pf.sleepHours && pf.sleepHours < 6 ? '(низкий → объём ×0.9)' : ''}`);
     if (factorsOn.stress) out.push(`Стресс: ${pf.stressLevel ?? '—'}/10 ${pf.stressLevel && pf.stressLevel >= 7 ? '(высокий → HIIT убран, ×0.95)' : ''}`);
-    if (factorsOn.hrv) out.push(`HRV: ${pf.hrvMs ? pf.hrvMs + ' мс' : '—'} ${pf.hrvMs && pf.hrvMs < 25 ? '(низкий → ×0.9)' : ''}`);
+    if (factorsOn.hrv) {
+      const hv = hrvRecoveryMult(hrvSignalFromStore(pf.hrvMs));
+      out.push(`HRV: ${pf.hrvMs ? pf.hrvMs + ' мс' : '—'} ${hv.mult < 1 ? `(просадка от базы → ×0.9)` : ''}`);
+    }
     if (factorsOn.ped) out.push(`PED-курс: ${pf.enhanced ? 'есть (→ ×1.05)' : 'не обнаружен'}`);
     if (factorsOn.joints) out.push(`Суставы: ${pf.jointIssues ? 'есть проблемы → низкоударный' : 'проблем не найдено'}`);
     return out;
@@ -684,7 +691,7 @@ export const CardioConstructor: React.FC = () => {
     setFactorsOn({
       sleep: cfg.sleepHours != null && cfg.sleepHours < 6,
       stress: cfg.stressLevel != null && cfg.stressLevel >= 7,
-      hrv: cfg.hrvMs != null && cfg.hrvMs > 0 && cfg.hrvMs < 25,
+      hrv: cfg.hrvMs != null && cfg.hrvMs > 0 && hrvRecoveryMult(hrvSignalFromStore(cfg.hrvMs)).mult < 1,
       ped: cfg.enhanced === true,
       joints: cfg.autoLowImpact === true,
     });

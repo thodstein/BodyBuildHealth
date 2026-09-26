@@ -93,6 +93,37 @@ describe('PRO-5 Э1 возврат в работу', () => {
     expect(SRC).toMatch(/returnStage: state\.returnStage \|\| null,/);
     expect(SRC).toMatch(/returnAction: state\.returnStage \? \(returnActive\?\.action \?\? null\) : null,/);
   });
+
+  /* П2 (26.09.2026): критерии выхода должны быть ИЗМЕРИМЫМИ и вводимыми, а не декларацией. */
+  it('П2: карточка показывает 4 критерия с «нет данных» и принимает ввод', () => {
+    render(<BBDiagnosticsHub />);
+    fireEvent.click(screen.getAllByText('Верх груди')[0]);
+    fireEvent.click(screen.getByRole('switch', { name: /Острая боль/ }));
+
+    const box = document.querySelector('[data-bb="return-criteria"]');
+    expect(box).not.toBeNull();
+    const rows = Array.from(document.querySelectorAll('[data-bb="return-criterion"]'));
+    expect(rows).toHaveLength(4);
+    // без ввода все — «нет данных», а не «зелёные»
+    for (const r of rows) expect(r.getAttribute('data-state')).toBe('no_data');
+    expect(box?.textContent).toContain('0 из 4');
+    expect(box?.textContent).toMatch(/«нет данных»/);
+    expect(box?.textContent).toMatch(/а не «всё хорошо»/);
+
+    // ввод боли 8/10 → провал по критерию нагрузки
+    const load = document.querySelector('[data-bb="return-criterion-input"][data-key="retPainLoad"]') as HTMLInputElement;
+    expect(load).toBeTruthy();
+    fireEvent.change(load, { target: { value: '8' } });
+    const after = Array.from(document.querySelectorAll('[data-bb="return-criterion"]'));
+    expect(after[0].getAttribute('data-state')).toBe('not_met');
+    expect(document.querySelector('[data-bb="return-criteria-verdict"]')?.textContent).toMatch(/Провал/);
+
+    // плиометрика чипом
+    fireEvent.click(document.querySelector('[data-bb="return-plyo"]')!);
+    expect(document.querySelectorAll('[data-bb="return-criterion"]')[3].getAttribute('data-state')).toBe('met');
+    // оговорка честная видна
+    expect(box?.textContent).toMatch(/эвристика/);
+  });
 });
 
 describe('PRO-5 Э3 паритет выдачи', () => {

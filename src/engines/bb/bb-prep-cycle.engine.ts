@@ -25,6 +25,7 @@ import type { BBTrainingFocus } from './bb-goal-types';
 import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import { buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES, isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, buildPeakWeek, configFromPlan, isMonotonicTaper, prepDietBreaks, isPrepRefeedDay, syncPrepDietBreaksWithPlan, type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan, type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry, type ContestSpecialization, type ExperienceLevel, type SodiumStrategy, type WaterStrategy } from './bb-contest-prep.engine';
 import { prepSplitProfile, PREP_MINIMAL_MODE_LABELS, type PrepMinimalMode } from './bb-prep-splits';
+import { hrvRecoveryMult, hrvSignalFromStore } from '../pro/hrv-baseline.engine';
 
 /** Конфигурация Prep-цикла (всё пользовательское, валидируется). */
 export interface PrepCycleConfig {
@@ -81,6 +82,9 @@ export interface PrepCycleConfig {
   bodyFat?: number;
   leanMass?: number;
   hrvMs?: number;
+  /** Личная база RMSSD / отклонение в SWC (26.09.2026) — вместо абсолютных мс. */
+  hrvBaseline?: number;
+  hrvBaselineZ?: number;
   sleepHours?: number;
   stressLevel?: number;
   labMrvMultiplier?: number;
@@ -518,9 +522,17 @@ export function prepAthleteMult(cfg: Pick<PrepCycleConfig, 'enhanced' | 'trainin
 }
 
 /** Множитель восстановления (низкая готовность → чуть меньше объёма подготовки). */
-export function prepRecoveryMult(cfg: Pick<PrepCycleConfig, 'hrvMs' | 'sleepHours' | 'stressLevel' | 'bodyFat'>): number {
+export function prepRecoveryMult(cfg: Pick<PrepCycleConfig, 'hrvMs' | 'hrvBaseline' | 'hrvBaselineZ' | 'sleepHours' | 'stressLevel' | 'bodyFat'>): number {
   let m = 1.0;
-  if (cfg.hrvMs != null && cfg.hrvMs < 50) m *= 0.97;
+  if (cfg.hrvMs != null) {
+    // 26.09.2026 было→стало: порог был абсолютным (50 мс) — атлет с базой 80 мс штрафовался
+    // за свою норму. Теперь по личной базе (Plews 2013 PMID 23535808); без базы не трогаем.
+    const sig = (cfg.hrvBaseline != null || cfg.hrvBaselineZ != null)
+      ? { hrvMs: cfg.hrvMs, hrvBaseline: cfg.hrvBaseline, hrvBaselineZ: cfg.hrvBaselineZ }
+      : hrvSignalFromStore(cfg.hrvMs);
+    const hv = hrvRecoveryMult(sig).mult;
+    if (hv < 1) m *= 0.97; // сохраняем прежнюю мягкостьprep-цикла (не 0.85 как в билдере)
+  }
   if (cfg.sleepHours != null && cfg.sleepHours < 6) m *= 0.97;
   if (cfg.stressLevel != null && cfg.stressLevel >= 7) m *= 0.97;
   if (cfg.bodyFat != null && cfg.bodyFat > 25) m *= 0.98;

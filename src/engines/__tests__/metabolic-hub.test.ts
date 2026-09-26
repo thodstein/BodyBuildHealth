@@ -1,8 +1,136 @@
-﻿import { describe, it, expect } from 'vitest';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange } from '../metabolic-hub.engine';
-import { bmrCunningham, bmrOwen, bmrTenHaaf, bmrHarrisRevised, bmrHenry, bmrLivingston, calcTEF as calcTEFConst, calcTrendWithConfidence as calcTrendConf2, energyDensityPerKg, hallAdaptationFactor, calcSweatElectrolytes, calcJPBodyFat, calcDurninBodyFat, computeBMR } from '../../core/metabolic-constants';
+import { describe, it, expect } from 'vitest';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcATRange, buildOneAnswerPro, PONTZER_FORMULA_NOTE, TDEE_ALREADY_ADAPTED_NOTE, IR_MARKERS_SHARED_INPUT_NOTE } from '../metabolic-hub.engine';
+import { bmrCunningham, bmrOwen, bmrTenHaaf, bmrHarrisRevised, bmrHenry, bmrLivingston, bmrMethodLabel, bmrMethodSpread, calcHomaIR, calcTyG, calcTEF as calcTEFConst, calcTrendWithConfidence as calcTrendConf2, energyDensityPerKg, hallAdaptationFactor, calcSweatElectrolytes, calcJPBodyFat, calcDurninBodyFat, computeBMR } from '../../core/metabolic-constants';
 
 const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
+
+describe('metabolic-hub — E1.3: TyG и HOMA-IR не выдаются за два независимых сигнала', () => {
+  it('оба показателя делят вход «глюкоза натощак» — и это правда, а не только текст', () => {
+    // Доказательство из кода, а не из комментария: глюкоза поднимает ОБА показателя,
+    // поэтому «два ⚠» рядом — это один сигнал, посчитанный дважды.
+    const lowGlucose = calcHomaIR(90, 5)!, highGlucose = calcHomaIR(130, 5)!;
+    expect(highGlucose).toBeGreaterThan(lowGlucose); // HOMA-IR реагирует на глюкозу
+    const tygLow = calcTyG(100, 90)!, tygHigh = calcTyG(100, 130)!;
+    expect(tygHigh).toBeGreaterThan(tygLow); // TyG тоже реагирует на глюкозу
+  });
+
+  it('при одинаковой глюкозе и инсулине разные ТГ не меняют HOMA-IR (и наоборот)', () => {
+    // HOMA-IR не «видит» ТГ, TyG не «видит» инсулин — они не копии друг друга,
+    // но и не независимые: общий вход остаётся глюкоза.
+    expect(calcHomaIR(100, 8)).toBe(calcHomaIR(100, 8));
+    expect(calcTyG(200, 100)).not.toBe(calcTyG(80, 100));
+  });
+
+  it('HOMA-IR без инсулина не показывается вовсе (нет данных — не «норма»)', () => {
+    const r = calcHomaIRWrap(100, undefined);
+    expect(r.homa).toBeNull();
+    expect(r.zone).toBe('unknown');
+    // подпись обязана говорить, чего не хватает, а не выглядеть как «всё хорошо»
+    expect(r.note).toMatch(/инсулин/i);
+  });
+
+  it('оговорка о общем входе видна пользователю и не заменяет пороги', () => {
+    expect(IR_MARKERS_SHARED_INPUT_NOTE).toMatch(/глюкоза/i);
+    expect(IR_MARKERS_SHARED_INPUT_NOTE).toMatch(/инсулин/i);
+    expect(IR_MARKERS_SHARED_INPUT_NOTE).toMatch(/не два независимых/i);
+  });
+});
+
+describe('metabolic-hub — E1.2: единая метка BMR (без «Mifflin»-фолбэка)', () => {
+  it('все 8 методов имеют собственную подпись, ни один не проваливается в чужую', () => {
+    const expected: Record<string, string> = {
+      katch_mcardle: 'Katch-McArdle', cunningham: 'Cunningham', owen: 'Owen',
+      ten_haaf: 'ten Haaf', mifflin: 'Mifflin', harris_revised: 'Harris-Benedict',
+      henry: 'Henry', livingston: 'Livingston',
+    };
+    for (const [id, frag] of Object.entries(expected)) {
+      const label = bmrMethodLabel(id as any);
+      expect(label, `метод ${id}`).toContain(frag);
+    }
+    // Ключевой регресс-тест: раньше 3 метода молча показывались как Mifflin
+    for (const id of ['livingston', 'harris_revised', 'henry']) {
+      expect(bmrMethodLabel(id as any), `${id} не должен читаться как Mifflin`).not.toBe(bmrMethodLabel('mifflin'));
+      expect(bmrMethodLabel(id as any)).not.toContain('Mifflin');
+    }
+    // неизвестный id не врёт, а показывает себя
+    expect(bmrMethodLabel('что-то новое')).toContain('что-то новое');
+  });
+
+  it('computeBMR отдаёт все формулы и разброс между ними считается', () => {
+    const r = computeBMR({ weight: 80, height: 180, age: 30, sex: 'male' });
+    expect(r.allMethods).toBeTruthy();
+    const n = Object.keys(r.allMethods!).length;
+    expect(n).toBeGreaterThanOrEqual(8);
+    const sp = bmrMethodSpread(r.allMethods);
+    expect(sp).toBeTruthy();
+    expect(sp!.n).toBe(n);
+    expect(sp!.spreadPct).toBeGreaterThan(0);
+    // выбранный метод реально есть среди посчитанных
+    expect(r.allMethods![r.method]).toBeGreaterThan(0);
+  });
+
+  it('разброс — это про разные формулы, а НЕ доверительный интервал (E1.2-ловушка)', () => {
+    // Замерено пробой, а не выдумано: 46–75% на реальных профилях.
+    // Раньше в комментарии стояло «единицы процентов» — это было бы новой ложью.
+    const lean = computeBMR({ weight: 55, height: 175, age: 25, sex: 'male' });
+    const heavy = computeBMR({ weight: 130, height: 175, age: 25, sex: 'male' });
+    const sLean = bmrMethodSpread(lean.allMethods)!;
+    const sHeavy = bmrMethodSpread(heavy.allMethods)!;
+    // точные замеренные значения — чтобы правка формул не прошла молча
+    expect(sLean.spreadPct).toBe(74.7);
+    expect(sHeavy.spreadPct).toBe(46);
+    // и фиксируем, что разброс велик И по неприменимым формулам:
+    // Livingston при BMI 18 даёт 2128 — абсурд, посчитанный «для сравнения»
+    expect(lean.allMethods!.livingston).toBeGreaterThan(lean.bmr!);
+    expect(lean.method).not.toBe('livingston');
+  });
+
+  it('без allMethods разброс не выдумывается (null, а не 0)', () => {
+    expect(bmrMethodSpread(undefined)).toBeNull();
+    expect(bmrMethodSpread(null)).toBeNull();
+    expect(bmrMethodSpread({ only: 1800 })).toBeNull();
+    // мусорные значения не должны ломать расчёт
+    expect(bmrMethodSpread({ a: 1800, b: 0, c: 1900 })).toBeTruthy();
+  });
+});
+
+describe('metabolic-hub — E1.1: честная оговорка к TDEE по формуле (Pontzer)', () => {
+  it('формульный путь подписывает оценку «реальный расход может быть выше на ~30%»', () => {
+    const oa = buildOneAnswerPro({ formulaTDEE: 2800, waterMl: 3000, ea: null });
+    expect(oa.tdeeSource).toBe('formula');
+    expect(oa.note).toContain('Pontzer');
+    expect(oa.note).toContain('~30%');
+    // подпись именно про ОЦЕНКУ, а не обещание надбавки
+    expect(oa.note).toContain(PONTZER_FORMULA_NOTE);
+  });
+
+  it('adaptive-v3 подписывает «уже адаптирован» и НЕ применяет надбавку Pontzer', () => {
+    const adaptive = { tdee: 2950, r2: 0.93, confidence: 'good' } as any;
+    const oa = buildOneAnswerPro({ formulaTDEE: 2800, adaptiveV3: adaptive, waterMl: 3000, ea: null });
+    expect(oa.tdeeSource).toBe('adaptive-v3');
+    expect(oa.note).toContain(TDEE_ALREADY_ADAPTED_NOTE);
+    // двойного счёта нет: фактический расход = adaptive, надбавка не прибавлена
+    expect(oa.tdee).toBe(2950);
+    expect(oa.tdee).toBeLessThan(Math.round(2950 * 1.3));
+  });
+
+  it('нигде не появилась надбавка «+30% к расходу» (формулу не раздуваем)', () => {
+    const formulaOnly = buildOneAnswerPro({ formulaTDEE: 2800, waterMl: 3000, ea: null });
+    // без adaptive TDEE == ровно формула, НЕ формула × 1.3
+    expect(formulaOnly.tdee).toBe(2800);
+    expect(formulaOnly.targets.maintain).toBe(2800);
+    // и в подписи нет формулировки «прибавляем/надбавляем +30%»
+    expect(formulaOnly.note).not.toMatch(/\+\s*30\s*%/);
+    expect(formulaOnly.note).not.toMatch(/(прибав|надбав|добав)\w*\s*\+?\s*30/i);
+  });
+
+  it('note шагов и КБЖУ несут ту же оговорку, а не silently её прячут', () => {
+    const s = calcSteps({ ...base, activityLevel: 'medium', trainingDays: 4 });
+    expect(s.note).toContain('Pontzer');
+    const k = calcKBJU({ ...base, activityLevel: 'medium', trainingDays: 4 });
+    expect(k.note).toContain('Pontzer');
+  });
+});
 
 describe('metabolic-hub — TEF waterfall', () => {
   it('steps: tef ~10% tdee (fallback без макросов)', () => {

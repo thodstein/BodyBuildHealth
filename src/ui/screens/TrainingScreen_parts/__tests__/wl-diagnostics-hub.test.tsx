@@ -437,4 +437,27 @@ describe('WLDiagnosticsHub PRO', () => {
     const { container } = render(<WLDiagnosticsHub />);
     expect(container.textContent).toContain('Дневник фазы');
   });
+
+  /* П1-Б: величина прыжка между попытками тотала показана честно (26.09.2026).
+   * Прыжки считаются процентами от базы, одинаково при любом весе; полосы IPF есть только
+   * для одиночных видов, для тоталов калибровки нет — значит НЕ выдумываем «оптимум». */
+  it('П1-Б: карточка попыток показывает фактические прыжки и оговорку про тоталы', async () => {
+    localStorage.setItem('he_wl_diagnostics_hub_v1', JSON.stringify({ taSnatchMax: '200' }));
+    render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));
+    const jumps = await waitFor(() => document.querySelector('[data-wl="attempt-jumps"]'), { timeout: 2000 });
+    expect(jumps).toBeTruthy();
+    const txt = jumps!.textContent || '';
+    expect(txt).toMatch(/Рывок: Прыжки \d+ и \d+ кг/);
+    // оговорка: полосы только для одиночных видов + 3-я попытка хуже 2-й
+    expect(txt).toMatch(/для ТОТАЛОВ калибровки нет/);
+    expect(txt).toMatch(/3-я попытка в среднем хуже 2-й/);
+    expect(txt).toContain('41160036');
+  });
+
+  it('П1-Б: без заявки строка прыжков не рисуется (нет выдуманных чисел)', () => {
+    render(<WLDiagnosticsHub />);
+    fireEvent.click(screen.getByRole('button', { name: /VBT\/FvR/ }));
+    expect(document.querySelector('[data-wl="attempt-jumps"]')).toBeFalsy();
+  });
 });

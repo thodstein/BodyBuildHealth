@@ -3,7 +3,7 @@
  * Только русские инварианты поведения, без UI.
  */
 import { describe, it, expect } from 'vitest';
-import { lrVerdictsFromSessions, lrVerdictFor, sideOfExercise } from '../bb-lr-volume.engine';
+import { lrVerdictsFromSessions, lrVerdictFor, sideOfExercise, LR_PHASE_ASYM_NOTE } from '../bb-lr-volume.engine';
 import { assessBbReadiness } from '../bb-readiness.engine';
 import { assessBbRedFlags } from '../bb-red-flags.engine';
 import { bbBarPathVerdict } from '../bb-bar-path.engine';
@@ -50,6 +50,15 @@ describe('P1 L/R-объём', () => {
     expect(t.verdict).toBe('topup');
     expect(t.bonus).toBe(0.25);
     expect(t.topUpSets).toBeGreaterThanOrEqual(2);
+  });
+
+  /* П1-В (26.09.2026): суммарный перекос может быть 0 при реальной фазовой асимметрии —
+   * поэтому одна цифра не должна читаться как доказательство симметрии. */
+  it('П1-В: оговорка про фазовую асимметрию честная и с источником', () => {
+    expect(LR_PHASE_ASYM_NOTE).toMatch(/перекос 0 %/);
+    expect(LR_PHASE_ASYM_NOTE).toMatch(/отсутствие данных, а не симметрия/);
+    expect(LR_PHASE_ASYM_NOTE).toContain('42466527');
+    expect(LR_PHASE_ASYM_NOTE).toMatch(/force-plate|видео-разбор/);
   });
 });
 

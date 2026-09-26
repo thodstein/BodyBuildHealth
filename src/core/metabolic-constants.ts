@@ -96,6 +96,47 @@ export function pregnancyTDEEAdd(opts: { trimester?: 1 | 2 | 3; lactating?: 'exc
   return 0;
 }
 export type BMRMethod = 'katch_mcardle' | 'cunningham' | 'owen' | 'ten_haaf' | 'mifflin' | 'harris_revised' | 'henry' | 'livingston';
+
+/** Единая метка BMR для UI (E1.2). Раньше подписи жили в двух местах TSX и покрывали 5 из 8
+ *  методов — `livingston`/`harris_revised`/`henry` молча показывались как «Mifflin», то есть
+ *  UI врал о том, каким расчётом получено число. Канон — здесь. */
+const BMR_METHOD_LABELS: Record<BMRMethod, string> = {
+  katch_mcardle: 'Katch-McArdle (по LBM)',
+  cunningham: 'Cunningham (по LBM)',
+  owen: 'Owen (только вес)',
+  ten_haaf: 'ten Haaf (вес+рост+возраст)',
+  mifflin: 'Mifflin-St Jeor (вес+рост+возраст)',
+  harris_revised: 'Harris-Benedict (пересмотр.)',
+  henry: 'Henry (вес+возраст)',
+  livingston: 'Livingston (BMI≥35)',
+};
+export function bmrMethodLabel(method: BMRMethod | string | undefined): string {
+  if (!method) return 'BMR (метод не указан)';
+  return BMR_METHOD_LABELS[method as BMRMethod] ?? `BMR (${method})`;
+}
+
+/** Разброс по ВСЕМ посчитанным формулам BMR.
+ *
+ *  ВАЖНО, иначе это станет новой ложью: разброс НЕЛЬЗЯ подавать как «погрешность
+ *  расчёта». Замерено на 4 профилях: 46–75% (55кг M → 1218 Henry … 2128 Livingston;
+ *  80кг M → 1453…2391; 130кг M → 2041…2979; 60кг Ж → 1175…1935). Причина — не только
+ *  различие формул, но и то, что часть из них к конкретному человеку НЕПРИМЕНИМА:
+ *  Livingston валиден для BMI≥35, а при BMI 18 даёт 2128 ккал — абсурд, который честный
+ *  движок всё равно посчитал «для сравнения». Поэтому движок выбирает одну формулу по
+ *  своим же правилам (BMRMethod), а разброс здесь — контекст «насколько сильно зависит
+ *  число от выбора формулы», а не доверительный интервал вокруг истины. */
+export function bmrMethodSpread(allMethods: Record<string, number> | undefined | null) {
+  if (!allMethods) return null;
+  const vals = Object.values(allMethods).filter(v => Number.isFinite(v) && v > 0);
+  if (vals.length < 2) return null;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  return {
+    min, max, n: vals.length,
+    spreadKcal: max - min,
+    spreadPct: Math.round(((max - min) / min) * 1000) / 10,
+  };
+}
+
 export interface BMRResult {
   bmr: number;
   lean: number;

@@ -53,6 +53,28 @@ export const CMJ_SCREENING_NOTE =
 
 export const CMJ_NON_BLOCKING_NOTE = 'Метрика не блокирует тренировку автоматически (не автоблокировка) — решение остаётся за вами.';
 
+/* ── П1-Д (26.09.2026): телефонный CMJ — индикатор ТРЕНДА, не лабораторный эталон ──
+ *
+ * Wilczyński B. et al. Agreement and reliability of force-plate, smartphone-based, and
+ * wearable-sensor countermovement jump assessments. Front Physiol 2026;17:1902583 ·
+ * PMID 42666427. Сравнивались force-plate / смартфон / носимые датчики: телефонная оценка
+ * согласуется с force-plate ХУЖЕ, а разброс между устройствами и настройками съёмки заметен.
+ *
+ * Обзор Liu 2026 (Sensors 26:5394): среди валидированных «замен лабораторным приборам» в
+ * приложениях — ВИДЕО-тайминг спринта/прыжка и ЧСС с нагрудной лентой, а НЕ сила/высота,
+ * посчитанная камерой телефона.
+ *
+ * Следствие для честности: сравнивать наши абсолютные см/Вт с force-plate нельзя, а решение
+ * о нагрузке по одному замеру строить нельзя. Метрика годится для сравнения САМА С СОБОЙ
+ * (тренд внутри одного способа съёмки) — поэтому оговорка говорит ровно это, а не «метрика
+ * ненадёжна, не смотрите» (метрика рабочая, просто не эталонная).
+ */
+export const CMJ_PHONE_TREND_NOTE =
+  'Оценка с телефона (по видео) — это ТРЕНД, а не лабораторный эталон: абсолютные см/Вт '
+  + 'не сопоставимы с force-plate (разброс между устройствами и способами съёмки — Wilczyński 2026, '
+  + 'PMID 42666427). Сравнивайте замеры только с вашими же, сделанными одинаково; решение о нагрузке '
+  + 'по одному замеру не строим.';
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const G = 9.81;
 const round1 = (v: number) => Math.round(v * 10) / 10;
@@ -173,7 +195,7 @@ export function cmjScreen(entries: CmjEntry[], referenceDate?: string): {
     seriesBestPct: current?.vsSeriesBestPct ?? null,
     seriesBestValue: best,
     zone, signals, blocking: false,
-    note: `${CMJ_SCREENING_NOTE} ${CMJ_NON_BLOCKING_NOTE}`,
+    note: `${CMJ_SCREENING_NOTE} ${CMJ_NON_BLOCKING_NOTE} ${CMJ_PHONE_TREND_NOTE}`,
   };
 }
 

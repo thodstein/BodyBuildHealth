@@ -987,7 +987,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     );
                   })}
                    {displaySrc.plVolumeLandmarks.some(l => l.status === 'over') && (
-                    <div style={{ color:'#ff5252', fontSize:11, marginTop:4 }}>⚠ Объём выше MRV — риск перетренированности. Снизьте подходы или добавьте разгрузку.</div>
+                    <div style={{ color:'#ff5252', fontSize:11, marginTop:4 }}>⚠ Объём выше верхней границы MRV. Важно: MRV — это верх РАБОЧЕГО ДИАПАЗОНА ориентировочной модели, а не потолок организма. В РКИ (Camargo 2026, +120 % объёма за 8 недель) ухудшения адаптации не нашли, поэтому решение ваше: снизить объём, если восстановление вас не устраивает, или оставить как есть.</div>
                   )}
                 </MetricCard>
               )}

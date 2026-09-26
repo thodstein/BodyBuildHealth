@@ -4,21 +4,41 @@
  * Учитывает RED-S пол (female 1400ккал, жиры ≥0.8г/кг) как в bb-contest-prep.
  */
 
+import { hrvRecoveryMult, hrvSignalFromStore } from './pro/hrv-baseline.engine';
+
 export interface RecoveryInput {
   bodyFat?: number;
   leanMass?: number;
   hrvMs?: number;
   sleepHours?: number;
   stressLevel?: number;
+  /**
+   * Грейд HRV, УЖЕ посчитанный по личной базе (combat-monitoring `hrvGrade(last, mean, sd)`).
+   * Этот путь корректен и имеет приоритет — трогать нельзя.
+   */
   hrvGrade?: 'optimal' | 'caution' | 'dangerous';
+  /** Личная база RMSSD (мс) — если она передана билдером явно. */
+  hrvBaseline?: number;
+  /** Отклонение lnRMSSD в единицах SWC — предпочтительнее ratio. */
+  hrvBaselineZ?: number;
 }
 
 export function computeRecoveryMultiplier(input: RecoveryInput): number {
   let v = 1;
   if (input.bodyFat != null) v *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1;
   if (input.leanMass != null) v *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1 : 0.9;
-  if (input.hrvGrade) v *= input.hrvGrade === 'dangerous' ? 0.85 : input.hrvGrade === 'caution' ? 0.95 : 1.05;
-  else if (input.hrvMs != null) v *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1 : 0.85;
+  if (input.hrvGrade) {
+    v *= input.hrvGrade === 'dangerous' ? 0.85 : input.hrvGrade === 'caution' ? 0.95 : 1.05;
+  } else if (input.hrvMs != null) {
+    // 26.09.2026 было→стало: пороги были абсолютными миллисекундами (70 / 50), и человек с базой
+    // 80 мс получал ×0.85 при 60 мс, то есть здоровый атлет штрафовался за свою норму.
+    // Теперь только от личной базы (Plews 2013 PMID 23535808 / Buchheit 2014 PMID 24282094);
+    // без базы объём не трогаем — вместо штрафа «по популяции».
+    const sig = (input.hrvBaseline != null || input.hrvBaselineZ != null)
+      ? { hrvMs: input.hrvMs, hrvBaseline: input.hrvBaseline, hrvBaselineZ: input.hrvBaselineZ }
+      : hrvSignalFromStore(input.hrvMs);
+    v *= hrvRecoveryMult(sig).mult;
+  }
   if (input.sleepHours != null) v *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1 : 0.85;
   if (input.stressLevel != null) v *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1 : 0.85;
   return Math.max(0.6, Math.min(1.5, v));

@@ -416,7 +416,21 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
   it('атлет-множители: курс/стаж держат больше объёма, новичок меньше', () => {
     expect(prepAthleteMult(base({ enhanced: true, trainingYears: 5 }))).toBeGreaterThan(prepAthleteMult(base({ enhanced: false, trainingYears: 5 })));
     expect(prepAthleteMult(base({ level: 'beginner', trainingYears: 1 }))).toBeLessThan(prepAthleteMult(base({ level: 'intermediate', trainingYears: 4 })));
-    expect(prepRecoveryMult(base({ hrvMs: 40, sleepHours: 5, stressLevel: 8 }))).toBeLessThan(prepRecoveryMult(base({})));
+    // было→стало (26.09.2026): этот ассерт раньше проходил из-за абсолютного `hrvMs < 50 → ×0.97`.
+    // Теперь HRV без базы объём не трогает, поэтому проверяем сон/стресс отдельно от HRV.
+    expect(prepRecoveryMult(base({ sleepHours: 5, stressLevel: 8 }))).toBeLessThan(prepRecoveryMult(base({})));
+  });
+
+  it('HRV в prep-цикле: без личной базы объём не трогаем (26.09.2026)', () => {
+    // было: prepRecoveryMult({hrvMs: 40}) < 1 (абсолютный порог 50 мс)
+    // стало: 40 мс — это нормальный RMSSD без базы; штраф только отклонения от СВОЕЙ базы
+    expect(prepRecoveryMult(base({ hrvMs: 40 }))).toBe(prepRecoveryMult(base({})));
+    expect(prepRecoveryMult(base({ hrvMs: 40 }))).toBe(1);
+    // а вот отклонение от базы 80 мс — уже по личной базе, ×0.97 (мягкость prep сохранена)
+    expect(prepRecoveryMult(base({ hrvMs: 55, hrvBaseline: 80 }))).toBeLessThan(1);
+    expect(prepRecoveryMult(base({ hrvMs: 80, hrvBaseline: 80 }))).toBe(1);
+    // z-путь предпочтительнее ratio
+    expect(prepRecoveryMult(base({ hrvMs: 60, hrvBaseline: 60, hrvBaselineZ: -2.5 }))).toBeLessThan(1);
   });
 
   it('фаза недели prep-блока соответствует позиции', () => {

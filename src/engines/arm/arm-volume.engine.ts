@@ -1,4 +1,5 @@
 import { canonicalizeArmMuscle, isArmTendonMuscle } from './arm-tendon-sets.engine';
+import { hrvRecoveryMult, hrvSignalFromStore } from '../pro/hrv-baseline.engine';
 
 /**
  * arm-volume.engine.ts — бюджеты, indirect, session limits для арм-планировщика.
@@ -11,6 +12,9 @@ export interface ArmRecoveryInput {
   hrvMs?: number;
   sleepHours?: number;
   stressLevel?: number;
+  /** Личная база RMSSD / отклонение в SWC (26.09.2026). */
+  hrvBaseline?: number;
+  hrvBaselineZ?: number;
 }
 
 export function computeArmRecoveryScore(input: ArmRecoveryInput): number {
@@ -20,8 +24,16 @@ export function computeArmRecoveryScore(input: ArmRecoveryInput): number {
     else if (input.bodyFat > 25) score -= 8;
   }
   if (input.hrvMs != null) {
-    if (input.hrvMs < 40) score -= 12;
-    else if (input.hrvMs < 60) score -= 6;
+    // 26.09.2026 было→стало: пороги были абсолютными миллисекундами (40 / 60) — атлет с базой
+    // 90 мс терял 6 очков за 60 мс, то есть за свою норму. Теперь очки снимаются только по
+    // отклонению от ЛИЧНОЙ базы (Plews 2013 PMID 23535808); без базы шкала не трогается.
+    // Шкала ниже конвертится в множитель объёма через recoveryScoreToMult — это не «просто текст».
+    const sig = (input.hrvBaseline != null || input.hrvBaselineZ != null)
+      ? { hrvMs: input.hrvMs, hrvBaseline: input.hrvBaseline, hrvBaselineZ: input.hrvBaselineZ }
+      : hrvSignalFromStore(input.hrvMs);
+    const hrvMult = hrvRecoveryMult(sig).mult;
+    if (hrvMult <= 0.85) score -= 12;
+    else if (hrvMult < 1) score -= 6;
   }
   if (input.sleepHours != null) {
     if (input.sleepHours < 6) score -= 15;

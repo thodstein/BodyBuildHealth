@@ -6,7 +6,7 @@ import {
 } from './SupportBioavailabilityData';
 import { PopupSelect, PopupNumber, PopupBool } from '../../components/PopupXxx';
 import { S } from './SupportShared';
-import { doseWindowFor, personDoseHints, bioEvidenceLabel, bioEvidenceFor, resolvePersonDefaults, migratedGet, migratedSet } from '../../../engines/support-hub-evidence.engine';
+import { doseWindowFor, personDoseHints, bioEvidenceLabel, bioEvidenceFor, limitUnitRu, resolvePersonDefaults, migratedGet, migratedSet } from '../../../engines/support-hub-evidence.engine';
 // 26 сен 2026 (E0.2): предел + юрисдикция + альтернативное мнение регулятора.
 import { NUTRIENT_LIMIT_INFO } from '../../../engines/support-plan/types';
 import { resolveNutrient } from '../../../engines/support-limits';
@@ -54,6 +54,8 @@ interface DosingCardProps {
   eff: {
     absorbed: number; rawAbsorbed: number; status: string; ulWarning: string;
     altNote?: string; ulKind?: string; ulUnverified?: boolean; windowNote?: string; hasWindow?: boolean;
+  /** Собственная оговорка реестра по веществу (E1.6) — иначе она write-only. */
+  limitNote?: string;
   };
   adjMult: number;
   costEff: number | null;
@@ -121,6 +123,16 @@ const DosingCard: React.FC<DosingCardProps> = ({
         {eff.altNote && (
           <div style={{ marginTop: 3, padding: '3px 6px', borderRadius: 5, fontSize: 7, lineHeight: 1.3, textAlign: 'center', background: 'rgba(96,165,250,0.12)', color: '#60a5fa' }}>
             {eff.altNote}
+          </div>
+        )}
+        {/* 26 сен 2026 (E1.6): СОБСТВЕННАЯ оговорка реестра. Раньше она лежала в
+            `NUTRIENT_LIMITS_V2[id].note` и не читалась НИГДЕ — то есть оговорки «UL для
+            омега-3 не установлен», «длительное превышение D — ранний признак» и
+            «гепатотоксичность EGCG не предсказуема дозой» были написаны, но пользователю
+            не показывались. Белый текст + 9px (правило 1 проекта и запрет микрошрифта). */}
+        {eff.limitNote && (
+          <div style={{ marginTop: 3, padding: '4px 6px', borderRadius: 5, fontSize: 9, lineHeight: 1.35, textAlign: 'left', background: 'rgba(245,158,11,0.12)', color: '#fff', borderLeft: '2px solid #f59e0b' }}>
+            {eff.limitNote}
           </div>
         )}
         {costEff !== null && (
@@ -223,7 +235,7 @@ export const SupportEffectiveDose: React.FC = () => {
   })), [sub2]);
 
   const calcEffDose = (form: FormWithBio | undefined, doseMg: number, id: string) => {
-    if (!form || !doseMg) return { absorbed: 0, rawAbsorbed: 0, range: null as { therMin: number; therMax: number; label: string } | null, status: '', ulWarning: '', windowNote: '', hasWindow: false };
+    if (!form || !doseMg) return { absorbed: 0, rawAbsorbed: 0, range: null as { therMin: number; therMax: number; label: string } | null, status: '', ulWarning: '', windowNote: '', hasWindow: false, limitNote: '' };
     const rawAbsorbed = Math.round(doseMg * form.bioavailability);
     const absorbed = Math.round(rawAbsorbed * adjMult);
     // P2: единое окно (THERAPEUTIC_WINDOWS приоритетнее, DOSE_RANGES — fallback), без новых чисел
@@ -264,12 +276,12 @@ export const SupportEffectiveDose: React.FC = () => {
     // просто «12 мг» и не понимает, почему цифра такая строгая.
     const lim = NUTRIENT_LIMIT_INFO[resolveNutrient(id) ?? ''];
     const altNote = lim && lim.altValue && lim.altValue !== lim.value
-      ? `${lim.jurisdiction} ${lim.year}: ${lim.value} ${lim.unit === 'mcg' ? 'мкг' : lim.unit === 'iu' ? 'МЕ' : 'мг'} · `
+      ? `${lim.jurisdiction} ${lim.year}: ${lim.value} ${limitUnitRu(lim.unit)} · `
         + `${lim.altJurisdiction} ${lim.altYear}: ${lim.altValue} — `
         + `разрыв ×${(Math.max(lim.value, lim.altValue) / Math.min(lim.value, lim.altValue)).toFixed(lim.altValue / lim.value >= 10 ? 0 : 1)}. `
         + `Показан более строгий предел.`
       : '';
-    return { absorbed, rawAbsorbed, range, status, ulWarning, windowNote: win.note, hasWindow: win.hasData, ulKind: win.ulKind, ulUnverified: win.ulUnverified, altNote };
+    return { absorbed, rawAbsorbed, range, status, ulWarning, windowNote: win.note, hasWindow: win.hasData, ulKind: win.ulKind, ulUnverified: win.ulUnverified, altNote, limitNote: win.limitNote };
   };
 
   const eff1 = calcEffDose(f1, dose1, sub1Id);

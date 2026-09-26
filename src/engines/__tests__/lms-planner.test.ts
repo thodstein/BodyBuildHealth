@@ -297,28 +297,50 @@ describe('buildLMSPlan', () => {
 
   // ── P1: ACWR / autoReg / PEDs интеграция ──
 
-  it('ACWR zone=caution → объём снижен, RIR повышен', () => {
+  /* ── P0-А (26.09.2026): ACWR стал advisory-сигналом, авто-правка объёма — только при
+   * независимом подтверждении восстановлением (ACWR_ADVISORY_NOTE: g=0.35, I?=95.8 %).
+   * Ниже оба теста переписаны под ЭТОТ контракт; было→стало зафиксировано в комментарии. */
+  it('ACWR caution + подтверждение восстановлением → объём снижен, RIR повышен', () => {
     const planBase = buildCycle01Plan();
+    // hrvMs — независимый маркер, открывающий гейт acwrCorroboratedByRecovery
     const planCaution = buildCycle01Plan({
       acwr: { ratio: 1.4, zone: 'caution' },
+      hrvMs: 25,
     });
     const baseSets = planBase.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
     const cautionSets = planCaution.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
-    expect(cautionSets).toBeLessThanOrEqual(baseSets);
-    // RIR должен быть выше при caution
+    // было: toBeLessThanOrEqual — ассерт проходил и при полном отсутствии правки (вакуумный лок)
+    expect(cautionSets).toBeLessThan(baseSets);
     const baseRir = planBase.weeks[0].days[0].exercises[0].workSets[0].rir;
     const cautionRir = planCaution.weeks[0].days[0].exercises[0].workSets[0].rir;
-    expect(cautionRir).toBeGreaterThanOrEqual(baseRir);
+    expect(cautionRir).toBeGreaterThan(baseRir);
   });
 
-  it('ACWR zone=dangerous → deload (объём ×0.65)', () => {
+  it('ACWR dangerous + подтверждение восстановлением → deload (объём ×0.65)', () => {
     const plan = buildCycle01Plan({
       acwr: { ratio: 1.6, zone: 'dangerous' },
+      hrvMs: 25,
     });
     const planBase = buildCycle01Plan();
     const baseSets = planBase.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
     const dangerSets = plan.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
     expect(dangerSets).toBeLessThan(baseSets);
+  });
+
+  it('ACWR dangerous БЕЗ подтверждения → объём не режется автоматически, но advisory виден (было→стало)', () => {
+    // было: zone=dangerous без маркеров резал объём ×0.65. стало: ACWR сам по себе —
+    // контекстный индикатор, авто-правку даёт только независимое подтверждение восстановлением.
+    // Право решать остаётся за пользователем — поэтому advisory обязан быть в rationale.
+    const plan = buildCycle01Plan({
+      acwr: { ratio: 1.6, zone: 'dangerous' },
+    });
+    const planBase = buildCycle01Plan();
+    const baseSets = planBase.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    const sets = plan.weeks[0].days[0].exercises.reduce((s, e) => s + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
+    expect(sets).toBe(baseSets);
+    const rationale = String(plan.progressionRationale ?? '');
+    expect(rationale).toContain('ACWR');
+    expect(rationale).toMatch(/индикатор, план не изменён/);
   });
 
   it('autoReg topSetPctMultiplier < 1 → вес снижен', () => {

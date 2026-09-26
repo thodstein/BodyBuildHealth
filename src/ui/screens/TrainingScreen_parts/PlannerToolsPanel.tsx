@@ -56,7 +56,7 @@ const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
     { id: 'lab', title: 'Лаборатория упражнений', icon: '🧬', accent: '#06b6d4', short: 'Подбор · техника · PRO+замена · сравнение', desc: '4 шага: подбор+нагрузка/блины/тоннаж/1RM/VBT + техника + force-векторы + сравнение — каталог drawer', render: () => <ExerciseLabMerged /> },
     { id: 'tools', title: 'PRI / схема повторов', icon: '🧠', accent: '#8b5cf6', short: 'PRI готовность → объём/RIR + схема повторов', desc: 'PRI-тест Masuda → целевой объём/RIR + схема повторов — источник Helms/RPE/RIR', render: () => <ToolsHub /> },
     { id: 'mixes', title: 'Миксы', icon: '🧪', accent: '#ec4899', short: 'Тренировочные + пресеты здоровья', desc: 'Тренировочные (памп/сила/фокус пред/интра/пост) + 7 пресетов здоровья — ISSN/Examine', render: () => <MixHub /> },
-    { id: 'metabolic', title: 'Метаболика', icon: '⚖️', accent: '#38bdf8', short: 'Вода · шаги · КБЖУ · жир · кортизол', desc: '5 в 1: EFSA/Mifflin/Navy/HPA — один снапшот с/без ААС, переключатель натурал/ААС', render: () => <MetabolicHub /> },
+    { id: 'metabolic', title: 'Метаболика', icon: '⚖️', accent: '#38bdf8', short: 'Вода · шаги · КБЖУ · жир · кортизол', desc: '16 режимов: EFSA/Mifflin/Navy/HPA — один снапшот с/без ААС, переключатель натурал/ААС', render: () => <MetabolicHub /> },
   ],
 
   // ═══ ББ-АВТО — инструменты (без дублей, только уникальный Темп из Интеллекта) ═══
@@ -70,7 +70,7 @@ const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
     { id: 'volume', title: 'Объём-хаб', icon: '📐', accent: '#22c55e', short: 'MEV/MAV/MRV · тоннаж/КПШ · блины', desc: 'Один расчёт объёма: пер-мышца MEV/MAV/MRV · тоннаж/КПШ/УОИ · блины 8 грифов — без дублей', render: () => <VolumeHub /> },
     { id: 'lab', title: 'Лаборатория упражнений', icon: '🧬', accent: '#06b6d4', short: 'Подбор · техника · PRO+замена · сравнение', desc: '4 шага: подбор+нагрузка/блины/тоннаж/1RM/VBT + техника + force-векторы + сравнение — каталог drawer', render: () => <ExerciseLabMerged /> },
     { id: 'mixes', title: 'Миксы', icon: '🧪', accent: '#ec4899', short: 'Тренировочные + пресеты здоровья', desc: 'Тренировочные (памп/сила/фокус пред/интра/пост) + 7 пресетов здоровья — ISSN/Examine', render: () => <MixHub /> },
-    { id: 'metabolic', title: 'Метаболика', icon: '⚖️', accent: '#38bdf8', short: 'Вода · шаги · КБЖУ · жир · кортизол', desc: '5 в 1: EFSA/Mifflin/Navy/HPA — один снапшот с/без ААС, переключатель натурал/ААС', render: () => <MetabolicHub /> },
+    { id: 'metabolic', title: 'Метаболика', icon: '⚖️', accent: '#38bdf8', short: 'Вода · шаги · КБЖУ · жир · кортизол', desc: '16 режимов: EFSA/Mifflin/Navy/HPA — один снапшот с/без ААС, переключатель натурал/ААС', render: () => <MetabolicHub /> },
   ],
 };
 

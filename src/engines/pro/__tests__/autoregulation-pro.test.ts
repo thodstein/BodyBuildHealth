@@ -8,6 +8,8 @@ import {
   adjustedWorkingWeight,
   sessionAutoRegulate,
   shouldTrainToday,
+  AUTOREG_MARKERS_TOTAL,
+  AUTOREG_RELIABILITY_NOTE,
   type AutoRegInput,
 } from '../autoregulation-pro.engine';
 
@@ -121,5 +123,69 @@ describe('shouldTrainToday', () => {
     const result = shouldTrainToday(baseInput({ readiness: 80, combinedRirShift: 3 }));
     expect(result.train).toBe(false);
     expect(result.reason).toContain('RIR');
+  });
+});
+
+/* ── P1-А (26.09.2026): прозрачность решения. Смысл — маркер, которого нет, НЕ должен
+ *    выглядеть как идеальный (раньше все дефолты были «идеальными» значениями). ── */
+describe('P1-А прозрачность решения (factors)', () => {
+  const full = baseInput({
+    hrvRatio: 1.0, sleepScore: 70, fatigue: 40, lastSessionRPE: 7, lastVelocityLossPct: 5,
+  });
+
+  it('все маркеры переданы → 7/7, надёжность высокая', () => {
+    const out = autoRegulate(full);
+    expect(out.factors).toHaveLength(AUTOREG_MARKERS_TOTAL);
+    expect(out.markersProvided).toBe(AUTOREG_MARKERS_TOTAL);
+    expect(out.markersTotal).toBe(AUTOREG_MARKERS_TOTAL);
+    expect(out.reliability).toBe('high');
+    expect(out.factors!.every(f => f.provided)).toBe(true);
+  });
+
+  it('минимальный вход (только ACWR + готовность) → 2/7, надёжность низкая, остальные «нет данных»', () => {
+    const out = autoRegulate(baseInput());
+    expect(out.markersProvided).toBe(2);
+    expect(out.reliability).toBe('low');
+    const missing = out.factors!.filter(f => !f.provided).map(f => f.key);
+    expect(missing).toEqual(['hrv', 'sleep', 'fatigue', 'lastRpe', 'velocityLoss']);
+    for (const f of out.factors!.filter(x => !x.provided)) {
+      expect(f.value).toBe('—');
+      expect(f.effect).toBe('нет данных — не участвует');
+      expect(f.volumeMult).toBe(1);
+      expect(f.topMult).toBe(1);
+    }
+  });
+
+  it('инвариант: произведение вкладов факторов == итоговому множителю (запись не врёт)', () => {
+    // Если фактор-регистратор ever разойдётся с арифметикой, этот тест упадёт.
+    const cases = [
+      full,
+      baseInput({ readiness: 40, acwr: { ratio: 1.45, zone: 'caution' } }),
+      baseInput({ readiness: 30, acwr: { ratio: 1.6, zone: 'dangerous' }, fatigue: 80, lastSessionRPE: 9.6 }),
+      baseInput({ hrvRatio: 0.7, sleepScore: 40, lastVelocityLossPct: 45, goal: 'strength' }),
+    ];
+    for (const c of cases) {
+      const out = autoRegulate(c);
+      const prodV = out.factors!.reduce((s, f) => s * f.volumeMult, 1);
+      const prodT = out.factors!.reduce((s, f) => s * f.topMult, 1);
+      const clamp = (v: number, lo: number, hi: number) => Math.round(Math.max(lo, Math.min(hi, v)) * 100) / 100;
+      expect(out.volumeMultiplier).toBe(clamp(prodV, 0.4, 1.25));
+      expect(out.topSetPctMultiplier).toBe(clamp(prodT, 0.85, 1.05));
+    }
+  });
+
+  it('факторы описывают те же решения, что и текстовый лог', () => {
+    const out = autoRegulate(baseInput({ readiness: 40, hrvRatio: 0.8, sleepScore: 30 }));
+    const byKey = Object.fromEntries(out.factors!.map(f => [f.key, f]));
+    expect(byKey.readiness.effect).toContain('топ-сет×0.94');
+    expect(byKey.hrv.effect).toContain('топ-сет×0.96');
+    expect(byKey.sleep.effect).toContain('объём×0.9');
+    expect(out.decisions.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('текст надёжности объясняет, что это доля маркеров, а не качество алгоритма', () => {
+    expect(AUTOREG_RELIABILITY_NOTE).toContain('доля реально переданных маркеров');
+    expect(AUTOREG_RELIABILITY_NOTE).toContain('42724227');
+    expect(AUTOREG_RELIABILITY_NOTE).toMatch(/НЕ считается идеальным/i);
   });
 });

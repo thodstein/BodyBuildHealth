@@ -31,6 +31,42 @@ export interface AutoRegInput {
   combinedRirShift?: number;
 }
 
+/**
+ * Прозрачность решения (P1-А, 26.09.2026).
+ *
+ * Источник: Schaffarczyk M., Sperlich B. Heart rate variability-guided endurance training: evaluating
+ * strengths, weaknesses, opportunities, and threats for load prescription and adjustment.
+ * Front Sports Act Living 2026;8:1858271 · PMID 42724227. Ключевое из abstract: узкое место —
+ * «уже не в нехватке физиологических данных, а в ОТСУТСТВИИ прозрачных и физиологически
+ * обоснованных фреймворков решений»; среди угроз — «rule-based decision frameworks, которые могут
+ * неадекватно улавливать контекстную зависимость адаптации» и «растущая зависимость от
+ * проприетарных метрик, чьи алгоритмы непрозрачны и могут чрезмерно упрощать решения».
+ *
+ * Что из этого следует для кода: пользователь должен видеть, из КАКИХ маркеров собрано решение,
+ * что сделал каждый и СКОЛЬКО маркеров реально было. Раньше `decisions[]` давал текст, но не вес,
+ * а все пропущенные маркеры подставлялись идеальными дефолтами (hrvRatio→1.0, fatigue→0,
+ * sleepScore→0, RPE→0, VLoss→0) — то есть «маркера нет» выглядело как «маркер идеален».
+ *
+ * reliability — ОРИЕНТИР ПРОЗРАЧНОСТИ, а не валидированный порог: он показывает долю реально
+ * присутствующих маркеров, чтобы решение по 2 из 7 не выглядело так же уверенно, как по 6 из 7.
+ */
+export type AutoRegReliability = 'low' | 'medium' | 'high';
+export const AUTOREG_MARKERS_TOTAL = 7;
+export const AUTOREG_RELIABILITY_NOTE =
+  'Надёжность решения — доля реально переданных маркеров, а не «качество» алгоритма: '
+  + 'правила авторегуляции не учитывают контекстную адаптацию (PMID 42724227). '
+  + 'Маркер, которого нет, НЕ считается идеальным — он просто не участвует.';
+
+export interface AutoRegFactor {
+  key: 'acwr' | 'readiness' | 'hrv' | 'sleep' | 'fatigue' | 'lastRpe' | 'velocityLoss';
+  label: string;
+  provided: boolean;      // false → маркер не передан, взят нейтральный дефолт
+  value: string;          // значение для показа (пусто, если не передан)
+  effect: string;         // что сделал маркер
+  volumeMult: number;     // применённый множитель объёма (1 = не менял)
+  topMult: number;        // применённый множитель топ-сета (1 = не менял)
+}
+
 export interface AutoRegOutput {
   topSetPctMultiplier: number;
   volumeMultiplier: number;
@@ -40,6 +76,12 @@ export interface AutoRegOutput {
   adjustedTopSetPct?: number;
   adjustedRIR?: number;
   decisions: string[];
+  /** Прозрачность решения (P1-А): вклад каждого маркера. Необязательное — для потребителей,
+   *  которым достаточно чисел. */
+  factors?: AutoRegFactor[];
+  markersProvided?: number;
+  markersTotal?: number;
+  reliability?: AutoRegReliability;
 }
 
 /** %1RM для «повторов до отказа» (Epley-обратная, r=1→100%). */
@@ -73,55 +115,74 @@ export function rpeFromLoad(e1RM: number, weight: number, reps: number): number 
 /** Склейка сигналов → корректировка плана. */
 export function autoRegulate(input: AutoRegInput): AutoRegOutput {
   const decisions: string[] = [];
+  const factors: AutoRegFactor[] = [];
   let volMult = input.plannedVolumeMult ?? 1;
   let topMult = 1;
   let deload = false;
   let intensityNote: string | undefined;
+  // Прозрачность (P1-А): вклад маркера в множители, который он реально применил.
+  // Арифметика не меняется — константы те же, просто они пишутся в фактор, а не «в никуда».
+  const apply = (f: AutoRegFactor) => { volMult *= f.volumeMult; topMult *= f.topMult; factors.push(f); };
+  // Маркер, которого нет, обязан называться «нет данных», а не «без корректировки»:
+  // иначе потребитель прочитает отсутствие данных как «всё в норме» (прозрачность, P1-А).
+  const MISSING_EFFECT = 'нет данных — не участвует';
+  const f = (key: AutoRegFactor['key'], label: string, provided: boolean, value: string, effect: string, vMult: number, tMult: number): AutoRegFactor =>
+    ({ key, label, provided, value, effect: provided ? effect : MISSING_EFFECT, volumeMult: vMult, topMult: tMult });
 
   // ACWR (P3)
   const z = input.acwr.zone;
-  if (z === "dangerous") { volMult *= 0.65; deload = true; decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)}>1.5 (опасно) → объём×0.65, deload`); }
-  else if (z === "caution") { volMult *= 0.85; decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)} (caution) → объём×0.85, RIR+1`); }
-  else if (z === "undertrained") { volMult *= 1.1; decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)}<0.8 (недотрен) → объём×1.1`); }
-  else { decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)} optimal → базовый объём`); }
+  if (z === "dangerous") { deload = true; decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)}>1.5 (опасно) → объём×0.65, deload`); apply(f('acwr', 'ACWR', true, input.acwr.ratio.toFixed(2), 'объём×0.65, deload', 0.65, 1)); }
+  else if (z === "caution") { decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)} (caution) → объём×0.85, RIR+1`); apply(f('acwr', 'ACWR', true, input.acwr.ratio.toFixed(2), 'объём×0.85, RIR+1', 0.85, 1)); }
+  else if (z === "undertrained") { decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)}<0.8 (недотрен) → объём×1.1`); apply(f('acwr', 'ACWR', true, input.acwr.ratio.toFixed(2), 'объём×1.1', 1.1, 1)); }
+  else { decisions.push(`ACWR ${input.acwr.ratio.toFixed(1)} optimal → базовый объём`); apply(f('acwr', 'ACWR', true, input.acwr.ratio.toFixed(2), 'без корректировки', 1, 1)); }
 
   // Readiness
   const r = input.readiness;
-  if (r < 35) { topMult *= 0.88; volMult *= 0.85; intensityNote = 'восстановительная'; decisions.push(`Готовность ${r}<35 → RIR+3, топ-сет×0.88, объём×0.85 (восстановительная)`); }
-  else if (r < 50) { topMult *= 0.94; volMult *= 0.92; intensityNote = 'лёгкая'; decisions.push(`Готовность ${r}<50 → RIR+2, топ-сет×0.94, объём×0.92 (лёгкая)`); }
-  else if (r < 65) { topMult *= 0.97; decisions.push(`Готовность ${r}<65 → RIR+1, топ-сет×0.97`); }
-  else if (r >= 80 && z === "optimal") { topMult *= 1.03; intensityNote = 'силовая'; decisions.push(`Готовность ${r}≥80 + ACWR optimal → топ-сет×1.03 (силовая)`); }
-  else { decisions.push(`Готовность ${r} → без корректировки`); }
+  if (r < 35) { intensityNote = 'восстановительная'; decisions.push(`Готовность ${r}<35 → RIR+3, топ-сет×0.88, объём×0.85 (восстановительная)`); apply(f('readiness', 'Готовность', true, String(r), 'RIR+3, топ-сет×0.88, объём×0.85', 0.85, 0.88)); }
+  else if (r < 50) { intensityNote = 'лёгкая'; decisions.push(`Готовность ${r}<50 → RIR+2, топ-сет×0.94, объём×0.92 (лёгкая)`); apply(f('readiness', 'Готовность', true, String(r), 'RIR+2, топ-сет×0.94, объём×0.92', 0.92, 0.94)); }
+  else if (r < 65) { decisions.push(`Готовность ${r}<65 → RIR+1, топ-сет×0.97`); apply(f('readiness', 'Готовность', true, String(r), 'RIR+1, топ-сет×0.97', 1, 0.97)); }
+  else if (r >= 80 && z === "optimal") { intensityNote = 'силовая'; decisions.push(`Готовность ${r}≥80 + ACWR optimal → топ-сет×1.03 (силовая)`); apply(f('readiness', 'Готовность', true, String(r), 'топ-сет×1.03 (силовая)', 1, 1.03)); }
+  else { decisions.push(`Готовность ${r} → без корректировки`); apply(f('readiness', 'Готовность', true, String(r), 'без корректировки', 1, 1)); }
 
   // HRV-specific: RMSSD ratio ниже baseline → ЦНС утомлена → снижаем интенсивность, не объём
   const hrv = input.hrvRatio ?? 1.0;
-  if (hrv < 0.75) { topMult *= 0.92; decisions.push(`HRV-ratio ${hrv.toFixed(2)}<0.75 (ЦНС подавлена) → топ-сет×0.92, RIR+1`); }
-  else if (hrv < 0.88) { topMult *= 0.96; decisions.push(`HRV-ratio ${hrv.toFixed(2)}<0.88 (снижена) → топ-сет×0.96`); }
-  else if (hrv > 1.15) { topMult *= 1.02; volMult *= 1.05; decisions.push(`HRV-ratio ${hrv.toFixed(2)}>1.15 (суперкомпенсация) → топ-сет×1.02, объём×1.05`); }
+  const hrvProvided = input.hrvRatio != null;
+  if (hrv < 0.75) { decisions.push(`HRV-ratio ${hrv.toFixed(2)}<0.75 (ЦНС подавлена) → топ-сет×0.92, RIR+1`); apply(f('hrv', 'HRV (к базе)', hrvProvided, hrv.toFixed(2), 'топ-сет×0.92, RIR+1', 1, 0.92)); }
+  else if (hrv < 0.88) { decisions.push(`HRV-ratio ${hrv.toFixed(2)}<0.88 (снижена) → топ-сет×0.96`); apply(f('hrv', 'HRV (к базе)', hrvProvided, hrv.toFixed(2), 'топ-сет×0.96', 1, 0.96)); }
+  else if (hrv > 1.15) { decisions.push(`HRV-ratio ${hrv.toFixed(2)}>1.15 (суперкомпенсация) → топ-сет×1.02, объём×1.05`); apply(f('hrv', 'HRV (к базе)', hrvProvided, hrv.toFixed(2), 'топ-сет×1.02, объём×1.05', 1.05, 1.02)); }
+  else apply(f('hrv', 'HRV (к базе)', hrvProvided, hrvProvided ? hrv.toFixed(2) : '—', 'без корректировки', 1, 1));
 
   // Sleep quality
   const sleep = input.sleepScore ?? 0;
-  if (sleep > 0 && sleep < 45) { volMult *= 0.9; decisions.push(`Сон ${sleep}<45 → RIR+1, объём×0.9`); }
+  const sleepProvided = input.sleepScore != null;
+  if (sleep > 0 && sleep < 45) { decisions.push(`Сон ${sleep}<45 → RIR+1, объём×0.9`); apply(f('sleep', 'Качество сна', sleepProvided, String(sleep), 'RIR+1, объём×0.9', 0.9, 1)); }
+  else apply(f('sleep', 'Качество сна', sleepProvided, sleepProvided ? String(sleep) : '—', 'без корректировки', 1, 1));
 
   // Fatigue
   const fat = input.fatigue ?? 0;
-  if (fat > 75) { volMult *= 0.8; deload = true; decisions.push(`Усталость ${fat}>75 → объём×0.8, RIR+2, deload`); }
-  else if (fat > 60) { volMult *= 0.9; decisions.push(`Усталость ${fat}>60 → объём×0.9, RIR+1`); }
+  const fatProvided = input.fatigue != null;
+  if (fat > 75) { deload = true; decisions.push(`Усталость ${fat}>75 → объём×0.8, RIR+2, deload`); apply(f('fatigue', 'Усталость', fatProvided, String(fat), 'объём×0.8, RIR+2, deload', 0.8, 1)); }
+  else if (fat > 60) { decisions.push(`Усталость ${fat}>60 → объём×0.9, RIR+1`); apply(f('fatigue', 'Усталость', fatProvided, String(fat), 'объём×0.9, RIR+1', 0.9, 1)); }
+  else apply(f('fatigue', 'Усталость', fatProvided, fatProvided ? String(fat) : '—', 'без корректировки', 1, 1));
 
   // Last session RPE
   const lrpe = input.lastSessionRPE ?? 0;
-  if (lrpe >= 9.5) { volMult *= 0.85; decisions.push(`RPE прошлой сессии ${lrpe}≥9.5 → RIR+2, объём×0.85`); }
-  else if (lrpe >= 9 && lrpe > 0) { decisions.push(`RPE прошлой сессии ${lrpe}≥9 → RIR+1, контроль`); }
+  const lrpeProvided = input.lastSessionRPE != null;
+  if (lrpe >= 9.5) { decisions.push(`RPE прошлой сессии ${lrpe}≥9.5 → RIR+2, объём×0.85`); apply(f('lastRpe', 'RPE прошлой сессии', lrpeProvided, String(lrpe), 'RIR+2, объём×0.85', 0.85, 1)); }
+  else if (lrpe >= 9 && lrpe > 0) { decisions.push(`RPE прошлой сессии ${lrpe}≥9 → RIR+1, контроль`); apply(f('lastRpe', 'RPE прошлой сессии', lrpeProvided, String(lrpe), 'RIR+1, контроль', 1, 1)); }
+  else apply(f('lastRpe', 'RPE прошлой сессии', lrpeProvided, lrpeProvided ? String(lrpe) : '—', 'без корректировки', 1, 1));
 
   // Velocity loss (P2 + P4): пороги по цели блока (Pareja-Blanco 2017; Chiang 2025 — межиндивидуальный разброс велик,
   // поэтому это зоны-предупреждения, а deload-гейт 40% общий). Epley-канон для RPE↔% — осознанно (Helms/Zourdos).
   const vl = input.lastVelocityLossPct ?? 0;
   const goal = input.goal ?? 'general';
-  if (vl > 40) { deload = true; volMult *= 0.5; topMult *= 0.92; decisions.push(`VLoss ${vl}%>40 → deload, объём×0.5, топ-сет×0.92`); }
-  else if (goal === 'strength' && vl > 25) { volMult *= 0.75; decisions.push(`VLoss ${vl}%>25 при силовой цели → объём×0.75 (лишний объём не в силу, Pareja-Blanco)`); }
-  else if (goal !== 'strength' && vl > 30) { volMult *= 0.85; decisions.push(`VLoss ${vl}%>30 → объём×0.85`); }
-  else if (vl > 25) { volMult *= 0.8; decisions.push(`VLoss ${vl}%>25 → объём×0.8`); }
-  else if (vl > 0 && vl < 10) { volMult *= 1.05; decisions.push(`VLoss ${vl}%<10 (свежесть) → объём×1.05`); }
+  const vlProvided = input.lastVelocityLossPct != null;
+  if (vl > 40) { deload = true; decisions.push(`VLoss ${vl}%>40 → deload, объём×0.5, топ-сет×0.92`); apply(f('velocityLoss', 'Потеря скорости', vlProvided, vl + '%', 'deload, объём×0.5, топ-сет×0.92', 0.5, 0.92)); }
+  else if (goal === 'strength' && vl > 25) { decisions.push(`VLoss ${vl}%>25 при силовой цели → объём×0.75 (лишний объём не в силу, Pareja-Blanco)`); apply(f('velocityLoss', 'Потеря скорости', vlProvided, vl + '%', 'объём×0.75', 0.75, 1)); }
+  else if (goal !== 'strength' && vl > 30) { decisions.push(`VLoss ${vl}%>30 → объём×0.85`); apply(f('velocityLoss', 'Потеря скорости', vlProvided, vl + '%', 'объём×0.85', 0.85, 1)); }
+  else if (vl > 25) { decisions.push(`VLoss ${vl}%>25 → объём×0.8`); apply(f('velocityLoss', 'Потеря скорости', vlProvided, vl + '%', 'объём×0.8', 0.8, 1)); }
+  else if (vl > 0 && vl < 10) { decisions.push(`VLoss ${vl}%<10 (свежесть) → объём×1.05`); apply(f('velocityLoss', 'Потеря скорости', vlProvided, vl + '%', 'объём×1.05', 1.05, 1)); }
+  else apply(f('velocityLoss', 'Потеря скорости', vlProvided, vlProvided ? vl + '%' : '—', 'без корректировки', 1, 1));
 
   volMult = r2(clamp(volMult, 0.4, 1.25));
   topMult = r2(clamp(topMult, 0.85, 1.05));
@@ -131,6 +192,11 @@ export function autoRegulate(input: AutoRegInput): AutoRegOutput {
   const loadRir = Math.min(2, (z === 'caution' || z === 'dangerous' ? 1 : 0) + (fat > 75 ? 2 : fat > 60 ? 1 : 0) + (lrpe >= 9.5 ? 2 : lrpe >= 9 ? 1 : 0));
   const rirShift = Math.round(clamp(intensityRir + loadRir, 0, 4));
 
+  // Прозрачность решения (P1-А): сколько маркеров реально пришло.
+  const markersProvided = factors.filter(x => x.provided).length;
+  const reliability: AutoRegReliability =
+    markersProvided >= 5 ? 'high' : markersProvided >= 3 ? 'medium' : 'low';
+
   const out: AutoRegOutput = {
     topSetPctMultiplier: topMult,
     volumeMultiplier: volMult,
@@ -138,6 +204,10 @@ export function autoRegulate(input: AutoRegInput): AutoRegOutput {
     deload,
     intensityNote,
     decisions,
+    factors,
+    markersProvided,
+    markersTotal: AUTOREG_MARKERS_TOTAL,
+    reliability,
   };
   if (input.plannedTopSetPct != null) {
     out.adjustedTopSetPct = r3(clamp(input.plannedTopSetPct * topMult, 0.5, 1.0));

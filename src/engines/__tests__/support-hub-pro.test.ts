@@ -3,7 +3,10 @@
  * Калькулятор поддержки не тронут.
  */
 import { describe, it, expect } from 'vitest';
-import { bioEvidenceFor, doseWindowFor, evidenceGradeExFor, evidenceOutcomesFor, stackEvidenceGrade, migratedGet, migratedSet, personDoseHints, passesGradeFilter, filterCatalogGroups, resolvePersonDefaults, OUTCOME_MATRIX_SIZE } from '../support-hub-evidence.engine';
+// канон — `support-limits`, а НЕ `support-plan/types`: у NUTRIENT_LIMIT_INFO нет поля
+// `note` (это урезанное представление для UI), и сравнение с ним давало `undefined`
+import { NUTRIENT_LIMITS_V2, resolveNutrient } from '../support-limits';
+import { bioEvidenceFor, doseWindowFor, limitUnitRu, evidenceGradeExFor, evidenceOutcomesFor, stackEvidenceGrade, migratedGet, migratedSet, personDoseHints, passesGradeFilter, filterCatalogGroups, resolvePersonDefaults, OUTCOME_MATRIX_SIZE } from '../support-hub-evidence.engine';
 import { LAB_TOP20, LAB_ID_ALIASES, resolveLabMonitor } from '../support-hub-labs.engine';
 import { getCachedPubmed, writePubmedCache, readPubmedCache } from '../support-hub-research.engine';
 import { aasRouteOf, suggestAasFrequency, aasTimingFor, fmtHalfLife, AAS_TIMING_DISCLAIMER } from '../support-hub-aas-timing.engine';
@@ -62,6 +65,150 @@ describe('P2 единое окно дозы', () => {
     expect(f.some(x => x.includes('ферритин'))).toBe(true);
     const o = personDoseHints('b12', { weightKg: 80, sex: 'male', age: 65 });
     expect(o.some(x => x.includes('60+'))).toBe(true);
+  });
+
+  // E1.5: «6–8 мг/кг» из плана НЕЛЬЗЯ превращать в дозу БАДа — для 100 кг это 600–800 мг,
+  // в 15–20 раз выше безопасного уровня из реестра (40 мг EFSA 2024 / 45 мг IOM).
+  it('E1.5: железо — потребность по весу названа, но отделена от дозы добавки', () => {
+    const h = personDoseHints('iron', { weightKg: 100 }).join(' | ');
+    expect(h).toContain('6–8 мг/кг');
+    expect(h).toContain('600–800 мг/сут при 100 кг');
+    expect(h.toLowerCase()).toContain('пища, а не доза добавки');
+    expect(h).toContain('endurance');
+  });
+
+  it('E1.5: потолок добавки взят из канона, а не посчитан «мг/кг × вес»', () => {
+    const h = personDoseHints('iron_bisglycinate', { weightKg: 100 }).join(' | ');
+    // в коде «НЕ» заглавной (акцент) — сравниваем без учёта регистра
+    expect(h.toLowerCase()).toContain('не превышает безопасный уровень 40 мг');
+    expect(h).toContain('45 мг, IOM 2001');
+    expect(h).toContain('Умножать «мг/кг» на вес для добавки опасно');
+  });
+
+  it('E1.5: честность источника — ориентир, а не доказанный эффект (NS по маркерам)', () => {
+    const h = personDoseHints('iron', { weightKg: 80 }).join(' | ');
+    expect(h).toContain('NS');
+    expect(h.toLowerCase()).toContain('не пруф-эффект');
+    expect(h).toContain('Smid 2024');
+    expect(h.toLowerCase()).toContain('короткие курсы');
+  });
+
+  it('E1.5: без веса хинт не выдумывает дозу', () => {
+    const h = personDoseHints('iron', {}).join(' | ');
+    expect(h).not.toContain('мг/кг');
+    expect(h).not.toContain('NaN');
+    expect(h).not.toContain('undefined');
+  });
+
+  it('E1.5: железный хинт не расползся на цинк/магний', () => {
+    expect(personDoseHints('zinc', { weightKg: 100 }).join(' | ')).not.toContain('ПИЩА, а не доза добавки');
+    expect(personDoseHints('magnesium', { weightKg: 100 }).join(' | ')).toContain('UL 350 мг');
+  });
+
+  // Тот же класс, что E1.2: одно значение — одна подпись. Раньше «40 мг» писалось вручную,
+  // а «45 mg» подставлялось из реестра — в одной строке смесь latin и кириллицы.
+  it('E1.5: единица измерения в подписи каноническая, без смеси mg/мг', () => {
+    const h = personDoseHints('iron', { weightKg: 100 }).join(' | ');
+    expect(h).toContain('40 мг');
+    expect(h).toContain('45 мг, IOM 2001');
+    expect(h).not.toMatch(/\d\s*mg\b/); // латиница в русской подписи не остаётся
+  });
+
+  it('limitUnitRu: маппинг единиц не разъезжается', () => {
+    expect(limitUnitRu('mg')).toBe('мг');
+    expect(limitUnitRu('mcg')).toBe('мкг');
+    expect(limitUnitRu('iu')).toBe('МЕ');
+    expect(limitUnitRu('g')).toBe('г');
+    // неизвестная единица не подменяется молча
+    expect(limitUnitRu('IU/l')).toBe('IU/l');
+    expect(limitUnitRu(undefined)).toBe('мг');
+  });
+});
+
+// ─── E1.6 (A4 / A7 / A8): оговорка реестра доходит до пользователя ───
+//
+// ГЛАВНАЯ НАХОДКА: все три эпика были «закрыты в тексте реестра» — витамин D, омега-3 и
+// EGCG имели честно написанные `note`. Но `NUTRIENT_LIMITS_V2[id].note` НЕ ЧИТАЛСЯ НИГДЕ:
+// ни в `doseWindowFor`, ни в UI. Класс дефекта тот же, что E0.12 (write-only) и E1.5:
+// «честно написано — пользователь не видит». Один фикс закрыл все три эпика сразу.
+describe('E1.6: оговорка реестра (A4 витамин D, A8 омега-3, A7 EGCG) доходит до UI', () => {
+  // Те же окна, что и в бою: THERAPEUTIC_WINDOWS и DOSE_RANGES живут в РАЗНЫХ модулях,
+  // причём второй — внутри TSX компонента. Статический импорт отсюда даёт `undefined`
+  // без ошибки компиляции (ровно тот класс, что описан в support-limits-registry.test).
+  const win = async (id: string) => {
+    const { THERAPEUTIC_WINDOWS } = await import('../../ui/screens/SupportScreen_parts/SupportBioavailabilityData');
+    const { DOSE_RANGES } = await import('../../ui/screens/SupportScreen_parts/SupportEffectiveDose');
+    return doseWindowFor(id, THERAPEUTIC_WINDOWS as never, DOSE_RANGES as never);
+  };
+
+  it('A4 — витамин D: мониторить надо КАЛЬЦИЙ МОЧИ, а не только сырую кальцию', async () => {
+    const n = (await win('vitamin_d3')).limitNote;
+    expect(n.length).toBeGreaterThan(80);
+    expect(n).toContain(NUTRIENT_LIMITS_V2.vitamin_d.note); // доставлен ровно текст реестра
+    // EFSA называет гиперкальциурию БОЛЕЕ РАННИМ признаком избытка, чем устойчивая
+    // гиперкальциемия — значит мониторить только сывороточную кальцию поздно
+    expect(n).toContain('КАЛЬЦИЙ МОЧИ');
+    expect(n).toContain('более ранним признаком');
+    // и это не абстрактно: у нашей аудитории (AAS) риск правдоподобен
+    expect(n).toContain('AAS');
+  });
+
+  it('A4 — то же самое НЕ теряется на форме (доза идёт по каноническому нутриенту)', async () => {
+    // форма `vitamin_d3` и нутриент `vitamin_d` — разные id; если бы резолв сломался,
+    // оговорка потерялась бы именно на форме, которую реально выбирает пользователь
+    expect(resolveNutrient('vitamin_d3')).toBe('vitamin_d');
+    expect((await win('vitamin_d3')).limitNote).toBe((await win('vitamin_d')).limitNote);
+  });
+
+  it('A8 — омега-3/DHA: UL НЕ установлен, и «1 г/сут» НЕльзя обобщать на EPA+DHA', async () => {
+    const n = (await win('dha')).limitNote;
+    expect(n).toContain(NUTRIENT_LIMITS_V2.dha.note);
+    // «ω-жирные» — НЕ одно и то же, что «омега-3»: подытог явный
+    expect(n.toUpperCase()).toContain('UL ДЛЯ ДОБАВКОВОГО DHA НЕ УСТАНОВЛЕН');
+    expect(n).toContain('ТОЛЬКО для DHA-доминантных');
+    expect(n).toContain('НЕ применять к смесям EPA+DHA');
+    // и главное — число «3 г омега-3» не выдаётся за предел
+    expect(n).toContain('«3 г омега-3» как предел этим заключением не поддержан');
+  });
+
+  it('A8 — SafeLevel не даёт права называть 1 г/сут пределом, но оговорку показать обязан', async () => {
+    const w = await win('dha');
+    expect(w.ulKind).toBe('SafeLevel');
+    expect(w.ulWarning).toBe(false);      // предупреждение «превышен UL» тут ложно
+    expect(w.limitNote.length).toBeGreaterThan(0); // но честность обязана быть видна
+  });
+
+  it('A7 — EGCG: гепатотоксичность не предсказуема дозой (гены), «до 800 мг безопасно» — ложь', async () => {
+    const n = (await win('curcumin')).limitNote;
+    expect(n).toContain(NUTRIENT_LIMITS_V2.curcumin.note);
+    expect(n).toContain('EGCG');
+    expect(n).toContain('COMT/UGT1A1');   // генотип, а не доза
+    expect(n).toContain('HLA-B*35:01');
+    expect(n.toLowerCase()).toContain('не предсказуема дозой');
+    expect(n).toContain('800 мг');        // названное ложное пороговое число
+  });
+
+  it('A7 — оговорка про EGCG висит на куркумине как «не путать», а не теряется', async () => {
+    // куркумин и зелёный чай — разные вещества с РАЗНОЙ токсикологией; если бы оговорка
+    // жила только в комментарии файла, смешение «куркумин = безопасная доза» вернулось бы
+    expect(NUTRIENT_LIMITS_V2.curcumin.kind).toBe('ClinicalGuidance');
+    expect((await win('curcumin')).limitNote).toContain('НЕ путать');
+  });
+
+  it('инвариант: оговорка не теряется ни в одной ветке резолва', async () => {
+    // и для каждого: если запись в реестре есть — оговорка обязана быть непустой
+    for (const id of ['vitamin_d3', 'dha', 'curcumin', 'iron', 'zinc', 'magnesium', 'b6']) {
+      const canon = resolveNutrient(id);
+      if (canon && NUTRIENT_LIMITS_V2[canon]?.note) {
+        expect((await win(id)).limitNote.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('инвариант: вещества вне реестра НЕ получают выдуманную оговорку', async () => {
+    expect((await win('vitex')).limitNote).toBe('');   // есть окно, но нет записи в реестре
+    expect((await win('serrapeptase')).limitNote).toBe(''); // ключ из 12 символов — нельзя матчить подстрокой
+    expect((await win('bcaa')).limitNote).toBe('');    // защита от ложного резолва (окно bcaa в базе нет)
   });
 });
 

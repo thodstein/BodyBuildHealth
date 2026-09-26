@@ -30,17 +30,54 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const readSrc = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf8');
+const readSrc2 = readSrc;
 const info = readSrc('src/ui/screens/RiskScreen_parts/RiskInfo.tsx');
 const specMethod = readSrc('src/ui/screens/RiskScreen_parts/RiskSpecMethod.tsx');
 const engine = readSrc('src/engines/risk-engine-tz-spec.ts');
 const mdss = readSrc('src/engines/mdss-engine.ts');
 const v7 = readSrc('src/engines/risk-engine-v7-matrix.ts');
 
+describe('E0.9 — тексты совпадают с кодом (счётчики не расходятся)', () => {
+  const hub = readSrc2('src/ui/screens/Shared/MetabolicHub.tsx');
+  const tools = readSrc2('src/ui/screens/TrainingScreen_parts/PlannerToolsPanel.tsx');
+  const mhEngine = readSrc2('src/engines/metabolic-hub.engine.ts');
+
+  it('число калькуляторов в hero выводится из MODE_DEFS, а не из литерала', () => {
+    // Раньше стояло «17 калькуляторов» при фактических 16 режимах.
+    // Теперь литерала нет вообще — число не может разъехаться с кодом.
+    expect(hub).not.toMatch(/17\s*калькуляторов/);
+    expect(hub).toMatch(/\{MODE_DEFS\.length\}\s*калькуляторов/);
+  });
+
+  it('MODE_DEFS действительно содержит 16 режимов (якорь для подписи)', () => {
+    const defs = hub.slice(hub.indexOf('const MODE_DEFS'));
+    const ids = [...defs.matchAll(/\{\s*m:\s*'([a-z_]+)'/g)].map(m => m[1]);
+    expect(ids).toHaveLength(16);
+  });
+
+  it('нет подписи «5 в 1» — хаб отгружает 16 режимов (оба списка)', () => {
+    // Дефект был продублирован в списках pl и bb.
+    const fiveInOne = tools.match(/desc: '5 в 1:/g) || [];
+    expect(fiveInOne).toHaveLength(0);
+    expect((tools.match(/desc: '16 режимов:/g) || []).length).toBe(2);
+  });
+
+  it('нет прозвища исследования в пользовательской строке', () => {
+    // «Biggest Loser» — прозвище работы Fothergill 2016, а не настройка и не ключ
+    // хранилища; пользователю оно ничего не сообщает. Ссылка на источник сохранена.
+    expect(mhEngine).not.toMatch(/\(Biggest Loser\)/);
+    expect(mhEngine).toMatch(/Fothergill, 2016/);
+  });
+
+  it('нет «Hall adaptive v2» — в коде только v3', () => {
+    expect(hub).not.toMatch(/Hall adaptive v2/);
+  });
+});
+
 describe('E0.12 — write-only ключи хранения удалены', () => {
   // Канон: ключ, который никто не читает, — это не хранилище, а мусор.
   // Хуже того: cloud-kv перехватывает setItem, поэтому каждая такая запись
   // ещё и УЛЕТАЕТ В ОБЛАКО целиком, съедая квоту и трафик ради недостижимых данных.
-  const readSrc2 = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf8');
 
   it('нет he_support_reports (дубль архива с другим кэшем)', () => {
     const f = readSrc2('src/ui/screens/SupportScreen_parts/SupportFavoritesView.tsx');

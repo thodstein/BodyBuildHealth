@@ -6,8 +6,8 @@
  *  Канон — Питание, алиас — Тренировки/Интеллект.
  */
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcMaintenanceFinder, calcAdaptiveThermogenesis, calcThyroidImpact, calcHomaIRWrap, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcLeafScore, calcAdaptiveTDEEv3, calcLeamScore, calcRedsCAT2, calcSweatTestV2, calcBeverageRankV2, calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap, calcAlcoholChronic, calcProteinTimingPro, calcNEATPro, calcATRange, calcReverseDietAuto, calcGoalTimelineV2, buildOneAnswerPro, diffMetabolicSnapshots, parseWeeklyScheduleTextPro, buildMetHoursPro, pregnancyAdd, calcPALPro, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
-import { boerLeanBodyMass } from '../../../core/metabolic-constants';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcMaintenanceFinder, calcAdaptiveThermogenesis, calcThyroidImpact, calcHomaIRWrap, IR_MARKERS_SHARED_INPUT_NOTE, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, calcTyG, calcMetSWrapper, calcFIB4, calcAPRI, calcQUICKI, calcWHtR, calcABSI, calcBAI, calcCaffeineCurve, buildDietBreakPlan, calcRefeedNeed, calcCarbLoading, calcSodiumLoading, calcBodyCompProjection, calcLeafScore, calcAdaptiveTDEEv3, calcLeamScore, calcRedsCAT2, calcSweatTestV2, calcBeverageRankV2, calcTGHDLWrap, calcLAPWrap, calcVAIWrap, calcFMIWrap, calcAlcoholChronic, calcProteinTimingPro, calcNEATPro, calcATRange, calcReverseDietAuto, calcGoalTimelineV2, buildOneAnswerPro, diffMetabolicSnapshots, parseWeeklyScheduleTextPro, buildMetHoursPro, pregnancyAdd, calcPALPro, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
+import { boerLeanBodyMass, bmrMethodLabel } from '../../../core/metabolic-constants';
 import { ACTIVITY_CATALOG_60, PROFESSION_PAL } from '../../../core/activity-catalog';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getNutritionV2Data } from '../../../core/nutrition-v2-data';
@@ -559,8 +559,8 @@ export const MetabolicHub: React.FC = () => {
   const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, profession, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate, sweatSodiumMgPerL: sweatSodium, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, alcoholDaysPerWeek: alcoholDays, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit, metHoursPerWeek, measuredRMR, leafScore, boneFlag, menstrualFlag, hdlMgDl, systolic, diastolic, ast, alt, plt, caffeineHoursSince, trimester: trimester || undefined, lactating: lactating === 'none' ? undefined : lactating, ethnicity, postBariatric, untreatedHypothyroid: untreatedHypo || undefined, acclimated, proteinSource } as any), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,profession,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,alcoholDays,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G,metHoursPerWeek,measuredRMR,leafScore,boneFlag,menstrualFlag,hdlMgDl,systolic,diastolic,ast,alt,plt,caffeineHoursSince,trimester,lactating,ethnicity,postBariatric,untreatedHypo,acclimated,proteinSource]);
 
   const water = useMemo(()=> calcWater(input), [input]);
-  const stepsCalc = useMemo(()=> calcSteps(input), [input]);
-  const kbju = useMemo(()=> calcKBJU(input), [input]);
+const stepsCalc = useMemo(()=> calcSteps(input), [input]);
+const kbju = useMemo(()=> calcKBJU(input), [input]);
   const fat = useMemo(()=> calcBodyFat(input), [input]);
   const cortisol = useMemo(()=> calcStressLoad(input), [input]);
   // NEAT — единая точка PRO: neatPro (профессия), v1 calcNEAT удалён из UI
@@ -757,8 +757,13 @@ export const MetabolicHub: React.FC = () => {
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
           <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#60a5fa,#00e68a)', color:'#000', fontWeight:900, fontSize:16 }}>⚖️</div>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Метаболика Pro — 17 калькуляторов</div>
-            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>IOM + Baker · FAO PAL MET-часы · 7 BMR · Navy/JP/BIA · FFMI 26.2 · SLI · Hall adaptive v2 · Levine · Trexler MATADOR · RED-S CAT2 · Пот-тест · TyG/FIB-4 · ACWR {acwr.toFixed(2)} · HCT {hematology.hct ?? '—'}% · WHtR {whtr? whtr.toFixed(2):'—'}</div>
+            {/* 26 сен 2026 (E0.9): число берётся из `MODE_DEFS.length`, а не из
+                литерала — раньше подпись завышала число режимов на единицу, и
+                расхождение могло вернуться в любом следующем режиме. Рядом в
+                подзаголовке имя модели веса приводило к устаревшей версии v2,
+                тогда как в коде реализована только v3 (см. `calcAdaptiveTDEEv3`). */}
+            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Метаболика Pro — {MODE_DEFS.length} калькуляторов</div>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>IOM + Baker · FAO PAL MET-часы · 7 BMR · Navy/JP/BIA · FFMI 26.2 · SLI · Hall adaptive v3 · Levine · Trexler MATADOR · RED-S CAT2 · Пот-тест · TyG/FIB-4 · ACWR {acwr.toFixed(2)} · HCT {hematology.hct ?? '—'}% · WHtR {whtr? whtr.toFixed(2):'—'}</div>
           </div>
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background: onAAS ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)', border: `1px solid ${onAAS ? 'rgba(239,68,68,0.22)' : 'rgba(34,197,94,0.22)'}`, color: onAAS ? '#f87171' : '#22c55e', fontWeight:800, whiteSpace:'nowrap' }}>{onAAS ? `💉 ${aasDose}мг/нед EXP` : '🌿 Натурал'}</span>
         </div>
@@ -861,7 +866,7 @@ export const MetabolicHub: React.FC = () => {
             { label:'Атлет 90кг', act:()=>{ setWeight(90); setHeight(185); setAge(28); setActivityLevel('medium' as any); setTrainingDays(5); setCardioMin(120); setBodyFat(12); } },
             { label:'Тяж 110кг', act:()=>{ setWeight(110); setHeight(190); setAge(32); setActivityLevel('high' as any); setTrainingDays(6); setCardioMin(150); setBodyFat(18); } },
             { label:'Бикини 55кг', act:()=>{ setWeight(55); setHeight(165); setAge(26); setSex('female' as any); setActivityLevel('medium' as any); setTrainingDays(4); setBodyFat(18); } },
-          ].map(p=> <button key={p.label} onClick={p.act} className="mh-preset" style={{ padding:'6px 10px', borderRadius:20, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{p.label}</button>)}
+          ].map(p=> <button key={p.label} onClick={p.act} className="mh-preset" style={{ padding:'6px 10px', minHeight:44, borderRadius:20, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{p.label}</button>)}
         </div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
           <button onClick={saveScenario} className="mh-act" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(96,165,250,0.18)', background:'rgba(96,165,250,0.10)', color:'#60a5fa', fontSize:10, fontWeight:700, cursor:'pointer' }}>💾 Сохранить сценарий</button>
@@ -869,10 +874,16 @@ export const MetabolicHub: React.FC = () => {
           <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
             {scenarios.map(sc=>(
               <span key={sc.id} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'4px 6px 4px 8px', borderRadius:20, background: compareIds.includes(sc.id) ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.04)', border: compareIds.includes(sc.id) ? '1px solid rgba(96,165,250,0.25)' : '1px solid rgba(255,255,255,0.06)', fontSize:8, color:'#fff' }}>
-                <button type="button" aria-pressed={compareIds.includes(sc.id)} aria-label={`Сравнить: ${sc.name}`} title="Отметить для ⇄ Сравнить" onClick={()=> { const next = compareIds.includes(sc.id) ? compareIds.filter(id=> id!==sc.id) : [...compareIds, sc.id].slice(-2); setCompareIds(next); }} className="mh-compare" data-on={compareIds.includes(sc.id) ? 'true' : 'false'} style={{ width:30, height:30, borderRadius:'50%', border: compareIds.includes(sc.id) ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.12)', background: compareIds.includes(sc.id) ? 'rgba(96,165,250,0.18)' : 'rgba(255,255,255,0.04)', color: compareIds.includes(sc.id) ? '#60a5fa' : 'rgba(255,255,255,0.45)', fontSize:12, fontWeight:800, cursor:'pointer', flexShrink:0 }}>{compareIds.includes(sc.id) ? '✓' : '○'}</button>
+                <button type="button" aria-pressed={compareIds.includes(sc.id)} aria-label={`Сравнить: ${sc.name}`} title="Отметить для ⇄ Сравнить" onClick={()=> { const next = compareIds.includes(sc.id) ? compareIds.filter(id=> id!==sc.id) : [...compareIds, sc.id].slice(-2); setCompareIds(next); }} className="mh-compare" data-on={compareIds.includes(sc.id) ? 'true' : 'false'} style={{
+                  // 26 сен 2026 (E0.13): тач-таргет 44×44, а видимый кружок остался 30×30.
+                  // Раньше кнопка была 30×30 — ниже нормы касания; увеличивать сам кружок
+                  // не нужно, достаточно расширить область нажатия (padding + content-clip),
+                  // иначе ряд сценариев визуально распухает.
+                  width:44, height:44, minWidth:44, minHeight:44, padding:7, boxSizing:'content-box', background:'transparent', border:'none', cursor:'pointer', flexShrink:0,
+                }}><span aria-hidden="true" style={{ width:30, height:30, borderRadius:'50%', display:'inline-flex', alignItems:'center', justifyContent:'center', border: compareIds.includes(sc.id) ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.12)', background: compareIds.includes(sc.id) ? 'rgba(96,165,250,0.18)' : 'rgba(255,255,255,0.04)', color: compareIds.includes(sc.id) ? '#60a5fa' : 'rgba(255,255,255,0.45)', fontSize:12, fontWeight:800 }}>{compareIds.includes(sc.id) ? '✓' : '○'}</span></button>
                 {sc.name}
-                <button onClick={()=> loadScenario(sc.id)} aria-label={`Загрузить ${sc.name}`} className="mh-mini" style={{ padding:'8px 10px', minHeight:40, minWidth:44, borderRadius:10, border:'none', background:'#60a5fa', color:'#000', fontSize:10, fontWeight:700, cursor:'pointer' }}>▶</button>
-                <button onClick={()=> deleteScenario(sc.id)} aria-label={`Удалить ${sc.name}`} className="mh-mini" style={{ minWidth:40, minHeight:40, borderRadius:10, border:'none', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:11, cursor:'pointer' }}>✕</button>
+                <button onClick={()=> loadScenario(sc.id)} aria-label={`Загрузить ${sc.name}`} className="mh-mini" style={{ padding:'8px 10px', minHeight:44, minWidth:44, borderRadius:10, border:'none', background:'#60a5fa', color:'#000', fontSize:10, fontWeight:700, cursor:'pointer' }}>▶</button>
+                <button onClick={()=> deleteScenario(sc.id)} aria-label={`Удалить ${sc.name}`} className="mh-mini" style={{ minWidth:44, minHeight:44, borderRadius:10, border:'none', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:11, cursor:'pointer' }}>✕</button>
               </span>
             ))}
           </div>
@@ -895,7 +906,8 @@ export const MetabolicHub: React.FC = () => {
           <MhToggle checked={creatineUse} onChange={setCreatineUse} icon="💊" title="Креатин 5 г/сут" desc="сила · масса · вода в мышцах" accent="#84cc16" />
         </div>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, lineHeight:1.35 }}>
-          BMR: {kbju.nat.method==='cunningham'?'Cunningham': kbju.nat.method==='ten_haaf'?'TenHaaf': kbju.nat.method==='owen'?'Owen': kbju.nat.method==='katch_mcardle'?'Katch-McArdle':'Mifflin'} · {kbju.nat.bmr}ккал · PAL {kbju.nat.pal.toFixed(2)} (pro {palPro.toFixed(2)}) · TDEE {stepsCalc.tdeeNat} · TEF {kbju.tefNat}ккал · DIAAS {proteinPro.diaas} leuc {proteinPro.leucinePerMeal}г (60+ ceiling {proteinPro.ceiling})
+          BMR: {bmrMethodLabel(kbju.nat.method)} · {kbju.nat.bmr}ккал · PAL {kbju.nat.pal.toFixed(2)} (pro {palPro.toFixed(2)}) · TDEE {stepsCalc.tdeeNat} · TEF {kbju.tefNat}ккал · DIAAS {proteinPro.diaas} leuc {proteinPro.leucinePerMeal}г (60+ ceiling {proteinPro.ceiling})
+          {kbju.bmrSpread && <span> · по другим формулам {kbju.bmrSpread.min}–{kbju.bmrSpread.max} ({kbju.bmrSpread.spreadPct}%) — часть формул к вам неприменима, это не точность расчёта</span>}
           {goalV2 && <span> · ЦельV2: {goalV2.note} ({goalV2.days}д)</span>}
         </div>
         {sex==='female' && (
@@ -921,7 +933,7 @@ export const MetabolicHub: React.FC = () => {
         <div style={{ marginTop:6 }}>
           <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.55)', marginBottom:4 }}>Расписание (plain-English):</div>
           <textarea value={scheduleText} onChange={e=> setScheduleText(e.target.value)} placeholder="пн: силовая 1ч, вт: бег 0.5ч, чт: силовая 1ч, сб: ходьба 1ч" style={{ width:'100%', minHeight:48, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:9, padding:'8px 10px', resize:'vertical' }} />
-          {parsedSchedule && <div style={{ fontSize:8, color:'#22c55e', marginTop:4 }}>Распознано: {parsedSchedule.map(s=>`${s.key} ${s.hours}ч`).join(', ')} → {scheduleMetHours} MET-ч/нед → PAL +{(scheduleMetHours*0.0067).toFixed(2)} <button onClick={()=> setMetHoursPerWeek(scheduleMetHours)} className="mh-mini" style={{ marginLeft:6, padding:'8px 10px', minHeight:40, borderRadius:8, border:'1px solid rgba(34,197,94,0.18)', background:'rgba(34,197,94,0.10)', color:'#22c55e', fontSize:10, fontWeight:700, cursor:'pointer' }}>→ Применить</button></div>}
+          {parsedSchedule && <div style={{ fontSize:8, color:'#22c55e', marginTop:4 }}>Распознано: {parsedSchedule.map(s=>`${s.key} ${s.hours}ч`).join(', ')} → {scheduleMetHours} MET-ч/нед → PAL +{(scheduleMetHours*0.0067).toFixed(2)} <button onClick={()=> setMetHoursPerWeek(scheduleMetHours)} className="mh-mini" style={{ marginLeft:6, padding:'8px 10px', minHeight:44, borderRadius:8, border:'1px solid rgba(34,197,94,0.18)', background:'rgba(34,197,94,0.10)', color:'#22c55e', fontSize:10, fontWeight:700, cursor:'pointer' }}>→ Применить</button></div>}
         </div>
         <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'6px 8px' }}>
           {metHoursPerWeek ? `MET ${metHoursPerWeek}ч/нед → честный PAL ${stepsCalc.pal.toFixed(2)} (Ainsworth) · PALpro ${palPro.toFixed(2)} (профессия ${profession} ${PROFESSION_PAL[profession]})` : 'Подсказка: 3× силовая 6 MET ×1ч =18 MET-ч/нед → +0.12 PAL. Парсер v2 понимает км и 2×, EN+RU, 60 активностей.'}
@@ -948,8 +960,8 @@ export const MetabolicHub: React.FC = () => {
       <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10, display: wizardStep===2 ? 'block' : 'none' }}>
         <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>💦 Пот-тест PRO — ② Активность</div>
         <div style={{ display:'flex', gap:6, marginBottom:8 }}>
-          <button onClick={()=> setUseMeasuredSweat(true)} style={{ flex:1, minHeight:32, borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:800, border: useMeasuredSweat?'1px solid #06b6d4':'1px solid rgba(255,255,255,0.08)', background: useMeasuredSweat?'rgba(6,182,214,0.12)':'rgba(255,255,255,0.02)', color: useMeasuredSweat?'#06b6d4':'#fff' }}>⚖️ Взвешивание (точно)</button>
-          <button onClick={()=> setUseMeasuredSweat(false)} style={{ flex:1, minHeight:32, borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:800, border: !useMeasuredSweat?'1px solid #06b6d4':'1px solid rgba(255,255,255,0.08)', background: !useMeasuredSweat?'rgba(6,182,214,0.12)':'rgba(255,255,255,0.02)', color: !useMeasuredSweat?'#06b6d4':'#fff' }}>📊 Оценка (ACSM ±30%)</button>
+          <button onClick={()=> setUseMeasuredSweat(true)} style={{ flex:1, minHeight:44, borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:800, border: useMeasuredSweat?'1px solid #06b6d4':'1px solid rgba(255,255,255,0.08)', background: useMeasuredSweat?'rgba(6,182,214,0.12)':'rgba(255,255,255,0.02)', color: useMeasuredSweat?'#06b6d4':'#fff' }}>⚖️ Взвешивание (точно)</button>
+          <button onClick={()=> setUseMeasuredSweat(false)} style={{ flex:1, minHeight:44, borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:800, border: !useMeasuredSweat?'1px solid #06b6d4':'1px solid rgba(255,255,255,0.08)', background: !useMeasuredSweat?'rgba(6,182,214,0.12)':'rgba(255,255,255,0.02)', color: !useMeasuredSweat?'#06b6d4':'#fff' }}>📊 Оценка (ACSM ±30%)</button>
         </div>
         {useMeasuredSweat ? (
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
@@ -1238,7 +1250,7 @@ export const MetabolicHub: React.FC = () => {
       <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {MODE_DEFS.map(({m,label,icon,desc,accent,evidence})=> (
           <button key={m} onClick={()=> setMode(m)} title={`${desc} · ${evidence}`} aria-pressed={mode===m} className="mh-mode" style={{
-            flex:'0 0 auto', display:'flex', alignItems:'center', gap:4, padding:'7px 10px', borderRadius:20, cursor:'pointer', fontSize:10, fontWeight:800, whiteSpace:'nowrap', minHeight:40,
+            flex:'0 0 auto', display:'flex', alignItems:'center', gap:4, padding:'7px 10px', borderRadius:20, cursor:'pointer', fontSize:10, fontWeight:800, whiteSpace:'nowrap', minHeight:44,
             border: mode===m ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.08)',
             background: mode===m ? `${accent}18` : 'rgba(255,255,255,0.04)',
             color: mode===m ? accent : '#fff', transition:'all 0.16s',
@@ -1671,7 +1683,7 @@ export const MetabolicHub: React.FC = () => {
                 <div style={{ padding:14, borderRadius:12, background: thyroid.mult!==1?'rgba(139,92,246,0.08)':'rgba(255,255,255,0.03)', border:`1px solid ${thyroid.mult!==1?'rgba(139,92,246,0.18)':'rgba(255,255,255,0.06)'}`, textAlign:'center' }}>
                   <div style={{ fontSize:10, color:'#8b5cf6' }}>Thyroid · Kim 2014 · FT4 12-22</div>
                   <div style={{ fontSize:22, fontWeight:900, color: thyroid.mult===1?'#fff': thyroid.mult<1?'#f59e0b':'#22c55e' }}>×{thyroid.mult.toFixed(2)}</div>
-                  <div style={{ fontSize:9, color:'#fff' }}>{thyroid.note} · BMR {kbju.bmr} ({kbju.nat.method})</div>
+                  <div style={{ fontSize:9, color:'#fff' }}>{thyroid.note} · BMR {kbju.bmr} ({bmrMethodLabel(kbju.nat.method)})</div>
                 </div>
                 <div style={{ padding:14, borderRadius:12, background: homa.zone==='ir'?'rgba(239,68,68,0.08)': homa.zone==='attention'?'rgba(245,158,11,0.08)': homa.zone==='optimal'?'rgba(34,197,94,0.08)':'rgba(255,255,255,0.03)', border:`1px solid ${homa.zone==='ir'?'rgba(239,68,68,0.18)': homa.zone==='attention'?'rgba(245,158,11,0.18)':'rgba(255,255,255,0.06)'}`, textAlign:'center' }}>
                   <div style={{ fontSize:10, color: homa.zone==='ir'?'#ef4444': homa.zone==='attention'?'#f59e0b':'#22c55e' }}>HOMA-IR · Wallace 2004</div>
@@ -1731,7 +1743,7 @@ export const MetabolicHub: React.FC = () => {
                   <div style={{ fontSize:8, color:'#fff' }}>{mets.criteria.join(', ')||'критериев 0'} · {mets.note}</div>
                 </div>
                 <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff', lineHeight:1.35 }}>
-                  WHtR {whtr? whtr.toFixed(3):'—'} {whtr && whtr>=0.5? '⚠ ≥0.5':''} · ABSI {absi? absi.toFixed(3):'—'} · BAI {bai ?? '—'}<br/>TyG {tyg ?? '—'} {tyg && tyg>=8.8? '⚠ IR':''} · FIB-4 {fib4 ?? '—'} {fib4 && fib4>=1.3? (fib4>2.67?'⚠ высок':'⚠'):''} · QUICKI {quicki ?? '—'} {quicki && quicki<0.33?'⚠':''}<br/><span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>ATP III ≥3/5 = MetS. TyG =ln(TG×Gluc/2) ≥8.8 IR. FIB-4 &lt;1.30 низкий &gt;2.67 высокий.</span>
+                  WHtR {whtr? whtr.toFixed(3):'—'} {whtr && whtr>=0.5? '⚠ ≥0.5':''} · ABSI {absi? absi.toFixed(3):'—'} · BAI {bai ?? '—'}<br/>TyG {tyg ?? '—'} {tyg && tyg>=8.8? '⚠ IR':''} · FIB-4 {fib4 ?? '—'} {fib4 && fib4>=1.3? (fib4>2.67?'⚠ высок':'⚠'):''} · QUICKI {quicki ?? '—'} {quicki && quicki<0.33?'⚠':''}<br/><span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>ATP III ≥3/5 = MetS. TyG =ln(TG×Gluc/2) ≥8.8 IR. FIB-4 &lt;1.30 низкий &gt;2.67 высокий.</span><br/><span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{IR_MARKERS_SHARED_INPUT_NOTE}.</span>
                 </div>
               </div>
               <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>

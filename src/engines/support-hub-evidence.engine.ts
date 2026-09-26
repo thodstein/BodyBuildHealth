@@ -320,7 +320,36 @@ export interface DoseWindow {
   /** Условия, при которых предел не применяется (EFSA 2024, витамин E). */
   ulExcludes?: Array<{ id: string; label: string }>;
   /** true, если значение предела не подтверждено первоисточником в раунде 26 сен 2026. */
-  ulUnverified: boolean;
+    ulUnverified: boolean;
+  /** СОБСТВЕННАЯ оговорка реестра к этому веществу (E1.6).
+   *
+   *  БЫЛО: `note` во всех ветках собиралась из трёх фактов — юрисдикция/год/значение/
+   *  criticalEffect, — и этим исчерпывалась. А сам `NUTRIENT_LIMITS_V2[id].note`, где
+   *  живёт вся исследованная честность, НЕ ЧИТАЛСЯ НИГДЕ: ни в движке, ни в UI.
+   *  То есть три честных оговорки были написаны и остались мёртвым текстом:
+   *   · витамин D — EFSA: длительное превышение РАННИЙ признак, а не только устойчивая
+   *     гиперкальциемия (и на AAS кальций уже поднят, т.е. превышение опаснее);
+   *   · омега-3/DHA — UL НЕ УСТАНОВЛЕН, «1 г/сут» это НЕ потолок, и обобщать DHA-доминантный
+   *     препарат на весь EPA+DHA нельзя; α-омега-3 способны ухудшать статус витамина A;
+   *   · EGCG/зелёный чай — гепатотоксичность идиосинкратическая (COMT/UGT1A1, HLA-B*35:01),
+   *     т.е. НЕ предсказуема дозой, и «до 800 мг безопасно» — ложная уверенность.
+   *  Класс дефекта тот же, что E0.12 (write-only) и E1.5 (единицы): «написано честно —
+   *  пользователь этого не видит». */
+  limitNote: string;
+  }
+
+/** Единая подпись единицы измерения (E1.5, класс E1.2: одно значение — одна подпись).
+ *  Раньше маппинг mg/mcg/iu дублировался в двух местах, и в одном из них «40 мг» писалось
+ *  вручную, а «45 mg» подставлялось из реестра — в одной строке пользователь видел смесь
+ *  латиницы и кириллицы для одной и той же величины. */
+export function limitUnitRu(unit: string | undefined | null): string {
+  const u = (unit || '').toLowerCase();
+  if (u === 'mcg' || u === 'ug') return 'мкг';
+  if (u === 'iu' || u === 'me') return 'МЕ';
+  if (u === 'g') return 'г';
+  if (u === 'mg') return 'мг';
+  // неизвестную единицу НЕ подменяем молча — показываем как есть
+  return unit || 'мг';
 }
 
 export function doseWindowFor(
@@ -372,6 +401,7 @@ export function doseWindowFor(
       // Честность: если записи в реестре нет — предел из старой таблицы НЕ перепроверен
       // первоисточником в этом раунде (правило плана: непроверенное → помечаем).
       ulUnverified: reg ? !reg.verified : true,
+      limitNote: reg?.note ?? '',
     };
   }
   // 26 сен 2026 (E0.3): тот же substring-матч остался в фолбэке по `ranges` — убран.
@@ -389,6 +419,7 @@ export function doseWindowFor(
       ul: reg && reg.value > 0 ? reg.value : null,
       unit: 'мг', hasData: true, ulKind: reg?.kind ?? 'Unknown',
       ulWarning: reg?.kind === 'UL', ulExcludes: reg?.excludes, ulUnverified: reg ? !reg.verified : true,
+      limitNote: reg?.note ?? '',
       note: `Диапазон: ${r.label}. `
         + (reg
           ? `Предел: ${reg.jurisdiction} ${reg.year} ${reg.kind === 'NotEstablished' ? 'НЕ УСТАНОВЛЕН' : reg.value} (${reg.criticalEffect}).`
@@ -401,9 +432,10 @@ export function doseWindowFor(
     return {
       min: 0, opt: 0, max: 0,
       ul: reg.value > 0 ? reg.value : null,
-      unit: reg.unit === 'mcg' ? 'мкг' : reg.unit === 'iu' ? 'МЕ' : 'мг',
+      unit: limitUnitRu(reg.unit),
       hasData: false, ulKind: reg.kind, ulWarning: reg.kind === 'UL', ulExcludes: reg.excludes,
       ulUnverified: !reg.verified,
+      limitNote: reg.note ?? '',
       note: `Терапевтического окна в базе нет. Предел: ${reg.jurisdiction} ${reg.year} `
         + `${reg.kind === 'NotEstablished' ? 'НЕ УСТАНОВЛЕН' : reg.value} (${reg.criticalEffect}).`,
     };
@@ -412,6 +444,8 @@ export function doseWindowFor(
     min: 0, opt: 0, max: 0, ul: null, unit: 'мг',
     note: 'Данных о терапевтическом окне в базе нет — доза не оценивается.',
     hasData: false, ulKind: 'Unknown', ulWarning: false, ulUnverified: true,
+    // вещества нет в реестре → оговорки не существует, выдумывать нечего
+    limitNote: '',
   };
 }
 
@@ -537,7 +571,26 @@ export function personDoseHints(id: string, person: PersonCtx): string[] {
   if (w && w > 0) {
     if (/creatine|креатин/.test(key)) hints.push(`Креатин: поддержка обычно 0.03–0.06 г/кг (~${Math.round(w * 0.03)}–${Math.round(w * 0.06)} г при ${w} кг); загрузка — только по протоколу.`);
     if (/magnesium|магн/.test(key)) hints.push(`Магний: дозы — в мг ЭЛЕМЕНТА; при массе ${w} кг ориентир тот же 200–400 мг элемента, UL 350 мг из добавок.`);
-    if (/iron|желез/.test(key)) hints.push(`Железо: UL 45 мг элемента/сут; приём утром + C, врозь с Ca/кофе.`);
+    if (/iron|желез/.test(key)) {
+      // Потребность в железе зависит от массы и выше у endurance-атлетов (Smid 2024,
+      // Sports Med, PMID 38407751: ~6–8 мг/кг при длительной подготовке 16–100 кг,
+      // до ~12 мг/кг у endurance-спортсменов; короткие протоколы неэффективны;
+      // Hb/ферритин/Tsat/VO2max в том исследовании — NS).
+      //
+      // ВАЖНО, иначе это станет опасной подменой: 6–12 мг/кг — это ПИТАТЕЛЬНАЯ потребность
+      // (из еды), а НЕ доза БАДа. Для 100 кг это 600–800 мг/сут — в 15–20 раз выше
+      // безопасного уровня из реестра. Поэтому ниже обе цифры разведены явно, а потолок
+      // добавки берётся из канона (support-limits), а не из «мг/кг».
+      const reg = NUTRIENT_LIMITS_V2.iron;
+      const safe = reg?.value ?? 40;
+      const unitRu = limitUnitRu(reg?.unit);
+      const alt = reg?.altValue ? ` (альт. ${reg.altValue} ${unitRu}, ${reg.altJurisdiction} ${reg.altYear})` : '';
+      hints.push(
+        `Железо: потребность в СУТОЧНОМ железе зависит от массы — ориентир для длительной подготовки ~6–8 мг/кг (~${(w * 6).toFixed(0)}–${(w * 8).toFixed(0)} мг/сут при ${w} кг), у endurance-атлетов до ~12 мг/кг. Это ПИЩА, а не доза добавки.`,
+        `Железо: добавка — только при подтверждённом дефиците, и она НЕ превышает безопасный уровень ${safe} ${unitRu}${alt} элемента/сут из реестра. Умножать «мг/кг» на вес для добавки опасно.`,
+        'Железо: короткие курсы (<4–6 нед) неэффективны — пополнять запас нужно длительно; в исследовании Smid 2024 Hb/ферритин/Tsat/VO2max значимо не менялись (NS) — цифра ориентировочная, не Пруф-эффект.',
+      );
+    }
     if (/zinc|цинк/.test(key)) hints.push(`Цинк: UL 40 мг/сут; при длительном приёме держать Zn:Cu ≈ 10:1.`);
   }
   if (person.sex === 'female') {
