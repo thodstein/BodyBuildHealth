@@ -2326,6 +2326,33 @@ function escXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
+/**
+ * Garmin TCX Sport по дисциплине сессии (код активности в TCD v2).
+ *
+ * Раньше здесь стояло жёсткое `Sport="Biking"` для КАЖДОЙ сессии: беговой
+ * цикл выгружался в Garmin Connect как заезд, гребной — тоже. При этом
+ * дисциплина в данных есть (session.equipment, cycle.config.equipment) и уже
+ * использовалась в ICS-экспорте через cardioEquipmentLabel — просто TCX её
+ * игнорировал.
+ *
+ * Порядок: сессия → цикл (у цикла дисциплина одна) → 'Other'. 'Other' —
+ * честный отказ угадывать, а не заявление «это велотренировка».
+ */
+const TCX_SPORT_BY_EQUIPMENT: Record<CardioEquipment, string> = {
+  running: 'Running',
+  cycling: 'Biking',
+  rowing: 'Rowing',
+  elliptical: 'Elliptical',
+  walking: 'Walking',
+  swimming: 'Swimming',
+};
+
+/** Активность Garmin по сессии цикла. */
+export function tcxSportForSession(session: CardioSession, cycle: CardioCycle): string {
+  const eq = session.equipment ?? cycle.config?.equipment?.[0];
+  return (eq ? TCX_SPORT_BY_EQUIPMENT[eq] : undefined) ?? 'Other';
+}
+
 /** Экспорт цикла в .tcx (Garmin Training Center): одна «деятельность» на
  *  сессию дня с длительностью, типом и примечанием. Если session.structured заданы интервалы — пишет Lap на каждый блок. */
 export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): string {
@@ -2340,7 +2367,7 @@ export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): strin
       const dateIso = s.dayOfWeek != null ? dayOfWeekIso(w.week, s.dayOfWeek, referenceIso) : dayStartIso(w.week, referenceIso);
       const start = dateIso + 'T' + '06:00:00Z';
       act++;
-      lines.push('  <Activities><Activity Sport="Biking" ActivityType="Manual">');
+      lines.push(`  <Activities><Activity Sport="${tcxSportForSession(s, cycle)}" ActivityType="Manual">`);
       lines.push(`    <Id>${start}</Id>`);
       if (s.structured && s.structured.length > 0) {
         let t = new Date(start).getTime();
@@ -2382,17 +2409,39 @@ export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): strin
   return lines.join('\r\n');
 }
 
+/**
+ * Zwift sport_type по дисциплине цикла.
+ *
+ * Было `some(equipment === 'running') ? 'run' : 'bike'` — то есть гребля,
+ * плавание, ходьба и эллипс молча выгружались как велотренировка. Zwift
+ * поддерживает только бег/вело/плавание, поэтому для остальных честный ответ —
+ * 'other': файл не врёт, импорт его отклонит (и это правильный отказ, а не
+ * наша выдумка).
+ */
+const ZWO_SPORT_BY_EQUIPMENT: Partial<Record<CardioEquipment, string>> = {
+  running: 'run',
+  cycling: 'bike',
+  swimming: 'swim',
+};
+
+/** Дисциплина цикла для экспорта: первая сессия с equipment → config → null. */
+function cycleEquipment(cycle: CardioCycle): CardioEquipment | null {
+  for (const w of cycle.weeks) for (const s of w.sessions) if (s.equipment) return s.equipment;
+  return cycle.config?.equipment?.[0] ?? null;
+}
+
 /** Экспорт первой недели цикла в Zwift .zwo (structured workout, bike/run). */
 export function buildCardioZwo(cycle: CardioCycle, referenceIso?: string): string {
   const w = cycle.weeks[0];
   if (!w) return '<?xml version="1.0" encoding="UTF-8"?><workout_file><workout></workout></workout_file>';
-  const sport = w.sessions.some(s => s.equipment === 'running') ? 'run' : 'bike';
+  const eq = cycleEquipment(cycle);
+  const sport = (eq ? ZWO_SPORT_BY_EQUIPMENT[eq] : undefined) ?? 'other';
   const lines: string[] = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<workout_file>',
     `  <author>BodyBuildHealth</author>`,
     `  <name>${escXml(cycle.name)}</name>`,
-    `  <description>${escXml(`Кардио ${CARDIO_GOAL_LABELS[cycle.goal]} · ${cycle.totalWeeks} нед · ${cycle.weeks[0].totalMinutes} мин/нед`)}</description>`,
+    `  <description>${escXml(`Кардио ${CARDIO_GOAL_LABELS[cycle.goal]} · ${cycle.totalWeeks} нед · ${cycle.weeks[0].totalMinutes} мин/нед${eq ? ` · ${cardioEquipmentLabel(eq)}` : ''}`)}</description>`,
     `  <sportType>${sport}</sportType>`,
     '  <workout>',
   ];
