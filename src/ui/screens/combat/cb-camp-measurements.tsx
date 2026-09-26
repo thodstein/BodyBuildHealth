@@ -6,12 +6,15 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { SectionCard, Highlight, Badge, CombatPopupSelect } from './CombatUI';
+import { localIsoDate } from '../../../core/local-date';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
 import {
   loadWeighIns, addWeighIn, removeWeighIn, weighTrajectory, cutDeviation,
   loadSparring, addSparring, removeSparring, sparringSummary, sparringJournalToLoad,
   leaScreen, sleepVerdict, heatProtocol,
   loadGrip, addGrip, gripSummary, gripP50Ref, GRIP_P50_AGE,
+  loadRtp, addRtp, rtpSummary, RTP_STAGES, RTP_STAGE_BY_ID, RTP_EARLY_AEROBIC_NOTE, RTP_SOURCE_IDS,
+  type RtpStageId,
   type SparType, type GripHand,
 } from '../../../engines/combat/combat-measurements.engine';
 
@@ -95,6 +98,21 @@ export const CbCampMeasurementsCard: React.FC<{
   const [gMsg, setGMsg] = useState<string | null>(null);
   const gSum = useMemo(() => gripSummary(grip), [grip]);
   const gP50 = useMemo(() => gripP50Ref(snap?.sex), [snap?.sex]);
+
+  // ── 8.6 градуированный RTP ──
+  const [rtp, setRtp] = useState<ReturnType<typeof loadRtp>>(() => loadRtp());
+  const [rDate, setRDate] = useState('');
+  const [rStage, setRStage] = useState<RtpStageId>('rest_light');
+  const [rMsg, setRMsg] = useState<string | null>(null);
+  const today = localIsoDate();
+  const rSum = useMemo(() => rtpSummary(rtp, today), [rtp, today]);
+  const onAddRtp = useCallback((symptomsFree: boolean) => {
+    const wrote = addRtp(rDate, rStage, symptomsFree);
+    setRMsg(wrote
+      ? `Записано: ${RTP_STAGE_BY_ID[rStage].label}.`
+      : 'Нужны корректные дата и ступень.');
+    setRtp(loadRtp());
+  }, [rDate, rStage]);
   const onAddGrip = useCallback(() => {
     const wrote = addGrip(gDate, gHand, Number(gKg.replace(',', '.')));
     setGMsg(wrote
@@ -222,6 +240,41 @@ export const CbCampMeasurementsCard: React.FC<{
           </div>
         ) : null}
         <span data-cb="grip-p50-source" style={{ fontSize: 11, color: '#fff' }}>{gP50 ? gP50.source : 'Ориентир P50: внесите пол в профиле.'}</span>
+      </div>
+
+      {/* 8.6 — градуированный RTP после сотрясения */}
+      <div data-cb="measure-rtp" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+        <Highlight>🧠 Возврат после сотрясения ({rtp.length} записей)</Highlight>
+        <div style={{ fontSize: 12, color: '#fff' }}>{RTP_EARLY_AEROBIC_NOTE}</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <CombatPopupSelect
+            label="Ступень"
+            value={rStage}
+            onChange={v => setRStage(v as RtpStageId)}
+            options={RTP_STAGES.map((s) => ({ id: s.id, label: s.label }))}
+          />
+          <input aria-label="Дата ступени" data-cb="rtp-date" style={{ ...inp(rDate, 'ГГГГ-ММ-ДД'), flex: '1 1 130px' }}
+            value={rDate} onChange={e => setRDate(e.target.value)} />
+          <button data-cb="rtp-pass" style={{ ...BTN, background: '#22c55e', color: '#fff', border: 0, borderRadius: 12 }}
+            onClick={() => onAddRtp(true)}>✓ Без симптомов</button>
+          <button data-cb="rtp-sym" style={{ ...BTN, background: '#ef4444', color: '#fff', border: 0, borderRadius: 12 }}
+            onClick={() => onAddRtp(false)}>⚠ Есть симптомы</button>
+        </div>
+        {rMsg ? <div data-cb="rtp-msg" style={{ fontSize: 12, color: '#fff' }}>{rMsg}</div> : null}
+        <div data-cb="rtp-status" style={{ fontSize: 12, color: '#fff' }}>
+          {rSum.passedStage ? `Пройдено: ${rSum.passedStage.label}` : 'Ещё не пройдено ни одной ступени'}
+          {rSum.currentStage ? ` · сейчас: ${rSum.currentStage.label}` : ' · протокол завершён'}
+        </div>
+        {rSum.blocked ? (
+          <div data-cb="rtp-blocked" style={{ fontSize: 12, color: '#fff' }}>
+            {rSum.blocked}
+          </div>
+        ) : null}
+        <div data-cb="rtp-window" style={{ fontSize: 12, color: '#fff' }}>{rSum.windowNote}</div>
+        <span data-cb="rtp-source" style={{ fontSize: 11, color: '#fff' }}>{RTP_SOURCE_IDS}</span>
+        <span data-cb="rtp-stages-note" style={{ fontSize: 11, color: '#fff' }}>
+          Последовательность ступеней — структура приложения: для единоборств одобренных протоколов нет (пробел в источниках выше).
+        </span>
       </div>
 
       {/* 8.4 — LEA / RED-S */}

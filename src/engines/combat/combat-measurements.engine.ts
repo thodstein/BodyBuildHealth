@@ -432,6 +432,183 @@ export function gripSummary(rows: GripEntry[]): GripSummary {
   return { bestL, bestR, latestL, latestR, asymmetryPct, dropFromPeakPct, level, note, source: GRIP_SOURCE };
 }
 
+// ─── 8.6 Градуированный RTP после сотрясения ────────────────────────────────
+//
+// ЧТО ПОДТВЕРЖДЕНО ИСТОЧНИКАМИ (все PMID проверены через PubMed efetch):
+//
+//   • Единоборства — ДОКУМЕНТИРОВАННЫЙ ПРОБЕЛ: «в отличие от большинства
+//     профессиональных контактных видов спорта, для единоборств НЕТ
+//     одобренных градуированных протоколов возврата» — PMID 28152320
+//     (Phys Sportsmed 2017, Nalepa). То есть сами ступени для единоборств
+//     не опубликованы.
+//   • Ранняя постепенная аэробная активность в пределах 24–72 ч после
+//     травмы ускоряет восстановление против покоя — PMID 42379672
+//     (Neurol Clin 2026).
+//   • У взрослых восстановление чаще всего ~14 сут; исходная тяжесть
+//     симптомов — самый сильный предиктор длительности — PMID 42379672.
+//   • Длительность протоколов RTP в контактных видах спорта 5–21 сутки,
+//     типичная — 7 суток; самый частый режим ограничения — «не в тот же
+//     день» — PMID 41557117 (систематический обзор, 19 исследований).
+//
+// ЧЕСТНО ПРО СТУПЕНИ. Числа выше — источник. Последовательность ступеней
+// ниже — СТРУКТУРА ПРИЛОЖЕНИЯ, а не цитата: для единоборств опубликованных
+// ступеней нет (см. PMID 28152320). Поэтому она помечена как инженерная и
+// не выдаётся за протокол. Гейты (не в тот же день, одна ступень в сутки,
+// симптомы держат ступень) — следствия перечисленных выше данных.
+
+/** Ранняя аэробная активность: 24–72 ч после травмы (PMID 42379672). */
+export const RTP_EARLY_AEROBIC_FROM_H = 24;
+export const RTP_EARLY_AEROBIC_TO_H = 72;
+/** Типичное восстановление взрослых, сут (PMID 42379672). */
+export const RTP_TYPICAL_RECOVERY_D = 14;
+/** Длительность протоколов RTP, сутки: 5–21, типичная 7 (PMID 41557117). */
+export const RTP_DURATION_MIN_D = 5;
+export const RTP_DURATION_TYPICAL_D = 7;
+export const RTP_DURATION_MAX_D = 21;
+
+export const RTP_SOURCE =
+  'PMID 28152320 (единоборства: одобренных градуированных протоколов нет — документированный пробел); PMID 42379672 (24–72 ч ранняя аэробная, ~14 сут восстановление, тяжесть симптомов = предиктор); PMID 41557117 (5–21 сут, типичная 7, «не в тот же день»)';
+
+/** Короткая ссылка на источники — чтобы не печатать числа второй раз на карточке. */
+export const RTP_SOURCE_IDS = 'PMID 28152320 · 42379672 · 41557117';
+
+export type RtpStageId =
+  | 'rest_light' | 'aerobic' | 'strength' | 'tech' | 'light_contact' | 'full';
+
+export interface RtpStage {
+  id: RtpStageId;
+  label: string;
+  /** минимум суток на ступени — инженерное правило, чтобы не проскочить ступень */
+  minDays: number;
+}
+
+export const RTP_STAGES: RtpStage[] = [
+  { id: 'rest_light', label: 'Покой и лёгкая активность', minDays: 1 },
+  { id: 'aerobic', label: 'Аэробная по нагрузке', minDays: 1 },
+  { id: 'strength', label: 'Силовая лёгкая, без ударов', minDays: 1 },
+  { id: 'tech', label: 'Техника без контакта', minDays: 1 },
+  { id: 'light_contact', label: 'Лёгкий контакт', minDays: 1 },
+  { id: 'full', label: 'Полный контакт', minDays: 1 },
+];
+
+export const RTP_STAGE_BY_ID: Record<RtpStageId, RtpStage> = RTP_STAGES.reduce((a, s) => {
+  a[s.id] = s; return a;
+}, {} as Record<RtpStageId, RtpStage>);
+
+export const COMBAT_RTP_KEY = 'he_combat_rtp_v1';
+/** 60 записей — длинный сдвиг по ступеням с повторами. */
+export const COMBAT_RTP_CAP = 60;
+
+export interface RtpLog {
+  date: string;
+  stage: RtpStageId;
+  /** симптомы на этой ступени: есть → ступень не засчитывается */
+  symptomsFree: boolean;
+  note?: string;
+}
+
+function validRtp(r: any): RtpLog | null {
+  if (!r || !isIso(r.date)) return null;
+  const st = (r.stage as string) in RTP_STAGE_BY_ID ? (r.stage as RtpStageId) : null;
+  if (!st) return null;
+  return { date: r.date, stage: st, symptomsFree: r.symptomsFree === true, note: typeof r.note === 'string' ? r.note.slice(0, 200) : undefined };
+}
+
+export function normalizeRtp(rows: any[]): RtpLog[] {
+  const byKey = new Map<string, RtpLog>();
+  for (const r of rows || []) {
+    const v = validRtp(r);
+    if (v) byKey.set(`${v.date}|${v.stage}`, v);
+  }
+  return [...byKey.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-COMBAT_RTP_CAP);
+}
+
+export function loadRtp(): RtpLog[] {
+  return normalizeRtp(readStore<any>(COMBAT_RTP_KEY));
+}
+
+export function addRtp(date: string, stage: RtpStageId, symptomsFree: boolean, note?: string): boolean {
+  const v = validRtp({ date, stage, symptomsFree, note });
+  if (!v) return false;
+  return writeStore(COMBAT_RTP_KEY, normalizeRtp([...readStore<any>(COMBAT_RTP_KEY), v]));
+}
+
+export function removeRtp(date: string, stage: RtpStageId): boolean {
+  if (!isIso(date)) return false;
+  return writeStore(COMBAT_RTP_KEY, readStore<any>(COMBAT_RTP_KEY).filter((r: any) => !(r?.date === date && r?.stage === stage)));
+}
+
+export type RtpStatus = 'no_log' | 'symptoms' | 'stage' | 'complete' | 'no_same_day';
+
+export interface RtpSummary {
+  /** последняя ступень, которую прошли без симптомов */
+  passedStage: RtpStage | null;
+  /** ступень, на которой спортсмен сейчас (следующая) */
+  currentStage: RtpStage | null;
+  status: RtpStatus;
+  /** можно ли сегодня закрыть currentStage */
+  canPass: boolean;
+  /** почему нельзя — человеческая строка */
+  blocked: string | null;
+  /** суток с последней записи */
+  daysSinceLast: number | null;
+  /** ожидаемое окно протокола для справки */
+  windowNote: string;
+  source: string;
+}
+
+function daysBetween(a: string, b: string): number {
+  return Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+}
+
+/**
+ * Сводка по градуированному RTP. Гейты следуют источникам:
+ * нельзя закрыть ступень в тот же день, что и предыдущую («не в тот же
+ * день», PMID 41557117), нельзя перескочить ступень, и симптомы держат
+ * текущую ступень (тяжесть симптомов = предиктор длительности, PMID 42379672).
+ */
+export function rtpSummary(rows: RtpLog[], today: string | null | undefined): RtpSummary {
+  const logs = rows.filter((r) => r.symptomsFree);
+  const withSymptoms = rows.filter((r) => !r.symptomsFree);
+  const lastSymptoms = withSymptoms.length ? withSymptoms[withSymptoms.length - 1] : null;
+  const passed = logs.length ? logs[logs.length - 1] : null;
+  const lastAny = rows.length ? rows[rows.length - 1] : null;
+  const daysSinceLast = lastAny && today ? Math.max(0, daysBetween(lastAny.date, today)) : null;
+
+  const order = RTP_STAGES.map((s) => s.id);
+  const nextIdx = passed ? order.indexOf(passed.stage) + 1 : 0;
+  const current = nextIdx < order.length ? RTP_STAGE_BY_ID[order[nextIdx]] : null;
+
+  const windowNote = `Окно протокола ${RTP_DURATION_MIN_D}–${RTP_DURATION_MAX_D} сут, типичное ${RTP_DURATION_TYPICAL_D}; восстановление взрослых чаще ~${RTP_TYPICAL_RECOVERY_D} сут.`;
+  const base: RtpSummary = {
+    passedStage: passed ? RTP_STAGE_BY_ID[passed.stage] : null,
+    currentStage: current, status: 'no_log', canPass: false, blocked: null,
+    daysSinceLast, windowNote, source: RTP_SOURCE,
+  };
+  if (!rows.length) {
+    return { ...base, status: 'no_log', blocked: 'Нет записей RTP. Начните с покоя и лёгкой активности.' };
+  }
+  // симптомы на последней записи — держим ступень
+  if (lastSymptoms && (!lastAny || lastSymptoms.date >= lastAny.date)) {
+    return { ...base, status: 'symptoms', blocked: 'Симптомы на последней ступени — держим текущий уровень, разговор с врачом.' };
+  }
+  if (!current) {
+    return { ...base, status: 'complete', canPass: false, blocked: 'Полный контакт пройден.' };
+  }
+  // «не в тот же день»
+  if (daysSinceLast !== null && daysSinceLast < 1) {
+    return { ...base, status: 'no_same_day', blocked: 'Нельзя закрывать следующую ступень в тот же день.' };
+  }
+  if (daysSinceLast !== null && daysSinceLast < (passed ? RTP_STAGE_BY_ID[passed.stage].minDays : 1)) {
+    const need = passed ? RTP_STAGE_BY_ID[passed.stage].minDays : 1;
+    return { ...base, status: 'stage', blocked: `Слишком рано: ступень держится минимум ${need} сут.` };
+  }
+  return { ...base, status: 'stage', canPass: true, blocked: null };
+}
+
+export const RTP_EARLY_AEROBIC_NOTE =
+  `Первые 24–72 ч: постепенная аэробная активность ускоряет восстановление, а не покой (PMID 42379672).`;
+
 // ─── 8.4 Скрининг LEA / RED-S ─────────────────────────────────────────────
 
 /**

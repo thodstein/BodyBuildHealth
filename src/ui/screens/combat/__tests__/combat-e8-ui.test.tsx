@@ -9,7 +9,7 @@ import React from 'react';
 import { CbCampMeasurementsCard } from '../cb-camp-measurements';
 import { buildCombatPlan } from '../../../../engines/combat/combat-builder.engine';
 import { finalizeCombatPlan } from '../../../../engines/combat/combat-finalize.engine';
-import { COMBAT_SPARRING_KEY, COMBAT_WIGHINS_KEY, COMBAT_GRIP_KEY } from '../../../../engines/combat/combat-measurements.engine';
+import { COMBAT_SPARRING_KEY, COMBAT_WIGHINS_KEY, COMBAT_GRIP_KEY, COMBAT_RTP_KEY } from '../../../../engines/combat/combat-measurements.engine';
 
 beforeEach(() => localStorage.clear());
 
@@ -183,5 +183,42 @@ describe('E8.3 — сила хвата на экране', () => {
     expect(screen.getByText(/Ориентир P50 43.0 кг/)).toBeTruthy();
     expect(screen.getByText(/не гейт/)).toBeTruthy();
     expect(screen.getByText(/34330493/)).toBeTruthy();
+  });
+});
+
+describe('E8.6 — RTP на экране', () => {
+  it('без записей предлагает начать с покоя и показывает источники', () => {
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.getByText(/Нет записей RTP/)).toBeTruthy();
+    expect(screen.getByText(/24–72 ч/)).toBeTruthy();
+    expect(screen.getByText(/28152320/)).toBeTruthy();
+  });
+
+  it('запись ступени без симптомов попадает в журнал', () => {
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    fireEvent.change(screen.getByLabelText('Дата ступени'), { target: { value: '2026-03-01' } });
+    fireEvent.click(screen.getByText('✓ Без симптомов'));
+    expect(JSON.parse(localStorage.getItem(COMBAT_RTP_KEY) || '[]').length).toBe(1);
+    expect(screen.getByText(/Записано: Покой/)).toBeTruthy();
+  });
+
+  it('симптомы держат ступень и это видно на экране', () => {
+    localStorage.setItem(COMBAT_RTP_KEY, JSON.stringify([
+      { date: '2026-03-01', stage: 'rest_light', symptomsFree: false },
+    ]));
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.getByText(/Симптомы/)).toBeTruthy();
+  });
+
+  it('честно сказано, что ступени — структура приложения, а не протокол', () => {
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.getByText(/структура приложения/)).toBeTruthy();
+    expect(screen.getByText(/одобренных протоколов нет/)).toBeTruthy();
+  });
+
+  it('окно протокола с цифрами источника видно на карточке', () => {
+    render(<CbCampMeasurementsCard plan={mkPlan()} />);
+    expect(screen.getByText(/5–21 сут/)).toBeTruthy();
+    expect(screen.getByText(/~14 сут/)).toBeTruthy();
   });
 });
