@@ -15,7 +15,8 @@ import {
 } from '../../../engines/arm/armlifting-diagnostics.engine';
 import { auditArmliftPlan, worstArmliftLink, ARMLIFT_AUDIT_LINKS } from '../../../engines/arm/armlift-plan-audit.engine';
 import { buildArmliftingHtml, buildArmliftingCsv } from '../../../engines/arm/armlifting-diagnostics.engine';
-import { downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
+import { buildArmliftIcs } from '../../../engines/arm/armlift-ics.engine';
+import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
 import { loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
 import { failuresFor, faultsFor, movementFor, relevantTestsFor, diagImplementForReportWeakest, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
 import { attemptTimelineFor, phaseForFailurePoint } from '../../../engines/arm/armlift-attempt-timeline.engine';
@@ -32,7 +33,7 @@ import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.eng
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
-import { buildArmliftIcs, downloadArmliftIcs } from '../../../engines/arm/armlift-ics.engine';
+
 import { buildArmliftAnnualOverlay, saveArmliftAnnualOverlay } from '../../../engines/arm/armlift-annual-bridge.engine';
 import { correctionsToInjectionItems, intensityForCause, rirForCause } from '../../../engines/arm/armlift-injection.engine';
 import { orderCorrectionsForDay, sessionOrderNote } from '../../../engines/arm/armlift-session-rules.engine';
@@ -40,7 +41,6 @@ import { diagnosticCompleteness } from '../../../engines/arm/armlift-completenes
 import { applyToPlanner } from './planner-bridge';
 import { AdRoot, AdCard, AdSec, AdGrid, AdChip, AdBtn, AdBanner, AdCta, AdStat } from './arm-design-system';
 import { haptics } from '../../../core/native-bridge';
-import { printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 /** PRO-визуал: уровень → цвет точки (строки/aria 1-в-1, только подача). */
 const LIFT_LEVEL_COLOR: Record<string, string> = {
@@ -666,7 +666,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   });
 
   // ROUND-10: ICS спец-блока (паритет с ТА/стронгом — у армлифтинга календаря не было)
-  const handleExportIcs = () => {
+  const handleExportIcs = async () => {
     try {
       const ics = buildArmliftIcs(specBlock, { implement: diag.implement, title: 'Армлифтинг спец-блок' });
       if (!ics) {
@@ -674,10 +674,12 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         setTimeout(() => setToast(''), 2500);
         return;
       }
-      downloadArmliftIcs(ics, `armlift-spec-block-${localIsoDate()}.ics`);
-      setToast('✓ Календарь .ics (недели спец-блока)');
+      // АПК: downloadArmliftIcs/downloadArmFile кладут Blob в <a download> и в WebView
+      // файл теряется (см. core/apk-share.ts) — идём через saveTextFileApk.
+      const o = await saveTextFileApk(`armlift-spec-block-${localIsoDate()}.ics`, ics, 'text/calendar;charset=utf-8');
+      setToast(shareOutcomeLabel(o));
       setTimeout(() => setToast(''), 2500);
-    } catch { /* noop */ }
+    } catch { setToast('⚠ Не удалось создать календарь .ics'); setTimeout(() => setToast(''), 2500); }
   };
 
   // ROUND-10: годовой overlay спец-блока (паритет со стронгом/ТА — односторонний ключ)
@@ -697,20 +699,20 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
   };
 
-  const handleExportHtml = () => {
+  const handleExportHtml = async () => {
     try {
-      downloadArmFile(`armlifting-${localIsoDate()}.html`, buildArmliftingHtml(exportData()), 'text/html');
-      setToast('✓ HTML экспорт вердикта');
+      const o = await saveTextFileApk(`armlifting-${localIsoDate()}.html`, buildArmliftingHtml(exportData()), 'text/html;charset=utf-8');
+      setToast(shareOutcomeLabel(o));
       setTimeout(() => setToast(''), 2500);
-    } catch { /* noop */ }
+    } catch { setToast('⚠ HTML не собран'); setTimeout(() => setToast(''), 2500); }
   };
 
-  const handleExportCsv = () => {
+  const handleExportCsv = async () => {
     try {
-      downloadArmFile(`armlifting-${localIsoDate()}.csv`, buildArmliftingCsv(exportData()), 'text/csv');
-      setToast('✓ CSV экспорт вердикта');
+      const o = await saveCsvApk(`armlifting-${localIsoDate()}.csv`, buildArmliftingCsv(exportData()));
+      setToast(shareOutcomeLabel(o));
       setTimeout(() => setToast(''), 2500);
-    } catch { /* noop */ }
+    } catch { setToast('⚠ CSV не собран'); setTimeout(() => setToast(''), 2500); }
   };
 
   /** АПК-безопасная печать: window.open().print() в Capacitor WebView не работает

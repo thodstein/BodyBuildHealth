@@ -431,7 +431,10 @@ describe('ArmDiagnosticsHub PRO', () => {
     fireEvent(window, new Event('he-arm-plan-saved'));
     await waitFor(() => expect(btn).not.toBeNull());
     fireEvent.click(btn!);
-    await waitFor(() => expect(document.body.textContent).toContain('Календарь .ics'));
+    // Контракт изменён осознанно: выгрузка идёт через core/apk-share (saveTextFileApk),
+    // поэтому тост — это честный ИТОГ операции (shareOutcomeLabel), а не обещание
+    // «✓ Календарь .ics»: на АПК старый путь через <a download> файл вообще не писал.
+    await waitFor(() => expect(document.body.textContent).toMatch(/Отправлено|Сохранено|Скопировано|Не удалось/));
   });
 
   it('ICS blocked-плана показывает safety-причину и не выгружает календарь', async () => {

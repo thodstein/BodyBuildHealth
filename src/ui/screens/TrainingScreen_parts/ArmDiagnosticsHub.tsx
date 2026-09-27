@@ -48,7 +48,7 @@ import { checkUCLGuard, checkShoulderGuard, checkTendonGuard } from '../../../en
 import { planBilateralVolume, loadBilateralHist, saveBilateralEntry, bilateralTrend } from '../../../engines/arm/arm-bilateral.engine';
 import { scorePlatform, planAttempts, loadPlatformLog } from '../../../engines/arm/arm-platform.engine';
 import { computeArmPerMuscleACWR, worstArmAcwrZone, armAcwrSummary } from '../../../engines/arm/arm-acwr.engine';
-import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv, downloadArmFile } from '../../../engines/arm/arm-diagnostics-export.engine';
+import { buildArmDiagnosticsHtml, buildArmDiagnosticsCsv } from '../../../engines/arm/arm-diagnostics-export.engine';
 import { armPlanExportBlockReasons, buildArmIcs } from '../../../engines/arm/arm-export.engine';
 import { buildArmBridgeData } from '../../../engines/arm/arm-bridge-payload.engine';
 import { loadRedFlags, redFlagLabels } from '../../../engines/arm/arm-redflags.store';
@@ -68,7 +68,7 @@ import { scoreArm, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { haptics } from '../../../core/native-bridge';
-import { printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
 import { OrthoScreenCard } from './OrthoScreenCard';
 
 const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
@@ -1002,24 +1002,31 @@ export const ArmDiagnosticsHub: React.FC = () => {
     };
   };
 
-  const handleExportHtmlP0 = () => {
+  // АПК: downloadArmFile кладёт Blob в <a download> — в Capacitor WebView файл уходит
+  // в никуда (см. core/apk-share.ts). Поэтому выгрузки идут через saveTextFileApk/
+  // saveCsvApk: native → Documents + Share, web → обычное скачивание.
+  const handleExportHtmlP0 = async () => {
     try {
-      downloadArmFile(`arm-diagnostics-${localIsoDate()}.html`, buildArmDiagnosticsHtml(exportDataP0() as any), 'text/html');
-      setInjectMsg('✓ HTML экспорт (точки + причины + топ-3 + Δ)');
+      const o = await saveTextFileApk(
+        `arm-diagnostics-${localIsoDate()}.html`,
+        buildArmDiagnosticsHtml(exportDataP0() as any),
+        'text/html;charset=utf-8',
+      );
+      setInjectMsg(shareOutcomeLabel(o));
       setTimeout(() => setInjectMsg(''), 2500);
-    } catch { /* noop */ }
+    } catch { setInjectMsg('⚠ HTML не собран — проверь замеры'); setTimeout(() => setInjectMsg(''), 2500); }
   };
 
-  const handleExportCsvP0 = () => {
+  const handleExportCsvP0 = async () => {
     try {
-      downloadArmFile(`arm-diagnostics-${localIsoDate()}.csv`, buildArmDiagnosticsCsv(exportDataP0() as any), 'text/csv');
-      setInjectMsg('✓ CSV экспорт');
+      const o = await saveCsvApk(`arm-diagnostics-${localIsoDate()}.csv`, buildArmDiagnosticsCsv(exportDataP0() as any));
+      setInjectMsg(shareOutcomeLabel(o));
       setTimeout(() => setInjectMsg(''), 2500);
-    } catch { /* noop */ }
+    } catch { setInjectMsg('⚠ CSV не собран — проверь замеры'); setTimeout(() => setInjectMsg(''), 2500); }
   };
 
   // ROUND-10: ICS-календарь арм-плана (движок `buildArmIcs` был мёртвым — не подключён в UI)
-  const handleExportIcsP0 = () => {
+  const handleExportIcsP0 = async () => {
     try {
       if (!armPlan) {
         setInjectMsg('⚠ Нет арм-плана — сначала собери в Арм-конструкторе');
@@ -1033,8 +1040,8 @@ export const ArmDiagnosticsHub: React.FC = () => {
         return;
       }
       const ics = buildArmIcs(armPlan as any);
-      downloadArmFile(`arm-plan-${localIsoDate()}.ics`, ics, 'text/calendar');
-      setInjectMsg('✓ Календарь .ics (недели/сессии плана)');
+      const o = await saveTextFileApk(`arm-plan-${localIsoDate()}.ics`, ics, 'text/calendar;charset=utf-8');
+      setInjectMsg(shareOutcomeLabel(o));
       setTimeout(() => setInjectMsg(''), 2500);
     } catch {
       setInjectMsg('⚠ Не удалось создать календарь .ics');

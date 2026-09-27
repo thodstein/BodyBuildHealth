@@ -354,7 +354,7 @@ describe('хаб стронга: каркас и визуал 1-в-1 с ТА', (
     expect(src).toMatch(/Выгрузка \(HTML\)/);
     // АПК-безопасность: window.open().print() в Capacitor WebView не работает
     // (документировано в core/apk-share.ts) — печать идёт через printHtmlApk.
-    expect(src).toMatch(/import \{ printHtmlApk, shareOutcomeLabel \} from '\.\.\/\.\.\/\.\.\/core\/apk-share'/);
+    expect(src).toMatch(/import \{[^}]*printHtmlApk[^}]*shareOutcomeLabel[^}]*\} from '\.\.\/\.\.\/\.\.\/core\/apk-share'/);
     expect(src).toMatch(/const handlePrint = async \(\) => \{[\s\S]{0,400}await printHtmlApk\(/);
     expect(src).not.toMatch(/const handlePrint = \(\) => \{[\s\S]{0,400}window\.open/);
     // снимок выгрузки один на HTML/CSV/печать — иначе сводки расходятся

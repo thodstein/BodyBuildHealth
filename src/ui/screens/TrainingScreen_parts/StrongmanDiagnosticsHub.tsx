@@ -13,13 +13,13 @@ import { WL_WEAKPOINT_LABELS } from '../../../engines/strength-sport/strength-sp
 import { SM_BIOMECH, diagnoseSMWeakPoint, SM_WEAKPOINT_CORRECTION, SM_WEAKPOINT_LABELS, type SMWeakPoint } from '../../../engines/strength-sport/strength-sport-sm-biomechanics.engine';
 import { scoreSM, smScoreColor } from '../../../engines/strength-sport/strength-sport-sm-scoring.engine';
 import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend } from '../../../engines/strength-sport/strength-sport-ohs.engine';
-import { buildSMBackup, downloadSMBackup, smStorageBytes, restoreSMBackup, isSMBackupShape, SM_STORAGE_KEYS } from '../../../engines/strength-sport/strength-sport-sm-storage.engine';
+import { buildSMBackup, smStorageBytes, restoreSMBackup, isSMBackupShape, SM_STORAGE_KEYS } from '../../../engines/strength-sport/strength-sport-sm-storage.engine';
 import { VBT_SS_THRESHOLDS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { diagnoseVelocityLossSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { diagnoseCarrySway } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { detectSMWeakFromDiary, candidateSMWeakPointsFromDiary, smWeeklySetsByLift, smLiftKeyForWeakPoint } from '../../../engines/strength-sport/strength-sport-sm-diary.engine';
 import { loadHubDiaryFlatEntries } from '../../../engines/hub-diary.engine';
-import { buildSMDiagnosticsHtml, downloadSMHtml, downloadSMCsv } from '../../../engines/strength-sport/strength-sport-sm-export.engine';
+import { buildSMDiagnosticsHtml, buildSMCsv } from '../../../engines/strength-sport/strength-sport-sm-export.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { StrongmanVideoGoniometer } from './StrongmanVideoGoniometer';
 import { validatePassport, validateContestPassports } from '../../../engines/strength-sport/strength-sport-passport.engine';
@@ -38,7 +38,7 @@ import { diagnoseSMAnthro } from '../../../engines/strength-sport/strength-sport
 import { diagnoseSMGripAsymmetry, appendSMGripSnapshot, smGripTrend } from '../../../engines/strength-sport/strength-sport-sm-asymmetry.engine';
 import { diagnoseSMHold, smFarmersWeightClass } from '../../../engines/strength-sport/strength-sport-sm-hold.engine';
 import { appendSMProgress, smProgressTrend, loadSMProgress, saveSMProgress } from '../../../engines/strength-sport/strength-sport-sm-progress.engine';
-import { buildSMIcs, downloadSMIcs } from '../../../engines/strength-sport/strength-sport-sm-ics.engine';
+import { buildSMIcs } from '../../../engines/strength-sport/strength-sport-sm-ics.engine';
 import { buildSMAnnualOverlay, saveSMAnnualOverlay } from '../../../engines/strength-sport/strength-sport-sm-annual-bridge.engine';
 import { calibrateSMLVP, smLvpPointsFromRamp, saveSMLVPProfile, loadSMLVPProfile, smLvpLiftFor } from '../../../engines/strength-sport/strength-sport-sm-lvp-calibration.engine';
 import { diagnoseLogDip } from '../../../engines/strength-sport/strength-sport-sm-biomechanics.engine';
@@ -68,7 +68,7 @@ import { OrthoScreenCard } from './OrthoScreenCard';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
-import { printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
 
 const STORAGE_KEY = 'he_strongman_diagnostics_hub_v1';
 
@@ -1285,13 +1285,19 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
   };
 
-  const handleSMBackup = () => {
+  const handleSMBackup = async () => {
     try {
       const b = buildSMBackup();
-      downloadSMBackup(`sm-backup-${localIsoDate()}.json`);
-      setToast(`✓ Резервная копия: ${Object.keys(b.data).length}/${SM_STORAGE_KEYS.length} ключей · ${(smStoreBytes.total / 1024).toFixed(1)} КБ`);
+      // АПК: downloadSMBackup кладёт Blob в <a download> и в WebView файл теряется
+      // (см. core/apk-share.ts) — бэкап сохраняем через saveTextFileApk (Documents+Share).
+      const o = await saveTextFileApk(
+        `sm-backup-${localIsoDate()}.json`,
+        JSON.stringify(b),
+        'application/json;charset=utf-8',
+      );
+      setToast(`${shareOutcomeLabel(o)} · ${Object.keys(b.data).length}/${SM_STORAGE_KEYS.length} ключей · ${(smStoreBytes.total / 1024).toFixed(1)} КБ`);
       setTimeout(() => setToast(''), 2500);
-    } catch { /* noop */ }
+    } catch { setToast('⚠ Бэкап не собран'); setTimeout(() => setToast(''), 2500); }
   };
 
   // Wave-0 Э0.4: бэкап без восстановления — ложное обещание («данные в безопасности», а вернуть
@@ -1351,9 +1357,10 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     if (!smSpec) { setToast('Нет спец-блока — выбери слабые фазы'); setTimeout(() => setToast(''), 2000); return; }
     const ics = buildSMIcs(smSpec, { title: 'Стронг спец-блок' });
     if (!ics) return;
-    downloadSMIcs(ics, `sm-spec-${localIsoDate()}.ics`);
-    setToast('✓ Календарь спец-блока (ICS)');
-    setTimeout(() => setToast(''), 2000);
+    // АПК: downloadSMIcs кладёт Blob в <a download> и в WebView файл теряется → saveTextFileApk
+    saveTextFileApk(`sm-spec-${localIsoDate()}.ics`, ics, 'text/calendar;charset=utf-8')
+      .then(o => { setToast(shareOutcomeLabel(o)); setTimeout(() => setToast(''), 2000); })
+      .catch(() => { setToast('⚠ Календарь не собран'); setTimeout(() => setToast(''), 2000); });
   };
 
   const handleSaveAnnual = () => {
@@ -1529,13 +1536,14 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     movement: movementExportLines,
     ...proSnapExtra(),
   });
-  const handleExport = () => {
-    const snap: any = smExportSnap();
-    const html = buildSMDiagnosticsHtml(snap);
-    downloadSMHtml(html, `strongman-diagnostics-${localIsoDate()}.html`);
-    setToast('✓ Выгрузка (HTML) готова');
-    setTimeout(()=>setToast(''),2000);
-  };
+    const handleExport = async () => {
+      try {
+        const html = buildSMDiagnosticsHtml(smExportSnap() as any);
+        const o = await saveTextFileApk(`strongman-diagnostics-${localIsoDate()}.html`, html, 'text/html;charset=utf-8');
+        setToast(shareOutcomeLabel(o));
+        setTimeout(()=>setToast(''),2000);
+      } catch { setToast('⚠ HTML не собран'); setTimeout(()=>setToast(''),2000); }
+    };
   /** Паритет с ТА `data-wl="print"`. АПК-безопасный путь: printHtmlApk на native
    *  сохраняет .html в Documents + Share (системная печать оттуда), на web — окно печати. */
   const handlePrint = async () => {
@@ -1551,12 +1559,13 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       setTimeout(()=>setToast(''),2500);
     }
   };
-  const handleExportCsv = () => {
-    const snap: any = smExportSnap();
-    downloadSMCsv(snap, `strongman-diagnostics-${localIsoDate()}.csv`);
-    setToast('✓ Выгрузка (CSV) готова');
-    setTimeout(()=>setToast(''),2000);
-  };
+    const handleExportCsv = async () => {
+      try {
+        const o = await saveCsvApk(`strongman-diagnostics-${localIsoDate()}.csv`, buildSMCsv(smExportSnap() as any));
+        setToast(shareOutcomeLabel(o));
+        setTimeout(()=>setToast(''),2000);
+      } catch { setToast('⚠ CSV не собран'); setTimeout(()=>setToast(''),2000); }
+    };
 
   const smBiomechForWeak = (wp: string) => {
     const map: Record<string, SMWeakPoint> = {};

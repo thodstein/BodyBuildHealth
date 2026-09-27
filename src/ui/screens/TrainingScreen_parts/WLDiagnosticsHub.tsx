@@ -25,7 +25,7 @@ import { calibrateLVP, saveLVPProfile } from '../../../engines/strength-sport/st
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { parsePoseAnglesCsv, summarizePoseAngles, avgAnglesOfSummary } from '../../../engines/strength-sport/strength-sport-pose.engine';
 import { sinclairCoefficient, sinclairTotal, qPoints, qMasters, qAgeScale, appendTAProgress, taProgressTrend, loadTAProgress, saveTAProgress, type TAProgressEntry } from '../../../engines/strength-sport/strength-sport-ta-progress.engine';
-import { buildWLDiagnosticsHtml, downloadWLHtml, downloadWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
+import { buildWLDiagnosticsHtml, buildWLCsv } from '../../../engines/strength-sport/strength-sport-wl-export.engine';
 import { detectTAWeakFromDiary, candidateTAWeakPointsFromDiary } from '../../../engines/strength-sport/strength-sport-diary-integration.engine';
 import { loadHubDiarySessions } from '../../../engines/hub-diary.engine';
 import { auditTAPlan, hubTabForPhase, TA_CORE_PHASES, TA_AUX_PHASES } from '../../../engines/strength-sport/strength-sport-ta-plan-audit.engine';
@@ -52,7 +52,7 @@ import { turnoverDiag, jerkDriveDiag, pullPowerBalance, lvpBallisticNote, moveme
 import { appendTAPhaseSnapshot, taPhaseTrend, loadTAPhaseHistory, saveTAPhaseHistory, type TAPhaseSnapshot } from '../../../engines/strength-sport/strength-sport-ta-phase-history.engine';
 import { appendTAPullPower, taPullPowerTrend, loadTAPullPower, saveTAPullPower } from '../../../engines/strength-sport/strength-sport-ta-pullpower-history.engine';
 import { ymaxNormForBodyweight } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
-import { printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
 import { localIsoDate } from '../../../core/local-date';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
@@ -1472,18 +1472,23 @@ export const WLDiagnosticsHub: React.FC = () => {
     return base;
   };
 
-  const handleExport = () => {
-    const snap = exportSnap();
-    const html = buildWLDiagnosticsHtml(snap);
-    downloadWLHtml(html, `ta-diagnostics-${new Date().toISOString().slice(0, 10)}.html`);
-    setToast('✓ HTML экспорт (фазы + биомеханика + коррекции)');
-    setTimeout(() => setToast(''), 2000);
+  // АПК: downloadWLHtml/downloadWLCsv кладут Blob в <a download> и в Capacitor WebView
+  // файл уходит в никуда (см. core/apk-share.ts) — идём через saveTextFileApk/saveCsvApk.
+  // Имя файла — по канону дат (localIsoDate), раньше был UTC-срез (вечером — вчера).
+  const handleExport = async () => {
+    try {
+      const html = buildWLDiagnosticsHtml(exportSnap());
+      const o = await saveTextFileApk(`ta-diagnostics-${localIsoDate()}.html`, html, 'text/html;charset=utf-8');
+      setToast(shareOutcomeLabel(o));
+      setTimeout(() => setToast(''), 2000);
+    } catch { setToast('⚠ HTML не собран'); setTimeout(() => setToast(''), 2000); }
   };
-  const handleExportCsv = () => {
-    const snap = exportSnap();
-    downloadWLCsv(snap, `ta-diagnostics-${new Date().toISOString().slice(0, 10)}.csv`);
-    setToast('✓ CSV экспорт (причины + коррекции + попытки)');
-    setTimeout(() => setToast(''), 2000);
+  const handleExportCsv = async () => {
+    try {
+      const o = await saveCsvApk(`ta-diagnostics-${localIsoDate()}.csv`, buildWLCsv(exportSnap()));
+      setToast(shareOutcomeLabel(o));
+      setTimeout(() => setToast(''), 2000);
+    } catch { setToast('⚠ CSV не собран'); setTimeout(() => setToast(''), 2000); }
   };
 
   // V4-C: печать сводки (то же HTML, что в экспорте; W6: APK-шапка со скором)

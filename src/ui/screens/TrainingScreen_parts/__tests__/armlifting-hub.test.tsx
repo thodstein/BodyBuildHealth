@@ -33,7 +33,10 @@ describe('W-AL UI: хаб армлифтинга', () => {
     const btn = document.body.querySelector('[data-arm="lift-export-ics"]');
     expect(btn).not.toBeNull();
     fireEvent.click(btn!);
-    await waitFor(() => expect(document.body.textContent).toMatch(/Календарь \.ics|Спец-блок пуст/));
+    // Контракт изменён осознанно: ICS уходит через core/apk-share (saveTextFileApk),
+    // тост — честный итог операции, а не обещание «Календарь .ics» (на АПК старый
+    // путь через Blob/<a download> файл не писал). Пустой спец-блок — тот же статус.
+    await waitFor(() => expect(document.body.textContent).toMatch(/Отправлено|Сохранено|Скопировано|Не удалось|Спец-блок пуст/));
   });
   it('ROUND-10: чипы покрытия снарядов — 0/7 без замеров, RT отмечается после ввода', () => {
     try { localStorage.clear(); } catch { /* noop */ }

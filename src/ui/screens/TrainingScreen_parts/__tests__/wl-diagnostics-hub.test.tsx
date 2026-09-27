@@ -169,7 +169,7 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(await screen.findByText(/Вставить коррекции/));
     await waitFor(() => expect(container.textContent).toContain('Вставлено коррекций'), { timeout: 2000 });
     fireEvent.click(screen.getAllByText(/🖨 HTML/)[0]);
-    await waitFor(() => expect(container.textContent).toContain('биомеханика + коррекции'), { timeout: 2000 });
+    await waitFor(() => expect(container.textContent).toMatch(/Отправлено|Сохранено|Скопировано|Не удалось/), { timeout: 2000 });
   });
   it('V4-C coverage-strip при наличии плана', async () => {
     const miniPlan: any = {
@@ -298,7 +298,7 @@ describe('WLDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getAllByText(/Рывок/)[0]);
     fireEvent.click(screen.getAllByText(/Рывок: отрыв/)[0]);
     fireEvent.click(screen.getAllByText(/🖨 HTML/)[0]);
-    await waitFor(() => expect(container.textContent).toContain('биомеханика + коррекции'), { timeout: 2000 });
+    await waitFor(() => expect(container.textContent).toMatch(/Отправлено|Сохранено|Скопировано|Не удалось/), { timeout: 2000 });
   });
   it('E15 ICS календарь спец-блока', async () => {
     const { container } = render(<WLDiagnosticsHub />);
@@ -446,7 +446,7 @@ describe('WLDiagnosticsHub PRO', () => {
     first.unmount();
     const second = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getAllByText(/🖨 HTML/)[0]);
-    await waitFor(() => expect(second.container.textContent).toContain('биомеханика + коррекции'), { timeout: 2000 });
+    await waitFor(() => expect(second.container.textContent).toMatch(/Отправлено|Сохранено|Скопировано|Не удалось/), { timeout: 2000 });
   });
 
   it('ROUND-10: фазы по дневнику читаются из ЖИВОГО ключа he_workout_log_v2', () => {
