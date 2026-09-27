@@ -224,11 +224,18 @@ describe('хаб армлифтинга: каркас и визуал 1-в-1 с 
     expect(taCss).toContain('--ad-field: rgba(255, 255, 255, 0.05);');
   });
 
-  it('видео/Kinovea в армлифтинге сохранены (пользователь выбрал оставить)', () => {
+  it('видео в армлифтинге: ручные замеры остались, Kinovea-CSV импорт убран (2026-09-27)', () => {
     const src = HUB_SRC();
+    // Флаги по ручным полям (угол/параллельность) остались
     expect(src).toContain('lift-video-flags');
-    expect(src).toMatch(/Kinovea/i);
-    // и в движке живой разбор CSV
+    expect(src).toContain('videoWristDeg');
+    expect(src).toContain('videoParallelBad');
+    // Kinovea-поверхность в хабе убрана (гард — на интерфейс, а не на слово:
+    // честный комментарий «импорт убран» в источнике остаться может)
+    expect(src).not.toMatch(/Kinovea CSV/);
+    expect(src).not.toMatch(/videoCsv/);
+    expect(src).not.toMatch(/<textarea/);
+    // и движок разбора CSV не тронут (инструмент остаётся внешним потребителям)
     const eng = fs.readFileSync(
       path.join(process.cwd(), 'src', 'engines', 'arm', 'arm-video-analysis.engine.ts'),
       'utf-8',

@@ -89,8 +89,8 @@ type DiagState = {
   pinchSubSec: string; farmerSubSec: string;
   /** PRO-6 M8: карта боли (зоны + красные флаги). */
   painZones: string[]; condNumb: boolean; condSwell: boolean; condNight: boolean;
-  /** PRO-6 M6: видео-лайт (CSV трека + угломер, пусто = тихо). */
-  videoCsv: string; videoWristDeg: string; videoParallelBad: boolean;
+  /** PRO-6 M6: видео-лайт (ручной угломер, пусто = тихо). CSV-импорт убран 2026-09-27. */
+  videoWristDeg: string; videoParallelBad: boolean;
 };
 const DEFAULT_DIAG: DiagState = {
   implement: 'rolling_thunder', failurePoint: '', faultIds: [],
@@ -106,7 +106,7 @@ const DEFAULT_DIAG: DiagState = {
   handSpanCm: '', handPalmCm: '', handThumbCm: '',
   pinchSubSec: '', farmerSubSec: '',
   painZones: [], condNumb: false, condSwell: false, condNight: false,
-  videoCsv: '', videoWristDeg: '', videoParallelBad: false,
+  videoWristDeg: '', videoParallelBad: false,
 };
 function loadDiag(): DiagState {
   try {
@@ -522,12 +522,12 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     swelling: diag.condSwell,
     nightPain: diag.condNight,
   }), [diag.painZones, diag.condNumb, diag.condSwell, diag.condNight]);
-  /** PRO-6 M6: видео-лайт — без CSV тихо. */
+  // PRO-6 M6: видео-лайт. Kinovea-CSV импорт убран 2026-09-27, поэтому работают
+  // только ручные поля (угол запястья / параллельность) — трек гуляния недоступен.
   const videoFlags = useMemo(() => analyzeArmliftVideo({
-    csv: diag.videoCsv,
     wristDeg: diag.videoWristDeg ? parseFloat(diag.videoWristDeg) : null,
     parallelOk: diag.videoParallelBad ? false : null,
-  }), [diag.videoCsv, diag.videoWristDeg, diag.videoParallelBad]);
+  }), [diag.videoWristDeg, diag.videoParallelBad]);
   /** D18: полнота диагностики (что довбить для честного вердикта). */
   const completeness = useMemo(() => diagnosticCompleteness({
     implement: diag.implement,
@@ -1147,22 +1147,13 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           {(diag.painZones.length > 0 || diag.condNumb || diag.condSwell || diag.condNight) && (
             <div className="ad-muted" data-arm="lift-pain-map">{painMap.unloadNote}</div>
           )}
-          <div className="lift-group">Видео-разбор (Kinovea CSV трека)</div>
+          <div className="lift-group">Видео-разбор — углы и положение снаряда вручную</div>
           <AdGrid cols="auto-sm">
             <LiftNum label="Угол запястья °" value={diag.videoWristDeg} onChange={(v) => setD({ videoWristDeg: v })} placeholder="180" aria="Угол запястья видео градусы" />
           </AdGrid>
           <div className="ad-row" aria-label="Диагностика: видео">
             <AdChip active={diag.videoParallelBad} onClick={() => setD({ videoParallelBad: !diag.videoParallelBad })}>Снаряд не параллелен</AdChip>
           </div>
-          <textarea
-            value={diag.videoCsv}
-            onChange={(e) => setD({ videoCsv: (e.target as HTMLTextAreaElement).value })}
-            placeholder="Вставь Kinovea CSV трека (t,x,y) — посчитаем гуляние"
-            aria-label="Kinovea CSV трека"
-            rows={3}
-            maxLength={20000}
-              style={{ width: '100%', minHeight: 64, fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: 8, fontFamily: 'monospace' }}
-          />
           {videoFlags && <div className="ad-muted" data-arm="lift-video-flags">🎥 {videoFlags.note}</div>}
           <div className="lift-group">Условия замера (режут ложные слабости)</div>
           <div className="ad-row" aria-label="Диагностика: условия">
