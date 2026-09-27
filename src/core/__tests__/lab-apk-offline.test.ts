@@ -7,6 +7,11 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
+vi.mock('../app-platform', () => ({
+  isNativeApp: () => true,
+  isCapacitorNative: () => true,
+}));
+
 vi.mock('tesseract.js', () => ({
   createWorker: vi.fn(async () => ({
     recognize: async () => ({
@@ -18,6 +23,7 @@ vi.mock('tesseract.js', () => ({
   })),
 }));
 
+import { createWorker } from 'tesseract.js';
 import { pickBestLabOcrText, processUploadedFile } from '../ocr-engine';
 import { normalizeLabMeasurement } from '../labs-mapping';
 
@@ -29,6 +35,9 @@ describe('АПК-оффлайн распознавание анализов (ф�
     const codes = result.labs.map(l => l.code);
     // Финальные коды — UCUM-канон (mapToUcumCode): креатинин → CREATININE.
     expect(codes).toEqual(expect.arrayContaining(['ALT', 'GLU', 'CREATININE']));
+    // APK WebView must load the bundled same-origin worker directly, not via
+    // Tesseract's default Blob worker (blocked on some Capacitor Android builds).
+    expect((createWorker as any).mock.calls[0][2]).toMatchObject({ workerBlobURL: false });
   });
 
   it('предупреждения честно говорят про оффлайн-режим, а не молчат', async () => {

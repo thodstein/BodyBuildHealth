@@ -532,6 +532,11 @@ export async function recognizeImageTextOffline(
       workerPath: opts.workerPath,
       corePath: opts.corePath,
       langPath: opts.langPath,
+      // Capacitor Android WebView can reject Tesseract's default Blob-backed
+      // worker even when the bundled worker asset is available. In APK use
+      // the same-origin worker directly; web/TG still need the Blob wrapper
+      // because their worker script may be served from a different origin.
+      workerBlobURL: !isNativeApp(),
       logger: (m: any) => {
         if (m?.status === 'recognizing text' && typeof m?.progress === 'number') {
           report(progressWindow.base + progressWindow.span * m.progress);
