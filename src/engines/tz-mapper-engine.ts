@@ -2173,12 +2173,8 @@ export function resolvePlan(ctx: MapperCtx): SupportRecommendation {
 // ════════════════════════════════════════════════════════════════════════════
 //  Query API (для UI)
 // ════════════════════════════════════════════════════════════════════════════
-export function getMechLabelTz(mechId: TzMechId): string {
-  return TZ_MECH_LABELS[mechId] || mechId;
-}
-export function getOrganLabelTz(organId: TzOrganId): string {
-  return TZ_SYSTEM_LABELS[organId] || organId;
-}
+// Метки mechId/organId живут в support-db (mechLabel/organLabel, строки 571/575) —
+// дублей getMechLabelTz/getOrganLabelTz здесь больше нет.
 
 // Экспорты из зависимостей для удобного импорта в UI
 export {

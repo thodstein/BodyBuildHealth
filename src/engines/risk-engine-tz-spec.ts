@@ -9,57 +9,79 @@ const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
 // ── 6 систем с механизмами и maxRaw ──
 // ТЗ п.10: каждый механизм имеет свою формулу с D/T/F/C
 // rep5 — особый: только T (без D) — ТЗ п.10.5
-interface MechDef { id: string; weight: number; defaultM: number; requiresD: boolean; requiresF: boolean; requiresC: boolean; }
+// `defaultM` больше НЕТ: поле было мёртвым и расходилось с расчётом по 10 из 28
+// механизмов (см. M_I_BASE_DEFAULTS выше — это единственный источник m_i).
+interface MechDef { id: string; weight: number; requiresD: boolean; requiresF: boolean; requiresC: boolean; }
 interface SysDef { id: string; name: string; icon: string; mechanisms: MechDef[]; maxRaw: number; }
 // maxRaw recalculated for extreme 2-drug course: test 1000 + tren 500, 16wk, 2 drugs, no labs
 // Formula: Σ(mech.weight × (drugMechWeight/4) × m_i × D × T × [F] × [C]) × U for each drug, summed
 // drugMechWeight/4 scales: weight=4 → 1.0 (full), weight=2 → 0.5 (half), weight=1 → 0.25 (weak)
+// ── m_i: БАЗОВЫЕ значения (гарантированные эффекты + эффекты, не требующие анализов) ──
+//
+// 26 сен 2026 (E1.9 / B9). БЫЛО: у каждого механизма в `SYSTEMS` было поле `defaultM`,
+// которое **не читалось нигде** (таблица приватная, поле — нет потребителей), и рядом
+// жил отдельный `baseDefaults` внутри `getMiFromLab` — единственный живой источник.
+// Расхождение было по **10 из 28** механизмов: cv2, cv4, liv1, cns1, cns2, rep1, rep2,
+// rep3, rep5, hem1. То есть мёртвое поле врало: починить его = не изменить НИЧЕГО, а
+// прочитать как документацию — попасть в ловушку (напр. rep1: в SYSTEMS 2, в расчёте 3).
+//
+// СТАЛО: одно место — здесь. `defaultM` удалён из `MechDef` и из всех 28 записей;
+// компилятор не даст reintroduce'нуть его молча, пока значение читается только отсюда.
+const M_I_BASE_DEFAULTS: Record<string, number> = {
+  cv1: 1, cv2: 2, cv3: 1, cv4: 2, cv5: 1,
+  liv1: 2, liv2: 1, liv3: 0,
+  ren1: 1, ren2: 1, ren3: 0, ren4: 1,
+  cns1: 2, cns2: 2, cns3: 0, cns4: 1, cns5: 0, cns6: 0,
+  rep1: 3, rep2: 3, rep3: 2, rep4: 1, rep5: 2,
+  hem1: 2, hem2: 0, hem3: 0, hem4: 0, hem5: 0,
+};
+
 const SYSTEMS: SysDef[] = [
   { id:'cardio', name:'Сердечно-сосудистая', icon:'❤️',
     mechanisms:[
-      { id:'cv1', weight:4, defaultM:1, requiresD:true, requiresF:false, requiresC:true },
-      { id:'cv2', weight:4, defaultM:1, requiresD:true, requiresF:true, requiresC:false },
-      { id:'cv3', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
-      { id:'cv4', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
-      { id:'cv5', weight:4, defaultM:1, requiresD:true, requiresF:false, requiresC:true },
+      { id:'cv1', weight:4, requiresD:true, requiresF:false, requiresC:true },
+      { id:'cv2', weight:4, requiresD:true, requiresF:true, requiresC:false },
+      { id:'cv3', weight:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cv4', weight:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cv5', weight:4, requiresD:true, requiresF:false, requiresC:true },
     ], maxRaw: 200 },
   { id:'hepatic', name:'Печень', icon:'🫁',
     mechanisms:[
-      { id:'liv1', weight:4, defaultM:1, requiresD:true, requiresF:true, requiresC:false },
-      { id:'liv2', weight:2, defaultM:1, requiresD:true, requiresF:true, requiresC:false },
-      { id:'liv3', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+      { id:'liv1', weight:4, requiresD:true, requiresF:true, requiresC:false },
+      { id:'liv2', weight:2, requiresD:true, requiresF:true, requiresC:false },
+      { id:'liv3', weight:2, requiresD:true, requiresF:false, requiresC:false },
     ], maxRaw: 60 },
   { id:'renal', name:'Почки', icon:'🫘',
     mechanisms:[
-      { id:'ren1', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
-      { id:'ren2', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:true },
-      { id:'ren3', weight:3, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
-      { id:'ren4', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
+      { id:'ren1', weight:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'ren2', weight:2, requiresD:true, requiresF:false, requiresC:true },
+      { id:'ren3', weight:3, requiresD:true, requiresF:false, requiresC:false },
+      { id:'ren4', weight:2, requiresD:true, requiresF:false, requiresC:false },
     ], maxRaw: 25 },
   { id:'cns', name:'ЦНС', icon:'🧠',
     mechanisms:[
-      { id:'cns1', weight:3, defaultM:1, requiresD:true, requiresF:false, requiresC:true },
-      { id:'cns2', weight:3, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
-      { id:'cns3', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
-      { id:'cns4', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
-      { id:'cns5', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
-      { id:'cns6', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cns1', weight:3, requiresD:true, requiresF:false, requiresC:true },
+      { id:'cns2', weight:3, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cns3', weight:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cns4', weight:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cns5', weight:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'cns6', weight:2, requiresD:true, requiresF:false, requiresC:false },
     ], maxRaw: 100 },
   { id:'reproductive', name:'Репродуктивная / HPG-ось', icon:'🧬',
     mechanisms:[
-      { id:'rep1', weight:4, defaultM:2, requiresD:true, requiresF:false, requiresC:false },
-      { id:'rep2', weight:4, defaultM:2, requiresD:true, requiresF:false, requiresC:false },
-      { id:'rep3', weight:2, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
-      { id:'rep4', weight:2, defaultM:1, requiresD:true, requiresF:true, requiresC:false },
-      { id:'rep5', weight:2, defaultM:1, requiresD:false, requiresF:false, requiresC:false },
+      { id:'rep1', weight:4, requiresD:true, requiresF:false, requiresC:false },
+      { id:'rep2', weight:4, requiresD:true, requiresF:false, requiresC:false },
+      { id:'rep3', weight:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'rep4', weight:2, requiresD:true, requiresF:true, requiresC:false },
+      { id:'rep5', weight:2, requiresD:false, requiresF:false, requiresC:false },
     ], maxRaw: 165 },
   { id:'hematologic', name:'Гематолого-метаболический', icon:'🩸',
     mechanisms:[
-      { id:'hem1', weight:3, defaultM:1, requiresD:true, requiresF:false, requiresC:false },
-      { id:'hem2', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
-      { id:'hem3', weight:3, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
-      { id:'hem4', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
-      { id:'hem5', weight:2, defaultM:0, requiresD:true, requiresF:false, requiresC:false },
+      { id:'hem1', weight:3, requiresD:true, requiresF:false, requiresC:false },
+      { id:'hem2', weight:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'hem3', weight:3, requiresD:true, requiresF:false, requiresC:false },
+      { id:'hem4', weight:2, requiresD:true, requiresF:false, requiresC:false },
+      { id:'hem5', weight:2, requiresD:true, requiresF:false, requiresC:false },
     ], maxRaw: 45 },
 ];
 
@@ -239,11 +261,9 @@ export const PROCEDURE_DB: Record<string, Array<{organId:string;mechId:string;k:
 
 // ── m_i из лабораторных значений (таблица T4) + коррекция по дозе ──
 function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:number,mechWeight?:number,rawDose?:number,sex?:'male'|'female'):number{
-  // Базовые defaults с учётом guaranteed эффектов ААС
-  const baseDefaults:Record<string,number>={cv1:1,cv2:2,cv3:1,cv4:2,cv5:1,liv1:2,liv2:1,liv3:0,ren1:1,ren2:1,ren3:0,ren4:1,cns1:2,cns2:2,cns3:0,cns4:1,cns5:0,cns6:0,rep1:3,rep2:3,rep3:2,rep4:1,rep5:2,hem1:2,hem2:0,hem3:0,hem4:0,hem5:0};
-  // Масштабируем по дозе: doseFactor 1.0-2.0 → умножаем m_i
+  // Базовые defaults — единый источник M_I_BASE_DEFAULTS (модуль-левел, см. выше)
   const mult = doseFactor && doseFactor > 1.0 ? Math.min(1.5, doseFactor) : 1.0;
-  const raw = baseDefaults[mechId] ?? 0;
+  const raw = M_I_BASE_DEFAULTS[mechId] ?? 0;
   // Дозозависимость эритроцитоза: при дозе ≤200 мг/нед (TRT-диапазон)
   // клинически значимая полицитемия редка (Endocrine Society 2018:
   // HCT>52% в основном при супрафизиологических дозах) — гарантированный

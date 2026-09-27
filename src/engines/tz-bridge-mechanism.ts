@@ -206,24 +206,6 @@ export function getBestSubsForMech(mechId: TzMechId, topN = 3): TzMechSubstance[
   return getSubsForMech(mechId, topN);
 }
 
-export function getSubsCoverage(substanceId: string): { mechId: TzMechId; k: number }[] {
-  const result: { mechId: TzMechId; k: number }[] = [];
-  for (const mechId of ALL_TZ_MECH_IDS) {
-    for (const s of TZ_MECH_TO_SUBS[mechId].substances) {
-      if (s.substanceId === substanceId) {
-        result.push({ mechId, k: s.k });
-        break;
-      }
-    }
-  }
-  return result;
-}
-
-// Сила покрытия: сколько механизмов покрывает вещество
-export function getSubsBreadth(substanceId: string): number {
-  return getSubsCoverage(substanceId).length;
-}
-
 // Топ-N substances по breadth (для broad-spectrum отбора)
 export function topBreadthSubs(n = 10): { substanceId: string; breadth: number; totalK: number }[] {
   const acc = new Map<string, { breadth: number; totalK: number }>();
@@ -441,17 +423,4 @@ export function screenPairConflicts(substanceIds: string[]): ConflictPair[] {
     }
   }
   return out;
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-//  Статистика БД (для отладки/UI)
-// ════════════════════════════════════════════════════════════════════════════
-export function getMechStats(): { mechId: TzMechId; organId: TzOrganId; count: number; topK: number }[] {
-  return ALL_TZ_MECH_IDS.map(mechId => {
-    const s = TZ_MECH_TO_SUBS[mechId];
-    return {
-      mechId, organId: s.organId, count: s.count,
-      topK: s.substances[0]?.k || 0,
-    };
-  });
 }

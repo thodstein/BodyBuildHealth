@@ -224,12 +224,7 @@ export function calcTEF(proteinG: number, carbsG: number, fatG: number, alcoholG
   // P 20-35% (берём 25%, растительный белок ~20% из-за клетчатки), C 5-10% (7%), F 0-3% (3%), alcohol 10-22% (берём 15% Suter 1992, средний)
   return Math.round(proteinG * 4 * 0.25 + carbsG * 4 * 0.07 + fatG * 9 * 0.03 + alcoholG * 7.1 * 0.15);
 }
-export function calcTEFFromKcal(kcal: number, proteinG: number, carbsG: number, fatG: number): number {
-  const tef = calcTEF(proteinG, carbsG, fatG);
-  // fallback 10% если макросы не заданы
-  if (proteinG + carbsG + fatG < 10) return Math.round(kcal * 0.10);
-  return clamp(tef, Math.round(kcal * 0.06), Math.round(kcal * 0.15));
-}
+// calcTEFFromKcal удалён (E1.9): 0 потребителей. Канон TEF — calcTEF (по макросам) + waterfall в UI.
 
 // ── PAL ──
 // Простая модель для хаба (low/medium/high/very_high + тренировочные дни/кардио)
@@ -505,19 +500,8 @@ export function calcAdaptiveAdjustment(
 }
 
 // ── Guardы антропометрии ──
-export function validateAnthropometry(input: { weight:number; height:number; lean?:number }): string[] {
-  const warns:string[]=[];
-  const hM=(input.height||175)/100;
-  if(input.lean && hM>0){
-    const ffmi=input.lean/(hM*hM)+6.1*(1.80-hM);
-    if(ffmi>26.2) warns.push(`FFMI ${ffmi.toFixed(1)} >26.2 — Helms 2023 лимит natty, BMR кламп`);
-    if(ffmi<14) warns.push(`FFMI ${ffmi.toFixed(1)} <14 — дефицит LBM`);
-  }
-  const bmi=input.weight/(hM*hM);
-  if(bmi>40) warns.push(`BMI ${bmi.toFixed(1)} — ожирение III, формулы с погрешностью`);
-  if(bmi<16) warns.push(`BMI ${bmi.toFixed(1)} — дефицит массы`);
-  return warns;
-}
+// validateAnthropometry удалён (E1.9): 0 потребителей. FFMI/BMI-стражи живут в самом
+// computeBMR/адаптерах и в UI-плашках — отдельный невызываемый дубль не нужен.
 
 // ── Hall dynamic weight change — Pro (Hall 2011 Lancet) ──
 // Энергетическая плотность потери зависит от доли жира p: density = p*9400+(1-p)*1800

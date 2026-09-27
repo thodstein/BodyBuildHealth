@@ -383,12 +383,6 @@ export function getActivatedMechIds(labs: LabValues): TzMechId[] {
   return getActivatedTzMechs(labs).map(m => m.mechId);
 }
 
-export function getActivatedOrgans(labs: LabValues): TzOrganId[] {
-  const set = new Set<TzOrganId>();
-  for (const m of getActivatedTzMechs(labs)) set.add(m.organId);
-  return Array.from(set);
-}
-
 export function hasSevereMech(labs: LabValues, mechId: TzMechId): boolean {
   return getActivatedTzMechs(labs).some(m => m.mechId === mechId && m.severity === 'severe');
 }

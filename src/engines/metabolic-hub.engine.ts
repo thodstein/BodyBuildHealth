@@ -901,8 +901,7 @@ export { MET_CATALOG, calcWHtR, calcABSI, calcBAI, calcTyG, calcFIB4, calcAPRI, 
 export function calcMetSWrapper(p:{ waistCm:number; tgMgDl?:number; hdlMgDl?:number; systolic?:number; diastolic?:number; glucoseMgDl?:number; sex:'male'|'female' }){
   return calcMetS_ATP3(p as any);
 }
-export function calcWHtRWrapper(w:number,h:number){ return calcWHtR(w,h); }
-export function calcABSIWrapper(w:number,h:number,weight:number){ return calcABSI(w,h,weight); }
+// calcWHtRWrapper/calcABSIWrapper удалены (E1.9): UI импортирует calcWHtR/calcABSI напрямую.
 
 // ——— Adaptive TDEE v2 (MacroFactor-стиль) — Hall density + trend R² ———
 export interface AdaptiveTDEEResult { tdee:number; tdeeNoAT:number; trend:number; r2:number; days:number; n:number; density:number; atKcal:number; confidence:'low'|'medium'|'high'; plateau:boolean; targets:{ maintain:number; cut:number; bulk:number }; note:string; weeklySeries: Array<{days:number; trend:number; r2:number}> }
@@ -952,9 +951,8 @@ export function calcAdaptiveTDEE(params:{ weightHistory:WeightPoint[]; avgIntake
 }
 
 // ——— MET-builder — честный PAL ———
-export function calcMETPal(basePal:number, metHoursPerWeek?:number, standingHours?:number, fidgetLevel?:1|2|3){
-  return computePalFromMet({ basePal, metHoursPerWeek, standingHours, fidgetLevel });
-}
+// calcMETPal удалён (E1.9): 0 потребителей. Канон — computePalFromMet в metabolic-constants
+// (её держит metabolic-hub.test.ts) и computePalFromActivity для UI.
 export function buildMetHours(schedule: Array<{ key:string; hours:number }>): number {
   let sum=0;
   for(const s of schedule){ const m=(MET_CATALOG as any)[s.key]?.met ?? 6; sum+=m*s.hours; }
