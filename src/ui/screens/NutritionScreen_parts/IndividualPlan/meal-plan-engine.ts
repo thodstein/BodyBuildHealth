@@ -1235,6 +1235,8 @@ function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
   }
   return arr[arr.length - 1];
 }
+// Волна 3 (quality integration): экспорт для тестов — взвешенный выбор по bb_quality_score.
+export { pickWeighted as _pickWeightedForTest };
 
 // P1.2: Pick from pool, but prefer locked foods, then preferred, then deprioritize recent
 function pickPriority<T extends { id: string }>(arr: T[], seed: number, opts?: { lockedIds?: Set<string>; preferredIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string>; uniform?: boolean }): T | undefined {
