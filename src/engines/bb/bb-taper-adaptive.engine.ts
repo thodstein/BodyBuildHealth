@@ -9,8 +9,8 @@
  *
  * Чистый движок: без UI-импортов, детерминирован, входы валидируются.
  */
-import type { BBContestPrepConfig, TrainingTaperWeek } from './bb-contest-prep.engine';
-import { buildTrainingTaper } from './bb-contest-prep.engine';
+import type { BBContestPrepConfig, BBContestCategory, TrainingTaperWeek } from './bb-contest-prep.engine';
+import { buildTrainingTaper, CATEGORY_PROFILES } from './bb-contest-prep.engine';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Типы
@@ -472,4 +472,212 @@ export function buildMultiShowProtocol(
   }
 
   return segments;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P2: Визуализация, сравнение, экспорт, напоминания, отмена, путешествия, ветераны
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** SVG-график кривой тапера (объём/интенсивность/RIR). */
+export function taperCurveSVG(taper: TrainingTaperWeek[]): string {
+  if (!taper.length) return '';
+  const w = 400;
+  const h = 200;
+  const pad = 30;
+  const iw = w - pad * 2;
+  const ih = h - pad * 2;
+  const maxVol = 1;
+  const maxInt = 1;
+  const pt = (i: number, v: number) => {
+    const x = pad + (i / Math.max(1, taper.length - 1)) * iw;
+    const y = pad + ih - v * ih;
+    return `${x},${y}`;
+  };
+  const volPts = taper.map((t, i) => pt(i, t.volumePct)).join(' ');
+  const intPts = taper.map((t, i) => pt(i, t.intensityPct)).join(' ');
+  const rirPts = taper.map((t, i) => pt(i, t.rirMin / 5)).join(' ');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">` +
+    `<polyline points="${volPts}" fill="none" stroke="#22c55e" stroke-width="2"/>` +
+    `<polyline points="${intPts}" fill="none" stroke="#3b82f6" stroke-width="2"/>` +
+    `<polyline points="${rirPts}" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4"/>` +
+    `<text x="${pad}" y="${pad - 10}" font-size="10" fill="#22c55e">объём</text>` +
+    `<text x="${pad + 30}" y="${pad - 10}" font-size="10" fill="#3b82f6">инт.</text>` +
+    `<text x="${pad + 55}" y="${pad - 10}" font-size="10" fill="#f59e0b">RIR</text>` +
+    `</svg>`;
+}
+
+export interface TaperStrategyComparison {
+  strategy: CarbLoadStrategy;
+  label: string;
+  carbBudgetGPerKg: [number, number];
+  spillRisk: 'low' | 'medium' | 'high';
+  bestFor: string;
+}
+
+/** Сравнительная таблица стратегий углеводной загрузки. */
+export function compareTaperStrategies(category: BBContestCategory): TaperStrategyComparison[] {
+  const profile = CATEGORY_PROFILES[category];
+  const [bMin, bMax] = profile.carbTotalBudgetGPerKg;
+  return [
+    { strategy: 'front', label: 'Ранняя (front)', carbBudgetGPerKg: [bMin, bMax], spillRisk: 'low', bestFor: 'Опытные, с контролем инсулина' },
+    { strategy: 'moderate', label: 'Умеренная (moderate)', carbBudgetGPerKg: [bMin, bMax], spillRisk: 'medium', bestFor: 'Большинство атлетов' },
+    { strategy: 'back', label: 'Поздняя (back)', carbBudgetGPerKg: [bMin, bMax], spillRisk: 'medium', bestFor: 'С хорошей инсулин-чувствительностью' },
+    { strategy: 'undulating', label: 'Волна (undulating)', carbBudgetGPerKg: [bMin, bMax], spillRisk: 'medium', bestFor: 'Непредсказуемый отклик' },
+    { strategy: 'linear', label: 'Линейная (linear)', carbBudgetGPerKg: [bMin, bMax], spillRisk: 'medium', bestFor: 'Стабильный метаболизм' },
+    { strategy: 'direct', label: 'Прямая (direct)', carbBudgetGPerKg: [bMin, bMax], spillRisk: 'low', bestFor: 'Без деплеции, быстрая загрузка' },
+  ];
+}
+
+export interface PeakWeekExport {
+  html: string;
+  ics: string;
+  csv: string;
+}
+
+/** Экспорт пик-недели в HTML (печать), ICS (календарь) и CSV. */
+export function exportPeakWeek(
+  plan: PeakWeekDayPlan[],
+  showDate: string,
+): PeakWeekExport {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const html = `<html><head><meta charset="utf-8"><title>Пик-неделя ${esc(showDate)}</title></head><body>` +
+    `<h1>Пик-неделя: ${esc(showDate)}</h1>` +
+    `<table><tr><th>День</th><th>Фаза</th><th>Ккал</th><th>Б</th><th>У</th><th>Ж</th><th>Вода</th><th>Натрий</th><th>Тренировка</th></tr>` +
+    plan.map(d =>
+      `<tr><td>D-${7 - d.day}</td><td>${esc(d.phaseLabel)}</td><td>${d.kcal}</td><td>${d.proteinG}</td><td>${d.carbsG}</td><td>${d.fatG}</td><td>${d.waterLiters}</td><td>${d.sodiumMg}</td><td>${esc(d.training.type)}</td></tr>`,
+    ).join('') +
+    `</table></body></html>`;
+
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//bb-taper//peak-week//RU']
+    .concat(plan.map(d => [
+      'BEGIN:VEVENT',
+      `DTSTART;VALUE=DATE=${d.date.replace(/-/g, '')}`,
+      `SUMMARY:Пик D-${7 - d.day} — ${d.phaseLabel}`,
+      `DESCRIPTION:Ккал ${d.kcal} · Вода ${d.waterLiters}л · Na ${d.sodiumMg}мг`,
+      'END:VEVENT',
+    ]).flat())
+    .concat(['END:VCALENDAR'])
+    .join('\r\n');
+
+  const csv = 'day,phase,kcal,protein,carbs,fat,water,sodium,training\n' +
+    plan.map(d =>
+      `${d.day},${d.phaseLabel},${d.kcal},${d.proteinG},${d.carbsG},${d.fatG},${d.waterLiters},${d.sodiumMg},${d.training.type}`,
+    ).join('\n');
+
+  return { html, ics, csv };
+}
+
+export interface PeakReminder {
+  date: string;
+  dayIndex: number;
+  title: string;
+  detail: string;
+}
+
+/** Напоминания пик-недели (утренний чек-ин каждый день). */
+export function buildPeakReminders(plan: PeakWeekDayPlan[]): PeakReminder[] {
+  return plan.map(d => ({
+    date: d.date,
+    dayIndex: d.day,
+    title: `Пик D-${7 - d.day}: ${d.phaseLabel}`,
+    detail: `Вес · Вода ${d.waterLiters}л · Na ${d.sodiumMg}мг · Тренировка: ${d.training.type}`,
+  }));
+}
+
+export interface CancellationProtocol {
+  days: Array<{ day: number; waterTarget: string; sodiumTarget: string; carbsTarget: string; note: string }>;
+  notes: string[];
+}
+
+/**
+ * Протокол отмены пик-недели: постепенный возврат к нормальной воде/натрию/углеводам за 3-5 дней.
+ */
+export function buildPeakCancellationPlan(): CancellationProtocol {
+  return {
+    days: [
+      { day: 1, waterTarget: '3.5л', sodiumTarget: '2800мг', carbsTarget: 'обычная', note: 'Возврат к базовому протоколу' },
+      { day: 2, waterTarget: '3.5л', sodiumTarget: '2800мг', carbsTarget: 'обычная', note: 'Без резких изменений' },
+      { day: 3, waterTarget: '3.5л', sodiumTarget: '2800мг', carbsTarget: 'обычная', note: 'Нормализация' },
+    ],
+    notes: [
+      'Отмена пика не опасна: водные манипуляции обратимы',
+      'Не обнуляйте воду и натрий — вернитесь к плану за 3 дня',
+      'После отмены можно начать новую подготовку',
+    ],
+  };
+}
+
+export interface TravelTaperMod {
+  waterDeltaL: number;
+  sodiumDeltaMg: number;
+  note: string;
+}
+
+/** Модификатор тапера для путешествий (смена часового пояса, перелёт). */
+export function travelTaperMod(traveling: boolean, timeZoneShiftHours?: number): TravelTaperMod {
+  if (!traveling) return { waterDeltaL: 0, sodiumDeltaMg: 0, note: '' };
+  const shift = Math.abs(timeZoneShiftHours ?? 0);
+  const waterDelta = shift >= 6 ? 0.5 : 0.3;
+  return {
+    waterDeltaL: waterDelta,
+    sodiumDeltaMg: 0,
+    note: `Перелёт ${shift}ч: +${waterDelta}л воды в день перелёта и первые 2 дня`,
+  };
+}
+
+export interface VeteranTaperMod {
+  taperLength: number;
+  volumeMult: number;
+  intensityMult: number;
+  note: string;
+}
+
+/** Модификатор для ветеранов 40+: длинный тапер, мягче интенсивность. */
+export function veteranTaperMod(age?: number): VeteranTaperMod {
+  if (age == null || age < 40) return { taperLength: 4, volumeMult: 1, intensityMult: 1, note: '' };
+  return {
+    taperLength: 4,
+    volumeMult: 1.05,
+    intensityMult: 0.97,
+    note: `Возраст ${age}: восстановление медленнее, интенсивность −3%`,
+  };
+}
+
+export interface TaperCalendarDay {
+  week: number;
+  date: string;
+  phase: string;
+  volumePct: number;
+  intensityPct: number;
+  rirMin: number;
+  rirMax: number;
+  isDeload: boolean;
+}
+
+/** Календарь тапера (недели × фазы × множители). */
+export function buildTaperCalendar(
+  taper: TrainingTaperWeek[],
+  showDate: string,
+  weeksOut: number,
+): TaperCalendarDay[] {
+  const days: TaperCalendarDay[] = [];
+  const show = new Date(`${showDate}T00:00:00`);
+  for (let i = weeksOut - 1; i >= 0; i--) {
+    const weekDate = new Date(show);
+    weekDate.setDate(weekDate.getDate() - i * 7);
+    const iso = `${weekDate.getFullYear()}-${String(weekDate.getMonth() + 1).padStart(2, '0')}-${String(weekDate.getDate()).padStart(2, '0')}`;
+    const t = taper[i];
+    if (!t) continue;
+    days.push({
+      week: weeksOut - i,
+      date: iso,
+      phase: t.label,
+      volumePct: t.volumePct,
+      intensityPct: t.intensityPct,
+      rirMin: t.rirMin,
+      rirMax: t.rirMax,
+      isDeload: t.volumePct < 0.65,
+    });
+  }
+  return days;
 }
