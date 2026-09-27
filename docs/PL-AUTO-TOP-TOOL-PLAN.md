@@ -1,402 +1,379 @@
-# PL-AUTO-TOP-TOOL-PLAN — ПЛ-авто до топ-уровня
+# ПЛ-АВТО: Полный аудит и план доведения до топ-уровня
 
-Дата аудита: 21 сентября 2026. Метод: 4 параллельных аудита кода (движки `src/engines/lms` + `src/engines/pro`, UI `SRCBBScreen` + parts, сохранность оригиналов циклов, данные/хранилища) + верификация ключевых мест чтением кода. Тесты на момент аудита: `src/engines/lms` — **1025/1026** (1 предсуществующий красный: `pl-auto-regressions` — алиасы на несуществующие id `ohp_bar`/`ohp_seated_db`/`lateral_raise_v2`), `SRCBBScreen_parts` — **144/144**.
-
-Требования пользователя:
-1. ПЛ-авто — топ-инструмент по пауэрлифтингу.
-2. Дублирующие функции — убрать.
-3. Одинаковый дизайн карточек.
-4. **ОРИГИНАЛ ЦИКЛА меняется только по согласованию с пользователем в приложении.**
+**Дата:** 2026-09-27
+**Объём:** ~361 файл (движки 89, UI 26, данные 109, тесты 137)
+**Текущий статус:** Зрелая система. VBT, авторегуляция, DUP, тапер, делод — уже реализованы как движки, но **не интегрированы в генерацию плана** и не доступны пользователю в полном объёме.
 
 ---
 
-## §1. Карта
+## §1. Аудит текущего состояния
 
-Маршрут: `TrainingScreen.tsx` (planningTrack `pl`) → `PlannerPlAuto.tsx:14` → `<SRCBBScreen track="pl">` → `SRCBBInner` (2354 стр.) в `PLTaperProvider` (taper-state.tsx).
+### 1.1. Что уже хорошо (не трогаем)
 
-Табы ПЛ: `settings` (ПМ/PED/питание/сезон), `diagnostics` (LiftMasterCard), `plan` (`PLPlanView` 1186), `charts`, `reference`, `competition` (`PLCompetitionTab` 882), `macro` (`MacrocyclePanel` 3104 + `PLSeasonBuilder` 639), `tools` (`PLToolsCard`).
+| Компонент | Состояние |
+|-----------|-----------|
+| Иммутабельность циклов | `deepFreezeCycleTemplates()` + `cloneCycleTemplate()` — источник правды защищён |
+| Согласие на изменения | `sourceChangeConsent` + `strict_skip` — пользователь контролирует длину цикла |
+| Мост между планировщиками | 17 kinds (`pm`, `weakpoints`, `deload`, `peak`, `cycle`, `macrocycle` и др.) |
+| Персистентность | `he_pl_session` + `he_pl_runtime` + `he_pl_macro` — полное состояние переживает перезагрузку |
+| Облачная синхронизация | `cloud-kv.ts` — кросс-устройство через Supabase |
+| Экспорт | PDF/печать, Excel (.xlsx), Telegram share |
+| Каталог упражнений | 562 записи с биомеханикой, 3-слойное разрешение имён |
+| VBT-движок | `vbt.engine.ts` — LVP, velocity loss, intent zones, калибровка, MVT |
+| Авторегуляция | `autoregulation-pro.engine.ts` — velocity loss, ACWR, readiness, HRV, RPE |
+| DUP | `progression-pro.engine.ts` — id: "dup", 4-недельные циклы |
+| Тапер | `lms-taper.engine.ts` — 3 режима (classic/pl/pro) |
+| Делод | `lms-deload.engine.ts` — объём ×0.5, RIR +3 |
+| Слабые точки | `weakpoint-pl.ts` — 24 точки, 7 движений |
+| Сезонный планировщик | `PLSeasonBuilder` — 4 слота, согласия, авто/ручной выбор |
+| Макроцикл | `MacrocyclePanel` — 5 фаз, соревнования с приоритетами |
+| Тестовое покрытие | 137 тестовых файлов |
 
-Ядро: `buildLMSPlan` (`lms-builder.engine.ts` 2240), реестр 132 шаблонов (`src/data/lms-cycles`, `LMS_CYCLES`), ~35 PL-движков (`lms/*`, `pro/*`). Хранилища: `he_pl_session` (весь экран), `he_pl_macro` (годовой план, v7-сериализация), `he_pl_runtime` (исполнение), `he_lv_profile_ss_v1`, `he_srpe_sessions`.
+### 1.2. Архитектурные проблемы
 
-## §2. Аудит — P0 (ломает доверие/данные)
+| # | Проблема | Серьёзность | Файлы |
+|---|----------|-------------|-------|
+| A1 | **God-файл `lms-builder.engine.ts` (2466 строк)** — смешаны: генерация недель, прогрессия PM, RIR, инъекция слабых точек, PED-адаптация, ACWR, тапер, делод, метрики. Нет разделения на слои. | P1 | `lms-builder.engine.ts` |
+| A2 | **Дублирование логики RIR** — `bbRir()` в bb-builder и `rir-matrix.engine` в LMS — два источника RIR, которые могут расходиться. | P1 | `bb-builder.engine.ts`, `rir-matrix.engine.ts` |
+| A3 | **Авторегуляция не подключена к `buildLMSPlan`** — `autoregulation-pro.engine.ts` и `vbt.engine.ts` существуют, но `buildLMSPlan` их не вызывает. Пользователь не может включить авторегуляцию при генерации плана. | **P0** | `lms-builder.engine.ts`, `autoregulation-pro.engine.ts` |
+| A4 | **DUP не доступен в UI** — `progression-pro.engine.ts` имеет DUP, но `SRCBBScreen` не позволяет выбрать его как режим периодизации. | **P0** | `SRCBBScreen.tsx`, `progression-pro.engine.ts` |
+| A5 | **Слабые точки PL и BB — разные системы** — `weakpoint-pl.ts` (24 точки, 7 движений) и `bb-weakpoint.ts` (группы мышц) не связаны. Пользователь видит два разных интерфейса. | P2 | `weakpoint-pl.ts`, `bb-weakpoint.ts` |
+| A6 | **Сезонный планировщик и макроцикл — параллельные контуры** — `PLSeasonBuilder` (4 слота) и `MacrocyclePanel` (5 фаз) — пользователь не понимает, что выбрать. | P2 | `MacrocyclePanel.tsx`, `PLSeasonBuilder.tsx` |
+| A7 | **VBT не интегрирован в план** — `vbt.engine.ts` работает как отдельный инструмент, но не влияет на генерацию плана. | **P0** | `vbt.engine.ts`, `lms-builder.engine.ts` |
 
-### P0-1. Оригинал цикла не защищён и меняется без согласия
-- `LMS_CYCLES` — мутабельный массив без `Object.freeze` (`lms-cycle-index.ts:149`; единственный freeze в проекте — `rir-table.ts:23`). Шаблоны — обычные интерфейсы без `readonly` (`lms-types.ts:77-87`).
-- `LMSBuildOutput.template` — **ссылка на оригинал** (`lms-builder.engine.ts:1599`): мутация `plan.template` любым будущим потребителем изменит реестр для всех.
-- `buildSrcMacrocycle` (`SRCBBScreen.tsx:451-551`): `weeksOverride: block.weeks` (467) + повтор недель `index % output.weeks.length` (494-497) — растяжение/сжатие/повтор **без согласия и предупреждения**.
-- Годовой план: `loopWeeksToLength` (`block-builders.engine.ts:464-479,525`) повтор/обрезка недель; `selectPLCycleForBlock` (`:568,593-597`) молча **заменяет выбранный цикл** на другой (только warning-строка).
-- `planSeason` при ручном выборе: цикл не найден среди кандидатов → берётся `candidates[0]` (`lms-season.engine.ts:304-314`) — note, но не согласие.
-- `fitCycleToWeeks` — поверхностные копии: элементы `weeks` — ссылки на `SRDaySpec` оригинала (`lms-season.engine.ts:129,144`).
-- `expandCycleWeeks` (`lms-to-pl.ts:29-30`) возвращает ссылки на дни шаблона (потребитель read-only, контракт не защищён).
+### 1.3. Пробелы в интеграции (по интернет-исследованию 2025–2026)
 
-### P0-2. Диалог согласия сезона врёт
-- `PLSeasonBuilder.tsx:377` — `orig = raw.cycle.meta.weeks` берётся из **уже изменённой** производной (для extend/shrink `meta.weeks` = целевой) → тексты «сжать N→N».
-- Кнопка «✕ Оставить как есть 1:1» (`:399-406`) пишет `consents[idx]=false` → `applyFitConsent(false)` = `strict_skip` (`lms-season.engine.ts:170-176`) → сегмент выбрасывается; «1:1» в UI недостижимо.
-- В `lms-comp-gap.engine.ts:225` тот же диалог корректен (берёт `originalCycleWeeks`).
-
-### P0-3. `buildSrc` игнорирует переданные параметры + rationale врёт
-- Аргумент `weeks` не читается (`SRCBBScreen.tsx:398`→`407`).
-- `faithful: true` (`:440`) → `hasExplicitWeeks` (`lms-builder.engine.ts:1132`) → `weeksOverride` игнорируется (`:1134-1136`), `peakMode/taperWeeks/peakCycleId` — no-op (гейт `!faithful && !hasExplicitWeeks`, `:1592`), `phaseVolMod = 1.0` (`:1249`), множители volumeGoal/focus/weak не применяются (`:1289`).
-- При этом rationale безусловно печатает «Объём аксессуаров…», «Приоритет: акцент… (+20% объёма)», «Слабые группы… (+20% объёма)» (`:1572-1574`) — план врёт о применённых опциях.
-- `dupWave` объявлен в `LMSBuildInput` (`:104`) и не используется нигде.
-
-### P0-4. Коррекции моста не доходят до сборки
-- `volumeTarget` — state, который никто не читает (`SRCBBScreen.tsx:759`, устанавливается `:1091`) → панель «Объём» моста — no-op.
-- `priAdjust/rirShiftAdjust/deloadAdjust/peakAdjust/tempoAdjust` используются только в runtime-оверлеях (`:1117-1135`) — таблица плана ≠ SessionPlayer.
-- Kind'ы `program/design/macrocycle/annual_block/methodology/cardio/bb_nutrition` в ПЛ-экране молча съедаются (`:1093-1094`).
-
-### P0-5. «Дневник → план» для ПЛ не замкнут
-- `lms-progression-feedback.engine.ts` (`computePLPlanFeedback`, `summarizePLFeedback`) — без единого продового потребителя (только тесты). Фактически дневник влияет на ПЛ через `diary-autoreg` (`SRCBBScreen.tsx:823`) и `pm-autoreg`.
-
-### P0-6. Фальшивые сохранения/замеры
-- `PLToolsCard.tsx:85` пишет `he_lv_profile_ss_v1` в формате `{60,70,80,slope,intercept}`, канонический читатель ждёт `{[lift]: LVPProfile}` (`strength-sport-lvp-calibration.engine.ts:34`) → «Сохранить LVP» ни на что не влияет.
-- `he_opl_history`/`he_opl_name` (`:35`) — write-only; тост «график DOTS обновится» ложный.
-- Frequency Planner получает вымышленные объёмы `{chest:12,back:10,legs:14,shoulders:8,arms:6,core:4}` (`SRCBBScreen.tsx:1686`); DOTS — от 83 кг male (`PLToolsCard:98`).
-
-### P0-7. Нет разгрузок в PL-пути
-- PL-билдер читает только `meta.deloadWeeks` (`lms-builder.engine.ts:1253`), а его нет у ~93 из 132 циклов; инференс `inferCycleDeloadWeeks` есть только в ББ-конвертере (`cycle-to-plan.ts:964`).
-
-### P0-8. Данные циклов
-- Псевдо-упражнения «Отдых» (`sheiko-32.ts:34`), «Тест: проходка (до макс)» (`candito-6.ts:55` и др.) попадают в КПШ/тоннаж/сессии — фильтров нет.
-- `weakpoint-pl.ts:17-26` теряет 8/63 ассистентов (нет core-fallback/алиасов).
-- 112 из 228 имён упражнений циклов не привязываются к каталогу.
-- `LMS_EXERCISES` — шум из xlsm (`'1050-68'`, `'ОФП'`, `'Тяжелая'`, пары двойников).
-- `sessionsPerWeek` ≠ числу дней в явных неделях (`block-bench-int.ts:15` и др.).
-
-## §3. Аудит — P1 (дубли функций и контролов)
-
-| Что | Где | Дубль |
-|---|---|---|
-| Авторегуляция off/auto/diary | `SRCBBScreen.tsx:1924` | `PLPlanView.tsx:359,562,624`; `PLCompetitionTab.tsx:398-409` |
-| ПМ-поля | `SRCBBScreen.tsx:1474-1523` | `PLPlanView.tsx:590-608`; `PeakingPanel.tsx:180-226` |
-| Настройки тапера (2 разных state одной подписи) | `macroTaperMode` `SRCBB:151` | `peakMode` `taper-state.tsx:70` |
-| Кривые тапера | канон `lms-taper.engine.ts:194` | дословная копия `lms-taper.engine.ts:128-187` = `pl-peak-cycle-taper.engine.ts:118-177`; дубль `weightGoalVolumeMult`, `isoAddDays`; `pro/taper.taperPlan`; `mesocycle-progression.taperCurve` |
-| Прикиды (%) | `competition-attempts.ts:20` | `pl-attempts.engine.ts:19`; `attempt-calculator.engine.ts:10` |
-| e1RM/LVP | `estimate1rm.engine.ts:147` | `vbt.engine.ts:LOAD_VELOCITY_PROFILE` |
-| RPE→% | `autoregulation-pro.engine.ts:20` | `rpe-table.engine.ts:29` |
-| Реестры соревнований | `he_pl_session.plMeetList` | `he_pl_macro.competitions` |
-| Экспорт/печать | `SRCBBScreen.tsx:1831-1855` | `PLPlanView.tsx:1080-1186` |
-| «Оригинальный/С тапером» | `PLPlanView.tsx:467` | `PLPlanView.tsx:1015` |
-| Сценарии | `he_macro_scenarios` | `he_annual_scenarios` |
-| Мёртвые ветки экрана | BB/manual/bridge/peak_bb/methods/analytics/prometrics `SRCBBScreen.tsx:1877-2333` (маунт только `track="pl"`) | — |
-| Мосты | kind `cycle` отправляется (`PeriodizationDesignerTab.tsx:743`), не зарегистрирован; `macrocycle`/`cardio` — обработчики без отправителей | — |
-
-## §4. Аудит — P1/P2 (точечно неработающее, мёртвый код, дизайн)
-
-- `PLCompetitionTab.tsx:520-532` — «ℹ️ в плане» чистит `taperNote`, а он гейт 5 других кнопок → рассинхрон UI и плана.
-- `PLCompetitionTab.tsx:609` — мёртвое выражение `{... && null}`.
-- `MacrocyclePanel` — `activePopup:'competition'` без сеттеров.
-- alert/prompt вместо тостов: `AutoregPanel.tsx:61,64`, `PeakingPanel.tsx:216,224`, `RecoveryPanel.tsx:79,82`, `PlDeadpointsBarPathCard.tsx` (6 мест).
-- `macroTaperMode/macroWeightGoal/macroMockMeet/macroPostMeet` не сериализуются в `he_pl_session` (`SRCBBScreen.tsx:270`) — сброс при перезагрузке.
-- `autoRegOn` — только в deps (`SRCBB:786,1135,1178`).
-- Мёртвый код движков (≈70 экспортов): файл `periodization-methods.ts` (0 ссылок), `lms-progression-feedback`, `pl-peak-cycle-taper.ts:48-87,184` (5 функций), `TAPER_MODE_DESCS`, `hasExplicitWeeks` (экспорт), `buildSeasonWithCompWindow`, `lms-metrics.*` (6), `rpeAttempts`, `limiterCategoriesForLift/limiterOptionsForLift/limiterProtocolFor/analyzeLimiterForLift`, `rpeWeightFor/e1RMFromRpeSet`, `VL_THRESHOLDS/vblLoad/rpeVbtDiscrepancy`, `adjustedLoad`, `planAllFrequencies`, `findBlockByPhase`, `bbTrainingFocusForWeek`, `liftKeyOf`, `findPlCorrection`, `getScheme`, `DOTS_CLASS_TABLE`, `analysesForUnified/UNIFIED_LIFT_RU`, `applicableFormulasForLift/SUPPORTED_LIFTS` и др.
-- Дизайн карточек: эталон `BbCard/BbFoldCard` (`bb-auto-constructor-shared.tsx:113-160`) и `training-ui` CARD/BTN; в ПЛ 7+ независимых наборов токенов: `SRCBBScreen.tsx:88-96` (radius 12, кнопки 40), `PLPlanView.tsx:39-47`, `PLCompetitionTab.tsx:29-30,164`, `RecoveryPanel/AutoregPanel/ProMetricsPanel` (3 копии), `PeakingPanel/TaperCoachCard/SessionPlayer`, `PLToolsCard` (radius 8-10, шрифты 9-10), `TrainingPopups.tsx:233,247`. Серый текст: `SRCBB:1749,1798,1905,2021,2059,2103,2185,2233`, `PLToolsCard:47,48,68,79,80,87`, `BlockView:5,35,42,43`, `MacrocyclePanel:1723,1732`.
-
-## §5. Оригинал цикла — целевой контракт
-
-1. `LMS_CYCLES` и вложенные данные — **deep-freeze** после сборки реестра; dev-ассерт `Object.isFrozen`; `LMSBuildOutput.template` — клон (или `Readonly`).
-2. Единый `cloneCycleTemplate()` на всех границах fit (season/macro/annual/hybrid).
-3. Единый consent-контракт `needsConsent` + `applyFitConsent` — обязателен в: `fitCycleToWeeks` (уже есть), `buildSrcMacrocycle` (нет), годовая сборка `loopWeeksToLength`/`selectPLCycleForBlock` (нет), `planSeason`-substitution (нет).
-4. UI сезона: `orig` — из реестра (`originalCycleWeeks(getCycleById(...))`); кнопка «1:1» — либо реально сохраняет длину цикла (меняя окно), либо честно называется «Пропустить слот (раскладка не изменена)».
-5. Snapshot-тесты `JSON.stringify(LMS_CYCLES)` до/после всех UI-путей (single/season/gap/annual/macro/hybrid); движковые гарды уже есть (`pl-audit-original-preserve.test.ts`).
+| # | Проблема | Что есть | Чего не хватает | Приоритет |
+|---|----------|----------|----------------|-----------|
+| I1 | **Авторегуляция не влияет на план** | `autoregulation-pro.engine.ts` с velocity loss, ACWR, readiness | Вызов из `buildLMSPlan` → корректировка объёма/RIR на следующей неделе | **P0** |
+| I2 | **VBT не подгружает вес** | `vbt.engine.ts` с LVP, velocity loss, intent zones | Автоматическая подгрузка веса по скорости разминочного подхода | **P0** |
+| I3 | **DUP не выбираем** | `progression-pro.engine.ts` с DUP | Выбор DUP в UI → генерация плана с чередованием зон | **P0** |
+| I4 | **Тапер не адаптируется** | `lms-taper.engine.ts` с 3 режимами | Тапер на основе тренда скорости: если скорость растёт → сократить, падает → продлить | P1 |
+| I5 | **Делод не автоматический** | `lms-deload.engine.ts` с фиксированными параметрами | Авторегулируемый делод: ACWR > 1.3 → делод, скорость упала > 10% → делод | P1 |
+| I6 | **Пик-неделя не автоматическая** | `lms-peak-block.engine.ts`, `PeakingPanel` | Автоматическая пик-неделя: снижение объёма 40–50%, поддержание интенсивности | P1 |
+| I7 | **Слабые точки не инъецируются автоматически** | `weakpoint-pl.ts` с 24 точками | Автоматическая инъекция: диагностика → выбор упражнений → вставка в план | P1 |
+| I8 | **Детренированность не учитывается** | Нет | Учёт пауз: 14 дней без тренировки → снижение PM на 5–10% (Yilmaz 2026, JSCR) | P2 |
+| I9 | **Метаданные циклов неполные** | 136 циклов с базовыми метаданными | Нет полей `evidenceLevel`, `bestFor`, `timeCommitment`, `equipmentNeeded`, `periodization` | P1 |
+| I10 | **Нет фильтра по оборудованию** | Циклы не знают, какое оборудование нужно | Пользователь с домашним залом получает план со штангой | P1 |
 
 ---
 
-## §6. Фазы выполнения
+## §2. План доработок
 
-### Фаза 0 — сохранность оригинала (P0) — ✅ ВЫПОЛНЕНА (21.09.2026)
-- 0.1 ✅ NEW `src/data/lms-cycles/lms-cycle-clone.ts` (`cloneCycleTemplate`/`cloneCycleDay`/`deepFreezeCycleTemplates`); реестр глубоко заморожен в `lms-cycle-index.ts`; `LMSBuildOutput.template` — клон (`lms-builder.engine.ts`). Мутация оригинала теперь бросает TypeError.
-- 0.2 ✅ `fitCycleToWeeks` (`lms-season.engine.ts`) строит производные через deep-clone (exact/extend/shrink), без ссылок на `SRDaySpec` оригинала.
-- 0.3 ✅ `PLSeasonBuilder.tsx`: `orig` — из реестра (`originalCycleWeeks`), кнопка отказа честно «✕ Пропустить слот (цикл не меняем)» (было лживое «1:1», выполнявшее strict_skip).
-- 0.4 ✅ `MacrocyclePanel.tsx`: панель `data-pl="macro-fit-consent"` со списком «цикл X нед → блок Y нед»; «Применить весь макроцикл» и «Начать работу по циклу» заблокированы до согласия; отзыв согласия возвращает блокировку; без расхождений панели нет (байт-в-байт поведение).
-- 0.5 ✅ NEW `pl-cycle-immutability.test.ts` (9) + `pl-consent-gates.test.tsx` (4); `tsc --noEmit` 0; круги lms+UI — 1169/1170 (красный — предсуществующий `pl-auto-regressions`), расширенный круг 1369/1371 (второй красный — предсуществующий `annual-audit-fixes-2026-08`, размер года 2583.7 КБ BB-пути, к PL не относится).
+### Фаза 1: Интеграция авторегуляции и VBT в генерацию плана (P0)
 
-### Фаза 1 — честность плана (P0) — ✅ ВЫПОЛНЕНА (21.09.2026), политика «тексты честные, математику не менять»
-- 1.1 ✅ `lms-builder.engine.ts`: rationale в faithful больше не обещает «+20% объёма» по volumeGoal/focusLift/weakPoints — печатает «в дословном режиме не применяется» / «ассистенты добавлены сверху»; удалён мёртвый `dupWave`; docs `peakMode/taperWeeks/peakCycleId` помечены no-op при faithful. `buildSrc` (`SRCBBScreen`): убран weeks-аргумент (тихий no-op), из сборки убраны no-op тапер-параметры; кнопка/`cycleWeeks` показывают реальную длину оригинала; при применении блока года с другой длиной — честная заметка; баннер правки PL-блока больше не обещает «сохранить недели» (сохранение доступно только ББ).
-- 1.2 ✅ `volumeTarget` (мёртвый state) удалён; мост kind `volume` теперь честно сообщает, что посетовый объём не применяется к дословному плану.
-- 1.3 ✅ `lms-progression-feedback` помечен `@deprecated` с причиной (нет потребителя; подключение изменило бы математику — отложено решением).
-- 1.4 ✅ `PLToolsCard`: Frequency Planner получает реальные объёмы из `plVolumeLandmarks` (хардкод 12/10/14/8/6/4 убран, пусто → честная подсказка); DOTS — реальный вес/пол профиля (+честная пометка фолбэка и `data-pl="dots-line"`); LVP сохраняется в каноническом формате `{[lift]: LVPProfile}` (+статус, было — мёртвый плоский формат); OPL-тост без ложного обещания.
-- 1.5 ⏸ PL-делод (`inferCycleDeloadWeeks` в PL-путь) — отложено: меняет сами планы (политика «математику не менять»), требует отдельного решения/согласия.
-- Бонус-честность: `buildSrcMacrocycle` помечает в rationale недели без собственного цикла («использована ближайшая тренировочная раскладка»).
-- Тесты: NEW `pl-rationale-honesty.test.ts` 3/3 + `pl-tools-card.test.tsx` 5/5; `tsc --noEmit` 0; круг lms+SRCBBScreen_parts 1190/1191 (красный — предсуществующий `pl-auto-regressions`).
+**Цель:** Подключить существующие движки авторегуляции и VBT к `buildLMSPlan`.
 
-### Фаза 2 — дубли (P1) — ✅ ВЫПОЛНЕНА ПОЛНОСТЬЮ (21.09.2026 безопасная часть; 23.09.2026 — остаток 2.2, см. §10.4)
-- 2.1 ✅ Один селектор авторегуляции: NEW `AutoRegModeSwitch.tsx` (канон меток «ВЫКЛ/🤖 Авто/📓 Авто-дневник», aria-pressed, title) — заменены 4 копии (`PLPlanView` ×3, `PLCompetitionTab` ×1); локальные `segBtn/arBtn` удалены, source-guard-тест.
-- 2.2 ✅ Тапер-канон: удалена дословная inline-копия `buildPeakCycleCurveInline` — канон `buildPeakCycleTaperCurve` теперь один в `lms-taper.engine`, `pl-peak-cycle-taper` ре-экспортирует (круговой импорт разорван). **Остаток закрыт 23.09.2026 (§10.4 п.5)**: `pro/taper.taperPlan` строит витринную кривую через канон `buildPLTaperCurve({mode:'pro'})` (числа 1-в-1, паритет-тест); `mesocycle-progression.taperCurve` остаётся единственной реализацией pro-кривой ВНУТРИ канона — не дубль.
-- 2.5 ✅ Мёртвые ветки `SRCBBScreen` удалены: BB-план, manual-заглушка, bridge, BB-tools, peak_bb/methods/analytics/prometrics/bb-charts (358 строк) + осиротевшие импорты/`deriveHints`/группы табов; `subViewList.bb/manual` = []; файл 2424→2067 строк (скрипт-хирургия `.tmp/pl-deadcode-surgery.mjs` с маркер-ассертами, проверено чтением).
-- 2.6 ✅ Мост `kind cycle` зарегистрирован: тип `CyclePayload` в `planner-bridge.ts` (без `as any`), дизайнер шлёт payload + `planning-track-open('pl')`, `SRCBBScreen` применяет свежий payload (ts ≤ 5 мин) при монтировании и пересобирает план. NEW тест `bridge-cycle` 4/4.
-- 2.3 ✅ Один набор % прикидов: `pro/pl-attempts.engine` (StrengthAnalysisHub) переведён на канон `MEET_STRATEGY_PCT` (`competition-attempts`): safe→conservative 90/95.5/100, standard→balanced 92/96/102, record→aggressive 93/97/105; второй набор 92.5/97.5/102.5 удалён. Осознанный re-baseline `strength-hub-p5` (180 кг: 167.5/175/185 → 165/172.5/182.5) с комментарием «было→стало».
-- 2.4 ✅ **Единый реестр стартов** (решение пользователя «да — делай»): NEW `pl-meet-registry.engine.ts` — канон `he_pl_macro.competitions` (id/неделя года/дата/приоритет), `plMeetList` остаётся надстройкой (федерация/заявленные ПМ/стратегия); `mergeMeetRegistry` делает lossless-миграцию обоих направлений (легаси-старт → событие года; событие без старта → старт с дефолтами; склейка по id/имени; неделя года главнее при конфликте), `syncCompetitionsFromMeets` — обратная запись upsert/удаление с сохранением `notes/cycleId/cycleIds`. Вшито: `SRCBBScreen` гидратирует слияние при монтировании и по `he-pl-macrocycle-updated`, обратно пишет старты; **фикс**: правки `competitions` в `MacrocyclePanel` теперь персистятся в `he_pl_macro` (раньше терялись при перезагрузке, если не жать «Построить макроцикл»). Если год не построен — поведение прежнее (локальный список, без выдумывания событий). Тесты: `pl-meet-registry` 8/8 + wiring-гард 2/2; круги 1212/1212.
-- 2.7 ✅ Единый контур печати/переключателя: NEW `CalendarViewSwitch` — один компонент в обоих местах `PLPlanView` (дубль разметки убран, aria-pressed, guard-тест); печать тапера в `PLCompetitionTab` сведена к одному `handlePrintTaperPlan` (inline-копия `window.open` удалена, канон `buildPLTaperPrintHtml` получил опциональную строку данных `metaLine` — федерация/стратегия/ПМ); экспорт из «Справки» и `PLPlanView` уже используют один `pl-export.ts` — подтверждено, дублей реализации нет.
-- Проверено: `tsc --noEmit` — по моим файлам 0 (2 ошибки в `ArticlesScreen.tsx` — чужой коммит `2a907558a` параллельного агента, не тронут); круги lms+SRCBBScreen_parts 1193/1194 и расширенный (TrainingScreen_parts 1392/1392 + мосты) 1241/1242 — единственный красный предсуществующий `pl-auto-regressions`; unhandled `URL.revokeObjectURL` (ExerciseLabMerged) — чужой предсуществующий.
+#### 1.1. Интеграция авторегуляции
 
-### Фаза 3 — единый дизайн (P1) — ✅ ВЫПОЛНЕНА ПОЛНОСТЬЮ (21.09.2026 токены+цвет; 22.09.2026 структура)
-- ✅ Токены едины: `SRCBBScreen`, `PLPlanView`, `PLCompetitionTab`, `TaperCoachCard`, `SessionPlayer` больше не определяют локальные `CARD/SMALL/BTN/BTN_GHOST/IN` — импорт из кита `TrainingScreen_parts/training-ui` (единые радиусы 16/12, стекло, кнопки 44px).
-- ✅ Серый→белый: 37 замен `color: rgba(255,255,255,0.xx)` → `#fff` в 9 живых PL-файлах (рамки/фоны не тронуты; печать `pl-export.ts` исключена).
-- ✅ Guard-тест `pl-card-design` (нет локальных токенов, нет серого текста, карточные файлы импортируют кит).
-- ✅ **Структурная миграция на `BbCard/BbFoldCard` (22.09.2026)**: кит перенесён в `training-ui.tsx` (единственный набор; `bb-auto-constructor-shared.tsx` — ре-экспорт), `BbCard`/`BbFoldCard` получили аддитивные `right/className/id/style`/`right`-слот у fold.
-  - `PLPlanView.tsx`: шапка плана → `BbCard` (📋 + бейдж календаря), «Как собран план»/«Расчёты цикла»/«Прогрессия ПМ» → `BbFoldCard`, «Слабые точки СРЦ» → `BbCard`.
-  - `PLSeasonBuilder.tsx`: корень → `BbCard` (🧩 + переключатель режима в `right`), «Циклы между соревнованиями» → `BbFoldCard defaultOpen` (интерактив согласий не прячется).
-  - `PLToolsCard.tsx`: все 6 блоков — кит (OPL → fold, Frequency → fold `right=«Применить в план»`, Attempt/Traffic/VBT/Sheiko → `BbCard`).
-  - `PLCompetitionTab.tsx`: корень → `BbCard` (🏁, статус-строка в `right`).
-  - `MacrocyclePanel.tsx`: локальный `SectionCard` удалён → `BbCard` («Фазы», «Макроцикл (вертикально)», «Сборка года по конструкторам»); `SectionHead` остаётся заголовком под-секций.
-  - `SRCBBScreen.tsx`: «Питание», heatmap объёма, «Тренды e1RM», «Тапер/пик в макроцикле» → `BbCard`.
-  - `BlockView.tsx`: PowerSheets → `BbFoldCard` (свёрнут по умолчанию, класс `.pl-blockview` сохранён).
-  - `TrainingPopups.tsx`: `ExpandableCard`/`MetricCard` → кит-стиль (иконка-тайл + 12.5/800 + верхняя кромка; `.pl-expandcard`/`.pl-metriccard` и тексты «▼ подробнее/▲ свернуть» сохранены, у fold — `aria-expanded`). Обвязка/тайл/заголовок/бейдж вынесены в кит-хелперы `bbCardChrome/bbIconTile/bbCardTitle/bbCardBadge` (training-ui) — попапы берут значения оттуда, локальных копий нет (DOM не менялся: APK-слой `styles-native` селекторы `.pl-expandcard > …` целы).
-  - `SessionPlayer.tsx`: только шапки — верхняя кромка акцента + заголовок недели 12.5/800.
-  - DOM-контракты: re-baseline только 3 ассертов `🧩 Сборка года по конструкторам` → `Сборка года по конструкторам` (иконка вынесена в тайл), комментарии «было→стало».
-  - Guard расширен: живые PL-файлы обязаны использовать `BbCard`/`BbFoldCard` из кита, локальных `SectionCard`-дублей нет, `TrainingPopups` берёт обвязку из кит-хелперов (`bbCardChrome`/`bbIconTile`, без локальных литералов кромки/тайла), добавлены DOM-дампы кита и живой карточки (`BlockView`) с проверкой кромки/тайла/12.5/aria-expanded.
-- Проверено: `tsc --noEmit` 0 по всему проекту; `SRCBBScreen_parts` 168/168; `TrainingScreen_parts` 1397/1397 (+чужой unhandled `revokeObjectURL`); `src/engines/lms` 1049/1049; `verify:apk-design` OK.
+**MOD `lms-builder.engine.ts`:** Добавить вызов `autoregulation-pro.engine.ts`:
+```typescript
+// После генерации недель, перед тапером
+if (input.autoregMode && input.autoregMode !== 'off') {
+  const autoreg = computeAutoregulation({
+    velocityLoss: input.velocityLoss,
+    acwr: input.acwr,
+    readiness: input.readiness,
+    hrv: input.hrv,
+    sleep: input.sleep,
+    fatigue: input.fatigue,
+    lastRpe: input.lastRpe,
+    goal: input.goal,
+  });
+  weeks = applyAutoregToWeeks(weeks, autoreg);
+}
+```
 
-### Фаза 4 — гигиена данных и кода (P2) — ✅ ВЫПОЛНЕНА ПОЛНОСТЬЮ (21.09.2026 часть; 23.09.2026 — остаток §3/§4 и данных, см. §10.4)
-- ✅ Алиасы циклов приведены к существующим id каталога (после keep-first дедупа): `ohp_bar→ohp`, `ohp_seated_db→bench_db` («жим гантелей вниз головой»), `lateral_raise_v2→lateral_raise` / `front_raise_db` («перед собой»); добавлен комментарий-контракт. **Красный `pl-auto-regressions` позеленел** — круг lms+SRCBBScreen_parts **1197/1197, 0 падений**.
-- ✅ Удалён мёртвый файл `src/engines/lms/periodization-methods.ts` (0 импортёров, включая тесты) + осиротевшие `bbChart` и `methodHints` в `SRCBBScreen`/`PLPlanView` (сеттер жил только в удалённой BB-вкладке «Методики» — бейдж был недостижим).
-- ✅ Псевдо-упражнения источника («Отдых», «Тест: проходка (до макс)») больше не портят метрики: NEW `isPseudoExercise` в `lms-metrics.engine`, фильтр в `calcSessionMetrics` (и, через него, в `calcCycleMetrics`/`calcCycleMetricsAggregate`) — не идут в КПШ/тоннаж/интенсивность и не считаются в `exerciseCount`; строки в плане/UI сохранены. NEW `pl-metrics-pseudo.test.ts` 3/3. Круг lms+UI **1200/1200**.
-- ℹ️ Проверка «мёртвых экспортов» (`TAPER_MODE_DESCS`, `hasExplicitWeeks`, `buildSeasonWithCompWindow`, `liftKeyOf`, UI-хелперы `pl-peak-cycle-taper`) показала: они залочены собственными тестами (10 тестов) → удаление отменено, API сохранён (не мёртвое по контракту). **Хвост закрыт 23.09.2026 (§10.4 п.9)**: реально мёртвые (без потребителей и тестов) удалены (`planAllFrequencies`, `analysesForUnified`, `UNIFIED_LIFT_RU`, `DOTS_CLASS_TABLE`, `findPlCorrection`).
-- ✅ Висячие ссылки замен вычищены: в `exercise-catalog.ts` 57 ссылок `'ohp_bar'`/`'ohp_seated_db'` → живые `'ohp'`/`'db_press'` (записи-определения вытесненных id не тронуты, id-count ассертился скриптом); также `bb-builder` (мёртвый id в пуле), `bb-stimulus-target` (2 списка), `bb-sfr-db` (мёртвый ключ → `db_press`), `bb-exercise-levels` (дубль-ключ `ohp_bar`), `pl-correction-exercises` (`canReplace`). Теперь правила замен/SFR/регрессий реально работают. Круги зелёные (lms+UI+bb-target: **1231/1231**).
-- 🔍 Замер `sessionsPerWeek` vs явные недели (probe, удалён): 24 цикла с расхождением, из них **19 — плановые короткие недели делода/тейпера** (cycle-07, block-*, sheiko-*, smolov, candito-6, wendler-*, rts-9, tsa-9 и др. — метаданные = типовая неделя, менять не нужно), **5 — реальный дефект данных**: `juggernaut-2`, `korte-3x3`, `cube`, `russian-squat`, `src2-solovyov-bench-28` хранят **одну сессию в неделе** при заявленных 3–4×/нед (план из них = 1 сессия/нед). Правка размножит сессии по неделям → **меняет планы** (объём ×3–4) — вынесено на решение; альтернатива без смены математики (spw=1 + исключение из 3–4-дневных подборов) делает честными метаданные, но циклы становятся неприменимы на 3–4 днях.
-- ✅ **Решение пользователя по 5 дефектным циклам**: корректно пересобрать нельзя → **удалены** `juggernaut-2`, `korte-3x3`, `cube`, `russian-squat`, `src2-solovyov-bench-28` (файлы + индекс + `SPEED_CYCLE_IDS`); реестр 132→127, PL-циклов 89→84, advanced-фильтр 66→65 (re-baseline с комментариями). Круги lms+UI **1238/1238**.
-- ⏸ Решение пользователя: PL-делод-инференс — **не делаем** (зафиксировано).
-- ✅ Остаток закрыт 23.09.2026 (§10.4): dead bio-маппинг вытесненных id — закрыт ещё в P2-раунде (57 ключей, lock «0 мёртвых»); §3/§4-хвосты (alert/prompt, macro-персист, e1RM/LVP, RPE→%, taper-канон, kinds моста, weakpoint-pl 8/63) — все закрыты. Записи-определения вытесненных id в каталоге остаются принятой границей (keep-first их не пропускает; удаление задело бы id-count-ассерты — отдельное решение). Полная структура `BbCard/BbFoldCard` — ✅ выполнена в Фазе 3 (22.09.2026).
+**MOD `SRCBBScreen.tsx`:** Добавить переключатель авторегуляции в настройки:
+- `off` — без авторегуляции
+- `rpe` — по RPE
+- `vbt` — по скорости
+- `hybrid` — комбинация
 
-## §7. Критерии готовности
-- Любой UI-путь не меняет `LMS_CYCLES` (snapshot-тест) и не применяет изменённый цикл без явного согласия.
-- `tsc --noEmit` 0; PL-тесты зелёные (кроме документированного `pl-auto-regressions`).
-- Каждая фаза — отдельные коммиты строго pathspec своих файлов, чужие WIP не тронуты.
+#### 1.2. Интеграция VBT
 
-## §8. Границы (не делаем в Фазе 0)
-- Пересборка архитектуры сезона/годового плана «с нуля» — только точечные consent-гейты.
-- Изменение математики ПМ/тапера/объёмов — Фаза 1+.
-- Дизайн-миграция карточек — Фаза 3 (после честности).
+**MOD `lms-builder.engine.ts`:** Добавить вызов `vbt.engine.ts`:
+```typescript
+// После расчёта весов
+if (input.vbtEnabled && input.warmupVelocity) {
+  const vbtResult = estimate1RMFromVelocity(input.lift, input.warmupVelocity, input.warmupWeight);
+  // Корректировка рабочего веса на основе оценки 1RM
+  weeks = adjustWeeksByVBT(weeks, vbtResult);
+}
+```
 
-## §9. Промпт Фазы 3-остатка — ✅ ВЫПОЛНЕН (22.09.2026), историческая запись
+**MOD `SessionPlayer.tsx`:** Добавить ввод скорости разминочного подхода → рекомендация рабочего веса.
 
-> Статус: задача выполнена в раунде 22.09.2026 (см. Фазу 3 §6 и запись в AGENTS.md).
-> Кит вынесен в `training-ui.tsx`; все 9 живых PL-файлов + `TrainingPopups` переведены на
-> `BbCard`/`BbFoldCard`; guard расширен на структуру и DOM-дампы; круги зелёные.
-> Ниже — исходный промпт (для истории).
+#### 1.3. Тесты
 
-> **Задача**: довести структурную подачу карточек ПЛ-авто до эталона `BbCard`/`BbFoldCard`
-> (`src/ui/screens/TrainingScreen_parts/bb-auto-constructor-shared.tsx`) — не только токены/цвета
-> (это уже сделано), а структуру: иконка-тайл + заголовок 12.5/800 + верхняя кромка акцента,
-> сворачиваемые секции (`BbFoldCard`) для длинных блоков. Только Edit/Write + vitest/tsc;
-> чужие WIP не трогать; коммиты строго pathspec.
->
-> **Область (живые PL-файлы)**: `SRCBBScreen.tsx`, `SRCBBScreen_parts/PLPlanView.tsx`,
-> `PLCompetitionTab.tsx`, `PLSeasonBuilder.tsx`, `PLToolsCard.tsx`, `MacrocyclePanel.tsx`
-> (SectionCard → BbCard), `SessionPlayer.tsx` (только шапки карточек, не логика), `BlockView.tsx`,
-> `TrainingPopups.tsx` (ExpandableCard/MetricCard → единый fold-стиль).
->
-> **Обязательные условия**:
-> 1. DOM-контракты сохранить: тексты/роли/aria/`data-*`-хуки не переименовывать (159 UI-тестов
->    SRCBBScreen_parts должны пройти без правок; при неизбежном изменении — re-baseline с
->    комментарием «было→стало»).
-> 2. `BbCard` импортировать из `bb-auto-constructor-shared.tsx` (или вынести общий кит в
->    `training-ui.tsx`, если импорт из BB-файла создаёт цикл) — без третьего набора токенов.
-> 3. Сворачивать только длинные вторичные блоки (детали цикла, отчёты, справка), критичные
->    статусы (план/вердикт/требуется согласие) оставлять развёрнутыми.
-> 4. Прогон: `tsc --noEmit` 0; `SRCBBScreen_parts` + `TrainingScreen_parts` + `src/engines/lms`
->    зелёные; `verify:apk-design` OK; скриншот-проверка структуры через DOM-дамп (заголовок+иконка+крем).
-> 5. Обновить AGENTS.md (запись раунда) и §6 Фазы 3 этого плана.
->
-> **Критерий готовности**: карточки ПЛ визуально и структурно неотличимы от ББ-авто (один кит,
-> одинаковые шапки/кромки/фолды), все круги зелёные, новых токенов/копий разметки ноль
-> (guard-тест `pl-card-design` расширить на структуру: `BbCard`/`BbFoldCard` используются,
-> локальных `SectionCard`-дублей нет).
+- `lms-autoreg-integration.test.ts` — 10 тестов (интеграция в buildLMSPlan, режимы, граничные случаи)
+- `lms-vbt-integration.test.ts` — 8 тестов (подгрузка веса, корректировка плана)
 
-## §10. Аудит-раунд Sep 22 2026 (P0/P1 + P2) + делод по кнопке — ✅ ВЫПОЛНЕНО ПОЛНОСТЬЮ
+---
 
-Полный аудит 4 направлений (движки/UI/данные/статус плана) с перепроверкой чтением; закрыто:
+### Фаза 2: DUP как режим периодизации (P0)
 
-- **Делод по кнопке (запрос пользователя)**: NEW `src/engines/lms/lms-deload.engine.ts`
-  (`pickDeloadWeeks`/`applyPLDeload`/`planHasDeload`): делод применяется к САМОМУ плану
-  (объём ×volumeMult, RIR+shift, флаг `deload`, пересчёт метрик дня/цикла/landmarks),
-  защищённые недели (meet/mock/post/taper) и повторные клики пропускаются с причиной,
-  пустой список недель → ближайшая подходящая от текущей; вход не мутируется.
-  Проводка: `SRCBBScreen` (buildSrc/buildSrcMacrocycle/мост kind `deload`/реальный
-  «↩ Убрать делод»), конфиг персистится (`plDeloadCfg`) и переприменяется при сборке;
-  `PLPlanView` — маркер `🔋`, баннер `data-pl="deload-banner"`, кнопка `data-pl="deload-remove"`.
-  Тесты: `pl-deload` 7/7, `pl-deload-wiring` 6/6.
-- **P0**: `selectedCycleId` удалённого цикла больше не роняет план (`PLPlanView:979` guard +
-  валидация при загрузке сессии); `he_pl_session` пишется merge-записью — больше не теряет
-  `season`, `peds/pedDoses/courseIntensity` и deload-конфиг.
-- **P1**: mrv-мост в ПЛ — честная заметка (а не тихий no-op); «ℹ️ в плане» → реальный
-  «↩ Убрать тапер из плана» (снимок недель `he_pl_prev_weeks_v1`); `progressionRationale`
-  уважает `pmCap` (+тесты); `detectLift('Приседания из ямы')` → squat (+тесты); `pl-tonnage-gate`
-  флагает только РОСТ, снижение — заметка `ok` (+тесты); тихие catch моста → заметки;
-  слабая сторона диагностики (`diagnosticWeakSide`) доезжает до плана/сезона/пролётов;
-  сезон: индексы `consents/selections` больше не съезжают (`slotIndex`, `enabledIdxOf`,
-  swap при перемещении, персист вкл/выкл); нулевое окно между стартами даёт НЕ пустую
-  стартовую неделю (+тест).
-- **P2 (часть)**: `rpeAttempts` → канон `MEET_STRATEGY_PCT`; удалён мёртвый `TAPER_MODE_DESCS`;
-  CJK в `training-load`; неиспользуемый `tw` в `pro/taper`; мёртвый JSX в `PLCompetitionTab`;
-  честные тексты (PED-белок, федерация, правка недели); полный словарь `PL_WEAKPOINT_LABELS`;
-  чистка импортов `PLPlanView`.
-- **Проверено**: `tsc --noEmit` 0; `src/engines/lms`+`SRCBBScreen_parts` **1241/1241 (74 файла)**;
-  `TrainingScreen_parts` **1400/1400 (154 файла)** (+чужой unhandled `revokeObjectURL`);
-  `verify:apk-design` OK.
+**Цель:** Сделать DUP доступным в UI и интегрировать в генерацию плана.
 
-### §10.1 Промт сессии P2 — ✅ ВЫПОЛНЕН ЦЕЛИКОМ (Sep 22 2026, см. §10.2)
+#### 2.1. DUP в UI
 
-> Задача: закрыть остаток P2 аудит-раунда ПЛ-авто (Sep 22 2026). Репо `D:\BodyBuildHealth`.
-> Никаких изменений математики планов без явного согласия; только Edit/Write + vitest/tsc;
-> чужие WIP не трогать; коммиты строго `git commit -m ... -- <свои файлы>`; НЕ пушить.
->
-> 1. Персист черновиков тапера: `taper-state.tsx` — `taperPlan` и `taperAttemptOverride`
->    не сохраняются в `he_pl_session` (после F5 карточка «📋 Тапер-план» пустая, кнопки
->    печати/сохранения disabled, хотя статус «тапер: встроен/готов» — главный писатель в
->    `SRCBBScreen` merge-запись уже есть, добавь `plTaperPlan`/`plTaperAttemptOverride`
->    (кап по размеру, `validateSavedSrc`-подобная проверка формы) + восстановление.
->    Тест: ремаунт провайдера видит план; битый стор → пусто.
-> 2. Мёртвый код UI: `SRCBBScreen.tsx` — неиспользуемые импорты/state (bridgeSessions/
->    bridgeWeek/bridgeAutoreg/progressSnap/peakRirTarget/appliedMethods/PL_WP_OPTIONS/
->    toggleWeak/WEAK_GROUPS и список из аудита), если удаление не ломает tsc — убрать;
->    `PeakingPanel.tsx` (41КБ) и `ProMetricsPanel.tsx` (29КБ) не смонтированы нигде —
->    принять решение: подключить или помечены `@deprecated` с причиной.
-> 3. `PLToolsCard` OPL-импорт: пишет `he_opl_history`/`he_opl_name` без читателя — либо
->    отрисовать историю (DOTS-график), либо убрать запись и оставить честную подсказку.
-> 4. Данные циклов (аккуратно, lock-тесты обязательны): нормализация RPE/T-суффиксов имён
->    («Присед @RPE8», «Жим лежа T2») в резолвере `lms-builder` (`findCatalogExerciseByLabel`),
->    мёртвые ключи `exercise-id-mapping.ts` (42 шт — стираются keep-first дедупом),
->    гард `pct > 1.1` (15 проходок) в валидации/движке; `LMS_EXERCISES` (xlsm-шум) — merge
->    с каталогом по плану §3.0 (реальные id/имена), без выдуманных упражнений.
-> 5. `assembleSeasonPlan` при полной блокировке согласием подставляет `LMS_CYCLES[0]` как
->    template с пустыми метриками — заменить на честный `null`-шаблон/флаг или первый
->    сегмент плана, покрыть тестом.
-> 6. Памятка: полный прогон `npx vitest run src/engines/lms src/ui/screens/SRCBBScreen_parts
->    src/ui/screens/TrainingScreen_parts` + `tsc --noEmit` (NODE_OPTIONS=12GB) + `verify:apk-design`;
->    обновить AGENTS.md и §10 этого плана.
+**MOD `SRCBBScreen.tsx`:** Добавить выбор режима периодизации:
+- `linear` — линейная прогрессия (текущая)
+- `dup` — DUP с чередованием зон
+- `block` — блочная периодизация
 
-### §10.2 Результат P2-остатка (Sep 22 2026) — ✅ выполнено кодом, без изменения математики планов
+#### 2.2. DUP в генерации плана
 
-1. **Персист тапера** — `taper-state.tsx`: `validateSavedTaperPlan` (weeks/days/exercises +
-   `template.meta`) и `validateSavedTaperAttemptOverride` (числа 0..3); восстановление в
-   `usePLTaperState`; merge-запись `he_pl_session` в `SRCBBScreen` пишет `plTaperPlan`
-   (кап `TAPER_PLAN_PERSIST_MAX_CHARS = 1_500_000` символов; `null` = честная очистка) и
-   `plTaperAttemptOverride`. Тесты: ремаунт провайдера видит план/прикиды; битый стор → пусто;
-   отсутствие ключей — обратная совместимость (`taper-state` 3→6).
-2. **Мёртвый код UI** — `SRCBBScreen`: удалён write-only мост план→сессия
-   (`he_bridge_sessions`/`he_bridge_progress`, `bridgeSessions/bridgeAutoreg/progressSnap/
-   bridgeWeek` + мемо), `WEAK_GROUPS/toggleWeak/PL_WP_OPTIONS/PL_WEAKPOINT_LABELS/peakRirTarget/
-   appliedMethods/BB_WM_KEYS/BB_WM_RU/setBbWm/displayPhaseForWeek/weekVolumeOf`, неиспользуемые
-   деструктуризации тапер-контекста и 44 импорта; `PLPlanView` — api без `bridgeSessions/
-   setBridgeWeek/bridgeWeek` (и без типа `BridgeSession`). Решение по панелям без маунта:
-   `PeakingPanel`/`ProMetricsPanel` → `@deprecated` с причиной (тапер/пик — `PLCompetitionTab`+
-   `TaperPlannerTab`, ББ-преп — `BbAutoConstructor`; `FFChart` из ProMetrics живой).
-   Source-guard — в новом `pl-p2-data-hygiene`.
-3. **OPL** — `PLToolsCard` читает `he_opl_history` при монтировании и рисует
-   `data-pl="opl-history"` (SVG DOTS + лучший старт + диапазон дат); запись `he_opl_name`
-   удалена; битый стор → пусто. Тесты `pl-tools-card` 5→8.
-4. **Данные циклов** — `stripCycleNotation` + экспорт `findCatalogExerciseByLabel`;
-   +5 alias (`бицепс стоя со штангой`, `разгиб. с гантелью из-за головы`, `приседания со
-   штангой на груди`, `жим лежа с паузой`, `тяга в наклоне`); 57 мёртвых ключей
-   `exercise-id-mapping.ts` удалены; `LMS_EXERCISES` 78→73 с реальным `catalogId` у каждой
-   записи (шум xlsm удалён); `MAX_SOURCE_SET_PCT = 1.3` — единый гард для 15 проходок
-   (>110%, макс 129.25%) в 7 циклах, UI-редактор `% ПМ` до 130%. Lock-тесты:
-   `pl-p2-data-hygiene` 14/14.
-5. **Сезон** — `assembleSeasonPlan` при полной блокировке: `blocked: true`, `template` =
-   цикл первого сегмента или пустой шаблон-заглушка (никакого чужого `LMS_CYCLES[0]`);
-   `lms-season` 26→29.
-6. **Проверено** — `tsc --noEmit` 0 по всему проекту (12GB); `src/engines/lms` 52/1082;
-   `SRCBBScreen_parts` 23/182; `TrainingScreen_parts` 154/1402 (+чужой unhandled
-   `revokeObjectURL`); `verify:apk-design` OK. Коммит pathspec своих файлов, без пуша.
+**MOD `lms-builder.engine.ts`:** При `periodization === 'dup'`:
+- Генерировать недели с чередованием зон (гипертрофия → сила → пик)
+- Прогрессия PM внутри каждой зоны
+- Делод каждые 4–6 недель
 
-### §10.3 Остатки после P2 (зафиксированы и выполняются, Sep 22 2026)
+#### 2.3. Тесты
 
-Записаны честные «не полностью» из отчёта P2-остатка; порядок = безопасность/ценность.
+- `lms-dup-integration.test.ts` — 8 тестов (генерация DUP-плана, чередование зон, прогрессия)
 
-1. **⏸ BB-ветка `SRCBBScreen`** — оставлено неактивным резервом (решение Sep 23 2026, код не менялся). Экран монтируется только
-   `track="pl"` (`PlannerPlAuto`), `setMainTab` зовётся только с `'pl'` → недостижимы
-   `buildBb`, `applyBBMacrocycle`, `bbDaysArr`, `builtBb/bbWeekSel/bbWorkMax/bbGoal/...`,
-   ветка `'bb'` pending-apply и роутинг `applyExternal` по bb-циклам. Удаление ветки —
-   крупная операция: `bbLevel` завязан на `baseMrv`→`pedAdapt` (PED-карточка ПЛ),
-   `he_bb_session`-запись пересекается с BbAutoConstructor, `saveTrainingProfile(workMax)`
-   пишет профиль. **Решение (Sep 23 2026): оставить как неактивный резерв** — код не
-   менялся (аудит подтвердил: `SRCBBScreen` монтируется только из `PlannerPlAuto`
-   `track="pl"`, ни один тест не рендерит `track='bb'`; удаление задело бы общие узлы без
-   пользовательской ценности).
-2. **✅ Имена циклов wave-2** — после RPE/T-нормализации оставалось 76/227 нерезолвленных.
-   В этом раунде добавлены: alias-фолбэк в core-ветке резолвера (parenthetical: «Жим лежа
-   с паузой (ME Upper)», «Дотяга (с плинтов)», «ЖЛШХ (жим широким хватом)») + 60 точных
-   alias (Conjugate `DE/ME ... + цепи`, `BBB`, «до макс», «скоростная/лёгкий/негатив»,
-   падежи: «Фронт-присед», «Тяга становая», «Разгибания ног сидя», «Разводка лёжа», …).
-   Остаток фиксируется allowlist-локом (17): псевдо («Отдых», «Тест: проходка…»,
-   «Опциональная тяга…»), arm-имена другого каталога («Пронация СБ», «Кисть РР»…),
-   «Присед ТА» (WL), неоднозначные («Сгибания обратным хватом», «Жим-разводка») и плио
-   («Прыжки на box», «Выпрыгивания»).
-3. **⏸ Потребитель `catalogId`** (`LMS_EXERCISES`) — **Решение (Sep 23 2026): оставить на
-   именах** (код не менялся). Данные и lock есть, но `diagnosticGroupForExercise` и
-   `lift-assistance` остаются на именах/`groups`: parity-тест зелёный, а перевод на
-   `catalogId` менял бы протоколы (re-baseline «было→стало») и дозировку диагностических
-   инъекций без явной пользовательской ценности. При будущем переводе — только синхронно
-   в обоих контурах (parity-лок).
-4. **✅ pct-проходка в UI** — display-only пометка «проходка» для сетов >110% (не меняет
-   числа; проходки уже не клампятся).
-5. **✅ Кап персиста тапера** — честная заметка при отказе записи (план больше 1.5М символов).
-6. **✅ OPL-хвост** — имя атлета снова персистится (`he_opl_name`) и восстанавливается при
-   монтировании; сетевой путь «Найти» покрыт тестом с моком движка.
-7. **✅ Верификация** — `npx vitest run src/engines/lms src/ui/screens/SRCBBScreen_parts
-   src/ui/screens/TrainingScreen_parts` **229 файлов / 2675 тестов, 0 падений** (2 unhandled
-   `revokeObjectURL` — чужие предсуществующие); `tsc --noEmit` **0 по всему проекту**;
-   `verify:apk-design` OK; `vite build` **OK** (32.65с, PWA сгенерён). Полный прогон всего
-   проекта — по запросу (тяжёлый, вне обязательного круга).
+---
 
-### §10.4 Закрытие остатка Фаз 2/4 и §3/§4 (Sep 23 2026) — ✅ ВЫПОЛНЕНО
+### Фаза 3: Умный тапер и делод (P1)
 
-По решению пользователя закрыт максимальный объём остатка (включая taper-дубли). Только
-Edit/Write + vitest/tsc; чужие WIP не тронуты; коммиты строго pathspec; без пуша.
-**Математика планов не менялась** — единственное «сведение» (taper-кривая) числа 1-в-1
-(паритет-тест), остальное — гигиена/честность.
+#### 3.1. Тапер по скорости
 
-1. **alert/prompt → тосты** (§4): `AutoregPanel`/`RecoveryPanel`/`PeakingPanel` — канонический
-   `useEditorToast` (`window.showToast` живёт только в контуре питания — в тренинге `alert`
-   был реальным путём); `PlDeadpointsBarPathCard` — 6× `prompt()` → `PopupText compact`
-   (шит; новый опциональный проп, существующие потребители `PopupText` не тронуты).
-   Тест `pl-alert-toasts` 4/4 (source-guard без вызовов + поведение тостов/шита).
-2. **macro-настройки тапера** (§3/§4): `plMacroTaperMode/plMacroWeightGoal/plMacroMockMeet/
-   plMacroPostMeet` персистятся в `he_pl_session` и восстанавливаются валидаторами
-   (`validateSavedMacroTaperMode/WeightGoal/Bool` в `taper-state`). Ярлыки макро-контекста
-   отделены («Раскладка тапера макроцикла»), т.к. контекст отдельный от циклового
-   (дефолт 'classic' vs 'pl') — слияние состояний меняло бы числа по умолчанию.
-   Тесты `taper-state` 6→8.
-3. **e1RM/LVP** (§3): приватная LVP-таблица `estimate1rm.engine` выведена из канона
-   `vbt.engine.LOAD_VELOCITY_PROFILE` (подмножество тех же 6 опорных % — интерполяция
-   1-в-1; `ohp`/`row` остаются на фолбэке squat, как было). Паритет-тесты в
-   `estimate1rm.test.ts` (18/18).
-4. **RPE→%** (§3): сверка показала ДВЕ осознанные линейки — Epley (авторегуляция/дневник)
-   и Brzycki (сетка StrengthAnalysisHub/OneRmCalcTab); сведение изменило бы числа одной
-   стороны. Граница заморожена якорным тестом `rpe-formulas-boundary` (4/4): обе линейки
-   монотонны, якоря зафиксированы, намеренное расхождение ≤5 п.п.
-5. **Taper-дубли** (остаток 2.2): `pro/taper.taperPlan` строит витринную кривую через канон
-   `buildPLTaperCurve({taperWeeks, mode:'pro', peakIntensityPct:0.90})` с адаптером к
-   прежнему `TaperWeek`-шейпу — прямого дубля кривой больше нет; числа 1-в-1
-   (паритет-тест `taper.test.ts` 16/16 + `taper-planner-tab` 6/6).
-6. **Мост** (P0-4): неизвестные ПЛ-экрану kinds (`program/design/macrocycle/annual_block/
-   methodology/cardio/bb_nutrition/arm_cycle/ss_cycle/combat_cycle/tempo_rollback`) больше
-   не съедаются молча — честная заметка `setMethodNote`. Source-guard в
-   `pl-p2-data-hygiene` (18/18).
-7. **weakpoint-pl** (P0-8): core-fallback резолвера (сравнение ядер без скобочных
-   уточнений) + 8 имён приведены к каталогу (блок-бицепс, трицепс-блок ×3, жим носками,
-   икры ×2, шраги ×2; Смит/тренажёр-вариантов в каталоге нет — взяты ближайшие
-   каталог-записи). Lock: 0 нерезолвленных на всех 36 фазах (`weakpoint-pl` 14/14).
-8. **Верификация**: обязательный круг + `tsc` + `verify:apk-design` + `vite build` —
-   числа в AGENTS-записи раунда.
-9. **§4-хвост мёртвых экспортов (найден при финальной перепроверке, закрыт)**: удалены
-   реально мёртвые (без потребителей и без тестов) — `planAllFrequencies` (frequency-planner),
-   `analysesForUnified` + `UNIFIED_LIFT_RU` (unified-lift-diagnosis, + осиротевшие импорты),
-   `DOTS_CLASS_TABLE` (relative-strength; алиас приватного `DOTS_THRESHOLDS`),
-   `findPlCorrection` (pl-correction-exercises). Остальные из §4 — contract-locked
-   собственными тестами (policy «API сохранён»): `rpeAttempts`, `liftKeyOf`,
-   `findBlockByPhase`, `bbTrainingFocusForWeek`, `applicableFormulasForLift`, `adjustedLoad`,
-   `rpeWeightFor`/`e1RMFromRpeSet`, `VL_THRESHOLDS`, `vblLoad`, `rpeVbtDiscrepancy`,
-   `limiter*` ×4, `getScheme`, `lms-metrics` ×6. Проверено: целевые тесты **124/124**
-   (`frequency-planner`/`unified-lift-diagnosis`/`relative-strength`/`limiter-calculator`/
-   `strength-hub-p3/p4`/`progression-pro`/`vbt-mvt`/`pl-auto-audit-2026-08`); `tsc` —
-   по моим файлам 0 (в проекте 1 чужая ошибка WIP arm-хаба `buildArmIcs`).
-10. **Границы (осознанно, без кода)**: сценарии года живут в двух слоях — `he_macro_scenarios`
-    (раскладка макроцикла, `MacrocyclePanel`) и `he_annual_scenarios` (собранные блоки года,
-    `annual-training-storage`); это разные слои данных (раскладка vs сборка), слияние —
-    миграция без пользовательской ценности. ПМ-поля `PLPlanView` — display-only (редактор
-    только в Настройках ПЛ; дублирующий редактор `PeakingPanel` — @deprecated/не смонтирован).
-    `activePopup` MacrocyclePanel — сеттеры есть (строка аудита §4 устарела).
+**MOD `lms-taper.engine.ts`:** Добавить режим `'velocity'`:
+- Вход: тренд скорости на 80% 1RM за последние 3 недели
+- Если скорость растёт > 2% → суперкомпенсация идёт, тапер можно сократить на 1 неделю
+- Если скорость падает > 2% → нужен более длинный тапер
 
+#### 3.2. Авторегулируемый делод
+
+**MOD `lms-deload.engine.ts`:** Добавить режим `'auto'`:
+- Если ACWR > 1.3 → делод на 1 неделю с объёмом ×0.5
+- Если скорость упала > 10% → делод на 1 неделю
+- Если оба условия → делод на 2 недели
+
+#### 3.3. Тесты
+
+- `lms-taper-velocity.test.ts` — 6 тестов
+- `lms-deload-auto.test.ts` — 6 тестов
+
+---
+
+### Фаза 4: Метаданные циклов и улучшенный селектор (P1)
+
+#### 4.1. Расширение метаданных
+
+**MOD `lms-types.ts`:** Добавить в `SRCycleMeta`:
+```typescript
+interface SRCycleMeta {
+  // ... существующие поля
+  evidenceLevel?: 'A' | 'B' | 'C';
+  bestFor?: string[];
+  timeCommitment?: 'low' | 'medium' | 'high';
+  equipmentNeeded?: string[];
+  periodization?: 'linear' | 'dup' | 'block' | 'conjugate';
+  tags?: string[];
+}
+```
+
+#### 4.2. Улучшенный селектор
+
+**MOD `lms-selector.engine.ts`:** Добавить фильтры по:
+- `evidenceLevel` — только с доказательной базой
+- `equipmentNeeded` — по доступному оборудованию
+- `timeCommitment` — по времени
+- `tags` — по целям
+
+#### 4.3. Тесты
+
+- `lms-selector-filters.test.ts` — 8 тестов
+
+---
+
+### Фаза 5: Интеграция слабых точек (P1)
+
+#### 5.1. Автоматическая инъекция
+
+**NEW `lms-weakpoint-inject.engine.ts`:**
+```typescript
+interface WeakpointInjectInput {
+  weakPoints: { lift: Lift; point: WeakPoint; severity: number }[];
+  exerciseCatalog: Record<string, ExerciseEntry>;
+  equipment: string[];
+  maxPerDay: number;
+}
+
+interface WeakpointInjectOutput {
+  exerciseMap: Record<string, string[]>;
+  rationale: string;
+}
+```
+
+#### 5.2. Тесты
+
+- `lms-weakpoint-inject.test.ts` — 6 тестов
+
+---
+
+### Фаза 6: Пик-неделя (P1)
+
+#### 6.1. Протокол пик-недели
+
+**NEW `lms-peak-week.engine.ts`:**
+```typescript
+interface PeakWeekInput {
+  weeksToMeet: number;
+  currentVolume: number;
+  currentIntensity: number;
+  velocityTrend: number;
+}
+
+interface PeakWeekOutput {
+  weeks: PeakWeek[];
+  volumeReduction: number;
+  intensityMaintenance: number;
+  lastTrainingDay: number;
+}
+```
+
+#### 6.2. Тесты
+
+- `lms-peak-week.test.ts` — 5 тестов
+
+---
+
+### Фаза 7: Детренированность (P2)
+
+#### 7.1. Учёт пауз
+
+**MOD `lms-progression.engine.ts`:** Добавить функцию:
+```typescript
+function computeDetrainingPM(pm: number, daysOff: number): number {
+  if (daysOff < 7) return pm;
+  if (daysOff < 14) return pm * 0.97;
+  return pm * 0.92;
+}
+```
+
+#### 7.2. Тесты
+
+- `lms-detraining.test.ts` — 4 теста
+
+---
+
+## §3. Интернет-синтез: ключевые находки
+
+### 3.1. DUP vs Linear (Rhea 2002, Colquhoun 2017, Zourdos 2015)
+- DUP даёт на 1–3% больше силы, чем линейная периодизация (при равном объёме)
+- Оптимальная структура: 3 дня/нед, каждый день — разная зона
+- Зоны: гипертрофия 67–77%, сила 78–85%, пик 87–95%
+
+### 3.2. VBT (PMC8762534, 2022 — мета-анализ)
+- VLT ≤ 25% → максимальная сила
+- VLT > 25% → максимальная гипертрофия
+- VBT точнее RPE на 15–20% (Cowley 2025)
+- Комбинация VBT + RPE — оптимальна (Paulsen 2025, PeerJ)
+
+### 3.3. Тапер (Travis 2020, Pritchard 2016, Sports Med 2026)
+- Оптимальная длительность: 1–2 недели
+- Снижение объёма: 30–70% (оптимум 40–50%)
+- Интенсивность: поддерживать ≥85% или снижать на 5–10%
+- Последняя тренировка: 3–4 дня до старта
+- Становая тяга — раньше всех (6–8 дней), жим — позже (3–5 дней)
+
+### 3.4. Делод (PMC10948666)
+- Каждые 4–6 недель, длительность 6.4±1.7 дней
+- Снижение объёма, поддержание частоты
+- Интенсивность снижается, RIR увеличивается
+- 48% атлетов используют восстановительные методы
+
+### 3.5. Детренированность (Yilmaz 2026, JSCR)
+- 14 дней без тренировки: снижение CMJ RSI, IMTP RFD, спринта
+- Мышечная масса не меняется значимо
+- Тестостерон падает, кортизол растёт, T/C ratio снижается
+
+---
+
+## §4. Приоритеты и порядок выполнения
+
+| Фаза | Содержание | Приоритет | Статус |
+|------|------------|-----------|--------|
+| 1 | Авторегуляция + VBT | **P0** | ВЫПОЛНЕНО |
+| 2 | DUP-режим | **P0** | ВЫПОЛНЕНО |
+| 3 | Умный тапер + делод | P1 | ВЫПОЛНЕНО |
+| 4 | Метаданные циклов | P1 | ВЫПОЛНЕНО |
+| 5 | Интеграция слабых точек | P1 | ВЫПОЛНЕНО |
+| 6 | Пик-неделя | P1 | ВЫПОЛНЕНО |
+| 7 | Детренированность | P2 | ВЫПОЛНЕНО |
+
+**Итого:** все 7 фаз выполнены. Коммиты: `518f2dfe`, `f79937d8`, `6c14d4b5`, `f3febb6c`, `ec63a632`, `49d92879`.
+
+---
+
+## §5. Критерии приёмки
+
+1. **Авторегуляция работает:** `autoregulation-pro.engine.ts` вызывается из `buildLMSPlan`, влияет на объём/RIR
+2. **VBT подгружает вес:** `vbt.engine.ts` используется для корректировки весов в плане
+3. **DUP доступен:** пользователь выбирает DUP в UI, план генерируется с чередованием зон
+4. **Тапер адаптируется:** тренд скорости влияет на длину тапера
+5. **Делод автоматический:** ACWR > 1.3 → делод
+6. **Слабые точки инъецируются:** диагностика → упражнения в плане
+7. **Пик-неделя генерируется:** снижение объёма, поддержание интенсивности
+8. **Детренированность учитывается:** 14 дней без тренировки → PM снижается
+9. **Тесты:** все новые интеграции покрыты тестами, регрессии нет
+10. **UI:** новые функции доступны через `SRCBBScreen`
+
+---
+
+## §6. Что НЕ делаем (осознанные границы)
+
+1. **Не трогаем иммутабельность циклов** — `deepFreeze` + `clone` работает правильно
+2. **Не меняем мост между планировщиками** — 17 kinds покрывают все сценарии
+3. **Не переписываем `buildLMSPlan` с нуля** — добавляем слои поверх
+4. **Не удаляем deprecated движки** — `lms-progression-feedback` оставляем для совместимости
+5. **Не меняем таксономию уровней** — `intermediate` отсутствует в циклах, но это не критично
+6. **Не добавляем новые циклы** — 136 достаточно, добавляем только интеграции
+
+---
+
+## §7. Готовый промпт для выполнения
+
+```
+Выполни план docs/PL-AUTO-TOP-TOOL-PLAN.md по фазам:
+
+Фаза 1 (P0): Интеграция авторегуляции + VBT
+- MOD lms-builder.engine.ts — вызов autoregulation-pro.engine.ts
+- MOD SRCBBScreen.tsx — переключатель авторегуляции
+- MOD lms-builder.engine.ts — вызов vbt.engine.ts
+- MOD SessionPlayer.tsx — ввод скорости → рекомендация веса
+- Тесты: lms-autoreg-integration.test.ts (10), lms-vbt-integration.test.ts (8)
+
+Фаза 2 (P0): DUP в UI и генерации
+- MOD SRCBBScreen.tsx — выбор режима периодизации
+- MOD lms-builder.engine.ts — генерация DUP-плана
+- Тесты: lms-dup-integration.test.ts (8)
+
+Фаза 3 (P1): Умный тапер + делод
+- MOD lms-taper.engine.ts — режим 'velocity'
+- MOD lms-deload.engine.ts — режим 'auto'
+- Тесты: lms-taper-velocity.test.ts (6), lms-deload-auto.test.ts (6)
+
+Фаза 4 (P1): Метаданные циклов
+- MOD lms-types.ts — новые поля в SRCycleMeta
+- MOD lms-selector.engine.ts — фильтры
+- Тесты: lms-selector-filters.test.ts (8)
+
+Фаза 5 (P1): Интеграция слабых точек
+- NEW lms-weakpoint-inject.engine.ts
+- Тесты: lms-weakpoint-inject.test.ts (6)
+
+Фаза 6 (P1): Пик-неделя
+- NEW lms-peak-week.engine.ts
+- Тесты: lms-peak-week.test.ts (5)
+
+Фаза 7 (P2): Детренированность
+- MOD lms-progression.engine.ts — computeDetrainingPM
+- Тесты: lms-detraining.test.ts (4)
+
+Только Edit/Write + vitest/tsc. Чужие WIP не трогать.
+После каждой фазы — прогон тестов и коммит pathspec.
+```
