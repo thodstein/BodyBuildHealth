@@ -56,11 +56,11 @@ export function generatePCTPlan(course: CourseEntry[], lastCourseWeek: number): 
   const pctProtocol: PCTProtocolItem[] = [
     { drug: 'clomi', substanceId: 'clomi', dose: '50 мг/день', doseValue: '50', doseUnit: 'мг/день', durationWeeks: 2, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 2, class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день' },
     { drug: 'clomi', substanceId: 'clomi', dose: '25 мг/день', doseValue: '25', doseUnit: 'мг/день', durationWeeks: 2, startDayOffset: 14, startWeek: pctStartWeek + 2, endWeek: pctStartWeek + 4, class: 'pct_serm', timing: 'Ежедневно', frequency: '1 раз/день' },
-    { drug: 'hcg', substanceId: 'hcg', dose: '500 МЕ 2×/нед', doseValue: '500', doseUnit: 'МЕ 2×/нед', durationWeeks: 3, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 3, class: 'pct_gonadotropin', timing: '2 раза/нед', frequency: '2 раза/нед', scheme: '3/1 (3 нед приема, 1 нед отдых)' }
+    { drug: 'hcg', substanceId: 'hcg', dose: '500 МЕ 2×/нед', doseValue: '500', doseUnit: 'МЕ 2×/нед', durationWeeks: 4, startDayOffset: 0, startWeek: pctStartWeek, endWeek: pctStartWeek + 4, class: 'pct_gonadotropin', timing: '2 раза/нед', frequency: '2 раза/нед', scheme: '3/1 (3 нед приема, 1 нед отдых)' }
   ];
 
   const supportStack = [
-    { id: 'tudca', name: 'TUDCA', dose: '1000 мг/день', durationWeeks: 6 },
+    { id: 'tudca', name: 'TUDCA', dose: '250-500 мг/день', durationWeeks: 6 },
     { id: 'omega3', name: 'Омега-3', dose: '2-3 г/день', durationWeeks: 8 },
     { id: 'magnesium', name: 'Магний бисглицинат', dose: '400 мг/вечер', durationWeeks: 6 },
     { id: 'nac', name: 'NAC', dose: '1200 мг/день', durationWeeks: 4 }
@@ -68,9 +68,13 @@ export function generatePCTPlan(course: CourseEntry[], lastCourseWeek: number): 
 
   const longOrals = course.filter(c => PHARMA_DB[c.substanceId]?.pd.hepatotoxicity >= 2 && (c.endWeek - c.startWeek) > 8);
   if (longOrals.length) warnings.push(`⚠️ Длительный приём оралов (${longOrals.map(o=>o.substanceId).join(', ')}). Усиленный контроль печени.`);
-  
+
   const highE2 = activeDrugs.some(d => PHARMA_DB[d.substanceId]?.pd.aromatization > 0.8);
   if (highE2) warnings.push('⚠️ Высокая ароматизация. Рассмотреть добавление ИА в ПКТ.');
+
+  warnings.push('⚠️ HCG: не использовать дольше 4 нед — риск десенситизации ЛГ-рецепторов и гинекомастии.');
+  warnings.push('⚠️ Кломифен: при нарушении зрения/тромбоэмболии — отмена, консультация врача.');
+  warnings.push('⚠️ Оральные ААС отменяются раньше инъекционных (за 1-2 нед до старта ПКТ).');
 
   return {
     startDate: localIsoDate(startDate),

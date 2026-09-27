@@ -1078,38 +1078,6 @@ function calculateSupportCoverage(
     totalSupport += substanceTotal;
   }
 
-  // Also process SubstanceEntry objects that might have additional coverage info
-  for (const substance of substances) {
-    const supKey = resolveSupKey(substance.id);
-    if (!supKey || processedKeys.has(supKey)) continue;
-    processedKeys.add(supKey);
-
-    let coverage: Record<string, number> | null = SUPPORT_BASE_COVERAGE[supKey] ?? null;
-    if (!coverage) {
-      const catEntry = SUPPORT_CATALOG_DATA[supKey];
-      if (catEntry) coverage = generateCoverageFromCatalog(catEntry);
-    }
-    if (!coverage) continue;
-    const dose = supportDoses?.[supKey] ?? supportDoses?.[substance.id] ?? SUPPORT_DEFAULT_DOSE[supKey] ?? 100;
-    const ec50 = SUPPORT_EC50[supKey] ?? 100;
-
-    let substanceTotal = 0;
-    for (const [coverageKey, emax] of Object.entries(coverage)) {
-      const adjustedCoverage = sigmoidEmax(emax, dose, ec50);
-      const system = getCoverageSystem(coverageKey);
-      if (system) {
-        systemSupport[system] = (systemSupport[system] ?? 0) + adjustedCoverage;
-      }
-      const organPrefix = coverageKey.split('_')[0];
-      const organs = COVERAGE_ORGAN_MAP[organPrefix] ?? [];
-      for (const organ of organs) {
-        organSupport[organ] = (organSupport[organ] ?? 0) + adjustedCoverage;
-      }
-      substanceTotal += adjustedCoverage;
-    }
-    totalSupport += substanceTotal;
-  }
-
   // Apply system weights: convert raw emax sum to weighted % risk reduction
   for (const system of ALL_RISK_SYSTEMS) {
     const weight = SYSTEM_WEIGHT[system] ?? 10;
@@ -1207,8 +1175,7 @@ export function calculateSupport(input: SupportInput): SupportOutput {
     // Capped diminishing protection: max 70% even with optimal support
     const rawCoverage = weight > 0 ? weightedSupport / weight : 0;
     const protectionFraction = Math.min(0.7, Math.max(0, rawCoverage * 0.65));
-    const lifestyleReduction = ((input.nutritionFactor ?? 0) * (NUTRITION_SYSTEM_REDUCTION[system] ?? 0.3) + (input.trainingFactor ?? 0) * (TRAINING_SYSTEM_REDUCTION[system] ?? 0.2));
-    const netRisk = raw * (1 - protectionFraction) * (1 - Math.min(0.5, lifestyleReduction));
+    const netRisk = raw * (1 - protectionFraction);
     systemBreakdownNet[system] = Math.min(100, Math.max(0, netRisk));
   }
 
