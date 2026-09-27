@@ -86,6 +86,7 @@ import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
 import { getProfile } from '../../../core/profile-manager';
+import { localIsoDate } from '../../../core/local-date';
 import { getWeightLog } from '../../../engines/profile-store';
 import { loadPrepWeekCheckins, savePrepWeekCheckin, prepWeekRefs, prepStrengthTrend, avgWeight7d, avgSleep7d, type PrepWeekCheckin } from '../../../engines/bb/bb-prep-weekly-log';
 import { getPostShowLog } from '../../../engines/bb/bb-prep-post-show-log.engine';
@@ -1004,11 +1005,13 @@ export const BbAutoConstructor: React.FC = () => {
       return prepWeightAdvice(getWeightLog().map(e => ({ date: e.date, weight: e.weight })), prepPlan, { targetWeightKg: targetW });
     } catch { return null; }
   }, [prepPlan, linked.profile?.settings]);
+  const allSrpeSessions = useMemo(() => loadSRPESessions(), []);
+  const recentSrpeSessions = useMemo(() => allSrpeSessions.slice(-28), [allSrpeSessions]);
   // 🤖 Адаптивный тапер (Э2): рекомендация недель тапера по sRPE/ACWR/усталости дневника.
   const adaptiveTaper = useMemo(() => {
     if (!prepPlan) return null;
     try {
-      const srpe = loadSRPESessions().slice(-28);
+      const srpe = recentSrpeSessions;
       const acwrRaw = calculateACWR();
       const acwrRatio = Number.isFinite(acwrRaw) && acwrRaw > 0 ? acwrRaw : undefined;
       const fatigue = linked.readiness?.fatigue;
@@ -1679,7 +1682,7 @@ export const BbAutoConstructor: React.FC = () => {
     const fat = linked.readiness?.fatigue ?? 30;
     const sleep = linked.readiness?.sleep ?? 70;
     const hrv = linked.profile?.settings?.baselineHrvRatio ?? 1.0;
-    const srpe = loadSRPESessions();
+    const srpe = allSrpeSessions;
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : { ratio: 1.0, zone: 'optimal' as const };
     const legacy = autoRegulate({ readiness: rec, acwr: { ratio: acwr.ratio, zone: acwr.zone }, fatigue: fat, hrvRatio: hrv, sleepScore: sleep, plannedTopSetPct: 0.8, plannedRIR: 2 });
     const lifestyle = linked.profile?.settings?.lifestyle;
@@ -1779,11 +1782,11 @@ export const BbAutoConstructor: React.FC = () => {
   // ACWR — единый расчёт для всего качества (пороги 1.3/1.5)
   const acwrData = useMemo(() => {
     try {
-      const srpe = loadSRPESessions();
+      const srpe = allSrpeSessions;
       if (srpe.length < 2) return null;
       return acuteChronicRatio(toDailyLoads(srpe));
     } catch { return null; }
-  }, [builtPlan]);
+  }, [builtPlan, allSrpeSessions]);
   const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, 1) : null, [builtPlan]);
   // Epic F: единый отчёт качества (агрегирует validation/balance/rotation/safety, дедуп).
   const qualityReport = useMemo(() => {
@@ -1804,11 +1807,11 @@ export const BbAutoConstructor: React.FC = () => {
   // Монотония Foster из того же дневника sRPE, что и ACWR.
   const srpeMonotony = useMemo(() => {
     try {
-      const srpe = loadSRPESessions();
+      const srpe = allSrpeSessions;
       if (srpe.length < 3) return null;
       return sRPEAdjustment(srpe);
     } catch { return null; }
-  }, [builtPlan]);
+  }, [builtPlan, allSrpeSessions]);
   const bbQualityV2 = useMemo(() => {
     if (!builtPlan) return null;
     try {
@@ -2164,8 +2167,8 @@ export const BbAutoConstructor: React.FC = () => {
             trainingFocus: bbTrainingFocus,
              trainingVolumeMode: trainingVolumeMode as any,
              sex: linked.profile?.settings?.personal?.sex,
-             bodyFat: linked.profile.settings.personal.bodyFat,
-             leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+              bodyFat: linked.profile?.settings?.personal?.bodyFat,
+              leanMass: (linked.profile?.settings?.personal?.weight ?? 80) * (1 - (linked.profile?.settings?.personal?.bodyFat ?? 20) / 100),
              hrvMs: linked.profile.settings.lifestyle.morningHRV,
              sleepHours: linked.profile.settings.lifestyle.sleepHours,
              stressLevel: linked.profile.settings.lifestyle.stressLevel,
@@ -2181,8 +2184,8 @@ export const BbAutoConstructor: React.FC = () => {
             targetBodyFat,
             cycleDay,
             recoveryMultOverride: recoveryOverride ?? undefined,
-            planStartWeek: new Date().toISOString().slice(0, 10),
-            supersetMode,
+             planStartWeek: localIsoDate(),
+             supersetMode,
             volumeScheme: effectiveVolumeScheme,
             bfrMode,
             blastCruiseEnabled,
@@ -2214,8 +2217,8 @@ export const BbAutoConstructor: React.FC = () => {
           specialization: specializationMode,
           specializationSchedule: buildSpecBlocks,
          injuries,
-         planStartWeek: new Date().toISOString().slice(0, 10),
-         favoriteExercises: bbFavEx,
+          planStartWeek: localIsoDate(),
+          favoriteExercises: bbFavEx,
          excludedExercises: bbExclEx,
          avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
           fewerCompound,
@@ -2449,7 +2452,7 @@ export const BbAutoConstructor: React.FC = () => {
     const modeLabel = bbAnnualMacrocycle
       ? `Годовой BB-макроцикл (${bbAnnualMacrocycle.totalWeeks} нед)`
       : planMode === 'programs' ? `Программа: ${customProgram?.name || selectedProgramId || selectedCycleId}` : 'Generic-сплит';
-    const srpe = loadSRPESessions();
+    const srpe = allSrpeSessions;
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
     const deloadNote = autoDeload && acwr && acwr.ratio > 1.5
       ? `🔄 Делод (ACWR ${acwr.ratio.toFixed(2)} >1.5 — danger): ${DELOAD_PROTOCOLS[deloadType].description}`
@@ -2501,8 +2504,8 @@ export const BbAutoConstructor: React.FC = () => {
         calorieSurplus,
         proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
         labMrvMultiplier: labAdjust.mrvMultiplier,
-        bodyFat: linked.profile.settings.personal.bodyFat,
-        leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+        bodyFat: linked.profile?.settings?.personal?.bodyFat,
+        leanMass: (linked.profile?.settings?.personal?.weight ?? 80) * (1 - (linked.profile?.settings?.personal?.bodyFat ?? 20) / 100),
         hrvMs: linked.profile.settings.lifestyle.morningHRV,
         sleepHours: linked.profile.settings.lifestyle.sleepHours,
         stressLevel: linked.profile.settings.lifestyle.stressLevel,
@@ -2998,7 +3001,7 @@ export const BbAutoConstructor: React.FC = () => {
     if (!builtPlan) return;
     const plan = applyEditsToPlan(builtPlan);
     try {
-      const startDate = startDateInput || new Date().toISOString().slice(0, 10);
+      const startDate = startDateInput || localIsoDate();
       const ics = buildBBPlanIcs(plan, { startDate });
       const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
       const url = URL.createObjectURL(blob);
