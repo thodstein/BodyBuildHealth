@@ -37,13 +37,6 @@ export const FOCUS_RIR_TABLE: Record<BBTrainingFocus, FocusRirConfig> = {
   endurance:   { base: 3, driftPer2Weeks: 0, pumpRir: 5 },
 };
 
-/** @deprecated не используется — reps берутся из PHASE_CONFIGS (periodization), tempo из bb-tempo-rest; оставлено для совместимости */
-export const FOCUS_REPS_TABLE: Record<BBTrainingFocus, FocusRepsConfig> = {
-  strength:    { heavy: [1, 5], pump: [8, 12],   light: [6, 10] },
-  hypertrophy: { heavy: [5, 10], pump: [12, 20], light: [8, 15] },
-  endurance:   { heavy: [8, 12], pump: [15, 30], light: [10, 20] },
-};
-
 // Волна-1 (аудит 2026-09): удалены мёртвые дубли канона —
 // PHASE_TEMPO (дублировал bb-tempo-rest и врал про deload 4-2-2-0) и
 // LEVEL_REP_MOD (ни одного потребителя). Канон темпов — только bb-tempo-rest.
