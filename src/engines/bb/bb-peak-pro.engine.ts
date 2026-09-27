@@ -277,6 +277,93 @@ export interface PeakTrendAdvice {
   advice: string[];
 }
 
+export interface PeakWeekAdaptation {
+  waterDeltaL: number;
+  sodiumDeltaMg: number;
+  carbsDeltaG: number;
+  reasons: string[];
+  urgency: 'none' | 'low' | 'medium' | 'high';
+}
+
+/**
+ * P1-1: Динамическая коррекция пик-недели по чек-инам.
+ *
+ * Анализирует тренд веса, визуал и адгеренс, возвращает дельты для воды/натрия/углеводов.
+ * Без данных — нулевые дельты (план не меняется).
+ */
+export function adaptPeakWeekByCheckin(
+  entries: PeakDayEntry[],
+  plan: PeakWeekDayPlan[],
+): PeakWeekAdaptation {
+  const clean = (entries || []).filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
+  if (!clean.length || !plan.length) {
+    return { waterDeltaL: 0, sodiumDeltaMg: 0, carbsDeltaG: 0, reasons: [], urgency: 'none' };
+  }
+
+  const reasons: string[] = [];
+  let waterDeltaL = 0;
+  let sodiumDeltaMg = 0;
+  let carbsDeltaG = 0;
+  let urgency: PeakWeekAdaptation['urgency'] = 'none';
+
+  // Анализ визуала (последние 3 точки)
+  const visuals = clean.filter(e => e.visual).slice(-3);
+  if (visuals.length >= 2) {
+    const last = visuals[visuals.length - 1].visual;
+    const prev = visuals[visuals.length - 2].visual;
+    if (last === 'flat' && prev === 'flat') {
+      waterDeltaL += 0.3;
+      reasons.push('Визуал «плоско» 2 дня: +0.3л воды');
+      urgency = 'medium';
+    }
+    if (last === 'spill' && prev === 'spill') {
+      waterDeltaL -= 0.3;
+      sodiumDeltaMg -= 500;
+      reasons.push('Визуал «расплывает» 2 дня: −0.3л воды, −500мг Na');
+      urgency = 'medium';
+    }
+  }
+
+  // Анализ веса (последние 3 точки)
+  const weights = clean.filter(e => e.weightKg != null).slice(-3);
+  if (weights.length >= 2) {
+    const last = weights[weights.length - 1].weightKg!;
+    const prev = weights[weights.length - 2].weightKg!;
+    const delta = last - prev;
+    if (delta < -0.5) {
+      waterDeltaL += 0.2;
+      carbsDeltaG += 30;
+      reasons.push(`Просадка веса ${delta.toFixed(1)}кг: +0.2л воды, +30г углеводов`);
+      urgency = urgency === 'medium' ? 'high' : 'medium';
+    }
+    if (delta > 0.8) {
+      waterDeltaL -= 0.2;
+      reasons.push(`Набор веса +${delta.toFixed(1)}кг: −0.2л воды`);
+    }
+  }
+
+  // Анализ адгеренса (последние 3 дня)
+  const adherence = peakWeekAdherence(plan, clean.slice(-3));
+  if (adherence.waterPct != null && adherence.waterPct < 0.7) {
+    waterDeltaL += 0.2;
+    reasons.push(`Адгеренс воды ${(adherence.waterPct * 100).toFixed(0)}%: +0.2л`);
+  }
+  if (adherence.sodiumPct != null && adherence.sodiumPct > 1.5) {
+    sodiumDeltaMg -= 500;
+    reasons.push(`Натрий ${(adherence.sodiumPct * 100).toFixed(0)}% от плана: −500мг`);
+  }
+  if (adherence.carbsPct != null && adherence.carbsPct < 0.7) {
+    carbsDeltaG += 30;
+    reasons.push(`Углеводы ${(adherence.carbsPct * 100).toFixed(0)}% от плана: +30г`);
+  }
+
+  if (!reasons.length) {
+    reasons.push('Тренд в коридоре — план не меняется');
+  }
+
+  return { waterDeltaL, sodiumDeltaMg, carbsDeltaG, reasons, urgency };
+}
+
 /** Тренд-совет по последним 2–3 чек-инам (визуал приоритетнее веса). */
 export function peakWeekTrendAdvice(entries: PeakDayEntry[]): PeakTrendAdvice {
   const clean = (entries || []).filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));

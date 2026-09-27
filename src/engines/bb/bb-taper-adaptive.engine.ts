@@ -240,3 +240,236 @@ export function estimateGlycogenFromCarbs(
   if (perKg < 5) return 8;
   return 9;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P1-3: Протокол «stable_full» — без водных манипуляций
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface StableFullProtocol {
+  waterLitersPerDay: number;
+  sodiumMgPerDay: number;
+  carbsGPerDay: number;
+  notes: string[];
+}
+
+/**
+ * Протокол «stable_full»: вода 3-4 л/день от D-7 до D-0 без колебаний,
+ * натрий constant, углеводы по выбранной стратегии загрузки.
+ * Для атлетов, которые не хотят манипуляции водой.
+ */
+export function buildStableFullProtocol(
+  cfg: BBContestPrepConfig,
+  carbBudgetGPerKg: number,
+): StableFullProtocol {
+  const w = cfg.weightKg;
+  const isFemale = cfg.sex === 'female';
+  const water = Math.round((isFemale ? 3.0 : 3.5) * 10) / 10;
+  const sodium = 2800;
+  const carbs = Math.round(w * carbBudgetGPerKg);
+  return {
+    waterLitersPerDay: water,
+    sodiumMgPerDay: sodium,
+    carbsGPerDay: carbs,
+    notes: [
+      'Без водных манипуляций: вода стабильна всю неделю',
+      `Вода ${water}л/день (35мл/кг)`,
+      `Натрий ${sodium}мг/день (constant)`,
+      `Углеводы ${carbs}г/день (${carbBudgetGPerKg} г/кг)`,
+    ],
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P1-5: Протокол для РПП/РЕД-С — без дефицита, без манипуляций
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface RedSafeProtocol {
+  minKcalPerDay: number;
+  proteinGPerDay: number;
+  waterLitersPerDay: number;
+  sodiumMgPerDay: number;
+  notes: string[];
+}
+
+/**
+ * Протокол для атлетов с РПП/РЕД-С:
+ * - Без дефицита калорий в тапере (поддержание или лёгкий профицит)
+ * - Без манипуляций водой/натрием
+ * - Повышенный белок (2.2 г/кг)
+ * - Мониторинг настроения в чек-инах
+ */
+export function buildRedSafeProtocol(cfg: BBContestPrepConfig): RedSafeProtocol {
+  const w = cfg.weightKg;
+  const isFemale = cfg.sex === 'female';
+  const minKcal = isFemale ? 1400 : 1600;
+  const protein = Math.round(w * 2.2);
+  const water = Math.round((isFemale ? 3.0 : 3.5) * 10) / 10;
+  return {
+    minKcalPerDay: minKcal,
+    proteinGPerDay: protein,
+    waterLitersPerDay: water,
+    sodiumMgPerDay: 2800,
+    notes: [
+      'РЕД-С протокол: без дефицита калорий в тапере',
+      `Минимум ${minKcal} ккал/день`,
+      `Белок ${protein}г/день (2.2 г/кг)`,
+      `Вода ${water}л/день, натрий 2800мг/день (стабильно)`,
+      'Мониторинг настроения в чек-инах (1-5)',
+    ],
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P1-8: Соматотип — коррекция углеводной загрузки и воды
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type Somatotype = 'ectomorph' | 'mesomorph' | 'endomorph';
+
+export interface SomatotypeTaperMod {
+  carbBudgetDeltaGPerKg: number;
+  waterDeltaL: number;
+  note: string;
+}
+
+/**
+ * Модификатор тапера по соматотипу.
+ * Эктоморф: +1 г/кг углеводов (медленный метаболизм, нужен запас).
+ * Эндоморф: −1 г/кг углеводов (быстрый метаболизм, риск spill).
+ * Мезоморф: без изменений.
+ */
+export function somatotypeTaperMod(somatotype?: Somatotype): SomatotypeTaperMod {
+  switch (somatotype) {
+    case 'ectomorph':
+      return { carbBudgetDeltaGPerKg: 1, waterDeltaL: 0.2, note: 'Эктоморф: +1 г/кг углеводов, +0.2л воды' };
+    case 'endomorph':
+      return { carbBudgetDeltaGPerKg: -1, waterDeltaL: -0.2, note: 'Эндоморф: −1 г/кг углеводов, −0.2л воды' };
+    default:
+      return { carbBudgetDeltaGPerKg: 0, waterDeltaL: 0, note: 'Мезоморф: без изменений' };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P1-6: Интеграция с лабораторными анализами
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface LabMarkers {
+  ferritin?: number;
+  cortisol?: number;
+  testosterone?: number;
+  estradiol?: number;
+  tsh?: number;
+  glucose?: number;
+  hba1c?: number;
+}
+
+export interface LabTaperWarning {
+  marker: string;
+  value: number;
+  threshold: string;
+  warning: string;
+  taperImpact: 'none' | 'mild' | 'moderate' | 'severe';
+}
+
+/**
+ * Предупреждения по лабораторным маркерам, влияющие на тапер.
+ */
+export function labTaperWarnings(labs: LabMarkers): LabTaperWarning[] {
+  const warnings: LabTaperWarning[] = [];
+  if (labs.ferritin != null && labs.ferritin < 30) {
+    warnings.push({ marker: 'ферритин', value: labs.ferritin, threshold: '<30 нг/мл', warning: 'Дефицит железа: утомляемость, снижение выносливости', taperImpact: 'moderate' });
+  }
+  if (labs.cortisol != null && labs.cortisol > 20) {
+    warnings.push({ marker: 'кортизол', value: labs.cortisol, threshold: '>20 мкг/дл', warning: 'Повышенный кортизол: задержка воды, катаболизм', taperImpact: 'moderate' });
+  }
+  if (labs.testosterone != null && labs.testosterone < 300) {
+    warnings.push({ marker: 'тестостерон', value: labs.testosterone, threshold: '<300 нг/дл', warning: 'Низкий тестостерон: снижение силы и восстановления', taperImpact: 'moderate' });
+  }
+  if (labs.estradiol != null && labs.estradiol > 40) {
+    warnings.push({ marker: 'эстрадиол', value: labs.estradiol, threshold: '>40 пг/мл', warning: 'Повышенный эстрадиол: задержка воды', taperImpact: 'mild' });
+  }
+  if (labs.tsh != null && labs.tsh > 4.5) {
+    warnings.push({ marker: 'ТТГ', value: labs.tsh, threshold: '>4.5 мМЕ/л', warning: 'Гипотиреоз: утомляемость, сухость кожи', taperImpact: 'mild' });
+  }
+  if (labs.glucose != null && labs.glucose > 100) {
+    warnings.push({ marker: 'глюкоза', value: labs.glucose, threshold: '>100 мг/дл', warning: 'Повышенная глюкоза: риск spill при загрузке', taperImpact: 'mild' });
+  }
+  if (labs.hba1c != null && labs.hba1c > 5.7) {
+    warnings.push({ marker: 'HbA1c', value: labs.hba1c, threshold: '>5.7%', warning: 'Преддиабет: риск spill при загрузке', taperImpact: 'mild' });
+  }
+  return warnings;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P1-7: Детальный протокол мульти-шоу
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface MultiShowSegment {
+  showDate: string;
+  weeksBefore: number;
+  phase: 'base' | 'overreach' | 'peak' | 'recovery';
+  volumeMult: number;
+  intensityMult: number;
+  note: string;
+}
+
+/**
+ * Построение детального протокола для серии шоу.
+ * Между шоу: неделя overreach (+20% объёма), затем возврат к базе.
+ * Два полных пика подряд запрещены (Escalante 2021).
+ */
+export function buildMultiShowProtocol(
+  showDates: string[],
+  baseVolumeMult: number = 1.0,
+  baseIntensityMult: number = 0.95,
+): MultiShowSegment[] {
+  if (!showDates.length) return [];
+  const sorted = [...showDates].sort();
+  const segments: MultiShowSegment[] = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const date = sorted[i];
+    const prevDate = i > 0 ? sorted[i - 1] : null;
+    const daysSincePrev = prevDate
+      ? Math.round((new Date(date).getTime() - new Date(prevDate).getTime()) / 86400000)
+      : null;
+
+    if (i === 0) {
+      segments.push({
+        showDate: date,
+        weeksBefore: 0,
+        phase: 'peak',
+        volumeMult: 0.6,
+        intensityMult: 0.85,
+        note: 'Первое шоу: стандартный тапер',
+      });
+    } else if (daysSincePrev != null && daysSincePrev < 14) {
+      segments.push({
+        showDate: date,
+        weeksBefore: 0,
+        phase: 'peak',
+        volumeMult: 0.65,
+        intensityMult: 0.88,
+        note: `Только ${daysSincePrev} дн после предыдущего: мягкий тапер, без overreach`,
+      });
+    } else {
+      segments.push({
+        showDate: date,
+        weeksBefore: 2,
+        phase: 'overreach',
+        volumeMult: baseVolumeMult * 1.2,
+        intensityMult: baseIntensityMult,
+        note: 'За 2 недели до шоу: overreach (+20% объёма) для компенсации',
+      });
+      segments.push({
+        showDate: date,
+        weeksBefore: 1,
+        phase: 'peak',
+        volumeMult: 0.6,
+        intensityMult: 0.85,
+        note: 'Финальная неделя перед шоу: стандартный тапер',
+      });
+    }
+  }
+
+  return segments;
+}
