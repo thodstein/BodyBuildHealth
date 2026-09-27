@@ -522,4 +522,20 @@ describe('E3: prescribeLoad repCap depends on exercise type', () => {
     expect(rirDrift([2, 0], 5, 5)).toBe(0); // кап к end
     expect(rirDrift([3, 1], 2, 1)).toBe(3); // фаза из 1 недели → без дрейфа
   });
+
+  it('boundary: weeks=1 — минимальный план без crash', () => {
+    const plan = buildBBPlan(makeInput({ weeks: 1 }));
+    expect(plan.weeks).toHaveLength(1);
+    expect(plan.weeks[0].sessions.length).toBeGreaterThan(0);
+  });
+
+  it('boundary: weeks=52 — максимальный план без crash', () => {
+    const plan = buildBBPlan(makeInput({ weeks: 52 }));
+    expect(plan.weeks).toHaveLength(52);
+  });
+
+  it('boundary: empty workMax — план генерируется с дефолтными весами', () => {
+    const plan = buildBBPlan(makeInput({ workMax: {} }));
+    expect(plan.weeks.length).toBeGreaterThan(0);
+  });
 });

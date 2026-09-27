@@ -72,6 +72,8 @@ import type { BBPlanReport } from './bb-report.engine';
 
 import type { BBPlanValidationResult } from './bb-validator.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
+import { rpeToPct } from './bb-rpe-calibration';
+import { isHighActivationExercise } from './bb-emg-scoring';
 import { resolveSpecialization, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationResolution, type SpecializationBlock } from './bb-specialization.engine';
 import { applyTradeoffToPlan } from './bb-tradeoff.engine';
 
