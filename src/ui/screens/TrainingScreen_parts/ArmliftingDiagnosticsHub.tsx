@@ -430,6 +430,17 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     if (!hit.length) return corrections;
     return [...hit, ...corrections.filter((c) => c.id !== armliftPrefCorr)];
   }, [corrections, armliftPrefCorr]);
+  /** Паритет с ТА (`data-wl="worst"`): «слабейшая связка → разобрать» — открывает вкладку
+   *  коррекций и выбирает упражнение, чинящее ИМЕННО эту связку
+   *  (`fixesPhase` = id связки из ARMLIFT_AUDIT_LINKS). Без плана/худшей связки — кнопки нет. */
+  const selectWorstLink = () => {
+    if (!liftWorst) return;
+    setTab('corr');
+    const hit = corrections.find((c) => (c.fixesPhase || []).includes(liftWorst));
+    if (hit) setArmliftPrefCorr(hit.id);
+    setToast(`🎯 Слабейшая связка: ${ARMLIFT_WEAK_LINK_SHORT_RU[liftWorst] || liftWorst} — открыта на разбор`);
+    setTimeout(() => setToast(''), 2500);
+  };
   /** PRO-CORR K6: запасная 4-я — «🔁 Запасная» строкой (топ-3 в мост не меняется). */
   const spareCorrection = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
     cause: cause.cause === 'pain' ? undefined : cause.cause,
@@ -829,6 +840,12 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               {liftWorst && (liftAudit.byLink[liftWorst]?.sets ?? 0) === 0 && (
                 <button data-arm="lift-audit-go" onClick={() => setTab('corr')} style={{ marginTop: 6, minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', border: '1px solid rgba(59,130,246,0.45)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
                   🎯 Дыра: {ARMLIFT_WEAK_LINK_SHORT_RU[liftWorst]} — не закрыта планом → Коррекция
+                </button>
+              )}
+              {/* Паритет с ТА `data-wl="worst"`: связка закрыта, но слабейшая — разбираем её (не дубль «дыры») */}
+              {liftWorst && (liftAudit.byLink[liftWorst]?.sets ?? 0) > 0 && (
+                <button data-arm="lift-worst" onClick={selectWorstLink} style={{ marginTop: 6, minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+                  🎯 Слабейшая связка: {ARMLIFT_WEAK_LINK_SHORT_RU[liftWorst]} ({liftAudit.byLink[liftWorst].sets} сетов) → разобрать
                 </button>
               )}
             </>

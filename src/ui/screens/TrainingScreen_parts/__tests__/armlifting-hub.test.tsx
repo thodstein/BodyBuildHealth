@@ -64,6 +64,27 @@ describe('W-AL UI: хаб армлифтинга', () => {
     expect(chips.filter((c) => c.getAttribute('data-covered') === 'true').length).toBe(1);
     expect(card.querySelectorAll('[data-worst="true"]').length).toBe(1);
   });
+  it('паритет с ТА: слабейшая связка закрыта планом → кнопка «разобрать» открывает коррекции', async () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    render(<ArmliftingDiagnosticsHub />);
+    // Без плана кнопки нет (как data-wl="worst" за planAudit.hasPlan)
+    expect(document.querySelector('[data-arm="lift-worst"]')).toBeNull();
+    // Все 5 звеньев закрыты (реальные id пулов), у crush — 1 сет: худшая связка покрыта,
+    // поэтому показывается «разобрать», а не «дыра»
+    window.localStorage.setItem('he_arm_plan_saved', JSON.stringify({ plan: { weeks: [{ week: 1, sessions: [{ day: 1, sessionTag: 'GripHeavy', exercises: [
+      { exerciseId: 'plate_pinch_hold', sets: 4 },
+      { exerciseId: 'rolling_thunder', sets: 3 },
+      { exerciseId: 'wrist_ext_bb', sets: 3 },
+      { exerciseId: 'farmer_walk_fat', sets: 2 },
+      { exerciseId: 'coc_trainer', sets: 1 },
+    ] }] }] } }));
+    fireEvent(window, new Event('he-arm-plan-saved'));
+    await waitFor(() => expect(document.querySelector('[data-arm="lift-worst"]')).not.toBeNull());
+    // «дыра» (0 сетов) остаётся отдельной кнопкой — дубля нет
+    expect(document.querySelector('[data-arm="lift-audit-go"]')).toBeNull();
+    fireEvent.click(document.querySelector('[data-arm="lift-worst"]')!);
+    await waitFor(() => expect(screen.getByText(/Слабейшая связка:.*открыта на разбор/)).not.toBeNull());
+  });
   it('RT 65.25 → 50% и вердикт многоборья', () => {
     try { localStorage.clear(); } catch { /* noop */ }
     render(<ArmliftingDiagnosticsHub />);

@@ -2,6 +2,11 @@
  * arm-hub-panels.tsx — панели хаба диагностики: шапка, контролы, вывод,
  * P0-блок, стол-полоса, CTA. Чистая презентация (props H: any), логика
  * живёт в ArmDiagnosticsHub. Строки и aria 1-в-1.
+ *
+ * Композиция 1-в-1 с ТА-хабом: HubHead = герой (иконка/заголовок/чипы/
+ * параметры/как-пользоваться/тост), ряд табов с «Применить» живёт в
+ * ArmDiagnosticsHub, HubActionBar = нижняя панель действий (применить +
+ * экспорт), как в WLDiagnosticsHub.
  */
 import React from 'react';
 import { loadRedFlags, saveRedFlags } from '../../../engines/arm/arm-redflags.store';
@@ -11,21 +16,32 @@ import { getArmLandmarks } from '../../../engines/arm/arm-volume-landmarks.engin
 import type { ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
-import { AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner, AdCta, AdSteps } from './arm-design-system';
+import { AdSec, AdGrid, AdField, AdChip, AdBtn, AdBanner } from './arm-design-system';
 import { CARD } from './training-ui';
 
 /* BB-shell: hero/controls/action поверх тех же .ad-* классов и data-arm
- * хуков (APK-CSS и тесты целы) — только воздух, иерархия CTA и липкость. */
+ * хуков (APK-CSS и тесты целы) — только воздух, иерархия CTA и липкость.
+ * Палитра/радиусы/метрики — язык ТА-хаба (§WL-VISUAL-PARITY в arm-design.css),
+ * здесь только верхняя кромка героя, которая инлайном перекрывает CSS. */
 const HUB_HERO: React.CSSProperties = {
   ...CARD,
-  borderTop: '2px solid rgba(245, 158, 11, 0.5)',
-  padding: '10px 12px',
+  borderTop: '2px solid rgba(59, 130, 246, 0.5)',
+  padding: '14px',
 };
 const HUB_SECTION_GAP: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 };
 import { LEVEL_OPTS, TAB_DEFS, WP_LABEL_SHORT } from './arm-hub-shared';
 
+const TECHNIQUE_OPTS = [
+  { id: 'balanced', label: 'Сбалансировано' },
+  { id: 'hook', label: 'Хук' },
+  { id: 'toproll', label: 'Топролл' },
+  { id: 'press', label: 'Пресс' },
+];
+
 export function HubHead({ H }: { H: any }) {
   const { state, report, scoring, showScoring, weightClassAuto, benchRes, forceVecPro, toast, hasWeak } = H;
+  const teen = state.ageBand === 'teen';
+  const pressBeginner = state.level === 'beginner' && state.technique === 'press';
   return (
     <div className="ad-card" data-tone="amber" data-arm="hub-head" style={HUB_HERO}>
       <div className="ad-head">
@@ -33,7 +49,7 @@ export function HubHead({ H }: { H: any }) {
           🤝
         </div>
         <div className="ad-head-tx">
-          <h2 className="ad-head-title">Арм-диагностика — PRO MAX хаб</h2>
+          <h2 className="ad-head-title">Арм-диагностика — хаб движения PRO</h2>
           <p className="ad-head-sub">6 табов × РУ/РА/РН × VBT × Force + Динамика F/t F100/F500 × Асимметрия × Бенчмарки × Fatigue × Tendon ACWR + Коррекция</p>
         </div>
         <div className="ad-head-side">
@@ -65,9 +81,22 @@ export function HubHead({ H }: { H: any }) {
         <span className="ad-tag">{benchRes.level} · {Math.round(benchRes.avgScore*10)/10} (сила {forceVecPro.scoreReliable ? forceVecPro.totalScore : '—'})</span>
         {report.asymmetryPct!=null && <span className="ad-tag">Асимметрия {report.asymmetryPct}%</span>}
       </div>
+      <HubControls H={H} />
+      {teen && (
+        <AdBanner tone="bad">
+          <b>⚠ 14–15 лет: зона отрыва медиального надмыщелка</b>
+          <div>Резкая тяга flexor-pronator отрывает апофиз роста — side-давление, спарринги и максимумы запрещены, только техника/ОФП + врач. Это скрининг, не диагноз.</div>
+        </AdBanner>
+      )}
+      {pressBeginner && (
+        <AdBanner tone="warn">
+          <b>⚠ Новичкам пресс опасен</b>
+          <div>Тендоны локтя рвутся от пресса из невыгодной позиции — только из нейтрали, начни с хука/топролла.</div>
+        </AdBanner>
+      )}
       <AdSec title="ℹ️ Как пользоваться" collapsible defaultOpen={false} summary="4 шага до плана">
         <div className="ad-muted">
-          <b>1 Тело</b> — вес, хват (RT/Axle/Pinch), VBT · <b>2 Точки</b> — 1–3 мёртвые точки из 12 (подсветка ● = для твоей техники) · <b>3 Тесты</b> — 4×F/t + L/R + стол/scale · <b>4 План</b> — причины → топ-3 → «💉 Вставить» или «→ Применить в Арм-конструктор» внизу. Видео — опционально.
+          <b>1 Тело</b> — вес, хват (RT/Axle/Pinch), VBT · <b>2 Точки</b> — 1–3 мёртвые точки из 12 (подсветка ● = для твоей техники) · <b>3 Тесты</b> — 4×F/t + L/R + стол/scale · <b>4 План</b> — причины → топ-3 → «💉 Вставить» или «→ Применить в Арм-конструктор» внизу. Видео в хабе нет — углы и замеры вводятся вручную.
         </div>
       </AdSec>
       {toast && <AdBanner tone="ok">{toast}</AdBanner>}
@@ -75,60 +104,57 @@ export function HubHead({ H }: { H: any }) {
   );
 }
 
+/** Параметры атлета: уровень/техника/вес/пол/возраст. Живёт в герое (как в ТА —
+ *  перекрёстные входы не размазываны по табам), свёрнут по умолчанию,
+ *  саммари всегда показывает текущие значения. */
 export function HubControls({ H }: { H: any }) {
-  const { state, setState, weightClassAuto, tab, setTab, applyToConstructor } = H;
+  const { state, setState, weightClassAuto } = H;
+  const levelLabel = LEVEL_OPTS.find((o) => o.id === state.level)?.label || state.level;
+  const techLabel = TECHNIQUE_OPTS.find((o) => o.id === state.technique)?.label || state.technique;
   return (
-    <div style={HUB_SECTION_GAP}>
-      <div>
-        <div className="ad-fl">Уровень</div>
-        <div className="ad-chips">
-          {LEVEL_OPTS.map(o=> <AdChip key={o.id} active={state.level===o.id} onClick={()=>setState((s: any)=>({...s, level:o.id}))}>{o.label}</AdChip>)}
+    <AdSec
+      title="🧭 Параметры атлета"
+      hook="hub-params"
+      collapsible
+      defaultOpen={false}
+      summary={`${levelLabel} · ${techLabel} · ${state.bwKg || '—'} кг · ${state.sex === 'female' ? 'Ж' : 'М'}${state.ageBand === 'teen' ? ' · 14–15' : ''}`}
+    >
+      <div style={HUB_SECTION_GAP}>
+        <div>
+          <div className="ad-fl">Уровень</div>
+          <div className="ad-chips">
+            {LEVEL_OPTS.map(o=> <AdChip key={o.id} active={state.level===o.id} onClick={()=>setState((s: any)=>({...s, level:o.id}))}>{o.label}</AdChip>)}
+          </div>
+        </div>
+        <div>
+          <div className="ad-fl">Техника</div>
+          <div className="ad-chips">
+            {TECHNIQUE_OPTS.map(o=> <AdChip key={o.id} active={state.technique===o.id} onClick={()=>setState((s: any)=>({...s, technique:o.id}))}>{o.label}</AdChip>)}
+          </div>
+        </div>
+        <AdGrid cols="2">
+          <AdField label="Вес кг">
+            <input inputMode="decimal" value={state.bwKg} onChange={e=>setState((s: any)=>({...s, bwKg:e.target.value}))} placeholder="80" />
+          </AdField>
+          <AdField label="Класс WAF">
+            <input value={weightClassAuto} readOnly />
+          </AdField>
+        </AdGrid>
+        <div>
+          <div className="ad-fl">Пол</div>
+          <div className="ad-chips">
+            {[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}].map(o=> <AdChip key={o.id} active={state.sex===o.id} onClick={()=>setState((s: any)=>({...s, sex:o.id}))}>{o.label}</AdChip>)}
+          </div>
+        </div>
+        <div>
+          <div className="ad-fl">Возраст</div>
+          <div className="ad-chips">
+            <AdChip active={state.ageBand === 'adult'} onClick={()=>setState((s: any)=>({...s, ageBand: s.ageBand === 'adult' ? '' : 'adult'}))}>Взрослый 16+</AdChip>
+            <AdChip active={state.ageBand === 'teen'} tone="red" onClick={()=>setState((s: any)=>({...s, ageBand: s.ageBand === 'teen' ? '' : 'teen'}))}>Подросток 14–15</AdChip>
+          </div>
         </div>
       </div>
-      <div>
-        <div className="ad-fl">Техника</div>
-        <div className="ad-chips">
-          {[{id:'balanced',label:'Сбалансировано'},{id:'hook',label:'Хук'},{id:'toproll',label:'Топролл'},{id:'press',label:'Пресс'}].map(o=> <AdChip key={o.id} active={state.technique===o.id} onClick={()=>setState((s: any)=>({...s, technique:o.id}))}>{o.label}</AdChip>)}
-        </div>
-      </div>
-      <AdGrid cols="2">
-        <AdField label="Вес кг">
-          <input inputMode="decimal" value={state.bwKg} onChange={e=>setState((s: any)=>({...s, bwKg:e.target.value}))} placeholder="80" />
-        </AdField>
-        <AdField label="Класс WAF">
-          <input value={weightClassAuto} readOnly />
-        </AdField>
-      </AdGrid>
-      <div>
-        <div className="ad-fl">Пол</div>
-        <div className="ad-chips">
-          {[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}].map(o=> <AdChip key={o.id} active={state.sex===o.id} onClick={()=>setState((s: any)=>({...s, sex:o.id}))}>{o.label}</AdChip>)}
-        </div>
-      </div>
-      <div>
-        <div className="ad-fl">Возраст</div>
-        <div className="ad-chips">
-          <AdChip active={state.ageBand === 'adult'} onClick={()=>setState((s: any)=>({...s, ageBand: s.ageBand === 'adult' ? '' : 'adult'}))}>Взрослый 16+</AdChip>
-          <AdChip active={state.ageBand === 'teen'} tone="red" onClick={()=>setState((s: any)=>({...s, ageBand: s.ageBand === 'teen' ? '' : 'teen'}))}>Подросток 14–15</AdChip>
-        </div>
-      </div>
-      {state.ageBand === 'teen' && (
-        <AdBanner tone="bad">
-          <b>⚠ 14–15 лет: зона отрыва медиального надмыщелка</b>
-          <div>Резкая тяга flexor-pronator отрывает апофиз роста — side-давление, спарринги и максимумы запрещены, только техника/ОФП + врач. Это скрининг, не диагноз.</div>
-        </AdBanner>
-      )}
-      {state.level === 'beginner' && state.technique === 'press' && (
-        <AdBanner tone="warn">
-          <b>⚠ Новичкам пресс опасен</b>
-          <div>Тендоны локтя рвутся от пресса из невыгодной позиции — только из нейтрали, начни с хука/топролла.</div>
-        </AdBanner>
-      )}
-      <AdSteps steps={TAB_DEFS.map(t=>({ id: t.id, label: `${t.icon} ${t.label}` }))} active={tab} onSelect={(id)=>setTab(id)} hook="hub-tabs" numbered={false} />
-      <div className="ad-row" style={{ marginTop: 6 }}>
-        <AdBtn variant="amber" block hero data-arm="hub-apply-top" aria-label="Применить в Арм-конструктор" onClick={applyToConstructor}>→ Применить в Арм-конструктор</AdBtn>
-      </div>
-    </div>
+    </AdSec>
   );
 }
 
@@ -181,7 +207,7 @@ const RED_FLAGS: Array<{ id: string; label: string }> = [
 ];
 
 export function HubP0Panel({ H }: { H: any }) {
-  const { state, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0, diaryTrendsP0, diarySuggestP0, toggleWeakPoint, handleInjectP0, hasInjectPrev, handleRollbackP0, handleExportHtmlP0, handlePrintP0, handleExportCsvP0, handleExportIcsP0, injectMsg, criticalSideP0, specWeeks, setSpecWeeks, armPlan, setTab, corrV2 } = H;
+  const { state, armAudit, armWorst, armCausesP0, armTop3P0, armSpecP0, diaryTrendsP0, diarySuggestP0, toggleWeakPoint, handleInjectP0, injectMsg, criticalSideP0, specWeeks, setSpecWeeks, armPlan, setTab, corrV2 } = H;
   // PRO-3 P4: red-flags в персисте (he_arm_diag_redflags), а не только в useState
   const [redFlags, setRedFlags] = React.useState<string[]>(() => { try { return loadRedFlags(); } catch { return []; } });
   const toggleRed = (id: string) => setRedFlags((p) => {
@@ -228,7 +254,7 @@ export function HubP0Panel({ H }: { H: any }) {
                   onClick={() => toggleWeakPoint(wp)}
                   data-covered={sets > 0 ? 'true' : 'false'}
                   data-worst={worst ? 'true' : 'false'}
-                  style={{ cursor: 'pointer', fontSize: 10, padding: '4px 8px', borderRadius: 12, background: worst ? 'rgba(239,68,68,0.12)' : sets > 0 ? 'rgba(34,197,94,0.10)' : isSel ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${worst ? 'rgba(239,68,68,0.35)' : sets > 0 ? 'rgba(34,197,94,0.25)' : isSel ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}`, color: worst ? '#ef4444' : sets > 0 ? '#22c55e' : '#fff' }}
+                  style={{ cursor: 'pointer', fontSize: 10, padding: '4px 8px', borderRadius: 12, background: worst ? 'rgba(239,68,68,0.12)' : sets > 0 ? 'rgba(34,197,94,0.10)' : isSel ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${worst ? 'rgba(239,68,68,0.35)' : sets > 0 ? 'rgba(34,197,94,0.25)' : isSel ? 'rgba(59,130,246,0.3)' : '#1f3a5f'}`, color: worst ? '#ef4444' : sets > 0 ? '#22c55e' : '#fff' }}
                 >
                   {(WP_LABEL_SHORT as any)[wp] || wp} {sets}
                 </span>
@@ -273,19 +299,12 @@ export function HubP0Panel({ H }: { H: any }) {
             <input inputMode="numeric" value={specWeeks} onChange={(e) => setSpecWeeks(e.target.value)} />
           </AdField>
           {armWorst && !state.weakPoints.includes(armWorst as any) && (
-            <AdBtn variant="amber" onClick={() => toggleWeakPoint(armWorst as any)}>🎯 Худшая в плане: {armWorst} → разобрать</AdBtn>
+            <AdBtn variant="amber" data-arm="arm-worst" onClick={() => toggleWeakPoint(armWorst as any)}>🎯 Худшая в плане: {armWorst} → разобрать</AdBtn>
           )}
           {diarySuggestP0.length > 0 && (
             <AdBtn variant="dark" onClick={() => { for (const p of diarySuggestP0.slice(0, 3)) if (!state.weakPoints.includes(p as any)) toggleWeakPoint(p as any); }}>📊 Дневник → в слабые ({diarySuggestP0.slice(0, 3).join(', ')})</AdBtn>
           )}
           <AdBtn variant="primary" block hero onClick={handleInjectP0}>💉 Вставить коррекции в план ({state.weakPoints.length || 0})</AdBtn>
-          {hasInjectPrev && (
-            <AdBtn variant="dark" onClick={handleRollbackP0}>↩ Откат</AdBtn>
-          )}
-          <AdBtn variant="ghost" onClick={handleExportHtmlP0}>🖨 HTML</AdBtn>
-          <AdBtn variant="ghost" onClick={handlePrintP0}>🖨 Печать</AdBtn>
-          <AdBtn variant="ghost" onClick={handleExportCsvP0}>📥 CSV</AdBtn>
-          <AdBtn variant="ghost" data-arm="export-ics" onClick={handleExportIcsP0}>📅 Календарь (.ics)</AdBtn>
           {criticalSideP0 && <span className="ad-tip">🔴 критично — side только ремень/изометрия</span>}
         </div>
         {injectMsg && <AdBanner tone={injectMsg.startsWith('✓') || injectMsg.startsWith('↩') ? 'ok' : 'warn'}>{injectMsg}</AdBanner>}
@@ -485,23 +504,49 @@ export function HubAction({ H }: { H: any }) {
   const label = (pts.join(', ') || muscles.join(', ')) || (dynKeys.length ? 'динамика' : 'баланс');
   const count = pts.length ? `${pts.length} точек` : `${muscles.length} мышц`;
   return (
-    <>
-      <AdSec title="📦 Что уедет в конструктор" hook="hub-bridge-preview" collapsible defaultOpen={false} summary={hasPayload ? label : 'пока пусто'}>
-        {hasPayload ? (
-          <div className="ad-muted">
-            <div>Точки: {pts.join(', ') || '—'} · Мышцы: {muscles.join(', ') || '—'} · Динамика: {dynKeys.join(', ') || '—'}</div>
-            <div>Дни инъекции: {days.join(', ') || '—'} · Топ-коррекции: {pts.length ? pts.map((p) => `${p}: ${((armTop3P0 as any)[p] || [])[0]?.id || '—'}`).join(' · ') : '—'}</div>
-            <div>Гейты: {criticalSideP0 ? '🔴 side gated — только ремень/изометрия' : '✓ humerus/budget/dedup — штатно'}</div>
-          </div>
-        ) : (
-          <div className="ad-muted">Пока нечего отправлять — выбери 1–3 точки (шаг 2) или введи тесты хвата/силы (шаг 3). Пустой мост не полетит: конструктор честно скажет «не выявлены».</div>
-        )}
-      </AdSec>
-      <AdCta>
-      <AdBtn variant="amber" block hero onClick={applyToConstructor}>→ Применить в Арм-конструктор ({label} · {count})</AdBtn>
-      </AdCta>
+    <AdSec title="📦 Что уедет в конструктор" hook="hub-bridge-preview" collapsible defaultOpen={false} summary={hasPayload ? label : 'пока пусто'}>
+      {hasPayload ? (
+        <div className="ad-muted">
+          <div>Точки: {pts.join(', ') || '—'} · Мышцы: {muscles.join(', ') || '—'} · Динамика: {dynKeys.join(', ') || '—'}</div>
+          <div>Дни инъекции: {days.join(', ') || '—'} · Топ-коррекции: {pts.length ? pts.map((p) => `${p}: ${((armTop3P0 as any)[p] || [])[0]?.id || '—'}`).join(' · ') : '—'}</div>
+          <div>Гейты: {criticalSideP0 ? '🔴 side gated — только ремень/изометрия' : '✓ humerus/budget/dedup — штатно'}</div>
+        </div>
+      ) : (
+        <div className="ad-muted">Пока нечего отправлять — выбери 1–3 точки (шаг 2) или введи тесты хвата/силы (шаг 3). Пустой мост не полетит: конструктор честно скажет «не выявлены».</div>
+      )}
       <div className="ad-muted">Bridge: <code>weakpoints</code> → <code>ArmAutoConstructor</code> via <code>planner-bridge</code> · <code>armWeakPoints(12)</code>+<code>biomechCards</code>+<code>corrections</code>+<code>armDynamic</code>+<code>scoring</code> в payload · dedup/budget/humerus gated</div>
       {(diag as any).biomechCards?.length ? <div className="ad-muted">Инъекция: {(diag as any).biomechCards.map((c:any)=> `${c.weakPoint}→${c.corrections[0]}`).join(' · ')} · per-day ≤8, budget {(report as any).scoring?.score ?? ''}</div> : null}
-    </>
+    </AdSec>
+  );
+}
+
+/** Нижняя панель действий — 1-в-1 с ТА-хабом: «Применить» + экспорт.
+ *  Кнопки липятся к низу (.ad-cta) — на телефоне всегда под рукой. */
+export function HubActionBar({ H }: { H: any }) {
+  const {
+    applyToConstructor, state, diag, handleRollbackP0, hasInjectPrev,
+    handleExportHtmlP0, handlePrintP0, handleExportCsvP0, handleExportIcsP0,
+  } = H;
+  const pts: string[] = state.weakPoints.length ? state.weakPoints : [];
+  const muscles: string[] = pts.length ? [] : (diag?.weakMuscles || []).slice(0, 2);
+  const label = (pts.join(', ') || muscles.join(', ')) || 'баланс';
+  return (
+    <div className="ad-cta" data-arm="hub-action-bar" style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+      <AdBtn
+        variant="amber"
+        hero
+        data-arm="hub-apply-bottom"
+        aria-label="Применить в Арм-конструктор"
+        onClick={applyToConstructor}
+        style={{ flex: '1 1 190px', minWidth: 0 }}
+      >
+        → Применить в Арм-конструктор ({label})
+      </AdBtn>
+      {hasInjectPrev && <AdBtn variant="dark" data-arm="hub-rollback" onClick={handleRollbackP0}>↩ Откат</AdBtn>}
+      <AdBtn variant="ghost" data-arm="export-html" onClick={handleExportHtmlP0}>🖨 HTML</AdBtn>
+      <AdBtn variant="ghost" data-arm="export-print" onClick={handlePrintP0}>🖨 Печать</AdBtn>
+      <AdBtn variant="ghost" data-arm="export-csv" onClick={handleExportCsvP0}>📥 CSV</AdBtn>
+      <AdBtn variant="ghost" data-arm="export-ics" onClick={handleExportIcsP0}>📅 Календарь (.ics)</AdBtn>
+    </div>
   );
 }
