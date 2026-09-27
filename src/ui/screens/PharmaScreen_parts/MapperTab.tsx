@@ -6,6 +6,7 @@ import type { DrugEntry, MapperResult } from '../../../engines/drug-mapper.engin
 import { useDataLink } from '../../../core/data-link';
 import { weeklyDose } from '../../../engines/pharma-frequency';
 import { PHARMA_DB } from '../../../core/pharma-database';
+import { FemalePharmaCalculator } from './FemalePharmaCalculator';
 
 const FEMALE_AAS_DRUGS = Object.values(PHARMA_DB).filter(s =>
   s.class !== 'peptide' && s.class !== 'vitamin' && s.class !== 'mineral' &&
@@ -15,6 +16,7 @@ const FEMALE_AAS_DRUGS = Object.values(PHARMA_DB).filter(s =>
 export const MapperTab: React.FC = () => {
   const linked = useDataLink();
   const course = linked.course || [];
+  /** Ж3/Л11 (фаза 2 женского слоя): пол профиля — женские патологии стека и женские ec50 гемато. */
   const profileSex: 'male' | 'female' = linked.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
   const [manualDrugs, setManualDrugs] = useState<DrugEntry[]>([]);
   const [femaleAasEntries, setFemaleAasEntries] = useState<{ drugId: string; doseMgWeek: number; ester: string; weeksOn: number }[]>([]);
@@ -407,6 +409,12 @@ export const MapperTab: React.FC = () => {
         <div style={{ ...card, textAlign:'center', padding:24, borderStyle:'dashed', background:'rgba(22,22,26,0.32)' }}>
           <div style={{ width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px', background:'rgba(139,92,246,0.10)', border:'1px solid rgba(139,92,246,0.14)', fontSize:20 }}>🧬</div>
           <div style={{ fontSize:12, color:'#fff', fontWeight:600 }}>{course.length > 0 ? 'Нажми «Запустить маппинг» — увидишь патологии и маркеры' : 'Добавь препараты в курс или вручную — затем запусти маппинг'}</div>
+        </div>
+      )}
+
+      {profileSex === 'female' && (
+        <div style={{ marginTop:16 }}>
+          <FemalePharmaCalculator />
         </div>
       )}
     </div>

@@ -21,6 +21,7 @@ import type { TzCategory } from './tz-bridge-mechanism';
 import { TOTAL_LIMIT, CATEGORY_LIMITS } from './tz-bridge-mechanism';
 import type { TzMechId } from './tz-bridge-marker';
 import { canonId } from './support-plan/shared-constants';
+import { PHARMA_DB } from '../core/constants';
 
 export interface FemaleLayerSub {
   substanceId: string;
@@ -77,6 +78,46 @@ export const FEMALE_LAYER_SUBS: FemaleLayerSub[] = [
     reason: '♀ Женский слой: яичниковая функция и чувствительность к инсулину (доказан при СПКЯ); успокоение ЦНС',
     mechsCovered: ['cns1' as TzMechId],
     priority: 3,
+  },
+  {
+    substanceId: 'folate',
+    nameRu: 'Фолиевая кислота (метилфолат)',
+    category: 'vitamin',
+    k: 0.08,
+    q: 'A',
+    reason: '♀ Критична при планировании беременности; профилактика дефектов нервной трубки (400-800 мкг/сут)',
+    mechsCovered: ['hem1' as TzMechId],
+    priority: 2,
+  },
+  {
+    substanceId: 'vitamin_b6',
+    nameRu: 'Витамин B6 (пиридоксин)',
+    category: 'vitamin',
+    k: 0.06,
+    q: 'B',
+    reason: '♀ Предменструальные симптомы, синтез серотонина/ГАМК; 10-25 мг/сут (не более 100 мг — нейротоксичность)',
+    mechsCovered: ['cns1' as TzMechId],
+    priority: 3,
+  },
+  {
+    substanceId: 'omega3',
+    nameRu: 'Омега-3 (EPA+DHA)',
+    category: 'fatty_acid',
+    k: 0.12,
+    q: 'A',
+    reason: '♀ Воспаление, липидный профиль, настроение; 1-2 г EPA+DHA/сут (ISSN 2017)',
+    mechsCovered: ['cv1' as TzMechId, 'cns1' as TzMechId],
+    priority: 2,
+  },
+  {
+    substanceId: 'probiotics',
+    nameRu: 'Пробиотики (Lactobacillus/Bifidobacterium)',
+    category: 'gut',
+    k: 0.04,
+    q: 'B',
+    reason: '♀ Микрофлора, иммунитет, синтез витаминов; 10-50 млрд КОЕ/сут',
+    mechsCovered: ['immune1' as TzMechId],
+    priority: 4,
   },
 ];
 
@@ -152,6 +193,45 @@ export const FEMALE_ALL_LAYER_SUBS: FemaleLayerSub[] = [
   ...FEMALE_LAB_GATED_SUBS,
 ];
 
+/**
+ * Фазовый учё менструального цикла: в лютеиновой фазе усиливаются Ca/Mg (ПМС),
+ * в фолликулярной — омега-3/адаптогены. Возвращает модификаторы приоритета.
+ */
+export interface FemaleCyclePhase {
+  phase: 'follicular' | 'ovulation' | 'luteal' | 'menstrual';
+  weekOfCycle: number;
+  note: string;
+  boostSubs: string[];
+}
+
+export function detectFemaleCyclePhase(cycleDay?: number): FemaleCyclePhase {
+  if (typeof cycleDay !== 'number' || !Number.isFinite(cycleDay) || cycleDay < 1) {
+    return { phase: 'follicular', weekOfCycle: 1, note: 'Фаза цикла не указана — базовая поддержка', boostSubs: [] };
+  }
+  if (cycleDay <= 7) return { phase: 'menstrual', weekOfCycle: 1, note: 'Менструация: железо (по ферритину), омега-3, магний', boostSubs: ['iron_bisglycinate', 'omega3', 'magnesium'] };
+  if (cycleDay <= 14) return { phase: 'follicular', weekOfCycle: 2, note: 'Фолликулярная фаза: омега-3, адаптогены', boostSubs: ['omega3', 'vitex'] };
+  if (cycleDay <= 21) return { phase: 'luteal', weekOfCycle: 3, note: 'Лютеиновая фаза: Ca/Mg (ПМС), B6, вода', boostSubs: ['calcium', 'magnesium', 'vitamin_b6'] };
+  return { phase: 'luteal', weekOfCycle: 4, note: 'Поздняя лютеиновая: Ca/Mg, сон', boostSubs: ['calcium', 'magnesium'] };
+}
+
+/** Предупреждения о вирилизации — активные при наличии курса. */
+export function femaleVirilizationWarnings(activeDrugs: string[]): string[] {
+  const warnings: string[] = [];
+  const hasAAS = activeDrugs.some(d => {
+    const entry = PHARMA_DB[d];
+    if (!entry) return false;
+    const cls = (entry.class || '').toLowerCase();
+    return cls.includes('aas') || cls.includes('testosterone') || cls.includes('trenbolone') ||
+           cls.includes('nandrolone') || cls.includes('oxandrolone') || cls.includes('stanozolol') ||
+           cls.includes('anabolic') || entry.pd?.AR_affinity !== undefined;
+  });
+  if (!hasAAS) return warnings;
+  warnings.push('⚠️ Вирилизация: при изменении голоса/росте волос на лице — отмена ААС, консультация эндокринолога.');
+  warnings.push('⚠️ Контрацепция обязательна на курсе — риск тератогенности.');
+  warnings.push('⚠️ Тест на беременность перед началом курса (ACOG).');
+  return warnings;
+}
+
 export interface FemaleLayerResult {
   /** Добавленные женским слоем позиции (id) */
   added: string[];
@@ -173,6 +253,14 @@ export function hctAtOrAbove48(labs: Record<string, number> | undefined): boolea
   if (!labs || typeof labs !== 'object') return false;
   const hct = labs['HEMATOCRIT'] ?? labs['HCT'];
   return typeof hct === 'number' && Number.isFinite(hct) && hct >= 48;
+}
+
+/** Базовые предупреждения для женщин (показываются всегда при sex=female). */
+export function femaleBaseWarnings(): string[] {
+  return [
+    '⚠️ Контрацепция обязательна на курсе — риск тератогенности.',
+    '⚠️ Тест на беременность перед началом курса (ACOG).',
+  ];
 }
 
 /**
@@ -213,8 +301,9 @@ export function applyFemaleSupport(rec: SupportRecommendation, ctx: MapperCtx): 
     // Гейт ВНУТРИ слоя: мужской путь сюда не доходит (sex-проверка выше).
     if (layer.labGate && !layer.labGate(ctx.labs)) continue;
     if (existing.has(canonId(layer.substanceId))) continue;
-    if (subs.length >= TOTAL_LIMIT[ctx.level]) break;
-    const catLimit = CATEGORY_LIMITS[ctx.level]?.[layer.category] ?? 0;
+    const totalLimit = TOTAL_LIMIT[ctx.level] ?? TOTAL_LIMIT['intermediate'] ?? 20;
+    if (subs.length >= totalLimit) break;
+    const catLimit = (CATEGORY_LIMITS[ctx.level] ?? CATEGORY_LIMITS['intermediate'])?.[layer.category] ?? 0;
     if ((categoryCount.get(layer.category) || 0) >= catLimit) continue;
     subs.push({
       substanceId: layer.substanceId,
@@ -231,7 +320,6 @@ export function applyFemaleSupport(rec: SupportRecommendation, ctx: MapperCtx): 
   }
 
   const femaleFlags = rec.pedRisk?.femaleFlags || [];
-  if (added.length === 0 && removed.length === 0 && femaleFlags.length === 0) return rec;
 
   const warnings = [...(rec.protocolWarnings || [])];
   for (const f of femaleFlags) {
