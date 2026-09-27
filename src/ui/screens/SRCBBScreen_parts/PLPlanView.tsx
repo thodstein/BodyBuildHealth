@@ -110,6 +110,8 @@ export interface PLPlanViewApi {
   autoRegResult: AutoRegOutput;
   pmAutoRegMode: PMAutoRegMode;
   setPmAutoRegMode: (m: PMAutoRegMode) => void;
+  periodizationMode: 'linear' | 'dup';
+  setPeriodizationMode: (m: 'linear' | 'dup') => void;
   pmDiary: { multiplier: Record<string, number>; decisions: string[]; adjusted: number; noData: number } | null;
   bridgeRir: number;
   pmSquat: number; pmBench: number; pmDead: number;
@@ -145,7 +147,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
     onNote, buildSrc,
     selectedCycleId, cycleWeeks, goal, level, peds, pedDoses, pedAuto, courseIntensity,
     autoRegMode, setAutoRegMode, autoRegResult, bridgeRir, pmSquat, pmBench, pmDead, best,
-    pmAutoRegMode, setPmAutoRegMode, pmDiary,
+    pmAutoRegMode, setPmAutoRegMode, periodizationMode, setPeriodizationMode, pmDiary,
     plWeakPoints, linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
     e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
     tempoStr, getTempo, hasDeload, onRemoveDeload,
@@ -431,6 +433,33 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       {pmDiary.decisions.slice(0,4).map((d, i) => <div key={i} style={{ marginTop:2, color:'#fff' }}>• {d}</div>)}
                     </div>}
                     {pmAutoRegMode === 'diary' && !pmDiary && <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>⚠ Постройте план — дневниковая авторегуляция ПМ применится к кривой ПМ.</div>}
+                  </div>
+                );
+              })()}
+              {/* Режим периодизации: linear vs DUP */}
+              {(() => {
+                const pzColor = periodizationMode === 'dup' ? '#22d3ee' : '#71717a';
+                const pzBtn = (m: 'linear' | 'dup', label: string) => (
+                  <button onClick={() => setPeriodizationMode(m)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: periodizationMode === m ? pzColor : 'rgba(255,255,255,0.08)', color: periodizationMode === m ? '#000' : '#fff' }}>{label}</button>
+                );
+                return (
+                  <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: periodizationMode === 'linear' ? 'rgba(255,255,255,0.02)' : 'rgba(34,211,238,0.06)', border: '1px solid ' + (periodizationMode === 'linear' ? 'rgba(255,255,255,0.06)' : 'rgba(34,211,238,0.25)') }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                      <div>
+                        <span style={{ fontSize:11, fontWeight:700, color: periodizationMode === 'linear' ? '#fff' : pzColor }}>
+                          {periodizationMode === 'linear' ? 'Периодизация: линейная' : '🔄 Периодизация: DUP'}
+                        </span>
+                        <span style={{ marginLeft:6, fontSize:10, color:'#fff' }}>ежедневное варьирование зон</span>
+                      </div>
+                      <div style={{ display:'flex', gap:3, alignItems:'center' }}>
+                        <span style={{ fontSize:10, fontWeight:700, color: pzColor, marginRight: 4 }}>Периодизация:</span>
+                        {pzBtn('linear', 'ЛИНЕЙНАЯ')}
+                        {pzBtn('dup', 'DUP')}
+                      </div>
+                    </div>
+                    {periodizationMode === 'dup' && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
+                      <div>DUP (Daily Undulating Periodization): каждый день недели — своя зона (гипертрофия/сила/пик). Вес и RIR варьируются по дням недели.</div>
+                    </div>}
                   </div>
                 );
               })()}

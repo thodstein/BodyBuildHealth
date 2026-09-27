@@ -1379,8 +1379,11 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       }
     }
     const weekLayout: SRDaySpec[] = hasExplicitWeeks ? template.weeks![w] : template.week1;
-    const days: LMSPlanDay[] = weekLayout.map((day: SRDaySpec) => {
+    const days: LMSPlanDay[] = weekLayout.map((day: SRDaySpec, dayIdx: number) => {
       const dayTag = dayLoadTag(day.exercises as { load?: string }[]);
+      // DUP: варьирование зон по дням недели (мягкий DUP поверх шаблона цикла)
+      const dupWtMult = input.periodization === 'dup' && !faithful ? [1.0, 0.97, 0.94][dayIdx % 3] ?? 1 : 1;
+      const dupRirShift = input.periodization === 'dup' && !faithful ? dayIdx % 3 : 0;
 
       // S-MRV: Бюджет утомления на сессию
       let dayFatigueBudget = fatigueBudget(input.currentReadiness);
@@ -1416,7 +1419,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
            // Расчётный вес с авторегуляцией (topSetPctMultiplier)
            const baseWeight = workWeight(pm, s.pct);
-           let adjWeight = Math.round(baseWeight * arTopMult * 10) / 10;
+           let adjWeight = Math.round(baseWeight * arTopMult * dupWtMult * 10) / 10;
 
            // VBT: подгрузка веса по скорости разминочного подхода
            if (input.vbt && input.vbt.lift === (spec.load?.toLowerCase() as VBTLift)) {
@@ -1430,9 +1433,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
              }
            }
 
-           // RIR с ACWR + авторегуляцией
-           const baseRir = faithful ? (s.rir ?? rirBase) : rirBase;
-           const adjRir = Math.max(0, Math.min(6, baseRir + acwrRirShift + arRirShift + (metaDeload && !faithful ? 2 : 0)));
+            // RIR с ACWR + авторегуляцией + DUP
+            const baseRir = faithful ? (s.rir ?? rirBase) : rirBase;
+            const adjRir = Math.max(0, Math.min(6, baseRir + acwrRirShift + arRirShift + dupRirShift + (metaDeload && !faithful ? 2 : 0)));
 
           return {
             pct: s.pct, reps: s.reps, sets: Math.max(1, sets),

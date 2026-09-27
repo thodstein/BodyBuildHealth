@@ -54,7 +54,7 @@ const api = (): PLPlanViewApi => ({
   selectedCycleId: 'cycle-01', cycleWeeks: 8, goal: 'strength', level: 'II-KMS',
   peds: [], pedDoses: {}, pedAuto: false, courseIntensity: 'moderate',
   autoRegMode: 'off', setAutoRegMode: () => {}, autoRegResult: { topSetPctMultiplier: 1, volumeMultiplier: 1, rirShift: 0, deload: false, decisions: [] } as never,
-  pmAutoRegMode: 'off', setPmAutoRegMode: () => {}, pmDiary: null,
+  pmAutoRegMode: 'off', setPmAutoRegMode: () => {}, periodizationMode: 'linear', setPeriodizationMode: () => {}, pmDiary: null,
   bridgeRir: 0, pmSquat: 180, pmBench: 120, pmDead: 220,
   best: { cycle: { meta: { id: 'cycle-01', title: 'Тестовый цикл', direction: 'powerlifting', period: 'силовой', level: 'II-KMS', weeks: 8, sessionsPerWeek: 3, correctionPct: 0.005 } }, score: 0, rationale: [], warnings: [] } as never,
   plWeakPoints: [],

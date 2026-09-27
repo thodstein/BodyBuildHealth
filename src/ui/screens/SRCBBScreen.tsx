@@ -607,6 +607,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       // and apply the cycle's own PM correction between weeks.
       progressionEnabled: true,
       faithful: true,
+      periodization: periodizationMode,
       ...rec,
     });
     // 🔋 Делод по кнопке пользователя: применяется к САМОМУ плану (таблица/печать/
@@ -956,6 +957,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const autoRegOn = autoRegMode !== 'off';
   // Авторегуляция ПРОГРЕССИИ ПМ (только ПМ) — независимый переключатель от авторегуляции весов/объёма/RIR.
   const [pmAutoRegMode, setPmAutoRegMode] = useState<PMAutoRegMode>('off');
+  // Режим периодизации: linear (линейная прогрессия) или dup (ежедневное варьирование зон).
+  const [periodizationMode, setPeriodizationMode] = useState<'linear' | 'dup'>('linear');
   const acwrData = useMemo(() => {
     const srpe = loadSRPESessions();
     if (srpe.length < 2) return { ratio: 1.0, zone: 'optimal' as const };
@@ -1801,7 +1804,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             buildSrc: () => buildSrc(),
             selectedCycleId, cycleWeeks, goal, level, peds, pedDoses, pedAuto, courseIntensity,
             autoRegMode, setAutoRegMode, autoRegResult, bridgeRir, pmSquat, pmBench, pmDead,
-            pmAutoRegMode, setPmAutoRegMode, pmDiary,
+             pmAutoRegMode, setPmAutoRegMode, periodizationMode, setPeriodizationMode, pmDiary,
             best: ranked[0] as never,
             plWeakPoints,
             linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
