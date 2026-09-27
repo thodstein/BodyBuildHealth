@@ -40,6 +40,7 @@ import { diagnosticCompleteness } from '../../../engines/arm/armlift-completenes
 import { applyToPlanner } from './planner-bridge';
 import { AdRoot, AdCard, AdSec, AdGrid, AdChip, AdBtn, AdBanner, AdCta, AdStat } from './arm-design-system';
 import { haptics } from '../../../core/native-bridge';
+import { printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 /** PRO-визуал: уровень → цвет точки (строки/aria 1-в-1, только подача). */
 const LIFT_LEVEL_COLOR: Record<string, string> = {
@@ -712,18 +713,13 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
   };
 
-  const handlePrint = () => {
+  /** АПК-безопасная печать: window.open().print() в Capacitor WebView не работает
+   *  (см. core/apk-share.ts) — там .html сохраняется в Documents + Share. */
+  const handlePrint = async () => {
     try {
-      const w = window.open('', '_blank');
-      if (!w) {
-        setToast('⚠ Всплывающие окна заблокированы — используй 🖨 HTML');
-        setTimeout(() => setToast(''), 2500);
-        return;
-      }
-      w.document.write(buildArmliftingHtml(exportData()));
-      w.document.close();
-      w.focus();
-      w.print();
+      const o = await printHtmlApk(buildArmliftingHtml(exportData()), `armlifting-diagnostics-${localIsoDate()}.html`);
+      setToast(shareOutcomeLabel(o));
+      setTimeout(() => setToast(''), 2500);
     } catch { /* noop */ }
   };
 

@@ -52,6 +52,8 @@ import { turnoverDiag, jerkDriveDiag, pullPowerBalance, lvpBallisticNote, moveme
 import { appendTAPhaseSnapshot, taPhaseTrend, loadTAPhaseHistory, saveTAPhaseHistory, type TAPhaseSnapshot } from '../../../engines/strength-sport/strength-sport-ta-phase-history.engine';
 import { appendTAPullPower, taPullPowerTrend, loadTAPullPower, saveTAPullPower } from '../../../engines/strength-sport/strength-sport-ta-pullpower-history.engine';
 import { ymaxNormForBodyweight } from '../../../engines/strength-sport/strength-sport-ta-norms.engine';
+import { printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { localIsoDate } from '../../../core/local-date';
 
 const STORAGE_KEY = 'he_wl_diagnostics_hub_v1';
 
@@ -1485,19 +1487,16 @@ export const WLDiagnosticsHub: React.FC = () => {
   };
 
   // V4-C: печать сводки (то же HTML, что в экспорте; W6: APK-шапка со скором)
-  const handlePrint = () => {
+  const handlePrint = async () => {
     try {
-      const html = buildWLDiagnosticsHtml(exportSnap(), { apkHeader: true });
-      const w = window.open('', '_blank');
-      if (!w) {
-        setToast('Всплывающие окна заблокированы — скачай HTML');
-        setTimeout(() => setToast(''), 2500);
-        return;
-      }
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-      w.print();
+      // АПК: window.open().print() в Capacitor WebView не работает (см. core/apk-share.ts) —
+      // printHtmlApk на native сохраняет .html в Documents + Share, на web — окно печати.
+      const o = await printHtmlApk(
+        buildWLDiagnosticsHtml(exportSnap(), { apkHeader: true }),
+        `ta-diagnostics-${localIsoDate()}.html`,
+      );
+      setToast(shareOutcomeLabel(o));
+      setTimeout(() => setToast(''), 2500);
     } catch {
       setToast('Печать недоступна — скачай HTML');
       setTimeout(() => setToast(''), 2500);

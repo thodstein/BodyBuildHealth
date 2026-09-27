@@ -212,10 +212,15 @@ describe('WLDiagnosticsHub PRO', () => {
     await waitFor(() => expect(container.textContent).toContain('Снимок OHS'), { timeout: 2000 });
     expect(JSON.parse(localStorage.getItem('he_ta_ohs_hist_v1') || '[]').length).toBe(1);
   });
-  it('V4-C печать без popup → честный фолбэк', async () => {
+  // Контракт изменён осознанно (Sep 2026): печать идёт через core/apk-share
+  // (printHtmlApk), потому что window.open().print() в Capacitor WebView не работает.
+  // Новый контракт: popup заблокирован -> printHtmlApk вернул 'failed' -> общий честный
+  // статус shareOutcomeLabel('failed') = «⚠ Не удалось» (раньше был свой текст про попапы).
+  // В jsdom window.open отсутствует, поэтому это и есть ветка «печать не вышла».
+  it('V4-C печать без popup → честный статус (через apk-share, не сырой window.print)', async () => {
     const { container } = render(<WLDiagnosticsHub />);
     fireEvent.click(screen.getByText(/🖨 Печать/));
-    await waitFor(() => expect(container.textContent).toMatch(/Всплывающие окна|Печать недоступна/), { timeout: 2000 });
+    await waitFor(() => expect(container.textContent).toMatch(/Не удалось|Печать недоступна/), { timeout: 2000 });
   });
   it('V5-A bridge несёт попытки + Sinclair', async () => {
     const { container } = render(<WLDiagnosticsHub />);

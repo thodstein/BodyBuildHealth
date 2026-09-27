@@ -68,6 +68,7 @@ import { OrthoScreenCard } from './OrthoScreenCard';
 import { CARD, DIM, ACCENT } from './training-ui';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
+import { printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 const STORAGE_KEY = 'he_strongman_diagnostics_hub_v1';
 
@@ -1535,20 +1536,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     setToast('✓ Выгрузка (HTML) готова');
     setTimeout(()=>setToast(''),2000);
   };
-  /** Паритет с ТА `data-wl="print"`: та же сводка, но в окно печати (а не скачивание файла). */
-  const handlePrint = () => {
+  /** Паритет с ТА `data-wl="print"`. АПК-безопасный путь: printHtmlApk на native
+   *  сохраняет .html в Documents + Share (системная печать оттуда), на web — окно печати. */
+  const handlePrint = async () => {
     try {
-      const html = buildSMDiagnosticsHtml(smExportSnap() as any);
-      const w = window.open('', '_blank');
-      if (!w) {
-        setToast('🚫 Окно печати заблокировано — сохрани HTML');
-        setTimeout(()=>setToast(''),2500);
-        return;
-      }
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-      w.print();
+      const o = await printHtmlApk(
+        buildSMDiagnosticsHtml(smExportSnap() as any),
+        `strongman-diagnostics-${localIsoDate()}.html`,
+      );
+      setToast(shareOutcomeLabel(o));
+      setTimeout(()=>setToast(''),2500);
     } catch {
       setToast('⚠ Печать недоступна — сохрани HTML');
       setTimeout(()=>setToast(''),2500);

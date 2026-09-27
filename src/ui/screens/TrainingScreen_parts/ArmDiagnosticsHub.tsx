@@ -68,6 +68,7 @@ import { scoreArm, scoreLabel } from '../../../engines/arm/arm-scoring.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { haptics } from '../../../core/native-bridge';
+import { printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { OrthoScreenCard } from './OrthoScreenCard';
 
 const STORAGE_KEY = 'he_arm_diagnostics_hub_v4';
@@ -1041,15 +1042,16 @@ export const ArmDiagnosticsHub: React.FC = () => {
     }
   };
 
-  const handlePrintP0 = () => {
+  /** АПК-безопасная печать: window.open().print() в Capacitor WebView не работает
+   *  (см. core/apk-share.ts) — там .html сохраняется в Documents + Share. */
+  const handlePrintP0 = async () => {
     try {
-      const html = buildArmDiagnosticsHtml(exportDataP0() as any);
-      const w = window.open('', '_blank');
-      if (!w) { setInjectMsg('⚠ Всплывающие окна заблокированы — используй 🖨 HTML'); setTimeout(() => setInjectMsg(''), 2500); return; }
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-      w.print();
+      const o = await printHtmlApk(
+        buildArmDiagnosticsHtml(exportDataP0() as any),
+        `arm-diagnostics-${localIsoDate()}.html`,
+      );
+      setInjectMsg(shareOutcomeLabel(o));
+      setTimeout(() => setInjectMsg(''), 2500);
     } catch { /* noop */ }
   };
 
