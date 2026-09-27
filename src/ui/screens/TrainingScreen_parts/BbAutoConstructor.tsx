@@ -3117,7 +3117,9 @@ export const BbAutoConstructor: React.FC = () => {
   // Сплит в режиме программ пропускается, поэтому его номер остаётся пропущенным.
   const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan:'4 План', weights:'5 Реальные веса', quality:'6 Нагрузка и качество', adjust:'7 Коррекция', contest:'🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
   // Причина блокировки шага — вместо молчаливого «не нажимается».
-  const stepLockReason = (s: Step): string | null => {
+  // Параметр — string, а не Step: PlannerStepNav подписан как lockReason?: (id: string) => string|null
+  // (id всегда из stepList, т.е. это id шага) — с узким Step функция не assignable (TS2322).
+  const stepLockReason = (s: string): string | null => {
     if (['plan','weights','quality','adjust'].includes(s) && !builtPlan) return 'Сначала соберите план (шаг «4 План» станет доступен после сборки)';
     if (s === 'contest' && !builtPlan) return 'Contest prep доступен после сборки плана';
     return null;
