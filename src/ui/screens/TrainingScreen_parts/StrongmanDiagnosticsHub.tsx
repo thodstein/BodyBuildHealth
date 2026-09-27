@@ -2,7 +2,7 @@
  *  6 табов: Жим | Переноски | Загрузки | Хват/Кор | Мобильность | Видео
  *  - SM_BIOMECH 13 фаз (углы + биомеханика + коррекции) как TA_BIOMECH
  *  - RSS-скоринг scoreSM (weak/asym/sway/vbt/mobility/grip/axial)
- *  - VBT carry 15%/stone 15% (Hindle), OHS 6 + grip tri-modal, Kinovea sway, contest packet
+ *  - VBT carry 15%/stone 15% (Hindle), OHS 6 + grip tri-modal, sway/carry-path (вручную), contest packet
  *  - Вывод в конструктор Стронг via planner-bridge (mode:strongman)
  */
 import React, { useMemo, useState, useEffect } from 'react';
@@ -16,13 +16,12 @@ import { assessOHS, OHS_NORMS, appendOHSSnapshot, ohsScoreTrend } from '../../..
 import { buildSMBackup, downloadSMBackup, smStorageBytes, restoreSMBackup, isSMBackupShape, SM_STORAGE_KEYS } from '../../../engines/strength-sport/strength-sport-sm-storage.engine';
 import { VBT_SS_THRESHOLDS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { diagnoseVelocityLossSS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
-import { parseKinoveaCSV, analyzeBarTracking, diagnoseCarrySway } from '../../../engines/strength-sport/strength-sport-video.engine';
+import { diagnoseCarrySway } from '../../../engines/strength-sport/strength-sport-video.engine';
 import { detectSMWeakFromDiary, candidateSMWeakPointsFromDiary, smWeeklySetsByLift, smLiftKeyForWeakPoint } from '../../../engines/strength-sport/strength-sport-sm-diary.engine';
 import { loadHubDiaryFlatEntries } from '../../../engines/hub-diary.engine';
 import { buildSMDiagnosticsHtml, downloadSMHtml, downloadSMCsv } from '../../../engines/strength-sport/strength-sport-sm-export.engine';
 import { LIMITER_OPTIONS } from '../../../engines/pro/limiter-calculator.engine';
 import { StrongmanVideoGoniometer } from './StrongmanVideoGoniometer';
-import { diagnoseCarryPathFromPoints } from '../../../engines/strength-sport/strength-sport-sm-carry-path.engine';
 import { validatePassport, validateContestPassports } from '../../../engines/strength-sport/strength-sport-passport.engine';
 import { correctEnodeByVariable } from '../../../engines/strength-sport/strength-sport-barpath.engine';
 import { getStrong } from '../../../engines/strength-sport/strength-sport-volume';
@@ -30,6 +29,7 @@ import { diagnoseSMWeakCause, SM_WEAK_CAUSE_LABELS } from '../../../engines/stre
 import { rankCorrectionsForSM, rankCorrectionsForSMLibrary } from '../../../engines/strength-sport/strength-sport-sm-correction-rank.engine';
 import { correctivesForSMWeakPoint, correctiveSessionForSM, correctiveBlockForSM, smCorrectiveExportLines, smTagsForMetrics, smErrorTagsForMetrics, SM_ERROR_TAG_RU, smCorrectivesByError } from '../../../engines/strength-sport/strength-sport-sm-corrective.engine';
 import { buildSMSpecBlock } from '../../../engines/strength-sport/strength-sport-sm-spec-block.engine';
+import { simulateSMCorrection } from '../../../engines/strength-sport/strength-sport-sm-simulator.engine';
 import { auditSMPlan, SM_ALL_PHASES, hubTabForSMPhase } from '../../../engines/strength-sport/strength-sport-sm-plan-audit.engine';
 import { injectSMWeakPoints, snapshotSMPlanForInject, rollbackSMPlanInject, hasSMPlanPrev, SM_INJECT_PREV_KEY } from '../../../engines/strength-sport/strength-sport-sm-injection.engine';
 import { simulateContest } from '../../../engines/strength-sport/strength-sport-contest-simulator.engine';
@@ -235,7 +235,7 @@ const TAB_DEFS: Array<{ id: SMTab; label: string; icon: string; desc: string }> 
   { id: 'load', label: 'Загрузки', icon: '🪨', desc: 'камни/мешок/кега' },
   { id: 'grip', label: 'Хват/Кор', icon: '✊', desc: 'хват + кор + кондиция' },
   { id: 'mobility', label: 'Мобильность', icon: '🧘', desc: 'ОГС (OHS) 6 + качание' },
-  { id: 'video', label: 'Видео', icon: '📹', desc: 'Кинова (Kinovea) + качание' },
+  { id: 'video', label: 'Видео', icon: '📹', desc: 'Качание/траектория' },
   { id: 'correction', label: 'Коррекция', icon: '🛠️', desc: 'фаза → причина → топ-3 → доза' },
 ];
 
@@ -301,18 +301,18 @@ const HubToggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; la
     style={{
       display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 14px', minHeight: 56,
       borderRadius: 16, cursor: 'pointer', textAlign: 'left', fontFamily: HUB_SF,
-      background: checked ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)',
-      border: '1px solid', borderColor: checked ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.08)',
-      color: '#fff', fontSize: 14, fontWeight: checked ? 700 : 500,
-      boxShadow: checked ? '0 0 16px rgba(245,158,11,0.22)' : 'none',
+    background: checked ? 'rgba(59,130,246,0.14)' : '#0a1629',
+    border: '1px solid', borderColor: checked ? 'rgba(59,130,246,0.45)' : '#1f3a5f',
+    color: '#fff', fontSize: 14, fontWeight: checked ? 700 : 500,
+    boxShadow: checked ? '0 0 16px rgba(59,130,246,0.35)' : 'none',
       ...style,
     }}
   >
     <span style={{
       width: 52, height: 32, borderRadius: 16, padding: 3, display: 'flex',
       justifyContent: checked ? 'flex-end' : 'flex-start', flexShrink: 0, transition: 'all 0.2s',
-      background: checked ? 'linear-gradient(135deg,#f59e0b,#ef4444)' : 'rgba(255,255,255,0.14)',
-      boxShadow: checked ? '0 0 14px rgba(245,158,11,0.45)' : 'inset 0 1px 3px rgba(0,0,0,0.3)',
+      background: checked ? 'linear-gradient(135deg,#3b82f6,#a855f7)' : 'rgba(255,255,255,0.14)',
+      boxShadow: checked ? '0 0 14px rgba(59,130,246,0.45)' : 'inset 0 1px 3px rgba(0,0,0,0.3)',
     }}>
       <span style={{ width: 26, height: 26, borderRadius: 13, background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.35)' }} />
     </span>
@@ -333,12 +333,12 @@ const HubPopupSelect: React.FC<{ label: string; value: string; options: Array<{ 
         aria-label={label}
         style={{
           width: '100%', padding: '10px 14px', minHeight: 60, borderRadius: 16, cursor: 'pointer',
-          background: 'rgba(22,30,52,0.88)', border: '1px solid rgba(140,190,255,0.16)',
+          background: '#0a1629', border: '1px solid #1f3a5f',
           color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
           textAlign: 'left', fontFamily: HUB_SF,
         }}
       >
-        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, color: '#f5b04c' }}>{label.toUpperCase()}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, color: '#3b82f6' }}>{label.toUpperCase()}</span>
         <span style={{ fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel ? sel.label : 'Выбрать…'}</span>
           <span style={{ fontSize: 12, color: '#fff', flexShrink: 0 }}>▾</span>
@@ -346,25 +346,25 @@ const HubPopupSelect: React.FC<{ label: string; value: string; options: Array<{ 
       </button>
       {open && (
         <div className="hub-sheet-backdrop" onClick={() => setOpen(false)} role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(2,6,14,0.62)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', padding: 0, animation: 'hubFade 0.22s ease' }}>
-          <div className="hub-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={label} style={{ width: '100%', maxWidth: 440, maxHeight: '80vh', overflowY: 'auto', scrollbarWidth: 'none', borderRadius: '24px 24px 0 0', background: 'linear-gradient(180deg, #232a3d 0%, #1a1e2e 100%)', border: '1px solid rgba(140,190,255,0.16)', borderBottom: 'none', borderTop: '2px solid #f59e0b', boxShadow: '0 -16px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))', animation: 'hubSheetUp 0.32s cubic-bezier(0.22,0.9,0.28,1)', fontFamily: HUB_SF }}>
+          <div className="hub-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={label} style={{ width: '100%', maxWidth: 440, maxHeight: '80vh', overflowY: 'auto', scrollbarWidth: 'none', borderRadius: '24px 24px 0 0', background: 'linear-gradient(180deg, #232a3d 0%, #1a1e2e 100%)', border: '1px solid #1f3a5f', borderBottom: 'none', borderTop: '2px solid #f59e0b', boxShadow: '0 -16px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))', animation: 'hubSheetUp 0.32s cubic-bezier(0.22,0.9,0.28,1)', fontFamily: HUB_SF }}>
             <div style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(140,190,255,0.30)', margin: '10px auto 0' }} />
             <div style={{ padding: '14px 16px 10px', fontSize: 15, fontWeight: 800, color: '#fff', textAlign: 'center' }}>{label}</div>
             <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {options.map(o => {
                 const active = o.id === value;
                 return (
-                  <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px 16px', minHeight: 60, borderRadius: 14, cursor: 'pointer', textAlign: 'left', background: active ? 'rgba(245,158,11,0.16)' : 'rgba(255,255,255,0.02)', border: active ? '1px solid rgba(245,158,11,0.35)' : '1px solid transparent', color: '#fff', fontSize: 16, fontWeight: active ? 700 : 500 }}>
-                    <span style={{ width: 22, height: 22, borderRadius: 11, border: '2px solid', borderColor: active ? '#f5b04c' : 'rgba(255,255,255,0.30)', background: active ? '#f59e0b' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{active ? '✓' : ''}</span>
+                  <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px 16px', minHeight: 60, borderRadius: 14, cursor: 'pointer', textAlign: 'left', background: active ? 'rgba(59,130,246,0.16)' : '#0a1629', border: active ? '1px solid #3b82f6' : '1px solid transparent', color: '#fff', fontSize: 16, fontWeight: active ? 700 : 500 }}>
+                    <span style={{ width: 22, height: 22, borderRadius: 11, border: '2px solid', borderColor: active ? '#3b82f6' : 'rgba(255,255,255,0.30)', background: active ? '#3b82f6' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{active ? '✓' : ''}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.label}</span>
-                      {o.desc && <span style={{ display: 'block', fontSize: 13, color: active ? '#f5b04c' : '#fff', marginTop: 2 }}>{o.desc}</span>}
+                      {o.desc && <span style={{ display: 'block', fontSize: 13, color: active ? '#3b82f6' : '#fff', marginTop: 2 }}>{o.desc}</span>}
                     </span>
                   </button>
                 );
               })}
             </div>
             <div style={{ padding: '12px 16px' }}>
-              <button onClick={() => setOpen(false)} style={{ width: '100%', minHeight: 52, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontSize: 17, fontWeight: 800, cursor: 'pointer', fontFamily: HUB_SF, boxShadow: '0 6px 20px rgba(245,158,11,0.30)' }}>Готово</button>
+              <button onClick={() => setOpen(false)} style={{ width: '100%', minHeight: 52, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', fontSize: 17, fontWeight: 800, cursor: 'pointer', fontFamily: HUB_SF, boxShadow: '0 6px 20px rgba(245,158,11,0.30)' }}>Готово</button>
             </div>
           </div>
         </div>
@@ -395,7 +395,7 @@ const HubNum: React.FC<{ label: string; value: string; onChange: (v: string) => 
         aria-label={`${label}: ${value || placeholder || 'не задано'}`}
         style={{
           width: '100%', padding: '8px 14px', minHeight: 56, borderRadius: 14, cursor: 'pointer',
-          background: 'rgba(22,30,52,0.88)', border: '1px solid rgba(140,190,255,0.16)',
+          background: '#0a1629', border: '1px solid #1f3a5f',
           color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
           textAlign: 'left', fontFamily: HUB_SF,
         }}
@@ -408,23 +408,23 @@ const HubNum: React.FC<{ label: string; value: string; onChange: (v: string) => 
       </button>
       {open && (
         <div className="hub-sheet-backdrop" onClick={() => setOpen(false)} role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(2,6,14,0.62)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', padding: 0, animation: 'hubFade 0.22s ease' }}>
-          <div className="hub-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={label} style={{ width: '100%', maxWidth: 440, maxHeight: '80vh', overflowY: 'auto', scrollbarWidth: 'none', borderRadius: '24px 24px 0 0', background: 'linear-gradient(180deg, #232a3d 0%, #1a1e2e 100%)', border: '1px solid rgba(140,190,255,0.16)', borderBottom: 'none', borderTop: '2px solid #f59e0b', boxShadow: '0 -16px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))', animation: 'hubSheetUp 0.32s cubic-bezier(0.22,0.9,0.28,1)', fontFamily: HUB_SF }}>
+          <div className="hub-sheet" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={label} style={{ width: '100%', maxWidth: 440, maxHeight: '80vh', overflowY: 'auto', scrollbarWidth: 'none', borderRadius: '24px 24px 0 0', background: 'linear-gradient(180deg, #232a3d 0%, #1a1e2e 100%)', border: '1px solid #1f3a5f', borderBottom: 'none', borderTop: '2px solid #f59e0b', boxShadow: '0 -16px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))', animation: 'hubSheetUp 0.32s cubic-bezier(0.22,0.9,0.28,1)', fontFamily: HUB_SF }}>
             <div style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(140,190,255,0.30)', margin: '10px auto 0' }} />
             <div style={{ padding: '14px 16px 10px', fontSize: 15, fontWeight: 800, color: '#fff', textAlign: 'center' }}>{label}{unit ? ` (${unit})` : ''}</div>
             <div style={{ padding: '0 16px', display: 'flex', gap: 8, alignItems: 'stretch' }}>
-              <button type="button" onClick={() => bump(-st)} aria-label="Уменьшить" style={{ flexShrink: 0, width: 56, minHeight: 56, borderRadius: 14, border: '1px solid rgba(140,190,255,0.20)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 22, fontWeight: 800, cursor: 'pointer' }}>−</button>
-              <input value={draft} onChange={e => setDraft(e.target.value)} inputMode="decimal" placeholder={placeholder || '0'} aria-label={label} style={{ flex: 1, minWidth: 0, background: 'rgba(22,30,52,0.95)', color: '#fff', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 14, padding: '12px 14px', fontSize: 20, fontWeight: 800, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }} />
-              <button type="button" onClick={() => bump(st)} aria-label="Увеличить" style={{ flexShrink: 0, width: 56, minHeight: 56, borderRadius: 14, border: '1px solid rgba(140,190,255,0.20)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 22, fontWeight: 800, cursor: 'pointer' }}>+</button>
+              <button type="button" onClick={() => bump(-st)} aria-label="Уменьшить" style={{ flexShrink: 0, width: 56, minHeight: 56, borderRadius: 14, border: '1px solid #1f3a5f', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 22, fontWeight: 800, cursor: 'pointer' }}>−</button>
+              <input value={draft} onChange={e => setDraft(e.target.value)} inputMode="decimal" placeholder={placeholder || '0'} aria-label={label} style={{ flex: 1, minWidth: 0, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: 10, fontSize: 16, minHeight: 44, fontWeight: 800, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }} />
+              <button type="button" onClick={() => bump(st)} aria-label="Увеличить" style={{ flexShrink: 0, width: 56, minHeight: 56, borderRadius: 14, border: '1px solid #1f3a5f', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 22, fontWeight: 800, cursor: 'pointer' }}>+</button>
             </div>
             <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {[['−5', -5 * st], ['−1', -st], ['+1', st], ['+5', 5 * st]].map(([t, d]) => (
-                <button key={t as string} type="button" onClick={() => bump(d as number)} style={{ flex: '1 1 60px', minHeight: 48, borderRadius: 12, border: '1px solid rgba(140,190,255,0.20)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>{t as string}</button>
+                <button key={t as string} type="button" onClick={() => bump(d as number)} style={{ flex: '1 1 60px', minHeight: 48, borderRadius: 12, border: '1px solid #1f3a5f', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>{t as string}</button>
               ))}
-              <button type="button" onClick={() => setDraft('')} style={{ flex: '1 1 60px', minHeight: 48, borderRadius: 12, border: '1px solid rgba(140,190,255,0.20)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>Очистить</button>
+              <button type="button" onClick={() => setDraft('')} style={{ flex: '1 1 60px', minHeight: 48, borderRadius: 12, border: '1px solid #1f3a5f', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>Очистить</button>
             </div>
             <div style={{ padding: '12px 16px', display: 'flex', gap: 8 }}>
               <button type="button" onClick={() => setOpen(false)} style={{ flex: 1, minHeight: 52, borderRadius: 14, border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: HUB_SF }}>Отмена</button>
-              <button type="button" onClick={() => commit(draft)} style={{ flex: 2, minHeight: 52, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontSize: 17, fontWeight: 800, cursor: 'pointer', fontFamily: HUB_SF, boxShadow: '0 6px 20px rgba(245,158,11,0.30)' }}>Готово</button>
+              <button type="button" onClick={() => commit(draft)} style={{ flex: 2, minHeight: 52, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', fontSize: 17, fontWeight: 800, cursor: 'pointer', fontFamily: HUB_SF, boxShadow: '0 6px 20px rgba(245,158,11,0.30)' }}>Готово</button>
             </div>
           </div>
         </div>
@@ -463,9 +463,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
   useEffect(() => {
     try { localStorage.setItem('he_sm_preferred_corr_v1', JSON.stringify(smPrefCorr)); } catch {}
   }, [smPrefCorr]);
-  const [csvText, setCsvText] = useState<string>('');
   const [poseResult, setPoseResult] = useState<{ verdict: string; lines: string[]; n: number } | null>(null);
-  const [carryPath, setCarryPath] = useState<{ type: string; verdict: string; lines: string[] } | null>(null);
   const [autoAngles, setAutoAngles] = useState<{ verdict: string; lines: string[] } | null>(null);
   // Инъекция коррекций в текущий SM-план (he_strength_sport_plan_v1) + откат
   const [planNonce, setPlanNonce] = useState(0);
@@ -610,11 +608,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     axialOverload,
     conditioningFail: state.conditioningFail || state.gripWeak.includes('conditioning') || false,
     acwrZone: acwr ? (acwr as { zone?: string }).zone ?? null : null,
-    hasVideo: !!swayCm || !!csvText,
+    hasVideo: !!swayCm,
     hasVbt: !!vbtLoss,
     hasMobility: ohs.failed !== 6,
     hasGrip: gripFails > 0 || !!state.gripHoldSec,
-  }), [weakPoints.length, asymmetry, swayCm, vbtLoss, ohs.failed, gripFails, axialOverload, state.conditioningFail, state.gripWeak, csvText, state.gripHoldSec, acwr]);
+  }), [weakPoints.length, asymmetry, swayCm, vbtLoss, ohs.failed, gripFails, axialOverload, state.conditioningFail, state.gripWeak, state.gripHoldSec, acwr]);
 
   const score = scoring.score;
   const level = scoring.level;
@@ -887,7 +885,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     } catch { return []; }
   }, [ohs.totalScore, ohs.failed, smDataNonce]);
   const smOhsTrend = useMemo(() => { try { return ohsScoreTrend(smOhsHist); } catch { return null; } }, [smOhsHist]);
-  const smStoreBytes = useMemo(() => { try { return smStorageBytes(); } catch { return { total: 0, byKey: {} }; } }, [csvText, state.lvpResult, smDataNonce]);
+  const smStoreBytes = useMemo(() => { try { return smStorageBytes(); } catch { return { total: 0, byKey: {} }; } }, [state.lvpResult, smDataNonce]);
   const smLvpStored = useMemo(() => {
     try { return loadSMLVPProfile(smLvpLiftFor(state.lvpLift) || state.lvpLift); } catch { return null; }
   }, [state.lvpLift, state.lvpResult, smDataNonce]);
@@ -1457,22 +1455,6 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   };
 
-  const handleCsvParse = () => {
-    const pts = parseKinoveaCSV(csvText);
-    if (!pts) { setToast('Таблица не распознана (нужен CSV Кинова)'); setTimeout(()=>setToast(''),2000); return; }
-    const res = analyzeBarTracking(pts);
-    if (!res) { setToast('Нет точек'); return; }
-    const sway = Math.round(res.xLoop * 10)/10;
-    const yMax = Math.round(res.yMax * 10)/10;
-    setState(s => ({ ...s, swayCm: String(sway), yokeSwayCm: String(sway), yMaxCm: String(yMax) }));
-    try {
-      const path = diagnoseCarryPathFromPoints(pts.map((p) => ({ x: p.x, y: p.y, t: p.t })));
-      setCarryPath(path ? { type: path.type, verdict: path.verdict, lines: path.lines } : null);
-    } catch { setCarryPath(null); }
-    setToast(`✓ Кинова (Kinovea): качание ${sway} см, высота ${res.yMax} см, скорость ${res.vmax} м/с`);
-    setTimeout(()=>setToast(''),3000);
-  };
-
   const applyMobilityToProfile = () => {
     const restrictions: string[] = [];
     if (!state.ohsHeelsFlat) restrictions.push('ankle');
@@ -1592,8 +1574,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     if (!tops.length) return null;
     const pref = smPrefCorr[sm as string];
     return (
-      <div data-sm="phase-top3" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 12, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)' }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#f5b04c', marginBottom: 2 }}>🏋️ Методы с выбором упражнения {pref ? '· ⭐ выбрано' : '· нажми — пойдёт первым в план'}</div>
+      <div data-sm="phase-top3" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: '#0a1629', border: '1px solid rgba(59,130,246,0.3)' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#93c5fd', marginBottom: 2 }}>🏋️ Методы с выбором упражнения {pref ? '· ⭐ выбрано' : '· нажми — пойдёт первым в план'}</div>
         {tops.map((c) => {
           const sel = pref === c.id;
           const pick = () => setSmPrefCorr((prev) => {
@@ -1611,12 +1593,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               aria-pressed={sel}
               aria-label={`${sel ? 'Выбрано' : 'Выбрать'}: ${c.target}`}
               onClick={pick}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44, marginTop: 4, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', color: '#fff', background: sel ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.06))' : 'rgba(255,255,255,0.03)', border: sel ? '2px solid rgba(245,158,11,0.65)' : '1px solid rgba(255,255,255,0.08)' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44, marginTop: 4, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', color: '#fff', background: sel ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))' : 'transparent', border: sel ? '2px solid rgba(59,130,246,0.7)' : '1px solid rgba(255,255,255,0.08)' }}
             >
-              <span aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: sel ? 'rgba(245,158,11,0.25)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
+              <span aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(59,130,246,0.45)', background: sel ? 'rgba(59,130,246,0.22)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
               <b style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{c.target}</b>
-              <span style={{ fontSize: 11, color: '#f5b04c', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.protocolAdj.sets}×{c.protocolAdj.reps} @{c.protocolAdj.pct}%</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#f5b04c' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓' : 'Выбрать'}</span>
+              <span style={{ fontSize: 11, color: '#93c5fd', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.protocolAdj.sets}×{c.protocolAdj.reps} @{c.protocolAdj.pct}%</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#93c5fd' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓' : 'Выбрать'}</span>
             </button>
           );
         })}
@@ -1626,11 +1608,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
   return (
     <div className="train-strongdiag" style={{ padding: '10px 8px 16px', color: '#fff', maxWidth: 880, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <style>{`.train-strongdiag input:focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(245,158,11,0.65) !important; box-shadow:0 0 0 3px rgba(245,158,11,0.18) !important; outline:none !important; }.train-strongdiag input::placeholder, .train-strongdiag textarea::placeholder{ color:rgba(255,255,255,0.75); opacity:1; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; min-height:44px; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:#fff; font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }.train-strongdiag button:focus-visible, .train-strongdiag summary:focus-visible, .train-strongdiag input:focus-visible, .train-strongdiag select:focus-visible, .train-strongdiag textarea:focus-visible{ outline:2px solid rgba(245,158,11,0.70); outline-offset:2px; }@media (prefers-reduced-motion: reduce){ .train-strongdiag button:active{ transform:none; } }@keyframes hubFade{from{opacity:0}to{opacity:1}}@keyframes hubSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
-      <div style={{ ...CARD, padding: '10px 12px', margin: '6px 0', background: 'linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.08))', border: '1px solid rgba(239,68,68,0.22)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -18, right: -18, width: 110, height: 110, borderRadius: 110, background: 'radial-gradient(circle,rgba(239,68,68,0.14),transparent 70%)', pointerEvents: 'none' }} />
+      <style>{`.train-strongdiag input:focus, .train-strongdiag select:focus, .train-strongdiag textarea:focus{ border-color:rgba(59,130,246,0.65) !important; box-shadow:0 0 0 3px rgba(59,130,246,0.18) !important; outline:none !important; }.train-strongdiag input::placeholder, .train-strongdiag textarea::placeholder{ color:rgba(255,255,255,0.75); opacity:1; }.train-strongdiag button{ -webkit-tap-highlight-color:transparent; min-height:44px; }.train-strongdiag button:active{ transform:scale(0.97); }.train-strongdiag details > summary{ list-style:none; }.train-strongdiag details > summary::-webkit-details-marker{ display:none; }.train-strongdiag details > summary::after{ content:'▾'; margin-left:auto; color:#fff; font-size:12px; transition:transform 0.2s; flex-shrink:0; }.train-strongdiag details[open] > summary::after{ transform:rotate(180deg); }.train-strongdiag summary:active{ opacity:0.75; }.train-strongdiag button:focus-visible, .train-strongdiag summary:focus-visible, .train-strongdiag input:focus-visible, .train-strongdiag select:focus-visible, .train-strongdiag textarea:focus-visible{ outline:2px solid rgba(59,130,246,0.70); outline-offset:2px; }@media (prefers-reduced-motion: reduce){ .train-strongdiag button:active{ transform:none; } }@keyframes hubFade{from{opacity:0}to{opacity:1}}@keyframes hubSheetUp{from{opacity:0;transform:translateY(56px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}`}</style>
+      <div data-sm="hero" style={{ ...CARD, padding: '10px 12px', margin: '6px 0', background: 'linear-gradient(135deg,rgba(59,130,246,0.12),rgba(168,85,247,0.08))', border: '1px solid rgba(59,130,246,0.25)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -18, right: -18, width: 110, height: 110, borderRadius: 110, background: 'radial-gradient(circle,rgba(59,130,246,0.16),transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#ef4444,#f59e0b)', color: '#fff', fontWeight: 900, fontSize: 16 }}>🏋️</div>
+          <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', fontWeight: 900, fontSize: 16 }}>🏋️</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Стронгмен-диагностика — хаб PRO</div>
             <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, opacity: 0.9 }}>16 фаз × углы + биомеханика + скорость (VBT) + присед над головой (OHS) + хват + качание (sway) + симулятор.</div>
@@ -1641,41 +1623,41 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>{weakPoints.length ? `${weakPoints.length} слабые` : 'баланс'}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: ohs.level === 'ok' ? '#22c55e' : '#ef4444' }}>OHS {ohs.totalScore}/6</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: gripFails > 0 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)', border: '1px solid rgba(255,255,255,0.06)', color: gripFails > 0 ? '#f59e0b' : '#22c55e' }}>{gripFails > 0 ? `grip ${gripFails}/3` : 'grip OK'}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: swayDiag ? (swayDiag.severity === 'ok' ? '#22c55e' : '#ef4444') : '#fff' }}>{swayDiag ? `sway ${swayDiag.swayCm} см` : 'sway —'}</span>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: vbtLoss ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: vbtLoss ? (vbtLoss.exceeded ? '#ef4444' : '#22c55e') : '#fff' }}>{vbtLoss ? `VBT ${vbtLoss.lossPct}%` : 'VBT —'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: '#0a1629', border: '1px solid #1f3a5f', color: '#fff' }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone === 'dangerous' ? '🔴' : acwr.zone === 'caution' ? '🟠' : '🟢') : ''}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: '#0a1629', border: '1px solid #1f3a5f', color: '#fff' }}>{weakPoints.length ? `${weakPoints.length} слабые` : 'баланс'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: ohs.level === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', border: '1px solid #1f3a5f', color: ohs.level === 'ok' ? '#22c55e' : '#ef4444' }}>OHS {ohs.totalScore}/6</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: gripFails > 0 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)', border: '1px solid #1f3a5f', color: gripFails > 0 ? '#f59e0b' : '#22c55e' }}>{gripFails > 0 ? `grip ${gripFails}/3` : 'grip OK'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: '#0a1629', border: '1px solid #1f3a5f', color: swayDiag ? (swayDiag.severity === 'ok' ? '#22c55e' : '#ef4444') : '#fff' }}>{swayDiag ? `sway ${swayDiag.swayCm} см` : 'sway —'}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: vbtLoss ? 'rgba(34,197,94,0.12)' : '#0a1629', border: '1px solid #1f3a5f', color: vbtLoss ? (vbtLoss.exceeded ? '#ef4444' : '#22c55e') : '#fff' }}>{vbtLoss ? `VBT ${vbtLoss.lossPct}%` : 'VBT —'}</span>
           {scoring.floors.length > 0 && <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.22)', color: '#ef4444' }}>порог: {scoring.floors[0]}</span>}
         </div>
         {(diaryWeaks.length>0 || diaryPhases.length>0) && (
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
             {diaryWeaks.length>0 && <span style={{ padding:'2px 8px', borderRadius:20, background:'rgba(94,234,212,0.10)', border:'1px solid rgba(94,234,212,0.22)', color:'#5ee', fontSize:10, fontWeight:700 }}>📓 Дневник: {diaryWeaks.map(w=> `${w.label}`).join(', ')}</span>}
-            {diaryPhases.length>0 && <span style={{ padding:'2px 8px', borderRadius:20, background:'rgba(167,139,250,0.10)', border:'1px solid rgba(167,139,250,0.22)', color:'#a78bfa', fontSize:10, fontWeight:700 }}>📓 Фаза по дневнику: {diaryPhases.join(' · ')}</span>}
+            {diaryPhases.length>0 && <span style={{ padding:'2px 8px', borderRadius:20, background:'rgba(59,130,246,0.10)', border:'1px solid #1f3a5f', color:'#60a5fa', fontSize:10, fontWeight:700 }}>📓 Фаза по дневнику: {diaryPhases.join(' · ')}</span>}
           </div>
         )}
-        <div style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
+        <div style={{ fontSize: 10, color: '#fff', background: '#0a1629', border: '1px solid #1f3a5f', borderRadius: 10, padding: '8px 10px', lineHeight: 1.45 }}>
           Выбери слабые фазы (углы + биомеханика) + качание 3/5 см + скорость 15% + хват из 3 тестов → общий балл. Кнопка <b style={{ color: '#60a5fa' }}>«Применить в Стронг-конструктор»</b> отправит данные с биомеханикой и контестом.
         </div>
-        <details style={{ marginTop: 6, borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <details style={{ marginTop: 6, borderRadius: 14, background: '#0a1629', border: '1px solid #1f3a5f' }}>
           <summary style={{ padding: '12px 14px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', minHeight: 48, display: 'flex', alignItems: 'center', gap: 8 }}>📊 Детали расчёта — лимитеры, физика, симулятор, причины</summary>
           <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column' }}>
-        {limiterForPhase.length>0 && <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 12, color: '#a78bfa' }}>💡 Лимитеры для {SM_BIOMECH[smWeakPoints[0] as SMWeakPoint]?.label || smWeakPoints[0]}: {limiterForPhase.map(o => `${o.label} (${o.method.slice(0, 40)}…)`).join(' · ')}</div>}
+        {limiterForPhase.length>0 && <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.16)', fontSize: 12, color: '#fff' }}>💡 Лимитеры для {SM_BIOMECH[smWeakPoints[0] as SMWeakPoint]?.label || smWeakPoints[0]}: {limiterForPhase.map(o => `${o.label} (${o.method.slice(0, 40)}…)`).join(' · ')}</div>}
         {(passportResult.errors.length>0 || passportResult.warnings.length>0) && <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: passportResult.errors.length?'rgba(239,68,68,0.08)':'rgba(245,158,11,0.08)', border: `1px solid ${passportResult.errors.length?'rgba(239,68,68,0.22)':'rgba(245,158,11,0.22)'}`, fontSize: 12, color: passportResult.errors.length?'#ef4444':'#f59e0b' }}>{passportResult.errors.length? `⛔ ${passportResult.errors.join(' · ')}` : `⚠ ${passportResult.warnings.join(' · ')}`}</div>}
         {enodeCorrected != null && swayCm != null && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 12, color: '#fff' }}>Поправка Энода: {swayCm} см → {enodeCorrected} см · скорость йок {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} · камень {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} м/с</div>}
-        <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: '#fff' }}>Осевая: {axialProgress.curM} м / {axialProgress.mrv} м (лимит {axialProgress.pct}%) · {axialQuant.text} · {axialQuant.recipe} · кондиция {state.conditioningFail? 'провалена — санки 10×30 м' : 'в норме — рывки 8×10 сек/50 сек'} · {swayDiag? `качание ${swayDiag.swayCm} см` : 'качание —'}</div>
+        <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 12, color: '#fff' }}>Осевая: {axialProgress.curM} м / {axialProgress.mrv} м (лимит {axialProgress.pct}%) · {axialQuant.text} · {axialQuant.recipe} · кондиция {state.conditioningFail? 'провалена — санки 10×30 м' : 'в норме — рывки 8×10 сек/50 сек'} · {swayDiag? `качание ${swayDiag.swayCm} см` : 'качание —'}</div>
         {carryPhys && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 12, color: '#60a5fa' }}>🚜 Йок-физика (Legg/Hindle): {carryPhys.note}</div>}
         {stoneMom && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 12, color: '#f59e0b' }}>🪨 Камень-момент (Harris): {stoneMom.note}</div>}
-        {contestSim && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.18)', fontSize: 12, color: '#fff' }}>{contestSim.hasEstimate ? `🏆 Симулятор: ${contestSim.predictedPlace} место из 10 · сумма ${contestSim.totalPoints} очков · слабые ${contestSim.weakEvents.join(', ') || '—'} · порядок ${contestSim.recOrder.join(' → ')}` : `🏆 Симулятор: прогноза нет — ${contestSim.noDataNote || 'нет данных по ивентам'}`}</div>}
+        {contestSim && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.16)', fontSize: 12, color: '#fff' }}>{contestSim.hasEstimate ? `🏆 Симулятор: ${contestSim.predictedPlace} место из 10 · сумма ${contestSim.totalPoints} очков · слабые ${contestSim.weakEvents.join(', ') || '—'} · порядок ${contestSim.recOrder.join(' → ')}` : `🏆 Симулятор: прогноза нет — ${contestSim.noDataNote || 'нет данных по ивентам'}`}</div>}
         {attemptsBridge && attemptsBridge.rationale.length > 1 && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', fontSize: 12, color: '#fff' }}>🎯 Попытки: {attemptsBridge.rationale.slice(1, 4).join(' · ')}{attemptsBridge.medley ? ` · Медли (medley) ${attemptsBridge.medley.totalTimeS} сек / лимит ${attemptsBridge.medley.timeCapS} сек` : ''}</div>}
-        {smCauses.length > 0 && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: '#fff' }}>🧬 Причины: {smCauses.map((c) => `${c.zone}: ${SM_WEAK_CAUSE_LABELS[c.cause]} (${c.confidence})`).join(' · ')}</div>}
+        {smCauses.length > 0 && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 12, color: '#fff' }}>🧬 Причины: {smCauses.map((c) => `${c.zone}: ${SM_WEAK_CAUSE_LABELS[c.cause]} (${c.confidence})`).join(' · ')}</div>}
         {smRankTop.length > 0 && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(94,234,212,0.08)', border: '1px solid rgba(94,234,212,0.18)', fontSize: 12, color: '#5ee' }}>⭐ Топ-коррекция: {smRankTop.map((c) => `${c.name} ${c.protocol.sets}×${c.protocol.reps} @${c.protocol.pct}%`).join(' · ')}</div>}
         {smSpec && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', fontSize: 12, color: '#fff' }}>📅 Спец-блок: {smSpec.weakPoints.join(', ')} × {smSpec.totalWeeks} нед · {smSpec.weeks[0]?.note || ''} · раскладка по дням ивента</div>}
         {bicepsWarn.length > 0 && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', fontSize: 12, color: '#ef4444' }}>🦾 Безопасность: {bicepsWarn.join(' · ')}</div>}
         {holdDiag && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.18)', fontSize: 12, color: '#fff' }}>✊ Удержание: {holdDiag.verdict}</div>}
-        {anthroDiag && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: '#fff' }}>📏 Антро: {anthroDiag.loadAdvice} {anthroDiag.pickupAdvice}</div>}
-        {logDipDiag && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: logDipDiag.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: logDipDiag.verdict === 'ok' ? '#22c55e' : '#f59e0b' }}>📐 Лог-дип: {logDipDiag.text}{logDipDiag.drivePowerW != null ? ` · drive ~${logDipDiag.drivePowerW}Вт` : ''}</div>}
+        {anthroDiag && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: '#0a1629', border: '1px solid #1f3a5f', fontSize: 12, color: '#fff' }}>📏 Антро: {anthroDiag.loadAdvice} {anthroDiag.pickupAdvice}</div>}
+        {logDipDiag && <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 14, background: logDipDiag.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border: '1px solid #1f3a5f', fontSize: 12, color: logDipDiag.verdict === 'ok' ? '#22c55e' : '#f59e0b' }}>📐 Лог-дип: {logDipDiag.text}{logDipDiag.drivePowerW != null ? ` · drive ~${logDipDiag.drivePowerW}Вт` : ''}</div>}
         {gripAsymDiag && gripAsymDiag.isAsym && <div style={{ marginTop: 6, padding: '10px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 12, color: '#fff' }}>⚖️ Асимметрия хвата: {gripAsymDiag.text}</div>}
           </div>
         </details>
@@ -1686,30 +1668,30 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       </div>
 
       <div style={{ ...CARD, padding: 10 }}>
-        <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>🧭 Выбор движения и слабые фазы</div>
+        <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #3b82f6', lineHeight:1.35 }}>🧭 Выбор движения и слабые фазы</div>
         <div data-sm="top-nav" role="tablist" aria-label="Разделы диагностики" style={{ position: 'static', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
           {TAB_DEFS.map(t => (
-            <button key={t.id} role="tab" aria-selected={tab === t.id} aria-pressed={tab === t.id} data-sm={`top-tab-${t.id}`} onClick={() => setTab(t.id)} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: tab === t.id ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: tab === t.id ? 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(239,68,68,0.12))' : 'rgba(22,30,52,0.88)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+            <button key={t.id} role="tab" aria-selected={tab === t.id} aria-pressed={tab === t.id} data-sm={`top-tab-${t.id}`} onClick={() => setTab(t.id)} style={{ minHeight: 44, padding: '10px 14px', borderRadius: 999, border: '1px solid', borderColor: tab === t.id ? '#3b82f6' : '#1f3a5f', background: tab === t.id ? 'rgba(59,130,246,0.14)' : '#0a1629', color: tab === t.id ? '#3b82f6' : '#fff', cursor: 'pointer', fontSize: 12, fontWeight: tab === t.id ? 600 : 700 }}>
               {t.icon} {t.label}
             </button>
           ))}
-          <button data-sm="top-apply" onClick={applyToConstructor} aria-label="Применить в Стронг-конструктор" style={{ minHeight: 44, marginLeft: 'auto', padding: '10px 14px', borderRadius: 999, background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer', boxShadow: '0 4px 14px rgba(245,158,11,0.25)' }}>→ Применить в Стронг</button>
+          <button data-sm="top-apply" onClick={applyToConstructor} aria-label="Применить в Стронг-конструктор" style={{ minHeight: 44, marginLeft: 'auto', padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', color: '#fff', border: 'none', fontWeight: 800, fontSize: 12, cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.3)' }}>→ Применить в Стронг</button>
         </div>
 
         {tab==='press' && (
           <div>
-            {smSectionHeader('📥 Замеры', '#60a5fa')}
+            {smSectionHeader('📥 Замеры', '#3b82f6')}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
               <HubNum label="Лог" unit="кг" value={state.logKg} onChange={v=>setState(s=>({...s, logKg:v}))} placeholder="100" step={2.5} />
               <HubNum label="Аксель" unit="кг" value={state.axleKg} onChange={v=>setState(s=>({...s, axleKg:v}))} placeholder="120" step={2.5} />
               <HubNum label="VBT лог — лучшая" unit="м/с" value={state.vbtLogBest} onChange={v=>setState(s=>({...s, vbtLogBest:v}))} placeholder="0.85" step={0.05} />
               <HubNum label="VBT лог — последняя" unit="м/с" value={state.vbtLogLast} onChange={v=>setState(s=>({...s, vbtLogLast:v}))} placeholder="0.65" step={0.05} />
             </div>
-            {smSectionHeader('🎯 Слабые фазы (4)', '#ef4444')}
+            {smSectionHeader('🎯 Слабые фазы (4)', '#3b82f6')}
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {PRESS_OPTS.map(o=>{ const on = state.pressWeak.includes(o.id); return (
-                <button key={o.id} onClick={()=>toggle('pressWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#ef4444' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(239,68,68,0.20), rgba(245,158,11,0.10))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(239,68,68,0.35)' : 'none' }}>
-                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#ff6b6b' : 'rgba(255,255,255,0.30)', background: on ? '#ef4444' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
+                <button key={o.id} onClick={()=>toggle('pressWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#3b82f6' : '#1f3a5f', background: on ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))' : '#0a1629', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(59,130,246,0.35)' : 'none' }}>
+                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#93c5fd' : 'rgba(255,255,255,0.30)', background: on ? '#3b82f6' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
                   <span>{o.label}</span>
                 </button> );})}
             </div>
@@ -1717,7 +1699,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               const bio = smBiomechForWeak(id);
               if (!bio) return null;
               return (
-                <div key={id} style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', borderLeft:'3px solid #ef4444', marginBottom:8 }}>
+                <div key={id} style={{ padding:'12px 14px', borderRadius:14, background:'#0a1629', border:'1px solid #1f3a5f', borderLeft:'3px solid #3b82f6', marginBottom:8 }}>
                   <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label} <span style={{ color:'#fff', fontWeight:500 }}>· {bio.joint} {bio.angleRangeDeg[0]}-{bio.angleRangeDeg[1]}° · {bio.keyJoint}</span></div>
                   <div style={{ fontSize:12, color:'#fff' }}>{bio.weakMuscles.join(', ')} · {bio.references.join(', ')}</div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:4, lineHeight:1.4 }}>{bio.biomechanicalReason}</div>
@@ -1725,11 +1707,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 </div>
               );
             })}
-            {state.pressWeak.length > 0 && smSectionHeader('🏋️ Методы с выбором упражнения', '#f59e0b')}
+            {state.pressWeak.length > 0 && smSectionHeader('🏋️ Методы с выбором упражнения', '#3b82f6')}
             {state.pressWeak.map(id=>{ const bio = smBiomechForWeak(id); if (!bio) return null; return <div key={`pick-${id}`}>{smTop3Block(bio.weakPoint)}</div>; })}
-            {smSectionHeader('⚙️ Вспомогательное и контест', '#a78bfa')}
+            {smSectionHeader('⚙️ Вспомогательное и контест', '#3b82f6')}
             <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Ивенты: {Object.keys(EVENT_META).slice(0,4).join(', ')} — {VBT_SS_THRESHOLDS.log_press ? `VBT log ${VBT_SS_THRESHOLDS.log_press.optimalMin}/${VBT_SS_THRESHOLDS.log_press.stopMin} м/с` : ''}</div>
-            <details open style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
+            <details open style={{ marginTop:10, borderRadius:16, background:'#0a1629', border:'1px solid #1f3a5f' }}>
               <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>🏆 Контест пакет</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <div style={{ marginTop:6 }}><HubPopupSelect label="Контест" value={state.contestId} onChange={v=>setState(s=>({...s, contestId:v}))} options={[{ id:'', label:'Без контеста (база)', desc:'общий план' }, ...Object.entries(CONTEST_PRESETS as any).map(([id,c]:any)=> ({ id: String(id), label: String(c.name) }))]} /></div>
@@ -1776,7 +1758,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='carry' && (
           <div>
-            {smSectionHeader('📥 Замеры', '#60a5fa')}
+            {smSectionHeader('📥 Замеры', '#3b82f6')}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
               <HubNum label="Йок" unit="кг" value={state.yokeKg} onChange={v=>setState(s=>({...s, yokeKg:v}))} placeholder="300" step={5} />
               <HubNum label="Фермер (на руку)" unit="кг" value={state.farmersKg} onChange={v=>setState(s=>({...s, farmersKg:v}))} placeholder="120" step={2.5} />
@@ -1786,11 +1768,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             {swayDiag && <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{swayDiag.text} · порог 3/5 см · скорость йок {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}/{VBT_SS_THRESHOLDS.yoke_walk.stopMin} м/с</div>}
             {vbtLoss && <div style={{ fontSize:12, color: vbtLoss.exceeded?'#ef4444':'#22c55e', marginTop:4 }}>VBT потеря {vbtLoss.lossPct}% · {vbtLoss.zone} · {vbtLoss.recommendation} · порог 15% carry (MHV-декремент &gt;15% = стоп, PoinT GO)</div>}
-            {smSectionHeader('🎯 Слабые фазы (5)', '#f59e0b')}
+            {smSectionHeader('🎯 Слабые фазы (5)', '#3b82f6')}
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {CARRY_OPTS.map(o=>{ const on = state.carryWeak.includes(o.id); return (
-                <button key={o.id} onClick={()=>toggle('carryWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#f59e0b' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(245,158,11,0.20), rgba(239,68,68,0.08))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(245,158,11,0.35)' : 'none' }}>
-                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#ffb84d' : 'rgba(255,255,255,0.30)', background: on ? '#f59e0b' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
+                <button key={o.id} onClick={()=>toggle('carryWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#3b82f6' : '#1f3a5f', background: on ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))' : '#0a1629', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(59,130,246,0.35)' : 'none' }}>
+                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#93c5fd' : 'rgba(255,255,255,0.30)', background: on ? '#3b82f6' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
                   <span>{o.label}</span>
                 </button> );})}
             </div>
@@ -1798,16 +1780,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               const bio = smBiomechForWeak(id);
               if (!bio) return null;
               return (
-                <div key={id} style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', borderLeft:'3px solid #f59e0b', marginBottom:8 }}>
+                <div key={id} style={{ padding:'12px 14px', borderRadius:14, background:'#0a1629', border:'1px solid #1f3a5f', borderLeft:'3px solid #3b82f6', marginBottom:8 }}>
                   <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label} <span style={{ color:'#fff', fontWeight:500 }}>· {bio.angleRangeDeg.join('-')}°</span></div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{bio.biomechanicalReason}</div>
                   <div style={{ fontSize:13, color:'#5ee' }}>{bio.corrections.join(' · ')}</div>
                 </div>
               );
             })}
-            {state.carryWeak.length > 0 && smSectionHeader('🏋️ Методы с выбором упражнения', '#f59e0b')}
+            {state.carryWeak.length > 0 && smSectionHeader('🏋️ Методы с выбором упражнения', '#3b82f6')}
             {state.carryWeak.map(id=>{ const bio = smBiomechForWeak(id); if (!bio) return null; return <div key={`pick-${id}`}>{smTop3Block(bio.weakPoint)}</div>; })}
-            {smSectionHeader('⚙️ Вспомогательное — локомоция, хват, разворот', '#a78bfa')}
+            {smSectionHeader('⚙️ Вспомогательное — локомоция, хват, разворот', '#3b82f6')}
             {carryPhys ? <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика: {carryPhys.note}{carryPhys.rateLimited ? ' · разгон 0–5м частотой, дальше крейсер коротким шагом' : ''}</div> : <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Физика йока: введи вес тела (вкладка Жим) + йок, кг → скорость/шаг/темп/оценка</div>}
             {farmersClass && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Фермер-класс: {farmersClass} (на руку, {athleteSex === 'female' ? 'Ж' : 'М'} нормы FitnessVolt)</div>}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
@@ -1843,16 +1825,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <HubNum label="Чемодан R" unit="с" value={state.suitcaseRightS} onChange={v=>setState(s=>({...s, suitcaseRightS:v}))} placeholder="30" step={1} />
             </div>
             {suitcaseDiag && <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>🧳 {suitcaseDiag.text}</div>}
-            <div style={{ marginTop:6, padding:'10px 12px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px dashed rgba(140,190,255,0.16)', textAlign:'center' }}>
-              <div style={{ fontSize:13, color:'#fff' }}>📹 Видео переноски — качание из Кинова (Kinovea)</div>
-              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Сними сбоку 30 кадров/с → таблица Кинова (CSV) → вкладка Видео → качание само</div>
+            <div style={{ marginTop:6, padding:'10px 12px', borderRadius:14, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
+              <div style={{ fontSize:13, color:'#fff' }}>📹 Качание при переноске — измеряй боковое вручную (макс(x) − мин(x))</div>
+              <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Сними сбоку 30 кадров/с и занеси макс(x)/мин(x) числом во вкладку «Видео». Импорт Kinovea CSV убран 2026-09-27.</div>
             </div>
           </div>
         )}
 
         {tab==='load' && (
           <div>
-            {smSectionHeader('📥 Замеры', '#60a5fa')}
+            {smSectionHeader('📥 Замеры', '#3b82f6')}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
               <HubNum label="Камень" unit="кг" value={state.stoneKg} onChange={v=>setState(s=>({...s, stoneKg:v}))} placeholder="140" step={2.5} />
               <HubNum label="Качание камня (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="2.0" step={0.5} />
@@ -1861,11 +1843,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Контест пресеты: {Object.values(CONTEST_PRESETS as any).slice(0,3).map((c:any)=>c.name).join(', ')} · stone VBT {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} м/с · платформа {state.platformHeightCm || '—'}см</div>
             <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{state.tackyUsed ? '✓ Смола (tacky) учтена — руки не сгибать' : '⚠ Без смолы — риск сгибания рук + разрыв бицепса'}</div>
-            {smSectionHeader('🎯 Слабые фазы (3)', '#22c55e')}
+            {smSectionHeader('🎯 Слабые фазы (3)', '#3b82f6')}
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {LOAD_OPTS.map(o=>{ const on = state.loadWeak.includes(o.id); return (
-                <button key={o.id} onClick={()=>toggle('loadWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#22c55e' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(34,197,94,0.20), rgba(34,197,94,0.06))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(34,197,94,0.35)' : 'none' }}>
-                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#4ade80' : 'rgba(255,255,255,0.30)', background: on ? '#22c55e' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
+                <button key={o.id} onClick={()=>toggle('loadWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#3b82f6' : '#1f3a5f', background: on ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))' : '#0a1629', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(59,130,246,0.35)' : 'none' }}>
+                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#93c5fd' : 'rgba(255,255,255,0.30)', background: on ? '#3b82f6' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
                   <span>{o.label}</span>
                 </button> );})}
             </div>
@@ -1873,16 +1855,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               const bio = smBiomechForWeak(id);
               if (!bio) return null;
               return (
-                <div key={id} style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', borderLeft:'3px solid #22c55e', marginBottom:8 }}>
+                <div key={id} style={{ padding:'12px 14px', borderRadius:14, background:'#0a1629', border:'1px solid #1f3a5f', borderLeft:'3px solid #3b82f6', marginBottom:8 }}>
                   <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label}</div>
                   <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>{bio.biomechanicalReason}</div>
                   <div style={{ fontSize:13, color:'#5ee' }}>{bio.corrections.join(' · ')} · {bio.loadCues}</div>
                 </div>
               );
             })}
-            {state.loadWeak.length > 0 && smSectionHeader('🏋️ Методы с выбором упражнения', '#22c55e')}
+            {state.loadWeak.length > 0 && smSectionHeader('🏋️ Методы с выбором упражнения', '#3b82f6')}
             {state.loadWeak.map(id=>{ const bio = smBiomechForWeak(id); if (!bio) return null; return <div key={`pick-${id}`}>{smTop3Block(bio.weakPoint)}</div>; })}
-            {smSectionHeader('⚙️ Вспомогательное — фазы камня и тайр', '#a78bfa')}
+            {smSectionHeader('⚙️ Вспомогательное — фазы камня и тайр', '#3b82f6')}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
               <HubNum label="Рабочий % от макса" unit="%" value={state.workPct} onChange={v=>setState(s=>({...s, workPct:v}))} placeholder="90" step={1} />
               <HubNum label="Камень хват" unit="сек" value={state.stoneGripS} onChange={v=>setState(s=>({...s, stoneGripS:v}))} placeholder="1.2" step={0.1} />
@@ -1912,7 +1894,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='grip' && (
           <div>
-            {smSectionHeader('📥 Замеры', '#60a5fa')}
+            {smSectionHeader('📥 Замеры', '#3b82f6')}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6 }}>
               <HubNum label="Опора · Support (фермер)" unit="сек" value={state.gripHoldSec} onChange={v=>setState(s=>({...s, gripHoldSec:v}))} placeholder="60" step={5} />
               <HubNum label="Щипок · Pinch" unit="сек" value={state.pinchHoldSec} onChange={v=>setState(s=>({...s, pinchHoldSec:v}))} placeholder="20" step={1} />
@@ -1929,26 +1911,26 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <HubPopupSelect label="Толстый гриф · FatGrip, мм" value={state.fatGripMm} onChange={v=>setState(s=>({...s, fatGripMm:v}))} options={[{ id:'38', label:'38', desc:'стандарт' }, { id:'50', label:'50', desc:'аксель' }, { id:'60', label:'60', desc:'толстый' }]} />
             </div>
             <div style={{ display:'flex', gap:6, marginTop:6 }}>
-              <button onClick={handleSaveGripProfile} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#a855f7,#6366f1)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(168,85,247,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Профиль хвата</button>
+              <button onClick={handleSaveGripProfile} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#3b82f6,#a855f7)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(59,130,246,0.30), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Профиль хвата</button>
               <span style={{ fontSize:12, color:'#fff', alignSelf:'center' }}>Опора/щипок/сдавливание — раздельно</span>
             </div>
             {holdDiag && <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>{holdDiag.verdict} · {holdDiag.details.join(' · ')}</div>}
-            {smSectionHeader('🎯 Слабые фазы (4)', '#a855f7')}
+            {smSectionHeader('🎯 Слабые фазы (4)', '#3b82f6')}
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:6 }}>
               {GRIP_OPTS.map(o=>{ const on = state.gripWeak.includes(o.id); return (
-                <button key={o.id} onClick={()=>toggle('gripWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#a855f7' : 'rgba(140,190,255,0.16)', background: on ? 'linear-gradient(135deg, rgba(168,85,247,0.20), rgba(168,85,247,0.06))' : 'rgba(22,30,52,0.88)', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(168,85,247,0.35)' : 'none' }}>
-                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#c084fc' : 'rgba(255,255,255,0.30)', background: on ? '#a855f7' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
+                <button key={o.id} onClick={()=>toggle('gripWeak', o.id)} aria-pressed={on} style={{ flex:'1 1 160px', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', minHeight:56, borderRadius:16, border:'1px solid', borderColor: on ? '#3b82f6' : '#1f3a5f', background: on ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))' : '#0a1629', color:'#fff', fontSize:14, fontWeight: on?800:600, cursor:'pointer', textAlign:'left', boxShadow: on ? '0 0 16px rgba(59,130,246,0.35)' : 'none' }}>
+                  <span style={{ width:22, height:22, borderRadius:11, border:'2px solid', borderColor: on ? '#93c5fd' : 'rgba(255,255,255,0.30)', background: on ? '#3b82f6' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0 }}>{on ? '✓' : ''}</span>
                   <span>{o.label}</span>
                 </button> );})}
             </div>
             {weakPoints.filter(id=>{ const b = smBiomechForWeak(id); return b && ['grip_support','core_brace','conditioning','farmers_grip'].includes(b.weakPoint); }).map(id=>{
               const bio = smBiomechForWeak(id);
               if (!bio) return null;
-              return <div key={id} style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', borderLeft:'3px solid #a855f7', marginBottom:8 }}><div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label}</div><div style={{ fontSize:12, color:'#fff' }}>{bio.biomechanicalReason}</div><div style={{ fontSize:13, color:'#5ee' }}>{bio.corrections.join(' · ')}</div></div>;
+              return <div key={id} style={{ padding:'12px 14px', borderRadius:14, background:'#0a1629', border:'1px solid #1f3a5f', borderLeft:'3px solid #3b82f6', marginBottom:8 }}><div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{bio.label}</div><div style={{ fontSize:12, color:'#fff' }}>{bio.biomechanicalReason}</div><div style={{ fontSize:13, color:'#5ee' }}>{bio.corrections.join(' · ')}</div></div>;
             })}
-            {weakPoints.some(id=>{ const b = smBiomechForWeak(id); return b && ['grip_support','core_brace','conditioning','farmers_grip'].includes(b.weakPoint); }) && smSectionHeader('🏋️ Методы с выбором упражнения', '#a855f7')}
+            {weakPoints.some(id=>{ const b = smBiomechForWeak(id); return b && ['grip_support','core_brace','conditioning','farmers_grip'].includes(b.weakPoint); }) && smSectionHeader('🏋️ Методы с выбором упражнения', '#3b82f6')}
             {weakPoints.map(id=>{ const bio = smBiomechForWeak(id); if (!bio || !['grip_support','core_brace','conditioning','farmers_grip'].includes(bio.weakPoint)) return null; return <div key={`pick-${id}`}>{smTop3Block(bio.weakPoint)}</div>; })}
-            {smSectionHeader('⚙️ Вспомогательное — диагностика хвата, бицепс, геркулес', '#a78bfa')}
+            {smSectionHeader('⚙️ Вспомогательное — диагностика хвата, бицепс, геркулес', '#3b82f6')}
             <div style={{ fontSize:12, color: '#fff', marginTop:4 }}>Хват: провалы {gripFails}/3 (калибровка {gripFailsCal}/3) {gripFails>=2?'— профилактика: молот 3×12 + щипок 2×15': '— норма'} · осевая {axialOverload?'перегруз — чемодан 2×20 м': 'в норме'} · {axialQuant.text}</div>
             <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>Бюджет McGill: {axialQuant.breakdown.join(' · ')}</div>
             <div style={{ fontSize:12, color:'#fff', marginTop:6 }}>Нагрузка (ACWR) {acwr? `${acwr.ratio.toFixed(2)}` : '—'} · кондиция: рывки 8×10 сек/50 сек</div>
@@ -1978,7 +1960,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='mobility' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Подвижность — присед над головой (OHS) 6 + асимметрия + качание</div>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #3b82f6', lineHeight:1.35 }}>Подвижность — присед над головой (OHS) 6 + асимметрия + качание</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginBottom:8 }}>
                             <HubToggle checked={state.ohsHeelsFlat} onChange={v=>setState(s=>({...s, ohsHeelsFlat:v}))} label="Пятки плоско" />
               <HubToggle checked={!state.ohsKneeValgus} onChange={v=>setState(s=>({...s, ohsKneeValgus:!v}))} label="Колени без вальгуса" />
@@ -1994,11 +1976,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               {ohs.failed >= 2 && (
                 <div data-sm="corr-mobility" style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)' }}>
                   <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛠️ OHS {ohs.failed}/6 → сначала мобильность (щадящие дозы −5%): {(smWeakPoints as string[]).filter((wp) => (smCauseByPhase as Record<string, string>)[wp] === 'mobility').join(', ') || 'yoke_pickup, stone_lap, log_clean'} · пауза-присед / фронт-присед с паузой / перекат + RDL</div>
-                  <button onClick={() => setTab('correction')} style={{ marginTop:8, padding:'12px 16px', minHeight:48, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>→ Открыть Коррекцию</button>
+                  <button onClick={() => setTab('correction')} style={{ marginTop:8, padding:'12px 16px', minHeight:48, borderRadius:14, background:'rgba(255,255,255,0.05)', border:'1px solid #1f3a5f', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>→ Открыть Коррекцию</button>
                 </div>
               )}
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
-                <button onClick={handleSaveOHSSnap} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#16a34a,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(34,197,94,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 Снапшот приседа (OHS)</button>
+                <button onClick={handleSaveOHSSnap} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#3b82f6,#a855f7)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(59,130,246,0.30), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 Снапшот приседа (OHS)</button>
                 <span style={{ fontSize:12, color:'#fff' }}>{smOhsTrend && smOhsTrend.n >= 2 ? `тренд ${smOhsTrend.delta >= 0 ? '+' : ''}${smOhsTrend.delta} за ${smOhsTrend.n} зам.` : `история ${smOhsHist.length}/10`}</span>
               </div>
               <div style={{ fontSize:12, color:'#fff', marginTop:4 }}>⚖️ Пол атлета: {athleteSexLabel(athleteSex)}{athleteSex ? ' — нормы камня/йока по полу' : ' — укажи пол во вкладке Видео или в профиле'}</div>
@@ -2027,9 +2009,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             </div>
             <div style={{ display:'flex', gap:6, marginBottom:6, alignItems:'center', flexWrap:'wrap' }}>
               <span style={{ fontSize:13, color:'#fff' }}>Подъём пятки 2.5 см (heel-raise)</span>
-              <button onClick={()=>setState(s=>({...s, heelRetest:'better'}))} aria-pressed={state.heelRetest==='better'} style={{ padding:'10px 16px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.heelRetest==='better'?'#22c55e':'rgba(140,190,255,0.16)', background: state.heelRetest==='better'?'rgba(34,197,94,0.14)':'rgba(22,30,52,0.88)', color: '#fff', fontSize:13, fontWeight:700 }}>Лучше</button>
-              <button onClick={()=>setState(s=>({...s, heelRetest:'same'}))} aria-pressed={state.heelRetest==='same'} style={{ padding:'10px 16px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.heelRetest==='same'?'#f59e0b':'rgba(140,190,255,0.16)', background: state.heelRetest==='same'?'rgba(245,158,11,0.14)':'rgba(22,30,52,0.88)', color: '#fff', fontSize:13, fontWeight:700 }}>Без изм</button>
-              <button onClick={()=>setState(s=>({...s, heelRetest:''}))} aria-label="Сбросить тест пятки" style={{ padding:'10px 16px', minHeight:44, borderRadius:999, border:'1px solid rgba(140,190,255,0.16)', background:'rgba(22,30,52,0.88)', color:'#fff', fontSize:13, fontWeight:700 }}>Сброс</button>
+              <button onClick={()=>setState(s=>({...s, heelRetest:'better'}))} aria-pressed={state.heelRetest==='better'} style={{ padding:'10px 16px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.heelRetest==='better'?'#3b82f6':'#1f3a5f', background: state.heelRetest==='better'?'rgba(59,130,246,0.14)':'#0a1629', color: '#fff', fontSize:13, fontWeight:700 }}>Лучше</button>
+              <button onClick={()=>setState(s=>({...s, heelRetest:'same'}))} aria-pressed={state.heelRetest==='same'} style={{ padding:'10px 16px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.heelRetest==='same'?'#3b82f6':'#1f3a5f', background: state.heelRetest==='same'?'rgba(59,130,246,0.14)':'#0a1629', color: '#fff', fontSize:13, fontWeight:700 }}>Без изм</button>
+              <button onClick={()=>setState(s=>({...s, heelRetest:''}))} aria-label="Сбросить тест пятки" style={{ padding:'10px 16px', minHeight:44, borderRadius:999, border:'1px solid #1f3a5f', background:'#0a1629', color:'#fff', fontSize:13, fontWeight:700 }}>Сброс</button>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6 }}>
               <HubNum label="Левая макс" unit="кг" value={state.leftMax} onChange={v=>setState(s=>({...s, leftMax:v}))} placeholder="100" step={2.5} />
@@ -2039,11 +2021,11 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               <div style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background: asymmetry.isCrit?'rgba(239,68,68,0.08)': asymmetry.isAsym?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${asymmetry.isCrit?'rgba(239,68,68,0.2)': asymmetry.isAsym?'rgba(245,158,11,0.2)':'rgba(34,197,94,0.2)'}` }}>
                 <div style={{ fontSize:14, fontWeight:800, color: asymmetry.isCrit?'#ef4444': asymmetry.isAsym?'#f59e0b':'#22c55e' }}>Асимметрия {asymmetry.diff}% {asymmetry.isCrit?'КРИТ ≥12%': asymmetry.isAsym?'ВНИМАНИЕ ≥7%':'— норма <7%'} {asymmetry.isAsym? `→ слабее ${asymmetry.weaker === 'left' ? 'слева' : 'справа'}`:''}</div>
                 <div style={{ fontSize:12, color:'#fff' }}>Пороги 7/12% — предиктор distal biceps tear (Heazlewood). {gripAsymDiag ? gripAsymDiag.text : ''}</div>
-                <button onClick={handleSaveGripSnap} style={{ marginTop:8, padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#f59e0b,#ef4444)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 Снапшот хвата (лев/прав)</button>
+                <button onClick={handleSaveGripSnap} style={{ marginTop:8, padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#3b82f6,#a855f7)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(59,130,246,0.30), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📸 Снапшот хвата (лев/прав)</button>
                 {asymmetry.isAsym && (
                   <div data-sm="corr-split" style={{ marginTop:8, padding:'12px 14px', borderRadius:14, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.22)' }}>
                     <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛠️ Слабее {asymmetry.weaker === 'left' ? 'слева' : 'справа'} → односторонняя добивка +1 сет (15–25%): farmers_grip → вис + молоток · grip_support → pinch block + axle hold</div>
-                    <button onClick={() => setTab('correction')} style={{ marginTop:8, padding:'12px 16px', minHeight:48, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>→ Открыть Коррекцию</button>
+                    <button onClick={() => setTab('correction')} style={{ marginTop:8, padding:'12px 16px', minHeight:48, borderRadius:14, background:'rgba(255,255,255,0.05)', border:'1px solid #1f3a5f', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>→ Открыть Коррекцию</button>
                   </div>
                 )}
               </div>
@@ -2063,13 +2045,9 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
 
         {tab==='video' && (
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #00e68a', lineHeight:1.35 }}>Видео — Кинова (Kinovea): качание (Sway) + скорость переноски (VBT)</div>
-            <div style={{ fontSize:12, color:'#fff', marginBottom:6 }}>Полевая методика: телефон сбоку 30 кадров/с → Кинова (Kinovea, бесплатно) → трек центра масс/йока → петля по горизонтали = качание. Скорость переноски: скорость ходьбы, м/с.</div>
-            <textarea value={csvText} onChange={e=>setCsvText(e.target.value)} placeholder="Вставь файл Кинова (Kinovea CSV): время,x,y или t,x,y; x,y в см (качание = петля)" style={{ width:'100%', height:64, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:'monospace' }} />
-            <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
-              <button onClick={handleCsvParse} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#0a84ff,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📊 Разобрать Kinovea CSV → Sway (качание)</button>
-              <span style={{ fontSize:12, color:'#fff', alignSelf:'center' }}>Или введи качание/скорость вручную</span>
-            </div>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #3b82f6', lineHeight:1.35 }}>Траектория и углы: качание (Sway) + скорость переноски</div>
+            <div style={{ fontSize:12, color:'#fff', marginBottom:6 }}>Полевая методика: телефон сбоку 30 кадров/с, петля по горизонтали = качание. Скорость переноски: скорость ходьбы, м/с. Значения вносятся вручную; гониометр и разбор углов — ниже.</div>
+            <div style={{ fontSize:12, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:12, padding:'10px 12px', marginBottom:6 }}>Импорт Kinovea CSV убран 2026-09-27 — новых треков из CSV не будет. Всё остальное (качание, скорость, Энод, углы суставов, калибровка скорость-нагрузка, прогресс) работает как раньше.</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
               <HubNum label="Качание (Sway)" unit="см" value={state.swayCm} onChange={v=>setState(s=>({...s, swayCm:v}))} placeholder="3.2" step={0.5} />
               <HubNum label="Высота подъёма (yMax)" unit="см" value={state.yMaxCm} onChange={v=>setState(s=>({...s, yMaxCm:v}))} placeholder="85" step={5} />
@@ -2080,16 +2058,15 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             {smMetricTops.length > 0 && (
               <div data-sm="corr-video" style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.22)' }}>
                 <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>🛠️ Замер → коррекция: {smMetricTops.map((t) => `${t.tag} → ${t.name} ${t.dose}`).join(' · ')}</div>
-                <button onClick={() => setTab('correction')} style={{ marginTop:8, padding:'12px 16px', minHeight:48, borderRadius:14, background:'linear-gradient(135deg,#f59e0b,#ef4444)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>→ Открыть Коррекцию</button>
+                <button onClick={() => setTab('correction')} style={{ marginTop:8, padding:'12px 16px', minHeight:48, borderRadius:14, background:'linear-gradient(135deg,#3b82f6,#a855f7)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>→ Открыть Коррекцию</button>
               </div>
             )}
-            <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color:'#fff' }}>VBT зоны: yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}-{VBT_SS_THRESHOLDS.yoke_walk.stopMin} · farmers {VBT_SS_THRESHOLDS.farmers_walk_heavy.optimalMin}/{VBT_SS_THRESHOLDS.farmers_walk_heavy.stopMin} · stone {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} · log {VBT_SS_THRESHOLDS.log_press.optimalMin}/{VBT_SS_THRESHOLDS.log_press.stopMin} м/с</div>
+            <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.16)', fontSize:12, color:'#fff' }}>VBT зоны: yoke {VBT_SS_THRESHOLDS.yoke_walk.optimalMin}-{VBT_SS_THRESHOLDS.yoke_walk.stopMin} · farmers {VBT_SS_THRESHOLDS.farmers_walk_heavy.optimalMin}/{VBT_SS_THRESHOLDS.farmers_walk_heavy.stopMin} · stone {VBT_SS_THRESHOLDS.atlas_stone_load.optimalMin}/{VBT_SS_THRESHOLDS.atlas_stone_load.stopMin} · log {VBT_SS_THRESHOLDS.log_press.optimalMin}/{VBT_SS_THRESHOLDS.log_press.stopMin} м/с</div>
             <div style={{ marginTop:6, display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:6 }}>
-              <div style={{ padding:'12px 12px', borderRadius:14, background: swayCm!=null ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(59,130,246,0.18)', fontSize:12, color:'#fff' }}>Поправка Энода (Enode): было {swayCm ?? '—'} см → стало {enodeCorrected ?? '—'} см<br/><span style={{ fontSize:10, color:'#fff' }}>{swayCm ?? 0} ×1.08 −0.45 = {enodeCorrected ?? 0}</span></div>
-              <div style={{ padding:'12px 12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color:'#fff' }}>Сетка: yoke 1.30/1.00<br/>farmers 1.40/1.10<br/>stone 0.45/0.30<br/>log 0.32/0.20 м/с — стоп при &lt;stopMin</div>
+              <div style={{ padding:'12px 12px', borderRadius:14, background: swayCm!=null ? 'rgba(59,130,246,0.08)' : '#0a1629', border:'1px solid #1f3a5f', fontSize:12, color:'#fff' }}>Поправка Энода (Enode): было {swayCm ?? '—'} см → стало {enodeCorrected ?? '—'} см<br/><span style={{ fontSize:10, color:'#fff' }}>{swayCm ?? 0} ×1.08 −0.45 = {enodeCorrected ?? 0}</span></div>
+              <div style={{ padding:'12px 12px', borderRadius:14, background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.16)', fontSize:12, color:'#fff' }}>Сетка: yoke 1.30/1.00<br/>farmers 1.40/1.10<br/>stone 0.45/0.30<br/>log 0.32/0.20 м/с — стоп при &lt;stopMin</div>
             </div>
-            {carryPath && <div style={{ marginTop:6, padding:'12px 14px', borderRadius:14, background: carryPath.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : carryPath.verdict === 'warn' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)', border:'1px solid rgba(255,255,255,0.06)' }}><div style={{ fontSize:14, fontWeight:800, color: carryPath.verdict === 'ok' ? '#22c55e' : carryPath.verdict === 'warn' ? '#f59e0b' : '#ef4444' }}>Траектория переноски: {carryPath.type} · {carryPath.verdict.toUpperCase()}</div><div style={{ fontSize:12, color:'#fff', marginTop:2 }}>{carryPath.lines.join(' · ')}</div></div>}
-            <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
+            <details style={{ marginTop:10, borderRadius:16, background:'#0a1629', border:'1px solid #1f3a5f' }}>
               <summary style={{ padding:'12px 14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>📷 Видеоуглы с телефона (съёмка → точки → таблица)</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
                 <StrongmanVideoGoniometer
@@ -2102,7 +2079,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 />
               </div>
             </details>
-            <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
+            <details style={{ marginTop:10, borderRadius:16, background:'#0a1629', border:'1px solid #1f3a5f' }}>
               <summary style={{ padding:'12px 14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>🦿 Углы суставов с видео (нормы)</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Трекер поз → выгрузка таблицы (время,таз,колено,голеностоп,плечо) → вставь ниже. Йок: таз 30–46° / колено 43–65°; лог: плечо ≥150°.</div>
@@ -2110,16 +2087,16 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 <HubPopupSelect label="Снаряд (углы)" value={state.poseLift} onChange={v=>setState(s=>({...s, poseLift:v}))} options={[{ id:'yoke_walk', label:'Йок (Yoke)' }, { id:'farmers_walk', label:'Фермер (Farmers)' }, { id:'log_press', label:'Лог (Log)' }]} />
                 <HubPopupSelect label="Пол" value={state.poseSex} onChange={v=>setState(s=>({...s, poseSex:v as '' | 'male' | 'female'}))} options={[{ id:'', label:'Не указан' }, { id:'male', label:'Мужской' }, { id:'female', label:'Женский' }]} />
                 <div style={{ display:'flex', alignItems:'flex-end', gap:6, flexWrap:'wrap' }}>
-                  <button onClick={handlePoseParse} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#a855f7,#6366f1)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(168,85,247,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>🦿 Разобрать углы</button>
-                  <button onClick={handleAutoAngles} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📐 Авто-углы (ROM)</button>
+                  <button onClick={handlePoseParse} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#3b82f6,#a855f7)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(59,130,246,0.30), inset 0 1px 0 rgba(255,255,255,0.25)' }}>🦿 Разобрать углы</button>
+                  <button onClick={handleAutoAngles} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.05)', border:'1px solid #1f3a5f', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📐 Авто-углы (ROM)</button>
                 </div>
               </div>
-              <textarea value={state.poseCsv} onChange={e=>setState(s=>({...s, poseCsv:e.target.value}))} placeholder={'время,таз,колено,голеностоп,плечо\n0.00,24,8,90,170\n0.03,20,25,88,172'} style={{ width:'100%', height:64, marginTop:6, background:'rgba(22,30,52,0.88)', color:'#fff', border:'1px solid rgba(140,190,255,0.16)', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:'monospace' }} />
-              {poseResult && <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background: poseResult.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border:'1px solid rgba(255,255,255,0.06)', fontSize:12, color: '#fff' }}>n={poseResult.n} · {ruVerdict(poseResult.verdict)} · {poseResult.lines.join(' · ')}</div>}
+              <textarea value={state.poseCsv} onChange={e=>setState(s=>({...s, poseCsv:e.target.value}))} placeholder={'время,таз,колено,голеностоп,плечо\n0.00,24,8,90,170\n0.03,20,25,88,172'} style={{ width:'100%', height:64, marginTop:6, background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:14, padding:'12px 16px', fontSize:13, fontFamily:'monospace' }} />
+              {poseResult && <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background: poseResult.verdict === 'ok' ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)', border:'1px solid #1f3a5f', fontSize:12, color: '#fff' }}>n={poseResult.n} · {ruVerdict(poseResult.verdict)} · {poseResult.lines.join(' · ')}</div>}
               {autoAngles && <div style={{ marginTop:6, padding:'12px 12px', borderRadius:14, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)', fontSize:12, color: '#fff' }}>📐 {ruVerdict(autoAngles.verdict)} · {autoAngles.lines.join(' · ')}</div>}
               </div>
             </details>
-            <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
+            <details style={{ marginTop:10, borderRadius:16, background:'#0a1629', border:'1px solid #1f3a5f' }}>
               <summary style={{ padding:'12px 14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>📈 Калибровка скорость-нагрузка (рампа → r²≥0.85)</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
@@ -2130,12 +2107,12 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 <HubNum label="Скорость 90%" unit="м/с" value={state.lvp90} onChange={v=>setState(s=>({...s, lvp90:v}))} placeholder="1.10" step={0.05} />
               </div>
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
-                <button onClick={handleLvpFit} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#0a84ff,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📈 Fit LVP</button>
+                <button onClick={handleLvpFit} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#3b82f6,#a855f7)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>📈 Fit LVP</button>
                 <span style={{ fontSize:12, color:'#fff' }}>{state.lvpResult || (smLvpStored ? `сохранён r² ${smLvpStored.r2}${smLvpStored.valid ? ' ✓' : ' ⚠'}` : 'рампа 50/65/75/90 → r²≥0.85')}</span>
               </div>
               </div>
             </details>
-            <details style={{ marginTop:10, borderRadius:16, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)' }}>
+            <details style={{ marginTop:10, borderRadius:16, background:'#0a1629', border:'1px solid #1f3a5f' }}>
               <summary style={{ padding:'14px', fontSize:14, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:52, display:'flex', alignItems:'center' }}>📊 Прогресс стронга (йок / фермер / лог / лестница)</summary>
               <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column' }}>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:6, marginTop:6 }}>
@@ -2146,35 +2123,35 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
                 <HubNum label="Вес тела" unit="кг" value={state.progBw} onChange={v=>setState(s=>({...s, progBw:v}))} placeholder="105" step={1} />
               </div>
               <div style={{ display:'flex', gap:6, marginTop:6, alignItems:'center' }}>
-                <button onClick={handleSaveProgress} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#16a34a,#30d158)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(34,197,94,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Снапшот прогресса</button>
+                <button onClick={handleSaveProgress} style={{ padding:'13px 20px', minHeight:52, borderRadius:14, background:'linear-gradient(135deg,#3b82f6,#a855f7)', border:'none', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', boxShadow:'0 6px 20px rgba(59,130,246,0.30), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💾 Снапшот прогресса</button>
                 <span style={{ fontSize:12, color:'#fff' }}>{smTrend ? `n=${smTrend.n} Δscore ${smTrend.scoreDelta} · best ${smTrend.bestScore} (${smTrend.bestDate})` : `история ${smProgressHist.length}/60`}</span>
               </div>
               </div>
             </details>
-            <div style={{ marginTop:6, padding:'10px 12px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px dashed rgba(140,190,255,0.16)', textAlign:'center' }}>
-              <div style={{ fontSize:13, color:'#fff' }}>📹 Видео качания — измеряй боковое как макс(x)−мин(x) в Кинова (Kinovea)</div>
-              <div style={{ marginTop:6, width:'100%', minHeight:52, background:'rgba(255,255,255,0.03)', borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, border:'1px solid rgba(255,255,255,0.04)' }}>Качание (Sway) 3 см — норма, больше 5 см — крит (McGill)</div>
+            <div style={{ marginTop:6, padding:'10px 12px', borderRadius:14, background:'#0a1629', border:'1px dashed #1f3a5f', textAlign:'center' }}>
+              <div style={{ fontSize:13, color:'#fff' }}>📹 Видео качания — измеряй боковое вручную: макс(x) − мин(x)</div>
+              <div style={{ marginTop:6, width:'100%', minHeight:52, background:'#0a1629', borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, border:'1px solid #1f3a5f' }}>Качание (Sway) 3 см — норма, больше 5 см — крит (McGill)</div>
             </div>
           </div>
         )}
 
         {tab==='correction' && (
           <div data-sm="corr-tab">
-            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #f59e0b', lineHeight:1.35 }}>🛠️ Коррекция движений — выбор движения → причина → методы с выбором упражнений</div>
-            <div data-sm="corr-filters" style={{ padding:'10px 12px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', marginBottom:8 }}>
+            <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6, paddingLeft:12, borderLeft:'3px solid #3b82f6', lineHeight:1.35 }}>🛠️ Коррекция движений — выбор движения → причина → методы с выбором упражнений</div>
+            <div data-sm="corr-filters" style={{ padding:'10px 12px', borderRadius:14, background:'#0a1629', border:'1px solid #1f3a5f', marginBottom:8 }}>
               <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:6 }}>🎚️ Подбор: уровень · зал · усталость{(state.corrLevel || state.corrEquipment.length || state.corrFatigue) ? '' : ' · без фильтров'}</div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
                 {SM_CORR_LEVELS.map((l) => (
-                  <button key={l.id} data-sm="corr-filter-level" data-active={state.corrLevel === l.id ? 'true' : 'false'} aria-pressed={state.corrLevel === l.id} onClick={() => setState((s) => ({ ...s, corrLevel: s.corrLevel === l.id ? '' : l.id }))} style={{ padding:'10px 14px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.corrLevel === l.id ? '#f5b04c' : 'rgba(140,190,255,0.16)', background: state.corrLevel === l.id ? 'rgba(245,158,11,0.20)' : 'transparent', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer' }}>{l.label}</button>
+                  <button key={l.id} data-sm="corr-filter-level" data-active={state.corrLevel === l.id ? 'true' : 'false'} aria-pressed={state.corrLevel === l.id} onClick={() => setState((s) => ({ ...s, corrLevel: s.corrLevel === l.id ? '' : l.id }))} style={{ padding:'10px 14px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.corrLevel === l.id ? '#3b82f6' : '#1f3a5f', background: state.corrLevel === l.id ? 'rgba(59,130,246,0.20)' : 'transparent', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer' }}>{l.label}</button>
                 ))}
               </div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
                 {SM_CORR_EQUIP.map((e) => (
-                  <button key={e.id} data-sm="corr-filter-equip" data-active={state.corrEquipment.includes(e.id) ? 'true' : 'false'} aria-pressed={state.corrEquipment.includes(e.id)} onClick={() => setState((s) => ({ ...s, corrEquipment: s.corrEquipment.includes(e.id) ? s.corrEquipment.filter((x) => x !== e.id) : [...s.corrEquipment, e.id] }))} style={{ padding:'10px 14px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.corrEquipment.includes(e.id) ? '#f5b04c' : 'rgba(140,190,255,0.16)', background: state.corrEquipment.includes(e.id) ? 'rgba(245,158,11,0.20)' : 'transparent', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer' }}>{e.label}</button>
+                  <button key={e.id} data-sm="corr-filter-equip" data-active={state.corrEquipment.includes(e.id) ? 'true' : 'false'} aria-pressed={state.corrEquipment.includes(e.id)} onClick={() => setState((s) => ({ ...s, corrEquipment: s.corrEquipment.includes(e.id) ? s.corrEquipment.filter((x) => x !== e.id) : [...s.corrEquipment, e.id] }))} style={{ padding:'10px 14px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.corrEquipment.includes(e.id) ? '#3b82f6' : '#1f3a5f', background: state.corrEquipment.includes(e.id) ? 'rgba(59,130,246,0.20)' : 'transparent', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer' }}>{e.label}</button>
                 ))}
               </div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                <button data-sm="corr-filter-fatigue" data-active={state.corrFatigue ? 'true' : 'false'} aria-pressed={state.corrFatigue} onClick={() => setState((s) => ({ ...s, corrFatigue: !s.corrFatigue }))} style={{ padding:'10px 14px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.corrFatigue ? '#f5b04c' : 'rgba(140,190,255,0.16)', background: state.corrFatigue ? 'rgba(245,158,11,0.20)' : 'transparent', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer' }}>😮‍💨 Щадящий при усталости</button>
+                <button data-sm="corr-filter-fatigue" data-active={state.corrFatigue ? 'true' : 'false'} aria-pressed={state.corrFatigue} onClick={() => setState((s) => ({ ...s, corrFatigue: !s.corrFatigue }))} style={{ padding:'10px 14px', minHeight:44, borderRadius:999, border:'1px solid', borderColor: state.corrFatigue ? '#3b82f6' : '#1f3a5f', background: state.corrFatigue ? 'rgba(59,130,246,0.20)' : 'transparent', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer' }}>😮‍💨 Щадящий при усталости</button>
               </div>
             </div>
             {smErrTags.tags.length > 0 && (
@@ -2187,32 +2164,45 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               </div>
             )}
             {smWeakPoints.length === 0 && (
-              <div data-sm="corr-empty" style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', fontSize:13, color:'#fff' }}>Выбери 1–4 слабые фазы на табах Жим / Переноски / Загрузки / Хват — здесь появится топ-3 с дозой, кью и прогрессией.</div>
+              <div data-sm="corr-empty" style={{ padding:'12px 14px', borderRadius:14, background:'#0a1629', border:'1px solid #1f3a5f', fontSize:13, color:'#fff' }}>Выбери 1–4 слабые фазы на табах Жим / Переноски / Загрузки / Хват — здесь появится топ-3 с дозой, кью и прогрессией.</div>
             )}
             {smWeakPoints.map((wp) => {
               const cause = (smCauseByPhase as Record<string, string>)[wp as string];
               const tops = (smCorrTops as Record<string, ReturnType<typeof correctivesForSMWeakPoint>>)[wp as string] || [];
               return (
-                <div key={wp as string} data-sm="corr-card" style={{ padding:'12px 14px', borderRadius:14, background:'rgba(22,30,52,0.88)', border:'1px solid rgba(140,190,255,0.16)', borderLeft:'3px solid #f59e0b', marginBottom:8 }}>
-                  <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{SM_WEAKPOINT_LABELS[wp as SMWeakPoint] || String(wp)} <span style={{ color:'#f5b04c', fontWeight:600 }}>· {cause ? `причина: ${SM_WEAK_CAUSE_LABELS[cause as keyof typeof SM_WEAK_CAUSE_LABELS] || cause}` : 'причина: техника (данных мало)'}</span></div>
+                <div key={wp as string} data-sm="corr-card" style={{ padding:'12px 14px', borderRadius:14, background:'#0a1629', border:'1px solid #1f3a5f', borderLeft:'3px solid #3b82f6', marginBottom:8 }}>
+                  <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>{SM_WEAKPOINT_LABELS[wp as SMWeakPoint] || String(wp)} <span style={{ color:'#3b82f6', fontWeight:600 }}>· {cause ? `причина: ${SM_WEAK_CAUSE_LABELS[cause as keyof typeof SM_WEAK_CAUSE_LABELS] || cause}` : 'причина: техника (данных мало)'}</span></div>
                   {tops.length === 0 && (
-                    <div data-sm="corr-empty-phase" style={{ fontSize:12, color:'#fff', marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.20)' }}>Под фильтры (зал/уровень) ничего не подошло — ослабь фильтры выше.</div>
+                    <div data-sm="corr-empty-phase" style={{ fontSize:12, color:'#fff', marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(59,130,246,0.20)' }}>Под фильтры (зал/уровень) ничего не подошло — ослабь фильтры выше.</div>
                   )}
                   {tops.map((c) => (
-                    <div key={c.id} data-sm="corr-row" style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
+                    <div key={c.id} data-sm="corr-row" style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'#0a1629', border:'1px solid #1f3a5f' }}>
                       <div style={{ fontSize:13, fontWeight:800, color:'#fff', display:'flex', alignItems:'center', gap:8 }}>
                         <button data-sm="corr-star" data-active={smPrefCorr[wp as string] === c.id ? 'true' : 'false'} onClick={() => setSmPrefCorr((prev) => {
                           const next = { ...prev };
                           if (next[wp as string] === c.id) delete next[wp as string];
                           else next[wp as string] = c.id;
                           return next;
-                        })} aria-pressed={smPrefCorr[wp as string] === c.id} aria-label={`Предпочитаемая коррекция: ${c.target}`} style={{ minWidth:44, minHeight:44, borderRadius:12, border:'1px solid', borderColor: smPrefCorr[wp as string] === c.id ? '#f5b04c' : 'rgba(255,255,255,0.12)', background: smPrefCorr[wp as string] === c.id ? 'rgba(245,158,11,0.20)' : 'transparent', color: smPrefCorr[wp as string] === c.id ? '#f5b04c' : '#fff', fontSize:18, fontWeight:800, cursor:'pointer', flexShrink:0 }}>{smPrefCorr[wp as string] === c.id ? '⭐' : '☆'}</button>
+                        })} aria-pressed={smPrefCorr[wp as string] === c.id} aria-label={`Предпочитаемая коррекция: ${c.target}`} style={{ minWidth:44, minHeight:44, borderRadius:12, border:'1px solid', borderColor: smPrefCorr[wp as string] === c.id ? '#3b82f6' : 'rgba(255,255,255,0.12)', background: smPrefCorr[wp as string] === c.id ? 'rgba(59,130,246,0.20)' : 'transparent', color: smPrefCorr[wp as string] === c.id ? '#3b82f6' : '#fff', fontSize:18, fontWeight:800, cursor:'pointer', flexShrink:0 }}>{smPrefCorr[wp as string] === c.id ? '⭐' : '☆'}</button>
                         <span>{c.kind === 'technique' ? '🎯 Техника' : c.kind === 'strength' ? '💪 Сила' : '🧱 Стабильность'} · {c.target}</span>
                       </div>
-                      <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Доза: {c.protocolAdj.sets}×{c.protocolAdj.reps} @{c.protocolAdj.pct}% · RIR {c.protocolAdj.rir} · {c.protocolAdj.tempo} · отдых {c.protocolAdj.restSeconds}с · <span style={{ color:'#f5b04c' }}>{c.doseNote}</span></div>
+                      <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Доза: {c.protocolAdj.sets}×{c.protocolAdj.reps} @{c.protocolAdj.pct}% · RIR {c.protocolAdj.rir} · {c.protocolAdj.tempo} · отдых {c.protocolAdj.restSeconds}с · <span style={{ color:'#3b82f6' }}>{c.doseNote}</span></div>
                       <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Кью: {c.cues[0]}</div>
                       <div style={{ fontSize:12, color:'#fff', marginTop:2 }}>Прогрессия: {c.progression} · Регресс: {c.regression}</div>
                       <div style={{ fontSize:11, color:'#fff', marginTop:2 }}>Ошибки: {c.errors.join('; ')} · Источник: {c.source}</div>
+                      {(() => {
+                        let d: ReturnType<typeof simulateSMCorrection> = null;
+                        try {
+                          const repsNum = parseInt(String(c.protocolAdj.reps ?? ''), 10);
+                          d = simulateSMCorrection(smPlan, { weakPoint: wp as any, corrId: c.id, sets: c.protocolAdj.sets, reps: Number.isFinite(repsNum) ? repsNum : undefined });
+                        } catch { d = null; }
+                        if (!d) return null;
+                        return (
+                          <div data-sm="corr-sim" style={{ fontSize:11, color:'#fff', marginTop:3, padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.18)' }}>
+                            <b style={{ color:'#3b82f6' }}>📈 Симуляция:</b> {d.summary} · ≈{d.weightEst} кг{d.distanceEstM > 0 ? ` · ≈${d.distanceEstM} м` : ''} · тоннаж {d.tonnageEst} · покрытие {d.coverageBefore}→{d.coverageAfter}{d.coveredFlip ? ' ⚠' : ''}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
@@ -2232,7 +2222,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
               </div>
             )}
             {smWeakPoints.length > 0 && (
-              <button data-sm="corr-apply" onClick={applyToConstructor} style={{ width:'100%', padding:'16px 20px', minHeight:56, borderRadius:16, background:'linear-gradient(135deg,#f59e0b,#ef4444)', color:'#fff', border:'none', fontWeight:800, fontSize:16, cursor:'pointer', boxShadow:'0 8px 24px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💉 Коррекцию в Стронг ({smCorrSession.length} упр.{Object.keys(smPrefCorr).length ? ` · ⭐ ${Object.keys(smPrefCorr).length}` : ''})</button>
+              <button data-sm="corr-apply" onClick={applyToConstructor} style={{ width:'100%', padding:'16px 20px', minHeight:56, borderRadius:16, background:'linear-gradient(135deg,#3b82f6,#a855f7)', color:'#fff', border:'none', fontWeight:800, fontSize:16, cursor:'pointer', boxShadow:'0 8px 24px rgba(59,130,246,0.30), inset 0 1px 0 rgba(255,255,255,0.25)' }}>💉 Коррекцию в Стронг ({smCorrSession.length} упр.{Object.keys(smPrefCorr).length ? ` · ⭐ ${Object.keys(smPrefCorr).length}` : ''})</button>
             )}
           </div>
         )}
@@ -2241,23 +2231,23 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
       <div style={{ ...CARD, padding: 10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.16)' }}>
         <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:6 }}>📋 Итог и применение</div>
         {smAudit && (
-          <div data-sm="sm-plan-audit" style={{ padding:'10px 12px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', marginBottom:6 }}>
+          <div data-sm="sm-plan-audit" style={{ padding:'10px 12px', borderRadius:14, background:'#0a1629', border:'1px solid #1f3a5f', marginBottom:6 }}>
             <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>
               📋 Аудит плана: {smAudit.hasPlan ? `покрытие фаз ${smAudit.coveredCount}/${SM_ALL_PHASES.length} · сетов ${smAudit.totalSets} · раб. недель ${smAudit.workWeeks}` : 'план стронга не собран — собери в Стронг-конструкторе'}
             </div>
             {smAudit.hasPlan && (
               <div data-sm="sm-coverage" style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
                 {SM_ALL_PHASES.map(ph => { const c = smAudit.byPhase[ph]; const worst = smAudit.worstPhase === ph; return (
-                  <span key={ph} title={`${SM_WEAKPOINT_LABELS[ph]} — ${c.sets} сетов`} data-covered={c.covered?'true':'false'} data-worst={worst?'true':'false'} style={{ fontSize:10, padding:'4px 8px', borderRadius:12, background: worst?'rgba(239,68,68,0.12)': c.covered?'rgba(34,197,94,0.10)':'rgba(255,255,255,0.04)', border:`1px solid ${worst?'rgba(239,68,68,0.35)': c.covered?'rgba(34,197,94,0.25)':'rgba(255,255,255,0.08)'}`, color: worst?'#ef4444': c.covered?'#22c55e':'#fff' }}>{SM_PHASE_SHORT[ph] || ph} {c.sets}</span>
+                  <span key={ph} title={`${SM_WEAKPOINT_LABELS[ph]} — ${c.sets} сетов`} data-covered={c.covered?'true':'false'} data-worst={worst?'true':'false'} style={{ fontSize:10, padding:'4px 8px', borderRadius:12, background: worst?'rgba(239,68,68,0.12)': c.covered?'rgba(34,197,94,0.10)':'#0a1629', border:`1px solid ${worst?'rgba(239,68,68,0.35)': c.covered?'rgba(34,197,94,0.25)':'#1f3a5f'}`, color: worst?'#ef4444': c.covered?'#22c55e':'#fff' }}>{SM_PHASE_SHORT[ph] || ph} {c.sets}</span>
                 ); })}
               </div>
             )}
             {smAudit.hasPlan && smAudit.worstPhase && (
-              <button data-sm="sm-worst" onClick={selectSmWorstPhase} style={{ marginTop:6, minHeight:44, padding:'8px 12px', borderRadius:10, background:'rgba(59,130,246,0.14)', border:'1px solid rgba(140,190,255,0.2)', color:'#60a5fa', fontSize:12, fontWeight:800, cursor:'pointer' }}>🎯 Худшая фаза: {SM_WEAKPOINT_LABELS[smAudit.worstPhase]} ({smAudit.byPhase[smAudit.worstPhase].sets} сетов) → разобрать</button>
+              <button data-sm="sm-worst" onClick={selectSmWorstPhase} style={{ marginTop:6, minHeight:44, padding:'8px 12px', borderRadius:10, background:'rgba(59,130,246,0.14)', border:'1px solid #1f3a5f', color:'#60a5fa', fontSize:12, fontWeight:800, cursor:'pointer' }}>🎯 Худшая фаза: {SM_WEAKPOINT_LABELS[smAudit.worstPhase]} ({smAudit.byPhase[smAudit.worstPhase].sets} сетов) → разобрать</button>
             )}
             <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
               <button data-sm="sm-inject" onClick={handleInjectSM} style={{ flex:'1 1 180px', minHeight:48, padding:'10px 14px', borderRadius:12, background:'linear-gradient(135deg,#3b82f6,#a855f7)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer' }}>💉 Вставить коррекции в план ({smWeakPoints.length})</button>
-              {hasInjectPrev && <button data-sm="sm-rollback" onClick={handleRollbackSM} style={{ minHeight:48, padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer' }}>↩ Откат</button>}
+              {hasInjectPrev && <button data-sm="sm-rollback" onClick={handleRollbackSM} style={{ minHeight:48, padding:'10px 14px', borderRadius:12, background:'rgba(255,255,255,0.05)', border:'1px solid #1f3a5f', color:'#fff', fontWeight:800, fontSize:13, cursor:'pointer' }}>↩ Откат</button>}
             </div>
             {smInjectMsg && <div data-sm="sm-inject-msg" style={{ marginTop:6, fontSize:12, color: smInjectMsg.startsWith('✓') || smInjectMsg.startsWith('↩') ? '#22c55e' : '#f59e0b' }}>{smInjectMsg}</div>}
           </div>
@@ -2309,7 +2299,7 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
             } catch { return null; }
           })()}
         </div>
-        <details style={{ marginBottom:6, borderRadius:14, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.07)' }}>
+        <details style={{ marginBottom:6, borderRadius:14, background:'#0a1629', border:'1px solid #1f3a5f' }}>
           <summary style={{ padding:'12px 14px', fontSize:13, fontWeight:800, color:'#fff', cursor:'pointer', minHeight:48, display:'flex', alignItems:'center' }}>Сводка расчёта — находки, ранжир, спец-блок</summary>
           <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column', gap:6 }}>
         <div style={{ fontSize:12, color:'#fff' }}>Находки: {scoring.findings.map(f=>f.text).join(' · ') || '—'}</div>
@@ -2327,19 +2317,21 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         {autoAngles && <div style={{ fontSize:12, color:'#fff' }}>Авто-углы: {autoAngles.lines.join(' · ')}</div>}
           </div>
         </details>
+        <div style={{ fontSize:15, fontWeight:800, color:'#fff', margin:'4px 0 6px', paddingLeft:12, borderLeft:'3px solid #3b82f6', lineHeight:1.35 }} data-sm="year-settings">🗓 Неделя и год</div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginBottom:6 }}>
           <HubNum label="Спец-блок" unit="нед (4–8)" value={state.specWeeks} onChange={v=>setState(s=>({...s, specWeeks:v}))} placeholder="6" step={1} />
           <HubNum label="Год: старт-неделя" unit="нед" value={state.annualStartWeek} onChange={v=>setState(s=>({...s, annualStartWeek:v}))} placeholder="1" step={1} />
         </div>
-        <button onClick={applyToConstructor} style={{ width:'100%', padding:'16px 20px', minHeight:56, borderRadius:16, background:'linear-gradient(135deg,#ef4444,#f59e0b)', color:'#fff', border:'none', fontWeight:800, fontSize:16, cursor:'pointer', boxShadow:'0 8px 24px rgba(239,68,68,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' }}>→ Применить в Стронг-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
-        <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
-          <button onClick={handleExport} aria-label="Печать отчёта (HTML)" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>🖨 Печать (HTML)</button>
-          <button onClick={handleExportCsv} aria-label="Выгрузить таблицу (CSV)" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📥 Выгрузка (CSV)</button>
-          <button onClick={handleExportIcs} aria-label="Календарь спец-блока (ICS)" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📅 Календарь (ICS)</button>
-          <button onClick={handleSaveAnnual} aria-label="Отправить в годовой план" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>🗓 В годовой план</button>
-          <button onClick={handleSMBackup} aria-label="Скачать резервную копию" style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}>📦 Резервная копия</button>
+        {/* Нижняя панель действий — 1-в-1 с ТА-хабом: flex-ряд БЕЗ своего фона, «Применить» flex:1 + ghost-экспорт */}
+        <div data-sm="action-bar" style={{ display:'flex', gap:8, marginTop:6, flexWrap:'wrap', alignItems:'stretch' }}>
+          <button data-sm="apply-bottom" onClick={applyToConstructor} style={{ flex:1, minWidth:0, minHeight:48, padding:'10px 14px', borderRadius:10, background:'linear-gradient(135deg,#3b82f6,#a855f7)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer' }}>→ Применить в Стронг-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
+          <button data-sm="export-html" onClick={handleExport} aria-label="Печать отчёта (HTML)" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>🖨 Печать (HTML)</button>
+          <button data-sm="export-csv" onClick={handleExportCsv} aria-label="Выгрузить таблицу (CSV)" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>📥 Выгрузка (CSV)</button>
+          <button data-sm="export-ics" onClick={handleExportIcs} aria-label="Календарь спец-блока (ICS)" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>📅 Календарь (ICS)</button>
+          <button data-sm="export-annual" onClick={handleSaveAnnual} aria-label="Отправить в годовой план" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>🗓 В годовой план</button>
+          <button data-sm="export-backup" onClick={handleSMBackup} aria-label="Скачать резервную копию" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>📦 Резервная копия</button>
           {/* Wave-0 Э0.4: восстановление из файла — без него «бэкап» был односторонним */}
-          <label style={{ flex:'1 1 140px', padding:'12px 8px', minHeight:52, borderRadius:14, background:'rgba(255,255,255,0.045)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+          <label data-sm="export-restore" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
             ♻️ Восстановить
             <input
               type="file"

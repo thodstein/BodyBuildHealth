@@ -1,9 +1,12 @@
 /** ArmDiagnosticsHub.tsx — ХАБ диагностики армрестлинга/армлифтинга PRO MAX (без рисков).
  * 5 подвкладок: Grip | Wrist/Rotation | Pressure | Strength(Dynamic+Bench) | Recovery(Tendon/ACWR)
- * - Углы РУ/РА/РН (motion-capture) + VBT + Force + Dynamic F/t F100/F500 + asymmetry + benchmarks + fatigue + ACWR (факт, без оценок риска)
+ * - Углы РУ/РА/РН (ручной ввод) + VBT + Force + Dynamic F/t F100/F500 + asymmetry + benchmarks + fatigue + ACWR (факт, без оценок риска)
  * - Детали + info (без score/verification/уровней) + table 3/2/1 + tendon факт
- * - Видео BlazePose (estimateAnglesFromLandmarks) + canvas preview
+ * - Видео-контура в хабе нет: углы вводятся вручную, всё остальное — из замеров и дневника
  * - Вывод в Арм-конструктор via planner-bridge (weakpoints)
+ *
+ * Структура 1-в-1 с ТА-хабом (WLDiagnosticsHub): герой (шапка+чипы+параметры+как пользоваться)
+ * → ряд табов с «Применить» → контент таба → «Итог и применение» → нижняя панель действий.
  */
 import { localIsoDate } from '../../../core/local-date';
 import React, { useMemo, useState, useEffect } from 'react';
@@ -12,7 +15,7 @@ import { getArmLandmarks, tendonWeeklyLimit } from '../../../engines/arm/arm-vol
 import { checkHumerusGuard, checkWristBalance } from '../../../engines/arm/arm-injury-guard.engine';
 import { tableWeekKind } from '../../../engines/arm/arm-table.engine';
 import { buildArmDiagnosticsReport } from '../../../engines/arm/arm-diagnostics-hub.engine';
-import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, estimateAnglesFromLandmarks, isAnglesVerified } from '../../../engines/arm/arm-motion-capture.engine';
+import { estimateArmAngles, validateArmAngles, recommendAnglesForTechnique, isAnglesVerified } from '../../../engines/arm/arm-motion-capture.engine';
 import { estimateForceVector } from '../../../engines/arm/arm-force-capture.engine';
 import { diagnoseVbt } from '../../../engines/arm/arm-vbt-capture.engine';
 import { buildDynamicReport } from '../../../engines/arm/arm-dynamic-force.engine';
@@ -20,10 +23,10 @@ import { loadForceTrials, addForceTrial, buildWeeklyStats, fatigueTrend, forceTr
 import { resolveArmLevelByTests } from '../../../engines/arm/arm-benchmarks.engine';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { applyToPlanner } from './planner-bridge';
-import { AdRoot, AdCard } from './arm-design-system';
-import { LEVEL_OPTS, TAB_DEFS, WEAK_GROUPS, WP_LABEL_SHORT } from './arm-hub-shared';
+import { AdRoot, AdCard, AdBtn, AdSteps } from './arm-design-system';
+import { TAB_DEFS } from './arm-hub-shared';
 import type { HubTab, TiqBout } from './arm-hub-shared';
-import { HubHead, HubControls, HubOutput, HubP0Panel, HubAction, HubTabNext, HubScenarios } from './arm-hub-panels';
+import { HubHead, HubOutput, HubP0Panel, HubAction, HubActionBar, HubTabNext, HubScenarios } from './arm-hub-panels';
 import { HubGripTab, HubWristTab } from './arm-hub-tabs1';
 import { HubPressureTab, HubStrengthTab, HubRecoveryTab } from './arm-hub-tabs2';
 import { HubCorrectionTab } from './arm-hub-correction-tab';
@@ -39,7 +42,6 @@ import { buildArmSpecBlock } from '../../../engines/arm/arm-spec-block.engine';
 import { injectArmCorrections, saveArmPlanPrev, loadArmPlanPrev, clearArmPlanPrev } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { detectArmWeakByE1rm, armVolumeHistory28d, armPointsForMuscles } from '../../../engines/arm/arm-diary-weak-detection.engine';
 import { loadHubDiarySessions } from '../../../engines/hub-diary.engine';
-import { parseArmTrackCsv, armPathMetrics, classifyArmTrajectory, isArmRealChange } from '../../../engines/arm/arm-video-analysis.engine';
 import { assessArmMobility, mobilityFailForWeakPoint, applyArmMobilityToProfile } from '../../../engines/arm/arm-mobility.engine';
 import { autoregArmFromDiary, type ArmDiaryDay } from '../../../engines/arm/arm-diary-autoreg.engine';
 import { checkUCLGuard, checkShoulderGuard, checkTendonGuard } from '../../../engines/arm/arm-injury-guard.engine';
@@ -232,10 +234,6 @@ export const ArmDiagnosticsHub: React.FC = () => {
     };
   }, []);
   const [bilatTick, setBilatTick] = useState(0);
-  const [trackCsv, setTrackCsv] = useState(String((p1saved as any).trackCsv ?? ''));
-  const [baseXLoop, setBaseXLoop] = useState<string>(() => {
-    try { return String((p1saved as any).baseXLoop ?? localStorage.getItem('he_arm_track_base') ?? ''); } catch { return ''; }
-  });
   const [mobWristFlex, setMobWristFlex] = useState((p1saved as any).mobWristFlex !== false);
   const [mobWristExt, setMobWristExt] = useState((p1saved as any).mobWristExt !== false);
   const [mobPron, setMobPron] = useState((p1saved as any).mobPron !== false);
@@ -321,7 +319,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
   useEffect(() => {
     try {
       localStorage.setItem(P1_KEY, JSON.stringify({
-        specWeeks, trackCsv, baseXLoop,
+        specWeeks,
         mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest,
         painElbow, painWrist, sleepHours, attKg,
         mvPhase, mvDetail, stReaction, stFalse, stCenter,
@@ -331,7 +329,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
         dgLosing, dgSideMax, dgFatigue, dgPress, dgElbow,
       }));
     } catch {}
-  }, [specWeeks, trackCsv, baseXLoop, mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest, painElbow, painWrist, sleepHours, attKg,
+  }, [specWeeks, mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest, painElbow, painWrist, sleepHours, attKg,
     mvPhase, mvDetail, stReaction, stFalse, stCenter,
     vecSR, vecSP, vecSB, vecSS, vecMR, vecMP, vecMB, vecMS, vecPR, vecPP, vecPB, vecPS,
     tsWrist, tsPron, tsRising, tsPin, tsR1, tsR3,
@@ -601,33 +599,11 @@ export const ArmDiagnosticsHub: React.FC = () => {
     try { return armPointsForMuscles(diaryTrendsP0.filter((t) => t.status !== 'ok').map((t) => t.muscle)); } catch { return []; }
   }, [diaryTrendsP0]);
 
-  // ── P1: мобильность (E10), трекинг (E8), авторегуляция/гварды (E11), bilateral (E12) ──
+  // ── P1: мобильность (E10), авторегуляция/гварды (E11), bilateral (E12) ──
   const armMobility = useMemo(() => assessArmMobility({
     wristFlexOk: mobWristFlex, wristExtOk: mobWristExt, pronOk: mobPron, supOk: mobSup,
     elbowExtOk: mobElbow, reverseRetest: mobRetest,
   }), [mobWristFlex, mobWristExt, mobPron, mobSup, mobElbow, mobRetest]);
-
-  const trackPts = useMemo(() => {
-    try { return trackCsv.trim() ? parseArmTrackCsv(trackCsv) : []; } catch { return []; }
-  }, [trackCsv]);
-
-  const trackMetrics = useMemo(() => {
-    try { return trackPts.length >= 3 ? armPathMetrics(trackPts) : null; } catch { return null; }
-  }, [trackPts]);
-
-  const trackType = useMemo(() => {
-    try { return trackPts.length >= 3 ? classifyArmTrajectory(trackPts) : null; } catch { return null; }
-  }, [trackPts]);
-
-  const trackSrd = useMemo(() => {
-    const base = parseFloat(baseXLoop);
-    if (!trackMetrics || !Number.isFinite(base)) return null;
-    try {
-      const real = isArmRealChange({ xLoop: base, yMax: 0, vMax: 0, points: 0 }, trackMetrics);
-      const d = Math.abs(trackMetrics.xLoop - base).toFixed(1);
-      return real ? `Δ${d} > SRD 4 — реальное изменение` : `Δ${d} ≤ SRD 4 — шум`;
-    } catch { return null; }
-  }, [trackMetrics, baseXLoop]);
 
   const autoregP0 = useMemo(() => {
     try {
@@ -1343,28 +1319,6 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const scoring = (report as any).scoring as ReturnType<typeof scoreArm> | undefined;
   const showScoring = !!scoring && (scoring.verification>0 || scoring.floors.length>0);
 
-  // Углы из файла landmarks (JSON) — локально, без CDN/камеры.
-  const handleVideoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      if (text.includes('shoulder')) {
-        const lm = JSON.parse(text);
-        const frame = estimateAnglesFromLandmarks(lm);
-        if (frame.elbowDeg) setState(s=> ({ ...s, elbowDeg: String(frame.elbowDeg), forearmDeg: String(frame.forearmDeg), wristDeg: String(frame.wristDeg), direction: (frame.direction as any) || s.direction }));
-        setToast('✓ Углы из landmarks применены');
-        setTimeout(()=>setToast(''), 2500);
-      } else {
-        setToast('Файл без landmarks — нужен JSON с точками (shoulder/elbow/wrist)');
-        setTimeout(()=>setToast(''), 2500);
-      }
-    } catch {
-      setToast('Файл не распознан — нужен JSON-экспорт landmarks');
-      setTimeout(()=>setToast(''), 2500);
-    }
-  };
-
   // Презентационный контекст для arm-hub-tabs/panels (вычислено выше, тела 1-в-1).
   const setMob = (key: string, v: boolean) => {
     const map: Record<string, (b: boolean) => void> = { mobWristFlex: setMobWristFlex, mobWristExt: setMobWristExt, mobPron: setMobPron, mobSup: setMobSup, mobElbow: setMobElbow };
@@ -1385,13 +1339,10 @@ export const ArmDiagnosticsHub: React.FC = () => {
   const onSaveBilat = () => { const lk = parseFloat(state.leftKg); const rk = parseFloat(state.rightKg); if (Number.isFinite(lk) && Number.isFinite(rk) && lk > 0 && rk > 0) { saveBilateralEntry(lk, rk); setBilatTick((x) => x + 1); } };
   const onResetDynamic = () => { const s = { fingerKg:'',fingerMs:'',hammerKg:'',hammerMs:'',hookKg:'',hookMs:'',cupKg:'',cupMs:'' }; setState(prev=> ({...prev, ...s})); };
   const onMobToProfile = () => { const s = applyArmMobilityToProfile(armMobility.restrictions); setMobMsg(`✓ Мобильность ${s} → профиль`); setTimeout(() => setMobMsg(''), 2500); };
-  const setTrackCsvClear = () => setTrackCsv('');
   const H: any = {
     state, setState, report, diag, angles, angleValid, anglesVerified, recAngles, autoPoint,
     hasWeak, scoring, showScoring, weightClassAuto, benchRes, forceVecPro, toast, bwNum,
     applyToConstructor, tab, setTab, toggleWeakPoint, clearWeakPoints, toggleLegacy,
-    handleVideoFile,
-    trackCsv, setTrackCsv, setTrackCsvClear, trackMetrics, trackType, trackSrd, setBaseXLoop,
     platformP0, measureHistP0, setMeasureTick,
     attKg, setAttKg, attOk, setAttOk, setAttTick, attHistP0,
     vbt, vbtThP0, vbtThresholdForWeakPoint,
@@ -1427,11 +1378,15 @@ export const ArmDiagnosticsHub: React.FC = () => {
 
   return (
     <AdRoot rootClass="train-armdiag" maxWidth={860}>
+      {/* 1 — герой: иконка/заголовок/чипы/параметры/как пользоваться (как в ТА) */}
       <HubHead H={H} />
 
+      {/* 2 — ряд табов + «Применить» (1-в-1 с ТА) */}
       <AdCard>
-        <div className="ad-sec-t" data-arm="hub-params-head">🧭 Параметры и выбор движения</div>
-        <HubControls H={H} />
+        <div className="ad-hub-tabbar" data-arm="hub-tabbar">
+          <AdSteps steps={TAB_DEFS.map(t=>({ id: t.id, label: `${t.icon} ${t.label}` }))} active={tab} onSelect={(id)=>setTab(id as HubTab)} hook="hub-tabs" numbered={false} />
+          <AdBtn variant="amber" data-arm="hub-apply-top" aria-label="Применить в Арм-конструктор" onClick={applyToConstructor}>→ Применить</AdBtn>
+        </div>
 
         {/* Tab content — key remount даёт enter-переход панели */}
         <div key={tab} className="ad-tabpanel" data-arm="hub-tabpanel">
@@ -1444,24 +1399,27 @@ export const ArmDiagnosticsHub: React.FC = () => {
           {tab==='pressure' && <HubPressureTab H={H} />}
 
           {tab==='recovery' && <HubRecoveryTab H={H} />}
-
-          {tab==='correction' && <HubCorrectionTab H={H} />}
           {tab==='recovery' && (
             <div style={{ marginTop: 8 }} data-arm="ortho-screen">
               <OrthoScreenCard compact />
             </div>
           )}
+
+          {tab==='correction' && <HubCorrectionTab H={H} />}
         </div>
         <HubTabNext H={H} />
       </AdCard>
 
+      {/* 3 — итог и применение: сводка + P0 + сценарии + мост (в ТА это блок «📦 Что уедет» + нижний ряд) */}
       <AdCard>
-        <div className="ad-sec-t" data-arm="hub-result-head">📋 Итог и применение</div>
         <HubOutput H={H} />
         <HubP0Panel H={H} />
         <HubScenarios H={H} />
         <HubAction H={H} />
       </AdCard>
+
+      {/* 4 — нижняя панель действий: применить + экспорт (как в ТА) */}
+      <HubActionBar H={H} />
     </AdRoot>
   );
 };

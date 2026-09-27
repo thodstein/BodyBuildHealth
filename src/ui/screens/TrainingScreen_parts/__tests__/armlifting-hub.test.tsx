@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import fs from 'fs';
+import path from 'path';
 import { ArmliftingDiagnosticsHub } from '../ArmliftingDiagnosticsHub';
+
+const HUB_SRC = (): string => fs.readFileSync(
+  path.join(process.cwd(), 'src', 'ui', 'screens', 'TrainingScreen_parts', 'ArmliftingDiagnosticsHub.tsx'),
+  'utf-8',
+);
 
 describe('W-AL UI: хаб армлифтинга', () => {
   it('рендер: замеры + вердикт-хинт без данных', () => {
@@ -112,5 +119,95 @@ describe('W-AL UI: хаб армлифтинга', () => {
     fireEvent.click(screen.getByText(/В Арм-конструктор/));
     expect(document.body.textContent).toContain('армлифтинг');
     expect(localStorage.getItem('he_training_planning_track')).toBe('arm');
+  });
+});
+
+describe('хаб армлифтинга: каркас и визуал 1-в-1 с ТА', () => {
+  it('каркас: герой → ряд табов + «Применить» → итог → нижняя панель (применить + весь экспорт)', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    const { container } = render(<ArmliftingDiagnosticsHub />);
+    // 1 — герой (замеры/покрытие/аудит плана/как пользоваться — всё в шапке)
+    expect(container.querySelector('[data-arm="lift-head"]')).toBeTruthy();
+    expect(container.querySelector('[data-arm="lift-coverage"]')).toBeTruthy();
+    expect(container.querySelector('[data-arm="lift-plan-audit"]')).toBeTruthy();
+    // 2 — ряд табов с «Применить» В ТОМ ЖЕ ряду (как в ТА-хабе, не отдельной карточкой снизу)
+    const tabs = container.querySelector('[data-arm="lift-tabs"]')!;
+    expect(tabs).toBeTruthy();
+    expect(tabs.querySelector('[data-arm="lift-apply-top"]')).toBeTruthy();
+    expect(HUB_SRC()).toMatch(/\[data-arm="lift-tabs"\] \.ad-btn \{ margin-left: auto; \}/);
+    // 3 — в ТА НЕТ отдельного заголовка «Итог»: мост-превью идёт своей карточкой «📦 Что уедет»
+    expect(container.querySelector('[data-arm="lift-result-head"]')).toBeNull();
+    expect(container.querySelector('[data-arm="lift-bridge-preview"]')).toBeTruthy();
+    // 4 — нижняя панель действий: применить + весь экспорт
+    const bar = container.querySelector('[data-arm="lift-export"]')!;
+    expect(bar).toBeTruthy();
+    expect(bar.querySelector('[data-arm="lift-apply-bottom"]')).toBeTruthy();
+    for (const hook of ['export-html', 'export-csv', 'lift-export-ics', 'export-print', 'lift-annual']) {
+      expect(bar.querySelector(`[data-arm="${hook}"]`), hook).toBeTruthy();
+    }
+    // низ — последняя секция хаба (ниже только закрывающий тег корня)
+    expect(bar.nextElementSibling).toBeNull();
+  });
+
+  it('визуал ТА: общий root .train-armdiag + синий вместо янтарного в выборе упражнений', () => {
+    const src = HUB_SRC();
+    // корень тот же, что у арм-хаба → блок §WL-VISUAL-PARITY из arm-design.css применяется автоматически
+    expect(src).toContain('rootClass="train-armdiag"');
+    // выбор упражнения/коррекции — индиго ТА, не янтарный
+    expect(src).toContain('linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))');
+    expect(src).toContain("2px solid rgba(59,130,246,0.7)");
+    expect(src).toContain('color: sel ? \'#93c5fd\' : \'#fff\'');
+    // CTA «Дыра → Коррекция» — градиент ТА
+    expect(src).toContain("background: 'linear-gradient(135deg,#3b82f6,#a855f7)'");
+    // янтарных остатков в выборе/коррекции быть не должно
+    expect(src).not.toMatch(/lift-(corr-row|corr-star|diag-top3|audit-go)[\s\S]{0,600}245,158,11/);
+    // поля/треки/тайлы — токены ТА: кромка #1f3a5f, блок #0a1629, поле rgba(255,255,255,0.05)
+    expect(src).toMatch(/\[data-arm="lift-tiles"\] \.ad-stat \{[^}]*border: 1px solid #1f3a5f/);
+    expect(src).toMatch(/\[data-arm="lift-tiles"\] \.ad-stat \{[^}]*background: #0a1629/);
+    expect(src).toMatch(/\.lift-bar \{[^}]*background: #1f3a5f/);
+    expect(src).toMatch(/\.lift-num \{[^}]*background: rgba\(255,255,255,0\.05\)/);
+    // нижняя панель — та же кромка/тень, что у арм-хаба
+    expect(src).toMatch(/\.lift-action-bar \{[^}]*background: #0a1629[^}]*border: 1px solid #1f3a5f[^}]*box-shadow: none/);
+    // 380px: кнопки табов/панели не разъезжаются
+    expect(src).toContain('@media (max-width: 380px)');
+  });
+
+  it('полный хром ТА: ни одного не-TA цвета поверхности вне семантики', () => {
+    const src = HUB_SRC();
+    // старые navy/stroke-поверхности вымерли (TA-поля остались как rgba(255,255,255,0.05))
+    expect(src).not.toMatch(/rgba\(22,30,52/);
+    expect(src).not.toMatch(/rgba\(140,190,255/);
+    // не-TA градиенты вымерли
+    for (const g of ['#f59e0b,#ef4444', '#a855f7,#6366f1', '#16a34a,#30d158', '#0a84ff,#30d158']) {
+      expect(src, g).not.toContain(g);
+    }
+    // янтарный фокус/рамка в хром не вернулись
+    expect(src).not.toMatch(/border-color:rgba\(245,158,11/);
+    expect(src).not.toMatch(/outline:2px solid rgba\(245,158,11/);
+    // невыбранные чипы покрытия/связности — TA-поверхность + TA-кромка (не стекло 0.04/0.08)
+    expect(src).not.toMatch(/'rgba\(255,255,255,0\.04\)'/);
+    expect(src).toMatch(/hit \? 'rgba\(34,197,94,0\.12\)' : '#0a1629'/);
+    expect(src).toMatch(/border: sel \? '2px solid rgba\(59,130,246,0\.7\)' : '1px solid #1f3a5f'/);
+    // ВАЖНО: #0f1c33 — не токен ТА (TA-карточка #0a1629, TA-поле rgba(255,255,255,0.05)).
+    // В прошлом раунде я сам назвал его «блоком ТА» и закрепил этим же guard'ом — теперь запрещён.
+    expect(src).not.toMatch(/#0f1c33/);
+    const taCss = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'ui', 'screens', 'TrainingScreen_parts', 'arm-design.css'),
+      'utf-8',
+    );
+    expect(taCss).toContain('--ad-bg: #0a1629;');
+    expect(taCss).toContain('--ad-field: rgba(255, 255, 255, 0.05);');
+  });
+
+  it('видео/Kinovea в армлифтинге сохранены (пользователь выбрал оставить)', () => {
+    const src = HUB_SRC();
+    expect(src).toContain('lift-video-flags');
+    expect(src).toMatch(/Kinovea/i);
+    // и в движке живой разбор CSV
+    const eng = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'engines', 'arm', 'arm-video-analysis.engine.ts'),
+      'utf-8',
+    );
+    expect(eng.length).toBeGreaterThan(500);
   });
 });

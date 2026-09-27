@@ -1,11 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import fs from 'fs';
+import path from 'path';
 import { ArmDiagnosticsHub } from '../ArmDiagnosticsHub';
 
 beforeEach(() => {
   localStorage.clear();
 });
+
+/** Кнопка таба из ряда .ad-steps[data-arm="hub-tabs"] — по aria-label.
+ * Нужен вместо getByText: подписи табов встречаются и в карточках контента. */
+const tabBtn = (re: RegExp): HTMLButtonElement =>
+  Array.from(document.querySelectorAll('[data-arm="hub-tabs"] button')).find((b) => re.test(b.textContent || ''))!;
 
 describe('ArmDiagnosticsHub PRO', () => {
   it('рендерит заголовок и 4 подвкладки', () => {
@@ -23,6 +30,66 @@ describe('ArmDiagnosticsHub PRO', () => {
     const wristBtn = screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON') || screen.getAllByText(/Кисть\/Ротация/)[0];
     fireEvent.click(wristBtn);
     expect(document.body.textContent).toContain('Локоть');
+  });
+
+  it('каркас 1-в-1 с ТА-хабом: герой → ряд табов+применить → итог → нижняя панель', () => {
+    const { container } = render(<ArmDiagnosticsHub />);
+    // 1 — герой с параметрами (свёрнуты в герое, не отдельной карточкой)
+    expect(container.querySelector('[data-arm="hub-head"]')).toBeTruthy();
+    expect(container.querySelector('[data-arm="hub-head"] [data-arm="hub-params"]')).toBeTruthy();
+    expect(container.querySelector('[data-arm="hub-params-head"]')).toBeNull();
+    // 2 — ряд табов с «Применить» РЯДОМ с пилюлями (не отдельной карточкой снизу)
+    const tabbar = container.querySelector('[data-arm="hub-tabbar"]')!;
+    expect(tabbar).toBeTruthy();
+    expect(tabbar.querySelector('[data-arm="hub-tabs"]')).toBeTruthy();
+    expect(tabbar.querySelector('[data-arm="hub-apply-top"]')).toBeTruthy();
+    // 3 — в ТА НЕТ отдельного заголовка «Итог»: мост-превью идёт своей карточкой «📦 Что уедет»
+    expect(container.querySelector('[data-arm="hub-result-head"]')).toBeNull();
+    expect(container.querySelector('[data-arm="hub-bridge-preview"]')).toBeTruthy();
+    // 4 — нижний ряд действий: применить + весь экспорт
+    const bar = container.querySelector('[data-arm="hub-action-bar"]')!;
+    expect(bar).toBeTruthy();
+    expect(bar.querySelector('[data-arm="hub-apply-bottom"]')).toBeTruthy();
+    for (const hook of ['export-html', 'export-print', 'export-csv', 'export-ics']) {
+      expect(bar.querySelector(`[data-arm="${hook}"]`)).toBeTruthy();
+    }
+    // низ — последняя секция хаба (ниже только ничего лишнего)
+    expect(bar.nextElementSibling).toBeNull();
+  });
+
+  it('визуальный язык ТА-хаба применён (surface #0a1629 / кромка #1f3a5f / синий актив / градиент «Применить»)', () => {
+    const css = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'ui', 'screens', 'TrainingScreen_parts', 'arm-design.css'),
+      'utf-8',
+    );
+    const sec = css.slice(css.indexOf('§WL-VISUAL-PARITY'));
+    expect(sec.length).toBeGreaterThan(500);
+    // токены поверхности/кромки/акцента — из inline-стилей ТА-хаба
+    expect(sec).toContain('--ad-bg: #0a1629');
+    expect(sec).toContain('--ad-edge: #1f3a5f');
+    expect(sec).toContain('--ad-acc: #3b82f6');
+    // активная пилюля таба/чипа — синяя (TA), не зелёная/янтарная
+    expect(sec).toMatch(/\.ad-step\[data-active='true'\][\s\S]{0,200}#3b82f6/);
+    expect(sec).toMatch(/\.ad-chip\[data-active='true'\][\s\S]{0,200}#3b82f6/);
+    // «Применить» (variant=amber) = градиент ТА 135° #3b82f6→#a855f7
+    expect(sec).toMatch(/data-variant='amber'[\s\S]{0,160}linear-gradient\(135deg, #3b82f6, #a855f7\)/);
+    // поля ввода — метрики ТА (r10 / p10 / 16px / 44px)
+    expect(sec).toMatch(/input[\s\S]{0,400}border-radius: 10px[\s\S]{0,200}font-size: 16px[\s\S]{0,120}min-height: 44px/);
+    // блок селекторов не утекает наружу арм-зон (правило 1 файла)
+    for (const line of sec.split('\n')) {
+      const l = line.trim();
+      if (!l.endsWith('{') || l.startsWith('/*') || l.startsWith('@')) continue;
+      expect(l.startsWith(':is(.train-arm')).toBe(true);
+    }
+  });
+
+  it('выбор упражнений и коррекция — синий язык ТА, не янтарный', () => {
+    const pick = fs.readFileSync(path.join(process.cwd(), 'src', 'ui', 'screens', 'TrainingScreen_parts', 'arm-hub-pick.tsx'), 'utf-8');
+    const corr = fs.readFileSync(path.join(process.cwd(), 'src', 'ui', 'screens', 'TrainingScreen_parts', 'arm-hub-correction-tab.tsx'), 'utf-8');
+    for (const src of [pick, corr]) {
+      expect(src).toContain('rgba(59,130,246,0.16)');
+      expect(src).not.toContain('245,158,11');
+    }
   });
 
   it('P1: таб Коррекция — пустое состояние + цепочка', () => {
@@ -82,12 +149,20 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(screen.getByPlaceholderText('15').getAttribute('inputmode')).toBe('decimal');
   });
 
-  it('видео убрано: нет камеры, есть загрузка landmarks JSON', () => {
+  it('видео-контур удалён полностью: нет камеры, landmarks JSON, Kinovea и textarea', () => {
     render(<ArmDiagnosticsHub />);
-    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
-    expect(document.body.textContent).toContain('Углы из файла landmarks');
-    expect(document.body.textContent).not.toContain('Включить камеру');
-    expect(document.body.textContent).not.toContain('Офлайн (APK)');
+    for (const re of [/Хват/, /Сила/, /Кисть\/Ротация/, /Давление/, /Сухожилие/, /Коррекция/]) {
+      fireEvent.click(tabBtn(re));
+      expect(document.querySelector('textarea')).toBeNull();
+      expect(document.body.textContent).not.toContain('landmarks');
+      expect(document.body.textContent).not.toContain('Kinovea');
+      expect(document.body.textContent).not.toContain('Включить камеру');
+      expect(document.body.textContent).not.toContain('Видео подсказывает');
+      expect(document.body.textContent).not.toContain('xLoop');
+    }
+    // ручной ввод углов остался живым (таб «Сухожилие» → «Дополнительно»)
+    fireEvent.click(tabBtn(/Сухожилие/));
+    expect(document.body.textContent).toContain('Ввод углов: ручной');
   });
 
   it('legacy cup зеркалится в чипы 12 точек', () => {
@@ -182,15 +257,6 @@ describe('ArmDiagnosticsHub PRO', () => {
     fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
     fireEvent.click(screen.getByText(/Pron откр/));
     expect(document.body.textContent).toContain('Топ-3');
-  });
-
-  it('P1 E8: Kinovea CSV → метрики и тип', () => {
-    render(<ArmDiagnosticsHub />);
-    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
-    const area = document.querySelector('textarea') as HTMLTextAreaElement;
-    fireEvent.change(area, { target: { value: 't,x,y\n0,0,0\n0.5,3,1\n1.0,8,2' } });
-    expect(document.body.textContent).toContain('xLoop 8');
-    expect(document.body.textContent).toContain('toproll наружу');
   });
 
   it('P1 E9: пороги точки на VBT-карточке после выбора', () => {
@@ -309,25 +375,13 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('Нормы ROM');
   });
 
-  it('P4: тип траектории с подсказкой что чинить', () => {
+  it('P4: точка из вкладки Кисть попадает в Коррекцию (видео-подсказок нет)', () => {
     render(<ArmDiagnosticsHub />);
-    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
-    const area = document.querySelector('textarea') as HTMLTextAreaElement;
-    fireEvent.change(area, { target: { value: 't,x,y\n0,0,0\n0.5,3,1\n1.0,8,2' } });
-    expect(document.body.textContent).toContain('Что чинить:');
-  });
-
-  it('P4: видео-подсказка в табе Коррекции добавляет точку', () => {
-    render(<ArmDiagnosticsHub />);
-    fireEvent.click(screen.getAllByText(/Кисть\/Ротация/).find(el=> el.tagName==='BUTTON')!);
-    const area = document.querySelector('textarea') as HTMLTextAreaElement;
-    fireEvent.change(area, { target: { value: 't,x,y\n0,0,0\n0.5,3,1\n1.0,8,2' } });
-    expect(document.body.textContent).toContain('Что чинить:');
-    fireEvent.click(screen.getByRole('button', { name: /Коррекция/ }));
-    // toproll-трек → подсказка rising/pron (low, кнопками)
-    expect(document.body.textContent).toContain('Видео подсказывает');
-    fireEvent.click(screen.getByRole('button', { name: '+ Rising' }));
-    // точка добавилась — таб перешёл в режим карточек
+    fireEvent.click(tabBtn(/Кисть\/Ротация/));
+    fireEvent.click(screen.getByText(/Pron откр/));
+    fireEvent.click(tabBtn(/Коррекция/));
+    expect(document.body.textContent).not.toContain('Видео подсказывает');
+    // выбранная точка видна в коррекции — таб перешёл в режим карточек
     expect(document.body.textContent).toContain('Коррекция движений (1)');
     expect(document.body.textContent).toContain('Доза базы');
   });

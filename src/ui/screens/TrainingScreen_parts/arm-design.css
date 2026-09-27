@@ -182,7 +182,12 @@
 }
 
 /* ─── Шаги/табы — липкая лента ───────────────────────────────────── */
-:is(.train-arm, .train-armdiag) .ad-steps {
+/* Стекло/радиус 19px — только для диаг-хаба (.train-armdiag). Лента шагов
+   конструктора (.train-arm) оформляется ИНЛАЙНО китом training-ui (тот же
+   плотный фон rgba(24,24,27,.92) и радиус 10, что в ББ-авто) — иначе правила
+   ниже перебивали бы его blur(20px), отрицательными полями и скруглением,
+   и «одинаковые» планировщики снова разошлись бы. */
+:is(.train-armdiag) .ad-steps {
   position: sticky;
   top: 0;
   z-index: 5;
@@ -202,7 +207,7 @@
   scroll-snap-type: x proximity;
 }
 
-:is(.train-arm, .train-armdiag) .ad-steps::-webkit-scrollbar {
+:is(.train-armdiag) .ad-steps::-webkit-scrollbar {
   display: none;
 }
 
@@ -2222,4 +2227,240 @@
 }
 :is(.train-armdiag) .ad-sec:has(> .ad-sec-head[aria-expanded='false']) .ad-sec-head {
   margin-bottom: 0;
+}
+
+/* ── Каркас «как в ТА-хабе»: ряд табов + «Применить» справа, нижняя панель ──
+ * 1) .ad-hub-tabbar — одна строка: липкая лента табов занимает остаток,
+ *    кнопка «Применить» не сжимается. На узком экране лента едет по горизонтали
+ *    (как раньше), кнопка переносится вниз — ломающих переполнений нет.
+ * 2) Нижняя панель (.ad-cta в хабе) — в ряд: главная кнопка тянется,
+ *    экспорт — ghost-рядом; на 320px всё переносится по строкам. */
+:is(.train-armdiag) .ad-hub-tabbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+:is(.train-armdiag) .ad-hub-tabbar .ad-steps {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+:is(.train-armdiag) .ad-hub-tabbar .ad-btn {
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+}
+:is(.train-armdiag) [data-arm='hub-action-bar'] {
+  row-gap: 8px;
+}
+:is(.train-armdiag) [data-arm='hub-action-bar'] .ad-btn-hero {
+  min-width: 190px;
+}
+@media (max-width: 380px) {
+  :is(.train-armdiag) .ad-hub-tabbar .ad-btn {
+    width: 100%;
+  }
+  :is(.train-armdiag) [data-arm='hub-action-bar'] .ad-btn {
+    flex: 1 1 46%;
+  }
+}
+
+/* ═══ §WL-VISUAL-PARITY — визуальный язык ТА-хаба на арм-хабе ═══
+ * Источник истины — inline-стили WLDiagnosticsHub (не «на глаз»):
+ *   поверхность #0a1629 · кромка #1f3a5f · активная пилюля #3b82f6
+ *   «Применить» = linear-gradient(135deg,#3b82f6,#a855f7), radius 10, 800
+ *   поля: radius 10 / padding 10 / font-size 16 / min-height 44
+ *   синяя нот-бокс: rgba(59,130,246,.07) + border rgba(59,130,246,.16)
+ * Правила проекта сохранены:
+ *   1) каждый селектор начинается с :is(.train-arm…) — наружу не течёт
+ *      (гард apk-arm-pack: «все селекторы с :is(.train-arm»);
+ *   2) ЛОГИКА в TSX не меняется — только цвет/радиус/метрики; строки,
+ *      aria, хуки и DOM-контракты прежние;
+ *   3) APK-слой styles-native-arm.css грузится позже (native) и правит
+ *      поверх — поэтому здесь только базовый язык;
+ *   4) СЕМАНТИЧЕСКИЕ цвета (зелёный/янтарь/красный — статусы, баннеры
+ *      тона warn/bad/ok, скоринг) НЕ перекрашиваются: это данные, не бренд. */
+:is(.train-armdiag) {
+  --ad-bg: #0a1629;
+  --ad-bg2: #0a1629;
+  --ad-bg3: rgba(255, 255, 255, 0.05);
+  --ad-edge: #1f3a5f;
+  --ad-edge2: #1f3a5f;
+  --ad-acc: #3b82f6;
+  --ad-acc-ink: #ffffff;
+  --ad-cyan: #60a5fa;
+  --ad-field: rgba(255, 255, 255, 0.05);
+  --ad-r: 14px;
+  --ad-r-sm: 10px;
+  --ad-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* Плоские карточки ТА: без стекла/блюра, кромка + синяя полоса сверху */
+:is(.train-armdiag) .ad-card {
+  background: #0a1629;
+  border: 1px solid #1f3a5f;
+  border-top: 2px solid rgba(59, 130, 246, 0.45);
+  border-radius: 14px;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  padding: 14px;
+}
+
+/* Секции — те же плоские блоки, шапка 12/700 белым */
+:is(.train-armdiag) .ad-sec {
+  background: #0a1629;
+  border: 1px solid #1f3a5f;
+  border-radius: 10px;
+  box-shadow: none;
+  padding: 10px;
+  margin-top: 10px;
+}
+:is(.train-armdiag) .ad-sec-head {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* Пилюли табов и чипы: min-height 44, radius 999, 10/14, 12/600 */
+:is(.train-armdiag) .ad-step {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid #1f3a5f;
+  background: #0a1629;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+:is(.train-armdiag) .ad-step[data-active='true'] {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.14);
+  color: #3b82f6;
+  font-weight: 600;
+}
+:is(.train-armdiag) .ad-chip {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid #1f3a5f;
+  background: #0a1629;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+:is(.train-armdiag) .ad-chip[data-active='true'] {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.14);
+  color: #3b82f6;
+  font-weight: 600;
+}
+:is(.train-armdiag) .ad-chip[data-tone='red'] {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+:is(.train-armdiag) .ad-chip[data-tone='green'] {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+/* Кнопки: метрики ТА (44 / 10×14 / radius 10 / 12px), иерархия сохранена */
+:is(.train-armdiag) .ad-btn {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+:is(.train-armdiag) .ad-btn[data-variant='amber'] {
+  background: linear-gradient(135deg, #3b82f6, #a855f7);
+  color: #ffffff;
+  box-shadow: none;
+}
+:is(.train-armdiag) .ad-btn[data-variant='primary'] {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: none;
+}
+:is(.train-armdiag) .ad-btn[data-variant='ghost'] {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+/* Нижний ряд действий в ТА — обычный flex-ряд (не липкая панель) */
+:is(.train-armdiag) .ad-cta {
+  position: static;
+}
+:is(.train-armdiag) .ad-btn[data-variant='dark'] {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #1f3a5f;
+  color: #ffffff;
+}
+
+/* Поля ввода — дословно метрики ТА (bg .05 / border .12 / r10 / p10 / 16px) */
+:is(.train-armdiag) .ad-field > input,
+:is(.train-armdiag) .ad-field > select,
+:is(.train-armdiag) .ad-field > textarea,
+:is(.train-armdiag) input,
+:is(.train-armdiag) select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px;
+  color: #ffffff;
+  font-size: 16px;
+  min-height: 44px;
+}
+
+/* Ноты/подсказки — синие боксы ТА (шрифт 11, белый) */
+:is(.train-armdiag) .ad-tip,
+:is(.train-armdiag) .ad-sec-hint {
+  background: rgba(59, 130, 246, 0.07);
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #ffffff;
+}
+
+/* Герой: иконка и боковая сводка в синем, не в янтарном */
+:is(.train-armdiag) .ad-head-ic {
+  background: linear-gradient(135deg, #3b82f6, #a855f7);
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.3);
+  border-color: #1f3a5f;
+}
+:is(.train-armdiag) .ad-head-side {
+  background: #0a1629;
+  border: 1px solid #1f3a5f;
+  border-top: 2px solid rgba(59, 130, 246, 0.45);
+  border-radius: 10px;
+  box-shadow: none;
+}
+:is(.train-armdiag) .ad-tag {
+  background: rgba(59, 130, 246, 0.07);
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  color: #ffffff;
+}
+
+/* Нижняя панель действий — плоская полоса с кромкой сверху */
+:is(.train-armdiag) [data-arm='hub-action-bar'] {
+  background: #0a1629;
+  border: 1px solid #1f3a5f;
+  border-top: 2px solid rgba(59, 130, 246, 0.45);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: none;
+}
+
+/* Фокус — синий (язык ТА), не зелёный */
+:is(.train-armdiag) .ad-btn:focus-visible,
+:is(.train-armdiag) .ad-chip:focus-visible,
+:is(.train-armdiag) .ad-step:focus-visible,
+:is(.train-armdiag) .ad-field > input:focus-visible,
+:is(.train-armdiag) input:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
 }

@@ -728,8 +728,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         .train-armdiag [data-arm="lift-head"] { padding: 10px 12px; }
         .train-armdiag [data-arm="lift-head"] .ad-head { gap: 8px; }
         .train-armdiag [data-arm="lift-head"] .ad-head-tx { min-width: 0; }
-        .train-armdiag .ad-card { padding: 12px; margin: 0 0 8px; }
-        .train-armdiag .ad-sec { padding: 10px; margin-top: 8px; }
+        .train-armdiag .ad-card { padding: 14px; margin: 0 0 10px; }
+        .train-armdiag .ad-sec { padding: 10px; margin-top: 10px; }
         .train-armdiag .ad-sec-t { margin: 0 0 6px; }
         .train-armdiag .ad-grid { gap: 8px; }
         .train-armdiag .ad-row { gap: 6px; }
@@ -737,23 +737,28 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         .train-armdiag .ad-sec-sum { color: #fff; }
         .train-armdiag .ad-fl { color: #fff; }
         .train-armdiag [data-arm="lift-tiles"] { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; margin: 8px 0; }
-        .train-armdiag [data-arm="lift-tiles"] .ad-stat { border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 8px 6px; text-align: center; }
+        .train-armdiag [data-arm="lift-tiles"] .ad-stat { border: 1px solid #1f3a5f; border-radius: 10px; padding: 8px 6px; text-align: center; background: #0a1629; }
         .train-armdiag [data-arm="lift-tiles"] .ad-stat-v { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; color: #fff; }
         .train-armdiag [data-arm="lift-tiles"] .ad-stat-l { font-size: 10px; font-weight: 700; color: #fff; }
         .train-armdiag [data-arm="lift-table"] .ad-row { align-items: center; }
-        .train-armdiag .lift-bar { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.12); overflow: hidden; min-width: 64px; flex: 1 1 64px; }
+        .train-armdiag .lift-bar { height: 6px; border-radius: 4px; background: #1f3a5f; overflow: hidden; min-width: 64px; flex: 1 1 64px; }
         .train-armdiag .lift-bar > span { display: block; height: 100%; border-radius: 4px; }
         .train-armdiag .lift-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .train-armdiag .lift-row-main { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 2 1 160px; }
         .train-armdiag .lift-row-meta { font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .train-armdiag .lift-num { display: flex; flex-direction: column; gap: 6px; min-width: 0; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 8px; background: rgba(255,255,255,0.03); }
+        .train-armdiag .lift-num { display: flex; flex-direction: column; gap: 6px; min-width: 0; border: 1px solid #1f3a5f; border-radius: 10px; padding: 8px; background: rgba(255,255,255,0.05); }
         .train-armdiag .lift-num-row { display: flex; gap: 6px; align-items: center; }
-        .train-armdiag .lift-num input { flex: 1 1 auto; min-width: 0; min-height: 48px; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 0 10px; }
+        .train-armdiag .lift-num input { flex: 1 1 auto; min-width: 0; min-height: 48px; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 0 10px; }
         .train-armdiag .lift-num input::placeholder { color: rgba(255,255,255,0.75); }
-        .train-armdiag .lift-num-clear { min-width: 44px; min-height: 44px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #fff; font-size: 14px; }
+        .train-armdiag .lift-num-clear { min-width: 44px; min-height: 44px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); color: #fff; font-size: 14px; }
         .train-armdiag .lift-group { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: #fff; margin: 8px 0 0; }
+        .train-armdiag [data-arm="lift-tabs"] .ad-btn { margin-left: auto; }
         .train-armdiag [id="lift-measures"], .train-armdiag [id="lift-verdict-sec"], .train-armdiag [id="lift-bridge"] { scroll-margin-top: 70px; }
-        .train-armdiag [data-arm="lift-export"] .ad-btn { min-height: 48px; font-weight: 700; }
+        .train-armdiag [data-arm="lift-export"] .ad-btn { min-height: 44px; font-weight: 800; }
+        .train-armdiag [data-arm="lift-export"] { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .train-armdiag [data-arm="lift-export"] .ad-btn-hero { min-width: 200px; }
+        .train-armdiag .lift-action-bar { background: #0a1629; border: 1px solid #1f3a5f; border-top: 2px solid rgba(59,130,246,0.45); border-radius: 14px; padding: 10px; box-shadow: none; }
+        @media (max-width: 380px) { .train-armdiag [data-arm="lift-tabs"] .ad-btn { width: 100%; margin-left: 0; } .train-armdiag [data-arm="lift-export"] .ad-btn { flex: 1 1 46%; } }
       `}</style>
       <AdCard>
         <div className="ad-head" data-arm="lift-head">
@@ -796,7 +801,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
                 {FAMILIES.map((f) => {
                   const hit = isOn(f);
                   return (
-                    <span key={f.id} className="ad-tag" data-covered={hit ? 'true' : 'false'} style={{ background: hit ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${hit ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: hit ? '#22c55e' : '#fff' }}>{hit ? '✓ ' : '— '}{f.label}</span>
+                    <span key={f.id} className="ad-tag" data-covered={hit ? 'true' : 'false'} style={{ background: hit ? 'rgba(34,197,94,0.12)' : '#0a1629', border: `1px solid ${hit ? 'rgba(34,197,94,0.3)' : '#1f3a5f'}`, color: hit ? '#22c55e' : '#fff' }}>{hit ? '✓ ' : '— '}{f.label}</span>
                   );
                 })}
               </div>
@@ -804,7 +809,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           } catch { return null; }
         })()}
         {/* ROUND-10: аудит собранного плана — покрытие 5 звеньев (паритет с ТА/стронг/арм/ББ) */}
-        <div data-arm="lift-plan-audit" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, lineHeight: 1.5 }}>
+        <div data-arm="lift-plan-audit" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: '#0a1629', border: '1px solid rgba(59,130,246,0.28)', fontSize: 11, lineHeight: 1.5 }}>
           {liftAudit ? (
             <>
               <b style={{ color: '#fff' }}>📋 Аудит плана: покрытие звеньев {liftAudit.covered.length}/{ARMLIFT_AUDIT_LINKS.length} ({liftAudit.coveragePct}%) · сетов {liftAudit.totalSets} · стол {Math.round(liftAudit.tableRatio * 100)}%</b>
@@ -813,7 +818,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
                   const sets = liftAudit.byLink[link]?.sets ?? 0;
                   const worst = liftWorst === link;
                   return (
-                    <span key={link} data-covered={sets > 0 ? 'true' : 'false'} data-worst={worst ? 'true' : 'false'} className="ad-tag" style={{ background: worst ? 'rgba(239,68,68,0.12)' : sets > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${worst ? 'rgba(239,68,68,0.35)' : sets > 0 ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`, color: worst ? '#ef4444' : sets > 0 ? '#22c55e' : '#fff' }}>
+                    <span key={link} data-covered={sets > 0 ? 'true' : 'false'} data-worst={worst ? 'true' : 'false'} className="ad-tag" style={{ background: worst ? 'rgba(239,68,68,0.12)' : sets > 0 ? 'rgba(34,197,94,0.1)' : '#0a1629', border: `1px solid ${worst ? 'rgba(239,68,68,0.35)' : sets > 0 ? 'rgba(34,197,94,0.25)' : '#1f3a5f'}`, color: worst ? '#ef4444' : sets > 0 ? '#22c55e' : '#fff' }}>
                       {ARMLIFT_WEAK_LINK_SHORT_RU[link]} {sets}
                     </span>
                   );
@@ -821,7 +826,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               </div>
               {liftAudit.duplicates.length > 0 && <div className="ad-muted" style={{ marginTop: 4 }}>⚠ Дубли (3+ сессии): {liftAudit.duplicates.slice(0, 4).join(', ')}</div>}
               {liftWorst && (liftAudit.byLink[liftWorst]?.sets ?? 0) === 0 && (
-                <button data-arm="lift-audit-go" onClick={() => setTab('corr')} style={{ marginTop: 6, minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(245,158,11,0.14)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+                <button data-arm="lift-audit-go" onClick={() => setTab('corr')} style={{ marginTop: 6, minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', border: '1px solid rgba(59,130,246,0.45)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
                   🎯 Дыра: {ARMLIFT_WEAK_LINK_SHORT_RU[liftWorst]} — не закрыта планом → Коррекция
                 </button>
               )}
@@ -845,8 +850,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <AdBtn variant="amber" data-arm="lift-apply-top" aria-label="Применить в Арм-конструктор" onClick={applyToConstructor}>→ Применить</AdBtn>
         </div>
         <div className="ad-muted">📏 Замеры — вход диагностики (%WR, слабейший). 🔍 Диагностика — точка срыва + фолы + тесты + причина. 🔧 Коррекция — упражнения + спец-блок волной.</div>
-      </AdCard>
-      {tab === 'pomost' && (<>
+      </AdCard>      {tab === 'pomost' && (<>
       <AdCard>
         <div id="lift-measures" />
         <AdSec title="🏋️ Армлифтинг — замеры снарядов" defaultOpen summary="RT · Axle · Pinch · CoC · Hub · Excalibur">
@@ -1139,7 +1143,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             aria-label="Kinovea CSV трека"
             rows={3}
             maxLength={20000}
-            style={{ width: '100%', minHeight: 64, fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, padding: 8, fontFamily: 'monospace' }}
+              style={{ width: '100%', minHeight: 64, fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: 8, fontFamily: 'monospace' }}
           />
           {videoFlags && <div className="ad-muted" data-arm="lift-video-flags">🎥 {videoFlags.note}</div>}
           <div className="lift-group">Условия замера (режут ложные слабости)</div>
@@ -1164,8 +1168,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           <div className="ad-muted">Чинить: {cause.fix} · {diagnosis.cues.join(' · ')}</div>
           <div className="ad-muted">{diagnosis.ruleNote}</div>
           {correctionsOrdered.length > 0 && (
-            <div data-arm="lift-diag-top3" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 12, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)' }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#f5b04c', marginBottom: 2 }}>🏋️ Методы с выбором упражнения {armliftPrefCorr ? '· ⭐ выбрано' : '· нажми — пойдёт первым в план'}</div>
+            <div data-arm="lift-diag-top3" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: '#0a1629', border: '1px solid rgba(59,130,246,0.3)' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#93c5fd', marginBottom: 2 }}>🏋️ Методы с выбором упражнения {armliftPrefCorr ? '· ⭐ выбрано' : '· нажми — пойдёт первым в план'}</div>
               {correctionsOrdered.map((c) => {
                 const sel = armliftPrefCorr === c.id;
                 return (
@@ -1177,12 +1181,12 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
                     aria-pressed={sel}
                     aria-label={`${sel ? 'Выбрано' : 'Выбрать'}: ${c.title}`}
                     onClick={() => setArmliftPrefCorr(c.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44, marginTop: 4, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', color: '#fff', background: sel ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.06))' : 'rgba(255,255,255,0.03)', border: sel ? '2px solid rgba(245,158,11,0.65)' : '1px solid rgba(255,255,255,0.08)' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44, marginTop: 4, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', color: '#fff', background: sel ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))' : 'transparent', border: sel ? '2px solid rgba(59,130,246,0.7)' : '1px solid #1f3a5f' }}
                   >
-                    <span aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: sel ? 'rgba(245,158,11,0.25)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
+                    <span aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(59,130,246,0.45)', background: sel ? 'rgba(59,130,246,0.22)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
                     <b style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{c.title}</b>
-                    <span style={{ fontSize: 11, color: '#f5b04c', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.protocol}</span>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#f5b04c' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓' : 'Выбрать'}</span>
+                    <span style={{ fontSize: 11, color: '#93c5fd', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.protocol}</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#93c5fd' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓' : 'Выбрать'}</span>
                   </button>
                 );
               })}
@@ -1204,7 +1208,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             {correctionsOrdered.map((c, idx) => {
               const sel = armliftPrefCorr === c.id;
               return (
-              <div key={c.id} className="ad-row" data-arm="lift-corr-row" data-selected={sel ? 'true' : 'false'} style={{ alignItems: 'center', borderRadius: 10, padding: '6px 8px', background: sel ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.06))' : 'transparent', border: sel ? '2px solid rgba(245,158,11,0.65)' : '1px solid transparent' }}>
+              <div key={c.id} className="ad-row" data-arm="lift-corr-row" data-selected={sel ? 'true' : 'false'} style={{ alignItems: 'center', borderRadius: 10, padding: '6px 8px', background: sel ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))' : 'transparent', border: sel ? '2px solid rgba(59,130,246,0.7)' : '1px solid transparent' }}>
                 <button
                   data-arm="lift-corr-star"
                   data-active={sel ? 'true' : 'false'}
@@ -1213,9 +1217,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
                   onClick={() => setArmliftPrefCorr(c.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, minHeight: 44, padding: 0, cursor: 'pointer', border: 'none', background: 'transparent', color: '#fff', textAlign: 'left' }}
                 >
-                  <span aria-hidden style={{ minWidth: 36, minHeight: 36, borderRadius: 9, border: '1px solid rgba(245,158,11,0.4)', background: sel ? 'rgba(245,158,11,0.25)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
+                  <span aria-hidden style={{ minWidth: 36, minHeight: 36, borderRadius: 9, border: '1px solid rgba(59,130,246,0.45)', background: sel ? 'rgba(59,130,246,0.22)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
                   <b style={{ flex: 1, minWidth: 0 }}>{idx + 1}. {c.title}</b> — {c.protocol}
-                  <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#f5b04c' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓ Выбрано' : 'Выбрать'}</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#93c5fd' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓ Выбрано' : 'Выбрать'}</span>
                 </button>
                 <span className="ad-muted">{c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq} · {c.source} · день {c.dayTag} · чинит: {c.fixesPhase.map((fid) => diagFailures.find((fp) => fp.id === fid)?.label || fid).join(', ')}</span>
                 {c.cues && c.cues.length > 0 && (
@@ -1265,7 +1269,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         <AdSec title="📦 Что уедет в конструктор" collapsible defaultOpen={false} summary={report.filled ? 'армлифтинг' : 'пока пусто'}>
           <div className="ad-muted">Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину «Армлифтинг». Слабейший снаряд, класс, рецепт, last-man-standing — в payload. Упражнения коррекции ({correctionsOrdered.map((c) => c.exId).join(', ') || '—'}) встанут в недели плана при сборке в дисциплине «Армлифтинг».</div>
           {correctionsOrdered.length > 0 && (
-            <div data-arm="lift-bridge-preview" style={{ marginTop: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)' }}>
+            <div data-arm="lift-bridge-preview" style={{ marginTop: 6, padding: '10px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)' }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: '#22c55e' }}>📋 Что встанет в план ({Math.min(3, correctionsOrdered.length)} упр. · {specBlock.length || 1} нед)</div>
               {correctionsOrdered.slice(0, 3).map((c, i) => (
                 <div key={c.id} style={{ fontSize: 11, color: '#fff', marginTop: 3 }}>{i + 1}. {c.title} — {c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq}{c.exId ? ` · id ${c.exId}` : ''}{armliftPrefCorr === c.id ? ' · ⭐ первым' : ''}</div>
@@ -1279,20 +1283,21 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             </div>
           )}
         </AdSec>
-        <AdCta>
-          <AdBtn variant="amber" block hero onClick={applyToConstructor}>→ В Арм-конструктор (армлифтинг)</AdBtn>
-        </AdCta>
-        <div className="ad-row" data-arm="lift-export">
-          <AdBtn variant="ghost" onClick={handleExportHtml}>🖨 HTML</AdBtn>
-          <AdBtn variant="ghost" onClick={handleExportCsv}>📥 CSV</AdBtn>
-          <AdBtn variant="ghost" data-arm="lift-export-ics" onClick={handleExportIcs}>📅 Календарь (.ics)</AdBtn>
-          <span data-arm="lift-annual" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <input aria-label="Год: старт-неделя" inputMode="numeric" value={state.annualStartWeek} onChange={(e) => set({ annualStartWeek: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) })} placeholder="1" style={{ width: 56, minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14, fontWeight: 700, textAlign: 'center' }} />
-            <AdBtn variant="ghost" onClick={handleSaveAnnual}>🗓 В годовой план</AdBtn>
-          </span>
-          <AdBtn variant="ghost" onClick={handlePrint}>🖨 Печать</AdBtn>
-        </div>
       </AdCard>
+
+      {/* Нижняя панель действий — 1-в-1 с ТА-хабом: «Применить» + экспорт.
+          data-arm="lift-export" — прежний хук экспортов (контракт apk-arm-pack). */}
+      <div className="ad-cta lift-action-bar" data-arm="lift-export">
+        <AdBtn variant="amber" hero data-arm="lift-apply-bottom" aria-label="Применить в Арм-конструктор" onClick={applyToConstructor} style={{ flex: '1 1 200px', minWidth: 0 }}>→ В Арм-конструктор (армлифтинг)</AdBtn>
+        <AdBtn variant="ghost" data-arm="export-html" onClick={handleExportHtml}>🖨 HTML</AdBtn>
+        <AdBtn variant="ghost" data-arm="export-csv" onClick={handleExportCsv}>📥 CSV</AdBtn>
+        <AdBtn variant="ghost" data-arm="lift-export-ics" onClick={handleExportIcs}>📅 Календарь (.ics)</AdBtn>
+        <span data-arm="lift-annual" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <input aria-label="Год: старт-неделя" inputMode="numeric" value={state.annualStartWeek} onChange={(e) => set({ annualStartWeek: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) })} placeholder="1" style={{ width: 56, minHeight: 44, borderRadius: 10, fontSize: 14, fontWeight: 700, textAlign: 'center' }} />
+          <AdBtn variant="ghost" onClick={handleSaveAnnual}>🗓 В годовой план</AdBtn>
+        </span>
+        <AdBtn variant="ghost" data-arm="export-print" onClick={handlePrint}>🖨 Печать</AdBtn>
+      </div>
     </AdRoot>
   );
 };
