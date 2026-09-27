@@ -1511,45 +1511,51 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
     autoAngles: autoAngles ? autoAngles.lines.join(' · ') : null,
   });
 
+  /** Снимок выгрузки — ЕДИНЫЙ для HTML/CSV/печати (иначе сводки расходятся). */
+  const smExportSnap = () => ({
+    weakPoints,
+    score, level, verification: scoring.verification,
+    sway: swayDiag?.text || null,
+    carrySwayCm: swayCm,
+    vbt: vbtLoss ? `${vbtLoss.lossPct}%` : null,
+    vbtLossPct: vbtLoss?.lossPct ?? null,
+    ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
+    gripFails,
+    asymmetryPct: asymmetry?.diff ?? null,
+    platformHeightCm: state.platformHeightCm ? parseFloat(state.platformHeightCm) : null,
+    tacky: state.tackyUsed,
+    findings: scoring.findings.map(f => f.text),
+    movement: movementExportLines,
+    ...proSnapExtra(),
+  });
   const handleExport = () => {
-    const snap: any = {
-      weakPoints,
-      score, level, verification: scoring.verification,
-      sway: swayDiag?.text || null,
-      carrySwayCm: swayCm,
-      vbt: vbtLoss ? `${vbtLoss.lossPct}%` : null,
-      vbtLossPct: vbtLoss?.lossPct ?? null,
-      ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
-      gripFails,
-      asymmetryPct: asymmetry?.diff ?? null,
-      platformHeightCm: state.platformHeightCm ? parseFloat(state.platformHeightCm) : null,
-      tacky: state.tackyUsed,
-      findings: scoring.findings.map(f => f.text),
-      movement: movementExportLines,
-      ...proSnapExtra(),
-    };
+    const snap: any = smExportSnap();
     const html = buildSMDiagnosticsHtml(snap);
     downloadSMHtml(html, `strongman-diagnostics-${localIsoDate()}.html`);
-    setToast('✓ Печать (HTML) готова');
+    setToast('✓ Выгрузка (HTML) готова');
     setTimeout(()=>setToast(''),2000);
   };
+  /** Паритет с ТА `data-wl="print"`: та же сводка, но в окно печати (а не скачивание файла). */
+  const handlePrint = () => {
+    try {
+      const html = buildSMDiagnosticsHtml(smExportSnap() as any);
+      const w = window.open('', '_blank');
+      if (!w) {
+        setToast('🚫 Окно печати заблокировано — сохрани HTML');
+        setTimeout(()=>setToast(''),2500);
+        return;
+      }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      w.print();
+    } catch {
+      setToast('⚠ Печать недоступна — сохрани HTML');
+      setTimeout(()=>setToast(''),2500);
+    }
+  };
   const handleExportCsv = () => {
-    const snap: any = {
-      weakPoints,
-      score, level, verification: scoring.verification,
-      sway: swayDiag?.text || null,
-      carrySwayCm: swayCm,
-      vbt: vbtLoss ? `${vbtLoss.lossPct}%` : null,
-      vbtLossPct: vbtLoss?.lossPct ?? null,
-      ohs: { totalScore: ohs.totalScore, failed: ohs.failed },
-      gripFails,
-      asymmetryPct: asymmetry?.diff ?? null,
-      platformHeightCm: state.platformHeightCm ? parseFloat(state.platformHeightCm) : null,
-      tacky: state.tackyUsed,
-      findings: scoring.findings.map(f => f.text),
-      movement: movementExportLines,
-      ...proSnapExtra(),
-    };
+    const snap: any = smExportSnap();
     downloadSMCsv(snap, `strongman-diagnostics-${localIsoDate()}.csv`);
     setToast('✓ Выгрузка (CSV) готова');
     setTimeout(()=>setToast(''),2000);
@@ -2325,7 +2331,8 @@ export const StrongmanDiagnosticsHub: React.FC = () => {
         {/* Нижняя панель действий — 1-в-1 с ТА-хабом: flex-ряд БЕЗ своего фона, «Применить» flex:1 + ghost-экспорт */}
         <div data-sm="action-bar" style={{ display:'flex', gap:8, marginTop:6, flexWrap:'wrap', alignItems:'stretch' }}>
           <button data-sm="apply-bottom" onClick={applyToConstructor} style={{ flex:1, minWidth:0, minHeight:48, padding:'10px 14px', borderRadius:10, background:'linear-gradient(135deg,#3b82f6,#a855f7)', color:'#fff', border:'none', fontWeight:800, fontSize:13, cursor:'pointer' }}>→ Применить в Стронг-конструктор ({weakPoints.join(', ') || 'баланс'})</button>
-          <button data-sm="export-html" onClick={handleExport} aria-label="Печать отчёта (HTML)" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>🖨 Печать (HTML)</button>
+          <button data-sm="export-html" onClick={handleExport} aria-label="Выгрузка отчёта (HTML)" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>📄 Выгрузка (HTML)</button>
+          <button data-sm="print" onClick={handlePrint} aria-label="Печать сводки" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>🖨 Печать</button>
           <button data-sm="export-csv" onClick={handleExportCsv} aria-label="Выгрузить таблицу (CSV)" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>📥 Выгрузка (CSV)</button>
           <button data-sm="export-ics" onClick={handleExportIcs} aria-label="Календарь спец-блока (ICS)" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>📅 Календарь (ICS)</button>
           <button data-sm="export-annual" onClick={handleSaveAnnual} aria-label="Отправить в годовой план" style={{ minHeight:48, padding:'10px 14px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>🗓 В годовой план</button>

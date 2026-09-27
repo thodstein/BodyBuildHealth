@@ -342,4 +342,36 @@ describe('хаб стронга: каркас и визуал 1-в-1 с ТА', (
     );
     expect(eng.length).toBeGreaterThan(500);
   });
+
+  it('паритет с ТА: настоящая печать в окно, а «Печать (HTML)» больше не врёт (скачивает файл)', async () => {
+    const src = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'ui', 'screens', 'TrainingScreen_parts', 'StrongmanDiagnosticsHub.tsx'),
+      'utf-8',
+    );
+    // подпись «Печать (HTML)» была ложью: кнопка СКАЧИВАЛА файл. Теперь это «Выгрузка (HTML)».
+    expect(src).not.toMatch(/Печать \(HTML\)/);
+    expect(src).toMatch(/data-sm="print"/);
+    expect(src).toMatch(/Выгрузка \(HTML\)/);
+    // печать = та же сводка, но window.print(), и честный фолбэк при блокировке окна
+    expect(src).toMatch(/const handlePrint = \(\) => \{[\s\S]{0,600}window\.open\('',\s*'_blank'\)/);
+    expect(src).toMatch(/w\.print\(\)/);
+    expect(src).toMatch(/Окно печати заблокировано/);
+    // снимок выгрузки один на HTML/CSV/печать — иначе сводки расходятся
+    expect(src).toMatch(/const smExportSnap = \(\) => \(\{/);
+    expect((src.match(/smExportSnap\(\)/g) || []).length).toBe(3);
+
+    // поведение: клик по печати открывает окно и вызывает print()
+    const w: any = { document: { write: vi.fn(), close: vi.fn() }, print: vi.fn(), focus: vi.fn() };
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(w as any);
+    const { container } = render(<StrongmanDiagnosticsHub />);
+    fireEvent.click(container.querySelector('[data-sm="print"]')!);
+    await waitFor(() => expect(w.print).toHaveBeenCalled());
+    expect(w.document.write).toHaveBeenCalled();
+    expect(openSpy).toHaveBeenCalled();
+    // окно печати заблокировано — честный тост, без падения
+    openSpy.mockReturnValue(null);
+    fireEvent.click(container.querySelector('[data-sm="print"]')!);
+    await waitFor(() => expect(screen.getByText(/Окно печати заблокировано/)).not.toBeNull());
+    openSpy.mockRestore();
+  });
 });
