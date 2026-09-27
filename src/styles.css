@@ -575,11 +575,36 @@ button.editor-schedule-cell {
   box-shadow: var(--glass-shadow) !important;
 }
 /* Липкие панели редактора ручного конструктора: верхняя (actions) и нижняя
-   (навигация шагов «← Назад / Далее →»). Позиционирование/фон заданы inline,
-   здесь — структурные правила и стекло. */
+   (навигация шагов «← Назад / Далее →»). Позиционирование верхней — здесь
+   (inline его не задавал, поэтому в TG/web она уезжала с контентом), фон —
+   !important: полупрозрачное стекло inline пропускало контент, который
+   скроллится под шапкой. */
 .manual-constructor--editor .editor-topbar-shell,
 .manual-constructor--editor .editor-bottomnav {
   flex-shrink: 0;
+}
+/* Скроллер — .tp-cbody окна конструктора, поэтому top:0 держит шапку ровно
+   под его собственной шапкой .tp-cbar (не под статус-баром). */
+.manual-constructor--editor .editor-topbar-shell {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: linear-gradient(180deg, rgba(26,28,38,0.98), rgba(18,20,30,0.97)) !important;
+}
+/* Фокус с клавиатуры/скроллIntoView не должен прятать карточку под шапкой. */
+.manual-constructor--editor .editor-meta-card,
+.manual-constructor--editor .editor-week-card,
+.manual-constructor--editor .editor-session-card,
+.manual-constructor--editor .editor-exercise-card {
+  scroll-margin-top: 150px;
+}
+/* Светлые темы: закреплённая полоса не должна быть тёмной (inline-градиент
+   тёмный, поэтому переопределяем, иначе она читалась бы чужой полосой). */
+[data-theme="light"] .manual-constructor--editor .editor-topbar-shell,
+[data-apk-theme="light"] .manual-constructor--editor .editor-topbar-shell {
+  background: linear-gradient(180deg, rgba(250,250,252,0.99), rgba(240,241,245,0.98)) !important;
+  border-color: var(--constructor-border) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important;
 }
 .manual-constructor--editor .editor-bottomnav {
   backdrop-filter: blur(10px);
@@ -706,6 +731,11 @@ button.editor-schedule-cell {
   }
   .manual-constructor--editor .editor-bottomnav > button { flex: 1; }
   .manual-constructor--editor { gap: 8px !important; }
+  /* На телефоне шапка переносится в 3-4 ряда — запас под неё больше. */
+  .manual-constructor--editor .editor-meta-card,
+  .manual-constructor--editor .editor-week-card,
+  .manual-constructor--editor .editor-session-card,
+  .manual-constructor--editor .editor-exercise-card { scroll-margin-top: 200px; }
   .manual-constructor--editor .editor-topbar { align-items: stretch !important; }
   .manual-constructor--editor .editor-topbar-hide-mobile { display: none !important; }
   .manual-constructor--editor .editor-topbar > div:last-child { width: 100%; margin-left: 0 !important; }

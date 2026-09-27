@@ -14,7 +14,7 @@ beforeEach(() => {
 });
 
 function goSplit(container: Element) {
-  fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+  fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
   const head = screen.getAllByRole('button', { name: /Именной цикл/ }).find((b) => b.getAttribute('aria-expanded') != null);
   expect(head).toBeTruthy();
   if (head && head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);

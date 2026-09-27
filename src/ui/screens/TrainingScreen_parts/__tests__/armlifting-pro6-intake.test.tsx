@@ -98,7 +98,7 @@ describe('M10 приёмник движения в конструкторе', ()
     render(<ArmAutoConstructor />);
     // пак пережил ремаунт, но карточка живёт на шаге «Атлет» и загейчена на дисциплину — идём туда
     fireEvent.click(screen.getByRole('button', { name: 'Армлифтинг' }));
-    fireEvent.click(screen.getByRole('button', { name: '🎯 Атлет' }));
+    fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
     expect(document.body.textContent).toContain('фаза срыва: Протяжка');
   });
 });

@@ -84,7 +84,7 @@ describe('W5a приёмник armlifting-моста', () => {
       source: 'intellectual',
     });
     render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '🎯 Атлет' }));
+    fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
     expect((screen.getByLabelText(/Pinch \(кг\)/) as HTMLInputElement).value).toBe('40');
     expect((screen.getByLabelText(/Support RT\/Axle \(кг\)/) as HTMLInputElement).value).toBe('80');
   });

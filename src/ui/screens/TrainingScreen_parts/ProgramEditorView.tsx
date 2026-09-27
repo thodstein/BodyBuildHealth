@@ -332,8 +332,11 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [goNextStep, goPrevStep, estepIdx]);
-  // Шапка редактора — обычная статичная панель (не липкая): без пиннинга
-  // position:fixed/sticky, чтобы не перекрывать селекты дней недели и фаз.
+  // Шапка редактора закреплена (sticky) — правило в styles.css
+  // (.manual-constructor--editor .editor-topbar-shell): скроллер окна
+  // конструктора .tp-cbody, поэтому top:0 держит её ровно под .tp-cbar и
+  // шапка не «уезжает» с контентом. Развёрнутая сетка «⋯ Ещё» вынесена из
+  // липкой зоны, иначе на телефоне она съедала бы треть экрана при скролле.
   const originalPrograms = useOriginalPrograms();
   const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
@@ -765,8 +768,11 @@ return (
           )}
           <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, cursor: 'pointer', background: showMore ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', border: showMore ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.10)', color: showMore ? '#00e68a' : 'rgba(255,255,255,0.65)', fontSize: 14, marginLeft: 'auto' }} onClick={() => setShowMore(v => !v)} title="Ещё действия" aria-expanded={showMore}>⋯</button>
         </div>
+        </div>
+        {/* «Ещё» — вне липкой шапки: развёрнутая сетка не должна висеть третью
+            экрана поверх контента при скролле (иначе шапка «плавает»). */}
         {showMore && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8, padding: '10px 12px', borderRadius: 14, background: 'linear-gradient(180deg, rgba(26,28,38,0.92), rgba(18,20,30,0.86))', border: '1px solid rgba(255,255,255,0.08)' }}>
             <button disabled={isAutoFilling} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '10px 11px', borderRadius: 12, cursor: isAutoFilling ? 'not-allowed' : 'pointer', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1, minHeight: 56, textAlign: 'left' }} onClick={autoFillDraft} title="Авто-черновик из профиля — соберёт недели и упражнения под ваш уровень"><span style={{ fontSize: 13 }}>⚡</span><span style={{ fontSize: 11, fontWeight: 800 }}>Авто-черновик</span><span style={{ fontSize: 10, color: 'rgba(0,230,138,0.70)' }}>из профиля</span></button>
             <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '10px 11px', borderRadius: 12, cursor: 'pointer', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', color: '#f59e0b', minHeight: 56, textAlign: 'left' }} onClick={() => setEditorLibOpen('library')}><span style={{ fontSize: 13 }}>📥</span><span style={{ fontSize: 11, fontWeight: 700 }}>Загрузить</span><span style={{ fontSize: 10, color: 'rgba(245,158,11,0.70)' }}>из библиотеки</span></button>
             {isPro && dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
@@ -778,7 +784,6 @@ return (
             <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '10px 11px', borderRadius: 12, cursor: 'pointer', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.18)', color: '#00e68a', minHeight: 56, textAlign: 'left' }} onClick={() => setCardioView('card')}><span style={{ fontSize: 13 }}>❤️</span><span style={{ fontSize: 11, fontWeight: 700 }}>Кардио</span><span style={{ fontSize: 10, color: 'rgba(0,230,138,0.70)' }}>синергия</span></button>
           </div>
         )}
-        </div>
 
       {/* Внутренний степпер редактора — единый стиль ManualUI */}
       <ManualStepper

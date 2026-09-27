@@ -45,11 +45,16 @@ describe('StrongmanDiagnosticsHub PRO', () => {
     expect(document.body.textContent).toContain('OHS');
     expect(document.body.textContent).toContain('Knee-to-wall');
   });
-  it('таб Видео рендерит Kinovea', async () => {
+  it('таб Видео: ручное качание/скорость, импорт Kinovea убран', async () => {
     render(<StrongmanDiagnosticsHub />);
     fireEvent.click(document.querySelector('[data-sm="top-tab-video"]') as HTMLElement);
-    expect(document.body.textContent).toContain('Kinovea');
     expect(document.body.textContent).toContain('Sway');
+    // Ручные поля и Энод на месте
+    expect(document.body.textContent).toContain('Качание (Sway)');
+    expect(document.body.textContent).toContain('Энода');
+    // Kinovea-импорта нет (CSV поз углов суставов — другой ввод, он остался)
+    expect(document.querySelector('textarea[placeholder*="Kinovea"]')).toBeNull();
+    expect(document.body.textContent).not.toContain('Разобрать Kinovea CSV');
   });
   it('биомеханика отображается при выборе', async () => {
     render(<StrongmanDiagnosticsHub />);

@@ -109,7 +109,7 @@ export function HubGripTab({ H }: { H: any }) {
                 const mn = Math.min(...vals);
                 const span = Math.max(1, mx - mn);
                 return vals.map((v: number, i: number) => (
-                  <div key={i} data-bar="rt" title={`${v}кг`} style={{ height: Math.round(6 + ((v - mn) / span) * 22), background: i === vals.length - 1 ? '#f59e0b' : 'rgba(245,158,11,0.35)' }} />
+                  <div key={i} data-bar="rt" title={`${v}кг`} style={{ height: Math.round(6 + ((v - mn) / span) * 22), background: i === vals.length - 1 ? '#3b82f6' : 'rgba(59,130,246,0.35)' }} />
                 ));
               })()}
             </div>
@@ -177,10 +177,10 @@ export function HubGripTab({ H }: { H: any }) {
 }
 
 export function HubWristTab({ H }: { H: any }) {
-  const { state, setState, angles, angleValid, anglesVerified, recAngles, autoPoint, toggleWeakPoint, handleVideoFile, trackCsv, setTrackCsv, trackMetrics, trackType, trackSrd, setBaseXLoop, setTrackCsvClear, diag, clearWeakPoints, toggleLegacy } = H;
+  const { state, setState, angles, angleValid, anglesVerified, recAngles, autoPoint, toggleWeakPoint, diag, clearWeakPoints, toggleLegacy } = H;
   return (
     <div>
-      <div className="ad-sec-t" data-arm="wrist-params-head">📥 Замеры — углы и видео</div>
+      <div className="ad-sec-t" data-arm="wrist-params-head">📥 Замеры — углы РУ/РА/кисти</div>
       <AdGrid cols="auto">
         <AdField label="Локоть°">
           <input inputMode="decimal" value={state.elbowDeg} onChange={e=>setState((s: any)=>({...s, elbowDeg:e.target.value}))} placeholder="110" />
@@ -209,30 +209,6 @@ export function HubWristTab({ H }: { H: any }) {
           <AdChip active={false} onClick={()=>toggleWeakPoint(autoPoint)}>+ Добавить {autoPoint}</AdChip>
         </AdBanner>
       )}
-      <AdSec title="🎥 Углы из файла landmarks (JSON)" hint="Экспорт точек (shoulder/elbow/wrist) из любого трекера поз → углы подставятся в ползунки. Работает офлайн, без камеры и CDN." collapsible defaultOpen={false} summary="JSON">
-        <div className="ad-row">
-          <label className="ad-chip">📁 Загрузить JSON<input type="file" accept=".json" onChange={handleVideoFile} style={{ display:'none' }} /></label>
-          <span className="ad-muted">Элбоу {angles.elbowDeg}° · forearm {angles.forearmDeg}° · wrist {angles.wristDeg}° · {anglesVerified ? '✓ в допуске' : 'проверь углы'}</span>
-        </div>
-        <AdSec title="📊 Kinovea CSV трекинга кисти (t,x,y)" collapsible defaultOpen={false} summary={trackMetrics ? `xLoop ${trackMetrics.xLoop} · ${trackMetrics.points} точек` : 'CSV не загружен'}>
-          <textarea value={trackCsv} onChange={(e) => setTrackCsv(e.target.value)} placeholder={'t,x,y\n0,0,0\n0.1,1.2,0.5'} rows={3} className="ad-mono" />
-          <div className="ad-row">
-            <AdBtn variant="dark" onClick={() => { try { if (trackMetrics) { setBaseXLoop(String(trackMetrics.xLoop)); localStorage.setItem('he_arm_track_base', String(trackMetrics.xLoop)); } } catch {} }}>📌 База SRD</AdBtn>
-            <AdBtn variant="dark" onClick={() => setTrackCsvClear()}>🗑 Очистить</AdBtn>
-          </div>
-          {trackMetrics && (
-            <div className="ad-muted">
-              xLoop {trackMetrics.xLoop} · yMax {trackMetrics.yMax} · vMax {trackMetrics.vMax} · точек {trackMetrics.points} · тип <b>{trackType === 'inside_hook' ? 'hook внутрь' : trackType === 'outside_toproll' ? 'toproll наружу' : 'press прямо'}</b>
-              {trackSrd && <span> · {trackSrd}</span>}
-              <div className="ad-tip">
-                {trackType === 'inside_hook' ? 'Что чинить: держи пронацию, не отдавай кисть — качай pron_lock'
-                  : trackType === 'outside_toproll' ? 'Что чинить: rising + тяга на себя, локоть 90° — качай rising_top'
-                  : 'Что чинить: плечо за рукой, только из нейтрали — новичкам пресс опасен'}
-              </div>
-            </div>
-          )}
-        </AdSec>
-      </AdSec>
       <AdSec title="🎯 12 мёртвых точек (1–3)" hint={`Группы Кисть/Ротация/Давление · техника ${state.technique} · до 3`} status={state.weakPoints.length ? 'ok' : undefined}>
         <div className="ad-row" data-arm="wp-groups">
           {WEAK_GROUPS.map(g=> (

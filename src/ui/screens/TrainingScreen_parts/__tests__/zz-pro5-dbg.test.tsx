@@ -6,7 +6,7 @@ import { validateArmPlan } from '../../../engines/arm/arm-validator.engine';
 
 it('zz dbg4', () => {
   const { container } = render(<ArmAutoConstructor />);
-  fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+  fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
   const head = screen.getAllByRole('button', { name: /Именной цикл/ }).find((b) => b.getAttribute('aria-expanded') != null)!;
   if (head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
   fireEvent.change(screen.getByLabelText('Hook-кап сетов в неделю'), { target: { value: '2' } });

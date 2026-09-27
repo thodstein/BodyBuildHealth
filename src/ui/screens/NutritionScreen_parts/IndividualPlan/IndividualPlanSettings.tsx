@@ -4,7 +4,7 @@ import { PHARMA_DB } from "../../../../core/pharma-database";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import {
-  GOALS, PHASES, BUDGET_LEVELS, PROTEIN_PRESETS, PROTEIN_G_PER_KG_RANGE, CARB_PERIODIZATION_OPTIONS, VARIETY_LEVELS, PLAN_TYPES,
+  GOALS, PHASES, BUDGET_LEVELS, PROTEIN_PRESETS, PROTEIN_G_PER_KG_RANGE, PROTEIN_G_PER_KG_RANGE_NOTE, CARB_PERIODIZATION_OPTIONS, VARIETY_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES, type PlanType,
 } from "./types";
 import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from "./ui";
@@ -1510,6 +1510,13 @@ export const IndividualPlanSettings: React.FC = () => {
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           Базовый диапазон белка: {PROTEIN_G_PER_KG_RANGE.min}–{PROTEIN_G_PER_KG_RANGE.max} г/кг массы. Жиры фиксированы на 0.8 г/кг, угли — остаток в диетпотолке.
           Нужно больше или меньше — переключи «✏️ Ручное КБЖУ» и введи свои граммы: ручной режим не ограничен диапазоном.
+        </div>
+        {/* 26 сен 2026 (E1.7 / A15): подпись под диапазоном. Без неё «1.6–2.2 г/кг»
+            выглядит цитатой из источника, хотя это выбранный нами коридор; и рядом стоит
+            другое число (30–35 г ДОБАВЛЕННОГО сывороточного, Li 2026), которое нельзя
+            выдавать за обоснование 2.2 г/кг. Белый текст по правилу 1 проекта. */}
+        <div style={{ fontSize: 9, color: '#fff', marginBottom: 8, lineHeight: 1.5, padding: '5px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid #f59e0b' }}>
+          {PROTEIN_G_PER_KG_RANGE_NOTE}
         </div>
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>Сейчас: {effectiveP} г белка · {(weight>0?(effectiveP/weight).toFixed(2):'–')} г/кг · {PROTEIN_PRESETS.find(p=>p.id===proteinPreset)?.gPerKg || 2} г/кг пресет</div>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PROTEIN_PRESETS.length}, 1fr)`, gap: 5 }}>

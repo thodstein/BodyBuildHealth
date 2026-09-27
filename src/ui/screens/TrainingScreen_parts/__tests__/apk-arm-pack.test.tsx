@@ -136,7 +136,6 @@ describe('APK arm pack', () => {
       '.train-arm.arm-apk',
       '.train-armdiag.arm-apk',
       '.ad-steps',
-      '.ad-step-group',
       '.ad-card',
       "[data-arm='quality-card']",
       "[data-arm='week-pills']",
@@ -243,13 +242,14 @@ describe('APK arm pack', () => {
 
   it('весь конструктор: 8 шагов рендерятся без падений (TG)', () => {
     render(<ArmAutoConstructor />);
+    // Подписи шагов — в формате ББ-авто: номер + текст, эмодзи только у выдачи.
     const steps: Array<[string, RegExp]> = [
-      ['🎛 Параметры', /Дисциплина/],
-      ['🎯 Атлет', /Рабочие максимумы/],
-      ['✊ Стол и хват', /Хват — диагностика/],
-      ['📚 Сплит и цикл', /Выбор сплита/],
-      ['📋 План', /План не собран/],
-      ['🏋️ Веса и качество', /План не собран/],
+      ['1 Параметры', /Дисциплина/],
+      ['2 Атлет', /Рабочие максимумы/],
+      ['3 Стол и хват', /Хват — диагностика/],
+      ['4 Сплит и цикл', /Выбор сплита/],
+      ['5 План', /План не собран/],
+      ['6 Веса и качество', /План не собран/],
       ['📤 Экспорт', /План не собран/],
       ['🗓 Год', /Год по блокам/],
     ];
@@ -276,7 +276,7 @@ describe('APK arm pack', () => {
     };
     resetAppPlatformCache();
     const c = render(<ArmAutoConstructor />);
-    for (const tab of ['🎛 Параметры', '🎯 Атлет', '✊ Стол и хват', '📚 Сплит и цикл', '📋 План', '🏋️ Веса и качество', '📤 Экспорт', '🗓 Год']) {
+    for (const tab of ['1 Параметры', '2 Атлет', '3 Стол и хват', '4 Сплит и цикл', '5 План', '6 Веса и качество', '📤 Экспорт', '🗓 Год']) {
       fireEvent.click(screen.getByRole('button', { name: tab }));
       expect(c.container.querySelector('.train-arm')?.classList.contains('arm-apk'), tab).toBe(true);
     }
@@ -291,7 +291,7 @@ describe('APK arm pack', () => {
 
   it('аккордеоны: PRO свернут с саммари, раскрывается по тапу', () => {
     render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '🎯 Атлет' }));
+    fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
     const head = screen.getByRole('button', { name: /PRO: старт WAF/ });
     expect(head.getAttribute('aria-expanded')).toBe('false');
     expect(head.textContent).toContain('без даты');
@@ -303,13 +303,15 @@ describe('APK arm pack', () => {
 
   it('выдача: дашборд плана на шаге План, обоснование — на шаге Экспорт', () => {
     render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
     for (const marker of ['Недель', 'Сессий', 'Стол', 'Делод/пик']) {
       expect(document.body.textContent, marker).toContain(marker);
     }
     fireEvent.click(screen.getByRole('button', { name: '📤 Экспорт' }));
-    expect(document.body.textContent).toContain('📖 Обоснование');
+    // Иконка аккордеона — отдельный тайл (как в BbFoldCard), поэтому в
+    // textContent склеивается с заголовком без пробела: проверяем заголовок.
+    expect(document.body.textContent).toContain('Обоснование');
   });
 
   it('хаб: Table-IQ свернут, журнал работает без раскрытия', () => {
@@ -338,9 +340,9 @@ describe('APK arm pack', () => {
 
   it('выдача: полоса объёма — 8 недель с фазами, клик переключает', () => {
     const { container } = render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
-    fireEvent.click(screen.getByRole('button', { name: '📋 План' }));
+    fireEvent.click(screen.getByRole('button', { name: '5 План' }));
     const strip = container.querySelector("[data-arm='week-pills']");
     expect(strip, 'vol strip').not.toBeNull();
     const btns = Array.from(strip!.querySelectorAll('.ad-wpill'));

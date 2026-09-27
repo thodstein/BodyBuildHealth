@@ -4,6 +4,7 @@ import React, { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
 import { buildTzInputCore, normalizeFlatLabs } from '../../../engines/support-plan/engine-helpers';
 import { useDataLink } from '../../../core/data-link';
+import { getRiskColor } from '../../../core/utils/risk-colors';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { DRUG_DB } from '../../../data/support-db';
 import { resolvePedAlias } from '../../../data/ped-alias-map';
@@ -22,12 +23,11 @@ const SYSTEM_COLORS: Record<string, { accent: string; bg: string; border: string
   hematologic:  { accent: '#14b8a6', bg: 'rgba(20,184,166,0.08)',  border: 'rgba(20,184,166,0.20)' },
 };
 
-const riskColor = (pct: number): string => {
-  if (pct < 25) return '#22c55e';
-  if (pct < 50) return '#eab308';
-  if (pct < 75) return '#f97316';
-  return '#ef4444';
-};
+// Канон цвета риска — общий для всего экрана «Риски». Раньше здесь и в 3D-модели
+// жили две копии с порогами 25/50/75, из-за чего один и тот же процент в шапке
+// вкладки и в чипах 3D окрашивался по-разному (20–25% — жёлтый здесь, зелёный
+// в RiskOverview).
+const riskColor = (pct: number): string => getRiskColor(pct);
 
 const riskLabel = (pct: number): string => {
   if (pct < 25) return 'Низкий';

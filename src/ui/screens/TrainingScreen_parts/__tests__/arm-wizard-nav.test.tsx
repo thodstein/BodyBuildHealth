@@ -18,29 +18,33 @@ function go(name: string) {
 }
 
 describe('Arm wizard navigation', () => {
-  it('7 шагов в порядке, маркеры на местах', () => {
+  it('8 шагов в порядке, подписи и маркеры на местах', () => {
     const { container } = render(<ArmAutoConstructor />);
     const steps = container.querySelectorAll("[data-arm='steps'] .ad-step");
+    // Подписи — формат ББ-авто: номер + текст, эмодзи только у шагов выдачи.
     expect(Array.from(steps).map((s) => s.textContent)).toEqual([
-      '1🎛 Параметры',
-      '2🎯 Атлет',
-      '3✊ Стол и хват',
-      '4📚 Сплит и цикл',
-      '5📋 План',
-      '6🏋️ Веса и качество',
-      '7📤 Экспорт',
-      '8🗓 Год',
+      '1 Параметры',
+      '2 Атлет',
+      '3 Стол и хват',
+      '4 Сплит и цикл',
+      '5 План',
+      '6 Веса и качество',
+      '📤 Экспорт',
+      '🗓 Год',
     ]);
     expect(document.body.textContent).toContain('Дисциплина');
     expect(container.querySelector("[data-arm='steps']")?.getAttribute('aria-label')).toBe('Шаги');
   });
 
-  it('группы ББ-стиля: ПАРАМЕТРЫ / ПЛАН / ВЫДАЧА', () => {
+  it('группы ББ-стиля: разделители без подписей групп', () => {
     const { container } = render(<ArmAutoConstructor />);
-    const bar = container.querySelector("[data-arm='steps']")!.textContent;
-    expect(bar).toContain('ПАРАМЕТРЫ');
-    expect(bar).toContain('ПЛАН');
-    expect(bar).toContain('ВЫДАЧА');
+    const barEl = container.querySelector("[data-arm='steps']")!;
+    // ББ-авто выводит только вертикальные разделители между группами и НЕ
+    // показывает названия групп — арм-конструктор повторяет это один в один.
+    expect(barEl.querySelectorAll('.ad-step').length).toBe(8);
+    expect(barEl.textContent).not.toContain('ПАРАМЕТРЫ');
+    expect(barEl.textContent).not.toContain('ВЫДАЧА');
+    expect(barEl.querySelectorAll('button[aria-current="step"]').length).toBe(1);
   });
 
   it('«Далее/Назад» ведут по цепочке params → athlete → grip → split', () => {
@@ -59,7 +63,7 @@ describe('Arm wizard navigation', () => {
 
   it('сплит и цикл — один шаг: пикер, шит и сборка рядом', () => {
     const { container } = render(<ArmAutoConstructor />);
-    go('📚 Сплит и цикл');
+    go('4 Сплит и цикл');
     expect(container.querySelector("[data-arm='split-list']")).not.toBeNull();
     expect(container.querySelector("[data-arm='cycle-picker']")).not.toBeNull();
     const head = screen.getAllByRole('button', { name: /Именной цикл/ }).find((b) => b.getAttribute('aria-expanded') != null);
@@ -71,7 +75,7 @@ describe('Arm wizard navigation', () => {
 
   it('план — только выдача: дашборд и недели, гейтов нет', () => {
     const { container } = render(<ArmAutoConstructor />);
-    go('📚 Сплит и цикл');
+    go('4 Сплит и цикл');
     fireEvent.click(screen.getByText('⚡ Собрать план'));
     expect(container.querySelector("[data-arm='plan-dash']")).not.toBeNull();
     expect(container.querySelector("[data-arm='gates']")).toBeNull();
@@ -84,7 +88,7 @@ describe('Arm wizard navigation', () => {
 
   it('экспорт — печать и обоснование отдельно от плана', () => {
     const { container } = render(<ArmAutoConstructor />);
-    go('📚 Сплит и цикл');
+    go('4 Сплит и цикл');
     fireEvent.click(screen.getByText('⚡ Собрать план'));
     go('📤 Экспорт');
     expect(screen.getByText('🖨 Печать')).toBeTruthy();
@@ -98,7 +102,7 @@ describe('Arm wizard navigation', () => {
     try {
       Object.defineProperty(window.navigator, 'clipboard', { value: { writeText: (s: string) => { writes.push(s); return Promise.resolve(); } }, configurable: true });
       render(<ArmAutoConstructor />);
-      go('📚 Сплит и цикл');
+      go('4 Сплит и цикл');
       fireEvent.click(screen.getByText('⚡ Собрать план'));
       go('📤 Экспорт');
       fireEvent.click(screen.getByText('📋 Копировать сводку'));
@@ -114,7 +118,7 @@ describe('Arm wizard navigation', () => {
 
   it('пустой план — только карточка-мост, гейтов нет', () => {
     const { container } = render(<ArmAutoConstructor />);
-    go('📋 План');
+    go('5 План');
     expect(document.body.textContent).toContain('План не собран');
     expect(container.querySelector("[data-arm='gates']")).toBeNull();
     expect(container.querySelector("[data-arm='weights-card']")).toBeNull();

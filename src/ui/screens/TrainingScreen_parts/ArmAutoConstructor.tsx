@@ -1,9 +1,11 @@
 /**
  * ArmAutoConstructor.tsx — PRO-конструктор армрестлинг/армлифтинг.
- * Изолирован, как BbAutoConstructor, но для arm-движка.
- * 7 шагов в стиле ББ-авто (модерн): params → athlete → grip → split → plan → quality → export.
- * Подача — training-ui токены (CARD/BTN/STEP_PILL) + группы ПАРАМЕТРЫ/ПЛАН/ВЫДАЧА;
- * DOM-контракты (классы .ad-*, data-arm хуки, строки, aria) 1-в-1.
+ * Подача 1-в-1 с BbAutoConstructor: общий кит training-ui (bbCardChrome /
+ * bbIconTile / bbCardTitle / bbCardBadge), общая лента шагов PlannerStepNav
+ * с вертикальными разделителями (без названий групп), шапка и flash на
+ * PLANNER_* токенах, свой скролл при смене шага.
+ * 8 шагов: params → athlete → grip → split → plan → quality → export → year.
+ * DOM-контракты (классы .ad-*, data-arm хуки, строки, aria) сохранены.
  */
 import React, { useMemo, useState, useEffect } from 'react';
 import { buildArmPlan } from '../../../engines/arm/arm-builder.engine';
@@ -59,54 +61,88 @@ import { armBuilderProfilePatch, armProfileSnapshot } from '../../../engines/arm
 import { applyArmMobilityToProfile, clearArmMobilityFromProfile } from '../../../engines/arm/arm-mobility.engine';
 import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
 import './arm-design.css';
-import { CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN } from './training-ui';
-import { PlannerHead, buzzPlanner } from './planner-ui';
+import {
+  CARD, SMALL, BTN, BTN_GHOST, H, IN,
+  bbCardChrome, bbIconTile, bbCardTitle, bbCardBadge,
+  PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_FLASH, PLANNER_STEP_NAV_WRAP,
+} from './training-ui';
+import { buzzPlanner } from './planner-ui';
 import { AdSwitch, AdSheetSelect } from './arm-design-system';
 import { isNativeApp } from '../../../core/app-platform';
 import { ensureArmApkStyles } from './arm-apk-loader';
 
-/* ── Единый плотный каркас (план PLANNERS-STRUCTURE-PRO P2): Ad* — тонкие обёртки
- * над planner-ui (BB-эталон). DOM-контракты 1-в-1: классы .ad-* + data-arm хуки +
- * строки + aria. Отступы — один слой (инлайн planner-ui); CSS-дубли гасятся
- * добивкой в arm-design.css. Скрытое = collapsed-тело нулевой высоты
- * (grid 0fr / opacity 0, без display:none): пустот нет, контент остаётся
- * в DOM для скринридеров и тестовых запросов. ── */
+/* ── Единый плотный каркас: Ad* — тонкие обёртки над китом training-ui
+  * (BB-авто — эталон). DOM-контракты 1-в-1: классы .ad-* + data-arm хуки +
+  * строки + aria. Визуал карточек — ровно кит ББ-авто (bbCardChrome: радиус
+  * 14, кромка акцента 2px сверху, тайл 26px, заголовок 12.5/800), а не
+  * локальная копия со стеклом и радиусом 12 — иначе «одинаковые» планировщики
+  * расходились. Скрытое = collapsed-тело нулевой высоты (grid 0fr / opacity 0,
+  * без display:none): пустот нет, контент остаётся в DOM для скринридеров и
+  * тестовых запросов. ── */
+
+/** Акценты секций — палитра ББ-авто (одна набор, чтобы планы читались одинаково). */
+const AD_ACCENT = {
+  params: '#a855f7', weak: '#f59e0b', ped: '#ec4899', max: '#22d3ee', waf: '#60a5fa',
+  grip: '#3b82f6', split: '#a855f7', axis: '#f472b6', plan: '#00e68a', ready: '#f59e0b',
+  weights: '#22d3ee', platform: '#a78bfa', export: '#60a5fa', year: '#a78bfa', total: '#00e68a',
+} as const;
+
 type AdStepDef = { id: string; label: string };
-function AdRoot({ rootClass, maxWidth, children }: { rootClass: string; maxWidth?: number; children: React.ReactNode }) {
+
+/** Ведущий эмодзи заголовка уходит в тайл (как `icon` в BbCard), остальное — в текст. */
+function splitIconTitle(title: React.ReactNode): { icon?: string; text: React.ReactNode } {
+  if (typeof title !== 'string') return { text: title };
+  const m = title.match(/^([\u{1F000}-\u{1FAFF}\u{2190}-\u{2BFF}\u{FE0F}\u{20E3}\u{200D}]{1,6})\s*/u);
+  return m ? { icon: m[1], text: title.slice(m[0].length) } : { text: title };
+}
+
+/** Корень шага. Отступы и ширину даёт хост окна конструктора (.tp-cbody) —
+ *  ровно как в ББ-авто, поэтому своего maxWidth/padding здесь нет. */
+function AdRoot({ rootClass, children }: { rootClass: string; children: React.ReactNode }) {
   React.useEffect(() => { ensureArmApkStyles(); }, []);
-  return <div className={isNativeApp() ? `${rootClass} arm-apk ad-wrap planner-root` : `${rootClass} ad-wrap planner-root`} style={maxWidth ? { maxWidth, margin: '0 auto', padding: '0 10px 90px', display: 'flex', flexDirection: 'column', gap: 8 } : { display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</div>;
+  // Отступы и ширину даёт хост окна конструктора (.tp-cbody) — как в ББ-авто.
+  return <div className={isNativeApp() ? `${rootClass} arm-apk ad-wrap planner-root` : `${rootClass} ad-wrap planner-root`} style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', minWidth: 0, maxWidth: '100%' }}>{children}</div>;
 }
-function AdHead({ icon, title, sub, side }: { icon: string; title: string; sub?: string; side?: React.ReactNode }) {
-  return <PlannerHead icon={icon} title={title} sub={sub} side={side} className="ad-head" />;
-}
+/** Контейнер шага — рамка карточки кита, БЕЗ gap: расстояние задаёт
+ *  marginBottom 10 самой карточки (как в ББ-авто), иначе 8+10 = «дырки». */
 function AdCard({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={className ? `ad-card ${className}` : 'ad-card'} style={{ ...CARD, padding: '10px 12px', margin: '0 0 8px', display: 'flex', flexDirection: 'column', gap: 8 }} {...rest}>{children}</div>;
+  return <div className={className ? `ad-card ${className}` : 'ad-card'} style={{ ...bbCardChrome(AD_ACCENT.params), display: 'flex', flexDirection: 'column' }} {...rest}>{children}</div>;
 }
-function AdSec({ title, hint, children, hook, collapsible, defaultOpen, summary, status }: { title: React.ReactNode; hint?: React.ReactNode; children: React.ReactNode; hook?: string; collapsible?: boolean; defaultOpen?: boolean; summary?: React.ReactNode; status?: 'ok' | 'warn' }) {
+function AdSec({ title, hint, children, hook, collapsible, defaultOpen, summary, status, accent = AD_ACCENT.params }: { title: React.ReactNode; hint?: React.ReactNode; children: React.ReactNode; hook?: string; collapsible?: boolean; defaultOpen?: boolean; summary?: React.ReactNode; status?: 'ok' | 'warn'; accent?: string }) {
   // Вторичное по умолчанию закрыто (BB-эталон PlannerFold); первичное — открыто.
   const [open, setOpen] = React.useState(defaultOpen ?? !collapsible);
+  const { icon, text } = splitIconTitle(title);
   const dot = status ? <span className="ad-dot" data-s={status} aria-hidden style={{ width: 8, height: 8, borderRadius: 99, background: status === 'ok' ? '#00e68a' : '#f59e0b', display: 'inline-block', marginRight: 6 }} /> : null;
+  const head = (
+    <>
+      {icon ? <span className="ad-sec-ic" aria-hidden style={bbIconTile(accent)}>{icon}</span> : null}
+      {dot}
+      <span className="ad-sec-t" style={{ ...bbCardTitle, flex: 1, margin: 0 }}>{text}</span>
+      {!open && summary ? <span className="ad-sec-sum" style={bbCardBadge(accent)}>{summary}</span> : null}
+    </>
+  );
+  const bodyStyle: React.CSSProperties = { marginTop: open ? 8 : 0, ...(open ? {} : { display: 'grid', gridTemplateRows: '0fr', opacity: 0, pointerEvents: 'none' as const }) };
   if (!collapsible) {
     return (
-      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '10px 12px', margin: 0 }}>
-        <div className="ad-sec-t" style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', marginBottom: 6 }}>{dot}{title}</div>
-        {hint ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 6, fontSize: 10.5 }}>{hint}</div> : null}
+      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={bbCardChrome(accent)}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>{head}</div>
+        {hint ? <div className="ad-sec-hint" style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginBottom: 8 }}>{hint}</div> : null}
         {children}
       </div>
     );
   }
   return (
-    <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '10px 12px', margin: 0 }}>
-      <button type="button" className="ad-sec-head" aria-expanded={open} onClick={() => { buzzPlanner(); setOpen((o) => !o); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: 0, cursor: 'pointer', background: 'transparent', border: 'none', color: '#fff', fontSize: 12.5, fontWeight: 800, textAlign: 'left', minHeight: 28 }}>
-        <span className="ad-sec-chev" aria-hidden style={{ color: '#00e68a', fontSize: 11 }}>{open ? '▾' : '▸'}</span>
-        {dot}
-        <span className="ad-sec-t" style={{ flex: 1, margin: 0 }}>{title}</span>
-        {!open && summary ? <span className="ad-sec-sum" style={{ ...SMALL, color: '#fff' }}>{summary}</span> : null}
-      </button>
-      {hint && open ? <div className="ad-sec-hint" style={{ ...SMALL, marginBottom: 6, marginTop: 6, fontSize: 10.5 }}>{hint}</div> : null}
-      {open
-        ? <div className="ad-sec-body" data-collapsed={false} style={{ marginTop: hint ? 0 : 6 }}>{children}</div>
-        : <div className="ad-sec-body" data-collapsed={true}>{children}</div>}
+    <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={bbCardChrome(accent)}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="ad-sec-head" aria-expanded={open} onClick={() => { buzzPlanner(); setOpen((o) => !o); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 0, cursor: 'pointer', background: 'transparent', border: 'none', color: '#fff', textAlign: 'left', fontFamily: 'inherit', minHeight: 28 }}>
+          {head}
+          <span className="ad-sec-chev" aria-hidden style={{ marginLeft: 'auto', fontSize: 11, color: '#fff', display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}>▾</span>
+        </button>
+      </div>
+      {hint && open ? <div className="ad-sec-hint" style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginTop: 6 }}>{hint}</div> : null}
+      <div className="ad-sec-body" data-collapsed={!open} style={bodyStyle}>
+        <div style={open ? undefined : { minHeight: 0, overflow: 'hidden' }}>{children}</div>
+      </div>
     </div>
   );
 }
@@ -173,19 +209,22 @@ function buzzStep(): void {
   try { (navigator as any)?.vibrate?.(8); } catch { /* no-op */ }
 }
 
-const STEP_DEFS: AdStepDef[] = [  { id: 'params', label: '🎛 Параметры' },
-  { id: 'athlete', label: '🎯 Атлет' },
-  { id: 'grip', label: '✊ Стол и хват' },
-  { id: 'split', label: '📚 Сплит и цикл' },
-  { id: 'plan', label: '📋 План' },
-  { id: 'quality', label: '🏋️ Веса и качество' },
+/* Шаги конструктора. Подписи — в формате ББ-авто: у первых семи номер и
+   текст без эмодзи, у шагов выдачи эмодзи без номера (как «🏁 Contest prep»).
+   Названия групп НЕ рисуются — только вертикальные разделители, как в ББ-авто. */
+const STEP_DEFS: AdStepDef[] = [  { id: 'params', label: '1 Параметры' },
+  { id: 'athlete', label: '2 Атлет' },
+  { id: 'grip', label: '3 Стол и хват' },
+  { id: 'split', label: '4 Сплит и цикл' },
+  { id: 'plan', label: '5 План' },
+  { id: 'quality', label: '6 Веса и качество' },
   { id: 'export', label: '📤 Экспорт' },
   { id: 'year', label: '🗓 Год' },
 ];
-const STEP_GROUPS: Array<{ name: string; ids: Step[] }> = [
-  { name: 'ПАРАМЕТРЫ', ids: ['params', 'athlete', 'grip', 'split'] },
-  { name: 'ПЛАН', ids: ['plan', 'quality'] },
-  { name: 'ВЫДАЧА', ids: ['export', 'year'] },
+const STEP_GROUPS: Step[][] = [
+  ['params', 'athlete', 'grip', 'split'],
+  ['plan', 'quality'],
+  ['export', 'year'],
 ];
 
 const SPLIT_TAG_RU: Record<string, string> = {
@@ -513,6 +552,7 @@ export function persistArmPlan(plan: unknown): void {
 
 export function ArmAutoConstructor() {
   const [step, setStep] = useState<Step>('params');
+  usePlannerStepScroll('arm', [step]);
   const [discipline, setDiscipline] = useState<string>('armwrestling');
   const [technique, setTechnique] = useState<string>('balanced');
   const [gripFocus, setGripFocus] = useState<string>('support');
@@ -1336,43 +1376,30 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
   const summFocus = (()=>{ try { return GRIP_FOCI.find(g=>g.id===gripFocus)?.label || gripFocus; } catch { return gripFocus; } })();
 
   return (
-    <AdRoot rootClass="train-arm" maxWidth={980}>
-      <AdHead
-        icon="🤝"
-        title="Арм-конструктор PRO"
-        sub="Армрестлинг (стол: hook/toproll/press, РУ/РА, table ≥50%) + армлифтинг (хват: support/pinch/crush). Периодизация 3/2/1 (Кузнецов), tendon-cap, humerus-guard."
-        side={best ? (<div className="ad-hero-side" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div className="ad-hero-score" aria-hidden style={{ minWidth: 56, textAlign: 'center', padding: '6px 10px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.25), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.4)', boxShadow: '0 4px 16px rgba(0,230,138,0.25)' }}><b style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{ranked[0]?.score ?? 0}</b><span style={{ display: 'block', fontSize: 9, color: '#fff' }}>баллов</span></div><div className="ad-hero-name" style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>{best.name}<span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>лучший сплит · {daysPerWeek} дн/нед</span></div></div>) : '—'}
-      />
-
-      <div data-arm="steps" aria-label="Шаги" className="ad-steps" style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgb(20,20,23)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        {STEP_GROUPS.map((g, gi) => (
-          <span key={g.name} className="ad-step-group" style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '1 1 auto', minWidth: 0, flexWrap: 'wrap' }}>
-            <span className="ad-step-group-label" aria-hidden style={{ fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.5 }}>{g.name}</span>
-            {g.ids.map((id) => {
-              const idx = STEP_DEFS.findIndex((s) => s.id === id);
-              const s = STEP_DEFS[idx];
-              const active = step === id;
-              return (
-                <button
-                  key={id}
-                  aria-label={s.label}
-                  aria-pressed={active}
-                  data-active={active}
-                  className="ad-step"
-                  onClick={() => { buzzStep(); setStep(id); }}
-                  style={{ ...STEP_PILL(active), backdropFilter: 'none', WebkitBackdropFilter: 'none', transition: 'none', padding: '6px 8px', fontSize: 10, flex: '1 1 auto', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                >
-                  <span className="ad-step-n" aria-hidden style={{ marginRight: 4, opacity: 0.8 }}>{idx + 1}</span>
-                  {s.label}
-                </button>
-              );
-            })}
-            {gi < STEP_GROUPS.length - 1 && <span className="ad-step-sep" aria-hidden style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', margin: '0 2px' }} />}
+    <AdRoot rootClass="train-arm">
+      <div style={PLANNER_HEAD_BAR}>
+        <span style={PLANNER_HEAD_TITLE}>🤝 Арм-конструктор</span>
+        {best ? (
+          <span className="ad-hero-side" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <div className="ad-hero-score" aria-hidden style={{ minWidth: 56, textAlign: 'center', padding: '6px 10px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.25), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.4)', boxShadow: '0 4px 16px rgba(0,230,138,0.25)' }}><b style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{ranked[0]?.score ?? 0}</b><span style={{ display: 'block', fontSize: 9, color: '#fff' }}>баллов</span></div>
+            <div className="ad-hero-name" style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.3, minWidth: 0 }}>{best.name}<span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>лучший сплит · {daysPerWeek} дн/нед</span></div>
           </span>
-        ))}
+        ) : null}
       </div>
 
-      {msg && <div className="ad-toast" data-arm="msg">{msg}</div>}
+      <div style={PLANNER_STEP_NAV_WRAP}>
+        <PlannerStepNav
+          dataNav="arm"
+          steps={STEP_DEFS}
+          groups={STEP_GROUPS}
+          active={step}
+          onSelect={id => { buzzStep(); setStep(id as Step); }}
+          navAttrs={{ 'data-arm': 'steps', className: 'ad-steps' }}
+          pillClassName="ad-step"
+        />
+      </div>
+
+      {msg && <div className="ad-toast" data-arm="msg" role="status" style={PLANNER_FLASH}>{msg}</div>}
 
       {step === 'params' && (
         <AdCard className="ad-stepview">

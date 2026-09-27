@@ -10,7 +10,6 @@ import { ARM_CORRECTIONS, correctionForWeakPoint } from '../../../engines/arm/ar
 import { doseForCause, doseLabel } from '../../../engines/arm/arm-correction-dose.engine';
 import { roleLabel, roleOf, preventiveFor, drillsForPhase, correctiveWaveForWeek, doseForCauseV2, shouldUseDoseV2 } from '../../../engines/arm/arm-correction-pro2.engine';
 import { simulateArmInjection } from '../../../engines/arm/arm-simulator.engine';
-import { suggestWeakPointsForTrack } from '../../../engines/arm/arm-video-analysis.engine';
 import { AdSec, AdBtn, AdBanner } from './arm-design-system';
 import { WP_LABEL_SHORT } from './arm-hub-shared';
 
@@ -35,23 +34,11 @@ export function HubCorrectionTab({ H }: { H: any }) {
   const {
     state, setState, report, diag, armCausesP0, armTop3P0, armSpecP0,
     handleInjectP0, hasInjectPrev, handleRollbackP0, injectMsg,
-    toggleWeakPoint, trackType, autoPoint, mvPhase, corrV2, armPrefCorr, setArmPrefCorr,
+    toggleWeakPoint, autoPoint, mvPhase, corrV2, armPrefCorr, setArmPrefCorr,
   } = H;
   const weakPoints: ArmWeakPoint[] = Array.isArray(state?.weakPoints) && state.weakPoints.length
     ? state.weakPoints
     : (Array.isArray((report as any)?.weakPoints) ? (report as any).weakPoints : []);
-  const videoSugs = (() => {
-    try { return suggestWeakPointsForTrack(trackType ?? null).filter((s) => !weakPoints.includes(s.point as ArmWeakPoint)); }
-    catch { return []; }
-  })();
-  const videoSuggest = videoSugs.length > 0 ? (
-    <div className="ad-tip" data-arm="correction-video-suggest">
-      📹 Видео подсказывает ({trackType}): {videoSugs.map((s) => (WP_LABEL_SHORT as any)[s.point] || s.point).join(' · ')}
-      {videoSugs.slice(0, 3).map((s) => (
-        <AdBtn key={s.point} variant="dark" onClick={() => toggleWeakPoint(s.point as ArmWeakPoint)}>+ {(WP_LABEL_SHORT as any)[s.point] || s.point}</AdBtn>
-      ))}
-    </div>
-  ) : null;
   const phaseChips = (
     <div className="ad-row" data-arm="correction-phase">
       <span className="ad-muted">Где срыв:</span>
@@ -104,7 +91,6 @@ export function HubCorrectionTab({ H }: { H: any }) {
         {phaseChips}
         {waveChips}
         {mvPhase ? <div className="ad-muted" data-arm="correction-matchphase">Фаза схватки: {mvPhase} — топ-3 получит +4 точкам фазы.</div> : null}
-        {videoSuggest}
         {angleSuggest}
         <div className="ad-tip">Канон пулов: §3 `docs/ARM-MOVEMENT-CORRECTION-PLAN.md` (все ids — из каталога).</div>
       </AdSec>
@@ -115,7 +101,6 @@ export function HubCorrectionTab({ H }: { H: any }) {
       {phaseChips}
       {waveChips}
       {mvPhase ? <div className="ad-muted" data-arm="correction-matchphase">Фаза схватки: {mvPhase} — топ-3 получил +4 точкам фазы (метка «точка слабой фазы» в причинах).</div> : null}
-      {videoSuggest}
       {angleSuggest}
       <div className="ad-list" data-arm="correction-list">
         {weakPoints.map((wp) => {
@@ -176,12 +161,12 @@ export function HubCorrectionTab({ H }: { H: any }) {
                         aria-pressed={pref}
                         aria-label={`${pref ? 'Выбрано' : 'Выбрать'}: ${t.id}`}
                         onClick={() => setArmPrefCorr(wp, t.id)}
-                        style={{ display: 'block', width: '100%', textAlign: 'left', minHeight: 52, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', color: '#fff', background: pref ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.06))' : 'rgba(59,130,246,0.06)', border: pref ? '2px solid rgba(245,158,11,0.65)' : '1px solid rgba(59,130,246,0.14)' }}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', minHeight: 52, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', color: '#fff', background: pref ? 'linear-gradient(135deg, rgba(59,130,246,0.16), rgba(168,85,247,0.06))' : 'rgba(255,255,255,0.03)', border: pref ? '2px solid rgba(59,130,246,0.65)' : '1px solid #1f3a5f' }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span data-arm="correction-star" aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: pref ? 'rgba(245,158,11,0.25)' : 'transparent', color: '#fff', fontSize: 14, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{pref ? '⭐' : '☆'}</span>
+                          <span data-arm="correction-star" aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(59,130,246,0.4)', background: pref ? 'rgba(59,130,246,0.25)' : 'transparent', color: '#fff', fontSize: 14, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{pref ? '⭐' : '☆'}</span>
                           <b style={{ flex: 1, minWidth: 0 }}>{t.id}</b>
-                          <span style={{ fontSize: 11, fontWeight: 800, color: pref ? '#f5b04c' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{pref ? '✓ Выбрано' : 'Выбрать'}</span>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: pref ? '#60a5fa' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{pref ? '✓ Выбрано' : 'Выбрать'}</span>
                         </div>
                         <div className="ad-muted">{roleLabel(t.id)} · score {t.score}{t.reason ? ` · ${t.reason}` : ''}</div>
                       </button>

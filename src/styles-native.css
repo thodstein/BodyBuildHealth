@@ -10609,16 +10609,9 @@ html.app-native .combat-constructor .cb-hero {
   border-top: 2px solid rgba(168, 85, 247, 0.5) !important;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5) !important;
 }
-html.app-native .combat-constructor .cb-hero-icon {
-  width: 48px !important;
-  height: 48px !important;
-  border-radius: 14px !important;
-  box-shadow: 0 0 22px rgba(168, 85, 247, 0.45) !important;
-}
-html.app-native .combat-constructor .cb-hero-title {
-  font-size: 16px !important;
-  line-height: 1.15 !important;
-}
+/* .cb-hero-icon / .cb-hero-title удалены 2026-09-27: иконка и заголовок
+   единоборств переехали в компактную шапку ББ-стиля (PLANNER_HEAD_BAR),
+   где отдельного тайла 48px нет — правила стали бы мёртвыми. */
 html.app-native .combat-constructor .cb-hero-sub {
   font-size: 12px !important;
   line-height: 1.5 !important;
@@ -10790,12 +10783,7 @@ html.app-native .combat-constructor .cb-steps .kit-sectionnav-opt[data-active]:f
     display: none !important;
   }
 }
-@media (max-width: 380px) {
-  html.app-native .combat-constructor .cb-hero-icon {
-    width: 40px !important;
-    height: 40px !important;
-  }
-}
+/* .cb-hero-icon удалён 2026-09-27: иконка ушла в компактную шапку ББ-стиля. */
 @media (prefers-reduced-motion: reduce) {
   html.app-native .combat-constructor .cb-split-card:active {
     transform: none !important;
@@ -11776,6 +11764,9 @@ html.app-native .manual-constructor .editor-topbar-shell {
   z-index: 30 !important;
   border-radius: 18px !important;
   border-top: 2px solid rgba(var(--accent-rgb), 0.35) !important;
+  /* Непрозрачный фон: контент, уезжающий под закреплённую шапку, не должен
+     просвечивать сквозь стекло — иначе шапка визуально «плавает». */
+  background: linear-gradient(180deg, rgba(9, 18, 34, 0.98), rgba(9, 18, 34, 0.97)) !important;
 }
 
 html.app-native .manual-constructor .editor-topbar button {

@@ -26,7 +26,7 @@ function openSec(re: RegExp) {
 describe('Arm switch', () => {
   it('тоггл меняет aria-checked и data-on', () => {
     render(<ArmAutoConstructor />);
-    go('🎯 Атлет');
+    go('2 Атлет');
     const sw = screen.getByRole('switch', { name: /Специализация/ });
     expect(sw.getAttribute('aria-checked')).toBe('false');
     fireEvent.click(sw);
@@ -36,7 +36,7 @@ describe('Arm switch', () => {
 
   it('свитч в свёрнутом аккордеоне раскрывает поля', () => {
     render(<ArmAutoConstructor />);
-    go('🎯 Атлет');
+    go('2 Атлет');
     openSec(/На курсе \(PED\)/);
     flipSwitch(/💉 На курсе \(PED\)/);
     expect(screen.getByText('Интенсивность курса')).toBeTruthy();
@@ -44,7 +44,7 @@ describe('Arm switch', () => {
 
   it('нативных чекбоксов в конструкторе не осталось', () => {
     const { container } = render(<ArmAutoConstructor />);
-    go('🎯 Атлет');
+    go('2 Атлет');
     expect(container.querySelectorAll("input[type='checkbox']").length).toBe(0);
   });
 });
@@ -56,7 +56,7 @@ function flipSwitch(nameRe: RegExp) {
 describe('Arm sheet select', () => {
   it('открытие, выбор, закрытие', () => {
     render(<ArmAutoConstructor />);
-    go('📚 Сплит и цикл');
+    go('4 Сплит и цикл');
     openSec(/Именной цикл/);
     fireEvent.click(screen.getByRole('button', { name: /^Цикл:/ }));
     const dlg = screen.getByRole('dialog', { name: 'Цикл' });
@@ -68,7 +68,7 @@ describe('Arm sheet select', () => {
 
   it('Escape и бэкдроп закрывают без выбора', () => {
     render(<ArmAutoConstructor />);
-    go('📚 Сплит и цикл');
+    go('4 Сплит и цикл');
     openSec(/Именной цикл/);
     fireEvent.click(screen.getByRole('button', { name: /^Цикл:/ }));
     expect(screen.getByRole('dialog', { name: 'Цикл' })).toBeTruthy();
@@ -82,10 +82,10 @@ describe('Arm sheet select', () => {
 
   it('русские подписи шитов и фокусов', () => {
     render(<ArmAutoConstructor />);
-    go('✊ Стол и хват');
+    go('3 Стол и хват');
     expect(document.body.textContent).toContain('Хаб');
     expect(document.body.textContent).not.toContain('High-hand');
-    go('🎯 Атлет');
+    go('2 Атлет');
     openSec(/На курсе \(PED\)/);
     flipSwitch(/💉 На курсе \(PED\)/);
     expect(document.body.textContent).not.toContain('Enhanced');

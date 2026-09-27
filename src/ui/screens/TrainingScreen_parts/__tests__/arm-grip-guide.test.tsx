@@ -26,7 +26,7 @@ function openSec(re: RegExp) {
 describe('Arm grip guide', () => {
   it('шаг хвата: 3 группы и 8 снарядов с диаметрами', () => {
     const { container } = render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '✊ Стол и хват' }));
+    fireEvent.click(screen.getByRole('button', { name: '3 Стол и хват' }));
     expect(document.body.textContent).toContain('Хват — диагностика');
     for (const g of ['Support', 'Pinch', 'Crush']) {
       expect(document.body.textContent, g).toContain(g);
@@ -40,7 +40,7 @@ describe('Arm grip guide', () => {
 
   it('PED-точка зажигается по свитчу', () => {
     const { container } = render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '🎯 Атлет' }));
+    fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
     openSec(/На курсе \(PED\)/);
     const before = okDots(container);
     fireEvent.click(screen.getByRole('switch', { name: /💉 На курсе \(PED\)/ }));
@@ -50,7 +50,7 @@ describe('Arm grip guide', () => {
 
   it('TOP-точка зажигается по RFD, цикл — по подборщику', () => {
     const { container } = render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '✊ Стол и хват' }));
+    fireEvent.click(screen.getByRole('button', { name: '3 Стол и хват' }));
     openSec(/TOP: матчап/);
     fireEvent.click(screen.getByRole('switch', { name: /RFD speed-блок/ }));
     expect(okDots(container)).toBeGreaterThan(0);
@@ -58,7 +58,7 @@ describe('Arm grip guide', () => {
 
   it('слабая зона зажигает свою точку', () => {
     const { container } = render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '🎯 Атлет' }));
+    fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
     const before = okDots(container);
     fireEvent.click(screen.getByRole('button', { name: 'Пронаторы' }));
     expect(okDots(container)).toBe(before + 1);

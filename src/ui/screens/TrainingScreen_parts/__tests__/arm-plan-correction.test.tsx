@@ -75,7 +75,7 @@ describe('applyArmEdits (pure)', () => {
 describe('Arm plan correction (UI)', () => {
   function build() {
     render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
   }
 

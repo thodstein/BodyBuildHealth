@@ -99,7 +99,7 @@ export function HubPressureTab({ H }: { H: any }) {
             <span> ⚠ Side — прогрессия ≤10%/нед, RIR≥2, ≤3 сета первые 4н</span>
             {state.weakPoints.filter((wp: string)=>['side_mid','side_pin','back_start','back_drag'].includes(wp)).map((wp: string)=>{
               const bio = ARM_BIOMECH[wp as keyof typeof ARM_BIOMECH];
-              return <div key={wp}>{bio.label}: {bio.angleRangeDeg[0]}-{bio.angleRangeDeg[1]}° {bio.keyJoint} · угол н/п — контроль по технике{wp === 'side_pin' ? ' · дожимание — только вручную по видео (авто-хинт даёт side_mid: side_pin humerus-рискован)' : ''}
+              return <div key={wp}>{bio.label}: {bio.angleRangeDeg[0]}-{bio.angleRangeDeg[1]}° {bio.keyJoint} · угол н/п — контроль по технике{wp === 'side_pin' ? ' · дожимание оценивается вручную (по ощущению силы и времени удержания)' : ''}
                 <ArmPickBlock wp={wp as any} top={(H.armTop3P0?.[wp] || []) as any} pref={(H.armPrefCorr || {})[wp]} onPick={H.setArmPrefCorr} />
               </div>;
             })}
@@ -487,7 +487,7 @@ export function HubRecoveryTab({ H }: { H: any }) {
         </AdSec>
         <AdSec title="Дополнительно">
           <div className="ad-muted">Техника: {state.technique} · Уровень: {state.level} · Направление: {state.direction} · Углы: {angles.elbowDeg}°/{angles.forearmDeg}°/{angles.wristDeg}°</div>
-          <div className="ad-muted">Ввод углов: {anglesVerified?'в допуске':'ручной (или JSON landmarks)'}</div>
+          <div className="ad-muted">Ввод углов: ручной · {anglesVerified?'в допуске':'вне допуска (исправь значения)'}</div>
         </AdSec>
       </AdGrid>
       <AdBanner tone="info">

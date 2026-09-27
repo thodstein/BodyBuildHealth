@@ -47,7 +47,7 @@ import { buildBbMovementPrintBlock } from '../../../engines/bb/bb-diagnostics-ex
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply, applyToPlanner, getPlannerApply, clearPlannerApply, type PlannerApply, type WeakpointsPayload } from './planner-bridge';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
-import { CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL } from './training-ui';
+import { CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_FLASH, PLANNER_STEP_NAV_WRAP } from './training-ui';
 import { PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import { DELOAD_PROTOCOLS, type LoadStrategy, type DeloadType, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
@@ -3125,53 +3125,27 @@ export const BbAutoConstructor: React.FC = () => {
     return null;
   };
   const renderStepNav = () => {
-    const groups: Record<string, string[]> = planMode === 'programs'
-      ? { 'ПАРАМЕТРЫ': ['params','ped'], 'ПЛАН': ['plan','weights','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] }
-      : { 'ПАРАМЕТРЫ': ['params','ped','split'], 'ПЛАН': ['plan','weights','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] };
-    const groupEndKeys = new Set(Object.values(groups).map(arr => (arr as string[])[(arr as string[]).length - 1]).filter(Boolean) as string[]);
+    const groups: string[][] = planMode === 'programs'
+      ? [['params','ped'], ['plan','weights','quality','adjust'], ['contest','annual','tools']]
+      : [['params','ped','split'], ['plan','weights','quality','adjust'], ['contest','annual','tools']];
     return (
-      // Без backdrop-filter: blur(12px) — он давал заметные лаги при переключении
-      // шагов на телефоне (жалоба «выбор шагов подтупливает»). Плотный фон вместо стекла.
-      <div data-bb="step-nav" style={{ background: 'rgba(24,24,27,0.92)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 4, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center' }}>
-        {stepList.map(s => {
-          const active = step === s;
-          const lockReason = stepLockReason(s);
-          const disabled = lockReason != null;
-          return (
-            <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
-              <button
-                disabled={disabled}
-                aria-current={active ? 'step' : undefined}
-                title={disabled ? lockReason! : undefined}
-                onClick={() => {
-                  if (disabled) { flash(`🔒 ${lockReason}`); return; }
-                  if (s === 'annual') { goAnnual(); return; }
-                  setStep(s);
-                }}
-                style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: disabled ? 0.45 : 1 }}
-              >{stepLabels[s]}</button>
-              {groupEndKeys.has(s) && s !== stepList[stepList.length - 1] && <span style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', flexShrink: 0 as const, margin: '0 2px', alignSelf: 'center' }} />}
-            </span>
-          );
-        })}
-      </div>
+      <PlannerStepNav
+        dataNav="bb"
+        steps={stepList.map(s => ({ id: s, label: stepLabels[s] }))}
+        groups={groups}
+        active={step}
+        lockReason={stepLockReason}
+        flash={flash}
+        onSelect={s => { if (s === 'annual') { goAnnual(); return; } setStep(s as Step); }}
+        navAttrs={{ 'data-bb': 'step-nav' }}
+      />
     );
   };
 
-  // Смена шага — наверх и активная пилюля в видимую зону (аудит 2026-09:
-  // «выбор шагов подтупливает» — после перехода экран оставался в середине
-  // предыдущего шага, а активная пилюля уезжала за край ленты).
-  useEffect(() => {
-    try {
-      const scroller = document.querySelector('.screen.training-screen') as HTMLElement | null;
-      if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'smooth' });
-      const nav = document.querySelector('[data-bb="step-nav"]') as HTMLElement | null;
-      const activeBtn = nav?.querySelector('button[aria-current="step"]') as HTMLElement | null;
-      if (activeBtn && typeof activeBtn.scrollIntoView === 'function') {
-        activeBtn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-      }
-    } catch { /* среда без DOM (SSR/jsdom) — не критично */ }
-  }, [step, planMode]);
+  // Смена шага — наверх и активная пилюля в видимую зону (жалоба «выбор шагов
+  // подтупливает»: после перехода экран оставался в середине предыдущего
+  // шага, а активная пилюля уезжала за край ленты).
+  usePlannerStepScroll('bb', [step, planMode]);
 
   // Переход на «Годовой план»: построенный цикл сохраняется автоматически
   // (возврат — через шаг «Коррекция»/«План»), чтобы не потерять работу.
@@ -4052,8 +4026,8 @@ export const BbAutoConstructor: React.FC = () => {
   return (
     <div>
       {/* Заголовок ББ-авто + кнопка «Начать заново» (как в ПЛ-авто) */}
-      <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 12, background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>💪 ББ-авто</span>
+      <div style={PLANNER_HEAD_BAR}>
+        <span style={PLANNER_HEAD_TITLE}>💪 ББ-авто</span>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           <button onClick={() => { setPrepMode(true); setPrepResult(null); }} title="Отдельный режим подготовки к соревнованиям: категория, акценты/минимум, сплит 4-26 нед, тапер, даты" aria-label="Prep-цикл" style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', border: '1px solid rgba(236,72,153,0.4)', background: prepMode ? 'linear-gradient(135deg,#ec4899,#be185d)' : 'rgba(236,72,153,0.1)', color: prepMode ? '#fff' : '#ec4899', minHeight: 30 }}>🏁 Prep-цикл</button>
           <button onClick={() => setResetAsk(true)} title="Сбросить сборку и начать заново" aria-label="Начать заново" style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(244,63,94,0.35)', background: 'rgba(244,63,94,0.08)', color: '#fb7185', minHeight: 30, flexShrink: 0 }}>🔄 Начать заново</button>
@@ -4064,7 +4038,7 @@ export const BbAutoConstructor: React.FC = () => {
       ) : (
         <>
       {/* Шаги конструктора — ряд с переносом, помещается на экране без прокрутки */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={PLANNER_STEP_NAV_WRAP}>
         {renderStepNav()}
       </div>
       {step === 'annual' && (
@@ -4111,7 +4085,7 @@ export const BbAutoConstructor: React.FC = () => {
       )}
       {/* Глобальное уведомление (flash) — видно на ВСЕХ шагах, не только в параметрах */}
       {bridgeMsg && (
-        <div role="status" style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontSize: 11, fontWeight: 700 }}>
+        <div role="status" style={PLANNER_FLASH}>
           {bridgeMsg}
         </div>
       )}

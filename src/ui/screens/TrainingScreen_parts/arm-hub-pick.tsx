@@ -32,12 +32,12 @@ export function ArmPickBlock({
             aria-pressed={sel}
             aria-label={`${sel ? 'Выбрано' : 'Выбрать'}: ${t.id}`}
             onClick={() => onPick(wp, t.id)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44, marginTop: 4, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', color: '#fff', background: sel ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.06))' : 'rgba(255,255,255,0.03)', border: sel ? '2px solid rgba(245,158,11,0.65)' : '1px solid rgba(255,255,255,0.08)' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44, marginTop: 4, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', color: '#fff', background: sel ? 'linear-gradient(135deg, rgba(59,130,246,0.16), rgba(168,85,247,0.06))' : 'rgba(255,255,255,0.03)', border: sel ? '2px solid rgba(59,130,246,0.65)' : '1px solid #1f3a5f' }}
           >
-            <span aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: sel ? 'rgba(245,158,11,0.25)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
+            <span aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(59,130,246,0.4)', background: sel ? 'rgba(59,130,246,0.25)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
             <b style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{t.id}</b>
             <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 800, whiteSpace: 'nowrap' }}>score {t.score}</span>
-            <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#f5b04c' : '#fff', whiteSpace: 'nowrap' }}>{sel ? '✓' : 'Выбрать'}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#60a5fa' : '#fff', whiteSpace: 'nowrap' }}>{sel ? '✓' : 'Выбрать'}</span>
           </button>
         );
       })}

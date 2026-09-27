@@ -758,13 +758,10 @@ html.app-native .train-arm.arm-apk .ad-ph[data-phase='deload'] {
   }
 }
 
-/* ─── 24. BB-СТРУКТУРА 7 ШАГОВ — группы, quality/export, week-лента ─── */
-/* Групповые подписи ПАРАМЕТРЫ/ПЛАН/ВЫДАЧА в ленте шагов */
-html.app-native .train-arm.arm-apk .ad-step-group-label {
-  font-variant-numeric: tabular-nums !important;
-  white-space: nowrap !important;
-}
-
+/* ─── 24. BB-СТРУКТУРА 7 ШАГОВ — quality/export, week-лента ─── */
+/* Групповые подписи в ленте шагов конструктора не рисуются (единый вид с
+   ББ-авто: только разделители), поэтому правила для .ad-step-group-label
+   удалены — иначе они были бы мёртвыми. */
 html.app-native .train-arm.arm-apk .ad-steps {
   scrollbar-width: none !important;
 }
@@ -866,9 +863,6 @@ html.app-native .train-arm.arm-apk .ad-sheet-value {
 }
 
 @media (max-width: 380px) {
-  html.app-native .train-arm.arm-apk .ad-step-group-label {
-    display: none !important;
-  }
   html.app-native .train-arm.arm-apk .ad-steps .ad-step {
     padding-left: 10px !important;
     padding-right: 10px !important;

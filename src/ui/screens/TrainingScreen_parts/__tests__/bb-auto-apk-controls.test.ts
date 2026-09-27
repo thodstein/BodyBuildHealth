@@ -12,6 +12,9 @@ import { resolve } from 'node:path';
 const DIR = resolve(__dirname, '..');
 const SRC = readFileSync(resolve(DIR, 'BbAutoConstructor.tsx'), 'utf8');
 const SHARED = readFileSync(resolve(DIR, 'bb-auto-constructor-shared.tsx'), 'utf8');
+// Кит переключателей и карточек живёт в общем training-ui (им пользуются
+// арм/ТА/единоборства) — guard проверяет его там, а ре-экспорт в SHARED.
+const KIT = readFileSync(resolve(DIR, 'training-ui.tsx'), 'utf8');
 const STEPS = readdirSync(DIR)
   .filter(f => /^bb-step-.*\.tsx$/.test(f))
   .map(f => readFileSync(resolve(DIR, f), 'utf8'))
@@ -27,11 +30,13 @@ describe('4.5 APK-контролы ББ-авто (source-guard)', () => {
   it('кит переключателей: role=switch, касание 44px, шрифты ≥10px', () => {
     expect(SHARED).toContain('BbRowSwitch');
     expect(SHARED).toContain('BbToggleChip');
-    expect((SHARED.match(/role="switch"/g) || []).length).toBeGreaterThanOrEqual(2);
-    expect((SHARED.match(/minHeight: 44/g) || []).length).toBeGreaterThanOrEqual(2);
+    expect(KIT).toContain('export const BbRowSwitch');
+    expect(KIT).toContain('export const BbToggleChip');
+    expect((KIT.match(/role="switch"/g) || []).length).toBeGreaterThanOrEqual(2);
+    expect((KIT.match(/minHeight: 44/g) || []).length).toBeGreaterThanOrEqual(2);
     // Заголовок 12px и описание 10px — минимум для телефона.
-    expect(SHARED).toContain('fontSize: 12');
-    expect(SHARED).toContain('fontSize: 10');
+    expect(KIT).toContain('fontSize: 12');
+    expect(KIT).toContain('fontSize: 10');
   });
 
   it('выпадающие списки — через PopupSelect (АПК-кит), не нативный select', () => {

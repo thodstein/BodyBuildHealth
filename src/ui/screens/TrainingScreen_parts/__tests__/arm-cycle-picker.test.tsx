@@ -27,7 +27,7 @@ const BASE = { discipline: 'armwrestling', level: 'intermediate', goal: 'strengt
 describe('Arm cycle picker', () => {
   it('показывает ВЕСЬ каталог с фаз-полосами недель, топ-3 со звёздами', () => {
     const { container } = render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     const picker = container.querySelector("[data-arm='cycle-picker']");
     expect(picker, 'picker').not.toBeNull();
     expect(picker!.querySelectorAll('.ad-split').length).toBe(ARM_CYCLE_LIBRARY.length);
@@ -43,17 +43,17 @@ describe('Arm cycle picker', () => {
 
   it('клик по карточке ставит недели цикла (exact-fit без согласия)', () => {
     render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     fireEvent.click(screen.getByRole('button', { name: /Именной цикл/ }));
     const top = rankArmCycles({ ...BASE })[0].cycle;
     fireEvent.click(screen.getByRole('button', { name: `Цикл ${top.name}` }));
-    fireEvent.click(screen.getByRole('button', { name: '🎛 Параметры' }));
+    fireEvent.click(screen.getByRole('button', { name: '1 Параметры' }));
     expect((screen.getByLabelText('Недель') as HTMLInputElement).value).toBe(String(top.weeks));
   });
 
   it('клик по карточке ставит цикл в шит и подсвечивает', () => {
     const { container } = render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     fireEvent.click(screen.getByRole('button', { name: /Именной цикл/ }));
     const top = rankArmCycles({ ...BASE })[0].cycle;
     fireEvent.click(screen.getByRole('button', { name: `Цикл ${top.name}` }));
@@ -67,7 +67,7 @@ describe('Arm cycle picker', () => {
 
   it('повторный клик сбрасывает в обычный план', () => {
     render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     fireEvent.click(screen.getByRole('button', { name: /Именной цикл/ }));
     const top = rankArmCycles({ ...BASE })[0].cycle;
     const btn = screen.getByRole('button', { name: `Цикл ${top.name}` });
@@ -78,7 +78,7 @@ describe('Arm cycle picker', () => {
 
   it('шит и пикер покрывают всю библиотеку (19)', () => {
     const { container } = render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     const dlg = openCycleSheet();
     const opts = within(dlg).getAllByRole('button').filter((b) => b.textContent !== 'Готово');
     expect(opts.length).toBe(20);
@@ -87,7 +87,7 @@ describe('Arm cycle picker', () => {
 
   it('шит — портал в body: fixed строго по вьюпорту, не в карточке', () => {
     render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     const dlg = openCycleSheet();
     const portal = dlg.closest('[data-arm="sheet-portal"]');
     expect(portal, 'portal wrapper').not.toBeNull();
@@ -98,7 +98,7 @@ describe('Arm cycle picker', () => {
 
   it('выбор из шита ставит цикл ( Toproll )', () => {
     render(<ArmAutoConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: '📚 Сплит и цикл' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     const dlg = openCycleSheet();
     fireEvent.click(within(dlg).getByText(/Toproll 6-week/));
     expect(screen.getByRole('button', { name: /Цикл: Toproll 6-week/ }), 'sheet synced').toBeTruthy();
