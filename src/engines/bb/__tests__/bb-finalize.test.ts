@@ -102,4 +102,16 @@ describe('BB shared finalizer', () => {
     const result = finalizeBBPlan(source, { reorder: false, level: 'intermediate' });
     expect(result.safetyConstraints).toEqual({ equipment: ['machine'], avoidAxialLoad: true });
   });
+
+  it('boundary: null plan returns empty plan without crash', () => {
+    const result = finalizeBBPlan(null as any);
+    expect(result).toBeTruthy();
+    expect(result.weeks).toEqual([]);
+  });
+
+  it('boundary: empty weeks returns plan as-is', () => {
+    const source: any = { pattern: {}, weeks: [], rationale: [] };
+    const result = finalizeBBPlan(source);
+    expect(result).toBe(source);
+  });
 });
