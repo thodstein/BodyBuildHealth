@@ -167,7 +167,11 @@ describe('хаб армлифтинга: каркас и визуал 1-в-1 с 
     expect(src).toMatch(/\.lift-bar \{[^}]*background: #1f3a5f/);
     expect(src).toMatch(/\.lift-num \{[^}]*background: rgba\(255,255,255,0\.05\)/);
     // нижняя панель — та же кромка/тень, что у арм-хаба
-    expect(src).toMatch(/\.lift-action-bar \{[^}]*background: #0a1629[^}]*border: 1px solid #1f3a5f[^}]*box-shadow: none/);
+    expect(src).toMatch(/\.lift-action-bar \{[^}]*background: none;[^}]*border: 0;[^}]*box-shadow: none/);
+    // карточка упражнения показывает поля движка: источник (+разминка, если есть) — как matchReason·source в ТА
+    expect(src).toContain('data-arm="lift-corr-source"');
+    expect(src).toContain('Источник: {c.source}');
+    expect(src).toContain('data-arm="lift-corr-warmup"');
     // 380px: кнопки табов/панели не разъезжаются
     expect(src).toContain('@media (max-width: 380px)');
   });

@@ -73,6 +73,10 @@ describe('ArmDiagnosticsHub PRO', () => {
     expect(sec).toMatch(/\.ad-chip\[data-active='true'\][\s\S]{0,200}#3b82f6/);
     // «Применить» (variant=amber) = градиент ТА 135° #3b82f6→#a855f7
     expect(sec).toMatch(/data-variant='amber'[\s\S]{0,160}linear-gradient\(135deg, #3b82f6, #a855f7\)/);
+    // НИЗ = обычный flex-ряд без подложки (как в ТА): моя прежняя «панель действий» с кромкой — выдумка
+    expect(sec).toMatch(/\[data-arm='hub-action-bar'\] \{[^}]*background: none;[^}]*border: 0/);
+    expect(sec).toMatch(/:is\(\.train-armdiag\) \.ad-cta \{[^}]*position: static/);
+    expect(sec).not.toMatch(/\[data-arm='hub-action-bar'\] \{[^}]*background: #0a1629/);
     // поля ввода — метрики ТА (r10 / p10 / 16px / 44px)
     expect(sec).toMatch(/input[\s\S]{0,400}border-radius: 10px[\s\S]{0,200}font-size: 16px[\s\S]{0,120}min-height: 44px/);
     // блок селекторов не утекает наружу арм-зон (правило 1 файла)

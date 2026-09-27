@@ -757,7 +757,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         .train-armdiag [data-arm="lift-export"] .ad-btn { min-height: 44px; font-weight: 800; }
         .train-armdiag [data-arm="lift-export"] { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
         .train-armdiag [data-arm="lift-export"] .ad-btn-hero { min-width: 200px; }
-        .train-armdiag .lift-action-bar { background: #0a1629; border: 1px solid #1f3a5f; border-top: 2px solid rgba(59,130,246,0.45); border-radius: 14px; padding: 10px; box-shadow: none; }
+        /* Нижний ряд — как в ТА: обычный flex-ряд, БЕЗ своей подложки/кромки */
+        .train-armdiag .lift-action-bar { background: none; border: 0; padding: 0; box-shadow: none; }
         @media (max-width: 380px) { .train-armdiag [data-arm="lift-tabs"] .ad-btn { width: 100%; margin-left: 0; } .train-armdiag [data-arm="lift-export"] .ad-btn { flex: 1 1 46%; } }
       `}</style>
       <AdCard>
@@ -1225,9 +1226,14 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
                 {c.cues && c.cues.length > 0 && (
                   <span className="ad-muted" data-arm="lift-corr-cues">Кью: {c.cues.join(' · ')}</span>
                 )}
-                {c.progression && (
-                  <span className="ad-muted">Прогрессия: {c.progression}</span>
-                )}
+          {c.progression && (
+            <span className="ad-muted">📈 Прогрессия: {c.progression}</span>
+          )}
+          {/* Источник и разминка — поля движка (source обязателен, warmup опционален), как в ТА-карточке */}
+          <span className="ad-muted" data-arm="lift-corr-source">🏷 Источник: {c.source}</span>
+          {c.warmup && (
+            <span className="ad-muted" data-arm="lift-corr-warmup">🔥 Разминка: {c.warmup}</span>
+          )}
               </div>
               );
             })}

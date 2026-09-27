@@ -2446,12 +2446,11 @@
 }
 
 /* Нижняя панель действий — плоская полоса с кромкой сверху */
+/* Нижний ряд арм-хаба — как в ТА: обычный flex-ряд, БЕЗ своей подложки/кромки */
 :is(.train-armdiag) [data-arm='hub-action-bar'] {
-  background: #0a1629;
-  border: 1px solid #1f3a5f;
-  border-top: 2px solid rgba(59, 130, 246, 0.45);
-  border-radius: 14px;
-  padding: 10px;
+  background: none;
+  border: 0;
+  padding: 0;
   box-shadow: none;
 }
 
