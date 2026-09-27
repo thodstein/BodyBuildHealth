@@ -37,6 +37,16 @@ export interface SRCycleMeta {
   sourcePhases?: SRPhaseBlock[];
   /** Происхождение sourcePhases для UI-аудита. */
   sourcePhaseSource?: 'original' | 'inferred';
+  /** Уровень доказательности методики (A=РКИ, B=когортные, C=экспертное мнение). */
+  evidenceLevel?: 'A' | 'B' | 'C';
+  /** Кому подходит: уровни подготовки. */
+  bestFor?: string[];
+  /** Временные затраты: low/medium/high. */
+  timeCommitment?: 'low' | 'medium' | 'high';
+  /** Необходимое оборудование. */
+  equipmentNeeded?: string[];
+  /** Тип периодизации. */
+  periodization?: 'linear' | 'dup' | 'block' | 'conjugate';
 }
 
 /** Один подход в раскладке: % от PM, повторения, количество подходов, RIR. */
