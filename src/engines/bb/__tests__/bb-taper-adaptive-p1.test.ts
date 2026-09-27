@@ -8,6 +8,8 @@ import {
   somatotypeTaperMod,
   labTaperWarnings,
   buildMultiShowProtocol,
+  analyzeNutritionDiary,
+  cyclePhaseTaperMod,
   type Somatotype,
   type LabMarkers,
 } from '../bb-taper-adaptive.engine';
@@ -162,5 +164,123 @@ describe('buildMultiShowProtocol', () => {
 
   it('пустой массив → пустой результат', () => {
     expect(buildMultiShowProtocol([])).toEqual([]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P1-2: Интеграция с дневником питания
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('analyzeNutritionDiary', () => {
+  it('пустой массив → insufficient_data', () => {
+    const r = analyzeNutritionDiary([]);
+    expect(r.daysLogged).toBe(0);
+    expect(r.carbsTrend).toBe('insufficient_data');
+    expect(r.carbStrategyRecommendation).toContain('Нет данных');
+  });
+
+  it('низкие углеводы → front/back рекомендация', () => {
+    const entries = Array.from({ length: 7 }, (_, i) => ({
+      date: `2026-10-${String(i + 1).padStart(2, '0')}`,
+      carbsG: 100,
+      kcal: 1800,
+    }));
+    const r = analyzeNutritionDiary(entries);
+    expect(r.avgCarbsGPerDay).toBe(100);
+    expect(r.carbStrategyRecommendation).toContain('агрессивную');
+  });
+
+  it('умеренные углеводы → moderate/linear рекомендация', () => {
+    const entries = Array.from({ length: 7 }, (_, i) => ({
+      date: `2026-10-${String(i + 1).padStart(2, '0')}`,
+      carbsG: 250,
+      kcal: 2200,
+    }));
+    const r = analyzeNutritionDiary(entries);
+    expect(r.avgCarbsGPerDay).toBe(250);
+    expect(r.carbStrategyRecommendation).toContain('стандартная');
+  });
+
+  it('высокие углеводы → undulating рекомендация', () => {
+    const entries = Array.from({ length: 7 }, (_, i) => ({
+      date: `2026-10-${String(i + 1).padStart(2, '0')}`,
+      carbsG: 400,
+      kcal: 3000,
+    }));
+    const r = analyzeNutritionDiary(entries);
+    expect(r.avgCarbsGPerDay).toBe(400);
+    expect(r.carbStrategyRecommendation).toContain('spill');
+  });
+
+  it('тренд increasing при росте углеводов', () => {
+    const entries = Array.from({ length: 6 }, (_, i) => ({
+      date: `2026-10-${String(i + 1).padStart(2, '0')}`,
+      carbsG: i < 3 ? 100 : 300,
+    }));
+    const r = analyzeNutritionDiary(entries);
+    expect(r.carbsTrend).toBe('increasing');
+  });
+
+  it('тренд decreasing при снижении углеводов', () => {
+    const entries = Array.from({ length: 6 }, (_, i) => ({
+      date: `2026-10-${String(i + 1).padStart(2, '0')}`,
+      carbsG: i < 3 ? 300 : 100,
+    }));
+    const r = analyzeNutritionDiary(entries);
+    expect(r.carbsTrend).toBe('decreasing');
+  });
+
+  it('средние значения по всем нутриентам', () => {
+    const entries = [
+      { date: '2026-10-01', carbsG: 200, proteinG: 150, fatG: 50, kcal: 2000, waterMl: 2500 },
+      { date: '2026-10-02', carbsG: 300, proteinG: 170, fatG: 60, kcal: 2400, waterMl: 3000 },
+    ];
+    const r = analyzeNutritionDiary(entries);
+    expect(r.avgCarbsGPerDay).toBe(250);
+    expect(r.avgProteinGPerDay).toBe(160);
+    expect(r.avgFatGPerDay).toBe(55);
+    expect(r.avgKcalPerDay).toBe(2200);
+    expect(r.avgWaterMlPerDay).toBe(2750);
+  });
+
+  it('фильтрация мусора (пустые даты)', () => {
+    const entries = [
+      { date: '', carbsG: 100 },
+      { date: '2026-10-01', carbsG: 200 },
+    ] as any;
+    const r = analyzeNutritionDiary(entries);
+    expect(r.daysLogged).toBe(1);
+    expect(r.avgCarbsGPerDay).toBe(200);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P1-4: Учёт фазы цикла в тапере
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('cyclePhaseTaperMod', () => {
+  it('без фазы → без изменений', () => {
+    const m = cyclePhaseTaperMod(undefined);
+    expect(m.intensityMult).toBe(1);
+    expect(m.volumeMult).toBe(1);
+    expect(m.note).toBe('');
+  });
+
+  it('фолликулярная фаза → стандартный тапер', () => {
+    const m = cyclePhaseTaperMod(5);
+    expect(m.intensityMult).toBe(1);
+    expect(m.note).toContain('стандартный');
+  });
+
+  it('лютеиновая фаза → интенсивность ×0.95, RIR +1', () => {
+    const m = cyclePhaseTaperMod(20);
+    expect(m.intensityMult).toBe(0.95);
+    expect(m.rirShift).toBe(1);
+    expect(m.note).toContain('Лютеиновая');
+  });
+
+  it('границы: день 14 = фолликулярная, день 15 = лютеиновая', () => {
+    expect(cyclePhaseTaperMod(14).intensityMult).toBe(1);
+    expect(cyclePhaseTaperMod(15).intensityMult).toBe(0.95);
   });
 });

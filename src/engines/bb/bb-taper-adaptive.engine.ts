@@ -681,3 +681,111 @@ export function buildTaperCalendar(
   }
   return days;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P1-2: Интеграция с дневником питания
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface NutritionDiaryEntry {
+  date: string;
+  carbsG?: number;
+  proteinG?: number;
+  fatG?: number;
+  kcal?: number;
+  waterMl?: number;
+}
+
+export interface NutritionTrendAnalysis {
+  avgCarbsGPerDay: number | null;
+  avgProteinGPerDay: number | null;
+  avgFatGPerDay: number | null;
+  avgKcalPerDay: number | null;
+  avgWaterMlPerDay: number | null;
+  daysLogged: number;
+  carbsTrend: 'increasing' | 'decreasing' | 'stable' | 'insufficient_data';
+  carbStrategyRecommendation: string;
+}
+
+/**
+ * Анализ дневника питания за N дней.
+ * Возвращает средние значения и тренд углеводов для коррекции стратегии загрузки.
+ */
+export function analyzeNutritionDiary(
+  entries: NutritionDiaryEntry[],
+  daysBack: number = 28,
+): NutritionTrendAnalysis {
+  const clean = (entries || []).filter(e => e && e.date);
+  if (!clean.length) {
+    return {
+      avgCarbsGPerDay: null, avgProteinGPerDay: null, avgFatGPerDay: null,
+      avgKcalPerDay: null, avgWaterMlPerDay: null, daysLogged: 0,
+      carbsTrend: 'insufficient_data', carbStrategyRecommendation: 'Нет данных за период',
+    };
+  }
+  const sorted = [...clean].sort((a, b) => a.date.localeCompare(b.date));
+  const recent = sorted.slice(-daysBack);
+  const avg = (pick: (e: NutritionDiaryEntry) => number | undefined): number | null => {
+    const vals = recent.map(pick).filter((v): v is number => v != null && Number.isFinite(v));
+    if (!vals.length) return null;
+    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  };
+  const carbs = recent.map(e => e.carbsG).filter((v): v is number => v != null);
+  let carbsTrend: NutritionTrendAnalysis['carbsTrend'] = 'insufficient_data';
+  if (carbs.length >= 4) {
+    const half = Math.floor(carbs.length / 2);
+    const firstAvg = carbs.slice(0, half).reduce((a, b) => a + b, 0) / half;
+    const secondAvg = carbs.slice(half).reduce((a, b) => a + b, 0) / (carbs.length - half);
+    if (secondAvg > firstAvg * 1.1) carbsTrend = 'increasing';
+    else if (secondAvg < firstAvg * 0.9) carbsTrend = 'decreasing';
+    else carbsTrend = 'stable';
+  }
+  const avgCarbs = avg(e => e.carbsG);
+  let recommendation = 'Недостаточно данных для рекомендации';
+  if (avgCarbs != null) {
+    if (avgCarbs < 150) recommendation = 'Углеводы низкие: рассмотрите более агрессивную загрузку (front/back)';
+    else if (avgCarbs < 300) recommendation = 'Углеводы умеренные: стандартная загрузка (moderate/linear)';
+    else recommendation = 'Углеводы высокие: осторожно со spill, используйте undulating';
+  }
+  return {
+    avgCarbsGPerDay: avgCarbs,
+    avgProteinGPerDay: avg(e => e.proteinG),
+    avgFatGPerDay: avg(e => e.fatG),
+    avgKcalPerDay: avg(e => e.kcal),
+    avgWaterMlPerDay: avg(e => e.waterMl),
+    daysLogged: recent.length,
+    carbsTrend,
+    carbStrategyRecommendation: recommendation,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P1-4: Учёт фазы цикла в тапере
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface CyclePhaseTaperMod {
+  intensityMult: number;
+  volumeMult: number;
+  rirShift: number;
+  note: string;
+}
+
+/**
+ * Модификатор тапера по фазе менструального цикла (женщины).
+ * Фолликулярная (1-14): пик силы, стандартный тапер.
+ * Лютеиновая (15-28): снижение силы на 5-10%, задержка воды.
+ */
+export function cyclePhaseTaperMod(cycleDay?: number): CyclePhaseTaperMod {
+  if (cycleDay == null || !Number.isFinite(cycleDay)) {
+    return { intensityMult: 1, volumeMult: 1, rirShift: 0, note: '' };
+  }
+  const d = Math.round(cycleDay);
+  if (d >= 15 && d <= 28) {
+    return {
+      intensityMult: 0.95,
+      volumeMult: 1.0,
+      rirShift: 1,
+      note: `Лютеиновая фаза (день ${d}): интенсивность −5%, RIR +1`,
+    };
+  }
+  return { intensityMult: 1, volumeMult: 1, rirShift: 0, note: `Фолликулярная фаза (день ${d}): стандартный тапер` };
+}
