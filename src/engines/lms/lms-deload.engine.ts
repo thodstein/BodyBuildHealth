@@ -36,6 +36,8 @@ export interface PLDeloadRequest {
   level?: string;
   /** PED-множитель MRV для пересчёта plVolumeLandmarks. */
   pedMrvMult?: number;
+  /** Автоматический режим: выбрать недели по ACWR. */
+  auto?: { acwr?: { ratio: number; zone: string } };
 }
 
 export interface PLDeloadSkip {
@@ -115,7 +117,24 @@ export function pickDeloadWeeks(
 export function applyPLDeload(plan: LMSBuildOutput, req: PLDeloadRequest = {}): PLDeloadResult {
   const volumeMult = clamp(req.volumeMult ?? 0.5, 0.2, 1);
   const rirShift = Math.round(clamp(req.rirShift ?? 3, 0, MAX_RIR));
-  const { weeks: targets, skipped } = pickDeloadWeeks(plan, req.weeks, req.currentWeek);
+
+  // Авто-режим: выбор недель по ACWR (только если явные weeks не заданы)
+  let autoWeeks: number[] | undefined;
+  let autoNote = '';
+  if (req.auto?.acwr && !req.weeks?.length) {
+    const { ratio, zone } = req.auto.acwr;
+    if (ratio > 1.3 && zone === 'dangerous') {
+      autoWeeks = []; // Делод применится к ближайшей неделе через pickDeloadWeeks
+      autoNote = `Авто-делод: ACWR ${ratio.toFixed(1)} (dangerous) — делод необходим.`;
+    } else if (ratio < 0.8 && zone === 'undertrained') {
+      autoWeeks = [];
+      autoNote = `Авто-делод: ACWR ${ratio.toFixed(1)} (undertrained) — делод не нужен, стимул встаёт.`;
+    } else {
+      autoNote = `Авто-делод: ACWR ${ratio.toFixed(1)} (${zone}) — делод не требуется.`;
+    }
+  }
+
+  const { weeks: targets, skipped } = pickDeloadWeeks(plan, autoWeeks ?? req.weeks, req.currentWeek);
   const applied: number[] = [];
   const notes: string[] = [];
   const targetSet = new Set(targets);
@@ -146,6 +165,7 @@ export function applyPLDeload(plan: LMSBuildOutput, req: PLDeloadRequest = {}): 
       ? skipped.map(s => `нед ${s.week} — ${s.reason}`).join('; ')
       : 'нет подходящей недели';
     notes.push(`🔋 Делод не добавлен: ${why}.`);
+    if (autoNote) notes.push(autoNote);
     return { plan, applied, skipped, notes };
   }
 
@@ -159,7 +179,7 @@ export function applyPLDeload(plan: LMSBuildOutput, req: PLDeloadRequest = {}): 
   const skipLine = skipped.length
     ? ` Пропущено: ${skipped.map(s => `нед ${s.week} — ${s.reason}`).join('; ')}.`
     : '';
-  notes.push(deloadLine + '.' + skipLine);
+  notes.push(deloadLine + '.' + skipLine + (autoNote ? ' ' + autoNote : ''));
 
   const next: LMSBuildOutput = {
     ...plan,

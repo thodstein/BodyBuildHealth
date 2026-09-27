@@ -36,7 +36,7 @@ import { taperCurve, type TaperWeek } from '../pro/mesocycle-progression.engine'
 import { taperWeeksForFatigue } from '../pro/taper.engine';
 import { getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 
-export type TaperMode = 'classic' | 'pl' | 'pro' | 'wf';
+export type TaperMode = 'classic' | 'pl' | 'pro' | 'wf' | 'velocity';
 export type TaperWeightGoal = 'lose' | 'gain' | 'maintain' | 'auto';
 export type PeakWeekLayout = 'attempts' | 'light';
 
@@ -87,6 +87,7 @@ export const TAPER_MODE_LABELS: Record<TaperMode, string> = {
   pl: '🏁 ПЛ-пик-протокол (3 нед, интенсификация)',
   pro: '🎯 Про (усталость-зависимый, прайминг)',
   wf: '🎢 Classic WF (4 нед: перегрузка → суперкомпенсация)',
+  velocity: '⚡ По скорости (адаптивный по тренду VBT)',
 };
 
 /**
@@ -250,6 +251,29 @@ export function buildPLTaperCurve(opts: TaperCurveOptions): TaperCurvePoint[] {
       label: t.week === weeks ? 'Финальная (прайминг)' : `Taper нед ${t.week}`,
       focus: t.rationale + weightNote,
     }));
+  }
+
+  if (mode === 'velocity') {
+    // Адаптивный тапер по тренду скорости: если скорость растёт — суперкомпенсация
+    // идёт, тапер короче; если падает — длиннее. Использует fatigue как прокси тренда.
+    const velocityTrend = opts.fatigue != null ? Math.max(-1, Math.min(1, (50 - opts.fatigue) / 50)) : 0;
+    const adjustedN = Math.max(1, Math.round(n + (velocityTrend > 0.2 ? -1 : velocityTrend < -0.2 ? 1 : 0)));
+    const velWeeks = Math.max(1, Math.min(4, adjustedN));
+    const fixedVel: Record<number, number[]> = { 1: [0.50], 2: [0.70, 0.50], 3: [0.80, 0.65, 0.50], 4: [0.85, 0.70, 0.55, 0.45] };
+    const vols = fixedVel[velWeeks] ?? [0.50];
+    return vols.map((volumePct, i) => {
+      const rirShift = i === velWeeks - 1 ? 2 : 1;
+      const label = i === velWeeks - 1 ? 'Финальная' : i === velWeeks - 2 ? 'Предпоследняя' : `Нед ${i + 1}`;
+      return {
+        week: i + 1,
+        volumePct: r2(volumePct * wGoalMult),
+        intensityPct: 1,
+        intensityMode: 'preserve' as const,
+        rirShift,
+        label: label + weightNote,
+        focus: velocityTrend > 0.2 ? 'Скорость растёт — суперкомпенсация идёт, тапер короче.' : velocityTrend < -0.2 ? 'Скорость падает — нужен более длинный тапер.' : 'Адаптивный тапер по тренду скорости.',
+      };
+    });
   }
 
   if (mode === 'wf') {
