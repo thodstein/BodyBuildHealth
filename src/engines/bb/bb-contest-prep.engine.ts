@@ -20,6 +20,13 @@
 
 import { getPeakingProtocol, type PeakingProtocol } from '../peaking-protocols.engine';
 import type { BBPlan } from './bb-builder.engine';
+import {
+  buildAdaptiveTaper,
+  buildTaperModifiers,
+  estimateTrainingExperience,
+  glycogenAdjustedDose,
+  type TrainingExperienceData,
+} from './bb-taper-adaptive.engine';
 // PRO-2 P6: тип записей восстановления + маркеры/памятка для экспорта (value-импорт
 // безопасен: bb-prep-post-show-log ни от кого не зависит, циклов нет).
 import { postShowRecoveryMarkers, postShowComedownNotes, type PostShowWeekEntry } from './bb-prep-post-show-log.engine';
@@ -115,6 +122,12 @@ export interface BBContestPrepConfig {
   carbLoadStrategy: CarbLoadStrategy;  // front/moderate/back/undulating/linear (8-12 г/кг total)
   waterStrategy: WaterStrategy;        // stable (рекомендовано)/tapered/high(classic, gated)
   sodiumStrategy: SodiumStrategy;      // stable (рекомендовано)/tapered (мягкий -30% за 48ч)
+
+  // ── Адаптивный тапер (P0-1: тренированность) ──
+  /** Данные о тренированности (из дневника тренировок / профиля). */
+  experience?: TrainingExperienceData;
+  /** Уровень гликогена 1-10 (1 = сильно истощён) — коррекция карб-дозы (Burke 2011). */
+  glycogenLevel?: number;
 
   // ── Безопасность и предпочтения ──
   contraindications?: string[];     // kidney/heart/hypertension → force minimal+constant
@@ -758,16 +771,21 @@ export function buildTrainingTaper(cfg: BBContestPrepConfig, opts?: { volumeMult
   const source = eff.trainingProtocol === 'bb'
     ? BB_TAPER_CURVE
     : getPeakingProtocol(eff.trainingProtocol).weeks;
-  const selected = source.slice(-eff.weeksOut);
+  const mods = buildTaperModifiers({ cfg: eff, experience: eff.experience });
+  const weeksOut = mods.taperLength ?? eff.weeksOut;
+  const selected = source.slice(-weeksOut);
   const n = selected.length;
   const vm = Number(opts?.volumeMult) && (opts?.volumeMult as number) > 0 ? Math.min(1, opts!.volumeMult as number) : 1;
+  const volM = (mods.volumeMult ?? 1) * vm;
+  const intM = mods.intensityMult ?? 1;
+  const rirS = mods.rirShift ?? 0;
   return selected.map((w, i) => ({
     weekOffset: -(n - i),
     label: w.label,
-    volumePct: w.volumePct * vm,
-    intensityPct: w.intensityPct,
-    rirMin: w.rirMin,
-    rirMax: w.rirMax,
+    volumePct: Math.round(w.volumePct * volM * 100) / 100,
+    intensityPct: Math.round(w.intensityPct * intM * 100) / 100,
+    rirMin: Math.max(0, w.rirMin + rirS),
+    rirMax: Math.max(0, w.rirMax + rirS),
     focus: w.focus,
     deloadBefore: w.deloadBefore,
   }));
@@ -1013,7 +1031,7 @@ const PEAK_FAMILY_RU: Record<PeakFamily, string> = {
   legs: 'ноги', back: 'спина', chest: 'верх', arms: 'руки',
 };
 
-export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?: number }): PeakWeekDayPlan[] {
+export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?: number; glycogenLevel?: number }): PeakWeekDayPlan[] {
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return [];
   const eff = applyContestPrepSafetyGate(cfg);
@@ -1034,6 +1052,9 @@ export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?
   // Бюджет total = среднее * вес * tolerance, кламп по категории
   const budgetMidPerKg = (budgetMin + budgetMax) / 2;
   const rawBudget = w * budgetMidPerKg * tolMult;
+  // P0-3: гликоген-коррекция дозы (Burke 2011): низкий гликоген → +15% бюджета
+  const glycAdj = glycogenAdjustedDose(1, opts?.glycogenLevel ?? eff.glycogenLevel);
+  const adjRawBudget = Math.round(rawBudget * glycAdj);
   // PRO-2 P2: явная доза из trial (trialCarbDoseGPerKg) приоритетнее среднего —
   // кламп по категории сохраняется (без trial путь байт-в-байт).
   const dosePerKg = opts?.carbDoseGPerKg != null && Number.isFinite(opts.carbDoseGPerKg)

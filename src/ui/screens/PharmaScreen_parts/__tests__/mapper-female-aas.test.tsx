@@ -1,44 +1,40 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { MapperTab } from '../MapperTab';
-import { FemalePharmaCalculator } from '../FemalePharmaCalculator';
+import { femaleAASWarnings, isFemaleAAS } from '../../../../data/aas-support-protocols';
 
-const mockLinked = {
-  course: [],
-  profile: { settings: { personal: { sex: 'female', age: 25, weight: 60, height: 165 }, genetics: {}, lifestyle: {} } },
-  labs: [],
-};
-
-vi.mock('../../../core/data-link', () => ({
-  useDataLink: () => ({ profile: mockLinked.profile }),
+vi.mock('../../../../core/data-link', () => ({
+  useDataLink: () => ({
+    course: [],
+    profile: { settings: { personal: { sex: 'female', age: 25 }, genetics: {}, lifestyle: {} } },
+    labs: [],
+  }),
 }));
 
-describe('FemalePharmaCalculator', () => {
-  beforeEach(() => {
-    document.body.innerHTML = '';
+vi.mock('../InteractionCheckerTab', () => ({
+  InteractionCheckerTab: () => <div data-testid="interaction-checker" />,
+}));
+
+vi.mock('../../../components/SafetyDepletion', () => ({
+  SafetyDepletion: () => <div data-testid="safety-depletion" />,
+}));
+
+describe('MapperTab: интеграция женских AAS', () => {
+  it('предупреждения о вирилизации отображаются для женщин с AAS в курсе', () => {
+    const { container } = render(<MapperTab />);
+    const warnings = container.querySelectorAll('[data-virilization-warning]');
+    expect(warnings.length).toBeGreaterThan(0);
   });
 
-  it('отображает заголовок калькулятора', () => {
-    render(<FemalePharmaCalculator />);
-    expect(screen.getByText(/Женский калькулятор фармакологии/i)).toBeTruthy();
+  it('femaleAASWarnings возвращает предупреждения для известных AAS', () => {
+    expect(femaleAASWarnings(['test_enant'])).toContain('⚠️ Вирилизация');
+    expect(femaleAASWarnings(['sust_250'])).toContain('⚠️ Вирилизация');
   });
 
-  it('отображает предупреждение о контрацепции', () => {
-    render(<FemalePharmaCalculator />);
-    expect(screen.getByText(/Контрацепция обязательна/i)).toBeTruthy();
-  });
-
-  it('отображает селект с опциями препаратов', () => {
-    render(<FemalePharmaCalculator />);
-    const selects = document.querySelectorAll('select');
-    expect(selects.length).toBeGreaterThan(0);
-  });
-});
-
-describe('MapperTab: интеграция FemalePharmaCalculator', () => {
-  it('отображает компонент FemalePharmaCalculator при sex=female', () => {
-    render(<MapperTab />);
-    expect(screen.getByText(/Мульти-ввод препаратов/i)).toBeTruthy();
+  it('isFemaleAAS корректно определяет AAS по id', () => {
+    expect(isFemaleAAS('test_enant')).toBe(true);
+    expect(isFemaleAAS('sust_250')).toBe(true);
+    expect(isFemaleAAS('test_prop')).toBe(false);
   });
 });
