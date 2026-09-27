@@ -308,9 +308,10 @@ export const StrengthSportConstructor: React.FC = () => {
       p.rationale.push('CRITICAL gate: объём ×0.85 RIR+1 (score≤49)');
     }
     // Sway carry из хаба: у билдера нет sway-входа — честно фиксируем в rationale,
-    // чтобы замер не терялся молча (Kinovea SRD 3/5см).
+    // чтобы замер не терялся молча (коридор 3/5см). Значение приходит из РУЧНОГО
+    // поля «Качание (Sway)» хаба (Kinovea-импорт убран 2026-09-27).
     if (swayCmBridge != null && swayCmBridge > 0) {
-      p.rationale.push(`Sway ${swayCmBridge}см из диагностики (Kinovea): коридор ±3см, при >5см — стоп carries и проверка техники`);
+      p.rationale.push(`Sway ${swayCmBridge}см из диагностики (ручной замер): коридор ±3см, при >5см — стоп carries и проверка техники`);
     }
     // J7 орто-скрининг: сводка в rationale (паттерн sway-блока — замер не теряется молча).
     if (orthoNote) {
