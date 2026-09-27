@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { AAS_PROTOCOLS, EVIDENCE_LEVELS } from '../../../data/aas-support-protocols';
 import { detectFemaleCyclePhase, femaleVirilizationWarnings, femaleBaseWarnings } from '../../../engines/female-support-layer';
-import { AAS_PROTOCOLS, EVIDENCE_LEVELS } from '../../../data/aas-support-protocols';
 
 interface FemalePharmaEntry {
   drugId: string;
@@ -58,14 +57,6 @@ export const FemalePharmaCalculator: React.FC<{ cycleDay?: number; labs?: Record
       {cyclePhase && (
         <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.14)', fontSize:10, color:'#fff', marginBottom:10 }}>
           🩸 <b>Фаза цикла:</b> {cyclePhase.phase} (неделя {cyclePhase.weekOfCycle}) — {cyclePhase.note}
-        </div>
-      )}
-
-      {femaleBaseWarnings().length > 0 && (
-        <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)', marginBottom:10 }}>
-          {femaleBaseWarnings().map((w, i) => (
-            <div key={i} style={{ fontSize:9, color:'#fbbf24', marginTop:i>0?4:0 }}>{w}</div>
-          ))}
         </div>
       )}
 

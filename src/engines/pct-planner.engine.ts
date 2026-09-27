@@ -1,6 +1,7 @@
 import { CourseEntry } from '../core/types';
 import { localIsoDate } from '../core/local-date';
 import { PHARMA_DB } from '../core/constants';
+import { planPctStart, type PctCompound } from './pct-timing.engine';
 
 export interface PCTProtocolItem {
   drug: string;
@@ -143,5 +144,35 @@ export function generatePCTPlan(
     pctProtocol,
     supportStack,
     warnings
+  };
+}
+
+/**
+ * Этап 4 — мост pct-timing ↔ pct-planner: точный старт ПКТ по последнему
+ * самому долгому эфиру (`planPctStart`, формула last + 3.5×t½ + накопление),
+ * поверх дозо-параметризованного протокола. Использует тот же источник эфиров/оралов.
+ */
+export function buildPCTPlanWithTiming(
+  course: CourseEntry[],
+  lastCourseWeek: number,
+  options: PCTOptions = {}
+): PCTSchedule & { startDayPrecise: number; longestSubstanceId: string } {
+  const compounds: PctCompound[] = course
+    .filter((c) => c.endWeek >= lastCourseWeek)
+    .map((c) => ({
+      substanceId: c.substanceId,
+      weeksOn: Math.max(0, (c.endWeek || 0) - (c.startWeek || 0)),
+    }));
+  const timing = planPctStart(compounds, 'combo');
+  const base = generatePCTPlan(course, lastCourseWeek, options);
+  const startWeeksPrecise = Math.ceil(timing.startDay / 7);
+  return {
+    ...base,
+    pctStartWeek: lastCourseWeek + Math.max(1, startWeeksPrecise),
+    startDayPrecise: timing.startDay,
+    longestSubstanceId: timing.longestId,
+    warnings: base.warnings.length
+      ? base.warnings
+      : [`ℹ️ Старт по клиренсу ${timing.longestId} (t½ ${timing.longestHalfLife} дн): ${timing.note}`],
   };
 }

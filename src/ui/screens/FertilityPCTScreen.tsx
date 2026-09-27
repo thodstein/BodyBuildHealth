@@ -4,7 +4,8 @@ import type { FertilityInput, FertilityResult, LabPoint, CourseEntry } from '../
 import { FERTILITY_TARGET, FERTILITY_TAU_WEEKS } from '../../core/constants';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
-import { generatePCTPlan } from '../../engines/pct-planner.engine';
+import { generatePCTPlan, buildPCTPlanWithTiming } from '../../engines/pct-planner.engine';
+import { STRUCTURED_PCT_PROTOCOLS, AAS_MEDICAL_DISCLAIMER } from '../../data/aas-support-protocols';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { UnifiedLabPanel } from '../components/UnifiedLabPanel';
 
@@ -102,6 +103,23 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
   useEffect(() => {
     db.init().then(() => db.getAll<CourseEntry>('course_log')).then(data => setPctCourse(data)).catch(() => {});
   }, []);
+
+  // ПКТ-план генерируется из курса (раньше setPctPlan не вызывался → вкладка была пустой).
+  useEffect(() => {
+    if (pctCourse.length === 0) { setPctPlan(null); return; }
+    const lastWeek = pctCourse.reduce((m, c) => Math.max(m, c.endWeek || 0), 0);
+    try {
+      setPctPlan(generatePCTPlan(pctCourse, lastWeek));
+    } catch {
+      setPctPlan(null);
+    }
+  }, [pctCourse]);
+
+  const pctTiming = useMemo(() => {
+    if (pctCourse.length === 0) return null;
+    const lastWeek = pctCourse.reduce((m, c) => Math.max(m, c.endWeek || 0), 0);
+    try { return buildPCTPlanWithTiming(pctCourse, lastWeek); } catch { return null; }
+  }, [pctCourse]);
 
   const [allLabs, setAllLabs] = useState<Record<string, string>>({});
   const [labEntries, setLabEntries] = useState<LabPoint[]>([]);
@@ -698,6 +716,37 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                 <p style={{ fontSize:11, color:'var(--text-dim)', lineHeight:1.5, margin:0 }}>
                   Послекурсовая терапия (ПКТ) направлена на восстановление гипоталамо-гипофизарно-тестикулярной оси (HPTA) после подавления экзогенными андрогенами. Мозг является главным регулятором фертильности — нейротоксичность ААС затрагивает глутаматную эксайтотоксичность, окислительный стресс, нейровоспаление, подавление нейрогенеза и нейростероидную недостаточность. Восстановление оси занимает 6-20+ недель в зависимости от стажа, соединений и возраста.
                 </p>
+              </div>
+
+              {pctTiming && (
+                <div style={s.card} data-pct-timing="1">
+                  <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#22c55e' }}>⏱️ Точный старт ПКТ по клиренсу</h4>
+                  <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.5 }}>
+                    Долгий препарат: <b>{pctTiming.longestSubstanceId}</b> (t½ {pctTiming.longestHalfLife} дн) · старт через <b>{pctTiming.startDayPrecise} дн</b> → <b>неделя {pctTiming.pctStartWeek}</b>.
+                    {' '}Формула last + 3.5×t½ + накопление. Подтверди анализом, схему — с врачом.
+                  </div>
+                </div>
+              )}
+
+              <div style={s.card} data-pct-structured="1">
+                <h4 style={{ margin:'0 0 6px', fontSize:12, color:'#22c55e' }}>💊 Структурированные протоколы ПКТ (по доказанности)</h4>
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  {STRUCTURED_PCT_PROTOCOLS.map((p) => (
+                    <div key={p.id} style={{ padding:'8px 10px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', gap:6, flexWrap:'wrap' }}>
+                        <span style={{ fontSize:10, fontWeight:600, color:'#22c55e' }}>{p.label}</span>
+                        <span style={{ fontSize:9, fontWeight:800, color:'#fff', background:'rgba(255,255,255,0.08)', padding:'1px 6px', borderRadius:8 }}>[{p.evidence}]</span>
+                      </div>
+                      <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:3, lineHeight:1.3 }}>
+                        {p.drugs.map((d) => `${d.substanceId} ${d.doseLabel} (${d.durationWeeks} нед)`).join(' · ')}
+                      </div>
+                      <div style={{ fontSize:9, color:'rgba(0,230,138,0.75)', marginTop:2, fontStyle:'italic' }}>{p.note}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', marginTop:8, lineHeight:1.4, padding:'8px 10px', borderRadius:8, background:'rgba(148,163,184,0.08)', border:'1px solid rgba(148,163,184,0.22)' }}>
+                  📋 {AAS_MEDICAL_DISCLAIMER}
+                </div>
               </div>
 
               <div style={s.card}>

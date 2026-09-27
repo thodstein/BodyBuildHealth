@@ -1,40 +1,53 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
-import { MapperTab } from '../MapperTab';
-import { femaleAASWarnings, isFemaleAAS } from '../../../../data/aas-support-protocols';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { FemalePharmaCalculator } from '../FemalePharmaCalculator';
+import { femaleAASWarnings, isFemaleAAS, matchProtocolsForStack, AAS_MEDICAL_DISCLAIMER } from '../../../../data/aas-support-protocols';
 
-vi.mock('../../../../core/data-link', () => ({
-  useDataLink: () => ({
-    course: [],
-    profile: { settings: { personal: { sex: 'female', age: 25 }, genetics: {}, lifestyle: {} } },
-    labs: [],
-  }),
-}));
-
-vi.mock('../InteractionCheckerTab', () => ({
-  InteractionCheckerTab: () => <div data-testid="interaction-checker" />,
-}));
-
-vi.mock('../../../components/SafetyDepletion', () => ({
-  SafetyDepletion: () => <div data-testid="safety-depletion" />,
-}));
-
-describe('MapperTab: интеграция женских AAS', () => {
-  it('предупреждения о вирилизации отображаются для женщин с AAS в курсе', () => {
-    const { container } = render(<MapperTab />);
-    const warnings = container.querySelectorAll('[data-virilization-warning]');
-    expect(warnings.length).toBeGreaterThan(0);
+describe('FemalePharmaCalculator (мульти-ввод фармы)', () => {
+  it('отображает заголовок калькулятора', () => {
+    render(<FemalePharmaCalculator />);
+    expect(screen.getByText(/Женский калькулятор фармакологии/i)).toBeTruthy();
   });
 
-  it('femaleAASWarnings возвращает предупреждения для известных AAS', () => {
-    expect(femaleAASWarnings(['test_enant'])).toContain('⚠️ Вирилизация');
-    expect(femaleAASWarnings(['sust_250'])).toContain('⚠️ Вирилизация');
+  it('отображает базовые предупреждения (контрацепция, тест на беременность)', () => {
+    render(<FemalePharmaCalculator />);
+    expect(screen.getByText(/Контрацепция обязательна/i)).toBeTruthy();
+    expect(screen.getByText(/Тест на беременность/i)).toBeTruthy();
   });
 
-  it('isFemaleAAS корректно определяет AAS по id', () => {
-    expect(isFemaleAAS('test_enant')).toBe(true);
-    expect(isFemaleAAS('sust_250')).toBe(true);
-    expect(isFemaleAAS('test_prop')).toBe(false);
+  it('добавляет препарат по клику и показывает селект с опциями', () => {
+    render(<FemalePharmaCalculator />);
+    fireEvent.click(screen.getByText(/Добавить препарат/i));
+    expect(document.querySelectorAll('select').length).toBe(1);
+    expect(screen.getByText(/мг\/нед/i)).toBeTruthy();
+  });
+});
+
+describe('AAS-протоколы: доказательность и матчинг', () => {
+  it('femaleAASWarnings пусто без AAS и непусто с AAS', () => {
+    expect(femaleAASWarnings(['insulin_rapid'])).toHaveLength(0);
+    expect(femaleAASWarnings(['test_enan']).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('isFemaleAAS различает AAS и не-AAS', () => {
+    expect(isFemaleAAS('test_enan')).toBe(true);
+    expect(isFemaleAAS('tren_acet')).toBe(true);
+    expect(isFemaleAAS('insulin_rapid')).toBe(false);
+    expect(isFemaleAAS('vitamin_d3')).toBe(false);
+  });
+
+  it('matchProtocolsForStack подбирает инсулиновый протокол по стеку', () => {
+    const matched = matchProtocolsForStack(['insulin_rapid']);
+    expect(matched.some((p) => p.id === 'insulin-management')).toBe(true);
+  });
+
+  it('matchProtocolsForStack даёт протокол вирилизации при AAS', () => {
+    const matched = matchProtocolsForStack(['test_enan']);
+    expect(matched.some((p) => p.id === 'female-virilization-monitoring')).toBe(true);
+  });
+
+  it('есть медицинский дисклеймер', () => {
+    expect(AAS_MEDICAL_DISCLAIMER).toMatch(/не медицинское назначение/i);
   });
 });

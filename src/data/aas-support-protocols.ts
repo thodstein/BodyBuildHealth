@@ -95,3 +95,61 @@ export const EVIDENCE_LEVELS: Record<string, { label: string; description: strin
   C: { label: 'C — Низкое', description: 'Серии случаев, экспертное мнение' },
   D: { label: 'D — Очень низкое', description: 'Теоретические рассуждения, данные на животных' },
 };
+
+/** Медицинский дисклеймер — обязателен на всех поверхностях протоколов. */
+export const AAS_MEDICAL_DISCLAIMER =
+  'Это справочная информация о снижении вреда, а не медицинское назначение. ' +
+  'Протоколы ПКТ, дозы и поддержка подбираются врачом по анализам. При симптомах — обратиться к специалисту. ' +
+  'Не использовать для самолечения.';
+
+const AAS_DRUG_IDS = new Set([
+  'test_enan', 'test_enant', 'test_prop', 'test_cyp', 'test_undec', 'sust_250', 'sustanon',
+  'tren_acet', 'tren_enan', 'tren_hex', 'nand_deca', 'nand_phenyl', 'npp', 'deca',
+  'oxan', 'oxandrolone', 'stan', 'stanozolol', 'methand', 'methandienone', 'dbol',
+  'anadrol', 'oxymetholone', 'prim_enan', 'prim_methen', 'masteron', 'drosta',
+  'drostanolone_prop', 'drostanolone_enan', 'trest_enan', 'trestolone', 'dhb',
+  'superdrol', 'methyltest', 'fluoxymesterone', 'turinabol', 'trena',
+]);
+
+/** Является ли препарат (по id/алиасу) анаболическим стероидом. */
+export function isFemaleAAS(drugId: string): boolean {
+  const id = String(drugId || '').toLowerCase();
+  if (AAS_DRUG_IDS.has(id)) return true;
+  return /^(test|tren|nand|sust|deca|oxan|stan|methand|dbol|anadrol|prim|masteron|drosta|trest|dhb)/.test(id);
+}
+
+/**
+ * Предупреждения о вирилизации для женского курса (Этап 7): показываются, когда
+ * в стеке есть хотя бы один AAS. Пусто, если AAS нет.
+ */
+export function femaleAASWarnings(activeDrugIds: string[]): string[] {
+  const hasAAS = (activeDrugIds || []).some(isFemaleAAS);
+  if (!hasAAS) return [];
+  return [
+    '⚠️ Вирилизация: при изменении голоса/росте волос на лице — отмена ААС, консультация эндокринолога.',
+    '⚠️ Контрацепция обязательна на курсе — риск тератогенности.',
+    '⚠️ Тест на беременность перед началом курса (ACOG).',
+  ];
+}
+
+/**
+ * Этап 5/7 — подбор протоколов поддержки под стек: протокол попадает в выдачу,
+ * если хотя бы одно его вещество совпадает с классом/наличием препарата в стеке,
+ * либо протокол безусловный (например, вирилизация для женщин).
+ */
+export function matchProtocolsForStack(drugIds: string[]): AASProtocol[] {
+  const ids = new Set((drugIds || []).map((d) => String(d || '').toLowerCase()));
+  const stackHasAAS = [...ids].some(isFemaleAAS);
+  const stackHas = (needle: string) => [...ids].some((id) => id.includes(needle));
+  return AAS_PROTOCOLS.filter((p) => {
+    if (p.id === 'female-virilization-monitoring') return stackHasAAS;
+    if (p.substances.length === 0) return stackHasAAS;
+    return p.substances.some((s) => {
+      const sid = s.id.toLowerCase();
+      if (ids.has(sid)) return true;
+      if (sid === 'hcg') return stackHas('hcg');
+      if (sid.startsWith('insulin')) return stackHas('insulin');
+      return false;
+    });
+  });
+}

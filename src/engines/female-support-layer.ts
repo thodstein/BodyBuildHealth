@@ -296,14 +296,19 @@ export function applyFemaleSupport(rec: SupportRecommendation, ctx: MapperCtx): 
   const categoryCount = new Map<string, number>();
   for (const s of baseSubs) categoryCount.set(s.category, (categoryCount.get(s.category) || 0) + 1);
 
+  // Уровень поддержки: канон — base|medium|max|manual. Неизвестный/legacy уровень
+  // (напр. 'intermediate') давал undefined-лимиты → слой молчал. Fallback = 'medium'.
+  const SUPPORT_LEVELS: ReadonlyArray<string> = ['base', 'medium', 'max', 'manual'];
+  const lvl = SUPPORT_LEVELS.includes(String(ctx.level)) ? (ctx.level as 'base' | 'medium' | 'max' | 'manual') : 'medium';
+
   for (const layer of FEMALE_ALL_LAYER_SUBS) {
     // Условные позиции (железо): без подтверждённого анализа — тихо пропускаем.
     // Гейт ВНУТРИ слоя: мужской путь сюда не доходит (sex-проверка выше).
     if (layer.labGate && !layer.labGate(ctx.labs)) continue;
     if (existing.has(canonId(layer.substanceId))) continue;
-    const totalLimit = TOTAL_LIMIT[ctx.level] ?? TOTAL_LIMIT['intermediate'] ?? 20;
+    const totalLimit = TOTAL_LIMIT[lvl] ?? 20;
     if (subs.length >= totalLimit) break;
-    const catLimit = (CATEGORY_LIMITS[ctx.level] ?? CATEGORY_LIMITS['intermediate'])?.[layer.category] ?? 0;
+    const catLimit = CATEGORY_LIMITS[lvl]?.[layer.category] ?? 0;
     if ((categoryCount.get(layer.category) || 0) >= catLimit) continue;
     subs.push({
       substanceId: layer.substanceId,

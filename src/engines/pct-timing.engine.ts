@@ -71,11 +71,60 @@ export function halfLifeOf(substanceId: string, ester?: string): { tHalf: number
   return { tHalf: c.tHalfDays, source: c.source };
 }
 
+export interface StructuredPctProtocol {
+  id: 'nolva' | 'combo' | 'scally';
+  label: string;
+  drugs: { substanceId: string; doseLabel: string; doseValue: number; unit: string; durationWeeks: number }[];
+  evidence: 'A' | 'B' | 'C';
+  note: string;
+}
+
+/**
+ * Структурированные протоколы ПКТ (Этап 4): из них можно программно извлечь
+ * дозы/длительности. `nolva`/`combo`/`scally` — порядок значимости по доказанности
+ * на людях (Scally-lite — B; combo — A по Rahnema 2014; nolva — A по клин. руководствам).
+ */
+export const STRUCTURED_PCT_PROTOCOLS: StructuredPctProtocol[] = [
+  {
+    id: 'nolva',
+    label: 'Nolvadex 20 мг/день 4–6 нед (стандарт лёгких курсов)',
+    drugs: [{ substanceId: 'tamoxifen', doseLabel: '20 мг/день', doseValue: 20, unit: 'мг', durationWeeks: 5 }],
+    evidence: 'A',
+    note: 'Моно-SERM для лёгких курсов; дозу снижают при побочных эффектах.',
+  },
+  {
+    id: 'combo',
+    label: 'Clomid 50 + Nolvadex 20 мг/день 4 нед, затем taper 2 нед (средние курсы)',
+    drugs: [
+      { substanceId: 'clomi', doseLabel: '50 мг/день', doseValue: 50, unit: 'мг', durationWeeks: 4 },
+      { substanceId: 'tamoxifen', doseLabel: '20 мг/день', doseValue: 20, unit: 'мг', durationWeeks: 4 },
+    ],
+    evidence: 'A',
+    note: 'Rahnema 2014 / клинические руководства: комбинация SERM для средних курсов.',
+  },
+  {
+    id: 'scally',
+    label: 'hCG-мост → Clomid 50 + Nolvadex 20 с taper 30 дн (тяжёлые/длинные, Scally-lite)',
+    drugs: [
+      { substanceId: 'hcg', doseLabel: '500–1500 МЕ 2–3×/нед, ≤4 нед', doseValue: 1000, unit: 'МЕ', durationWeeks: 4 },
+      { substanceId: 'clomi', doseLabel: '50 мг/день', doseValue: 50, unit: 'мг', durationWeeks: 4 },
+      { substanceId: 'tamoxifen', doseLabel: '20 мг/день', doseValue: 20, unit: 'мг', durationWeeks: 4 },
+    ],
+    evidence: 'B',
+    note: 'Тяжёлые/длинные курсы: hCG-подготовка (не более 4 нед) → SERM. Схему согласуй с врачом.',
+  },
+];
+
 const PROTOCOLS: Record<string, string> = {
   nolva: 'Nolvadex 20 мг/день 4–6 нед (стандарт лёгких курсов)',
   combo: 'Clomid 50 + Nolvadex 20 мг/день 4 нед, затем taper 2 нед (средние курсы)',
   scally: 'hCG-мост → Clomid 50 + Nolvadex 20 с taper 30 дн (тяжёлые/длинные, Scally-lite). Схему согласуй с врачом',
 };
+
+/** Структурированный протокол по id (для программного извлечения доз). */
+export function structuredPctProtocol(id: string): StructuredPctProtocol | null {
+  return STRUCTURED_PCT_PROTOCOLS.find((p) => p.id === id) ?? null;
+}
 
 export function planPctStart(compounds: PctCompound[], protocol: keyof typeof PROTOCOLS | string = 'nolva'): PctPlan {
   const list = (compounds || []).filter(Boolean);
