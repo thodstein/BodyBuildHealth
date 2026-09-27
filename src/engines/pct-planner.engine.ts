@@ -156,7 +156,7 @@ export function buildPCTPlanWithTiming(
   course: CourseEntry[],
   lastCourseWeek: number,
   options: PCTOptions = {}
-): PCTSchedule & { startDayPrecise: number; longestSubstanceId: string } {
+): PCTSchedule & { startDayPrecise: number; longestSubstanceId: string; longestHalfLife: number } {
   const compounds: PctCompound[] = course
     .filter((c) => c.endWeek >= lastCourseWeek)
     .map((c) => ({
@@ -171,6 +171,7 @@ export function buildPCTPlanWithTiming(
     pctStartWeek: lastCourseWeek + Math.max(1, startWeeksPrecise),
     startDayPrecise: timing.startDay,
     longestSubstanceId: timing.longestId,
+    longestHalfLife: timing.longestHalfLife,
     warnings: base.warnings.length
       ? base.warnings
       : [`ℹ️ Старт по клиренсу ${timing.longestId} (t½ ${timing.longestHalfLife} дн): ${timing.note}`],

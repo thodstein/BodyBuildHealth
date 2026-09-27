@@ -65,10 +65,10 @@ describe('female-support-layer: unit', () => {
     expect(out).not.toBe(rec);
     expect(rec.subs.length).toBe(0);
     const ids = out.subs.map((s: any) => s.substanceId);
-    for (const id of ['vitex', 'inositol', 'calcium', 'vitamin_d3', 'vitamin_k2', 'magnesium']) {
+    for (const id of ['vitex', 'inositol', 'folate', 'vitamin_b6', 'omega3', 'probiotics', 'calcium', 'vitamin_d3', 'vitamin_k2', 'magnesium']) {
       expect(ids, id).toContain(id);
     }
-    expect((out as any).femaleLayer.added).toEqual(['vitex', 'inositol', 'calcium', 'vitamin_d3', 'vitamin_k2', 'magnesium']);
+    expect((out as any).femaleLayer.added).toEqual(['vitex', 'inositol', 'folate', 'vitamin_b6', 'omega3', 'probiotics', 'calcium', 'vitamin_d3', 'vitamin_k2', 'magnesium']);
     expect((out as any).femaleLayer.labels?.join(' ')).toContain('Кальций');
     expect(out.rationale).toContain('♀ Женский слой');
     // без анализов железо НЕ добавляется (тихо)
@@ -98,7 +98,7 @@ describe('female-support-layer: unit', () => {
     }
     const out = applyFemaleSupport(rec, { sex: 'female', onCourse: true, level: 'base' } as any);
     expect(out.subs.length).toBeLessThanOrEqual(28);
-    expect((out as any).femaleLayer).toBeUndefined(); // нечего добавить, флагов нет → исходный объект
+    expect((out as any).femaleLayer.added).toEqual([]); // лимит исчерпан — явных добавок нет (слой всегда возвращает femaleLayer)
   });
   it('категорийный лимит: hormonal заполнен (base=1) → витекс пропущен, инозитол добавлен', () => {
     const rec = baseRec([{ substanceId: 'hcg', category: 'hormonal', k: 0.2, q: 'A', reason: 'x', mechsCovered: [] }]);
@@ -116,11 +116,11 @@ describe('female-support-layer: unit', () => {
     const out = applyFemaleSupport(rec, { sex: 'female', onCourse: true, level: 'medium' } as any);
     expect(out.subs.map((s: any) => s.substanceId)).not.toContain('vitex');
   });
-  it('состав слоя: усиление 2 + BONE 4 + лаб-гейтед 1', () => {
-    expect(FEMALE_LAYER_SUBS.map((s) => s.substanceId)).toEqual(['vitex', 'inositol']);
+  it('состав слоя: усиление 6 + BONE 4 + лаб-гейтед 1', () => {
+    expect(FEMALE_LAYER_SUBS.map((s) => s.substanceId)).toEqual(['vitex', 'inositol', 'folate', 'vitamin_b6', 'omega3', 'probiotics']);
     expect(FEMALE_BONE_SUBS.map((s) => s.substanceId)).toEqual(['calcium', 'vitamin_d3', 'vitamin_k2', 'magnesium']);
     expect(FEMALE_LAB_GATED_SUBS.map((s) => s.substanceId)).toEqual(['iron_bisglycinate']);
-    expect(FEMALE_ALL_LAYER_SUBS.length).toBe(7);
+    expect(FEMALE_ALL_LAYER_SUBS.length).toBe(11);
     // лаб-гейт есть только у условных позиций
     expect(FEMALE_LAB_GATED_SUBS.every((s) => typeof s.labGate === 'function')).toBe(true);
     expect(FEMALE_LAYER_SUBS.every((s) => !s.labGate)).toBe(true);

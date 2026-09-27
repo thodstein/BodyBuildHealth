@@ -102,7 +102,7 @@ export const FEMALE_LAYER_SUBS: FemaleLayerSub[] = [
   {
     substanceId: 'omega3',
     nameRu: 'Омега-3 (EPA+DHA)',
-    category: 'fatty_acid',
+    category: 'cardioprotector',
     k: 0.12,
     q: 'A',
     reason: '♀ Воспаление, липидный профиль, настроение; 1-2 г EPA+DHA/сут (ISSN 2017)',
@@ -112,7 +112,7 @@ export const FEMALE_LAYER_SUBS: FemaleLayerSub[] = [
   {
     substanceId: 'probiotics',
     nameRu: 'Пробиотики (Lactobacillus/Bifidobacterium)',
-    category: 'gut',
+    category: 'antiinflam',
     k: 0.04,
     q: 'B',
     reason: '♀ Микрофлора, иммунитет, синтез витаминов; 10-50 млрд КОЕ/сут',

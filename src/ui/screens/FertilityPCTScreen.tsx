@@ -5,7 +5,8 @@ import { FERTILITY_TARGET, FERTILITY_TAU_WEEKS } from '../../core/constants';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 import { generatePCTPlan, buildPCTPlanWithTiming } from '../../engines/pct-planner.engine';
-import { STRUCTURED_PCT_PROTOCOLS, AAS_MEDICAL_DISCLAIMER } from '../../data/aas-support-protocols';
+import { STRUCTURED_PCT_PROTOCOLS } from '../../engines/pct-timing.engine';
+import { AAS_MEDICAL_DISCLAIMER } from '../../data/aas-support-protocols';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { UnifiedLabPanel } from '../components/UnifiedLabPanel';
 
