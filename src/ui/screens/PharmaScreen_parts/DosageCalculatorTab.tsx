@@ -10,8 +10,20 @@ import { DRUG_THRESHOLDS } from '../../../core/constants';
 import {
   CLASS_LABELS, INJECTABLE_WITH_ESTERS, PHARMA_CLASSES, formatHalfLife, type PharmaClass,
 } from './constants';
+import { AAS_PROTOCOLS, EVIDENCE_LEVELS } from '../../../data/aas-support-protocols';
 
-const DRUG_OPTIONS = Object.keys(DRUG_THRESHOLDS);
+const AAS_DRUG_IDS = [
+  'test_enan', 'test_prop', 'test_cyp', 'tren_acet', 'tren_enan',
+  'nand_deca', 'nand_phenyl', 'oxan', 'stan', 'methand', 'anadrol', 'dbol', 'prim_enan', 'prim_methen', 'masteron', 'drosta',
+  'hcg', 'insulin_rapid', 'insulin_long', 'igf1_lr3', 'mgf', 'gh',
+  'clomi', 'tamoxifen', 'anastro', 'letro', 'exemest', 'caberg', 'bromocript',
+  'vitamin_d3', 'omega3', 'nac', 'tudca', 'silymarin', 'coq10', 'magnesium', 'zinc', 'bergamot',
+] as const;
+
+const DRUG_OPTIONS = [
+  ...Object.keys(DRUG_THRESHOLDS),
+  ...AAS_DRUG_IDS.filter(id => PHARMA_DB[id]?.name),
+];
 
 const AndrogenicIndexCalculator: React.FC = () => {
   const [entries, setEntries] = useState<{ drug: string; doseMgWeek: number }[]>([
@@ -484,6 +496,42 @@ export const DosageCalculatorTab: React.FC = () => {
         )}
       </>}
       {dosageSub === 'androgen' && <AndrogenicIndexCalculator />}
+      {dosageSub === 'androgen' && (
+        <div style={{ marginTop:16 }}>
+          <div style={{ fontSize:13, fontWeight:800, color:'#fff', marginBottom:8 }}>📋 AAS-протоколы по уровню доказательности</div>
+          {(['A','B','C','D'] as const).map(level => {
+            const protocols = AAS_PROTOCOLS.filter(p => p.evidenceLevel === level);
+            if (protocols.length === 0) return null;
+            return (
+              <div key={level} style={{ marginBottom:12 }}>
+                <div style={{ fontSize:11, fontWeight:700, color: level==='A' ? '#22c55e' : level==='B' ? '#60a5fa' : level==='C' ? '#f59e0b' : '#f87171', marginBottom:4 }}>
+                  {EVIDENCE_LEVELS[level]?.label} — {EVIDENCE_LEVELS[level]?.description}
+                </div>
+                {protocols.map(p => (
+                  <div key={p.id} style={{ background:'rgba(0,0,0,0.22)', borderRadius:10, padding:'10px 11px', marginBottom:6, border:'1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{p.title}</div>
+                    <div style={{ fontSize:10, color:'#fff', marginTop:4, lineHeight:1.45 }}>{p.evidenceNote}</div>
+                    {p.substances.length > 0 && (
+                      <div style={{ marginTop:6, display:'flex', flexWrap:'wrap', gap:4 }}>
+                        {p.substances.map(s => (
+                          <span key={s.id} style={{ fontSize:9, padding:'3px 8px', borderRadius:20, background:'rgba(139,92,246,0.10)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.18)' }}>{s.name}: {s.dose} ({s.timing})</span>
+                        ))}
+                      </div>
+                    )}
+                    {p.monitoring.length > 0 && (
+                      <div style={{ fontSize:9, color:'#fff', marginTop:6 }}>🔬 {p.monitoring.join(' · ')}</div>
+                    )}
+                    {p.warnings.length > 0 && (
+                      <div style={{ fontSize:9, color:'#fbbf24', marginTop:4 }}>⚠️ {p.warnings.join(' · ')}</div>
+                    )}
+                    <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:4 }}>Источник: {p.source}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
