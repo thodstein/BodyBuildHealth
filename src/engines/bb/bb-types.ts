@@ -10,6 +10,11 @@
 import type { DayCharacter } from './bb-day-types';
 import type { SplitPattern } from './bb-split-patterns';
 import type { VolumeLandmarkRow } from '../volume-landmarks.engine';
+import type { BBVolumeTarget } from './bb-volume.engine';
+import type { BBRotationReport } from './bb-rotation.engine';
+import type { BBSessionCost } from './bb-fatigue.engine';
+import type { BBPlanReport } from './bb-report.engine';
+import type { BBPlanValidationResult } from './bb-validator.engine';
 
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
@@ -92,13 +97,13 @@ export interface BBPlan {
   level?: string;
   volumeLandmarks?: VolumeLandmarkRow[];
   muscleFrequency?: Record<string, number>;
-  volumeTargets?: Record<string, any>;
-  rotationReport?: any;
-  fatigueReport?: Array<{ week: number; sessions: Array<any> }>;
+  volumeTargets?: Record<string, BBVolumeTarget>;
+  rotationReport?: BBRotationReport;
+  fatigueReport?: Array<{ week: number; sessions: Array<BBSessionCost> }>;
   weeklyVolume?: Record<number, Record<string, { directSets: number; effectiveSets: number; fatigueWeightedSets: number }>>;
-  report?: any;
+  report?: BBPlanReport;
   balanceReport?: import('./bb-balance.engine').BBBalanceReport;
-  validation?: any;
+  validation?: BBPlanValidationResult;
   safetyConstraints?: {
     equipment?: string[];
     excludedExercises?: string[];
